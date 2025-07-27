@@ -1,0 +1,602 @@
+/**
+ * StudyQuest Memory Manager
+ * GAS最適化済み - メモリ管理、イベントリスナークリーンアップ、リソース管理
+ */
+
+/**
+ * メモリ管理マネージャー
+ */
+class MemoryManager {
+  constructor(coreState) {
+    this.coreState = coreState;
+    
+    // メモリ監視設定
+    this.memorySettings = {
+      checkInterval: 30000, // 30秒ごとにチェック
+      warningThreshold: 0.8, // 80%で警告
+      criticalThreshold: 0.9, // 90%で強制クリーンアップ
+      maxHeapSize: STUDY_QUEST_CONSTANTS.GAS_MAX_MEMORY_MB * 1024 * 1024
+    };
+    
+    // リソース追跡
+    this.trackedResources = {
+      eventListeners: new Map(),
+      domElements: new WeakMap(),
+      timers: new Set(),
+      intervals: new Set(),
+      observers: new Set(),
+      caches: new Set()
+    };
+    
+    // クリーンアップ戦略
+    this.cleanupStrategies = new Map();
+    this.setupCleanupStrategies();
+    
+    // パフォーマンス監視
+    this.memoryMetrics = {
+      initialHeapSize: 0,
+      currentHeapSize: 0,
+      peakHeapSize: 0,
+      cleanupCount: 0,
+      lastCleanupTime: 0
+    };
+    
+    this.startMemoryMonitoring();
+    this.setupPageUnloadCleanup();
+  }
+
+  /**
+   * メモリ監視の開始
+   */
+  startMemoryMonitoring() {
+    if (performance.memory) {
+      this.memoryMetrics.initialHeapSize = performance.memory.usedJSHeapSize;
+      
+      const monitoringInterval = setInterval(() => {
+        this.performMemoryCheck();
+      }, this.memorySettings.checkInterval);
+      
+      this.trackInterval(monitoringInterval);
+      
+      console.log('🧠 Memory monitoring started');
+    } else {
+      console.warn('⚠️ Performance.memory not available, memory monitoring disabled');
+    }
+  }
+
+  /**
+   * メモリチェックの実行
+   */
+  performMemoryCheck() {
+    if (!performance.memory) return;
+    
+    const currentHeap = performance.memory.usedJSHeapSize;
+    const totalHeap = performance.memory.totalJSHeapSize;
+    const heapLimit = performance.memory.jsHeapSizeLimit;
+    
+    this.memoryMetrics.currentHeapSize = currentHeap;
+    this.memoryMetrics.peakHeapSize = Math.max(this.memoryMetrics.peakHeapSize, currentHeap);
+    
+    const heapUsageRatio = currentHeap / heapLimit;
+    
+    console.log(`🧠 Memory check: ${Math.round(currentHeap / 1024 / 1024)}MB / ${Math.round(heapLimit / 1024 / 1024)}MB (${(heapUsageRatio * 100).toFixed(1)}%)`);
+    
+    // 警告レベルのチェック
+    if (heapUsageRatio > this.memorySettings.criticalThreshold) {
+      console.warn('🚨 Critical memory usage detected, forcing cleanup');
+      this.forceCleanup();
+    } else if (heapUsageRatio > this.memorySettings.warningThreshold) {
+      console.warn('⚠️ High memory usage detected, performing optimization');
+      this.performOptimization();
+    }
+    
+    // Core状態に報告
+    this.coreState.updatePerformanceMetrics({
+      memoryMetrics: {
+        currentMB: Math.round(currentHeap / 1024 / 1024),
+        peakMB: Math.round(this.memoryMetrics.peakHeapSize / 1024 / 1024),
+        usageRatio: heapUsageRatio,
+        cleanupCount: this.memoryMetrics.cleanupCount
+      }
+    });
+  }
+
+  /**
+   * イベントリスナーの追跡
+   */
+  trackEventListener(element, eventType, handler, options = {}) {
+    const listenerId = this.generateListenerId(element, eventType);
+    
+    this.trackedResources.eventListeners.set(listenerId, {
+      element,
+      eventType,
+      handler,
+      options,
+      addedAt: Date.now()
+    });
+    
+    element.addEventListener(eventType, handler, options);
+    
+    console.log(`📝 Event listener tracked: ${listenerId}`);
+    
+    return listenerId;
+  }
+
+  /**
+   * イベントリスナーの削除
+   */
+  removeEventListener(listenerId) {
+    const listener = this.trackedResources.eventListeners.get(listenerId);
+    
+    if (listener) {
+      listener.element.removeEventListener(listener.eventType, listener.handler, listener.options);
+      this.trackedResources.eventListeners.delete(listenerId);
+      
+      console.log(`🗑️ Event listener removed: ${listenerId}`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * 全イベントリスナーのクリーンアップ
+   */
+  cleanupEventListeners() {
+    let removedCount = 0;
+    
+    for (const [listenerId, listener] of this.trackedResources.eventListeners.entries()) {
+      try {
+        listener.element.removeEventListener(listener.eventType, listener.handler, listener.options);
+        removedCount++;
+      } catch (error) {
+        console.warn(`⚠️ Failed to remove event listener ${listenerId}:`, error);
+      }
+    }
+    
+    this.trackedResources.eventListeners.clear();
+    
+    console.log(`🧹 Cleaned up ${removedCount} event listeners`);
+    return removedCount;
+  }
+
+  /**
+   * タイマーの追跡
+   */
+  trackTimeout(timeoutId) {
+    this.trackedResources.timers.add(timeoutId);
+    return timeoutId;
+  }
+
+  trackInterval(intervalId) {
+    this.trackedResources.intervals.add(intervalId);
+    return intervalId;
+  }
+
+  /**
+   * タイマーのクリーンアップ
+   */
+  cleanupTimers() {
+    let clearedCount = 0;
+    
+    // Timeouts
+    for (const timeoutId of this.trackedResources.timers) {
+      clearTimeout(timeoutId);
+      clearedCount++;
+    }
+    this.trackedResources.timers.clear();
+    
+    // Intervals
+    for (const intervalId of this.trackedResources.intervals) {
+      clearInterval(intervalId);
+      clearedCount++;
+    }
+    this.trackedResources.intervals.clear();
+    
+    console.log(`🧹 Cleaned up ${clearedCount} timers`);
+    return clearedCount;
+  }
+
+  /**
+   * オブザーバーの追跡
+   */
+  trackObserver(observer, name = 'unknown') {
+    this.trackedResources.observers.add({ observer, name });
+    return observer;
+  }
+
+  /**
+   * オブザーバーのクリーンアップ
+   */
+  cleanupObservers() {
+    let disconnectedCount = 0;
+    
+    for (const { observer, name } of this.trackedResources.observers) {
+      try {
+        if (typeof observer.disconnect === 'function') {
+          observer.disconnect();
+          disconnectedCount++;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to disconnect observer ${name}:`, error);
+      }
+    }
+    
+    this.trackedResources.observers.clear();
+    
+    console.log(`🧹 Cleaned up ${disconnectedCount} observers`);
+    return disconnectedCount;
+  }
+
+  /**
+   * キャッシュの追跡
+   */
+  trackCache(cache, name = 'unknown') {
+    this.trackedResources.caches.add({ cache, name });
+    return cache;
+  }
+
+  /**
+   * キャッシュのクリーンアップ
+   */
+  cleanupCaches() {
+    let clearedCount = 0;
+    
+    for (const { cache, name } of this.trackedResources.caches) {
+      try {
+        if (typeof cache.clear === 'function') {
+          cache.clear();
+          clearedCount++;
+        } else if (cache instanceof Map) {
+          cache.clear();
+          clearedCount++;
+        } else if (cache instanceof Set) {
+          cache.clear();
+          clearedCount++;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to clear cache ${name}:`, error);
+      }
+    }
+    
+    console.log(`🧹 Cleaned up ${clearedCount} caches`);
+    return clearedCount;
+  }
+
+  /**
+   * DOM要素の弱参照追跡
+   */
+  trackDOMElement(element, metadata = {}) {
+    this.trackedResources.domElements.set(element, {
+      ...metadata,
+      trackedAt: Date.now()
+    });
+  }
+
+  /**
+   * 強制クリーンアップ
+   */
+  forceCleanup() {
+    console.log('🚨 Performing force cleanup...');
+    
+    const startTime = Date.now();
+    const cleanupResults = {};
+    
+    // 各種リソースのクリーンアップ
+    cleanupResults.eventListeners = this.cleanupEventListeners();
+    cleanupResults.timers = this.cleanupTimers();
+    cleanupResults.observers = this.cleanupObservers();
+    cleanupResults.caches = this.cleanupCaches();
+    
+    // ガベージコレクションの強制実行（可能な場合）
+    if (window.gc) {
+      window.gc();
+      cleanupResults.forcedGC = true;
+    }
+    
+    // 統計更新
+    this.memoryMetrics.cleanupCount++;
+    this.memoryMetrics.lastCleanupTime = Date.now();
+    
+    const duration = Date.now() - startTime;
+    
+    console.log(`✅ Force cleanup completed in ${duration}ms:`, cleanupResults);
+    
+    return cleanupResults;
+  }
+
+  /**
+   * 最適化処理
+   */
+  performOptimization() {
+    console.log('⚡ Performing memory optimization...');
+    
+    // 段階的なクリーンアップ
+    const strategies = [
+      'cleanupExpiredCaches',
+      'cleanupOrphanedListeners',
+      'compactDataStructures',
+      'clearTemporaryReferences'
+    ];
+    
+    for (const strategy of strategies) {
+      if (this.cleanupStrategies.has(strategy)) {
+        try {
+          this.cleanupStrategies.get(strategy)();
+        } catch (error) {
+          console.warn(`⚠️ Optimization strategy ${strategy} failed:`, error);
+        }
+      }
+    }
+    
+    console.log('✅ Memory optimization completed');
+  }
+
+  /**
+   * クリーンアップ戦略の設定
+   */
+  setupCleanupStrategies() {
+    // 期限切れキャッシュのクリーンアップ
+    this.cleanupStrategies.set('cleanupExpiredCaches', () => {
+      for (const { cache, name } of this.trackedResources.caches) {
+        if (typeof cache.cleanup === 'function') {
+          cache.cleanup();
+        }
+      }
+    });
+    
+    // 孤立したイベントリスナーのクリーンアップ
+    this.cleanupStrategies.set('cleanupOrphanedListeners', () => {
+      const toRemove = [];
+      
+      for (const [listenerId, listener] of this.trackedResources.eventListeners.entries()) {
+        // DOM要素が存在しない場合は削除
+        if (!document.contains(listener.element)) {
+          toRemove.push(listenerId);
+        }
+      }
+      
+      toRemove.forEach(id => this.removeEventListener(id));
+    });
+    
+    // データ構造の最適化
+    this.cleanupStrategies.set('compactDataStructures', () => {
+      // 配列の最適化（未使用領域の削減）
+      if (this.coreState.state.currentAnswers && Array.isArray(this.coreState.state.currentAnswers)) {
+        // 配列の圧縮（実際の実装では状況に応じて）
+        const compacted = this.coreState.state.currentAnswers.slice();
+        this.coreState.updateState({ currentAnswers: compacted });
+      }
+    });
+    
+    // 一時的な参照のクリア
+    this.cleanupStrategies.set('clearTemporaryReferences', () => {
+      // 一時的なDOM参照をクリア
+      const tempElements = document.querySelectorAll('[data-temp]');
+      tempElements.forEach(el => el.remove());
+    });
+  }
+
+  /**
+   * ページアンロード時のクリーンアップ設定
+   */
+  setupPageUnloadCleanup() {
+    const cleanup = () => {
+      console.log('🔄 Page unload cleanup initiated');
+      this.forceCleanup();
+    };
+    
+    // 複数のイベントに対応
+    const unloadEvents = ['beforeunload', 'unload', 'pagehide'];
+    unloadEvents.forEach(eventType => {
+      this.trackEventListener(window, eventType, cleanup, { passive: true });
+    });
+    
+    // Visibility API を使用した非表示時のクリーンアップ
+    this.trackEventListener(document, 'visibilitychange', () => {
+      if (document.hidden) {
+        this.performOptimization();
+      }
+    }, { passive: true });
+  }
+
+  /**
+   * ユーティリティメソッド
+   */
+  generateListenerId(element, eventType) {
+    const elementId = element.id || element.tagName || 'unknown';
+    const timestamp = Date.now();
+    return `${elementId}-${eventType}-${timestamp}`;
+  }
+
+  /**
+   * メモリ使用量の取得
+   */
+  getMemoryUsage() {
+    if (!performance.memory) {
+      return { available: false };
+    }
+    
+    return {
+      available: true,
+      used: performance.memory.usedJSHeapSize,
+      total: performance.memory.totalJSHeapSize,
+      limit: performance.memory.jsHeapSizeLimit,
+      usedMB: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+      totalMB: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+      limitMB: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024),
+      usageRatio: performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit
+    };
+  }
+
+  /**
+   * リソース統計の取得
+   */
+  getResourceStats() {
+    return {
+      eventListeners: this.trackedResources.eventListeners.size,
+      timers: this.trackedResources.timers.size,
+      intervals: this.trackedResources.intervals.size,
+      observers: this.trackedResources.observers.size,
+      caches: this.trackedResources.caches.size,
+      memoryMetrics: this.memoryMetrics
+    };
+  }
+
+  /**
+   * デバッグ情報の取得
+   */
+  getDebugInfo() {
+    return {
+      memory: this.getMemoryUsage(),
+      resources: this.getResourceStats(),
+      cleanupStrategies: Array.from(this.cleanupStrategies.keys()),
+      trackedListeners: Array.from(this.trackedResources.eventListeners.keys()),
+      lastCleanup: new Date(this.memoryMetrics.lastCleanupTime).toISOString()
+    };
+  }
+
+  /**
+   * 完全なリソースクリーンアップ
+   */
+  destroy() {
+    console.log('🧹 Memory manager destroying...');
+    
+    const finalCleanup = this.forceCleanup();
+    
+    // 自身の監視タイマーもクリア
+    this.cleanupTimers();
+    
+    // 全ての追跡をクリア
+    this.trackedResources.eventListeners.clear();
+    this.trackedResources.timers.clear();
+    this.trackedResources.intervals.clear();
+    this.trackedResources.observers.clear();
+    this.trackedResources.caches.clear();
+    
+    console.log('✅ Memory manager destroyed, final cleanup:', finalCleanup);
+    
+    return finalCleanup;
+  }
+}
+
+/**
+ * 自動メモリ管理システム
+ */
+class AutoMemoryManager extends MemoryManager {
+  constructor(coreState) {
+    super(coreState);
+    
+    // 自動管理設定
+    this.autoSettings = {
+      enabled: true,
+      aggressiveMode: false,
+      adaptiveThresholds: true,
+      backgroundOptimization: true
+    };
+    
+    this.setupAutoManagement();
+  }
+
+  /**
+   * 自動管理の設定
+   */
+  setupAutoManagement() {
+    if (!this.autoSettings.enabled) return;
+    
+    // アイドル時間での最適化
+    if ('requestIdleCallback' in window && this.autoSettings.backgroundOptimization) {
+      const idleOptimization = (deadline) => {
+        if (deadline.timeRemaining() > 10) { // 10ms以上の余裕がある場合
+          this.performOptimization();
+        }
+        
+        // 次のアイドル時間をスケジュール
+        if (this.autoSettings.enabled) {
+          requestIdleCallback(idleOptimization, { timeout: 60000 }); // 最大60秒待機
+        }
+      };
+      
+      requestIdleCallback(idleOptimization);
+    }
+    
+    // 適応的しきい値の調整
+    if (this.autoSettings.adaptiveThresholds) {
+      this.setupAdaptiveThresholds();
+    }
+  }
+
+  /**
+   * 適応的しきい値の設定
+   */
+  setupAdaptiveThresholds() {
+    const adjustThresholds = () => {
+      const memoryUsage = this.getMemoryUsage();
+      
+      if (memoryUsage.available && memoryUsage.usageRatio > 0.7) {
+        // 高メモリ使用時はより積極的に
+        this.memorySettings.warningThreshold = 0.7;
+        this.memorySettings.criticalThreshold = 0.8;
+        this.autoSettings.aggressiveMode = true;
+      } else {
+        // 通常時は標準設定
+        this.memorySettings.warningThreshold = 0.8;
+        this.memorySettings.criticalThreshold = 0.9;
+        this.autoSettings.aggressiveMode = false;
+      }
+    };
+    
+    // 定期的な調整
+    const adjustmentInterval = setInterval(adjustThresholds, 60000); // 1分ごと
+    this.trackInterval(adjustmentInterval);
+  }
+
+  /**
+   * アグレッシブモードでのクリーンアップ
+   */
+  performOptimization() {
+    if (this.autoSettings.aggressiveMode) {
+      // より積極的なクリーンアップ
+      super.performOptimization();
+      
+      // 追加の最適化処理
+      this.performAggressiveOptimization();
+    } else {
+      super.performOptimization();
+    }
+  }
+
+  /**
+   * アグレッシブ最適化
+   */
+  performAggressiveOptimization() {
+    console.log('⚡ Performing aggressive optimization...');
+    
+    // より頻繁なキャッシュクリーンアップ
+    for (const { cache } of this.trackedResources.caches) {
+      if (typeof cache.cleanup === 'function') {
+        cache.cleanup();
+      }
+    }
+    
+    // DOM要素の積極的な解放
+    const unusedElements = document.querySelectorAll('[data-unused], .hidden, [style*="display: none"]');
+    let removedCount = 0;
+    
+    unusedElements.forEach(el => {
+      if (el.dataset.keepAlive !== 'true') {
+        el.remove();
+        removedCount++;
+      }
+    });
+    
+    if (removedCount > 0) {
+      console.log(`🗑️ Aggressively removed ${removedCount} unused DOM elements`);
+    }
+  }
+}
+
+// グローバルエクスポート
+window.MemoryManager = MemoryManager;
+window.AutoMemoryManager = AutoMemoryManager;
+

@@ -713,6 +713,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     var finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (configJson.displayMode || DISPLAY_MODES.ANONYMOUS);
 
     var result = {
+      status: 'success', // フロントエンド期待値: 必須statusフィールドを追加
       header: headerTitle,
       sheetName: publishedSheetName,
       showCounts: (adminMode === true) ? true : (configJson.showCounts === true),
@@ -803,6 +804,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     if (lastRow < startRowToRead) {
       debugLog('🔍 増分データ分析: 新しいデータなし。lastRow=%s, startRowToRead=%s', lastRow, startRowToRead);
       return {
+        status: 'success', // フロントエンド期待値: 必須statusフィールドを追加
         header: '', // 必要に応じて設定
         sheetName: publishedSheetName,
         showCounts: configJson.showCounts === true,
@@ -859,6 +861,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     debugLog('✅ 増分データ取得完了: %s件の新しいデータを返します', formattedNewData.length);
 
     return {
+      status: 'success', // フロントエンド期待値: 必須statusフィールドを追加
       header: '', // 必要に応じて設定
       sheetName: publishedSheetName,
       showCounts: false, // 必要に応じて設定

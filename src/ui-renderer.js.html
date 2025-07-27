@@ -1,0 +1,668 @@
+<script>
+/**
+ * StudyQuest UI Renderer
+ * GAS最適化済み - DOM操作、レンダリング、UI状態管理
+ */
+
+// パフォーマンス関連定数
+const UI_CONSTANTS = {
+  BASE_RENDER_BATCH_SIZE: 10,
+  LOW_PERF_BATCH_SIZE: 5,
+  HIGH_PERF_BATCH_SIZE: 15,
+  VIEWPORT_BUFFER: 200,
+  PERFORMANCE_BUDGET: 16,
+  CHUNK_SIZE: 5,
+  IDLE_TIMEOUT: 5000,
+  
+  // GAS環境向け最適化
+  GAS_RENDER_BATCH_SIZE: 8, // GAS環境では控えめに
+  DOM_BATCH_THRESHOLD: 20,
+  VIRTUAL_SCROLL_THRESHOLD: 50
+};
+
+// アイコン定義
+const ICONS = {
+  'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+  'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+  'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+  'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
+  'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+  'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
+  'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+};
+
+/**
+ * 動的バッチサイズ計算
+ */
+function getDynamicBatchSize(performanceMetrics = {}) {
+  const memory = navigator.deviceMemory || 4;
+  const cores = navigator.hardwareConcurrency || 4;
+  const frameTime = performanceMetrics.frameTime || 16;
+  
+  if (memory >= 8 && cores >= 8 && frameTime < 12) {
+    return UI_CONSTANTS.HIGH_PERF_BATCH_SIZE;
+  }
+  
+  if (memory <= 2 || cores <= 2 || frameTime > 20) {
+    return UI_CONSTANTS.LOW_PERF_BATCH_SIZE;
+  }
+  
+  return UI_CONSTANTS.BASE_RENDER_BATCH_SIZE;
+}
+
+/**
+ * UI レンダリングマネージャー
+ */
+class UIRenderer {
+  constructor(coreState) {
+    this.coreState = coreState;
+    this.renderBatchSize = getDynamicBatchSize();
+    this.isLowPerformanceMode = this.detectLowPerformanceMode();
+    
+    // DOM要素キャッシュ
+    this.elements = this.initializeElements();
+    
+    // レンダリング状態
+    this.renderingState = {
+      isRendering: false,
+      pendingUpdates: new Set(),
+      lastRenderTime: 0,
+      frameId: null
+    };
+    
+    // 仮想スクロール状態
+    this.virtualScrollState = {
+      renderedItems: 0,
+      totalItems: 0,
+      isLoading: false,
+      renderedRowIndexes: new Set(),
+      cardRegistry: new Map()
+    };
+    
+    // パフォーマンス監視
+    this.performanceMonitor = {
+      renderTimes: [],
+      avgRenderTime: 0,
+      slowRenderCount: 0
+    };
+    
+    this.setupObservers();
+  }
+
+  /**
+   * DOM要素の初期化
+   */
+  initializeElements() {
+    const elements = {
+      body: document.body,
+      mainContainer: document.getElementById('main-container'),
+      answersContainer: document.getElementById('answers'),
+      sizeSlider: document.getElementById('sizeSlider'),
+      sliderValue: document.getElementById('sliderValue'),
+      headingLabel: document.getElementById('headingLabel'),
+      sheetNameText: document.getElementById('sheetNameText'),
+      endPublicationBtn: document.getElementById('endPublicationBtn'),
+      adminToggleBtn: document.getElementById('adminToggleBtn'),
+      answerCount: document.getElementById('answerCount'),
+      classFilter: document.getElementById('classFilter'),
+      sortOrder: document.getElementById('sortOrder'),
+      scoreOption: document.getElementById('scoreOption'),
+      footer: document.getElementById('controlsFooter'),
+      loadingOverlay: document.getElementById('loading-overlay')
+    };
+
+    // 必須要素の存在チェック
+    const missingElements = Object.entries(elements)
+      .filter(([key, element]) => !element)
+      .map(([key]) => key);
+
+    if (missingElements.length > 0) {
+      console.warn('⚠️ Missing DOM elements:', missingElements);
+    }
+
+    return elements;
+  }
+
+  /**
+   * 低性能モードの検出
+   */
+  detectLowPerformanceMode() {
+    const memory = navigator.deviceMemory || 4;
+    const cores = navigator.hardwareConcurrency || 4;
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    return memory <= 2 || cores <= 2 || isMobile;
+  }
+
+  /**
+   * オブザーバーの設定
+   */
+  setupObservers() {
+    // Intersection Observer for visibility tracking
+    if ('IntersectionObserver' in window) {
+      this.visibilityObserver = new IntersectionObserver(
+        this.handleVisibilityChange.bind(this),
+        { threshold: 0.1 }
+      );
+    }
+
+    // Resize Observer for layout adjustments
+    if ('ResizeObserver' in window) {
+      this.resizeObserver = new ResizeObserver(
+        this.debounce(this.handleResize.bind(this), 100)
+      );
+      
+      if (this.elements.mainContainer) {
+        this.resizeObserver.observe(this.elements.mainContainer);
+      }
+    }
+  }
+
+  /**
+   * メインレンダリングメソッド
+   */
+  async renderBoard(data, options = {}) {
+    const {
+      isLayoutChange = false,
+      isInitialLoad = false,
+      forceRefresh = false
+    } = options;
+
+    if (this.renderingState.isRendering && !forceRefresh) {
+      this.renderingState.pendingUpdates.add(() => this.renderBoard(data, options));
+      return;
+    }
+
+    this.renderingState.isRendering = true;
+    const startTime = performance.now();
+
+    try {
+      // GAS実行時間チェック
+      this.coreState.checkGASExecutionTime();
+
+      console.log('🎨 Starting board render:', {
+        itemCount: data.length,
+        isInitialLoad,
+        isLayoutChange,
+        batchSize: this.renderBatchSize
+      });
+
+      await this.executeRender(data, { isLayoutChange, isInitialLoad });
+
+      const renderTime = performance.now() - startTime;
+      this.updatePerformanceMetrics(renderTime);
+
+      console.log(`✅ Board render completed in ${renderTime.toFixed(2)}ms`);
+
+    } catch (error) {
+      console.error('❌ Render error:', error);
+      this.coreState.setError(error, 'UI Rendering');
+      this.showErrorMessage('表示の更新中にエラーが発生しました');
+    } finally {
+      this.renderingState.isRendering = false;
+      this.processPendingUpdates();
+    }
+  }
+
+  /**
+   * 実際のレンダリング実行
+   */
+  async executeRender(data, options) {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+
+    // データの前処理
+    const processedData = await this.preprocessRenderData(data);
+    
+    // レンダリング方式の決定
+    const useVirtualScrolling = processedData.length > UI_CONSTANTS.VIRTUAL_SCROLL_THRESHOLD;
+    
+    if (useVirtualScrolling && !this.isLowPerformanceMode) {
+      await this.renderWithVirtualScrolling(processedData, options);
+    } else {
+      await this.renderDirectly(processedData, options);
+    }
+
+    // 後処理
+    this.updateAnswerCount(processedData.length);
+    this.applyAnimations();
+  }
+
+  /**
+   * 直接レンダリング
+   */
+  async renderDirectly(data, options) {
+    const container = this.elements.answersContainer;
+    const fragment = document.createDocumentFragment();
+    
+    // バッチ処理でカード作成
+    for (let i = 0; i < data.length; i += this.renderBatchSize) {
+      const batch = data.slice(i, i + this.renderBatchSize);
+      
+      for (const item of batch) {
+        const card = this.createAnswerCard(item);
+        fragment.appendChild(card);
+      }
+      
+      // GAS制約を考慮した中断チェック
+      if (i % (this.renderBatchSize * 3) === 0) {
+        await this.yieldToMain();
+        this.coreState.checkGASExecutionTime();
+      }
+    }
+    
+    // DOM更新を一括実行
+    this.batchDOMUpdate(() => {
+      container.innerHTML = '';
+      container.appendChild(fragment);
+    });
+  }
+
+  /**
+   * 仮想スクロールレンダリング
+   */
+  async renderWithVirtualScrolling(data, options) {
+    const container = this.elements.answersContainer;
+    const visibleRange = this.calculateVisibleRange(data.length);
+    
+    this.virtualScrollState.totalItems = data.length;
+    
+    // 表示範囲のアイテムのみレンダリング
+    const visibleItems = data.slice(visibleRange.start, visibleRange.end);
+    const fragment = document.createDocumentFragment();
+    
+    for (let i = 0; i < visibleItems.length; i++) {
+      const item = visibleItems[i];
+      const card = this.createAnswerCard(item);
+      fragment.appendChild(card);
+      
+      // パフォーマンス制御
+      if (i % UI_CONSTANTS.CHUNK_SIZE === 0) {
+        await this.yieldToMain();
+      }
+    }
+    
+    this.batchDOMUpdate(() => {
+      container.innerHTML = '';
+      container.appendChild(fragment);
+    });
+    
+    this.virtualScrollState.renderedItems = visibleItems.length;
+  }
+
+  /**
+   * 回答カードの作成
+   */
+  createAnswerCard(data) {
+    const card = document.createElement('div');
+    card.className = this.getCardClasses(data);
+    card.dataset.rowIndex = data.rowIndex;
+    
+    card.innerHTML = this.generateCardHTML(data);
+    
+    // イベント委譲のためのデータ設定
+    this.setupCardInteractions(card, data);
+    
+    // リアクションスタイルの適用
+    this.applyReactionStyles(card, data);
+    
+    return card;
+  }
+
+  /**
+   * カードのHTMLテンプレート生成
+   */
+  generateCardHTML(data) {
+    const escapedAnswer = this.escapeHtml(data.answer || '');
+    const escapedStudentName = this.escapeHtml(data.studentName || '');
+    const escapedClass = this.escapeHtml(data.class || '');
+    
+    return `
+      <div class="answer-text mb-2 text-gray-800 leading-relaxed break-words whitespace-pre-wrap">
+        ${escapedAnswer}
+      </div>
+      <div class="answer-meta flex items-center justify-between text-xs text-gray-500 mt-2">
+        <div class="student-info flex items-center">
+          <span class="student-name font-medium">${escapedStudentName}</span>
+          ${escapedClass ? `<span class="class-name ml-2 px-2 py-1 bg-gray-100 rounded-full">${escapedClass}</span>` : ''}
+        </div>
+        <div class="card-actions flex items-center space-x-1">
+          ${this.generateReactionButtons(data)}
+          ${this.generateHighlightButton(data)}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * リアクションボタンの生成
+   */
+  generateReactionButtons(data) {
+    const reactionTypes = [
+      { key: 'LIKE', icon: 'hand-thumb-up-outline', solidIcon: 'hand-thumb-up-solid', label: 'いいね' },
+      { key: 'UNDERSTAND', icon: 'lightbulb-outline', solidIcon: 'lightbulb-solid', label: '理解' },
+      { key: 'CURIOUS', icon: 'magnifying-glass-plus-outline', solidIcon: 'magnifying-glass-plus-solid', label: '興味' }
+    ];
+
+    return reactionTypes.map(reaction => {
+      const count = data.reactions?.[reaction.key]?.count || 0;
+      const isActive = count > 0;
+      const iconKey = isActive ? reaction.solidIcon : reaction.icon;
+      
+      return `
+        <button 
+          class="reaction-btn flex items-center space-x-1 px-2 py-1 rounded-md transition-colors duration-200 hover:bg-gray-100 ${isActive ? 'text-blue-600' : 'text-gray-500'}"
+          data-reaction="${reaction.key}"
+          data-row-index="${data.rowIndex}"
+          title="${reaction.label}"
+        >
+          <span class="w-4 h-4">${this.getIcon(iconKey, 'w-4 h-4')}</span>
+          ${count > 0 ? `<span class="text-xs font-medium">${count}</span>` : ''}
+        </button>
+      `;
+    }).join('');
+  }
+
+  /**
+   * ハイライトボタンの生成
+   */
+  generateHighlightButton(data) {
+    const isHighlighted = data.highlight;
+    
+    return `
+      <button 
+        class="highlight-btn flex items-center space-x-1 px-2 py-1 rounded-md transition-colors duration-200 hover:bg-gray-100 ${isHighlighted ? 'text-yellow-600' : 'text-gray-500'}"
+        data-row-index="${data.rowIndex}"
+        title="ハイライト"
+      >
+        <span class="w-4 h-4">${this.getIcon(isHighlighted ? 'star-solid' : 'star-outline', 'w-4 h-4')}</span>
+      </button>
+    `;
+  }
+
+  /**
+   * カードクラスの取得
+   */
+  getCardClasses(data) {
+    const baseClasses = [
+      'answer-card',
+      'bg-white',
+      'rounded-lg',
+      'shadow-sm',
+      'border',
+      'border-gray-200',
+      'p-4',
+      'mb-3',
+      'hover:shadow-md',
+      'transition-shadow',
+      'duration-200',
+      'cursor-pointer'
+    ];
+
+    // 条件付きクラス
+    if (data.highlight) {
+      baseClasses.push('highlighted', 'border-yellow-300', 'bg-yellow-50');
+    }
+
+    return baseClasses.join(' ');
+  }
+
+  /**
+   * リアクションスタイルの適用
+   */
+  applyReactionStyles(element, data) {
+    if (!element || !data || !(element instanceof HTMLElement)) return;
+    
+    // 既存のリアクション関連クラスをクリア
+    const reactionClasses = [
+      'reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious',
+      'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious',
+      'reaction-bg-like-understand-curious', 'reaction-border-1', 'reaction-border-2', 'reaction-border-3',
+      'highlighted'
+    ];
+    reactionClasses.forEach(cls => element.classList.remove(cls));
+    
+    // ハイライト状態を適用（リアクション装飾より優先）
+    if (data.highlight) {
+      element.classList.add('highlighted');
+      return;
+    }
+    
+    // アクティブなリアクションを特定
+    const reactionTypes = ['LIKE', 'UNDERSTAND', 'CURIOUS'];
+    const active = reactionTypes.filter(rt => 
+      data.reactions && data.reactions[rt] && data.reactions[rt].count > 0
+    );
+    
+    // 背景色クラスを適用
+    if (active.length === 1) {
+      const reactionMap = {
+        'LIKE': 'reaction-bg-like',
+        'UNDERSTAND': 'reaction-bg-understand',
+        'CURIOUS': 'reaction-bg-curious'
+      };
+      element.classList.add(reactionMap[active[0]]);
+    } else if (active.length === 2) {
+      const sorted = active.sort();
+      const key = sorted.join('-').toLowerCase();
+      element.classList.add(`reaction-bg-${key}`);
+    } else if (active.length === 3) {
+      element.classList.add('reaction-bg-like-understand-curious');
+    }
+    
+    // 境界線の強調
+    if (active.length > 0) {
+      element.classList.add(`reaction-border-${active.length}`);
+    }
+  }
+
+  /**
+   * ユーティリティメソッド
+   */
+  escapeHtml(text) {
+    if (typeof text !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  getIcon(iconName, classes = '') {
+    const icon = ICONS[iconName] || '';
+    if (!icon) return '';
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = icon;
+    const svgElement = tempDiv.querySelector('svg');
+    
+    if (svgElement && classes) {
+      svgElement.className = classes;
+    }
+    
+    return tempDiv.innerHTML;
+  }
+
+  batchDOMUpdate(updateFn) {
+    if (this.renderingState.frameId) {
+      cancelAnimationFrame(this.renderingState.frameId);
+    }
+    
+    this.renderingState.frameId = requestAnimationFrame(() => {
+      updateFn();
+      this.renderingState.frameId = null;
+    });
+  }
+
+  async yieldToMain() {
+    return new Promise(resolve => {
+      if (this.isLowPerformanceMode) {
+        setTimeout(resolve, 0);
+      } else {
+        requestIdleCallback ? requestIdleCallback(resolve) : setTimeout(resolve, 0);
+      }
+    });
+  }
+
+  debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  /**
+   * イベントハンドラー
+   */
+  handleVisibilityChange(entries) {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        // 要素が表示された時の処理
+        const element = entry.target;
+        if (element.classList.contains('answer-card')) {
+          this.loadCardContent(element);
+        }
+      }
+    });
+  }
+
+  handleResize() {
+    this.adjustLayout();
+  }
+
+  /**
+   * レイアウト調整
+   */
+  adjustLayout() {
+    const container = this.elements.answersContainer;
+    if (!container) return;
+    
+    const containerWidth = container.offsetWidth;
+    const optimalColumns = Math.floor(containerWidth / 300); // 300px per column
+    
+    container.style.columnCount = Math.max(1, optimalColumns);
+  }
+
+  /**
+   * パフォーマンス関連
+   */
+  updatePerformanceMetrics(renderTime) {
+    this.performanceMonitor.renderTimes.push(renderTime);
+    
+    // 最新10回の平均を計算
+    if (this.performanceMonitor.renderTimes.length > 10) {
+      this.performanceMonitor.renderTimes.shift();
+    }
+    
+    this.performanceMonitor.avgRenderTime = 
+      this.performanceMonitor.renderTimes.reduce((a, b) => a + b, 0) / 
+      this.performanceMonitor.renderTimes.length;
+    
+    if (renderTime > UI_CONSTANTS.PERFORMANCE_BUDGET * 3) {
+      this.performanceMonitor.slowRenderCount++;
+      console.warn(`⚠️ Slow render detected: ${renderTime.toFixed(2)}ms`);
+    }
+    
+    // Core状態にパフォーマンス情報を送信
+    this.coreState.updatePerformanceMetrics({
+      avgRenderTime: this.performanceMonitor.avgRenderTime,
+      slowRenderCount: this.performanceMonitor.slowRenderCount
+    });
+  }
+
+  calculateVisibleRange(totalItems) {
+    const containerHeight = this.elements.answersContainer?.offsetHeight || window.innerHeight;
+    const itemHeight = 120; // 推定カード高さ
+    const visibleItems = Math.ceil(containerHeight / itemHeight);
+    const buffer = Math.ceil(visibleItems * 0.5); // 50%のバッファ
+    
+    return {
+      start: 0,
+      end: Math.min(totalItems, visibleItems + buffer)
+    };
+  }
+
+  async preprocessRenderData(data) {
+    // データの前処理、ソート、フィルタリングなど
+    return Array.isArray(data) ? data : [];
+  }
+
+  setupCardInteractions(card, data) {
+    // カードに必要なデータ属性を設定
+    card.setAttribute('data-student-name', data.studentName || '');
+    card.setAttribute('data-class', data.class || '');
+  }
+
+  updateAnswerCount(count) {
+    if (this.elements.answerCount) {
+      this.elements.answerCount.textContent = count;
+    }
+  }
+
+  applyAnimations() {
+    // 低性能モードでは無効化
+    if (this.isLowPerformanceMode) return;
+    
+    const cards = this.elements.answersContainer?.querySelectorAll('.answer-card') || [];
+    cards.forEach((card, index) => {
+      card.style.animationDelay = `${index * 50}ms`;
+      card.classList.add('fade-in');
+    });
+  }
+
+  showErrorMessage(message) {
+    console.error('UI Error:', message);
+    // エラー表示の実装
+  }
+
+  loadCardContent(element) {
+    // 遅延読み込み処理
+  }
+
+  processPendingUpdates() {
+    if (this.renderingState.pendingUpdates.size > 0) {
+      const updates = Array.from(this.renderingState.pendingUpdates);
+      this.renderingState.pendingUpdates.clear();
+      
+      // 最新の更新のみ実行
+      const latestUpdate = updates[updates.length - 1];
+      latestUpdate();
+    }
+  }
+
+  /**
+   * リソースのクリーンアップ
+   */
+  destroy() {
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+    }
+    
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    
+    if (this.renderingState.frameId) {
+      cancelAnimationFrame(this.renderingState.frameId);
+    }
+    
+    this.renderingState.pendingUpdates.clear();
+    
+    console.log('🧹 UI Renderer destroyed');
+  }
+}
+
+// グローバルエクスポート
+window.UIRenderer = UIRenderer;
+window.UI_CONSTANTS = UI_CONSTANTS;
+window.ICONS = ICONS;
+window.getDynamicBatchSize = getDynamicBatchSize;
+
+</script>
