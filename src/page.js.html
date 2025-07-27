@@ -616,15 +616,22 @@ class StudyQuestApp {
         
         // Apply default low performance tweaks
         this.optimizeForLowPerformance();
-        
-        // Immediate async loading for data with proper await
-        await this.loadDataImmediate();
-        
-        // Clear timeout on successful completion
-        if (this.initTimeoutId) {
-          clearTimeout(this.initTimeoutId);
-          this.initTimeoutId = null;
-        }
+
+        // Show info modal while loading sheet data in the background
+        this.showInfoModal();
+
+        // Kick off data loading without blocking UI
+        this.loadDataImmediate()
+          .catch(error => {
+            console.error('❌ StudyQuestApp: Critical error in loadDataImmediate:', error);
+            this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
+          })
+          .finally(() => {
+            if (this.initTimeoutId) {
+              clearTimeout(this.initTimeoutId);
+              this.initTimeoutId = null;
+            }
+          });
         
       } catch (error) {
         console.error('❌ StudyQuestApp: Critical error in init():', error);
@@ -2147,10 +2154,6 @@ class StudyQuestApp {
           console.warn('⚠️ StudyQuestApp: Available sheets loading failed:', error.message);
         }
       }
-      
-      // Show info modal during loading (after data is loaded but before completion)
-      console.log('📋 StudyQuestApp: Showing info modal during initialization...');
-      this.showInfoModal();
       
       console.log('🎯 StudyQuestApp: Immediate loading initialization completed');
       
