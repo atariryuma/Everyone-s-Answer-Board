@@ -49,14 +49,14 @@ function escapeJavaScript(str) {
     .replace(/\t/g, '\\t');
 }
 
-// グローバル定数の定義
-var SCRIPT_PROPS_KEYS = {
+// グローバル定数の定義（書き換え不可）
+const SCRIPT_PROPS_KEYS = {
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
   ADMIN_EMAIL: 'ADMIN_EMAIL'
 };
 
-var DB_SHEET_CONFIG = {
+const DB_SHEET_CONFIG = {
   SHEET_NAME: 'Users',
   HEADERS: [
     'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
@@ -64,12 +64,12 @@ var DB_SHEET_CONFIG = {
   ]
 };
 
-var LOG_SHEET_CONFIG = {
+const LOG_SHEET_CONFIG = {
   SHEET_NAME: 'Logs',
   HEADERS: ['timestamp', 'userId', 'action', 'details']
 };
 
-var COLUMN_HEADERS = {
+const COLUMN_HEADERS = {
   TIMESTAMP: 'タイムスタンプ',
   EMAIL: 'メールアドレス',
   CLASS: 'クラス',
@@ -83,22 +83,22 @@ var COLUMN_HEADERS = {
 };
 
 // 表示モード定数
-var DISPLAY_MODES = {
+const DISPLAY_MODES = {
   ANONYMOUS: 'anonymous',
   NAMED: 'named'
 };
 
 // リアクション関連定数
-var REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
 // スコア計算設定
-var SCORING_CONFIG = {
+const SCORING_CONFIG = {
   LIKE_MULTIPLIER_FACTOR: 0.1,
   RANDOM_SCORE_FACTOR: 0.01
 };
 
-var EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
-var DEBUG = PropertiesService.getScriptProperties()
+const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
+const DEBUG = PropertiesService.getScriptProperties()
   .getProperty('DEBUG_MODE') === 'true';
 
 /**

@@ -1702,7 +1702,7 @@ class StudyQuestApp {
       // 3. Start loading immediately without waiting
       console.log('📊 StudyQuestApp: Starting sheet data loading...');
       try {
-        await this.loadSheetData({ showLoading: false, isInitialLoad: true });
+        await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: true });
         console.log('✅ StudyQuestApp: Sheet data loaded, restoring differential cards...');
         
         // 差分カードの復元
@@ -2508,6 +2508,10 @@ class StudyQuestApp {
       requestedSheetName: options.requestedSheetName || null,
       ...options
     };
+
+    if (config.isInitialLoad) {
+      config.bypassCache = true;
+    }
     
     // Prevent concurrent loading
     if (this.state.isLoading && config.showLoading) {
@@ -2713,6 +2717,7 @@ class StudyQuestApp {
             
             // 🔥 CRITICAL FIX: Set currentAnswers with received data
             this.state.currentAnswers = result.data || [];
+            this.updateLastSeenCount(this.state.currentAnswers.length);
             console.log('✅ StudyQuestApp: Set currentAnswers with', this.state.currentAnswers.length, 'items');
             
             // サーバーからの質問文と現在表示の一致性をチェック
@@ -2743,9 +2748,10 @@ class StudyQuestApp {
               lastUpdated: Date.now()
             };
             console.log('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
+
+            this.lastDataLoadTime = Date.now();
             
             if (isInitialLoad) {
-              this.state.lastSeenCount = result.data.length;
               // 初期データロード完了フラグを設定
               this.initialDataLoaded = true;
               const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
@@ -4696,15 +4702,14 @@ class StudyQuestApp {
     
     try {
       // 1. データ取得同期チェック
-      const currentTime = Date.now();
       const lastDataLoad = this.lastDataLoadTime || 0;
-      const timeSinceLastLoad = currentTime - lastDataLoad;
-      
-      if (timeSinceLastLoad > 300000) { // 5分以上
+      const minutesSinceLastLoad = (Date.now() - lastDataLoad) / (1000 * 60);
+
+      if (minutesSinceLastLoad > 5) {
         issues.push({
           type: 'data_staleness',
           severity: 'warning',
-          message: `最後のデータ取得から${Math.round(timeSinceLastLoad/60000)}分経過`,
+          message: `最後のデータ取得から${Math.round(minutesSinceLastLoad)}分経過`,
           recommendation: 'データ更新を実行'
         });
       }
