@@ -1021,17 +1021,49 @@ class SharedModals {
       return;
     }
 
-    // 公開時間と停止時間の設定
+    // 公開時間と停止時間の設定（動的取得版）
     if (publishResult && publishResult.publishedAt) {
       const publishTime = new Date(publishResult.publishedAt);
-      const minutes = publishResult.autoStopMinutes || 360;
+      const minutes = publishResult.autoStopMinutes || 360; // 6時間 = 360分（デフォルト）
       const stopTime = new Date(publishTime.getTime() + (minutes * 60 * 1000));
+      
+      console.log('🕒 自動停止時間設定:', {
+        publishedAt: publishResult.publishedAt,
+        autoStopMinutes: minutes,
+        source: publishResult.autoStopMinutes ? 'server' : 'default',
+        publishTime: publishTime.toLocaleString('ja-JP'),
+        stopTime: stopTime.toLocaleString('ja-JP')
+      });
       
       document.getElementById('publish-start-time').textContent = publishTime.toLocaleString('ja-JP');
       document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
       
       // 残り時間のカウントダウンを開始
       this.startCountdown(stopTime);
+    } else {
+      // publishResultが不完全な場合のフォールバック処理
+      console.warn('⚠️ 公開結果データが不完全です:', publishResult);
+      
+      const now = new Date();
+      const minutes = 360; // デフォルト6時間
+      const stopTime = new Date(now.getTime() + (minutes * 60 * 1000));
+      
+      document.getElementById('publish-start-time').textContent = now.toLocaleString('ja-JP');
+      document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
+      
+      // 警告表示
+      const remainingTimeEl = document.getElementById('remaining-time');
+      if (remainingTimeEl) {
+        remainingTimeEl.textContent = '⚠️ 時間設定を確認してください';
+        remainingTimeEl.className = 'font-medium text-yellow-100';
+      }
+      
+      console.log('🕒 フォールバック自動停止時間設定:', {
+        publishTime: now.toLocaleString('ja-JP'),
+        autoStopMinutes: minutes,
+        stopTime: stopTime.toLocaleString('ja-JP'),
+        fallbackReason: '公開結果データ不足'
+      });
     }
 
     modal.classList.remove('hidden');
@@ -1207,8 +1239,17 @@ class SharedModals {
     const autoStopDisplay = document.getElementById('auto-stop-time-display');
     if (autoStopDisplay) {
       if (autoStopSettings && autoStopSettings.enabled) {
-        const minutes = autoStopSettings.minutes || 30;
-        autoStopDisplay.textContent = `${minutes}分後に自動停止`;
+        const minutes = autoStopSettings.minutes || 360; // 6時間 = 360分（config.gsと統一）
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        
+        if (hours > 0 && remainingMinutes > 0) {
+          autoStopDisplay.textContent = `${hours}時間${remainingMinutes}分後に自動停止`;
+        } else if (hours > 0) {
+          autoStopDisplay.textContent = `${hours}時間後に自動停止`;
+        } else {
+          autoStopDisplay.textContent = `${minutes}分後に自動停止`;
+        }
         autoStopDisplay.className = 'text-blue-100';
       } else {
         autoStopDisplay.textContent = '自動停止は無効';

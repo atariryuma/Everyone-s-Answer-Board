@@ -259,14 +259,12 @@
     return hasContent && hasAuthor;
   }
   
-  // Handle save and publish
+  // Handle save and publish - 修正版（公開モーダル経由）
   function handleSaveAndPublish() {
     const btn = document.getElementById('save-publish-btn');
     if (!btn || btn.disabled) return;
     
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner mr-2"></div>保存中...';
-    
+    // 設定の準備
     const config = {
       sheetId: selectedSheetId,
       formId: selectedFormId,
@@ -278,6 +276,39 @@
       }
     };
     
+    // 自動停止設定を準備
+    const autoStopSettings = {
+      enabled: true,
+      minutes: 360 // 6時間 = 360分（config.gsと統一）
+    };
+    
+    // 公開モーダルを表示
+    if (window.sharedModals && typeof window.sharedModals.showPublish === 'function') {
+      window.sharedModals.showPublish(
+        // 公開実行時のコールバック
+        () => {
+          console.log('📤 公開モーダルで公開が選択されました');
+          executePublishProcess(btn, config);
+        },
+        // キャンセル時のコールバック
+        () => {
+          console.log('❌ 公開がキャンセルされました');
+        },
+        // 自動停止設定
+        autoStopSettings
+      );
+    } else {
+      // フォールバック: モーダルが利用できない場合は直接実行
+      console.warn('⚠️ 公開モーダルが利用できません。直接実行します。');
+      executePublishProcess(btn, config);
+    }
+  }
+  
+  // 実際の公開処理実行
+  function executePublishProcess(btn, config) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>保存・公開中...';
+    
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('saveAndPublishBoard', config)
         .then(result => {
@@ -288,6 +319,15 @@
             }
             loadSystemStatus();
             navigateToStep(3);
+            
+            // 自動停止確認モーダルを表示（公開成功後）
+            setTimeout(() => {
+              if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
+                window.sharedModals.showAutoStopConfirmation(result);
+                console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
+              }
+            }, 1000);
+            
           } else {
             showMessage(result.message || '保存に失敗しました', 'error');
           }
