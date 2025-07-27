@@ -1428,9 +1428,9 @@ function executeQuickStart(quickstartBtn, quickstartText) {
   });
   
   if (isCurrentlyPublished) {
-    // 公開中の場合: 停止確認モーダルを表示
-    console.log('📢 現在公開中のため、停止確認モーダルを表示します');
-    showQuickStartStopConfirmation(quickstartBtn, quickstartText);
+    // 公開中の場合: シンプルな新規作成モーダルを表示（停止確認をスキップ）
+    console.log('📢 公開中のため、シンプルな新規作成モーダルを表示します');
+    showSimpleQuickStartModal(quickstartBtn, quickstartText);
   } else {
     // 非公開の場合: 直接クイックスタート実行（自動公開フラグ付き）
     console.log('📝 現在非公開のため、直接クイックスタートを実行します（自動公開）');
@@ -1462,6 +1462,110 @@ function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
     }
+  }
+}
+
+// 公開中ボード用のシンプルなクイックスタートモーダル表示
+function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
+  console.log('📱 シンプルクイックスタートモーダルを表示します');
+  
+  // sharedModalsが利用可能な場合は専用のモーダルを使用
+  if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
+    const modalTitle = '新しいフォームを作成しますか？';
+    const modalContent = `
+      <div class="text-gray-700 mb-4">
+        <p class="mb-3">現在公開中の回答ボードを一時停止して、新しいフォームとボードを作成します。</p>
+        
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h4 class="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            📋 実行内容
+          </h4>
+          <ul class="text-sm text-blue-700 space-y-1">
+            <li>• 既存の回答データは保持されます</li>
+            <li>• 新しいフォームとスプレッドシートを作成</li>
+            <li>• 高精度AI列判定を実行</li>
+            <li>• 作成完了後に自動で再公開</li>
+          </ul>
+        </div>
+      </div>
+    `;
+    
+    window.sharedModals.showConfirmation(
+      modalTitle,
+      modalContent,
+      function() {
+        // 停止して新規作成ボタンクリック時の処理
+        console.log('✅ ユーザーが「停止して新規作成」を選択しました');
+        
+        // 公開停止処理とクイックスタートを統合実行
+        executeStopAndQuickStart(quickstartBtn, quickstartText);
+      },
+      function() {
+        // キャンセル時の処理
+        console.log('❌ シンプルクイックスタートがキャンセルされました');
+        resetQuickStartButton(quickstartBtn, quickstartText);
+      },
+      '停止して新規作成', // 確認ボタンのテキスト
+      'キャンセル'      // キャンセルボタンのテキスト
+    );
+  } else {
+    // フォールバック: 標準confirm
+    const confirmMessage = '現在公開中の回答ボードを停止して、新しいフォームとボードを作成しますか？\n\n• 既存の回答データは保持されます\n• 新しいフォームとスプレッドシートを作成\n• 高精度AI列判定を実行\n• 作成完了後に自動で再公開';
+    
+    if (confirm(confirmMessage)) {
+      executeStopAndQuickStart(quickstartBtn, quickstartText);
+    } else {
+      resetQuickStartButton(quickstartBtn, quickstartText);
+    }
+  }
+}
+
+// 公開停止とクイックスタートの統合処理
+function executeStopAndQuickStart(quickstartBtn, quickstartText) {
+  console.log('🛑📋 公開停止→クイックスタートの統合処理を開始します');
+  
+  // ボタン状態を更新
+  quickstartBtn.disabled = true;
+  quickstartText.textContent = '公開停止中...';
+  
+  // 1. まず公開停止処理を実行
+  if (typeof unpublishBoard === 'function') {
+    showMessage('現在の回答ボードを停止しています...', 'info');
+    
+    unpublishBoard()
+      .then(function(stopResult) {
+        console.log('✅ 公開停止が完了しました:', stopResult);
+        showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
+        
+        // 公開停止が完了したら、少し遅延してからクイックスタートを実行
+        setTimeout(() => {
+          quickstartText.textContent = 'セットアップ中...';
+          console.log('🚀 クイックスタート処理を開始します（自動公開モード）');
+          
+          // 2. クイックスタート実行（自動公開フラグ付き）
+          executeQuickStartProcess(quickstartBtn, quickstartText, true);
+        }, 1000);
+      })
+      .catch(function(stopError) {
+        console.error('❌ 公開停止に失敗しました:', stopError);
+        showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
+        resetQuickStartButton(quickstartBtn, quickstartText);
+      });
+  } else {
+    console.error('❌ unpublishBoard function not found');
+    showMessage('❌ 公開停止機能が見つかりません。ページを再読み込みしてください。', 'error');
+    resetQuickStartButton(quickstartBtn, quickstartText);
+  }
+}
+
+// クイックスタートボタンの状態をリセット
+function resetQuickStartButton(quickstartBtn, quickstartText) {
+  if (quickstartBtn && quickstartText) {
+    quickstartBtn.disabled = false;
+    quickstartText.textContent = 'クイックスタートを開始';
   }
 }
 

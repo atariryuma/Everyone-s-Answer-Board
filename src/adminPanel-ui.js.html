@@ -146,11 +146,11 @@ function updateUIWithNewStatus(status) {
   updateStepIndicators(currentStep);
   manageSectionStates(currentStep);
   
-  // Update spreadsheet button state
-  updateSpreadsheetButton();
-
   // Update unpublish button state
   updateUnpublishButton(status);
+
+  // Update system status display and resource buttons (スプレッドシート・フォームボタンの有効化処理を含む)
+  updateSystemStatusDisplay(status);
 
     // If an active sheet is set on initial load, load its configuration
     if (status.activeSheetName && status.userInfo && status.userInfo.spreadsheetId) {
