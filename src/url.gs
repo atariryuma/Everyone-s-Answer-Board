@@ -7,6 +7,26 @@ var URL_CACHE_KEY = 'WEB_APP_URL';
 var URL_CACHE_TTL = 21600; // 6時間
 
 /**
+ * 余分なクォートを除去してURLを正規化します。
+ * @param {string} url 処理対象のURL
+ * @returns {string} 正規化されたURL
+ */
+function normalizeUrlString(url) {
+  if (!url || typeof url !== 'string') {
+    return url;
+  }
+
+  var cleaned = String(url).trim();
+
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+      (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1);
+  }
+
+  return cleaned.replace(/\\"/g, '"').replace(/\\'/g, "'");
+}
+
+/**
  * WebアプリのURLを取得（キャッシュ利用）
  * @returns {string} WebアプリURL
  */
@@ -106,6 +126,8 @@ function getWebAppUrlCached() {
       ttl: 3600, // 1時間キャッシュ
       enableMemoization: true 
     });
+
+    webAppUrl = normalizeUrlString(webAppUrl);
 
     // キャッシュされたURLの検証（既存URLが開発URLになっていないかチェック）
     if (webAppUrl && (webAppUrl.includes('googleusercontent.com') ||
