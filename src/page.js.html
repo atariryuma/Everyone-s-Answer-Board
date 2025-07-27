@@ -291,6 +291,25 @@ class StudyQuestApp {
     this.state.newContentCount = 0;
     this.state.pollingFailureCount = 0;
     
+    // Clear DOM to prevent inconsistency
+    const container = this.elements.answersContainer;
+    if (container) {
+      const existingCards = container.querySelectorAll('.answer-card');
+      if (existingCards.length > 0) {
+        console.log('🧹 Clearing', existingCards.length, 'existing DOM cards during init reset');
+        // Remove observers
+        existingCards.forEach(card => {
+          if (this.visibilityObserver) {
+            this.visibilityObserver.unobserve(card);
+          }
+          if (this.scrollObserver) {
+            this.scrollObserver.unobserve(card);
+          }
+        });
+        container.innerHTML = '';
+      }
+    }
+    
     // Clear differential cards to prevent residual data
     this.clearDifferentialCards();
     
@@ -566,6 +585,19 @@ class StudyQuestApp {
 
   async init() {
       try {
+        // 初回アクセス時にデジタルシティズンシップモーダルを表示（読み込みと同時進行）
+        const hasSeenDigitalCitizenship = localStorage.getItem('hasSeenDigitalCitizenship');
+        const shouldShowModal = !hasSeenDigitalCitizenship || 
+          (hasSeenDigitalCitizenship && Date.now() > parseInt(hasSeenDigitalCitizenship));
+        
+        if (shouldShowModal && window.sharedModals) {
+          console.log('🌐 初回アクセス/期限切れ: デジタルシティズンシップモーダルを表示');
+          window.sharedModals.showDigitalCitizenship();
+          // 表示済みフラグを設定（24時間有効）
+          const expiry = Date.now() + (24 * 60 * 60 * 1000);
+          localStorage.setItem('hasSeenDigitalCitizenship', expiry.toString());
+        }
+        
         // 初期ロード状態を表示
         this.showLoadingOverlay();
         
