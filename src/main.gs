@@ -281,25 +281,6 @@ function isSystemSetup() {
   return !!dbSpreadsheetId && !!adminEmail && !!serviceAccountCreds;
 }
 
-/**
- * 登録ページを表示する関数
- */
-function showRegistrationPage() {
-  try {
-    var template = HtmlService.createTemplateFromFile('LoginPage');
-    template.include = include;
-    
-  
-    // No template variable processing - client will get GOOGLE_CLIENT_ID via server function
-    
-    var output = template.evaluate()
-      .setTitle('ログイン - StudyQuest');
-    return safeSetXFrameOptionsDeny(output);
-  } catch (error) {
-    console.error('Error in showRegistrationPage:', error);
-    return HtmlService.createHtmlOutput('<h1>システムエラー</h1><p>アプリケーションの読み込みに失敗しました。</p>');
-  }
-}
 
 /**
  * Get Google Client ID for fallback authentication
@@ -718,16 +699,6 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   return userInfo;
 }
 
-/**
- * レガシー getUserInfo 関数（後方互換性のため保持）
- * @deprecated getOrFetchUserInfo を使用してください
- */
-function getUserInfo(email, userId) {
-  return getOrFetchUserInfo(userId || email, userId ? 'userId' : 'email', {
-    currentUserEmail: email,
-    enableSecurityCheck: true
-  });
-}
 
 /**
  * ログインページを表示

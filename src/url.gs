@@ -333,15 +333,6 @@ function generateUserUrls(userId) {
   }
 }
 
-/**
- * 指定されたURLへサーバーサイドでリダイレクトします。
- * @param {string} url リダイレクト先のURL
- * @deprecated main.gsのredirectToUrl()を使用してください（セキュリティ強化版）
- */
-function redirectToUrlLegacy(url) {
-  console.warn('redirectToUrlLegacy()は非推奨です。main.gsのredirectToUrl()を使用してください。');
-  return HtmlService.createHtmlOutput('<script>window.top.location.href="' + url + '";</script>');
-}
 
 /**
  * キャッシュバスティング対応のURL生成
@@ -469,11 +460,3 @@ function generateUserUrlsWithCacheBusting(userId, options = {}) {
   }
 }
 
-/**
- * 後方互換性のためのレガシー関数
- * @deprecated buildAdminPanelUrl()を使用してください
- */
-function buildUserAdminUrl(userId) {
-  console.warn('buildUserAdminUrl()は非推奨です。buildAdminPanelUrl()を使用してください。');
-  return buildAdminPanelUrl(userId);
-}

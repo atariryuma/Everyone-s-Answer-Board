@@ -291,26 +291,6 @@ function forceLogoutAndRedirectToLogin() {
   }
 }
 
-/**
- * テスト用の簡単なHTMLOutput関数
- * @returns {HtmlOutput} テストHTML
- */
-function testForceLogoutRedirect() {
-  console.log('🧪 testForceLogoutRedirect - 開始');
-  
-  try {
-    const testHtml = '<script>console.log("Test redirect working"); alert("Test successful!");</script>';
-    const htmlOutput = HtmlService.createHtmlOutput(testHtml);
-    
-    console.log('✅ Test HtmlOutput created successfully');
-    console.log('📋 Test content length:', testHtml.length);
-    
-    return htmlOutput;
-  } catch (error) {
-    console.error('❌ Test function error:', error.message);
-    return HtmlService.createHtmlOutput('<script>alert("Test failed: ' + error.message + '");</script>');
-  }
-}
 
 /**
  * アカウント切り替えを検出

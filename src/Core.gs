@@ -117,15 +117,8 @@ function determineSetupStep(userInfo, configJson) {
 // ユーザー情報キャッシュ（関数実行中の重複取得を防ぐ）
 // =================================================================
 
-var _executionUserInfoCache = null;
 var _executionSheetsServiceCache = null;
 
-/**
- * 関数実行中のユーザー情報キャッシュをクリア
- */
-function clearExecutionUserInfoCache() {
-  _executionUserInfoCache = null;
-}
 
 /**
  * 関数実行中のSheetsServiceキャッシュをクリア
@@ -156,19 +149,6 @@ function clearAllExecutionCache() {
   clearExecutionSheetsServiceCache();
 }
 
-/**
- * ユーザー情報を取得（実行中はキャッシュを使用）
- * @deprecated getOrFetchUserInfo を使用してください
- * @param {string} userId ユーザーID
- * @returns {Object} ユーザー情報
- */
-function getCachedUserInfo(userId) {
-  // 新しい統合関数を使用（実行レベルキャッシュを有効化）
-  return getOrFetchUserInfo(userId, 'userId', {
-    useExecutionCache: true,
-    ttl: 300
-  });
-}
 
 // =================================================================
 // メインロジック
@@ -2795,14 +2775,6 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
   }
 }
 
-/**
- * クイックスタート用フォーム作成（後方互換性）
- * @deprecated createUnifiedForm('quickstart', ...) を使用してください
- */
-function createQuickStartForm(userEmail, userId) {
-  console.warn('createQuickStartForm() is deprecated. Use createUnifiedForm("quickstart", ...) instead.');
-  return createUnifiedForm('quickstart', userEmail, userId);
-}
 
 /**
  * カスタムフォーム作成（管理パネル用）
