@@ -1814,7 +1814,10 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
       
       // ユーザー情報から publishedSheetName を取得
       try {
-        const userInfo = getCachedUserInfo(requestUserId);
+        const userInfo = getOrFetchUserInfo(requestUserId, 'userId', {
+          useExecutionCache: true,
+          ttl: 300
+        });
         if (userInfo && userInfo.configJson) {
           const configJson = JSON.parse(userInfo.configJson);
           const fallbackSheetName = configJson.publishedSheetName;
@@ -1933,10 +1936,13 @@ function createExecutionContext(requestUserId, options = {}) {
   try {
     // 1. 共有リソースの取得（最適化：既存リソース再利用対応）
     const originalSheetsService = options.reuseService || getSheetsServiceCached();
-    let userInfo = options.reuseUserInfo || getCachedUserInfo(requestUserId);
+    let userInfo = options.reuseUserInfo || getOrFetchUserInfo(requestUserId, 'userId', {
+      useExecutionCache: true,
+      ttl: 300
+    });
 
     if (!userInfo) {
-      console.warn('getCachedUserInfo miss: userId=%s', requestUserId);
+      console.warn('getOrFetchUserInfo miss: userId=%s', requestUserId);
       userInfo = findUserByIdFresh(requestUserId);
 
       if (userInfo) {

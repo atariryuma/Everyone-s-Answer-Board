@@ -164,7 +164,10 @@ function clearAllExecutionCache() {
  */
 function getOpinionHeaderSafely(userId, sheetName) {
   try {
-    const userInfo = getCachedUserInfo(userId);
+    const userInfo = getOrFetchUserInfo(userId, 'userId', {
+      useExecutionCache: true,
+      ttl: 300
+    });
     if (!userInfo) {
       return 'お題';
     }
@@ -591,7 +594,10 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       var currentUserId = requestUserId; // requestUserId を使用
       debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s, adminMode=%s', currentUserId, classFilter, sortOrder, adminMode);
 
-      var userInfo = getCachedUserInfo(currentUserId);
+      var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+        useExecutionCache: true,
+        ttl: 300
+      });
       if (!userInfo) {
         throw new Error('ユーザー情報が見つかりません');
       }
@@ -737,7 +743,10 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
 
     var currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = getCachedUserInfo(currentUserId);
+    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+      useExecutionCache: true,
+      ttl: 300
+    });
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1346,7 +1355,10 @@ function testSetup() {
 
 
 function getResponsesData(userId, sheetName) {
-  var userInfo = getCachedUserInfo(userId);
+  var userInfo = getOrFetchUserInfo(userId, 'userId', {
+    useExecutionCache: true,
+    ttl: 300
+  });
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
@@ -3248,7 +3260,10 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
  */
 function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     try {
-      var userInfo = getCachedUserInfo(userId);
+      var userInfo = getOrFetchUserInfo(userId, 'userId', {
+    useExecutionCache: true,
+    ttl: 300
+  });
       if (!userInfo) {
         throw new Error('ユーザー情報が見つかりません');
       }
@@ -4463,7 +4478,10 @@ function getInitialData(requestUserId, targetSheetName) {
     
     // ユーザー認証
     verifyUserAccess(currentUserId);
-    var userInfo = getCachedUserInfo(currentUserId); // Use cached version
+    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+      useExecutionCache: true,
+      ttl: 300
+    }); // Use cached version
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -4476,7 +4494,10 @@ function getInitialData(requestUserId, targetSheetName) {
         console.log('✅ データ整合性が自動修正されました');
         // 修正後は最新データを再取得
         clearExecutionUserInfoCache();
-        userInfo = getCachedUserInfo(currentUserId);
+        userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+          useExecutionCache: true,
+          ttl: 300
+        });
       }
     } catch (consistencyError) {
       console.warn('⚠️ データ整合性チェック中にエラー:', consistencyError.message);
