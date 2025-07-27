@@ -1043,8 +1043,7 @@ function republishBoard(requestUserId) {
 
     // 設定を保存
     updateUser(requestUserId, {
-      configJson: JSON.stringify(configJson),
-      lastUpdated: new Date().toISOString()
+      configJson: JSON.stringify(configJson)
     });
 
     console.log('republishBoard完了: シート=%s', configJson.publishedSheetName);

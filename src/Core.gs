@@ -68,8 +68,7 @@ function clearActiveSheet(requestUserId) {
     
     // データベースに保存
     updateUser(requestUserId, {
-      configJson: JSON.stringify(configJson),
-      lastUpdated: new Date().toISOString()
+      configJson: JSON.stringify(configJson)
     });
     
     console.log('clearActiveSheet完了: 公開を停止しました');
