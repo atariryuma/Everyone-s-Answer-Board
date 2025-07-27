@@ -350,8 +350,8 @@ class StudyQuestApp {
             this.elements.adminToggleBtn.style.display = 'none'; // 確実に非表示
           }
         }
-        // Show info modal on initial load (always show for new boards)
-        setTimeout(() => this.showInfoModal(), 500);
+        // Show info modal immediately on initial load (always show for new boards)
+        this.showInfoModal();
         
         // Start polling for new answers
         this.startNewAnswerPolling();
@@ -367,7 +367,7 @@ class StudyQuestApp {
           try {
             await this.loadSheetData({ bypassCache: true });
             // Show info modal on board refresh
-            setTimeout(() => this.showInfoModal(), 1000);
+            this.showInfoModal();
           } catch (error) {
             console.error('ボードデータ更新エラー:', error);
           }
@@ -380,7 +380,7 @@ class StudyQuestApp {
             // 必要に応じてフルリフレッシュ
             await this.loadSheetData({ bypassCache: true });
             // Show info modal when new board is published
-            setTimeout(() => this.showInfoModal(), 1500);
+            this.showInfoModal();
           } catch (error) {
             console.warn('新しいボードの即座更新でエラー:', error);
             // エラー時もフルリフレッシュを実行
@@ -390,7 +390,7 @@ class StudyQuestApp {
               console.error('フォールバック読み込みもエラー:', loadError);
             }
             // Show info modal even on error
-            setTimeout(() => this.showInfoModal(), 1500);
+            this.showInfoModal();
           }
         }
       });
@@ -405,7 +405,7 @@ class StudyQuestApp {
               await this.checkForNewContentLight(true);
               await this.loadSheetData({ bypassCache: true });
               // Show info modal when board is updated via BroadcastChannel
-              setTimeout(() => this.showInfoModal(), 1500);
+              this.showInfoModal();
             } catch (error) {
               console.warn('BroadcastChannel経由の更新でエラー:', error);
               try {
@@ -414,7 +414,7 @@ class StudyQuestApp {
                 console.error('BroadcastChannel フォールバック読み込みもエラー:', loadError);
               }
               // Show info modal even on error
-              setTimeout(() => this.showInfoModal(), 1500);
+              this.showInfoModal();
             }
           }
         });
@@ -1903,7 +1903,14 @@ class StudyQuestApp {
   }
   
   clearAllCardsForEmptyData() {
-    console.log('🗑️ clearAllCardsForEmptyData: 空データ受信のため全カードをクリアします');
+    // 真の初回判定: localStorage状態 + DOM状態を確認
+    const isFirstTime = this.isFirstTimeBoardAccess();
+    
+    if (isFirstTime) {
+      console.log('🎯 初回ボードアクセス: 初期化処理を実行します');
+    } else {
+      console.log('🗑️ clearAllCardsForEmptyData: 空データ受信のため全カードをクリアします');
+    }
     
     // currentAnswersを空にリセット
     this.state.currentAnswers = [];
@@ -1912,20 +1919,27 @@ class StudyQuestApp {
     const container = this.elements.answersContainer;
     if (container) {
       const existingCards = container.querySelectorAll('.answer-card');
-      console.log('clearAllCardsForEmptyData: DOMから', existingCards.length, '個のカードを削除します');
       
-      // オブザーバーからカードを解除
-      existingCards.forEach(card => {
-        if (this.visibilityObserver) {
-          this.visibilityObserver.unobserve(card);
+      if (existingCards.length > 0) {
+        if (isFirstTime) {
+          console.log('初回ボード初期化: DOM内の', existingCards.length, '個の要素を初期化します');
+        } else {
+          console.log('clearAllCardsForEmptyData: DOMから', existingCards.length, '個のカードを削除します');
         }
-        if (this.scrollObserver) {
-          this.scrollObserver.unobserve(card);
-        }
-      });
-      
-      // DOMをクリア
-      container.innerHTML = '';
+        
+        // オブザーバーからカードを解除
+        existingCards.forEach(card => {
+          if (this.visibilityObserver) {
+            this.visibilityObserver.unobserve(card);
+          }
+          if (this.scrollObserver) {
+            this.scrollObserver.unobserve(card);
+          }
+        });
+        
+        // DOMをクリア
+        container.innerHTML = '';
+      }
     }
     
     // バーチャルスクロール状態をリセット
@@ -1939,7 +1953,7 @@ class StudyQuestApp {
       };
     }
     
-    console.log('✅ clearAllCardsForEmptyData: クリア完了');
+    console.log('✅', isFirstTime ? '初回初期化完了' : 'clearAllCardsForEmptyData: クリア完了');
   }
   
   validatePostLoadState() {
@@ -2004,13 +2018,126 @@ class StudyQuestApp {
     }
   }
   
-  handleDataInconsistency() {
-    console.log('🔄 データ不整合を解決するため強制リフレッシュを実行します...');
+  async handleDataInconsistency() {
+    console.log('🔄 データ不整合を解決するため詳細分析を開始します...');
     
-    // 強制キャッシュクリアとデータ再読み込み
-    this.forceDataRefresh().catch(error => {
-      console.error('⚠️ 強制リフレッシュでエラー:', error);
-    });
+    try {
+      // 1. 現在の状態を詳細に分析
+      const currentState = await this.analyzeCurrentDataState();
+      
+      // 2. 不整合の種類を特定
+      const inconsistencyType = this.classifyInconsistency(currentState);
+      
+      // 3. 不整合タイプに応じた修復戦略を実行
+      await this.executeRepairStrategy(inconsistencyType, currentState);
+      
+    } catch (error) {
+      console.error('⚠️ データ不整合修復でエラー:', error);
+      // フォールバック: 従来の強制リフレッシュ
+      this.forceDataRefresh().catch(fallbackError => {
+        console.error('⚠️ フォールバック強制リフレッシュもエラー:', fallbackError);
+      });
+    }
+  }
+
+  async analyzeCurrentDataState() {
+    const container = this.elements.answersContainer;
+    const domCards = container ? container.querySelectorAll('.answer-card') : [];
+    
+    return {
+      domCardCount: domCards.length,
+      stateDataCount: this.state.currentAnswers ? this.state.currentAnswers.length : 0,
+      lastSeenCount: this.state.lastSeenCount || 0,
+      pollingResult: this.lastPollingResult,
+      hasLocalStorage: this.hasRelevantLocalStorage(),
+      isInitialLoad: !this.initialDataLoaded,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  classifyInconsistency(state) {
+    if (state.isInitialLoad && state.domCardCount > 0) {
+      return 'phantom_cards_on_init';
+    } else if (state.stateDataCount === 0 && state.pollingResult?.newCount > 0) {
+      return 'empty_state_with_server_data';
+    } else if (state.domCardCount !== state.stateDataCount) {
+      return 'dom_state_mismatch';
+    } else if (state.lastSeenCount > state.stateDataCount) {
+      return 'seen_count_ahead';
+    } else {
+      return 'general_inconsistency';
+    }
+  }
+
+  async executeRepairStrategy(type, state) {
+    console.log('🔧 不整合修復戦略:', type, state);
+    
+    switch (type) {
+      case 'phantom_cards_on_init':
+        console.log('👻 初回読み込み時の幽霊カードを修復');
+        this.clearAllCardsForEmptyData();
+        await this.loadSheetData({ bypassCache: true });
+        break;
+        
+      case 'empty_state_with_server_data':
+        console.log('📡 サーバーデータ存在時の空状態を修復');
+        await this.performServerDataSync();
+        break;
+        
+      case 'dom_state_mismatch':
+        console.log('🔄 DOM-State不整合を修復');
+        await this.resyncDOMWithState();
+        break;
+        
+      case 'seen_count_ahead':
+        console.log('📊 lastSeenCount先行問題を修復');
+        this.updateLastSeenCount(state.stateDataCount);
+        break;
+        
+      default:
+        console.log('🔄 一般的な不整合修復');
+        await this.forceDataRefresh();
+    }
+  }
+
+  hasRelevantLocalStorage() {
+    const userId = this.state?.userId || USER_ID;
+    const sheetName = SHEET_NAME;
+    
+    return {
+      hasLastSeen: localStorage.getItem(`lastSeenCount_${userId}_${sheetName}`) !== null,
+      hasDiffCards: localStorage.getItem(`differentialCards_${userId}_${sheetName}`) !== null
+    };
+  }
+
+  async performServerDataSync() {
+    console.log('🔄 サーバーデータ同期開始');
+    
+    // 軽量チェックで最新のカウントを取得
+    const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+    const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
+    
+    console.log('📊 サーバーカウント確認:', countData);
+    
+    if (countData && countData.count > 0) {
+      // サーバーにデータがある場合は強制再読み込み
+      await this.loadSheetData({ bypassCache: true });
+    } else {
+      // サーバーにもデータがない場合は空状態を表示
+      this.displayEmptyState();
+    }
+  }
+
+  async resyncDOMWithState() {
+    console.log('🔄 DOM-State再同期開始');
+    
+    // 現在のstateデータに基づいてDOMを再構築
+    if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
+      this.renderBoard(this.state.currentAnswers, []);
+    } else {
+      this.clearAllCardsForEmptyData();
+      this.displayEmptyState();
+    }
   }
   
   async forceDataRefresh() {
@@ -2039,6 +2166,57 @@ class StudyQuestApp {
     await this.loadSheetData({ bypassCache: true });
     
     console.log('✅ 強制データリフレッシュ完了');
+  }
+
+  /**
+   * データ取得結果の有効性を判定
+   * @param {object} result - サーバーからの応答
+   * @returns {boolean} 有効なデータかどうか
+   */
+  isValidDataResult(result) {
+    try {
+      // 基本構造の確認
+      if (!result || typeof result !== 'object') {
+        console.log('🔍 データ判定: 結果がオブジェクトではない');
+        return false;
+      }
+      
+      // ステータス確認
+      if (result.status !== 'success') {
+        console.log('🔍 データ判定: ステータスが成功ではない -', result.status);
+        return false;
+      }
+      
+      // データ配列の存在確認
+      if (!Array.isArray(result.data)) {
+        console.log('🔍 データ判定: dataが配列ではない');
+        return false;
+      }
+      
+      // ヘッダー情報の確認
+      if (!result.header || typeof result.header !== 'string') {
+        console.log('🔍 データ判定: ヘッダー情報が不正');
+        return false;
+      }
+      
+      // シート名の確認
+      if (!result.sheetName || typeof result.sheetName !== 'string') {
+        console.log('🔍 データ判定: シート名が不正');
+        return false;
+      }
+      
+      console.log('✅ データ判定: 有効なデータ構造 -', {
+        status: result.status,
+        dataLength: result.data.length,
+        hasHeader: !!result.header,
+        sheetName: result.sheetName
+      });
+      
+      return true;
+    } catch (error) {
+      console.warn('⚠️ データ判定エラー:', error);
+      return false;
+    }
   }
 
   /**
@@ -2080,8 +2258,8 @@ class StudyQuestApp {
             );
         });
         
-        // 成功した場合は結果を返す
-        if (result && (result.status === 'success' || (result.data && result.data.length > 0))) {
+        // 成功した場合は結果を返す - 改善された判定条件
+        if (result && this.isValidDataResult(result)) {
           console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
           return result;
         }
@@ -4161,6 +4339,46 @@ class StudyQuestApp {
     } catch (error) {
       console.warn('⚠️ lastSeenCount読み込みエラー:', error);
       return 0;
+    }
+  }
+
+  // 真の初回ボードアクセス判定
+  isFirstTimeBoardAccess() {
+    try {
+      const userId = this.state?.userId || USER_ID;
+      const sheetName = SHEET_NAME;
+      
+      // 1. lastSeenCountの存在確認
+      const lastSeenKey = `lastSeenCount_${userId}_${sheetName}`;
+      const hasLastSeen = localStorage.getItem(lastSeenKey) !== null;
+      
+      // 2. 差分カードの存在確認
+      const diffCardKey = `differentialCards_${userId}_${sheetName}`;
+      const hasDiffCards = localStorage.getItem(diffCardKey) !== null;
+      
+      // 3. 初期データロード状態の確認
+      const hasInitialLoad = this.initialDataLoaded === true;
+      
+      // 4. DOM内の既存カード確認
+      const container = this.elements?.answersContainer;
+      const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
+      
+      // 真の初回判定: すべてが未設定/初期状態の場合
+      const isFirstTime = !hasLastSeen && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
+      
+      console.log('🔍 初回判定結果:', {
+        hasLastSeen,
+        hasDiffCards,
+        hasInitialLoad,
+        hasDOMCards,
+        isFirstTime
+      });
+      
+      return isFirstTime;
+    } catch (error) {
+      console.warn('⚠️ 初回判定エラー:', error);
+      // エラー時は安全側（初回ではない）と判定
+      return false;
     }
   }
 

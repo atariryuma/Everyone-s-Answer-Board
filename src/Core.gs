@@ -3269,7 +3269,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
   
   return cacheManager.get(cacheKey, () => {
     return executeGetSheetData(userId, sheetName, classFilter, sortMode);
-  }, { ttl: 300 }); // 5分間キャッシュ
+  }, { ttl: 180 }); // 3分間キャッシュ（短縮してデータ整合性向上）
 }
 
 /**
