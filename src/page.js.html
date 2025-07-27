@@ -3497,12 +3497,24 @@ class StudyQuestApp {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
+    // パフォーマンス最適化: 短時間での重複操作を防ぐ
+    const now = Date.now();
+    const lastOperation = this.lastReactionTimes?.get(reactionKey);
+    if (lastOperation && (now - lastOperation) < 1000) { // 1秒以内の重複操作を防ぐ
+      console.log(`⚡ 重複操作スキップ: ${reactionKey}`);
+      return;
+    }
+
     // 既存の個別キューシステム（常に維持）
     this.reactionQueue.set(reactionKey, {
       rowIndex: numericRowIndex,
       reaction,
-      timestamp: Date.now()
+      timestamp: now
     });
+
+    // 最後の操作時刻を記録
+    if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
+    this.lastReactionTimes.set(reactionKey, now);
 
     // オプション: バッチ処理も並行実行（既存機能に影響なし）
     if (this.enableBatchProcessing && !this.batchProcessingActive) {
@@ -3988,6 +4000,20 @@ class StudyQuestApp {
   }
 
   async updateReactionUI(item, immediate = false) {
+    // パフォーマンス最適化: 変更が必要な場合のみ更新
+    const lastUpdateKey = `ui_update_${item.rowIndex}`;
+    const currentStateHash = this.calculateStateHash(item);
+    const lastStateHash = this.lastUIStates?.get(lastUpdateKey);
+    
+    if (lastStateHash === currentStateHash && !immediate) {
+      console.log(`⚡ UI更新スキップ (変更なし): rowIndex=${item.rowIndex}`);
+      return;
+    }
+    
+    // 状態ハッシュを記録
+    if (!this.lastUIStates) this.lastUIStates = new Map();
+    this.lastUIStates.set(lastUpdateKey, currentStateHash);
+
     if (immediate) {
       // 即座実行（requestAnimationFrameを使わない）
       try {
@@ -4517,6 +4543,174 @@ class StudyQuestApp {
       console.log('🛑 同期状態監視を停止しました');
     }
   }
+
+  // アイテム状態のハッシュを計算（変更検出用）
+  calculateStateHash(item) {
+    const state = {
+      reactions: item.reactions,
+      highlight: item.highlight,
+      rowIndex: item.rowIndex
+    };
+    return JSON.stringify(state);
+  }
+
+  // バッチ処理パフォーマンステスト（開発・デバッグ用）
+  async testBatchPerformance() {
+    console.log('🧪 バッチ処理パフォーマンステスト開始');
+    
+    const testResults = {
+      batchTest: null,
+      individualTest: null,
+      comparison: null
+    };
+    
+    try {
+      // テスト用の模擬リアクション操作データ
+      const testOperations = [];
+      const testRowCount = Math.min(this.state.currentAnswers.length, 5); // 最大5行でテスト
+      
+      for (let i = 0; i < testRowCount; i++) {
+        const item = this.state.currentAnswers[i];
+        if (item) {
+          testOperations.push({
+            rowIndex: item.rowIndex,
+            reaction: 'LIKE',
+            timestamp: Date.now()
+          });
+        }
+      }
+      
+      if (testOperations.length === 0) {
+        console.warn('⚠️ テスト用データが不足しています');
+        return { error: 'テスト用データが不足' };
+      }
+      
+      console.log(`📊 ${testOperations.length}件の操作でテスト実行`);
+      
+      // 1. バッチ処理のテスト
+      console.log('🔄 バッチ処理テスト開始');
+      const batchStartTime = performance.now();
+      
+      try {
+        // バッチ処理は実際にサーバーを呼ばず、ローカルでの処理時間のみ測定
+        this.addToBatchQueue(testOperations[0].rowIndex, testOperations[0].reaction);
+        for (let i = 1; i < testOperations.length; i++) {
+          this.addToBatchQueue(testOperations[i].rowIndex, testOperations[i].reaction);
+        }
+        
+        const batchEndTime = performance.now();
+        testResults.batchTest = {
+          duration: batchEndTime - batchStartTime,
+          operationCount: testOperations.length,
+          avgTimePerOp: (batchEndTime - batchStartTime) / testOperations.length
+        };
+        
+        console.log('✅ バッチ処理テスト完了:', testResults.batchTest);
+      } catch (error) {
+        console.error('❌ バッチ処理テストエラー:', error);
+        testResults.batchTest = { error: error.message };
+      }
+      
+      // 2. 個別処理のテスト（シミュレーション）
+      console.log('🔄 個別処理テスト開始');
+      const individualStartTime = performance.now();
+      
+      try {
+        // 個別処理のシミュレーション（実際のAPI呼び出しなし）
+        for (const operation of testOperations) {
+          // キューに追加するシミュレーション
+          this.reactionQueue.set(`${operation.rowIndex}-${operation.reaction}`, operation);
+          // 小さな遅延でAPI呼び出しのオーバーヘッドをシミュレート
+          await new Promise(resolve => setTimeout(resolve, 1));
+        }
+        
+        const individualEndTime = performance.now();
+        testResults.individualTest = {
+          duration: individualEndTime - individualStartTime,
+          operationCount: testOperations.length,
+          avgTimePerOp: (individualEndTime - individualStartTime) / testOperations.length
+        };
+        
+        console.log('✅ 個別処理テスト完了:', testResults.individualTest);
+      } catch (error) {
+        console.error('❌ 個別処理テストエラー:', error);
+        testResults.individualTest = { error: error.message };
+      }
+      
+      // 3. パフォーマンス比較
+      if (testResults.batchTest && testResults.individualTest && 
+          !testResults.batchTest.error && !testResults.individualTest.error) {
+        
+        const speedImprovement = testResults.individualTest.duration / testResults.batchTest.duration;
+        const efficiencyGain = ((testResults.individualTest.avgTimePerOp - testResults.batchTest.avgTimePerOp) 
+                               / testResults.individualTest.avgTimePerOp) * 100;
+        
+        testResults.comparison = {
+          speedImprovement: speedImprovement,
+          efficiencyGain: efficiencyGain,
+          recommendation: speedImprovement > 1.2 ? 'バッチ処理推奨' : 
+                         speedImprovement < 0.8 ? '個別処理推奨' : '同程度'
+        };
+        
+        console.log('📈 パフォーマンス比較結果:', testResults.comparison);
+      }
+      
+      // 4. メモリ使用量チェック（概算）
+      const memoryInfo = performance.memory ? {
+        usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+        totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024)
+      } : { info: 'メモリ情報は利用できません' };
+      
+      testResults.memoryUsage = memoryInfo;
+      
+      console.log('🧪 バッチ処理パフォーマンステスト完了', testResults);
+      return testResults;
+      
+    } catch (error) {
+      console.error('❌ バッチ処理テストエラー:', error);
+      return { error: error.message, partialResults: testResults };
+    }
+  }
+
+  // バッチ処理の健全性チェック
+  validateBatchSystem() {
+    console.log('🔍 バッチ処理システム健全性チェック');
+    
+    const issues = [];
+    
+    // 1. バッチキューの状態確認
+    if (!this.batchQueue) {
+      issues.push('バッチキューが初期化されていません');
+    } else if (this.batchQueue.size > 100) {
+      issues.push(`バッチキューサイズが大きすぎます: ${this.batchQueue.size}`);
+    }
+    
+    // 2. 個別キューの状態確認
+    if (!this.reactionQueue) {
+      issues.push('リアクションキューが初期化されていません');
+    } else if (this.reactionQueue.size > 50) {
+      issues.push(`リアクションキューサイズが大きすぎます: ${this.reactionQueue.size}`);
+    }
+    
+    // 3. 処理状態の確認
+    if (this.isProcessingReactionQueue && this.batchProcessingActive) {
+      issues.push('個別処理とバッチ処理が同時に動作中です');
+    }
+    
+    // 4. 設定の確認
+    if (this.enableBatchProcessing === undefined) {
+      issues.push('バッチ処理設定が未定義です');
+    }
+    
+    // 5. 結果
+    if (issues.length === 0) {
+      console.log('✅ バッチ処理システム健全性: 正常');
+      return { status: 'healthy', issues: [] };
+    } else {
+      console.warn('⚠️ バッチ処理システム健全性: 問題検出', issues);
+      return { status: 'issues_detected', issues };
+    }
+  }
   
   async toggleAdminMode() {
     // Temporarily disable button to prevent duplicate clicks
@@ -4965,10 +5159,33 @@ class StudyQuestApp {
     });
   }
   applyUpdates(items) {
+    // パフォーマンス最適化: 変更が必要なアイテムのみ処理
+    const itemsToUpdate = items.filter(item => {
+      const updateKey = `apply_update_${item.rowIndex}`;
+      const currentHash = this.calculateStateHash(item);
+      const lastHash = this.lastApplyStates?.get(updateKey);
+      
+      if (lastHash === currentHash) {
+        return false; // 変更なし - スキップ
+      }
+      
+      // 状態を記録
+      if (!this.lastApplyStates) this.lastApplyStates = new Map();
+      this.lastApplyStates.set(updateKey, currentHash);
+      return true; // 変更あり - 更新対象
+    });
+    
+    if (itemsToUpdate.length === 0) {
+      console.log('⚡ applyUpdates: 全アイテムスキップ (変更なし)');
+      return;
+    }
+    
+    console.log(`⚡ applyUpdates: ${itemsToUpdate.length}/${items.length}件を更新`);
+
     // バッチ処理用にリアクション更新データを蓄積
     const reactionUpdates = [];
     
-    items.forEach(item => {
+    itemsToUpdate.forEach(item => {
       this.reactionTypes.forEach(rt => {
         if (item.reactions && item.reactions[rt.key]) {
           reactionUpdates.push({
