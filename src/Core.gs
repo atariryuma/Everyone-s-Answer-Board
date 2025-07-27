@@ -4024,7 +4024,28 @@ function createCustomFormUI(requestUserId, config) {
     verifyUserAccess(requestUserId);
     const activeUserEmail = Session.getActiveUser().getEmail();
     
-    const result = createCustomForm(activeUserEmail, requestUserId, config);
+    // AdminPanelのconfig構造を内部形式に変換（createCustomForm の処理を統合）
+    const convertedConfig = {
+      mainQuestion: {
+        title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
+        type: config.responseType || config.questionType || 'text', // responseTypeを優先して使用
+        choices: config.questionChoices || config.choices || [], // questionChoicesを優先して使用
+        includeOthers: config.includeOthers || false
+      },
+      enableClass: config.enableClass || false,
+      classQuestion: {
+        choices: config.classChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4']
+      }
+    };
+    
+    console.log('createCustomFormUI - converted config:', JSON.stringify(convertedConfig));
+    
+    const overrides = {
+      titlePrefix: config.formTitle || 'カスタムフォーム',
+      customConfig: convertedConfig
+    };
+    
+    const result = createUnifiedForm('custom', activeUserEmail, requestUserId, overrides);
     
     // 既存ユーザーの情報を更新（スプレッドシート情報を追加）
     const existingUser = findUserById(requestUserId);
@@ -4109,7 +4130,8 @@ function createQuickStartFormUI(requestUserId) {
     verifyUserAccess(requestUserId);
     const activeUserEmail = Session.getActiveUser().getEmail();
     
-    const result = createQuickStartForm(activeUserEmail, requestUserId);
+    // createQuickStartForm の処理を統合（直接 createUnifiedForm を呼び出し）
+    const result = createUnifiedForm('quickstart', activeUserEmail, requestUserId);
     
     // 既存ユーザーの情報を更新
     const existingUser = findUserById(requestUserId);

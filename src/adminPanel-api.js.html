@@ -1007,8 +1007,10 @@ function resetConfigJson() {
 const quickStartSteps = [
   { id: 1, text: 'ユーザー専用フォルダの作成', detail: 'フォルダ構造を準備中...' },
   { id: 2, text: 'Googleフォームとスプレッドシートの作成', detail: 'データ収集の仕組みを構築中...' },
-  { id: 3, text: '回答ボードの設定と公開', detail: 'Webアプリケーションを設定中...' },
-  { id: 4, text: 'セットアップ完了', detail: '利用準備が整いました！' }
+  { id: 3, text: 'シート設定と列構造の最適化', detail: 'データ構造を設定中...' },
+  { id: 4, text: '高精度AI列判定の実行', detail: 'AIによる列の自動判定を実行中...' },
+  { id: 5, text: '公開設定と時間モーダル表示', detail: 'Webアプリケーションを公開中...' },
+  { id: 6, text: 'セットアップ完了', detail: '利用準備が整いました！' }
 ];
 
 // Show QuickStart progress bar
@@ -1097,7 +1099,7 @@ function updateOverallProgress(percentage, statusMessage) {
 function simulateQuickStartProgress() {
   // Step 1: Real folder creation/check
   updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
-  updateOverallProgress(10, 'フォルダを作成しています...');
+  updateOverallProgress(5, 'フォルダを作成しています...');
   
   // Actually call the folder creation API to sync with real backend progress
   runGasWithUserId('createUserFolder', 'フォルダを確認・作成中...')
@@ -1105,24 +1107,38 @@ function simulateQuickStartProgress() {
       console.log('✅ QuickStart folder creation successful:', folderResult);
       updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
       updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-      updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+      updateOverallProgress(20, 'フォームとスプレッドシートを作成しています...');
       
-      // Continue with form/spreadsheet creation (still simulated as backend handles this)
+      // Step 2: Form/spreadsheet creation
       setTimeout(() => {
         updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-        updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
-        updateOverallProgress(70, '回答ボードを設定しています...');
+        updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
+        updateOverallProgress(40, 'シート設定を最適化しています...');
         
-        // Final completion step
+        // Step 3: Sheet configuration
         setTimeout(() => {
-          updateProgressStep(3, 'completed', '回答ボードの設定と公開', '✅ 回答ボードが公開されました');
-          updateProgressStep(4, 'active', 'セットアップ完了', '利用準備が整いました！');
-          updateOverallProgress(100, 'セットアップが完了しました！');
+          updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
+          updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
+          updateOverallProgress(60, 'AI列判定を実行しています...');
           
+          // Step 4: AI column detection (the time-consuming part)
           setTimeout(() => {
-            updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
-          }, 500);
-        }, 2000);
+            updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
+            updateProgressStep(5, 'active', '公開設定と時間モーダル表示', 'Webアプリケーションを公開中...');
+            updateOverallProgress(80, '公開設定を適用しています...');
+            
+            // Step 5: Publishing and modal setup
+            setTimeout(() => {
+              updateProgressStep(5, 'completed', '公開設定と時間モーダル表示', '✅ アプリケーションが公開されました');
+              updateProgressStep(6, 'active', 'セットアップ完了', '利用準備が整いました！');
+              updateOverallProgress(100, 'セットアップが完了しました！');
+              
+              setTimeout(() => {
+                updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+              }, 500);
+            }, 1500);
+          }, 3000); // AI processing takes longer
+        }, 1000);
       }, 1500);
     })
     .catch(function(error) {
@@ -1130,25 +1146,37 @@ function simulateQuickStartProgress() {
       updateProgressStep(1, 'error', 'ユーザー専用フォルダの作成', '⚠️ フォルダ作成でエラーが発生しましたが処理を続行します');
       showMessage('フォルダの作成に警告がありましたが、セットアップを続行します。', 'warning');
       
-      // Continue with fallback timing even if folder creation fails
+      // Continue with fallback timing even if folder creation fails (updated for 6 steps)
       setTimeout(() => {
         updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-        updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+        updateOverallProgress(20, 'フォームとスプレッドシートを作成しています...');
         
         setTimeout(() => {
           updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-          updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
-          updateOverallProgress(70, '回答ボードを設定しています...');
+          updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
+          updateOverallProgress(40, 'シート設定を最適化しています...');
           
           setTimeout(() => {
-            updateProgressStep(3, 'completed', '回答ボードの設定と公開', '✅ 回答ボードが公開されました');
-            updateProgressStep(4, 'active', 'セットアップ完了', '利用準備が整いました！');
-            updateOverallProgress(100, 'セットアップが完了しました！');
+            updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
+            updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
+            updateOverallProgress(60, 'AI列判定を実行しています...');
             
             setTimeout(() => {
-              updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
-            }, 500);
-          }, 2000);
+              updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
+              updateProgressStep(5, 'active', '公開設定と時間モーダル表示', 'Webアプリケーションを公開中...');
+              updateOverallProgress(80, '公開設定を適用しています...');
+              
+              setTimeout(() => {
+                updateProgressStep(5, 'completed', '公開設定と時間モーダル表示', '✅ アプリケーションが公開されました');
+                updateProgressStep(6, 'active', 'セットアップ完了', '利用準備が整いました！');
+                updateOverallProgress(100, 'セットアップが完了しました！');
+                
+                setTimeout(() => {
+                  updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+                }, 500);
+              }, 1500);
+            }, 3000);
+          }, 1000);
         }, 1500);
       }, 1000);
     });
@@ -1164,14 +1192,33 @@ function simulateCustomFormProgressWithFolderCheck() {
   runGasWithUserId('createUserFolder', 'フォルダを確認・作成中...')
     .then(function(folderResult) {
       updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成・確認', '✅ フォルダが準備されました');
-      updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-      updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+      updateProgressStep(2, 'active', 'カスタムフォームとスプレッドシートの作成', 'ユーザー設定に基づいてフォームを作成中...');
+      updateOverallProgress(25, 'カスタムフォームを作成しています...');
       
-      // Step 2: フォーム・スプレッドシート作成は元の処理に続く
+      // Step 2: カスタムフォーム・スプレッドシート作成
       setTimeout(() => {
-        updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-        updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
-        updateOverallProgress(70, '回答ボードを設定しています...');
+        updateProgressStep(2, 'completed', 'カスタムフォームとスプレッドシートの作成', '✅ カスタムフォームが作成されました');
+        updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
+        updateOverallProgress(50, 'シート設定を最適化しています...');
+        
+        // Step 3: シート設定・最適化
+        setTimeout(() => {
+          updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
+          updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
+          updateOverallProgress(70, 'AI列判定を実行しています...');
+          
+          // Step 4: AI列判定（時間のかかる処理）
+          setTimeout(() => {
+            updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
+            updateProgressStep(5, 'active', 'セットアップ完了（公開は手動で行ってください）', '設定が完了しました...');
+            updateOverallProgress(100, 'セットアップが完了しました！');
+            
+            // Step 5: 完了（公開は手動）
+            setTimeout(() => {
+              updateProgressStep(5, 'completed', 'セットアップ完了（公開は手動で行ってください）', '✅ 管理パネルから公開設定を行ってください');
+            }, 500);
+          }, 3000); // AI処理時間
+        }, 1000);
       }, 2000);
     })
     .catch(function(error) {
@@ -1179,15 +1226,31 @@ function simulateCustomFormProgressWithFolderCheck() {
       console.error('Folder creation failed:', error);
       showMessage('フォルダの作成に失敗しました。処理を続行します。', 'warning');
       
-      // エラーでも処理を続行
+      // エラーでも処理を続行（5ステップ対応）
       setTimeout(() => {
-        updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-        updateOverallProgress(35, 'フォームとスプレッドシートを作成しています...');
+        updateProgressStep(2, 'active', 'カスタムフォームとスプレッドシートの作成', 'ユーザー設定に基づいてフォームを作成中...');
+        updateOverallProgress(25, 'カスタムフォームを作成しています...');
         
         setTimeout(() => {
-          updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-          updateProgressStep(3, 'active', '回答ボードの設定と公開', 'Webアプリケーションを設定中...');
-          updateOverallProgress(70, '回答ボードを設定しています...');
+          updateProgressStep(2, 'completed', 'カスタムフォームとスプレッドシートの作成', '✅ カスタムフォームが作成されました');
+          updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
+          updateOverallProgress(50, 'シート設定を最適化しています...');
+          
+          setTimeout(() => {
+            updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
+            updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
+            updateOverallProgress(70, 'AI列判定を実行しています...');
+            
+            setTimeout(() => {
+              updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
+              updateProgressStep(5, 'active', 'セットアップ完了（公開は手動で行ってください）', '設定が完了しました...');
+              updateOverallProgress(100, 'セットアップが完了しました！');
+              
+              setTimeout(() => {
+                updateProgressStep(5, 'completed', 'セットアップ完了（公開は手動で行ってください）', '✅ 管理パネルから公開設定を行ってください');
+              }, 500);
+            }, 3000);
+          }, 1000);
         }, 2000);
       }, 1000);
     });
@@ -1248,7 +1311,7 @@ function handleQuickStart() {
       if (result && result.status === 'success') {
         // Final progress update
         updateOverallProgress(100, 'セットアップが完了しました！');
-        updateProgressStep(4, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+        updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
         
         showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
         
@@ -1272,7 +1335,7 @@ function handleQuickStart() {
         logWarn('QuickStart returned error result:', result);
         
         // Show error in progress
-        updateProgressStep(4, 'error', 'セットアップエラー', result?.message || 'エラーが発生しました');
+        updateProgressStep(6, 'error', 'セットアップエラー', result?.message || 'エラーが発生しました');
         updateOverallProgress(0, 'セットアップに失敗しました');
         
         // 権限エラーの可能性を考慮したメッセージ
@@ -1297,7 +1360,7 @@ function handleQuickStart() {
       logError('QuickStart error:', error);
       
       // Show error in progress
-      updateProgressStep(4, 'error', 'セットアップエラー', '通信エラーが発生しました');
+      updateProgressStep(6, 'error', 'セットアップエラー', '通信エラーが発生しました');
       updateOverallProgress(0, 'セットアップに失敗しました');
       
       // 権限エラーの可能性を考慮したメッセージ
