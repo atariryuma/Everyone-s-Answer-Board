@@ -1520,6 +1520,33 @@ function initializeAPI() {
   logDebug('✅ API初期化完了');
 }
 
+// =============================================================================
+// MISSING FUNCTIONS RESTORATION
+// =============================================================================
+
+// Wrapper for loadStatus to maintain compatibility
+function loadSystemStatus(bypassCache = false) {
+  loadStatus(bypassCache);
+}
+
+// Basic loadUserInfo implementation
+function loadUserInfo() {
+  logDebug('📋 loadUserInfo called - delegating to loadStatus');
+  loadStatus();
+}
+
+// Update answer count function
+function updateAnswerCount() {
+  if (!currentStatus || !currentStatus._normalized || !currentStatus._normalized.isPublished) {
+    return;
+  }
+  
+  const answerCountElement = document.getElementById('answer-count');
+  if (answerCountElement && currentStatus.answerCount !== undefined) {
+    answerCountElement.textContent = currentStatus.answerCount || '0';
+  }
+}
+
 // Setup real-time updates
 function setupRealtimeUpdates() {
   // Update system status every 30 seconds
