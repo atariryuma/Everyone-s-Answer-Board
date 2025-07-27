@@ -2656,7 +2656,7 @@ class StudyQuestApp {
               fetchParams.classFilter,
               fetchParams.sortOrder,
               fetchParams.showAdminFeatures,
-              config.bypassCache || false
+              fetchParams.bypassCache || false
             );
         });
         
@@ -2967,7 +2967,8 @@ class StudyQuestApp {
         classFilter,
         sortOrder,
         showAdminFeatures: this.state.showAdminFeatures,
-        requestedSheetName
+        requestedSheetName,
+        bypassCache: config.bypassCache || false
       };
       console.log('📡 Starting data fetch with parameters:', fetchParams);
       
