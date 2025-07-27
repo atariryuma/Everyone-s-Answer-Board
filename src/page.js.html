@@ -4404,10 +4404,16 @@ class StudyQuestApp {
     });
   }
 
+  // ユーザーIDとシート名に基づくローカルストレージキー生成
+  getScopedKey(base) {
+    const userId = this.state?.userId || USER_ID;
+    return `${base}_${userId}_${SHEET_NAME}`;
+  }
+
   // lastSeenCount永続化機能
   loadLastSeenCount() {
     try {
-      const key = `lastSeenCount_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const key = this.getScopedKey('lastSeenCount');
       const stored = localStorage.getItem(key);
       const count = stored ? parseInt(stored, 10) : 0;
       
@@ -4422,16 +4428,11 @@ class StudyQuestApp {
   // 真の初回ボードアクセス判定
   isFirstTimeBoardAccess() {
     try {
-      const userId = this.state?.userId || USER_ID;
-      const sheetName = SHEET_NAME;
-      
       // 1. lastSeenCountの存在確認
-      const lastSeenKey = `lastSeenCount_${userId}_${sheetName}`;
-      const hasLastSeen = localStorage.getItem(lastSeenKey) !== null;
-      
+      const hasLastSeen = localStorage.getItem(this.getScopedKey('lastSeenCount')) !== null;
+
       // 2. 差分カードの存在確認
-      const diffCardKey = `differentialCards_${userId}_${sheetName}`;
-      const hasDiffCards = localStorage.getItem(diffCardKey) !== null;
+      const hasDiffCards = localStorage.getItem(this.getScopedKey('differentialCards')) !== null;
       
       // 3. 初期データロード状態の確認
       const hasInitialLoad = this.initialDataLoaded === true;
@@ -4461,7 +4462,7 @@ class StudyQuestApp {
 
   saveLastSeenCount(count) {
     try {
-      const key = `lastSeenCount_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const key = this.getScopedKey('lastSeenCount');
       localStorage.setItem(key, count.toString());
       
       console.log('💾 lastSeenCount保存:', { key, count });
@@ -4487,7 +4488,7 @@ class StudyQuestApp {
   // 差分カード管理メソッド
   loadDifferentialCards() {
     try {
-      const key = `differentialCards_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const key = this.getScopedKey('differentialCards');
       const stored = localStorage.getItem(key);
       const cards = stored ? JSON.parse(stored) : [];
       
@@ -4501,7 +4502,7 @@ class StudyQuestApp {
 
   saveDifferentialCards(cardIds) {
     try {
-      const key = `differentialCards_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const key = this.getScopedKey('differentialCards');
       const existing = this.loadDifferentialCards();
       const merged = [...new Set([...existing, ...cardIds])];
       localStorage.setItem(key, JSON.stringify(merged));
@@ -4514,7 +4515,7 @@ class StudyQuestApp {
 
   clearDifferentialCards() {
     try {
-      const key = `differentialCards_${this.state?.userId || USER_ID}_${SHEET_NAME}`;
+      const key = this.getScopedKey('differentialCards');
       localStorage.removeItem(key);
       console.log('🗑️ 差分カードクリア:', { key });
     } catch (error) {

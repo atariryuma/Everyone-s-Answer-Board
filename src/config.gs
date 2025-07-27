@@ -515,7 +515,7 @@ function getConfig(requestUserId, sheetName, forceRefresh = false) {
   verifyUserAccess(requestUserId);
   const userId = requestUserId; // requestUserId を使用
   const userCache = CacheService.getUserCache();
-  const cacheKey = 'config_v3_' + userId + '_' + sheetName;
+  const cacheKey = buildUserScopedKey('config_v3', userId, sheetName);
 
   if (!forceRefresh) {
     const cached = userCache.get(cacheKey);
@@ -1183,7 +1183,7 @@ function activateSheet(requestUserId, spreadsheetId, sheetName) {
       if (userInfo) {
         // 最小限のキャッシュクリア（スプレッドシート関連のみ）
         const keysToRemove = [
-          'config_v3_' + currentUserId + '_' + sheetName,
+          buildUserScopedKey('config_v3', currentUserId, sheetName),
           'sheets_' + spreadsheetId,
           'data_' + spreadsheetId
         ];
