@@ -1150,7 +1150,9 @@ class StudyQuestApp {
     }
     
     // 「すべて」の場合はnullに変換してサーバーに送信
-    const classFilter = selectedClass === 'すべて' ? null : selectedClass;
+    const classFilter = !selectedClass || selectedClass === 'すべて'
+      ? null
+      : selectedClass;
     const sortOrder = this.elements.sortOrder.value || 'newest';
     
     return { selectedClass, classFilter, sortOrder };
@@ -1236,14 +1238,11 @@ class StudyQuestApp {
         lastSeenCount: this.state.lastSeenCount,
         difference: newCount - this.state.lastSeenCount
       });
-      
-      // 失敗フラグをリセット
-      this.hadInitialDataLoadFailure = false;
-      
-      // 新着通知を先に表示
+
       await this.checkForNewItems(newCount);
+      return; // データ取得成功まで基準は更新しない
     }
-    
+
     this.updateLastSeenCount(newCount);
     this.initialDataLoaded = true;
     
@@ -1407,7 +1406,9 @@ class StudyQuestApp {
       
       // 現在のフィルタ設定を取得
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-      const classFilter = selectedClass === 'すべて' ? null : selectedClass;
+      const classFilter = !selectedClass || selectedClass === 'すべて'
+        ? null
+        : selectedClass;
       const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
       const adminMode = this.state.showAdminFeatures;
       
@@ -1615,7 +1616,9 @@ class StudyQuestApp {
 
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-      const classFilter = selectedClass === 'すべて' ? null : selectedClass;
+      const classFilter = !selectedClass || selectedClass === 'すべて'
+        ? null
+        : selectedClass;
       const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
       const adminMode = this.state.showAdminFeatures;
       
@@ -2539,7 +2542,9 @@ class StudyQuestApp {
     
     // 軽量チェックで最新のカウントを取得
     const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-    const classFilter = selectedClass === 'すべて' ? null : selectedClass;
+    const classFilter = !selectedClass || selectedClass === 'すべて'
+      ? null
+      : selectedClass;
     
     console.log('📤 軽量チェックパラメータ:', { originalSelectedClass: selectedClass, processedClassFilter: classFilter });
     
@@ -3071,8 +3076,10 @@ class StudyQuestApp {
       container.appendChild(frag);
     }
     try {
-      // classFilter「すべて」の場合はサーバーに送信しない（全データ取得のため）
-      const classFilter = selectedClass === 'すべて' ? null : selectedClass;
+      // classFilter「すべて」または空の場合はサーバーに送信しない（全データ取得のため）
+      const classFilter = !selectedClass || selectedClass === 'すべて'
+        ? null
+        : selectedClass;
       
       // データ取得パラメータの詳細ログ
       const fetchParams = {
