@@ -336,9 +336,137 @@ function generateUserUrls(userId) {
 /**
  * 指定されたURLへサーバーサイドでリダイレクトします。
  * @param {string} url リダイレクト先のURL
+ * @deprecated main.gsのredirectToUrl()を使用してください（セキュリティ強化版）
  */
-function redirectToUrl(url) {
+function redirectToUrlLegacy(url) {
+  console.warn('redirectToUrlLegacy()は非推奨です。main.gsのredirectToUrl()を使用してください。');
   return HtmlService.createHtmlOutput('<script>window.top.location.href="' + url + '";</script>');
+}
+
+/**
+ * キャッシュバスティング対応のURL生成
+ * 非公開状態時の確実なリダイレクトを保証するため、キャッシュ無効化パラメータを追加
+ * @param {string} baseUrl - ベースURL
+ * @param {Object} options - オプション設定
+ * @returns {string} キャッシュバスティング付きURL
+ */
+function addCacheBustingParams(baseUrl, options = {}) {
+  try {
+    if (!baseUrl || typeof baseUrl !== 'string') {
+      console.warn('addCacheBustingParams: 無効なbaseUrlが渡されました:', baseUrl);
+      return baseUrl;
+    }
+    
+    const url = new URL(baseUrl);
+    
+    // キャッシュバスティングパラメータを追加
+    if (options.forceFresh || options.unpublished) {
+      // タイムスタンプベースのキャッシュバスティング
+      url.searchParams.set('_cb', Date.now().toString());
+      console.log('🔄 Cache busting timestamp added:', Date.now());
+    }
+    
+    if (options.sessionId) {
+      // セッション固有のパラメータ
+      url.searchParams.set('_sid', options.sessionId);
+    }
+    
+    if (options.publicationStatus === 'unpublished') {
+      // 非公開状態の明示的な指定
+      url.searchParams.set('_ps', 'unpublished');
+      url.searchParams.set('_t', Math.random().toString(36).substr(2, 9));
+      console.log('🚫 Unpublished state cache busting applied');
+    }
+    
+    if (options.version) {
+      // バージョン指定
+      url.searchParams.set('_v', options.version);
+    }
+    
+    return url.toString();
+    
+  } catch (error) {
+    console.error('addCacheBustingParams error:', error.message);
+    return baseUrl; // エラー時は元のURLを返す
+  }
+}
+
+/**
+ * 非公開状態用の特別なURL生成
+ * キャッシュを完全に無効化したアクセスを保証
+ * @param {string} userId - ユーザーID
+ * @returns {string} 非公開状態アクセス用URL
+ */
+function generateUnpublishedStateUrl(userId) {
+  try {
+    const baseUrl = getWebAppUrlCached();
+    if (!baseUrl) {
+      console.error('generateUnpublishedStateUrl: ベースURLの取得に失敗');
+      return '';
+    }
+    
+    // 非公開状態用の強力なキャッシュバスティング
+    const cacheBustedUrl = addCacheBustingParams(baseUrl, {
+      forceFresh: true,
+      publicationStatus: 'unpublished',
+      sessionId: Session.getTemporaryActiveUserKey() || 'session_' + Date.now(),
+      version: Date.now().toString()
+    });
+    
+    // userIdパラメータを追加（mode=viewは除外して非公開ページに誘導）
+    const url = new URL(cacheBustedUrl);
+    if (userId) {
+      url.searchParams.set('userId', userId);
+    }
+    
+    console.log('🚫 Unpublished state URL generated:', url.toString());
+    return url.toString();
+    
+  } catch (error) {
+    console.error('generateUnpublishedStateUrl error:', error.message);
+    // フォールバック: 基本的なURL
+    const baseUrl = getWebAppUrlCached();
+    return baseUrl + (userId ? '?userId=' + userId + '&_cb=' + Date.now() : '?_cb=' + Date.now());
+  }
+}
+
+/**
+ * パブリケーション状態を考慮したURL生成の拡張
+ * @param {string} userId - ユーザーID
+ * @param {Object} options - URL生成オプション
+ * @returns {Object} 拡張されたURL群
+ */
+function generateUserUrlsWithCacheBusting(userId, options = {}) {
+  try {
+    const standardUrls = generateUserUrls(userId);
+    
+    if (standardUrls.status === 'error') {
+      return standardUrls;
+    }
+    
+    // キャッシュバスティング対応版のURL生成
+    const cacheBustOptions = {
+      forceFresh: options.forceFresh || false,
+      publicationStatus: options.publicationStatus || 'unknown',
+      sessionId: options.sessionId || Session.getTemporaryActiveUserKey() || 'session_' + Date.now()
+    };
+    
+    return {
+      ...standardUrls,
+      // 既存URLにキャッシュバスティングを追加
+      adminUrl: addCacheBustingParams(standardUrls.adminUrl, cacheBustOptions),
+      viewUrl: addCacheBustingParams(standardUrls.viewUrl, cacheBustOptions),
+      setupUrl: addCacheBustingParams(standardUrls.setupUrl, cacheBustOptions),
+      // 非公開状態専用URL
+      unpublishedUrl: generateUnpublishedStateUrl(userId),
+      cacheBustingApplied: true,
+      cacheBustOptions: cacheBustOptions
+    };
+    
+  } catch (error) {
+    console.error('generateUserUrlsWithCacheBusting error:', error.message);
+    return generateUserUrls(userId); // フォールバック
+  }
 }
 
 /**

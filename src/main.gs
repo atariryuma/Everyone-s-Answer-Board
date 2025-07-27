@@ -524,15 +524,46 @@ function doGet(e) {
       return renderAdminPanel(userInfo, 'admin');
     }
 
-    // mode=view の場合
+    // mode=view の場合（キャッシュバスティング対応強化）
     if (params.mode === 'view') {
       if (!params.userId) {
         return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
       }
-      const userInfo = findUserById(params.userId);
+      
+      // ユーザー情報を強制的に最新状態で取得（キャッシュバイパス）
+      const userInfo = findUserById(params.userId, { 
+        useExecutionCache: false,
+        forceRefresh: true 
+      });
+      
       if (!userInfo) {
         return showErrorPage('エラー', '指定されたユーザーが見つかりません。');
       }
+      
+      // パブリケーション状態の事前検証
+      let config = {};
+      try {
+        config = JSON.parse(userInfo.configJson || '{}');
+      } catch (e) {
+        console.warn('Config JSON parse error during publication check:', e.message);
+      }
+      
+      // 非公開の場合は確実にUnpublishedページに誘導
+      const isCurrentlyPublished = !!(
+        config.appPublished === true && 
+        config.publishedSpreadsheetId && 
+        config.publishedSheetName &&
+        typeof config.publishedSheetName === 'string' &&
+        config.publishedSheetName.trim() !== ''
+      );
+      
+      console.log('🔍 Publication status check:', {
+        appPublished: config.appPublished,
+        hasSpreadsheetId: !!config.publishedSpreadsheetId,
+        hasSheetName: !!config.publishedSheetName,
+        isCurrentlyPublished: isCurrentlyPublished
+      });
+      
       return renderAnswerBoard(userInfo, params);
     }
     
@@ -1308,10 +1339,30 @@ function renderAnswerBoard(userInfo, params) {
     }
   }
 
+  // 強化されたパブリケーション状態検証（キャッシュバスティング対応）
   const isPublished = !!(config.appPublished && config.publishedSpreadsheetId && safePublishedSheetName);
+  
+  // リアルタイム検証: 非公開状態の場合は確実に検出
+  const isCurrentlyPublished = isPublished && 
+    config.appPublished === true && 
+    config.publishedSpreadsheetId && 
+    safePublishedSheetName;
+  
   const sheetConfigKey = 'sheet_' + (safePublishedSheetName || params.sheetName);
   const sheetConfig = config[sheetConfigKey] || {};
-  const showBoard = params.isDirectPageAccess || isPublished;
+  
+  // 修正: ダイレクトアクセスよりもパブリケーション状態を優先
+  // 非公開の場合は、ダイレクトアクセスでもUnpublishedページに誘導
+  const showBoard = isCurrentlyPublished && (params.isDirectPageAccess || true);
+  
+  console.log('🔍 renderAnswerBoard decision:', {
+    isCurrentlyPublished: isCurrentlyPublished,
+    isDirectPageAccess: params.isDirectPageAccess,
+    showBoard: showBoard,
+    appPublished: config.appPublished,
+    hasSpreadsheetId: !!config.publishedSpreadsheetId,
+    hasSheetName: !!safePublishedSheetName
+  });
   const file = showBoard ? 'Page' : 'Unpublished';
   const template = HtmlService.createTemplateFromFile(file);
   template.include = include;
@@ -1359,6 +1410,7 @@ function renderAnswerBoard(userInfo, params) {
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
     }
+    // 公開ボード: 通常のキャッシュ設定
     return template.evaluate()
       .setTitle('StudyQuest -みんなの回答ボード-')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -1380,9 +1432,92 @@ function renderAnswerBoard(userInfo, params) {
       template.adminEmail = userInfo.adminEmail || 'admin@example.com';
       template.cacheTimestamp = Date.now();
     }
-    return template.evaluate()
+    // 非公開ボード: キャッシュを無効化して確実なリダイレクトを保証
+    const htmlOutput = template.evaluate()
       .setTitle('StudyQuest - 準備中')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
+      .addMetaTag('pragma', 'no-cache')
+      .addMetaTag('expires', '0');
+    
+    // HTTPヘッダーレベルでのキャッシュ制御（可能な範囲で）
+    try {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    } catch (e) {
+      console.warn('X-Frame-Options設定に失敗:', e.message);
+    }
+    
+    return htmlOutput;
+  }
+}
+
+/**
+ * クライアントサイドからのパブリケーション状態チェック
+ * キャッシュバスティング対応のため、リアルタイムで状態を確認
+ * @param {string} userId - ユーザーID
+ * @returns {Object} パブリケーション状態情報
+ */
+function checkCurrentPublicationStatus(userId) {
+  try {
+    console.log('🔍 checkCurrentPublicationStatus called for userId:', userId);
+    
+    if (!userId) {
+      console.warn('userId is required for publication status check');
+      return { error: 'userId is required', isPublished: false };
+    }
+    
+    // ユーザー情報を強制的に最新状態で取得（キャッシュバイパス）
+    const userInfo = findUserById(userId, { 
+      useExecutionCache: false,
+      forceRefresh: true 
+    });
+    
+    if (!userInfo) {
+      console.warn('User not found for publication status check:', userId);
+      return { error: 'User not found', isPublished: false };
+    }
+    
+    // 設定情報を解析
+    let config = {};
+    try {
+      config = JSON.parse(userInfo.configJson || '{}');
+    } catch (e) {
+      console.warn('Config JSON parse error during publication status check:', e.message);
+      return { error: 'Config parse error', isPublished: false };
+    }
+    
+    // 現在のパブリケーション状態を厳密にチェック
+    const isCurrentlyPublished = !!(
+      config.appPublished === true && 
+      config.publishedSpreadsheetId && 
+      config.publishedSheetName &&
+      typeof config.publishedSheetName === 'string' &&
+      config.publishedSheetName.trim() !== ''
+    );
+    
+    console.log('📊 Publication status check result:', {
+      userId: userId,
+      appPublished: config.appPublished,
+      hasSpreadsheetId: !!config.publishedSpreadsheetId,
+      hasSheetName: !!config.publishedSheetName,
+      isCurrentlyPublished: isCurrentlyPublished,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      isPublished: isCurrentlyPublished,
+      publishedSheetName: config.publishedSheetName || null,
+      publishedSpreadsheetId: config.publishedSpreadsheetId || null,
+      lastChecked: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('❌ Error in checkCurrentPublicationStatus:', error);
+    return { 
+      error: error.message, 
+      isPublished: false,
+      lastChecked: new Date().toISOString()
+    };
   }
 }
 

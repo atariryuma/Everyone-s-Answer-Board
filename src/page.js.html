@@ -279,6 +279,9 @@ class StudyQuestApp {
       console.error('❌ StudyQuestApp: Fatal initialization error:', error);
       this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
     });
+    
+    // パブリケーション状態監視システムの初期化
+    this.initPublicationStatusMonitoring();
   }
 
   // Reset state for clean initialization (Phase 1.2)
@@ -521,6 +524,107 @@ class StudyQuestApp {
     this.errorHistory.push(errorDetails);
     if (this.errorHistory.length > 5) {
       this.errorHistory.shift();
+    }
+  }
+
+  /**
+   * パブリケーション状態監視システムの初期化
+   * キャッシュ関連のアクセス問題を防ぐため、リアルタイムで状態を監視
+   */
+  initPublicationStatusMonitoring() {
+    console.log('🔍 初期化: パブリケーション状態監視システム');
+    
+    // 定期的なパブリケーション状態チェック（3分間隔）
+    this.publicationCheckInterval = setInterval(() => {
+      this.checkPublicationStatus();
+    }, 180000); // 3分 = 180,000ms
+    
+    // ページの可視性変更時（ユーザーがタブに戻ってきた時）の状態チェック
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        console.log('📱 ページが可視状態に戻りました - パブリケーション状態をチェック');
+        this.checkPublicationStatus();
+      }
+    });
+    
+    // ページフォーカス時の状態チェック
+    window.addEventListener('focus', () => {
+      console.log('🎯 ページがフォーカスされました - パブリケーション状態をチェック');
+      this.checkPublicationStatus();
+    });
+    
+    // 初回チェック（10秒後に実行）
+    setTimeout(() => {
+      this.checkPublicationStatus();
+    }, 10000);
+  }
+
+  /**
+   * パブリケーション状態の実際のチェック処理
+   * 非公開状態が検出された場合、Unpublished.htmlにリダイレクト
+   */
+  async checkPublicationStatus() {
+    try {
+      console.log('🔍 パブリケーション状態をチェック中...');
+      
+      // サーバーサイドでのリアルタイム状態確認
+      const result = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Publication status check timeout'));
+        }, 8000); // 8秒タイムアウト
+        
+        google.script.run
+          .withSuccessHandler((response) => {
+            clearTimeout(timeout);
+            resolve(response);
+          })
+          .withFailureHandler((error) => {
+            clearTimeout(timeout);
+            reject(error);
+          })
+          .checkCurrentPublicationStatus(this.state.userId);
+      });
+      
+      console.log('📊 パブリケーション状態チェック結果:', result);
+      
+      // 非公開状態が検出された場合の処理
+      if (result && result.isPublished === false) {
+        console.log('⚠️ ボードが非公開状態に変更されました - Unpublished.htmlにリダイレクト');
+        
+        // キャッシュをクリア
+        if (this.cache && typeof this.cache.clear === 'function') {
+          this.cache.clear();
+        }
+        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+          window.unifiedCache.clear();
+        }
+        
+        // ローカルストレージのキャッシュもクリア
+        try {
+          Object.keys(localStorage).forEach(key => {
+            if (key.includes('studyquest') || key.includes('board') || key.includes('sheet')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (e) {
+          console.warn('localStorage clear warning:', e);
+        }
+        
+        // 非公開ページにリダイレクト（キャッシュバスティング付き）
+        const unpublishedUrl = new URL(window.location.href);
+        unpublishedUrl.searchParams.delete('mode'); // mode=viewを削除
+        unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
+        
+        window.location.href = unpublishedUrl.toString();
+        return;
+      }
+      
+      // 公開状態の場合は正常継続
+      console.log('✅ ボードは正常に公開中です');
+      
+    } catch (error) {
+      console.warn('⚠️ パブリケーション状態チェックでエラー:', error.message);
+      // エラーの場合は継続（ネットワーク問題などを考慮）
     }
   }
 
@@ -3070,6 +3174,79 @@ class StudyQuestApp {
       console.log('✅ Server cache cleared');
     } catch (error) {
       console.warn('⚠️ Failed to clear server cache:', error);
+    }
+  }
+
+  /**
+   * 非公開状態遷移用の包括的キャッシュクリア
+   * 既存のclearDataCachesを拡張し、より強力なキャッシュクリアを実行
+   */
+  clearAllCachesForUnpublished() {
+    console.log('🧹 非公開状態遷移: 包括的キャッシュクリア開始');
+    
+    try {
+      // 1. 既存のキャッシュクリア機能を使用
+      if (this.cache && typeof this.cache.clear === 'function') {
+        this.cache.clear();
+        console.log('🗑️ Frontend cache cleared');
+      }
+      
+      if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+        window.unifiedCache.clear();
+        console.log('🗑️ Unified cache cleared');
+      }
+      
+      // 2. 拡張されたローカルストレージクリア
+      const localStorageKeys = Object.keys(localStorage);
+      const studyQuestKeys = localStorageKeys.filter(key => 
+        key.includes('studyquest') || 
+        key.includes('board') || 
+        key.includes('sheet') ||
+        key.includes('admin') ||
+        key.includes('publication') ||
+        key.includes('answer') ||
+        key.includes('cache_') ||
+        key.includes('lastSeenCount_') ||
+        key.includes('differentialCards_')
+      );
+      
+      studyQuestKeys.forEach(key => {
+        localStorage.removeItem(key);
+        console.log('🗑️ Removed localStorage key:', key);
+      });
+      
+      // 3. セッションストレージクリア
+      if (window.sessionStorage) {
+        const sessionKeys = Object.keys(sessionStorage);
+        const studyQuestSessionKeys = sessionKeys.filter(key => 
+          key.includes('studyquest') || 
+          key.includes('board') || 
+          key.includes('admin')
+        );
+        
+        studyQuestSessionKeys.forEach(key => {
+          sessionStorage.removeItem(key);
+          console.log('🗑️ Removed sessionStorage key:', key);
+        });
+      }
+      
+      // 4. アプリケーションの状態リセット
+      if (this.state) {
+        this.state.currentAnswers = [];
+        this.state.hasNewContent = false;
+        this.state.newContentCount = 0;
+        this.state.lastSeenCount = 0;
+      }
+      
+      // 5. キャッシュ無効化タイムスタンプ設定
+      localStorage.setItem('lastUnpublishTime', Date.now().toString());
+      localStorage.setItem('unpublishedRedirectTimestamp', new Date().toISOString());
+      
+      console.log('✅ 非公開状態遷移用キャッシュクリア完了');
+      
+    } catch (error) {
+      console.error('❌ 非公開状態キャッシュクリアでエラー:', error);
+      // エラーがあっても処理は継続
     }
   }
   
@@ -6170,6 +6347,11 @@ class StudyQuestApp {
     }
   }
   redirectToUnpublishedPage() {
+    console.log('🚫 Redirecting to unpublished page (legacy function)');
+    
+    // キャッシュクリア処理（新機能と統合）
+    this.clearAllCachesForUnpublished();
+    
     // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
     try {
       localStorage.setItem('expandAllSections', 'true');
@@ -6178,20 +6360,14 @@ class StudyQuestApp {
       console.warn('⚠️ localStorage設定に失敗:', error);
     }
     
-    // Force redirect to Unpublished.html for both admin and viewers
-    google.script.run
-      .withSuccessHandler(function(webAppUrl) {
-        const url = new URL(webAppUrl);
-        // Redirect to Unpublished.html
-        url.pathname = url.pathname.replace(/\/[^\/]*$/, '/Unpublished.html');
-        window.location.href = url.toString();
-      })
-      .withFailureHandler(function(error) {
-        console.error('Failed to get web app URL:', error);
-        // Fallback: try relative path
-        window.location.href = './Unpublished.html';
-      })
-      .getWebAppUrl();
+    // 新しいキャッシュバスティング機能を使用したリダイレクト
+    const unpublishedUrl = new URL(window.location.href);
+    unpublishedUrl.searchParams.delete('mode'); // mode=viewを削除
+    unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
+    unpublishedUrl.searchParams.set('_redirect', 'unpublished'); // リダイレクト理由
+    
+    console.log('🔄 Redirecting to unpublished URL:', unpublishedUrl.toString());
+    window.location.href = unpublishedUrl.toString();
   }
   
   endAdminMode() {

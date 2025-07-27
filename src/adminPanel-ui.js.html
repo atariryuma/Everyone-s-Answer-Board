@@ -1549,17 +1549,56 @@ function updateSystemStatusDisplay(status) {
     }
   }
 
+  // フォームURLの取得（複数ソースから）
+  let formUrl = null;
+  
+  // 1. configJsonから取得
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      const configJson = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+      
+      if (configJson && configJson.formUrl) {
+        formUrl = configJson.formUrl;
+        console.log('✅ FormURL found in configJson:', formUrl);
+      }
+    } catch (error) {
+      console.warn('⚠️ configJson parse error:', error);
+    }
+  }
+  
+  // 2. userInfo.formUrlから取得（フォールバック）
+  if (!formUrl && status.userInfo && status.userInfo.formUrl) {
+    formUrl = status.userInfo.formUrl;
+    console.log('📋 FormURL found in userInfo:', formUrl);
+  }
+  
+  // 3. customFormInfoから取得（後方互換性）
+  if (!formUrl && status.customFormInfo && status.customFormInfo.formUrl) {
+    formUrl = status.customFormInfo.formUrl;
+    console.log('📄 FormURL found in customFormInfo:', formUrl);
+  }
+  
+  // statusオブジェクトにformUrlを設定
+  status.formUrl = formUrl;
+
   if (status.formUrl) { // statusオブジェクトにformUrlが存在する場合
     if (formBtn) {
       formBtn.disabled = false;
-      formBtn.onclick = () => window.open(status.formUrl, '_blank');
+      // onclick は既に adminPanel-events.js で openForm 関数が設定されているため、
+      // ここでは disabled 状態とスタイルのみを制御
+      formBtn.title = 'フォームを開く';
+      formBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      console.log('✅ Form button enabled with URL:', status.formUrl);
     }
   } else { // formUrlが存在しない場合、ボタンを無効化し、メッセージを表示
     if (formBtn) {
       formBtn.disabled = true;
-      formBtn.onclick = null; // クリックイベントを解除
-      // 必要に応じて、ボタンのツールチップやテキストを更新してユーザーに状況を伝える
-      // 例: formBtn.title = 'フォームURLが未設定です';
+      // onclick イベントは既存のものを保持（openForm関数）
+      formBtn.title = 'フォームURLが未設定です。フォームを作成してください。';
+      formBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      console.log('⚠️ Form button disabled - no URL available');
     }
   }
   

@@ -482,15 +482,110 @@ function proceedWithSaveAndPublish(config) {
     });
 }
 
+/**
+ * 公開停止時の強化されたキャッシュクリア処理
+ * キャッシュ関連のアクセス問題を防ぐため、あらゆるキャッシュを完全にクリア
+ */
+function clearAllCachesForUnpublish() {
+  console.log('🧹 公開停止時の包括的キャッシュクリア処理を開始');
+  
+  try {
+    // 1. アプリケーションレベルのキャッシュクリア
+    if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+      console.log('🗑️ Unified cache cleared');
+      window.unifiedCache.clear();
+    }
+    
+    if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+      console.log('🗑️ GAS optimizer cache cleared');
+      window.gasOptimizer.clearCache();
+    }
+    
+    // 2. ローカルストレージのキャッシュクリア（StudyQuest関連のみ）
+    try {
+      const localStorageKeys = Object.keys(localStorage);
+      const studyQuestKeys = localStorageKeys.filter(key => 
+        key.includes('studyquest') || 
+        key.includes('board') || 
+        key.includes('sheet') ||
+        key.includes('admin') ||
+        key.includes('publication') ||
+        key.includes('answer')
+      );
+      
+      studyQuestKeys.forEach(key => {
+        console.log('🗑️ Removing localStorage key:', key);
+        localStorage.removeItem(key);
+      });
+      
+      console.log(`🗑️ Cleared ${studyQuestKeys.length} localStorage keys`);
+    } catch (e) {
+      console.warn('⚠️ localStorage clear warning:', e);
+    }
+    
+    // 3. セッションストレージのクリア
+    try {
+      if (window.sessionStorage) {
+        const sessionKeys = Object.keys(sessionStorage);
+        const studyQuestSessionKeys = sessionKeys.filter(key => 
+          key.includes('studyquest') || 
+          key.includes('board') || 
+          key.includes('admin')
+        );
+        
+        studyQuestSessionKeys.forEach(key => {
+          console.log('🗑️ Removing sessionStorage key:', key);
+          sessionStorage.removeItem(key);
+        });
+        
+        console.log(`🗑️ Cleared ${studyQuestSessionKeys.length} sessionStorage keys`);
+      }
+    } catch (e) {
+      console.warn('⚠️ sessionStorage clear warning:', e);
+    }
+    
+    // 4. BroadcastChannel通知（他のタブに公開停止を通知）
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('board-updates');
+        channel.postMessage({
+          type: 'BOARD_UNPUBLISHED',
+          timestamp: Date.now(),
+          userId: window.userId || 'unknown'
+        });
+        console.log('📢 BroadcastChannel: 公開停止を他のタブに通知');
+        channel.close();
+      }
+    } catch (e) {
+      console.warn('⚠️ BroadcastChannel notification warning:', e);
+    }
+    
+    // 5. キャッシュ無効化のためのタイムスタンプ更新
+    try {
+      localStorage.setItem('lastUnpublishTime', Date.now().toString());
+      localStorage.setItem('cacheInvalidationToken', Math.random().toString(36));
+      console.log('🔄 Cache invalidation tokens updated');
+    } catch (e) {
+      console.warn('⚠️ Cache invalidation token update warning:', e);
+    }
+    
+    console.log('✅ 公開停止時のキャッシュクリア処理が完了しました');
+    
+  } catch (error) {
+    console.error('❌ キャッシュクリア処理でエラー:', error);
+    // エラーがあっても処理は継続
+  }
+}
+
 // Unpublish board
 function unpublishBoard() {
   return runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
     .then(function(response) {
       logDebug('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
-      if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-        window.unifiedCache.clear();
-      }
+      
+      // 強化されたキャッシュクリア処理（キャッシュバスティング対応）
+      clearAllCachesForUnpublish();
       
       // Reset column selection dropdowns to default "--列を選択--" state
       resetColumnSelections();
@@ -840,6 +935,16 @@ function openDatabaseSpreadsheet() {
 
 // Open form
 function openForm() {
+  console.log('🔗 openForm function called');
+  
+  // ボタンが無効化されている場合はクリックを無視
+  const formBtn = document.getElementById('open-form-btn');
+  if (formBtn && formBtn.disabled) {
+    console.log('⚠️ Form button is disabled, ignoring click');
+    showMessage('フォームを作成してからクリックしてください。', 'warning');
+    return;
+  }
+  
   // データベースからフォームURLを取得する優先順位を設定
   let formUrl = null;
   
@@ -1312,38 +1417,56 @@ function checkPublicationStatusAndProceed(onProceed, onCancel) {
 
 // クイックスタートの実際の実行
 function executeQuickStart(quickstartBtn, quickstartText) {
-  // 自動停止設定を事前に準備
-  const autoStopSettings = {
-    enabled: true,
-    minutes: 360 // 6時間 = 360分（config.gsと統一）
-  };
+  // 現在の公開状態を確認
+  const isCurrentlyPublished = currentStatus && 
+                               currentStatus._normalized && 
+                               currentStatus._normalized.isPublished;
   
-  // 公開モーダルを表示（クイックスタート用）
-  if (window.sharedModals && typeof window.sharedModals.showPublish === 'function') {
-    window.sharedModals.showPublish(
-      // 公開実行時のコールバック - クイックスタート実行
+  console.log('🚀 クイックスタート実行: 公開状態チェック', {
+    isCurrentlyPublished: isCurrentlyPublished,
+    currentStatus: currentStatus?._normalized
+  });
+  
+  if (isCurrentlyPublished) {
+    // 公開中の場合: 停止確認モーダルを表示
+    console.log('📢 現在公開中のため、停止確認モーダルを表示します');
+    showQuickStartStopConfirmation(quickstartBtn, quickstartText);
+  } else {
+    // 非公開の場合: 直接クイックスタート実行（自動公開フラグ付き）
+    console.log('📝 現在非公開のため、直接クイックスタートを実行します（自動公開）');
+    executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
+  }
+}
+
+// 公開中ボード停止確認モーダル表示
+function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
+  if (window.sharedModals && typeof window.sharedModals.showQuickStartStopConfirmation === 'function') {
+    window.sharedModals.showQuickStartStopConfirmation(
+      // 確認時のコールバック
       () => {
-        console.log('📤 クイックスタート: 公開モーダルで公開が選択されました');
-        executeQuickStartProcess(quickstartBtn, quickstartText);
+        console.log('✅ ユーザーが停止して新規作成を確認しました');
+        executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
       },
       // キャンセル時のコールバック
       () => {
         console.log('❌ クイックスタートがキャンセルされました');
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタートを開始';
-      },
-      // 自動停止設定
-      autoStopSettings
+      }
     );
   } else {
-    // フォールバック: モーダルが利用できない場合は直接実行
-    console.warn('⚠️ 公開モーダルが利用できません。直接実行します。');
-    executeQuickStartProcess(quickstartBtn, quickstartText);
+    // フォールバック: 通常の確認ダイアログ
+    if (confirm('現在公開中のボードを停止して、新しいフォームとボードを作成しますか？')) {
+      executeQuickStartProcess(quickstartBtn, quickstartText, true);
+    } else {
+      quickstartBtn.disabled = false;
+      quickstartText.textContent = 'クイックスタートを開始';
+    }
   }
 }
 
 // クイックスタートの実際の処理実行
-function executeQuickStartProcess(quickstartBtn, quickstartText) {
+function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = false) {
   // Update button state
   quickstartBtn.disabled = true;
   quickstartText.textContent = 'セットアップ中...';
@@ -1362,7 +1485,12 @@ function executeQuickStartProcess(quickstartBtn, quickstartText) {
         updateOverallProgress(100, 'セットアップが完了しました！');
         updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
         
-        showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
+        // 自動公開状態に応じたメッセージ表示
+        if (autoPublish) {
+          showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成され、公開されました。', 'success');
+        } else {
+          showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
+        }
         
         // Update status after quick start
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
@@ -1402,44 +1530,49 @@ function executeQuickStartProcess(quickstartBtn, quickstartText) {
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタート完了';
         
-        // 公開完了確認とURL生成後に自動停止確認モーダルを表示
-        setTimeout(() => {
-          // ローディングオーバーレイを非表示にしてからモーダル表示
-          if (window.unifiedLoadingManager) {
-            window.unifiedLoadingManager.setLoading(false);
-          }
+        // 自動公開の場合のみ自動停止確認モーダルを表示
+        if (autoPublish) {
+          console.log('🚀 自動公開が有効なため、自動停止確認モーダルを表示します');
           
-          // URL生成確認とデータ検証を実行
-          const enhancedResult = {
-            ...result,
-            // URL生成の待機時間を延長
-            url: result?.url || '',
-            autoStopMinutes: result?.autoStopMinutes || 360,
-            autoStopTime: result?.autoStopTime || '',
-            publicationData: {
-              isPublished: result?.success || false,
-              hasValidUrl: !!(result?.url && result.url.length > 0),
-              timestamp: new Date().toISOString()
-            }
-          };
-          
-          console.log('📊 QuickStart公開データ検証:', {
-            hasResult: !!result,
-            hasUrl: !!(result?.url && result.url.length > 0),
-            autoStopMinutes: result?.autoStopMinutes,
-            enhancedResult: enhancedResult
-          });
-          
-          // 自動停止確認モーダルを表示（検証済みデータで）
           setTimeout(() => {
-            if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
-              window.sharedModals.showAutoStopConfirmation(enhancedResult);
-              console.log('✅ QuickStart公開後に自動停止確認モーダルを表示しました（URL検証済み）');
-            } else {
-              console.warn('⚠️ 自動停止モーダルが利用できません');
+            // ローディングオーバーレイを非表示にしてからモーダル表示
+            if (window.unifiedLoadingManager) {
+              window.unifiedLoadingManager.setLoading(false);
             }
-          }, 800); // URL生成確認に十分な時間を確保
-        }, 2000);
+            
+            // URL生成確認とデータ検証を実行
+            const enhancedResult = {
+              ...result,
+              url: result?.url || '',
+              autoStopMinutes: result?.autoStopMinutes || 360,
+              autoStopTime: result?.autoStopTime || '',
+              publicationData: {
+                isPublished: result?.success || false,
+                hasValidUrl: !!(result?.url && result.url.length > 0),
+                timestamp: new Date().toISOString()
+              }
+            };
+            
+            console.log('📊 QuickStart公開データ検証:', {
+              autoPublish: autoPublish,
+              hasResult: !!result,
+              hasUrl: !!(result?.url && result.url.length > 0),
+              enhancedResult: enhancedResult
+            });
+            
+            // 自動停止確認モーダルを表示（検証済みデータで）
+            setTimeout(() => {
+              if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
+                window.sharedModals.showAutoStopConfirmation(enhancedResult);
+                console.log('✅ QuickStart自動公開後に自動停止確認モーダルを表示しました');
+              } else {
+                console.warn('⚠️ 自動停止モーダルが利用できません');
+              }
+            }, 800);
+          }, 2000);
+        } else {
+          console.log('ℹ️ 自動公開が無効のため、自動停止確認モーダルをスキップします');
+        }
         
         // Hide progress bar after delay and reset button
         setTimeout(() => {
