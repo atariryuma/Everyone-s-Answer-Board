@@ -1050,12 +1050,25 @@ class SharedModals {
       // 残り時間のカウントダウンを開始
       this.startCountdown(stopTime);
     } else {
-      // publishResultが不完全な場合の包括的フォールバック処理
-      console.warn('⚠️ 公開結果データが不完全です:', {
-        publishResult: publishResult,
-        validationErrors: validationResult.errors,
-        fallbackAction: 'デフォルト設定を適用'
-      });
+      // Critical errors がある場合のみ警告表示、軽微な問題は情報レベル
+      if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
+        console.warn('⚠️ 公開結果データに重要な問題があります:', {
+          publishResult: publishResult,
+          criticalErrors: validationResult.criticalErrors,
+          fallbackAction: 'デフォルト設定を適用'
+        });
+      } else if (validationResult.warningErrors && validationResult.warningErrors.length > 0) {
+        console.log('ℹ️ 公開結果データに軽微な問題がありますが正常に処理します:', {
+          publishResult: publishResult,
+          warningErrors: validationResult.warningErrors,
+          fallbackAction: 'デフォルト設定を適用'
+        });
+      } else {
+        console.debug('🔧 フォールバック処理を実行中:', {
+          publishResult: publishResult,
+          reason: '検証結果がfalse（原因不明）'
+        });
+      }
       
       const now = new Date();
       const minutes = 360; // デフォルト6時間
@@ -1064,12 +1077,17 @@ class SharedModals {
       document.getElementById('publish-start-time').textContent = now.toLocaleString('ja-JP');
       document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
       
-      // エラー状態の詳細表示
+      // エラー状態の詳細表示（Critical errors のみ表示）
       const remainingTimeEl = document.getElementById('remaining-time');
       if (remainingTimeEl) {
-        const errorCount = validationResult.errors.length;
-        remainingTimeEl.textContent = `⚠️ ${errorCount}個の問題を検出 - 設定を確認してください`;
-        remainingTimeEl.className = 'font-medium text-yellow-100';
+        if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
+          const errorCount = validationResult.criticalErrors.length;
+          remainingTimeEl.textContent = `⚠️ ${errorCount}個の重要な問題を検出 - 設定を確認してください`;
+          remainingTimeEl.className = 'font-medium text-yellow-100';
+        } else {
+          // Critical errors がない場合は通常のカウントダウンを開始
+          this.startCountdown(stopTime);
+        }
       }
       
       // URL状態の表示（エラーケース）
@@ -1155,17 +1173,21 @@ class SharedModals {
         }
       }
 
-      // 公開時刻チェック（柔軟な対応）
-      if (!publishResult.publishedAt) {
-        // 公開時刻が設定されていない場合は現在時刻を使用
+      // 公開時刻チェック（最適化版）
+      if (!publishResult.publishedAt || publishResult.publishedAt.trim() === '') {
+        // 公開時刻が設定されていない場合のみ現在時刻を使用
         publishResult.publishedAt = new Date().toISOString();
         console.log('🕒 公開時刻を現在時刻で補完:', publishResult.publishedAt);
-        errors.push('公開時刻が設定されていません（現在時刻で補完）');
+        // 補完は情報レベル（警告ではない）
+        console.debug('ℹ️ 公開時刻が未設定のため現在時刻で補完しました');
       } else {
+        // 公開時刻が既に存在する場合は検証のみ実行
         try {
           const publishTime = new Date(publishResult.publishedAt);
           if (isNaN(publishTime.getTime())) {
             errors.push('公開時刻の形式が無効です');
+          } else {
+            console.debug('✅ 公開時刻は正常です:', publishResult.publishedAt);
           }
         } catch (e) {
           errors.push('公開時刻の解析に失敗しました');
@@ -1178,11 +1200,36 @@ class SharedModals {
       }
     }
 
+    // Critical errors vs Warning errors の分類
+    const criticalErrors = errors.filter(error => 
+      error.includes('公開が成功していません') ||
+      error.includes('公開URLが空です') ||
+      error.includes('公開URLが不完全です') ||
+      error.includes('公開時刻の形式が無効です') ||
+      error.includes('公開時刻の解析に失敗しました') ||
+      error.includes('自動停止時間が範囲外です')
+    );
+    
+    const warningErrors = errors.filter(error => !criticalErrors.includes(error));
+    const hasCriticalErrors = criticalErrors.length > 0;
+    
+    console.debug('🔍 エラー分類:', {
+      criticalErrors: criticalErrors,
+      warningErrors: warningErrors,
+      totalErrors: errors.length
+    });
+
     return {
-      isValid: isValid && errors.length === 0,
+      isValid: isValid && !hasCriticalErrors, // Critical errors のみで判定
       hasValidUrl: hasValidUrl,
       errors: errors,
-      summary: errors.length === 0 ? '✅ データは正常です' : `❌ ${errors.length}個の問題があります`
+      criticalErrors: criticalErrors,
+      warningErrors: warningErrors,
+      summary: hasCriticalErrors ? 
+        `❌ ${criticalErrors.length}個の重要な問題があります` : 
+        (warningErrors.length > 0 ? 
+          `⚠️ ${warningErrors.length}個の軽微な問題があります` : 
+          '✅ データは正常です')
     };
   }
 
