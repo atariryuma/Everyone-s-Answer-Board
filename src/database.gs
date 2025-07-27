@@ -495,13 +495,15 @@ function findUserByIdFresh(userId) {
   // 既存キャッシュを強制削除
   var cacheKey = 'user_' + userId;
   cacheManager.remove(cacheKey);
-  
-  // データベースから直接取得（キャッシュなし）
-  var freshUserInfo = fetchUserFromDatabase('userId', userId);
-  
+
+  // データベースから直接取得（範囲キャッシュも無効化）
+  var freshUserInfo = fetchUserFromDatabase('userId', userId, {
+    clearCache: true
+  });
+
   // 次回の通常アクセス時にキャッシュされるため、ここでは手動設定不要
   console.log('✅ Fresh user data retrieved for:', userId);
-  
+
   return freshUserInfo;
 }
 
