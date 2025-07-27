@@ -512,21 +512,6 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// =============================================================================
-// TOUCH AND MOBILE INTERACTIONS
-// =============================================================================
-
-// Handle touch interactions for mobile
-if ('ontouchstart' in window) {
-  // Add touch-friendly classes
-  document.body.classList.add('touch-device');
-  
-  // Improve button tap targets
-  var buttons = document.querySelectorAll('button, .btn');
-  buttons.forEach(function(button) {
-    button.classList.add('touch-target');
-  });
-}
 
 // =============================================================================
 // ACCESSIBILITY ENHANCEMENTS

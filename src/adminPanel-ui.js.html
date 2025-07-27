@@ -409,12 +409,6 @@ function populateHeaderOptions(headers) {
   }
   window.populateHeaderOptionsRunning = true;
   
-  const DEBUG_UI = window.DEBUG || false;
-  if (DEBUG_UI) {
-    console.group('🎯 populateHeaderOptions');
-    console.log('📝 Headers to populate:', headers.length, headers);
-  }
-  
   const selects = [
     'opinionHeader',      // Main required field
     'reason-column',     // Optional details field (reason column)
@@ -422,34 +416,16 @@ function populateHeaderOptions(headers) {
     'class-column'
   ];
   
-  if (DEBUG_UI) {
-    console.log('🎯 Target dropdown elements:', selects);
-  }
-  
   selects.forEach(selectId => {
-    if (DEBUG_UI) {
-      console.log(`🔍 Looking for element: ${selectId}`);
-    }
     const select = document.getElementById(selectId);
     
     if (select) {
-      if (DEBUG_UI) {
-        console.log(`✅ Found element: ${selectId}`);
-      }
-      
       // Store current value
       const currentValue = select.value;
-      if (DEBUG_UI) {
-        console.log(`📄 Current value: "${currentValue}"`);
-      }
       
       // Clear and repopulate
       select.innerHTML = '<option value="">-- 列を選択 --</option>';
-      if (DEBUG_UI) {
-        console.log(`🧹 Cleared dropdown: ${selectId}`);
-      }
       
-      let optionsAdded = 0;
       const excludedHeaders = [
         'なるほど！',
         'いいね！',
@@ -466,42 +442,14 @@ function populateHeaderOptions(headers) {
         option.value = header;
         option.textContent = header;
         select.appendChild(option);
-        optionsAdded++;
       });
-      
-      if (DEBUG_UI) {
-        console.log(`📋 Added ${optionsAdded} options to ${selectId}`);
-        console.log(`📊 Total options in ${selectId}:`, select.options.length);
-      }
       
       // Restore previous value if still valid
       if (currentValue && headers.includes(currentValue)) {
         select.value = currentValue;
-        if (DEBUG_UI) {
-          console.log(`♻️ Restored value: "${currentValue}" for ${selectId}`);
-        }
-      }
-      
-      // Debug final state
-      if (DEBUG_UI) {
-        console.log(`🎯 Final state of ${selectId}:`, {
-          value: select.value,
-          optionsCount: select.options.length,
-          visible: !select.hidden,
-          disabled: select.disabled
-        });
-      }
-      
-    } else {
-      if (DEBUG_UI) {
-        console.error(`❌ Element not found: ${selectId}`);
       }
     }
   });
-  
-  if (DEBUG_UI) {
-    console.groupEnd();
-  }
   
   // Reset throttle after a delay
   setTimeout(() => {
@@ -519,18 +467,11 @@ function populateConfig(cfg) {
   }
   window.populateConfigRunning = true;
   
-  const DEBUG_UI = window.DEBUG || false;
-  if (DEBUG_UI) {
-    console.group('🤖 populateConfig');
-    console.log('📝 AI Config received:', cfg);
-  }
-  
   const mappings = {
     // Main opinion dropdown (primary target)
     'opinionHeader': cfg.opinionHeader || cfg.opinionColumn,
     
     // Detail configuration dropdowns (secondary targets with property name fixes)
-    'reason-column': cfg.reasonColumn || cfg.reasonHeader,
     'reason-column': cfg.reasonColumn || cfg.reasonHeader,
     'name-column': cfg.nameColumn || cfg.nameHeader,
     'class-column': cfg.classColumn || cfg.classHeader,
@@ -538,56 +479,18 @@ function populateConfig(cfg) {
     'show-counts': cfg.showCounts
   };
   
-  if (DEBUG_UI) {
-    console.log('🎯 Mappings to apply:', mappings);
-  }
-  
   Object.keys(mappings).forEach(elementId => {
     const element = document.getElementById(elementId);
     const value = mappings[elementId];
     
-    if (DEBUG_UI) {
-      console.log(`🔍 Setting ${elementId}:`, { 
-        element: !!element, 
-        value: value,
-        valueType: typeof value 
-      });
-    }
-    
     if (element && value !== undefined) {
       if (element.type === 'checkbox') {
         element.checked = Boolean(value);
-        if (DEBUG_UI) {
-          console.log(`☑️ Checkbox ${elementId} set to:`, element.checked);
-        }
       } else {
         element.value = value;
-        if (DEBUG_UI) {
-          console.log(`📋 Dropdown ${elementId} set to:`, element.value);
-        }
-        
-        // Verify the option exists in the dropdown
-        const hasOption = Array.from(element.options).some(option => option.value === value);
-        if (!hasOption && DEBUG_UI) {
-          console.warn(`⚠️ Option "${value}" not found in ${elementId} dropdown`);
-          console.log(`Available options:`, Array.from(element.options).map(opt => opt.value));
-        } else if (DEBUG_UI) {
-          console.log(`✅ Option "${value}" successfully selected in ${elementId}`);
-        }
-      }
-    } else {
-      if (!element && DEBUG_UI) {
-        console.warn(`❌ Element not found: ${elementId}`);
-      }
-      if (value === undefined && DEBUG_UI) {
-        console.log(`⚪ No value for: ${elementId}`);
       }
     }
   });
-  
-  if (DEBUG_UI) {
-    console.groupEnd();
-  }
   
   // Reset throttle after a delay
   setTimeout(() => {
@@ -618,25 +521,21 @@ function clearConfigFields() {
 
 // Build configuration object from form
 function buildConfigObject() {
-  if (window.DEBUG) {
-    console.group('📋 buildConfigObject');
-  }
-  
   // Get values from primary elements (with fallback to secondary elements)
   const opinionValue = document.getElementById('opinionHeader')?.value || 
                       document.getElementById('reason-column')?.value || '';
   const nameValue = document.getElementById('name-column')?.value || '';
   const classValue = document.getElementById('class-column')?.value || '';
   const showNames = document.getElementById('show-names')?.checked || false;
-  const showCounts = document.getElementById('show-counts')?.checked || false; // デフォルトfalseに変更
+  const showCounts = document.getElementById('show-counts')?.checked || false;
   
-  const config = {
+  return {
     sheetName: selectedSheet,
     // Use property names that match backend expectations (opinionHeader format)
     opinionHeader: opinionValue,
     nameHeader: nameValue,
     classHeader: classValue,
-    reasonHeader: document.getElementById('reason-column')?.value || '', // Add reasonHeader
+    reasonHeader: document.getElementById('reason-column')?.value || '',
     // Also provide legacy format for backward compatibility
     opinionColumn: opinionValue,
     nameColumn: nameValue,
@@ -644,15 +543,6 @@ function buildConfigObject() {
     showNames: showNames,
     showCounts: showCounts
   };
-  
-  if (window.DEBUG) {
-    console.log('📊 Built config object:', config);
-    console.log('🎯 Primary opinion value from opinionHeader:', document.getElementById('opinionHeader')?.value);
-    console.log('🔄 Fallback opinion value from reason-column:', document.getElementById('reason-column')?.value);
-    console.groupEnd();
-  }
-  
-  return config;
 }
 
 // Validate configuration
@@ -661,18 +551,7 @@ function validateConfig() {
   const opinionValue = document.getElementById('opinionHeader')?.value || 
                       document.getElementById('reason-column')?.value || '';
   
-  const isValid = opinionValue && opinionValue.trim() !== '';
-  
-  if (window.DEBUG) {
-    console.log('🔍 validateConfig:', {
-      opinionHeader: document.getElementById('opinionHeader')?.value,
-      reasonColumn: document.getElementById('reason-column')?.value,
-      finalValue: opinionValue,
-      isValid: isValid
-    });
-  }
-  
-  return isValid;
+  return opinionValue && opinionValue.trim() !== '';
 }
 
 // Update configuration buttons state
@@ -1496,115 +1375,6 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
     });
 }
 
-// Load data preview for selected sheet (Enhanced version)
-function loadDataPreview(sheetName, details) {
-  const previewContent = document.getElementById('data-preview-content');
-  if (!previewContent) return;
-  
-  console.log('📊 Loading data preview for sheet:', sheetName, 'with details:', details);
-  
-  // Show loading state (if details are not yet available)
-  if (!details) {
-    previewContent.innerHTML = `
-      <div class="animate-pulse">
-        <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-        <div class="h-4 bg-gray-700 rounded w-1/2 mb-2"></div>
-        <div class="h-3 bg-gray-700 rounded w-full"></div>
-      </div>
-    `;
-    return;
-  }
-
-  // If details are provided, use them directly
-  if (details && details.headers) {
-    const headersList = details.headers.slice(0, 6); // First 6 headers for better display
-    const moreHeaders = details.headers.length > 6 ? `...他${details.headers.length - 6}列` : '';
-    
-    // Calculate data row count (excluding header)
-    const dataRowCount = (details.rowCount || 0) - 1; // Subtract 1 for header row
-    const hasData = dataRowCount > 0;
-    
-    // Show sample data if available
-    let sampleDataHtml = '';
-    if (details.sampleData && details.sampleData.length > 0) {
-      const sampleRows = details.sampleData.slice(0, 3); // Show first 3 rows
-      sampleDataHtml = `
-        <div class="mb-3">
-          <span class="text-gray-400 text-xs">サンプルデータ:</span>
-          <div class="mt-1 bg-gray-800/50 rounded p-2 text-xs">
-            ${sampleRows.map((row, index) => `
-              <div class="flex gap-2 mb-1 ${index > 0 ? 'text-gray-400' : 'text-gray-300'}">
-                <span class="text-blue-400 w-4">${index + 1}:</span>
-                <span class="truncate">${Array.isArray(row) ? row.slice(0, 3).join(' | ') : row}</span>
-                ${Array.isArray(row) && row.length > 3 ? '<span class="text-gray-500">...</span>' : ''}
-              </div>
-            `).join('')}
-            ${details.sampleData.length > 3 ? '<div class="text-gray-500 text-center">...</div>' : ''}
-          </div>
-        </div>
-      `;
-    }
-    
-    previewContent.innerHTML = `
-      <div class="text-sm space-y-3">
-        <!-- Basic Info -->
-        <div class="flex justify-between items-center">
-          <div>
-            <span class="text-gray-400">列数:</span>
-            <span class="text-white font-medium">${details.headers.length}列</span>
-          </div>
-          <div>
-            <span class="text-gray-400">データ行数:</span>
-            <span class="text-${hasData ? 'green' : 'yellow'}-400 font-medium">
-              ${hasData ? `${dataRowCount}行` : '0行'}
-            </span>
-          </div>
-        </div>
-        
-        <!-- Headers -->
-        <div>
-          <span class="text-gray-400 text-xs">列一覧:</span>
-          <div class="flex flex-wrap gap-1 mt-1">
-            ${headersList.map((header, index) => `
-              <span class="px-2 py-1 bg-blue-500/20 text-blue-200 rounded text-xs flex items-center gap-1">
-                <span class="text-blue-400">${index + 1}.</span>
-                ${header || '(空白)'}
-              </span>
-            `).join('')}
-            ${moreHeaders ? `<span class="text-gray-400 text-xs px-2 py-1">${moreHeaders}</span>` : ''}
-          </div>
-        </div>
-        
-        ${sampleDataHtml}
-        
-        <!-- Status Message -->
-        <div class="text-xs ${hasData ? 'text-green-400' : 'text-yellow-400'} bg-gray-800/30 rounded p-2 border ${hasData ? 'border-green-500/20' : 'border-yellow-500/20'}">
-          ${hasData 
-            ? '✅ データが確認できました。列設定を行って公開準備を進めてください。' 
-            : '⚠️ データが入力されていません。スプレッドシートにデータを追加してから設定してください。'
-          }
-        </div>
-      </div>
-    `;
-  } else {
-    previewContent.innerHTML = `
-      <div class="text-sm">
-        <div class="text-yellow-400 bg-yellow-500/10 rounded p-3 border border-yellow-500/20">
-          <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-            </svg>
-            <span class="font-medium">データを取得できませんでした</span>
-          </div>
-          <p class="text-xs text-yellow-300">
-            シートが存在しない、またはアクセス権限がない可能性があります。<br>
-            スプレッドシートの設定を確認してください。
-          </p>
-        </div>
-      </div>
-    `;
-  }
-}
 
 // =============================================================================
 // SETUP STATUS HANDLING FUNCTIONS
@@ -1899,54 +1669,6 @@ function enableSection(section) {
 }
 
 
-// セットアップ状況をグローバルステータスから取得
-
-// セットアップ未完了時の段階的制御を強制
-function enforceStepProgression() {
-  const step1Completed = checkStep1Completion();
-  const step2Completed = checkStep2Completion();
-  
-  // Step 2の制御
-  const step2Section = document.getElementById('sheet-selection-section');
-  if (!step1Completed) {
-    disableSection(step2Section, '⚠️ 先にデータ準備を完了してください');
-  } else {
-    enableSection(step2Section);
-  }
-  
-  // Step 3の制御
-  const step3Section = document.getElementById('config-section');
-  if (!step1Completed || !step2Completed) {
-    disableSection(step3Section, '⚠️ 前のステップを完了してください');
-  } else {
-    enableSection(step3Section);
-  }
-}
-
-// Step 1完了チェック
-function checkStep1Completion() {
-  return !!(selectedSheetId || selectedFormId || 
-            (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
-}
-
-// Step 2完了チェック
-function checkStep2Completion() {
-  return !!(currentStatus && currentStatus.activeSheetName);
-}
-
-// セクションを有効化
-function enableSection(section) {
-  if (!section) return;
-  
-  section.style.opacity = '1';
-  section.style.pointerEvents = 'auto';
-  
-  // 警告メッセージを削除
-  const warning = section.querySelector('.step-warning');
-  if (warning) {
-    warning.remove();
-  }
-}
 
 // Validate configuration
 function validateConfiguration() {
@@ -1959,125 +1681,6 @@ function validateConfiguration() {
   return hasContent && hasAuthor;
 }
 
-// Handle sheet selection
-function handleSheetSelection(event) {
-  selectedSheetId = event.target.value;
-  selectedFormId = null; // Clear form selection
-  
-  if (selectedSheetId) {
-    loadSheetColumns(selectedSheetId);
-  }
-  
-  validateCurrentStep();
-}
-
-// Handle form selection
-function handleFormSelection(event) {
-  selectedFormId = event.target.value;
-  selectedSheetId = null; // Clear sheet selection
-  
-  if (selectedFormId) {
-    loadFormColumns(selectedFormId);
-  }
-  
-  validateCurrentStep();
-}
-
-// Load sheet columns
-function loadSheetColumns(sheetId) {
-  if (typeof runGasWithUserId === 'function') {
-    runGasWithUserId('getSheetColumns', sheetId)
-      .then(columns => {
-        displayColumnMapping(columns);
-      })
-      .catch(error => {
-        console.error('Failed to load sheet columns:', error);
-        showMessage('列の読み込みに失敗しました', 'error');
-      });
-  }
-}
-
-// Load form columns
-function loadFormColumns(formId) {
-  if (typeof runGasWithUserId === 'function') {
-    runGasWithUserId('getFormColumns', formId)
-      .then(columns => {
-        displayColumnMapping(columns);
-      })
-      .catch(error => {
-        console.error('Failed to load form columns:', error);
-        showMessage('フォーム項目の読み込みに失敗しました', 'error');
-      });
-  }
-}
-
-// Display column mapping interface
-function displayColumnMapping(columns) {
-  const configPlaceholder = document.getElementById('config-placeholder');
-  const configContent = document.getElementById('config-content');
-  
-  if (configPlaceholder) configPlaceholder.classList.add('hidden');
-  if (configContent) configContent.classList.remove('hidden');
-  
-  const mappingContainer = document.getElementById('column-mappings');
-  if (!mappingContainer) return;
-  
-  mappingContainer.innerHTML = '';
-  
-  columns.forEach((column, index) => {
-    const mappingDiv = document.createElement('div');
-    mappingDiv.className = 'column-mapping';
-    mappingDiv.innerHTML = `
-      <div>
-        <label class="block text-sm font-medium text-gray-200 mb-2">
-          ${column.name}
-          ${column.required ? '<span class="text-red-400">*</span>' : ''}
-        </label>
-        <p class="text-xs text-gray-400">${column.description || ''}</p>
-      </div>
-      <div>
-        <select class="form-control form-select column-mapping-select" data-column="${column.id}">
-          <option value="">選択してください</option>
-          <option value="content">回答内容</option>
-          <option value="author">回答者名</option>
-          <option value="reaction">リアクション</option>
-        </select>
-      </div>
-    `;
-    mappingContainer.appendChild(mappingDiv);
-  });
-}
-
-// Handle column mapping
-function handleColumnMapping(select) {
-  const columnId = select.dataset.column;
-  const mappingType = select.value;
-  const mappingDiv = select.closest('.column-mapping');
-  
-  // Update visual feedback
-  mappingDiv.classList.remove('required', 'mapped');
-  if (mappingType && mappingType !== 'ignore') {
-    mappingDiv.classList.add('mapped');
-  }
-  
-  // Update configuration
-  if (!currentConfig) currentConfig = {};
-  if (!currentConfig.columnMappings) currentConfig.columnMappings = {};
-  currentConfig.columnMappings[columnId] = mappingType;
-  
-  validateCurrentStep();
-}
-
-// Handle toggle changes
-function handleToggleChange(event) {
-  const toggleName = event.target.name;
-  const isChecked = event.target.checked;
-  
-  if (!currentConfig) currentConfig = {};
-  currentConfig[toggleName] = isChecked;
-  
-  validateCurrentStep();
-}
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
 </script>

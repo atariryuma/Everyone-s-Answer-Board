@@ -203,40 +203,6 @@ function safeSetText(elementId, text) {
   var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
   if (element) {
     setSafeTextContent(element, text || '');
-  } else {
-    console.warn(`❌ [DEBUG] Element not found: ${elementId}`);
-  }
-}
-
-// Check if element exists and has class
-function hasClass(element, className) {
-  return element && element.classList && element.classList.contains(className);
-}
-
-// Safe attribute setter
-function safeSetAttribute(elementId, attribute, value) {
-  var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
-  if (element) {
-    element.setAttribute(attribute, value);
-  }
-}
-
-// Safe style setter
-function safeSetStyle(elementId, property, value) {
-  var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
-  if (element && element.style) {
-    element.style[property] = value;
-  }
-}
-
-// Safe innerHTML setter (use with caution)
-function safeSetHTML(elementId, html) {
-  var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
-  if (element) {
-    // Basic XSS protection
-    var div = document.createElement('div');
-    div.textContent = html;
-    element.innerHTML = div.innerHTML;
   }
 }
 
