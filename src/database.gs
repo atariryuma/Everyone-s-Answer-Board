@@ -24,7 +24,7 @@ const DELETE_LOG_SHEET_CONFIG = {
 };
 
 /**
- * 削除ログを記録
+ * 削除ログを安全にトランザクション的に記録
  * @param {string} executorEmail - 削除実行者のメール
  * @param {string} targetUserId - 削除対象のユーザーID
  * @param {string} targetEmail - 削除対象のメール
@@ -32,71 +32,162 @@ const DELETE_LOG_SHEET_CONFIG = {
  * @param {string} deleteType - 削除タイプ ("self" | "admin")
  */
 function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
+  const transactionLog = {
+    startTime: Date.now(),
+    steps: [],
+    success: false,
+    rollbackActions: []
+  };
+  
   try {
+    // 入力検証
+    if (!executorEmail || !targetUserId || !targetEmail || !deleteType) {
+      throw new Error('必須パラメータが不足しています');
+    }
+    
     const props = PropertiesService.getScriptProperties();
     const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     
     if (!dbId) {
       console.warn('削除ログの記録をスキップします: データベースIDが設定されていません');
-      return;
+      return { success: false, reason: 'no_database_id' };
     }
+    
+    transactionLog.steps.push('validation_complete');
     
     const service = getSheetsServiceCached();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
     
-    // ログシートの存在確認・作成
+    // ロック取得でトランザクション開始
+    const lock = LockService.getScriptLock();
+    let lockAcquired = false;
+    
     try {
-      const spreadsheetInfo = getSpreadsheetsData(service, dbId);
-      const logSheetExists = spreadsheetInfo.sheets.some(sheet => 
-        sheet.properties.title === logSheetName
-      );
+      lockAcquired = lock.tryLock(5000);
+      if (!lockAcquired) {
+        throw new Error('ログ記録のロック取得に失敗しました');
+      }
+      transactionLog.steps.push('lock_acquired');
       
-      if (!logSheetExists) {
-        // バッチ最適化: ログシート作成
-        console.log('📊 バッチ最適化: ログシート作成を実行');
+      // ログシートの存在確認・作成（トランザクション内）
+      let sheetCreated = false;
+      try {
+        const spreadsheetInfo = getSpreadsheetsData(service, dbId);
+        const logSheetExists = spreadsheetInfo.sheets.some(sheet => 
+          sheet.properties.title === logSheetName
+        );
         
-        const addSheetRequest = {
-          addSheet: {
-            properties: {
-              title: logSheetName,
-              gridProperties: {
-                rowCount: 1000,
-                columnCount: DELETE_LOG_SHEET_CONFIG.HEADERS.length
+        if (!logSheetExists) {
+          // バッチ最適化: ログシート作成
+          console.log('📊 トランザクション内ログシート作成開始');
+          
+          const addSheetRequest = {
+            addSheet: {
+              properties: {
+                title: logSheetName,
+                gridProperties: {
+                  rowCount: 1000,
+                  columnCount: DELETE_LOG_SHEET_CONFIG.HEADERS.length
+                }
               }
             }
-          }
-        };
+          };
+          
+          // シートを作成
+          batchUpdateSpreadsheet(service, dbId, {
+            requests: [addSheetRequest]
+          });
+          
+          transactionLog.steps.push('sheet_created');
+          sheetCreated = true;
+          
+          // ヘッダー行を追加（作成直後）
+          appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [DELETE_LOG_SHEET_CONFIG.HEADERS]);
+          transactionLog.steps.push('headers_added');
+          
+          console.log('✅ ログシートとヘッダーの作成完了');
+        }
+      } catch (sheetError) {
+        // シート作成失敗時のロールバック
+        if (sheetCreated) {
+          transactionLog.rollbackActions.push('remove_created_sheet');
+        }
+        throw new Error(`ログシートの準備に失敗: ${sheetError.message}`);
+      }
+      
+      // ログエントリを安全に追加
+      const logEntry = [
+        new Date().toISOString(),
+        String(executorEmail).substring(0, 255), // 長さ制限
+        String(targetUserId).substring(0, 255),
+        String(targetEmail).substring(0, 255),
+        String(reason || '').substring(0, 500), // 理由は500文字まで
+        String(deleteType).substring(0, 50)
+      ];
+      
+      try {
+        appendSheetsData(service, dbId, `'${logSheetName}'!A:F`, [logEntry]);
+        transactionLog.steps.push('log_entry_added');
         
-        // シートを作成
-        batchUpdateSpreadsheet(service, dbId, {
-          requests: [addSheetRequest]
+        // 検証: 追加されたログエントリの確認
+        Utilities.sleep(100); // 書き込み完了待機
+        const verificationData = batchGetSheetsData(service, dbId, [`'${logSheetName}'!A:F`]);
+        const lastRow = verificationData.valueRanges[0].values?.slice(-1)[0];
+        
+        if (!lastRow || lastRow[1] !== executorEmail || lastRow[2] !== targetUserId) {
+          throw new Error('ログエントリの検証に失敗しました');
+        }
+        
+        transactionLog.steps.push('verification_complete');
+        transactionLog.success = true;
+        
+        console.log('✅ 削除ログの安全な記録完了:', {
+          executor: executorEmail,
+          target: targetUserId,
+          type: deleteType,
+          steps: transactionLog.steps.length
         });
         
-        // ヘッダー行を追加（作成直後）
-        appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [DELETE_LOG_SHEET_CONFIG.HEADERS]);
+        return { 
+          success: true, 
+          logEntry: logEntry,
+          transactionLog: transactionLog
+        };
         
-        console.log('✅ ログシートとヘッダーの作成完了');
+      } catch (appendError) {
+        throw new Error(`ログエントリの追加に失敗: ${appendError.message}`);
       }
-    } catch (sheetError) {
-      console.warn('ログシートの確認に失敗しましたが、処理を続行します:', sheetError.message);
+      
+    } finally {
+      if (lockAcquired) {
+        lock.releaseLock();
+        transactionLog.steps.push('lock_released');
+      }
     }
     
-    // ログエントリを追加
-    const logEntry = [
-      new Date().toISOString(),
-      executorEmail,
-      targetUserId,
-      targetEmail,
-      reason || '',
-      deleteType
-    ];
-    
-    appendSheetsData(service, dbId, `'${logSheetName}'!A:F`, [logEntry]);
-    console.log('✅ 削除ログを記録しました:', logEntry);
-    
   } catch (error) {
-    console.error('削除ログの記録に失敗しました:', error.message);
-    // ログ記録の失敗は削除処理自体を止めない
+    transactionLog.duration = Date.now() - transactionLog.startTime;
+    
+    // 構造化エラーログ
+    const errorInfo = {
+      timestamp: new Date().toISOString(),
+      function: 'logAccountDeletion',
+      severity: 'medium', // ログ記録失敗は削除処理自体を止めない
+      parameters: { executorEmail, targetUserId, targetEmail, deleteType },
+      error: error.message,
+      transactionLog: transactionLog
+    };
+    
+    console.error('🚨 削除ログ記録エラー:', JSON.stringify(errorInfo, null, 2));
+    
+    // ロールバック処理（必要に応じて）
+    // 現在はログ記録のみなので、深刻なロールバックは不要
+    
+    return { 
+      success: false, 
+      error: error.message,
+      transactionLog: transactionLog
+    };
   }
 }
 
@@ -175,22 +266,51 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       throw new Error('この機能にアクセスする権限がありません。');
     }
     
-    // 削除理由の検証
-    if (!reason || reason.trim().length < 20) {
+    // 厳格な削除理由の検証
+    if (!reason || typeof reason !== 'string' || reason.trim().length < 20) {
       throw new Error('削除理由は20文字以上で入力してください。');
+    }
+    
+    // 削除理由の内容検証（不適切な理由を防ぐ）
+    const invalidReasonPatterns = [
+      /test/i, /テスト/i, /試し/i, /適当/i, /dummy/i, /sample/i
+    ];
+    
+    if (invalidReasonPatterns.some(pattern => pattern.test(reason))) {
+      throw new Error('削除理由に適切な内容を入力してください。テスト用の削除は許可されていません。');
     }
     
     const executorEmail = Session.getActiveUser().getEmail();
     
-    // 削除対象ユーザー情報を取得
+    // セキュリティチェック: 管理者メールの検証
+    if (!executorEmail || !executorEmail.includes('@')) {
+      throw new Error('実行者のメールアドレスを取得できません。');
+    }
+    
+    // 削除対象ユーザー情報を安全に取得
     const targetUserInfo = findUserById(targetUserId);
     if (!targetUserInfo) {
       throw new Error('削除対象のユーザーが見つかりません。');
     }
     
+    // 追加セキュリティチェック
+    if (!targetUserInfo.adminEmail || !targetUserInfo.userId) {
+      throw new Error('削除対象ユーザーの情報が不完全です。');
+    }
+    
     // 自分自身の削除を防ぐ
     if (targetUserInfo.adminEmail === executorEmail) {
       throw new Error('自分自身のアカウントは管理者削除機能では削除できません。個人用削除機能をご利用ください。');
+    }
+    
+    // 最後のアクティブ確認（削除予定の危険度チェック）
+    if (targetUserInfo.lastAccessedAt) {
+      const lastAccess = new Date(targetUserInfo.lastAccessedAt);
+      const daysSinceLastAccess = (Date.now() - lastAccess.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceLastAccess < 7) {
+        console.warn(`警告: 削除対象ユーザーは${Math.floor(daysSinceLastAccess)}日前にアクセスしています`);
+      }
     }
     
     const lock = LockService.getScriptLock();

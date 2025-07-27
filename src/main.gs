@@ -69,6 +69,16 @@ const LOG_SHEET_CONFIG = {
   HEADERS: ['timestamp', 'userId', 'action', 'details']
 };
 
+// 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
+var _executionUserInfoCache = null;
+
+/**
+ * 実行中のユーザー情報キャッシュをクリア
+ */
+function clearExecutionUserInfoCache() {
+  _executionUserInfoCache = null;
+}
+
 const COLUMN_HEADERS = {
   TIMESTAMP: 'タイムスタンプ',
   EMAIL: 'メールアドレス',

@@ -141,30 +141,29 @@ function verifyAdminAccess(userId) {
       return false;
     }
 
-    // データベースから指定されたIDのユーザー情報を取得（キャッシュ活用）
-    // セキュリティ検証のため、最新データを確実に取得
+    // データベースから指定されたIDのユーザー情報を取得
+    // セキュリティ認証では最新データが必要だが、過度なキャッシュクリアを避ける
     console.log('verifyAdminAccess: ユーザー検索開始 - userId:', userId);
     
-    // キャッシュを完全にクリアして最新データを取得
-    var cacheKey = 'user_' + userId;
-    var emailCacheKey = 'email_' + activeUserEmail;
+    // まずキャッシュからユーザー情報を取得を試行
+    var userFromDb = getOrFetchUserInfo(userId, 'userId', { 
+      useExecutionCache: false, // セキュリティ認証のため実行時キャッシュは使用しない
+      ttl: 60 // 短いTTLで最新性を確保
+    });
     
-    console.log('verifyAdminAccess: キャッシュクリア実行');
-    cacheManager.remove(cacheKey);
-    cacheManager.remove(emailCacheKey);
+    // セキュリティクリティカルな場合のみ、追加検証として直接取得
+    if (!userFromDb || !userFromDb.adminEmail) {
+      console.log('verifyAdminAccess: 直接データベース検索にフォールバック');
+      userFromDb = fetchUserFromDatabase('userId', userId);
+    }
     
-    // 直接データベースから取得（キャッシュを経由しない）
-    // 初回登録直後の場合、データベース書き込み完了を待つためのリトライ機能
-    console.log('verifyAdminAccess: データベースから直接ユーザー検索');
-    var userFromDb = fetchUserFromDatabase('userId', userId);
-    
-    console.log('verifyAdminAccess: データベース検索結果:', {
+    console.log('verifyAdminAccess: ユーザー検索結果:', {
       found: !!userFromDb,
       userId: userFromDb ? userFromDb.userId : 'なし',
       adminEmail: userFromDb ? userFromDb.adminEmail : 'なし',
       isActive: userFromDb ? userFromDb.isActive : 'なし',
       activeUserEmail: activeUserEmail,
-      retriesUsed: 0 // リトライは行わないため0
+      cacheStrategy: 'optimized' // 最適化されたキャッシュ戦略を使用
     });
 
     if (!userFromDb) {
@@ -195,10 +194,20 @@ function verifyAdminAccess(userId) {
       console.log('✅ 管理者本人によるアクセスを確認しました:', activeUserEmail, 'UserID:', userId);
       return true; // メールが一致し、かつアクティブであれば成功
     } else {
-      console.warn('⚠️ 不正なアクセス試行をブロックしました。' +
-                  'DB Email: ' + userFromDb.adminEmail + 
-                  ', Active Email: ' + activeUserEmail + 
-                  ', Is Active: ' + isActive);
+      // セキュリティログの構造化
+      const securityAlert = {
+        timestamp: new Date().toISOString(),
+        event: 'unauthorized_access_attempt',
+        severity: 'high',
+        details: {
+          attemptedUserId: userId,
+          dbEmail: userFromDb.adminEmail,
+          activeUserEmail: activeUserEmail,
+          isUserActive: isActive,
+          sourceFunction: 'verifyAdminAccess'
+        }
+      };
+      console.warn('🚨 セキュリティアラート:', JSON.stringify(securityAlert, null, 2));
       return false; // 一致しない、またはアクティブでない場合は失敗
     }
   } catch (e) {
@@ -288,8 +297,24 @@ function processLoginFlow(userEmail) {
       return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
     }
   } catch (error) {
-    console.error('processLoginFlowでエラー:', error.stack);
-    return showErrorPage('ログインエラー', 'ログイン処理中にエラーが発生しました。', error);
+    // 構造化エラーログの出力
+    const errorInfo = {
+      timestamp: new Date().toISOString(),
+      function: 'processLoginFlow',
+      userEmail: userEmail || 'unknown',
+      errorType: error.name || 'UnknownError',
+      message: error.message,
+      stack: error.stack,
+      severity: 'high' // ログインエラーは高重要度
+    };
+    console.error('🚨 processLoginFlow 重大エラー:', JSON.stringify(errorInfo, null, 2));
+    
+    // ユーザーフレンドリーなエラーメッセージ
+    const userMessage = error.message.includes('ユーザー') 
+      ? error.message 
+      : 'ログイン処理中に予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
+      
+    return showErrorPage('ログインエラー', userMessage, error);
   }
 }
 

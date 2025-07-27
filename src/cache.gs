@@ -238,27 +238,55 @@ class CacheManager {
   }
 
   /**
-   * パターンに一致するキーのキャッシュを削除します。
+   * パターンに一致するキーのキャッシュを安全に削除します。
    * @param {string} pattern - 削除するキーのパターン（部分一致）
+   * @param {object} [options] - オプション { strict: boolean, maxKeys: number }
    */
-  clearByPattern(pattern) {
+  clearByPattern(pattern, options = {}) {
+    const { strict = false, maxKeys = 1000 } = options;
+    
     if (!pattern || typeof pattern !== 'string') {
       console.warn(`[Cache] Invalid pattern for clearByPattern: ${pattern}`);
-      return;
+      return 0;
     }
     
-    // メモ化キャッシュから一致するキーを削除
+    // セキュリティチェック: 過度に広範囲な削除を防ぐ
+    if (!strict && (pattern.length < 3 || pattern === '*' || pattern === '.*')) {
+      console.warn(`[Cache] Pattern too broad for safe removal: ${pattern}. Use strict=true to override.`);
+      return 0;
+    }
+    
+    // メモ化キャッシュから一致するキーを安全に削除
     const keysToRemove = [];
     let failedRemovals = 0;
+    let skippedCount = 0;
     
     try {
       for (const key of this.memoCache.keys()) {
+        // 安全性チェック: 重要なシステムキーは保護
+        if (this._isProtectedKey(key)) {
+          skippedCount++;
+          continue;
+        }
+        
         if (key.includes(pattern)) {
           keysToRemove.push(key);
+          
+          // 大量削除の防止
+          if (keysToRemove.length >= maxKeys) {
+            console.warn(`[Cache] Reached maxKeys limit (${maxKeys}) for pattern: ${pattern}`);
+            break;
+          }
         }
       }
     } catch (e) {
       console.warn(`[Cache] Failed to iterate memoCache keys for pattern: ${pattern}`, e.message);
+      this.stats.errors++;
+    }
+    
+    // 削除前の確認ログ
+    if (keysToRemove.length > 100) {
+      console.warn(`[Cache] Large pattern deletion detected: ${keysToRemove.length} keys for pattern: ${pattern}`);
     }
     
     keysToRemove.forEach(key => {
@@ -268,45 +296,123 @@ class CacheManager {
       } catch (e) {
         console.warn(`[Cache] Failed to remove key during pattern clear: ${key}`, e.message);
         failedRemovals++;
+        this.stats.errors++;
       }
     });
     
-    debugLog(`[Cache] Cleared ${keysToRemove.length - failedRemovals} cache entries matching pattern: ${pattern} (${failedRemovals} failed)`);
+    const successCount = keysToRemove.length - failedRemovals;
+    
+    debugLog(`[Cache] Pattern clear completed: ${successCount} removed, ${failedRemovals} failed, ${skippedCount} protected (pattern: ${pattern})`);
+    
+    return successCount;
+  }
+  
+  /**
+   * 保護すべきキーかどうかを判定
+   * @private
+   */
+  _isProtectedKey(key) {
+    const protectedPatterns = [
+      'SA_TOKEN_CACHE',           // サービスアカウントトークン
+      'WEB_APP_URL',             // WebアプリURL
+      'SYSTEM_CONFIG',           // システム設定
+      'DOMAIN_INFO'              // ドメイン情報
+    ];
+    
+    return protectedPatterns.some(pattern => key.includes(pattern));
   }
 
   /**
-   * インテリジェント無効化：関連するキャッシュエントリを連鎖的に無効化
+   * インテリジェント無効化：関連するキャッシュエントリを安全に連鎖的に無効化
    * @param {string} entityType - エンティティタイプ (user, spreadsheet, form等)
    * @param {string} entityId - エンティティID
    * @param {Array<string>} relatedIds - 関連するエンティティID群
+   * @param {object} [options] - オプション { dryRun: boolean, maxRelated: number }
    */
-  invalidateRelated(entityType, entityId, relatedIds = []) {
+  invalidateRelated(entityType, entityId, relatedIds = [], options = {}) {
+    const { dryRun = false, maxRelated = 50 } = options;
+    const invalidationLog = {
+      entityType,
+      entityId,
+      totalRemoved: 0,
+      errors: [],
+      patterns: [],
+      startTime: Date.now()
+    };
+    
     try {
-      console.log(`🔗 関連キャッシュ無効化開始: ${entityType}/${entityId}`);
+      // 入力検証
+      if (!entityType || !entityId) {
+        throw new Error('entityType and entityId are required');
+      }
+      
+      // 関連IDの数制限
+      if (relatedIds.length > maxRelated) {
+        console.warn(`[Cache] Too many related IDs (${relatedIds.length}), limiting to ${maxRelated}`);
+        relatedIds = relatedIds.slice(0, maxRelated);
+      }
+      
+      console.log(`🔗 関連キャッシュ無効化開始: ${entityType}/${entityId} (${dryRun ? 'DRY RUN' : 'LIVE'})`);
       
       // 1. メインエンティティのキャッシュ無効化
       const patterns = this._getInvalidationPatterns(entityType, entityId);
+      invalidationLog.patterns.push(...patterns);
+      
       patterns.forEach(pattern => {
-        this.clearByPattern(pattern);
+        try {
+          if (!dryRun) {
+            const removed = this.clearByPattern(pattern, { strict: false, maxKeys: 100 });
+            invalidationLog.totalRemoved += removed;
+          } else {
+            console.log(`[Cache] DRY RUN: Would clear pattern: ${pattern}`);
+          }
+        } catch (error) {
+          invalidationLog.errors.push(`Pattern ${pattern}: ${error.message}`);
+        }
       });
       
-      // 2. 関連エンティティのキャッシュ無効化
+      // 2. 関連エンティティのキャッシュ無効化（検証付き）
       relatedIds.forEach(relatedId => {
-        if (relatedId && relatedId !== entityId) {
+        if (!relatedId || relatedId === entityId) {
+          return; // 無効な関連IDまたは自分自身はスキップ
+        }
+        
+        try {
           const relatedPatterns = this._getInvalidationPatterns(entityType, relatedId);
           relatedPatterns.forEach(pattern => {
-            this.clearByPattern(pattern);
+            if (!dryRun) {
+              const removed = this.clearByPattern(pattern, { strict: false, maxKeys: 50 });
+              invalidationLog.totalRemoved += removed;
+            } else {
+              console.log(`[Cache] DRY RUN: Would clear related pattern: ${pattern}`);
+            }
           });
+        } catch (error) {
+          invalidationLog.errors.push(`Related ID ${relatedId}: ${error.message}`);
         }
       });
       
       // 3. クロスエンティティ関連キャッシュの無効化
-      this._invalidateCrossEntityCache(entityType, entityId, relatedIds);
+      if (!dryRun) {
+        this._invalidateCrossEntityCache(entityType, entityId, relatedIds, invalidationLog);
+      }
       
-      console.log(`✅ 関連キャッシュ無効化完了: ${entityType}/${entityId}`);
+      invalidationLog.duration = Date.now() - invalidationLog.startTime;
+      
+      if (invalidationLog.errors.length > 0) {
+        console.warn(`⚠️ 関連キャッシュ無効化で一部エラー: ${entityType}/${entityId}`, invalidationLog.errors);
+      } else {
+        console.log(`✅ 関連キャッシュ無効化完了: ${entityType}/${entityId} (${invalidationLog.totalRemoved} entries, ${invalidationLog.duration}ms)`);
+      }
+      
+      return invalidationLog;
       
     } catch (error) {
-      console.warn(`⚠️ 関連キャッシュ無効化エラー: ${entityType}/${entityId}`, error.message);
+      invalidationLog.errors.push(`Fatal: ${error.message}`);
+      invalidationLog.duration = Date.now() - invalidationLog.startTime;
+      console.error(`❌ 関連キャッシュ無効化致命的エラー: ${entityType}/${entityId}`, error);
+      this.stats.errors++;
+      return invalidationLog;
     }
   }
   
@@ -353,29 +459,59 @@ class CacheManager {
   }
   
   /**
-   * クロスエンティティキャッシュの無効化
+   * クロスエンティティキャッシュの安全な無効化
    * @private
    */
-  _invalidateCrossEntityCache(entityType, entityId, relatedIds) {
+  _invalidateCrossEntityCache(entityType, entityId, relatedIds, invalidationLog) {
     try {
       // ユーザー変更時は関連するスプレッドシート・フォームキャッシュも無効化
       if (entityType === 'user' && relatedIds.length > 0) {
         relatedIds.forEach(relatedId => {
-          this.clearByPattern(`user_${entityId}_spreadsheet_${relatedId}*`);
-          this.clearByPattern(`user_${entityId}_form_${relatedId}*`);
+          if (relatedId && typeof relatedId === 'string' && relatedId.length > 0) {
+            try {
+              const removed1 = this.clearByPattern(`user_${entityId}_spreadsheet_${relatedId}`, { maxKeys: 20 });
+              const removed2 = this.clearByPattern(`user_${entityId}_form_${relatedId}`, { maxKeys: 20 });
+              invalidationLog.totalRemoved += (removed1 + removed2);
+            } catch (error) {
+              invalidationLog.errors.push(`Cross-entity user-${relatedId}: ${error.message}`);
+            }
+          }
         });
       }
       
       // スプレッドシート変更時は関連するユーザーキャッシュも無効化
       if (entityType === 'spreadsheet' && relatedIds.length > 0) {
         relatedIds.forEach(userId => {
-          this.clearByPattern(`user_${userId}_spreadsheet_${entityId}*`);
-          this.clearByPattern(`config_${userId}*`); // ユーザー設定も無効化
+          if (userId && typeof userId === 'string' && userId.length > 0) {
+            try {
+              const removed1 = this.clearByPattern(`user_${userId}_spreadsheet_${entityId}`, { maxKeys: 20 });
+              const removed2 = this.clearByPattern(`config_${userId}`, { maxKeys: 10 }); // ユーザー設定も無効化
+              invalidationLog.totalRemoved += (removed1 + removed2);
+            } catch (error) {
+              invalidationLog.errors.push(`Cross-entity spreadsheet-${userId}: ${error.message}`);
+            }
+          }
+        });
+      }
+      
+      // フォーム変更時の追加ロジック
+      if (entityType === 'form' && relatedIds.length > 0) {
+        relatedIds.forEach(userId => {
+          if (userId && typeof userId === 'string' && userId.length > 0) {
+            try {
+              const removed = this.clearByPattern(`user_${userId}_form_${entityId}`, { maxKeys: 10 });
+              invalidationLog.totalRemoved += removed;
+            } catch (error) {
+              invalidationLog.errors.push(`Cross-entity form-${userId}: ${error.message}`);
+            }
+          }
         });
       }
       
     } catch (error) {
+      invalidationLog.errors.push(`Cross-entity fatal: ${error.message}`);
       console.warn('クロスエンティティキャッシュ無効化エラー:', error.message);
+      this.stats.errors++;
     }
   }
 

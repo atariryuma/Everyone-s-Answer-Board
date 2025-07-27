@@ -5,6 +5,7 @@ describe('getInitialData header extraction', () => {
   const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
+  const databaseCode = fs.readFileSync('src/database.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -13,7 +14,14 @@ describe('getInitialData header extraction', () => {
       debugLog: () => {},
       console,
       PropertiesService: {
-        getScriptProperties: () => ({ getProperty: () => null }),
+        getScriptProperties: () => ({ 
+          getProperty: (key) => {
+            if (key === 'DATABASE_SPREADSHEET_ID') return 'test-spreadsheet-id';
+            if (key === 'ADMIN_EMAIL') return 'admin@example.com';
+            if (key === 'SERVICE_ACCOUNT_CREDS') return '{}';
+            return null;
+          }
+        }),
       },
       CacheService: {
         getUserCache: () => ({ get: () => null, put: () => {} }),
@@ -41,16 +49,36 @@ describe('getInitialData header extraction', () => {
         getScriptId: () => 'ID'
       },
       Session: { getActiveUser: () => ({ getEmail: () => 'test@example.com' }) },
-      Utilities: { getUuid: () => 'uid', computeDigest: () => [], Charset: { UTF_8: 'UTF-8' } },
+      Utilities: { 
+        getUuid: () => 'uid', 
+        computeDigest: () => [], 
+        Charset: { UTF_8: 'UTF-8' },
+        sleep: (ms) => {} // モックのsleep関数
+      },
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
+    vm.runInContext(databaseCode, context);
     vm.runInContext(coreCode, context);
 
     Object.assign(context, {
       verifyUserAccess: jest.fn(),
-      getCachedUserInfo: jest.fn(() => ({
+      getOrFetchUserInfo: jest.fn(() => ({
+        userId: 'U',
+        adminEmail: 'test@example.com',
+        spreadsheetId: '',
+        spreadsheetUrl: '',
+        configJson: JSON.stringify({
+          publishedSheetName: 'ClassA',
+          sheet_ClassA: {
+            opinionHeader: 'テーマ',
+            nameHeader: '氏名',
+            classHeader: 'クラス',
+          },
+        }),
+      })),
+      findUserById: jest.fn(() => ({
         userId: 'U',
         adminEmail: 'test@example.com',
         spreadsheetId: '',
@@ -68,6 +96,9 @@ describe('getInitialData header extraction', () => {
       generateUserUrls: jest.fn(() => ({ webApp: 'web', adminUrl: 'admin', viewUrl: 'view' })),
       getResponsesData: jest.fn(() => ({ status: 'success', data: [] })),
       determineSetupStep: jest.fn(() => 3),
+      getServiceAccountTokenCached: jest.fn(() => 'mock-token'),
+      getSheetsService: jest.fn(() => ({})),
+      getCachedSheetsService: jest.fn(() => ({})),
     });
   });
 
