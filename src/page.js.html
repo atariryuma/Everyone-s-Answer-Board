@@ -40,7 +40,6 @@ const ICONS = {
   'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
   'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
   'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
-  'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
   'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
   'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
 };
@@ -281,6 +280,290 @@ class StudyQuestApp {
       this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
     });
   }
+
+  // Reset state for clean initialization (Phase 1.2)
+  resetStateForCleanInit() {
+    console.log('🔄 Resetting state for clean initialization...');
+    
+    // Reset core data arrays
+    this.state.currentAnswers = [];
+    this.state.hasNewContent = false;
+    this.state.newContentCount = 0;
+    this.state.pollingFailureCount = 0;
+    
+    // Clear differential cards to prevent residual data
+    this.clearDifferentialCards();
+    
+    // Reset initialization flags
+    this.initialDataLoaded = false;
+    this.hadInitialDataLoadFailure = false;
+    this.lastViewKey = null;
+    
+    // Clear content check flags
+    this.contentCheckInProgress = false;
+    
+    // Reset current active sheet state
+    this.state.currentActiveSheet = SHEET_NAME;
+    
+    console.log('✅ State reset completed', {
+      currentAnswers: this.state.currentAnswers.length,
+      initialDataLoaded: this.initialDataLoaded,
+      currentActiveSheet: this.state.currentActiveSheet
+    });
+  }
+
+  // Unified state management synchronization (Phase 2.3)
+  synchronizeStateAfterDataUpdate(newData, context = 'unknown') {
+    console.log(`🔄 Synchronizing state after data update (${context})...`);
+    
+    const dataLength = newData ? newData.length : 0;
+    const previousLength = this.state.currentAnswers.length;
+    
+    // Step 1: Update data
+    this.state.currentAnswers = newData || [];
+    
+    // Step 2: Update count-related state variables simultaneously
+    this.updateLastSeenCount(dataLength);
+    
+    // Step 3: Update content flags
+    if (dataLength > previousLength) {
+      this.state.hasNewContent = true;
+      this.state.newContentCount = dataLength - previousLength;
+    } else {
+      this.state.hasNewContent = false;
+      this.state.newContentCount = 0;
+    }
+    
+    // Step 4: Reset polling failure count on successful data update
+    this.state.pollingFailureCount = 0;
+    
+    // Phase 4.1: Enhanced monitoring and logging
+    this.logDataConsistencyMetrics(context, dataLength, previousLength);
+    
+    console.log('✅ State synchronization completed:', {
+      context,
+      dataLength,
+      previousLength,
+      hasNewContent: this.state.hasNewContent,
+      newContentCount: this.state.newContentCount,
+      lastSeenCount: this.state.lastSeenCount
+    });
+    
+    return {
+      dataLength,
+      hasChanges: dataLength !== previousLength
+    };
+  }
+
+  // Comprehensive data consistency and cache monitoring (Phase 4.1)
+  logDataConsistencyMetrics(context, currentDataLength, previousDataLength) {
+    const domCardCount = this.elements.answersContainer ? 
+      this.elements.answersContainer.querySelectorAll('.answer-card').length : 0;
+    
+    const metrics = {
+      timestamp: new Date().toISOString(),
+      context,
+      dataMetrics: {
+        currentLength: currentDataLength,
+        previousLength: previousDataLength,
+        lastSeenCount: this.state.lastSeenCount,
+        changeAmount: currentDataLength - previousDataLength
+      },
+      domMetrics: {
+        cardCount: domCardCount,
+        dataVsDom: currentDataLength - domCardCount,
+        isConsistent: currentDataLength === domCardCount
+      },
+      stateMetrics: {
+        hasNewContent: this.state.hasNewContent,
+        newContentCount: this.state.newContentCount,
+        pollingFailureCount: this.state.pollingFailureCount,
+        initialDataLoaded: this.initialDataLoaded
+      },
+      performanceMetrics: {
+        timeSinceInit: Date.now() - this.state.startTime,
+        isLoadingActive: this.state.isLoading
+      }
+    };
+    
+    console.log('📊 Data Consistency Metrics (Phase 4.1):', metrics);
+    
+    // Store metrics for debugging (keep last 10 entries)
+    if (!this.debugMetrics) this.debugMetrics = [];
+    this.debugMetrics.push(metrics);
+    if (this.debugMetrics.length > 10) {
+      this.debugMetrics.shift();
+    }
+    
+    // Alert on significant inconsistencies
+    if (!metrics.domMetrics.isConsistent) {
+      console.warn('⚠️ DOM-Data inconsistency detected:', {
+        data: currentDataLength,
+        dom: domCardCount,
+        context
+      });
+    }
+    
+    return metrics;
+  }
+
+  // Cache hit/miss tracking (Phase 4.1)
+  logCacheActivity(operation, hit, details = {}) {
+    const cacheLog = {
+      timestamp: new Date().toISOString(),
+      operation,
+      hit,
+      details,
+      context: this.state.currentActiveSheet || 'unknown'
+    };
+    
+    console.log(`🗄️ Cache ${hit ? 'HIT' : 'MISS'}:`, cacheLog);
+    
+    // Store cache metrics
+    if (!this.cacheMetrics) this.cacheMetrics = [];
+    this.cacheMetrics.push(cacheLog);
+    if (this.cacheMetrics.length > 20) {
+      this.cacheMetrics.shift();
+    }
+  }
+
+  // Enhanced error handling and recovery system (Phase 4.2)
+  async handleDataLoadError(error, context, retryOptions = {}) {
+    const {
+      maxRetries = 2,
+      retryDelay = 1000,
+      fallbackStrategy = 'clearAndReload'
+    } = retryOptions;
+
+    console.error(`❌ Data load error in ${context}:`, error);
+    
+    // Log detailed error information
+    this.logErrorDetails(error, context);
+    
+    // Increment failure count
+    this.state.pollingFailureCount = (this.state.pollingFailureCount || 0) + 1;
+    
+    // Determine recovery strategy based on error type and failure count
+    const recoveryStrategy = this.determineRecoveryStrategy(error, context);
+    
+    try {
+      switch (recoveryStrategy) {
+        case 'retry':
+          console.log(`🔄 Attempting retry for ${context}...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return await this.executeRecoveryRetry(context);
+          
+        case 'clearAndReload':
+          console.log(`🔄 Executing clear and reload for ${context}...`);
+          return await this.executeRecoveryReload();
+          
+        case 'fallbackMode':
+          console.log(`🔄 Switching to fallback mode for ${context}...`);
+          return await this.executeRecoveryFallback();
+          
+        default:
+          console.log(`ℹ️ No recovery action taken for ${context}`);
+          this.displayUserFriendlyError(error, context);
+          return null;
+      }
+    } catch (recoveryError) {
+      console.error('❌ Recovery strategy failed:', recoveryError);
+      this.displayUserFriendlyError(error, context, true);
+      return null;
+    }
+  }
+
+  logErrorDetails(error, context) {
+    const errorDetails = {
+      timestamp: new Date().toISOString(),
+      context,
+      error: {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      },
+      state: {
+        currentAnswersLength: this.state.currentAnswers?.length || 0,
+        lastSeenCount: this.state.lastSeenCount,
+        pollingFailureCount: this.state.pollingFailureCount,
+        isLoading: this.state.isLoading
+      },
+      environment: {
+        userAgent: navigator.userAgent,
+        currentSheet: this.state.currentActiveSheet,
+        timeSinceInit: Date.now() - this.state.startTime
+      }
+    };
+    
+    console.log('📝 Error Details (Phase 4.2):', errorDetails);
+    
+    // Store error history
+    if (!this.errorHistory) this.errorHistory = [];
+    this.errorHistory.push(errorDetails);
+    if (this.errorHistory.length > 5) {
+      this.errorHistory.shift();
+    }
+  }
+
+  determineRecoveryStrategy(error, context) {
+    // Determine best recovery strategy based on error characteristics
+    if (this.state.pollingFailureCount <= 2) {
+      return 'retry';
+    } else if (this.state.pollingFailureCount <= 5) {
+      return 'clearAndReload';
+    } else {
+      return 'fallbackMode';
+    }
+  }
+
+  async executeRecoveryRetry(context) {
+    try {
+      await this.clearDataCaches(true);
+      return await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+    } catch (retryError) {
+      throw new Error(`Retry failed: ${retryError.message}`);
+    }
+  }
+
+  async executeRecoveryReload() {
+    try {
+      await this.clearAllCardsForEmptyData();
+      this.resetStateForCleanInit();
+      return await this.loadSheetData({ bypassCache: true, isInitialLoad: true });
+    } catch (reloadError) {
+      throw new Error(`Reload failed: ${reloadError.message}`);
+    }
+  }
+
+  async executeRecoveryFallback() {
+    // Implement minimal functional state
+    this.displayEmptyState();
+    this.provideFeedback('データの読み込みに問題が発生しました。ページを更新してください。', 'error');
+    
+    // Reset polling to longer intervals
+    if (this.pollingTimeout) {
+      clearTimeout(this.pollingTimeout);
+      this.currentPollInterval = 60000; // 1 minute
+      this.startPolling();
+    }
+    
+    return { fallbackMode: true };
+  }
+
+  displayUserFriendlyError(error, context, isRecoveryFailed = false) {
+    let userMessage = 'データの読み込み中に問題が発生しました。';
+    
+    if (isRecoveryFailed) {
+      userMessage = '復旧処理が失敗しました。ページを再読み込みしてください。';
+    } else if (context.includes('polling')) {
+      userMessage = '新着チェック中に問題が発生しました。自動的に再試行します。';
+    } else if (context.includes('initial')) {
+      userMessage = 'アプリケーションの初期化中に問題が発生しました。ページを再読み込みしてください。';
+    }
+    
+    this.provideFeedback(userMessage, 'error');
+  }
+
   async init() {
       try {
         // 初期ロード状態を表示
@@ -291,6 +574,9 @@ class StudyQuestApp {
           this.hideLoadingOverlay();
           console.warn('ページの初期化に時間がかかっています。ページを再読み込みしてください。');
         }, 15000);
+        
+        // Reset state for clean initialization
+        this.resetStateForCleanInit();
         
         // Critical path only - non-blocking
         this.setupCriticalElements();
@@ -862,17 +1148,29 @@ class StudyQuestApp {
   
   async processContentCountResponse(countData, selectedClass, sortOrder) {
     const newCount = countData.count || 0;
+    const currentCount = this.state.currentAnswers?.length || 0;
+    const lastSeen = this.state.lastSeenCount || 0;
     
-    console.log('📊 Content count check:', {
+    // Enhanced consistency verification (Phase 3.1)
+    const consistencyCheck = {
+      lightCheckCount: newCount,
+      currentDataCount: currentCount,
+      lastSeenCount: lastSeen,
+      hasInconsistency: Math.abs(newCount - currentCount) > 0 && currentCount > 0,
+      significantChange: newCount !== lastSeen
+    };
+    
+    console.log('📊 Enhanced content count check (Phase 3.1):', {
       newCount,
-      currentCount: this.state.currentAnswers?.length || 0,
-      lastSeenCount: this.state.lastSeenCount,
+      currentCount,
+      lastSeenCount: lastSeen,
       selectedClass,
       sortOrder,
-      hadInitialFailure: this.hadInitialDataLoadFailure
+      hadInitialFailure: this.hadInitialDataLoadFailure,
+      consistencyCheck
     });
     
-    // ポーリング成功のマーク
+    // ポーリング成功のマーク - unified state management (Phase 2.3)
     this.state.pollingFailureCount = 0;
     
     // 現在のビューキー
@@ -935,14 +1233,23 @@ class StudyQuestApp {
   }
   
   async checkForNewItems(newCount) {
-    if (newCount > this.state.lastSeenCount) {
-      const newItems = newCount - this.state.lastSeenCount;
-      
-      console.log('📢 New content detected:', {
-        newCount,
-        lastSeen: this.state.lastSeenCount,
-        newItems
-      });
+    const currentCount = this.state.currentAnswers?.length || 0;
+    const lastSeen = this.state.lastSeenCount || 0;
+    
+    // Enhanced new item detection with consistency validation (Phase 3.1)
+    const detectionMetrics = {
+      lightCheckCount: newCount,
+      currentDataCount: currentCount,
+      lastSeenCount: lastSeen,
+      expectedNewItems: newCount - lastSeen,
+      hasNewItems: newCount > lastSeen,
+      dataIsStale: currentCount > 0 && newCount > currentCount
+    };
+    
+    console.log('📢 Enhanced new content detection (Phase 3.1):', detectionMetrics);
+    
+    if (detectionMetrics.hasNewItems && detectionMetrics.expectedNewItems > 0) {
+      const newItems = detectionMetrics.expectedNewItems;
       
       // 新着通知バナーを表示
       this.showNewContentBanner(newItems);
@@ -1081,26 +1388,36 @@ class StudyQuestApp {
         throw new Error(incrementalData.message);
       }
       
-      console.log('📥 増分データ取得結果:', {
+      // Enhanced incremental data analysis (Phase 3.2)
+      const incrementalAnalysis = {
         newCount: incrementalData.newCount,
         totalCount: incrementalData.totalCount,
         hasNewData: incrementalData.newCount > 0,
         currentCardsCount: this.state.currentAnswers.length,
-        lastSeenCount: this.state.lastSeenCount
-      });
+        lastSeenCount: this.state.lastSeenCount,
+        domCardCount: this.elements.answersContainer ? 
+          this.elements.answersContainer.querySelectorAll('.answer-card').length : 0
+      };
       
-      // データ整合性チェック：表示中のカード数と期待値が不一致の場合
-      const expectedCardCount = this.state.lastSeenCount || 0;
-      const actualCardCount = this.state.currentAnswers.length;
+      console.log('📥 Enhanced incremental analysis (Phase 3.2):', incrementalAnalysis);
       
-      if (actualCardCount < expectedCardCount || (incrementalData.totalCount > 0 && actualCardCount === 0)) {
-        console.warn('🚨 データ不整合検出 - フルリフレッシュを実行:', {
-          expected: expectedCardCount,
-          actual: actualCardCount,
-          serverTotal: incrementalData.totalCount
+      // Enhanced consistency validation (Phase 3.2)
+      const consistencyValidation = {
+        stateDataMismatch: incrementalAnalysis.currentCardsCount !== incrementalAnalysis.lastSeenCount,
+        domDataMismatch: incrementalAnalysis.domCardCount !== incrementalAnalysis.currentCardsCount,
+        serverClientMismatch: incrementalAnalysis.totalCount > 0 && incrementalAnalysis.currentCardsCount === 0,
+        significantInconsistency: Math.abs(incrementalAnalysis.currentCardsCount - incrementalAnalysis.lastSeenCount) > 5
+      };
+      
+      if (consistencyValidation.significantInconsistency || 
+          consistencyValidation.serverClientMismatch ||
+          consistencyValidation.domDataMismatch) {
+        console.warn('🚨 Enhanced inconsistency detection - triggering full refresh (Phase 3.2):', {
+          incrementalAnalysis,
+          consistencyValidation
         });
         
-        // 不整合の場合は直接フルリフレッシュを実行
+        // Use unified state management for fallback
         await this.refreshContentFull();
         return;
       }
@@ -1108,23 +1425,27 @@ class StudyQuestApp {
       // 新しいデータがない場合
       if (incrementalData.newCount === 0) {
         this.provideFeedback('最新の状態です', 'info');
-        this.updateLastSeenCount(incrementalData.totalCount);
+        // Use unified state management even for no-data updates (Phase 2.3)
+        this.synchronizeStateAfterDataUpdate(this.state.currentAnswers, 'incrementalRefresh-noNewData');
         return;
       }
       
-      // 新しいカードを既存のカードに追加
+      // Prepare merged data with proper ordering (Phase 3.2)
+      let mergedData;
+      if (sortOrder === 'newest') {
+        mergedData = incrementalData.data.concat(this.state.currentAnswers);
+      } else {
+        mergedData = this.state.currentAnswers.concat(incrementalData.data);
+      }
+      
+      // First: DOM update with new cards
       await this.appendNewCards(incrementalData.data, sortOrder);
 
-      // 状態を更新
-      if (sortOrder === 'newest') {
-        this.state.currentAnswers = incrementalData.data.concat(this.state.currentAnswers);
-      } else {
-        this.state.currentAnswers = this.state.currentAnswers.concat(incrementalData.data);
-      }
+      // Second: Unified state synchronization (Phase 2.3 + 3.2)
+      this.synchronizeStateAfterDataUpdate(mergedData, 'incrementalRefresh');
 
-      // サーバーキャッシュをクリアして他のソート順でも新着が反映されるようにする
+      // Third: Clear server cache for consistency across sort orders
       this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
-      this.updateLastSeenCount(incrementalData.totalCount);
       
       console.log('✅ 増分リフレッシュ完了:', {
         addedCards: incrementalData.newCount,
@@ -1265,7 +1586,6 @@ class StudyQuestApp {
     if (!newData || newData.length === 0) return;
     
     console.log('📌 新しいカードを追加:', newData.length + '件');
-    debugLog('DEBUG: appendNewCards called. newData length:', newData.length);
     
     const container = this.elements.answersContainer;
     if (!container) return;
@@ -1300,10 +1620,8 @@ class StudyQuestApp {
     
     if (sortOrder === 'newest') {
       container.prepend(fragment);
-      debugLog('DEBUG: appendNewCards - Fragment prepended. answersContainer children count:', container.children.length);
     } else {
       container.appendChild(fragment);
-      debugLog('DEBUG: appendNewCards - Fragment appended. answersContainer children count:', container.children.length);
     }
     
     // アニメーションで新しいカードを表示
@@ -1706,7 +2024,6 @@ class StudyQuestApp {
     this.deferredUpdates.clear();
     this.domFragmentPool.length = 0;
     
-    debugLog('アプリケーションのクリーンアップ完了');
   }
   async loadDataImmediate() {
     try {
@@ -1930,7 +2247,7 @@ class StudyQuestApp {
     this.displayEmptyState();
   }
   
-  clearAllCardsForEmptyData() {
+  async clearAllCardsForEmptyData() {
     // 真の初回判定: localStorage状態 + DOM状態を確認
     const isFirstTime = this.isFirstTimeBoardAccess();
     
@@ -1967,6 +2284,10 @@ class StudyQuestApp {
         
         // DOMをクリア
         container.innerHTML = '';
+        
+        // DOM clearing completion wait (Phase 1.3)
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        console.log('✅ DOM清除完了、次のフレームで差分復元準備完了');
       }
     }
     
@@ -1984,7 +2305,7 @@ class StudyQuestApp {
     console.log('✅', isFirstTime ? '初回初期化完了' : 'clearAllCardsForEmptyData: クリア完了');
   }
   
-  validatePostLoadState() {
+  async validatePostLoadState() {
     const container = this.elements.answersContainer;
     if (!container) return;
     
@@ -1998,7 +2319,7 @@ class StudyQuestApp {
       console.warn('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
       
       // 空データのためのクリーンアップを実行
-      this.clearAllCardsForEmptyData();
+      await this.clearAllCardsForEmptyData();
       
       // 空状態を表示
       this.displayEmptyState();
@@ -2103,7 +2424,7 @@ class StudyQuestApp {
     switch (type) {
       case 'phantom_cards_on_init':
         console.log('👻 初回読み込み時の幽霊カードを修復');
-        this.clearAllCardsForEmptyData();
+        await this.clearAllCardsForEmptyData();
         await this.loadSheetData({ bypassCache: true });
         break;
         
@@ -2163,7 +2484,7 @@ class StudyQuestApp {
     if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
       this.renderBoard(this.state.currentAnswers, []);
     } else {
-      this.clearAllCardsForEmptyData();
+      await this.clearAllCardsForEmptyData();
       this.displayEmptyState();
     }
   }
@@ -2335,7 +2656,7 @@ class StudyQuestApp {
               fetchParams.classFilter,
               fetchParams.sortOrder,
               fetchParams.showAdminFeatures,
-              fetchParams.requestedSheetName
+              config.bypassCache || false
             );
         });
         
@@ -2556,7 +2877,7 @@ class StudyQuestApp {
       
       // Clear caches if needed
       if (config.bypassCache || this.shouldClearCache(config)) {
-        await this.clearDataCaches();
+        await this.clearDataCaches(config.bypassCache && config.isInitialLoad);
       }
       
       // Load data with simplified parameters
@@ -2577,12 +2898,35 @@ class StudyQuestApp {
            (config.showLoading && !config.isInitialLoad);
   }
   
-  async clearDataCaches() {
-    console.log('🧹 Clearing data caches...');
+  async clearDataCaches(isCompleteBypass = false) {
+    console.log('🧹 Clearing data caches...', { isCompleteBypass });
     
     // Clear frontend cache
     if (this.cache) {
       this.cache.clear();
+      console.log('✅ Frontend cache cleared');
+    }
+    
+    // Clear UnifiedCache if available
+    if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+      window.unifiedCache.clear();
+      console.log('✅ UnifiedCache cleared');
+    }
+    
+    // Clear localStorage cache entries for complete bypass
+    if (isCompleteBypass) {
+      try {
+        const keys = Object.keys(localStorage);
+        const cacheKeys = keys.filter(key => 
+          key.includes('cache_') || 
+          key.includes('lastSeenCount_') ||
+          key.includes('differentialCards_')
+        );
+        cacheKeys.forEach(key => localStorage.removeItem(key));
+        console.log('✅ localStorage cache cleared:', cacheKeys.length, 'keys');
+      } catch (error) {
+        console.warn('⚠️ Failed to clear localStorage cache:', error);
+      }
     }
     
     // Clear server cache
@@ -2663,7 +3007,6 @@ class StudyQuestApp {
               } else {
                 // データ不整合チェック: 軽量チェックでデータが存在するかを確認
                 console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
-                debugLog('Data consistency check:', { currentAnswers: this.state.currentAnswers.length, resultData: result.data ? result.data.length : 0 });
                 
                 try {
                   // 初期データロード時は高速復旧戦略を採用
@@ -2682,15 +3025,26 @@ class StudyQuestApp {
                   } else {
                     // 通常時は従来のフォールバック処理（簡素化版）
                     const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
-                    console.log('🔍 Data consistency check:', {
-                      fullDataEmpty: !result?.data || result.data.length === 0,
-                      lightCheckCount: countData?.count || 0,
+                    // Enhanced consistency check with lastSeenCount (Phase 2.2)
+                    const expected = countData?.count || 0;
+                    const actual = result?.data ? result.data.length : 0;
+                    const lastSeen = this.state.lastSeenCount || 0;
+                    
+                    console.log('🔍 Enhanced data consistency check (Phase 2.2):', {
+                      expected,
+                      actual,
+                      lastSeen,
+                      fullDataEmpty: actual === 0,
                       requestedSheet: requestedSheetName,
-                      currentSheet: this.state.currentActiveSheet
+                      currentSheet: this.state.currentActiveSheet,
+                      shouldTriggerRefresh: expected > 0 && actual === 0 && expected !== lastSeen
                     });
                     
-                    if (countData && countData.count > 0) {
-                      console.warn('⚠️ Data inconsistency detected! Light check shows', countData.count, 'items but full fetch returned empty');
+                    // Only trigger fallback if there's significant inconsistency
+                    // considering user's previously seen count
+                    if (expected > 0 && actual === 0 && expected !== lastSeen) {
+                      console.warn('⚠️ Significant data inconsistency detected!', 
+                        `Expected: ${expected}, Actual: ${actual}, LastSeen: ${lastSeen}`);
                       console.log('🔄 Attempting simplified fallback...');
                       
                       // 簡素化されたフォールバック（待機時間短縮）
@@ -2725,7 +3079,7 @@ class StudyQuestApp {
               // 再チェック後もデータが空の場合のみ空状態を表示
               if (!result || !result.data || result.data.length === 0) {
                 // 空データ受信時は古いカードを強制的にクリア
-                this.clearAllCardsForEmptyData();
+                await this.clearAllCardsForEmptyData();
                 
                 // 空状態を表示
                 this.displayEmptyState();
@@ -2741,10 +3095,10 @@ class StudyQuestApp {
 
             console.log('Received data:', result.data);
             
-            // 🔥 CRITICAL FIX: Set currentAnswers with received data
-            this.state.currentAnswers = result.data || [];
-            this.updateLastSeenCount(this.state.currentAnswers.length);
-            console.log('✅ StudyQuestApp: Set currentAnswers with', this.state.currentAnswers.length, 'items');
+            // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
+            // Step 1 & 2: Data acquisition and unified state synchronization
+            const syncResult = this.synchronizeStateAfterDataUpdate(result.data, 'performDataLoad');
+            console.log('✅ Step 1-2: Data acquisition and state synchronization completed:', syncResult);
             
             // サーバーからの質問文と現在表示の一致性をチェック
             if (result.header) {
@@ -2794,10 +3148,16 @@ class StudyQuestApp {
               this.elements.headingLabel.textContent = result.header;
             }
 
-            requestAnimationFrame(() => {
-              this.renderBoard(false, isInitialLoad);
-              // データロード完了後の状態検証をrenderBoardの実行後に移動
-              this.validatePostLoadState();
+            // Step 3: DOM update with proper sequencing (Phase 2.1)
+            requestAnimationFrame(async () => {
+              console.log('✅ Step 3: DOM update starting...');
+              await this.renderBoard(false, isInitialLoad);
+              console.log('✅ Step 3: DOM update completed');
+              
+              // Step 4: Consistency validation after DOM update (Phase 2.1)
+              console.log('✅ Step 4: Consistency validation starting...');
+              await this.validatePostLoadState();
+              console.log('✅ Step 4: Consistency validation completed');
             });
             
           } finally {
@@ -3108,7 +3468,6 @@ class StudyQuestApp {
     
     
     
-    debugLog('clearVirtualScrollingState: Virtual scrolling state cleared for sheet switch');
   }
   
   updateSheetSelectorLabels() {
@@ -3188,16 +3547,15 @@ class StudyQuestApp {
       element.classList.add('reaction-border-1');
     }
   }
-  renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
+  async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
     try {
       // Define newRows first to avoid TDZ error
       const newRows = this.state.currentAnswers;
-      debugLog('DEBUG: renderBoard called. newRows.length:', newRows.length);
       
       // 空データの場合の早期処理
       if (!newRows || newRows.length === 0) {
         console.log('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
-        this.renderEmptyState();
+        await this.renderEmptyState();
         return;
       }
       
@@ -3220,8 +3578,8 @@ class StudyQuestApp {
     }
   }
   
-  renderEmptyState() {
-    this.clearAllCardsForEmptyData();
+  async renderEmptyState() {
+    await this.clearAllCardsForEmptyData();
     this.displayEmptyState();
   }
   
@@ -3236,7 +3594,6 @@ class StudyQuestApp {
   prepareRenderingState(newRows) {
     const container = this.elements.answersContainer;
     container.querySelectorAll('.skeleton').forEach(el => el.remove());
-    debugLog('DEBUG: Skeletons removed. answersContainer children count:', container.children.length);
     
     this.updateLayoutControls(newRows);
   }
@@ -3318,7 +3675,6 @@ class StudyQuestApp {
     
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
-      debugLog('DEBUG: renderBoard - Fragment appended. answersContainer children count:', container.children.length);
     }
   }
   
@@ -3343,7 +3699,6 @@ class StudyQuestApp {
       console.warn('calculateVisibleRange: containerHeight is 0, rendering all items as fallback.');
     }
 
-    debugLog('Virtual scroll range:', { startIndex, endIndex, visibleCount: endIndex - startIndex, totalItems });
 
     return { startIndex, endIndex };
   }
