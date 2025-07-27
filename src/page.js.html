@@ -217,6 +217,7 @@ class StudyQuestApp {
     // 新着チェック用の初期化
     this.lastViewKey = null;
     this.initialDataLoaded = false;
+    this.hadInitialDataLoadFailure = false; // 初期データロード失敗フラグ
     
     // Initial state setup complete
     this.serverShowCounts = window.showCounts;
@@ -843,7 +844,8 @@ class StudyQuestApp {
       currentCount: this.state.currentAnswers?.length || 0,
       lastSeenCount: this.state.lastSeenCount,
       selectedClass,
-      sortOrder
+      sortOrder,
+      hadInitialFailure: this.hadInitialDataLoadFailure
     });
     
     // ポーリング成功のマーク
@@ -870,12 +872,29 @@ class StudyQuestApp {
   
   async handleInitialContentLoad(currentViewKey, newCount) {
     this.lastViewKey = currentViewKey;
+    
+    // 初期データロード失敗後の初回成功ポーリング時の特別処理
+    if (this.hadInitialDataLoadFailure && newCount > this.state.lastSeenCount) {
+      console.log('🔄 初期データロード失敗後の新着検出:', {
+        newCount,
+        lastSeenCount: this.state.lastSeenCount,
+        difference: newCount - this.state.lastSeenCount
+      });
+      
+      // 失敗フラグをリセット
+      this.hadInitialDataLoadFailure = false;
+      
+      // 新着通知を先に表示
+      await this.checkForNewItems(newCount);
+    }
+    
     this.updateLastSeenCount(newCount);
     this.initialDataLoaded = true;
     
     console.log('✅ Initial content load completed:', {
       viewKey: currentViewKey,
-      count: newCount
+      count: newCount,
+      hadPreviousFailure: this.hadInitialDataLoadFailure
     });
   }
   
@@ -2391,6 +2410,9 @@ class StudyQuestApp {
                 this.displayEmptyState();
                 if (isInitialLoad) {
                   this.state.lastSeenCount = 0;
+                  // 初期データロード失敗フラグを設定
+                  this.hadInitialDataLoadFailure = true;
+                  console.log('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
                 }
                 return;
               }
@@ -4711,6 +4733,281 @@ class StudyQuestApp {
       return { status: 'issues_detected', issues };
     }
   }
+
+  // 通知システムのエッジケーステスト（開発・デバッグ用）
+  async testNotificationEdgeCases() {
+    console.log('🧪 通知システムエッジケーステスト開始');
+    
+    const testResults = {
+      tests: [],
+      summary: { passed: 0, failed: 0, total: 0 }
+    };
+    
+    try {
+      // テスト1: 初期データロード失敗後の通知
+      console.log('📋 テスト1: 初期データロード失敗→ポーリング成功シナリオ');
+      const test1 = await this.testInitialLoadFailureNotification();
+      testResults.tests.push(test1);
+      
+      // テスト2: 通知バナー要素の存在確認
+      console.log('📋 テスト2: 通知バナー要素の存在確認');
+      const test2 = this.testNotificationBannerElements();
+      testResults.tests.push(test2);
+      
+      // テスト3: 通知条件のロジック確認
+      console.log('📋 テスト3: 通知条件ロジックの確認');
+      const test3 = this.testNotificationLogic();
+      testResults.tests.push(test3);
+      
+      // テスト4: デバウンス機能の確認
+      console.log('📋 テスト4: 通知デバウンス機能の確認');
+      const test4 = await this.testNotificationDebounce();
+      testResults.tests.push(test4);
+      
+      // 結果集計
+      testResults.tests.forEach(test => {
+        testResults.summary.total++;
+        if (test.passed) {
+          testResults.summary.passed++;
+        } else {
+          testResults.summary.failed++;
+        }
+      });
+      
+      console.log('✅ 通知システムエッジケーステスト完了:', testResults.summary);
+      return testResults;
+      
+    } catch (error) {
+      console.error('❌ 通知システムテストエラー:', error);
+      return { error: error.message, partialResults: testResults };
+    }
+  }
+
+  async testInitialLoadFailureNotification() {
+    const testName = '初期データロード失敗後の通知';
+    try {
+      // 現在の状態を保存
+      const originalInitialDataLoaded = this.initialDataLoaded;
+      const originalHadInitialDataLoadFailure = this.hadInitialDataLoadFailure;
+      const originalLastSeenCount = this.state.lastSeenCount;
+      
+      // テスト状態を設定
+      this.initialDataLoaded = false;
+      this.hadInitialDataLoadFailure = true;
+      this.state.lastSeenCount = 0;
+      
+      console.log('🔧 テスト状態設定:', {
+        initialDataLoaded: this.initialDataLoaded,
+        hadInitialDataLoadFailure: this.hadInitialDataLoadFailure,
+        lastSeenCount: this.state.lastSeenCount
+      });
+      
+      // モック通知関数
+      let notificationShown = false;
+      const originalShowNewContentBanner = this.showNewContentBanner;
+      this.showNewContentBanner = (newItems) => {
+        notificationShown = true;
+        console.log('🎯 テスト中：通知が表示されました -', newItems, '件');
+        return originalShowNewContentBanner.call(this, newItems);
+      };
+      
+      // 模擬的な handleInitialContentLoad 呼び出し
+      await this.handleInitialContentLoad('すべて-newest', 1);
+      
+      // 結果検証
+      const passed = notificationShown && this.state.lastSeenCount === 1 && !this.hadInitialDataLoadFailure;
+      
+      // 状態を復元
+      this.initialDataLoaded = originalInitialDataLoaded;
+      this.hadInitialDataLoadFailure = originalHadInitialDataLoadFailure;
+      this.state.lastSeenCount = originalLastSeenCount;
+      this.showNewContentBanner = originalShowNewContentBanner;
+      
+      return {
+        name: testName,
+        passed,
+        details: {
+          notificationShown,
+          finalLastSeenCount: this.state.lastSeenCount,
+          failureFlagCleared: !this.hadInitialDataLoadFailure
+        }
+      };
+      
+    } catch (error) {
+      return { name: testName, passed: false, error: error.message };
+    }
+  }
+  
+  testNotificationBannerElements() {
+    const testName = '通知バナー要素の存在確認';
+    try {
+      const elements = {
+        banner: this.elements.newContentBanner,
+        text: this.elements.newContentText,
+        refreshBtn: this.elements.refreshContentBtn,
+        dismissBtn: this.elements.dismissBannerBtn
+      };
+      
+      const missing = [];
+      Object.entries(elements).forEach(([key, element]) => {
+        if (!element) {
+          missing.push(key);
+        }
+      });
+      
+      const passed = missing.length === 0;
+      
+      return {
+        name: testName,
+        passed,
+        details: {
+          elementsFound: Object.keys(elements).length - missing.length,
+          totalElements: Object.keys(elements).length,
+          missingElements: missing
+        }
+      };
+      
+    } catch (error) {
+      return { name: testName, passed: false, error: error.message };
+    }
+  }
+  
+  testNotificationLogic() {
+    const testName = '通知条件ロジックの確認';
+    try {
+      const scenarios = [
+        { newCount: 5, lastSeen: 3, shouldNotify: true, expected: 2 },
+        { newCount: 3, lastSeen: 3, shouldNotify: false, expected: 0 },
+        { newCount: 2, lastSeen: 3, shouldNotify: false, expected: 0 },
+        { newCount: 1, lastSeen: 0, shouldNotify: true, expected: 1 }
+      ];
+      
+      const results = scenarios.map(scenario => {
+        const shouldNotify = scenario.newCount > scenario.lastSeen;
+        const newItems = shouldNotify ? scenario.newCount - scenario.lastSeen : 0;
+        
+        return {
+          scenario,
+          actualShouldNotify: shouldNotify,
+          actualNewItems: newItems,
+          correct: shouldNotify === scenario.shouldNotify && newItems === scenario.expected
+        };
+      });
+      
+      const passed = results.every(result => result.correct);
+      
+      return {
+        name: testName,
+        passed,
+        details: {
+          scenariosTested: scenarios.length,
+          scenariosPassed: results.filter(r => r.correct).length,
+          results
+        }
+      };
+      
+    } catch (error) {
+      return { name: testName, passed: false, error: error.message };
+    }
+  }
+  
+  async testNotificationDebounce() {
+    const testName = '通知デバウンス機能の確認';
+    try {
+      // デバウンステストのために短時間で複数回通知を試行
+      const originalLastNotificationTime = this.lastNotificationTime;
+      
+      let notificationCount = 0;
+      const originalShowNewContentBanner = this.showNewContentBanner;
+      
+      this.showNewContentBanner = (newItems) => {
+        notificationCount++;
+        console.log('🎯 デバウンステスト：通知回数 =', notificationCount);
+        return originalShowNewContentBanner.call(this, newItems);
+      };
+      
+      // 最初の通知
+      this.lastNotificationTime = null;
+      await this.checkForNewItems(1);
+      const firstNotificationCount = notificationCount;
+      
+      // 短時間内での2回目の通知（デバウンスされるべき）
+      this.lastNotificationTime = Date.now() - 1500; // 1.5秒前に設定
+      await this.checkForNewItems(2);
+      const secondNotificationCount = notificationCount;
+      
+      // 十分な時間後の3回目の通知（デバウンスされないべき）
+      this.lastNotificationTime = Date.now() - 3000; // 3秒前に設定
+      await this.checkForNewItems(3);
+      const thirdNotificationCount = notificationCount;
+      
+      // 復元
+      this.showNewContentBanner = originalShowNewContentBanner;
+      this.lastNotificationTime = originalLastNotificationTime;
+      
+      // デバウンスが正しく動作している場合: 1回目と3回目で通知、2回目はスキップ
+      const passed = firstNotificationCount === 1 && secondNotificationCount === 1 && thirdNotificationCount === 2;
+      
+      return {
+        name: testName,
+        passed,
+        details: {
+          firstNotification: firstNotificationCount,
+          secondNotification: secondNotificationCount,
+          thirdNotification: thirdNotificationCount,
+          expectedBehavior: '1→1→2 (2回目はデバウンス)'
+        }
+      };
+      
+    } catch (error) {
+      return { name: testName, passed: false, error: error.message };
+    }
+  }
+  
+  // 通知システムの健全性チェック
+  validateNotificationSystem() {
+    console.log('🔍 通知システム健全性チェック');
+    
+    const issues = [];
+    
+    // 1. 通知バナー要素の存在確認
+    if (!this.elements.newContentBanner) {
+      issues.push('newContentBanner要素が見つかりません');
+    }
+    if (!this.elements.newContentText) {
+      issues.push('newContentText要素が見つかりません');
+    }
+    if (!this.elements.refreshContentBtn) {
+      issues.push('refreshContentBtn要素が見つかりません');
+    }
+    
+    // 2. 初期化状態の確認
+    if (this.initialDataLoaded === undefined) {
+      issues.push('initialDataLoaded状態が未定義です');
+    }
+    if (this.hadInitialDataLoadFailure === undefined) {
+      issues.push('hadInitialDataLoadFailure状態が未定義です');
+    }
+    
+    // 3. 通知状態の確認
+    if (this.state.lastSeenCount === undefined) {
+      issues.push('lastSeenCount状態が未定義です');
+    }
+    
+    // 4. ポーリング状態の確認
+    if (!this.pollingSettings || this.pollingSettings.enabled === undefined) {
+      issues.push('ポーリング設定が不正です');
+    }
+    
+    // 5. 結果
+    if (issues.length === 0) {
+      console.log('✅ 通知システム健全性: 正常');
+      return { status: 'healthy', issues: [] };
+    } else {
+      console.warn('⚠️ 通知システム健全性: 問題検出', issues);
+      return { status: 'issues_detected', issues };
+    }
+  }
   
   async toggleAdminMode() {
     // Temporarily disable button to prevent duplicate clicks
@@ -6617,6 +6914,152 @@ try {
     })));
     
     return results;
+  };
+
+  // === 通知システムテスト用グローバル関数 ===
+  
+  // 通知システム全体のテスト実行
+  window.testNotificationSystem = async () => {
+    console.log('🧪 通知システム全体テスト開始');
+    
+    const app = window.studyQuestApp;
+    if (!app) {
+      console.error('StudyQuestApp not found');
+      return { success: false, error: 'StudyQuestApp not found' };
+    }
+    
+    try {
+      const results = await app.testNotificationEdgeCases();
+      console.log('📊 通知システムテスト結果:', results);
+      return results;
+    } catch (error) {
+      console.error('❌ 通知システムテストエラー:', error);
+      return { success: false, error: error.message };
+    }
+  };
+  
+  // 通知システムの健全性チェック
+  window.validateNotificationSystem = () => {
+    console.log('🔍 通知システム健全性チェック開始');
+    
+    const app = window.studyQuestApp;
+    if (!app) {
+      console.error('StudyQuestApp not found');
+      return { success: false, error: 'StudyQuestApp not found' };
+    }
+    
+    try {
+      const results = app.validateNotificationSystem();
+      console.log('📊 通知システム健全性:', results);
+      return results;
+    } catch (error) {
+      console.error('❌ 通知システム健全性チェックエラー:', error);
+      return { success: false, error: error.message };
+    }
+  };
+  
+  // 初期データロード失敗シナリオの手動テスト
+  window.simulateInitialLoadFailure = async () => {
+    console.log('🧪 初期データロード失敗シナリオのシミュレーション開始');
+    
+    const app = window.studyQuestApp;
+    if (!app) {
+      console.error('StudyQuestApp not found');
+      return { success: false, error: 'StudyQuestApp not found' };
+    }
+    
+    try {
+      // 現在の状態を保存
+      const originalInitialDataLoaded = app.initialDataLoaded;
+      const originalHadInitialDataLoadFailure = app.hadInitialDataLoadFailure;
+      const originalLastSeenCount = app.state.lastSeenCount;
+      
+      // 失敗状態をシミュレート
+      app.initialDataLoaded = false;
+      app.hadInitialDataLoadFailure = true;
+      app.state.lastSeenCount = 0;
+      
+      console.log('🔧 失敗状態設定:', {
+        initialDataLoaded: app.initialDataLoaded,
+        hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
+        lastSeenCount: app.state.lastSeenCount
+      });
+      
+      // 通知カウンターを設定
+      let notificationShown = false;
+      const originalShowNewContentBanner = app.showNewContentBanner;
+      app.showNewContentBanner = (newItems) => {
+        notificationShown = true;
+        console.log('🎯 シミュレーション中：通知が表示されました -', newItems, '件');
+        return originalShowNewContentBanner.call(app, newItems);
+      };
+      
+      // ポーリング成功をシミュレート
+      await app.handleInitialContentLoad('すべて-newest', 1);
+      
+      const result = {
+        success: true,
+        notificationShown,
+        finalState: {
+          initialDataLoaded: app.initialDataLoaded,
+          hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
+          lastSeenCount: app.state.lastSeenCount
+        }
+      };
+      
+      // 状態を復元
+      app.initialDataLoaded = originalInitialDataLoaded;
+      app.hadInitialDataLoadFailure = originalHadInitialDataLoadFailure;
+      app.state.lastSeenCount = originalLastSeenCount;
+      app.showNewContentBanner = originalShowNewContentBanner;
+      
+      console.log('✅ シミュレーション完了:', result);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ シミュレーションエラー:', error);
+      return { success: false, error: error.message };
+    }
+  };
+  
+  // 現在の通知システム状態を取得
+  window.getNotificationSystemStatus = () => {
+    const app = window.studyQuestApp;
+    if (!app) return null;
+    
+    return {
+      initialDataLoaded: app.initialDataLoaded,
+      hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
+      lastSeenCount: app.state.lastSeenCount,
+      pollingEnabled: app.pollingSettings?.enabled,
+      notificationElements: {
+        banner: !!app.elements.newContentBanner,
+        text: !!app.elements.newContentText,
+        refreshBtn: !!app.elements.refreshContentBtn,
+        dismissBtn: !!app.elements.dismissBannerBtn
+      },
+      bannerVisible: app.elements.newContentBanner && !app.elements.newContentBanner.classList.contains('hidden'),
+      lastNotificationTime: app.lastNotificationTime,
+      currentAnswersCount: app.state.currentAnswers?.length || 0
+    };
+  };
+  
+  // 通知デバウンスのテスト
+  window.testNotificationDebounce = async () => {
+    console.log('🧪 通知デバウンステスト開始');
+    
+    const app = window.studyQuestApp;
+    if (!app) {
+      console.error('StudyQuestApp not found');
+      return { success: false, error: 'StudyQuestApp not found' };
+    }
+    
+    try {
+      return await app.testNotificationDebounce();
+    } catch (error) {
+      console.error('❌ デバウンステストエラー:', error);
+      return { success: false, error: error.message };
+    }
   };
   
   // ドメイン情報とフォームリンクを取得
