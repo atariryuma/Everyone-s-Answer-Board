@@ -3903,16 +3903,17 @@ class StudyQuestApp {
   
   shouldUpdateCard(newData, oldData) {
     if (!oldData) return true;
-    
-    // リアクション数の変更をチェック
-    const newReactionCount = this.reactionTypes.reduce((sum, rt) => 
+
+    const newReactionCount = this.reactionTypes.reduce((sum, rt) =>
       sum + (newData.reactions?.[rt.key]?.count || 0), 0);
-    const oldReactionCount = this.reactionTypes.reduce((sum, rt) => 
+    const oldReactionCount = this.reactionTypes.reduce((sum, rt) =>
       sum + (oldData.reactions?.[rt.key]?.count || 0), 0);
-    
-    return newReactionCount !== oldReactionCount || 
+
+    return newReactionCount !== oldReactionCount ||
            newData.isHighlighted !== oldData.isHighlighted ||
-           newData.content !== oldData.content;
+           newData.opinion !== oldData.opinion ||
+           newData.reason !== oldData.reason ||
+           newData.name !== oldData.name;
   }
   
   finalizeRenderingState() {
@@ -3965,17 +3966,22 @@ class StudyQuestApp {
   
   updateAnswerCard(card, newData, oldData) {
     if (!card || !newData) return;
-    
+
     try {
-      // Update text content if changed
-      if (!oldData || oldData.content !== newData.content) {
-        const contentElement = card.querySelector('.answer-preview p');
-        if (contentElement) {
-          contentElement.textContent = newData.content || newData.reason || '';
+      if (!oldData || oldData.opinion !== newData.opinion) {
+        const opinionElement = card.querySelector('.opinion-text');
+        if (opinionElement) {
+          opinionElement.textContent = newData.opinion || '';
         }
       }
-      
-      // Update student name if changed
+
+      if (!oldData || oldData.reason !== newData.reason) {
+        const reasonElement = card.querySelector('.answer-preview p');
+        if (reasonElement) {
+          reasonElement.textContent = newData.reason || '';
+        }
+      }
+
       if (!oldData || oldData.name !== newData.name) {
         const nameElement = card.querySelector('.font-bold');
         if (nameElement) {
