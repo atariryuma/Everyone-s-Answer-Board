@@ -1778,6 +1778,20 @@ function updateSystemStatusDisplay(status) {
       spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
     }
   }
+
+  if (status.formUrl) { // statusオブジェクトにformUrlが存在する場合
+    if (formBtn) {
+      formBtn.disabled = false;
+      formBtn.onclick = () => window.open(status.formUrl, '_blank');
+    }
+  } else { // formUrlが存在しない場合、ボタンを無効化し、メッセージを表示
+    if (formBtn) {
+      formBtn.disabled = true;
+      formBtn.onclick = null; // クリックイベントを解除
+      // 必要に応じて、ボタンのツールチップやテキストを更新してユーザーに状況を伝える
+      // 例: formBtn.title = 'フォームURLが未設定です';
+    }
+  }
   
   // Handle generic resource button in Step 1 (spreadsheet only)
   if (resourceBtn && status.spreadsheetUrl) {
