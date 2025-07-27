@@ -1014,6 +1014,19 @@ class StudyQuestApp {
     this.state.newContentCount = 0;
   }
   
+  // コンテンツ更新（通知バナーからの呼び出し）
+  async refreshContent() {
+    try {
+      // まず増分更新を試行
+      await this.refreshContentIncremental();
+    } catch (error) {
+      console.error('コンテンツ更新エラー:', error);
+      // 増分更新が失敗した場合はフル更新にフォールバック
+      console.log('🔄 フォールバック: 全体更新を実行');
+      await this.refreshContentFull();
+    }
+  }
+  
   // 増分コンテンツ更新（新しいカードのみ取得・追加）
   async refreshContentIncremental() {
     this.dismissNewContentBanner();
@@ -1047,8 +1060,26 @@ class StudyQuestApp {
       console.log('📥 増分データ取得結果:', {
         newCount: incrementalData.newCount,
         totalCount: incrementalData.totalCount,
-        hasNewData: incrementalData.newCount > 0
+        hasNewData: incrementalData.newCount > 0,
+        currentCardsCount: this.state.currentAnswers.length,
+        lastSeenCount: this.state.lastSeenCount
       });
+      
+      // データ整合性チェック：表示中のカード数と期待値が不一致の場合
+      const expectedCardCount = this.state.lastSeenCount || 0;
+      const actualCardCount = this.state.currentAnswers.length;
+      
+      if (actualCardCount < expectedCardCount || (incrementalData.totalCount > 0 && actualCardCount === 0)) {
+        console.warn('🚨 データ不整合検出 - フルリフレッシュを実行:', {
+          expected: expectedCardCount,
+          actual: actualCardCount,
+          serverTotal: incrementalData.totalCount
+        });
+        
+        // 不整合の場合は直接フルリフレッシュを実行
+        await this.refreshContentFull();
+        return;
+      }
       
       // 新しいデータがない場合
       if (incrementalData.newCount === 0) {
@@ -2017,8 +2048,9 @@ class StudyQuestApp {
    * @returns {Promise} データ取得結果
    */
   async performDataFetchWithRetry(fetchParams, isInitialLoad) {
-    const MAX_ATTEMPTS = 3;
-    const retryDelays = [1000, 2000, 3000]; // 段階的な待機時間
+    // 初期データロード時は高速リトライ、通常時は従来通り
+    const MAX_ATTEMPTS = isInitialLoad ? 2 : 3;
+    const retryDelays = isInitialLoad ? [500, 1000] : [1000, 2000, 3000]; // 初期ロード時は高速化
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
@@ -2359,41 +2391,55 @@ class StudyQuestApp {
                 debugLog('Data consistency check:', { currentAnswers: this.state.currentAnswers.length, resultData: result.data ? result.data.length : 0 });
                 
                 try {
-                  // フォールバック: 軽量チェックでデータの存在を確認
-                  const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
-                  console.log('🔍 Data consistency check:', {
-                    fullDataEmpty: !result?.data || result.data.length === 0,
-                    lightCheckCount: countData?.count || 0,
-                    requestedSheet: requestedSheetName,
-                    currentSheet: this.state.currentActiveSheet
-                  });
-                  
-                  if (countData && countData.count > 0) {
-                    console.warn('⚠️ Data inconsistency detected! Light check shows', countData.count, 'items but full fetch returned empty');
-                    console.log('🔄 Attempting fallback data fetch with retry...');
+                  // 初期データロード時は高速復旧戦略を採用
+                  if (isInitialLoad) {
+                    console.log('🚀 初期データロード失敗 - 高速復旧戦略を実行');
                     
-                    // フォールバック: 少し待ってから再試行
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // 軽量チェックでデータ存在を確認
+                    const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
                     
-                    // 再試行でデータ取得を試行
-                    const retryResult = await new Promise((resolve, reject) => {
-                      google.script.run
-                        .withSuccessHandler(resolve)
-                        .withFailureHandler(reject)
-                        .getPublishedSheetData(
-                          this.state.userId,
-                          classFilter,
-                          this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
-                          this.state.showAdminFeatures,
-                          true
-                        );
+                    if (countData && countData.count > 0) {
+                      console.log(`⚡ 軽量チェックで${countData.count}件検出 - 後続ポーリングで復旧予定`);
+                      // 初期データロード失敗フラグを設定してポーリングに委ねる
+                      this.hadInitialDataLoadFailure = true;
+                      this.state.lastSeenCount = 0;
+                    }
+                  } else {
+                    // 通常時は従来のフォールバック処理（簡素化版）
+                    const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
+                    console.log('🔍 Data consistency check:', {
+                      fullDataEmpty: !result?.data || result.data.length === 0,
+                      lightCheckCount: countData?.count || 0,
+                      requestedSheet: requestedSheetName,
+                      currentSheet: this.state.currentActiveSheet
                     });
                     
-                    if (retryResult && retryResult.data && retryResult.data.length > 0) {
-                      console.log('✅ Fallback retry successful! Got', retryResult.data.length, 'items');
-                      result = retryResult; // 成功した結果を使用
-                    } else {
-                      console.warn('❌ Fallback retry also returned empty data');
+                    if (countData && countData.count > 0) {
+                      console.warn('⚠️ Data inconsistency detected! Light check shows', countData.count, 'items but full fetch returned empty');
+                      console.log('🔄 Attempting simplified fallback...');
+                      
+                      // 簡素化されたフォールバック（待機時間短縮）
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                      
+                      const retryResult = await new Promise((resolve, reject) => {
+                        google.script.run
+                          .withSuccessHandler(resolve)
+                          .withFailureHandler(reject)
+                          .getPublishedSheetData(
+                            this.state.userId,
+                            classFilter,
+                            this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
+                            this.state.showAdminFeatures,
+                            true
+                          );
+                      });
+                      
+                      if (retryResult && retryResult.data && retryResult.data.length > 0) {
+                        console.log('✅ Fallback retry successful! Got', retryResult.data.length, 'items');
+                        result = retryResult; // 成功した結果を使用
+                      } else {
+                        console.warn('❌ Fallback retry also returned empty data');
+                      }
                     }
                   }
                 } catch (fallbackError) {
@@ -7060,6 +7106,280 @@ try {
       console.error('❌ デバウンステストエラー:', error);
       return { success: false, error: error.message };
     }
+  };
+
+  // === データ取得診断機能 ===
+  
+  // データ取得状況の詳細診断
+  window.diagnoseDataFetch = async () => {
+    console.log('🔬 データ取得診断開始');
+    
+    const app = window.studyQuestApp;
+    if (!app) {
+      console.error('StudyQuestApp not found');
+      return { success: false, error: 'StudyQuestApp not found' };
+    }
+    
+    const diagnosis = {
+      timestamp: new Date().toISOString(),
+      userState: {
+        userId: app.state.userId,
+        currentAnswersCount: app.state.currentAnswers?.length || 0,
+        lastSeenCount: app.state.lastSeenCount,
+        initialDataLoaded: app.initialDataLoaded,
+        hadInitialDataLoadFailure: app.hadInitialDataLoadFailure
+      },
+      uiState: {
+        classFilter: app.elements.classFilter?.value || 'unknown',
+        sortOrder: app.elements.sortOrder?.value || 'unknown',
+        showAdminFeatures: app.state.showAdminFeatures
+      },
+      tests: [],
+      recommendations: []
+    };
+    
+    try {
+      // テスト1: 軽量データカウント
+      console.log('📊 テスト1: データカウント');
+      const startTime = performance.now();
+      const countData = await app.gas.getDataCount(
+        diagnosis.uiState.classFilter,
+        diagnosis.uiState.sortOrder,
+        diagnosis.uiState.showAdminFeatures
+      );
+      const countTime = performance.now() - startTime;
+      
+      diagnosis.tests.push({
+        name: 'データカウント',
+        duration: Math.round(countTime),
+        result: countData,
+        success: !!countData && countData.count !== undefined
+      });
+      
+      // テスト2: フルデータ取得
+      console.log('📊 テスト2: フルデータ取得');
+      const fullStartTime = performance.now();
+      const fullData = await app.gas.getPublishedSheetData(
+        app.state.userId,
+        diagnosis.uiState.classFilter,
+        diagnosis.uiState.sortOrder,
+        diagnosis.uiState.showAdminFeatures,
+        false
+      );
+      const fullTime = performance.now() - fullStartTime;
+      
+      diagnosis.tests.push({
+        name: 'フルデータ取得',
+        duration: Math.round(fullTime),
+        result: {
+          status: fullData?.status,
+          dataCount: fullData?.data?.length || 0,
+          sheetName: fullData?.sheetName
+        },
+        success: !!fullData && !!fullData.data
+      });
+      
+      // テスト3: 増分データ取得
+      if (diagnosis.userState.lastSeenCount > 0) {
+        console.log('📊 テスト3: 増分データ取得');
+        const incrementalStartTime = performance.now();
+        const incrementalData = await app.gas.getIncrementalSheetData(
+          diagnosis.uiState.classFilter,
+          diagnosis.uiState.sortOrder,
+          diagnosis.uiState.showAdminFeatures,
+          diagnosis.userState.lastSeenCount
+        );
+        const incrementalTime = performance.now() - incrementalStartTime;
+        
+        diagnosis.tests.push({
+          name: '増分データ取得',
+          duration: Math.round(incrementalTime),
+          result: {
+            newCount: incrementalData?.newCount || 0,
+            totalCount: incrementalData?.totalCount || 0,
+            status: incrementalData?.status
+          },
+          success: !!incrementalData && incrementalData.status !== 'error'
+        });
+      }
+      
+      // 診断結果の評価と推奨事項
+      const countResult = diagnosis.tests.find(t => t.name === 'データカウント');
+      const fullResult = diagnosis.tests.find(t => t.name === 'フルデータ取得');
+      
+      if (countResult && fullResult) {
+        if (countResult.success && fullResult.success) {
+          const expectedCount = countResult.result.count || 0;
+          const actualCount = fullResult.result.dataCount || 0;
+          
+          if (expectedCount !== actualCount) {
+            diagnosis.recommendations.push({
+              level: 'warning',
+              message: `データ不整合検出: カウント=${expectedCount}, 実際=${actualCount}`,
+              action: 'サーバー側のデータ取得ロジックを確認してください'
+            });
+          } else if (expectedCount === 0) {
+            diagnosis.recommendations.push({
+              level: 'info',
+              message: 'データが存在しません',
+              action: 'フォームに新しい回答を投稿してください'
+            });
+          } else {
+            diagnosis.recommendations.push({
+              level: 'success',
+              message: 'データ取得は正常に動作しています',
+              action: '問題が発生した場合はページを再読み込みしてください'
+            });
+          }
+        } else {
+          diagnosis.recommendations.push({
+            level: 'error',
+            message: 'データ取得に失敗しました',
+            action: 'ネットワーク接続とユーザー権限を確認してください'
+          });
+        }
+      }
+      
+      // パフォーマンス評価
+      const avgTime = diagnosis.tests.reduce((sum, test) => sum + test.duration, 0) / diagnosis.tests.length;
+      if (avgTime > 3000) {
+        diagnosis.recommendations.push({
+          level: 'warning',
+          message: `応答時間が遅い (平均${Math.round(avgTime)}ms)`,
+          action: 'サーバーのパフォーマンスを確認してください'
+        });
+      }
+      
+      console.log('📊 データ取得診断完了:', diagnosis);
+      return diagnosis;
+      
+    } catch (error) {
+      console.error('❌ 診断エラー:', error);
+      diagnosis.tests.push({
+        name: '診断実行',
+        duration: 0,
+        result: null,
+        success: false,
+        error: error.message
+      });
+      return diagnosis;
+    }
+  };
+  
+  // データ取得パフォーマンス監視
+  window.monitorDataFetchPerformance = async (duration = 60000) => {
+    console.log(`📈 データ取得パフォーマンス監視開始 (${duration/1000}秒間)`);
+    
+    const app = window.studyQuestApp;
+    if (!app) {
+      console.error('StudyQuestApp not found');
+      return { success: false, error: 'StudyQuestApp not found' };
+    }
+    
+    const monitor = {
+      startTime: Date.now(),
+      duration: duration,
+      samples: [],
+      summary: {}
+    };
+    
+    const interval = setInterval(async () => {
+      try {
+        const startTime = performance.now();
+        const countData = await app.gas.getDataCount('すべて', 'newest', false);
+        const endTime = performance.now();
+        
+        monitor.samples.push({
+          timestamp: Date.now(),
+          duration: Math.round(endTime - startTime),
+          success: !!countData,
+          count: countData?.count || 0
+        });
+        
+        console.log(`📊 サンプル${monitor.samples.length}: ${Math.round(endTime - startTime)}ms`);
+        
+      } catch (error) {
+        monitor.samples.push({
+          timestamp: Date.now(),
+          duration: 0,
+          success: false,
+          error: error.message
+        });
+      }
+    }, 5000); // 5秒間隔
+    
+    // 指定時間後に監視終了
+    setTimeout(() => {
+      clearInterval(interval);
+      
+      // 統計計算
+      const successful = monitor.samples.filter(s => s.success);
+      const failed = monitor.samples.filter(s => !s.success);
+      
+      if (successful.length > 0) {
+        const durations = successful.map(s => s.duration);
+        monitor.summary = {
+          totalSamples: monitor.samples.length,
+          successfulSamples: successful.length,
+          failedSamples: failed.length,
+          successRate: (successful.length / monitor.samples.length * 100).toFixed(1) + '%',
+          avgDuration: Math.round(durations.reduce((a, b) => a + b, 0) / durations.length),
+          minDuration: Math.min(...durations),
+          maxDuration: Math.max(...durations),
+          medianDuration: durations.sort((a, b) => a - b)[Math.floor(durations.length / 2)]
+        };
+      } else {
+        monitor.summary = {
+          totalSamples: monitor.samples.length,
+          successfulSamples: 0,
+          failedSamples: failed.length,
+          successRate: '0%',
+          error: '全てのサンプルが失敗しました'
+        };
+      }
+      
+      console.log('📈 パフォーマンス監視完了:', monitor.summary);
+    }, duration);
+    
+    return monitor;
+  };
+  
+  // 現在のシステム状態の包括的なレポート
+  window.getSystemStatusReport = () => {
+    const app = window.studyQuestApp;
+    if (!app) return null;
+    
+    const report = {
+      timestamp: new Date().toISOString(),
+      application: {
+        version: '2.0',
+        initialDataLoaded: app.initialDataLoaded,
+        hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
+        pollingActive: app.pollingSettings?.enabled,
+        batchProcessingEnabled: app.enableBatchProcessing
+      },
+      data: {
+        currentAnswersCount: app.state.currentAnswers?.length || 0,
+        lastSeenCount: app.state.lastSeenCount,
+        visibleCardsCount: document.querySelectorAll('.answer-card').length,
+        userId: app.state.userId?.substring(0, 8) + '...'
+      },
+      ui: {
+        classFilter: app.elements.classFilter?.value,
+        sortOrder: app.elements.sortOrder?.value,
+        showAdminFeatures: app.state.showAdminFeatures,
+        notificationBannerVisible: app.elements.newContentBanner && !app.elements.newContentBanner.classList.contains('hidden')
+      },
+      performance: {
+        memoryUsage: performance.memory ? {
+          used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+          total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB'
+        } : 'unavailable'
+      }
+    };
+    
+    console.log('📋 システム状態レポート:', report);
+    return report;
   };
   
   // ドメイン情報とフォームリンクを取得
