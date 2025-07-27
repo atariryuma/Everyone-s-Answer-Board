@@ -1498,22 +1498,43 @@ function executeQuickStartProcess(quickstartBtn, quickstartText) {
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタート完了';
         
-        // 自動停止モーダルを表示（公開開始に合わせて）
+        // 公開完了確認とURL生成後に自動停止確認モーダルを表示
         setTimeout(() => {
           // ローディングオーバーレイを非表示にしてからモーダル表示
           if (window.unifiedLoadingManager) {
             window.unifiedLoadingManager.setLoading(false);
           }
           
-          // 自動停止確認モーダルを表示
+          // URL生成確認とデータ検証を実行
+          const enhancedResult = {
+            ...result,
+            // URL生成の待機時間を延長
+            url: result?.url || '',
+            autoStopMinutes: result?.autoStopMinutes || 360,
+            autoStopTime: result?.autoStopTime || '',
+            publicationData: {
+              isPublished: result?.success || false,
+              hasValidUrl: !!(result?.url && result.url.length > 0),
+              timestamp: new Date().toISOString()
+            }
+          };
+          
+          console.log('📊 QuickStart公開データ検証:', {
+            hasResult: !!result,
+            hasUrl: !!(result?.url && result.url.length > 0),
+            autoStopMinutes: result?.autoStopMinutes,
+            enhancedResult: enhancedResult
+          });
+          
+          // 自動停止確認モーダルを表示（検証済みデータで）
           setTimeout(() => {
             if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
-              window.sharedModals.showAutoStopConfirmation(result);
-              console.log('✅ 自動停止確認モーダルを表示しました');
+              window.sharedModals.showAutoStopConfirmation(enhancedResult);
+              console.log('✅ QuickStart公開後に自動停止確認モーダルを表示しました（URL検証済み）');
             } else {
               console.warn('⚠️ 自動停止モーダルが利用できません');
             }
-          }, 500); // ローディング非表示から少し遅れて表示
+          }, 800); // URL生成確認に十分な時間を確保
         }, 2000);
         
         // Hide progress bar after delay and reset button

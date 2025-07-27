@@ -1005,7 +1005,7 @@ class SharedModals {
     modal.classList.remove('hidden');
   }
 
-  // 6時間自動停止確認モーダルの表示
+  // 6時間自動停止確認モーダルの表示（完全版エラーハンドリング）
   showAutoStopConfirmation(publishResult) {
     // ローディングオーバーレイを確実に非表示にする
     if (window.unifiedLoadingManager) {
@@ -1017,12 +1017,16 @@ class SharedModals {
 
     const modal = document.getElementById('auto-stop-confirmation-modal');
     if (!modal) {
-      console.error('自動停止確認モーダルが見つかりません');
+      console.error('❌ 自動停止確認モーダルが見つかりません');
       return;
     }
 
-    // 公開時間と停止時間の設定（動的取得版）
-    if (publishResult && publishResult.publishedAt) {
+    // 公開結果データの完全性検証
+    const validationResult = this.validatePublishResult(publishResult);
+    console.log('🔍 公開結果データ検証:', validationResult);
+
+    // 公開時間と停止時間の設定（完全版）
+    if (validationResult.isValid && publishResult.publishedAt) {
       const publishTime = new Date(publishResult.publishedAt);
       const minutes = publishResult.autoStopMinutes || 360; // 6時間 = 360分（デフォルト）
       const stopTime = new Date(publishTime.getTime() + (minutes * 60 * 1000));
@@ -1032,17 +1036,26 @@ class SharedModals {
         autoStopMinutes: minutes,
         source: publishResult.autoStopMinutes ? 'server' : 'default',
         publishTime: publishTime.toLocaleString('ja-JP'),
-        stopTime: stopTime.toLocaleString('ja-JP')
+        stopTime: stopTime.toLocaleString('ja-JP'),
+        hasValidUrl: validationResult.hasValidUrl,
+        url: publishResult.url || 'undefined'
       });
       
       document.getElementById('publish-start-time').textContent = publishTime.toLocaleString('ja-JP');
       document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
       
+      // URL状態の表示
+      this.displayUrlStatus(publishResult, validationResult);
+      
       // 残り時間のカウントダウンを開始
       this.startCountdown(stopTime);
     } else {
-      // publishResultが不完全な場合のフォールバック処理
-      console.warn('⚠️ 公開結果データが不完全です:', publishResult);
+      // publishResultが不完全な場合の包括的フォールバック処理
+      console.warn('⚠️ 公開結果データが不完全です:', {
+        publishResult: publishResult,
+        validationErrors: validationResult.errors,
+        fallbackAction: 'デフォルト設定を適用'
+      });
       
       const now = new Date();
       const minutes = 360; // デフォルト6時間
@@ -1051,18 +1064,23 @@ class SharedModals {
       document.getElementById('publish-start-time').textContent = now.toLocaleString('ja-JP');
       document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
       
-      // 警告表示
+      // エラー状態の詳細表示
       const remainingTimeEl = document.getElementById('remaining-time');
       if (remainingTimeEl) {
-        remainingTimeEl.textContent = '⚠️ 時間設定を確認してください';
+        const errorCount = validationResult.errors.length;
+        remainingTimeEl.textContent = `⚠️ ${errorCount}個の問題を検出 - 設定を確認してください`;
         remainingTimeEl.className = 'font-medium text-yellow-100';
       }
+      
+      // URL状態の表示（エラーケース）
+      this.displayUrlStatus(publishResult, validationResult);
       
       console.log('🕒 フォールバック自動停止時間設定:', {
         publishTime: now.toLocaleString('ja-JP'),
         autoStopMinutes: minutes,
         stopTime: stopTime.toLocaleString('ja-JP'),
-        fallbackReason: '公開結果データ不足'
+        fallbackReason: '公開結果データ不足',
+        validationErrors: validationResult.errors
       });
     }
 
@@ -1085,6 +1103,100 @@ class SharedModals {
         alert('時間延長機能は今後実装予定です。');
       };
     }
+  }
+
+  // 公開結果データの完全性検証
+  validatePublishResult(publishResult) {
+    const errors = [];
+    let isValid = true;
+    let hasValidUrl = false;
+
+    // 基本的な存在チェック
+    if (!publishResult) {
+      errors.push('公開結果データが存在しません');
+      isValid = false;
+    } else {
+      // 公開成功フラグのチェック
+      if (!publishResult.success) {
+        errors.push('公開が成功していません');
+        isValid = false;
+      }
+
+      // URL検証
+      if (!publishResult.url || publishResult.url.trim() === '') {
+        errors.push('公開URLが空です');
+      } else if (publishResult.url.length < 10) {
+        errors.push('公開URLが不完全です（長さ不足）');
+      } else {
+        hasValidUrl = true;
+      }
+
+      // 公開時刻チェック
+      if (!publishResult.publishedAt) {
+        errors.push('公開時刻が設定されていません');
+      } else {
+        try {
+          const publishTime = new Date(publishResult.publishedAt);
+          if (isNaN(publishTime.getTime())) {
+            errors.push('公開時刻の形式が無効です');
+          }
+        } catch (e) {
+          errors.push('公開時刻の解析に失敗しました');
+        }
+      }
+
+      // 自動停止時間チェック
+      if (publishResult.autoStopMinutes && (publishResult.autoStopMinutes < 1 || publishResult.autoStopMinutes > 1440)) {
+        errors.push('自動停止時間が範囲外です（1分-24時間）');
+      }
+    }
+
+    return {
+      isValid: isValid && errors.length === 0,
+      hasValidUrl: hasValidUrl,
+      errors: errors,
+      summary: errors.length === 0 ? '✅ データは正常です' : `❌ ${errors.length}個の問題があります`
+    };
+  }
+
+  // URL状態表示（モーダル内での状態表示）
+  displayUrlStatus(publishResult, validationResult) {
+    // URL状態を表示するための要素を探す（または作成）
+    let urlStatusElement = document.getElementById('url-status-display');
+    
+    if (!urlStatusElement) {
+      // URL状態表示要素が存在しない場合は、既存の要素の近くに追加
+      const remainingTimeEl = document.getElementById('remaining-time');
+      if (remainingTimeEl && remainingTimeEl.parentNode) {
+        urlStatusElement = document.createElement('div');
+        urlStatusElement.id = 'url-status-display';
+        urlStatusElement.className = 'mt-2 text-xs';
+        remainingTimeEl.parentNode.insertBefore(urlStatusElement, remainingTimeEl.nextSibling);
+      }
+    }
+
+    if (urlStatusElement) {
+      if (validationResult.hasValidUrl) {
+        urlStatusElement.innerHTML = `
+          <div class="text-green-300">
+            ✅ URL生成済み: <span class="font-mono text-xs break-all">${publishResult.url.substring(0, 50)}...</span>
+          </div>
+        `;
+      } else {
+        const urlError = validationResult.errors.find(e => e.includes('URL')) || '不明なURLエラー';
+        urlStatusElement.innerHTML = `
+          <div class="text-yellow-300">
+            ⚠️ URL問題: ${urlError}
+          </div>
+        `;
+      }
+    }
+
+    console.log('🔗 URL状態表示更新:', {
+      hasValidUrl: validationResult.hasValidUrl,
+      url: publishResult?.url || 'undefined',
+      errors: validationResult.errors.filter(e => e.includes('URL'))
+    });
   }
 
   // 残り時間カウントダウン
