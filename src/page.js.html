@@ -2181,32 +2181,50 @@ class StudyQuestApp {
         return false;
       }
       
-      // ステータス確認
-      if (result.status !== 'success') {
+      // レスポンス構造の詳細ログ
+      console.log('🔍 データ判定: レスポンス構造確認', {
+        hasStatus: 'status' in result,
+        status: result.status,
+        hasData: 'data' in result,
+        dataType: Array.isArray(result.data) ? 'array' : typeof result.data,
+        dataLength: Array.isArray(result.data) ? result.data.length : 'N/A',
+        hasHeader: 'header' in result,
+        hasSheetName: 'sheetName' in result,
+        keys: Object.keys(result)
+      });
+      
+      // 2つの可能なレスポンス形式に対応
+      // 1. 新形式: { status: 'success', data: [...], header: '...', sheetName: '...' }
+      // 2. 旧形式: { data: [...], header: '...', sheetName: '...' } (statusフィールドなし)
+      
+      const hasStatusField = 'status' in result;
+      
+      // ステータス確認（存在する場合のみ）
+      if (hasStatusField && result.status !== 'success') {
         console.log('🔍 データ判定: ステータスが成功ではない -', result.status);
         return false;
       }
       
       // データ配列の存在確認
       if (!Array.isArray(result.data)) {
-        console.log('🔍 データ判定: dataが配列ではない');
+        console.log('🔍 データ判定: dataが配列ではない', typeof result.data);
         return false;
       }
       
-      // ヘッダー情報の確認
-      if (!result.header || typeof result.header !== 'string') {
-        console.log('🔍 データ判定: ヘッダー情報が不正');
+      // ヘッダー情報の確認（任意フィールド）
+      if (result.header && typeof result.header !== 'string') {
+        console.log('🔍 データ判定: ヘッダー情報の型が不正', typeof result.header);
         return false;
       }
       
-      // シート名の確認
-      if (!result.sheetName || typeof result.sheetName !== 'string') {
-        console.log('🔍 データ判定: シート名が不正');
+      // シート名の確認（任意フィールド）
+      if (result.sheetName && typeof result.sheetName !== 'string') {
+        console.log('🔍 データ判定: シート名の型が不正', typeof result.sheetName);
         return false;
       }
       
       console.log('✅ データ判定: 有効なデータ構造 -', {
-        status: result.status,
+        status: result.status || '(no status field)',
         dataLength: result.data.length,
         hasHeader: !!result.header,
         sheetName: result.sheetName
@@ -2217,6 +2235,41 @@ class StudyQuestApp {
       console.warn('⚠️ データ判定エラー:', error);
       return false;
     }
+  }
+
+  /**
+   * データ検証失敗の理由を取得
+   * @param {object} result - 検証対象のレスポンス
+   * @returns {string} 失敗理由
+   */
+  getValidationFailureReason(result) {
+    if (!result) {
+      return 'レスポンスがnull/undefined';
+    }
+    if (typeof result !== 'object') {
+      return `レスポンスがオブジェクトではない (${typeof result})`;
+    }
+    
+    const hasStatusField = 'status' in result;
+    if (hasStatusField && result.status !== 'success') {
+      return `ステータスが成功ではない (${result.status})`;
+    }
+    
+    if (!('data' in result)) {
+      return 'dataフィールドが存在しない';
+    }
+    if (!Array.isArray(result.data)) {
+      return `dataが配列ではない (${typeof result.data})`;
+    }
+    
+    if (result.header && typeof result.header !== 'string') {
+      return `ヘッダーの型が不正 (${typeof result.header})`;
+    }
+    if (result.sheetName && typeof result.sheetName !== 'string') {
+      return `シート名の型が不正 (${typeof result.sheetName})`;
+    }
+    
+    return '不明な検証失敗';
   }
 
   /**
@@ -2258,6 +2311,16 @@ class StudyQuestApp {
             );
         });
         
+        // レスポンスの詳細ログ
+        console.log(`🔍 データ取得レスポンス (試行 ${attempt + 1}):`, {
+          hasResult: !!result,
+          resultType: typeof result,
+          resultKeys: result ? Object.keys(result) : [],
+          hasData: result && 'data' in result,
+          dataType: result && result.data ? (Array.isArray(result.data) ? 'array' : typeof result.data) : 'undefined',
+          dataLength: result && Array.isArray(result.data) ? result.data.length : 'N/A'
+        });
+        
         // 成功した場合は結果を返す - 改善された判定条件
         if (result && this.isValidDataResult(result)) {
           console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
@@ -2290,11 +2353,13 @@ class StudyQuestApp {
           }
         }
         
-        // 空データの場合
+        // 無効なデータの場合（詳細な理由を記録）
+        const validationReason = this.getValidationFailureReason(result);
         if (attempt < MAX_ATTEMPTS - 1) {
-          console.warn(`⚠️ 空データ、リトライします (試行 ${attempt + 1})`);
+          console.warn(`⚠️ 無効なデータ、リトライします (試行 ${attempt + 1}): ${validationReason}`);
         } else {
-          console.warn('❌ 最大試行回数に達しました、空データを返します');
+          console.warn(`❌ 最大試行回数に達しました、最後のレスポンスを返します: ${validationReason}`);
+          // 有効でないデータでも、何らかのレスポンスがあれば返す
           return result || { status: 'error', message: 'データが見つかりませんでした', data: [] };
         }
         
