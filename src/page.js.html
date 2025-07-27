@@ -1149,9 +1149,11 @@ class StudyQuestApp {
       selectedClass = 'すべて';
     }
     
+    // 「すべて」の場合はnullに変換してサーバーに送信
+    const classFilter = selectedClass === 'すべて' ? null : selectedClass;
     const sortOrder = this.elements.sortOrder.value || 'newest';
     
-    return { selectedClass, sortOrder };
+    return { selectedClass, classFilter, sortOrder };
   }
   
   async clearCacheForContentCheck() {
@@ -1404,9 +1406,12 @@ class StudyQuestApp {
       console.log('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
       
       // 現在のフィルタ設定を取得
-      const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const classFilter = selectedClass === 'すべて' ? null : selectedClass;
       const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
       const adminMode = this.state.showAdminFeatures;
+      
+      console.log('📤 増分取得パラメータ:', { originalSelectedClass: selectedClass, processedClassFilter: classFilter });
       
       // 増分データを取得
       const incrementalData = await this.gas.getIncrementalSheetData(
@@ -1416,40 +1421,60 @@ class StudyQuestApp {
         this.state.lastSeenCount || 0
       );
       
+      console.log('📊 API整合性ログ - 増分データ取得完了:', {
+        endpoint: 'getIncrementalSheetData',
+        requestParams: {
+          classFilter,
+          sortOrder,
+          adminMode,
+          sinceRowCount: this.state.lastSeenCount || 0
+        },
+        responseStructure: {
+          status: incrementalData.status,
+          newCount: incrementalData.newCount,
+          totalCount: incrementalData.totalCount,
+          hasData: !!incrementalData.data
+        },
+        contextInfo: {
+          purpose: 'refreshContentIncremental',
+          currentAnswersLength: this.state.currentAnswers?.length || 0
+        }
+      });
+      
       if (incrementalData.status === 'error') {
         throw new Error(incrementalData.message);
       }
       
-      // Enhanced incremental data analysis (Phase 3.2)
-      const incrementalAnalysis = {
+      // Enhanced incremental data analysis (Phase 3.2) - 改善版
+      const preUpdateAnalysis = {
         newCount: incrementalData.newCount,
         totalCount: incrementalData.totalCount,
         hasNewData: incrementalData.newCount > 0,
-        currentCardsCount: this.state.currentAnswers.length,
         lastSeenCount: this.state.lastSeenCount,
-        domCardCount: this.elements.answersContainer ? 
-          this.elements.answersContainer.querySelectorAll('.answer-card').length : 0
+        serverExpectedCount: incrementalData.totalCount,
+        serverNewItems: incrementalData.newCount
       };
       
-      console.log('📥 Enhanced incremental analysis (Phase 3.2):', incrementalAnalysis);
+      console.log('📥 Enhanced incremental analysis (Phase 3.2) - 改善版:', preUpdateAnalysis);
       
-      // Enhanced consistency validation (Phase 3.2)
-      const consistencyValidation = {
-        stateDataMismatch: incrementalAnalysis.currentCardsCount !== incrementalAnalysis.lastSeenCount,
-        domDataMismatch: incrementalAnalysis.domCardCount !== incrementalAnalysis.currentCardsCount,
-        serverClientMismatch: incrementalAnalysis.totalCount > 0 && incrementalAnalysis.currentCardsCount === 0,
-        significantInconsistency: Math.abs(incrementalAnalysis.currentCardsCount - incrementalAnalysis.lastSeenCount) > 5
+      // サーバーベースの一貫性チェック（DOM更新前の最小限チェック）
+      const criticalInconsistency = {
+        zeroStateWithServerData: preUpdateAnalysis.totalCount > 0 && 
+                                this.state.currentAnswers.length === 0 && 
+                                this.state.lastSeenCount > 0,
+        significantCountMismatch: Math.abs(preUpdateAnalysis.totalCount - this.state.lastSeenCount) > 10
       };
       
-      if (consistencyValidation.significantInconsistency || 
-          consistencyValidation.serverClientMismatch ||
-          consistencyValidation.domDataMismatch) {
-        console.warn('🚨 Enhanced inconsistency detection - triggering full refresh (Phase 3.2):', {
-          incrementalAnalysis,
-          consistencyValidation
+      // 重大な不整合のみフルリフレッシュ（false positiveを削減）
+      if (criticalInconsistency.zeroStateWithServerData || 
+          criticalInconsistency.significantCountMismatch) {
+        console.warn('🚨 重大なサーバー・クライアント不整合検出 - フルリフレッシュ実行:', {
+          preUpdateAnalysis,
+          criticalInconsistency,
+          currentAnswersLength: this.state.currentAnswers.length
         });
         
-        // Use unified state management for fallback
+        // 重大な不整合の場合のみ全体リフレッシュを実行
         await this.refreshContentFull();
         return;
       }
@@ -1507,20 +1532,35 @@ class StudyQuestApp {
   // 全体コンテンツ更新（従来の方法）
   async refreshContentFull() {
     try {
+      // lastSeenCountを保持（安定化のため）
+      const preservedLastSeenCount = this.state.lastSeenCount;
+      
       // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
       this.cache.clear();
-      console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了');
+      console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了, lastSeenCount保持:', preservedLastSeenCount);
       
       await this.loadSheetData({ bypassCache: true });
       
-      // 手動リフレッシュ後は新着チェック基準を更新（初期化フラグは維持）
-      this.updateLastSeenCount(this.state.currentAnswers.length);
-      console.log('🔄 全体リフレッシュ完了、新着基準更新:', {
-        newLastSeenCount: this.state.lastSeenCount,
-        maintainInitialFlag: this.initialDataLoaded,
-        currentAnswersLength: this.state.currentAnswers.length,
-        visibleCards: document.querySelectorAll('.answer-card').length
-      });
+      // 手動リフレッシュ後の新着チェック基準更新戦略
+      const shouldUpdateLastSeen = this.state.currentAnswers.length > preservedLastSeenCount;
+      
+      if (shouldUpdateLastSeen) {
+        // データが増加している場合のみ更新
+        this.updateLastSeenCount(this.state.currentAnswers.length);
+        console.log('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
+          newLastSeenCount: this.state.lastSeenCount,
+          preservedCount: preservedLastSeenCount,
+          currentAnswersLength: this.state.currentAnswers.length
+        });
+      } else {
+        // データが減少または同じ場合は保持
+        this.state.lastSeenCount = preservedLastSeenCount;
+        console.log('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
+          preservedLastSeenCount: preservedLastSeenCount,
+          currentAnswersLength: this.state.currentAnswers.length,
+          maintainedStability: true
+        });
+      }
       
       this.provideFeedback('更新完了！', 'success');
       
@@ -1574,9 +1614,12 @@ class StudyQuestApp {
     if (this.state.isLoading) return; // 既にロード中の場合は跳ばす
 
     try {
-      const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const classFilter = selectedClass === 'すべて' ? null : selectedClass;
       const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
       const adminMode = this.state.showAdminFeatures;
+      
+      console.log('📤 新着確認パラメータ:', { originalSelectedClass: selectedClass, processedClassFilter: classFilter });
       
       const incrementalData = await this.gas.getIncrementalSheetData(
         classFilter, 
@@ -2495,8 +2538,27 @@ class StudyQuestApp {
     console.log('🔄 サーバーデータ同期開始');
     
     // 軽量チェックで最新のカウントを取得
-    const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+    const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+    const classFilter = selectedClass === 'すべて' ? null : selectedClass;
+    
+    console.log('📤 軽量チェックパラメータ:', { originalSelectedClass: selectedClass, processedClassFilter: classFilter });
+    
     const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
+    
+    console.log('📊 API整合性ログ - 軽量チェック完了:', {
+      endpoint: 'getDataCount',
+      requestParams: {
+        classFilter,
+        sortOrder: 'newest',
+        showAdminFeatures: this.state.showAdminFeatures
+      },
+      responseData: countData,
+      contextInfo: {
+        lastSeenCount: this.state.lastSeenCount,
+        currentAnswersLength: this.state.currentAnswers?.length || 0,
+        purpose: 'performServerDataSync'
+      }
+    });
     
     console.log('📊 サーバーカウント確認:', countData);
     
@@ -2524,10 +2586,13 @@ class StudyQuestApp {
   async forceDataRefresh() {
     console.log('🗑️ 強制データリフレッシュ開始...');
     
+    // lastSeenCountを保持（安定化のため）
+    const preservedLastSeenCount = this.state.lastSeenCount;
+    
     // フロントエンドキャッシュをクリア
     if (this.cache) {
       this.cache.clear();
-      console.log('✅ フロントエンドキャッシュをクリア');
+      console.log('✅ フロントエンドキャッシュをクリア, lastSeenCount保持:', preservedLastSeenCount);
     }
     
     // サーバーキャッシュをクリア
@@ -2546,7 +2611,22 @@ class StudyQuestApp {
     // 強制データ再読み込み
     await this.loadSheetData({ bypassCache: true });
     
-    console.log('✅ 強制データリフレッシュ完了');
+    // lastSeenCount復元（安定化のため）
+    const shouldPreserveLastSeen = this.state.currentAnswers.length <= preservedLastSeenCount;
+    if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
+      this.state.lastSeenCount = preservedLastSeenCount;
+      console.log('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
+        preservedCount: preservedLastSeenCount,
+        currentAnswersLength: this.state.currentAnswers.length,
+        stabilityMaintained: true
+      });
+    } else {
+      console.log('✅ 強制データリフレッシュ完了、新データによりlastSeenCount更新:', {
+        oldCount: preservedLastSeenCount,
+        newCount: this.state.lastSeenCount,
+        currentAnswersLength: this.state.currentAnswers.length
+      });
+    }
   }
 
   /**
@@ -2991,7 +3071,8 @@ class StudyQuestApp {
       container.appendChild(frag);
     }
     try {
-      const classFilter = selectedClass;
+      // classFilter「すべて」の場合はサーバーに送信しない（全データ取得のため）
+      const classFilter = selectedClass === 'すべて' ? null : selectedClass;
       
       // データ取得パラメータの詳細ログ
       const fetchParams = {
@@ -3002,6 +3083,12 @@ class StudyQuestApp {
         requestedSheetName,
         bypassCache: config.bypassCache || false
       };
+      
+      console.log('📤 データ取得パラメータ:', {
+        ...fetchParams,
+        originalSelectedClass: selectedClass,
+        processedClassFilter: classFilter
+      });
       console.log('📡 Starting data fetch with parameters:', fetchParams);
       
       // エラーハンドリング強化版のデータ取得
@@ -3126,6 +3213,27 @@ class StudyQuestApp {
               }
             }
 
+            console.log('📊 API整合性ログ - データ受信完了:', {
+              endpoint: 'getPublishedSheetData',
+              requestParams: {
+                classFilter: fetchParams.classFilter,
+                sortOrder: fetchParams.sortOrder,
+                showAdminFeatures: fetchParams.showAdminFeatures,
+                bypassCache: fetchParams.bypassCache
+              },
+              responseStructure: {
+                hasData: !!result.data,
+                dataLength: result.data?.length || 0,
+                hasHeader: !!result.header,
+                status: result.status
+              },
+              contextInfo: {
+                isInitialLoad,
+                lastSeenCount: this.state.lastSeenCount,
+                currentAnswersLength: this.state.currentAnswers?.length || 0
+              }
+            });
+            
             console.log('Received data:', result.data);
             
             // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
