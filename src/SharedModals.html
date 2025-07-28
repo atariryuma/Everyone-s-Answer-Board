@@ -1165,6 +1165,7 @@ class SharedModals {
       // URL検証（複数のURLフィールドをチェック）
       const candidateUrls = [
         publishResult.url,
+        publishResult.boardUrl,
         publishResult.viewUrl,
         publishResult.webAppUrl
       ].filter(url => url && url.trim() !== '');
