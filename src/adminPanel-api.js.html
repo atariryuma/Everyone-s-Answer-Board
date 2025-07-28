@@ -448,7 +448,7 @@ function proceedWithSaveAndPublish(config) {
               const publishResult = {
                 publishedAt: result.publishedAt || new Date().toISOString(),
                 autoStopMinutes: result.autoStopMinutes || 360,
-                boardUrl: result.boardUrl || '',
+                boardUrl: result.boardUrl || result.viewUrl || '',
                 status: 'success',
                 ...result
               };

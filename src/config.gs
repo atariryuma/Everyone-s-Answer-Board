@@ -2280,14 +2280,50 @@ function buildResponseFromContext(context) {
       isPublished: configJson.appPublished || false,
       setupStep: 3, // saveAndPublish完了時は常にStep 3
       
-      // URL情報（キャッシュされた値を使用）
-      appUrls: {
-        webAppUrl: ScriptApp.getService().getUrl(),
-        viewUrl: userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view'),
-        setupUrl: ScriptApp.getService().getUrl() + '?setup=true',
-        adminUrl: ScriptApp.getService().getUrl() + '?mode=admin&userId=' + context.requestUserId,
-        status: 'success'
-      },
+      // URL情報（generateUserUrlsを使用した適切なURL生成）
+      appUrls: (function() {
+        try {
+          return generateUserUrls(context.requestUserId);
+        } catch (e) {
+          console.warn('generateUserUrls失敗、フォールバック使用:', e.message);
+          return {
+            webAppUrl: ScriptApp.getService().getUrl(),
+            viewUrl: userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view'),
+            setupUrl: ScriptApp.getService().getUrl() + '?setup=true',
+            adminUrl: ScriptApp.getService().getUrl() + '?mode=admin&userId=' + context.requestUserId,
+            status: 'success'
+          };
+        }
+      })(),
+      
+      // トップレベルのURL（フロントエンドとの互換性のため）
+      boardUrl: (function() {
+        try {
+          const urls = generateUserUrls(context.requestUserId);
+          return urls.viewUrl || userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+        } catch (e) {
+          console.warn('boardUrl生成失敗、フォールバック使用:', e.message);
+          return userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+        }
+      })(),
+      viewUrl: (function() {
+        try {
+          const urls = generateUserUrls(context.requestUserId);
+          return urls.viewUrl || userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+        } catch (e) {
+          console.warn('viewUrl生成失敗、フォールバック使用:', e.message);
+          return userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+        }
+      })(),
+      webAppUrl: (function() {
+        try {
+          const urls = generateUserUrls(context.requestUserId);
+          return urls.webAppUrl || ScriptApp.getService().getUrl();
+        } catch (e) {
+          console.warn('webAppUrl生成失敗、フォールバック使用:', e.message);
+          return ScriptApp.getService().getUrl();
+        }
+      })(),
       
       // スプレッドシート情報（既存データから構築）
       activeSheetName: publishedSheetName,
