@@ -1554,6 +1554,64 @@ function unpublishBoard(requestUserId) {
 }
 
 /**
+ * アクティブシートを設定する関数
+ * AdminPanel.htmlから呼び出される
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {string} sheetName - アクティブにするシート名
+ */
+function setActiveSheet(requestUserId, sheetName) {
+  console.log('🎯 setActiveSheet: アクティブシート設定開始', { requestUserId, sheetName });
+  verifyUserAccess(requestUserId);
+  
+  try {
+    if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
+      throw new Error('有効なシート名が指定されていません');
+    }
+    
+    var userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // アクティブシートを設定
+    configJson.publishedSheetName = sheetName.trim();
+    configJson.lastModified = new Date().toISOString();
+    
+    // シート設定キーを生成
+    var sheetConfigKey = 'sheet_' + sheetName.trim();
+    
+    // シート設定が存在しない場合は基本設定を作成
+    if (!configJson[sheetConfigKey]) {
+      configJson[sheetConfigKey] = {
+        sheetName: sheetName.trim(),
+        lastModified: new Date().toISOString()
+      };
+    }
+    
+    // データベースを更新
+    updateUser(requestUserId, { 
+      configJson: JSON.stringify(configJson),
+      lastAccessedAt: new Date().toISOString()
+    });
+    
+    console.log('✅ setActiveSheet: アクティブシート設定完了', { sheetName });
+    
+    return {
+      success: true,
+      message: `シート「${sheetName}」をアクティブに設定しました`,
+      activeSheetName: sheetName,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (e) {
+    console.error('setActiveSheet エラー: ' + e.message);
+    throw new Error('アクティブシートの設定に失敗しました: ' + e.message);
+  }
+}
+
+/**
  * 表示オプション設定（統合版：Optimized機能統合）
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID

@@ -146,6 +146,11 @@ function updateUIWithNewStatus(status) {
   updateStepIndicators(currentStep);
   manageSectionStates(currentStep);
   
+  // シート未選択時は列選択をクリア
+  if (!status.activeSheetName) {
+    clearColumnSelections();
+  }
+  
   // Update unpublish button state
   updateUnpublishButton(status);
 
@@ -441,8 +446,14 @@ function populateHeaderOptions(headers) {
       // Store current value
       const currentValue = select.value;
       
-      // Clear and repopulate
-      select.innerHTML = '<option value="">-- 列を選択 --</option>';
+      // Clear and repopulate with appropriate placeholder
+      if (headers && headers.length > 0) {
+        select.innerHTML = '<option value="">-- 列を選択 --</option>';
+        select.disabled = false;
+      } else {
+        select.innerHTML = '<option value="">-- シートを選択してください --</option>';
+        select.disabled = true;
+      }
       
       const excludedHeaders = [
         'なるほど！',
@@ -1244,13 +1255,16 @@ function handleSheetSelectionChange(event) {
   if (newSelectedSheet) {
     console.log('📋 Loading config for sheet:', newSelectedSheet);
 
+    // 1. 即座にシートをアクティブ化
+    activateSelectedSheet(newSelectedSheet);
+
     // Call getSheetDetails once and use its result for config
     if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
       console.error('スプレッドシート情報が見つかりません');
       return;
     }
 
-    // Call loadConfigForSelected which now handles getSheetDetails and populates UI
+    // 2. アクティブシートの列データを取得して列選択を更新
     loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId)
       .then(result => {
         console.log('✅ シート設定読み込み完了:', result);
@@ -1263,7 +1277,94 @@ function handleSheetSelectionChange(event) {
         // エラー時もUI状態を更新
         updateUIForSelectedSheet();
       });
+  } else {
+    // シート選択が解除された場合
+    clearColumnSelections();
+    updateUIForSelectedSheet();
   }
+}
+
+// シートを即座にアクティブ化する関数
+function activateSelectedSheet(sheetName) {
+  if (!sheetName || !currentStatus || !currentStatus.userInfo) {
+    console.warn('⚠️ シートアクティブ化に必要な情報が不足しています');
+    return;
+  }
+
+  console.log(`🎯 シートを即座にアクティブ化: ${sheetName}`);
+  
+  // サーバー側でアクティブシートを設定
+  runGasWithUserId('setActiveSheet', 'シートをアクティブ化中...', sheetName)
+    .then(response => {
+      console.log('✅ シートアクティブ化完了:', response);
+      
+      // currentStatusを更新
+      if (currentStatus.userInfo.configJson) {
+        try {
+          const config = JSON.parse(currentStatus.userInfo.configJson);
+          config.publishedSheetName = sheetName;
+          currentStatus.userInfo.configJson = JSON.stringify(config);
+          currentStatus.activeSheetName = sheetName;
+          
+          // シートドロップダウンの表示を更新
+          updateSheetSelectActiveIndicator(sheetName);
+          
+          console.log('✅ ローカル状態更新完了');
+        } catch (e) {
+          console.warn('⚠️ configJson更新に失敗:', e);
+        }
+      }
+    })
+    .catch(error => {
+      console.error('❌ シートアクティブ化失敗:', error);
+      showMessage('シートのアクティブ化に失敗しました', 'warning');
+    });
+}
+
+// シートドロップダウンのアクティブ表示を更新
+function updateSheetSelectActiveIndicator(activeSheetName) {
+  const select = document.getElementById('sheet-select');
+  if (!select) return;
+  
+  // 全てのオプションからアクティブ表示を削除
+  Array.from(select.options).forEach(option => {
+    if (option.value && option.textContent.includes(' (アクティブ)')) {
+      option.textContent = option.value;
+      option.style.fontWeight = 'normal';
+      option.style.color = '';
+      option.className = '';
+    }
+  });
+  
+  // 新しいアクティブシートに表示を追加
+  const activeOption = Array.from(select.options).find(option => option.value === activeSheetName);
+  if (activeOption) {
+    activeOption.textContent = `${activeSheetName} (アクティブ)`;
+    activeOption.style.fontWeight = 'bold';
+    activeOption.style.color = '#10b981';
+    activeOption.className = 'active-sheet-option';
+  }
+}
+
+// 列選択をクリアする関数
+function clearColumnSelections() {
+  console.log('🧹 列選択をクリア');
+  
+  const columnSelects = [
+    'opinion-column',
+    'name-column', 
+    'reason-column',
+    'class-column',
+    'timestamp-column'
+  ];
+  
+  columnSelects.forEach(selectId => {
+    const select = document.getElementById(selectId);
+    if (select) {
+      select.innerHTML = '<option value="">-- シートを選択してください --</option>';
+      select.disabled = true;
+    }
+  });
 }
 
 // Load configuration for selected sheet - OPTIMIZED
