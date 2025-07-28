@@ -2517,12 +2517,12 @@ function createFormFactory(options) {
     var userId = options.userId;
     var formDescription = options.formDescription || 'みんなの回答ボードへの投稿フォームです。';
     
-    // タイムスタンプ生成
+    // タイムスタンプ生成（日時を含む）
     var now = new Date();
-    var dateString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd');
+    var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
     
     // フォームタイトル生成
-    var formTitle = options.formTitle || ('みんなの回答ボード ' + dateString);
+    var formTitle = options.formTitle || ('みんなの回答ボード ' + dateTimeString);
     
     // フォーム作成
     var form = FormApp.create(formTitle);
@@ -2543,7 +2543,7 @@ function createFormFactory(options) {
     }
 
     // スプレッドシート作成
-    var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateString);
+    var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
 
     // リアクション関連列を追加
     addReactionColumnsToSpreadsheet(spreadsheetResult.spreadsheetId, spreadsheetResult.sheetName);
@@ -2809,7 +2809,7 @@ const FORM_PRESETS = {
   quickstart: {
     titlePrefix: 'みんなの回答ボード',
     questions: 'custom',
-    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを大切にしましょう\n• 正しい情報を共有しましょう\n• 個人情報は書かないようにしましょう',
+    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを持ち、建設的な意見を心がけましょう\n• 事実に基づいた正しい情報を共有しましょう\n• 多様な意見を尊重し、違いを学びの機会としましょう\n• 個人情報やプライバシーに関わる内容は書かないようにしましょう\n• 責任ある発言を心がけ、みんなが安心して参加できる環境を作りましょう\n\nあなたの意見や感想は、クラスメイトの学びを深める大切な資源です。',
     config: {
       mainQuestion: '今日の学習について、あなたの考えや感想を聞かせてください',
       questionType: 'text',
@@ -2820,13 +2820,13 @@ const FORM_PRESETS = {
   custom: {
     titlePrefix: 'みんなの回答ボード',
     questions: 'custom',
-    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを大切にしましょう\n• 正しい情報を共有しましょう\n• 個人情報は書かないようにしましょう',
+    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを持ち、建設的な意見を心がけましょう\n• 事実に基づいた正しい情報を共有しましょう\n• 多様な意見を尊重し、違いを学びの機会としましょう\n• 個人情報やプライバシーに関わる内容は書かないようにしましょう\n• 責任ある発言を心がけ、みんなが安心して参加できる環境を作りましょう\n\nあなたの意見や感想は、クラスメイトの学びを深める大切な資源です。',
     config: {} // Will be overridden by user input
   },
   study: {
     titlePrefix: 'みんなの回答ボード',
     questions: 'simple', // Default, can be overridden
-    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを大切にしましょう\n• 正しい情報を共有しましょう\n• 個人情報は書かないようにしましょう',
+    description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを持ち、建設的な意見を心がけましょう\n• 事実に基づいた正しい情報を共有しましょう\n• 多様な意見を尊重し、違いを学びの機会としましょう\n• 個人情報やプライバシーに関わる内容は書かないようにしましょう\n• 責任ある発言を心がけ、みんなが安心して参加できる環境を作りましょう\n\nあなたの意見や感想は、クラスメイトの学びを深める大切な資源です。',
     config: {}
   }
 };
@@ -2847,11 +2847,11 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
     }
 
     const now = new Date();
-    const dateString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd');
+    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
     
     // タイトル生成（上書き可能）
     const titlePrefix = overrides.titlePrefix || preset.titlePrefix;
-    const formTitle = overrides.formTitle || `${titlePrefix} ${dateString}`;
+    const formTitle = overrides.formTitle || `${titlePrefix} ${dateTimeString}`;
     
     // 設定をマージ（プリセット + ユーザー設定）
     const mergedConfig = { ...preset.config, ...overrides.customConfig };
@@ -2915,13 +2915,13 @@ function createCustomForm(userEmail, userId, config) {
  * リンクされたスプレッドシートを作成
  * @param {string} userEmail - ユーザーメール
  * @param {GoogleAppsScript.Forms.Form} form - フォーム
- * @param {string} dateString - 日付文字列
+ * @param {string} dateTimeString - 日付時刻文字列
  * @returns {Object} スプレッドシート情報
  */
-function createLinkedSpreadsheet(userEmail, form, dateString) {
+function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
   try {
     // スプレッドシート名を設定
-    var spreadsheetName = userEmail + ' - 回答データ - ' + dateString;
+    var spreadsheetName = userEmail + ' - 回答データ - ' + dateTimeString;
     
     // 新しいスプレッドシートを作成
     var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);

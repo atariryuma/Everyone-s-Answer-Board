@@ -387,6 +387,25 @@ function proceedWithSaveAndPublish(config) {
       if (result && (result.userInfo || result.status === 'success')) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
+        // 履歴に保存
+        try {
+          const questionText = config.opinionHeader || config.opinionColumn || selectedSheet || '回答ボード';
+          const historyItem = {
+            questionText: questionText,
+            sheetName: selectedSheet,
+            publishedAt: new Date().toISOString(),
+            answerCount: result.answerCount || 0,
+            reactionCount: result.reactionCount || 0,
+            config: config,
+            formUrl: result.formUrl || (currentStatus && currentStatus.userInfo && currentStatus.userInfo.formUrl) || '',
+            spreadsheetUrl: result.spreadsheetUrl || (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) || ''
+          };
+          saveToHistory(historyItem);
+          logDebug('Published board saved to history:', historyItem);
+        } catch (historyError) {
+          logWarn('Failed to save to history:', historyError);
+        }
+        
         // ボードビューアーに即座更新を通知
         try {
           // メインウィンドウにメッセージを送信（あれば）

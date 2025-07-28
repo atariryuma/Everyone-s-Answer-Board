@@ -1721,5 +1721,352 @@ function validateConfiguration() {
 }
 
 
+// =============================================================================
+// HISTORY MANAGEMENT FUNCTIONS
+// =============================================================================
+
+// 履歴アイテムの最大保存数
+const MAX_HISTORY_ITEMS = 10;
+
+/**
+ * 回答ボードの履歴を保存
+ * @param {Object} historyItem - 保存する履歴アイテム
+ */
+function saveToHistory(historyItem) {
+  try {
+    if (!historyItem || !historyItem.questionText) {
+      logWarn('Invalid history item, skipping save');
+      return;
+    }
+
+    const history = getHistoryFromStorage();
+    
+    // 新しいアイテムを先頭に追加
+    const newItem = {
+      id: generateHistoryId(),
+      timestamp: new Date().toISOString(),
+      publishedAt: historyItem.publishedAt || new Date().toISOString(),
+      publishedEndAt: historyItem.publishedEndAt || null,
+      questionText: historyItem.questionText,
+      sheetName: historyItem.sheetName || '',
+      answerCount: historyItem.answerCount || 0,
+      reactionCount: historyItem.reactionCount || 0,
+      config: historyItem.config || {},
+      formUrl: historyItem.formUrl || '',
+      spreadsheetUrl: historyItem.spreadsheetUrl || ''
+    };
+    
+    history.unshift(newItem);
+    
+    // 最大数を超えた場合は古いものを削除
+    if (history.length > MAX_HISTORY_ITEMS) {
+      history.splice(MAX_HISTORY_ITEMS);
+    }
+    
+    localStorage.setItem('answerBoardHistory', JSON.stringify(history));
+    logDebug('History saved:', newItem);
+    
+    // UI を更新
+    loadHistoryUI();
+    
+  } catch (error) {
+    logWarn('Failed to save history:', error);
+  }
+}
+
+/**
+ * 履歴を localStorage から取得
+ * @returns {Array} 履歴配列
+ */
+function getHistoryFromStorage() {
+  try {
+    const historyJson = localStorage.getItem('answerBoardHistory');
+    return historyJson ? JSON.parse(historyJson) : [];
+  } catch (error) {
+    logWarn('Failed to parse history from storage:', error);
+    return [];
+  }
+}
+
+/**
+ * 履歴用のユニークIDを生成
+ * @returns {string} ユニークID
+ */
+function generateHistoryId() {
+  return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
+ * 履歴UIを読み込み・表示
+ */
+function loadHistoryUI() {
+  const historyList = document.getElementById('history-list');
+  const historyEmpty = document.getElementById('history-empty');
+  const clearHistoryBtn = document.getElementById('clear-history-btn');
+  
+  if (!historyList) return;
+  
+  const history = getHistoryFromStorage();
+  
+  if (history.length === 0) {
+    // 履歴が空の場合
+    if (historyEmpty) historyEmpty.classList.remove('hidden');
+    if (clearHistoryBtn) clearHistoryBtn.classList.add('hidden');
+    
+    // 既存の履歴アイテムをクリア
+    const existingItems = historyList.querySelectorAll('.history-item');
+    existingItems.forEach(item => item.remove());
+    
+  } else {
+    // 履歴がある場合
+    if (historyEmpty) historyEmpty.classList.add('hidden');
+    if (clearHistoryBtn) clearHistoryBtn.classList.remove('hidden');
+    
+    // 既存のアイテムをクリア
+    const existingItems = historyList.querySelectorAll('.history-item');
+    existingItems.forEach(item => item.remove());
+    
+    // 履歴アイテムを表示
+    history.forEach((item, index) => {
+      const historyElement = createHistoryItemElement(item, index);
+      historyList.appendChild(historyElement);
+    });
+  }
+}
+
+/**
+ * 履歴アイテムのDOM要素を作成
+ * @param {Object} item - 履歴アイテム
+ * @param {number} index - インデックス
+ * @returns {HTMLElement} 履歴アイテム要素
+ */
+function createHistoryItemElement(item, index) {
+  const element = document.createElement('div');
+  element.className = 'history-item bg-gray-800/30 border border-gray-600/30 rounded-lg p-4 hover:border-purple-500/50 transition-colors';
+  
+  const publishedAt = new Date(item.publishedAt);
+  const publishedEndAt = item.publishedEndAt ? new Date(item.publishedEndAt) : null;
+  
+  const formatDateTime = (date) => {
+    return date.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  
+  element.innerHTML = `
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+            ${index + 1}
+          </div>
+          <h4 class="text-sm font-medium text-white truncate">${escapeHtml(item.questionText)}</h4>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
+          <div class="text-gray-400">
+            <span class="font-medium text-green-400">公開:</span> ${formatDateTime(publishedAt)}
+          </div>
+          <div class="text-gray-400">
+            <span class="font-medium text-red-400">終了:</span> ${publishedEndAt ? formatDateTime(publishedEndAt) : '未設定'}
+          </div>
+          <div class="text-gray-400">
+            <span class="font-medium text-blue-400">回答数:</span> ${item.answerCount}
+          </div>
+          <div class="text-gray-400">
+            <span class="font-medium text-purple-400">リアクション:</span> ${item.reactionCount}
+          </div>
+        </div>
+        
+        ${item.sheetName ? `<div class="text-xs text-gray-500 mb-2">シート: ${escapeHtml(item.sheetName)}</div>` : ''}
+      </div>
+      
+      <div class="flex flex-col gap-2">
+        <button type="button" 
+                class="btn btn-primary btn-sm"
+                onclick="republishFromHistory('${item.id}')"
+                title="この設定で再公開">
+          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          再公開
+        </button>
+        <button type="button" 
+                class="text-xs text-red-400 hover:text-red-300 hover:underline"
+                onclick="removeHistoryItem('${item.id}')"
+                title="この履歴を削除">
+          削除
+        </button>
+      </div>
+    </div>
+  `;
+  
+  return element;
+}
+
+/**
+ * HTMLエスケープ関数
+ * @param {string} text - エスケープするテキスト
+ * @returns {string} エスケープされたテキスト
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * 履歴から再公開
+ * @param {string} historyId - 履歴ID
+ */
+function republishFromHistory(historyId) {
+  try {
+    const history = getHistoryFromStorage();
+    const item = history.find(h => h.id === historyId);
+    
+    if (!item) {
+      showMessage('履歴アイテムが見つかりませんでした', 'error');
+      return;
+    }
+    
+    // 確認ダイアログを表示
+    showConfirmationModal(
+      '履歴から再公開',
+      `「${item.questionText}」の設定で回答ボードを再公開しますか？\n\n既存の公開設定は置き換えられます。`,
+      function() {
+        performRepublishFromHistory(item);
+      }
+    );
+    
+  } catch (error) {
+    logError('Failed to republish from history:', error);
+    showMessage('再公開に失敗しました', 'error');
+  }
+}
+
+/**
+ * 履歴からの再公開を実行
+ * @param {Object} item - 履歴アイテム
+ */
+function performRepublishFromHistory(item) {
+  try {
+    showMessage('設定を復元中...', 'info');
+    
+    // 設定を復元
+    if (item.config) {
+      // フォーム設定の復元
+      if (item.config.opinionHeader) {
+        const opinionSelect = document.getElementById('opinionHeader');
+        if (opinionSelect) opinionSelect.value = item.config.opinionHeader;
+      }
+      
+      if (item.config.nameHeader) {
+        const nameSelect = document.getElementById('name-column');
+        if (nameSelect) nameSelect.value = item.config.nameHeader;
+      }
+      
+      if (item.config.classHeader) {
+        const classSelect = document.getElementById('class-column');
+        if (classSelect) classSelect.value = item.config.classHeader;
+      }
+      
+      if (item.config.reasonHeader) {
+        const reasonSelect = document.getElementById('reason-column');
+        if (reasonSelect) reasonSelect.value = item.config.reasonHeader;
+      }
+      
+      // チェックボックスの復元
+      const showNamesCheckbox = document.getElementById('show-names');
+      if (showNamesCheckbox) showNamesCheckbox.checked = item.config.showNames || false;
+      
+      const showCountsCheckbox = document.getElementById('show-counts');
+      if (showCountsCheckbox) showCountsCheckbox.checked = item.config.showCounts || false;
+    }
+    
+    // シート名が指定されている場合は選択
+    if (item.sheetName) {
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        sheetSelect.value = item.sheetName;
+        selectedSheet = item.sheetName;
+      }
+    }
+    
+    // 設定ボタンの状態を更新
+    updateConfigButtons();
+    
+    showMessage('✅ 設定が復元されました。「設定を保存して公開」ボタンで再公開してください。', 'success');
+    
+    // Step 3に移動してハイライト
+    const step3Section = document.getElementById('config-section');
+    if (step3Section) {
+      step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      step3Section.classList.add('ring-2', 'ring-purple-400', 'ring-opacity-50');
+      setTimeout(() => {
+        step3Section.classList.remove('ring-2', 'ring-purple-400', 'ring-opacity-50');
+      }, 3000);
+    }
+    
+  } catch (error) {
+    logError('Failed to perform republish from history:', error);
+    showMessage('設定の復元に失敗しました', 'error');
+  }
+}
+
+/**
+ * 履歴アイテムを削除
+ * @param {string} historyId - 履歴ID
+ */
+function removeHistoryItem(historyId) {
+  try {
+    const history = getHistoryFromStorage();
+    const filteredHistory = history.filter(item => item.id !== historyId);
+    
+    localStorage.setItem('answerBoardHistory', JSON.stringify(filteredHistory));
+    loadHistoryUI();
+    
+    showMessage('履歴アイテムを削除しました', 'success');
+    
+  } catch (error) {
+    logError('Failed to remove history item:', error);
+    showMessage('履歴アイテムの削除に失敗しました', 'error');
+  }
+}
+
+/**
+ * 履歴を全てクリア
+ */
+function clearHistory() {
+  showConfirmationModal(
+    '履歴をクリア',
+    '全ての履歴を削除しますか？この操作は取り消せません。',
+    function() {
+      try {
+        localStorage.removeItem('answerBoardHistory');
+        loadHistoryUI();
+        showMessage('履歴をクリアしました', 'success');
+      } catch (error) {
+        logError('Failed to clear history:', error);
+        showMessage('履歴のクリアに失敗しました', 'error');
+      }
+    }
+  );
+}
+
+// 履歴クリアボタンのイベントリスナーを設定
+document.addEventListener('DOMContentLoaded', function() {
+  const clearHistoryBtn = document.getElementById('clear-history-btn');
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener('click', clearHistory);
+  }
+  
+  // 初期履歴を読み込み
+  loadHistoryUI();
+});
+
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
 </script>
