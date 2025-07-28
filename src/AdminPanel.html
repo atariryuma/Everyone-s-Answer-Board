@@ -457,68 +457,7 @@
           </div>
         </div>
 
-        <!-- 回答ボード履歴 -->
-        <div class="glass-panel p-4 lg:p-6" id="history-section">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-4">
-              <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-lg">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <div>
-                <h2 class="text-lg font-semibold text-white">回答ボード履歴</h2>
-                <p class="text-xs text-gray-400">過去の回答ボードから簡単に再公開</p>
-              </div>
-            </div>
-            <button type="button" class="toggle-section" onclick="toggleSection('history-content')" aria-expanded="true" aria-label="履歴セクションを展開/折りたたみ">
-              <svg class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-              </svg>
-            </button>
-          </div>
-          
-          <div id="history-content" class="progressive-section expanded">
-            <div class="space-y-4">
-              <!-- 履歴説明 -->
-              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3">
-                <div class="flex items-center gap-2 mb-2">
-                  <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                  </svg>
-                  <span class="text-sm font-medium text-purple-200">過去の回答ボード一覧</span>
-                </div>
-                <p class="text-xs text-purple-300">
-                  過去に公開した回答ボードの履歴を確認し、同じ設定で簡単に再公開できます。
-                  <span class="text-purple-200 font-medium">デジタル市民としての学習の継続性</span>を支援します。
-                </p>
-              </div>
-              
-              <!-- 履歴リスト -->
-              <div id="history-list" class="space-y-3">
-                <!-- 履歴が空の場合の表示 -->
-                <div id="history-empty" class="text-center py-8">
-                  <div class="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                  </div>
-                  <p class="text-gray-400 text-sm">まだ履歴がありません</p>
-                  <p class="text-gray-500 text-xs mt-1">回答ボードを公開すると履歴が保存されます</p>
-                </div>
-              </div>
-              
-              <!-- 履歴管理ボタン -->
-              <div class="flex justify-end gap-2 pt-2">
-                <button type="button" id="clear-history-btn" class="text-xs text-red-400 hover:text-red-300 hover:underline hidden">
-                  履歴をクリア
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ステップ2: データシート設定 -->
+        <!-- ステップ2: シート設定・履歴 -->
         <div class="glass-panel p-4 lg:p-6" id="sheet-selection-section">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-4">
@@ -526,8 +465,8 @@
                 2
               </div>
               <div>
-                <h2 class="text-lg font-semibold text-white">シート設定</h2>
-                <p class="text-xs text-gray-400">表示するデータシートを選択</p>
+                <h2 class="text-lg font-semibold text-white">シート設定・履歴</h2>
+                <p class="text-xs text-gray-400">データシートの選択と過去の設定の再利用</p>
               </div>
             </div>
             <button type="button" class="toggle-section" onclick="toggleSection('step2-content')" aria-expanded="true" aria-label="セクションを展開/折りたたみ">
@@ -538,58 +477,66 @@
           </div>
           
           <div id="step2-content" class="progressive-section expanded">
-            <div class="space-y-4">
-              <!-- シート選択の説明 -->
-              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
-                <div class="flex items-center gap-2 mb-2">
-                  <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+            <div class="space-y-6">
+              <!-- 新規選択セクション -->
+              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-3">
+                  <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                   </svg>
-                  <span class="text-sm font-medium text-green-200">データシート選択</span>
+                  <h3 class="text-sm font-medium text-green-200">新規選択</h3>
                 </div>
-                <p class="text-xs text-green-300">スプレッドシートの中から回答ボードとして表示するシートを選択します</p>
-              </div>
-              
-              <!-- シート選択コントロール -->
-              <div class="space-y-3">
-                <label for="sheet-select" class="block text-sm font-medium text-white">
-                  <span class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
+                
+                <!-- シート選択コントロール -->
+                <div class="space-y-3">
+                  <label for="sheet-select" class="block text-sm font-medium text-white">
                     データシート
-                  </span>
-                </label>
-                <div class="flex gap-2">
-                  <select id="sheet-select" class="form-control flex-1" aria-describedby="sheet-help">
-                    <option>読み込み中...</option>
-                  </select>
-                  <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-3" title="スプレッドシートを開く">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                    </svg>
-                  </button>
+                  </label>
+                  <div class="flex gap-2">
+                    <select id="sheet-select" class="form-control flex-1" aria-describedby="sheet-help">
+                      <option>読み込み中...</option>
+                    </select>
+                    <button type="button" id="open-spreadsheet-btn-step2" class="btn btn-secondary px-3" title="スプレッドシートを開く">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <p id="sheet-help" class="text-xs text-green-300">
+                    スプレッドシートから表示したいシートを選択してください
+                  </p>
                 </div>
-                <p id="sheet-help" class="text-xs text-gray-400">
-                  フォームの回答や表示したいデータが含まれるシートを選択してください
-                </p>
               </div>
 
-              <!-- データプレビュー -->
-              <div id="data-preview-section" class="hidden">
-                <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
-                  <h4 class="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              <!-- 履歴選択セクション -->
+              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    データプレビュー
-                  </h4>
-                  <div id="data-preview-content" class="text-sm text-gray-300">
-                    <div class="animate-pulse">
-                      <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                      <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+                    <h3 class="text-sm font-medium text-purple-200">過去の設定から選択</h3>
+                  </div>
+                  <button type="button" id="clear-history-btn" class="text-xs text-red-400 hover:text-red-300 hover:underline hidden">
+                    履歴をクリア
+                  </button>
+                </div>
+                
+                <!-- 履歴カード一覧 -->
+                <div id="history-cards-container">
+                  <!-- 履歴が空の場合 -->
+                  <div id="history-empty" class="text-center py-4">
+                    <div class="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
                     </div>
+                    <p class="text-gray-400 text-sm">まだ履歴がありません</p>
+                    <p class="text-gray-500 text-xs">回答ボードを公開すると履歴が保存されます</p>
+                  </div>
+                  
+                  <!-- 履歴カード（JavaScriptで動的生成） -->
+                  <div id="history-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 hidden">
                   </div>
                 </div>
               </div>

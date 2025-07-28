@@ -1821,10 +1821,10 @@ function loadHistoryUI() {
     // 履歴がある場合
     if (historyEmpty) historyEmpty.classList.add('hidden');
     if (clearHistoryBtn) clearHistoryBtn.classList.remove('hidden');
+    historyList.classList.remove('hidden');
     
     // 既存のアイテムをクリア
-    const existingItems = historyList.querySelectorAll('.history-item');
-    existingItems.forEach(item => item.remove());
+    historyList.innerHTML = '';
     
     // 履歴アイテムを表示
     history.forEach((item, index) => {
@@ -1842,14 +1842,13 @@ function loadHistoryUI() {
  */
 function createHistoryItemElement(item, index) {
   const element = document.createElement('div');
-  element.className = 'history-item bg-gray-800/30 border border-gray-600/30 rounded-lg p-4 hover:border-purple-500/50 transition-colors';
+  element.className = 'history-item bg-gray-800/30 border border-gray-600/30 rounded-lg p-3 hover:border-purple-500/50 transition-all duration-300 cursor-pointer transform hover:scale-[1.02]';
   
   const publishedAt = new Date(item.publishedAt);
   const publishedEndAt = item.publishedEndAt ? new Date(item.publishedEndAt) : null;
   
   const formatDateTime = (date) => {
     return date.toLocaleString('ja-JP', {
-      year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -1858,52 +1857,43 @@ function createHistoryItemElement(item, index) {
   };
   
   element.innerHTML = `
-    <div class="flex items-start justify-between gap-4">
+    <div class="flex items-center justify-between gap-3">
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+          <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
             ${index + 1}
           </div>
           <h4 class="text-sm font-medium text-white truncate">${escapeHtml(item.questionText)}</h4>
         </div>
         
-        <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
-          <div class="text-gray-400">
-            <span class="font-medium text-green-400">公開:</span> ${formatDateTime(publishedAt)}
-          </div>
-          <div class="text-gray-400">
-            <span class="font-medium text-red-400">終了:</span> ${publishedEndAt ? formatDateTime(publishedEndAt) : '未設定'}
-          </div>
-          <div class="text-gray-400">
-            <span class="font-medium text-blue-400">回答数:</span> ${item.answerCount}
-          </div>
-          <div class="text-gray-400">
-            <span class="font-medium text-purple-400">リアクション:</span> ${item.reactionCount}
-          </div>
+        <div class="flex items-center gap-4 text-xs text-gray-400">
+          <span><span class="text-green-400">公開:</span> ${formatDateTime(publishedAt)}</span>
+          <span><span class="text-blue-400">回答:</span> ${item.answerCount}</span>
+          ${item.sheetName ? `<span class="text-gray-500">シート: ${escapeHtml(item.sheetName)}</span>` : ''}
         </div>
-        
-        ${item.sheetName ? `<div class="text-xs text-gray-500 mb-2">シート: ${escapeHtml(item.sheetName)}</div>` : ''}
       </div>
       
-      <div class="flex flex-col gap-2">
+      <div class="flex items-center gap-2">
         <button type="button" 
-                class="btn btn-primary btn-sm"
-                onclick="republishFromHistory('${item.id}')"
-                title="この設定で再公開">
-          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          再公開
-        </button>
-        <button type="button" 
-                class="text-xs text-red-400 hover:text-red-300 hover:underline"
-                onclick="removeHistoryItem('${item.id}')"
+                class="text-xs text-red-400 hover:text-red-300 hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+                onclick="event.stopPropagation(); removeHistoryItem('${item.id}')"
                 title="この履歴を削除">
           削除
         </button>
+        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
       </div>
     </div>
   `;
+  
+  // Add click event for auto-configuration
+  element.addEventListener('click', function() {
+    selectFromHistory(item);
+  });
+  
+  // Add group class for hover effects
+  element.classList.add('group');
   
   return element;
 }
@@ -1920,63 +1910,91 @@ function escapeHtml(text) {
 }
 
 /**
- * 履歴から再公開
- * @param {string} historyId - 履歴ID
+ * 履歴から設定を選択して自動構成
+ * @param {Object} item - 履歴アイテム
  */
-function republishFromHistory(historyId) {
+function selectFromHistory(item) {
   try {
-    const history = getHistoryFromStorage();
-    const item = history.find(h => h.id === historyId);
+    showMessage('設定を読み込み中...', 'info');
     
-    if (!item) {
-      showMessage('履歴アイテムが見つかりませんでした', 'error');
-      return;
+    // シートを自動選択
+    if (item.sheetName) {
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        // シートが選択肢に存在するかチェック
+        const sheetExists = Array.from(sheetSelect.options).some(option => option.value === item.sheetName);
+        if (sheetExists) {
+          sheetSelect.value = item.sheetName;
+          selectedSheet = item.sheetName;
+          lastSelectedSheetName = item.sheetName;
+          
+          // シート選択変更イベントを手動でトリガー
+          const changeEvent = new Event('change', { bubbles: true });
+          sheetSelect.dispatchEvent(changeEvent);
+        } else {
+          showMessage(`シート「${item.sheetName}」が見つかりません。現在利用可能なシートから選択してください。`, 'warning');
+        }
+      }
     }
     
-    // 確認ダイアログを表示
-    showConfirmationModal(
-      '履歴から再公開',
-      `「${item.questionText}」の設定で回答ボードを再公開しますか？\n\n既存の公開設定は置き換えられます。`,
-      function() {
-        performRepublishFromHistory(item);
-      }
-    );
+    // 設定を復元（少し遅延させてシート選択処理の完了を待つ）
+    setTimeout(() => {
+      restoreConfigurationFromHistory(item);
+    }, 500);
     
   } catch (error) {
-    logError('Failed to republish from history:', error);
-    showMessage('再公開に失敗しました', 'error');
+    logError('Failed to select from history:', error);
+    showMessage('設定の読み込みに失敗しました', 'error');
   }
 }
 
 /**
- * 履歴からの再公開を実行
+ * 履歴から設定を復元
  * @param {Object} item - 履歴アイテム
  */
-function performRepublishFromHistory(item) {
+function restoreConfigurationFromHistory(item) {
   try {
-    showMessage('設定を復元中...', 'info');
-    
-    // 設定を復元
     if (item.config) {
       // フォーム設定の復元
       if (item.config.opinionHeader) {
         const opinionSelect = document.getElementById('opinionHeader');
-        if (opinionSelect) opinionSelect.value = item.config.opinionHeader;
+        if (opinionSelect) {
+          // 選択肢に存在するかチェック
+          const optionExists = Array.from(opinionSelect.options).some(option => option.value === item.config.opinionHeader);
+          if (optionExists) {
+            opinionSelect.value = item.config.opinionHeader;
+          }
+        }
       }
       
       if (item.config.nameHeader) {
         const nameSelect = document.getElementById('name-column');
-        if (nameSelect) nameSelect.value = item.config.nameHeader;
+        if (nameSelect) {
+          const optionExists = Array.from(nameSelect.options).some(option => option.value === item.config.nameHeader);
+          if (optionExists) {
+            nameSelect.value = item.config.nameHeader;
+          }
+        }
       }
       
       if (item.config.classHeader) {
         const classSelect = document.getElementById('class-column');
-        if (classSelect) classSelect.value = item.config.classHeader;
+        if (classSelect) {
+          const optionExists = Array.from(classSelect.options).some(option => option.value === item.config.classHeader);
+          if (optionExists) {
+            classSelect.value = item.config.classHeader;
+          }
+        }
       }
       
       if (item.config.reasonHeader) {
         const reasonSelect = document.getElementById('reason-column');
-        if (reasonSelect) reasonSelect.value = item.config.reasonHeader;
+        if (reasonSelect) {
+          const optionExists = Array.from(reasonSelect.options).some(option => option.value === item.config.reasonHeader);
+          if (optionExists) {
+            reasonSelect.value = item.config.reasonHeader;
+          }
+        }
       }
       
       // チェックボックスの復元
@@ -1987,32 +2005,38 @@ function performRepublishFromHistory(item) {
       if (showCountsCheckbox) showCountsCheckbox.checked = item.config.showCounts || false;
     }
     
-    // シート名が指定されている場合は選択
-    if (item.sheetName) {
-      const sheetSelect = document.getElementById('sheet-select');
-      if (sheetSelect) {
-        sheetSelect.value = item.sheetName;
-        selectedSheet = item.sheetName;
-      }
-    }
-    
     // 設定ボタンの状態を更新
     updateConfigButtons();
     
-    showMessage('✅ 設定が復元されました。「設定を保存して公開」ボタンで再公開してください。', 'success');
+    // Config areaを表示
+    const configArea = document.getElementById('config-area');
+    if (configArea) {
+      configArea.classList.remove('hidden');
+    }
     
-    // Step 3に移動してハイライト
+    // Config placeholderを非表示
+    const configPlaceholder = document.getElementById('config-placeholder');
+    if (configPlaceholder) {
+      configPlaceholder.classList.add('hidden');
+    }
+    
+    showMessage(`✅ 「${item.questionText}」の設定を適用しました`, 'success');
+    
+    // Step 3にスムーズに移動
     const step3Section = document.getElementById('config-section');
     if (step3Section) {
-      step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      step3Section.classList.add('ring-2', 'ring-purple-400', 'ring-opacity-50');
       setTimeout(() => {
-        step3Section.classList.remove('ring-2', 'ring-purple-400', 'ring-opacity-50');
-      }, 3000);
+        step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // 軽いハイライト効果
+        step3Section.classList.add('ring-2', 'ring-purple-400', 'ring-opacity-30');
+        setTimeout(() => {
+          step3Section.classList.remove('ring-2', 'ring-purple-400', 'ring-opacity-30');
+        }, 2000);
+      }, 100);
     }
     
   } catch (error) {
-    logError('Failed to perform republish from history:', error);
+    logError('Failed to restore configuration from history:', error);
     showMessage('設定の復元に失敗しました', 'error');
   }
 }
