@@ -1106,13 +1106,31 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
       return { count: count, reacted: reacted };
     }
 
+    // 理由列デバッグ情報を追加
+    var reasonValue = '';
+    var reasonDebugInfo = {
+      reasonIndex: reasonIndex,
+      reasonIndexDefined: reasonIndex !== undefined,
+      hasOriginalData: !!(row.originalData),
+      originalDataLength: row.originalData ? row.originalData.length : 0,
+      reasonCellExists: reasonIndex !== undefined && row.originalData && row.originalData.length > reasonIndex,
+      reasonCellValue: reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex] ? row.originalData[reasonIndex] : 'N/A'
+    };
+    
+    if (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex] !== undefined) {
+      reasonValue = row.originalData[reasonIndex] || '';
+    }
+    
+    debugLog('🔍 formatSheetDataForFrontend 理由列デバッグ (Row %s):', index, reasonDebugInfo);
+    debugLog('🔍 最終理由値:', reasonValue);
+
     return {
       rowIndex: row.rowNumber || (index + 2),
       name: nameValue,
       email: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] : '',
       class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
       opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
-      reason: (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex]) ? row.originalData[reasonIndex] : '',
+      reason: reasonValue,
       reactions: {
         UNDERSTAND: checkReactionState('UNDERSTAND'),
         LIKE: checkReactionState('LIKE'),
@@ -3763,6 +3781,37 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
         });
         mappedIndex = longestHeader.index;
         debugLog('mapConfigToActualHeaders: Auto-detected main question header for %s: "%s" -> index %s', configKey, longestHeader.header, mappedIndex);
+      }
+    }
+    
+    // reasonHeader（理由列）の特別処理：見つからない場合は理由らしいヘッダーを自動検出
+    if (mappedIndex === undefined && configKey === 'reasonHeader') {
+      var reasonKeywords = ['理由', 'reason', 'なぜ', 'why', '根拠', 'わけ'];
+      
+      debugLog('mapConfigToActualHeaders: Searching for reason header with keywords: %s', JSON.stringify(reasonKeywords));
+      
+      for (var header in actualHeaderIndices) {
+        var normalizedHeader = header.toLowerCase().trim();
+        for (var k = 0; k < reasonKeywords.length; k++) {
+          if (normalizedHeader.includes(reasonKeywords[k]) || reasonKeywords[k].includes(normalizedHeader)) {
+            mappedIndex = actualHeaderIndices[header];
+            debugLog('mapConfigToActualHeaders: Auto-detected reason header for %s: "%s" -> index %s (keyword: %s)', configKey, header, mappedIndex, reasonKeywords[k]);
+            break;
+          }
+        }
+        if (mappedIndex !== undefined) break;
+      }
+      
+      // より広範囲の検索（部分一致）
+      if (mappedIndex === undefined) {
+        for (var header in actualHeaderIndices) {
+          var normalizedHeader = header.toLowerCase().trim();
+          if (normalizedHeader.indexOf('理由') !== -1 || normalizedHeader.indexOf('reason') !== -1) {
+            mappedIndex = actualHeaderIndices[header];
+            debugLog('mapConfigToActualHeaders: Found reason header by partial match for %s: "%s" -> index %s', configKey, header, mappedIndex);
+            break;
+          }
+        }
       }
     }
     

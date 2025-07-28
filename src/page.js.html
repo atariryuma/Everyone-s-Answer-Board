@@ -3444,6 +3444,18 @@ class StudyQuestApp {
             const syncResult = this.synchronizeStateAfterDataUpdate(result.data, 'performDataLoad');
             console.log('✅ Step 1-2: Data acquisition and state synchronization completed:', syncResult);
             
+            // 理由列デバッグ: 取得されたデータの詳細を確認
+            console.log('🔍 理由列デバッグ - 取得データ詳細:', result.data.map((item, index) => ({
+              index: index,
+              rowIndex: item.rowIndex,
+              opinion: item.opinion?.substring(0, 50) + '...',
+              reason: item.reason,
+              reasonLength: item.reason?.length || 0,
+              reasonExists: !!item.reason,
+              reasonTrimmed: item.reason?.trim(),
+              allKeys: Object.keys(item)
+            })));
+            
             // サーバーからの質問文と現在表示の一致性をチェック
             if (result.header) {
               const currentDisplayed = this.elements.headingLabel ? this.elements.headingLabel.textContent : '';
@@ -4354,6 +4366,15 @@ class StudyQuestApp {
         highlight: Boolean(data.highlight)
       };
       
+      // 理由列デバッグ: createAnswerCard での理由データ処理状況
+      console.log('🔍 createAnswerCard 理由列デバッグ:', {
+        rowIndex: safeData.rowIndex,
+        originalReason: data.reason,
+        validatedReason: safeData.reason,
+        reasonLength: safeData.reason?.length || 0,
+        willShowReason: !!(safeData.reason && safeData.reason.trim())
+      });
+      
       // Optimized cache key generation (faster than JSON.stringify)
       const cacheKey = `${safeData.rowIndex}-${safeData.opinion.slice(0,50)}-${safeData.reason.slice(0,30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
       
@@ -4448,17 +4469,27 @@ class StudyQuestApp {
       contentDiv.appendChild(opinionTitle);
       
       // 理由テキストが存在する場合のみ追加（堅牢化）
+      console.log('🔍 理由テキスト追加デバッグ:', {
+        hasReason: !!safeData.reason,
+        reasonTrimmed: safeData.reason?.trim(),
+        willAddReason: !!(safeData.reason && safeData.reason.trim()),
+        reasonTextElement: !!reasonText
+      });
+      
       if (safeData.reason && safeData.reason.trim()) {
+        console.log('✅ 理由テキストを追加します:', safeData.reason);
         try {
           // 理由テキストの有効性を検証
           if (reasonText && reasonText.textContent === safeData.reason) {
             contentDiv.appendChild(reasonText);
+            console.log('✅ 理由テキスト追加完了（既存要素使用）');
           } else {
             // 理由テキスト要素の再作成が必要な場合
             const newReasonText = document.createElement('p');
             newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
             newReasonText.textContent = safeData.reason;
             contentDiv.appendChild(newReasonText);
+            console.log('✅ 理由テキスト追加完了（新規要素作成）');
           }
         } catch (reasonError) {
           // 理由テキスト追加でエラーが発生した場合の回復処理
@@ -4468,11 +4499,14 @@ class StudyQuestApp {
             fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
             fallbackReasonText.textContent = safeData.reason;
             contentDiv.appendChild(fallbackReasonText);
+            console.log('✅ 理由テキスト追加完了（フォールバック）');
           } catch (fallbackError) {
             console.error('createAnswerCard: Failed to add reason text even with fallback:', fallbackError);
             // 理由テキストが追加できない場合でもカード生成は継続
           }
         }
+      } else {
+        console.log('❌ 理由テキストが空のため追加をスキップ');
       }
     
       // Create footer div
@@ -7523,13 +7557,28 @@ class StudyQuestApp {
    */
   validateReasonText(reason) {
     try {
+      console.log('🔍 validateReasonText デバッグ:', {
+        input: reason,
+        inputType: typeof reason,
+        inputIsNull: reason === null,
+        inputIsUndefined: reason === undefined,
+        inputLength: reason?.length
+      });
+      
       // null, undefined, 空文字列チェック
       if (!reason && reason !== 0) {
+        console.log('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
         return '';
       }
       
       // 文字列変換と基本検証
       const reasonStr = String(reason).trim();
+      
+      console.log('🔍 validateReasonText 処理結果:', {
+        reasonStr: reasonStr,
+        reasonStrLength: reasonStr.length,
+        willBeEmpty: reasonStr.length === 0
+      });
       
       // 長すぎる理由テキストの制限（10000文字まで）
       if (reasonStr.length > 10000) {
