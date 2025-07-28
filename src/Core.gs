@@ -1106,23 +1106,11 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
       return { count: count, reacted: reacted };
     }
 
-    // 理由列デバッグ情報を追加
+    // 理由列の値を取得
     var reasonValue = '';
-    var reasonDebugInfo = {
-      reasonIndex: reasonIndex,
-      reasonIndexDefined: reasonIndex !== undefined,
-      hasOriginalData: !!(row.originalData),
-      originalDataLength: row.originalData ? row.originalData.length : 0,
-      reasonCellExists: reasonIndex !== undefined && row.originalData && row.originalData.length > reasonIndex,
-      reasonCellValue: reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex] ? row.originalData[reasonIndex] : 'N/A'
-    };
-    
     if (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex] !== undefined) {
       reasonValue = row.originalData[reasonIndex] || '';
     }
-    
-    debugLog('🔍 formatSheetDataForFrontend 理由列デバッグ (Row %s):', index, reasonDebugInfo);
-    debugLog('🔍 最終理由値:', reasonValue);
 
     return {
       rowIndex: row.rowNumber || (index + 2),
