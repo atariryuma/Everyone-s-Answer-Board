@@ -1498,7 +1498,7 @@ function unpublishBoard(requestUserId) {
     configJson.appPublished = false; // 公開停止
     
     // 回答ボード連携の解除（フォーム情報は保持）
-    configJson.setupStatus = 'reconfiguring'; // ステップ1-3を全オープンにするための状態
+    configJson.setupStatus = 'pending'; // ステップ1から再開（直感的な進行のため）
     configJson.setupStep = 1; // ステップ1にリセット（公開終了後はセットアップから再開）
     
     // 列設定のみクリア（データソース・シート選択は保持）

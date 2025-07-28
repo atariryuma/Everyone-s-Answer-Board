@@ -480,7 +480,12 @@ function proceedWithSaveAndPublish(config) {
         } else {
           // Only force refresh if no fresh data available
           logInfo('No fresh data in response, forcing refresh');
-          loadStatus(true);
+          loadStatus(true).then(() => {
+            // ステップ進行を更新
+            const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
+            updateStepIndicators(currentStep);
+            manageSectionStates(currentStep);
+          });
         }
       } else {
         logError('Save failed:', result);
@@ -497,7 +502,12 @@ function proceedWithSaveAndPublish(config) {
         window.unifiedCache.clear();
       }
       
-      loadStatus(true);
+      loadStatus(true).then(() => {
+        // エラー後もステップ進行を更新
+        const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
+        updateStepIndicators(currentStep);
+        manageSectionStates(currentStep);
+      });
       handleError(error, 'saveAndPublish', '設定の保存に失敗しました。システム状態を再読み込みしました。');
     });
 }
@@ -750,6 +760,11 @@ function createFormWithConfig() {
         // ステータス更新とシート選択の確実な同期
         console.log('📊 カスタムセットアップ完了: ステータス更新とシート選択同期開始');
         loadStatus(true).then(() => {
+          // ステップ進行を明示的に更新
+          const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
+          updateStepIndicators(currentStep);
+          manageSectionStates(currentStep);
+          
           // ステータス更新完了後、新しく作成されたシートを自動選択
           setTimeout(() => {
             try {

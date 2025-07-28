@@ -96,21 +96,29 @@ function clearActiveSheet(requestUserId) {
  * @returns {number} セットアップステップ (1-3)
  */
 function determineSetupStep(userInfo, configJson) {
-  // Step 1: 基本ユーザー情報のみ（データソース未設定）
-  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
-    console.log('determineSetupStep: Step 1 - データソース未設定');
+  const setupStatus = configJson ? configJson.setupStatus : 'pending';
+  
+  // Step 1: データソース未設定 OR セットアップ初期状態
+  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '' || setupStatus === 'pending') {
+    console.log('determineSetupStep: Step 1 - データソース未設定またはセットアップ初期状態');
     return 1;
   }
   
-  // Step 2: データソース準備済み（フォーム未作成またはセットアップ未完了）
-  if (!configJson || configJson.setupStatus !== 'completed' || !configJson.formCreated) {
-    console.log('determineSetupStep: Step 2 - データソース設定済み、セットアップ未完了');
+  // Step 2: データソース設定済み + (再設定中 OR セットアップ未完了)
+  if (!configJson || setupStatus === 'reconfiguring' || setupStatus !== 'completed' || !configJson.formCreated) {
+    console.log('determineSetupStep: Step 2 - データソース設定済み、セットアップ未完了または再設定中');
     return 2;
   }
   
-  // Step 3: 全セットアップ完了
-  console.log('determineSetupStep: Step 3 - 全セットアップ完了');
-  return 3;
+  // Step 3: 全セットアップ完了 + 公開済み
+  if (setupStatus === 'completed' && configJson.formCreated && configJson.appPublished) {
+    console.log('determineSetupStep: Step 3 - 全セットアップ完了・公開済み');
+    return 3;
+  }
+  
+  // フォールバック: Step 2
+  console.log('determineSetupStep: フォールバック - Step 2');
+  return 2;
 }
 
 // =================================================================

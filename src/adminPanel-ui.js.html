@@ -607,34 +607,63 @@ function updateStepIndicators(currentStep) {
     const text = step.querySelector('span');
 
     if (stepNumber < currentStep) {
-      // 完了したステップ
+      // 完了したステップ: チェックマーク表示
       if (circle) {
         circle.className = 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all';
+        circle.innerHTML = '✓'; // チェックマーク
       }
       if (text) {
         text.classList.remove('text-gray-500');
-        text.classList.add('text-gray-300');
+        text.classList.add('text-green-400', 'font-medium');
       }
     } else if (stepNumber === currentStep) {
-      // 現在のステップ
+      // 現在のステップ: 強調表示と番号
       if (circle) {
-        circle.className = 'w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800';
+        circle.className = 'w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-cyan-400 ring-offset-2 ring-offset-gray-900 animate-pulse';
+        circle.innerHTML = stepNumber;
       }
       if (text) {
         text.classList.remove('text-gray-500');
-        text.classList.add('text-white', 'font-semibold');
+        text.classList.add('text-cyan-400', 'font-bold');
       }
     } else {
-      // 未完了のステップ
+      // 未来のステップ: グレーアウト
       if (circle) {
-        circle.className = 'w-6 h-6 bg-gray-600 text-gray-400 rounded-full flex items-center justify-center font-bold text-xs transition-all';
+        circle.className = 'w-6 h-6 bg-gray-700 text-gray-500 rounded-full flex items-center justify-center font-bold text-xs transition-all border border-gray-600';
+        circle.innerHTML = stepNumber;
       }
       if (text) {
-        text.classList.remove('text-white', 'font-semibold');
+        text.classList.remove('text-white', 'font-semibold', 'text-green-400', 'text-cyan-400', 'font-bold', 'font-medium');
         text.classList.add('text-gray-500');
       }
     }
   });
+  
+  // 進行状況メッセージの更新
+  updateProgressMessage(currentStep);
+}
+
+function updateProgressMessage(currentStep) {
+  const messageElement = document.getElementById('progress-message');
+  if (!messageElement) return;
+  
+  let message = '';
+  switch (currentStep) {
+    case 1:
+      message = '📋 ステップ1: データソースを準備してください';
+      break;
+    case 2:
+      message = '⚙️ ステップ2: シートと列の設定を完了してください';
+      break;
+    case 3:
+      message = '🚀 ステップ3: フォームを作成して公開してください';
+      break;
+    default:
+      message = '🎉 セットアップが完了しました！';
+  }
+  
+  messageElement.textContent = message;
+  messageElement.className = `text-sm ${currentStep === 1 ? 'text-cyan-400' : currentStep === 2 ? 'text-yellow-400' : 'text-green-400'} font-medium mb-4`;
 }
 
 // Update footer and guidance text
@@ -850,34 +879,16 @@ function expandActiveSection(stepNumber) {
 function manageSectionStates(currentStep) {
   console.log(`🔄 Managing section states for step ${currentStep}`);
   
-  // Check if we're in reconfiguring state (after unpublish)
-  const isReconfiguring = currentStatus && currentStatus.userInfo && 
-    JSON.parse(currentStatus.userInfo.configJson || '{}').setupStatus === 'reconfiguring';
-  
-  if (isReconfiguring) {
-    console.log('🔧 Reconfiguring mode: Opening all steps for easy reconfiguration');
-    // In reconfiguring mode, open all steps 1-3 for easy reconfiguration
-    for (let i = 1; i <= 3; i++) {
-      expandActiveSection(i);
-      
-      // Show config area for step 3 if we have a sheet
-      if (i === 3 && currentStatus && currentStatus.activeSheetName) {
-        const configArea = document.getElementById('config-area');
-        if (configArea) {
-          configArea.classList.remove('hidden');
-        }
-      }
-    }
-    return;
-  }
-  
-  // Simplified section management - just expand the current step
+  // ステップごとのセクション制御
   for (let i = 1; i <= 3; i++) {
+    const sectionId = `step${i}-content`;
+    const section = document.getElementById(sectionId);
+    
     if (i === currentStep) {
-      // Current active section - expand it
+      // 現在のステップ: 展開して有効化
       expandActiveSection(i);
       
-      // Special handling for Step 3: ensure config-area is visible
+      // Step 3の特別処理: config-areaの表示
       if (i === 3) {
         const configArea = document.getElementById('config-area');
         if (configArea && currentStatus && currentStatus.activeSheetName) {
@@ -886,9 +897,29 @@ function manageSectionStates(currentStep) {
         }
       }
       
-      console.log(`🔄 Step ${i}: Active`);
+      console.log(`🔄 Step ${i}: Active (current step)`);
+    } else if (i < currentStep) {
+      // 完了済みステップ: アクセス可能だが、展開は任意
+      if (section) {
+        section.classList.add('opacity-90'); // 完了した状態を視覚的に示す
+      }
+      console.log(`✅ Step ${i}: Completed (accessible)`);
+    } else {
+      // 未来のステップ: Step 1の場合はpending状態でも全て閲覧可能
+      if (currentStep === 1) {
+        // Step 1では全ステップにアクセス可能（データ確認のため）
+        if (section) {
+          section.classList.add('opacity-75'); // 未来のステップとして軽く表示
+        }
+        console.log(`⏭️ Step ${i}: Available for preview`);
+      } else {
+        // Step 2以降では順次開放
+        if (section) {
+          section.classList.add('opacity-50'); // 未来のステップとして表示
+        }
+        console.log(`⏭️ Step ${i}: Future step (available)`);
+      }
     }
-    // Note: No collapsing or darkening of other steps - keep them all accessible
   }
 }
 
