@@ -828,7 +828,7 @@ function expandActiveSection(stepNumber) {
   // Note: Visual indicators are now managed by manageSectionStates()
 }
 
-// Manage section states based on current step
+// Manage section states based on current step (simplified - no visual effects)
 function manageSectionStates(currentStep) {
   console.log(`🔄 Managing section states for step ${currentStep}`);
   
@@ -840,11 +840,6 @@ function manageSectionStates(currentStep) {
     console.log('🔧 Reconfiguring mode: Opening all steps for easy reconfiguration');
     // In reconfiguring mode, open all steps 1-3 for easy reconfiguration
     for (let i = 1; i <= 3; i++) {
-      const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.glass-panel');
-      if (!sectionContainer) continue;
-      
-      sectionContainer.classList.remove('section-completed', 'section-active', 'section-future', 'show-checkmark');
-      sectionContainer.classList.add('section-active');
       expandActiveSection(i);
       
       // Show config area for step 3 if we have a sheet
@@ -858,41 +853,10 @@ function manageSectionStates(currentStep) {
     return;
   }
   
-  // Determine if sections are truly completed based on setup status
-  const isStepCompleted = (stepNumber) => {
-    if (stepNumber === 1) {
-      // Step 1 is completed if we have spreadsheet data
-      return currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId;
-    } else if (stepNumber === 2) {
-      // Step 2 is completed if we have active sheet
-      return currentStatus && currentStatus.activeSheetName;
-    } else if (stepNumber === 3) {
-      // Step 3 is completed if app is published (use normalized state)
-      return currentStatus && currentStatus._normalized && currentStatus._normalized.isPublished;
-    }
-    return false;
-  };
-  
-  // Update all sections based on their true state
+  // Simplified section management - just expand the current step
   for (let i = 1; i <= 3; i++) {
-    const sectionContainer = document.getElementById(`step${i}-content`)?.closest('.glass-panel');
-    if (!sectionContainer) continue;
-    
-    // Clear all state classes
-    sectionContainer.classList.remove('section-completed', 'section-active', 'section-future', 'show-checkmark');
-    
-    const isCompleted = isStepCompleted(i);
-    const isActive = i === currentStep;
-    const isFuture = i > currentStep;
-    
-    if (isCompleted && i < currentStep) {
-      // Truly completed sections get checkmark
-      sectionContainer.classList.add('section-completed', 'show-checkmark');
-      collapseCompletedSection(i);
-      console.log(`✅ Step ${i}: Completed with checkmark`);
-    } else if (isActive) {
-      // Current active section
-      sectionContainer.classList.add('section-active');
+    if (i === currentStep) {
+      // Current active section - expand it
       expandActiveSection(i);
       
       // Special handling for Step 3: ensure config-area is visible
@@ -905,15 +869,8 @@ function manageSectionStates(currentStep) {
       }
       
       console.log(`🔄 Step ${i}: Active`);
-    } else if (isFuture) {
-      // Future sections
-      sectionContainer.classList.add('section-future');
-      console.log(`⏳ Step ${i}: Future`);
-    } else {
-      // Completed but current step - no checkmark yet
-      expandActiveSection(i);
-      console.log(`📋 Step ${i}: Current (no checkmark)`);
     }
+    // Note: No collapsing or darkening of other steps - keep them all accessible
   }
 }
 
@@ -1767,7 +1724,7 @@ function saveToHistory(historyItem) {
     logDebug('History saved:', newItem);
     
     // UI を更新
-    loadHistoryUI();
+    loadSimpleHistoryTable();
     
   } catch (error) {
     logWarn('Failed to save history:', error);
@@ -1796,117 +1753,170 @@ function generateHistoryId() {
   return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// 旧来のカード形式の履歴表示は削除 - 簡単なテーブル形式のみ使用
+
 /**
- * 履歴UIを読み込み・表示
+ * 簡単な履歴テーブルを表示（新実装）
  */
-function loadHistoryUI() {
-  const historyList = document.getElementById('history-list');
-  const historyEmpty = document.getElementById('history-empty');
-  const clearHistoryBtn = document.getElementById('clear-history-btn');
+function loadSimpleHistoryTable() {
+  const tableBody = document.getElementById('history-table-body');
   
-  if (!historyList) return;
+  if (!tableBody) return;
   
   const history = getHistoryFromStorage();
   
+  // テーブルをクリア
+  tableBody.innerHTML = '';
+  
   if (history.length === 0) {
     // 履歴が空の場合
-    if (historyEmpty) historyEmpty.classList.remove('hidden');
-    if (clearHistoryBtn) clearHistoryBtn.classList.add('hidden');
-    
-    // 既存の履歴アイテムをクリア
-    const existingItems = historyList.querySelectorAll('.history-item');
-    existingItems.forEach(item => item.remove());
-    
-  } else {
-    // 履歴がある場合
-    if (historyEmpty) historyEmpty.classList.add('hidden');
-    if (clearHistoryBtn) clearHistoryBtn.classList.remove('hidden');
-    
-    // 既存のアイテムをクリア
-    const existingItems = historyList.querySelectorAll('.history-item');
-    existingItems.forEach(item => item.remove());
-    
-    // 履歴アイテムを表示
-    history.forEach((item, index) => {
-      const historyElement = createHistoryItemElement(item, index);
-      historyList.appendChild(historyElement);
-    });
+    const emptyRow = document.createElement('tr');
+    emptyRow.innerHTML = `
+      <td colspan="5" class="px-3 py-4 text-center text-gray-500 text-sm">
+        履歴がありません
+      </td>
+    `;
+    tableBody.appendChild(emptyRow);
+    return;
   }
+  
+  // 履歴アイテムをテーブル行として表示
+  history.forEach((item, index) => {
+    const row = createHistoryTableRow(item, index);
+    tableBody.appendChild(row);
+  });
 }
 
 /**
- * 履歴アイテムのDOM要素を作成
+ * 履歴テーブル行を作成
  * @param {Object} item - 履歴アイテム
  * @param {number} index - インデックス
- * @returns {HTMLElement} 履歴アイテム要素
+ * @returns {HTMLElement} テーブル行要素
  */
-function createHistoryItemElement(item, index) {
-  const element = document.createElement('div');
-  element.className = 'history-item bg-gray-800/30 border border-gray-600/30 rounded-lg p-4 hover:border-purple-500/50 transition-colors';
+function createHistoryTableRow(item, index) {
+  const row = document.createElement('tr');
+  row.className = 'hover:bg-gray-700/30 cursor-pointer transition-colors';
+  row.onclick = () => selectHistoryItem(item.id);
   
-  const publishedAt = new Date(item.publishedAt);
-  const publishedEndAt = item.publishedEndAt ? new Date(item.publishedEndAt) : null;
-  
-  const formatDateTime = (date) => {
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '未設定';
+    const date = new Date(dateString);
     return date.toLocaleString('ja-JP', {
       year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
     });
   };
   
-  element.innerHTML = `
-    <div class="flex items-start justify-between gap-4">
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-            ${index + 1}
-          </div>
-          <h4 class="text-sm font-medium text-white truncate">${escapeHtml(item.questionText)}</h4>
-        </div>
-        
-        <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
-          <div class="text-gray-400">
-            <span class="font-medium text-green-400">公開:</span> ${formatDateTime(publishedAt)}
-          </div>
-          <div class="text-gray-400">
-            <span class="font-medium text-red-400">終了:</span> ${publishedEndAt ? formatDateTime(publishedEndAt) : '未設定'}
-          </div>
-          <div class="text-gray-400">
-            <span class="font-medium text-blue-400">回答数:</span> ${item.answerCount}
-          </div>
-          <div class="text-gray-400">
-            <span class="font-medium text-purple-400">リアクション:</span> ${item.reactionCount}
-          </div>
-        </div>
-        
-        ${item.sheetName ? `<div class="text-xs text-gray-500 mb-2">シート: ${escapeHtml(item.sheetName)}</div>` : ''}
-      </div>
-      
-      <div class="flex flex-col gap-2">
-        <button type="button" 
-                class="btn btn-primary btn-sm"
-                onclick="republishFromHistory('${item.id}')"
-                title="この設定で再公開">
-          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          再公開
-        </button>
-        <button type="button" 
-                class="text-xs text-red-400 hover:text-red-300 hover:underline"
-                onclick="removeHistoryItem('${item.id}')"
-                title="この履歴を削除">
-          削除
-        </button>
-      </div>
-    </div>
+  row.innerHTML = `
+    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.timestamp)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedEndAt)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300 max-w-xs truncate" title="${escapeHtml(item.questionText)}">${escapeHtml(item.questionText)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300">${item.answerCount || 0}</td>
   `;
   
-  return element;
+  return row;
 }
+
+/**
+ * 履歴選択時の自動フロー処理
+ * @param {string} historyId - 履歴ID
+ */
+function selectHistoryItem(historyId) {
+  try {
+    const history = getHistoryFromStorage();
+    const item = history.find(h => h.id === historyId);
+    
+    if (!item) {
+      showMessage('履歴アイテムが見つかりませんでした', 'error');
+      return;
+    }
+    
+    // 自動でシートを選択
+    if (item.sheetName) {
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        sheetSelect.value = item.sheetName;
+        selectedSheet = item.sheetName;
+        
+        // シート選択イベントを発生させてプレビューを読み込み
+        const changeEvent = new Event('change', { bubbles: true });
+        sheetSelect.dispatchEvent(changeEvent);
+      }
+    }
+    
+    // 設定を復元
+    if (item.config) {
+      setTimeout(() => {
+        restoreConfigFromHistory(item.config);
+        
+        // Step 3の表示設定セクションに移動
+        const step3Section = document.getElementById('step3-content');
+        if (step3Section) {
+          step3Section.classList.remove('hidden');
+          step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        // 現在のステップを3に更新
+        updateStepIndicators(3);
+        manageSectionStates(3);
+        
+        showMessage(`「${item.questionText}」の設定を復元しました`, 'success');
+      }, 500); // シート選択処理の完了を待つ
+    }
+    
+  } catch (error) {
+    logError('Failed to select history item:', error);
+    showMessage('履歴の選択に失敗しました', 'error');
+  }
+}
+
+/**
+ * 履歴から設定を復元
+ * @param {Object} config - 設定オブジェクト
+ */
+function restoreConfigFromHistory(config) {
+  try {
+    // フォーム設定の復元
+    if (config.opinionHeader) {
+      const opinionSelect = document.getElementById('opinionHeader');
+      if (opinionSelect) opinionSelect.value = config.opinionHeader;
+    }
+    
+    if (config.nameHeader) {
+      const nameSelect = document.getElementById('name-column');
+      if (nameSelect) nameSelect.value = config.nameHeader;
+    }
+    
+    if (config.classHeader) {
+      const classSelect = document.getElementById('class-column');
+      if (classSelect) classSelect.value = config.classHeader;
+    }
+    
+    if (config.reasonHeader) {
+      const reasonSelect = document.getElementById('reason-column');
+      if (reasonSelect) reasonSelect.value = config.reasonHeader;
+    }
+    
+    // チェックボックスの復元
+    const showNamesCheckbox = document.getElementById('show-names');
+    if (showNamesCheckbox) showNamesCheckbox.checked = config.showNames || false;
+    
+    const showCountsCheckbox = document.getElementById('show-counts');
+    if (showCountsCheckbox) showCountsCheckbox.checked = config.showCounts || false;
+    
+    // 設定ボタンの状態を更新
+    updateConfigButtons();
+    
+  } catch (error) {
+    logError('Failed to restore config from history:', error);
+  }
+}
+
+// createHistoryItemElement関数は削除 - テーブル形式のcreateHistoryTableRowを使用
 
 /**
  * HTMLエスケープ関数
@@ -1919,153 +1929,12 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-/**
- * 履歴から再公開
- * @param {string} historyId - 履歴ID
- */
-function republishFromHistory(historyId) {
-  try {
-    const history = getHistoryFromStorage();
-    const item = history.find(h => h.id === historyId);
-    
-    if (!item) {
-      showMessage('履歴アイテムが見つかりませんでした', 'error');
-      return;
-    }
-    
-    // 確認ダイアログを表示
-    showConfirmationModal(
-      '履歴から再公開',
-      `「${item.questionText}」の設定で回答ボードを再公開しますか？\n\n既存の公開設定は置き換えられます。`,
-      function() {
-        performRepublishFromHistory(item);
-      }
-    );
-    
-  } catch (error) {
-    logError('Failed to republish from history:', error);
-    showMessage('再公開に失敗しました', 'error');
-  }
-}
+// 旧来の複雑な履歴管理関数群は削除 - selectHistoryItem()による自動フローのみ使用
 
-/**
- * 履歴からの再公開を実行
- * @param {Object} item - 履歴アイテム
- */
-function performRepublishFromHistory(item) {
-  try {
-    showMessage('設定を復元中...', 'info');
-    
-    // 設定を復元
-    if (item.config) {
-      // フォーム設定の復元
-      if (item.config.opinionHeader) {
-        const opinionSelect = document.getElementById('opinionHeader');
-        if (opinionSelect) opinionSelect.value = item.config.opinionHeader;
-      }
-      
-      if (item.config.nameHeader) {
-        const nameSelect = document.getElementById('name-column');
-        if (nameSelect) nameSelect.value = item.config.nameHeader;
-      }
-      
-      if (item.config.classHeader) {
-        const classSelect = document.getElementById('class-column');
-        if (classSelect) classSelect.value = item.config.classHeader;
-      }
-      
-      if (item.config.reasonHeader) {
-        const reasonSelect = document.getElementById('reason-column');
-        if (reasonSelect) reasonSelect.value = item.config.reasonHeader;
-      }
-      
-      // チェックボックスの復元
-      const showNamesCheckbox = document.getElementById('show-names');
-      if (showNamesCheckbox) showNamesCheckbox.checked = item.config.showNames || false;
-      
-      const showCountsCheckbox = document.getElementById('show-counts');
-      if (showCountsCheckbox) showCountsCheckbox.checked = item.config.showCounts || false;
-    }
-    
-    // シート名が指定されている場合は選択
-    if (item.sheetName) {
-      const sheetSelect = document.getElementById('sheet-select');
-      if (sheetSelect) {
-        sheetSelect.value = item.sheetName;
-        selectedSheet = item.sheetName;
-      }
-    }
-    
-    // 設定ボタンの状態を更新
-    updateConfigButtons();
-    
-    showMessage('✅ 設定が復元されました。「設定を保存して公開」ボタンで再公開してください。', 'success');
-    
-    // Step 3に移動してハイライト
-    const step3Section = document.getElementById('config-section');
-    if (step3Section) {
-      step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      step3Section.classList.add('ring-2', 'ring-purple-400', 'ring-opacity-50');
-      setTimeout(() => {
-        step3Section.classList.remove('ring-2', 'ring-purple-400', 'ring-opacity-50');
-      }, 3000);
-    }
-    
-  } catch (error) {
-    logError('Failed to perform republish from history:', error);
-    showMessage('設定の復元に失敗しました', 'error');
-  }
-}
-
-/**
- * 履歴アイテムを削除
- * @param {string} historyId - 履歴ID
- */
-function removeHistoryItem(historyId) {
-  try {
-    const history = getHistoryFromStorage();
-    const filteredHistory = history.filter(item => item.id !== historyId);
-    
-    localStorage.setItem('answerBoardHistory', JSON.stringify(filteredHistory));
-    loadHistoryUI();
-    
-    showMessage('履歴アイテムを削除しました', 'success');
-    
-  } catch (error) {
-    logError('Failed to remove history item:', error);
-    showMessage('履歴アイテムの削除に失敗しました', 'error');
-  }
-}
-
-/**
- * 履歴を全てクリア
- */
-function clearHistory() {
-  showConfirmationModal(
-    '履歴をクリア',
-    '全ての履歴を削除しますか？この操作は取り消せません。',
-    function() {
-      try {
-        localStorage.removeItem('answerBoardHistory');
-        loadHistoryUI();
-        showMessage('履歴をクリアしました', 'success');
-      } catch (error) {
-        logError('Failed to clear history:', error);
-        showMessage('履歴のクリアに失敗しました', 'error');
-      }
-    }
-  );
-}
-
-// 履歴クリアボタンのイベントリスナーを設定
+// 簡単な履歴テーブル初期化
 document.addEventListener('DOMContentLoaded', function() {
-  const clearHistoryBtn = document.getElementById('clear-history-btn');
-  if (clearHistoryBtn) {
-    clearHistoryBtn.addEventListener('click', clearHistory);
-  }
-  
-  // 初期履歴を読み込み
-  loadHistoryUI();
+  // 簡単な履歴テーブルを読み込み
+  loadSimpleHistoryTable();
 });
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
