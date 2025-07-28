@@ -1390,7 +1390,92 @@ function simulateQuickStartProgress() {
     });
 }
 
-
+// Simulate Custom Form progress (for custom form creation)
+function simulateCustomFormProgressWithFolderCheck() {
+  // Step 1: Real folder creation/check
+  updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
+  updateOverallProgress(5, 'フォルダを作成しています...');
+  
+  // Actually call the folder creation API to sync with real backend progress
+  runGasWithUserId('createUserFolder', 'フォルダを確認・作成中...')
+    .then(function(folderResult) {
+      console.log('✅ Custom form folder creation successful:', folderResult);
+      updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
+      updateProgressStep(2, 'active', 'カスタムフォームとスプレッドシートの作成', 'カスタム設定でデータ収集の仕組みを構築中...');
+      updateOverallProgress(25, 'カスタムフォームとスプレッドシートを作成しています...');
+      
+      // Step 2: Custom form/spreadsheet creation
+      setTimeout(() => {
+        updateProgressStep(2, 'completed', 'カスタムフォームとスプレッドシートの作成', '✅ カスタムフォームとスプレッドシートが作成されました');
+        updateProgressStep(3, 'active', 'カスタム設定の適用', 'フォーム設定とレイアウトを適用中...');
+        updateOverallProgress(50, 'カスタム設定を適用しています...');
+        
+        // Step 3: Custom configuration
+        setTimeout(() => {
+          updateProgressStep(3, 'completed', 'カスタム設定の適用', '✅ カスタム設定が適用されました');
+          updateProgressStep(4, 'active', 'シート構造の最適化', 'データ構造を最適化中...');
+          updateOverallProgress(75, 'シート構造を最適化しています...');
+          
+          // Step 4: Sheet optimization
+          setTimeout(() => {
+            updateProgressStep(4, 'completed', 'シート構造の最適化', '✅ シート構造が最適化されました');
+            updateProgressStep(5, 'active', 'カスタムフォーム完了', 'フォーム準備を完了中...');
+            updateOverallProgress(90, '最終準備を実行しています...');
+            
+            // Step 5: Final preparation
+            setTimeout(() => {
+              updateProgressStep(5, 'completed', 'カスタムフォーム完了', '✅ カスタムフォームの準備が完了しました');
+              updateProgressStep(6, 'active', 'セットアップ完了', '利用準備が整いました！');
+              updateOverallProgress(100, 'セットアップが完了しました！');
+              
+              setTimeout(() => {
+                updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 カスタムフォームの準備が整いました！');
+              }, 500);
+            }, 1000);
+          }, 1500);
+        }, 1000);
+      }, 2000);
+    })
+    .catch(function(error) {
+      console.warn('⚠️ Custom form folder creation failed, continuing with fallback:', error);
+      updateProgressStep(1, 'error', 'ユーザー専用フォルダの作成', '⚠️ フォルダ作成でエラーが発生しましたが処理を続行します');
+      showMessage('フォルダの作成に警告がありましたが、カスタムフォーム作成を続行します。', 'warning');
+      
+      // Continue with fallback timing even if folder creation fails
+      setTimeout(() => {
+        updateProgressStep(2, 'active', 'カスタムフォームとスプレッドシートの作成', 'カスタム設定でデータ収集の仕組みを構築中...');
+        updateOverallProgress(25, 'カスタムフォームとスプレッドシートを作成しています...');
+        
+        setTimeout(() => {
+          updateProgressStep(2, 'completed', 'カスタムフォームとスプレッドシートの作成', '✅ カスタムフォームとスプレッドシートが作成されました');
+          updateProgressStep(3, 'active', 'カスタム設定の適用', 'フォーム設定とレイアウトを適用中...');
+          updateOverallProgress(50, 'カスタム設定を適用しています...');
+          
+          setTimeout(() => {
+            updateProgressStep(3, 'completed', 'カスタム設定の適用', '✅ カスタム設定が適用されました');
+            updateProgressStep(4, 'active', 'シート構造の最適化', 'データ構造を最適化中...');
+            updateOverallProgress(75, 'シート構造を最適化しています...');
+            
+            setTimeout(() => {
+              updateProgressStep(4, 'completed', 'シート構造の最適化', '✅ シート構造が最適化されました');
+              updateProgressStep(5, 'active', 'カスタムフォーム完了', 'フォーム準備を完了中...');
+              updateOverallProgress(90, '最終準備を実行しています...');
+              
+              setTimeout(() => {
+                updateProgressStep(5, 'completed', 'カスタムフォーム完了', '✅ カスタムフォームの準備が完了しました');
+                updateProgressStep(6, 'active', 'セットアップ完了', '利用準備が整いました！');
+                updateOverallProgress(100, 'セットアップが完了しました！');
+                
+                setTimeout(() => {
+                  updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 カスタムフォームの準備が整いました！');
+                }, 500);
+              }, 1000);
+            }, 1500);
+          }, 1000);
+        }, 2000);
+      }, 1000);
+    });
+}
 
 // Handle quick start setup
 function handleQuickStart() {

@@ -396,8 +396,8 @@
                 外部リソースの連携 (上級者向け)
               </summary>
               <div class="p-4 pt-0 space-y-4">
-                <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
-                  <label class="block text-sm font-medium text-purple-200 mb-2">
+                <div class="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4">
+                  <label class="block text-sm font-medium text-cyan-200 mb-2">
                     GoogleスプレッドシートのURL
                   </label>
                   <div class="space-y-3">
@@ -406,7 +406,7 @@
                            placeholder="https://docs.google.com/spreadsheets/d/..."
                            class="form-control"
                            aria-describedby="resource-url-help">
-                    <p id="resource-url-help" class="text-xs text-purple-300 mt-1">
+                    <p id="resource-url-help" class="text-xs text-cyan-300 mt-1">
                       既存のGoogleスプレッドシートのURLを貼り付けてください
                     </p>
                     <div class="flex gap-2">
@@ -479,14 +479,25 @@
           
           <div id="step2-content" class="progressive-section expanded">
             <div class="space-y-4">
+              <!-- データシート選択の説明 -->
+              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                <div class="flex items-center gap-2 mb-2">
+                  <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-green-200">データシート選択</span>
+                </div>
+                <p class="text-xs text-green-300">スプレッドシートの中から回答ボードとして表示するシートを選択します</p>
+              </div>
+              
               <!-- 履歴テーブル -->
-              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+              <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-3">
                   <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    <h4 class="text-sm font-medium text-purple-200">過去の設定から選択</h4>
+                    <h4 class="text-sm font-medium text-blue-200">過去の設定から選択</h4>
                   </div>
                   <button type="button" id="clear-history-btn" class="text-xs text-red-400 hover:text-red-300 hover:underline hidden">
                     履歴をクリア
@@ -514,17 +525,6 @@
                 </div>
               </div>
               
-              <!-- シート選択の説明 -->
-              <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
-                <div class="flex items-center gap-2 mb-2">
-                  <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                  </svg>
-                  <span class="text-sm font-medium text-green-200">データシート選択</span>
-                </div>
-                <p class="text-xs text-green-300">スプレッドシートの中から回答ボードとして表示するシートを選択します</p>
-              </div>
-              
               <!-- シート選択コントロール -->
               <div class="space-y-3">
                 <label for="sheet-select" class="block text-sm font-medium text-white">
@@ -550,24 +550,6 @@
                 </p>
               </div>
 
-              <!-- データプレビュー -->
-              <div id="data-preview-section" class="hidden">
-                <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
-                  <h4 class="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                    </svg>
-                    データプレビュー
-                  </h4>
-                  <div id="data-preview-content" class="text-sm text-gray-300">
-                    <div class="animate-pulse">
-                      <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                      <div class="h-4 bg-gray-700 rounded w-1/2"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -593,15 +575,15 @@
           
           <div id="step3-content" class="progressive-section expanded">
             <div id="config-area" class="space-y-4 hidden">
-              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+              <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
                 <div class="flex items-center gap-2 mb-2">
-                  <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                   </svg>
-                  <span class="text-sm font-medium text-purple-200">列マッピング設定</span>
+                  <span class="text-sm font-medium text-blue-200">列マッピング設定</span>
                 </div>
-                <p class="text-xs text-purple-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
+                <p class="text-xs text-blue-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
               </div>
               
               <!-- 必須設定 -->
@@ -614,14 +596,14 @@
                     </div>
                     <div class="flex gap-2">
                       <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
-                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-purple-600/80 hover:from-cyan-600 hover:to-purple-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
+                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-blue-600/80 hover:from-cyan-600 hover:to-blue-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
                         <span class="relative z-10 flex items-center gap-1">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                           </svg>
                           <span class="text-xs font-bold">AI判定</span>
                         </span>
-                        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-purple-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+                        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-blue-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                       </button>
                     </div>
                     <p id="main-help" class="text-xs text-red-300 mt-1">

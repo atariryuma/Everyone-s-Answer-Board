@@ -1170,13 +1170,12 @@ function initializeUI() {
 }
 
 // =============================================================================
-// DATA PREVIEW FUNCTIONALITY
+// SHEET SELECTION FUNCTIONALITY  
 // =============================================================================
 
-// Handle sheet selection change for data preview
+// Handle sheet selection change
 function handleSheetSelectionChange(event) {
   const newSelectedSheet = event.target.value;
-  const previewSection = document.getElementById('data-preview-section');
 
   // Prevent redundant calls if the selected sheet hasn't actually changed
   if (newSelectedSheet === lastSelectedSheetName) {
@@ -1186,44 +1185,27 @@ function handleSheetSelectionChange(event) {
   
   console.log('📊 Sheet selection changed:', {
     previousSheet: selectedSheet,
-    newSelectedSheet: newSelectedSheet,
-    hasPreviewSection: !!previewSection
+    newSelectedSheet: newSelectedSheet
   });
   
   // Update global selected sheet variable and last selected sheet
   selectedSheet = newSelectedSheet;
   lastSelectedSheetName = newSelectedSheet;
   
-  if (newSelectedSheet && previewSection) {
-    console.log('📋 Loading preview and config for sheet:', newSelectedSheet);
-    previewSection.classList.remove('hidden');
-    
-    // Show loading state for preview
-    const previewContent = document.getElementById('data-preview-content');
-    if (previewContent) {
-      previewContent.innerHTML = `
-        <div class="animate-pulse">
-          <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-          <div class="h-4 bg-gray-700 rounded w-1/2"></div>
-        </div>
-      `;
-    }
+  if (newSelectedSheet) {
+    console.log('📋 Loading config for sheet:', newSelectedSheet);
 
-    // Call getSheetDetails once and use its result for both preview and config
+    // Call getSheetDetails once and use its result for config
     if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
       console.error('スプレッドシート情報が見つかりません');
-      if (previewContent) previewContent.innerHTML = '<p class="text-red-400">スプレッドシート情報が見つかりません</p>';
       return;
     }
 
     // Call loadConfigForSelected which now handles getSheetDetails and populates UI
     loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId);
 
-    // Update UI state (this might need to be moved inside the .then() block if it depends on details)
+    // Update UI state
     updateUIForSelectedSheet();
-  } else if (previewSection) {
-    console.log('📋 Hiding preview section');
-    previewSection.classList.add('hidden');
   }
 }
 
