@@ -142,6 +142,74 @@ function getCachedSheetsService() {
 }
 
 /**
+ * ヘッダー整合性検証（リアルタイム検証用）
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 検証結果
+ */
+function validateHeaderIntegrity(userId) {
+  try {
+    console.log('🔍 Starting header integrity validation for userId:', userId);
+    
+    const userInfo = getOrFetchUserInfo(userId, 'userId');
+    if (!userInfo || !userInfo.spreadsheetId) {
+      return {
+        success: false,
+        error: 'User spreadsheet not found',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    const spreadsheetId = userInfo.spreadsheetId;
+    const sheetName = userInfo.sheetName || 'EABDB';
+    
+    // 理由列のヘッダー検証を重点的に実施
+    const indices = getHeaderIndices(spreadsheetId, sheetName);
+    
+    const validationResults = {
+      success: true,
+      timestamp: new Date().toISOString(),
+      spreadsheetId: spreadsheetId,
+      sheetName: sheetName,
+      headerValidation: {
+        reasonColumnIndex: indices[COLUMN_HEADERS.REASON],
+        opinionColumnIndex: indices[COLUMN_HEADERS.OPINION],
+        hasReasonColumn: indices[COLUMN_HEADERS.REASON] !== undefined,
+        hasOpinionColumn: indices[COLUMN_HEADERS.OPINION] !== undefined
+      },
+      issues: []
+    };
+
+    // 理由列の必須チェック
+    if (indices[COLUMN_HEADERS.REASON] === undefined) {
+      validationResults.success = false;
+      validationResults.issues.push('Reason column (理由) not found in headers');
+    }
+
+    // 回答列の必須チェック
+    if (indices[COLUMN_HEADERS.OPINION] === undefined) {
+      validationResults.success = false;
+      validationResults.issues.push('Opinion column (回答) not found in headers');
+    }
+
+    // ログ出力
+    if (validationResults.success) {
+      console.log('✅ Header integrity validation passed');
+    } else {
+      console.warn('⚠️ Header integrity validation failed:', validationResults.issues);
+    }
+
+    return validationResults;
+  } catch (error) {
+    console.error('❌ Header integrity validation error:', error);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
  * 実行開始時のキャッシュクリア（新しいリクエスト開始時に呼び出し）
  */
 function clearAllExecutionCache() {

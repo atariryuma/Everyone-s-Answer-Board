@@ -622,66 +622,30 @@ if (typeof global !== 'undefined') {
  */
 
 /**
- * ヘッダーインデックスをキャッシュ付きで取得
+ * ヘッダーインデックスをキャッシュ付きで安定取得（リトライ機能付き）
  */
 function getHeadersCached(spreadsheetId, sheetName) {
   const key = `hdr_${spreadsheetId}_${sheetName}`;
+  
   const indices = cacheManager.get(key, () => {
-    try {
-      console.log(`[getHeadersCached] Starting for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`);
-      
-      var service = getSheetsServiceCached();
-      if (!service) {
-        throw new Error('Sheets service is not available');
-      }
-      
-      var range = sheetName + '!1:1';
-      console.log(`[getHeadersCached] Fetching range: ${range}`);
-      
-      // Use the updated API pattern consistent with other functions
-      var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range);
-      var response = UrlFetchApp.fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + service.accessToken }
-      });
-      
-      var responseData = JSON.parse(response.getContentText());
-      console.log(`[getHeadersCached] API response:`, JSON.stringify(responseData, null, 2));
-      
-      if (!responseData) {
-        throw new Error('API response is null or undefined');
-      }
-      
-      if (!responseData.values) {
-        console.warn(`[getHeadersCached] No values in response for ${range}`);
-        return {};
-      }
-      
-      if (!responseData.values[0] || responseData.values[0].length === 0) {
-        console.warn(`[getHeadersCached] Empty header row for ${range}`);
-        return {};
-      }
-      
-      var headers = responseData.values[0];
-      console.log(`[getHeadersCached] Headers found:`, headers);
-      
-      var indices = {};
-      
-      // タイムスタンプ列を除外してヘッダーのインデックスを生成
-      headers.forEach(function(headerName, index) {
-        if (headerName && headerName.trim() !== '' && headerName !== 'タイムスタンプ') {
-          indices[headerName] = index;
-          console.log(`[getHeadersCached] Mapped ${headerName} -> ${index}`);
-        }
-      });
-      
-      console.log(`[getHeadersCached] Final indices:`, indices);
-      return indices;
-    } catch (error) {
-      console.error('getHeadersCached error:', error.toString());
-      console.error('Error stack:', error.stack);
-      return {};
-    }
+    return getHeadersWithRetry(spreadsheetId, sheetName, 3);
   }, { ttl: 1800, enableMemoization: true }); // 30分間キャッシュ + メモ化
+
+  // 必須列の存在チェック（理由列の安定性確保）
+  if (indices && Object.keys(indices).length > 0) {
+    const hasRequiredColumns = validateRequiredHeaders(indices);
+    if (!hasRequiredColumns.isValid) {
+      console.warn(`[getHeadersCached] Missing required columns: ${hasRequiredColumns.missing.join(', ')}, attempting recovery`);
+      cacheManager.remove(key);
+      
+      // 即座に再取得を試行
+      const recoveredIndices = getHeadersWithRetry(spreadsheetId, sheetName, 2);
+      if (recoveredIndices && validateRequiredHeaders(recoveredIndices).isValid) {
+        console.log(`[getHeadersCached] Successfully recovered missing headers`);
+        return recoveredIndices;
+      }
+    }
+  }
 
   if (!indices || Object.keys(indices).length === 0) {
     cacheManager.remove(key);
@@ -689,6 +653,121 @@ function getHeadersCached(spreadsheetId, sheetName) {
   }
 
   return indices;
+}
+
+/**
+ * リトライ機能付きヘッダー取得
+ * @private
+ */
+function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`);
+      
+      var service = getSheetsServiceCached();
+      if (!service) {
+        throw new Error('Sheets service is not available');
+      }
+      
+      var range = sheetName + '!1:1';
+      console.log(`[getHeadersWithRetry] Fetching range: ${range}`);
+      
+      // Use the updated API pattern consistent with other functions
+      var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range);
+      var response = UrlFetchApp.fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + service.accessToken },
+        muteHttpExceptions: true
+      });
+      
+      // HTTPステータスチェック
+      if (response.getResponseCode() !== 200) {
+        throw new Error(`HTTP ${response.getResponseCode()}: ${response.getContentText()}`);
+      }
+      
+      var responseData = JSON.parse(response.getContentText());
+      console.log(`[getHeadersWithRetry] API response (attempt ${attempt}):`, JSON.stringify(responseData, null, 2));
+      
+      if (!responseData) {
+        throw new Error('API response is null or undefined');
+      }
+      
+      if (!responseData.values) {
+        console.warn(`[getHeadersWithRetry] No values in response for ${range} (attempt ${attempt})`);
+        throw new Error('No values in response');
+      }
+      
+      if (!responseData.values[0] || responseData.values[0].length === 0) {
+        console.warn(`[getHeadersWithRetry] Empty header row for ${range} (attempt ${attempt})`);
+        throw new Error('Empty header row');
+      }
+      
+      var headers = responseData.values[0];
+      console.log(`[getHeadersWithRetry] Headers found (attempt ${attempt}):`, headers);
+      
+      var indices = {};
+      
+      // タイムスタンプ列を除外してヘッダーのインデックスを生成
+      headers.forEach(function(headerName, index) {
+        if (headerName && headerName.trim() !== '' && headerName !== 'タイムスタンプ') {
+          indices[headerName] = index;
+          console.log(`[getHeadersWithRetry] Mapped ${headerName} -> ${index}`);
+        }
+      });
+      
+      // 最低限のヘッダーが存在するかチェック
+      if (Object.keys(indices).length === 0) {
+        throw new Error('No valid headers found');
+      }
+      
+      console.log(`[getHeadersWithRetry] Final indices (attempt ${attempt}):`, indices);
+      return indices;
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} failed:`, error.toString());
+      
+      // 最後の試行でない場合は待機してリトライ
+      if (attempt < maxRetries) {
+        const waitTime = attempt * 1000; // 1秒、2秒、3秒...
+        console.log(`[getHeadersWithRetry] Waiting ${waitTime}ms before retry...`);
+        Utilities.sleep(waitTime);
+      }
+    }
+  }
+  
+  // 全てのリトライが失敗した場合
+  console.error(`[getHeadersWithRetry] All ${maxRetries} attempts failed. Last error:`, lastError.toString());
+  if (lastError.stack) {
+    console.error('Error stack:', lastError.stack);
+  }
+  
+  return {};
+}
+
+/**
+ * 必須ヘッダーの存在を検証
+ * @private
+ */
+function validateRequiredHeaders(indices) {
+  const requiredHeaders = [
+    COLUMN_HEADERS.REASON,  // 理由列は必須
+    COLUMN_HEADERS.OPINION, // 回答列は必須
+  ];
+  
+  const missing = [];
+  
+  for (const header of requiredHeaders) {
+    if (indices[header] === undefined) {
+      missing.push(header);
+    }
+  }
+  
+  return {
+    isValid: missing.length === 0,
+    missing: missing
+  };
 }
 
 /**

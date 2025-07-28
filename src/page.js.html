@@ -260,6 +260,7 @@ class StudyQuestApp {
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
       clearCache: () => this.runGas('refreshBoardData', this.state.userId),
+      validateData: () => this.validateBoardDataIntegrity(),
       getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode)
     };
     
@@ -4092,7 +4093,7 @@ class StudyQuestApp {
     return newReactionCount !== oldReactionCount ||
            newData.isHighlighted !== oldData.isHighlighted ||
            newData.opinion !== oldData.opinion ||
-           newData.reason !== oldData.reason ||
+           this.validateReasonText(newData.reason) !== this.validateReasonText(oldData.reason) ||
            newData.name !== oldData.name;
   }
   
@@ -4155,7 +4156,7 @@ class StudyQuestApp {
         }
       }
 
-      if (!oldData || oldData.reason !== newData.reason) {
+      if (!oldData || this.validateReasonText(oldData.reason) !== this.validateReasonText(newData.reason)) {
         const reasonElement = card.querySelector('.answer-preview p');
         if (reasonElement) {
           reasonElement.textContent = newData.reason || '';
@@ -4342,11 +4343,11 @@ class StudyQuestApp {
         return null;
       }
       
-      // Ensure required properties exist with safe defaults
+      // Ensure required properties exist with safe defaults（理由列の堅牢化）
       const safeData = {
         rowIndex: data.rowIndex || 0,
         opinion: data.opinion || '',
-        reason: data.reason || '',
+        reason: this.validateReasonText(data.reason),
         name: data.name || '',
         email: data.email || '',
         reactions: data.reactions || {},
@@ -4446,9 +4447,32 @@ class StudyQuestApp {
       
       contentDiv.appendChild(opinionTitle);
       
-      // 理由テキストが存在する場合のみ追加
+      // 理由テキストが存在する場合のみ追加（堅牢化）
       if (safeData.reason && safeData.reason.trim()) {
-        contentDiv.appendChild(reasonText);
+        try {
+          // 理由テキストの有効性を検証
+          if (reasonText && reasonText.textContent === safeData.reason) {
+            contentDiv.appendChild(reasonText);
+          } else {
+            // 理由テキスト要素の再作成が必要な場合
+            const newReasonText = document.createElement('p');
+            newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+            newReasonText.textContent = safeData.reason;
+            contentDiv.appendChild(newReasonText);
+          }
+        } catch (reasonError) {
+          // 理由テキスト追加でエラーが発生した場合の回復処理
+          console.warn('createAnswerCard: Reason text append error, attempting recovery:', reasonError);
+          try {
+            const fallbackReasonText = document.createElement('p');
+            fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+            fallbackReasonText.textContent = safeData.reason;
+            contentDiv.appendChild(fallbackReasonText);
+          } catch (fallbackError) {
+            console.error('createAnswerCard: Failed to add reason text even with fallback:', fallbackError);
+            // 理由テキストが追加できない場合でもカード生成は継続
+          }
+        }
       }
     
       // Create footer div
@@ -7490,6 +7514,147 @@ class StudyQuestApp {
     this.setupObservers();
     
     debugLog('resetVirtualScrollState: Virtual scroll state reset complete');
+  }
+
+  /**
+   * 理由テキストの堅牢化検証
+   * @param {any} reason - 理由データ
+   * @returns {string} 検証済み理由テキスト
+   */
+  validateReasonText(reason) {
+    try {
+      // null, undefined, 空文字列チェック
+      if (!reason && reason !== 0) {
+        return '';
+      }
+      
+      // 文字列変換と基本検証
+      const reasonStr = String(reason).trim();
+      
+      // 長すぎる理由テキストの制限（10000文字まで）
+      if (reasonStr.length > 10000) {
+        console.warn('validateReasonText: Reason text too long, truncating:', reasonStr.length);
+        return reasonStr.substring(0, 10000) + '...';
+      }
+      
+      // HTMLエスケープが必要な文字をチェック
+      if (reasonStr.includes('<') || reasonStr.includes('>') || reasonStr.includes('&')) {
+        // HTMLが含まれている可能性がある場合は警告
+        console.warn('validateReasonText: Potentially unsafe HTML content detected');
+      }
+      
+      return reasonStr;
+    } catch (error) {
+      console.error('validateReasonText: Error validating reason text:', error);
+      return ''; // エラー時は空文字列を返す
+    }
+  }
+
+  /**
+   * ボードデータの整合性をリアルタイムで検証
+   * @returns {Promise<Object>} 検証結果
+   */
+  async validateBoardDataIntegrity() {
+    try {
+      console.log('🔍 Starting real-time board data integrity validation...');
+      
+      const validationResults = {
+        timestamp: new Date().toISOString(),
+        totalCards: 0,
+        validCards: 0,
+        invalidCards: 0,
+        reasonFieldIssues: 0,
+        headerIssues: 0,
+        errors: []
+      };
+
+      // DOM内のカードを検証
+      const cards = this.elements.answersContainer?.querySelectorAll('.answer-card') || [];
+      validationResults.totalCards = cards.length;
+
+      cards.forEach((card, index) => {
+        try {
+          const rowIndex = card.dataset.rowIndex;
+          const opinionElement = card.querySelector('.opinion-text');
+          const reasonElement = card.querySelector('.answer-preview p');
+          
+          // 基本要素の存在チェック
+          if (!opinionElement || !rowIndex) {
+            validationResults.invalidCards++;
+            validationResults.errors.push(`Card ${index}: Missing essential elements`);
+            return;
+          }
+
+          // 理由列の状態チェック
+          const hasReasonData = this.state.currentAnswers.find(a => a.rowIndex == rowIndex)?.reason;
+          const hasReasonElement = reasonElement && reasonElement.textContent.trim();
+          
+          if (hasReasonData && !hasReasonElement) {
+            validationResults.reasonFieldIssues++;
+            validationResults.errors.push(`Card ${index} (row ${rowIndex}): Reason data exists but not displayed`);
+          }
+          
+          validationResults.validCards++;
+        } catch (cardError) {
+          validationResults.invalidCards++;
+          validationResults.errors.push(`Card ${index}: Validation error - ${cardError.message}`);
+        }
+      });
+
+      // ヘッダー情報の検証
+      try {
+        const headerValidation = await this.runGas('validateHeaderIntegrity', this.state.userId);
+        if (!headerValidation.success) {
+          validationResults.headerIssues++;
+          validationResults.errors.push(`Header validation failed: ${headerValidation.error}`);
+        }
+      } catch (headerError) {
+        validationResults.headerIssues++;
+        validationResults.errors.push(`Header validation error: ${headerError.message}`);
+      }
+
+      // 検証結果のログ出力
+      const issueCount = validationResults.invalidCards + validationResults.reasonFieldIssues + validationResults.headerIssues;
+      if (issueCount > 0) {
+        console.warn('⚠️ Board data integrity issues detected:', validationResults);
+        
+        // 自動修復の試行（理由列の問題のみ）
+        if (validationResults.reasonFieldIssues > 0) {
+          console.log('🔧 Attempting automatic reason field recovery...');
+          await this.autoRecoverReasonFields();
+        }
+      } else {
+        console.log('✅ Board data integrity validation passed');
+      }
+
+      return validationResults;
+    } catch (error) {
+      console.error('❌ Board data integrity validation failed:', error);
+      return {
+        timestamp: new Date().toISOString(),
+        error: error.message,
+        success: false
+      };
+    }
+  }
+
+  /**
+   * 理由列の自動修復処理
+   */
+  async autoRecoverReasonFields() {
+    try {
+      console.log('🔧 Starting automatic reason field recovery...');
+      
+      // キャッシュクリアして最新データを取得
+      await this.gas.clearCache();
+      
+      // データを再取得してカードを更新
+      await this.loadBoardData();
+      
+      console.log('✅ Reason field recovery completed');
+    } catch (error) {
+      console.error('❌ Automatic reason field recovery failed:', error);
+    }
   }
 }
 // ===== 共通ドメイン情報処理関数 =====
