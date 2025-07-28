@@ -1651,8 +1651,12 @@ function navigateToStep(step) {
 
 // セットアップ状況をグローバルステータスから取得
 
-// セットアップ未完了時の段階的制御を強制
+// DEPRECATED: ステップ制御は統一されたmanagedSectionStates()で管理
+// この関数は競合を避けるため無効化
 function enforceStepProgression() {
+  console.log('⚠️ enforceStepProgression is deprecated. Using manageSectionStates() instead.');
+  return; // 早期リターンで処理を無効化
+  
   const step1Completed = checkStep1Completion();
   const step2Completed = checkStep2Completion();
   

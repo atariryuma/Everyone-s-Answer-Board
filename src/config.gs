@@ -2278,7 +2278,7 @@ function buildResponseFromContext(context) {
     const response = {
       userInfo: userInfo,
       isPublished: configJson.appPublished || false,
-      setupStep: 3, // saveAndPublish完了時は常にStep 3
+      setupStep: determineSetupStep(userInfo, configJson), // 統一されたロジックを使用
       
       // URL情報（generateUserUrlsを使用した適切なURL生成）
       appUrls: (function() {

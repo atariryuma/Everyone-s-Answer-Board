@@ -9,10 +9,8 @@
     // セットアップ状況を確認
     const setupStatus = getSetupStatusFromGlobalStatus();
     
-    // セットアップ未完了時の段階的制御
-    if (setupStatus === 'pending') {
-      enforceStepProgression();
-    }
+    // Note: ステップ制御は統一されたmanagedSectionStates()で管理
+    // enforceStepProgression()は無効化して競合を回避
     
     let isValid = false;
     
