@@ -1812,10 +1812,11 @@ function loadHistoryUI() {
     // 履歴が空の場合
     if (historyEmpty) historyEmpty.classList.remove('hidden');
     if (clearHistoryBtn) clearHistoryBtn.classList.add('hidden');
-    
+
     // 既存の履歴アイテムをクリア
     const existingItems = historyList.querySelectorAll('.history-item');
     existingItems.forEach(item => item.remove());
+    historyList.classList.add('hidden');
     
   } else {
     // 履歴がある場合
@@ -1840,13 +1841,13 @@ function loadHistoryUI() {
  * @param {number} index - インデックス
  * @returns {HTMLElement} 履歴アイテム要素
  */
+
 function createHistoryItemElement(item, index) {
-  const element = document.createElement('div');
-  element.className = 'history-item bg-gray-800/30 border border-gray-600/30 rounded-lg p-3 hover:border-purple-500/50 transition-all duration-300 cursor-pointer transform hover:scale-[1.02]';
-  
+  const element = document.createElement('li');
+  element.className = 'history-item flex items-center justify-between p-2 border border-gray-700 rounded-md hover:bg-gray-700/30';
+
   const publishedAt = new Date(item.publishedAt);
-  const publishedEndAt = item.publishedEndAt ? new Date(item.publishedEndAt) : null;
-  
+
   const formatDateTime = (date) => {
     return date.toLocaleString('ja-JP', {
       month: 'short',
@@ -1855,36 +1856,12 @@ function createHistoryItemElement(item, index) {
       minute: '2-digit'
     });
   };
-  
+
   element.innerHTML = `
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-            ${index + 1}
-          </div>
-          <h4 class="text-sm font-medium text-white truncate">${escapeHtml(item.questionText)}</h4>
-        </div>
-        
-        <div class="flex items-center gap-4 text-xs text-gray-400">
-          <span><span class="text-green-400">公開:</span> ${formatDateTime(publishedAt)}</span>
-          <span><span class="text-blue-400">回答:</span> ${item.answerCount}</span>
-          ${item.sheetName ? `<span class="text-gray-500">シート: ${escapeHtml(item.sheetName)}</span>` : ''}
-        </div>
-      </div>
-      
-      <div class="flex items-center gap-2">
-        <button type="button" 
-                class="text-xs text-red-400 hover:text-red-300 hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
-                onclick="event.stopPropagation(); removeHistoryItem('${item.id}')"
-                title="この履歴を削除">
-          削除
-        </button>
-        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-        </svg>
-      </div>
-    </div>
+    <button type="button" class="flex-1 text-left text-sm text-purple-200 hover:underline truncate">
+      ${escapeHtml(item.questionText)}
+    </button>
+    <span class="text-xs text-gray-400">${formatDateTime(publishedAt)}</span>
   `;
   
   // Add click event for auto-configuration
