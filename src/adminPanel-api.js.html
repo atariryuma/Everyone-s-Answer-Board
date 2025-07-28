@@ -398,7 +398,8 @@ function proceedWithSaveAndPublish(config) {
             reactionCount: result.reactionCount || 0,
             config: config,
             formUrl: result.formUrl || (currentStatus && currentStatus.userInfo && currentStatus.userInfo.formUrl) || '',
-            spreadsheetUrl: result.spreadsheetUrl || (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) || ''
+            spreadsheetUrl: result.spreadsheetUrl || (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) || '',
+            setupType: '外部リソース' // 既存スプレッドシートを使用した公開
           };
           saveToHistory(historyItem);
           logDebug('Published board saved to history:', historyItem);
@@ -748,6 +749,26 @@ function createFormWithConfig() {
         
         // ステータスを更新
         loadStatus(true);
+        
+        // カスタムセットアップの履歴を保存
+        try {
+          const historyItem = {
+            questionText: config.mainQuestion || 'カスタムフォーム',
+            publishedAt: new Date().toISOString(),
+            publishedEndAt: null,
+            sheetName: result.sheetName || '',
+            answerCount: 0,
+            reactionCount: 0,
+            config: config,
+            formUrl: result.formUrl || '',
+            spreadsheetUrl: result.spreadsheetUrl || '',
+            setupType: 'カスタムセットアップ'
+          };
+          saveToHistory(historyItem);
+          logDebug('Custom setup saved to history:', historyItem);
+        } catch (historyError) {
+          logWarn('Failed to save custom setup to history:', historyError);
+        }
         
         // フォームURL表示の強制更新（管理パネルのリソース欄用）
         setTimeout(() => {
@@ -1705,6 +1726,26 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           window.unifiedCache.clear();
         }
         loadStatus(true);
+        
+        // クイックスタートの履歴を保存
+        try {
+          const historyItem = {
+            questionText: result.questionText || 'テーマに沿って自分の考えを書きましょう。',
+            publishedAt: new Date().toISOString(),
+            publishedEndAt: null,
+            sheetName: result.sheetName || '',
+            answerCount: 0,
+            reactionCount: 0,
+            config: result.config || {},
+            formUrl: result.formUrl || '',
+            spreadsheetUrl: result.spreadsheetUrl || '',
+            setupType: 'クイックスタート'
+          };
+          saveToHistory(historyItem);
+          logDebug('QuickStart saved to history:', historyItem);
+        } catch (historyError) {
+          logWarn('Failed to save QuickStart to history:', historyError);
+        }
         
         // フォームURL表示の強制更新（管理パネルのリソース欄用）
         setTimeout(() => {

@@ -504,19 +504,18 @@
                   </button>
                 </div>
                 <div class="overflow-x-auto">
-                  <table class="w-full text-sm">
+                  <table class="w-full text-sm table-fixed">
                     <thead class="bg-gray-800">
                       <tr>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300">作成日時</th>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300">公開日時</th>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300">終了日時</th>
+                        <th class="px-3 py-2 text-left text-xs text-gray-300 w-32">公開日時</th>
+                        <th class="px-3 py-2 text-left text-xs text-gray-300 w-32">終了日時</th>
                         <th class="px-3 py-2 text-left text-xs text-gray-300">問題文</th>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300">回答数</th>
+                        <th class="px-3 py-2 text-left text-xs text-gray-300 w-16">回答数</th>
                       </tr>
                     </thead>
                     <tbody id="history-table-body">
                       <tr>
-                        <td colspan="5" class="px-3 py-4 text-center text-gray-400 text-sm">
+                        <td colspan="4" class="px-3 py-4 text-center text-gray-400 text-sm">
                           履歴がありません
                         </td>
                       </tr>
@@ -575,15 +574,15 @@
           
           <div id="step3-content" class="progressive-section expanded">
             <div id="config-area" class="space-y-4 hidden">
-              <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
                 <div class="flex items-center gap-2 mb-2">
-                  <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                   </svg>
-                  <span class="text-sm font-medium text-blue-200">列マッピング設定</span>
+                  <span class="text-sm font-medium text-purple-200">列マッピング設定</span>
                 </div>
-                <p class="text-xs text-blue-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
+                <p class="text-xs text-purple-300">スプレッドシートの列を回答ボードの項目に割り当てます</p>
               </div>
               
               <!-- 必須設定 -->
@@ -596,14 +595,14 @@
                     </div>
                     <div class="flex gap-2">
                       <select id="opinionHeader" class="form-control flex-1" aria-describedby="main-help"></select>
-                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-cyan-600/80 to-blue-600/80 hover:from-cyan-600 hover:to-blue-600 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
+                      <button type="button" id="reguess-headers-btn" class="btn bg-gradient-to-r from-purple-600/80 to-purple-700/80 hover:from-purple-600 hover:to-purple-700 text-white px-3 py-2 relative overflow-hidden group" title="AI搭載 高精度列判定システム">
                         <span class="relative z-10 flex items-center gap-1">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                           </svg>
                           <span class="text-xs font-bold">AI判定</span>
                         </span>
-                        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400/20 to-blue-400/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+                        <div class="absolute inset-0 bg-gradient-to-r from-purple-400/20 to-purple-500/20 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                       </button>
                     </div>
                     <p id="main-help" class="text-xs text-red-300 mt-1">

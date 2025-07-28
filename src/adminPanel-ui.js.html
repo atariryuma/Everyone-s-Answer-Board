@@ -1692,7 +1692,8 @@ function saveToHistory(historyItem) {
       reactionCount: historyItem.reactionCount || 0,
       config: historyItem.config || {},
       formUrl: historyItem.formUrl || '',
-      spreadsheetUrl: historyItem.spreadsheetUrl || ''
+      spreadsheetUrl: historyItem.spreadsheetUrl || '',
+      setupType: historyItem.setupType || 'unknown' // クイックスタート、カスタムセットアップ、外部リソースを識別
     };
     
     history.unshift(newItem);
@@ -1754,7 +1755,7 @@ function loadSimpleHistoryTable() {
     // 履歴が空の場合
     const emptyRow = document.createElement('tr');
     emptyRow.innerHTML = `
-      <td colspan="5" class="px-3 py-4 text-center text-gray-500 text-sm">
+      <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
         履歴がありません
       </td>
     `;
@@ -1793,10 +1794,9 @@ function createHistoryTableRow(item, index) {
   };
   
   row.innerHTML = `
-    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.timestamp)}</td>
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedEndAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300 max-w-xs truncate" title="${escapeHtml(item.questionText)}">${escapeHtml(item.questionText)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${escapeHtml(item.questionText)}">${escapeHtml(item.questionText)}</td>
     <td class="px-3 py-2 text-xs text-gray-300">${item.answerCount || 0}</td>
   `;
   
