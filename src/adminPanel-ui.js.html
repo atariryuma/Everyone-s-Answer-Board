@@ -155,7 +155,13 @@ function updateUIWithNewStatus(status) {
     // If an active sheet is set on initial load, load its configuration
     if (status.activeSheetName && status.userInfo && status.userInfo.spreadsheetId) {
       selectedSheet = status.activeSheetName;
-      loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId);
+      loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId)
+        .then(result => {
+          console.log('✅ 初期化時のシート設定読み込み完了:', result);
+        })
+        .catch(error => {
+          console.warn('⚠️ 初期化時のシート設定読み込み失敗:', error);
+        });
     }
     
   } finally {
@@ -361,17 +367,29 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       const option = document.createElement('option');
       
       // Handle both object and string formats
+      let sheetName;
       if (typeof sheet === 'object' && sheet.name) {
+        sheetName = sheet.name;
         option.value = sheet.name;
-        option.textContent = sheet.name;
         logDebug(`📄 Sheet ${index + 1}: ${sheet.name} (ID: ${sheet.id})`);
       } else if (typeof sheet === 'string') {
+        sheetName = sheet;
         option.value = sheet;
-        option.textContent = sheet;
         logDebug(`📄 Sheet ${index + 1}: ${sheet}`);
       } else {
         console.warn('⚠️ Unknown sheet format:', sheet);
         return;
+      }
+      
+      // アクティブシートの表示を改善
+      if (sheetName === activeSheetName) {
+        option.textContent = `${sheetName} (アクティブ)`;
+        option.style.fontWeight = 'bold';
+        option.style.color = '#10b981'; // 緑色でアクティブを表示
+        option.className = 'active-sheet-option';
+        logDebug(`✅ Active sheet marked: ${sheetName}`);
+      } else {
+        option.textContent = sheetName;
       }
       
       select.appendChild(option);
@@ -1202,10 +1220,18 @@ function handleSheetSelectionChange(event) {
     }
 
     // Call loadConfigForSelected which now handles getSheetDetails and populates UI
-    loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId);
-
-    // Update UI state
-    updateUIForSelectedSheet();
+    loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId)
+      .then(result => {
+        console.log('✅ シート設定読み込み完了:', result);
+        // UI更新完了後の処理
+        updateUIForSelectedSheet();
+      })
+      .catch(error => {
+        console.error('❌ シート設定読み込み失敗:', error);
+        showMessage('シートの設定読み込みに失敗しました', 'error');
+        // エラー時もUI状態を更新
+        updateUIForSelectedSheet();
+      });
   }
 }
 
@@ -1215,28 +1241,31 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
 
   if (!spreadsheetId || !sheetName) {
     console.error('スプレッドシート情報が不足しています。');
-    return;
+    return Promise.reject(new Error('スプレッドシート情報が不足しています'));
   }
+
+  return new Promise((resolve, reject) => {
 
   // Check if fresh save protection is active - skip cache if so
   const timeSinceFreshSave = Date.now() - (window.freshSaveTimestamp || 0);
   const isFreshSaveActive = timeSinceFreshSave < 30000; // 30 seconds
   
-  // Check if we already have sheet details from integrated API
-  if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails && 
-      currentStatus.activeSheetName === sheetName && currentStatus.sheetDetails.allHeaders && currentStatus.sheetDetails.allHeaders.length > 0) {
-    console.log('⚡ Using cached sheet details from integrated API');
-    try {
-      populateHeaderOptions(currentStatus.sheetDetails.allHeaders);
-      console.log('✅ Header options populated from cache');
-      populateConfig(currentStatus.sheetDetails.guessedConfig);
-      console.log('✅ AI configuration applied from cache');
-      return; // Early return - no API call needed
-    } catch (error) {
-      console.error('Error in cached config population:', error);
-      // Fall through to API call if cache fails
+    // Check if we already have sheet details from integrated API
+    if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails && 
+        currentStatus.activeSheetName === sheetName && currentStatus.sheetDetails.allHeaders && currentStatus.sheetDetails.allHeaders.length > 0) {
+      console.log('⚡ Using cached sheet details from integrated API');
+      try {
+        populateHeaderOptions(currentStatus.sheetDetails.allHeaders);
+        console.log('✅ Header options populated from cache');
+        populateConfig(currentStatus.sheetDetails.guessedConfig);
+        console.log('✅ AI configuration applied from cache');
+        resolve({ source: 'cache', headers: currentStatus.sheetDetails.allHeaders, config: currentStatus.sheetDetails.guessedConfig });
+        return; // Early return - no API call needed
+      } catch (error) {
+        console.error('Error in cached config population:', error);
+        // Fall through to API call if cache fails
+      }
     }
-  }
 
   // Force fresh API call if fresh save protection is active or cache unavailable
   if (isFreshSaveActive) {
@@ -1245,73 +1274,82 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
     console.log('📞 Making API call for sheet details:', sheetName);
   }
   
-  runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, sheetName)
-    .then(function(details) {
-      console.log('✅ Sheet details loaded via API:', details);
-      
-      // If headers are empty, and we have retries left, try again after a delay
-      if (details && (!details.allHeaders || details.allHeaders.length === 0) && retryCount < maxRetries) {
-        console.warn(`⚠️ No headers found for ${sheetName}. Retrying in 2 seconds... (Attempt ${retryCount + 1}/${maxRetries})`);
-        showMessage(`シート情報を再取得中... (${retryCount + 1}/${maxRetries})`, 'info');
-        setTimeout(() => {
-          loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries);
-        }, 2000); // Retry after 2 seconds
-        return;
-      }
+    runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, sheetName)
+      .then(function(details) {
+        console.log('✅ Sheet details loaded via API:', details);
+        
+        // If headers are empty, and we have retries left, try again after a delay
+        if (details && (!details.allHeaders || details.allHeaders.length === 0) && retryCount < maxRetries) {
+          console.warn(`⚠️ No headers found for ${sheetName}. Retrying in 2 seconds... (Attempt ${retryCount + 1}/${maxRetries})`);
+          showMessage(`シート情報を再取得中... (${retryCount + 1}/${maxRetries})`, 'info');
+          setTimeout(() => {
+            loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries)
+              .then(resolve)
+              .catch(reject);
+          }, 2000); // Retry after 2 seconds
+          return;
+        }
 
-      try {
-        populateHeaderOptions(details.allHeaders);
-        console.log('✅ Header options populated from API');
-        populateConfig(details.guessedConfig);
-        console.log('✅ AI configuration applied from API');
-        if (retryCount > 0) {
-          showMessage('✅ シート情報が正常に読み込まれました！', 'success');
-        }
-      } catch (error) {
-        console.error('Error in API config population sequence:', error);
-        showMessage('設定の適用中にエラーが発生しました', 'error');
-      }
-    })
-    .catch(function(error) {
-      console.error('Failed to load sheet config via API:', error);
-      
-      // より詳細なエラーメッセージの表示
-      let errorMessage = 'シート設定の読み込みに失敗しました';
-      
-      if (error && error.message) {
-        if (error.message.includes('が見つかりません')) {
-          errorMessage = `指定されたシート "${sheetName}" が見つかりません。`;
-        } else if (error.message.includes('ヘッダーが見つかりません')) {
-          errorMessage = `シート "${sheetName}" の1行目にヘッダーが見つかりません。`;
-        } else if (error.message.includes('アクセス権限')) {
-          errorMessage = 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。';
-        } else if (error.message.includes('SheetsService')) {
-          errorMessage = 'Google Sheets APIサービスでエラーが発生しました。しばらく時間をおいて再試行してください。';
-        } else {
-          errorMessage = `エラーの詳細: ${error.message}`;
-        }
-      }
-      
-      showMessage(errorMessage, 'error');
-      
-      // エラー時のリトライオプションを提供
-      if (retryCount < maxRetries) {
-        setTimeout(() => {
-          const retryButton = document.createElement('button');
-          retryButton.textContent = '再試行';
-          retryButton.className = 'ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600';
-          retryButton.onclick = () => {
-            retryButton.remove();
-            loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries);
-          };
-          
-          const messageElement = document.querySelector('.message');
-          if (messageElement) {
-            messageElement.appendChild(retryButton);
+        try {
+          populateHeaderOptions(details.allHeaders);
+          console.log('✅ Header options populated from API');
+          populateConfig(details.guessedConfig);
+          console.log('✅ AI configuration applied from API');
+          if (retryCount > 0) {
+            showMessage('✅ シート情報が正常に読み込まれました！', 'success');
           }
-        }, 1000);
-      }
-    });
+          resolve({ source: 'api', headers: details.allHeaders, config: details.guessedConfig });
+        } catch (error) {
+          console.error('Error in API config population sequence:', error);
+          showMessage('設定の適用中にエラーが発生しました', 'error');
+          reject(error);
+        }
+      })
+      .catch(function(error) {
+        console.error('Failed to load sheet config via API:', error);
+        
+        // より詳細なエラーメッセージの表示
+        let errorMessage = 'シート設定の読み込みに失敗しました';
+        
+        if (error && error.message) {
+          if (error.message.includes('が見つかりません')) {
+            errorMessage = `指定されたシート "${sheetName}" が見つかりません。`;
+          } else if (error.message.includes('ヘッダーが見つかりません')) {
+            errorMessage = `シート "${sheetName}" の1行目にヘッダーが見つかりません。`;
+          } else if (error.message.includes('アクセス権限')) {
+            errorMessage = 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。';
+          } else if (error.message.includes('SheetsService')) {
+            errorMessage = 'Google Sheets APIサービスでエラーが発生しました。しばらく時間をおいて再試行してください。';
+          } else {
+            errorMessage = `エラーの詳細: ${error.message}`;
+          }
+        }
+        
+        showMessage(errorMessage, 'error');
+        
+        // エラー時のリトライオプションを提供
+        if (retryCount < maxRetries) {
+          setTimeout(() => {
+            const retryButton = document.createElement('button');
+            retryButton.textContent = '再試行';
+            retryButton.className = 'ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600';
+            retryButton.onclick = () => {
+              retryButton.remove();
+              loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries)
+                .then(resolve)
+                .catch(reject);
+            };
+            
+            const messageElement = document.querySelector('.message');
+            if (messageElement) {
+              messageElement.appendChild(retryButton);
+            }
+          }, 1000);
+        } else {
+          reject(error);
+        }
+      });
+  }); // Promise終了
 }
 
 

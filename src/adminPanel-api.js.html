@@ -747,8 +747,42 @@ function createFormWithConfig() {
         // クラス選択肢をデータベースに保存
         saveClassChoicesToDatabase(classChoices);
         
-        // ステータスを更新
-        loadStatus(true);
+        // ステータス更新とシート選択の確実な同期
+        console.log('📊 カスタムセットアップ完了: ステータス更新とシート選択同期開始');
+        loadStatus(true).then(() => {
+          // ステータス更新完了後、新しく作成されたシートを自動選択
+          setTimeout(() => {
+            try {
+              if (result.sheetName) {
+                const sheetSelect = document.getElementById('sheet-select');
+                if (sheetSelect && sheetSelect.value !== result.sheetName) {
+                  console.log(`🎯 新規作成シートを自動選択: ${result.sheetName}`);
+                  sheetSelect.value = result.sheetName;
+                  selectedSheet = result.sheetName;
+                  
+                  // 新しいシートの設定を直接読み込み
+                  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) {
+                    loadConfigForSelected(result.sheetName, currentStatus.userInfo.spreadsheetId)
+                      .then(configResult => {
+                        console.log('✅ カスタムセットアップ後のシート設定読み込み完了:', configResult);
+                        // 設定読み込み完了後、管理パネルのステップを更新
+                        updateStepIndicators(3);
+                        manageSectionStates(3);
+                        console.log('✅ カスタムセットアップ後の初期化完了');
+                      })
+                      .catch(configError => {
+                        console.warn('⚠️ カスタムセットアップ後の設定読み込み失敗:', configError);
+                      });
+                  }
+                }
+              }
+            } catch (sheetSelectError) {
+              console.warn('カスタムセットアップ後のシート選択でエラー:', sheetSelectError);
+            }
+          }, 500); // UIの更新完了を待つ
+        }).catch(statusError => {
+          console.warn('ステータス更新でエラー:', statusError);
+        });
         
         // カスタムセットアップの履歴を保存
         try {
