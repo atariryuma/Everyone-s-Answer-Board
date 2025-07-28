@@ -4149,6 +4149,72 @@ function createCustomFormUI(requestUserId, config) {
     
     const result = createUnifiedForm('custom', activeUserEmail, requestUserId, overrides);
     
+    // ユーザー専用フォルダを作成・取得してファイルを移動
+    let folder = null;
+    let moveResults = { form: false, spreadsheet: false };
+    try {
+      console.log('📁 ユーザーフォルダ作成とファイル移動開始...');
+      folder = createUserFolder(activeUserEmail);
+      
+      if (folder) {
+        // フォームファイルを移動
+        try {
+          const formFile = DriveApp.getFileById(result.formId);
+          if (formFile) {
+            // 既にフォルダに存在するかチェック
+            const formParents = formFile.getParents();
+            let isFormAlreadyInFolder = false;
+            
+            while (formParents.hasNext()) {
+              if (formParents.next().getId() === folder.getId()) {
+                isFormAlreadyInFolder = true;
+                break;
+              }
+            }
+            
+            if (!isFormAlreadyInFolder) {
+              folder.addFile(formFile);
+              DriveApp.getRootFolder().removeFile(formFile);
+              moveResults.form = true;
+              console.log('✅ カスタムフォームファイル移動完了');
+            }
+          }
+        } catch (formMoveError) {
+          console.warn('カスタムフォームファイル移動エラー:', formMoveError.message);
+        }
+        
+        // スプレッドシートファイルを移動
+        try {
+          const ssFile = DriveApp.getFileById(result.spreadsheetId);
+          if (ssFile) {
+            // 既にフォルダに存在するかチェック
+            const ssParents = ssFile.getParents();
+            let isSsAlreadyInFolder = false;
+            
+            while (ssParents.hasNext()) {
+              if (ssParents.next().getId() === folder.getId()) {
+                isSsAlreadyInFolder = true;
+                break;
+              }
+            }
+            
+            if (!isSsAlreadyInFolder) {
+              folder.addFile(ssFile);
+              DriveApp.getRootFolder().removeFile(ssFile);
+              moveResults.spreadsheet = true;
+              console.log('✅ カスタムスプレッドシートファイル移動完了');
+            }
+          }
+        } catch (ssMoveError) {
+          console.warn('カスタムスプレッドシートファイル移動エラー:', ssMoveError.message);
+        }
+        
+        console.log('📁 カスタムセットアップファイル移動結果:', moveResults);
+      }
+    } catch (folderError) {
+      console.warn('カスタムセットアップフォルダ処理エラー:', folderError.message);
+    }
+    
     // 既存ユーザーの情報を更新（スプレッドシート情報を追加）
     const existingUser = findUserById(requestUserId);
     if (existingUser) {
@@ -4163,6 +4229,8 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.appPublished = true;
       updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
       updatedConfigJson.publishedSheetName = result.sheetName;
+      updatedConfigJson.folderId = folder ? folder.getId() : '';
+      updatedConfigJson.folderUrl = folder ? folder.getUrl() : '';
       
       // カスタムフォーム設定情報を保存
       // カスタムフォーム設定情報をシート固有のキーの下に保存
@@ -4212,7 +4280,11 @@ function createCustomFormUI(requestUserId, config) {
       message: 'カスタムフォームが正常に作成されました！',
       formUrl: result.formUrl,
       spreadsheetUrl: result.spreadsheetUrl,
-      formTitle: result.formTitle
+      formTitle: result.formTitle,
+      sheetName: result.sheetName,
+      folderId: folder ? folder.getId() : '',
+      folderUrl: folder ? folder.getUrl() : '',
+      filesMovedToFolder: moveResults
     };
   } catch (error) {
     console.error('createCustomFormUI error:', error.message);
