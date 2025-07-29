@@ -660,12 +660,15 @@ function updateStepIndicators(currentStep, status = null) {
 
     // ステップ3で公開中の場合、完了マークを表示（バッジは削除）
     if (stepNumber === 3 && isPublished) {
-      // 完了マークを表示するため、ステップ3のアイコンを完了状態に変更
-      const stepIcon = step.querySelector('.step-number');
-      if (stepIcon && !stepIcon.classList.contains('step-completed')) {
-        stepIcon.classList.remove('bg-blue-600', 'text-white');
-        stepIcon.classList.add('bg-green-600', 'text-white', 'step-completed');
-        stepIcon.innerHTML = '<i class="fas fa-check text-sm"></i>';
+      // circleは既に取得済みのdiv要素を使用
+      if (circle && !circle.classList.contains('step-completed')) {
+        circle.className = 'w-7 h-7 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 shadow-lg step-completed';
+        circle.innerHTML = '✓';
+      }
+      // テキストも完了状態にする
+      if (text) {
+        text.classList.remove('text-gray-400', 'text-cyan-400');
+        text.classList.add('text-green-400', 'font-medium');
       }
     }
   });
@@ -774,7 +777,18 @@ function updateTopicText(status) {
   if (!topicTextElement) return;
 
   let topic = '（問題文未設定）';
-  const cfg = status.config || {};
+  // より包括的なconfig取得
+  let cfg = status.config || {};
+  
+  // userInfo.configJsonからも情報を取得
+  if (status.userInfo?.configJson) {
+    try {
+      const fullConfig = JSON.parse(status.userInfo.configJson);
+      cfg = { ...cfg, ...fullConfig };
+    } catch (e) {
+      console.warn('Failed to parse userInfo.configJson:', e);
+    }
+  }
 
   if (status.customFormInfo && status.customFormInfo.mainQuestion) {
     topic = status.customFormInfo.mainQuestion;
