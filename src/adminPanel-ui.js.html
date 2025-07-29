@@ -658,12 +658,15 @@ function updateStepIndicators(currentStep, status = null) {
       }
     }
 
-    // ステップ3で公開中の場合、公開状態バッジを追加
+    // ステップ3で公開中の場合、完了マークを表示（バッジは削除）
     if (stepNumber === 3 && isPublished) {
-      const badge = document.createElement('div');
-      badge.className = 'publication-badge ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded-full font-bold flex items-center gap-1';
-      badge.innerHTML = '● 公開中';
-      step.appendChild(badge);
+      // 完了マークを表示するため、ステップ3のアイコンを完了状態に変更
+      const stepIcon = step.querySelector('.step-number');
+      if (stepIcon && !stepIcon.classList.contains('step-completed')) {
+        stepIcon.classList.remove('bg-blue-600', 'text-white');
+        stepIcon.classList.add('bg-green-600', 'text-white', 'step-completed');
+        stepIcon.innerHTML = '<i class="fas fa-check text-sm"></i>';
+      }
     }
   });
   
@@ -804,7 +807,11 @@ function updateTopicText(status) {
 
 // 予定終了日時を更新する関数
 function updateScheduledEndTime(config, element) {
-  const scheduledEndTime = config.scheduledEndTime;
+  // 複数のソースから scheduledEndTime を取得を試行
+  const scheduledEndTime = config.scheduledEndTime || 
+                           config.autoStopTime || 
+                           (window.lastStatusCache?.config?.scheduledEndTime) ||
+                           (window.lastStatusCache?.config?.autoStopTime);
   
   if (scheduledEndTime) {
     try {
@@ -2060,22 +2067,23 @@ function createHistoryTableRow(item, index) {
     });
   };
   
-  // 終了日時の表示ロジック
-  const getEndTimeDisplay = (item) => {
-    if (item.endTime) {
-      // 実際の終了日時がある場合
-      return `<span class="text-gray-400">${formatDateTime(item.endTime)}</span>`;
-    } else if (item.isActive || (!item.endTime && item.publishedAt)) {
-      // 公開中の場合
-      if (item.scheduledEndTime) {
-        return `<span class="text-green-400">予定: ${formatDateTime(item.scheduledEndTime)}</span>`;
+  // 回答形式の表示ロジック
+  const getAnswerFormatDisplay = (item) => {
+    // configから回答形式を判定
+    if (item.config) {
+      const config = item.config;
+      if (config.showNames && config.showCounts) {
+        return `<span class="text-blue-400">名前・数</span>`;
+      } else if (config.showNames) {
+        return `<span class="text-green-400">名前表示</span>`;
+      } else if (config.showCounts) {
+        return `<span class="text-purple-400">数表示</span>`;
       } else {
-        return `<span class="text-yellow-400">予定: 未設定</span>`;
+        return `<span class="text-gray-400">標準</span>`;
       }
-    } else {
-      // 古いデータ互換性用
-      return `<span class="text-gray-400">${formatDateTime(item.publishedEndAt)}</span>`;
     }
+    // configがない古いデータの場合
+    return `<span class="text-gray-500">不明</span>`;
   };
   
   // 活動状況インジケーター
@@ -2085,8 +2093,8 @@ function createHistoryTableRow(item, index) {
   
   row.innerHTML = `
     <td class="px-3 py-2 text-xs text-gray-300">${statusIndicator}${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs">${getEndTimeDisplay(item)}</td>
     <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${escapeHtml(item.questionText)}">${escapeHtml(item.questionText)}</td>
+    <td class="px-3 py-2 text-xs text-center">${getAnswerFormatDisplay(item)}</td>
     <td class="px-3 py-2 text-xs text-center ${isActive ? 'text-green-400 font-medium' : 'text-gray-300'}">${item.answerCount || 0}</td>
   `;
   
