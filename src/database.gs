@@ -668,14 +668,8 @@ function fixUserDataConsistency(userId) {
       needsUpdate = true;
     }
     
-    // 3. セットアップ状態の正規化
-    if (userInfo.spreadsheetId && configJson.setupStatus !== 'completed') {
-      console.log('🔄 セットアップ状態を正規化');
-      configJson.setupStatus = 'completed';
-      configJson.formCreated = true;
-      configJson.appPublished = true;
-      needsUpdate = true;
-    }
+    // 3. セットアップ状態の正規化（統一修復システムに委譲）
+    // Note: 重複する修復ロジックはperformAutoHealing()に統合済み
     
     if (needsUpdate) {
       updateData.configJson = JSON.stringify(configJson);

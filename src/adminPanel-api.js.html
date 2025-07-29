@@ -782,7 +782,6 @@ function createFormWithConfig() {
   
   // カスタムフォーム作成中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
 
-  // バックエンドの正しい関数を使用: createCustomForm(userEmail, userId, config)
   // userEmailは現在のユーザー情報から取得
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.adminEmail) {
     showMessage('ユーザー情報が取得できません。ページを再読み込みしてください。', 'error');

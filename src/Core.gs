@@ -90,35 +90,236 @@ function clearActiveSheet(requestUserId) {
 }
 
 /**
- * セットアップステップを統一的に判定する関数
+ * セットアップステップを決定する統一関数（権威的実装）
  * @param {Object} userInfo - ユーザー情報
  * @param {Object} configJson - 設定JSON
+ * @param {Object} options - オプション設定
  * @returns {number} セットアップステップ (1-3)
  */
-function determineSetupStep(userInfo, configJson) {
-  const setupStatus = configJson ? configJson.setupStatus : 'pending';
+function determineSetupStepUnified(userInfo, configJson, options = {}) {
+  const debugMode = options.debugMode || false;
   
   // Step 1: データソース未設定
   if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
-    console.log('determineSetupStep: Step 1 - データソース未設定');
+    if (debugMode) console.log('🔧 setupStep統一判定: Step 1 - データソース未設定');
     return 1;
   }
   
-  // Step 2: データソース設定済み + (再設定中 OR セットアップ未完了)
-  if (!configJson || setupStatus === 'reconfiguring' || setupStatus !== 'completed' || !configJson.formCreated) {
-    console.log('determineSetupStep: Step 2 - データソース設定済み、セットアップ未完了または再設定中');
+  // configJsonが存在しない場合は必ずStep 2
+  if (!configJson || typeof configJson !== 'object') {
+    if (debugMode) console.log('🔧 setupStep統一判定: Step 2 - configJson未設定');
     return 2;
   }
   
-  // Step 3: 公開設定（セットアップ完了）
-  if (setupStatus === 'completed' && configJson.formCreated) {
-    console.log('determineSetupStep: Step 3 - 公開設定（公開準備完了）');
+  const setupStatus = configJson.setupStatus || 'pending';
+  const formCreated = !!configJson.formCreated;
+  const hasFormUrl = !!(configJson.formUrl && configJson.formUrl.trim());
+  
+  // Step 2条件: 明示的な判定
+  const isStep2 = (
+    setupStatus === 'pending' ||      // 明示的な未完了状態
+    setupStatus === 'reconfiguring' || // 再設定中
+    setupStatus === 'error' ||        // エラー状態
+    !formCreated ||                   // フォーム未作成
+    !hasFormUrl                       // フォームURL未設定
+  );
+  
+  if (isStep2) {
+    if (debugMode) {
+      console.log('🔧 setupStep統一判定: Step 2 - セットアップ未完了', {
+        setupStatus,
+        formCreated,
+        hasFormUrl
+      });
+    }
+    return 2;
+  }
+  
+  // Step 3: セットアップ完了（すべての条件をクリア）
+  if (setupStatus === 'completed' && formCreated && hasFormUrl) {
+    if (debugMode) console.log('🔧 setupStep統一判定: Step 3 - セットアップ完了');
     return 3;
   }
   
-  // フォールバック: Step 2
-  console.log('determineSetupStep: フォールバック - Step 2');
+  // フォールバック: 不明な状態はStep 2として扱う
+  if (debugMode) {
+    console.log('🔧 setupStep統一判定: フォールバック - Step 2', {
+      setupStatus,
+      formCreated,
+      hasFormUrl
+    });
+  }
   return 2;
+}
+
+
+/**
+ * 統一された自動修復システム（循環参照を回避した安全な実装）
+ * @param {Object} userInfo - ユーザー情報  
+ * @param {Object} configJson - 設定JSON
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 修復結果 {updated: boolean, configJson: Object, changes: Array}
+ */
+function performAutoHealing(userInfo, configJson, userId) {
+  const changes = [];
+  let updated = false;
+  const healedConfig = { ...configJson };
+  
+  try {
+    // 修復ルール1: formUrlが存在するがformCreatedがfalseの場合
+    if (healedConfig.formUrl && healedConfig.formUrl.trim() && !healedConfig.formCreated) {
+      healedConfig.formCreated = true;
+      changes.push('formCreated: false → true (formURL存在)');
+      updated = true;
+    }
+    
+    // 修復ルール2: formCreatedがtrueだがsetupStatusがcompletedでない場合  
+    if (healedConfig.formCreated && healedConfig.setupStatus !== 'completed') {
+      healedConfig.setupStatus = 'completed';
+      changes.push(`setupStatus: ${configJson.setupStatus} → completed (form作成済み)`);
+      updated = true;
+    }
+    
+    // 修復ルール3: publishedSheetNameが存在するがappPublishedがfalseの場合
+    // Note: これは公開状態の判定なので、より慎重に処理
+    if (healedConfig.publishedSheetName && 
+        healedConfig.publishedSheetName.trim() && 
+        healedConfig.setupStatus === 'completed' &&
+        !healedConfig.appPublished) {
+      healedConfig.appPublished = true;
+      changes.push('appPublished: false → true (公開シート名存在)');
+      updated = true;
+    }
+    
+    // 修復後の状態検証
+    if (updated) {
+      const validation = validateConfigJsonState(healedConfig, userInfo);
+      if (!validation.isValid) {
+        console.error('❌ Auto-healing後の状態が無効:', validation.errors);
+        return { updated: false, configJson: configJson, changes: [] };
+      }
+      
+      if (validation.warnings.length > 0) {
+        console.warn('⚠️ Auto-healing後の警告:', validation.warnings);
+      }
+    }
+    
+    // データベース更新（変更があった場合のみ）
+    if (updated && userId) {
+      try {
+        updateUser(userId, { configJson: JSON.stringify(healedConfig) });
+        console.log('📋 Auto-healing実行:', changes.join(', '));
+      } catch (updateError) {
+        console.error('❌ Auto-healing DB更新失敗:', updateError.message);
+        // DB更新失敗時は元の設定を返す
+        return { updated: false, configJson: configJson, changes: [] };
+      }
+    }
+    
+    return { updated, configJson: healedConfig, changes };
+    
+  } catch (error) {
+    console.error('❌ Auto-healing処理エラー:', error.message);
+    return { updated: false, configJson: configJson, changes: [] };
+  }
+}
+
+/**
+ * ConfigJson状態検証・遷移管理システム
+ * @param {Object} configJson - 検証対象の設定
+ * @param {Object} userInfo - ユーザー情報  
+ * @returns {Object} 検証結果 {isValid: boolean, errors: Array, warnings: Array}
+ */
+function validateConfigJsonState(configJson, userInfo) {
+  const errors = [];
+  const warnings = [];
+  
+  if (!configJson || typeof configJson !== 'object') {
+    return { isValid: false, errors: ['configJsonが無効です'], warnings: [] };
+  }
+  
+  const setupStatus = configJson.setupStatus || 'pending';
+  const formCreated = !!configJson.formCreated;
+  const appPublished = !!configJson.appPublished;
+  const hasFormUrl = !!(configJson.formUrl && configJson.formUrl.trim());
+  const hasPublishedSheet = !!(configJson.publishedSheetName && configJson.publishedSheetName.trim());
+  
+  // 検証ルール1: setupStatus = 'completed' だが必要な要素が不足
+  if (setupStatus === 'completed') {
+    if (!formCreated) {
+      errors.push('setupStatus=completedですが、formCreated=falseです');
+    }
+    if (!hasFormUrl) {
+      errors.push('setupStatus=completedですが、formUrlが未設定です');
+    }
+  }
+  
+  // 検証ルール2: formCreated = true だが関連要素が不足
+  if (formCreated && !hasFormUrl) {
+    errors.push('formCreated=trueですが、formUrlが未設定です');
+  }
+  
+  // 検証ルール3: appPublished = true だが公開情報が不足
+  if (appPublished) {
+    if (!hasPublishedSheet) {
+      errors.push('appPublished=trueですが、publishedSheetNameが未設定です');
+    }
+    if (setupStatus !== 'completed') {
+      errors.push('appPublished=trueですが、setupStatus != completedです');
+    }
+  }
+  
+  // 検証ルール4: データソース検証
+  if (!userInfo || !userInfo.spreadsheetId) {
+    if (setupStatus === 'completed' || formCreated || appPublished) {
+      errors.push('データソース未設定ですが、高度な設定が有効になっています');
+    }
+  }
+  
+  // 警告ルール: 推奨設定の確認
+  if (setupStatus === 'completed' && formCreated && !appPublished && hasPublishedSheet) {
+    warnings.push('公開準備完了していますが、appPublished=falseです');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings
+  };
+}
+
+/**
+ * 安全な状態遷移を実行する関数
+ * @param {Object} currentConfig - 現在の設定
+ * @param {Object} newValues - 新しい値
+ * @param {Object} userInfo - ユーザー情報
+ * @returns {Object} 遷移結果 {success: boolean, configJson: Object, errors: Array}
+ */
+function safeStateTransition(currentConfig, newValues, userInfo) {
+  const transitionConfig = { ...currentConfig, ...newValues };
+  
+  // 遷移前検証
+  const validation = validateConfigJsonState(transitionConfig, userInfo);
+  
+  if (!validation.isValid) {
+    return {
+      success: false,
+      configJson: currentConfig,
+      errors: validation.errors
+    };
+  }
+  
+  // 遷移実行
+  console.log('✅ 状態遷移実行:', Object.keys(newValues).join(', '));
+  if (validation.warnings.length > 0) {
+    console.warn('⚠️ 状態遷移警告:', validation.warnings.join(', '));
+  }
+  
+  return {
+    success: true,
+    configJson: transitionConfig,
+    errors: []
+  };
 }
 
 
@@ -231,7 +432,6 @@ function clearAllExecutionCache() {
 // メインロジック
 // =================================================================
 
-// doGetLegacy function removed - consolidated into main doGet in UltraOptimizedCore.gs
 
 /**
  * 意見ヘッダーを安全に取得する関数（テンプレート変数の問題を回避）
@@ -1153,26 +1353,10 @@ function getAppConfig(requestUserId) {
     
     var configJson = JSON.parse(userInfo.configJson || '{}');
 
-    // --- Auto-healing for inconsistent setup states ---
-    var needsUpdate = false;
-    if (configJson.formUrl && !configJson.formCreated) {
-      configJson.formCreated = true;
-      needsUpdate = true;
-    }
-    if (configJson.formCreated && configJson.setupStatus !== 'completed') {
-      configJson.setupStatus = 'completed';
-      needsUpdate = true;
-    }
-    if (configJson.publishedSheetName && !configJson.appPublished) {
-      configJson.appPublished = true;
-      needsUpdate = true;
-    }
-    if (needsUpdate) {
-      try {
-        updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
-      } catch (updateErr) {
-        console.warn('Config auto-heal failed: ' + updateErr.message);
-      }
+    // --- 統一された自動修復システム ---
+    const healingResult = performAutoHealing(userInfo, configJson, currentUserId);
+    if (healingResult.updated) {
+      configJson = healingResult.configJson;
     }
 
     var sheets = getSheetsList(currentUserId);
@@ -1238,7 +1422,7 @@ function getAppConfig(requestUserId) {
         lastUpdated: new Date().toISOString()
       },
       // ユーザーのセットアップ段階を判定（統一化されたロジック）
-      setupStep: determineSetupStep(userInfo, configJson)
+      setupStep: determineSetupStepUnified(userInfo, configJson)
     };
   } catch (e) {
     console.error('アプリ設定取得エラー: ' + e.message);
@@ -2898,42 +3082,6 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
 }
 
 
-/**
- * カスタムフォーム作成（管理パネル用）
- * @deprecated createUnifiedForm('custom', ...) を使用してください
- * 互換性のため保持、内部でcreateUnifiedFormを使用
- */
-function createCustomForm(userEmail, userId, config) {
-  try {
-    console.warn('createCustomForm() is deprecated. Use createUnifiedForm("custom", ...) instead.');
-    
-    // AdminPanelのconfig構造を内部形式に変換
-    const convertedConfig = {
-      mainQuestion: {
-        title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
-        type: config.responseType || config.questionType || 'text', // responseTypeを優先して使用
-        choices: config.questionChoices || config.choices || [], // questionChoicesを優先して使用
-        includeOthers: config.includeOthers || false
-      },
-      enableClass: config.enableClass || false,
-      classQuestion: {
-        choices: config.classChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4']
-      }
-    };
-    
-    console.log('createCustomForm - converted config:', JSON.stringify(convertedConfig));
-    
-    const overrides = {
-      titlePrefix: config.formTitle || 'カスタムフォーム',
-      customConfig: convertedConfig
-    };
-    
-    return createUnifiedForm('custom', userEmail, userId, overrides);
-  } catch (error) {
-    console.error('createCustomForm Error:', error.message);
-    throw new Error('カスタムフォームの作成に失敗しました: ' + error.message);
-  }
-}
 
 
 /**
@@ -3100,91 +3248,6 @@ function shareAllSpreadsheetsWithServiceAccount() {
 /**
  * フォーム作成
  */
-/**
- * StudyQuestフォーム作成（追加機能付き）
- * @deprecated createUnifiedForm('study', ...) を使用してください
- */
-function createStudyQuestForm(userEmail, userId, formTitle, questionType) {
-  try {
-    console.warn('createStudyQuestForm() is deprecated. Use createUnifiedForm("study", ...) instead.');
-    console.log('📝 新しいStudyQuestフォームを作成開始');
-    console.log('👤 ユーザー:', userEmail);
-    console.log('🆔 ユーザーID:', userId);
-    console.log('📋 フォームタイトル:', formTitle);
-    
-    // パフォーマンス測定開始
-    var profiler = (typeof globalProfiler !== 'undefined') ? globalProfiler : {
-      start: function() {},
-      end: function() {}
-    };
-    profiler.start('createForm');
-    
-    // 統合ファクトリを使用してフォーム作成
-    const overrides = {
-      formTitle: formTitle,
-      questions: questionType || 'simple'
-    };
-    
-    console.log('🏭 統合ファクトリでフォーム作成中:', JSON.stringify(overrides));
-    var formResult = createUnifiedForm('study', userEmail, userId, overrides);
-    
-    console.log('✅ 新しいフォーム作成完了:');
-    console.log('  📝 フォームID:', formResult.formId);
-    console.log('  📊 スプレッドシートID:', formResult.spreadsheetId);
-    console.log('  📄 シート名:', formResult.sheetName);
-    
-    // StudyQuest固有のカスタマイズ
-    var form = FormApp.openById(formResult.formId);
-    
-    // Email収集タイプの設定（可能な場合）
-    try {
-      if (typeof form.setEmailCollectionType === 'function') {
-        form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
-      }
-    } catch (undocumentedError) {
-      console.warn('Email collection type setting failed:', undocumentedError.message);
-    }
-    
-    // 確認メッセージの設定（回答ボードURLを含む）
-    var appUrls = generateUserUrls(userId);
-    var boardUrl = appUrls.viewUrl || (appUrls.webAppUrl + '?userId=' + encodeURIComponent(userId || ''));
-    
-    var confirmationMessage = '回答してくれて、ありがとうございます！🎉\n\n' +
-      'みんなの考えを見てみましょう: ' + boardUrl + '\n\n' +
-      '【デジタル市民として】\n' +
-      '✨ 相手の気持ちを考えながら、やさしい言葉で伝えましょう\n' +
-      '💡 正しい情報を大切にして、みんなで学び合いましょう\n' +
-      '🔒 自分や友だちの大切な情報は守りましょう';
-
-    if (form.getPublishedUrl()) {
-      confirmationMessage += '\n\n回答の編集はこちら: ' + form.getPublishedUrl();
-    }
-    
-    form.setConfirmationMessage(confirmationMessage);
-    
-    // サービスアカウントをスプレッドシートに追加（失敗しても処理継続）
-    try {
-      addServiceAccountToSpreadsheet(formResult.spreadsheetId);
-    } catch (serviceAccountError) {
-      console.warn('サービスアカウント追加に失敗しましたが、処理を継続します:', serviceAccountError.message);
-      // 権限エラーの場合でも、フォーム作成自体は成功とみなす
-    }
-    
-    profiler.end('createForm');
-    
-    console.log('🎉 StudyQuestフォーム作成が完全に完了しました:');
-    console.log('  📝 最終フォームID:', formResult.formId);
-    console.log('  📊 最終スプレッドシートID:', formResult.spreadsheetId);
-    console.log('  🔗 フォームURL:', formResult.formUrl || 'N/A');
-    console.log('  🔗 スプレッドシートURL:', formResult.spreadsheetUrl || 'N/A');
-    
-    return formResult;
-    
-  } catch (e) {
-    console.error('createStudyQuestFormエラー: ' + e.message);
-    throw new Error('フォームの作成に失敗しました: ' + e.message);
-  }
-}
 
 /**
  * サービスアカウントをスプレッドシートに追加
@@ -4370,9 +4433,6 @@ function createQuickStartFormUI(requestUserId) {
   }
 }
 
-/**
- * @deprecated createCustomFormUIを使用してください
- */
 function deleteCurrentUserAccount(requestUserId) {
   try {
     if (!requestUserId) {
@@ -4722,27 +4782,11 @@ function getInitialData(requestUserId, targetSheetName) {
     // === ステップ2: 設定データの取得と自動修復 ===
     var configJson = JSON.parse(userInfo.configJson || '{}');
     
-    // Auto-healing for inconsistent setup states
-    var needsUpdate = false;
-    if (configJson.formUrl && !configJson.formCreated) {
-      configJson.formCreated = true;
-      needsUpdate = true;
-    }
-    if (configJson.formCreated && configJson.setupStatus !== 'completed') {
-      configJson.setupStatus = 'completed';
-      needsUpdate = true;
-    }
-    if (configJson.publishedSheetName && !configJson.appPublished) {
-      configJson.appPublished = true;
-      needsUpdate = true;
-    }
-    if (needsUpdate) {
-      try {
-        updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
-        userInfo.configJson = JSON.stringify(configJson);
-      } catch (updateErr) {
-        console.warn('Config auto-heal failed: ' + updateErr.message);
-      }
+    // --- 統一された自動修復システム ---
+    const healingResult = performAutoHealing(userInfo, configJson, currentUserId);
+    if (healingResult.updated) {
+      configJson = healingResult.configJson;
+      userInfo.configJson = JSON.stringify(configJson);
     }
     
     // === ステップ3: シート一覧とアプリURL生成 ===
@@ -4765,7 +4809,7 @@ function getInitialData(requestUserId, targetSheetName) {
     }
     
     // === ステップ5: セットアップステップの決定 ===
-    var setupStep = determineSetupStep(userInfo, configJson);
+    var setupStep = determineSetupStepUnified(userInfo, configJson);
 
     // 公開シート設定とヘッダー情報を取得
     var publishedSheetName = configJson.publishedSheetName || '';

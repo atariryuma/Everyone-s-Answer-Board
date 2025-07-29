@@ -1499,7 +1499,7 @@ function unpublishBoard(requestUserId) {
     
     // 回答ボード連携の解除（フォーム情報は保持）
     configJson.setupStatus = 'pending'; // ステップ1から再開（直感的な進行のため）
-    configJson.setupStep = 1; // ステップ1にリセット（公開終了後はセットアップから再開）
+    // Note: setupStepは削除（計算プロパティのため保存不要）
     
     // 列設定のみクリア（データソース・シート選択は保持）
     configJson.opinionHeader = '';
@@ -2336,7 +2336,7 @@ function buildResponseFromContext(context) {
     const response = {
       userInfo: userInfo,
       isPublished: configJson.appPublished || false,
-      setupStep: determineSetupStep(userInfo, configJson), // 統一されたロジックを使用
+      setupStep: determineSetupStepUnified(userInfo, configJson), // 統一されたロジックを使用
       
       // URL情報（generateUserUrlsを使用した適切なURL生成）
       appUrls: (function() {

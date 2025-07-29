@@ -358,8 +358,9 @@ function getSetupStatusFromConfig(configJsonString) {
       return config.setupStatus;
     }
     
-    // setupStatusがない場合、他のフィールドから推測
-    if (config.appPublished === true && config.formCreated === true) {
+    // setupStatusがない場合、他のフィールドから推測（循環参照回避）
+    // Note: この推測ロジックは循環参照を避けるため、formUrlベースに変更
+    if (config.formCreated === true && config.formUrl && config.formUrl.trim()) {
       return 'completed';
     }
     
