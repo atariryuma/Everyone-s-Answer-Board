@@ -1337,12 +1337,23 @@ function renderUnpublishedPage(userInfo, params) {
     console.log('✅ renderUnpublishedPage: Template setup completed');
     
     // キャッシュを無効化して確実なリダイレクトを保証
-    return template.evaluate()
+    const htmlOutput = template.evaluate()
       .setTitle('StudyQuest - 準備中')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
       .addMetaTag('pragma', 'no-cache')
       .addMetaTag('expires', '0');
+
+    try {
+      if (HtmlService && HtmlService.XFrameOptionsMode &&
+          HtmlService.XFrameOptionsMode.ALLOWALL) {
+        htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      }
+    } catch (e) {
+      console.warn('XFrameOptionsMode設定エラー:', e.message);
+    }
+
+    return htmlOutput;
       
   } catch (error) {
     console.error('❌ renderUnpublishedPage error:', error);
