@@ -98,9 +98,9 @@ function clearActiveSheet(requestUserId) {
 function determineSetupStep(userInfo, configJson) {
   const setupStatus = configJson ? configJson.setupStatus : 'pending';
   
-  // Step 1: データソース未設定 OR セットアップ初期状態
-  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '' || setupStatus === 'pending') {
-    console.log('determineSetupStep: Step 1 - データソース未設定またはセットアップ初期状態');
+  // Step 1: データソース未設定
+  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+    console.log('determineSetupStep: Step 1 - データソース未設定');
     return 1;
   }
   
@@ -110,9 +110,9 @@ function determineSetupStep(userInfo, configJson) {
     return 2;
   }
   
-  // Step 3: 全セットアップ完了 + 公開済み
-  if (setupStatus === 'completed' && configJson.formCreated && configJson.appPublished) {
-    console.log('determineSetupStep: Step 3 - 全セットアップ完了・公開済み');
+  // Step 3: 公開設定（セットアップ完了）
+  if (setupStatus === 'completed' && configJson.formCreated) {
+    console.log('determineSetupStep: Step 3 - 公開設定（公開準備完了）');
     return 3;
   }
   
@@ -120,6 +120,7 @@ function determineSetupStep(userInfo, configJson) {
   console.log('determineSetupStep: フォールバック - Step 2');
   return 2;
 }
+
 
 // =================================================================
 // ユーザー情報キャッシュ（関数実行中の重複取得を防ぐ）

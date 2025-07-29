@@ -391,24 +391,8 @@ function proceedWithSaveAndPublish(config) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
         // 履歴に保存
-        try {
-          const questionText = config.opinionHeader || config.opinionColumn || selectedSheet || '回答ボード';
-          const historyItem = {
-            questionText: questionText,
-            sheetName: selectedSheet,
-            publishedAt: new Date().toISOString(),
-            answerCount: result.answerCount || 0,
-            reactionCount: result.reactionCount || 0,
-            config: config,
-            formUrl: result.formUrl || (currentStatus && currentStatus.userInfo && currentStatus.userInfo.formUrl) || '',
-            spreadsheetUrl: result.spreadsheetUrl || (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) || '',
-            setupType: '外部リソース' // 既存スプレッドシートを使用した公開
-          };
-          saveToHistory(historyItem);
-          logDebug('Published board saved to history:', historyItem);
-        } catch (historyError) {
-          logWarn('Failed to save to history:', historyError);
-        }
+        // 公開時は履歴保存を行わない（公開停止時に保存するため）
+        logDebug('Board published successfully - history will be saved on unpublish');
         
         // ボードビューアーに即座更新を通知
         try {
@@ -617,6 +601,9 @@ function unpublishBoard() {
       logDebug('公開停止レスポンス:', response);
       showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
       
+      // 公開停止時に履歴を保存
+      saveHistoryOnUnpublish(response);
+      
       // 強化されたキャッシュクリア処理（キャッシュバスティング対応）
       clearAllCachesForUnpublish();
       
@@ -633,6 +620,57 @@ function unpublishBoard() {
       // エラーを再スローして呼び出し元でキャッチできるようにする
       return Promise.reject(error);
     });
+}
+
+// 公開停止時に履歴を保存する関数
+function saveHistoryOnUnpublish(unpublishResponse) {
+  try {
+    // 現在のステータスを取得（キャッシュから）
+    const currentStatus = window.lastStatusCache;
+    if (!currentStatus || !currentStatus.config) {
+      logWarn('履歴保存: 現在のステータス情報が取得できません');
+      return;
+    }
+    
+    const config = currentStatus.config;
+    const userInfo = currentStatus.userInfo || {};
+    
+    // 履歴アイテムを作成
+    const historyItem = {
+      questionText: config.opinionHeader || config.opinionColumn || userInfo.customFormInfo?.mainQuestion || '（問題文未設定）',
+      sheetName: config.publishedSheetName || '',
+      publishedAt: config.publishedAt || config.lastPublishedAt || new Date().toISOString(),
+      endTime: new Date().toISOString(), // 実際の終了日時
+      scheduledEndTime: config.scheduledEndTime || null, // 予定終了日時
+      answerCount: unpublishResponse.answerCount || currentStatus.answerCount || 0,
+      reactionCount: unpublishResponse.reactionCount || currentStatus.reactionCount || 0,
+      config: config,
+      formUrl: userInfo.formUrl || '',
+      spreadsheetUrl: userInfo.spreadsheetUrl || '',
+      setupType: determineSetupType(config, userInfo),
+      isActive: false // 終了したのでfalse
+    };
+    
+    // 履歴保存を実行
+    saveToHistory(historyItem);
+    logDebug('履歴保存完了（公開停止時）:', historyItem);
+    
+  } catch (error) {
+    logWarn('公開停止時の履歴保存に失敗:', error);
+  }
+}
+
+// セットアップタイプを判定する補助関数
+function determineSetupType(config, userInfo) {
+  if (userInfo.customFormInfo) {
+    return 'カスタムセットアップ';
+  } else if (config.isQuickStart || config.setupType === 'quickstart') {
+    return 'クイックスタート';
+  } else if (config.isExternalResource) {
+    return '外部リソース';
+  } else {
+    return 'unknown';
+  }
 }
 
 // Reset column selection dropdowns to default state
@@ -802,25 +840,8 @@ function createFormWithConfig() {
           console.warn('ステータス更新でエラー:', statusError);
         });
         
-        // カスタムセットアップの履歴を保存
-        try {
-          const historyItem = {
-            questionText: config.mainQuestion || 'カスタムフォーム',
-            publishedAt: new Date().toISOString(),
-            publishedEndAt: null,
-            sheetName: result.sheetName || '',
-            answerCount: 0,
-            reactionCount: 0,
-            config: config,
-            formUrl: result.formUrl || '',
-            spreadsheetUrl: result.spreadsheetUrl || '',
-            setupType: 'カスタムセットアップ'
-          };
-          saveToHistory(historyItem);
-          logDebug('Custom setup saved to history:', historyItem);
-        } catch (historyError) {
-          logWarn('Failed to save custom setup to history:', historyError);
-        }
+        // 公開時は履歴保存を行わない（公開停止時に保存するため）
+        logDebug('Custom setup completed - history will be saved on unpublish');
         
         // フォームURL表示の強制更新（管理パネルのリソース欄用）
         setTimeout(() => {
@@ -1779,25 +1800,8 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         }
         loadStatus(true);
         
-        // クイックスタートの履歴を保存
-        try {
-          const historyItem = {
-            questionText: result.questionText || 'テーマに沿って自分の考えを書きましょう。',
-            publishedAt: new Date().toISOString(),
-            publishedEndAt: null,
-            sheetName: result.sheetName || '',
-            answerCount: 0,
-            reactionCount: 0,
-            config: result.config || {},
-            formUrl: result.formUrl || '',
-            spreadsheetUrl: result.spreadsheetUrl || '',
-            setupType: 'クイックスタート'
-          };
-          saveToHistory(historyItem);
-          logDebug('QuickStart saved to history:', historyItem);
-        } catch (historyError) {
-          logWarn('Failed to save QuickStart to history:', historyError);
-        }
+        // 公開時は履歴保存を行わない（公開停止時に保存するため）
+        logDebug('QuickStart completed - history will be saved on unpublish');
         
         // フォームURL表示の強制更新（管理パネルのリソース欄用）
         setTimeout(() => {

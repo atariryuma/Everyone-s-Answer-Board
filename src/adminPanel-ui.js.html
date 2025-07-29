@@ -742,6 +742,8 @@ function updateFooterAndGuidance(status) {
 // Update topic text in footer
 function updateTopicText(status) {
   const topicTextElement = document.getElementById('current-topic-text');
+  const scheduledEndTimeElement = document.getElementById('scheduled-end-time');
+  
   if (!topicTextElement) return;
 
   let topic = '（問題文未設定）';
@@ -769,6 +771,46 @@ function updateTopicText(status) {
   }
 
   topicTextElement.textContent = topic;
+  
+  // 予定終了日時の更新
+  if (scheduledEndTimeElement) {
+    updateScheduledEndTime(cfg, scheduledEndTimeElement);
+  }
+}
+
+// 予定終了日時を更新する関数
+function updateScheduledEndTime(config, element) {
+  const scheduledEndTime = config.scheduledEndTime;
+  
+  if (scheduledEndTime) {
+    try {
+      const endDate = new Date(scheduledEndTime);
+      const formattedTime = endDate.toLocaleString('ja-JP', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      // 現在時刻との比較
+      const now = new Date();
+      const isOverdue = endDate < now;
+      
+      if (isOverdue) {
+        element.textContent = `${formattedTime} (期限切れ)`;
+        element.className = 'text-xs font-medium text-red-400';
+      } else {
+        element.textContent = formattedTime;
+        element.className = 'text-xs font-medium text-orange-400';
+      }
+    } catch (e) {
+      element.textContent = '設定エラー';
+      element.className = 'text-xs font-medium text-gray-400';
+    }
+  } else {
+    element.textContent = '未設定';
+    element.className = 'text-xs font-medium text-gray-400';
+  }
 }
 
 // Update guidance text for specific step
@@ -1860,6 +1902,9 @@ function saveToHistory(historyItem) {
       timestamp: new Date().toISOString(),
       publishedAt: historyItem.publishedAt || new Date().toISOString(),
       publishedEndAt: historyItem.publishedEndAt || null,
+      // 新しいフィールド: 終了関連
+      endTime: historyItem.endTime || null, // 実際の終了日時（終了時に記録）
+      scheduledEndTime: historyItem.scheduledEndTime || null, // 予定終了日時
       questionText: historyItem.questionText,
       sheetName: historyItem.sheetName || '',
       answerCount: historyItem.answerCount || 0,
@@ -1867,7 +1912,8 @@ function saveToHistory(historyItem) {
       config: historyItem.config || {},
       formUrl: historyItem.formUrl || '',
       spreadsheetUrl: historyItem.spreadsheetUrl || '',
-      setupType: historyItem.setupType || 'unknown' // クイックスタート、カスタムセットアップ、外部リソースを識別
+      setupType: historyItem.setupType || 'unknown', // クイックスタート、カスタムセットアップ、外部リソースを識別
+      isActive: historyItem.isActive || false // 現在公開中かどうか
     };
     
     history.unshift(newItem);
@@ -1952,7 +1998,13 @@ function loadSimpleHistoryTable() {
  */
 function createHistoryTableRow(item, index) {
   const row = document.createElement('tr');
-  row.className = 'hover:bg-gray-700/30 cursor-pointer transition-colors';
+  
+  // 公開中の項目は緑色のハイライト
+  const isActive = item.isActive || (!item.endTime && item.publishedAt);
+  row.className = isActive 
+    ? 'hover:bg-green-700/20 cursor-pointer transition-colors bg-green-900/10' 
+    : 'hover:bg-gray-700/30 cursor-pointer transition-colors';
+  
   row.onclick = () => selectHistoryItem(item.id);
   
   const formatDateTime = (dateString) => {
@@ -1967,11 +2019,34 @@ function createHistoryTableRow(item, index) {
     });
   };
   
+  // 終了日時の表示ロジック
+  const getEndTimeDisplay = (item) => {
+    if (item.endTime) {
+      // 実際の終了日時がある場合
+      return `<span class="text-gray-400">${formatDateTime(item.endTime)}</span>`;
+    } else if (item.isActive || (!item.endTime && item.publishedAt)) {
+      // 公開中の場合
+      if (item.scheduledEndTime) {
+        return `<span class="text-green-400">予定: ${formatDateTime(item.scheduledEndTime)}</span>`;
+      } else {
+        return `<span class="text-yellow-400">予定: 未設定</span>`;
+      }
+    } else {
+      // 古いデータ互換性用
+      return `<span class="text-gray-400">${formatDateTime(item.publishedEndAt)}</span>`;
+    }
+  };
+  
+  // 活動状況インジケーター
+  const statusIndicator = isActive 
+    ? `<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse inline-block mr-2"></div>`
+    : `<div class="w-2 h-2 bg-gray-500 rounded-full inline-block mr-2"></div>`;
+  
   row.innerHTML = `
-    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedEndAt)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300">${statusIndicator}${formatDateTime(item.publishedAt)}</td>
+    <td class="px-3 py-2 text-xs">${getEndTimeDisplay(item)}</td>
     <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${escapeHtml(item.questionText)}">${escapeHtml(item.questionText)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300">${item.answerCount || 0}</td>
+    <td class="px-3 py-2 text-xs text-center ${isActive ? 'text-green-400 font-medium' : 'text-gray-300'}">${item.answerCount || 0}</td>
   `;
   
   return row;
