@@ -1806,6 +1806,17 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         // フォームURL表示の強制更新（管理パネルのリソース欄用）
         setTimeout(() => {
           updateFormUrlDisplay();
+          
+          // 予定終了時間の表示を更新
+          const scheduledEndTimeElement = document.getElementById('scheduled-end-time');
+          if (scheduledEndTimeElement && window.lastStatusCache?.config) {
+            updateScheduledEndTime(window.lastStatusCache.config, scheduledEndTimeElement);
+          }
+          
+          // 公開停止ボタンの状態を更新
+          if (typeof updateUnpublishButton === 'function' && window.lastStatusCache) {
+            updateUnpublishButton(window.lastStatusCache);
+          }
         }, 1000);
         
         // 回答ボードにフォーム作成完了を通知（フォームリンク更新用）

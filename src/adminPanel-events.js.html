@@ -20,7 +20,8 @@ function setupEventListeners() {
     'unpublish-board-btn': getCachedElement('unpublish-board-btn'),
     'delete-account-btn': getCachedElement('delete-account-btn'),
     'open-spreadsheet-btn': getCachedElement('open-spreadsheet-btn'),
-    'open-form-btn': getCachedElement('open-form-btn')
+    'open-form-btn': getCachedElement('open-form-btn'),
+    'clear-history-btn': getCachedElement('clear-history-btn')
   };
   
   
@@ -48,6 +49,29 @@ function setupEventListeners() {
         '公開停止の確認',
         '回答ボードの公開を停止しますか？',
         unpublishBoard
+      );
+    });
+  }
+  
+  // Clear history button
+  if (elements['clear-history-btn']) {
+    elements['clear-history-btn'].addEventListener('click', function() {
+      showConfirmationModal(
+        '履歴削除の確認',
+        'すべての履歴を削除しますか？この操作は取り消せません。',
+        function() {
+          try {
+            localStorage.removeItem('admin_panel_history');
+            showMessage('✅ 履歴をクリアしました', 'success');
+            // 履歴テーブルを更新
+            if (typeof loadSimpleHistoryTable === 'function') {
+              loadSimpleHistoryTable();
+            }
+          } catch (error) {
+            console.error('履歴クリアに失敗:', error);
+            showMessage('❌ 履歴クリアに失敗しました', 'error');
+          }
+        }
       );
     });
   }
