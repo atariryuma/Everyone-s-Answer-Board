@@ -838,6 +838,21 @@ function createFormWithConfig() {
                     loadConfigForSelected(result.sheetName, currentStatus.userInfo.spreadsheetId)
                       .then(configResult => {
                         console.log('✅ カスタムセットアップ後のシート設定読み込み完了:', configResult);
+                        
+                        // AI判定結果が利用可能な場合、自動で設定を保存
+                        if (configResult && configResult.config && configResult.config.guessedConfig) {
+                          console.log('🤖 AI判定結果を自動保存中...');
+                          setTimeout(() => {
+                            // 設定保存処理を呼び出し
+                            if (typeof saveAndPublish === 'function') {
+                              saveAndPublish();
+                              console.log('✅ カスタムセットアップ: AI判定結果を自動保存しました');
+                            } else {
+                              console.warn('⚠️ saveAndPublish関数が見つかりません');
+                            }
+                          }, 1000); // UI更新の完了を待つ
+                        }
+                        
                         // 設定読み込み完了後、管理パネルのステップを更新
                         updateStepIndicators(3);
                         manageSectionStates(3);
