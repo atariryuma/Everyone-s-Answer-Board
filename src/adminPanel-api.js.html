@@ -651,8 +651,26 @@ function saveHistoryOnUnpublish(unpublishResponse) {
       isActive: false // 終了したのでfalse
     };
     
-    // 履歴保存を実行
+    // LocalStorage履歴保存を実行
     saveToHistory(historyItem);
+    
+    // サーバーサイド履歴保存も実行
+    try {
+      runGasWithUserId('saveHistoryToSheetAPI', '履歴をサーバーに保存中...', historyItem)
+        .then(response => {
+          if (response && response.status === 'success') {
+            logDebug('✅ サーバーサイド履歴保存完了:', response);
+          } else {
+            logWarn('⚠️ サーバーサイド履歴保存で警告:', response);
+          }
+        })
+        .catch(error => {
+          logWarn('❌ サーバーサイド履歴保存エラー:', error);
+        });
+    } catch (serverError) {
+      logWarn('❌ サーバーサイド履歴保存の呼び出しに失敗:', serverError);
+    }
+    
     logDebug('履歴保存完了（公開停止時）:', historyItem);
     
   } catch (error) {

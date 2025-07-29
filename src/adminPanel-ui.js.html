@@ -1960,7 +1960,8 @@ function validateConfiguration() {
 // HISTORY MANAGEMENT FUNCTIONS
 // =============================================================================
 
-// 履歴アイテムの最大保存数
+// 履歴管理の定数
+const HISTORY_STORAGE_KEY = 'answerBoardHistory';
 const MAX_HISTORY_ITEMS = 10;
 
 /**
@@ -2003,7 +2004,7 @@ function saveToHistory(historyItem) {
       history.splice(MAX_HISTORY_ITEMS);
     }
     
-    localStorage.setItem('answerBoardHistory', JSON.stringify(history));
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
     logDebug('History saved:', newItem);
     
     // UI を更新
@@ -2020,7 +2021,7 @@ function saveToHistory(historyItem) {
  */
 function getHistoryFromStorage() {
   try {
-    const historyJson = localStorage.getItem('answerBoardHistory');
+    const historyJson = localStorage.getItem(HISTORY_STORAGE_KEY);
     return historyJson ? JSON.parse(historyJson) : [];
   } catch (error) {
     logWarn('Failed to parse history from storage:', error);
@@ -2041,6 +2042,30 @@ function generateHistoryId() {
 /**
  * 簡単な履歴テーブルを表示（新実装）
  */
+/**
+ * サーバーから履歴を同期してLocalStorageに保存
+ */
+async function syncHistoryFromServer() {
+  try {
+    console.log('🔄 サーバーから履歴を同期中...');
+    
+    const response = await runGasWithUserId('getHistoryFromServerAPI', 'サーバーから履歴を取得中...');
+    
+    if (response && response.status === 'success' && Array.isArray(response.historyArray)) {
+      // サーバーからの履歴をLocalStorageに保存
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(response.historyArray));
+      console.log('✅ サーバーから履歴を同期しました:', response.count, '件');
+      return response.historyArray;
+    } else {
+      console.warn('⚠️ サーバーからの履歴取得で警告:', response);
+      return [];
+    }
+  } catch (error) {
+    console.error('❌ サーバー履歴同期エラー:', error);
+    return [];
+  }
+}
+
 function loadSimpleHistoryTable() {
   const tableBody = document.getElementById('history-table-body');
   
@@ -2555,8 +2580,16 @@ function validateAndFixUIState(status) {
 
 // 簡単な履歴テーブル初期化
 document.addEventListener('DOMContentLoaded', function() {
-  // 簡単な履歴テーブルを読み込み
-  loadSimpleHistoryTable();
+  // サーバーから履歴を同期してからテーブルを読み込み
+  syncHistoryFromServer()
+    .then(function(syncedHistory) {
+      console.log('🔄 ページ読み込み時の履歴同期完了:', syncedHistory.length, '件');
+      loadSimpleHistoryTable();
+    })
+    .catch(function(syncError) {
+      console.warn('⚠️ ページ読み込み時の履歴同期に失敗、ローカルデータで表示:', syncError);
+      loadSimpleHistoryTable();
+    });
 });
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます

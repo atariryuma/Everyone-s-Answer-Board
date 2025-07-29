@@ -3055,23 +3055,23 @@ function resetConfigJson(requestUserId) {
   try {
     // 初期configJsonを定義
     const initialConfigJson = {
+      // セットアップ管理
+      setupStatus: 'pending',
+      
       // フォーム設定
-      title: '',
-      questionText: '',
-      responseType: 'text',
-      options: [],
+      formCreated: false,
+      formUrl: '',
+      editFormUrl: '',
+      
+      // 公開設定
+      appPublished: false,
+      publishedSheetName: '',
+      publishedSpreadsheetId: '',
       
       // 表示設定  
       displayMode: 'anonymous',
       showCounts: false,
       sortOrder: 'newest',
-      
-      // システム設定
-      formCreated: false,
-      formUrl: '',
-      editFormUrl: '',
-      spreadsheetId: '',
-      targetSheetName: '',
       
       // メタデータ
       version: '1.0.0',

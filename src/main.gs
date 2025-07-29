@@ -296,17 +296,210 @@ function determineSetupTypeFromConfig(config, userInfo) {
  * @param {Object} userInfo - ユーザー情報
  */
 function saveHistoryToSheet(historyItem, userInfo) {
-  // 簡易実装：ログに出力（実際の保存ロジックは必要に応じて実装）
-  console.log('📋 履歴アイテム保存:', {
-    問題文: historyItem.questionText,
-    開始: historyItem.publishedAt,
-    終了: historyItem.endTime,
-    回答数: historyItem.answerCount,
-    終了理由: historyItem.endReason
-  });
+  console.log('📋 サーバーサイド履歴保存開始:', historyItem.questionText);
   
-  // 実際の実装では、専用の履歴管理スプレッドシートに保存するか、
-  // 既存のデータベース構造に統合する
+  try {
+    if (!userInfo || !userInfo.userId) {
+      throw new Error('ユーザー情報が不正です');
+    }
+    
+    // 既存のユーザー情報を取得
+    const existingUser = findUserById(userInfo.userId);
+    if (!existingUser) {
+      throw new Error('ユーザーが見つかりません: ' + userInfo.userId);
+    }
+    
+    // 現在のconfigJsonを取得・解析
+    let configJson;
+    try {
+      configJson = JSON.parse(existingUser.configJson || '{}');
+    } catch (parseError) {
+      console.warn('configJson解析エラー、新規作成します:', parseError.message);
+      configJson = {};
+    }
+    
+    // 履歴配列を取得または初期化
+    if (!Array.isArray(configJson.historyArray)) {
+      configJson.historyArray = [];
+    }
+    
+    // 新しい履歴アイテムを作成
+    const serverHistoryItem = {
+      id: historyItem.id || ('server_' + Date.now()),
+      timestamp: new Date().toISOString(),
+      questionText: historyItem.questionText || '（問題文未設定）',
+      sheetName: historyItem.sheetName || '',
+      publishedAt: historyItem.publishedAt || new Date().toISOString(),
+      endTime: historyItem.endTime || new Date().toISOString(),
+      scheduledEndTime: historyItem.scheduledEndTime || null,
+      answerCount: historyItem.answerCount || 0,
+      reactionCount: historyItem.reactionCount || 0,
+      endReason: historyItem.endReason || 'manual',
+      savedAt: new Date().toISOString()
+    };
+    
+    // 履歴配列の先頭に追加
+    configJson.historyArray.unshift(serverHistoryItem);
+    
+    // 最大50件まで保持
+    if (configJson.historyArray.length > 50) {
+      configJson.historyArray.splice(50);
+    }
+    
+    // configJsonを更新
+    configJson.lastModified = new Date().toISOString();
+    
+    // データベースに保存
+    const updateResult = updateUser(userInfo.userId, {
+      configJson: JSON.stringify(configJson),
+      lastAccessedAt: new Date().toISOString()
+    });
+    
+    if (updateResult.status === 'success') {
+      console.log('✅ サーバーサイド履歴保存完了:', {
+        userId: userInfo.userId,
+        questionText: serverHistoryItem.questionText,
+        historyCount: configJson.historyArray.length
+      });
+    } else {
+      throw new Error('データベース更新に失敗: ' + updateResult.message);
+    }
+    
+  } catch (error) {
+    console.error('❌ サーバーサイド履歴保存エラー:', error.message);
+    // エラーをログに記録するが、メイン処理は継続
+  }
+}
+
+/**
+ * 履歴をサーバーサイドに保存する（認証付きAPI）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {Object} historyItem - 履歴アイテム
+ * @returns {Object} 保存結果
+ */
+function saveHistoryToSheetAPI(requestUserId, historyItem) {
+  try {
+    verifyUserAccess(requestUserId);
+    
+    // ユーザー情報を取得
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザーが見つかりません');
+    }
+    
+    // 履歴保存を実行
+    saveHistoryToSheet(historyItem, userInfo);
+    
+    return {
+      status: 'success',
+      message: '履歴がサーバーに保存されました',
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('saveHistoryToSheetAPI エラー:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * サーバーサイドから履歴を取得する（認証付きAPI）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {Object} 履歴データ
+ */
+function getHistoryFromServerAPI(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    
+    // ユーザー情報を取得
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザーが見つかりません');
+    }
+    
+    // configJsonから履歴を取得
+    let configJson;
+    try {
+      configJson = JSON.parse(userInfo.configJson || '{}');
+    } catch (parseError) {
+      console.warn('configJson解析エラー:', parseError.message);
+      configJson = {};
+    }
+    
+    const historyArray = Array.isArray(configJson.historyArray) ? configJson.historyArray : [];
+    
+    return {
+      status: 'success',
+      historyArray: historyArray,
+      count: historyArray.length,
+      lastModified: configJson.lastModified || null
+    };
+    
+  } catch (error) {
+    console.error('getHistoryFromServerAPI エラー:', error.message);
+    return {
+      status: 'error',
+      message: error.message,
+      historyArray: []
+    };
+  }
+}
+
+/**
+ * サーバーサイドの履歴をクリアする（認証付きAPI）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {Object} クリア結果
+ */
+function clearHistoryFromServerAPI(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    
+    // ユーザー情報を取得
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザーが見つかりません');
+    }
+    
+    // configJsonから履歴をクリア
+    let configJson;
+    try {
+      configJson = JSON.parse(userInfo.configJson || '{}');
+    } catch (parseError) {
+      console.warn('configJson解析エラー、新規作成します:', parseError.message);
+      configJson = {};
+    }
+    
+    // 履歴配列をクリア
+    configJson.historyArray = [];
+    configJson.lastModified = new Date().toISOString();
+    
+    // データベースに保存
+    const updateResult = updateUser(requestUserId, {
+      configJson: JSON.stringify(configJson),
+      lastAccessedAt: new Date().toISOString()
+    });
+    
+    if (updateResult.status === 'success') {
+      console.log('✅ サーバーサイド履歴クリア完了:', requestUserId);
+      return {
+        status: 'success',
+        message: 'サーバーサイドの履歴をクリアしました',
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      throw new Error('データベース更新に失敗: ' + updateResult.message);
+    }
+    
+  } catch (error) {
+    console.error('clearHistoryFromServerAPI エラー:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
 }
 
 const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;

@@ -266,12 +266,30 @@ function processLoginFlow(userEmail) {
     else {
       console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
       
-      // 3a. 新規ユーザーデータを準備（初期設定でpending状態）
+      // 3a. 新規ユーザーデータを準備（統一された初期設定）
       const initialConfig = {
+        // セットアップ管理
         setupStatus: 'pending',
         createdAt: new Date().toISOString(),
+        
+        // フォーム設定
         formCreated: false,
-        appPublished: false
+        formUrl: '',
+        editFormUrl: '',
+        
+        // 公開設定
+        appPublished: false,
+        publishedSheetName: '',
+        publishedSpreadsheetId: '',
+        
+        // 表示設定
+        displayMode: 'anonymous',
+        showCounts: false,
+        sortOrder: 'newest',
+        
+        // メタデータ
+        version: '1.0.0',
+        lastModified: new Date().toISOString()
       };
       
       const newUser = {

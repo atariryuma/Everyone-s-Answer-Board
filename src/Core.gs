@@ -152,6 +152,105 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
   return 2;
 }
 
+/**
+ * configJsonの構造と型の妥当性を検証する
+ * @param {Object} config - 検証対象のconfigオブジェクト
+ * @returns {Object} 検証結果 {isValid: boolean, errors: string[]}
+ */
+function validateConfigJson(config) {
+  const errors = [];
+  
+  if (!config || typeof config !== 'object') {
+    return {
+      isValid: false,
+      errors: ['configが存在しないか、オブジェクトではありません']
+    };
+  }
+  
+  // 必須フィールドの型チェック
+  const requiredFields = {
+    setupStatus: 'string',
+    formCreated: 'boolean',
+    appPublished: 'boolean',
+    publishedSheetName: 'string',
+    publishedSpreadsheetId: 'string'
+  };
+  
+  for (const [field, expectedType] of Object.entries(requiredFields)) {
+    if (config[field] === undefined) {
+      errors.push(`必須フィールド '${field}' が未定義です`);
+    } else if (typeof config[field] !== expectedType) {
+      errors.push(`フィールド '${field}' の型が不正です。期待値: ${expectedType}, 実際の値: ${typeof config[field]}`);
+    }
+  }
+  
+  // 文字列フィールドの特別な検証
+  if (config.publishedSheetName === 'true') {
+    errors.push("publishedSheetNameが不正な値 'true' になっています");
+  }
+  
+  // setupStatusの値チェック
+  const validSetupStatuses = ['pending', 'completed', 'error', 'reconfiguring'];
+  if (config.setupStatus && !validSetupStatuses.includes(config.setupStatus)) {
+    errors.push(`setupStatusの値が不正です: ${config.setupStatus}`);
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+}
+
+/**
+ * configJsonを安全にパースし、必要に応じて修復する
+ * @param {string} configJsonString - JSONエンコードされた設定文字列
+ * @returns {Object} パース済みで検証されたconfig
+ */
+function parseAndValidateConfigJson(configJsonString) {
+  let config = {};
+  
+  try {
+    if (configJsonString && configJsonString.trim() !== '' && configJsonString !== '{}') {
+      config = JSON.parse(configJsonString);
+    }
+  } catch (parseError) {
+    console.warn('configJson解析エラー:', parseError.message);
+    config = {};
+  }
+  
+  // デフォルト値で不足フィールドを補完
+  const defaultConfig = {
+    setupStatus: 'pending',
+    formCreated: false,
+    formUrl: '',
+    editFormUrl: '',
+    appPublished: false,
+    publishedSheetName: '',
+    publishedSpreadsheetId: '',
+    displayMode: 'anonymous',
+    showCounts: false,
+    sortOrder: 'newest',
+    version: '1.0.0',
+    lastModified: new Date().toISOString()
+  };
+  
+  // 不足フィールドをデフォルト値で埋める
+  const mergedConfig = { ...defaultConfig, ...config };
+  
+  // 不正な値の修正
+  if (mergedConfig.publishedSheetName === 'true') {
+    mergedConfig.publishedSheetName = '';
+    console.warn('publishedSheetNameの不正値を修正しました');
+  }
+  
+  const validation = validateConfigJson(mergedConfig);
+  if (!validation.isValid) {
+    console.warn('configJson検証警告:', validation.errors);
+  }
+  
+  return mergedConfig;
+}
+
 
 /**
  * 統一された自動修復システム（循環参照を回避した安全な実装）
@@ -520,10 +619,28 @@ function registerNewUser(adminEmail) {
   userId = Utilities.getUuid();
   
   var initialConfig = {
+    // セットアップ管理
     setupStatus: 'pending',
     createdAt: new Date().toISOString(),
+    
+    // フォーム設定
     formCreated: false,
-    appPublished: false
+    formUrl: '',
+    editFormUrl: '',
+    
+    // 公開設定
+    appPublished: false,
+    publishedSheetName: '',
+    publishedSpreadsheetId: '',
+    
+    // 表示設定
+    displayMode: 'anonymous',
+    showCounts: false,
+    sortOrder: 'newest',
+    
+    // メタデータ
+    version: '1.0.0',
+    lastModified: new Date().toISOString()
   };
   
   var userData = {
@@ -4237,6 +4354,25 @@ function createCustomFormUI(requestUserId, config) {
     
     const result = createUnifiedForm('custom', activeUserEmail, requestUserId, overrides);
     
+    // 新規追加: カスタムフォーム作成後のシートアクティベーション
+    if (result.sheetName) {
+      try {
+        console.log('🎯 カスタムフォーム作成後のシートアクティベーション開始:', result.sheetName);
+        const activeSheetResult = setActiveSheet(requestUserId, result.sheetName);
+        console.log('✅ カスタムフォーム作成後のシートアクティベーション完了:', activeSheetResult);
+      } catch (sheetError) {
+        console.warn('⚠️ シートアクティベーション失敗（処理継続）:', sheetError.message);
+        // シートアクティベーション失敗時のログ詳細化
+        console.error('シートアクティベーション失敗詳細:', {
+          requestUserId: requestUserId,
+          sheetName: result.sheetName,
+          error: sheetError.message
+        });
+      }
+    } else {
+      console.warn('⚠️ createUnifiedForm結果にsheetNameが含まれていません:', result);
+    }
+    
     // ユーザー専用フォルダを作成・取得してファイルを移動
     let folder = null;
     let moveResults = { form: false, spreadsheet: false };
@@ -4315,8 +4451,22 @@ function createCustomFormUI(requestUserId, config) {
       updatedConfigJson.lastFormCreatedAt = new Date().toISOString();
       updatedConfigJson.setupStatus = 'completed';
       updatedConfigJson.appPublished = true;
-      updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
-      updatedConfigJson.publishedSheetName = result.sheetName;
+      // publishedSheetName と publishedSpreadsheetId の安全な設定
+      if (result.spreadsheetId && typeof result.spreadsheetId === 'string') {
+        updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
+        console.log('✅ publishedSpreadsheetId設定完了:', result.spreadsheetId);
+      } else {
+        console.error('❌ 無効なspreadsheetId:', result.spreadsheetId);
+        throw new Error('フォーム作成は成功しましたが、スプレッドシートIDが無効です');
+      }
+      
+      if (result.sheetName && typeof result.sheetName === 'string' && result.sheetName.trim() !== '' && result.sheetName !== 'true') {
+        updatedConfigJson.publishedSheetName = result.sheetName;
+        console.log('✅ publishedSheetName設定完了:', result.sheetName);
+      } else {
+        console.error('❌ 無効なsheetName:', result.sheetName);
+        throw new Error('フォーム作成は成功しましたが、シート名が無効です: ' + result.sheetName);
+      }
       updatedConfigJson.folderId = folder ? folder.getId() : '';
       updatedConfigJson.folderUrl = folder ? folder.getUrl() : '';
       
@@ -4397,6 +4547,19 @@ function createQuickStartFormUI(requestUserId) {
     // createQuickStartForm の処理を統合（直接 createUnifiedForm を呼び出し）
     const result = createUnifiedForm('quickstart', activeUserEmail, requestUserId);
     
+    // QuickStart作成後のシートアクティベーション
+    if (result.sheetName) {
+      try {
+        console.log('🎯 QuickStart作成後のシートアクティベーション開始:', result.sheetName);
+        const activeSheetResult = setActiveSheet(requestUserId, result.sheetName);
+        console.log('✅ QuickStart作成後のシートアクティベーション完了:', activeSheetResult);
+      } catch (sheetError) {
+        console.warn('⚠️ QuickStartシートアクティベーション失敗（処理継続）:', sheetError.message);
+      }
+    } else {
+      console.warn('⚠️ QuickStart createUnifiedForm結果にsheetNameが含まれていません:', result);
+    }
+    
     // 既存ユーザーの情報を更新
     const existingUser = findUserById(requestUserId);
     if (existingUser) {
@@ -4406,6 +4569,21 @@ function createQuickStartFormUI(requestUserId) {
       updatedConfigJson.formCreated = true;
       updatedConfigJson.setupStatus = 'completed';
       updatedConfigJson.appPublished = true;
+      
+      // QuickStart用のpublishedSheetNameとpublishedSpreadsheetIdの安全な設定
+      if (result.spreadsheetId && typeof result.spreadsheetId === 'string') {
+        updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
+        console.log('✅ QuickStart publishedSpreadsheetId設定完了:', result.spreadsheetId);
+      } else {
+        console.error('❌ QuickStart 無効なspreadsheetId:', result.spreadsheetId);
+      }
+      
+      if (result.sheetName && typeof result.sheetName === 'string' && result.sheetName.trim() !== '' && result.sheetName !== 'true') {
+        updatedConfigJson.publishedSheetName = result.sheetName;
+        console.log('✅ QuickStart publishedSheetName設定完了:', result.sheetName);
+      } else {
+        console.error('❌ QuickStart 無効なsheetName:', result.sheetName);
+      }
       
       const updateData = {
         spreadsheetId: result.spreadsheetId,
