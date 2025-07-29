@@ -506,12 +506,12 @@
         }
     </style>
     <script>
-        // 強制ログアウトしてログインページにリダイレクトする関数（簡素化版）
+        // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
         function forceLogoutAndRedirect() {
             console.log('🔄 サーバーサイド強制ログアウト開始...');
             console.log('📍 現在のURL:', window.location.href);
             
-            // リダイレクトループ防止：既にログインページにいる場合は単純にリロード
+            // リダイレクトループ防止：既にログイン画面にいる場合は単純にリロード
             if (window.location.href.includes('mode=login')) {
                 console.log('⚠️ 既にログインモードです。ページをリロードします。');
                 window.location.reload();
@@ -563,7 +563,7 @@
         // シンプルなフォールバック関数
         function fallbackReload() {
             console.log('🔄 フォールバック：ページリロード実行');
-            const confirmMessage = 'ログインページへの移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
+            const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
             if (confirm(confirmMessage)) {
                 window.location.reload();
             }
@@ -613,7 +613,7 @@
                 🔄 再読み込み
             </button>
             <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
-                🏠 ログインページ
+                🏠 ログイン画面
             </button>
             <button type="button" class="btn btn-secondary" onclick="testServerFunction()" style="font-size: 12px;">
                 🧪 テスト
