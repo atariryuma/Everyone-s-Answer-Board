@@ -46,11 +46,9 @@ function getPublicationState(status) {
     }
   }
   
-  // 4. Fallback: if there's an active sheet, likely published
-  if (!isPublished && status.activeSheetName) {
-    isPublished = true;
-    reason = 'activeSheetName exists (fallback)';
-  }
+  // 4. Strict fallback: only if explicit publication indicators exist
+  // Note: Removed loose fallback logic that assumed activeSheetName = published
+  // This prevents false positives where unpublished boards show as published
   
   return { isPublished, reason };
 }
@@ -191,7 +189,23 @@ function updateUnpublishButton(status) {
   const unpublishBtn = document.getElementById('unpublish-board-btn');
   if (!unpublishBtn) return;
 
-  if (status._normalized?.isPublished) {
+  // Use same strict logic as footer: both normalized and explicit checks
+  const isPublished = status._normalized?.isPublished || false;
+  let explicitAppPublished = status.appPublished === true;
+  
+  if (!explicitAppPublished && status.userInfo?.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      explicitAppPublished = config.appPublished === true;
+    } catch (configError) {
+      console.warn('❌ Failed to parse configJson for unpublish button check:', configError);
+      explicitAppPublished = false;
+    }
+  }
+  
+  const finalIsPublished = isPublished && explicitAppPublished;
+
+  if (finalIsPublished) {
     unpublishBtn.classList.remove('hidden');
   } else {
     unpublishBtn.classList.add('hidden');
@@ -723,20 +737,38 @@ function updateFooterAndGuidance(status) {
     return;
   }
 
-  // Use normalized publication state from status object
+  // Use normalized publication state from status object with additional validation
   const isPublished = status._normalized?.isPublished || false;
   const viewUrl = status._normalized?.viewUrl;
   
-  console.log('🔍 Simplified publication check:', {
+  // Additional strict check: ensure appPublished is explicitly true
+  let explicitAppPublished = status.appPublished === true;
+  
+  if (!explicitAppPublished && status.userInfo?.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      explicitAppPublished = config.appPublished === true;
+    } catch (configError) {
+      console.warn('❌ Failed to parse configJson for publication check:', configError);
+      explicitAppPublished = false;
+    }
+  }
+  
+  // Final publication decision: both normalized and explicit checks must agree
+  const finalIsPublished = isPublished && explicitAppPublished;
+  
+  console.log('🔍 Enhanced publication check:', {
     'normalized isPublished': isPublished,
+    'explicit appPublished': explicitAppPublished,
+    'final decision': finalIsPublished,
     'publish reason': status._normalized?.publishReason,
     'normalized viewUrl': viewUrl,
     'has valid viewUrl': status._normalized?.hasValidViewUrl,
-    'will show footer': isPublished
+    'will show footer': finalIsPublished
   });
 
-  // Show footer if published (regardless of viewUrl availability for now)
-  if (isPublished) {
+  // Show footer if published (with strict validation)
+  if (finalIsPublished) {
     footer.classList.remove('hidden');
     
     // Update board URL using our generated viewUrl (if available)
