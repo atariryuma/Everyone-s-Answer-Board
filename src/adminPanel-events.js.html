@@ -6,8 +6,8 @@
 // DOM Elements Cache
 var elements = {};
 
-// 履歴管理用定数
-const HISTORY_STORAGE_KEY = 'answerBoardHistory';
+// 履歴管理用定数 - adminPanel-ui.js.htmlで定義済みのため、ここでは参照のみ
+// const HISTORY_STORAGE_KEY = 'answerBoardHistory'; // 重複宣言を回避
 
 // =============================================================================
 // MAIN EVENT LISTENERS SETUP
@@ -581,51 +581,7 @@ function switchToAnotherAccount() {
   );
 }
 
-// Update UI for selected sheet
-function updateUIForSelectedSheet() {
-  var hasSelection = selectedSheet && selectedSheet.trim() !== '';
-  
-  // Update step indicators based on current status (統一されたロジックを使用)
-  const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
-  updateStepIndicators(currentStep);
-  
-  // Enable/disable configuration section
-  var configSection = document.getElementById('config-section');
-  if (configSection) {
-    if (hasSelection) {
-      configSection.classList.remove('opacity-50', 'pointer-events-none');
-      
-      // 防御的ロジック: config-areaが確実に表示されるようにする
-      var configArea = document.getElementById('config-area');
-      if (configArea) {
-        configArea.classList.remove('hidden');
-        console.log('🛡️ updateUIForSelectedSheet: Config area shown defensively');
-      }
-    } else {
-      configSection.classList.add('opacity-50', 'pointer-events-none');
-    }
-  }
-  
-  // Update guidance text
-  var guidanceText = document.getElementById('guidance-text');
-  if (guidanceText) {
-    if (hasSelection) {
-      guidanceText.textContent = 'ステップ3: 列を設定してボードを公開しましょう';
-    } else {
-      guidanceText.textContent = 'ステップ2: 表示したいシートを選択してください。';
-    }
-  }
-
-  // Toggle placeholder visibility
-  var configPlaceholder = document.getElementById('config-placeholder');
-  if (configPlaceholder) {
-    if (hasSelection) {
-      configPlaceholder.classList.add('hidden');
-    } else {
-      configPlaceholder.classList.remove('hidden');
-    }
-  }
-}
+// updateUIForSelectedSheet function moved to adminPanel-ui.js.html to resolve loading order issues
 
 // =============================================================================
 // KEYBOARD SHORTCUTS
