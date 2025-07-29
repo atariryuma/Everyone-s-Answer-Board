@@ -251,6 +251,34 @@
     <!-- 左右パネル -->
       <div class="left-panel col-span-2 space-y-2">
         
+        <!-- 自動停止通知バナー -->
+        <div id="auto-stop-notification" class="hidden glass-panel p-4 border-l-4 border-yellow-500 bg-yellow-900/20">
+          <div class="flex items-start gap-3">
+            <svg class="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+            <div class="flex-1">
+              <h3 class="text-yellow-300 font-semibold mb-1">自動停止されました</h3>
+              <p class="text-gray-300 text-sm mb-2">
+                回答ボードは予定時刻に自動的に非公開になりました。
+              </p>
+              <div class="text-xs text-gray-400 mb-3" id="auto-stop-details">
+                停止時刻: <span id="auto-stopped-time"></span>
+              </div>
+              <button type="button" id="republish-after-auto-stop-btn" 
+                      class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                再公開する
+              </button>
+            </div>
+            <button type="button" onclick="document.getElementById('auto-stop-notification').classList.add('hidden')" 
+                    class="text-gray-400 hover:text-white transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        
         <!-- ステップ1: データソース設定 -->
         <div class="glass-panel p-4 lg:p-6" id="data-setup-section">
           <div class="flex items-center justify-between mb-4">

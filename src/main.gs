@@ -107,6 +107,208 @@ const SCORING_CONFIG = {
   RANDOM_SCORE_FACTOR: 0.01
 };
 
+/**
+ * 自動停止チェック関数
+ * 公開期限をチェックし、期限切れの場合は自動的に非公開に変更
+ * @param {Object} config - ユーザーのconfig情報
+ * @param {Object} userInfo - ユーザー情報
+ * @return {boolean} 自動停止実行の有無
+ */
+function checkAndHandleAutoStop(config, userInfo) {
+  // appPublishedがfalseなら既に非公開
+  if (!config.appPublished) {
+    return false;
+  }
+  
+  // 自動停止が無効、または必要な情報がない場合はスキップ
+  if (!config.autoStopEnabled || !config.scheduledEndAt) {
+    console.log('🔍 自動停止チェック: 無効またはデータ不足', {
+      autoStopEnabled: config.autoStopEnabled,
+      hasScheduledEndAt: !!config.scheduledEndAt
+    });
+    return false;
+  }
+  
+  const scheduledEndTime = new Date(config.scheduledEndAt);
+  const now = new Date();
+  
+  console.log('🔍 自動停止チェック:', {
+    scheduledEndAt: config.scheduledEndAt,
+    now: now.toISOString(),
+    isOverdue: now >= scheduledEndTime
+  });
+  
+  // 期限切れチェック
+  if (now >= scheduledEndTime) {
+    console.log('⚠️ 期限切れ検出 - 自動停止を実行します');
+    
+    // 自動停止前に履歴を保存
+    try {
+      saveHistoryOnAutoStop(config, userInfo);
+    } catch (historyError) {
+      console.error('❌ 自動停止時履歴保存エラー:', historyError);
+      // 履歴保存エラーは処理を継続
+    }
+    
+    // 自動停止実行
+    config.appPublished = false;
+    config.autoStoppedAt = now.toISOString();
+    config.autoStopReason = 'scheduled_timeout';
+    
+    try {
+      // データベース更新
+      updateUser(userInfo.userId, {
+        configJson: JSON.stringify(config)
+      });
+      
+      console.log(`🔄 自動停止実行完了: ${userInfo.adminEmail} (期限: ${config.scheduledEndAt})`);
+      return true; // 自動停止実行済み
+    } catch (error) {
+      console.error('❌ 自動停止処理でエラー:', error);
+      return false;
+    }
+  }
+  
+  console.log('✅ まだ期限内です');
+  return false; // まだ期限内
+}
+
+/**
+ * 自動停止時の履歴保存関数
+ * @param {Object} config - ユーザーのconfig情報
+ * @param {Object} userInfo - ユーザー情報
+ */
+function saveHistoryOnAutoStop(config, userInfo) {
+  console.log('💾 自動停止時履歴保存開始');
+  
+  // 履歴アイテムを作成
+  const historyItem = {
+    id: 'auto_' + Date.now(),
+    questionText: getQuestionTextFromConfig(config, userInfo),
+    sheetName: config.publishedSheetName || '',
+    publishedAt: config.publishedAt || config.lastPublishedAt || new Date().toISOString(),
+    endTime: new Date().toISOString(), // 実際の終了日時
+    scheduledEndTime: config.scheduledEndAt || null, // 予定終了日時
+    answerCount: getAnswerCountFromSheet(config, userInfo),
+    reactionCount: 0, // 自動停止時はリアクション数取得を省略
+    config: config,
+    formUrl: userInfo.formUrl || config.formUrl || '',
+    spreadsheetUrl: userInfo.spreadsheetUrl || '',
+    setupType: determineSetupTypeFromConfig(config, userInfo),
+    isActive: false,
+    endReason: 'auto_timeout'
+  };
+  
+  // サーバーサイドでの履歴保存（スプレッドシート）
+  try {
+    saveHistoryToSheet(historyItem, userInfo);
+    console.log('✅ 自動停止履歴保存完了:', historyItem.questionText);
+  } catch (error) {
+    console.error('❌ サーバーサイド履歴保存エラー:', error);
+  }
+}
+
+/**
+ * configからメイン質問文を取得
+ * @param {Object} config - config情報
+ * @param {Object} userInfo - ユーザー情報
+ * @return {string} 質問文
+ */
+function getQuestionTextFromConfig(config, userInfo) {
+  // 1. sheet固有設定から取得
+  if (config.publishedSheetName) {
+    const sheetConfigKey = `sheet_${config.publishedSheetName}`;
+    const sheetConfig = config[sheetConfigKey];
+    if (sheetConfig && sheetConfig.opinionHeader) {
+      return sheetConfig.opinionHeader;
+    }
+  }
+  
+  // 2. グローバル設定から取得
+  if (config.opinionHeader) {
+    return config.opinionHeader;
+  }
+  
+  // 3. カスタムフォーム情報から取得
+  if (userInfo.customFormInfo) {
+    try {
+      const customInfo = typeof userInfo.customFormInfo === 'string' 
+        ? JSON.parse(userInfo.customFormInfo) 
+        : userInfo.customFormInfo;
+      if (customInfo.mainQuestion) {
+        return customInfo.mainQuestion;
+      }
+    } catch (e) {
+      console.warn('customFormInfo パースエラー:', e);
+    }
+  }
+  
+  return '（問題文未設定）';
+}
+
+/**
+ * シートから回答数を取得
+ * @param {Object} config - config情報
+ * @param {Object} userInfo - ユーザー情報
+ * @return {number} 回答数
+ */
+function getAnswerCountFromSheet(config, userInfo) {
+  try {
+    if (!userInfo.spreadsheetId || !config.publishedSheetName) {
+      return 0;
+    }
+    
+    const sheet = SpreadsheetApp.openById(userInfo.spreadsheetId).getSheetByName(config.publishedSheetName);
+    if (!sheet) {
+      return 0;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    return Math.max(0, lastRow - 1); // ヘッダー行を除外
+    
+  } catch (error) {
+    console.warn('回答数取得エラー:', error);
+    return 0;
+  }
+}
+
+/**
+ * セットアップタイプを判定
+ * @param {Object} config - config情報
+ * @param {Object} userInfo - ユーザー情報
+ * @return {string} セットアップタイプ
+ */
+function determineSetupTypeFromConfig(config, userInfo) {
+  if (userInfo.customFormInfo) {
+    return 'カスタムセットアップ';
+  } else if (config.isQuickStart || config.setupType === 'quickstart') {
+    return 'クイックスタート';
+  } else if (config.isExternalResource) {
+    return '外部リソース';
+  } else {
+    return 'unknown';
+  }
+}
+
+/**
+ * 履歴をスプレッドシートに保存
+ * @param {Object} historyItem - 履歴アイテム
+ * @param {Object} userInfo - ユーザー情報
+ */
+function saveHistoryToSheet(historyItem, userInfo) {
+  // 簡易実装：ログに出力（実際の保存ロジックは必要に応じて実装）
+  console.log('📋 履歴アイテム保存:', {
+    問題文: historyItem.questionText,
+    開始: historyItem.publishedAt,
+    終了: historyItem.endTime,
+    回答数: historyItem.answerCount,
+    終了理由: historyItem.endReason
+  });
+  
+  // 実際の実装では、専用の履歴管理スプレッドシートに保存するか、
+  // 既存のデータベース構造に統合する
+}
+
 const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 const DEBUG = PropertiesService.getScriptProperties()
   .getProperty('DEBUG_MODE') === 'true';
@@ -537,6 +739,13 @@ function doGet(e) {
         config = JSON.parse(userInfo.configJson || '{}');
       } catch (e) {
         console.warn('Config JSON parse error during publication check:', e.message);
+      }
+      
+      // 自動停止チェック: 期限切れの場合は自動的に非公開に変更
+      const wasAutoStopped = checkAndHandleAutoStop(config, userInfo);
+      if (wasAutoStopped) {
+        console.log('🔄 自動停止が実行されました - 非公開ページに誘導します');
+        // configのappPublishedは既にfalseに変更されているため、後続の非公開チェックで適切に処理される
       }
       
       // 非公開の場合は確実にUnpublishedページに誘導（ErrorBoundary起動前に処理）

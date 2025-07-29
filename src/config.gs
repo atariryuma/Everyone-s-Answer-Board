@@ -2815,9 +2815,21 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
     configJson.lastModified = new Date().toISOString();
     
     // 6時間自動停止機能の設定
-    configJson.publishedAt = new Date().toISOString(); // 公開開始時間
+    const publishedAt = new Date().toISOString();
+    const autoStopMinutes = 360; // 6時間 = 360分
+    const scheduledEndAt = new Date(Date.now() + (autoStopMinutes * 60 * 1000)).toISOString();
+    
+    configJson.publishedAt = publishedAt; // 公開開始時間
     configJson.autoStopEnabled = true; // 6時間自動停止フラグ
-    configJson.autoStopMinutes = 360; // 6時間 = 360分
+    configJson.autoStopMinutes = autoStopMinutes; // 6時間 = 360分
+    configJson.scheduledEndAt = scheduledEndAt; // 予定終了日時
+    configJson.lastPublishedAt = publishedAt; // 最後の公開日時
+    configJson.totalPublishCount = (configJson.totalPublishCount || 0) + 1; // 累計公開回数
+    configJson.autoStoppedAt = null; // 自動停止実行日時をリセット
+    configJson.autoStopReason = null; // 自動停止理由をリセット
+    
+    // シート固有のフォームURL同期
+    syncFormUrlForActiveSheet(configJson, sheetName);
     
     // updateUserOptimizedを使用してコンテキストに変更を蓄積
     updateUserOptimized(context, { 
@@ -2829,6 +2841,38 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
   } catch (error) {
     console.error('❌ switchToSheetInContext エラー:', error.message);
     throw new Error('シート切り替えに失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * アクティブシートのフォームURLをグローバル設定に同期
+ * @param {Object} configJson - 設定JSON
+ * @param {string} sheetName - アクティブシート名
+ */
+function syncFormUrlForActiveSheet(configJson, sheetName) {
+  if (!sheetName || !configJson) {
+    console.warn('⚠️ syncFormUrlForActiveSheet: 無効なパラメータ');
+    return;
+  }
+  
+  const sheetConfigKey = `sheet_${sheetName}`;
+  const sheetConfig = configJson[sheetConfigKey];
+  
+  if (sheetConfig && typeof sheetConfig === 'object' && sheetConfig.formUrl) {
+    const oldFormUrl = configJson.formUrl;
+    configJson.formUrl = sheetConfig.formUrl;
+    
+    console.log('🔗 フォームURL同期完了:', {
+      シート名: sheetName,
+      旧URL: oldFormUrl,
+      新URL: configJson.formUrl
+    });
+  } else {
+    console.warn('⚠️ シート固有のフォームURLが見つかりません:', {
+      シート名: sheetName,
+      設定キー: sheetConfigKey,
+      利用可能な設定: Object.keys(configJson).filter(key => key.startsWith('sheet_'))
+    });
   }
 }
 

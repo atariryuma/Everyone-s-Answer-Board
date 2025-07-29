@@ -1928,6 +1928,8 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
     reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
     nameHeader: '名前',
     classHeader: 'クラス',
+    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl, // シート固有のフォームURL保存
+    editFormUrl: formAndSsInfo.editFormUrl, // 編集用URL保存
     lastModified: new Date().toISOString()
   };
   
@@ -1946,6 +1948,11 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
     throw new Error('無効なシート名: ' + safeSheetName);
   }
   
+  // 6時間自動停止機能の設定
+  var publishedAt = new Date().toISOString();
+  var autoStopMinutes = 360; // 6時間 = 360分
+  var scheduledEndAt = new Date(Date.now() + (autoStopMinutes * 60 * 1000)).toISOString();
+  
   var updatedConfig = {
     ...configJson,
     setupStatus: 'completed',
@@ -1958,6 +1965,15 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
     folderId: folder ? folder.getId() : '',
     folderUrl: folder ? folder.getUrl() : '',
     completedAt: new Date().toISOString(),
+    // 6時間自動停止機能の設定
+    publishedAt: publishedAt, // 公開開始時間
+    autoStopEnabled: true, // 6時間自動停止フラグ
+    autoStopMinutes: autoStopMinutes, // 6時間 = 360分
+    scheduledEndAt: scheduledEndAt, // 予定終了日時
+    lastPublishedAt: publishedAt, // 最後の公開日時
+    totalPublishCount: (configJson.totalPublishCount || 0) + 1, // 累計公開回数
+    autoStoppedAt: null, // 自動停止実行日時をリセット
+    autoStopReason: null, // 自動停止理由をリセット
     [sheetConfigKey]: quickStartSheetConfig
   };
   
@@ -4253,6 +4269,8 @@ function createCustomFormUI(requestUserId, config) {
         includeOthers: config.includeOthers,
         enableClass: config.enableClass,
         classChoices: config.classChoices,
+        formUrl: result.formUrl, // シート固有のフォームURL保存
+        editFormUrl: result.editFormUrl || result.formUrl, // 編集用URL保存
         lastModified: new Date().toISOString()
       };
 

@@ -103,7 +103,10 @@ function updateUIWithNewStatus(status) {
   isUIUpdateInProgress = true;
   
   try {
-    // Standardize status object with publication state and viewUrl
+    // 1. configJson正規化処理（包括的システム最適化）
+    status = validateAndFixUIState(status);
+    
+    // 2. Standardize status object with publication state and viewUrl
     const publicationState = getPublicationState(status);
     const viewUrl = generateViewUrl(status, userId);
     
@@ -766,6 +769,10 @@ function updateFooterAndGuidance(status) {
   }
   
   console.groupEnd();
+  
+  // 自動停止通知の表示チェック
+  checkAndShowAutoStopNotification(status);
+  
   adjustLayout();
 }
 
@@ -821,15 +828,25 @@ function updateTopicText(status) {
 
 // 予定終了日時を更新する関数
 function updateScheduledEndTime(config, element) {
-  // 複数のソースから scheduledEndTime を取得を試行
-  const scheduledEndTime = config.scheduledEndTime || 
-                           config.autoStopTime || 
-                           (window.lastStatusCache?.config?.scheduledEndTime) ||
-                           (window.lastStatusCache?.config?.autoStopTime);
+  // 複数のソースから scheduledEndAt を取得を試行
+  const scheduledEndAt = config.scheduledEndAt || 
+                         config.scheduledEndTime ||  // 古いフィールド名との互換性
+                         (window.lastStatusCache?.config?.scheduledEndAt) ||
+                         (window.lastStatusCache?.config?.scheduledEndTime);
   
-  if (scheduledEndTime) {
+  // scheduledEndAtが設定されていない場合は、publishedAt + autoStopMinutesから計算
+  let finalScheduledEndTime = scheduledEndAt;
+  
+  if (!finalScheduledEndTime && config.publishedAt && config.autoStopMinutes) {
+    const publishedTime = new Date(config.publishedAt);
+    const autoStopMs = config.autoStopMinutes * 60 * 1000;
+    finalScheduledEndTime = new Date(publishedTime.getTime() + autoStopMs).toISOString();
+    console.log('🕐 終了予定時刻を計算しました:', finalScheduledEndTime);
+  }
+  
+  if (finalScheduledEndTime) {
     try {
-      const endDate = new Date(scheduledEndTime);
+      const endDate = new Date(finalScheduledEndTime);
       const formattedTime = endDate.toLocaleString('ja-JP', {
         year: '2-digit',
         month: '2-digit',
@@ -841,10 +858,18 @@ function updateScheduledEndTime(config, element) {
       // 現在時刻との比較
       const now = new Date();
       const isOverdue = endDate < now;
+      const timeRemaining = endDate.getTime() - now.getTime();
+      const oneHourMs = 60 * 60 * 1000; // 1時間のミリ秒
       
       if (isOverdue) {
         element.textContent = `${formattedTime} (期限切れ)`;
         element.className = 'text-xs font-medium text-red-400';
+      } else if (timeRemaining <= oneHourMs) {
+        // 1時間以内の場合は警告表示
+        const minutesRemaining = Math.floor(timeRemaining / (60 * 1000));
+        element.textContent = `${formattedTime} (残り${minutesRemaining}分)`;
+        element.className = 'text-xs font-medium text-red-400 animate-pulse';
+        console.log('⚠️ 期限まで1時間以内です:', minutesRemaining + '分');
       } else {
         element.textContent = formattedTime;
         element.className = 'text-xs font-medium text-orange-400';
@@ -872,6 +897,65 @@ function updateGuidanceForStep(step, guidanceElement) {
     guidanceElement.textContent = 'セットアップを開始してください';
   } else {
     guidanceElement.textContent = messages[step] || 'セットアップを開始してください';
+  }
+}
+
+// 自動停止通知の表示チェック
+function checkAndShowAutoStopNotification(status) {
+  const notificationElement = document.getElementById('auto-stop-notification');
+  const autoStoppedTimeElement = document.getElementById('auto-stopped-time');
+  
+  if (!notificationElement || !autoStoppedTimeElement) return;
+  
+  const config = status.config || {};
+  
+  // 自動停止されている場合のみ通知を表示
+  if (config.autoStoppedAt && config.autoStopReason === 'scheduled_timeout') {
+    console.log('🔔 自動停止通知を表示します:', config.autoStoppedAt);
+    
+    // 停止時刻を表示
+    try {
+      const stoppedDate = new Date(config.autoStoppedAt);
+      const formattedTime = stoppedDate.toLocaleString('ja-JP', {
+        year: '2-digit',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      autoStoppedTimeElement.textContent = formattedTime;
+    } catch (e) {
+      autoStoppedTimeElement.textContent = '時刻不明';
+    }
+    
+    // 通知を表示
+    notificationElement.classList.remove('hidden');
+    
+    // 再公開ボタンのイベントリスナーを設定
+    const republishBtn = document.getElementById('republish-after-auto-stop-btn');
+    if (republishBtn) {
+      // 既存のイベントリスナーを削除
+      republishBtn.replaceWith(republishBtn.cloneNode(true));
+      
+      // 新しいイベントリスナーを追加
+      const newRepublishBtn = document.getElementById('republish-after-auto-stop-btn');
+      newRepublishBtn.addEventListener('click', function() {
+        // Step 3に移動して再公開を促す
+        const step3Section = document.getElementById('step3-content');
+        if (step3Section) {
+          step3Section.classList.remove('hidden');
+          step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        // 通知を非表示
+        notificationElement.classList.add('hidden');
+        
+        showMessage('表示設定を確認して再公開してください', 'info');
+      });
+    }
+  } else {
+    // 自動停止されていない場合は通知を非表示
+    notificationElement.classList.add('hidden');
   }
 }
 
@@ -2224,6 +2308,199 @@ function escapeHtml(text) {
 }
 
 // 旧来の複雑な履歴管理関数群は削除 - selectHistoryItem()による自動フローのみ使用
+
+// =============================================================================
+// CONFIG JSON 正規化・修復システム
+// =============================================================================
+
+/**
+ * configJsonの整合性を確保し、矛盾した状態を修復する
+ * @param {Object} config - 修復対象のconfig
+ * @param {Object} userInfo - ユーザー情報
+ * @return {Object} 正規化されたconfig
+ */
+function normalizeConfigJson(config, userInfo) {
+  if (!config || typeof config !== 'object') {
+    console.warn('⚠️ normalizeConfigJson: 無効なconfigオブジェクト');
+    return config;
+  }
+  
+  console.log('🔧 configJson正規化開始:', {
+    setupStatus: config.setupStatus,
+    setupStep: config.setupStep,
+    appPublished: config.appPublished,
+    publishedSheetName: config.publishedSheetName
+  });
+  
+  // Step 1: publishedSheetName修復
+  config = fixPublishedSheetName(config);
+  
+  // Step 2: setupStep再計算
+  config.setupStep = determineSetupStepFixed(userInfo, config);
+  
+  // Step 3: グローバル列設定同期
+  config = syncGlobalColumnSettings(config);
+  
+  // Step 4: 必須フィールドの補完
+  config = ensureRequiredFields(config);
+  
+  console.log('✅ configJson正規化完了:', {
+    setupStatus: config.setupStatus,
+    setupStep: config.setupStep,
+    appPublished: config.appPublished,
+    publishedSheetName: config.publishedSheetName
+  });
+  
+  return config;
+}
+
+/**
+ * publishedSheetName修復関数
+ * @param {Object} config - 修復対象のconfig
+ * @return {Object} 修復されたconfig
+ */
+function fixPublishedSheetName(config) {
+  // publishedSheetNameが空文字または未定義で、sheet固有設定が存在する場合
+  if ((!config.publishedSheetName || config.publishedSheetName.trim() === '') && 
+      config.publishedSpreadsheetId) {
+    
+    // sheet_で始まるキーを検索
+    const sheetKeys = Object.keys(config).filter(key => key.startsWith('sheet_'));
+    
+    if (sheetKeys.length > 0) {
+      // 最初に見つかったシート名を使用
+      const detectedSheetName = sheetKeys[0].replace('sheet_', '');
+      config.publishedSheetName = detectedSheetName;
+      
+      console.log('🔧 publishedSheetName修復:', {
+        検出されたシート名: detectedSheetName,
+        利用可能なシート設定: sheetKeys
+      });
+    }
+  }
+  
+  return config;
+}
+
+/**
+ * 修正されたsetupStep判定関数
+ * @param {Object} userInfo - ユーザー情報
+ * @param {Object} config - config情報
+ * @return {number} setupStep
+ */
+function determineSetupStepFixed(userInfo, config) {
+  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+    console.log('🔧 setupStep判定: Step 1 - データソース未設定');
+    return 1;
+  }
+  
+  if (!config || config.setupStatus !== 'completed' || !config.formCreated) {
+    console.log('🔧 setupStep判定: Step 2 - セットアップ未完了');
+    return 2;
+  }
+  
+  // 修正: appPublished状態に関係なく、setupStatusがcompletedならStep 3
+  if (config.setupStatus === 'completed' && config.formCreated) {
+    console.log('🔧 setupStep判定: Step 3 - 公開設定（セットアップ完了）');
+    return 3;
+  }
+  
+  console.log('🔧 setupStep判定: フォールバック - Step 2');
+  return 2;
+}
+
+/**
+ * グローバル列設定を最新のシート設定と同期
+ * @param {Object} config - 同期対象のconfig
+ * @return {Object} 同期されたconfig
+ */
+function syncGlobalColumnSettings(config) {
+  if (!config.publishedSheetName) {
+    return config; // シート名が不明な場合はスキップ
+  }
+  
+  const sheetConfigKey = `sheet_${config.publishedSheetName}`;
+  const sheetConfig = config[sheetConfigKey];
+  
+  if (sheetConfig && typeof sheetConfig === 'object') {
+    // シート固有設定をグローバル設定に同期
+    config.opinionHeader = sheetConfig.opinionHeader || config.opinionHeader || '';
+    config.nameHeader = sheetConfig.nameHeader || config.nameHeader || '';
+    config.reasonHeader = sheetConfig.reasonHeader || config.reasonHeader || '';
+    config.classHeader = sheetConfig.classHeader || config.classHeader || '';
+    config.timestampHeader = sheetConfig.timestampHeader || config.timestampHeader || '';
+    
+    // フォームURL同期 - シート固有のformUrlをグローバル設定に同期
+    if (sheetConfig.formUrl) {
+      config.formUrl = sheetConfig.formUrl;
+      console.log('🔗 フォームURL同期:', {
+        シート名: config.publishedSheetName,
+        フォームURL: config.formUrl
+      });
+    }
+    
+    console.log('🔧 グローバル列設定同期完了:', {
+      シート名: config.publishedSheetName,
+      メイン質問: config.opinionHeader,
+      名前列: config.nameHeader
+    });
+  }
+  
+  return config;
+}
+
+/**
+ * 必須フィールドの補完
+ * @param {Object} config - 補完対象のconfig
+ * @return {Object} 補完されたconfig
+ */
+function ensureRequiredFields(config) {
+  const defaults = {
+    showNames: false,
+    showCounts: false,
+    highlightMode: false,
+    autoStopEnabled: true,
+    autoStopMinutes: 360
+  };
+  
+  Object.keys(defaults).forEach(key => {
+    if (config[key] === undefined) {
+      config[key] = defaults[key];
+    }
+  });
+  
+  return config;
+}
+
+/**
+ * UI状態の整合性チェックと修復
+ * @param {Object} status - ステータス情報
+ * @return {Object} 修復されたステータス
+ */
+function validateAndFixUIState(status) {
+  if (!status || !status.config) {
+    return status;
+  }
+  
+  // configJsonを正規化
+  status.config = normalizeConfigJson(status.config, status.userInfo);
+  
+  // UI要素の整合性チェック
+  const expectedStep = status.config.setupStep;
+  const currentUIStep = parseInt(document.querySelector('.step-indicator.active')?.textContent) || 1;
+  
+  if (expectedStep !== currentUIStep) {
+    console.log('🔧 UI状態修復: setupStep不整合検出', {
+      期待値: expectedStep,
+      現在のUI: currentUIStep
+    });
+    
+    // UI状態を正しいステップに更新
+    updateStepIndicators(expectedStep, status);
+  }
+  
+  return status;
+}
 
 // 簡単な履歴テーブル初期化
 document.addEventListener('DOMContentLoaded', function() {
