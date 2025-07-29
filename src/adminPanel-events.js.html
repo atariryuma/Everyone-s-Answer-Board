@@ -176,6 +176,15 @@ function setupEventListeners() {
       }
     } else {
       console.log('📝 公開を継続してカスタムフォームを作成します');
+      
+      // カスタムセットアップ時は全セクション展開フラグを設定
+      try {
+        localStorage.setItem('expandAllSections', 'true');
+        console.log('📂 カスタムセットアップ用の全セクション展開フラグを設定しました');
+      } catch (e) {
+        console.warn('⚠️ localStorage設定に失敗:', e);
+      }
+      
       // 継続の場合は直接フォーム作成モーダルを表示
       showFormConfigModalSafely();
     }

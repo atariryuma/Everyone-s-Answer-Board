@@ -558,7 +558,19 @@ function doGet(e) {
       // 非公開の場合は即座にUnpublishedページを表示
       if (!isCurrentlyPublished) {
         console.log('🚫 Board is unpublished, redirecting to Unpublished page immediately');
-        return renderUnpublishedPage(userInfo, params);
+        console.log('🔍 UserInfo for unpublished page:', {
+          userId: userInfo.userId,
+          adminEmail: userInfo.adminEmail,
+          spreadsheetId: userInfo.spreadsheetId
+        });
+        
+        try {
+          return renderUnpublishedPage(userInfo, params);
+        } catch (unpublishedError) {
+          console.error('❌ renderUnpublishedPage failed:', unpublishedError);
+          // 最後の手段: 簡易版Unpublishedページ
+          return renderMinimalUnpublishedPage(userInfo);
+        }
       }
       
       return renderAnswerBoard(userInfo, params);
@@ -1321,18 +1333,37 @@ function renderUnpublishedPage(userInfo, params) {
     const template = HtmlService.createTemplateFromFile('Unpublished');
     template.include = include;
     
-    // 基本情報の設定
-    template.userId = userInfo.userId;
-    template.spreadsheetId = userInfo.spreadsheetId;
-    template.ownerName = userInfo.adminEmail;
-    template.isOwner = true;
-    template.adminEmail = userInfo.adminEmail;
+    // 基本情報の設定（安全なデフォルト値付き）
+    template.userId = userInfo.userId || '';
+    template.spreadsheetId = userInfo.spreadsheetId || '';
+    template.ownerName = userInfo.adminEmail || 'システム管理者';
+    template.isOwner = true; // 非公開ページは所有者のみアクセス可能
+    template.adminEmail = userInfo.adminEmail || '';
     template.cacheTimestamp = Date.now();
     
-    // URL生成
-    const appUrls = generateUserUrls(userInfo.userId);
-    template.adminPanelUrl = appUrls.adminUrl;
-    template.boardUrl = appUrls.viewUrl;
+    // 安全な変数設定
+    template.include = include;
+    
+    // URL生成（エラー耐性を持たせる）
+    let appUrls;
+    try {
+      appUrls = generateUserUrls(userInfo.userId);
+      if (!appUrls || appUrls.status === 'error') {
+        throw new Error('URL生成に失敗しました');
+      }
+    } catch (urlError) {
+      console.warn('URL生成エラー、フォールバック値を使用:', urlError);
+      // フォールバック: 基本的なURL構造
+      const baseUrl = getWebAppUrlCached() || 'https://script.google.com/macros/s/AKfycbyq0CohJCpwb8KYJQrba4pWhvtss5HD2nKDPMuzPBX2EOftIAI2UbtjjyEn4N52TCzX/exec';
+      appUrls = {
+        adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`,
+        viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`,
+        status: 'fallback'
+      };
+    }
+    
+    template.adminPanelUrl = appUrls.adminUrl || '';
+    template.boardUrl = appUrls.viewUrl || '';
     
     console.log('✅ renderUnpublishedPage: Template setup completed');
     
@@ -1359,6 +1390,60 @@ function renderUnpublishedPage(userInfo, params) {
     console.error('❌ renderUnpublishedPage error:', error);
     // フォールバック: 基本的なエラーページ
     return showErrorPage('準備中', 'ボードの準備が完了していません。管理者にお問い合わせください。');
+  }
+}
+
+/**
+ * 最小限の非公開ページレンダリング（フォールバック用）
+ * テンプレートエラーを回避してHTMLを直接生成
+ * @param {Object} userInfo - ユーザー情報
+ * @returns {HtmlOutput} 最小限のHTML
+ */
+function renderMinimalUnpublishedPage(userInfo) {
+  try {
+    console.log('🚫 renderMinimalUnpublishedPage: Creating minimal unpublished page');
+    
+    const userId = userInfo.userId || '';
+    const adminEmail = userInfo.adminEmail || '';
+    
+    // 直接HTMLを生成（テンプレートを使わない）
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="ja">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>StudyQuest - 準備中</title>
+          <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 20px; background: #1a1a1a; color: white; text-align: center; }
+              .container { max-width: 600px; margin: 50px auto; padding: 40px 20px; background: #2a2a2a; border-radius: 12px; }
+              .status { font-size: 24px; margin-bottom: 20px; color: #fbbf24; }
+              .message { font-size: 16px; margin-bottom: 30px; color: #9ca3af; }
+              .admin-btn { display: inline-block; padding: 12px 24px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; margin: 10px; }
+              .admin-btn:hover { background: #2563eb; }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <div class="status">⏳ 回答ボード準備中</div>
+              <div class="message">現在、回答ボードは非公開になっています</div>
+              <a href="?mode=admin&userId=${encodeURIComponent(userId)}" class="admin-btn">管理パネルを開く</a>
+              <div style="margin-top: 20px; font-size: 12px; color: #6b7280;">管理者: ${adminEmail}</div>
+          </div>
+      </body>
+      </html>
+    `;
+    
+    return HtmlService.createHtmlOutput(htmlContent)
+      .setTitle('StudyQuest - 準備中')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
+      
+  } catch (error) {
+    console.error('❌ renderMinimalUnpublishedPage error:', error);
+    // 最終フォールバック
+    return HtmlService.createHtmlOutput('<h1>準備中</h1><p>回答ボードは現在準備中です。</p>')
+      .setTitle('準備中');
   }
 }
 
