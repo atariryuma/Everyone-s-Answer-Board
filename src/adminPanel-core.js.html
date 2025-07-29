@@ -286,6 +286,19 @@ function initializeAdminPanelMaster() {
   // 公開停止後の全セクション展開処理
   checkAndExpandAllSections();
   
+  // フォーム作成完了表示をクリア（新規アクセス時はデフォルトで非表示）
+  setTimeout(() => {
+    const formJustCreated = sessionStorage.getItem('form_just_created');
+    if (formJustCreated !== 'true') {
+      // 新規作成ではない場合、セクションを非表示にする
+      const formUrlSection = document.getElementById('form-url-section');
+      if (formUrlSection && !formUrlSection.classList.contains('hidden')) {
+        formUrlSection.classList.add('hidden');
+        logDebug('📋 既存アクセス時はフォーム完了セクションを非表示');
+      }
+    }
+  }, 100);
+  
   // Phase 2: 各モジュールを順次初期化 (race conditionを防ぐ)
   // 遅延を最小限に抑制して即座に初期化
   setTimeout(() => {

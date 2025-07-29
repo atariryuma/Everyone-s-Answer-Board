@@ -843,6 +843,9 @@ function createFormWithConfig() {
         // 公開時は履歴保存を行わない（公開停止時に保存するため）
         logDebug('Custom setup completed - history will be saved on unpublish');
         
+        // フォーム作成完了フラグを設定
+        sessionStorage.setItem('form_just_created', 'true');
+        
         // フォームURL表示の強制更新（管理パネルのリソース欄用）
         setTimeout(() => {
           updateFormUrlDisplay();
@@ -1802,6 +1805,9 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         
         // 公開時は履歴保存を行わない（公開停止時に保存するため）
         logDebug('QuickStart completed - history will be saved on unpublish');
+        
+        // フォーム作成完了フラグを設定
+        sessionStorage.setItem('form_just_created', 'true');
         
         // フォームURL表示の強制更新（管理パネルのリソース欄用）
         setTimeout(() => {

@@ -4999,3 +4999,27 @@ function setApplicationStatusForUI(enabled) {
   }
 }
 
+/**
+ * エラーバウンダリからのテスト用関数
+ * ErrorBoundaryで呼び出される関数の実装
+ * @returns {Object} テスト結果
+ */
+function testForceLogoutRedirect() {
+  try {
+    console.log('🧪 testForceLogoutRedirect called');
+    return {
+      status: 'success',
+      message: 'テスト関数が正常に動作しています',
+      timestamp: new Date().toISOString(),
+      function: 'testForceLogoutRedirect'
+    };
+  } catch (error) {
+    console.error('testForceLogoutRedirect エラー:', error);
+    return {
+      status: 'error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+

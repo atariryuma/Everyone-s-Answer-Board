@@ -506,7 +506,7 @@
         }
     </style>
     <script>
-        // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
+        // 強制ログアウトしてログインページにリダイレクトする関数（簡素化版）
         function forceLogoutAndRedirect() {
             console.log('🔄 サーバーサイド強制ログアウト開始...');
             console.log('📍 現在のURL:', window.location.href);
@@ -563,7 +563,7 @@
         // シンプルなフォールバック関数
         function fallbackReload() {
             console.log('🔄 フォールバック：ページリロード実行');
-            const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
+            const confirmMessage = 'ログインページへの移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
             if (confirm(confirmMessage)) {
                 window.location.reload();
             }
@@ -573,18 +573,32 @@
         function testServerFunction() {
             console.log('🧪 Testing server function...');
             
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    console.log('🧪 Test Success:', result);
-                    console.log('🧪 Test Result Type:', typeof result);
-                    console.log('🧪 Test Result Length:', result ? result.length : 'N/A');
-                    alert('テスト成功: ' + (result ? '内容あり (' + result.length + ' chars)' : '空の結果'));
-                })
-                .withFailureHandler(function(error) {
-                    console.error('🧪 Test Error:', error);
-                    alert('テスト失敗: ' + error.message);
-                })
-                .testForceLogoutRedirect();
+            // 関数存在チェック
+            if (typeof google !== 'undefined' && 
+                google.script && 
+                google.script.run) {
+                
+                try {
+                    google.script.run
+                        .withSuccessHandler(function(result) {
+                            console.log('🧪 Test Success:', result);
+                            console.log('🧪 Test Result Type:', typeof result);
+                            console.log('🧪 Test Result Length:', result ? result.length : 'N/A');
+                            alert('テスト成功: ' + (result ? '内容あり (' + result.length + ' chars)' : '空の結果'));
+                        })
+                        .withFailureHandler(function(error) {
+                            console.error('🧪 Test Error:', error);
+                            alert('テスト失敗: ' + error.message);
+                        })
+                        .testForceLogoutRedirect();
+                } catch (funcError) {
+                    console.warn('⚠️ testForceLogoutRedirect関数の呼び出しでエラー:', funcError);
+                    alert('テスト機能でエラーが発生しました: ' + funcError.message);
+                }
+            } else {
+                console.warn('⚠️ Google Apps Scriptランタイムが利用できません');
+                alert('テスト機能は現在利用できません。管理者にお問い合わせください。');
+            }
         }
     </script>
 </head>
@@ -599,7 +613,7 @@
                 🔄 再読み込み
             </button>
             <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
-                🏠 ログイン画面に戻る
+                🏠 ログインページ
             </button>
             <button type="button" class="btn btn-secondary" onclick="testServerFunction()" style="font-size: 12px;">
                 🧪 テスト

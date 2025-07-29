@@ -539,7 +539,7 @@ function doGet(e) {
         console.warn('Config JSON parse error during publication check:', e.message);
       }
       
-      // 非公開の場合は確実にUnpublishedページに誘導
+      // 非公開の場合は確実にUnpublishedページに誘導（ErrorBoundary起動前に処理）
       const isCurrentlyPublished = !!(
         config.appPublished === true && 
         config.publishedSpreadsheetId && 
@@ -554,6 +554,12 @@ function doGet(e) {
         hasSheetName: !!config.publishedSheetName,
         isCurrentlyPublished: isCurrentlyPublished
       });
+      
+      // 非公開の場合は即座にUnpublishedページを表示
+      if (!isCurrentlyPublished) {
+        console.log('🚫 Board is unpublished, redirecting to Unpublished page immediately');
+        return renderUnpublishedPage(userInfo, params);
+      }
       
       return renderAnswerBoard(userInfo, params);
     }
@@ -1301,6 +1307,50 @@ function renderAdminPanel(userInfo, mode) {
  * @param {Object} params リクエストパラメータ
  * @return {HtmlOutput} HTMLコンテンツ
  */
+/**
+ * 非公開ボード専用のレンダリング関数
+ * ErrorBoundaryを回避して確実にUnpublished.htmlを表示
+ * @param {Object} userInfo - ユーザー情報
+ * @param {Object} params - URLパラメータ
+ * @returns {HtmlOutput} Unpublished.htmlテンプレート
+ */
+function renderUnpublishedPage(userInfo, params) {
+  try {
+    console.log('🚫 renderUnpublishedPage: Rendering unpublished page for userId:', userInfo.userId);
+    
+    const template = HtmlService.createTemplateFromFile('Unpublished');
+    template.include = include;
+    
+    // 基本情報の設定
+    template.userId = userInfo.userId;
+    template.spreadsheetId = userInfo.spreadsheetId;
+    template.ownerName = userInfo.adminEmail;
+    template.isOwner = true;
+    template.adminEmail = userInfo.adminEmail;
+    template.cacheTimestamp = Date.now();
+    
+    // URL生成
+    const appUrls = generateUserUrls(userInfo.userId);
+    template.adminPanelUrl = appUrls.adminUrl;
+    template.boardUrl = appUrls.viewUrl;
+    
+    console.log('✅ renderUnpublishedPage: Template setup completed');
+    
+    // キャッシュを無効化して確実なリダイレクトを保証
+    return template.evaluate()
+      .setTitle('StudyQuest - 準備中')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
+      .addMetaTag('pragma', 'no-cache')
+      .addMetaTag('expires', '0');
+      
+  } catch (error) {
+    console.error('❌ renderUnpublishedPage error:', error);
+    // フォールバック: 基本的なエラーページ
+    return showErrorPage('準備中', 'ボードの準備が完了していません。管理者にお問い合わせください。');
+  }
+}
+
 function renderAnswerBoard(userInfo, params) {
   let config = {};
   try {
@@ -1332,24 +1382,13 @@ function renderAnswerBoard(userInfo, params) {
   const sheetConfigKey = 'sheet_' + (safePublishedSheetName || params.sheetName);
   const sheetConfig = config[sheetConfigKey] || {};
   
-  // 修正: ダイレクトアクセスよりもパブリケーション状態を優先
-  // 非公開の場合は、ダイレクトアクセスでもUnpublishedページに誘導
-  const showBoard = isCurrentlyPublished && (params.isDirectPageAccess || true);
+  // この関数は公開ボード専用（非公開判定は呼び出し前に完了）
+  console.log('✅ renderAnswerBoard: Rendering published board for userId:', userInfo.userId);
   
-  console.log('🔍 renderAnswerBoard decision:', {
-    isCurrentlyPublished: isCurrentlyPublished,
-    isDirectPageAccess: params.isDirectPageAccess,
-    showBoard: showBoard,
-    appPublished: config.appPublished,
-    hasSpreadsheetId: !!config.publishedSpreadsheetId,
-    hasSheetName: !!safePublishedSheetName
-  });
-  const file = showBoard ? 'Page' : 'Unpublished';
-  const template = HtmlService.createTemplateFromFile(file);
+  const template = HtmlService.createTemplateFromFile('Page');
   template.include = include;
-
-  if (showBoard) {
-    try {
+  
+  try {
       if (userInfo.spreadsheetId) {
         try { addServiceAccountToSpreadsheet(userInfo.spreadsheetId); } catch (err) { console.warn('アクセス権設定警告:', err.message); }
       }
@@ -1391,44 +1430,16 @@ function renderAnswerBoard(userInfo, params) {
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
     }
+    
     // 公開ボード: 通常のキャッシュ設定
     return template.evaluate()
       .setTitle('StudyQuest -みんなの回答ボード-')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  } else {
-    try {
-      template.userId = userInfo.userId;
-      template.spreadsheetId = userInfo.spreadsheetId;
-      template.ownerName = userInfo.adminEmail;
-      template.isOwner = true;
-      template.adminEmail = userInfo.adminEmail;
-      template.cacheTimestamp = Date.now();
-      var appUrls = generateUserUrls(userId);
-      template.adminPanelUrl = appUrls.adminUrl;
-      template.boardUrl = appUrls.viewUrl;
-    } catch (e) {
-      console.error('Unpublished template setup error:', e);
-      template.ownerName = 'システム管理者';
-      template.isOwner = true;
-      template.adminEmail = userInfo.adminEmail || 'admin@example.com';
-      template.cacheTimestamp = Date.now();
-    }
-    // 非公開ボード: キャッシュを無効化して確実なリダイレクトを保証
-    const htmlOutput = template.evaluate()
-      .setTitle('StudyQuest - 準備中')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0');
-    
-    // HTTPヘッダーレベルでのキャッシュ制御（可能な範囲で）
-    try {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    } catch (e) {
-      console.warn('X-Frame-Options設定に失敗:', e.message);
-    }
-    
-    return htmlOutput;
+      
+  } catch (error) {
+    console.error('❌ renderAnswerBoard error:', error);
+    // フォールバック: 基本的なエラーページ
+    return showErrorPage('エラー', 'ボードの表示でエラーが発生しました。管理者にお問い合わせください。');
   }
 }
 
