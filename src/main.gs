@@ -1352,12 +1352,13 @@ function renderUnpublishedPage(userInfo, params) {
 }
 
 function renderAnswerBoard(userInfo, params) {
-  let config = {};
   try {
-    config = JSON.parse(userInfo.configJson || '{}');
-  } catch (e) {
-    console.warn('Invalid configJson:', e.message);
-  }
+    let config = {};
+    try {
+      config = JSON.parse(userInfo.configJson || '{}');
+    } catch (e) {
+      console.warn('Invalid configJson:', e.message);
+    }
   // publishedSheetNameの型安全性確保（'true'問題の修正）
   let safePublishedSheetName = '';
   if (config.publishedSheetName) {
@@ -1431,11 +1432,11 @@ function renderAnswerBoard(userInfo, params) {
       template.isAdminUser = isOwner;
     }
     
-    // 公開ボード: 通常のキャッシュ設定
-    return template.evaluate()
-      .setTitle('StudyQuest -みんなの回答ボード-')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-      
+  // 公開ボード: 通常のキャッシュ設定
+  return template.evaluate()
+    .setTitle('StudyQuest -みんなの回答ボード-')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+
   } catch (error) {
     console.error('❌ renderAnswerBoard error:', error);
     // フォールバック: 基本的なエラーページ
