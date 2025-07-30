@@ -3379,35 +3379,34 @@ class StudyQuestApp {
       // エラーハンドリング強化版のデータ取得
       await this.performDataFetchWithRetry(fetchParams, isInitialLoad)
         .then(async result => {
-          try {
-            // 初期ロードタイムアウトをクリア
-            if (isInitialLoad && this.initTimeoutId) {
-              clearTimeout(this.initTimeoutId);
-              this.initTimeoutId = null;
-            }
-            
-            if (!result || !result.data || result.data.length === 0) {
-              // 詳細なエラーログ出力
-              if (result && result.status === 'error') {
-                console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
+          // 初期ロードタイムアウトをクリア
+          if (isInitialLoad && this.initTimeoutId) {
+            clearTimeout(this.initTimeoutId);
+            this.initTimeoutId = null;
+          }
+          
+          if (!result || !result.data || result.data.length === 0) {
+            // 詳細なエラーログ出力
+            if (result && result.status === 'error') {
+              console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
+              
+              // ユーザー情報エラーの特別な処理
+              if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
+                console.error('❌ StudyQuestApp: User not found. Current userId:', this.state.userId);
+                console.error('❌ StudyQuestApp: URL parameters:', window.location.href);
+                console.error('❌ StudyQuestApp: This may indicate:');
+                console.error('  1. Invalid userId parameter in URL');
+                console.error('  2. User not registered in the system');
+                console.error('  3. Database connectivity issues');
+                console.error('  4. Session expired or corrupted');
+                console.error('❌ StudyQuestApp: Possible solutions:');
+                console.error('  - Check if the URL parameters are correct');
+                console.error('  - Try refreshing the page');
+                console.error('  - Contact administrator if the issue persists');
                 
-                // ユーザー情報エラーの特別な処理
-                if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
-                  console.error('❌ StudyQuestApp: User not found. Current userId:', this.state.userId);
-                  console.error('❌ StudyQuestApp: URL parameters:', window.location.href);
-                  console.error('❌ StudyQuestApp: This may indicate:');
-                  console.error('  1. Invalid userId parameter in URL');
-                  console.error('  2. User not registered in the system');
-                  console.error('  3. Database connectivity issues');
-                  console.error('  4. Session expired or corrupted');
-                  console.error('❌ StudyQuestApp: Possible solutions:');
-                  console.error('  - Check if the URL parameters are correct');
-                  console.error('  - Try refreshing the page');
-                  console.error('  - Contact administrator if the issue persists');
-                  
-                  // UIにエラーメッセージを表示
-                  this.displayUserNotFoundError(result.message);
-                  return;
+                // UIにエラーメッセージを表示
+                this.displayUserNotFoundError(result.message);
+                return;
                 }
               } else {
                 // データ状態チェック: 空データが正常な状態かエラーかを判定
@@ -3612,41 +3611,29 @@ class StudyQuestApp {
               await this.validatePostLoadState();
               console.log('✅ Step 4: Consistency validation completed');
             });
-            
-          } finally {
-            // 成功時にローディング状態を解除
-            this.state.isLoading = false;
-            this.hideLoadingOverlay();
-          }
         })
         .catch(error => {
-          try {
-            // 初期ロードタイムアウトをクリア
-            if (isInitialLoad && this.initTimeoutId) {
-              clearTimeout(this.initTimeoutId);
-              this.initTimeoutId = null;
-            }
-            
-            console.error('❌ StudyQuestApp: All retry attempts failed:', error);
-            
-            // Check if the error indicates the board has been unpublished
-            const errorStr = error.message || error.toString();
-            if (errorStr.includes('アクティブなシートが見つかりません') || 
-                errorStr.includes('公開されていません') ||
-                errorStr.includes('unpublished') ||
-                errorStr.includes('not found')) {
-              // Board has been unpublished, redirect to Unpublished.html
-              console.log('Board appears to be unpublished, redirecting...');
-              this.redirectToUnpublishedPage();
-              return;
-            }
-            
-            this.safeDisplayEmptyState();
-          } finally {
-            // エラー時にもローディング状態を解除
-            this.state.isLoading = false;
-            this.hideLoadingOverlay();
+          // 初期ロードタイムアウトをクリア
+          if (isInitialLoad && this.initTimeoutId) {
+            clearTimeout(this.initTimeoutId);
+            this.initTimeoutId = null;
           }
+          
+          console.error('❌ StudyQuestApp: All retry attempts failed:', error);
+          
+          // Check if the error indicates the board has been unpublished
+          const errorStr = error.message || error.toString();
+          if (errorStr.includes('アクティブなシートが見つかりません') || 
+              errorStr.includes('公開されていません') ||
+              errorStr.includes('unpublished') ||
+              errorStr.includes('not found')) {
+            // Board has been unpublished, redirect to Unpublished.html
+            console.log('Board appears to be unpublished, redirecting...');
+            this.redirectToUnpublishedPage();
+            return;
+          }
+          
+          this.safeDisplayEmptyState();
         })
         ;
       
