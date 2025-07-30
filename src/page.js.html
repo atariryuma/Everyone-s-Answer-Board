@@ -3353,11 +3353,11 @@ class StudyQuestApp {
       container.innerHTML = '';
       container.appendChild(frag);
     }
-    try {
-      // classFilter「すべて」または空の場合はサーバーに送信しない（全データ取得のため）
-      const classFilter = !selectedClass || selectedClass === 'すべて'
-        ? null
-        : selectedClass;
+    
+    // classFilter「すべて」または空の場合はサーバーに送信しない（全データ取得のため）
+    const classFilter = !selectedClass || selectedClass === 'すべて'
+      ? null
+      : selectedClass;
       
       // データ取得パラメータの詳細ログ
       const fetchParams = {
