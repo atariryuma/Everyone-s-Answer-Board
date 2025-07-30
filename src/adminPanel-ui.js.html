@@ -2693,7 +2693,7 @@ function validateAndFixUIState(status) {
 // 簡単な履歴テーブル初期化
 document.addEventListener('DOMContentLoaded', function() {
   // 依存関数が利用可能になるまで待機してから実行
-  function waitForDependencies() {
+  function waitForDependencies(attempts = 0) {
     if (typeof runGasWithUserId === 'function') {
       // サーバーから履歴を同期してからテーブルを読み込み
       syncHistoryFromServer()
@@ -2705,11 +2705,18 @@ document.addEventListener('DOMContentLoaded', function() {
           console.warn('⚠️ ページ読み込み時の履歴同期に失敗、ローカルデータで表示:', syncError);
           loadSimpleHistoryTable();
         });
-    } else {
-      // 関数がまだ利用できない場合は少し待つ
-      console.log('⏳ runGasWithUserId関数の読み込み待機中...');
-      setTimeout(waitForDependencies, 100);
+      return;
     }
+    
+    if (attempts < 20) { // 最大2秒待機
+      console.log('⏳ runGasWithUserId関数の読み込み待機中...');
+      setTimeout(() => waitForDependencies(attempts + 1), 100);
+      return;
+    }
+    
+    // タイムアウト後はローカルデータのみで動作
+    console.warn('⚠️ runGasWithUserId関数が利用できません。ローカルデータのみで表示します。');
+    loadSimpleHistoryTable();
   }
   
   waitForDependencies();

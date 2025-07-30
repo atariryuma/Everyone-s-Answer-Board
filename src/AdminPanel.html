@@ -30,12 +30,13 @@
   
   <script>
   // GASOptimizer and UnifiedCache are now guaranteed to be defined
-  // Enhanced Global Error Handling
+  // Enhanced Global Error Handling with Smart Recovery
   window.addEventListener('error', function(event) {
     const errorMessage = event.error?.message || '';
     const errorStack = event.error?.stack || '';
+    const errorLine = event.lineno || 'unknown';
     
-    // Suppress specific Google Apps Script internal errors
+    // Non-critical GAS internal errors (suppress with logging)
     const suppressedErrors = [
       'document.write',
       'Unexpected token',
@@ -50,9 +51,6 @@
       'speaker',
       'vibrate',
       'vr',
-      'await is only valid in async functions',
-      'Cannot set property',
-      'Cannot read property',
       'cdn.tailwindcss.com should not be used in production',
       'tailwindcss.com/docs/installation',
       'should not be used in production',
@@ -60,7 +58,20 @@
       'Tailwind CLI'
     ];
     
+    // Critical errors that need intervention
+    const criticalErrors = [
+      'await is only valid in async functions',
+      'Cannot set property',
+      'Cannot read property',
+      'is not defined',
+      'is not a function'
+    ];
+    
     const shouldSuppress = suppressedErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
+    
+    const isCritical = criticalErrors.some(pattern => 
       errorMessage.includes(pattern) || errorStack.includes(pattern)
     );
     
@@ -69,6 +80,33 @@
       console.debug('Suppressed Google Apps Script internal error:', errorMessage);
       event.preventDefault();
       return;
+    }
+    
+    if (isCritical) {
+      console.error('🚨 Critical Error Detected:', {
+        message: errorMessage,
+        line: errorLine,
+        stack: errorStack.substring(0, 500) // Truncate for readability
+      });
+      
+      // Attempt recovery for specific critical errors
+      if (errorMessage.includes('is not defined') || errorMessage.includes('is not a function')) {
+        console.log('🔧 Attempting function recovery...');
+        // Trigger fallback initialization after a short delay
+        setTimeout(() => {
+          if (typeof window.initializeAdminPanelMaster === 'function') {
+            console.log('🔄 Re-initializing admin panel...');
+            window.initializeAdminPanelMaster();
+          }
+        }, 1000);
+      }
+      
+      // Show user-friendly error message for critical issues
+      setTimeout(() => {
+        if (window.showMessage && typeof window.showMessage === 'function') {
+          window.showMessage('システムの初期化で問題が発生しました。ページを再読み込みしてください。', 'warning');
+        }
+      }, 2000);
     }
     
     // Log important errors

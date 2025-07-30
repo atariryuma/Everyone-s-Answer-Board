@@ -852,7 +852,7 @@ function createFormWithConfig() {
                             });
                           }
                           
-                          setTimeout(() => {
+                          setTimeout(async () => {
                             // カスタムセットアップ専用の確実な設定保存処理
                             if (typeof saveAndPublish === 'function') {
                               // カスタムセットアップ用の強制公開設定
