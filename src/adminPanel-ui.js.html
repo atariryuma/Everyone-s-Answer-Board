@@ -2692,16 +2692,27 @@ function validateAndFixUIState(status) {
 
 // 簡単な履歴テーブル初期化
 document.addEventListener('DOMContentLoaded', function() {
-  // サーバーから履歴を同期してからテーブルを読み込み
-  syncHistoryFromServer()
-    .then(function(syncedHistory) {
-      console.log('🔄 ページ読み込み時の履歴同期完了:', syncedHistory.length, '件');
-      loadSimpleHistoryTable();
-    })
-    .catch(function(syncError) {
-      console.warn('⚠️ ページ読み込み時の履歴同期に失敗、ローカルデータで表示:', syncError);
-      loadSimpleHistoryTable();
-    });
+  // 依存関数が利用可能になるまで待機してから実行
+  function waitForDependencies() {
+    if (typeof runGasWithUserId === 'function') {
+      // サーバーから履歴を同期してからテーブルを読み込み
+      syncHistoryFromServer()
+        .then(function(syncedHistory) {
+          console.log('🔄 ページ読み込み時の履歴同期完了:', syncedHistory.length, '件');
+          loadSimpleHistoryTable();
+        })
+        .catch(function(syncError) {
+          console.warn('⚠️ ページ読み込み時の履歴同期に失敗、ローカルデータで表示:', syncError);
+          loadSimpleHistoryTable();
+        });
+    } else {
+      // 関数がまだ利用できない場合は少し待つ
+      console.log('⏳ runGasWithUserId関数の読み込み待機中...');
+      setTimeout(waitForDependencies, 100);
+    }
+  }
+  
+  waitForDependencies();
 });
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます

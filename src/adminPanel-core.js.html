@@ -311,13 +311,24 @@ function initializeAdminPanelMaster() {
     }
     
     // API通信初期化（最重要 - getInitialDataを呼び出す）
-    if (typeof initializeAPI === 'function') {
-      logDebug('🚀 API module initialization starting...');
-      initializeAPI();
-      logDebug('✅ API module initialized');
-    } else {
-      console.error('❌ initializeAPI function not found!');
+    function initializeAPIWithRetry(attempts = 0) {
+      if (typeof initializeAPI === 'function' && typeof runGasWithUserId === 'function') {
+        logDebug('🚀 API module initialization starting...');
+        initializeAPI();
+        logDebug('✅ API module initialized');
+      } else if (attempts < 10) {
+        logDebug(`⏳ API関数読み込み待機中... (試行 ${attempts + 1}/10)`);
+        setTimeout(() => initializeAPIWithRetry(attempts + 1), 100);
+      } else {
+        console.error('❌ API functions not found after maximum attempts!');
+        console.error('Missing functions:', {
+          initializeAPI: typeof initializeAPI,
+          runGasWithUserId: typeof runGasWithUserId
+        });
+      }
     }
+    
+    initializeAPIWithRetry();
     
     // UI初期化
     if (typeof initializeUI === 'function') {
@@ -333,12 +344,29 @@ function initializeAdminPanelMaster() {
     
     // イベント管理初期化（最後に実行）
     setTimeout(() => {
-      if (typeof initializeEventListeners === 'function') {
-        initializeEventListeners();
-        logDebug('✅ Events module initialized');
+      function initializeEventsWithRetry(attempts = 0) {
+        if (typeof initializeEventListeners === 'function' && 
+            typeof handleQuickStart === 'function' && 
+            typeof runHeaderGuessing === 'function') {
+          initializeEventListeners();
+          logDebug('✅ Events module initialized');
+          logInfo('🎉 AdminPanel Master Initialization Complete');
+        } else if (attempts < 10) {
+          logDebug(`⏳ イベント関数読み込み待機中... (試行 ${attempts + 1}/10)`);
+          setTimeout(() => initializeEventsWithRetry(attempts + 1), 100);
+        } else {
+          console.error('❌ Event functions not found after maximum attempts!');
+          console.error('Missing functions:', {
+            initializeEventListeners: typeof initializeEventListeners,
+            handleQuickStart: typeof handleQuickStart,
+            runHeaderGuessing: typeof runHeaderGuessing
+          });
+          logInfo('⚠️ AdminPanel Master Initialization Complete (with missing functions)');
+        }
       }
-      logInfo('🎉 AdminPanel Master Initialization Complete');
-    }, 50); // 100ms -> 50msに短縮
+      
+      initializeEventsWithRetry();
+    }, 50);
     
   }, 10); // 50ms -> 10msに短縮
 }

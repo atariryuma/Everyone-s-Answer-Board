@@ -4,7 +4,8 @@
 
 <!-- Permissions Policy for Google Apps Script environment -->
 <!-- Explicitly disable problematic features that cause console warnings -->
-<meta http-equiv="Permissions-Policy" content="accelerometer=(), gyroscope=(), magnetometer=(), microphone=(), camera=(), geolocation=(), midi=(), payment=(), usb=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()">
+<!-- Note: Only include features that are widely supported to avoid browser warnings -->
+<meta http-equiv="Permissions-Policy" content="accelerometer=(), gyroscope=(), magnetometer=(), microphone=(), camera=(), geolocation=(), midi=(), payment=(), usb=()">
 
 <!-- Additional security headers -->
 <meta name="referrer" content="no-referrer">

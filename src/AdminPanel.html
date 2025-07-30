@@ -50,6 +50,9 @@
       'speaker',
       'vibrate',
       'vr',
+      'await is only valid in async functions',
+      'Cannot set property',
+      'Cannot read property',
       'cdn.tailwindcss.com should not be used in production',
       'tailwindcss.com/docs/installation',
       'should not be used in production',
@@ -1084,17 +1087,23 @@
   <!-- 共通モーダルコンポーネントを読み込み -->
   <?!= include('SharedModals'); ?>
   <!-- Admin Panel JavaScript Components -->
+  <!-- Core functions must be loaded first -->
   <?!= include('adminPanel-core.js'); ?>
   <?!= include('adminPanel-status.js'); ?>
+  
+  <!-- API functions must be loaded before UI and events that depend on them -->
   <?!= include('adminPanel-api.js'); ?>
+  
+  <!-- UI functions depend on API functions -->
   <?!= include('adminPanel-ui.js'); ?>
-  <?!= include('adminPanel-events.js'); ?>
-
-  <!-- フォーム設定モーダル用JavaScript -->
-  <!-- Form Controls and Modal Management -->
+  
+  <!-- Form controls need to be available before events -->
   <?!= include('adminPanel-forms.js'); ?>
   
-  <!-- Admin Panel Specific JavaScript -->
+  <!-- Events depend on all other modules -->
+  <?!= include('adminPanel-events.js'); ?>
+  
+  <!-- Main initialization script must be loaded last -->
   <?!= include('adminPanel.js'); ?>
 
   <script>
