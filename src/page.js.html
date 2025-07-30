@@ -1067,7 +1067,7 @@ class StudyQuestApp {
     } else {
         console.error('No answers container found for event delegation');
     }
-}
+  }
   
   // Debug helper functions removed for production
   adjustLayout() {
@@ -3382,307 +3382,284 @@ class StudyQuestApp {
           fetchParams,
           isInitialLoad
         );
-          // 初期ロードタイムアウトをクリア
-          if (isInitialLoad && this.initTimeoutId) {
-            clearTimeout(this.initTimeoutId);
-            this.initTimeoutId = null;
-          }
-          
-          if (!result || !result.data || result.data.length === 0) {
-            // 詳細なエラーログ出力
-            if (result && result.status === 'error') {
-              console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
+        // 初期ロードタイムアウトをクリア
+        if (isInitialLoad && this.initTimeoutId) {
+          clearTimeout(this.initTimeoutId);
+          this.initTimeoutId = null;
+        }
+        
+        if (!result || !result.data || result.data.length === 0) {
+          // 詳細なエラーログ出力
+          if (result && result.status === 'error') {
+            console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
+            
+            // ユーザー情報エラーの特別な処理
+            if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
+              console.error('❌ StudyQuestApp: User not found. Current userId:', this.state.userId);
+              console.error('❌ StudyQuestApp: URL parameters:', window.location.href);
+              console.error('❌ StudyQuestApp: This may indicate:');
+              console.error('  1. Invalid userId parameter in URL');
+              console.error('  2. User not registered in the system');
+              console.error('  3. Database connectivity issues');
+              console.error('  4. Session expired or corrupted');
+              console.error('❌ StudyQuestApp: Possible solutions:');
+              console.error('  - Check if the URL parameters are correct');
+              console.error('  - Try refreshing the page');
+              console.error('  - Contact administrator if the issue persists');
               
-              // ユーザー情報エラーの特別な処理
-              if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
-                console.error('❌ StudyQuestApp: User not found. Current userId:', this.state.userId);
-                console.error('❌ StudyQuestApp: URL parameters:', window.location.href);
-                console.error('❌ StudyQuestApp: This may indicate:');
-                console.error('  1. Invalid userId parameter in URL');
-                console.error('  2. User not registered in the system');
-                console.error('  3. Database connectivity issues');
-                console.error('  4. Session expired or corrupted');
-                console.error('❌ StudyQuestApp: Possible solutions:');
-                console.error('  - Check if the URL parameters are correct');
-                console.error('  - Try refreshing the page');
-                console.error('  - Contact administrator if the issue persists');
-                
-                // UIにエラーメッセージを表示
-                this.displayUserNotFoundError(result.message);
-                return;
-              }
+              // UIにエラーメッセージを表示
+              this.displayUserNotFoundError(result.message);
+              return;
+            }
+          } else {
+            // データ状態チェック: 空データが正常な状態かエラーかを判定
+            const isValidEmptyData = result && result.data && Array.isArray(result.data) && result.data.length === 0 && result.header;
+            
+            if (isValidEmptyData) {
+              // 正常な空データの場合は高速復旧戦略をスキップ
+              console.log('📝 正常な空データを受信（まだ回答がありません）');
             } else {
-                // データ状態チェック: 空データが正常な状態かエラーかを判定
-                const isValidEmptyData = result && result.data && Array.isArray(result.data) && result.data.length === 0 && result.header;
-                
-                if (isValidEmptyData) {
-                  // 正常な空データの場合は高速復旧戦略をスキップ
-                  console.log('📝 正常な空データを受信（まだ回答がありません）');
-                } else {
-                  console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
+              console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
+              
+              try {
+                // 異常なデータの場合のみ高速復旧戦略を実行
+                if (isInitialLoad) {
+                  console.log('🚀 初期データロード失敗 - 高速復旧戦略を実行');
                   
-                  try {
-                    // 異常なデータの場合のみ高速復旧戦略を実行
-                    if (isInitialLoad) {
-                      console.log('🚀 初期データロード失敗 - 高速復旧戦略を実行');
-                      
-                      // 軽量チェックでデータ存在を確認
-                      const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
-                      
-                      if (countData && countData.count > 0) {
-                        console.log(`⚡ 軽量チェックで${countData.count}件検出 - 後続ポーリングで復旧予定`);
-                        // 初期データロード失敗フラグを設定してポーリングに委ねる
-                        this.hadInitialDataLoadFailure = true;
-                        this.state.lastSeenCount = 0;
-                      }
-                    } else {
-                    // 通常時は従来のフォールバック処理（簡素化版）
-                    const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
-                    // Enhanced consistency check with lastSeenCount (Phase 2.2)
-                    const expected = countData?.count || 0;
-                    const actual = result?.data ? result.data.length : 0;
-                    const lastSeen = this.state.lastSeenCount || 0;
+                  // 軽量チェックでデータ存在を確認
+                  const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
+                  
+                  if (countData && countData.count > 0) {
+                    console.log(`⚡ 軽量チェックで${countData.count}件検出 - 後続ポーリングで復旧予定`);
+                    // 初期データロード失敗フラグを設定してポーリングに委ねる
+                    this.hadInitialDataLoadFailure = true;
+                    this.state.lastSeenCount = 0;
+                  }
+                } else {
+                  // 通常時は従来のフォールバック処理（簡素化版）
+                  const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
+                  // Enhanced consistency check with lastSeenCount (Phase 2.2)
+                  const expected = countData?.count || 0;
+                  const actual = result?.data ? result.data.length : 0;
+                  const lastSeen = this.state.lastSeenCount || 0;
+                  
+                  console.log('🔍 Enhanced data consistency check (Phase 2.2):', {
+                    expected,
+                    actual,
+                    lastSeen,
+                    fullDataEmpty: actual === 0,
+                    requestedSheet: requestedSheetName,
+                    currentSheet: this.state.currentActiveSheet,
+                    shouldTriggerRefresh: expected > 0 && actual === 0 && expected !== lastSeen
+                  });
+                  
+                  // Only trigger fallback if there's significant inconsistency
+                  // considering user's previously seen count
+                  if (expected > 0 && actual === 0 && expected !== lastSeen) {
+                    console.warn('⚠️ Significant data inconsistency detected!', 
+                      `Expected: ${expected}, Actual: ${actual}, LastSeen: ${lastSeen}`);
+                    console.log('🔄 Attempting simplified fallback...');
                     
-                    console.log('🔍 Enhanced data consistency check (Phase 2.2):', {
-                      expected,
-                      actual,
-                      lastSeen,
-                      fullDataEmpty: actual === 0,
-                      requestedSheet: requestedSheetName,
-                      currentSheet: this.state.currentActiveSheet,
-                      shouldTriggerRefresh: expected > 0 && actual === 0 && expected !== lastSeen
+                    // 簡素化されたフォールバック（待機時間短縮）
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    const retryResult = await new Promise((resolve, reject) => {
+                      google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .getPublishedSheetData(
+                          this.state.userId,
+                          classFilter,
+                          this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
+                          this.state.showAdminFeatures,
+                          true
+                        );
                     });
                     
-                    // Only trigger fallback if there's significant inconsistency
-                    // considering user's previously seen count
-                    if (expected > 0 && actual === 0 && expected !== lastSeen) {
-                      console.warn('⚠️ Significant data inconsistency detected!', 
-                        `Expected: ${expected}, Actual: ${actual}, LastSeen: ${lastSeen}`);
-                      console.log('🔄 Attempting simplified fallback...');
-                      
-                      // 簡素化されたフォールバック（待機時間短縮）
-                      await new Promise(resolve => setTimeout(resolve, 500));
-                      
-                      const retryResult = await new Promise((resolve, reject) => {
-                        google.script.run
-                          .withSuccessHandler(resolve)
-                          .withFailureHandler(reject)
-                          .getPublishedSheetData(
-                            this.state.userId,
-                            classFilter,
-                            this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
-                            this.state.showAdminFeatures,
-                            true
-                          );
-                      });
-                      
-                      if (retryResult && retryResult.data && retryResult.data.length > 0) {
-                        console.log('✅ Fallback retry successful! Got', retryResult.data.length, 'items');
-                        result = retryResult; // 成功した結果を使用
-                      } else {
-                        console.warn('❌ Fallback retry also returned empty data');
-                      }
+                    if (retryResult && retryResult.data && retryResult.data.length > 0) {
+                      console.log('✅ Fallback retry successful! Got', retryResult.data.length, 'items');
+                      result = retryResult; // 成功した結果を使用
+                    } else {
+                      console.warn('❌ Fallback retry also returned empty data');
                     }
                   }
-                } catch (fallbackError) {
-                  console.warn('⚠️ Fallback data consistency check failed:', fallbackError);
                 }
-              }
-              
-              // 再チェック後もデータが空の場合のみ空状態を表示
-              if (!result || !result.data || result.data.length === 0) {
-                // 重要: 問題文は空データでも表示する
-                if (result && result.header && this.elements.headingLabel && 
-                    result.header !== '読み込み中...' && 
-                    !result.header.includes('読み込み') &&
-                    result.header.trim() !== '') {
-                  this.elements.headingLabel.textContent = result.header;
-                  console.log('✅ 空データ時でも問題文を表示:', result.header);
-                }
-                
-                // 空データ受信時は古いカードを強制的にクリア
-                await this.clearAllCardsForEmptyData();
-                
-                // 空状態を表示（問題文表示後）
-                this.displayEmptyState();
-                if (isInitialLoad) {
-                  this.state.lastSeenCount = 0;
-                  // 初期データロード失敗フラグを設定
-                  this.hadInitialDataLoadFailure = true;
-                  console.log('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
-                }
-                return;
+              } catch (fallbackError) {
+                console.warn('⚠️ Fallback data consistency check failed:', fallbackError);
               }
             }
-
-            console.log('📊 API整合性ログ - データ受信完了:', {
-              endpoint: 'getPublishedSheetData',
-              requestParams: {
-                classFilter: fetchParams.classFilter,
-                sortOrder: fetchParams.sortOrder,
-                showAdminFeatures: fetchParams.showAdminFeatures,
-                bypassCache: fetchParams.bypassCache
-              },
-              responseStructure: {
-                hasData: !!result.data,
-                dataLength: result.data?.length || 0,
-                hasHeader: !!result.header,
-                status: result.status
-              },
-              contextInfo: {
-                isInitialLoad,
-                lastSeenCount: this.state.lastSeenCount,
-                currentAnswersLength: this.state.currentAnswers?.length || 0
-              }
-            });
-            
-            console.log('Received data:', result.data);
-            
-            // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
-            // Step 1 & 2: Data acquisition and unified state synchronization
-            const syncResult = this.synchronizeStateAfterDataUpdate(result.data, 'performDataLoad');
-            console.log('✅ Step 1-2: Data acquisition and state synchronization completed:', syncResult);
-            
-            // 理由列デバッグ: 取得されたデータの詳細を確認
-            console.log('🔍 理由列デバッグ - 取得データ詳細:', result.data.map((item, index) => ({
-              index: index,
-              rowIndex: item.rowIndex,
-              opinion: item.opinion?.substring(0, 50) + '...',
-              reason: item.reason,
-              reasonLength: item.reason?.length || 0,
-              reasonExists: !!item.reason,
-              reasonTrimmed: item.reason?.trim(),
-              allKeys: Object.keys(item)
-            })));
-            
-            // サーバーからの質問文と現在表示の一致性をチェック
-            if (result.header) {
-              const currentDisplayed = this.elements.headingLabel ? this.elements.headingLabel.textContent : '';
-              if (currentDisplayed && currentDisplayed !== result.header) {
-                console.warn('⚠️ 質問文不一致検出:', {
-                  '現在表示': currentDisplayed,
-                  'サーバー設定': result.header,
-                  'シート名': result.sheetName
-                });
-                
-                // 質問文を新しいものに更新
-                console.log('🔄 質問文をサーバー設定に合わせます');
-              }
-            }
-            
-            // Apply saved reaction states to restore user's previous reactions
-            this.applyReactionState(result.data);
-            
-            // Populate class filter with available classes and make it visible
-            this.populateClassFilter(result.data);
-            
-            // アクティブシート情報を記録（ポーリングで使用）
-            this.state.activeSheetInfo = {
-              sheetName: result.sheetName || 'フォームの回答 1',
-              opinionHeader: result.header || 'お題',
-              lastUpdated: Date.now()
-            };
-            console.log('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
-
-            this.lastDataLoadTime = Date.now();
-            
-            if (isInitialLoad) {
-              // 初期データロード完了フラグを設定
-              this.initialDataLoaded = true;
-              const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-              const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-              this.lastViewKey = `${selectedClass}-${sortOrder}`;
-              // Initial data load completed
-            }
-
-            // Update heading with the actual question text from server (only if valid)
-            if (result.header && this.elements.headingLabel && 
+          }
+          
+          // 再チェック後もデータが空の場合のみ空状態を表示
+          if (!result || !result.data || result.data.length === 0) {
+            // 重要: 問題文は空データでも表示する
+            if (result && result.header && this.elements.headingLabel && 
                 result.header !== '読み込み中...' && 
                 !result.header.includes('読み込み') &&
                 result.header.trim() !== '') {
               this.elements.headingLabel.textContent = result.header;
+              console.log('✅ 空データ時でも問題文を表示:', result.header);
             }
-
-            // Step 3: DOM update with proper sequencing (Phase 2.1)
-            requestAnimationFrame(async () => {
-              console.log('✅ Step 3: DOM update starting...');
-              await this.renderBoard(false, isInitialLoad);
-              console.log('✅ Step 3: DOM update completed');
-              
-              // Step 4: Consistency validation after DOM update (Phase 2.1)
-              console.log('✅ Step 4: Consistency validation starting...');
-              await this.validatePostLoadState();
-              console.log('✅ Step 4: Consistency validation completed');
-            });
-          }
-        } catch (error) {
-          // 初期ロードタイムアウトをクリア
-          if (isInitialLoad && this.initTimeoutId) {
-            clearTimeout(this.initTimeoutId);
-            this.initTimeoutId = null;
-          }
-          
-          console.error('❌ StudyQuestApp: All retry attempts failed:', error);
-          
-          // Check if the error indicates the board has been unpublished
-          const errorStr = error.message || error.toString();
-          if (errorStr.includes('アクティブなシートが見つかりません') || 
-              errorStr.includes('公開されていません') ||
-              errorStr.includes('unpublished') ||
-              errorStr.includes('not found')) {
-            // Board has been unpublished, redirect to Unpublished.html
-            console.log('Board appears to be unpublished, redirecting...');
-            this.redirectToUnpublishedPage();
+            
+            // 空データ受信時は古いカードを強制的にクリア
+            await this.clearAllCardsForEmptyData();
+            
+            // 空状態を表示（問題文表示後）
+            this.displayEmptyState();
+            if (isInitialLoad) {
+              this.state.lastSeenCount = 0;
+              // 初期データロード失敗フラグを設定
+              this.hadInitialDataLoadFailure = true;
+              console.log('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
+            }
             return;
           }
+        }
+
+        console.log('📊 API整合性ログ - データ受信完了:', {
+          endpoint: 'getPublishedSheetData',
+          requestParams: {
+            classFilter: fetchParams.classFilter,
+            sortOrder: fetchParams.sortOrder,
+            showAdminFeatures: fetchParams.showAdminFeatures,
+            bypassCache: fetchParams.bypassCache
+          },
+          responseStructure: {
+            hasData: !!result.data,
+            dataLength: result.data?.length || 0,
+            hasHeader: !!result.header,
+            status: result.status
+          },
+          contextInfo: {
+            isInitialLoad,
+            lastSeenCount: this.state.lastSeenCount,
+            currentAnswersLength: this.state.currentAnswers?.length || 0
+          }
+        });
+        
+        console.log('Received data:', result.data);
+        
+        // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
+        // Step 1 & 2: Data acquisition and unified state synchronization
+        const syncResult = this.synchronizeStateAfterDataUpdate(result.data, 'performDataLoad');
+        console.log('✅ Step 1-2: Data acquisition and state synchronization completed:', syncResult);
+        
+        // 理由列デバッグ: 取得されたデータの詳細を確認
+        console.log('🔍 理由列デバッグ - 取得データ詳細:', result.data.map((item, index) => ({
+          index: index,
+          rowIndex: item.rowIndex,
+          opinion: item.opinion?.substring(0, 50) + '...',
+          reason: item.reason,
+          reasonLength: item.reason?.length || 0,
+          reasonExists: !!item.reason,
+          reasonTrimmed: item.reason?.trim(),
+          allKeys: Object.keys(item)
+        })));
+        
+        // サーバーからの質問文と現在表示の一致性をチェック
+        if (result.header) {
+          const currentDisplayed = this.elements.headingLabel ? this.elements.headingLabel.textContent : '';
+          if (currentDisplayed && currentDisplayed !== result.header) {
+            console.warn('⚠️ 質問文不一致検出:', {
+              '現在表示': currentDisplayed,
+              'サーバー設定': result.header,
+              'シート名': result.sheetName
+            });
+            
+            // 質問文を新しいものに更新
+            console.log('🔄 質問文をサーバー設定に合わせます');
+          }
+        }
+        
+        // Apply saved reaction states to restore user's previous reactions
+        this.applyReactionState(result.data);
+        
+        // Populate class filter with available classes and make it visible
+        this.populateClassFilter(result.data);
+        
+        // アクティブシート情報を記録（ポーリングで使用）
+        this.state.activeSheetInfo = {
+          sheetName: result.sheetName || 'フォームの回答 1',
+          opinionHeader: result.header || 'お題',
+          lastUpdated: Date.now()
+        };
+        console.log('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
+
+        this.lastDataLoadTime = Date.now();
+        
+        if (isInitialLoad) {
+          // 初期データロード完了フラグを設定
+          this.initialDataLoaded = true;
+          const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+          const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+          this.lastViewKey = `${selectedClass}-${sortOrder}`;
+          // Initial data load completed
+        }
+
+        // Update heading with the actual question text from server (only if valid)
+        if (result.header && this.elements.headingLabel && 
+            result.header !== '読み込み中...' && 
+            !result.header.includes('読み込み') &&
+            result.header.trim() !== '') {
+          this.elements.headingLabel.textContent = result.header;
+        }
+
+        // Step 3: DOM update with proper sequencing (Phase 2.1)
+        requestAnimationFrame(async () => {
+          console.log('✅ Step 3: DOM update starting...');
+          await this.renderBoard(false, isInitialLoad);
+          console.log('✅ Step 3: DOM update completed');
           
-          this.safeDisplayEmptyState();
+          // Step 4: Consistency validation after DOM update (Phase 2.1)
+          console.log('✅ Step 4: Consistency validation starting...');
+          await this.validatePostLoadState();
+          console.log('✅ Step 4: Consistency validation completed');
+        });
+
+        // Post-processing after successful data load
+        this.adjustLayout();
+        
+        if (!this.state.isAdminUser || !window.hasAdminCapability) {
+          this.state.showAdminFeatures = false;
+          this.state.showHighlightToggle = false;
+          // 管理モードボタンを確実に非表示
+          if (this.elements.adminToggleBtn) {
+            this.elements.adminToggleBtn.classList.add('hidden');
+            this.elements.adminToggleBtn.setAttribute('hidden', '');
+            this.elements.adminToggleBtn.style.display = 'none';
+          }
+        } else {
+          this.state.showHighlightToggle = true;
+          // 管理モードボタンを表示
+          if (this.elements.adminToggleBtn) {
+            this.elements.adminToggleBtn.classList.remove('hidden');
+            this.elements.adminToggleBtn.removeAttribute('hidden');
+            this.elements.adminToggleBtn.style.display = '';
+          }
+          // Admin settings updated
+          this.cache.clear();
+          // Cache cleared due to admin highlight settings
         }
-      
-      
-      // Post-processing after successful data load
-      this.adjustLayout();
-      
-      if (!this.state.isAdminUser || !window.hasAdminCapability) {
-        this.state.showAdminFeatures = false;
-        this.state.showHighlightToggle = false;
-        // 管理モードボタンを確実に非表示
-        if (this.elements.adminToggleBtn) {
-          this.elements.adminToggleBtn.classList.add('hidden');
-          this.elements.adminToggleBtn.setAttribute('hidden', '');
-          this.elements.adminToggleBtn.style.display = 'none';
+        
+        if (isInitialLoad) {
+          this.elements.answersContainer.classList.add('render-optimized');
+          // If loading is active, also add loading-safe class to prevent stacking context issues
+          if (document.body.classList.contains('loading-active') || 
+              this.elements.answersContainer.classList.contains('loading-active')) {
+            this.elements.answersContainer.classList.add('loading-safe');
+          }
         }
-      } else {
-        this.state.showHighlightToggle = true;
-        // 管理モードボタンを表示
-        if (this.elements.adminToggleBtn) {
-          this.elements.adminToggleBtn.classList.remove('hidden');
-          this.elements.adminToggleBtn.removeAttribute('hidden');
-          this.elements.adminToggleBtn.style.display = '';
-        }
-        // Admin settings updated
-        this.cache.clear();
-        // Cache cleared due to admin highlight settings
+      } catch (error) {
+        console.error('Error loading sheet data:', error);
+        const errorMessage = this.escapeHtml(error.message || 'Unknown error');
+        this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
+        this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
+        // 同期エラーの場合にもローディング状態を解除
+        this.state.isLoading = false;
+        this.hideLoadingOverlay();
       }
-      
-      if (isInitialLoad) {
-        this.elements.answersContainer.classList.add('render-optimized');
-        // If loading is active, also add loading-safe class to prevent stacking context issues
-        if (document.body.classList.contains('loading-active') || 
-            this.elements.answersContainer.classList.contains('loading-active')) {
-          this.elements.answersContainer.classList.add('loading-safe');
-        }
-      }
-    } catch (error) {
-      console.error('Error loading sheet data:', error);
-      const errorMessage = this.escapeHtml(error.message || 'Unknown error');
-      this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
-      this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
-      // 同期エラーの場合にもローディング状態を解除
-      this.state.isLoading = false;
-      this.hideLoadingOverlay();
-    }
   }
+
   async loadAvailableSheets() {
     try {
       const sheetsData = await this.gas.getAvailableSheets();
@@ -5055,7 +5032,7 @@ class StudyQuestApp {
     }
     
     return response;
-}
+  }
 
   async processReactionResponse(item, response, reaction) {
     console.log('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
@@ -5175,7 +5152,7 @@ class StudyQuestApp {
         item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
         item.reactions[reaction].reacted = true;
     }
-}
+  }
 
   // 即座UI更新（requestAnimationFrameを使わない同期更新）
   async immediateUIUpdate(rowIndex, reaction) {
