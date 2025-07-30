@@ -687,70 +687,55 @@ class StudyQuestApp {
   }
 
   async init() {
-      try {
-        // 初回アクセス時にデジタルシティズンシップモーダルを表示（読み込みと同時進行）
-        const hasSeenDigitalCitizenship = localStorage.getItem('hasSeenDigitalCitizenship');
-        const shouldShowModal = !hasSeenDigitalCitizenship || 
-          (hasSeenDigitalCitizenship && Date.now() > parseInt(hasSeenDigitalCitizenship));
-        
-        if (shouldShowModal && window.sharedModals) {
-          console.log('🌐 初回アクセス/期限切れ: デジタルシティズンシップモーダルを表示');
-          window.sharedModals.showDigitalCitizenship();
-          // 表示済みフラグを設定（24時間有効）
-          const expiry = Date.now() + (24 * 60 * 60 * 1000);
-          localStorage.setItem('hasSeenDigitalCitizenship', expiry.toString());
-        }
-        
-        // 初期ロード状態を表示
-        this.showLoadingOverlay();
-        
-        // タイムアウト設定（30秒）
-        this.initTimeoutId = setTimeout(() => {
-          this.hideLoadingOverlay();
-          console.warn('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
-          this.showErrorMessage('初期化がタイムアウトしました。接続状況を確認して、ページを再読み込みしてください。', false);
-        }, 30000);
-        
-        // Reset state for clean initialization
-        this.resetStateForCleanInit();
-        
-        // Critical path only - non-blocking
-        this.setupCriticalElements();
-        this.showMinimalSkeleton();
-        
-        // Apply default low performance tweaks
-        this.optimizeForLowPerformance();
-
-        // Show info modal while loading sheet data in the background
-        this.showInfoModal();
-
-        // Kick off data loading without blocking UI
-        this.loadDataImmediate()
-          .catch(error => {
-            console.error('❌ StudyQuestApp: Critical error in loadDataImmediate:', error);
-            this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
-          })
-          .finally(() => {
-            if (this.initTimeoutId) {
-              clearTimeout(this.initTimeoutId);
-              this.initTimeoutId = null;
-            }
-          });
-        
-      } catch (error) {
-        console.error('❌ StudyQuestApp: Critical error in init():', error);
-        this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
-        
-        // Clear timeout on error
-        if (this.initTimeoutId) {
-          clearTimeout(this.initTimeoutId);
-          this.initTimeoutId = null;
-        }
-        
-        // Hide loading overlay on error
-        this.hideLoadingOverlay();
-        return; // Exit early on initialization failure
+    try {
+      // 初回アクセス時にデジタルシティズンシップモーダルを表示（読み込みと同時進行）
+      const hasSeenDigitalCitizenship = localStorage.getItem('hasSeenDigitalCitizenship');
+      const shouldShowModal = !hasSeenDigitalCitizenship || 
+        (hasSeenDigitalCitizenship && Date.now() > parseInt(hasSeenDigitalCitizenship));
+      
+      if (shouldShowModal && window.sharedModals) {
+        console.log('🌐 初回アクセス/期限切れ: デジタルシティズンシップモーダルを表示');
+        window.sharedModals.showDigitalCitizenship();
+        // 表示済みフラグを設定（24時間有効）
+        const expiry = Date.now() + (24 * 60 * 60 * 1000);
+        localStorage.setItem('hasSeenDigitalCitizenship', expiry.toString());
       }
+      
+      // 初期ロード状態を表示
+      this.showLoadingOverlay();
+      
+      // タイムアウト設定（30秒）
+      this.initTimeoutId = setTimeout(() => {
+        this.hideLoadingOverlay();
+        console.warn('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
+        this.showErrorMessage('初期化がタイムアウトしました。接続状況を確認して、ページを再読み込みしてください。', false);
+      }, 30000);
+      
+      // Reset state for clean initialization
+      this.resetStateForCleanInit();
+      
+      // Critical path only - non-blocking
+      this.setupCriticalElements();
+      this.showMinimalSkeleton();
+      
+      // Apply default low performance tweaks
+      this.optimizeForLowPerformance();
+
+      // Show info modal while loading sheet data in the background
+      this.showInfoModal();
+
+      // Kick off data loading without blocking UI
+      this.loadDataImmediate()
+        .catch(error => {
+          console.error('❌ StudyQuestApp: Critical error in loadDataImmediate:', error);
+          this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
+        })
+        .finally(() => {
+          if (this.initTimeoutId) {
+            clearTimeout(this.initTimeoutId);
+            this.initTimeoutId = null;
+          }
+        });
       
       // Defer all non-critical operations
       requestIdleCallback(() => {
@@ -787,7 +772,7 @@ class StudyQuestApp {
         this.startSyncMonitoring();
       }, { timeout: 50 });
 
-      // AdminPanelからのメッセージをリッスン
+      // AdminPanelからのメッセージをリッスン  
       window.addEventListener('message', async (event) => {
         if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
           // Refresh board data message received
@@ -872,7 +857,22 @@ class StudyQuestApp {
           }
         });
       }
+      
+    } catch (error) {
+      console.error('❌ StudyQuestApp: Critical error in init():', error);
+      this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
+      
+      // Clear timeout on error
+      if (this.initTimeoutId) {
+        clearTimeout(this.initTimeoutId);
+        this.initTimeoutId = null;
+      }
+      
+      // Hide loading overlay on error
+      this.hideLoadingOverlay();
+      return; // Exit early on initialization failure
     }
+  }
   setupCriticalElements() {
     if (this.elements.headingLabel) {
       // 問題文を常に表示（読み込み中は表示しない）
