@@ -1438,13 +1438,32 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
       reasonValue = row.originalData[reasonIndex] || '';
     }
 
+    // 意見と理由の取得（マッピングが利用できない場合はprocessedRowから取得）
+    var opinionValue = '';
+    var finalReasonValue = reasonValue;
+    
+    if (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) {
+      opinionValue = row.originalData[opinionIndex];
+    } else if (row.opinion) {
+      // フォールバック: processedRowから取得
+      opinionValue = row.opinion;
+    }
+    
+    if (!finalReasonValue && row.reason) {
+      // フォールバック: processedRowから取得
+      finalReasonValue = row.reason;
+    }
+    
+    debugLog('formatSheetDataForFrontend: Content extraction for row %s - opinion="%s", reason="%s"', 
+             index, opinionValue.substring(0, 50), finalReasonValue.substring(0, 50));
+
     return {
       rowIndex: row.rowNumber || (index + 2),
       name: nameValue,
-      email: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] : '',
+      email: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]] : (row.email || ''),
       class: (classIndex !== undefined && row.originalData && row.originalData[classIndex]) ? row.originalData[classIndex] : '',
-      opinion: (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) ? row.originalData[opinionIndex] : '',
-      reason: reasonValue,
+      opinion: opinionValue,
+      reason: finalReasonValue,
       reactions: {
         UNDERSTAND: checkReactionState('UNDERSTAND'),
         LIKE: checkReactionState('LIKE'),
@@ -3603,6 +3622,28 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     var effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
     debugLog('🔍 executeGetSheetData: シート設定取得完了 sheetKey=%s, hasGuessedConfig=%s', sheetKey, !!effectiveHeaderConfig.opinionHeader);
     
+    // フォールバック設定: 設定が空の場合はデフォルト構造を提供
+    if (!effectiveHeaderConfig.opinionHeader && headers.length > 1) {
+      effectiveHeaderConfig.opinionHeader = headers[1]; // 通常、タイムスタンプの次が最初の質問
+      debugLog('🔄 executeGetSheetData: フォールバック設定 - opinionHeader: %s', effectiveHeaderConfig.opinionHeader);
+    }
+    if (!effectiveHeaderConfig.reasonHeader && headers.length > 2) {
+      effectiveHeaderConfig.reasonHeader = headers[2]; // 2番目の質問を理由として設定
+      debugLog('🔄 executeGetSheetData: フォールバック設定 - reasonHeader: %s', effectiveHeaderConfig.reasonHeader);
+    }
+    
+    // 統合デバッグ: 設定とデータの詳細ログ
+    debugLog('🔍 executeGetSheetData: 統合デバッグ情報', {
+      headers: headers,
+      headersLength: headers.length,
+      configJson: configJson,
+      sheetKey: sheetKey,
+      sheetConfig: sheetConfig,
+      effectiveHeaderConfig: effectiveHeaderConfig,
+      dataRowsLength: dataRows.length,
+      firstRowSample: dataRows.length > 0 ? dataRows[0] : 'なし'
+    });
+    
     // Check if current user is the board owner
     var isOwner = (configJson.ownerId === userId);
     debugLog('getSheetData: isOwner=%s, ownerId=%s, userId=%s', isOwner, configJson.ownerId, userId);
@@ -3869,6 +3910,26 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
     processedRow.displayName = '匿名';
   }
   
+  // 重要: コンテンツフィールドを追加（opinion, reason）
+  // これらのフィールドは formatSheetDataForFrontend で使用される
+  // 一番最初の列を意見として設定（通常フォームの最初の質問）
+  processedRow.opinion = row.length > 1 ? (row[1] || '') : '';
+  
+  // 2番目の列を理由として設定（フォーム回答の2番目の項目）
+  processedRow.reason = row.length > 2 ? (row[2] || '') : '';
+  
+  // メールアドレス（フォーム回答者の識別用）
+  var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+  if (emailIndex !== undefined && row[emailIndex]) {
+    processedRow.email = row[emailIndex];
+  }
+  
+  // タイムスタンプ（フォーム回答時刻）
+  var timestampIndex = headerIndices[COLUMN_HEADERS.TIMESTAMP];
+  if (timestampIndex !== undefined && row[timestampIndex]) {
+    processedRow.timestamp = row[timestampIndex];
+  }
+  
   return processedRow;
 }
 
@@ -4065,6 +4126,19 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
             break;
           }
         }
+      }
+    }
+    
+    // フォールバック: 設定が見つからない場合はデフォルト位置を使用
+    if (mappedIndex === undefined) {
+      if (configKey === 'opinionHeader') {
+        // 意見列が見つからない場合、1番目の列（タイムスタンプの次）を使用
+        mappedIndex = 1;
+        debugLog('mapConfigToActualHeaders: Using fallback position for %s: index %s', configKey, mappedIndex);
+      } else if (configKey === 'reasonHeader') {
+        // 理由列が見つからない場合、2番目の列を使用
+        mappedIndex = 2;
+        debugLog('mapConfigToActualHeaders: Using fallback position for %s: index %s', configKey, mappedIndex);
       }
     }
     

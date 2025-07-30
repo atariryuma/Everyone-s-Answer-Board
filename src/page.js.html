@@ -4355,6 +4355,17 @@ class StudyQuestApp {
         return null;
       }
       
+      // 重要なコンテンツがない場合の処理
+      if (!data.opinion && !data.reason) {
+        console.warn('createAnswerCard: データにコンテンツ（opinion/reason）がありません:', {
+          rowIndex: data.rowIndex,
+          hasOpinion: !!data.opinion,
+          hasReason: !!data.reason,
+          dataKeys: Object.keys(data)
+        });
+        // 空のコンテンツでもカードは作成する（エラー状態として表示）
+      }
+      
       // Ensure required properties exist with safe defaults（理由列の堅牢化）
       const safeData = {
         rowIndex: data.rowIndex || 0,
@@ -4371,8 +4382,12 @@ class StudyQuestApp {
         rowIndex: safeData.rowIndex,
         originalReason: data.reason,
         validatedReason: safeData.reason,
+        opinion: safeData.opinion?.substring(0, 30) + '...',
         reasonLength: safeData.reason?.length || 0,
-        willShowReason: !!(safeData.reason && safeData.reason.trim())
+        opinionLength: safeData.opinion?.length || 0,
+        willShowReason: !!(safeData.reason && safeData.reason.trim()),
+        willShowOpinion: !!(safeData.opinion && safeData.opinion.trim()),
+        hasValidContent: !!(safeData.opinion || safeData.reason)
       });
       
       // Optimized cache key generation (faster than JSON.stringify)
@@ -4460,11 +4475,11 @@ class StudyQuestApp {
       
       const opinionTitle = document.createElement('h3');
       opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
-      opinionTitle.textContent = safeData.opinion;
+      opinionTitle.textContent = safeData.opinion || '（回答内容が取得できませんでした）';
       
       const reasonText = document.createElement('p');
       reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-      reasonText.textContent = safeData.reason;
+      reasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
       
       contentDiv.appendChild(opinionTitle);
       
@@ -4476,37 +4491,34 @@ class StudyQuestApp {
         reasonTextElement: !!reasonText
       });
       
-      if (safeData.reason && safeData.reason.trim()) {
-        console.log('✅ 理由テキストを追加します:', safeData.reason);
-        try {
-          // 理由テキストの有効性を検証
-          if (reasonText && reasonText.textContent === safeData.reason) {
-            contentDiv.appendChild(reasonText);
-            console.log('✅ 理由テキスト追加完了（既存要素使用）');
-          } else {
-            // 理由テキスト要素の再作成が必要な場合
-            const newReasonText = document.createElement('p');
-            newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-            newReasonText.textContent = safeData.reason;
-            contentDiv.appendChild(newReasonText);
-            console.log('✅ 理由テキスト追加完了（新規要素作成）');
-          }
-        } catch (reasonError) {
-          // 理由テキスト追加でエラーが発生した場合の回復処理
-          console.warn('createAnswerCard: Reason text append error, attempting recovery:', reasonError);
-          try {
-            const fallbackReasonText = document.createElement('p');
-            fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-            fallbackReasonText.textContent = safeData.reason;
-            contentDiv.appendChild(fallbackReasonText);
-            console.log('✅ 理由テキスト追加完了（フォールバック）');
-          } catch (fallbackError) {
-            console.error('createAnswerCard: Failed to add reason text even with fallback:', fallbackError);
-            // 理由テキストが追加できない場合でもカード生成は継続
-          }
+      // 理由テキストを常に追加（空の場合はプレースホルダー表示）
+      console.log('✅ 理由テキストを追加します:', safeData.reason || '（空の理由）');
+      try {
+        // 理由テキストの有効性を検証
+        if (reasonText && reasonText.textContent) {
+          contentDiv.appendChild(reasonText);
+          console.log('✅ 理由テキスト追加完了（既存要素使用）');
+        } else {
+          // 理由テキスト要素の再作成が必要な場合
+          const newReasonText = document.createElement('p');
+          newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+          newReasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
+          contentDiv.appendChild(newReasonText);
+          console.log('✅ 理由テキスト追加完了（新規要素作成）');
         }
-      } else {
-        console.log('❌ 理由テキストが空のため追加をスキップ');
+      } catch (reasonError) {
+        // 理由テキスト追加でエラーが発生した場合の回復処理
+        console.warn('createAnswerCard: Reason text append error, attempting recovery:', reasonError);
+        try {
+          const fallbackReasonText = document.createElement('p');
+          fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+          fallbackReasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
+          contentDiv.appendChild(fallbackReasonText);
+          console.log('✅ 理由テキスト追加完了（フォールバック）');
+        } catch (fallbackError) {
+          console.error('createAnswerCard: Failed to add reason text even with fallback:', fallbackError);
+          // 理由テキストが追加できない場合でもカード生成は継続
+        }
       }
     
       // Create footer div
