@@ -653,7 +653,41 @@ function updateConfigButtons() {
 // STEP INDICATORS AND GUIDANCE
 // =============================================================================
 
-// Update step indicators
+// 統一されたステップ完了チェック - データベースのconfigJsonを単一の情報源として使用
+function getStepCompletionFromConfig(status) {
+  if (!status?.userInfo?.configJson) {
+    return { step1: false, step2: false, step3: false, isPublished: false };
+  }
+
+  try {
+    const config = typeof status.userInfo.configJson === 'string' 
+      ? JSON.parse(status.userInfo.configJson) 
+      : status.userInfo.configJson;
+
+    // Step 1: スプレッドシートIDの存在確認
+    const step1Complete = !!(status.userInfo.spreadsheetId);
+    
+    // Step 2: セットアップ完了状態の確認
+    const step2Complete = config.setupStatus === 'completed' && 
+                          config.formCreated === true && 
+                          config.formUrl && config.formUrl.trim();
+    
+    // Step 3: 公開状態の確認
+    const step3Complete = config.appPublished === true;
+    
+    return {
+      step1: step1Complete,
+      step2: step2Complete,
+      step3: step3Complete,
+      isPublished: step3Complete
+    };
+  } catch (error) {
+    console.warn('❌ configJsonの解析に失敗:', error);
+    return { step1: false, step2: false, step3: false, isPublished: false };
+  }
+}
+
+// Update step indicators - 簡素化版
 function updateStepIndicators(currentStep, status = null) {
   const steps = [
     document.getElementById('step-1-indicator'),
@@ -661,8 +695,9 @@ function updateStepIndicators(currentStep, status = null) {
     document.getElementById('step-3-indicator')
   ];
 
-  // 公開状態の判定
-  const isPublished = status?._normalized?.isPublished || (window.lastStatusCache?._normalized?.isPublished);
+  // データベース状態から実際の完了状況を取得
+  const completion = getStepCompletionFromConfig(status);
+  console.log('📊 Step completion from database:', completion);
 
   steps.forEach((step, index) => {
     if (!step) return;
@@ -677,14 +712,17 @@ function updateStepIndicators(currentStep, status = null) {
       existingBadge.remove();
     }
 
-    if (stepNumber < currentStep) {
+    // データベース状態に基づく完了判定
+    const isStepComplete = completion[`step${stepNumber}`];
+
+    if (isStepComplete) {
       // 完了したステップ: チェックマーク表示
       if (circle) {
         circle.className = 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all';
-        circle.innerHTML = '✓'; // チェックマーク
+        circle.innerHTML = '✓';
       }
       if (text) {
-        text.classList.remove('text-gray-500');
+        text.classList.remove('text-gray-500', 'text-cyan-400');
         text.classList.add('text-green-400', 'font-medium');
       }
     } else if (stepNumber === currentStep) {
@@ -694,57 +732,49 @@ function updateStepIndicators(currentStep, status = null) {
         circle.innerHTML = stepNumber;
       }
       if (text) {
-        text.classList.remove('text-gray-500');
+        text.classList.remove('text-gray-500', 'text-green-400');
         text.classList.add('text-cyan-400', 'font-bold');
       }
     } else {
-      // 未来のステップ: グレーアウト
+      // 未完了のステップ: グレーアウト
       if (circle) {
         circle.className = 'w-6 h-6 bg-gray-700 text-gray-500 rounded-full flex items-center justify-center font-bold text-xs transition-all border border-gray-600';
         circle.innerHTML = stepNumber;
       }
       if (text) {
-        text.classList.remove('text-white', 'font-semibold', 'text-green-400', 'text-cyan-400', 'font-bold', 'font-medium');
+        text.classList.remove('text-white', 'text-green-400', 'text-cyan-400', 'font-bold', 'font-medium');
         text.classList.add('text-gray-500');
-      }
-    }
-
-    // ステップ3で公開中の場合、完了マークを表示（バッジは削除）
-    if (stepNumber === 3 && isPublished) {
-      // circleは既に取得済みのdiv要素を使用
-      if (circle && !circle.classList.contains('step-completed')) {
-        circle.className = 'w-7 h-7 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 shadow-lg step-completed';
-        circle.innerHTML = '✓';
-      }
-      // テキストも完了状態にする
-      if (text) {
-        text.classList.remove('text-gray-400', 'text-cyan-400');
-        text.classList.add('text-green-400', 'font-medium');
       }
     }
   });
   
   // 進行状況メッセージの更新
-  updateProgressMessage(currentStep, status);
+  updateProgressMessage(currentStep, status, completion);
 }
 
-function updateProgressMessage(currentStep, status = null) {
+function updateProgressMessage(currentStep, status = null, completion = null) {
   const messageElement = document.getElementById('progress-message');
   if (!messageElement) return;
   
-  // 公開状態の判定
-  const isPublished = status?._normalized?.isPublished || (window.lastStatusCache?._normalized?.isPublished);
+  // completionが渡されていない場合は取得
+  if (!completion) {
+    completion = getStepCompletionFromConfig(status);
+  }
   
   let message = '';
   switch (currentStep) {
     case 1:
-      message = '📋 ステップ1: データソースを準備してください';
+      message = completion.step1 ? 
+        '✅ ステップ1完了: データソースが準備済みです' : 
+        '📋 ステップ1: データソースを準備してください';
       break;
     case 2:
-      message = '⚙️ ステップ2: シートと列の設定を完了してください';
+      message = completion.step2 ? 
+        '✅ ステップ2完了: シート設定が完了済みです' :
+        '⚙️ ステップ2: シートと列の設定を完了してください';
       break;
     case 3:
-      if (isPublished) {
+      if (completion.isPublished) {
         message = '✅ ボードが公開中です。設定変更や公開停止ができます';
       } else {
         message = '🚀 ステップ3: 列を設定してボードを公開しましょう';

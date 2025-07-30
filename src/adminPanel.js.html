@@ -77,35 +77,28 @@
               (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
   }
   
-  // Step 2完了チェック - AI判定完了とセットアップ完了状態を確認
+  // Step 2完了チェック - 統一されたconfigJson状態確認
   function checkStep2Completion() {
-    if (!currentStatus || !currentStatus.activeSheetName) {
+    if (!currentStatus?.userInfo?.configJson) {
       return false;
     }
     
-    // セットアップ状況を確認
     try {
-      if (currentStatus.userInfo && currentStatus.userInfo.configJson) {
-        const config = typeof currentStatus.userInfo.configJson === 'string' 
-          ? JSON.parse(currentStatus.userInfo.configJson) 
-          : currentStatus.userInfo.configJson;
-        
-        // セットアップが完了している場合はStep 2完了とみなす
-        const setupCompleted = config.setupStatus === 'completed' && 
-                              config.formCreated === true && 
-                              config.formUrl && config.formUrl.trim();
-        
-        if (setupCompleted) {
-          console.log('✅ Step 2 完了: セットアップが完了済み');
-          return true;
-        }
-      }
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+      
+      // データベース状態に基づく統一判定
+      const setupCompleted = config.setupStatus === 'completed' && 
+                            config.formCreated === true && 
+                            config.formUrl && config.formUrl.trim();
+      
+      console.log('✅ Step 2完了チェック (統一版):', setupCompleted);
+      return setupCompleted;
     } catch (error) {
-      console.warn('Step 2完了チェックでエラー:', error);
+      console.warn('❌ Step 2完了チェックでエラー:', error);
+      return false;
     }
-    
-    // フォールバック: activeSheetNameのみで判定（従来の動作）
-    return !!(currentStatus && currentStatus.activeSheetName);
   }
   
   // セクションを無効化
