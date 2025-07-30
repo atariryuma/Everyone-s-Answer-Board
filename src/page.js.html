@@ -3614,6 +3614,7 @@ class StudyQuestApp {
               await this.validatePostLoadState();
               console.log('✅ Step 4: Consistency validation completed');
             });
+          }
         } catch (error) {
           // 初期ロードタイムアウトをクリア
           if (isInitialLoad && this.initTimeoutId) {
