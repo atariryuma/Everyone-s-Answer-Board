@@ -4690,12 +4690,38 @@ class StudyQuestApp {
       console.log(`⚡ 重複操作スキップ: ${reactionKey}`);
       return;
     }
+    
+    // 処理中のリアクションチェック（競合状態回避）
+    if (this.pendingReactions.has(reactionKey)) {
+      console.log(`⏳ 処理中のためスキップ: ${reactionKey}`);
+      return;
+    }
+    
+    // データ整合性チェック
+    const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
+    if (!item) {
+      console.warn(`⚠️ アイテムが見つかりません: rowIndex=${numericRowIndex}`);
+      return;
+    }
+    
+    // UI状態の事前更新（楽観的更新）
+    const currentState = item.reactions?.[reaction]?.reacted || false;
+    if (item.reactions && item.reactions[reaction]) {
+      item.reactions[reaction].reacted = !currentState;
+      item.reactions[reaction].count = currentState 
+        ? Math.max(0, (item.reactions[reaction].count || 1) - 1)
+        : (item.reactions[reaction].count || 0) + 1;
+      
+      // UI即座更新
+      this.updateReactionButtonsForItem(item);
+    }
 
     // 既存の個別キューシステム（常に維持）
     this.reactionQueue.set(reactionKey, {
       rowIndex: numericRowIndex,
       reaction,
-      timestamp: now
+      timestamp: now,
+      originalState: currentState // 元の状態を記録（復旧用）
     });
 
     // 最後の操作時刻を記録
@@ -4715,29 +4741,65 @@ class StudyQuestApp {
     if (this.isProcessingReactionQueue) return;
     this.isProcessingReactionQueue = true;
 
+    const processingStart = Date.now();
+    let processedCount = 0;
+    let errorCount = 0;
+
     try {
+      console.log(`🔄 リアクションキュー処理開始 (キューサイズ: ${this.reactionQueue.size})`);
+      
       // バッチ処理が有効で、キューに複数アイテムがある場合はバッチ処理を試行
       if (this.enableBatchProcessing && this.reactionQueue.size > 1 && !this.batchProcessingActive) {
         const canBatch = await this.tryBatchProcessing();
         if (canBatch) {
           // バッチ処理成功時は個別キューをクリア
+          processedCount = this.reactionQueue.size;
           this.reactionQueue.clear();
+          console.log(`✅ バッチ処理完了 (${processedCount}件処理)`);
           return;
         }
         // バッチ処理失敗時は既存の個別処理にフォールバック
+        console.log('⚠️ バッチ処理失敗、個別処理にフォールバック');
       }
 
       // 既存の個別処理システム（完全に保持）
-      while (this.reactionQueue.size > 0) {
-        const [reactionKey, operation] = this.reactionQueue.entries().next().value;
-        this.reactionQueue.delete(reactionKey);
-
-        await this.executeReactionOperation(operation, reactionKey);
+      const queueEntries = Array.from(this.reactionQueue.entries());
+      
+      for (const [reactionKey, operation] of queueEntries) {
+        try {
+          this.reactionQueue.delete(reactionKey);
+          await this.executeReactionOperation(operation, reactionKey);
+          processedCount++;
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ 個別リアクション処理エラー (${reactionKey}):`, error);
+          
+          // エラー時の復旧処理
+          await this.handleReactionError(error, operation.rowIndex, operation.reaction);
+        }
       }
+      
     } catch (error) {
-      console.error('リアクションキュー処理エラー:', error);
+      console.error('❌ リアクションキュー処理致命的エラー:', error);
+      errorCount++;
     } finally {
       this.isProcessingReactionQueue = false;
+      
+      const processingTime = Date.now() - processingStart;
+      console.log(`📊 リアクションキュー処理完了: ${processedCount}件成功, ${errorCount}件エラー, ${processingTime}ms`);
+      
+      // 残っているキューがある場合の警告
+      if (this.reactionQueue.size > 0) {
+        console.warn(`⚠️ キュー処理後も${this.reactionQueue.size}件が残っています`);
+      }
+      
+      // エラー率が高い場合の対処
+      if (errorCount > 0 && errorCount / (processedCount + errorCount) > 0.5) {
+        console.warn('🚨 リアクション処理エラー率が高いです。システム状態を確認してください。');
+        if (typeof this.diagnoseReactionSystemHealth === 'function') {
+          this.diagnoseReactionSystemHealth();
+        }
+      }
     }
   }
 
@@ -5421,6 +5483,28 @@ class StudyQuestApp {
         timestamp: new Date().toISOString()
     });
     
+    // エラー復旧処理を追加
+    try {
+      // UI状態を元に戻す（楽観的更新の取り消し）
+      const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+      if (item && item.reactions && item.reactions[reaction]) {
+        // サーバーエラーの場合、ローカル状態を元に戻す
+        const wasReacted = item.reactions[reaction].reacted;
+        item.reactions[reaction].reacted = !wasReacted;
+        if (wasReacted) {
+          item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 1) - 1);
+        } else {
+          item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
+        }
+        
+        // UI再描画（差分更新で軽量化）
+        this.updateReactionButtonsForItem(item);
+        console.log('✅ リアクションUI状態復旧完了:', { rowIndex, reaction });
+      }
+    } catch (recoveryError) {
+      console.warn('⚠️ リアクションエラー復旧処理に失敗:', recoveryError);
+    }
+    
     // ユーザーにエラーを表示（オプション）
     if (window.messageManager) {
         window.messageManager.show(
@@ -5429,6 +5513,37 @@ class StudyQuestApp {
             3000
         );
     }
+  }
+
+  /**
+   * 特定のアイテムのリアクションボタンを更新（UI状態同期）
+   * @param {Object} item - 回答アイテム
+   */
+  updateReactionButtonsForItem(item) {
+    if (!item || !item.reactions) return;
+    
+    const buttons = document.querySelectorAll(`[data-row-index="${item.rowIndex}"]`);
+    buttons.forEach(btn => {
+      const reaction = btn.dataset.reaction;
+      if (reaction && item.reactions[reaction]) {
+        const reactionData = item.reactions[reaction];
+        const isReacted = reactionData.reacted || false;
+        const count = reactionData.count || 0;
+        
+        // ボタンの状態を更新
+        btn.classList.toggle('reacted', isReacted);
+        
+        // カウント表示を更新
+        const countElement = btn.querySelector('.reaction-count');
+        if (countElement) {
+          countElement.textContent = count > 0 ? count : '';
+        }
+        
+        // アクセシビリティ属性を更新
+        btn.setAttribute('aria-pressed', isReacted);
+        btn.title = `${reaction}: ${count}件 ${isReacted ? '(あなたがリアクション済み)' : ''}`;
+      }
+    });
   }
   
   showErrorFeedback(btn, message) {

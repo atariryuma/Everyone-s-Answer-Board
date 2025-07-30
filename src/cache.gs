@@ -24,7 +24,7 @@ class CacheManager {
   }
 
   /**
-   * キャッシュから値を取得、なければ指定された関数で生成して保存します。
+   * キャッシュから値を取得、なければ指定された関数で生成して保存します（最適化版）
    * @param {string} key - キャッシュキー
    * @param {function} valueFn - 値を生成する関数
    * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean }
@@ -33,67 +33,21 @@ class CacheManager {
   get(key, valueFn, options = {}) {
     const { ttl = this.defaultTTL, enableMemoization = false } = options;
     
-    // パフォーマンス監視
+    // パフォーマンス監視とバリデーション
     this.stats.totalOps++;
-    const startTime = Date.now();
-
-    // Input validation
-    if (!key || typeof key !== 'string') {
-      console.error(`[Cache] Invalid key: ${key}`);
+    if (!this.validateKey(key)) {
       this.stats.errors++;
-      return valueFn();
+      return valueFn ? valueFn() : null;
     }
 
-    // 1. メモ化キャッシュのチェック
-    if (enableMemoization && this.memoCache.has(key)) {
-      try {
-        const memoEntry = this.memoCache.get(key);
-        // メモ化キャッシュの有効期限チェック（オプション）
-        if (!memoEntry.ttl || (memoEntry.createdAt + memoEntry.ttl * 1000 > Date.now())) {
-          debugLog(`[Cache] Memo hit for key: ${key}`);
-          this.stats.hits++;
-          return memoEntry.value;
-        }
-      } catch (e) {
-        console.warn(`[Cache] Memo cache access failed for key: ${key}`, e.message);
-        this.stats.errors++;
-        this.memoCache.delete(key);
-      }
+    // 階層化キャッシュアクセス（最適化）
+    const cacheResult = this.getFromCacheHierarchy(key, enableMemoization, ttl);
+    if (cacheResult.found) {
+      this.stats.hits++;
+      return cacheResult.value;
     }
 
-    // 2. Apps Scriptキャッシュのチェック
-    try {
-      const cachedValue = this.scriptCache.get(key);
-      if (cachedValue !== null) {
-        debugLog(`[Cache] ScriptCache hit for key: ${key}`);
-        this.stats.hits++;
-        let parsedValue = cachedValue;
-        // WEB_APP_URL のように JSON ではない可能性のあるキーはパースしない
-        if (key !== 'WEB_APP_URL') {
-          try {
-            parsedValue = JSON.parse(cachedValue);
-          } catch (e) {
-            console.warn(`[Cache] Failed to parse cache for key: ${key} (not JSON, returning raw):`, e.message);
-            // パース失敗時は元の文字列をそのまま返す
-          }
-        }
-        if (enableMemoization) {
-          this.memoCache.set(key, { value: parsedValue, createdAt: Date.now(), ttl });
-        }
-        return parsedValue;
-      }
-    } catch (e) {
-      console.warn(`[Cache] Failed to parse cache for key: ${key}`, e.message);
-      this.stats.errors++;
-      // 破損したキャッシュエントリを削除
-      try {
-        this.scriptCache.remove(key);
-      } catch (removeError) {
-        console.warn(`[Cache] Failed to remove corrupted cache entry: ${key}`, removeError.message);
-      }
-    }
-
-    // 3. 値の生成とキャッシュ保存
+    // キャッシュミス: 新しい値を生成
     debugLog(`[Cache] Miss for key: ${key}. Generating new value.`);
     this.stats.misses++;
     
@@ -127,6 +81,109 @@ class CacheManager {
     }
 
     return newValue;
+  }
+
+  // =============================================================================
+  // 最適化されたヘルパー関数群
+  // =============================================================================
+
+  /**
+   * キーの妥当性検証
+   * @param {string} key - 検証するキー
+   * @returns {boolean} 妥当性
+   */
+  validateKey(key) {
+    if (!key || typeof key !== 'string') {
+      console.error(`[Cache] Invalid key: ${key}`);
+      return false;
+    }
+    if (key.length > 100) {
+      console.warn(`[Cache] Key too long: ${key}`);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * 階層化キャッシュから値を取得
+   * @param {string} key - キー
+   * @param {boolean} enableMemoization - メモ化キャッシュ有効
+   * @param {number} ttl - TTL
+   * @returns {Object} { found: boolean, value: any }
+   */
+  getFromCacheHierarchy(key, enableMemoization, ttl) {
+    // Level 1: メモ化キャッシュ（最高速）
+    if (enableMemoization && this.memoCache.has(key)) {
+      try {
+        const memoEntry = this.memoCache.get(key);
+        if (!memoEntry.ttl || (memoEntry.createdAt + memoEntry.ttl * 1000 > Date.now())) {
+          debugLog(`[Cache] L1(Memo) hit: ${key}`);
+          return { found: true, value: memoEntry.value };
+        } else {
+          this.memoCache.delete(key); // 期限切れを削除
+        }
+      } catch (e) {
+        console.warn(`[Cache] L1(Memo) error: ${key}`, e.message);
+        this.memoCache.delete(key);
+      }
+    }
+
+    // Level 2: Apps Scriptキャッシュ
+    try {
+      const cachedValue = this.scriptCache.get(key);
+      if (cachedValue !== null) {
+        debugLog(`[Cache] L2(Script) hit: ${key}`);
+        const parsedValue = this.parseScriptCacheValue(key, cachedValue);
+        
+        // メモ化キャッシュに昇格
+        if (enableMemoization && parsedValue !== null) {
+          this.memoCache.set(key, { value: parsedValue, createdAt: Date.now(), ttl });
+        }
+        
+        return { found: true, value: parsedValue };
+      }
+    } catch (e) {
+      console.warn(`[Cache] L2(Script) error: ${key}`, e.message);
+      this.stats.errors++;
+      this.handleCorruptedCacheEntry(key);
+    }
+
+    return { found: false, value: null };
+  }
+
+  /**
+   * ScriptCacheの値を安全にパース
+   * @param {string} key - キー
+   * @param {string} cachedValue - キャッシュされた値
+   * @returns {any} パースされた値
+   */
+  parseScriptCacheValue(key, cachedValue) {
+    // 特定のキーは生文字列として扱う
+    const rawStringKeys = ['WEB_APP_URL'];
+    if (rawStringKeys.includes(key)) {
+      return cachedValue;
+    }
+
+    try {
+      return JSON.parse(cachedValue);
+    } catch (e) {
+      console.warn(`[Cache] Parse failed for ${key}, returning raw string`);
+      return cachedValue;
+    }
+  }
+
+  /**
+   * 破損したキャッシュエントリを処理
+   * @param {string} key - キー
+   */
+  handleCorruptedCacheEntry(key) {
+    try {
+      this.scriptCache.remove(key);
+      this.memoCache.delete(key);
+      debugLog(`[Cache] Cleaned corrupted entry: ${key}`);
+    } catch (removeError) {
+      console.warn(`[Cache] Failed to clean corrupted entry: ${key}`, removeError.message);
+    }
   }
 
   /**

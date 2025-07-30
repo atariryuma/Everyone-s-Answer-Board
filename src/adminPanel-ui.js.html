@@ -135,88 +135,114 @@ function updateUIWithNewStatus(status) {
   isUIUpdateInProgress = true;
   
   try {
-    // 1. configJson正規化処理（包括的システム最適化）
-    status = validateAndFixUIState(status);
-    
-    // 2. Standardize status object with publication state and viewUrl
-    const publicationState = getPublicationState(status);
-    const viewUrl = generateViewUrl(status, userId);
-    
-    // Add normalized properties to status object
-    status._normalized = {
-      isPublished: publicationState.isPublished,
-      publishReason: publicationState.reason,
-      viewUrl: viewUrl,
-      hasValidViewUrl: !!viewUrl
-    };
-    
+    // Phase 1: データ準備（同期処理）
+    status = prepareStatusData(status);
     currentStatus = status;
-  
-  // セットアップ状況を確認
-  const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
-  
-  // 固定表示要素をクリア（setupStatus関係なく実行）
-  clearInitialDisplayElements();
-  
-  // Update static UI elements first（常に実行）
-  updateStaticUI(status);
-  
-  // セットアップ未完了時の追加処理
-  if (setupStatus === 'pending') {
-    updateButtonStatesForSetup(status);
-  }
-  
-  // Update dynamic content based on state
-  if (status.activeSheetName) {
-    updateDynamicContent(status);
-  } else {
-    updateUIForNoActiveSheet(status);
-  }
-  
-  // Update footer and guidance
-  updateFooterAndGuidance(status);
-  
-  // Update step indicators and manage sections
-  const currentStep = status.setupStep || 1;
-  updateStepIndicators(currentStep, status);
-  manageSectionStates(currentStep);
-  
-  // シート未選択時は列選択をクリア
-  if (!status.activeSheetName) {
-    clearColumnSelections();
-  }
-  
-  // Update unpublish button state
-  updateUnpublishButton(status);
-
-  // Update system status display and resource buttons (スプレッドシート・フォームボタンの有効化処理を含む)
-  updateSystemStatusDisplay(status);
-
-    // If an active sheet is set on initial load, load its configuration
-    if (status.activeSheetName && status.userInfo && status.userInfo.spreadsheetId) {
-      selectedSheet = status.activeSheetName;
-      loadConfigForSelected(status.activeSheetName, status.userInfo.spreadsheetId)
-        .then(result => {
-          console.log('✅ 初期化時のシート設定読み込み完了:', result);
-        })
-        .catch(error => {
-          console.warn('⚠️ 初期化時のシート設定読み込み失敗:', error);
-        });
-    }
     
+    // Phase 2: 並列UI更新（非同期処理の最適化）
+    executeParallelUIUpdates(status);
+    
+  } catch (error) {
+    logError('UI更新でエラー:', error);
   } finally {
-    // Release the UI update mutex
-    isUIUpdateInProgress = false;
-    
-    // Process any pending UI update
-    if (pendingUIUpdate) {
-      const nextUpdate = pendingUIUpdate;
-      pendingUIUpdate = null;
-      logDebug('Processing queued UI update');
-      setTimeout(() => updateUIWithNewStatus(nextUpdate), 0);
-    }
+    // 最後にMutexを解除
+    setTimeout(() => finishUIUpdate(), 0);
   }
 }
+
+// データ準備の最適化（同期処理部分）
+function prepareStatusData(status) {
+  // 1. configJson正規化処理（包括的システム最適化）
+  status = validateAndFixUIState(status);
+  
+  // 2. 正規化されたプロパティの追加（計算集約処理）
+  const publicationState = getPublicationState(status);
+  const viewUrl = generateViewUrl(status, userId);
+  
+  status._normalized = {
+    isPublished: publicationState.isPublished,
+    publishReason: publicationState.reason,
+    viewUrl: viewUrl,
+    hasValidViewUrl: !!viewUrl
+  };
+  
+  return status;
+}
+
+// 並列UI更新の実行（非同期処理の最適化）
+function executeParallelUIUpdates(status) {
+  const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
+  const currentStep = status.setupStep || 1;
+  
+  // 並列実行可能な更新タスクを定義
+  const updateTasks = [
+    // Task 1: 静的要素の更新
+    () => {
+      clearInitialDisplayElements();
+      updateStaticUI(status);
+      if (setupStatus === 'pending') {
+        updateButtonStatesForSetup(status);
+      }
+    },
+    
+    // Task 2: 動的コンテンツの更新
+    () => {
+      if (status.activeSheetName) {
+        updateDynamicContent(status);
+      } else {
+        updateUIForNoActiveSheet(status);
+      }
+    },
+    
+    // Task 3: フッターとガイダンスの更新
+    () => updateFooterAndGuidance(status),
+    
+    // Task 4: ステータスバーの更新（最適化済み）
+    () => updateStepIndicators(currentStep, status)
+  ];
+  
+  // 並列実行（requestAnimationFrameで最適化）
+  requestAnimationFrame(() => {
+    // 重い処理を複数のフレームに分散
+    executeTasksInBatches(updateTasks);
+  });
+}
+
+// タスクのバッチ実行（フレーム分散最適化）
+function executeTasksInBatches(tasks, batchSize = 2) {
+  if (tasks.length === 0) return;
+  
+  // 現在のバッチを実行
+  const currentBatch = tasks.splice(0, batchSize);
+  currentBatch.forEach(task => {
+    try {
+      task();
+    } catch (error) {
+      logError('UI更新タスクエラー:', error);
+    }
+  });
+  
+  // 残りのタスクがある場合は次のフレームで実行
+  if (tasks.length > 0) {
+    requestAnimationFrame(() => executeTasksInBatches(tasks, batchSize));
+  }
+}
+
+// UI更新完了処理
+function finishUIUpdate() {
+  isUIUpdateInProgress = false;
+  
+  // 待機中の更新があれば実行
+  if (pendingUIUpdate) {
+    const nextUpdate = pendingUIUpdate;
+    pendingUIUpdate = null;
+    updateUIWithNewStatus(nextUpdate);
+  }
+}
+
+// =============================================================================
+// HELPER FUNCTIONS FOR UI UPDATES
+// =============================================================================
 
 // Update unpublish button state
 function updateUnpublishButton(status) {
@@ -687,7 +713,7 @@ function getStepCompletionFromConfig(status) {
   }
 }
 
-// Update step indicators - 簡素化版
+// Update step indicators - 最適化版（バッチDOM更新）
 function updateStepIndicators(currentStep, status = null) {
   const steps = [
     document.getElementById('step-1-indicator'),
@@ -697,8 +723,11 @@ function updateStepIndicators(currentStep, status = null) {
 
   // データベース状態から実際の完了状況を取得
   const completion = getStepCompletionFromConfig(status);
-  console.log('📊 Step completion from database:', completion);
+  logDebug('📊 Step completion from database:', completion);
 
+  // DOM更新をバッチ化するための設定配列を作成
+  const updates = [];
+  
   steps.forEach((step, index) => {
     if (!step) return;
     
@@ -706,7 +735,7 @@ function updateStepIndicators(currentStep, status = null) {
     const circle = step.querySelector('div');
     const text = step.querySelector('span');
 
-    // 既存の公開状態バッジを削除
+    // 既存のバッジを削除（最適化）
     const existingBadge = step.querySelector('.publication-badge');
     if (existingBadge) {
       existingBadge.remove();
@@ -714,42 +743,66 @@ function updateStepIndicators(currentStep, status = null) {
 
     // データベース状態に基づく完了判定
     const isStepComplete = completion[`step${stepNumber}`];
-
-    if (isStepComplete) {
-      // 完了したステップ: チェックマーク表示
-      if (circle) {
-        circle.className = 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all';
-        circle.innerHTML = '✓';
-      }
-      if (text) {
-        text.classList.remove('text-gray-500', 'text-cyan-400');
-        text.classList.add('text-green-400', 'font-medium');
-      }
-    } else if (stepNumber === currentStep) {
-      // 現在のステップ: 強調表示と番号
-      if (circle) {
-        circle.className = 'w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-cyan-400 ring-offset-2 ring-offset-gray-900 animate-pulse';
-        circle.innerHTML = stepNumber;
-      }
-      if (text) {
-        text.classList.remove('text-gray-500', 'text-green-400');
-        text.classList.add('text-cyan-400', 'font-bold');
-      }
-    } else {
-      // 未完了のステップ: グレーアウト
-      if (circle) {
-        circle.className = 'w-6 h-6 bg-gray-700 text-gray-500 rounded-full flex items-center justify-center font-bold text-xs transition-all border border-gray-600';
-        circle.innerHTML = stepNumber;
-      }
-      if (text) {
-        text.classList.remove('text-white', 'text-green-400', 'text-cyan-400', 'font-bold', 'font-medium');
-        text.classList.add('text-gray-500');
-      }
-    }
+    
+    // 更新情報を配列に追加（実際のDOM更新は後で一括実行）
+    updates.push({
+      circle,
+      text,
+      stepNumber,
+      isStepComplete,
+      isCurrentStep: stepNumber === currentStep
+    });
   });
   
-  // 進行状況メッセージの更新
-  updateProgressMessage(currentStep, status, completion);
+  // バッチDOM更新実行（リフローを最小化）
+  requestAnimationFrame(() => {
+    executeBatchStepUpdates(updates);
+    // 進行状況メッセージの更新（同じアニメーションフレーム内で実行）
+    updateProgressMessage(currentStep, status, completion);
+  });
+}
+
+// バッチDOM更新の実行（最適化されたDOM操作）
+function executeBatchStepUpdates(updates) {
+  const styleConfigs = {
+    completed: {
+      circleClass: 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all',
+      circleContent: '✓',
+      textClasses: { remove: ['text-gray-500', 'text-cyan-400'], add: ['text-green-400', 'font-medium'] }
+    },
+    current: {
+      circleClass: 'w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-cyan-400 ring-offset-2 ring-offset-gray-900 animate-pulse',
+      textClasses: { remove: ['text-gray-500', 'text-green-400'], add: ['text-cyan-400', 'font-bold'] }
+    },
+    pending: {
+      circleClass: 'w-6 h-6 bg-gray-700 text-gray-500 rounded-full flex items-center justify-center font-bold text-xs transition-all border border-gray-600',
+      textClasses: { remove: ['text-white', 'text-green-400', 'text-cyan-400', 'font-bold', 'font-medium'], add: ['text-gray-500'] }
+    }
+  };
+
+  updates.forEach(({ circle, text, stepNumber, isStepComplete, isCurrentStep }) => {
+    let config;
+    
+    if (isStepComplete) {
+      config = styleConfigs.completed;
+    } else if (isCurrentStep) {
+      config = styleConfigs.current;
+    } else {
+      config = styleConfigs.pending;
+    }
+
+    // Circle要素の更新
+    if (circle) {
+      circle.className = config.circleClass;
+      circle.innerHTML = config.circleContent || stepNumber;
+    }
+
+    // Text要素の更新（クラス操作の最適化）
+    if (text && config.textClasses) {
+      text.classList.remove(...config.textClasses.remove);
+      text.classList.add(...config.textClasses.add);
+    }
+  });
 }
 
 function updateProgressMessage(currentStep, status = null, completion = null) {
@@ -761,31 +814,79 @@ function updateProgressMessage(currentStep, status = null, completion = null) {
     completion = getStepCompletionFromConfig(status);
   }
   
-  let message = '';
+  // 改善されたメッセージとガイダンス
+  const messageData = getEnhancedProgressMessage(currentStep, completion, status);
+  
+  messageElement.textContent = messageData.message;
+  messageElement.className = `text-sm ${messageData.colorClass} font-medium transition-colors duration-300`;
+}
+
+// 強化されたプログレスメッセージの生成
+function getEnhancedProgressMessage(currentStep, completion, status) {
+  const messageConfigs = {
+    1: {
+      completed: {
+        message: '✅ データ準備完了：フォーム・スプレッドシートが利用可能です',
+        colorClass: 'text-green-400'
+      },
+      inProgress: {
+        message: '📋 クイックスタート（自動）またはカスタムセットアップ（既存データ）を選択',
+        colorClass: 'text-cyan-400'
+      }
+    },
+    2: {
+      completed: {
+        message: '✅ シート設定完了：回答データの表示準備ができました',
+        colorClass: 'text-green-400'  
+      },
+      inProgress: {
+        message: '⚙️ シートを選択して、表示する列（質問・回答など）を設定してください',
+        colorClass: 'text-yellow-400'
+      }
+    },
+    3: {
+      published: {
+        message: '🎉 ボード公開中：参加者が回答を投稿・閲覧できます',
+        colorClass: 'text-green-400'
+      },
+      readyToPublish: {
+        message: '🚀 公開準備完了：「ボードを公開」で参加者に共有しましょう',
+        colorClass: 'text-purple-400'
+      },
+      needsConfiguration: {
+        message: '🔧 列設定を完了してから公開してください',
+        colorClass: 'text-orange-400'
+      }
+    }
+  };
+  
+  // ステップごとの状態判定とメッセージ選択
   switch (currentStep) {
     case 1:
-      message = completion.step1 ? 
-        '✅ ステップ1完了: データソースが準備済みです' : 
-        '📋 ステップ1: データソースを準備してください';
-      break;
+      return completion.step1 ? 
+        messageConfigs[1].completed : 
+        messageConfigs[1].inProgress;
+        
     case 2:
-      message = completion.step2 ? 
-        '✅ ステップ2完了: シート設定が完了済みです' :
-        '⚙️ ステップ2: シートと列の設定を完了してください';
-      break;
+      return completion.step2 ? 
+        messageConfigs[2].completed : 
+        messageConfigs[2].inProgress;
+        
     case 3:
       if (completion.isPublished) {
-        message = '✅ ボードが公開中です。設定変更や公開停止ができます';
+        return messageConfigs[3].published;
+      } else if (completion.step2) {
+        return messageConfigs[3].readyToPublish;
       } else {
-        message = '🚀 ステップ3: 列を設定してボードを公開しましょう';
+        return messageConfigs[3].needsConfiguration;
       }
-      break;
+      
     default:
-      message = '🎉 セットアップが完了しました！';
+      return {
+        message: '🎉 セットアップ完了：StudyQuestをお楽しみください！',
+        colorClass: 'text-green-400'
+      };
   }
-  
-  messageElement.textContent = message;
-  messageElement.className = `text-sm ${currentStep === 1 ? 'text-cyan-400' : currentStep === 2 ? 'text-yellow-400' : 'text-green-400'} font-medium mb-4`;
 }
 
 // Update footer and guidance text
@@ -1474,70 +1575,94 @@ function updateFormUrlDisplay(status = null) {
   
   if (!formUrlInput) return;
   
-  // 現在のstatusがない場合はglobal currentStatusを使用
+  // 現在のstatusの最適化された取得
   const currentStatusToUse = status || currentStatus;
-  let formUrl = null;
+  if (!currentStatusToUse || !currentStatusToUse.userInfo) {
+    logWarn('⚠️ updateFormUrlDisplay: status情報が不足しています');
+    return;
+  }
+  
+  // フォームURL取得の最適化（優先度順）
+  const formUrl = getFormUrlFromStatus(currentStatusToUse);
+  
+  // UI更新の最適化
+  if (formUrl) {
+    updateFormUrlElements(formUrlInput, openFormLink, formUrl);
+    handleFormUrlSectionVisibility(formUrlSection);
+    logDebug('🔗 FormURL UI更新完了:', formUrl);
+  } else {
+    clearFormUrlElements(formUrlInput, formUrlSection);
+    logDebug('📭 FormURL未設定のためUI非表示');
+  }
+}
+
+// フォームURL取得の最適化されたヘルパー関数
+function getFormUrlFromStatus(status) {
+  const userInfo = status.userInfo;
   
   // 1. configJsonから直接取得（最も確実）
-  if (currentStatusToUse && currentStatusToUse.userInfo && currentStatusToUse.userInfo.configJson) {
+  if (userInfo.configJson) {
     try {
-      const configJson = typeof currentStatusToUse.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatusToUse.userInfo.configJson) 
-        : currentStatusToUse.userInfo.configJson;
+      const configJson = typeof userInfo.configJson === 'string' 
+        ? JSON.parse(userInfo.configJson) 
+        : userInfo.configJson;
       
-      if (configJson && configJson.formUrl) {
-        formUrl = configJson.formUrl;
-        logDebug('✅ FormURL表示: configJsonから直接取得成功');
+      if (configJson?.formUrl) {
+        logDebug('✅ FormURL: configJsonから取得');
+        return configJson.formUrl;
       }
     } catch (error) {
-      logWarn('⚠️ configJsonの解析でエラー:', error);
+      logWarn('⚠️ configJSON解析エラー:', error.message);
     }
   }
   
-  // 2. ユーザー情報のformUrlから取得（フォールバック）
-  if (!formUrl && currentStatusToUse && currentStatusToUse.userInfo && currentStatusToUse.userInfo.formUrl) {
-    formUrl = currentStatusToUse.userInfo.formUrl;
-    logDebug('📋 FormURL表示: userInfo.formUrlから取得');
+  // 2. ユーザー情報から直接取得
+  if (userInfo.formUrl) {
+    logDebug('📋 FormURL: userInfoから取得');
+    return userInfo.formUrl;
   }
   
   // 3. カスタムフォーム情報から取得（後方互換性）
-  if (!formUrl && currentStatusToUse && currentStatusToUse.customFormInfo && currentStatusToUse.customFormInfo.formUrl) {
-    formUrl = currentStatusToUse.customFormInfo.formUrl;
-    logDebug('📄 FormURL表示: customFormInfo.formUrlから取得');
+  if (status.customFormInfo?.formUrl) {
+    logDebug('📄 FormURL: customFormInfoから取得');
+    return status.customFormInfo.formUrl;
   }
   
-  // UI要素の更新
-  if (formUrl) {
-    formUrlInput.value = formUrl;
-    if (openFormLink) {
-      openFormLink.href = formUrl;
-    }
+  return null;
+}
+
+// フォームURL要素更新の最適化
+function updateFormUrlElements(input, link, url) {
+  input.value = url;
+  if (link) {
+    link.href = url;
+  }
+}
+
+// フォームURL要素クリアの最適化
+function clearFormUrlElements(input, section) {
+  input.value = '';
+  if (section) {
+    section.classList.add('hidden');
+  }
+}
+
+// フォームURLセクション表示制御の最適化
+function handleFormUrlSectionVisibility(section) {
+  if (!section) return;
+  
+  const formJustCreated = sessionStorage.getItem('form_just_created');
+  if (formJustCreated === 'true') {
+    section.classList.remove('hidden');
+    logDebug('🆕 新規フォーム作成セクション表示');
     
-    // フォーム作成完了セクションの表示制御
-    if (formUrlSection) {
-      // 新しくフォームが作成された場合のみ表示
-      const formJustCreated = sessionStorage.getItem('form_just_created');
-      if (formJustCreated === 'true') {
-        formUrlSection.classList.remove('hidden');
-        logDebug('🆕 新規フォーム作成のため完了セクションを表示');
-        
-        // 10秒後にフラグをクリア（セクションは表示したまま）
-        setTimeout(() => {
-          sessionStorage.removeItem('form_just_created');
-          logDebug('🧹 フォーム作成完了フラグをクリアしました');
-        }, 10000);
-      } else {
-        formUrlSection.classList.add('hidden');
-        logDebug('📋 既存フォームのため完了セクションを非表示');
-      }
-    }
-    logDebug('🔗 FormURL UI更新完了:', formUrl);
+    // フラグクリアの最適化（タイマー処理）
+    setTimeout(() => {
+      sessionStorage.removeItem('form_just_created');
+      logDebug('🧹 フォーム作成フラグクリア');
+    }, 10000);
   } else {
-    formUrlInput.value = '';
-    if (formUrlSection) {
-      formUrlSection.classList.add('hidden');
-    }
-    logDebug('📭 FormURL未設定のためUI非表示');
+    section.classList.add('hidden');
   }
 }
 
