@@ -706,11 +706,12 @@ class StudyQuestApp {
         // 初期ロード状態を表示
         this.showLoadingOverlay();
         
-        // タイムアウト設定（15秒）
+        // タイムアウト設定（30秒）
         this.initTimeoutId = setTimeout(() => {
           this.hideLoadingOverlay();
-          console.warn('ページの初期化に時間がかかっています。ページを再読み込みしてください。');
-        }, 15000);
+          console.warn('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
+          this.showErrorMessage('初期化がタイムアウトしました。接続状況を確認して、ページを再読み込みしてください。', false);
+        }, 30000);
         
         // Reset state for clean initialization
         this.resetStateForCleanInit();
@@ -2439,7 +2440,7 @@ class StudyQuestApp {
   }
 
   /**
-   * 空状態表示用のフォームURLを取得
+   * 空状態表示用のフォームURLを取得 - 強化版
    * @returns {Promise<string|null>} フォームURL
    */
   async getFormUrlForEmptyState() {
@@ -2448,9 +2449,19 @@ class StudyQuestApp {
       
       // getCurrentUserStatusを使用してフォーム情報を取得
       const result = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('フォームURL取得がタイムアウトしました (10秒)'));
+        }, 10000);
+        
         google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
+          .withSuccessHandler(response => {
+            clearTimeout(timeout);
+            resolve(response);
+          })
+          .withFailureHandler(error => {
+            clearTimeout(timeout);
+            reject(error);
+          })
           .getCurrentUserStatus();
       });
       
@@ -2475,9 +2486,39 @@ class StudyQuestApp {
           console.log('✅ フォームURL取得成功 (userInfo):', result.userInfo.formUrl);
           return result.userInfo.formUrl;
         }
+        
+        // 3. スプレッドシートからフォームURLを検出（第三の方法）
+        if (result.userInfo.spreadsheetId) {
+          console.log('🔍 スプレッドシートからフォームURLを検出中...');
+          try {
+            const detectResult = await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error('フォームURL検出がタイムアウトしました (15秒)'));
+              }, 15000);
+              
+              google.script.run
+                .withSuccessHandler(response => {
+                  clearTimeout(timeout);
+                  resolve(response);
+                })
+                .withFailureHandler(error => {
+                  clearTimeout(timeout);
+                  reject(error);
+                })
+                .detectFormUrlFromSpreadsheet(result.userInfo.spreadsheetId, result.activeSheetName || null);
+            });
+            
+            if (detectResult && detectResult.success && detectResult.formUrl) {
+              console.log('✅ フォームURL検出成功:', detectResult.formUrl);
+              return detectResult.formUrl;
+            }
+          } catch (detectError) {
+            console.warn('⚠️ フォームURL検出エラー:', detectError);
+          }
+        }
       }
       
-      console.warn('⚠️ フォームURLが見つかりません');
+      console.warn('⚠️ 全ての方法でフォームURLが見つかりませんでした');
       return null;
       
     } catch (error) {
@@ -2957,8 +2998,8 @@ class StudyQuestApp {
         // データ取得を Promise で実行
         const result = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            reject(new Error('データ取得がタイムアウトしました'));
-          }, attempt === 0 ? 15000 : 10000); // 初回は15秒、以降は10秒
+            reject(new Error(`データ取得がタイムアウトしました (${attempt === 0 ? 30 : 20}秒)`));
+          }, attempt === 0 ? 30000 : 20000); // 初回は30秒、以降は20秒
           
           google.script.run
             .withSuccessHandler(response => {
@@ -3406,8 +3447,12 @@ class StudyQuestApp {
                   return;
                 }
               } else {
-                // データ不整合チェック: 軽量チェックでデータが存在するかを確認
-                console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
+                // データ状態チェック: 空データが正常な状態かエラーかを判定
+                if (result && result.data && Array.isArray(result.data) && result.data.length === 0 && result.header) {
+                  console.log('📝 StudyQuestApp: 正常な空データを受信（まだ回答がありません）:', result);
+                } else {
+                  console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
+                }
                 
                 try {
                   // 初期データロード時は高速復旧戦略を採用
