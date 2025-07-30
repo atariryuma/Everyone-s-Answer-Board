@@ -1032,6 +1032,43 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     // データ取得
     var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
     debugLog('getPublishedSheetData: sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
+    
+    // 診断: スプレッドシートとシートの存在確認
+    try {
+      console.log('🔍 診断: スプレッドシート詳細情報');
+      console.log('  publishedSpreadsheetId:', publishedSpreadsheetId);
+      console.log('  publishedSheetName:', publishedSheetName);
+      console.log('  データ取得結果:', {
+        status: sheetData.status,
+        totalCount: sheetData.totalCount,
+        hasData: !!(sheetData.data && sheetData.data.length > 0),
+        hasHeaders: !!(sheetData.headers && sheetData.headers.length > 0)
+      });
+      
+      if (sheetData.totalCount === 0) {
+        console.log('⚠️ 診断: データが0件です。原因を調査します...');
+        var spreadsheet = SpreadsheetApp.openById(publishedSpreadsheetId);
+        var sheet = spreadsheet.getSheetByName(publishedSheetName);
+        if (sheet) {
+          var lastRow = sheet.getLastRow();
+          var lastColumn = sheet.getLastColumn();
+          console.log('  スプレッドシート実状態:', {
+            lastRow: lastRow,
+            lastColumn: lastColumn,
+            hasData: lastRow > 1, // ヘッダー行を除く
+            範囲: `A1:${String.fromCharCode(64 + lastColumn)}${lastRow}`
+          });
+          
+          if (lastRow <= 1) {
+            console.log('⚠️ 診断結果: スプレッドシートにデータ行がありません（ヘッダーのみ）');
+          }
+        } else {
+          console.log('❌ 診断結果: 指定されたシート名が見つかりません');
+        }
+      }
+    } catch (diagnosisError) {
+      console.warn('診断処理でエラー:', diagnosisError.message);
+    }
 
     if (sheetData.status === 'error') {
       throw new Error(sheetData.message);
