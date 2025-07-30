@@ -332,6 +332,17 @@
               window.unifiedCache.clear();
             }
             loadSystemStatus();
+            
+            // 🔧 公開成功後に状態整合性チェック・修復を実行
+            setTimeout(() => {
+              console.log('🔧 公開後の状態整合性チェックを実行中...');
+              if (typeof runSetupRepair === 'function') {
+                runSetupRepair();
+              } else {
+                console.warn('⚠️ runSetupRepair関数が利用できません');
+              }
+            }, 500);
+            
             navigateToStep(3);
             
             // 自動停止確認モーダルを表示（公開成功後）

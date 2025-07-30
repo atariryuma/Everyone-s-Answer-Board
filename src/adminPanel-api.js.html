@@ -279,7 +279,23 @@ function runHeaderGuessing() {
           // ✨ 重要: AI判定完了後に自動的にセットアップを完了
           setTimeout(() => {
             console.log('🚀 AI判定完了 - 自動セットアップ完了処理を開始');
-            completeAIDetectionProcess();
+            
+            // セットアップ状態を確認して必要な場合のみ実行
+            if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
+              const config = typeof currentStatus.userInfo.configJson === 'string' 
+                ? JSON.parse(currentStatus.userInfo.configJson) 
+                : currentStatus.userInfo.configJson;
+              
+              if (config.setupStatus === 'pending' || !config.formCreated) {
+                console.log('🔧 セットアップ未完了状態を検出 - 自動完了を実行');
+                completeAIDetectionProcess();
+              } else {
+                console.log('✅ セットアップは既に完了済み - 自動完了をスキップ');
+              }
+            } else {
+              console.log('🔧 ステータス情報が不明 - 念のため自動完了を実行');
+              completeAIDetectionProcess();
+            }
           }, 1000);
         }, 100);
       })
@@ -415,6 +431,37 @@ function repairSetupStateInconsistencies() {
         fixes.push('注意: 公開状態の確認が必要');
       }
       
+      // 5. 🔧 新ルール: appPublished=true だが setupStatus='pending' の場合（公開済み不整合）
+      if (config.appPublished && config.setupStatus === 'pending') {
+        issues.push('公開済みだが setupStatus=pending');
+        config.setupStatus = 'completed';
+        fixes.push('setupStatus を completed に修正（既に公開済みのため）');
+      }
+      
+      // 6. 🔧 新ルール: 公開URLが存在するが formCreated=false の場合
+      if (currentStatus.viewUrl && currentStatus.viewUrl.trim() && !config.formCreated) {
+        issues.push('公開URLが存在するが formCreated=false');
+        config.formCreated = true;
+        fixes.push('formCreated を true に修正（公開URL存在のため）');
+      }
+      
+      // 7. 🔧 新ルール: isPublished=true だが setupStatus='pending' の場合（システム状態不整合）
+      if (currentStatus.isPublished && config.setupStatus === 'pending') {
+        issues.push('システムで公開済み判定だが setupStatus=pending');
+        config.setupStatus = 'completed';
+        fixes.push('setupStatus を completed に修正（公開状態確認済み）');
+      }
+      
+      // 8. 🔧 新ルール: AI判定結果が存在するがsetupStatus='pending'の場合（AI完了後の状態更新漏れ）
+      if (currentStatus.sheetDetails?.guessedConfig && 
+          currentStatus.sheetDetails.guessedConfig.opinionHeader && 
+          config.setupStatus === 'pending') {
+        issues.push('AI列判定完了済みだが setupStatus=pending');
+        config.setupStatus = 'completed';
+        config.formCreated = true; // AI判定完了時はフォームも準備完了とみなす
+        fixes.push('AI判定完了に基づいてセットアップ状態を完了に更新');
+      }
+      
       console.log('📋 診断結果:', { issues, fixes });
       
       if (fixes.length === 0) {
@@ -475,6 +522,17 @@ function runSetupRepair() {
           showMessage(result.message, 'success');
           if (result.fixes.length > 0) {
             console.log('修復詳細:', result.fixes);
+            
+            // 🔧 修復実行後は強制的にUI状態を更新
+            setTimeout(() => {
+              console.log('🔄 修復後のUI状態更新を実行中...');
+              if (typeof loadSystemStatus === 'function') {
+                loadSystemStatus();
+              }
+              if (typeof validateCurrentStep === 'function') {
+                validateCurrentStep();
+              }
+            }, 200);
           }
         }
       })
