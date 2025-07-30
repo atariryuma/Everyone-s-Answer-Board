@@ -1494,7 +1494,6 @@ function detectFormUrlFromSpreadsheet(spreadsheetId) {
     return { success: false, formUrl: null, method: 'error', message: error.message };
   }
 }
-}
 
 /**
  * 既存のフォームから指定されたスプレッドシートを出力先としているものを探す（逆検索）
