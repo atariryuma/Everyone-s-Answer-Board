@@ -19,7 +19,11 @@
         isValid = selectedSheetId || selectedFormId;
         break;
       case 2:
-        isValid = currentConfig && validateConfiguration();
+        // Step 2 validation: check for both config validation AND setup completion
+        const configValid = currentConfig && validateConfiguration();
+        const step2Complete = checkStep2Completion();
+        isValid = configValid || step2Complete;
+        console.log(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`);
         break;
       case 3:
         isValid = true;
@@ -73,8 +77,34 @@
               (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
   }
   
-  // Step 2完了チェック
+  // Step 2完了チェック - AI判定完了とセットアップ完了状態を確認
   function checkStep2Completion() {
+    if (!currentStatus || !currentStatus.activeSheetName) {
+      return false;
+    }
+    
+    // セットアップ状況を確認
+    try {
+      if (currentStatus.userInfo && currentStatus.userInfo.configJson) {
+        const config = typeof currentStatus.userInfo.configJson === 'string' 
+          ? JSON.parse(currentStatus.userInfo.configJson) 
+          : currentStatus.userInfo.configJson;
+        
+        // セットアップが完了している場合はStep 2完了とみなす
+        const setupCompleted = config.setupStatus === 'completed' && 
+                              config.formCreated === true && 
+                              config.formUrl && config.formUrl.trim();
+        
+        if (setupCompleted) {
+          console.log('✅ Step 2 完了: セットアップが完了済み');
+          return true;
+        }
+      }
+    } catch (error) {
+      console.warn('Step 2完了チェックでエラー:', error);
+    }
+    
+    // フォールバック: activeSheetNameのみで判定（従来の動作）
     return !!(currentStatus && currentStatus.activeSheetName);
   }
   

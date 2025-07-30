@@ -1299,12 +1299,16 @@ function addSpreadsheetUrl(requestUserId, url) {
     // スプレッドシートからフォームURLを自動検出（可能な場合）
     var formUrl = null;
     try {
-      formUrl = detectFormUrlFromSpreadsheet(spreadsheetId);
-      console.log('スプレッドシートからフォーム検出:', formUrl ? 'あり' : 'なし');
+      var formResult = detectFormUrlFromSpreadsheet(spreadsheetId);
+      console.log('スプレッドシートからフォーム検出結果:', formResult);
       
-      // 検出されたフォームURLをconfigJsonにも保存
-      if (formUrl) {
+      // 新しい返り値形式に対応
+      if (formResult && formResult.success && formResult.formUrl) {
+        formUrl = formResult.formUrl;
         configJson.formUrl = formUrl;
+        console.log('✅ フォーム検出成功 (' + formResult.method + '):', formUrl);
+      } else {
+        console.log('❌ フォーム検出失敗:', formResult?.message || '不明なエラー');
       }
     } catch (formDetectionError) {
       console.warn('フォーム自動検出でエラー:', formDetectionError.message);
@@ -1409,11 +1413,13 @@ function addFormUrl(requestUserId, url) {
  */
 function detectFormUrlFromSpreadsheet(spreadsheetId) {
   try {
+    console.log('🔍 フォームURL検出開始 (強化版):', spreadsheetId);
+    
     // スプレッドシートを開く
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     var sheets = spreadsheet.getSheets();
     
-    // 各シートでフォームへのリンクを探す
+    // 方法1: 各シートでフォームへのリンクを探す（getFormUrl）
     for (var i = 0; i < sheets.length; i++) {
       var sheet = sheets[i];
       
@@ -1422,14 +1428,43 @@ function detectFormUrlFromSpreadsheet(spreadsheetId) {
         var form = sheet.getFormUrl();
         if (form) {
           console.log('✅ フォーム自動検出成功 (getFormUrl):', form);
-          return form;
+          return { success: true, formUrl: form, method: 'getFormUrl' };
         }
       } catch (formError) {
         // getFormUrl()がエラーになる場合があるのでcatchする
+        console.debug('⚠️ getFormUrl failed for sheet:', sheet.getName(), formError.message);
       }
-      
-      // 手動でセルの内容からフォームURLを探す（A1:Z10の範囲）
+    }
+    
+    // 方法2: 既存フォームからスプレッドシートへの接続を逆検索
+    try {
+      console.log('🔍 方法2: 既存フォームからの逆検索を試行中...');
+      var foundFormUrl = findFormByDestinationSpreadsheet(spreadsheetId);
+      if (foundFormUrl) {
+        console.log('✅ フォーム逆検索成功:', foundFormUrl);
+        return { success: true, formUrl: foundFormUrl, method: 'reverseSearch' };
+      }
+    } catch (reverseError) {
+      console.debug('⚠️ 逆検索エラー:', reverseError.message);
+    }
+    
+    // 方法3: 自動フォーム作成（最後の手段）
+    try {
+      console.log('🔧 方法3: フォーム自動作成を試行中...');
+      var createdFormUrl = createFormForSpreadsheet(spreadsheetId, sheets[0].getName());
+      if (createdFormUrl) {
+        console.log('✅ フォーム自動作成成功:', createdFormUrl);
+        return { success: true, formUrl: createdFormUrl, method: 'autoCreate' };
+      }
+    } catch (createError) {
+      console.warn('⚠️ フォーム自動作成エラー:', createError.message);
+    }
+    
+    // 方法4: セル内容からフォームURLを手動検索（最後の検索方法）
+    for (var i = 0; i < sheets.length; i++) {
+      var sheet = sheets[i];
       try {
+        console.log('🔍 方法4: セル内容検索 -', sheet.getName());
         var range = sheet.getRange('A1:Z10');
         var values = range.getValues();
         
@@ -1441,21 +1476,158 @@ function detectFormUrlFromSpreadsheet(spreadsheetId) {
               var urlMatch = cellValue.match(/https:\/\/docs\.google\.com\/forms\/d\/[a-zA-Z0-9_-]+/);
               if (urlMatch) {
                 console.log('✅ フォーム自動検出成功 (セル内容):', urlMatch[0]);
-                return urlMatch[0];
+                return { success: true, formUrl: urlMatch[0], method: 'cellSearch' };
               }
             }
           }
         }
       } catch (cellError) {
-        console.warn('セル内容の検索でエラー:', cellError.message);
+        console.warn('⚠️ セル内容検索エラー:', sheet.getName(), cellError.message);
       }
     }
     
-    console.log('ℹ️ フォームURL検出: 見つかりませんでした');
+    console.log('❌ 全ての検出方法が失敗しました');
+    return { success: false, formUrl: null, method: 'none', message: 'フォームURLが見つかりませんでした' };
+    
+  } catch (error) {
+    console.error('❌ detectFormUrlFromSpreadsheet 致命的エラー:', error.message);
+    return { success: false, formUrl: null, method: 'error', message: error.message };
+  }
+}
+}
+
+/**
+ * 既存のフォームから指定されたスプレッドシートを出力先としているものを探す（逆検索）
+ * @param {string} targetSpreadsheetId - 探すスプレッドシートのID
+ * @returns {string|null} フォームURL（見つからない場合はnull）
+ */
+function findFormByDestinationSpreadsheet(targetSpreadsheetId) {
+  try {
+    console.log('🔍 フォーム逆検索開始:', targetSpreadsheetId);
+    
+    // Driveから最近作成されたフォームを検索
+    var formFiles = DriveApp.searchFiles('mimeType="application/vnd.google-apps.form"');
+    var checkedCount = 0;
+    var maxCheck = 20; // 最大20個のフォームをチェック
+    
+    while (formFiles.hasNext() && checkedCount < maxCheck) {
+      var formFile = formFiles.next();
+      checkedCount++;
+      
+      try {
+        var formId = formFile.getId();
+        var form = FormApp.openById(formId);
+        
+        // フォームの出力先スプレッドシートを確認
+        var destinationType = form.getDestinationType();
+        if (destinationType === FormApp.DestinationType.SPREADSHEET) {
+          var destinationId = form.getDestinationId();
+          
+          if (destinationId && destinationId === targetSpreadsheetId) {
+            var formUrl = form.getPublishedUrl();
+            console.log('✅ 逆検索で一致するフォームを発見:', formUrl);
+            return formUrl;
+          }
+        }
+      } catch (formCheckError) {
+        console.debug('⚠️ フォームチェックエラー:', formFile.getName(), formCheckError.message);
+      }
+    }
+    
+    console.log('ℹ️ 逆検索完了: 一致するフォームなし (' + checkedCount + '個チェック)');
     return null;
     
   } catch (error) {
-    console.error('detectFormUrlFromSpreadsheet エラー:', error.message);
+    console.warn('❌ フォーム逆検索エラー:', error.message);
+    return null;
+  }
+}
+
+/**
+ * スプレッドシート用のフォームを自動作成
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {string|null} 作成されたフォームのURL
+ */
+function createFormForSpreadsheet(spreadsheetId, sheetName) {
+  try {
+    console.log('🔧 createFormForSpreadsheet: フォーム自動作成開始', { spreadsheetId, sheetName });
+    
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var sheet = spreadsheet.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      console.error('❌ 指定されたシートが見つかりません:', sheetName);
+      return null;
+    }
+    
+    // ヘッダー行を取得（質問項目として使用）
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (!headers || headers.length === 0) {
+      console.error('❌ ヘッダー行が空です');
+      return null;
+    }
+    
+    // フォームを作成
+    var formTitle = `回答フォーム - ${spreadsheet.getName()}`;
+    var form = FormApp.create(formTitle);
+    
+    console.log('📝 フォーム作成成功:', form.getEditUrl());
+    
+    // ヘッダーから質問項目を作成（タイムスタンプとメール以外）
+    var questionCount = 0;
+    headers.forEach(function(header, index) {
+      if (header && typeof header === 'string' && header.trim()) {
+        var headerStr = header.trim();
+        
+        // システム列をスキップ
+        if (headerStr === 'タイムスタンプ' || 
+            headerStr === 'メールアドレス' ||
+            headerStr.toLowerCase().includes('timestamp') ||
+            headerStr.toLowerCase().includes('email')) {
+          return;
+        }
+        
+        // 質問項目を作成
+        if (headerStr.length > 5) { // 短すぎる項目はスキップ
+          var item;
+          if (headerStr.includes('理由') || headerStr.includes('説明') || headerStr.includes('詳細')) {
+            // 長文回答用
+            item = form.addParagraphTextItem();
+          } else {
+            // 短文回答用
+            item = form.addTextItem();
+          }
+          
+          item.setTitle(headerStr);
+          if (questionCount === 0) {
+            item.setRequired(true); // 最初の質問は必須
+          }
+          questionCount++;
+          console.log(`✅ 質問項目追加: ${headerStr}`);
+        }
+      }
+    });
+    
+    if (questionCount === 0) {
+      console.warn('⚠️ 有効な質問項目が見つかりませんでした');
+      return null;
+    }
+    
+    // フォームの回答先をスプレッドシートに設定
+    try {
+      form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
+      console.log('✅ フォーム回答先をスプレッドシートに設定');
+    } catch (destError) {
+      console.warn('⚠️ 回答先設定でエラー:', destError.message);
+    }
+    
+    var formUrl = form.getPublishedUrl();
+    console.log('✅ フォーム自動作成完了:', formUrl);
+    return formUrl;
+    
+  } catch (error) {
+    console.error('❌ createFormForSpreadsheet エラー:', error.message);
     return null;
   }
 }

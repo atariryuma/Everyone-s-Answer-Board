@@ -271,10 +271,16 @@ function runHeaderGuessing() {
           if (configToUse.reasonColumn) detectedColumns.push(`💭 理由列: ${configToUse.reasonColumn}`);
           
           const message = detectedColumns.length > 0 
-            ? `🎉 高精度AI判定が完了しました！\n\n検出された列:\n${detectedColumns.join('\n')}\n\n設定内容を確認して「保存・公開」を押してください。`
-            : '🎉 高精度AI判定が完了しました！設定内容を確認して「保存・公開」を押してください。';
+            ? `🎉 高精度AI判定が完了しました！\n\n検出された列:\n${detectedColumns.join('\n')}\n\n自動的にセットアップを完了します...`
+            : '🎉 高精度AI判定が完了しました！自動的にセットアップを完了します...';
           
           showMessage(message, 'success');
+          
+          // ✨ 重要: AI判定完了後に自動的にセットアップを完了
+          setTimeout(() => {
+            console.log('🚀 AI判定完了 - 自動セットアップ完了処理を開始');
+            completeAIDetectionProcess();
+          }, 1000);
         }, 100);
       })
       .catch(function(error) {
@@ -294,6 +300,191 @@ function runHeaderGuessing() {
         errorMessage += '\n\n💡 問題が続く場合は、管理者にお問い合わせください。';
         
         showMessage(errorMessage, 'error');
+      });
+  }
+}
+
+// ✨ AI判定完了後の自動セットアップ完了処理
+function completeAIDetectionProcess() {
+  try {
+    console.log('🔧 AI判定完了 - セットアップ自動完了を実行中...');
+    
+    // 1. 設定検証
+    if (!validateConfig()) {
+      console.warn('⚠️ AI判定結果の設定が不完全 - 手動設定が必要');
+      showMessage('AI判定結果を確認してください。設定に不備があります。', 'warning');
+      return;
+    }
+    
+    // 2. フォームURL検出・作成の実行
+    console.log('🔍 フォームURL検出を実行中...');
+    
+    runGasWithUserId('detectFormUrlFromSpreadsheet', 'フォーム検出中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+      .then(result => {
+        console.log('📋 フォーム検出結果:', result);
+        
+        if (result && result.success && result.formUrl) {
+          console.log('✅ フォームURL検出成功:', result.formUrl);
+          
+          // 3. 設定の自動保存と完了状態への更新
+          const config = buildConfigObject();
+          config.formUrl = result.formUrl;
+          config.formCreated = true;
+          config.setupStatus = 'completed';
+          
+          console.log('💾 AI判定完了後の設定を自動保存中...', config);
+          
+          return runGasWithUserId('saveConfiguration', '設定保存中...', config);
+        } else {
+          throw new Error('フォームURLの検出に失敗しました');
+        }
+      })
+      .then(saveResult => {
+        if (saveResult && saveResult.success) {
+          console.log('✅ AI判定完了 - 設定自動保存完了');
+          showMessage('🎉 AI判定とセットアップが自動完了しました！', 'success');
+          
+          // 4. UI状態の更新
+          if (typeof loadSystemStatus === 'function') {
+            loadSystemStatus();
+          }
+          
+          // 5. ステップ表示の更新
+          if (typeof navigateToStep === 'function') {
+            navigateToStep(3); // ステップ3（表示設定）に進む
+          }
+          
+        } else {
+          throw new Error(saveResult?.message || '設定の保存に失敗しました');
+        }
+      })
+      .catch(error => {
+        console.error('❌ AI判定完了処理でエラー:', error);
+        showMessage(`⚠️ セットアップの自動完了に失敗しました: ${error.message}\n手動で「保存・公開」を実行してください。`, 'warning');
+      });
+      
+  } catch (error) {
+    console.error('❌ completeAIDetectionProcess 致命的エラー:', error);
+    showMessage('セットアップ自動完了でエラーが発生しました。手動で設定を確認してください。', 'error');
+  }
+}
+
+// ✨ セットアップ状態の診断・修復機能
+function repairSetupStateInconsistencies() {
+  return new Promise((resolve, reject) => {
+    try {
+      console.log('🔧 セットアップ状態の診断・修復を開始...');
+      
+      if (!currentStatus || !currentStatus.userInfo) {
+        reject(new Error('ユーザー情報が利用できません'));
+        return;
+      }
+      
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+        
+      const issues = [];
+      const fixes = [];
+      
+      // 1. フォームURL vs formCreated の整合性チェック
+      if (config.formUrl && config.formUrl.trim() && !config.formCreated) {
+        issues.push('フォームURLが存在するが formCreated=false');
+        config.formCreated = true;
+        fixes.push('formCreated を true に修正');
+      }
+      
+      // 2. formCreated vs setupStatus の整合性チェック
+      if (config.formCreated && config.setupStatus !== 'completed') {
+        issues.push('フォームが作成済みだが setupStatus != completed');
+        config.setupStatus = 'completed';
+        fixes.push('setupStatus を completed に修正');
+      }
+      
+      // 3. スプレッドシートIDとactiveSheetNameの整合性チェック
+      if (currentStatus.userInfo.spreadsheetId && !currentStatus.activeSheetName && selectedSheet) {
+        issues.push('スプレッドシートが存在するが activeSheetName が未設定');
+        // これはconfigではなくstatusの問題なので、バックエンドで修正が必要
+        fixes.push('activeSheetName の更新が必要（要バックエンド処理）');
+      }
+      
+      // 4. 公開状態の整合性チェック（publishedSheetName vs appPublished）
+      if (config.publishedSheetName && !config.appPublished) {
+        issues.push('公開シート名が存在するが appPublished=false');
+        // これは慎重に判断する必要があるため、警告のみ
+        fixes.push('注意: 公開状態の確認が必要');
+      }
+      
+      console.log('📋 診断結果:', { issues, fixes });
+      
+      if (fixes.length === 0) {
+        resolve({
+          success: true,
+          message: '✅ セットアップ状態に問題は見つかりませんでした',
+          issues: [],
+          fixes: []
+        });
+        return;
+      }
+      
+      // 修正された設定を保存
+      console.log('💾 修正された設定を保存中...', config);
+      
+      runGasWithUserId('saveConfiguration', '設定修復中...', config)
+        .then(saveResult => {
+          if (saveResult && saveResult.success) {
+            console.log('✅ セットアップ状態の修復完了');
+            
+            // UI状態の更新
+            if (typeof loadSystemStatus === 'function') {
+              loadSystemStatus();
+            }
+            
+            resolve({
+              success: true,
+              message: `🔧 ${fixes.length}件のセットアップ問題を修復しました`,
+              issues,
+              fixes
+            });
+          } else {
+            reject(new Error(saveResult?.message || '設定の保存に失敗しました'));
+          }
+        })
+        .catch(saveError => {
+          reject(new Error(`設定保存エラー: ${saveError.message}`));
+        });
+        
+    } catch (error) {
+      console.error('❌ セットアップ状態修復でエラー:', error);
+      reject(error);
+    }
+  });
+}
+
+// ✨ セットアップ診断・修復を実行するUI関数
+function runSetupRepair() {
+  const btn = document.getElementById('setup-repair-btn');
+  if (btn) {
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>修復中...';
+    
+    repairSetupStateInconsistencies()
+      .then(result => {
+        if (result.success) {
+          showMessage(result.message, 'success');
+          if (result.fixes.length > 0) {
+            console.log('修復詳細:', result.fixes);
+          }
+        }
+      })
+      .catch(error => {
+        console.error('セットアップ修復エラー:', error);
+        showMessage(`セットアップ修復に失敗しました: ${error.message}`, 'error');
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
       });
   }
 }
