@@ -13,7 +13,7 @@ let pendingUIUpdate = null;
 // UTILITY FUNCTIONS
 // =============================================================================
 
-// Unified publication state detection
+// Unified publication state detection with enhanced flow completion recognition
 function getPublicationState(status) {
   if (!status) {
     return { isPublished: false, reason: 'No status data' };
@@ -40,17 +40,51 @@ function getPublicationState(status) {
       if (config.appPublished === true) {
         isPublished = true;
         reason = 'configJson.appPublished=true';
+        
+        // Enhanced validation: Verify setup completion indicators
+        const hasCompletedSetup = (
+          config.setupStatus === 'completed' &&
+          config.formCreated === true &&
+          config.publishedSheetName &&
+          config.publishedSpreadsheetId
+        );
+        
+        if (hasCompletedSetup) {
+          reason += ' (完全セットアップ済み)';
+        } else {
+          console.log('⚠️ Publication state: appPublished=true but setup incomplete', {
+            setupStatus: config.setupStatus,
+            formCreated: config.formCreated,
+            hasPublishedSheet: !!config.publishedSheetName,
+            hasPublishedSpreadsheet: !!config.publishedSpreadsheetId
+          });
+          reason += ' (セットアップ不完全)';
+        }
+      } 
+      // 4. Enhanced completion check: Allow recognition of completed but not yet published setups
+      else if (config.setupStatus === 'completed' && 
+               config.formCreated === true && 
+               config.publishedSheetName && 
+               config.publishedSpreadsheetId) {
+        // This covers cases where setup is complete but appPublished might not be properly set
+        console.log('🔧 Publication state: Setup complete but appPublished=false - potential state inconsistency');
+        reason = 'セットアップ完了だが公開状態不整合';
+        // Don't auto-publish, but log for debugging
       }
     } catch (e) {
       console.warn('Failed to parse configJson:', e);
     }
   }
   
-  // 4. Strict fallback: only if explicit publication indicators exist
+  // Maintained strict logic to prevent false positives
   // Note: Removed loose fallback logic that assumed activeSheetName = published
-  // This prevents false positives where unpublished boards show as published
   
-  return { isPublished, reason };
+  return { 
+    isPublished, 
+    reason,
+    // Add confidence level for better debugging
+    confidence: isPublished ? (reason.includes('完全セットアップ済み') ? 'high' : 'medium') : 'low'
+  };
 }
 
 // Generate viewUrl with comprehensive fallback logic

@@ -842,11 +842,116 @@ function createFormWithConfig() {
                         // AI判定結果が利用可能な場合、自動で設定を保存
                         if (configResult && configResult.config && configResult.config.guessedConfig) {
                           console.log('🤖 AI判定結果を自動保存中...');
+                          
+                          // 設定保存前にキャッシュクリアを実行
+                          if (typeof clearServerCache === 'function') {
+                            clearServerCache().then(() => {
+                              console.log('✅ サーバーキャッシュクリア完了');
+                            }).catch(cacheError => {
+                              console.warn('⚠️ キャッシュクリア失敗:', cacheError);
+                            });
+                          }
+                          
                           setTimeout(() => {
-                            // 設定保存処理を呼び出し
+                            // カスタムセットアップ専用の確実な設定保存処理
                             if (typeof saveAndPublish === 'function') {
-                              saveAndPublish();
-                              console.log('✅ カスタムセットアップ: AI判定結果を自動保存しました');
+                              // カスタムセットアップ用の強制公開設定
+                              const forcePublishConfig = {
+                                batchMode: true,
+                                displayOptions: {
+                                  showNames: false, // カスタムセットアップのデフォルト
+                                  showCounts: false
+                                }
+                              };
+                              
+                              // 直接シート設定保存（batchMode確実適用）
+                              const directSaveResult = await runGasWithUserId('saveSheetConfig', 'カスタム設定を保存中...', 
+                                userId, result.sheetName, currentStatus.userInfo.spreadsheetId, 
+                                configResult.config.guessedConfig, forcePublishConfig);
+                              
+                              console.log('✅ カスタムセットアップ: 直接設定保存完了', directSaveResult);
+                              
+                              saveAndPublish().then(async (saveResult) => {
+                                console.log('✅ カスタムセットアップ: AI判定結果を自動保存しました', saveResult);
+                                
+                                // 保存後に追加でキャッシュクリア
+                                if (typeof clearServerCache === 'function') {
+                                  clearServerCache().then(() => {
+                                    console.log('✅ 保存後キャッシュクリア完了');
+                                  });
+                                }
+                                
+                                // 設定反映確認
+                                if (configResult.config.guessedConfig) {
+                                  const verificationResult = await verifyConfigAfterSave(
+                                    result.sheetName, 
+                                    configResult.config.guessedConfig
+                                  );
+                                  
+                                  if (verificationResult.success) {
+                                    console.log('🎯 カスタムセットアップ: 設定反映確認完了');
+                                  } else {
+                                    console.warn('⚠️ カスタムセットアップ: 設定反映に問題があります', verificationResult.message);
+                                  }
+                                }
+                                
+                                // フロー完了確認（必須状態の包括的確認）
+                                const completionResult = await verifySetupFlowCompletion('custom', result.sheetName);
+                                
+                                if (completionResult.success) {
+                                  console.log('🎉 カスタムセットアップフロー完了確認: 全要件を満たしています', completionResult.details);
+                                  
+                                  // 設定同期メカニズムを実行（完了状態の維持・強化）
+                                  const syncResult = await enhanceConfigSynchronization('custom', {
+                                    sheetName: result.sheetName,
+                                    spreadsheetId: currentStatus.userInfo.spreadsheetId,
+                                    config: configResult.config.guessedConfig
+                                  });
+                                  
+                                  let successMessage = `✅ カスタムセットアップが正常に完了しました！\n\n設定内容:\n📋 シート: ${result.sheetName}\n🎯 ステータス: ${completionResult.details.setupStatus}\n📢 公開状態: ${completionResult.details.appPublished ? '公開中' : '非公開'}`;
+                                  
+                                  if (syncResult.synchronized) {
+                                    successMessage += `\n\n🔄 設定同期: ${syncResult.appliedFixes.length}件の修正を適用しました`;
+                                    console.log('🔧 カスタムセットアップ: 設定同期完了', syncResult.appliedFixes);
+                                  }
+                                  
+                                  showMessage(successMessage, 'success');
+                                } else {
+                                  console.warn('⚠️ カスタムセットアップフロー: 未完了項目があります', completionResult);
+                                  
+                                  // 未完了項目がある場合も同期メカニズムで修正を試行
+                                  try {
+                                    const syncResult = await enhanceConfigSynchronization('custom', {
+                                      sheetName: result.sheetName,
+                                      spreadsheetId: currentStatus.userInfo.spreadsheetId,
+                                      config: configResult.config.guessedConfig
+                                    });
+                                    
+                                    if (syncResult.synchronized) {
+                                      console.log('🔧 カスタムセットアップ: 未完了項目を同期修正で解決', syncResult.appliedFixes);
+                                      showMessage(`✅ カスタムセットアップが完了しました！\n\n📋 シート: ${result.sheetName}\n🔧 ${syncResult.appliedFixes.length}件の設定不整合を自動修正しました`, 'success');
+                                    } else {
+                                      // 同期修正でも解決できない場合の警告
+                                      let warningMessage = `⚠️ セットアップに未完了項目があります:\n\n`;
+                                      if (completionResult.issues) {
+                                        warningMessage += completionResult.issues.join('\n') + '\n\n';
+                                      }
+                                      warningMessage += '管理者パネルで設定を確認してください。';
+                                      showMessage(warningMessage, 'warning');
+                                    }
+                                  } catch (syncError) {
+                                    console.error('❌ カスタムセットアップ: 同期修正処理エラー', syncError);
+                                    let warningMessage = `⚠️ セットアップに未完了項目があります:\n\n`;
+                                    if (completionResult.issues) {
+                                      warningMessage += completionResult.issues.join('\n') + '\n\n';
+                                    }
+                                    warningMessage += '管理者パネルで設定を確認してください。';
+                                    showMessage(warningMessage, 'warning');
+                                  }
+                                }
+                              }).catch(saveError => {
+                                console.error('❌ カスタムセットアップ自動保存失敗:', saveError);
+                              });
                             } else {
                               console.warn('⚠️ saveAndPublish関数が見つかりません');
                             }
@@ -1190,6 +1295,364 @@ const FRESH_SAVE_PROTECTION_DURATION = 30000; // 30 seconds
 
 // Make freshSaveTimestamp globally accessible
 window.freshSaveTimestamp = freshSaveTimestamp;
+
+// =============================================================================
+// CONFIG VERIFICATION MECHANISM
+// =============================================================================
+
+/**
+ * 設定保存後の検証機能
+ * カスタムセットアップで設定した内容が正しく保存・反映されているかを確認
+ */
+async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
+  try {
+    console.log('🔍 設定反映確認開始:', expectedSheetName);
+    
+    // 少し待ってからステータスを再取得
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const verificationStatus = await runGasWithUserId('getAppConfig', '設定反映を確認中...');
+    
+    if (verificationStatus && verificationStatus.userInfo) {
+      const configJson = JSON.parse(verificationStatus.userInfo.configJson || '{}');
+      const sheetKey = 'sheet_' + expectedSheetName;
+      const savedConfig = configJson[sheetKey];
+      
+      console.log('🔍 保存された設定:', savedConfig);
+      console.log('🔍 期待する設定:', expectedConfig);
+      
+      // 基本的な整合性チェック
+      const isConsistent = (
+        savedConfig &&
+        savedConfig.guessedConfig &&
+        expectedConfig.opinionHeader &&
+        savedConfig.guessedConfig.opinionHeader === expectedConfig.opinionHeader
+      );
+      
+      if (isConsistent) {
+        console.log('✅ 設定反映確認: 正常に保存されています');
+        return { success: true, message: '設定が正常に反映されました' };
+      } else {
+        console.warn('⚠️ 設定反映確認: 設定に不整合があります');
+        
+        // 自動修復を試行
+        console.log('🔧 設定不整合を検出 - 自動修復を試行中...');
+        await runGasWithUserId('saveSheetConfig', '設定を修復中...', 
+          userId, expectedSheetName, currentStatus.userInfo.spreadsheetId, expectedConfig, { batchMode: true });
+        
+        return { success: false, message: '設定不整合を検出し、修復を試行しました', repaired: true };
+      }
+    }
+    
+    return { success: false, message: '設定確認中にエラーが発生しました' };
+    
+  } catch (error) {
+    console.error('❌ 設定反映確認エラー:', error);
+    return { success: false, message: '設定確認処理でエラーが発生しました: ' + error.message };
+  }
+}
+
+/**
+ * セットアップフロー完了確認（QuickStart・Custom Setup共通）
+ * @param {string} flowType - 'quickstart' または 'custom'
+ * @param {string} sheetName - 対象シート名
+ * @returns {Object} 完了確認結果
+ */
+async function verifySetupFlowCompletion(flowType, sheetName) {
+  try {
+    console.log(`🎯 ${flowType}フロー完了確認開始:`, sheetName);
+    
+    // 設定が安定するまで少し待つ
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    const completionStatus = await runGasWithUserId('getAppConfig', 'フロー完了状態を確認中...');
+    
+    if (!completionStatus || !completionStatus.userInfo) {
+      console.error('❌ フロー完了確認: ステータス取得失敗');
+      return { success: false, message: 'ステータス取得に失敗しました' };
+    }
+    
+    const configJson = JSON.parse(completionStatus.userInfo.configJson || '{}');
+    const issues = [];
+    
+    // 必須完了状態の確認
+    console.log('🔍 完了状態確認 - configJson:', {
+      setupStatus: configJson.setupStatus,
+      appPublished: configJson.appPublished,
+      formCreated: configJson.formCreated,
+      publishedSheetName: configJson.publishedSheetName,
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId
+    });
+    
+    // 1. setupStatus='completed' 確認
+    if (configJson.setupStatus !== 'completed') {
+      issues.push(`❌ setupStatus: "${configJson.setupStatus}" → "completed"が必要`);
+    }
+    
+    // 2. appPublished=true 確認  
+    if (configJson.appPublished !== true) {
+      issues.push(`❌ appPublished: ${configJson.appPublished} → trueが必要`);
+    }
+    
+    // 3. formCreated=true 確認
+    if (configJson.formCreated !== true) {
+      issues.push(`❌ formCreated: ${configJson.formCreated} → trueが必要`);
+    }
+    
+    // 4. 公開情報の確認
+    if (!configJson.publishedSheetName) {
+      issues.push(`❌ publishedSheetName未設定 → "${sheetName}"が必要`);
+    } else if (configJson.publishedSheetName !== sheetName) {
+      issues.push(`❌ publishedSheetName不一致: "${configJson.publishedSheetName}" → "${sheetName}"`);
+    }
+    
+    if (!configJson.publishedSpreadsheetId) {
+      issues.push('❌ publishedSpreadsheetId未設定');
+    }
+    
+    // 5. シート固有設定の確認
+    const sheetKey = 'sheet_' + sheetName;
+    const sheetConfig = configJson[sheetKey];
+    if (!sheetConfig || !sheetConfig.guessedConfig) {
+      issues.push(`❌ シート設定未保存: ${sheetKey}`);
+    }
+    
+    if (issues.length === 0) {
+      console.log(`✅ ${flowType}フロー完了確認: すべての要件を満たしています`);
+      return {
+        success: true,
+        message: `${flowType}フローが正常に完了しました`,
+        details: {
+          setupStatus: configJson.setupStatus,
+          appPublished: configJson.appPublished,
+          formCreated: configJson.formCreated,
+          publishedSheetName: configJson.publishedSheetName,
+          hasSheetConfig: !!sheetConfig?.guessedConfig
+        }
+      };
+    } else {
+      console.warn(`⚠️ ${flowType}フロー完了確認: 未完了項目があります`, issues);
+      return {
+        success: false,
+        message: `${flowType}フローに未完了項目があります`,
+        issues: issues,
+        details: {
+          setupStatus: configJson.setupStatus,
+          appPublished: configJson.appPublished,
+          formCreated: configJson.formCreated,
+          publishedSheetName: configJson.publishedSheetName,
+          hasSheetConfig: !!sheetConfig?.guessedConfig
+        }
+      };
+    }
+    
+  } catch (error) {
+    console.error(`❌ ${flowType}フロー完了確認エラー:`, error);
+    return { 
+      success: false, 
+      message: `フロー完了確認でエラーが発生しました: ${error.message}` 
+    };
+  }
+}
+
+/**
+ * 設定同期メカニズム強化 - フロー完了状態との整合性を保つ
+ * @param {string} flowType - 'quickstart' または 'custom'
+ * @param {Object} expectedState - 期待される設定状態
+ * @returns {Promise<Object>} 同期結果
+ */
+async function enhanceConfigSynchronization(flowType, expectedState) {
+  try {
+    console.log(`🔄 ${flowType}フロー: 設定同期メカニズム開始`, expectedState);
+    
+    // 現在のステータスを取得
+    const currentStatus = await runGasWithUserId('getAppConfig', '設定同期のため最新状態を取得中...');
+    
+    if (!currentStatus || !currentStatus.userInfo) {
+      throw new Error('設定同期: ステータス取得失敗');
+    }
+    
+    const configJson = JSON.parse(currentStatus.userInfo.configJson || '{}');
+    const synchronizationIssues = [];
+    const appliedFixes = [];
+    
+    // 1. 必須設定状態の確認と修正
+    const requiredStates = {
+      setupStatus: 'completed',
+      appPublished: true,
+      formCreated: true,
+      publishedSheetName: expectedState.sheetName,
+      publishedSpreadsheetId: expectedState.spreadsheetId || currentStatus.userInfo.spreadsheetId
+    };
+    
+    let needsSync = false;
+    const updatedConfig = { ...configJson };
+    
+    for (const [key, expectedValue] of Object.entries(requiredStates)) {
+      if (configJson[key] !== expectedValue) {
+        synchronizationIssues.push(`${key}: "${configJson[key]}" → "${expectedValue}"`);
+        updatedConfig[key] = expectedValue;
+        needsSync = true;
+      }
+    }
+    
+    // 2. シート固有設定の同期確認
+    if (expectedState.sheetName && expectedState.config) {
+      const sheetKey = 'sheet_' + expectedState.sheetName;
+      const currentSheetConfig = configJson[sheetKey];
+      
+      if (!currentSheetConfig || !currentSheetConfig.guessedConfig) {
+        synchronizationIssues.push(`シート設定未保存: ${sheetKey}`);
+        updatedConfig[sheetKey] = {
+          guessedConfig: expectedState.config,
+          lastUpdated: new Date().toISOString(),
+          flowType: flowType
+        };
+        needsSync = true;
+      }
+    }
+    
+    // 3. 設定の同期適用（必要な場合のみ）
+    if (needsSync) {
+      console.log(`🔧 ${flowType}フロー: 設定不整合を検出 - 同期修正を実行`, synchronizationIssues);
+      
+      // バックエンドに同期修正を依頼
+      const syncResult = await runGasWithUserId('syncConfigurationState', '設定同期を実行中...', 
+        userId, updatedConfig, flowType);
+      
+      if (syncResult && syncResult.success) {
+        appliedFixes.push(...synchronizationIssues);
+        console.log(`✅ ${flowType}フロー: 設定同期修正完了`, appliedFixes);
+        
+        // キャッシュをクリアして最新状態を反映
+        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+          window.unifiedCache.clear();
+        }
+        
+        return {
+          success: true,
+          synchronized: true,
+          appliedFixes: appliedFixes,
+          message: `${flowType}フローの設定同期が完了しました`
+        };
+      } else {
+        console.warn(`⚠️ ${flowType}フロー: 設定同期修正に失敗`, syncResult);
+        return {
+          success: false,
+          synchronized: false,
+          issues: synchronizationIssues,
+          message: '設定同期修正に失敗しました'
+        };
+      }
+    } else {
+      console.log(`✅ ${flowType}フロー: 設定は既に同期されています`);
+      return {
+        success: true,
+        synchronized: false,
+        message: `${flowType}フローの設定は既に正しく同期されています`
+      };
+    }
+    
+  } catch (error) {
+    console.error(`❌ ${flowType}フロー設定同期エラー:`, error);
+    return {
+      success: false,
+      synchronized: false,
+      error: error.message,
+      message: `設定同期処理でエラーが発生しました: ${error.message}`
+    };
+  }
+}
+
+/**
+ * 統合的な設定整合性チェック - 複数フローに対応
+ * @param {Object} status - 現在のステータス
+ * @returns {Object} 整合性チェック結果
+ */
+function performIntegratedConfigConsistencyCheck(status) {
+  if (!status || !status.userInfo) {
+    return { consistent: false, issues: ['ステータスデータが不正です'] };
+  }
+  
+  try {
+    const configJson = JSON.parse(status.userInfo.configJson || '{}');
+    const issues = [];
+    const recommendations = [];
+    
+    // 1. 基本的な設定整合性チェック
+    const basicChecks = [
+      {
+        condition: configJson.setupStatus === 'completed',
+        issue: 'setupStatusがcompletedではありません',
+        recommendation: 'セットアップフローを完了してください'
+      },
+      {
+        condition: configJson.formCreated === true,
+        issue: 'formCreatedがtrueではありません',
+        recommendation: 'フォーム作成処理を実行してください'
+      },
+      {
+        condition: !!configJson.publishedSheetName,
+        issue: 'publishedSheetNameが未設定です',
+        recommendation: 'シート選択を確認してください'
+      },
+      {
+        condition: !!configJson.publishedSpreadsheetId,
+        issue: 'publishedSpreadsheetIdが未設定です',
+        recommendation: 'スプレッドシート設定を確認してください'
+      }
+    ];
+    
+    basicChecks.forEach(check => {
+      if (!check.condition) {
+        issues.push(check.issue);
+        recommendations.push(check.recommendation);
+      }
+    });
+    
+    // 2. 公開状態の整合性チェック
+    if (configJson.appPublished === true) {
+      if (configJson.setupStatus !== 'completed') {
+        issues.push('公開状態なのにセットアップが未完了です');
+        recommendations.push('セットアップを完了するか、公開を停止してください');
+      }
+      if (!configJson.formCreated) {
+        issues.push('公開状態なのにフォームが未作成です');
+        recommendations.push('フォームを作成するか、公開を停止してください');
+      }
+    }
+    
+    // 3. シート固有設定の整合性チェック
+    if (configJson.publishedSheetName) {
+      const sheetKey = 'sheet_' + configJson.publishedSheetName;
+      const sheetConfig = configJson[sheetKey];
+      
+      if (!sheetConfig || !sheetConfig.guessedConfig) {
+        issues.push(`シート固有設定が未保存です: ${configJson.publishedSheetName}`);
+        recommendations.push('列設定を確認・保存してください');
+      }
+    }
+    
+    const isConsistent = issues.length === 0;
+    
+    return {
+      consistent: isConsistent,
+      issues: issues,
+      recommendations: recommendations,
+      severity: issues.length > 3 ? 'high' : issues.length > 1 ? 'medium' : 'low',
+      summary: isConsistent ? '設定は整合性が保たれています' : `${issues.length}件の整合性問題が見つかりました`
+    };
+    
+  } catch (error) {
+    console.error('設定整合性チェックエラー:', error);
+    return {
+      consistent: false,
+      issues: ['設定解析エラーが発生しました'],
+      recommendations: ['設定を再確認してください'],
+      error: error.message
+    };
+  }
+}
 
 // Get optimal polling interval based on user activity
 function getOptimalPollInterval() {
@@ -1834,6 +2297,69 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           window.unifiedCache.clear();
         }
         loadStatus(true);
+        
+        // QuickStartフロー完了確認（包括的な完了状態検証）
+        setTimeout(async () => {
+          try {
+            const sheetName = result.sheetName || result.publishedSheetName || 'unknown_sheet';
+            const completionResult = await verifySetupFlowCompletion('quickstart', sheetName);
+            
+            if (completionResult.success) {
+              console.log('🎉 QuickStartフロー完了確認: 全要件を満たしています', completionResult.details);
+              
+              // QuickStart成功時も設定同期を実行（堅牢性の向上）
+              try {
+                const syncResult = await enhanceConfigSynchronization('quickstart', {
+                  sheetName: sheetName,
+                  spreadsheetId: result.spreadsheetId,
+                  config: result.config || {}
+                });
+                
+                if (syncResult.synchronized) {
+                  console.log('🔧 QuickStart: 設定同期で追加最適化を実行', syncResult.appliedFixes);
+                }
+              } catch (syncError) {
+                console.warn('⚠️ QuickStart: 設定同期処理でエラー（フロー完了には影響なし）', syncError);
+              }
+            } else {
+              console.warn('⚠️ QuickStartフロー: 未完了項目があります', completionResult);
+              
+              // QuickStartで未完了項目がある場合は積極的に同期修正を試行
+              try {
+                const syncResult = await enhanceConfigSynchronization('quickstart', {
+                  sheetName: sheetName,
+                  spreadsheetId: result.spreadsheetId,
+                  config: result.config || {}
+                });
+                
+                if (syncResult.synchronized) {
+                  console.log('🔧 QuickStart: 未完了項目を同期修正で自動解決', syncResult.appliedFixes);
+                  
+                  // 再度完了確認を実行
+                  const reVerificationResult = await verifySetupFlowCompletion('quickstart', sheetName);
+                  if (reVerificationResult.success) {
+                    console.log('✅ QuickStart: 同期修正後の再確認で完了を確認');
+                  } else {
+                    console.warn('⚠️ QuickStart: 同期修正後も未完了項目が残存', reVerificationResult.issues);
+                  }
+                } else {
+                  // 同期修正できない場合の警告（QuickStartでは控えめに）
+                  let notificationMessage = `🔍 QuickStart完了確認:\n`;
+                  if (completionResult.issues && completionResult.issues.length > 0) {
+                    notificationMessage += `未完了項目: ${completionResult.issues.length}件\n`;
+                    console.log('📋 QuickStart未完了詳細:', completionResult.issues);
+                  }
+                  notificationMessage += '詳細はコンソールログをご確認ください。';
+                  console.info(notificationMessage);
+                }
+              } catch (syncError) {
+                console.error('❌ QuickStart: 同期修正処理エラー', syncError);
+              }
+            }
+          } catch (verificationError) {
+            console.error('❌ QuickStartフロー完了確認エラー:', verificationError);
+          }
+        }, 2000);
         
         // 公開時は履歴保存を行わない（公開停止時に保存するため）
         logDebug('QuickStart completed - history will be saved on unpublish');

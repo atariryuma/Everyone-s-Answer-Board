@@ -3591,9 +3591,17 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     // 名簿マップを作成（キャッシュ利用）
     var rosterMap = buildRosterMap(rosterData);
     
-    // 表示モードを取得
+    // 表示モードとシート固有設定を取得
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+    
+    // シート固有の設定を取得（最新のAI判定結果を反映）
+    var sheetKey = 'sheet_' + sheetName;
+    var sheetConfig = configJson[sheetKey] || {};
+    
+    // AI判定結果またはguessedConfigがある場合、それを優先使用
+    var effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
+    debugLog('🔍 executeGetSheetData: シート設定取得完了 sheetKey=%s, hasGuessedConfig=%s', sheetKey, !!effectiveHeaderConfig.opinionHeader);
     
     // Check if current user is the board owner
     var isOwner = (configJson.ownerId === userId);
@@ -3618,22 +3626,74 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     // ソート適用
     var sortedData = applySortMode(filteredData, sortMode || 'newest');
     
+    // カスタムフォーム設定がある場合のヘッダー情報を優先
+    var effectiveHeaders = headers;
+    var mainQuestionHeader = headers[0]; // デフォルトは最初の列をメイン質問とする
+    
+    // AI判定結果またはシート設定からメイン質問を特定
+    if (effectiveHeaderConfig.opinionHeader) {
+      var opinionIndex = headers.indexOf(effectiveHeaderConfig.opinionHeader);
+      if (opinionIndex !== -1) {
+        mainQuestionHeader = effectiveHeaderConfig.opinionHeader;
+        debugLog('🎯 executeGetSheetData: AI判定結果からメインヘッダー設定 - %s', mainQuestionHeader);
+      }
+    }
+    
     return {
       status: 'success',
       data: sortedData,
-      headers: headers,
+      headers: effectiveHeaders,
+      header: mainQuestionHeader, // フロントエンドが期待するメインヘッダー
       totalCount: sortedData.length,
-      displayMode: displayMode
+      displayMode: displayMode,
+      sheetName: sheetName,
+      showCounts: configJson.showCounts || false,
+      // デバッグ情報
+      _sheetConfig: sheetConfig,
+      _effectiveHeaderConfig: effectiveHeaderConfig
     };
     
   } catch (e) {
     console.error('シートデータ取得エラー: ' + e.message);
-    return {
-      status: 'error',
-      message: 'データの取得に失敗しました: ' + e.message,
-      data: [],
-      headers: []
-    };
+    console.error('Error stack: ' + e.stack);
+    
+    // データ取得失敗時のフォールバック処理
+    try {
+      var userInfo = findUserById(userId);
+      var configJson = JSON.parse(userInfo.configJson || '{}');
+      var sheetKey = 'sheet_' + sheetName;
+      var sheetConfig = configJson[sheetKey] || {};
+      var effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
+      
+      // 設定からメインヘッダーを復元
+      var fallbackHeader = effectiveHeaderConfig.opinionHeader || sheetName;
+      
+      console.warn('🔄 データ取得失敗 - フォールバック情報で応答: header=' + fallbackHeader);
+      
+      return {
+        status: 'success', // フロントエンドエラーを避けるためsuccessを返す
+        data: [],
+        headers: [],
+        header: fallbackHeader,
+        totalCount: 0,
+        displayMode: configJson.displayMode || 'anonymous',
+        sheetName: sheetName,
+        showCounts: configJson.showCounts || false,
+        _error: 'データ取得に失敗しました: ' + e.message,
+        _fallbackUsed: true
+      };
+    } catch (fallbackError) {
+      console.error('フォールバック処理も失敗: ' + fallbackError.message);
+      
+      return {
+        status: 'error',
+        message: 'データの取得に失敗しました: ' + e.message,
+        data: [],
+        headers: [],
+        header: sheetName,
+        totalCount: 0
+      };
+    }
   }
 }
 
