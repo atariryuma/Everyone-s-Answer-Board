@@ -3407,8 +3407,8 @@ class StudyQuestApp {
                 // UIにエラーメッセージを表示
                 this.displayUserNotFoundError(result.message);
                 return;
-                }
-              } else {
+              }
+            } else {
                 // データ状態チェック: 空データが正常な状態かエラーかを判定
                 const isValidEmptyData = result && result.data && Array.isArray(result.data) && result.data.length === 0 && result.header;
                 
