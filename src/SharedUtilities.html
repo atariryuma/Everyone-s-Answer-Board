@@ -895,10 +895,8 @@ class UnifiedLoadingManager {
 
     try {
       if (isLoading) {
-        console.log('UnifiedLoadingManager: Showing loading overlay with options:', options);
         this.show(options);
       } else {
-        console.log('UnifiedLoadingManager: Hiding loading overlay.');
         this.hide();
       }
     } catch (error) {
