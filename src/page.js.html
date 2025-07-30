@@ -2443,56 +2443,28 @@ class StudyQuestApp {
    */
   async getFormUrlForEmptyState() {
     try {
-      // getCurrentUserStatusを使用してフォーム情報を取得
-      const result = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('フォームURL取得がタイムアウトしました (5秒)'));
-        }, 5000); // 10秒→5秒に短縮
-        
-        google.script.run
-          .withSuccessHandler(response => {
-            clearTimeout(timeout);
-            resolve(response);
-          })
-          .withFailureHandler(error => {
-            clearTimeout(timeout);
-            reject(error);
-          })
-          .getCurrentUserStatus();
-      });
+      // getActiveFormInfoを使用してフォーム情報を取得
+        const result = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('フォームURL取得がタイムアウトしました (10秒)'));
+          }, 10000); // 10秒に延長
+
+          google.script.run
+            .withSuccessHandler(response => {
+              clearTimeout(timeout);
+              resolve(response);
+            })
+            .withFailureHandler(error => {
+              clearTimeout(timeout);
+              reject(error);
+            })
+            .getActiveFormInfo(this.state.userId);
+        });
       
-      if (result && result.status === 'success' && result.userInfo) {
-        // 1. configJsonからフォームURLを確実に取得（最優先）
-        if (result.userInfo.configJson) {
-          try {
-            const configJson = typeof result.userInfo.configJson === 'string' ? 
-              JSON.parse(result.userInfo.configJson) : result.userInfo.configJson;
-            
-            // シート固有のフォームURLも確認
-            const sheetName = result.activeSheetName || this.state.currentActiveSheet;
-            if (sheetName) {
-              const sheetKey = `sheet_${sheetName}`;
-              const sheetConfig = configJson[sheetKey];
-              if (sheetConfig && sheetConfig.formUrl) {
-                console.log('✅ フォームURL取得成功 (シート固有):', sheetConfig.formUrl);
-                return sheetConfig.formUrl;
-              }
-            }
-            
-            // 全体のフォームURL
-            if (configJson.formUrl) {
-              console.log('✅ フォームURL取得成功 (configJson):', configJson.formUrl);
-              return configJson.formUrl;
-            }
-          } catch (parseError) {
-            console.warn('⚠️ configJson解析エラー:', parseError);
-          }
-        }
-        
-        // 2. userInfo.formUrlから取得（フォールバック）
-        if (result.userInfo.formUrl) {
-          console.log('✅ フォームURL取得成功 (userInfo):', result.userInfo.formUrl);
-          return result.userInfo.formUrl;
+      if (result && result.status === 'success') {
+        if (result.formUrl) {
+          console.log('✅ フォームURL取得成功:', result.formUrl);
+          return result.formUrl;
         }
       }
       
