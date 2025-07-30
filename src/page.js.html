@@ -3377,8 +3377,11 @@ class StudyQuestApp {
       console.log('📡 Starting data fetch with parameters:', fetchParams);
       
       // エラーハンドリング強化版のデータ取得
-      await this.performDataFetchWithRetry(fetchParams, isInitialLoad)
-        .then(async result => {
+      try {
+        const result = await this.performDataFetchWithRetry(
+          fetchParams,
+          isInitialLoad
+        );
           // 初期ロードタイムアウトをクリア
           if (isInitialLoad && this.initTimeoutId) {
             clearTimeout(this.initTimeoutId);
@@ -3611,8 +3614,7 @@ class StudyQuestApp {
               await this.validatePostLoadState();
               console.log('✅ Step 4: Consistency validation completed');
             });
-        })
-        .catch(error => {
+        } catch (error) {
           // 初期ロードタイムアウトをクリア
           if (isInitialLoad && this.initTimeoutId) {
             clearTimeout(this.initTimeoutId);
@@ -3634,7 +3636,7 @@ class StudyQuestApp {
           }
           
           this.safeDisplayEmptyState();
-        });
+        }
       
       
       // Post-processing after successful data load
