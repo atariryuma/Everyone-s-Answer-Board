@@ -11,13 +11,20 @@ describe('getWebAppBaseUrl caching', () => {
     context = {
       cacheManager: {
         store,
-        get(key, fn) {
-          if (this.store[key]) return this.store[key];
+        get(key, fn, options = {}) {
+          if (this.store[key]) {
+            return this.store[key];
+          }
           const val = fn();
           this.store[key] = val;
           return val;
         },
-        remove(key) { delete this.store[key]; }
+        remove(key) { 
+          delete this.store[key]; 
+        },
+        put(key, value, ttl) { 
+          this.store[key] = value; 
+        }
       },
       ScriptApp: {
         getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
@@ -55,12 +62,12 @@ describe('getWebAppBaseUrl caching', () => {
         getUuid: () => 'mock-uuid',
         computeDigest: () => [],
         Charset: { UTF_8: 'UTF-8' }
-      }
+      },
+      debugLog: (...args) => console.log('[DEBUG]', ...args)
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
-    vm.runInContext(urlCode, context);
   });
 
 
@@ -74,6 +81,7 @@ describe('getWebAppBaseUrl caching', () => {
 
     // Change the underlying service URL, but cache should still return old value
     context.ScriptApp.getService = () => ({ getUrl: () => 'https://script.google.com/macros/s/NEW_ID/exec' });
+    context.ScriptApp.getScriptId = () => 'NEW_ID';
     const url2 = context.getWebAppBaseUrl();
     expect(url2).toBe('https://script.google.com/macros/s/ID/exec'); // Still the cached value
 
