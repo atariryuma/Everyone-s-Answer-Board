@@ -264,12 +264,17 @@ class StudyQuestApp {
       getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode)
     };
     
-    // Polling settings
+    // Polling settings with dynamic interval adjustment
     this.pollingSettings = {
       enabled: true,
-      interval: 30000, // 30秒間隔
+      baseInterval: 30000, // 基本30秒間隔
+      currentInterval: 30000, // 現在の間隔
+      minInterval: 15000, // 最小15秒 (高アクティビティ時)
+      maxInterval: 120000, // 最大2分 (低アクティビティ時)
       maxRetries: 3,
-      currentRetries: 0
+      currentRetries: 0,
+      successCount: 0, // 連続成功回数
+      activityScore: 0 // アクティビティスコア
     };
     const savedCols = localStorage.getItem('boardColumns');
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
@@ -1683,7 +1688,35 @@ class StudyQuestApp {
     }
   }
 
-  // 新着回答のポーリング開始
+  // Dynamic polling interval adjustment based on activity
+  adjustPollingInterval(hasNewContent = false) {
+    const settings = this.pollingSettings;
+    
+    if (hasNewContent) {
+      // 新着コンテンツがある場合は間隔を短くして活性化
+      settings.activityScore = Math.min(settings.activityScore + 10, 100);
+      settings.currentInterval = Math.max(
+        settings.minInterval,
+        settings.baseInterval - (settings.activityScore * 150) // 最大15秒短縮
+      );
+    } else {
+      // 新着コンテンツがない場合は徐々に間隔を長くして負荷軽減
+      settings.activityScore = Math.max(settings.activityScore - 5, 0);
+      settings.currentInterval = Math.min(
+        settings.maxInterval,
+        settings.baseInterval + (settings.activityScore * 900) // 最大90秒延長
+      );
+    }
+    
+    console.log('📊 ポーリング間隔調整:', {
+      hasNewContent,
+      activityScore: settings.activityScore,
+      newInterval: settings.currentInterval,
+      intervalChange: settings.currentInterval - settings.baseInterval
+    });
+  }
+
+  // 新着回答のポーリング開始 (最適化版)
   startNewAnswerPolling() {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
@@ -1693,8 +1726,20 @@ class StudyQuestApp {
       if (!this.pollingSettings.enabled) return;
 
       try {
-        await this.checkForNewAnswers();
-        this.pollingSettings.currentRetries = 0; // 成功時はリトライカウントをリセット
+        const hasNewContent = await this.checkForNewAnswers();
+        this.pollingSettings.currentRetries = 0;
+        this.pollingSettings.successCount++;
+        
+        // 動的間隔調整
+        this.adjustPollingInterval(hasNewContent);
+        
+        // 間隔が変更された場合はポーリングを再開
+        if (this.pollingSettings.currentInterval !== this.pollingSettings.interval) {
+          this.pollingSettings.interval = this.pollingSettings.currentInterval;
+          this.startNewAnswerPolling(); // 新しい間隔で再開
+          return;
+        }
+        
       } catch (error) {
         this.pollingSettings.currentRetries++;
         console.warn(`ポーリングエラー (${this.pollingSettings.currentRetries}/${this.pollingSettings.maxRetries}):`, error);
@@ -1704,10 +1749,11 @@ class StudyQuestApp {
           this.stopNewAnswerPolling();
         }
       }
-    }, this.pollingSettings.interval);
+    }, this.pollingSettings.currentInterval);
 
-    console.log('🔄 新着回答ポーリング開始:', {
-      interval: this.pollingSettings.interval,
+    console.log('🔄 新着回答ポーリング開始 (最適化版):', {
+      currentInterval: this.pollingSettings.currentInterval,
+      activityScore: this.pollingSettings.activityScore,
       enabled: this.pollingSettings.enabled
     });
   }
@@ -2136,8 +2182,23 @@ class StudyQuestApp {
   }
 
   destroy() {
+    console.log('🧹 StudyQuestApp: 包括的クリーンアップ開始');
+    
+    // ポーリング停止（改善版）
     this.stopPolling();
+    this.stopNewAnswerPolling();
+    
+    // 動的間隔調整の設定をリセット
+    if (this.pollingSettings) {
+      this.pollingSettings.enabled = false;
+      this.pollingSettings.activityScore = 0;
+      this.pollingSettings.currentInterval = this.pollingSettings.baseInterval;
+    }
+    
+    // 既存のクリーンアップ
     this.cleanup();
+    
+    // イベントリスナーの削除（既存）
     if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
       this.elements.sizeSlider.removeEventListener('input', this.handlers.onSizeSliderInput);
     }
@@ -2233,17 +2294,26 @@ class StudyQuestApp {
         console.warn('⚠️ StudyQuestApp: Admin verification failed, continuing with default permissions:', error.message);
       });
       
-      // 3. Start loading immediately without waiting
-      console.log('📊 StudyQuestApp: Starting sheet data loading...');
+      // 3. Start loading immediately without waiting - 最適化版
+      console.log('📊 StudyQuestApp: Starting optimized sheet data loading...');
       try {
-        await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: true });
+        // 初回読み込み時はキャッシュを活用して高速化
+        await this.loadSheetData({ 
+          showLoading: false, 
+          isInitialLoad: true, 
+          bypassCache: false // 初回読み込み最適化: キャッシュを活用
+        });
         console.log('✅ StudyQuestApp: Sheet data loaded, restoring differential cards...');
         
         // 差分カードの復元
         this.restoreDifferentialCards();
         
-        console.log('✅ StudyQuestApp: Starting polling...');
-        this.startPolling();
+        // ポーリング開始を少し遅らせて初回読み込みを優先
+        console.log('✅ StudyQuestApp: Scheduling delayed polling start...');
+        setTimeout(() => {
+          this.startPolling();
+          console.log('✅ StudyQuestApp: Delayed polling started');
+        }, 1000); // 1秒遅延でポーリング開始
       } catch (error) {
         console.error('❌ StudyQuestApp: Sheet data loading failed:', error);
         this.displayDataLoadError(error.message || 'データの読み込みに失敗しました');
@@ -2452,14 +2522,24 @@ class StudyQuestApp {
           google.script.run
             .withSuccessHandler(response => {
               clearTimeout(timeout);
+              console.log('🔍 getActiveFormInfo レスポンス:', response);
               resolve(response);
             })
             .withFailureHandler(error => {
               clearTimeout(timeout);
+              console.error('❌ getActiveFormInfo エラー:', error);
               reject(error);
             })
             .getActiveFormInfo(this.state.userId);
         });
+      
+      console.log('🔍 フォームURL判定:', {
+        hasResult: !!result,
+        status: result?.status,
+        hasFormUrl: !!(result?.formUrl),
+        formUrl: result?.formUrl || 'null',
+        resultKeys: result ? Object.keys(result) : []
+      });
       
       if (result && result.status === 'success') {
         if (result.formUrl) {
@@ -3154,8 +3234,14 @@ class StudyQuestApp {
       ...options
     };
 
-    if (config.isInitialLoad) {
+    // 初回読み込み最適化: bypassCacheが明示的に指定されていない場合のみキャッシュ活用
+    if (config.isInitialLoad && options.bypassCache === undefined) {
+      // 初回読み込み時は適度なキャッシュ活用で高速化
+      config.bypassCache = false;
+      console.log('🚀 初回読み込み最適化: キャッシュを活用します');
+    } else if (config.isInitialLoad && options.bypassCache === true) {
       config.bypassCache = true;
+      console.log('🔄 初回読み込み: 明示的なキャッシュバイパス');
     }
     
     // Prevent concurrent loading

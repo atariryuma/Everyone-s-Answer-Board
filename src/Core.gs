@@ -1937,6 +1937,16 @@ function getActiveFormInfo(requestUserId) {
     }
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // デバッグログを追加
+    debugLog('🔍 getActiveFormInfo: configJson分析', {
+      userId: currentUserId,
+      formUrl: configJson.formUrl || 'null',
+      editFormUrl: configJson.editFormUrl || 'null',
+      formCreated: !!configJson.formCreated,
+      setupStatus: configJson.setupStatus || 'undefined',
+      publishedSheetName: configJson.publishedSheetName || 'null'
+    });
 
     // フォーム回答数を取得
     var answerCount = 0;
