@@ -3070,8 +3070,23 @@ function deleteUserAccount(userId) {
         'self'
       );
 
-      // 関連するすべてのキャッシュを削除
-      invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+        // 関連するすべてのキャッシュを削除
+        invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+
+        // セッション関連のキャッシュも完全クリア
+        try {
+          if (typeof cleanupSessionOnAccountSwitch === 'function') {
+            cleanupSessionOnAccountSwitch(userInfo.adminEmail);
+          }
+          if (typeof cacheManager !== 'undefined') {
+            cacheManager.clearAll();
+          }
+          if (typeof clearAllExecutionCache === 'function') {
+            clearAllExecutionCache();
+          }
+        } catch (cacheError) {
+          warnLog('アカウント削除後のキャッシュクリアでエラー:', cacheError.message);
+        }
 
       // Google Drive のデータは保持するため何も操作しない
 
