@@ -459,7 +459,13 @@ function repairSetupStateInconsistencies() {
         issues.push('AI列判定完了済みだが setupStatus=pending');
         config.setupStatus = 'completed';
         config.formCreated = true; // AI判定完了時はフォームも準備完了とみなす
-        fixes.push('AI判定完了に基づいてセットアップ状態を完了に更新');
+        config.customSetupCompleted = true; // カスタムセットアップ完了フラグ
+        fixes.push('AI判定完了に基づいてカスタムセットアップ状態を完了に更新');
+        
+        // カスタムセットアップの自動完了処理をトリガー
+        setTimeout(() => {
+          triggerCustomSetupCompletion(selectedSheet);
+        }, 1000);
       }
       
       console.log('📋 診断結果:', { issues, fixes });
@@ -2060,6 +2066,101 @@ function simulateCustomFormProgressWithFolderCheck() {
         }, 2000);
       }, 1000);
     });
+}
+
+// =============================================================================
+// CUSTOM SETUP COMPLETION MANAGEMENT
+// =============================================================================
+
+/**
+ * カスタムセットアップの自動完了処理をトリガー
+ * @param {string} sheetName - 完了対象のシート名
+ */
+function triggerCustomSetupCompletion(sheetName) {
+  console.log('🎯 カスタムセットアップ自動完了処理開始:', sheetName);
+  
+  try {
+    // オプション設定セクションを表示
+    showCustomSetupOptionsSection();
+    
+    // 完了状態を表示
+    showCustomSetupCompletionMessage(sheetName);
+    
+    // セットアップステップを自動更新
+    updateSetupStepIndicator(3); // ステップ3（完了）に更新
+    
+    console.log('✅ カスタムセットアップ自動完了処理完了');
+    
+  } catch (error) {
+    console.error('❌ カスタムセットアップ自動完了処理エラー:', error);
+  }
+}
+
+/**
+ * カスタムセットアップのオプション設定セクションを表示
+ */
+function showCustomSetupOptionsSection() {
+  const optionsSection = document.getElementById('custom-options-section');
+  const setupSection = document.getElementById('setup-section');
+  
+  if (optionsSection) {
+    optionsSection.classList.remove('hidden');
+    console.log('✅ オプション設定セクションを表示');
+  }
+  
+  if (setupSection) {
+    // セットアップセクションは非表示にしない（ユーザーが設定を確認できるように）
+    console.log('ℹ️ セットアップセクションは表示のまま維持');
+  }
+}
+
+/**
+ * カスタムセットアップ完了メッセージを表示
+ * @param {string} sheetName - 完了したシート名
+ */
+function showCustomSetupCompletionMessage(sheetName) {
+  showMessage(
+    `🎉 カスタムセットアップが完了しました！シート「${sheetName}」でAI列判定が完了し、設定可能な詳細オプションが表示されました。お好みに応じて設定を調整してください。`,
+    'success',
+    8000 // 8秒間表示
+  );
+  
+  // 詳細な完了情報もログ出力
+  console.log('🎉 カスタムセットアップ完了詳細:', {
+    sheetName: sheetName,
+    completedAt: new Date().toISOString(),
+    nextSteps: ['オプション設定の調整（任意）', '公開設定の確認']
+  });
+}
+
+/**
+ * セットアップステップインジケーターを更新
+ * @param {number} step - 更新するステップ番号
+ */
+function updateSetupStepIndicator(step) {
+  try {
+    // 既存のアクティブステップを無効化
+    const activeSteps = document.querySelectorAll('.step-indicator.active');
+    activeSteps.forEach(el => el.classList.remove('active'));
+    
+    // 新しいステップをアクティブに
+    const targetStep = document.getElementById(`step-${step}-indicator`);
+    if (targetStep) {
+      targetStep.classList.add('active');
+      console.log(`✅ ステップ${step}インジケーターをアクティブに更新`);
+    }
+    
+    // ステップ完了の視覚的フィードバック
+    for (let i = 1; i < step; i++) {
+      const completedStep = document.getElementById(`step-${i}-indicator`);
+      if (completedStep) {
+        completedStep.classList.add('completed');
+      }
+    }
+    
+  } catch (error) {
+    console.warn('⚠️ ステップインジケーター更新エラー:', error);
+  }
 }
 
 // =============================================================================

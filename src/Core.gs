@@ -388,13 +388,17 @@ function validateConfigJsonState(configJson, userInfo) {
     return { isValid: false, errors: ['configJsonが無効です'], warnings: [] };
   }
 
-  // 公開済み状態では厳格なvalidationをバイパス（安定性優先）
+  // 公開済み状態とQuickStart状態では厳格なvalidationをバイパス（安定性優先）
   const appPublished = !!configJson.appPublished;
-  if (appPublished) {
+  const isQuickStartCompleted = (configJson.setupStatus === 'completed' && configJson.formCreated === true);
+  
+  if (appPublished || isQuickStartCompleted) {
     return { 
       isValid: true, 
       errors: [], 
-      warnings: ['公開済み状態のためvalidationをバイパスしました'] 
+      warnings: appPublished ? 
+        ['公開済み状態のためvalidationをバイパスしました'] : 
+        ['QuickStart完了状態のためvalidationを緩和しました']
     };
   }
 
@@ -2348,7 +2352,11 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
     classHeader: 'クラス',
     formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl, // シート固有のフォームURL保存
     editFormUrl: formAndSsInfo.editFormUrl, // 編集用URL保存
-    lastModified: new Date().toISOString()
+    formCreated: true, // シート固有のフォーム作成フラグ
+    setupStatus: 'completed', // シート固有のセットアップ状態
+    isConfigured: true, // 設定完了フラグ
+    lastModified: new Date().toISOString(),
+    createdAt: new Date().toISOString() // 作成日時記録
   };
 
   debugLog('📝 クイックスタート用質問文設定:');
@@ -2407,8 +2415,24 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   debugLog('📋 データベース更新内容:');
   debugLog('  📊 新スプレッドシートID:', updateData.spreadsheetId);
   debugLog('  🔗 新スプレッドシートURL:', updateData.spreadsheetUrl);
+  debugLog('  ⚙️ シート固有設定キー:', sheetConfigKey);
+  debugLog('  📝 シート固有設定:', quickStartSheetConfig);
 
+  // データベース更新実行
   updateUser(requestUserId, updateData);
+  
+  // 更新後の検証（QuickStart専用）
+  try {
+    const verificationResult = verifyQuickStartConfiguration(requestUserId, formAndSsInfo.sheetName);
+    if (!verificationResult.isValid) {
+      warnLog('⚠️ QuickStart設定検証で警告:', verificationResult.warnings);
+    } else {
+      debugLog('✅ QuickStart設定検証完了');
+    }
+  } catch (verificationError) {
+    warnLog('⚠️ QuickStart設定検証でエラー:', verificationError.message);
+    // 検証エラーは致命的ではないため続行
+  }
 
   infoLog('✅ ユーザーデータベース更新完了!');
 
@@ -2481,27 +2505,62 @@ function performAutoPublish(requestUserId, sheetName) {
       targetSheet: trimmedSheetName
     });
 
-    // setActiveSheetを呼び出して自動公開を実行
-    const publishResult = setActiveSheet(requestUserId, trimmedSheetName);
+    // setActiveSheetを呼び出して自動公開を実行（改善版）
+    let publishResult;
+    let retryCount = 0;
+    const maxRetries = 2;
     
-    // 公開結果の詳細検証
-    if (publishResult && publishResult.success !== false) {
-      infoLog('✅ QuickStart自動公開完了', {
-        requestUserId,
-        sheetName: trimmedSheetName,
-        result: publishResult
-      });
-      
-      return {
-        success: true,
-        published: true,
-        sheetName: trimmedSheetName,
-        message: '回答ボードが自動的に公開されました',
-        details: publishResult,
-        publishedAt: new Date().toISOString()
-      };
-    } else {
-      throw new Error('setActiveSheetが失敗しました: ' + (publishResult?.message || 'unknown error'));
+    while (retryCount <= maxRetries) {
+      try {
+        publishResult = setActiveSheet(requestUserId, trimmedSheetName);
+        
+        // 公開結果の詳細検証
+        if (publishResult && publishResult.success !== false) {
+          infoLog('✅ QuickStart自動公開完了', {
+            requestUserId,
+            sheetName: trimmedSheetName,
+            result: publishResult,
+            retryCount: retryCount
+          });
+          
+          // 公開後の最終確認
+          try {
+            const finalVerification = verifyPublishStatus(requestUserId, trimmedSheetName);
+            return {
+              success: true,
+              published: true,
+              sheetName: trimmedSheetName,
+              message: '回答ボードが自動的に公開されました',
+              details: publishResult,
+              publishedAt: new Date().toISOString(),
+              verificationPassed: finalVerification.isPublished
+            };
+          } catch (verifyError) {
+            warnLog('⚠️ 公開後の確認でエラー:', verifyError.message);
+            return {
+              success: true,
+              published: true,
+              sheetName: trimmedSheetName,
+              message: '回答ボードが自動的に公開されました（確認スキップ）',
+              details: publishResult,
+              publishedAt: new Date().toISOString(),
+              verificationPassed: false
+            };
+          }
+        } else {
+          throw new Error('setActiveSheetが失敗しました: ' + (publishResult?.message || 'unknown error'));
+        }
+        
+      } catch (publishError) {
+        retryCount++;
+        if (retryCount <= maxRetries) {
+          warnLog(`⚠️ QuickStart自動公開リトライ ${retryCount}/${maxRetries}:`, publishError.message);
+          // 少し待ってからリトライ
+          Utilities.sleep(1000 * retryCount);
+        } else {
+          throw publishError;
+        }
+      }
     }
     
   } catch (error) {
@@ -2599,6 +2658,95 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, p
 }
 
 /**
+ * 公開状態の確認（QuickStart用）
+ * @param {string} requestUserId - ユーザーID
+ * @param {string} sheetName - シート名
+ * @returns {object} 公開状態確認結果
+ */
+function verifyPublishStatus(requestUserId, sheetName) {
+  try {
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      return { isPublished: false, error: 'ユーザー情報が見つかりません' };
+    }
+    
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    
+    // 公開状態の確認条件
+    const isPublished = (
+      configJson.appPublished === true &&
+      configJson.publishedSheetName === sheetName &&
+      configJson.setupStatus === 'completed' &&
+      configJson.formCreated === true &&
+      configJson.formUrl
+    );
+    
+    return {
+      isPublished: isPublished,
+      publishedSheetName: configJson.publishedSheetName,
+      appPublished: configJson.appPublished,
+      setupStatus: configJson.setupStatus,
+      formCreated: configJson.formCreated,
+      hasFormUrl: !!configJson.formUrl
+    };
+    
+  } catch (error) {
+    return { 
+      isPublished: false, 
+      error: `公開状態確認エラー: ${error.message}` 
+    };
+  }
+}
+
+/**
+ * QuickStart設定の検証（専用関数）
+ * @param {string} requestUserId - ユーザーID
+ * @param {string} sheetName - シート名
+ * @returns {object} 検証結果
+ */
+function verifyQuickStartConfiguration(requestUserId, sheetName) {
+  try {
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      return { isValid: false, errors: ['ユーザー情報が見つかりません'] };
+    }
+    
+    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const sheetConfigKey = 'sheet_' + sheetName;
+    const sheetConfig = configJson[sheetConfigKey];
+    
+    const warnings = [];
+    
+    // 基本設定の確認
+    if (!configJson.formUrl) warnings.push('グローバルformURLが未設定');
+    if (!configJson.formCreated) warnings.push('フォーム作成フラグが未設定');
+    if (configJson.setupStatus !== 'completed') warnings.push('setupStatusが未完了');
+    
+    // シート固有設定の確認
+    if (!sheetConfig) {
+      warnings.push(`シート設定未保存: ${sheetConfigKey}`);
+    } else {
+      if (!sheetConfig.formUrl) warnings.push('シート固有formURLが未設定');
+      if (!sheetConfig.opinionHeader) warnings.push('質問ヘッダーが未設定');
+      if (!sheetConfig.isConfigured) warnings.push('シート設定完了フラグが未設定');
+    }
+    
+    return {
+      isValid: warnings.length === 0,
+      warnings: warnings,
+      configJson: configJson,
+      sheetConfig: sheetConfig
+    };
+    
+  } catch (error) {
+    return { 
+      isValid: false, 
+      errors: [`設定検証エラー: ${error.message}`] 
+    };
+  }
+}
+
+/**
  * クイックスタートセットアップのコンテキストを初期化
  * @param {string} requestUserId - ユーザーID
  * @returns {object} セットアップコンテキスト
@@ -2660,6 +2808,105 @@ function initializeQuickStartContext(requestUserId) {
   };
 }
 
+/**
+ * QuickStartエラーの分類と回復可能性の判定
+ * @param {Error} error - 発生したエラー
+ * @returns {object} エラー分類結果
+ */
+function classifyQuickStartError(error) {
+  const message = error.message.toLowerCase();
+  
+  // 回復可能なエラーパターン
+  if (message.includes('timeout') || message.includes('network') || message.includes('service unavailable')) {
+    return {
+      code: 'QUICKSTART_NETWORK_ERROR',
+      category: 'ネットワーク接続',
+      recoverable: true,
+      retryDelay: 3000
+    };
+  }
+  
+  if (message.includes('permission') || message.includes('access denied')) {
+    return {
+      code: 'QUICKSTART_PERMISSION_ERROR',
+      category: '権限不足',
+      recoverable: false,
+      retryDelay: 0
+    };
+  }
+  
+  if (message.includes('quota') || message.includes('limit exceeded')) {
+    return {
+      code: 'QUICKSTART_QUOTA_ERROR',
+      category: 'API制限',
+      recoverable: true,
+      retryDelay: 10000
+    };
+  }
+  
+  if (message.includes('form') && message.includes('create')) {
+    return {
+      code: 'QUICKSTART_FORM_ERROR',
+      category: 'フォーム作成',
+      recoverable: true,
+      retryDelay: 2000
+    };
+  }
+  
+  // デフォルト: 不明なエラー
+  return {
+    code: 'QUICKSTART_UNKNOWN_ERROR',
+    category: 'システムエラー',
+    recoverable: false,
+    retryDelay: 0
+  };
+}
+
+/**
+ * QuickStart自動修復の試行
+ * @param {string} requestUserId - ユーザーID
+ * @param {Error} error - 発生したエラー
+ * @param {object} classification - エラー分類結果
+ * @returns {object} 修復結果
+ */
+function attemptQuickStartRecovery(requestUserId, error, classification) {
+  if (!classification.recoverable) {
+    return { recovered: false, message: '回復不可能なエラーです' };
+  }
+  
+  try {
+    // 少し待機してからリトライ
+    if (classification.retryDelay > 0) {
+      Utilities.sleep(classification.retryDelay);
+    }
+    
+    // カテゴリ別の修復処理
+    switch (classification.category) {
+      case 'ネットワーク接続':
+      case 'API制限':
+        warnLog('⚠️ 接続エラー - リトライ待機後に自動回復を試行');
+        return { recovered: false, message: 'リトライが必要です' };
+        
+      case 'フォーム作成':
+        warnLog('⚠️ フォーム作成エラー - クリーンアップ後にリトライ');
+        // 部分的なクリーンアップを実行
+        try {
+          clearExecutionUserInfoCache();
+        } catch (cleanupError) {
+          warnLog('クリーンアップエラー:', cleanupError.message);
+        }
+        return { recovered: false, message: 'クリーンアップ完了 - リトライ可能' };
+        
+      default:
+        return { recovered: false, message: '自動修復対象外' };
+    }
+    
+  } catch (recoveryError) {
+    errorLog('自動修復処理エラー:', recoveryError.message);
+    return { recovered: false, message: '修復処理でエラー発生' };
+  }
+}
+
 function quickStartSetup(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
@@ -2710,6 +2957,25 @@ function quickStartSetup(requestUserId) {
 
   } catch (e) {
     errorLog('❌ quickStartSetup エラー: ' + e.message);
+    errorLog('Stack trace:', e.stack);
+
+    // エラー詳細の分類と回復可能性の判定
+    const errorClassification = classifyQuickStartError(e);
+    
+    // 回復可能なエラーの場合は自動修復を試行
+    if (errorClassification.recoverable) {
+      try {
+        warnLog('⚠️ 回復可能なエラーを検出 - 自動修復を試行:', errorClassification.category);
+        const recoveryResult = attemptQuickStartRecovery(requestUserId, e, errorClassification);
+        
+        if (recoveryResult.recovered) {
+          infoLog('✅ QuickStart自動修復成功:', recoveryResult.message);
+          return recoveryResult.result;
+        }
+      } catch (recoveryError) {
+        errorLog('❌ QuickStart自動修復失敗:', recoveryError.message);
+      }
+    }
 
     // エラー時はセットアップ状態をリセット
     try {
@@ -2717,6 +2983,8 @@ function quickStartSetup(requestUserId) {
       currentConfig.setupStatus = 'error';
       currentConfig.lastError = e.message;
       currentConfig.errorAt = new Date().toISOString();
+      currentConfig.errorCategory = errorClassification.category;
+      currentConfig.recoverable = errorClassification.recoverable;
 
       updateUser(requestUserId, {
         configJson: JSON.stringify(currentConfig)
@@ -2730,6 +2998,13 @@ function quickStartSetup(requestUserId) {
     return {
       status: 'error',
       message: 'クイックスタートセットアップに失敗しました: ' + e.message,
+      errorCode: errorClassification.code,
+      errorCategory: errorClassification.category,
+      recoverable: errorClassification.recoverable,
+      retryable: errorClassification.recoverable,
+      recovery: errorClassification.recoverable ? 
+        'リトライボタンをクリックして再試行してください' : 
+        '管理者にお問い合わせください',
       webAppUrl: '',
       adminUrl: '',
       viewUrl: '',
