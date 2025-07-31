@@ -104,6 +104,7 @@ function loadStatus(bypassCache = false) {
 
     // runGasWithUserId を使用して getAppConfig を呼び出す
     // 最新のステータスを取得するため追加の引数は不要
+    console.log('DEBUG: Calling getAppConfig via runGasWithUserId'); // ★追加
     return runGasWithUserId('getAppConfig', 'システム情報を読み込み中...') // getInitialData -> getAppConfig
       .then(response => {
         logDebug('✅ Integrated data loaded:', response);
