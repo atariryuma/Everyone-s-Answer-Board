@@ -9,6 +9,8 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
     context = {
       console,
       debugLog: () => {},
+      errorLog: jest.fn(), // Add errorLog mock
+      infoLog: jest.fn(),  // Add infoLog mock
       LockService: {
         getScriptLock: () => ({
           waitLock: jest.fn(),

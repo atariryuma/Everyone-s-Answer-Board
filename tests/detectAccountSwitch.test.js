@@ -28,6 +28,9 @@ describe('detectAccountSwitch uses user properties', () => {
       cleanupSessionOnAccountSwitch: jest.fn(() => {}),
       clearDatabaseCache: jest.fn(() => {}),
       console: { log: jest.fn(), warn: jest.fn(), error: jest.fn() },
+      debugLog: jest.fn(),
+      errorLog: jest.fn(), // Add errorLog mock
+      infoLog: jest.fn(),  // Add infoLog mock
       SCRIPT_PROPS_KEYS: {
         DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID'
       }

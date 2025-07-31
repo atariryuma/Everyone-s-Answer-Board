@@ -55,7 +55,6 @@ describe('generateAppUrls admin url', () => {
     vm.createContext(context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
-    vm.runInContext(urlCode, context);
   });
 
   test('returns adminUrl with userId and mode parameter', () => {
