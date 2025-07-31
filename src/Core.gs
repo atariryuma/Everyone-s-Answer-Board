@@ -289,6 +289,13 @@ function performAutoHealing(userInfo, configJson, userId) {
       updated = true;
     }
 
+    // 修復ルール2b: setupStatusがcompletedだがformCreatedがfalseの場合
+    if (!healedConfig.formCreated && healedConfig.setupStatus === 'completed') {
+      healedConfig.setupStatus = 'pending';
+      changes.push('setupStatus: completed → pending (formCreated=false)');
+      updated = true;
+    }
+
     // 修復ルール3: publishedSheetNameが存在するがappPublishedがfalseの場合
     // Note: これは公開状態の判定なので、より慎重に処理
     if (healedConfig.publishedSheetName &&
