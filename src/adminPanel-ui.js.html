@@ -5,6 +5,10 @@ let lastSelectedSheetName = null; // To prevent redundant sheet selection change
 let isUIUpdateInProgress = false;
 let pendingUIUpdate = null;
 
+// Global step state cache to prevent duplicate calculations
+let cachedSetupStep = null;
+let lastStatusChecksum = null;
+
 // =============================================================================
 // ADMIN PANEL UI UPDATES & DISPLAY CONTROL
 // =============================================================================
@@ -153,7 +157,7 @@ function updateUIWithNewStatus(status) {
 // データ準備の最適化（同期処理部分）
 function prepareStatusData(status) {
   // 1. configJson正規化処理（包括的システム最適化）
-  status = validateAndFixUIState(status);
+  status = preProcessStatus(status);
   
   // 2. 正規化されたプロパティの追加（計算集約処理）
   const publicationState = getPublicationState(status);
@@ -197,8 +201,8 @@ function executeParallelUIUpdates(status) {
     // Task 3: フッターとガイダンスの更新
     () => updateFooterAndGuidance(status),
     
-    // Task 4: ステータスバーの更新（最適化済み）
-    () => updateStepIndicators(currentStep, status)
+    // Task 4: ステータスバーの更新（統合最適化版）
+    () => updateStepIndicators(status?.setupStep || currentStep, status)
   ];
   
   // 並列実行（requestAnimationFrameで最適化）
@@ -2577,7 +2581,7 @@ function normalizeConfigJson(config, userInfo) {
     setupStatus: config.setupStatus,
     appPublished: config.appPublished,
     publishedSheetName: config.publishedSheetName,
-    setupStep: '計算プロパティ: ' + determineSetupStepUnified(userInfo, config)
+    setupStep: '計算プロパティ: ' + determineSetupStepUnified(userInfo, config, false) // 正規化時はキャッシュを使わない
   });
   
   return config;
@@ -2692,23 +2696,34 @@ function fixPublishedSheetName(config) {
 }
 
 /**
- * setupStep判定の統一化されたフロントエンド実装
+ * setupStep判定の統一化されたフロントエンド実装（キャッシュ最適化版）
  * バックエンドのdetermineSetupStepUnified()と完全に同期
  * @param {Object} userInfo - ユーザー情報
  * @param {Object} config - config情報
+ * @param {boolean} useCache - キャッシュを使用するか（デフォルト: true）
  * @return {number} setupStep
  */
-function determineSetupStepUnified(userInfo, config) {
+function determineSetupStepUnified(userInfo, config, useCache = true) {
+  // キャッシュチェック用のチェックサム生成
+  const currentChecksum = generateStatusChecksum(userInfo, config);
+  
+  // キャッシュが有効で、前回と同じ状態の場合はキャッシュを返す
+  if (useCache && cachedSetupStep !== null && lastStatusChecksum === currentChecksum) {
+    return cachedSetupStep;
+  }
+  
   // Step 1: データソース未設定
   if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
-    console.log('🔧 setupStep統一判定(FE): Step 1 - データソース未設定');
-    return 1;
+    const step = 1;
+    updateStepCache(step, currentChecksum);
+    return step;
   }
   
   // configが存在しない場合は必ずStep 2
   if (!config || typeof config !== 'object') {
-    console.log('🔧 setupStep統一判定(FE): Step 2 - config未設定');
-    return 2;
+    const step = 2;
+    updateStepCache(step, currentChecksum);
+    return step;
   }
   
   const setupStatus = config.setupStatus || 'pending';
@@ -2725,27 +2740,56 @@ function determineSetupStepUnified(userInfo, config) {
   );
   
   if (isStep2) {
-    console.log('🔧 setupStep統一判定(FE): Step 2 - セットアップ未完了', {
-      setupStatus,
-      formCreated,
-      hasFormUrl
-    });
-    return 2;
+    const step = 2;
+    updateStepCache(step, currentChecksum);
+    return step;
   }
   
   // Step 3: セットアップ完了（すべての条件をクリア）
   if (setupStatus === 'completed' && formCreated && hasFormUrl) {
-    console.log('🔧 setupStep統一判定(FE): Step 3 - セットアップ完了');
-    return 3;
+    const step = 3;
+    updateStepCache(step, currentChecksum);
+    return step;
   }
   
   // フォールバック: 不明な状態はStep 2として扱う
-  console.log('🔧 setupStep統一判定(FE): フォールバック - Step 2', {
-    setupStatus,
-    formCreated,
-    hasFormUrl
+  const step = 2;
+  updateStepCache(step, currentChecksum);
+  return step;
+}
+
+/**
+ * ステップキャッシュを更新
+ * @param {number} step - 新しいステップ
+ * @param {string} checksum - 状態チェックサム
+ */
+function updateStepCache(step, checksum) {
+  cachedSetupStep = step;
+  lastStatusChecksum = checksum;
+}
+
+/**
+ * 状態チェックサムを生成（変更検出用）
+ * @param {Object} userInfo - ユーザー情報
+ * @param {Object} config - config情報
+ * @return {string} チェックサム
+ */
+function generateStatusChecksum(userInfo, config) {
+  const key = JSON.stringify({
+    spreadsheetId: userInfo?.spreadsheetId || '',
+    setupStatus: config?.setupStatus || '',
+    formCreated: !!config?.formCreated,
+    formUrl: config?.formUrl || ''
   });
-  return 2;
+  
+  // 簡単なハッシュ生成
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    const char = key.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 32bit整数に変換
+  }
+  return hash.toString();
 }
 
 
@@ -2813,11 +2857,12 @@ function ensureRequiredFields(config) {
 }
 
 /**
- * UI状態の整合性チェックと修復
+ * ステータス前処理とUI状態統合管理（パフォーマンス最適化版）
+ * setupStep判定を一度だけ実行し、すべての関連処理を統合
  * @param {Object} status - ステータス情報
- * @return {Object} 修復されたステータス
+ * @return {Object} 処理済みステータス（setupStepプロパティ付き）
  */
-function validateAndFixUIState(status) {
+function preProcessStatus(status) {
   if (!status || !status.config) {
     return status;
   }
@@ -2825,24 +2870,36 @@ function validateAndFixUIState(status) {
   // configJsonを正規化
   status.config = normalizeConfigJson(status.config, status.userInfo);
   
-  // configJsonの整合性検証
+  // setupStepを一度だけ計算（キャッシュ利用）
+  const currentStep = determineSetupStepUnified(status.userInfo, status.config);
+  status.setupStep = currentStep; // ステータスオブジェクトに追加
+  
+  // configJsonの整合性検証（setupStep計算済みのため重複なし）
   validateConfigJsonIntegrity(status.config, status.userInfo);
   
-  // UI要素の整合性チェック
-  const expectedStep = determineSetupStepUnified(status.userInfo, status.config);
+  // UI要素の整合性チェックと修復（1回の計算結果を再利用）
   const currentUIStep = parseInt(document.querySelector('.step-indicator.active')?.textContent) || 1;
   
-  if (expectedStep !== currentUIStep) {
+  if (currentStep !== currentUIStep) {
     console.log('🔧 UI状態修復: setupStep不整合検出', {
-      期待値: expectedStep,
+      期待値: currentStep,
       現在のUI: currentUIStep
     });
     
     // UI状態を正しいステップに更新
-    updateStepIndicators(expectedStep, status);
+    updateStepIndicators(currentStep, status);
   }
   
   return status;
+}
+
+/**
+ * レガシー関数（後方互換性のため残す）
+ * @deprecated preProcessStatus() を使用してください
+ */
+function validateAndFixUIState(status) {
+  console.warn('⚠️ validateAndFixUIState() は非推奨です。preProcessStatus() を使用してください。');
+  return preProcessStatus(status);
 }
 
 // 簡単な履歴テーブル初期化
