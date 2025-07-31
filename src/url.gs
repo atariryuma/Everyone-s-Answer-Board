@@ -57,7 +57,7 @@ function normalizeUrlString(url) {
  */
 function computeWebAppUrl() {
   try {
-    const url = ScriptApp.getService().getUrl();
+    let url = ScriptApp.getService().getUrl();
     if (!url) {
       warnLog('ScriptApp.getService().getUrl()がnullを返しました');
       return getFallbackUrl();
