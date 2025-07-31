@@ -154,7 +154,8 @@ function updateUIWithNewStatus(status) {
 // データ準備の最適化（同期処理部分）
 function prepareStatusData(status) {
   // 1. configJson正規化処理（包括的システム最適化）
-  status.config = normalizeConfigJson(status.config, status.userInfo);
+  // 統一スキーマを使用してconfigを正規化（重複機能削除）
+  status.config = getConfigJSON(status.userInfo);
   
   // 2. 正規化されたプロパティの追加（計算集約処理）
   const publicationState = getPublicationState(status);
@@ -2558,42 +2559,7 @@ function escapeHtml(text) {
  * @param {Object} userInfo - ユーザー情報
  * @return {Object} 正規化されたconfig
  */
-function normalizeConfigJson(config, userInfo) {
-  if (!config || typeof config !== 'object') {
-    console.warn('⚠️ normalizeConfigJson: 無効なconfigオブジェクト');
-    return config;
-  }
-  
-  console.log('🔧 configJson正規化開始:', {
-    setupStatus: config.setupStatus,
-    setupStep: config.setupStep,
-    appPublished: config.appPublished,
-    publishedSheetName: config.publishedSheetName
-  });
-  
-  // Step 1: publishedSheetName修復
-  config = fixPublishedSheetName(config);
-  
-  // Step 2: setupStep再計算（統一関数使用）
-  // Note: setupStepは計算プロパティとして常に動的に算出され、configJsonには保存されません
-  
-  // Step 3: グローバル列設定同期
-  config = syncGlobalColumnSettings(config);
-  
-  // Step 4: 必須フィールドの補完
-  config = ensureRequiredFields(config);
-  
-  // Step 5: 冗長フィールドの削除
-  config = removeRedundantFields(config);
-  
-  console.log('✅ configJson正規化完了:', {
-    setupStatus: config.setupStatus,
-    appPublished: config.appPublished,
-    publishedSheetName: config.publishedSheetName
-  });
-  
-  return config;
-}
+// [DEPRECATED] 統一スキーマのgetConfigJSON()に置き換えられました
 
 /**
  * 冗長フィールドの削除（データ整合性向上）

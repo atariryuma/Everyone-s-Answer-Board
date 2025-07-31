@@ -327,13 +327,7 @@ function saveHistoryToSheet(historyItem, userInfo) {
     }
 
     // 現在のconfigJsonを取得・解析
-    let configJson;
-    try {
-      configJson = JSON.parse(existingUser.configJson || '{}');
-    } catch (parseError) {
-      warnLog('configJson解析エラー、新規作成します:', parseError.message);
-      configJson = {};
-    }
+    let configJson = getConfigJSON(existingUser);
 
     // 履歴配列を取得または初期化
     if (!Array.isArray(configJson.historyArray)) {
@@ -440,7 +434,7 @@ function getHistoryFromServerAPI(requestUserId) {
     // configJsonから履歴を取得
     let configJson;
     try {
-      configJson = JSON.parse(userInfo.configJson || '{}');
+      configJson = getConfigJSON(userInfo);
     } catch (parseError) {
       warnLog('configJson解析エラー:', parseError.message);
       configJson = {};
@@ -483,7 +477,7 @@ function clearHistoryFromServerAPI(requestUserId) {
     // configJsonから履歴をクリア
     let configJson;
     try {
-      configJson = JSON.parse(userInfo.configJson || '{}');
+      configJson = getConfigJSON(userInfo);
     } catch (parseError) {
       warnLog('configJson解析エラー、新規作成します:', parseError.message);
       configJson = {};
@@ -1023,7 +1017,7 @@ function processViewRequest(userInfo, params) {
   // Parse config safely
   let config = {};
   try {
-    config = JSON.parse(userInfo.configJson || '{}');
+    config = getConfigJSON(userInfo);
   } catch (e) {
     warnLog('Config JSON parse error during publication check:', e.message);
   }
@@ -1929,7 +1923,7 @@ function renderAnswerBoard(userInfo, params) {
   try {
     let config = {};
     try {
-      config = JSON.parse(userInfo.configJson || '{}');
+      config = getConfigJSON(userInfo);
     } catch (e) {
       warnLog('Invalid configJson:', e.message);
     }
@@ -2057,7 +2051,7 @@ function checkCurrentPublicationStatus(userId) {
     // 設定情報を解析
     let config = {};
     try {
-      config = JSON.parse(userInfo.configJson || '{}');
+      config = getConfigJSON(userInfo);
     } catch (e) {
       warnLog('Config JSON parse error during publication status check:', e.message);
       return { error: 'Config parse error', isPublished: false };

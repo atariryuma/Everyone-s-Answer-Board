@@ -626,7 +626,7 @@ function fixUserDataConsistency(userId) {
 
     debugLog('📊 現在のspreadsheetId:', userInfo.spreadsheetId);
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = parseAndValidateConfigJson(userInfo.configJson);
     debugLog('📝 configJson内のpublishedSpreadsheetId:', configJson.publishedSpreadsheetId);
 
     let needsUpdate = false;
@@ -641,7 +641,10 @@ function fixUserDataConsistency(userId) {
     }
 
     // 2. spreadsheetIdとpublishedSpreadsheetIdの整合性チェック
-    if (userInfo.spreadsheetId && configJson.publishedSpreadsheetId !== userInfo.spreadsheetId) {
+    if (userInfo.spreadsheetId && 
+        (configJson.publishedSpreadsheetId !== userInfo.spreadsheetId || 
+         !configJson.publishedSpreadsheetId || 
+         configJson.publishedSpreadsheetId.trim() === '')) {
       debugLog('🔄 publishedSpreadsheetIdを実際のspreadsheetIdに合わせて修正');
       debugLog('  修正前:', configJson.publishedSpreadsheetId);
       debugLog('  修正後:', userInfo.spreadsheetId);
@@ -653,7 +656,14 @@ function fixUserDataConsistency(userId) {
     // 3. セットアップ状態の正規化（統一修復システムに委譲）
     // Note: 重複する修復ロジックはperformAutoHealing()に統合済み
 
-    if (needsUpdate) {
+    // マイグレーション処理の実行
+    const migrationResult = migrateConfigJSON(configJson);
+    if (migrationResult.migrated) {
+      debugLog('🔄 ConfigJSON マイグレーション実行:', migrationResult.changes);
+      updateData.configJson = JSON.stringify(migrationResult.config);
+      updateData.lastAccessedAt = new Date().toISOString();
+      needsUpdate = true;
+    } else if (needsUpdate) {
       updateData.configJson = JSON.stringify(configJson);
       updateData.lastAccessedAt = new Date().toISOString();
 

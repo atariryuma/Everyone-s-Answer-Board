@@ -498,7 +498,7 @@ function getEffectiveSpreadsheetId(requestUserId) {
   verifyUserAccess(requestUserId);
   const userInfo = getUserInfo(requestUserId);
   const configJson = userInfo && userInfo.configJson
-    ? JSON.parse(userInfo.configJson)
+    ? getConfigJSON(userInfo)
     : {};
   return configJson.publishedSpreadsheetId || userInfo.spreadsheetId;
 }
@@ -565,7 +565,7 @@ function getConfig(requestUserId, sheetName, forceRefresh = false) {
     };
 
     // 2. 保存済みの設定があるか確認
-    const configJson = userInfo.configJson ? JSON.parse(userInfo.configJson) : {};
+    const configJson = getConfigJSON(userInfo);
     const sheetConfigKey = 'sheet_' + sheetName;
     const savedSheetConfig = configJson[sheetConfigKey];
 
@@ -1048,7 +1048,7 @@ function republishBoard(requestUserId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
 
     // 既存の公開設定をチェック
     if (!configJson.publishedSpreadsheetId || !configJson.publishedSheetName) {
@@ -1086,7 +1086,7 @@ function checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
   try {
     const userInfo = getUserInfo(requestUserId);
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
 
     // 現在のスプレッドシートIDが以前と異なる場合（新しいフォーム）
     const currentSpreadsheetId = configJson.publishedSpreadsheetId;
@@ -1301,7 +1301,7 @@ function addSpreadsheetUrl(requestUserId, url) {
     addServiceAccountToSpreadsheet(spreadsheetId);
 
     // 公開設定をリセットしつつユーザー情報を更新
-    const configJson = userInfo.configJson ? JSON.parse(userInfo.configJson) : {};
+    const configJson = getConfigJSON(userInfo);
     configJson.publishedSpreadsheetId = spreadsheetId;
     configJson.publishedSheetName = '';
     configJson.appPublished = false;
@@ -1664,17 +1664,15 @@ function unpublishBoard(requestUserId) {
       adminEmail: userInfo.adminEmail
     });
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
     debugLog('🔍 公開停止前の設定:', {
-      publishedSheet: configJson.publishedSheet,
       publishedSheetName: configJson.publishedSheetName,
       publishedSpreadsheetId: configJson.publishedSpreadsheetId,
       appPublished: configJson.appPublished
     });
 
     // 公開状態のクリア（データソースとシート選択は保持）
-    configJson.publishedSheet = ''; // 後方互換性のため残す
-    configJson.publishedSheetName = ''; // 正しいプロパティ名
+    configJson.publishedSheetName = '';
     configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
     configJson.appPublished = false; // 公開停止
 
@@ -1754,7 +1752,7 @@ function setActiveSheet(requestUserId, sheetName) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
 
     // アクティブシートを設定
     configJson.publishedSheetName = sheetName.trim();
@@ -1812,7 +1810,7 @@ function setDisplayOptions(requestUserId, displayOptions, options = {}) {
       throw new Error('ユーザー情報が見つかりません。');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
 
     // 各オプションを個別にチェックして設定（undefinedの場合は既存値を保持）
     if (displayOptions.showNames !== undefined) {
@@ -2049,7 +2047,7 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
           ttl: 300
         });
         if (userInfo && userInfo.configJson) {
-          const configJson = JSON.parse(userInfo.configJson);
+          const configJson = getConfigJSON(userInfo);
           const fallbackSheetName = configJson.publishedSheetName;
           if (fallbackSheetName && typeof fallbackSheetName === 'string' && fallbackSheetName.trim() !== '') {
             infoLog('✅ configJsonからフォールバックシート名を使用:', fallbackSheetName);
@@ -2477,7 +2475,7 @@ function buildResponseFromContext(context) {
   try {
     // 最新のuserInfoから必要な情報を取得
     const userInfo = context.userInfo;
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
     const spreadsheetId = userInfo.spreadsheetId;
 
     // publishedSheetNameの型安全性確保（'true'問題の修正）
@@ -2676,7 +2674,7 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
       sheetNameTrimmed: typeof sheetName === 'string' ? sheetName.trim() : 'not string',
       contextUserInfo: context && context.userInfo ? {
         hasConfigJson: !!(context.userInfo.configJson),
-        publishedSheetName: JSON.parse(context.userInfo.configJson || '{}').publishedSheetName
+        publishedSheetName: getConfigJSON(context.userInfo).publishedSheetName
       } : 'no userInfo'
     });
 
@@ -3303,7 +3301,7 @@ function syncConfigurationState(requestUserId, newConfig, flowType) {
       setupStatus: mergedConfig.setupStatus
     });
 
-    const validation = validateConfigJsonState(mergedConfig, userInfo);
+    const validation = validateConfigJsonState(mergedConfig, userInfo, flowType);
     if (!validation.isValid) {
       logError(`設定検証失敗: ${validation.errors.join(', ')}`, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
       return { 

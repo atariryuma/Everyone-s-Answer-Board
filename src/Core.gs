@@ -111,7 +111,7 @@ function clearActiveSheet(requestUserId) {
       throw new Error('ユーザー情報が見つかりません。');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
 
     debugLog('🔍 公開停止前の設定:', {
       publishedSheetName: configJson.publishedSheetName,
@@ -120,9 +120,8 @@ function clearActiveSheet(requestUserId) {
     });
 
     // 公開状態のクリア（データソースとシート選択は保持）
-    configJson.publishedSheet = ''; // 後方互換性のため残す
-    configJson.publishedSheetName = ''; // 正しいプロパティ名
-    configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
+    configJson.publishedSheetName = '';
+    configJson.publishedSpreadsheetId = '';
     configJson.appPublished = false; // 公開停止
 
     // データベースに保存
@@ -204,102 +203,22 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
 }
 
 /**
- * configJsonの構造と型の妥当性を検証する
- * @param {Object} config - 検証対象のconfigオブジェクト
- * @returns {Object} 検証結果 {isValid: boolean, errors: string[]}
+ * ConfigJSON基本検証関数（簡素版統一スキーマ使用）
+ * @param {Object} config - 検証対象の設定
+ * @returns {Object} 検証結果 {isValid: boolean, errors: Array}
  */
 function validateConfigJson(config) {
-  const errors = [];
-
-  if (!config || typeof config !== 'object') {
-    return {
-      isValid: false,
-      errors: ['configが存在しないか、オブジェクトではありません']
-    };
-  }
-
-  // 必須フィールドの型チェック
-  const requiredFields = {
-    setupStatus: 'string',
-    formCreated: 'boolean',
-    appPublished: 'boolean',
-    publishedSheetName: 'string',
-    publishedSpreadsheetId: 'string'
-  };
-
-  for (const [field, expectedType] of Object.entries(requiredFields)) {
-    if (config[field] === undefined) {
-      errors.push(`必須フィールド '${field}' が未定義です`);
-    } else if (typeof config[field] !== expectedType) {
-      errors.push(`フィールド '${field}' の型が不正です。期待値: ${expectedType}, 実際の値: ${typeof config[field]}`);
-    }
-  }
-
-  // 文字列フィールドの特別な検証
-  if (config.publishedSheetName === 'true') {
-    errors.push("publishedSheetNameが不正な値 'true' になっています");
-  }
-
-  // setupStatusの値チェック
-  const validSetupStatuses = ['pending', 'completed', 'error', 'reconfiguring'];
-  if (config.setupStatus && !validSetupStatuses.includes(config.setupStatus)) {
-    errors.push(`setupStatusの値が不正です: ${config.setupStatus}`);
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors: errors
-  };
+  return validateConfigJSON(config);
 }
 
 /**
- * configJsonを安全にパースし、必要に応じて修復する
+ * ConfigJSONを安全にパースし、必要に応じて修復する（簡素版統一スキーマ使用）
  * @param {string} configJsonString - JSONエンコードされた設定文字列
  * @returns {Object} パース済みで検証されたconfig
  */
 function parseAndValidateConfigJson(configJsonString) {
-  let config = {};
-
-  try {
-    if (configJsonString && configJsonString.trim() !== '' && configJsonString !== '{}') {
-      config = JSON.parse(configJsonString);
-    }
-  } catch (parseError) {
-    warnLog('configJson解析エラー:', parseError.message);
-    config = {};
-  }
-
-  // デフォルト値で不足フィールドを補完
-  const defaultConfig = {
-    setupStatus: 'pending',
-    formCreated: false,
-    formUrl: '',
-    editFormUrl: '',
-    appPublished: false,
-    publishedSheetName: '',
-    publishedSpreadsheetId: '',
-    displayMode: 'anonymous',
-    showCounts: false,
-    sortOrder: 'newest',
-    version: '1.0.0',
-    lastModified: new Date().toISOString()
-  };
-
-  // 不足フィールドをデフォルト値で埋める
-  const mergedConfig = { ...defaultConfig, ...config };
-
-  // 不正な値の修正
-  if (mergedConfig.publishedSheetName === 'true') {
-    mergedConfig.publishedSheetName = '';
-    warnLog('publishedSheetNameの不正値を修正しました');
-  }
-
-  const validation = validateConfigJson(mergedConfig);
-  if (!validation.isValid) {
-    warnLog('configJson検証警告:', validation.errors);
-  }
-
-  return mergedConfig;
+  const userInfo = { configJson: configJsonString };
+  return getConfigJSON(userInfo);
 }
 /**
  * 統一された自動修復システム（循環参照を回避した安全な実装）
@@ -348,7 +267,7 @@ function performAutoHealing(userInfo, configJson, userId) {
 
     // 修復後の状態検証
     if (updated) {
-      const validation = validateConfigJsonState(healedConfig, userInfo);
+      const validation = validateConfigJsonState(healedConfig, userInfo, 'auto-heal');
       if (!validation.isValid) {
         logError(`Auto-healing後の状態が無効: ${validation.errors}`, 'autoHealConfig', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.DATABASE);
         return { updated: false, configJson: configJson, changes: [] };
@@ -383,9 +302,10 @@ function performAutoHealing(userInfo, configJson, userId) {
  * ConfigJson状態検証・遷移管理システム
  * @param {Object} configJson - 検証対象の設定
  * @param {Object} userInfo - ユーザー情報
+ * @param {string} flowType - フローの種類（'custom', 'quickstart', 'auto-heal', 'transition' など）
  * @returns {Object} 検証結果 {isValid: boolean, errors: Array, warnings: Array}
  */
-function validateConfigJsonState(configJson, userInfo) {
+function validateConfigJsonState(configJson, userInfo, flowType) {
   const errors = [];
   const warnings = [];
 
@@ -397,13 +317,34 @@ function validateConfigJsonState(configJson, userInfo) {
   const appPublished = !!configJson.appPublished;
   const isQuickStartCompleted = (configJson.setupStatus === 'completed' && configJson.formCreated === true);
   
-  if (appPublished || isQuickStartCompleted) {
+  // カスタムセットアップ完了状態の検出
+  const formCreated = !!configJson.formCreated;
+  const hasSheetConfigs = Object.keys(configJson).some(key => key.startsWith('sheet_'));
+  const isCustomSetupCompleted = formCreated && hasSheetConfigs;
+  
+  // カスタムフロー設定同期時の特別処理
+  if (flowType === 'custom' && formCreated) {
+    return {
+      isValid: true,
+      errors: [],
+      warnings: ['カスタムフロー設定同期のためvalidationを緩和しました']
+    };
+  }
+  
+  if (appPublished || isQuickStartCompleted || isCustomSetupCompleted) {
+    let warningMessage = '';
+    if (appPublished) {
+      warningMessage = '公開済み状態のためvalidationをバイパスしました';
+    } else if (isQuickStartCompleted) {
+      warningMessage = 'QuickStart完了状態のためvalidationを緩和しました';
+    } else if (isCustomSetupCompleted) {
+      warningMessage = 'カスタムセットアップ完了状態のためvalidationを緩和しました';
+    }
+    
     return { 
       isValid: true, 
       errors: [], 
-      warnings: appPublished ? 
-        ['公開済み状態のためvalidationをバイパスしました'] : 
-        ['QuickStart完了状態のためvalidationを緩和しました']
+      warnings: [warningMessage]
     };
   }
 
@@ -467,7 +408,7 @@ function safeStateTransition(currentConfig, newValues, userInfo) {
   const transitionConfig = { ...currentConfig, ...newValues };
 
   // 遷移前検証
-  const validation = validateConfigJsonState(transitionConfig, userInfo);
+  const validation = validateConfigJsonState(transitionConfig, userInfo, 'transition');
 
   if (!validation.isValid) {
     return {
@@ -609,7 +550,7 @@ function getOpinionHeaderSafely(userId, sheetName) {
       return 'お題';
     }
 
-    const config = JSON.parse(userInfo.configJson || '{}');
+    const config = getConfigJSON(userInfo);
     const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
     const sheetConfig = config[sheetConfigKey] || {};
 
@@ -651,7 +592,7 @@ function registerNewUser(adminEmail) {
   if (existingUser) {
     // 既存ユーザーの場合は最小限の更新のみ（設定は保護）
     userId = existingUser.userId;
-    const existingConfig = JSON.parse(existingUser.configJson || '{}');
+    const existingConfig = getConfigJSON(existingUser);
 
     // 最終アクセス時刻とアクティブ状態のみ更新（設定は保護）
     updateUser(userId, {
@@ -1063,7 +1004,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       }
       debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
 
-      var configJson = JSON.parse(userInfo.configJson || '{}');
+      var configJson = getConfigJSON(userInfo);
       debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
 
     // セットアップ状況を確認
@@ -1248,7 +1189,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
     var setupStatus = configJson.setupStatus || 'pending';
     var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
     var publishedSheetName = configJson.publishedSheetName;
@@ -1589,7 +1530,7 @@ function getAppConfig(requestUserId) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
 
     // --- 統一された自動修復システム ---
     const healingResult = performAutoHealing(userInfo, configJson, currentUserId);
@@ -1704,7 +1645,7 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
 
     // シート設定を更新
     var sheetKey = 'sheet_' + sheetName;
@@ -1759,7 +1700,7 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
 
     configJson.publishedSpreadsheetId = spreadsheetId;
     configJson.publishedSheetName = sheetName;
@@ -1945,7 +1886,7 @@ function getActiveFormInfo(requestUserId) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
     
     // デバッグログを追加
     debugLog('🔍 getActiveFormInfo: configJson分析', {
@@ -1960,8 +1901,8 @@ function getActiveFormInfo(requestUserId) {
     // フォーム回答数を取得
     var answerCount = 0;
     try {
-      if (configJson.publishedSpreadsheetId && configJson.publishedSheet) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheet);
+      if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
+        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
         }
@@ -2048,7 +1989,7 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
 
     if (!configJson.publishedSpreadsheetId || !configJson.publishedSheetName) {
       return {
@@ -2097,7 +2038,7 @@ function updateFormSettings(requestUserId, title, description) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
 
     if (configJson.editFormUrl) {
       try {
@@ -2142,7 +2083,7 @@ function saveSystemConfig(requestUserId, config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
 
     // システム設定を更新
     configJson.systemConfig = {
@@ -2675,7 +2616,7 @@ function verifyPublishStatus(requestUserId, sheetName) {
       return { isPublished: false, error: 'ユーザー情報が見つかりません' };
     }
     
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
     
     // 公開状態の確認条件
     const isPublished = (
@@ -2716,7 +2657,7 @@ function verifyQuickStartConfiguration(requestUserId, sheetName) {
       return { isValid: false, errors: ['ユーザー情報が見つかりません'] };
     }
     
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = getConfigJSON(userInfo);
     const sheetConfigKey = 'sheet_' + sheetName;
     const sheetConfig = configJson[sheetConfigKey];
     
@@ -3333,7 +3274,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
 //       throw new Error('ユーザー情報が見つかりません');
 //     }
 
-//     var configJson = JSON.parse(userInfo.configJson || '{}');
+//     var configJson = getConfigJSON(userInfo);
 
 //     configJson.publishedSpreadsheetId = '';
 //     configJson.publishedSheetName = '';
@@ -3609,7 +3550,7 @@ function saveClassChoices(userId, classChoices) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
     configJson.savedClassChoices = classChoices;
     configJson.lastClassChoicesUpdate = new Date().toISOString();
 
@@ -3636,7 +3577,7 @@ function getSavedClassChoices(userId) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
 
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
     var savedClassChoices = configJson.savedClassChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4'];
 
     return {
@@ -4111,7 +4052,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     var rosterMap = buildRosterMap(rosterData);
 
     // 表示モードとシート固有設定を取得
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
     var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
 
     // シート固有の設定を取得（最新のAI判定結果を反映）
@@ -4201,7 +4142,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     // データ取得失敗時のフォールバック処理
     try {
       var userInfo = findUserById(userId);
-      var configJson = JSON.parse(userInfo.configJson || '{}');
+      var configJson = getConfigJSON(userInfo);
       var sheetKey = 'sheet_' + sheetName;
       var sheetConfig = configJson[sheetKey] || {};
       var effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
@@ -5967,7 +5908,7 @@ function getInitialData(requestUserId, targetSheetName) {
     }
 
     // === ステップ2: 設定データの取得と自動修復 ===
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = getConfigJSON(userInfo);
 
     // --- 統一された自動修復システム ---
     const healingResult = performAutoHealing(userInfo, configJson, currentUserId);
