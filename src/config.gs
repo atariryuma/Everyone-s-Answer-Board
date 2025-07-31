@@ -3267,6 +3267,40 @@ function resetConfigJson(requestUserId) {
   }
 }
 
+/**
+ * 設定JSONを同期します。
+ * repairSetupStateInconsistencies やフロー同期で利用されます。
+ * @param {string} requestUserId ユーザーID
+ * @param {Object} newConfig 反映する設定オブジェクト
+ * @param {string} flowType 呼び出し元フロー種別
+ * @returns {Object} 同期結果
+ */
+function syncConfigurationState(requestUserId, newConfig, flowType) {
+  verifyUserAccess(requestUserId);
+
+  if (!newConfig || typeof newConfig !== 'object') {
+    throw new Error('無効な設定データです');
+  }
+
+  const userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('ユーザー情報が見つかりません');
+  }
+
+  const currentConfig = JSON.parse(userInfo.configJson || '{}');
+  const mergedConfig = { ...currentConfig, ...newConfig, lastModified: new Date().toISOString() };
+
+  const validation = validateConfigJsonState(mergedConfig, userInfo);
+  if (!validation.isValid) {
+    return { success: false, errors: validation.errors };
+  }
+
+  updateUser(requestUserId, { configJson: JSON.stringify(mergedConfig) });
+  invalidateUserCache(requestUserId, userInfo.adminEmail, null, false);
+
+  return { success: true, flowType: flowType || '', configJson: mergedConfig };
+}
+
 // =================================================================
 // アプリケーション有効/無効機能（isActive概念）
 // =================================================================
