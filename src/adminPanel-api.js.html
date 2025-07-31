@@ -2400,14 +2400,8 @@ function handleQuickStart() {
     return;
   }
 
-  // 公開状態をチェックして、必要に応じて確認モーダルを表示
-  checkPublicationStatusAndProceed(() => {
-    // 確認完了後の処理
-    executeQuickStart(quickstartBtn, quickstartText);
-  }, () => {
-    // キャンセル時の処理
-    console.log('クイックスタートがキャンセルされました');
-  });
+  // 公開状態に応じたクイックスタート処理を実行
+  executeQuickStart(quickstartBtn, quickstartText);
 }
 
 // 公開状態チェックとモーダル表示
