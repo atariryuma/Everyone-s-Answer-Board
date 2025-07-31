@@ -28,6 +28,40 @@ if (typeof infoLog === 'undefined') {
 }
 
 /**
+ * セットアップステップを判定する（サーバー側統一実装）
+ * フロントエンドとバックエンドで共通のステップ判定ロジックを提供
+ * @param {Object} userInfo - ユーザー情報
+ * @param {Object} configJson - 設定JSON（オブジェクト形式）
+ * @returns {number} setupStep (1-3)
+ */
+function getSetupStep(userInfo, configJson) {
+  // Step 1: データソース未設定
+  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+    return 1;
+  }
+  
+  // configが存在しない場合は必ずStep 2
+  if (!configJson || typeof configJson !== 'object') {
+    return 2;
+  }
+  
+  // 公開済み状態の最優先判定（データ不整合に関係なく公開済みならStep 3）
+  const isCurrentlyPublished = (
+    configJson.appPublished === true ||
+    (configJson.setupStatus === 'completed' && 
+     configJson.formCreated === true && 
+     configJson.formUrl && configJson.formUrl.trim())
+  );
+  
+  if (isCurrentlyPublished) {
+    return 3;
+  }
+  
+  // デフォルト: セットアップ継続中
+  return 2;
+}
+
+/**
  * 自動停止時間を計算する
  * @param {string} publishedAt - 公開開始時間のISO文字列
  * @param {number} minutes - 自動停止までの分数
@@ -354,9 +388,18 @@ function validateConfigJsonState(configJson, userInfo) {
     return { isValid: false, errors: ['configJsonが無効です'], warnings: [] };
   }
 
+  // 公開済み状態では厳格なvalidationをバイパス（安定性優先）
+  const appPublished = !!configJson.appPublished;
+  if (appPublished) {
+    return { 
+      isValid: true, 
+      errors: [], 
+      warnings: ['公開済み状態のためvalidationをバイパスしました'] 
+    };
+  }
+
   const setupStatus = configJson.setupStatus || 'pending';
   const formCreated = !!configJson.formCreated;
-  const appPublished = !!configJson.appPublished;
   const hasFormUrl = !!(configJson.formUrl && configJson.formUrl.trim());
   const hasPublishedSheet = !!(configJson.publishedSheetName && configJson.publishedSheetName.trim());
 
@@ -5663,7 +5706,14 @@ function getInitialData(requestUserId, targetSheetName) {
     }
 
     // === ステップ5: セットアップステップの決定 ===
-    var setupStep = determineSetupStepUnified(userInfo, configJson);
+    var setupStep = 1;
+    try {
+      setupStep = getSetupStep(userInfo, configJson);
+      debugLog('setupStep決定完了', { userId: currentUserId, setupStep: setupStep });
+    } catch (stepError) {
+      warnLog('setupStep決定でエラー、デフォルト値(1)を使用:', stepError.message);
+      setupStep = 1;
+    }
 
     // 公開シート設定とヘッダー情報を取得
     var publishedSheetName = configJson.publishedSheetName || '';

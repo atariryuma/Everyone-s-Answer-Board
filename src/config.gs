@@ -3276,29 +3276,58 @@ function resetConfigJson(requestUserId) {
  * @returns {Object} 同期結果
  */
 function syncConfigurationState(requestUserId, newConfig, flowType) {
-  verifyUserAccess(requestUserId);
+  try {
+    verifyUserAccess(requestUserId);
 
-  if (!newConfig || typeof newConfig !== 'object') {
-    throw new Error('無効な設定データです');
+    if (!newConfig || typeof newConfig !== 'object') {
+      const error = '無効な設定データです';
+      logError(error, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
+      return { success: false, errors: [error] };
+    }
+
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      const error = 'ユーザー情報が見つかりません';
+      logError(error, 'syncConfigurationState', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.DATABASE);
+      return { success: false, errors: [error] };
+    }
+
+    const currentConfig = JSON.parse(userInfo.configJson || '{}');
+    const mergedConfig = { ...currentConfig, ...newConfig, lastModified: new Date().toISOString() };
+
+    // より詳細なログ出力
+    debugLog('syncConfigurationState: 設定同期開始', {
+      userId: requestUserId,
+      flowType: flowType,
+      appPublished: !!mergedConfig.appPublished,
+      setupStatus: mergedConfig.setupStatus
+    });
+
+    const validation = validateConfigJsonState(mergedConfig, userInfo);
+    if (!validation.isValid) {
+      logError(`設定検証失敗: ${validation.errors.join(', ')}`, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
+      return { 
+        success: false, 
+        errors: validation.errors,
+        warnings: validation.warnings || [],
+        context: { flowType, userId: requestUserId }
+      };
+    }
+
+    updateUser(requestUserId, { configJson: JSON.stringify(mergedConfig) });
+    invalidateUserCache(requestUserId, userInfo.adminEmail, null, false);
+
+    debugLog('syncConfigurationState: 設定同期完了', { userId: requestUserId, flowType: flowType });
+    return { success: true, flowType: flowType || '', configJson: mergedConfig };
+
+  } catch (error) {
+    logError(error, 'syncConfigurationState', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+    return { 
+      success: false, 
+      errors: ['設定の同期中にシステムエラーが発生しました'], 
+      systemError: error.message 
+    };
   }
-
-  const userInfo = findUserById(requestUserId);
-  if (!userInfo) {
-    throw new Error('ユーザー情報が見つかりません');
-  }
-
-  const currentConfig = JSON.parse(userInfo.configJson || '{}');
-  const mergedConfig = { ...currentConfig, ...newConfig, lastModified: new Date().toISOString() };
-
-  const validation = validateConfigJsonState(mergedConfig, userInfo);
-  if (!validation.isValid) {
-    return { success: false, errors: validation.errors };
-  }
-
-  updateUser(requestUserId, { configJson: JSON.stringify(mergedConfig) });
-  invalidateUserCache(requestUserId, userInfo.adminEmail, null, false);
-
-  return { success: true, flowType: flowType || '', configJson: mergedConfig };
 }
 
 // =================================================================
