@@ -2012,7 +2012,17 @@ function renderAnswerBoard(userInfo, params) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 
   } catch (error) {
-    logError(error, 'renderAnswerBoard', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { userId, spreadsheetId, sheetName });
+    logError(
+      error,
+      'renderAnswerBoard',
+      ERROR_SEVERITY.HIGH,
+      ERROR_CATEGORIES.SYSTEM,
+      {
+        userId: userInfo.userId,
+        spreadsheetId: userInfo.spreadsheetId,
+        sheetName: safePublishedSheetName || params.sheetName,
+      }
+    );
     // フォールバック: 基本的なエラーページ
     return showErrorPage('エラー', 'ボードの表示でエラーが発生しました。管理者にお問い合わせください。');
   }
