@@ -1718,8 +1718,7 @@ function getWebAppUrl() {
   } catch (error) {
     logError(error, 'getWebAppUrl', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
     // 緊急時のフォールバックURL
-    const fallbackUrl = 'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec';
-    return fallbackUrl;
+    return getFallbackUrl();
   }
 }
 /**
@@ -1833,7 +1832,7 @@ function renderUnpublishedPage(userInfo, params) {
     } catch (urlError) {
       warnLog('URL生成エラー、フォールバック値を使用:', urlError);
       // フォールバック: 基本的なURL構造
-      const baseUrl = getWebAppUrlCached() || 'https://script.google.com/macros/s/AKfycbyq0CohJCpwb8KYJQrba4pWhvtss5HD2nKDPMuzPBX2EOftIAI2UbtjjyEn4N52TCzX/exec';
+      const baseUrl = getWebAppUrlCached() || getFallbackUrl();
       appUrls = {
         adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`,
         viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`,
