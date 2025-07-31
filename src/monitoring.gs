@@ -19,7 +19,7 @@ class StructuredLogger {
     this.sessionId = Utilities.getUuid();
     this.startTime = Date.now();
   }
-  
+
   /**
    * 構造化ログを出力
    */
@@ -27,7 +27,7 @@ class StructuredLogger {
     if (this.logLevels[level] < this.currentLevel) {
       return; // ログレベルが低い場合はスキップ
     }
-    
+
     const logEntry = {
       timestamp: new Date().toISOString(),
       level: level,
@@ -36,7 +36,7 @@ class StructuredLogger {
       metadata: metadata,
       uptime: Date.now() - this.startTime
     };
-    
+
     // レベルに応じた出力先を選択
     switch (level) {
       case 'DEBUG':
@@ -53,13 +53,13 @@ class StructuredLogger {
         console.error(`[${level}] ${message}`, metadata);
         break;
     }
-    
+
     // 重要なログは永続化（オプション）
     if (level === 'ERROR' || level === 'FATAL') {
       this._persistLog(logEntry);
     }
   }
-  
+
   /**
    * 重要なログを永続化
    */
@@ -68,19 +68,19 @@ class StructuredLogger {
       // PropertiesServiceに最新のエラーログを保存
       const props = PropertiesService.getScriptProperties();
       const errorLogs = JSON.parse(props.getProperty('ERROR_LOGS') || '[]');
-      
+
       // 最新20件のエラーログを保持
       errorLogs.push(logEntry);
       if (errorLogs.length > 20) {
         errorLogs.shift();
       }
-      
+
       props.setProperty('ERROR_LOGS', JSON.stringify(errorLogs));
     } catch (error) {
       console.error('ログ永続化エラー:', error.message);
     }
   }
-  
+
   /**
    * パフォーマンス測定開始
    */
@@ -95,7 +95,7 @@ class StructuredLogger {
       }
     };
   }
-  
+
   // 便利メソッド
   debug(message, metadata = {}) { this.log('DEBUG', message, metadata); }
   info(message, metadata = {}) { this.log('INFO', message, metadata); }
@@ -116,7 +116,7 @@ class SystemHealthChecker {
     this.lastCheckTime = null;
     this.healthStatus = 'unknown';
   }
-  
+
   /**
    * ヘルスチェック項目を登録
    */
@@ -128,7 +128,7 @@ class SystemHealthChecker {
       description: options.description || ''
     });
   }
-  
+
   /**
    * 全てのヘルスチェックを実行
    */
@@ -136,21 +136,21 @@ class SystemHealthChecker {
     logger.info('システムヘルスチェック開始');
     const results = new Map();
     let overallStatus = 'healthy';
-    
+
     for (const [name, check] of this.checks) {
       try {
         const timer = logger.startTimer(`HealthCheck: ${name}`);
         const result = await this._runSingleCheck(name, check);
         timer.end();
-        
+
         results.set(name, result);
-        
+
         if (result.status === 'unhealthy' && check.critical) {
           overallStatus = 'critical';
         } else if (result.status === 'unhealthy' && overallStatus === 'healthy') {
           overallStatus = 'degraded';
         }
-        
+
       } catch (error) {
         logger.error(`ヘルスチェック実行エラー: ${name}`, { error: error.message });
         results.set(name, {
@@ -158,27 +158,27 @@ class SystemHealthChecker {
           message: error.message,
           timestamp: new Date().toISOString()
         });
-        
+
         if (check.critical) {
           overallStatus = 'critical';
         }
       }
     }
-    
+
     this.healthStatus = overallStatus;
     this.lastCheckTime = new Date().toISOString();
-    
+
     const healthReport = {
       overall: overallStatus,
       timestamp: this.lastCheckTime,
       checks: Object.fromEntries(results),
       summary: this._generateSummary(results)
     };
-    
+
     logger.info('システムヘルスチェック完了', { status: overallStatus });
     return healthReport;
   }
-  
+
   /**
    * 単一のヘルスチェックを実行
    */
@@ -187,7 +187,7 @@ class SystemHealthChecker {
       const timeout = setTimeout(() => {
         reject(new Error(`ヘルスチェックタイムアウト: ${name}`));
       }, check.timeout);
-      
+
       try {
         const result = check.fn();
         clearTimeout(timeout);
@@ -202,7 +202,7 @@ class SystemHealthChecker {
       }
     });
   }
-  
+
   /**
    * ヘルスチェック結果のサマリーを生成
    */
@@ -211,7 +211,7 @@ class SystemHealthChecker {
     let healthy = 0;
     let unhealthy = 0;
     let errors = 0;
-    
+
     for (const [name, result] of results) {
       switch (result.status) {
         case 'healthy':
@@ -225,7 +225,7 @@ class SystemHealthChecker {
           break;
       }
     }
-    
+
     return {
       total,
       healthy,
@@ -251,7 +251,7 @@ function performSystemDiagnostics() {
     security: {},
     dependencies: {}
   };
-  
+
   try {
     // 環境情報
     diagnostics.environment = {
@@ -260,21 +260,21 @@ function performSystemDiagnostics() {
       locale: Session.getActiveLocale(),
       userEmail: Session.getActiveUser().getEmail()
     };
-    
+
     // パフォーマンス情報
     diagnostics.performance = {
       cacheHealth: cacheManager?.getHealth() || 'unavailable',
       memoryStats: globalContextManager?.activeContexts?.size || 0,
       lastExecutionTime: Date.now() - executionStartTime
     };
-    
+
     // セキュリティ情報
     diagnostics.security = {
       authenticationEnabled: true,
       domainRestriction: getDeployUserDomainInfo(),
       userVerificationActive: typeof verifyUserAccess === 'function'
     };
-    
+
     // 依存関係チェック
     diagnostics.dependencies = {
       sheetsApi: typeof getSheetsServiceCached === 'function',
@@ -282,10 +282,10 @@ function performSystemDiagnostics() {
       cache: typeof cacheManager !== 'undefined',
       monitoring: typeof logger !== 'undefined'
     };
-    
+
     logger.info('システム診断完了');
     return diagnostics;
-    
+
   } catch (error) {
     logger.error('システム診断エラー', { error: error.message });
     diagnostics.error = error.message;
@@ -307,7 +307,7 @@ function initializeHealthChecks() {
       return false;
     }
   }, { critical: true, description: 'データベース接続確認' });
-  
+
   // Sheets API サービスチェック
   healthChecker.registerCheck('sheetsApi', () => {
     try {
@@ -317,7 +317,7 @@ function initializeHealthChecks() {
       return false;
     }
   }, { critical: true, description: 'Sheets API サービス状態' });
-  
+
   // キャッシュシステムチェック
   healthChecker.registerCheck('cache', () => {
     try {
@@ -328,7 +328,7 @@ function initializeHealthChecks() {
       return false;
     }
   }, { critical: false, description: 'キャッシュシステム健全性' });
-  
+
   // 認証システムチェック
   healthChecker.registerCheck('authentication', () => {
     try {
@@ -338,7 +338,7 @@ function initializeHealthChecks() {
       return false;
     }
   }, { critical: true, description: '認証システム動作確認' });
-  
+
   // メモリ使用量チェック
   healthChecker.registerCheck('memory', () => {
     try {
@@ -348,7 +348,7 @@ function initializeHealthChecks() {
       return false;
     }
   }, { critical: false, description: 'メモリ使用量確認' });
-  
+
   logger.info('ヘルスチェック項目初期化完了');
 }
 
@@ -358,7 +358,7 @@ function initializeHealthChecks() {
 function getMonitoringDashboard() {
   try {
     const timer = logger.startTimer('MonitoringDashboard');
-    
+
     // 各種統計情報を収集
     const dashboard = {
       timestamp: new Date().toISOString(),
@@ -375,10 +375,10 @@ function getMonitoringDashboard() {
       errors: getRecentErrors(),
       uptime: Date.now() - executionStartTime
     };
-    
+
     timer.end();
     return dashboard;
-    
+
   } catch (error) {
     logger.error('監視ダッシュボードデータ取得エラー', { error: error.message });
     return {

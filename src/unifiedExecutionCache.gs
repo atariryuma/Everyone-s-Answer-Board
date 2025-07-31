@@ -22,12 +22,12 @@ class UnifiedExecutionCache {
       this.clearAll();
       return null;
     }
-    
+
     if (this.userInfoCache && this.lastUserIdKey === userId) {
       debugLog(`✅ 統一キャッシュヒット: ユーザー情報 (${userId})`);
       return this.userInfoCache;
     }
-    
+
     return null;
   }
 
@@ -51,12 +51,12 @@ class UnifiedExecutionCache {
       this.clearAll();
       return null;
     }
-    
+
     if (this.sheetsServiceCache) {
       debugLog(`✅ 統一キャッシュヒット: SheetsService`);
       return this.sheetsServiceCache;
     }
-    
+
     return null;
   }
 
@@ -147,7 +147,7 @@ class UnifiedExecutionCache {
 }
 
 // グローバル統一キャッシュインスタンス
-var globalUnifiedCache = null;
+let globalUnifiedCache = null;
 
 /**
  * 統一実行キャッシュのインスタンスを取得

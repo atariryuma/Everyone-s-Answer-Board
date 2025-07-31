@@ -8,7 +8,7 @@
  */
 const ERROR_SEVERITY = {
   LOW: 'low',
-  MEDIUM: 'medium', 
+  MEDIUM: 'medium',
   HIGH: 'high',
   CRITICAL: 'critical'
 };
@@ -48,9 +48,9 @@ class UnifiedErrorHandler {
    */
   logError(error, context, severity = ERROR_SEVERITY.MEDIUM, category = ERROR_CATEGORIES.SYSTEM, metadata = {}) {
     this.errorCount++;
-    
+
     const errorInfo = this._buildErrorInfo(error, context, severity, category, metadata);
-    
+
     // 重要度に応じた出力方法
     switch (severity) {
       case ERROR_SEVERITY.CRITICAL:
@@ -66,7 +66,7 @@ class UnifiedErrorHandler {
         console.log(`ℹ️ LOW SEVERITY [${context}]:`, errorInfo.message);
         break;
     }
-    
+
     return errorInfo;
   }
 
@@ -86,10 +86,10 @@ class UnifiedErrorHandler {
     };
 
     return this.logError(
-      error, 
-      context, 
-      ERROR_SEVERITY.HIGH, 
-      ERROR_CATEGORIES.AUTHORIZATION, 
+      error,
+      context,
+      ERROR_SEVERITY.HIGH,
+      ERROR_CATEGORIES.AUTHORIZATION,
       securityMetadata
     );
   }
@@ -109,10 +109,10 @@ class UnifiedErrorHandler {
     };
 
     return this.logError(
-      error, 
-      `database.${operation}`, 
-      ERROR_SEVERITY.MEDIUM, 
-      ERROR_CATEGORIES.DATABASE, 
+      error,
+      `database.${operation}`,
+      ERROR_SEVERITY.MEDIUM,
+      ERROR_CATEGORIES.DATABASE,
       dbMetadata
     );
   }
@@ -133,10 +133,10 @@ class UnifiedErrorHandler {
     };
 
     return this.logError(
-      message, 
-      `validation.${field}`, 
-      ERROR_SEVERITY.LOW, 
-      ERROR_CATEGORIES.VALIDATION, 
+      message,
+      `validation.${field}`,
+      ERROR_SEVERITY.LOW,
+      ERROR_CATEGORIES.VALIDATION,
       validationMetadata
     );
   }
@@ -226,7 +226,7 @@ class UnifiedErrorHandler {
    */
   _isRetryableError(error) {
     if (!error) return false;
-    
+
     const retryablePatterns = [
       /timeout/i,
       /rate limit/i,

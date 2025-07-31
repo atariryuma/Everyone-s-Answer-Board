@@ -22,10 +22,10 @@ function acquireStandardizedLock(operationType, operationName = 'unknown') {
   if (!timeout) {
     throw new Error(`無効な操作タイプ: ${operationType}`);
   }
-  
+
   const lock = LockService.getScriptLock();
   debugLog(`🔒 ロック取得試行: ${operationName} (${operationType}, ${timeout}ms)`);
-  
+
   try {
     lock.waitLock(timeout);
     debugLog(`✅ ロック取得成功: ${operationName}`);
@@ -39,7 +39,7 @@ function acquireStandardizedLock(operationType, operationName = 'unknown') {
 /**
  * ロックを安全に解放
  * @param {Lock} lock - 解放するロック
- * @param {string} [operationName] - デバッグ用操作名 
+ * @param {string} [operationName] - デバッグ用操作名
  */
 function releaseStandardizedLock(lock, operationName = 'unknown') {
   try {
@@ -59,7 +59,7 @@ function releaseStandardizedLock(lock, operationName = 'unknown') {
  */
 function executeWithStandardizedLock(operationType, operationName, operation) {
   const lock = acquireStandardizedLock(operationType, operationName);
-  
+
   try {
     return operation();
   } finally {
