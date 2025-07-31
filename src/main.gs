@@ -1029,15 +1029,16 @@ function processViewRequest(userInfo, params) {
   }
 
   // Check if currently published
+  // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
   const isCurrentlyPublished = !!(config.appPublished === true &&
-    config.publishedSpreadsheetId &&
+    userInfo.spreadsheetId &&
     config.publishedSheetName &&
     typeof config.publishedSheetName === 'string' &&
     config.publishedSheetName.trim() !== '');
 
   debugLog('🔍 Publication status check:', {
     appPublished: config.appPublished,
-    hasSpreadsheetId: !!config.publishedSpreadsheetId,
+    hasSpreadsheetId: !!userInfo.spreadsheetId,
     hasSheetName: !!config.publishedSheetName,
     isCurrentlyPublished: isCurrentlyPublished
   });
@@ -1940,12 +1941,13 @@ function renderAnswerBoard(userInfo, params) {
   }
 
   // 強化されたパブリケーション状態検証（キャッシュバスティング対応）
-  const isPublished = !!(config.appPublished && config.publishedSpreadsheetId && safePublishedSheetName);
+  // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
+  const isPublished = !!(config.appPublished && userInfo.spreadsheetId && safePublishedSheetName);
 
   // リアルタイム検証: 非公開状態の場合は確実に検出
   const isCurrentlyPublished = isPublished &&
     config.appPublished === true &&
-    config.publishedSpreadsheetId &&
+    userInfo.spreadsheetId &&
     safePublishedSheetName;
 
   const sheetConfigKey = 'sheet_' + (safePublishedSheetName || params.sheetName);
@@ -2058,9 +2060,10 @@ function checkCurrentPublicationStatus(userId) {
     }
 
     // 現在のパブリケーション状態を厳密にチェック
+    // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
     const isCurrentlyPublished = !!(
       config.appPublished === true &&
-      config.publishedSpreadsheetId &&
+      userInfo.spreadsheetId &&
       config.publishedSheetName &&
       typeof config.publishedSheetName === 'string' &&
       config.publishedSheetName.trim() !== ''
@@ -2069,7 +2072,7 @@ function checkCurrentPublicationStatus(userId) {
     debugLog('📊 Publication status check result:', {
       userId: userId,
       appPublished: config.appPublished,
-      hasSpreadsheetId: !!config.publishedSpreadsheetId,
+      hasSpreadsheetId: !!userInfo.spreadsheetId,
       hasSheetName: !!config.publishedSheetName,
       isCurrentlyPublished: isCurrentlyPublished,
       timestamp: new Date().toISOString()
@@ -2078,7 +2081,7 @@ function checkCurrentPublicationStatus(userId) {
     return {
       isPublished: isCurrentlyPublished,
       publishedSheetName: config.publishedSheetName || null,
-      publishedSpreadsheetId: config.publishedSpreadsheetId || null,
+      publishedSpreadsheetId: userInfo.spreadsheetId || null, // 統一ConfigJSONスキーマ対応
       lastChecked: new Date().toISOString()
     };
 

@@ -1011,7 +1011,8 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     var setupStatus = configJson.setupStatus || 'pending';
 
     // 公開対象のスプレッドシートIDとシート名を取得
-    var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
+    // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
+    var publishedSpreadsheetId = userInfo.spreadsheetId;
     var publishedSheetName = configJson.publishedSheetName;
 
     if (!publishedSpreadsheetId || !publishedSheetName) {
@@ -1545,7 +1546,8 @@ function getAppConfig(requestUserId) {
     var answerCount = 0;
     var totalReactions = 0;
     try {
-      if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
+      // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
+      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
         var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
@@ -1901,7 +1903,8 @@ function getActiveFormInfo(requestUserId) {
     // フォーム回答数を取得
     var answerCount = 0;
     try {
-      if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
+      // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
+      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
         var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
@@ -5924,7 +5927,8 @@ function getInitialData(requestUserId, targetSheetName) {
     var answerCount = 0;
     var totalReactions = 0;
     try {
-      if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
+      // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
+      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
         var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
