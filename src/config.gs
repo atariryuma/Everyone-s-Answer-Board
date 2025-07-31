@@ -8,7 +8,6 @@ const CONFIG_SHEET_NAME = 'Config';
 let runtimeUserInfo = null;
 
 // メモリ管理用の実行レベル変数 (main.gsと統一)
-let _executionUserInfoCache = null;
 let lastCacheUserIdKey = null;
 let executionStartTime = Date.now();
 const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
