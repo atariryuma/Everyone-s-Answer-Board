@@ -5961,6 +5961,15 @@ function getInitialData(requestUserId, targetSheetName) {
     var classHeader = activeSheetConfig.classHeader || '';
 
     // === ベース応答の構築 ===
+    debugLog('🔍 getInitialData: userInfo構造チェック', {
+      hasUserId: !!userInfo.userId,
+      hasAdminEmail: !!userInfo.adminEmail,
+      hasSpreadsheetId: !!userInfo.spreadsheetId,
+      hasConfigJson: !!userInfo.configJson,
+      answerCount: answerCount,
+      totalReactions: totalReactions
+    });
+
     var response = {
       // ユーザー情報
       userInfo: {
@@ -5970,7 +5979,8 @@ function getInitialData(requestUserId, targetSheetName) {
         lastAccessedAt: userInfo.lastAccessedAt,
         spreadsheetId: userInfo.spreadsheetId,
         spreadsheetUrl: userInfo.spreadsheetUrl,
-        configJson: userInfo.configJson
+        configJson: userInfo.configJson,
+        createdAt: userInfo.createdAt || null
       },
       // アプリ設定
       appUrls: appUrls,

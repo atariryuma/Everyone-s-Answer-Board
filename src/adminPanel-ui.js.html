@@ -322,8 +322,24 @@ function updateStaticUI(status) {
 // =============================================================================
 
 function updateDatabaseInfo(status) {
-  if (!status || !status.userInfo) {
+  console.log('🔍 updateDatabaseInfo: status構造チェック', {
+    hasStatus: !!status,
+    hasUserInfo: !!(status && status.userInfo),
+    statusKeys: status ? Object.keys(status) : [],
+    userInfoKeys: status && status.userInfo ? Object.keys(status.userInfo) : [],
+    answerCount: status && status.answerCount,
+    totalReactions: status && status.totalReactions
+  });
+
+  if (!status) {
+    console.warn('System info update failed: No status object');
+    setFallbackValues();
+    return;
+  }
+
+  if (!status.userInfo) {
     console.warn('System info update failed: No user info available');
+    setFallbackValues();
     return;
   }
 
@@ -339,7 +355,18 @@ function updateDatabaseInfo(status) {
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
   safeSetText('info-answer-count', status.answerCount || '0');
-  safeSetText('info-reaction-count', status.totalReactions || '0');
+  
+  // 新しいアカウント情報
+  updateAccountInfo(status.userInfo);
+  
+  // 新しいセットアップ進行状況
+  updateSetupProgress(status);
+  
+  // 新しいデータ統計
+  updateDataStatistics(status);
+  
+  // 新しいシステム情報
+  updateSystemInfo(status, cfg);
 
   // 公開状態の表示を更新
   const isPublished = cfg.isPublished !== undefined
@@ -361,6 +388,186 @@ function updateDatabaseInfo(status) {
 
   // チェックボックスの状態同期
   syncCheckboxStates(status);
+}
+
+// アカウント情報更新関数
+function updateAccountInfo(userInfo) {
+  if (!userInfo) return;
+  
+  // 日時フォーマット関数
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '-';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('ja-JP', { 
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch {
+      return '-';
+    }
+  };
+  
+  safeSetText('info-created-at', formatDateTime(userInfo.createdAt));
+  safeSetText('info-last-access', formatDateTime(userInfo.lastAccessedAt));
+}
+
+// セットアップ進行状況更新関数
+function updateSetupProgress(status) {
+  const setupStep = status.setupStep || 1;
+  const maxSteps = 4; // 最大ステップ数
+  const percentage = Math.round((setupStep / maxSteps) * 100);
+  
+  safeSetText('info-setup-step', `${setupStep}/${maxSteps}`);
+  safeSetText('info-setup-percentage', `${percentage}%`);
+  
+  const progressBar = safeGetElement('info-setup-progress');
+  if (progressBar) {
+    progressBar.style.width = `${percentage}%`;
+    
+    // 完了度に応じて色を変更
+    if (percentage === 100) {
+      progressBar.className = 'bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-300';
+    } else if (percentage >= 75) {
+      progressBar.className = 'bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300';
+    } else {
+      progressBar.className = 'bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-300';
+    }
+  }
+}
+
+// データ統計更新関数
+function updateDataStatistics(status) {
+  safeSetText('info-answer-count', status.answerCount || '0');
+  
+  // アクティブシート数の計算
+  const activeSheets = status.allSheets ? status.allSheets.length : 0;
+  safeSetText('info-active-sheets', activeSheets.toString());
+  
+  // 設定済みヘッダー数の計算
+  const configuredHeaders = countConfiguredHeaders(status.config);
+  safeSetText('info-configured-headers', configuredHeaders.toString());
+}
+
+// システム情報更新関数
+function updateSystemInfo(status, config) {
+  // 最終更新日時
+  const lastModified = config.lastModified || status.userInfo?.lastAccessedAt;
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '-';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('ja-JP', { 
+        month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch {
+      return '-';
+    }
+  };
+  
+  safeSetText('info-last-modified', formatDateTime(lastModified));
+  
+  // システム健全性の判定
+  const healthStatus = determineSystemHealth(status);
+  updateSystemHealthUI(healthStatus);
+}
+
+// 設定済みヘッダー数をカウント
+function countConfiguredHeaders(config) {
+  if (!config) return 0;
+  
+  let count = 0;
+  Object.keys(config).forEach(key => {
+    if (key.startsWith('sheet_')) {
+      const sheetConfig = config[key];
+      if (sheetConfig.opinionHeader) count++;
+      if (sheetConfig.nameHeader) count++;
+      if (sheetConfig.classHeader) count++;
+      if (sheetConfig.reasonHeader) count++;
+    }
+  });
+  
+  return count;
+}
+
+// システム健全性判定
+function determineSystemHealth(status) {
+  const issues = [];
+  
+  if (!status.userInfo?.spreadsheetId) issues.push('スプレッドシートID未設定');
+  if (!status.config?.publishedSheetName) issues.push('公開シート未設定');
+  if (status.answerCount === 0) issues.push('回答データなし');
+  
+  return {
+    level: issues.length === 0 ? 'healthy' : issues.length <= 1 ? 'warning' : 'critical',
+    issues: issues
+  };
+}
+
+// システム健全性UI更新
+function updateSystemHealthUI(healthStatus) {
+  const indicator = safeGetElement('info-health-indicator');
+  const text = safeGetElement('info-health-text');
+  
+  if (!indicator || !text) return;
+  
+  switch (healthStatus.level) {
+    case 'healthy':
+      indicator.className = 'w-2 h-2 rounded-full bg-green-400';
+      text.textContent = '正常';
+      break;
+    case 'warning':
+      indicator.className = 'w-2 h-2 rounded-full bg-yellow-400';
+      text.textContent = '注意';
+      break;
+    case 'critical':
+      indicator.className = 'w-2 h-2 rounded-full bg-red-400';
+      text.textContent = '要対応';
+      break;
+    default:
+      indicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+      text.textContent = '不明';
+  }
+}
+
+// 詳細情報表示関数
+function showTechnicalDetails() {
+  // モーダルまたはポップアップで詳細情報を表示
+  console.log('詳細情報表示機能は今後実装予定');
+}
+
+// フォールバック値設定関数
+function setFallbackValues() {
+  safeSetText('info-admin-email', '取得中...');
+  safeSetText('info-user-id', '取得中...');
+  safeSetText('info-published-sheet', '取得中...');
+  safeSetText('info-answer-count', '取得中...');
+  safeSetText('info-created-at', '取得中...');
+  safeSetText('info-last-access', '取得中...');
+  safeSetText('info-setup-step', '取得中...');
+  safeSetText('info-setup-percentage', '取得中...');
+  safeSetText('info-active-sheets', '取得中...');
+  safeSetText('info-configured-headers', '取得中...');
+  safeSetText('info-last-modified', '取得中...');
+  safeSetText('info-display-mode', '取得中...');
+  safeSetText('info-show-counts', '取得中...');
+  
+  // プログレスバーリセット
+  const progressBar = safeGetElement('info-setup-progress');
+  if (progressBar) progressBar.style.width = '0%';
+  
+  // 公開状態も初期状態に設定
+  const publishIndicator = safeGetElement('info-publish-indicator');
+  const publishText = safeGetElement('info-publish-text');
+  if (publishIndicator) publishIndicator.className = 'w-2 h-2 rounded-full bg-yellow-400';
+  if (publishText) publishText.textContent = '確認中';
+  
+  // システム健全性も初期状態に設定
+  const healthIndicator = safeGetElement('info-health-indicator');
+  const healthText = safeGetElement('info-health-text');
+  if (healthIndicator) healthIndicator.className = 'w-2 h-2 rounded-full bg-yellow-400';
+  if (healthText) healthText.textContent = '確認中';
 }
 
 // Update publication status UI
