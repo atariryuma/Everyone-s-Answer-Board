@@ -1523,8 +1523,10 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getAppConfig(requestUserId) {
+  debugLog('getAppConfig: Function started for userId:', requestUserId); // ★追加
   verifyUserAccess(requestUserId);
   try {
+    debugLog('getAppConfig: After verifyUserAccess'); // ★追加
     var currentUserId = requestUserId;
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
@@ -1542,6 +1544,7 @@ function getAppConfig(requestUserId) {
       configJson = healingResult.configJson;
       debugLog('getAppConfig: configJson (after healing):', JSON.stringify(configJson));
     }
+    debugLog('getAppConfig: After healing process'); // ★追加
 
     var sheets = getSheetsList(currentUserId);
     debugLog('getAppConfig: sheets:', JSON.stringify(sheets));
@@ -1565,6 +1568,7 @@ function getAppConfig(requestUserId) {
     } catch (countError) {
       warnLog('回答数の取得に失敗: ' + countError.message);
     }
+    debugLog('getAppConfig: Before return statement'); // ★追加
 
     return {
       status: 'success',
