@@ -1528,33 +1528,40 @@ function getAppConfig(requestUserId) {
     var currentUserId = requestUserId;
     var userInfo = findUserById(currentUserId);
     if (!userInfo) {
+      logError('getAppConfig: ユーザー情報が見つかりません', { userId: currentUserId });
       throw new Error('ユーザー情報が見つかりません');
     }
+    debugLog('getAppConfig: userInfo:', JSON.stringify(userInfo));
 
     var configJson = getConfigJSON(userInfo);
+    debugLog('getAppConfig: configJson (before healing):', JSON.stringify(configJson));
 
     // --- 統一された自動修復システム ---
     const healingResult = performAutoHealing(userInfo, configJson, currentUserId);
     if (healingResult.updated) {
       configJson = healingResult.configJson;
+      debugLog('getAppConfig: configJson (after healing):', JSON.stringify(configJson));
     }
 
     var sheets = getSheetsList(currentUserId);
+    debugLog('getAppConfig: sheets:', JSON.stringify(sheets));
+
     var appUrls = generateUserUrls(currentUserId);
+    debugLog('getAppConfig: appUrls:', JSON.stringify(appUrls));
 
     // 回答数を取得
     var answerCount = 0;
     var totalReactions = 0;
     try {
-      // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
       if (userInfo.spreadsheetId && configJson.publishedSheetName) {
         var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
-          // リアクション数の概算計算（詳細実装は後回し）
           totalReactions = answerCount * 2; // 暫定値
         }
       }
+      debugLog('getAppConfig: answerCount:', answerCount);
+      debugLog('getAppConfig: totalReactions:', totalReactions);
     } catch (countError) {
       warnLog('回答数の取得に失敗: ' + countError.message);
     }
@@ -1567,9 +1574,9 @@ function getAppConfig(requestUserId) {
       publishedSheetName: configJson.publishedSheetName || '',
       displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
       isPublished: configJson.appPublished || false,
-      appPublished: configJson.appPublished || false, // AdminPanel.htmlで使用される
+      appPublished: configJson.appPublished || false,
       availableSheets: sheets,
-      allSheets: sheets, // AdminPanel.htmlで使用される
+      allSheets: sheets,
       spreadsheetUrl: userInfo.spreadsheetUrl,
       formUrl: configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',
@@ -1578,10 +1585,8 @@ function getAppConfig(requestUserId) {
       viewUrl: appUrls.viewUrl,
       activeSheetName: configJson.publishedSheetName || '',
       appUrls: appUrls,
-      // AdminPanel.htmlが期待する表示設定プロパティ
       showNames: configJson.showNames || false,
       showCounts: configJson.showCounts === true,
-      // データベース詳細情報
       userInfo: {
         userId: currentUserId,
         adminEmail: userInfo.adminEmail,
@@ -1592,21 +1597,18 @@ function getAppConfig(requestUserId) {
         isActive: userInfo.isActive || 'false',
         configJson: userInfo.configJson || '{}'
       },
-      // 統計情報
       answerCount: answerCount,
       totalReactions: totalReactions,
-      // システム状態
       systemStatus: {
         setupStatus: configJson.setupStatus || 'unknown',
         formCreated: configJson.formCreated || false,
         appPublished: configJson.appPublished || false,
         lastUpdated: new Date().toISOString()
       },
-      // ユーザーのセットアップ段階を判定（統一化されたロジック）
       setupStep: determineSetupStepUnified(userInfo, configJson)
     };
   } catch (e) {
-    logError(e, 'getAppSettings', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    logError(e, 'getAppConfig', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
     return {
       status: 'error',
       message: '設定の取得に失敗しました: ' + e.message
