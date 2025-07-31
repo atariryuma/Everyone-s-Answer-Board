@@ -476,8 +476,8 @@ function repairSetupStateInconsistencies() {
       
       // 修正された設定を保存
       console.log('💾 修正された設定を保存中...', config);
-      
-        runGasWithUserId('saveSheetConfig', '設定修復中...', currentStatus.userInfo.spreadsheetId, selectedSheet, config)
+
+        runGasWithUserId('syncConfigurationState', '設定修復中...', config, 'repair')
         .then(saveResult => {
           if (saveResult && saveResult.success) {
             console.log('✅ セットアップ状態の修復完了');
