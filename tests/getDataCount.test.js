@@ -3,6 +3,7 @@ const vm = require('vm');
 
 describe('getDataCount reflects new rows', () => {
   const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
+  const configSchemaCode = fs.readFileSync('src/configSchema.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const spreadsheetCacheCode = fs.readFileSync('src/spreadsheetCache.gs', 'utf8');
@@ -53,6 +54,7 @@ describe('getDataCount reflects new rows', () => {
     };
     vm.createContext(context);
     vm.runInContext(errorHandlerCode, context);
+    vm.runInContext(configSchemaCode, context);
     vm.runInContext(spreadsheetCacheCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(coreCode, context);

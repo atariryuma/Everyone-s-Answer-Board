@@ -3,6 +3,7 @@ const vm = require('vm');
 
 describe('getInitialData header extraction', () => {
   const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
+  const configSchemaCode = fs.readFileSync('src/configSchema.gs', 'utf8');
   const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
@@ -11,6 +12,16 @@ describe('getInitialData header extraction', () => {
 
   beforeEach(() => {
     const store = {};
+    // 統一スキーマ関数のモック
+    global.getConfigJSON = jest.fn((userInfo) => {
+      if (!userInfo || !userInfo.configJson) return {};
+      try {
+        return JSON.parse(userInfo.configJson);
+      } catch (e) {
+        return {};
+      }
+    });
+    
     context = {
       debugLog: () => {},
       console,
@@ -59,6 +70,7 @@ describe('getInitialData header extraction', () => {
     };
     vm.createContext(context);
     vm.runInContext(errorHandlerCode, context);
+    vm.runInContext(configSchemaCode, context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(databaseCode, context);

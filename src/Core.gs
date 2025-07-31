@@ -162,7 +162,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
   }
 
   const setupStatus = configJson.setupStatus || 'pending';
-  const formCreated = !!configJson.formCreated;
+  const formCreatedForStep = !!configJson.formCreated;
   const hasFormUrl = !!(configJson.formUrl && configJson.formUrl.trim());
 
   // Step 2条件: 明示的な判定
@@ -170,7 +170,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
     setupStatus === 'pending' ||      // 明示的な未完了状態
     setupStatus === 'reconfiguring' || // 再設定中
     setupStatus === 'error' ||        // エラー状態
-    !formCreated ||                   // フォーム未作成
+    !formCreatedForStep ||                   // フォーム未作成
     !hasFormUrl                       // フォームURL未設定
   );
 
@@ -318,12 +318,12 @@ function validateConfigJsonState(configJson, userInfo, flowType) {
   const isQuickStartCompleted = (configJson.setupStatus === 'completed' && configJson.formCreated === true);
   
   // カスタムセットアップ完了状態の検出
-  const formCreated = !!configJson.formCreated;
+  const formCreatedForCustom = !!configJson.formCreated;
   const hasSheetConfigs = Object.keys(configJson).some(key => key.startsWith('sheet_'));
-  const isCustomSetupCompleted = formCreated && hasSheetConfigs;
+  const isCustomSetupCompleted = formCreatedForCustom && hasSheetConfigs;
   
   // カスタムフロー設定同期時の特別処理
-  if (flowType === 'custom' && formCreated) {
+  if (flowType === 'custom' && formCreatedForCustom) {
     return {
       isValid: true,
       errors: [],
@@ -349,13 +349,13 @@ function validateConfigJsonState(configJson, userInfo, flowType) {
   }
 
   const setupStatus = configJson.setupStatus || 'pending';
-  const formCreated = !!configJson.formCreated;
+  const formCreatedForValidation = !!configJson.formCreated;
   const hasFormUrl = !!(configJson.formUrl && configJson.formUrl.trim());
   const hasPublishedSheet = !!(configJson.publishedSheetName && configJson.publishedSheetName.trim());
 
   // 検証ルール1: setupStatus = 'completed' だが必要な要素が不足
   if (setupStatus === 'completed') {
-    if (!formCreated) {
+    if (!formCreatedForValidation) {
       errors.push('setupStatus=completedですが、formCreated=falseです');
     }
     if (!hasFormUrl) {
@@ -364,7 +364,7 @@ function validateConfigJsonState(configJson, userInfo, flowType) {
   }
 
   // 検証ルール2: formCreated = true だが関連要素が不足
-  if (formCreated && !hasFormUrl) {
+  if (formCreatedForValidation && !hasFormUrl) {
     errors.push('formCreated=trueですが、formUrlが未設定です');
   }
 
@@ -949,7 +949,7 @@ function verifyUserAccess(requestUserId) {
 
   // 管理者かどうかを確認
   if (activeUserEmail !== requestedUserInfo.adminEmail) {
-    const config = JSON.parse(requestedUserInfo.configJson || '{}');
+    const config = getConfigJSON(requestedUserInfo);
     if (config.appPublished === true) {
       debugLog(`✅ 公開ボード閲覧許可: ${activeUserEmail} -> ${requestUserId}`);
       return;
@@ -2289,20 +2289,17 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   debugLog('  📊 スプレッドシートID:', formAndSsInfo.spreadsheetId);
   debugLog('  📄 シート名:', formAndSsInfo.sheetName);
 
-  // クイックスタート用の適切な初期設定を作成
-  var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
+  // 統一スキーマを使用してQuickStart設定を作成
   var quickStartSheetConfig = {
     opinionHeader: '今日の学習について、あなたの考えや感想を聞かせてください',
     reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
     nameHeader: '名前',
     classHeader: 'クラス',
-    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl, // シート固有のフォームURL保存
-    editFormUrl: formAndSsInfo.editFormUrl, // 編集用URL保存
-    formCreated: true, // シート固有のフォーム作成フラグ
-    setupStatus: 'completed', // シート固有のセットアップ状態
-    isConfigured: true, // 設定完了フラグ
-    lastModified: new Date().toISOString(),
-    createdAt: new Date().toISOString() // 作成日時記録
+    formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
+    editFormUrl: formAndSsInfo.editFormUrl,
+    formCreated: true,
+    setupStatus: 'completed',
+    isConfigured: true
   };
 
   debugLog('📝 クイックスタート用質問文設定:');
@@ -2325,36 +2322,38 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   var autoStopMinutes = 360; // 6時間 = 360分
   var scheduledEndAt = new Date(Date.now() + (autoStopMinutes * 60 * 1000)).toISOString();
 
-  var updatedConfig = {
+  // 統一スキーマを使用してConfigJSONを正規化
+  var baseConfig = normalizeConfigJSON({
     ...configJson,
     setupStatus: 'completed',
     formCreated: true,
     formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl,
     editFormUrl: formAndSsInfo.editFormUrl,
     publishedSpreadsheetId: formAndSsInfo.spreadsheetId,
-    publishedSheetName: safeSheetName, // 型安全性が確保されたシート名
+    publishedSheetName: safeSheetName,
     appPublished: true,
     folderId: folder ? folder.getId() : '',
     folderUrl: folder ? folder.getUrl() : '',
     completedAt: new Date().toISOString(),
-    // 6時間自動停止機能の設定
-    publishedAt: publishedAt, // 公開開始時間
-    autoStopEnabled: true, // 6時間自動停止フラグ
-    autoStopMinutes: autoStopMinutes, // 6時間 = 360分
-    scheduledEndAt: scheduledEndAt, // 予定終了日時
-    lastPublishedAt: publishedAt, // 最後の公開日時
-    totalPublishCount: (configJson.totalPublishCount || 0) + 1, // 累計公開回数
-    autoStoppedAt: null, // 自動停止実行日時をリセット
-    autoStopReason: null, // 自動停止理由をリセット
-    [sheetConfigKey]: quickStartSheetConfig
-  };
+    publishedAt: publishedAt,
+    autoStopEnabled: true,
+    autoStopMinutes: autoStopMinutes,
+    scheduledEndAt: scheduledEndAt,
+    lastPublishedAt: publishedAt,
+    totalPublishCount: (configJson.totalPublishCount || 0) + 1,
+    autoStoppedAt: null,
+    autoStopReason: null
+  });
+  
+  // シート固有設定を統一関数で追加
+  var updatedConfig = setSheetConfig(baseConfig, safeSheetName, quickStartSheetConfig);
 
   // ユーザーデータベースを新しいセットアップ情報で完全に更新
   debugLog('💾 ユーザーデータベースを新しいセットアップで更新中...');
   var updateData = {
     spreadsheetId: formAndSsInfo.spreadsheetId,
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-    configJson: JSON.stringify(updatedConfig),
+    configJson: stringifyConfigJSON(updatedConfig),
     lastAccessedAt: new Date().toISOString()
   };
 

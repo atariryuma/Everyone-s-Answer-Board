@@ -3,6 +3,7 @@ const vm = require('vm');
 
 describe('Core.gs utilities', () => {
   const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
+  const configSchemaCode = fs.readFileSync('src/configSchema.gs', 'utf8');
   const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
@@ -64,6 +65,7 @@ describe('Core.gs utilities', () => {
     };
     vm.createContext(context);
     vm.runInContext(errorHandlerCode, context);
+    vm.runInContext(configSchemaCode, context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(coreCode, context);
@@ -89,6 +91,11 @@ describe('Core.gs utilities', () => {
           sheet_Sheet1: { opinionHeader: 'テーマ' }
         })
       });
+      // 統一スキーマ関数のモック
+      global.getConfigJSON = jest.fn(() => ({
+        publishedSheetName: 'Sheet1',
+        sheet_Sheet1: { opinionHeader: 'テーマ' }
+      }));
       const header = context.getOpinionHeaderSafely('uid', 'Sheet1');
       expect(header).toBe('テーマ');
     });

@@ -2681,7 +2681,7 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
     // フォールバック: configJsonからpublishedSheetNameを取得
     if (context && context.userInfo && context.userInfo.configJson) {
       try {
-        const configJson = JSON.parse(context.userInfo.configJson);
+        const configJson = getConfigJSON(context.userInfo);
         const fallbackSheetName = configJson.publishedSheetName;
         if (fallbackSheetName && typeof fallbackSheetName === 'string' && fallbackSheetName.trim() !== '') {
           warnLog('⚠️ Using fallback publishedSheetName from config:', fallbackSheetName);
@@ -2911,7 +2911,7 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
  */
 function getConfigFromContext(context, sheetName) {
   try {
-    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    const configJson = getConfigJSON(context.userInfo);
     const sheetKey = 'sheet_' + sheetName;
     const sheetConfig = configJson[sheetKey] || {};
 
@@ -2938,7 +2938,7 @@ function saveSheetConfigInContext(context, spreadsheetId, sheetName, config) {
   debugLog('💾 saveSheetConfigInContext: インメモリ更新');
 
   try {
-    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    const configJson = getConfigJSON(context.userInfo);
     const sheetKey = 'sheet_' + sheetName;
 
     // シート固有の設定を準備し、グローバル設定と重複するキーを削除
@@ -2976,7 +2976,7 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
   debugLog('🔄 switchToSheetInContext: インメモリ更新');
 
   try {
-    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    const configJson = getConfigJSON(context.userInfo);
 
     // アクティブシート情報を更新
     configJson.publishedSpreadsheetId = spreadsheetId;
@@ -3055,7 +3055,7 @@ function setDisplayOptionsInContext(context, displayOptions) {
   debugLog('🎛️ setDisplayOptionsInContext: インメモリ更新');
 
   try {
-    const configJson = JSON.parse(context.userInfo.configJson || '{}');
+    const configJson = getConfigJSON(context.userInfo);
 
     // 表示オプションを更新
     if (displayOptions.showNames !== undefined) {

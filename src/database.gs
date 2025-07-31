@@ -223,7 +223,7 @@ function getAllUsersForAdmin() {
 
       // 設定情報をパース
       try {
-        user.configJson = JSON.parse(user.configJson || '{}');
+        user.configJson = getConfigJSON(user);
       } catch (e) {
         user.configJson = {};
       }

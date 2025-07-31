@@ -282,9 +282,7 @@ function runHeaderGuessing() {
             
             // セットアップ状態を確認して必要な場合のみ実行
             if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-              const config = typeof currentStatus.userInfo.configJson === 'string' 
-                ? JSON.parse(currentStatus.userInfo.configJson) 
-                : currentStatus.userInfo.configJson;
+              const config = getConfigJSON(currentStatus.userInfo);
               
               if (config.setupStatus === 'pending' || !config.formCreated) {
                 console.log('🔧 セットアップ未完了状態を検出 - 自動完了を実行');
@@ -396,9 +394,7 @@ function repairSetupStateInconsistencies() {
         return;
       }
       
-      const config = typeof currentStatus.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatus.userInfo.configJson) 
-        : currentStatus.userInfo.configJson;
+      const config = getConfigJSON(currentStatus.userInfo);
         
       const issues = [];
       const fixes = [];
@@ -1226,9 +1222,7 @@ function openForm() {
   // 1. configJsonから直接取得（最も確実）
   if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
     try {
-      const configJson = typeof currentStatus.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatus.userInfo.configJson) 
-        : currentStatus.userInfo.configJson;
+      const configJson = getConfigJSON(currentStatus.userInfo);
       
       if (configJson && configJson.formUrl) {
         formUrl = configJson.formUrl;
@@ -1336,7 +1330,7 @@ async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
     const verificationStatus = await runGasWithUserId('getAppConfig', '設定反映を確認中...');
     
     if (verificationStatus && verificationStatus.userInfo) {
-      const configJson = JSON.parse(verificationStatus.userInfo.configJson || '{}');
+      const configJson = getConfigJSON(verificationStatus.userInfo);
       const sheetKey = 'sheet_' + expectedSheetName;
       const savedConfig = configJson[sheetKey];
       
@@ -1394,7 +1388,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
       return { success: false, message: 'ステータス取得に失敗しました' };
     }
     
-    const configJson = JSON.parse(completionStatus.userInfo.configJson || '{}');
+    const configJson = getConfigJSON(completionStatus.userInfo);
     const issues = [];
     
     // 必須完了状態の確認
@@ -1494,7 +1488,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       throw new Error('設定同期: ステータス取得失敗');
     }
     
-    const configJson = JSON.parse(currentStatus.userInfo.configJson || '{}');
+    const configJson = getConfigJSON(currentStatus.userInfo);
     const synchronizationIssues = [];
     const appliedFixes = [];
     
@@ -1597,7 +1591,7 @@ function performIntegratedConfigConsistencyCheck(status) {
   }
   
   try {
-    const configJson = JSON.parse(status.userInfo.configJson || '{}');
+    const configJson = getConfigJSON(status.userInfo);
     const issues = [];
     const recommendations = [];
     
