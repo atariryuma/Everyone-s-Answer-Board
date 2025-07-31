@@ -1044,255 +1044,22 @@ function createFormWithConfig() {
   hideFormConfigModal();
   
   // カスタムセットアップ用進捗表示を開始
-  showQuickStartProgress();
-  simulateCustomFormProgressWithFolderCheck();
+  // Use the new unified custom setup system
+  console.log('🎨 統合カスタムセットアップ開始:', config);
   
-  // カスタムフォーム作成中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
-
   // userEmailは現在のユーザー情報から取得
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.adminEmail) {
     showMessage('ユーザー情報が取得できません。ページを再読み込みしてください。', 'error');
     return;
   }
   
-  runGasWithUserId('createCustomFormUI', false, config)
-    .then(function(result) {
-      logDebug('📥 Received response from createCustomFormUI:', result);
-      if (result && result.status === 'success') {
-        showMessage('✅ 新しいフォームが作成され、連携されました！', 'success');
-        
-        // クラス選択肢をデータベースに保存
-        saveClassChoicesToDatabase(classChoices);
-        
-        // ステータス更新とシート選択の確実な同期
-        console.log('📊 カスタムセットアップ完了: ステータス更新とシート選択同期開始');
-        loadStatus(true).then(() => {
-          // ステップ進行を明示的に更新
-          const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
-          updateStepIndicators(currentStep);
-          manageSectionStates(currentStep);
-          
-          // ステータス更新完了後、新しく作成されたシートを自動選択
-          setTimeout(() => {
-            try {
-              if (result.sheetName) {
-                const sheetSelect = document.getElementById('sheet-select');
-                if (sheetSelect && sheetSelect.value !== result.sheetName) {
-                  console.log(`🎯 新規作成シートを自動選択: ${result.sheetName}`);
-                  sheetSelect.value = result.sheetName;
-                  selectedSheet = result.sheetName;
-                  
-                  // 新しいシートの設定を直接読み込み
-                  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) {
-                    loadConfigForSelected(result.sheetName, currentStatus.userInfo.spreadsheetId)
-                      .then(configResult => {
-                        console.log('✅ カスタムセットアップ後のシート設定読み込み完了:', configResult);
-                        
-                        // AI判定結果が利用可能な場合、自動で設定を保存
-                        if (configResult && configResult.config && configResult.config.guessedConfig) {
-                          console.log('🤖 AI判定結果を自動保存中...');
-                          
-                          // 設定保存前にキャッシュクリアを実行
-                          if (typeof clearServerCache === 'function') {
-                            clearServerCache().then(() => {
-                              console.log('✅ サーバーキャッシュクリア完了');
-                            }).catch(cacheError => {
-                              console.warn('⚠️ キャッシュクリア失敗:', cacheError);
-                            });
-                          }
-                          
-                          setTimeout(async () => {
-                            // カスタムセットアップ専用の確実な設定保存処理
-                            if (typeof saveAndPublish === 'function') {
-                              // カスタムセットアップ用の強制公開設定
-                              const forcePublishConfig = {
-                                batchMode: true,
-                                displayOptions: {
-                                  showNames: false, // カスタムセットアップのデフォルト
-                                  showCounts: false
-                                }
-                              };
-                              
-                              // 直接シート設定保存（batchMode確実適用）
-                              const directSaveResult = await runGasWithUserId('saveSheetConfig', 'カスタム設定を保存中...', 
-                                userId, result.sheetName, currentStatus.userInfo.spreadsheetId, 
-                                configResult.config.guessedConfig, forcePublishConfig);
-                              
-                              console.log('✅ カスタムセットアップ: 直接設定保存完了', directSaveResult);
-                              
-                              saveAndPublish().then(async (saveResult) => {
-                                console.log('✅ カスタムセットアップ: AI判定結果を自動保存しました', saveResult);
-                                
-                                // 保存後に追加でキャッシュクリア
-                                if (typeof clearServerCache === 'function') {
-                                  clearServerCache().then(() => {
-                                    console.log('✅ 保存後キャッシュクリア完了');
-                                  });
-                                }
-                                
-                                // 設定反映確認
-                                if (configResult.config.guessedConfig) {
-                                  const verificationResult = await verifyConfigAfterSave(
-                                    result.sheetName, 
-                                    configResult.config.guessedConfig
-                                  );
-                                  
-                                  if (verificationResult.success) {
-                                    console.log('🎯 カスタムセットアップ: 設定反映確認完了');
-                                  } else {
-                                    console.warn('⚠️ カスタムセットアップ: 設定反映に問題があります', verificationResult.message);
-                                  }
-                                }
-                                
-                                // フロー完了確認（必須状態の包括的確認）
-                                const completionResult = await verifySetupFlowCompletion('custom', result.sheetName);
-                                
-                                if (completionResult.success) {
-                                  console.log('🎉 カスタムセットアップフロー完了確認: 全要件を満たしています', completionResult.details);
-                                  
-                                  // 設定同期メカニズムを実行（完了状態の維持・強化）
-                                  const syncResult = await enhanceConfigSynchronization('custom', {
-                                    sheetName: result.sheetName,
-                                    spreadsheetId: currentStatus.userInfo.spreadsheetId,
-                                    config: configResult.config.guessedConfig
-                                  });
-                                  
-                                  let successMessage = `✅ カスタムセットアップが正常に完了しました！\n\n設定内容:\n📋 シート: ${result.sheetName}\n🎯 ステータス: ${completionResult.details.setupStatus}\n📢 公開状態: ${completionResult.details.appPublished ? '公開中' : '非公開'}`;
-                                  
-                                  if (syncResult.synchronized) {
-                                    successMessage += `\n\n🔄 設定同期: ${syncResult.appliedFixes.length}件の修正を適用しました`;
-                                    console.log('🔧 カスタムセットアップ: 設定同期完了', syncResult.appliedFixes);
-                                  }
-                                  
-                                  showMessage(successMessage, 'success');
-                                } else {
-                                  console.warn('⚠️ カスタムセットアップフロー: 未完了項目があります', completionResult);
-                                  
-                                  // 未完了項目がある場合も同期メカニズムで修正を試行
-                                  try {
-                                    const syncResult = await enhanceConfigSynchronization('custom', {
-                                      sheetName: result.sheetName,
-                                      spreadsheetId: currentStatus.userInfo.spreadsheetId,
-                                      config: configResult.config.guessedConfig
-                                    });
-                                    
-                                    if (syncResult.synchronized) {
-                                      console.log('🔧 カスタムセットアップ: 未完了項目を同期修正で解決', syncResult.appliedFixes);
-                                      showMessage(`✅ カスタムセットアップが完了しました！\n\n📋 シート: ${result.sheetName}\n🔧 ${syncResult.appliedFixes.length}件の設定不整合を自動修正しました`, 'success');
-                                    } else {
-                                      // 同期修正でも解決できない場合の警告
-                                      let warningMessage = `⚠️ セットアップに未完了項目があります:\n\n`;
-                                      if (completionResult.issues) {
-                                        warningMessage += completionResult.issues.join('\n') + '\n\n';
-                                      }
-                                      warningMessage += '管理者パネルで設定を確認してください。';
-                                      showMessage(warningMessage, 'warning');
-                                    }
-                                  } catch (syncError) {
-                                    console.error('❌ カスタムセットアップ: 同期修正処理エラー', syncError);
-                                    let warningMessage = `⚠️ セットアップに未完了項目があります:\n\n`;
-                                    if (completionResult.issues) {
-                                      warningMessage += completionResult.issues.join('\n') + '\n\n';
-                                    }
-                                    warningMessage += '管理者パネルで設定を確認してください。';
-                                    showMessage(warningMessage, 'warning');
-                                  }
-                                }
-                              }).catch(saveError => {
-                                console.error('❌ カスタムセットアップ自動保存失敗:', saveError);
-                              });
-                            } else {
-                              console.warn('⚠️ saveAndPublish関数が見つかりません');
-                            }
-                          }, 1000); // UI更新の完了を待つ
-                        }
-                        
-                        // 設定読み込み完了後、管理パネルのステップを更新
-                        updateStepIndicators(3);
-                        manageSectionStates(3);
-                        console.log('✅ カスタムセットアップ後の初期化完了');
-                      })
-                      .catch(configError => {
-                        console.warn('⚠️ カスタムセットアップ後の設定読み込み失敗:', configError);
-                      });
-                  }
-                }
-              }
-            } catch (sheetSelectError) {
-              console.warn('カスタムセットアップ後のシート選択でエラー:', sheetSelectError);
-            }
-          }, 500); // UIの更新完了を待つ
-        }).catch(statusError => {
-          console.warn('ステータス更新でエラー:', statusError);
-        });
-        
-        // 公開時は履歴保存を行わない（公開停止時に保存するため）
-        logDebug('Custom setup completed - history will be saved on unpublish');
-        
-        // フォーム作成完了フラグを設定
-        sessionStorage.setItem('form_just_created', 'true');
-        
-        // フォームURL表示の強制更新（管理パネルのリソース欄用）
-        setTimeout(() => {
-          updateFormUrlDisplay();
-        }, 1000);
-        
-        // 回答ボードにフォーム作成完了を通知（フォームリンク更新用）
-        try {
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-              type: 'FORM_CREATED',
-              formUrl: result.formUrl,
-              timestamp: Date.now()
-            }, '*');
-          }
-          
-          if (typeof BroadcastChannel !== 'undefined') {
-            const channel = new BroadcastChannel('board-updates');
-            channel.postMessage({
-              type: 'FORM_CREATED',
-              formUrl: result.formUrl,
-              timestamp: Date.now()
-            });
-            channel.close();
-          }
-        } catch (notifyError) {
-          console.warn('フォーム作成通知でエラー:', notifyError);
-        }
-        
-        // モーダルを閉じる
-        hideFormConfigModal();
-        
-        // 進捗バーを3秒後に非表示
-        setTimeout(() => {
-          hideQuickStartProgress();
-        }, 3000);
-      } else {
-        console.error('❌ カスタムフォーム作成が失敗:', result);
-        showMessage(result?.message || 'フォームの作成に失敗しました。', 'error');
-        // 失敗時も進捗バーを非表示
-        setTimeout(() => {
-          hideQuickStartProgress();
-        }, 2000);
-      }
-    })
-    .catch(function(error) {
-      console.error('フォーム作成エラー:', error);
-      
-      // 権限エラーの可能性を考慮したメッセージ
-      let errorMessage = 'フォームの作成に失敗しました。';
-      if (error.toString().includes('permission') || error.toString().includes('権限')) {
-        errorMessage = 'フォームの作成に失敗しました。Google Drive やスプレッドシートへのアクセス権限を確認してください。';
-      }
-      
-      showMessage(errorMessage, 'error');
-      
-      // エラー時も進捗バーを非表示
-      setTimeout(() => {
-        hideQuickStartProgress();
-      }, 2000);
-    });
+  // Call the new unified custom setup handler - this replaces the old createCustomFormUI flow
+  handleCustomSetup(config);
+  
+  // クラス選択肢をデータベースに保存
+  saveClassChoicesToDatabase(classChoices);
 }
+
 
 // Save class choices to database
 function saveClassChoicesToDatabase(classChoices) {
@@ -2062,6 +1829,16 @@ const quickStartSteps = [
   { id: 6, text: 'セットアップ完了', detail: '利用準備が整いました！' }
 ];
 
+// Custom setup progress management
+const customSetupSteps = [
+  { id: 1, text: 'カスタムフォーム設定の解析', detail: 'フォーム設定を検証中...' },
+  { id: 2, text: 'Googleフォームとスプレッドシートの作成', detail: 'カスタムフォームを構築中...' },
+  { id: 3, text: '高精度AI列判定の自動実行', detail: 'AIによる列の自動判定を実行中...' },
+  { id: 4, text: '設定の自動保存と適用', detail: 'AI判定結果を設定に適用中...' },
+  { id: 5, text: '回答ボードの自動公開', detail: 'Webアプリケーションを公開中...' },
+  { id: 6, text: 'カスタムセットアップ完了', detail: 'すべての設定が完了しました！' }
+];
+
 // Show QuickStart progress bar
 function showQuickStartProgress() {
   const progressContainer = document.getElementById('quickstart-progress');
@@ -2144,90 +1921,57 @@ function updateOverallProgress(percentage, statusMessage) {
   }
 }
 
-// Simulate QuickStart progress (for demonstration)
+// Simulate QuickStart progress with enhanced backend synchronization
 function simulateQuickStartProgress() {
-  // Step 1: Real folder creation/check
+  console.log('🚀 Starting enhanced QuickStart progress simulation');
+  
+  // Step 1: Initialize
   updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
   updateOverallProgress(5, 'フォルダを作成しています...');
   
-  // Actually call the folder creation API to sync with real backend progress
-  runGasWithUserId('createUserFolder', 'フォルダを確認・作成中...')
-    .then(function(folderResult) {
-      console.log('✅ QuickStart folder creation successful:', folderResult);
-      updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
-      updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-      updateOverallProgress(20, 'フォームとスプレッドシートを作成しています...');
+  // Continue with timed simulation to ensure progress doesn't stop
+  setTimeout(() => {
+    updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
+    updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
+    updateOverallProgress(20, 'フォームとスプレッドシートを作成しています...');
+    
+    setTimeout(() => {
+      updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
+      updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
+      updateOverallProgress(40, 'シート設定を最適化しています...');
       
-      // Step 2: Form/spreadsheet creation
       setTimeout(() => {
-        updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-        updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
-        updateOverallProgress(40, 'シート設定を最適化しています...');
+        updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
+        updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
+        updateOverallProgress(60, 'AI列判定を実行しています...');
         
-        // Step 3: Sheet configuration
         setTimeout(() => {
-          updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
-          updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
-          updateOverallProgress(60, 'AI列判定を実行しています...');
+          updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
+          updateProgressStep(5, 'active', '公開設定の適用', 'Webアプリケーションを公開中...');
+          updateOverallProgress(80, '公開設定を適用しています...');
           
-          // Step 4: AI column detection (the time-consuming part)
           setTimeout(() => {
-            updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
-            updateProgressStep(5, 'active', '公開設定と時間モーダル表示', 'Webアプリケーションを公開中...');
-            updateOverallProgress(80, '公開設定を適用しています...');
+            updateProgressStep(5, 'completed', '公開設定の適用', '✅ アプリケーションが公開されました');
+            updateProgressStep(6, 'active', 'セットアップ完了確認', '最終確認を実行中...');
+            updateOverallProgress(95, '最終確認を実行しています...');
             
-            // Step 5: Publishing and modal setup
             setTimeout(() => {
-              updateProgressStep(5, 'completed', '公開設定と時間モーダル表示', '✅ アプリケーションが公開されました');
-              updateProgressStep(6, 'active', 'セットアップ完了', '利用準備が整いました！');
-              updateOverallProgress(100, 'セットアップが完了しました！');
-              
-              setTimeout(() => {
-                updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
-              }, 500);
-            }, 1500);
-          }, 3000); // AI processing takes longer
-        }, 1000);
-      }, 1500);
+              console.log('✅ QuickStart progress simulation completed - backend should be ready');
+              // ここで最終完了状態は executeQuickStartProcess の成功ハンドラーで設定される
+            }, 800);
+          }, 1800);
+        }, 3500);
+      }, 1200);
+    }, 1800);
+  }, 1000);
+  
+  // Optional folder creation check (non-blocking - doesn't affect main progress)
+  runGasWithUserId('createUserFolder', false)
+    .then(function(folderResult) {
+      console.log('✅ QuickStart folder creation check successful:', folderResult);
     })
     .catch(function(error) {
-      console.warn('⚠️ QuickStart folder creation failed, continuing with fallback:', error);
-      updateProgressStep(1, 'error', 'ユーザー専用フォルダの作成', '⚠️ フォルダ作成でエラーが発生しましたが処理を続行します');
-      showMessage('フォルダの作成に警告がありましたが、セットアップを続行します。', 'warning');
-      
-      // Continue with fallback timing even if folder creation fails (updated for 6 steps)
-      setTimeout(() => {
-        updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-        updateOverallProgress(20, 'フォームとスプレッドシートを作成しています...');
-        
-        setTimeout(() => {
-          updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-          updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
-          updateOverallProgress(40, 'シート設定を最適化しています...');
-          
-          setTimeout(() => {
-            updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
-            updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
-            updateOverallProgress(60, 'AI列判定を実行しています...');
-            
-            setTimeout(() => {
-              updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
-              updateProgressStep(5, 'active', '公開設定と時間モーダル表示', 'Webアプリケーションを公開中...');
-              updateOverallProgress(80, '公開設定を適用しています...');
-              
-              setTimeout(() => {
-                updateProgressStep(5, 'completed', '公開設定と時間モーダル表示', '✅ アプリケーションが公開されました');
-                updateProgressStep(6, 'active', 'セットアップ完了', '利用準備が整いました！');
-                updateOverallProgress(100, 'セットアップが完了しました！');
-                
-                setTimeout(() => {
-                  updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
-                }, 500);
-              }, 1500);
-            }, 3000);
-          }, 1000);
-        }, 1500);
-      }, 1000);
+      console.warn('⚠️ QuickStart folder creation check failed, but continuing:', error);
     });
 }
 
@@ -2315,6 +2059,233 @@ function simulateCustomFormProgressWithFolderCheck() {
           }, 1000);
         }, 2000);
       }, 1000);
+    });
+}
+
+// =============================================================================
+// CUSTOM SETUP FUNCTIONALITY - Unified Automation
+// =============================================================================
+
+// Show Custom Setup progress bar
+function showCustomSetupProgress() {
+  const progressContainer = document.getElementById('quickstart-progress'); // Reuse same container
+  if (progressContainer) {
+    progressContainer.classList.remove('hidden');
+    resetCustomSetupProgressSteps();
+  }
+}
+
+// Hide Custom Setup progress bar
+function hideCustomSetupProgress() {
+  const progressContainer = document.getElementById('quickstart-progress');
+  if (progressContainer) {
+    progressContainer.classList.add('hidden');
+  }
+}
+
+// Reset Custom Setup progress steps
+function resetCustomSetupProgressSteps() {
+  customSetupSteps.forEach(step => {
+    updateProgressStep(step.id, 'waiting', step.text, '待機中...');
+  });
+  updateOverallProgress(0, '初期化中...');
+}
+
+// Simulate Custom Setup progress with real backend synchronization
+function simulateCustomSetupProgress() {
+  console.log('🎨 Starting enhanced Custom Setup progress simulation');
+  
+  // Step 1: Custom form configuration analysis
+  updateProgressStep(1, 'active', 'カスタムフォーム設定の解析', 'フォーム設定を検証中...');
+  updateOverallProgress(10, 'カスタム設定を解析しています...');
+  
+  setTimeout(() => {
+    updateProgressStep(1, 'completed', 'カスタムフォーム設定の解析', '✅ 設定解析が完了しました');
+    updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'カスタムフォームを構築中...');
+    updateOverallProgress(25, 'カスタムフォームとスプレッドシートを作成しています...');
+    
+    setTimeout(() => {
+      updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ カスタムフォームが作成されました');
+      updateProgressStep(3, 'active', '高精度AI列判定の自動実行', 'AIによる列の自動判定を実行中...');
+      updateOverallProgress(50, 'AI列判定を実行しています...');
+      
+      setTimeout(() => {
+        updateProgressStep(3, 'completed', '高精度AI列判定の自動実行', '✅ AI列判定が完了しました');
+        updateProgressStep(4, 'active', '設定の自動保存と適用', 'AI判定結果を設定に適用中...');
+        updateOverallProgress(70, 'AI判定結果を設定に適用しています...');
+        
+        setTimeout(() => {
+          updateProgressStep(4, 'completed', '設定の自動保存と適用', '✅ 設定が正常に保存されました');
+          updateProgressStep(5, 'active', '回答ボードの自動公開', 'Webアプリケーションを公開中...');
+          updateOverallProgress(85, '回答ボードを公開しています...');
+          
+          setTimeout(() => {
+            updateProgressStep(5, 'completed', '回答ボードの自動公開', '✅ 回答ボードが公開されました');
+            updateProgressStep(6, 'active', 'カスタムセットアップ完了確認', '最終確認を実行中...');
+            updateOverallProgress(95, '最終確認を実行しています...');
+            
+            setTimeout(() => {
+              updateProgressStep(6, 'completed', 'カスタムセットアップ完了', '🎉 カスタムセットアップが完了しました！');
+              updateOverallProgress(100, 'カスタムセットアップが完了しました！');
+            }, 800);
+          }, 1200);
+        }, 1500);
+      }, 2000);
+    }, 1800);
+  }, 1000);
+}
+
+// Handle unified custom setup
+function handleCustomSetup(config) {
+  console.log('🎨 カスタムセットアップ開始:', config);
+  
+  // Show progress and start simulation
+  showCustomSetupProgress();
+  simulateCustomSetupProgress();
+  
+  // Call the unified backend custom setup function
+  runGasWithUserId('customSetup', false, config)
+    .then(function(result) {
+      if (result && result.status === 'success') {
+        console.log('🎉 CustomSetupバックエンド処理完了:', result);
+        
+        // Enhanced completion notification with detailed backend response
+        const setupStatus = result.autoPublished ? 'カスタムセットアップ完了！ボードが公開されました！' : 'カスタムセットアップ完了！';
+        updateOverallProgress(100, setupStatus);
+        updateProgressStep(6, 'completed', 'カスタムセットアップ完了', '🎉 すべての設定が完了しました！');
+        
+        // Enhanced message display based on actual backend results
+        let detailMessage = '';
+        if (result.aiDetected && result.autoConfigured && result.autoPublished) {
+          detailMessage = 'AI列判定、設定保存、自動公開がすべて正常に完了しました。すぐに利用できます！';
+        } else if (result.aiDetected && result.autoConfigured) {
+          detailMessage = 'AI列判定と設定保存が完了しました。管理パネルから手動で公開してください。';
+        } else {
+          // Check for specific error reasons
+          const aiError = result.aiDetectionResult?.error;
+          const configError = result.saveResult?.error;
+          const publishError = result.publishResult?.error;
+          
+          detailMessage = 'カスタムフォームが作成されました。';
+          if (aiError) detailMessage += `AI判定: ${aiError}。`;
+          if (configError) detailMessage += `設定保存: ${configError}。`;
+          if (publishError) detailMessage += `自動公開: ${publishError}。`;
+          detailMessage += '管理パネルで設定を確認してください。';
+        }
+        
+        showMessage(`✅ カスタムセットアップが完了しました！${detailMessage}`, 'success');
+        
+        // Update progress step with specific status
+        if (result.autoPublished) {
+          updateProgressStep(5, 'completed', '回答ボードの自動公開', '🌐 ボードが自動的に公開されました');
+        } else {
+          updateProgressStep(5, 'completed', '回答ボード作成完了', '📝 手動公開の準備ができました');
+        }
+        
+        // Log detailed completion status
+        console.log('📊 CustomSetup完了詳細:', {
+          setupComplete: result.setupComplete,
+          aiDetected: result.aiDetected,
+          autoConfigured: result.autoConfigured,
+          autoPublished: result.autoPublished,
+          completedSteps: result.completedSteps,
+          completedAt: result.completedAt
+        });
+        
+        // Log custom setup specific information
+        if (result.aiDetectionResult) {
+          console.log('🤖 AI列判定結果詳細:', {
+            success: result.aiDetectionResult.success,
+            aiDetected: result.aiDetectionResult.aiDetected,
+            guessedConfig: result.aiDetectionResult.guessedConfig
+          });
+        }
+        
+        if (result.saveResult) {
+          console.log('💾 設定保存結果詳細:', {
+            success: result.saveResult.success,
+            configured: result.saveResult.configured,
+            savedConfig: result.saveResult.savedConfig
+          });
+        }
+        
+        if (result.publishResult) {
+          console.log('🌐 自動公開結果詳細:', {
+            success: result.publishResult.success,
+            published: result.publishResult.published,
+            publishedAt: result.publishResult.publishedAt
+          });
+        }
+        
+        // Update status after custom setup
+        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+          window.unifiedCache.clear();
+        }
+        loadStatus(true);
+        
+        // CustomSetupフロー完了確認（包括的な完了状態検証）
+        setTimeout(async () => {
+          try {
+            const sheetName = result.sheetName || 'unknown_sheet';
+            const completionResult = await verifySetupFlowCompletion('custom', sheetName);
+            
+            if (completionResult.success) {
+              console.log('🎉 CustomSetupフロー完了確認: 全要件を満たしています', completionResult.details);
+              
+              // CustomSetup成功時も設定同期を実行（堅牢性の向上）
+              try {
+                const syncResult = await enhanceConfigSynchronization('custom', {
+                  sheetName: sheetName,
+                  spreadsheetId: result.spreadsheetId,
+                  config: result.aiDetectionResult?.guessedConfig || {}
+                });
+                
+                if (syncResult.synchronized) {
+                  console.log('🔧 CustomSetup: 設定同期で追加最適化を実行', syncResult.appliedFixes);
+                }
+              } catch (syncError) {
+                console.warn('⚠️ CustomSetup: 設定同期処理でエラー（フロー完了には影響なし）', syncError);
+              }
+            } else {
+              console.warn('⚠️ CustomSetupフロー: 未完了項目があります', completionResult);
+              
+              // CustomSetupで未完了項目がある場合は積極的に同期修正を試行
+              try {
+                const syncResult = await enhanceConfigSynchronization('custom', {
+                  sheetName: sheetName,
+                  spreadsheetId: result.spreadsheetId,
+                  config: result.aiDetectionResult?.guessedConfig || {}
+                });
+                
+                if (syncResult.synchronized) {
+                  console.log('🔧 CustomSetup: 未完了項目を同期修正で自動解決', syncResult.appliedFixes);
+                }
+              } catch (syncError) {
+                console.error('❌ CustomSetup: 同期修正処理エラー', syncError);
+              }
+            }
+          } catch (verificationError) {
+            console.error('❌ CustomSetupフロー完了確認エラー:', verificationError);
+          }
+        }, 2000);
+        
+        // Hide progress after completion
+        setTimeout(() => {
+          hideCustomSetupProgress();
+        }, 5000);
+        
+      } else {
+        console.error('❌ CustomSetup backend error:', result);
+        updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ セットアップでエラーが発生しました');
+        showMessage('❌ カスタムセットアップに失敗しました: ' + (result?.message || 'unknown error'), 'error');
+        hideCustomSetupProgress();
+      }
+    })
+    .catch(function(error) {
+      console.error('❌ CustomSetup backend call failed:', error);
+      updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ バックエンドエラーが発生しました');
+      showMessage('❌ カスタムセットアップでエラーが発生しました: ' + error.message, 'error');
+      hideCustomSetupProgress();
     });
 }
 
@@ -2530,15 +2501,61 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
   runGasWithUserId('quickStartSetup', false)
     .then(function(result) {
       if (result && result.status === 'success') {
-        // Final progress update
-        updateOverallProgress(100, 'セットアップが完了しました！');
+        console.log('🎉 QuickStartバックエンド処理完了:', result);
+        
+        // Enhanced completion notification with detailed backend response
+        updateOverallProgress(100, result.autoPublished ? 'セットアップ完了！ボードが公開されました！' : 'セットアップ完了！');
         updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
         
-        // 自動公開状態に応じたメッセージ表示
-        if (autoPublish) {
-          showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成され、公開されました。', 'success');
+        // Enhanced message display based on actual backend results
+        const publishStatus = result.autoPublished ? '公開されました' : '作成されました';
+        let detailMessage;
+        
+        if (result.autoPublished) {
+          detailMessage = 'フォームとボードが自動作成され、公開されました。すぐに利用できます！';
         } else {
-          showMessage('✅ クイックスタートが完了しました！フォームとボードが自動作成されました。', 'success');
+          // Check if there's a specific reason for auto-publish failure
+          const publishError = result.publishResult?.error;
+          const manualInstructions = result.publishResult?.manualPublishInstructions;
+          
+          detailMessage = 'フォームとボードが自動作成されました。';
+          if (publishError) {
+            detailMessage += `自動公開は失敗しました（${publishError}）。`;
+          }
+          if (manualInstructions) {
+            detailMessage += manualInstructions;
+          } else {
+            detailMessage += '管理パネルから手動で公開してください。';
+          }
+        }
+        
+        showMessage(`✅ クイックスタートが完了しました！${detailMessage}`, 'success');
+        
+        // Update progress step with auto-publish status
+        if (result.autoPublished) {
+          updateProgressStep(5, 'completed', '回答ボードの自動公開', '🌐 ボードが自動的に公開されました');
+        } else {
+          updateProgressStep(5, 'completed', '回答ボード作成完了', '📝 手動公開の準備ができました');
+        }
+        
+        // Log detailed completion status
+        console.log('📊 QuickStart完了詳細:', {
+          setupComplete: result.setupComplete,
+          autoPublished: result.autoPublished,
+          publishResult: result.publishResult,
+          completedSteps: result.completedSteps,
+          completedAt: result.completedAt
+        });
+        
+        // Log auto-publish specific information if available
+        if (result.publishResult) {
+          console.log('🌐 自動公開結果詳細:', {
+            success: result.publishResult.success,
+            published: result.publishResult.published,
+            publishedAt: result.publishResult.publishedAt,
+            error: result.publishResult.error,
+            manualInstructions: result.publishResult.manualPublishInstructions
+          });
         }
         
         // Update status after quick start

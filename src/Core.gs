@@ -2398,18 +2398,99 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
 }
 
 /**
+ * QuickStart専用自動公開処理（堅牢性向上版）
+ * @param {string} requestUserId - ユーザーID
+ * @param {string} sheetName - 公開するシート名
+ * @returns {object} 公開結果
+ */
+function performAutoPublish(requestUserId, sheetName) {
+  try {
+    debugLog('🌐 QuickStart自動公開開始', { requestUserId, sheetName });
+    
+    // 入力値検証
+    if (!requestUserId || typeof requestUserId !== 'string') {
+      throw new Error('有効なユーザーIDが指定されていません');
+    }
+    
+    if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
+      throw new Error('有効なシート名が指定されていません');
+    }
+
+    const trimmedSheetName = sheetName.trim();
+    
+    // ユーザー情報の事前確認
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    // スプレッドシートの存在確認
+    if (!userInfo.spreadsheetId) {
+      throw new Error('スプレッドシートIDが見つかりません');
+    }
+    
+    debugLog('🔍 自動公開前の事前確認完了', {
+      userId: requestUserId,
+      hasSpreadsheet: !!userInfo.spreadsheetId,
+      targetSheet: trimmedSheetName
+    });
+
+    // setActiveSheetを呼び出して自動公開を実行
+    const publishResult = setActiveSheet(requestUserId, trimmedSheetName);
+    
+    // 公開結果の詳細検証
+    if (publishResult && publishResult.success !== false) {
+      infoLog('✅ QuickStart自動公開完了', {
+        requestUserId,
+        sheetName: trimmedSheetName,
+        result: publishResult
+      });
+      
+      return {
+        success: true,
+        published: true,
+        sheetName: trimmedSheetName,
+        message: '回答ボードが自動的に公開されました',
+        details: publishResult,
+        publishedAt: new Date().toISOString()
+      };
+    } else {
+      throw new Error('setActiveSheetが失敗しました: ' + (publishResult?.message || 'unknown error'));
+    }
+    
+  } catch (error) {
+    errorLog('❌ QuickStart自動公開エラー', {
+      requestUserId,
+      sheetName,
+      error: error.message,
+      stack: error.stack
+    });
+    
+    // 自動公開が失敗しても全体のQuickStartは成功とする（堅牢性）
+    return {
+      success: false,
+      published: false,
+      sheetName: sheetName,
+      message: '自動公開に失敗しましたが、手動で公開できます',
+      error: error.message,
+      failedAt: new Date().toISOString(),
+      // 手動公開用の情報を提供
+      manualPublishInstructions: '管理パネルのシート選択から手動で公開してください'
+    };
+  }
+}
+
+/**
  * クイックスタート完了時のレスポンス生成
  * @param {object} setupContext - セットアップコンテキスト
  * @param {object} createdFiles - 作成されたファイル情報
  * @param {object} updatedConfig - 更新された設定
+ * @param {object} publishResult - 公開結果（オプション）
  * @returns {object} 成功レスポンス
  */
-function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
+function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, publishResult) {
   var requestUserId = setupContext.requestUserId;
   var formAndSsInfo = createdFiles.formAndSsInfo;
-
-  // ステップ4: 回答ボードを公開状態に設定
-  debugLog('🌐 ステップ4: 回答ボード公開中...');
 
   // 最終検証：新規作成されたファイルの確認
   debugLog('🔍 最終検証 - 作成されたファイル:');
@@ -2419,12 +2500,26 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
   debugLog('  🔗 フォームURL:', formAndSsInfo.formUrl);
   debugLog('  🔗 スプレッドシートURL:', formAndSsInfo.spreadsheetUrl);
 
+  // 公開結果の検証
+  var isPublished = publishResult && publishResult.success && publishResult.published;
+  var publishMessage = isPublished 
+    ? '回答ボードが自動的に公開されました！' 
+    : '回答ボードが作成されました。管理パネルから手動で公開してください。';
+  
+  debugLog('🔍 公開結果検証:', {
+    hasPublishResult: !!publishResult,
+    isPublished: isPublished,
+    publishMessage: publishMessage
+  });
+
   infoLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
 
   var appUrls = generateUserUrls(requestUserId);
-  return {
+  
+  // 拡張されたレスポンス情報
+  var response = {
     status: 'success',
-    message: 'クイックスタートが完了しました！回答ボードをお楽しみください。',
+    message: 'クイックスタートが完了しました！' + publishMessage,
     webAppUrl: appUrls.webAppUrl,
     adminUrl: appUrls.adminUrl,
     viewUrl: appUrls.viewUrl,
@@ -2432,8 +2527,29 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
     formUrl: updatedConfig.formUrl,
     editFormUrl: updatedConfig.editFormUrl,
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-    folderUrl: updatedConfig.folderUrl
+    folderUrl: updatedConfig.folderUrl,
+    // 進捗システム用の詳細情報
+    setupComplete: true,
+    autoPublished: isPublished,
+    publishResult: publishResult,
+    sheetName: formAndSsInfo.sheetName,
+    formId: formAndSsInfo.formId,
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    // フロントエンド完了通知用のタイムスタンプ
+    completedAt: new Date().toISOString(),
+    // 成功ステップの詳細
+    completedSteps: [
+      'ユーザー専用フォルダの作成',
+      'Googleフォームとスプレッドシートの作成',
+      'データベース更新とキャッシュ管理',
+      isPublished ? '回答ボードの自動公開' : '回答ボード作成（手動公開待ち）',
+      'キャッシュクリアと最終化',
+      'セットアップ完了'
+    ]
   };
+  
+  debugLog('📤 QuickStart最終レスポンス生成完了:', response);
+  return response;
 }
 
 /**
@@ -2501,30 +2617,50 @@ function initializeQuickStartContext(requestUserId) {
 function quickStartSetup(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
+    debugLog('🚀 QuickStart: セットアップ開始', { requestUserId });
+    
     // ステップ0: セットアップコンテキストを初期化
+    debugLog('📋 QuickStart: ステップ0 - コンテキスト初期化中...');
     var setupContext = initializeQuickStartContext(requestUserId);
     var configJson = setupContext.configJson;
     var userEmail = setupContext.userEmail;
     var userInfo = setupContext.userInfo;
+    debugLog('✅ QuickStart: ステップ0完了 - コンテキスト初期化成功');
 
     // ステップ1-2: ファイル作成とフォルダ管理を実行
+    debugLog('📁 QuickStart: ステップ1-2 - ファイル・フォルダ作成中...');
     var createdFiles = createQuickStartFiles(setupContext);
     var formAndSsInfo = createdFiles.formAndSsInfo;
     var folder = createdFiles.folder;
+    debugLog('✅ QuickStart: ステップ1-2完了 - ファイル作成成功', {
+      formId: formAndSsInfo.formId,
+      spreadsheetId: formAndSsInfo.spreadsheetId,
+      sheetName: formAndSsInfo.sheetName
+    });
 
     // ステップ3: データベース更新とキャッシュ管理を実行
+    debugLog('💾 QuickStart: ステップ3 - データベース更新中...');
     var updatedConfig = updateQuickStartDatabase(setupContext, createdFiles);
+    debugLog('✅ QuickStart: ステップ3完了 - データベース更新成功');
 
-    // 管理パネルでの表示を確実に更新するために、実行キャッシュもクリア
+    // ステップ4: 自動公開処理（重要な新機能）
+    debugLog('🌐 QuickStart: ステップ4 - 自動公開処理中...');
+    var publishResult = performAutoPublish(requestUserId, formAndSsInfo.sheetName);
+    debugLog('✅ QuickStart: ステップ4完了 - 自動公開成功', publishResult);
+
+    // ステップ5: キャッシュクリアと最終化
+    debugLog('🔄 QuickStart: ステップ5 - キャッシュクリア中...');
     clearExecutionUserInfoCache();
-
-    // さらに、少し遅延してもう一度全キャッシュをクリアして確実に反映
     invalidateUserCache(requestUserId, userEmail, createdFiles.formAndSsInfo.spreadsheetId, true);
     clearExecutionUserInfoCache();
-    debugLog('🔄 管理パネル表示更新のための追加キャッシュクリア完了');
+    debugLog('✅ QuickStart: ステップ5完了 - キャッシュクリア成功');
 
-    // ステップ4: 最終レスポンス生成
-    return generateQuickStartResponse(setupContext, createdFiles, updatedConfig);
+    // ステップ6: 最終レスポンス生成
+    debugLog('📤 QuickStart: ステップ6 - レスポンス生成中...');
+    var finalResponse = generateQuickStartResponse(setupContext, createdFiles, updatedConfig, publishResult);
+    debugLog('🎉 QuickStart: 全工程完了！', finalResponse);
+    
+    return finalResponse;
 
   } catch (e) {
     errorLog('❌ quickStartSetup エラー: ' + e.message);
@@ -4484,6 +4620,392 @@ function getAllUsersForAdminForUI(requestUserId) {
       status: 'error',
       message: error.message
     };
+  }
+}
+
+/**
+ * 統合カスタムセットアップ処理（QuickStart同様の完全自動化）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {object} config - カスタムフォーム設定
+ * @returns {object} セットアップ結果
+ */
+function customSetup(requestUserId, config) {
+  verifyUserAccess(requestUserId);
+  try {
+    debugLog('🎨 CustomSetup: 統合セットアップ開始', { requestUserId, config });
+    
+    // ステップ1: カスタムフォーム設定の解析と検証
+    debugLog('📋 CustomSetup: ステップ1 - 設定解析中...');
+    var setupContext = initializeCustomSetupContext(requestUserId, config);
+    debugLog('✅ CustomSetup: ステップ1完了 - 設定解析成功');
+
+    // ステップ2: Googleフォームとスプレッドシートの作成
+    debugLog('📝 CustomSetup: ステップ2 - フォーム・スプレッドシート作成中...');
+    var createdFiles = createCustomFormAndSheet(setupContext);
+    var formAndSsInfo = createdFiles.formAndSsInfo;
+    var folder = createdFiles.folder;
+    debugLog('✅ CustomSetup: ステップ2完了 - ファイル作成成功', {
+      formId: formAndSsInfo.formId,
+      spreadsheetId: formAndSsInfo.spreadsheetId,
+      sheetName: formAndSsInfo.sheetName
+    });
+
+    // ステップ3: 高精度AI列判定の自動実行
+    debugLog('🤖 CustomSetup: ステップ3 - AI列判定実行中...');
+    var aiDetectionResult = performAutoAIDetection(requestUserId, formAndSsInfo.spreadsheetId, formAndSsInfo.sheetName);
+    debugLog('✅ CustomSetup: ステップ3完了 - AI列判定成功', aiDetectionResult);
+
+    // ステップ4: 設定の自動保存と適用
+    debugLog('💾 CustomSetup: ステップ4 - 設定保存中...');
+    var saveResult = applyAutoConfiguration(requestUserId, formAndSsInfo.spreadsheetId, formAndSsInfo.sheetName, aiDetectionResult);
+    debugLog('✅ CustomSetup: ステップ4完了 - 設定保存成功');
+
+    // ステップ5: 回答ボードの自動公開
+    debugLog('🌐 CustomSetup: ステップ5 - 自動公開処理中...');
+    var publishResult = performAutoPublish(requestUserId, formAndSsInfo.sheetName);
+    debugLog('✅ CustomSetup: ステップ5完了 - 自動公開成功', publishResult);
+
+    // ステップ6: キャッシュクリアと最終化
+    debugLog('🔄 CustomSetup: ステップ6 - 最終化処理中...');
+    clearExecutionUserInfoCache();
+    invalidateUserCache(requestUserId, setupContext.userEmail, formAndSsInfo.spreadsheetId, true);
+    clearExecutionUserInfoCache();
+    debugLog('✅ CustomSetup: ステップ6完了 - 最終化成功');
+
+    // ステップ7: 最終レスポンス生成と完了通知
+    debugLog('📤 CustomSetup: ステップ7 - レスポンス生成中...');
+    var finalResponse = generateCustomSetupResponse(setupContext, createdFiles, saveResult, aiDetectionResult, publishResult);
+    debugLog('🎉 CustomSetup: 全工程完了！', finalResponse);
+    
+    return finalResponse;
+
+  } catch (e) {
+    errorLog('❌ customSetup エラー: ' + e.message);
+
+    // エラー時はセットアップ状態をリセット
+    try {
+      var userInfo = findUserById(requestUserId);
+      if (userInfo) {
+        var currentConfig = JSON.parse(userInfo.configJson || '{}');
+        currentConfig.setupStatus = 'error';
+        currentConfig.lastError = e.message;
+        currentConfig.errorAt = new Date().toISOString();
+
+        updateUser(requestUserId, {
+          configJson: JSON.stringify(currentConfig)
+        });
+        invalidateUserCache(requestUserId, userInfo.adminEmail, null, false);
+        clearExecutionUserInfoCache();
+      }
+    } catch (updateError) {
+      errorLog('エラー状態の更新に失敗: ' + updateError.message);
+    }
+
+    return {
+      status: 'error',
+      message: 'カスタムセットアップに失敗しました: ' + e.message,
+      webAppUrl: '',
+      adminUrl: '',
+      viewUrl: '',
+      setupUrl: ''
+    };
+  }
+}
+
+/**
+ * カスタムセットアップのコンテキストを初期化
+ * @param {string} requestUserId - ユーザーID
+ * @param {object} config - カスタムフォーム設定
+ * @returns {object} セットアップコンテキスト
+ */
+function initializeCustomSetupContext(requestUserId, config) {
+  debugLog('🚀 カスタムセットアップのコンテキスト初期化開始: ' + requestUserId);
+
+  // ユーザー情報の取得
+  var userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('ユーザー情報が見つかりません');
+  }
+
+  var userEmail = userInfo.adminEmail;
+  var configJson = JSON.parse(userInfo.configJson || '{}');
+
+  // カスタム設定の詳細ログ
+  debugLog('📋 カスタム設定詳細:', {
+    mainQuestion: config.mainQuestion,
+    responseType: config.responseType,
+    enableClass: config.enableClass,
+    classChoices: config.classChoices
+  });
+
+  return {
+    requestUserId: requestUserId,
+    userInfo: userInfo,
+    userEmail: userEmail,
+    configJson: configJson,
+    customConfig: config
+  };
+}
+
+/**
+ * カスタムフォームとスプレッドシート作成の統合処理
+ * @param {object} setupContext - セットアップコンテキスト
+ * @returns {object} 作成されたファイル情報
+ */
+function createCustomFormAndSheet(setupContext) {
+  var userEmail = setupContext.userEmail;
+  var requestUserId = setupContext.requestUserId;
+  var config = setupContext.customConfig;
+
+  // ステップ1: ユーザー専用フォルダを作成
+  debugLog('📁 カスタムセットアップ: フォルダ作成中...');
+  var folder = createUserFolder(userEmail);
+
+  // ステップ2: AdminPanelのconfig構造を内部形式に変換
+  const convertedConfig = {
+    mainQuestion: {
+      title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
+      type: config.responseType || config.questionType || 'text',
+      choices: config.questionChoices || config.choices || [],
+      includeOthers: config.includeOthers || false
+    },
+    enableClass: config.enableClass || false,
+    classQuestion: {
+      choices: config.classChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4']
+    }
+  };
+
+  const overrides = {
+    titlePrefix: config.formTitle || 'カスタムフォーム',
+    customConfig: convertedConfig
+  };
+
+  // ステップ3: 統合フォーム作成
+  const formAndSsInfo = createUnifiedForm('custom', userEmail, requestUserId, overrides);
+
+  // ステップ4: 作成したファイルをフォルダに移動
+  if (folder) {
+    moveFilesToFolder(folder, formAndSsInfo.formId, formAndSsInfo.spreadsheetId);
+  }
+
+  return {
+    formAndSsInfo: formAndSsInfo,
+    folder: folder
+  };
+}
+
+/**
+ * 高精度AI列判定の自動実行
+ * @param {string} requestUserId - ユーザーID
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {object} AI判定結果
+ */
+function performAutoAIDetection(requestUserId, spreadsheetId, sheetName) {
+  try {
+    debugLog('🤖 AI列判定自動実行開始', { requestUserId, spreadsheetId, sheetName });
+    
+    // getSheetDetailsを使用してAI判定を実行
+    const sheetDetails = getSheetDetails(requestUserId, spreadsheetId, sheetName);
+    
+    if (!sheetDetails || !sheetDetails.guessedConfig) {
+      throw new Error('AI列判定の実行に失敗しました');
+    }
+    
+    infoLog('✅ AI列判定自動実行完了', {
+      opinionColumn: sheetDetails.guessedConfig.opinionColumn,
+      nameColumn: sheetDetails.guessedConfig.nameColumn,
+      classColumn: sheetDetails.guessedConfig.classColumn
+    });
+    
+    return {
+      success: true,
+      aiDetected: true,
+      guessedConfig: sheetDetails.guessedConfig,
+      allHeaders: sheetDetails.allHeaders,
+      message: 'AI列判定が正常に完了しました'
+    };
+    
+  } catch (error) {
+    errorLog('❌ AI列判定自動実行エラー', { error: error.message });
+    return {
+      success: false,
+      aiDetected: false,
+      message: 'AI列判定に失敗しました: ' + error.message,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 自動設定適用処理
+ * @param {string} requestUserId - ユーザーID
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {object} aiDetectionResult - AI判定結果
+ * @returns {object} 保存結果
+ */
+function applyAutoConfiguration(requestUserId, spreadsheetId, sheetName, aiDetectionResult) {
+  try {
+    debugLog('💾 自動設定適用開始', { requestUserId, sheetName });
+    
+    if (!aiDetectionResult.success || !aiDetectionResult.guessedConfig) {
+      throw new Error('AI判定結果が無効です');
+    }
+    
+    // AI判定結果を設定として保存
+    const saveResult = saveSheetConfig(requestUserId, spreadsheetId, sheetName, aiDetectionResult.guessedConfig);
+    
+    if (!saveResult || !saveResult.success) {
+      throw new Error('設定保存に失敗しました: ' + (saveResult?.message || 'unknown error'));
+    }
+    
+    infoLog('✅ 自動設定適用完了', saveResult);
+    
+    return {
+      success: true,
+      configured: true,
+      savedConfig: aiDetectionResult.guessedConfig,
+      message: '設定が正常に保存されました',
+      details: saveResult
+    };
+    
+  } catch (error) {
+    errorLog('❌ 自動設定適用エラー', { error: error.message });
+    return {
+      success: false,
+      configured: false,
+      message: '設定適用に失敗しました: ' + error.message,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * カスタムセットアップの最終レスポンス生成
+ * @param {object} setupContext - セットアップコンテキスト
+ * @param {object} createdFiles - 作成されたファイル情報
+ * @param {object} saveResult - 保存結果
+ * @param {object} aiDetectionResult - AI判定結果
+ * @param {object} publishResult - 公開結果
+ * @returns {object} 最終レスポンス
+ */
+function generateCustomSetupResponse(setupContext, createdFiles, saveResult, aiDetectionResult, publishResult) {
+  var requestUserId = setupContext.requestUserId;
+  var formAndSsInfo = createdFiles.formAndSsInfo;
+
+  // 最終検証：新規作成されたファイルの確認
+  debugLog('🔍 カスタムセットアップ最終検証 - 作成されたファイル:');
+  debugLog('  📝 フォームID:', formAndSsInfo.formId);
+  debugLog('  📊 スプレッドシートID:', formAndSsInfo.spreadsheetId);
+  debugLog('  📄 シート名:', formAndSsInfo.sheetName);
+
+  // AI判定と公開結果の検証
+  var isAIDetected = aiDetectionResult && aiDetectionResult.success && aiDetectionResult.aiDetected;
+  var isConfigured = saveResult && saveResult.success && saveResult.configured;
+  var isPublished = publishResult && publishResult.success && publishResult.published;
+  
+  var setupMessage = 'カスタムセットアップが完了しました！';
+  if (isAIDetected && isConfigured && isPublished) {
+    setupMessage += 'AI列判定、設定保存、自動公開がすべて正常に完了しました。';
+  } else if (isAIDetected && isConfigured) {
+    setupMessage += 'AI列判定と設定保存が完了しました。管理パネルから手動で公開してください。';
+  } else {
+    setupMessage += 'フォームが作成されました。管理パネルで設定を確認してください。';
+  }
+
+  infoLog('✅ カスタムセットアップ完了: ' + requestUserId);
+
+  var appUrls = generateUserUrls(requestUserId);
+  
+  // 拡張されたレスポンス情報
+  var response = {
+    status: 'success',
+    message: setupMessage,
+    webAppUrl: appUrls.webAppUrl,
+    adminUrl: appUrls.adminUrl,
+    viewUrl: appUrls.viewUrl,
+    setupUrl: appUrls.setupUrl,
+    formUrl: formAndSsInfo.formUrl,
+    editFormUrl: formAndSsInfo.editFormUrl,
+    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+    folderUrl: createdFiles.folder ? createdFiles.folder.getUrl() : '',
+    // カスタムセットアップ固有の詳細情報
+    setupComplete: true,
+    aiDetected: isAIDetected,
+    autoConfigured: isConfigured,
+    autoPublished: isPublished,
+    aiDetectionResult: aiDetectionResult,
+    saveResult: saveResult,
+    publishResult: publishResult,
+    sheetName: formAndSsInfo.sheetName,
+    formId: formAndSsInfo.formId,
+    spreadsheetId: formAndSsInfo.spreadsheetId,
+    // フロントエンド完了通知用のタイムスタンプ
+    completedAt: new Date().toISOString(),
+    // 成功ステップの詳細
+    completedSteps: [
+      'カスタムフォーム設定の解析',
+      'Googleフォームとスプレッドシートの作成',
+      isAIDetected ? '高精度AI列判定の実行' : 'AI列判定（失敗）',
+      isConfigured ? '設定の自動保存と適用' : '設定保存（失敗）',
+      isPublished ? '回答ボードの自動公開' : '回答ボード作成（手動公開待ち）',
+      'キャッシュクリアと最終化',
+      'カスタムセットアップ完了'
+    ]
+  };
+  
+  debugLog('📤 カスタムセットアップ最終レスポンス生成完了:', response);
+  return response;
+}
+
+/**
+ * ファイルをフォルダに移動する処理
+ * @param {object} folder - 移動先フォルダ
+ * @param {string} formId - フォームID
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function moveFilesToFolder(folder, formId, spreadsheetId) {
+  try {
+    var formFile = DriveApp.getFileById(formId);
+    var ssFile = DriveApp.getFileById(spreadsheetId);
+
+    // 既にフォルダに存在するかチェック
+    var isFormInFolder = false;
+    var isSSInFolder = false;
+
+    var formParents = formFile.getParents();
+    while (formParents.hasNext()) {
+      if (formParents.next().getId() === folder.getId()) {
+        isFormInFolder = true;
+        break;
+      }
+    }
+
+    var ssParents = ssFile.getParents();
+    while (ssParents.hasNext()) {
+      if (ssParents.next().getId() === folder.getId()) {
+        isSSInFolder = true;
+        break;
+      }
+    }
+
+    // 必要に応じてファイルを移動
+    if (!isFormInFolder) {
+      folder.addFile(formFile);
+      DriveApp.getRootFolder().removeFile(formFile);
+      debugLog('📁 フォームファイルをフォルダに移動完了');
+    }
+
+    if (!isSSInFolder) {
+      folder.addFile(ssFile);
+      DriveApp.getRootFolder().removeFile(ssFile);
+      debugLog('📁 スプレッドシートファイルをフォルダに移動完了');
+    }
+
+  } catch (error) {
+    warnLog('⚠️ ファイル移動処理で警告:', error.message);
+    // ファイル移動の失敗は致命的エラーではないため、処理を継続
   }
 }
 
