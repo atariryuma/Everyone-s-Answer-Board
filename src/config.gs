@@ -7,8 +7,8 @@ const CONFIG_SHEET_NAME = 'Config';
 
 var runtimeUserInfo = null;
 
-// メモリ管理用の実行レベル変数
-var executionUserInfoCache = null;
+// メモリ管理用の実行レベル変数 (main.gsと統一)
+var _executionUserInfoCache = null;
 var lastCacheUserIdKey = null;
 var executionStartTime = Date.now();
 const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
@@ -30,15 +30,15 @@ function getUserInfoCached(requestUserId) {
   const userIdKey = requestUserId || getUserId();
   
   // キャッシュヒット条件：同じユーザーIDかつキャッシュが有効
-  if (executionUserInfoCache && lastCacheUserIdKey === userIdKey) {
-    return executionUserInfoCache;
+  if (_executionUserInfoCache && lastCacheUserIdKey === userIdKey) {
+    return _executionUserInfoCache;
   }
   
   // キャッシュミス：新規取得
   try {
     const userInfo = findUserById(userIdKey);
     if (userInfo) {
-      executionUserInfoCache = userInfo;
+      _executionUserInfoCache = userInfo;
       lastCacheUserIdKey = userIdKey;
     }
     return userInfo;
@@ -54,9 +54,31 @@ function getUserInfoCached(requestUserId) {
  * 実行レベルのユーザー情報キャッシュをクリア
  */
 function clearExecutionUserInfoCache() {
-  executionUserInfoCache = null;
+  _executionUserInfoCache = null;
   lastCacheUserIdKey = null;
-  debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
+  
+  // 統一キャッシュマネージャーの関連エントリもクリア
+  if (typeof cacheManager !== 'undefined' && cacheManager) {
+    try {
+      // ユーザー関連キャッシュのクリア
+      if (lastCacheUserIdKey) {
+        cacheManager.remove('user_' + lastCacheUserIdKey);
+        cacheManager.remove('userinfo_' + lastCacheUserIdKey);
+      }
+      
+      // セッション関連キャッシュのクリア
+      const currentEmail = Session.getActiveUser().getEmail();
+      if (currentEmail) {
+        cacheManager.remove('session_' + currentEmail);
+      }
+      
+      debugLog('[Memory] 実行レベル + 統一キャッシュの関連エントリをクリアしました');
+    } catch (error) {
+      debugLog('[Memory] 統一キャッシュクリア中にエラー:', error.message);
+    }
+  } else {
+    debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
+  }
 }
 
 /**
@@ -1895,10 +1917,7 @@ function createBoardFromAdmin(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getExistingBoard(requestUserId) {
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
-  if (requestUserId) {
-    verifyUserAccess(requestUserId);
-  }
+  verifyUserAccess(requestUserId);
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
     var userInfo = findUserByEmail(activeUserEmail);
@@ -1933,10 +1952,7 @@ function getExistingBoard(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function verifyUserAuthentication(requestUserId) {
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
-  if (requestUserId) {
-    verifyUserAccess(requestUserId);
-  }
+  verifyUserAccess(requestUserId);
   try {
     var email = Session.getActiveUser().getEmail();
     if (email) {
@@ -1968,10 +1984,7 @@ function verifyUserAuthentication(requestUserId) {
  * @returns {{status:'success'|'error',message:string}}
  */
 function resetUserAuthentication(requestUserId) {
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
-  if (requestUserId) {
-    verifyUserAccess(requestUserId);
-  }
+  verifyUserAccess(requestUserId);
   try {
     var email = Session.getActiveUser().getEmail();
     if (typeof cleanupSessionOnAccountSwitch === 'function' && email) {

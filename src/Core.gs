@@ -682,8 +682,7 @@ function registerNewUser(adminEmail) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
-  verifyUserAccess(requestUserId);
-  clearExecutionUserInfoCache();
+  verifyUserAccess(requestUserId); // 内部でキャッシュクリア済み
 
   try {
     var reactingUserEmail = Session.getActiveUser().getEmail();
@@ -912,26 +911,32 @@ function getCurrentSheetName(spreadsheetId) {
  * @throws {Error} 認証エラーまたは権限エラー
  */
 function verifyUserAccess(requestUserId) {
-  // 型安全性強化: パラメータ検証
-  if (!requestUserId) {
-    throw new Error('認証エラー: ユーザーIDが指定されていません');
-  }
-  if (typeof requestUserId !== 'string') {
-    throw new Error('認証エラー: ユーザーIDは文字列である必要があります');
-  }
-  if (requestUserId.trim().length === 0) {
-    throw new Error('認証エラー: ユーザーIDが空文字列です');
-  }
-  if (requestUserId.length > 255) {
-    throw new Error('認証エラー: ユーザーIDが長すぎます（最大255文字）');
+  // 型安全性強化: パラメータ検証（nullable対応）
+  if (requestUserId != null) { // null と undefined をチェック
+    if (typeof requestUserId !== 'string') {
+      throw new Error('認証エラー: ユーザーIDは文字列である必要があります');
+    }
+    if (requestUserId.trim().length === 0) {
+      throw new Error('認証エラー: ユーザーIDが空文字列です');
+    }
+    if (requestUserId.length > 255) {
+      throw new Error('認証エラー: ユーザーIDが長すぎます（最大255文字）');
+    }
   }
   
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
 
+  // Session.getActiveUser().getEmail()を直接使用（verifyUserAccessではemail比較が必要）
   const activeUserEmail = Session.getActiveUser().getEmail();
   debugLog(`verifyUserAccess start: userId=${requestUserId}, email=${activeUserEmail}`);
   if (!activeUserEmail) {
     throw new Error('認証エラー: アクティブユーザーの情報を取得できませんでした');
+  }
+  
+  // requestUserIdがnull/undefinedの場合は新規ユーザーとして扱い、基本的なセッション検証のみ実行
+  if (requestUserId == null) {
+    debugLog(`✅ 新規ユーザーセッション検証成功: ${activeUserEmail}`);
+    return;
   }
   
   const requestedUserInfo = findUserById(requestUserId);
@@ -2108,9 +2113,8 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // 管理者権限チェック - 現在のユーザーがボードの所有者かどうかを確認
-    var activeUserEmail = Session.getActiveUser().getEmail();
-    if (activeUserEmail !== userInfo.adminEmail) {
+    // 管理者権限チェック - 統一されたcheckAdmin関数を使用
+    if (!checkAdmin(requestUserId)) {
       throw new Error('ハイライト機能は管理者のみ使用できます');
     }
 
@@ -2484,10 +2488,7 @@ function initializeQuickStartContext(requestUserId) {
 }
 
 function quickStartSetup(requestUserId) {
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
-  if (requestUserId) {
-    verifyUserAccess(requestUserId);
-  }
+  verifyUserAccess(requestUserId);
   try {
     // ステップ0: セットアップコンテキストを初期化
     var setupContext = initializeQuickStartContext(requestUserId);
@@ -4275,10 +4276,7 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
  * @returns {object} 更新結果
  */
 function updateIsActiveStatus(requestUserId, isActive) {
-  // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
-  if (requestUserId) {
-    verifyUserAccess(requestUserId);
-  }
+  verifyUserAccess(requestUserId);
   try {
     var activeUserEmail = Session.getActiveUser().getEmail();
     if (!activeUserEmail) {

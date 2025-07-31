@@ -77,6 +77,23 @@ var _executionUserInfoCache = null;
  */
 function clearExecutionUserInfoCache() {
   _executionUserInfoCache = null;
+  
+  // 統一キャッシュマネージャーの関連エントリもクリア
+  if (typeof cacheManager !== 'undefined' && cacheManager) {
+    try {
+      // セッション関連キャッシュのクリア
+      const currentEmail = Session.getActiveUser().getEmail();
+      if (currentEmail) {
+        cacheManager.remove('session_' + currentEmail);
+      }
+      
+      debugLog('[Memory] 実行レベル + 統一キャッシュの関連エントリをクリアしました');
+    } catch (error) {
+      debugLog('[Memory] 統一キャッシュクリア中にエラー:', error.message);
+    }
+  } else {
+    debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
+  }
 }
 
 const COLUMN_HEADERS = {
