@@ -3,6 +3,7 @@ const vm = require('vm');
 
 describe('saveAndPublish with mocked getCachedUserInfo', () => {
   const code = fs.readFileSync('src/config.gs', 'utf8');
+  const lockManagerCode = fs.readFileSync('src/lockManager.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -19,6 +20,7 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
       },
     };
     vm.createContext(context);
+    vm.runInContext(lockManagerCode, context);
     vm.runInContext(code, context);
 
     Object.assign(context, {
@@ -62,7 +64,7 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
     });
 
     expect(() => context.saveAndPublish('U', 'Sheet1', {})).toThrow(
-      '設定の保存と公開中にサーバーエラーが発生しました: ユーザー情報が取得できません',
+      'ユーザー情報が取得できません',
     );
   });
 });

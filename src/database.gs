@@ -58,15 +58,8 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
     const service = getSheetsServiceCached();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
 
-    // ロック取得でトランザクション開始
-    const lock = LockService.getScriptLock();
-    let lockAcquired = false;
-
-    try {
-      lockAcquired = lock.tryLock(5000);
-      if (!lockAcquired) {
-        throw new Error('ログ記録のロック取得に失敗しました');
-      }
+    // 統一ロック管理でトランザクション開始
+    return executeWithStandardizedLock('WRITE_OPERATION', 'logAccountDeletion', () => {
       transactionLog.steps.push('lock_acquired');
 
       // ログシートの存在確認・作成（トランザクション内）
@@ -157,13 +150,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       } catch (appendError) {
         throw new Error(`ログエントリの追加に失敗: ${appendError.message}`);
       }
-
-    } finally {
-      if (lockAcquired) {
-        lock.releaseLock();
-        transactionLog.steps.push('lock_released');
-      }
-    }
+    });
 
   } catch (error) {
     transactionLog.duration = Date.now() - transactionLog.startTime;
@@ -313,10 +300,8 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       }
     }
 
-    const lock = LockService.getScriptLock();
-    lock.waitLock(15000);
-
-    try {
+    // 統一ロック管理でデータベース削除実行
+    return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccountByAdmin', () => {
       // データベースからユーザー行を削除
       const props = PropertiesService.getScriptProperties();
       const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
@@ -383,20 +368,17 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       // 関連キャッシュを削除
       invalidateUserCache(targetUserId, targetUserInfo.adminEmail, targetUserInfo.spreadsheetId, false);
 
-    } finally {
-      lock.releaseLock();
-    }
-
-    const successMessage = `管理者によりアカウント「${targetUserInfo.adminEmail}」が削除されました。\n削除理由: ${reason.trim()}`;
-    infoLog(successMessage);
-    return {
-      success: true,
-      message: successMessage,
-      deletedUser: {
-        userId: targetUserId,
-        email: targetUserInfo.adminEmail
-      }
-    };
+      const successMessage = `管理者によりアカウント「${targetUserInfo.adminEmail}」が削除されました。\n削除理由: ${reason.trim()}`;
+      infoLog(successMessage);
+      return {
+        success: true,
+        message: successMessage,
+        deletedUser: {
+          userId: targetUserId,
+          email: targetUserInfo.adminEmail
+        }
+      };
+    });
 
   } catch (error) {
     errorLog('deleteUserAccountByAdmin error:', error.message);
@@ -1140,11 +1122,8 @@ function updateUser(userId, updateData) {
  * @returns {object} 作成されたユーザーデータ
  */
 function createUser(userData) {
-  // 同時登録による重複を防ぐためロックを取得
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-
-  try {
+  // 統一ロック管理で重複登録を防ぐ
+  return executeWithStandardizedLock('WRITE_OPERATION', 'createUser', () => {
     // メールアドレスの重複チェック
     var existingUser = findUserByEmail(userData.adminEmail);
     if (existingUser) {
@@ -1185,9 +1164,7 @@ function createUser(userData) {
     invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
 
     return userData;
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 /**
@@ -2554,7 +2531,7 @@ function getDbSheet() {
       throw new Error('データベースIDが設定されていません');
     }
 
-    var ss = SpreadsheetApp.openById(dbId);
+    var ss = openSpreadsheetOptimized(dbId);
     var sheet = ss.getSheetByName(DB_SHEET_CONFIG.SHEET_NAME);
     if (!sheet) {
       throw new Error('データベースシートが見つかりません: ' + DB_SHEET_CONFIG.SHEET_NAME);
@@ -3014,10 +2991,8 @@ function deleteUserAccount(userId) {
       throw new Error('データベースにユーザー情報が見つかりません。');
     }
 
-    const lock = LockService.getScriptLock();
-    lock.waitLock(15000); // 15秒待機
-
-    try {
+    // 統一ロック管理でアカウント削除実行
+    return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccount', () => {
       // データベース（シート）からユーザー行を削除（サービスアカウント経由）
       var props = PropertiesService.getScriptProperties();
       var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
@@ -3104,13 +3079,10 @@ function deleteUserAccount(userId) {
       const userProps = PropertiesService.getUserProperties();
       userProps.deleteProperty('CURRENT_USER_ID');
 
-    } finally {
-      lock.releaseLock();
-    }
-
-    const successMessage = 'アカウント「' + userInfo.adminEmail + '」が正常に削除されました。';
-    infoLog(successMessage);
-    return successMessage;
+      const successMessage = 'アカウント「' + userInfo.adminEmail + '」が正常に削除されました。';
+      infoLog(successMessage);
+      return successMessage;
+    });
 
   } catch (error) {
     errorLog('アカウント削除エラー:', error.message);

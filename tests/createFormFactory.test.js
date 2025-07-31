@@ -2,6 +2,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('createFormFactory returns URLs', () => {
+  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
 
@@ -34,9 +35,13 @@ describe('createFormFactory returns URLs', () => {
         create: jest.fn(() => mockForm),
         EmailCollectionType: { VERIFIED: 'VERIFIED' }
       },
-      Utilities: { formatDate: jest.fn(() => '2025/01/01 00:00:00') }
+      Utilities: { 
+        formatDate: jest.fn(() => '2025/01/01 00:00:00'),
+        getUuid: () => 'test-uuid-' + Math.random()
+      }
     };
     vm.createContext(context);
+    vm.runInContext(errorHandlerCode, context);
     vm.runInContext(code, context);
     context.createLinkedSpreadsheet = jest.fn(() => ({
       spreadsheetId: 'SS_ID',

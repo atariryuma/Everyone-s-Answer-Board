@@ -2,6 +2,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('isDeployUser uses ADMIN_EMAIL property', () => {
+  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
@@ -13,9 +14,11 @@ describe('isDeployUser uses ADMIN_EMAIL property', () => {
       PropertiesService: { getScriptProperties: () => scriptProps },
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
       SCRIPT_PROPS_KEYS: { ADMIN_EMAIL: 'ADMIN_EMAIL' },
+      Utilities: { getUuid: () => 'test-uuid-' + Math.random() },
       console
     };
     vm.createContext(context);
+    vm.runInContext(errorHandlerCode, context);
     vm.runInContext(code, context);
   });
 

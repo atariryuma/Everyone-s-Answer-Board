@@ -43,7 +43,7 @@ function getUserInfoCached(requestUserId) {
     }
     return userInfo;
   } catch (error) {
-    errorLog('getUserInfoCached error:', error.message);
+    logError(error, 'getUserInfoCached', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CACHE);
     // エラー時はキャッシュをクリア
     clearExecutionUserInfoCache();
     return null;
@@ -101,7 +101,7 @@ class ManagedExecutionContext {
       this.resources.set('sheetsService', this.sheetsService);
       this._trackMemoryUsage('sheetsService');
     } catch (error) {
-      errorLog('❌ サービス作成エラー:', error.message);
+      logError(error, 'createService', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
       this.sheetsService = getSheetsServiceCached();
       this.resources.set('sheetsService', this.sheetsService);
       this._trackMemoryUsage('sheetsService');
@@ -234,7 +234,7 @@ class ManagedExecutionContext {
       debugLog(`✅ ExecutionContextクリーンアップ完了: ${this.requestUserId} (lifetime: ${lifetime}ms, peak memory: ${this.memoryUsage.peak})`);
 
     } catch (error) {
-      errorLog('❌ ExecutionContextクリーンアップエラー:', error.message);
+      logError(error, 'ExecutionContextCleanup', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
     }
   }
 
@@ -335,7 +335,7 @@ function performGlobalMemoryCleanup() {
     infoLog('✅ グローバルメモリクリーンアップ完了');
 
   } catch (error) {
-    errorLog('❌ グローバルメモリクリーンアップエラー:', error.message);
+    logError(error, 'globalMemoryCleanup', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
   }
 }
 
@@ -355,7 +355,7 @@ function getCurrentSpreadsheet(requestUserId) {
     // スプレッドシートIDの形式チェック
     const spreadsheetIdPattern = /^[a-zA-Z0-9-_]{44}$/;
     if (!spreadsheetIdPattern.test(userInfo.spreadsheetId)) {
-      errorLog('❌ 無効なスプレッドシートID形式:', userInfo.spreadsheetId);
+      logValidationError('spreadsheetId', userInfo.spreadsheetId, 'valid_format', '無効なスプレッドシートID形式');
       throw new Error(`無効なスプレッドシートID形式です: ${userInfo.spreadsheetId}`);
     }
 
@@ -363,7 +363,7 @@ function getCurrentSpreadsheet(requestUserId) {
     debugLog('🔧 getCurrentSpreadsheet: スプレッドシートアクセス試行中:', userInfo.spreadsheetId);
 
     try {
-      return SpreadsheetApp.openById(userInfo.spreadsheetId);
+      return openSpreadsheetOptimized(userInfo.spreadsheetId);
     } catch (openError) {
       errorLog('❌ SpreadsheetApp.openById 権限エラー:', openError.message);
 
@@ -512,7 +512,7 @@ function getEffectiveSpreadsheetId(requestUserId) {
  */
 function getSheetHeaders(requestUserId, spreadsheetId, sheetName) {
   verifyUserAccess(requestUserId);
-  const ss = SpreadsheetApp.openById(spreadsheetId);
+  const ss = openSpreadsheetOptimized(spreadsheetId);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
 
@@ -1039,10 +1039,9 @@ function republishBoard(requestUserId) {
   }
 
   verifyUserAccess(requestUserId);
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-
-  try {
+  
+  // 統一ロック管理で再公開処理を実行
+  return executeWithStandardizedLock('BATCH_OPERATION', 'republishBoard', () => {
     debugLog('republishBoard開始: userId=%s', requestUserId);
 
     const userInfo = getConfigUserInfo(requestUserId);
@@ -1074,13 +1073,7 @@ function republishBoard(requestUserId) {
       publishedSheetName: configJson.publishedSheetName,
       publishedSpreadsheetId: configJson.publishedSpreadsheetId
     };
-
-  } catch (error) {
-    errorLog('republishBoardでエラー:', error.message, error.stack);
-    throw new Error('再公開処理中にエラーが発生しました: ' + error.message);
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 /**
@@ -1434,7 +1427,7 @@ function detectFormUrlFromSpreadsheet(spreadsheetId) {
     debugLog('🔍 フォームURL検出開始 (強化版):', spreadsheetId);
 
     // スプレッドシートを開く
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = openSpreadsheetOptimized(spreadsheetId);
     const sheets = spreadsheet.getSheets();
 
     // 方法1: 各シートでフォームへのリンクを探す（getFormUrl）
@@ -1570,7 +1563,7 @@ function createFormForSpreadsheet(spreadsheetId, sheetName) {
   try {
     debugLog('🔧 createFormForSpreadsheet: フォーム自動作成開始', { spreadsheetId, sheetName });
 
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = openSpreadsheetOptimized(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -2113,7 +2106,7 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
       // フォールバック: SpreadsheetApp.openById()を試行（権限がある場合のみ）
       warnLog('⚠️ フォールバック: SpreadsheetApp.openById()を試行');
       try {
-        const ss = SpreadsheetApp.openById(targetId);
+        const ss = openSpreadsheetOptimized(targetId);
         const sheet = ss.getSheetByName(sheetName);
         if (!sheet) {
           throw new Error('シートが見つかりません: ' + sheetName);
@@ -3105,10 +3098,9 @@ function setDisplayOptionsInContext(context, displayOptions) {
  */
 function saveAndPublish(requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-
-  try {
+  
+  // 統一ロック管理で設定保存・公開処理を実行
+  return executeWithStandardizedLock('BATCH_OPERATION', 'saveAndPublish', () => {
     debugLog('🚀 saveAndPublishOptimized開始: sheetName=%s', sheetName);
     const overallStartTime = new Date().getTime();
 
@@ -3213,13 +3205,7 @@ function saveAndPublish(requestUserId, sheetName, config) {
     };
 
     return finalResponse;
-
-  } catch (error) {
-    errorLog('❌ saveAndPublishOptimized致命的エラー:', error.message, error.stack);
-    throw new Error('設定の保存と公開中にサーバーエラーが発生しました: ' + error.message);
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 /**

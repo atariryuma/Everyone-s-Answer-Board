@@ -10,10 +10,9 @@ if (typeof debugLog === 'undefined') {
   }
 }
 
-if (typeof errorLog === 'undefined') {
-  function errorLog(message, ...args) {
-    console.error('[ERROR]', message, ...args);
-  }
+// Import standardized error handling functions
+if (typeof logError === 'undefined') {
+  throw new Error('errorHandler.gs must be loaded before Core.gs');
 }
 
 if (typeof warnLog === 'undefined') {
@@ -47,7 +46,7 @@ function getAutoStopTime(publishedAt, minutes) {
       remainingMinutes: Math.max(0, Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60)))
     };
   } catch (error) {
-    errorLog('自動停止時間計算エラー:', error);
+    logError(error, 'calculateAutoStopTime', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
     return null;
   }
 }
@@ -63,13 +62,9 @@ function clearActiveSheet(requestUserId) {
   }
 
   verifyUserAccess(requestUserId);
-  const lock = LockService.getScriptLock();
-
-  try {
-    if (!lock.tryLock(10000)) {
-      throw new Error('システムが混雑しています。しばらく待ってから再度お試しください。');
-    }
-
+  
+  // 統一ロック管理でアクティブシート終了処理を実行
+  return executeWithStandardizedLock('WRITE_OPERATION', 'clearActiveSheet', () => {
     debugLog('clearActiveSheet開始: userId=' + requestUserId);
 
     const userInfo = getConfigUserInfo(requestUserId);
@@ -103,15 +98,7 @@ function clearActiveSheet(requestUserId) {
       message: '回答ボードの公開を終了しました',
       status: 'unpublished'
     };
-
-  } catch (error) {
-    errorLog('clearActiveSheetでエラー:', error.message, error.stack);
-    throw new Error('公開終了処理中にエラーが発生しました: ' + error.message);
-  } finally {
-    if (lock) {
-      lock.releaseLock();
-    }
-  }
+  });
 }
 
 /**
@@ -317,7 +304,7 @@ function performAutoHealing(userInfo, configJson, userId) {
     if (updated) {
       const validation = validateConfigJsonState(healedConfig, userInfo);
       if (!validation.isValid) {
-        errorLog('❌ Auto-healing後の状態が無効:', validation.errors);
+        logError(`Auto-healing後の状態が無効: ${validation.errors}`, 'autoHealConfig', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.DATABASE);
         return { updated: false, configJson: configJson, changes: [] };
       }
 
@@ -332,7 +319,7 @@ function performAutoHealing(userInfo, configJson, userId) {
         updateUser(userId, { configJson: JSON.stringify(healedConfig) });
         debugLog('📋 Auto-healing実行:', changes.join(', '));
       } catch (updateError) {
-        errorLog('❌ Auto-healing DB更新失敗:', updateError.message);
+        logDatabaseError(updateError, 'autoHealConfigUpdate', { userId: user.userId });
         // DB更新失敗時は元の設定を返す
         return { updated: false, configJson: configJson, changes: [] };
       }
@@ -341,7 +328,7 @@ function performAutoHealing(userInfo, configJson, userId) {
     return { updated, configJson: healedConfig, changes };
 
   } catch (error) {
-    errorLog('❌ Auto-healing処理エラー:', error.message);
+    logError(error, 'autoHealConfig', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
     return { updated: false, configJson: configJson, changes: [] };
   }
 }
@@ -528,7 +515,7 @@ function validateHeaderIntegrity(userId) {
 
     return validationResults;
   } catch (error) {
-    errorLog('❌ Header integrity validation error:', error);
+    logError(error, 'validateHeaderIntegrity', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.DATABASE);
     return {
       success: false,
       error: error.message,
@@ -577,7 +564,7 @@ function getOpinionHeaderSafely(userId, sheetName) {
 
     return opinionHeader;
   } catch (e) {
-    errorLog('getOpinionHeaderSafely error:', e);
+    logError(e, 'getOpinionHeaderSafely', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
     return 'お題';
   }
 }
@@ -675,7 +662,7 @@ function registerNewUser(adminEmail) {
     // 生成されたユーザー情報のキャッシュをクリア
     invalidateUserCache(userId, adminEmail, null, false);
   } catch (e) {
-    errorLog('データベースへのユーザー登録に失敗: ' + e.message);
+    logDatabaseError(e, 'userRegistration', { userId: userInfo.userId, email: userInfo.email });
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }
 
@@ -730,7 +717,7 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
       throw new Error(result.message || 'リアクションの処理に失敗しました');
     }
   } catch (e) {
-    errorLog('addReaction エラー: ' + e.message);
+    logError(e, 'addReaction', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId, rowIndex, reaction });
     return {
       status: "error",
       message: e.message
@@ -830,7 +817,7 @@ function addReactionBatch(requestUserId, batchOperations) {
         }
 
       } catch (operationError) {
-        errorLog('個別操作エラー:', operation, operationError.message);
+        logError(operationError, 'batchOperation', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { operation, batchIndex: i });
         batchResults.push({
           rowIndex: operation.rowIndex,
           reaction: operation.reaction,
@@ -875,7 +862,7 @@ function addReactionBatch(requestUserId, batchOperations) {
     };
 
   } catch (error) {
-    errorLog('addReactionBatch エラー:', error.message);
+    logError(error, 'addReactionBatch', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { batchSize: operations.length });
 
     // バッチ処理失敗時は個別処理にフォールバック可能であることを示す
     return {
@@ -898,7 +885,7 @@ function addReactionBatch(requestUserId, batchOperations) {
  */
 function getCurrentSheetName(spreadsheetId) {
   try {
-    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
     var sheets = spreadsheet.getSheets();
 
     // デフォルトでは最初のシートを使用
@@ -1067,7 +1054,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
 
       if (sheetData.totalCount === 0) {
         debugLog('⚠️ 診断: データが0件です。原因を調査します...');
-        var spreadsheet = SpreadsheetApp.openById(publishedSpreadsheetId);
+        var spreadsheet = openSpreadsheetOptimized(publishedSpreadsheetId);
         var sheet = spreadsheet.getSheetByName(publishedSheetName);
         if (sheet) {
           var lastRow = sheet.getLastRow();
@@ -1168,7 +1155,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     return result;
 
   } catch (e) {
-    errorLog('公開シートデータ取得エラー: ' + e.message);
+    logError(e, 'getPublishedSheetData', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE, { userId, publishedSpreadsheetId, publishedSheetName });
     return {
       status: 'error',
       message: 'データの取得に失敗しました: ' + e.message,
@@ -1221,7 +1208,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     }
 
     // スプレッドシートとシートを取得
-    var ss = SpreadsheetApp.openById(publishedSpreadsheetId);
+    var ss = openSpreadsheetOptimized(publishedSpreadsheetId);
       debugLog('DEBUG: Spreadsheet object obtained: %s', ss ? ss.getName() : 'null');
 
       var sheet = ss.getSheetByName(publishedSheetName);
@@ -1309,7 +1296,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       isIncremental: true
     };
   } catch (e) {
-    errorLog('増分データ取得エラー: ' + e.message);
+    logError(e, 'getIncrementalData', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE, { userId, timestamp });
     return {
       status: 'error',
       message: '増分データの取得に失敗しました: ' + e.message
@@ -1347,8 +1334,7 @@ function getAvailableSheets(requestUserId) {
       };
     });
   } catch (e) {
-    errorLog('getAvailableSheets エラー: ' + e.message);
-    errorLog('Error details:', e.stack);
+    logError(e, 'getAvailableSheets', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE, { userId });
     return [];
   }
 }
@@ -1366,7 +1352,7 @@ function getSheetsList(userId) {
       return [];
     }
 
-    var spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
+    var spreadsheet = openSpreadsheetOptimized(userInfo.spreadsheetId);
     var sheets = spreadsheet.getSheets();
 
     var sheetList = sheets.map(function(sheet) {
@@ -1379,7 +1365,7 @@ function getSheetsList(userId) {
     infoLog('✅ getSheetsList: Found sheets for userId %s: %s', userId, JSON.stringify(sheetList));
     return sheetList;
   } catch (e) {
-    errorLog('getSheetsList エラー: ' + e.message);
+    logError(e, 'getSheetsList', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE, { userId });
     return [];
   }
 }
@@ -1405,7 +1391,7 @@ function refreshBoardData(requestUserId) {
     // 最新のステータスを取得
     return getAppConfig(requestUserId);
   } catch (e) {
-    errorLog('refreshBoardData の再読み込みに失敗: ' + e.message);
+    logError(e, 'refreshBoardData', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
     return { status: 'error', message: 'ボードデータの再読み込みに失敗しました: ' + e.message };
   }
 }
@@ -1618,7 +1604,7 @@ function getAppConfig(requestUserId) {
       setupStep: determineSetupStepUnified(userInfo, configJson)
     };
   } catch (e) {
-    errorLog('アプリ設定取得エラー: ' + e.message);
+    logError(e, 'getAppSettings', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
     return {
       status: 'error',
       message: '設定の取得に失敗しました: ' + e.message
@@ -1682,7 +1668,7 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
     infoLog('✅ シート設定を保存しました: %s', sheetKey);
     return { status: 'success', message: 'シート設定を保存しました。' };
   } catch (e) {
-    errorLog('シート設定保存エラー: ' + e.message);
+    logDatabaseError(e, 'saveSheetSettings', { userId });
     return { status: 'error', message: 'シート設定の保存に失敗しました: ' + e.message };
   }
 }
@@ -1725,7 +1711,7 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
     infoLog('✅ 表示シートを切り替えました: %s - %s', spreadsheetId, sheetName);
     return { status: 'success', message: '表示シートを切り替えました。' };
   } catch (e) {
-    errorLog('シート切り替えエラー: ' + e.message);
+    logError(e, 'switchSheet', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId, sheetName });
     return { status: 'error', message: '表示シートの切り替えに失敗しました: ' + e.message };
   }
 }
@@ -1759,7 +1745,7 @@ function setupApplication(credsJson, dbId) {
     infoLog('✅ セットアップが正常に完了しました。');
     return { status: 'success', message: 'セットアップが正常に完了しました。' };
   } catch (e) {
-    errorLog('セットアップエラー:', e);
+    logError(e, 'customSetup', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { userId });
     throw new Error('セットアップに失敗しました: ' + e.message);
   }
 }
@@ -1802,7 +1788,7 @@ function testSetup() {
     }
 
   } catch (e) {
-    errorLog('セットアップテストエラー:', e);
+    logError(e, 'testCustomSetup', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
     return { status: 'error', message: 'セットアップテストに失敗しました: ' + e.message };
   }
 }
@@ -1839,7 +1825,7 @@ function getResponsesData(userId, sheetName) {
       headers: values[0]
     };
   } catch (e) {
-    errorLog('回答データの取得に失敗: ' + e.message);
+    logError(e, 'getAnswerData', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE, { userId });
     return { status: 'error', message: '回答データの取得に失敗しました: ' + e.message };
   }
 }
@@ -1880,7 +1866,7 @@ function getCurrentUserStatus(requestUserId) {
       }
     };
   } catch (e) {
-    errorLog('getCurrentUserStatus エラー: ' + e.message);
+    logError(e, 'getCurrentUserStatus', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
     return { status: 'error', message: 'ステータス取得に失敗しました: ' + e.message };
   }
 }
@@ -1926,7 +1912,7 @@ function getActiveFormInfo(requestUserId) {
       isFormActive: !!(configJson.formUrl && configJson.formCreated)
     };
   } catch (e) {
-    errorLog('getActiveFormInfo エラー: ' + e.message);
+    logError(e, 'getActiveFormInfo', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
     return { status: 'error', message: 'フォーム情報の取得に失敗しました: ' + e.message };
   }
 }
@@ -1962,7 +1948,7 @@ function checkAdmin(requestUserId) {
 function countSheetRows(spreadsheetId, sheetName, classFilter) {
   const key = `rowCount_${spreadsheetId}_${sheetName}_${classFilter}`;
   return cacheManager.get(key, () => {
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+    const sheet = openSpreadsheetOptimized(spreadsheetId).getSheetByName(sheetName);
     if (!sheet) return 0;
 
     const lastRow = sheet.getLastRow();
@@ -2800,7 +2786,7 @@ function getSheetColumns(userId, sheetId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
 
-    var spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
+    var spreadsheet = openSpreadsheetOptimized(userInfo.spreadsheetId);
     var sheet = spreadsheet.getSheetById(sheetId);
 
     if (!sheet) {
@@ -2867,10 +2853,8 @@ function extractFormIdFromUrl(url) {
  */
 function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reactingUserEmail) {
   try {
-    // LockServiceを使って競合を防ぐ
-    var lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(10000);
+    // 統一ロック管理でリアクション処理を実行
+    return executeWithStandardizedLock('WRITE_OPERATION', 'processReaction', () => {
 
       var service = getSheetsServiceCached();
       var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
@@ -2979,10 +2963,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
         action: userAction,
         count: targetCount
       };
-
-    } finally {
-      lock.releaseLock();
-    }
+    });
 
   } catch (e) {
     errorLog('リアクション処理エラー: ' + e.message);
@@ -3573,7 +3554,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
     var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
     var serviceAccountEmail = serviceAccountCreds.client_email;
 
-    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
 
     // サービスアカウントを編集者として追加
     if (serviceAccountEmail) {
@@ -3644,7 +3625,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
 
     // SpreadsheetApp経由でも編集者として追加
     try {
-      var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
       spreadsheet.addEditor(userEmail);
       debugLog('SpreadsheetApp経由でユーザーを編集者として追加: ' + userEmail);
     } catch (spreadsheetAddError) {
@@ -3687,7 +3668,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
  */
 function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
   try {
-    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
     var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
 
     var additionalHeaders = [
