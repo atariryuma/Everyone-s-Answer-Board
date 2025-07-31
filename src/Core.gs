@@ -12,19 +12,24 @@ if (typeof debugLog === 'undefined') {
 
 // Import standardized error handling functions
 if (typeof logError === 'undefined') {
-  throw new Error('errorHandler.gs must be loaded before Core.gs');
+  console.error('⚠️ errorHandler.gs not loaded - using fallback error handling');
+  // Fallback error handler
+  globalThis.logError = function(error, context, severity, category, metadata) {
+    console.error(`[ERROR] ${context || 'Unknown'}:`, error);
+    return { logged: true, fallback: true };
+  };
 }
 
 if (typeof warnLog === 'undefined') {
-  function warnLog(message, ...args) {
+  globalThis.warnLog = function(message, ...args) {
     console.warn('[WARN]', message, ...args);
-  }
+  };
 }
 
 if (typeof infoLog === 'undefined') {
-  function infoLog(message, ...args) {
+  globalThis.infoLog = function(message, ...args) {
     console.log('[INFO]', message, ...args);
-  }
+  };
 }
 
 /**

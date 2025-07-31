@@ -2,6 +2,14 @@
   "timeZone": "Asia/Tokyo",
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
+  "dependencies": {
+    "enabledAdvancedServices": [],
+    "libraries": []
+  },
+  "executionOrder": [
+    "errorHandler.gs",
+    "Core.gs"
+  ],
   "oauthScopes": [
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/forms",
