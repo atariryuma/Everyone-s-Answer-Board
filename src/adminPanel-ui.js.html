@@ -978,7 +978,7 @@ function updateUIForSelectedSheet() {
   var hasSelection = selectedSheet && selectedSheet.trim() !== '';
   
   // Update step indicators based on current status (統一されたロジックを使用)
-  const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
+  const currentStep = determineSetupStepUnified(currentStatus.userInfo, currentStatus.config);
   updateStepIndicators(currentStep);
   
   // Enable/disable configuration section
