@@ -1535,6 +1535,7 @@ function getAppConfig(requestUserId) {
 
     var configJson = getConfigJSON(userInfo);
     debugLog('getAppConfig: configJson (before healing):', JSON.stringify(configJson));
+    debugLog('getAppConfig: configJson.formCreated (after getConfigJSON):', configJson.formCreated);
 
     // --- 統一された自動修復システム ---
     const healingResult = performAutoHealing(userInfo, configJson, currentUserId);
