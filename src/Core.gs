@@ -186,7 +186,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
   }
 
   // Step 3: セットアップ完了（すべての条件をクリア）
-  if (setupStatus === 'completed' && formCreated && hasFormUrl) {
+  if (setupStatus === 'completed' && formCreatedForStep && hasFormUrl) {
     if (debugMode) debugLog('🔧 setupStep統一判定: Step 3 - セットアップ完了');
     return 3;
   }
@@ -195,7 +195,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
   if (debugMode) {
     debugLog('🔧 setupStep統一判定: フォールバック - Step 2', {
       setupStatus,
-      formCreated,
+      formCreated: formCreatedForStep,
       hasFormUrl
     });
   }
@@ -1538,12 +1538,14 @@ function getAppConfig(requestUserId) {
 
     var configJson = getConfigJSON(userInfo);
     debugLog('getAppConfig: configJson (after getConfigJSON, before healing):', JSON.stringify(configJson));
+    debugLog('✅ getAppConfig: configJson.formCreated =', configJson.formCreated); // ★追加
 
     // --- 統一された自動修復システム ---
     const healingResult = performAutoHealing(userInfo, configJson, currentUserId);
     if (healingResult.updated) {
       configJson = healingResult.configJson;
       debugLog('getAppConfig: configJson (after healing):', JSON.stringify(configJson));
+      debugLog('✅ getAppConfig: configJson.formCreated (after healing) =', configJson.formCreated); // ★追加
     }
     debugLog('getAppConfig: After healing process'); // ★追加
 
