@@ -2379,7 +2379,7 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   debugLog('📋 データベース更新内容:');
   debugLog('  📊 新スプレッドシートID:', updateData.spreadsheetId);
   debugLog('  🔗 新スプレッドシートURL:', updateData.spreadsheetUrl);
-  debugLog('  ⚙️ シート固有設定キー:', sheetConfigKey);
+  debugLog('  ⚙️ シート固有設定キー:', `sheet_${safeSheetName}`);
   debugLog('  📝 シート固有設定:', quickStartSheetConfig);
 
   // データベース更新実行
