@@ -889,11 +889,23 @@ function initializeAdminPanelMaster() {
     // イベント管理初期化（最後に実行）
     setTimeout(() => {
       function initializeEventsWithRetry(attempts = 0) {
-        if (typeof initializeEventListeners === 'function' && 
-            typeof handleQuickStart === 'function' && 
-            typeof runHeaderGuessing === 'function') {
+        // 🔧 改善されたグローバル関数チェック（windowオブジェクトも確認）
+        const functionsAvailable = {
+          initializeEventListeners: typeof initializeEventListeners === 'function' || typeof window.initializeEventListeners === 'function',
+          handleQuickStart: typeof handleQuickStart === 'function' || typeof window.handleQuickStart === 'function',
+          runHeaderGuessing: typeof runHeaderGuessing === 'function' || typeof window.runHeaderGuessing === 'function'
+        };
+        
+        logDebug('🔍 関数可用性チェック:', functionsAvailable);
+        
+        if (functionsAvailable.initializeEventListeners && 
+            functionsAvailable.handleQuickStart && 
+            functionsAvailable.runHeaderGuessing) {
           try {
-            initializeEventListeners();
+            // グローバルまたはローカルスコープから関数を取得
+            const initEventsFn = typeof initializeEventListeners === 'function' ? initializeEventListeners : window.initializeEventListeners;
+            initEventsFn();
+            
             updateSystemStatus('eventsInitialized', true);
             updateSystemStatus('initializationComplete', true);
             logDebug('✅ Events module initialized');
@@ -908,43 +920,52 @@ function initializeAdminPanelMaster() {
           return;
         } 
         
-        if (attempts < 5) { // 10 -> 5に短縮
-          logDebug(`⏳ イベント関数読み込み待機中... (試行 ${attempts + 1}/5)`);
-          setTimeout(() => initializeEventsWithRetry(attempts + 1), 200);
+        if (attempts < 8) { // 5 -> 8に増加（より寛容に）
+          logDebug(`⏳ イベント関数読み込み待機中... (試行 ${attempts + 1}/8)`);
+          setTimeout(() => initializeEventsWithRetry(attempts + 1), 300); // 200ms -> 300msに調整
           return;
         }
         
-        // フォールバック実装
-        console.warn('⚠️ Event functions not available, implementing fallback...');
+        // フォールバック実装（より確実に）
+        console.warn('⚠️ Event functions not available after 8 attempts, implementing enhanced fallback...');
         const missingEventFunctions = {
           initializeEventListeners: typeof initializeEventListeners,
           handleQuickStart: typeof handleQuickStart,
-          runHeaderGuessing: typeof runHeaderGuessing
+          runHeaderGuessing: typeof runHeaderGuessing,
+          // グローバルスコープも確認
+          'window.initializeEventListeners': typeof window.initializeEventListeners,
+          'window.handleQuickStart': typeof window.handleQuickStart,
+          'window.runHeaderGuessing': typeof window.runHeaderGuessing
         };
-        console.error('Missing functions:', missingEventFunctions);
+        console.error('Missing functions detail:', missingEventFunctions);
         updateSystemStatus('eventsInitialized', false, new Error(`Missing event functions: ${JSON.stringify(missingEventFunctions)}`));
         
-        // 基本的なフォールバック関数を実装
-        if (typeof handleQuickStart !== 'function') {
+        // 🔧 強化されたフォールバック関数を実装
+        if (!functionsAvailable.handleQuickStart) {
           window.handleQuickStart = function() {
-            console.warn('🔄 Fallback: handleQuickStart called');
-            window.showMessage && window.showMessage('QuickStart機能は現在利用できません。ページを再読み込みしてください。', 'warning');
+            console.warn('🔄 Enhanced Fallback: handleQuickStart called');
+            if (window.showMessage) {
+              window.showMessage('QuickStart機能は現在利用できません。ページを再読み込みしてください。', 'warning');
+            }
           };
-          logDebug('📦 Fallback handleQuickStart implemented');
+          logDebug('📦 Enhanced Fallback handleQuickStart implemented');
         }
         
-        if (typeof runHeaderGuessing !== 'function') {
+        if (!functionsAvailable.runHeaderGuessing) {
           window.runHeaderGuessing = function() {
-            console.warn('🔄 Fallback: runHeaderGuessing called');
-            window.showMessage && window.showMessage('AI判定機能は現在利用できません。ページを再読み込みしてください。', 'warning');
+            console.warn('🔄 Enhanced Fallback: runHeaderGuessing called');
+            if (window.showMessage) {
+              window.showMessage('AI判定機能は現在利用できません。ページを再読み込みしてください。', 'warning');
+            }
           };
-          logDebug('📦 Fallback runHeaderGuessing implemented');
+          logDebug('📦 Enhanced Fallback runHeaderGuessing implemented');
         }
         
         // イベントリスナーは利用可能な場合のみ初期化
-        if (typeof initializeEventListeners === 'function') {
+        if (functionsAvailable.initializeEventListeners) {
           try {
-            initializeEventListeners();
+            const initEventsFn = typeof initializeEventListeners === 'function' ? initializeEventListeners : window.initializeEventListeners;
+            initEventsFn();
             updateSystemStatus('eventsInitialized', 'partial');
             logDebug('✅ Events module initialized (partial)');
           } catch (error) {
@@ -956,14 +977,14 @@ function initializeAdminPanelMaster() {
         }
         
         updateSystemStatus('initializationComplete', 'fallback');
-        logInfo('⚠️ AdminPanel Master Initialization Complete (with fallback functions)');
+        logInfo('⚠️ AdminPanel Master Initialization Complete (with enhanced fallback functions)');
         
         // システム状態の最終レポート（フォールバック版）
-        console.log('📊 Final System Status (Fallback):', window.systemStatus);
+        console.log('📊 Final System Status (Enhanced Fallback):', window.systemStatus);
       }
       
       initializeEventsWithRetry();
-    }, 100); // 50ms -> 100msに調整
+    }, 150); // 100ms -> 150msに調整（より余裕を持って）
     
   }, 10); // 50ms -> 10msに短縮
 }

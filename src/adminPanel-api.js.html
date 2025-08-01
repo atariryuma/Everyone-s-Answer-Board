@@ -83,56 +83,7 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 // PROCESSING CACHE SYSTEM (重複処理防止)
 // =============================================================================
 
-// 🎯 処理結果キャッシュ（セッション中の重複実行を防止）
-const processingCache = {
-  sheetHeaderValidation: new Map(),
-  aiColumnDetection: new Map(), 
-  configNormalization: new Map(),
-  urlGeneration: new Map(),
-  
-  // キャッシュクリア
-  clear() {
-    this.sheetHeaderValidation.clear();
-    this.aiColumnDetection.clear();
-    this.configNormalization.clear();
-    this.urlGeneration.clear();
-    console.log('🗑️ ProcessingCache: 全キャッシュをクリア');
-  },
-  
-  // 特定キャッシュのクリア
-  clearType(type) {
-    if (this[type]) {
-      this[type].clear();
-      console.log(`🗑️ ProcessingCache: ${type}キャッシュをクリア`);
-    }
-  }
-};
-
-// 🔧 キャッシュ付き処理実行ヘルパー
-function executeWithCache(cacheType, key, processor, ttl = 300000) { // 5分TTL
-  const cache = processingCache[cacheType];
-  if (!cache) {
-    console.warn(`⚠️ 無効なキャッシュタイプ: ${cacheType}`);
-    return processor();
-  }
-  
-  // キャッシュヒット確認
-  const cached = cache.get(key);
-  if (cached && (Date.now() - cached.timestamp) < ttl) {
-    console.log(`🎯 キャッシュヒット: ${cacheType}[${key}]`);
-    return cached.result;
-  }
-  
-  // 処理実行とキャッシュ保存
-  console.log(`🔄 処理実行: ${cacheType}[${key}]`);
-  const result = processor();
-  cache.set(key, {
-    result: result,
-    timestamp: Date.now()
-  });
-  
-  return result;
-}
+// 注意: processingCacheとexecuteWithCache関数は adminPanel-core.js.html で定義されています
 
 // =============================================================================
 // LOADSTATUS DEBOUNCE SYSTEM - Prevent Excessive API Calls
