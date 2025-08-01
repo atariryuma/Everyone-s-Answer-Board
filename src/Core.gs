@@ -5728,6 +5728,7 @@ function confirmUserRegistration() {
  * @param {string} targetSheetName - 詳細を取得するシート名（省略可能）
  * @returns {Object} 統合された初期データ
  */
+
 function getInitialData(requestUserId, targetSheetName) {
   debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName });
 

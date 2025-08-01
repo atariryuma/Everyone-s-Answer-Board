@@ -118,6 +118,28 @@ function validateStatus(status) {
     return false;
   }
   
+  // 🎯 キャッシュ機能付き検証実行
+  const statusKey = generateStatusCacheKey(status);
+  return executeWithCache('sheetHeaderValidation', statusKey, () => {
+    return performStatusValidation(status);
+  }, 60000); // 1分キャッシュ
+}
+
+// 🔧 status オブジェクトのキャッシュキー生成
+function generateStatusCacheKey(status) {
+  const keyParts = [
+    status.userInfo?.userId || 'unknown',
+    status.activeSheetName || 'no-sheet',
+    status.sheetDetails?.allHeaders?.length || 0,
+    status.config?.setupStatus || 'unknown'
+  ];
+  return keyParts.join('|');
+}
+
+// 🔧 実際のステータス検証処理（キャッシュ対象）
+function performStatusValidation(status) {
+  console.log('🔍 ステータス検証を実行中...');
+  
   // 必須プロパティの検証
   const validationErrors = [];
   

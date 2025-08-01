@@ -80,19 +80,230 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 }
 
 // =============================================================================
+// PROCESSING CACHE SYSTEM (重複処理防止)
+// =============================================================================
+
+// 🎯 処理結果キャッシュ（セッション中の重複実行を防止）
+const processingCache = {
+  sheetHeaderValidation: new Map(),
+  aiColumnDetection: new Map(), 
+  configNormalization: new Map(),
+  urlGeneration: new Map(),
+  
+  // キャッシュクリア
+  clear() {
+    this.sheetHeaderValidation.clear();
+    this.aiColumnDetection.clear();
+    this.configNormalization.clear();
+    this.urlGeneration.clear();
+    console.log('🗑️ ProcessingCache: 全キャッシュをクリア');
+  },
+  
+  // 特定キャッシュのクリア
+  clearType(type) {
+    if (this[type]) {
+      this[type].clear();
+      console.log(`🗑️ ProcessingCache: ${type}キャッシュをクリア`);
+    }
+  }
+};
+
+// 🔧 キャッシュ付き処理実行ヘルパー
+function executeWithCache(cacheType, key, processor, ttl = 300000) { // 5分TTL
+  const cache = processingCache[cacheType];
+  if (!cache) {
+    console.warn(`⚠️ 無効なキャッシュタイプ: ${cacheType}`);
+    return processor();
+  }
+  
+  // キャッシュヒット確認
+  const cached = cache.get(key);
+  if (cached && (Date.now() - cached.timestamp) < ttl) {
+    console.log(`🎯 キャッシュヒット: ${cacheType}[${key}]`);
+    return cached.result;
+  }
+  
+  // 処理実行とキャッシュ保存
+  console.log(`🔄 処理実行: ${cacheType}[${key}]`);
+  const result = processor();
+  cache.set(key, {
+    result: result,
+    timestamp: Date.now()
+  });
+  
+  return result;
+}
+
+// =============================================================================
+// LOADSTATUS DEBOUNCE SYSTEM - Prevent Excessive API Calls
+// =============================================================================
+
+// 🎯 LoadStatus デバウンス管理システム
+const loadStatusDebounce = {
+  timer: null,
+  pendingCall: null,
+  lastCallTime: 0,
+  minInterval: 1000,      // 最小呼び出し間隔（1秒）
+  debounceDelay: 300,     // デバウンス遅延（300ms）
+  
+  // 呼び出し統計
+  totalCalls: 0,
+  debouncedCalls: 0,
+  successfulCalls: 0,
+  
+  // 現在の状態
+  isProcessing: false,
+  lastResult: null,
+  lastResultTime: 0
+};
+
+/**
+ * デバウンス機能付きloadStatusラッパー
+ * @param {boolean} bypassCache - キャッシュバイパスフラグ
+ * @param {boolean} forceImmediate - 即座実行フラグ
+ * @returns {Promise} loadStatusの結果
+ */
+function debouncedLoadStatus(bypassCache = false, forceImmediate = false) {
+  loadStatusDebounce.totalCalls++;
+  
+  console.log(`📞 debouncedLoadStatus called (${loadStatusDebounce.totalCalls}回目)`);
+  
+  // 既に処理中の場合は現在の処理を待つ
+  if (loadStatusDebounce.isProcessing && !forceImmediate) {
+    console.log('⏳ loadStatus処理中のため既存の処理を待機');
+    return loadStatusDebounce.pendingCall || Promise.resolve(loadStatusDebounce.lastResult);
+  }
+  
+  // 最小間隔チェック
+  const now = Date.now();
+  const timeSinceLastCall = now - loadStatusDebounce.lastCallTime;
+  
+  if (timeSinceLastCall < loadStatusDebounce.minInterval && !forceImmediate) {
+    console.log(`⚡ 最小間隔制限 (${timeSinceLastCall}ms < ${loadStatusDebounce.minInterval}ms)`);
+    loadStatusDebounce.debouncedCalls++;
+    
+    // 既存のタイマーをクリア
+    if (loadStatusDebounce.timer) {
+      clearTimeout(loadStatusDebounce.timer);
+    }
+    
+    // デバウンスタイマーを設定
+    return new Promise((resolve, reject) => {
+      loadStatusDebounce.timer = setTimeout(() => {
+        console.log('🚀 デバウンス遅延後にloadStatus実行');
+        executeLoadStatus(bypassCache)
+          .then(resolve)
+          .catch(reject);
+      }, loadStatusDebounce.debounceDelay);
+    });
+  }
+  
+  // 即座実行または間隔OK
+  return executeLoadStatus(bypassCache, forceImmediate);
+}
+
+/**
+ * 実際のloadStatus実行
+ * @param {boolean} bypassCache - キャッシュバイパスフラグ
+ * @param {boolean} isForced - 強制実行フラグ
+ * @returns {Promise} loadStatusの結果
+ */
+function executeLoadStatus(bypassCache = false, isForced = false) {
+  console.log(`🎯 executeLoadStatus開始 (bypassCache: ${bypassCache}, forced: ${isForced})`);
+  
+  loadStatusDebounce.isProcessing = true;
+  loadStatusDebounce.lastCallTime = Date.now();
+  
+  // 現在の処理をpendingCallに設定
+  loadStatusDebounce.pendingCall = loadStatusCore(bypassCache)
+    .then(result => {
+      console.log('✅ loadStatus成功');
+      loadStatusDebounce.successfulCalls++;
+      loadStatusDebounce.lastResult = result;
+      loadStatusDebounce.lastResultTime = Date.now();
+      return result;
+    })
+    .catch(error => {
+      console.error('❌ loadStatus失敗:', error);
+      throw error;
+    })
+    .finally(() => {
+      loadStatusDebounce.isProcessing = false;
+      loadStatusDebounce.pendingCall = null;
+      
+      // 統計をログ出力
+      console.log('📊 LoadStatus統計:', {
+        total: loadStatusDebounce.totalCalls,
+        debounced: loadStatusDebounce.debouncedCalls,
+        successful: loadStatusDebounce.successfulCalls,
+        efficiency: `${Math.round((loadStatusDebounce.debouncedCalls / loadStatusDebounce.totalCalls) * 100)}%節約`
+      });
+    });
+  
+  return loadStatusDebounce.pendingCall;
+}
+
+/**
+ * デバウンス統計をリセット
+ */
+function resetLoadStatusStats() {
+  loadStatusDebounce.totalCalls = 0;
+  loadStatusDebounce.debouncedCalls = 0;
+  loadStatusDebounce.successfulCalls = 0;
+  console.log('📊 LoadStatus統計をリセット');
+}
+
+/**
+ * 緊急時のloadStatus強制実行
+ * @param {boolean} bypassCache - キャッシュバイパスフラグ
+ * @returns {Promise} loadStatusの結果
+ */
+function forceLoadStatus(bypassCache = false) {
+  console.log('🚨 loadStatus強制実行');
+  
+  // 既存のタイマーをクリア
+  if (loadStatusDebounce.timer) {
+    clearTimeout(loadStatusDebounce.timer);
+    loadStatusDebounce.timer = null;
+  }
+  
+  return debouncedLoadStatus(bypassCache, true);
+}
+
+// =============================================================================
 // STATUS AND DATA LOADING
 // =============================================================================
 
-// Load system status - OPTIMIZED with integrated API
+
+/**
+ * 新しいデバウンス機能付きloadStatus（公開API）
+ * @param {boolean} bypassCache - キャッシュバイパスフラグ
+ * @returns {Promise} loadStatusの結果
+ */
 function loadStatus(bypassCache = false) {
-  console.group('🔄 loadStatus - Integrated API');
+  console.log('🎯 loadStatus呼び出し - デバウンス機能付き');
+  return debouncedLoadStatus(bypassCache);
+}
+
+/**
+ * 元のloadStatus実装（デバウンスシステム内部で使用）
+ * @param {boolean} bypassCache - キャッシュバイパスフラグ
+ * @returns {Promise} loadStatusの結果
+ */
+function loadStatusCore(bypassCache = false) {
+  console.group('🔄 loadStatusCore - Integrated API');
   logDebug('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
   logDebug('📞 About to call runGasWithUserId for getInitialData');
+
+  // 🎯 グローバルローディングオーバーレイ開始
+  const operationId = 'loadStatus_' + Date.now();
+  showGlobalLoading(operationId, 'データベースからシステム情報を読み込み中...', { showProgress: true });
 
   // userIdPromise が解決されるのを待ってから getInitialData を呼び出す
   return userIdPromise.then(() => {
     if (!userId) {
       console.error('❌ userId is not available after userIdPromise resolution in loadStatus!');
+      hideGlobalLoading(operationId);
       showMessage('ユーザーIDが取得できません。ページを再読み込みしてください。', 'error');
       console.groupEnd();
       return Promise.reject(new Error('userId is not available'));
@@ -100,12 +311,18 @@ function loadStatus(bypassCache = false) {
 
     logDebug('✅ userId is available:', userId);
     logDebug('🌐 Calling getInitialData with userId:', userId);
+    
+    // ローディングメッセージ更新
+    updateLoadingMessage('データベースから設定情報を取得中...');
 
     // runGasWithUserId を使用して getInitialData を呼び出す
     // 最新のステータスを取得するため追加の引数は不要
-    return runGasWithUserId('getInitialData', 'システム情報を読み込み中...')
+    return runGasWithUserId('getInitialData', false) // グローバルローディングを使うので、個別ローディングは無効
       .then(response => {
         logDebug('✅ Integrated data loaded:', response);
+        
+        // ローディングメッセージ更新
+        updateLoadingMessage('UIにデータを反映中...');
 
         // Update UI with integrated response
         updateUIWithNewStatus(response);
@@ -113,6 +330,7 @@ function loadStatus(bypassCache = false) {
         // If sheet details are included, apply them immediately
         if (response.sheetDetails && response.activeSheetName) {
           logDebug('✅ Sheet details included in integrated response, applying configuration');
+          updateLoadingMessage('シート設定を適用中...');
           try {
             populateHeaderOptions(response.sheetDetails.allHeaders);
             logDebug('✅ Header options populated from integrated data');
@@ -124,10 +342,15 @@ function loadStatus(bypassCache = false) {
         }
 
         logInfo('⚡ Performance: Single API call replaced 3-4 separate calls');
+        
+        // 🎯 グローバルローディング完了
+        hideGlobalLoading(operationId, 'データの読み込みが完了しました');
+        
         return response; // Promiseチェーンを維持するためレスポンスを返す
       })
       .catch(error => {
         console.error('❌ Integrated API failed:', error);
+        hideGlobalLoading(operationId);
         showMessage('システムステータスの読み込みに失敗しました', 'error');
         throw error; // エラーを再スロー
       })
@@ -2490,7 +2713,7 @@ function executeStopAndQuickStart(quickstartBtn, quickstartText) {
         console.log('✅ 公開停止が完了しました:', stopResult);
         showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
         
-        // 🔧 公開停止後にstatusを更新して最新状態を反映（キャッシュバイパス）
+        // 🔧 公開停止後のstatus更新
         await loadStatus(true);
         
         // 公開停止が完了したら、少し遅延してからクイックスタートを実行
@@ -2568,8 +2791,8 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         
         showMessage(`✅ クイックスタートが完了しました！${detailMessage}`, 'success');
         
-        // 🔧 新しいWebAppURLを反映するためstatusを更新（キャッシュバイパス）
-        console.log('🔄 QuickStart完了後のstatus更新を開始（ドメイン変更対応）');
+        // 🔧 QuickStart完了後のstatus更新
+        console.log('🔄 QuickStart完了後のstatus更新を開始');
         await loadStatus(true);
         
         // Update progress step with auto-publish status

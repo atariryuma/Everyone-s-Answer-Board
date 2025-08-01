@@ -110,6 +110,7 @@ function computeWebAppUrl() {
   }
 }
 
+
 function getWebAppUrlCached() {
   try {
     // 統合キャッシュマネージャーを使用したURL管理（最適化版）

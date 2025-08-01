@@ -1,10 +1,250 @@
 <script>
 let lastSelectedSheetName = null; // To prevent redundant sheet selection change events
 
+// =============================================================================
+// UI UPDATE BATCHING SYSTEM - Prevent Duplicate DOM Operations
+// =============================================================================
+
 // UI Update Mutex to prevent race conditions
 let isUIUpdateInProgress = false;
 let pendingUIUpdate = null;
 
+// 🎯 UI更新バッチングシステム
+const uiUpdateBatching = {
+  pendingUpdates: new Map(),
+  batchTimer: null,
+  lastBatchTime: 0,
+  batchInterval: 100, // 100ms batching window
+  
+  // バッチング状態の管理
+  completedOperations: new Set(),
+  
+  // DOM操作の結果キャッシュ
+  domCache: new Map(),
+  
+  // 最後の更新内容
+  lastUpdateData: null
+};
+
+/**
+ * UI更新をバッチ処理でスケジュール
+ * @param {Object} status - ステータスデータ
+ * @param {string} updateType - 更新タイプ
+ */
+function scheduleUIUpdate(status, updateType = 'full') {
+  const updateId = `${updateType}_${Date.now()}`;
+  
+  // 同じタイプの更新が既にペンディング中の場合は置き換え
+  for (const [id, data] of uiUpdateBatching.pendingUpdates) {
+    if (data.type === updateType) {
+      uiUpdateBatching.pendingUpdates.delete(id);
+      console.log(`🔄 UI更新を統合: ${updateType}`);
+    }
+  }
+  
+  uiUpdateBatching.pendingUpdates.set(updateId, {
+    status,
+    type: updateType,
+    timestamp: Date.now()
+  });
+  
+  // バッチタイマーを設定
+  if (uiUpdateBatching.batchTimer) {
+    clearTimeout(uiUpdateBatching.batchTimer);
+  }
+  
+  uiUpdateBatching.batchTimer = setTimeout(() => {
+    executeBatchedUIUpdates();
+  }, uiUpdateBatching.batchInterval);
+  
+  console.log(`📋 UI更新をスケジュール: ${updateType} (ペンディング: ${uiUpdateBatching.pendingUpdates.size})`);
+}
+
+/**
+ * バッチ化されたUI更新を実行
+ */
+function executeBatchedUIUpdates() {
+  if (uiUpdateBatching.pendingUpdates.size === 0) return;
+  
+  console.log(`🚀 バッチUI更新開始 (${uiUpdateBatching.pendingUpdates.size}件の更新を統合)`);
+  
+  // 最新のステータスデータを取得
+  let latestStatus = null;
+  let latestTimestamp = 0;
+  
+  for (const [id, data] of uiUpdateBatching.pendingUpdates) {
+    if (data.timestamp > latestTimestamp) {
+      latestStatus = data.status;
+      latestTimestamp = data.timestamp;
+    }
+  }
+  
+  if (!latestStatus) {
+    console.warn('⚠️ バッチ更新: 有効なステータスデータが見つかりません');
+    uiUpdateBatching.pendingUpdates.clear();
+    return;
+  }
+  
+  // 重複チェック: 前回と同じデータの場合はスキップ
+  const statusHash = generateStatusHash(latestStatus);
+  if (uiUpdateBatching.lastUpdateData === statusHash) {
+    console.log('🎯 バッチ更新: 前回と同じデータのためスキップ');
+    uiUpdateBatching.pendingUpdates.clear();
+    return;
+  }
+  
+  // 実際のUI更新を実行
+  performOptimizedUIUpdate(latestStatus);
+  
+  // 状態をクリア
+  uiUpdateBatching.pendingUpdates.clear();
+  uiUpdateBatching.lastUpdateData = statusHash;
+  uiUpdateBatching.lastBatchTime = Date.now();
+  
+  console.log('✅ バッチUI更新完了');
+}
+
+/**
+ * ステータスデータのハッシュ生成（重複検出用）
+ * @param {Object} status - ステータスデータ
+ * @returns {string} ハッシュ値
+ */
+function generateStatusHash(status) {
+  const keyData = {
+    setupStep: status.setupStep,
+    setupStatus: status.userInfo?.configJson ? JSON.parse(status.userInfo.configJson).setupStatus : null,
+    activeSheet: status.activeSheetName,
+    appPublished: status.config?.appPublished,
+    hasSheetDetails: !!status.sheetDetails
+  };
+  return JSON.stringify(keyData);
+}
+
+/**
+ * 最適化されたUI更新実行
+ * @param {Object} status - ステータスデータ
+ */
+function performOptimizedUIUpdate(status) {
+  console.log('🔧 最適化UI更新開始');
+  
+  // DOM操作を最小限に抑制する最適化された更新
+  const updateOperations = new Map();
+  
+  // 1. データ準備（1回のみ）
+  const preparedStatus = prepareStatusData(status);
+  
+  // 2. DOM更新操作をバッチ化
+  updateOperations.set('static', () => updateStaticUIOptimized(preparedStatus));
+  updateOperations.set('dynamic', () => updateDynamicContentOptimized(preparedStatus));
+  updateOperations.set('footer', () => updateFooterAndGuidanceOptimized(preparedStatus));
+  updateOperations.set('indicators', () => updateStepIndicatorsOptimized(preparedStatus));
+  
+  // 3. DOM操作を効率的に実行
+  requestAnimationFrame(() => {
+    for (const [operationType, operation] of updateOperations) {
+      try {
+        // 重複実行チェック
+        const operationKey = `${operationType}_${uiUpdateBatching.lastBatchTime}`;
+        if (!uiUpdateBatching.completedOperations.has(operationKey)) {
+          operation();
+          uiUpdateBatching.completedOperations.add(operationKey);
+        }
+      } catch (error) {
+        console.error(`❌ UI更新エラー (${operationType}):`, error);
+      }
+    }
+    
+    // 完了操作のクリーンアップ（メモリリーク防止）
+    setTimeout(() => {
+      uiUpdateBatching.completedOperations.clear();
+    }, 5000);
+  });
+}
+
+/**
+ * 最適化されたフッター・ガイダンス更新（重複実行防止）
+ * @param {Object} status - ステータスデータ
+ */
+function updateFooterAndGuidanceOptimized(status) {
+  const cacheKey = `footer_${status.setupStep}_${status.activeSheetName || 'none'}`;
+  
+  // DOM操作結果のキャッシュチェック
+  if (uiUpdateBatching.domCache.has(cacheKey)) {
+    console.log('🎯 フッター更新: DOMキャッシュヒット');
+    return;
+  }
+  
+  console.log('🦶 最適化フッター更新開始');
+  
+  const footer = document.getElementById('admin-footer');
+  const guidanceText = document.getElementById('guidance-text');
+  
+  if (!footer || !guidanceText) {
+    console.warn('❌ Footer or guidance elements not found');
+    return;
+  }
+  
+  // 実際のフッター更新ロジック（元の関数から）
+  updateFooterAndGuidance(status);
+  
+  // DOM操作結果をキャッシュ
+  uiUpdateBatching.domCache.set(cacheKey, true);
+  
+  // キャッシュのTTLを設定（10秒）
+  setTimeout(() => {
+    uiUpdateBatching.domCache.delete(cacheKey);
+  }, 10000);
+  
+  console.log('✅ 最適化フッター更新完了');
+}
+
+/**
+ * 最適化された静的UI更新
+ * @param {Object} status - ステータスデータ
+ */
+function updateStaticUIOptimized(status) {
+  console.log('🎨 最適化静的UI更新開始');
+  
+  // 既存の静的UI更新ロジックを使用
+  clearInitialDisplayElements();
+  updateStaticUI(status);
+  
+  const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
+  if (setupStatus === 'pending') {
+    updateButtonStatesForSetup(status);
+  }
+  
+  console.log('✅ 最適化静的UI更新完了');
+}
+
+/**
+ * 最適化された動的コンテンツ更新
+ * @param {Object} status - ステータスデータ
+ */
+function updateDynamicContentOptimized(status) {
+  console.log('🔧 最適化動的コンテンツ更新開始');
+  
+  if (status.activeSheetName) {
+    updateDynamicContent(status);
+  } else {
+    updateUIForNoActiveSheet(status);
+  }
+  
+  console.log('✅ 最適化動的コンテンツ更新完了');
+}
+
+/**
+ * 最適化されたステップインジケーター更新
+ * @param {Object} status - ステータスデータ
+ */
+function updateStepIndicatorsOptimized(status) {
+  console.log('📊 最適化ステップインジケーター更新開始');
+  
+  const currentStep = status?.setupStep || 1;
+  updateStepIndicators(currentStep, status);
+  
+  console.log('✅ 最適化ステップインジケーター更新完了');
+}
 
 // =============================================================================
 // ADMIN PANEL UI UPDATES & DISPLAY CONTROL
@@ -90,58 +330,62 @@ function getPublicationState(status) {
 
 // Generate viewUrl with comprehensive fallback logic
 function generateViewUrl(status, userId) {
-  // 🔧 動的ドメイン変更対応: 最新のWebAppURLを優先使用
-  console.log('🔍 generateViewUrl: URL生成開始', {
-    hasViewUrl: !!status.appUrls?.viewUrl,
-    hasWebApp: !!status.appUrls?.webApp,
-    hasWebAppUrl: !!status.webAppUrl,
-    webAppDomain: status.appUrls?.webApp ? new URL(status.appUrls.webApp).host : 'none',
-    webAppUrlDomain: status.webAppUrl ? new URL(status.webAppUrl).host : 'none'
-  });
-  
-  // 1. 最新のwebAppUrlを最優先（ドメイン変更に対応）
-  if (status.webAppUrl && userId) {
-    const generatedUrl = status.webAppUrl + '?mode=view&userId=' + encodeURIComponent(userId);
-    console.log('🎯 webAppUrlから生成:', generatedUrl);
-    return generatedUrl;
-  }
-  
-  // 2. appUrls.webAppを次に優先
-  if (status.appUrls?.webApp && userId) {
-    const generatedUrl = status.appUrls.webApp + '?mode=view&userId=' + encodeURIComponent(userId);
-    console.log('🎯 appUrls.webAppから生成:', generatedUrl);
-    return generatedUrl;
-  }
-  
-  // 3. 既存のviewUrlは最後の選択肢（古い可能性があるため）
-  if (status.appUrls?.viewUrl) {
-    console.log('⚠️ 既存viewUrlを使用（要確認）:', status.appUrls.viewUrl);
-    return status.appUrls.viewUrl;
-  }
-  
-  // 4. UserIdなしのフォールバック
-  if (status.webAppUrl) {
-    const fallbackUrl = status.webAppUrl + '?mode=view';
-    console.log('🔄 UserIdなしフォールバック:', fallbackUrl);
-    return fallbackUrl;
-  }
-  
-  if (status.appUrls?.webApp) {
-    const fallbackUrl = status.appUrls.webApp + '?mode=view';
-    console.log('🔄 appUrls.webAppフォールバック:', fallbackUrl);
-    return fallbackUrl;
-  }
-  
-  console.warn('❌ ViewURL生成失敗: 有効なWebAppURLが見つかりません');
-  return null;
+  // 🎯 URL生成キャッシュを使用（再生成の回避）
+  const cacheKey = generateUrlCacheKey(status, userId);
+  return executeWithCache('urlGeneration', cacheKey, () => {
+    console.log('🔗 generateViewUrl: URL生成開始');
+    
+    // シンプルなクエリパラメータ追加のみ
+    const baseUrl = status.webAppUrl || status.appUrls?.webApp;
+    
+    if (!baseUrl) {
+      console.warn('❌ WebAppURLが見つかりません');
+      return null;
+    }
+    
+    if (!userId) {
+      return baseUrl + '?mode=view';
+    }
+    
+    return baseUrl + '?mode=view&userId=' + encodeURIComponent(userId);
+  }, 600000); // 10分キャッシュ
+}
+
+/**
+ * URL生成用のキャッシュキー生成
+ * @param {Object} status - ステータスオブジェクト
+ * @param {string} userId - ユーザーID
+ * @returns {string} キャッシュキー
+ */
+function generateUrlCacheKey(status, userId) {
+  const keyParts = [
+    userId || 'none',
+    status?.webAppUrl || status?.appUrls?.webApp || 'no-base-url'
+  ];
+  return keyParts.join('|');
 }
 
 // =============================================================================
 // MAIN UI UPDATE FUNCTIONS
 // =============================================================================
 
-// Update UI with new status data
+// Update UI with new status data - 最適化バッチング版
 function updateUIWithNewStatus(status) {
+  if (!validateStatus(status)) {
+    logWarn('Invalid status received, skipping UI update');
+    return;
+  }
+
+  // 🎯 新しいUI更新バッチングシステムを使用
+  console.log('📋 UI更新をバッチングシステムでスケジュール');
+  scheduleUIUpdate(status, 'full');
+  
+  // currentStatusを更新（他の関数で参照される）
+  currentStatus = status;
+}
+
+// レガシー関数（互換性のため保持）
+function updateUIWithNewStatusLegacy(status) {
   if (!validateStatus(status)) {
     logWarn('Invalid status received, skipping UI update');
     return;
@@ -2585,45 +2829,56 @@ function normalizeConfigJson(config, userInfo) {
     return config;
   }
   
-  // 正規化キャッシュチェック（重複処理回避）
-  const configHash = JSON.stringify(config);
-  if (config._normalizedHash === configHash) {
-    console.log('🎯 正規化キャッシュヒット - 処理をスキップ');
-    return config;
-  }
-  
-  console.log('🔧 configJson正規化開始:', {
-    setupStatus: config.setupStatus,
-    setupStep: config.setupStep,
-    appPublished: config.appPublished,
-    publishedSheetName: config.publishedSheetName
-  });
-  
-  // Step 1: publishedSheetName修復
-  config = fixPublishedSheetName(config);
-  
-  // Step 2: setupStep再計算（統一関数使用）
-  // Note: setupStepは計算プロパティとして常に動的に算出され、configJsonには保存されません
-  
-  // Step 3: グローバル列設定同期
-  config = syncGlobalColumnSettings(config);
-  
-  // Step 4: 必須フィールドの補完
-  config = ensureRequiredFields(config);
-  
-  // Step 5: 冗長フィールドの削除
-  config = removeRedundantFields(config);
-  
-  // 正規化キャッシュ設定（重複処理回避）
-  config._normalizedHash = JSON.stringify(config);
-  
-  console.log('✅ configJson正規化完了:', {
-    setupStatus: config.setupStatus,
-    appPublished: config.appPublished,
-    publishedSheetName: config.publishedSheetName
-  });
-  
-  return config;
+  // 🎯 統合処理キャッシュシステムを使用（重複処理の回避）
+  const cacheKey = generateConfigCacheKey(config, userInfo);
+  return executeWithCache('configNormalization', cacheKey, () => {
+    console.log('🔧 configJson正規化開始:', {
+      setupStatus: config.setupStatus,
+      setupStep: config.setupStep,
+      appPublished: config.appPublished,
+      publishedSheetName: config.publishedSheetName
+    });
+    
+    // Step 1: publishedSheetName修復
+    let normalizedConfig = fixPublishedSheetName(config);
+    
+    // Step 2: setupStep再計算（統一関数使用）
+    // Note: setupStepは計算プロパティとして常に動的に算出され、configJsonには保存されません
+    
+    // Step 3: グローバル列設定同期
+    normalizedConfig = syncGlobalColumnSettings(normalizedConfig);
+    
+    // Step 4: 必須フィールドの補完
+    normalizedConfig = ensureRequiredFields(normalizedConfig);
+    
+    // Step 5: 冗長フィールドの削除
+    normalizedConfig = removeRedundantFields(normalizedConfig);
+    
+    console.log('✅ configJson正規化完了:', {
+      setupStatus: normalizedConfig.setupStatus,
+      appPublished: normalizedConfig.appPublished,
+      publishedSheetName: normalizedConfig.publishedSheetName
+    });
+    
+    return normalizedConfig;
+  }, 300000); // 5分キャッシュ
+}
+
+/**
+ * Config正規化用のキャッシュキー生成
+ * @param {Object} config - 設定オブジェクト
+ * @param {Object} userInfo - ユーザー情報
+ * @returns {string} キャッシュキー
+ */
+function generateConfigCacheKey(config, userInfo) {
+  const keyParts = [
+    userInfo?.userId || 'unknown',
+    config?.setupStatus || 'unknown',
+    config?.appPublished || false,
+    config?.publishedSheetName || 'none',
+    config?.lastModified || '0'
+  ];
+  return keyParts.join('|');
 }
 
 /**
