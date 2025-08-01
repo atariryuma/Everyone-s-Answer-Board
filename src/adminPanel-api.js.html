@@ -109,8 +109,32 @@ function loadStatus(bypassCache = false) {
       .then(response => {
         logDebug('✅ Integrated data loaded:', response);
 
+        // 🚨 緊急診断: updateUIWithNewStatus関数の存在確認と実行
+        console.log('🔍 緊急診断: updateUIWithNewStatus関数の状態確認');
+        console.log('🔍 typeof updateUIWithNewStatus:', typeof updateUIWithNewStatus);
+        console.log('🔍 updateUIWithNewStatus:', updateUIWithNewStatus);
+        console.log('🔍 response構造:', {
+          hasUserInfo: !!(response && response.userInfo),
+          hasConfig: !!(response && response.config),
+          responseKeys: response ? Object.keys(response) : []
+        });
+
         // Update UI with integrated response
-        updateUIWithNewStatus(response);
+        try {
+          if (typeof updateUIWithNewStatus === 'function') {
+            console.log('✅ updateUIWithNewStatus関数が存在、実行します');
+            updateUIWithNewStatus(response);
+            console.log('✅ updateUIWithNewStatus実行完了');
+          } else {
+            console.error('❌ updateUIWithNewStatus関数が未定義、フォールバック処理実行');
+            // フォールバック: 直接データベース情報を更新
+            emergencyUpdateDatabaseInfo(response);
+          }
+        } catch (updateError) {
+          console.error('❌ updateUIWithNewStatus実行エラー:', updateError);
+          // フォールバック: 直接データベース情報を更新
+          emergencyUpdateDatabaseInfo(response);
+        }
 
         // If sheet details are included, apply them immediately
         if (response.sheetDetails && response.activeSheetName) {
@@ -142,6 +166,63 @@ function loadStatus(bypassCache = false) {
     console.groupEnd();
     throw error; // エラーを再スロー
   });
+}
+
+// 🚨 緊急フォールバック: 直接データベース情報更新
+function emergencyUpdateDatabaseInfo(response) {
+  console.log('🚨 emergencyUpdateDatabaseInfo: 開始');
+  
+  try {
+    if (!response || !response.userInfo) {
+      console.error('❌ emergencyUpdateDatabaseInfo: response.userInfoがありません');
+      return;
+    }
+    
+    // 直接DOM要素を更新
+    const updateElement = (id, value) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = value || '-';
+        console.log(`✅ ${id} = "${value}"`);
+      } else {
+        console.error(`❌ 要素が見つかりません: ${id}`);
+      }
+    };
+    
+    // 基本情報の更新
+    updateElement('info-admin-email', response.userInfo.adminEmail);
+    updateElement('info-user-id', response.userInfo.userId);
+    updateElement('info-answer-count', response.answerCount || '0');
+    
+    // 公開シート名の更新
+    const publishedSheetName = (response.config && response.config.publishedSheetName) || 
+                              response.publishedSheetName || 'なし';
+    updateElement('info-published-sheet', publishedSheetName);
+    
+    // 作成日と最終アクセス日
+    if (response.userInfo.createdAt) {
+      const createdAt = new Date(response.userInfo.createdAt).toLocaleDateString('ja-JP');
+      updateElement('info-created-at', createdAt);
+    }
+    
+    if (response.userInfo.lastAccessedAt) {
+      const lastAccessed = new Date(response.userInfo.lastAccessedAt).toLocaleDateString('ja-JP');
+      updateElement('info-last-access', lastAccessed);
+    }
+    
+    // 表示モード
+    const displayMode = (response.config && response.config.showNames) ? '名前表示' : '匿名表示';
+    updateElement('info-display-mode', displayMode);
+    
+    // カウント表示
+    const showCounts = (response.config && response.config.showCounts) ? '表示' : '非表示';
+    updateElement('info-show-counts', showCounts);
+    
+    console.log('✅ emergencyUpdateDatabaseInfo: 完了');
+    
+  } catch (error) {
+    console.error('❌ emergencyUpdateDatabaseInfo: エラー:', error);
+  }
 }
 
 // Load sheet configuration for selected sheet

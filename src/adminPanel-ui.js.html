@@ -1,9 +1,31 @@
 <script>
+// 🔍 スクリプト読み込み確認
+console.log('📄 adminPanel-ui.js.html: スクリプト読み込み開始');
+console.log('📄 DOMContentLoaded状態:', document.readyState);
+console.log('📄 現在時刻:', new Date().toISOString());
+
 let lastSelectedSheetName = null; // To prevent redundant sheet selection change events
 
 // UI Update Mutex to prevent race conditions
 let isUIUpdateInProgress = false;
 let pendingUIUpdate = null;
+
+// スクリプト読み込み完了の確認
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ adminPanel-ui.js.html: DOMContentLoaded完了');
+    console.log('✅ updateUIWithNewStatus関数定義状況:', typeof updateUIWithNewStatus);
+  });
+} else {
+  console.log('✅ adminPanel-ui.js.html: DOM既に読み込み済み');
+  console.log('✅ updateUIWithNewStatus関数定義状況:', typeof updateUIWithNewStatus);
+}
+
+// ページ読み込み完了の確認
+window.addEventListener('load', function() {
+  console.log('✅ adminPanel-ui.js.html: ページ読み込み完了');
+  console.log('✅ 全スクリプト読み込み後のupdateUIWithNewStatus:', typeof updateUIWithNewStatus);
+});
 
 
 // =============================================================================
