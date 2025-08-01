@@ -1557,13 +1557,8 @@ function getAppConfig(requestUserId) {
     var answerCount = 0;
     var totalReactions = 0;
     try {
-      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
-        if (responseData.status === 'success') {
-          answerCount = responseData.data.length;
-          totalReactions = answerCount * 2; // 暫定値
-        }
-      }
+      answerCount = getAnswerCountFromSheet(configJson, userInfo);
+      totalReactions = answerCount * 2; // 暫定値
       debugLog('getAppConfig: answerCount:', answerCount);
       debugLog('getAppConfig: totalReactions:', totalReactions);
     } catch (countError) {
@@ -1910,13 +1905,7 @@ function getActiveFormInfo(requestUserId) {
     // フォーム回答数を取得
     var answerCount = 0;
     try {
-      // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
-      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
-        if (responseData.status === 'success') {
-          answerCount = responseData.data.length;
-        }
-      }
+      answerCount = getAnswerCountFromSheet(configJson, userInfo);
     } catch (countError) {
       warnLog('回答数の取得に失敗: ' + countError.message);
     }
@@ -5934,16 +5923,14 @@ function getInitialData(requestUserId, targetSheetName) {
     var answerCount = 0;
     var totalReactions = 0;
     try {
-      // 統一ConfigJSONスキーマ対応: userInfo.spreadsheetIdを使用
-      if (userInfo.spreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
-        if (responseData.status === 'success') {
-          answerCount = responseData.data.length;
-          totalReactions = answerCount * 2; // 暫定値
-        }
-      }
+      // 統一ConfigJSONスキーマ対応: getAnswerCountFromSheet関数を使用
+      answerCount = getAnswerCountFromSheet(configJson, userInfo);
+      totalReactions = answerCount * 2; // 暫定値
+      debugLog('✅ 回答数取得完了:', { answerCount: answerCount, totalReactions: totalReactions });
     } catch (err) {
       warnLog('Answer count retrieval failed:', err.message);
+      answerCount = 0;
+      totalReactions = 0;
     }
 
     // === ステップ5: セットアップステップの決定 ===
