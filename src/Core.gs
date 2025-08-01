@@ -329,6 +329,15 @@ function validateConfigJsonState(configJson, userInfo, flowType) {
       errors: [],
       warnings: ['カスタムフロー設定同期のためvalidationを緩和しました']
     };
+  } else if (flowType === 'quickstart' &&
+             configJson.setupStatus === 'completed' &&
+             configJson.appPublished === true &&
+             configJson.formCreated === true) {
+    return {
+      isValid: true,
+      errors: [],
+      warnings: ['QuickStartフロー設定同期のためvalidationを緩和しました']
+    };
   }
   
   if (appPublished || isQuickStartCompleted || isCustomSetupCompleted) {
