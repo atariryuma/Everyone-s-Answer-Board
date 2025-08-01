@@ -1758,7 +1758,20 @@ function setActiveSheet(requestUserId, sheetName) {
 
     // アクティブシートを設定
     configJson.publishedSheetName = sheetName.trim();
+    configJson.publishedSpreadsheetId = userInfo.spreadsheetId;
+    
+    // 🔧 CustomSetup完了時の重要なステータス更新
+    configJson.setupStatus = 'completed';
+    configJson.appPublished = true;
+    configJson.formCreated = true;
     configJson.lastModified = new Date().toISOString();
+    
+    debugLog('🔧 setActiveSheet: 完了ステータス更新', {
+      setupStatus: configJson.setupStatus,
+      appPublished: configJson.appPublished,
+      publishedSheetName: configJson.publishedSheetName,
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId
+    });
 
     // シート設定キーを生成
     const sheetConfigKey = 'sheet_' + sheetName.trim();
@@ -1783,6 +1796,9 @@ function setActiveSheet(requestUserId, sheetName) {
       success: true,
       message: `シート「${sheetName}」をアクティブに設定しました`,
       activeSheetName: sheetName,
+      setupStatus: configJson.setupStatus,
+      appPublished: configJson.appPublished,
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId,
       timestamp: new Date().toISOString()
     };
 

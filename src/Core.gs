@@ -1716,10 +1716,21 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
 
     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
     infoLog('✅ シート設定を保存しました: %s', sheetKey);
-    return { status: 'success', message: 'シート設定を保存しました。' };
+    return { 
+      success: true, 
+      status: 'success', 
+      message: 'シート設定を保存しました。',
+      sheetKey: sheetKey,
+      savedConfig: config
+    };
   } catch (e) {
     logDatabaseError(e, 'saveSheetSettings', { userId });
-    return { status: 'error', message: 'シート設定の保存に失敗しました: ' + e.message };
+    return { 
+      success: false,
+      status: 'error', 
+      message: 'シート設定の保存に失敗しました: ' + e.message,
+      error: e.message
+    };
   }
 }
 

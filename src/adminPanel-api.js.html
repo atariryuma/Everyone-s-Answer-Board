@@ -1519,6 +1519,27 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
     const synchronizationIssues = [];
     const appliedFixes = [];
     
+    // 🎯 事前チェック: 設定が既に正しい場合はスキップ
+    const isAlreadyConfigured = (
+      configJson.setupStatus === 'completed' &&
+      configJson.appPublished === true &&
+      configJson.formCreated === true &&
+      configJson.publishedSheetName === expectedState.sheetName &&
+      configJson.publishedSpreadsheetId === (expectedState.spreadsheetId || currentStatus.userInfo.spreadsheetId)
+    );
+    
+    if (isAlreadyConfigured) {
+      console.log(`🎯 ${flowType}フロー: 設定は既に正しく構成されています - 同期をスキップ`);
+      return {
+        success: true,
+        synchronized: false,
+        appliedFixes: [],
+        message: `${flowType}フローの設定は既に完了しています`
+      };
+    }
+    
+    console.log(`🔍 ${flowType}フロー: 設定不整合を検出 - 詳細チェックを実行`);
+    
     // 1. 必須設定状態の確認と修正
     const requiredStates = {
       setupStatus: 'completed',
@@ -2465,9 +2486,12 @@ function executeStopAndQuickStart(quickstartBtn, quickstartText) {
     showMessage('現在の回答ボードを停止しています...', 'info');
     
     unpublishBoard()
-      .then(function(stopResult) {
+      .then(async function(stopResult) {
         console.log('✅ 公開停止が完了しました:', stopResult);
         showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
+        
+        // 🔧 公開停止後にstatusを更新して最新状態を反映（キャッシュバイパス）
+        await loadStatus(true);
         
         // 公開停止が完了したら、少し遅延してからクイックスタートを実行
         setTimeout(() => {
@@ -2543,6 +2567,10 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         }
         
         showMessage(`✅ クイックスタートが完了しました！${detailMessage}`, 'success');
+        
+        // 🔧 新しいWebAppURLを反映するためstatusを更新（キャッシュバイパス）
+        console.log('🔄 QuickStart完了後のstatus更新を開始（ドメイン変更対応）');
+        await loadStatus(true);
         
         // Update progress step with auto-publish status
         if (result.autoPublished) {

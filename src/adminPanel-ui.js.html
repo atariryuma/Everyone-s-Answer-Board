@@ -90,28 +90,49 @@ function getPublicationState(status) {
 
 // Generate viewUrl with comprehensive fallback logic
 function generateViewUrl(status, userId) {
-  // 1. Use existing viewUrl if available
-  let viewUrl = status.appUrls?.viewUrl;
-  if (viewUrl) {
-    return viewUrl;
-  }
+  // 🔧 動的ドメイン変更対応: 最新のWebAppURLを優先使用
+  console.log('🔍 generateViewUrl: URL生成開始', {
+    hasViewUrl: !!status.appUrls?.viewUrl,
+    hasWebApp: !!status.appUrls?.webApp,
+    hasWebAppUrl: !!status.webAppUrl,
+    webAppDomain: status.appUrls?.webApp ? new URL(status.appUrls.webApp).host : 'none',
+    webAppUrlDomain: status.webAppUrl ? new URL(status.webAppUrl).host : 'none'
+  });
   
-  // 2. Generate from appUrls.webApp with userId
-  if (status.appUrls?.webApp && userId) {
-    return status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
-  }
-  
-  // 3. Generate from status.webAppUrl with userId
+  // 1. 最新のwebAppUrlを最優先（ドメイン変更に対応）
   if (status.webAppUrl && userId) {
-    return status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
+    const generatedUrl = status.webAppUrl + '?mode=view&userId=' + encodeURIComponent(userId);
+    console.log('🎯 webAppUrlから生成:', generatedUrl);
+    return generatedUrl;
   }
   
-  // 4. Simple fallback without userId
+  // 2. appUrls.webAppを次に優先
+  if (status.appUrls?.webApp && userId) {
+    const generatedUrl = status.appUrls.webApp + '?mode=view&userId=' + encodeURIComponent(userId);
+    console.log('🎯 appUrls.webAppから生成:', generatedUrl);
+    return generatedUrl;
+  }
+  
+  // 3. 既存のviewUrlは最後の選択肢（古い可能性があるため）
+  if (status.appUrls?.viewUrl) {
+    console.log('⚠️ 既存viewUrlを使用（要確認）:', status.appUrls.viewUrl);
+    return status.appUrls.viewUrl;
+  }
+  
+  // 4. UserIdなしのフォールバック
+  if (status.webAppUrl) {
+    const fallbackUrl = status.webAppUrl + '?mode=view';
+    console.log('🔄 UserIdなしフォールバック:', fallbackUrl);
+    return fallbackUrl;
+  }
+  
   if (status.appUrls?.webApp) {
-    return status.appUrls.webApp + '?mode=view';
+    const fallbackUrl = status.appUrls.webApp + '?mode=view';
+    console.log('🔄 appUrls.webAppフォールバック:', fallbackUrl);
+    return fallbackUrl;
   }
   
-  logWarn('Could not generate viewUrl');
+  console.warn('❌ ViewURL生成失敗: 有効なWebAppURLが見つかりません');
   return null;
 }
 
