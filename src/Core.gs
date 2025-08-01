@@ -1566,6 +1566,13 @@ function getAppConfig(requestUserId) {
     } catch (countError) {
       warnLog('回答数の取得に失敗: ' + countError.message);
     }
+    // 公開シート設定とヘッダー情報を取得
+    var publishedSheetName = configJson.publishedSheetName || '';
+    var sheetConfigKey = publishedSheetName ? 'sheet_' + publishedSheetName : '';
+    var activeSheetConfig = sheetConfigKey && configJson[sheetConfigKey]
+      ? configJson[sheetConfigKey]
+      : {};
+
     debugLog('getAppConfig: Before return statement'); // ★追加
 
     return {
@@ -1606,6 +1613,17 @@ function getAppConfig(requestUserId) {
         formCreated: configJson.formCreated || false,
         appPublished: configJson.appPublished || false,
         lastUpdated: new Date().toISOString()
+      },
+      config: {
+        publishedSheetName: configJson.publishedSheetName || '',
+        opinionHeader: activeSheetConfig.opinionHeader || '',
+        nameHeader: activeSheetConfig.nameHeader || '',
+        classHeader: activeSheetConfig.classHeader || '',
+        showNames: configJson.showNames || false,
+        showCounts: configJson.showCounts !== undefined ? configJson.showCounts : false,
+        displayMode: configJson.displayMode || 'anonymous',
+        setupStatus: configJson.setupStatus || 'initial',
+        isPublished: !!configJson.appPublished
       },
       setupStep: determineSetupStepUnified(userInfo, configJson)
     };

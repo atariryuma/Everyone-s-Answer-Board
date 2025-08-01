@@ -133,11 +133,22 @@ function validateStatus(status) {
     }
   }
   
-  // 設定情報の検証
+  // 設定情報の検証（改善されたエラーハンドリング）
   if (!status.config) {
-    validationErrors.push('設定情報が見つかりません');
     console.warn('⚠️ status.config が存在しません、空のオブジェクトで初期化します');
-    status.config = {};
+    status.config = {
+      publishedSheetName: '',
+      opinionHeader: '',
+      nameHeader: '',
+      classHeader: '',
+      showNames: false,
+      showCounts: false,
+      displayMode: 'anonymous',
+      setupStatus: 'initial',
+      isPublished: false
+    };
+    // 警告として記録するが、致命的エラーとしては扱わない
+    console.info('📋 status.config を既定値で初期化しました');
   }
   
   // appUrlsの検証
@@ -176,11 +187,21 @@ function validateStatus(status) {
     status.setupStep = 1; // デフォルト値
   }
   
-  // 検証エラーがある場合
-  if (validationErrors.length > 0) {
-    console.error('❌ レスポンス検証エラー:', validationErrors);
-    showMessage('データ検証エラー: ' + validationErrors.join(', '), 'error');
+  // 検証エラーがある場合（致命的エラーのみ処理を停止）
+  const criticalErrors = validationErrors.filter(error => 
+    !error.includes('設定情報が見つかりません') && 
+    !error.includes('オプショナル')
+  );
+  
+  if (criticalErrors.length > 0) {
+    console.error('❌ レスポンス検証エラー:', criticalErrors);
+    showMessage('データ検証エラー: ' + criticalErrors.join(', '), 'error');
     return false;
+  }
+  
+  // 警告レベルのエラーは表示するが処理は継続
+  if (validationErrors.length > 0) {
+    console.warn('⚠️ レスポンス検証警告:', validationErrors);
   }
   
   console.log('✅ レスポンス検証成功');
