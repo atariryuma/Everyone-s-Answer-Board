@@ -1304,7 +1304,7 @@ function openForm() {
   // 1. configJsonから直接取得（最も確実）
   if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
     try {
-      const configJson = getConfigJSON(currentStatus.userInfo);
+      const configJson = await runGasWithUserId('getConfigJSON', false, currentStatus.userInfo);
       
       if (configJson && configJson.formUrl) {
         formUrl = configJson.formUrl;
@@ -1470,7 +1470,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
       return { success: false, message: 'ステータス取得に失敗しました' };
     }
     
-    const configJson = getConfigJSON(completionStatus.userInfo);
+    const configJson = await runGasWithUserId('getConfigJSON', false, completionStatus.userInfo);
     const issues = [];
     
     // 必須完了状態の確認
@@ -1570,7 +1570,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       throw new Error('設定同期: ステータス取得失敗');
     }
     
-    const configJson = getConfigJSON(currentStatus.userInfo);
+    const configJson = await runGasWithUserId('getConfigJSON', false, currentStatus.userInfo);
     const synchronizationIssues = [];
     const appliedFixes = [];
     
