@@ -109,22 +109,10 @@ function loadStatus(bypassCache = false) {
       .then(response => {
         logDebug('✅ Integrated data loaded:', response);
 
-        // 🚨 緊急診断: updateUIWithNewStatus関数の存在確認と実行
-        console.log('🔍 緊急診断: updateUIWithNewStatus関数の状態確認');
-        console.log('🔍 typeof updateUIWithNewStatus:', typeof updateUIWithNewStatus);
-        console.log('🔍 updateUIWithNewStatus:', updateUIWithNewStatus);
-        console.log('🔍 response構造:', {
-          hasUserInfo: !!(response && response.userInfo),
-          hasConfig: !!(response && response.config),
-          responseKeys: response ? Object.keys(response) : []
-        });
-
         // Update UI with integrated response
         try {
           if (typeof updateUIWithNewStatus === 'function') {
-            console.log('✅ updateUIWithNewStatus関数が存在、実行します');
             updateUIWithNewStatus(response);
-            console.log('✅ updateUIWithNewStatus実行完了');
           } else {
             console.error('❌ updateUIWithNewStatus関数が未定義、フォールバック処理実行');
             // フォールバック: 直接データベース情報を更新

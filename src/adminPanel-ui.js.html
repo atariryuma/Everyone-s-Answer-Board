@@ -396,7 +396,6 @@ function updateDatabaseInfo(status) {
   const cfg = status.config || {};
 
   // 🚨 SIMPLIFIED: 基本情報のみ直接更新
-  console.log('🔧 SIMPLIFIED: 基本情報のみ更新');
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
@@ -419,7 +418,6 @@ function updateDatabaseInfo(status) {
   safeSetText('info-display-mode', displayMode);
   safeSetText('info-show-counts', showCounts);
   
-  console.log('🎉 updateDatabaseInfo: SIMPLIFIED版完了');
 }
 
 // アカウント情報更新関数

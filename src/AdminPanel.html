@@ -169,11 +169,7 @@
   const __IS_SYSTEM_ADMIN_RAW__ = '<?= escapeJavaScript(typeof isDeployUser !== "undefined" ? isDeployUser : "false") ?>';
   const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
   window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
-  console.log('Template Debug:');
-  console.log('- Raw template value:', __IS_SYSTEM_ADMIN_RAW__);
-  console.log('- Raw template type:', typeof __IS_SYSTEM_ADMIN_RAW__);
-  console.log('- Processed value:', __IS_SYSTEM_ADMIN__);
-  console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
+  // Template debugging disabled for production
   
   </script>
 </head>
