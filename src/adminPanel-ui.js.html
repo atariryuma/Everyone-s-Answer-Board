@@ -141,36 +141,39 @@ function generateViewUrl(status, userId) {
 // MAIN UI UPDATE FUNCTIONS
 // =============================================================================
 
-// Update UI with new status data
+// Update UI with new status data - SIMPLIFIED VERSION
 function updateUIWithNewStatus(status) {
+  console.log('🔄 updateUIWithNewStatus: 開始 - SIMPLIFIED VERSION');
+  
   if (!validateStatus(status)) {
-    logWarn('Invalid status received, skipping UI update');
+    console.warn('❌ validateStatus failed, using emergency update');
+    emergencyUpdateDatabaseInfo(status);
     return;
   }
-
-  // UI Update Mutex: Prevent concurrent UI updates
-  if (isUIUpdateInProgress) {
-    logDebug('UI update in progress, queuing this update');
-    pendingUIUpdate = status;
-    return;
-  }
-
-  isUIUpdateInProgress = true;
+  
+  console.log('✅ validateStatus成功、直接UI更新実行');
   
   try {
-    // Phase 1: データ準備（同期処理）
-    status = prepareStatusData(status);
-    currentStatus = status;
+    // 🚨 SIMPLIFIED: 複雑な並列処理をスキップして直接更新
+    updateDatabaseInfo(status);
+    console.log('✅ updateDatabaseInfo完了');
     
-    // Phase 2: 並列UI更新（非同期処理の最適化）
-    executeParallelUIUpdates(status);
+    // 基本的なUI要素の更新
+    if (status.userInfo && status.userInfo.spreadsheetUrl) {
+      currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    }
+    
+    // currentStatusを更新
+    currentStatus = status;
+    console.log('✅ currentStatus更新完了');
     
   } catch (error) {
-    logError('UI更新でエラー:', error);
-  } finally {
-    // 最後にMutexを解除
-    setTimeout(() => finishUIUpdate(), 0);
+    console.error('❌ updateUIWithNewStatus実行エラー:', error);
+    // フォールバック実行
+    emergencyUpdateDatabaseInfo(status);
   }
+  
+  console.log('🎉 updateUIWithNewStatus: 完了');
 }
 
 // データ準備の最適化（同期処理部分）
@@ -376,30 +379,15 @@ function updateStaticUI(status) {
 // =============================================================================
 
 function updateDatabaseInfo(status) {
-  console.log('🔍 updateDatabaseInfo: 関数開始');
-  console.log('🔍 updateDatabaseInfo: status構造チェック', {
-    hasStatus: !!status,
-    hasUserInfo: !!(status && status.userInfo),
-    statusKeys: status ? Object.keys(status) : [],
-    userInfoKeys: status && status.userInfo ? Object.keys(status.userInfo) : [],
-    answerCount: status && status.answerCount,
-    totalReactions: status && status.totalReactions,
-    hasConfig: !!(status && status.config)
-  });
+  console.log('🔍 updateDatabaseInfo: SIMPLIFIED版開始');
 
-  if (!status) {
-    console.warn('❌ updateDatabaseInfo: status object なし');
+  if (!status || !status.userInfo) {
+    console.warn('❌ updateDatabaseInfo: 必要なデータなし、フォールバック実行');
     setFallbackValues();
     return;
   }
 
-  if (!status.userInfo) {
-    console.warn('❌ updateDatabaseInfo: userInfo なし');
-    setFallbackValues();
-    return;
-  }
-
-  console.log('✅ updateDatabaseInfo: バリデーション通過、UI更新開始');
+  console.log('✅ updateDatabaseInfo: データ確認済み、UI更新開始');
 
   // スプレッドシートURLを設定
   if (status.userInfo.spreadsheetUrl) {
@@ -407,72 +395,32 @@ function updateDatabaseInfo(status) {
   }
 
   const cfg = status.config || {};
-  
-  console.log('📊 updateDatabaseInfo: 設定データ確認', {
-    config: cfg,
-    adminEmail: status.userInfo.adminEmail,
-    userId: status.userInfo.userId,
-    publishedSheetName: cfg.publishedSheetName || status.publishedSheetName,
-    answerCount: status.answerCount
-  });
 
-  // 基本情報の更新
-  console.log('🔧 updateDatabaseInfo: 基本情報更新開始');
+  // 🚨 SIMPLIFIED: 基本情報のみ直接更新
+  console.log('🔧 SIMPLIFIED: 基本情報のみ更新');
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
   safeSetText('info-answer-count', status.answerCount || '0');
-  console.log('✅ updateDatabaseInfo: 基本情報更新完了');
   
-  // 新しいアカウント情報
-  console.log('🔧 updateDatabaseInfo: アカウント情報更新開始');
-  updateAccountInfo(status.userInfo);
-  console.log('✅ updateDatabaseInfo: アカウント情報更新完了');
+  // 作成日・最終アクセス日（簡素化）
+  if (status.userInfo.createdAt) {
+    const createdAt = new Date(status.userInfo.createdAt).toLocaleDateString('ja-JP');
+    safeSetText('info-created-at', createdAt);
+  }
   
-  // 新しいセットアップ進行状況
-  console.log('🔧 updateDatabaseInfo: セットアップ進行状況更新開始');
-  updateSetupProgress(status);
-  console.log('✅ updateDatabaseInfo: セットアップ進行状況更新完了');
-  
-  // 新しいデータ統計
-  console.log('🔧 updateDatabaseInfo: データ統計更新開始');
-  updateDataStatistics(status);
-  console.log('✅ updateDatabaseInfo: データ統計更新完了');
-  
-  // 新しいシステム情報
-  console.log('🔧 updateDatabaseInfo: システム情報更新開始');
-  updateSystemInfo(status, cfg);
-  console.log('✅ updateDatabaseInfo: システム情報更新完了');
+  if (status.userInfo.lastAccessedAt) {
+    const lastAccessed = new Date(status.userInfo.lastAccessedAt).toLocaleDateString('ja-JP');
+    safeSetText('info-last-access', lastAccessed);
+  }
 
-  // 公開状態の表示を更新
-  const isPublished = cfg.isPublished !== undefined
-    ? cfg.isPublished
-    : status.appPublished || status.isPublished || (status.activeSheetName && (cfg.publishedSheetName || status.publishedSheetName));
-  updatePublicationStatusUI(isPublished);
-
-  // 表示モードの更新
-  const displayModeFlag = cfg.showNames !== undefined ? cfg.showNames : status.showNames;
-  const displayMode = displayModeFlag ? '名前表示' : '匿名表示';
+  // 表示モードとカウント表示（簡素化）
+  const displayMode = (cfg.showNames || status.showNames) ? '名前表示' : '匿名表示';
+  const showCounts = (cfg.showCounts || status.showCounts) ? '表示' : '非表示';
   safeSetText('info-display-mode', displayMode);
-
-  // カウント表示の更新
-  const showCountsFlag = cfg.showCounts !== undefined
-    ? cfg.showCounts
-    : (status.showCounts !== undefined ? status.showCounts : false);
-  const showCounts = showCountsFlag ? '表示' : '非表示';
   safeSetText('info-show-counts', showCounts);
-
-  // チェックボックスの状態同期
-  syncCheckboxStates(status);
   
-  console.log('🎉 updateDatabaseInfo: 全処理完了', {
-    adminEmail: status.userInfo.adminEmail,
-    userId: status.userInfo.userId,
-    answerCount: status.answerCount,
-    isPublished: isPublished,
-    displayMode: displayMode,
-    showCounts: showCounts
-  });
+  console.log('🎉 updateDatabaseInfo: SIMPLIFIED版完了');
 }
 
 // アカウント情報更新関数
