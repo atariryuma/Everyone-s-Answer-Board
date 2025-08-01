@@ -178,7 +178,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
     if (debugMode) {
       debugLog('🔧 setupStep統一判定: Step 2 - セットアップ未完了', {
         setupStatus,
-        formCreated: formCreatedForStep,
+        formCreated,
         hasFormUrl
       });
     }
@@ -186,7 +186,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
   }
 
   // Step 3: セットアップ完了（すべての条件をクリア）
-  if (setupStatus === 'completed' && formCreatedForStep && hasFormUrl) {
+  if (setupStatus === 'completed' && formCreated && hasFormUrl) {
     if (debugMode) debugLog('🔧 setupStep統一判定: Step 3 - セットアップ完了');
     return 3;
   }
@@ -195,7 +195,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
   if (debugMode) {
     debugLog('🔧 setupStep統一判定: フォールバック - Step 2', {
       setupStatus,
-      formCreated: formCreatedForStep,
+      formCreated,
       hasFormUrl
     });
   }
