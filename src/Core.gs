@@ -1534,6 +1534,7 @@ function getAppConfig(requestUserId) {
       throw new Error('ユーザー情報が見つかりません');
     }
     debugLog('getAppConfig: userInfo:', JSON.stringify(userInfo));
+    debugLog('getAppConfig: userInfo.configJson (raw):', userInfo.configJson);
 
     var configJson = getConfigJSON(userInfo);
     debugLog('getAppConfig: configJson (after getConfigJSON, before healing):', JSON.stringify(configJson));
