@@ -335,13 +335,38 @@ function generateViewUrl(status, userId) {
   return executeWithCache('urlGeneration', cacheKey, () => {
     console.log('🔗 generateViewUrl: URL生成開始');
     
-    // シンプルなクエリパラメータ追加のみ
-    const baseUrl = status.webAppUrl || status.appUrls?.webApp;
+    // 🔧 強化されたURL取得ロジック（複数のフォールバック）
+    let baseUrl = status.webAppUrl || 
+                  status.appUrls?.webApp || 
+                  status.appUrls?.admin ||
+                  window.location.origin + window.location.pathname;
+    
+    // さらなるフォールバック: currentStatusから取得
+    if (!baseUrl && window.currentStatus) {
+      baseUrl = window.currentStatus.webAppUrl || 
+                window.currentStatus.appUrls?.webApp;
+    }
+    
+    // 最終フォールバック: 現在のURLから生成
+    if (!baseUrl) {
+      const currentUrl = window.location.href;
+      // /exec以前の部分を取得してexecを追加
+      const execIndex = currentUrl.indexOf('/exec');
+      if (execIndex !== -1) {
+        baseUrl = currentUrl.substring(0, execIndex + 5); // '/exec'まで含める
+      } else {
+        // /execが見つからない場合は現在のURLを基準にする
+        baseUrl = window.location.origin + window.location.pathname;
+      }
+      console.log('🔧 フォールバックURL生成:', baseUrl);
+    }
     
     if (!baseUrl) {
-      console.warn('❌ WebAppURLが見つかりません');
+      console.warn('❌ WebAppURLの取得に失敗しました - 全てのフォールバックが無効');
       return null;
     }
+    
+    console.log('✅ WebAppURL取得成功:', baseUrl);
     
     if (!userId) {
       return baseUrl + '?mode=view';

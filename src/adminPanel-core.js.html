@@ -423,28 +423,59 @@ function hideGlobalLoading(operationId, finalMessage) {
  * Create the global loading overlay DOM structure
  */
 function createGlobalLoadingOverlay() {
-  // Create main overlay
+  // Create main overlay with admin panel theme
   const overlay = document.createElement('div');
   overlay.id = 'global-loading-overlay';
-  overlay.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center';
-  overlay.style.display = 'none';
+  overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
+  overlay.style.cssText = `
+    display: none;
+    background: rgba(26, 27, 38, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  `;
   
-  // Create loading content container
+  // Create loading content container using glass-panel theme
   const container = document.createElement('div');
-  container.className = 'bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl p-8 max-w-sm mx-4 text-center shadow-2xl border border-white/20';
+  container.className = 'glass-panel text-center shadow-2xl';
+  container.style.cssText = `
+    background: rgba(26, 27, 38, 0.9);
+    border: 1px solid rgba(139, 233, 253, 0.2);
+    border-radius: 1rem;
+    padding: 2rem;
+    max-width: 20rem;
+    margin: 1rem;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  `;
   
-  // Create spinner
+  // Create spinner with admin panel primary color
   const spinner = document.createElement('div');
-  spinner.className = 'animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4';
+  spinner.className = 'animate-spin rounded-full mx-auto mb-4';
+  spinner.style.cssText = `
+    width: 3rem;
+    height: 3rem;
+    border: 4px solid rgba(139, 233, 253, 0.2);
+    border-top: 4px solid #8be9fd;
+    border-radius: 50%;
+  `;
   
-  // Create message element
+  // Create message element with admin panel text color
   const messageElement = document.createElement('div');
-  messageElement.className = 'text-lg font-medium text-gray-800 dark:text-gray-200 mb-2';
+  messageElement.className = 'text-lg font-medium mb-2';
+  messageElement.style.cssText = `
+    color: #c0caf5;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
+  `;
   messageElement.textContent = '処理中...';
   
-  // Create progress element
+  // Create progress element with admin panel accent color
   const progressElement = document.createElement('div');
-  progressElement.className = 'text-sm text-gray-600 dark:text-gray-400';
+  progressElement.className = 'text-sm';
+  progressElement.style.cssText = `
+    color: #8be9fd;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', sans-serif;
+  `;
   progressElement.textContent = '';
   
   // Assemble structure
@@ -459,7 +490,7 @@ function createGlobalLoadingOverlay() {
   globalLoadingState.messageElement = messageElement;
   globalLoadingState.progressElement = progressElement;
   
-  console.log('🎨 Global loading overlay created');
+  console.log('🎨 Admin-themed global loading overlay created');
 }
 
 /**
