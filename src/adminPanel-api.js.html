@@ -1466,7 +1466,9 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
           appPublished: configJson.appPublished,
           formCreated: configJson.formCreated,
           publishedSheetName: configJson.publishedSheetName,
-          hasSheetConfig: !!sheetConfig?.guessedConfig
+          hasSheetConfig: flowType === 'quickstart' 
+            ? !!(sheetConfig && (sheetConfig.opinionHeader || sheetConfig.guessedConfig))
+            : !!(sheetConfig && sheetConfig.guessedConfig)
         }
       };
     } else {
@@ -1480,7 +1482,9 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
           appPublished: configJson.appPublished,
           formCreated: configJson.formCreated,
           publishedSheetName: configJson.publishedSheetName,
-          hasSheetConfig: !!sheetConfig?.guessedConfig
+          hasSheetConfig: flowType === 'quickstart' 
+            ? !!(sheetConfig && (sheetConfig.opinionHeader || sheetConfig.guessedConfig))
+            : !!(sheetConfig && sheetConfig.guessedConfig)
         }
       };
     }
@@ -1556,8 +1560,14 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       console.log(`🔧 ${flowType}フロー: 設定不整合を検出 - 同期修正を実行`, synchronizationIssues);
       
       // バックエンドに同期修正を依頼
+      console.log(`🔧 同期パラメータ確認:`, {
+        updatedConfig: updatedConfig,
+        flowType: flowType,
+        configType: typeof updatedConfig
+      });
+      
       const syncResult = await runGasWithUserId('syncConfigurationState', '設定同期を実行中...', 
-        userId, updatedConfig, flowType);
+        updatedConfig, flowType);
       
       if (syncResult && syncResult.success) {
         appliedFixes.push(...synchronizationIssues);

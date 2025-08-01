@@ -2564,6 +2564,13 @@ function normalizeConfigJson(config, userInfo) {
     return config;
   }
   
+  // 正規化キャッシュチェック（重複処理回避）
+  const configHash = JSON.stringify(config);
+  if (config._normalizedHash === configHash) {
+    console.log('🎯 正規化キャッシュヒット - 処理をスキップ');
+    return config;
+  }
+  
   console.log('🔧 configJson正規化開始:', {
     setupStatus: config.setupStatus,
     setupStep: config.setupStep,
@@ -2585,6 +2592,9 @@ function normalizeConfigJson(config, userInfo) {
   
   // Step 5: 冗長フィールドの削除
   config = removeRedundantFields(config);
+  
+  // 正規化キャッシュ設定（重複処理回避）
+  config._normalizedHash = JSON.stringify(config);
   
   console.log('✅ configJson正規化完了:', {
     setupStatus: config.setupStatus,

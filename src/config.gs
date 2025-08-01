@@ -3280,7 +3280,7 @@ function syncConfigurationState(requestUserId, newConfig, flowType) {
     verifyUserAccess(requestUserId);
 
     if (!newConfig || typeof newConfig !== 'object') {
-      const error = '無効な設定データです';
+      const error = `无効な設定データです: ${typeof newConfig}, 値: ${JSON.stringify(newConfig)}`;
       logError(error, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
       return { success: false, errors: [error] };
     }
