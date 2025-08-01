@@ -275,8 +275,15 @@ function loadStatusCore(bypassCache = false) {
         // ローディングメッセージ更新
         updateLoadingMessage('UIにデータを反映中...');
 
-        // Update UI with integrated response
-        updateUIWithNewStatus(response);
+        // Update UI with integrated response - use safe call with dependency waiting
+        try {
+          await waitForFunction('updateUIWithNewStatus');
+          updateUIWithNewStatus(response);
+        } catch (error) {
+          logError('Failed to wait for updateUIWithNewStatus:', error);
+          // フォールバック: safeCallを使用
+          safeCall('updateUIWithNewStatus', response);
+        }
 
         // If sheet details are included, apply them immediately
         if (response.sheetDetails && response.activeSheetName) {
@@ -540,9 +547,7 @@ function completeAIDetectionProcess() {
           }
           
           // 5. ステップ表示の更新
-          if (typeof navigateToStep === 'function') {
-            navigateToStep(3); // ステップ3（表示設定）に進む
-          }
+          safeCall('navigateToStep', 3); // ステップ3（表示設定）に進む
           
         } else {
           throw new Error(saveResult?.message || '設定の保存に失敗しました');
@@ -886,7 +891,7 @@ function proceedWithSaveAndPublish(config) {
         // Use fresh data from save response if available
         if (result.userInfo && result._meta) {
           logInfo('Using fresh data from save response');
-          updateUIWithNewStatus(result);
+          safeCall('updateUIWithNewStatus', result);
         } else {
           // Only force refresh if no fresh data available
           logInfo('No fresh data in response, forcing refresh');
@@ -1950,7 +1955,7 @@ function startSystemStatusUpdate() {
       .then(function(status) {
         // 変更があった場合のみUIを更新
         if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
-          updateUIWithNewStatus(status);
+          safeCall('updateUIWithNewStatus', status);
         }
       })
       .catch(function(error) {
@@ -2009,7 +2014,7 @@ function resetConfigJson() {
           setTimeout(() => {
             runGasWithUserId('getInitialData', 'データを更新中...')
               .then(function(updatedStatus) {
-                updateUIWithNewStatus(updatedStatus);
+                safeCall('updateUIWithNewStatus', updatedStatus);
                 logInfo('🔄 リセット後のUI更新完了');
               })
               .catch(function(error) {

@@ -38,6 +38,28 @@ function logInfo(...args) { adminLog('info', ...args); }
 function logDebug(...args) { adminLog('debug', ...args); }
 
 // =============================================================================
+// HTML ESCAPING UTILITIES
+// =============================================================================
+
+// Safe HTML escaping function
+function escapeHtml(text) {
+  if (text == null) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Safe validation for objects
+function isValidObject(obj) {
+  return obj && typeof obj === 'object' && !Array.isArray(obj);
+}
+
+// Safe array validation
+function isValidArray(arr) {
+  return Array.isArray(arr);
+}
+
+// =============================================================================
 // ENHANCED MESSAGE SYSTEM FOR SETUP FLOW
 // =============================================================================
 
@@ -1026,15 +1048,29 @@ function initializeAdminPanelMaster() {
 
 // 関数存在チェック付き安全呼び出し
 function safeCall(functionName, ...args) {
+  // Validate function name
+  if (!functionName || typeof functionName !== 'string') {
+    logError('safeCall: Invalid function name:', functionName);
+    return null;
+  }
+
   if (typeof window[functionName] === 'function') {
     try {
+      logDebug(`Calling function: ${functionName}`);
       return window[functionName](...args);
     } catch (error) {
-      console.error(`Error calling ${functionName}:`, error);
+      logError(`Error calling ${functionName}:`, error);
+      
+      // 関数存在時のエラー統計を記録
+      if (!window.adminPanelErrorStats) {
+        window.adminPanelErrorStats = {};
+      }
+      window.adminPanelErrorStats[functionName] = (window.adminPanelErrorStats[functionName] || 0) + 1;
+      
       return null;
     }
   } else {
-    console.warn(`Function ${functionName} is not defined, deferring call`);
+    logWarn(`Function ${functionName} is not defined, deferring call`);
     // 遅延実行キューに追加
     deferredCalls.push({ functionName, args, timestamp: Date.now() });
     return null;
@@ -1139,21 +1175,56 @@ function checkInitializationComplete() {
   }
 }
 
-// 安全な初期化を段階的に実行
-function safeInitializeAdminPanelMaster() {
+// 複数の関数を待機（既存のwaitForFunction関数を使用）
+function waitForFunctions(funcNames, maxRetries = 50, interval = 100) {
+  return Promise.all(
+    funcNames.map(funcName => waitForFunction(funcName, maxRetries, interval))
+  );
+}
+
+// 段階的初期化システム
+async function safeInitializeAdminPanelMaster() {
   try {
     console.log('🚀 Starting safe admin panel initialization...');
     
     // Core初期化フラグを設定
     window.coreInitialized = true;
     
-    // 既存の初期化を実行
-    initializeAdminPanelMaster();
+    // 段階1: コア機能の初期化
+    console.log('📝 Phase 1: Core initialization');
+    if (typeof initCore === 'function') {
+      initCore();
+    }
     
-    // 初期化完了チェックを遅延実行
+    // 段階2: 重要な関数の読み込みを待機
+    console.log('📝 Phase 2: Waiting for critical functions');
+    try {
+      await waitForFunctions([
+        'updateUIWithNewStatus',
+        'navigateToStep',
+        'showFormConfigModal',
+        'hideFormConfigModal',
+        'toggleSection'
+      ], 30, 200); // 30回×200ms = 6秒まで待機
+      console.log('✅ All critical functions loaded successfully');
+    } catch (error) {
+      console.warn('⚠️ Some critical functions not loaded:', error.message);
+      // 一部の関数が読み込まれていなくても続行
+    }
+    
+    // 段階3: メインの初期化を実行
+    console.log('📝 Phase 3: Main initialization');
+    if (typeof initializeAdminPanelMaster === 'function') {
+      initializeAdminPanelMaster();
+    }
+    
+    // 段階4: 初期化完了チェックを遅延実行
+    console.log('📝 Phase 4: Final verification');
     setTimeout(() => {
       checkInitializationComplete();
-    }, 1000);
+    }, 1500);
+    
+    console.log('✅ Safe initialization completed');
     
   } catch (error) {
     console.error('❌ Error during safe initialization:', error);
@@ -1164,8 +1235,13 @@ function safeInitializeAdminPanelMaster() {
       if (typeof initializeAdminPanelMaster === 'function') {
         initializeAdminPanelMaster();
         window.coreInitialized = true;
+        
+        // 回復後の最終チェック
+        setTimeout(() => {
+          checkInitializationComplete();
+        }, 1000);
       }
-    }, 2000);
+    }, 3000);
   }
 }
 

@@ -113,7 +113,10 @@
     if (!existingWarning) {
       const warning = document.createElement('div');
       warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
-      warning.innerHTML = `<span class="font-semibold">${message}</span>`;
+      const span = document.createElement('span');
+      span.className = 'font-semibold';
+      span.textContent = message || '';
+      warning.appendChild(span);
       section.insertBefore(warning, section.firstChild);
     }
   }
@@ -186,42 +189,76 @@
   
   // Display column mapping interface
   function displayColumnMapping(columns) {
-    const configPlaceholder = document.getElementById('config-placeholder');
-    const configContent = document.getElementById('config-content');
-    
-    if (configPlaceholder) configPlaceholder.classList.add('hidden');
-    if (configContent) configContent.classList.remove('hidden');
-    
-    const mappingContainer = document.getElementById('column-mappings');
-    if (!mappingContainer) return;
-    
-    mappingContainer.innerHTML = '';
-    
-    columns.forEach((column, index) => {
-      const mappingDiv = document.createElement('div');
-      mappingDiv.className = 'column-mapping';
-      mappingDiv.innerHTML = `
-        <div>
-          <label class="block text-sm font-medium text-gray-200 mb-2">
-            ${column.name}
-            ${column.required ? '<span class="text-red-400">*</span>' : ''}
-          </label>
-          <p class="text-xs text-gray-400">${column.description || ''}</p>
-        </div>
-        <div>
-          <select class="form-control form-select column-mapping-select" data-column="${column.id}">
-            <option value="">選択してください</option>
-            ${columns.map(col => `<option value="${col.id}">${col.name}</option>`).join('')}
-            <option value="content">回答内容</option>
-            <option value="author">回答者名</option>
-            <option value="timestamp">回答時刻</option>
-            <option value="reaction">リアクション</option>
-            <option value="ignore">無視</option>
-          </select>
-        </div>
-      `;
-      mappingContainer.appendChild(mappingDiv);
-    });
+    try {
+      // Validate input parameters
+      if (!isValidArray(columns)) {
+        logError('displayColumnMapping: Invalid columns parameter:', columns);
+        return;
+      }
+
+      const configPlaceholder = document.getElementById('config-placeholder');
+      const configContent = document.getElementById('config-content');
+      
+      if (configPlaceholder) configPlaceholder.classList.add('hidden');
+      if (configContent) configContent.classList.remove('hidden');
+      
+      const mappingContainer = document.getElementById('column-mappings');
+      if (!mappingContainer) {
+        logError('displayColumnMapping: mapping container not found');
+        return;
+      }
+      
+      mappingContainer.innerHTML = '';
+      
+      columns.forEach((column, index) => {
+        // Validate each column object
+        if (!isValidObject(column)) {
+          logWarn('displayColumnMapping: Skipping invalid column at index', index, column);
+          return;
+        }
+
+        // Safe access to column properties with fallbacks
+        const columnId = escapeHtml(column.id || '');
+        const columnName = escapeHtml(column.name || 'Unknown Column');
+        const columnDescription = escapeHtml(column.description || '');
+        const isRequired = column.required === true;
+
+        const mappingDiv = document.createElement('div');
+        mappingDiv.className = 'column-mapping';
+        
+        // Build column options safely
+        const columnOptions = isValidArray(columns) ? 
+          columns
+            .filter(col => isValidObject(col) && col.id && col.name)
+            .map(col => `<option value="${escapeHtml(col.id)}">${escapeHtml(col.name)}</option>`)
+            .join('') : '';
+
+        mappingDiv.innerHTML = `
+          <div>
+            <label class="block text-sm font-medium text-gray-200 mb-2">
+              ${columnName}
+              ${isRequired ? '<span class="text-red-400">*</span>' : ''}
+            </label>
+            <p class="text-xs text-gray-400">${columnDescription}</p>
+          </div>
+          <div>
+            <select class="form-control form-select column-mapping-select" data-column="${columnId}">
+              <option value="">選択してください</option>
+              ${columnOptions}
+              <option value="content">回答内容</option>
+              <option value="author">回答者名</option>
+              <option value="timestamp">回答時刻</option>
+              <option value="reaction">リアクション</option>
+              <option value="ignore">無視</option>
+            </select>
+          </div>
+        `;
+        mappingContainer.appendChild(mappingDiv);
+      });
+    } catch (error) {
+      logError('displayColumnMapping: Exception occurred:', error);
+      showMessage('カラムマッピングの表示中にエラーが発生しました', 'error');
+    }
   }
   
   // Handle column mapping

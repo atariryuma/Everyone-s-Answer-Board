@@ -493,6 +493,11 @@ function updateUIWithNewStatus(status) {
   currentStatus = status;
 }
 
+// Ensure global access and prevent redefinition
+if (typeof window.updateUIWithNewStatus === 'undefined') {
+  window.updateUIWithNewStatus = updateUIWithNewStatus;
+}
+
 // レガシー関数（互換性のため保持）
 function updateUIWithNewStatusLegacy(status) {
   if (!validateStatus(status)) {
@@ -1595,38 +1600,53 @@ function checkAndShowAutoStopNotification(status) {
 
 // Toggle section expansion/collapse
 function toggleSection(sectionId) {
-  const section = document.getElementById(sectionId);
-  if (!section) {
-    console.warn('Section not found:', sectionId);
+  // Validate input parameter
+  if (!sectionId || typeof sectionId !== 'string') {
+    logWarn('toggleSection: Invalid sectionId parameter:', sectionId);
     return;
   }
-  
-  // Find the toggle button for this section
-  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
-  const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
-  
-  // Toggle the section visibility
-  if (section.classList.contains('hidden')) {
-    // Show section
-    section.classList.remove('hidden');
-    if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', 'true');
+
+  try {
+    const section = document.getElementById(sectionId);
+    if (!section) {
+      logWarn('toggleSection: Section not found:', sectionId);
+      return;
     }
-    if (arrow) {
-      arrow.classList.remove('fa-chevron-up');
-      arrow.classList.add('fa-chevron-down');
+    
+    // Find the toggle button for this section
+    const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+    const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
+    
+    // Toggle the section visibility
+    if (section.classList.contains('hidden')) {
+      // Show section
+      section.classList.remove('hidden');
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', 'true');
+      }
+      if (arrow) {
+        arrow.classList.remove('fa-chevron-up');
+        arrow.classList.add('fa-chevron-down');
+      }
+    } else {
+      // Hide section
+      section.classList.add('hidden');
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', 'false');
+      }
+      if (arrow) {
+        arrow.classList.remove('fa-chevron-down');
+        arrow.classList.add('fa-chevron-up');
+      }
     }
-  } else {
-    // Hide section
-    section.classList.add('hidden');
-    if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', 'false');
-    }
-    if (arrow) {
-      arrow.classList.remove('fa-chevron-down');
-      arrow.classList.add('fa-chevron-up');
-    }
+  } catch (error) {
+    logError('toggleSection: Exception occurred:', error);
   }
+}
+
+// Ensure global access and prevent redefinition
+if (typeof window.toggleSection === 'undefined') {
+  window.toggleSection = toggleSection;
 }
 
 // Automatically collapse completed sections
@@ -1742,36 +1762,58 @@ function manageSectionStates(currentStep) {
 
 // Show form configuration modal
 function showFormConfigModal() {
-  if (window.sharedModals) {
-    window.sharedModals.showFormConfig();
-    loadSavedClassChoices();
-    manageFocusForModal('form-config-modal', true);
-  } else {
-    // Fallback for legacy support
-    const modal = document.getElementById('form-config-modal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
+  try {
+    if (window.sharedModals) {
+      window.sharedModals.showFormConfig();
       loadSavedClassChoices();
       manageFocusForModal('form-config-modal', true);
+    } else {
+      // Fallback for legacy support
+      const modal = document.getElementById('form-config-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        loadSavedClassChoices();
+        manageFocusForModal('form-config-modal', true);
+      } else {
+        logWarn('showFormConfigModal: Modal element not found');
+      }
     }
+  } catch (error) {
+    logError('showFormConfigModal: Exception occurred:', error);
   }
+}
+
+// Ensure global access and prevent redefinition
+if (typeof window.showFormConfigModal === 'undefined') {
+  window.showFormConfigModal = showFormConfigModal;
 }
 
 // Hide form configuration modal
 function hideFormConfigModal() {
-  if (window.sharedModals) {
-    window.sharedModals.hideModal('form-config-modal');
-    manageFocusForModal('form-config-modal', false);
-  } else {
-    // Fallback for legacy support
-    const modal = document.getElementById('form-config-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
+  try {
+    if (window.sharedModals) {
+      window.sharedModals.hideModal('form-config-modal');
       manageFocusForModal('form-config-modal', false);
+    } else {
+      // Fallback for legacy support
+      const modal = document.getElementById('form-config-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        manageFocusForModal('form-config-modal', false);
+      } else {
+        logWarn('hideFormConfigModal: Modal element not found');
+      }
     }
+  } catch (error) {
+    logError('hideFormConfigModal: Exception occurred:', error);
   }
+}
+
+// Ensure global access and prevent redefinition
+if (typeof window.hideFormConfigModal === 'undefined') {
+  window.hideFormConfigModal = hideFormConfigModal;
 }
 
 // Show privacy modal
@@ -2568,28 +2610,43 @@ function updateSystemStatusDisplay(status) {
 
 // Navigate to specific step
 function navigateToStep(step) {
-  currentStep = step;
-  
-  // Update step indicators
-  document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
-    const stepNumber = index + 1;
-    indicator.classList.toggle('completed', stepNumber < step);
-    indicator.classList.toggle('active', stepNumber === step);
-  });
-  
-  // Show/hide step content
-  document.querySelectorAll('.step-content').forEach((content, index) => {
-    const stepNumber = index + 1;
-    content.classList.toggle('hidden', stepNumber !== step);
-  });
-  
-  // Update progress bar
-  const progressBar = document.querySelector('.progress-bar');
-  if (progressBar) {
-    progressBar.style.width = `${(step / 3) * 100}%`;
+  // Validate step parameter
+  if (typeof step !== 'number' || step < 1 || step > 3) {
+    logWarn('navigateToStep: Invalid step number:', step);
+    return;
   }
-  
-  validateCurrentStep();
+
+  try {
+    currentStep = step;
+    
+    // Update step indicators
+    document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
+      const stepNumber = index + 1;
+      indicator.classList.toggle('completed', stepNumber < step);
+      indicator.classList.toggle('active', stepNumber === step);
+    });
+    
+    // Show/hide step content
+    document.querySelectorAll('.step-content').forEach((content, index) => {
+      const stepNumber = index + 1;
+      content.classList.toggle('hidden', stepNumber !== step);
+    });
+    
+    // Update progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    if (progressBar) {
+      progressBar.style.width = `${(step / 3) * 100}%`;
+    }
+    
+    validateCurrentStep();
+  } catch (error) {
+    logError('navigateToStep: Exception occurred:', error);
+  }
+}
+
+// Ensure global access and prevent redefinition
+if (typeof window.navigateToStep === 'undefined') {
+  window.navigateToStep = navigateToStep;
 }
 
 
