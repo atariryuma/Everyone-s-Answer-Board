@@ -178,7 +178,7 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
     if (debugMode) {
       debugLog('🔧 setupStep統一判定: Step 2 - セットアップ未完了', {
         setupStatus,
-        formCreated,
+        formCreated: formCreatedForStep,
         hasFormUrl
       });
     }

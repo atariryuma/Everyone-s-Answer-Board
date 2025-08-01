@@ -281,6 +281,7 @@ function getAnswerCountFromSheet(config, userInfo) {
     }
 
     const lastRow = sheet.getLastRow();
+    debugLog('getAnswerCountFromSheet: lastRow=', lastRow);
     return Math.max(0, lastRow - 1); // ヘッダー行を除外
 
   } catch (error) {
@@ -372,7 +373,9 @@ function saveHistoryToSheet(historyItem, userInfo) {
         questionText: serverHistoryItem.questionText,
         historyCount: configJson.historyArray.length
       });
+      debugLog('saveHistoryToSheet: updateUser result:', updateResult);
     } else {
+      debugLog('saveHistoryToSheet: updateUser failed:', updateResult);
       throw new Error('データベース更新に失敗: ' + updateResult.message);
     }
 
