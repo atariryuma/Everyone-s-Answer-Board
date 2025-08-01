@@ -2855,7 +2855,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (attempts < 20) { // 最大2秒待機
-      console.log('⏳ runGasWithUserId関数の読み込み待機中...');
+      // 🔧 ログ頻度を調整: 3回に1回のみログ出力
+      if (attempts % 3 === 0) {
+        console.log(`⏳ runGasWithUserId関数の読み込み待機中... (${attempts + 1}/20)`);
+      }
       setTimeout(() => waitForDependencies(attempts + 1), 100);
       return;
     }

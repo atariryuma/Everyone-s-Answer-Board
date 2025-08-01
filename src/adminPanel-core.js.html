@@ -474,13 +474,51 @@ function initializeAdminPanelMaster() {
       console.error('Missing functions:', missingFunctions);
       updateSystemStatus('apiInitialized', false, new Error(`Missing functions: ${JSON.stringify(missingFunctions)}`));
       
-      // 基本的なフォールバック関数を実装
+      // 🔧 改良されたフォールバック関数を実装
       if (typeof runGasWithUserId !== 'function') {
         window.runGasWithUserId = function(functionName, loadingMessage, ...args) {
           console.warn(`🔄 Fallback: ${functionName} called with message: ${loadingMessage}`);
-          return Promise.reject(new Error(`API function ${functionName} not available - system initializing`));
+          
+          // 🎯 段階的にリトライして実際のAPI関数を待機
+          return new Promise((resolve, reject) => {
+            let retryCount = 0;
+            const maxRetries = 10;
+            
+            const checkApiAvailability = () => {
+              // SharedUtilitiesが読み込まれ、実際のrunGasWithUserId関数が利用可能かチェック
+              if (typeof sharedUtilities !== 'undefined' && 
+                  sharedUtilities.gas && 
+                  typeof sharedUtilities.gas.call === 'function') {
+                
+                // 実際のAPI関数を呼び出し
+                try {
+                  // ローディング表示付きで実行
+                  const realCall = loadingMessage && loadingMessage !== false ?
+                    sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'overlay', userId, ...args) :
+                    (userId ? 
+                      sharedUtilities.gas.call(functionName, userId, ...args) :
+                      sharedUtilities.gas.call(functionName, ...args));
+                    
+                  console.log(`✅ Fallback成功: ${functionName}の実行を復旧`);
+                  resolve(realCall);
+                } catch (error) {
+                  console.error(`❌ Fallback実行エラー: ${functionName}`, error);
+                  reject(error);
+                }
+              } else {
+                retryCount++;
+                if (retryCount < maxRetries) {
+                  setTimeout(checkApiAvailability, 1000);
+                } else {
+                  reject(new Error(`API function ${functionName} not available after ${maxRetries} retries`));
+                }
+              }
+            };
+            
+            checkApiAvailability();
+          });
         };
-        logDebug('📦 Fallback runGasWithUserId implemented');
+        logDebug('📦 Improved fallback runGasWithUserId implemented');
       }
       
       if (typeof initializeAPI !== 'function') {

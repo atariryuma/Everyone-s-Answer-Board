@@ -314,7 +314,23 @@ function setupFormConfigModalHandlers() {
   }
   
   if (formConfigCreate) {
-    formConfigCreate.addEventListener('click', createFormWithConfig);
+    formConfigCreate.addEventListener('click', function() {
+      // 🔧 動的関数チェック: 読み込み順序問題を解決
+      if (typeof createFormWithConfig === 'function') {
+        createFormWithConfig();
+      } else {
+        console.warn('⚠️ createFormWithConfig not available, retrying...');
+        // 短時間待機してから再試行
+        setTimeout(() => {
+          if (typeof createFormWithConfig === 'function') {
+            createFormWithConfig();
+          } else {
+            console.error('❌ createFormWithConfig still not available');
+            showMessage('フォーム作成機能が読み込まれていません。ページを再読み込みしてください。', 'error');
+          }
+        }, 500);
+      }
+    });
   }
 }
 

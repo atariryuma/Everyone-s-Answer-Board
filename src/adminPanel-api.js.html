@@ -2536,7 +2536,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
   // クイックスタート中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
   
   runGasWithUserId('quickStartSetup', false)
-    .then(function(result) {
+    .then(async function(result) {
       if (result && result.status === 'success') {
         console.log('🎉 QuickStartバックエンド処理完了:', result);
         
