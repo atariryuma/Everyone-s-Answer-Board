@@ -300,7 +300,14 @@ function setupFormConfigModalHandlers() {
   }
   
   if (formConfigCreate) {
-    formConfigCreate.addEventListener('click', createFormWithConfig);
+    formConfigCreate.addEventListener('click', function() {
+      if (typeof createFormWithConfig === 'function') {
+        createFormWithConfig();
+      } else {
+        console.error('createFormWithConfig function is not defined yet.');
+        showMessage('フォーム作成機能がまだ準備できていません。しばらくしてから再度お試しください。', 'warning');
+      }
+    });
   }
 }
 
