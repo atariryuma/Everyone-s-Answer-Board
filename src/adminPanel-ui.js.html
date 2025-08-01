@@ -143,37 +143,36 @@ function generateViewUrl(status, userId) {
 
 // Update UI with new status data - SIMPLIFIED VERSION
 function updateUIWithNewStatus(status) {
-  console.log('🔄 updateUIWithNewStatus: 開始 - SIMPLIFIED VERSION');
-  
   if (!validateStatus(status)) {
-    console.warn('❌ validateStatus failed, using emergency update');
+    console.warn('❌ Status validation failed, using emergency update');
     emergencyUpdateDatabaseInfo(status);
     return;
   }
   
-  console.log('✅ validateStatus成功、直接UI更新実行');
-  
   try {
-    // 🚨 SIMPLIFIED: 複雑な並列処理をスキップして直接更新
+    // Direct UI update (simplified for performance)
     updateDatabaseInfo(status);
-    console.log('✅ updateDatabaseInfo完了');
     
-    // 基本的なUI要素の更新
+    // Update basic UI elements
     if (status.userInfo && status.userInfo.spreadsheetUrl) {
       currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
     }
     
-    // currentStatusを更新
+    // Update currentStatus with normalization
     currentStatus = status;
-    console.log('✅ currentStatus更新完了');
+    
+    // Basic normalization processing
+    if (!currentStatus._normalized) {
+      currentStatus._normalized = {
+        isPublished: currentStatus.isPublished || currentStatus.appPublished || 
+                    (currentStatus.config && currentStatus.config.isPublished) || false
+      };
+    }
     
   } catch (error) {
-    console.error('❌ updateUIWithNewStatus実行エラー:', error);
-    // フォールバック実行
+    console.error('❌ updateUIWithNewStatus error:', error);
     emergencyUpdateDatabaseInfo(status);
   }
-  
-  console.log('🎉 updateUIWithNewStatus: 完了');
 }
 
 // データ準備の最適化（同期処理部分）

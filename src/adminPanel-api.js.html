@@ -477,7 +477,18 @@ function repairSetupStateInconsistencies() {
         return;
       }
       
-      const config = getConfigJSON(currentStatus.userInfo);
+      // getConfigJSON関数の代替処理（サーバーサイド関数が未定義のため）
+      let config;
+      try {
+        if (currentStatus.userInfo.configJson) {
+          config = JSON.parse(currentStatus.userInfo.configJson);
+        } else {
+          config = {};
+        }
+      } catch (parseError) {
+        console.error('❌ ConfigJSON parse error:', parseError);
+        config = {};
+      }
         
       const issues = [];
       const fixes = [];
@@ -2505,14 +2516,19 @@ function checkPublicationStatusAndProceed(onProceed, onCancel) {
 
 // クイックスタートの実際の実行
 function executeQuickStart(quickstartBtn, quickstartText) {
-  // 現在の公開状態を確認
-  const isCurrentlyPublished = currentStatus && 
-                               currentStatus._normalized && 
-                               currentStatus._normalized.isPublished;
+  // 現在の公開状態を確認（簡素化・安定化）
+  const isCurrentlyPublished = currentStatus && (
+    currentStatus.isPublished || 
+    currentStatus.appPublished ||
+    (currentStatus.config && currentStatus.config.isPublished) ||
+    (currentStatus._normalized && currentStatus._normalized.isPublished)
+  );
   
-  console.log('🚀 クイックスタート実行: 公開状態チェック', {
+  console.log('🚀 クイックスタート実行: 公開状態チェック（修正版）', {
     isCurrentlyPublished: isCurrentlyPublished,
-    currentStatus: currentStatus?._normalized
+    hasCurrentStatus: !!currentStatus,
+    isPublished: currentStatus?.isPublished,
+    appPublished: currentStatus?.appPublished
   });
   
   if (isCurrentlyPublished) {

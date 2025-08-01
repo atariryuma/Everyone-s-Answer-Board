@@ -67,21 +67,17 @@ function setupEventListeners() {
           '履歴削除の確認',
           'すべての履歴を削除しますか？この操作は取り消せません。',
           function() {
-            console.log('📝 履歴削除が確認されました');
             try {
               localStorage.removeItem(HISTORY_STORAGE_KEY);
-              console.log('✅ ローカルストレージから履歴を削除しました');
               
               // サーバーサイドの履歴もクリア
               runGasWithUserId('clearHistoryFromServerAPI', 'サーバーから履歴をクリア中...')
                 .then(function(serverResponse) {
-                  console.log('✅ サーバーサイド履歴もクリアしました:', serverResponse);
                   showMessage('✅ 履歴をクリアしました（ローカル・サーバー両方）', 'success');
                   
                   // 履歴テーブルを更新
                   if (typeof loadSimpleHistoryTable === 'function') {
                     loadSimpleHistoryTable();
-                    console.log('📊 履歴テーブルを更新しました');
                   } else {
                     console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
                   }
@@ -93,7 +89,6 @@ function setupEventListeners() {
                   // 履歴テーブルを更新
                   if (typeof loadSimpleHistoryTable === 'function') {
                     loadSimpleHistoryTable();
-                    console.log('📊 履歴テーブルを更新しました');
                   } else {
                     console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
                   }
@@ -110,12 +105,10 @@ function setupEventListeners() {
         if (confirm('すべての履歴を削除しますか？この操作は取り消せません。')) {
           try {
             localStorage.removeItem(HISTORY_STORAGE_KEY);
-            console.log('✅ ローカルストレージから履歴を削除しました（フォールバック）');
             
             // サーバーサイドの履歴もクリア（フォールバック）
             runGasWithUserId('clearHistoryFromServerAPI', 'サーバーから履歴をクリア中...')
               .then(function(serverResponse) {
-                console.log('✅ サーバーサイド履歴もクリアしました（フォールバック）:', serverResponse);
                 showMessage('✅ 履歴をクリアしました（ローカル・サーバー両方）', 'success');
               })
               .catch(function(serverError) {
@@ -133,7 +126,6 @@ function setupEventListeners() {
         }
       }
     });
-    console.log('✅ 履歴クリアボタンのイベントリスナーを設定しました');
   } else {
     console.error('❌ clear-history-btnが見つかりません');
   }
@@ -155,8 +147,15 @@ function setupEventListeners() {
   var createBoardBtn = document.getElementById('create-board-btn');
   if (createBoardBtn) {
     createBoardBtn.addEventListener('click', function() {
-      // 公開状態をチェックしてカスタムセットアップ選択モーダルを表示
-      if (currentStatus && currentStatus._normalized && currentStatus._normalized.isPublished) {
+      // 公開状態をチェックしてカスタムセットアップ選択モーダルを表示（修正版）
+      const isCurrentlyPublished = currentStatus && (
+        currentStatus.isPublished || 
+        currentStatus.appPublished ||
+        (currentStatus.config && currentStatus.config.isPublished) ||
+        (currentStatus._normalized && currentStatus._normalized.isPublished)
+      );
+      
+      if (isCurrentlyPublished) {
         // 公開中の場合、選択モーダルを表示
         window.sharedModals.showCustomSetupSelection(
           (selectedOption) => {
@@ -183,12 +182,8 @@ function setupEventListeners() {
   // カスタムフォーム作成を進行
   function proceedWithCustomFormCreation(shouldStop) {
     if (shouldStop) {
-      console.log('📝 公開停止してカスタムフォームを作成します');
-      
       // 実際に公開停止処理を実行
       if (typeof unpublishBoard === 'function') {
-        console.log('🛑 公開停止処理を開始します...');
-        
         // 公開停止の確認ダイアログを表示
         window.sharedModals.showConfirmation(
           '公開停止の確認',
@@ -206,12 +201,9 @@ function setupEventListeners() {
         showMessage('公開停止機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     } else {
-      console.log('📝 公開を継続してカスタムフォームを作成します');
-      
       // カスタムセットアップ時は全セクション展開フラグを設定
       try {
         localStorage.setItem('expandAllSections', 'true');
-        console.log('📂 カスタムセットアップ用の全セクション展開フラグを設定しました');
       } catch (e) {
         console.warn('⚠️ localStorage設定に失敗:', e);
       }
@@ -223,27 +215,21 @@ function setupEventListeners() {
 
   // 公開停止→フォーム作成の実行
   function executeStopAndCreateForm() {
-    console.log('🛑 公開停止処理を実行中...');
-    
     // unpublishBoard関数を呼び出し
     unpublishBoard()
       .then(function(response) {
-        console.log('✅ 公開停止が完了しました:', response);
-        
         // 公開停止が確実に完了した旨を表示
         showMessage('✅ 公開停止が完了しました。カスタムフォームを作成できます。', 'success');
         
         // 全セクション展開フラグを設定（公開停止後の管理パネル表示改善）
         try {
           localStorage.setItem('expandAllSections', 'true');
-          console.log('📂 公開停止後の全セクション展開フラグを設定しました');
         } catch (e) {
           console.warn('⚠️ localStorage設定に失敗:', e);
         }
         
         // 少し遅延してからフォーム作成モーダルを表示
         setTimeout(function() {
-          console.log('🎨 フォーム作成モーダルを表示します');
           showFormConfigModalSafely();
         }, 1500); // 1.5秒後に表示（UIフィードバック時間を確保）
       })
