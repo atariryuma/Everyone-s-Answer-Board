@@ -378,46 +378,61 @@ function updateStaticUI(status) {
 // =============================================================================
 
 function updateDatabaseInfo(status) {
-  console.log('🔍 updateDatabaseInfo: SIMPLIFIED版開始');
-
   if (!status || !status.userInfo) {
     console.warn('❌ updateDatabaseInfo: 必要なデータなし、フォールバック実行');
     setFallbackValues();
     return;
   }
 
-  console.log('✅ updateDatabaseInfo: データ確認済み、UI更新開始');
+  try {
+    // スプレッドシートURLを設定
+    if (status.userInfo.spreadsheetUrl) {
+      currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    }
 
-  // スプレッドシートURLを設定
-  if (status.userInfo.spreadsheetUrl) {
-    currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    const cfg = status.config || {};
+
+    // 基本情報を安全に更新
+    safeSetText('info-admin-email', status.userInfo.adminEmail || 'なし');
+    safeSetText('info-user-id', status.userInfo.userId || 'なし');
+    safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
+    safeSetText('info-answer-count', status.answerCount || '0');
+    
+    // 作成日・最終アクセス日を安全に更新
+    try {
+      if (status.userInfo.createdAt) {
+        const createdAt = new Date(status.userInfo.createdAt).toLocaleDateString('ja-JP');
+        safeSetText('info-created-at', createdAt);
+      } else {
+        safeSetText('info-created-at', 'なし');
+      }
+    } catch (dateError) {
+      console.warn('⚠️ 作成日の処理でエラー:', dateError);
+      safeSetText('info-created-at', 'なし');
+    }
+    
+    try {
+      if (status.userInfo.lastAccessedAt) {
+        const lastAccessed = new Date(status.userInfo.lastAccessedAt).toLocaleDateString('ja-JP');
+        safeSetText('info-last-access', lastAccessed);
+      } else {
+        safeSetText('info-last-access', 'なし');
+      }
+    } catch (dateError) {
+      console.warn('⚠️ 最終アクセス日の処理でエラー:', dateError);
+      safeSetText('info-last-access', 'なし');
+    }
+
+    // 表示モードとカウント表示
+    const displayMode = (cfg.showNames || status.showNames) ? '名前表示' : '匿名表示';
+    const showCounts = (cfg.showCounts || status.showCounts) ? '表示' : '非表示';
+    safeSetText('info-display-mode', displayMode);
+    safeSetText('info-show-counts', showCounts);
+    
+  } catch (error) {
+    console.error('❌ updateDatabaseInfo処理中にエラー:', error);
+    setFallbackValues();
   }
-
-  const cfg = status.config || {};
-
-  // 🚨 SIMPLIFIED: 基本情報のみ直接更新
-  safeSetText('info-admin-email', status.userInfo.adminEmail);
-  safeSetText('info-user-id', status.userInfo.userId);
-  safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
-  safeSetText('info-answer-count', status.answerCount || '0');
-  
-  // 作成日・最終アクセス日（簡素化）
-  if (status.userInfo.createdAt) {
-    const createdAt = new Date(status.userInfo.createdAt).toLocaleDateString('ja-JP');
-    safeSetText('info-created-at', createdAt);
-  }
-  
-  if (status.userInfo.lastAccessedAt) {
-    const lastAccessed = new Date(status.userInfo.lastAccessedAt).toLocaleDateString('ja-JP');
-    safeSetText('info-last-access', lastAccessed);
-  }
-
-  // 表示モードとカウント表示（簡素化）
-  const displayMode = (cfg.showNames || status.showNames) ? '名前表示' : '匿名表示';
-  const showCounts = (cfg.showCounts || status.showCounts) ? '表示' : '非表示';
-  safeSetText('info-display-mode', displayMode);
-  safeSetText('info-show-counts', showCounts);
-  
 }
 
 // アカウント情報更新関数
