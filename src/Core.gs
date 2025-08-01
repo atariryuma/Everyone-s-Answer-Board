@@ -3117,19 +3117,96 @@ function createFormFactory(options) {
     // リアクション関連列を追加
     addReactionColumnsToSpreadsheet(spreadsheetResult.spreadsheetId, spreadsheetResult.sheetName);
 
-    return {
-      formId: form.getId(),
-      formUrl: form.getPublishedUrl(),
-      viewFormUrl: form.getPublishedUrl(),
-      editFormUrl: typeof form.getEditUrl === 'function' ? form.getEditUrl() : '',
+    // フォームURL取得（強化版）
+    var formId = form.getId();
+    var formUrl = '';
+    var editFormUrl = '';
+    
+    // 公開URLの取得（リトライ機能付き）
+    var maxRetries = 3;
+    for (var i = 0; i < maxRetries; i++) {
+      try {
+        formUrl = form.getPublishedUrl();
+        if (formUrl && formUrl.trim() !== '') {
+          debugLog('✅ フォーム公開URL取得成功:', formUrl);
+          break;
+        }
+      } catch (urlError) {
+        warnLog(`フォーム公開URL取得エラー (試行 ${i + 1}/${maxRetries}):`, urlError.message);
+        if (i === maxRetries - 1) {
+          throw new Error('フォーム公開URLの取得に失敗しました: ' + urlError.message);
+        }
+        Utilities.sleep(1000); // 1秒待機してリトライ
+      }
+    }
+    
+    // 編集URLの取得（エラー耐性強化）
+    try {
+      if (typeof form.getEditUrl === 'function') {
+        editFormUrl = form.getEditUrl();
+        debugLog('✅ フォーム編集URL取得成功:', editFormUrl);
+      } else {
+        warnLog('⚠️ getEditUrl関数が利用できません - 編集URLは空文字に設定');
+      }
+    } catch (editUrlError) {
+      warnLog('フォーム編集URL取得エラー:', editUrlError.message);
+      // 編集URLは必須ではないため、エラーでも処理を続行
+    }
+    
+    // URL検証
+    if (!formUrl || formUrl.trim() === '') {
+      throw new Error('フォーム公開URLが空文字です - フォーム作成に失敗した可能性があります');
+    }
+    
+    var result = {
+      formId: formId,
+      formUrl: formUrl,
+      viewFormUrl: formUrl, // 公開URLと同じ
+      editFormUrl: editFormUrl || formUrl, // フォールバック: 編集URLが取得できない場合は公開URLを使用
       spreadsheetId: spreadsheetResult.spreadsheetId,
       spreadsheetUrl: spreadsheetResult.spreadsheetUrl,
       sheetName: spreadsheetResult.sheetName
     };
+    
+    debugLog('🎯 createFormFactory成功結果:', {
+      formId: result.formId,
+      formUrlLength: result.formUrl.length,
+      editFormUrlLength: result.editFormUrl.length,
+      hasSpreadsheetId: !!result.spreadsheetId,
+      sheetName: result.sheetName
+    });
+    
+    return result;
 
   } catch (error) {
-    errorLog('createFormFactory エラー:', error.message);
-    throw new Error('フォーム作成ファクトリでエラーが発生しました: ' + error.message);
+    // 詳細なエラー情報を記録
+    const errorContext = {
+      userEmail: options.userEmail,
+      userId: options.userId,
+      formTitle: options.formTitle,
+      questionType: options.questions || 'default',
+      hasCustomConfig: !!(options.customConfig && Object.keys(options.customConfig).length > 0),
+      errorType: error.constructor.name,
+      errorMessage: error.message,
+      stackTrace: error.stack
+    };
+    
+    logError(error, 'createFormFactory', ERROR_SEVERITY.CRITICAL, ERROR_CATEGORIES.FORM_CREATION, errorContext);
+    
+    // 特定のエラータイプに応じた詳細なエラーメッセージ
+    let userFriendlyMessage = 'フォーム作成ファクトリでエラーが発生しました';
+    
+    if (error.message.includes('Permission denied') || error.message.includes('Forbidden')) {
+      userFriendlyMessage = 'フォーム作成の権限がありません。管理者にお問い合わせください。';
+    } else if (error.message.includes('Quota exceeded') || error.message.includes('Rate limit')) {
+      userFriendlyMessage = 'Google APIの利用制限に達しました。しばらく時間をおいてから再試行してください。';
+    } else if (error.message.includes('Network') || error.message.includes('timeout')) {
+      userFriendlyMessage = 'ネットワークエラーが発生しました。インターネット接続を確認して再試行してください。';
+    } else if (error.message.includes('Invalid') || error.message.includes('Bad request')) {
+      userFriendlyMessage = '無効な設定データが検出されました。設定を確認してください。';
+    }
+    
+    throw new Error(userFriendlyMessage + ' (詳細: ' + error.message + ')');
   }
 }
 
@@ -5996,5 +6073,149 @@ function testForceLogoutRedirect() {
       message: error.message,
       timestamp: new Date().toISOString()
     };
+  }
+}
+
+/**
+ * 空のformUrlを補完する機能
+ * @param {string} userId - ユーザーID
+ * @param {Object} config - configJsonオブジェクト
+ * @returns {Object} 補完結果
+ */
+function supplementFormUrls(userId, config) {
+  try {
+    debugLog('🔧 フォームURL補完処理開始:', userId);
+    
+    if (!config) {
+      warnLog('configが提供されていません');
+      return { status: 'error', message: 'configが必要です' };
+    }
+    
+    let needsUpdate = false;
+    const supplementedConfig = { ...config };
+    
+    // formUrlが空の場合の補完処理
+    if (supplementedConfig.formCreated && (!supplementedConfig.formUrl || supplementedConfig.formUrl.trim() === '')) {
+      debugLog('⚠️ formUrlが空です - 補完を試行します');
+      
+      // 1. スプレッドシートから既存のフォームを検索
+      if (supplementedConfig.publishedSpreadsheetId) {
+        try {
+          const formUrl = findFormUrlFromSpreadsheet(supplementedConfig.publishedSpreadsheetId);
+          if (formUrl) {
+            supplementedConfig.formUrl = formUrl;
+            supplementedConfig.editFormUrl = supplementedConfig.editFormUrl || formUrl;
+            needsUpdate = true;
+            infoLog('✅ スプレッドシートからformURLを補完:', formUrl);
+          }
+        } catch (spreadsheetError) {
+          warnLog('スプレッドシートからのformURL検索に失敗:', spreadsheetError.message);
+        }
+      }
+      
+      // 2. シート固有設定からの補完
+      if (!supplementedConfig.formUrl && supplementedConfig.publishedSheetName) {
+        const sheetConfigKey = `sheet_${supplementedConfig.publishedSheetName}`;
+        const sheetConfig = supplementedConfig[sheetConfigKey];
+        
+        if (sheetConfig && sheetConfig.formUrl) {
+          supplementedConfig.formUrl = sheetConfig.formUrl;
+          supplementedConfig.editFormUrl = supplementedConfig.editFormUrl || sheetConfig.editFormUrl || sheetConfig.formUrl;
+          needsUpdate = true;
+          infoLog('✅ シート固有設定からformURLを補完:', sheetConfig.formUrl);
+        }
+      }
+    }
+    
+    // editFormUrlが空の場合の補完処理
+    if (supplementedConfig.formUrl && (!supplementedConfig.editFormUrl || supplementedConfig.editFormUrl.trim() === '')) {
+      supplementedConfig.editFormUrl = supplementedConfig.formUrl; // フォールバック
+      needsUpdate = true;
+      debugLog('📝 editFormUrlをformUrlで補完');
+    }
+    
+    // 更新が必要な場合はデータベースに保存
+    if (needsUpdate) {
+      try {
+        const updateResult = updateUser(userId, {
+          configJson: JSON.stringify(supplementedConfig),
+          lastAccessedAt: new Date().toISOString()
+        });
+        
+        if (updateResult.status === 'success') {
+          infoLog('✅ フォームURL補完完了 - データベース更新成功');
+          return {
+            status: 'success',
+            message: 'フォームURLを補完しました',
+            updated: true,
+            formUrl: supplementedConfig.formUrl,
+            editFormUrl: supplementedConfig.editFormUrl
+          };
+        } else {
+          throw new Error('データベース更新に失敗: ' + updateResult.message);
+        }
+      } catch (updateError) {
+        logError(updateError, 'supplementFormUrls_databaseUpdate', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.DATABASE);
+        return {
+          status: 'error',
+          message: 'フォームURL補完後のデータベース更新に失敗',
+          error: updateError.message
+        };
+      }
+    } else {
+      debugLog('💡 フォームURL補完は不要です');
+      return {
+        status: 'success',
+        message: 'フォームURLは既に設定されています',
+        updated: false,
+        formUrl: supplementedConfig.formUrl,
+        editFormUrl: supplementedConfig.editFormUrl
+      };
+    }
+    
+  } catch (error) {
+    logError(error, 'supplementFormUrls', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    return {
+      status: 'error',
+      message: 'フォームURL補完処理でエラーが発生しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * スプレッドシートに関連付けられたフォームのURLを検索
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {string|null} 見つかったフォームURL、または null
+ */
+function findFormUrlFromSpreadsheet(spreadsheetId) {
+  try {
+    debugLog('🔍 スプレッドシートからフォームURL検索開始:', spreadsheetId);
+    
+    if (!spreadsheetId) {
+      return null;
+    }
+    
+    const spreadsheet = openSpreadsheetOptimized(spreadsheetId);
+    if (!spreadsheet) {
+      warnLog('スプレッドシートが見つかりません:', spreadsheetId);
+      return null;
+    }
+    
+    // フォームURLを取得
+    try {
+      const formUrl = spreadsheet.getFormUrl();
+      if (formUrl) {
+        debugLog('✅ スプレッドシートからフォームURLを発見:', formUrl);
+        return formUrl;
+      }
+    } catch (formUrlError) {
+      debugLog('スプレッドシートにフォームが関連付けられていません');
+    }
+    
+    return null;
+    
+  } catch (error) {
+    logError(error, 'findFormUrlFromSpreadsheet', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    return null;
   }
 }

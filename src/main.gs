@@ -20,6 +20,81 @@ function include(path) {
 }
 
 /**
+ * configJsonを安全に解析し、正規化する統一ヘルパー関数
+ * @param {string} configJsonString - JSON文字列のconfigJson
+ * @param {Object} options - 正規化オプション
+ * @returns {Object} 正規化されたconfigJsonオブジェクト
+ */
+function parseAndNormalizeConfigJson(configJsonString, options = {}) {
+  try {
+    debugLog('🔧 parseAndNormalizeConfigJson: 処理開始');
+    
+    // 空文字列や無効な値の場合はデフォルト設定を返す
+    if (!configJsonString || configJsonString.trim() === '' || configJsonString === '{}') {
+      debugLog('⚠️ 空のconfigJsonが渡されました - デフォルト設定を使用');
+      return normalizeConfigJson({}, options);
+    }
+    
+    // JSON解析を試行
+    let parsedConfig;
+    try {
+      parsedConfig = JSON.parse(configJsonString);
+    } catch (parseError) {
+      warnLog('configJson解析エラー:', parseError.message);
+      logError(parseError, 'parseAndNormalizeConfigJson_parseError', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATA_VALIDATION);
+      
+      // 解析エラーの場合はデフォルト設定を返す
+      return normalizeConfigJson({}, options);
+    }
+    
+    // 正規化処理を適用
+    const normalizedConfig = normalizeConfigJson(parsedConfig, options);
+    
+    debugLog('✅ parseAndNormalizeConfigJson: 処理完了', {
+      setupStatus: normalizedConfig.setupStatus,
+      formCreated: normalizedConfig.formCreated,
+      appPublished: normalizedConfig.appPublished,
+      hasFormUrl: !!normalizedConfig.formUrl
+    });
+    
+    return normalizedConfig;
+    
+  } catch (error) {
+    // 詳細なエラー情報を記録
+    const errorContext = {
+      inputType: typeof configJsonString,
+      inputLength: configJsonString ? configJsonString.length : 0,
+      hasOptions: !!(options && Object.keys(options).length > 0),
+      errorType: error.constructor.name,
+      errorMessage: error.message,
+      stackTrace: error.stack
+    };
+    
+    logError(error, 'parseAndNormalizeConfigJson', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATA_VALIDATION, errorContext);
+    
+    warnLog('🚨 parseAndNormalizeConfigJson で致命的エラーが発生 - フォールバック設定を使用');
+    
+    // 最終フォールバック: 最小限の設定を返す
+    return {
+      setupStatus: 'error',
+      formCreated: false,
+      appPublished: false,
+      formUrl: '',
+      editFormUrl: '',
+      displayMode: 'anonymous',
+      showCounts: false,
+      showNames: false,
+      autoStopEnabled: false,
+      totalPublishCount: 0,
+      historyArray: [],
+      lastModified: new Date().toISOString(),
+      error: error.message,
+      fallbackUsed: true
+    };
+  }
+}
+
+/**
  * JavaScript文字列エスケープ関数 (URL対応版)
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列
@@ -326,14 +401,8 @@ function saveHistoryToSheet(historyItem, userInfo) {
       throw new Error('ユーザーが見つかりません: ' + userInfo.userId);
     }
 
-    // 現在のconfigJsonを取得・解析
-    let configJson;
-    try {
-      configJson = JSON.parse(existingUser.configJson || '{}');
-    } catch (parseError) {
-      warnLog('configJson解析エラー、新規作成します:', parseError.message);
-      configJson = {};
-    }
+    // 現在のconfigJsonを取得・解析（正規化付き）
+    const configJson = parseAndNormalizeConfigJson(existingUser.configJson);
 
     // 履歴配列を取得または初期化
     if (!Array.isArray(configJson.historyArray)) {
@@ -437,14 +506,8 @@ function getHistoryFromServerAPI(requestUserId) {
       throw new Error('ユーザーが見つかりません');
     }
 
-    // configJsonから履歴を取得
-    let configJson;
-    try {
-      configJson = JSON.parse(userInfo.configJson || '{}');
-    } catch (parseError) {
-      warnLog('configJson解析エラー:', parseError.message);
-      configJson = {};
-    }
+    // configJsonから履歴を取得（正規化付き）
+    const configJson = parseAndNormalizeConfigJson(userInfo.configJson);
 
     const historyArray = Array.isArray(configJson.historyArray) ? configJson.historyArray : [];
 
@@ -480,14 +543,8 @@ function clearHistoryFromServerAPI(requestUserId) {
       throw new Error('ユーザーが見つかりません');
     }
 
-    // configJsonから履歴をクリア
-    let configJson;
-    try {
-      configJson = JSON.parse(userInfo.configJson || '{}');
-    } catch (parseError) {
-      warnLog('configJson解析エラー、新規作成します:', parseError.message);
-      configJson = {};
-    }
+    // configJsonから履歴をクリア（正規化付き）
+    const configJson = parseAndNormalizeConfigJson(userInfo.configJson);
 
     // 履歴配列をクリア
     configJson.historyArray = [];
@@ -1020,13 +1077,8 @@ function handleViewMode(params) {
  * @returns {HtmlOutput} Answer board or unpublished page
  */
 function processViewRequest(userInfo, params) {
-  // Parse config safely
-  let config = {};
-  try {
-    config = JSON.parse(userInfo.configJson || '{}');
-  } catch (e) {
-    warnLog('Config JSON parse error during publication check:', e.message);
-  }
+  // Parse config safely with normalization
+  const config = parseAndNormalizeConfigJson(userInfo.configJson);
 
   // Check for auto-stop and handle accordingly
   const wasAutoStopped = checkAndHandleAutoStop(config, userInfo);
@@ -1927,12 +1979,7 @@ function renderMinimalUnpublishedPage(userInfo) {
 
 function renderAnswerBoard(userInfo, params) {
   try {
-    let config = {};
-    try {
-      config = JSON.parse(userInfo.configJson || '{}');
-    } catch (e) {
-      warnLog('Invalid configJson:', e.message);
-    }
+    const config = parseAndNormalizeConfigJson(userInfo.configJson);
   // publishedSheetNameの型安全性確保（'true'問題の修正）
   let safePublishedSheetName = '';
   if (config.publishedSheetName) {
@@ -2054,14 +2101,8 @@ function checkCurrentPublicationStatus(userId) {
       return { error: 'User not found', isPublished: false };
     }
 
-    // 設定情報を解析
-    let config = {};
-    try {
-      config = JSON.parse(userInfo.configJson || '{}');
-    } catch (e) {
-      warnLog('Config JSON parse error during publication status check:', e.message);
-      return { error: 'Config parse error', isPublished: false };
-    }
+    // 設定情報を解析（正規化付き）
+    const config = parseAndNormalizeConfigJson(userInfo.configJson);
 
     // 現在のパブリケーション状態を厳密にチェック
     const isCurrentlyPublished = !!(

@@ -3429,3 +3429,241 @@ function checkApplicationAccess() {
     };
   }
 }
+
+/**
+ * configJsonを正規化し、標準的な構造に統一する
+ * @param {Object|string} configData - configJsonオブジェクトまたはJSON文字列
+ * @param {Object} options - 正規化オプション
+ * @returns {Object} 正規化されたconfigJsonオブジェクト
+ */
+function normalizeConfigJson(configData, options = {}) {
+  try {
+    debugLog('🔧 configJson正規化開始');
+    
+    // 入力データの正規化
+    let config = {};
+    if (typeof configData === 'string') {
+      try {
+        config = JSON.parse(configData || '{}');
+      } catch (parseError) {
+        warnLog('configJson解析エラー、デフォルト値を使用:', parseError.message);
+        config = {};
+      }
+    } else if (typeof configData === 'object' && configData !== null) {
+      config = { ...configData };
+    }
+    
+    // デフォルトのconfigJson構造
+    const defaultConfig = {
+      // 基本情報
+      setupStatus: 'pending',
+      version: '1.0.0',
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString(),
+      
+      // フォーム関連
+      formCreated: false,
+      formUrl: '',
+      editFormUrl: '',
+      
+      // 公開設定
+      appPublished: false,
+      publishedSheetName: '',
+      publishedSpreadsheetId: '',
+      publishedAt: null,
+      lastPublishedAt: null,
+      
+      // 表示設定
+      displayMode: 'anonymous',
+      showCounts: false,
+      showNames: false,
+      sortOrder: 'newest',
+      
+      // 自動停止設定
+      autoStopEnabled: false,
+      autoStopMinutes: 360,
+      scheduledEndAt: null,
+      autoStoppedAt: null,
+      autoStopReason: null,
+      
+      // 統計情報
+      totalPublishCount: 0,
+      
+      // 履歴配列
+      historyArray: []
+    };
+    
+    // デフォルト値を適用（既存の値を優先）
+    const normalizedConfig = { ...defaultConfig, ...config };
+    
+    // データ型の修正と検証
+    normalizedConfig.setupStatus = validateStringValue(normalizedConfig.setupStatus, ['pending', 'completed', 'error'], 'pending');
+    normalizedConfig.formCreated = Boolean(normalizedConfig.formCreated);
+    normalizedConfig.appPublished = Boolean(normalizedConfig.appPublished);
+    normalizedConfig.showCounts = Boolean(normalizedConfig.showCounts);
+    normalizedConfig.showNames = Boolean(normalizedConfig.showNames);
+    normalizedConfig.autoStopEnabled = Boolean(normalizedConfig.autoStopEnabled);
+    normalizedConfig.totalPublishCount = Math.max(0, parseInt(normalizedConfig.totalPublishCount) || 0);
+    
+    // 文字列フィールドの安全性確保
+    const stringFields = ['formUrl', 'editFormUrl', 'publishedSheetName', 'publishedSpreadsheetId', 'displayMode', 'sortOrder'];
+    stringFields.forEach(field => {
+      if (typeof normalizedConfig[field] !== 'string') {
+        normalizedConfig[field] = '';
+      }
+    });
+    
+    // 配列フィールドの初期化
+    if (!Array.isArray(normalizedConfig.historyArray)) {
+      normalizedConfig.historyArray = [];
+    }
+    
+    // タイムスタンプフィールドの検証
+    const timestampFields = ['createdAt', 'lastModified', 'publishedAt', 'lastPublishedAt', 'scheduledEndAt', 'autoStoppedAt'];
+    timestampFields.forEach(field => {
+      if (normalizedConfig[field] && !isValidISOString(normalizedConfig[field])) {
+        warnLog(`無効なタイムスタンプを修正: ${field}`);
+        normalizedConfig[field] = null;
+      }
+    });
+    
+    // 冗長フィールドの削除
+    const fieldsToRemove = ['setupStep', 'isFormReady', 'temporaryData'];
+    fieldsToRemove.forEach(field => {
+      if (normalizedConfig[field] !== undefined) {
+        delete normalizedConfig[field];
+        debugLog(`🧹 冗長フィールド削除: ${field}`);
+      }
+    });
+    
+    // formUrl/editFormUrlの補完処理（オプション）
+    if (options.supplementFormUrls && normalizedConfig.formCreated && !normalizedConfig.formUrl) {
+      debugLog('⚠️ formUrlが空です - 補完が必要な可能性があります');
+    }
+    
+    // シート固有設定の正規化
+    const sheetConfigs = {};
+    Object.keys(normalizedConfig).forEach(key => {
+      if (key.startsWith('sheet_')) {
+        const sheetConfig = normalizedConfig[key];
+        if (typeof sheetConfig === 'object' && sheetConfig !== null) {
+          sheetConfigs[key] = normalizeSheetConfig(sheetConfig);
+        }
+      }
+    });
+    
+    // 正規化されたシート設定を統合
+    Object.assign(normalizedConfig, sheetConfigs);
+    
+    // 最終更新時刻を設定
+    normalizedConfig.lastModified = new Date().toISOString();
+    
+    debugLog('✅ configJson正規化完了:', {
+      setupStatus: normalizedConfig.setupStatus,
+      formCreated: normalizedConfig.formCreated,
+      appPublished: normalizedConfig.appPublished,
+      hasFormUrl: !!normalizedConfig.formUrl,
+      sheetConfigCount: Object.keys(sheetConfigs).length
+    });
+    
+    return normalizedConfig;
+    
+  } catch (error) {
+    // 詳細なエラー情報を記録
+    const errorContext = {
+      inputType: typeof configData,
+      inputLength: configData ? configData.toString().length : 0,
+      hasOptions: !!(options && Object.keys(options).length > 0),
+      errorType: error.constructor.name,
+      errorMessage: error.message,
+      stackTrace: error.stack
+    };
+    
+    logError(error, 'normalizeConfigJson', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATA_VALIDATION, errorContext);
+    
+    warnLog('🚨 configJson正規化でエラーが発生しました - フォールバック設定を使用します');
+    
+    // フォールバック: 最小限の設定を返す
+    return {
+      setupStatus: 'error',
+      formCreated: false,
+      appPublished: false,
+      formUrl: '',
+      editFormUrl: '',
+      displayMode: 'anonymous',
+      showCounts: false,
+      showNames: false,
+      autoStopEnabled: false,
+      totalPublishCount: 0,
+      historyArray: [],
+      lastModified: new Date().toISOString(),
+      error: error.message,
+      fallbackUsed: true
+    };
+  }
+}
+
+/**
+ * シート固有設定を正規化
+ * @param {Object} sheetConfig - シート設定オブジェクト
+ * @returns {Object} 正規化されたシート設定
+ */
+function normalizeSheetConfig(sheetConfig) {
+  const defaultSheetConfig = {
+    opinionHeader: '',
+    reasonHeader: '',
+    nameHeader: '名前',
+    classHeader: 'クラス',
+    nameColumn: '名前',
+    classColumn: 'クラス',
+    opinionColumn: '',
+    sheetName: '',
+    formUrl: '',
+    editFormUrl: '',
+    lastModified: new Date().toISOString()
+  };
+  
+  const normalized = { ...defaultSheetConfig, ...sheetConfig };
+  
+  // 文字列フィールドの検証
+  Object.keys(normalized).forEach(key => {
+    if (typeof normalized[key] === 'string') {
+      normalized[key] = normalized[key].trim();
+    } else if (typeof normalized[key] !== 'string' && key !== 'lastModified') {
+      normalized[key] = '';
+    }
+  });
+  
+  normalized.lastModified = new Date().toISOString();
+  
+  return normalized;
+}
+
+/**
+ * 文字列値を検証し、許可された値の中から選択
+ * @param {any} value - 検証する値
+ * @param {string[]} allowedValues - 許可された値の配列
+ * @param {string} defaultValue - デフォルト値
+ * @returns {string} 検証された値
+ */
+function validateStringValue(value, allowedValues, defaultValue) {
+  if (typeof value === 'string' && allowedValues.includes(value)) {
+    return value;
+  }
+  return defaultValue;
+}
+
+/**
+ * ISO文字列の妥当性を検証
+ * @param {string} dateString - 検証する日時文字列
+ * @returns {boolean} 妥当な場合はtrue
+ */
+function isValidISOString(dateString) {
+  if (typeof dateString !== 'string') return false;
+  try {
+    const date = new Date(dateString);
+    return date.toISOString() === dateString;
+  } catch (error) {
+    return false;
+  }
+}

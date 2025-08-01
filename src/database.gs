@@ -970,7 +970,7 @@ function updateUser(userId, updateData) {
     throw new Error('データ更新エラー: 許可されていないフィールドが含まれています: ' + invalidFields.join(', '));
   }
 
-  // 各フィールドの型検証
+  // 各フィールドの型検証とconfigJson正規化
   for (const field of updateFields) {
     const value = updateData[field];
     if (value !== null && value !== undefined && typeof value !== 'string') {
@@ -978,6 +978,42 @@ function updateUser(userId, updateData) {
     }
     if (typeof value === 'string' && value.length > 10000) {
       throw new Error(`データ更新エラー: フィールド "${field}" が長すぎます（最大10000文字）`);
+    }
+  }
+
+  // configJsonの正規化処理
+  if (updateData.configJson) {
+    try {
+      debugLog('📝 updateUser: configJson正規化処理開始');
+      
+      // 現在のconfigJsonを解析
+      let configObject;
+      try {
+        configObject = JSON.parse(updateData.configJson);
+      } catch (parseError) {
+        warnLog('updateUser: configJson解析エラー:', parseError.message);
+        configObject = {};
+      }
+      
+      // 正規化関数を適用
+      const normalizedConfig = normalizeConfigJson(configObject, {
+        supplementFormUrls: true
+      });
+      
+      // 正規化されたconfigJsonを文字列化して更新データに設定
+      updateData.configJson = JSON.stringify(normalizedConfig);
+      
+      debugLog('✅ updateUser: configJson正規化完了', {
+        originalLength: (updateData.configJson || '').length,
+        normalizedLength: updateData.configJson.length,
+        setupStatus: normalizedConfig.setupStatus,
+        hasFormUrl: !!normalizedConfig.formUrl
+      });
+      
+    } catch (normalizationError) {
+      logError(normalizationError, 'updateUser_configJsonNormalization', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATA_VALIDATION);
+      // 正規化エラーは警告に留め、元のconfigJsonを使用
+      warnLog('configJson正規化に失敗しました - 元のデータを使用します:', normalizationError.message);
     }
   }
 
