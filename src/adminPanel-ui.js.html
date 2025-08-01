@@ -2282,6 +2282,33 @@ function showAppropriateHeaderStatus() {
   }
 }
 
+// ドメイン表示を更新するヘルパー関数
+function updateDomainDisplay(type, domainText, statusText) {
+  const initialDiv = document.getElementById('header-domain-initial');
+  const matchDiv = document.getElementById('header-domain-match');
+  const mismatchDiv = document.getElementById('header-domain-mismatch');
+
+  if (initialDiv) initialDiv.classList.add('hidden');
+  if (matchDiv) matchDiv.classList.add('hidden');
+  if (mismatchDiv) mismatchDiv.classList.add('hidden');
+
+  if (type === 'match' && matchDiv) {
+    matchDiv.classList.remove('hidden');
+    const textEl = document.getElementById('header-domain-match-text');
+    if (textEl) textEl.textContent = domainText;
+  } else if (type === 'mismatch' && mismatchDiv) {
+    mismatchDiv.classList.remove('hidden');
+    const textEl = document.getElementById('header-domain-mismatch-text');
+    if (textEl) textEl.textContent = domainText;
+  } else if (initialDiv) {
+    initialDiv.classList.remove('hidden');
+    const domainEl = document.getElementById('header-domain-name-initial');
+    const statusEl = document.getElementById('header-status-text-initial');
+    if (domainEl) domainEl.textContent = domainText;
+    if (statusEl) statusEl.textContent = statusText;
+  }
+}
+
 /**
  * セットアップ状況に応じてボタン状態を更新
  * @param {Object} status - ステータスオブジェクト
