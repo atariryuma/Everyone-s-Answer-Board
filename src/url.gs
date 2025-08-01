@@ -66,17 +66,19 @@ function computeWebAppUrl() {
     // 末尾のスラッシュを除去
     url = url.replace(/\/$/, '');
 
-    // 開発環境URL検出の簡素化（優先度順）
-    const devIndicators = [
-      'userCodeAppPanel',  // 最も確実な開発環境指標
-      '/dev',              // 開発エンドポイント
-      '/test'              // テストエンドポイント
-    ];
-
-    // 開発環境URLの早期検出
-    for (var i = 0; i < devIndicators.length; i++) {
-      if (url.includes(devIndicators[i])) {
-        warnLog('開発環境URL検出: ' + url + ' → フォールバック使用');
+    // 🎯 開発環境URL検出の改善（userCodeAppPanelのみ検出）
+    // 注意: googleusercontent.comは有効なデプロイURLの場合があるため、
+    // userCodeAppPanelが含まれる場合のみ開発環境と判定
+    if (url.includes('userCodeAppPanel')) {
+      warnLog('⚠️ 開発環境URL検出 (userCodeAppPanel): ' + url + ' → フォールバック使用');
+      return getFallbackUrl();
+    }
+    
+    // その他の開発環境インジケーター
+    const otherDevIndicators = ['/dev', '/test'];
+    for (var i = 0; i < otherDevIndicators.length; i++) {
+      if (url.includes(otherDevIndicators[i])) {
+        warnLog('⚠️ 開発環境URL検出 (' + otherDevIndicators[i] + '): ' + url + ' → フォールバック使用');
         return getFallbackUrl();
       }
     }
