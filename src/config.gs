@@ -3541,19 +3541,49 @@ function normalizeConfigJson(configData, options = {}) {
       debugLog('⚠️ formUrlが空です - 補完が必要な可能性があります');
     }
     
-    // シート固有設定の正規化
+    // シート固有設定の正規化（保護強化）
     const sheetConfigs = {};
+    let processedSheetCount = 0;
+    
     Object.keys(normalizedConfig).forEach(key => {
       if (key.startsWith('sheet_')) {
         const sheetConfig = normalizedConfig[key];
         if (typeof sheetConfig === 'object' && sheetConfig !== null) {
-          sheetConfigs[key] = normalizeSheetConfig(sheetConfig);
+          try {
+            sheetConfigs[key] = normalizeSheetConfig(sheetConfig);
+            processedSheetCount++;
+            debugLog('✅ シート設定正規化完了:', key);
+          } catch (sheetError) {
+            warnLog('シート設定正規化エラー:', key, sheetError.message);
+            // エラーの場合は元の設定を保持
+            sheetConfigs[key] = sheetConfig;
+          }
+        } else if (sheetConfig !== null && sheetConfig !== undefined) {
+          // オブジェクト以外の場合は警告を出すが、保護する
+          warnLog('⚠️ 非オブジェクトのシート設定を保護:', key, typeof sheetConfig);
+          sheetConfigs[key] = sheetConfig;
         }
       }
     });
     
+    // preserveSheetConfigsオプションが有効な場合は既存のシート設定を強制保持
+    if (options.preserveSheetConfigs) {
+      Object.keys(config).forEach(key => {
+        if (key.startsWith('sheet_') && !sheetConfigs[key]) {
+          sheetConfigs[key] = config[key];
+          debugLog('🛡️ シート設定を強制保護:', key);
+        }
+      });
+    }
+    
     // 正規化されたシート設定を統合
     Object.assign(normalizedConfig, sheetConfigs);
+    
+    debugLog('📊 シート設定処理結果:', {
+      processedCount: processedSheetCount,
+      totalSheetConfigs: Object.keys(sheetConfigs).length,
+      preserveMode: !!options.preserveSheetConfigs
+    });
     
     // 最終更新時刻を設定
     normalizedConfig.lastModified = new Date().toISOString();

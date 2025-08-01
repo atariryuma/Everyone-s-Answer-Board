@@ -981,10 +981,10 @@ function updateUser(userId, updateData) {
     }
   }
 
-  // configJsonの正規化処理
+  // configJsonの正規化処理（シート設定保護付き）
   if (updateData.configJson) {
     try {
-      debugLog('📝 updateUser: configJson正規化処理開始');
+      debugLog('📝 updateUser: configJson正規化処理開始（シート設定保護付き）');
       
       // 現在のconfigJsonを解析
       let configObject;
@@ -995,19 +995,43 @@ function updateUser(userId, updateData) {
         configObject = {};
       }
       
+      // シート固有設定（sheet_*）を事前に抽出・保護
+      const sheetConfigs = {};
+      let sheetConfigCount = 0;
+      
+      Object.keys(configObject).forEach(key => {
+        if (key.startsWith('sheet_')) {
+          sheetConfigs[key] = configObject[key];
+          sheetConfigCount++;
+        }
+      });
+      
+      debugLog('🛡️ シート設定保護:', {
+        sheetConfigCount: sheetConfigCount,
+        sheetKeys: Object.keys(sheetConfigs)
+      });
+      
       // 正規化関数を適用
       const normalizedConfig = normalizeConfigJson(configObject, {
-        supplementFormUrls: true
+        supplementFormUrls: true,
+        preserveSheetConfigs: true
+      });
+      
+      // 保護したシート設定を復元
+      Object.keys(sheetConfigs).forEach(sheetKey => {
+        normalizedConfig[sheetKey] = sheetConfigs[sheetKey];
+        debugLog('🔄 シート設定復元:', sheetKey);
       });
       
       // 正規化されたconfigJsonを文字列化して更新データに設定
       updateData.configJson = JSON.stringify(normalizedConfig);
       
-      debugLog('✅ updateUser: configJson正規化完了', {
+      debugLog('✅ updateUser: configJson正規化完了（シート設定保護付き）', {
         originalLength: (updateData.configJson || '').length,
         normalizedLength: updateData.configJson.length,
         setupStatus: normalizedConfig.setupStatus,
-        hasFormUrl: !!normalizedConfig.formUrl
+        hasFormUrl: !!normalizedConfig.formUrl,
+        restoredSheetConfigs: sheetConfigCount
       });
       
     } catch (normalizationError) {
