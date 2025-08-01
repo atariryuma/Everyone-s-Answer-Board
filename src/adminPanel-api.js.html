@@ -1615,8 +1615,12 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       console.log(`🔧 ${flowType}フロー: 設定不整合を検出 - 同期修正を実行`, synchronizationIssues);
       
       // バックエンドに同期修正を依頼
-      const syncResult = await runGasWithUserId('syncConfigurationState', '設定同期を実行中...', 
-        userId, updatedConfig, flowType);
+      const syncResult = await runGasWithUserId(
+        'syncConfigurationState',
+        '設定同期を実行中...',
+        updatedConfig,
+        flowType
+      );
       
       if (syncResult && syncResult.success) {
         appliedFixes.push(...synchronizationIssues);
