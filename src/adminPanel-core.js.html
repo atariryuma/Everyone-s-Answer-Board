@@ -1020,11 +1020,160 @@ function initializeAdminPanelMaster() {
   }, 10); // 50ms -> 10msに短縮
 }
 
-// 単一DOMContentLoadedハンドラー
+// =============================================================================
+// 安全な関数呼び出しシステム - エラー防止のための中核機能
+// =============================================================================
+
+// 関数存在チェック付き安全呼び出し
+function safeCall(functionName, ...args) {
+  if (typeof window[functionName] === 'function') {
+    try {
+      return window[functionName](...args);
+    } catch (error) {
+      console.error(`Error calling ${functionName}:`, error);
+      return null;
+    }
+  } else {
+    console.warn(`Function ${functionName} is not defined, deferring call`);
+    // 遅延実行キューに追加
+    deferredCalls.push({ functionName, args, timestamp: Date.now() });
+    return null;
+  }
+}
+
+// 遅延実行キュー
+const deferredCalls = [];
+
+// 関数が利用可能になるまで待機
+function waitForFunction(functionName, maxRetries = 50, interval = 100) {
+  return new Promise((resolve, reject) => {
+    let retries = 0;
+    
+    function check() {
+      if (typeof window[functionName] === 'function') {
+        resolve(window[functionName]);
+      } else if (retries < maxRetries) {
+        retries++;
+        setTimeout(check, interval);
+      } else {
+        reject(new Error(`Function ${functionName} not found after ${maxRetries * interval}ms`));
+      }
+    }
+    
+    check();
+  });
+}
+
+// 遅延実行キューの処理
+function processDeferredCalls() {
+  const currentTime = Date.now();
+  const processedCalls = [];
+  
+  deferredCalls.forEach((call, index) => {
+    // 5秒以上古い呼び出しは破棄
+    if (currentTime - call.timestamp > 5000) {
+      console.warn(`Discarding old deferred call: ${call.functionName}`);
+      processedCalls.push(index);
+      return;
+    }
+    
+    // 関数が利用可能になったら実行
+    if (typeof window[call.functionName] === 'function') {
+      try {
+        console.log(`Executing deferred call: ${call.functionName}`);
+        window[call.functionName](...call.args);
+        processedCalls.push(index);
+      } catch (error) {
+        console.error(`Error executing deferred call ${call.functionName}:`, error);
+        processedCalls.push(index);
+      }
+    }
+  });
+  
+  // 処理済みの呼び出しを削除（逆順で削除）
+  processedCalls.reverse().forEach(index => {
+    deferredCalls.splice(index, 1);
+  });
+}
+
+// 定期的に遅延実行キューを処理
+const deferredCallsProcessor = setInterval(() => {
+  if (deferredCalls.length > 0) {
+    processDeferredCalls();
+  }
+  
+  // 5分経ったら定期実行を停止
+  if (Date.now() - window.adminPanelStartTime > 300000) {
+    clearInterval(deferredCallsProcessor);
+  }
+}, 200);
+
+// 初期化完了フラグとチェッカー
+window.adminPanelStartTime = Date.now();
+window.coreInitialized = false;
+window.uiInitialized = false;
+window.apiInitialized = false;
+
+// 初期化状態をチェック
+function checkInitializationComplete() {
+  const requiredFunctions = [
+    'updateUIWithNewStatus',
+    'navigateToStep', 
+    'showFormConfigModal',
+    'hideFormConfigModal',
+    'toggleSection',
+    'runGasWithUserId'
+  ];
+  
+  const missingFunctions = requiredFunctions.filter(func => 
+    typeof window[func] !== 'function'
+  );
+  
+  if (missingFunctions.length === 0) {
+    console.log('✅ All critical functions are available');
+    processDeferredCalls(); // 最終的な遅延実行処理
+    return true;
+  } else {
+    console.log('⚠️ Missing functions:', missingFunctions);
+    return false;
+  }
+}
+
+// 安全な初期化を段階的に実行
+function safeInitializeAdminPanelMaster() {
+  try {
+    console.log('🚀 Starting safe admin panel initialization...');
+    
+    // Core初期化フラグを設定
+    window.coreInitialized = true;
+    
+    // 既存の初期化を実行
+    initializeAdminPanelMaster();
+    
+    // 初期化完了チェックを遅延実行
+    setTimeout(() => {
+      checkInitializationComplete();
+    }, 1000);
+    
+  } catch (error) {
+    console.error('❌ Error during safe initialization:', error);
+    
+    // エラー回復を試行
+    setTimeout(() => {
+      console.log('🔄 Attempting initialization recovery...');
+      if (typeof initializeAdminPanelMaster === 'function') {
+        initializeAdminPanelMaster();
+        window.coreInitialized = true;
+      }
+    }, 2000);
+  }
+}
+
+// 単一DOMContentLoadedハンドラー - エラー防止版
 if (document.readyState !== 'loading') {
-  initializeAdminPanelMaster();
+  safeInitializeAdminPanelMaster();
 } else {
-  document.addEventListener('DOMContentLoaded', initializeAdminPanelMaster);
+  document.addEventListener('DOMContentLoaded', safeInitializeAdminPanelMaster);
 }
 
 // Update layout on resize

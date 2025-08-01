@@ -36,7 +36,20 @@ function showGoogleIntegrationInfo() {
 
 // フォーム設定モーダルが開かれたときにカウンターをリセット
 // この機能は既にshowFormConfigModal内で適切に処理されています
-document.addEventListener('DOMContentLoaded', function() {
+// 安全なフォーム初期化 - Core初期化後に実行
+function safeInitializeForms() {
+  // Core初期化完了を待機
+  if (typeof window.coreInitialized !== 'undefined' && window.coreInitialized) {
+    initializeFormComponents();
+  } else {
+    // Core初期化を待って再試行
+    setTimeout(safeInitializeForms, 200);
+  }
+}
+
+function initializeFormComponents() {
+  console.log('📝 Initializing form components...');
+  
   // モーダルが表示されるたびにカウンターをセットアップ
   const observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
@@ -54,5 +67,18 @@ document.addEventListener('DOMContentLoaded', function() {
   if (modal) {
     observer.observe(modal, { attributes: true });
   }
-});
+  
+  window.apiInitialized = true; // Forms初期化完了フラグ
+}
+
+// 競合を避けるため、Core初期化システムから呼び出される
+if (document.readyState !== 'loading') {
+  // 既にDOMがロード済みの場合は即座に実行
+  setTimeout(safeInitializeForms, 200);
+} else {
+  // DOMロード完了後に実行（Coreより後になる）
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(safeInitializeForms, 700); // UI初期化を待つ
+  });
+}
 </script>

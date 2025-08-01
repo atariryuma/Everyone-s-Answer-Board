@@ -255,12 +255,7 @@ function setupEventListeners() {
 
   // 安全なフォーム作成モーダル表示
   function showFormConfigModalSafely() {
-    if (typeof showFormConfigModal === 'function') {
-      showFormConfigModal();
-    } else {
-      console.error('showFormConfigModal function not found');
-      showMessage('フォーム作成機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
-    }
+    safeCall('showFormConfigModal');
   }
 
   // Create additional form button
@@ -271,7 +266,7 @@ function setupEventListeners() {
         showMessage('スプレッドシートの情報が見つかりません。', 'error');
         return;
       }
-      showFormConfigModal();
+      safeCall('showFormConfigModal');
     });
   }
   
@@ -481,7 +476,7 @@ function setupBackdropClickHandlers() {
           // Close modal when clicking backdrop
           switch(modalId) {
             case 'form-config-modal':
-              hideFormConfigModal();
+              safeCall('hideFormConfigModal');
               break;
             case 'privacy-modal':
               hidePrivacyModal();
@@ -622,7 +617,7 @@ document.addEventListener('keydown', function(e) {
       
       switch(modalId) {
         case 'form-config-modal':
-          hideFormConfigModal();
+          safeCall('hideFormConfigModal');
           break;
         case 'privacy-modal':
           hidePrivacyModal();
