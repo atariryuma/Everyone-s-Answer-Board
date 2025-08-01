@@ -361,6 +361,12 @@ function generateViewUrl(status, userId) {
       console.log('🔧 フォールバックURL生成:', baseUrl);
     }
     
+    // 🎯 開発環境URL→本番環境URL変換処理
+    if (baseUrl && baseUrl.includes('googleusercontent.com')) {
+      baseUrl = convertDevUrlToProductionUrl(baseUrl);
+      console.log('🔄 開発環境URL→本番環境URL変換完了:', baseUrl);
+    }
+    
     if (!baseUrl) {
       console.warn('❌ WebAppURLの取得に失敗しました - 全てのフォールバックが無効');
       return null;
@@ -388,6 +394,61 @@ function generateUrlCacheKey(status, userId) {
     status?.webAppUrl || status?.appUrls?.webApp || 'no-base-url'
   ];
   return keyParts.join('|');
+}
+
+/**
+ * 開発環境URL（googleusercontent.com）を本番環境URL（script.google.com）に変換
+ * @param {string} devUrl - 開発環境URL
+ * @returns {string} 本番環境URL
+ */
+function convertDevUrlToProductionUrl(devUrl) {
+  try {
+    console.log('🔧 開発環境URL変換開始:', devUrl);
+    
+    // GoogleAppsScriptの実行URLからスクリプトIDを抽出する方法を模索
+    // 開発環境URLの例: https://n-uoo3whqxnsbcl3hdxqtnpnofkykwqt7v7oqj33q-0lu-script.googleusercontent.com/userCodeAppPanel
+    
+    // 現在のページURLから正しいスクリプトIDを取得を試行
+    const currentUrl = window.location.href;
+    
+    // 方法1: 現在のURLが既に適切なscript.google.com形式の場合
+    if (currentUrl.includes('script.google.com')) {
+      const scriptMatch = currentUrl.match(/\/s\/([A-Za-z0-9_-]+)\//);
+      if (scriptMatch && scriptMatch[1]) {
+        const scriptId = scriptMatch[1];
+        const productionUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+        console.log('✅ スクリプトIDから本番URL生成:', productionUrl);
+        return productionUrl;
+      }
+    }
+    
+    // 方法2: /exec が含まれる場合、そのまま使用
+    if (currentUrl.includes('/exec')) {
+      const execIndex = currentUrl.indexOf('/exec');
+      const productionUrl = currentUrl.substring(0, execIndex + 5);
+      console.log('✅ 現在URLから本番URL抽出:', productionUrl);
+      return productionUrl;
+    }
+    
+    // 方法3: Google Apps Scriptのデプロイ設定から推測
+    // 通常のデプロイではscriptIDが必要だが、現在のコンテキストから取得を試行
+    const urlParts = devUrl.split('/');
+    const domain = urlParts[2]; // googleusercontent.comのドメイン部分
+    
+    // 最終フォールバック: 現在のURLをベースに推測
+    if (window.location.origin && window.location.pathname.includes('/exec')) {
+      const fallbackUrl = window.location.origin + window.location.pathname;
+      console.log('🔧 フォールバック本番URL:', fallbackUrl);
+      return fallbackUrl;
+    }
+    
+    console.warn('⚠️ 本番URL変換に失敗、元のURLを返します');
+    return devUrl;
+    
+  } catch (error) {
+    console.error('❌ URL変換エラー:', error);
+    return devUrl; // エラー時は元のURLを返す
+  }
 }
 
 // =============================================================================
