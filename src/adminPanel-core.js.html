@@ -306,9 +306,22 @@ function initializeAdminPanel(incomingUserId) {
 
 // Safe text content setter
 function safeSetText(elementId, text) {
+  console.log('🔧 safeSetText: 呼び出し', { elementId, text });
+  
   var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
   if (element) {
     setSafeTextContent(element, text || '');
+    console.log('✅ safeSetText: 成功', { elementId, text });
+  } else {
+    console.warn('❌ safeSetText: 要素が見つかりません', { elementId, text });
+    // DOM要素が見つからない場合、直接DOMにアクセスを試行
+    const fallbackElement = document.getElementById(elementId);
+    if (fallbackElement) {
+      fallbackElement.textContent = text || '';
+      console.log('✅ safeSetText: フォールバック成功', { elementId, text });
+    } else {
+      console.error('❌ safeSetText: フォールバックも失敗', { elementId, text });
+    }
   }
 }
 

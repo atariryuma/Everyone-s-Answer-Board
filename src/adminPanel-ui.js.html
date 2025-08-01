@@ -173,6 +173,12 @@ function prepareStatusData(status) {
 
 // 並列UI更新の実行（非同期処理の最適化）
 function executeParallelUIUpdates(status) {
+  console.log('🔄 executeParallelUIUpdates: 開始', {
+    hasStatus: !!status,
+    hasUserInfo: !!(status && status.userInfo),
+    setupStep: status.setupStep
+  });
+  
   const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
   const currentStep = status.setupStep || 1;
   
@@ -180,10 +186,16 @@ function executeParallelUIUpdates(status) {
   const updateTasks = [
     // Task 1: 静的要素の更新
     () => {
-      clearInitialDisplayElements();
-      updateStaticUI(status);
-      if (setupStatus === 'pending') {
-        updateButtonStatesForSetup(status);
+      console.log('🔄 Task 1: 静的要素の更新開始');
+      try {
+        clearInitialDisplayElements();
+        updateStaticUI(status);
+        if (setupStatus === 'pending') {
+          updateButtonStatesForSetup(status);
+        }
+        console.log('✅ Task 1: 静的要素の更新完了');
+      } catch (error) {
+        console.error('❌ Task 1: 静的要素の更新エラー:', error);
       }
     },
     
@@ -294,11 +306,31 @@ function updateSpreadsheetButton() {
 
 // Update static UI elements
 function updateStaticUI(status) {
-  // Update database info panel
-  updateDatabaseInfo(status);
+  console.log('🔄 updateStaticUI: 開始', {
+    hasStatus: !!status,
+    hasUserInfo: !!(status && status.userInfo)
+  });
   
-  // Update existing user section
-  updateExistingUserSection(status);
+  try {
+    // Update database info panel
+    console.log('🔄 updateStaticUI: updateDatabaseInfo呼び出し');
+    updateDatabaseInfo(status);
+    console.log('✅ updateStaticUI: updateDatabaseInfo完了');
+    
+    // Update existing user section
+    console.log('🔄 updateStaticUI: updateExistingUserSection呼び出し');
+    updateExistingUserSection(status);
+    console.log('✅ updateStaticUI: updateExistingUserSection完了');
+    
+  } catch (error) {
+    console.error('❌ updateStaticUI: エラー発生:', error);
+    // エラーが発生してもフォールバック処理を実行
+    try {
+      setFallbackValues();
+    } catch (fallbackError) {
+      console.error('❌ updateStaticUI: フォールバック処理もエラー:', fallbackError);
+    }
+  }
   
   // Populate sheet selection - fix property name mismatch
   logDebug('🔍 Debug: Checking sheet data properties', {
@@ -322,26 +354,30 @@ function updateStaticUI(status) {
 // =============================================================================
 
 function updateDatabaseInfo(status) {
+  console.log('🔍 updateDatabaseInfo: 関数開始');
   console.log('🔍 updateDatabaseInfo: status構造チェック', {
     hasStatus: !!status,
     hasUserInfo: !!(status && status.userInfo),
     statusKeys: status ? Object.keys(status) : [],
     userInfoKeys: status && status.userInfo ? Object.keys(status.userInfo) : [],
     answerCount: status && status.answerCount,
-    totalReactions: status && status.totalReactions
+    totalReactions: status && status.totalReactions,
+    hasConfig: !!(status && status.config)
   });
 
   if (!status) {
-    console.warn('System info update failed: No status object');
+    console.warn('❌ updateDatabaseInfo: status object なし');
     setFallbackValues();
     return;
   }
 
   if (!status.userInfo) {
-    console.warn('System info update failed: No user info available');
+    console.warn('❌ updateDatabaseInfo: userInfo なし');
     setFallbackValues();
     return;
   }
+
+  console.log('✅ updateDatabaseInfo: バリデーション通過、UI更新開始');
 
   // スプレッドシートURLを設定
   if (status.userInfo.spreadsheetUrl) {
@@ -349,24 +385,42 @@ function updateDatabaseInfo(status) {
   }
 
   const cfg = status.config || {};
+  
+  console.log('📊 updateDatabaseInfo: 設定データ確認', {
+    config: cfg,
+    adminEmail: status.userInfo.adminEmail,
+    userId: status.userInfo.userId,
+    publishedSheetName: cfg.publishedSheetName || status.publishedSheetName,
+    answerCount: status.answerCount
+  });
 
   // 基本情報の更新
+  console.log('🔧 updateDatabaseInfo: 基本情報更新開始');
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
   safeSetText('info-answer-count', status.answerCount || '0');
+  console.log('✅ updateDatabaseInfo: 基本情報更新完了');
   
   // 新しいアカウント情報
+  console.log('🔧 updateDatabaseInfo: アカウント情報更新開始');
   updateAccountInfo(status.userInfo);
+  console.log('✅ updateDatabaseInfo: アカウント情報更新完了');
   
   // 新しいセットアップ進行状況
+  console.log('🔧 updateDatabaseInfo: セットアップ進行状況更新開始');
   updateSetupProgress(status);
+  console.log('✅ updateDatabaseInfo: セットアップ進行状況更新完了');
   
   // 新しいデータ統計
+  console.log('🔧 updateDatabaseInfo: データ統計更新開始');
   updateDataStatistics(status);
+  console.log('✅ updateDatabaseInfo: データ統計更新完了');
   
   // 新しいシステム情報
+  console.log('🔧 updateDatabaseInfo: システム情報更新開始');
   updateSystemInfo(status, cfg);
+  console.log('✅ updateDatabaseInfo: システム情報更新完了');
 
   // 公開状態の表示を更新
   const isPublished = cfg.isPublished !== undefined
@@ -388,6 +442,15 @@ function updateDatabaseInfo(status) {
 
   // チェックボックスの状態同期
   syncCheckboxStates(status);
+  
+  console.log('🎉 updateDatabaseInfo: 全処理完了', {
+    adminEmail: status.userInfo.adminEmail,
+    userId: status.userInfo.userId,
+    answerCount: status.answerCount,
+    isPublished: isPublished,
+    displayMode: displayMode,
+    showCounts: showCounts
+  });
 }
 
 // アカウント情報更新関数
