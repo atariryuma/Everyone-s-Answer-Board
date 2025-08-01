@@ -848,7 +848,7 @@ class SharedModals {
     }
 
     titleEl.textContent = title;
-    messageEl.textContent = message;
+    messageEl.innerHTML = message;
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
