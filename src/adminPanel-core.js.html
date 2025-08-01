@@ -390,6 +390,42 @@ function checkAndExpandAllSections() {
   }
 }
 
+// ドメイン情報を取得してヘッダーを更新
+function fetchDomainInfo() {
+  if (typeof runGasWithUserId !== 'function') {
+    logWarn('runGasWithUserId is not available.');
+    return Promise.resolve(null);
+  }
+
+  return runGasWithUserId('getSystemDomainInfo', false)
+    .then(info => {
+      if (!info || info.error) {
+        logWarn('Domain info retrieval failed:', info);
+        if (typeof updateDomainDisplay === 'function') {
+          updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
+        }
+        return null;
+      }
+
+      if (typeof updateDomainDisplay === 'function') {
+        if (info.isDomainMatch) {
+          updateDomainDisplay('match', info.adminDomain, 'セキュアアクセス有効');
+        } else {
+          updateDomainDisplay('mismatch', info.adminDomain, 'アクセス制限あり');
+        }
+      }
+
+      return info;
+    })
+    .catch(error => {
+      logWarn('fetchDomainInfo error:', error);
+      if (typeof updateDomainDisplay === 'function') {
+        updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
+      }
+      return null;
+    });
+}
+
 // 統合初期化システム - 単一エントリーポイント
 // システム監視用の状態管理
 window.systemStatus = {
@@ -414,6 +450,9 @@ function updateSystemStatus(component, status, error = null) {
 
 function initializeAdminPanelMaster() {
   logInfo('🚀 AdminPanel Master Initialization Started');
+  if (window.unifiedLoading) {
+    window.unifiedLoading.showSimple('初期化中...');
+  }
   updateSystemStatus('initializationStarted', true);
   
   // Phase 1: Core初期化
@@ -540,6 +579,12 @@ function initializeAdminPanelMaster() {
             
             // システム状態の最終レポート
             console.log('📊 Final System Status:', window.systemStatus);
+
+            fetchDomainInfo().finally(() => {
+              if (window.unifiedLoading) {
+                window.unifiedLoading.hide();
+              }
+            });
           } catch (error) {
             updateSystemStatus('eventsInitialized', false, error);
             console.error('❌ Events initialization failed:', error);
@@ -599,6 +644,12 @@ function initializeAdminPanelMaster() {
         
         // システム状態の最終レポート（フォールバック版）
         console.log('📊 Final System Status (Fallback):', window.systemStatus);
+
+        fetchDomainInfo().finally(() => {
+          if (window.unifiedLoading) {
+            window.unifiedLoading.hide();
+          }
+        });
       }
       
       initializeEventsWithRetry();
