@@ -51,7 +51,9 @@ function setupEventListeners() {
       showConfirmationModal(
         '公開停止の確認',
         '回答ボードの公開を停止しますか？',
-        unpublishBoard
+        () => {
+          unpublishBoard().then(() => loadStatus(true));
+        }
       );
     });
   }
