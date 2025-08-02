@@ -522,7 +522,15 @@ body {
   background: linear-gradient(90deg, var(--color-primary), #50fa7b);
   transition: width 0.5s ease;
   border-radius: 3px;
+  width: 0%; /* デフォルト値 */
 }
+
+/* プログレス用のdata属性サポート */
+.loading-progress-fill[data-progress="0"] { width: 0%; }
+.loading-progress-fill[data-progress="25"] { width: 25%; }
+.loading-progress-fill[data-progress="50"] { width: 50%; }
+.loading-progress-fill[data-progress="75"] { width: 75%; }
+.loading-progress-fill[data-progress="100"] { width: 100%; }
 
 .loading-percentage {
   font-size: 0.9rem;

@@ -154,6 +154,7 @@ function clearExecutionUserInfoCache() {
   _executionUserInfoCache = null;
 
   // 統一キャッシュマネージャーの関連エントリもクリア
+  // 統一キャッシュマネージャーの使用を確認
   if (typeof cacheManager !== 'undefined' && cacheManager) {
     try {
       // セッション関連キャッシュのクリア
@@ -676,13 +677,10 @@ function log(level, message, details) {
   }
 }
 
-function debugLog() {
-  if (!DEBUG) return;
-  try {
-    debugLog.apply(null, arguments);
-  } catch (e) {
-    // ignore logging errors
-  }
+// debugLog関数は debugConfig.gs から提供されます
+// debugConfig.gs が先に読み込まれていることを確認
+if (typeof debugLog === 'undefined') {
+  throw new Error('debugConfig.gs must be loaded before main.gs');
 }
 
 /**
@@ -1020,7 +1018,7 @@ function handleAppSetupMode() {
     return showErrorPage('アクセス拒否', 'アプリ設定にアクセスする権限がありません。');
   }
 
-  debugLog('Showing app setup page for userId:', lastAdminUserId);
+  debugLog('Showing app setup page for userId:', lastAdminUserId ? '***' : 'none');
   return showAppSetupPage(lastAdminUserId);
 }
 
@@ -1041,7 +1039,7 @@ function handleAdminMode(params) {
   // Save admin session state
   const userProperties = PropertiesService.getUserProperties();
   userProperties.setProperty('lastAdminUserId', params.userId);
-  debugLog('Saved admin session state:', params.userId);
+  debugLog('Saved admin session state:', params.userId ? '***' : 'none');
 
   const userInfo = findUserById(params.userId);
   return renderAdminPanel(userInfo, 'admin');
@@ -1131,7 +1129,7 @@ function handleUnknownMode(params) {
 
   // If valid userId with admin access, redirect to admin panel
   if (params.userId && verifyAdminAccess(params.userId)) {
-    debugLog('Redirecting unknown mode to admin panel for valid user:', params.userId);
+    debugLog('Redirecting unknown mode to admin panel for valid user:', params.userId ? '***' : 'none');
     const userInfo = findUserById(params.userId);
     return renderAdminPanel(userInfo, 'admin');
   }
@@ -1166,7 +1164,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
       const correctUrl = buildUserAdminUrl(userInfo.userId);
       return redirectToUrl(correctUrl);
     }
-    debugLog(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
+    debugLog(`✅ セキュリティ検証成功: userId ${params.userId ? '***' : 'none'} への正当なアクセスを確認しました。`);
   }
 
   return renderAdminPanel(userInfo, params.mode);
@@ -1252,7 +1250,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
     // 実行レベルキャッシュにも保存（オプション）
     if (userInfo && opts.useExecutionCache && (userId || userInfo.userId)) {
       _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
-      debugLog('✅ 実行レベルキャッシュに保存:', userId || userInfo.userId);
+      debugLog('✅ 実行レベルキャッシュに保存:', (userId || userInfo.userId) ? '***' : 'none');
     }
 
   } catch (cacheError) {
@@ -1318,7 +1316,7 @@ function showAppSetupPage(userId) {
     try {
       debugLog('showAppSetupPage: Checking deploy user permissions...');
       const currentUserEmail = getCurrentUserEmail();
-      debugLog('showAppSetupPage: Current user email:', currentUserEmail);
+      debugLog('showAppSetupPage: Current user email:', currentUserEmail ? '***@***' : 'none');
       const deployUserCheckResult = isDeployUser();
       debugLog('showAppSetupPage: isDeployUser() result:', deployUserCheckResult);
 
@@ -1381,7 +1379,7 @@ function getAppSetupUrl() {
     // システム管理者権限チェック
     debugLog('getAppSetupUrl: Checking deploy user permissions...');
     const currentUserEmail = Session.getActiveUser().getEmail();
-    debugLog('getAppSetupUrl: Current user email:', currentUserEmail);
+    debugLog('getAppSetupUrl: Current user email:', currentUserEmail ? '***@***' : 'none');
     const deployUserCheckResult = isDeployUser();
     debugLog('getAppSetupUrl: isDeployUser() result:', deployUserCheckResult);
 
@@ -1822,7 +1820,7 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.showAdminFeatures = true;
   const deployUserResult = isDeployUser();
   debugLog('renderAdminPanel - isDeployUser() result:', deployUserResult);
-  debugLog('renderAdminPanel - current user email:', getCurrentUserEmail());
+  debugLog('renderAdminPanel - current user email:', getCurrentUserEmail() ? '***@***' : 'none');
   adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
 

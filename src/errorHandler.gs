@@ -238,6 +238,50 @@ class UnifiedErrorHandler {
     const errorMessage = error.message || String(error);
     return retryablePatterns.some(pattern => pattern.test(errorMessage));
   }
+
+  // 静的プロパティ - 互換性のため
+  static get ErrorTypes() {
+    return {
+      INFO: ERROR_SEVERITY.LOW,
+      DEBUG: ERROR_SEVERITY.LOW,
+      WARNING: ERROR_SEVERITY.MEDIUM,
+      MEDIUM: ERROR_SEVERITY.MEDIUM,
+      HIGH: ERROR_SEVERITY.HIGH,
+      CRITICAL: ERROR_SEVERITY.CRITICAL
+    };
+  }
+
+  static get ErrorCategories() {
+    return {
+      SYSTEM_INITIALIZATION: ERROR_CATEGORIES.SYSTEM,
+      API_COMMUNICATION: ERROR_CATEGORIES.NETWORK,
+      DATA_VALIDATION: ERROR_CATEGORIES.VALIDATION,
+      UI_UPDATE: ERROR_CATEGORIES.SYSTEM,
+      USER_ACTION: ERROR_CATEGORIES.USER_INPUT,
+      CACHE_OPERATION: ERROR_CATEGORIES.CACHE
+    };
+  }
+
+  // 静的メソッド - グローバルインスタンスを使用
+  static logError(error, context, severity = ERROR_SEVERITY.MEDIUM, category = ERROR_CATEGORIES.SYSTEM, metadata = {}) {
+    return globalErrorHandler.logError(error, context, severity, category, metadata);
+  }
+
+  static logSecurityWarning(warning, context, metadata = {}) {
+    return globalErrorHandler.logSecurityWarning(warning, context, metadata);
+  }
+
+  static logValidationError(field, value, rule, message) {
+    return globalErrorHandler.logValidationError(field, value, rule, message);
+  }
+
+  static logPerformanceWarning(operation, duration, threshold, details = {}) {
+    return globalErrorHandler.logPerformanceWarning(operation, duration, threshold, details);
+  }
+
+  static getErrorStats() {
+    return globalErrorHandler.getErrorStats();
+  }
 }
 
 // グローバルインスタンス

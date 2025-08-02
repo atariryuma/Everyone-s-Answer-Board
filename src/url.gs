@@ -2,29 +2,10 @@
  * @fileoverview URL管理 - GAS互換版
  */
 
-// デバッグログ関数の定義（テスト環境対応）
+// ログ関数は debugConfig.gs から提供されます
+// debugConfig.gs が先に読み込まれていることを確認
 if (typeof debugLog === 'undefined') {
-  function debugLog(message, ...args) {
-    console.log('[DEBUG]', message, ...args);
-  }
-}
-
-if (typeof errorLog === 'undefined') {
-  function errorLog(message, ...args) {
-    console.error('[ERROR]', message, ...args);
-  }
-}
-
-if (typeof warnLog === 'undefined') {
-  function warnLog(message, ...args) {
-    console.warn('[WARN]', message, ...args);
-  }
-}
-
-if (typeof infoLog === 'undefined') {
-  function infoLog(message, ...args) {
-    console.log('[INFO]', message, ...args);
-  }
+  throw new Error('debugConfig.gs must be loaded before url.gs');
 }
 
 // URL管理の定数

@@ -2538,31 +2538,6 @@ function updateSystemStatusDisplay(status) {
   }
 }
 
-// Navigate to specific step
-function navigateToStep(step) {
-  currentStep = step;
-  
-  // Update step indicators
-  document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
-    const stepNumber = index + 1;
-    indicator.classList.toggle('completed', stepNumber < step);
-    indicator.classList.toggle('active', stepNumber === step);
-  });
-  
-  // Show/hide step content
-  document.querySelectorAll('.step-content').forEach((content, index) => {
-    const stepNumber = index + 1;
-    content.classList.toggle('hidden', stepNumber !== step);
-  });
-  
-  // Update progress bar
-  const progressBar = document.querySelector('.progress-bar');
-  if (progressBar) {
-    progressBar.style.width = `${(step / 3) * 100}%`;
-  }
-  
-  validateCurrentStep();
-}
 
 
 // セットアップ状況をグローバルステータスから取得

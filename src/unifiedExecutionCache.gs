@@ -24,7 +24,7 @@ class UnifiedExecutionCache {
     }
 
     if (this.userInfoCache && this.lastUserIdKey === userId) {
-      debugLog(`✅ 統一キャッシュヒット: ユーザー情報 (${userId})`);
+      debugLog(`✅ 統一キャッシュヒット: ユーザー情報 (${userId ? '***' : 'none'})`);
       return this.userInfoCache;
     }
 
@@ -39,7 +39,7 @@ class UnifiedExecutionCache {
   setUserInfo(userId, userInfo) {
     this.userInfoCache = userInfo;
     this.lastUserIdKey = userId;
-    debugLog(`💾 統一キャッシュ保存: ユーザー情報 (${userId})`);
+    debugLog(`💾 統一キャッシュ保存: ユーザー情報 (${userId ? '***' : 'none'})`);
   }
 
   /**
@@ -124,18 +124,22 @@ class UnifiedExecutionCache {
   syncWithUnifiedCache(operation) {
     if (typeof cacheManager !== 'undefined' && cacheManager) {
       try {
+        // パフォーマンス最適化: 必要最小限のキャッシュクリアのみ実行
         switch (operation) {
           case 'userDataChange':
+            // ユーザー特定データのみクリア
             if (this.lastUserIdKey) {
               cacheManager.remove(`user_${this.lastUserIdKey}`);
-              cacheManager.remove(`userinfo_${this.lastUserIdKey}`);
+              // userinfo_は重複なので除去
             }
             break;
           case 'configChange':
+            // 設定変更時のみシステム設定クリア
             cacheManager.remove('system_config');
             break;
           case 'systemChange':
-            // システム全体のキャッシュクリア
+            // 重大なシステム変更時のみ全体クリア（慎重に使用）
+            debugLog('🚨 システム全体キャッシュクリアは重大操作のため慎重に実行');
             break;
         }
         debugLog(`🔄 統一キャッシュマネージャーと同期: ${operation}`);

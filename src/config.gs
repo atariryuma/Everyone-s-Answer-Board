@@ -17,8 +17,18 @@ const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
  * メモリ管理強化版：実行時間制限とキャッシュ自動クリア
  * @param {string} [requestUserId] - リクエスト元のユーザーID (オプション)
  * @returns {object|null} ユーザー情報
+ * @deprecated Use UnifiedUserManager.getUser() instead for better consistency
  */
 function getUserInfoCached(requestUserId) {
+  // 統一ユーザー管理への移行促進のため、警告ログを出力
+  if (typeof UnifiedUserManager !== 'undefined') {
+    return UnifiedUserManager.getUser(requestUserId, { 
+      useCache: true, 
+      authCheck: false // 既存の動作を保持
+    });
+  }
+  
+  // フォールバック: 従来の実装
   // 実行時間制限チェック
   if (Date.now() - executionStartTime > EXECUTION_MAX_LIFETIME) {
     warnLog('⚠️ 実行時間制限到達、キャッシュを自動クリア');

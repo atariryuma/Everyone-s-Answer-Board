@@ -3,11 +3,10 @@
  * 主要な業務ロジックとAPI エンドポイント
  */
 
-// デバッグログ関数の定義（テスト環境対応）
+// ログ関数は debugConfig.gs から提供されます
+// debugConfig.gs が先に読み込まれていることを確認
 if (typeof debugLog === 'undefined') {
-  function debugLog(message, ...args) {
-    console.log('[DEBUG]', message, ...args);
-  }
+  throw new Error('debugConfig.gs must be loaded before Core.gs');
 }
 
 // Import standardized error handling functions
@@ -15,16 +14,14 @@ if (typeof logError === 'undefined') {
   throw new Error('errorHandler.gs must be loaded before Core.gs');
 }
 
+// warnLog関数は debugConfig.gs から提供されます
 if (typeof warnLog === 'undefined') {
-  function warnLog(message, ...args) {
-    console.warn('[WARN]', message, ...args);
-  }
+  throw new Error('debugConfig.gs must be loaded before Core.gs');
 }
 
+// infoLog関数は debugConfig.gs から提供されます
 if (typeof infoLog === 'undefined') {
-  function infoLog(message, ...args) {
-    console.log('[INFO]', message, ...args);
-  }
+  throw new Error('debugConfig.gs must be loaded before Core.gs');
 }
 
 /**
