@@ -75,7 +75,12 @@ if (typeof infoLog === 'undefined') {
  */
 function getSetupStep(userInfo, configJson) {
   // Step 1: データソース未設定
-  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+  if (
+    !userInfo ||
+    !userInfo.spreadsheetId ||
+    userInfo.spreadsheetId.trim() === '' ||
+    userInfo.spreadsheetId === 'pending'
+  ) {
     return 1;
   }
   
@@ -185,7 +190,11 @@ function determineSetupStepUnified(userInfo, configJson, options = {}) {
   const debugMode = options.debugMode || false;
 
   // Step 1: データソース未設定
-  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+  const spreadsheetId =
+    userInfo && typeof userInfo.spreadsheetId === 'string'
+      ? userInfo.spreadsheetId.trim()
+      : '';
+  if (!spreadsheetId || spreadsheetId === 'pending') {
     if (debugMode) debugLog('🔧 setupStep統一判定: Step 1 - データソース未設定');
     return 1;
   }

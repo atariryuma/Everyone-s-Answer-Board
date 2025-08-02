@@ -1118,7 +1118,10 @@ function getStepCompletionFromConfig(status) {
 
     // 通常のステップ完了判定
     // Step 1: スプレッドシートIDの存在確認
-    const step1Complete = !!(status.userInfo.spreadsheetId);
+    const spreadsheetId = (status.userInfo && typeof status.userInfo.spreadsheetId === 'string')
+      ? status.userInfo.spreadsheetId.trim()
+      : '';
+    const step1Complete = spreadsheetId !== '' && spreadsheetId !== 'pending';
     
     // Step 2: セットアップ完了状態の確認
     const step2Complete = config.setupStatus === 'completed' && 
