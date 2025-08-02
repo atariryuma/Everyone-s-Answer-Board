@@ -909,7 +909,8 @@ class UnifiedLoadingManager {
     const config = {
       message: options.message || '処理中...',
       type: options.type || 'overlay',
-      progress: options.progress || null,
+      // Preserve 0 progress values while still ignoring undefined
+      progress: options.progress ?? null,
       steps: options.steps || null,
       disableInteraction: options.disableInteraction !== false,
       ...options
@@ -971,10 +972,17 @@ class UnifiedLoadingManager {
       content += `<div class="loading-spinner"></div>`;
     }
     
-    if (config.progress !== null) {
-      const progressValue = typeof config.progress === 'object' 
-        ? Math.round((config.progress.current / config.progress.total) * 100)
-        : config.progress;
+    if (config.progress !== null && config.progress !== undefined) {
+      let progressValue = typeof config.progress === 'object'
+        ? (config.progress.total ? Math.round((config.progress.current / config.progress.total) * 100) : 0)
+        : Number(config.progress);
+
+      // Ensure the progress value is a finite number between 0 and 100
+      if (!Number.isFinite(progressValue)) {
+        progressValue = 0;
+      }
+      progressValue = Math.max(0, Math.min(100, progressValue));
+
       content += `
         <div class="loading-progress">
           <div class="loading-progress-bar"><div class="loading-progress-fill" style="width: ${progressValue}%"></div></div>
