@@ -808,8 +808,9 @@ setInterval(cleanupProcessingCache, 300000);
 
 /**
  * 統一ローディング状態管理システム（競合状態解決機能付き）
+ * 既存のUnifiedLoadingManagerが存在する場合は拡張機能のみ追加
  */
-const UnifiedLoadingManager = {
+const AdminPanelLoadingManager = {
   // 状態管理
   isActive: false,
   activeOperations: new Map(), // オペレーションIDと詳細情報のマップ
@@ -1113,30 +1114,34 @@ const UnifiedLoadingManager = {
   }
 };
 
-// グローバルに公開（既存のUnifiedLoadingManagerとの競合を回避）
+// グローバルに公開（既存のUnifiedLoadingManagerとの競合を完全回避）
 if (typeof window.UnifiedLoadingManager === 'undefined') {
-  window.UnifiedLoadingManager = UnifiedLoadingManager;
-  console.log('✅ UnifiedLoadingManager (AdminPanel enhanced version) initialized');
+  // UnifiedLoadingManagerが存在しない場合は、AdminPanelLoadingManagerをコピー
+  window.UnifiedLoadingManager = AdminPanelLoadingManager;
+  console.log('✅ UnifiedLoadingManager (AdminPanel version) initialized');
 } else {
   // 既存のUnifiedLoadingManagerが存在する場合は、機能を拡張
   console.log('ℹ️ UnifiedLoadingManager already exists, extending with AdminPanel features');
   
-  // 既存のUnifiedLoadingManagerに新機能を追加
+  // AdminPanelの拡張機能を既存のUnifiedLoadingManagerに追加
   if (!window.UnifiedLoadingManager.show) {
-    Object.assign(window.UnifiedLoadingManager, UnifiedLoadingManager);
+    Object.assign(window.UnifiedLoadingManager, AdminPanelLoadingManager);
   }
 }
 
+// AdminPanel専用の参照も作成
+window.AdminPanelLoadingManager = AdminPanelLoadingManager;
+
 // 従来のグローバルローディング状態（後方互換性）
 const globalLoadingState = {
-  get isActive() { return UnifiedLoadingManager.isActive; },
-  get activeOperations() { return new Set(UnifiedLoadingManager.activeOperations.keys()); },
-  get overlayElement() { return UnifiedLoadingManager.overlayElement; },
-  get progressElement() { return UnifiedLoadingManager.progressElement; },
-  get messageElement() { return UnifiedLoadingManager.messageElement; },
-  get currentMessage() { return UnifiedLoadingManager.currentMessage; },
-  get startTime() { return UnifiedLoadingManager.startTime; },
-  get progressUpdateTimer() { return UnifiedLoadingManager.progressUpdateTimer; }
+  get isActive() { return (window.UnifiedLoadingManager || AdminPanelLoadingManager).isActive; },
+  get activeOperations() { return new Set((window.UnifiedLoadingManager || AdminPanelLoadingManager).activeOperations.keys()); },
+  get overlayElement() { return (window.UnifiedLoadingManager || AdminPanelLoadingManager).overlayElement; },
+  get progressElement() { return (window.UnifiedLoadingManager || AdminPanelLoadingManager).progressElement; },
+  get messageElement() { return (window.UnifiedLoadingManager || AdminPanelLoadingManager).messageElement; },
+  get currentMessage() { return (window.UnifiedLoadingManager || AdminPanelLoadingManager).currentMessage; },
+  get startTime() { return (window.UnifiedLoadingManager || AdminPanelLoadingManager).startTime; },
+  get progressUpdateTimer() { return (window.UnifiedLoadingManager || AdminPanelLoadingManager).progressUpdateTimer; }
 };
 
 /**
@@ -1148,7 +1153,7 @@ const globalLoadingState = {
 function showGlobalLoading(operationId, message = '処理中...', options = {}) {
   // 統一ローディングマネージャーを使用
   if (window.UnifiedLoadingManager) {
-    return UnifiedLoadingManager.show(operationId, message, options);
+    return window.UnifiedLoadingManager.show(operationId, message, options);
   }
   
   // フォールバック: 従来の実装
@@ -1179,7 +1184,7 @@ function showGlobalLoading(operationId, message = '処理中...', options = {}) 
 function hideGlobalLoading(operationId, finalMessage) {
   // 統一ローディングマネージャーを使用
   if (window.UnifiedLoadingManager) {
-    return UnifiedLoadingManager.hide(operationId, finalMessage);
+    return window.UnifiedLoadingManager.hide(operationId, finalMessage);
   }
   
   // フォールバック: 従来の実装
