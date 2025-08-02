@@ -821,7 +821,7 @@ function proceedWithSaveAndPublish(config) {
             type: 'BOARD_PUBLISHED',
             sheetName: selectedSheet,
             timestamp: Date.now()
-          }, '*');
+          }, window.location.origin);
           logInfo('ボード公開メッセージをメインウィンドウに送信');
         }
         
@@ -1013,9 +1013,6 @@ function unpublishBoard() {
       
       // Reset column selection dropdowns to default "--列を選択--" state
       resetColumnSelections();
-      
-      loadStatus(true); // ステータスを強制更新
-      
       // 公開停止処理が成功したことを返す
       return Promise.resolve(response);
     })
@@ -2559,7 +2556,8 @@ function executeQuickStart(quickstartBtn, quickstartText) {
   } else {
     // 非公開の場合: 直接クイックスタート実行（自動公開フラグ付き）
     console.log('📝 現在非公開のため、直接クイックスタートを実行します（自動公開）');
-    executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
+    executeQuickStartProcess(quickstartBtn, quickstartText, true)
+      .then(() => loadStatus(true)); // autoPublish = true
   }
 }
 
@@ -2570,7 +2568,8 @@ function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
       // 確認時のコールバック
       () => {
         console.log('✅ ユーザーが停止して新規作成を確認しました');
-        executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
+        executeQuickStartProcess(quickstartBtn, quickstartText, true)
+          .then(() => loadStatus(true)); // autoPublish = true
       },
       // キャンセル時のコールバック
       () => {
@@ -2582,7 +2581,8 @@ function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
   } else {
     // フォールバック: 通常の確認ダイアログ
     if (confirm('現在公開中のボードを停止して、新しいフォームとボードを作成しますか？')) {
-      executeQuickStartProcess(quickstartBtn, quickstartText, true);
+      executeQuickStartProcess(quickstartBtn, quickstartText, true)
+        .then(() => loadStatus(true));
     } else {
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
@@ -2606,7 +2606,7 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
         console.log('✅ ユーザーが「停止して新規作成」を選択しました');
         
         // 公開停止処理とクイックスタートを統合実行
-        executeStopAndQuickStart(quickstartBtn, quickstartText);
+        handleStopAndCreateNew(quickstartBtn, quickstartText);
       },
       function() {
         // キャンセル時の処理
@@ -2621,7 +2621,7 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
     const confirmMessage = '現在公開中の回答ボードを停止して、新しいフォームとボードを作成しますか？\n\n• 既存の回答データは保持されます\n• 新しいフォームとスプレッドシートを作成\n• 高精度AI列判定を実行\n• 作成完了後に自動で再公開';
     
     if (confirm(confirmMessage)) {
-      executeStopAndQuickStart(quickstartBtn, quickstartText);
+      handleStopAndCreateNew(quickstartBtn, quickstartText);
     } else {
       resetQuickStartButton(quickstartBtn, quickstartText);
     }
@@ -2629,32 +2629,30 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
 }
 
 // 公開停止とクイックスタートの統合処理
-function executeStopAndQuickStart(quickstartBtn, quickstartText) {
+function handleStopAndCreateNew(quickstartBtn, quickstartText) {
   console.log('🛑📋 公開停止→クイックスタートの統合処理を開始します');
-  
+
   // ボタン状態を更新
   quickstartBtn.disabled = true;
   quickstartText.textContent = '公開停止中...';
-  
+
   // 1. まず公開停止処理を実行
   if (typeof unpublishBoard === 'function') {
     showMessage('現在の回答ボードを停止しています...', 'info');
-    
+
     unpublishBoard()
-      .then(async function(stopResult) {
+      .then(function(stopResult) {
         console.log('✅ 公開停止が完了しました:', stopResult);
         showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
-        
-        // 🔧 公開停止後のstatus更新
-        await loadStatus(true);
-        
+
         // 公開停止が完了したら、少し遅延してからクイックスタートを実行
         setTimeout(() => {
           quickstartText.textContent = 'セットアップ中...';
           console.log('🚀 クイックスタート処理を開始します（自動公開モード）');
-          
+
           // 2. クイックスタート実行（自動公開フラグ付き）
-          executeQuickStartProcess(quickstartBtn, quickstartText, true);
+          executeQuickStartProcess(quickstartBtn, quickstartText, true)
+            .then(() => loadStatus(true));
         }, 1000);
       })
       .catch(function(stopError) {
@@ -2682,15 +2680,15 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
   // Update button state
   quickstartBtn.disabled = true;
   quickstartText.textContent = 'セットアップ中...';
-  
+
   // Show progress bar and start simulation
   showQuickStartProgress();
   simulateQuickStartProgress();
-  
+
   // Show loading message optimized for QuickStart
   // クイックスタート中は専用のプログレスバーを使用するため、汎用ローディングは表示しない
-  
-  runGasWithUserId('quickStartSetup', false)
+
+  return runGasWithUserId('quickStartSetup', false)
     .then(async function(result) {
       if (result && result.status === 'success') {
         console.log('🎉 QuickStartバックエンド処理完了:', result);
@@ -2723,10 +2721,6 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         
         showMessage(`✅ クイックスタートが完了しました！${detailMessage}`, 'success');
         
-        // 🔧 QuickStart完了後のstatus更新
-        console.log('🔄 QuickStart完了後のstatus更新を開始');
-        await loadStatus(true);
-        
         // Update progress step with auto-publish status
         if (result.autoPublished) {
           updateProgressStep(5, 'completed', '回答ボードの自動公開', '🌐 ボードが自動的に公開されました');
@@ -2754,11 +2748,10 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           });
         }
         
-        // Update status after quick start
+        // Update cache after quick start
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
           window.unifiedCache.clear();
         }
-        loadStatus(true);
         
         // QuickStartフロー完了確認（包括的な完了状態検証）
         setTimeout(async () => {
@@ -2852,7 +2845,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
               type: 'FORM_CREATED',
               formUrl: result.formUrl,
               timestamp: Date.now()
-            }, '*');
+            }, window.location.origin);
           }
           
           if (typeof BroadcastChannel !== 'undefined') {

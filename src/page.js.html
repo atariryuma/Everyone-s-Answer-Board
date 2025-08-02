@@ -777,8 +777,13 @@ class StudyQuestApp {
         this.startSyncMonitoring();
       }, { timeout: 50 });
 
-      // AdminPanelからのメッセージをリッスン  
+      // AdminPanelからのメッセージをリッスン
       window.addEventListener('message', async (event) => {
+        const allowedOrigins = [window.location.origin];
+        if (!allowedOrigins.includes(event.origin)) {
+          console.warn('dropping postMessage.. was from unexpected origin:', event.origin);
+          return;
+        }
         if (event.data && event.data.type === 'REFRESH_BOARD_DATA') {
           // Refresh board data message received
           try {
