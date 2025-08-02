@@ -1411,7 +1411,7 @@ function openAppSetupPage() {
   const timeoutMessage = 'リダイレクトがタイムアウトしました。新しいタブで開きます。';
   const fallbackMessage = 'アプリ設定ページを新しいタブで開きます。';
 
-  runGasWithUserId('getWebAppUrl', loadingMessage)
+  runGasWithUserId('getProductionWebAppUrl', loadingMessage)
     .then(function(webAppUrl) {
       const setupUrl = webAppUrl + '?setup=true&mode=appsetup&userId=' + encodeURIComponent(userId);
 

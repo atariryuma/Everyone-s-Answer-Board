@@ -991,7 +991,7 @@ function preWarmCache(activeUserEmail) {
 
     // 3. システム設定の事前取得
     try {
-      getWebAppUrlCached();
+      getProductionWebAppUrl();
       results.preWarmedItems.push('webapp_url');
       debugLog('[Cache] Pre-warmed webapp URL');
     } catch (error) {

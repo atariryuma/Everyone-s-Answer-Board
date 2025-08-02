@@ -558,7 +558,7 @@ function handleDeleteRequest() {
             window.localStorage.clear();
           }
           setTimeout(function() {
-            runGasWithUserId('getWebAppUrl')
+            runGasWithUserId('getProductionWebAppUrl')
               .then(function(webAppUrl) {
                 window.location.href = webAppUrl;
               })

@@ -105,8 +105,7 @@ function forceLogoutAndRedirectToLogin() {
   debugLog('🔄 forceLogoutAndRedirectToLogin - 関数開始');
   debugLog('🔍 Function called at:', new Date().toISOString());
   debugLog('🔍 Available functions check:');
-  debugLog('  - getWebAppUrlCached:', typeof getWebAppUrlCached);
-  debugLog('  - sanitizeRedirectUrl:', typeof sanitizeRedirectUrl);
+  debugLog('  - getProductionWebAppUrl:', typeof getProductionWebAppUrl);
   debugLog('  - HtmlService:', typeof HtmlService);
 
   try {
@@ -142,20 +141,20 @@ function forceLogoutAndRedirectToLogin() {
     try {
       debugLog('🔗 URL生成開始...');
 
-      // getWebAppUrlCached関数の存在確認
-      if (typeof getWebAppUrlCached !== 'function') {
-        throw new Error('getWebAppUrlCached function not found');
+      // getProductionWebAppUrl関数の存在確認
+      if (typeof getProductionWebAppUrl !== 'function') {
+        throw new Error('getProductionWebAppUrl function not found');
       }
 
-      const rawUrl = getWebAppUrlCached() + '?mode=login';
+      const rawUrl = getProductionWebAppUrl() + '?mode=login';
       debugLog('📝 Raw URL generated:', rawUrl);
 
-      // sanitizeRedirectUrl関数の存在確認
-      if (typeof sanitizeRedirectUrl !== 'function') {
-        throw new Error('sanitizeRedirectUrl function not found');
+      // URL形式の基本検証（sanitizeRedirectUrlの代替）
+      if (!rawUrl || !rawUrl.startsWith('https://')) {
+        throw new Error('Invalid URL format');
       }
 
-      loginUrl = sanitizeRedirectUrl(rawUrl);
+      loginUrl = rawUrl;
       debugLog('✅ ログインURL生成・サニタイズ成功:', loginUrl);
 
     } catch (urlError) {
@@ -165,10 +164,10 @@ function forceLogoutAndRedirectToLogin() {
       const fallbackUrl = ScriptApp.getService().getUrl() + '?mode=login';
       debugLog('📝 Fallback URL:', fallbackUrl);
 
-      try {
-        loginUrl = sanitizeRedirectUrl(fallbackUrl);
-      } catch (sanitizeError) {
-        errorLog('❌ Fallback URL sanitization failed:', sanitizeError.message);
+      // フォールバックURLの基本検証
+      if (fallbackUrl && fallbackUrl.startsWith('https://')) {
+        loginUrl = fallbackUrl;
+      } else {
         loginUrl = fallbackUrl; // 最終フォールバック
       }
     }

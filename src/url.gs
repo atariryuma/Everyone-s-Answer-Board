@@ -51,11 +51,16 @@ function getProductionWebAppUrl() {
 
 /**
  * WebアプリのベースURLを取得します。
- * 値はキャッシュされ、再計算を避けます。
+ * キャッシュ機能付きでパフォーマンスを最適化。
  * @returns {string} WebアプリのベースURL
  */
 function getWebAppBaseUrl() {
-  return cacheManager.get('WEB_APP_URL', () => getProductionWebAppUrl());
+  try {
+    return cacheManager.get('WEB_APP_URL', () => getProductionWebAppUrl());
+  } catch (e) {
+    warnLog('Cache error, falling back to direct URL generation:', e.message);
+    return getProductionWebAppUrl();
+  }
 }
 
 /**
@@ -64,12 +69,38 @@ function getWebAppBaseUrl() {
  * @returns {{adminUrl: string, viewUrl: string}} 生成されたURL
  */
 function generateUserUrls(userId) {
+  if (!userId) {
+    errorLog('generateUserUrls: userId is required');
+    return { adminUrl: '', viewUrl: '' };
+  }
+  
   const baseUrl = getWebAppBaseUrl();
+  if (!baseUrl) {
+    errorLog('generateUserUrls: Failed to get base URL');
+    return { adminUrl: '', viewUrl: '' };
+  }
+  
+  const encodedUserId = encodeURIComponent(userId);
   return {
-    adminUrl: `${baseUrl}?mode=admin&userId=${userId}`,
-    viewUrl: `${baseUrl}?mode=view&userId=${userId}`
+    adminUrl: `${baseUrl}?mode=admin&userId=${encodedUserId}`,
+    viewUrl: `${baseUrl}?mode=view&userId=${encodedUserId}`
   };
 }
 
-// 既存のgetWebAppUrlCachedやgetFallbackUrlなどは不要になるため削除
-// 必要に応じて、他のファイルでgetProductionWebAppUrlを呼び出すように変更します。
+/**
+ * 後方互換性のための廃止予定関数
+ * @deprecated getProductionWebAppUrl() を直接使用してください
+ */
+function getWebAppUrl() {
+  warnLog('getWebAppUrl() is deprecated. Use getProductionWebAppUrl() instead.');
+  return getProductionWebAppUrl();
+}
+
+/**
+ * 後方互換性のための廃止予定関数  
+ * @deprecated getProductionWebAppUrl() を直接使用してください
+ */
+function getWebAppUrlCached() {
+  warnLog('getWebAppUrlCached() is deprecated. Use getWebAppBaseUrl() instead.');
+  return getWebAppBaseUrl();
+}
