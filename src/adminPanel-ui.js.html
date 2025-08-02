@@ -410,7 +410,8 @@ function updateUnpublishButton(status) {
     }
   }
   
-  const finalIsPublished = isPublished && explicitAppPublished;
+  // Treat the board as published when either flag indicates publication.
+  const finalIsPublished = isPublished || explicitAppPublished;
 
   if (finalIsPublished) {
     unpublishBtn.classList.remove('hidden');
@@ -1221,8 +1222,10 @@ function updateFooterAndGuidance(status) {
     }
   }
   
-  // Final publication decision: both normalized and explicit checks must agree
-  const finalIsPublished = isPublished && explicitAppPublished;
+  // Final publication decision: board is considered published if either flag is true
+  // This prevents inconsistent states where the backend has published the board
+  // but normalization hasn't yet reflected the change.
+  const finalIsPublished = isPublished || explicitAppPublished;
   
   console.log('🔍 Enhanced publication check:', {
     'normalized isPublished': isPublished,
