@@ -441,6 +441,9 @@
     openAppSetupPage,
     logoutAndRedirect
   };
+  
+  // 後方互換性のためのグローバル関数
+  window.initializeAdminPanel = initializeAdminPanel;
 
   // StudyQuest アプリ設定への遷移
   function openAppSetupPage() {

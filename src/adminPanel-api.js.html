@@ -784,6 +784,9 @@ function repairSetupStateInconsistencies() {
     try {
       console.log('🔧 セットアップ状態の診断・修復を開始...');
       
+      // currentStatusを取得
+      const currentStatus = window.lastStatusCache;
+      
       if (!currentStatus || !currentStatus.userInfo) {
         reject(new Error('ユーザー情報が利用できません'));
         return;

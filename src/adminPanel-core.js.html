@@ -1113,8 +1113,19 @@ const UnifiedLoadingManager = {
   }
 };
 
-// グローバルに公開
-window.UnifiedLoadingManager = UnifiedLoadingManager;
+// グローバルに公開（既存のUnifiedLoadingManagerとの競合を回避）
+if (typeof window.UnifiedLoadingManager === 'undefined') {
+  window.UnifiedLoadingManager = UnifiedLoadingManager;
+  console.log('✅ UnifiedLoadingManager (AdminPanel enhanced version) initialized');
+} else {
+  // 既存のUnifiedLoadingManagerが存在する場合は、機能を拡張
+  console.log('ℹ️ UnifiedLoadingManager already exists, extending with AdminPanel features');
+  
+  // 既存のUnifiedLoadingManagerに新機能を追加
+  if (!window.UnifiedLoadingManager.show) {
+    Object.assign(window.UnifiedLoadingManager, UnifiedLoadingManager);
+  }
+}
 
 // 従来のグローバルローディング状態（後方互換性）
 const globalLoadingState = {
