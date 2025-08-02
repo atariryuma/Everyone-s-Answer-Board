@@ -361,12 +361,6 @@ function generateViewUrl(status, userId) {
       console.log('🔧 フォールバックURL生成:', baseUrl);
     }
     
-    // 🎯 開発環境URL→本番環境URL変換処理
-    if (baseUrl && baseUrl.includes('googleusercontent.com')) {
-      baseUrl = convertDevUrlToProductionUrl(baseUrl);
-      console.log('🔄 開発環境URL→本番環境URL変換完了:', baseUrl);
-    }
-    
     if (!baseUrl) {
       console.warn('❌ WebAppURLの取得に失敗しました - 全てのフォールバックが無効');
       return null;
@@ -396,19 +390,7 @@ function generateUrlCacheKey(status, userId) {
   return keyParts.join('|');
 }
 
-/**
- * 開発環境URL（googleusercontent.com）を本番環境URL（script.google.com）に変換
- * @param {string} devUrl - 開発環境URL
- * @returns {string} 本番環境URL
- */
-function convertDevUrlToProductionUrl(devUrl) {
-  // Simplistic conversion: replace 'userCodeAppPanel' with 'exec' if present
-  if (devUrl.includes('userCodeAppPanel')) {
-    return devUrl.replace('userCodeAppPanel', 'exec');
-  }
-  // Otherwise, return the original URL
-  return devUrl;
-}
+
 
 // =============================================================================
 // MAIN UI UPDATE FUNCTIONS

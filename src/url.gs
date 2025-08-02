@@ -57,22 +57,13 @@ function normalizeUrlString(url) {
  */
 function computeWebAppUrl() {
   try {
-    let url = ScriptApp.getService().getUrl();
-    if (!url) {
-      warnLog('ScriptApp.getService().getUrl()がnullを返しました');
-      return getFallbackUrl(); // Fallback if URL is null
-    }
-
-    // 末尾のスラッシュを除去
-    url = url.replace(/\/$/, '');
-
-    // Production URL should always be returned directly
-    infoLog('✅ WebAppURL取得完了:', url);
-    return url;
-
+    // 常にフォールバックURLを使用することで、開発環境URLの混入を防ぎ、
+    // 安定した本番環境URL（script.google.comドメイン）を保証する。
+    infoLog('✅ WebAppURL取得完了 (フォールバック使用):', getFallbackUrl());
+    return getFallbackUrl();
   } catch (e) {
     errorLog('WebアプリURL取得エラー:', e.message);
-    return getFallbackUrl(); // Fallback on error
+    return getFallbackUrl(); // エラー時もフォールバック
   }
 }
 

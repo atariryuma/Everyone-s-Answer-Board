@@ -1736,13 +1736,7 @@ function sanitizeRedirectUrl(url) {
       return getWebAppUrlCached();
     }
 
-    // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
-    if (cleanUrl.includes('userCodeAppPanel')) {
-      warnLog('Development URL detected in redirect, using fallback:', cleanUrl);
-      return getWebAppUrlCached();
-    }
-
-    // 最終的な URL 妥当性チェック（googleusercontent.comも有効URLとして認識）
+    // URLの妥当性チェック（url.gsで生成された本番URLを信頼）
     const isValidUrl = cleanUrl.includes('script.google.com') ||
                      cleanUrl.includes('googleusercontent.com') ||
                      cleanUrl.includes('localhost');

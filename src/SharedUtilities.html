@@ -1050,7 +1050,7 @@ window.setLoading = function(isLoading, message, step, percentage) {
 // Suppress iframe and sandbox-related warnings specific to Google Apps Script
 (function() {
   const isGoogleAppsScript = window.location.hostname.includes('script.google.com') ||
-                           window.location.href.includes('script.googleusercontent.com') ||
+                           
                            typeof google !== 'undefined' && google.script;
 
   if (isGoogleAppsScript) {
