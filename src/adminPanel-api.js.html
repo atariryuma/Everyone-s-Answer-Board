@@ -283,7 +283,7 @@ function loadStatusCore(bypassCache = false) {
           logDebug('✅ Sheet details included in integrated response, applying configuration');
           updateLoadingMessage('シート設定を適用中...');
           try {
-            safeCall('populateHeaderOptions', details.allHeaders);
+            safeCall('populateHeaderOptions', response.sheetDetails.allHeaders);
             logDebug('✅ Header options populated from integrated data');
             populateConfig(response.sheetDetails.guessedConfig);
             logDebug('✅ AI configuration applied from integrated data');
@@ -816,29 +816,14 @@ function proceedWithSaveAndPublish(config) {
         logDebug('Board published successfully - history will be saved on unpublish');
         
         // ボードビューアーに即座更新を通知
-        try {
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-              type: 'BOARD_PUBLISHED',
-              sheetName: selectedSheet,
-              timestamp: Date.now()
-            }, '*');
-            logInfo('ボード公開メッセージをメインウィンドウに送信');
-          }
-          
-          // 同じドメインの他のタブにも通知
-          if (typeof BroadcastChannel !== 'undefined') {
-            const channel = new BroadcastChannel('board-updates');
-            channel.postMessage({
-              type: 'BOARD_PUBLISHED',
-              sheetName: selectedSheet,
-              timestamp: Date.now()
-            });
-            channel.close();
-            logInfo('ボード公開メッセージをBroadcastChannelで送信');
-          }
-        } catch (broadcastError) {
-          console.warn('リアルタイム更新通知でエラー:', broadcastError);
+        // ボードビューアーに即座更新を通知
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'BOARD_PUBLISHED',
+            sheetName: selectedSheet,
+            timestamp: Date.now()
+          }, '*');
+          logInfo('ボード公開メッセージをメインウィンドウに送信');
         }
         
         // 6時間自動停止の確認モーダルを表示

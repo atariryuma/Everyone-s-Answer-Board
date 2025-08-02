@@ -1058,6 +1058,10 @@ function updateConfigButtons() {
   }
 }
 
+// Ensure global access
+window.updateConfigButtons = updateConfigButtons;
+console.log('✅ updateConfigButtons actual function loaded');
+
 // =============================================================================
 // STEP INDICATORS AND GUIDANCE
 // =============================================================================
