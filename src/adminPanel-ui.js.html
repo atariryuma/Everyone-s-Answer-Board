@@ -402,12 +402,20 @@ function generateUrlCacheKey(status, userId) {
  * @returns {string} 本番環境URL
  */
 function convertDevUrlToProductionUrl(devUrl) {
-  // Simplistic conversion: replace 'userCodeAppPanel' with 'exec' if present
-  if (devUrl.includes('userCodeAppPanel')) {
-    return devUrl.replace('userCodeAppPanel', 'exec');
+  if (devUrl.includes('googleusercontent.com')) {
+    try {
+      // Extract the deployment ID from the URL
+      // Example: https://n-uoo3whqxnsbcl3hdxqtnpnofkykwqt7v7oqj33q-0lu-script.googleusercontent.com/exec
+      const match = devUrl.match(/https:\/\/[a-zA-Z0-9-]+-([a-zA-Z0-9_-]+)\.script\.googleusercontent\.com\/exec/);
+      if (match && match[1]) {
+        const scriptId = match[1];
+        return `https://script.google.com/macros/s/${scriptId}/exec`;
+      }
+    } catch (e) {
+      console.error('Error extracting script ID from dev URL:', e);
+    }
   }
-  // Otherwise, return the original URL
-  return devUrl;
+  return devUrl; // Return original if not a dev URL or extraction fails
 }
 
 // =============================================================================
