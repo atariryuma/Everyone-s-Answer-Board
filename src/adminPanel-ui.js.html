@@ -33,6 +33,10 @@ function updateUIWithNewStatusInternal(status) {
     updateFooterAndGuidance(status);
     updateStepIndicators(status);
     
+    // システム状況パネルの更新（重要：これが欠けていた）
+    updateDatabaseInfo(status);
+    updateSystemStatusDisplay(status);
+    
     console.log('✅ Simplified UI update completed');
   } catch (error) {
     console.error('❌ UI update failed:', error);
