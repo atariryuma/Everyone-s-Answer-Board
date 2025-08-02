@@ -21,21 +21,10 @@ const uiUpdateBatching = {
   
   // DOM操作の結果キャッシュ
   domCache: new Map(),
-
+  
   // 最後の更新内容
   lastUpdateData: null
 };
-
-// 安全なJSONパースヘルパー
-function safeParseJSON(jsonStr, fallback = null) {
-  if (typeof jsonStr !== 'string') return jsonStr || fallback;
-  try {
-    return JSON.parse(jsonStr);
-  } catch (e) {
-    logWarn('safeParseJSON failed', e);
-    return fallback;
-  }
-}
 
 /**
  * UI更新をバッチ処理でスケジュール
@@ -121,12 +110,9 @@ function executeBatchedUIUpdates() {
  * @returns {string} ハッシュ値
  */
 function generateStatusHash(status) {
-  const configObj = status.userInfo?.configJson
-    ? safeParseJSON(status.userInfo.configJson, {})
-    : {};
   const keyData = {
     setupStep: status.setupStep,
-    setupStatus: configObj.setupStatus || null,
+    setupStatus: status.userInfo?.configJson ? JSON.parse(status.userInfo.configJson).setupStatus : null,
     activeSheet: status.activeSheetName,
     appPublished: status.config?.appPublished,
     hasSheetDetails: !!status.sheetDetails
@@ -290,10 +276,11 @@ function getPublicationState(status) {
   }
   // 3. Check configJson for appPublished
   else if (status.userInfo?.configJson) {
-    const config = safeParseJSON(status.userInfo.configJson, {});
-    if (config.appPublished === true) {
-      isPublished = true;
-      reason = 'configJson.appPublished=true';
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      if (config.appPublished === true) {
+        isPublished = true;
+        reason = 'configJson.appPublished=true';
         
         // Enhanced validation: Verify setup completion indicators
         const hasCompletedSetup = (
@@ -316,15 +303,18 @@ function getPublicationState(status) {
         }
       } 
       // 4. Enhanced completion check: Allow recognition of completed but not yet published setups
-    } else if (config.setupStatus === 'completed' &&
-               config.formCreated === true &&
-               config.publishedSheetName &&
+      else if (config.setupStatus === 'completed' && 
+               config.formCreated === true && 
+               config.publishedSheetName && 
                config.publishedSpreadsheetId) {
         // This covers cases where setup is complete but appPublished might not be properly set
         console.log('🔧 Publication state: Setup complete but appPublished=false - potential state inconsistency');
         reason = 'セットアップ完了だが公開状態不整合';
         // Don't auto-publish, but log for debugging
       }
+    } catch (e) {
+      console.warn('Failed to parse configJson:', e);
+    }
   }
   
   // Maintained strict logic to prevent false positives
@@ -643,8 +633,13 @@ function updateUnpublishButton(status) {
   let explicitAppPublished = status.appPublished === true;
   
   if (!explicitAppPublished && status.userInfo?.configJson) {
-    const config = safeParseJSON(status.userInfo.configJson, {});
-    explicitAppPublished = config.appPublished === true;
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      explicitAppPublished = config.appPublished === true;
+    } catch (configError) {
+      console.warn('❌ Failed to parse configJson for unpublish button check:', configError);
+      explicitAppPublished = false;
+    }
   }
   
   const finalIsPublished = isPublished && explicitAppPublished;
@@ -776,10 +771,11 @@ function syncCheckboxStates(status) {
     if (status.config.showCounts !== undefined) showCounts = status.config.showCounts;
   } else if (status.userInfo?.configJson) {
     // 2. Fallback to raw configJson
-    const config = safeParseJSON(status.userInfo.configJson, {});
-    if (config.showNames !== undefined) showNames = config.showNames;
-    if (config.showCounts !== undefined) showCounts = config.showCounts;
-    if (!config || Object.keys(config).length === 0) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      if (config.showNames !== undefined) showNames = config.showNames;
+      if (config.showCounts !== undefined) showCounts = config.showCounts;
+    } catch (e) {
       logWarn('Failed to parse configJson, using status properties');
       if (status.showNames !== undefined) showNames = status.showNames;
       if (status.showCounts !== undefined) showCounts = status.showCounts;
@@ -1081,8 +1077,8 @@ function getStepCompletionFromConfig(status) {
   }
 
   try {
-    const config = typeof status.userInfo.configJson === 'string'
-      ? safeParseJSON(status.userInfo.configJson, {})
+    const config = typeof status.userInfo.configJson === 'string' 
+      ? JSON.parse(status.userInfo.configJson) 
       : status.userInfo.configJson;
 
     // 公開状態の優先チェック（データ不整合に関係なく公開済みなら全ステップ完了）
@@ -1317,8 +1313,13 @@ function updateFooterAndGuidance(status) {
   let explicitAppPublished = status.appPublished === true;
   
   if (!explicitAppPublished && status.userInfo?.configJson) {
-    const config = safeParseJSON(status.userInfo.configJson, {});
-    explicitAppPublished = config.appPublished === true;
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      explicitAppPublished = config.appPublished === true;
+    } catch (configError) {
+      console.warn('❌ Failed to parse configJson for publication check:', configError);
+      explicitAppPublished = false;
+    }
   }
   
   // Final publication decision: both normalized and explicit checks must agree
@@ -1435,7 +1436,7 @@ function updateTopicText(status) {
   // userInfo.configJsonからも情報を取得
   if (status.userInfo?.configJson) {
     try {
-      const fullConfig = safeParseJSON(status.userInfo.configJson, {});
+      const fullConfig = JSON.parse(status.userInfo.configJson);
       cfg = { ...cfg, ...fullConfig };
     } catch (e) {
       console.warn('Failed to parse userInfo.configJson:', e);
@@ -1450,9 +1451,13 @@ function updateTopicText(status) {
     const sheetName = cfg.publishedSheetName || status.publishedSheetName;
     if (sheetName) {
       if (status.userInfo?.configJson) {
-        const fullCfg = safeParseJSON(status.userInfo.configJson, {});
-        const sheetCfg = fullCfg['sheet_' + sheetName] || {};
-        topic = sheetCfg.opinionHeader || sheetName || '（問題文未設定）';
+        try {
+          const fullCfg = JSON.parse(status.userInfo.configJson);
+          const sheetCfg = fullCfg['sheet_' + sheetName] || {};
+          topic = sheetCfg.opinionHeader || sheetName || '（問題文未設定）';
+        } catch (e) {
+          topic = sheetName || '（問題文未設定）';
+        }
       } else {
         topic = sheetName;
       }
@@ -2039,8 +2044,8 @@ function getFormUrlFromStatus(status) {
   // 1. configJsonから直接取得（最も確実）
   if (userInfo.configJson) {
     try {
-      const configJson = typeof userInfo.configJson === 'string'
-        ? safeParseJSON(userInfo.configJson, {})
+      const configJson = typeof userInfo.configJson === 'string' 
+        ? JSON.parse(userInfo.configJson) 
         : userInfo.configJson;
       
       if (configJson?.formUrl) {
@@ -2192,7 +2197,7 @@ function activateSelectedSheet(sheetName) {
       // currentStatusを更新
       if (currentStatus.userInfo.configJson) {
         try {
-          const config = safeParseJSON(currentStatus.userInfo.configJson, {});
+          const config = JSON.parse(currentStatus.userInfo.configJson);
           config.publishedSheetName = sheetName;
           currentStatus.userInfo.configJson = JSON.stringify(config);
           currentStatus.activeSheetName = sheetName;
@@ -2391,9 +2396,9 @@ function getSetupStatusFromUserInfo(userInfo) {
       return 'pending'; // ユーザー情報がない場合はセットアップ未完了とみなす
     }
 
-  const config = typeof userInfo.configJson === 'string'
-    ? safeParseJSON(userInfo.configJson, {})
-    : userInfo.configJson;
+    const config = typeof userInfo.configJson === 'string'
+      ? JSON.parse(userInfo.configJson)
+      : userInfo.configJson;
 
     // setupStatusが明示的に設定されている場合はそれを使用
     if (config.setupStatus) {
@@ -2556,8 +2561,8 @@ function updateSystemStatusDisplay(status) {
   // 1. configJsonから取得
   if (status.userInfo && status.userInfo.configJson) {
     try {
-      const configJson = typeof status.userInfo.configJson === 'string'
-        ? safeParseJSON(status.userInfo.configJson, {})
+      const configJson = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
         : status.userInfo.configJson;
       
       if (configJson && configJson.formUrl) {
@@ -2739,7 +2744,7 @@ function saveToHistory(historyItem) {
 function getHistoryFromStorage() {
   try {
     const historyJson = localStorage.getItem(HISTORY_STORAGE_KEY);
-    return historyJson ? safeParseJSON(historyJson, []) : [];
+    return historyJson ? JSON.parse(historyJson) : [];
   } catch (error) {
     logWarn('Failed to parse history from storage:', error);
     return [];
