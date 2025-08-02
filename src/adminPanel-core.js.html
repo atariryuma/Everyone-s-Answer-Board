@@ -1152,27 +1152,34 @@ const globalLoadingState = {
  */
 function showGlobalLoading(operationId, message = '処理中...', options = {}) {
   // 統一ローディングマネージャーを使用
-  if (window.UnifiedLoadingManager) {
-    return window.UnifiedLoadingManager.show(operationId, message, options);
+  if (window.unifiedLoading) {
+    const config = {
+      message,
+      type: options.type || (options.showProgress === false ? 'overlay' : 'progress'),
+      progress: options.progress,
+      disableInteraction: options.disableInteraction !== false
+    };
+    window.unifiedLoading.show(config);
+    return;
   }
-  
+
   // フォールバック: 従来の実装
   console.log(`🔄 Global loading start: ${operationId} - ${message}`);
-  
+
   // Create overlay if not exists
   if (!globalLoadingState.overlayElement) {
     createGlobalLoadingOverlay();
   }
-  
+
   // Update message and show overlay
   updateLoadingMessage(message);
   showLoadingOverlay();
-  
+
   // Start progress tracking if enabled
   if (options.showProgress !== false) {
     startProgressTracking();
   }
-  
+
   globalLoadingState.isActive = true;
 }
 
@@ -1183,13 +1190,19 @@ function showGlobalLoading(operationId, message = '処理中...', options = {}) 
  */
 function hideGlobalLoading(operationId, finalMessage) {
   // 統一ローディングマネージャーを使用
-  if (window.UnifiedLoadingManager) {
-    return window.UnifiedLoadingManager.hide(operationId, finalMessage);
+  if (window.unifiedLoading) {
+    if (finalMessage) {
+      window.unifiedLoading.show({ message: finalMessage, type: 'overlay', disableInteraction: true });
+      setTimeout(() => window.unifiedLoading.hide(), 800);
+    } else {
+      window.unifiedLoading.hide();
+    }
+    return;
   }
-  
+
   // フォールバック: 従来の実装
   console.log(`✅ Global loading end: ${operationId}`);
-  
+
   if (finalMessage) {
     updateLoadingMessage(finalMessage);
     setTimeout(() => hideLoadingOverlay(), 800);
@@ -1321,6 +1334,12 @@ function hideLoadingOverlay() {
  * @param {string} message - New message to display
  */
 function updateLoadingMessage(message) {
+  if (window.unifiedLoading && window.unifiedLoading.currentState) {
+    const config = { ...window.unifiedLoading.currentState, message };
+    window.unifiedLoading.show(config);
+    return;
+  }
+
   if (globalLoadingState.messageElement) {
     globalLoadingState.messageElement.textContent = message;
     globalLoadingState.currentMessage = message;
