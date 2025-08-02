@@ -1029,6 +1029,13 @@ function updateSystemStatus(component, status, error = null) {
 }
 
 function initializeAdminPanelMaster() {
+  // 重複初期化防止
+  if (window.adminPanelInitialized) {
+    console.log('⚠️ Admin panel already initialized, skipping...');
+    return;
+  }
+  window.adminPanelInitialized = true;
+  
   console.log('🚀 Starting simplified admin panel initialization...');
   updateSystemStatus('initializationStarted', true);
   
@@ -1243,6 +1250,12 @@ function waitForFunctions(funcNames, maxRetries = 50, interval = 100) {
 // 簡素化された初期化システム
 function safeInitializeAdminPanelMaster() {
   try {
+    // 重複初期化防止
+    if (window.adminPanelInitialized) {
+      console.log('⚠️ Admin panel already initialized, skipping safe init...');
+      return;
+    }
+    
     console.log('🚀 Starting simplified admin panel initialization...');
     
     // Core初期化フラグを設定

@@ -33,9 +33,8 @@ function updateUIWithNewStatusInternal(status) {
     updateFooterAndGuidance(status);
     updateStepIndicators(status);
     
-    // システム状況パネルの更新（重要：これが欠けていた）
+    // システム状況パネルの更新（updateDatabaseInfoに統合済み）
     updateDatabaseInfo(status);
-    updateSystemStatusDisplay(status);
     
     console.log('✅ Simplified UI update completed');
   } catch (error) {
@@ -2300,28 +2299,37 @@ function updateBasicStaticUI(status) {
   }
 }
 
-// Update system status display
+// Update system status display - 安全版
 function updateSystemStatusDisplay(status) {
   if (!status) return;
   
-  // Update publish status
-  const publishIndicator = document.getElementById('info-publish-indicator');
-  const publishText = document.getElementById('info-publish-text');
-  
-  if (status.isPublished) {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
-    publishText.textContent = '公開中';
-  } else {
-    publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
-    publishText.textContent = '非公開';
+  try {
+    // Update publish status with null checks
+    const publishIndicator = document.getElementById('info-publish-indicator');
+    const publishText = document.getElementById('info-publish-text');
+    
+    if (publishIndicator && publishText) {
+      if (status.isPublished) {
+        publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
+        publishText.textContent = '公開中';
+      } else {
+        publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+        publishText.textContent = '非公開';
+      }
+    }
+    
+    // Update other status fields with safe access
+    safeSetText('info-published-sheet', status.sheetName || '-');
+    safeSetText('info-display-mode', status.displayMode || '-');
+    safeSetText('info-show-counts', status.showCounts ? '表示' : '非表示');
+    
+    // Skip non-existent elements
+    // Note: info-answer-count and info-reaction-count elements don't exist in HTML
+    console.log('✅ System status display updated safely');
+  } catch (error) {
+    console.error('❌ System status display update failed:', error);
+    return; // Prevent further execution on error
   }
-  
-  // Update other status fields
-  document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
-  document.getElementById('info-display-mode').textContent = status.displayMode || '-';
-  document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
-  document.getElementById('info-answer-count').textContent = status.answerCount || '0';
-  document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
   
   // Enable resource buttons if URLs are available
   const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
