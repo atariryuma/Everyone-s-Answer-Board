@@ -2884,40 +2884,34 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
 }
 
 // 公開停止とクイックスタートの統合処理
-function handleStopAndCreateNew(quickstartBtn, quickstartText) {
+async function handleStopAndCreateNew(quickstartBtn, quickstartText) {
   console.log('🛑📋 公開停止→クイックスタートの統合処理を開始します');
 
-  // ボタン状態を更新
-  quickstartBtn.disabled = true;
-  quickstartText.textContent = '公開停止中...';
+  try {
+    // ボタン状態を更新
+    quickstartBtn.disabled = true;
+    quickstartText.textContent = '公開停止中...';
 
-  // 1. まず公開停止処理を実行
-  if (typeof unpublishBoard === 'function') {
+    if (typeof unpublishBoard !== 'function') {
+      throw new Error('unpublishBoard function not found');
+    }
+
     showMessage('現在の回答ボードを停止しています...', 'info');
+    const stopResult = await unpublishBoard();
+    console.log('✅ 公開停止が完了しました:', stopResult);
+    showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
 
-    unpublishBoard()
-      .then(function(stopResult) {
-        console.log('✅ 公開停止が完了しました:', stopResult);
-        showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
+    // 公開停止が完了したら、少し遅延してからクイックスタートを実行
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    quickstartText.textContent = 'セットアップ中...';
+    console.log('🚀 クイックスタート処理を開始します（自動公開モード）');
 
-        // 公開停止が完了したら、少し遅延してからクイックスタートを実行
-        setTimeout(() => {
-          quickstartText.textContent = 'セットアップ中...';
-          console.log('🚀 クイックスタート処理を開始します（自動公開モード）');
-
-          // 2. クイックスタート実行（自動公開フラグ付き）
-          executeQuickStartProcess(quickstartBtn, quickstartText, true)
-            .then(() => loadStatus(true));
-        }, 1000);
-      })
-      .catch(function(stopError) {
-        console.error('❌ 公開停止に失敗しました:', stopError);
-        showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
-        resetQuickStartButton(quickstartBtn, quickstartText);
-      });
-  } else {
-    console.error('❌ unpublishBoard function not found');
-    showMessage('❌ 公開停止機能が見つかりません。ページを再読み込みしてください。', 'error');
+    // クイックスタート実行（自動公開フラグ付き）
+    await executeQuickStartProcess(quickstartBtn, quickstartText, true);
+    await loadStatus(true);
+  } catch (error) {
+    console.error('❌ 公開停止→クイックスタート処理に失敗しました:', error);
+    showMessage('❌ 公開停止またはセットアップに失敗しました。再度お試しください。', 'error');
     resetQuickStartButton(quickstartBtn, quickstartText);
   }
 }
