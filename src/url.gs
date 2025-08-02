@@ -49,5 +49,27 @@ function getProductionWebAppUrl() {
   }
 }
 
+/**
+ * WebアプリのベースURLを取得します。
+ * 値はキャッシュされ、再計算を避けます。
+ * @returns {string} WebアプリのベースURL
+ */
+function getWebAppBaseUrl() {
+  return cacheManager.get('WEB_APP_URL', () => getProductionWebAppUrl());
+}
+
+/**
+ * ユーザー毎のアプリURLを生成します。
+ * @param {string} userId ユーザーID
+ * @returns {{adminUrl: string, viewUrl: string}} 生成されたURL
+ */
+function generateUserUrls(userId) {
+  const baseUrl = getWebAppBaseUrl();
+  return {
+    adminUrl: `${baseUrl}?mode=admin&userId=${userId}`,
+    viewUrl: `${baseUrl}?mode=view&userId=${userId}`
+  };
+}
+
 // 既存のgetWebAppUrlCachedやgetFallbackUrlなどは不要になるため削除
 // 必要に応じて、他のファイルでgetProductionWebAppUrlを呼び出すように変更します。

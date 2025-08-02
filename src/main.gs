@@ -701,8 +701,8 @@ function getDeployUserDomainInfo() {
     if (webAppUrl) {
       // Google WorkspaceアカウントのドメインをURLから抽出
       const domainMatch =
-        webAppUrl.match(/\/a\/([a-zA-Z0-9\-.]+)\/macros\/) ||
-        webAppUrl.match(/\/a\/macros\/([a-zA-Z0-9\-.]+)\/);
+        webAppUrl.match(/\/a\/([a-zA-Z0-9\-.]+)\/macros\//) ||
+        webAppUrl.match(/\/a\/macros\/([a-zA-Z0-9\-.]+)\//);
       if (domainMatch && domainMatch[1]) {
         deployDomain = domainMatch[1];
       }
