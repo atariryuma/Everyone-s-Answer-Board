@@ -262,10 +262,13 @@ function performSystemDiagnostics() {
     };
 
     // パフォーマンス情報
+    const execCache = typeof getUnifiedExecutionCache === 'function'
+      ? getUnifiedExecutionCache()
+      : { executionStartTime: Date.now() };
     diagnostics.performance = {
       cacheHealth: cacheManager?.getHealth() || 'unavailable',
       memoryStats: globalContextManager?.activeContexts?.size || 0,
-      lastExecutionTime: Date.now() - executionStartTime
+      lastExecutionTime: Date.now() - execCache.executionStartTime
     };
 
     // セキュリティ情報
@@ -373,7 +376,7 @@ function getMonitoringDashboard() {
         maxContexts: globalContextManager.maxConcurrentContexts
       } : null,
       errors: getRecentErrors(),
-      uptime: Date.now() - executionStartTime
+      uptime: Date.now() - execCache.executionStartTime
     };
 
     timer.end();

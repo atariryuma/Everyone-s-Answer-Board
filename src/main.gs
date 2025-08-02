@@ -144,34 +144,6 @@ const LOG_SHEET_CONFIG = {
   HEADERS: ['timestamp', 'userId', 'action', 'details']
 };
 
-// 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
-let _executionUserInfoCache = null;
-
-/**
- * 実行中のユーザー情報キャッシュをクリア
- */
-function clearExecutionUserInfoCache() {
-  _executionUserInfoCache = null;
-
-  // 統一キャッシュマネージャーの関連エントリもクリア
-  // 統一キャッシュマネージャーの使用を確認
-  if (typeof cacheManager !== 'undefined' && cacheManager) {
-    try {
-      // セッション関連キャッシュのクリア
-      const currentEmail = getCurrentUserEmail();
-      if (currentEmail) {
-        cacheManager.remove('session_' + currentEmail);
-      }
-
-      debugLog('[Memory] 実行レベル + 統一キャッシュの関連エントリをクリアしました');
-    } catch (error) {
-      debugLog('[Memory] 統一キャッシュクリア中にエラー:', error.message);
-    }
-  } else {
-    debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
-  }
-}
-
 const COLUMN_HEADERS = {
   TIMESTAMP: 'タイムスタンプ',
   EMAIL: 'メールアドレス',
@@ -677,10 +649,21 @@ function log(level, message, details) {
   }
 }
 
-// debugLog関数は debugConfig.gs から提供されます
-// debugConfig.gs が先に読み込まれていることを確認
+// debugLog関数が未定義の場合は安全なダミー実装を使用
 if (typeof debugLog === 'undefined') {
-  throw new Error('debugConfig.gs must be loaded before main.gs');
+  var debugLog = function() {};
+}
+
+if (typeof clearExecutionUserInfoCache !== 'function') {
+  var clearExecutionUserInfoCache = function() {};
+}
+
+if (typeof clearExecutionSheetsServiceCache !== 'function') {
+  var clearExecutionSheetsServiceCache = function() {};
+}
+
+if (typeof clearAllExecutionCache !== 'function') {
+  var clearAllExecutionCache = function() {};
 }
 
 /**
@@ -1208,9 +1191,13 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   const cacheKey = `unified_user_info_${userId || email}`;
 
   // 実行レベルキャッシュの確認（オプション）
-  if (opts.useExecutionCache && _executionUserInfoCache &&
-      _executionUserInfoCache.userId === userId) {
-    return _executionUserInfoCache.userInfo;
+  let execCache = null;
+  if (opts.useExecutionCache && typeof getUnifiedExecutionCache === 'function') {
+    execCache = getUnifiedExecutionCache();
+    const cached = execCache.getUserInfo(userId || email);
+    if (cached) {
+      return cached;
+    }
   }
 
   // 統合キャッシュマネージャーを使用（キャッシュ miss 時は自動でデータベースから取得）
@@ -1248,9 +1235,9 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
     });
 
     // 実行レベルキャッシュにも保存（オプション）
-    if (userInfo && opts.useExecutionCache && (userId || userInfo.userId)) {
-      _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
-      debugLog('✅ 実行レベルキャッシュに保存:', (userId || userInfo.userId) ? '***' : 'none');
+    if (userInfo && execCache) {
+      execCache.setUserInfo(userId || userInfo.userId || email, userInfo);
+      debugLog('✅ 統一キャッシュに保存:', (userId || userInfo.userId || email) ? '***' : 'none');
     }
 
   } catch (cacheError) {

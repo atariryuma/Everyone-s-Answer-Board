@@ -3,10 +3,9 @@
  * 主要な業務ロジックとAPI エンドポイント
  */
 
-// ログ関数は debugConfig.gs から提供されます
-// debugConfig.gs が先に読み込まれていることを確認
+// ログ関数が未定義の場合は安全なダミー実装を使用
 if (typeof debugLog === 'undefined') {
-  throw new Error('debugConfig.gs must be loaded before Core.gs');
+  var debugLog = function() {};
 }
 
 // Import standardized error handling functions
@@ -14,14 +13,12 @@ if (typeof logError === 'undefined') {
   throw new Error('errorHandler.gs must be loaded before Core.gs');
 }
 
-// warnLog関数は debugConfig.gs から提供されます
 if (typeof warnLog === 'undefined') {
-  throw new Error('debugConfig.gs must be loaded before Core.gs');
+  var warnLog = debugLog;
 }
 
-// infoLog関数は debugConfig.gs から提供されます
 if (typeof infoLog === 'undefined') {
-  throw new Error('debugConfig.gs must be loaded before Core.gs');
+  var infoLog = debugLog;
 }
 
 /**
@@ -481,26 +478,23 @@ function safeStateTransition(currentConfig, newValues, userInfo) {
 // ユーザー情報キャッシュ（関数実行中の重複取得を防ぐ）
 // =================================================================
 
-let _executionSheetsServiceCache = null;
 /**
- * 関数実行中のSheetsServiceキャッシュをクリア
- */
-function clearExecutionSheetsServiceCache() {
-  _executionSheetsServiceCache = null;
-}
-
-/**
- * 関数実行中のSheetsServiceを取得（キャッシュを使用）
+ * 関数実行中のSheetsServiceを取得（統一キャッシュを使用）
  * @returns {Object} SheetsServiceオブジェクト
  */
 function getCachedSheetsService() {
-  if (_executionSheetsServiceCache === null) {
-    debugLog('🔧 ExecutionLevel SheetsService: 初回作成');
-    _executionSheetsServiceCache = getSheetsService();
-  } else {
-    debugLog('♻️ ExecutionLevel SheetsService: キャッシュから取得');
+  const cache = typeof getUnifiedExecutionCache === 'function'
+    ? getUnifiedExecutionCache()
+    : null;
+  const cached = cache ? cache.getSheetsService() : null;
+  if (cached) {
+    return cached;
   }
-  return _executionSheetsServiceCache;
+  const service = getSheetsService();
+  if (cache) {
+    cache.setSheetsService(service);
+  }
+  return service;
 }
 
 /**
@@ -571,13 +565,6 @@ function validateHeaderIntegrity(userId) {
   }
 }
 
-/**
- * 実行開始時のキャッシュクリア（新しいリクエスト開始時に呼び出し）
- */
-function clearAllExecutionCache() {
-  clearExecutionUserInfoCache();
-  clearExecutionSheetsServiceCache();
-}
 // =================================================================
 // メインロジック
 // =================================================================
