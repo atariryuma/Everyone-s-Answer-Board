@@ -817,7 +817,7 @@ function proceedWithSaveAndPublish(config) {
         
         // ボードビューアーに即座更新を通知
         try {
-          // メインウィンドウにメッセージを送信（あれば）
+          
           if (window.parent && window.parent !== window) {
             window.parent.postMessage({
               type: 'BOARD_PUBLISHED',

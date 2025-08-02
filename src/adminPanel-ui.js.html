@@ -942,6 +942,10 @@ function populateHeaderOptions(headers) {
   }, 100);
 }
 
+// Ensure global access
+window.populateHeaderOptions = populateHeaderOptions;
+console.log('✅ populateHeaderOptions actual function loaded');
+
 // Populate configuration with guessed values
 function populateConfig(cfg) {
   if (!cfg) return;
@@ -1837,6 +1841,10 @@ function hidePrivacyModal() {
     manageFocusForModal('privacy-modal', false);
   }
 }
+
+// Ensure global access
+window.hidePrivacyModal = hidePrivacyModal;
+console.log('✅ hidePrivacyModal actual function loaded');
 
 // Show digital citizenship modal
 function showDigitalCitizenshipModal() {

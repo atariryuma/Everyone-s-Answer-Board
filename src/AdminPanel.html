@@ -1148,15 +1148,15 @@
   <!-- 共通モーダルコンポーネントを読み込み -->
   <?!= include('SharedModals'); ?>
   <!-- Admin Panel JavaScript Components -->
-  <!-- Core functions must be loaded first -->
-  <?!= include('adminPanel-core.js'); ?>
+  <!-- UI functions (including updateUIWithNewStatus) must be loaded early -->
+  <?!= include('adminPanel-ui.js'); ?>
   <?!= include('adminPanel-status.js'); ?>
+  
+  <!-- Core functions (which might use UI functions) -->
+  <?!= include('adminPanel-core.js'); ?>
   
   <!-- API functions must be loaded before UI and events that depend on them -->
   <?!= include('adminPanel-api.js'); ?>
-  
-  <!-- UI functions depend on API functions -->
-  <?!= include('adminPanel-ui.js'); ?>
   
   <!-- Form controls need to be available before events -->
   <?!= include('adminPanel-forms.js'); ?>
