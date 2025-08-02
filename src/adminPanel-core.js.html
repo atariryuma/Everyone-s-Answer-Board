@@ -1029,258 +1029,76 @@ function updateSystemStatus(component, status, error = null) {
 }
 
 function initializeAdminPanelMaster() {
-  logInfo('🚀 AdminPanel Master Initialization Started');
+  console.log('🚀 Starting simplified admin panel initialization...');
   updateSystemStatus('initializationStarted', true);
   
-  // Phase 1: Core初期化
+  // 1. Core初期化
   try {
     initCore();
     updateSystemStatus('coreInitialized', true);
   } catch (error) {
     updateSystemStatus('coreInitialized', false, error);
     console.error('❌ Core initialization failed:', error);
+    return;
   }
   
-  // 公開停止後の全セクション展開処理
-  checkAndExpandAllSections();
-  
-  // フォーム作成完了表示をクリア（新規アクセス時はデフォルトで非表示）
-  setTimeout(() => {
-    const formJustCreated = sessionStorage.getItem('form_just_created');
-    if (formJustCreated !== 'true') {
-      // 新規作成ではない場合、セクションを非表示にする
-      const formUrlSection = document.getElementById('form-url-section');
-      if (formUrlSection && !formUrlSection.classList.contains('hidden')) {
-        formUrlSection.classList.add('hidden');
-        logDebug('📋 既存アクセス時はフォーム完了セクションを非表示');
-      }
-    }
-  }, 100);
-  
-  // Phase 2: 各モジュールを並列初期化 (パフォーマンス向上)
-  // 遅延を最小限に抑制して即座に初期化
-  setTimeout(() => {
-    logDebug('🔧 Phase 2: 並列モジュール初期化開始');
-    
-    // Status管理初期化
-    if (typeof initializeMessageArea === 'function') {
-      initializeMessageArea();
-      logDebug('✅ Status module initialized');
-    }
-    
-    // API通信初期化（最重要 - getInitialDataを呼び出す）
-    function initializeAPIWithRetry(attempts = 0) {
-      if (typeof initializeAPI === 'function' && typeof runGasWithUserId === 'function') {
-        logDebug('🚀 API module initialization starting...');
-        try {
-          initializeAPI();
-          updateSystemStatus('apiInitialized', true);
-          logDebug('✅ API module initialized');
-        } catch (error) {
-          updateSystemStatus('apiInitialized', false, error);
-          console.error('❌ API initialization failed:', error);
-        }
-        return;
-      } 
-      
-      if (attempts < 5) { // 10 -> 5に短縮
-        logDebug(`⏳ API関数読み込み待機中... (試行 ${attempts + 1}/5)`);
-        setTimeout(() => initializeAPIWithRetry(attempts + 1), 200); // 100ms -> 200msに調整
-        return;
-      }
-      
-      // フォールバック実装
-      console.warn('⚠️ API functions not available, implementing fallback...');
-      const missingFunctions = {
-        initializeAPI: typeof initializeAPI,
-        runGasWithUserId: typeof runGasWithUserId
-      };
-      console.error('Missing functions:', missingFunctions);
-      updateSystemStatus('apiInitialized', false, new Error(`Missing functions: ${JSON.stringify(missingFunctions)}`));
-      
-      // 🔧 改良されたフォールバック関数を実装
-      if (typeof runGasWithUserId !== 'function') {
-        window.runGasWithUserId = function(functionName, loadingMessage, ...args) {
-          console.warn(`🔄 Fallback: ${functionName} called with message: ${loadingMessage}`);
-          
-          // 🎯 段階的にリトライして実際のAPI関数を待機
-          return new Promise((resolve, reject) => {
-            let retryCount = 0;
-            const maxRetries = 10;
-            
-            const checkApiAvailability = () => {
-              // SharedUtilitiesが読み込まれ、実際のrunGasWithUserId関数が利用可能かチェック
-              if (typeof sharedUtilities !== 'undefined' && 
-                  sharedUtilities.gas && 
-                  typeof sharedUtilities.gas.call === 'function') {
-                
-                // 実際のAPI関数を呼び出し
-                try {
-                  // ローディング表示付きで実行
-                  const realCall = loadingMessage && loadingMessage !== false ?
-                    sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'overlay', userId, ...args) :
-                    (userId ? 
-                      sharedUtilities.gas.call(functionName, userId, ...args) :
-                      sharedUtilities.gas.call(functionName, ...args));
-                    
-                  console.log(`✅ Fallback成功: ${functionName}の実行を復旧`);
-                  resolve(realCall);
-                } catch (error) {
-                  console.error(`❌ Fallback実行エラー: ${functionName}`, error);
-                  reject(error);
-                }
-              } else {
-                retryCount++;
-                if (retryCount < maxRetries) {
-                  setTimeout(checkApiAvailability, 1000);
-                } else {
-                  reject(new Error(`API function ${functionName} not available after ${maxRetries} retries`));
-                }
-              }
-            };
-            
-            checkApiAvailability();
-          });
-        };
-        logDebug('📦 Improved fallback runGasWithUserId implemented');
-      }
-      
-      if (typeof initializeAPI !== 'function') {
-        window.initializeAPI = function() {
-          console.warn('🔄 Fallback: initializeAPI called');
-          logDebug('📦 Fallback API initialization');
-        };
-        logDebug('📦 Fallback initializeAPI implemented');
-      }
-      
-      updateSystemStatus('apiInitialized', 'fallback');
-      logDebug('✅ API module initialized with fallback');
-    }
-    
-    initializeAPIWithRetry();
-    
-    // UI初期化
+  // 2. UI初期化 - 直接実行
+  try {
     if (typeof initializeUI === 'function') {
-      try {
-        initializeUI();
-        updateSystemStatus('uiInitialized', true);
-        logDebug('✅ UI module initialized');
-      } catch (error) {
-        updateSystemStatus('uiInitialized', false, error);
-        console.error('❌ UI initialization failed:', error);
-      }
+      initializeUI();
+      updateSystemStatus('uiInitialized', true);
+      console.log('✅ AdminPanel: UI components ready');
+    }
+  } catch (error) {
+    updateSystemStatus('uiInitialized', false, error);
+    console.error('❌ UI initialization failed:', error);
+  }
+  
+  // 3. イベントハンドラー初期化 - 直接実行
+  try {
+    if (typeof initializeEvents === 'function') {
+      initializeEvents();
+      updateSystemStatus('eventsInitialized', true);
+      console.log('✅ AdminPanel: Event handlers ready');
+    }
+  } catch (error) {
+    updateSystemStatus('eventsInitialized', false, error);
+    console.error('❌ Events initialization failed:', error);
+  }
+  
+  // 4. API初期化 - 簡素化
+  try {
+    if (typeof initializeAPI === 'function') {
+      initializeAPI();
+      updateSystemStatus('apiInitialized', true);
+      console.log('✅ AdminPanel: API ready');
     } else {
-      updateSystemStatus('uiInitialized', false, new Error('initializeUI function not found'));
+      console.warn('⚠️ initializeAPI function not available');
     }
-    
-    // フォーム管理初期化
-    if (typeof setupCharacterCounters === 'function') {
-      setupCharacterCounters();
-      logDebug('✅ Forms module initialized');
+  } catch (error) {
+    updateSystemStatus('apiInitialized', false, error);
+    console.error('❌ API initialization failed:', error);
+  }
+  
+  // 5. 初期表示設定
+  const formJustCreated = sessionStorage.getItem('form_just_created');
+  if (formJustCreated !== 'true') {
+    const formUrlSection = document.getElementById('form-url-section');
+    if (formUrlSection && !formUrlSection.classList.contains('hidden')) {
+      formUrlSection.classList.add('hidden');
     }
-    
-    // イベント管理初期化（最後に実行）
-    setTimeout(() => {
-      function initializeEventsWithRetry(attempts = 0) {
-        // 🔧 改善されたグローバル関数チェック（windowオブジェクトも確認）
-        const functionsAvailable = {
-          initializeEventListeners: typeof initializeEventListeners === 'function' || typeof window.initializeEventListeners === 'function',
-          handleQuickStart: typeof handleQuickStart === 'function' || typeof window.handleQuickStart === 'function',
-          runHeaderGuessing: typeof runHeaderGuessing === 'function' || typeof window.runHeaderGuessing === 'function'
-        };
-        
-        logDebug('🔍 関数可用性チェック:', functionsAvailable);
-        
-        if (functionsAvailable.initializeEventListeners && 
-            functionsAvailable.handleQuickStart && 
-            functionsAvailable.runHeaderGuessing) {
-          try {
-            // グローバルまたはローカルスコープから関数を取得
-            const initEventsFn = typeof initializeEventListeners === 'function' ? initializeEventListeners : window.initializeEventListeners;
-            initEventsFn();
-            
-            updateSystemStatus('eventsInitialized', true);
-            updateSystemStatus('initializationComplete', true);
-            logDebug('✅ Events module initialized');
-            logInfo('🎉 AdminPanel Master Initialization Complete');
-            
-            // システム状態の最終レポート
-            console.log('📊 Final System Status:', window.systemStatus);
-          } catch (error) {
-            updateSystemStatus('eventsInitialized', false, error);
-            console.error('❌ Events initialization failed:', error);
-          }
-          return;
-        } 
-        
-        if (attempts < 8) { // 5 -> 8に増加（より寛容に）
-          logDebug(`⏳ イベント関数読み込み待機中... (試行 ${attempts + 1}/8)`);
-          setTimeout(() => initializeEventsWithRetry(attempts + 1), 300); // 200ms -> 300msに調整
-          return;
-        }
-        
-        // フォールバック実装（より確実に）
-        console.warn('⚠️ Event functions not available after 8 attempts, implementing enhanced fallback...');
-        const missingEventFunctions = {
-          initializeEventListeners: typeof initializeEventListeners,
-          handleQuickStart: typeof handleQuickStart,
-          runHeaderGuessing: typeof runHeaderGuessing,
-          // グローバルスコープも確認
-          'window.initializeEventListeners': typeof window.initializeEventListeners,
-          'window.handleQuickStart': typeof window.handleQuickStart,
-          'window.runHeaderGuessing': typeof window.runHeaderGuessing
-        };
-        console.error('Missing functions detail:', missingEventFunctions);
-        updateSystemStatus('eventsInitialized', false, new Error(`Missing event functions: ${JSON.stringify(missingEventFunctions)}`));
-        
-        // 🔧 強化されたフォールバック関数を実装
-        if (!functionsAvailable.handleQuickStart) {
-          window.handleQuickStart = function() {
-            console.warn('🔄 Enhanced Fallback: handleQuickStart called');
-            if (window.showMessage) {
-              window.showMessage('QuickStart機能は現在利用できません。ページを再読み込みしてください。', 'warning');
-            }
-          };
-          logDebug('📦 Enhanced Fallback handleQuickStart implemented');
-        }
-        
-        if (!functionsAvailable.runHeaderGuessing) {
-          window.runHeaderGuessing = function() {
-            console.warn('🔄 Enhanced Fallback: runHeaderGuessing called');
-            if (window.showMessage) {
-              window.showMessage('AI判定機能は現在利用できません。ページを再読み込みしてください。', 'warning');
-            }
-          };
-          logDebug('📦 Enhanced Fallback runHeaderGuessing implemented');
-        }
-        
-        // イベントリスナーは利用可能な場合のみ初期化
-        if (functionsAvailable.initializeEventListeners) {
-          try {
-            const initEventsFn = typeof initializeEventListeners === 'function' ? initializeEventListeners : window.initializeEventListeners;
-            initEventsFn();
-            updateSystemStatus('eventsInitialized', 'partial');
-            logDebug('✅ Events module initialized (partial)');
-          } catch (error) {
-            updateSystemStatus('eventsInitialized', false, error);
-            console.error('❌ Partial events initialization failed:', error);
-          }
-        } else {
-          logDebug('📦 Events module skipped (function not available)');
-        }
-        
-        updateSystemStatus('initializationComplete', 'fallback');
-        logInfo('⚠️ AdminPanel Master Initialization Complete (with enhanced fallback functions)');
-        
-        // システム状態の最終レポート（フォールバック版）
-        console.log('📊 Final System Status (Enhanced Fallback):', window.systemStatus);
-      }
-      
-      initializeEventsWithRetry();
-    }, 150); // 100ms -> 150msに調整（より余裕を持って）
-    
-  }, 10); // 50ms -> 10msに短縮
+  }
+  
+  console.log('✅ Simplified initialization completed');
 }
+
+// 削除済み: 複雑な並列初期化とフォールバック処理
+
+// 残りの古い初期化コードを削除
+// (以下のコードは新しい簡素化版に置き換えられました)
+
+// 削除済みコード: 旧フォーム管理初期化とイベント管理のリトライロジック
+// これらの機能は新しい簡素化版に統合されました
 
 // =============================================================================
 // 安全な関数呼び出しシステム - エラー防止のための中核機能

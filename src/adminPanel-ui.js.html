@@ -9,295 +9,124 @@ let lastSelectedSheetName = null; // To prevent redundant sheet selection change
 let isUIUpdateInProgress = false;
 let pendingUIUpdate = null;
 
-// 🎯 UI更新バッチングシステム（最適化版）
-const uiUpdateBatching = {
-  pendingUpdates: new Map(),
-  batchTimer: null,
-  lastBatchTime: 0,
-  batchInterval: 80, // ✅ 80msに短縮（応答性向上）
-  
-  // バッチング状態の管理
-  completedOperations: new Set(),
-  
-  // DOM操作の結果キャッシュ（強化版）
-  domCache: new Map(),
-  cacheTimeouts: new Map(), // TTL管理用
-  maxCacheSize: 50, // キャッシュサイズ制限
-  defaultCacheTTL: 15000, // 15秒のデフォルトTTL
-  
-  // 最後の更新内容
-  lastUpdateData: null,
-  
-  // パフォーマンス監視
-  updateCount: 0,
-  skippedUpdates: 0,
-  totalUpdateTime: 0,
-  
-  // メモリリーク防止機能
-  lastCleanupTime: Date.now(),
-  cleanupInterval: 20000, // 20秒ごとにクリーンアップ
-  
-  // DOM操作最適化設定
-  useRequestIdleCallback: typeof requestIdleCallback !== 'undefined',
-  prioritizedOperations: ['static', 'dynamic'], // 高優先度の操作
-  deferredOperations: ['footer', 'indicators'], // 遅延可能な操作
-  
-  // 自動クリーンアップ機能
-  performCleanup() {
-    const now = Date.now();
-    if (now - this.lastCleanupTime > this.cleanupInterval) {
-      // 期限切れキャッシュエントリの削除
-      let cleanedCount = 0;
-      for (const [key, timeoutId] of this.cacheTimeouts) {
-        if (now > timeoutId) {
-          this.domCache.delete(key);
-          this.cacheTimeouts.delete(key);
-          cleanedCount++;
-        }
-      }
-      
-      // キャッシュサイズ制限の適用
-      if (this.domCache.size > this.maxCacheSize) {
-        const keysToDelete = Array.from(this.domCache.keys()).slice(0, this.domCache.size - this.maxCacheSize);
-        keysToDelete.forEach(key => {
-          this.domCache.delete(key);
-          this.cacheTimeouts.delete(key);
-        });
-        cleanedCount += keysToDelete.length;
-      }
-      
-      // 完了操作セットのクリア
-      this.completedOperations.clear();
-      
-      this.lastCleanupTime = now;
-      if (cleanedCount > 0) {
-        console.log(`🧹 UI更新バッチング: ${cleanedCount}件のキャッシュエントリをクリーンアップ`);
-      }
-    }
-  },
-  
-  // DOM操作結果のキャッシュ（TTL付き）
-  cacheResult(key, value, ttl = this.defaultCacheTTL) {
-    this.domCache.set(key, value);
-    this.cacheTimeouts.set(key, Date.now() + ttl);
-  },
-  
-  // キャッシュされた結果の取得
-  getCachedResult(key) {
-    if (this.domCache.has(key)) {
-      const expiry = this.cacheTimeouts.get(key);
-      if (expiry && Date.now() < expiry) {
-        return this.domCache.get(key);
-      } else {
-        // 期限切れエントリの削除
-        this.domCache.delete(key);
-        this.cacheTimeouts.delete(key);
-      }
-    }
-    return null;
-  }
-};
+// 簡素化されたUI更新システム
+// 複雑なバッチング、キャッシュ、TTL管理を削除
 
 /**
- * UI更新をバッチ処理でスケジュール
+ * 簡素化されたUI更新関数
  * @param {Object} status - ステータスデータ
- * @param {string} updateType - 更新タイプ
  */
-function scheduleUIUpdate(status, updateType = 'full') {
-  const updateId = `${updateType}_${Date.now()}`;
+function updateUIWithNewStatus(status) {
+  console.log('🔧 Starting simplified UI update');
   
-  // 同じタイプの更新が既にペンディング中の場合は置き換え
-  for (const [id, data] of uiUpdateBatching.pendingUpdates) {
-    if (data.type === updateType) {
-      uiUpdateBatching.pendingUpdates.delete(id);
-      console.log(`🔄 UI更新を統合: ${updateType}`);
-    }
-  }
-  
-  uiUpdateBatching.pendingUpdates.set(updateId, {
-    status,
-    type: updateType,
-    timestamp: Date.now()
-  });
-  
-  // バッチタイマーを設定
-  if (uiUpdateBatching.batchTimer) {
-    clearTimeout(uiUpdateBatching.batchTimer);
-  }
-  
-  uiUpdateBatching.batchTimer = setTimeout(() => {
-    executeBatchedUIUpdates();
-  }, uiUpdateBatching.batchInterval);
-  
-  console.log(`📋 UI更新をスケジュール: ${updateType} (ペンディング: ${uiUpdateBatching.pendingUpdates.size})`);
-}
-
-/**
- * バッチ化されたUI更新を実行
- */
-function executeBatchedUIUpdates() {
-  if (uiUpdateBatching.pendingUpdates.size === 0) return;
-  
-  console.log(`🚀 バッチUI更新開始 (${uiUpdateBatching.pendingUpdates.size}件の更新を統合)`);
-  
-  // 最新のステータスデータを取得
-  let latestStatus = null;
-  let latestTimestamp = 0;
-  
-  for (const [id, data] of uiUpdateBatching.pendingUpdates) {
-    if (data.timestamp > latestTimestamp) {
-      latestStatus = data.status;
-      latestTimestamp = data.timestamp;
-    }
-  }
-  
-  if (!latestStatus) {
-    console.warn('⚠️ バッチ更新: 有効なステータスデータが見つかりません');
-    uiUpdateBatching.pendingUpdates.clear();
+  if (isUIUpdateInProgress) {
+    console.log('⏳ UI update already in progress, skipping');
     return;
   }
   
-  // 重複チェック: 前回と同じデータの場合はスキップ
-  const statusHash = generateStatusHash(latestStatus);
-  if (uiUpdateBatching.lastUpdateData === statusHash) {
-    console.log('🎯 バッチ更新: 前回と同じデータのためスキップ');
-    uiUpdateBatching.pendingUpdates.clear();
-    return;
+  isUIUpdateInProgress = true;
+  
+  try {
+    // 基本的なUI更新のみ実行
+    updateStaticElements(status);
+    updateDynamicContent(status);
+    updateFooterAndGuidance(status);
+    updateStepIndicators(status);
+    
+    console.log('✅ Simplified UI update completed');
+  } catch (error) {
+    console.error('❌ UI update failed:', error);
+  } finally {
+    isUIUpdateInProgress = false;
   }
-  
-  // 実際のUI更新を実行
-  performOptimizedUIUpdate(latestStatus);
-  
-  // 状態をクリア
-  uiUpdateBatching.pendingUpdates.clear();
-  uiUpdateBatching.lastUpdateData = statusHash;
-  uiUpdateBatching.lastBatchTime = Date.now();
-  
-  console.log('✅ バッチUI更新完了');
 }
 
 /**
- * ステータスデータのハッシュ生成（重複検出用）
- * @param {Object} status - ステータスデータ
- * @returns {string} ハッシュ値
- */
-function generateStatusHash(status) {
-  const keyData = {
-    setupStep: status.setupStep,
-    setupStatus: status.userInfo?.configJson ? JSON.parse(status.userInfo.configJson).setupStatus : null,
-    activeSheet: status.activeSheetName,
-    appPublished: status.config?.appPublished,
-    hasSheetDetails: !!status.sheetDetails
-  };
-  return JSON.stringify(keyData);
-}
-
-/**
- * 最適化されたUI更新実行
+ * 静的要素の更新
  * @param {Object} status - ステータスデータ
  */
-function performOptimizedUIUpdate(status) {
-  const startTime = performance.now();
-  console.log('🔧 最適化UI更新開始');
+function updateStaticElements(status) {
+  console.log('🎨 静的要素更新開始');
   
-  // 自動クリーンアップを実行
-  uiUpdateBatching.performCleanup();
-  
-  // DOM操作を最小限に抑制する最適化された更新
-  const updateOperations = new Map();
-  
-  // 1. データ準備（1回のみ）
-  const preparedStatus = prepareStatusData(status);
-  
-  // 2. DOM更新操作をバッチ化（優先度付き）
-  updateOperations.set('static', () => updateStaticUIOptimized(preparedStatus));
-  updateOperations.set('dynamic', () => updateDynamicContentOptimized(preparedStatus));
-  updateOperations.set('footer', () => updateFooterAndGuidanceOptimized(preparedStatus));
-  updateOperations.set('indicators', () => updateStepIndicatorsOptimized(preparedStatus));
-  
-  // 3. 優先度に基づいて段階的に実行
-  requestAnimationFrame(() => {
-    // 高優先度操作を最初に実行
-    for (const operationType of uiUpdateBatching.prioritizedOperations) {
-      if (updateOperations.has(operationType)) {
-        executeUIOperation(operationType, updateOperations.get(operationType));
-        updateOperations.delete(operationType);
-      }
+  try {
+    // 基本的な表示設定
+    clearInitialDisplayElements();
+    
+    // 設定状態の取得
+    const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
+    console.log(`🔧 configJson setupStatus: ${setupStatus}`);
+    
+    // ボタン状態の更新
+    if (setupStatus === 'pending') {
+      updateButtonStatesForSetup(status);
     }
     
-    // 遅延可能な操作は次のフレームで実行
-    if (updateOperations.size > 0) {
-      if (uiUpdateBatching.useRequestIdleCallback) {
-        // requestIdleCallbackが利用可能な場合はアイドル時に実行
-        requestIdleCallback(() => {
-          for (const [operationType, operation] of updateOperations) {
-            executeUIOperation(operationType, operation);
-          }
-          logUpdatePerformance(startTime);
-        });
-      } else {
-        // フォールバック: 次のanimationFrameで実行
-        requestAnimationFrame(() => {
-          for (const [operationType, operation] of updateOperations) {
-            executeUIOperation(operationType, operation);
-          }
-          logUpdatePerformance(startTime);
-        });
-      }
-    } else {
-      logUpdatePerformance(startTime);
-    }
-  });
-}
-
-/**
- * UI操作の実行（エラーハンドリング付き）
- * @param {string} operationType - 操作タイプ
- * @param {Function} operation - 実行する操作
- */
-function executeUIOperation(operationType, operation) {
-  try {
-    // 重複実行チェック
-    const operationKey = `${operationType}_${uiUpdateBatching.lastBatchTime}`;
-    if (!uiUpdateBatching.completedOperations.has(operationKey)) {
-      const operationStart = performance.now();
-      operation();
-      const operationTime = performance.now() - operationStart;
-      
-      uiUpdateBatching.completedOperations.add(operationKey);
-      
-      // 長時間の操作を警告
-      if (operationTime > 10) {
-        console.warn(`⚠️ UI操作 "${operationType}" が ${operationTime.toFixed(1)}ms かかりました`);
-      }
-    }
+    console.log('✅ 静的要素更新完了');
   } catch (error) {
-    console.error(`❌ UI更新エラー (${operationType}):`, error);
+    console.error('❌ 静的要素更新エラー:', error);
   }
 }
 
 /**
- * 更新パフォーマンスのログ出力
- * @param {number} startTime - 開始時間
+ * 動的コンテンツの更新
+ * @param {Object} status - ステータスデータ
  */
-function logUpdatePerformance(startTime) {
-  const totalTime = performance.now() - startTime;
-  uiUpdateBatching.updateCount++;
-  uiUpdateBatching.totalUpdateTime += totalTime;
+function updateDynamicContent(status) {
+  console.log('🔧 動的コンテンツ更新開始');
   
-  const avgTime = uiUpdateBatching.totalUpdateTime / uiUpdateBatching.updateCount;
+  try {
+    if (status.activeSheetName && status.sheetDetails) {
+      // シートが選択されている場合の更新
+      updateSheetSpecificContent(status);
+    } else {
+      // シート未選択時のUI表示
+      updateUIForNoActiveSheet(status);
+    }
+    
+    console.log('✅ 動的コンテンツ更新完了');
+  } catch (error) {
+    console.error('❌ 動的コンテンツ更新エラー:', error);
+  }
+}
+
+/**
+ * フッターとガイダンスの更新
+ * @param {Object} status - ステータスデータ
+ */
+function updateFooterAndGuidance(status) {
+  console.log('🦶 フッター更新開始');
   
-  console.log(`✅ 最適化UI更新完了 (${totalTime.toFixed(1)}ms, 平均: ${avgTime.toFixed(1)}ms)`);
+  try {
+    const isPublished = getPublicationState(status).isPublished;
+    
+    if (isPublished) {
+      // 公開済みの場合の表示
+      updatePublishedFooter(status);
+    } else {
+      // 未公開の場合は非表示
+      hideFooter();
+    }
+    
+    console.log('✅ フッター更新完了');
+  } catch (error) {
+    console.error('❌ フッター更新エラー:', error);
+  }
+}
+
+/**
+ * ステップインジケーターの更新
+ * @param {Object} status - ステータスデータ
+ */
+function updateStepIndicators(status) {
+  console.log('📊 ステップインジケーター更新開始');
   
-  // 統計を定期的にログ出力
-  if (uiUpdateBatching.updateCount % 10 === 0) {
-    console.log('📊 UI更新統計:', {
-      totalUpdates: uiUpdateBatching.updateCount,
-      skippedUpdates: uiUpdateBatching.skippedUpdates,
-      averageTime: `${avgTime.toFixed(1)}ms`,
-      cacheSize: uiUpdateBatching.domCache.size,
-      efficiency: `${Math.round((uiUpdateBatching.skippedUpdates / uiUpdateBatching.updateCount) * 100)}%キャッシュヒット`
-    });
+  try {
+    const currentStep = status?.setupStep || 1;
+    updateStepDisplay(currentStep, status);
+    
+    console.log('✅ ステップインジケーター更新完了');
+  } catch (error) {
+    console.error('❌ ステップインジケーター更新エラー:', error);
   }
 }
 
@@ -485,18 +314,17 @@ function getPublicationState(status) {
 // MAIN UI UPDATE FUNCTIONS
 // =============================================================================
 
-// Update UI with new status data - 最適化バッチング版
+// 簡素化されたUI更新関数
 window.updateUIWithNewStatus = function(status) {
   if (!validateStatus(status)) {
-    logWarn('Invalid status received, skipping UI update');
+    console.warn('Invalid status received, skipping UI update');
     return;
   }
 
-  // 🎯 新しいUI更新バッチングシステムを使用
-  console.log('📋 UI更新をバッチングシステムでスケジュール');
-  scheduleUIUpdate(status, 'full');
+  // 直接UI更新を実行（バッチング削除）
+  updateUIWithNewStatus(status);
   
-  // currentStatusを更新（他の関数で参照される）
+  // currentStatusを更新
   currentStatus = status;
 };
 console.log('✅ updateUIWithNewStatus actual function loaded');
