@@ -2582,15 +2582,39 @@ function buildResponseFromContext(context) {
       })(),
       viewUrl: (function() {
         try {
+          debugLog('🔗 viewURL生成開始:', { userId: context.requestUserId });
+          
           const urls = generateUserUrls(context.requestUserId);
-          return urls.viewUrl || userInfo.viewUrl || '';
+          debugLog('🔗 generateUserUrls結果:', urls);
+          
+          const validUrl = urls.viewUrl || userInfo.viewUrl || '';
+          
+          // ✅ 空文字チェックと明示的エラー
+          if (!validUrl || validUrl.trim() === '') {
+            warnLog('🚨 viewUrl生成結果が空文字 - 直接生成を試行');
+            
+            const baseUrl = getProductionWebAppUrl();
+            if (!baseUrl) {
+              throw new Error('Base URL generation failed');
+            }
+            
+            const directUrl = `${baseUrl}?mode=view&userId=${encodeURIComponent(context.requestUserId)}`;
+            debugLog('✅ 直接生成URL:', directUrl);
+            return directUrl;
+          }
+          
+          debugLog('✅ viewURL生成成功:', validUrl);
+          return validUrl;
+          
         } catch (e) {
           warnLog('viewUrl生成失敗、フォールバック使用:', e.message);
           // 新しいURL生成システムでフォールバック
           try {
             const baseUrl = getProductionWebAppUrl();
             if (baseUrl && context.requestUserId) {
-              return `${baseUrl}?mode=view&userId=${encodeURIComponent(context.requestUserId)}`;
+              const fallbackUrl = `${baseUrl}?mode=view&userId=${encodeURIComponent(context.requestUserId)}`;
+              debugLog('🔄 フォールバックURL生成:', fallbackUrl);
+              return fallbackUrl;
             }
             return userInfo.viewUrl || '';
           } catch (fallbackError) {

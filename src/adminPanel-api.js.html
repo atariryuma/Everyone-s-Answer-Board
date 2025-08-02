@@ -94,8 +94,8 @@ const loadStatusDebounce = {
   timer: null,
   pendingCall: null,
   lastCallTime: 0,
-  minInterval: 1000,      // 最小呼び出し間隔（1秒）
-  debounceDelay: 300,     // デバウンス遅延（300ms）
+  minInterval: 2000,      // ✅ 最小呼び出し間隔を2秒に延長（パフォーマンス改善）
+  debounceDelay: 500,     // ✅ デバウンス遅延を500msに延長
   
   // 呼び出し統計
   totalCalls: 0,
@@ -128,9 +128,14 @@ function debouncedLoadStatus(bypassCache = false, forceImmediate = false) {
   // 最小間隔チェック
   const now = Date.now();
   const timeSinceLastCall = now - loadStatusDebounce.lastCallTime;
+  const timeSinceLastSuccess = now - loadStatusDebounce.lastResultTime;
   
-  if (timeSinceLastCall < loadStatusDebounce.minInterval && !forceImmediate) {
-    console.log(`⚡ 最小間隔制限 (${timeSinceLastCall}ms < ${loadStatusDebounce.minInterval}ms)`);
+  // ✅ 最近成功した呼び出しがある場合は、より長い間隔を適用
+  const effectiveMinInterval = timeSinceLastSuccess < 10000 ? 
+    loadStatusDebounce.minInterval * 1.5 : loadStatusDebounce.minInterval;
+  
+  if (timeSinceLastCall < effectiveMinInterval && !forceImmediate) {
+    console.log(`⚡ 最小間隔制限 (${timeSinceLastCall}ms < ${effectiveMinInterval}ms, 最近の成功: ${timeSinceLastSuccess}ms前)`);
     loadStatusDebounce.debouncedCalls++;
     
     // 既存のタイマーをクリア

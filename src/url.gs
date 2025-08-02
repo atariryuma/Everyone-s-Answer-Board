@@ -70,32 +70,74 @@ function getWebAppBaseUrl() {
  */
 function generateUserUrls(userId) {
   try {
-    debugLog('🔗 generateUserUrls called with userId:', userId);
+    debugLog('🔗 generateUserUrls START:', {
+      userId: userId,
+      userIdType: typeof userId,
+      userIdValid: !!userId,
+      userIdLength: userId ? userId.length : 0
+    });
     
     if (!userId) {
-      errorLog('generateUserUrls: userId is required');
+      errorLog('🚨 generateUserUrls: userId is required');
       return { adminUrl: '', viewUrl: '', error: 'userId_required' };
     }
     
     const baseUrl = getWebAppBaseUrl();
-    debugLog('🔗 Base URL retrieved:', baseUrl);
+    debugLog('🔗 Base URL result:', {
+      baseUrl: baseUrl,
+      baseUrlType: typeof baseUrl,
+      baseUrlValid: !!baseUrl,
+      baseUrlLength: baseUrl ? baseUrl.length : 0
+    });
     
     if (!baseUrl) {
-      errorLog('generateUserUrls: Failed to get base URL');
+      errorLog('🚨 generateUserUrls: Failed to get base URL');
       return { adminUrl: '', viewUrl: '', error: 'base_url_failed' };
     }
     
     const encodedUserId = encodeURIComponent(userId);
+    debugLog('🔗 User ID encoding:', {
+      original: userId,
+      encoded: encodedUserId,
+      encodingSuccessful: encodedUserId !== userId
+    });
+    
     const result = {
       adminUrl: `${baseUrl}?mode=admin&userId=${encodedUserId}`,
       viewUrl: `${baseUrl}?mode=view&userId=${encodedUserId}`
     };
     
-    debugLog('✅ generateUserUrls successful:', result);
+    // URL検証
+    const urlValidation = {
+      adminUrlValid: result.adminUrl.startsWith('https://'),
+      viewUrlValid: result.viewUrl.startsWith('https://'),
+      adminUrlLength: result.adminUrl.length,
+      viewUrlLength: result.viewUrl.length
+    };
+    
+    debugLog('🔗 URL validation:', urlValidation);
+    debugLog('✅ generateUserUrls RESULT:', result);
+    
+    // 最終検証
+    if (!urlValidation.adminUrlValid || !urlValidation.viewUrlValid) {
+      errorLog('🚨 Generated URLs are invalid');
+      return { 
+        adminUrl: '', 
+        viewUrl: '', 
+        error: 'invalid_urls_generated',
+        details: urlValidation 
+      };
+    }
+    
     return result;
     
   } catch (e) {
-    errorLog('generateUserUrls: Unexpected error:', e.message, e.stack);
+    errorLog('🚨 generateUserUrls: Unexpected error:', {
+      message: e.message,
+      stack: e.stack,
+      userId: userId,
+      userIdType: typeof userId
+    });
     return { 
       adminUrl: '', 
       viewUrl: '', 

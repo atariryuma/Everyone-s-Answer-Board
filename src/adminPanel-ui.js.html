@@ -2882,6 +2882,9 @@ function normalizeConfigJson(config, userInfo) {
     // Step 4: 必須フィールドの補完
     normalizedConfig = ensureRequiredFields(normalizedConfig);
     
+    // Step 4.5: URL特化フィールドの検証・修復
+    normalizedConfig = ensureUrlFields(normalizedConfig, userInfo);
+    
     // Step 5: 冗長フィールドの削除
     normalizedConfig = removeRedundantFields(normalizedConfig);
     
@@ -3072,11 +3075,19 @@ function ensureRequiredFields(config) {
     showCounts: false,
     highlightMode: false,
     autoStopEnabled: true,
-    autoStopMinutes: 360
+    autoStopMinutes: 360,
+    // ✅ 重要: URL生成に必要なフィールドを追加
+    appPublished: false,
+    formCreated: false,
+    setupStatus: 'pending',
+    displayMode: 'anonymous',
+    sortOrder: 'newest',
+    totalPublishCount: 0
   };
   
   Object.keys(defaults).forEach(key => {
     if (config[key] === undefined) {
+      console.log(`🔧 ensureRequiredFields: ${key} undefined -> ${defaults[key]}`);
       config[key] = defaults[key];
     }
   });
@@ -3084,6 +3095,61 @@ function ensureRequiredFields(config) {
   return config;
 }
 
+/**
+ * URL生成専用フィールドの検証・修復
+ * @param {Object} config - 検証対象のconfig
+ * @param {Object} userInfo - ユーザー情報（オプション）
+ * @return {Object} 修復されたconfig
+ */
+function ensureUrlFields(config, userInfo) {
+  console.log('🔗 ensureUrlFields: URL関連フィールドの検証開始');
+  
+  // appPublishedのundefined対策（最重要）
+  if (config.appPublished === undefined) {
+    console.log('🔧 ensureUrlFields: appPublished undefined -> false');
+    config.appPublished = false;
+  }
+  
+  // 公開状態の整合性チェック
+  if (config.appPublished === true) {
+    // 公開中なのに必須情報が不足している場合の修復
+    if (!config.publishedSheetName || config.publishedSheetName === '') {
+      console.log('🚨 ensureUrlFields: 公開中だがsheetName不足 -> 非公開に修正');
+      config.appPublished = false;
+    }
+    
+    if (!config.publishedSpreadsheetId || config.publishedSpreadsheetId === '') {
+      console.log('🚨 ensureUrlFields: 公開中だがspreadsheetId不足 -> 非公開に修正');
+      config.appPublished = false;
+    }
+  }
+  
+  // formCreatedのundefined対策
+  if (config.formCreated === undefined) {
+    // publishedSheetNameがあればformは作成済みと推定
+    config.formCreated = !!(config.publishedSheetName && config.publishedSheetName !== '');
+    console.log(`🔧 ensureUrlFields: formCreated undefined -> ${config.formCreated}`);
+  }
+  
+  // setupStatusの修復
+  if (!config.setupStatus || config.setupStatus === '') {
+    if (config.appPublished === true && config.formCreated === true) {
+      config.setupStatus = 'completed';
+    } else {
+      config.setupStatus = 'pending';
+    }
+    console.log(`🔧 ensureUrlFields: setupStatus -> ${config.setupStatus}`);
+  }
+  
+  console.log('✅ ensureUrlFields: URL関連フィールド検証完了', {
+    appPublished: config.appPublished,
+    formCreated: config.formCreated,
+    setupStatus: config.setupStatus,
+    hasSheetName: !!config.publishedSheetName
+  });
+  
+  return config;
+}
 
 /**
  * 公開済み状態用configJson修復関数
