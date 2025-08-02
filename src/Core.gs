@@ -5789,20 +5789,11 @@ function getInitialData(requestUserId, targetSheetName) {
     var sheets = getSheetsList(currentUserId);
     var appUrls = generateUserUrls(currentUserId);
 
-    // === ステップ4: 回答数とリアクション数の取得 ===
-    var answerCount = 0;
-    var totalReactions = 0;
-    try {
-      if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
-        if (responseData.status === 'success') {
-          answerCount = responseData.data.length;
-          totalReactions = answerCount * 2; // 暫定値
-        }
-      }
-    } catch (err) {
-      warnLog('Answer count retrieval failed:', err.message);
-    }
+    // === ステップ4: 回答数とリアクション数の取得（軽量化のため削除） ===
+    // パフォーマンス向上のため、これらのデータは専用APIで別途取得する
+    var answerCount = 0; // 初期値
+    var totalReactions = 0; // 初期値
+    debugLog('🚀 getInitialData: 回答数取得をスキップ（パフォーマンス最適化）');
 
     // === ステップ5: セットアップステップの決定 ===
     var setupStep = 1;

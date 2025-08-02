@@ -715,12 +715,32 @@ function updateDatabaseInfo(status) {
 
   const cfg = status.config || {};
 
+  // 日付フォーマット関数
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      return new Date(dateString).toLocaleString('ja-JP', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch (e) {
+      return '無効な日付';
+    }
+  };
+
   // 基本情報の更新
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
-  safeSetText('info-answer-count', status.answerCount || '0');
-  safeSetText('info-reaction-count', status.totalReactions || '0');
+  
+  // ★★ 詳細情報パネルの更新 ★★
+  safeSetText('info-created-at', formatDate(status.userInfo.createdAt));
+  safeSetText('info-last-accessed', formatDate(status.userInfo.lastAccessedAt));
+  
+  // システムステータスの更新
+  const setupStatus = cfg.setupStatus || '不明';
+  safeSetText('info-system-status', setupStatus);
+
 
   // 公開状態の表示を更新
   const isPublished = cfg.isPublished !== undefined
@@ -1816,8 +1836,6 @@ function hideFormConfigModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
         manageFocusForModal('form-config-modal', false);
-      } else {
-        logWarn('hideFormConfigModal: Modal element not found');
       }
     }
   } catch (error) {

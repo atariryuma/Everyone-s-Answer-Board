@@ -1250,15 +1250,21 @@ function unpublishBoard() {
 // 公開停止時に履歴を保存する関数
 function saveHistoryOnUnpublish(unpublishResponse) {
   try {
-    // 現在のステータスを取得（キャッシュから）
-    const currentStatus = window.lastStatusCache;
-    if (!currentStatus || !currentStatus.config) {
-      logWarn('履歴保存: 現在のステータス情報が取得できません');
-      return;
+    // 信頼性の高いunpublishResponseから直接データを取得
+    if (!unpublishResponse || !unpublishResponse.userInfo || !unpublishResponse.config) {
+      logWarn('履歴保存: unpublishResponseに必要な情報が含まれていません', unpublishResponse);
+      // 念のため、グローバルキャッシュにフォールバック
+      const currentStatus = window.lastStatusCache;
+      if (!currentStatus || !currentStatus.config) {
+        logError('履歴保存失敗: フォールバック用のステータス情報も取得できません');
+        return;
+      }
+      unpublishResponse.config = currentStatus.config;
+      unpublishResponse.userInfo = currentStatus.userInfo;
     }
-    
-    const config = currentStatus.config;
-    const userInfo = currentStatus.userInfo || {};
+
+    const config = unpublishResponse.config;
+    const userInfo = unpublishResponse.userInfo;
     
     // 履歴アイテムを作成
     const historyItem = {
