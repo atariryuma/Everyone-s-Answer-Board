@@ -389,8 +389,8 @@ function prepareStatusData(status) {
   
   // 2. 正規化されたプロパティの追加（計算集約処理）
   const publicationState = getPublicationState(status);
-  const viewUrl = `${google.script.run.withSuccessHandler(function(url){ return url; }).getProductionWebAppUrl()}?mode=view&userId=${encodeURIComponent(userId)}`;
-  
+  const viewUrl = status.viewUrl || '';
+
   status._normalized = {
     isPublished: publicationState.isPublished,
     publishReason: publicationState.reason,
@@ -1160,7 +1160,7 @@ function updateFooterAndGuidance(status) {
 
   // Use normalized publication state from status object with additional validation
   const isPublished = status._normalized?.isPublished || false;
-  const viewUrl = `${google.script.run.withSuccessHandler(function(url){ return url; }).getProductionWebAppUrl()}?mode=view&userId=${encodeURIComponent(status.userInfo.userId)}`;
+  const viewUrl = status.viewUrl || status._normalized?.viewUrl || '';
   
   // Additional strict check: ensure appPublished is explicitly true
   let explicitAppPublished = status.appPublished === true;
@@ -1183,8 +1183,8 @@ function updateFooterAndGuidance(status) {
     'explicit appPublished': explicitAppPublished,
     'final decision': finalIsPublished,
     'publish reason': status._normalized?.publishReason,
-    'normalized viewUrl': viewUrl,
-    'has valid viewUrl': status._normalized?.hasValidViewUrl,
+    viewUrl: viewUrl,
+    'has valid viewUrl': !!viewUrl,
     'will show footer': finalIsPublished
   });
 
@@ -1192,7 +1192,7 @@ function updateFooterAndGuidance(status) {
   if (finalIsPublished) {
     footer.classList.remove('hidden');
     
-    // Update board URL using our generated viewUrl (if available)
+    // Update board URL using viewUrl (if available)
     const boardUrlInput = document.getElementById('board-url');
     const viewBoardLink = document.getElementById('view-board-link');
     
