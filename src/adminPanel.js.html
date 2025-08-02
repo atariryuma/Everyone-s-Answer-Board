@@ -23,7 +23,9 @@
         const configValid = currentConfig && validateConfiguration();
         const step2Complete = checkStep2Completion();
         isValid = configValid || step2Complete;
-        console.log(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`);
+        UnifiedErrorHandler.logError(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`,
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
         break;
       case 3:
         isValid = true;
@@ -44,7 +46,10 @@
       }
       return 'pending';
     } catch (error) {
-      console.warn('getSetupStatusFromGlobalStatus エラー:', error);
+      UnifiedErrorHandler.logError('getSetupStatusFromGlobalStatus エラー:',
+          UnifiedErrorHandler.ErrorTypes.WARNING,
+          UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+          error);
       return 'pending';
     }
   }
@@ -93,10 +98,16 @@
                             config.formCreated === true && 
                             config.formUrl && config.formUrl.trim();
       
-      console.log('✅ Step 2完了チェック (統一版):', setupCompleted);
+        UnifiedErrorHandler.logError('✅ Step 2完了チェック (統一版):',
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+            setupCompleted);
       return setupCompleted;
     } catch (error) {
-      console.warn('❌ Step 2完了チェックでエラー:', error);
+        UnifiedErrorHandler.logError('❌ Step 2完了チェックでエラー:',
+            UnifiedErrorHandler.ErrorTypes.WARNING,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+            error);
       return false;
     }
   }
@@ -164,7 +175,10 @@
           displayColumnMapping(columns);
         })
         .catch(error => {
-          console.error('Failed to load sheet columns:', error);
+          UnifiedErrorHandler.logError('Failed to load sheet columns:',
+              UnifiedErrorHandler.ErrorTypes.HIGH,
+              UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+              error);
           showMessage('列の読み込みに失敗しました', 'error');
         });
     }
@@ -178,7 +192,10 @@
           displayColumnMapping(columns);
         })
         .catch(error => {
-          console.error('Failed to load form columns:', error);
+          UnifiedErrorHandler.logError('Failed to load form columns:',
+              UnifiedErrorHandler.ErrorTypes.HIGH,
+              UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+              error);
           showMessage('フォーム項目の読み込みに失敗しました', 'error');
         });
     }
@@ -294,19 +311,25 @@
       window.sharedModals.showPublish(
         // 公開実行時のコールバック
         () => {
-          console.log('📤 公開モーダルで公開が選択されました');
+            UnifiedErrorHandler.logError('📤 公開モーダルで公開が選択されました',
+                UnifiedErrorHandler.ErrorTypes.INFO,
+                UnifiedErrorHandler.ErrorCategories.USER_ACTION);
           executePublishProcess(btn, config);
         },
         // キャンセル時のコールバック
         () => {
-          console.log('❌ 公開がキャンセルされました');
+            UnifiedErrorHandler.logError('❌ 公開がキャンセルされました',
+                UnifiedErrorHandler.ErrorTypes.INFO,
+                UnifiedErrorHandler.ErrorCategories.USER_ACTION);
         },
         // 自動停止設定
         autoStopSettings
       );
     } else {
       // フォールバック: モーダルが利用できない場合は直接実行
-      console.warn('⚠️ 公開モーダルが利用できません。直接実行します。');
+      UnifiedErrorHandler.logError('⚠️ 公開モーダルが利用できません。直接実行します。',
+          UnifiedErrorHandler.ErrorTypes.WARNING,
+          UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
       executePublishProcess(btn, config);
     }
   }
@@ -328,11 +351,15 @@
             
             // 🔧 公開成功後に状態整合性チェック・修復を実行
             setTimeout(() => {
-              console.log('🔧 公開後の状態整合性チェックを実行中...');
+                UnifiedErrorHandler.logError('🔧 公開後の状態整合性チェックを実行中...',
+                    UnifiedErrorHandler.ErrorTypes.DEBUG,
+                    UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
               if (typeof runSetupRepair === 'function') {
                 runSetupRepair();
               } else {
-                console.warn('⚠️ runSetupRepair関数が利用できません');
+                  UnifiedErrorHandler.logError('⚠️ runSetupRepair関数が利用できません',
+                      UnifiedErrorHandler.ErrorTypes.WARNING,
+                      UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
               }
             }, 500);
             
@@ -342,7 +369,9 @@
             setTimeout(() => {
               if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
                 window.sharedModals.showAutoStopConfirmation(result);
-                console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
+                  UnifiedErrorHandler.logError('✅ 通常公開後に自動停止確認モーダルを表示しました',
+                      UnifiedErrorHandler.ErrorTypes.INFO,
+                      UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
               }
             }, 1000);
             
@@ -351,7 +380,10 @@
           }
         })
         .catch(error => {
-          console.error('Save failed:', error);
+            UnifiedErrorHandler.logError('Save failed:',
+                UnifiedErrorHandler.ErrorTypes.HIGH,
+                UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+                error);
           showMessage('保存に失敗しました', 'error');
         })
         .finally(() => {
@@ -383,7 +415,10 @@
           }
         })
         .catch(error => {
-          console.error('Unpublish failed:', error);
+          UnifiedErrorHandler.logError('Unpublish failed:',
+              UnifiedErrorHandler.ErrorTypes.HIGH,
+              UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+              error);
           showMessage('停止に失敗しました', 'error');
         })
         .finally(() => {
@@ -417,7 +452,10 @@
         }
       })
       .withFailureHandler(function(error) {
-        console.error('Failed to get app setup URL:', error);
+        UnifiedErrorHandler.logError('Failed to get app setup URL:',
+            UnifiedErrorHandler.ErrorTypes.HIGH,
+            UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+            error);
         showMessage('アプリ設定URLの取得中にエラーが発生しました', 'error');
       })
       .getAppSetupUrl(); // この関数はバックエンドで実装されていると仮定
@@ -431,7 +469,10 @@
           window.location.href = url; // ログイン画面へリダイレクト
         })
         .withFailureHandler(function(error) {
-          console.error('Logout failed:', error);
+          UnifiedErrorHandler.logError('Logout failed:',
+              UnifiedErrorHandler.ErrorTypes.HIGH,
+              UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+              error);
           showMessage('ログアウト処理中にエラーが発生しました', 'error');
         })
         .resetUserAuthentication(); // バックエンドの認証リセット関数を呼び出す
@@ -446,12 +487,18 @@
     try {
       // 引数の妥当性チェック
       if (!targetUrl || typeof targetUrl !== 'string') {
-        console.error('showAdminPanelRedirect: 無効なtargetUrlが渡されました:', targetUrl);
+        UnifiedErrorHandler.logError('showAdminPanelRedirect: 無効なtargetUrlが渡されました:',
+            UnifiedErrorHandler.ErrorTypes.MEDIUM,
+            UnifiedErrorHandler.ErrorCategories.UI_UPDATE,
+            targetUrl);
         showMessage('遷移URLが無効です。ページを再読み込みしてください。', 'error');
         return;
       }
       
-      console.log('管理パネルからの遷移画面を表示:', targetUrl);
+      UnifiedErrorHandler.logError('管理パネルからの遷移画面を表示:',
+          UnifiedErrorHandler.ErrorTypes.INFO,
+          UnifiedErrorHandler.ErrorCategories.UI_UPDATE,
+          targetUrl);
       
       // ローディング状態を停止
       if (typeof setLoading === 'function') {
@@ -497,7 +544,10 @@
       document.close();
       
     } catch (error) {
-      console.error('showAdminPanelRedirectでエラー:', error);
+      UnifiedErrorHandler.logError('showAdminPanelRedirectでエラー:',
+          UnifiedErrorHandler.ErrorTypes.HIGH,
+          UnifiedErrorHandler.ErrorCategories.UI_UPDATE,
+          error);
       showMessage('ページ遷移中にエラーが発生しました: ' + error.message, 'error');
     }
   }
