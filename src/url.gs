@@ -69,22 +69,40 @@ function getWebAppBaseUrl() {
  * @returns {{adminUrl: string, viewUrl: string}} 生成されたURL
  */
 function generateUserUrls(userId) {
-  if (!userId) {
-    errorLog('generateUserUrls: userId is required');
-    return { adminUrl: '', viewUrl: '' };
+  try {
+    debugLog('🔗 generateUserUrls called with userId:', userId);
+    
+    if (!userId) {
+      errorLog('generateUserUrls: userId is required');
+      return { adminUrl: '', viewUrl: '', error: 'userId_required' };
+    }
+    
+    const baseUrl = getWebAppBaseUrl();
+    debugLog('🔗 Base URL retrieved:', baseUrl);
+    
+    if (!baseUrl) {
+      errorLog('generateUserUrls: Failed to get base URL');
+      return { adminUrl: '', viewUrl: '', error: 'base_url_failed' };
+    }
+    
+    const encodedUserId = encodeURIComponent(userId);
+    const result = {
+      adminUrl: `${baseUrl}?mode=admin&userId=${encodedUserId}`,
+      viewUrl: `${baseUrl}?mode=view&userId=${encodedUserId}`
+    };
+    
+    debugLog('✅ generateUserUrls successful:', result);
+    return result;
+    
+  } catch (e) {
+    errorLog('generateUserUrls: Unexpected error:', e.message, e.stack);
+    return { 
+      adminUrl: '', 
+      viewUrl: '', 
+      error: 'unexpected_error',
+      details: e.message 
+    };
   }
-  
-  const baseUrl = getWebAppBaseUrl();
-  if (!baseUrl) {
-    errorLog('generateUserUrls: Failed to get base URL');
-    return { adminUrl: '', viewUrl: '' };
-  }
-  
-  const encodedUserId = encodeURIComponent(userId);
-  return {
-    adminUrl: `${baseUrl}?mode=admin&userId=${encodedUserId}`,
-    viewUrl: `${baseUrl}?mode=view&userId=${encodedUserId}`
-  };
 }
 
 /**

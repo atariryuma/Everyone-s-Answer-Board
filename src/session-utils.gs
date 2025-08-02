@@ -86,8 +86,8 @@ function resetUserAuthentication() {
     props.deleteAllProperties();
     debugLog('ユーザープロパティをクリアしました。');
 
-    // ログインページのURLを返す
-    const loginPageUrl = ScriptApp.getService().getUrl();
+    // ログインページのURLを返す（新しいURL生成システム使用）
+    const loginPageUrl = getProductionWebAppUrl();
     debugLog('リセット完了。ログインページURL:', loginPageUrl);
     return loginPageUrl;
   } catch (error) {
@@ -161,7 +161,7 @@ function forceLogoutAndRedirectToLogin() {
       warnLog('⚠️ WebAppURL取得失敗、フォールバック使用:', urlError.message);
       warnLog('⚠️ URLエラースタック:', urlError.stack);
 
-      const fallbackUrl = ScriptApp.getService().getUrl() + '?mode=login';
+      const fallbackUrl = getProductionWebAppUrl() + '?mode=login';
       debugLog('📝 Fallback URL:', fallbackUrl);
 
       // フォールバックURLの基本検証

@@ -2532,13 +2532,31 @@ function buildResponseFromContext(context) {
           return generateUserUrls(context.requestUserId);
         } catch (e) {
           warnLog('generateUserUrls失敗、フォールバック使用:', e.message);
-          return {
-            webAppUrl: ScriptApp.getService().getUrl(),
-            viewUrl: userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view'),
-            setupUrl: ScriptApp.getService().getUrl() + '?setup=true',
-            adminUrl: ScriptApp.getService().getUrl() + '?mode=admin&userId=' + context.requestUserId,
-            status: 'success'
-          };
+          // 新しいURL生成システムを使用したフォールバック
+          try {
+            const baseUrl = getProductionWebAppUrl();
+            if (!baseUrl) {
+              throw new Error('Base URL generation failed');
+            }
+            const encodedUserId = encodeURIComponent(context.requestUserId);
+            return {
+              webAppUrl: baseUrl,
+              viewUrl: `${baseUrl}?mode=view&userId=${encodedUserId}`,
+              setupUrl: `${baseUrl}?setup=true`,
+              adminUrl: `${baseUrl}?mode=admin&userId=${encodedUserId}`,
+              status: 'fallback'
+            };
+          } catch (fallbackError) {
+            errorLog('フォールバックURL生成も失敗:', fallbackError.message);
+            return {
+              webAppUrl: '',
+              viewUrl: '',
+              setupUrl: '',
+              adminUrl: '',
+              status: 'error',
+              error: fallbackError.message
+            };
+          }
         }
       })(),
 
@@ -2546,28 +2564,54 @@ function buildResponseFromContext(context) {
       boardUrl: (function() {
         try {
           const urls = generateUserUrls(context.requestUserId);
-          return urls.viewUrl || userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          return urls.viewUrl || userInfo.viewUrl || '';
         } catch (e) {
           warnLog('boardUrl生成失敗、フォールバック使用:', e.message);
-          return userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          // 新しいURL生成システムでフォールバック
+          try {
+            const baseUrl = getProductionWebAppUrl();
+            if (baseUrl && context.requestUserId) {
+              return `${baseUrl}?mode=view&userId=${encodeURIComponent(context.requestUserId)}`;
+            }
+            return userInfo.viewUrl || '';
+          } catch (fallbackError) {
+            errorLog('boardUrlフォールバックも失敗:', fallbackError.message);
+            return userInfo.viewUrl || '';
+          }
         }
       })(),
       viewUrl: (function() {
         try {
           const urls = generateUserUrls(context.requestUserId);
-          return urls.viewUrl || userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          return urls.viewUrl || userInfo.viewUrl || '';
         } catch (e) {
           warnLog('viewUrl生成失敗、フォールバック使用:', e.message);
-          return userInfo.viewUrl || (ScriptApp.getService().getUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          // 新しいURL生成システムでフォールバック
+          try {
+            const baseUrl = getProductionWebAppUrl();
+            if (baseUrl && context.requestUserId) {
+              return `${baseUrl}?mode=view&userId=${encodeURIComponent(context.requestUserId)}`;
+            }
+            return userInfo.viewUrl || '';
+          } catch (fallbackError) {
+            errorLog('viewUrlフォールバックも失敗:', fallbackError.message);
+            return userInfo.viewUrl || '';
+          }
         }
       })(),
       webAppUrl: (function() {
         try {
           const urls = generateUserUrls(context.requestUserId);
-          return urls.webAppUrl || ScriptApp.getService().getUrl();
+          return urls.adminUrl || getProductionWebAppUrl();
         } catch (e) {
           warnLog('webAppUrl生成失敗、フォールバック使用:', e.message);
-          return ScriptApp.getService().getUrl();
+          // 新しいURL生成システムでフォールバック
+          try {
+            return getProductionWebAppUrl();
+          } catch (fallbackError) {
+            errorLog('webAppUrlフォールバックも失敗:', fallbackError.message);
+            return '';
+          }
         }
       })(),
 
