@@ -10,9 +10,48 @@ if (typeof debugLog === 'undefined') {
   }
 }
 
-// Import standardized error handling functions
+// Import standardized error handling functions with safe fallbacks
+// The Apps Script runtime does not guarantee file load order, so Core.gs
+// must operate even if errorHandler.gs has not executed yet.
+if (typeof ERROR_SEVERITY === 'undefined') {
+  const ERROR_SEVERITY = {
+    LOW: 'low',
+    MEDIUM: 'medium',
+    HIGH: 'high',
+    CRITICAL: 'critical'
+  };
+}
+
+if (typeof ERROR_CATEGORIES === 'undefined') {
+  const ERROR_CATEGORIES = {
+    AUTHENTICATION: 'authentication',
+    AUTHORIZATION: 'authorization',
+    DATABASE: 'database',
+    CACHE: 'cache',
+    NETWORK: 'network',
+    VALIDATION: 'validation',
+    SYSTEM: 'system',
+    USER_INPUT: 'user_input'
+  };
+}
+
 if (typeof logError === 'undefined') {
-  throw new Error('errorHandler.gs must be loaded before Core.gs');
+  /**
+   * Basic fallback error logger used when UnifiedErrorHandler is not yet loaded.
+   * This prevents initialization failures while still recording minimal details.
+   */
+  function logError(error, context, severity = ERROR_SEVERITY.MEDIUM, category = ERROR_CATEGORIES.SYSTEM, metadata = {}) {
+    const message = error && error.message ? error.message : String(error);
+    console.error(`[FallbackError][${context}]`, message, metadata);
+    return {
+      message,
+      context,
+      severity,
+      category,
+      metadata,
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 if (typeof warnLog === 'undefined') {
