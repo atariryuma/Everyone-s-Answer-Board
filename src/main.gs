@@ -415,9 +415,9 @@ function saveHistoryToSheet(historyItem, userInfo) {
       timestamp: new Date().toISOString(),
       questionText: historyItem.questionText || '（問題文未設定）',
       sheetName: historyItem.sheetName || '',
-      publishedAt: historyItem.publishedAt || new Date().toISOString(),
-      endTime: historyItem.endTime || new Date().toISOString(),
-      scheduledEndTime: historyItem.scheduledEndTime || null,
+      publishedAt: historyItem.publishedAt || config.lastPublishedAt || new Date().toISOString(),
+      endTime: new Date().toISOString(), // 実際の終了日時
+      scheduledEndTime: historyItem.scheduledEndTime || null, // 予定終了日時
       answerCount: historyItem.answerCount || 0,
       reactionCount: historyItem.reactionCount || 0,
       endReason: historyItem.endReason || 'manual',
@@ -576,7 +576,7 @@ function clearHistoryFromServerAPI(requestUserId) {
   }
 }
 
-const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
+const EMAIL_REGEX = /^[^@]+@[^@]+\.[^@]+$/;
 const DEBUG = PropertiesService.getScriptProperties()
   .getProperty('DEBUG_MODE') === 'true';
 
@@ -620,7 +620,7 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
   } catch (e) {
-    warnLog('Failed to set XFrameOptionsMode:', e.message);
+    warnLog('XFrameOptionsMode設定エラー:', e.message);
   }
   return htmlOutput;
 }
@@ -694,15 +694,15 @@ function getDeployUserDomainInfo() {
     const activeUserEmail = getCurrentUserEmail();
     const currentDomain = getEmailDomain(activeUserEmail);
 
-    // 統一されたURL取得システムを使用（開発URL除去機能付き）
-    const webAppUrl = getWebAppUrlCached();
+    // 統一されたURL取得システムを使用
+    const webAppUrl = getProductionWebAppUrl();
     let deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
 
     if (webAppUrl) {
       // Google WorkspaceアカウントのドメインをURLから抽出
       const domainMatch =
-        webAppUrl.match(/\/a\/([a-zA-Z0-9\-.]+)\/macros\//) ||
-        webAppUrl.match(/\/a\/macros\/([a-zA-Z0-9\-.]+)\//);
+        webAppUrl.match(/\/a\/([a-zA-Z0-9\-.]+)\/macros\/) ||
+        webAppUrl.match(/\/a\/macros\/([a-zA-Z0-9\-.]+)\/);
       if (domainMatch && domainMatch[1]) {
         deployDomain = domainMatch[1];
       }
@@ -864,7 +864,12 @@ function getSystemDomainInfo() {
     };
   } catch (e) {
     logError(e, 'getSystemDomainInfo', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
-    return { error: e.message };
+    return {
+      currentDomain: '不明',
+      deployDomain: '不明',
+      isDomainMatch: false,
+      error: e.message
+    };
   }
 }
 
@@ -1154,7 +1159,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
   // セキュリティチェック: アクセスしようとしているuserIdが自分のものでなければ、自分の管理画面にリダイレクト
   if (params.userId && params.userId !== userInfo.userId) {
     warnLog(`不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`);
-    const correctUrl = buildUserAdminUrl(userInfo.userId);
+    const correctUrl = `${getProductionWebAppUrl()}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`;
     return redirectToUrl(correctUrl);
   }
 
@@ -1163,7 +1168,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
     const isVerified = verifyAdminAccess(params.userId);
     if (!isVerified) {
       warnLog(`セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`);
-      const correctUrl = buildUserAdminUrl(userInfo.userId);
+      const correctUrl = `${getProductionWebAppUrl()}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`;
       return redirectToUrl(correctUrl);
     }
     debugLog(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
@@ -1391,7 +1396,7 @@ function getAppSetupUrl() {
     }
 
     // WebアプリのベースURLを取得
-    const baseUrl = ScriptApp.getService().getUrl();
+    const baseUrl = getProductionWebAppUrl();
     if (!baseUrl) {
       throw new Error('WebアプリのURLを取得できませんでした');
     }
@@ -1482,101 +1487,28 @@ function showAccessRestrictedPage(accessCheck) {
   }
 }
 
-/**
- * ユーザー専用の一意の管理パネルURLを構築
- * @param {string} userId ユーザーID
- * @return {string}
- */
-function buildUserAdminUrl(userId) {
-  const baseUrl = getWebAppUrl();
-  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
-}
-
-/**
- * 標準化されたページURL生成のヘルパー関数群
- */
-const URLBuilder = {
-  /**
-   * ログインページのURLを生成
-   * @returns {string} ログインページURL
-   */
-  login: function() {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=login`;
-  },
-
-  /**
-   * 管理パネルのURLを生成
-   * @param {string} userId - ユーザーID
-   * @returns {string} 管理パネルURL
-   */
-  admin: function(userId) {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
-  },
-
-  /**
-   * アプリ設定ページのURLを生成
-   * @returns {string} アプリ設定ページURL
-   */
-  appSetup: function() {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=appSetup`;
-  },
-
-  /**
-   * 回答ボードのURLを生成
-   * @param {string} userId - ユーザーID
-   * @returns {string} 回答ボードURL
-   */
-  view: function(userId) {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`;
-  },
-
-  /**
-   * パラメータ付きURLを安全に生成
-   * @param {string} mode - モード ('login', 'admin', 'view', 'appSetup')
-   * @param {Object} params - 追加パラメータ
-   * @returns {string} 生成されたURL
-   */
-  build: function(mode, params = {}) {
-    const baseUrl = getWebAppUrl();
-    const url = new URL(baseUrl);
-    url.searchParams.set('mode', mode);
-
-    Object.keys(params).forEach(key => {
-      if (params[key] !== null && params[key] !== undefined) {
-        url.searchParams.set(key, params[key]);
-      }
-    });
-
-    return url.toString();
-  }
-};
 
 /**
  * 指定されたURLへリダイレクトするサーバーサイド関数
- * @param {string} url - リダイレクト先のURL
+ * @param {string} url - リダイレクト先のURL (現在は使用されず、常に本番URLにリダイレクト)
  * @returns {HtmlOutput} リダイレクトを実行するHTML出力
  */
 function redirectToUrl(url) {
-  // XSS攻撃を防ぐため、URLをサニタイズ
-  const sanitizedUrl = sanitizeRedirectUrl(url);
-  return HtmlService.createHtmlOutput().setContent(`<script>window.top.location.href = '${sanitizedUrl}';</script>`);
+  const productionUrl = getProductionWebAppUrl();
+  return HtmlService.createHtmlOutput().setContent(`<script>window.top.location.href = '${productionUrl}';</script>`);
 }
+
 /**
  * セキュアなリダイレクトHTMLを作成 (シンプル版)
- * @param {string} targetUrl リダイレクト先URL
- * @param {string} message 表示メッセージ
+ * @param {string} targetUrl - リダイレクト先URL (現在は使用されず、常に本番URLにリダイレクト)
+ * @param {string} message - 表示メッセージ
  * @return {HtmlOutput}
  */
 function createSecureRedirect(targetUrl, message) {
-  // URL検証とサニタイゼーション
-  const sanitizedUrl = sanitizeRedirectUrl(targetUrl);
+  const productionUrl = getProductionWebAppUrl();
 
   debugLog('createSecureRedirect - Original URL:', targetUrl);
-  debugLog('createSecureRedirect - Sanitized URL:', sanitizedUrl);
+  debugLog('createSecureRedirect - Sanitized URL (Production):', productionUrl);
 
   // ユーザーアクティベーション必須のHTMLアンカー方式（サンドボックス制限準拠）
   const userActionRedirectHtml = `
@@ -1664,12 +1596,12 @@ function createSecureRedirect(targetUrl, message) {
         <h1 class="title">${message || 'アクセス確認'}</h1>
         <p class="subtitle">セキュリティのため、下のボタンをクリックして続行してください</p>
 
-        <a href="${sanitizedUrl}" target="_top" class="main-button">
+        <a href="${productionUrl}" target="_top" class="main-button">
           🚀 続行する
         </a>
 
         <div class="url-info">
-          <div class="url-text">${sanitizedUrl}</div>
+          <div class="url-text">${productionUrl}</div>
         </div>
 
         <div class="note">
@@ -1695,78 +1627,7 @@ function createSecureRedirect(targetUrl, message) {
   return htmlOutput;
 }
 
-/**
- * リダイレクト用URLの検証とサニタイゼーション
- * @param {string} url 検証対象のURL
- * @return {string} サニタイズされたURL
- */
-function sanitizeRedirectUrl(url) {
-  if (!url) {
-    return getWebAppUrlCached();
-  }
 
-  try {
-    let cleanUrl = String(url).trim();
-
-    // 複数レベルのクォート除去（JSON文字列化による多重クォートに対応）
-    let previousUrl = '';
-    while (cleanUrl !== previousUrl) {
-      previousUrl = cleanUrl;
-
-      // 先頭と末尾のクォートを除去
-      if ((cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
-          (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))) {
-        cleanUrl = cleanUrl.slice(1, -1);
-      }
-
-      // エスケープされたクォートを除去
-      cleanUrl = cleanUrl.replace(/\\"/g, '"').replace(/\\'/g, "'");
-
-      // URL内に埋め込まれた別のURLを検出
-      const embeddedUrlMatch = cleanUrl.match(/https?:\/\/[^\s<>"']+/);
-      if (embeddedUrlMatch && embeddedUrlMatch[0] !== cleanUrl) {
-        debugLog('Extracting embedded URL:', embeddedUrlMatch[0]);
-        cleanUrl = embeddedUrlMatch[0];
-      }
-    }
-
-    // 基本的なURL形式チェック
-    if (!cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
-      warnLog('Invalid URL format after sanitization:', cleanUrl);
-      return getWebAppUrlCached();
-    }
-
-    // URLの妥当性チェック（url.gsで生成された本番URLを信頼）
-    const isValidUrl = cleanUrl.includes('script.google.com') ||
-                     cleanUrl.includes('googleusercontent.com') ||
-                     cleanUrl.includes('localhost');
-
-    if (!isValidUrl) {
-      warnLog('Suspicious URL detected:', cleanUrl);
-      return getWebAppUrlCached();
-    }
-
-    return cleanUrl;
-  } catch (e) {
-    logError(e, 'urlSanitization', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
-    return getWebAppUrlCached();
-  }
-}
-
-/**
- * 正しいWeb App URLを取得 (url.gsのgetWebAppUrlCachedを使用)
- * @return {string}
- */
-function getWebAppUrl() {
-  try {
-    // url.gsの統一されたURL取得関数を使用
-    return getWebAppUrlCached();
-  } catch (error) {
-    logError(error, 'getWebAppUrl', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
-    // 緊急時のフォールバックURL
-    return getFallbackUrl();
-  }
-}
 /**
  * doGet のリクエストパラメータを解析
  * @param {Object} e Event object
@@ -1871,14 +1732,20 @@ function renderUnpublishedPage(userInfo, params) {
     // URL生成（エラー耐性を持たせる）
     let appUrls;
     try {
-      appUrls = generateUserUrls(userInfo.userId);
+      const baseUrl = getProductionWebAppUrl();
+      appUrls = {
+        adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`,
+        viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`,
+        status: 'success'
+      };
+
       if (!appUrls || appUrls.status === 'error') {
         throw new Error('URL生成に失敗しました');
       }
     } catch (urlError) {
       warnLog('URL生成エラー、フォールバック値を使用:', urlError);
       // フォールバック: 基本的なURL構造
-      const baseUrl = getWebAppUrlCached() || getFallbackUrl();
+      const baseUrl = getProductionWebAppUrl();
       appUrls = {
         adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`,
         viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`,
@@ -1988,7 +1855,7 @@ function updateUserWebAppUrlInDb() {
       throw new Error('User information not found for email: ' + userEmail);
     }
 
-    const currentCorrectWebAppUrl = getWebAppUrlCached(); // This should now return the script.google.com URL
+    const currentCorrectWebAppUrl = getProductionWebAppUrl();
     if (!currentCorrectWebAppUrl) {
       throw new Error('Could not determine the correct Web App URL.');
     }
@@ -2137,59 +2004,22 @@ function checkCurrentPublicationStatus(userId) {
     });
 
     if (!userInfo) {
-      warnLog('User not found for publication status check:', userId);
       return { error: 'User not found', isPublished: false };
     }
 
-    // 設定情報を解析（正規化付き）
+    // configJsonからパブリケーション状態を取得
     const config = parseAndNormalizeConfigJson(userInfo.configJson);
 
-    // 現在のパブリケーション状態を厳密にチェック
-    const isCurrentlyPublished = !!(
-      config.appPublished === true &&
+    const isPublished = !!(config.appPublished === true &&
       config.publishedSpreadsheetId &&
       config.publishedSheetName &&
       typeof config.publishedSheetName === 'string' &&
-      config.publishedSheetName.trim() !== ''
-    );
+      config.publishedSheetName.trim() !== '');
 
-    debugLog('📊 Publication status check result:', {
-      userId: userId,
-      appPublished: config.appPublished,
-      hasSpreadsheetId: !!config.publishedSpreadsheetId,
-      hasSheetName: !!config.publishedSheetName,
-      isCurrentlyPublished: isCurrentlyPublished,
-      timestamp: new Date().toISOString()
-    });
+    return { isPublished: isPublished };
 
-    return {
-      isPublished: isCurrentlyPublished,
-      publishedSheetName: config.publishedSheetName || null,
-      publishedSpreadsheetId: config.publishedSpreadsheetId || null,
-      lastChecked: new Date().toISOString()
-    };
-
-  } catch (error) {
-    logError(error, 'checkCurrentPublicationStatus', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
-    return {
-      error: error.message,
-      isPublished: false,
-      lastChecked: new Date().toISOString()
-    };
+  } catch (e) {
+    errorLog('❌ Error checking publication status:', e.message);
+    return { error: e.message, isPublished: false };
   }
 }
-/**
- * JavaScript エスケープのテスト関数
- */
-
-/**
- * パフォーマンス監視エンドポイント（簡易版）
- */
-
-/**
- * escapeJavaScript関数のテスト
- */
-
-/**
- * Base64エンコード/デコードのテスト
- */
