@@ -60,102 +60,44 @@ function computeWebAppUrl() {
     let url = ScriptApp.getService().getUrl();
     if (!url) {
       warnLog('ScriptApp.getService().getUrl()がnullを返しました');
-      return getFallbackUrl();
+      return getFallbackUrl(); // Fallback if URL is null
     }
 
     // 末尾のスラッシュを除去
     url = url.replace(/\/$/, '');
 
-    // 🎯 開発環境URL検出の改善（userCodeAppPanelのみ検出）
-    // 注意: googleusercontent.comは有効なデプロイURLの場合があるため、
-    // userCodeAppPanelが含まれる場合のみ開発環境と判定
-    if (url.includes('userCodeAppPanel')) {
-      warnLog('⚠️ 開発環境URL検出 (userCodeAppPanel): ' + url + ' → フォールバック使用');
-      return getFallbackUrl();
-    }
-    
-    // その他の開発環境インジケーター
-    const otherDevIndicators = ['/dev', '/test'];
-    for (var i = 0; i < otherDevIndicators.length; i++) {
-      if (url.includes(otherDevIndicators[i])) {
-        warnLog('⚠️ 開発環境URL検出 (' + otherDevIndicators[i] + '): ' + url + ' → フォールバック使用');
-        return getFallbackUrl();
-      }
-    }
-
-    // 優先: script.google.com のURLを検証
-    var isValidScriptUrl = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/exec$/.test(url);
-    if (isValidScriptUrl) {
-      infoLog('✅ 有効なWebAppURL検証完了 (script.google.com):', url);
-      return url;
-    }
-
-    // 開発環境URL検出: userCodeAppPanel または googleusercontent.com を含む場合
-    if (url.includes('userCodeAppPanel') || url.includes('googleusercontent.com')) {
-      warnLog('⚠️ 開発環境URL検出 (userCodeAppPanel または googleusercontent.com): ' + url + ' → フォールバック使用');
-      return getFallbackUrl();
-    }
-
-    // 従来形式のURL補正（必要に応じて）
-    var correctedUrl = url.replace(
-      /^https:\/\/script\.google\.com\/a\/([^\/]+)\/macros\//,
-      'https://script.google.com/a/macros/$1/'
-    );
-
-    if (correctedUrl !== url) {
-      debugLog('URL形式を補正しました:', url, '→', correctedUrl);
-      return correctedUrl;
-    }
-
-    warnLog('不明なURLパターン:', url, '→ フォールバック使用');
-    return getFallbackUrl();
+    // Production URL should always be returned directly
+    infoLog('✅ WebAppURL取得完了:', url);
+    return url;
 
   } catch (e) {
     errorLog('WebアプリURL取得エラー:', e.message);
-    return getFallbackUrl();
+    return getFallbackUrl(); // Fallback on error
   }
 }
 
 
 function getWebAppUrlCached() {
   try {
-    // 統合キャッシュマネージャーを使用したURL管理（最適化版）
     var webAppUrl = cacheManager.get(URL_CACHE_KEY, function() {
       debugLog('🔍 WebAppURL キャッシュmiss - 新規生成');
-      return computeWebAppUrl(); // 最適化されたURL生成を使用
+      return computeWebAppUrl();
     }, {
-      ttl: 3600, // 1時間キャッシュ
+      ttl: 3600,
       enableMemoization: true
     });
 
-    // URL正規化
     webAppUrl = normalizeUrlString(webAppUrl);
 
-    // キャッシュ済みURLの妥当性チェック
     if (webAppUrl) {
-      // 開発環境URL検出（簡素化）
-      var devIndicators = ['userCodeAppPanel', '/dev', '/test'];
-      var isDevelopmentUrl = devIndicators.some(function(indicator) {
-        return webAppUrl.includes(indicator);
-      });
-
-      if (isDevelopmentUrl) {
-        warnLog('⚠️ キャッシュされた開発URL検出、クリアして再生成:', webAppUrl);
-        cacheManager.remove(URL_CACHE_KEY);
-        // 再帰的に呼び出して新しいURLを生成（最大1回）
-        return computeWebAppUrl(); // 直接生成で無限ループ回避
-      }
-
       infoLog('✅ 有効なキャッシュURL取得:', webAppUrl);
       return webAppUrl;
     }
 
-    // フォールバック処理
     warnLog('⚠️ キャッシュURL無効、直接生成に切り替え');
     var fallbackUrl = computeWebAppUrl();
 
-    // 有効なURLが生成された場合はキャッシュに保存
-    if (fallbackUrl && !fallbackUrl.includes('userCodeAppPanel')) {
+    if (fallbackUrl) {
       try {
         cacheManager.put(URL_CACHE_KEY, fallbackUrl, 3600);
         infoLog('✅ 新規URL生成・キャッシュ完了:', fallbackUrl);
@@ -199,7 +141,7 @@ function clearUrlCache() {
 
     // 新しいURLを即座に生成してキャッシュ
     var newUrl = computeWebAppUrl();
-    if (newUrl && !newUrl.includes('googleusercontent.com') && !newUrl.includes('userCodeAppPanel')) {
+    if (newUrl) {
       cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
       debugLog('New URL cached:', newUrl);
     }
@@ -235,12 +177,6 @@ function forceUrlSystemReset() {
     var newUrl = computeWebAppUrl();
     debugLog('New URL generated:', newUrl);
 
-    // 開発URLチェック
-    if (newUrl && (newUrl.includes('googleusercontent.com') || newUrl.includes('userCodeAppPanel'))) {
-      warnLog('Development URL detected, using fallback');
-      newUrl = getFallbackUrl();
-    }
-
     // 新しいURLをキャッシュ
     if (newUrl) {
       cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
@@ -267,7 +203,6 @@ function forceUrlSystemReset() {
  */
 function generateUserUrls(userId) {
   try {
-    // userIdの妥当性チェック（簡素化）
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
       errorLog('generateUserUrls: 無効なuserId:', userId);
       return {
@@ -280,22 +215,13 @@ function generateUserUrls(userId) {
       };
     }
 
-    // 最適化済みURL取得（リトライ処理内包）
     var webAppUrl = getWebAppUrlCached();
 
-    // 基本的な妥当性チェック
     if (!webAppUrl) {
       errorLog('WebAppURL取得失敗、フォールバック使用');
       webAppUrl = getFallbackUrl();
     }
 
-    // 開発URL最終チェック（簡素化）
-    if (webAppUrl.includes('userCodeAppPanel')) {
-      warnLog('開発URL検出、フォールバックに切り替え:', webAppUrl);
-      webAppUrl = getFallbackUrl();
-    }
-
-    // URLが取得できない場合のエラーハンドリング
     if (!webAppUrl) {
       return {
         webAppUrl: '',
@@ -307,7 +233,6 @@ function generateUserUrls(userId) {
       };
     }
 
-    // URL生成（エンコード処理）
     var encodedUserId = encodeURIComponent(userId.trim());
 
     return {
