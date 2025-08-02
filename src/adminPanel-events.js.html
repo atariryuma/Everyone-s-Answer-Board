@@ -34,28 +34,84 @@ function setupEventListeners() {
     reguessBtn.addEventListener('click', runHeaderGuessing);
   }
   
-  // Save and publish button
-  if (elements['save-publish-btn']) {
-    elements['save-publish-btn'].addEventListener('click', function() {
-      if (!selectedSheet) {
+  // Save and publish button - 防御的実装
+  const savePublishBtn = elements['save-publish-btn'] || getCachedElement('save-publish-btn');
+  if (savePublishBtn) {
+    // 既存のハンドラーをクリア
+    const newSaveBtn = savePublishBtn.cloneNode(true);
+    savePublishBtn.parentNode.replaceChild(newSaveBtn, savePublishBtn);
+    
+    newSaveBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('💾 Save and publish button clicked');
+      
+      // ボタンが無効化されている場合はクリックを無視
+      if (newSaveBtn.disabled) {
+        console.log('⚠️ Save button is disabled, ignoring click');
+        return;
+      }
+      
+      // selectedSheet の確認（より堅牢なチェック）
+      const sheetSelect = document.getElementById('sheet-select');
+      const selectedSheetValue = sheetSelect ? sheetSelect.value : null;
+      
+      if (!selectedSheetValue || selectedSheetValue === '') {
         showMessage('まずシートを選択してください。', 'warning');
         return;
       }
-      saveAndPublish();
+      
+      // saveAndPublish関数の存在確認
+      if (typeof saveAndPublish === 'function') {
+        saveAndPublish();
+      } else {
+        console.error('saveAndPublish function not found');
+        showMessage('保存機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
+      }
     });
+    
+    // 要素をキャッシュに更新
+    elements['save-publish-btn'] = newSaveBtn;
+    console.log('✅ Save and publish button handler attached');
+  } else {
+    console.warn('⚠️ Save and publish button not found');
   }
   
-  // Unpublish button
-  if (elements['unpublish-board-btn']) {
-    elements['unpublish-board-btn'].addEventListener('click', function() {
-      showConfirmationModal(
-        '公開停止の確認',
-        '回答ボードの公開を停止しますか？',
-        () => {
-          unpublishBoard().then(() => loadStatus(true));
-        }
-      );
+  // Unpublish button - 防御的実装
+  const unpublishBtn = elements['unpublish-board-btn'] || getCachedElement('unpublish-board-btn');
+  if (unpublishBtn) {
+    // 既存のハンドラーをクリア
+    const newUnpublishBtn = unpublishBtn.cloneNode(true);
+    unpublishBtn.parentNode.replaceChild(newUnpublishBtn, unpublishBtn);
+    
+    newUnpublishBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🛑 Unpublish button clicked');
+      
+      if (typeof showConfirmationModal === 'function' && typeof unpublishBoard === 'function') {
+        showConfirmationModal(
+          '公開停止の確認',
+          '回答ボードの公開を停止しますか？',
+          () => {
+            unpublishBoard().then(() => {
+              if (typeof loadStatus === 'function') {
+                loadStatus(true);
+              }
+            });
+          }
+        );
+      } else {
+        console.error('Required functions not found for unpublish');
+        showMessage('公開停止機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
+      }
     });
+    
+    // 要素をキャッシュに更新
+    elements['unpublish-board-btn'] = newUnpublishBtn;
+    console.log('✅ Unpublish button handler attached');
+  } else {
+    console.warn('⚠️ Unpublish button not found');
   }
   
   // Clear history button - 直接取得で確実に処理
@@ -140,10 +196,18 @@ function setupEventListeners() {
     console.error('❌ clear-history-btnが見つかりません');
   }
   
-  // クイックスタートボタンのイベントリスナー
+  // クイックスタートボタンのイベントリスナー - 防御的実装
   var quickstartBtn = document.getElementById('quickstart-btn');
   if (quickstartBtn) {
-    quickstartBtn.addEventListener('click', function() {
+    // 既存のハンドラーをクリア
+    const newQuickstartBtn = quickstartBtn.cloneNode(true);
+    quickstartBtn.parentNode.replaceChild(newQuickstartBtn, quickstartBtn);
+    
+    newQuickstartBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🚀 Quickstart button clicked');
+      
       if (typeof handleQuickStart === 'function') {
         handleQuickStart();
       } else {
@@ -151,35 +215,54 @@ function setupEventListeners() {
         showMessage('クイックスタート機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     });
+    console.log('✅ Quickstart button handler attached');
+  } else {
+    console.warn('⚠️ Quickstart button not found');
   }
 
-  // Create board button
+  // Create board button - 防御的実装
   var createBoardBtn = document.getElementById('create-board-btn');
   if (createBoardBtn) {
-    createBoardBtn.addEventListener('click', function() {
+    // 既存のハンドラーをクリア
+    const newCreateBoardBtn = createBoardBtn.cloneNode(true);
+    createBoardBtn.parentNode.replaceChild(newCreateBoardBtn, createBoardBtn);
+    
+    newCreateBoardBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🎨 Create board button clicked');
+      
       // 公開状態をチェックしてカスタムセットアップ選択モーダルを表示
       if (currentStatus && currentStatus._normalized && currentStatus._normalized.isPublished) {
         // 公開中の場合、選択モーダルを表示
-        window.sharedModals.showCustomSetupSelection(
-          (selectedOption) => {
-            console.log('✅ ユーザーが選択:', selectedOption);
-            if (selectedOption === 'stop') {
-              // 停止して作成を選択
-              proceedWithCustomFormCreation(true);
-            } else if (selectedOption === 'continue') {
-              // 継続しながら作成を選択
-              proceedWithCustomFormCreation(false);
+        if (window.sharedModals && typeof window.sharedModals.showCustomSetupSelection === 'function') {
+          window.sharedModals.showCustomSetupSelection(
+            (selectedOption) => {
+              console.log('✅ ユーザーが選択:', selectedOption);
+              if (selectedOption === 'stop') {
+                // 停止して作成を選択
+                proceedWithCustomFormCreation(true);
+              } else if (selectedOption === 'continue') {
+                // 継続しながら作成を選択
+                proceedWithCustomFormCreation(false);
+              }
+            },
+            () => {
+              console.log('❌ カスタムセットアップがキャンセルされました');
             }
-          },
-          () => {
-            console.log('❌ カスタムセットアップがキャンセルされました');
-          }
-        );
+          );
+        } else {
+          console.error('sharedModals.showCustomSetupSelection not found');
+          proceedWithCustomFormCreation(false);
+        }
       } else {
         // 公開していない場合、直接フォーム作成モーダルを表示
         proceedWithCustomFormCreation(false);
       }
     });
+    console.log('✅ Create board button handler attached');
+  } else {
+    console.warn('⚠️ Create board button not found');
   }
 
   // カスタムフォーム作成を進行
@@ -360,63 +443,53 @@ function setupResourceHandlers() {
 // =============================================================================
 
 function setupAccountManagementHandlers() {
-  // Delete account handler - 防御的実装とリトライ機能
-  function attachDeleteHandler(retryCount = 0) {
-    const deleteBtn = elements['delete-account-btn'] || 
-                     getCachedElement('delete-account-btn') || 
-                     document.getElementById('delete-account-btn');
+  console.log('🔧 Setting up account management handlers...');
+  
+  // Delete account handler - シンプルで確実な実装
+  const deleteBtn = elements['delete-account-btn'] || 
+                   getCachedElement('delete-account-btn') || 
+                   document.getElementById('delete-account-btn');
+  
+  if (deleteBtn) {
+    // 既存のクリックハンドラーをクリア
+    const newDeleteBtn = deleteBtn.cloneNode(true);
+    deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
     
-    if (deleteBtn) {
-      // 既存のイベントリスナーを削除（重複を防ぐため）
-      deleteBtn.removeEventListener('click', handleDeleteRequest);
-      // 新しいイベントリスナーを追加
-      deleteBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('🗑️ Delete account button clicked');
-        handleDeleteRequest();
-      });
-      console.log('✅ Delete account button handler attached (attempt ' + (retryCount + 1) + ')');
-      return true;
-    } else {
-      console.warn('⚠️ Delete account button not found (attempt ' + (retryCount + 1) + ')');
-      if (retryCount < 2) {
-        // 最大3回まで500ms間隔でリトライ
-        setTimeout(() => attachDeleteHandler(retryCount + 1), 500);
-      }
-      return false;
-    }
+    // 新しいイベントリスナーを追加
+    newDeleteBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🗑️ Delete account button clicked');
+      handleDeleteRequest();
+    });
+    
+    // 要素をキャッシュに更新
+    elements['delete-account-btn'] = newDeleteBtn;
+    console.log('✅ Delete account button handler attached');
+  } else {
+    console.warn('⚠️ Delete account button not found');
   }
   
-  // リセット設定ボタンハンドラー - 防御的実装とリトライ機能
-  function attachResetHandler(retryCount = 0) {
-    const resetBtn = document.getElementById('reset-config-btn');
-    
-    if (resetBtn) {
-      // 既存のイベントリスナーを削除（重複を防ぐため）
-      resetBtn.removeEventListener('click', resetConfigJson);
-      // 新しいイベントリスナーを追加
-      resetBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('🔄 Reset config button clicked');
-        resetConfigJson();
-      });
-      console.log('✅ Reset config button handler attached (attempt ' + (retryCount + 1) + ')');
-      return true;
-    } else {
-      console.warn('⚠️ Reset config button not found (attempt ' + (retryCount + 1) + ')');
-      if (retryCount < 2) {
-        // 最大3回まで500ms間隔でリトライ
-        setTimeout(() => attachResetHandler(retryCount + 1), 500);
-      }
-      return false;
-    }
-  }
+  // Reset config handler - シンプルで確実な実装
+  const resetBtn = document.getElementById('reset-config-btn');
   
-  // ボタンハンドラーをアタッチ
-  attachDeleteHandler();
-  attachResetHandler();
+  if (resetBtn) {
+    // 既存のクリックハンドラーをクリア
+    const newResetBtn = resetBtn.cloneNode(true);
+    resetBtn.parentNode.replaceChild(newResetBtn, resetBtn);
+    
+    // 新しいイベントリスナーを追加
+    newResetBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🔄 Reset config button clicked');
+      resetConfigJson();
+    });
+    
+    console.log('✅ Reset config button handler attached');
+  } else {
+    console.warn('⚠️ Reset config button not found');
+  }
   
   // Switch account handlers
   var switchAccountBtns = document.querySelectorAll('[onclick*="switchToAnotherAccount"]');
@@ -426,6 +499,8 @@ function setupAccountManagementHandlers() {
       switchToAnotherAccount();
     });
   });
+  
+  console.log('✅ Account management handlers setup complete');
 }
 
 // =============================================================================
@@ -433,33 +508,103 @@ function setupAccountManagementHandlers() {
 // =============================================================================
 
 function setupExternalLinkHandlers() {
-  // Open spreadsheet
-  if (elements['open-spreadsheet-btn']) {
-    elements['open-spreadsheet-btn'].addEventListener('click', openDatabaseSpreadsheet);
+  console.log('🔗 Setting up external link handlers...');
+  
+  // Open spreadsheet - 防御的実装
+  const spreadsheetBtn = elements['open-spreadsheet-btn'] || getCachedElement('open-spreadsheet-btn');
+  if (spreadsheetBtn) {
+    const newSpreadsheetBtn = spreadsheetBtn.cloneNode(true);
+    spreadsheetBtn.parentNode.replaceChild(newSpreadsheetBtn, spreadsheetBtn);
+    
+    newSpreadsheetBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('📊 Open spreadsheet button clicked');
+      
+      if (typeof openDatabaseSpreadsheet === 'function') {
+        openDatabaseSpreadsheet();
+      } else {
+        console.error('openDatabaseSpreadsheet function not found');
+        showMessage('スプレッドシート機能を読み込み中です。', 'warning');
+      }
+    });
+    
+    elements['open-spreadsheet-btn'] = newSpreadsheetBtn;
+    console.log('✅ Open spreadsheet button handler attached');
   }
   
-  // Open form
-  if (elements['open-form-btn']) {
-    elements['open-form-btn'].addEventListener('click', openForm);
+  // Open form - 防御的実装
+  const formBtn = elements['open-form-btn'] || getCachedElement('open-form-btn');
+  if (formBtn) {
+    const newFormBtn = formBtn.cloneNode(true);
+    formBtn.parentNode.replaceChild(newFormBtn, formBtn);
+    
+    newFormBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('📝 Open form button clicked');
+      
+      if (typeof openForm === 'function') {
+        openForm();
+      } else {
+        console.error('openForm function not found');
+        showMessage('フォーム機能を読み込み中です。', 'warning');
+      }
+    });
+    
+    elements['open-form-btn'] = newFormBtn;
+    console.log('✅ Open form button handler attached');
   }
   
   // Digital citizenship
   var digitalCitizenshipBtn = document.getElementById('digital-citizenship-btn');
   if (digitalCitizenshipBtn) {
-    digitalCitizenshipBtn.addEventListener('click', showDigitalCitizenshipModal);
+    digitalCitizenshipBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🏛️ Digital citizenship button clicked');
+      
+      if (typeof showDigitalCitizenshipModal === 'function') {
+        showDigitalCitizenshipModal();
+      } else {
+        console.error('showDigitalCitizenshipModal function not found');
+      }
+    });
   }
   
   // Copy board URL
   var copyUrlBtn = document.getElementById('copy-url-btn');
   if (copyUrlBtn) {
-    copyUrlBtn.addEventListener('click', copyBoardUrl);
+    copyUrlBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('📋 Copy board URL button clicked');
+      
+      if (typeof copyBoardUrl === 'function') {
+        copyBoardUrl();
+      } else {
+        console.error('copyBoardUrl function not found');
+      }
+    });
   }
   
   // Copy form URL
   var copyFormUrlBtn = document.getElementById('copy-form-url-btn');
   if (copyFormUrlBtn) {
-    copyFormUrlBtn.addEventListener('click', copyFormUrl);
+    copyFormUrlBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('📋 Copy form URL button clicked');
+      
+      if (typeof copyFormUrl === 'function') {
+        copyFormUrl();
+      } else {
+        console.error('copyFormUrl function not found');
+      }
+    });
   }
+  
+  console.log('✅ External link handlers setup complete');
 }
 
 // =============================================================================
@@ -716,15 +861,26 @@ function manageFocusForModal(modalId, show) {
 // Initialize event listeners when DOM is ready
 // Add additional delay to ensure all JavaScript modules are loaded
 function initializeEventListeners() {
+  console.log('🎯 Starting event listeners initialization...');
+  
   // Check if essential functions are available, but continue even if some are missing
   const requiredFunctions = ['handleQuickStart', 'showFormConfigModal', 'toggleSection'];
   const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
 
   if (missingFunctions.length > 0) {
     console.warn('⚠️ AdminPanel: Missing functions during event initialization:', missingFunctions);
+    console.log('⚠️ Will retry after 1 second...');
+    
+    // 1秒後にリトライ
+    setTimeout(() => {
+      console.log('🔄 Retrying event listeners setup...');
+      setupEventListeners();
+    }, 1000);
+  } else {
+    console.log('✅ All required functions available, setting up event listeners');
   }
 
-  console.log('✅ AdminPanel: Setting up event listeners');
+  // 必須関数がなくてもイベントリスナーは設定する（防御的実装により対応）
   setupEventListeners();
 }
 
