@@ -121,13 +121,53 @@ function updateStepIndicators(status) {
   console.log('📊 ステップインジケーター更新開始');
   
   try {
-    const currentStep = status?.setupStep || 1;
-    updateStepDisplay(currentStep, status);
+    // setupStatusに基づいてcurrentStepを決定
+    const currentStep = determineCurrentStepFromStatus(status);
+    console.log(`🎯 Determined current step: ${currentStep} (setupStatus: ${status?.config?.setupStatus})`);
+    
+    // 実際のステップインジケーター更新を実行
+    updateStepIndicatorsWithStep(currentStep, status);
     
     console.log('✅ ステップインジケーター更新完了');
   } catch (error) {
     console.error('❌ ステップインジケーター更新エラー:', error);
   }
+}
+
+/**
+ * setupStatusに基づいて現在のステップを決定
+ * @param {Object} status - ステータスデータ
+ * @returns {number} 現在のステップ (1-3)
+ */
+function determineCurrentStepFromStatus(status) {
+  // デフォルトはステップ1
+  if (!status || !status.config) {
+    console.log('🔍 No status/config found, defaulting to step 1');
+    return 1;
+  }
+  
+  const setupStatus = status.config.setupStatus;
+  const completion = getStepCompletionFromConfig(status);
+  
+  console.log('🔍 Step determination:', { setupStatus, completion });
+  
+  // setupStatusが"pending"の場合は常にステップ1
+  if (setupStatus === 'pending') {
+    console.log('🎯 setupStatus is pending, forcing step 1');
+    return 1;
+  }
+  
+  // ステップ完了状況に基づいた決定
+  if (!completion.step1) {
+    return 1; // データ準備が未完了
+  } else if (!completion.step2) {
+    return 2; // シート設定が未完了
+  } else if (!completion.step3) {
+    return 3; // 表示設定が未完了
+  }
+  
+  // 全て完了している場合は最終ステップ
+  return 3;
 }
 
 /**
@@ -221,7 +261,7 @@ function updateStepIndicatorsOptimized(status) {
   console.log('📊 最適化ステップインジケーター更新開始');
   
   const currentStep = status?.setupStep || 1;
-  updateStepIndicators(currentStep, status);
+  updateStepIndicatorsWithStep(currentStep, status);
   
   console.log('✅ 最適化ステップインジケーター更新完了');
 }
@@ -851,7 +891,7 @@ function getStepCompletionFromConfig(status) {
 }
 
 // Update step indicators - 最適化版（バッチDOM更新）
-function updateStepIndicators(currentStep, status = null) {
+function updateStepIndicatorsWithStep(currentStep, status = null) {
   const steps = [
     document.getElementById('step-1-indicator'),
     document.getElementById('step-2-indicator'),
@@ -1116,7 +1156,7 @@ function updateUIForSelectedSheet() {
   
   // Update step indicators based on server-provided setupStep
   const currentStep = currentStatus.setupStep || 1;
-  updateStepIndicators(currentStep);
+  updateStepIndicatorsWithStep(currentStep);
   
   // Enable/disable configuration section
   var configSection = document.getElementById('config-section');
@@ -2653,7 +2693,7 @@ function selectHistoryItem(historyId) {
         }
         
         // 現在のステップを3に更新
-        updateStepIndicators(3);
+        updateStepIndicatorsWithStep(3);
         manageSectionStates(3);
         
         showMessage(`「${item.questionText}」の設定を復元しました`, 'success');

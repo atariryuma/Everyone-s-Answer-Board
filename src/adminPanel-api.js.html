@@ -894,7 +894,7 @@ function proceedWithSaveAndPublish(config) {
           loadStatus(true).then(() => {
             // ステップ進行を更新
             const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
-            updateStepIndicators(currentStep);
+            updateStepIndicatorsWithStep(currentStep);
             manageSectionStates(currentStep);
           });
         }
