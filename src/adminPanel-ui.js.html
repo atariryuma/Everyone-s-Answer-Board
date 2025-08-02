@@ -16,7 +16,7 @@ let pendingUIUpdate = null;
  * 簡素化されたUI更新関数
  * @param {Object} status - ステータスデータ
  */
-function updateUIWithNewStatus(status) {
+function updateUIWithNewStatusInternal(status) {
   console.log('🔧 Starting simplified UI update');
   
   if (isUIUpdateInProgress) {
@@ -321,135 +321,14 @@ window.updateUIWithNewStatus = function(status) {
     return;
   }
 
-  // 直接UI更新を実行（バッチング削除）
-  updateUIWithNewStatus(status);
+  // 内部実装を呼び出し（無限再帰を防ぐ）
+  updateUIWithNewStatusInternal(status);
   
   // currentStatusを更新
   currentStatus = status;
 };
 console.log('✅ updateUIWithNewStatus actual function loaded');
 
-// レガシー関数（互換性のため保持）
-function updateUIWithNewStatusLegacy(status) {
-  if (!validateStatus(status)) {
-    logWarn('Invalid status received, skipping UI update');
-    return;
-  }
-
-  // UI Update Mutex: Prevent concurrent UI updates
-  if (isUIUpdateInProgress) {
-    logDebug('UI update in progress, queuing this update');
-    pendingUIUpdate = status;
-    return;
-  }
-
-  isUIUpdateInProgress = true;
-  
-  try {
-    // Phase 1: データ準備（同期処理）
-    status = prepareStatusData(status);
-    currentStatus = status;
-    
-    // Phase 2: 並列UI更新（非同期処理の最適化）
-    executeParallelUIUpdates(status);
-    
-  } catch (error) {
-    logError('UI更新でエラー:', error);
-  } finally {
-    // 最後にMutexを解除
-    setTimeout(() => finishUIUpdate(), 0);
-  }
-}
-
-// データ準備の最適化（同期処理部分）
-function prepareStatusData(status) {
-  // 1. configJson正規化処理（包括的システム最適化）
-  status.config = normalizeConfigJson(status.config, status.userInfo);
-  
-  // 2. 正規化されたプロパティの追加（計算集約処理）
-  const publicationState = getPublicationState(status);
-  const viewUrl = status.viewUrl || '';
-
-  status._normalized = {
-    isPublished: publicationState.isPublished,
-    publishReason: publicationState.reason,
-    viewUrl: viewUrl,
-    hasValidViewUrl: !!viewUrl
-  };
-  
-  return status;
-}
-
-// 並列UI更新の実行（非同期処理の最適化）
-function executeParallelUIUpdates(status) {
-  const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
-  const currentStep = status.setupStep || 1;
-  
-  // 並列実行可能な更新タスクを定義
-  const updateTasks = [
-    // Task 1: 静的要素の更新
-    () => {
-      clearInitialDisplayElements();
-      updateStaticUI(status);
-      if (setupStatus === 'pending') {
-        updateButtonStatesForSetup(status);
-      }
-    },
-    
-    // Task 2: 動的コンテンツの更新
-    () => {
-      if (status.activeSheetName) {
-        updateDynamicContent(status);
-      } else {
-        updateUIForNoActiveSheet(status);
-      }
-    },
-    
-    // Task 3: フッターとガイダンスの更新
-    () => updateFooterAndGuidance(status),
-    
-    // Task 4: ステータスバーの更新（統合最適化版）
-    () => updateStepIndicators(status?.setupStep || currentStep, status)
-  ];
-  
-  // 並列実行（requestAnimationFrameで最適化）
-  requestAnimationFrame(() => {
-    // 重い処理を複数のフレームに分散
-    executeTasksInBatches(updateTasks);
-  });
-}
-
-// タスクのバッチ実行（フレーム分散最適化）
-function executeTasksInBatches(tasks, batchSize = 2) {
-  if (tasks.length === 0) return;
-  
-  // 現在のバッチを実行
-  const currentBatch = tasks.splice(0, batchSize);
-  currentBatch.forEach(task => {
-    try {
-      task();
-    } catch (error) {
-      logError('UI更新タスクエラー:', error);
-    }
-  });
-  
-  // 残りのタスクがある場合は次のフレームで実行
-  if (tasks.length > 0) {
-    requestAnimationFrame(() => executeTasksInBatches(tasks, batchSize));
-  }
-}
-
-// UI更新完了処理
-function finishUIUpdate() {
-  isUIUpdateInProgress = false;
-  
-  // 待機中の更新があれば実行
-  if (pendingUIUpdate) {
-    const nextUpdate = pendingUIUpdate;
-    pendingUIUpdate = null;
-    updateUIWithNewStatus(nextUpdate);
-  }
-}
 
 // =============================================================================
 // HELPER FUNCTIONS FOR UI UPDATES
