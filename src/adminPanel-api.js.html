@@ -275,15 +275,8 @@ function loadStatusCore(bypassCache = false) {
         // ローディングメッセージ更新
         updateLoadingMessage('UIにデータを反映中...');
 
-        // Update UI with integrated response - use safe call with dependency waiting
-        try {
-          await waitForFunction('updateUIWithNewStatus');
-          updateUIWithNewStatus(response);
-        } catch (error) {
-          logError('Failed to wait for updateUIWithNewStatus:', error);
-          // フォールバック: safeCallを使用
-          safeCall('updateUIWithNewStatus', response);
-        }
+        // Update UI with integrated response - use safe call
+        safeCall('updateUIWithNewStatus', response);
 
         // If sheet details are included, apply them immediately
         if (response.sheetDetails && response.activeSheetName) {
@@ -425,13 +418,13 @@ function runHeaderGuessing() {
     };
     
     // Show start notification
-    showMessage('🤖 高精度AI判定システムが起動しました。データを分析中...', 'info');
+    showMessage('高精度AI判定システムが起動しました。データを分析中...', 'info');
     
     runGasWithUserId('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
       .then(function(details) {
         if (!details || !details.guessedConfig) {
           restoreButton();
-          showMessage('❌ AI列判定が失敗しました。手動で列を設定してください。', 'warning');
+          showMessage('AI列判定が失敗しました。手動で列を設定してください。', 'warning');
           return;
         }
         
@@ -816,7 +809,7 @@ function proceedWithSaveAndPublish(config) {
       
       // Check if result has data (from integrated API) or legacy success status
       if (result && (result.userInfo || result.status === 'success')) {
-        showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
+        showMessage('設定が保存され、ボードが公開されました！', 'success');
         
         // 履歴に保存
         // 公開時は履歴保存を行わない（公開停止時に保存するため）

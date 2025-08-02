@@ -493,10 +493,9 @@ function updateUIWithNewStatus(status) {
   currentStatus = status;
 }
 
-// Ensure global access and prevent redefinition
-if (typeof window.updateUIWithNewStatus === 'undefined') {
-  window.updateUIWithNewStatus = updateUIWithNewStatus;
-}
+// Replace stub with actual function and ensure global access
+window.updateUIWithNewStatus = updateUIWithNewStatus;
+console.log('✅ updateUIWithNewStatus actual function loaded');
 
 // レガシー関数（互換性のため保持）
 function updateUIWithNewStatusLegacy(status) {
@@ -1644,10 +1643,9 @@ function toggleSection(sectionId) {
   }
 }
 
-// Ensure global access and prevent redefinition
-if (typeof window.toggleSection === 'undefined') {
-  window.toggleSection = toggleSection;
-}
+// Replace stub with actual function and ensure global access
+window.toggleSection = toggleSection;
+console.log('✅ toggleSection actual function loaded');
 
 // Automatically collapse completed sections
 function collapseCompletedSection(stepNumber) {
@@ -1784,10 +1782,9 @@ function showFormConfigModal() {
   }
 }
 
-// Ensure global access and prevent redefinition
-if (typeof window.showFormConfigModal === 'undefined') {
-  window.showFormConfigModal = showFormConfigModal;
-}
+// Replace stub with actual function and ensure global access
+window.showFormConfigModal = showFormConfigModal;
+console.log('✅ showFormConfigModal actual function loaded');
 
 // Hide form configuration modal
 function hideFormConfigModal() {
@@ -1811,10 +1808,9 @@ function hideFormConfigModal() {
   }
 }
 
-// Ensure global access and prevent redefinition
-if (typeof window.hideFormConfigModal === 'undefined') {
-  window.hideFormConfigModal = hideFormConfigModal;
-}
+// Replace stub with actual function and ensure global access
+window.hideFormConfigModal = hideFormConfigModal;
+console.log('✅ hideFormConfigModal actual function loaded');
 
 // Show privacy modal
 function showPrivacyModal(onContinue) {
@@ -2644,10 +2640,9 @@ function navigateToStep(step) {
   }
 }
 
-// Ensure global access and prevent redefinition
-if (typeof window.navigateToStep === 'undefined') {
-  window.navigateToStep = navigateToStep;
-}
+// Replace stub with actual function and ensure global access
+window.navigateToStep = navigateToStep;
+console.log('✅ navigateToStep actual function loaded');
 
 
 // セットアップ状況をグローバルステータスから取得
