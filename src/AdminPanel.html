@@ -1118,17 +1118,17 @@
         </div>
         
         <!-- 下側/右側: ボードURL操作 -->
-        <div class="flex items-center gap-3 flex-shrink-0">
+        <div class="flex items-center gap-3 w-full sm:w-auto">
           <input type="text" id="board-url" readonly
-                 class="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400 min-w-[300px]"
+                 class="flex-1 min-w-0 w-full sm:min-w-[300px] px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm cursor-pointer hover:bg-gray-700 focus:ring-2 focus:ring-green-400"
                  onclick="this.select()" placeholder="URLが生成されます">
-          <button type="button" onclick="copyBoardUrl(this)" class="btn btn-secondary px-3 py-2 flex items-center" title="URLをコピー" aria-label="生徒用URLをコピー">
+          <button type="button" onclick="copyBoardUrl(this)" class="btn btn-secondary px-3 py-2 flex items-center flex-shrink-0" title="URLをコピー" aria-label="生徒用URLをコピー">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
             </svg>
           </button>
-          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer" 
-             class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white px-4 py-2 flex items-center gap-2 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl" 
+          <a id="view-board-link" href="#" target="_blank" rel="noopener noreferrer"
+             class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white px-4 py-2 flex items-center gap-2 flex-shrink-0 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
              title="回答ボードを新しいタブで開く" aria-label="新しいタブで回答ボードを開く">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
