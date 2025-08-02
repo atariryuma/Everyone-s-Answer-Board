@@ -8,14 +8,20 @@
 // =============================================================================
 
 function handleError(error, context, userMessage) {
-  console.error(`❌ Error in ${context}:`, error);
+  UnifiedErrorHandler.logError(`❌ Error in ${context}:`,
+      UnifiedErrorHandler.ErrorTypes.HIGH,
+      UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+      error);
   
   if (error && typeof error === 'object') {
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
+      UnifiedErrorHandler.logError('Error details:',
+          UnifiedErrorHandler.ErrorTypes.DEBUG,
+          UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+          {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          });
   }
 
   var displayMessage = userMessage || translateErrorMessage(error?.message || String(error), context);
@@ -106,14 +112,19 @@ function showError(error) {
 // API レスポンス標準化: 強化された検証とエラーハンドリング
 function validateStatus(status) {
   if (!status) {
-    console.error('❌ レスポンス検証失敗: ステータスオブジェクトがnullまたはundefined');
+    UnifiedErrorHandler.logError('❌ レスポンス検証失敗: ステータスオブジェクトがnullまたはundefined',
+        UnifiedErrorHandler.ErrorTypes.HIGH,
+        UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     showMessage('システムからの応答が無効です。ページを再読み込みしてください。', 'error');
     return false;
   }
   
   // エラーレスポンスの処理
   if (status.status === 'error') {
-    console.error('❌ APIエラーレスポンス:', status.message);
+      UnifiedErrorHandler.logError('❌ APIエラーレスポンス:',
+          UnifiedErrorHandler.ErrorTypes.HIGH,
+          UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+          status.message);
     showMessage('エラー: ' + status.message, 'error');
     return false;
   }
@@ -138,7 +149,9 @@ function generateStatusCacheKey(status) {
 
 // 🔧 実際のステータス検証処理（キャッシュ対象）
 function performStatusValidation(status) {
-  console.log('🔍 ステータス検証を実行中...');
+  UnifiedErrorHandler.logError('🔍 ステータス検証を実行中...',
+      UnifiedErrorHandler.ErrorTypes.DEBUG,
+      UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
   
   // 必須プロパティの検証
   const validationErrors = [];
@@ -158,54 +171,84 @@ function performStatusValidation(status) {
   // 設定情報の検証
   if (!status.config) {
     validationErrors.push('設定情報が見つかりません');
-    console.warn('⚠️ status.config が存在しません、空のオブジェクトで初期化します');
+      UnifiedErrorHandler.logError('⚠️ status.config が存在しません、空のオブジェクトで初期化します',
+          UnifiedErrorHandler.ErrorTypes.WARNING,
+          UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     status.config = {};
   }
   
   // appUrlsの検証
   if (!status.appUrls) {
     validationErrors.push('アプリケーションURLが設定されていません');
-    console.warn('⚠️ status.appUrls が存在しません');
+      UnifiedErrorHandler.logError('⚠️ status.appUrls が存在しません',
+          UnifiedErrorHandler.ErrorTypes.WARNING,
+          UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
   }
   
   // シート情報の検証（警告レベル）
   if (!status.allSheets || !Array.isArray(status.allSheets)) {
-    console.warn('⚠️ シート一覧が無効または存在しません:', status.allSheets);
+      UnifiedErrorHandler.logError('⚠️ シート一覧が無効または存在しません:',
+          UnifiedErrorHandler.ErrorTypes.WARNING,
+          UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+          status.allSheets);
     status.allSheets = []; // フォールバック
   }
   
   // シート詳細の検証（オプショナル）
   if (status.sheetDetails) {
     if (!status.sheetDetails.allHeaders || !Array.isArray(status.sheetDetails.allHeaders)) {
-      console.warn('⚠️ シートヘッダー情報が無効です:', status.sheetDetails.allHeaders);
-      console.warn('これは「No headers found for フォームの回答」エラーの原因となる可能性があります');
+        UnifiedErrorHandler.logError('⚠️ シートヘッダー情報が無効です:',
+            UnifiedErrorHandler.ErrorTypes.WARNING,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+            status.sheetDetails.allHeaders);
+        UnifiedErrorHandler.logError('これは「No headers found for フォームの回答」エラーの原因となる可能性があります',
+            UnifiedErrorHandler.ErrorTypes.WARNING,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     } else {
-      console.log('✅ シートヘッダー検証OK:', status.sheetDetails.allHeaders.length + '個のヘッダー');
+        UnifiedErrorHandler.logError('✅ シートヘッダー検証OK:',
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+            status.sheetDetails.allHeaders.length + '個のヘッダー');
     }
     
     if (!status.sheetDetails.guessedConfig) {
-      console.warn('⚠️ AI列判定結果が存在しません - 手動設定が必要です');
+        UnifiedErrorHandler.logError('⚠️ AI列判定結果が存在しません - 手動設定が必要です',
+            UnifiedErrorHandler.ErrorTypes.WARNING,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     } else {
-      console.log('✅ AI列判定結果が利用可能:', status.sheetDetails.guessedConfig);
+        UnifiedErrorHandler.logError('✅ AI列判定結果が利用可能:',
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+            status.sheetDetails.guessedConfig);
     }
   } else {
-    console.log('ℹ️ シート詳細はオプショナルなので存在しません（正常）');
+    UnifiedErrorHandler.logError('ℹ️ シート詳細はオプショナルなので存在しません（正常）',
+        UnifiedErrorHandler.ErrorTypes.INFO,
+        UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
   }
   
   // セットアップステップの検証
   if (typeof status.setupStep !== 'number') {
-    console.warn('⚠️ セットアップステップが数値ではありません:', status.setupStep);
+    UnifiedErrorHandler.logError('⚠️ セットアップステップが数値ではありません:',
+        UnifiedErrorHandler.ErrorTypes.WARNING,
+        UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+        status.setupStep);
     status.setupStep = 1; // デフォルト値
   }
   
   // 検証エラーがある場合
   if (validationErrors.length > 0) {
-    console.error('❌ レスポンス検証エラー:', validationErrors);
+    UnifiedErrorHandler.logError('❌ レスポンス検証エラー:',
+        UnifiedErrorHandler.ErrorTypes.HIGH,
+        UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION,
+        validationErrors);
     showMessage('データ検証エラー: ' + validationErrors.join(', '), 'error');
     return false;
   }
   
-  console.log('✅ レスポンス検証成功');
+  UnifiedErrorHandler.logError('✅ レスポンス検証成功',
+      UnifiedErrorHandler.ErrorTypes.INFO,
+      UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
   return true;
 }
 

@@ -229,9 +229,14 @@ function setupEventListeners() {
         // 全セクション展開フラグを設定（公開停止後の管理パネル表示改善）
         try {
           localStorage.setItem('expandAllSections', 'true');
-          console.log('📂 公開停止後の全セクション展開フラグを設定しました');
+          UnifiedErrorHandler.logError('📂 公開停止後の全セクション展開フラグを設定しました',
+              UnifiedErrorHandler.ErrorTypes.DEBUG,
+              UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         } catch (e) {
-          console.warn('⚠️ localStorage設定に失敗:', e);
+          UnifiedErrorHandler.logError('⚠️ localStorage設定に失敗:',
+              UnifiedErrorHandler.ErrorTypes.WARNING,
+              UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+              e);
         }
         
         // 少し遅延してからフォーム作成モーダルを表示
@@ -241,7 +246,10 @@ function setupEventListeners() {
         }, 1500); // 1.5秒後に表示（UIフィードバック時間を確保）
       })
       .catch(function(error) {
-        console.error('❌ 公開停止に失敗しました:', error);
+        UnifiedErrorHandler.logError('❌ 公開停止に失敗しました:',
+            UnifiedErrorHandler.ErrorTypes.HIGH,
+            UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION,
+            error);
         showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
       });
   }
@@ -251,7 +259,9 @@ function setupEventListeners() {
     if (typeof showFormConfigModal === 'function') {
       showFormConfigModal();
     } else {
-      console.error('showFormConfigModal function not found');
+      UnifiedErrorHandler.logError('showFormConfigModal function not found',
+          UnifiedErrorHandler.ErrorTypes.HIGH,
+          UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
       showMessage('フォーム作成機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
     }
   }
@@ -312,13 +322,17 @@ function setupFormConfigModalHandlers() {
       if (typeof createFormWithConfig === 'function') {
         createFormWithConfig();
       } else {
-        console.warn('⚠️ createFormWithConfig not available, retrying...');
+        UnifiedErrorHandler.logError('⚠️ createFormWithConfig not available, retrying...',
+            UnifiedErrorHandler.ErrorTypes.WARNING,
+            UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         // 短時間待機してから再試行
         setTimeout(() => {
           if (typeof createFormWithConfig === 'function') {
             createFormWithConfig();
           } else {
-            console.error('❌ createFormWithConfig still not available');
+            UnifiedErrorHandler.logError('❌ createFormWithConfig still not available',
+                UnifiedErrorHandler.ErrorTypes.HIGH,
+                UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
             showMessage('フォーム作成機能が読み込まれていません。ページを再読み込みしてください。', 'error');
           }
         }, 500);
@@ -368,7 +382,9 @@ function setupAccountManagementHandlers() {
     deleteBtn.addEventListener('click', handleDeleteRequest);
     UnifiedErrorHandler.logError('Delete account button event listener attached successfully', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   } else {
-    console.warn('Delete account button not found');
+    UnifiedErrorHandler.logError('Delete account button not found',
+        UnifiedErrorHandler.ErrorTypes.WARNING,
+        UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   }
   
   // Switch account handlers
@@ -677,7 +693,9 @@ function initializeEventListeners() {
     UnifiedErrorHandler.logError('⚠️ AdminPanel: Missing functions during event initialization:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, missingFunctions);
   }
 
-  console.log('✅ AdminPanel: Setting up event listeners');
+  UnifiedErrorHandler.logError('✅ AdminPanel: Setting up event listeners',
+      UnifiedErrorHandler.ErrorTypes.INFO,
+      UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   setupEventListeners();
 }
 

@@ -290,7 +290,9 @@ function loadStatusCore(bypassCache = false) {
           }
         }
 
-        logInfo('⚡ Performance: Single API call replaced 3-4 separate calls');
+        UnifiedErrorHandler.logInfo('⚡ Performance: Single API call replaced 3-4 separate calls',
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         
         // 🎯 グローバルローディング完了
         hideGlobalLoading(operationId, 'データの読み込みが完了しました');
@@ -820,7 +822,9 @@ function proceedWithSaveAndPublish(config) {
               sheetName: selectedSheet,
               timestamp: Date.now()
             }, '*');
-            logInfo('ボード公開メッセージをメインウィンドウに送信');
+            UnifiedErrorHandler.logInfo('ボード公開メッセージをメインウィンドウに送信',
+                UnifiedErrorHandler.ErrorTypes.DEBUG,
+                UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           }
           
           // 同じドメインの他のタブにも通知
@@ -832,7 +836,9 @@ function proceedWithSaveAndPublish(config) {
               timestamp: Date.now()
             });
             channel.close();
-            logInfo('ボード公開メッセージをBroadcastChannelで送信');
+            UnifiedErrorHandler.logInfo('ボード公開メッセージをBroadcastChannelで送信',
+                UnifiedErrorHandler.ErrorTypes.DEBUG,
+                UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           }
         } catch (broadcastError) {
           UnifiedErrorHandler.logError('リアルタイム更新通知でエラー:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, broadcastError);
@@ -879,11 +885,15 @@ function proceedWithSaveAndPublish(config) {
         
         // Use fresh data from save response if available
         if (result.userInfo && result._meta) {
-          logInfo('Using fresh data from save response');
+          UnifiedErrorHandler.logInfo('Using fresh data from save response',
+              UnifiedErrorHandler.ErrorTypes.DEBUG,
+              UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           updateUIWithNewStatus(result);
         } else {
           // Only force refresh if no fresh data available
-          logInfo('No fresh data in response, forcing refresh');
+          UnifiedErrorHandler.logInfo('No fresh data in response, forcing refresh',
+              UnifiedErrorHandler.ErrorTypes.DEBUG,
+              UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           loadStatus(true).then(() => {
             // ステップ進行を更新
             const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
@@ -921,17 +931,17 @@ function proceedWithSaveAndPublish(config) {
  * キャッシュ関連のアクセス問題を防ぐため、あらゆるキャッシュを完全にクリア
  */
 function clearAllCachesForUnpublish() {
-  console.log('🧹 公開停止時の包括的キャッシュクリア処理を開始');
+  UnifiedErrorHandler.logError('🧹 公開停止時の包括的キャッシュクリア処理を開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   try {
     // 1. アプリケーションレベルのキャッシュクリア
     if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-      console.log('🗑️ Unified cache cleared');
+      UnifiedErrorHandler.logError('🗑️ Unified cache cleared', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
       window.unifiedCache.clear();
     }
     
     if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
-      console.log('🗑️ GAS optimizer cache cleared');
+      UnifiedErrorHandler.logError('🗑️ GAS optimizer cache cleared', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
       window.gasOptimizer.clearCache();
     }
     
@@ -948,13 +958,13 @@ function clearAllCachesForUnpublish() {
       );
       
       studyQuestKeys.forEach(key => {
-        console.log('🗑️ Removing localStorage key:', key);
+        UnifiedErrorHandler.logError('🗑️ Removing localStorage key:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, key);
         localStorage.removeItem(key);
       });
       
-      console.log(`🗑️ Cleared ${studyQuestKeys.length} localStorage keys`);
+      UnifiedErrorHandler.logError(`🗑️ Cleared ${studyQuestKeys.length} localStorage keys`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     } catch (e) {
-      console.warn('⚠️ localStorage clear warning:', e);
+      UnifiedErrorHandler.logError('⚠️ localStorage clear warning:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, e);
     }
     
     // 3. セッションストレージのクリア
@@ -968,14 +978,14 @@ function clearAllCachesForUnpublish() {
         );
         
         studyQuestSessionKeys.forEach(key => {
-          console.log('🗑️ Removing sessionStorage key:', key);
+          UnifiedErrorHandler.logError('🗑️ Removing sessionStorage key:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, key);
           sessionStorage.removeItem(key);
         });
         
-        console.log(`🗑️ Cleared ${studyQuestSessionKeys.length} sessionStorage keys`);
+        UnifiedErrorHandler.logError(`🗑️ Cleared ${studyQuestSessionKeys.length} sessionStorage keys`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
       }
     } catch (e) {
-      console.warn('⚠️ sessionStorage clear warning:', e);
+      UnifiedErrorHandler.logError('⚠️ sessionStorage clear warning:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, e);
     }
     
     // 4. BroadcastChannel通知（他のタブに公開停止を通知）
@@ -987,26 +997,26 @@ function clearAllCachesForUnpublish() {
           timestamp: Date.now(),
           userId: window.userId || 'unknown'
         });
-        console.log('📢 BroadcastChannel: 公開停止を他のタブに通知');
+        UnifiedErrorHandler.logError('📢 BroadcastChannel: 公開停止を他のタブに通知', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         channel.close();
       }
     } catch (e) {
-      console.warn('⚠️ BroadcastChannel notification warning:', e);
+      UnifiedErrorHandler.logError('⚠️ BroadcastChannel notification warning:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, e);
     }
     
     // 5. キャッシュ無効化のためのタイムスタンプ更新
     try {
       localStorage.setItem('lastUnpublishTime', Date.now().toString());
       localStorage.setItem('cacheInvalidationToken', Math.random().toString(36));
-      console.log('🔄 Cache invalidation tokens updated');
+      UnifiedErrorHandler.logError('🔄 Cache invalidation tokens updated', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     } catch (e) {
-      console.warn('⚠️ Cache invalidation token update warning:', e);
+      UnifiedErrorHandler.logError('⚠️ Cache invalidation token update warning:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, e);
     }
     
-    console.log('✅ 公開停止時のキャッシュクリア処理が完了しました');
+    UnifiedErrorHandler.logError('✅ 公開停止時のキャッシュクリア処理が完了しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     
   } catch (error) {
-    console.error('❌ キャッシュクリア処理でエラー:', error);
+    UnifiedErrorHandler.logError('❌ キャッシュクリア処理でエラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
     // エラーがあっても処理は継続
   }
 }
@@ -1110,7 +1120,7 @@ function determineSetupType(config, userInfo) {
 
 // Reset column selection dropdowns to default state
 function resetColumnSelections() {
-  console.log('🔄 Resetting column selections to default state');
+  UnifiedErrorHandler.logError('🔄 Resetting column selections to default state', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   const columnSelects = [
     'opinion-column-select',
@@ -1124,7 +1134,7 @@ function resetColumnSelections() {
     const select = document.getElementById(selectId);
     if (select) {
       select.value = ''; // Reset to empty value
-      console.log(`✅ Reset ${selectId} to default`);
+      UnifiedErrorHandler.logError(`✅ Reset ${selectId} to default`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     }
   });
   
@@ -1134,7 +1144,7 @@ function resetColumnSelections() {
     const checkbox = document.getElementById(checkboxId);
     if (checkbox) {
       checkbox.checked = false;
-      console.log(`✅ Reset ${checkboxId} to unchecked`);
+      UnifiedErrorHandler.logError(`✅ Reset ${checkboxId} to unchecked`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     }
   });
 }
@@ -1155,7 +1165,7 @@ function loadSavedClassChoices() {
             }
         })
         .catch(function(error) {
-            console.warn('保存されたクラス選択肢の読み込みに失敗:', error.message);
+            UnifiedErrorHandler.logError('保存されたクラス選択肢の読み込みに失敗:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error.message);
             showMessage('クラス選択肢の読み込みに失敗しました。', 'error');
         });
 }
@@ -1207,13 +1217,13 @@ function createFormWithConfig() {
     enableClass: enableClassSelection && classChoices.length > 0,
   };
   
-  console.log('📋 カスタムフォーム設定:', config);
+  UnifiedErrorHandler.logError('📋 カスタムフォーム設定:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, config);
   
   hideFormConfigModal();
   
   // カスタムセットアップ用進捗表示を開始
   // Use the new unified custom setup system
-  console.log('🎨 統合カスタムセットアップ開始:', config);
+  UnifiedErrorHandler.logError('🎨 統合カスタムセットアップ開始:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, config);
   
   // userEmailは現在のユーザー情報から取得
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.adminEmail) {
@@ -1233,7 +1243,7 @@ function createFormWithConfig() {
 function saveClassChoicesToDatabase(classChoices) {
     runGasWithUserId('saveClassChoices', classChoices)
         .catch(function(error) {
-            console.warn('クラス選択肢の保存に失敗:', error.message);
+            UnifiedErrorHandler.logError('クラス選択肢の保存に失敗:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error.message);
         });
 }
 
@@ -1289,7 +1299,7 @@ function addResource() {
 function copyBoardUrl(buttonElement) {
   const urlInput = document.getElementById('board-url');
   if (!urlInput) {
-    console.error('board-url input element not found.');
+    UnifiedErrorHandler.logError('board-url input element not found.', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     return;
   }
 
@@ -1311,7 +1321,7 @@ function copyBoardUrl(buttonElement) {
           buttonElement.disabled = false;
         }, 2000);
       }).catch((error) => {
-        console.error('Clipboard API failed:', error);
+        UnifiedErrorHandler.logError('Clipboard API failed:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
         // Fallback to manual copy message
         const messageElement = document.createElement('span');
         messageElement.textContent = ' (手動でコピーしてください)';
@@ -1327,7 +1337,7 @@ function copyBoardUrl(buttonElement) {
       showMessage('URLがクリップボードにコピーされました！', 'success'); // Fallback uses showMessage
     }
   } catch (err) {
-    console.error('copyBoardUrl error:', err);
+    UnifiedErrorHandler.logError('copyBoardUrl error:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, err);
     showMessage('URLのコピーに失敗しました。手動でコピーしてください。', 'warning'); // Fallback uses showMessage
   }
 }
@@ -1372,12 +1382,12 @@ function openDatabaseSpreadsheet() {
 
 // Open form
 function openForm() {
-  console.log('🔗 openForm function called');
+  UnifiedErrorHandler.logError('🔗 openForm function called', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   // ボタンが無効化されている場合はクリックを無視
   const formBtn = document.getElementById('open-form-btn');
   if (formBtn && formBtn.disabled) {
-    console.log('⚠️ Form button is disabled, ignoring click');
+    UnifiedErrorHandler.logError('⚠️ Form button is disabled, ignoring click', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     showMessage('フォームを作成してからクリックしてください。', 'warning');
     return;
   }
@@ -1436,7 +1446,7 @@ function openAppSetupPage() {
       window.unifiedLoading.showSimple('アプリ設定ページへ移動中...');
 
       const redirectTimeout = setTimeout(() => {
-        console.warn('Redirect to app setup page timed out. Attempting fallback.');
+        UnifiedErrorHandler.logError('Redirect to app setup page timed out. Attempting fallback.', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         window.unifiedLoading.hide();
         showMessage(timeoutMessage, 'warning');
         window.open(setupUrl, '_blank'); // Fallback: open in new tab
@@ -1448,7 +1458,7 @@ function openAppSetupPage() {
         window.unifiedLoading.hide();
         window.open(setupUrl, '_top'); // _top を使用して現在のウィンドウで開く
       } catch (e) {
-        console.error('Error opening app setup page:', e);
+        UnifiedErrorHandler.logError('Error opening app setup page:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, e);
         window.unifiedLoading.hide();
         showMessage(errorMessage + ' ' + (e.message || ''), 'error');
         // フォールバック: 新しいタブで開く
@@ -1457,7 +1467,7 @@ function openAppSetupPage() {
       }
     })
     .catch(function(error) {
-      console.error('Failed to get web app URL for app setup page:', error);
+      UnifiedErrorHandler.logError('Failed to get web app URL for app setup page:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
       window.unifiedLoading.hide();
       showMessage('アプリ設定ページのURLを取得できませんでした。' + (error.message || ''), 'error');
     });
@@ -1490,7 +1500,7 @@ window.freshSaveTimestamp = freshSaveTimestamp;
  */
 async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
   try {
-    console.log('🔍 設定反映確認開始:', expectedSheetName);
+    UnifiedErrorHandler.logError('🔍 設定反映確認開始:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, expectedSheetName);
     
     // 少し待ってからステータスを再取得
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1502,8 +1512,8 @@ async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
       const sheetKey = 'sheet_' + expectedSheetName;
       const savedConfig = configJson[sheetKey];
       
-      console.log('🔍 保存された設定:', savedConfig);
-      console.log('🔍 期待する設定:', expectedConfig);
+      UnifiedErrorHandler.logError('🔍 保存された設定:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, savedConfig);
+      UnifiedErrorHandler.logError('🔍 期待する設定:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, expectedConfig);
       
       // 基本的な整合性チェック
       const isConsistent = (
@@ -1514,13 +1524,13 @@ async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
       );
       
       if (isConsistent) {
-        console.log('✅ 設定反映確認: 正常に保存されています');
+        UnifiedErrorHandler.logError('✅ 設定反映確認: 正常に保存されています', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         return { success: true, message: '設定が正常に反映されました' };
       } else {
-        console.warn('⚠️ 設定反映確認: 設定に不整合があります');
+        UnifiedErrorHandler.logError('⚠️ 設定反映確認: 設定に不整合があります', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         
         // 自動修復を試行
-        console.log('🔧 設定不整合を検出 - 自動修復を試行中...');
+        UnifiedErrorHandler.logError('🔧 設定不整合を検出 - 自動修復を試行中...', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         await runGasWithUserId('saveSheetConfig', '設定を修復中...',
           currentStatus.userInfo.spreadsheetId, expectedSheetName, expectedConfig, { batchMode: true });
         
@@ -1531,7 +1541,7 @@ async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
     return { success: false, message: '設定確認中にエラーが発生しました' };
     
   } catch (error) {
-    console.error('❌ 設定反映確認エラー:', error);
+    UnifiedErrorHandler.logError('❌ 設定反映確認エラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
     return { success: false, message: '設定確認処理でエラーが発生しました: ' + error.message };
   }
 }
@@ -1544,7 +1554,7 @@ async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
  */
 async function verifySetupFlowCompletion(flowType, sheetName) {
   try {
-    console.log(`🎯 ${flowType}フロー完了確認開始:`, sheetName);
+    UnifiedErrorHandler.logError(`🎯 ${flowType}フロー完了確認開始:`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, sheetName);
     
     // 設定が安定するまで少し待つ
     await new Promise(resolve => setTimeout(resolve, 3000));
@@ -1552,7 +1562,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     const completionStatus = await runGasWithUserId('getAppConfig', 'フロー完了状態を確認中...');
     
     if (!completionStatus || !completionStatus.userInfo) {
-      console.error('❌ フロー完了確認: ステータス取得失敗');
+      UnifiedErrorHandler.logError('❌ フロー完了確認: ステータス取得失敗', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
       return { success: false, message: 'ステータス取得に失敗しました' };
     }
     
@@ -1560,13 +1570,13 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     const issues = [];
     
     // 必須完了状態の確認
-    console.log('🔍 完了状態確認 - configJson:', {
-      setupStatus: configJson.setupStatus,
-      appPublished: configJson.appPublished,
-      formCreated: configJson.formCreated,
-      publishedSheetName: configJson.publishedSheetName,
-      publishedSpreadsheetId: configJson.publishedSpreadsheetId
-    });
+    UnifiedErrorHandler.logError('🔍 完了状態確認 - configJson:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  setupStatus: configJson.setupStatus,
+  appPublished: configJson.appPublished,
+  formCreated: configJson.formCreated,
+  publishedSheetName: configJson.publishedSheetName,
+  publishedSpreadsheetId: configJson.publishedSpreadsheetId
+});
     
     // 1. setupStatus='completed' 確認
     if (configJson.setupStatus !== 'completed') {
@@ -1598,13 +1608,13 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     const sheetKey = 'sheet_' + sheetName;
     const sheetConfig = configJson[sheetKey];
     
-    console.log('🔍 シート設定確認:', {
-      sheetKey: sheetKey,
-      hasSheetConfig: !!sheetConfig,
-      sheetConfigType: typeof sheetConfig,
-      sheetConfigKeys: sheetConfig ? Object.keys(sheetConfig) : [],
-      hasGuessedConfig: !!(sheetConfig && sheetConfig.guessedConfig)
-    });
+    UnifiedErrorHandler.logError('🔍 シート設定確認:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  sheetKey: sheetKey,
+  hasSheetConfig: !!sheetConfig,
+  sheetConfigType: typeof sheetConfig,
+  sheetConfigKeys: sheetConfig ? Object.keys(sheetConfig) : [],
+  hasGuessedConfig: !!(sheetConfig && sheetConfig.guessedConfig)
+});
     
     if (!sheetConfig) {
       issues.push(`❌ シート設定未保存: ${sheetKey}`);
@@ -1625,7 +1635,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     }
     
     if (issues.length === 0) {
-      console.log(`✅ ${flowType}フロー完了確認: すべての要件を満たしています`);
+      UnifiedErrorHandler.logError(`✅ ${flowType}フロー完了確認: すべての要件を満たしています`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
       return {
         success: true,
         message: `${flowType}フローが正常に完了しました`,
@@ -1640,7 +1650,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
         }
       };
     } else {
-      console.warn(`⚠️ ${flowType}フロー完了確認: 未完了項目があります`, issues);
+      UnifiedErrorHandler.logError(`⚠️ ${flowType}フロー完了確認: 未完了項目があります`, UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, issues);
       return {
         success: false,
         message: `${flowType}フローに未完了項目があります`,
@@ -1658,7 +1668,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     }
     
   } catch (error) {
-    console.error(`❌ ${flowType}フロー完了確認エラー:`, error);
+    UnifiedErrorHandler.logError(`❌ ${flowType}フロー完了確認エラー:`, UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
     return { 
       success: false, 
       message: `フロー完了確認でエラーが発生しました: ${error.message}` 
@@ -1674,7 +1684,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
  */
 async function enhanceConfigSynchronization(flowType, expectedState) {
   try {
-    console.log(`🔄 ${flowType}フロー: 設定同期メカニズム開始`, expectedState);
+    UnifiedErrorHandler.logError(`🔄 ${flowType}フロー: 設定同期メカニズム開始`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, expectedState);
     
     // 現在のステータスを取得
     const currentStatus = await runGasWithUserId('getAppConfig', '設定同期のため最新状態を取得中...');
@@ -1697,7 +1707,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
     );
     
     if (isAlreadyConfigured) {
-      console.log(`🎯 ${flowType}フロー: 設定は既に正しく構成されています - 同期をスキップ`);
+      UnifiedErrorHandler.logError(`🎯 ${flowType}フロー: 設定は既に正しく構成されています - 同期をスキップ`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
       return {
         success: true,
         synchronized: false,
@@ -1706,7 +1716,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       };
     }
     
-    console.log(`🔍 ${flowType}フロー: 設定不整合を検出 - 詳細チェックを実行`);
+    UnifiedErrorHandler.logError(`🔍 ${flowType}フロー: 設定不整合を検出 - 詳細チェックを実行`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     
     // 1. 必須設定状態の確認と修正
     const requiredStates = {
@@ -1746,21 +1756,21 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
     
     // 3. 設定の同期適用（必要な場合のみ）
     if (needsSync) {
-      console.log(`🔧 ${flowType}フロー: 設定不整合を検出 - 同期修正を実行`, synchronizationIssues);
+      UnifiedErrorHandler.logError(`🔧 ${flowType}フロー: 設定不整合を検出 - 同期修正を実行`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, synchronizationIssues);
       
       // バックエンドに同期修正を依頼
-      console.log(`🔧 同期パラメータ確認:`, {
-        updatedConfig: updatedConfig,
-        flowType: flowType,
-        configType: typeof updatedConfig
-      });
+      UnifiedErrorHandler.logError(`🔧 同期パラメータ確認:`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  updatedConfig: updatedConfig,
+  flowType: flowType,
+  configType: typeof updatedConfig
+});
       
       const syncResult = await runGasWithUserId('syncConfigurationState', '設定同期を実行中...', 
         updatedConfig, flowType);
       
       if (syncResult && syncResult.success) {
         appliedFixes.push(...synchronizationIssues);
-        console.log(`✅ ${flowType}フロー: 設定同期修正完了`, appliedFixes);
+        UnifiedErrorHandler.logError(`✅ ${flowType}フロー: 設定同期修正完了`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, appliedFixes);
         
         // キャッシュをクリアして最新状態を反映
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
@@ -1774,7 +1784,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
           message: `${flowType}フローの設定同期が完了しました`
         };
       } else {
-        console.warn(`⚠️ ${flowType}フロー: 設定同期修正に失敗`, syncResult);
+        UnifiedErrorHandler.logError(`⚠️ ${flowType}フロー: 設定同期修正に失敗`, UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncResult);
         return {
           success: false,
           synchronized: false,
@@ -1783,7 +1793,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
         };
       }
     } else {
-      console.log(`✅ ${flowType}フロー: 設定は既に同期されています`);
+      UnifiedErrorHandler.logError(`✅ ${flowType}フロー: 設定は既に同期されています`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
       return {
         success: true,
         synchronized: false,
@@ -1792,7 +1802,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
     }
     
   } catch (error) {
-    console.error(`❌ ${flowType}フロー設定同期エラー:`, error);
+    UnifiedErrorHandler.logError(`❌ ${flowType}フロー設定同期エラー:`, UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
     return {
       success: false,
       synchronized: false,
@@ -1882,7 +1892,7 @@ function performIntegratedConfigConsistencyCheck(status) {
     };
     
   } catch (error) {
-    console.error('設定整合性チェックエラー:', error);
+    UnifiedErrorHandler.logError('設定整合性チェックエラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
     return {
       consistent: false,
       issues: ['設定解析エラーが発生しました'],
@@ -1991,20 +2001,26 @@ function resetConfigJson() {
       `;
     }
     
-    logInfo('🔄 ConfigJsonリセット開始');
+    UnifiedErrorHandler.logInfo('🔄 ConfigJsonリセット開始',
+        UnifiedErrorHandler.ErrorTypes.INFO,
+        UnifiedErrorHandler.ErrorCategories.DATA_PROCESSING);
     
     runGasWithUserId('resetConfigJson', '設定をリセット中...')
       .then(function(result) {
         if (result.success) {
           showMessage('✅ 設定を初期値にリセットしました。ページを再読み込みして変更を確認してください。', 'success');
-          logInfo('✅ ConfigJsonリセット完了');
+          UnifiedErrorHandler.logInfo('✅ ConfigJsonリセット完了',
+              UnifiedErrorHandler.ErrorTypes.INFO,
+              UnifiedErrorHandler.ErrorCategories.DATA_PROCESSING);
           
           // UIを更新するために最新データを取得
           setTimeout(() => {
             runGasWithUserId('getInitialData', 'データを更新中...')
               .then(function(updatedStatus) {
                 updateUIWithNewStatus(updatedStatus);
-                logInfo('🔄 リセット後のUI更新完了');
+                UnifiedErrorHandler.logInfo('🔄 リセット後のUI更新完了',
+                    UnifiedErrorHandler.ErrorTypes.INFO,
+                    UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
               })
               .catch(function(error) {
                 logWarn('⚠️ リセット後のUI更新でエラー:', error);
@@ -2145,7 +2161,7 @@ function updateOverallProgress(percentage, statusMessage) {
 
 // Simulate QuickStart progress with enhanced backend synchronization
 function simulateQuickStartProgress() {
-  console.log('🚀 Starting enhanced QuickStart progress simulation');
+  UnifiedErrorHandler.logError('🚀 Starting enhanced QuickStart progress simulation', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   // Step 1: Initialize
   updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
@@ -2178,7 +2194,7 @@ function simulateQuickStartProgress() {
             updateOverallProgress(95, '最終確認を実行しています...');
             
             setTimeout(() => {
-              console.log('✅ QuickStart progress simulation completed - backend should be ready');
+              UnifiedErrorHandler.logError('✅ QuickStart progress simulation completed - backend should be ready', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
               // ここで最終完了状態は executeQuickStartProcess の成功ハンドラーで設定される
             }, 800);
           }, 1800);
@@ -2190,10 +2206,10 @@ function simulateQuickStartProgress() {
   // Optional folder creation check (non-blocking - doesn't affect main progress)
   runGasWithUserId('createUserFolder', false)
     .then(function(folderResult) {
-      console.log('✅ QuickStart folder creation check successful:', folderResult);
+      UnifiedErrorHandler.logError('✅ QuickStart folder creation check successful:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, folderResult);
     })
     .catch(function(error) {
-      console.warn('⚠️ QuickStart folder creation check failed, but continuing:', error);
+      UnifiedErrorHandler.logError('⚠️ QuickStart folder creation check failed, but continuing:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
     });
 }
 
@@ -2206,7 +2222,7 @@ function simulateCustomFormProgressWithFolderCheck() {
   // Actually call the folder creation API to sync with real backend progress
   runGasWithUserId('createUserFolder', 'フォルダを確認・作成中...')
     .then(function(folderResult) {
-      console.log('✅ Custom form folder creation successful:', folderResult);
+      UnifiedErrorHandler.logError('✅ Custom form folder creation successful:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, folderResult);
       updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
       updateProgressStep(2, 'active', 'カスタムフォームとスプレッドシートの作成', 'カスタム設定でデータ収集の仕組みを構築中...');
       updateOverallProgress(25, 'カスタムフォームとスプレッドシートを作成しています...');
@@ -2244,7 +2260,7 @@ function simulateCustomFormProgressWithFolderCheck() {
       }, 2000);
     })
     .catch(function(error) {
-      console.warn('⚠️ Custom form folder creation failed, continuing with fallback:', error);
+      UnifiedErrorHandler.logError('⚠️ Custom form folder creation failed, continuing with fallback:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
       updateProgressStep(1, 'error', 'ユーザー専用フォルダの作成', '⚠️ フォルダ作成でエラーが発生しましたが処理を続行します');
       showMessage('フォルダの作成に警告がありましたが、カスタムフォーム作成を続行します。', 'warning');
       
@@ -2315,7 +2331,7 @@ function resetCustomSetupProgressSteps() {
 
 // Simulate Custom Setup progress with real backend synchronization
 function simulateCustomSetupProgress() {
-  console.log('🎨 Starting enhanced Custom Setup progress simulation');
+  UnifiedErrorHandler.logError('🎨 Starting enhanced Custom Setup progress simulation', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   // Step 1: Custom form configuration analysis
   updateProgressStep(1, 'active', 'カスタムフォーム設定の解析', 'フォーム設定を検証中...');
@@ -2359,7 +2375,7 @@ function simulateCustomSetupProgress() {
 
 // Handle unified custom setup
 function handleCustomSetup(config) {
-  console.log('🎨 カスタムセットアップ開始:', config);
+  UnifiedErrorHandler.logError('🎨 カスタムセットアップ開始:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, config);
   
   // Show progress and start simulation
   showCustomSetupProgress();
@@ -2369,7 +2385,7 @@ function handleCustomSetup(config) {
   runGasWithUserId('customSetup', false, config)
     .then(function(result) {
       if (result && result.status === 'success') {
-        console.log('🎉 CustomSetupバックエンド処理完了:', result);
+        UnifiedErrorHandler.logError('🎉 CustomSetupバックエンド処理完了:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, result);
         
         // Enhanced completion notification with detailed backend response
         const setupStatus = result.autoPublished ? 'カスタムセットアップ完了！ボードが公開されました！' : 'カスタムセットアップ完了！';
@@ -2405,38 +2421,38 @@ function handleCustomSetup(config) {
         }
         
         // Log detailed completion status
-        console.log('📊 CustomSetup完了詳細:', {
-          setupComplete: result.setupComplete,
-          aiDetected: result.aiDetected,
-          autoConfigured: result.autoConfigured,
-          autoPublished: result.autoPublished,
-          completedSteps: result.completedSteps,
-          completedAt: result.completedAt
-        });
+        UnifiedErrorHandler.logError('📊 CustomSetup完了詳細:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  setupComplete: result.setupComplete,
+  aiDetected: result.aiDetected,
+  autoConfigured: result.autoConfigured,
+  autoPublished: result.autoPublished,
+  completedSteps: result.completedSteps,
+  completedAt: result.completedAt
+});
         
         // Log custom setup specific information
         if (result.aiDetectionResult) {
-          console.log('🤖 AI列判定結果詳細:', {
-            success: result.aiDetectionResult.success,
-            aiDetected: result.aiDetectionResult.aiDetected,
-            guessedConfig: result.aiDetectionResult.guessedConfig
-          });
+          UnifiedErrorHandler.logError('🤖 AI列判定結果詳細:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  success: result.aiDetectionResult.success,
+  aiDetected: result.aiDetectionResult.aiDetected,
+  guessedConfig: result.aiDetectionResult.guessedConfig
+});
         }
         
         if (result.saveResult) {
-          console.log('💾 設定保存結果詳細:', {
-            success: result.saveResult.success,
-            configured: result.saveResult.configured,
-            savedConfig: result.saveResult.savedConfig
-          });
+          UnifiedErrorHandler.logError('💾 設定保存結果詳細:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  success: result.saveResult.success,
+  configured: result.saveResult.configured,
+  savedConfig: result.saveResult.savedConfig
+});
         }
         
         if (result.publishResult) {
-          console.log('🌐 自動公開結果詳細:', {
-            success: result.publishResult.success,
-            published: result.publishResult.published,
-            publishedAt: result.publishResult.publishedAt
-          });
+          UnifiedErrorHandler.logError('🌐 自動公開結果詳細:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  success: result.publishResult.success,
+  published: result.publishResult.published,
+  publishedAt: result.publishResult.publishedAt
+});
         }
         
         // Update status after custom setup
@@ -2452,7 +2468,7 @@ function handleCustomSetup(config) {
             const completionResult = await verifySetupFlowCompletion('custom', sheetName);
             
             if (completionResult.success) {
-              console.log('🎉 CustomSetupフロー完了確認: 全要件を満たしています', completionResult.details);
+              UnifiedErrorHandler.logError('🎉 CustomSetupフロー完了確認: 全要件を満たしています', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, completionResult.details);
               
               // CustomSetup成功時も設定同期を実行（堅牢性の向上）
               try {
@@ -2463,13 +2479,13 @@ function handleCustomSetup(config) {
                 });
                 
                 if (syncResult.synchronized) {
-                  console.log('🔧 CustomSetup: 設定同期で追加最適化を実行', syncResult.appliedFixes);
+                  UnifiedErrorHandler.logError('🔧 CustomSetup: 設定同期で追加最適化を実行', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncResult.appliedFixes);
                 }
               } catch (syncError) {
-                console.warn('⚠️ CustomSetup: 設定同期処理でエラー（フロー完了には影響なし）', syncError);
+                UnifiedErrorHandler.logError('⚠️ CustomSetup: 設定同期処理でエラー（フロー完了には影響なし）', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncError);
               }
             } else {
-              console.warn('⚠️ CustomSetupフロー: 未完了項目があります', completionResult);
+              UnifiedErrorHandler.logError('⚠️ CustomSetupフロー: 未完了項目があります', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, completionResult);
               
               // CustomSetupで未完了項目がある場合は積極的に同期修正を試行
               try {
@@ -2480,14 +2496,14 @@ function handleCustomSetup(config) {
                 });
                 
                 if (syncResult.synchronized) {
-                  console.log('🔧 CustomSetup: 未完了項目を同期修正で自動解決', syncResult.appliedFixes);
+                  UnifiedErrorHandler.logError('🔧 CustomSetup: 未完了項目を同期修正で自動解決', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncResult.appliedFixes);
                 }
               } catch (syncError) {
-                console.error('❌ CustomSetup: 同期修正処理エラー', syncError);
+                UnifiedErrorHandler.logError('❌ CustomSetup: 同期修正処理エラー', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncError);
               }
             }
           } catch (verificationError) {
-            console.error('❌ CustomSetupフロー完了確認エラー:', verificationError);
+            UnifiedErrorHandler.logError('❌ CustomSetupフロー完了確認エラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, verificationError);
           }
         }, 2000);
         
@@ -2497,14 +2513,14 @@ function handleCustomSetup(config) {
         }, 5000);
         
       } else {
-        console.error('❌ CustomSetup backend error:', result);
+        UnifiedErrorHandler.logError('❌ CustomSetup backend error:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, result);
         updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ セットアップでエラーが発生しました');
         showMessage('❌ カスタムセットアップに失敗しました: ' + (result?.message || 'unknown error'), 'error');
         hideCustomSetupProgress();
       }
     })
     .catch(function(error) {
-      console.error('❌ CustomSetup backend call failed:', error);
+      UnifiedErrorHandler.logError('❌ CustomSetup backend call failed:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
       updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ バックエンドエラーが発生しました');
       showMessage('❌ カスタムセットアップでエラーが発生しました: ' + error.message, 'error');
       hideCustomSetupProgress();
@@ -2517,7 +2533,7 @@ function handleQuickStart() {
   const quickstartText = document.getElementById('quickstart-text');
   
   if (!quickstartBtn || !quickstartText) {
-    console.error('QuickStart elements not found');
+    UnifiedErrorHandler.logError('QuickStart elements not found', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     return;
   }
 
@@ -2527,7 +2543,7 @@ function handleQuickStart() {
     executeQuickStart(quickstartBtn, quickstartText);
   }, () => {
     // キャンセル時の処理
-    console.log('クイックスタートがキャンセルされました');
+    UnifiedErrorHandler.logError('クイックスタートがキャンセルされました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   });
 }
 
@@ -2538,17 +2554,17 @@ function checkPublicationStatusAndProceed(onProceed, onCancel) {
     // 公開中の場合、確認モーダルを表示
     window.sharedModals.showQuickStartStopConfirmation(
       () => {
-        console.log('✅ ユーザーが停止して新規作成を選択');
+        UnifiedErrorHandler.logError('✅ ユーザーが停止して新規作成を選択', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         if (onProceed) onProceed();
       },
       () => {
-        console.log('❌ ユーザーがキャンセルを選択');
+        UnifiedErrorHandler.logError('❌ ユーザーがキャンセルを選択', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         if (onCancel) onCancel();
       }
     );
   } else {
     // 公開していない場合、直接進行
-    console.log('📝 公開されていないため、直接クイックスタートを開始');
+    UnifiedErrorHandler.logError('📝 公開されていないため、直接クイックスタートを開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     if (onProceed) onProceed();
   }
 }
@@ -2560,18 +2576,18 @@ function executeQuickStart(quickstartBtn, quickstartText) {
                                currentStatus._normalized && 
                                currentStatus._normalized.isPublished;
   
-  console.log('🚀 クイックスタート実行: 公開状態チェック', {
-    isCurrentlyPublished: isCurrentlyPublished,
-    currentStatus: currentStatus?._normalized
-  });
+  UnifiedErrorHandler.logError('🚀 クイックスタート実行: 公開状態チェック', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  isCurrentlyPublished: isCurrentlyPublished,
+  currentStatus: currentStatus?._normalized
+});
   
   if (isCurrentlyPublished) {
     // 公開中の場合: シンプルな新規作成モーダルを表示（停止確認をスキップ）
-    console.log('📢 公開中のため、シンプルな新規作成モーダルを表示します');
+    UnifiedErrorHandler.logError('📢 公開中のため、シンプルな新規作成モーダルを表示します', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     showSimpleQuickStartModal(quickstartBtn, quickstartText);
   } else {
     // 非公開の場合: 直接クイックスタート実行（自動公開フラグ付き）
-    console.log('📝 現在非公開のため、直接クイックスタートを実行します（自動公開）');
+    UnifiedErrorHandler.logError('📝 現在非公開のため、直接クイックスタートを実行します（自動公開）', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
   }
 }
@@ -2582,12 +2598,12 @@ function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
     window.sharedModals.showQuickStartStopConfirmation(
       // 確認時のコールバック
       () => {
-        console.log('✅ ユーザーが停止して新規作成を確認しました');
+        UnifiedErrorHandler.logError('✅ ユーザーが停止して新規作成を確認しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
       },
       // キャンセル時のコールバック
       () => {
-        console.log('❌ クイックスタートがキャンセルされました');
+        UnifiedErrorHandler.logError('❌ クイックスタートがキャンセルされました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         quickstartBtn.disabled = false;
         quickstartText.textContent = 'クイックスタートを開始';
       }
@@ -2605,7 +2621,7 @@ function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
 
 // 公開中ボード用のシンプルなクイックスタートモーダル表示
 function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
-  console.log('📱 シンプルクイックスタートモーダルを表示します');
+  UnifiedErrorHandler.logError('📱 シンプルクイックスタートモーダルを表示します', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   // sharedModalsが利用可能な場合は専用のモーダルを使用
   if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
@@ -2616,14 +2632,14 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
       '現在公開中の回答ボードを一時停止して、新しいフォームとボードを作成します。',
       function() {
         // 停止して新規作成ボタンクリック時の処理
-        console.log('✅ ユーザーが「停止して新規作成」を選択しました');
+        UnifiedErrorHandler.logError('✅ ユーザーが「停止して新規作成」を選択しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         
         // 公開停止処理とクイックスタートを統合実行
         executeStopAndQuickStart(quickstartBtn, quickstartText);
       },
       function() {
         // キャンセル時の処理
-        console.log('❌ シンプルクイックスタートがキャンセルされました');
+        UnifiedErrorHandler.logError('❌ シンプルクイックスタートがキャンセルされました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         resetQuickStartButton(quickstartBtn, quickstartText);
       },
       '停止して新規作成', // 確認ボタンのテキスト
@@ -2643,7 +2659,7 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
 
 // 公開停止とクイックスタートの統合処理
 function executeStopAndQuickStart(quickstartBtn, quickstartText) {
-  console.log('🛑📋 公開停止→クイックスタートの統合処理を開始します');
+  UnifiedErrorHandler.logError('🛑📋 公開停止→クイックスタートの統合処理を開始します', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   // ボタン状態を更新
   quickstartBtn.disabled = true;
@@ -2655,7 +2671,7 @@ function executeStopAndQuickStart(quickstartBtn, quickstartText) {
     
     unpublishBoard()
       .then(async function(stopResult) {
-        console.log('✅ 公開停止が完了しました:', stopResult);
+        UnifiedErrorHandler.logError('✅ 公開停止が完了しました:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, stopResult);
         showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
         
         // 🔧 公開停止後のstatus更新
@@ -2664,19 +2680,19 @@ function executeStopAndQuickStart(quickstartBtn, quickstartText) {
         // 公開停止が完了したら、少し遅延してからクイックスタートを実行
         setTimeout(() => {
           quickstartText.textContent = 'セットアップ中...';
-          console.log('🚀 クイックスタート処理を開始します（自動公開モード）');
+          UnifiedErrorHandler.logError('🚀 クイックスタート処理を開始します（自動公開モード）', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           
           // 2. クイックスタート実行（自動公開フラグ付き）
           executeQuickStartProcess(quickstartBtn, quickstartText, true);
         }, 1000);
       })
       .catch(function(stopError) {
-        console.error('❌ 公開停止に失敗しました:', stopError);
+        UnifiedErrorHandler.logError('❌ 公開停止に失敗しました:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, stopError);
         showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
         resetQuickStartButton(quickstartBtn, quickstartText);
       });
   } else {
-    console.error('❌ unpublishBoard function not found');
+    UnifiedErrorHandler.logError('❌ unpublishBoard function not found', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     showMessage('❌ 公開停止機能が見つかりません。ページを再読み込みしてください。', 'error');
     resetQuickStartButton(quickstartBtn, quickstartText);
   }
@@ -2706,7 +2722,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
   runGasWithUserId('quickStartSetup', false)
     .then(async function(result) {
       if (result && result.status === 'success') {
-        console.log('🎉 QuickStartバックエンド処理完了:', result);
+        UnifiedErrorHandler.logError('🎉 QuickStartバックエンド処理完了:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, result);
         
         // Enhanced completion notification with detailed backend response
         updateOverallProgress(100, result.autoPublished ? 'セットアップ完了！ボードが公開されました！' : 'セットアップ完了！');
@@ -2737,7 +2753,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         showMessage(`✅ クイックスタートが完了しました！${detailMessage}`, 'success');
         
         // 🔧 QuickStart完了後のstatus更新
-        console.log('🔄 QuickStart完了後のstatus更新を開始');
+        UnifiedErrorHandler.logError('🔄 QuickStart完了後のstatus更新を開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         await loadStatus(true);
         
         // Update progress step with auto-publish status
@@ -2748,23 +2764,23 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         }
         
         // Log detailed completion status
-        console.log('📊 QuickStart完了詳細:', {
-          setupComplete: result.setupComplete,
-          autoPublished: result.autoPublished,
-          publishResult: result.publishResult,
-          completedSteps: result.completedSteps,
-          completedAt: result.completedAt
-        });
+        UnifiedErrorHandler.logError('📊 QuickStart完了詳細:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  setupComplete: result.setupComplete,
+  autoPublished: result.autoPublished,
+  publishResult: result.publishResult,
+  completedSteps: result.completedSteps,
+  completedAt: result.completedAt
+});
         
         // Log auto-publish specific information if available
         if (result.publishResult) {
-          console.log('🌐 自動公開結果詳細:', {
-            success: result.publishResult.success,
-            published: result.publishResult.published,
-            publishedAt: result.publishResult.publishedAt,
-            error: result.publishResult.error,
-            manualInstructions: result.publishResult.manualPublishInstructions
-          });
+          UnifiedErrorHandler.logError('🌐 自動公開結果詳細:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  success: result.publishResult.success,
+  published: result.publishResult.published,
+  publishedAt: result.publishResult.publishedAt,
+  error: result.publishResult.error,
+  manualInstructions: result.publishResult.manualPublishInstructions
+});
         }
         
         // Update status after quick start
@@ -2780,7 +2796,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
             const completionResult = await verifySetupFlowCompletion('quickstart', sheetName);
             
             if (completionResult.success) {
-              console.log('🎉 QuickStartフロー完了確認: 全要件を満たしています', completionResult.details);
+              UnifiedErrorHandler.logError('🎉 QuickStartフロー完了確認: 全要件を満たしています', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, completionResult.details);
               
               // QuickStart成功時も設定同期を実行（堅牢性の向上）
               try {
@@ -2791,13 +2807,13 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
                 });
                 
                 if (syncResult.synchronized) {
-                  console.log('🔧 QuickStart: 設定同期で追加最適化を実行', syncResult.appliedFixes);
+                  UnifiedErrorHandler.logError('🔧 QuickStart: 設定同期で追加最適化を実行', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncResult.appliedFixes);
                 }
               } catch (syncError) {
-                console.warn('⚠️ QuickStart: 設定同期処理でエラー（フロー完了には影響なし）', syncError);
+                UnifiedErrorHandler.logError('⚠️ QuickStart: 設定同期処理でエラー（フロー完了には影響なし）', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncError);
               }
             } else {
-              console.warn('⚠️ QuickStartフロー: 未完了項目があります', completionResult);
+              UnifiedErrorHandler.logError('⚠️ QuickStartフロー: 未完了項目があります', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, completionResult);
               
               // QuickStartで未完了項目がある場合は積極的に同期修正を試行
               try {
@@ -2808,31 +2824,31 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
                 });
                 
                 if (syncResult.synchronized) {
-                  console.log('🔧 QuickStart: 未完了項目を同期修正で自動解決', syncResult.appliedFixes);
+                  UnifiedErrorHandler.logError('🔧 QuickStart: 未完了項目を同期修正で自動解決', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncResult.appliedFixes);
                   
                   // 再度完了確認を実行
                   const reVerificationResult = await verifySetupFlowCompletion('quickstart', sheetName);
                   if (reVerificationResult.success) {
-                    console.log('✅ QuickStart: 同期修正後の再確認で完了を確認');
+                    UnifiedErrorHandler.logError('✅ QuickStart: 同期修正後の再確認で完了を確認', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
                   } else {
-                    console.warn('⚠️ QuickStart: 同期修正後も未完了項目が残存', reVerificationResult.issues);
+                    UnifiedErrorHandler.logError('⚠️ QuickStart: 同期修正後も未完了項目が残存', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, reVerificationResult.issues);
                   }
                 } else {
                   // 同期修正できない場合の警告（QuickStartでは控えめに）
                   let notificationMessage = `🔍 QuickStart完了確認:\n`;
                   if (completionResult.issues && completionResult.issues.length > 0) {
                     notificationMessage += `未完了項目: ${completionResult.issues.length}件\n`;
-                    console.log('📋 QuickStart未完了詳細:', completionResult.issues);
+                    UnifiedErrorHandler.logError('📋 QuickStart未完了詳細:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, completionResult.issues);
                   }
                   notificationMessage += '詳細はコンソールログをご確認ください。';
-                  console.info(notificationMessage);
+                  UnifiedErrorHandler.logError(notificationMessage, UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
                 }
               } catch (syncError) {
-                console.error('❌ QuickStart: 同期修正処理エラー', syncError);
+                UnifiedErrorHandler.logError('❌ QuickStart: 同期修正処理エラー', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, syncError);
               }
             }
           } catch (verificationError) {
-            console.error('❌ QuickStartフロー完了確認エラー:', verificationError);
+            UnifiedErrorHandler.logError('❌ QuickStartフロー完了確認エラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, verificationError);
           }
         }, 2000);
         
@@ -2878,7 +2894,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
             channel.close();
           }
         } catch (notifyError) {
-          console.warn('クイックスタート - フォーム作成通知でエラー:', notifyError);
+          UnifiedErrorHandler.logError('クイックスタート - フォーム作成通知でエラー:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, notifyError);
         }
         
         // Reset button state
@@ -2887,7 +2903,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         
         // 自動公開の場合のみ自動停止確認モーダルを表示
         if (autoPublish) {
-          console.log('🚀 自動公開が有効なため、自動停止確認モーダルを表示します');
+          UnifiedErrorHandler.logError('🚀 自動公開が有効なため、自動停止確認モーダルを表示します', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           
           setTimeout(() => {
             // ローディングオーバーレイを非表示にしてからモーダル表示
@@ -2908,25 +2924,25 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
               }
             };
             
-            console.log('📊 QuickStart公開データ検証:', {
-              autoPublish: autoPublish,
-              hasResult: !!result,
-              hasUrl: !!(result?.url && result.url.length > 0),
-              enhancedResult: enhancedResult
-            });
+            UnifiedErrorHandler.logError('📊 QuickStart公開データ検証:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, {
+  autoPublish: autoPublish,
+  hasResult: !!result,
+  hasUrl: !!(result?.url && result.url.length > 0),
+  enhancedResult: enhancedResult
+});
             
             // 自動停止確認モーダルを表示（検証済みデータで）
             setTimeout(() => {
               if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
                 window.sharedModals.showAutoStopConfirmation(enhancedResult);
-                console.log('✅ QuickStart自動公開後に自動停止確認モーダルを表示しました');
+                UnifiedErrorHandler.logError('✅ QuickStart自動公開後に自動停止確認モーダルを表示しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
               } else {
-                console.warn('⚠️ 自動停止モーダルが利用できません');
+                UnifiedErrorHandler.logError('⚠️ 自動停止モーダルが利用できません', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
               }
             }, 800);
           }, 2000);
         } else {
-          console.log('ℹ️ 自動公開が無効のため、自動停止確認モーダルをスキップします');
+          UnifiedErrorHandler.logError('ℹ️ 自動公開が無効のため、自動停止確認モーダルをスキップします', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
         }
         
         // Hide progress bar after delay and reset button

@@ -235,7 +235,9 @@ const CACHE_TTL = {
 function executeWithCache(cacheType, key, fn, ttl) {
   const cache = processingCache[cacheType];
   if (!cache) {
-    console.warn(`⚠️ Unknown cache type: ${cacheType}`);
+      UnifiedErrorHandler.logError(`⚠️ Unknown cache type: ${cacheType}`,
+          UnifiedErrorHandler.ErrorTypes.WARNING,
+          UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
     return fn(); // Execute without caching
   }
   
@@ -244,12 +246,16 @@ function executeWithCache(cacheType, key, fn, ttl) {
   
   // Check if cached result is still valid
   if (cacheEntry && (now - cacheEntry.timestamp) < (ttl || CACHE_TTL[cacheType])) {
-    console.log(`✅ Cache hit for ${cacheType}:${key}`);
+      UnifiedErrorHandler.logError(`✅ Cache hit for ${cacheType}:${key}`,
+          UnifiedErrorHandler.ErrorTypes.DEBUG,
+          UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
     return cacheEntry.result;
   }
   
   // Execute function and cache result
-  console.log(`🔄 Cache miss for ${cacheType}:${key}, executing...`);
+    UnifiedErrorHandler.logError(`🔄 Cache miss for ${cacheType}:${key}, executing...`,
+        UnifiedErrorHandler.ErrorTypes.DEBUG,
+        UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
   try {
     const result = fn();
     cache.set(key, {
@@ -258,7 +264,10 @@ function executeWithCache(cacheType, key, fn, ttl) {
     });
     return result;
   } catch (error) {
-    console.error(`❌ Error executing cached function ${cacheType}:${key}:`, error);
+      UnifiedErrorHandler.logError(`❌ Error executing cached function ${cacheType}:${key}:`,
+          UnifiedErrorHandler.ErrorTypes.HIGH,
+          UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION,
+          error);
     throw error;
   }
 }
@@ -273,18 +282,24 @@ function clearProcessingCache(cacheType, key) {
     // Clear specific cache entry
     if (processingCache[cacheType]) {
       processingCache[cacheType].delete(key);
-      console.log(`🧹 Cleared cache entry: ${cacheType}:${key}`);
+        UnifiedErrorHandler.logError(`🧹 Cleared cache entry: ${cacheType}:${key}`,
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
     }
   } else if (cacheType) {
     // Clear entire cache type
     if (processingCache[cacheType]) {
       processingCache[cacheType].clear();
-      console.log(`🧹 Cleared cache type: ${cacheType}`);
+        UnifiedErrorHandler.logError(`🧹 Cleared cache type: ${cacheType}`,
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
     }
   } else {
     // Clear all caches
     Object.values(processingCache).forEach(cache => cache.clear());
-    console.log('🧹 Cleared all processing caches');
+      UnifiedErrorHandler.logError('🧹 Cleared all processing caches',
+          UnifiedErrorHandler.ErrorTypes.DEBUG,
+          UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
   }
 }
 
@@ -306,7 +321,9 @@ function cleanupProcessingCache() {
     }
     
     if (cleanedCount > 0) {
-      console.log(`🧹 Cleaned ${cleanedCount} expired entries from ${cacheType} cache`);
+        UnifiedErrorHandler.logError(`🧹 Cleaned ${cleanedCount} expired entries from ${cacheType} cache`,
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
     }
   });
 }
@@ -339,7 +356,9 @@ const globalLoadingState = {
  * @param {Object} options - Additional options
  */
 function showGlobalLoading(operationId, message = '処理中...', options = {}) {
-  console.log(`🔄 Global loading start: ${operationId} - ${message}`);
+  UnifiedErrorHandler.logError(`🔄 Global loading start: ${operationId} - ${message}`,
+      UnifiedErrorHandler.ErrorTypes.DEBUG,
+      UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // Add operation to active set
   globalLoadingState.activeOperations.add(operationId);
@@ -368,7 +387,9 @@ function showGlobalLoading(operationId, message = '処理中...', options = {}) 
  * @param {string} finalMessage - Optional final message before hiding
  */
 function hideGlobalLoading(operationId, finalMessage) {
-  console.log(`✅ Global loading end: ${operationId}`);
+  UnifiedErrorHandler.logError(`✅ Global loading end: ${operationId}`,
+      UnifiedErrorHandler.ErrorTypes.DEBUG,
+      UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // Remove operation from active set
   globalLoadingState.activeOperations.delete(operationId);
@@ -383,7 +404,9 @@ function hideGlobalLoading(operationId, finalMessage) {
       hideLoadingOverlay();
     }
   } else {
-    console.log(`⏳ ${globalLoadingState.activeOperations.size} operations still active`);
+    UnifiedErrorHandler.logError(`⏳ ${globalLoadingState.activeOperations.size} operations still active`,
+        UnifiedErrorHandler.ErrorTypes.DEBUG,
+        UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   }
 }
 
@@ -458,7 +481,9 @@ function createGlobalLoadingOverlay() {
   globalLoadingState.messageElement = messageElement;
   globalLoadingState.progressElement = progressElement;
   
-  console.log('🎨 Admin-themed global loading overlay created');
+  UnifiedErrorHandler.logError('🎨 Admin-themed global loading overlay created',
+      UnifiedErrorHandler.ErrorTypes.DEBUG,
+      UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -502,7 +527,9 @@ function hideLoadingOverlay() {
     stopProgressTracking();
   }, 300);
   
-  console.log('🎯 Global loading overlay hidden');
+  UnifiedErrorHandler.logError('🎯 Global loading overlay hidden',
+      UnifiedErrorHandler.ErrorTypes.DEBUG,
+      UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -513,7 +540,9 @@ function updateLoadingMessage(message) {
   if (globalLoadingState.messageElement) {
     globalLoadingState.messageElement.textContent = message;
     globalLoadingState.currentMessage = message;
-    console.log(`💬 Loading message updated: ${message}`);
+    UnifiedErrorHandler.logError(`💬 Loading message updated: ${message}`,
+        UnifiedErrorHandler.ErrorTypes.DEBUG,
+        UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   }
 }
 
@@ -553,7 +582,9 @@ function stopProgressTracking() {
 function forceHideGlobalLoading() {
   globalLoadingState.activeOperations.clear();
   hideLoadingOverlay();
-  console.log('🚨 Force hide global loading - all operations cleared');
+  UnifiedErrorHandler.logError('🚨 Force hide global loading - all operations cleared',
+      UnifiedErrorHandler.ErrorTypes.WARNING,
+      UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -573,7 +604,9 @@ var userId = '';
 
 // マルチテナント対応: バックエンドから安全にユーザーIDを取得
 function initializeUserId() {
-  console.group('🔐 Initializing UserId');
+  UnifiedErrorHandler.logError('🔐 Initializing UserId',
+      UnifiedErrorHandler.ErrorTypes.DEBUG,
+      UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   UnifiedErrorHandler.logError('📞 About to call getCurrentUserStatus', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   
   return new Promise((resolve, reject) => {
@@ -584,20 +617,17 @@ function initializeUserId() {
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
           userId = response.userInfo.userId;
           UnifiedErrorHandler.logError('✅ AdminPanel: User authenticated, userId:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, userId);
-          console.groupEnd();
-          resolve(userId);
+            resolve(userId);
         } else {
-          console.error('❌ Failed to get userId from backend:', response);
-          console.error('❌ Expected: {status: "success", userInfo: {userId: "..."}}');
-          console.groupEnd();
+            UnifiedErrorHandler.logError('❌ Failed to get userId from backend:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, response);
+            UnifiedErrorHandler.logError('❌ Expected: {status: "success", userInfo: {userId: "..."}}', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
           reject(new Error('ユーザーIDの取得に失敗しました'));
         }
       })
       .withFailureHandler(error => {
-        console.error('❌ Backend error getting userId:', error);
-        console.error('❌ Error type:', typeof error);
-        console.error('❌ Error details:', error);
-        console.groupEnd();
+          UnifiedErrorHandler.logError('❌ Backend error getting userId:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, error);
+          UnifiedErrorHandler.logError('❌ Error type:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, typeof error);
+          UnifiedErrorHandler.logError('❌ Error details:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, error);
         reject(error);
       })
       .getCurrentUserStatus();
@@ -744,7 +774,10 @@ function initializeAdminPanelMaster() {
     updateSystemStatus('coreInitialized', true);
   } catch (error) {
     updateSystemStatus('coreInitialized', false, error);
-    console.error('❌ Core initialization failed:', error);
+    UnifiedErrorHandler.logError('❌ Core initialization failed:',
+        UnifiedErrorHandler.ErrorTypes.HIGH,
+        UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+        error);
   }
   
   // 公開停止後の全セクション展開処理
@@ -784,7 +817,10 @@ function initializeAdminPanelMaster() {
           UnifiedErrorHandler.logError('✅ API module initialized', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         } catch (error) {
           updateSystemStatus('apiInitialized', false, error);
-          console.error('❌ API initialization failed:', error);
+          UnifiedErrorHandler.logError('❌ API initialization failed:',
+              UnifiedErrorHandler.ErrorTypes.HIGH,
+              UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+              error);
         }
         return;
       } 
@@ -796,18 +832,25 @@ function initializeAdminPanelMaster() {
       }
       
       // フォールバック実装
-      console.warn('⚠️ API functions not available, implementing fallback...');
+      UnifiedErrorHandler.logError('⚠️ API functions not available, implementing fallback...',
+          UnifiedErrorHandler.ErrorTypes.WARNING,
+          UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
       const missingFunctions = {
         initializeAPI: typeof initializeAPI,
         runGasWithUserId: typeof runGasWithUserId
       };
-      console.error('Missing functions:', missingFunctions);
+      UnifiedErrorHandler.logError('Missing functions:',
+          UnifiedErrorHandler.ErrorTypes.HIGH,
+          UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+          missingFunctions);
       updateSystemStatus('apiInitialized', false, new Error(`Missing functions: ${JSON.stringify(missingFunctions)}`));
       
       // 🔧 改良されたフォールバック関数を実装
       if (typeof runGasWithUserId !== 'function') {
         window.runGasWithUserId = function(functionName, loadingMessage, ...args) {
-          console.warn(`🔄 Fallback: ${functionName} called with message: ${loadingMessage}`);
+          UnifiedErrorHandler.logError(`🔄 Fallback: ${functionName} called with message: ${loadingMessage}`,
+              UnifiedErrorHandler.ErrorTypes.WARNING,
+              UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
           
           // 🎯 段階的にリトライして実際のAPI関数を待機
           return new Promise((resolve, reject) => {
@@ -829,10 +872,15 @@ function initializeAdminPanelMaster() {
                       sharedUtilities.gas.call(functionName, userId, ...args) :
                       sharedUtilities.gas.call(functionName, ...args));
                     
-                  console.log(`✅ Fallback成功: ${functionName}の実行を復旧`);
+                  UnifiedErrorHandler.logError(`✅ Fallback成功: ${functionName}の実行を復旧`,
+                      UnifiedErrorHandler.ErrorTypes.DEBUG,
+                      UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
                   resolve(realCall);
                 } catch (error) {
-                  console.error(`❌ Fallback実行エラー: ${functionName}`, error);
+                  UnifiedErrorHandler.logError(`❌ Fallback実行エラー: ${functionName}`,
+                      UnifiedErrorHandler.ErrorTypes.HIGH,
+                      UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+                      error);
                   reject(error);
                 }
               } else {
@@ -853,7 +901,9 @@ function initializeAdminPanelMaster() {
       
       if (typeof initializeAPI !== 'function') {
         window.initializeAPI = function() {
-          console.warn('🔄 Fallback: initializeAPI called');
+          UnifiedErrorHandler.logError('🔄 Fallback: initializeAPI called',
+              UnifiedErrorHandler.ErrorTypes.WARNING,
+              UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
           UnifiedErrorHandler.logError('📦 Fallback API initialization', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         };
         UnifiedErrorHandler.logError('📦 Fallback initializeAPI implemented', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
@@ -873,7 +923,10 @@ function initializeAdminPanelMaster() {
         UnifiedErrorHandler.logError('✅ UI module initialized', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
       } catch (error) {
         updateSystemStatus('uiInitialized', false, error);
-        console.error('❌ UI initialization failed:', error);
+        UnifiedErrorHandler.logError('❌ UI initialization failed:',
+            UnifiedErrorHandler.ErrorTypes.HIGH,
+            UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+            error);
       }
     } else {
       updateSystemStatus('uiInitialized', false, new Error('initializeUI function not found'));
@@ -908,13 +961,21 @@ function initializeAdminPanelMaster() {
             updateSystemStatus('eventsInitialized', true);
             updateSystemStatus('initializationComplete', true);
             UnifiedErrorHandler.logError('✅ Events module initialized', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
-            logInfo('🎉 AdminPanel Master Initialization Complete');
+            UnifiedErrorHandler.logError('🎉 AdminPanel Master Initialization Complete',
+                UnifiedErrorHandler.ErrorTypes.INFO,
+                UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
             
             // システム状態の最終レポート
-            console.log('📊 Final System Status:', window.systemStatus);
+            UnifiedErrorHandler.logError('📊 Final System Status:',
+                UnifiedErrorHandler.ErrorTypes.DEBUG,
+                UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+                window.systemStatus);
           } catch (error) {
             updateSystemStatus('eventsInitialized', false, error);
-            console.error('❌ Events initialization failed:', error);
+            UnifiedErrorHandler.logError('❌ Events initialization failed:',
+                UnifiedErrorHandler.ErrorTypes.HIGH,
+                UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+                error);
           }
           return;
         } 
@@ -926,7 +987,9 @@ function initializeAdminPanelMaster() {
         }
         
         // フォールバック実装（より確実に）
-        console.warn('⚠️ Event functions not available after 8 attempts, implementing enhanced fallback...');
+        UnifiedErrorHandler.logError('⚠️ Event functions not available after 8 attempts, implementing enhanced fallback...',
+            UnifiedErrorHandler.ErrorTypes.WARNING,
+            UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         const missingEventFunctions = {
           initializeEventListeners: typeof initializeEventListeners,
           handleQuickStart: typeof handleQuickStart,
@@ -936,13 +999,18 @@ function initializeAdminPanelMaster() {
           'window.handleQuickStart': typeof window.handleQuickStart,
           'window.runHeaderGuessing': typeof window.runHeaderGuessing
         };
-        console.error('Missing functions detail:', missingEventFunctions);
+        UnifiedErrorHandler.logError('Missing functions detail:',
+            UnifiedErrorHandler.ErrorTypes.HIGH,
+            UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+            missingEventFunctions);
         updateSystemStatus('eventsInitialized', false, new Error(`Missing event functions: ${JSON.stringify(missingEventFunctions)}`));
         
         // 🔧 強化されたフォールバック関数を実装
         if (!functionsAvailable.handleQuickStart) {
           window.handleQuickStart = function() {
-            console.warn('🔄 Enhanced Fallback: handleQuickStart called');
+            UnifiedErrorHandler.logError('🔄 Enhanced Fallback: handleQuickStart called',
+                UnifiedErrorHandler.ErrorTypes.WARNING,
+                UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
             if (window.showMessage) {
               window.showMessage('QuickStart機能は現在利用できません。ページを再読み込みしてください。', 'warning');
             }
@@ -952,7 +1020,9 @@ function initializeAdminPanelMaster() {
         
         if (!functionsAvailable.runHeaderGuessing) {
           window.runHeaderGuessing = function() {
-            console.warn('🔄 Enhanced Fallback: runHeaderGuessing called');
+            UnifiedErrorHandler.logError('🔄 Enhanced Fallback: runHeaderGuessing called',
+                UnifiedErrorHandler.ErrorTypes.WARNING,
+                UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
             if (window.showMessage) {
               window.showMessage('AI判定機能は現在利用できません。ページを再読み込みしてください。', 'warning');
             }
@@ -969,17 +1039,25 @@ function initializeAdminPanelMaster() {
             UnifiedErrorHandler.logError('✅ Events module initialized (partial)', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
           } catch (error) {
             updateSystemStatus('eventsInitialized', false, error);
-            console.error('❌ Partial events initialization failed:', error);
+            UnifiedErrorHandler.logError('❌ Partial events initialization failed:',
+                UnifiedErrorHandler.ErrorTypes.HIGH,
+                UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+                error);
           }
         } else {
           logDebug('📦 Events module skipped (function not available)');
         }
         
         updateSystemStatus('initializationComplete', 'fallback');
-        logInfo('⚠️ AdminPanel Master Initialization Complete (with enhanced fallback functions)');
+        UnifiedErrorHandler.logError('⚠️ AdminPanel Master Initialization Complete (with enhanced fallback functions)',
+            UnifiedErrorHandler.ErrorTypes.WARNING,
+            UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         
         // システム状態の最終レポート（フォールバック版）
-        console.log('📊 Final System Status (Enhanced Fallback):', window.systemStatus);
+        UnifiedErrorHandler.logError('📊 Final System Status (Enhanced Fallback):',
+            UnifiedErrorHandler.ErrorTypes.DEBUG,
+            UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION,
+            window.systemStatus);
       }
       
       initializeEventsWithRetry();
