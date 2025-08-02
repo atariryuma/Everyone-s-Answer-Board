@@ -1153,12 +1153,15 @@ const globalLoadingState = {
 function showGlobalLoading(operationId, message = '処理中...', options = {}) {
   // 統一ローディングマネージャーを使用
   if (window.unifiedLoading) {
+    const showProgress = options.showProgress !== false && options.progress !== undefined;
     const config = {
       message,
-      type: options.type || (options.showProgress === false ? 'overlay' : 'progress'),
-      progress: options.progress,
+      type: options.type || (showProgress ? 'progress' : 'overlay'),
       disableInteraction: options.disableInteraction !== false
     };
+    if (showProgress) {
+      config.progress = options.progress;
+    }
     window.unifiedLoading.show(config);
     return;
   }

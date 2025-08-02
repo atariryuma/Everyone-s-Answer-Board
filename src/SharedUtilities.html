@@ -971,8 +971,8 @@ class UnifiedLoadingManager {
       content += `<div class="loading-spinner"></div>`;
     }
     
-    if (config.progress !== null) {
-      const progressValue = typeof config.progress === 'object' 
+    if (config.progress !== null && config.progress !== undefined) {
+      const progressValue = typeof config.progress === 'object'
         ? Math.round((config.progress.current / config.progress.total) * 100)
         : config.progress;
       content += `
