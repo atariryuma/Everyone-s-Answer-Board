@@ -38,7 +38,7 @@ function scheduleUIUpdate(status, updateType = 'full') {
   for (const [id, data] of uiUpdateBatching.pendingUpdates) {
     if (data.type === updateType) {
       uiUpdateBatching.pendingUpdates.delete(id);
-      console.log(`🔄 UI更新を統合: ${updateType}`);
+      UnifiedErrorHandler.logInfo(`🔄 UI更新を統合: ${updateType}`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     }
   }
   
@@ -57,7 +57,7 @@ function scheduleUIUpdate(status, updateType = 'full') {
     executeBatchedUIUpdates();
   }, uiUpdateBatching.batchInterval);
   
-  console.log(`📋 UI更新をスケジュール: ${updateType} (ペンディング: ${uiUpdateBatching.pendingUpdates.size})`);
+  UnifiedErrorHandler.logInfo(`📋 UI更新をスケジュール: ${updateType} (ペンディング: ${uiUpdateBatching.pendingUpdates.size})`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -66,7 +66,7 @@ function scheduleUIUpdate(status, updateType = 'full') {
 function executeBatchedUIUpdates() {
   if (uiUpdateBatching.pendingUpdates.size === 0) return;
   
-  console.log(`🚀 バッチUI更新開始 (${uiUpdateBatching.pendingUpdates.size}件の更新を統合)`);
+  UnifiedErrorHandler.logInfo(`🚀 バッチUI更新開始 (${uiUpdateBatching.pendingUpdates.size}件の更新を統合)`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // 最新のステータスデータを取得
   let latestStatus = null;
@@ -80,7 +80,7 @@ function executeBatchedUIUpdates() {
   }
   
   if (!latestStatus) {
-    console.warn('⚠️ バッチ更新: 有効なステータスデータが見つかりません');
+    UnifiedErrorHandler.logError('⚠️ バッチ更新: 有効なステータスデータが見つかりません', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     uiUpdateBatching.pendingUpdates.clear();
     return;
   }
@@ -88,7 +88,7 @@ function executeBatchedUIUpdates() {
   // 重複チェック: 前回と同じデータの場合はスキップ
   const statusHash = generateStatusHash(latestStatus);
   if (uiUpdateBatching.lastUpdateData === statusHash) {
-    console.log('🎯 バッチ更新: 前回と同じデータのためスキップ');
+    UnifiedErrorHandler.logInfo('🎯 バッチ更新: 前回と同じデータのためスキップ', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     uiUpdateBatching.pendingUpdates.clear();
     return;
   }
@@ -101,7 +101,7 @@ function executeBatchedUIUpdates() {
   uiUpdateBatching.lastUpdateData = statusHash;
   uiUpdateBatching.lastBatchTime = Date.now();
   
-  console.log('✅ バッチUI更新完了');
+  UnifiedErrorHandler.logInfo('✅ バッチUI更新完了', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -125,7 +125,7 @@ function generateStatusHash(status) {
  * @param {Object} status - ステータスデータ
  */
 function performOptimizedUIUpdate(status) {
-  console.log('🔧 最適化UI更新開始');
+  UnifiedErrorHandler.logInfo('🔧 最適化UI更新開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // DOM操作を最小限に抑制する最適化された更新
   const updateOperations = new Map();
@@ -150,7 +150,7 @@ function performOptimizedUIUpdate(status) {
           uiUpdateBatching.completedOperations.add(operationKey);
         }
       } catch (error) {
-        console.error(`❌ UI更新エラー (${operationType}):`, error);
+        UnifiedErrorHandler.logError(`❌ UI更新エラー (${operationType}):`, UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, error);
       }
     }
     
@@ -170,17 +170,17 @@ function updateFooterAndGuidanceOptimized(status) {
   
   // DOM操作結果のキャッシュチェック
   if (uiUpdateBatching.domCache.has(cacheKey)) {
-    console.log('🎯 フッター更新: DOMキャッシュヒット');
+    UnifiedErrorHandler.logInfo('🎯 フッター更新: DOMキャッシュヒット', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     return;
   }
   
-  console.log('🦶 最適化フッター更新開始');
+  UnifiedErrorHandler.logInfo('🦶 最適化フッター更新開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   const footer = document.getElementById('admin-footer');
   const guidanceText = document.getElementById('guidance-text');
   
   if (!footer || !guidanceText) {
-    console.warn('❌ Footer or guidance elements not found');
+    UnifiedErrorHandler.logError('❌ Footer or guidance elements not found', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     return;
   }
   
@@ -195,7 +195,7 @@ function updateFooterAndGuidanceOptimized(status) {
     uiUpdateBatching.domCache.delete(cacheKey);
   }, 10000);
   
-  console.log('✅ 最適化フッター更新完了');
+  UnifiedErrorHandler.logInfo('✅ 最適化フッター更新完了', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -203,7 +203,7 @@ function updateFooterAndGuidanceOptimized(status) {
  * @param {Object} status - ステータスデータ
  */
 function updateStaticUIOptimized(status) {
-  console.log('🎨 最適化静的UI更新開始');
+  UnifiedErrorHandler.logInfo('🎨 最適化静的UI更新開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // 既存の静的UI更新ロジックを使用
   clearInitialDisplayElements();
@@ -214,7 +214,7 @@ function updateStaticUIOptimized(status) {
     updateButtonStatesForSetup(status);
   }
   
-  console.log('✅ 最適化静的UI更新完了');
+  UnifiedErrorHandler.logInfo('✅ 最適化静的UI更新完了', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -222,7 +222,7 @@ function updateStaticUIOptimized(status) {
  * @param {Object} status - ステータスデータ
  */
 function updateDynamicContentOptimized(status) {
-  console.log('🔧 最適化動的コンテンツ更新開始');
+  UnifiedErrorHandler.logInfo('🔧 最適化動的コンテンツ更新開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   if (status.activeSheetName) {
     updateDynamicContent(status);
@@ -230,7 +230,7 @@ function updateDynamicContentOptimized(status) {
     updateUIForNoActiveSheet(status);
   }
   
-  console.log('✅ 最適化動的コンテンツ更新完了');
+  UnifiedErrorHandler.logInfo('✅ 最適化動的コンテンツ更新完了', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 /**
@@ -238,12 +238,12 @@ function updateDynamicContentOptimized(status) {
  * @param {Object} status - ステータスデータ
  */
 function updateStepIndicatorsOptimized(status) {
-  console.log('📊 最適化ステップインジケーター更新開始');
+  UnifiedErrorHandler.logInfo('📊 最適化ステップインジケーター更新開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   const currentStep = status?.setupStep || 1;
   updateStepIndicators(currentStep, status);
   
-  console.log('✅ 最適化ステップインジケーター更新完了');
+  UnifiedErrorHandler.logInfo('✅ 最適化ステップインジケーター更新完了', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 // =============================================================================
@@ -293,7 +293,7 @@ function getPublicationState(status) {
         if (hasCompletedSetup) {
           reason += ' (完全セットアップ済み)';
         } else {
-          console.log('⚠️ Publication state: appPublished=true but setup incomplete', {
+          UnifiedErrorHandler.logInfo('⚠️ Publication state: appPublished=true but setup incomplete', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.STATE_INCONSISTENCY, {
             setupStatus: config.setupStatus,
             formCreated: config.formCreated,
             hasPublishedSheet: !!config.publishedSheetName,
@@ -308,12 +308,12 @@ function getPublicationState(status) {
                config.publishedSheetName && 
                config.publishedSpreadsheetId) {
         // This covers cases where setup is complete but appPublished might not be properly set
-        console.log('🔧 Publication state: Setup complete but appPublished=false - potential state inconsistency');
+                  UnifiedErrorHandler.logInfo('🔧 Publication state: Setup complete but appPublished=false - potential state inconsistency', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.STATE_INCONSISTENCY);
         reason = 'セットアップ完了だが公開状態不整合';
         // Don't auto-publish, but log for debugging
       }
     } catch (e) {
-      console.warn('Failed to parse configJson:', e);
+      UnifiedErrorHandler.logError('Failed to parse configJson:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.DATA_PROCESSING, e);
     }
   }
   
@@ -333,7 +333,7 @@ function generateViewUrl(status, userId) {
   // 🎯 URL生成キャッシュを使用（再生成の回避）
   const cacheKey = generateUrlCacheKey(status, userId);
   return executeWithCache('urlGeneration', cacheKey, () => {
-    console.log('🔗 generateViewUrl: URL生成開始');
+    UnifiedErrorHandler.logInfo('🔗 generateViewUrl: URL生成開始', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
     
     // 🔧 強化されたURL取得ロジック（複数のフォールバック）
     let baseUrl = status.webAppUrl || 
@@ -358,21 +358,21 @@ function generateViewUrl(status, userId) {
         // /execが見つからない場合は現在のURLを基準にする
         baseUrl = window.location.origin + window.location.pathname;
       }
-      console.log('🔧 フォールバックURL生成:', baseUrl);
+      UnifiedErrorHandler.logInfo('🔧 フォールバックURL生成:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, baseUrl);
     }
     
     // 🎯 開発環境URL→本番環境URL変換処理
     if (baseUrl && baseUrl.includes('googleusercontent.com')) {
       baseUrl = convertDevUrlToProductionUrl(baseUrl);
-      console.log('🔄 開発環境URL→本番環境URL変換完了:', baseUrl);
+      UnifiedErrorHandler.logError('🔄 開発環境URL→本番環境URL変換完了:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, baseUrl);
     }
     
     if (!baseUrl) {
-      console.warn('❌ WebAppURLの取得に失敗しました - 全てのフォールバックが無効');
+      UnifiedErrorHandler.logError('❌ WebAppURLの取得に失敗しました - 全てのフォールバックが無効', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
       return null;
     }
     
-    console.log('✅ WebAppURL取得成功:', baseUrl);
+    UnifiedErrorHandler.logError('✅ WebAppURL取得成功:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, baseUrl);
     
     if (!userId) {
       return baseUrl + '?mode=view';
@@ -403,7 +403,7 @@ function generateUrlCacheKey(status, userId) {
  */
 function convertDevUrlToProductionUrl(devUrl) {
   try {
-    console.log('🔧 開発環境URL変換開始:', devUrl);
+    UnifiedErrorHandler.logInfo('🔧 開発環境URL変換開始:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, devUrl);
     
     // GoogleAppsScriptの実行URLからスクリプトIDを抽出する方法を模索
     // 開発環境URLの例: https://n-uoo3whqxnsbcl3hdxqtnpnofkykwqt7v7oqj33q-0lu-script.googleusercontent.com/userCodeAppPanel
@@ -417,7 +417,7 @@ function convertDevUrlToProductionUrl(devUrl) {
       if (scriptMatch && scriptMatch[1]) {
         const scriptId = scriptMatch[1];
         const productionUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
-        console.log('✅ スクリプトIDから本番URL生成:', productionUrl);
+        UnifiedErrorHandler.logError('✅ スクリプトIDから本番URL生成:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, productionUrl);
         return productionUrl;
       }
     }
@@ -426,7 +426,7 @@ function convertDevUrlToProductionUrl(devUrl) {
     if (currentUrl.includes('/exec')) {
       const execIndex = currentUrl.indexOf('/exec');
       const productionUrl = currentUrl.substring(0, execIndex + 5);
-      console.log('✅ 現在URLから本番URL抽出:', productionUrl);
+      UnifiedErrorHandler.logError('✅ 現在URLから本番URL抽出:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, productionUrl);
       return productionUrl;
     }
     
@@ -438,15 +438,15 @@ function convertDevUrlToProductionUrl(devUrl) {
     // 最終フォールバック: 現在のURLをベースに推測
     if (window.location.origin && window.location.pathname.includes('/exec')) {
       const fallbackUrl = window.location.origin + window.location.pathname;
-      console.log('🔧 フォールバック本番URL:', fallbackUrl);
+      UnifiedErrorHandler.logError('🔧 フォールバック本番URL:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, fallbackUrl);
       return fallbackUrl;
     }
     
-    console.warn('⚠️ 本番URL変換に失敗、元のURLを返します');
+    UnifiedErrorHandler.logError('⚠️ 本番URL変換に失敗、元のURLを返します', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
     return devUrl;
     
   } catch (error) {
-    console.error('❌ URL変換エラー:', error);
+    UnifiedErrorHandler.logError('❌ URL変換エラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, error);
     return devUrl; // エラー時は元のURLを返す
   }
 }
@@ -463,7 +463,7 @@ function updateUIWithNewStatus(status) {
   }
 
   // 🎯 新しいUI更新バッチングシステムを使用
-  console.log('📋 UI更新をバッチングシステムでスケジュール');
+  UnifiedErrorHandler.logError('📋 UI更新をバッチングシステムでスケジュール', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   scheduleUIUpdate(status, 'full');
   
   // currentStatusを更新（他の関数で参照される）
@@ -610,7 +610,7 @@ function updateUnpublishButton(status) {
       const config = JSON.parse(status.userInfo.configJson);
       explicitAppPublished = config.appPublished === true;
     } catch (configError) {
-      console.warn('❌ Failed to parse configJson for unpublish button check:', configError);
+      UnifiedErrorHandler.logError('❌ Failed to parse configJson for unpublish button check:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, configError);
       explicitAppPublished = false;
     }
   }
@@ -673,7 +673,7 @@ function updateStaticUI(status) {
 
 function updateDatabaseInfo(status) {
   if (!status || !status.userInfo) {
-    console.warn('System info update failed: No user info available');
+    UnifiedErrorHandler.logError('System info update failed: No user info available', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     return;
   }
 
@@ -811,7 +811,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
         option.value = sheet;
         logDebug(`📄 Sheet ${index + 1}: ${sheet}`);
       } else {
-        console.warn('⚠️ Unknown sheet format:', sheet);
+        UnifiedErrorHandler.logError('⚠️ Unknown sheet format:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, sheet);
         return;
       }
       
@@ -831,7 +831,7 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     select.disabled = false;
     logDebug('✅ Sheet dropdown populated successfully');
   } else {
-    console.warn('⚠️ No sheets available:', sheetNames);
+    UnifiedErrorHandler.logError('⚠️ No sheets available:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, sheetNames);
     select.innerHTML = '<option value="">利用可能なシートがありません</option>';
     select.disabled = true;
   }
@@ -1072,7 +1072,7 @@ function getStepCompletionFromConfig(status) {
       isPublished: step3Complete
     };
   } catch (error) {
-    console.warn('❌ configJsonの解析に失敗:', error);
+    UnifiedErrorHandler.logError('❌ configJsonの解析に失敗:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.DATA_PROCESSING, error);
     return { step1: false, step2: false, step3: false, isPublished: false };
   }
 }
@@ -1255,14 +1255,11 @@ function getEnhancedProgressMessage(currentStep, completion, status) {
 
 // Update footer and guidance text
 function updateFooterAndGuidance(status) {
-  console.group('🦶 updateFooterAndGuidance');
-  
   const footer = document.getElementById('admin-footer');
   const guidanceText = document.getElementById('guidance-text');
   
   if (!footer || !guidanceText) {
-    console.warn('❌ Footer or guidance elements not found');
-    console.groupEnd();
+    UnifiedErrorHandler.logError('❌ Footer or guidance elements not found', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     return;
   }
 
@@ -1278,7 +1275,7 @@ function updateFooterAndGuidance(status) {
       const config = JSON.parse(status.userInfo.configJson);
       explicitAppPublished = config.appPublished === true;
     } catch (configError) {
-      console.warn('❌ Failed to parse configJson for publication check:', configError);
+      UnifiedErrorHandler.logError('❌ Failed to parse configJson for publication check:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, configError);
       explicitAppPublished = false;
     }
   }
@@ -1286,7 +1283,7 @@ function updateFooterAndGuidance(status) {
   // Final publication decision: both normalized and explicit checks must agree
   const finalIsPublished = isPublished && explicitAppPublished;
   
-  console.log('🔍 Enhanced publication check:', {
+  UnifiedErrorHandler.logError('🔍 Enhanced publication check:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, {
     'normalized isPublished': isPublished,
     'explicit appPublished': explicitAppPublished,
     'final decision': finalIsPublished,
@@ -1306,30 +1303,28 @@ function updateFooterAndGuidance(status) {
     
     if (boardUrlInput) {
       boardUrlInput.value = viewUrl || 'URL生成中...';
-      console.log('📝 Board URL input updated:', viewUrl || 'URL generation pending');
+      UnifiedErrorHandler.logError('📝 Board URL input updated:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, viewUrl || 'URL generation pending');
     }
     if (viewBoardLink && viewUrl) {
       viewBoardLink.href = viewUrl;
-      console.log('🔗 View board link updated:', viewUrl);
+      UnifiedErrorHandler.logError('🔗 View board link updated:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, viewUrl);
     } else if (viewBoardLink) {
       viewBoardLink.removeAttribute('href');
-      console.log('🔗 View board link cleared - no URL available');
+      UnifiedErrorHandler.logError('🔗 View board link cleared - no URL available', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     }
     
     // Update topic text
     updateTopicText(status);
     
     guidanceText.textContent = '回答ボードは現在公開中です。';
-    console.log('✅ Footer shown - board is published');
+    UnifiedErrorHandler.logError('✅ Footer shown - board is published', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   } else {
     footer.classList.add('hidden');
-    console.log('❌ Footer hidden - board not published');
+    UnifiedErrorHandler.logError('❌ Footer hidden - board not published', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     
     // Update guidance based on setup step
     updateGuidanceForStep(status.setupStep || 1, guidanceText);
   }
-  
-  console.groupEnd();
   
   // 自動停止通知の表示チェック
   checkAndShowAutoStopNotification(status);
@@ -1355,7 +1350,7 @@ function updateUIForSelectedSheet() {
       var configArea = document.getElementById('config-area');
       if (configArea) {
         configArea.classList.remove('hidden');
-        console.log('🛡️ updateUIForSelectedSheet: Config area shown defensively');
+        UnifiedErrorHandler.logError('🛡️ updateUIForSelectedSheet: Config area shown defensively', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
       }
     } else {
       configSection.classList.add('opacity-50', 'pointer-events-none');
@@ -1400,7 +1395,7 @@ function updateTopicText(status) {
       const fullConfig = JSON.parse(status.userInfo.configJson);
       cfg = { ...cfg, ...fullConfig };
     } catch (e) {
-      console.warn('Failed to parse userInfo.configJson:', e);
+      UnifiedErrorHandler.logError('Failed to parse userInfo.configJson:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, e);
     }
   }
 
@@ -1448,7 +1443,7 @@ function updateScheduledEndTime(config, element) {
     const publishedTime = new Date(config.publishedAt);
     const autoStopMs = config.autoStopMinutes * 60 * 1000;
     finalScheduledEndTime = new Date(publishedTime.getTime() + autoStopMs).toISOString();
-    console.log('🕐 終了予定時刻を計算しました:', finalScheduledEndTime);
+    UnifiedErrorHandler.logError('🕐 終了予定時刻を計算しました:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, finalScheduledEndTime);
   }
   
   if (finalScheduledEndTime) {
@@ -1476,7 +1471,7 @@ function updateScheduledEndTime(config, element) {
         const minutesRemaining = Math.floor(timeRemaining / (60 * 1000));
         element.textContent = `${formattedTime} (残り${minutesRemaining}分)`;
         element.className = 'text-xs font-medium text-red-400 animate-pulse';
-        console.log('⚠️ 期限まで1時間以内です:', minutesRemaining + '分');
+        UnifiedErrorHandler.logError('⚠️ 期限まで1時間以内です:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, minutesRemaining + '分');
       } else {
         element.textContent = formattedTime;
         element.className = 'text-xs font-medium text-orange-400';
@@ -1518,7 +1513,7 @@ function checkAndShowAutoStopNotification(status) {
   
   // 自動停止されている場合のみ通知を表示
   if (config.autoStoppedAt && config.autoStopReason === 'scheduled_timeout') {
-    console.log('🔔 自動停止通知を表示します:', config.autoStoppedAt);
+    UnifiedErrorHandler.logError('🔔 自動停止通知を表示します:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, config.autoStoppedAt);
     
     // 停止時刻を表示
     try {
@@ -1574,7 +1569,7 @@ function checkAndShowAutoStopNotification(status) {
 function toggleSection(sectionId) {
   const section = document.getElementById(sectionId);
   if (!section) {
-    console.warn('Section not found:', sectionId);
+    UnifiedErrorHandler.logError('Section not found:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, sectionId);
     return;
   }
   
@@ -1612,7 +1607,7 @@ function collapseCompletedSection(stepNumber) {
   const section = document.getElementById(sectionId);
   if (!section) return;
   
-  console.log(`📁 Auto-collapsing completed step ${stepNumber}`);
+  UnifiedErrorHandler.logError(`📁 Auto-collapsing completed step ${stepNumber}`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // Collapse the section
   section.classList.add('hidden');
@@ -1637,7 +1632,7 @@ function expandActiveSection(stepNumber) {
   const section = document.getElementById(sectionId);
   if (!section) return;
   
-  console.log(`📂 Auto-expanding active step ${stepNumber}`);
+  UnifiedErrorHandler.logError(`📂 Auto-expanding active step ${stepNumber}`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // Expand the section
   section.classList.remove('hidden');
@@ -1647,7 +1642,7 @@ function expandActiveSection(stepNumber) {
     const configArea = document.getElementById('config-area');
     if (configArea && currentStatus && currentStatus.activeSheetName) {
       configArea.classList.remove('hidden');
-      console.log(`📋 expandActiveSection: Config area shown for Step 3`);
+      UnifiedErrorHandler.logError(`📋 expandActiveSection: Config area shown for Step 3`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     }
   }
   
@@ -1667,7 +1662,7 @@ function expandActiveSection(stepNumber) {
 
 // Manage section states based on current step (simplified - no visual effects)
 function manageSectionStates(currentStep) {
-  console.log(`🔄 Managing section states for step ${currentStep}`);
+  UnifiedErrorHandler.logError(`🔄 Managing section states for step ${currentStep}`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   // ステップごとのセクション制御
   for (let i = 1; i <= 3; i++) {
@@ -1683,17 +1678,17 @@ function manageSectionStates(currentStep) {
         const configArea = document.getElementById('config-area');
         if (configArea && currentStatus && currentStatus.activeSheetName) {
           configArea.classList.remove('hidden');
-          console.log(`📋 Step 3: Config area shown for sheet: ${currentStatus.activeSheetName}`);
+          UnifiedErrorHandler.logError(`📋 Step 3: Config area shown for sheet: ${currentStatus.activeSheetName}`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
         }
       }
       
-      console.log(`🔄 Step ${i}: Active (current step)`);
+      UnifiedErrorHandler.logError(`🔄 Step ${i}: Active (current step)`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     } else if (i < currentStep) {
       // 完了済みステップ: アクセス可能だが、展開は任意
       if (section) {
         section.classList.add('opacity-90'); // 完了した状態を視覚的に示す
       }
-      console.log(`✅ Step ${i}: Completed (accessible)`);
+      UnifiedErrorHandler.logError(`✅ Step ${i}: Completed (accessible)`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     } else {
       // 未来のステップ: Step 1の場合はpending状態でも全て閲覧可能
       if (currentStep === 1) {
@@ -1701,13 +1696,13 @@ function manageSectionStates(currentStep) {
         if (section) {
           section.classList.add('opacity-75'); // 未来のステップとして軽く表示
         }
-        console.log(`⏭️ Step ${i}: Available for preview`);
+        UnifiedErrorHandler.logError(`⏭️ Step ${i}: Available for preview`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
       } else {
         // Step 2以降では順次開放
         if (section) {
           section.classList.add('opacity-50'); // 未来のステップとして表示
         }
-        console.log(`⏭️ Step ${i}: Future step (available)`);
+        UnifiedErrorHandler.logError(`⏭️ Step ${i}: Future step (available)`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
       }
     }
   }
@@ -1805,7 +1800,7 @@ function showConfirmationModal(title, message, onConfirm) {
   const confirmBtn = document.getElementById('modal-confirm-btn');
   const cancelBtn = document.getElementById('modal-cancel-btn');
   
-  console.log('🔍 showConfirmationModal: 要素検索結果:', {
+  UnifiedErrorHandler.logError('🔍 showConfirmationModal: 要素検索結果:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, {
     modal: !!modal,
     titleElement: !!titleElement,
     messageElement: !!messageElement,
@@ -1819,13 +1814,13 @@ function showConfirmationModal(title, message, onConfirm) {
     
     // 確認ボタンのクリックイベント
     confirmBtn.onclick = function() {
-      console.log('✅ 確認ボタンがクリックされました');
+      UnifiedErrorHandler.logError('✅ 確認ボタンがクリックされました', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
       hideConfirmationModal();
       if (onConfirm) {
         try {
           onConfirm();
         } catch (error) {
-          console.error('❌ 確認コールバック実行エラー:', error);
+          UnifiedErrorHandler.logError('❌ 確認コールバック実行エラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.USER_ACTION, error);
         }
       }
     };
@@ -1833,7 +1828,7 @@ function showConfirmationModal(title, message, onConfirm) {
     // キャンセルボタンのクリックイベント
     if (cancelBtn) {
       cancelBtn.onclick = function() {
-        console.log('❌ キャンセルボタンがクリックされました');
+        UnifiedErrorHandler.logError('❌ キャンセルボタンがクリックされました', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
         hideConfirmationModal();
       };
     }
@@ -1841,16 +1836,16 @@ function showConfirmationModal(title, message, onConfirm) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     manageFocusForModal('confirmation-modal', true);
-    console.log('✅ 確認モーダルを表示しました');
+    UnifiedErrorHandler.logError('✅ 確認モーダルを表示しました', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   } else {
-    console.error('❌ モーダル要素が見つかりません。フォールバックを使用します。');
+    UnifiedErrorHandler.logError('❌ モーダル要素が見つかりません。フォールバックを使用します。', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     // フォールバック: ブラウザ標準の確認ダイアログ
     if (window.confirm(`${title}\n\n${message}`)) {
       if (onConfirm) {
         try {
           onConfirm();
         } catch (error) {
-          console.error('❌ フォールバック確認コールバック実行エラー:', error);
+          UnifiedErrorHandler.logError('❌ フォールバック確認コールバック実行エラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.USER_ACTION, error);
         }
       }
     }
@@ -2044,7 +2039,7 @@ function checkAutoPublishDialog(status) {
 
 // Initialize UI components
 function initializeUI() {
-  console.log('✅ AdminPanel: UI components ready');
+  UnifiedErrorHandler.logError('✅ AdminPanel: UI components ready', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   // UI初期化のみ実行、loadStatusは adminPanel-api.js で処理される
 }
 
@@ -2058,11 +2053,11 @@ function handleSheetSelectionChange(event) {
 
   // Prevent redundant calls if the selected sheet hasn't actually changed
   if (newSelectedSheet === lastSelectedSheetName) {
-    console.log('📊 Sheet selection changed, but value is the same. Skipping redundant processing.');
+    UnifiedErrorHandler.logError('📊 Sheet selection changed, but value is the same. Skipping redundant processing.', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
     return;
   }
   
-  console.log('📊 Sheet selection changed:', {
+  UnifiedErrorHandler.logError('📊 Sheet selection changed:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.USER_ACTION, {
     previousSheet: selectedSheet,
     newSelectedSheet: newSelectedSheet
   });
@@ -2072,26 +2067,26 @@ function handleSheetSelectionChange(event) {
   lastSelectedSheetName = newSelectedSheet;
   
   if (newSelectedSheet) {
-    console.log('📋 Loading config for sheet:', newSelectedSheet);
+    UnifiedErrorHandler.logError('📋 Loading config for sheet:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, newSelectedSheet);
 
     // 1. 即座にシートをアクティブ化
     activateSelectedSheet(newSelectedSheet);
 
     // Call getSheetDetails once and use its result for config
     if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
-      console.error('スプレッドシート情報が見つかりません');
+      UnifiedErrorHandler.logError('スプレッドシート情報が見つかりません', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
       return;
     }
 
     // 2. アクティブシートの列データを取得して列選択を更新
     loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId)
       .then(result => {
-        console.log('✅ シート設定読み込み完了:', result);
+        UnifiedErrorHandler.logError('✅ シート設定読み込み完了:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, result);
         // UI更新完了後の処理
         updateUIForSelectedSheet();
       })
       .catch(error => {
-        console.error('❌ シート設定読み込み失敗:', error);
+        UnifiedErrorHandler.logError('❌ シート設定読み込み失敗:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
         showMessage('シートの設定読み込みに失敗しました', 'error');
         // エラー時もUI状態を更新
         updateUIForSelectedSheet();
@@ -2106,16 +2101,16 @@ function handleSheetSelectionChange(event) {
 // シートを即座にアクティブ化する関数
 function activateSelectedSheet(sheetName) {
   if (!sheetName || !currentStatus || !currentStatus.userInfo) {
-    console.warn('⚠️ シートアクティブ化に必要な情報が不足しています');
+    UnifiedErrorHandler.logError('⚠️ シートアクティブ化に必要な情報が不足しています', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     return;
   }
 
-  console.log(`🎯 シートを即座にアクティブ化: ${sheetName}`);
+  UnifiedErrorHandler.logError(`🎯 シートを即座にアクティブ化: ${sheetName}`, UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   
   // サーバー側でアクティブシートを設定
   runGasWithUserId('setActiveSheet', 'シートをアクティブ化中...', sheetName)
     .then(response => {
-      console.log('✅ シートアクティブ化完了:', response);
+      UnifiedErrorHandler.logError('✅ シートアクティブ化完了:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, response);
       
       // currentStatusを更新
       if (currentStatus.userInfo.configJson) {
@@ -2128,14 +2123,14 @@ function activateSelectedSheet(sheetName) {
           // シートドロップダウンの表示を更新
           updateSheetSelectActiveIndicator(sheetName);
           
-          console.log('✅ ローカル状態更新完了');
+          UnifiedErrorHandler.logError('✅ ローカル状態更新完了', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         } catch (e) {
-          console.warn('⚠️ configJson更新に失敗:', e);
+          UnifiedErrorHandler.logError('⚠️ configJson更新に失敗:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, e);
         }
       }
     })
     .catch(error => {
-      console.error('❌ シートアクティブ化失敗:', error);
+      UnifiedErrorHandler.logError('❌ シートアクティブ化失敗:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
       showMessage('シートのアクティブ化に失敗しました', 'warning');
     });
 }
@@ -2167,7 +2162,7 @@ function updateSheetSelectActiveIndicator(activeSheetName) {
 
 // 列選択をクリアする関数
 function clearColumnSelections() {
-  console.log('🧹 列選択をクリア');
+  UnifiedErrorHandler.logError('🧹 列選択をクリア', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   
   const columnSelects = [
     'opinion-column',
@@ -2188,10 +2183,10 @@ function clearColumnSelections() {
 
 // Load configuration for selected sheet - OPTIMIZED
 function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetries = 3) {
-  console.log('📋 Loading config for:', { selectedSheet: sheetName, spreadsheetId: spreadsheetId, retry: retryCount });
+  UnifiedErrorHandler.logError('📋 Loading config for:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, { selectedSheet: sheetName, spreadsheetId: spreadsheetId, retry: retryCount });
 
   if (!spreadsheetId || !sheetName) {
-    console.error('スプレッドシート情報が不足しています。');
+    UnifiedErrorHandler.logError('スプレッドシート情報が不足しています。', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     return Promise.reject(new Error('スプレッドシート情報が不足しています'));
   }
 
@@ -2204,34 +2199,34 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
     // Check if we already have sheet details from integrated API
     if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails && 
         currentStatus.activeSheetName === sheetName && currentStatus.sheetDetails.allHeaders && currentStatus.sheetDetails.allHeaders.length > 0) {
-      console.log('⚡ Using cached sheet details from integrated API');
+      UnifiedErrorHandler.logError('⚡ Using cached sheet details from integrated API', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
       try {
         populateHeaderOptions(currentStatus.sheetDetails.allHeaders);
-        console.log('✅ Header options populated from cache');
+        UnifiedErrorHandler.logError('✅ Header options populated from cache', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
         populateConfig(currentStatus.sheetDetails.guessedConfig);
-        console.log('✅ AI configuration applied from cache');
+        UnifiedErrorHandler.logError('✅ AI configuration applied from cache', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
         resolve({ source: 'cache', headers: currentStatus.sheetDetails.allHeaders, config: currentStatus.sheetDetails.guessedConfig });
         return; // Early return - no API call needed
       } catch (error) {
-        console.error('Error in cached config population:', error);
+        UnifiedErrorHandler.logError('Error in cached config population:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION, error);
         // Fall through to API call if cache fails
       }
     }
 
   // Force fresh API call if fresh save protection is active or cache unavailable
   if (isFreshSaveActive) {
-    console.log('🔄 Fresh save protection active - forcing API call for latest data');
+    UnifiedErrorHandler.logError('🔄 Fresh save protection active - forcing API call for latest data', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
   } else {
-    console.log('📞 Making API call for sheet details:', sheetName);
+    UnifiedErrorHandler.logError('📞 Making API call for sheet details:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, sheetName);
   }
   
     runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, sheetName)
       .then(function(details) {
-        console.log('✅ Sheet details loaded via API:', details);
+        UnifiedErrorHandler.logError('✅ Sheet details loaded via API:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, details);
         
         // If headers are empty, and we have retries left, try again after a delay
         if (details && (!details.allHeaders || details.allHeaders.length === 0) && retryCount < maxRetries) {
-          console.warn(`⚠️ No headers found for ${sheetName}. Retrying in 2 seconds... (Attempt ${retryCount + 1}/${maxRetries})`);
+          UnifiedErrorHandler.logError(`⚠️ No headers found for ${sheetName}. Retrying in 2 seconds... (Attempt ${retryCount + 1}/${maxRetries})`, UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           showMessage(`シート情報を再取得中... (${retryCount + 1}/${maxRetries})`, 'info');
           setTimeout(() => {
             loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries)
@@ -2243,21 +2238,21 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
 
         try {
           populateHeaderOptions(details.allHeaders);
-          console.log('✅ Header options populated from API');
+          UnifiedErrorHandler.logError('✅ Header options populated from API', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           populateConfig(details.guessedConfig);
-          console.log('✅ AI configuration applied from API');
+          UnifiedErrorHandler.logError('✅ AI configuration applied from API', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
           if (retryCount > 0) {
             showMessage('✅ シート情報が正常に読み込まれました！', 'success');
           }
           resolve({ source: 'api', headers: details.allHeaders, config: details.guessedConfig });
         } catch (error) {
-          console.error('Error in API config population sequence:', error);
+          UnifiedErrorHandler.logError('Error in API config population sequence:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
           showMessage('設定の適用中にエラーが発生しました', 'error');
           reject(error);
         }
       })
       .catch(function(error) {
-        console.error('Failed to load sheet config via API:', error);
+        UnifiedErrorHandler.logError('Failed to load sheet config via API:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
         
         // より詳細なエラーメッセージの表示
         let errorMessage = 'シート設定の読み込みに失敗しました';
@@ -2325,7 +2320,7 @@ function getSetupStatusFromUserInfo(userInfo) {
 
     // setupStatusが明示的に設定されている場合はそれを使用
     if (config.setupStatus) {
-      console.log('🔧 configJson setupStatus:', config.setupStatus);
+      UnifiedErrorHandler.logError('🔧 configJson setupStatus:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, config.setupStatus);
       return config.setupStatus;
     }
     
@@ -2338,7 +2333,7 @@ function getSetupStatusFromUserInfo(userInfo) {
     return 'pending';
     
   } catch (error) {
-    console.warn('getSetupStatusFromUserInfo JSON解析エラー:', error.message);
+    UnifiedErrorHandler.logError('getSetupStatusFromUserInfo JSON解析エラー:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, error.message);
     return 'pending'; // エラー時はセットアップ未完了とみなす
   }
 }
@@ -2352,7 +2347,7 @@ function clearInitialDisplayElements() {
   const initialContainer = document.getElementById('header-domain-initial');
   if (initialContainer) {
     initialContainer.style.display = 'none';
-    console.log('✅ 初期ドメイン表示を非表示');
+    UnifiedErrorHandler.logError('✅ 初期ドメイン表示を非表示', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   }
   
   // 適切なドメイン情報を表示
@@ -2367,7 +2362,7 @@ function clearInitialDisplayElements() {
   existingGuides.forEach(guide => {
     if (guide) {
       guide.remove();
-      console.log('✅ 既存セットアップガイドを削除');
+      UnifiedErrorHandler.logError('✅ 既存セットアップガイドを削除', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     }
   });
 }
@@ -2391,7 +2386,7 @@ function showAppropriateHeaderStatus() {
       domainText.textContent = 'naha-okinawa.ed.jp';
     }
     
-    console.log('✅ ドメイン一致表示を有効化');
+    UnifiedErrorHandler.logError('✅ ドメイン一致表示を有効化', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   }
 }
 
@@ -2427,7 +2422,7 @@ function updateButtonStatesForSetup(status) {
     }
   });
   
-  console.log('✅ ボタン状態を適切に更新しました');
+  UnifiedErrorHandler.logError('✅ ボタン状態を適切に更新しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
 }
 
 
@@ -2490,23 +2485,23 @@ function updateSystemStatusDisplay(status) {
       
       if (configJson && configJson.formUrl) {
         formUrl = configJson.formUrl;
-        console.log('✅ FormURL found in configJson:', formUrl);
+        UnifiedErrorHandler.logError('✅ FormURL found in configJson:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, formUrl);
       }
     } catch (error) {
-      console.warn('⚠️ configJson parse error:', error);
+      UnifiedErrorHandler.logError('⚠️ configJson parse error:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, error);
     }
   }
   
   // 2. userInfo.formUrlから取得（フォールバック）
   if (!formUrl && status.userInfo && status.userInfo.formUrl) {
     formUrl = status.userInfo.formUrl;
-    console.log('📋 FormURL found in userInfo:', formUrl);
+    UnifiedErrorHandler.logError('📋 FormURL found in userInfo:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, formUrl);
   }
   
   // 3. customFormInfoから取得（後方互換性）
   if (!formUrl && status.customFormInfo && status.customFormInfo.formUrl) {
     formUrl = status.customFormInfo.formUrl;
-    console.log('📄 FormURL found in customFormInfo:', formUrl);
+    UnifiedErrorHandler.logError('📄 FormURL found in customFormInfo:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, formUrl);
   }
   
   // statusオブジェクトにformUrlを設定
@@ -2519,7 +2514,7 @@ function updateSystemStatusDisplay(status) {
       // ここでは disabled 状態とスタイルのみを制御
       formBtn.title = 'フォームを開く';
       formBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-      console.log('✅ Form button enabled with URL:', status.formUrl);
+      UnifiedErrorHandler.logError('✅ Form button enabled with URL:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE, status.formUrl);
     }
   } else { // formUrlが存在しない場合、ボタンを無効化し、メッセージを表示
     if (formBtn) {
@@ -2527,7 +2522,7 @@ function updateSystemStatusDisplay(status) {
       // onclick イベントは既存のものを保持（openForm関数）
       formBtn.title = 'フォームURLが未設定です。フォームを作成してください。';
       formBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      console.log('⚠️ Form button disabled - no URL available');
+      UnifiedErrorHandler.logError('⚠️ Form button disabled - no URL available', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
     }
   }
   
@@ -2678,21 +2673,21 @@ function generateHistoryId() {
  */
 async function syncHistoryFromServer() {
   try {
-    console.log('🔄 サーバーから履歴を同期中...');
+    UnifiedErrorHandler.logError('🔄 サーバーから履歴を同期中...', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION);
     
     const response = await runGasWithUserId('getHistoryFromServerAPI', 'サーバーから履歴を取得中...');
     
     if (response && response.status === 'success' && Array.isArray(response.historyArray)) {
       // サーバーからの履歴をLocalStorageに保存
       localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(response.historyArray));
-      console.log('✅ サーバーから履歴を同期しました:', response.count, '件');
+      UnifiedErrorHandler.logError('✅ サーバーから履歴を同期しました:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, { count: response.count });
       return response.historyArray;
     } else {
-      console.warn('⚠️ サーバーからの履歴取得で警告:', response);
+      UnifiedErrorHandler.logError('⚠️ サーバーからの履歴取得で警告:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, response);
       return [];
     }
   } catch (error) {
-    console.error('❌ サーバー履歴同期エラー:', error);
+    UnifiedErrorHandler.logError('❌ サーバー履歴同期エラー:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
     return [];
   }
 }
@@ -2911,14 +2906,14 @@ function escapeHtml(text) {
  */
 function normalizeConfigJson(config, userInfo) {
   if (!config || typeof config !== 'object') {
-    console.warn('⚠️ normalizeConfigJson: 無効なconfigオブジェクト');
+    UnifiedErrorHandler.logError('⚠️ normalizeConfigJson: 無効なconfigオブジェクト', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     return config;
   }
   
   // 🎯 統合処理キャッシュシステムを使用（重複処理の回避）
   const cacheKey = generateConfigCacheKey(config, userInfo);
   return executeWithCache('configNormalization', cacheKey, () => {
-    console.log('🔧 configJson正規化開始:', {
+    UnifiedErrorHandler.logError('🔧 configJson正規化開始:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, {
       setupStatus: config.setupStatus,
       setupStep: config.setupStep,
       appPublished: config.appPublished,
@@ -2940,7 +2935,7 @@ function normalizeConfigJson(config, userInfo) {
     // Step 5: 冗長フィールドの削除
     normalizedConfig = removeRedundantFields(normalizedConfig);
     
-    console.log('✅ configJson正規化完了:', {
+    UnifiedErrorHandler.logError('✅ configJson正規化完了:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, {
       setupStatus: normalizedConfig.setupStatus,
       appPublished: normalizedConfig.appPublished,
       publishedSheetName: normalizedConfig.publishedSheetName
@@ -2978,7 +2973,7 @@ function removeRedundantFields(config) {
   // setupStepは計算プロパティのため、保存済みの値を削除
   delete cleanConfig.setupStep;
   
-  console.log('🧹 冗長フィールド削除: setupStep');
+  UnifiedErrorHandler.logError('🧹 冗長フィールド削除: setupStep', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
   
   return cleanConfig;
 }
@@ -2990,7 +2985,7 @@ function removeRedundantFields(config) {
  */
 function validateConfigJsonIntegrity(config, userInfo) {
   if (!config || !userInfo) {
-    console.warn('⚠️ 整合性検証: 無効なパラメータ');
+    UnifiedErrorHandler.logError('⚠️ 整合性検証: 無効なパラメータ', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     return;
   }
   
@@ -3001,10 +2996,9 @@ function validateConfigJsonIntegrity(config, userInfo) {
   const hasPublishedSheet = !!(config.publishedSheetName && config.publishedSheetName.trim());
   const hasSpreadsheet = !!(userInfo.spreadsheetId && userInfo.spreadsheetId.trim());
   
-  console.group('🔍 ConfigJson整合性検証');
   
   // 基本状態の表示
-  console.log('📊 現在の状態:', {
+  UnifiedErrorHandler.logError('📊 現在の状態:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, {
     setupStatus,
     formCreated,
     appPublished,
@@ -3039,12 +3033,11 @@ function validateConfigJsonIntegrity(config, userInfo) {
   
   // 結果表示
   if (issues.length === 0) {
-    console.log('✅ 整合性検証完了: 問題なし');
+    UnifiedErrorHandler.logError('✅ 整合性検証完了: 問題なし', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
   } else {
-    console.warn('⚠️ 整合性問題検出:', issues);
+    UnifiedErrorHandler.logError('⚠️ 整合性問題検出:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, issues);
   }
   
-  console.groupEnd();
 }
 
 /**
@@ -3065,7 +3058,7 @@ function fixPublishedSheetName(config) {
       const detectedSheetName = sheetKeys[0].replace('sheet_', '');
       config.publishedSheetName = detectedSheetName;
       
-      console.log('🔧 publishedSheetName修復:', {
+      UnifiedErrorHandler.logError('🔧 publishedSheetName修復:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, {
         検出されたシート名: detectedSheetName,
         利用可能なシート設定: sheetKeys
       });
@@ -3103,13 +3096,13 @@ function syncGlobalColumnSettings(config) {
     // フォームURL同期 - シート固有のformUrlをグローバル設定に同期
     if (sheetConfig.formUrl) {
       config.formUrl = sheetConfig.formUrl;
-      console.log('🔗 フォームURL同期:', {
+      UnifiedErrorHandler.logError('🔗 フォームURL同期:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, {
         シート名: config.publishedSheetName,
         フォームURL: config.formUrl
       });
     }
     
-    console.log('🔧 グローバル列設定同期完了:', {
+    UnifiedErrorHandler.logError('🔧 グローバル列設定同期完了:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION, {
       シート名: config.publishedSheetName,
       メイン質問: config.opinionHeader,
       名前列: config.nameHeader
@@ -3153,23 +3146,23 @@ function fixConfigForPublishedState(config) {
   
   // 公開済み状態の必須フィールドを修復
   if (fixedConfig.setupStatus !== 'completed') {
-    console.log('🔧 setupStatusをpendingからcompletedに修復');
+    UnifiedErrorHandler.logError('🔧 setupStatusをpendingからcompletedに修復', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     fixedConfig.setupStatus = 'completed';
   }
   
   if (!fixedConfig.formCreated) {
-    console.log('🔧 formCreatedをfalseからtrueに修復');
+    UnifiedErrorHandler.logError('🔧 formCreatedをfalseからtrueに修復', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     fixedConfig.formCreated = true;
   }
   
   if (!fixedConfig.appPublished) {
-    console.log('🔧 appPublishedをfalseからtrueに修復');
+    UnifiedErrorHandler.logError('🔧 appPublishedをfalseからtrueに修復', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     fixedConfig.appPublished = true;
   }
   
   // formUrlの仮置き（実際のフォームURLが不明な場合）
   if (!fixedConfig.formUrl || fixedConfig.formUrl.trim() === '') {
-    console.log('🔧 formUrlを仮設定（公開済み状態維持用）');
+    UnifiedErrorHandler.logError('🔧 formUrlを仮設定（公開済み状態維持用）', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.DATA_VALIDATION);
     fixedConfig.formUrl = 'https://docs.google.com/temp-form-url'; // 仮ライセンスURL
   }
   
@@ -3185,11 +3178,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // サーバーから履歴を同期してからテーブルを読み込み
       syncHistoryFromServer()
         .then(function(syncedHistory) {
-          console.log('🔄 ページ読み込み時の履歴同期完了:', syncedHistory.length, '件');
+          UnifiedErrorHandler.logError('🔄 ページ読み込み時の履歴同期完了:', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, { count: syncedHistory.length });
           loadSimpleHistoryTable();
         })
         .catch(function(syncError) {
-          console.warn('⚠️ ページ読み込み時の履歴同期に失敗、ローカルデータで表示:', syncError);
+          UnifiedErrorHandler.logError('⚠️ ページ読み込み時の履歴同期に失敗、ローカルデータで表示:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, syncError);
           loadSimpleHistoryTable();
         });
       return;
@@ -3198,14 +3191,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (attempts < 20) { // 最大2秒待機
       // 🔧 ログ頻度を調整: 3回に1回のみログ出力
       if (attempts % 3 === 0) {
-        console.log(`⏳ runGasWithUserId関数の読み込み待機中... (${attempts + 1}/20)`);
+        UnifiedErrorHandler.logError(`⏳ runGasWithUserId関数の読み込み待機中... (${attempts + 1}/20)`, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
       }
       setTimeout(() => waitForDependencies(attempts + 1), 100);
       return;
     }
     
     // タイムアウト後はローカルデータのみで動作
-    console.warn('⚠️ runGasWithUserId関数が利用できません。ローカルデータのみで表示します。');
+    UnifiedErrorHandler.logError('⚠️ runGasWithUserId関数が利用できません。ローカルデータのみで表示します。', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
     loadSimpleHistoryTable();
   }
   

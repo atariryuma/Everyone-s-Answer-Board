@@ -14,7 +14,7 @@ var elements = {};
 // =============================================================================
 
 function setupEventListeners() {
-  console.log('✅ AdminPanel: Initializing event handlers');
+  UnifiedErrorHandler.logError('✅ AdminPanel: Initializing event handlers', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   
   // Cache frequently used elements
   elements = {
@@ -36,13 +36,7 @@ function setupEventListeners() {
   
   // Save and publish button
   if (elements['save-publish-btn']) {
-    elements['save-publish-btn'].addEventListener('click', function() {
-      if (!selectedSheet) {
-        showMessage('まずシートを選択してください。', 'warning');
-        return;
-      }
-      saveAndPublish();
-    });
+          UnifiedErrorHandler.logError('💾 Save and publish button clicked', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
   }
   
   // Unpublish button
@@ -60,66 +54,66 @@ function setupEventListeners() {
   var clearHistoryBtn = document.getElementById('clear-history-btn');
   if (clearHistoryBtn) {
     clearHistoryBtn.addEventListener('click', function() {
-      console.log('🗑️ 履歴クリアボタンがクリックされました');
+      UnifiedErrorHandler.logError('🗑️ 履歴クリアボタンがクリックされました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
       
       if (typeof showConfirmationModal === 'function') {
         showConfirmationModal(
           '履歴削除の確認',
           'すべての履歴を削除しますか？この操作は取り消せません。',
           function() {
-            console.log('📝 履歴削除が確認されました');
+            UnifiedErrorHandler.logError('📝 履歴削除が確認されました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
             try {
               localStorage.removeItem(HISTORY_STORAGE_KEY);
-              console.log('✅ ローカルストレージから履歴を削除しました');
+              UnifiedErrorHandler.logError('✅ ローカルストレージから履歴を削除しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
               
               // サーバーサイドの履歴もクリア
               runGasWithUserId('clearHistoryFromServerAPI', 'サーバーから履歴をクリア中...')
                 .then(function(serverResponse) {
-                  console.log('✅ サーバーサイド履歴もクリアしました:', serverResponse);
+                  UnifiedErrorHandler.logError('✅ サーバーサイド履歴もクリアしました:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, serverResponse);
                   showMessage('✅ 履歴をクリアしました（ローカル・サーバー両方）', 'success');
                   
                   // 履歴テーブルを更新
                   if (typeof loadSimpleHistoryTable === 'function') {
                     loadSimpleHistoryTable();
-                    console.log('📊 履歴テーブルを更新しました');
+                    UnifiedErrorHandler.logError('📊 履歴テーブルを更新しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
                   } else {
-                    console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
+                    UnifiedErrorHandler.logError('⚠️ loadSimpleHistoryTable関数が見つかりません', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
                   }
                 })
                 .catch(function(serverError) {
-                  console.warn('⚠️ サーバーサイド履歴クリアに失敗:', serverError);
+                  UnifiedErrorHandler.logError('⚠️ サーバーサイド履歴クリアに失敗:', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, serverError);
                   showMessage('✅ ローカル履歴をクリアしました（サーバー側は手動で確認してください）', 'success');
                   
                   // 履歴テーブルを更新
                   if (typeof loadSimpleHistoryTable === 'function') {
                     loadSimpleHistoryTable();
-                    console.log('📊 履歴テーブルを更新しました');
+                    UnifiedErrorHandler.logError('📊 履歴テーブルを更新しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
                   } else {
-                    console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
+                    UnifiedErrorHandler.logError('⚠️ loadSimpleHistoryTable関数が見つかりません', UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
                   }
                 });
             } catch (error) {
-              console.error('❌ 履歴クリアに失敗:', error);
+              UnifiedErrorHandler.logError('❌ 履歴クリアに失敗:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.USER_ACTION, error);
               showMessage('❌ 履歴クリアに失敗しました', 'error');
             }
           }
         );
       } else {
-        console.error('❌ showConfirmationModal関数が見つかりません');
+        UnifiedErrorHandler.logError('❌ showConfirmationModal関数が見つかりません', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         // フォールバック: 直接確認
         if (confirm('すべての履歴を削除しますか？この操作は取り消せません。')) {
           try {
             localStorage.removeItem(HISTORY_STORAGE_KEY);
-            console.log('✅ ローカルストレージから履歴を削除しました（フォールバック）');
+            UnifiedErrorHandler.logError('✅ ローカルストレージから履歴を削除しました（フォールバック）', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.CACHE_OPERATION);
             
             // サーバーサイドの履歴もクリア（フォールバック）
             runGasWithUserId('clearHistoryFromServerAPI', 'サーバーから履歴をクリア中...')
               .then(function(serverResponse) {
-                console.log('✅ サーバーサイド履歴もクリアしました（フォールバック）:', serverResponse);
+                UnifiedErrorHandler.logError('✅ サーバーサイド履歴もクリアしました（フォールバック）:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, serverResponse);
                 showMessage('✅ 履歴をクリアしました（ローカル・サーバー両方）', 'success');
               })
               .catch(function(serverError) {
-                console.warn('⚠️ サーバーサイド履歴クリアに失敗（フォールバック）:', serverError);
+                UnifiedErrorHandler.logError('⚠️ サーバーサイド履歴クリアに失敗（フォールバック）:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, serverError);
                 showMessage('✅ ローカル履歴をクリアしました（サーバー側は手動で確認してください）', 'success');
               });
             
@@ -127,15 +121,15 @@ function setupEventListeners() {
               loadSimpleHistoryTable();
             }
           } catch (error) {
-            console.error('❌ 履歴クリアに失敗:', error);
+            UnifiedErrorHandler.logError('❌ 履歴クリアに失敗:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.USER_ACTION, error);
             showMessage('❌ 履歴クリアに失敗しました', 'error');
           }
         }
       }
     });
-    console.log('✅ 履歴クリアボタンのイベントリスナーを設定しました');
+        UnifiedErrorHandler.logError('✅ 履歴クリアボタンのイベントリスナーを設定しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   } else {
-    console.error('❌ clear-history-btnが見つかりません');
+    UnifiedErrorHandler.logError('❌ clear-history-btnが見つかりません', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
   }
   
   // クイックスタートボタンのイベントリスナー
@@ -145,7 +139,7 @@ function setupEventListeners() {
       if (typeof handleQuickStart === 'function') {
         handleQuickStart();
       } else {
-        console.error('handleQuickStart function not found');
+        UnifiedErrorHandler.logError('handleQuickStart function not found', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         showMessage('クイックスタート機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     });
@@ -160,7 +154,7 @@ function setupEventListeners() {
         // 公開中の場合、選択モーダルを表示
         window.sharedModals.showCustomSetupSelection(
           (selectedOption) => {
-            console.log('✅ ユーザーが選択:', selectedOption);
+            UnifiedErrorHandler.logError('✅ ユーザーが選択:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.USER_ACTION, selectedOption);
             if (selectedOption === 'stop') {
               // 停止して作成を選択
               proceedWithCustomFormCreation(true);
@@ -170,7 +164,7 @@ function setupEventListeners() {
             }
           },
           () => {
-            console.log('❌ カスタムセットアップがキャンセルされました');
+            UnifiedErrorHandler.logError('❌ カスタムセットアップがキャンセルされました', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
           }
         );
       } else {
@@ -183,11 +177,11 @@ function setupEventListeners() {
   // カスタムフォーム作成を進行
   function proceedWithCustomFormCreation(shouldStop) {
     if (shouldStop) {
-      console.log('📝 公開停止してカスタムフォームを作成します');
+                        UnifiedErrorHandler.logError('📝 公開停止してカスタムフォームを作成します', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
       
       // 実際に公開停止処理を実行
       if (typeof unpublishBoard === 'function') {
-        console.log('🛑 公開停止処理を開始します...');
+                                    UnifiedErrorHandler.logError('🛑 公開停止処理を実行中...', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
         
         // 公開停止の確認ダイアログを表示
         window.sharedModals.showConfirmation(
@@ -198,23 +192,22 @@ function setupEventListeners() {
             executeStopAndCreateForm();
           },
           function() {
-            console.log('❌ 公開停止がキャンセルされました');
+            UnifiedErrorHandler.logError('❌ 公開停止がキャンセルされました', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
           }
         );
       } else {
-        console.error('unpublishBoard function not found');
+        UnifiedErrorHandler.logError('unpublishBoard function not found', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
         showMessage('公開停止機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     } else {
-      console.log('📝 公開を継続してカスタムフォームを作成します');
+                  UnifiedErrorHandler.logError('📝 公開を継続してカスタムフォームを作成します', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
       
       // カスタムセットアップ時は全セクション展開フラグを設定
       try {
-        localStorage.setItem('expandAllSections', 'true');
-        console.log('📂 カスタムセットアップ用の全セクション展開フラグを設定しました');
+          localStorage.setItem('expandAllSections', 'true');
+                UnifiedErrorHandler.logError('📂 カスタムセットアップ用の全セクション展開フラグを設定しました', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
       } catch (e) {
-        console.warn('⚠️ localStorage設定に失敗:', e);
-      }
+        UnifiedErrorHandler.logError('⚠️ localStorage設定に失敗:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, e);
       
       // 継続の場合は直接フォーム作成モーダルを表示
       showFormConfigModalSafely();
@@ -223,12 +216,12 @@ function setupEventListeners() {
 
   // 公開停止→フォーム作成の実行
   function executeStopAndCreateForm() {
-    console.log('🛑 公開停止処理を実行中...');
+    UnifiedErrorHandler.logError('🛑 公開停止処理を実行中...', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.USER_ACTION);
     
     // unpublishBoard関数を呼び出し
     unpublishBoard()
       .then(function(response) {
-        console.log('✅ 公開停止が完了しました:', response);
+        UnifiedErrorHandler.logError('✅ 公開停止が完了しました:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, response);
         
         // 公開停止が確実に完了した旨を表示
         showMessage('✅ 公開停止が完了しました。カスタムフォームを作成できます。', 'success');
@@ -243,7 +236,7 @@ function setupEventListeners() {
         
         // 少し遅延してからフォーム作成モーダルを表示
         setTimeout(function() {
-          console.log('🎨 フォーム作成モーダルを表示します');
+          UnifiedErrorHandler.logError('🎨 フォーム作成モーダルを表示します', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.UI_UPDATE);
           showFormConfigModalSafely();
         }, 1500); // 1.5秒後に表示（UIフィードバック時間を確保）
       })
@@ -293,7 +286,7 @@ function setupEventListeners() {
   // Real-time validation
   setupRealtimeValidation();
   
-  console.log('✅ AdminPanel: Event handlers ready');
+  UnifiedErrorHandler.logError('✅ AdminPanel: Event handlers ready', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
 }
 
 // =============================================================================
@@ -373,7 +366,7 @@ function setupAccountManagementHandlers() {
     deleteBtn.removeEventListener('click', handleDeleteRequest);
     // 新しいイベントリスナーを追加
     deleteBtn.addEventListener('click', handleDeleteRequest);
-    console.log('Delete account button event listener attached successfully');
+    UnifiedErrorHandler.logError('Delete account button event listener attached successfully', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
   } else {
     console.warn('Delete account button not found');
   }
@@ -585,11 +578,11 @@ function switchToAnotherAccount() {
     function() {
       sharedUtilities.gas.callWithLoading('resetUserAuthentication', 'セッションをクリアしています...', 'overlay')
         .then(function(result) {
-          console.log('Session cleanup result:', result);
+                    UnifiedErrorHandler.logError('Session cleanup result:', UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, result);
           window.location.href = 'https://accounts.google.com/logout';
         })
         .catch(function(error) {
-          console.error('Session cleanup failed:', error);
+          UnifiedErrorHandler.logError('❌ Session cleanup failed:', UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, error);
           alert('セッションクリアに失敗しました。手動でGoogleアカウントからログアウトしてください。');
           window.location.href = 'https://accounts.google.com/logout';
         });
@@ -681,7 +674,7 @@ function initializeEventListeners() {
   const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
 
   if (missingFunctions.length > 0) {
-    console.warn('⚠️ AdminPanel: Missing functions during event initialization:', missingFunctions);
+    UnifiedErrorHandler.logError('⚠️ AdminPanel: Missing functions during event initialization:', UnifiedErrorHandler.ErrorTypes.WARNING, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, missingFunctions);
   }
 
   console.log('✅ AdminPanel: Setting up event listeners');
