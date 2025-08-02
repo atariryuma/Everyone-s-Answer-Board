@@ -38,6 +38,14 @@ function updateUIWithNewStatusInternal(status) {
     
     // 修復機能用のステータスキャッシュを設定
     window.lastStatusCache = status;
+
+    // Populate header options and configuration
+    if (status.sheetDetails && status.sheetDetails.headers) {
+      populateHeaderOptions(status.sheetDetails.headers);
+    }
+    if (status.config) {
+      populateConfig(status.config);
+    }
     
     console.log('✅ Simplified UI update completed');
   } catch (error) {
