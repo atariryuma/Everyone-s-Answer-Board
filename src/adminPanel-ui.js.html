@@ -402,20 +402,12 @@ function generateUrlCacheKey(status, userId) {
  * @returns {string} 本番環境URL
  */
 function convertDevUrlToProductionUrl(devUrl) {
-  if (devUrl.includes('googleusercontent.com')) {
-    try {
-      // Extract the deployment ID from the URL
-      // Example: https://n-uoo3whqxnsbcl3hdxqtnpnofkykwqt7v7oqj33q-0lu-script.googleusercontent.com/exec
-      const match = devUrl.match(/https:\/\/[a-zA-Z0-9-]+-([a-zA-Z0-9_-]+)\.script\.googleusercontent\.com\/exec/);
-      if (match && match[1]) {
-        const scriptId = match[1];
-        return `https://script.google.com/macros/s/${scriptId}/exec`;
-      }
-    } catch (e) {
-      console.error('Error extracting script ID from dev URL:', e);
-    }
+  // Simplistic conversion: replace 'userCodeAppPanel' with 'exec' if present
+  if (devUrl.includes('userCodeAppPanel')) {
+    return devUrl.replace('userCodeAppPanel', 'exec');
   }
-  return devUrl; // Return original if not a dev URL or extraction fails
+  // Otherwise, return the original URL
+  return devUrl;
 }
 
 // =============================================================================
@@ -423,7 +415,7 @@ function convertDevUrlToProductionUrl(devUrl) {
 // =============================================================================
 
 // Update UI with new status data - 最適化バッチング版
-function updateUIWithNewStatus(status) {
+window.updateUIWithNewStatus = function(status) {
   if (!validateStatus(status)) {
     logWarn('Invalid status received, skipping UI update');
     return;
@@ -435,10 +427,7 @@ function updateUIWithNewStatus(status) {
   
   // currentStatusを更新（他の関数で参照される）
   currentStatus = status;
-}
-
-// Replace stub with actual function and ensure global access
-window.updateUIWithNewStatus = updateUIWithNewStatus;
+};
 console.log('✅ updateUIWithNewStatus actual function loaded');
 
 // レガシー関数（互換性のため保持）

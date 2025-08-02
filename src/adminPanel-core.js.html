@@ -8,11 +8,7 @@
 // =============================================================================
 
 // Define critical function stubs immediately to prevent undefined errors
-if (typeof window.updateUIWithNewStatus === 'undefined') {
-  window.updateUIWithNewStatus = function(status) {
-    console.warn('updateUIWithNewStatus stub called - actual function not yet loaded');
-  };
-}
+
 
 if (typeof window.navigateToStep === 'undefined') {
   window.navigateToStep = function(step) {
