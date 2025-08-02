@@ -7,10 +7,7 @@ const CONFIG_SHEET_NAME = 'Config';
 
 let runtimeUserInfo = null;
 
-// メモリ管理用の実行レベル変数 (main.gsと統一)
-let lastCacheUserIdKey = null;
-let executionStartTime = Date.now();
-const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
+// メモリ管理用の実行レベル変数 (統一キャッシュに移行)
 
 /**
  * 実行中に一度だけユーザー情報を取得して再利用する。
@@ -29,64 +26,26 @@ function getUserInfoCached(requestUserId) {
   }
   
   // フォールバック: 従来の実装
-  // 実行時間制限チェック
-  if (Date.now() - executionStartTime > EXECUTION_MAX_LIFETIME) {
-    warnLog('⚠️ 実行時間制限到達、キャッシュを自動クリア');
-    clearExecutionUserInfoCache();
-    executionStartTime = Date.now();
-  }
-
   const userIdKey = requestUserId || getUserId();
 
-  // キャッシュヒット条件：同じユーザーIDかつキャッシュが有効
-  if (_executionUserInfoCache && lastCacheUserIdKey === userIdKey) {
-    return _executionUserInfoCache;
+  const cache = typeof getUnifiedExecutionCache === 'function'
+    ? getUnifiedExecutionCache()
+    : null;
+  const cached = cache ? cache.getUserInfo(userIdKey) : null;
+  if (cached) {
+    return cached;
   }
 
-  // キャッシュミス：新規取得
   try {
     const userInfo = findUserById(userIdKey);
-    if (userInfo) {
-      _executionUserInfoCache = userInfo;
-      lastCacheUserIdKey = userIdKey;
+    if (userInfo && cache) {
+      cache.setUserInfo(userIdKey, userInfo);
     }
     return userInfo;
   } catch (error) {
     logError(error, 'getUserInfoCached', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CACHE);
-    // エラー時はキャッシュをクリア
-    clearExecutionUserInfoCache();
+    cache && cache.clearUserInfo();
     return null;
-  }
-}
-
-/**
- * 実行レベルのユーザー情報キャッシュをクリア
- */
-function clearExecutionUserInfoCache() {
-  _executionUserInfoCache = null;
-  lastCacheUserIdKey = null;
-
-  // 統一キャッシュマネージャーの関連エントリもクリア
-  if (typeof cacheManager !== 'undefined' && cacheManager) {
-    try {
-      // ユーザー関連キャッシュのクリア
-      if (lastCacheUserIdKey) {
-        cacheManager.remove('user_' + lastCacheUserIdKey);
-        cacheManager.remove('userinfo_' + lastCacheUserIdKey);
-      }
-
-      // セッション関連キャッシュのクリア
-      const currentEmail = Session.getActiveUser().getEmail();
-      if (currentEmail) {
-        cacheManager.remove('session_' + currentEmail);
-      }
-
-      debugLog('[Memory] 実行レベル + 統一キャッシュの関連エントリをクリアしました');
-    } catch (error) {
-      debugLog('[Memory] 統一キャッシュクリア中にエラー:', error.message);
-    }
-  } else {
-    debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
   }
 }
 
@@ -2202,7 +2161,12 @@ function createExecutionContext(requestUserId, options = {}) {
       userInfo = findUserByIdFresh(requestUserId);
 
       if (userInfo) {
-        _executionUserInfoCache = { userId: requestUserId, userInfo };
+        const cache = typeof getUnifiedExecutionCache === 'function'
+          ? getUnifiedExecutionCache()
+          : null;
+        if (cache) {
+          cache.setUserInfo(requestUserId, userInfo);
+        }
         infoLog('✅ findUserByIdFresh success: cached for execution');
       } else {
         errorLog('❌ findUserByIdFresh failed for userId=%s', requestUserId);

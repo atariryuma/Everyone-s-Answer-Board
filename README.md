@@ -143,7 +143,8 @@ Googleスプレッドシートをデータベースとして活用し、Google�
 // 重要関数
 - cacheManager.get(key, valueFn, options)     // キャッシュ取得
 - invalidateUserCache(userId, ...)            // ユーザーキャッシュ無効化
-- clearAllExecutionCache()                    // 実行キャッシュクリア
+- clearExecutionUserInfoCache()              // 実行ユーザー情報キャッシュクリア
+- clearAllExecutionCache()                    // 実行キャッシュ全体クリア
 ```
 
 ## ⚠️ 既知の問題と修正状況
@@ -154,12 +155,13 @@ Googleスプレッドシートをデータベースとして活用し、Google�
 3. **⚡ パフォーマンス改善**: 不要なキャッシュクリア操作を最適化
 4. **🎨 スタイル統一**: インラインスタイルをCSS変数に変換
 5. **🔧 関数統合完了**: ログ関数をdebugConfig.gsに統一（4ファイルの重複を解消）
+6. **🗃️ キャッシュ管理統合**: 実行レベルキャッシュをunifiedExecutionCache.gsに中央集約
 
 ### 🔄 現在対応中
 1. **関数重複の統合**:
    - ✅ ログ関数の統合完了 (debugLog, errorLog, warnLog, infoLog → debugConfig.gs)
    - ❌ ユーザー情報取得関数が6個重複
-   - ❌ キャッシュ管理関数が散在
+   - ✅ キャッシュ管理関数の中央集約完了 (unifiedExecutionCache.gs)
 
 2. **大容量ファイルの分割** (優先度: 高):
    - 🎯 Core.gs → 12モジュール (238KB → 各20KB以下)
@@ -190,12 +192,12 @@ Googleスプレッドシートをデータベースとして活用し、Google�
 | getOrFetchUserInfo | main.gs | ❌ 重複 | 段階的廃止 |
 | findUserById | database.gs | ✅ 保持 | DB特化として保持 |
 
-### 3. キャッシュ管理 (中央集約中)
-| 関数名 | 現在の状態 | 統一先 |
-|--------|-----------|--------|
-| clearExecutionUserInfoCache | ❌ 4ファイルで重複 | unifiedExecutionCache.gs |
-| invalidateUserCache | ⚠️ 散在 | CacheManager |
-| clearAllExecutionCache | ❌ 複数実装 | unifiedExecutionCache.gs |
+### 3. キャッシュ管理 (統一完了)
+| 関数名 | 状態 | 統一先 |
+|--------|------|--------|
+| clearExecutionUserInfoCache | ✅ 統一完了 | unifiedExecutionCache.gs |
+| invalidateUserCache | ✅ 統一完了 | cache.gs (CacheManager) |
+| clearAllExecutionCache | ✅ 統一完了 | unifiedExecutionCache.gs |
 
 ## セットアップ
 
