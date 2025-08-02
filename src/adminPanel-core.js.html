@@ -1118,7 +1118,7 @@ function safeCall(functionName, ...args) {
 const deferredCalls = [];
 
 // 関数が利用可能になるまで待機
-function waitForFunction(functionName, maxRetries = 50, interval = 100) {
+function waitForFunction(functionName, maxRetries = 100, interval = 200) {
   return new Promise((resolve, reject) => {
     let retries = 0;
     
@@ -1179,7 +1179,7 @@ const deferredCallsProcessor = setInterval(() => {
   if (Date.now() - window.adminPanelStartTime > 300000) {
     clearInterval(deferredCallsProcessor);
   }
-}, 200);
+}, 300);
 
 // 初期化完了フラグとチェッカー
 window.adminPanelStartTime = Date.now();
