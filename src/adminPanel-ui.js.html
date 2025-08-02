@@ -402,76 +402,12 @@ function generateUrlCacheKey(status, userId) {
  * @returns {string} 本番環境URL
  */
 function convertDevUrlToProductionUrl(devUrl) {
-  try {
-    console.log('🔧 開発環境URL変換開始:', devUrl);
-    
-    // 現在のページURLから正しいスクリプトIDを取得を試行
-    const currentUrl = window.location.href;
-    console.log('🔍 現在のURL:', currentUrl);
-    
-    // 🎯 方法1: 現在のURLが既に適切なscript.google.com形式の場合
-    if (currentUrl.includes('script.google.com')) {
-      const scriptMatch = currentUrl.match(/\/s\/([A-Za-z0-9_-]+)\//);
-      if (scriptMatch && scriptMatch[1]) {
-        const scriptId = scriptMatch[1];
-        const productionUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
-        console.log('✅ スクリプトIDから本番URL生成:', productionUrl);
-        return productionUrl;
-      }
-    }
-    
-    // 🎯 方法2: /exec が含まれる場合、そのまま使用（最も確実）
-    if (currentUrl.includes('/exec')) {
-      const execIndex = currentUrl.indexOf('/exec');
-      const productionUrl = currentUrl.substring(0, execIndex + 5);
-      console.log('✅ 現在URLから本番URL抽出:', productionUrl);
-      return productionUrl;
-    }
-    
-    // 🎯 方法3: GoogleAppsScriptの開発環境URLパターンを解析
-    // 開発URLの例: https://n-xxx-script.googleusercontent.com/userCodeAppPanel
-    if (devUrl.includes('googleusercontent.com') && devUrl.includes('script')) {
-      // userCodeAppPanel を /exec に置換して開発環境のまま使用
-      // （注意: これは開発環境でのみ動作します）
-      let convertedUrl = devUrl.replace('/userCodeAppPanel', '/exec');
-      console.log('🔧 開発環境URL調整:', convertedUrl);
-      return convertedUrl;
-    }
-    
-    // 🎯 方法4: 最終フォールバック - 現在のURLを基準に構築
-    if (window.location.origin && window.location.pathname) {
-      // パスに /exec が含まれていない場合でも、適切なベースURLを構築
-      let fallbackUrl = window.location.origin + window.location.pathname;
-      
-      // パスが /exec で終わっていない場合は追加
-      if (!fallbackUrl.endsWith('/exec')) {
-        // userCodeAppPanel があれば exec に置換
-        if (fallbackUrl.includes('userCodeAppPanel')) {
-          fallbackUrl = fallbackUrl.replace('userCodeAppPanel', 'exec');
-        } else {
-          // パスの最後に /exec を追加
-          fallbackUrl = fallbackUrl.replace(/\/?$/, '/exec');
-        }
-      }
-      
-      console.log('🔧 フォールバック本番URL:', fallbackUrl);
-      return fallbackUrl;
-    }
-    
-    // 🎯 方法5: 開発環境URLをそのまま調整して使用
-    if (devUrl.includes('userCodeAppPanel')) {
-      const adjustedUrl = devUrl.replace('userCodeAppPanel', 'exec');
-      console.log('🔧 開発URLを調整:', adjustedUrl);
-      return adjustedUrl;
-    }
-    
-    console.warn('⚠️ 本番URL変換に失敗、元のURLを返します');
-    return devUrl;
-    
-  } catch (error) {
-    console.error('❌ URL変換エラー:', error);
-    return devUrl; // エラー時は元のURLを返す
+  // Simplistic conversion: replace 'userCodeAppPanel' with 'exec' if present
+  if (devUrl.includes('userCodeAppPanel')) {
+    return devUrl.replace('userCodeAppPanel', 'exec');
   }
+  // Otherwise, return the original URL
+  return devUrl;
 }
 
 // =============================================================================
