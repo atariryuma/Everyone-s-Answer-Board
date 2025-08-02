@@ -1971,6 +1971,52 @@ function renderMinimalUnpublishedPage(userInfo) {
   }
 }
 
+/**
+ * Updates the webAppUrl for the current user in the database.
+ * This function should be called after a new deployment to ensure the correct production URL is stored.
+ * @returns {Object} Status of the update operation.
+ */
+function updateUserWebAppUrlInDb() {
+  try {
+    const userEmail = getCurrentUserEmail();
+    if (!userEmail) {
+      throw new Error('Current user email not found.');
+    }
+
+    const userInfo = findUserByEmail(userEmail);
+    if (!userInfo) {
+      throw new Error('User information not found for email: ' + userEmail);
+    }
+
+    const currentCorrectWebAppUrl = getWebAppUrlCached(); // This should now return the script.google.com URL
+    if (!currentCorrectWebAppUrl) {
+      throw new Error('Could not determine the correct Web App URL.');
+    }
+
+    if (userInfo.webAppUrl === currentCorrectWebAppUrl) {
+      infoLog('✅ WebAppUrl in DB is already correct:', currentCorrectWebAppUrl);
+      return { status: 'success', message: 'Web App URL is already up to date in the database.' };
+    }
+
+    // Update the webAppUrl in the userInfo object
+    userInfo.webAppUrl = currentCorrectWebAppUrl;
+
+    // Save the updated userInfo back to the database
+    const updateResult = updateUser(userInfo.userId, { webAppUrl: currentCorrectWebAppUrl });
+
+    if (updateResult.status === 'success') {
+      infoLog('✅ Successfully updated WebAppUrl in DB for user:', userEmail, 'New URL:', currentCorrectWebAppUrl);
+      return { status: 'success', message: 'Web App URL updated successfully in the database.' };
+    } else {
+      throw new Error('Failed to update user in database: ' + updateResult.message);
+    }
+
+  } catch (e) {
+    errorLog('❌ Error updating WebAppUrl in DB:', e.message);
+    return { status: 'error', message: 'Error updating Web App URL in database: ' + e.message };
+  }
+}
+
 function renderAnswerBoard(userInfo, params) {
   try {
     const config = parseAndNormalizeConfigJson(userInfo.configJson);
