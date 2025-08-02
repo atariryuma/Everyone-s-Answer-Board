@@ -9,21 +9,93 @@ let lastSelectedSheetName = null; // To prevent redundant sheet selection change
 let isUIUpdateInProgress = false;
 let pendingUIUpdate = null;
 
-// 🎯 UI更新バッチングシステム
+// 🎯 UI更新バッチングシステム（最適化版）
 const uiUpdateBatching = {
   pendingUpdates: new Map(),
   batchTimer: null,
   lastBatchTime: 0,
-  batchInterval: 100, // 100ms batching window
+  batchInterval: 80, // ✅ 80msに短縮（応答性向上）
   
   // バッチング状態の管理
   completedOperations: new Set(),
   
-  // DOM操作の結果キャッシュ
+  // DOM操作の結果キャッシュ（強化版）
   domCache: new Map(),
+  cacheTimeouts: new Map(), // TTL管理用
+  maxCacheSize: 50, // キャッシュサイズ制限
+  defaultCacheTTL: 15000, // 15秒のデフォルトTTL
   
   // 最後の更新内容
-  lastUpdateData: null
+  lastUpdateData: null,
+  
+  // パフォーマンス監視
+  updateCount: 0,
+  skippedUpdates: 0,
+  totalUpdateTime: 0,
+  
+  // メモリリーク防止機能
+  lastCleanupTime: Date.now(),
+  cleanupInterval: 20000, // 20秒ごとにクリーンアップ
+  
+  // DOM操作最適化設定
+  useRequestIdleCallback: typeof requestIdleCallback !== 'undefined',
+  prioritizedOperations: ['static', 'dynamic'], // 高優先度の操作
+  deferredOperations: ['footer', 'indicators'], // 遅延可能な操作
+  
+  // 自動クリーンアップ機能
+  performCleanup() {
+    const now = Date.now();
+    if (now - this.lastCleanupTime > this.cleanupInterval) {
+      // 期限切れキャッシュエントリの削除
+      let cleanedCount = 0;
+      for (const [key, timeoutId] of this.cacheTimeouts) {
+        if (now > timeoutId) {
+          this.domCache.delete(key);
+          this.cacheTimeouts.delete(key);
+          cleanedCount++;
+        }
+      }
+      
+      // キャッシュサイズ制限の適用
+      if (this.domCache.size > this.maxCacheSize) {
+        const keysToDelete = Array.from(this.domCache.keys()).slice(0, this.domCache.size - this.maxCacheSize);
+        keysToDelete.forEach(key => {
+          this.domCache.delete(key);
+          this.cacheTimeouts.delete(key);
+        });
+        cleanedCount += keysToDelete.length;
+      }
+      
+      // 完了操作セットのクリア
+      this.completedOperations.clear();
+      
+      this.lastCleanupTime = now;
+      if (cleanedCount > 0) {
+        console.log(`🧹 UI更新バッチング: ${cleanedCount}件のキャッシュエントリをクリーンアップ`);
+      }
+    }
+  },
+  
+  // DOM操作結果のキャッシュ（TTL付き）
+  cacheResult(key, value, ttl = this.defaultCacheTTL) {
+    this.domCache.set(key, value);
+    this.cacheTimeouts.set(key, Date.now() + ttl);
+  },
+  
+  // キャッシュされた結果の取得
+  getCachedResult(key) {
+    if (this.domCache.has(key)) {
+      const expiry = this.cacheTimeouts.get(key);
+      if (expiry && Date.now() < expiry) {
+        return this.domCache.get(key);
+      } else {
+        // 期限切れエントリの削除
+        this.domCache.delete(key);
+        this.cacheTimeouts.delete(key);
+      }
+    }
+    return null;
+  }
 };
 
 /**
@@ -125,7 +197,11 @@ function generateStatusHash(status) {
  * @param {Object} status - ステータスデータ
  */
 function performOptimizedUIUpdate(status) {
+  const startTime = performance.now();
   console.log('🔧 最適化UI更新開始');
+  
+  // 自動クリーンアップを実行
+  uiUpdateBatching.performCleanup();
   
   // DOM操作を最小限に抑制する最適化された更新
   const updateOperations = new Map();
@@ -133,32 +209,96 @@ function performOptimizedUIUpdate(status) {
   // 1. データ準備（1回のみ）
   const preparedStatus = prepareStatusData(status);
   
-  // 2. DOM更新操作をバッチ化
+  // 2. DOM更新操作をバッチ化（優先度付き）
   updateOperations.set('static', () => updateStaticUIOptimized(preparedStatus));
   updateOperations.set('dynamic', () => updateDynamicContentOptimized(preparedStatus));
   updateOperations.set('footer', () => updateFooterAndGuidanceOptimized(preparedStatus));
   updateOperations.set('indicators', () => updateStepIndicatorsOptimized(preparedStatus));
   
-  // 3. DOM操作を効率的に実行
+  // 3. 優先度に基づいて段階的に実行
   requestAnimationFrame(() => {
-    for (const [operationType, operation] of updateOperations) {
-      try {
-        // 重複実行チェック
-        const operationKey = `${operationType}_${uiUpdateBatching.lastBatchTime}`;
-        if (!uiUpdateBatching.completedOperations.has(operationKey)) {
-          operation();
-          uiUpdateBatching.completedOperations.add(operationKey);
-        }
-      } catch (error) {
-        console.error(`❌ UI更新エラー (${operationType}):`, error);
+    // 高優先度操作を最初に実行
+    for (const operationType of uiUpdateBatching.prioritizedOperations) {
+      if (updateOperations.has(operationType)) {
+        executeUIOperation(operationType, updateOperations.get(operationType));
+        updateOperations.delete(operationType);
       }
     }
     
-    // 完了操作のクリーンアップ（メモリリーク防止）
-    setTimeout(() => {
-      uiUpdateBatching.completedOperations.clear();
-    }, 5000);
+    // 遅延可能な操作は次のフレームで実行
+    if (updateOperations.size > 0) {
+      if (uiUpdateBatching.useRequestIdleCallback) {
+        // requestIdleCallbackが利用可能な場合はアイドル時に実行
+        requestIdleCallback(() => {
+          for (const [operationType, operation] of updateOperations) {
+            executeUIOperation(operationType, operation);
+          }
+          logUpdatePerformance(startTime);
+        });
+      } else {
+        // フォールバック: 次のanimationFrameで実行
+        requestAnimationFrame(() => {
+          for (const [operationType, operation] of updateOperations) {
+            executeUIOperation(operationType, operation);
+          }
+          logUpdatePerformance(startTime);
+        });
+      }
+    } else {
+      logUpdatePerformance(startTime);
+    }
   });
+}
+
+/**
+ * UI操作の実行（エラーハンドリング付き）
+ * @param {string} operationType - 操作タイプ
+ * @param {Function} operation - 実行する操作
+ */
+function executeUIOperation(operationType, operation) {
+  try {
+    // 重複実行チェック
+    const operationKey = `${operationType}_${uiUpdateBatching.lastBatchTime}`;
+    if (!uiUpdateBatching.completedOperations.has(operationKey)) {
+      const operationStart = performance.now();
+      operation();
+      const operationTime = performance.now() - operationStart;
+      
+      uiUpdateBatching.completedOperations.add(operationKey);
+      
+      // 長時間の操作を警告
+      if (operationTime > 10) {
+        console.warn(`⚠️ UI操作 "${operationType}" が ${operationTime.toFixed(1)}ms かかりました`);
+      }
+    }
+  } catch (error) {
+    console.error(`❌ UI更新エラー (${operationType}):`, error);
+  }
+}
+
+/**
+ * 更新パフォーマンスのログ出力
+ * @param {number} startTime - 開始時間
+ */
+function logUpdatePerformance(startTime) {
+  const totalTime = performance.now() - startTime;
+  uiUpdateBatching.updateCount++;
+  uiUpdateBatching.totalUpdateTime += totalTime;
+  
+  const avgTime = uiUpdateBatching.totalUpdateTime / uiUpdateBatching.updateCount;
+  
+  console.log(`✅ 最適化UI更新完了 (${totalTime.toFixed(1)}ms, 平均: ${avgTime.toFixed(1)}ms)`);
+  
+  // 統計を定期的にログ出力
+  if (uiUpdateBatching.updateCount % 10 === 0) {
+    console.log('📊 UI更新統計:', {
+      totalUpdates: uiUpdateBatching.updateCount,
+      skippedUpdates: uiUpdateBatching.skippedUpdates,
+      averageTime: `${avgTime.toFixed(1)}ms`,
+      cacheSize: uiUpdateBatching.domCache.size,
+      efficiency: `${Math.round((uiUpdateBatching.skippedUpdates / uiUpdateBatching.updateCount) * 100)}%キャッシュヒット`
+    });
+  }
 }
 
 /**
@@ -166,11 +306,13 @@ function performOptimizedUIUpdate(status) {
  * @param {Object} status - ステータスデータ
  */
 function updateFooterAndGuidanceOptimized(status) {
-  const cacheKey = `footer_${status.setupStep}_${status.activeSheetName || 'none'}`;
+  const cacheKey = `footer_${status.setupStep}_${status.activeSheetName || 'none'}_${status.config?.appPublished || false}`;
   
-  // DOM操作結果のキャッシュチェック
-  if (uiUpdateBatching.domCache.has(cacheKey)) {
+  // キャッシュされた結果をチェック
+  const cachedResult = uiUpdateBatching.getCachedResult(cacheKey);
+  if (cachedResult) {
     console.log('🎯 フッター更新: DOMキャッシュヒット');
+    uiUpdateBatching.skippedUpdates++;
     return;
   }
   
@@ -184,18 +326,27 @@ function updateFooterAndGuidanceOptimized(status) {
     return;
   }
   
-  // 実際のフッター更新ロジック（元の関数から）
-  updateFooterAndGuidance(status);
-  
-  // DOM操作結果をキャッシュ
-  uiUpdateBatching.domCache.set(cacheKey, true);
-  
-  // キャッシュのTTLを設定（10秒）
-  setTimeout(() => {
-    uiUpdateBatching.domCache.delete(cacheKey);
-  }, 10000);
-  
-  console.log('✅ 最適化フッター更新完了');
+  try {
+    // 実際のフッター更新ロジック（元の関数から）
+    if (typeof updateFooterAndGuidance === 'function') {
+      updateFooterAndGuidance(status);
+    } else {
+      console.warn('⚠️ updateFooterAndGuidance function not found');
+      return;
+    }
+    
+    // DOM操作結果をキャッシュ（TTL付き）
+    uiUpdateBatching.cacheResult(cacheKey, {
+      setupStep: status.setupStep,
+      activeSheetName: status.activeSheetName,
+      appPublished: status.config?.appPublished,
+      timestamp: Date.now()
+    }, 12000); // 12秒のTTL
+    
+    console.log('✅ 最適化フッター更新完了');
+  } catch (error) {
+    console.error('❌ フッター更新エラー:', error);
+  }
 }
 
 /**

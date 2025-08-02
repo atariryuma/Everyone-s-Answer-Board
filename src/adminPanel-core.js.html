@@ -37,59 +37,460 @@ if (typeof window.toggleSection === 'undefined') {
 console.log('✅ Function stubs initialized to prevent undefined errors');
 
 // =============================================================================
-// LOGGING UTILITIES - Standardized logging with levels
+// UNIFIED ERROR HANDLING AND LOGGING SYSTEM - Enhanced Version
 // =============================================================================
 
-// Simple logging utility with conditional output based on DEBUG mode
-const DEBUG_MODE = window.DEBUG_MODE || false;
+// 統一エラー処理システム（強化版）
+const UnifiedErrorHandler = {
+  // エラー分類定数
+  ErrorTypes: {
+    CRITICAL: 'critical',      // システム全体に影響する重大エラー
+    HIGH: 'high',             // 機能に重大な影響があるエラー
+    MEDIUM: 'medium',         // 部分的な機能障害
+    LOW: 'low',               // 軽微なエラーや警告
+    DEBUG: 'debug'            // デバッグ情報
+  },
+  
+  ErrorCategories: {
+    URL_GENERATION: 'url_generation',
+    API_COMMUNICATION: 'api_communication',
+    UI_UPDATE: 'ui_update',
+    DATA_VALIDATION: 'data_validation',
+    CACHE_OPERATION: 'cache_operation',
+    USER_ACTION: 'user_action',
+    SYSTEM_INITIALIZATION: 'system_initialization'
+  },
+  
+  // エラー統計
+  errorStats: {
+    total: 0,
+    byType: {},
+    byCategory: {},
+    recentErrors: [], // 最新10件のエラー
+    maxRecentErrors: 10
+  },
+  
+  // 設定
+  debugMode: window.DEBUG_MODE || false,
+  suppressedPatterns: [
+    'document.write',
+    'Failed to execute \'write\'',
+    'mae_html_user_bin_i18n',
+    'warden_bin_i18n',
+    'unrecognized feature',
+    'Tailwind CLI'
+  ],
+  
+  /**
+   * 統一エラーログ機能
+   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
+   * @param {string} type - エラータイプ
+   * @param {string} category - エラーカテゴリ
+   * @param {Object} context - 追加コンテキスト情報
+   */
+  logError(error, type = this.ErrorTypes.MEDIUM, category = this.ErrorCategories.SYSTEM_INITIALIZATION, context = {}) {
+    const errorMessage = error?.message || error?.toString() || String(error);
+    
+    // 抑制パターンのチェック
+    if (this.shouldSuppressError(errorMessage)) {
+      if (this.debugMode) {
+        console.debug('🔇 Suppressed error:', errorMessage);
+      }
+      return;
+    }
+    
+    // エラー情報を構築
+    const errorInfo = {
+      timestamp: new Date().toISOString(),
+      message: errorMessage,
+      type: type,
+      category: category,
+      context: context,
+      stack: error?.stack || null,
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    
+    // 統計を更新
+    this.updateErrorStats(errorInfo);
+    
+    // エラーレベルに応じたログ出力
+    this.outputError(errorInfo);
+    
+    // 重要なエラーの場合は追加処理
+    if (type === this.ErrorTypes.CRITICAL || type === this.ErrorTypes.HIGH) {
+      this.handleCriticalError(errorInfo);
+    }
+    
+    return errorInfo;
+  },
+  
+  /**
+   * エラー抑制チェック
+   * @param {string} message - エラーメッセージ
+   * @returns {boolean} 抑制すべきかどうか
+   */
+  shouldSuppressError(message) {
+    return this.suppressedPatterns.some(pattern => 
+      message && message.includes(pattern)
+    );
+  },
+  
+  /**
+   * エラー統計の更新
+   * @param {Object} errorInfo - エラー情報
+   */
+  updateErrorStats(errorInfo) {
+    this.errorStats.total++;
+    
+    // タイプ別統計
+    if (!this.errorStats.byType[errorInfo.type]) {
+      this.errorStats.byType[errorInfo.type] = 0;
+    }
+    this.errorStats.byType[errorInfo.type]++;
+    
+    // カテゴリ別統計
+    if (!this.errorStats.byCategory[errorInfo.category]) {
+      this.errorStats.byCategory[errorInfo.category] = 0;
+    }
+    this.errorStats.byCategory[errorInfo.category]++;
+    
+    // 最近のエラーを記録
+    this.errorStats.recentErrors.push({
+      timestamp: errorInfo.timestamp,
+      message: errorInfo.message.substring(0, 100), // 最初の100文字
+      type: errorInfo.type,
+      category: errorInfo.category
+    });
+    
+    // 最大数を超えた場合は古いものを削除
+    if (this.errorStats.recentErrors.length > this.maxRecentErrors) {
+      this.errorStats.recentErrors.shift();
+    }
+  },
+  
+  /**
+   * エラーのログ出力
+   * @param {Object} errorInfo - エラー情報
+   */
+  outputError(errorInfo) {
+    const prefix = `[AdminPanel:${errorInfo.type.toUpperCase()}:${errorInfo.category}]`;
+    const logMessage = `${errorInfo.message}`;
+    
+    switch (errorInfo.type) {
+      case this.ErrorTypes.CRITICAL:
+        console.error(`🚨 ${prefix}`, logMessage, errorInfo.context);
+        break;
+      case this.ErrorTypes.HIGH:
+        console.error(`❌ ${prefix}`, logMessage, errorInfo.context);
+        break;
+      case this.ErrorTypes.MEDIUM:
+        console.warn(`⚠️ ${prefix}`, logMessage, errorInfo.context);
+        break;
+      case this.ErrorTypes.LOW:
+        console.warn(`ℹ️ ${prefix}`, logMessage);
+        break;
+      case this.ErrorTypes.DEBUG:
+        if (this.debugMode) {
+          console.log(`🔍 ${prefix}`, logMessage, errorInfo.context);
+        }
+        break;
+      default:
+        console.log(`📝 ${prefix}`, logMessage);
+    }
+  },
+  
+  /**
+   * 重要なエラーの追加処理
+   * @param {Object} errorInfo - エラー情報
+   */
+  handleCriticalError(errorInfo) {
+    // 重要なエラーの場合は詳細な情報をログ出力
+    console.group(`🚨 重要なエラーの詳細: ${errorInfo.category}`);
+    console.log('タイムスタンプ:', errorInfo.timestamp);
+    console.log('メッセージ:', errorInfo.message);
+    console.log('コンテキスト:', errorInfo.context);
+    if (errorInfo.stack) {
+      console.log('スタックトレース:', errorInfo.stack);
+    }
+    console.log('統計情報:', this.getErrorStats());
+    console.groupEnd();
+    
+    // TODO: 将来的にはサーバーサイドへの重要エラー報告機能を追加
+  },
+  
+  /**
+   * エラー統計の取得
+   * @returns {Object} エラー統計情報
+   */
+  getErrorStats() {
+    return {
+      ...this.errorStats,
+      categories: Object.keys(this.ErrorCategories),
+      types: Object.keys(this.ErrorTypes)
+    };
+  }
+};
+
+// グローバルに公開
+window.UnifiedErrorHandler = UnifiedErrorHandler;
+
+// 従来のログ関数を統一エラーハンドラーに統合
+const DEBUG_MODE = UnifiedErrorHandler.debugMode;
 
 function adminLog(level, ...args) {
-  if (!DEBUG_MODE) return;
+  const message = args.join(' ');
+  const context = { originalArgs: args };
   
   switch (level) {
     case 'error':
-      console.error('[AdminPanel]', ...args);
+      UnifiedErrorHandler.logError(message, UnifiedErrorHandler.ErrorTypes.HIGH, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, context);
       break;
     case 'warn':
-      console.warn('[AdminPanel]', ...args);
+      UnifiedErrorHandler.logError(message, UnifiedErrorHandler.ErrorTypes.MEDIUM, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, context);
       break;
     case 'info':
-      console.log('[AdminPanel]', ...args);
+      if (DEBUG_MODE) console.log('[AdminPanel:INFO]', ...args);
       break;
     case 'debug':
-      if (DEBUG_MODE) console.log('[AdminPanel:DEBUG]', ...args);
+      UnifiedErrorHandler.logError(message, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, context);
       break;
     default:
-      console.log('[AdminPanel]', ...args);
+      if (DEBUG_MODE) console.log('[AdminPanel]', ...args);
   }
 }
 
-// Convenience functions for different log levels
-function logError(...args) { adminLog('error', ...args); }
-function logWarn(...args) { adminLog('warn', ...args); }
-function logInfo(...args) { adminLog('info', ...args); }
-function logDebug(...args) { adminLog('debug', ...args); }
+// 便利な関数群（統一エラーハンドラーを使用）
+function logError(message, category = UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, context = {}) {
+  return UnifiedErrorHandler.logError(message, UnifiedErrorHandler.ErrorTypes.HIGH, category, context);
+}
+
+function logWarn(message, category = UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, context = {}) {
+  return UnifiedErrorHandler.logError(message, UnifiedErrorHandler.ErrorTypes.MEDIUM, category, context);
+}
+
+function logInfo(...args) { 
+  if (DEBUG_MODE) console.log('[AdminPanel:INFO]', ...args);
+}
+
+function logDebug(message, context = {}) {
+  return UnifiedErrorHandler.logError(message, UnifiedErrorHandler.ErrorTypes.DEBUG, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION, context);
+}
 
 // =============================================================================
-// HTML ESCAPING UTILITIES
+// SHARED UTILITIES AND CODE QUALITY IMPROVEMENTS
 // =============================================================================
 
-// Safe HTML escaping function
+/**
+ * 統一ユーティリティクラス（コード品質向上とメンテナンス性改善）
+ */
+const AdminPanelUtilities = {
+  // =============================================================================
+  // HTML ESCAPING AND SANITIZATION
+  // =============================================================================
+  
+  /**
+   * 安全なHTMLエスケープ機能（XSS対策）
+   * @param {*} text - エスケープするテキスト
+   * @returns {string} エスケープされたHTML
+   */
+  escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  },
+  
+  /**
+   * オブジェクトの安全な検証
+   * @param {*} obj - 検証するオブジェクト
+   * @returns {boolean} 有効なオブジェクトかどうか
+   */
+  isValidObject(obj) {
+    return obj && typeof obj === 'object' && !Array.isArray(obj) && obj.constructor === Object;
+  },
+  
+  /**
+   * 配列の安全な検証
+   * @param {*} arr - 検証する配列
+   * @returns {boolean} 有効な配列かどうか
+   */
+  isValidArray(arr) {
+    return Array.isArray(arr);
+  },
+  
+  /**
+   * 文字列の安全な検証
+   * @param {*} str - 検証する文字列
+   * @param {number} minLength - 最小文字数（オプション）
+   * @returns {boolean} 有効な文字列かどうか
+   */
+  isValidString(str, minLength = 0) {
+    return typeof str === 'string' && str.length >= minLength;
+  },
+  
+  // =============================================================================
+  // PERFORMANCE MONITORING
+  // =============================================================================
+  
+  /**
+   * パフォーマンス監視システム
+   */
+  PerformanceMonitor: {
+    operations: new Map(),
+    thresholds: {
+      warning: 100,  // 100ms以上で警告
+      critical: 500  // 500ms以上で重要警告
+    },
+    
+    /**
+     * 操作の開始を記録
+     * @param {string} operationId - 操作ID
+     * @param {string} description - 操作の説明
+     */
+    start(operationId, description = '') {
+      this.operations.set(operationId, {
+        startTime: performance.now(),
+        description: description,
+        endTime: null,
+        duration: null
+      });
+    },
+    
+    /**
+     * 操作の終了を記録
+     * @param {string} operationId - 操作ID
+     * @returns {number} 実行時間（ミリ秒）
+     */
+    end(operationId) {
+      const operation = this.operations.get(operationId);
+      if (!operation) {
+        console.warn(`⚠️ Unknown operation ID: ${operationId}`);
+        return 0;
+      }
+      
+      operation.endTime = performance.now();
+      operation.duration = operation.endTime - operation.startTime;
+      
+      // パフォーマンス警告の出力
+      if (operation.duration > this.thresholds.critical) {
+        console.error(`🚨 Critical performance issue: ${operationId} took ${operation.duration.toFixed(1)}ms`);
+      } else if (operation.duration > this.thresholds.warning) {
+        console.warn(`⚠️ Performance warning: ${operationId} took ${operation.duration.toFixed(1)}ms`);
+      }
+      
+      return operation.duration;
+    },
+    
+    /**
+     * 統計情報の取得
+     * @returns {Object} パフォーマンス統計
+     */
+    getStats() {
+      const completedOps = Array.from(this.operations.values()).filter(op => op.duration !== null);
+      if (completedOps.length === 0) {
+        return { totalOperations: 0, averageDuration: 0, slowOperations: 0 };
+      }
+      
+      const totalDuration = completedOps.reduce((sum, op) => sum + op.duration, 0);
+      const slowOps = completedOps.filter(op => op.duration > this.thresholds.warning).length;
+      
+      return {
+        totalOperations: completedOps.length,
+        averageDuration: totalDuration / completedOps.length,
+        slowOperations: slowOps,
+        slowOperationPercentage: (slowOps / completedOps.length) * 100
+      };
+    }
+  },
+  
+  // =============================================================================
+  // DEBUGGING AND DIAGNOSTICS
+  // =============================================================================
+  
+  /**
+   * デバッグ・診断システム
+   */
+  Diagnostics: {
+    /**
+     * システム状態の包括的診断
+     * @returns {Object} 診断結果
+     */
+    runSystemDiagnostics() {
+      const diagnostics = {
+        timestamp: new Date().toISOString(),
+        browser: this.getBrowserInfo(),
+        performance: AdminPanelUtilities.PerformanceMonitor.getStats(),
+        errors: window.UnifiedErrorHandler ? window.UnifiedErrorHandler.getErrorStats() : null,
+        loadingState: window.UnifiedLoadingManager ? window.UnifiedLoadingManager.getStats() : null,
+        uiState: window.uiUpdateBatching ? {
+          updateCount: window.uiUpdateBatching.updateCount,
+          skippedUpdates: window.uiUpdateBatching.skippedUpdates,
+          cacheSize: window.uiUpdateBatching.domCache.size
+        } : null,
+        memoryUsage: this.getMemoryUsage()
+      };
+      
+      console.group('🔍 システム診断結果');
+      console.log('診断時刻:', diagnostics.timestamp);
+      console.log('ブラウザ情報:', diagnostics.browser);
+      console.log('パフォーマンス:', diagnostics.performance);
+      console.log('エラー統計:', diagnostics.errors);
+      console.log('ローディング状態:', diagnostics.loadingState);
+      console.log('UI更新統計:', diagnostics.uiState);
+      console.log('メモリ使用量:', diagnostics.memoryUsage);
+      console.groupEnd();
+      
+      return diagnostics;
+    },
+    
+    /**
+     * ブラウザ情報の取得
+     * @returns {Object} ブラウザ情報
+     */
+    getBrowserInfo() {
+      return {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        cookieEnabled: navigator.cookieEnabled,
+        onLine: navigator.onLine,
+        screenResolution: `${screen.width}x${screen.height}`,
+        viewportSize: `${window.innerWidth}x${window.innerHeight}`
+      };
+    },
+    
+    /**
+     * メモリ使用量の取得（利用可能な場合）
+     * @returns {Object|null} メモリ使用量情報
+     */
+    getMemoryUsage() {
+      if (performance.memory) {
+        return {
+          usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + ' MB',
+          totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + ' MB',
+          jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + ' MB'
+        };
+      }
+      return null;
+    }
+  }
+};
+
+// グローバルに公開
+window.AdminPanelUtilities = AdminPanelUtilities;
+
+// 従来の関数（後方互換性）
 function escapeHtml(text) {
-  if (text == null) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  return AdminPanelUtilities.escapeHtml(text);
 }
 
-// Safe validation for objects
 function isValidObject(obj) {
-  return obj && typeof obj === 'object' && !Array.isArray(obj);
+  return AdminPanelUtilities.isValidObject(obj);
 }
 
-// Safe array validation
 function isValidArray(arr) {
-  return Array.isArray(arr);
+  return AdminPanelUtilities.isValidArray(arr);
 }
 
 // =============================================================================
@@ -406,31 +807,341 @@ setInterval(cleanupProcessingCache, 300000);
 // =============================================================================
 
 /**
- * Global loading overlay state management
+ * 統一ローディング状態管理システム（競合状態解決機能付き）
  */
-const globalLoadingState = {
+const UnifiedLoadingManager = {
+  // 状態管理
   isActive: false,
-  activeOperations: new Set(),
+  activeOperations: new Map(), // オペレーションIDと詳細情報のマップ
   overlayElement: null,
   progressElement: null,
   messageElement: null,
   currentMessage: '',
   startTime: null,
-  progressUpdateTimer: null
+  progressUpdateTimer: null,
+  
+  // 競合状態解決のための設定
+  operationPriority: {
+    critical: 1000,
+    high: 500,
+    medium: 100,
+    low: 10
+  },
+  
+  // 統計とパフォーマンス監視
+  stats: {
+    totalOperations: 0,
+    concurrentOperations: 0,
+    maxConcurrentOperations: 0,
+    averageDisplayTime: 0,
+    lastOperationTimes: [] // 最新10件の表示時間
+  },
+  
+  // メモリリーク防止
+  maxOperationHistory: 10,
+  cleanupInterval: 30000, // 30秒
+  lastCleanupTime: Date.now(),
+  
+  /**
+   * ローディング表示の開始（競合状態対応）
+   * @param {string} operationId - オペレーションID
+   * @param {string} message - 表示メッセージ
+   * @param {Object} options - オプション
+   */
+  show(operationId, message = '処理中...', options = {}) {
+    const priority = options.priority || 'medium';
+    const startTime = Date.now();
+    
+    console.log(`🔄 統一ローディング開始: ${operationId} (優先度: ${priority})`);
+    
+    // オペレーション情報を記録
+    const operationInfo = {
+      id: operationId,
+      message: message,
+      priority: this.operationPriority[priority] || this.operationPriority.medium,
+      startTime: startTime,
+      options: options
+    };
+    
+    this.activeOperations.set(operationId, operationInfo);
+    
+    // 統計更新
+    this.stats.totalOperations++;
+    this.stats.concurrentOperations = this.activeOperations.size;
+    if (this.stats.concurrentOperations > this.stats.maxConcurrentOperations) {
+      this.stats.maxConcurrentOperations = this.stats.concurrentOperations;
+    }
+    
+    // 最優先のオペレーションを決定
+    const highestPriorityOperation = this.getHighestPriorityOperation();
+    
+    // 表示メッセージを更新（最優先オペレーションの場合のみ）
+    if (highestPriorityOperation && highestPriorityOperation.id === operationId) {
+      this.updateDisplayedMessage(message);
+    }
+    
+    // オーバーレイを表示
+    this.showOverlay();
+    
+    // 進捗追跡開始
+    if (options.showProgress !== false) {
+      this.startProgressTracking();
+    }
+    
+    this.isActive = true;
+  },
+  
+  /**
+   * ローディング表示の終了
+   * @param {string} operationId - オペレーションID
+   * @param {string} finalMessage - 最終メッセージ
+   */
+  hide(operationId, finalMessage = null) {
+    if (!this.activeOperations.has(operationId)) {
+      console.warn(`⚠️ Unknown operation ID for hide: ${operationId}`);
+      return;
+    }
+    
+    const operation = this.activeOperations.get(operationId);
+    const displayTime = Date.now() - operation.startTime;
+    
+    console.log(`✅ 統一ローディング終了: ${operationId} (${displayTime}ms)`);
+    
+    // 統計更新
+    this.updateDisplayTimeStats(displayTime);
+    
+    // オペレーションを削除
+    this.activeOperations.delete(operationId);
+    this.stats.concurrentOperations = this.activeOperations.size;
+    
+    // 他のアクティブなオペレーションがある場合
+    if (this.activeOperations.size > 0) {
+      const nextOperation = this.getHighestPriorityOperation();
+      if (nextOperation) {
+        this.updateDisplayedMessage(nextOperation.message);
+        console.log(`🔄 ローディング表示継続: ${nextOperation.id} (残り${this.activeOperations.size}件)`);
+      }
+    } else {
+      // 全てのオペレーションが完了
+      if (finalMessage) {
+        this.updateDisplayedMessage(finalMessage);
+        setTimeout(() => this.hideOverlay(), 800);
+      } else {
+        this.hideOverlay();
+      }
+    }
+  },
+  
+  /**
+   * 最優先のオペレーションを取得
+   * @returns {Object|null} 最優先のオペレーション情報
+   */
+  getHighestPriorityOperation() {
+    let highest = null;
+    for (const operation of this.activeOperations.values()) {
+      if (!highest || operation.priority > highest.priority) {
+        highest = operation;
+      }
+    }
+    return highest;
+  },
+  
+  /**
+   * 表示時間統計の更新
+   * @param {number} displayTime - 表示時間（ミリ秒）
+   */
+  updateDisplayTimeStats(displayTime) {
+    this.stats.lastOperationTimes.push(displayTime);
+    if (this.stats.lastOperationTimes.length > this.maxOperationHistory) {
+      this.stats.lastOperationTimes.shift();
+    }
+    
+    // 平均表示時間を計算
+    this.stats.averageDisplayTime = this.stats.lastOperationTimes.reduce((a, b) => a + b, 0) / this.stats.lastOperationTimes.length;
+  },
+  
+  /**
+   * メッセージ表示の更新
+   * @param {string} message - 新しいメッセージ
+   */
+  updateDisplayedMessage(message) {
+    this.currentMessage = message;
+    if (this.messageElement) {
+      this.messageElement.textContent = message;
+    }
+    console.log(`💬 Loading message updated: ${message}`);
+  },
+  
+  /**
+   * オーバーレイの表示
+   */
+  showOverlay() {
+    // オーバーレイが存在しない場合は作成
+    if (!this.overlayElement) {
+      this.createOverlay();
+    }
+    
+    if (this.overlayElement && this.overlayElement.style.display !== 'flex') {
+      this.overlayElement.style.display = 'flex';
+      this.startTime = Date.now();
+    }
+  },
+  
+  /**
+   * オーバーレイの非表示
+   */
+  hideOverlay() {
+    if (this.overlayElement) {
+      this.overlayElement.style.display = 'none';
+      this.isActive = false;
+      
+      // 進捗追跡停止
+      if (this.progressUpdateTimer) {
+        clearInterval(this.progressUpdateTimer);
+        this.progressUpdateTimer = null;
+      }
+      
+      console.log('🎯 統一ローディングオーバーレイ非表示');
+    }
+  },
+  
+  /**
+   * 統計情報の取得
+   * @returns {Object} 統計情報
+   */
+  getStats() {
+    return {
+      ...this.stats,
+      activeOperations: Array.from(this.activeOperations.keys()),
+      isActive: this.isActive,
+      currentMessage: this.currentMessage
+    };
+  },
+  
+  /**
+   * メモリクリーンアップ
+   */
+  performCleanup() {
+    const now = Date.now();
+    if (now - this.lastCleanupTime > this.cleanupInterval) {
+      // 表示時間履歴の制限
+      if (this.stats.lastOperationTimes.length > this.maxOperationHistory) {
+        this.stats.lastOperationTimes = this.stats.lastOperationTimes.slice(-this.maxOperationHistory);
+      }
+      
+      this.lastCleanupTime = now;
+      console.log('🧹 統一ローディング: メモリクリーンアップ完了');
+    }
+  },
+  
+  /**
+   * オーバーレイDOM要素の作成
+   */
+  createOverlay() {
+    if (this.overlayElement) {
+      return; // 既に作成済み
+    }
+    
+    // メイン オーバーレイ要素を作成
+    const overlay = document.createElement('div');
+    overlay.id = 'unified-loading-overlay';
+    overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
+    overlay.style.cssText = `
+      display: none;
+      background: rgba(26, 27, 38, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    `;
+    
+    // ローディングコンテンツコンテナを作成
+    const content = document.createElement('div');
+    content.className = 'bg-white bg-opacity-95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center border border-gray-200';
+    
+    // ローディングアニメーション
+    const spinner = document.createElement('div');
+    spinner.className = 'inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4';
+    
+    // メッセージ要素
+    const message = document.createElement('div');
+    message.className = 'text-gray-800 font-medium text-lg mb-2';
+    message.textContent = this.currentMessage || '処理中...';
+    
+    // 進捗要素（オプション）
+    const progress = document.createElement('div');
+    progress.className = 'text-gray-600 text-sm';
+    progress.textContent = '';
+    
+    // 要素を組み立て
+    content.appendChild(spinner);
+    content.appendChild(message);
+    content.appendChild(progress);
+    overlay.appendChild(content);
+    
+    // DOMに追加
+    document.body.appendChild(overlay);
+    
+    // 参照を保存
+    this.overlayElement = overlay;
+    this.messageElement = message;
+    this.progressElement = progress;
+    
+    console.log('🎨 統一ローディングオーバーレイ作成完了');
+  },
+  
+  /**
+   * 進捗追跡の開始
+   */
+  startProgressTracking() {
+    if (this.progressUpdateTimer) {
+      clearInterval(this.progressUpdateTimer);
+    }
+    
+    this.progressUpdateTimer = setInterval(() => {
+      this.performCleanup(); // 定期的なクリーンアップも実行
+      
+      if (this.progressElement && this.activeOperations.size > 0) {
+        const elapsed = Date.now() - this.startTime;
+        const seconds = Math.floor(elapsed / 1000);
+        
+        if (this.activeOperations.size > 1) {
+          this.progressElement.textContent = `${this.activeOperations.size}件の処理を実行中... (${seconds}秒)`;
+        } else {
+          this.progressElement.textContent = `処理時間: ${seconds}秒`;
+        }
+      }
+    }, 1000);
+  }
+};
+
+// グローバルに公開
+window.UnifiedLoadingManager = UnifiedLoadingManager;
+
+// 従来のグローバルローディング状態（後方互換性）
+const globalLoadingState = {
+  get isActive() { return UnifiedLoadingManager.isActive; },
+  get activeOperations() { return new Set(UnifiedLoadingManager.activeOperations.keys()); },
+  get overlayElement() { return UnifiedLoadingManager.overlayElement; },
+  get progressElement() { return UnifiedLoadingManager.progressElement; },
+  get messageElement() { return UnifiedLoadingManager.messageElement; },
+  get currentMessage() { return UnifiedLoadingManager.currentMessage; },
+  get startTime() { return UnifiedLoadingManager.startTime; },
+  get progressUpdateTimer() { return UnifiedLoadingManager.progressUpdateTimer; }
 };
 
 /**
- * Show global loading overlay with progress tracking
+ * Show global loading overlay with progress tracking（統一ローディング使用）
  * @param {string} operationId - Unique ID for the operation
  * @param {string} message - Loading message to display
  * @param {Object} options - Additional options
  */
 function showGlobalLoading(operationId, message = '処理中...', options = {}) {
-  console.log(`🔄 Global loading start: ${operationId} - ${message}`);
+  // 統一ローディングマネージャーを使用
+  if (window.UnifiedLoadingManager) {
+    return UnifiedLoadingManager.show(operationId, message, options);
+  }
   
-  // Add operation to active set
-  globalLoadingState.activeOperations.add(operationId);
-  globalLoadingState.currentMessage = message;
+  // フォールバック: 従来の実装
+  console.log(`🔄 Global loading start: ${operationId} - ${message}`);
   
   // Create overlay if not exists
   if (!globalLoadingState.overlayElement) {
@@ -450,27 +1161,24 @@ function showGlobalLoading(operationId, message = '処理中...', options = {}) 
 }
 
 /**
- * Hide global loading overlay for specific operation
+ * Hide global loading overlay for specific operation（統一ローディング使用）
  * @param {string} operationId - Operation ID to remove
  * @param {string} finalMessage - Optional final message before hiding
  */
 function hideGlobalLoading(operationId, finalMessage) {
+  // 統一ローディングマネージャーを使用
+  if (window.UnifiedLoadingManager) {
+    return UnifiedLoadingManager.hide(operationId, finalMessage);
+  }
+  
+  // フォールバック: 従来の実装
   console.log(`✅ Global loading end: ${operationId}`);
   
-  // Remove operation from active set
-  globalLoadingState.activeOperations.delete(operationId);
-  
-  // If no more active operations, hide overlay
-  if (globalLoadingState.activeOperations.size === 0) {
-    if (finalMessage) {
-      updateLoadingMessage(finalMessage);
-      // Show final message briefly before hiding
-      setTimeout(() => hideLoadingOverlay(), 800);
-    } else {
-      hideLoadingOverlay();
-    }
+  if (finalMessage) {
+    updateLoadingMessage(finalMessage);
+    setTimeout(() => hideLoadingOverlay(), 800);
   } else {
-    console.log(`⏳ ${globalLoadingState.activeOperations.size} operations still active`);
+    hideLoadingOverlay();
   }
 }
 

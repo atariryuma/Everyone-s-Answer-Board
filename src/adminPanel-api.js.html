@@ -15,21 +15,34 @@ function runGasWithUserId(functionName, loadingMessage = '処理中...', ...args
     if (!userId) {
       return userIdPromise.then(() => {
         if (!userId) {
-          logError('No userId available for:', functionName);
+          const errorMsg = 'No userId available for: ' + functionName;
+          if (window.UnifiedErrorHandler) {
+            window.UnifiedErrorHandler.logError(errorMsg, window.UnifiedErrorHandler.ErrorTypes.HIGH, window.UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, { functionName });
+          } else {
+            logError(errorMsg);
+          }
           throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
         }
         
         // ローディング機能付きでuserIdを第一引数として追加 - Admin Panel uses overlay loading
         return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'overlay', userId, ...args);
       }).catch((error) => {
-        logError('Error in runGasWithUserId (after userIdPromise):', error);
+        if (window.UnifiedErrorHandler) {
+          window.UnifiedErrorHandler.logError(error, window.UnifiedErrorHandler.ErrorTypes.HIGH, window.UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, { functionName, stage: 'after_userIdPromise' });
+        } else {
+          logError('Error in runGasWithUserId (after userIdPromise):', error);
+        }
         throw error;
       });
     }
     
     // userIdが既に設定されている場合 - ローディング機能付き - Admin Panel uses overlay loading
     return sharedUtilities.gas.callWithLoading(functionName, loadingMessage, 'overlay', userId, ...args).catch((error) => {
-      logError('Error in runGasWithUserId (direct call with loading):', error);
+      if (window.UnifiedErrorHandler) {
+        window.UnifiedErrorHandler.logError(error, window.UnifiedErrorHandler.ErrorTypes.HIGH, window.UnifiedErrorHandler.ErrorCategories.API_COMMUNICATION, { functionName, stage: 'direct_call_with_loading' });
+      } else {
+        logError('Error in runGasWithUserId (direct call with loading):', error);
+      }
       throw error;
     });
   }
@@ -89,23 +102,81 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 // LOADSTATUS DEBOUNCE SYSTEM - Prevent Excessive API Calls
 // =============================================================================
 
-// 🎯 LoadStatus デバウンス管理システム
+// 🎯 LoadStatus デバウンス管理システム（最適化版）
 const loadStatusDebounce = {
   timer: null,
   pendingCall: null,
   lastCallTime: 0,
-  minInterval: 2000,      // ✅ 最小呼び出し間隔を2秒に延長（パフォーマンス改善）
-  debounceDelay: 500,     // ✅ デバウンス遅延を500msに延長
+  minInterval: 1500,      // ✅ 最小呼び出し間隔を1.5秒に最適化
+  debounceDelay: 300,     // ✅ デバウンス遅延を300msに最適化（応答性向上）
+  adaptiveInterval: true, // ✅ アダプティブ間隔調整を有効化
   
   // 呼び出し統計
   totalCalls: 0,
   debouncedCalls: 0,
   successfulCalls: 0,
+  failedCalls: 0,
   
   // 現在の状態
   isProcessing: false,
   lastResult: null,
-  lastResultTime: 0
+  lastResultTime: 0,
+  
+  // パフォーマンス監視
+  averageResponseTime: 0,
+  lastResponseTimes: [], // 最新5回のレスポンス時間
+  maxResponseTimeHistory: 5,
+  
+  // メモリリーク防止
+  lastCleanupTime: Date.now(),
+  cleanupInterval: 30000, // 30秒ごとにクリーンアップ
+  
+  // 自動クリーンアップ機能
+  performCleanup() {
+    const now = Date.now();
+    if (now - this.lastCleanupTime > this.cleanupInterval) {
+      // レスポンス時間履歴を制限
+      if (this.lastResponseTimes.length > this.maxResponseTimeHistory) {
+        this.lastResponseTimes = this.lastResponseTimes.slice(-this.maxResponseTimeHistory);
+      }
+      
+      // 古いタイマーのクリア
+      if (this.timer && this.pendingCall === null) {
+        clearTimeout(this.timer);
+        this.timer = null;
+      }
+      
+      this.lastCleanupTime = now;
+      console.log('🧹 LoadStatus デバウンス: 自動クリーンアップ完了');
+    }
+  },
+  
+  // アダプティブ間隔計算
+  getAdaptiveInterval() {
+    if (!this.adaptiveInterval || this.lastResponseTimes.length < 2) {
+      return this.minInterval;
+    }
+    
+    // 平均レスポンス時間に基づいて間隔を調整
+    this.averageResponseTime = this.lastResponseTimes.reduce((a, b) => a + b, 0) / this.lastResponseTimes.length;
+    
+    // レスポンス時間が長い場合は間隔を延長、短い場合は短縮
+    if (this.averageResponseTime > 2000) {
+      return Math.min(this.minInterval * 1.5, 4000); // 最大4秒
+    } else if (this.averageResponseTime < 500) {
+      return Math.max(this.minInterval * 0.8, 800); // 最小0.8秒
+    }
+    
+    return this.minInterval;
+  },
+  
+  // レスポンス時間記録
+  recordResponseTime(responseTime) {
+    this.lastResponseTimes.push(responseTime);
+    if (this.lastResponseTimes.length > this.maxResponseTimeHistory) {
+      this.lastResponseTimes.shift();
+    }
+  }
 };
 
 /**
@@ -117,6 +188,9 @@ const loadStatusDebounce = {
 function debouncedLoadStatus(bypassCache = false, forceImmediate = false) {
   loadStatusDebounce.totalCalls++;
   
+  // 自動クリーンアップを実行
+  loadStatusDebounce.performCleanup();
+  
   console.log(`📞 debouncedLoadStatus called (${loadStatusDebounce.totalCalls}回目)`);
   
   // 既に処理中の場合は現在の処理を待つ
@@ -125,17 +199,23 @@ function debouncedLoadStatus(bypassCache = false, forceImmediate = false) {
     return loadStatusDebounce.pendingCall || Promise.resolve(loadStatusDebounce.lastResult);
   }
   
-  // 最小間隔チェック
+  // アダプティブ間隔を取得
   const now = Date.now();
   const timeSinceLastCall = now - loadStatusDebounce.lastCallTime;
   const timeSinceLastSuccess = now - loadStatusDebounce.lastResultTime;
   
-  // ✅ 最近成功した呼び出しがある場合は、より長い間隔を適用
-  const effectiveMinInterval = timeSinceLastSuccess < 10000 ? 
-    loadStatusDebounce.minInterval * 1.5 : loadStatusDebounce.minInterval;
+  // ✅ アダプティブ間隔とコンテキストベース調整
+  let effectiveMinInterval = loadStatusDebounce.getAdaptiveInterval();
+  
+  // 最近の成功状況に応じて間隔を調整
+  if (timeSinceLastSuccess < 10000 && loadStatusDebounce.successfulCalls > 0) {
+    effectiveMinInterval *= 1.2; // 成功後は少し長めに
+  } else if (loadStatusDebounce.failedCalls > loadStatusDebounce.successfulCalls) {
+    effectiveMinInterval *= 0.8; // 失敗が多い場合は短めに
+  }
   
   if (timeSinceLastCall < effectiveMinInterval && !forceImmediate) {
-    console.log(`⚡ 最小間隔制限 (${timeSinceLastCall}ms < ${effectiveMinInterval}ms, 最近の成功: ${timeSinceLastSuccess}ms前)`);
+    console.log(`⚡ アダプティブ間隔制限 (${timeSinceLastCall}ms < ${effectiveMinInterval.toFixed(0)}ms, 平均応答時間: ${loadStatusDebounce.averageResponseTime.toFixed(0)}ms)`);
     loadStatusDebounce.debouncedCalls++;
     
     // 既存のタイマーをクリア
@@ -146,7 +226,7 @@ function debouncedLoadStatus(bypassCache = false, forceImmediate = false) {
     // デバウンスタイマーを設定
     return new Promise((resolve, reject) => {
       loadStatusDebounce.timer = setTimeout(() => {
-        console.log('🚀 デバウンス遅延後にloadStatus実行');
+        console.log('🚀 アダプティブデバウンス後にloadStatus実行');
         executeLoadStatus(bypassCache)
           .then(resolve)
           .catch(reject);
@@ -167,36 +247,172 @@ function debouncedLoadStatus(bypassCache = false, forceImmediate = false) {
 function executeLoadStatus(bypassCache = false, isForced = false) {
   console.log(`🎯 executeLoadStatus開始 (bypassCache: ${bypassCache}, forced: ${isForced})`);
   
+  const startTime = Date.now();
   loadStatusDebounce.isProcessing = true;
-  loadStatusDebounce.lastCallTime = Date.now();
+  loadStatusDebounce.lastCallTime = startTime;
   
   // 現在の処理をpendingCallに設定
   loadStatusDebounce.pendingCall = loadStatusCore(bypassCache)
     .then(result => {
-      console.log('✅ loadStatus成功');
+      const responseTime = Date.now() - startTime;
+      console.log(`✅ loadStatus成功 (${responseTime}ms)`);
+      
       loadStatusDebounce.successfulCalls++;
       loadStatusDebounce.lastResult = result;
       loadStatusDebounce.lastResultTime = Date.now();
+      loadStatusDebounce.recordResponseTime(responseTime);
+      
       return result;
     })
     .catch(error => {
-      console.error('❌ loadStatus失敗:', error);
+      const responseTime = Date.now() - startTime;
+      console.error(`❌ loadStatus失敗 (${responseTime}ms):`, error);
+      
+      loadStatusDebounce.failedCalls++;
+      loadStatusDebounce.recordResponseTime(responseTime);
+      
       throw error;
     })
     .finally(() => {
       loadStatusDebounce.isProcessing = false;
       loadStatusDebounce.pendingCall = null;
       
-      // 統計をログ出力
+      // 拡張統計をログ出力
       console.log('📊 LoadStatus統計:', {
         total: loadStatusDebounce.totalCalls,
         debounced: loadStatusDebounce.debouncedCalls,
         successful: loadStatusDebounce.successfulCalls,
-        efficiency: `${Math.round((loadStatusDebounce.debouncedCalls / loadStatusDebounce.totalCalls) * 100)}%節約`
+        failed: loadStatusDebounce.failedCalls,
+        efficiency: `${Math.round((loadStatusDebounce.debouncedCalls / loadStatusDebounce.totalCalls) * 100)}%節約`,
+        avgResponse: `${loadStatusDebounce.averageResponseTime.toFixed(0)}ms`,
+        adaptiveInterval: `${loadStatusDebounce.getAdaptiveInterval().toFixed(0)}ms`
       });
     });
   
   return loadStatusDebounce.pendingCall;
+}
+
+// =============================================================================
+// URL VALIDATION AND RETRY MECHANISM
+// =============================================================================
+
+/**
+ * URL生成の検証とリトライ機構
+ * @param {Object} result - クイックスタート結果
+ * @returns {Promise<Object>} 検証結果
+ */
+async function validateAndRetryUrlGeneration(result) {
+  const maxRetries = 3;
+  const retryDelay = 1000; // 1秒
+  
+  console.log('🔍 URL検証とリトライ機構を開始');
+  
+  let attempts = 0;
+  let lastError = null;
+  let validationDetails = [];
+  
+  while (attempts < maxRetries) {
+    attempts++;
+    console.log(`🔄 URL検証試行 ${attempts}/${maxRetries}`);
+    
+    try {
+      // 現在のresultからURLを確認
+      let currentUrl = result?.url || result?.viewUrl || '';
+      
+      // URLが空または無効な場合は再生成を試行
+      if (!currentUrl || !isValidUrl(currentUrl)) {
+        console.log(`⚠️ 試行 ${attempts}: 無効または空のURL、再生成を実行`);
+        
+        // userIdを取得してURL再生成
+        const userId = window.userId || result?.userId;
+        if (userId) {
+          const urlResult = await runGasWithUserId('generateUserUrls', false, userId);
+          if (urlResult && urlResult.viewUrl) {
+            currentUrl = urlResult.viewUrl;
+            console.log(`✅ 試行 ${attempts}: URL再生成成功`);
+          }
+        }
+      }
+      
+      // URL検証
+      const isValid = isValidUrl(currentUrl);
+      const validationInfo = {
+        attempt: attempts,
+        url: currentUrl,
+        isValid: isValid,
+        length: currentUrl ? currentUrl.length : 0,
+        timestamp: new Date().toISOString()
+      };
+      
+      validationDetails.push(validationInfo);
+      
+      if (isValid) {
+        console.log(`✅ URL検証成功 (試行 ${attempts}):`, currentUrl.substring(0, 50) + '...');
+        return {
+          isValid: true,
+          finalUrl: currentUrl,
+          attempts: attempts,
+          details: validationDetails
+        };
+      } else {
+        console.warn(`❌ URL検証失敗 (試行 ${attempts}):`, validationInfo);
+        lastError = `Invalid URL on attempt ${attempts}`;
+      }
+      
+    } catch (error) {
+      console.error(`🚨 URL検証エラー (試行 ${attempts}):`, error);
+      lastError = error.message;
+      validationDetails.push({
+        attempt: attempts,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // 最後の試行でない場合は待機
+    if (attempts < maxRetries) {
+      console.log(`⏳ ${retryDelay}ms待機後に再試行...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+  
+  console.error('🚨 URL検証とリトライが全て失敗しました');
+  return {
+    isValid: false,
+    finalUrl: '',
+    attempts: attempts,
+    details: validationDetails,
+    lastError: lastError
+  };
+}
+
+/**
+ * URL妥当性チェック
+ * @param {string} url - 検証するURL
+ * @returns {boolean} 妥当性
+ */
+function isValidUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  
+  // 基本的なURL形式チェック
+  if (!url.startsWith('https://')) {
+    return false;
+  }
+  
+  // Google Apps ScriptのURLパターンチェック
+  const gasUrlPattern = /^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec\?/;
+  if (!gasUrlPattern.test(url)) {
+    return false;
+  }
+  
+  // 必要なパラメータの存在確認
+  if (!url.includes('mode=') || !url.includes('userId=')) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**
@@ -2874,21 +3090,25 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         if (autoPublish) {
           console.log('🚀 自動公開が有効なため、自動停止確認モーダルを表示します');
           
-          setTimeout(() => {
+          setTimeout(async () => {
             // ローディングオーバーレイを非表示にしてからモーダル表示
             if (window.unifiedLoadingManager) {
               window.unifiedLoadingManager.setLoading(false);
             }
             
-            // URL生成確認とデータ検証を実行
+            // URL生成確認とデータ検証を実行（強化版）
+            const urlValidationResult = await validateAndRetryUrlGeneration(result);
+            
             const enhancedResult = {
               ...result,
-              url: result?.url || '',
+              url: urlValidationResult.finalUrl || result?.url || '',
               autoStopMinutes: result?.autoStopMinutes || 360,
               autoStopTime: result?.autoStopTime || '',
               publicationData: {
                 isPublished: result?.success || false,
-                hasValidUrl: !!(result?.url && result.url.length > 0),
+                hasValidUrl: urlValidationResult.isValid,
+                urlValidationAttempts: urlValidationResult.attempts,
+                urlValidationDetails: urlValidationResult.details,
                 timestamp: new Date().toISOString()
               }
             };
@@ -2896,7 +3116,8 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
             console.log('📊 QuickStart公開データ検証:', {
               autoPublish: autoPublish,
               hasResult: !!result,
-              hasUrl: !!(result?.url && result.url.length > 0),
+              hasUrl: urlValidationResult.isValid,
+              urlRetryCount: urlValidationResult.attempts,
               enhancedResult: enhancedResult
             });
             

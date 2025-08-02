@@ -56,10 +56,43 @@ function getProductionWebAppUrl() {
  */
 function getWebAppBaseUrl() {
   try {
-    return cacheManager.get('WEB_APP_URL', () => getProductionWebAppUrl());
+    // キャッシュマネージャーが利用可能かチェック
+    if (typeof cacheManager !== 'undefined' && cacheManager && typeof cacheManager.get === 'function') {
+      const cachedUrl = cacheManager.get('WEB_APP_URL', () => getProductionWebAppUrl());
+      
+      // キャッシュ結果の妥当性確認
+      if (cachedUrl && typeof cachedUrl === 'string' && cachedUrl.startsWith('https://')) {
+        debugLog('✅ getWebAppBaseUrl: Cache hit with valid URL');
+        return cachedUrl;
+      } else {
+        warnLog('⚠️ getWebAppBaseUrl: Invalid cached URL, regenerating:', cachedUrl);
+        // キャッシュクリアして再生成
+        if (typeof cacheManager.clear === 'function') {
+          cacheManager.clear('WEB_APP_URL');
+        }
+        return getProductionWebAppUrl();
+      }
+    } else {
+      debugLog('⚠️ getWebAppBaseUrl: CacheManager not available, using direct generation');
+      return getProductionWebAppUrl();
+    }
   } catch (e) {
-    warnLog('Cache error, falling back to direct URL generation:', e.message);
-    return getProductionWebAppUrl();
+    errorLog('🚨 getWebAppBaseUrl: Cache error, falling back to direct URL generation:', e.message);
+    
+    // キャッシュエラー時はキャッシュを無視して直接生成
+    try {
+      const directUrl = getProductionWebAppUrl();
+      if (directUrl && directUrl.startsWith('https://')) {
+        infoLog('✅ getWebAppBaseUrl: Direct URL generation successful after cache error');
+        return directUrl;
+      } else {
+        errorLog('🚨 getWebAppBaseUrl: Direct URL generation also failed');
+        return '';
+      }
+    } catch (directError) {
+      errorLog('🚨 getWebAppBaseUrl: Critical failure in both cache and direct generation:', directError.message);
+      return '';
+    }
   }
 }
 
@@ -90,9 +123,29 @@ function generateUserUrls(userId) {
       baseUrlLength: baseUrl ? baseUrl.length : 0
     });
     
-    if (!baseUrl) {
-      errorLog('🚨 generateUserUrls: Failed to get base URL');
-      return { adminUrl: '', viewUrl: '', error: 'base_url_failed' };
+    if (!baseUrl || baseUrl.trim() === '') {
+      errorLog('🚨 generateUserUrls: Failed to get base URL - attempting direct retry');
+      
+      // 直接再試行を実行
+      const retryUrl = getProductionWebAppUrl();
+      if (retryUrl && retryUrl.startsWith('https://')) {
+        infoLog('✅ generateUserUrls: Direct retry successful');
+        // 成功した場合は後続処理で使用
+        const encodedUserId = encodeURIComponent(userId);
+        return {
+          adminUrl: `${retryUrl}?mode=admin&userId=${encodedUserId}`,
+          viewUrl: `${retryUrl}?mode=view&userId=${encodedUserId}`,
+          retryUsed: true
+        };
+      } else {
+        errorLog('🚨 generateUserUrls: Direct retry also failed');
+        return { 
+          adminUrl: '', 
+          viewUrl: '', 
+          error: 'base_url_failed',
+          details: { baseUrl, retryUrl }
+        };
+      }
     }
     
     const encodedUserId = encodeURIComponent(userId);
@@ -118,16 +171,33 @@ function generateUserUrls(userId) {
     debugLog('🔗 URL validation:', urlValidation);
     debugLog('✅ generateUserUrls RESULT:', result);
     
-    // 最終検証
+    // 最終検証とより詳細なエラー情報
     if (!urlValidation.adminUrlValid || !urlValidation.viewUrlValid) {
-      errorLog('🚨 Generated URLs are invalid');
+      const errorDetails = {
+        ...urlValidation,
+        baseUrl: baseUrl,
+        userId: userId,
+        encodedUserId: encodedUserId,
+        adminUrl: result.adminUrl,
+        viewUrl: result.viewUrl,
+        timestamp: new Date().toISOString()
+      };
+      
+      errorLog('🚨 Generated URLs failed validation:', errorDetails);
       return { 
         adminUrl: '', 
         viewUrl: '', 
         error: 'invalid_urls_generated',
-        details: urlValidation 
+        details: errorDetails 
       };
     }
+    
+    // 成功時のログ
+    infoLog('✅ generateUserUrls: URLs generated successfully', {
+      adminUrlLength: result.adminUrl.length,
+      viewUrlLength: result.viewUrl.length,
+      userId: userId ? userId.substring(0, 8) + '...' : 'N/A' // プライバシー保護のため一部のみ
+    });
     
     return result;
     
