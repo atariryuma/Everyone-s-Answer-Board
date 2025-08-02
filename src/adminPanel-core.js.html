@@ -1063,8 +1063,8 @@ function initializeAdminPanelMaster() {
   
   // 3. イベントハンドラー初期化 - 直接実行
   try {
-    if (typeof initializeEvents === 'function') {
-      initializeEvents();
+    if (typeof initializeEventListeners === 'function') {
+      initializeEventListeners();
       updateSystemStatus('eventsInitialized', true);
       console.log('✅ AdminPanel: Event handlers ready');
     }
