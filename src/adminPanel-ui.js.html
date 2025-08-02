@@ -128,6 +128,9 @@ function updateStepIndicators(status) {
     // 実際のステップインジケーター更新を実行
     updateStepIndicatorsWithStep(currentStep, status);
     
+    // セクション表示状態を更新（重要：これが欠けていた）
+    manageSectionStates(currentStep);
+    
     console.log('✅ ステップインジケーター更新完了');
   } catch (error) {
     console.error('❌ ステップインジケーター更新エラー:', error);

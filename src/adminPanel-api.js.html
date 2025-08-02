@@ -916,7 +916,7 @@ function proceedWithSaveAndPublish(config) {
       loadStatus(true).then(() => {
         // エラー後もステップ進行を更新
         const currentStep = currentStatus && currentStatus.setupStep ? currentStatus.setupStep : 1;
-        updateStepIndicators(currentStep);
+        updateStepIndicatorsWithStep(currentStep);
         manageSectionStates(currentStep);
       });
       handleError(error, 'saveAndPublish', '設定の保存に失敗しました。システム状態を再読み込みしました。');
