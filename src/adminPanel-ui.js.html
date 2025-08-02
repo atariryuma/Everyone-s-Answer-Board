@@ -402,12 +402,18 @@ function generateUrlCacheKey(status, userId) {
  * @returns {string} 本番環境URL
  */
 function convertDevUrlToProductionUrl(devUrl) {
-  // Simplistic conversion: replace 'userCodeAppPanel' with 'exec' if present
-  if (devUrl.includes('userCodeAppPanel')) {
-    return devUrl.replace('userCodeAppPanel', 'exec');
+  // Replace known development path segments with production equivalent
+  let prodUrl = devUrl;
+
+  if (prodUrl.includes('userCodeAppPanel')) {
+    prodUrl = prodUrl.replace('userCodeAppPanel', 'exec');
   }
-  // Otherwise, return the original URL
-  return devUrl;
+
+  if (prodUrl.includes('/dev')) {
+    prodUrl = prodUrl.replace('/dev', '/exec');
+  }
+
+  return prodUrl;
 }
 
 // =============================================================================
