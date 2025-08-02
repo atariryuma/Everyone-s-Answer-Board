@@ -706,11 +706,60 @@ function repairSetupStateInconsistencies() {
               fixes
             });
           } else {
-            reject(new Error(saveResult?.message || '設定の保存に失敗しました'));
+            // 詳細なエラー情報を保持しつつフォールバック修復を試行
+            console.warn('⚠️ 主要修復が失敗、フォールバック修復を試行中...');
+            
+            // フォールバック: 最小限の設定だけで修復を試行
+            const fallbackConfig = {
+              setupStatus: 'pending',
+              formCreated: false,
+              appPublished: false
+            };
+            
+            runGasWithUserId('syncConfigurationState', 'フォールバック修復中...', fallbackConfig, 'fallback')
+              .then(fallbackResult => {
+                if (fallbackResult && fallbackResult.success) {
+                  resolve({
+                    success: true,
+                    message: '⚠️ 基本設定のみ修復しました（再セットアップが必要です）',
+                    issues,
+                    fixes: ['基本設定リセット']
+                  });
+                } else {
+                  reject(new Error(saveResult?.message || '設定の保存に失敗しました（フォールバックも失敗）'));
+                }
+              })
+              .catch(fallbackError => {
+                reject(new Error(`設定保存エラー: ${saveResult?.message || saveError.message} (フォールバック失敗: ${fallbackError.message})`));
+              });
           }
         })
         .catch(saveError => {
-          reject(new Error(`設定保存エラー: ${saveError.message}`));
+          console.error('❌ syncConfigurationState呼び出しでエラー:', saveError);
+          
+          // キャッシュクリアによる修復試行
+          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+            console.log('🔄 キャッシュクリアを実行してリトライします...');
+            window.unifiedCache.clear();
+            
+            // キャッシュクリア後にリトライ
+            setTimeout(() => {
+              runGasWithUserId('getInitialData', 'データ再取得中...')
+                .then(refreshedData => {
+                  resolve({
+                    success: true,
+                    message: '⚠️ キャッシュクリア後にデータを更新しました（手動で設定確認をお願いします）',
+                    issues,
+                    fixes: ['キャッシュクリア', 'データ再取得']
+                  });
+                })
+                .catch(refreshError => {
+                  reject(new Error(`設定保存エラー: ${saveError.message} (データ再取得も失敗: ${refreshError.message})`));
+                });
+            }, 1000);
+          } else {
+            reject(new Error(`設定保存エラー: ${saveError.message}`));
+          }
         });
         
     } catch (error) {

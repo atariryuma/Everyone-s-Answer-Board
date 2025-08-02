@@ -338,7 +338,6 @@ function setupFormConfigModalHandlers() {
 function setupResourceHandlers() {
   var addResourceBtn = document.getElementById('add-resource-btn');
   var resourceUrlInput = document.getElementById('resource-url-input');
-  var resetConfigBtn = document.getElementById('reset-config-btn');
   
   if (addResourceBtn) {
     addResourceBtn.addEventListener('click', addResource);
@@ -353,12 +352,7 @@ function setupResourceHandlers() {
     });
   }
   
-  if (resetConfigBtn) {
-    resetConfigBtn.addEventListener('click', resetConfigJson);
-    console.log('✅ Reset config button handler attached');
-  } else {
-    console.warn('⚠️ Reset config button not found');
-  }
+  // Note: resetConfigBtn handler is now handled in setupAccountManagementHandlers
 }
 
 // =============================================================================
@@ -366,17 +360,63 @@ function setupResourceHandlers() {
 // =============================================================================
 
 function setupAccountManagementHandlers() {
-  // Delete account handler - 防御的実装
-  const deleteBtn = elements['delete-account-btn'] || getCachedElement('delete-account-btn');
-  if (deleteBtn) {
-    // 既存のイベントリスナーを削除（重複を防ぐため）
-    deleteBtn.removeEventListener('click', handleDeleteRequest);
-    // 新しいイベントリスナーを追加
-    deleteBtn.addEventListener('click', handleDeleteRequest);
-    console.log('✅ Delete account button handler attached');
-  } else {
-    console.warn('⚠️ Delete account button not found');
+  // Delete account handler - 防御的実装とリトライ機能
+  function attachDeleteHandler(retryCount = 0) {
+    const deleteBtn = elements['delete-account-btn'] || 
+                     getCachedElement('delete-account-btn') || 
+                     document.getElementById('delete-account-btn');
+    
+    if (deleteBtn) {
+      // 既存のイベントリスナーを削除（重複を防ぐため）
+      deleteBtn.removeEventListener('click', handleDeleteRequest);
+      // 新しいイベントリスナーを追加
+      deleteBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🗑️ Delete account button clicked');
+        handleDeleteRequest();
+      });
+      console.log('✅ Delete account button handler attached (attempt ' + (retryCount + 1) + ')');
+      return true;
+    } else {
+      console.warn('⚠️ Delete account button not found (attempt ' + (retryCount + 1) + ')');
+      if (retryCount < 2) {
+        // 最大3回まで500ms間隔でリトライ
+        setTimeout(() => attachDeleteHandler(retryCount + 1), 500);
+      }
+      return false;
+    }
   }
+  
+  // リセット設定ボタンハンドラー - 防御的実装とリトライ機能
+  function attachResetHandler(retryCount = 0) {
+    const resetBtn = document.getElementById('reset-config-btn');
+    
+    if (resetBtn) {
+      // 既存のイベントリスナーを削除（重複を防ぐため）
+      resetBtn.removeEventListener('click', resetConfigJson);
+      // 新しいイベントリスナーを追加
+      resetBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🔄 Reset config button clicked');
+        resetConfigJson();
+      });
+      console.log('✅ Reset config button handler attached (attempt ' + (retryCount + 1) + ')');
+      return true;
+    } else {
+      console.warn('⚠️ Reset config button not found (attempt ' + (retryCount + 1) + ')');
+      if (retryCount < 2) {
+        // 最大3回まで500ms間隔でリトライ
+        setTimeout(() => attachResetHandler(retryCount + 1), 500);
+      }
+      return false;
+    }
+  }
+  
+  // ボタンハンドラーをアタッチ
+  attachDeleteHandler();
+  attachResetHandler();
   
   // Switch account handlers
   var switchAccountBtns = document.querySelectorAll('[onclick*="switchToAnotherAccount"]');

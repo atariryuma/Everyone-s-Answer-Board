@@ -820,31 +820,135 @@ function buildConfigObject() {
 
 // Validate configuration
 function validateConfig() {
+  // Check if we have a valid spreadsheet ID
+  if (!currentStatus?.userInfo?.spreadsheetId || 
+      currentStatus.userInfo.spreadsheetId === 'pending' ||
+      currentStatus.userInfo.spreadsheetId.trim() === '') {
+    console.log('❌ Validation failed: No valid spreadsheet ID');
+    return false;
+  }
+
+  // Check if setup is completed
+  if (!currentStatus?.userInfo?.configJson) {
+    console.log('❌ Validation failed: No config JSON');
+    return false;
+  }
+
+  let config;
+  try {
+    config = typeof currentStatus.userInfo.configJson === 'string' 
+      ? JSON.parse(currentStatus.userInfo.configJson) 
+      : currentStatus.userInfo.configJson;
+  } catch (error) {
+    console.log('❌ Validation failed: Invalid config JSON', error);
+    return false;
+  }
+
+  // Check if setup status is completed (not pending)
+  if (config.setupStatus !== 'completed') {
+    console.log('❌ Validation failed: Setup status is not completed:', config.setupStatus);
+    return false;
+  }
+
   // Check primary element first, then fallback to secondary element
   const opinionValue = document.getElementById('opinionHeader')?.value || 
                       document.getElementById('reason-column')?.value || '';
   
-  return opinionValue && opinionValue.trim() !== '';
+  if (!opinionValue || opinionValue.trim() === '') {
+    console.log('❌ Validation failed: No opinion column selected');
+    return false;
+  }
+
+  console.log('✅ Validation passed: All requirements met');
+  return true;
 }
 
-// Update configuration buttons state
-function updateConfigButtons() {
-  const isValid = validateConfig();
-  const saveBtn = document.getElementById('save-publish-btn');
+// 統一されたボタン状態管理システム
+function updateAllButtonStates() {
+  console.log('🎛️ Updating all button states...');
   
-  if (saveBtn) {
-    saveBtn.disabled = !isValid;
-    if (isValid) {
-      saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  const isConfigValid = validateConfig();
+  const hasSpreadsheet = currentStatus?.userInfo?.spreadsheetId && 
+                        currentStatus.userInfo.spreadsheetId !== 'pending';
+  const hasFormUrl = currentStatus?.userInfo?.configJson ? 
+                    (() => {
+                      try {
+                        const config = JSON.parse(currentStatus.userInfo.configJson);
+                        return config.formUrl && config.formUrl.trim();
+                      } catch {
+                        return false;
+                      }
+                    })() : false;
+  
+  // 設定保存・公開ボタン
+  updateButtonState('save-publish-btn', isConfigValid, {
+    disabledMessage: '設定が不完全です',
+    enabledMessage: '設定を保存して公開'
+  });
+  
+  // スプレッドシート開くボタン
+  updateButtonState('open-spreadsheet-btn', hasSpreadsheet, {
+    disabledMessage: 'スプレッドシートがありません',
+    enabledMessage: 'スプレッドシートを開く'
+  });
+  
+  // フォーム開くボタン  
+  updateButtonState('open-form-btn', hasFormUrl, {
+    disabledMessage: 'フォームがありません',
+    enabledMessage: 'フォームを開く'
+  });
+  
+  // リセット設定ボタン（常に有効だが、条件により警告）
+  const resetBtn = document.getElementById('reset-config-btn');
+  if (resetBtn) {
+    resetBtn.disabled = false; // 常に有効
+    if (!hasSpreadsheet) {
+      resetBtn.title = '設定をリセットします（データがない場合は効果がありません）';
     } else {
-      saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      resetBtn.title = '現在の設定を初期値にリセットします';
     }
   }
+  
+  // アカウント削除ボタン（常に有効）
+  const deleteBtn = document.getElementById('delete-account-btn');
+  if (deleteBtn) {
+    deleteBtn.disabled = false; // 常に有効
+    deleteBtn.title = 'アカウントとすべてのデータを完全に削除します';
+  }
+  
+  console.log('✅ Button states updated:', {
+    configValid: isConfigValid,
+    hasSpreadsheet,
+    hasFormUrl
+  });
+}
+
+// 個別ボタン状態更新ヘルパー
+function updateButtonState(buttonId, isEnabled, messages = {}) {
+  const button = document.getElementById(buttonId);
+  if (!button) return;
+  
+  button.disabled = !isEnabled;
+  
+  if (isEnabled) {
+    button.classList.remove('opacity-50', 'cursor-not-allowed');
+    button.title = messages.enabledMessage || '';
+  } else {
+    button.classList.add('opacity-50', 'cursor-not-allowed');
+    button.title = messages.disabledMessage || '条件が満たされていません';
+  }
+}
+
+// 後方互換性のため元の関数名も保持
+function updateConfigButtons() {
+  updateAllButtonStates();
 }
 
 // Ensure global access
 window.updateConfigButtons = updateConfigButtons;
-console.log('✅ updateConfigButtons actual function loaded');
+window.updateAllButtonStates = updateAllButtonStates;
+window.updateButtonState = updateButtonState;
+console.log('✅ updateConfigButtons and button state management functions loaded');
 
 // =============================================================================
 // STEP INDICATORS AND GUIDANCE
@@ -873,16 +977,20 @@ function getStepCompletionFromConfig(status) {
     }
 
     // 通常のステップ完了判定
-    // Step 1: スプレッドシートIDの存在確認
+    // Step 1: スプレッドシートIDの存在確認とセットアップ状態の確認
     const spreadsheetId = (status.userInfo && typeof status.userInfo.spreadsheetId === 'string')
       ? status.userInfo.spreadsheetId.trim()
       : '';
-    const step1Complete = spreadsheetId !== '' && spreadsheetId !== 'pending';
+    // pendingの場合はセットアップが未完了なのでstep1も未完了として扱う
+    const step1Complete = spreadsheetId !== '' && 
+                         spreadsheetId !== 'pending' && 
+                         config.setupStatus === 'completed';
     
-    // Step 2: セットアップ完了状態の確認
+    // Step 2: セットアップ完了状態の確認 - pendingの場合は未完了として扱う
     const step2Complete = config.setupStatus === 'completed' && 
                           config.formCreated === true && 
-                          config.formUrl && config.formUrl.trim();
+                          config.formUrl && config.formUrl.trim() &&
+                          config.setupStatus !== 'pending';
     
     // Step 3: 公開状態の確認
     const step3Complete = config.appPublished === true;
