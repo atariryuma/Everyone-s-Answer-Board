@@ -83,13 +83,17 @@ function computeWebAppUrl() {
       }
     }
 
-    // URLパターン検証の簡素化
+    // 優先: script.google.com のURLを検証
     var isValidScriptUrl = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/exec$/.test(url);
-    var isValidDeployUrl = /^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/.test(url);
-
-    if (isValidScriptUrl || isValidDeployUrl) {
-      infoLog('✅ 有効なWebAppURL検証完了:', url);
+    if (isValidScriptUrl) {
+      infoLog('✅ 有効なWebAppURL検証完了 (script.google.com):', url);
       return url;
+    }
+
+    // 開発環境URL検出: userCodeAppPanel または googleusercontent.com を含む場合
+    if (url.includes('userCodeAppPanel') || url.includes('googleusercontent.com')) {
+      warnLog('⚠️ 開発環境URL検出 (userCodeAppPanel または googleusercontent.com): ' + url + ' → フォールバック使用');
+      return getFallbackUrl();
     }
 
     // 従来形式のURL補正（必要に応じて）
