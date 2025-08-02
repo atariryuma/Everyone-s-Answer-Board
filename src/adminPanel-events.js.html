@@ -502,19 +502,19 @@ function setupRealtimeValidation() {
   // Opinion column validation
   var opinionSelect = document.getElementById('opinion-column');
   if (opinionSelect) {
-    opinionSelect.addEventListener('change', updateConfigButtons);
+    opinionSelect.addEventListener('change', function() { safeCall('updateConfigButtons'); });
   }
   
   // Show names checkbox
   var showNamesCheckbox = document.getElementById('show-names');
   if (showNamesCheckbox) {
-    showNamesCheckbox.addEventListener('change', updateConfigButtons);
+    showNamesCheckbox.addEventListener('change', function() { safeCall('updateConfigButtons'); });
   }
   
   // Show counts checkbox
   var showCountsCheckbox = document.getElementById('show-counts');
   if (showCountsCheckbox) {
-    showCountsCheckbox.addEventListener('change', updateConfigButtons);
+    showCountsCheckbox.addEventListener('change', function() { safeCall('updateConfigButtons'); });
   }
   
   // Name column validation
@@ -528,7 +528,7 @@ function setupRealtimeValidation() {
         showNamesCheckbox.disabled = true;
         showNamesCheckbox.checked = false;
       }
-      updateConfigButtons();
+      safeCall('updateConfigButtons');
     });
   }
 }

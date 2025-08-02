@@ -285,7 +285,7 @@ function loadStatusCore(bypassCache = false) {
           try {
             safeCall('populateHeaderOptions', response.sheetDetails.allHeaders);
             logDebug('✅ Header options populated from integrated data');
-            populateConfig(response.sheetDetails.guessedConfig);
+            safeCall('populateConfig', response.sheetDetails.guessedConfig);
             logDebug('✅ AI configuration applied from integrated data');
           } catch (configError) {
             console.error('Error applying sheet configuration from integrated data:', configError);
@@ -815,8 +815,7 @@ function proceedWithSaveAndPublish(config) {
         // 公開時は履歴保存を行わない（公開停止時に保存するため）
         logDebug('Board published successfully - history will be saved on unpublish');
         
-        // ボードビューアーに即座更新を通知
-        // ボードビューアーに即座更新を通知
+        
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({
             type: 'BOARD_PUBLISHED',

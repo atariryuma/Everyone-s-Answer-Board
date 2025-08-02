@@ -989,6 +989,10 @@ function populateConfig(cfg) {
   updateConfigButtons();
 }
 
+// Ensure global access
+window.populateConfig = populateConfig;
+console.log('✅ populateConfig actual function loaded');
+
 // Clear configuration fields
 function clearConfigFields() {
   const fieldIds = [
