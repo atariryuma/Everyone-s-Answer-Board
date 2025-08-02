@@ -166,7 +166,7 @@
   }
   </script>
   <script>
-  const __IS_SYSTEM_ADMIN_RAW__ = '<?= escapeJavaScript(typeof isDeployUser !== "undefined" ? isDeployUser : "false") ?>';
+  const __IS_SYSTEM_ADMIN_RAW__ = 'false'; // Temporarily hardcoded for debugging SyntaxError
   const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
   window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
   console.log('Template Debug:');
