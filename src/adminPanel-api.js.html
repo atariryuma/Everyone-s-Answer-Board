@@ -283,7 +283,7 @@ function loadStatusCore(bypassCache = false) {
           logDebug('✅ Sheet details included in integrated response, applying configuration');
           updateLoadingMessage('シート設定を適用中...');
           try {
-            populateHeaderOptions(response.sheetDetails.allHeaders);
+            safeCall('populateHeaderOptions', details.allHeaders);
             logDebug('✅ Header options populated from integrated data');
             populateConfig(response.sheetDetails.guessedConfig);
             logDebug('✅ AI configuration applied from integrated data');
@@ -817,7 +817,6 @@ function proceedWithSaveAndPublish(config) {
         
         // ボードビューアーに即座更新を通知
         try {
-          
           if (window.parent && window.parent !== window) {
             window.parent.postMessage({
               type: 'BOARD_PUBLISHED',

@@ -427,11 +427,11 @@ function setupModalHandlers() {
   var privacyCancel = document.getElementById('privacy-modal-cancel');
   
   if (privacyClose) {
-    privacyClose.addEventListener('click', hidePrivacyModal);
+    privacyClose.addEventListener('click', function() { safeCall('hidePrivacyModal'); });
   }
   
   if (privacyCancel) {
-    privacyCancel.addEventListener('click', hidePrivacyModal);
+    privacyCancel.addEventListener('click', function() { safeCall('hidePrivacyModal'); });
   }
   
   // Digital citizenship modal
@@ -479,7 +479,7 @@ function setupBackdropClickHandlers() {
               safeCall('hideFormConfigModal');
               break;
             case 'privacy-modal':
-              hidePrivacyModal();
+              safeCall('hidePrivacyModal');
               break;
             case 'digital-citizenship-modal':
               hideDigitalCitizenshipModal();
