@@ -36,6 +36,9 @@ function updateUIWithNewStatusInternal(status) {
     // システム状況パネルの更新（updateDatabaseInfoに統合済み）
     updateDatabaseInfo(status);
     
+    // 修復機能用のステータスキャッシュを設定
+    window.lastStatusCache = status;
+    
     console.log('✅ Simplified UI update completed');
   } catch (error) {
     console.error('❌ UI update failed:', error);

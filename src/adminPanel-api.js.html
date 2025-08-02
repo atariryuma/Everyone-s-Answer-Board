@@ -580,12 +580,32 @@ function repairSetupStateInconsistencies() {
     try {
       console.log('🔧 セットアップ状態の診断・修復を開始...');
       
-      // currentStatusを取得
-      const currentStatus = window.lastStatusCache;
+      // currentStatusを取得（複数のフォールバック）
+      let currentStatus = window.lastStatusCache || window.currentStatus || window.globalStatus;
       
+      // フォールバックでも取得できない場合は動的に取得を試行
       if (!currentStatus || !currentStatus.userInfo) {
-        reject(new Error('ユーザー情報が利用できません'));
-        return;
+        console.log('⚠️ キャッシュされたステータスが利用できません。動的取得を試行...');
+        
+        // loadStatus を呼び出して最新状態を取得
+        if (typeof loadStatus === 'function') {
+          loadStatus(true).then(() => {
+            currentStatus = window.lastStatusCache;
+            if (currentStatus && currentStatus.userInfo) {
+              console.log('✅ 動的取得成功、修復を続行...');
+              // 再帰的に修復を実行
+              repairSetupStateInconsistencies().then(resolve).catch(reject);
+            } else {
+              reject(new Error('動的取得後もユーザー情報が利用できません'));
+            }
+          }).catch(error => {
+            reject(new Error(`ステータス取得に失敗: ${error.message}`));
+          });
+          return; // 動的取得中は処理を中断
+        } else {
+          reject(new Error('ユーザー情報が利用できません（loadStatus関数も利用不可）'));
+          return;
+        }
       }
       
       const config = typeof currentStatus.userInfo.configJson === 'string' 

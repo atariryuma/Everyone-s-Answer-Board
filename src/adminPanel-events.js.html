@@ -355,6 +355,9 @@ function setupResourceHandlers() {
   
   if (resetConfigBtn) {
     resetConfigBtn.addEventListener('click', resetConfigJson);
+    console.log('✅ Reset config button handler attached');
+  } else {
+    console.warn('⚠️ Reset config button not found');
   }
 }
 
@@ -370,9 +373,9 @@ function setupAccountManagementHandlers() {
     deleteBtn.removeEventListener('click', handleDeleteRequest);
     // 新しいイベントリスナーを追加
     deleteBtn.addEventListener('click', handleDeleteRequest);
-    console.log('Delete account button event listener attached successfully');
+    console.log('✅ Delete account button handler attached');
   } else {
-    console.warn('Delete account button not found');
+    console.warn('⚠️ Delete account button not found');
   }
   
   // Switch account handlers
