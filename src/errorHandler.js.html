@@ -30,11 +30,27 @@ const ERROR_CATEGORIES = {
 };
 
 /**
+ * 環境に応じたUUID生成
+ * @returns {string} UUID文字列
+ */
+function generateUuid() {
+  if (typeof Utilities !== 'undefined' && typeof Utilities.getUuid === 'function') {
+    return Utilities.getUuid();
+  }
+
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/**
  * 統一エラーハンドラークラス
  */
 class UnifiedErrorHandler {
   constructor() {
-    this.sessionId = Utilities.getUuid();
+    this.sessionId = generateUuid();
     this.errorCount = 0;
     this.startTime = Date.now();
   }
@@ -195,7 +211,7 @@ class UnifiedErrorHandler {
     const baseInfo = {
       timestamp: new Date().toISOString(),
       sessionId: this.sessionId,
-      errorId: Utilities.getUuid(),
+      errorId: generateUuid(),
       context: context,
       severity: severity,
       category: category,
