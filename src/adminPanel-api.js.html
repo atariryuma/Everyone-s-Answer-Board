@@ -2306,6 +2306,9 @@ function handleCustomSetup(config) {
     });
 }
 
+// QuickStart実行状態の管理
+let isQuickStartInProgress = false;
+
 // Handle quick start setup
 function handleQuickStart() {
   const quickstartBtn = document.getElementById('quickstart-btn');
@@ -2313,6 +2316,13 @@ function handleQuickStart() {
   
   if (!quickstartBtn || !quickstartText) {
     console.error('QuickStart elements not found');
+    return;
+  }
+
+  // 多重実行防止チェック
+  if (isQuickStartInProgress) {
+    console.log('⚠️ QuickStartは既に実行中です。完了をお待ちください。');
+    showMessage('クイックスタートは既に実行中です。完了をお待ちください。', 'info');
     return;
   }
 
@@ -2350,6 +2360,10 @@ function checkPublicationStatusAndProceed(onProceed, onCancel) {
 
 // クイックスタートの実際の実行
 function executeQuickStart(quickstartBtn, quickstartText) {
+  // QuickStart実行開始フラグを設定
+  isQuickStartInProgress = true;
+  console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定');
+  
   // 現在の公開状態を確認
   const isCurrentlyPublished = currentStatus && 
                                currentStatus._normalized && 
@@ -2474,6 +2488,10 @@ function resetQuickStartButton(quickstartBtn, quickstartText) {
     quickstartBtn.disabled = false;
     quickstartText.textContent = 'クイックスタートを開始';
   }
+  
+  // 多重実行防止フラグもクリア
+  isQuickStartInProgress = false;
+  console.log('🔓 QuickStartリセット - 多重実行防止フラグをクリア');
 }
 
 // クイックスタートの実際の処理実行
@@ -2528,6 +2546,10 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         } else {
           updateProgressStep(5, 'completed', '回答ボード作成完了', '📝 手動公開の準備ができました');
         }
+        
+        // QuickStart成功完了 - 多重実行防止フラグをクリア
+        isQuickStartInProgress = false;
+        console.log('🔓 QuickStart成功完了 - 多重実行防止フラグをクリア');
         
         // Log detailed completion status
         console.log('📊 QuickStart完了詳細:', {
@@ -2764,6 +2786,10 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
       
       quickstartBtn.disabled = false;
       quickstartText.textContent = 'クイックスタートを開始';
+      
+      // QuickStartエラー完了 - 多重実行防止フラグをクリア
+      isQuickStartInProgress = false;
+      console.log('🔓 QuickStartエラー完了 - 多重実行防止フラグをクリア');
       
       // Hide progress bar after delay
       setTimeout(() => {

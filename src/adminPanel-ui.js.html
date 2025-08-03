@@ -1077,7 +1077,8 @@ function updateTopicText(status) {
             // フォールバック: 直接のopinionHeader
             topic = sheetCfg.opinionHeader;
           } else {
-            topic = sheetName || '（問題文未設定）';
+            // シート名ではなく、適切なデフォルトメッセージを表示
+            topic = '（質問文が設定されていません）';
           }
         } catch (e) {
           topic = sheetName || '（問題文未設定）';
@@ -2185,6 +2186,35 @@ function updateSystemStatusDisplay(status) {
   // statusオブジェクトにformUrlを設定
   status.formUrl = formUrl;
 
+  // folderUrlとeditFormUrlも同様に設定（updateNewResourceButtons用）
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      const configJson = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+      
+      // フォルダURL設定
+      status.folderUrl = configJson.folderUrl;
+      
+      // 編集フォームURL設定（シート固有優先）
+      const publishedSheetName = configJson.publishedSheetName;
+      if (publishedSheetName) {
+        const sheetConfigKey = `sheet_${publishedSheetName}`;
+        const sheetConfig = configJson[sheetConfigKey];
+        if (sheetConfig && sheetConfig.editFormUrl) {
+          status.editFormUrl = sheetConfig.editFormUrl;
+        }
+      }
+      
+      // フォールバック: トップレベルのeditFormUrl
+      if (!status.editFormUrl && configJson.editFormUrl) {
+        status.editFormUrl = configJson.editFormUrl;
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to extract additional URLs from configJson:', error);
+    }
+  }
+
   if (status.formUrl) { // statusオブジェクトにformUrlが存在する場合
     if (formBtn) {
       formBtn.disabled = false;
@@ -2975,38 +3005,9 @@ function updateNewResourceButtons(status) {
   const folderBtn = document.getElementById('open-folder-btn');
   const editFormBtn = document.getElementById('open-edit-form-btn');
   
-  let folderUrl = null;
-  let editFormUrl = null;
-  
-  // configJsonからフォルダURLと編集フォームURLを取得
-  if (status.userInfo && status.userInfo.configJson) {
-    try {
-      const configJson = typeof status.userInfo.configJson === 'string' 
-        ? JSON.parse(status.userInfo.configJson) 
-        : status.userInfo.configJson;
-      
-      // フォルダURL取得
-      folderUrl = configJson.folderUrl;
-      
-      // 編集フォームURL取得（シート固有優先）
-      const publishedSheetName = configJson.publishedSheetName;
-      if (publishedSheetName) {
-        const sheetConfigKey = `sheet_${publishedSheetName}`;
-        const sheetConfig = configJson[sheetConfigKey];
-        if (sheetConfig && sheetConfig.editFormUrl) {
-          editFormUrl = sheetConfig.editFormUrl;
-        }
-      }
-      
-      // フォールバック: トップレベルのeditFormURL
-      if (!editFormUrl && configJson.editFormUrl) {
-        editFormUrl = configJson.editFormUrl;
-      }
-      
-    } catch (error) {
-      console.warn('⚠️ Failed to parse configJson for new resource buttons:', error);
-    }
-  }
+  // statusオブジェクトから直接URLを取得（updateSystemStatusDisplayで設定済み）
+  const folderUrl = status.folderUrl;
+  const editFormUrl = status.editFormUrl;
   
   // フォルダボタンの有効化
   if (folderBtn) {
