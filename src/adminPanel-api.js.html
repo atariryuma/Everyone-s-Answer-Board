@@ -2572,10 +2572,16 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         }
         
         // Update status after quick start
-        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-          window.unifiedCache.clear();
+        if (result.updatedConfig) {
+          console.log('🔄 クイックスタート完了: サーバーからの最新設定でUIを更新します', result.updatedConfig);
+          const newStatus = { ...currentStatus, ...result.updatedConfig, userInfo: { ...currentStatus.userInfo, configJson: JSON.stringify(result.updatedConfig) } };
+          updateUIWithNewStatus(newStatus);
+        } else {
+          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+            window.unifiedCache.clear();
+          }
+          loadStatus(true);
         }
-        loadStatus(true);
         
         // QuickStartフロー完了確認（包括的な完了状態検証）
         setTimeout(async () => {
