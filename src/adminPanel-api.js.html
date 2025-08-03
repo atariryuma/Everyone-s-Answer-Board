@@ -2360,10 +2360,6 @@ function checkPublicationStatusAndProceed(onProceed, onCancel) {
 
 // クイックスタートの実際の実行
 function executeQuickStart(quickstartBtn, quickstartText) {
-  // QuickStart実行開始フラグを設定
-  isQuickStartInProgress = true;
-  console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定');
-  
   // 現在の公開状態を確認
   const isCurrentlyPublished = currentStatus && 
                                currentStatus._normalized && 
@@ -2375,12 +2371,14 @@ function executeQuickStart(quickstartBtn, quickstartText) {
   });
   
   if (isCurrentlyPublished) {
-    // 公開中の場合: シンプルな新規作成モーダルを表示（停止確認をスキップ）
+    // 公開中の場合: シンプルな新規作成モーダルを表示
     console.log('📢 公開中のため、シンプルな新規作成モーダルを表示します');
     showSimpleQuickStartModal(quickstartBtn, quickstartText);
   } else {
-    // 非公開の場合: 直接クイックスタート実行（自動公開フラグ付き）
+    // 非公開の場合: フラグを設定してから直接クイックスタート実行
     console.log('📝 現在非公開のため、直接クイックスタートを実行します（自動公開）');
+    isQuickStartInProgress = true;
+    console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定');
     executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
   }
 }
@@ -2423,6 +2421,10 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
         // 停止して新規作成ボタンクリック時の処理
         console.log('✅ ユーザーが「停止して新規作成」を選択しました');
         
+        // 確認されたらフラグを設定
+        isQuickStartInProgress = true;
+        console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定（モーダル確認後）');
+        
         // 公開停止処理とクイックスタートを統合実行
         executeStopAndQuickStart(quickstartBtn, quickstartText);
       },
@@ -2437,6 +2439,8 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
     const confirmMessage = '現在公開中の回答ボードを停止して、新しいフォームとボードを作成しますか？\n\n• 既存の回答データは保持されます\n• 新しいフォームとスプレッドシートを作成\n• 高精度AI列判定を実行\n• 作成完了後に自動で再公開';
     
     if (confirm(confirmMessage)) {
+      isQuickStartInProgress = true;
+      console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定（confirm後）');
       executeStopAndQuickStart(quickstartBtn, quickstartText);
     } else {
       resetQuickStartButton(quickstartBtn, quickstartText);

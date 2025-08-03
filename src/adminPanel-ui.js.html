@@ -1058,10 +1058,20 @@ function updateTopicText(status) {
     }
   }
 
+  // デバッグログ: 質問文取得の詳細情報
+  console.log('🔍 updateTopicText - debug info:', {
+    customFormMainQuestion: status.customFormInfo?.mainQuestion || 'null',
+    globalOpinionHeader: cfg.opinionHeader || 'null',
+    publishedSheetName: cfg.publishedSheetName || status.publishedSheetName || 'null',
+    hasUserConfigJson: !!status.userInfo?.configJson
+  });
+
   if (status.customFormInfo && status.customFormInfo.mainQuestion) {
     topic = status.customFormInfo.mainQuestion;
+    console.log('✅ 質問文をカスタムフォーム情報から取得:', topic);
   } else if (cfg.opinionHeader) {
     topic = cfg.opinionHeader;
+    console.log('✅ 質問文をグローバル設定から取得:', topic);
   } else {
     const sheetName = cfg.publishedSheetName || status.publishedSheetName;
     if (sheetName) {
@@ -1070,22 +1080,41 @@ function updateTopicText(status) {
           const fullCfg = JSON.parse(status.userInfo.configJson);
           const sheetCfg = fullCfg['sheet_' + sheetName] || {};
           
-          // guessedConfig内のopinionHeaderを優先
+          console.log('🔍 Sheet config analysis:', {
+            sheetName: sheetName,
+            hasSheetConfig: !!sheetCfg,
+            hasGuessedConfig: !!sheetCfg.guessedConfig,
+            guessedOpinionHeader: sheetCfg.guessedConfig?.opinionHeader || 'null',
+            directOpinionHeader: sheetCfg.opinionHeader || 'null'
+          });
+          
+          // guessedConfig内のopinionHeaderを最優先
           if (sheetCfg.guessedConfig && sheetCfg.guessedConfig.opinionHeader) {
             topic = sheetCfg.guessedConfig.opinionHeader;
+            console.log('✅ 質問文をAI列判定結果から取得:', topic);
           } else if (sheetCfg.opinionHeader) {
             // フォールバック: 直接のopinionHeader
             topic = sheetCfg.opinionHeader;
+            console.log('✅ 質問文をシート設定から取得:', topic);
           } else {
-            // シート名ではなく、適切なデフォルトメッセージを表示
-            topic = '（質問文が設定されていません）';
+            // AI列判定結果が見つからない場合の適切なメッセージ
+            topic = '（AI列判定結果が見つかりません）';
+            console.warn('⚠️ AI列判定結果が見つかりません for sheet:', sheetName);
           }
         } catch (e) {
-          topic = sheetName || '（問題文未設定）';
+          // configJson解析エラーの場合
+          topic = '（設定の解析に失敗しました）';
+          console.error('❌ configJson解析エラー:', e);
         }
       } else {
-        topic = sheetName;
+        // userInfo.configJsonがない場合
+        topic = '（設定情報が見つかりません）';
+        console.warn('⚠️ userInfo.configJsonが見つかりません');
       }
+    } else {
+      // シート名がない場合
+      topic = '（公開シートが未設定）';
+      console.warn('⚠️ publishedSheetNameが未設定');
     }
   }
 
@@ -2088,7 +2117,8 @@ function getActiveResourceUrls(status) {
   };
 
   if (!status || !status.userInfo) {
-    return urls; // ユーザー情報がなければ空のURLを返す
+    console.warn('⚠️ getActiveResourceUrls: status or userInfo is missing');
+    return urls;
   }
 
   // 1. スプレッドシートURLの取得 (userInfo直下から)
@@ -2101,6 +2131,15 @@ function getActiveResourceUrls(status) {
       config = typeof status.userInfo.configJson === 'string' 
         ? JSON.parse(status.userInfo.configJson) 
         : status.userInfo.configJson;
+        
+      // デバッグログ: configJsonの重要フィールドを確認
+      console.log('🔍 getActiveResourceUrls - config analysis:', {
+        folderUrl: config.folderUrl || 'null',
+        editFormUrl: config.editFormUrl || 'null', 
+        formUrl: config.formUrl || 'null',
+        publishedSheetName: config.publishedSheetName || 'null',
+        availableKeys: Object.keys(config).filter(key => key.includes('Url') || key.startsWith('sheet_'))
+      });
     } catch (e) {
       console.warn("configJsonの解析に失敗しました", e);
     }
@@ -2116,6 +2155,12 @@ function getActiveResourceUrls(status) {
     if (sheetConfig) {
       urls.form = sheetConfig.formUrl || urls.form;
       urls.editForm = sheetConfig.editFormUrl || urls.editForm;
+      console.log(`🔍 Sheet-specific URLs for "${publishedSheetName}":`, {
+        formUrl: sheetConfig.formUrl || 'null',
+        editFormUrl: sheetConfig.editFormUrl || 'null'
+      });
+    } else {
+      console.log(`⚠️ No sheet config found for: sheet_${publishedSheetName}`);
     }
   }
   
@@ -2126,7 +2171,9 @@ function getActiveResourceUrls(status) {
   if (!urls.editForm && config.editFormUrl) {
     urls.editForm = config.editFormUrl;
   }
-
+  
+  // 最終結果をログ出力
+  console.log('✅ getActiveResourceUrls - final result:', urls);
   return urls;
 }
 
@@ -2950,12 +2997,21 @@ function formatDateTime(date) {
 
 // 新しいリソースボタンを更新する関数
 function updateNewResourceButtons(resourceUrls) {
+  console.log('🔧 updateNewResourceButtons called with:', resourceUrls);
+  
   const folderBtn = document.getElementById('open-folder-btn');
   const editFormBtn = document.getElementById('open-edit-form-btn');
 
   // 引数で渡されたURLを使用
   const folderUrl = resourceUrls.folder;
   const editFormUrl = resourceUrls.editForm;
+  
+  console.log('🔍 Resource button debug:', {
+    folderUrl: folderUrl || 'null',
+    editFormUrl: editFormUrl || 'null',
+    folderBtnExists: !!folderBtn,
+    editFormBtnExists: !!editFormBtn
+  });
   
   // フォルダボタンの有効化
   if (folderBtn) {

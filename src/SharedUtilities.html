@@ -1019,6 +1019,46 @@ class UnifiedLoadingManager {
     }
     this.setLoading(true, options);
   }
+  
+  // クイックスタート専用の進行状況表示
+  showQuickStartProgress(message, step = 0) {
+    const options = { message, type: 'modal', disableInteraction: true };
+    if (step > 0) {
+      options.steps = [
+        { text: '公開中のボードを停止中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
+        { text: 'フォームとシートを作成中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
+        { text: 'ボードを新規公開中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
+        { text: 'ファイルを整理中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' },
+        { text: '設定を保存中...', status: step > 5 ? 'completed' : step === 5 ? 'active' : 'pending' }
+      ];
+    }
+    this.setLoading(true, options);
+  }
+  
+  // カスタムセットアップ専用の進行状況表示
+  showCustomSetupProgress(message, step = 0) {
+    const options = { message, type: 'modal', disableInteraction: true };
+    if (step > 0) {
+      options.steps = [
+        { text: 'フォーム設定を解析中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
+        { text: 'Googleフォームを作成中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
+        { text: 'スプレッドシートと連携中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
+        { text: 'ボードを公開中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' },
+        { text: 'リソースを整理中...', status: step > 5 ? 'completed' : step === 5 ? 'active' : 'pending' }
+      ];
+    }
+    this.setLoading(true, options);
+  }
+  
+  // データベース反映中の表示
+  showDatabaseSync(message = 'データベースに反映中...', details = '') {
+    const options = { 
+      message: message + (details ? '\n' + details : ''), 
+      type: 'transparent', 
+      disableInteraction: true 
+    };
+    this.setLoading(true, options);
+  }
 }
 
 // Create and initialize the global instance once the DOM is ready.
