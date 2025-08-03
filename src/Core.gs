@@ -2339,21 +2339,31 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   debugLog('  📊 スプレッドシートID:', formAndSsInfo.spreadsheetId);
   debugLog('  📄 シート名:', formAndSsInfo.sheetName);
 
-  // クイックスタート用の適切な初期設定を作成
+  // クイックスタート用の適切な初期設定を作成（guessedConfig形式）
   var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
   var quickStartSheetConfig = {
-    opinionHeader: '今日の学習について、あなたの考えや感想を聞かせてください',
-    reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
-    nameHeader: '名前',
-    classHeader: 'クラス',
+    guessedConfig: {
+      opinionHeader: '今日の学習について、あなたの考えや感想を聞かせてください',
+      reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
+      nameHeader: '名前',
+      classHeader: 'クラス',
+      timestampHeader: 'タイムスタンプ',
+      // 基本的な列マッピング（QuickStart用デフォルト）
+      opinionColumn: 1, // B列（0ベースなので1）
+      nameColumn: 2,    // C列
+      reasonColumn: 3,  // D列  
+      classColumn: 4,   // E列
+      timestampColumn: 0 // A列（タイムスタンプ）
+    },
     formUrl: formAndSsInfo.viewFormUrl || formAndSsInfo.formUrl, // シート固有のフォームURL保存
     editFormUrl: formAndSsInfo.editFormUrl, // 編集用URL保存
-    lastModified: new Date().toISOString()
+    lastModified: new Date().toISOString(),
+    flowType: 'quickstart' // 作成フロー識別用
   };
 
   debugLog('📝 クイックスタート用質問文設定:');
-  debugLog('  💭 メイン質問:', quickStartSheetConfig.opinionHeader);
-  debugLog('  💡 理由質問:', quickStartSheetConfig.reasonHeader);
+  debugLog('  💭 メイン質問:', quickStartSheetConfig.guessedConfig.opinionHeader);
+  debugLog('  💡 理由質問:', quickStartSheetConfig.guessedConfig.reasonHeader);
 
   // 型安全性確保: publishedSheetNameの明示的文字列変換
   var safeSheetName = formAndSsInfo.sheetName;
@@ -2562,6 +2572,10 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, p
 
   var appUrls = generateUserUrls(requestUserId);
   
+  // シート設定データの取得
+  var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
+  var sheetConfig = updatedConfig[sheetConfigKey] || {};
+  
   // 拡張されたレスポンス情報
   var response = {
     status: 'success',
@@ -2581,6 +2595,9 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, p
     sheetName: formAndSsInfo.sheetName,
     formId: formAndSsInfo.formId,
     spreadsheetId: formAndSsInfo.spreadsheetId,
+    // シート設定データ（フロントエンド同期用）
+    config: sheetConfig.guessedConfig || {},
+    publishedSheetName: formAndSsInfo.sheetName,
     // フロントエンド完了通知用のタイムスタンプ
     completedAt: new Date().toISOString(),
     // 成功ステップの詳細

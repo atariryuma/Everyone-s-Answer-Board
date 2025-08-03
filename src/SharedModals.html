@@ -1489,18 +1489,27 @@ class SharedModals {
     const confirmBtn = document.getElementById('quickstart-stop-confirm-btn');
     const cancelBtn = document.getElementById('quickstart-stop-cancel-btn');
     
+    // 既存のイベントハンドラーをクリアして新しいものを設定
     if (confirmBtn) {
-      confirmBtn.onclick = () => {
+      // 古いイベントリスナーを削除
+      const newConfirmBtn = confirmBtn.cloneNode(true);
+      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+      
+      newConfirmBtn.addEventListener('click', () => {
         this.hideModal('quickstart-stop-confirmation-modal');
         if (onConfirm) onConfirm();
-      };
+      });
     }
     
     if (cancelBtn) {
-      cancelBtn.onclick = () => {
+      // 古いイベントリスナーを削除
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      
+      newCancelBtn.addEventListener('click', () => {
         this.hideModal('quickstart-stop-confirmation-modal');
         if (onCancel) onCancel();
-      };
+      });
     }
   }
 
@@ -1525,34 +1534,49 @@ class SharedModals {
     
     let selectedOption = null;
     
+    // 既存のイベントハンドラーをクリア
     if (stopOption && continueOption) {
-      stopOption.onclick = () => {
+      // 古いイベントリスナーを削除してから新しいものを設定
+      const newStopOption = stopOption.cloneNode(true);
+      const newContinueOption = continueOption.cloneNode(true);
+      stopOption.parentNode.replaceChild(newStopOption, stopOption);
+      continueOption.parentNode.replaceChild(newContinueOption, continueOption);
+      
+      newStopOption.addEventListener('click', () => {
         selectedOption = 'stop';
         stopRadio.classList.remove('hidden');
         continueRadio.classList.add('hidden');
         if (confirmBtn) confirmBtn.disabled = false;
-      };
+      });
       
-      continueOption.onclick = () => {
+      newContinueOption.addEventListener('click', () => {
         selectedOption = 'continue';
         continueRadio.classList.remove('hidden');
         stopRadio.classList.add('hidden');
         if (confirmBtn) confirmBtn.disabled = false;
-      };
+      });
     }
     
     if (confirmBtn) {
-      confirmBtn.onclick = () => {
+      // 古いイベントリスナーを削除
+      const newConfirmBtn = confirmBtn.cloneNode(true);
+      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+      
+      newConfirmBtn.addEventListener('click', () => {
         this.hideModal('custom-setup-selection-modal');
         if (onConfirm) onConfirm(selectedOption);
-      };
+      });
     }
     
     if (cancelBtn) {
-      cancelBtn.onclick = () => {
+      // 古いイベントリスナーを削除
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      
+      newCancelBtn.addEventListener('click', () => {
         this.hideModal('custom-setup-selection-modal');
         if (onCancel) onCancel();
-      };
+      });
     }
   }
 }
