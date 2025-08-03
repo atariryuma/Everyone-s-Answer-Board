@@ -10,7 +10,10 @@ if (typeof debugLog === 'undefined') {
 
 // Import standardized error handling functions
 if (typeof logError === 'undefined') {
-  throw new Error('errorHandler.js.html must be loaded before Core.gs');
+  eval(HtmlService.createHtmlOutputFromFile('errorHandler.js').getContent());
+  if (typeof logError === 'undefined') {
+    throw new Error('Failed to load errorHandler.js before Core.gs');
+  }
 }
 
 if (typeof warnLog === 'undefined') {
