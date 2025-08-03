@@ -296,7 +296,10 @@ function setupEventListeners() {
   // Real-time validation
   setupRealtimeValidation();
   
-  UnifiedErrorHandler.logError('✅ AdminPanel: Event handlers ready', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
+    UnifiedErrorHandler.logError('✅ AdminPanel: Event handlers ready', UnifiedErrorHandler.ErrorTypes.INFO, UnifiedErrorHandler.ErrorCategories.SYSTEM_INITIALIZATION);
+  }
+
+  // Close setupEventListeners
 }
 
 // =============================================================================
@@ -658,8 +661,9 @@ function manageFocusForModal(modalId, show) {
   if (!modal) return;
   
   if (show) {
-    // Store currently focused element
-    modal.setAttribute('data-previous-focus', document.activeElement?.id || '');
+    // Store currently focused element - avoid optional chaining for wider compatibility
+    var activeEl = document.activeElement;
+    modal.setAttribute('data-previous-focus', activeEl && activeEl.id ? activeEl.id : '');
     
     // Focus first interactive element in modal
     var firstFocusable = modal.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
