@@ -974,6 +974,7 @@ function updateFooterAndGuidance(status) {
     updateTopicText(status);
     
     guidanceText.textContent = '回答ボードは現在公開中です。';
+    console.log('✅ Footer shown - board is published');
   } else {
     footer.classList.add('hidden');
     console.log('❌ Footer hidden - board not published');
@@ -3042,13 +3043,6 @@ function updateNewResourceButtons(resourceUrls) {
     }
   }
 }
-
-// =============================================================================
-// GLOBAL FUNCTION EXPORTS
-// =============================================================================
-
-// Export key functions to window for global access
-window.updateTopicText = updateTopicText;
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
 </script>
