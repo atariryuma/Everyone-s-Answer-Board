@@ -2165,30 +2165,32 @@ function updateSystemStatusDisplay(status) {
     }
   }
 
-  // フォームボタンの有効化/無効化
+  // フォームボタンの有効化
   const formBtn = document.getElementById('open-form-btn');
   if (formBtn) {
+    formBtn.disabled = false;
+    formBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     if (resourceUrls.form) {
-      formBtn.disabled = false;
+      formBtn.onclick = () => window.open(resourceUrls.form, '_blank');
       formBtn.title = 'フォームを開く';
-      formBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     } else {
-      formBtn.disabled = true;
+      formBtn.onclick = () => showMessage('フォームURLが未設定です。フォームを作成してください。', 'warning');
       formBtn.title = 'フォームURLが未設定です。フォームを作成してください。';
-      formBtn.classList.add('opacity-50', 'cursor-not-allowed');
     }
   }
 
-  // Handle generic resource button in Step 1 (spreadsheet only)
+  // Handle generic resource button in Step 1 (any resource)
   const resourceBtn = document.getElementById('add-resource-btn');
-  if (resourceBtn && resourceUrls.spreadsheet) {
+  if (resourceBtn) {
+    const anyResourceUrl = resourceUrls.spreadsheet || resourceUrls.folder || resourceUrls.form || resourceUrls.editForm;
     resourceBtn.disabled = false;
-    resourceBtn.onclick = () => {
-      window.open(resourceUrls.spreadsheet, '_blank');
-    };
-
-    // Update button title for spreadsheet only
-    resourceBtn.title = 'スプレッドシートを開く';
+    if (anyResourceUrl) {
+      resourceBtn.onclick = () => window.open(anyResourceUrl, '_blank');
+      resourceBtn.title = 'リソースを開く';
+    } else {
+      resourceBtn.onclick = () => showMessage('リソースURLが未設定です', 'warning');
+      resourceBtn.title = 'リソースURLが未設定です';
+    }
   }
 
   // Handle new resource buttons
@@ -2957,35 +2959,31 @@ function updateNewResourceButtons(resourceUrls) {
   
   // フォルダボタンの有効化
   if (folderBtn) {
+    folderBtn.disabled = false;
+    folderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     if (folderUrl) {
-      folderBtn.disabled = false;
       folderBtn.onclick = () => window.open(folderUrl, '_blank');
       folderBtn.title = 'ドライブフォルダを開く';
-      folderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       console.log('✅ Folder button enabled with URL:', folderUrl);
     } else {
-      folderBtn.disabled = true;
-      folderBtn.onclick = null;
+      folderBtn.onclick = () => showMessage('フォルダURLが未設定です', 'warning');
       folderBtn.title = 'フォルダURLが未設定です';
-      folderBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      console.log('⚠️ Folder button disabled - no URL available');
+      console.log('⚠️ Folder button enabled - no URL available');
     }
   }
-  
+
   // 編集フォームボタンの有効化
   if (editFormBtn) {
+    editFormBtn.disabled = false;
+    editFormBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     if (editFormUrl) {
-      editFormBtn.disabled = false;
       editFormBtn.onclick = () => window.open(editFormUrl, '_blank');
       editFormBtn.title = 'フォーム編集画面を開く';
-      editFormBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       console.log('✅ Edit form button enabled with URL:', editFormUrl);
     } else {
-      editFormBtn.disabled = true;
-      editFormBtn.onclick = null;
+      editFormBtn.onclick = () => showMessage('編集フォームURLが未設定です', 'warning');
       editFormBtn.title = '編集フォームURLが未設定です';
-      editFormBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      console.log('⚠️ Edit form button disabled - no URL available');
+      console.log('⚠️ Edit form button enabled - no URL available');
     }
   }
 }
