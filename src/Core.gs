@@ -8,9 +8,15 @@ if (typeof debugLog === 'undefined') {
   var debugLog = function() {};
 }
 
-// Import standardized error handling functions
+// Import standardized error handling functions from the shared HTML file
 if (typeof logError === 'undefined') {
-  eval(HtmlService.createHtmlOutputFromFile('errorHandler.js').getContent());
+  const errorHandlerCode = HtmlService
+    .createHtmlOutputFromFile('errorHandler.js')
+    .getContent()
+    .replace(/<script[^>]*>/i, '')
+    .replace(/<\/script>/i, '')
+    .trim();
+  eval(errorHandlerCode);
   if (typeof logError === 'undefined') {
     throw new Error('Failed to load errorHandler.js before Core.gs');
   }
