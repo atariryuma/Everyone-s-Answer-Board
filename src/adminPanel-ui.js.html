@@ -2176,6 +2176,24 @@ function getActiveResourceUrls(status) {
   return urls;
 }
 
+// =============================================================================
+// RESOURCE BUTTON FUNCTIONS
+// =============================================================================
+
+function openSpreadsheet() {
+  const resourceUrls = getActiveResourceUrls(currentStatus);
+  if (resourceUrls.spreadsheet) {
+    window.open(resourceUrls.spreadsheet, '_blank');
+  }
+}
+
+function openFolder() {
+  const resourceUrls = getActiveResourceUrls(currentStatus);
+  if (resourceUrls.folder) {
+    window.open(resourceUrls.folder, '_blank');
+  }
+}
+
 function updateSystemStatusDisplay(status) {
   if (!status) return;
 
@@ -3049,6 +3067,9 @@ function updateNewResourceButtons(resourceUrls) {
 
 // Export key functions to window for global access
 window.updateTopicText = updateTopicText;
+window.getActiveResourceUrls = getActiveResourceUrls;
+window.openSpreadsheet = openSpreadsheet;
+window.openFolder = openFolder;
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
 </script>
