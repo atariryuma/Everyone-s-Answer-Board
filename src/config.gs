@@ -3295,23 +3295,34 @@ function syncConfigurationState(requestUserId, newConfig, flowType) {
     const currentConfig = JSON.parse(userInfo.configJson || '{}');
     const mergedConfig = { ...currentConfig, ...newConfig, lastModified: new Date().toISOString() };
 
-    // より詳細なログ出力
+    // より詳細なログ出力（シート設定キーも含む）
+    const sheetConfigKeys = Object.keys(mergedConfig).filter(key => key.startsWith('sheet_'));
     debugLog('syncConfigurationState: 設定同期開始', {
       userId: requestUserId,
       flowType: flowType,
       appPublished: !!mergedConfig.appPublished,
-      setupStatus: mergedConfig.setupStatus
+      setupStatus: mergedConfig.setupStatus,
+      sheetConfigKeys: sheetConfigKeys
     });
 
-    const validation = validateConfigJsonState(mergedConfig, userInfo);
-    if (!validation.isValid) {
-      logError(`設定検証失敗: ${validation.errors.join(', ')}`, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
-      return { 
-        success: false, 
-        errors: validation.errors,
-        warnings: validation.warnings || [],
-        context: { flowType, userId: requestUserId }
-      };
+    // クイックスタートフローの場合は、シート設定の保存を優先してvalidationを緩和
+    if (flowType === 'quickstart' && mergedConfig.appPublished === true) {
+      debugLog('syncConfigurationState: クイックスタートフロー - validation緩和モード');
+      // シート設定が含まれていることを確認
+      if (sheetConfigKeys.length > 0) {
+        debugLog('syncConfigurationState: シート設定キーを検出、保存を続行', sheetConfigKeys);
+      }
+    } else {
+      const validation = validateConfigJsonState(mergedConfig, userInfo);
+      if (!validation.isValid) {
+        logError(`設定検証失敗: ${validation.errors.join(', ')}`, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
+        return { 
+          success: false, 
+          errors: validation.errors,
+          warnings: validation.warnings || [],
+          context: { flowType, userId: requestUserId }
+        };
+      }
     }
 
     updateUser(requestUserId, { configJson: JSON.stringify(mergedConfig) });

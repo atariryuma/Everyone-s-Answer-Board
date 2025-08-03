@@ -181,6 +181,7 @@ function executeParallelUIUpdates(status) {
     () => {
       clearInitialDisplayElements();
       updateStaticUI(status);
+      updateUnpublishButton(status);
       if (setupStatus === 'pending') {
         updateButtonStatesForSetup(status);
       }

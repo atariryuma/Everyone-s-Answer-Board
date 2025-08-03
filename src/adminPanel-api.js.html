@@ -1517,6 +1517,13 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       const sheetKey = 'sheet_' + expectedState.sheetName;
       const currentSheetConfig = configJson[sheetKey];
       
+      console.log(`🔍 ${flowType}フロー: シート設定確認`, {
+        sheetKey: sheetKey,
+        hasCurrentConfig: !!currentSheetConfig,
+        hasGuessedConfig: !!(currentSheetConfig?.guessedConfig),
+        expectedConfigKeys: Object.keys(expectedState.config || {})
+      });
+      
       if (!currentSheetConfig || !currentSheetConfig.guessedConfig) {
         synchronizationIssues.push(`シート設定未保存: ${sheetKey}`);
         updatedConfig[sheetKey] = {
@@ -1525,6 +1532,10 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
           flowType: flowType
         };
         needsSync = true;
+        console.log(`📝 ${flowType}フロー: シート設定を作成`, { 
+          sheetKey, 
+          configKeys: Object.keys(expectedState.config || {}) 
+        });
       }
     }
     
@@ -1557,7 +1568,13 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
           success: false,
           synchronized: false,
           issues: synchronizationIssues,
-          message: '設定同期修正に失敗しました'
+          syncResult: syncResult,
+          message: '設定同期修正に失敗しました',
+          details: {
+            errors: syncResult?.errors || [],
+            systemError: syncResult?.systemError,
+            context: syncResult?.context
+          }
         };
       }
     } else {
