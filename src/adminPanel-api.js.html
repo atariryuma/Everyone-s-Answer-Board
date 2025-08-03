@@ -103,15 +103,8 @@ function loadStatus(bypassCache = false) {
 
     // runGasWithUserId を使用して getInitialData を呼び出す
     // 最新のステータスを取得するため追加の引数は不要
-    if (window.unifiedLoading) {
-      window.unifiedLoading.showApiProgress('初期データを取得中...', 0, 'システム情報とユーザー設定を読み込んでいます...');
-    }
     return runGasWithUserId('getInitialData', 'システム情報を読み込み中...')
       .then(response => {
-        if (window.unifiedLoading) {
-          window.unifiedLoading.showApiProgress('初期データを取得中...', 100, 'システム情報の読み込みが完了しました');
-          setTimeout(() => window.unifiedLoading.hide(), 500);
-        }
         logDebug('✅ Integrated data loaded:', response);
 
         // Update UI with integrated response
@@ -253,10 +246,6 @@ function runHeaderGuessing() {
     // Show start notification
     showMessage('🤖 高精度AI判定システムが起動しました。データを分析中...', 'info');
     
-    if (window.unifiedLoading) {
-      window.unifiedLoading.showDatabaseProgress('AI分析を実行中...', 25, 'スプレッドシートデータを解析しています...');
-    }
-    
     runGasWithUserId('getSheetDetails', 'AI搭載高精度列判定システムが分析中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
       .then(function(details) {
         if (!details || !details.guessedConfig) {
@@ -269,11 +258,6 @@ function runHeaderGuessing() {
           ...details.guessedConfig,
           sheetName: selectedSheet
         };
-        
-        if (window.unifiedLoading) {
-          window.unifiedLoading.showDatabaseProgress('AI分析を実行中...', 100, 'AI列判定が完了しました');
-          setTimeout(() => window.unifiedLoading.hide(), 1000);
-        }
         
         setTimeout(() => {
           populateConfig(configToUse);
@@ -647,20 +631,12 @@ function proceedWithSaveAndPublish(config) {
   freshSaveTimestamp = Date.now();
   window.freshSaveTimestamp = freshSaveTimestamp;
   
-  if (window.unifiedLoading) {
-    window.unifiedLoading.showFileProgress('設定を保存中...', 30, '設定データをサーバーに保存しています...');
-  }
-  
   runGasWithUserId('saveAndPublish', '設定を保存し、ボードを公開しています...', selectedSheet, config)
     .then(function(result) {
       isSaveInProgress = false;
       
       // Check if result has data (from integrated API) or legacy success status
       if (result && (result.userInfo || result.status === 'success')) {
-        if (window.unifiedLoading) {
-          window.unifiedLoading.showFileProgress('設定を保存中...', 100, 'ボードの公開が完了しました！');
-          setTimeout(() => window.unifiedLoading.hide(), 1000);
-        }
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
         // 履歴に保存
@@ -1941,18 +1917,6 @@ function updateProgressStep(stepId, status, text, detail) {
       detailElement.className = 'text-xs text-red-400';
       break;
   }
-  
-  // Sync with unified loading system if available
-  if (window.unifiedLoading && status === 'active') {
-    const currentProgress = window.unifiedLoading.currentState?.progress || 0;
-    window.unifiedLoading.setLoading(true, {
-      message: text,
-      type: 'quickstart',
-      progress: currentProgress,
-      statusText: detail,
-      disableInteraction: false
-    });
-  }
 }
 
 // Update overall progress bar
@@ -1971,17 +1935,6 @@ function updateOverallProgress(percentage, statusMessage) {
   
   if (progressStatus) {
     progressStatus.textContent = statusMessage;
-  }
-  
-  // Integrate with unified loading system
-  if (window.unifiedLoading && window.unifiedLoading.currentState) {
-    window.unifiedLoading.setLoading(true, {
-      message: statusMessage,
-      type: 'quickstart',
-      progress: percentage,
-      statusText: `進行状況: ${percentage}% - ${statusMessage}`,
-      disableInteraction: false
-    });
   }
 }
 
@@ -2495,68 +2448,42 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
   }
 }
 
-// 公開停止とクイックスタートの統合処理 - 直接実行バージョン
+// 公開停止とクイックスタートの統合処理
 function executeStopAndQuickStart(quickstartBtn, quickstartText) {
-  console.log('🛑📋 統合処理を直接開始します（停止+新規作成）');
+  console.log('🛑📋 公開停止→クイックスタートの統合処理を開始します');
   
   // ボタン状態を更新
   quickstartBtn.disabled = true;
-  quickstartText.textContent = '統合処理を開始中...';
+  quickstartText.textContent = '公開停止中...';
   
-  // 進捗表示を開始
-  showQuickStartProgress();
-  
-  // 統合進捗メッセージ
-  updateOverallProgress(10, '既存ボードを停止中...');
-  updateProgressStep(1, 'active', '既存ボードの停止', '現在公開中のボードを停止しています...');
-  
-  // 統合処理を直接実行（stopAndQuickstart専用のバックエンド関数を呼び出し）
-  if (window.unifiedLoading) {
-    window.unifiedLoading.showApiProgress('統合処理を実行中...', 20, '既存ボードの停止と新規作成を並行処理しています...');
-  }
-  
-  runGasWithUserId('stopAndQuickStart', false)
-    .then(function(result) {
-      if (result && result.status === 'success') {
-        console.log('🎉 統合処理（停止+新規作成）完了:', result);
+  // 1. まず公開停止処理を実行
+  if (typeof unpublishBoard === 'function') {
+    showMessage('現在の回答ボードを停止しています...', 'info');
+    
+    unpublishBoard()
+      .then(function(stopResult) {
+        console.log('✅ 公開停止が完了しました:', stopResult);
+        showMessage('✅ 公開停止が完了しました。新しいフォームを作成します...', 'success');
         
-        if (window.unifiedLoading) {
-          window.unifiedLoading.showApiProgress('統合処理を実行中...', 100, 'セットアップが完了しました！');
-          setTimeout(() => window.unifiedLoading.hide(), 1500);
-        }
-        
-        // 最終完了状態
-        updateOverallProgress(100, 'セットアップ完了！新しいボードが公開されました！');
-        updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 新しいフォームとボードの準備が整いました！');
-        
-        const successMessage = '✅ 既存ボードを停止し、新しいフォームとボードを作成しました！';
-        showMessage(successMessage, 'success');
-        
-        // ボタンの状態をリセット
+        // 公開停止が完了したら、少し遅延してからクイックスタートを実行
         setTimeout(() => {
-          hideQuickStartProgress();
-          resetQuickStartButton(quickstartBtn, quickstartText);
+          quickstartText.textContent = 'セットアップ中...';
+          console.log('🚀 クイックスタート処理を開始します（自動公開モード）');
           
-          // ページリロードして最新状態を反映
-          console.log('🔄 統合処理完了後、ページを更新します');
-          location.reload();
-        }, 2000);
-        
-      } else {
-        console.error('❌ 統合処理に失敗しました:', result);
-        updateOverallProgress(100, '❌ 処理に失敗しました');
-        showMessage('❌ 統合処理に失敗しました。再度お試しください。', 'error');
-        hideQuickStartProgress();
+          // 2. クイックスタート実行（自動公開フラグ付き）
+          executeQuickStartProcess(quickstartBtn, quickstartText, true);
+        }, 1000);
+      })
+      .catch(function(stopError) {
+        console.error('❌ 公開停止に失敗しました:', stopError);
+        showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
         resetQuickStartButton(quickstartBtn, quickstartText);
-      }
-    })
-    .catch(function(error) {
-      console.error('❌ 統合処理でエラーが発生:', error);
-      updateOverallProgress(100, '❌ エラーが発生しました');
-      showMessage('❌ 処理中にエラーが発生しました: ' + (error.message || error), 'error');
-      hideQuickStartProgress();
-      resetQuickStartButton(quickstartBtn, quickstartText);
-    });
+      });
+  } else {
+    console.error('❌ unpublishBoard function not found');
+    showMessage('❌ 公開停止機能が見つかりません。ページを再読み込みしてください。', 'error');
+    resetQuickStartButton(quickstartBtn, quickstartText);
+  }
 }
 
 // クイックスタートボタンの状態をリセット
