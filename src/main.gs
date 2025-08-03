@@ -232,12 +232,19 @@ function saveHistoryOnAutoStop(config, userInfo) {
  * @return {string} 質問文
  */
 function getQuestionTextFromConfig(config, userInfo) {
-  // 1. sheet固有設定から取得
+  // 1. sheet固有設定から取得（guessedConfig優先）
   if (config.publishedSheetName) {
     const sheetConfigKey = `sheet_${config.publishedSheetName}`;
     const sheetConfig = config[sheetConfigKey];
-    if (sheetConfig && sheetConfig.opinionHeader) {
-      return sheetConfig.opinionHeader;
+    if (sheetConfig) {
+      // guessedConfig内のopinionHeaderを優先
+      if (sheetConfig.guessedConfig && sheetConfig.guessedConfig.opinionHeader) {
+        return sheetConfig.guessedConfig.opinionHeader;
+      }
+      // フォールバック: 直接のopinionHeader
+      if (sheetConfig.opinionHeader) {
+        return sheetConfig.opinionHeader;
+      }
     }
   }
 

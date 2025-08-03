@@ -338,8 +338,12 @@ function updateDatabaseInfo(status) {
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
-  safeSetText('info-answer-count', status.answerCount || '0');
-  safeSetText('info-reaction-count', status.totalReactions || '0');
+  
+  // セットアップ情報の更新
+  updateSetupInfo(status);
+  
+  // 自動停止設定の更新
+  updateAutoStopInfo(status);
 
   // 公開状態の表示を更新
   const isPublished = cfg.isPublished !== undefined
@@ -1065,7 +1069,16 @@ function updateTopicText(status) {
         try {
           const fullCfg = JSON.parse(status.userInfo.configJson);
           const sheetCfg = fullCfg['sheet_' + sheetName] || {};
-          topic = sheetCfg.opinionHeader || sheetName || '（問題文未設定）';
+          
+          // guessedConfig内のopinionHeaderを優先
+          if (sheetCfg.guessedConfig && sheetCfg.guessedConfig.opinionHeader) {
+            topic = sheetCfg.guessedConfig.opinionHeader;
+          } else if (sheetCfg.opinionHeader) {
+            // フォールバック: 直接のopinionHeader
+            topic = sheetCfg.opinionHeader;
+          } else {
+            topic = sheetName || '（問題文未設定）';
+          }
         } catch (e) {
           topic = sheetName || '（問題文未設定）';
         }
@@ -2113,8 +2126,6 @@ function updateSystemStatusDisplay(status) {
   document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
   document.getElementById('info-display-mode').textContent = status.displayMode || '-';
   document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
-  document.getElementById('info-answer-count').textContent = status.answerCount || '0';
-  document.getElementById('info-reaction-count').textContent = status.reactionCount || '0';
   
   // Enable resource buttons if URLs are available
   const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
@@ -2131,16 +2142,28 @@ function updateSystemStatusDisplay(status) {
   // フォームURLの取得（複数ソースから）
   let formUrl = null;
   
-  // 1. configJsonから取得
+  // 1. configJsonから取得（シート固有優先）
   if (status.userInfo && status.userInfo.configJson) {
     try {
       const configJson = typeof status.userInfo.configJson === 'string' 
         ? JSON.parse(status.userInfo.configJson) 
         : status.userInfo.configJson;
       
-      if (configJson && configJson.formUrl) {
+      // 1a. シート固有のformURLを最優先
+      const publishedSheetName = configJson.publishedSheetName;
+      if (publishedSheetName) {
+        const sheetConfigKey = `sheet_${publishedSheetName}`;
+        const sheetConfig = configJson[sheetConfigKey];
+        if (sheetConfig && sheetConfig.formUrl) {
+          formUrl = sheetConfig.formUrl;
+          console.log('✅ FormURL found in sheet-specific config:', formUrl);
+        }
+      }
+      
+      // 1b. フォールバック: トップレベルのformURL
+      if (!formUrl && configJson && configJson.formUrl) {
         formUrl = configJson.formUrl;
-        console.log('✅ FormURL found in configJson:', formUrl);
+        console.log('✅ FormURL found in top-level configJson:', formUrl);
       }
     } catch (error) {
       console.warn('⚠️ configJson parse error:', error);
@@ -2191,6 +2214,9 @@ function updateSystemStatusDisplay(status) {
     // Update button title for spreadsheet only
     resourceBtn.title = 'スプレッドシートを開く';
   }
+  
+  // Handle new resource buttons
+  updateNewResourceButtons(status);
 }
 
 // Navigate to specific step
@@ -2837,6 +2863,185 @@ document.addEventListener('DOMContentLoaded', function() {
   
   waitForDependencies();
 });
+
+// セットアップ情報を更新する関数
+function updateSetupInfo(status) {
+  try {
+    // statusからconfigJsonデータを取得
+    let configData = {};
+    if (status.userInfo && status.userInfo.configJson) {
+      configData = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+    }
+    
+    // 作成完了日時
+    if (configData.completedAt) {
+      const completedDate = new Date(configData.completedAt);
+      safeSetText('info-completed-at', formatDateTime(completedDate));
+    } else {
+      safeSetText('info-completed-at', '-');
+    }
+    
+    // 公開開始日時
+    if (configData.publishedAt) {
+      const publishedDate = new Date(configData.publishedAt);
+      safeSetText('info-published-at', formatDateTime(publishedDate));
+    } else {
+      safeSetText('info-published-at', '-');
+    }
+    
+    // 公開回数
+    safeSetText('info-publish-count', `${configData.totalPublishCount || 0}回`);
+    
+    // 公開シート名
+    safeSetText('info-published-sheet-name', configData.publishedSheetName || '-');
+    
+    console.log('✅ Setup info updated successfully');
+  } catch (error) {
+    console.warn('⚠️ Failed to update setup info:', error);
+    safeSetText('info-completed-at', '-');
+    safeSetText('info-published-at', '-');
+    safeSetText('info-publish-count', '-');
+    safeSetText('info-published-sheet-name', '-');
+  }
+}
+
+// 自動停止設定を更新する関数
+function updateAutoStopInfo(status) {
+  try {
+    // statusからconfigJsonデータを取得
+    let configData = {};
+    if (status.userInfo && status.userInfo.configJson) {
+      configData = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+    }
+    
+    // 自動停止有効フラグ
+    if (configData.autoStopEnabled) {
+      safeSetText('info-auto-stop-enabled', '有効');
+    } else {
+      safeSetText('info-auto-stop-enabled', '無効');
+    }
+    
+    // 停止時間
+    if (configData.autoStopMinutes) {
+      const hours = Math.floor(configData.autoStopMinutes / 60);
+      const minutes = configData.autoStopMinutes % 60;
+      const durationText = hours > 0 ? `${hours}時間${minutes > 0 ? minutes + '分' : ''}` : `${minutes}分`;
+      safeSetText('info-auto-stop-duration', durationText);
+    } else {
+      safeSetText('info-auto-stop-duration', '-');
+    }
+    
+    // 予定終了日時
+    if (configData.scheduledEndAt) {
+      const endDate = new Date(configData.scheduledEndAt);
+      safeSetText('info-scheduled-end', formatDateTime(endDate));
+    } else {
+      safeSetText('info-scheduled-end', '-');
+    }
+    
+    console.log('✅ Auto-stop info updated successfully');
+  } catch (error) {
+    console.warn('⚠️ Failed to update auto-stop info:', error);
+    safeSetText('info-auto-stop-enabled', '-');
+    safeSetText('info-auto-stop-duration', '-');
+    safeSetText('info-scheduled-end', '-');
+  }
+}
+
+// 日時フォーマット関数
+function formatDateTime(date) {
+  try {
+    const options = {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Tokyo'
+    };
+    return new Intl.DateTimeFormat('ja-JP', options).format(date).replace(/\//g, '-');
+  } catch (error) {
+    console.warn('⚠️ Date formatting failed:', error);
+    return date.toISOString().split('T')[0] + ' ' + date.toISOString().split('T')[1].substring(0, 5);
+  }
+}
+
+// 新しいリソースボタンを更新する関数
+function updateNewResourceButtons(status) {
+  const folderBtn = document.getElementById('open-folder-btn');
+  const editFormBtn = document.getElementById('open-edit-form-btn');
+  
+  let folderUrl = null;
+  let editFormUrl = null;
+  
+  // configJsonからフォルダURLと編集フォームURLを取得
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      const configJson = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+      
+      // フォルダURL取得
+      folderUrl = configJson.folderUrl;
+      
+      // 編集フォームURL取得（シート固有優先）
+      const publishedSheetName = configJson.publishedSheetName;
+      if (publishedSheetName) {
+        const sheetConfigKey = `sheet_${publishedSheetName}`;
+        const sheetConfig = configJson[sheetConfigKey];
+        if (sheetConfig && sheetConfig.editFormUrl) {
+          editFormUrl = sheetConfig.editFormUrl;
+        }
+      }
+      
+      // フォールバック: トップレベルのeditFormURL
+      if (!editFormUrl && configJson.editFormUrl) {
+        editFormUrl = configJson.editFormUrl;
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Failed to parse configJson for new resource buttons:', error);
+    }
+  }
+  
+  // フォルダボタンの有効化
+  if (folderBtn) {
+    if (folderUrl) {
+      folderBtn.disabled = false;
+      folderBtn.onclick = () => window.open(folderUrl, '_blank');
+      folderBtn.title = 'ドライブフォルダを開く';
+      folderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      console.log('✅ Folder button enabled with URL:', folderUrl);
+    } else {
+      folderBtn.disabled = true;
+      folderBtn.onclick = null;
+      folderBtn.title = 'フォルダURLが未設定です';
+      folderBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      console.log('⚠️ Folder button disabled - no URL available');
+    }
+  }
+  
+  // 編集フォームボタンの有効化
+  if (editFormBtn) {
+    if (editFormUrl) {
+      editFormBtn.disabled = false;
+      editFormBtn.onclick = () => window.open(editFormUrl, '_blank');
+      editFormBtn.title = 'フォーム編集画面を開く';
+      editFormBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      console.log('✅ Edit form button enabled with URL:', editFormUrl);
+    } else {
+      editFormBtn.disabled = true;
+      editFormBtn.onclick = null;
+      editFormBtn.title = '編集フォームURLが未設定です';
+      editFormBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      console.log('⚠️ Edit form button disabled - no URL available');
+    }
+  }
+}
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
 </script>

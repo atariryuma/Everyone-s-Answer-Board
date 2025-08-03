@@ -936,22 +936,30 @@
         </div>
       </div>
 
-      <!-- データ状況 -->
+      <!-- セットアップ情報 -->
       <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
         <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          データ状況
+          セットアップ情報
         </h4>
         <div class="space-y-2 text-xs">
           <div class="flex justify-between items-center">
-            <span class="text-gray-400">総回答数:</span>
-            <span class="text-white font-bold text-lg" id="info-answer-count">-</span>
+            <span class="text-gray-400">作成完了:</span>
+            <span class="text-white text-sm" id="info-completed-at">-</span>
           </div>
           <div class="flex justify-between items-center">
-            <span class="text-gray-400">総リアクション数:</span>
-            <span class="text-white font-bold text-lg" id="info-reaction-count">-</span>
+            <span class="text-gray-400">公開開始:</span>
+            <span class="text-white text-sm" id="info-published-at">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">公開回数:</span>
+            <span class="text-white font-bold" id="info-publish-count">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">公開シート:</span>
+            <span class="text-white text-sm" id="info-published-sheet-name">-</span>
           </div>
         </div>
       </div>
@@ -964,7 +972,7 @@
           </svg>
           リソース
         </h4>
-        <div class="space-y-3 text-xs">
+        <div class="space-y-2 text-xs">
           <div class="flex gap-2">
             <button type="button" id="open-spreadsheet-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -972,15 +980,53 @@
               </svg>
               スプレッドシート
             </button>
+            <button type="button" id="open-folder-btn" class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+              </svg>
+              フォルダ
+            </button>
+          </div>
+          <div class="flex gap-2">
             <button type="button" id="open-form-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
-              フォーム
+              フォーム(回答)
+            </button>
+            <button type="button" id="open-edit-form-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2 transition-all" disabled>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+              フォーム(編集)
             </button>
           </div>
         </div>
         
+      </div>
+      
+      <!-- 自動停止設定 -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          自動停止設定
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">自動停止:</span>
+            <span class="text-white text-sm" id="info-auto-stop-enabled">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">停止時間:</span>
+            <span class="text-white text-sm" id="info-auto-stop-duration">-</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">予定終了:</span>
+            <span class="text-white text-sm" id="info-scheduled-end">-</span>
+          </div>
+        </div>
       </div>
       
       <!-- セットアップ修復ツール -->
