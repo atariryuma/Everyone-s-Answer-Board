@@ -2445,11 +2445,6 @@ function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
 function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
   console.log('📱 シンプルクイックスタートモーダルを表示します');
   
-  // 🔧 修正: モーダル表示前に即座にボタン無効化とフラグ設定（二重クリック防止）
-  quickstartBtn.disabled = true;
-  isQuickStartInProgress = true;
-  console.log('🔒 モーダル表示前に多重実行防止フラグとボタン無効化を設定');
-  
   // 共有モーダルを使用してクイックスタート停止確認を表示
   if (window.sharedModals && typeof window.sharedModals.showQuickStartStopConfirmation === 'function') {
     window.sharedModals.showQuickStartStopConfirmation(
@@ -2457,11 +2452,15 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
         // 停止して新規作成ボタンクリック時の処理
         console.log('✅ ユーザーが「停止して新規作成」を選択しました');
         
-        // 公開停止処理とクイックスタートを統合実行（フラグは既に設定済み）
+        // 確認されたらフラグを設定
+        isQuickStartInProgress = true;
+        console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定（モーダル確認後）');
+        
+        // 公開停止処理とクイックスタートを統合実行
         executeStopAndQuickStart(quickstartBtn, quickstartText);
       },
       function() {
-        // キャンセル時の処理: 状態を確実に復元
+        // キャンセル時の処理
         console.log('❌ シンプルクイックスタートがキャンセルされました');
         resetQuickStartButton(quickstartBtn, quickstartText);
       }
@@ -2471,10 +2470,10 @@ function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
     const confirmMessage = '現在公開中の回答ボードを停止して、新しいフォームとボードを作成しますか？\n\n• 既存の回答データは保持されます\n• 新しいフォームとスプレッドシートを作成\n• 高精度AI列判定を実行\n• 作成完了後に自動で再公開';
     
     if (confirm(confirmMessage)) {
-      // 確認済み: 処理続行（フラグは既に設定済み）
+      isQuickStartInProgress = true;
+      console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定（confirm後）');
       executeStopAndQuickStart(quickstartBtn, quickstartText);
     } else {
-      // キャンセル: 状態を確実に復元
       resetQuickStartButton(quickstartBtn, quickstartText);
     }
   }

@@ -19,22 +19,15 @@
         isValid = selectedSheetId || selectedFormId;
         break;
       case 2:
-        // 🔧 修正: Step 2 validation を緩和し、AI判定完了も考慮
+        // Step 2 validation: check for both config validation AND setup completion
         const configValid = currentConfig && validateConfiguration();
         const step2Complete = checkStep2Completion();
-        const aiDetectionComplete = checkAIDetectionComplete();
-        
-        // より柔軟な検証: 設定有効 OR セットアップ完了 OR AI判定完了
-        isValid = configValid || step2Complete || aiDetectionComplete;
+        isValid = configValid || step2Complete;
+        console.log(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`);
         break;
       case 3:
         isValid = true;
         break;
-    }
-    
-    // 🔧 修正: セットアップ完了状態では強制的に有効化
-    if (setupStatus === 'completed') {
-      isValid = true;
     }
     
     savePublishBtn.disabled = !isValid;
@@ -104,27 +97,6 @@
       return setupCompleted;
     } catch (error) {
       console.warn('❌ Step 2完了チェックでエラー:', error);
-      return false;
-    }
-  }
-
-  // 🔧 新規追加: AI判定完了状態をチェック
-  function checkAIDetectionComplete() {
-    if (!currentStatus?.sheetDetails?.guessedConfig) {
-      return false;
-    }
-    
-    try {
-      const guessedConfig = currentStatus.sheetDetails.guessedConfig;
-      
-      // AI判定で必要な要素が揃っているかチェック
-      const hasOpinionColumn = guessedConfig.opinionColumn && guessedConfig.opinionColumn.trim();
-      const hasAuthorColumn = guessedConfig.authorColumn && guessedConfig.authorColumn.trim();
-      
-      const aiComplete = hasOpinionColumn && hasAuthorColumn;
-      return aiComplete;
-    } catch (error) {
-      console.warn('❌ AI判定完了チェックでエラー:', error);
       return false;
     }
   }
@@ -291,8 +263,7 @@
     const hasContent = Object.values(mappings).includes('content');
     const hasAuthor = Object.values(mappings).includes('author');
     
-    // 🔧 修正: より柔軟な検証 - contentのみでも有効とする
-    return hasContent; // authorは必須ではなく推奨とする
+    return hasContent && hasAuthor;
   }
   
   // Handle save and publish - 修正版（公開モーダル経由）
