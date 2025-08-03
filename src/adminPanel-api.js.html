@@ -2326,45 +2326,11 @@ function handleQuickStart() {
     return;
   }
 
-  // 公開状態をチェックして、必要に応じて確認モーダルを表示
-  checkPublicationStatusAndProceed(() => {
-    // 確認完了後の処理
-    executeQuickStart(quickstartBtn, quickstartText);
-  }, () => {
-    // キャンセル時の処理
-    console.log('クイックスタートがキャンセルされました');
-  });
-}
-
-// 公開状態チェックとモーダル表示
-function checkPublicationStatusAndProceed(onProceed, onCancel) {
-  // 現在のステータスから公開状態を確認
-  if (currentStatus && currentStatus._normalized && currentStatus._normalized.isPublished) {
-    // 公開中の場合、確認モーダルを表示
-    window.sharedModals.showQuickStartStopConfirmation(
-      () => {
-        console.log('✅ ユーザーが停止して新規作成を選択');
-        if (onProceed) onProceed();
-      },
-      () => {
-        console.log('❌ ユーザーがキャンセルを選択');
-        if (onCancel) onCancel();
-      }
-    );
-  } else {
-    // 公開していない場合、直接進行
-    console.log('📝 公開されていないため、直接クイックスタートを開始');
-    if (onProceed) onProceed();
-  }
-}
-
-// クイックスタートの実際の実行
-function executeQuickStart(quickstartBtn, quickstartText) {
   // QuickStart実行開始フラグを設定
   isQuickStartInProgress = true;
   console.log('🔒 QuickStart実行開始 - 多重実行防止フラグを設定');
-  
-  // 現在の公開状態を確認
+
+  // 現在の公開状態を確認して適切な処理を実行
   const isCurrentlyPublished = currentStatus && 
                                currentStatus._normalized && 
                                currentStatus._normalized.isPublished;
@@ -2373,11 +2339,33 @@ function executeQuickStart(quickstartBtn, quickstartText) {
     isCurrentlyPublished: isCurrentlyPublished,
     currentStatus: currentStatus?._normalized
   });
-  
+
   if (isCurrentlyPublished) {
-    // 公開中の場合: シンプルな新規作成モーダルを表示（停止確認をスキップ）
-    console.log('📢 公開中のため、シンプルな新規作成モーダルを表示します');
-    showSimpleQuickStartModal(quickstartBtn, quickstartText);
+    // 公開中の場合: 確認モーダルを表示
+    console.log('📢 公開中のため、停止確認モーダルを表示します');
+    if (window.sharedModals && typeof window.sharedModals.showQuickStartStopConfirmation === 'function') {
+      window.sharedModals.showQuickStartStopConfirmation(
+        () => {
+          // 停止して新規作成ボタンクリック時の処理
+          console.log('✅ ユーザーが「停止して新規作成」を選択しました');
+          executeStopAndQuickStart(quickstartBtn, quickstartText);
+        },
+        () => {
+          // キャンセル時の処理
+          console.log('❌ クイックスタートがキャンセルされました');
+          resetQuickStartButton(quickstartBtn, quickstartText);
+        }
+      );
+    } else {
+      // フォールバック: 標準confirm
+      const confirmMessage = '現在公開中の回答ボードを停止して、新しいフォームとボードを作成しますか？\n\n• 既存の回答データは保持されます\n• 新しいフォームとスプレッドシートを作成\n• 高精度AI列判定を実行\n• 作成完了後に自動で再公開';
+      
+      if (confirm(confirmMessage)) {
+        executeStopAndQuickStart(quickstartBtn, quickstartText);
+      } else {
+        resetQuickStartButton(quickstartBtn, quickstartText);
+      }
+    }
   } else {
     // 非公開の場合: 直接クイックスタート実行（自動公開フラグ付き）
     console.log('📝 現在非公開のため、直接クイックスタートを実行します（自動公開）');
@@ -2385,64 +2373,6 @@ function executeQuickStart(quickstartBtn, quickstartText) {
   }
 }
 
-// 公開中ボード停止確認モーダル表示
-function showQuickStartStopConfirmation(quickstartBtn, quickstartText) {
-  if (window.sharedModals && typeof window.sharedModals.showQuickStartStopConfirmation === 'function') {
-    window.sharedModals.showQuickStartStopConfirmation(
-      // 確認時のコールバック
-      () => {
-        console.log('✅ ユーザーが停止して新規作成を確認しました');
-        executeQuickStartProcess(quickstartBtn, quickstartText, true); // autoPublish = true
-      },
-      // キャンセル時のコールバック
-      () => {
-        console.log('❌ クイックスタートがキャンセルされました');
-        quickstartBtn.disabled = false;
-        quickstartText.textContent = 'クイックスタートを開始';
-      }
-    );
-  } else {
-    // フォールバック: 通常の確認ダイアログ
-    if (confirm('現在公開中のボードを停止して、新しいフォームとボードを作成しますか？')) {
-      executeQuickStartProcess(quickstartBtn, quickstartText, true);
-    } else {
-      quickstartBtn.disabled = false;
-      quickstartText.textContent = 'クイックスタートを開始';
-    }
-  }
-}
-
-// 公開中ボード用のシンプルなクイックスタートモーダル表示
-function showSimpleQuickStartModal(quickstartBtn, quickstartText) {
-  console.log('📱 シンプルクイックスタートモーダルを表示します');
-  
-  // 共有モーダルを使用してクイックスタート停止確認を表示
-  if (window.sharedModals && typeof window.sharedModals.showQuickStartStopConfirmation === 'function') {
-    window.sharedModals.showQuickStartStopConfirmation(
-      function() {
-        // 停止して新規作成ボタンクリック時の処理
-        console.log('✅ ユーザーが「停止して新規作成」を選択しました');
-        
-        // 公開停止処理とクイックスタートを統合実行
-        executeStopAndQuickStart(quickstartBtn, quickstartText);
-      },
-      function() {
-        // キャンセル時の処理
-        console.log('❌ シンプルクイックスタートがキャンセルされました');
-        resetQuickStartButton(quickstartBtn, quickstartText);
-      }
-    );
-  } else {
-    // フォールバック: 標準confirm
-    const confirmMessage = '現在公開中の回答ボードを停止して、新しいフォームとボードを作成しますか？\n\n• 既存の回答データは保持されます\n• 新しいフォームとスプレッドシートを作成\n• 高精度AI列判定を実行\n• 作成完了後に自動で再公開';
-    
-    if (confirm(confirmMessage)) {
-      executeStopAndQuickStart(quickstartBtn, quickstartText);
-    } else {
-      resetQuickStartButton(quickstartBtn, quickstartText);
-    }
-  }
-}
 
 // 公開停止とクイックスタートの統合処理
 function executeStopAndQuickStart(quickstartBtn, quickstartText) {
