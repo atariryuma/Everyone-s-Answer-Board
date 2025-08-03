@@ -90,7 +90,7 @@ Googleスプレッドシートをデータベースとして活用し、Google�
 
 #### 【適正サイズファイル】
 6. **auth.gs** (15,249文字) - 認証とアクセス制御
-7. **errorHandler.gs** (9,634文字) - 統一エラーハンドリング
+7. **errorHandler.js.html** (9,634文字) - 統一エラーハンドリング
 8. **unifiedUtilities.gs** (14,094文字) - 統一ユーティリティ
 9. **url.gs** (14,056文字) - URL管理とルーティング
 10. **session-utils.gs** (12,710文字) - セッション管理
@@ -275,7 +275,7 @@ https://www.googleapis.com/auth/userinfo.email
 ### 新規関数作成時の注意点
 1. **重複チェック**: 既存の類似関数がないか確認
 2. **統一クラス優先**: UnifiedUserManager, CacheManager等を優先使用
-3. **エラーハンドリング**: errorHandler.gsの関数を使用
+3. **エラーハンドリング**: errorHandler.js.htmlの関数を使用
 4. **機密情報保護**: ログ出力で機密情報をマスク
 
 ### パフォーマンス考慮事項

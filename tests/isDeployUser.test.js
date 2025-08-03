@@ -2,7 +2,11 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('isDeployUser uses ADMIN_EMAIL property', () => {
-  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
+  const errorHandlerCode = fs
+    .readFileSync('src/errorHandler.js.html', 'utf8')
+    .split('\n')
+    .slice(1, -1)
+    .join('\n');
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
