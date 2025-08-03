@@ -1216,6 +1216,12 @@
   <script>
     // 管理者モーダルの初期化
     document.addEventListener('DOMContentLoaded', function() {
+      // 🔍 Debug: Core objects check (TODO: 削除予定)
+      console.log('AP:', !!window.adminPanel, !!window.unifiedLoading, !!window.statusTextManager);
+      // 🔍 Debug: Functions check (TODO: 削除予定)
+      console.log('F:', !!window.executeStopAndQuickStart, !!window.getActiveResourceUrls, !!window.updateTopicText);
+      console.log('Init:', document.readyState, !!document.getElementById('loading-overlay'));
+      
       if (window.sharedModals) {
         window.sharedModals.loadAdminModals();
       }
