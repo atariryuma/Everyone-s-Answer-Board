@@ -2756,6 +2756,67 @@ function quickStartSetup(requestUserId) {
 }
 
 /**
+ * 統合処理: 既存ボード停止 + 新規クイックスタート
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ */
+function stopAndQuickStart(requestUserId) {
+  verifyUserAccess(requestUserId);
+  try {
+    debugLog('🛑📋 統合処理開始: 既存ボード停止 + 新規クイックスタート', { requestUserId });
+    
+    // ステップ1: 既存ボードの停止（非公開化）
+    debugLog('🛑 ステップ1: 既存ボード停止中...');
+    try {
+      var stopResult = unpublishBoard(requestUserId);
+      if (stopResult && stopResult.status === 'success') {
+        debugLog('✅ ステップ1完了: 既存ボード停止成功');
+      } else {
+        warnLog('⚠️ ステップ1: 既存ボード停止で警告', stopResult);
+      }
+    } catch (stopError) {
+      // 停止エラーは警告として扱い、処理を継続
+      warnLog('⚠️ ステップ1: 既存ボード停止でエラー（処理継続）', stopError.message);
+    }
+    
+    // ステップ2: 新規クイックスタートセットアップ
+    debugLog('🚀 ステップ2: 新規クイックスタート開始...');
+    var quickStartResult = quickStartSetup(requestUserId);
+    
+    if (quickStartResult && quickStartResult.status === 'success') {
+      debugLog('✅ ステップ2完了: 新規クイックスタート成功');
+      
+      // 統合処理の成功レスポンス
+      var integrationResponse = {
+        ...quickStartResult,
+        integrationMode: true,
+        previousBoardStopped: true,
+        message: '既存ボードを停止し、新しいフォームとボードを作成しました！'
+      };
+      
+      debugLog('🎉 統合処理完了', integrationResponse);
+      return integrationResponse;
+      
+    } else {
+      throw new Error('新規クイックスタートに失敗: ' + (quickStartResult?.message || 'unknown error'));
+    }
+    
+  } catch (e) {
+    errorLog('❌ stopAndQuickStart エラー:', e.message);
+    
+    return {
+      status: 'error',
+      message: '統合処理に失敗しました: ' + e.message,
+      integrationMode: true,
+      previousBoardStopped: false,
+      webAppUrl: '',
+      adminUrl: '',
+      viewUrl: '',
+      setupUrl: ''
+    };
+  }
+}
+
+/**
  * ユーザー専用フォルダを作成 (マルチテナント対応版)
  */
 function createUserFolder(userEmail) {
