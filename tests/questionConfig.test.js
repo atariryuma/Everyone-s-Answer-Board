@@ -2,7 +2,11 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('getQuestionConfig simple', () => {
-  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
+  const errorHandlerCode = fs
+    .readFileSync('src/errorHandler.js.html', 'utf8')
+    .split('\n')
+    .slice(1, -1)
+    .join('\n');
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   const context = {
     Utilities: { getUuid: () => 'test-uuid-' + Math.random() }
