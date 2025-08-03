@@ -2929,6 +2929,23 @@ function setupRealtimeUpdates() {
   }, 10000);
 }
 
+// =============================================================================
+// RESOURCE BUTTON FUNCTIONS
+// =============================================================================
+
+function openSpreadsheet() {
+  const resourceUrls = getActiveResourceUrls(currentStatus);
+  if (resourceUrls.spreadsheet) {
+    window.open(resourceUrls.spreadsheet, '_blank');
+  }
+}
+
+function openFolder() {
+  const resourceUrls = getActiveResourceUrls(currentStatus);
+  if (resourceUrls.folder) {
+    window.open(resourceUrls.folder, '_blank');
+  }
+}
 
 // =============================================================================
 // GLOBAL FUNCTION EXPORTS
@@ -2936,6 +2953,9 @@ function setupRealtimeUpdates() {
 
 // Export key functions to window for global access
 window.executeStopAndQuickStart = executeStopAndQuickStart;
+window.getActiveResourceUrls = getActiveResourceUrls;
+window.openSpreadsheet = openSpreadsheet;
+window.openFolder = openFolder;
 window.openForm = openForm;
 
 // Initialize when DOM is ready
