@@ -2108,6 +2108,62 @@ function updateBasicStaticUI(status) {
 }
 
 // Update system status display
+/**
+ * 現在アクティブなすべてのリソースURLを取得し、統一されたオブジェクトとして返す。
+ * @param {object} status - 最新のシステムステータスオブジェクト
+ * @returns {object} - 各リソースのURLを格納したオブジェクト
+ */
+function getActiveResourceUrls(status) {
+  const urls = {
+    spreadsheet: null,
+    folder: null,
+    form: null,
+    editForm: null
+  };
+
+  if (!status || !status.userInfo) {
+    return urls; // ユーザー情報がなければ空のURLを返す
+  }
+
+  // 1. スプレッドシートURLの取得 (userInfo直下から)
+  urls.spreadsheet = status.userInfo.spreadsheetUrl || null;
+
+  // 2. configJsonの解析 (一度だけ実行)
+  let config = {};
+  if (status.userInfo.configJson) {
+    try {
+      config = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+    } catch (e) {
+      console.warn("configJsonの解析に失敗しました", e);
+    }
+  }
+
+  // 3. フォルダURLの取得 (configJsonから)
+  urls.folder = config.folderUrl || null;
+
+  // 4. フォームURLの取得 (configJsonから、公開シートを優先)
+  const publishedSheetName = config.publishedSheetName;
+  if (publishedSheetName) {
+    const sheetConfig = config[`sheet_${publishedSheetName}`];
+    if (sheetConfig) {
+      urls.form = sheetConfig.formUrl || urls.form;
+      urls.editForm = sheetConfig.editFormUrl || urls.editForm;
+    }
+  }
+  
+  // フォールバック: トップレベルのフォームURL
+  if (!urls.form && config.formUrl) {
+    urls.form = config.formUrl;
+  }
+  if (!urls.editForm && config.editFormUrl) {
+    urls.editForm = config.editFormUrl;
+  }
+
+  return urls;
+}
+
 function updateSystemStatusDisplay(status) {
   if (!status) return;
   
@@ -2130,13 +2186,13 @@ function updateSystemStatusDisplay(status) {
   
   // Enable resource buttons if URLs are available
   const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
-  const formBtn = document.getElementById('open-form-btn');
-  const resourceBtn = document.getElementById('open-resource-btn');
-  
-  if (status.spreadsheetUrl) {
-    if (spreadsheetBtn) {
-      spreadsheetBtn.disabled = false;
-      spreadsheetBtn.onclick = () => window.open(status.spreadsheetUrl, '_blank');
+  if (spreadsheetBtn) {
+    spreadsheetBtn.disabled = !resourceUrls.spreadsheet;
+    if (resourceUrls.spreadsheet) {
+      spreadsheetBtn.onclick = () => window.open(resourceUrls.spreadsheet, '_blank');
+      spreadsheetBtn.title = 'スプレッドシートを開く';
+    } else {
+      spreadsheetBtn.title = 'スプレッドシートURLが未設定です';
     }
   }
 
