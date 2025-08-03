@@ -170,3 +170,12 @@ function updateDebugConfig(newConfig) {
   Object.assign(DEBUG_CONFIG, newConfig);
   infoLog('デバッグ設定を更新しました', newConfig);
 }
+
+/**
+ * 旧式のデバッグロガー。互換性のために残しています。
+ * @deprecated debugLog の使用を推奨します。
+ * @param {...any} args debugLog へ渡す引数。
+ */
+function logDebug(...args) {
+  debugLog(...args);
+}
