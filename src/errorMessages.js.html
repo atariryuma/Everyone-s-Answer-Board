@@ -306,11 +306,15 @@ class UnifiedErrorHandler {
 // グローバルインスタンスを作成
 window.unifiedErrorHandler = new UnifiedErrorHandler();
 
-// 便利な関数をエクスポート
-window.handleError = (error, context, severity, type) => {
+// Attach to AdminPanel namespace
+window.AdminPanel = window.AdminPanel || {};
+window.AdminPanel.errors = window.AdminPanel.errors || {};
+window.AdminPanel.errors.handle = (error, context, severity, type) => {
   return window.unifiedErrorHandler.handleError(error, context, severity, type);
 };
 
+// Backward compatibility
+window.handleError = window.AdminPanel.errors.handle;
 window.ERROR_SEVERITY = ERROR_SEVERITY;
 window.ERROR_TYPES = ERROR_TYPES;
 

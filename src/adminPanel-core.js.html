@@ -40,108 +40,9 @@ function logDebug(...args) { adminLog('debug', ...args); }
 // =============================================================================
 // ENHANCED MESSAGE SYSTEM FOR SETUP FLOW
 // =============================================================================
-
-// 強化されたメッセージ表示システム
-function showMessage(message, type = 'info', duration = 5000, options = {}) {
-  // 既存のメッセージシステムがあるかチェック
-  if (window.sharedUtilities && window.sharedUtilities.showMessage) {
-    return window.sharedUtilities.showMessage(message, type, duration, options);
-  }
-  
-  // フォールバック: インライン実装
-  return showInlineMessage(message, type, duration, options);
-}
-
-// インラインメッセージ表示（フォールバック実装）
-function showInlineMessage(message, type = 'info', duration = 5000, options = {}) {
-  // メッセージコンテナを取得または作成
-  let container = document.getElementById('message-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'message-container';
-    container.className = 'fixed top-4 right-4 z-[10000] space-y-2';
-    document.body.appendChild(container);
-  }
-  
-  // メッセージ要素を作成
-  const messageEl = createMessageElement(message, type, options);
-  container.appendChild(messageEl);
-  
-  // アニメーション表示
-  requestAnimationFrame(() => {
-    messageEl.classList.remove('translate-x-full', 'opacity-0');
-    messageEl.classList.add('translate-x-0', 'opacity-100');
-  });
-  
-  // 自動削除
-  if (duration > 0) {
-    setTimeout(() => {
-      removeMessage(messageEl);
-    }, duration);
-  }
-  
-  return messageEl;
-}
-
-// メッセージ要素の作成
-function createMessageElement(message, type, options) {
-  const colors = {
-    success: 'bg-green-600/20 border-green-500/50 text-green-100',
-    error: 'bg-red-600/20 border-red-500/50 text-red-100',
-    warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
-    info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
-  };
-  
-  const icons = {
-    success: '✅',
-    error: '❌', 
-    warning: '⚠️',
-    info: 'ℹ️'
-  };
-  
-  const messageEl = document.createElement('div');
-  messageEl.className = `message glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${colors[type]}`;
-  
-  messageEl.innerHTML = `
-    <div class="mr-3 text-xl">${icons[type]}</div>
-    <div class="flex-1 text-sm">${escapeHtml(message)}</div>
-    <button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.message').remove()">✕</button>
-  `;
-  
-  return messageEl;
-}
-
-// メッセージ削除のアニメーション
-function removeMessage(messageEl) {
-  messageEl.classList.remove('translate-x-0', 'opacity-100');
-  messageEl.classList.add('translate-x-full', 'opacity-0');
-  messageEl.addEventListener('transitionend', () => messageEl.remove());
-}
-
-// HTML エスケープ関数
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// セットアップステップ用の特別なメッセージ
-function showSetupMessage(message, step, type = 'info') {
-  const stepIcon = step ? `🔥 Step ${step}:` : '📋';
-  return showMessage(`${stepIcon} ${message}`, type, 6000, { step });
-}
-
-// エラー用の詳細メッセージ
-function showDetailedError(title, details, suggestions = []) {
-  let message = `${title}`;
-  if (details) {
-    message += `\n詳細: ${details}`;
-  }
-  if (suggestions.length > 0) {
-    message += `\n対処法: ${suggestions.join(', ')}`;
-  }
-  return showMessage(message, 'error', 8000, { detailed: true });
-}
+// Message handling is now centralized in AdminPanel.ui.showMessage defined in
+// adminPanel-framework.js.html. The previous inline implementation has been
+// removed to avoid duplication.
 
 // =============================================================================
 // UNIFIED MANAGEMENT SYSTEM API - 統一管理システムAPI
@@ -349,11 +250,9 @@ function initializeUserId() {
 
 // ユーザーID取得の完了を待つPromise
 const userIdPromise = initializeUserId();
-var selectedSheet = '';
 var currentActiveSheet = '';
 var webAppUrl = '';
 var currentSpreadsheetUrl = '';
-var currentStatus = null;
 
 // Global variables from adminPanel.js.html
 let currentStep = 1;

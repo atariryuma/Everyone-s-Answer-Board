@@ -6,78 +6,9 @@
 // =============================================================================
 // ERROR HANDLING SYSTEM
 // =============================================================================
-
-function handleError(error, context, userMessage) {
-  console.error(`❌ Error in ${context}:`, error);
-  
-  if (error && typeof error === 'object') {
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-  }
-
-  var displayMessage = userMessage || translateErrorMessage(error?.message || String(error), context);
-  showMessage(displayMessage, 'error');
-}
-
-// Error message translation for better UX
-function translateErrorMessage(errorMsg, context) {
-  const lowerMsg = errorMsg.toLowerCase();
-  
-  // 範囲エラー
-  if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
-    return '選択した範囲にデータが見つかりません。シートにデータがあることを確認してください。';
-  }
-  
-  // シート情報取得エラー
-  if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
-    return 'シート情報の取得に失敗しました。スプレッドシートのアクセス権限を確認してください。';
-  }
-  
-  // 権限エラー
-  if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
-    return 'スプレッドシートへのアクセス権限がありません。管理者に権限を確認してください。';
-  }
-  
-  // ネットワークエラー
-  if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
-    return 'ネットワークエラーが発生しました。インターネット接続を確認して再試行してください。';
-  }
-  
-  // フォーム関連エラー
-  if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
-    return 'フォームが見つかりません。新しいフォームを作成してください。';
-  }
-  
-  // バリデーションエラー
-  if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
-    return '入力内容に問題があります。必須項目が入力されているか確認してください。';
-  }
-  
-  // 認証エラー
-  if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
-    return '認証が必要です。ページを再読み込みしてください。';
-  }
-  
-  // サーバーエラー
-  if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
-    return 'サーバーエラーが発生しました。しばらく待ってから再試行してください。';
-  }
-  
-  // 設定エラー
-  if (context && context.includes('config') || lowerMsg.includes('configuration')) {
-    return '設定の保存に失敗しました。入力内容を確認して再試行してください。';
-  }
-  
-  // 一般的なエラー
-  if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
-    return '処理に失敗しました。しばらく待ってから再試行してください。';
-  }
-  
-  return errorMsg || '不明なエラーが発生しました。';
-}
+// handleError implementation is now provided by window.AdminPanel.errors.handle
+// defined in adminPanel-framework.js.html. All calls in this file rely on the
+// global handleError for unified error processing.
 
 // Safe GAS call wrapper with error handling
 function safeGASCall(methodName, successHandler, errorMessage) {
