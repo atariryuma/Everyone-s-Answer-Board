@@ -2227,8 +2227,14 @@ async function handleCustomSetup(config) {
         
         updateOverallProgress(100, 'カスタムセットアップ完了');
         updateProgressStep(6, 'completed', 'カスタムセットアップ完了', '🎉 すべての設定が完了しました！');
-        
+
         showMessage('✅ カスタムセットアップが完了しました！', 'success');
+
+        // ローカル状態を即時更新して旧スプレッドシート参照を防止
+        if (window.currentStatus && window.currentStatus.userInfo) {
+          currentStatus.userInfo.spreadsheetId = result.spreadsheetId;
+          currentStatus.userInfo.spreadsheetUrl = result.spreadsheetUrl;
+        }
         
         if (result.autoPublished) {
           updateProgressStep(5, 'completed', '回答ボードの自動公開', '🌐 ボードが自動的に公開されました');
