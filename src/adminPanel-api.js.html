@@ -2274,21 +2274,37 @@ async function handleCustomSetup(config) {
           window.unifiedCache.clear();
         }
         
-        // 状態更新とUI同期を確実に実行
-        loadStatus(true);
-        
-        // アクティブシート情報の即座な反映を強制
-        setTimeout(() => {
-          if (result.sheetName && typeof updateActiveSheetUI === 'function') {
-            updateActiveSheetUI(result.sheetName);
-            console.log('🔄 CustomSetup: アクティブシート情報を強制更新:', result.sheetName);
-          }
+        // 状態更新を待機してからUI同期を実行（競合回避）
+        setTimeout(async () => {
+          console.log('🔄 CustomSetup: 状態同期後のUI更新開始');
           
-          // シート選択UIの再同期
-          if (typeof refreshSheetSelection === 'function') {
-            refreshSheetSelection();
+          // 状態を更新
+          await loadStatus(true);
+          
+          // 状態更新完了後にアクティブシート設定を確実に実行
+          if (result.sheetName) {
+            console.log('🔄 CustomSetup: アクティブシート情報を最終更新:', result.sheetName);
+            
+            // 確実にシート選択を更新
+            if (typeof updateActiveSheetUI === 'function') {
+              updateActiveSheetUI(result.sheetName);
+            }
+            
+            // さらに確実に選択状態を保持
+            setTimeout(() => {
+              const select = document.getElementById('sheet-select');
+              if (select && select.value !== result.sheetName) {
+                console.log('🔧 CustomSetup: 最終フォールバック選択実行');
+                select.value = result.sheetName;
+                selectedSheet = result.sheetName;
+                lastSelectedSheetName = result.sheetName;
+                if (typeof updateSheetSelectActiveIndicator === 'function') {
+                  updateSheetSelectActiveIndicator(result.sheetName);
+                }
+              }
+            }, 200);
           }
-        }, 500);
+        }, 1000);
         
         // CustomSetupフロー完了確認（包括的な完了状態検証）
         setTimeout(async () => {
