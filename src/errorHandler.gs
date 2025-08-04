@@ -71,30 +71,6 @@ class UnifiedErrorHandler {
   }
 
   /**
-   * セキュリティ関連エラーの特別処理
-   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
-   * @param {string} context - エラー発生箇所
-   * @param {object} securityDetails - セキュリティ関連詳細情報
-   */
-  logSecurityError(error, context, securityDetails = {}) {
-    const securityMetadata = {
-      ...securityDetails,
-      userAgent: typeof Session !== 'undefined' ? Session.getActiveUser()?.getEmail() : 'unknown',
-      ipAddress: 'not_available_in_gas', // GASでは取得不可
-      timestamp: new Date().toISOString(),
-      securityAlert: true
-    };
-
-    return this.logError(
-      error,
-      context,
-      ERROR_SEVERITY.HIGH,
-      ERROR_CATEGORIES.AUTHORIZATION,
-      securityMetadata
-    );
-  }
-
-  /**
    * データベース操作エラーの処理
    * @param {Error|string} error - エラーオブジェクトまたはメッセージ
    * @param {string} operation - データベース操作の種類
@@ -139,50 +115,6 @@ class UnifiedErrorHandler {
       ERROR_CATEGORIES.VALIDATION,
       validationMetadata
     );
-  }
-
-  /**
-   * パフォーマンス関連警告の記録
-   * @param {string} operation - 操作名
-   * @param {number} duration - 実行時間（ミリ秒）
-   * @param {number} threshold - 閾値（ミリ秒）
-   * @param {object} details - 詳細情報
-   */
-  logPerformanceWarning(operation, duration, threshold, details = {}) {
-    if (duration <= threshold) {
-      return; // 閾値以下の場合は記録しない
-    }
-
-    const perfMetadata = {
-      operation: operation,
-      duration: duration,
-      threshold: threshold,
-      overThresholdBy: duration - threshold,
-      ...details,
-      timestamp: new Date().toISOString()
-    };
-
-    return this.logError(
-      `Performance threshold exceeded: ${operation} took ${duration}ms (threshold: ${threshold}ms)`,
-      `performance.${operation}`,
-      ERROR_SEVERITY.MEDIUM,
-      ERROR_CATEGORIES.SYSTEM,
-      perfMetadata
-    );
-  }
-
-  /**
-   * エラー統計を取得
-   * @returns {object} エラー統計情報
-   */
-  getErrorStats() {
-    return {
-      sessionId: this.sessionId,
-      totalErrors: this.errorCount,
-      uptime: Date.now() - this.startTime,
-      errorRate: this.errorCount / ((Date.now() - this.startTime) / 1000 / 60), // エラー/分
-      timestamp: new Date().toISOString()
-    };
   }
 
   /**
@@ -255,13 +187,6 @@ function logError(error, context, severity, category, metadata) {
 }
 
 /**
- * セキュリティエラーをログに記録
- */
-function logSecurityError(error, context, securityDetails) {
-  return globalErrorHandler.logSecurityError(error, context, securityDetails);
-}
-
-/**
  * データベースエラーをログに記録
  */
 function logDatabaseError(error, operation, operationDetails) {
@@ -273,18 +198,4 @@ function logDatabaseError(error, operation, operationDetails) {
  */
 function logValidationError(field, value, rule, message) {
   return globalErrorHandler.logValidationError(field, value, rule, message);
-}
-
-/**
- * パフォーマンス警告をログに記録
- */
-function logPerformanceWarning(operation, duration, threshold, details) {
-  return globalErrorHandler.logPerformanceWarning(operation, duration, threshold, details);
-}
-
-/**
- * エラー統計を取得
- */
-function getErrorStats() {
-  return globalErrorHandler.getErrorStats();
 }
