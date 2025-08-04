@@ -4019,32 +4019,52 @@ function getSheetsList(userId) {
     try {
       spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
     } catch (accessError) {
-      warnLog('getSheetsList: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
+      var statusMatch = (accessError && accessError.message || '').match(/Sheets API error:\s*(\d+)/);
+      var statusCode = statusMatch ? parseInt(statusMatch[1], 10) : null;
 
-      // サービスアカウントの権限修復を試行
-      try {
-        addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-        debugLog('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
+      if (statusCode === 403) {
+        warnLog('getSheetsList: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
 
-        // 少し待ってから再試行
-        Utilities.sleep(1000);
-        spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
-
-      } catch (repairError) {
-        errorLog('getSheetsList: 権限修復に失敗:', repairError.message);
-
-        // 最終手段：ユーザー権限での修復も試行
+        // サービスアカウントの権限修復を試行
         try {
-          var currentUserEmail = Session.getActiveUser().getEmail();
-          if (currentUserEmail === userInfo.adminEmail) {
-            repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
-            debugLog('getSheetsList: ユーザー権限での修復を実行しました。');
-          }
-        } catch (finalRepairError) {
-          errorLog('getSheetsList: 最終修復も失敗:', finalRepairError.message);
-        }
+          addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
+          debugLog('getSheetsList: サービスアカウント権限を追加しました。再試行中...');
 
-        return [];
+          // 少し待ってから再試行
+          Utilities.sleep(1000);
+          spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+
+        } catch (repairError) {
+          errorLog('getSheetsList: 権限修復に失敗:', repairError.message);
+
+          // 最終手段：ユーザー権限での修復も試行
+          try {
+            var currentUserEmail = Session.getActiveUser().getEmail();
+            if (currentUserEmail === userInfo.adminEmail) {
+              repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
+              debugLog('getSheetsList: ユーザー権限での修復を実行しました。');
+            }
+          } catch (finalRepairError) {
+            errorLog('getSheetsList: 最終修復も失敗:', finalRepairError.message);
+          }
+
+          return [];
+        }
+      } else if (statusCode >= 500 && statusCode < 600) {
+        var maxRetries = 2;
+        for (var attempt = 0; attempt < maxRetries; attempt++) {
+          Utilities.sleep(Math.pow(2, attempt) * 1000);
+          try {
+            spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
+            break;
+          } catch (retryError) {
+            if (attempt === maxRetries - 1) {
+              throw retryError;
+            }
+          }
+        }
+      } else {
+        throw accessError;
       }
     }
 
