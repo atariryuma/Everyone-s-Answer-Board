@@ -133,74 +133,24 @@ class UnifiedURLManager {
 
   /**
    * WebアプリURLを統一的に取得
-   * getWebAppUrl, getWebAppUrlCached を統合
-   * @param {object} options - オプション設定
-   * @returns {string} WebアプリURL
+   * @returns {string}
    */
-  static getWebAppURL(options = {}) {
-    const { useCache = true, forceRefresh = false } = options;
-
-    try {
-      // キャッシュ確認
-      if (useCache && !forceRefresh) {
-        const cachedUrl = cacheManager.get(URL_CACHE_KEY);
-        if (cachedUrl) {
-          debugLog('✅ 統一URL管理: キャッシュヒット');
-          return cachedUrl;
-        }
-      }
-
-      // URL生成（既存のcomputeWebAppUrl関数を利用）
-      const url = computeWebAppUrl();
-
-      // キャッシュ保存
-      if (url && useCache) {
-        cacheManager.set(URL_CACHE_KEY, url, URL_CACHE_TTL);
-        debugLog('💾 統一URL管理: URLキャッシュ保存');
-      }
-
-      return url;
-
-    } catch (error) {
-      errorLog('統一URL管理エラー:', error.message);
-      return getFallbackUrl();
-    }
+  static getWebAppURL() {
+    return getWebAppUrl();
   }
 
   /**
    * ユーザー用URLを生成
-   * buildUserAdminUrl, generateUserUrls を統合
    * @param {string} userId - ユーザーID
    * @param {object} options - URL生成オプション
    * @returns {object} 各種URL
    */
   static generateUserURLs(userId, options = {}) {
-    const {
-      mode = 'view',
-      cacheBusting = false,
-      baseUrl = null
-    } = options;
-
-    try {
-      const webAppUrl = baseUrl || this.getWebAppURL();
-      const timestamp = cacheBusting ? `&t=${Date.now()}` : '';
-
-      return {
-        view: `${webAppUrl}?userId=${encodeURIComponent(userId)}&mode=view${timestamp}`,
-        admin: `${webAppUrl}?userId=${encodeURIComponent(userId)}&mode=admin${timestamp}`,
-        setup: `${webAppUrl}?userId=${encodeURIComponent(userId)}&mode=setup${timestamp}`,
-        edit: `${webAppUrl}?userId=${encodeURIComponent(userId)}&mode=edit${timestamp}`
-      };
-
-    } catch (error) {
-      errorLog('ユーザーURL生成エラー:', error.message);
-      return {};
-    }
+    return generateUserUrlsWithCacheBusting(userId, options);
   }
 
   /**
    * URL検証・サニタイズ
-   * sanitizeRedirectUrl, normalizeUrlString を統合
    * @param {string} url - 検証対象URL
    * @returns {string} サニタイズされたURL
    */
@@ -210,10 +160,13 @@ class UnifiedURLManager {
     }
 
     try {
-      // 既存のnormalizeUrlString関数を利用
-      let sanitized = normalizeUrlString(url);
+      let sanitized = String(url).trim();
+      if ((sanitized.startsWith('"') && sanitized.endsWith('"')) ||
+          (sanitized.startsWith("'") && sanitized.endsWith("'"))) {
+        sanitized = sanitized.slice(1, -1);
+      }
+      sanitized = sanitized.replace(/\\"/g, '"').replace(/\\'/g, "'");
 
-      // 追加のセキュリティチェック
       if (sanitized.includes('javascript:') || sanitized.includes('data:')) {
         warnLog('統一URL管理: 危険なURLスキームを検出');
         return '';

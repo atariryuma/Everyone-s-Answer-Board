@@ -128,21 +128,9 @@
       try {
         setLoading(true, 'ユーザー情報確認中…');
         
-        // URL システムのリセットを事前に実行
-        google.script.run
-          .withSuccessHandler(() => {
-            console.log('URL system reset completed');
-            // 統合されたログインフローを実行
-            processUnifiedLogin()
-              .catch(handleLoginError);
-          })
-          .withFailureHandler((error) => {
-            console.warn('URL system reset failed:', error);
-            // リセットに失敗してもログイン処理は続行
-            processUnifiedLogin()
-              .catch(handleLoginError);
-          })
-          .forceUrlSystemReset();
+        // 統合されたログインフローを実行
+        processUnifiedLogin()
+          .catch(handleLoginError);
       } catch (err) {
         console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';

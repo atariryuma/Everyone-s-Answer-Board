@@ -105,7 +105,7 @@ function forceLogoutAndRedirectToLogin() {
   debugLog('🔄 forceLogoutAndRedirectToLogin - 関数開始');
   debugLog('🔍 Function called at:', new Date().toISOString());
   debugLog('🔍 Available functions check:');
-  debugLog('  - getWebAppUrlCached:', typeof getWebAppUrlCached);
+  debugLog('  - getWebAppUrl:', typeof getWebAppUrl);
   debugLog('  - sanitizeRedirectUrl:', typeof sanitizeRedirectUrl);
   debugLog('  - HtmlService:', typeof HtmlService);
 
@@ -142,12 +142,12 @@ function forceLogoutAndRedirectToLogin() {
     try {
       debugLog('🔗 URL生成開始...');
 
-      // getWebAppUrlCached関数の存在確認
-      if (typeof getWebAppUrlCached !== 'function') {
-        throw new Error('getWebAppUrlCached function not found');
+      // getWebAppUrl関数の存在確認
+      if (typeof getWebAppUrl !== 'function') {
+        throw new Error('getWebAppUrl function not found');
       }
 
-      const rawUrl = getWebAppUrlCached() + '?mode=login';
+      const rawUrl = getWebAppUrl() + '?mode=login';
       debugLog('📝 Raw URL generated:', rawUrl);
 
       // sanitizeRedirectUrl関数の存在確認

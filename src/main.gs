@@ -645,7 +645,7 @@ function getDeployUserDomainInfo() {
     const currentDomain = getEmailDomain(activeUserEmail);
 
     // 統一されたURL取得システムを使用（開発URL除去機能付き）
-    const webAppUrl = getWebAppUrlCached();
+    const webAppUrl = getWebAppUrl();
     let deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
 
     if (webAppUrl) {
@@ -1657,7 +1657,7 @@ function createSecureRedirect(targetUrl, message) {
  */
 function sanitizeRedirectUrl(url) {
   if (!url) {
-    return getWebAppUrlCached();
+    return getWebAppUrl();
   }
 
   try {
@@ -1688,13 +1688,13 @@ function sanitizeRedirectUrl(url) {
     // 基本的なURL形式チェック
     if (!cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
       warnLog('Invalid URL format after sanitization:', cleanUrl);
-      return getWebAppUrlCached();
+      return getWebAppUrl();
     }
 
     // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
     if (cleanUrl.includes('userCodeAppPanel')) {
       warnLog('Development URL detected in redirect, using fallback:', cleanUrl);
-      return getWebAppUrlCached();
+      return getWebAppUrl();
     }
 
     // 最終的な URL 妥当性チェック（googleusercontent.comも有効URLとして認識）
@@ -1704,30 +1704,16 @@ function sanitizeRedirectUrl(url) {
 
     if (!isValidUrl) {
       warnLog('Suspicious URL detected:', cleanUrl);
-      return getWebAppUrlCached();
+      return getWebAppUrl();
     }
 
     return cleanUrl;
   } catch (e) {
     logError(e, 'urlSanitization', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
-    return getWebAppUrlCached();
+    return getWebAppUrl();
   }
 }
 
-/**
- * 正しいWeb App URLを取得 (url.gsのgetWebAppUrlCachedを使用)
- * @return {string}
- */
-function getWebAppUrl() {
-  try {
-    // url.gsの統一されたURL取得関数を使用
-    return getWebAppUrlCached();
-  } catch (error) {
-    logError(error, 'getWebAppUrl', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
-    // 緊急時のフォールバックURL
-    return getFallbackUrl();
-  }
-}
 /**
  * doGet のリクエストパラメータを解析
  * @param {Object} e Event object
@@ -1839,7 +1825,7 @@ function renderUnpublishedPage(userInfo, params) {
     } catch (urlError) {
       warnLog('URL生成エラー、フォールバック値を使用:', urlError);
       // フォールバック: 基本的なURL構造
-      const baseUrl = getWebAppUrlCached() || getFallbackUrl();
+      const baseUrl = getWebAppUrl();
       appUrls = {
         adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`,
         viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`,
