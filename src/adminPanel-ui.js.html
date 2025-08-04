@@ -310,6 +310,17 @@ function updateStaticUI(status) {
   const sheetsData = status.sheetNames || status.allSheets || [];
   populateSheetSelect(sheetsData, status.activeSheetName);
   
+  // アクティブシートの確実な反映（強化）
+  if (status.activeSheetName) {
+    setTimeout(() => {
+      const select = document.getElementById('sheet-select');
+      if (select && select.value !== status.activeSheetName) {
+        console.log('🔄 Force updating active sheet selection:', status.activeSheetName);
+        updateActiveSheetUI(status.activeSheetName);
+      }
+    }, 100);
+  }
+  
   // Update custom form info
   updateCustomFormInfo(status);
   
@@ -490,12 +501,43 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     select.disabled = true;
   }
   
-  // Set active sheet if available
+  // Set active sheet if available (強化された選択ロジック)
   if (activeSheetName) {
-    select.value = activeSheetName;
-    selectedSheet = activeSheetName;
-    lastSelectedSheetName = activeSheetName; // Update last selected sheet
-    logDebug('✅ Active sheet set:', activeSheetName);
+    // シート名の正規化を考慮した選択処理
+    const normalizedActiveSheet = activeSheetName.trim();
+    
+    // 正確な一致を確認
+    const availableOptions = Array.from(select.options);
+    const matchingOption = availableOptions.find(option => option.value === normalizedActiveSheet);
+    
+    if (matchingOption) {
+      select.value = normalizedActiveSheet;
+      selectedSheet = normalizedActiveSheet;
+      lastSelectedSheetName = normalizedActiveSheet;
+      logDebug('✅ Active sheet set successfully:', normalizedActiveSheet);
+    } else {
+      // 部分一致またはフォールバック処理
+      console.warn('⚠️ Active sheet not found in options, attempting fallback:', {
+        activeSheetName: normalizedActiveSheet,
+        availableOptions: availableOptions.map(opt => opt.value)
+      });
+      
+      // 最初の有効なオプションを選択
+      if (availableOptions.length > 1) { // Skip the default "-- シートを選択 --"
+        const firstSheet = availableOptions[1].value;
+        select.value = firstSheet;
+        selectedSheet = firstSheet;
+        lastSelectedSheetName = firstSheet;
+        logDebug('🔄 Fallback to first available sheet:', firstSheet);
+      }
+    }
+    
+    // 選択状態を確認
+    if (select.value) {
+      logDebug('✅ Final sheet selection confirmed:', select.value);
+    } else {
+      console.error('❌ Sheet selection failed - no sheet selected');
+    }
   }
   
   // Add change event listener for data preview
@@ -1806,6 +1848,51 @@ function updateSheetSelectActiveIndicator(activeSheetName) {
     activeOption.style.fontWeight = 'bold';
     activeOption.style.color = '#10b981';
     activeOption.className = 'active-sheet-option';
+  }
+}
+
+// 新しい関数: アクティブシートUI更新
+function updateActiveSheetUI(sheetName) {
+  console.log('🔄 updateActiveSheetUI called with:', sheetName);
+  
+  const select = document.getElementById('sheet-select');
+  if (!select) {
+    console.warn('⚠️ Sheet select element not found');
+    return;
+  }
+  
+  // シート選択を更新
+  if (sheetName && select.value !== sheetName) {
+    const normalizedSheetName = sheetName.trim();
+    const availableOptions = Array.from(select.options);
+    const matchingOption = availableOptions.find(option => option.value === normalizedSheetName);
+    
+    if (matchingOption) {
+      select.value = normalizedSheetName;
+      selectedSheet = normalizedSheetName;
+      lastSelectedSheetName = normalizedSheetName;
+      console.log('✅ Active sheet UI updated:', normalizedSheetName);
+      
+      // アクティブ表示も更新
+      updateSheetSelectActiveIndicator(normalizedSheetName);
+      
+      // UI状態も更新
+      updateUIForSelectedSheet();
+    } else {
+      console.warn('⚠️ Sheet not found in select options:', normalizedSheetName);
+    }
+  }
+}
+
+// 新しい関数: シート選択の再同期
+function refreshSheetSelection() {
+  console.log('🔄 refreshSheetSelection called');
+  
+  // 現在の状態からアクティブシート情報を取得
+  if (window.currentStatus && window.currentStatus.activeSheetName) {
+    updateActiveSheetUI(window.currentStatus.activeSheetName);
+  } else if (selectedSheet) {
+    updateActiveSheetUI(selectedSheet);
   }
 }
 

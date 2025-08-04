@@ -2269,11 +2269,26 @@ async function handleCustomSetup(config) {
           }
         }
         
-        // Update status after custom setup
+        // Update status after custom setup (強化されたUI同期)
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
           window.unifiedCache.clear();
         }
+        
+        // 状態更新とUI同期を確実に実行
         loadStatus(true);
+        
+        // アクティブシート情報の即座な反映を強制
+        setTimeout(() => {
+          if (result.sheetName && typeof updateActiveSheetUI === 'function') {
+            updateActiveSheetUI(result.sheetName);
+            console.log('🔄 CustomSetup: アクティブシート情報を強制更新:', result.sheetName);
+          }
+          
+          // シート選択UIの再同期
+          if (typeof refreshSheetSelection === 'function') {
+            refreshSheetSelection();
+          }
+        }, 500);
         
         // CustomSetupフロー完了確認（包括的な完了状態検証）
         setTimeout(async () => {
