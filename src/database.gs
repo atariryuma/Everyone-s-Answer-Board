@@ -988,6 +988,7 @@ function updateUser(userId, updateData) {
     if (!dbId) {
       throw new Error('データ更新エラー: データベースIDが設定されていません');
     }
+    // サービスインスタンスを一度だけ取得して再利用
     const service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
@@ -1040,9 +1041,11 @@ function updateUser(userId, updateData) {
         try {
           if (retryCount > 0) {
             debugLog('🔄 認証エラーによるリトライ (' + retryCount + '/' + maxRetries + ')');
-            // 認証エラーの場合、新しいサービスを取得
-            service = getSheetsServiceCached(true); // forceRefresh = true
-            Utilities.sleep(1000); // 少し待機
+            // 認証エラーの場合のみ、新しいサービスを取得
+            if (!service || retryCount === 1) {
+              service = getSheetsServiceCached(true); // forceRefresh = true
+              Utilities.sleep(1000); // 少し待機
+            }
           }
 
           batchUpdateSheetsData(service, dbId, requests);

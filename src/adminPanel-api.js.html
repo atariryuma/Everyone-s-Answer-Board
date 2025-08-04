@@ -421,12 +421,36 @@ function completeAIDetectionProcess() {
 }
 
 // ✨ セットアップ状態の診断・修復機能
+// 診断実行状態の管理
+let diagnosticInProgress = false;
+let lastDiagnosticTime = 0;
+const DIAGNOSTIC_COOLDOWN = 30000; // 30秒のクールダウン
+
 function repairSetupStateInconsistencies() {
   return new Promise((resolve, reject) => {
     try {
+      // 重複実行防止チェック
+      const now = Date.now();
+      if (diagnosticInProgress) {
+        console.log('🔄 診断が既に実行中です。スキップします。');
+        resolve({ issues: [], fixes: [], skipped: true, reason: 'already_running' });
+        return;
+      }
+      
+      // クールダウンチェック
+      if (now - lastDiagnosticTime < DIAGNOSTIC_COOLDOWN) {
+        const remainingTime = Math.ceil((DIAGNOSTIC_COOLDOWN - (now - lastDiagnosticTime)) / 1000);
+        console.log(`⏳ クールダウン中です。あと${remainingTime}秒後に実行可能です。`);
+        resolve({ issues: [], fixes: [], skipped: true, reason: 'cooldown', remainingTime });
+        return;
+      }
+      
+      diagnosticInProgress = true;
+      lastDiagnosticTime = now;
       console.log('🔧 セットアップ状態の診断・修復を開始...');
       
       if (!currentStatus || !currentStatus.userInfo) {
+        diagnosticInProgress = false;
         reject(new Error('ユーザー情報が利用できません'));
         return;
       }
@@ -500,6 +524,7 @@ function repairSetupStateInconsistencies() {
       console.log('📋 診断結果:', { issues, fixes });
       
       if (fixes.length === 0) {
+        diagnosticInProgress = false;
         resolve({
           success: true,
           message: '✅ セットアップ状態に問題は見つかりませんでした',
@@ -522,6 +547,7 @@ function repairSetupStateInconsistencies() {
               loadSystemStatus();
             }
             
+            diagnosticInProgress = false;
             resolve({
               success: true,
               message: `🔧 ${fixes.length}件のセットアップ問題を修復しました`,
@@ -529,15 +555,18 @@ function repairSetupStateInconsistencies() {
               fixes
             });
           } else {
+            diagnosticInProgress = false;
             reject(new Error(saveResult?.message || '設定の保存に失敗しました'));
           }
         })
         .catch(saveError => {
+          diagnosticInProgress = false;
           reject(new Error(`設定保存エラー: ${saveError.message}`));
         });
         
     } catch (error) {
       console.error('❌ セットアップ状態修復でエラー:', error);
+      diagnosticInProgress = false;
       reject(error);
     }
   });

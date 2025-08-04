@@ -688,18 +688,28 @@ function getHeadersCached(spreadsheetId, sheetName) {
     return getHeadersWithRetry(spreadsheetId, sheetName, 3);
   }, { ttl: 1800, enableMemoization: true }); // 30分間キャッシュ + メモ化
 
-  // 必須列の存在チェック（理由列の安定性確保）
+  // 必須列の存在チェック（改善された復旧メカニズム）
   if (indices && Object.keys(indices).length > 0) {
     const hasRequiredColumns = validateRequiredHeaders(indices);
     if (!hasRequiredColumns.isValid) {
-      warnLog(`[getHeadersCached] Missing required columns: ${hasRequiredColumns.missing.join(', ')}, attempting recovery`);
-      cacheManager.remove(key);
+      // 完全に必須列が不足している場合のみ復旧を試行
+      // 片方でも存在する場合は設定によるものとして受け入れる
+      if (!hasRequiredColumns.hasReasonColumn && !hasRequiredColumns.hasOpinionColumn) {
+        warnLog(`[getHeadersCached] Critical headers missing: ${hasRequiredColumns.missing.join(', ')}, attempting recovery`);
+        cacheManager.remove(key);
 
-      // 即座に再取得を試行
-      const recoveredIndices = getHeadersWithRetry(spreadsheetId, sheetName, 2);
-      if (recoveredIndices && validateRequiredHeaders(recoveredIndices).isValid) {
-        debugLog(`[getHeadersCached] Successfully recovered missing headers`);
-        return recoveredIndices;
+        // 即座に再取得を試行（リトライ回数を削減）
+        const recoveredIndices = getHeadersWithRetry(spreadsheetId, sheetName, 1);
+        if (recoveredIndices && Object.keys(recoveredIndices).length > 0) {
+          const recoveredValidation = validateRequiredHeaders(recoveredIndices);
+          if (recoveredValidation.hasReasonColumn || recoveredValidation.hasOpinionColumn) {
+            debugLog(`[getHeadersCached] Successfully recovered headers with basic columns`);
+            return recoveredIndices;
+          }
+        }
+      } else {
+        // 一部の列が存在する場合は警告のみで継続
+        debugLog(`[getHeadersCached] Partial header validation - continuing with available columns: reason=${hasRequiredColumns.hasReasonColumn}, opinion=${hasRequiredColumns.hasOpinionColumn}`);
       }
     }
   }
@@ -804,26 +814,64 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
 }
 
 /**
- * 必須ヘッダーの存在を検証
+ * 必須ヘッダーの存在を検証（設定ベース対応）
  * @private
  */
 function validateRequiredHeaders(indices) {
-  const requiredHeaders = [
-    COLUMN_HEADERS.REASON,  // 理由列は必須
-    COLUMN_HEADERS.OPINION, // 回答列は必須
+  // 最低限必要なヘッダーパターンをチェック
+  // 理由列・回答列は設定によって名前が変わる可能性があるため、
+  // より柔軟な検証を実装
+  const reasonPatterns = [
+    COLUMN_HEADERS.REASON,     // 理由
+    '理由',
+    'そう思う理由',
+    'reason'
+  ];
+  
+  const opinionPatterns = [
+    COLUMN_HEADERS.OPINION,    // 回答
+    '回答',
+    '意見',
+    '考え',
+    'opinion',
+    'answer'
   ];
 
   const missing = [];
+  let hasReasonColumn = false;
+  let hasOpinionColumn = false;
 
-  for (const header of requiredHeaders) {
-    if (indices[header] === undefined) {
-      missing.push(header);
+  // 理由列の存在チェック（いずれかのパターンが存在すればOK）
+  for (const pattern of reasonPatterns) {
+    if (indices[pattern] !== undefined) {
+      hasReasonColumn = true;
+      break;
     }
   }
 
+  // 回答列の存在チェック（いずれかのパターンが存在すればOK）
+  for (const pattern of opinionPatterns) {
+    if (indices[pattern] !== undefined) {
+      hasOpinionColumn = true;
+      break;
+    }
+  }
+
+  if (!hasReasonColumn) {
+    missing.push(COLUMN_HEADERS.REASON);
+  }
+  if (!hasOpinionColumn) {
+    missing.push(COLUMN_HEADERS.OPINION);
+  }
+
+  // 基本的なヘッダーが1つも存在しない場合は無効
+  const hasBasicHeaders = Object.keys(indices).length > 0;
+
   return {
-    isValid: missing.length === 0,
-    missing: missing
+    isValid: hasBasicHeaders && (hasReasonColumn || hasOpinionColumn), // 最低1つは必要
+    missing: missing,
+    hasReasonColumn: hasReasonColumn,
+    hasOpinionColumn: hasOpinionColumn
   };
 }
 
