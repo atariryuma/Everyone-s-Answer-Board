@@ -1044,6 +1044,36 @@ window.setLoading = function(isLoading, message, step, percentage) {
 };
 
 // =============================================================================
+// TIMING MANAGER INTEGRATION - TimingManagerへの段階的移行
+// =============================================================================
+
+// レガシー互換性のためのラッパー関数
+window.sharedUtilities = window.sharedUtilities || {};
+window.sharedUtilities.debounce = new DebounceManager();
+window.sharedUtilities.throttle = new ThrottleManager();
+
+// TimingManagerが利用可能な場合の拡張ラッパー
+if (typeof TimingManager !== 'undefined') {
+  // 新しいTimingManager機能を既存のインターフェースにマップ
+  window.sharedUtilities.debounce.debounceAdvanced = TimingManager.debounce;
+  window.sharedUtilities.throttle.throttleAdvanced = TimingManager.throttle;
+  
+  // 段階的移行用のヘルパー
+  window.sharedUtilities.timing = {
+    delay: TimingManager.delay,
+    sequence: TimingManager.sequence,
+    parallel: TimingManager.parallel,
+    progressSequence: TimingManager.progressSequence,
+    clearTiming: TimingManager.clearTiming,
+    clearAllTiming: TimingManager.clearAllTiming
+  };
+
+  console.log('🔄 TimingManager integration enabled - Advanced timing features available');
+} else {
+  console.warn('⚠️ TimingManager not available - Using legacy timing functions only');
+}
+
+// =============================================================================
 // GOOGLE APPS SCRIPT ENVIRONMENT WARNING SUPPRESSION
 // =============================================================================
 

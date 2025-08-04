@@ -1161,3 +1161,244 @@ function analyzeCacheEfficiency() {
   }
 }
 
+// =============================================================================
+// UNIFIED FRONTEND CACHE CONTROLLER - フロントエンド統一キャッシュ制御
+// =============================================================================
+
+/**
+ * フロントエンド用統一キャッシュ制御システム
+ * UnifiedCacheControllerの機能をCacheManagerに統合
+ */
+CacheManager.prototype.clearInProgress = false;
+CacheManager.prototype.pendingClears = [];
+
+/**
+ * 統一キャッシュクリア - 全キャッシュシステムを順次クリア
+ * @param {Object} options - クリアオプション
+ * @returns {Promise} クリア完了Promise
+ */
+CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
+  const { force = false, timeout = 10000 } = options;
+
+  // 既にクリア中の場合は待機
+  if (this.clearInProgress && !force) {
+    if (this.debugMode) {
+      debugLog('🔄 Cache clear already in progress, waiting...');
+    }
+    return new Promise((resolve, reject) => {
+      this.pendingClears.push({ resolve, reject });
+    });
+  }
+
+  this.clearInProgress = true;
+  const startTime = Date.now();
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      if (this.debugMode) {
+        debugLog('🗑️ Starting unified cache clear process');
+      }
+
+      // キャッシュクリア操作のリスト（優先順位順）
+      const clearOperations = [
+        {
+          name: 'UnifiedCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'GasOptimizerCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+              window.gasOptimizer.clearCache();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'SharedUtilitiesCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.cache && typeof window.sharedUtilities.cache.clear === 'function') {
+              window.sharedUtilities.cache.clear();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'DOMElementCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.dom && typeof window.sharedUtilities.dom.clearElementCache === 'function') {
+              window.sharedUtilities.dom.clearElementCache();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'ThrottleDebounceCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.throttle && typeof window.sharedUtilities.throttle.clearAll === 'function') {
+              window.sharedUtilities.throttle.clearAll();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'ScriptCache',
+          operation: () => {
+            try {
+              this.clearAll();
+              return true;
+            } catch (error) {
+              return false;
+            }
+          }
+        }
+      ];
+
+      const results = [];
+      
+      // 順次実行でキャッシュクリア（競合回避）
+      for (const clearOp of clearOperations) {
+        try {
+          const success = clearOp.operation();
+          results.push({ name: clearOp.name, success });
+          
+          if (this.debugMode && success) {
+            debugLog(`✅ ${clearOp.name} cleared successfully`);
+          }
+          
+          // 各操作間に短い間隔を設ける
+          if (typeof Utilities !== 'undefined') {
+            Utilities.sleep(50);
+          }
+          
+        } catch (error) {
+          warnLog(`⚠️ Failed to clear ${clearOp.name}:`, error);
+          results.push({ name: clearOp.name, success: false, error: error.message });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const totalTime = Date.now() - startTime;
+
+      if (this.debugMode) {
+        debugLog(`🎉 Cache clear completed: ${successCount}/${results.length} caches cleared in ${totalTime}ms`);
+      }
+
+      // 待機中のクリア要求を解決
+      this.resolvePendingClears(results);
+
+      resolve({
+        success: true,
+        results,
+        successCount,
+        totalCount: results.length,
+        duration: totalTime
+      });
+
+    } catch (error) {
+      errorLog('❌ Unified cache clear failed:', error);
+      this.rejectPendingClears(error);
+      reject(error);
+    } finally {
+      this.clearInProgress = false;
+    }
+  });
+};
+
+/**
+ * 特定タイプのキャッシュのみクリア
+ * @param {string} cacheType - キャッシュタイプ
+ * @returns {Promise} クリア結果
+ */
+CacheManager.prototype.clearSpecificCache = function(cacheType) {
+  return new Promise((resolve, reject) => {
+    const cacheOperations = {
+      unified: () => typeof window !== 'undefined' && window.unifiedCache?.clear(),
+      gasOptimizer: () => typeof window !== 'undefined' && window.gasOptimizer?.clearCache(),
+      sharedUtilities: () => typeof window !== 'undefined' && window.sharedUtilities?.cache?.clear(),
+      domElements: () => typeof window !== 'undefined' && window.sharedUtilities?.dom?.clearElementCache(),
+      throttleDebounce: () => typeof window !== 'undefined' && window.sharedUtilities?.throttle?.clearAll(),
+      script: () => this.clearAll()
+    };
+
+    const operation = cacheOperations[cacheType];
+    if (!operation) {
+      reject(new Error(`Unknown cache type: ${cacheType}`));
+      return;
+    }
+
+    try {
+      operation();
+      if (this.debugMode) {
+        debugLog(`✅ ${cacheType} cache cleared`);
+      }
+      resolve({ success: true, cacheType });
+    } catch (error) {
+      warnLog(`⚠️ Failed to clear ${cacheType} cache:`, error);
+      resolve({ success: false, cacheType, error: error.message });
+    }
+  });
+};
+
+/**
+ * キャッシュ状態の診断
+ * @returns {Object} 診断結果
+ */
+CacheManager.prototype.diagnoseFrontendCache = function() {
+  const caches = {
+    unifiedCache: {
+      available: typeof window !== 'undefined' && !!(window.unifiedCache && window.unifiedCache.clear),
+      size: typeof window !== 'undefined' ? (window.unifiedCache?.size || 'unknown') : 'unavailable'
+    },
+    gasOptimizer: {
+      available: typeof window !== 'undefined' && !!(window.gasOptimizer && window.gasOptimizer.clearCache),
+      size: typeof window !== 'undefined' ? (window.gasOptimizer?.cache?.size || 'unknown') : 'unavailable'
+    },
+    sharedUtilities: {
+      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.cache),
+      size: typeof window !== 'undefined' ? (window.sharedUtilities?.cache?.size || 'unknown') : 'unavailable'
+    },
+    domElements: {
+      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.dom),
+      size: 'unknown'
+    },
+    scriptCache: {
+      available: true,
+      size: this.memoCache.size
+    }
+  };
+
+  return {
+    clearInProgress: this.clearInProgress,
+    pendingClears: this.pendingClears.length,
+    caches,
+    health: this.getHealth()
+  };
+};
+
+/**
+ * 待機中のクリア要求を解決
+ */
+CacheManager.prototype.resolvePendingClears = function(results) {
+  const pending = this.pendingClears.splice(0);
+  pending.forEach(({ resolve }) => resolve(results));
+};
+
+/**
+ * 待機中のクリア要求を拒否
+ */
+CacheManager.prototype.rejectPendingClears = function(error) {
+  const pending = this.pendingClears.splice(0);
+  pending.forEach(({ reject }) => reject(error));
+};
+
