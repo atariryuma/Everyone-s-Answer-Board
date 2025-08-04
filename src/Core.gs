@@ -2849,11 +2849,15 @@ function getHeaderIndices(spreadsheetId, sheetName) {
   var cacheKey = 'hdr_' + spreadsheetId + '_' + sheetName;
   var indices = getHeadersCached(spreadsheetId, sheetName);
 
-  // 理由列が取得できていない場合はキャッシュを無効化して再取得
+  // 理由列が取得できていない場合のみキャッシュを無効化して再取得
   if (!indices || indices[COLUMN_HEADERS.REASON] === undefined) {
     debugLog('getHeaderIndices: Reason header missing, refreshing cache for key=%s', cacheKey);
     cacheManager.remove(cacheKey);
-    indices = getHeadersCached(spreadsheetId, sheetName);
+    // 直接再取得は避け、getHeadersCachedの内部ロジックに委譲
+    var refreshedIndices = getHeadersCached(spreadsheetId, sheetName);
+    if (refreshedIndices && Object.keys(refreshedIndices).length > 0) {
+      indices = refreshedIndices;
+    }
   }
 
   return indices;

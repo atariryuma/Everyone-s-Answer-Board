@@ -683,14 +683,18 @@ if (typeof global !== 'undefined') {
  */
 function getHeadersCached(spreadsheetId, sheetName) {
   const key = `hdr_${spreadsheetId}_${sheetName}`;
+  const validationKey = `hdr_validation_${spreadsheetId}_${sheetName}`;
 
   const indices = cacheManager.get(key, () => {
     return getHeadersWithRetry(spreadsheetId, sheetName, 3);
   }, { ttl: 1800, enableMemoization: true }); // 30分間キャッシュ + メモ化
 
-  // 必須列の存在チェック（改善された復旧メカニズム）
+  // 必須列の存在チェック（改善された復旧メカニズム + 重複防止）
   if (indices && Object.keys(indices).length > 0) {
-    const hasRequiredColumns = validateRequiredHeaders(indices);
+    // バリデーション結果もキャッシュして重複処理を防止
+    const hasRequiredColumns = cacheManager.get(validationKey, () => {
+      return validateRequiredHeaders(indices);
+    }, { ttl: 1800, enableMemoization: true });
     if (!hasRequiredColumns.isValid) {
       // 完全に必須列が不足している場合のみ復旧を試行
       // 片方でも存在する場合は設定によるものとして受け入れる

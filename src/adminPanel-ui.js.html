@@ -1492,13 +1492,7 @@ function showConfirmationModal(title, message, onConfirm) {
   const confirmBtn = document.getElementById('modal-confirm-btn');
   const cancelBtn = document.getElementById('modal-cancel-btn');
   
-  console.log('🔍 showConfirmationModal: 要素検索結果:', {
-    modal: !!modal,
-    titleElement: !!titleElement,
-    messageElement: !!messageElement,
-    confirmBtn: !!confirmBtn,
-    cancelBtn: !!cancelBtn
-  });
+  console.log('🔍 showConfirmationModal: 要素検索完了');
   
   if (modal && titleElement && messageElement && confirmBtn) {
     titleElement.textContent = title;
@@ -1715,10 +1709,7 @@ function handleSheetSelectionChange(event) {
     return;
   }
   
-  console.log('📊 Sheet selection changed:', {
-    previousSheet: selectedSheet,
-    newSelectedSheet: newSelectedSheet
-  });
+  console.log('📊 Sheet selection changed: ' + newSelectedSheet);
   
   // Update global selected sheet variable and last selected sheet
   selectedSheet = newSelectedSheet;
@@ -1841,7 +1832,7 @@ function clearColumnSelections() {
 
 // Load configuration for selected sheet - OPTIMIZED
 function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetries = 3) {
-  console.log('📋 Loading config for:', { selectedSheet: sheetName, spreadsheetId: spreadsheetId, retry: retryCount });
+  console.log('📋 Loading config for: ' + sheetName);
 
   if (!spreadsheetId || !sheetName) {
     console.error('スプレッドシート情報が不足しています。');

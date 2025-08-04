@@ -372,10 +372,10 @@ function completeAIDetectionProcess() {
     
     runGasWithUserId('detectFormUrlFromSpreadsheet', 'フォーム検出中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
       .then(result => {
-        console.log('📋 フォーム検出結果:', result);
+        console.log('📋 フォーム検出結果受信');
         
         if (result && result.success && result.formUrl) {
-          console.log('✅ フォームURL検出成功:', result.formUrl);
+          console.log('✅ フォームURL検出成功');
           
           // 3. 設定の自動保存と完了状態への更新
           const config = buildConfigObject();
@@ -754,12 +754,7 @@ function proceedWithSaveAndPublish(config) {
                 ...result
               };
               
-              console.log('📊 通常公開完了データ確認:', {
-                hasPublishedAt: !!publishResult.publishedAt,
-                hasAutoStopMinutes: !!publishResult.autoStopMinutes,
-                hasBoardUrl: !!publishResult.boardUrl,
-                publishResult
-              });
+              console.log('📊 通常公開完了データ確認完了');
               
               if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
                 window.sharedModals.showAutoStopConfirmation(publishResult);
@@ -1103,13 +1098,13 @@ function createFormWithConfig() {
     enableClass: enableClassSelection && classChoices.length > 0,
   };
   
-  console.log('📋 カスタムフォーム設定:', config);
+  console.log('📋 カスタムフォーム設定準備完了');
   
   hideFormConfigModal();
   
   // カスタムセットアップ用進捗表示を開始
   // Use the new unified custom setup system
-  console.log('🎨 統合カスタムセットアップ開始:', config);
+  console.log('🎨 統合カスタムセットアップ開始');
   
   // userEmailは現在のユーザー情報から取得
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.adminEmail) {
@@ -2217,17 +2212,17 @@ function simulateCustomSetupProgress() {
 }
 
 // Handle unified custom setup
-function handleCustomSetup(config) {
-  console.log('🎨 カスタムセットアップ開始:', config);
+async function handleCustomSetup(config) {
+  console.log('🎨 カスタムセットアップ開始');
   
   // Show progress and start simulation
   showCustomSetupProgress();
   simulateCustomSetupProgress();
   
   // Call the unified backend custom setup function
-  runGasWithUserId('customSetup', false, config)
-    .then(function(result) {
-      if (result && result.status === 'success') {
+  try {
+    const result = await runGasWithUserId('customSetup', false, config);
+    if (result && result.status === 'success') {
         console.log('✅ カスタムセットアップ完了');
         
         updateOverallProgress(100, 'カスタムセットアップ完了');
@@ -2256,20 +2251,22 @@ function handleCustomSetup(config) {
             publishedSheetName: result.sheetName || 'フォームの回答 1'
           };
           
-          runGasWithUserId('syncConfigurationState', '状態修正中...', stateFixConfig, 'repair')
-            .then(function(syncResult) {
-              if (syncResult && syncResult.success) {
-                console.log('✅ 状態修正完了');
-                // キャッシュクリアしてUI更新
-                if (window.unifiedCache) window.unifiedCache.clear();
-                if (typeof loadSystemStatus === 'function') loadSystemStatus();
-              } else {
-                console.log('❌ 状態修正失敗:', syncResult?.errors);
-              }
-            })
-            .catch(function(error) {
-              console.log('❌ 状態修正エラー:', error.message);
-            });
+          try {
+            const syncResult = await runGasWithUserId('syncConfigurationState', '状態修正中...', stateFixConfig, 'repair');
+            if (syncResult && syncResult.success) {
+              console.log('✅ 状態修正完了');
+              // 徹底的なキャッシュクリア
+              if (window.unifiedCache) window.unifiedCache.clear();
+              if (window.gasOptimizer && window.gasOptimizer.cache) window.gasOptimizer.cache.clear();
+              // 少し待ってからUI更新
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              if (typeof loadSystemStatus === 'function') loadSystemStatus();
+            } else {
+              console.log('❌ 状態修正失敗:', syncResult?.errors);
+            }
+          } catch (error) {
+            console.log('❌ 状態修正エラー:', error.message);
+          }
         }
         
         // Update status after custom setup
@@ -2329,19 +2326,18 @@ function handleCustomSetup(config) {
           hideCustomSetupProgress();
         }, 5000);
         
-      } else {
-        console.error('❌ CustomSetup backend error:', result);
-        updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ セットアップでエラーが発生しました');
-        showMessage('❌ カスタムセットアップに失敗しました: ' + (result?.message || 'unknown error'), 'error');
-        hideCustomSetupProgress();
-      }
-    })
-    .catch(function(error) {
-      console.error('❌ CustomSetup backend call failed:', error);
-      updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ バックエンドエラーが発生しました');
-      showMessage('❌ カスタムセットアップでエラーが発生しました: ' + error.message, 'error');
+    } else {
+      console.error('❌ CustomSetup backend error:', result);
+      updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ セットアップでエラーが発生しました');
+      showMessage('❌ カスタムセットアップに失敗しました: ' + (result?.message || 'unknown error'), 'error');
       hideCustomSetupProgress();
-    });
+    }
+  } catch (error) {
+    console.error('❌ CustomSetup backend call failed:', error);
+    updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ バックエンドエラーが発生しました');
+    showMessage('❌ カスタムセットアップでエラーが発生しました: ' + error.message, 'error');
+    hideCustomSetupProgress();
+  }
 }
 
 // QuickStart実行状態の管理
