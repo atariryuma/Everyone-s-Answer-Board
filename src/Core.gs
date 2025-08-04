@@ -27,6 +27,10 @@ if (typeof infoLog === 'undefined') {
   }
 }
 
+// デフォルト質問文の共通定数
+var DEFAULT_MAIN_QUESTION = 'あなたの考えや気づいたことを教えてください';
+var DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教えてください（任意）';
+
 /**
  * セットアップステップを判定する（サーバー側統一実装）
  * フロントエンドとバックエンドで共通のステップ判定ロジックを提供
@@ -2343,8 +2347,8 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
   var quickStartSheetConfig = {
     guessedConfig: {
-      opinionHeader: '今日の学習について、あなたの考えや感想を聞かせてください',
-      reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
+      opinionHeader: DEFAULT_MAIN_QUESTION,
+      reasonHeader: DEFAULT_REASON_QUESTION,
       nameHeader: '名前',
       classHeader: 'クラス',
       timestampHeader: 'タイムスタンプ',
@@ -3286,13 +3290,13 @@ function getQuestionConfig(questionType, customConfig) {
       helpText: ''
     },
     mainQuestion: {
-      title: '今日の学習について、あなたの考えや感想を聞かせてください',
+      title: DEFAULT_MAIN_QUESTION,
       helpText: '',
       choices: ['気づいたことがある。', '疑問に思うことがある。', 'もっと知りたいことがある。'],
       type: 'paragraph'
     },
     reasonQuestion: {
-      title: 'そう考える理由や体験があれば教えてください。',
+      title: DEFAULT_REASON_QUESTION,
       helpText: '',
       type: 'paragraph'
     }
@@ -3397,7 +3401,7 @@ const FORM_PRESETS = {
     questions: 'custom',
     description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを持ち、建設的な意見を心がけましょう\n• 事実に基づいた正しい情報を共有しましょう\n• 多様な意見を尊重し、違いを学びの機会としましょう\n• 個人情報やプライバシーに関わる内容は書かないようにしましょう\n• 責任ある発言を心がけ、みんなが安心して参加できる環境を作りましょう\n\nあなたの意見や感想は、クラスメイトの学びを深める大切な資源です。',
     config: {
-      mainQuestion: '今日の学習について、あなたの考えや感想を聞かせてください',
+      mainQuestion: DEFAULT_MAIN_QUESTION,
       questionType: 'text',
       enableClass: false,
       includeOthers: false
@@ -4822,7 +4826,7 @@ function createCustomFormAndSheet(setupContext) {
   // ステップ2: AdminPanelのconfig構造を内部形式に変換
   const convertedConfig = {
     mainQuestion: {
-      title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
+      title: config.mainQuestion || DEFAULT_MAIN_QUESTION,
       type: config.responseType || config.questionType || 'text',
       choices: config.questionChoices || config.choices || [],
       includeOthers: config.includeOthers || false
@@ -5080,7 +5084,7 @@ function createCustomFormUI(requestUserId, config) {
     // AdminPanelのconfig構造を内部形式に変換（createCustomForm の処理を統合）
     const convertedConfig = {
       mainQuestion: {
-        title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
+        title: config.mainQuestion || DEFAULT_MAIN_QUESTION,
         type: config.responseType || config.questionType || 'text', // responseTypeを優先して使用
         choices: config.questionChoices || config.choices || [], // questionChoicesを優先して使用
         includeOthers: config.includeOthers || false

@@ -1081,10 +1081,17 @@ function updateTopicText(status) {
             topic = '（質問文が設定されていません）';
           }
         } catch (e) {
-          topic = sheetName || '（問題文未設定）';
+          // クイックスタート直後のフォールバック改善
+          if (sheetName && fullCfg['sheet_' + sheetName]?.flowType === 'quickstart') {
+            // クイックスタート用デフォルト質問文を表示
+            topic = 'あなたの考えや気づいたことを教えてください';
+          } else {
+            topic = '（質問文が設定されていません）';
+          }
         }
       } else {
-        topic = sheetName;
+        // シート名をそのまま表示せず、適切なメッセージを表示
+        topic = '（質問文が設定されていません）';
       }
     }
   }

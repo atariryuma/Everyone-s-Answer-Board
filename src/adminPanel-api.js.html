@@ -2596,6 +2596,12 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           if (typeof updateUnpublishButton === 'function' && window.lastStatusCache) {
             updateUnpublishButton(window.lastStatusCache);
           }
+          
+          // クイックスタート完了後のフッター強制更新（質問文確定後）
+          if (window.updateFooter && typeof window.updateFooter === 'function') {
+            console.log('🔄 QuickStart完了: フッター表示を強制更新');
+            window.updateFooter(window.lastStatusCache || result);
+          }
         }, 1000);
         
         // 回答ボードにフォーム作成完了を通知（フォームリンク更新用）

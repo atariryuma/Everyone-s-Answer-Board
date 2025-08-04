@@ -611,7 +611,7 @@ function autoMapHeaders(headers, sheetName = null) {
   // 高精度マッピングルール（優先度順）
   const mappingRules = {
     opinionHeader: {
-      exact: ['今日の学習について、あなたの考えや感想を聞かせてください', 'あなたの回答・意見', '回答・意見'],
+      exact: ['あなたの考えや気づいたことを教えてください', 'あなたの回答・意見', '回答・意見'],
       high: ['今日のテーマ', 'あなたの考え', '意見', '回答', '答え', '質問への回答'],
       medium: ['answer', 'response', 'opinion', 'comment', '投稿', 'コメント', '内容'],
       low: ['テキスト', 'text', '記述', '入力', '自由記述']
