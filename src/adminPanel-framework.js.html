@@ -1,0 +1,184 @@
+<script>
+// Unified Admin Panel Namespace and Management Classes
+// Generated to address function interference issues and centralize state, events,
+// asynchronous operations, and DOM handling.
+
+window.AdminPanel = window.AdminPanel || {
+  errors: {},
+  ui: {},
+  state: {
+    current: null,
+    selectedSheet: '',
+    updateStatus(status) {
+      this.current = status;
+    }
+  }
+};
+
+// -----------------------------------------------------------------------------
+// Error & Message Handling
+// -----------------------------------------------------------------------------
+window.AdminPanel.errors.handle = function(error, context, userMessage) {
+  if (window.unifiedErrorHandler && typeof window.unifiedErrorHandler.handleError === 'function') {
+    return window.unifiedErrorHandler.handleError(error, context, undefined, undefined);
+  }
+  console.error(`❌ Error in ${context}:`, error);
+  const message = userMessage || (error && error.message ? error.message : String(error));
+  window.AdminPanel.ui.showMessage(message, 'error');
+};
+
+window.AdminPanel.ui.showMessage = function(msg, type = 'info', duration = 5000, options = {}) {
+  // Prefer shared utility implementation if available
+  if (window.sharedUtilities && typeof window.sharedUtilities.showMessage === 'function') {
+    return window.sharedUtilities.showMessage(msg, type, duration, options);
+  }
+  // Minimal fallback implementation
+  const containerId = 'ap-message-container';
+  let container = document.getElementById(containerId);
+  if (!container) {
+    container = document.createElement('div');
+    container.id = containerId;
+    container.style.position = 'fixed';
+    container.style.top = '1rem';
+    container.style.right = '1rem';
+    container.style.zIndex = '10000';
+    document.body.appendChild(container);
+  }
+  const div = document.createElement('div');
+  div.textContent = msg;
+  div.className = `ap-message ap-${type}`;
+  container.appendChild(div);
+  if (duration > 0) {
+    setTimeout(() => div.remove(), duration);
+  }
+  return div;
+};
+
+// Backward compatibility
+window.handleError = window.AdminPanel.errors.handle;
+window.showMessage = window.AdminPanel.ui.showMessage;
+
+// -----------------------------------------------------------------------------
+// State Manager
+// -----------------------------------------------------------------------------
+class AdminPanelStateManager {
+  constructor() {
+    this.state = {
+      currentStatus: null,
+      selectedSheet: '',
+      isLoading: false
+    };
+    this.subscribers = new Map();
+  }
+
+  setState(key, value) {
+    this.state[key] = value;
+    this.notifySubscribers(key, value);
+  }
+
+  subscribe(key, callback) {
+    if (!this.subscribers.has(key)) {
+      this.subscribers.set(key, []);
+    }
+    this.subscribers.get(key).push(callback);
+  }
+
+  notifySubscribers(key, value) {
+    const subs = this.subscribers.get(key) || [];
+    subs.forEach(cb => {
+      try {
+        cb(value);
+      } catch (e) {
+        console.warn('Subscriber callback failed', e);
+      }
+    });
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Event Manager
+// -----------------------------------------------------------------------------
+class AdminPanelEventManager {
+  constructor() {
+    this.listeners = new Map();
+  }
+
+  addListener(element, event, handler, options = {}) {
+    if (!element || !event || !handler) return;
+    const key = `${element.id || 'anonymous'}-${event}`;
+    if (this.listeners.has(key)) {
+      console.warn(`Duplicate listener for ${key}`);
+      return;
+    }
+    element.addEventListener(event, handler, options);
+    this.listeners.set(key, { element, event, handler, options });
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Async Manager
+// -----------------------------------------------------------------------------
+class AdminPanelAsyncManager {
+  constructor() {
+    this.runningOperations = new Map();
+  }
+
+  async executeExclusive(operationId, operation) {
+    if (this.runningOperations.has(operationId)) {
+      return this.runningOperations.get(operationId);
+    }
+    const promise = Promise.resolve().then(operation);
+    this.runningOperations.set(operationId, promise);
+    try {
+      return await promise;
+    } finally {
+      this.runningOperations.delete(operationId);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// DOM Manager
+// -----------------------------------------------------------------------------
+class AdminPanelDOMManager {
+  constructor() {
+    this.elementCache = new Map();
+    this.operationQueue = [];
+  }
+
+  getElement(id) {
+    if (!this.elementCache.has(id)) {
+      this.elementCache.set(id, document.getElementById(id));
+    }
+    return this.elementCache.get(id);
+  }
+
+  queueOperation(operation) {
+    this.operationQueue.push(operation);
+    return new Promise(resolve => {
+      requestAnimationFrame(() => {
+        const op = this.operationQueue.shift();
+        resolve(op());
+      });
+    });
+  }
+}
+
+// Instantiate managers and expose via namespace
+window.AdminPanel.stateManager = new AdminPanelStateManager();
+window.AdminPanel.eventManager = new AdminPanelEventManager();
+window.AdminPanel.asyncManager = new AdminPanelAsyncManager();
+window.AdminPanel.domManager = new AdminPanelDOMManager();
+
+// Link legacy globals to state manager for compatibility
+Object.defineProperties(window, {
+  currentStatus: {
+    get() { return window.AdminPanel.stateManager.state.currentStatus; },
+    set(v) { window.AdminPanel.stateManager.setState('currentStatus', v); }
+  },
+  selectedSheet: {
+    get() { return window.AdminPanel.stateManager.state.selectedSheet; },
+    set(v) { window.AdminPanel.stateManager.setState('selectedSheet', v); }
+  }
+});
+</script>
