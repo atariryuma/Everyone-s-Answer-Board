@@ -4727,6 +4727,36 @@ function customSetup(requestUserId, config) {
     var publishResult = performAutoPublish(requestUserId, formAndSsInfo.sheetName);
     debugLog('✅ CustomSetup: ステップ5完了 - 自動公開成功', publishResult);
 
+    // ステップ5.5: 状態整合性のための設定更新
+    try {
+      debugLog('🧩 CustomSetup: 設定状態を更新中...');
+      var currentUser = findUserById(requestUserId);
+      if (currentUser) {
+        var updatedConfigJson = JSON.parse(currentUser.configJson || '{}');
+        updatedConfigJson.formCreated = true;
+        updatedConfigJson.formUrl = formAndSsInfo.formUrl;
+        updatedConfigJson.editFormUrl = formAndSsInfo.editFormUrl;
+        updatedConfigJson.publishedSheetName = formAndSsInfo.sheetName;
+        updatedConfigJson.publishedSpreadsheetId = formAndSsInfo.spreadsheetId;
+        updatedConfigJson.folderId = folder ? folder.getId() : '';
+        updatedConfigJson.folderUrl = folder ? folder.getUrl() : '';
+        updatedConfigJson.setupStatus = saveResult.success ? 'completed' : 'pending';
+        updatedConfigJson.appPublished = publishResult && publishResult.success && publishResult.published;
+        updatedConfigJson.lastModified = new Date().toISOString();
+
+        updateUser(requestUserId, {
+          spreadsheetId: formAndSsInfo.spreadsheetId,
+          spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+          folderId: folder ? folder.getId() : '',
+          folderUrl: folder ? folder.getUrl() : '',
+          configJson: JSON.stringify(updatedConfigJson),
+          lastAccessedAt: new Date().toISOString()
+        });
+      }
+    } catch (stateError) {
+      errorLog('❌ CustomSetup状態更新エラー: ' + stateError.message);
+    }
+
     // ステップ6: キャッシュクリアと最終化
     debugLog('🔄 CustomSetup: ステップ6 - 最終化処理中...');
     clearExecutionUserInfoCache();
@@ -4910,28 +4940,41 @@ function performAutoAIDetection(requestUserId, spreadsheetId, sheetName) {
 function applyAutoConfiguration(requestUserId, spreadsheetId, sheetName, aiDetectionResult) {
   try {
     debugLog('💾 自動設定適用開始', { requestUserId, sheetName });
-    
+
     if (!aiDetectionResult.success || !aiDetectionResult.guessedConfig) {
       throw new Error('AI判定結果が無効です');
     }
-    
-    // AI判定結果を設定として保存
-    const saveResult = saveSheetConfig(requestUserId, spreadsheetId, sheetName, aiDetectionResult.guessedConfig);
-    
-    if (!saveResult || !saveResult.success) {
+
+    var guessedConfig = aiDetectionResult.guessedConfig;
+    if (typeof guessedConfig !== 'object') {
+      throw new Error('AI判定結果の形式が不正です');
+    }
+
+    // 保存処理（リトライ付き）
+    var attempts = 0;
+    var saveResult;
+    while (attempts < 2) {
+      attempts++;
+      saveResult = saveSheetConfig(requestUserId, spreadsheetId, sheetName, guessedConfig);
+      if (saveResult && saveResult.status === 'success') {
+        break;
+      }
+    }
+
+    if (!saveResult || saveResult.status !== 'success') {
       throw new Error('設定保存に失敗しました: ' + (saveResult?.message || 'unknown error'));
     }
-    
+
     infoLog('✅ 自動設定適用完了', saveResult);
-    
+
     return {
       success: true,
       configured: true,
-      savedConfig: aiDetectionResult.guessedConfig,
+      savedConfig: guessedConfig,
       message: '設定が正常に保存されました',
       details: saveResult
     };
-    
+
   } catch (error) {
     errorLog('❌ 自動設定適用エラー', { error: error.message });
     return {
@@ -4993,7 +5036,7 @@ function generateCustomSetupResponse(setupContext, createdFiles, saveResult, aiD
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
     folderUrl: createdFiles.folder ? createdFiles.folder.getUrl() : '',
     // カスタムセットアップ固有の詳細情報
-    setupComplete: true,
+    setupComplete: isAIDetected && isConfigured && isPublished,
     aiDetected: isAIDetected,
     autoConfigured: isConfigured,
     autoPublished: isPublished,
