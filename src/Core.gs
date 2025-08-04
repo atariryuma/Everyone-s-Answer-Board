@@ -2719,7 +2719,6 @@ function quickStartSetup(requestUserId) {
     debugLog('🔄 QuickStart: ステップ5 - キャッシュクリア中...');
     clearExecutionUserInfoCache();
     invalidateUserCache(requestUserId, userEmail, createdFiles.formAndSsInfo.spreadsheetId, true);
-    clearExecutionUserInfoCache();
     debugLog('✅ QuickStart: ステップ5完了 - キャッシュクリア成功');
 
     // ステップ6: 最終レスポンス生成
@@ -4785,7 +4784,6 @@ function customSetup(requestUserId, config) {
     debugLog('🔄 CustomSetup: ステップ6 - 最終化処理中...');
     clearExecutionUserInfoCache();
     invalidateUserCache(requestUserId, setupContext.userEmail, formAndSsInfo.spreadsheetId, true);
-    clearExecutionUserInfoCache();
     debugLog('✅ CustomSetup: ステップ6完了 - 最終化成功');
 
     // ステップ7: 最終レスポンス生成と完了通知
@@ -4810,7 +4808,7 @@ function customSetup(requestUserId, config) {
         updateUser(requestUserId, {
           configJson: JSON.stringify(currentConfig)
         });
-        invalidateUserCache(requestUserId, userInfo.adminEmail, null, false);
+        invalidateUserCache(requestUserId, userInfo.adminEmail || userInfo.email, null, false);
         clearExecutionUserInfoCache();
       }
     } catch (updateError) {

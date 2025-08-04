@@ -26,7 +26,7 @@ class FlowExecutionManager {
    * @returns {Promise} 実行結果
    */
   async executeWithLock(flowId, operation, options = {}) {
-    const { timeout = 30000, allowQueue = false } = options;
+    const { timeout = SYSTEM_CONSTANTS.TIMEOUTS.DEFAULT_FLOW_TIMEOUT, allowQueue = false } = options;
 
     // 既に実行中の場合の処理
     if (this.activeFlows.has(flowId)) {
@@ -53,7 +53,7 @@ class FlowExecutionManager {
   }
 
   /**
-   * 操作を実行
+   * 操作を実行（改良版 - AbortController対応）
    */
   async executeOperation(flowId, operation, timeout) {
     this.activeFlows.add(flowId);
@@ -62,16 +62,28 @@ class FlowExecutionManager {
       console.log(`🚀 Starting flow execution: ${flowId}`);
     }
 
-    // タイムアウト付きPromise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Flow ${flowId} timed out after ${timeout}ms`)), timeout);
-    });
-
-    const operationPromise = Promise.resolve(operation());
-    this.pendingOperations.set(flowId, operationPromise);
-
+    // AbortControllerを使用した適切なタイムアウト制御
+    const abortController = new AbortController();
+    let timeoutId = null;
+    
     try {
-      const result = await Promise.race([operationPromise, timeoutPromise]);
+      // タイムアウト設定
+      timeoutId = setTimeout(() => {
+        console.warn(`⏰ Flow ${flowId} timeout after ${timeout}ms - aborting operation`);
+        abortController.abort();
+      }, timeout);
+
+      // 操作実行（AbortSignalを渡す）
+      const operationPromise = Promise.resolve(operation(abortController.signal));
+      this.pendingOperations.set(flowId, operationPromise);
+
+      const result = await operationPromise;
+      
+      // 正常完了時はタイムアウトをクリア
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       
       if (this.debugMode) {
         console.log(`✅ Flow ${flowId} completed successfully`);
@@ -79,9 +91,30 @@ class FlowExecutionManager {
       
       return result;
     } catch (error) {
+      // タイムアウトをクリア
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      // AbortErrorの場合はより詳細なエラーメッセージ
+      if (error.name === 'AbortError' || abortController.signal.aborted) {
+        const timeoutError = new Error(`Flow ${flowId} was aborted due to timeout (${timeout}ms)`);
+        timeoutError.name = 'TimeoutError';
+        timeoutError.flowId = flowId;
+        timeoutError.timeout = timeout;
+        console.error(`❌ Flow ${flowId} aborted due to timeout`);
+        throw timeoutError;
+      }
+
       console.error(`❌ Flow ${flowId} failed:`, error);
       throw error;
     } finally {
+      // リソースクリーンアップ
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
       this.activeFlows.delete(flowId);
       this.pendingOperations.delete(flowId);
       
@@ -1535,8 +1568,30 @@ async function clearAllCachesForUnpublish() {
   console.log('🧹 公開停止時の包括的キャッシュクリア処理を開始');
   
   try {
-    // 1. 統一キャッシュクリア
-    await cacheManager.clearAllFrontendCaches();
+    // 1. 既存の安定したキャッシュクリア方式
+    // 統一キャッシュクリア
+    if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+      window.unifiedCache.clear();
+      console.log('✅ UnifiedCache cleared');
+    }
+    
+    // GAS最適化キャッシュクリア
+    if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+      window.gasOptimizer.clearCache();
+      console.log('✅ GasOptimizer cache cleared');
+    }
+    
+    // SharedUtilitiesキャッシュクリア
+    if (window.sharedUtilities && window.sharedUtilities.cache && typeof window.sharedUtilities.cache.clear === 'function') {
+      window.sharedUtilities.cache.clear();
+      console.log('✅ SharedUtilities cache cleared');
+    }
+    
+    // DOM要素キャッシュクリア
+    if (window.sharedUtilities && window.sharedUtilities.dom && typeof window.sharedUtilities.dom.clearElementCache === 'function') {
+      window.sharedUtilities.dom.clearElementCache();
+      console.log('✅ DOM element cache cleared');
+    }
     
     // 2. ローカルストレージのキャッシュクリア（StudyQuest関連のみ）
     try {
@@ -1920,7 +1975,7 @@ function copyBoardUrl(buttonElement) {
         messageElement.textContent = ' (手動でコピーしてください)';
         messageElement.style.color = 'orange';
         buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-        setTimeout(() => messageElement.remove(), 5000);
+        setTimeout(() => messageElement.remove(), SYSTEM_CONSTANTS.TIMEOUTS.ERROR_DISPLAY_DURATION);
       });
     } else {
       // Fallback for browsers that don't support Clipboard API
@@ -2620,13 +2675,15 @@ const quickStartSteps = [
 ];
 
 // Custom setup progress management
+// Custom Setup step definitions (7 steps for comprehensive setup) - 独立版
 const customSetupSteps = [
-  { id: 1, text: 'カスタムフォーム設定の解析', detail: 'フォーム設定を検証中...' },
-  { id: 2, text: 'Googleフォームとスプレッドシートの作成', detail: 'カスタムフォームを構築中...' },
-  { id: 3, text: '高精度AI列判定の自動実行', detail: 'AIによる列の自動判定を実行中...' },
-  { id: 4, text: '設定の自動保存と適用', detail: 'AI判定結果を設定に適用中...' },
-  { id: 5, text: '回答ボードの自動公開', detail: 'Webアプリケーションを公開中...' },
-  { id: 6, text: 'カスタムセットアップ完了', detail: 'すべての設定が完了しました！' }
+  { id: 1, text: 'カスタムフォーム設定の解析', detail: 'フォーム設定を検証中...', maxTime: 45 },
+  { id: 2, text: 'Googleフォームとスプレッドシートの作成', detail: 'カスタムフォームを構築中...', maxTime: 90 },
+  { id: 3, text: '高精度AI列判定の自動実行', detail: 'AIが最適な列構成を判定中...', maxTime: 120 },
+  { id: 4, text: '設定の自動保存と適用', detail: '判定結果を設定に反映中...', maxTime: 30 },
+  { id: 5, text: '回答ボードの自動公開', detail: 'Webアプリケーションを公開中...', maxTime: 60 },
+  { id: 6, text: 'キャッシュクリアと最終化', detail: 'システム最適化中...', maxTime: 30 },
+  { id: 7, text: '最終レスポンス生成と完了通知', detail: 'セットアップ完了準備中...', maxTime: 15 }
 ];
 
 // Show QuickStart progress bar
@@ -2856,113 +2913,397 @@ function simulateCustomFormProgressWithFolderCheck() {
 // CUSTOM SETUP FUNCTIONALITY - Unified Automation
 // =============================================================================
 
-// Show Custom Setup progress bar
+// Show Custom Setup progress bar (独立版)
 function showCustomSetupProgress() {
-  const progressContainer = document.getElementById('quickstart-progress'); // Reuse same container
+  const progressContainer = document.getElementById('customsetup-progress'); // 独立したコンテナを使用
   if (progressContainer) {
     progressContainer.classList.remove('hidden');
     resetCustomSetupProgressSteps();
   }
 }
 
-// Hide Custom Setup progress bar
+// Hide Custom Setup progress bar (独立版)
 function hideCustomSetupProgress() {
-  const progressContainer = document.getElementById('quickstart-progress');
+  const progressContainer = document.getElementById('customsetup-progress'); // 独立したコンテナを使用
   if (progressContainer) {
     progressContainer.classList.add('hidden');
   }
 }
 
-// Reset Custom Setup progress steps
+// Reset Custom Setup progress steps (独立版)
 function resetCustomSetupProgressSteps() {
   customSetupSteps.forEach(step => {
-    updateProgressStep(step.id, 'waiting', step.text, '待機中...');
+    updateCustomProgressStep(step.id, 'waiting', step.text, '待機中...');
   });
-  updateOverallProgress(0, '初期化中...');
+  updateCustomOverallProgress(0, '初期化中...', calculateTotalEstimatedTime());
 }
 
-// Simulate Custom Setup progress with real backend synchronization
-async function simulateCustomSetupProgress() {
-  console.log('🎨 Starting enhanced Custom Setup progress simulation (TimingManager版)');
+// CustomSetup専用のプログレス更新関数
+function updateCustomProgressStep(stepId, status, text, detail) {
+  const stepElement = document.getElementById(`custom-progress-step-${stepId}`);
+  const dotElement = document.getElementById(`custom-progress-step-${stepId}-dot`);
+  const textElement = document.getElementById(`custom-progress-step-${stepId}-text`);
+  const detailElement = document.getElementById(`custom-progress-step-${stepId}-detail`);
+  const timeElement = document.getElementById(`custom-progress-step-${stepId}-time`);
   
-  const progressSteps = [
-    {
-      id: 1,
-      text: 'カスタムフォーム設定の解析',
-      detail: 'フォーム設定を検証中...',
-      completedText: '✅ 設定解析が完了しました',
-      progress: 10,
-      progressText: 'カスタム設定を解析しています...',
-      delay: 1000
-    },
-    {
-      id: 2,
-      text: 'Googleフォームとスプレッドシートの作成',
-      detail: 'カスタムフォームを構築中...',
-      completedText: '✅ カスタムフォームが作成されました',
-      progress: 25,
-      progressText: 'カスタムフォームとスプレッドシートを作成しています...',
-      delay: 1800
-    },
-    {
-      id: 3,
-      text: '高精度AI列判定の自動実行',
-      detail: 'AIによる列の自動判定を実行中...',
-      completedText: '✅ AI列判定が完了しました',
-      progress: 50,
-      progressText: 'AI列判定を実行しています...',
-      delay: 2000
-    },
-    {
-      id: 4,
-      text: '設定の自動保存と適用',
-      detail: 'AI判定結果を設定に適用中...',
-      completedText: '✅ 設定が正常に保存されました',
-      progress: 70,
-      progressText: 'AI判定結果を設定に適用しています...',
-      delay: 1500
-    },
-    {
-      id: 5,
-      text: '回答ボードの自動公開',
-      detail: 'Webアプリケーションを公開中...',
-      completedText: '✅ 回答ボードが公開されました',
-      progress: 85,
-      progressText: '回答ボードを公開しています...',
-      delay: 1200
-    },
-    {
-      id: 6,
-      text: 'カスタムセットアップ完了確認',
-      detail: '最終確認を実行中...',
-      completedText: '🎉 カスタムセットアップが完了しました！',
-      progress: 100,
-      progressText: 'カスタムセットアップが完了しました！',
-      delay: 800
-    }
-  ];
+  if (!stepElement || !dotElement || !textElement || !detailElement) return;
+  
+  // Update text and detail
+  textElement.textContent = text;
+  detailElement.textContent = detail;
+  
+  // Update visual state based on status
+  switch (status) {
+    case 'waiting':
+      dotElement.className = 'w-3 h-3 rounded-full bg-gray-500 transition-all duration-300';
+      textElement.className = 'text-sm font-medium text-gray-300';
+      detailElement.className = 'text-xs text-gray-500 mt-1';
+      if (timeElement) timeElement.classList.add('opacity-0');
+      break;
+    case 'active':
+      dotElement.className = 'w-3 h-3 rounded-full bg-purple-400 animate-pulse transition-all duration-300';
+      textElement.className = 'text-sm font-medium text-purple-300';
+      detailElement.className = 'text-xs text-purple-400 mt-1';
+      if (timeElement) timeElement.classList.remove('opacity-0');
+      break;
+    case 'completed':
+      dotElement.className = 'w-3 h-3 rounded-full bg-green-400 transition-all duration-300';
+      textElement.className = 'text-sm font-medium text-green-300';
+      detailElement.className = 'text-xs text-green-400 mt-1';
+      if (timeElement) timeElement.classList.add('opacity-0');
+      break;
+    case 'error':
+      dotElement.className = 'w-3 h-3 rounded-full bg-red-400 transition-all duration-300';
+      textElement.className = 'text-sm font-medium text-red-300';
+      detailElement.className = 'text-xs text-red-400 mt-1';
+      if (timeElement) timeElement.classList.add('opacity-0');
+      break;
+  }
+}
 
-  // TimingManagerを使用してプログレス実行
-  await TimingManager.progressSequence(
-    progressSteps.map(step => ({
-      text: step.text,
-      detail: step.detail,
-      completedText: step.completedText,
-      operation: async () => {
-        // プログレス更新操作
-        updateOverallProgress(step.progress, step.progressText);
-        await TimingManager.delay(step.delay / 2); // 半分の時間で状態表示
-        return step;
+// CustomSetup専用の全体プログレス更新関数
+function updateCustomOverallProgress(percentage, statusMessage, estimatedTimeRemaining = null) {
+  const progressBar = document.getElementById('custom-progress-bar');
+  const progressPercentage = document.getElementById('custom-progress-percentage');
+  const progressStatus = document.getElementById('custom-progress-status');
+  const progressEta = document.getElementById('custom-progress-eta');
+  
+  if (progressBar) {
+    progressBar.style.width = `${Math.min(percentage, 100)}%`;
+  }
+  
+  if (progressPercentage) {
+    progressPercentage.textContent = `${Math.round(percentage)}%`;
+  }
+  
+  if (progressStatus) {
+    progressStatus.textContent = statusMessage;
+  }
+  
+  if (progressEta && estimatedTimeRemaining !== null) {
+    const minutes = Math.ceil(estimatedTimeRemaining / 60);
+    progressEta.textContent = `推定残り時間: ${minutes}分`;
+  }
+}
+
+// 推定残り時間を計算
+function calculateTotalEstimatedTime() {
+  return customSetupSteps.reduce((total, step) => total + (step.maxTime || SYSTEM_CONSTANTS.CUSTOM_SETUP.STEP_TIMES.CONFIG_SAVE), 0);
+}
+
+// CustomSetup専用のキャンセル処理
+function setupCustomSetupCancelHandler() {
+  const cancelBtn = document.getElementById('customsetup-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function() {
+      if (confirm(SYSTEM_CONSTANTS.CUSTOM_SETUP.CANCEL_CONFIRMATION_MESSAGE)) {
+        hideCustomSetupProgress();
+        showMessage('⚠️ カスタムセットアップが中断されました', 'warning');
+        // TODO: バックエンド処理の中断ロジックを実装
       }
-    })),
-    (index, status, text, detail) => {
-      const step = progressSteps[index];
-      updateProgressStep(step.id, status, text, detail);
-    },
-    300 // ステップ間の基本間隔
-  );
+    });
+  }
+}
 
-  console.log('✅ Custom Setup progress simulation completed - backend integration ready (TimingManager版)');
+// Simulate Custom Setup progress with real backend synchronization (独立版)
+async function simulateCustomSetupProgress() {
+  console.log('🎨 Starting enhanced Custom Setup progress simulation (独立版 TimingManager)');
+  
+  // キャンセルハンドラーをセットアップ
+  setupCustomSetupCancelHandler();
+  
+  let currentStep = 0;
+  let startTime = Date.now();
+  
+  for (const step of customSetupSteps) {
+    currentStep++;
+    
+    // ステップ開始
+    updateCustomProgressStep(step.id, 'active', step.text, step.detail);
+    
+    // プログレス計算（各ステップは全体の1/7）
+    const baseProgress = ((currentStep - 1) / customSetupSteps.length) * 100;
+    const nextProgress = (currentStep / customSetupSteps.length) * 100;
+    
+    // 段階的プログレス更新
+    const stepDuration = (step.maxTime || SYSTEM_CONSTANTS.CUSTOM_SETUP.STEP_TIMES.CONFIG_SAVE) * 1000; // 秒をミリ秒に変換
+    const updateInterval = Math.max(stepDuration / 10, SYSTEM_CONSTANTS.CUSTOM_SETUP.PROGRESS_UPDATE_INTERVAL); // プログレス更新間隔
+    
+    let elapsed = 0;
+    while (elapsed < stepDuration) {
+      await TimingManager.delay(updateInterval);
+      elapsed += updateInterval;
+      
+      // 現在のステップ内でのプログレス
+      const stepProgress = Math.min(elapsed / stepDuration, 1);
+      const currentProgress = baseProgress + (nextProgress - baseProgress) * stepProgress;
+      
+      // 残り時間計算
+      const totalElapsed = (Date.now() - startTime) / 1000;
+      const totalEstimated = calculateTotalEstimatedTime();
+      const remainingTime = Math.max(totalEstimated - totalElapsed, 0);
+      
+      updateCustomOverallProgress(currentProgress, step.detail, remainingTime);
+    }
+    
+    // ステップ完了
+    updateCustomProgressStep(step.id, 'completed', step.text, `✅ ${step.text}完了`);
+    updateCustomOverallProgress(nextProgress, `${step.text}完了`);
+    
+    // 短い完了表示待機
+    await TimingManager.delay(SYSTEM_CONSTANTS.UI.ANIMATION_DURATION);
+  }
+  
+  console.log('✅ Custom Setup progress simulation completed (独立版)');
+}
+
+/**
+ * 簡素化された状態更新関数
+ * 複雑な統合処理を避け、最小限のキャッシュクリアと直接的なloadStatus呼び出し
+ */
+async function simpleStatusRefresh() {
+  console.log('🔄 簡素化状態同期開始');
+  
+  try {
+    // 最小限のキャッシュクリア（エラー耐性）
+    if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+      window.unifiedCache.clear();
+      console.log('✅ UnifiedCache cleared for status refresh');
+    }
+    
+    // 直接的なloadStatus呼び出し
+    const status = await loadStatus(true);
+    console.log('✅ 簡素化状態同期完了');
+    return status;
+    
+  } catch (error) {
+    console.warn('⚠️ 簡素化状態同期でエラー:', error);
+    // エラーでもloadStatusを試行
+    try {
+      return await loadStatus(true);
+    } catch (fallbackError) {
+      console.error('❌ フォールバックloadStatusも失敗:', fallbackError);
+      throw fallbackError;
+    }
+  }
+}
+
+/**
+ * バックエンド完了ポーリング関数
+ * タイムアウト発生時にバックエンド処理の完了を確認
+ */
+async function startBackendCompletionPolling() {
+  console.log('🔄 バックエンド完了ポーリング開始');
+  const maxAttempts = 20; // 最大2分間（6秒×20回）
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`🔍 ポーリング試行 ${attempt}/${maxAttempts}`);
+      
+      // 6秒待機
+      await new Promise(resolve => setTimeout(resolve, 6000));
+      
+      // 状態確認
+      const status = await simpleStatusRefresh();
+      
+      // カスタムセットアップ完了の確認
+      if (status && (status.setupStep >= 3 || status.systemStatus?.setupStatus === 'completed')) {
+        console.log('✅ バックエンド処理完了を検出');
+        
+        // 成功処理
+        updateProgressStep(6, 'completed', 'カスタムセットアップ完了', '🎉 バックエンドでの処理が完了しました！');
+        showMessage('✅ カスタムセットアップが完了しました！（バックエンド処理完了）', 'success');
+        
+        // UI更新
+        updateUIAfterCustomSetup(status);
+        
+        // プログレス非表示
+        setTimeout(() => {
+          hideCustomSetupProgress();
+        }, 3000);
+        
+        return;
+      }
+      
+      // 進行状況表示更新
+      updateProgressStep(6, 'active', 'カスタムセットアップ継続中', `⏳ 処理確認中... (${attempt}/${maxAttempts})`);
+      
+    } catch (error) {
+      console.warn(`⚠️ ポーリング試行 ${attempt} でエラー:`, error);
+    }
+  }
+  
+  // 最大試行回数に達した場合
+  console.warn('⚠️ バックエンド完了ポーリング最大試行回数に達しました');
+  updateProgressStep(6, 'error', 'カスタムセットアップ状態不明', '⚠️ 処理状態を確認できませんでした');
+  showMessage('⚠️ 処理状態の確認がタイムアウトしました。ページを再読み込みして状態を確認してください。', 'warning');
+  
+  setTimeout(() => {
+    hideCustomSetupProgress();
+  }, 5000);
+}
+
+/**
+ * カスタムセットアップ成功後のUI更新
+ */
+function updateUIAfterCustomSetup(status) {
+  console.log('🎨 カスタムセットアップ成功後のUI更新');
+  
+  try {
+    // アクティブシート設定
+    if (status.activeSheetName) {
+      const select = document.getElementById('sheet-select');
+      if (select) {
+        select.value = status.activeSheetName;
+        selectedSheet = status.activeSheetName;
+        lastSelectedSheetName = status.activeSheetName;
+        console.log('✅ アクティブシート設定完了:', status.activeSheetName);
+      }
+    }
+    
+    // その他のUI更新関数があれば呼び出し
+    if (typeof updateSheetSelectActiveIndicator === 'function' && status.activeSheetName) {
+      updateSheetSelectActiveIndicator(status.activeSheetName);
+    }
+    
+    if (typeof updateUIForSelectedSheet === 'function') {
+      updateUIForSelectedSheet();
+    }
+    
+  } catch (error) {
+    console.warn('⚠️ UI更新でエラー:', error);
+  }
+}
+
+/**
+ * QuickStart用バックエンド完了ポーリング関数
+ * タイムアウト発生時にバックエンド処理の完了を確認
+ */
+async function startQuickStartPolling(quickstartBtn, quickstartText) {
+  console.log('🔄 QuickStartバックエンド完了ポーリング開始');
+  const maxAttempts = 20; // 最大2分間（6秒×20回）
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`🔍 QuickStartポーリング試行 ${attempt}/${maxAttempts}`);
+      
+      // 6秒待機
+      await new Promise(resolve => setTimeout(resolve, 6000));
+      
+      // 状態確認
+      const status = await simpleStatusRefresh();
+      
+      // QuickStart完了の確認（フォーム作成状態やセットアップ完了を確認）
+      if (status && (status.setupStep >= 3 || status.systemStatus?.setupStatus === 'completed' || status.formUrl)) {
+        console.log('✅ QuickStartバックエンド処理完了を検出');
+        
+        // 成功処理
+        updateProgressStep(6, 'completed', 'クイックスタート完了', '🎉 バックエンドでの処理が完了しました！');
+        showMessage('✅ クイックスタートが完了しました！（バックエンド処理完了）', 'success');
+        
+        // UI更新
+        updateUIAfterQuickStart(status, quickstartBtn, quickstartText);
+        
+        // プログレス非表示
+        setTimeout(() => {
+          hideQuickStartProgress();
+        }, 3000);
+        
+        return true; // 成功で終了
+      }
+      
+    } catch (error) {
+      console.warn(`⚠️ QuickStartポーリング試行 ${attempt} でエラー:`, error);
+    }
+  }
+  
+  // 最大試行回数に達した場合
+  console.warn('⚠️ QuickStartポーリング: 最大試行回数に達しました');
+  updateProgressStep(6, 'error', 'クイックスタート確認失敗', '処理の完了を確認できませんでした');
+  showMessage('⚠️ クイックスタートの完了確認に時間がかかっています。後でページを再読み込みして確認してください。', 'warning');
+  
+  // ボタン状態のリセット
+  if (quickstartBtn && quickstartText) {
+    quickstartBtn.disabled = false;
+    quickstartText.textContent = 'クイックスタートを開始';
+  }
+  
+  setTimeout(() => {
+    hideQuickStartProgress();
+  }, 5000);
+  
+  return false;
+}
+
+/**
+ * QuickStart成功後のUI更新
+ */
+function updateUIAfterQuickStart(status, quickstartBtn, quickstartText) {
+  console.log('🚀 QuickStart成功後のUI更新');
+  
+  try {
+    // ボタン状態更新
+    if (quickstartBtn && quickstartText) {
+      quickstartBtn.disabled = false;
+      quickstartText.textContent = 'クイックスタート完了';
+    }
+    
+    // フォーム作成完了フラグを設定
+    sessionStorage.setItem('form_just_created', 'true');
+    
+    // アクティブシート設定（あれば）
+    if (status.activeSheetName) {
+      const select = document.getElementById('sheet-select');
+      if (select) {
+        select.value = status.activeSheetName;
+        selectedSheet = status.activeSheetName;
+        lastSelectedSheetName = status.activeSheetName;
+        console.log('✅ QuickStart: アクティブシート設定完了:', status.activeSheetName);
+      }
+    }
+    
+    // フォームURL表示の更新
+    if (typeof updateFormUrlDisplay === 'function') {
+      updateFormUrlDisplay();
+    }
+    
+    // その他のUI更新関数があれば呼び出し
+    if (typeof updateSheetSelectActiveIndicator === 'function' && status.activeSheetName) {
+      updateSheetSelectActiveIndicator(status.activeSheetName);
+    }
+    
+    if (typeof updateUIForSelectedSheet === 'function') {
+      updateUIForSelectedSheet();
+    }
+    
+    // 公開停止ボタンの状態更新
+    if (typeof updateUnpublishButton === 'function') {
+      updateUnpublishButton(status);
+    }
+    
+  } catch (error) {
+    console.warn('⚠️ QuickStart UI更新でエラー:', error);
+  }
 }
 
 // Handle unified custom setup
@@ -2975,9 +3316,19 @@ async function handleCustomSetup(config) {
   try {
     // Phase 1: プログレス表示開始
     showCustomSetupProgress();
-    await simulateCustomSetupProgress();
     
-    // Phase 2: バックエンド処理実行
+    // Phase 1.5: バックエンド進捗同期開始
+    startProgressSync('customSetup', (progress) => {
+      if (progress.currentStep && progress.stepName) {
+        updateCustomProgressStep(progress.currentStep, 'active', progress.stepName, progress.stepDetail || '処理中...');
+        updateCustomOverallProgress(progress.progress, progress.stepDetail, progress.estimatedTimeRemaining);
+      }
+    });
+    
+    // フォールバックとしてのシミュレーション進捗（バックエンド同期がない場合）
+    const simulationPromise = simulateCustomSetupProgress();
+    
+    // Phase 2: バックエンド処理実行  
     const result = await runGasWithUserId('customSetup', false, config);
     
     if (!result || result.status !== 'success') {
@@ -2985,8 +3336,12 @@ async function handleCustomSetup(config) {
     }
     
     console.log('✅ カスタムセットアップ完了');
-    updateOverallProgress(100, 'カスタムセットアップ完了');
-    updateProgressStep(6, 'completed', 'カスタムセットアップ完了', '🎉 すべての設定が完了しました！');
+    
+    // バックエンド進捗同期を停止
+    stopProgressSync('customSetup');
+    
+    updateCustomOverallProgress(100, 'カスタムセットアップ完了');
+    updateCustomProgressStep(7, 'completed', 'カスタムセットアップ完了', '🎉 すべての設定が完了しました！');
     
     // Phase 3: 状態修正（必要な場合のみ）
     if (result.spreadsheetId && result.autoPublished) {
@@ -3008,11 +3363,23 @@ async function handleCustomSetup(config) {
     // Phase 4: 単一の最終同期（すべての並行処理を統合）
     console.log('🔄 最終データ同期開始');
     
-    // 統一キャッシュクリア
-    await cacheManager.clearAllFrontendCaches();
+    // 既存の安定したキャッシュクリア方式
+    try {
+      if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+        window.unifiedCache.clear();
+        console.log('✅ UnifiedCache cleared for final sync');
+      }
+      
+      if (window.sharedUtilities && window.sharedUtilities.cache && typeof window.sharedUtilities.cache.clear === 'function') {
+        window.sharedUtilities.cache.clear();
+        console.log('✅ SharedUtilities cache cleared for final sync');
+      }
+    } catch (cacheError) {
+      console.warn('⚠️ Cache clear warning during final sync:', cacheError);
+    }
     
-    // 最新データ取得
-    const freshStatus = await loadStatus(true);
+    // 最新データ取得（簡素化版）
+    const freshStatus = await simpleStatusRefresh();
     
     // Phase 5: UI完全更新（アクティブシート設定を含む）
     if (freshStatus && freshStatus.activeSheetName) {
@@ -3051,8 +3418,25 @@ async function handleCustomSetup(config) {
     
   } catch (error) {
       console.error('❌ カスタムセットアップエラー:', error);
-      updateProgressStep(6, 'error', 'カスタムセットアップ失敗', '❌ セットアップでエラーが発生しました');
-      showMessage('❌ カスタムセットアップに失敗しました: ' + error.message, 'error');
+      
+      // バックエンド進捗同期を停止
+      stopProgressSync('customSetup');
+      
+      // 統一エラーハンドラーでエラーを分類（showMessageはハンドラー内で処理）
+      const errorInfo = handleError(error, 'customSetup', ERROR_SEVERITY.HIGH, ERROR_TYPES.SYSTEM);
+      
+      // タイムアウトエラーの場合は特別処理
+      if (error.message.includes('timed out') || errorInfo.type === ERROR_TYPES.TIMEOUT) {
+        console.log('⏳ タイムアウト検出 - バックエンド完了ポーリング開始');
+        updateCustomProgressStep(7, 'active', 'カスタムセットアップ継続中', '⏳ 処理に時間がかかっています...');
+        
+        // バックエンド完了を待つポーリング開始
+        startBackendCompletionPolling();
+        return; // エラーを投げずに終了
+      }
+      
+      // その他のエラーは統一エラーハンドラーで処理済み
+      updateCustomProgressStep(7, 'error', 'カスタムセットアップ失敗', '❌ セットアップでエラーが発生しました');
       hideCustomSetupProgress();
       throw error;
     }
@@ -3248,13 +3632,8 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           const newStatus = { ...currentStatus, ...result.updatedConfig, userInfo: { ...currentStatus.userInfo, configJson: JSON.stringify(result.updatedConfig) } };
           updateUIWithNewStatus(newStatus);
         } else {
-          // 統一キャッシュクリア後にステータス再読み込み
-          cacheManager.clearAllFrontendCaches().then(() => {
-            loadStatus(true);
-          }).catch(clearError => {
-            console.warn('Cache clear failed, proceeding with status reload:', clearError);
-            loadStatus(true);
-          });
+          // 安定したステータス再読み込み（キャッシュクリア削除）
+          simpleStatusRefresh();
         }
         
         // QuickStartフロー完了確認（包括的な完了状態検証）
@@ -3414,7 +3793,18 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
     .catch(function(error) {
       logError('QuickStart error:', error);
       
-      // Show error in progress
+      // タイムアウトエラーの特別処理（CustomSetupパターン適用）
+      if (error.toString().includes('timeout') || error.toString().includes('タイムアウト')) {
+        console.log('⏳ タイムアウト検出 - バックエンド完了ポーリング開始');
+        updateProgressStep(6, 'active', 'クイックスタート継続中', '⏳ 処理に時間がかかっています...');
+        showMessage('⏳ 処理に時間がかかっています。バックエンドで処理を継続中です...', 'info');
+        
+        // バックエンド完了を待つポーリング開始
+        startQuickStartPolling(quickstartBtn, quickstartText);
+        return; // エラーを投げずに終了
+      }
+      
+      // その他のエラーは従来通り
       updateProgressStep(6, 'error', 'セットアップエラー', '通信エラーが発生しました');
       updateOverallProgress(0, 'セットアップに失敗しました');
       
