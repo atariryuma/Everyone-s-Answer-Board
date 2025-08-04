@@ -391,9 +391,62 @@ window.systemStatus = {
   uiInitialized: false,
   eventsInitialized: false,
   initializationComplete: false,
+  userDataSyncComplete: false,
   errors: [],
   lastActivity: Date.now()
 };
+
+// 初期化中のユーザー操作防止
+document.body.style.pointerEvents = 'none';
+console.log('🛡️ User interaction disabled during initialization');
+
+// 主要なUI要素を無効化する関数
+function disableUserInteraction() {
+  // フォーム要素の無効化
+  const forms = document.querySelectorAll('form, input, button, select, textarea');
+  forms.forEach(element => {
+    element.disabled = true;
+    element.style.opacity = '0.6';
+  });
+  
+  // クリック可能な要素の無効化
+  const clickables = document.querySelectorAll('[onclick], .btn, .button');
+  clickables.forEach(element => {
+    element.style.pointerEvents = 'none';
+    element.style.opacity = '0.6';
+  });
+  
+  console.log('🛡️ All interactive elements disabled');
+}
+
+// UI要素を有効化する関数
+function enableUserInteraction() {
+  // フォーム要素の有効化
+  const forms = document.querySelectorAll('form, input, button, select, textarea');
+  forms.forEach(element => {
+    element.disabled = false;
+    element.style.opacity = '';
+  });
+  
+  // クリック可能な要素の有効化
+  const clickables = document.querySelectorAll('[onclick], .btn, .button');
+  clickables.forEach(element => {
+    element.style.pointerEvents = '';
+    element.style.opacity = '';
+  });
+  
+  // body要素も有効化
+  document.body.style.pointerEvents = 'auto';
+  
+  console.log('✅ All interactive elements enabled');
+}
+
+// DOM読み込み後に要素を無効化
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', disableUserInteraction);
+} else {
+  disableUserInteraction();
+}
 
 function updateSystemStatus(component, status, error = null) {
   window.systemStatus[component] = status;
@@ -532,6 +585,45 @@ function initializeAdminPanelMaster() {
             
             // システム状態の最終レポート
             console.log('📊 Final System Status:', window.systemStatus);
+            
+            // ユーザー情報の確実な同期完了後にローディング解除
+            setTimeout(async () => {
+              try {
+                console.log('🔄 Final user data synchronization...');
+                
+                // ユーザーデータの最終同期を確実に実行
+                if (typeof loadStatus === 'function') {
+                  await loadStatus(true);
+                  console.log('✅ User data synchronization completed');
+                } else {
+                  console.warn('⚠️ loadStatus function not available');
+                }
+                
+                // すべての同期が完了したらローディングオーバーレイを非表示
+                if (window.unifiedLoading) {
+                  window.unifiedLoading.hide();
+                  console.log('✅ Global loading overlay hidden after full sync');
+                } else {
+                  // フォールバック: 直接DOM操作
+                  const overlay = document.getElementById('loading-overlay');
+                  if (overlay) {
+                    overlay.classList.add('hidden');
+                    console.log('✅ Loading overlay hidden (fallback)');
+                  }
+                }
+                
+                // UI要素の有効化
+                enableUserInteraction();
+                updateSystemStatus('userDataSyncComplete', true);
+                
+              } catch (error) {
+                console.error('❌ Final sync error:', error);
+                // エラーでもローディングは解除
+                if (window.unifiedLoading) {
+                  window.unifiedLoading.hide();
+                }
+              }
+            }, 800);
           } catch (error) {
             updateSystemStatus('eventsInitialized', false, error);
             console.error('❌ Events initialization failed:', error);
@@ -591,6 +683,48 @@ function initializeAdminPanelMaster() {
         
         // システム状態の最終レポート（フォールバック版）
         console.log('📊 Final System Status (Fallback):', window.systemStatus);
+        
+        // フォールバック初期化でもローディング解除処理を実行
+        setTimeout(async () => {
+          try {
+            console.log('🔄 Fallback: Final user data synchronization attempt...');
+            
+            // 可能であればユーザーデータ同期を試行
+            if (typeof loadStatus === 'function') {
+              try {
+                await loadStatus(true);
+                console.log('✅ Fallback: User data synchronization completed');
+              } catch (syncError) {
+                console.warn('⚠️ Fallback: User data sync failed, but continuing:', syncError);
+              }
+            }
+            
+            // ローディングオーバーレイを必ず非表示
+            if (window.unifiedLoading) {
+              window.unifiedLoading.hide();
+              console.log('✅ Fallback: Global loading overlay hidden');
+            } else {
+              const overlay = document.getElementById('loading-overlay');
+              if (overlay) {
+                overlay.classList.add('hidden');
+                console.log('✅ Fallback: Loading overlay hidden (direct DOM)');
+              }
+            }
+            
+            // UI要素の有効化
+            enableUserInteraction();
+            updateSystemStatus('userDataSyncComplete', true);
+            console.log('✅ Fallback: User interaction enabled');
+            
+          } catch (error) {
+            console.error('❌ Fallback sync error:', error);
+            // エラーでもローディングは解除
+            if (window.unifiedLoading) {
+              window.unifiedLoading.hide();
+            }
+            enableUserInteraction();
+          }
+        }, 600);
       }
       
       initializeEventsWithRetry();
