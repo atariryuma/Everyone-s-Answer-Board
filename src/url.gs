@@ -57,55 +57,104 @@ function normalizeUrlString(url) {
  */
 function computeWebAppUrl() {
   try {
-    let url = ScriptApp.getService().getUrl();
-    if (!url) {
-      warnLog('ScriptApp.getService().getUrl()がnullを返しました');
-      return getFallbackUrl();
+    // 複数の方法でURLを取得し検証
+    let primaryUrl = null;
+    let fallbackUrl = null;
+    
+    // 方法1: ScriptApp.getService().getUrl()
+    try {
+      primaryUrl = ScriptApp.getService().getUrl();
+      if (primaryUrl) {
+        primaryUrl = primaryUrl.replace(/\/$/, ''); // 末尾のスラッシュを除去
+        debugLog('🔍 Primary URL取得:', primaryUrl);
+      }
+    } catch (e) {
+      warnLog('Primary URL取得エラー:', e.message);
     }
 
-    // 末尾のスラッシュを除去
-    url = url.replace(/\/$/, '');
+    // 方法2: ScriptIdベースのフォールバック
+    try {
+      const scriptId = ScriptApp.getScriptId();
+      if (scriptId) {
+        fallbackUrl = 'https://script.google.com/macros/s/' + scriptId + '/exec';
+        debugLog('🔄 Fallback URL生成:', fallbackUrl);
+      }
+    } catch (e) {
+      warnLog('Fallback URL生成エラー:', e.message);
+    }
 
-    // 開発環境URL検出の簡素化（優先度順）
+    // 開発環境URLの検出（優先度順）
     const devIndicators = [
       'userCodeAppPanel',  // 最も確実な開発環境指標
       '/dev',              // 開発エンドポイント
-      '/test'              // テストエンドポイント
+      '/test',             // テストエンドポイント
+      'googleusercontent.com' // Dev環境でよく使われる
     ];
 
-    // 開発環境URLの早期検出
-    for (var i = 0; i < devIndicators.length; i++) {
-      if (url.includes(devIndicators[i])) {
-        warnLog('開発環境URL検出: ' + url + ' → フォールバック使用');
-        return getFallbackUrl();
+    // Primary URLの検証
+    if (primaryUrl) {
+      // 開発環境URLかチェック
+      let isDevelopmentUrl = false;
+      for (var i = 0; i < devIndicators.length; i++) {
+        if (primaryUrl.includes(devIndicators[i])) {
+          warnLog('⚠️ Primary URL開発環境検出:', primaryUrl, '→ フォールバック使用');
+          isDevelopmentUrl = true;
+          break;
+        }
+      }
+
+      if (!isDevelopmentUrl) {
+        // URL形式の検証（Google Workspace対応）
+        var isValidGoogleWorkspaceUrl = /^https:\/\/script\.google\.com\/a\/macros\/[^\/]+\/s\/[A-Za-z0-9_-]+\/exec$/.test(primaryUrl);
+        var isValidStandardUrl = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(primaryUrl);
+        var isValidDeployUrl = /^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/.test(primaryUrl);
+
+        if (isValidGoogleWorkspaceUrl || isValidStandardUrl || isValidDeployUrl) {
+          infoLog('✅ Primary URL検証完了 (Google Workspace対応):', primaryUrl);
+          return primaryUrl;
+        }
+
+        // URL形式の補正（Google Workspace形式対応）
+        var correctedUrl = primaryUrl.replace(
+          /^https:\/\/script\.google\.com\/a\/([^\/]+)\/macros\//,
+          'https://script.google.com/a/macros/$1/'
+        );
+
+        if (correctedUrl !== primaryUrl) {
+          debugLog('🔧 URL形式を補正:', primaryUrl, '→', correctedUrl);
+          // 補正後のURLを再検証
+          if (/^https:\/\/script\.google\.com\/a\/macros\/[^\/]+\/s\/[A-Za-z0-9_-]+\/exec$/.test(correctedUrl)) {
+            infoLog('✅ 補正されたURL検証完了:', correctedUrl);
+            return correctedUrl;
+          }
+        }
       }
     }
 
-    // URLパターン検証の簡素化
-    var isValidScriptUrl = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?s\/[A-Za-z0-9_-]+\/exec$/.test(url);
-    var isValidDeployUrl = /^https:\/\/[a-z0-9-]+\.googleusercontent\.com$/.test(url);
-
-    if (isValidScriptUrl || isValidDeployUrl) {
-      infoLog('✅ 有効なWebAppURL検証完了:', url);
-      return url;
+    // Fallback URLの検証
+    if (fallbackUrl) {
+      // 開発環境でないかチェック
+      let isFallbackDev = false;
+      for (var i = 0; i < devIndicators.length; i++) {
+        if (fallbackUrl.includes(devIndicators[i])) {
+          warnLog('⚠️ Fallback URL開発環境検出:', fallbackUrl);
+          isFallbackDev = true;
+          break;
+        }
+      }
+      
+      if (!isFallbackDev && /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(fallbackUrl)) {
+        infoLog('✅ Fallback URL使用:', fallbackUrl);
+        return fallbackUrl;
+      }
     }
 
-    // 従来形式のURL補正（必要に応じて）
-    var correctedUrl = url.replace(
-      /^https:\/\/script\.google\.com\/a\/([^\/]+)\/macros\//,
-      'https://script.google.com/a/macros/$1/'
-    );
-
-    if (correctedUrl !== url) {
-      debugLog('URL形式を補正しました:', url, '→', correctedUrl);
-      return correctedUrl;
-    }
-
-    warnLog('不明なURLパターン:', url, '→ フォールバック使用');
-    return getFallbackUrl();
+    // 最終フォールバック
+    errorLog('❌ 有効なURL生成に失敗 - Primary:', primaryUrl, 'Fallback:', fallbackUrl);
+    return fallbackUrl || '';
 
   } catch (e) {
-    errorLog('WebアプリURL取得エラー:', e.message);
+    errorLog('❌ computeWebAppUrl 重大エラー:', e.message);
     return getFallbackUrl();
   }
 }
@@ -182,24 +231,62 @@ function getFallbackUrl() {
 }
 
 /**
- * URLキャッシュをクリアして再初期化
+ * URLキャッシュをクリアして再初期化（強化版）
  */
 function clearUrlCache() {
   try {
+    infoLog('🗑️ URLキャッシュクリア開始');
+    
+    // 全てのキャッシュソースをクリア
     var cache = CacheService.getScriptCache();
     cache.remove(URL_CACHE_KEY);
-    debugLog('URL cache cleared successfully');
+    
+    // 統合キャッシュマネージャーからもクリア
+    if (typeof cacheManager !== 'undefined' && cacheManager.remove) {
+      cacheManager.remove(URL_CACHE_KEY);
+      debugLog('🧹 統合キャッシュマネージャーからもクリア完了');
+    }
 
-    // 新しいURLを即座に生成してキャッシュ
+    infoLog('✅ 全URLキャッシュクリア完了');
+
+    // 新しいURLを即座に生成
     var newUrl = computeWebAppUrl();
-    if (newUrl && !newUrl.includes('googleusercontent.com') && !newUrl.includes('userCodeAppPanel')) {
-      cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
-      debugLog('New URL cached:', newUrl);
+    
+    if (newUrl) {
+      // 生成されたURLの検証
+      var isValidUrl = false;
+      
+      // Google Workspace URL形式
+      if (/^https:\/\/script\.google\.com\/a\/macros\/[^\/]+\/s\/[A-Za-z0-9_-]+\/exec$/.test(newUrl)) {
+        isValidUrl = true;
+        infoLog('✅ Google WorkspaceURL形式で新規URL生成:', newUrl);
+      }
+      // 標準URL形式
+      else if (/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(newUrl)) {
+        isValidUrl = true;
+        infoLog('✅ 標準URL形式で新規URL生成:', newUrl);
+      }
+
+      // 有効なURLの場合のみキャッシュ
+      if (isValidUrl && !newUrl.includes('googleusercontent.com') && !newUrl.includes('userCodeAppPanel')) {
+        cache.put(URL_CACHE_KEY, newUrl, URL_CACHE_TTL);
+        
+        // 統合キャッシュマネージャーにもキャッシュ
+        if (typeof cacheManager !== 'undefined' && cacheManager.put) {
+          cacheManager.put(URL_CACHE_KEY, newUrl, 3600);
+        }
+        
+        infoLog('✅ 新規URL生成・キャッシュ完了:', newUrl);
+      } else {
+        warnLog('⚠️ 生成されたURLが無効またはdev環境のためキャッシュしません:', newUrl);
+      }
+    } else {
+      warnLog('⚠️ 新しいURL生成に失敗');
     }
 
     return newUrl;
   } catch (e) {
-    errorLog('clearUrlCache error:', e.message);
+    errorLog('❌ clearUrlCache error:', e.message);
     return getFallbackUrl();
   }
 }
@@ -254,6 +341,47 @@ function forceUrlSystemReset() {
 }
 
 /**
+ * URLの妥当性を検証
+ * @param {string} url - 検証するURL
+ * @returns {object} 検証結果
+ */
+function validateWebAppUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return { isValid: false, reason: 'URLが空または無効な形式' };
+  }
+
+  // 開発環境URLの検出
+  const devIndicators = ['userCodeAppPanel', '/dev', '/test', 'googleusercontent.com'];
+  for (var i = 0; i < devIndicators.length; i++) {
+    if (url.includes(devIndicators[i])) {
+      return { isValid: false, reason: '開発環境URLが検出されました', type: 'development' };
+    }
+  }
+
+  // Google Workspace URL形式
+  if (/^https:\/\/script\.google\.com\/a\/macros\/[^\/]+\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) {
+    const domain = url.match(/\/a\/macros\/([^\/]+)\//);
+    return { 
+      isValid: true, 
+      type: 'google-workspace', 
+      domain: domain ? domain[1] : 'unknown',
+      scriptId: url.match(/\/s\/([A-Za-z0-9_-]+)\/exec/)?.[1]
+    };
+  }
+
+  // 標準URL形式
+  if (/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) {
+    return { 
+      isValid: true, 
+      type: 'standard',
+      scriptId: url.match(/\/s\/([A-Za-z0-9_-]+)\/exec/)?.[1]
+    };
+  }
+
+  return { isValid: false, reason: '認識されないURL形式', url: url };
+}
+
+/**
  * アプリケーション用のURL群を生成（最適化版）
  * @param {string} userId - ユーザーID
  * @returns {object} URL群
@@ -282,10 +410,32 @@ function generateUserUrls(userId) {
       webAppUrl = getFallbackUrl();
     }
 
-    // 開発URL最終チェック（簡素化）
-    if (webAppUrl.includes('userCodeAppPanel')) {
-      warnLog('開発URL検出、フォールバックに切り替え:', webAppUrl);
-      webAppUrl = getFallbackUrl();
+    // URL検証システムを使用
+    var validation = validateWebAppUrl(webAppUrl);
+    if (!validation.isValid) {
+      warnLog('⚠️ URL検証失敗:', validation.reason, 'URL:', webAppUrl);
+      
+      // フォールバックを試行
+      var fallbackUrl = getFallbackUrl();
+      var fallbackValidation = validateWebAppUrl(fallbackUrl);
+      
+      if (fallbackValidation.isValid) {
+        webAppUrl = fallbackUrl;
+        infoLog('✅ フォールバックURL使用:', webAppUrl);
+      } else {
+        errorLog('❌ フォールバックURLも無効:', fallbackValidation.reason);
+        return {
+          webAppUrl: webAppUrl, // エラーでも一応返す
+          adminUrl: '',
+          viewUrl: '',
+          setupUrl: '',
+          status: 'error',
+          message: 'WebアプリURLの検証に失敗: ' + validation.reason,
+          validation: validation
+        };
+      }
+    } else {
+      infoLog('✅ URL検証成功:', validation.type, validation.domain ? `(${validation.domain})` : '', webAppUrl);
     }
 
     // URLが取得できない場合のエラーハンドリング
@@ -308,7 +458,8 @@ function generateUserUrls(userId) {
       adminUrl: webAppUrl + '?mode=admin&userId=' + encodedUserId,
       viewUrl: webAppUrl + '?mode=view&userId=' + encodedUserId,
       setupUrl: webAppUrl + '?setup=true',
-      status: 'success'
+      status: 'success',
+      validation: validation  // 検証情報も含める
     };
 
   } catch (e) {
