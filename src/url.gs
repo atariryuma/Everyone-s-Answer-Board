@@ -43,12 +43,30 @@ function getWebAppUrl() {
     }).deployments || [];
     const webApp = deployments.find(d => d.deploymentConfig && d.deploymentConfig.webApp);
     const url = webApp ? webApp.deploymentConfig.webApp.url : '';
-    infoLog('Web app URL obtained:', url);
-    return url;
+    if (url) {
+      infoLog('Web app URL obtained:', url);
+      return url;
+    }
+    warnLog('getWebAppUrl: no deployments found, falling back');
   } catch (e) {
-    errorLog('getWebAppUrl error:', e.message);
-    return '';
+    warnLog('getWebAppUrl API error:', e.message);
   }
+
+  // Fallback to ScriptApp service URL if API is unavailable or returns nothing
+  try {
+    const serviceUrl = ScriptApp.getService && ScriptApp.getService().getUrl
+      ? ScriptApp.getService().getUrl()
+      : '';
+    if (serviceUrl) {
+      infoLog('Web app URL fallback obtained:', serviceUrl);
+      return serviceUrl;
+    }
+    warnLog('getWebAppUrl fallback failed: service URL unavailable');
+  } catch (e) {
+    errorLog('getWebAppUrl fallback error:', e.message);
+  }
+
+  return '';
 }
 
 /**

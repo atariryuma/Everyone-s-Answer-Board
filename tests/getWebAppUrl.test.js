@@ -24,4 +24,24 @@ describe('getWebAppUrl', () => {
     vm.runInContext(urlCode, context);
     expect(context.getWebAppUrl()).toBe('https://script.google.com/macros/s/ID/exec');
   });
+
+  test('falls back to ScriptApp service URL when API fails', () => {
+    const context = {
+      ScriptApp: {
+        getScriptId: () => 'ID',
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' })
+      },
+      AppsScript: {
+        Script: {
+          Deployments: {
+            list: () => { throw new Error('API disabled'); }
+          }
+        }
+      },
+      console: { log: () => {}, error: () => {}, warn: () => {} }
+    };
+    vm.createContext(context);
+    vm.runInContext(urlCode, context);
+    expect(context.getWebAppUrl()).toBe('https://script.google.com/macros/s/ID/exec');
+  });
 });
