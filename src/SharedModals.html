@@ -1524,56 +1524,66 @@ class SharedModals {
     
     modal.classList.remove('hidden');
     
-    // ラジオボタンの制御
-    const stopOption = document.getElementById('custom-stop-option');
-    const continueOption = document.getElementById('custom-continue-option');
-    const stopRadio = document.getElementById('custom-stop-radio');
-    const continueRadio = document.getElementById('custom-continue-radio');
-    const confirmBtn = document.getElementById('custom-setup-confirm-btn');
-    const cancelBtn = document.getElementById('custom-setup-cancel-btn');
-    
+    // ラジオボタンとボタン要素の取得
+    let stopOption = document.getElementById('custom-stop-option');
+    let continueOption = document.getElementById('custom-continue-option');
+    let confirmBtn = document.getElementById('custom-setup-confirm-btn');
+    let cancelBtn = document.getElementById('custom-setup-cancel-btn');
+
     let selectedOption = null;
-    
+
     // 既存のイベントハンドラーをクリア
+    if (confirmBtn) {
+      const newConfirmBtn = confirmBtn.cloneNode(true);
+      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+      confirmBtn = newConfirmBtn;
+    }
+
+    if (cancelBtn) {
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      cancelBtn = newCancelBtn;
+    }
+
     if (stopOption && continueOption) {
-      // 古いイベントリスナーを削除してから新しいものを設定
       const newStopOption = stopOption.cloneNode(true);
       const newContinueOption = continueOption.cloneNode(true);
       stopOption.parentNode.replaceChild(newStopOption, stopOption);
       continueOption.parentNode.replaceChild(newContinueOption, continueOption);
-      
-      newStopOption.addEventListener('click', () => {
+      stopOption = newStopOption;
+      continueOption = newContinueOption;
+    }
+
+    const stopRadio = document.getElementById('custom-stop-radio');
+    const continueRadio = document.getElementById('custom-continue-radio');
+
+    if (stopOption) {
+      stopOption.addEventListener('click', () => {
         selectedOption = 'stop';
-        stopRadio.classList.remove('hidden');
-        continueRadio.classList.add('hidden');
-        if (confirmBtn) confirmBtn.disabled = false;
-      });
-      
-      newContinueOption.addEventListener('click', () => {
-        selectedOption = 'continue';
-        continueRadio.classList.remove('hidden');
-        stopRadio.classList.add('hidden');
+        stopRadio?.classList.remove('hidden');
+        continueRadio?.classList.add('hidden');
         if (confirmBtn) confirmBtn.disabled = false;
       });
     }
-    
+
+    if (continueOption) {
+      continueOption.addEventListener('click', () => {
+        selectedOption = 'continue';
+        continueRadio?.classList.remove('hidden');
+        stopRadio?.classList.add('hidden');
+        if (confirmBtn) confirmBtn.disabled = false;
+      });
+    }
+
     if (confirmBtn) {
-      // 古いイベントリスナーを削除
-      const newConfirmBtn = confirmBtn.cloneNode(true);
-      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-      
-      newConfirmBtn.addEventListener('click', () => {
+      confirmBtn.addEventListener('click', () => {
         this.hideModal('custom-setup-selection-modal');
         if (onConfirm) onConfirm(selectedOption);
       });
     }
-    
+
     if (cancelBtn) {
-      // 古いイベントリスナーを削除
-      const newCancelBtn = cancelBtn.cloneNode(true);
-      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-      
-      newCancelBtn.addEventListener('click', () => {
+      cancelBtn.addEventListener('click', () => {
         this.hideModal('custom-setup-selection-modal');
         if (onCancel) onCancel();
       });
