@@ -952,15 +952,20 @@ function updateFooterAndGuidanceImmediate(status) {
   // Final publication decision: both normalized and explicit checks must agree
   const finalIsPublished = isPublished && explicitAppPublished;
   
-  console.log('🔍 Enhanced publication check:', {
-    'normalized isPublished': isPublished,
-    'explicit appPublished': explicitAppPublished,
-    'final decision': finalIsPublished,
-    'publish reason': status._normalized?.publishReason,
-    'normalized viewUrl': viewUrl,
-    'has valid viewUrl': status._normalized?.hasValidViewUrl,
-    'will show footer': finalIsPublished
-  });
+  // 本番環境では詳細ログを削減
+  if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+    console.log('🔍 Enhanced publication check:', {
+      'normalized isPublished': isPublished,
+      'explicit appPublished': explicitAppPublished,
+      'final decision': finalIsPublished,
+      'publish reason': status._normalized?.publishReason,
+      'normalized viewUrl': viewUrl,
+      'has valid viewUrl': status._normalized?.hasValidViewUrl,
+      'will show footer': finalIsPublished
+    });
+  } else {
+    console.log(`🔍 Publication check: ${finalIsPublished ? '公開中' : '非公開'}`);
+  }
 
   // Show footer if published (with strict validation)
   if (finalIsPublished) {
@@ -2599,12 +2604,15 @@ function normalizeConfigJson(config, userInfo) {
     }
   }
   
-  console.log('🔧 configJson正規化開始:', {
-    setupStatus: config.setupStatus,
-    setupStep: config.setupStep,
-    appPublished: config.appPublished,
-    publishedSheetName: config.publishedSheetName
-  });
+  // 本番環境では詳細ログを削減
+  if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+    console.log('🔧 configJson正規化開始:', {
+      setupStatus: config.setupStatus,
+      setupStep: config.setupStep,
+      appPublished: config.appPublished,
+      publishedSheetName: config.publishedSheetName
+    });
+  }
   
   // Step 1: publishedSheetName修復
   config = fixPublishedSheetName(config);
@@ -2621,11 +2629,14 @@ function normalizeConfigJson(config, userInfo) {
   // Step 5: 冗長フィールドの削除
   config = removeRedundantFields(config);
   
-  console.log('✅ configJson正規化完了:', {
-    setupStatus: config.setupStatus,
-    appPublished: config.appPublished,
-    publishedSheetName: config.publishedSheetName
-  });
+  // 本番環境では詳細ログを削減
+  if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+    console.log('✅ configJson正規化完了:', {
+      setupStatus: config.setupStatus,
+      appPublished: config.appPublished,
+      publishedSheetName: config.publishedSheetName
+    });
+  }
   
   // キャッシュ更新
   if (window.processCache && window.generateSimpleHash) {
@@ -2725,11 +2736,30 @@ function validateConfigJsonIntegrity(config, userInfo) {
  * @return {Object} 修復されたconfig
  */
 function fixPublishedSheetName(config) {
-  // publishedSheetNameが空文字または未定義で、sheet固有設定が存在する場合
-  if ((!config.publishedSheetName || config.publishedSheetName.trim() === '') && 
+  // publishedSheetNameが'フォームの回答 1'のようなデフォルト名の場合も修復対象
+  const isDefaultSheetName = config.publishedSheetName === 'フォームの回答 1' || 
+                            config.publishedSheetName?.startsWith('フォームの回答');
+                            
+  if ((!config.publishedSheetName || 
+       config.publishedSheetName.trim() === '' || 
+       isDefaultSheetName) && 
       config.publishedSpreadsheetId) {
     
-    // sheet_で始まるキーを検索
+    // AI列判定結果から質問文を取得を試行
+    if (currentStatus?.sheetDetails?.guessedConfig?.opinionHeader) {
+      const questionText = currentStatus.sheetDetails.guessedConfig.opinionHeader;
+      config.publishedSheetName = questionText;
+      
+      if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+        console.log('🔧 publishedSheetName修復 (AI列判定結果使用):', {
+          元の名前: config.publishedSheetName,
+          新しい名前: questionText
+        });
+      }
+      return config;
+    }
+    
+    // AI列判定結果が無い場合は従来のsheet_キー検索
     const sheetKeys = Object.keys(config).filter(key => key.startsWith('sheet_'));
     
     if (sheetKeys.length > 0) {
@@ -2737,10 +2767,12 @@ function fixPublishedSheetName(config) {
       const detectedSheetName = sheetKeys[0].replace('sheet_', '');
       config.publishedSheetName = detectedSheetName;
       
-      console.log('🔧 publishedSheetName修復:', {
-        検出されたシート名: detectedSheetName,
-        利用可能なシート設定: sheetKeys
-      });
+      if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+        console.log('🔧 publishedSheetName修復 (シートキー使用):', {
+          検出されたシート名: detectedSheetName,
+          利用可能なシート設定: sheetKeys
+        });
+      }
     }
   }
   
