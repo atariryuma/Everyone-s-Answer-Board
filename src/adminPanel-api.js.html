@@ -521,7 +521,7 @@ function repairSetupStateInconsistencies() {
         fixes.push('AI判定完了に基づいてセットアップ状態を完了に更新');
       }
       
-      console.log('📋 診断結果:', { issues, fixes });
+      console.log('📋 診断結果: 問題' + issues.length + '件、修正' + fixes.length + '件');
       
       if (fixes.length === 0) {
         diagnosticInProgress = false;
@@ -1455,17 +1455,8 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     const configJson = JSON.parse(completionStatus.userInfo.configJson || '{}');
     const issues = [];
     
-    // 必須完了状態の確認（詳細ログ強化）
-    console.log(`🔍 ${flowType}フロー完了状態確認 - configJson:`, {
-      setupStatus: configJson.setupStatus,
-      appPublished: configJson.appPublished,
-      formCreated: configJson.formCreated,
-      publishedSheetName: configJson.publishedSheetName,
-      publishedSpreadsheetId: configJson.publishedSpreadsheetId,
-      sheetName: sheetName,
-      userSpreadsheetId: completionStatus.userInfo?.spreadsheetId,
-      timestamp: new Date().toISOString()
-    });
+    // 必須完了状態の確認
+    console.log(`🔍 ${flowType}フロー完了状態確認: setupStatus=${configJson.setupStatus}, appPublished=${configJson.appPublished}`);
     
     // 1. setupStatus='completed' 確認
     if (configJson.setupStatus !== 'completed') {
@@ -1598,12 +1589,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       const sheetKey = 'sheet_' + expectedState.sheetName;
       const currentSheetConfig = configJson[sheetKey];
       
-      console.log(`🔍 ${flowType}フロー: シート設定確認`, {
-        sheetKey: sheetKey,
-        hasCurrentConfig: !!currentSheetConfig,
-        hasGuessedConfig: !!(currentSheetConfig?.guessedConfig),
-        expectedConfigKeys: Object.keys(expectedState.config || {})
-      });
+      console.log(`🔍 ${flowType}フロー: シート設定確認 ${sheetKey}`);
       
       if (!currentSheetConfig || !currentSheetConfig.guessedConfig) {
         synchronizationIssues.push(`シート設定未保存: ${sheetKey}`);
@@ -1613,10 +1599,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
           flowType: flowType
         };
         needsSync = true;
-        console.log(`📝 ${flowType}フロー: シート設定を作成`, { 
-          sheetKey, 
-          configKeys: Object.keys(expectedState.config || {}) 
-        });
+        console.log(`📝 ${flowType}フロー: シート設定を作成 ${sheetKey}`);
       }
     }
     
@@ -2245,74 +2228,48 @@ function handleCustomSetup(config) {
   runGasWithUserId('customSetup', false, config)
     .then(function(result) {
       if (result && result.status === 'success') {
-        console.log('🎉 CustomSetupバックエンド処理完了:', result);
+        console.log('✅ カスタムセットアップ完了');
         
-        // Enhanced completion notification with detailed backend response
-        const setupStatus = result.autoPublished ? 'カスタムセットアップ完了！ボードが公開されました！' : 'カスタムセットアップ完了！';
-        updateOverallProgress(100, setupStatus);
+        updateOverallProgress(100, 'カスタムセットアップ完了');
         updateProgressStep(6, 'completed', 'カスタムセットアップ完了', '🎉 すべての設定が完了しました！');
         
-        // Enhanced message display based on actual backend results
-        let detailMessage = '';
-        if (result.aiDetected && result.autoConfigured && result.autoPublished) {
-          detailMessage = 'AI列判定、設定保存、自動公開がすべて正常に完了しました。すぐに利用できます！';
-        } else if (result.aiDetected && result.autoConfigured) {
-          detailMessage = 'AI列判定と設定保存が完了しました。管理パネルから手動で公開してください。';
-        } else {
-          // Check for specific error reasons
-          const aiError = result.aiDetectionResult?.error;
-          const configError = result.saveResult?.error;
-          const publishError = result.publishResult?.error;
-          
-          detailMessage = 'カスタムフォームが作成されました。';
-          if (aiError) detailMessage += `AI判定: ${aiError}。`;
-          if (configError) detailMessage += `設定保存: ${configError}。`;
-          if (publishError) detailMessage += `自動公開: ${publishError}。`;
-          detailMessage += '管理パネルで設定を確認してください。';
-        }
+        showMessage('✅ カスタムセットアップが完了しました！', 'success');
         
-        showMessage(`✅ カスタムセットアップが完了しました！${detailMessage}`, 'success');
-        
-        // Update progress step with specific status
         if (result.autoPublished) {
           updateProgressStep(5, 'completed', '回答ボードの自動公開', '🌐 ボードが自動的に公開されました');
         } else {
           updateProgressStep(5, 'completed', '回答ボード作成完了', '📝 手動公開の準備ができました');
         }
         
-        // Log detailed completion status
-        console.log('📊 CustomSetup完了詳細:', {
-          setupComplete: result.setupComplete,
-          aiDetected: result.aiDetected,
-          autoConfigured: result.autoConfigured,
-          autoPublished: result.autoPublished,
-          completedSteps: result.completedSteps,
-          completedAt: result.completedAt
-        });
+        // エラーのみログ出力
+        if (result.aiDetectionResult?.error) console.log('❌ AI判定エラー:', result.aiDetectionResult.error);
+        if (result.saveResult?.error) console.log('❌ 設定保存エラー:', result.saveResult.error);
+        if (result.publishResult?.error) console.log('❌ 公開エラー:', result.publishResult.error);
         
-        // Log custom setup specific information
-        if (result.aiDetectionResult) {
-          console.log('🤖 AI列判定結果詳細:', {
-            success: result.aiDetectionResult.success,
-            aiDetected: result.aiDetectionResult.aiDetected,
-            guessedConfig: result.aiDetectionResult.guessedConfig
-          });
-        }
-        
-        if (result.saveResult) {
-          console.log('💾 設定保存結果詳細:', {
-            success: result.saveResult.success,
-            configured: result.saveResult.configured,
-            savedConfig: result.saveResult.savedConfig
-          });
-        }
-        
-        if (result.publishResult) {
-          console.log('🌐 自動公開結果詳細:', {
-            success: result.publishResult.success,
-            published: result.publishResult.published,
-            publishedAt: result.publishResult.publishedAt
-          });
+        // 即座に状態修正を実行（publishedSpreadsheetId設定）
+        if (result.spreadsheetId && result.autoPublished) {
+          console.log('🔧 状態修正実行中...');
+          const stateFixConfig = {
+            setupStatus: 'completed',
+            appPublished: true,
+            publishedSpreadsheetId: result.spreadsheetId,
+            publishedSheetName: result.sheetName || 'フォームの回答 1'
+          };
+          
+          runGasWithUserId('syncConfigurationState', '状態修正中...', stateFixConfig, 'repair')
+            .then(function(syncResult) {
+              if (syncResult && syncResult.success) {
+                console.log('✅ 状態修正完了');
+                // キャッシュクリアしてUI更新
+                if (window.unifiedCache) window.unifiedCache.clear();
+                if (typeof loadSystemStatus === 'function') loadSystemStatus();
+              } else {
+                console.log('❌ 状態修正失敗:', syncResult?.errors);
+              }
+            })
+            .catch(function(error) {
+              console.log('❌ 状態修正エラー:', error.message);
+            });
         }
         
         // Update status after custom setup
@@ -2416,10 +2373,7 @@ function handleQuickStart() {
                                currentStatus._normalized && 
                                currentStatus._normalized.isPublished;
   
-  console.log('🚀 クイックスタート実行: 公開状態チェック', {
-    isCurrentlyPublished: isCurrentlyPublished,
-    currentStatus: currentStatus?._normalized
-  });
+  console.log('🚀 クイックスタート実行: 公開状態=' + isCurrentlyPublished);
 
   if (isCurrentlyPublished) {
     // 公開中の場合: 確認モーダルを表示

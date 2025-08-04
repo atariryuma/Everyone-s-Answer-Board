@@ -991,7 +991,6 @@ function updateFooterAndGuidanceImmediate(status) {
     updateTopicText(status);
     
     guidanceText.textContent = '回答ボードは現在公開中です。';
-    console.log('✅ Footer shown - board is published');
   } else {
     footer.classList.add('hidden');
     console.log('❌ Footer hidden - board not published');
@@ -2978,7 +2977,6 @@ function updateSetupInfo(status) {
     // 公開シート名
     safeSetText('info-published-sheet-name', configData.publishedSheetName || '-');
     
-    console.log('✅ Setup info updated successfully');
   } catch (error) {
     console.warn('⚠️ Failed to update setup info:', error);
     safeSetText('info-completed-at', '-');
@@ -3024,7 +3022,6 @@ function updateAutoStopInfo(status) {
       safeSetText('info-scheduled-end', '-');
     }
     
-    console.log('✅ Auto-stop info updated successfully');
   } catch (error) {
     console.warn('⚠️ Failed to update auto-stop info:', error);
     safeSetText('info-auto-stop-enabled', '-');
