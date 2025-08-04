@@ -2496,7 +2496,7 @@ function buildResponseFromContext(context) {
           return generateUserUrls(context.requestUserId);
         } catch (e) {
           warnLog('generateUserUrls失敗、フォールバック使用:', e.message);
-          const fallbackBaseUrl = getWebAppUrlCached() || '';
+          const fallbackBaseUrl = getWebAppUrl() || '';
           return {
             webAppUrl: fallbackBaseUrl,
             viewUrl: userInfo.viewUrl || (fallbackBaseUrl + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view'),
@@ -2511,28 +2511,28 @@ function buildResponseFromContext(context) {
       boardUrl: (function() {
         try {
           const urls = generateUserUrls(context.requestUserId);
-          return urls.viewUrl || userInfo.viewUrl || (getWebAppUrlCached() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          return urls.viewUrl || userInfo.viewUrl || (getWebAppUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
         } catch (e) {
           warnLog('boardUrl生成失敗、フォールバック使用:', e.message);
-          return userInfo.viewUrl || (getWebAppUrlCached() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          return userInfo.viewUrl || (getWebAppUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
         }
       })(),
       viewUrl: (function() {
         try {
           const urls = generateUserUrls(context.requestUserId);
-          return urls.viewUrl || userInfo.viewUrl || (getWebAppUrlCached() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          return urls.viewUrl || userInfo.viewUrl || (getWebAppUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
         } catch (e) {
           warnLog('viewUrl生成失敗、フォールバック使用:', e.message);
-          return userInfo.viewUrl || (getWebAppUrlCached() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
+          return userInfo.viewUrl || (getWebAppUrl() + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view');
         }
       })(),
       webAppUrl: (function() {
         try {
           const urls = generateUserUrls(context.requestUserId);
-          return urls.webAppUrl || getWebAppUrlCached();
+          return urls.webAppUrl || getWebAppUrl();
         } catch (e) {
           warnLog('webAppUrl生成失敗、フォールバック使用:', e.message);
-          return getWebAppUrlCached();
+          return getWebAppUrl();
         }
       })(),
 

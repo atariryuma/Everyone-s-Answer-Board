@@ -15,8 +15,18 @@ describe('generateAppUrls admin url', () => {
         remove() {}
       },
       ScriptApp: {
-        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
         getScriptId: () => 'ID'
+      },
+      AppsScript: {
+        Script: {
+          Deployments: {
+            list: () => ({
+              deployments: [
+                { deploymentConfig: { webApp: { url: 'https://script.google.com/macros/s/ID/exec' } } }
+              ]
+            })
+          }
+        }
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
       PropertiesService: {
