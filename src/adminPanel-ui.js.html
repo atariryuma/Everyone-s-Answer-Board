@@ -1741,51 +1741,70 @@ function initializeUI() {
 // SHEET SELECTION FUNCTIONALITY  
 // =============================================================================
 
-// Handle sheet selection change
+// シート選択処理中フラグ（重複防止）
+let sheetSelectionInProgress = false;
+
+// Handle sheet selection change (最適化版)
 function handleSheetSelectionChange(event) {
   const newSelectedSheet = event.target.value;
 
+  // 重複実行防止
+  if (sheetSelectionInProgress) {
+    console.log('📊 Sheet selection already in progress, skipping...');
+    return;
+  }
+
   // Prevent redundant calls if the selected sheet hasn't actually changed
   if (newSelectedSheet === lastSelectedSheetName) {
-    console.log('📊 Sheet selection changed, but value is the same. Skipping redundant processing.');
+    console.log('📊 Sheet selection unchanged, skipping redundant processing.');
     return;
   }
   
+  sheetSelectionInProgress = true;
   console.log('📊 Sheet selection changed: ' + newSelectedSheet);
   
-  // Update global selected sheet variable and last selected sheet
-  selectedSheet = newSelectedSheet;
-  lastSelectedSheetName = newSelectedSheet;
-  
-  if (newSelectedSheet) {
-    console.log('📋 Loading config for sheet:', newSelectedSheet);
+  try {
+    // Update global selected sheet variable and last selected sheet
+    selectedSheet = newSelectedSheet;
+    lastSelectedSheetName = newSelectedSheet;
+    
+    if (newSelectedSheet) {
+      console.log('📋 Loading config for sheet:', newSelectedSheet);
 
-    // 1. 即座にシートをアクティブ化
-    activateSelectedSheet(newSelectedSheet);
+      // 基本検証
+      if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+        console.error('スプレッドシート情報が見つかりません');
+        return;
+      }
 
-    // Call getSheetDetails once and use its result for config
-    if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
-      console.error('スプレッドシート情報が見つかりません');
-      return;
+      // アクティブシートの列データを取得して列選択を更新
+      loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId)
+        .then(result => {
+          console.log('✅ シート設定読み込み完了:', result);
+          updateUIForSelectedSheet();
+        })
+        .catch(error => {
+          console.error('❌ シート設定読み込み失敗:', error);
+          showMessage('シートの設定読み込みに失敗しました', 'error');
+          updateUIForSelectedSheet();
+        })
+        .finally(() => {
+          // 処理フラグをリセット
+          sheetSelectionInProgress = false;
+        });
+        
+      // 即座にシートをアクティブ化
+      activateSelectedSheet(newSelectedSheet);
+    } else {
+      // シート選択が解除された場合
+      clearColumnSelections();
+      updateUIForSelectedSheet();
     }
-
-    // 2. アクティブシートの列データを取得して列選択を更新
-    loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId)
-      .then(result => {
-        console.log('✅ シート設定読み込み完了:', result);
-        // UI更新完了後の処理
-        updateUIForSelectedSheet();
-      })
-      .catch(error => {
-        console.error('❌ シート設定読み込み失敗:', error);
-        showMessage('シートの設定読み込みに失敗しました', 'error');
-        // エラー時もUI状態を更新
-        updateUIForSelectedSheet();
-      });
-  } else {
-    // シート選択が解除された場合
-    clearColumnSelections();
-    updateUIForSelectedSheet();
+  } catch (error) {
+    console.error('❌ Sheet selection error:', error);
+  } finally {
+    // 処理フラグをリセット（エラー時も確実に）
+    sheetSelectionInProgress = false;
   }
 }
 
@@ -1851,8 +1870,21 @@ function updateSheetSelectActiveIndicator(activeSheetName) {
   }
 }
 
+// 重複UI更新防止用キャッシュ
+let lastUIUpdateSheet = null;
+let uiUpdateCount = 0;
+
 // 新しい関数: アクティブシートUI更新
 function updateActiveSheetUI(sheetName) {
+  // 重複防止: 同じシートに対する連続更新を制限
+  if (lastUIUpdateSheet === sheetName && uiUpdateCount >= 2) {
+    return; // 重複更新をスキップ
+  }
+  
+  if (lastUIUpdateSheet !== sheetName) {
+    uiUpdateCount = 0; // 新しいシートの場合はカウントリセット
+  }
+  
   console.log('🔄 updateActiveSheetUI called with:', sheetName);
   
   const select = document.getElementById('sheet-select');
@@ -1871,6 +1903,8 @@ function updateActiveSheetUI(sheetName) {
       select.value = normalizedSheetName;
       selectedSheet = normalizedSheetName;
       lastSelectedSheetName = normalizedSheetName;
+      lastUIUpdateSheet = normalizedSheetName;
+      uiUpdateCount++;
       console.log('✅ Active sheet UI updated:', normalizedSheetName);
       
       // アクティブ表示も更新

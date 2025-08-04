@@ -103,6 +103,10 @@ function showError(error) {
 // STATUS VALIDATION AND UPDATES
 // =============================================================================
 
+// 検証ログの重複防止用キャッシュ
+let lastValidationHash = null;
+let validationLogCount = 0;
+
 // API レスポンス標準化: 強化された検証とエラーハンドリング
 function validateStatus(status) {
   if (!status) {
@@ -116,6 +120,20 @@ function validateStatus(status) {
     console.error('❌ APIエラーレスポンス:', status.message);
     showMessage('エラー: ' + status.message, 'error');
     return false;
+  }
+  
+  // 重複検証防止: 同じデータに対する検証ログを制限
+  const validationKey = JSON.stringify({
+    userId: status.userInfo?.userId,
+    activeSheet: status.activeSheetName,
+    headerCount: status.sheetDetails?.allHeaders?.length,
+    setupStep: status.setupStep
+  });
+  
+  const shouldLogValidation = lastValidationHash !== validationKey || validationLogCount < 2;
+  if (shouldLogValidation) {
+    lastValidationHash = validationKey;
+    validationLogCount++;
   }
   
   // 必須プロパティの検証
@@ -152,27 +170,36 @@ function validateStatus(status) {
     status.allSheets = []; // フォールバック
   }
   
-  // シート詳細の検証（オプショナル）
+  // シート詳細の検証（オプショナル）- 重複ログ防止
   if (status.sheetDetails) {
     if (!status.sheetDetails.allHeaders || !Array.isArray(status.sheetDetails.allHeaders)) {
       console.warn('⚠️ シートヘッダー情報が無効です:', status.sheetDetails.allHeaders);
       console.warn('これは「No headers found for フォームの回答」エラーの原因となる可能性があります');
     } else {
-      console.log('✅ シートヘッダー検証OK:', status.sheetDetails.allHeaders.length + '個のヘッダー');
+      // 重複ヘッダー検証ログを防止
+      if (shouldLogValidation) {
+        console.log('✅ シートヘッダー検証OK:', status.sheetDetails.allHeaders.length + '個のヘッダー');
+      }
     }
     
     if (!status.sheetDetails.guessedConfig) {
-      console.warn('⚠️ AI列判定結果が存在しません - 手動設定が必要です');
+      if (shouldLogValidation) {
+        console.warn('⚠️ AI列判定結果が存在しません - 手動設定が必要です');
+      }
     } else {
-      // 本番環境では詳細ログを削減
-      if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-        console.log('✅ AI列判定結果が利用可能:', status.sheetDetails.guessedConfig);
-      } else {
-        console.log('✅ AI列判定結果が利用可能');
+      // 本番環境では詳細ログを削減 + 重複防止
+      if (shouldLogValidation) {
+        if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+          console.log('✅ AI列判定結果が利用可能:', status.sheetDetails.guessedConfig);
+        } else {
+          console.log('✅ AI列判定結果が利用可能');
+        }
       }
     }
   } else {
-    console.log('ℹ️ シート詳細はオプショナルなので存在しません（正常）');
+    if (shouldLogValidation) {
+      console.log('ℹ️ シート詳細はオプショナルなので存在しません（正常）');
+    }
   }
   
   // セットアップステップの検証
@@ -188,7 +215,10 @@ function validateStatus(status) {
     return false;
   }
   
-  console.log('✅ レスポンス検証成功');
+  // 重複防止: 初回または重要な変更時のみ成功ログを出力
+  if (shouldLogValidation) {
+    console.log('✅ レスポンス検証成功');
+  }
   return true;
 }
 
