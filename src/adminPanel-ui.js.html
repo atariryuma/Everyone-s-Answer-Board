@@ -907,8 +907,20 @@ function getEnhancedProgressMessage(currentStep, completion, status) {
   }
 }
 
-// Update footer and guidance text
+// デバウンス機能用のタイムアウト管理
+let footerUpdateTimeout = null;
+
+// Update footer and guidance text (with debounce)
 function updateFooterAndGuidance(status) {
+  // デバウンス処理：短時間の連続呼び出しを制御
+  clearTimeout(footerUpdateTimeout);
+  footerUpdateTimeout = setTimeout(() => {
+    updateFooterAndGuidanceImmediate(status);
+  }, 150); // 150ms遅延
+}
+
+// 実際のフッター更新処理
+function updateFooterAndGuidanceImmediate(status) {
   console.group('🦶 updateFooterAndGuidance');
   
   const footer = document.getElementById('admin-footer');
@@ -2576,6 +2588,17 @@ function normalizeConfigJson(config, userInfo) {
     return config;
   }
   
+  // キャッシュチェック（同じデータの重複処理を防止）
+  if (window.processCache && window.generateSimpleHash && window.isCacheValid) {
+    const configHash = window.generateSimpleHash(config);
+    const cacheEntry = window.processCache.configNormalization;
+    
+    if (window.isCacheValid(cacheEntry) && cacheEntry.dataHash === configHash) {
+      console.log('🚀 configJson正規化: キャッシュから結果を取得');
+      return cacheEntry.data;
+    }
+  }
+  
   console.log('🔧 configJson正規化開始:', {
     setupStatus: config.setupStatus,
     setupStep: config.setupStep,
@@ -2603,6 +2626,15 @@ function normalizeConfigJson(config, userInfo) {
     appPublished: config.appPublished,
     publishedSheetName: config.publishedSheetName
   });
+  
+  // キャッシュ更新
+  if (window.processCache && window.generateSimpleHash) {
+    const configHash = window.generateSimpleHash(config);
+    const cacheEntry = window.processCache.configNormalization;
+    cacheEntry.data = config;
+    cacheEntry.dataHash = configHash;
+    cacheEntry.timestamp = Date.now();
+  }
   
   return config;
 }

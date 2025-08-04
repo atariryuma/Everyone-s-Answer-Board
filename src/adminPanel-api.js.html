@@ -84,6 +84,41 @@ function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
 // =============================================================================
 
 // Load system status - OPTIMIZED with integrated API
+// AI列判定結果とconfigJsonのキャッシュ管理
+const processCache = {
+  aiColumnMapping: {
+    data: null,
+    headersHash: null,
+    timestamp: null,
+    ttl: 300000 // 5分間のキャッシュ
+  },
+  configNormalization: {
+    data: null,
+    dataHash: null,
+    timestamp: null,
+    ttl: 60000 // 1分間のキャッシュ
+  }
+};
+
+// ハッシュ生成関数（簡易版）
+function generateSimpleHash(data) {
+  return JSON.stringify(data).split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+}
+
+// キャッシュ有効性チェック
+function isCacheValid(cacheEntry) {
+  if (!cacheEntry.data || !cacheEntry.timestamp) return false;
+  return (Date.now() - cacheEntry.timestamp) < cacheEntry.ttl;
+}
+
+// グローバルに関数とキャッシュを公開（他のファイルから利用可能にする）
+window.processCache = processCache;
+window.generateSimpleHash = generateSimpleHash;
+window.isCacheValid = isCacheValid;
+
 function loadStatus(bypassCache = false) {
   console.group('🔄 loadStatus - Integrated API');
   logDebug('🚀 Loading system status with integrated API, bypassCache:', bypassCache);
@@ -2582,8 +2617,11 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         // フォーム作成完了フラグを設定
         sessionStorage.setItem('form_just_created', 'true');
         
-        // フォームURL表示の強制更新（管理パネルのリソース欄用）
+        // QuickStart完了時の統合UI更新処理（最適化版）
         setTimeout(() => {
+          console.log('🔄 QuickStart完了: 統合UI更新を開始');
+          
+          // すべてのUI更新を1回の処理でまとめて実行
           updateFormUrlDisplay();
           
           // 予定終了時間の表示を更新
@@ -2597,12 +2635,14 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
             updateUnpublishButton(window.lastStatusCache);
           }
           
-          // クイックスタート完了後のフッター強制更新（質問文確定後）
-          if (window.updateFooter && typeof window.updateFooter === 'function') {
-            console.log('🔄 QuickStart完了: フッター表示を強制更新');
-            window.updateFooter(window.lastStatusCache || result);
+          // フッター表示の最終更新（デバウンス機能により最適化済み）
+          if (window.updateFooterAndGuidance && typeof window.updateFooterAndGuidance === 'function') {
+            console.log('🔄 QuickStart完了: フッター表示を最終更新（デバウンス適用）');
+            window.updateFooterAndGuidance(window.lastStatusCache || result);
           }
-        }, 1000);
+          
+          console.log('✅ QuickStart完了: 統合UI更新が完了');
+        }, 1200); // 少し遅延を増やして他の処理の完了を待つ
         
         // 回答ボードにフォーム作成完了を通知（フォームリンク更新用）
         try {
