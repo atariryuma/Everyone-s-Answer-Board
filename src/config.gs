@@ -1966,26 +1966,6 @@ function verifyUserAuthentication(requestUserId) {
 }
 
 /**
- * セッションをリセットして新しいアカウント選択を促す (マルチテナント対応版)
- * SharedUtilities のアカウント切り替え機能から呼び出される
- * @param {string} requestUserId - リクエスト元のユーザーID
- * @returns {{status:'success'|'error',message:string}}
- */
-function resetUserAuthentication(requestUserId) {
-  verifyUserAccess(requestUserId);
-  try {
-    const email = Session.getActiveUser().getEmail();
-    if (typeof cleanupSessionOnAccountSwitch === 'function' && email) {
-      cleanupSessionOnAccountSwitch(email);
-    }
-    return { status: 'success', message: 'ユーザー認証がリセットされました' };
-  } catch (e) {
-    errorLog('resetUserAuthentication エラー: ' + e.message);
-    return { status: 'error', message: 'ユーザー認証のリセットに失敗しました: ' + e.message };
-  }
-}
-
-/**
  * スプレッドシートの列名から自動的にconfig設定を推測する (マルチテナント対応版)
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {string} sheetName - シート名

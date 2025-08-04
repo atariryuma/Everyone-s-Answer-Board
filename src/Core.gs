@@ -5474,19 +5474,6 @@ function activateSheetSimple(requestUserId, sheetName) {
 }
 
 /**
- * 現在ログイン中のユーザーのメールアドレスを取得する簡易関数
- * @returns {string} ユーザーのメールアドレス
- */
-function getCurrentUserEmail() {
-  try {
-    return Session.getActiveUser().getEmail() || '';
-  } catch (error) {
-    errorLog('getCurrentUserEmail error:', error);
-    return '';
-  }
-}
-
-/**
  * ログインフロー修正の検証テスト
  * @returns {object} テスト結果
  */
