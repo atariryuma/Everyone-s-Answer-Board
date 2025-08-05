@@ -563,6 +563,96 @@ class SecurityUtilities {
 }
 
 // =============================================================================
+// MESSAGE DISPLAY UTILITIES
+// =============================================================================
+
+/**
+ * 統一されたメッセージ表示システム
+ * 管理パネルとアプリ設定管理で共通のデザインを提供
+ */
+class MessageManager {
+  constructor() {
+    this.messageContainer = null;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init());
+    } else {
+      this.init();
+    }
+  }
+
+  init() {
+    // メッセージコンテナの作成
+    if (!document.getElementById('gas-message-container')) {
+      const container = document.createElement('div');
+      container.id = 'gas-message-container';
+      container.className = 'fixed top-32 right-4 z-50 space-y-2';
+      document.body.appendChild(container);
+      this.messageContainer = container;
+    }
+  }
+
+  show(message, type = 'info', duration = 5000) {
+    const messageEl = document.createElement('div');
+    messageEl.className = `
+      p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full
+      ${this.getTypeClasses(type)}
+    `;
+    messageEl.innerHTML = `
+      <div class="flex items-center space-x-2">
+        <div class="flex-shrink-0">
+          ${this.getIcon(type)}
+        </div>
+        <div class="flex-1 text-sm font-medium">${message}</div>
+        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+          </svg>
+        </button>
+      </div>
+    `;
+
+    this.messageContainer.appendChild(messageEl);
+
+    // アニメーション
+    setTimeout(() => {
+      messageEl.classList.remove('translate-x-full');
+    }, 10);
+
+    // 自動削除
+    if (duration > 0) {
+      setTimeout(() => {
+        if (messageEl.parentElement) {
+          messageEl.classList.add('translate-x-full', 'opacity-0');
+          setTimeout(() => messageEl.remove(), 300);
+        }
+      }, duration);
+    }
+
+    return messageEl;
+  }
+
+  getTypeClasses(type) {
+    const classes = {
+      info: 'bg-blue-500 text-white',
+      success: 'bg-green-500 text-white',
+      warning: 'bg-yellow-500 text-black',
+      error: 'bg-red-500 text-white'
+    };
+    return classes[type] || classes.info;
+  }
+
+  getIcon(type) {
+    const icons = {
+      info: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/></svg>',
+      success: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>',
+      warning: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/></svg>',
+      error: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM12 8a1 1 0 112 0v4a1 1 0 11-2 0V8z"/></svg>'
+    };
+    return icons[type] || icons.info;
+  }
+}
+
+// =============================================================================
 // INITIALIZATION AND GLOBAL SETUP
 // =============================================================================
 
@@ -575,7 +665,8 @@ window.sharedUtilities = {
   errors: new ErrorHandler(),
   loading: new LoadingManager(),
   gas: new GASUtilities(),
-  security: new SecurityUtilities()
+  security: new SecurityUtilities(),
+  messages: new MessageManager()
 };
 
 // Setup global error handling
@@ -769,6 +860,11 @@ window.sharedUtilities.auth = {
 // Global function for backward compatibility
 window.switchToAnotherAccount = function() {
   window.sharedUtilities.auth.switchToAnotherAccount();
+};
+
+// Global message function for unified message display
+window.showMessage = function(message, type = 'info', duration = 5000) {
+  return window.sharedUtilities.messages.show(message, type, duration);
 };
 
 // =============================================================================

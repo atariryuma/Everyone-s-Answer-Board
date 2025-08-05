@@ -349,51 +349,17 @@
         let currentUserInfo = null;
         let setupInProgress = false;
 
-        // メッセージ表示関数 (通知として右上に表示)
+        // 統一されたメッセージ表示関数 - SharedUtilitiesを使用
         function showMessage(message, type = 'info', duration = 5000) {
-            const notificationContainer = document.getElementById('notification-container');
-            if (!notificationContainer) {
-                console.error('Notification container not found!');
-                return;
-            }
-
-            const colors = {
-                success: 'bg-green-600/20 border-green-500/50 text-green-100',
-                error: 'bg-red-600/20 border-red-500/50 text-red-100',
-                warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
-                info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
-            };
-
-            const icon = {
-                success: '✅',
-                error: '❌',
-                warning: '⚠️',
-                info: 'ℹ️'
-            };
-
-            const notification = document.createElement('div');
-            notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${colors[type]}`;
-            notification.innerHTML = `
-                <div class="mr-3 text-2xl">${icon[type]}</div>
-                <div class="flex-1 text-sm">${message}</div>
-                <button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>
-            `;
-
-            notificationContainer.appendChild(notification);
-
-            // アニメーションで表示
-            setTimeout(() => {
-                notification.classList.remove('translate-x-full', 'opacity-0');
-                notification.classList.add('translate-x-0', 'opacity-100');
-            }, 10); // 小さな遅延でトランジションをトリガー
-
-            // 自動的に消えるように設定
-            if (duration > 0) {
-                setTimeout(() => {
-                    notification.classList.remove('translate-x-0', 'opacity-100');
-                    notification.classList.add('translate-x-full', 'opacity-0');
-                    notification.addEventListener('transitionend', () => notification.remove());
-                }, duration);
+            // SharedUtilitiesの統一メッセージシステムを使用
+            if (window.sharedUtilities && window.sharedUtilities.messages) {
+                return window.sharedUtilities.messages.show(message, type, duration);
+            } else if (window.showMessage && window.showMessage !== showMessage) {
+                // グローバルshowMessage関数があればそれを使用
+                return window.showMessage(message, type, duration);
+            } else {
+                // フォールバック: コンソールログ
+                console.log(`[${type.toUpperCase()}] ${message}`);
             }
         }
 
