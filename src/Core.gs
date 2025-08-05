@@ -4884,7 +4884,7 @@ function customSetup(requestUserId, config) {
         updatedConfigJson.appPublished = publishResult && publishResult.success && publishResult.published;
         updatedConfigJson.lastModified = new Date().toISOString();
 
-        updateUser(requestUserId, {
+        const updateResult = updateUser(requestUserId, {
           spreadsheetId: formAndSsInfo.spreadsheetId,
           spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
           folderId: folder ? folder.getId() : '',
@@ -4892,6 +4892,31 @@ function customSetup(requestUserId, config) {
           configJson: JSON.stringify(updatedConfigJson),
           lastAccessedAt: new Date().toISOString()
         });
+        
+        if (updateResult.status !== 'success') {
+          throw new Error('カスタムセットアップ情報のデータベース保存に失敗: ' + updateResult.message);
+        }
+        
+        infoLog('✅ カスタムセットアップ完了: フォーム・スプレッドシート情報をデータベースに保存しました', {
+          spreadsheetId: formAndSsInfo.spreadsheetId,
+          formId: formAndSsInfo.formId,
+          folderId: folder ? folder.getId() : 'none'
+        });
+        
+        // データベース更新の検証
+        try {
+          const verificationUser = findUserById(requestUserId);
+          if (verificationUser && verificationUser.spreadsheetId === formAndSsInfo.spreadsheetId) {
+            infoLog('✅ データベース更新検証成功: スプレッドシートID正しく保存されています');
+          } else {
+            warnLog('⚠️ データベース更新検証警告: スプレッドシートID不一致の可能性', {
+              expected: formAndSsInfo.spreadsheetId,
+              actual: verificationUser ? verificationUser.spreadsheetId : 'null'
+            });
+          }
+        } catch (verificationError) {
+          warnLog('⚠️ データベース更新検証エラー:', verificationError.message);
+        }
       }
     } catch (stateError) {
       errorLog('❌ CustomSetup状態更新エラー: ' + stateError.message);

@@ -37,6 +37,13 @@ if (typeof infoLog === 'undefined') {
  */
 function getWebAppUrl() {
   try {
+    // AppsScriptオブジェクトの存在チェックを追加
+    if (typeof AppsScript === 'undefined' || !AppsScript.Script || !AppsScript.Script.Deployments) {
+      infoLog('AppsScript API not available, using fallback method');
+      // フォールバック処理に直接移行
+      return getFallbackWebAppUrl();
+    }
+    
     const scriptId = ScriptApp.getScriptId();
     const deployments = AppsScript.Script.Deployments.list(scriptId, {
       fields: 'deployments(deploymentConfig(webApp(url)))'
@@ -47,10 +54,20 @@ function getWebAppUrl() {
       infoLog('Web app URL obtained:', url);
       return url;
     }
-    warnLog('getWebAppUrl: no deployments found, falling back');
+    infoLog('getWebAppUrl: no deployments found, falling back');
   } catch (e) {
-    warnLog('getWebAppUrl API error:', e.message);
+    infoLog('getWebAppUrl API error (normal fallback):', e.message);
   }
+  
+  // フォールバック処理に移行
+  return getFallbackWebAppUrl();
+}
+
+/**
+ * ScriptApp.getService()を使用したフォールバックWebAppURL取得
+ * @returns {string} Web app URL or empty string on failure
+ */
+function getFallbackWebAppUrl() {
 
   // Fallback to ScriptApp service URL if API is unavailable or returns nothing
   try {
