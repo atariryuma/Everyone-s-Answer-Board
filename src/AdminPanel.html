@@ -981,34 +981,6 @@
         </div>
       </div>
 
-      <!-- セットアップ情報 -->
-      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
-        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          セットアップ情報
-        </h4>
-        <div class="space-y-2 text-xs">
-          <div class="flex justify-between items-center">
-            <span class="text-gray-400">作成完了:</span>
-            <span class="text-white text-sm" id="info-completed-at">-</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-gray-400">公開開始:</span>
-            <span class="text-white text-sm" id="info-published-at">-</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-gray-400">公開回数:</span>
-            <span class="text-white font-bold" id="info-publish-count">-</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-gray-400">公開シート:</span>
-            <span class="text-white text-sm" id="info-published-sheet-name">-</span>
-          </div>
-        </div>
-      </div>
-
       <!-- リソース -->
       <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
         <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
@@ -1043,31 +1015,7 @@
         </div>
         
       </div>
-      
-      <!-- 自動停止設定 -->
-      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
-        <h4 class="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          自動停止設定
-        </h4>
-        <div class="space-y-2 text-xs">
-          <div class="flex justify-between items-center">
-            <span class="text-gray-400">自動停止:</span>
-            <span class="text-white text-sm" id="info-auto-stop-enabled">-</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-gray-400">停止時間:</span>
-            <span class="text-white text-sm" id="info-auto-stop-duration">-</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-gray-400">予定終了:</span>
-            <span class="text-white text-sm" id="info-scheduled-end">-</span>
-          </div>
-        </div>
-      </div>
-      
+
       <!-- アプリ設定リンク -->
 <? if (isDeployUser) { ?>
       <div id="app-setup-link" class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">

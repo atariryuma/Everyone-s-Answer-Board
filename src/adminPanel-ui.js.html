@@ -371,11 +371,6 @@ function updateDatabaseInfo(status) {
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
   
-  // セットアップ情報の更新
-  updateSetupInfo(status);
-  
-  // 自動停止設定の更新
-  updateAutoStopInfo(status);
 
   // 公開状態の表示を更新
   const isPublished = cfg.isPublished !== undefined
@@ -3031,92 +3026,6 @@ function fixConfigForPublishedState(config) {
 document.addEventListener('DOMContentLoaded', function() {
   loadSimpleHistoryTable();
 });
-
-// セットアップ情報を更新する関数
-function updateSetupInfo(status) {
-  try {
-    // statusからconfigJsonデータを取得
-    let configData = {};
-    if (status.userInfo && status.userInfo.configJson) {
-      configData = typeof status.userInfo.configJson === 'string' 
-        ? JSON.parse(status.userInfo.configJson) 
-        : status.userInfo.configJson;
-    }
-    
-    // 作成完了日時
-    if (configData.completedAt) {
-      const completedDate = new Date(configData.completedAt);
-      safeSetText('info-completed-at', formatDateTime(completedDate));
-    } else {
-      safeSetText('info-completed-at', '-');
-    }
-    
-    // 公開開始日時
-    if (configData.publishedAt) {
-      const publishedDate = new Date(configData.publishedAt);
-      safeSetText('info-published-at', formatDateTime(publishedDate));
-    } else {
-      safeSetText('info-published-at', '-');
-    }
-    
-    // 公開回数
-    safeSetText('info-publish-count', `${configData.totalPublishCount || 0}回`);
-    
-    // 公開シート名
-    safeSetText('info-published-sheet-name', configData.publishedSheetName || '-');
-    
-  } catch (error) {
-    console.warn('⚠️ Failed to update setup info:', error);
-    safeSetText('info-completed-at', '-');
-    safeSetText('info-published-at', '-');
-    safeSetText('info-publish-count', '-');
-    safeSetText('info-published-sheet-name', '-');
-  }
-}
-
-// 自動停止設定を更新する関数
-function updateAutoStopInfo(status) {
-  try {
-    // statusからconfigJsonデータを取得
-    let configData = {};
-    if (status.userInfo && status.userInfo.configJson) {
-      configData = typeof status.userInfo.configJson === 'string' 
-        ? JSON.parse(status.userInfo.configJson) 
-        : status.userInfo.configJson;
-    }
-    
-    // 自動停止有効フラグ
-    if (configData.autoStopEnabled) {
-      safeSetText('info-auto-stop-enabled', '有効');
-    } else {
-      safeSetText('info-auto-stop-enabled', '無効');
-    }
-    
-    // 停止時間
-    if (configData.autoStopMinutes) {
-      const hours = Math.floor(configData.autoStopMinutes / 60);
-      const minutes = configData.autoStopMinutes % 60;
-      const durationText = hours > 0 ? `${hours}時間${minutes > 0 ? minutes + '分' : ''}` : `${minutes}分`;
-      safeSetText('info-auto-stop-duration', durationText);
-    } else {
-      safeSetText('info-auto-stop-duration', '-');
-    }
-    
-    // 予定終了日時
-    if (configData.scheduledEndAt) {
-      const endDate = new Date(configData.scheduledEndAt);
-      safeSetText('info-scheduled-end', formatDateTime(endDate));
-    } else {
-      safeSetText('info-scheduled-end', '-');
-    }
-    
-  } catch (error) {
-    console.warn('⚠️ Failed to update auto-stop info:', error);
-    safeSetText('info-auto-stop-enabled', '-');
-    safeSetText('info-auto-stop-duration', '-');
-    safeSetText('info-scheduled-end', '-');
-  }
-}
 
 // 日時フォーマット関数
 function formatDateTime(date) {
