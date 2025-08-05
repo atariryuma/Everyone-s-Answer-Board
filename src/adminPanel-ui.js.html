@@ -2241,8 +2241,14 @@ function getActiveResourceUrls(status) {
     }
   }
 
-  // 3. フォルダURLの取得 (configJsonから)
+  // 3. フォルダURLの取得 (configJsonから、またはfolderId から構築)
   urls.folder = config.folderUrl || null;
+  
+  // フォルダURLが設定されていない場合、folderIdから構築を試行
+  if (!urls.folder && config.folderId) {
+    urls.folder = `https://drive.google.com/drive/folders/${config.folderId}`;
+    console.log('📁 Folder URL constructed from folderId:', urls.folder);
+  }
 
   // 4. フォームURLの取得 (configJsonから、公開シートを優先)
   const publishedSheetName = config.publishedSheetName;
@@ -3164,15 +3170,33 @@ function formatDateTime(date) {
 function updateNewResourceButtons(resourceUrls) {
   const folderBtn = document.getElementById('open-folder-btn');
 
-  // 引数で渡されたURLを使用
-  const folderUrl = resourceUrls.folder;
+  // 複数のソースからフォルダURLを取得を試行
+  let folderUrl = resourceUrls.folder;
+  
+  // フォルダURLが見つからない場合、他のソースを確認
+  if (!folderUrl) {
+    // configJsonから直接取得を試行
+    const config = window.configJson || window.AdminPanel?.status?.config;
+    if (config) {
+      folderUrl = config.folderUrl || config.folderId && `https://drive.google.com/drive/folders/${config.folderId}`;
+    }
+    
+    // フォルダIDから直接URLを構築
+    if (!folderUrl && config?.folderId) {
+      folderUrl = `https://drive.google.com/drive/folders/${config.folderId}`;
+      console.log('📁 Folder URL constructed from folderId:', folderUrl);
+    }
+  }
   
   // フォルダボタンの有効化
   if (folderBtn) {
     folderBtn.disabled = false;
     folderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     if (folderUrl) {
-      folderBtn.onclick = () => window.open(folderUrl, '_blank');
+      folderBtn.onclick = () => {
+        console.log('📁 Opening folder URL:', folderUrl);
+        window.open(folderUrl, '_blank');
+      };
       folderBtn.title = 'ドライブフォルダを開く';
       console.log('✅ Folder button enabled with URL:', folderUrl);
     } else {
