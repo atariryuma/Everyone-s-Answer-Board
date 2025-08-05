@@ -577,7 +577,7 @@ class StudyQuestApp {
       const result = await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Publication status check timeout'));
-        }, 5000); // 8秒→5秒に短縮
+        }, 10000); // 5秒→10秒に延長（サーバー処理時間を考慮）
         
         google.script.run
           .withSuccessHandler((response) => {
@@ -1658,23 +1658,32 @@ class StudyQuestApp {
       
       await this.loadSheetData({ bypassCache: true });
       
-      // 手動リフレッシュ後の新着チェック基準更新戦略
-      const shouldUpdateLastSeen = this.state.currentAnswers.length > preservedLastSeenCount;
+      // 手動リフレッシュ後の新着チェック基準更新戦略（改善版）
+      const currentDataLength = this.state.currentAnswers.length;
+      const shouldUpdateLastSeen = currentDataLength > preservedLastSeenCount;
       
       if (shouldUpdateLastSeen) {
         // データが増加している場合のみ更新
-        this.updateLastSeenCount(this.state.currentAnswers.length);
+        this.updateLastSeenCount(currentDataLength);
         console.log('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
           newLastSeenCount: this.state.lastSeenCount,
           preservedCount: preservedLastSeenCount,
-          currentAnswersLength: this.state.currentAnswers.length
+          currentAnswersLength: currentDataLength
+        });
+      } else if (currentDataLength === 0 && preservedLastSeenCount > 0) {
+        // データが0件で以前に見たカードがある場合は、最小値として1を保持
+        this.state.lastSeenCount = Math.max(1, preservedLastSeenCount);
+        console.log('🔄 全体リフレッシュ完了、新着基準保持（データ0件時の安定化）:', {
+          adjustedLastSeenCount: this.state.lastSeenCount,
+          preservedCount: preservedLastSeenCount,
+          currentAnswersLength: currentDataLength
         });
       } else {
         // データが減少または同じ場合は保持
         this.state.lastSeenCount = preservedLastSeenCount;
         console.log('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
           preservedLastSeenCount: preservedLastSeenCount,
-          currentAnswersLength: this.state.currentAnswers.length,
+          currentAnswersLength: currentDataLength,
           maintainedStability: true
         });
       }
@@ -1810,11 +1819,7 @@ class StudyQuestApp {
     }
   }
   
-  // コンテンツを更新（手動） - 増分更新を優先
-  async refreshContent() {
-    // 増分更新を試行、失敗時は全体更新にフォールバック
-    await this.refreshContentIncremental();
-  }
+  // 重複定義のため削除 - 1498行目の定義を使用
   
   // 新しいカードを既存のカードコンテナに追加
   async appendNewCards(newData, sortOrder = 'newest') {
@@ -4762,6 +4767,10 @@ class StudyQuestApp {
       return;
     }
     
+    // リアクションボタンを取得してローディング状態を設定
+    const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
+    this.setReactionButtonsLoading(buttons, true);
+    
     // UI状態の事前更新（楽観的更新）
     const currentState = item.reactions?.[reaction]?.reacted || false;
     if (item.reactions && item.reactions[reaction]) {
@@ -4868,7 +4877,7 @@ class StudyQuestApp {
         this.pendingReactions.add(reactionKey);
 
         const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-        this.setReactionButtonsLoading(btns, true);
+        // ローディング状態は handleReaction で既に設定済みなので、ここでは設定しない
 
         const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
         if (!item) {
