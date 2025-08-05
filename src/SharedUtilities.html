@@ -568,7 +568,7 @@ class SecurityUtilities {
 
 /**
  * 統一されたメッセージ表示システム
- * 管理パネルとアプリ設定管理で共通のデザインを提供
+ * アプリ設定管理のデザインを基準とし、ヘッダーに応じて動的に位置調整
  */
 class MessageManager {
   constructor() {
@@ -582,49 +582,71 @@ class MessageManager {
 
   init() {
     // メッセージコンテナの作成
-    if (!document.getElementById('gas-message-container')) {
+    if (!document.getElementById('notification-container')) {
       const container = document.createElement('div');
-      container.id = 'gas-message-container';
-      container.className = 'fixed top-32 right-4 z-50 space-y-2';
+      container.id = 'notification-container';
+      container.className = this.getContainerClasses();
       document.body.appendChild(container);
       this.messageContainer = container;
+    } else {
+      this.messageContainer = document.getElementById('notification-container');
+      // 既存コンテナのクラスを更新
+      this.messageContainer.className = this.getContainerClasses();
     }
   }
 
+  // ヘッダーの有無に応じて動的に位置を調整
+  getContainerClasses() {
+    const header = document.querySelector('header, .header, #header, [class*="header"]');
+    const adminHeader = document.querySelector('.admin-header, #admin-header');
+    
+    let topPosition = 'top-4'; // デフォルト位置
+    
+    if (adminHeader) {
+      // 管理パネルヘッダーがある場合
+      topPosition = 'top-20';
+    } else if (header) {
+      // 一般的なヘッダーがある場合
+      const headerHeight = header.offsetHeight;
+      if (headerHeight > 60) {
+        topPosition = 'top-24';
+      } else {
+        topPosition = 'top-16';
+      }
+    }
+    
+    return `fixed ${topPosition} right-4 z-50 space-y-2 max-w-sm`;
+  }
+
   show(message, type = 'info', duration = 5000) {
+    // コンテナの位置を再チェック（動的対応）
+    if (this.messageContainer) {
+      this.messageContainer.className = this.getContainerClasses();
+    }
+
     const messageEl = document.createElement('div');
-    messageEl.className = `
-      p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full
-      ${this.getTypeClasses(type)}
-    `;
+    messageEl.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${this.getTypeClasses(type)}`;
+    
     messageEl.innerHTML = `
-      <div class="flex items-center space-x-2">
-        <div class="flex-shrink-0">
-          ${this.getIcon(type)}
-        </div>
-        <div class="flex-1 text-sm font-medium">${message}</div>
-        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
-          </svg>
-        </button>
-      </div>
+      <div class="mr-3 text-2xl">${this.getIcon(type)}</div>
+      <div class="flex-1 text-sm">${message}</div>
+      <button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>
     `;
 
     this.messageContainer.appendChild(messageEl);
 
-    // アニメーション
+    // アニメーションで表示
     setTimeout(() => {
-      messageEl.classList.remove('translate-x-full');
+      messageEl.classList.remove('translate-x-full', 'opacity-0');
+      messageEl.classList.add('translate-x-0', 'opacity-100');
     }, 10);
 
     // 自動削除
     if (duration > 0) {
       setTimeout(() => {
-        if (messageEl.parentElement) {
-          messageEl.classList.add('translate-x-full', 'opacity-0');
-          setTimeout(() => messageEl.remove(), 300);
-        }
+        messageEl.classList.remove('translate-x-0', 'opacity-100');
+        messageEl.classList.add('translate-x-full', 'opacity-0');
+        messageEl.addEventListener('transitionend', () => messageEl.remove());
       }, duration);
     }
 
@@ -633,20 +655,20 @@ class MessageManager {
 
   getTypeClasses(type) {
     const classes = {
-      info: 'bg-blue-500 text-white',
-      success: 'bg-green-500 text-white',
-      warning: 'bg-yellow-500 text-black',
-      error: 'bg-red-500 text-white'
+      success: 'bg-green-600/20 border-green-500/50 text-green-100',
+      error: 'bg-red-600/20 border-red-500/50 text-red-100',
+      warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
+      info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
     };
     return classes[type] || classes.info;
   }
 
   getIcon(type) {
     const icons = {
-      info: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/></svg>',
-      success: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>',
-      warning: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/></svg>',
-      error: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM12 8a1 1 0 112 0v4a1 1 0 11-2 0V8z"/></svg>'
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
     };
     return icons[type] || icons.info;
   }
