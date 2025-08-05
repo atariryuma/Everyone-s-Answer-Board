@@ -1438,9 +1438,8 @@ function proceedWithSaveAndPublish(config) {
       if (result && (result.userInfo || result.status === 'success')) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
-        // 履歴に保存
-        // 公開時は履歴保存を行わない（公開停止時に保存するため）
-        logDebug('Board published successfully - history will be saved on unpublish');
+        // 履歴に保存（公開時）
+        saveHistoryOnPublish(result, config);
         
         // ボードビューアーに即座更新を通知
         try {
@@ -1640,83 +1639,53 @@ async function clearAllCachesForUnpublish() {
 
 // Unpublish board
 function unpublishBoard() {
-  return runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
-    .then(function(response) {
-      logDebug('公開停止レスポンス:', response);
-      // 公開停止時に履歴を保存
-      saveHistoryOnUnpublish(response);
+    return runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
+      .then(function(response) {
+        logDebug('公開停止レスポンス:', response);
 
-      // 強化されたキャッシュクリア処理（キャッシュバスティング対応）
-      clearAllCachesForUnpublish();
+        // 強化されたキャッシュクリア処理（キャッシュバスティング対応）
+        clearAllCachesForUnpublish();
 
-      // Reset column selection dropdowns to default "--列を選択--" state
-      resetColumnSelections();
+        // Reset column selection dropdowns to default "--列を選択--" state
+        resetColumnSelections();
 
-      // 公開停止処理が成功したことを返す
-      return Promise.resolve(response);
-    })
-    .catch(function(error) {
-      handleError(error, 'unpublishBoard', 'ボードの公開停止に失敗しました。');
-      // エラーを再スローして呼び出し元でキャッチできるようにする
-      return Promise.reject(error);
-    });
-}
-
-// 公開停止時に履歴を保存する関数
-function saveHistoryOnUnpublish(unpublishResponse) {
-  try {
-    // 現在のステータスを取得（キャッシュから）
-    const currentStatus = window.lastStatusCache;
-    if (!currentStatus || !currentStatus.config) {
-      logWarn('履歴保存: 現在のステータス情報が取得できません');
-      return;
-    }
-    
-    const config = currentStatus.config;
-    const userInfo = currentStatus.userInfo || {};
-    
-    // 履歴アイテムを作成
-    const historyItem = {
-      questionText: config.opinionHeader || config.opinionColumn || userInfo.customFormInfo?.mainQuestion || '（問題文未設定）',
-      sheetName: config.publishedSheetName || '',
-      publishedAt: config.publishedAt || config.lastPublishedAt || new Date().toISOString(),
-      endTime: new Date().toISOString(), // 実際の終了日時
-      scheduledEndTime: config.scheduledEndTime || null, // 予定終了日時
-      answerCount: unpublishResponse.answerCount || currentStatus.answerCount || 0,
-      reactionCount: unpublishResponse.reactionCount || currentStatus.reactionCount || 0,
-      config: config,
-      formUrl: userInfo.formUrl || '',
-      spreadsheetUrl: userInfo.spreadsheetUrl || '',
-      setupType: determineSetupType(config, userInfo),
-      isActive: false // 終了したのでfalse
-    };
-    
-    // LocalStorage履歴保存を実行
-    saveToHistory(historyItem);
-    
-    // サーバーサイド履歴保存も実行
-    try {
-      runGasWithUserId('saveHistoryToSheetAPI', '履歴をサーバーに保存中...', historyItem)
-        .then(response => {
-          if (response && response.status === 'success') {
-            logDebug('✅ サーバーサイド履歴保存完了:', response);
-          } else {
-            logWarn('⚠️ サーバーサイド履歴保存で警告:', response);
-          }
-        })
-        .catch(error => {
-          logWarn('❌ サーバーサイド履歴保存エラー:', error);
-        });
-    } catch (serverError) {
-      logWarn('❌ サーバーサイド履歴保存の呼び出しに失敗:', serverError);
-    }
-    
-    logDebug('履歴保存完了（公開停止時）:', historyItem);
-    
-  } catch (error) {
-    logWarn('公開停止時の履歴保存に失敗:', error);
+        // 公開停止処理が成功したことを返す
+        return Promise.resolve(response);
+      })
+      .catch(function(error) {
+        handleError(error, 'unpublishBoard', 'ボードの公開停止に失敗しました。');
+        // エラーを再スローして呼び出し元でキャッチできるようにする
+        return Promise.reject(error);
+      });
   }
-}
+
+  // 公開時に履歴を保存する関数
+  function saveHistoryOnPublish(publishResponse, config) {
+    try {
+      const userInfo = publishResponse.userInfo || {};
+      const historyItem = {
+        questionText:
+          config.opinionHeader ||
+          config.opinionColumn ||
+          userInfo.customFormInfo?.mainQuestion ||
+          '（問題文未設定）',
+        sheetName: config.publishedSheetName || '',
+        publishedAt: publishResponse.publishedAt || new Date().toISOString(),
+        answerCount: 0,
+        reactionCount: 0,
+        config: config,
+        formUrl: userInfo.formUrl || '',
+        spreadsheetUrl: userInfo.spreadsheetUrl || '',
+        setupType: determineSetupType(config, userInfo),
+        isActive: false
+      };
+
+      saveToHistory(historyItem);
+      logDebug('履歴保存完了（公開時）:', historyItem);
+    } catch (error) {
+      logWarn('公開時の履歴保存に失敗:', error);
+    }
+  }
 
 // セットアップタイプを判定する補助関数
 function determineSetupType(config, userInfo) {

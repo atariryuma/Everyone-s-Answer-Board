@@ -74,76 +74,47 @@ function setupEventListeners() {
     clearHistoryBtn.addEventListener('click', function() {
       console.log('🗑️ 履歴クリアボタンがクリックされました');
       
-      if (typeof showConfirmationModal === 'function') {
-        showConfirmationModal(
-          '履歴削除の確認',
-          'すべての履歴を削除しますか？この操作は取り消せません。',
-          function() {
-            console.log('📝 履歴削除が確認されました');
+        if (typeof showConfirmationModal === 'function') {
+          showConfirmationModal(
+            '履歴削除の確認',
+            'すべての履歴を削除しますか？この操作は取り消せません。',
+            function() {
+              console.log('📝 履歴削除が確認されました');
+              try {
+                localStorage.removeItem(HISTORY_STORAGE_KEY);
+                console.log('✅ ローカルストレージから履歴を削除しました');
+                showMessage('✅ 履歴をクリアしました', 'success');
+
+                // 履歴テーブルを更新
+                if (typeof loadSimpleHistoryTable === 'function') {
+                  loadSimpleHistoryTable();
+                  console.log('📊 履歴テーブルを更新しました');
+                } else {
+                  console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
+                }
+              } catch (error) {
+                console.error('❌ 履歴クリアに失敗:', error);
+                showMessage('❌ 履歴クリアに失敗しました', 'error');
+              }
+            }
+          );
+        } else {
+          console.error('❌ showConfirmationModal関数が見つかりません');
+          // フォールバック: 直接確認
+          if (confirm('すべての履歴を削除しますか？この操作は取り消せません。')) {
             try {
               localStorage.removeItem(HISTORY_STORAGE_KEY);
-              console.log('✅ ローカルストレージから履歴を削除しました');
-              
-              // サーバーサイドの履歴もクリア
-              runGasWithUserId('clearHistoryFromServerAPI', 'サーバーから履歴をクリア中...')
-                .then(function(serverResponse) {
-                  console.log('✅ サーバーサイド履歴もクリアしました:', serverResponse);
-                  showMessage('✅ 履歴をクリアしました（ローカル・サーバー両方）', 'success');
-                  
-                  // 履歴テーブルを更新
-                  if (typeof loadSimpleHistoryTable === 'function') {
-                    loadSimpleHistoryTable();
-                    console.log('📊 履歴テーブルを更新しました');
-                  } else {
-                    console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
-                  }
-                })
-                .catch(function(serverError) {
-                  console.warn('⚠️ サーバーサイド履歴クリアに失敗:', serverError);
-                  showMessage('✅ ローカル履歴をクリアしました（サーバー側は手動で確認してください）', 'success');
-                  
-                  // 履歴テーブルを更新
-                  if (typeof loadSimpleHistoryTable === 'function') {
-                    loadSimpleHistoryTable();
-                    console.log('📊 履歴テーブルを更新しました');
-                  } else {
-                    console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
-                  }
-                });
+              console.log('✅ ローカルストレージから履歴を削除しました（フォールバック）');
+              showMessage('✅ 履歴をクリアしました', 'success');
+              if (typeof loadSimpleHistoryTable === 'function') {
+                loadSimpleHistoryTable();
+              }
             } catch (error) {
               console.error('❌ 履歴クリアに失敗:', error);
               showMessage('❌ 履歴クリアに失敗しました', 'error');
             }
           }
-        );
-      } else {
-        console.error('❌ showConfirmationModal関数が見つかりません');
-        // フォールバック: 直接確認
-        if (confirm('すべての履歴を削除しますか？この操作は取り消せません。')) {
-          try {
-            localStorage.removeItem(HISTORY_STORAGE_KEY);
-            console.log('✅ ローカルストレージから履歴を削除しました（フォールバック）');
-            
-            // サーバーサイドの履歴もクリア（フォールバック）
-            runGasWithUserId('clearHistoryFromServerAPI', 'サーバーから履歴をクリア中...')
-              .then(function(serverResponse) {
-                console.log('✅ サーバーサイド履歴もクリアしました（フォールバック）:', serverResponse);
-                showMessage('✅ 履歴をクリアしました（ローカル・サーバー両方）', 'success');
-              })
-              .catch(function(serverError) {
-                console.warn('⚠️ サーバーサイド履歴クリアに失敗（フォールバック）:', serverError);
-                showMessage('✅ ローカル履歴をクリアしました（サーバー側は手動で確認してください）', 'success');
-              });
-            
-            if (typeof loadSimpleHistoryTable === 'function') {
-              loadSimpleHistoryTable();
-            }
-          } catch (error) {
-            console.error('❌ 履歴クリアに失敗:', error);
-            showMessage('❌ 履歴クリアに失敗しました', 'error');
-          }
         }
-      }
     });
     console.log('✅ 履歴クリアボタンのイベントリスナーを設定しました');
   } else {
