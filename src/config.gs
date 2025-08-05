@@ -3008,7 +3008,7 @@ function syncFormUrlForActiveSheet(configJson, sheetName) {
     return;
   }
 
-  const sheetConfigKey = 'sheet_' + sheetName;
+  const sheetConfigKey = `sheet_${sheetName}`;
   const sheetConfig = configJson[sheetConfigKey];
 
   if (sheetConfig && typeof sheetConfig === 'object' && sheetConfig.formUrl) {
