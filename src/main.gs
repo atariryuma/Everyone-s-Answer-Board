@@ -1780,7 +1780,7 @@ function renderUnpublishedPage(userInfo, params) {
     template.userId = userInfo.userId || '';
     template.spreadsheetId = userInfo.spreadsheetId || '';
     template.ownerName = userInfo.adminEmail || 'システム管理者';
-    template.isOwner = true; // 非公開ページは所有者のみアクセス可能
+    template.isOwner = (getCurrentUserEmail() === userInfo.adminEmail); // 現在のユーザーがボードの所有者であるかを確認
     template.adminEmail = userInfo.adminEmail || '';
     template.cacheTimestamp = Date.now();
 
