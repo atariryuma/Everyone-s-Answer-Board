@@ -4,7 +4,6 @@ const vm = require('vm');
 describe('applyAutoConfiguration', () => {
   let context;
   beforeEach(() => {
-    const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
     const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
     context = {
       console,
@@ -14,7 +13,6 @@ describe('applyAutoConfiguration', () => {
       Utilities: { getUuid: () => 'test-uuid' }
     };
     vm.createContext(context);
-    vm.runInContext(errorHandlerCode, context);
     vm.runInContext(coreCode, context);
     context.saveSheetConfig = jest.fn();
   });

@@ -2,7 +2,6 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('verifyUserAccess security checks', () => {
-  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
 
@@ -19,7 +18,6 @@ describe('verifyUserAccess security checks', () => {
       })),
     };
     vm.createContext(context);
-    vm.runInContext(errorHandlerCode, context);
     vm.runInContext(coreCode, context);
   });
 
