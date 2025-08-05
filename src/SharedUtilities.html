@@ -624,12 +624,14 @@ class MessageManager {
       this.messageContainer.className = this.getContainerClasses();
     }
 
+    const sanitizedMessage = (message || '').replace(/^[✅❌⚠️ℹ️]\s*/, '');
+
     const messageEl = document.createElement('div');
     messageEl.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${this.getTypeClasses(type)}`;
-    
+
     messageEl.innerHTML = `
       <div class="mr-3 text-2xl">${this.getIcon(type)}</div>
-      <div class="flex-1 text-sm">${message}</div>
+      <div class="flex-1 text-sm">${sanitizedMessage}</div>
       <button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>
     `;
 

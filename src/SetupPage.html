@@ -135,14 +135,16 @@
                 warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
                 info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
             };
-            
+
+            const sanitizedMessage = (message || '').replace(/^[✅❌⚠️ℹ️]\s*/, '');
+
             messageArea.innerHTML = `
                 <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
                     <div class="flex items-center">
                         <div class="mr-3">
                             ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
                         </div>
-                        <div class="flex-1">${message}</div>
+                        <div class="flex-1">${sanitizedMessage}</div>
                         <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
                     </div>
                 </div>
