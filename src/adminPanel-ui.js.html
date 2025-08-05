@@ -151,6 +151,11 @@ function updateUIWithNewStatus(status) {
   }
 }
 
+// Ensure function is globally accessible
+if (typeof window !== 'undefined') {
+  window.updateUIWithNewStatus = updateUIWithNewStatus;
+}
+
 // データ準備の最適化（同期処理部分）
 function prepareStatusData(status) {
   // 1. configJson正規化処理（包括的システム最適化）
@@ -1126,7 +1131,7 @@ function updateTopicText(status) {
       if (status.userInfo?.configJson) {
         try {
           const fullCfg = JSON.parse(status.userInfo.configJson);
-          const sheetCfg = fullCfg['sheet_' + sheetName] || {};
+          const sheetCfg = fullCfg['sheet_' + (sheetName || '')] || {};
           
           // guessedConfig内のopinionHeaderを優先
           if (sheetCfg.guessedConfig && sheetCfg.guessedConfig.opinionHeader) {
@@ -1140,7 +1145,7 @@ function updateTopicText(status) {
           }
         } catch (e) {
           // クイックスタート直後のフォールバック改善
-          if (sheetName && fullCfg['sheet_' + sheetName]?.flowType === 'quickstart') {
+          if (sheetName && fullCfg['sheet_' + (sheetName || '')]?.flowType === 'quickstart') {
             // クイックスタート用デフォルト質問文を表示
             topic = 'あなたの考えや気づいたことを教えてください';
           } else {
@@ -1335,6 +1340,11 @@ function toggleSection(sectionId) {
   }
 }
 
+// Ensure function is globally accessible
+if (typeof window !== 'undefined') {
+  window.toggleSection = toggleSection;
+}
+
 // Automatically collapse completed sections
 function collapseCompletedSection(stepNumber) {
   const sectionId = `step${stepNumber}-content`;
@@ -1464,6 +1474,11 @@ function showFormConfigModal() {
   }
 }
 
+// Ensure function is globally accessible
+if (typeof window !== 'undefined') {
+  window.showFormConfigModal = showFormConfigModal;
+}
+
 // Hide form configuration modal
 function hideFormConfigModal() {
   if (window.sharedModals) {
@@ -1478,6 +1493,11 @@ function hideFormConfigModal() {
       manageFocusForModal('form-config-modal', false);
     }
   }
+}
+
+// Ensure function is globally accessible
+if (typeof window !== 'undefined') {
+  window.hideFormConfigModal = hideFormConfigModal;
 }
 
 // Show privacy modal
@@ -2253,7 +2273,7 @@ function getActiveResourceUrls(status) {
   // 4. フォームURLの取得 (configJsonから、公開シートを優先)
   const publishedSheetName = config.publishedSheetName;
   if (publishedSheetName) {
-    const sheetConfig = config[`sheet_${publishedSheetName}`];
+    const sheetConfig = config[`sheet_${publishedSheetName || ''}`];
     if (sheetConfig) {
       urls.form = sheetConfig.formUrl || urls.form;
       urls.editForm = sheetConfig.editFormUrl || urls.editForm;
@@ -2362,6 +2382,11 @@ function navigateToStep(step) {
   }
   
   validateCurrentStep();
+}
+
+// Ensure function is globally accessible
+if (typeof window !== 'undefined') {
+  window.navigateToStep = navigateToStep;
 }
 
 
@@ -2942,7 +2967,7 @@ function syncGlobalColumnSettings(config) {
     return config; // シート名が不明な場合はスキップ
   }
   
-  const sheetConfigKey = `sheet_${config.publishedSheetName}`;
+  const sheetConfigKey = `sheet_${config.publishedSheetName || ''}`;
   const sheetConfig = config[sheetConfigKey];
   
   if (sheetConfig && typeof sheetConfig === 'object') {

@@ -2140,7 +2140,7 @@ async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
     
     if (verificationStatus && verificationStatus.userInfo) {
       const configJson = JSON.parse(verificationStatus.userInfo.configJson || '{}');
-      const sheetKey = 'sheet_' + expectedSheetName;
+      const sheetKey = 'sheet_' + (expectedSheetName || '');
       const savedConfig = configJson[sheetKey];
       
       
@@ -2233,7 +2233,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     }
     
     // 5. シート固有設定の確認（より柔軟な判定）
-    const sheetKey = 'sheet_' + sheetName;
+    const sheetKey = 'sheet_' + (sheetName || '');
     const sheetConfig = configJson[sheetKey];
     const hasSheetConfig = !!(sheetConfig && (sheetConfig.guessedConfig || sheetConfig.opinionHeader));
     
@@ -2325,7 +2325,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
     
     // 2. シート固有設定の同期確認
     if (expectedState.sheetName && expectedState.config) {
-      const sheetKey = 'sheet_' + expectedState.sheetName;
+      const sheetKey = 'sheet_' + (expectedState.sheetName || '');
       const currentSheetConfig = configJson[sheetKey];
       
       
@@ -2459,7 +2459,7 @@ function performIntegratedConfigConsistencyCheck(status) {
     
     // 3. シート固有設定の整合性チェック
     if (configJson.publishedSheetName) {
-      const sheetKey = 'sheet_' + configJson.publishedSheetName;
+      const sheetKey = 'sheet_' + (configJson.publishedSheetName || '');
       const sheetConfig = configJson[sheetKey];
       
       if (!sheetConfig || !sheetConfig.guessedConfig) {
