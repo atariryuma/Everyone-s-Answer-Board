@@ -2218,7 +2218,8 @@ function getActiveResourceUrls(status) {
   const urls = {
     spreadsheet: null,
     folder: null,
-    form: null
+    form: null,
+    editForm: null
   };
 
   if (!status || !status.userInfo) {
@@ -2241,11 +2242,7 @@ function getActiveResourceUrls(status) {
   }
 
   // 3. フォルダURLの取得 (configJsonから)
-  if (config.folderUrl) {
-    urls.folder = config.folderUrl;
-  } else if (config.folderId) {
-    urls.folder = `https://drive.google.com/drive/folders/${config.folderId}`;
-  }
+  urls.folder = config.folderUrl || null;
 
   // 4. フォームURLの取得 (configJsonから、公開シートを優先)
   const publishedSheetName = config.publishedSheetName;
@@ -2253,12 +2250,16 @@ function getActiveResourceUrls(status) {
     const sheetConfig = config[`sheet_${publishedSheetName}`];
     if (sheetConfig) {
       urls.form = sheetConfig.formUrl || urls.form;
+      urls.editForm = sheetConfig.editFormUrl || urls.editForm;
     }
   }
   
   // フォールバック: トップレベルのフォームURL
   if (!urls.form && config.formUrl) {
     urls.form = config.formUrl;
+  }
+  if (!urls.editForm && config.editFormUrl) {
+    urls.editForm = config.editFormUrl;
   }
 
   return urls;
@@ -2316,7 +2317,7 @@ function updateSystemStatusDisplay(status) {
   // Handle generic resource button in Step 1 (any resource)
   const resourceBtn = document.getElementById('add-resource-btn');
   if (resourceBtn) {
-    const anyResourceUrl = resourceUrls.spreadsheet || resourceUrls.folder || resourceUrls.form;
+    const anyResourceUrl = resourceUrls.spreadsheet || resourceUrls.folder || resourceUrls.form || resourceUrls.editForm;
     resourceBtn.disabled = false;
     if (anyResourceUrl) {
       resourceBtn.onclick = () => window.open(anyResourceUrl, '_blank');
@@ -3162,9 +3163,11 @@ function formatDateTime(date) {
 // 新しいリソースボタンを更新する関数
 function updateNewResourceButtons(resourceUrls) {
   const folderBtn = document.getElementById('open-folder-btn');
+  const editFormBtn = document.getElementById('open-edit-form-btn');
 
   // 引数で渡されたURLを使用
   const folderUrl = resourceUrls.folder;
+  const editFormUrl = resourceUrls.editForm;
   
   // フォルダボタンの有効化
   if (folderBtn) {
@@ -3178,6 +3181,21 @@ function updateNewResourceButtons(resourceUrls) {
       folderBtn.onclick = () => showMessage('フォルダURLが未設定です', 'warning');
       folderBtn.title = 'フォルダURLが未設定です';
       console.log('⚠️ Folder button enabled - no URL available');
+    }
+  }
+
+  // 編集フォームボタンの有効化
+  if (editFormBtn) {
+    editFormBtn.disabled = false;
+    editFormBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    if (editFormUrl) {
+      editFormBtn.onclick = () => window.open(editFormUrl, '_blank');
+      editFormBtn.title = 'フォーム編集画面を開く';
+      console.log('✅ Edit form button enabled with URL:', editFormUrl);
+    } else {
+      editFormBtn.onclick = () => showMessage('編集フォームURLが未設定です', 'warning');
+      editFormBtn.title = '編集フォームURLが未設定です';
+      console.log('⚠️ Edit form button enabled - no URL available');
     }
   }
 }
