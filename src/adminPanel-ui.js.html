@@ -2520,61 +2520,6 @@ function generateHistoryId() {
 /**
  * 簡単な履歴テーブルを表示（新実装）
  */
-// 履歴同期の管理変数
-let historySyncInProgress = false;
-let lastHistorySync = 0;
-const HISTORY_SYNC_COOLDOWN = 60000; // 1分のクールダウン
-
-/**
- * サーバーから履歴を同期してLocalStorageに保存（最適化版）
- */
-async function syncHistoryFromServer() {
-  try {
-    // 重複同期防止チェック
-    const now = Date.now();
-    if (historySyncInProgress) {
-      console.log('🔄 履歴同期が既に実行中です。スキップします。');
-      return getHistoryFromStorage(); // ローカルの履歴を返す
-    }
-    
-    // クールダウンチェック
-    if (now - lastHistorySync < HISTORY_SYNC_COOLDOWN) {
-      const remainingTime = Math.ceil((HISTORY_SYNC_COOLDOWN - (now - lastHistorySync)) / 1000);
-      console.log(`⏳ 履歴同期のクールダウン中です。あと${remainingTime}秒後に実行可能です。`);
-      return getHistoryFromStorage(); // ローカルの履歴を返す
-    }
-    
-    historySyncInProgress = true;
-    lastHistorySync = now;
-    console.log('🔄 サーバーから履歴を同期中...');
-    
-    const response = await runGasWithUserId('getHistoryFromServerAPI', 'サーバーから履歴を取得中...');
-    
-    if (response && response.status === 'success' && Array.isArray(response.historyArray)) {
-      // 空履歴時の最適化処理
-      if (response.historyArray.length === 0 && response.count === 0) {
-        console.log('📋 サーバー履歴は空です。処理を最適化します。');
-        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify([]));
-        historySyncInProgress = false;
-        return [];
-      }
-      
-      // サーバーからの履歴をLocalStorageに保存
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(response.historyArray));
-      console.log('✅ サーバーから履歴を同期しました:', response.count, '件');
-      historySyncInProgress = false;
-      return response.historyArray;
-    } else {
-      console.warn('⚠️ サーバーからの履歴取得で警告:', response);
-      historySyncInProgress = false;
-      return [];
-    }
-  } catch (error) {
-    console.error('❌ サーバー履歴同期エラー:', error);
-    historySyncInProgress = false;
-    return [];
-  }
-}
 
 function loadSimpleHistoryTable() {
   const tableBody = document.getElementById('history-table-body');
@@ -2615,7 +2560,7 @@ function createHistoryTableRow(item, index) {
   const row = document.createElement('tr');
   
   // 公開中の項目は緑色のハイライト
-  const isActive = item.isActive || (!item.endTime && item.publishedAt);
+  const isActive = !!item.isActive;
   row.className = isActive 
     ? 'hover:bg-green-700/20 cursor-pointer transition-colors bg-green-900/10' 
     : 'hover:bg-gray-700/30 cursor-pointer transition-colors';
@@ -3084,34 +3029,7 @@ function fixConfigForPublishedState(config) {
 
 // 簡単な履歴テーブル初期化
 document.addEventListener('DOMContentLoaded', function() {
-  // 依存関数が利用可能になるまで待機してから実行
-  function waitForDependencies(attempts = 0) {
-    if (typeof runGasWithUserId === 'function') {
-      // サーバーから履歴を同期してからテーブルを読み込み
-      syncHistoryFromServer()
-        .then(function(syncedHistory) {
-          console.log('🔄 ページ読み込み時の履歴同期完了:', syncedHistory.length, '件');
-          loadSimpleHistoryTable();
-        })
-        .catch(function(syncError) {
-          console.warn('⚠️ ページ読み込み時の履歴同期に失敗、ローカルデータで表示:', syncError);
-          loadSimpleHistoryTable();
-        });
-      return;
-    }
-    
-    if (attempts < 20) { // 最大2秒待機
-      console.log('⏳ runGasWithUserId関数の読み込み待機中...');
-      setTimeout(() => waitForDependencies(attempts + 1), 100);
-      return;
-    }
-    
-    // タイムアウト後はローカルデータのみで動作
-    console.warn('⚠️ runGasWithUserId関数が利用できません。ローカルデータのみで表示します。');
-    loadSimpleHistoryTable();
-  }
-  
-  waitForDependencies();
+  loadSimpleHistoryTable();
 });
 
 // セットアップ情報を更新する関数
