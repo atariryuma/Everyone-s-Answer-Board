@@ -1160,7 +1160,12 @@ function completeAIDetectionProcess() {
           if (typeof navigateToStep === 'function') {
             navigateToStep(3); // ステップ3（表示設定）に進む
           }
-          
+
+          // 6. 自動公開の実行
+          if (typeof saveAndPublish === 'function') {
+            saveAndPublish();
+          }
+
         } else {
           throw new Error(saveResult?.message || '設定の保存に失敗しました');
         }
