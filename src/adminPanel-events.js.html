@@ -1,4 +1,3 @@
-
 <script>
 // =============================================================================
 // ADMIN PANEL EVENT LISTENERS & UI INTERACTIONS
@@ -319,22 +318,15 @@ function setupFormConfigModalHandlers() {
   var formConfigClose = document.getElementById('form-config-close');
   var formConfigCancel = document.getElementById('form-config-cancel');
   var formConfigCreate = document.getElementById('form-config-create');
-
-  // hideFormConfigModal が未定義の場合はイベント登録をスキップ
-  var canHideModal = typeof hideFormConfigModal === 'function';
-
-  if (formConfigClose && canHideModal) {
+  
+  if (formConfigClose) {
     formConfigClose.addEventListener('click', hideFormConfigModal);
   }
-
-  if (formConfigCancel && canHideModal) {
+  
+  if (formConfigCancel) {
     formConfigCancel.addEventListener('click', hideFormConfigModal);
   }
-
-  if (!canHideModal) {
-    console.error('hideFormConfigModal function not found');
-  }
-
+  
   if (formConfigCreate) {
     formConfigCreate.addEventListener('click', createFormWithConfig);
   }
