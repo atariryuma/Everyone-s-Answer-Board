@@ -1161,6 +1161,8 @@ window.setLoading = function(isLoading, message, step, percentage) {
   }
 };
 
+
+
 // =============================================================================
 // TIMING MANAGER INTEGRATION - TimingManagerへの段階的移行
 // =============================================================================
@@ -1190,7 +1192,6 @@ function initializeTimingManagerIntegration() {
     console.log('🔄 TimingManager integration enabled - Advanced timing features available');
     return true;
   } else {
-    console.log('ℹ️ TimingManager not yet available - Will retry after DOM load');
     return false;
   }
 }
@@ -1202,9 +1203,7 @@ if (!initializeTimingManagerIntegration()) {
     if (!initializeTimingManagerIntegration()) {
       // さらに遅延して最終試行
       setTimeout(function() {
-        if (!initializeTimingManagerIntegration()) {
-          console.log('ℹ️ TimingManager not available - Using legacy timing functions only');
-        }
+        initializeTimingManagerIntegration();
       }, 100);
     }
   });
