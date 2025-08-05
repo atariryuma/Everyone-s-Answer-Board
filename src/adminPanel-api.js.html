@@ -3368,22 +3368,8 @@ async function handleCustomSetup(config) {
     updateCustomOverallProgress(100, 'カスタムセットアップ完了');
     console.log('🎉 カスタムセットアップが完了しました（手動公開待機）');
     
-    // Phase 3: 状態修正（必要な場合のみ）
-    if (result.spreadsheetId && result.autoPublished) {
-      console.log('🔧 状態修正実行中...');
-      
-      const stateFixConfig = {
-        setupStatus: 'completed',
-        appPublished: true,
-        publishedSpreadsheetId: result.spreadsheetId,
-        publishedSheetName: result.sheetName || 'フォームの回答 1'
-      };
-      
-      const syncResult = await runGasWithUserId('syncConfigurationState', '状態修正中...', stateFixConfig, 'repair');
-      if (syncResult && syncResult.success) {
-        console.log('✅ 状態修正完了');
-      }
-    }
+    // Phase 3: カスタムセットアップは手動公開前提のため、自動公開状態修正は実行しない
+    console.log('ℹ️ カスタムセットアップ完了 - 手動公開待機中（自動公開状態修正をスキップ）');
     
     // Phase 4: 単一の最終同期（すべての並行処理を統合）
     console.log('🔄 最終データ同期開始');
@@ -3420,6 +3406,25 @@ async function handleCustomSetup(config) {
     
     // 最新データ取得（簡素化版）
     const freshStatus = await simpleStatusRefresh();
+    
+    // カスタムセットアップ後は手動公開前提のため、公開状態を強制的に非公開に設定
+    if (freshStatus && freshStatus.userInfo && freshStatus.userInfo.configJson) {
+      try {
+        const config = JSON.parse(freshStatus.userInfo.configJson);
+        if (config.appPublished === true) {
+          console.log('⚠️ カスタムセットアップ後に自動公開が検出されました - 手動公開前提に修正');
+          config.appPublished = false;
+          freshStatus.userInfo.configJson = JSON.stringify(config);
+          freshStatus.appPublished = false;
+          freshStatus.isPublished = false;
+          if (freshStatus._normalized) {
+            freshStatus._normalized.isPublished = false;
+          }
+        }
+      } catch (configError) {
+        console.warn('⚠️ カスタムセットアップ後の設定解析エラー:', configError);
+      }
+    }
     
     // Phase 5: UI完全更新（アクティブシート設定を含む）
     if (freshStatus && freshStatus.activeSheetName) {
