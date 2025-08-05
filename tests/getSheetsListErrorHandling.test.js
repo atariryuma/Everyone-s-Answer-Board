@@ -4,7 +4,6 @@ const vm = require('vm');
 describe('getSheetsList error handling', () => {
   let context;
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
-  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
 
   beforeEach(() => {
     context = {
@@ -17,7 +16,6 @@ describe('getSheetsList error handling', () => {
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
     };
     vm.createContext(context);
-    vm.runInContext(errorHandlerCode, context);
     vm.runInContext(coreCode, context);
 
     context.findUserById = jest.fn(() => ({

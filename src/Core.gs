@@ -3,16 +3,210 @@
  * 主要な業務ロジックとAPI エンドポイント
  */
 
+// =================================================================
+// エラーハンドリング
+// =================================================================
+
+/**
+ * エラーの重要度レベル
+ */
+const ERROR_SEVERITY = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  CRITICAL: 'critical',
+};
+
+/**
+ * エラーカテゴリ
+ */
+const ERROR_CATEGORIES = {
+  AUTHENTICATION: 'authentication',
+  AUTHORIZATION: 'authorization',
+  DATABASE: 'database',
+  CACHE: 'cache',
+  NETWORK: 'network',
+  VALIDATION: 'validation',
+  SYSTEM: 'system',
+  USER_INPUT: 'user_input',
+};
+
+/**
+ * 統一エラーハンドラークラス
+ */
+class UnifiedErrorHandler {
+  constructor() {
+    this.sessionId = Utilities.getUuid();
+    this.errorCount = 0;
+    this.startTime = Date.now();
+  }
+
+  /**
+   * 構造化エラーログを生成・出力
+   * @param {Error|string} error エラーオブジェクトまたはメッセージ
+   * @param {string} context エラー発生箇所/関数名
+   * @param {string} [severity=ERROR_SEVERITY.MEDIUM] エラーの重要度
+   * @param {string} [category=ERROR_CATEGORIES.SYSTEM] エラーカテゴリ
+   * @param {Object} [metadata={}] 追加メタデータ
+   * @returns {Object} 構造化エラー情報
+   */
+  logError(error, context, severity = ERROR_SEVERITY.MEDIUM, category = ERROR_CATEGORIES.SYSTEM, metadata = {}) {
+    this.errorCount++;
+
+    const errorInfo = this._buildErrorInfo(error, context, severity, category, metadata);
+
+    // 重要度に応じた出力方法
+    switch (severity) {
+      case ERROR_SEVERITY.CRITICAL:
+        console.error(`🚨 CRITICAL ERROR [${context}]:`, JSON.stringify(errorInfo, null, 2));
+        break;
+      case ERROR_SEVERITY.HIGH:
+        console.error(`❌ HIGH SEVERITY [${context}]:`, JSON.stringify(errorInfo, null, 2));
+        break;
+      case ERROR_SEVERITY.MEDIUM:
+        console.warn(`⚠️ MEDIUM SEVERITY [${context}]:`, errorInfo.message, errorInfo.metadata);
+        break;
+      case ERROR_SEVERITY.LOW:
+        console.log(`ℹ️ LOW SEVERITY [${context}]:`, errorInfo.message);
+        break;
+    }
+
+    return errorInfo;
+  }
+
+  /**
+   * データベース操作エラーの処理
+   * @param {Error|string} error エラーオブジェクトまたはメッセージ
+   * @param {string} operation データベース操作の種類
+   * @param {Object} [operationDetails={}] 操作詳細
+   */
+  logDatabaseError(error, operation, operationDetails = {}) {
+    const dbMetadata = {
+      operation: operation,
+      ...operationDetails,
+      retryable: this._isRetryableError(error),
+      timestamp: new Date().toISOString(),
+    };
+
+    return this.logError(
+      error,
+      `database.${operation}`,
+      ERROR_SEVERITY.MEDIUM,
+      ERROR_CATEGORIES.DATABASE,
+      dbMetadata,
+    );
+  }
+
+  /**
+   * バリデーションエラーの処理
+   * @param {string} field バリデーション対象フィールド
+   * @param {string} value 入力値
+   * @param {string} rule バリデーションルール
+   * @param {string} message エラーメッセージ
+   */
+  logValidationError(field, value, rule, message) {
+    const validationMetadata = {
+      field: field,
+      value: typeof value === 'string' ? value.substring(0, 100) : String(value).substring(0, 100),
+      rule: rule,
+      timestamp: new Date().toISOString(),
+    };
+
+    return this.logError(
+      message,
+      `validation.${field}`,
+      ERROR_SEVERITY.LOW,
+      ERROR_CATEGORIES.VALIDATION,
+      validationMetadata,
+    );
+  }
+
+  /**
+   * エラー情報オブジェクトを構築
+   * @private
+   */
+  _buildErrorInfo(error, context, severity, category, metadata) {
+    const baseInfo = {
+      timestamp: new Date().toISOString(),
+      sessionId: this.sessionId,
+      errorId: Utilities.getUuid(),
+      context: context,
+      severity: severity,
+      category: category,
+      errorNumber: this.errorCount,
+      uptime: Date.now() - this.startTime,
+    };
+
+    if (error instanceof Error) {
+      return {
+        ...baseInfo,
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        metadata: metadata,
+      };
+    }
+
+    return {
+      ...baseInfo,
+      message: String(error),
+      metadata: metadata,
+    };
+  }
+
+  /**
+   * エラーがリトライ可能かどうかを判定
+   * @private
+   */
+  _isRetryableError(error) {
+    if (!error) return false;
+
+    const retryablePatterns = [
+      /timeout/i,
+      /rate limit/i,
+      /service unavailable/i,
+      /temporary/i,
+      /quota/i,
+    ];
+
+    const errorMessage = error.message || String(error);
+    return retryablePatterns.some(pattern => pattern.test(errorMessage));
+  }
+}
+
+// グローバルインスタンス
+const globalErrorHandler = new UnifiedErrorHandler();
+
+/**
+ * 便利な関数群 - グローバルエラーハンドラーのラッパー
+ */
+
+/**
+ * 一般的なエラーをログに記録
+ */
+function logError(error, context, severity, category, metadata) {
+  return globalErrorHandler.logError(error, context, severity, category, metadata);
+}
+
+/**
+ * データベースエラーをログに記録
+ */
+function logDatabaseError(error, operation, operationDetails) {
+  return globalErrorHandler.logDatabaseError(error, operation, operationDetails);
+}
+
+/**
+ * バリデーションエラーをログに記録
+ */
+function logValidationError(field, value, rule, message) {
+  return globalErrorHandler.logValidationError(field, value, rule, message);
+}
+
 // デバッグログ関数の定義（テスト環境対応）
 if (typeof debugLog === 'undefined') {
   function debugLog(message, ...args) {
     console.log('[DEBUG]', message, ...args);
   }
-}
-
-// Import standardized error handling functions
-if (typeof logError === 'undefined') {
-  throw new Error('errorHandler.gs must be loaded before Core.gs');
 }
 
 if (typeof warnLog === 'undefined') {
@@ -1767,83 +1961,6 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
   } catch (e) {
     logError(e, 'switchSheet', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId, sheetName });
     return { status: 'error', message: '表示シートの切り替えに失敗しました: ' + e.message };
-  }
-}
-
-// =================================================================
-// セットアップ関数
-// =================================================================
-
-/**
- * アプリケーションの初期セットアップ（管理者が手動で実行） (マルチテナント対応版)
- */
-function setupApplication(credsJson, dbId) {
-  try {
-    JSON.parse(credsJson);
-    if (typeof dbId !== 'string' || dbId.length !== 44) {
-      throw new Error('無効なスプレッドシートIDです。IDは44文字の文字列である必要があります。');
-    }
-
-    var props = PropertiesService.getScriptProperties();
-    props.setProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS, credsJson);
-    props.setProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID, dbId);
-
-    var adminEmail = Session.getEffectiveUser().getEmail();
-    if (adminEmail) {
-      props.setProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL, adminEmail);
-    }
-
-    // データベースシートの初期化
-    initializeDatabaseSheet(dbId);
-
-    infoLog('✅ セットアップが正常に完了しました。');
-    return { status: 'success', message: 'セットアップが正常に完了しました。' };
-  } catch (e) {
-    logError(e, 'customSetup', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { userId });
-    throw new Error('セットアップに失敗しました: ' + e.message);
-  }
-}
-
-/**
- * セットアップ状態をテストする (マルチテナント対応版)
- */
-function testSetup() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var creds = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
-
-    if (!dbId) {
-      return { status: 'error', message: 'データベーススプレッドシートIDが設定されていません。' };
-    }
-
-    if (!creds) {
-      return { status: 'error', message: 'サービスアカウント認証情報が設定されていません。' };
-    }
-
-    // データベースへの接続テスト
-    try {
-      var userInfo = findUserByEmail(Session.getActiveUser().getEmail());
-      return {
-        status: 'success',
-        message: 'セットアップは正常に完了しています。システムは使用準備が整いました。',
-        details: {
-          databaseConnected: true,
-          userCount: userInfo ? 'ユーザー登録済み' : '未登録',
-          serviceAccountConfigured: true
-        }
-      };
-    } catch (dbError) {
-      return {
-        status: 'warning',
-        message: '設定は保存されていますが、データベースアクセスに問題があります。',
-        details: { error: dbError.message }
-      };
-    }
-
-  } catch (e) {
-    logError(e, 'testCustomSetup', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
-    return { status: 'error', message: 'セットアップテストに失敗しました: ' + e.message };
   }
 }
 

@@ -2,7 +2,6 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('isDeployUser uses ADMIN_EMAIL property', () => {
-  const errorHandlerCode = fs.readFileSync('src/errorHandler.gs', 'utf8');
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
@@ -18,7 +17,6 @@ describe('isDeployUser uses ADMIN_EMAIL property', () => {
       console
     };
     vm.createContext(context);
-    vm.runInContext(errorHandlerCode, context);
     vm.runInContext(code, context);
   });
 
