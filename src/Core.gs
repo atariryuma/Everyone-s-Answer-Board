@@ -4868,6 +4868,7 @@ function customSetup(requestUserId, config) {
     debugLog('✅ CustomSetup: ステップ5完了 - 自動公開成功', publishResult);
 
     // ステップ5.5: 状態整合性のための設定更新
+    infoLog('🚀 CustomSetup: ステップ5.5開始チェック - データベース更新処理に入ります');
     try {
       debugLog('🧩 CustomSetup: 設定状態を更新中...');
       infoLog('📋 CustomSetup: データベース登録開始', {
@@ -4878,6 +4879,12 @@ function customSetup(requestUserId, config) {
       });
       
       var currentUser = findUserById(requestUserId);
+      infoLog('📋 CustomSetup: ユーザー情報取得結果', {
+        userId: requestUserId,
+        userFound: !!currentUser,
+        hasConfigJson: currentUser ? !!currentUser.configJson : false
+      });
+      
       if (currentUser) {
         infoLog('📋 CustomSetup: ユーザー情報取得成功、設定更新中...');
         var updatedConfigJson = JSON.parse(currentUser.configJson || '{}');
@@ -4904,8 +4911,6 @@ function customSetup(requestUserId, config) {
         const updateResult = updateUser(requestUserId, {
           spreadsheetId: formAndSsInfo.spreadsheetId,
           spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-          folderId: folder ? folder.getId() : '',
-          folderUrl: folder ? folder.getUrl() : '',
           configJson: JSON.stringify(updatedConfigJson),
           lastAccessedAt: new Date().toISOString()
         });
@@ -4945,9 +4950,15 @@ function customSetup(requestUserId, config) {
         } catch (verificationError) {
           warnLog('⚠️ データベース更新検証エラー:', verificationError.message);
         }
+      } else {
+        errorLog('❌ CustomSetup: ユーザー情報が見つかりません - データベース更新をスキップします', {
+          requestUserId: requestUserId
+        });
       }
     } catch (stateError) {
       errorLog('❌ CustomSetup状態更新エラー: ' + stateError.message);
+      errorLog('❌ CustomSetup状態更新エラー詳細: ', stateError.stack || stateError);
+      infoLog('⚠️ CustomSetup: ステップ5.5でエラーが発生しましたが処理を続行します');
     }
 
     // ステップ6: キャッシュクリアと最終化
