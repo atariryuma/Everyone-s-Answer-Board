@@ -1241,14 +1241,14 @@
   <!-- Core functions must be loaded first -->
   <?!= include('adminPanel-core.js'); ?>
   
-  <!-- API functions with TimingManager must be loaded early -->
-  <?!= include('adminPanel-api.js'); ?>
+  <!-- UI functions must be loaded before API functions -->
+  <?!= include('adminPanel-ui.js'); ?>
   
-  <!-- Status functions depend on API functions -->
+  <!-- Status functions depend on UI functions -->
   <?!= include('adminPanel-status.js'); ?>
   
-  <!-- UI functions depend on API and status functions -->
-  <?!= include('adminPanel-ui.js'); ?>
+  <!-- API functions depend on UI and status functions -->
+  <?!= include('adminPanel-api.js'); ?>
   
   <!-- Form controls need to be available before events -->
   <?!= include('adminPanel-forms.js'); ?>

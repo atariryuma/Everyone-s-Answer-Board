@@ -336,7 +336,11 @@
               }
             }, 500);
             
-            navigateToStep(3);
+            if (typeof navigateToStep === 'function') {
+              navigateToStep(3);
+            } else {
+              console.warn('⚠️ navigateToStep function not available');
+            }
             
             // 自動停止確認モーダルを表示（公開成功後）
             setTimeout(() => {
