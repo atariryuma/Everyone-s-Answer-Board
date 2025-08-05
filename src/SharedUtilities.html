@@ -603,19 +603,19 @@ class MessageManager {
     let topPosition = 'top-4'; // デフォルト位置
     
     if (adminHeader) {
-      // 管理パネルヘッダーがある場合 - より下に配置
-      topPosition = 'top-28';
+      // 管理パネルヘッダーがある場合
+      topPosition = 'top-20';
     } else if (header) {
       // 一般的なヘッダーがある場合
       const headerHeight = header.offsetHeight;
       if (headerHeight > 60) {
-        topPosition = 'top-32';
+        topPosition = 'top-24';
       } else {
-        topPosition = 'top-20';
+        topPosition = 'top-16';
       }
     }
     
-    return `fixed ${topPosition} right-4 z-50 space-y-2 max-w-md min-w-80`;
+    return `fixed ${topPosition} right-4 z-50 space-y-2 max-w-sm`;
   }
 
   show(message, type = 'info', duration = 5000) {
