@@ -618,37 +618,28 @@
               </div>
               
               <!-- 履歴テーブル -->
-              <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
-                <div class="flex items-center justify-between mb-3">
-                  <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <h4 class="text-sm font-medium text-blue-200">過去の設定から選択</h4>
-                  </div>
-                  <button type="button" id="clear-history-btn" class="text-xs text-red-400 hover:text-red-300 hover:underline">
+              <div class="border rounded p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="text-sm font-medium">過去の設定から選択</h4>
+                  <button type="button" id="clear-history-btn" class="text-xs text-red-500">
                     履歴をクリア
                   </button>
                 </div>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm table-fixed">
-                    <thead class="bg-gray-800">
-                      <tr>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300 w-32">公開日時</th>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300">問題文</th>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300 w-24">回答形式</th>
-                        <th class="px-3 py-2 text-left text-xs text-gray-300 w-16">回答数</th>
-                      </tr>
-                    </thead>
-                    <tbody id="history-table-body">
-                      <tr>
-                        <td colspan="4" class="px-3 py-4 text-center text-gray-400 text-sm">
-                          履歴がありません
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <table class="w-full text-sm border-collapse">
+                  <thead>
+                    <tr>
+                      <th class="border px-2 py-1 w-32 text-left">公開日時</th>
+                      <th class="border px-2 py-1 text-left">問題文</th>
+                      <th class="border px-2 py-1 w-24 text-left">回答形式</th>
+                      <th class="border px-2 py-1 w-16 text-left">回答数</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-table-body">
+                    <tr>
+                      <td class="border px-2 py-2 text-center" colspan="4">履歴がありません</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               
               <!-- Enhanced Sheet Selection Control -->
