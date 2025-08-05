@@ -1822,6 +1822,27 @@ function loadSavedClassChoices() {
 }
 
 // Create form with custom configuration
+/**
+ * QuickStartと同じ形式のフォームタイトルを生成する。
+ * @returns {string} フォームタイトル。
+ */
+function generateQuickstartFormTitle() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Tokyo'
+  });
+  const formatted = formatter.format(now);
+  const [datePart, timePart] = formatted.split(' ');
+  const [year, month, day] = datePart.split('/');
+  return `みんなの回答ボード ${year}年${month}月${day}日 ${timePart}`;
+}
+
 function createFormWithConfig() {
   const questionTextarea = document.getElementById('custom-main-question');
   const questionTypeSelect = document.getElementById('main-question-type');
@@ -1866,6 +1887,7 @@ function createFormWithConfig() {
     classChoices: classChoices,
     includeOthers: includeOthersOption,
     enableClass: enableClassSelection && classChoices.length > 0,
+    formTitle: generateQuickstartFormTitle(),
   };
   
   console.log('📋 カスタムフォーム設定準備完了');
