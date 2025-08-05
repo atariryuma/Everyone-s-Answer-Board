@@ -1055,19 +1055,10 @@ function processViewRequest(userInfo, params) {
     isCurrentlyPublished: isCurrentlyPublished
   });
 
-  // Redirect to access restricted page if not published
+  // Redirect to unpublished page if not published
   if (!isCurrentlyPublished) {
-    infoLog('🚫 Board is unpublished, redirecting to Access Restricted page');
-
-    const accessCheck = {
-      hasAccess: false,
-      isApplicationEnabled: true,
-      isSystemAdmin: false,
-      userEmail: Session.getActiveUser().getEmail(),
-      accessReason: 'Board is unpublished'
-    };
-
-    return showAccessRestrictedPage(accessCheck);
+    infoLog('🚫 Board is unpublished, redirecting to Unpublished page');
+    return renderUnpublishedPage(userInfo, params);
   }
 
   return renderAnswerBoard(userInfo, params);
