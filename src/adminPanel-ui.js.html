@@ -2253,7 +2253,7 @@ function getActiveResourceUrls(status) {
   // 4. フォームURLの取得 (configJsonから、公開シートを優先)
   const publishedSheetName = config.publishedSheetName;
   if (publishedSheetName) {
-    const sheetConfig = config[`sheet_${publishedSheetName}`];
+    const sheetConfig = config['sheet_' + publishedSheetName];
     if (sheetConfig) {
       urls.form = sheetConfig.formUrl || urls.form;
       urls.editForm = sheetConfig.editFormUrl || urls.editForm;
@@ -2942,7 +2942,7 @@ function syncGlobalColumnSettings(config) {
     return config; // シート名が不明な場合はスキップ
   }
   
-  const sheetConfigKey = `sheet_${config.publishedSheetName}`;
+  const sheetConfigKey = 'sheet_' + config.publishedSheetName;
   const sheetConfig = config[sheetConfigKey];
   
   if (sheetConfig && typeof sheetConfig === 'object') {
