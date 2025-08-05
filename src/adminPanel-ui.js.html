@@ -2525,16 +2525,22 @@ function loadSimpleHistoryTable() {
   
   // テーブルをクリア
   tableBody.innerHTML = '';
-
+  
   if (history.length === 0) {
+    // 履歴が空の場合
     const emptyRow = document.createElement('tr');
-    emptyRow.innerHTML = '<td colspan="4" style="text-align:center; padding:8px;">履歴がありません</td>';
+    emptyRow.innerHTML = `
+      <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
+        履歴がありません
+      </td>
+    `;
     tableBody.appendChild(emptyRow);
     return;
   }
-
-  history.forEach((item) => {
-    const row = createHistoryTableRow(item);
+  
+  // 履歴アイテムをテーブル行として表示
+  history.forEach((item, index) => {
+    const row = createHistoryTableRow(item, index);
     tableBody.appendChild(row);
   });
 }
@@ -2542,13 +2548,20 @@ function loadSimpleHistoryTable() {
 /**
  * 履歴テーブル行を作成
  * @param {Object} item - 履歴アイテム
+ * @param {number} index - インデックス
  * @returns {HTMLElement} テーブル行要素
  */
-function createHistoryTableRow(item) {
+function createHistoryTableRow(item, index) {
   const row = document.createElement('tr');
-
-  row.addEventListener('click', () => selectHistoryItem(item.id));
-
+  
+  // 公開中の項目は緑色のハイライト
+  const isActive = !!item.isActive;
+  row.className = isActive 
+    ? 'hover:bg-green-700/20 cursor-pointer transition-colors bg-green-900/10' 
+    : 'hover:bg-gray-700/30 cursor-pointer transition-colors';
+  
+  row.onclick = () => selectHistoryItem(item.id);
+  
   const formatDateTime = (dateString) => {
     if (!dateString) return '未設定';
     const date = new Date(dateString);
@@ -2560,31 +2573,38 @@ function createHistoryTableRow(item) {
       minute: '2-digit'
     });
   };
-
-  const getAnswerFormatDisplay = (data) => {
-    if (data.config) {
-      const config = data.config;
+  
+  // 回答形式の表示ロジック
+  const getAnswerFormatDisplay = (item) => {
+    // configから回答形式を判定
+    if (item.config) {
+      const config = item.config;
       if (config.showNames && config.showCounts) {
-        return '名前・数';
+        return `<span class="text-blue-400">名前・数</span>`;
+      } else if (config.showNames) {
+        return `<span class="text-green-400">名前表示</span>`;
+      } else if (config.showCounts) {
+        return `<span class="text-purple-400">数表示</span>`;
+      } else {
+        return `<span class="text-gray-400">標準</span>`;
       }
-      if (config.showNames) {
-        return '名前表示';
-      }
-      if (config.showCounts) {
-        return '数表示';
-      }
-      return '標準';
     }
-    return '不明';
+    // configがない古いデータの場合
+    return `<span class="text-gray-500">不明</span>`;
   };
-
+  
+  // 活動状況インジケーター
+  const statusIndicator = isActive 
+    ? `<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse inline-block mr-2"></div>`
+    : `<div class="w-2 h-2 bg-gray-500 rounded-full inline-block mr-2"></div>`;
+  
   row.innerHTML = `
-    <td class="border px-2 py-1">${formatDateTime(item.publishedAt)}</td>
-    <td class="border px-2 py-1">${escapeHtml(item.questionText)}</td>
-    <td class="border px-2 py-1">${getAnswerFormatDisplay(item)}</td>
-    <td class="border px-2 py-1 text-center">${item.answerCount || 0}</td>
+    <td class="px-3 py-2 text-xs text-gray-300">${statusIndicator}${formatDateTime(item.publishedAt)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${escapeHtml(item.questionText)}">${escapeHtml(item.questionText)}</td>
+    <td class="px-3 py-2 text-xs text-center">${getAnswerFormatDisplay(item)}</td>
+    <td class="px-3 py-2 text-xs text-center ${isActive ? 'text-green-400 font-medium' : 'text-gray-300'}">${item.answerCount || 0}</td>
   `;
-
+  
   return row;
 }
 
