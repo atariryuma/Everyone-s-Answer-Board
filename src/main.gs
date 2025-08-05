@@ -867,7 +867,7 @@ function initializeRequestProcessing() {
   const accessCheck = checkApplicationAccess();
   if (!accessCheck.hasAccess) {
     infoLog('アプリケーションアクセス拒否:', accessCheck.accessReason);
-    return showAccessRestrictedPage(accessCheck);
+    return showErrorPage('アクセスが制限されています', 'アプリケーションは現在利用できません。管理者にお問い合わせください。');
   }
 
   return null; // Continue processing
@@ -1383,48 +1383,6 @@ function showErrorPage(title, message, error) {
   return htmlOutput;
 }
 
-/**
- * アクセス制限ページを表示
- * @param {object} accessCheck - アクセスチェック結果
- * @returns {HtmlOutput}
- */
-function showAccessRestrictedPage(accessCheck) {
-  try {
-    const template = HtmlService.createTemplateFromFile('AccessRestricted');
-    template.include = include;
-    template.accessCheck = accessCheck;
-    template.isSystemAdmin = accessCheck.isSystemAdmin || false;
-    template.userEmail = accessCheck.userEmail || '';
-    template.timestamp = new Date().toISOString();
-
-    const htmlOutput = template.evaluate()
-      .setTitle('アクセス制限 - StudyQuest');
-
-    // XFrameOptionsMode を安全に設定
-    try {
-      if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
-        htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-      }
-    } catch (e) {
-      warnLog('XFrameOptionsMode設定エラー:', e.message);
-    }
-
-    return htmlOutput;
-  } catch (error) {
-    logError(error, 'showAccessRestrictedPage', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
-    // フォールバック: シンプルなHTMLを返す
-    return HtmlService.createHtmlOutput(`
-      <html>
-        <head><title>アクセス制限</title></head>
-        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-          <h1>アクセスが制限されています</h1>
-          <p>このアプリケーションは現在利用できません。</p>
-          <p>管理者にお問い合わせください。</p>
-        </body>
-      </html>
-    `).setTitle('アクセス制限');
-  }
-}
 
 /**
  * ユーザー専用の一意の管理パネルURLを構築
@@ -1848,8 +1806,8 @@ function renderUnpublishedPage(userInfo, params) {
 
   } catch (error) {
     logError(error, 'renderUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
-    // フォールバック: 基本的なエラーページ
-    return showErrorPage('準備中', 'ボードの準備が完了していません。管理者にお問い合わせください。');
+    // フォールバック: ErrorBoundary.htmlを回避して確実にUnpublishedページを表示
+    return renderMinimalUnpublishedPage(userInfo);
   }
 }
 
