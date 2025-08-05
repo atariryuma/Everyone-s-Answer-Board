@@ -1455,71 +1455,94 @@ class SharedModals {
     const modal = document.getElementById('custom-setup-selection-modal');
     if (!modal) {
       console.error('カスタムセットアップ選択モーダルが見つかりません');
+      if (onCancel) onCancel();
       return;
     }
     
+    console.log('🎨 カスタムセットアップ選択モーダルを表示');
     modal.classList.remove('hidden');
     
-    // ラジオボタンとボタン要素の取得
-    let stopOption = document.getElementById('custom-stop-option');
-    let continueOption = document.getElementById('custom-continue-option');
-    let confirmBtn = document.getElementById('custom-setup-confirm-btn');
-    let cancelBtn = document.getElementById('custom-setup-cancel-btn');
-
-    let selectedOption = null;
-
-    // 既存のイベントハンドラーをクリア
-    if (confirmBtn) {
-      const newConfirmBtn = confirmBtn.cloneNode(true);
-      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-      confirmBtn = newConfirmBtn;
-    }
-
-    if (cancelBtn) {
-      const newCancelBtn = cancelBtn.cloneNode(true);
-      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-      cancelBtn = newCancelBtn;
-    }
-
-    if (stopOption && continueOption) {
-      const newStopOption = stopOption.cloneNode(true);
-      const newContinueOption = continueOption.cloneNode(true);
-      stopOption.parentNode.replaceChild(newStopOption, stopOption);
-      continueOption.parentNode.replaceChild(newContinueOption, continueOption);
-      stopOption = newStopOption;
-      continueOption = newContinueOption;
-    }
-
+    // 要素の取得
+    const stopOption = document.getElementById('custom-stop-option');
+    const continueOption = document.getElementById('custom-continue-option');
+    const confirmBtn = document.getElementById('custom-setup-confirm-btn');
+    const cancelBtn = document.getElementById('custom-setup-cancel-btn');
     const stopRadio = document.getElementById('custom-stop-radio');
     const continueRadio = document.getElementById('custom-continue-radio');
 
-    if (stopOption) {
-      stopOption.addEventListener('click', () => {
+    // 選択状態をリセット
+    let selectedOption = null;
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (stopRadio) stopRadio.classList.add('hidden');
+    if (continueRadio) continueRadio.classList.add('hidden');
+
+    // 既存のイベントリスナーを削除（簡素化）
+    const newStopOption = stopOption?.cloneNode(true);
+    const newContinueOption = continueOption?.cloneNode(true);
+    const newConfirmBtn = confirmBtn?.cloneNode(true);
+    const newCancelBtn = cancelBtn?.cloneNode(true);
+
+    if (newStopOption && stopOption) {
+      stopOption.parentNode.replaceChild(newStopOption, stopOption);
+    }
+    if (newContinueOption && continueOption) {
+      continueOption.parentNode.replaceChild(newContinueOption, continueOption);
+    }
+    if (newConfirmBtn && confirmBtn) {
+      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    }
+    if (newCancelBtn && cancelBtn) {
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    }
+
+    // 停止オプションのイベント設定
+    if (newStopOption) {
+      newStopOption.addEventListener('click', () => {
+        console.log('🛑 停止オプションが選択されました');
         selectedOption = 'stop';
-        stopRadio?.classList.remove('hidden');
-        continueRadio?.classList.add('hidden');
-        if (confirmBtn) confirmBtn.disabled = false;
+        const currentStopRadio = document.getElementById('custom-stop-radio');
+        const currentContinueRadio = document.getElementById('custom-continue-radio');
+        const currentConfirmBtn = document.getElementById('custom-setup-confirm-btn');
+        
+        if (currentStopRadio) currentStopRadio.classList.remove('hidden');
+        if (currentContinueRadio) currentContinueRadio.classList.add('hidden');
+        if (currentConfirmBtn) currentConfirmBtn.disabled = false;
       });
     }
 
-    if (continueOption) {
-      continueOption.addEventListener('click', () => {
+    // 継続オプションのイベント設定
+    if (newContinueOption) {
+      newContinueOption.addEventListener('click', () => {
+        console.log('▶️ 継続オプションが選択されました');
         selectedOption = 'continue';
-        continueRadio?.classList.remove('hidden');
-        stopRadio?.classList.add('hidden');
-        if (confirmBtn) confirmBtn.disabled = false;
+        const currentStopRadio = document.getElementById('custom-stop-radio');
+        const currentContinueRadio = document.getElementById('custom-continue-radio');
+        const currentConfirmBtn = document.getElementById('custom-setup-confirm-btn');
+        
+        if (currentContinueRadio) currentContinueRadio.classList.remove('hidden');
+        if (currentStopRadio) currentStopRadio.classList.add('hidden');
+        if (currentConfirmBtn) currentConfirmBtn.disabled = false;
       });
     }
 
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', () => {
+    // 確認ボタンのイベント設定
+    if (newConfirmBtn) {
+      newConfirmBtn.addEventListener('click', () => {
+        console.log('✅ カスタムセットアップ確認ボタンがクリックされました - 選択:', selectedOption);
         this.hideModal('custom-setup-selection-modal');
-        if (onConfirm) onConfirm(selectedOption);
+        if (onConfirm && selectedOption) {
+          onConfirm(selectedOption);
+        } else {
+          console.warn('⚠️ 選択肢が未選択です');
+          if (onCancel) onCancel();
+        }
       });
     }
 
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => {
+    // キャンセルボタンのイベント設定
+    if (newCancelBtn) {
+      newCancelBtn.addEventListener('click', () => {
+        console.log('❌ カスタムセットアップがキャンセルされました');
         this.hideModal('custom-setup-selection-modal');
         if (onCancel) onCancel();
       });
