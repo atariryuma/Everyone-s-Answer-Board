@@ -4870,8 +4870,16 @@ function customSetup(requestUserId, config) {
     // ステップ5.5: 状態整合性のための設定更新
     try {
       debugLog('🧩 CustomSetup: 設定状態を更新中...');
+      infoLog('📋 CustomSetup: データベース登録開始', {
+        requestUserId: requestUserId,
+        formId: formAndSsInfo.formId,
+        spreadsheetId: formAndSsInfo.spreadsheetId,
+        sheetName: formAndSsInfo.sheetName
+      });
+      
       var currentUser = findUserById(requestUserId);
       if (currentUser) {
+        infoLog('📋 CustomSetup: ユーザー情報取得成功、設定更新中...');
         var updatedConfigJson = JSON.parse(currentUser.configJson || '{}');
         updatedConfigJson.formCreated = true;
         updatedConfigJson.formUrl = formAndSsInfo.formUrl;
@@ -4884,6 +4892,15 @@ function customSetup(requestUserId, config) {
         updatedConfigJson.appPublished = publishResult && publishResult.success && publishResult.published;
         updatedConfigJson.lastModified = new Date().toISOString();
 
+        infoLog('📋 CustomSetup: updateUser実行前の状態', {
+          spreadsheetId: formAndSsInfo.spreadsheetId,
+          spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+          formUrl: formAndSsInfo.formUrl,
+          editFormUrl: formAndSsInfo.editFormUrl,
+          folderId: folder ? folder.getId() : 'none',
+          configJsonKeys: Object.keys(updatedConfigJson)
+        });
+
         const updateResult = updateUser(requestUserId, {
           spreadsheetId: formAndSsInfo.spreadsheetId,
           spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
@@ -4893,14 +4910,25 @@ function customSetup(requestUserId, config) {
           lastAccessedAt: new Date().toISOString()
         });
         
+        infoLog('📋 CustomSetup: updateUser実行結果', {
+          status: updateResult.status,
+          message: updateResult.message || 'success'
+        });
+        
         if (updateResult.status !== 'success') {
           throw new Error('カスタムセットアップ情報のデータベース保存に失敗: ' + updateResult.message);
         }
         
         infoLog('✅ カスタムセットアップ完了: フォーム・スプレッドシート情報をデータベースに保存しました', {
+          userId: requestUserId,
           spreadsheetId: formAndSsInfo.spreadsheetId,
+          spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
           formId: formAndSsInfo.formId,
-          folderId: folder ? folder.getId() : 'none'
+          formUrl: formAndSsInfo.formUrl,
+          editFormUrl: formAndSsInfo.editFormUrl,
+          folderId: folder ? folder.getId() : 'none',
+          folderUrl: folder ? folder.getUrl() : 'none',
+          sheetName: formAndSsInfo.sheetName
         });
         
         // データベース更新の検証

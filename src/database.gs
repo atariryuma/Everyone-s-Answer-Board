@@ -982,6 +982,17 @@ function updateUser(userId, updateData) {
   }
 
   try {
+    // カスタムセットアップ関連の更新の場合の詳細ログ
+    if (updateData.spreadsheetId || updateData.folderId || (updateData.configJson && updateData.configJson.includes('formCreated'))) {
+      infoLog('📋 updateUser: カスタムセットアップ関連の更新を開始', {
+        userId: userId,
+        hasSpreadsheetId: !!updateData.spreadsheetId,
+        hasFolderId: !!updateData.folderId,
+        hasConfigJson: !!updateData.configJson,
+        updateFields: Object.keys(updateData)
+      });
+    }
+    
     const props = PropertiesService.getScriptProperties();
     const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
@@ -1111,6 +1122,16 @@ function updateUser(userId, updateData) {
 
     // クリティカル更新時の包括的キャッシュ同期
     synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId);
+
+    // カスタムセットアップ関連の更新の場合の完了ログ
+    if (updateData.spreadsheetId || updateData.folderId || (updateData.configJson && updateData.configJson.includes('formCreated'))) {
+      infoLog('✅ updateUser: カスタムセットアップ関連の更新が完了しました', {
+        userId: userId,
+        spreadsheetId: updateData.spreadsheetId || 'unchanged',
+        folderId: updateData.folderId || 'unchanged',
+        hasConfigJson: !!updateData.configJson
+      });
+    }
 
     return { status: 'success', message: 'ユーザープロフィールが正常に更新されました' };
   } catch (error) {
