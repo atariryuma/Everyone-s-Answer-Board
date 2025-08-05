@@ -1765,7 +1765,15 @@ function renderUnpublishedPage(userInfo, params) {
   try {
     debugLog('🚫 renderUnpublishedPage: Rendering unpublished page for userId:', userInfo.userId);
 
-    const template = HtmlService.createTemplateFromFile('Unpublished');
+    let template;
+    try {
+      template = HtmlService.createTemplateFromFile('Unpublished');
+      debugLog('✅ renderUnpublishedPage: Template created successfully');
+    } catch (templateError) {
+      console.error('❌ renderUnpublishedPage: Template creation failed:', templateError);
+      throw new Error('Unpublished.htmlテンプレートの読み込みに失敗: ' + templateError.message);
+    }
+    
     template.include = include;
 
     // 基本情報の設定（安全なデフォルト値付き）
@@ -1938,45 +1946,246 @@ function renderMinimalUnpublishedPage(userInfo) {
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <title>StudyQuest - 準備中</title>
           <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 20px; background: #1a1a1a; color: white; text-align: center; }
-              .container { max-width: 600px; margin: 50px auto; padding: 40px 20px; background: #2a2a2a; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-              .status { font-size: 28px; margin-bottom: 20px; color: #fbbf24; }
-              .message { font-size: 18px; margin-bottom: 30px; color: #9ca3af; line-height: 1.5; }
-              .admin-btn { display: inline-block; padding: 14px 28px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; margin: 10px; font-weight: 500; transition: all 0.3s; }
-              .admin-btn:hover { background: #2563eb; transform: translateY(-2px); }
-              .republish-btn { background: #10b981; }
-              .republish-btn:hover { background: #059669; }
-              .info { margin-top: 20px; font-size: 14px; color: #6b7280; }
-              .error-note { margin-top: 30px; padding: 15px; background: #dc2626; border-radius: 8px; color: white; font-size: 14px; }
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body {
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                  min-height: 100vh;
+                  color: #ffffff;
+                  line-height: 1.6;
+                  overflow-x: hidden;
+              }
+              .background-overlay {
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 100%;
+                  background: 
+                      radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                      radial-gradient(circle at 80% 20%, rgba(255, 183, 77, 0.3) 0%, transparent 50%),
+                      radial-gradient(circle at 40% 40%, rgba(120, 119, 198, 0.2) 0%, transparent 50%);
+                  z-index: -1;
+              }
+              .main-container {
+                  min-height: 100vh;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  padding: 20px;
+                  position: relative;
+              }
+              .content-card {
+                  background: rgba(255, 255, 255, 0.95);
+                  backdrop-filter: blur(20px);
+                  border-radius: 24px;
+                  box-shadow: 
+                      0 25px 50px -12px rgba(0, 0, 0, 0.25),
+                      0 0 0 1px rgba(255, 255, 255, 0.1);
+                  max-width: 600px;
+                  width: 100%;
+                  padding: 40px;
+                  text-align: center;
+                  color: #374151;
+                  position: relative;
+                  overflow: hidden;
+              }
+              .content-card::before {
+                  content: '';
+                  position: absolute;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  height: 4px;
+                  background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+                  background-size: 200% 100%;
+                  animation: shimmer 3s ease-in-out infinite;
+              }
+              @keyframes shimmer {
+                  0%, 100% { background-position: 200% 0; }
+                  50% { background-position: -200% 0; }
+              }
+              .status-icon {
+                  width: 80px;
+                  height: 80px;
+                  margin: 0 auto 24px;
+                  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 36px;
+                  animation: pulse 2s infinite;
+                  box-shadow: 0 10px 30px rgba(251, 191, 36, 0.3);
+              }
+              @keyframes pulse {
+                  0%, 100% { transform: scale(1); }
+                  50% { transform: scale(1.05); }
+              }
+              .status-title {
+                  font-size: 32px;
+                  font-weight: 700;
+                  color: #1f2937;
+                  margin-bottom: 16px;
+                  background: linear-gradient(135deg, #667eea, #764ba2);
+                  -webkit-background-clip: text;
+                  -webkit-text-fill-color: transparent;
+                  background-clip: text;
+              }
+              .status-message {
+                  font-size: 18px;
+                  color: #6b7280;
+                  margin-bottom: 40px;
+                  line-height: 1.7;
+              }
+              .button-group {
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 16px;
+                  justify-content: center;
+                  margin-bottom: 32px;
+              }
+              .btn {
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  padding: 14px 28px;
+                  border: none;
+                  border-radius: 12px;
+                  font-size: 16px;
+                  font-weight: 600;
+                  text-decoration: none;
+                  cursor: pointer;
+                  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                  position: relative;
+                  overflow: hidden;
+              }
+              .btn::before {
+                  content: '';
+                  position: absolute;
+                  top: 0;
+                  left: -100%;
+                  width: 100%;
+                  height: 100%;
+                  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                  transition: left 0.5s;
+              }
+              .btn:hover::before {
+                  left: 100%;
+              }
+              .btn-primary {
+                  background: linear-gradient(135deg, #10b981, #059669);
+                  color: white;
+                  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+              }
+              .btn-primary:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+              }
+              .btn-secondary {
+                  background: linear-gradient(135deg, #3b82f6, #2563eb);
+                  color: white;
+                  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+              }
+              .btn-secondary:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+              }
+              .btn-tertiary {
+                  background: linear-gradient(135deg, #6b7280, #4b5563);
+                  color: white;
+                  box-shadow: 0 4px 14px rgba(107, 114, 128, 0.3);
+              }
+              .btn-tertiary:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 8px 25px rgba(107, 114, 128, 0.4);
+              }
+              .info-section {
+                  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+                  border: 1px solid rgba(99, 102, 241, 0.2);
+                  border-radius: 16px;
+                  padding: 24px;
+                  margin-bottom: 24px;
+              }
+              .info-title {
+                  font-size: 14px;
+                  font-weight: 600;
+                  color: #6366f1;
+                  margin-bottom: 8px;
+              }
+              .info-detail {
+                  font-size: 14px;
+                  color: #6b7280;
+              }
+              .error-notice {
+                  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1));
+                  border: 1px solid rgba(239, 68, 68, 0.3);
+                  border-radius: 16px;
+                  padding: 20px;
+                  margin-top: 24px;
+              }
+              .error-notice-title {
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: #dc2626;
+                  margin-bottom: 8px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+              }
+              .error-notice-text {
+                  font-size: 14px;
+                  color: #7f1d1d;
+                  line-height: 1.6;
+              }
+              @media (max-width: 640px) {
+                  .content-card { padding: 24px; margin: 16px; }
+                  .status-title { font-size: 24px; }
+                  .status-message { font-size: 16px; }
+                  .button-group { flex-direction: column; }
+                  .btn { width: 100%; justify-content: center; }
+              }
           </style>
       </head>
       <body>
-          <div class="container">
-              <div class="status">⏳ 回答ボード準備中</div>
-              <div class="message">
-                  現在、回答ボードは非公開になっています<br>
-                  管理者として以下の操作が可能です
-              </div>
-              
-              <div>
-                  <button onclick="republishBoard()" class="admin-btn republish-btn">
-                      🔄 回答ボードを再公開
-                  </button>
-                  <a href="?mode=admin&userId=${encodeURIComponent(userId)}" class="admin-btn">
-                      ⚙️ 管理パネルを開く
-                  </a>
-                  <button onclick="location.reload()" class="admin-btn">
-                      🔄 ページを更新
-                  </button>
-              </div>
-              
-              <div class="info">
-                  管理者: ${adminEmail || 'システム管理者'}<br>
-                  ユーザーID: ${userId || '不明'}
-              </div>
-              
-              <div class="error-note">
-                  ⚠️ テンプレートの読み込みでエラーが発生しました。基本機能のみ表示しています。
+          <div class="background-overlay"></div>
+          <div class="main-container">
+              <div class="content-card">
+                  <div class="status-icon">⏳</div>
+                  <h1 class="status-title">回答ボード準備中</h1>
+                  <p class="status-message">
+                      現在、回答ボードは非公開になっています。<br>
+                      管理者として以下の操作が可能です。
+                  </p>
+                  
+                  <div class="button-group">
+                      <button onclick="republishBoard()" class="btn btn-primary">
+                          🔄 回答ボードを再公開
+                      </button>
+                      <a href="?mode=admin&userId=${encodeURIComponent(userId)}" class="btn btn-secondary">
+                          ⚙️ 管理パネルを開く
+                      </a>
+                      <button onclick="location.reload()" class="btn btn-tertiary">
+                          🔄 ページを更新
+                      </button>
+                  </div>
+                  
+                  <div class="info-section">
+                      <div class="info-title">管理者情報</div>
+                      <div class="info-detail">
+                          管理者: ${adminEmail || 'システム管理者'}<br>
+                          ユーザーID: ${userId || '不明'}
+                      </div>
+                  </div>
+                  
+                  <div class="error-notice">
+                      <div class="error-notice-title">
+                          ⚠️ システム情報
+                      </div>
+                      <div class="error-notice-text">
+                          テンプレートの読み込みでエラーが発生したため、基本機能のみ表示しています。すべての管理機能は正常に動作します。
+                      </div>
+                  </div>
               </div>
           </div>
           
