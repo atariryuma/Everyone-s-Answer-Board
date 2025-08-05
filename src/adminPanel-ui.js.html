@@ -5,6 +5,20 @@ let lastSelectedSheetName = null; // To prevent redundant sheet selection change
 let isUIUpdateInProgress = false;
 let pendingUIUpdate = null;
 
+// =============================================================================
+// EARLY FUNCTION DEFINITIONS (Critical functions that must be available immediately)
+// =============================================================================
+
+// Define critical functions early and register them globally
+if (typeof window !== 'undefined') {
+  // Placeholder functions that will be properly defined later
+  window.showFormConfigModal = window.showFormConfigModal || function() { console.warn('showFormConfigModal not yet loaded'); };
+  window.hideFormConfigModal = window.hideFormConfigModal || function() { console.warn('hideFormConfigModal not yet loaded'); };
+  window.toggleSection = window.toggleSection || function() { console.warn('toggleSection not yet loaded'); };
+  window.navigateToStep = window.navigateToStep || function() { console.warn('navigateToStep not yet loaded'); };
+  window.updateUIWithNewStatus = window.updateUIWithNewStatus || function() { console.warn('updateUIWithNewStatus not yet loaded'); };
+}
+
 
 // =============================================================================
 // ADMIN PANEL UI UPDATES & DISPLAY CONTROL
@@ -151,7 +165,7 @@ function updateUIWithNewStatus(status) {
   }
 }
 
-// Ensure function is globally accessible
+// Override placeholder with actual function
 if (typeof window !== 'undefined') {
   window.updateUIWithNewStatus = updateUIWithNewStatus;
 }
@@ -1340,7 +1354,7 @@ function toggleSection(sectionId) {
   }
 }
 
-// Ensure function is globally accessible
+// Override placeholder with actual function
 if (typeof window !== 'undefined') {
   window.toggleSection = toggleSection;
 }
@@ -1474,7 +1488,7 @@ function showFormConfigModal() {
   }
 }
 
-// Ensure function is globally accessible
+// Override placeholder with actual function
 if (typeof window !== 'undefined') {
   window.showFormConfigModal = showFormConfigModal;
 }
@@ -1495,7 +1509,7 @@ function hideFormConfigModal() {
   }
 }
 
-// Ensure function is globally accessible
+// Override placeholder with actual function
 if (typeof window !== 'undefined') {
   window.hideFormConfigModal = hideFormConfigModal;
 }
@@ -2266,7 +2280,7 @@ function getActiveResourceUrls(status) {
   
   // フォルダURLが設定されていない場合、folderIdから構築を試行
   if (!urls.folder && config.folderId) {
-    urls.folder = `https://drive.google.com/drive/folders/${config.folderId}`;
+    urls.folder = `https://drive.google.com/drive/folders/${config.folderId || ''}`;
     console.log('📁 Folder URL constructed from folderId:', urls.folder);
   }
 
@@ -2384,7 +2398,7 @@ function navigateToStep(step) {
   validateCurrentStep();
 }
 
-// Ensure function is globally accessible
+// Override placeholder with actual function
 if (typeof window !== 'undefined') {
   window.navigateToStep = navigateToStep;
 }
@@ -3203,12 +3217,12 @@ function updateNewResourceButtons(resourceUrls) {
     // configJsonから直接取得を試行
     const config = window.configJson || window.AdminPanel?.status?.config;
     if (config) {
-      folderUrl = config.folderUrl || config.folderId && `https://drive.google.com/drive/folders/${config.folderId}`;
+      folderUrl = config.folderUrl || config.folderId && `https://drive.google.com/drive/folders/${config.folderId || ''}`;
     }
     
     // フォルダIDから直接URLを構築
     if (!folderUrl && config?.folderId) {
-      folderUrl = `https://drive.google.com/drive/folders/${config.folderId}`;
+      folderUrl = `https://drive.google.com/drive/folders/${config.folderId || ''}`;
       console.log('📁 Folder URL constructed from folderId:', folderUrl);
     }
   }
