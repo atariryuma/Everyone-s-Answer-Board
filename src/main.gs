@@ -1363,6 +1363,23 @@ function showErrorPage(title, message, error) {
   template.title = title;
   template.message = message;
   template.mode = 'admin'; // エラーテンプレートが依存するmode変数にデフォルト値を提供
+  
+  // 現在のユーザーがデータベースに登録されているかチェック
+  let isRegisteredUser = false;
+  let currentUserEmail = '';
+  try {
+    currentUserEmail = getCurrentUserEmail();
+    if (currentUserEmail) {
+      const userInfo = findUserByEmail(currentUserEmail);
+      isRegisteredUser = !!userInfo;
+    }
+  } catch (e) {
+    console.warn('⚠️ showErrorPage: ユーザー登録状態の確認でエラー:', e);
+  }
+  
+  template.isRegisteredUser = isRegisteredUser;
+  template.userEmail = currentUserEmail;
+  
   if (DEBUG && error) {
     template.debugInfo = error.stack;
   } else {
@@ -1805,7 +1822,18 @@ function renderUnpublishedPage(userInfo, params) {
     return htmlOutput;
 
   } catch (error) {
-    logError(error, 'renderUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'renderUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, {
+      userId: userInfo ? userInfo.userId : 'null',
+      hasUserInfo: !!userInfo,
+      errorMessage: error.message,
+      errorStack: error.stack
+    });
+    console.error('🚨 renderUnpublishedPage error details:', {
+      error: error,
+      userInfo: userInfo,
+      userId: userInfo ? userInfo.userId : 'N/A',
+      adminEmail: userInfo ? userInfo.adminEmail : 'N/A'
+    });
     // フォールバック: ErrorBoundary.htmlを回避して確実にUnpublishedページを表示
     return renderMinimalUnpublishedPage(userInfo);
   }
@@ -1820,9 +1848,15 @@ function renderUnpublishedPage(userInfo, params) {
 function renderMinimalUnpublishedPage(userInfo) {
   try {
     debugLog('🚫 renderMinimalUnpublishedPage: Creating minimal unpublished page');
+    
+    // 安全にuserInfoを処理
+    if (!userInfo) {
+      console.warn('⚠️ renderMinimalUnpublishedPage: userInfo is null/undefined');
+      userInfo = { userId: '', adminEmail: '' };
+    }
 
-    const userId = userInfo.userId || '';
-    const adminEmail = userInfo.adminEmail || '';
+    const userId = (userInfo.userId && typeof userInfo.userId === 'string') ? userInfo.userId : '';
+    const adminEmail = (userInfo.adminEmail && typeof userInfo.adminEmail === 'string') ? userInfo.adminEmail : '';
 
     // 直接HTMLを生成（テンプレートを使わない）
     const htmlContent = `
@@ -1858,10 +1892,109 @@ function renderMinimalUnpublishedPage(userInfo) {
       .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
 
   } catch (error) {
-    logError(error, 'renderMinimalUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
-    // 最終フォールバック
-    return HtmlService.createHtmlOutput('<h1>準備中</h1><p>回答ボードは現在準備中です。</p>')
-      .setTitle('準備中');
+    logError(error, 'renderMinimalUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, {
+      userId: userInfo ? userInfo.userId : 'null',
+      hasUserInfo: !!userInfo,
+      errorMessage: error.message,
+      errorStack: error.stack
+    });
+    console.error('🚨 renderMinimalUnpublishedPage error details:', {
+      error: error,
+      userInfo: userInfo,
+      userId: userInfo ? userInfo.userId : 'N/A',
+      adminEmail: userInfo ? userInfo.adminEmail : 'N/A'
+    });
+    // 最終フォールバック: 管理者向け機能付き
+    const userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
+    const adminEmail = (userInfo && userInfo.adminEmail) ? userInfo.adminEmail : '';
+    
+    const finalFallbackHtml = `
+      <!DOCTYPE html>
+      <html lang="ja">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>StudyQuest - 準備中</title>
+          <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 20px; background: #1a1a1a; color: white; text-align: center; }
+              .container { max-width: 600px; margin: 50px auto; padding: 40px 20px; background: #2a2a2a; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+              .status { font-size: 28px; margin-bottom: 20px; color: #fbbf24; }
+              .message { font-size: 18px; margin-bottom: 30px; color: #9ca3af; line-height: 1.5; }
+              .admin-btn { display: inline-block; padding: 14px 28px; background: #3b82f6; color: white; text-decoration: none; border-radius: 8px; margin: 10px; font-weight: 500; transition: all 0.3s; }
+              .admin-btn:hover { background: #2563eb; transform: translateY(-2px); }
+              .republish-btn { background: #10b981; }
+              .republish-btn:hover { background: #059669; }
+              .info { margin-top: 20px; font-size: 14px; color: #6b7280; }
+              .error-note { margin-top: 30px; padding: 15px; background: #dc2626; border-radius: 8px; color: white; font-size: 14px; }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <div class="status">⏳ 回答ボード準備中</div>
+              <div class="message">
+                  現在、回答ボードは非公開になっています<br>
+                  管理者として以下の操作が可能です
+              </div>
+              
+              <div>
+                  <button onclick="republishBoard()" class="admin-btn republish-btn">
+                      🔄 回答ボードを再公開
+                  </button>
+                  <a href="?mode=admin&userId=${encodeURIComponent(userId)}" class="admin-btn">
+                      ⚙️ 管理パネルを開く
+                  </a>
+                  <button onclick="location.reload()" class="admin-btn">
+                      🔄 ページを更新
+                  </button>
+              </div>
+              
+              <div class="info">
+                  管理者: ${adminEmail || 'システム管理者'}<br>
+                  ユーザーID: ${userId || '不明'}
+              </div>
+              
+              <div class="error-note">
+                  ⚠️ テンプレートの読み込みでエラーが発生しました。基本機能のみ表示しています。
+              </div>
+          </div>
+          
+          <script>
+              function republishBoard() {
+                  if (!confirm('回答ボードを再公開しますか？')) return;
+                  
+                  const button = event.target;
+                  button.disabled = true;
+                  button.textContent = '再公開中...';
+                  
+                  try {
+                      google.script.run
+                          .withSuccessHandler((result) => {
+                              alert('再公開が完了しました！ページを更新します。');
+                              setTimeout(() => {
+                                  window.location.href = '?mode=view&userId=${encodeURIComponent(userId)}&_cb=' + Date.now();
+                              }, 1000);
+                          })
+                          .withFailureHandler((error) => {
+                              alert('再公開に失敗しました: ' + error.message);
+                              button.disabled = false;
+                              button.textContent = '🔄 回答ボードを再公開';
+                          })
+                          .republishBoard('${userId}');
+                  } catch (error) {
+                      alert('エラーが発生しました: ' + error.message);
+                      button.disabled = false;
+                      button.textContent = '🔄 回答ボードを再公開';
+                  }
+              }
+          </script>
+      </body>
+      </html>
+    `;
+    
+    return HtmlService.createHtmlOutput(finalFallbackHtml)
+      .setTitle('StudyQuest - 準備中')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
   }
 }
 

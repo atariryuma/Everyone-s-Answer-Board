@@ -612,6 +612,11 @@
             <button type="button" class="btn btn-primary" onclick="location.reload()">
                 🔄 ページを更新
             </button>
+            <? if (typeof isRegisteredUser !== 'undefined' && isRegisteredUser) { ?>
+            <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
+                🏠 ログイン画面へ
+            </button>
+            <? } ?>
             <button type="button" class="btn btn-secondary" onclick="testServerFunction()" style="font-size: 12px;">
                 🧪 接続テスト
             </button>
