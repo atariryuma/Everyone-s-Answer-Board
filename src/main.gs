@@ -1055,19 +1055,21 @@ function processViewRequest(userInfo, params) {
     isCurrentlyPublished: isCurrentlyPublished
   });
 
-  // Redirect to access restricted page if not published
+  // Redirect to unpublished page if not published
   if (!isCurrentlyPublished) {
-    infoLog('🚫 Board is unpublished, redirecting to Access Restricted page');
+    infoLog('🚫 Board is unpublished, redirecting to Unpublished page immediately');
+    debugLog('🔍 UserInfo for unpublished page:', {
+      userId: userInfo.userId,
+      adminEmail: userInfo.adminEmail,
+      spreadsheetId: userInfo.spreadsheetId
+    });
 
-    const accessCheck = {
-      hasAccess: false,
-      isApplicationEnabled: true,
-      isSystemAdmin: false,
-      userEmail: Session.getActiveUser().getEmail(),
-      accessReason: 'Board is unpublished'
-    };
-
-    return showAccessRestrictedPage(accessCheck);
+    try {
+      return renderUnpublishedPage(userInfo, params);
+    } catch (unpublishedError) {
+      logError(unpublishedError, 'renderUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+      return renderMinimalUnpublishedPage(userInfo);
+    }
   }
 
   return renderAnswerBoard(userInfo, params);
