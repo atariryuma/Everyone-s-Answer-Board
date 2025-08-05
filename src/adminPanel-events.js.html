@@ -51,7 +51,19 @@ function setupEventListeners() {
       showConfirmationModal(
         '公開停止の確認',
         '回答ボードの公開を停止しますか？',
-        unpublishBoard
+        function() {
+          unpublishBoard()
+            .then(function() {
+              return loadStatus(true);
+            })
+            .then(function() {
+              showMessage('回答ボードは非公開になりました。', 'success');
+            })
+            .catch(function(error) {
+              console.error('❌ 公開停止に失敗しました:', error);
+              showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
+            });
+        }
       );
     });
   }
@@ -224,15 +236,17 @@ function setupEventListeners() {
   // 公開停止→フォーム作成の実行
   function executeStopAndCreateForm() {
     console.log('🛑 公開停止処理を実行中...');
-    
+
     // unpublishBoard関数を呼び出し
     unpublishBoard()
       .then(function(response) {
         console.log('✅ 公開停止が完了しました:', response);
-        
+        return loadStatus(true).then(() => response);
+      })
+      .then(function(response) {
         // 公開停止が確実に完了した旨を表示
         showMessage('✅ 公開停止が完了しました。カスタムフォームを作成できます。', 'success');
-        
+
         // 全セクション展開フラグを設定（公開停止後の管理パネル表示改善）
         try {
           localStorage.setItem('expandAllSections', 'true');
@@ -240,7 +254,7 @@ function setupEventListeners() {
         } catch (e) {
           console.warn('⚠️ localStorage設定に失敗:', e);
         }
-        
+
         // 少し遅延してからフォーム作成モーダルを表示
         setTimeout(function() {
           console.log('🎨 フォーム作成モーダルを表示します');
