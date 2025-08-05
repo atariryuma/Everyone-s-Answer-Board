@@ -1052,25 +1052,44 @@ window.sharedUtilities = window.sharedUtilities || {};
 window.sharedUtilities.debounce = new DebounceManager();
 window.sharedUtilities.throttle = new ThrottleManager();
 
-// TimingManagerが利用可能な場合の拡張ラッパー
-if (typeof TimingManager !== 'undefined') {
-  // 新しいTimingManager機能を既存のインターフェースにマップ
-  window.sharedUtilities.debounce.debounceAdvanced = TimingManager.debounce;
-  window.sharedUtilities.throttle.throttleAdvanced = TimingManager.throttle;
-  
-  // 段階的移行用のヘルパー
-  window.sharedUtilities.timing = {
-    delay: TimingManager.delay,
-    sequence: TimingManager.sequence,
-    parallel: TimingManager.parallel,
-    progressSequence: TimingManager.progressSequence,
-    clearTiming: TimingManager.clearTiming,
-    clearAllTiming: TimingManager.clearAllTiming
-  };
+// TimingManager統合の遅延実行化（読み込み順序問題の解決）
+function initializeTimingManagerIntegration() {
+  if (typeof TimingManager !== 'undefined') {
+    // 新しいTimingManager機能を既存のインターフェースにマップ
+    window.sharedUtilities.debounce.debounceAdvanced = TimingManager.debounce;
+    window.sharedUtilities.throttle.throttleAdvanced = TimingManager.throttle;
+    
+    // 段階的移行用のヘルパー
+    window.sharedUtilities.timing = {
+      delay: TimingManager.delay,
+      sequence: TimingManager.sequence,
+      parallel: TimingManager.parallel,
+      progressSequence: TimingManager.progressSequence,
+      clearTiming: TimingManager.clearTiming,
+      clearAllTiming: TimingManager.clearAllTiming
+    };
 
-  console.log('🔄 TimingManager integration enabled - Advanced timing features available');
-} else {
-  console.warn('⚠️ TimingManager not available - Using legacy timing functions only');
+    console.log('🔄 TimingManager integration enabled - Advanced timing features available');
+    return true;
+  } else {
+    console.log('ℹ️ TimingManager not yet available - Will retry after DOM load');
+    return false;
+  }
+}
+
+// 即座に試行
+if (!initializeTimingManagerIntegration()) {
+  // DOMContentLoaded後に再試行
+  document.addEventListener('DOMContentLoaded', function() {
+    if (!initializeTimingManagerIntegration()) {
+      // さらに遅延して最終試行
+      setTimeout(function() {
+        if (!initializeTimingManagerIntegration()) {
+          console.log('ℹ️ TimingManager not available - Using legacy timing functions only');
+        }
+      }, 100);
+    }
+  });
 }
 
 // =============================================================================
