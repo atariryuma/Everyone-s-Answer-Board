@@ -6188,3 +6188,40 @@ function testForceLogoutRedirect() {
     };
   }
 }
+
+/**
+ * フロー進捗を取得する関数（BackendProgressSync用）
+ * @param {string} flowId - フローID（例: 'customSetup', 'quickStart'）
+ * @returns {Object} 進捗情報
+ */
+function getFlowProgress(flowId) {
+  try {
+    debugLog(`🔍 getFlowProgress called for flowId: ${flowId}`);
+    
+    // 現在はシンプルなスタブ実装
+    // 実際のバックエンド処理状況を取得するロジックを将来実装
+    const mockProgress = {
+      flowId: flowId,
+      progress: 50, // 0-100の進捗率
+      currentStep: flowId === 'customSetup' ? 3 : 2,
+      totalSteps: flowId === 'customSetup' ? 7 : 4,
+      stepName: flowId === 'customSetup' ? 'AI列判定実行中' : 'フォーム作成中',
+      stepDetail: '処理中...',
+      estimatedTimeRemaining: 120,
+      isComplete: false,
+      timestamp: new Date().toISOString()
+    };
+    
+    return {
+      status: 'success',
+      data: mockProgress
+    };
+  } catch (error) {
+    logError(error, 'getFlowProgress', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { flowId });
+    return {
+      status: 'error',
+      message: `進捗取得に失敗しました: ${error.message}`,
+      flowId: flowId
+    };
+  }
+}

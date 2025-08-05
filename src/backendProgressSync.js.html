@@ -97,6 +97,13 @@ class BackendProgressSync {
 
       return this.parseProgressResponse(response);
     } catch (error) {
+      // getFlowProgress関数が存在しない場合の特別なハンドリング
+      if (error.message && error.message.includes('getFlowProgress is not a function')) {
+        console.log(`ℹ️ Backend progress sync not available for ${flowId}, using fallback mode`);
+        this.isEnabled = false; // 将来のリクエストを無効化
+        return null;
+      }
+      
       console.warn(`⚠️ Failed to fetch progress for ${flowId}:`, error);
       return null;
     }

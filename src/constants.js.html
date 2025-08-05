@@ -21,15 +21,15 @@ const SYSTEM_CONSTANTS = {
   CUSTOM_SETUP: {
     TOTAL_STEPS: 7,
     STEP_TIMES: {
-      ANALYSIS: 45,           // ステップ1: カスタムフォーム設定の解析 (45秒)
-      FORM_CREATION: 90,      // ステップ2: フォーム・スプレッドシート作成 (90秒)
-      AI_DETECTION: 120,      // ステップ3: AI列判定 (120秒)
-      CONFIG_SAVE: 30,        // ステップ4: 設定保存 (30秒)
-      PUBLISH: 60,            // ステップ5: 自動公開 (60秒)
-      CACHE_CLEAR: 30,        // ステップ6: キャッシュクリア (30秒)
-      RESPONSE: 15            // ステップ7: レスポンス生成 (15秒)
+      ANALYSIS: 12,           // ステップ1: カスタムフォーム設定の解析 (12秒)
+      FORM_CREATION: 20,      // ステップ2: フォーム・スプレッドシート作成 (20秒)
+      AI_DETECTION: 25,       // ステップ3: AI列判定 (25秒)
+      CONFIG_SAVE: 8,         // ステップ4: 設定保存 (8秒)
+      PUBLISH: 15,            // ステップ5: 自動公開 (15秒)
+      CACHE_CLEAR: 8,         // ステップ6: キャッシュクリア (8秒)
+      RESPONSE: 5             // ステップ7: レスポンス生成 (5秒)
     },
-    PROGRESS_UPDATE_INTERVAL: 200,  // プログレス更新間隔 (200ms)
+    PROGRESS_UPDATE_INTERVAL: 150,  // プログレス更新間隔 (150ms)
     MAX_RETRY_COUNT: 3,             // 最大リトライ回数
     CANCEL_CONFIRMATION_MESSAGE: 'カスタムセットアップを中断しますか？\n途中で中断すると、設定が不完全な状態になる可能性があります。'
   },
