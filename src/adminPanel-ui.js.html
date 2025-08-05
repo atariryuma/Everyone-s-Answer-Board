@@ -3163,11 +3163,9 @@ function formatDateTime(date) {
 // 新しいリソースボタンを更新する関数
 function updateNewResourceButtons(resourceUrls) {
   const folderBtn = document.getElementById('open-folder-btn');
-  const editFormBtn = document.getElementById('open-edit-form-btn');
 
   // 引数で渡されたURLを使用
   const folderUrl = resourceUrls.folder;
-  const editFormUrl = resourceUrls.editForm;
   
   // フォルダボタンの有効化
   if (folderBtn) {
@@ -3181,21 +3179,6 @@ function updateNewResourceButtons(resourceUrls) {
       folderBtn.onclick = () => showMessage('フォルダURLが未設定です', 'warning');
       folderBtn.title = 'フォルダURLが未設定です';
       console.log('⚠️ Folder button enabled - no URL available');
-    }
-  }
-
-  // 編集フォームボタンの有効化
-  if (editFormBtn) {
-    editFormBtn.disabled = false;
-    editFormBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    if (editFormUrl) {
-      editFormBtn.onclick = () => window.open(editFormUrl, '_blank');
-      editFormBtn.title = 'フォーム編集画面を開く';
-      console.log('✅ Edit form button enabled with URL:', editFormUrl);
-    } else {
-      editFormBtn.onclick = () => showMessage('編集フォームURLが未設定です', 'warning');
-      editFormBtn.title = '編集フォームURLが未設定です';
-      console.log('⚠️ Edit form button enabled - no URL available');
     }
   }
 }
