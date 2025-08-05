@@ -1062,14 +1062,14 @@ function runHeaderGuessing() {
           if (configToUse.reasonColumn) detectedColumns.push(`💭 理由列: ${configToUse.reasonColumn}`);
           
           const message = detectedColumns.length > 0 
-            ? `🎉 高精度AI判定が完了しました！\n\n検出された列:\n${detectedColumns.join('\n')}\n\n自動的にセットアップを完了します...`
-            : '🎉 高精度AI判定が完了しました！自動的にセットアップを完了します...';
+            ? `🎉 高精度AI判定が完了しました！\n\n検出された列:\n${detectedColumns.join('\n')}\n\n設定を保存して公開してください。`
+            : '🎉 高精度AI判定が完了しました！設定を保存して公開してください。';
           
           showMessage(message, 'success');
           
-          // ✨ 重要: AI判定完了後に自動的にセットアップを完了
+          // ✨ 重要: AI判定完了後の処理
           setTimeout(() => {
-            console.log('🚀 AI判定完了 - 自動セットアップ完了処理を開始');
+            console.log('🚀 AI判定完了 - 後処理を開始');
             
             // セットアップ状態を確認して必要な場合のみ実行
             if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
@@ -1078,13 +1078,13 @@ function runHeaderGuessing() {
                 : currentStatus.userInfo.configJson;
               
               if (config.setupStatus === 'pending' || !config.formCreated) {
-                console.log('🔧 セットアップ未完了状態を検出 - 自動完了を実行');
+                console.log('🔧 セットアップ未完了状態を検出 - 処理を実行');
                 completeAIDetectionProcess();
               } else {
-                console.log('✅ セットアップは既に完了済み - 自動完了をスキップ');
+                console.log('✅ セットアップは既に完了済み - 処理をスキップ');
               }
             } else {
-              console.log('🔧 ステータス情報が不明 - 念のため自動完了を実行');
+              console.log('🔧 ステータス情報が不明 - 念のため処理を実行');
               completeAIDetectionProcess();
             }
           }, 1000);
@@ -1114,7 +1114,7 @@ function runHeaderGuessing() {
 // ✨ AI判定完了後の自動セットアップ完了処理
 function completeAIDetectionProcess() {
   try {
-    console.log('🔧 AI判定完了 - セットアップ自動完了を実行中...');
+    console.log('🔧 AI判定完了 - 設定保存処理を実行中...');
     
     // 1. 設定検証
     if (!validateConfig()) {
@@ -1149,7 +1149,7 @@ function completeAIDetectionProcess() {
       .then(saveResult => {
         if (saveResult && saveResult.success) {
           console.log('✅ AI判定完了 - 設定自動保存完了');
-          showMessage('🎉 AI判定とセットアップが自動完了しました！', 'success');
+          showMessage('🎉 AI判定が完了しました！設定を保存して公開してください。', 'success');
           
           // 4. UI状態の更新
           if (typeof loadSystemStatus === 'function') {
@@ -1158,13 +1158,11 @@ function completeAIDetectionProcess() {
           
           // 5. ステップ表示の更新
           if (typeof navigateToStep === 'function') {
-            navigateToStep(3); // ステップ3（表示設定）に進む
+            navigateToStep(2); // ステップ2（AI列分析完了）に進む
           }
 
-          // 6. 自動公開の実行
-          if (typeof saveAndPublish === 'function') {
-            saveAndPublish();
-          }
+          // 6. 手動公開を促すメッセージ表示（自動公開は削除）
+          console.log('✅ AI判定完了 - ユーザーによる手動公開を待機中');
 
         } else {
           throw new Error(saveResult?.message || '設定の保存に失敗しました');
@@ -1172,12 +1170,12 @@ function completeAIDetectionProcess() {
       })
       .catch(error => {
         console.error('❌ AI判定完了処理でエラー:', error);
-        showMessage(`⚠️ セットアップの自動完了に失敗しました: ${error.message}\n手動で「保存・公開」を実行してください。`, 'warning');
+        showMessage(`⚠️ AI判定後の処理でエラーが発生しました: ${error.message}\n手動で「保存・公開」を実行してください。`, 'warning');
       });
       
   } catch (error) {
     console.error('❌ completeAIDetectionProcess 致命的エラー:', error);
-    showMessage('セットアップ自動完了でエラーが発生しました。手動で設定を確認してください。', 'error');
+    showMessage('AI判定処理でエラーが発生しました。手動で設定を確認してください。', 'error');
   }
 }
 
@@ -2694,14 +2692,10 @@ function resetConfigJson() {
 // QUICKSTART FUNCTIONALITY
 // =============================================================================
 
-// QuickStart progress management
+// QuickStart progress management (Simplified 2-step)
 const quickStartSteps = [
-  { id: 1, text: 'ユーザー専用フォルダの作成', detail: 'フォルダ構造を準備中...' },
-  { id: 2, text: 'Googleフォームとスプレッドシートの作成', detail: 'データ収集の仕組みを構築中...' },
-  { id: 3, text: 'シート設定と列構造の最適化', detail: 'データ構造を設定中...' },
-  { id: 4, text: '高精度AI列判定の実行', detail: 'AIによる列の自動判定を実行中...' },
-  { id: 5, text: '公開設定と時間モーダル表示', detail: 'Webアプリケーションを公開中...' },
-  { id: 6, text: 'セットアップ完了', detail: '利用準備が整いました！' }
+  { id: 1, text: 'フォーム・スプレッドシート作成', detail: 'フォームとスプレッドシートを自動作成中...' },
+  { id: 2, text: 'ボード設定と自動公開', detail: '回答ボードの設定と自動公開を実行中...' }
 ];
 
 // Custom setup progress management
@@ -2799,46 +2793,34 @@ function updateOverallProgress(percentage, statusMessage) {
 
 // Simulate QuickStart progress with enhanced backend synchronization
 function simulateQuickStartProgress() {
-  console.log('🚀 Starting enhanced QuickStart progress simulation');
+  console.log('🚀 Starting simplified QuickStart progress simulation (2 steps)');
   
-  // Step 1: Initialize
-  updateProgressStep(1, 'active', 'ユーザー専用フォルダの作成', 'フォルダ構造を準備中...');
-  updateOverallProgress(5, 'フォルダを作成しています...');
+  // 2-Step Simplified QuickStart Progress
+  updateProgressStep(1, 'active', 'フォーム・スプレッドシート作成', 'フォームとスプレッドシートを自動作成中...');
+  updateOverallProgress(10, 'フォーム・スプレッドシートを作成しています...', 2.5);
   
-  // Continue with timed simulation to ensure progress doesn't stop
+  // 段階的に進捗を更新（2ステップ構成）
   setTimeout(() => {
-    updateProgressStep(1, 'completed', 'ユーザー専用フォルダの作成', '✅ フォルダが作成されました');
-    updateProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'データ収集の仕組みを構築中...');
-    updateOverallProgress(20, 'フォームとスプレッドシートを作成しています...');
+    updateOverallProgress(30, 'フォーム作成中...', 2);
     
     setTimeout(() => {
-      updateProgressStep(2, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ フォームとスプレッドシートが作成されました');
-      updateProgressStep(3, 'active', 'シート設定と列構造の最適化', 'データ構造を設定中...');
-      updateOverallProgress(40, 'シート設定を最適化しています...');
+      updateOverallProgress(60, 'スプレッドシート作成完了', 1.5);
+      updateProgressStep(1, 'completed', 'フォーム・スプレッドシート作成', '✅ フォームとスプレッドシートが作成されました');
+      updateProgressStep(2, 'active', 'ボード設定と自動公開', '回答ボードの設定と自動公開を実行中...');
       
       setTimeout(() => {
-        updateProgressStep(3, 'completed', 'シート設定と列構造の最適化', '✅ データ構造が最適化されました');
-        updateProgressStep(4, 'active', '高精度AI列判定の実行', 'AIによる列の自動判定を実行中...');
-        updateOverallProgress(60, 'AI列判定を実行しています...');
+        updateOverallProgress(80, 'ボード設定適用中...', 1);
         
         setTimeout(() => {
-          updateProgressStep(4, 'completed', '高精度AI列判定の実行', '✅ AI列判定が完了しました');
-          updateProgressStep(5, 'active', '公開設定の適用', 'Webアプリケーションを公開中...');
-          updateOverallProgress(80, '公開設定を適用しています...');
+          updateOverallProgress(95, '自動公開準備中...', 0.5);
           
           setTimeout(() => {
-            updateProgressStep(5, 'completed', '公開設定の適用', '✅ アプリケーションが公開されました');
-            updateProgressStep(6, 'active', 'セットアップ完了確認', '最終確認を実行中...');
-            updateOverallProgress(95, '最終確認を実行しています...');
-            
-            setTimeout(() => {
-              console.log('✅ QuickStart progress simulation completed - backend should be ready');
-              // ここで最終完了状態は executeQuickStartProcess の成功ハンドラーで設定される
-            }, 800);
-          }, 1800);
-        }, 3500);
-      }, 1200);
-    }, 1800);
+            console.log('✅ QuickStart progress simulation completed - backend should be ready');
+            // 最終完了状態は executeQuickStartProcess の成功ハンドラーで設定される
+          }, 500);
+        }, 800);
+      }, 1000);
+    }, 1500);
   }, 1000);
   
   // Optional folder creation check (non-blocking - doesn't affect main progress)
@@ -3172,7 +3154,7 @@ async function startBackendCompletionPolling() {
         
         // 成功処理
         updateProgressStep(6, 'completed', 'カスタムセットアップ完了', '🎉 バックエンドでの処理が完了しました！');
-        showMessage('✅ カスタムセットアップが完了しました！（バックエンド処理完了）', 'success');
+        showMessage('✅ フォームとデータの準備が完了しました！AI列判定を開始します。', 'success');
         
         // UI更新
         updateUIAfterCustomSetup(status);
@@ -3357,13 +3339,12 @@ async function handleCustomSetup(config) {
     // Phase 1: プログレス表示開始
     showCustomSetupProgress();
     
-    // シンプルな進捗表示（実際の処理に連動）
-    updateCustomOverallProgress(10, 'カスタムセットアップを開始しています...', 15);
-    updateCustomProgressStep(1, 'active', 'カスタムフォーム設定の解析', 'フォーム設定を検証中...');
+    // 2ステップの簡素化された進捗表示
+    updateCustomOverallProgress(10, 'カスタムセットアップを開始しています...', 4);
+    updateCustomProgressStep(1, 'active', 'データ準備とフォーム作成', 'Googleフォームとスプレッドシートを構築中...');
     
     await TimingManager.delay(500); // 視覚的フィードバック
-    updateCustomOverallProgress(20, 'バックエンド処理を実行中...', 12);
-    updateCustomProgressStep(2, 'active', 'Googleフォームとスプレッドシートの作成', 'カスタムフォームを構築中...');
+    updateCustomOverallProgress(20, 'フォーム・スプレッドシート作成中...', 3);
     
     // Phase 2: バックエンド処理実行  
     const result = await runGasWithUserId('customSetup', false, config);
@@ -3374,24 +3355,18 @@ async function handleCustomSetup(config) {
     
     console.log('✅ カスタムセットアップ完了');
     
-    // 段階的に進捗を更新
-    updateCustomOverallProgress(60, 'フォーム・スプレッドシート作成完了', 8);
-    updateCustomProgressStep(3, 'completed', 'Googleフォームとスプレッドシートの作成', '✅ ファイル作成完了');
-    updateCustomProgressStep(4, 'active', '高精度AI列判定の自動実行', 'AIが最適な列構成を判定中...');
+    // 2ステップ進捗を段階的に更新
+    updateCustomOverallProgress(60, 'フォーム・スプレッドシート作成完了', 2);
+    updateCustomProgressStep(1, 'completed', 'データ準備とフォーム作成', '✅ フォームとスプレッドシートが作成されました');
+    updateCustomProgressStep(2, 'active', 'AIによる列分析', 'AIがスプレッドシートの列を分析し、最適な設定を提案中...');
     
     await TimingManager.delay(1000);
-    updateCustomOverallProgress(80, 'AI列判定と設定適用完了', 5);
-    updateCustomProgressStep(4, 'completed', '高精度AI列判定の自動実行', '✅ AI列判定完了');
-    updateCustomProgressStep(5, 'active', '設定の自動保存と適用', '判定結果を設定に反映中...');
-    
-    await TimingManager.delay(500);
-    updateCustomOverallProgress(90, '最終処理中...', 2);
-    updateCustomProgressStep(5, 'completed', '設定の自動保存と適用', '✅ 設定保存完了');
-    updateCustomProgressStep(6, 'active', '回答ボードの自動公開', 'Webアプリケーションを公開中...');
+    updateCustomOverallProgress(90, 'AI列分析完了', 1);
+    updateCustomProgressStep(2, 'completed', 'AIによる列分析', '✅ AI列判定が完了しました');
     
     await TimingManager.delay(500);
     updateCustomOverallProgress(100, 'カスタムセットアップ完了');
-    updateCustomProgressStep(7, 'completed', 'カスタムセットアップ完了', '🎉 すべての設定が完了しました！');
+    console.log('🎉 カスタムセットアップが完了しました（手動公開待機）');
     
     // Phase 3: 状態修正（必要な場合のみ）
     if (result.spreadsheetId && result.autoPublished) {
@@ -3661,9 +3636,7 @@ async function handleCustomSetup(config) {
       successDetails.push('✅ 回答ボードを自動公開');
     }
     
-    const successMessage = result.autoPublished ? 
-      'カスタムセットアップが完了し、回答ボードが公開されました！' :
-      'カスタムセットアップが完了しました！';
+    const successMessage = '🎉 カスタムセットアップが完了しました！設定を保存して公開してください。';
     showMessage(successMessage, 'success');
     
     // プログレス非表示
@@ -3860,23 +3833,23 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         console.log('🎉 QuickStartバックエンド処理完了:', result);
         
         // Enhanced completion notification with detailed backend response
-        updateOverallProgress(100, result.autoPublished ? 'セットアップ完了！ボードが公開されました！' : 'セットアップ完了！');
-        updateProgressStep(6, 'completed', 'セットアップ完了', '🎉 すべての準備が整いました！');
+        updateOverallProgress(100, result.autoPublished ? 'クイックスタート完了！ボードが公開されました！' : 'クイックスタート完了！');
+        updateProgressStep(2, 'completed', 'ボード設定と自動公開', '🎉 クイックスタートが完了しました！');
         
         // Enhanced message display based on actual backend results
         const publishStatus = result.autoPublished ? '公開されました' : '作成されました';
         let detailMessage;
         
         if (result.autoPublished) {
-          detailMessage = 'フォームとボードが自動作成され、公開されました。すぐに利用できます！';
+          detailMessage = 'フォームとボードが自動作成・公開されました！すぐに利用できます。';
         } else {
           // Check if there's a specific reason for auto-publish failure
           const publishError = result.publishResult?.error;
           const manualInstructions = result.publishResult?.manualPublishInstructions;
           
-          detailMessage = 'フォームとボードが自動作成されました。';
+          detailMessage = 'フォームとボードが作成されました。';
           if (publishError) {
-            detailMessage += `自動公開は失敗しました（${publishError}）。`;
+            detailMessage += `自動公開に失敗したため（${publishError}）、`;
           }
           if (manualInstructions) {
             detailMessage += manualInstructions;
@@ -3885,14 +3858,10 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           }
         }
         
-        showMessage(`✅ クイックスタートが完了しました！${detailMessage}`, 'success');
+        showMessage(`🎉 クイックスタートが完了しました！${detailMessage}`, 'success');
         
         // Update progress step with auto-publish status
-        if (result.autoPublished) {
-          updateProgressStep(5, 'completed', '回答ボードの自動公開', '🌐 ボードが自動的に公開されました');
-        } else {
-          updateProgressStep(5, 'completed', '回答ボード作成完了', '📝 手動公開の準備ができました');
-        }
+        updateProgressStep(5, 'completed', '回答ボード作成完了', '📝 設定を保存して公開してください');
         
         // QuickStart成功完了 - 多重実行防止フラグをクリア
         isQuickStartInProgress = false;
