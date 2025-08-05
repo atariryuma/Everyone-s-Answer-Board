@@ -4968,10 +4968,12 @@ function createCustomFormAndSheet(userEmail, requestUserId, config) {
     }
   };
 
-  const overrides = {
-    titlePrefix: config.formTitle || 'カスタムフォーム',
-    customConfig: convertedConfig
-  };
+  const overrides = { customConfig: convertedConfig };
+  if (config.formTitle) {
+    overrides.formTitle = config.formTitle;
+  } else {
+    overrides.titlePrefix = 'カスタムフォーム';
+  }
 
   const formAndSsInfo = createUnifiedForm('custom', userEmail, requestUserId, overrides);
 
@@ -5059,10 +5061,12 @@ function createCustomFormUI(requestUserId, config) {
 
     debugLog('createCustomFormUI - converted config:', JSON.stringify(convertedConfig));
 
-    const overrides = {
-      titlePrefix: config.formTitle || 'カスタムフォーム',
-      customConfig: convertedConfig
-    };
+    const overrides = { customConfig: convertedConfig };
+    if (config.formTitle) {
+      overrides.formTitle = config.formTitle;
+    } else {
+      overrides.titlePrefix = 'カスタムフォーム';
+    }
 
     const result = createUnifiedForm('custom', activeUserEmail, requestUserId, overrides);
 
