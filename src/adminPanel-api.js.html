@@ -923,16 +923,16 @@ function loadStatus(bypassCache = false) {
 function loadConfigForSelected() {
   if (!selectedSheet) {
     logWarn('No sheet selected for config loading');
-    return;
+    return Promise.reject(new Error('No sheet selected for config loading'));
   }
   
   if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
     logError('Missing required data for loadConfigForSelected');
     showMessage('スプレッドシートの情報が見つかりません。', 'error');
-    return;
+    return Promise.reject(new Error('Missing required data for loadConfigForSelected'));
   }
   
-  runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
     .catch(handleSheetDetailsError);
 }
@@ -1123,6 +1123,18 @@ function completeAIDetectionProcess() {
           config.setupStatus = 'completed';
           
           console.log('💾 AI判定完了後の設定を自動保存中...', config);
+          
+          // Save draft to session storage when AI prediction is completed
+          const draftData = {
+            questionText: config.opinionHeader || config.opinionColumn || '（問題文未設定）',
+            sheetName: selectedSheet,
+            config: config,
+            displayMode: document.getElementById('anonymous-mode')?.checked ? '匿名表示' : '通常表示',
+            countDisplay: '表示' // Default, could be configured based on UI settings
+          };
+          
+          saveDraftToSession(draftData);
+          console.log('📝 下書きをセッションに保存しました:', draftData.questionText);
           
           return runGasWithUserId('saveSheetConfig', '設定保存中...', currentStatus.userInfo.spreadsheetId, selectedSheet, config);
         } else {
@@ -1659,31 +1671,134 @@ function unpublishBoard() {
       });
   }
 
-  // 公開時に履歴を保存する関数
+  // 公開時に履歴を保存する関数（新しい統合アプローチ）
   function saveHistoryOnPublish(publishResponse, config) {
     try {
       const userInfo = publishResponse.userInfo || {};
-      const historyItem = {
-        questionText:
-          config.opinionHeader ||
-          config.opinionColumn ||
-          userInfo.customFormInfo?.mainQuestion ||
-          '（問題文未設定）',
-        sheetName: config.publishedSheetName || '',
-        publishedAt: publishResponse.publishedAt || new Date().toISOString(),
-        answerCount: 0,
-        reactionCount: 0,
-        config: config,
-        formUrl: userInfo.formUrl || '',
-        spreadsheetUrl: userInfo.spreadsheetUrl || '',
-        setupType: determineSetupType(config, userInfo),
-        isActive: false
-      };
-
-      saveToHistory(historyItem);
-      logDebug('履歴保存完了（公開時）:', historyItem);
+      
+      // Create consolidated history entry with draft + publication data
+      createConsolidatedHistoryEntry(publishResponse, config, userInfo);
+      
+      logDebug('統合履歴保存完了（公開時）');
     } catch (error) {
       logWarn('公開時の履歴保存に失敗:', error);
+    }
+  }
+  
+  /**
+   * Create consolidated history entry combining draft and publication data
+   * @param {Object} publishResponse - Response from publication API
+   * @param {Object} config - Form configuration
+   * @param {Object} userInfo - User information
+   */
+  function createConsolidatedHistoryEntry(publishResponse, config, userInfo) {
+    try {
+      // Get draft data from session storage
+      const draftState = getDraftFromSession();
+      
+      // Determine creation time and publication time
+      const createdAt = draftState?.createdAt || new Date().toISOString();
+      const publishedAt = publishResponse.publishedAt || new Date().toISOString();
+      
+      // Extract question text from various sources
+      const questionText = draftState?.questionText ||
+                          config.opinionHeader ||
+                          config.opinionColumn ||
+                          userInfo.customFormInfo?.mainQuestion ||
+                          '（問題文未設定）';
+      
+      // Determine display mode and count display from draft or defaults
+      const displayMode = draftState?.displayMode || '通常表示';
+      const countDisplay = draftState?.countDisplay || '表示';
+      
+      // Create consolidated history entry
+      const consolidatedHistoryItem = {
+        id: generateHistoryId(),
+        formId: `${userInfo.spreadsheetId || 'unknown'}_${config.publishedSheetName || 'unknown'}`,
+        
+        // Timestamps
+        createdAt: createdAt,
+        publishedAt: publishedAt,
+        
+        // Form content
+        questionText: questionText,
+        sheetName: config.publishedSheetName || '',
+        
+        // Display settings
+        displayMode: displayMode, // '通常表示' or '匿名表示'
+        countDisplay: countDisplay, // '表示' or '非表示'
+        
+        // Form configuration and state
+        config: config,
+        status: 'published',
+        setupType: determineSetupType(config, userInfo),
+        isActive: true, // Set to true since we're publishing
+        
+        // URLs and counts
+        formUrl: userInfo.formUrl || '',
+        spreadsheetUrl: userInfo.spreadsheetUrl || '',
+        answerCount: 0,
+        reactionCount: 0,
+        
+        // AI column prediction results (from draft or current state)
+        sheetDetails: draftState?.sheetDetails || {
+          allHeaders: currentStatus?.sheetDetails?.allHeaders || [],
+          guessedConfig: currentStatus?.sheetDetails?.guessedConfig || {},
+          existingConfig: currentStatus?.sheetDetails?.existingConfig || {}
+        },
+        
+        // Additional metadata
+        activeSheetName: draftState?.sheetName || config.publishedSheetName,
+        spreadsheetId: userInfo.spreadsheetId || '',
+        configurationComplete: draftState?.configurationComplete || !!(config.opinionHeader)
+      };
+      
+      // Save consolidated history entry using existing localStorage mechanism
+      const history = getHistoryFromStorage();
+      
+      // Check if entry with same formId already exists and remove it
+      const existingIndex = history.findIndex(item => item.formId === consolidatedHistoryItem.formId);
+      if (existingIndex !== -1) {
+        history.splice(existingIndex, 1);
+        logDebug('Removed existing draft entry for formId:', consolidatedHistoryItem.formId);
+      }
+      
+      // Add new consolidated entry at the beginning
+      history.unshift(consolidatedHistoryItem);
+      
+      // Enforce maximum history items limit
+      const MAX_HISTORY_ITEMS = 10;
+      if (history.length > MAX_HISTORY_ITEMS) {
+        history.splice(MAX_HISTORY_ITEMS);
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('answerboard_history', JSON.stringify(history));
+      
+      // Sync to server (async)
+      syncHistoryToServer(consolidatedHistoryItem);
+      
+      // Update UI
+      if (typeof loadSimpleHistoryTable === 'function') {
+        loadSimpleHistoryTable();
+      }
+      
+      // Clear draft from session storage after successful save
+      clearDraftFromSession();
+      
+      logDebug('Consolidated history entry created:', {
+        formId: consolidatedHistoryItem.formId,
+        questionText: consolidatedHistoryItem.questionText,
+        createdAt: consolidatedHistoryItem.createdAt,
+        publishedAt: consolidatedHistoryItem.publishedAt,
+        displayMode: consolidatedHistoryItem.displayMode,
+        countDisplay: consolidatedHistoryItem.countDisplay
+      });
+      
+    } catch (error) {
+      logError('Failed to create consolidated history entry:', error);
+      // Fallback: clear draft even if save failed
+      clearDraftFromSession();
     }
   }
 

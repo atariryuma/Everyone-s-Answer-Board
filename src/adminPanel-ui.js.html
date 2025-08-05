@@ -2450,7 +2450,7 @@ function saveToHistory(historyItem) {
 
     const history = getHistoryFromStorage();
     
-    // 新しいアイテムを先頭に追加
+    // AI列判定結果を含む拡張された履歴アイテムを作成
     const newItem = {
       id: generateHistoryId(),
       timestamp: new Date().toISOString(),
@@ -2467,7 +2467,21 @@ function saveToHistory(historyItem) {
       formUrl: historyItem.formUrl || '',
       spreadsheetUrl: historyItem.spreadsheetUrl || '',
       setupType: historyItem.setupType || 'unknown', // クイックスタート、カスタムセットアップ、外部リソースを識別
-      isActive: historyItem.isActive || false // 現在公開中かどうか
+      isActive: historyItem.isActive || false, // 現在公開中かどうか
+      
+      // AI列判定結果の保存（復元時に必要）
+      sheetDetails: {
+        allHeaders: currentStatus?.sheetDetails?.allHeaders || [],
+        guessedConfig: currentStatus?.sheetDetails?.guessedConfig || {},
+        existingConfig: currentStatus?.sheetDetails?.existingConfig || {}
+      },
+      
+      // 復元に必要な追加情報
+      activeSheetName: currentStatus?.activeSheetName || historyItem.sheetName,
+      spreadsheetId: currentStatus?.userInfo?.spreadsheetId || '',
+      
+      // 保存時点での設定完了状態
+      configurationComplete: !!(currentStatus?.sheetDetails?.guessedConfig?.opinionHeader)
     };
     
     history.unshift(newItem);
@@ -2478,13 +2492,41 @@ function saveToHistory(historyItem) {
     }
     
     localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
-    logDebug('History saved:', newItem);
+    logDebug('Enhanced history saved:', newItem);
+    
+    // サーバーサイドに同期（非同期）
+    syncHistoryToServer(newItem);
     
     // UI を更新
     loadSimpleHistoryTable();
     
   } catch (error) {
     logWarn('Failed to save history:', error);
+  }
+}
+
+/**
+ * 履歴をサーバーサイドに同期
+ * @param {Object} historyItem - 同期する履歴アイテム
+ */
+async function syncHistoryToServer(historyItem) {
+  try {
+    if (!historyItem || !historyItem.id) {
+      return;
+    }
+    
+    logDebug('Syncing history to server:', historyItem.questionText);
+    
+    const response = await runGasWithUserId('saveHistoryToSheetAPI', false, historyItem);
+    
+    if (response && response.status === 'success') {
+      logDebug('History synced to server successfully');
+    } else {
+      logWarn('Server history sync failed:', response?.message);
+    }
+  } catch (error) {
+    // サーバー同期失敗はローカル保存に影響しない
+    logWarn('Failed to sync history to server:', error);
   }
 }
 
@@ -2503,11 +2545,287 @@ function getHistoryFromStorage() {
 }
 
 /**
+ * サーバーサイドとローカルストレージの履歴を統合
+ * @returns {Promise<Array>} 統合された履歴配列
+ */
+async function getMergedHistory() {
+  try {
+    // ローカルストレージから取得
+    const localHistory = getHistoryFromStorage();
+    
+    // サーバーサイドから取得
+    let serverHistory = [];
+    try {
+      const response = await runGasWithUserId('getHistoryFromServerAPI', false);
+      if (response && response.status === 'success' && Array.isArray(response.historyArray)) {
+        serverHistory = response.historyArray;
+        logDebug('Server history loaded:', serverHistory.length, 'items');
+      }
+    } catch (serverError) {
+      logWarn('Failed to load server history, using local only:', serverError);
+    }
+    
+    // 統合処理：ID重複を除去し、タイムスタンプで降順ソート
+    const mergedMap = new Map();
+    
+    // ローカル履歴を追加
+    localHistory.forEach(item => {
+      if (item.id) {
+        mergedMap.set(item.id, { ...item, source: 'local' });
+      }
+    });
+    
+    // サーバー履歴を追加（重複する場合はサーバー側を優先）
+    serverHistory.forEach(item => {
+      if (item.id) {
+        mergedMap.set(item.id, { ...item, source: 'server' });
+      }
+    });
+    
+    // Map を配列に変換し、タイムスタンプで降順ソート
+    const mergedArray = Array.from(mergedMap.values()).sort((a, b) => {
+      const aTime = new Date(a.timestamp || a.publishedAt || 0).getTime();
+      const bTime = new Date(b.timestamp || b.publishedAt || 0).getTime();
+      return bTime - aTime; // 降順
+    });
+    
+    logDebug('History merged:', {
+      local: localHistory.length,
+      server: serverHistory.length,
+      merged: mergedArray.length
+    });
+    
+    return mergedArray;
+  } catch (error) {
+    logError('Failed to merge history:', error);
+    // フォールバック：ローカルのみ
+    return getHistoryFromStorage();
+  }
+}
+
+/**
  * 履歴用のユニークIDを生成
  * @returns {string} ユニークID
  */
 function generateHistoryId() {
   return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
+ * Draft session storage management functions
+ */
+
+// Draft session storage key
+const DRAFT_SESSION_KEY = 'answerboard_draft_state';
+
+/**
+ * Save draft state to session storage
+ * @param {Object} draftData - Draft form data
+ */
+function saveDraftToSession(draftData) {
+  try {
+    if (!draftData || !draftData.questionText) {
+      logWarn('Invalid draft data, skipping session save');
+      return;
+    }
+
+    // Create unique form identifier
+    const formId = `${currentStatus?.userInfo?.spreadsheetId || 'unknown'}_${draftData.sheetName || selectedSheet || 'unknown'}`;
+    
+    const draftState = {
+      formId,
+      createdAt: new Date().toISOString(),
+      questionText: draftData.questionText,
+      sheetName: draftData.sheetName || selectedSheet,
+      config: draftData.config || {},
+      displayMode: draftData.displayMode || '通常表示', // 通常表示 or 匿名表示
+      countDisplay: draftData.countDisplay || '表示', // 表示 or 非表示
+      
+      // AI column prediction results for recovery
+      sheetDetails: {
+        allHeaders: currentStatus?.sheetDetails?.allHeaders || [],
+        guessedConfig: currentStatus?.sheetDetails?.guessedConfig || {},
+        existingConfig: currentStatus?.sheetDetails?.existingConfig || {}
+      },
+      
+      // Form configuration state
+      spreadsheetId: currentStatus?.userInfo?.spreadsheetId || '',
+      configurationComplete: !!(currentStatus?.sheetDetails?.guessedConfig?.opinionHeader),
+      
+      // Timestamp for draft management
+      lastUpdated: new Date().toISOString()
+    };
+    
+    sessionStorage.setItem(DRAFT_SESSION_KEY, JSON.stringify(draftState));
+    logDebug('Draft saved to session storage:', draftState.questionText);
+    
+  } catch (error) {
+    logWarn('Failed to save draft to session:', error);
+  }
+}
+
+/**
+ * Get draft state from session storage
+ * @returns {Object|null} Draft state or null if not found
+ */
+function getDraftFromSession() {
+  try {
+    const draftJson = sessionStorage.getItem(DRAFT_SESSION_KEY);
+    if (!draftJson) return null;
+    
+    const draftState = JSON.parse(draftJson);
+    logDebug('Draft loaded from session storage:', draftState.questionText);
+    return draftState;
+    
+  } catch (error) {
+    logWarn('Failed to load draft from session:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear draft from session storage
+ */
+function clearDraftFromSession() {
+  try {
+    sessionStorage.removeItem(DRAFT_SESSION_KEY);
+    logDebug('Draft cleared from session storage');
+  } catch (error) {
+    logWarn('Failed to clear draft from session:', error);
+  }
+}
+
+/**
+ * Check if draft exists in session storage
+ * @returns {boolean} True if draft exists
+ */
+function hasDraftInSession() {
+  try {
+    return !!sessionStorage.getItem(DRAFT_SESSION_KEY);
+  } catch (error) {
+    logWarn('Failed to check draft in session:', error);
+    return false;
+  }
+}
+
+/**
+ * Recover draft state from session storage on page load
+ * @returns {Promise<boolean>} True if draft was recovered successfully
+ */
+async function recoverDraftFromSession() {
+  try {
+    const draftState = getDraftFromSession();
+    if (!draftState) {
+      logDebug('No draft found in session storage');
+      return false;
+    }
+    
+    logDebug('Attempting to recover draft from session:', draftState.questionText);
+    
+    // Show recovery notification
+    showMessage('下書きを復元しています...', 'info');
+    
+    // Restore basic form state
+    if (draftState.sheetName) {
+      selectedSheet = draftState.sheetName;
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        sheetSelect.value = draftState.sheetName;
+      }
+    }
+    
+    // Restore spreadsheet ID if available
+    if (draftState.spreadsheetId && currentStatus?.userInfo) {
+      currentStatus.userInfo.spreadsheetId = draftState.spreadsheetId;
+    }
+    
+    // Restore sheet details and AI prediction results
+    if (draftState.sheetDetails && currentStatus) {
+      if (!currentStatus.sheetDetails) {
+        currentStatus.sheetDetails = {};
+      }
+      
+      currentStatus.sheetDetails.allHeaders = draftState.sheetDetails.allHeaders || [];
+      currentStatus.sheetDetails.guessedConfig = draftState.sheetDetails.guessedConfig || {};
+      currentStatus.sheetDetails.existingConfig = draftState.sheetDetails.existingConfig || {};
+    }
+    
+    // Restore question text
+    const questionInput = document.getElementById('question-input');
+    if (questionInput && draftState.questionText) {
+      questionInput.value = draftState.questionText;
+    }
+    
+    // Restore display mode settings
+    const anonymousCheckbox = document.getElementById('anonymous-mode');
+    if (anonymousCheckbox) {
+      anonymousCheckbox.checked = draftState.displayMode === '匿名表示';
+    }
+    
+    // Update UI to reflect recovered state
+    if (draftState.configurationComplete) {
+      // Show that AI column prediction is completed
+      const currentStep = document.querySelector('[data-step="4"]');
+      if (currentStep) {
+        updateStepProgress(4, currentStatus);
+      }
+    }
+    
+    // Update any config panels if they exist
+    if (draftState.config && Object.keys(draftState.config).length > 0) {
+      updateConfigPanelUI(draftState.config);
+    }
+    
+    // Show success message
+    const ageMinutes = Math.floor((new Date() - new Date(draftState.createdAt)) / (1000 * 60));
+    const ageText = ageMinutes < 1 ? '直前' : `${ageMinutes}分前`;
+    showMessage(`下書きを復元しました（${ageText}に作成）`, 'success');
+    
+    logDebug('Draft recovered successfully from session storage');
+    return true;
+    
+  } catch (error) {
+    logError('Failed to recover draft from session:', error);
+    showMessage('下書きの復元に失敗しました', 'error');
+    return false;
+  }
+}
+
+/**
+ * Update config panel UI with recovered settings
+ * @param {Object} config - Configuration object
+ */
+function updateConfigPanelUI(config) {
+  try {
+    // Update opinion header if available
+    if (config.opinionHeader) {
+      const opinionSelect = document.getElementById('opinion-header-select');
+      if (opinionSelect) {
+        opinionSelect.value = config.opinionHeader;
+      }
+    }
+    
+    // Update name header if available
+    if (config.nameHeader) {
+      const nameSelect = document.getElementById('name-header-select');
+      if (nameSelect) {
+        nameSelect.value = config.nameHeader;
+      }
+    }
+    
+    // Update reaction settings if available
+    if (config.allowReactions !== undefined) {
+      const reactionCheckbox = document.getElementById('allow-reactions');
+      if (reactionCheckbox) {
+        reactionCheckbox.checked = !!config.allowReactions;
+      }
+    }
+    
+    logDebug('Config panel UI updated with recovered settings');
+    
+  } catch (error) {
+    logWarn('Failed to update config panel UI:', error);
+  }
 }
 
 // 旧来のカード形式の履歴表示は削除 - 簡単なテーブル形式のみ使用
@@ -2516,33 +2834,71 @@ function generateHistoryId() {
  * 簡単な履歴テーブルを表示（新実装）
  */
 
-function loadSimpleHistoryTable() {
+async function loadSimpleHistoryTable() {
   const tableBody = document.getElementById('history-table-body');
   
   if (!tableBody) return;
   
-  const history = getHistoryFromStorage();
-  
-  // テーブルをクリア
-  tableBody.innerHTML = '';
-  
-  if (history.length === 0) {
-    // 履歴が空の場合
-    const emptyRow = document.createElement('tr');
-    emptyRow.innerHTML = `
-      <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
-        履歴がありません
-      </td>
+  try {
+    // ローディング表示
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
+          <div class="flex items-center justify-center">
+            <div class="spinner mr-2"></div>
+            履歴を読み込み中...
+          </div>
+        </td>
+      </tr>
     `;
-    tableBody.appendChild(emptyRow);
-    return;
+    
+    // サーバーサイドとローカルストレージの履歴を取得・統合
+    const mergedHistory = await getMergedHistory();
+    
+    // テーブルをクリア
+    tableBody.innerHTML = '';
+    
+    if (mergedHistory.length === 0) {
+      // 履歴が空の場合
+      const emptyRow = document.createElement('tr');
+      emptyRow.innerHTML = `
+        <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
+          履歴がありません
+        </td>
+      `;
+      tableBody.appendChild(emptyRow);
+      return;
+    }
+    
+    // 履歴アイテムをテーブル行として表示
+    mergedHistory.forEach((item, index) => {
+      const row = createHistoryTableRow(item, index);
+      tableBody.appendChild(row);
+    });
+    
+    logDebug('History table loaded with', mergedHistory.length, 'items');
+  } catch (error) {
+    logError('Failed to load history table:', error);
+    
+    // エラー時はローカルストレージのみ使用
+    const localHistory = getHistoryFromStorage();
+    tableBody.innerHTML = '';
+    
+    if (localHistory.length === 0) {
+      const emptyRow = document.createElement('tr');
+      emptyRow.innerHTML = `
+        <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
+          履歴の読み込みに失敗しました
+        </td>
+      `;
+      tableBody.appendChild(emptyRow);
+    } else {
+      localHistory.forEach((item, index) => {
+        const row = createHistoryTableRow(item, index);
+        tableBody.appendChild(row);
+      });
+    }
   }
-  
-  // 履歴アイテムをテーブル行として表示
-  history.forEach((item, index) => {
-    const row = createHistoryTableRow(item, index);
-    tableBody.appendChild(row);
-  });
 }
 
 /**
@@ -2574,35 +2930,91 @@ function createHistoryTableRow(item, index) {
     });
   };
   
-  // 回答形式の表示ロジック
+  // 回答形式の表示ロジック（カスタムフォーム設定に基づく）
   const getAnswerFormatDisplay = (item) => {
-    // configから回答形式を判定
-    if (item.config) {
-      const config = item.config;
-      if (config.showNames && config.showCounts) {
-        return `<span class="text-blue-400">名前・数</span>`;
-      } else if (config.showNames) {
-        return `<span class="text-green-400">名前表示</span>`;
-      } else if (config.showCounts) {
-        return `<span class="text-purple-400">数表示</span>`;
-      } else {
-        return `<span class="text-gray-400">標準</span>`;
+    if (!item.config) {
+      return `<span class="text-gray-500">不明</span>`;
+    }
+    
+    const config = item.config;
+    
+    // 1. setupType が既に設定されている場合
+    if (item.setupType) {
+      switch (item.setupType) {
+        case 'quickstart':
+          return `<span class="text-green-400">1行回答</span>`;
+        case 'custom':
+          // カスタムの場合は詳細設定を確認
+          break;
+        case 'external':
+          return `<span class="text-orange-400">外部</span>`;
       }
     }
-    // configがない古いデータの場合
-    return `<span class="text-gray-500">不明</span>`;
+    
+    // 2. フォーム設定から判定
+    // 複数選択（checkbox）の判定
+    if (config.multipleChoice || 
+        config.allowMultipleAnswers || 
+        (config.formElements && config.formElements.some(elem => elem.type === 'checkbox'))) {
+      return `<span class="text-purple-400">複数選択</span>`;
+    }
+    
+    // 単一選択（radio/select）の判定
+    if (config.singleChoice || 
+        config.choices || 
+        config.options ||
+        (config.formElements && config.formElements.some(elem => elem.type === 'radio' || elem.type === 'select'))) {
+      return `<span class="text-blue-400">単一選択</span>`;
+    }
+    
+    // 3. 質問文の内容から推測（AIが推測した内容）
+    const questionText = item.questionText || '';
+    if (questionText.includes('選択') || questionText.includes('どれ')) {
+      if (questionText.includes('複数') || questionText.includes('いくつ')) {
+        return `<span class="text-purple-400">複数選択</span>`;
+      } else {
+        return `<span class="text-blue-400">単一選択</span>`;
+      }
+    }
+    
+    // 4. デフォルト：1行回答（自由記述）
+    return `<span class="text-green-400">1行回答</span>`;
   };
   
-  // 活動状況インジケーター
-  const statusIndicator = isActive 
-    ? `<div class="w-2 h-2 bg-green-400 rounded-full animate-pulse inline-block mr-2"></div>`
-    : `<div class="w-2 h-2 bg-gray-500 rounded-full inline-block mr-2"></div>`;
+  // Visual indicators for display options
+  const getDisplayModeIcon = (displayMode) => {
+    return displayMode === '匿名表示' ? '👤' : '👥';
+  };
+  
+  const getCountDisplayIcon = (countDisplay) => {
+    return countDisplay === '非表示' ? '🚫' : '📊';
+  };
+  
+  const getStatusIcon = (status, isActive) => {
+    if (isActive && status === 'published') return '🌐';
+    if (status === 'ended') return '⏹️';
+    if (status === 'draft') return '📝';
+    return '🌐'; // default for published
+  };
+  
+  // Format display mode and count display as compact visual indicators
+  const displayModeIcon = getDisplayModeIcon(item.displayMode || '通常表示');
+  const countDisplayIcon = getCountDisplayIcon(item.countDisplay || '表示');
+  const statusIcon = getStatusIcon(item.status, isActive);
+  
+  // Combine visual indicators
+  const visualIndicators = `${statusIcon} ${displayModeIcon} ${countDisplayIcon}`;
   
   row.innerHTML = `
-    <td class="px-3 py-2 text-xs text-gray-300">${statusIndicator}${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${escapeHtml(item.questionText)}">${escapeHtml(item.questionText)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.createdAt || item.timestamp)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${escapeHtml(item.questionText || '')} | ${visualIndicators}">
+      <div class="flex items-center gap-1">
+        <span class="truncate flex-1">${escapeHtml(item.questionText || '')}</span>
+        <span class="text-xs opacity-75 flex-shrink-0">${visualIndicators}</span>
+      </div>
+    </td>
     <td class="px-3 py-2 text-xs text-center">${getAnswerFormatDisplay(item)}</td>
-    <td class="px-3 py-2 text-xs text-center ${isActive ? 'text-green-400 font-medium' : 'text-gray-300'}">${item.answerCount || 0}</td>
   `;
   
   return row;
@@ -2612,52 +3024,176 @@ function createHistoryTableRow(item, index) {
  * 履歴選択時の自動フロー処理
  * @param {string} historyId - 履歴ID
  */
-function selectHistoryItem(historyId) {
+async function selectHistoryItem(historyId) {
   try {
-    const history = getHistoryFromStorage();
-    const item = history.find(h => h.id === historyId);
+    // 統合履歴から検索（ローカル + サーバー）
+    const mergedHistory = await getMergedHistory();
+    const item = mergedHistory.find(h => h.id === historyId);
     
     if (!item) {
       showMessage('履歴アイテムが見つかりませんでした', 'error');
       return;
     }
     
-    // 自動でシートを選択
-    if (item.sheetName) {
+    // 復元プロセス開始の通知と進捗表示
+    const progressSteps = [
+      '🔍 履歴データを解析中...',
+      '📊 AI列判定結果を復元中...',
+      '⚙️ 設定を適用中...',
+      '✅ 復元完了'
+    ];
+    
+    let currentStep = 0;
+    const showProgress = (message) => {
+      showMessage(message, 'info', 2000);
+    };
+    
+    showProgress(progressSteps[currentStep++]);
+    
+    // 1. シートを選択してスプレッドシート情報を設定
+    if (item.sheetName && item.spreadsheetId) {
+      selectedSheet = item.sheetName;
+      
+      // currentStatus にスプレッドシート情報を設定
+      if (!currentStatus) {
+        currentStatus = {};
+      }
+      if (!currentStatus.userInfo) {
+        currentStatus.userInfo = {};
+      }
+      currentStatus.userInfo.spreadsheetId = item.spreadsheetId;
+      currentStatus.activeSheetName = item.activeSheetName || item.sheetName;
+      
+      // sheet select UI を更新
       const sheetSelect = document.getElementById('sheet-select');
       if (sheetSelect) {
         sheetSelect.value = item.sheetName;
-        selectedSheet = item.sheetName;
-        
-        // シート選択イベントを発生させてプレビューを読み込み
-        const changeEvent = new Event('change', { bubbles: true });
-        sheetSelect.dispatchEvent(changeEvent);
       }
     }
     
-    // 設定を復元
-    if (item.config) {
-      setTimeout(() => {
-        restoreConfigFromHistory(item.config);
+    // 2. AI列判定結果を復元
+    setTimeout(() => {
+      showProgress(progressSteps[currentStep++]); // AI列判定結果を復元中...
+      
+      if (item.sheetDetails) {
+        if (!currentStatus) currentStatus = {};
+        currentStatus.sheetDetails = {
+          allHeaders: item.sheetDetails.allHeaders || [],
+          guessedConfig: item.sheetDetails.guessedConfig || {},
+          existingConfig: item.sheetDetails.existingConfig || {}
+        };
         
-        // Step 3の表示設定セクションに移動
-        const step3Section = document.getElementById('step3-content');
-        if (step3Section) {
-          step3Section.classList.remove('hidden');
-          step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        logDebug('Restored AI column prediction results:', currentStatus.sheetDetails);
+        
+        // 3. ヘッダー選択肢を設定
+        if (item.sheetDetails.allHeaders && item.sheetDetails.allHeaders.length > 0) {
+          populateHeaderOptions(item.sheetDetails.allHeaders);
+          console.log('✅ Header options restored from history');
         }
         
-        // 現在のステップを3に更新
-        updateStepIndicators(3);
-        manageSectionStates(3);
-        
-        showMessage(`「${item.questionText}」の設定を復元しました`, 'success');
-      }, 500); // シート選択処理の完了を待つ
-    }
+        // 4. AI判定設定を適用
+        if (item.sheetDetails.guessedConfig) {
+          setTimeout(() => {
+            populateConfig(item.sheetDetails.guessedConfig);
+            console.log('✅ AI configuration restored from history');
+          }, 100);
+        }
+      }
+    }, 500);
+    
+    // 5. フォーム設定を復元
+    setTimeout(() => {
+      showProgress(progressSteps[currentStep++]); // 設定を適用中...
+      
+      if (item.config) {
+        restoreConfigFromHistory(item.config);
+      }
+      
+      // 6. UI状態をStep 3（設定完了）に更新
+      const step3Section = document.getElementById('step3-content');
+      if (step3Section) {
+        step3Section.classList.remove('hidden');
+        step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      // ステップインジケーターを更新
+      updateStepIndicators(3);
+      manageSectionStates(3);
+      
+      // 設定ボタンの状態を更新
+      updateConfigButtons();
+      
+      // 設定完了状態を反映
+      if (item.configurationComplete) {
+        updateUIForSelectedSheet();
+      }
+      
+      // 最終完了通知
+      setTimeout(() => {
+        showProgress(progressSteps[currentStep++]); // 復元完了
+        setTimeout(() => {
+          showMessage(`「${item.questionText}」の設定を完全復元しました`, 'success');
+        }, 500);
+      }, 300);
+      
+    }, 800); // AI設定適用の完了を待つ
     
   } catch (error) {
     logError('Failed to select history item:', error);
-    showMessage('履歴の選択に失敗しました', 'error');
+    
+    // 詳細なエラー分析と部分復元の試行
+    let errorMessage = '履歴の選択に失敗しました';
+    let partiallyRestored = false;
+    
+    try {
+      // 部分復元を試行
+      const mergedHistory = await getMergedHistory();
+      const item = mergedHistory.find(h => h.id === historyId);
+      
+      if (item) {
+        // 最低限の設定復元を試行
+        if (item.sheetName) {
+          selectedSheet = item.sheetName;
+          const sheetSelect = document.getElementById('sheet-select');
+          if (sheetSelect) {
+            sheetSelect.value = item.sheetName;
+          }
+          partiallyRestored = true;
+        }
+        
+        if (item.config && item.config.opinionHeader) {
+          const opinionSelect = document.getElementById('opinionHeader');
+          if (opinionSelect) {
+            opinionSelect.innerHTML = `<option value="${item.config.opinionHeader}">${item.config.opinionHeader}</option>`;
+            opinionSelect.value = item.config.opinionHeader;
+            partiallyRestored = true;
+          }
+        }
+        
+        if (partiallyRestored) {
+          errorMessage = `「${item.questionText}」の基本設定のみ復元しました。AI列判定は手動で実行してください。`;
+          showMessage(errorMessage, 'warning');
+          
+          // Step 2に移動（手動設定を促す）
+          updateStepIndicators(2);
+          manageSectionStates(2);
+          return;
+        }
+      }
+    } catch (partialError) {
+      logWarn('Partial restoration also failed:', partialError);
+    }
+    
+    // 完全な失敗時のメッセージ
+    if (error.message.includes('not found')) {
+      errorMessage = '指定された履歴が見つかりませんでした。サーバーとの同期に問題がある可能性があります。';
+    } else if (error.message.includes('network') || error.message.includes('timeout')) {
+      errorMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+    } else if (error.message.includes('permission')) {
+      errorMessage = 'アクセス権限がありません。管理者にお問い合わせください。';
+    }
+    
+    showMessage(errorMessage, 'error');
   }
 }
 
@@ -3023,8 +3559,14 @@ function fixConfigForPublishedState(config) {
 
 
 // 簡単な履歴テーブル初期化
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  // Load history table
   loadSimpleHistoryTable();
+  
+  // Check for and recover draft from session storage
+  if (hasDraftInSession()) {
+    await recoverDraftFromSession();
+  }
 });
 
 // 日時フォーマット関数
