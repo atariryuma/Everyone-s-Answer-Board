@@ -17,6 +17,8 @@ if (typeof window !== 'undefined') {
   window.toggleSection = window.toggleSection || function() { console.warn('toggleSection not yet loaded'); };
   window.navigateToStep = window.navigateToStep || function() { console.warn('navigateToStep not yet loaded'); };
   window.updateUIWithNewStatus = window.updateUIWithNewStatus || function() { console.warn('updateUIWithNewStatus not yet loaded'); };
+  window.hidePrivacyModal = window.hidePrivacyModal || function() { console.warn('hidePrivacyModal not yet loaded'); };
+  window.showPrivacyModal = window.showPrivacyModal || function() { console.warn('showPrivacyModal not yet loaded'); };
 }
 
 
@@ -1530,6 +1532,11 @@ function showPrivacyModal(onContinue) {
   }
 }
 
+// Override placeholder with actual function
+if (typeof window !== 'undefined') {
+  window.showPrivacyModal = showPrivacyModal;
+}
+
 // Hide privacy modal
 function hidePrivacyModal() {
   const modal = document.getElementById('privacy-modal');
@@ -1538,6 +1545,11 @@ function hidePrivacyModal() {
     modal.classList.remove('flex');
     manageFocusForModal('privacy-modal', false);
   }
+}
+
+// Override placeholder with actual function
+if (typeof window !== 'undefined') {
+  window.hidePrivacyModal = hidePrivacyModal;
 }
 
 // Show digital citizenship modal
@@ -2280,14 +2292,15 @@ function getActiveResourceUrls(status) {
   
   // フォルダURLが設定されていない場合、folderIdから構築を試行
   if (!urls.folder && config.folderId) {
-    urls.folder = `https://drive.google.com/drive/folders/${config.folderId || ''}`;
+    const safeFolderId = String(config.folderId || '');
+    urls.folder = 'https://drive.google.com/drive/folders/' + safeFolderId;
     console.log('📁 Folder URL constructed from folderId:', urls.folder);
   }
 
   // 4. フォームURLの取得 (configJsonから、公開シートを優先)
   const publishedSheetName = config.publishedSheetName;
   if (publishedSheetName) {
-    const sheetConfig = config[`sheet_${publishedSheetName || ''}`];
+    const sheetConfig = config['sheet_' + String(publishedSheetName || '')];
     if (sheetConfig) {
       urls.form = sheetConfig.formUrl || urls.form;
       urls.editForm = sheetConfig.editFormUrl || urls.editForm;
@@ -2981,7 +2994,7 @@ function syncGlobalColumnSettings(config) {
     return config; // シート名が不明な場合はスキップ
   }
   
-  const sheetConfigKey = `sheet_${config.publishedSheetName || ''}`;
+  const sheetConfigKey = 'sheet_' + String(config.publishedSheetName || '');
   const sheetConfig = config[sheetConfigKey];
   
   if (sheetConfig && typeof sheetConfig === 'object') {
@@ -3217,12 +3230,12 @@ function updateNewResourceButtons(resourceUrls) {
     // configJsonから直接取得を試行
     const config = window.configJson || window.AdminPanel?.status?.config;
     if (config) {
-      folderUrl = config.folderUrl || config.folderId && `https://drive.google.com/drive/folders/${config.folderId || ''}`;
+      folderUrl = config.folderUrl || (config.folderId && ('https://drive.google.com/drive/folders/' + String(config.folderId || '')));
     }
     
     // フォルダIDから直接URLを構築
     if (!folderUrl && config?.folderId) {
-      folderUrl = `https://drive.google.com/drive/folders/${config.folderId || ''}`;
+      folderUrl = 'https://drive.google.com/drive/folders/' + String(config.folderId || '');
       console.log('📁 Folder URL constructed from folderId:', folderUrl);
     }
   }
