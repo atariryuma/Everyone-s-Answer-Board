@@ -1115,7 +1115,7 @@ function updateUser(userId, updateData) {
     }
 
     // 重要: 更新完了後に包括的キャッシュ同期を実行
-    var userInfo = findUserById(userId);
+    var userInfo = findUserByIdFresh(userId); // findUserByIdFresh を使用
     var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
     var oldSpreadsheetId = userInfo ? userInfo.spreadsheetId : null;
     var newSpreadsheetId = updateData.spreadsheetId || oldSpreadsheetId;
