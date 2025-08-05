@@ -1804,11 +1804,20 @@ function renderUnpublishedPage(userInfo, params) {
 
     // キャッシュを無効化して確実なリダイレクトを保証
     const htmlOutput = template.evaluate()
-      .setTitle('StudyQuest - 準備中')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0');
+      .setTitle('StudyQuest - 準備中');
+    
+    // addMetaTagを安全に追加
+    try {
+      htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    } catch (e) {
+      console.warn('⚠️ addMetaTag(viewport) failed:', e.message);
+    }
+    
+    try {
+      htmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
+    } catch (e) {
+      console.warn('⚠️ addMetaTag(cache-control) failed:', e.message);
+    }
 
     try {
       if (HtmlService && HtmlService.XFrameOptionsMode &&
@@ -1886,10 +1895,23 @@ function renderMinimalUnpublishedPage(userInfo) {
       </html>
     `;
 
-    return HtmlService.createHtmlOutput(htmlContent)
-      .setTitle('StudyQuest - 準備中')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
+    const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+      .setTitle('StudyQuest - 準備中');
+    
+    // addMetaTagを安全に追加
+    try {
+      htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    } catch (e) {
+      console.warn('⚠️ renderMinimalUnpublishedPage addMetaTag(viewport) failed:', e.message);
+    }
+    
+    try {
+      htmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
+    } catch (e) {
+      console.warn('⚠️ renderMinimalUnpublishedPage addMetaTag(cache-control) failed:', e.message);
+    }
+    
+    return htmlOutput;
 
   } catch (error) {
     logError(error, 'renderMinimalUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, {
@@ -1991,10 +2013,23 @@ function renderMinimalUnpublishedPage(userInfo) {
       </html>
     `;
     
-    return HtmlService.createHtmlOutput(finalFallbackHtml)
-      .setTitle('StudyQuest - 準備中')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
+    const finalHtmlOutput = HtmlService.createHtmlOutput(finalFallbackHtml)
+      .setTitle('StudyQuest - 準備中');
+    
+    // addMetaTagを安全に追加
+    try {
+      finalHtmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    } catch (e) {
+      console.warn('⚠️ Final fallback addMetaTag(viewport) failed:', e.message);
+    }
+    
+    try {
+      finalHtmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
+    } catch (e) {
+      console.warn('⚠️ Final fallback addMetaTag(cache-control) failed:', e.message);
+    }
+    
+    return finalHtmlOutput;
   }
 }
 
