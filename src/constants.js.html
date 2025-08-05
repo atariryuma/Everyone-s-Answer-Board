@@ -19,15 +19,14 @@ const SYSTEM_CONSTANTS = {
 
   // CustomSetup関連定数
   CUSTOM_SETUP: {
-    TOTAL_STEPS: 7,
+    TOTAL_STEPS: 6,
     STEP_TIMES: {
-      ANALYSIS: 12,           // ステップ1: カスタムフォーム設定の解析 (12秒)
+      ANALYSIS: 12,           // ステップ1: 入力検証 (12秒)
       FORM_CREATION: 20,      // ステップ2: フォーム・スプレッドシート作成 (20秒)
       AI_DETECTION: 25,       // ステップ3: AI列判定 (25秒)
       CONFIG_SAVE: 8,         // ステップ4: 設定保存 (8秒)
-      PUBLISH: 15,            // ステップ5: 自動公開 (15秒)
-      CACHE_CLEAR: 8,         // ステップ6: キャッシュクリア (8秒)
-      RESPONSE: 5             // ステップ7: レスポンス生成 (5秒)
+      CACHE_CLEAR: 8,         // ステップ5: キャッシュクリア (8秒)
+      RESPONSE: 5             // ステップ6: レスポンス生成 (5秒)
     },
     PROGRESS_UPDATE_INTERVAL: 150,  // プログレス更新間隔 (150ms)
     MAX_RETRY_COUNT: 3,             // 最大リトライ回数
