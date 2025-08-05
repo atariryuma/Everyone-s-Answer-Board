@@ -320,11 +320,23 @@ function setupFormConfigModalHandlers() {
   var formConfigCreate = document.getElementById('form-config-create');
   
   if (formConfigClose) {
-    formConfigClose.addEventListener('click', hideFormConfigModal);
+    formConfigClose.addEventListener('click', function() {
+      if (typeof hideFormConfigModal === 'function') {
+        hideFormConfigModal();
+      } else {
+        console.warn('hideFormConfigModal not available');
+      }
+    });
   }
   
   if (formConfigCancel) {
-    formConfigCancel.addEventListener('click', hideFormConfigModal);
+    formConfigCancel.addEventListener('click', function() {
+      if (typeof hideFormConfigModal === 'function') {
+        hideFormConfigModal();
+      } else {
+        console.warn('hideFormConfigModal not available');
+      }
+    });
   }
   
   if (formConfigCreate) {
@@ -479,7 +491,9 @@ function setupBackdropClickHandlers() {
           // Close modal when clicking backdrop
           switch(modalId) {
             case 'form-config-modal':
-              hideFormConfigModal();
+              if (typeof hideFormConfigModal === 'function') {
+                hideFormConfigModal();
+              }
               break;
             case 'privacy-modal':
               hidePrivacyModal();
@@ -620,7 +634,9 @@ document.addEventListener('keydown', function(e) {
       
       switch(modalId) {
         case 'form-config-modal':
-          hideFormConfigModal();
+          if (typeof hideFormConfigModal === 'function') {
+            hideFormConfigModal();
+          }
           break;
         case 'privacy-modal':
           hidePrivacyModal();
