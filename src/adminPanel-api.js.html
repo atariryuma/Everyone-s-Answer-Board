@@ -1643,19 +1643,15 @@ function unpublishBoard() {
   return runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
     .then(function(response) {
       logDebug('公開停止レスポンス:', response);
-      showMessage(response.message || '✅ 回答ボードの公開を停止しました。', 'success');
-      
       // 公開停止時に履歴を保存
       saveHistoryOnUnpublish(response);
-      
+
       // 強化されたキャッシュクリア処理（キャッシュバスティング対応）
       clearAllCachesForUnpublish();
-      
+
       // Reset column selection dropdowns to default "--列を選択--" state
       resetColumnSelections();
-      
-      loadStatus(true); // ステータスを強制更新
-      
+
       // 公開停止処理が成功したことを返す
       return Promise.resolve(response);
     })
