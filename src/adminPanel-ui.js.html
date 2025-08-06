@@ -169,11 +169,7 @@ function updateUIWithNewStatus(status) {
 
 // Override placeholder with actual function
 if (typeof window !== 'undefined') {
-  if (typeof window._registerAdminFunction === 'function') {
-    window._registerAdminFunction('updateUIWithNewStatus', updateUIWithNewStatus);
-  } else {
-    window.updateUIWithNewStatus = updateUIWithNewStatus;
-  }
+  window.updateUIWithNewStatus = updateUIWithNewStatus;
 }
 
 // データ準備の最適化（同期処理部分）
@@ -1357,11 +1353,7 @@ function toggleSection(sectionId) {
 
 // Override placeholder with actual function
 if (typeof window !== 'undefined') {
-  if (typeof window._registerAdminFunction === 'function') {
-    window._registerAdminFunction('toggleSection', toggleSection);
-  } else {
-    window.toggleSection = toggleSection;
-  }
+  window.toggleSection = toggleSection;
 }
 
 // Automatically collapse completed sections
@@ -1495,11 +1487,7 @@ function showFormConfigModal() {
 
 // Override placeholder with actual function
 if (typeof window !== 'undefined') {
-  if (typeof window._registerAdminFunction === 'function') {
-    window._registerAdminFunction('showFormConfigModal', showFormConfigModal);
-  } else {
-    window.showFormConfigModal = showFormConfigModal;
-  }
+  window.showFormConfigModal = showFormConfigModal;
 }
 
 // Hide form configuration modal
@@ -1556,11 +1544,7 @@ function hidePrivacyModal() {
 
 // Override placeholder with actual function
 if (typeof window !== 'undefined') {
-  if (typeof window._registerAdminFunction === 'function') {
-    window._registerAdminFunction('hidePrivacyModal', hidePrivacyModal);
-  } else {
-    window.hidePrivacyModal = hidePrivacyModal;
-  }
+  window.hidePrivacyModal = hidePrivacyModal;
 }
 
 // Show digital citizenship modal
@@ -2430,11 +2414,7 @@ function navigateToStep(step) {
 
 // Override placeholder with actual function
 if (typeof window !== 'undefined') {
-  if (typeof window._registerAdminFunction === 'function') {
-    window._registerAdminFunction('navigateToStep', navigateToStep);
-  } else {
-    window.navigateToStep = navigateToStep;
-  }
+  window.navigateToStep = navigateToStep;
 }
 
 
