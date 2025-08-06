@@ -15,30 +15,7 @@ window.AdminPanel = window.AdminPanel || {
   }
 };
 
-// -----------------------------------------------------------------------------
-// Error & Message Handling
-// -----------------------------------------------------------------------------
-window.AdminPanel.errors.handle = function(error, context, userMessage) {
-  // Use the unified error handler from SharedUtilities
-  if (window.sharedUtilities && window.sharedUtilities.errors && typeof window.sharedUtilities.errors.logError === 'function') {
-    window.sharedUtilities.errors.logError(error, context);
-  } else {
-    console.error(`❌ Fallback Error in ${context}:`, error);
-  }
-  const message = userMessage || (error && error.message ? error.message : String(error));
-  window.AdminPanel.ui.showMessage(message, 'error');
-};
 
-window.AdminPanel.ui.showMessage = function(msg, type = 'info', duration = 5000, options = {}) {
-  // Prefer shared utility implementation if available
-  if (window.sharedUtilities && typeof window.sharedUtilities.showMessage === 'function') {
-    return window.sharedUtilities.showMessage(msg, type, duration, options);
-  }
-  // If shared utility is not available, log a critical error.
-  // This indicates a setup issue, as sharedUtilities should always be loaded.
-  console.error('CRITICAL ERROR: Shared message utility (window.sharedUtilities.showMessage) is not available. Message:', msg);
-  // No fallback UI implementation here to avoid conflicts and ensure single source of truth.
-};
 
 
 
