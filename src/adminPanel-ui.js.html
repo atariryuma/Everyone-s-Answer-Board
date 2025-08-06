@@ -690,12 +690,19 @@ function clearConfigFields() {
 // Build configuration object from form
 function buildConfigObject() {
   // Get values from primary elements (with fallback to secondary elements)
-  const opinionValue = document.getElementById('opinionHeader')?.value || 
-                      document.getElementById('reason-column')?.value || '';
-  const nameValue = document.getElementById('name-column')?.value || '';
-  const classValue = document.getElementById('class-column')?.value || '';
-  const showNames = document.getElementById('show-names')?.checked || false;
-  const showCounts = document.getElementById('show-counts')?.checked || false;
+  const opinionHeaderEl = document.getElementById('opinionHeader');
+  const reasonColumnEl = document.getElementById('reason-column');
+  const nameColumnEl = document.getElementById('name-column');
+  const classColumnEl = document.getElementById('class-column');
+  const showNamesEl = document.getElementById('show-names');
+  const showCountsEl = document.getElementById('show-counts');
+  
+  const opinionValue = (opinionHeaderEl ? opinionHeaderEl.value : '') || 
+                      (reasonColumnEl ? reasonColumnEl.value : '') || '';
+  const nameValue = nameColumnEl ? nameColumnEl.value : '';
+  const classValue = classColumnEl ? classColumnEl.value : '';
+  const showNames = showNamesEl ? showNamesEl.checked : false;
+  const showCounts = showCountsEl ? showCountsEl.checked : false;
   
   return {
     sheetName: selectedSheet,
@@ -716,8 +723,10 @@ function buildConfigObject() {
 // Full implementation of validateConfig (framework has minimal version)
 function _fullValidateConfig() {
   // Check primary element first, then fallback to secondary element
-  const opinionValue = document.getElementById('opinionHeader')?.value || 
-                      document.getElementById('reason-column')?.value || '';
+  const opinionHeaderEl = document.getElementById('opinionHeader');
+  const reasonColumnEl = document.getElementById('reason-column');
+  const opinionValue = (opinionHeaderEl ? opinionHeaderEl.value : '') || 
+                      (reasonColumnEl ? reasonColumnEl.value : '') || '';
   
   return opinionValue && opinionValue.trim() !== '';
 }
@@ -877,8 +886,16 @@ function executeBatchStepUpdates(updates) {
 
     // Text要素の更新（クラス操作の最適化）
     if (text && config.textClasses) {
-      text.classList.remove(...config.textClasses.remove);
-      text.classList.add(...config.textClasses.add);
+      if (config.textClasses.remove && config.textClasses.remove.length > 0) {
+        for (const className of config.textClasses.remove) {
+          text.classList.remove(className);
+        }
+      }
+      if (config.textClasses.add && config.textClasses.add.length > 0) {
+        for (const className of config.textClasses.add) {
+          text.classList.add(className);
+        }
+      }
     }
   });
 }
@@ -1128,7 +1145,7 @@ function updateTopicText(status) {
   if (status.userInfo?.configJson) {
     try {
       const fullConfig = JSON.parse(status.userInfo.configJson);
-      cfg = { ...cfg, ...fullConfig };
+      cfg = Object.assign({}, cfg, fullConfig);
     } catch (e) {
       console.warn('Failed to parse userInfo.configJson:', e);
     }
@@ -2549,7 +2566,7 @@ async function getMergedHistory() {
     // ローカル履歴を追加（軽量検証）
     for (const item of localHistory) {
       if (item?.id) {
-        mergedMap.set(item.id, { ...item, source: 'local' });
+        mergedMap.set(item.id, Object.assign({}, item, { source: 'local' }));
         totalItems++;
       }
     }
@@ -2557,7 +2574,7 @@ async function getMergedHistory() {
     // サーバー履歴を追加（サーバー側優先）
     for (const item of serverHistory) {
       if (item?.id) {
-        mergedMap.set(item.id, { ...item, source: 'server' });
+        mergedMap.set(item.id, Object.assign({}, item, { source: 'server' }));
         totalItems++;
       }
     }
@@ -3522,7 +3539,7 @@ function normalizeConfigJson(config, userInfo) {
  * @return {Object} クリーンアップされたconfig
  */
 function removeRedundantFields(config) {
-  const cleanConfig = { ...config };
+  const cleanConfig = Object.assign({}, config);
   
   // setupStepは計算プロパティのため、保存済みの値を削除
   delete cleanConfig.setupStep;
@@ -3719,7 +3736,7 @@ function ensureRequiredFields(config) {
  * @return {Object} 修復されたconfig
  */
 function fixConfigForPublishedState(config) {
-  const fixedConfig = { ...config };
+  const fixedConfig = Object.assign({}, config);
   
   // 公開済み状態の必須フィールドを修復
   if (fixedConfig.setupStatus !== 'completed') {
@@ -3769,7 +3786,8 @@ function formatDateTime(date) {
       minute: '2-digit',
       timeZone: 'Asia/Tokyo'
     };
-    return new Intl.DateTimeFormat('ja-JP', options).format(date).replace(/\//g, '-');
+    // Google Apps Script compatible date formatting
+    return date.toLocaleDateString('ja-JP', options).replace(/\//g, '-');
   } catch (error) {
     console.warn('⚠️ Date formatting failed:', error);
     return date.toISOString().split('T')[0] + ' ' + date.toISOString().split('T')[1].substring(0, 5);
