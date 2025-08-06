@@ -886,7 +886,7 @@ function validateRequiredHeaders(indices) {
  * @param {string} [spreadsheetId] - 関連スプレッドシートID
  * @param {boolean} [clearPattern=false] - パターンベースのクリアを行うか
  */
-function invalidateUserCache(userId, email, spreadsheetId, clearPattern) {
+function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId) {
   const keysToRemove = [];
 
   if (userId) {
@@ -911,6 +911,10 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern) {
   // さらに包括的なパターンマッチングが必要な場合
   if (clearPattern && spreadsheetId) {
     cacheManager.clearByPattern(spreadsheetId);
+  }
+
+  if (dbSpreadsheetId) {
+    cacheManager.invalidateRelated('spreadsheet', dbSpreadsheetId);
   }
 
   debugLog(`[Cache] Invalidated user cache for userId: ${userId}, email: ${email}, spreadsheetId: ${spreadsheetId}`);
