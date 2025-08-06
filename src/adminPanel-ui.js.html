@@ -2383,35 +2383,7 @@ function updateSystemStatusDisplay(status) {
 }
 
 // Navigate to specific step
-function navigateToStep(step) {
-  currentStep = step;
-  
-  // Update step indicators
-  document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
-    const stepNumber = index + 1;
-    indicator.classList.toggle('completed', stepNumber < step);
-    indicator.classList.toggle('active', stepNumber === step);
-  });
-  
-  // Show/hide step content
-  document.querySelectorAll('.step-content').forEach((content, index) => {
-    const stepNumber = index + 1;
-    content.classList.toggle('hidden', stepNumber !== step);
-  });
-  
-  // Update progress bar
-  const progressBar = document.querySelector('.progress-bar');
-  if (progressBar) {
-    progressBar.style.width = `${(step / 3) * 100}%`;
-  }
-  
-  validateCurrentStep();
-}
-
-// Override placeholder with actual function
-if (typeof window !== 'undefined') {
-  window.navigateToStep = navigateToStep;
-}
+// navigateToStep function is now defined in adminPanel-framework.js.html
 
 
 // セットアップ状況をグローバルステータスから取得
@@ -3819,24 +3791,24 @@ function fixConfigForPublishedState(config) {
   
   // 公開済み状態の必須フィールドを修復
   if (fixedConfig.setupStatus !== 'completed') {
-    console.log('🔧 setupStatusをpendingからcompletedに修復');
+    console.log('🔧 setupStatus fixed from pending to completed');
     fixedConfig.setupStatus = 'completed';
   }
   
   if (!fixedConfig.formCreated) {
-    console.log('🔧 formCreatedをfalseからtrueに修復');
+    console.log('🔧 formCreated status fixed from false to true');
     fixedConfig.formCreated = true;
   }
   
   if (!fixedConfig.appPublished) {
-    console.log('🔧 appPublishedをfalseからtrueに修復');
+    console.log('🔧 appPublished status fixed from false to true');
     fixedConfig.appPublished = true;
   }
   
-  // formUrlの仮置き（実際のフォームURLが不明な場合）
+  // Form URL temporary setting (if actual form URL is unknown)
   if (!fixedConfig.formUrl || fixedConfig.formUrl.trim() === '') {
-    console.log('🔧 formUrlを仮設定（公開済み状態維持用）');
-    fixedConfig.formUrl = 'https://docs.google.com/temp-form-url'; // 仮ライセンスURL
+    console.log('🔧 formUrl temporary setting for published state maintenance');
+    fixedConfig.formUrl = 'https://docs.google.com/temp-form-url'; // Temporary license URL
   }
   
   return fixedConfig;

@@ -7,11 +7,11 @@
 // LOGGING UTILITIES - Standardized logging with levels
 // =============================================================================
 
-// Simple logging utility with conditional output based on DEBUG mode
-const DEBUG_MODE = window.DEBUG_MODE || false;
+// Simple logging utility with conditional output based on DEBUG mode  
+// DEBUG_MODE is defined in constants.js.html
 
 function adminLog(level, ...args) {
-  if (!DEBUG_MODE) return;
+  if (!(window.DEBUG_MODE || window.SYSTEM_CONSTANTS?.DEBUG_MODE)) return;
   
   switch (level) {
     case 'error':
@@ -24,7 +24,7 @@ function adminLog(level, ...args) {
       console.log('[AdminPanel]', ...args);
       break;
     case 'debug':
-      if (DEBUG_MODE) console.log('[AdminPanel:DEBUG]', ...args);
+      if (window.DEBUG_MODE || window.SYSTEM_CONSTANTS?.DEBUG_MODE) console.log('[AdminPanel:DEBUG]', ...args);
       break;
     default:
       console.log('[AdminPanel]', ...args);

@@ -401,9 +401,9 @@
 
   // Export functions for global access
   window.adminPanel = {
-    initializeAdminPanel,
-    navigateToStep,
-    showMessage,
+    initializeAdminPanel: window.initializeAdminPanel, // Function moved to framework
+    navigateToStep: window.navigateToStep, // Function moved to framework
+    showMessage: window.showMessage || function() { console.warn('showMessage not yet available'); },
     switchToAnotherAccount,
     openAppSetupPage,
     logoutAndRedirect
