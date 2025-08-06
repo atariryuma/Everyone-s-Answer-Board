@@ -485,11 +485,20 @@ function updateUIWithNewStatus(status) {
   // Try to use the full implementation if available
   if (typeof window._fullUpdateUIWithNewStatus === 'function') {
     try {
+      console.log('updateUIWithNewStatus: Using full implementation');
       return window._fullUpdateUIWithNewStatus(status);
     } catch (error) {
       console.warn('Full updateUIWithNewStatus failed, using fallback:', error);
       // Continue with minimal implementation below
     }
+  } else {
+    // Wait a short moment for the full implementation to load
+    setTimeout(() => {
+      if (typeof window._fullUpdateUIWithNewStatus === 'function') {
+        console.log('updateUIWithNewStatus: Full implementation now available, retrying');
+        window._fullUpdateUIWithNewStatus(status);
+      }
+    }, 100);
   }
   
   // Minimal implementation for essential UI updates
@@ -707,6 +716,116 @@ window.AdminPanel.functionRegistry = {
   }
 };
 
+// =============================================================================
+// ADDITIONAL UI FUNCTIONS - Critical functions that were missing
+// =============================================================================
+
+// Update form URL display (minimal implementation)
+function updateFormUrlDisplay(status = null) {
+  // Try to use the full implementation if available
+  if (typeof window._fullUpdateFormUrlDisplay === 'function') {
+    try {
+      return window._fullUpdateFormUrlDisplay(status);
+    } catch (error) {
+      console.warn('Full updateFormUrlDisplay failed, using fallback:', error);
+    }
+  }
+  
+  // Minimal implementation for essential form URL updates
+  console.log('updateFormUrlDisplay: Using minimal implementation');
+  
+  try {
+    const formUrlInput = document.getElementById('form-url-input');
+    if (!formUrlInput) return;
+    
+    const currentStatusToUse = status || window.currentStatus;
+    if (!currentStatusToUse || !currentStatusToUse.userInfo) {
+      console.warn('⚠️ updateFormUrlDisplay: status情報が不足しています');
+      return;
+    }
+    
+    // Simple form URL extraction
+    let formUrl = null;
+    if (currentStatusToUse.userInfo.configJson) {
+      try {
+        const config = typeof currentStatusToUse.userInfo.configJson === 'string' 
+          ? JSON.parse(currentStatusToUse.userInfo.configJson) 
+          : currentStatusToUse.userInfo.configJson;
+        formUrl = config.formUrl;
+      } catch (e) {
+        console.warn('Failed to parse configJson for form URL');
+      }
+    }
+    
+    if (formUrl) {
+      formUrlInput.value = formUrl;
+      const openFormLink = document.getElementById('open-form-url-link');
+      if (openFormLink) {
+        openFormLink.href = formUrl;
+      }
+    }
+  } catch (error) {
+    console.error('Error in minimal updateFormUrlDisplay:', error);
+  }
+}
+
+// Populate header options (minimal implementation)
+function populateHeaderOptions(headers) {
+  // Try to use the full implementation if available
+  if (typeof window._fullPopulateHeaderOptions === 'function') {
+    try {
+      return window._fullPopulateHeaderOptions(headers);
+    } catch (error) {
+      console.warn('Full populateHeaderOptions failed, using fallback:', error);
+    }
+  }
+  
+  // Minimal implementation for essential header population
+  console.log('populateHeaderOptions: Using minimal implementation');
+  
+  try {
+    if (window.populateHeaderOptionsRunning) {
+      return;
+    }
+    window.populateHeaderOptionsRunning = true;
+    
+    const selects = ['opinionHeader', 'reason-column', 'name-column', 'class-column'];
+    
+    selects.forEach(selectId => {
+      const select = document.getElementById(selectId);
+      if (select) {
+        const currentValue = select.value;
+        
+        if (headers && headers.length > 0) {
+          select.innerHTML = '<option value="">-- 列を選択 --</option>';
+          headers.forEach(header => {
+            if (header && typeof header === 'string' && header.trim()) {
+              const option = document.createElement('option');
+              option.value = header;
+              option.textContent = header;
+              select.appendChild(option);
+            }
+          });
+          select.disabled = false;
+          if (currentValue) {
+            select.value = currentValue;
+          }
+        } else {
+          select.innerHTML = '<option value="">-- シートを選択してください --</option>';
+          select.disabled = true;
+        }
+      }
+    });
+    
+    setTimeout(() => {
+      window.populateHeaderOptionsRunning = false;
+    }, 100);
+  } catch (error) {
+    console.error('Error in minimal populateHeaderOptions:', error);
+    window.populateHeaderOptionsRunning = false;
+  }
+}
+
 // Make all critical functions globally available immediately
 window.toggleSection = toggleSection;
 window.hidePrivacyModal = hidePrivacyModal;
@@ -717,6 +836,8 @@ window.showMessage = showMessage;
 window.updateUIWithNewStatus = updateUIWithNewStatus;
 window.validateConfig = validateConfig;
 window.updateConfigButtons = updateConfigButtons;
+window.updateFormUrlDisplay = updateFormUrlDisplay;
+window.populateHeaderOptions = populateHeaderOptions;
 window.checkFunctionAvailability = checkFunctionAvailability;
 window.safeCallFunction = safeCallFunction;
 
@@ -725,6 +846,7 @@ const criticalFunctions = [
   'toggleSection', 'hidePrivacyModal', 'hideDigitalCitizenshipModal', 
   'hideConfirmationModal', 'showFormConfigModal', 'showMessage', 
   'updateUIWithNewStatus', 'validateConfig', 'updateConfigButtons', 
+  'updateFormUrlDisplay', 'populateHeaderOptions',
   'navigateToStep', 'initializeAdminPanel'
 ];
 

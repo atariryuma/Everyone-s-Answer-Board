@@ -564,7 +564,8 @@ function populateSheetSelect(sheetNames, activeSheetName) {
 }
 
 // Populate header options for configuration
-function populateHeaderOptions(headers) {
+// Full implementation of populateHeaderOptions (framework has minimal version)
+function _fullPopulateHeaderOptions(headers) {
   // Throttle function calls to prevent spam
   if (window.populateHeaderOptionsRunning) {
     return;
@@ -749,6 +750,8 @@ function _fullUpdateConfigButtons() {
 // Make full implementations globally available for framework fallback
 window._fullValidateConfig = _fullValidateConfig;
 window._fullUpdateConfigButtons = _fullUpdateConfigButtons;
+window._fullUpdateFormUrlDisplay = _fullUpdateFormUrlDisplay;
+window._fullPopulateHeaderOptions = _fullPopulateHeaderOptions;
 
 // =============================================================================
 // STEP INDICATORS AND GUIDANCE
@@ -1645,7 +1648,8 @@ function updateCustomFormInfo(status) {
 }
 
 // フォームURL表示を確実に更新
-function updateFormUrlDisplay(status = null) {
+// Full implementation of updateFormUrlDisplay (framework has minimal version)
+function _fullUpdateFormUrlDisplay(status = null) {
   const formUrlInput = document.getElementById('form-url-input');
   const formUrlSection = document.getElementById('form-url-section');
   const openFormLink = document.getElementById('open-form-url-link');
