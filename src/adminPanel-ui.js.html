@@ -2723,7 +2723,7 @@ async function recoverDraftFromSession() {
     logDebug('Attempting to recover draft from session:', draftState.questionText);
     
     // Show recovery notification
-    showMessage('下書きを復元しています...', 'info');
+    showMessage('下書きを読み込んでいます...', 'info');
     
     // Restore basic form state
     if (draftState.sheetName) {
@@ -2779,14 +2779,14 @@ async function recoverDraftFromSession() {
     // Show success message
     const ageMinutes = Math.floor((new Date() - new Date(draftState.createdAt)) / (1000 * 60));
     const ageText = ageMinutes < 1 ? '直前' : `${ageMinutes}分前`;
-    showMessage(`下書きを復元しました（${ageText}に作成）`, 'success');
+    showMessage(`下書きを読み込みました（${ageText}に作成）`, 'success');
     
     logDebug('Draft recovered successfully from session storage');
     return true;
     
   } catch (error) {
     logError('Failed to recover draft from session:', error);
-    showMessage('下書きの復元に失敗しました', 'error');
+    showMessage('下書きの読み込みに失敗しました', 'error');
     return false;
   }
 }
@@ -2930,33 +2930,36 @@ function createHistoryTableRow(item, index) {
     });
   };
   
-  // 回答形式の表示ロジック（カスタムフォーム設定に基づく）
+  // 回答形式の表示ロジック（改善版）
   const getAnswerFormatDisplay = (item) => {
-    if (!item.config) {
-      return `<span class="text-gray-500">不明</span>`;
+    // 1. QuickStartの場合は確実にテキストと判定
+    if (item.setupType === 'quickstart') {
+      return `<span class="text-green-400">テキスト</span>`;
     }
     
-    const config = item.config;
-    
-    // 1. setupType が既に設定されている場合
+    // 2. setupType が設定されている場合
     if (item.setupType) {
       switch (item.setupType) {
-        case 'quickstart':
-          return `<span class="text-green-400">1行回答</span>`;
-        case 'custom':
-          // カスタムの場合は詳細設定を確認
-          break;
         case 'external':
           return `<span class="text-orange-400">外部</span>`;
+        case 'custom':
+          // カスタムの場合は詳細設定を確認（下記の判定に進む）
+          break;
       }
     }
     
-    // 2. フォーム設定から判定
+    const config = item.config;
+    if (!config) {
+      // configがない場合もテキストとして扱う（"不明"を表示しない）
+      return `<span class="text-green-400">テキスト</span>`;
+    }
+    
+    // 3. フォーム設定から判定
     // 複数選択（checkbox）の判定
     if (config.multipleChoice || 
         config.allowMultipleAnswers || 
         (config.formElements && config.formElements.some(elem => elem.type === 'checkbox'))) {
-      return `<span class="text-purple-400">複数選択</span>`;
+      return `<span class="text-purple-400">複数</span>`;
     }
     
     // 単一選択（radio/select）の判定
@@ -2964,26 +2967,26 @@ function createHistoryTableRow(item, index) {
         config.choices || 
         config.options ||
         (config.formElements && config.formElements.some(elem => elem.type === 'radio' || elem.type === 'select'))) {
-      return `<span class="text-blue-400">単一選択</span>`;
+      return `<span class="text-blue-400">選択</span>`;
     }
     
-    // 3. 質問文の内容から推測（AIが推測した内容）
+    // 4. 質問文の内容から推測（AIが推測した内容）
     const questionText = item.questionText || '';
     if (questionText.includes('選択') || questionText.includes('どれ')) {
       if (questionText.includes('複数') || questionText.includes('いくつ')) {
-        return `<span class="text-purple-400">複数選択</span>`;
+        return `<span class="text-purple-400">複数</span>`;
       } else {
-        return `<span class="text-blue-400">単一選択</span>`;
+        return `<span class="text-blue-400">選択</span>`;
       }
     }
     
-    // 4. デフォルト：1行回答（自由記述）
-    return `<span class="text-green-400">1行回答</span>`;
+    // 5. デフォルト：テキスト（自由記述）
+    return `<span class="text-green-400">テキスト</span>`;
   };
   
   // Visual indicators for display options
   const getDisplayModeIcon = (displayMode) => {
-    return displayMode === '匿名表示' ? '👤' : '👥';
+    return displayMode === '匿名表示' ? '🎭' : '👥';
   };
   
   const getCountDisplayIcon = (countDisplay) => {
@@ -2997,6 +3000,22 @@ function createHistoryTableRow(item, index) {
     return '🌐'; // default for published
   };
   
+  // Helper functions for tooltip text descriptions
+  const getStatusText = (status, isActive) => {
+    if (isActive && status === 'published') return '公開中';
+    if (status === 'ended') return '終了';
+    if (status === 'draft') return '下書き';
+    return '公開済み';
+  };
+
+  const getDisplayModeText = (displayMode) => {
+    return displayMode === '匿名表示' ? '匿名表示' : '通常表示';
+  };
+
+  const getCountDisplayText = (countDisplay) => {
+    return countDisplay === '非表示' ? 'カウント非表示' : 'カウント表示';
+  };
+  
   // Format display mode and count display as compact visual indicators
   const displayModeIcon = getDisplayModeIcon(item.displayMode || '通常表示');
   const countDisplayIcon = getCountDisplayIcon(item.countDisplay || '表示');
@@ -3005,10 +3024,16 @@ function createHistoryTableRow(item, index) {
   // Combine visual indicators
   const visualIndicators = `${statusIcon} ${displayModeIcon} ${countDisplayIcon}`;
   
+  // Create detailed tooltip text
+  const tooltipText = `${escapeHtml(item.questionText || '')}
+状態: ${getStatusText(item.status, isActive)}
+表示: ${getDisplayModeText(item.displayMode || '通常表示')}
+カウント: ${getCountDisplayText(item.countDisplay || '表示')}`;
+
   row.innerHTML = `
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.createdAt || item.timestamp)}</td>
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${escapeHtml(item.questionText || '')} | ${visualIndicators}">
+    <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${tooltipText}">
       <div class="flex items-center gap-1">
         <span class="truncate flex-1">${escapeHtml(item.questionText || '')}</span>
         <span class="text-xs opacity-75 flex-shrink-0">${visualIndicators}</span>
@@ -3038,9 +3063,9 @@ async function selectHistoryItem(historyId) {
     // 復元プロセス開始の通知と進捗表示
     const progressSteps = [
       '🔍 履歴データを解析中...',
-      '📊 AI列判定結果を復元中...',
+      '📊 AI列判定結果を読み込み中...',
       '⚙️ 設定を適用中...',
-      '✅ 復元完了'
+      '✅ 読み込み完了'
     ];
     
     let currentStep = 0;
@@ -3132,7 +3157,7 @@ async function selectHistoryItem(historyId) {
       setTimeout(() => {
         showProgress(progressSteps[currentStep++]); // 復元完了
         setTimeout(() => {
-          showMessage(`「${item.questionText}」の設定を完全復元しました`, 'success');
+          showMessage(`「${item.questionText}」の設定を完全読み込みしました`, 'success');
         }, 500);
       }, 300);
       
@@ -3171,7 +3196,7 @@ async function selectHistoryItem(historyId) {
         }
         
         if (partiallyRestored) {
-          errorMessage = `「${item.questionText}」の基本設定のみ復元しました。AI列判定は手動で実行してください。`;
+          errorMessage = `「${item.questionText}」の基本設定のみ読み込みました。AI列判定は手動で実行してください。`;
           showMessage(errorMessage, 'warning');
           
           // Step 2に移動（手動設定を促す）
