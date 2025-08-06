@@ -261,9 +261,11 @@ function initializeUI() {
 function initializeAPI() {
   logDebug('🔧 API初期化開始');
   
-  // Start background status updates
-  if (typeof startSystemStatusUpdate === 'function') {
-    startSystemStatusUpdate();
+  // Start background status updates with safe calling
+  if (checkFunctionAvailability('startSystemStatusUpdate')) {
+    safeCallFunction('startSystemStatusUpdate');
+  } else {
+    console.warn('⚠️ startSystemStatusUpdate not available - background updates disabled');
   }
   
   // Setup user activity tracking
@@ -273,8 +275,10 @@ function initializeAPI() {
 
   // 初回ロード時にシステムステータスをロード
   logDebug('🚀 loadStatus()を呼び出します');
-  if (typeof loadStatus === 'function') {
-    loadStatus();
+  if (checkFunctionAvailability('loadStatus')) {
+    safeCallFunction('loadStatus');
+  } else {
+    console.warn('⚠️ loadStatus not available - manual status refresh required');
   }
   
   logDebug('✅ API初期化完了');
@@ -291,11 +295,18 @@ function updateUserActivity() {
 function initializeEventListeners() {
   console.log('✅ AdminPanel: Setting up event listeners');
   
-  // All critical functions are now available in framework, so proceed directly
-  if (typeof setupEventListeners === 'function') {
-    setupEventListeners();
+  // Use safe function calling with availability checks
+  if (checkFunctionAvailability('setupEventListeners')) {
+    safeCallFunction('setupEventListeners');
   } else {
-    console.warn('⚠️ setupEventListeners function not available');
+    console.warn('⚠️ setupEventListeners function not available, attempting graceful degradation');
+    
+    // Basic fallback event listener setup
+    if (checkFunctionAvailability('setupRealtimeValidation')) {
+      safeCallFunction('setupRealtimeValidation');
+    } else {
+      console.warn('⚠️ setupRealtimeValidation not available - real-time validation disabled');
+    }
   }
 }
 
@@ -566,6 +577,136 @@ function showMessage(message, type = 'info') {
   }
 }
 
+// =============================================================================
+// VALIDATION FUNCTIONS - Moved from adminPanel-ui.js.html for early availability
+// =============================================================================
+
+// Validate configuration with fallback logic
+function validateConfig() {
+  // Try to use the full implementation if available
+  if (typeof window._fullValidateConfig === 'function') {
+    try {
+      return window._fullValidateConfig();
+    } catch (error) {
+      console.warn('Full validateConfig failed, using fallback:', error);
+    }
+  }
+  
+  // Minimal implementation for essential validation
+  console.log('validateConfig: Using minimal implementation');
+  
+  try {
+    // Check primary element first, then fallback to secondary element
+    const opinionValue = document.getElementById('opinionHeader')?.value || 
+                        document.getElementById('reason-column')?.value || '';
+    
+    return opinionValue && opinionValue.trim() !== '';
+  } catch (error) {
+    console.error('Error in minimal validateConfig:', error);
+    return false;
+  }
+}
+
+// Update configuration buttons state with fallback logic
+function updateConfigButtons() {
+  // Try to use the full implementation if available
+  if (typeof window._fullUpdateConfigButtons === 'function') {
+    try {
+      return window._fullUpdateConfigButtons();
+    } catch (error) {
+      console.warn('Full updateConfigButtons failed, using fallback:', error);
+    }
+  }
+  
+  // Minimal implementation for essential button updates
+  console.log('updateConfigButtons: Using minimal implementation');
+  
+  try {
+    const isValid = validateConfig();
+    const saveBtn = document.getElementById('save-publish-btn');
+    
+    if (saveBtn) {
+      saveBtn.disabled = !isValid;
+      if (isValid) {
+        saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+        saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+    }
+  } catch (error) {
+    console.error('Error in minimal updateConfigButtons:', error);
+  }
+}
+
+// =============================================================================
+// FUNCTION AVAILABILITY MANAGEMENT
+// =============================================================================
+
+// Central function availability checker
+function checkFunctionAvailability(functionName) {
+  const isAvailable = typeof window[functionName] === 'function';
+  if (!isAvailable) {
+    console.warn(`⚠️ Function ${functionName} is not available`);
+  }
+  return isAvailable;
+}
+
+// Safe function caller with fallback handling
+function safeCallFunction(functionName, ...args) {
+  try {
+    if (checkFunctionAvailability(functionName)) {
+      return window[functionName](...args);
+    } else {
+      console.warn(`⚠️ Cannot call ${functionName} - function not available`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Error calling ${functionName}:`, error);
+    return null;
+  }
+}
+
+// Function registry for better management
+window.AdminPanel.functionRegistry = {
+  available: new Set(),
+  pending: new Set(),
+  
+  register(functionName) {
+    if (typeof window[functionName] === 'function') {
+      this.available.add(functionName);
+      this.pending.delete(functionName);
+      console.log(`✅ Function registered: ${functionName}`);
+    } else {
+      this.pending.add(functionName);
+      console.warn(`⚠️ Function pending: ${functionName}`);
+    }
+  },
+  
+  isAvailable(functionName) {
+    return this.available.has(functionName);
+  },
+  
+  waitFor(functionName, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+      if (this.isAvailable(functionName)) {
+        resolve(window[functionName]);
+        return;
+      }
+      
+      const startTime = Date.now();
+      const checkInterval = setInterval(() => {
+        if (this.isAvailable(functionName)) {
+          clearInterval(checkInterval);
+          resolve(window[functionName]);
+        } else if (Date.now() - startTime > timeout) {
+          clearInterval(checkInterval);
+          reject(new Error(`Function ${functionName} not available after ${timeout}ms`));
+        }
+      }, 100);
+    });
+  }
+};
+
 // Make all critical functions globally available immediately
 window.toggleSection = toggleSection;
 window.hidePrivacyModal = hidePrivacyModal;
@@ -574,6 +715,22 @@ window.hideConfirmationModal = hideConfirmationModal;
 window.showFormConfigModal = showFormConfigModal;
 window.showMessage = showMessage;
 window.updateUIWithNewStatus = updateUIWithNewStatus;
+window.validateConfig = validateConfig;
+window.updateConfigButtons = updateConfigButtons;
+window.checkFunctionAvailability = checkFunctionAvailability;
+window.safeCallFunction = safeCallFunction;
+
+// Register all critical functions
+const criticalFunctions = [
+  'toggleSection', 'hidePrivacyModal', 'hideDigitalCitizenshipModal', 
+  'hideConfirmationModal', 'showFormConfigModal', 'showMessage', 
+  'updateUIWithNewStatus', 'validateConfig', 'updateConfigButtons', 
+  'navigateToStep', 'initializeAdminPanel'
+];
+
+criticalFunctions.forEach(funcName => {
+  window.AdminPanel.functionRegistry.register(funcName);
+});
 
 // =============================================================================
 // SYSTEM STATUS AND USER INTERACTION MANAGEMENT

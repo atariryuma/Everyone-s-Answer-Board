@@ -713,8 +713,8 @@ function buildConfigObject() {
   };
 }
 
-// Validate configuration
-function validateConfig() {
+// Full implementation of validateConfig (framework has minimal version)
+function _fullValidateConfig() {
   // Check primary element first, then fallback to secondary element
   const opinionValue = document.getElementById('opinionHeader')?.value || 
                       document.getElementById('reason-column')?.value || '';
@@ -722,9 +722,9 @@ function validateConfig() {
   return opinionValue && opinionValue.trim() !== '';
 }
 
-// Update configuration buttons state
-function updateConfigButtons() {
-  const isValid = validateConfig();
+// Full implementation of updateConfigButtons (framework has minimal version)
+function _fullUpdateConfigButtons() {
+  const isValid = (typeof _fullValidateConfig === 'function') ? _fullValidateConfig() : validateConfig();
   const saveBtn = document.getElementById('save-publish-btn');
   
   if (saveBtn) {
@@ -736,6 +736,10 @@ function updateConfigButtons() {
     }
   }
 }
+
+// Make full implementations globally available for framework fallback
+window._fullValidateConfig = _fullValidateConfig;
+window._fullUpdateConfigButtons = _fullUpdateConfigButtons;
 
 // =============================================================================
 // STEP INDICATORS AND GUIDANCE
