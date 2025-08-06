@@ -1822,7 +1822,7 @@ function unpublishBoard() {
       // Create QuickStart-specific history entry
       const quickStartHistoryItem = {
         id: generateHistoryId(),
-        formId: `${quickStartResult.spreadsheetId || 'quickstart'}_${quickStartResult.sheetName || 'default'}`,
+        formId: generateHistoryId(), // Ensure unique ID for each QuickStart entry
         
         // Timestamps - QuickStart creates and publishes simultaneously
         createdAt: completedAt,
@@ -1833,8 +1833,8 @@ function unpublishBoard() {
         sheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName || '',
         
         // Display settings (QuickStart defaults)
-        displayMode: '通常表示',
-        countDisplay: '表示',
+        displayMode: quickStartResult.config?.displayMode === 'anonymous' ? '匿名表示' : '通常表示',
+        countDisplay: quickStartResult.config?.showCounts === false ? '非表示' : '表示',
         
         // Form configuration and state
         config: quickStartResult.config || {},
@@ -1864,14 +1864,7 @@ function unpublishBoard() {
       // Save QuickStart history entry using existing localStorage mechanism
       const history = getHistoryFromStorage();
       
-      // Check if entry with same formId already exists and remove it
-      const existingIndex = history.findIndex(item => item.formId === quickStartHistoryItem.formId);
-      if (existingIndex !== -1) {
-        history.splice(existingIndex, 1);
-        logDebug('Removed existing entry for formId:', quickStartHistoryItem.formId);
-      }
-      
-      // Add new QuickStart entry at the beginning
+      // Add new QuickStart entry at the beginning without removing existing ones
       history.unshift(quickStartHistoryItem);
       
       // Enforce maximum history items limit
