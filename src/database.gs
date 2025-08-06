@@ -3095,7 +3095,7 @@ function deleteUserAccount(userId) {
       );
 
       // 関連するすべてのキャッシュを削除
-      invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+      invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false, dbId);
 
       // Google Drive のデータは保持するため何も操作しない
 

@@ -1195,6 +1195,16 @@ function verifyUserAccess(requestUserId) {
     throw new Error(`認証エラー: 指定されたユーザーID (${requestUserId}) が見つかりません。`);
   }
 
+  const freshUserInfo = fetchUserFromDatabase('userId', requestUserId, {
+    retryCount: 0,
+    enableDiagnostics: false,
+    autoRepair: false,
+    clearCache: true
+  });
+  if (!freshUserInfo) {
+    throw new Error(`認証エラー: 指定されたユーザーID (${requestUserId}) は無効です。`);
+  }
+
   // 管理者かどうかを確認
   if (activeUserEmail !== requestedUserInfo.adminEmail) {
     const config = JSON.parse(requestedUserInfo.configJson || '{}');

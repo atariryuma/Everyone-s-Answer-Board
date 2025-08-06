@@ -16,6 +16,7 @@ describe('verifyUserAccess security checks', () => {
         adminEmail: 'admin@example.com',
         configJson: JSON.stringify({ appPublished: false }),
       })),
+      fetchUserFromDatabase: jest.fn(() => ({ adminEmail: 'admin@example.com' })),
     };
     vm.createContext(context);
     vm.runInContext(coreCode, context);
@@ -37,6 +38,12 @@ describe('verifyUserAccess security checks', () => {
       configJson: JSON.stringify({ appPublished: true }),
     });
     expect(() => context.verifyUserAccess('U1')).not.toThrow();
+  });
+
+  test('denies access when user missing in database', () => {
+    context.fetchUserFromDatabase.mockReturnValue(null);
+    expect(() => context.verifyUserAccess('U1')).toThrow('認証エラー');
+    expect(context.fetchUserFromDatabase).toHaveBeenCalled();
   });
 });
 
