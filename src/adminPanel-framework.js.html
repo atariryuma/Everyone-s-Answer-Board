@@ -19,10 +19,12 @@ window.AdminPanel = window.AdminPanel || {
 // Error & Message Handling
 // -----------------------------------------------------------------------------
 window.AdminPanel.errors.handle = function(error, context, userMessage) {
-  if (window.unifiedErrorHandler && typeof window.unifiedErrorHandler.handleError === 'function') {
-    return window.unifiedErrorHandler.handleError(error, context, undefined, undefined);
+  // Use the unified error handler from SharedUtilities
+  if (window.sharedUtilities && window.sharedUtilities.errors && typeof window.sharedUtilities.errors.logError === 'function') {
+    window.sharedUtilities.errors.logError(error, context);
+  } else {
+    console.error(`❌ Fallback Error in ${context}:`, error);
   }
-  console.error(`❌ Error in ${context}:`, error);
   const message = userMessage || (error && error.message ? error.message : String(error));
   window.AdminPanel.ui.showMessage(message, 'error');
 };
@@ -38,9 +40,7 @@ window.AdminPanel.ui.showMessage = function(msg, type = 'info', duration = 5000,
   // No fallback UI implementation here to avoid conflicts and ensure single source of truth.
 };
 
-// Backward compatibility
-window.handleError = window.AdminPanel.errors.handle;
-window.showMessage = window.AdminPanel.ui.showMessage;
+
 
 // -----------------------------------------------------------------------------
 // State Manager
