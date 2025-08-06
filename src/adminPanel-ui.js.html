@@ -2316,10 +2316,13 @@ function getActiveResourceUrls(status) {
 }
 
 function updateSystemStatusDisplay(status) {
+  console.log('--- Entering updateSystemStatusDisplay ---'); // Gemini Debug
   if (!status) return;
 
   // すべてのリソースURLを一括取得
+  console.log('Calling getActiveResourceUrls...'); // Gemini Debug
   const resourceUrls = getActiveResourceUrls(status);
+  console.log('resourceUrls received:', resourceUrls); // Gemini Debug
 
   // Update publish status
   const publishIndicator = document.getElementById('info-publish-indicator');
