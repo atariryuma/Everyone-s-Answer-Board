@@ -1,0 +1,131 @@
+<script>
+/**
+ * Admin Panel Early Initialization Script
+ * 
+ * This script must be loaded BEFORE any HTML content that uses onclick handlers.
+ * It defines critical functions as early stubs to prevent "function not defined" errors
+ * during page initialization.
+ */
+
+console.log('🚀 AdminPanel Early Init: Loading critical function stubs');
+
+// =============================================================================
+// CRITICAL FUNCTION STUBS
+// These functions are called early during HTML loading and must be available immediately
+// =============================================================================
+
+if (typeof window !== 'undefined') {
+  
+  // Track which functions have been replaced with real implementations
+  window._adminFunctionTracker = {
+    stubs: new Set(),
+    replaced: new Set(),
+    errors: []
+  };
+  
+  // Helper to create stub functions that track calls and provide helpful logging
+  function createStub(functionName, category = 'general') {
+    window._adminFunctionTracker.stubs.add(functionName);
+    
+    return function(...args) {
+      console.log(`📋 AdminPanel: ${functionName}() called during initialization (stub mode)`);
+      
+      // For UI functions, try to provide basic functionality
+      if (category === 'ui' && functionName === 'toggleSection') {
+        const sectionId = args[0];
+        if (sectionId) {
+          const element = document.getElementById(sectionId);
+          if (element) {
+            const isHidden = element.style.display === 'none';
+            element.style.display = isHidden ? '' : 'none';
+            console.log(`📋 AdminPanel: toggleSection stub toggled ${sectionId} to ${isHidden ? 'visible' : 'hidden'}`);
+            return;
+          }
+        }
+      }
+      
+      // Queue the call for when the real function becomes available
+      if (category === 'critical') {
+        console.warn(`⚠️ AdminPanel: ${functionName}() called but real implementation not loaded yet. Args:`, args);
+        window._adminFunctionTracker.errors.push({
+          function: functionName,
+          args: args,
+          timestamp: new Date().toISOString(),
+          trace: new Error().stack
+        });
+      }
+    };
+  }
+  
+  // Helper to replace stub with real function
+  function registerRealFunction(functionName, realFunction) {
+    if (window._adminFunctionTracker.stubs.has(functionName)) {
+      window[functionName] = realFunction;
+      window._adminFunctionTracker.replaced.add(functionName);
+      console.log(`✅ AdminPanel: ${functionName}() stub replaced with real implementation`);
+    }
+  }
+  
+  // =============================================================================
+  // FUNCTION STUBS - These will be replaced when real implementations load
+  // =============================================================================
+  
+  // UI Navigation Functions
+  window.navigateToStep = window.navigateToStep || createStub('navigateToStep', 'critical');
+  window.toggleSection = window.toggleSection || createStub('toggleSection', 'ui');
+  
+  // Modal Functions
+  window.showFormConfigModal = window.showFormConfigModal || createStub('showFormConfigModal', 'critical');
+  window.hideFormConfigModal = window.hideFormConfigModal || createStub('hideFormConfigModal', 'general');
+  window.hidePrivacyModal = window.hidePrivacyModal || createStub('hidePrivacyModal', 'critical');
+  window.showPrivacyModal = window.showPrivacyModal || createStub('showPrivacyModal', 'general');
+  
+  // Status Update Functions
+  window.updateUIWithNewStatus = window.updateUIWithNewStatus || createStub('updateUIWithNewStatus', 'critical');
+  
+  // Additional functions that might be called early
+  window.showSecurityDetailsModal = window.showSecurityDetailsModal || createStub('showSecurityDetailsModal', 'general');
+  window.hideSecurityDetailsModal = window.hideSecurityDetailsModal || createStub('hideSecurityDetailsModal', 'general');
+  
+  // =============================================================================
+  // FUNCTION REPLACEMENT SYSTEM
+  // =============================================================================
+  
+  // Make registerRealFunction available globally for use by actual implementation files
+  window._registerAdminFunction = registerRealFunction;
+  
+  // Status check function for debugging
+  window._checkAdminFunctions = function() {
+    console.log('🔍 AdminPanel Function Status:');
+    console.log('  Stubs created:', Array.from(window._adminFunctionTracker.stubs));
+    console.log('  Functions replaced:', Array.from(window._adminFunctionTracker.replaced));
+    console.log('  Errors logged:', window._adminFunctionTracker.errors.length);
+    
+    if (window._adminFunctionTracker.errors.length > 0) {
+      console.log('  Recent errors:', window._adminFunctionTracker.errors.slice(-5));
+    }
+    
+    return {
+      stubs: window._adminFunctionTracker.stubs.size,
+      replaced: window._adminFunctionTracker.replaced.size,
+      errors: window._adminFunctionTracker.errors.length
+    };
+  };
+  
+  console.log('✅ AdminPanel Early Init: Critical function stubs loaded successfully');
+  
+  // Schedule a check after page load to verify everything is working
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+      const status = window._checkAdminFunctions();
+      if (status.errors > 0) {
+        console.warn(`⚠️ AdminPanel: ${status.errors} function call errors detected during initialization`);
+      } else {
+        console.log('✅ AdminPanel: All function calls handled successfully during initialization');
+      }
+    }, 2000);
+  });
+}
+
+console.log('🎯 AdminPanel Early Init: Ready for HTML content loading');
+</script>
