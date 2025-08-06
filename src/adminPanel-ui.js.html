@@ -3712,6 +3712,11 @@ function syncGlobalColumnSettings(config) {
  * @return {Object} 補完されたconfig
  */
 function ensureRequiredFields(config) {
+  // Ensure config is a valid object
+  if (!config || typeof config !== 'object') {
+    config = {};
+  }
+  
   const defaults = {
     showNames: false,
     showCounts: false,
