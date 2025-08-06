@@ -2264,6 +2264,7 @@ function getActiveResourceUrls(status) {
   };
 
   if (!status || !status.userInfo) {
+    console.log('getActiveResourceUrls: status or userInfo missing', status); // Gemini Debug
     return urls; // ユーザー情報がなければ空のURLを返す
   }
 
@@ -2277,6 +2278,7 @@ function getActiveResourceUrls(status) {
       config = typeof status.userInfo.configJson === 'string' 
         ? JSON.parse(status.userInfo.configJson) 
         : status.userInfo.configJson;
+      console.log('getActiveResourceUrls: configJson parsed:', config); // Gemini Debug
     } catch (e) {
       console.warn("configJsonの解析に失敗しました", e);
     }
