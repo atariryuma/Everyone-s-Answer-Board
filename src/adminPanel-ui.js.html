@@ -3674,15 +3674,15 @@ function syncGlobalColumnSettings(config) {
     if (sheetConfig.formUrl) {
       config.formUrl = sheetConfig.formUrl;
       console.log('🔗 フォームURL同期:', {
-        シート名: config.publishedSheetName,
-        フォームURL: config.formUrl
+        sheetName: config.publishedSheetName,
+        formUrl: config.formUrl
       });
     }
     
     console.log('🔧 グローバル列設定同期完了:', {
-      シート名: config.publishedSheetName,
-      メイン質問: config.opinionHeader,
-      名前列: config.nameHeader
+      sheetName: config.publishedSheetName,
+      mainQuestion: config.opinionHeader,
+      nameColumn: config.nameHeader
     });
   }
   
