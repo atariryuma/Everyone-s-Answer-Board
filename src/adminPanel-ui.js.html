@@ -2531,7 +2531,7 @@ function saveToHistory(historyItem) {
  * @param {Object} historyItem - 同期する履歴アイテム
  */
 async function syncHistoryToServer(historyItem, retryCount = 0) {
-  const MAX_RETRIES = 2;
+  const MAX_RETRIES = 1; // 2→1に削減でパフォーマンス向上
   
   try {
     if (!historyItem || !historyItem.id) {
@@ -2541,9 +2541,9 @@ async function syncHistoryToServer(historyItem, retryCount = 0) {
     
     logDebug('Syncing history to server (attempt ' + (retryCount + 1) + '):', historyItem.questionText);
     
-    // タイムアウト付きでサーバー同期を実行
+    // 軽量タイムアウトでサーバー同期を実行  
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Server sync timeout')), 30000);
+      setTimeout(() => reject(new Error('Server sync timeout')), 15000); // 30s→15sに短縮
     });
     
     const syncPromise = runGasWithUserId('saveHistoryToSheetAPI', false, historyItem);
@@ -2618,7 +2618,7 @@ async function getMergedHistory() {
     try {
       logDebug('Loading server history...');
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Server history timeout')), 15000);
+        setTimeout(() => reject(new Error('Server history timeout')), 8000); // 15s→8sに短縮
       });
       
       const historyPromise = runGasWithUserId('getHistoryFromServerAPI', false);
@@ -2626,8 +2626,8 @@ async function getMergedHistory() {
       
       if (response && response.status === 'success') {
         if (Array.isArray(response.historyArray)) {
-          serverHistory = response.historyArray.filter(item => item && item.id); // Validate items
-          logDebug('Server history loaded:', serverHistory.length, 'valid items');
+          serverHistory = response.historyArray.filter(item => item?.id); // 軽量検証
+          if (serverHistory.length > 0) logDebug('Server history loaded:', serverHistory.length, 'items');
         } else {
           logWarn('Server response historyArray is not an array');
         }
@@ -2642,52 +2642,36 @@ async function getMergedHistory() {
       }
     }
     
-    // 統合処理：ID重複を除去し、タイムスタンプで降順ソート
+    // 軽量統合処理：ID重複を除去
     const mergedMap = new Map();
-    let validItemsCount = 0;
-    let invalidItemsCount = 0;
+    let totalItems = 0;
     
-    // ローカル履歴を追加（データ検証付き）
-    localHistory.forEach(item => {
-      if (item && item.id && typeof item.id === 'string') {
+    // ローカル履歴を追加（軽量検証）
+    for (const item of localHistory) {
+      if (item?.id) {
         mergedMap.set(item.id, { ...item, source: 'local' });
-        validItemsCount++;
-      } else {
-        invalidItemsCount++;
-        logWarn('Invalid local history item:', item);
+        totalItems++;
       }
-    });
+    }
     
-    // サーバー履歴を追加（データ検証付き、重複する場合はサーバー側を優先）
-    serverHistory.forEach(item => {
-      if (item && item.id && typeof item.id === 'string') {
+    // サーバー履歴を追加（サーバー側優先）
+    for (const item of serverHistory) {
+      if (item?.id) {
         mergedMap.set(item.id, { ...item, source: 'server' });
-        validItemsCount++;
-      } else {
-        invalidItemsCount++;
-        logWarn('Invalid server history item:', item);
+        totalItems++;
       }
-    });
+    }
     
-    // Map を配列に変換し、タイムスタンプで降順ソート（エラーハンドリング付き）
+    // 軽量ソート（エラーハンドリング簡略化）
     const mergedArray = Array.from(mergedMap.values()).sort((a, b) => {
-      try {
-        const aTime = new Date(a.timestamp || a.publishedAt || a.createdAt || 0).getTime();
-        const bTime = new Date(b.timestamp || b.publishedAt || b.createdAt || 0).getTime();
-        return bTime - aTime; // 降順
-      } catch (sortError) {
-        logWarn('Error sorting history items:', sortError);
-        return 0; // Keep original order for problematic items
-      }
+      const aTime = new Date(a.timestamp || a.publishedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.timestamp || b.publishedAt || b.createdAt || 0).getTime();
+      return bTime - aTime; // 降順
     });
     
-    logDebug('History merged successfully:', {
-      local: localHistory.length,
-      server: serverHistory.length,
-      merged: mergedArray.length,
-      valid: validItemsCount,
-      invalid: invalidItemsCount
-    });
+    if (mergedArray.length > 0) {
+      logDebug(`History merged: ${mergedArray.length} items (${localHistory.length} local, ${serverHistory.length} server)`);
+    }
     
     return mergedArray;
   } catch (error) {
