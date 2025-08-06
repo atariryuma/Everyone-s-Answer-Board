@@ -1767,7 +1767,6 @@ function unpublishBoard() {
       history.unshift(consolidatedHistoryItem);
       
       // Enforce maximum history items limit
-      const MAX_HISTORY_ITEMS = 10;
       if (history.length > MAX_HISTORY_ITEMS) {
         history.splice(MAX_HISTORY_ITEMS);
       }
@@ -1775,8 +1774,16 @@ function unpublishBoard() {
       // Save to localStorage
       localStorage.setItem('answerboard_history', JSON.stringify(history));
       
-      // Sync to server (async)
-      syncHistoryToServer(consolidatedHistoryItem);
+      // Sync to server (async with error handling)
+      syncHistoryToServer(consolidatedHistoryItem).then(result => {
+        if (result.status === 'error') {
+          logWarn('Consolidated history server sync failed:', result.message);
+        } else {
+          logDebug('Consolidated history server sync completed');
+        }
+      }).catch(error => {
+        logError('Unexpected error in consolidated history server sync:', error);
+      });
       
       // Update UI
       if (typeof loadSimpleHistoryTable === 'function') {
@@ -1868,7 +1875,6 @@ function unpublishBoard() {
       history.unshift(quickStartHistoryItem);
 
       // Enforce maximum history items limit
-      const MAX_HISTORY_ITEMS = 10;
       if (history.length > MAX_HISTORY_ITEMS) {
         history.splice(MAX_HISTORY_ITEMS);
       }
@@ -1876,8 +1882,16 @@ function unpublishBoard() {
       // Save to localStorage using shared key
       localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
       
-      // Sync to server (async)
-      syncHistoryToServer(quickStartHistoryItem);
+      // Sync to server (async with error handling)
+      syncHistoryToServer(quickStartHistoryItem).then(result => {
+        if (result.status === 'error') {
+          logWarn('QuickStart history server sync failed:', result.message);
+        } else {
+          logDebug('QuickStart history server sync completed');
+        }
+      }).catch(error => {
+        logError('Unexpected error in QuickStart history server sync:', error);
+      });
       
       // Update UI
       if (typeof loadSimpleHistoryTable === 'function') {

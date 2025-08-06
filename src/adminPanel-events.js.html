@@ -78,23 +78,45 @@ function setupEventListeners() {
           showConfirmationModal(
             '履歴削除の確認',
             'すべての履歴を削除しますか？この操作は取り消せません。',
-            function() {
+            async function() {
               console.log('📝 履歴削除が確認されました');
+              
               try {
+                // ローディング表示
+                showMessage('🔄 履歴をクリアしています...', 'info');
+                
+                // 1. クライアント側の履歴をクリア
                 localStorage.removeItem(HISTORY_STORAGE_KEY);
                 console.log('✅ ローカルストレージから履歴を削除しました');
-                showMessage('✅ 履歴をクリアしました', 'success');
+                
+                // 2. サーバー側の履歴もクリア
+                if (typeof runGasWithUserId === 'function') {
+                  console.log('🔄 サーバー側履歴のクリアを開始...');
+                  const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
+                  
+                  if (serverResponse && serverResponse.status === 'success') {
+                    console.log('✅ サーバー側履歴のクリア完了');
+                    showMessage('✅ すべての履歴をクリアしました', 'success');
+                  } else {
+                    console.warn('⚠️ サーバー側履歴のクリアに失敗:', serverResponse?.message || 'Unknown error');
+                    showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
+                  }
+                } else {
+                  console.warn('⚠️ サーバー同期機能が利用できません');
+                  showMessage('⚠️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
+                }
 
-                // 履歴テーブルを更新
+                // 3. 履歴テーブルを更新
                 if (typeof loadSimpleHistoryTable === 'function') {
                   loadSimpleHistoryTable();
                   console.log('📊 履歴テーブルを更新しました');
                 } else {
                   console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
                 }
+                
               } catch (error) {
                 console.error('❌ 履歴クリアに失敗:', error);
-                showMessage('❌ 履歴クリアに失敗しました', 'error');
+                showMessage('❌ 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
               }
             }
           );
@@ -102,17 +124,42 @@ function setupEventListeners() {
           console.error('❌ showConfirmationModal関数が見つかりません');
           // フォールバック: 直接確認
           if (confirm('すべての履歴を削除しますか？この操作は取り消せません。')) {
-            try {
-              localStorage.removeItem(HISTORY_STORAGE_KEY);
-              console.log('✅ ローカルストレージから履歴を削除しました（フォールバック）');
-              showMessage('✅ 履歴をクリアしました', 'success');
-              if (typeof loadSimpleHistoryTable === 'function') {
-                loadSimpleHistoryTable();
+            (async function() {
+              try {
+                // ローディング表示
+                showMessage('🔄 履歴をクリアしています...', 'info');
+                
+                // 1. クライアント側の履歴をクリア
+                localStorage.removeItem(HISTORY_STORAGE_KEY);
+                console.log('✅ ローカルストレージから履歴を削除しました（フォールバック）');
+                
+                // 2. サーバー側の履歴もクリア
+                if (typeof runGasWithUserId === 'function') {
+                  console.log('🔄 サーバー側履歴のクリアを開始...（フォールバック）');
+                  const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
+                  
+                  if (serverResponse && serverResponse.status === 'success') {
+                    console.log('✅ サーバー側履歴のクリア完了（フォールバック）');
+                    showMessage('✅ すべての履歴をクリアしました', 'success');
+                  } else {
+                    console.warn('⚠️ サーバー側履歴のクリアに失敗（フォールバック）:', serverResponse?.message || 'Unknown error');
+                    showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
+                  }
+                } else {
+                  console.warn('⚠️ サーバー同期機能が利用できません（フォールバック）');
+                  showMessage('⚠️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
+                }
+                
+                // 3. 履歴テーブルを更新
+                if (typeof loadSimpleHistoryTable === 'function') {
+                  loadSimpleHistoryTable();
+                }
+                
+              } catch (error) {
+                console.error('❌ 履歴クリアに失敗:', error);
+                showMessage('❌ 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
               }
-            } catch (error) {
-              console.error('❌ 履歴クリアに失敗:', error);
-              showMessage('❌ 履歴クリアに失敗しました', 'error');
-            }
+            })();
           }
         }
     });

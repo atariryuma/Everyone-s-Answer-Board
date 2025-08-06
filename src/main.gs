@@ -69,6 +69,9 @@ const LOG_SHEET_CONFIG = {
   HEADERS: ['timestamp', 'userId', 'action', 'details']
 };
 
+// 履歴管理の定数
+const MAX_HISTORY_ITEMS = 50;
+
 // 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
 let _executionUserInfoCache = null;
 
@@ -347,27 +350,54 @@ function saveHistoryToSheet(historyItem, userInfo) {
       configJson.historyArray = [];
     }
 
-    // 新しい履歴アイテムを作成
+    // 新しい履歴アイテムを作成（標準化された構造）
     const serverHistoryItem = {
+      // 基本ID
       id: historyItem.id || ('server_' + Date.now()),
+      formId: historyItem.formId || null,
+      
+      // タイムスタンプ（標準化）
       timestamp: new Date().toISOString(),
-      questionText: historyItem.questionText || '（問題文未設定）',
-      sheetName: historyItem.sheetName || '',
+      createdAt: historyItem.createdAt || historyItem.timestamp || new Date().toISOString(),
       publishedAt: historyItem.publishedAt || new Date().toISOString(),
+      publishedEndAt: historyItem.publishedEndAt || null,
       endTime: historyItem.endTime || new Date().toISOString(),
       scheduledEndTime: historyItem.scheduledEndTime || null,
+      savedAt: new Date().toISOString(),
+      
+      // フォーム内容
+      questionText: historyItem.questionText || '（問題文未設定）',
+      sheetName: historyItem.sheetName || '',
+      
+      // 表示設定
+      displayMode: historyItem.displayMode || '通常表示',
+      countDisplay: historyItem.countDisplay || '表示',
+      
+      // フォーム構成と状態
+      config: historyItem.config || {},
+      status: historyItem.status || 'published',
+      setupType: historyItem.setupType || 'custom',
+      isActive: historyItem.isActive !== undefined ? historyItem.isActive : true,
+      
+      // URL と集計
+      formUrl: historyItem.formUrl || '',
+      spreadsheetUrl: historyItem.spreadsheetUrl || '',
       answerCount: historyItem.answerCount || 0,
       reactionCount: historyItem.reactionCount || 0,
-      endReason: historyItem.endReason || 'manual',
-      savedAt: new Date().toISOString()
+      
+      // シート詳細情報
+      sheetDetails: historyItem.sheetDetails || {},
+      
+      // サーバー固有のフィールド
+      endReason: historyItem.endReason || 'manual'
     };
 
     // 履歴配列の先頭に追加
     configJson.historyArray.unshift(serverHistoryItem);
 
-    // 最大50件まで保持
-    if (configJson.historyArray.length > 50) {
-      configJson.historyArray.splice(50);
+    // 最大履歴件数まで保持
+    if (configJson.historyArray.length > MAX_HISTORY_ITEMS) {
+      configJson.historyArray.splice(MAX_HISTORY_ITEMS);
     }
 
     // configJsonを更新

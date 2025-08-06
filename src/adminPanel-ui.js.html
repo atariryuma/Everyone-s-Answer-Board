@@ -67,7 +67,7 @@ function getPublicationState(status) {
         );
         
         if (hasCompletedSetup) {
-          reason += ' (完全セットアップ済み)';
+          reason += ' (セットアップ済み)';
         } else {
           console.log('⚠️ Publication state: appPublished=true but setup incomplete', {
             setupStatus: config.setupStatus,
@@ -100,7 +100,7 @@ function getPublicationState(status) {
     isPublished, 
     reason,
     // Add confidence level for better debugging
-    confidence: isPublished ? (reason.includes('完全セットアップ済み') ? 'high' : 'medium') : 'low'
+    confidence: isPublished ? (reason.includes('セットアップ済み') ? 'high' : 'medium') : 'low'
   };
 }
 
@@ -2206,8 +2206,8 @@ function showAppropriateHeaderStatus() {
  * @param {Object} status - ステータスオブジェクト
  */
 function updateButtonStatesForSetup(status) {
-  // より穏やかなUI制御（完全無効化ではなく、適切なガイダンス）
-  
+  // より穏やかなUI制御（セットアップ無効化ではなく、適切なガイダンス）
+
   // 最低限無効化すべき公開関連ボタンのみ
   const criticalPublishButtons = [
     'save-publish-btn',
@@ -2441,7 +2441,7 @@ function validateConfiguration() {
 
 // 履歴管理の定数
 const HISTORY_STORAGE_KEY = 'answerBoardHistory';
-const MAX_HISTORY_ITEMS = 10;
+const MAX_HISTORY_ITEMS = 50;
 
 /**
  * 回答ボードの履歴を保存
@@ -2503,8 +2503,20 @@ function saveToHistory(historyItem) {
     localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
     logDebug('Enhanced history saved:', newItem);
     
-    // サーバーサイドに同期（非同期）
-    syncHistoryToServer(newItem);
+    // サーバーサイドに同期（非同期、エラーハンドリング付き）
+    syncHistoryToServer(newItem).then(result => {
+      if (result.status === 'error') {
+        logWarn('Server sync failed after retries:', result.message);
+        // サーバー同期失敗をユーザーに通知（オプション）
+        if (typeof showMessage === 'function' && result.retryCount > 2) {
+          showMessage('⚠️ サーバーへの同期に失敗しましたが、ローカルには保存されました', 'warning');
+        }
+      } else {
+        logDebug('Server sync completed successfully');
+      }
+    }).catch(error => {
+      logError('Unexpected error in server sync:', error);
+    });
     
     // UI を更新
     loadSimpleHistoryTable();
@@ -2518,24 +2530,53 @@ function saveToHistory(historyItem) {
  * 履歴をサーバーサイドに同期
  * @param {Object} historyItem - 同期する履歴アイテム
  */
-async function syncHistoryToServer(historyItem) {
+async function syncHistoryToServer(historyItem, retryCount = 0) {
+  const MAX_RETRIES = 2;
+  
   try {
     if (!historyItem || !historyItem.id) {
-      return;
+      logWarn('Invalid history item for server sync:', historyItem);
+      return { status: 'error', message: 'Invalid history item' };
     }
     
-    logDebug('Syncing history to server:', historyItem.questionText);
+    logDebug('Syncing history to server (attempt ' + (retryCount + 1) + '):', historyItem.questionText);
     
-    const response = await runGasWithUserId('saveHistoryToSheetAPI', false, historyItem);
+    // タイムアウト付きでサーバー同期を実行
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Server sync timeout')), 30000);
+    });
+    
+    const syncPromise = runGasWithUserId('saveHistoryToSheetAPI', false, historyItem);
+    const response = await Promise.race([syncPromise, timeoutPromise]);
     
     if (response && response.status === 'success') {
       logDebug('History synced to server successfully');
+      return { status: 'success', message: 'Server sync completed' };
     } else {
-      logWarn('Server history sync failed:', response?.message);
+      const errorMsg = response?.message || 'Unknown server error';
+      logWarn('Server history sync failed:', errorMsg);
+      
+      // リトライロジック
+      if (retryCount < MAX_RETRIES) {
+        logDebug('Retrying server sync in 2 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return await syncHistoryToServer(historyItem, retryCount + 1);
+      }
+      
+      return { status: 'error', message: errorMsg, retryCount: retryCount + 1 };
     }
   } catch (error) {
-    // サーバー同期失敗はローカル保存に影響しない
-    logWarn('Failed to sync history to server:', error);
+    const errorMsg = error.message || 'Server sync failed';
+    logWarn('Failed to sync history to server:', errorMsg);
+    
+    // リトライロジック
+    if (retryCount < MAX_RETRIES && !errorMsg.includes('timeout')) {
+      logDebug('Retrying server sync due to error in 2 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return await syncHistoryToServer(historyItem, retryCount + 1);
+    }
+    
+    return { status: 'error', message: errorMsg, retryCount: retryCount + 1 };
   }
 }
 
@@ -2559,56 +2600,107 @@ function getHistoryFromStorage() {
  */
 async function getMergedHistory() {
   try {
-    // ローカルストレージから取得
-    const localHistory = getHistoryFromStorage();
+    // ローカルストレージから取得（検証付き）
+    let localHistory = [];
+    try {
+      localHistory = getHistoryFromStorage();
+      if (!Array.isArray(localHistory)) {
+        logWarn('Local history is not an array, resetting to empty');
+        localHistory = [];
+      }
+    } catch (localError) {
+      logWarn('Failed to load local history:', localError);
+      localHistory = [];
+    }
     
-    // サーバーサイドから取得
+    // サーバーサイドから取得（タイムアウト付き）
     let serverHistory = [];
     try {
-      const response = await runGasWithUserId('getHistoryFromServerAPI', false);
-      if (response && response.status === 'success' && Array.isArray(response.historyArray)) {
-        serverHistory = response.historyArray;
-        logDebug('Server history loaded:', serverHistory.length, 'items');
+      logDebug('Loading server history...');
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Server history timeout')), 15000);
+      });
+      
+      const historyPromise = runGasWithUserId('getHistoryFromServerAPI', false);
+      const response = await Promise.race([historyPromise, timeoutPromise]);
+      
+      if (response && response.status === 'success') {
+        if (Array.isArray(response.historyArray)) {
+          serverHistory = response.historyArray.filter(item => item && item.id); // Validate items
+          logDebug('Server history loaded:', serverHistory.length, 'valid items');
+        } else {
+          logWarn('Server response historyArray is not an array');
+        }
+      } else {
+        logWarn('Server history response failed:', response?.message || 'Unknown error');
       }
     } catch (serverError) {
-      logWarn('Failed to load server history, using local only:', serverError);
+      if (serverError.message.includes('timeout')) {
+        logWarn('Server history request timed out, using local only');
+      } else {
+        logWarn('Failed to load server history:', serverError.message);
+      }
     }
     
     // 統合処理：ID重複を除去し、タイムスタンプで降順ソート
     const mergedMap = new Map();
+    let validItemsCount = 0;
+    let invalidItemsCount = 0;
     
-    // ローカル履歴を追加
+    // ローカル履歴を追加（データ検証付き）
     localHistory.forEach(item => {
-      if (item.id) {
+      if (item && item.id && typeof item.id === 'string') {
         mergedMap.set(item.id, { ...item, source: 'local' });
+        validItemsCount++;
+      } else {
+        invalidItemsCount++;
+        logWarn('Invalid local history item:', item);
       }
     });
     
-    // サーバー履歴を追加（重複する場合はサーバー側を優先）
+    // サーバー履歴を追加（データ検証付き、重複する場合はサーバー側を優先）
     serverHistory.forEach(item => {
-      if (item.id) {
+      if (item && item.id && typeof item.id === 'string') {
         mergedMap.set(item.id, { ...item, source: 'server' });
+        validItemsCount++;
+      } else {
+        invalidItemsCount++;
+        logWarn('Invalid server history item:', item);
       }
     });
     
-    // Map を配列に変換し、タイムスタンプで降順ソート
+    // Map を配列に変換し、タイムスタンプで降順ソート（エラーハンドリング付き）
     const mergedArray = Array.from(mergedMap.values()).sort((a, b) => {
-      const aTime = new Date(a.timestamp || a.publishedAt || 0).getTime();
-      const bTime = new Date(b.timestamp || b.publishedAt || 0).getTime();
-      return bTime - aTime; // 降順
+      try {
+        const aTime = new Date(a.timestamp || a.publishedAt || a.createdAt || 0).getTime();
+        const bTime = new Date(b.timestamp || b.publishedAt || b.createdAt || 0).getTime();
+        return bTime - aTime; // 降順
+      } catch (sortError) {
+        logWarn('Error sorting history items:', sortError);
+        return 0; // Keep original order for problematic items
+      }
     });
     
-    logDebug('History merged:', {
+    logDebug('History merged successfully:', {
       local: localHistory.length,
       server: serverHistory.length,
-      merged: mergedArray.length
+      merged: mergedArray.length,
+      valid: validItemsCount,
+      invalid: invalidItemsCount
     });
     
     return mergedArray;
   } catch (error) {
-    logError('Failed to merge history:', error);
-    // フォールバック：ローカルのみ
-    return getHistoryFromStorage();
+    logError('Critical error in getMergedHistory:', error);
+    // フォールバック：ローカルのみ（さらに安全に）
+    try {
+      const fallbackHistory = getHistoryFromStorage();
+      logDebug('Using fallback local history:', fallbackHistory.length, 'items');
+      return Array.isArray(fallbackHistory) ? fallbackHistory : [];
+    } catch (fallbackError) {
+      logError('Even fallback failed:', fallbackError);
+      return [];
+    }
   }
 }
 
@@ -2846,16 +2938,20 @@ function updateConfigPanelUI(config) {
 async function loadSimpleHistoryTable() {
   const tableBody = document.getElementById('history-table-body');
   
-  if (!tableBody) return;
+  if (!tableBody) {
+    logWarn('History table body not found');
+    return;
+  }
   
   try {
-    // ローディング表示
+    // ローディング表示（改善されたスタイル）
     tableBody.innerHTML = `
       <tr>
-        <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
-          <div class="flex items-center justify-center">
-            <div class="spinner mr-2"></div>
-            履歴を読み込み中...
+        <td colspan="4" class="px-3 py-6 text-center text-gray-500 text-sm">
+          <div class="flex flex-col items-center justify-center">
+            <div class="spinner mb-3"></div>
+            <div>履歴を読み込み中...</div>
+            <div class="text-xs text-gray-600 mt-1">ローカルとサーバーの履歴を統合しています</div>
           </div>
         </td>
       </tr>
@@ -2867,23 +2963,53 @@ async function loadSimpleHistoryTable() {
     // テーブルをクリア
     tableBody.innerHTML = '';
     
-    if (mergedHistory.length === 0) {
-      // 履歴が空の場合
+    if (!Array.isArray(mergedHistory) || mergedHistory.length === 0) {
+      // 履歴が空の場合（改善されたメッセージ）
       const emptyRow = document.createElement('tr');
       emptyRow.innerHTML = `
-        <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
-          履歴がありません
+        <td colspan="4" class="px-3 py-8 text-center text-gray-500 text-sm">
+          <div class="flex flex-col items-center">
+            <div class="text-4xl mb-2">📝</div>
+            <div class="font-medium mb-1">履歴がありません</div>
+            <div class="text-xs text-gray-600">フォームを公開すると履歴が表示されます</div>
+          </div>
         </td>
       `;
       tableBody.appendChild(emptyRow);
       return;
     }
     
-    // 履歴アイテムをテーブル行として表示
+    // 履歴アイテムをテーブル行として表示（エラーハンドリング付き）
+    let successCount = 0;
+    let errorCount = 0;
+    
     mergedHistory.forEach((item, index) => {
-      const row = createHistoryTableRow(item, index);
-      tableBody.appendChild(row);
+      try {
+        if (!item || !item.id) {
+          logWarn('Invalid history item at index', index, item);
+          errorCount++;
+          return;
+        }
+        
+        const row = createHistoryTableRow(item, index);
+        if (row) {
+          tableBody.appendChild(row);
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (rowError) {
+        logWarn('Failed to create row for history item at index', index, rowError);
+        errorCount++;
+      }
     });
+    
+    // 統計情報をログに出力
+    logDebug(`History table loaded: ${successCount} success, ${errorCount} errors`);
+    
+    if (errorCount > 0) {
+      showMessage(`⚠️ 一部の履歴項目（${errorCount}件）の表示に問題がありました`, 'warning');
+    }
     
     logDebug('History table loaded with', mergedHistory.length, 'items');
   } catch (error) {
@@ -2928,15 +3054,52 @@ function createHistoryTableRow(item, index) {
   row.onclick = () => selectHistoryItem(item.id);
   
   const formatDateTime = (dateString) => {
-    if (!dateString) return '未設定';
-    const date = new Date(dateString);
-    return date.toLocaleString('ja-JP', {
-      year: '2-digit',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return '<span class="text-gray-500 text-xs">未設定</span>';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return '<span class="text-red-400 text-xs">無効な日付</span>';
+      }
+      
+      const now = new Date();
+      const diffMs = now - date;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      
+      let relativeTime = '';
+      if (diffDays > 7) {
+        // 1週間以上前は通常の日付表示
+        relativeTime = date.toLocaleString('ja-JP', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } else if (diffDays > 0) {
+        relativeTime = `${diffDays}日前`;
+      } else if (diffHours > 0) {
+        relativeTime = `${diffHours}時間前`;
+      } else if (diffMinutes > 0) {
+        relativeTime = `${diffMinutes}分前`;
+      } else {
+        relativeTime = 'たった今';
+      }
+      
+      const fullDate = date.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        weekday: 'short'
+      });
+      
+      return `<span class="text-xs" title="${fullDate}">${relativeTime}</span>`;
+    } catch (error) {
+      return '<span class="text-red-400 text-xs">日付エラー</span>';
+    }
   };
   
   // 回答形式の表示ロジック（改善版）
@@ -3036,19 +3199,39 @@ function createHistoryTableRow(item, index) {
   // Combine visual indicators
   const visualIndicators = `${statusIcon} ${displayModeIcon} ${countDisplayIcon}`;
 
-  // Create detailed tooltip text
-  const tooltipText = `${escapeHtml(item.questionText || '')}
+  // Enhanced question text display with truncation
+  const questionText = item.questionText || '（質問文未設定）';
+  const displayQuestionText = questionText.length > 40 
+    ? questionText.substring(0, 40) + '...' 
+    : questionText;
+  
+  // Sheet name display (if available)
+  const sheetName = item.sheetName || '';
+  const sheetDisplay = sheetName ? `<div class="text-xs text-gray-500 mt-1">📊 ${escapeHtml(sheetName)}</div>` : '';
+  
+  // Create detailed tooltip text with better formatting
+  const tooltipText = `質問: ${escapeHtml(questionText)}
 状態: ${getStatusText(status, isActive)}
 表示: ${getDisplayModeText(displayMode)}
-カウント: ${getCountDisplayText(countDisplay)}`;
+カウント: ${getCountDisplayText(countDisplay)}
+シート: ${sheetName || '未設定'}
+作成: ${item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '不明'}
+公開: ${item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未公開'}`;
 
   row.innerHTML = `
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.createdAt || item.timestamp)}</td>
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300 truncate" title="${tooltipText}">
-      <div class="flex items-center gap-1">
-        <span class="truncate flex-1">${escapeHtml(item.questionText || '')}</span>
-        <span class="text-xs opacity-75 flex-shrink-0">${visualIndicators}</span>
+    <td class="px-3 py-2 text-xs text-gray-300" title="${escapeHtml(tooltipText)}" style="max-width: 250px;">
+      <div class="flex items-start gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="truncate leading-tight">${escapeHtml(displayQuestionText)}</div>
+          ${sheetDisplay}
+        </div>
+        <div class="text-xs opacity-75 flex-shrink-0 flex gap-1">
+          <span title="状態: ${getStatusText(status, isActive)}">${statusIcon}</span>
+          <span title="表示モード: ${getDisplayModeText(displayMode)}">${displayModeIcon}</span>
+          <span title="カウント表示: ${getCountDisplayText(countDisplay)}">${countDisplayIcon}</span>
+        </div>
       </div>
     </td>
     <td class="px-3 py-2 text-xs text-center">${getAnswerFormatDisplay(item)}</td>
@@ -3108,72 +3291,101 @@ async function selectHistoryItem(historyId) {
       }
     }
     
-    // 2. AI列判定結果を復元
-    setTimeout(() => {
-      showProgress(progressSteps[currentStep++]); // AI列判定結果を復元中...
-      
-      if (item.sheetDetails) {
-        if (!currentStatus) currentStatus = {};
-        currentStatus.sheetDetails = {
-          allHeaders: item.sheetDetails.allHeaders || [],
-          guessedConfig: item.sheetDetails.guessedConfig || {},
-          existingConfig: item.sheetDetails.existingConfig || {}
-        };
+    // 2. AI列判定結果を復元（Promise化で確実性向上）
+    await new Promise(resolve => {
+      setTimeout(() => {
+        showProgress(progressSteps[currentStep++]); // AI列判定結果を復元中...
         
-        logDebug('Restored AI column prediction results:', currentStatus.sheetDetails);
-        
-        // 3. ヘッダー選択肢を設定
-        if (item.sheetDetails.allHeaders && item.sheetDetails.allHeaders.length > 0) {
-          populateHeaderOptions(item.sheetDetails.allHeaders);
-          console.log('✅ Header options restored from history');
+        if (item.sheetDetails) {
+          if (!window.currentStatus) window.currentStatus = {};
+          window.currentStatus.sheetDetails = {
+            allHeaders: item.sheetDetails.allHeaders || [],
+            guessedConfig: item.sheetDetails.guessedConfig || {},
+            existingConfig: item.sheetDetails.existingConfig || {}
+          };
+          
+          logDebug('Restored AI column prediction results:', window.currentStatus.sheetDetails);
+          
+          // 3. ヘッダー選択肢を設定
+          if (item.sheetDetails.allHeaders && item.sheetDetails.allHeaders.length > 0) {
+            if (typeof populateHeaderOptions === 'function') {
+              populateHeaderOptions(item.sheetDetails.allHeaders);
+              console.log('✅ Header options restored from history');
+            } else {
+              logWarn('populateHeaderOptions function not available');
+            }
+          }
+          
+          // 4. AI判定設定を適用
+          if (item.sheetDetails.guessedConfig) {
+            setTimeout(() => {
+              if (typeof populateConfig === 'function') {
+                populateConfig(item.sheetDetails.guessedConfig);
+                console.log('✅ AI configuration restored from history');
+              } else {
+                logWarn('populateConfig function not available');
+              }
+              resolve();
+            }, 100);
+          } else {
+            resolve();
+          }
+        } else {
+          resolve();
         }
-        
-        // 4. AI判定設定を適用
-        if (item.sheetDetails.guessedConfig) {
-          setTimeout(() => {
-            populateConfig(item.sheetDetails.guessedConfig);
-            console.log('✅ AI configuration restored from history');
-          }, 100);
-        }
-      }
-    }, 500);
+      }, 500);
+    });
     
-    // 5. フォーム設定を復元
-    setTimeout(() => {
-      showProgress(progressSteps[currentStep++]); // 設定を適用中...
-      
-      if (item.config) {
-        restoreConfigFromHistory(item.config);
-      }
-      
-      // 6. UI状態をStep 3（設定完了）に更新
-      const step3Section = document.getElementById('step3-content');
-      if (step3Section) {
-        step3Section.classList.remove('hidden');
-        step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      
-      // ステップインジケーターを更新
+    // 5. フォーム設定を復元（改善されたタイミング制御）
+    showProgress(progressSteps[currentStep++]); // 設定を適用中...
+    
+    if (item.config) {
+      await new Promise(resolve => {
+        setTimeout(() => {
+          restoreConfigFromHistory(item.config);
+          resolve();
+        }, 200);
+      });
+    }
+    
+    // 6. UI状態をStep 3（設定完了）に更新
+    const step3Section = document.getElementById('step3-content');
+    if (step3Section) {
+      step3Section.classList.remove('hidden');
+      step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    // ステップインジケーターを更新
+    if (typeof updateStepIndicators === 'function') {
       updateStepIndicators(3);
+    }
+    if (typeof manageSectionStates === 'function') {
       manageSectionStates(3);
-      
-      // 設定ボタンの状態を更新
+    }
+    
+    // 設定ボタンの状態を更新
+    if (typeof updateConfigButtons === 'function') {
       updateConfigButtons();
-      
-      // 設定完了状態を反映
-      if (item.configurationComplete) {
-        updateUIForSelectedSheet();
-      }
-      
-      // 最終完了通知
+    }
+    
+    // 設定完了状態を反映
+    if (item.configurationComplete && typeof updateUIForSelectedSheet === 'function') {
+      updateUIForSelectedSheet();
+    }
+    
+    // 最終完了通知（確実な完了を保証）
+    await new Promise(resolve => {
       setTimeout(() => {
         showProgress(progressSteps[currentStep++]); // 復元完了
         setTimeout(() => {
-          showMessage(`「${item.questionText}」の設定を完全読み込みしました`, 'success');
+          const truncatedQuestion = item.questionText && item.questionText.length > 50 
+            ? item.questionText.substring(0, 50) + '...'
+            : item.questionText || '履歴項目';
+          showMessage(`「${truncatedQuestion}」の設定を読み込みしました`, 'success');
+          resolve();
         }, 500);
       }, 300);
-      
-    }, 800); // AI設定適用の完了を待つ
+    });
     
   } catch (error) {
     logError('Failed to select history item:', error);
@@ -3240,39 +3452,95 @@ async function selectHistoryItem(historyId) {
  */
 function restoreConfigFromHistory(config) {
   try {
-    // フォーム設定の復元
-    if (config.opinionHeader) {
-      const opinionSelect = document.getElementById('opinionHeader');
-      if (opinionSelect) opinionSelect.value = config.opinionHeader;
+    logDebug('Restoring config from history:', config);
+    
+    // フォーム設定の復元（チェック付き）
+    const configMappings = [
+      { configKey: 'opinionHeader', elementId: 'opinionHeader', label: 'Opinion Header' },
+      { configKey: 'nameHeader', elementId: 'name-column', label: 'Name Column' },
+      { configKey: 'classHeader', elementId: 'class-column', label: 'Class Column' },
+      { configKey: 'reasonHeader', elementId: 'reason-column', label: 'Reason Column' }
+    ];
+    
+    configMappings.forEach(({ configKey, elementId, label }) => {
+      if (config[configKey]) {
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.value = config[configKey];
+          logDebug(`✅ ${label} restored:`, config[configKey]);
+          
+          // 変更イベントを発火して関連UIを更新
+          const event = new Event('change', { bubbles: true });
+          element.dispatchEvent(event);
+        } else {
+          logWarn(`⚠️ Element not found for ${label} (${elementId})`);
+        }
+      }
+    });
+    
+    // チェックボックスの復元（イベント付き）
+    const checkboxMappings = [
+      { configKey: 'showNames', elementId: 'show-names', label: 'Show Names' },
+      { configKey: 'showCounts', elementId: 'show-counts', label: 'Show Counts' }
+    ];
+    
+    checkboxMappings.forEach(({ configKey, elementId, label }) => {
+      const checkbox = document.getElementById(elementId);
+      if (checkbox) {
+        const value = config[configKey] || false;
+        checkbox.checked = value;
+        logDebug(`✅ ${label} restored:`, value);
+        
+        // 変更イベントを発火
+        const event = new Event('change', { bubbles: true });
+        checkbox.dispatchEvent(event);
+      } else {
+        logWarn(`⚠️ Checkbox not found for ${label} (${elementId})`);
+      }
+    });
+    
+    // 追加の設定項目の復元
+    if (config.displayMode) {
+      const displayModeElements = document.querySelectorAll('input[name="displayMode"]');
+      displayModeElements.forEach(radio => {
+        if (radio.value === config.displayMode) {
+          radio.checked = true;
+          const event = new Event('change', { bubbles: true });
+          radio.dispatchEvent(event);
+        }
+      });
+      logDebug('✅ Display mode restored:', config.displayMode);
     }
     
-    if (config.nameHeader) {
-      const nameSelect = document.getElementById('name-column');
-      if (nameSelect) nameSelect.value = config.nameHeader;
+    if (config.countDisplay) {
+      const countDisplayElements = document.querySelectorAll('input[name="countDisplay"]');
+      countDisplayElements.forEach(radio => {
+        if (radio.value === config.countDisplay) {
+          radio.checked = true;
+          const event = new Event('change', { bubbles: true });
+          radio.dispatchEvent(event);
+        }
+      });
+      logDebug('✅ Count display restored:', config.countDisplay);
     }
-    
-    if (config.classHeader) {
-      const classSelect = document.getElementById('class-column');
-      if (classSelect) classSelect.value = config.classHeader;
-    }
-    
-    if (config.reasonHeader) {
-      const reasonSelect = document.getElementById('reason-column');
-      if (reasonSelect) reasonSelect.value = config.reasonHeader;
-    }
-    
-    // チェックボックスの復元
-    const showNamesCheckbox = document.getElementById('show-names');
-    if (showNamesCheckbox) showNamesCheckbox.checked = config.showNames || false;
-    
-    const showCountsCheckbox = document.getElementById('show-counts');
-    if (showCountsCheckbox) showCountsCheckbox.checked = config.showCounts || false;
     
     // 設定ボタンの状態を更新
-    updateConfigButtons();
+    if (typeof updateConfigButtons === 'function') {
+      updateConfigButtons();
+      logDebug('✅ Config buttons updated');
+    }
+    
+    // UI状態の強制更新
+    setTimeout(() => {
+      if (typeof validateConfiguration === 'function') {
+        validateConfiguration();
+      }
+      logDebug('✅ Configuration validation completed');
+    }, 100);
     
   } catch (error) {
     logError('Failed to restore config from history:', error);
+    showMessage('⚠️ 設定の復元に一部失敗しましたが、可能な項目は復元されました', 'warning');
   }
 }
 
