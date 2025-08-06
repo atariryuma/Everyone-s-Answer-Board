@@ -1801,6 +1801,109 @@ function unpublishBoard() {
       clearDraftFromSession();
     }
   }
+  
+  /**
+   * Create history entry for QuickStart completion
+   * @param {Object} quickStartResult - QuickStart completion result
+   */
+  function createQuickStartHistoryEntry(quickStartResult) {
+    try {
+      logDebug('Creating QuickStart history entry:', quickStartResult);
+      
+      // Extract question text from QuickStart config
+      const questionText = quickStartResult.config?.opinionHeader ||
+                          quickStartResult.config?.opinionColumn ||
+                          'クイックスタート - あなたの考えや気づいたことを教えてください';
+      
+      // Use completion time as both creation and publication time for QuickStart
+      const completedAt = quickStartResult.completedAt || new Date().toISOString();
+      const publishedAt = quickStartResult.publishResult?.publishedAt || completedAt;
+      
+      // Create QuickStart-specific history entry
+      const quickStartHistoryItem = {
+        id: generateHistoryId(),
+        formId: `${quickStartResult.spreadsheetId || 'quickstart'}_${quickStartResult.sheetName || 'default'}`,
+        
+        // Timestamps - QuickStart creates and publishes simultaneously
+        createdAt: completedAt,
+        publishedAt: publishedAt,
+        
+        // Form content
+        questionText: questionText,
+        sheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName || '',
+        
+        // Display settings (QuickStart defaults)
+        displayMode: '通常表示',
+        countDisplay: '表示',
+        
+        // Form configuration and state
+        config: quickStartResult.config || {},
+        status: quickStartResult.autoPublished ? 'published' : 'draft',
+        setupType: 'quickstart',
+        isActive: quickStartResult.autoPublished || false,
+        
+        // URLs and counts
+        formUrl: quickStartResult.formUrl || '',
+        spreadsheetUrl: quickStartResult.spreadsheetUrl || '',
+        answerCount: 0,
+        reactionCount: 0,
+        
+        // AI column prediction results from QuickStart config
+        sheetDetails: {
+          allHeaders: quickStartResult.config ? Object.values(quickStartResult.config).filter(v => typeof v === 'string') : [],
+          guessedConfig: quickStartResult.config || {},
+          existingConfig: quickStartResult.config || {}
+        },
+        
+        // Additional metadata
+        activeSheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName,
+        spreadsheetId: quickStartResult.spreadsheetId || '',
+        configurationComplete: true // QuickStart always completes configuration
+      };
+      
+      // Save QuickStart history entry using existing localStorage mechanism
+      const history = getHistoryFromStorage();
+      
+      // Check if entry with same formId already exists and remove it
+      const existingIndex = history.findIndex(item => item.formId === quickStartHistoryItem.formId);
+      if (existingIndex !== -1) {
+        history.splice(existingIndex, 1);
+        logDebug('Removed existing entry for formId:', quickStartHistoryItem.formId);
+      }
+      
+      // Add new QuickStart entry at the beginning
+      history.unshift(quickStartHistoryItem);
+      
+      // Enforce maximum history items limit
+      const MAX_HISTORY_ITEMS = 10;
+      if (history.length > MAX_HISTORY_ITEMS) {
+        history.splice(MAX_HISTORY_ITEMS);
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('answerboard_history', JSON.stringify(history));
+      
+      // Sync to server (async)
+      syncHistoryToServer(quickStartHistoryItem);
+      
+      // Update UI
+      if (typeof loadSimpleHistoryTable === 'function') {
+        loadSimpleHistoryTable();
+      }
+      
+      logDebug('QuickStart history entry created successfully:', {
+        formId: quickStartHistoryItem.formId,
+        questionText: quickStartHistoryItem.questionText,
+        createdAt: quickStartHistoryItem.createdAt,
+        publishedAt: quickStartHistoryItem.publishedAt,
+        status: quickStartHistoryItem.status,
+        isActive: quickStartHistoryItem.isActive
+      });
+      
+    } catch (error) {
+      logError('Failed to create QuickStart history entry:', error);
+    }
+  }
 
 // セットアップタイプを判定する補助関数
 function determineSetupType(config, userInfo) {
@@ -3834,6 +3937,16 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
     .then(function(result) {
       if (result && result.status === 'success') {
         console.log('🎉 QuickStartバックエンド処理完了:', result);
+        
+        // Save QuickStart history entry
+        if (result.setupComplete) {
+          try {
+            createQuickStartHistoryEntry(result);
+            console.log('📝 QuickStart履歴保存完了');
+          } catch (error) {
+            console.error('❌ QuickStart履歴保存に失敗:', error);
+          }
+        }
         
         // Enhanced completion notification with detailed backend response
         updateOverallProgress(100, result.autoPublished ? 'クイックスタート完了！ボードが公開されました！' : 'クイックスタート完了！');
