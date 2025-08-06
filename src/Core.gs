@@ -2716,6 +2716,9 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, p
     sheetName: formAndSsInfo.sheetName,
     formId: formAndSsInfo.formId,
     spreadsheetId: formAndSsInfo.spreadsheetId,
+    // Display settings for history and UI
+    displayMode: updatedConfig.displayMode || 'anonymous',
+    showCounts: updatedConfig.showCounts === true,
     // シート設定データ（フロントエンド同期用）
     config: sheetConfig.guessedConfig || {},
     publishedSheetName: formAndSsInfo.sheetName,
