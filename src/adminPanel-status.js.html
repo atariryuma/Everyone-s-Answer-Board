@@ -162,17 +162,5 @@ function updateUserActivity() {
 // INITIALIZATION HELPERS
 // =============================================================================
 
-// Initialize message area
-function initializeMessageArea() {
-  var messageArea = document.getElementById('message-area');
-  if (!messageArea) {
-    // Create message area if it doesn't exist
-    messageArea = document.createElement('div');
-    messageArea.id = 'message-area';
-    messageArea.className = 'fixed top-32 right-4 z-50 max-w-sm';
-    document.body.appendChild(messageArea);
-  }
-}
-
-// 初期化は adminPanel-core.js の統合初期化システムで管理されます
+// Message area initialization is now handled in adminPanel-framework.js.html
 </script>

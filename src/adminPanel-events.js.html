@@ -705,21 +705,6 @@ function manageFocusForModal(modalId, show) {
 // INITIALIZATION
 // =============================================================================
 
-// Initialize event listeners when DOM is ready
-// Add additional delay to ensure all JavaScript modules are loaded
-function initializeEventListeners() {
-  // Check if essential functions are available, but continue even if some are missing
-  const requiredFunctions = ['handleQuickStart', 'showFormConfigModal', 'toggleSection'];
-  const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
-
-  if (missingFunctions.length > 0) {
-    console.warn('⚠️ AdminPanel: Missing functions during event initialization:', missingFunctions);
-  }
-
-  console.log('✅ AdminPanel: Setting up event listeners');
-  setupEventListeners();
-}
-
-// 初期化は adminPanel-core.js の統合初期化システムで管理されます
+// Event listener initialization is now handled in adminPanel-framework.js.html
 
 </script>

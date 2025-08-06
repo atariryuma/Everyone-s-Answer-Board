@@ -4225,24 +4225,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
 // INITIALIZATION
 // =============================================================================
 
-// Initialize API communications
-function initializeAPI() {
-  logDebug('🔧 API初期化開始');
-  
-  // Start background status updates
-  startSystemStatusUpdate();
-  
-  // Setup user activity tracking
-  document.addEventListener('click', updateUserActivity);
-  document.addEventListener('keypress', updateUserActivity);
-  document.addEventListener('scroll', updateUserActivity);
-
-  // 初回ロード時にシステムステータスをロード
-  logDebug('🚀 loadStatus()を呼び出します');
-  loadStatus();
-  
-  logDebug('✅ API初期化完了');
-}
+// API initialization is now handled in adminPanel-framework.js.html
 
 // =============================================================================
 // MISSING FUNCTIONS RESTORATION
