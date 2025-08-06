@@ -836,8 +836,62 @@ window.showMessage = showMessage;
 window.updateUIWithNewStatus = updateUIWithNewStatus;
 window.validateConfig = validateConfig;
 window.updateConfigButtons = updateConfigButtons;
+// Populate configuration (minimal implementation)
+function populateConfig(cfg) {
+  // Try to use the full implementation if available
+  if (typeof window._fullPopulateConfig === 'function') {
+    try {
+      return window._fullPopulateConfig(cfg);
+    } catch (error) {
+      console.warn('Full populateConfig failed, using fallback:', error);
+    }
+  }
+  
+  // Minimal implementation for essential config population
+  console.log('populateConfig: Using minimal implementation');
+  
+  try {
+    if (!cfg) return;
+    
+    if (window.populateConfigRunning) {
+      return;
+    }
+    window.populateConfigRunning = true;
+    
+    const mappings = {
+      'opinionHeader': cfg.opinionHeader || cfg.opinionColumn,
+      'reason-column': cfg.reasonColumn || cfg.reasonHeader,
+      'name-column': cfg.nameColumn || cfg.nameHeader,
+      'class-column': cfg.classColumn || cfg.classHeader,
+      'show-names': cfg.showNames,
+      'show-counts': cfg.showCounts
+    };
+    
+    Object.keys(mappings).forEach(elementId => {
+      const element = document.getElementById(elementId);
+      const value = mappings[elementId];
+      
+      if (element && value !== undefined) {
+        if (element.type === 'checkbox') {
+          element.checked = Boolean(value);
+        } else {
+          element.value = value;
+        }
+      }
+    });
+    
+    setTimeout(() => {
+      window.populateConfigRunning = false;
+    }, 100);
+  } catch (error) {
+    console.error('Error in minimal populateConfig:', error);
+    window.populateConfigRunning = false;
+  }
+}
+
 window.updateFormUrlDisplay = updateFormUrlDisplay;
 window.populateHeaderOptions = populateHeaderOptions;
+window.populateConfig = populateConfig;
 window.checkFunctionAvailability = checkFunctionAvailability;
 window.safeCallFunction = safeCallFunction;
 
@@ -846,7 +900,7 @@ const criticalFunctions = [
   'toggleSection', 'hidePrivacyModal', 'hideDigitalCitizenshipModal', 
   'hideConfirmationModal', 'showFormConfigModal', 'showMessage', 
   'updateUIWithNewStatus', 'validateConfig', 'updateConfigButtons', 
-  'updateFormUrlDisplay', 'populateHeaderOptions',
+  'updateFormUrlDisplay', 'populateHeaderOptions', 'populateConfig',
   'navigateToStep', 'initializeAdminPanel'
 ];
 

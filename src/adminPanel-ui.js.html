@@ -627,7 +627,8 @@ function _fullPopulateHeaderOptions(headers) {
 }
 
 // Populate configuration with guessed values
-function populateConfig(cfg) {
+// Full implementation of populateConfig (framework has minimal version)
+function _fullPopulateConfig(cfg) {
   if (!cfg) return;
   
   // Throttle function calls to prevent spam
@@ -752,6 +753,7 @@ window._fullValidateConfig = _fullValidateConfig;
 window._fullUpdateConfigButtons = _fullUpdateConfigButtons;
 window._fullUpdateFormUrlDisplay = _fullUpdateFormUrlDisplay;
 window._fullPopulateHeaderOptions = _fullPopulateHeaderOptions;
+window._fullPopulateConfig = _fullPopulateConfig;
 
 // =============================================================================
 // STEP INDICATORS AND GUIDANCE
