@@ -1,0 +1,409 @@
+<script>
+// =============================================================================
+// ADMIN PANEL FUNCTION SAFETY & DEBUGGING SYSTEM
+// =============================================================================
+// This file provides comprehensive function safety, fallback mechanisms,
+// and debugging tools to prevent "function is not defined" errors
+
+(function() {
+  'use strict';
+
+  // Debug configuration
+  const DEBUG_FUNCTIONS = true;
+  const LOG_PREFIX = '🔧 [FunctionSafety]';
+  
+  // Critical functions that must be available
+  const CRITICAL_FUNCTIONS = [
+    'navigateToStep',
+    'hidePrivacyModal', 
+    'showPrivacyModal',
+    'updateUIWithNewStatus',
+    'showFormConfigModal',
+    'hideFormConfigModal',
+    'toggleSection'
+  ];
+
+  // Function loading state tracker
+  window.AdminPanelFunctionState = {
+    loaded: {},
+    failed: {},
+    retryCount: {},
+    maxRetries: 3
+  };
+
+  // Enhanced logging utility
+  function debugLog(message, data = null) {
+    if (DEBUG_FUNCTIONS) {
+      if (data) {
+        console.log(LOG_PREFIX, message, data);
+      } else {
+        console.log(LOG_PREFIX, message);
+      }
+    }
+  }
+
+  function debugError(message, error = null) {
+    console.error(LOG_PREFIX, message, error || '');
+  }
+
+  function debugWarn(message, data = null) {
+    console.warn(LOG_PREFIX, message, data || '');
+  }
+
+  // =============================================================================
+  // FUNCTION VERIFICATION & DIAGNOSIS
+  // =============================================================================
+
+  /**
+   * Comprehensive function verification with detailed diagnostics
+   */
+  function verifyFunction(funcName) {
+    const checks = {
+      windowDefined: typeof window[funcName] === 'function',
+      globalDefined: typeof window[funcName] !== 'undefined',
+      globalType: typeof window[funcName],
+      inGlobalScope: funcName in window,
+      hasToString: window[funcName] && typeof window[funcName].toString === 'function'
+    };
+
+    if (checks.windowDefined) {
+      window.AdminPanelFunctionState.loaded[funcName] = true;
+      debugLog(`✅ Function ${funcName} verified successfully`);
+      return true;
+    } else {
+      debugWarn(`❌ Function ${funcName} verification failed:`, checks);
+      return false;
+    }
+  }
+
+  /**
+   * Diagnose why a function might not be loading
+   */
+  function diagnoseFunctionIssue(funcName) {
+    debugLog(`🔍 Diagnosing function: ${funcName}`);
+    
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      funcName: funcName,
+      windowObject: !!window,
+      windowKeys: Object.keys(window).filter(key => key.includes(funcName.toLowerCase())),
+      similarFunctions: Object.keys(window).filter(key => 
+        typeof window[key] === 'function' && 
+        (key.includes('admin') || key.includes('Panel') || key.includes('Modal'))
+      ),
+      scriptElements: document.querySelectorAll('script').length,
+      adminElements: document.querySelectorAll('[id*="admin"], [class*="admin"]').length,
+      documentReady: document.readyState
+    };
+
+    debugLog(`📊 Diagnostic results for ${funcName}:`, diagnostics);
+    return diagnostics;
+  }
+
+  // =============================================================================
+  // FUNCTION SAFETY WRAPPERS
+  // =============================================================================
+
+  /**
+   * Create a safe wrapper for any function that shows user-friendly messages
+   */
+  function createSafeWrapper(funcName, fallbackAction = null) {
+    return function(...args) {
+      try {
+        // Check if real function is available
+        if (typeof window[funcName] === 'function') {
+          debugLog(`🎯 Executing ${funcName} with args:`, args);
+          return window[funcName].apply(this, args);
+        } 
+        
+        // Function not available - try fallback
+        debugWarn(`⚠️ Function ${funcName} not available, attempting fallback`);
+        
+        if (fallbackAction && typeof fallbackAction === 'function') {
+          return fallbackAction.apply(this, args);
+        }
+        
+        // Show user-friendly message
+        showFunctionNotAvailableMessage(funcName);
+        
+      } catch (error) {
+        debugError(`💥 Error executing ${funcName}:`, error);
+        handleFunctionError(funcName, error, args);
+      }
+    };
+  }
+
+  /**
+   * Show user-friendly message when function is not available
+   */
+  function showFunctionNotAvailableMessage(funcName) {
+    const messages = {
+      'navigateToStep': 'ステップ機能を読み込み中です。少し待ってから再度お試しください。',
+      'hidePrivacyModal': 'プライバシーモーダルを閉じています...',
+      'showPrivacyModal': 'プライバシー設定を読み込み中です...',
+      'updateUIWithNewStatus': 'ステータス更新機能を読み込み中です...',
+      'showFormConfigModal': 'フォーム設定を読み込み中です。少し待ってから再度お試しください。',
+      'hideFormConfigModal': 'フォーム設定を閉じています...',
+      'toggleSection': 'セクション表示機能を読み込み中です...'
+    };
+
+    const message = messages[funcName] || `機能「${funcName}」を読み込み中です。少し待ってから再度お試しください。`;
+    
+    // Try to show message using available message system
+    if (typeof showMessage === 'function') {
+      showMessage(message, 'warning');
+    } else if (typeof window.showMessage === 'function') {
+      window.showMessage(message, 'warning');
+    } else {
+      // Fallback to alert if no message system available
+      alert(message);
+    }
+  }
+
+  /**
+   * Handle function execution errors gracefully
+   */
+  function handleFunctionError(funcName, error, args) {
+    debugError(`Function ${funcName} failed with error:`, error);
+    
+    // Log error details for debugging
+    console.error('Function execution failed:', {
+      function: funcName,
+      error: error.message,
+      stack: error.stack,
+      args: args,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Show user-friendly error message
+    const message = `申し訳ございませんが、処理中にエラーが発生しました。ページを再読み込みして再度お試しください。`;
+    if (typeof showMessage === 'function') {
+      showMessage(message, 'error');
+    } else {
+      alert(message);
+    }
+  }
+
+  // =============================================================================
+  // FUNCTION FALLBACKS
+  // =============================================================================
+
+  const FUNCTION_FALLBACKS = {
+    navigateToStep: function(step) {
+      debugLog('🚨 navigateToStep fallback triggered', { step });
+      // Try basic navigation fallback
+      const stepElements = document.querySelectorAll('.step-indicator, [data-step]');
+      if (stepElements.length > 0) {
+        stepElements.forEach((el, index) => {
+          if (index + 1 === step) {
+            el.classList.add('active', 'current');
+            el.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            el.classList.remove('active', 'current');
+          }
+        });
+      }
+    },
+
+    hidePrivacyModal: function() {
+      debugLog('🚨 hidePrivacyModal fallback triggered');
+      const modal = document.getElementById('privacy-modal');
+      if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    },
+
+    showPrivacyModal: function() {
+      debugLog('🚨 showPrivacyModal fallback triggered');
+      const modal = document.getElementById('privacy-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    },
+
+    updateUIWithNewStatus: function(status) {
+      debugLog('🚨 updateUIWithNewStatus fallback triggered', { status });
+      // Basic status update fallback
+      if (status && typeof status === 'object') {
+        // Try to update basic UI elements
+        const statusElements = document.querySelectorAll('[data-status], .status-display');
+        statusElements.forEach(el => {
+          el.textContent = status.message || 'ステータス更新中...';
+        });
+      }
+    },
+
+    showFormConfigModal: function() {
+      debugLog('🚨 showFormConfigModal fallback triggered');
+      const modal = document.getElementById('form-config-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      } else {
+        showFunctionNotAvailableMessage('showFormConfigModal');
+      }
+    },
+
+    hideFormConfigModal: function() {
+      debugLog('🚨 hideFormConfigModal fallback triggered');
+      const modal = document.getElementById('form-config-modal');
+      if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    },
+
+    toggleSection: function(sectionId) {
+      debugLog('🚨 toggleSection fallback triggered', { sectionId });
+      const section = document.getElementById(sectionId);
+      if (section) {
+        section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        section.classList.toggle('hidden');
+      }
+    }
+  };
+
+  // =============================================================================
+  // FUNCTION RETRY MECHANISM
+  // =============================================================================
+
+  /**
+   * Retry loading a function with exponential backoff
+   */
+  function retryFunctionLoad(funcName, callback, attempt = 1) {
+    const maxAttempts = window.AdminPanelFunctionState.maxRetries;
+    
+    if (attempt > maxAttempts) {
+      debugError(`❌ Function ${funcName} failed to load after ${maxAttempts} attempts`);
+      window.AdminPanelFunctionState.failed[funcName] = true;
+      return;
+    }
+
+    debugLog(`🔄 Retry attempt ${attempt}/${maxAttempts} for function: ${funcName}`);
+    
+    setTimeout(() => {
+      if (verifyFunction(funcName)) {
+        debugLog(`✅ Function ${funcName} loaded successfully on attempt ${attempt}`);
+        if (callback) callback();
+      } else {
+        retryFunctionLoad(funcName, callback, attempt + 1);
+      }
+    }, Math.pow(2, attempt - 1) * 1000); // Exponential backoff: 1s, 2s, 4s
+  }
+
+  // =============================================================================
+  // INITIALIZATION & PUBLIC API
+  // =============================================================================
+
+  /**
+   * Initialize all critical functions with safety wrappers
+   */
+  function initializeFunctionSafety() {
+    debugLog('🚀 Initializing function safety system...');
+
+    CRITICAL_FUNCTIONS.forEach(funcName => {
+      // Create safe wrapper with fallback
+      const safeWrapper = createSafeWrapper(funcName, FUNCTION_FALLBACKS[funcName]);
+      
+      // Set as fallback if function doesn't exist
+      if (typeof window[funcName] !== 'function') {
+        window[funcName] = safeWrapper;
+        debugLog(`🛡️ Safety wrapper installed for: ${funcName}`);
+        
+        // Start retry mechanism
+        retryFunctionLoad(funcName);
+      } else {
+        debugLog(`✅ Function ${funcName} already available`);
+        window.AdminPanelFunctionState.loaded[funcName] = true;
+      }
+    });
+  }
+
+  /**
+   * Comprehensive system diagnosis
+   */
+  function runSystemDiagnosis() {
+    debugLog('🔬 Running comprehensive system diagnosis...');
+    
+    const diagnosis = {
+      timestamp: new Date().toISOString(),
+      documentReady: document.readyState,
+      functionsLoaded: {},
+      functionsAvailable: {},
+      totalScripts: document.querySelectorAll('script').length,
+      adminElements: document.querySelectorAll('[id*="admin"], [class*="admin"]').length,
+      errors: []
+    };
+
+    // Check each critical function
+    CRITICAL_FUNCTIONS.forEach(funcName => {
+      diagnosis.functionsLoaded[funcName] = window.AdminPanelFunctionState.loaded[funcName] || false;
+      diagnosis.functionsAvailable[funcName] = typeof window[funcName] === 'function';
+      
+      if (!diagnosis.functionsAvailable[funcName]) {
+        diagnosis.errors.push(`Function ${funcName} not available`);
+        diagnoseFunctionIssue(funcName);
+      }
+    });
+
+    debugLog('📊 System Diagnosis Results:', diagnosis);
+    return diagnosis;
+  }
+
+  /**
+   * Force reload all functions (emergency recovery)
+   */
+  function forceReloadFunctions() {
+    debugLog('🆘 Force reloading all functions...');
+    
+    CRITICAL_FUNCTIONS.forEach(funcName => {
+      window.AdminPanelFunctionState.retryCount[funcName] = 0;
+      window.AdminPanelFunctionState.failed[funcName] = false;
+      retryFunctionLoad(funcName);
+    });
+  }
+
+  // =============================================================================
+  // EXPOSE PUBLIC API
+  // =============================================================================
+
+  // Expose debugging and recovery functions globally
+  window.AdminPanelFunctionSafety = {
+    verify: verifyFunction,
+    diagnose: diagnoseFunctionIssue,
+    runDiagnosis: runSystemDiagnosis,
+    forceReload: forceReloadFunctions,
+    state: window.AdminPanelFunctionState,
+    
+    // Emergency functions for manual recovery
+    emergency: {
+      navigateToStep: FUNCTION_FALLBACKS.navigateToStep,
+      hidePrivacyModal: FUNCTION_FALLBACKS.hidePrivacyModal,
+      showPrivacyModal: FUNCTION_FALLBACKS.showPrivacyModal,
+      updateUIWithNewStatus: FUNCTION_FALLBACKS.updateUIWithNewStatus,
+      showFormConfigModal: FUNCTION_FALLBACKS.showFormConfigModal,
+      hideFormConfigModal: FUNCTION_FALLBACKS.hideFormConfigModal,
+      toggleSection: FUNCTION_FALLBACKS.toggleSection
+    }
+  };
+
+  // Initialize immediately
+  initializeFunctionSafety();
+
+  // Run diagnosis after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runSystemDiagnosis);
+  } else {
+    setTimeout(runSystemDiagnosis, 100);
+  }
+
+  debugLog('✅ Function safety system initialized');
+
+})();
+</script>

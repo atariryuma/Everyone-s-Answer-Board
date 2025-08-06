@@ -1,0 +1,406 @@
+<script>
+// =============================================================================
+// ADMIN PANEL ERROR RECOVERY SYSTEM
+// =============================================================================
+// Comprehensive error recovery for common JavaScript loading issues
+
+(function() {
+  'use strict';
+
+  const RECOVERY_PREFIX = '🔄 [ErrorRecovery]';
+  
+  // Track recovery attempts
+  let recoveryAttempts = 0;
+  const maxRecoveryAttempts = 3;
+  
+  // =============================================================================
+  // ERROR PATTERN DETECTION
+  // =============================================================================
+
+  const ERROR_PATTERNS = {
+    functionNotDefined: /(\w+) is not defined/,
+    cannotReadProperty: /Cannot read property '(\w+)' of undefined/,
+    cannotAccess: /Cannot access '(\w+)' before initialization/,
+    syntaxError: /SyntaxError/,
+    referenceError: /ReferenceError/,
+    typeError: /TypeError/
+  };
+
+  const CRITICAL_FUNCTION_ERRORS = [
+    'navigateToStep is not defined',
+    'hidePrivacyModal is not defined', 
+    'updateUIWithNewStatus is not defined',
+    'showFormConfigModal is not defined',
+    'toggleSection is not defined'
+  ];
+
+  // =============================================================================
+  // AUTOMATIC ERROR RECOVERY
+  // =============================================================================
+
+  /**
+   * Handle specific error types with targeted recovery
+   */
+  function handleSpecificError(error, source) {
+    const errorMessage = error.message || error.toString();
+    console.log(`${RECOVERY_PREFIX} Handling error: ${errorMessage}`);
+    
+    // Check if it's a critical function error
+    const isCriticalFunctionError = CRITICAL_FUNCTION_ERRORS.some(pattern => 
+      errorMessage.includes(pattern.replace(' is not defined', ''))
+    );
+
+    if (isCriticalFunctionError) {
+      console.log(`${RECOVERY_PREFIX} Critical function error detected - initiating recovery`);
+      return recoverCriticalFunction(errorMessage);
+    }
+
+    // Handle other error types
+    if (ERROR_PATTERNS.functionNotDefined.test(errorMessage)) {
+      const match = errorMessage.match(ERROR_PATTERNS.functionNotDefined);
+      if (match) {
+        return recoverMissingFunction(match[1]);
+      }
+    }
+
+    if (ERROR_PATTERNS.syntaxError.test(errorMessage)) {
+      return recoverSyntaxError(errorMessage, source);
+    }
+
+    return false; // No recovery available
+  }
+
+  /**
+   * Recover critical admin panel functions
+   */
+  function recoverCriticalFunction(errorMessage) {
+    console.log(`${RECOVERY_PREFIX} Attempting critical function recovery...`);
+    
+    // Extract function name from error
+    const functionName = errorMessage.match(/(\w+) is not defined/)?.[1];
+    
+    if (!functionName) return false;
+
+    // Check if function safety system is available
+    if (window.AdminPanelFunctionSafety?.emergency?.[functionName]) {
+      console.log(`${RECOVERY_PREFIX} Using emergency fallback for ${functionName}`);
+      window[functionName] = window.AdminPanelFunctionSafety.emergency[functionName];
+      return true;
+    }
+
+    // Check if function is available but not in global scope
+    if (checkAlternativeFunctionSources(functionName)) {
+      return true;
+    }
+
+    // Last resort: create minimal fallback
+    createMinimalFallback(functionName);
+    return true;
+  }
+
+  /**
+   * Check alternative sources for function definitions
+   */
+  function checkAlternativeFunctionSources(functionName) {
+    console.log(`${RECOVERY_PREFIX} Checking alternative sources for ${functionName}`);
+    
+    // Check if function exists in other scopes
+    const possibleSources = [
+      window.AdminPanel,
+      window.sharedModals,
+      document
+    ];
+
+    for (const source of possibleSources) {
+      if (source && typeof source[functionName] === 'function') {
+        console.log(`${RECOVERY_PREFIX} Found ${functionName} in alternative source`);
+        window[functionName] = source[functionName].bind(source);
+        return true;
+      }
+    }
+
+    // Check for functions with similar names
+    const similarFunctions = Object.keys(window)
+      .filter(key => typeof window[key] === 'function')
+      .filter(key => key.toLowerCase().includes(functionName.toLowerCase()) || 
+                     key.includes(functionName.replace(/([A-Z])/g, '').toLowerCase()));
+
+    if (similarFunctions.length > 0) {
+      console.log(`${RECOVERY_PREFIX} Found similar functions:`, similarFunctions);
+      // Could potentially use the closest match, but this needs careful consideration
+    }
+
+    return false;
+  }
+
+  /**
+   * Create minimal fallback function
+   */
+  function createMinimalFallback(functionName) {
+    console.log(`${RECOVERY_PREFIX} Creating minimal fallback for ${functionName}`);
+    
+    const fallbacks = {
+      navigateToStep: function(step) {
+        console.log(`${RECOVERY_PREFIX} Fallback navigateToStep called with step:`, step);
+        showUserMessage(`ステップ ${step} に移動中...`, 'info');
+        
+        // Try basic step navigation
+        const stepElements = document.querySelectorAll('.step-indicator, [data-step]');
+        stepElements.forEach((el, index) => {
+          if (index + 1 === step) {
+            el.classList.add('active');
+            el.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            el.classList.remove('active');
+          }
+        });
+      },
+
+      hidePrivacyModal: function() {
+        console.log(`${RECOVERY_PREFIX} Fallback hidePrivacyModal called`);
+        const modals = ['privacy-modal', 'privacyModal'].map(id => document.getElementById(id)).filter(Boolean);
+        modals.forEach(modal => {
+          modal.style.display = 'none';
+          modal.classList.add('hidden');
+          modal.classList.remove('flex', 'block');
+        });
+      },
+
+      updateUIWithNewStatus: function(status) {
+        console.log(`${RECOVERY_PREFIX} Fallback updateUIWithNewStatus called with:`, status);
+        if (status && status.message) {
+          showUserMessage(status.message, status.type || 'info');
+        }
+      },
+
+      showFormConfigModal: function() {
+        console.log(`${RECOVERY_PREFIX} Fallback showFormConfigModal called`);
+        const modal = document.getElementById('form-config-modal');
+        if (modal) {
+          modal.style.display = 'flex';
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+        } else {
+          showUserMessage('フォーム設定を読み込み中です...', 'warning');
+        }
+      },
+
+      toggleSection: function(sectionId) {
+        console.log(`${RECOVERY_PREFIX} Fallback toggleSection called with:`, sectionId);
+        const section = document.getElementById(sectionId);
+        if (section) {
+          const isHidden = section.style.display === 'none' || section.classList.contains('hidden');
+          if (isHidden) {
+            section.style.display = 'block';
+            section.classList.remove('hidden');
+          } else {
+            section.style.display = 'none';
+            section.classList.add('hidden');
+          }
+        }
+      }
+    };
+
+    if (fallbacks[functionName]) {
+      window[functionName] = fallbacks[functionName];
+      console.log(`${RECOVERY_PREFIX} Minimal fallback installed for ${functionName}`);
+    } else {
+      // Generic fallback
+      window[functionName] = function(...args) {
+        console.log(`${RECOVERY_PREFIX} Generic fallback called for ${functionName} with args:`, args);
+        showUserMessage(`機能「${functionName}」は現在利用できません`, 'warning');
+      };
+    }
+  }
+
+  /**
+   * Recover from syntax errors
+   */
+  function recoverSyntaxError(errorMessage, source) {
+    console.log(`${RECOVERY_PREFIX} Attempting syntax error recovery`);
+    
+    // Log the error for debugging
+    console.error(`${RECOVERY_PREFIX} Syntax error details:`, {
+      message: errorMessage,
+      source: source || 'unknown',
+      timestamp: new Date().toISOString()
+    });
+
+    // Try to reload critical functions
+    if (window.AdminPanelFunctionSafety) {
+      window.AdminPanelFunctionSafety.forceReload();
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Show user-friendly message
+   */
+  function showUserMessage(message, type = 'info') {
+    // Try multiple message systems
+    if (typeof showMessage === 'function') {
+      showMessage(message, type);
+    } else if (typeof window.showMessage === 'function') {
+      window.showMessage(message, type);
+    } else if (window.sharedModals?.showMessage) {
+      window.sharedModals.showMessage(message, type);
+    } else {
+      // Fallback to console and alert
+      console.log(`${RECOVERY_PREFIX} User message (${type}):`, message);
+      if (type === 'error') {
+        alert(`エラー: ${message}`);
+      }
+    }
+  }
+
+  // =============================================================================
+  // GLOBAL ERROR HANDLERS
+  // =============================================================================
+
+  /**
+   * Enhanced global error handler
+   */
+  function handleGlobalError(event) {
+    const error = event.error || event;
+    const message = error.message || event.message || '';
+    const source = event.filename || event.source || 'unknown';
+    
+    // Skip non-critical errors
+    const skipPatterns = [
+      'ResizeObserver loop limit exceeded',
+      'Non-Error promise rejection captured',
+      'Script error',
+      'Network request failed',
+      'Loading CSS chunk',
+      'Loading chunk'
+    ];
+
+    if (skipPatterns.some(pattern => message.includes(pattern))) {
+      return; // Skip handling
+    }
+
+    console.log(`${RECOVERY_PREFIX} Global error intercepted:`, { message, source });
+
+    // Attempt recovery if within limits
+    if (recoveryAttempts < maxRecoveryAttempts) {
+      recoveryAttempts++;
+      const recovered = handleSpecificError(error, source);
+      
+      if (recovered) {
+        console.log(`${RECOVERY_PREFIX} Error recovery successful (attempt ${recoveryAttempts})`);
+        showUserMessage('システムエラーが発生しましたが、自動復旧しました', 'info');
+      } else {
+        console.log(`${RECOVERY_PREFIX} Error recovery failed (attempt ${recoveryAttempts})`);
+      }
+    } else {
+      console.error(`${RECOVERY_PREFIX} Maximum recovery attempts reached`);
+      showUserMessage('システムエラーが発生しました。ページを再読み込みしてください', 'error');
+    }
+  }
+
+  /**
+   * Handle unhandled promise rejections
+   */
+  function handleUnhandledRejection(event) {
+    console.log(`${RECOVERY_PREFIX} Unhandled promise rejection:`, event.reason);
+    
+    // Try to extract meaningful information
+    const reason = event.reason;
+    if (reason && reason.message) {
+      handleSpecificError(reason, 'promise');
+    }
+  }
+
+  // =============================================================================
+  // PROACTIVE MONITORING
+  // =============================================================================
+
+  /**
+   * Monitor critical function availability
+   */
+  function startFunctionMonitoring() {
+    const criticalFunctions = ['navigateToStep', 'hidePrivacyModal', 'updateUIWithNewStatus', 'showFormConfigModal', 'toggleSection'];
+    
+    setInterval(() => {
+      criticalFunctions.forEach(funcName => {
+        if (typeof window[funcName] !== 'function') {
+          console.warn(`${RECOVERY_PREFIX} Critical function ${funcName} missing - attempting recovery`);
+          recoverCriticalFunction(`${funcName} is not defined`);
+        }
+      });
+    }, 5000); // Check every 5 seconds
+  }
+
+  /**
+   * Recovery system health check
+   */
+  function healthCheck() {
+    const results = {
+      timestamp: new Date().toISOString(),
+      recoveryAttempts,
+      maxRecoveryAttempts,
+      functionsAvailable: {},
+      systemHealth: 'unknown'
+    };
+
+    const criticalFunctions = ['navigateToStep', 'hidePrivacyModal', 'updateUIWithNewStatus', 'showFormConfigModal', 'toggleSection'];
+    let availableCount = 0;
+
+    criticalFunctions.forEach(funcName => {
+      const available = typeof window[funcName] === 'function';
+      results.functionsAvailable[funcName] = available;
+      if (available) availableCount++;
+    });
+
+    const healthPercentage = (availableCount / criticalFunctions.length) * 100;
+    
+    if (healthPercentage === 100) {
+      results.systemHealth = 'excellent';
+    } else if (healthPercentage >= 80) {
+      results.systemHealth = 'good';
+    } else if (healthPercentage >= 60) {
+      results.systemHealth = 'fair';
+    } else {
+      results.systemHealth = 'poor';
+    }
+
+    console.log(`${RECOVERY_PREFIX} Health check:`, results);
+    return results;
+  }
+
+  // =============================================================================
+  // INITIALIZATION
+  // =============================================================================
+
+  // Install global error handlers
+  window.addEventListener('error', handleGlobalError);
+  window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+  // Start proactive monitoring
+  setTimeout(startFunctionMonitoring, 2000);
+
+  // Expose recovery system API
+  window.AdminPanelErrorRecovery = {
+    recover: recoverCriticalFunction,
+    healthCheck,
+    attempts: () => recoveryAttempts,
+    maxAttempts: maxRecoveryAttempts,
+    
+    // Manual recovery triggers
+    recoverAll: function() {
+      console.log(`${RECOVERY_PREFIX} Manual recovery initiated`);
+      const criticalFunctions = ['navigateToStep', 'hidePrivacyModal', 'updateUIWithNewStatus', 'showFormConfigModal', 'toggleSection'];
+      criticalFunctions.forEach(funcName => {
+        if (typeof window[funcName] !== 'function') {
+          recoverCriticalFunction(`${funcName} is not defined`);
+        }
+      });
+    }
+  };
+
+  console.log(`${RECOVERY_PREFIX} Error recovery system initialized`);
+
+})();
+</script>

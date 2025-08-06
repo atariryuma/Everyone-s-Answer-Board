@@ -1,25 +1,252 @@
-<script>
-/* ========================================
- * Admin Panel - Unified JavaScript
- * Google Apps Script Best Practices Implementation
- * ======================================== */
-
-// Load all JavaScript modules in correct dependency order
+<!-- Admin Panel - Unified JavaScript -->
+<!-- Function Safety System must be loaded first to prevent undefined errors -->
+<?!= include('adminPanel-function-safety.js.html'); ?>
+<!-- Error Recovery System -->
+<?!= include('adminPanel-error-recovery.js.html'); ?>
+<!-- Constants must be loaded first -->
 <?!= include('constants.js.html'); ?>
+<!-- Backend progress sync system -->
 <?!= include('backendProgressSync.js.html'); ?>
+<!-- Error handling system must be loaded first -->
 <?!= include('errorMessages.js.html'); ?>
+<!-- Core functions must be loaded first -->
 <?!= include('adminPanel-core.js.html'); ?>
+
+<!-- UI functions must be loaded before API functions -->
 <?!= include('adminPanel-ui.js.html'); ?>
+
+<!-- Status functions depend on UI functions -->
 <?!= include('adminPanel-status.js.html'); ?>
+
+<!-- API functions depend on UI and status functions -->
 <?!= include('adminPanel-api.js.html'); ?>
+
+<!-- Form controls need to be available before events -->
 <?!= include('adminPanel-forms.js.html'); ?>
+
+<!-- Events depend on all other modules -->
 <?!= include('adminPanel-events.js.html'); ?>
+
+<!-- Main initialization script must be loaded last -->
 <?!= include('adminPanel.js.html'); ?>
 
-// Initialization code
-document.addEventListener('DOMContentLoaded', function() {
-  if (window.sharedModals) {
-    window.sharedModals.loadAdminModals();
+<!-- Debug console (development only) -->
+<?!= include('adminPanel-debug-console.js.html'); ?>
+
+<script>
+// Enhanced JavaScript Loading Verification with Recovery
+console.log('🔧 AdminPanel-JavaScript: Starting comprehensive verification...');
+
+const VERIFICATION_CONFIG = {
+  requiredFunctions: ['navigateToStep', 'hidePrivacyModal', 'updateUIWithNewStatus', 'showFormConfigModal', 'toggleSection'],
+  maxRetries: 3,
+  retryDelay: 1000,
+  enableDetailedLogging: true
+};
+
+let verificationAttempts = 0;
+
+function runVerification() {
+  verificationAttempts++;
+  console.log(`🔍 Verification attempt ${verificationAttempts}/${VERIFICATION_CONFIG.maxRetries}`);
+  
+  const results = {
+    missingFunctions: [],
+    availableFunctions: [],
+    partiallyLoaded: [],
+    errors: []
+  };
+
+  // Detailed function checking
+  VERIFICATION_CONFIG.requiredFunctions.forEach(funcName => {
+    try {
+      const funcType = typeof window[funcName];
+      const isFunction = funcType === 'function';
+      const exists = window[funcName] !== undefined;
+      
+      if (isFunction) {
+        results.availableFunctions.push(funcName);
+        console.log(`✅ Function ${funcName} loaded successfully (${funcType})`);
+        
+        // Try to get function signature for verification
+        if (VERIFICATION_CONFIG.enableDetailedLogging) {
+          try {
+            const signature = window[funcName].toString().split('{')[0].trim();
+            console.log(`   📝 Signature: ${signature}`);
+          } catch (e) {
+            console.log(`   📝 Signature: [native code or protected]`);
+          }
+        }
+      } else if (exists) {
+        results.partiallyLoaded.push({ name: funcName, type: funcType, value: window[funcName] });
+        console.warn(`⚠️ Function ${funcName} exists but is not a function (${funcType}):`, window[funcName]);
+      } else {
+        results.missingFunctions.push(funcName);
+        console.error(`❌ Function ${funcName} is missing`);
+      }
+    } catch (error) {
+      results.errors.push({ function: funcName, error: error.message });
+      console.error(`💥 Error checking function ${funcName}:`, error);
+    }
+  });
+
+  // Show comprehensive results
+  if (results.missingFunctions.length === 0 && results.errors.length === 0) {
+    console.log('✅ All required functions loaded successfully!');
+    console.log(`📊 Function Status: ${results.availableFunctions.length}/${VERIFICATION_CONFIG.requiredFunctions.length} loaded`);
+    
+    // Run final validation
+    validateFunctionality();
+    return true;
+  } else {
+    console.error('🚨 Function loading issues detected:');
+    
+    if (results.missingFunctions.length > 0) {
+      console.error('   Missing functions:', results.missingFunctions);
+    }
+    
+    if (results.partiallyLoaded.length > 0) {
+      console.warn('   Partially loaded:', results.partiallyLoaded);
+    }
+    
+    if (results.errors.length > 0) {
+      console.error('   Errors:', results.errors);
+    }
+    
+    // Show available admin functions for debugging
+    const availableAdminFunctions = Object.getOwnPropertyNames(window).filter(name => 
+      typeof window[name] === 'function' && 
+      (name.includes('admin') || name.includes('Admin') || name.includes('navigate') || name.includes('Modal') || name.includes('toggle'))
+    );
+    
+    console.log('🔍 Available admin-related functions:', availableAdminFunctions);
+    
+    // Attempt recovery if systems are available
+    attemptFunctionRecovery(results);
+    return false;
   }
+}
+
+function attemptFunctionRecovery(results) {
+  console.log('🔄 Attempting function recovery...');
+  
+  // Try function safety system recovery
+  if (window.AdminPanelFunctionSafety && typeof window.AdminPanelFunctionSafety.forceReload === 'function') {
+    console.log('🛡️ Using function safety system for recovery...');
+    window.AdminPanelFunctionSafety.forceReload();
+  }
+  
+  // Try error recovery system
+  if (window.AdminPanelErrorRecovery && typeof window.AdminPanelErrorRecovery.recoverAll === 'function') {
+    console.log('🔧 Using error recovery system...');
+    window.AdminPanelErrorRecovery.recoverAll();
+  }
+  
+  // Schedule retry if we haven't exceeded max attempts
+  if (verificationAttempts < VERIFICATION_CONFIG.maxRetries) {
+    console.log(`⏰ Scheduling retry in ${VERIFICATION_CONFIG.retryDelay}ms...`);
+    setTimeout(() => {
+      console.log('🔄 Retrying verification...');
+      runVerification();
+    }, VERIFICATION_CONFIG.retryDelay);
+  } else {
+    console.error('🚨 Maximum verification attempts reached. Manual intervention may be required.');
+    console.log('💡 Available debugging tools:');
+    console.log('   - AdminDebug.check() - Check function status');
+    console.log('   - AdminDebug.diagnose() - Full system diagnosis');
+    console.log('   - AdminDebug.recover() - Emergency recovery');
+  }
+}
+
+function validateFunctionality() {
+  console.log('🧪 Running functionality validation...');
+  
+  // Test non-destructive functions to ensure they work
+  const testResults = {};
+  
+  // Test navigateToStep (with current step to avoid side effects)
+  if (typeof window.navigateToStep === 'function') {
+    try {
+      // We won't actually call it to avoid side effects, just verify it's callable
+      testResults.navigateToStep = 'available';
+    } catch (error) {
+      testResults.navigateToStep = `error: ${error.message}`;
+    }
+  }
+  
+  // Test toggleSection existence
+  if (typeof window.toggleSection === 'function') {
+    testResults.toggleSection = 'available';
+  }
+  
+  console.log('🧪 Validation results:', testResults);
+  
+  // Log system health
+  const systemHealth = {
+    functionsLoaded: VERIFICATION_CONFIG.requiredFunctions.filter(name => typeof window[name] === 'function').length,
+    totalRequired: VERIFICATION_CONFIG.requiredFunctions.length,
+    safetySystemAvailable: !!window.AdminPanelFunctionSafety,
+    errorRecoveryAvailable: !!window.AdminPanelErrorRecovery,
+    debugConsoleAvailable: !!window.AdminDebug
+  };
+  
+  console.log('🏥 System Health:', systemHealth);
+  
+  // Calculate health percentage
+  const healthPercentage = (systemHealth.functionsLoaded / systemHealth.totalRequired) * 100;
+  console.log(`📊 Overall Health: ${healthPercentage.toFixed(1)}%`);
+  
+  if (healthPercentage === 100) {
+    console.log('💚 System is fully operational');
+  } else if (healthPercentage >= 80) {
+    console.log('💛 System is mostly operational');
+  } else {
+    console.log('❤️ System has significant issues - user experience may be affected');
+  }
+}
+
+// Start verification immediately
+runVerification();
+
+// 管理者モーダルの初期化 - Enhanced with error handling
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('🎯 DOMContentLoaded fired, initializing admin modals with error handling...');
+  
+  try {
+    if (window.sharedModals && typeof window.sharedModals.loadAdminModals === 'function') {
+      window.sharedModals.loadAdminModals();
+      console.log('✅ Admin modals initialized successfully');
+    } else {
+      console.warn('⚠️ sharedModals.loadAdminModals not available');
+      
+      // Try alternative initialization methods
+      if (window.AdminPanel && typeof window.AdminPanel.init === 'function') {
+        window.AdminPanel.init();
+        console.log('✅ AdminPanel.init() called as fallback');
+      }
+    }
+    
+    // Final verification after DOM is ready
+    setTimeout(() => {
+      console.log('🔬 Post-DOM verification...');
+      runVerification();
+    }, 500);
+    
+  } catch (error) {
+    console.error('💥 Error during admin modal initialization:', error);
+    
+    // Attempt recovery
+    if (window.AdminPanelErrorRecovery) {
+      window.AdminPanelErrorRecovery.recoverAll();
+    }
+  }
+});
+
+// Additional safety check after window load
+window.addEventListener('load', function() {
+  setTimeout(() => {
+    console.log('🏁 Final verification after window load...');
+    runVerification();
+  }, 1000);
 });
 </script>

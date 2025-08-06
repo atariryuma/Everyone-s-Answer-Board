@@ -1,0 +1,336 @@
+<script>
+// =============================================================================
+// ADMIN PANEL DEBUG CONSOLE
+// =============================================================================
+// Advanced debugging tools for troubleshooting JavaScript loading issues
+// Available in browser console as: AdminDebug.*
+
+(function() {
+  'use strict';
+
+  const DEBUG_PREFIX = '🐛 [AdminDebug]';
+
+  // =============================================================================
+  // BROWSER CONSOLE DEBUGGING UTILITIES
+  // =============================================================================
+
+  /**
+   * Check all critical functions and their availability
+   */
+  function checkFunctions() {
+    console.group(`${DEBUG_PREFIX} Function Status Check`);
+    
+    const criticalFunctions = [
+      'navigateToStep', 'hidePrivacyModal', 'showPrivacyModal',
+      'updateUIWithNewStatus', 'showFormConfigModal', 'hideFormConfigModal', 'toggleSection'
+    ];
+
+    const results = {};
+    
+    criticalFunctions.forEach(funcName => {
+      const available = typeof window[funcName] === 'function';
+      const inWindowObject = funcName in window;
+      const type = typeof window[funcName];
+      
+      results[funcName] = { available, inWindowObject, type };
+      
+      const status = available ? '✅' : '❌';
+      console.log(`${status} ${funcName}: ${available ? 'AVAILABLE' : 'MISSING'} (type: ${type})`);
+      
+      if (!available && window[funcName]) {
+        console.log(`   └─ Value:`, window[funcName]);
+      }
+    });
+    
+    console.groupEnd();
+    return results;
+  }
+
+  /**
+   * List all window functions that might be related to admin panel
+   */
+  function listAdminFunctions() {
+    console.group(`${DEBUG_PREFIX} All Admin-Related Functions`);
+    
+    const adminFunctions = Object.keys(window)
+      .filter(key => typeof window[key] === 'function')
+      .filter(key => 
+        key.toLowerCase().includes('admin') ||
+        key.toLowerCase().includes('panel') ||
+        key.toLowerCase().includes('modal') ||
+        key.toLowerCase().includes('navigate') ||
+        key.toLowerCase().includes('toggle') ||
+        key.toLowerCase().includes('update') ||
+        key.toLowerCase().includes('show') ||
+        key.toLowerCase().includes('hide')
+      )
+      .sort();
+
+    console.log('Found admin-related functions:', adminFunctions.length);
+    adminFunctions.forEach(funcName => {
+      console.log(`  📄 ${funcName}()`);
+    });
+    
+    console.groupEnd();
+    return adminFunctions;
+  }
+
+  /**
+   * Test specific function with safe execution
+   */
+  function testFunction(funcName, ...args) {
+    console.group(`${DEBUG_PREFIX} Testing Function: ${funcName}`);
+    
+    try {
+      if (typeof window[funcName] !== 'function') {
+        console.error(`❌ Function ${funcName} is not available`);
+        console.log(`   Type: ${typeof window[funcName]}`);
+        console.log(`   Value:`, window[funcName]);
+        return false;
+      }
+
+      console.log(`✅ Function ${funcName} is available`);
+      console.log(`   Signature: ${window[funcName].toString().split('{')[0]}`);
+      
+      if (args.length > 0) {
+        console.log(`🧪 Executing with args:`, args);
+        const result = window[funcName](...args);
+        console.log(`✅ Execution completed. Result:`, result);
+        return result;
+      } else {
+        console.log(`ℹ️  No arguments provided - function not executed`);
+      }
+      
+    } catch (error) {
+      console.error(`💥 Error testing function:`, error);
+      return false;
+    } finally {
+      console.groupEnd();
+    }
+  }
+
+  /**
+   * Check script loading and includes
+   */
+  function checkScriptLoading() {
+    console.group(`${DEBUG_PREFIX} Script Loading Analysis`);
+    
+    const scripts = document.querySelectorAll('script');
+    const scriptInfo = {
+      totalScripts: scripts.length,
+      inlineScripts: 0,
+      externalScripts: 0,
+      adminRelatedScripts: 0,
+      errors: []
+    };
+
+    scripts.forEach((script, index) => {
+      if (script.src) {
+        scriptInfo.externalScripts++;
+        if (script.src.includes('admin')) {
+          scriptInfo.adminRelatedScripts++;
+        }
+      } else {
+        scriptInfo.inlineScripts++;
+        if (script.textContent && script.textContent.includes('admin')) {
+          scriptInfo.adminRelatedScripts++;
+        }
+      }
+    });
+
+    console.log('📊 Script Statistics:', scriptInfo);
+    
+    // Check for common script errors
+    const commonErrors = [
+      'SyntaxError',
+      'ReferenceError', 
+      'TypeError',
+      'is not defined',
+      'Cannot read property',
+      'Cannot access before initialization'
+    ];
+
+    // Check console for errors
+    console.log('🔍 Recent JavaScript errors (check browser console for details)');
+    
+    console.groupEnd();
+    return scriptInfo;
+  }
+
+  /**
+   * Emergency function recovery
+   */
+  function emergencyRecovery() {
+    console.group(`${DEBUG_PREFIX} Emergency Function Recovery`);
+    
+    try {
+      if (window.AdminPanelFunctionSafety) {
+        console.log('🆘 Triggering emergency recovery...');
+        window.AdminPanelFunctionSafety.forceReload();
+        console.log('✅ Emergency recovery initiated');
+      } else {
+        console.warn('⚠️ Function safety system not available');
+        
+        // Manual emergency recovery
+        console.log('🔧 Attempting manual recovery...');
+        
+        // Re-run basic initialization
+        if (typeof initializeAdminPanel === 'function') {
+          initializeAdminPanel();
+          console.log('✅ Manual admin panel initialization completed');
+        }
+        
+        if (typeof window.AdminPanel?.init === 'function') {
+          window.AdminPanel.init();
+          console.log('✅ AdminPanel.init() called');
+        }
+      }
+      
+    } catch (error) {
+      console.error('💥 Emergency recovery failed:', error);
+    } finally {
+      console.groupEnd();
+    }
+  }
+
+  /**
+   * Full system diagnosis
+   */
+  function fullDiagnosis() {
+    console.group(`${DEBUG_PREFIX} Full System Diagnosis`);
+    console.log('🔬 Running comprehensive system check...');
+    
+    // 1. Check document state
+    console.log('📄 Document State:', {
+      readyState: document.readyState,
+      title: document.title,
+      url: window.location.href
+    });
+
+    // 2. Check critical functions
+    const functionResults = checkFunctions();
+    
+    // 3. List admin functions
+    const adminFunctions = listAdminFunctions();
+    
+    // 4. Check scripts
+    const scriptInfo = checkScriptLoading();
+    
+    // 5. Check for common objects
+    console.log('🎯 Key Objects:', {
+      AdminPanel: !!window.AdminPanel,
+      AdminPanelFunctionSafety: !!window.AdminPanelFunctionSafety,
+      sharedModals: !!window.sharedModals,
+      showMessage: typeof window.showMessage
+    });
+
+    // 6. Check safety system state
+    if (window.AdminPanelFunctionSafety) {
+      console.log('🛡️ Function Safety State:', window.AdminPanelFunctionSafety.state);
+    }
+
+    const diagnosis = {
+      timestamp: new Date().toISOString(),
+      functions: functionResults,
+      adminFunctions: adminFunctions,
+      scripts: scriptInfo,
+      recommendation: ''
+    };
+
+    // Generate recommendation
+    const missingFunctions = Object.entries(functionResults)
+      .filter(([name, info]) => !info.available)
+      .map(([name]) => name);
+
+    if (missingFunctions.length === 0) {
+      diagnosis.recommendation = '✅ All functions are available. System appears healthy.';
+    } else {
+      diagnosis.recommendation = `⚠️ ${missingFunctions.length} functions missing: ${missingFunctions.join(', ')}. Try running AdminDebug.emergencyRecovery()`;
+    }
+
+    console.log('📋 Diagnosis Summary:', diagnosis);
+    console.groupEnd();
+    
+    return diagnosis;
+  }
+
+  /**
+   * Monitor function definitions in real-time
+   */
+  function startFunctionMonitor(duration = 10000) {
+    console.log(`${DEBUG_PREFIX} Starting function monitor for ${duration}ms...`);
+    
+    const criticalFunctions = ['navigateToStep', 'hidePrivacyModal', 'updateUIWithNewStatus', 'showFormConfigModal', 'toggleSection'];
+    const initialState = {};
+    
+    criticalFunctions.forEach(funcName => {
+      initialState[funcName] = typeof window[funcName] === 'function';
+    });
+
+    const monitor = setInterval(() => {
+      let changesDetected = false;
+      
+      criticalFunctions.forEach(funcName => {
+        const currentState = typeof window[funcName] === 'function';
+        if (initialState[funcName] !== currentState) {
+          console.log(`${DEBUG_PREFIX} 📡 Function state changed: ${funcName} -> ${currentState ? 'AVAILABLE' : 'MISSING'}`);
+          initialState[funcName] = currentState;
+          changesDetected = true;
+        }
+      });
+      
+      if (changesDetected) {
+        console.log(`${DEBUG_PREFIX} 🔄 Function states updated at ${new Date().toLocaleTimeString()}`);
+      }
+    }, 500);
+
+    setTimeout(() => {
+      clearInterval(monitor);
+      console.log(`${DEBUG_PREFIX} 📡 Function monitor stopped`);
+    }, duration);
+
+    return monitor;
+  }
+
+  // =============================================================================
+  // EXPOSE DEBUG CONSOLE API
+  // =============================================================================
+
+  window.AdminDebug = {
+    // Primary debugging functions
+    check: checkFunctions,
+    test: testFunction,
+    list: listAdminFunctions,
+    diagnose: fullDiagnosis,
+    
+    // Recovery functions
+    recover: emergencyRecovery,
+    
+    // Advanced debugging
+    scripts: checkScriptLoading,
+    monitor: startFunctionMonitor,
+    
+    // Direct access to safety system
+    safety: () => window.AdminPanelFunctionSafety,
+    
+    // Helper utilities
+    help: function() {
+      console.log(`${DEBUG_PREFIX} Available Commands:`);
+      console.log('  AdminDebug.check()     - Check all critical functions');
+      console.log('  AdminDebug.test(name)  - Test specific function');
+      console.log('  AdminDebug.list()      - List admin-related functions');
+      console.log('  AdminDebug.diagnose()  - Full system diagnosis');
+      console.log('  AdminDebug.recover()   - Emergency recovery');
+      console.log('  AdminDebug.scripts()   - Analyze script loading');
+      console.log('  AdminDebug.monitor()   - Monitor function changes');
+      console.log('  AdminDebug.help()      - Show this help');
+    }
+  };
+
+  // Auto-run basic check on load
+  setTimeout(() => {
+    console.log(`${DEBUG_PREFIX} Debug console ready. Type AdminDebug.help() for commands.`);
+  }, 1000);
+
+})();
+</script>
