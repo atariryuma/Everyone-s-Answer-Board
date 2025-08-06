@@ -2474,6 +2474,9 @@ function saveToHistory(historyItem) {
       spreadsheetUrl: historyItem.spreadsheetUrl || '',
       setupType: historyItem.setupType || 'unknown', // クイックスタート、カスタムセットアップ、外部リソースを識別
       isActive: historyItem.isActive || false, // 現在公開中かどうか
+      displayMode: historyItem.displayMode || '通常表示',
+      countDisplay: historyItem.countDisplay || '表示',
+      status: historyItem.status || 'published',
       
       // AI列判定結果の保存（復元時に必要）
       sheetDetails: {
@@ -3023,18 +3026,21 @@ function createHistoryTableRow(item, index) {
   };
   
   // Format display mode and count display as compact visual indicators
-  const displayModeIcon = getDisplayModeIcon(item.displayMode || '通常表示');
-  const countDisplayIcon = getCountDisplayIcon(item.countDisplay || '表示');
-  const statusIcon = getStatusIcon(item.status, isActive);
+  const displayMode = item.displayMode || item.config?.displayMode || '通常表示';
+  const countDisplay = item.countDisplay || item.config?.countDisplay || '表示';
+  const status = item.status || item.config?.status || 'published';
+  const displayModeIcon = getDisplayModeIcon(displayMode);
+  const countDisplayIcon = getCountDisplayIcon(countDisplay);
+  const statusIcon = getStatusIcon(status, isActive);
   
   // Combine visual indicators
   const visualIndicators = `${statusIcon} ${displayModeIcon} ${countDisplayIcon}`;
-  
+
   // Create detailed tooltip text
   const tooltipText = `${escapeHtml(item.questionText || '')}
-状態: ${getStatusText(item.status, isActive)}
-表示: ${getDisplayModeText(item.displayMode || '通常表示')}
-カウント: ${getCountDisplayText(item.countDisplay || '表示')}`;
+状態: ${getStatusText(status, isActive)}
+表示: ${getDisplayModeText(displayMode)}
+カウント: ${getCountDisplayText(countDisplay)}`;
 
   row.innerHTML = `
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.createdAt || item.timestamp)}</td>
