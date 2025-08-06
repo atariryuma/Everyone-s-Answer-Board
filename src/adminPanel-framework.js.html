@@ -289,17 +289,13 @@ function updateUserActivity() {
 
 // Initialize event listeners
 function initializeEventListeners() {
-  // Check if essential functions are available, but continue even if some are missing
-  const requiredFunctions = ['handleQuickStart', 'showFormConfigModal', 'toggleSection'];
-  const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
-
-  if (missingFunctions.length > 0) {
-    console.warn('⚠️ AdminPanel: Missing functions during event initialization:', missingFunctions);
-  }
-
   console.log('✅ AdminPanel: Setting up event listeners');
+  
+  // All critical functions are now available in framework, so proceed directly
   if (typeof setupEventListeners === 'function') {
     setupEventListeners();
+  } else {
+    console.warn('⚠️ setupEventListeners function not available');
   }
 }
 
@@ -386,6 +382,198 @@ function initializeAdminPanel(incomingUserId) {
 
 // Make initializeAdminPanel globally available
 window.initializeAdminPanel = initializeAdminPanel;
+
+// =============================================================================
+// CRITICAL UI FUNCTIONS - Moved from adminPanel-ui.js.html for early availability
+// =============================================================================
+
+// Toggle section visibility
+function toggleSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  if (!section) {
+    console.warn('Section not found:', sectionId);
+    return;
+  }
+  
+  // Find the toggle button for this section
+  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+  const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
+  
+  // Toggle the section visibility
+  if (section.classList.contains('hidden')) {
+    // Show section
+    section.classList.remove('hidden');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-up');
+      arrow.classList.add('fa-chevron-down');
+    }
+  } else {
+    // Hide section
+    section.classList.add('hidden');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-down');
+      arrow.classList.add('fa-chevron-up');
+    }
+  }
+}
+
+// Hide privacy modal
+function hidePrivacyModal() {
+  const modal = document.getElementById('privacy-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (typeof manageFocusForModal === 'function') {
+      manageFocusForModal('privacy-modal', false);
+    }
+  }
+}
+
+// Show form configuration modal
+function showFormConfigModal() {
+  if (window.sharedModals) {
+    window.sharedModals.showFormConfig();
+    if (typeof loadSavedClassChoices === 'function') {
+      loadSavedClassChoices();
+    }
+    if (typeof manageFocusForModal === 'function') {
+      manageFocusForModal('form-config-modal', true);
+    }
+  } else {
+    // Fallback for legacy support
+    const modal = document.getElementById('form-config-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (typeof loadSavedClassChoices === 'function') {
+        loadSavedClassChoices();
+      }
+      if (typeof manageFocusForModal === 'function') {
+        manageFocusForModal('form-config-modal', true);
+      }
+    }
+  }
+}
+
+// Enhanced updateUIWithNewStatus that works with both minimal and full implementations
+function updateUIWithNewStatus(status) {
+  if (!status) {
+    console.warn('updateUIWithNewStatus: Invalid status received');
+    return;
+  }
+  
+  // Store for later use
+  window.currentStatus = status;
+  
+  // Try to use the full implementation if available
+  if (typeof window._fullUpdateUIWithNewStatus === 'function') {
+    try {
+      return window._fullUpdateUIWithNewStatus(status);
+    } catch (error) {
+      console.warn('Full updateUIWithNewStatus failed, using fallback:', error);
+      // Continue with minimal implementation below
+    }
+  }
+  
+  // Minimal implementation for essential UI updates
+  console.log('updateUIWithNewStatus: Using minimal implementation');
+  
+  // Update essential UI elements that are always available
+  try {
+    // Update basic status information
+    if (status._normalized && typeof status._normalized.isPublished !== 'undefined') {
+      const publishStatus = status._normalized.isPublished ? '公開中' : '停止中';
+      const publishElement = document.getElementById('info-publish-text');
+      if (publishElement) {
+        publishElement.textContent = publishStatus;
+      }
+    }
+    
+    // Update answer count if available
+    if (status.answerCount !== undefined) {
+      const answerCountElement = document.getElementById('answer-count');
+      if (answerCountElement) {
+        answerCountElement.textContent = status.answerCount || '0';
+      }
+    }
+    
+    // Update active sheet information
+    if (status.activeSheetName) {
+      const sheetNameElements = document.querySelectorAll('.active-sheet-name');
+      sheetNameElements.forEach(element => {
+        element.textContent = status.activeSheetName;
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error in minimal updateUIWithNewStatus:', error);
+  }
+}
+
+// Hide digital citizenship modal
+function hideDigitalCitizenshipModal() {
+  const modal = document.getElementById('digital-citizenship-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (typeof manageFocusForModal === 'function') {
+      manageFocusForModal('digital-citizenship-modal', false);
+    }
+  }
+}
+
+// Hide confirmation modal
+function hideConfirmationModal() {
+  const modal = document.getElementById('confirmation-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (typeof manageFocusForModal === 'function') {
+      manageFocusForModal('confirmation-modal', false);
+    }
+  }
+}
+
+// Generic showMessage function (placeholder)
+function showMessage(message, type = 'info') {
+  console.log(`[${type.toUpperCase()}] ${message}`);
+  
+  // Try to use advanced message system if available
+  if (window.AdminPanel && window.AdminPanel.ui && typeof window.AdminPanel.ui.showMessage === 'function') {
+    return window.AdminPanel.ui.showMessage(message, type);
+  }
+  
+  // Simple fallback implementation
+  const messageArea = document.getElementById('message-area');
+  if (messageArea) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type} bg-${type === 'error' ? 'red' : type === 'warning' ? 'yellow' : type === 'success' ? 'green' : 'blue'}-100 border-l-4 border-${type === 'error' ? 'red' : type === 'warning' ? 'yellow' : type === 'success' ? 'green' : 'blue'}-500 p-4 mb-4`;
+    messageDiv.textContent = message;
+    messageArea.appendChild(messageDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (messageDiv.parentNode) {
+        messageDiv.parentNode.removeChild(messageDiv);
+      }
+    }, 5000);
+  }
+}
+
+// Make all critical functions globally available immediately
+window.toggleSection = toggleSection;
+window.hidePrivacyModal = hidePrivacyModal;
+window.hideDigitalCitizenshipModal = hideDigitalCitizenshipModal;
+window.hideConfirmationModal = hideConfirmationModal;
+window.showFormConfigModal = showFormConfigModal;
+window.showMessage = showMessage;
+window.updateUIWithNewStatus = updateUIWithNewStatus;
 
 // =============================================================================
 // SYSTEM STATUS AND USER INTERACTION MANAGEMENT
@@ -577,31 +765,20 @@ function initializeAdminPanelMaster() {
     }
     
     // API通信初期化（最重要 - getInitialDataを呼び出す）
-    function initializeAPIWithRetry(attempts = 0) {
-      try {
-        logDebug('🚀 API module initialization starting...');
-        initializeAPI();
-        updateSystemStatus('apiInitialized', true);
-        logDebug('✅ API module initialized');
-        return;
-      } catch (error) {
-        updateSystemStatus('apiInitialized', false, error);
-        console.error('❌ API initialization failed:', error);
-      }
-      
-      if (attempts < 5) {
-        logDebug(`⏳ API関数読み込み待機中... (試行 ${attempts + 1}/5)`);
-        setTimeout(() => initializeAPIWithRetry(attempts + 1), 200);
-        return;
-      }
+    try {
+      logDebug('🚀 API module initialization starting...');
+      initializeAPI();
+      updateSystemStatus('apiInitialized', true);
+      logDebug('✅ API module initialized');
+    } catch (error) {
+      updateSystemStatus('apiInitialized', false, error);
+      console.error('❌ API initialization failed:', error);
       
       // フォールバック実装
-      console.warn('⚠️ API functions not available, implementing fallback...');
+      console.warn('⚠️ API functions not available, using fallback...');
       updateSystemStatus('apiInitialized', 'fallback');
       logDebug('✅ API module initialized with fallback');
     }
-    
-    initializeAPIWithRetry();
     
     // UI初期化
     try {
@@ -624,123 +801,75 @@ function initializeAdminPanelMaster() {
     
     // イベント管理初期化（最後に実行）
     setTimeout(() => {
-      function initializeEventsWithRetry(attempts = 0) {
-        try {
-          initializeEventListeners();
-          updateSystemStatus('eventsInitialized', true);
-          updateSystemStatus('initializationComplete', true);
-          logDebug('✅ Events module initialized');
-          logInfo('🎉 AdminPanel Master Initialization Complete');
-          
-          // システム状態の最終レポート
-          console.log('📊 Final System Status:', window.systemStatus);
-          
-          // ユーザー情報の確実な同期完了後にローディング解除
-          setTimeout(async () => {
-            try {
-              console.log('🔄 Final user data synchronization...');
-              
-              // ユーザーデータの最終同期を確実に実行
-              if (typeof loadStatus === 'function') {
-                await loadStatus(true);
-                console.log('✅ User data synchronization completed');
-              } else {
-                console.warn('⚠️ loadStatus function not available');
-              }
-              
-              // すべての同期が完了したらローディングオーバーレイを非表示
-              if (window.unifiedLoading) {
-                window.unifiedLoading.hide();
-                console.log('✅ Global loading overlay hidden after full sync');
-              } else {
-                // フォールバック: 直接DOM操作
-                const overlay = document.getElementById('loading-overlay');
-                if (overlay) {
-                  overlay.classList.add('hidden');
-                  console.log('✅ Loading overlay hidden (fallback)');
-                }
-              }
-              
-              // UI要素の有効化
-              enableUserInteraction();
-              updateSystemStatus('userDataSyncComplete', true);
-              
-            } catch (error) {
-              console.error('❌ Final sync error:', error);
-              // エラーでもローディングは解除
-              if (window.unifiedLoading) {
-                window.unifiedLoading.hide();
-              }
-            }
-          }, 800);
-          return;
-        } catch (error) {
-          updateSystemStatus('eventsInitialized', false, error);
-          console.error('❌ Events initialization failed:', error);
-        }
+      try {
+        initializeEventListeners();
+        updateSystemStatus('eventsInitialized', true);
+        updateSystemStatus('initializationComplete', true);
+        logDebug('✅ Events module initialized');
+        logInfo('🎉 AdminPanel Master Initialization Complete');
         
-        if (attempts < 5) {
-          logDebug(`⏳ イベント関数読み込み待機中... (試行 ${attempts + 1}/5)`);
-          setTimeout(() => initializeEventsWithRetry(attempts + 1), 200);
-          return;
-        }
+        // システム状態の最終レポート
+        console.log('📊 Final System Status:', window.systemStatus);
         
-        // フォールバック実装
-        console.warn('⚠️ Event functions not available, implementing fallback...');
-        updateSystemStatus('eventsInitialized', 'fallback');
-        updateSystemStatus('initializationComplete', 'fallback');
-        logInfo('⚠️ AdminPanel Master Initialization Complete (with fallback functions)');
+        // ユーザー情報の同期と最終処理
+        finalizeInitialization();
         
-        // システム状態の最終レポート（フォールバック版）
-        console.log('📊 Final System Status (Fallback):', window.systemStatus);
+      } catch (error) {
+        updateSystemStatus('eventsInitialized', false, error);
+        console.error('❌ Events initialization failed:', error);
         
-        // フォールバック初期化でもローディング解除処理を実行
-        setTimeout(async () => {
-          try {
-            console.log('🔄 Fallback: Final user data synchronization attempt...');
-            
-            // 可能であればユーザーデータ同期を試行
-            if (typeof loadStatus === 'function') {
-              try {
-                await loadStatus(true);
-                console.log('✅ Fallback: User data synchronization completed');
-              } catch (syncError) {
-                console.warn('⚠️ Fallback: User data sync failed, but continuing:', syncError);
-              }
-            }
-            
-            // ローディングオーバーレイを必ず非表示
-            if (window.unifiedLoading) {
-              window.unifiedLoading.hide();
-              console.log('✅ Fallback: Global loading overlay hidden');
-            } else {
-              const overlay = document.getElementById('loading-overlay');
-              if (overlay) {
-                overlay.classList.add('hidden');
-                console.log('✅ Fallback: Loading overlay hidden (direct DOM)');
-              }
-            }
-            
-            // UI要素の有効化
-            enableUserInteraction();
-            updateSystemStatus('userDataSyncComplete', true);
-            console.log('✅ Fallback: User interaction enabled');
-            
-          } catch (error) {
-            console.error('❌ Fallback sync error:', error);
-            // エラーでもローディングは解除
-            if (window.unifiedLoading) {
-              window.unifiedLoading.hide();
-            }
-            enableUserInteraction();
-          }
-        }, 600);
+        // エラーでも最終処理は実行
+        finalizeInitialization();
       }
-      
-      initializeEventsWithRetry();
     }, 100);
     
   }, 10);
+}
+
+// Finalize initialization and enable user interaction
+async function finalizeInitialization() {
+  setTimeout(async () => {
+    try {
+      console.log('🔄 Final user data synchronization...');
+      
+      // ユーザーデータの最終同期を確実に実行
+      if (typeof loadStatus === 'function') {
+        try {
+          await loadStatus(true);
+          console.log('✅ User data synchronization completed');
+        } catch (syncError) {
+          console.warn('⚠️ User data sync failed, but continuing:', syncError);
+        }
+      } else {
+        console.warn('⚠️ loadStatus function not available');
+      }
+      
+      // すべての同期が完了したらローディングオーバーレイを非表示
+      if (window.unifiedLoading) {
+        window.unifiedLoading.hide();
+        console.log('✅ Global loading overlay hidden after full sync');
+      } else {
+        // フォールバック: 直接DOM操作
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+          overlay.classList.add('hidden');
+          console.log('✅ Loading overlay hidden (fallback)');
+        }
+      }
+      
+      // UI要素の有効化
+      enableUserInteraction();
+      updateSystemStatus('userDataSyncComplete', true);
+      
+    } catch (error) {
+      console.error('❌ Final sync error:', error);
+      // エラーでもローディングは解除
+      if (window.unifiedLoading) {
+        window.unifiedLoading.hide();
+      }
+      enableUserInteraction();
+    }
+  }, 500);
 }
 
 // 単一DOMContentLoadedハンドラー

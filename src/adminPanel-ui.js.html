@@ -12,12 +12,9 @@ let pendingUIUpdate = null;
 // Define critical functions early and register them globally
 if (typeof window !== 'undefined') {
   // Placeholder functions that will be properly defined later
-  window.showFormConfigModal = window.showFormConfigModal || function() { console.warn('showFormConfigModal not yet loaded'); };
+  // All critical functions are now defined in adminPanel-framework.js.html which loads first
+  // Keeping only functions not moved to framework
   window.hideFormConfigModal = window.hideFormConfigModal || function() { console.warn('hideFormConfigModal not yet loaded'); };
-  window.toggleSection = window.toggleSection || function() { console.warn('toggleSection not yet loaded'); };
-  window.navigateToStep = window.navigateToStep || function() { console.warn('navigateToStep not yet loaded'); };
-  window.updateUIWithNewStatus = window.updateUIWithNewStatus || function() { console.warn('updateUIWithNewStatus not yet loaded'); };
-  window.hidePrivacyModal = window.hidePrivacyModal || function() { console.warn('hidePrivacyModal not yet loaded'); };
   window.showPrivacyModal = window.showPrivacyModal || function() { console.warn('showPrivacyModal not yet loaded'); };
 }
 
@@ -136,7 +133,8 @@ function generateViewUrl(status, userId) {
 // =============================================================================
 
 // Update UI with new status data
-function updateUIWithNewStatus(status) {
+// Full implementation of updateUIWithNewStatus for later use
+function _fullUpdateUIWithNewStatus(status) {
   if (!validateStatus(status)) {
     logWarn('Invalid status received, skipping UI update');
     return;
@@ -167,9 +165,9 @@ function updateUIWithNewStatus(status) {
   }
 }
 
-// Override placeholder with actual function
+// Make the full implementation available for the framework version
 if (typeof window !== 'undefined') {
-  window.updateUIWithNewStatus = updateUIWithNewStatus;
+  window._fullUpdateUIWithNewStatus = _fullUpdateUIWithNewStatus;
 }
 
 // データ準備の最適化（同期処理部分）
@@ -1316,45 +1314,7 @@ function checkAndShowAutoStopNotification(status) {
 // =============================================================================
 
 // Toggle section expansion/collapse
-function toggleSection(sectionId) {
-  const section = document.getElementById(sectionId);
-  if (!section) {
-    console.warn('Section not found:', sectionId);
-    return;
-  }
-  
-  // Find the toggle button for this section
-  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
-  const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
-  
-  // Toggle the section visibility
-  if (section.classList.contains('hidden')) {
-    // Show section
-    section.classList.remove('hidden');
-    if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', 'true');
-    }
-    if (arrow) {
-      arrow.classList.remove('fa-chevron-up');
-      arrow.classList.add('fa-chevron-down');
-    }
-  } else {
-    // Hide section
-    section.classList.add('hidden');
-    if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', 'false');
-    }
-    if (arrow) {
-      arrow.classList.remove('fa-chevron-down');
-      arrow.classList.add('fa-chevron-up');
-    }
-  }
-}
-
-// Override placeholder with actual function
-if (typeof window !== 'undefined') {
-  window.toggleSection = toggleSection;
-}
+// toggleSection function is now defined in adminPanel-framework.js.html
 
 // Automatically collapse completed sections
 function collapseCompletedSection(stepNumber) {
@@ -1468,27 +1428,7 @@ function manageSectionStates(currentStep) {
 // =============================================================================
 
 // Show form configuration modal
-function showFormConfigModal() {
-  if (window.sharedModals) {
-    window.sharedModals.showFormConfig();
-    loadSavedClassChoices();
-    manageFocusForModal('form-config-modal', true);
-  } else {
-    // Fallback for legacy support
-    const modal = document.getElementById('form-config-modal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      loadSavedClassChoices();
-      manageFocusForModal('form-config-modal', true);
-    }
-  }
-}
-
-// Override placeholder with actual function
-if (typeof window !== 'undefined') {
-  window.showFormConfigModal = showFormConfigModal;
-}
+// showFormConfigModal function is now defined in adminPanel-framework.js.html
 
 // Hide form configuration modal
 function hideFormConfigModal() {
@@ -1533,19 +1473,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Hide privacy modal
-function hidePrivacyModal() {
-  const modal = document.getElementById('privacy-modal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    manageFocusForModal('privacy-modal', false);
-  }
-}
-
-// Override placeholder with actual function
-if (typeof window !== 'undefined') {
-  window.hidePrivacyModal = hidePrivacyModal;
-}
+// hidePrivacyModal function is now defined in adminPanel-framework.js.html
 
 // Show digital citizenship modal
 function showDigitalCitizenshipModal() {
