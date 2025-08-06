@@ -63,10 +63,6 @@ if (typeof window !== 'undefined') {
       window[functionName] = realFunction;
       window._adminFunctionTracker.replaced.add(functionName);
       console.log(`✅ AdminPanel: ${functionName}() stub replaced with real implementation`);
-    } else {
-      // Function was not stubbed, register directly
-      window[functionName] = realFunction;
-      console.log(`📝 AdminPanel: ${functionName}() registered directly (no stub)`);
     }
   }
   
@@ -90,9 +86,6 @@ if (typeof window !== 'undefined') {
   // Additional functions that might be called early
   window.showSecurityDetailsModal = window.showSecurityDetailsModal || createStub('showSecurityDetailsModal', 'general');
   window.hideSecurityDetailsModal = window.hideSecurityDetailsModal || createStub('hideSecurityDetailsModal', 'general');
-  
-  // Config and validation functions
-  window.updateConfigButtons = window.updateConfigButtons || createStub('updateConfigButtons', 'critical');
   
   // =============================================================================
   // FUNCTION REPLACEMENT SYSTEM
@@ -121,29 +114,6 @@ if (typeof window !== 'undefined') {
   
   console.log('✅ AdminPanel Early Init: Critical function stubs loaded successfully');
   
-  // Enhanced error tracking for syntax errors
-  window.addEventListener('error', function(event) {
-    const message = event.message || '';
-    const filename = event.filename || '';
-    const lineno = event.lineno || 0;
-    
-    if (filename.includes('userCodeAppPanel') && message.includes('Invalid or unexpected token')) {
-      console.error('🚨 AdminPanel: Syntax error detected - investigating:', {
-        message,
-        line: lineno,
-        filename: filename.substring(filename.lastIndexOf('/') + 1)
-      });
-      
-      // Track which JavaScript files might have loaded successfully
-      window._adminFunctionTracker.errors.push({
-        type: 'syntax_error',
-        message,
-        line: lineno,
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-  
   // Schedule a check after page load to verify everything is working
   document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
@@ -152,20 +122,6 @@ if (typeof window !== 'undefined') {
         console.warn(`⚠️ AdminPanel: ${status.errors} function call errors detected during initialization`);
       } else {
         console.log('✅ AdminPanel: All function calls handled successfully during initialization');
-      }
-      
-      // Additional check - warn if no functions were replaced
-      if (status.replaced === 0) {
-        console.warn('⚠️ AdminPanel: No functions were replaced - JavaScript files may not be loading properly');
-        console.log('🔧 AdminPanel: Checking for common issues...');
-        
-        // Try to detect which files might have syntax errors
-        const expectedFunctions = ['navigateToStep', 'toggleSection', 'updateUIWithNewStatus', 'hidePrivacyModal', 'showFormConfigModal', 'updateConfigButtons'];
-        const missingFunctions = expectedFunctions.filter(fn => typeof window[fn] !== 'function' || window._adminFunctionTracker.stubs.has(fn));
-        
-        if (missingFunctions.length > 0) {
-          console.warn('🔍 AdminPanel: Functions still missing real implementations:', missingFunctions);
-        }
       }
     }, 2000);
   });

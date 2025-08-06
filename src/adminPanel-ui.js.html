@@ -743,15 +743,6 @@ function updateConfigButtons() {
   }
 }
 
-// Register function with early initialization system
-if (typeof window !== 'undefined') {
-  if (typeof window._registerAdminFunction === 'function') {
-    window._registerAdminFunction('updateConfigButtons', updateConfigButtons);
-  } else {
-    window.updateConfigButtons = updateConfigButtons;
-  }
-}
-
 // =============================================================================
 // STEP INDICATORS AND GUIDANCE
 // =============================================================================
