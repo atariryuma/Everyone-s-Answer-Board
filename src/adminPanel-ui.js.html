@@ -48,7 +48,7 @@ function getPublicationState(status) {
     reason = 'status.appPublished=true';
   }
   // 3. Check configJson for appPublished
-  else if (status.userInfo?.configJson) {
+  else if (status.userInfo && status.userInfo.configJson) {
     try {
       const config = JSON.parse(status.userInfo.configJson);
       if (config.appPublished === true) {
@@ -104,13 +104,13 @@ function getPublicationState(status) {
 // Generate viewUrl with comprehensive fallback logic
 function generateViewUrl(status, userId) {
   // 1. Use existing viewUrl if available
-  let viewUrl = status.appUrls?.viewUrl;
+  let viewUrl = status.appUrls && status.appUrls.viewUrl;
   if (viewUrl) {
     return viewUrl;
   }
   
   // 2. Generate from appUrls.webApp with userId
-  if (status.appUrls?.webApp && userId) {
+  if (status.appUrls && status.appUrls.webApp && userId) {
     return status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
   }
   
@@ -120,7 +120,7 @@ function generateViewUrl(status, userId) {
   }
   
   // 4. Simple fallback without userId
-  if (status.appUrls?.webApp) {
+  if (status.appUrls && status.appUrls.webApp) {
     return status.appUrls.webApp + '?mode=view';
   }
   
@@ -219,7 +219,7 @@ function executeParallelUIUpdates(status) {
     () => updateFooterAndGuidance(status),
     
     // Task 4: ステータスバーの更新（統合最適化版）
-    () => updateStepIndicators(status?.setupStep || currentStep, status)
+    () => updateStepIndicators((status && status.setupStep) || currentStep, status)
   ];
   
   // 並列実行（requestAnimationFrameで最適化）
@@ -271,10 +271,10 @@ function updateUnpublishButton(status) {
   if (!unpublishBtn) return;
 
   // Use same strict logic as footer: both normalized and explicit checks
-  const isPublished = status._normalized?.isPublished || false;
+  const isPublished = (status._normalized && status._normalized.isPublished) || false;
   let explicitAppPublished = status.appPublished === true;
   
-  if (!explicitAppPublished && status.userInfo?.configJson) {
+  if (!explicitAppPublished && status.userInfo && status.userInfo.configJson) {
     try {
       const config = JSON.parse(status.userInfo.configJson);
       explicitAppPublished = config.appPublished === true;
@@ -421,7 +421,7 @@ function syncCheckboxStates(status) {
   if (status.config) {
     if (status.config.showNames !== undefined) showNames = status.config.showNames;
     if (status.config.showCounts !== undefined) showCounts = status.config.showCounts;
-  } else if (status.userInfo?.configJson) {
+  } else if (status.userInfo && status.userInfo.configJson) {
     // 2. Fallback to raw configJson
     try {
       const config = JSON.parse(status.userInfo.configJson);
@@ -712,7 +712,7 @@ function buildConfigObject() {
     opinionHeader: opinionValue,
     nameHeader: nameValue,
     classHeader: classValue,
-    reasonHeader: document.getElementById('reason-column')?.value || '',
+    reasonHeader: (document.getElementById('reason-column') && document.getElementById('reason-column').value) || '',
     // Also provide legacy format for backward compatibility
     opinionColumn: opinionValue,
     nameColumn: nameValue,
@@ -761,7 +761,7 @@ window._fullPopulateConfig = _fullPopulateConfig;
 
 // 統一されたステップ完了チェック - 公開状態優先判定対応版
 function getStepCompletionFromConfig(status) {
-  if (!status?.userInfo?.configJson) {
+  if (!(status && status.userInfo && status.userInfo.configJson)) {
     return { step1: false, step2: false, step3: false, isPublished: false };
   }
 
@@ -1015,13 +1015,13 @@ function updateFooterAndGuidanceImmediate(status) {
   }
 
   // Use normalized publication state from status object with additional validation
-  const isPublished = status._normalized?.isPublished || false;
-  const viewUrl = status._normalized?.viewUrl;
+  const isPublished = (status._normalized && status._normalized.isPublished) || false;
+  const viewUrl = status._normalized && status._normalized.viewUrl;
   
   // Additional strict check: ensure appPublished is explicitly true
   let explicitAppPublished = status.appPublished === true;
   
-  if (!explicitAppPublished && status.userInfo?.configJson) {
+  if (!explicitAppPublished && status.userInfo && status.userInfo.configJson) {
     try {
       const config = JSON.parse(status.userInfo.configJson);
       explicitAppPublished = config.appPublished === true;
@@ -1040,9 +1040,9 @@ function updateFooterAndGuidanceImmediate(status) {
       'normalized isPublished': isPublished,
       'explicit appPublished': explicitAppPublished,
       'final decision': finalIsPublished,
-      'publish reason': status._normalized?.publishReason,
+      'publish reason': status._normalized && status._normalized.publishReason,
       'normalized viewUrl': viewUrl,
-      'has valid viewUrl': status._normalized?.hasValidViewUrl,
+      'has valid viewUrl': status._normalized && status._normalized.hasValidViewUrl,
       'will show footer': finalIsPublished
     });
   } else {
@@ -1180,7 +1180,7 @@ function updateTopicText(status) {
           }
         } catch (e) {
           // クイックスタート直後のフォールバック改善
-          if (sheetName && fullCfg['sheet_' + (sheetName || '')]?.flowType === 'quickstart') {
+          if (sheetName && fullCfg['sheet_' + (sheetName || '')] && fullCfg['sheet_' + (sheetName || '')].flowType === 'quickstart') {
             // クイックスタート用デフォルト質問文を表示
             topic = 'あなたの考えや気づいたことを教えてください';
           } else {
@@ -1207,8 +1207,8 @@ function updateScheduledEndTime(config, element) {
   // 複数のソースから scheduledEndAt を取得を試行
   const scheduledEndAt = config.scheduledEndAt || 
                          config.scheduledEndTime ||  // 古いフィールド名との互換性
-                         (window.lastStatusCache?.config?.scheduledEndAt) ||
-                         (window.lastStatusCache?.config?.scheduledEndTime);
+                         (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndAt) ||
+                         (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndTime);
   
   // scheduledEndAtが設定されていない場合は、publishedAt + autoStopMinutesから計算
   let finalScheduledEndTime = scheduledEndAt;
@@ -2403,17 +2403,17 @@ function saveToHistory(historyItem) {
       
       // AI列判定結果の保存（復元時に必要）
       sheetDetails: {
-        allHeaders: currentStatus?.sheetDetails?.allHeaders || [],
-        guessedConfig: currentStatus?.sheetDetails?.guessedConfig || {},
-        existingConfig: currentStatus?.sheetDetails?.existingConfig || {}
+        allHeaders: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [],
+        guessedConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {},
+        existingConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.existingConfig) || {}
       },
       
       // 復元に必要な追加情報
-      activeSheetName: currentStatus?.activeSheetName || historyItem.sheetName,
-      spreadsheetId: currentStatus?.userInfo?.spreadsheetId || '',
+      activeSheetName: (currentStatus && currentStatus.activeSheetName) || historyItem.sheetName,
+      spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
       
       // 保存時点での設定完了状態
-      configurationComplete: !!(currentStatus?.sheetDetails?.guessedConfig?.opinionHeader)
+      configurationComplete: !!(currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader)
     };
     
     history.unshift(newItem);
@@ -2476,7 +2476,7 @@ async function syncHistoryToServer(historyItem, retryCount = 0) {
       logDebug('History synced to server successfully');
       return { status: 'success', message: 'Server sync completed' };
     } else {
-      const errorMsg = response?.message || 'Unknown server error';
+      const errorMsg = (response && response.message) || 'Unknown server error';
       logWarn('Server history sync failed:', errorMsg);
       
       // リトライロジック
@@ -2555,7 +2555,7 @@ async function getMergedHistory() {
           logWarn('Server response historyArray is not an array');
         }
       } else {
-        logWarn('Server history response failed:', response?.message || 'Unknown error');
+        logWarn('Server history response failed:', (response && response.message) || 'Unknown error');
       }
     } catch (serverError) {
       if (serverError.message.includes('timeout')) {
@@ -2571,7 +2571,7 @@ async function getMergedHistory() {
     
     // ローカル履歴を追加（軽量検証）
     for (const item of localHistory) {
-      if (item?.id) {
+      if (item && item.id) {
         mergedMap.set(item.id, Object.assign({}, item, { source: 'local' }));
         totalItems++;
       }
@@ -2579,7 +2579,7 @@ async function getMergedHistory() {
     
     // サーバー履歴を追加（サーバー側優先）
     for (const item of serverHistory) {
-      if (item?.id) {
+      if (item && item.id) {
         mergedMap.set(item.id, Object.assign({}, item, { source: 'server' }));
         totalItems++;
       }
@@ -2638,7 +2638,7 @@ function saveDraftToSession(draftData) {
     }
 
     // Create unique form identifier
-    const formId = `${currentStatus?.userInfo?.spreadsheetId || 'unknown'}_${draftData.sheetName || selectedSheet || 'unknown'}`;
+    const formId = `${(currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || 'unknown'}_${draftData.sheetName || selectedSheet || 'unknown'}`;
     
     const draftState = {
       formId,
@@ -2651,14 +2651,14 @@ function saveDraftToSession(draftData) {
       
       // AI column prediction results for recovery
       sheetDetails: {
-        allHeaders: currentStatus?.sheetDetails?.allHeaders || [],
-        guessedConfig: currentStatus?.sheetDetails?.guessedConfig || {},
-        existingConfig: currentStatus?.sheetDetails?.existingConfig || {}
+        allHeaders: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [],
+        guessedConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {},
+        existingConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.existingConfig) || {}
       },
       
       // Form configuration state
-      spreadsheetId: currentStatus?.userInfo?.spreadsheetId || '',
-      configurationComplete: !!(currentStatus?.sheetDetails?.guessedConfig?.opinionHeader),
+      spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
+      configurationComplete: !!(currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader),
       
       // Timestamp for draft management
       lastUpdated: new Date().toISOString()
@@ -2743,7 +2743,7 @@ async function recoverDraftFromSession() {
     }
     
     // Restore spreadsheet ID if available
-    if (draftState.spreadsheetId && currentStatus?.userInfo) {
+    if (draftState.spreadsheetId && currentStatus && currentStatus.userInfo) {
       currentStatus.userInfo.spreadsheetId = draftState.spreadsheetId;
     }
     
@@ -3096,9 +3096,9 @@ function createHistoryTableRow(item, index) {
   };
   
   // Format display mode and count display as compact visual indicators
-  const displayMode = item.displayMode || item.config?.displayMode || '通常表示';
-  const countDisplay = item.countDisplay || item.config?.countDisplay || '表示';
-  const status = item.status || item.config?.status || 'published';
+  const displayMode = item.displayMode || (item.config && item.config.displayMode) || '通常表示';
+  const countDisplay = item.countDisplay || (item.config && item.config.countDisplay) || '表示';
+  const status = item.status || (item.config && item.config.status) || 'published';
   const displayModeIcon = getDisplayModeIcon(displayMode);
   const countDisplayIcon = getCountDisplayIcon(countDisplay);
   const statusIcon = getStatusIcon(status, isActive);
@@ -3627,7 +3627,7 @@ function validateConfigJsonIntegrity(config, userInfo) {
 function fixPublishedSheetName(config) {
   // publishedSheetNameが'フォームの回答 1'のようなデフォルト名の場合も修復対象
   const isDefaultSheetName = config.publishedSheetName === 'フォームの回答 1' || 
-                            config.publishedSheetName?.startsWith('フォームの回答');
+                            config.publishedSheetName && config.publishedSheetName.startsWith('フォームの回答');
                             
   if ((!config.publishedSheetName || 
        config.publishedSheetName.trim() === '' || 
@@ -3635,7 +3635,7 @@ function fixPublishedSheetName(config) {
       config.publishedSpreadsheetId) {
     
     // AI列判定結果から質問文を取得を試行
-    if (currentStatus?.sheetDetails?.guessedConfig?.opinionHeader) {
+    if (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader) {
       const questionText = currentStatus.sheetDetails.guessedConfig.opinionHeader;
       config.publishedSheetName = questionText;
       
@@ -3815,13 +3815,13 @@ function updateNewResourceButtons(resourceUrls) {
   // フォルダURLが見つからない場合、他のソースを確認
   if (!folderUrl) {
     // configJsonから直接取得を試行
-    const config = window.configJson || window.AdminPanel?.status?.config;
+    const config = window.configJson || (window.AdminPanel && window.AdminPanel.status && window.AdminPanel.status.config);
     if (config) {
       folderUrl = config.folderUrl || (config.folderId && ('https://drive.google.com/drive/folders/' + String(config.folderId || '')));
     }
     
     // フォルダIDから直接URLを構築
-    if (!folderUrl && config?.folderId) {
+    if (!folderUrl && config && config.folderId) {
       folderUrl = 'https://drive.google.com/drive/folders/' + String(config.folderId || '');
       console.log('📁 Folder URL constructed from folderId:', folderUrl);
     }
