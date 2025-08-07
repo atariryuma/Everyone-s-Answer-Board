@@ -1147,7 +1147,7 @@ function updateTopicText(status) {
   let cfg = status.config || {};
   
   // userInfo.configJsonからも情報を取得
-  if (status.userInfo?.configJson) {
+  if (status.userInfo && status.userInfo.configJson) {
     try {
       const fullConfig = JSON.parse(status.userInfo.configJson);
       cfg = Object.assign({}, cfg, fullConfig);
@@ -1163,7 +1163,7 @@ function updateTopicText(status) {
   } else {
     const sheetName = cfg.publishedSheetName || status.publishedSheetName;
     if (sheetName) {
-      if (status.userInfo?.configJson) {
+      if (status.userInfo && status.userInfo.configJson) {
         try {
           const fullCfg = JSON.parse(status.userInfo.configJson);
           const sheetCfg = fullCfg['sheet_' + (sheetName || '')] || {};
@@ -2549,7 +2549,7 @@ async function getMergedHistory() {
       
       if (response && response.status === 'success') {
         if (Array.isArray(response.historyArray)) {
-          serverHistory = response.historyArray.filter(item => item?.id); // 軽量検証
+          serverHistory = response.historyArray.filter(item => item && item.id); // 軽量検証
           if (serverHistory.length > 0) logDebug('Server history loaded:', serverHistory.length, 'items');
         } else {
           logWarn('Server response historyArray is not an array');
@@ -3853,4 +3853,25 @@ function updateNewResourceButtons(resourceUrls) {
 }
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
+
+// Explicitly register full implementations when this file loads
+if (window.AdminPanel && window.AdminPanel.functionRegistry) {
+  console.log('🔧 Registering full implementations from adminPanel-ui.js.html');
+  const fullImplFunctions = [
+    'updateUIWithNewStatus', 'populateHeaderOptions', 'populateConfig', 
+    'updateFormUrlDisplay', 'validateConfig', 'updateConfigButtons'
+  ];
+  
+  fullImplFunctions.forEach(funcName => {
+    window.AdminPanel.functionRegistry.registerFullImplementation(funcName);
+  });
+  
+  // Immediately check for full implementations after registration
+  setTimeout(() => {
+    const foundCount = window.AdminPanel.functionRegistry.checkForFullImplementations();
+    console.log(`✅ Full implementation registration complete: ${foundCount}/6 functions available`);
+  }, 50);
+} else {
+  console.warn('⚠️ AdminPanel.functionRegistry not available for full implementation registration');
+}
 </script>

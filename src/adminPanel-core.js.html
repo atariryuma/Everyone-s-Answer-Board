@@ -11,7 +11,7 @@
 // DEBUG_MODE is defined in constants.js.html
 
 function adminLog(level, ...args) {
-  if (!(window.DEBUG_MODE || window.SYSTEM_CONSTANTS?.DEBUG_MODE)) return;
+  if (!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE))) return;
   
   switch (level) {
     case 'error':
@@ -24,7 +24,7 @@ function adminLog(level, ...args) {
       console.log('[AdminPanel]', ...args);
       break;
     case 'debug':
-      if (window.DEBUG_MODE || window.SYSTEM_CONSTANTS?.DEBUG_MODE) console.log('[AdminPanel:DEBUG]', ...args);
+      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) console.log('[AdminPanel:DEBUG]', ...args);
       break;
     default:
       console.log('[AdminPanel]', ...args);
@@ -86,9 +86,9 @@ window.unifiedManagement = {
 
   // UI管理 (UnifiedLoadingManager)
   ui: {
-    showLoading: (message, options) => window.unifiedLoading?.showSimple(message, options),
-    showProgress: (message, step, percentage) => window.unifiedLoading?.showAdminProgress(message, step, percentage),
-    hideLoading: () => window.unifiedLoading?.hide(),
+    showLoading: (message, options) => window.unifiedLoading && window.unifiedLoading.showSimple(message, options),
+    showProgress: (message, step, percentage) => window.unifiedLoading && window.unifiedLoading.showAdminProgress(message, step, percentage),
+    hideLoading: () => window.unifiedLoading && window.unifiedLoading.hide(),
     setLoading: (isLoading, message, step, percentage) => window.setLoading(isLoading, message, step, percentage)
   },
 
@@ -98,8 +98,8 @@ window.unifiedManagement = {
     flow: typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.diagnoseExecution() : { activeFlows: [], pendingOperations: 0 },
     timing: {
       activeTimers: typeof timingManager !== 'undefined' ? timingManager.activeTimers.size : 0,
-      debounceTimers: typeof timingManager !== 'undefined' ? (timingManager.debounceTimers?.size || 0) : 0,
-      throttleTimers: typeof timingManager !== 'undefined' ? (timingManager.throttleTimers?.size || 0) : 0
+      debounceTimers: typeof timingManager !== 'undefined' ? ((timingManager.debounceTimers && timingManager.debounceTimers.size) || 0) : 0,
+      throttleTimers: typeof timingManager !== 'undefined' ? ((timingManager.throttleTimers && timingManager.throttleTimers.size) || 0) : 0
     },
     timestamp: Date.now()
   })

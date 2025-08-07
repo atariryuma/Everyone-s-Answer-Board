@@ -147,7 +147,7 @@ Object.defineProperties(window, {
 // DEBUG_MODE is defined in constants.js.html
 
 function adminLog(level, ...args) {
-  if (!(window.DEBUG_MODE || window.SYSTEM_CONSTANTS?.DEBUG_MODE)) return;
+  if (!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE))) return;
   
   switch (level) {
     case 'error':
@@ -160,7 +160,7 @@ function adminLog(level, ...args) {
       console.log('[AdminPanel]', ...args);
       break;
     case 'debug':
-      if (window.DEBUG_MODE || window.SYSTEM_CONSTANTS?.DEBUG_MODE) console.log('[AdminPanel:DEBUG]', ...args);
+      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) console.log('[AdminPanel:DEBUG]', ...args);
       break;
     default:
       console.log('[AdminPanel]', ...args);
@@ -694,8 +694,10 @@ function validateConfig() {
   
   try {
     // Check primary element first, then fallback to secondary element
-    const opinionValue = document.getElementById('opinionHeader')?.value || 
-                        document.getElementById('reason-column')?.value || '';
+    const opinionValueEl1 = document.getElementById('opinionHeader');
+    const opinionValueEl2 = document.getElementById('reason-column');
+    const opinionValue = (opinionValueEl1 && opinionValueEl1.value) || 
+                        (opinionValueEl2 && opinionValueEl2.value) || '';
     
     return opinionValue && opinionValue.trim() !== '';
   } catch (error) {

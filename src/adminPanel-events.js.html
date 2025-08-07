@@ -98,7 +98,7 @@ function setupEventListeners() {
                     console.log('✅ サーバー側履歴のクリア完了');
                     showMessage('✅ すべての履歴をクリアしました', 'success');
                   } else {
-                    console.warn('⚠️ サーバー側履歴のクリアに失敗:', serverResponse?.message || 'Unknown error');
+                    console.warn('⚠️ サーバー側履歴のクリアに失敗:', (serverResponse && serverResponse.message) || 'Unknown error');
                     showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
                   }
                 } else {
@@ -142,7 +142,7 @@ function setupEventListeners() {
                     console.log('✅ サーバー側履歴のクリア完了（フォールバック）');
                     showMessage('✅ すべての履歴をクリアしました', 'success');
                   } else {
-                    console.warn('⚠️ サーバー側履歴のクリアに失敗（フォールバック）:', serverResponse?.message || 'Unknown error');
+                    console.warn('⚠️ サーバー側履歴のクリアに失敗（フォールバック）:', (serverResponse && serverResponse.message) || 'Unknown error');
                     showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
                   }
                 } else {
@@ -682,7 +682,7 @@ function manageFocusForModal(modalId, show) {
   
   if (show) {
     // Store currently focused element
-    modal.setAttribute('data-previous-focus', document.activeElement?.id || '');
+    modal.setAttribute('data-previous-focus', (document.activeElement && document.activeElement.id) || '');
     
     // Focus first interactive element in modal
     var firstFocusable = modal.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
