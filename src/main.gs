@@ -10,9 +10,7 @@
  */
 function include(path) {
   try {
-    const tmpl = HtmlService.createTemplateFromFile(path);
-    tmpl.include = include;
-    return tmpl.evaluate().getContent();
+    return HtmlService.createHtmlOutputFromFile(path).getContent();
   } catch (error) {
     logError(error, 'includeFile', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { filePath: path });
     return `<!-- Error including ${path}: ${error.message} -->`;
