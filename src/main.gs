@@ -1177,11 +1177,30 @@ function handleAdminMode(params) {
     });
     
     // 詳細な診断情報付きエラーページ
+    let propertiesDiagnostics = 'unknown';
+    try {
+      const userProps = PropertiesService.getUserProperties();
+      const scriptProps = PropertiesService.getScriptProperties();
+      
+      const userPropsData = userProps.getProperties();
+      const scriptPropsKeys = Object.keys(scriptProps.getProperties()).filter(k => k.startsWith('newUser_'));
+      
+      propertiesDiagnostics = {
+        userProperties: Object.keys(userPropsData).length,
+        scriptProperties: scriptPropsKeys.length,
+        recentUsers: scriptPropsKeys.slice(0, 3) // 最新3件
+      };
+    } catch (propError) {
+      propertiesDiagnostics = 'error: ' + propError.message;
+    }
+    
     const diagnosticInfo = [
       `ユーザーID: ${params.userId}`,
+      `現在のメール: ${getCurrentUserEmail()}`,
       `認証時間: ${authDuration}ms`,
       `総処理時間: ${totalRequestTime}ms`,
       `データベース接続: ${systemDiagnostics.databaseConnectivity}`,
+      `プロパティ状態: ${JSON.stringify(propertiesDiagnostics)}`,
       `時刻: ${new Date().toLocaleString('ja-JP')}`
     ].join('\n');
     

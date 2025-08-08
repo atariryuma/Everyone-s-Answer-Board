@@ -120,6 +120,119 @@ function getServiceAccountEmail() {
 }
 
 /**
+ * 緊急メール認証システム - データベースで見つからない新規ユーザーの認証
+ * @param {string} userId - 検証するユーザーID
+ * @param {string} activeUserEmail - 現在のログインユーザーのメールアドレス
+ * @param {Array} detectionResults - 新規ユーザー検出結果
+ * @returns {Object} 認証結果 {approved: boolean, method: string, reason: string}
+ */
+function performEmergencyEmailAuth(userId, activeUserEmail, detectionResults) {
+  const authResult = {
+    approved: false,
+    method: 'none',
+    reason: 'no_match',
+    details: {}
+  };
+  
+  try {
+    const currentEmail = activeUserEmail ? activeUserEmail.toLowerCase().trim() : '';
+    if (!currentEmail) {
+      authResult.reason = 'no_active_email';
+      return authResult;
+    }
+    
+    // 方法1: ScriptPropertiesで記録されたメールアドレスとの一致確認
+    for (const result of detectionResults) {
+      if (result.method === 'ScriptProperties' && result.data && result.data.email) {
+        const recordedEmail = result.data.email.toLowerCase().trim();
+        if (recordedEmail === currentEmail) {
+          authResult.approved = true;
+          authResult.method = 'ScriptProperties_email_match';
+          authResult.reason = 'email_match_in_script_props';
+          authResult.details = {
+            recordedEmail: recordedEmail,
+            timeDiff: result.timeDiff,
+            key: result.key
+          };
+          return authResult;
+        }
+      }
+    }
+    
+    // 方法2: EmailBasedでの検出結果を使用
+    for (const result of detectionResults) {
+      if (result.method === 'EmailBased' && result.data) {
+        const recordedEmail = result.data.email.toLowerCase().trim();
+        if (recordedEmail === currentEmail) {
+          authResult.approved = true;
+          authResult.method = 'EmailBased_detection';
+          authResult.reason = 'email_based_detection_match';
+          authResult.details = {
+            recordedEmail: recordedEmail,
+            timeDiff: result.timeDiff,
+            key: result.key
+          };
+          return authResult;
+        }
+      }
+    }
+    
+    // 方法3: ドメイン一致確認（教育機関ドメインなどの信頼できるドメイン）
+    const trustedDomains = ['naha-okinawa.ed.jp', 'gmail.com']; // 必要に応じて拡張
+    const emailDomain = currentEmail.split('@')[1];
+    
+    if (trustedDomains.includes(emailDomain)) {
+      // さらに最近の作成記録があるかチェック
+      try {
+        const scriptProps = PropertiesService.getScriptProperties();
+        const allProps = scriptProps.getProperties();
+        const recentThreshold = Date.now() - (5 * 60 * 1000); // 5分以内
+        
+        for (const [key, value] of Object.entries(allProps)) {
+          if (key.startsWith('newUser_') && key.toLowerCase().includes(emailDomain)) {
+            try {
+              const data = JSON.parse(value);
+              const createdTime = parseInt(data.createdTime);
+              
+              if (createdTime > recentThreshold) {
+                authResult.approved = true;
+                authResult.method = 'trusted_domain_recent';
+                authResult.reason = 'trusted_domain_with_recent_activity';
+                authResult.details = {
+                  domain: emailDomain,
+                  recentActivity: true,
+                  timeDiff: Date.now() - createdTime,
+                  key: key
+                };
+                return authResult;
+              }
+            } catch (parseError) {
+              // パース失敗は無視
+            }
+          }
+        }
+      } catch (domainCheckError) {
+        warnLog('performEmergencyEmailAuth: ドメインチェックでエラー:', domainCheckError.message);
+      }
+    }
+    
+    authResult.reason = 'no_emergency_criteria_met';
+    authResult.details = {
+      currentEmail: currentEmail,
+      detectionResultsCount: detectionResults.length,
+      domain: emailDomain
+    };
+    
+  } catch (error) {
+    authResult.reason = 'emergency_auth_error';
+    authResult.details = { error: error.message };
+    errorLog('performEmergencyEmailAuth: エラー:', error.message);
+  }
+  
+  return authResult;
+}
+
+/**
  * 指定されたユーザーの管理者権限を検証する - 統合検索システム対応版
  * @param {string} userId - 検証するユーザーのID
  * @returns {boolean} 管理者権限がある場合は true、そうでなければ false
@@ -152,27 +265,126 @@ function verifyAdminAccess(userId) {
     const searchDuration = Date.now() - startTime;
 
     if (!userFromDb) {
-      // 新規ユーザー作成直後の特別処理
+      // 新規ユーザー作成直後の特別処理 - 改善された検出ロジック
       let isRecentlyCreated = false;
+      let detectionSource = 'none';
+      const detectionResults = [];
+      
       try {
-        const userProperties = PropertiesService.getUserProperties();
-        const lastCreatedUserId = userProperties.getProperty('lastCreatedUserId');
-        const lastCreatedTime = userProperties.getProperty('lastCreatedUserTime');
-        
-        if (lastCreatedUserId === userId && lastCreatedTime) {
-          const timeDiff = Date.now() - parseInt(lastCreatedTime);
-          isRecentlyCreated = timeDiff < 60000; // 60秒以内に作成された場合（時間を延長）
+        // 方法1: UserPropertiesでの検出
+        try {
+          const userProperties = PropertiesService.getUserProperties();
+          const lastCreatedUserId = userProperties.getProperty('lastCreatedUserId');
+          const lastCreatedTime = userProperties.getProperty('lastCreatedUserTime');
+          const lastCreatedEmail = userProperties.getProperty('lastCreatedUserEmail');
           
-          debugLog('verifyAdminAccess: 新規ユーザー作成チェック:', {
-            userId: userId,
+          const userPropsResult = {
+            method: 'UserProperties',
             lastCreatedUserId: lastCreatedUserId,
-            timeDiff: timeDiff,
-            isRecentlyCreated: isRecentlyCreated,
-            threshold: '60秒'
-          });
+            lastCreatedTime: lastCreatedTime,
+            lastCreatedEmail: lastCreatedEmail,
+            found: false,
+            timeDiff: null
+          };
+          
+          if (lastCreatedUserId === userId && lastCreatedTime) {
+            const timeDiff = Date.now() - parseInt(lastCreatedTime);
+            userPropsResult.timeDiff = timeDiff;
+            userPropsResult.found = timeDiff < 120000; // 120秒以内に作成された場合
+            
+            if (userPropsResult.found) {
+              isRecentlyCreated = true;
+              detectionSource = 'UserProperties';
+            }
+          }
+          detectionResults.push(userPropsResult);
+        } catch (userPropError) {
+          detectionResults.push({ method: 'UserProperties', error: userPropError.message });
         }
-      } catch (propError) {
-        warnLog('verifyAdminAccess: ユーザープロパティ取得エラー:', propError.message);
+        
+        // 方法2: ScriptPropertiesでの検出（フォールバック）
+        if (!isRecentlyCreated) {
+          try {
+            const scriptProps = PropertiesService.getScriptProperties();
+            const allScriptProps = scriptProps.getProperties();
+            
+            Object.keys(allScriptProps).forEach(key => {
+              if (key.startsWith('newUser_') && key.includes(userId)) {
+                try {
+                  const data = JSON.parse(allScriptProps[key]);
+                  const timeDiff = Date.now() - parseInt(data.createdTime);
+                  
+                  const scriptPropsResult = {
+                    method: 'ScriptProperties',
+                    key: key,
+                    data: data,
+                    timeDiff: timeDiff,
+                    found: timeDiff < 120000
+                  };
+                  
+                  if (scriptPropsResult.found) {
+                    isRecentlyCreated = true;
+                    detectionSource = 'ScriptProperties';
+                  }
+                  detectionResults.push(scriptPropsResult);
+                } catch (parseError) {
+                  detectionResults.push({ method: 'ScriptProperties', key: key, parseError: parseError.message });
+                }
+              }
+            });
+          } catch (scriptPropError) {
+            detectionResults.push({ method: 'ScriptProperties', error: scriptPropError.message });
+          }
+        }
+        
+        // 方法3: メールアドレスベースの検出
+        if (!isRecentlyCreated) {
+          try {
+            const scriptProps = PropertiesService.getScriptProperties();
+            const allScriptProps = scriptProps.getProperties();
+            const currentEmail = activeUserEmail.toLowerCase();
+            
+            Object.keys(allScriptProps).forEach(key => {
+              if (key.startsWith('newUser_') && key.toLowerCase().includes(currentEmail)) {
+                try {
+                  const data = JSON.parse(allScriptProps[key]);
+                  const timeDiff = Date.now() - parseInt(data.createdTime);
+                  
+                  const emailBasedResult = {
+                    method: 'EmailBased',
+                    key: key,
+                    data: data,
+                    timeDiff: timeDiff,
+                    found: timeDiff < 120000
+                  };
+                  
+                  if (emailBasedResult.found) {
+                    isRecentlyCreated = true;
+                    detectionSource = 'EmailBased';
+                  }
+                  detectionResults.push(emailBasedResult);
+                } catch (parseError) {
+                  detectionResults.push({ method: 'EmailBased', key: key, parseError: parseError.message });
+                }
+              }
+            });
+          } catch (emailDetectionError) {
+            detectionResults.push({ method: 'EmailBased', error: emailDetectionError.message });
+          }
+        }
+        
+        infoLog('verifyAdminAccess: 新規ユーザー検出結果:', {
+          userId: userId,
+          activeUserEmail: activeUserEmail,
+          isRecentlyCreated: isRecentlyCreated,
+          detectionSource: detectionSource,
+          threshold: '120秒',
+          detectionResults: detectionResults
+        });
+        
+      } catch (generalError) {
+        warnLog('verifyAdminAccess: 新規ユーザー検出で一般エラー:', generalError.message);
+        detectionResults.push({ method: 'general', error: generalError.message });
       }
       
       if (isRecentlyCreated) {
@@ -192,13 +404,22 @@ function verifyAdminAccess(userId) {
           }
         }
         
-        // まだ見つからない場合は仮承認
+        // まだ見つからない場合は緊急メール認証システムを実行
         if (!userFromDb) {
-          warnLog('verifyAdminAccess: 🕒 リトライ後もデータなし - メールベースで仮承認を試行');
-          const currentEmailLower = activeUserEmail ? activeUserEmail.toLowerCase().trim() : '';
-          if (currentEmailLower) {
-            infoLog('verifyAdminAccess: 🎫 新規ユーザー仮承認 - データベース同期完了を待つ間の暫定認証');
-            return true; // 仮承認
+          warnLog('verifyAdminAccess: 🕒 リトライ後もデータなし - 緊急メール認証システムを実行');
+          
+          // 緊急メール認証: 複数の検証方法
+          const emergencyAuth = performEmergencyEmailAuth(userId, activeUserEmail, detectionResults);
+          
+          if (emergencyAuth.approved) {
+            infoLog('verifyAdminAccess: 🚨 緊急メール認証で承認', {
+              userId: userId,
+              method: emergencyAuth.method,
+              reason: emergencyAuth.reason
+            });
+            return true; // 緊急承認
+          } else {
+            warnLog('verifyAdminAccess: 🚫 緊急メール認証でも承認できません', emergencyAuth);
           }
         }
       }
@@ -437,16 +658,104 @@ function processLoginFlow(userEmail) {
         infoLog('processLoginFlow: ✅ ユーザーレコード検証が完了しました:', newUser.userId);
       }
       
+      // 書き込み完了の検証
+      debugLog('processLoginFlow: データベース書き込み完了検証を開始:', newUser.userId);
+      let writeVerificationSuccess = false;
+      let verificationAttempts = 0;
+      const maxVerificationAttempts = 3;
+      
+      while (!writeVerificationSuccess && verificationAttempts < maxVerificationAttempts) {
+        verificationAttempts++;
+        try {
+          Utilities.sleep(500 * verificationAttempts); // 段階的待機: 500ms, 1000ms, 1500ms
+          
+          const verificationUser = fetchUserFromDatabase('userId', newUser.userId, {
+            enableDiagnostics: false,
+            autoRepair: false,
+            retryCount: 0
+          });
+          
+          if (verificationUser && verificationUser.userId === newUser.userId) {
+            writeVerificationSuccess = true;
+            infoLog(`✅ processLoginFlow: 書き込み完了検証成功 (試行${verificationAttempts}回目)`, newUser.userId);
+            break;
+          } else {
+            warnLog(`⚠️ processLoginFlow: 書き込み完了検証失敗 (試行${verificationAttempts}/${maxVerificationAttempts})`, {
+              userId: newUser.userId,
+              found: !!verificationUser,
+              foundUserId: verificationUser ? verificationUser.userId : null
+            });
+          }
+        } catch (verifyError) {
+          warnLog(`❌ processLoginFlow: 書き込み完了検証でエラー (試行${verificationAttempts}/${maxVerificationAttempts}):`, verifyError.message);
+        }
+      }
+      
+      if (!writeVerificationSuccess) {
+        warnLog('🚨 processLoginFlow: 書き込み完了検証が最終的に失敗しました:', {
+          userId: newUser.userId,
+          attempts: verificationAttempts,
+          warning: 'データベース同期に遅延がある可能性があります'
+        });
+      }
+
       debugLog('processLoginFlow: New user creation completed:', newUser.userId);
 
       // 3e. 新規ユーザー作成の完了を記録（管理パネルアクセス時の参考用）
       try {
-        const userProperties = PropertiesService.getUserProperties();
-        userProperties.setProperty('lastCreatedUserId', newUser.userId);
-        userProperties.setProperty('lastCreatedUserTime', Date.now().toString());
-        debugLog('✅ processLoginFlow: 新規ユーザー作成情報を記録しました');
+        const createdTime = Date.now().toString();
+        const userEmail = newUser.adminEmail;
+        
+        // UserPropertiesとScriptPropertiesの両方に記録（フォールバック対応）
+        const userProps = PropertiesService.getUserProperties();
+        const scriptProps = PropertiesService.getScriptProperties();
+        
+        // UserPropertiesに記録
+        userProps.setProperties({
+          'lastCreatedUserId': newUser.userId,
+          'lastCreatedUserTime': createdTime,
+          'lastCreatedUserEmail': userEmail
+        });
+        
+        // ScriptPropertiesにも記録（フォールバック用）
+        const scriptKey = `newUser_${userEmail}_${newUser.userId}`;
+        scriptProps.setProperty(scriptKey, JSON.stringify({
+          userId: newUser.userId,
+          email: userEmail,
+          createdTime: createdTime,
+          timestamp: new Date().toISOString()
+        }));
+        
+        // 古い記録をクリーンアップ（1時間以上前の記録）
+        try {
+          const allScriptProps = scriptProps.getProperties();
+          const oneHourAgo = Date.now() - (60 * 60 * 1000);
+          
+          Object.keys(allScriptProps).forEach(key => {
+            if (key.startsWith('newUser_')) {
+              try {
+                const data = JSON.parse(allScriptProps[key]);
+                if (parseInt(data.createdTime) < oneHourAgo) {
+                  scriptProps.deleteProperty(key);
+                }
+              } catch (e) {
+                // 無効なデータは削除
+                scriptProps.deleteProperty(key);
+              }
+            }
+          });
+        } catch (cleanupError) {
+          warnLog('processLoginFlow: クリーンアップでエラー:', cleanupError.message);
+        }
+        
+        infoLog('✅ processLoginFlow: 新規ユーザー作成情報を記録しました', {
+          userId: newUser.userId,
+          email: userEmail,
+          userProps: 'success',
+          scriptProps: 'success'
+        });
       } catch (propError) {
-        warnLog('⚠️ processLoginFlow: ユーザープロパティ記録でエラー:', propError.message);
+        errorLog('🚨 processLoginFlow: ユーザープロパティ記録でエラー:', propError.message);
       }
 
       // 3f. 新規ユーザーの管理パネルへリダイレクト
