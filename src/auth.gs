@@ -142,7 +142,7 @@ function verifyAdminAccess(userId) {
 
     // データベースから指定されたIDのユーザー情報を取得
     // セキュリティ認証では最新データが必要だが、過度なキャッシュクリアを避ける
-    debugLog('verifyAdminAccess: ユーザー検索開始 - userId:', userId, 'activeUserEmail:', activeUserEmail);
+    debugLog('verifyAdminAccess: ユーザー検索開始 - userId:', userId);
 
     // 複数段階でのユーザー情報取得（最新データ確保のため）
     var userFromDb = null;
@@ -164,7 +164,7 @@ function verifyAdminAccess(userId) {
     if (!userFromDb || !userFromDb.adminEmail) {
       debugLog('verifyAdminAccess: 直接データベース検索にフォールバック');
       try {
-        userFromDb = fetchUserFromDatabase('userId', userId, { clearCache: true });
+        userFromDb = fetchUserFromDatabase('userId', userId);
         searchAttempts.push({ method: 'fetchUserFromDatabase', success: !!userFromDb });
       } catch (error) {
         errorLog('verifyAdminAccess: fetchUserFromDatabase でエラー:', error.message);
@@ -174,13 +174,13 @@ function verifyAdminAccess(userId) {
 
     // 第3段階: findUserById による追加検証
     if (!userFromDb) {
-      debugLog('verifyAdminAccess: findUserByIdFresh による最終検証を実行');
+      debugLog('verifyAdminAccess: findUserById による最終検証を実行');
       try {
-        userFromDb = findUserByIdFresh(userId);
-        searchAttempts.push({ method: 'findUserByIdFresh', success: !!userFromDb });
+        userFromDb = findUserById(userId, { useExecutionCache: false, forceRefresh: true });
+        searchAttempts.push({ method: 'findUserById', success: !!userFromDb });
       } catch (error) {
-        errorLog('verifyAdminAccess: findUserByIdFresh でエラー:', error.message);
-        searchAttempts.push({ method: 'findUserByIdFresh', error: error.message });
+        errorLog('verifyAdminAccess: findUserById でエラー:', error.message);
+        searchAttempts.push({ method: 'findUserById', error: error.message });
       }
     }
 
@@ -351,8 +351,8 @@ function processLoginFlow(userEmail) {
       if (!waitForUserRecord(newUser.userId, 5000, 300)) { // 5秒間待機、300ms間隔でリトライ
         warnLog('processLoginFlow: ユーザーレコード検証でタイムアウト:', newUser.userId);
         
-        // 追加検証: キャッシュをバイパスして直接データベースから取得を試行
-        const verifyUser = findUserByIdFresh(newUser.userId);
+        // 追加検証: 直接データベースから取得を試行
+        const verifyUser = findUserById(newUser.userId, { useExecutionCache: false, forceRefresh: true });
         if (!verifyUser) {
           errorLog('processLoginFlow: 🚨 ユーザー作成後の検証に失敗 - ユーザーがデータベースに見つかりません:', newUser.userId);
           throw new Error('ユーザー登録の処理中にエラーが発生しました。しばらく待ってから再度お試しください。');
