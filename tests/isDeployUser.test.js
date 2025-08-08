@@ -2,7 +2,8 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('isDeployUser uses ADMIN_EMAIL property', () => {
-  const code = fs.readFileSync('src/Core.gs', 'utf8');
+  const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
+  const commonUtilitiesCode = fs.readFileSync('src/commonUtilities.gs', 'utf8');
   let context;
   beforeEach(() => {
     const scriptProps = { getProperty: jest.fn((key) => {
@@ -14,10 +15,16 @@ describe('isDeployUser uses ADMIN_EMAIL property', () => {
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
       SCRIPT_PROPS_KEYS: { ADMIN_EMAIL: 'ADMIN_EMAIL' },
       Utilities: { getUuid: () => 'test-uuid-' + Math.random() },
-      console
+      console,
+      // Add missing logging functions
+      errorLog: () => {},
+      debugLog: () => {},
+      infoLog: () => {},
+      warnLog: () => {}
     };
     vm.createContext(context);
-    vm.runInContext(code, context);
+    vm.runInContext(commonUtilitiesCode, context);
+    vm.runInContext(coreCode, context);
   });
 
   test('returns true when email matches property', () => {

@@ -4,12 +4,16 @@ const vm = require('vm');
 describe('Core.gs utilities', () => {
   const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
+  const commonUtilitiesCode = fs.readFileSync('src/commonUtilities.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
     const store = {};
     context = { 
       debugLog: () => {}, 
+      errorLog: () => {},
+      infoLog: () => {},
+      warnLog: () => {},
       console, 
       PropertiesService: {
         getScriptProperties: () => ({
@@ -64,6 +68,7 @@ describe('Core.gs utilities', () => {
     vm.createContext(context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
+    vm.runInContext(commonUtilitiesCode, context);
     vm.runInContext(coreCode, context);
   });
 
