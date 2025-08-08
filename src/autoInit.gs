@@ -7,7 +7,7 @@
  * システムの自動初期化（WebApp起動時やトリガー実行時に呼び出される）
  * この関数は、doGet, doPost, またはタイマートリガーから呼び出されることを想定
  */
-async function autoInitializeSystem() {
+function autoInitializeSystem() {
   // 既に初期化済みの場合はスキップ
   if (typeof systemIntegrationManager !== 'undefined' && 
       systemIntegrationManager.initialized) {
@@ -23,7 +23,7 @@ async function autoInitializeSystem() {
     infoLog('🔄 自動システム初期化開始');
     
     // 統合システムの初期化実行
-    const initResult = await initializeOptimizedSystem({
+    const initResult = initializeOptimizedSystem({
       enablePeriodicHealthCheck: true,
       logLevel: 'INFO'
     });
@@ -36,7 +36,7 @@ async function autoInitializeSystem() {
       });
 
       // 初期化完了後の追加設定
-      await performPostInitializationTasks();
+      performPostInitializationTasks();
 
       return {
         success: true,
@@ -66,21 +66,21 @@ async function autoInitializeSystem() {
  * 初期化完了後の追加タスク
  * @private
  */
-async function performPostInitializationTasks() {
+function performPostInitializationTasks() {
   try {
     // 1. 初期セキュリティ監査の実行
     if (typeof performComprehensiveSecurityHealthCheck !== 'undefined') {
-      const securityCheck = await performComprehensiveSecurityHealthCheck();
+      const securityCheck = performComprehensiveSecurityHealthCheck();
       if (securityCheck.overallStatus === 'CRITICAL') {
         errorLog('🚨 初期セキュリティチェックで重要な問題を検出', securityCheck);
       }
     }
 
     // 2. キャッシュのウォームアップ
-    await warmupSystemCaches();
+    warmupSystemCaches();
 
     // 3. システム統計の初期設定
-    await updateSystemMetrics();
+    updateSystemMetrics();
 
     infoLog('✅ 初期化後タスク完了');
 
@@ -93,18 +93,18 @@ async function performPostInitializationTasks() {
  * システムキャッシュのウォームアップ
  * @private
  */
-async function warmupSystemCaches() {
+function warmupSystemCaches() {
   try {
     debugLog('🔥 システムキャッシュウォームアップ開始');
 
     // 重要な設定情報のプリロード
     if (typeof getSecureDatabaseId !== 'undefined') {
-      await getSecureDatabaseId();
+      getSecureDatabaseId();
       debugLog('📊 データベースID キャッシュ済み');
     }
 
     if (typeof getServiceAccountTokenCached !== 'undefined') {
-      await getServiceAccountTokenCached();
+      getServiceAccountTokenCached();
       debugLog('🔐 サービスアカウントトークン キャッシュ済み');
     }
 
@@ -120,10 +120,10 @@ async function warmupSystemCaches() {
  * @param {object} request - HTTPリクエストオブジェクト
  * @returns {Promise<void>}
  */
-async function ensureSystemInitializedForWebApp(request) {
+function ensureSystemInitializedForWebApp(request) {
   try {
     // システム初期化の確認・実行
-    const initResult = await autoInitializeSystem();
+    const initResult = autoInitializeSystem();
     
     if (!initResult.success) {
       warnLog('WebApp初期化警告:', initResult.message);
@@ -143,18 +143,18 @@ async function ensureSystemInitializedForWebApp(request) {
 /**
  * 定期メンテナンス実行（時間ベーストリガーから呼び出し）
  */
-async function performPeriodicMaintenance() {
+function performPeriodicMaintenance() {
   try {
     infoLog('🔧 定期メンテナンス開始');
 
     // 1. システム診断実行
     let diagnostics = null;
     if (typeof diagnoseOptimizedSystem !== 'undefined') {
-      diagnostics = await diagnoseOptimizedSystem();
+      diagnostics = diagnoseOptimizedSystem();
     }
 
     // 2. キャッシュクリーンアップ
-    await performCacheCleanup();
+    performCacheCleanup();
 
     // 3. メトリクス集計とログ出力
     if (typeof systemIntegrationManager !== 'undefined') {
@@ -167,7 +167,7 @@ async function performPeriodicMaintenance() {
     }
 
     // 4. 古いログの削除（必要に応じて）
-    await cleanupOldLogs();
+    cleanupOldLogs();
 
     infoLog('✅ 定期メンテナンス完了', {
       diagnosticsStatus: diagnostics?.healthCheck?.overallStatus || 'UNKNOWN'
@@ -182,7 +182,7 @@ async function performPeriodicMaintenance() {
  * キャッシュクリーンアップ
  * @private
  */
-async function performCacheCleanup() {
+function performCacheCleanup() {
   try {
     debugLog('🧹 キャッシュクリーンアップ開始');
 
@@ -207,7 +207,7 @@ async function performCacheCleanup() {
  * 古いログファイルのクリーンアップ
  * @private
  */
-async function cleanupOldLogs() {
+function cleanupOldLogs() {
   try {
     // 監査ログのサイズ制限
     if (typeof unifiedSecretManager !== 'undefined') {
@@ -227,13 +227,13 @@ async function cleanupOldLogs() {
  * 緊急時のシステムリセット
  * 重大な問題が発生した際の最終手段
  */
-async function emergencySystemReset() {
+function emergencySystemReset() {
   try {
     warnLog('🆘 緊急システムリセット開始');
 
     // 1. 現在のシステムをシャットダウン
     if (typeof systemIntegrationManager !== 'undefined') {
-      await systemIntegrationManager.shutdown();
+      systemIntegrationManager.shutdown();
     }
 
     // 2. キャッシュを全クリア
@@ -254,7 +254,7 @@ async function emergencySystemReset() {
     }
 
     // 3. システムを再初期化
-    const reinitResult = await autoInitializeSystem();
+    const reinitResult = autoInitializeSystem();
 
     if (reinitResult.success) {
       infoLog('✅ 緊急システムリセット完了');

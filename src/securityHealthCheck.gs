@@ -7,7 +7,7 @@
  * 統合セキュリティヘルスチェック実行
  * @returns {Promise<object>} 包括的なヘルスチェック結果
  */
-async function performComprehensiveSecurityHealthCheck() {
+function performComprehensiveSecurityHealthCheck() {
   const startTime = Date.now();
   
   const healthCheckResult = {
@@ -25,7 +25,7 @@ async function performComprehensiveSecurityHealthCheck() {
 
     // 1. 統一秘密情報管理システム
     try {
-      const secretManagerHealth = await unifiedSecretManager.performHealthCheck();
+      const secretManagerHealth = unifiedSecretManager.performHealthCheck();
       healthCheckResult.components.secretManager = secretManagerHealth;
       
       if (secretManagerHealth.issues.length > 0) {
@@ -41,7 +41,7 @@ async function performComprehensiveSecurityHealthCheck() {
 
     // 2. マルチテナントセキュリティ
     try {
-      const multiTenantHealth = await performMultiTenantHealthCheck();
+      const multiTenantHealth = performMultiTenantHealthCheck();
       healthCheckResult.components.multiTenantSecurity = multiTenantHealth;
       
       if (multiTenantHealth.issues.length > 0) {
@@ -57,7 +57,7 @@ async function performComprehensiveSecurityHealthCheck() {
 
     // 3. 統一バッチ処理システム
     try {
-      const batchProcessorHealth = await performUnifiedBatchHealthCheck();
+      const batchProcessorHealth = performUnifiedBatchHealthCheck();
       healthCheckResult.components.batchProcessor = batchProcessorHealth;
       
       if (batchProcessorHealth.issues.length > 0) {
@@ -98,7 +98,7 @@ async function performComprehensiveSecurityHealthCheck() {
 
     // 5. 認証システム
     try {
-      const authHealth = await checkAuthenticationHealth();
+      const authHealth = checkAuthenticationHealth();
       healthCheckResult.components.authentication = authHealth;
       
       if (!authHealth.serviceAccountValid) {
@@ -114,7 +114,7 @@ async function performComprehensiveSecurityHealthCheck() {
 
     // 6. データベース接続性
     try {
-      const dbHealth = await checkDatabaseHealth();
+      const dbHealth = checkDatabaseHealth();
       healthCheckResult.components.database = dbHealth;
       
       if (!dbHealth.accessible) {
@@ -168,7 +168,7 @@ async function performComprehensiveSecurityHealthCheck() {
  * 認証システムのヘルスチェック
  * @private
  */
-async function checkAuthenticationHealth() {
+function checkAuthenticationHealth() {
   const authHealth = {
     status: 'UNKNOWN',
     serviceAccountValid: false,
@@ -179,7 +179,7 @@ async function checkAuthenticationHealth() {
 
   try {
     // サービスアカウント認証情報の検証
-    const serviceAccountCreds = await getSecureServiceAccountCreds();
+    const serviceAccountCreds = getSecureServiceAccountCreds();
     if (serviceAccountCreds && serviceAccountCreds.client_email && serviceAccountCreds.private_key) {
       authHealth.serviceAccountValid = true;
     } else {
@@ -188,7 +188,7 @@ async function checkAuthenticationHealth() {
 
     // トークン生成テスト
     try {
-      const testToken = await getServiceAccountTokenCached();
+      const testToken = getServiceAccountTokenCached();
       if (testToken && testToken.length > 0) {
         authHealth.tokenGenerationWorking = true;
         authHealth.lastTokenGeneration = new Date().toISOString();
@@ -211,7 +211,7 @@ async function checkAuthenticationHealth() {
  * データベース接続性のヘルスチェック
  * @private
  */
-async function checkDatabaseHealth() {
+function checkDatabaseHealth() {
   const dbHealth = {
     status: 'UNKNOWN',
     accessible: false,
@@ -223,7 +223,7 @@ async function checkDatabaseHealth() {
 
   try {
     // データベースID取得
-    const dbId = await getSecureDatabaseId();
+    const dbId = getSecureDatabaseId();
     if (dbId) {
       dbHealth.databaseId = dbId.substring(0, 10) + '...';
     } else {
@@ -239,9 +239,9 @@ async function checkDatabaseHealth() {
         dbHealth.sheetsServiceWorking = true;
 
         // 軽量なデータベースアクセステスト
-        const testResponse = await resilientExecutor.execute(
+        const testResponse = resilientExecutor.execute(
           async () => {
-            return await resilientUrlFetch(
+            return resilientUrlFetch(
               `${service.baseUrl}/${encodeURIComponent(dbId)}`,
               {
                 method: 'GET',
@@ -355,9 +355,9 @@ function scheduleSecurityHealthCheck(intervalMinutes = 60) {
 /**
  * 定期実行される関数（トリガーから呼び出し）
  */
-async function runScheduledSecurityHealthCheck() {
+function runScheduledSecurityHealthCheck() {
   try {
-    const healthResult = await performComprehensiveSecurityHealthCheck();
+    const healthResult = performComprehensiveSecurityHealthCheck();
     
     // 重要な問題がある場合は管理者に通知
     if (healthResult.overallStatus === 'CRITICAL') {

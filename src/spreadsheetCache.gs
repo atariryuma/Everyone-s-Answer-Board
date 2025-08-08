@@ -21,7 +21,7 @@ const SPREADSHEET_CACHE_CONFIG = {
  * @param {boolean} forceRefresh - 強制リフレッシュフラグ
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Spreadsheetオブジェクト
  */
-async function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
+function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   if (!spreadsheetId || typeof spreadsheetId !== 'string') {
     throw new Error('有効なスプレッドシートIDが必要です');
   }
@@ -33,7 +33,7 @@ async function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   if (forceRefresh) {
     delete spreadsheetMemoryCache[spreadsheetId];
     try {
-      await resilientCacheOperation(
+      resilientCacheOperation(
         () => PropertiesService.getScriptProperties().deleteProperty(cacheKey),
         'PropertiesService.deleteProperty'
       );
@@ -51,7 +51,7 @@ async function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
 
   // Phase 2: セッションキャッシュをチェック
   try {
-    const sessionCacheData = await resilientCacheOperation(
+    const sessionCacheData = resilientCacheOperation(
       () => PropertiesService.getScriptProperties().getProperty(cacheKey),
       'PropertiesService.getProperty'
     );
@@ -59,7 +59,7 @@ async function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
       const sessionEntry = JSON.parse(sessionCacheData);
       if ((now - sessionEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL) {
         // セッションキャッシュからSpreadsheetオブジェクトを再構築
-        const spreadsheet = await resilientSpreadsheetOperation(
+        const spreadsheet = resilientSpreadsheetOperation(
           () => SpreadsheetApp.openById(spreadsheetId),
           'SpreadsheetApp.openById'
         );

@@ -5,6 +5,7 @@ describe('getDataCount reflects new rows', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const spreadsheetCacheCode = fs.readFileSync('src/spreadsheetCache.gs', 'utf8');
+  const debugConfigCode = fs.readFileSync('src/debugConfig.gs', 'utf8');
   let context;
   let sheetData;
 
@@ -51,6 +52,7 @@ describe('getDataCount reflects new rows', () => {
       COLUMN_HEADERS: { CLASS: 'クラス' },
     };
     vm.createContext(context);
+    vm.runInContext(debugConfigCode, context);
     vm.runInContext(spreadsheetCacheCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(coreCode, context);

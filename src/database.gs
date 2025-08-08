@@ -47,7 +47,7 @@ const DELETE_LOG_SHEET_CONFIG = {
  * @param {string} reason - 削除理由
  * @param {string} deleteType - 削除タイプ ("self" | "admin")
  */
-async function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
+function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
   const transactionLog = {
     startTime: Date.now(),
     steps: [],
@@ -61,8 +61,8 @@ async function logAccountDeletion(executorEmail, targetUserId, targetEmail, reas
       throw new Error('必須パラメータが不足しています');
     }
 
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
 
     if (!dbId) {
       warnLog('削除ログの記録をスキップします: データベースIDが設定されていません');
@@ -140,7 +140,7 @@ async function logAccountDeletion(executorEmail, targetUserId, targetEmail, reas
 
         // 検証: 追加されたログエントリの確認
         Utilities.sleep(100); // 書き込み完了待機
-        const verificationData = await batchGetSheetsData(service, dbId, [`'${logSheetName}'!A:F`]);
+        const verificationData = batchGetSheetsData(service, dbId, [`'${logSheetName}'!A:F`]);
         const lastRow = verificationData.valueRanges[0].values?.slice(-1)[0];
 
         if (!lastRow || lastRow[1] !== executorEmail || lastRow[2] !== targetUserId) {
@@ -197,15 +197,15 @@ async function logAccountDeletion(executorEmail, targetUserId, targetEmail, reas
 /**
  * 全ユーザー一覧を取得（管理者用）
  */
-async function getAllUsersForAdmin() {
+function getAllUsersForAdmin() {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
       throw new Error('この機能にアクセスする権限がありません。');
     }
 
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
 
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
@@ -214,7 +214,7 @@ async function getAllUsersForAdmin() {
     const service = getSheetsServiceCached();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-    const data = await batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    const data =  batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
     const values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
@@ -262,7 +262,7 @@ async function getAllUsersForAdmin() {
  * @param {string} targetUserId - 削除対象のユーザーID
  * @param {string} reason - 削除理由
  */
-async function deleteUserAccountByAdmin(targetUserId, reason) {
+function deleteUserAccountByAdmin(targetUserId, reason) {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
@@ -319,8 +319,8 @@ async function deleteUserAccountByAdmin(targetUserId, reason) {
     // 統一ロック管理でデータベース削除実行
     return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccountByAdmin', () => {
       // データベースからユーザー行を削除
-      const props = await getResilientScriptProperties();
-      const dbId = await getSecureDatabaseId();
+      const props =  getResilientScriptProperties();
+      const dbId =  getSecureDatabaseId();
 
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
@@ -340,7 +340,7 @@ async function deleteUserAccountByAdmin(targetUserId, reason) {
       }
 
       // データを取得してユーザー行を特定
-      const data = await batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+      const data =  batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
       const values = data.valueRanges[0].values || [];
 
       let rowToDelete = -1;
@@ -406,7 +406,7 @@ async function deleteUserAccountByAdmin(targetUserId, reason) {
  * 削除権限チェック
  * @param {string} targetUserId - 対象ユーザーID
  */
-async function canDeleteUser(targetUserId) {
+function canDeleteUser(targetUserId) {
   try {
     const currentUserEmail = Session.getActiveUser().getEmail();
     const targetUser = findUserById(targetUserId);
@@ -426,15 +426,15 @@ async function canDeleteUser(targetUserId) {
 /**
  * 削除ログ一覧を取得（管理者用）
  */
-async function getDeletionLogs() {
+function getDeletionLogs() {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
       throw new Error('この機能にアクセスする権限がありません。');
     }
 
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
 
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
@@ -728,7 +728,7 @@ function fetchUserFromDatabase(field, value, options = {}) {
         ': ' + field + '=' + value);
 
       var props = PropertiesService.getScriptProperties();
-      var dbId = await getSecureDatabaseId();
+      var dbId =  getSecureDatabaseId();
 
       if (!dbId) {
         var configError = new Error('データベースIDが設定されていません');
@@ -1009,8 +1009,8 @@ function updateUser(userId, updateData) {
       });
     }
     
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
 
     if (!dbId) {
       throw new Error('データ更新エラー: データベースIDが設定されていません');
@@ -1020,7 +1020,7 @@ function updateUser(userId, updateData) {
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
     // 現在のデータを取得
-    const data = await batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    const data =  batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
 
     if (values.length === 0) {
@@ -1170,8 +1170,8 @@ function createUser(userData) {
       throw new Error('このメールアドレスは既に登録されています。');
     }
 
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
     const service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
@@ -1340,7 +1340,7 @@ function createSheetsService(accessToken) {
           var url = 'https://sheets.googleapis.com/v4/spreadsheets/' +
                    options.spreadsheetId + '/values/' + encodeURIComponent(options.range);
 
-          var response = await resilientUrlFetch(url, {
+          var response =  resilientUrlFetch(url, {
             headers: { 'Authorization': 'Bearer ' + accessToken },
             muteHttpExceptions: true,
             followRedirects: true,
@@ -1360,7 +1360,7 @@ function createSheetsService(accessToken) {
           url += '?fields=' + encodeURIComponent(options.fields);
         }
 
-        var response = await resilientUrlFetch(url, {
+        var response =  resilientUrlFetch(url, {
           headers: { 'Authorization': 'Bearer ' + accessToken },
           muteHttpExceptions: true,
           followRedirects: true,
@@ -1384,7 +1384,7 @@ function createSheetsService(accessToken) {
  * @param {string[]} ranges - 取得範囲の配列
  * @returns {object} レスポンス
  */
-async function batchGetSheetsData(service, spreadsheetId, ranges) {
+function batchGetSheetsData(service, spreadsheetId, ranges) {
   debugLog('DEBUG: batchGetSheetsData - 統一バッチ処理システムを使用');
 
   // 型安全性とバリデーション強化: 入力パラメータ検証
@@ -1427,7 +1427,7 @@ async function batchGetSheetsData(service, spreadsheetId, ranges) {
   }
 
   // 統一バッチ処理システムを使用
-  return await unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, {
+  return  unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, {
     useCache: true,
     ttl: 120, // 2分間キャッシュ（API制限対策）
     valueRenderOption: 'UNFORMATTED_VALUE',
@@ -1442,9 +1442,9 @@ async function batchGetSheetsData(service, spreadsheetId, ranges) {
  * @param {object[]} requests - 更新リクエストの配列
  * @returns {object} レスポンス
  */
-async function batchUpdateSheetsData(service, spreadsheetId, requests) {
+function batchUpdateSheetsData(service, spreadsheetId, requests) {
   // 統一バッチ処理システムを使用
-  return await unifiedBatchProcessor.batchUpdate(service, spreadsheetId, requests, {
+  return  unifiedBatchProcessor.batchUpdate(service, spreadsheetId, requests, {
     valueInputOption: 'RAW',
     includeValuesInResponse: false,
     invalidateCache: true
@@ -1459,14 +1459,14 @@ async function batchUpdateSheetsData(service, spreadsheetId, requests) {
  * @param {array} values - 値の配列
  * @returns {object} レスポンス
  */
-async function appendSheetsData(service, spreadsheetId, range, values) {
+function appendSheetsData(service, spreadsheetId, range, values) {
   // 回復力のある実行でappend操作を実行
-  return await resilientExecutor.execute(
+  return  resilientExecutor.execute(
     async () => {
       const url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) +
         ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
 
-      const response = await resilientUrlFetch(url, {
+      const response =  resilientUrlFetch(url, {
         method: 'post',
         contentType: 'application/json',
         headers: { 'Authorization': 'Bearer ' + service.accessToken },
@@ -1599,12 +1599,12 @@ function getSpreadsheetsData(service, spreadsheetId) {
  */
 function getAllUsers() {
   try {
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
     const service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-    const data = await batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    const data =  batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
@@ -1662,10 +1662,10 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  * @param {object} requestBody - リクエストボディ
  * @returns {object} レスポンス
  */
-async function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
+function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
   // 統一バッチ処理システムを使用
   const requests = requestBody.requests || [];
-  return await unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
+  return  unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
     includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse || false,
     responseRanges: requestBody.responseRanges || [],
     invalidateCache: true
@@ -1681,8 +1681,8 @@ function diagnoseDatabase(targetUserId) {
   try {
     debugLog('🔍 データベース診断開始:', targetUserId || 'ALL_USERS');
 
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
 
     var diagnosticResult = {
       timestamp: new Date().toISOString(),
@@ -1908,7 +1908,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
 
     // 1. データベーススプレッドシートの権限確認
     var props = PropertiesService.getScriptProperties();
-    var dbId = spreadsheetId || await getSecureDatabaseId();
+    var dbId = spreadsheetId ||  getSecureDatabaseId();
 
     if (!dbId) {
       result.summary.issues.push('データベースIDが設定されていません');
@@ -2161,8 +2161,8 @@ function performDataIntegrityCheck(options = {}) {
     };
 
     // データベース接続確認
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
     if (!dbId) {
       result.summary.issues.push('データベースIDが設定されていません');
       result.summary.status = 'critical';
@@ -2473,8 +2473,8 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
  */
 function getDbSheet() {
   try {
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
     }
@@ -2731,8 +2731,8 @@ function performPerformanceCheck() {
   try {
     // データベースアクセス速度テスト
     var dbTestStart = Date.now();
-    const props = await getResilientScriptProperties();
-    const dbId = await getSecureDatabaseId();
+    const props =  getResilientScriptProperties();
+    const dbId =  getSecureDatabaseId();
 
     if (dbId) {
       const service = getSheetsServiceCached();
@@ -2943,7 +2943,7 @@ function deleteUserAccount(userId) {
     return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccount', () => {
       // データベース（シート）からユーザー行を削除（サービスアカウント経由）
       var props = PropertiesService.getScriptProperties();
-      var dbId = await getSecureDatabaseId();
+      var dbId =  getSecureDatabaseId();
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
       }
@@ -2973,7 +2973,7 @@ function deleteUserAccount(userId) {
       debugLog('Found database sheet with sheetId:', targetSheetId);
 
       // データを取得
-      const data = await batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+      const data =  batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
       const values = data.valueRanges[0].values || [];
 
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）

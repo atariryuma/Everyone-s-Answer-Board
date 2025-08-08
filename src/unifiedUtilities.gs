@@ -225,7 +225,7 @@ class UnifiedAPIClient {
       try {
         debugLog(`🌐 統一API: ${method} ${url} (試行 ${attempt + 1}/${retries + 1})`);
 
-        const response = await resilientUrlFetch(url, requestConfig);
+        const response = resilientUrlFetch(url, requestConfig);
         const statusCode = response.getResponseCode();
 
         // 成功時

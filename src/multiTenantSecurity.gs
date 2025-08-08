@@ -34,7 +34,7 @@ class MultiTenantSecurityManager {
     }
 
     // 管理者権限チェック（必要に応じて実装）
-    const hasAdminAccess = await this.checkAdminAccess(requestUserId, targetUserId, operation);
+    const hasAdminAccess = this.checkAdminAccess(requestUserId, targetUserId, operation);
     if (hasAdminAccess) {
       this.logDataAccess('ADMIN_ACCESS_GRANTED', { requestUserId, targetUserId, operation });
       return true;
@@ -185,7 +185,7 @@ class MultiTenantSecurityManager {
     warnLog('🚨 重大なセキュリティ違反が発生しました', logEntry);
     
     // フューチャー実装: 通知システムとの連携
-    // await this.sendSecurityAlert(logEntry);
+    // this.sendSecurityAlert(logEntry);
   }
 
   /**
@@ -216,15 +216,15 @@ const multiTenantSecurity = new MultiTenantSecurityManager();
  * @param {object} options - オプション
  * @returns {any} 結果
  */
-async function secureMultiTenantCacheOperation(operation, baseKey, userId, value = null, options = {}) {
+function secureMultiTenantCacheOperation(operation, baseKey, userId, value = null, options = {}) {
   // テナント境界検証
   const currentUserId = Session.getActiveUser().getEmail(); // 簡易実装
-  if (!await multiTenantSecurity.validateTenantBoundary(currentUserId, userId, `cache_${operation}`)) {
+  if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, `cache_${operation}`)) {
     throw new Error(`SECURITY_ERROR: テナント境界違反 - ${operation} operation denied`);
   }
 
   // データアクセスパターン検証
-  if (!await multiTenantSecurity.validateDataAccessPattern(userId, 'user_cache', operation)) {
+  if (!multiTenantSecurity.validateDataAccessPattern(userId, 'user_cache', operation)) {
     throw new Error(`SECURITY_ERROR: 不正なデータアクセスパターン - ${operation} denied`);
   }
 
@@ -235,7 +235,7 @@ async function secureMultiTenantCacheOperation(operation, baseKey, userId, value
   try {
     switch (operation) {
       case 'get':
-        return await resilientCacheOperation(
+        return resilientCacheOperation(
           () => CacheService.getUserCache().get(secureKey),
           `SecureCache_Get_${baseKey}`,
           () => null // フォールバック
@@ -243,13 +243,13 @@ async function secureMultiTenantCacheOperation(operation, baseKey, userId, value
 
       case 'set':
         const ttl = options.ttl || 300; // 5分デフォルト
-        return await resilientCacheOperation(
+        return resilientCacheOperation(
           () => CacheService.getUserCache().put(secureKey, JSON.stringify(value), ttl),
           `SecureCache_Set_${baseKey}`
         );
 
       case 'delete':
-        return await resilientCacheOperation(
+        return resilientCacheOperation(
           () => CacheService.getUserCache().remove(secureKey),
           `SecureCache_Delete_${baseKey}`
         );
@@ -274,16 +274,16 @@ async function secureMultiTenantCacheOperation(operation, baseKey, userId, value
  * @param {object} options - オプション
  * @returns {object|null} ユーザー情報
  */
-async function getSecureUserInfo(userId, options = {}) {
+function getSecureUserInfo(userId, options = {}) {
   const currentUserId = Session.getActiveUser().getEmail();
   
   // テナント境界検証
-  if (!await multiTenantSecurity.validateTenantBoundary(currentUserId, userId, 'user_info_access')) {
+  if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, 'user_info_access')) {
     throw new Error('SECURITY_ERROR: ユーザー情報アクセス拒否 - テナント境界違反');
   }
 
   // セキュアなキャッシュキーでユーザー情報を取得
-  return await secureMultiTenantCacheOperation('get', 'user_info', userId, null, options);
+  return secureMultiTenantCacheOperation('get', 'user_info', userId, null, options);
 }
 
 /**
@@ -293,22 +293,22 @@ async function getSecureUserInfo(userId, options = {}) {
  * @param {object} options - オプション
  * @returns {any} 設定値
  */
-async function getSecureUserConfig(userId, configKey, options = {}) {
+function getSecureUserConfig(userId, configKey, options = {}) {
   const currentUserId = Session.getActiveUser().getEmail();
   
   // テナント境界検証
-  if (!await multiTenantSecurity.validateTenantBoundary(currentUserId, userId, 'user_config_access')) {
+  if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, 'user_config_access')) {
     throw new Error('SECURITY_ERROR: ユーザー設定アクセス拒否 - テナント境界違反');
   }
 
-  return await secureMultiTenantCacheOperation('get', `config_${configKey}`, userId, null, options);
+  return secureMultiTenantCacheOperation('get', `config_${configKey}`, userId, null, options);
 }
 
 /**
  * マルチテナントセキュリティの健全性チェック
  * @returns {object} 健全性チェック結果
  */
-async function performMultiTenantHealthCheck() {
+function performMultiTenantHealthCheck() {
   const results = {
     timestamp: new Date().toISOString(),
     securityManagerStatus: 'OK',
@@ -329,13 +329,13 @@ async function performMultiTenantHealthCheck() {
     const testUserId1 = 'test_user_1@example.com';
     const testUserId2 = 'test_user_2@example.com';
     
-    const isolation1 = await multiTenantSecurity.validateTenantBoundary(testUserId1, testUserId2, 'test');
+    const isolation1 = multiTenantSecurity.validateTenantBoundary(testUserId1, testUserId2, 'test');
     if (isolation1) {
       results.issues.push('テナント分離テストが失敗 - 異なるテナント間のアクセスが許可されました');
       results.tenantIsolationTest = 'FAILED';
     }
 
-    const isolation2 = await multiTenantSecurity.validateTenantBoundary(testUserId1, testUserId1, 'test');
+    const isolation2 = multiTenantSecurity.validateTenantBoundary(testUserId1, testUserId1, 'test');
     if (!isolation2) {
       results.issues.push('テナント分離テストが失敗 - 同一テナント内のアクセスが拒否されました');
       results.tenantIsolationTest = 'FAILED';

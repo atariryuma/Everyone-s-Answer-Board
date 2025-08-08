@@ -53,7 +53,7 @@ class UnifiedBatchProcessor {
     
     // キャッシュ確認
     if (useCache) {
-      const cached = await secureMultiTenantCacheOperation('get', cacheKey, spreadsheetId);
+      const cached = secureMultiTenantCacheOperation('get', cacheKey, spreadsheetId);
       if (cached) {
         this.updateCacheMetrics(true);
         debugLog(`✅ 統一バッチ処理: キャッシュヒット - batchGet ${spreadsheetId}`);
@@ -62,7 +62,7 @@ class UnifiedBatchProcessor {
     }
 
     // 回復力のあるバッチ取得実行
-    const result = await resilientExecutor.execute(
+    const result = resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
         
@@ -79,10 +79,10 @@ class UnifiedBatchProcessor {
             includeGridData: includeGridData.toString()
           });
 
-          const response = await resilientUrlFetch(`${url}?${params.toString()}`, {
+          const response = resilientUrlFetch(`${url}?${params.toString()}`, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${await getServiceAccountTokenCached()}`
+              'Authorization': `Bearer ${getServiceAccountTokenCached()}`
             }
           });
 
@@ -95,7 +95,7 @@ class UnifiedBatchProcessor {
 
           // チャンク間の遅延
           if (chunkedRanges.length > 1 && chunk !== chunkedRanges[chunkedRanges.length - 1]) {
-            await this.sleep(this.config.chunkDelay);
+            this.sleep(this.config.chunkDelay);
           }
         }
 
@@ -119,7 +119,7 @@ class UnifiedBatchProcessor {
 
     // キャッシュ保存
     if (useCache && result) {
-      await secureMultiTenantCacheOperation('set', cacheKey, spreadsheetId, JSON.stringify(result), { ttl });
+      secureMultiTenantCacheOperation('set', cacheKey, spreadsheetId, JSON.stringify(result), { ttl });
       this.updateCacheMetrics(false);
     }
 
@@ -142,7 +142,7 @@ class UnifiedBatchProcessor {
       invalidateCache = true
     } = options;
 
-    return await resilientExecutor.execute(
+    return resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
 
@@ -159,10 +159,10 @@ class UnifiedBatchProcessor {
           };
 
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}/values:batchUpdate`;
-          const response = await resilientUrlFetch(url, {
+          const response = resilientUrlFetch(url, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${await getServiceAccountTokenCached()}`,
+              'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
               'Content-Type': 'application/json'
             },
             payload: JSON.stringify(requestBody)
@@ -177,7 +177,7 @@ class UnifiedBatchProcessor {
 
           // チャンク間の遅延
           if (chunkedInputs.length > 1 && chunk !== chunkedInputs[chunkedInputs.length - 1]) {
-            await this.sleep(this.config.chunkDelay);
+            this.sleep(this.config.chunkDelay);
           }
         }
 
@@ -187,7 +187,7 @@ class UnifiedBatchProcessor {
 
         // キャッシュ無効化
         if (invalidateCache) {
-          await this.invalidateCacheForSpreadsheet(spreadsheetId);
+          this.invalidateCacheForSpreadsheet(spreadsheetId);
         }
 
         return {
@@ -219,7 +219,7 @@ class UnifiedBatchProcessor {
       invalidateCache = true
     } = options;
 
-    return await resilientExecutor.execute(
+    return resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
 
@@ -235,10 +235,10 @@ class UnifiedBatchProcessor {
           };
 
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}:batchUpdate`;
-          const response = await resilientUrlFetch(url, {
+          const response = resilientUrlFetch(url, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${await getServiceAccountTokenCached()}`,
+              'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
               'Content-Type': 'application/json'
             },
             payload: JSON.stringify(requestBody)
@@ -253,7 +253,7 @@ class UnifiedBatchProcessor {
 
           // チャンク間の遅延
           if (chunkedRequests.length > 1 && chunk !== chunkedRequests[chunkedRequests.length - 1]) {
-            await this.sleep(this.config.chunkDelay);
+            this.sleep(this.config.chunkDelay);
           }
         }
 
@@ -263,7 +263,7 @@ class UnifiedBatchProcessor {
 
         // キャッシュ無効化
         if (invalidateCache) {
-          await this.invalidateCacheForSpreadsheet(spreadsheetId);
+          this.invalidateCacheForSpreadsheet(spreadsheetId);
         }
 
         return {
@@ -289,7 +289,7 @@ class UnifiedBatchProcessor {
   async batchCacheOperation(operation, operations, userId, options = {}) {
     const { concurrency = this.config.concurrencyLimit } = options;
 
-    return await resilientExecutor.execute(
+    return resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
 
@@ -302,11 +302,11 @@ class UnifiedBatchProcessor {
             try {
               switch (operation) {
                 case 'get':
-                  return await secureMultiTenantCacheOperation('get', op.key, userId);
+                  return secureMultiTenantCacheOperation('get', op.key, userId);
                 case 'set':
-                  return await secureMultiTenantCacheOperation('set', op.key, userId, op.value, { ttl: op.ttl });
+                  return secureMultiTenantCacheOperation('set', op.key, userId, op.value, { ttl: op.ttl });
                 case 'delete':
-                  return await secureMultiTenantCacheOperation('delete', op.key, userId);
+                  return secureMultiTenantCacheOperation('delete', op.key, userId);
                 default:
                   throw new Error(`無効なキャッシュ操作: ${operation}`);
               }
@@ -316,12 +316,12 @@ class UnifiedBatchProcessor {
             }
           });
 
-          const chunkResults = await Promise.all(chunkPromises);
+          const chunkResults = Promise.all(chunkPromises);
           allResults = allResults.concat(chunkResults);
 
           // チャンク間の遅延
           if (chunks.length > 1 && chunk !== chunks[chunks.length - 1]) {
-            await this.sleep(this.config.chunkDelay);
+            this.sleep(this.config.chunkDelay);
           }
         }
 
@@ -410,10 +410,10 @@ class UnifiedBatchProcessor {
       for (const range of ranges.slice(0, 10)) { // 最大10個に制限
         try {
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`;
-          const response = await resilientUrlFetch(url, {
+          const response = resilientUrlFetch(url, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${await getServiceAccountTokenCached()}`
+              'Authorization': `Bearer ${getServiceAccountTokenCached()}`
             }
           });
 
@@ -428,7 +428,7 @@ class UnifiedBatchProcessor {
           warnLog(`フォールバック個別取得エラー (${range}):`, error.message);
         }
 
-        await this.sleep(200); // 個別取得間の遅延
+        this.sleep(200); // 個別取得間の遅延
       }
 
       return {
@@ -540,8 +540,8 @@ const unifiedBatchProcessor = new UnifiedBatchProcessor({
  * @param {object} options - オプション
  * @returns {Promise<object>} バッチ取得結果
  */
-async function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
-  return await unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, options);
+function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
+  return unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, options);
 }
 
 /**
@@ -552,8 +552,8 @@ async function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) 
  * @param {object} options - オプション
  * @returns {Promise<object>} バッチ更新結果
  */
-async function batchUpdateSheetsData(service, spreadsheetId, valueInputs, options = {}) {
-  return await unifiedBatchProcessor.batchUpdate(service, spreadsheetId, valueInputs, options);
+function batchUpdateSheetsData(service, spreadsheetId, valueInputs, options = {}) {
+  return unifiedBatchProcessor.batchUpdate(service, spreadsheetId, valueInputs, options);
 }
 
 /**
@@ -564,9 +564,9 @@ async function batchUpdateSheetsData(service, spreadsheetId, valueInputs, option
  * @param {object} options - オプション
  * @returns {Promise<object>} 構造更新結果
  */
-async function batchUpdateSpreadsheet(service, spreadsheetId, requestBody, options = {}) {
+function batchUpdateSpreadsheet(service, spreadsheetId, requestBody, options = {}) {
   const requests = requestBody.requests || [];
-  return await unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
+  return unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
     ...options,
     includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse,
     responseRanges: requestBody.responseRanges
@@ -577,7 +577,7 @@ async function batchUpdateSpreadsheet(service, spreadsheetId, requestBody, optio
  * 統一バッチ処理のヘルスチェック
  * @returns {object} ヘルスチェック結果
  */
-async function performUnifiedBatchHealthCheck() {
+function performUnifiedBatchHealthCheck() {
   const results = {
     timestamp: new Date().toISOString(),
     batchProcessorStatus: 'OK',

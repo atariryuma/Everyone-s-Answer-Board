@@ -58,7 +58,7 @@ class SystemIntegrationManager {
       // 依存関係の順序で各コンポーネントを初期化
       for (const componentName of this.initializationOrder) {
         try {
-          await this.initializeComponent(componentName, options);
+          this.initializeComponent(componentName, options);
           initResult.componentsInitialized.push(componentName);
           infoLog(`✅ ${componentName} 初期化完了`);
         } catch (error) {
@@ -78,7 +78,7 @@ class SystemIntegrationManager {
 
       // 初期ヘルスチェック実行
       try {
-        const healthResult = await this.performInitialHealthCheck();
+        const healthResult = this.performInitialHealthCheck();
         initResult.initialHealthCheck = healthResult;
         
         if (healthResult.overallStatus === 'CRITICAL') {
@@ -127,7 +127,7 @@ class SystemIntegrationManager {
       case 'unifiedSecretManager':
         if (typeof unifiedSecretManager !== 'undefined') {
           // 秘密情報管理の健全性チェック
-          const healthCheck = await unifiedSecretManager.performHealthCheck();
+          const healthCheck = unifiedSecretManager.performHealthCheck();
           if (healthCheck.criticalSecretsStatus === 'ERROR') {
             throw new Error('重要な秘密情報が見つかりません');
           }
@@ -148,7 +148,7 @@ class SystemIntegrationManager {
       case 'multiTenantSecurity':
         if (typeof multiTenantSecurity !== 'undefined') {
           // マルチテナントセキュリティの初期検証
-          const testResult = await multiTenantSecurity.validateTenantBoundary(
+          const testResult = multiTenantSecurity.validateTenantBoundary(
             'test@example.com', 
             'test@example.com', 
             'init_test'
@@ -208,7 +208,7 @@ class SystemIntegrationManager {
     try {
       // セキュリティヘルスチェックが利用可能な場合は実行
       if (typeof performComprehensiveSecurityHealthCheck !== 'undefined') {
-        return await performComprehensiveSecurityHealthCheck();
+        return performComprehensiveSecurityHealthCheck();
       } else {
         // 基本的なヘルスチェック
         return this.performBasicHealthCheck();
@@ -408,14 +408,14 @@ const systemIntegrationManager = new SystemIntegrationManager();
  * @param {object} options - 初期化オプション
  * @returns {Promise<object>} 初期化結果
  */
-async function initializeOptimizedSystem(options = {}) {
-  return await systemIntegrationManager.initializeSystem(options);
+function initializeOptimizedSystem(options = {}) {
+  return systemIntegrationManager.initializeSystem(options);
 }
 
 /**
  * システム統計更新（トリガーから呼び出される関数）
  */
-async function updateSystemMetrics() {
+function updateSystemMetrics() {
   try {
     if (!systemIntegrationManager.initialized) {
       return;
@@ -457,7 +457,7 @@ async function updateSystemMetrics() {
  * 手動でのシステム診断実行
  * @returns {Promise<object>} 診断結果
  */
-async function diagnoseOptimizedSystem() {
+function diagnoseOptimizedSystem() {
   const diagnostics = {
     timestamp: new Date().toISOString(),
     systemStatus: systemIntegrationManager.getSystemStatus(),
@@ -469,7 +469,7 @@ async function diagnoseOptimizedSystem() {
   try {
     // 包括的ヘルスチェック実行
     if (typeof performComprehensiveSecurityHealthCheck !== 'undefined') {
-      diagnostics.healthCheck = await performComprehensiveSecurityHealthCheck();
+      diagnostics.healthCheck = performComprehensiveSecurityHealthCheck();
     }
 
     // 推奨事項の生成

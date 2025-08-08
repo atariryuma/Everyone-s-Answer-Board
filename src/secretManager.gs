@@ -84,7 +84,7 @@ class UnifiedSecretManager {
     // Google Secret Manager から取得を試行
     if (this.config.useSecretManager && this.config.projectId) {
       try {
-        secretValue = await this.getSecretFromManager(secretName, version);
+        secretValue = this.getSecretFromManager(secretName, version);
         if (secretValue) {
           debugLog(`🔐 Secret Manager取得成功: ${secretName}`);
           if (useCache) {
@@ -103,7 +103,7 @@ class UnifiedSecretManager {
     // フォールバック: PropertiesService から取得
     if (fallback) {
       try {
-        secretValue = await this.getSecretFromProperties(secretName);
+        secretValue = this.getSecretFromProperties(secretName);
         if (secretValue) {
           debugLog(`🔐 Properties Service取得成功: ${secretName}`);
           if (useCache) {
@@ -168,7 +168,7 @@ class UnifiedSecretManager {
     // Google Secret Manager に保存を試行
     if (useSecretManager && this.config.projectId) {
       try {
-        await this.setSecretInManager(secretName, secretValue);
+        this.setSecretInManager(secretName, secretValue);
         success = true;
         debugLog(`🔐 Secret Manager保存成功: ${secretName}`);
       } catch (error) {
@@ -183,7 +183,7 @@ class UnifiedSecretManager {
     if (updateProperties) {
       try {
         const valueToStore = encrypt ? this.encryptValue(secretValue) : secretValue;
-        await this.setSecretInProperties(secretName, valueToStore, { encrypted: encrypt });
+        this.setSecretInProperties(secretName, valueToStore, { encrypted: encrypt });
         success = true;
         debugLog(`🔐 Properties Service保存成功: ${secretName}`);
       } catch (error) {
@@ -209,12 +209,12 @@ class UnifiedSecretManager {
     
     try {
       // Google Cloud Secret Manager API 呼び出し
-      const response = await resilientUrlFetch(
+      const response = resilientUrlFetch(
         `https://secretmanager.googleapis.com/v1/${secretPath}:access`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${await getServiceAccountTokenCached()}`,
+            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
             'Content-Type': 'application/json'
           }
         }
@@ -246,12 +246,12 @@ class UnifiedSecretManager {
     
     try {
       // シークレットの存在確認
-      const existsResponse = await resilientUrlFetch(
+      const existsResponse = resilientUrlFetch(
         `${secretsListUrl}/${secretName}`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${await getServiceAccountTokenCached()}`,
+            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
             'Content-Type': 'application/json'
           }
         }
@@ -261,10 +261,10 @@ class UnifiedSecretManager {
 
       // シークレットが存在しない場合は作成
       if (!secretExists) {
-        const createResponse = await resilientUrlFetch(secretsListUrl, {
+        const createResponse = resilientUrlFetch(secretsListUrl, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${await getServiceAccountTokenCached()}`,
+            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
             'Content-Type': 'application/json'
           },
           payload: JSON.stringify({
@@ -281,12 +281,12 @@ class UnifiedSecretManager {
       }
 
       // バージョンを追加
-      const addVersionResponse = await resilientUrlFetch(
+      const addVersionResponse = resilientUrlFetch(
         `${secretsListUrl}/${secretName}:addVersion`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${await getServiceAccountTokenCached()}`,
+            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
             'Content-Type': 'application/json'
           },
           payload: JSON.stringify({
@@ -315,7 +315,7 @@ class UnifiedSecretManager {
    */
   async getSecretFromProperties(secretName) {
     try {
-      const props = await getResilientScriptProperties();
+      const props = getResilientScriptProperties();
       let value = props.getProperty(secretName);
       
       if (!value) {
@@ -340,7 +340,7 @@ class UnifiedSecretManager {
    */
   async setSecretInProperties(secretName, secretValue, options = {}) {
     try {
-      const props = await getResilientScriptProperties();
+      const props = getResilientScriptProperties();
       props.setProperty(secretName, secretValue);
       
       // 暗号化メタデータの保存
@@ -552,12 +552,12 @@ class UnifiedSecretManager {
       // Secret Manager接続テスト
       if (this.config.useSecretManager && this.config.projectId) {
         try {
-          await resilientUrlFetch(
+          resilientUrlFetch(
             `https://secretmanager.googleapis.com/v1/projects/${this.config.projectId}/secrets`,
             {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${await getServiceAccountTokenCached()}`
+                'Authorization': `Bearer ${getServiceAccountTokenCached()}`
               }
             }
           );
@@ -572,7 +572,7 @@ class UnifiedSecretManager {
 
       // Properties Service テスト
       try {
-        const props = await getResilientScriptProperties();
+        const props = getResilientScriptProperties();
         props.getProperty('TEST_KEY'); // 存在しないキーでのテスト
         results.propertiesServiceStatus = 'OK';
       } catch (error) {
@@ -609,7 +609,7 @@ class UnifiedSecretManager {
         for (const secretName of Object.keys(this.criticalSecrets)) {
           criticalCount++;
           try {
-            const value = await this.getSecret(secretName, { auditLog: false });
+            const value = this.getSecret(secretName, { auditLog: false });
             if (value) {
               foundCount++;
             }
@@ -657,8 +657,8 @@ const unifiedSecretManager = new UnifiedSecretManager({
  * 安全なサービスアカウント認証情報取得
  * @returns {Promise<object>} サービスアカウント認証情報
  */
-async function getSecureServiceAccountCreds() {
-  const credsString = await unifiedSecretManager.getSecret('SERVICE_ACCOUNT_CREDS');
+function getSecureServiceAccountCreds() {
+  const credsString = unifiedSecretManager.getSecret('SERVICE_ACCOUNT_CREDS');
   if (!credsString) {
     throw new Error('SECURITY_ERROR: サービスアカウント認証情報が設定されていません');
   }
@@ -678,8 +678,8 @@ async function getSecureServiceAccountCreds() {
  * 安全なデータベースID取得
  * @returns {Promise<string>} データベーススプレッドシートID
  */
-async function getSecureDatabaseId() {
-  return await unifiedSecretManager.getSecret('DATABASE_SPREADSHEET_ID');
+function getSecureDatabaseId() {
+  return unifiedSecretManager.getSecret('DATABASE_SPREADSHEET_ID');
 }
 
 /**
@@ -687,8 +687,8 @@ async function getSecureDatabaseId() {
  * @param {string} key - 秘密情報キー
  * @returns {Promise<string>} 秘密情報の値
  */
-async function getSecureProperty(key) {
-  return await unifiedSecretManager.getSecret(key);
+function getSecureProperty(key) {
+  return unifiedSecretManager.getSecret(key);
 }
 
 /**
@@ -698,6 +698,6 @@ async function getSecureProperty(key) {
  * @param {object} options - オプション
  * @returns {Promise<boolean>} 設定成功フラグ
  */
-async function setSecureProperty(key, value, options = {}) {
-  return await unifiedSecretManager.setSecret(key, value, options);
+function setSecureProperty(key, value, options = {}) {
+  return unifiedSecretManager.setSecret(key, value, options);
 }

@@ -20,7 +20,10 @@ describe('deleteUserAccount cache handling', () => {
         getUserProperties: () => ({ deleteProperty: jest.fn() })
       },
       DB_SHEET_CONFIG: { SHEET_NAME: 'Users', HEADERS: ['userId'] },
-      SCRIPT_PROPS_KEYS: { DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID' }
+      SCRIPT_PROPS_KEYS: { DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID' },
+      getSecureDatabaseId: () => 'db123',
+      getResilientScriptProperties: () => ({ getProperty: () => 'db123' }),
+      resilientExecutor: { execute: (fn) => fn() }
     };
     vm.createContext(context);
     vm.runInContext(dbCode, context);

@@ -226,7 +226,7 @@ class CacheManager {
         const currentUserId = Session.getActiveUser().getEmail();
         const cacheOperations = keys.map(key => ({ key: key }));
         
-        const cachedResults = await unifiedBatchProcessor.batchCacheOperation(
+        const cachedResults = unifiedBatchProcessor.batchCacheOperation(
           'get', 
           cacheOperations, 
           currentUserId,
@@ -252,7 +252,7 @@ class CacheManager {
         }
         
         if (missingKeys.length > 0) {
-          const newValues = await Promise.resolve(valuesFn(missingKeys));
+          const newValues = Promise.resolve(valuesFn(missingKeys));
           const setCacheOps = Object.keys(newValues).map(key => ({
             key: key,
             value: JSON.stringify(newValues[key]),
@@ -264,7 +264,7 @@ class CacheManager {
           }
           
           if (setCacheOps.length > 0) {
-            await unifiedBatchProcessor.batchCacheOperation('set', setCacheOps, currentUserId, { concurrency: 5 });
+            unifiedBatchProcessor.batchCacheOperation('set', setCacheOps, currentUserId, { concurrency: 5 });
           }
         }
         

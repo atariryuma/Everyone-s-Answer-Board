@@ -22,9 +22,9 @@ function getServiceAccountTokenCached() {
  * 新しいJWTトークンを生成
  * @returns {string} アクセストークン
  */
-async function generateNewServiceAccountToken() {
+function generateNewServiceAccountToken() {
   // 統一秘密情報管理システムで安全に取得
-  const serviceAccountCreds = await getSecureServiceAccountCreds();
+  const serviceAccountCreds = getSecureServiceAccountCreds();
   
   const privateKey = serviceAccountCreds.private_key.replace(/\\n/g, '\n'); // 改行文字を正規化
   const clientEmail = serviceAccountCreds.client_email;
@@ -51,7 +51,7 @@ async function generateNewServiceAccountToken() {
   const jwt = signatureInput + '.' + encodedSignature;
 
   // トークンリクエスト
-  const response = await resilientUrlFetch(tokenUrl, {
+  const response = resilientUrlFetch(tokenUrl, {
     method: "post",
     contentType: "application/x-www-form-urlencoded",
     payload: {
@@ -89,9 +89,9 @@ function clearServiceAccountTokenCache() {
  * 設定されているサービスアカウントのメールアドレスを取得
  * @returns {string} サービスアカウントのメールアドレス
  */
-async function getServiceAccountEmail() {
+function getServiceAccountEmail() {
   try {
-    const serviceAccountCreds = await getSecureServiceAccountCreds();
+    const serviceAccountCreds = getSecureServiceAccountCreds();
     return serviceAccountCreds.client_email || 'メールアドレス不明';
   } catch (error) {
     warnLog('サービスアカウントメール取得エラー:', error.message);

@@ -69,7 +69,7 @@ class ResilientExecutor {
       try {
         debugLog(`[ResilientExecutor] Executing ${operationName} (attempt ${attempt + 1}/${this.config.maxRetries + 1})`);
         
-        const result = await this.executeWithTimeout(operation, this.config.timeoutMs);
+        const result = this.executeWithTimeout(operation, this.config.timeoutMs);
         
         // 成功時の回路ブレーカー処理
         this.handleSuccess(operationName);
@@ -94,7 +94,7 @@ class ResilientExecutor {
         if (attempt < this.config.maxRetries) {
           const delay = this.calculateBackoffDelay(attempt);
           debugLog(`[ResilientExecutor] ${operationName} failed (attempt ${attempt + 1}). Retrying in ${delay}ms: ${error.message}`);
-          await this.sleep(delay);
+          this.sleep(delay);
         }
       }
     }
@@ -107,7 +107,7 @@ class ResilientExecutor {
     if (fallback && typeof fallback === 'function') {
       try {
         debugLog(`[ResilientExecutor] Executing fallback for ${operationName}`);
-        return await fallback(lastError);
+        return fallback(lastError);
       } catch (fallbackError) {
         warnLog(`[ResilientExecutor] Fallback failed for ${operationName}: ${fallbackError.message}`);
       }
@@ -270,8 +270,8 @@ const resilientExecutor = new ResilientExecutor({
  * @param {object} options - フェッチオプション
  * @returns {Promise<HTTPResponse>} レスポンス
  */
-async function resilientUrlFetch(url, options = {}) {
-  return await resilientExecutor.execute(
+function resilientUrlFetch(url, options = {}) {
+  return resilientExecutor.execute(
     () => UrlFetchApp.fetch(url, options),
     {
       name: `UrlFetch-${url}`,
@@ -286,8 +286,8 @@ async function resilientUrlFetch(url, options = {}) {
  * @param {string} operationName - 操作名
  * @returns {Promise<any>} 操作結果
  */
-async function resilientSpreadsheetOperation(operation, operationName = 'SpreadsheetOperation') {
-  return await resilientExecutor.execute(operation, {
+function resilientSpreadsheetOperation(operation, operationName = 'SpreadsheetOperation') {
+  return resilientExecutor.execute(operation, {
     name: operationName,
     idempotent: true, // ほとんどのSpreadsheet操作は冪等
   });
@@ -300,8 +300,8 @@ async function resilientSpreadsheetOperation(operation, operationName = 'Spreads
  * @param {function} fallback - フォールバック関数
  * @returns {Promise<any>} 操作結果
  */
-async function resilientCacheOperation(operation, operationName = 'CacheOperation', fallback = null) {
-  return await resilientExecutor.execute(operation, {
+function resilientCacheOperation(operation, operationName = 'CacheOperation', fallback = null) {
+  return resilientExecutor.execute(operation, {
     name: operationName,
     idempotent: true,
     fallback: fallback
