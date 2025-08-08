@@ -55,7 +55,7 @@ function testSetup() {
 
     // データベースへの接続テスト
     try {
-      var userInfo = findUserByEmail(Session.getActiveUser().getEmail());
+      var userInfo = findUserByEmail(getCurrentUserEmail());
       return {
         status: 'success',
         message: 'セットアップは正常に完了しています。システムは使用準備が整いました。',

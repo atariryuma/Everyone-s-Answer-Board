@@ -5850,12 +5850,38 @@ function getInitialData(requestUserId, targetSheetName) {
 
   } catch (error) {
     errorLog('❌ getInitialData error:', error);
+    
+    // エラーレスポンスにも最低限のuserInfo構造を含める
+    let fallbackUserInfo = null;
+    try {
+      const activeUserEmail = getCurrentUserEmail();
+      if (activeUserEmail) {
+        fallbackUserInfo = {
+          userId: requestUserId || 'unknown',
+          adminEmail: activeUserEmail,
+          isActive: false,
+          lastAccessedAt: null,
+          spreadsheetId: '',
+          spreadsheetUrl: '',
+          configJson: '{}'
+        };
+      }
+    } catch (userError) {
+      errorLog('❌ Fallback userInfo creation failed:', userError);
+    }
+    
     return {
       status: 'error',
       message: error.message,
+      userInfo: fallbackUserInfo,
+      setupStep: 1,
+      appUrls: null,
+      activeSheetName: null,
       _meta: {
         apiVersion: 'integrated_v1',
-        error: error.message
+        error: error.message,
+        includedApis: ['error_fallback'],
+        executionTime: 0
       }
     };
   }

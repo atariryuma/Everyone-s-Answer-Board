@@ -877,6 +877,19 @@ function loadStatus(bypassCache = false) {
     return runGasWithUserId('getInitialData', 'システム情報を読み込み中...')
       .then(response => {
         logDebug('✅ Integrated data loaded:', response);
+        
+        // エラーレスポンスの検証
+        if (!response || response.status === 'error') {
+          const errorMsg = response ? response.message : 'サーバーから無効な応答を受信しました';
+          logError('getInitialData returned error:', errorMsg);
+          throw new Error(errorMsg);
+        }
+        
+        // 必須フィールドの検証
+        if (!response.userInfo) {
+          logError('userInfo missing in response:', response);
+          throw new Error('ユーザー情報が取得できませんでした。ページを再読み込みしてください。');
+        }
 
         // Update UI with integrated response
         updateUIWithNewStatus(response);

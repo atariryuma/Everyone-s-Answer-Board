@@ -55,10 +55,10 @@ function validateStatus(status) {
   
   // 重複検証防止: 同じデータに対する検証ログを制限
   const validationKey = JSON.stringify({
-    userId: status.userInfo && status.userInfo.userId,
-    activeSheet: status.activeSheetName,
-    headerCount: status.sheetDetails && status.sheetDetails.allHeaders && status.sheetDetails.allHeaders.length,
-    setupStep: status.setupStep
+    userId: (status.userInfo && status.userInfo.userId) || 'unknown',
+    activeSheet: status.activeSheetName || null,
+    headerCount: (status.sheetDetails && status.sheetDetails.allHeaders && status.sheetDetails.allHeaders.length) || 0,
+    setupStep: status.setupStep || 1
   });
   
   const shouldLogValidation = lastValidationHash !== validationKey || validationLogCount < 2;

@@ -114,7 +114,7 @@ function verifyAdminAccess(userId) {
     }
 
     // 現在操作しているGoogleアカウントのメールアドレスを取得
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       warnLog('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
       return false;
