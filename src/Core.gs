@@ -818,8 +818,11 @@ function getOpinionHeaderSafely(userId, sheetName) {
 }
 
 /**
- * 新規ユーザーを登録する（データベース登録のみ）
- * フォーム作成はクイックスタートで実行される
+ * Register a new user or update an existing one.
+ *
+ * @param {string} adminEmail - Email address of the user performing the action.
+ * @returns {Object} Registration result including URLs and flags.
+ * @throws {Error} When authentication fails or database operations error.
  */
 function registerNewUser(adminEmail) {
   const activeUserEmail = getCurrentUserEmail();
@@ -913,7 +916,7 @@ function registerNewUser(adminEmail) {
     // 生成されたユーザー情報のキャッシュをクリア
     invalidateUserCache(userId, adminEmail, null, false);
   } catch (e) {
-    logDatabaseError(e, 'userRegistration', { userId: userInfo.userId, email: userInfo.email });
+    logDatabaseError(e, 'userRegistration', { userId: userId, email: adminEmail });
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }
 

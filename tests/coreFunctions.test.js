@@ -107,7 +107,8 @@ describe('Core.gs utilities', () => {
         updateUser: jest.fn(),
         invalidateUserCache: jest.fn(),
         generateUserUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' })),
-        getDeployUserDomainInfo: jest.fn(() => ({ deployDomain: '', isDomainMatch: true }))
+        getDeployUserDomainInfo: jest.fn(() => ({ deployDomain: '', isDomainMatch: true })),
+        logDatabaseError: jest.fn()
       });
     });
 
@@ -123,6 +124,13 @@ describe('Core.gs utilities', () => {
       const res = context.registerNewUser('admin@example.com');
       expect(context.updateUser).toHaveBeenCalled();
       expect(res.isExistingUser).toBe(true);
+    });
+
+    test('logs and throws when createUser fails', () => {
+      context.findUserByEmail.mockReturnValue(null);
+      context.createUser.mockImplementation(() => { throw new Error('db'); });
+      expect(() => context.registerNewUser('admin@example.com')).toThrow('ユーザー登録に失敗しました。システム管理者に連絡してください。');
+      expect(context.logDatabaseError).toHaveBeenCalledWith(expect.any(Error), 'userRegistration', { userId: 'UUID', email: 'admin@example.com' });
     });
   });
 });
