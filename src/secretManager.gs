@@ -60,21 +60,21 @@ class UnifiedSecretManager {
       throw new Error('SECURITY_ERROR: 無効な秘密情報名');
     }
 
-    // 監査ログ記録
-    if (auditLog) {
-      this.logSecretAccess('GET', secretName, {
-        useCache,
-        version,
-        timestamp: new Date().toISOString(),
-        userEmail: Session.getActiveUser().getEmail()
-      });
-    }
+    const logMeta = {
+      useCache,
+      version,
+      timestamp: new Date().toISOString(),
+      userEmail: Session.getActiveUser().getEmail()
+    };
 
     // キャッシュ確認
     if (useCache && this.isSecretCached(secretName)) {
       const cached = this.getSecretFromCache(secretName);
       if (cached && !this.isCacheExpired(secretName)) {
         debugLog(`🔐 秘密情報キャッシュヒット: ${secretName}`);
+        if (auditLog) {
+          this.logSecretAccess('CACHE_HIT', secretName, logMeta);
+        }
         return cached;
       }
     }
@@ -89,6 +89,12 @@ class UnifiedSecretManager {
           debugLog(`🔐 Secret Manager取得成功: ${secretName}`);
           if (useCache) {
             this.cacheSecret(secretName, secretValue);
+          }
+          if (auditLog) {
+            this.logSecretAccess('GET', secretName, {
+              ...logMeta,
+              source: 'secretManager'
+            });
           }
           return secretValue;
         }
@@ -108,6 +114,12 @@ class UnifiedSecretManager {
           debugLog(`🔐 Properties Service取得成功: ${secretName}`);
           if (useCache) {
             this.cacheSecret(secretName, secretValue);
+          }
+          if (auditLog) {
+            this.logSecretAccess('GET', secretName, {
+              ...logMeta,
+              source: 'properties'
+            });
           }
           return secretValue;
         }
