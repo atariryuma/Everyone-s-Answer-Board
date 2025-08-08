@@ -1117,7 +1117,7 @@ function handleAdminMode(params) {
 
   debugLog('handleAdminMode: verifying admin access for userId:', params.userId);
   if (!verifyAdminAccess(params.userId)) {
-    warnLog('handleAdminMode: admin access denied for userId:', params.userId);
+    infoLog('handleAdminMode: admin access denied for userId:', params.userId);
     return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
   }
   debugLog('handleAdminMode: admin access verified for userId:', params.userId);
