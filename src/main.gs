@@ -1115,9 +1115,34 @@ function handleAdminMode(params) {
     return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
   }
 
-  if (!verifyAdminAccess(params.userId)) {
-    return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
+  // 管理者権限確認（詳細ログ付き）
+  debugLog('🔍 handleAdminMode: 管理者権限確認開始', {
+    userId: params.userId,
+    timestamp: new Date().toISOString()
+  });
+  
+  const adminAccessResult = verifyAdminAccess(params.userId);
+  
+  if (!adminAccessResult) {
+    errorLog('🚨 handleAdminMode: 管理者権限確認失敗', {
+      userId: params.userId,
+      currentUser: getCurrentUserEmail(),
+      timestamp: new Date().toISOString()
+    });
+    
+    // 権限確認失敗時に追加的な診断情報を提供
+    return showErrorPage(
+      'アクセス拒否', 
+      'この管理パネルにアクセスする権限がありません。\n\n' +
+      '考えられる原因:\n' +
+      '• ユーザー情報の同期待ちの可能性があります\n' +
+      '• ブラウザを更新して数秒待ってから再度お試しください\n\n' +
+      `ユーザーID: ${params.userId}\n` +
+      `時刻: ${new Date().toLocaleString('ja-JP')}`
+    );
   }
+  
+  infoLog('✅ handleAdminMode: 管理者権限確認成功', params.userId);
 
   // Save admin session state
   const userProperties = PropertiesService.getUserProperties();
