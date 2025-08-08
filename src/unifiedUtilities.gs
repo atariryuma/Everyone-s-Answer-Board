@@ -226,6 +226,12 @@ class UnifiedAPIClient {
         debugLog(`🌐 統一API: ${method} ${url} (試行 ${attempt + 1}/${retries + 1})`);
 
         const response = resilientUrlFetch(url, requestConfig);
+        
+        // レスポンスオブジェクトの検証
+        if (!response || typeof response.getResponseCode !== 'function') {
+          throw new Error('無効なレスポンスオブジェクトが返されました');
+        }
+        
         const statusCode = response.getResponseCode();
 
         // 成功時

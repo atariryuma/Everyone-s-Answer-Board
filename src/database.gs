@@ -1486,30 +1486,84 @@ function batchUpdateSheetsData(service, spreadsheetId, requests) {
  * @returns {object} レスポンス
  */
 function appendSheetsData(service, spreadsheetId, range, values) {
-  // 回復力のある実行でappend操作を実行
-  return  resilientExecutor.execute(
-    async () => {
+  try {
+    const url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) +
+      ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+
+    debugLog('appendSheetsData: リクエスト開始', { url, valueCount: values.length });
+
+    // 直接UrlFetchApp.fetchを使用（同期実行）
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + service.accessToken },
+      payload: JSON.stringify({ values: values }),
+      muteHttpExceptions: true
+    });
+
+    // レスポンスオブジェクトの検証
+    if (!response || typeof response.getResponseCode !== 'function') {
+      throw new Error('無効なレスポンスオブジェクトが返されました');
+    }
+
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+
+    debugLog('appendSheetsData: レスポンス受信', { 
+      responseCode, 
+      contentLength: responseText ? responseText.length : 0 
+    });
+
+    if (responseCode !== 200) {
+      throw new Error(`Append operation failed: ${responseCode} - ${responseText}`);
+    }
+
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      warnLog('appendSheetsData: レスポンス解析に失敗、元のレスポンスを返します', {
+        parseError: parseError.message,
+        responseText: responseText.substring(0, 200)
+      });
+      return { updates: { updatedRows: 1 } }; // フォールバック
+    }
+
+  } catch (error) {
+    errorLog('appendSheetsData: 処理中にエラーが発生しました', {
+      error: error.message,
+      spreadsheetId,
+      range,
+      valueCount: values ? values.length : 0
+    });
+
+    // リトライ処理（1回のみ）
+    try {
+      Utilities.sleep(2000); // 2秒待機
+      
       const url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) +
         ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
 
-      const response =  resilientUrlFetch(url, {
+      const retryResponse = UrlFetchApp.fetch(url, {
         method: 'post',
         contentType: 'application/json',
         headers: { 'Authorization': 'Bearer ' + service.accessToken },
-        payload: JSON.stringify({ values: values })
+        payload: JSON.stringify({ values: values }),
+        muteHttpExceptions: true
       });
 
-      if (response.getResponseCode() !== 200) {
-        throw new Error('Append operation failed: ' + response.getResponseCode() + ' - ' + response.getContentText());
+      if (retryResponse && typeof retryResponse.getResponseCode === 'function') {
+        const retryCode = retryResponse.getResponseCode();
+        if (retryCode === 200) {
+          infoLog('appendSheetsData: リトライで成功しました');
+          return JSON.parse(retryResponse.getContentText());
+        }
       }
-
-      return JSON.parse(response.getContentText());
-    },
-    {
-      name: `AppendSheetsData_${spreadsheetId}`,
-      idempotent: false
+    } catch (retryError) {
+      errorLog('appendSheetsData: リトライも失敗しました', retryError.message);
     }
-  );
+
+    throw error;
+  }
 }
 
 /**

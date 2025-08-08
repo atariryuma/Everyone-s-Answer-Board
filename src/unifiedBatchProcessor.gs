@@ -86,6 +86,11 @@ class UnifiedBatchProcessor {
             }
           });
 
+          // レスポンスオブジェクトの検証
+          if (!response || typeof response.getResponseCode !== 'function') {
+            throw new Error('BatchGet: 無効なレスポンスオブジェクトが返されました');
+          }
+          
           if (response.getResponseCode() !== 200) {
             throw new Error(`BatchGet failed: ${response.getResponseCode()} - ${response.getContentText()}`);
           }
@@ -168,6 +173,11 @@ class UnifiedBatchProcessor {
             payload: JSON.stringify(requestBody)
           });
 
+          // レスポンスオブジェクトの検証
+          if (!response || typeof response.getResponseCode !== 'function') {
+            throw new Error('BatchUpdate: 無効なレスポンスオブジェクトが返されました');
+          }
+          
           if (response.getResponseCode() !== 200) {
             throw new Error(`BatchUpdate failed: ${response.getResponseCode()} - ${response.getContentText()}`);
           }
@@ -244,6 +254,11 @@ class UnifiedBatchProcessor {
             payload: JSON.stringify(requestBody)
           });
 
+          // レスポンスオブジェクトの検証
+          if (!response || typeof response.getResponseCode !== 'function') {
+            throw new Error('BatchUpdateSpreadsheet: 無効なレスポンスオブジェクトが返されました');
+          }
+          
           if (response.getResponseCode() !== 200) {
             throw new Error(`BatchUpdateSpreadsheet failed: ${response.getResponseCode()} - ${response.getContentText()}`);
           }
@@ -417,7 +432,8 @@ class UnifiedBatchProcessor {
             }
           });
 
-          if (response.getResponseCode() === 200) {
+          // レスポンスオブジェクトの検証
+          if (response && typeof response.getResponseCode === 'function' && response.getResponseCode() === 200) {
             const data = JSON.parse(response.getContentText());
             valueRanges.push({
               range: range,
