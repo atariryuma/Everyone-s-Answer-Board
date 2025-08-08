@@ -1059,6 +1059,7 @@ function handleDefaultRoute() {
 
   if (lastAdminUserId && verifyAdminAccess(lastAdminUserId)) {
     debugLog('Found previous admin session, redirecting to admin panel:', lastAdminUserId);
+    debugLog('DEBUG: Calling findUserById with lastAdminUserId:', lastAdminUserId);
     const userInfo = findUserById(lastAdminUserId);
     return renderAdminPanel(userInfo, 'admin');
   }

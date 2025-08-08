@@ -774,9 +774,9 @@ function fetchUserFromDatabase(field, value, options = {}) {
 
       const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-      debugLog('fetchUserFromDatabase - 検索開始: ' + field + '=' + value);
-      debugLog('fetchUserFromDatabase - データベースID: ' + dbId);
-      debugLog('fetchUserFromDatabase - シート名: ' + sheetName);
+      debugLog('DEBUG: fetchUserFromDatabase - 検索開始: ' + field + '=' + value);
+      debugLog('DEBUG: fetchUserFromDatabase - データベースID: ' + dbId);
+      debugLog('DEBUG: fetchUserFromDatabase - シート名: ' + sheetName);
 
       // キャッシュクリア（リトライ時は必須）
       if (retryAttempt > 0 || opts.clearCache) {
@@ -862,7 +862,7 @@ function fetchUserFromDatabase(field, value, options = {}) {
           }
 
           infoLog('✅ fetchUserFromDatabase - ユーザー取得成功:', field + '=' + value,
-            'userId=' + user.userId, 'isActive=' + user.isActive);
+            'userId=' + user.userId, 'isActive=' + user.isActive, 'DEBUG: User data:', user);
 
           return user;
         }
@@ -873,6 +873,9 @@ function fetchUserFromDatabase(field, value, options = {}) {
         field: field,
         value: value,
         totalSearchedRows: values.length - 1,
+        'DEBUG: No user found for this query.': true
+      });
+      return null;
         attempt: retryAttempt + 1,
         availableUserIds: values.slice(1).map(row => row[headers.indexOf('userId')] || 'undefined').slice(0, 5)
       });
