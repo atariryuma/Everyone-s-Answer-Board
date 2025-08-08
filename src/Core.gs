@@ -822,8 +822,11 @@ function getOpinionHeaderSafely(userId, sheetName) {
  * フォーム作成はクイックスタートで実行される
  */
 function registerNewUser(adminEmail) {
-  const activeUser = Session.getActiveUser();
-  if (adminEmail !== activeUser.getEmail()) {
+  const activeUserEmail = getCurrentUserEmail();
+  if (!activeUserEmail) {
+    throw new Error('認証エラー: アクティブユーザーの情報を取得できませんでした。');
+  }
+  if (adminEmail !== activeUserEmail) {
     throw new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
   }
 
@@ -1666,7 +1669,7 @@ function refreshBoardData(requestUserId) {
  */
 function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, adminMode, isOwner, displayMode) {
   // 現在のユーザーメールを取得（リアクション状態判定用）
-  var currentUserEmail = Session.getActiveUser().getEmail();
+  var currentUserEmail = getCurrentUserEmail();
 
   return rawData.map(function(row, index) {
     var classIndex = mappedIndices.classHeader;
@@ -2022,7 +2025,7 @@ function getResponsesData(userId, sheetName) {
  */
 function getCurrentUserStatus(requestUserId) {
   try {
-    const activeUserEmail = Session.getActiveUser().getEmail();
+    const activeUserEmail = getCurrentUserEmail();
 
     // requestUserIdが無効な場合は、メールアドレスでユーザーを検索
     let userInfo;
@@ -4172,7 +4175,7 @@ function getSheetsList(userId) {
 
           // 最終手段：ユーザー権限での修復も試行
           try {
-            var currentUserEmail = Session.getActiveUser().getEmail();
+            var currentUserEmail = getCurrentUserEmail();
             if (currentUserEmail === userInfo.adminEmail) {
               repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
               debugLog('getSheetsList: ユーザー権限での修復を実行しました。');
@@ -4628,7 +4631,7 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
 function updateIsActiveStatus(requestUserId, isActive) {
   verifyUserAccess(requestUserId);
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return {
         status: 'error',
@@ -4691,7 +4694,7 @@ function updateIsActiveStatus(requestUserId, isActive) {
  */
 function hasSetupPageAccess() {
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return false;
     }
@@ -4753,7 +4756,7 @@ function isSystemAdmin() {
   try {
     var props = PropertiesService.getScriptProperties();
     var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-    var currentUserEmail = Session.getActiveUser().getEmail();
+    var currentUserEmail = getCurrentUserEmail();
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
     errorLog('isSystemAdmin エラー: ' + e.message);
@@ -5056,7 +5059,7 @@ function performAutoAIDetection(requestUserId, spreadsheetId, sheetName) {
 function createCustomFormUI(requestUserId, config) {
   try {
     verifyUserAccess(requestUserId);
-    const activeUserEmail = Session.getActiveUser().getEmail();
+    const activeUserEmail = getCurrentUserEmail();
 
     // AdminPanelのconfig構造を内部形式に変換（createCustomForm の処理を統合）
     const convertedConfig = {
@@ -5271,7 +5274,7 @@ function createCustomFormUI(requestUserId, config) {
 function createQuickStartFormUI(requestUserId) {
   try {
     verifyUserAccess(requestUserId);
-    const activeUserEmail = Session.getActiveUser().getEmail();
+    const activeUserEmail = getCurrentUserEmail();
 
     // createQuickStartForm の処理を統合（直接 createUnifiedForm を呼び出し）
     const result = createUnifiedForm('quickstart', activeUserEmail, requestUserId);
@@ -5403,7 +5406,7 @@ function activateSheetSimple(requestUserId, sheetName) {
 function processLoginFlow() {
   try {
     // アクティブユーザーのメールアドレスを取得
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return {
         status: 'error',
@@ -5945,7 +5948,7 @@ function getApplicationStatusForUI() {
   try {
     const accessCheck = checkApplicationAccess();
     const isEnabled = getApplicationEnabled();
-    const adminEmail = Session.getActiveUser().getEmail();
+    const adminEmail = getCurrentUserEmail();
 
     return {
       status: 'success',
