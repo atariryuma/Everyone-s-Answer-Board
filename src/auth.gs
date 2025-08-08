@@ -202,19 +202,23 @@ function verifyAdminAccess(userId) {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function processLoginFlow(userEmail) {
+  debugLog('processLoginFlow: Starting login flow for user:', userEmail); // 追加
   try {
     if (!userEmail) {
+      debugLog('processLoginFlow: User email is not defined.'); // 追加
       throw new Error('ユーザーメールアドレスが指定されていません');
     }
 
     // 1. ユーザー情報をデータベースから取得
+    debugLog('processLoginFlow: Attempting to find user by email:', userEmail); // 追加
     var userInfo = findUserByEmail(userEmail);
+    debugLog('processLoginFlow: User info found:', userInfo ? 'Yes' : 'No'); // 追加
 
     // 2. 既存ユーザーの処理
     if (userInfo) {
       // 2a. アクティブユーザーの場合
       if (isTrue(userInfo.isActive)) {
-        debugLog('processLoginFlow: 既存アクティブユーザー:', userEmail);
+        debugLog('processLoginFlow: Existing active user:', userEmail);
 
         // 最終アクセス時刻を更新（設定は保護）
         updateUserLastAccess(userInfo.userId);
@@ -230,11 +234,13 @@ function processLoginFlow(userEmail) {
         }
 
         const adminUrl = buildUserAdminUrl(userInfo.userId);
+        debugLog('processLoginFlow: Redirecting to admin panel:', adminUrl); // 追加
         return createSecureRedirect(adminUrl, welcomeMessage);
       }
       // 2b. 非アクティブユーザーの場合
       else {
         warnLog('processLoginFlow: 既存だが非アクティブなユーザー:', userEmail);
+        debugLog('processLoginFlow: User is inactive, showing error page.'); // 追加
         return showErrorPage(
           'アカウントが無効です',
           'あなたのアカウントは現在無効化されています。管理者にお問い合わせください。'
@@ -243,7 +249,7 @@ function processLoginFlow(userEmail) {
     }
     // 3. 新規ユーザーの処理
     else {
-      debugLog('processLoginFlow: 新規ユーザー登録開始:', userEmail);
+      debugLog('processLoginFlow: New user registration started:', userEmail);
 
       // 3a. 新規ユーザーデータを準備（統一された初期設定）
       const initialConfig = {
@@ -275,11 +281,11 @@ function processLoginFlow(userEmail) {
         userId: Utilities.getUuid(),
         adminEmail: userEmail,
         createdAt: new Date().toISOString(),
-        isActive: true, // 即時有効化
         configJson: JSON.stringify(initialConfig),
         spreadsheetId: '',
         spreadsheetUrl: '',
-        lastAccessedAt: new Date().toISOString()
+        lastAccessedAt: new Date().toISOString(),
+        isActive: true // 即時有効化
       };
 
       // 3b. データベースに作成
@@ -287,10 +293,11 @@ function processLoginFlow(userEmail) {
       if (!waitForUserRecord(newUser.userId, 3000, 500)) {
         warnLog('processLoginFlow: user not found after create:', newUser.userId);
       }
-      debugLog('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
+      debugLog('processLoginFlow: New user creation completed:', newUser.userId);
 
       // 3c. 新規ユーザーの管理パネルへリダイレクト
       const adminUrl = buildUserAdminUrl(newUser.userId);
+      debugLog('processLoginFlow: Redirecting new user to admin panel:', adminUrl); // 追加
       return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
     }
   } catch (error) {
@@ -305,6 +312,7 @@ function processLoginFlow(userEmail) {
       severity: 'high' // ログインエラーは高重要度
     };
     errorLog('🚨 processLoginFlow 重大エラー:', JSON.stringify(errorInfo, null, 2));
+    debugLog('processLoginFlow: Error in login flow. Error:', error.message); // 追加
 
     // ユーザーフレンドリーなエラーメッセージ
     const userMessage = error.message.includes('ユーザー')

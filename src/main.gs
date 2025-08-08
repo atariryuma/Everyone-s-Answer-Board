@@ -933,10 +933,14 @@ function initializeRequestProcessing() {
  * @returns {HtmlOutput|null} Early return result or null to continue
  */
 function validateUserAuthentication() {
+  debugLog('validateUserAuthentication: Starting authentication check.'); // 追加
   const userEmail = getCurrentUserEmail();
+  debugLog('validateUserAuthentication: userEmail from getCurrentUserEmail:', userEmail); // 追加
   if (!userEmail) {
+    debugLog('validateUserAuthentication: userEmail is empty, showing login page.'); // 追加
     return showLoginPage();
   }
+  debugLog('validateUserAuthentication: userEmail is present, continuing processing.'); // 追加
   return null; // Continue processing
 }
 
