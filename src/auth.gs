@@ -146,31 +146,94 @@ function handleNewUserAuthentication(userId, activeUserEmail, searchSummary) {
       const scriptProps = PropertiesService.getScriptProperties();
       const allProps = scriptProps.getProperties();
       
-      // 新規ユーザー記録を探す（ユーザーIDまたはメールアドレスベース）
+      // デバッグログ: ScriptPropertiesの内容と検索パラメーターを記録
+      const newUserKeys = Object.keys(allProps).filter(k => k.startsWith('newUser_'));
+      debugLog('handleNewUserAuthentication: 検索パラメーター:', {
+        userId: userId,
+        currentEmail: currentEmail,
+        totalProps: Object.keys(allProps).length,
+        newUserKeys: newUserKeys.length,
+        availableKeys: newUserKeys.slice(0, 5) // 最初の5件のみ表示
+      });
+      
+      // 新規ユーザー記録を探す - より柔軟な検索ロジック
       for (const [key, value] of Object.entries(allProps)) {
-        if (key.startsWith('newUser_') && (key.includes(userId) || key.toLowerCase().includes(currentEmail))) {
+        if (key.startsWith('newUser_')) {
           try {
             const data = JSON.parse(value);
             const timeDiff = Date.now() - parseInt(data.createdTime);
             
             // 5分以内に作成されたユーザーのみ対象
             if (timeDiff < 300000) { // 5分 = 300秒
-              isRecentlyCreated = true;
-              createdTimeInfo = {
-                timeDiff: timeDiff,
-                key: key,
-                data: data
+              // より柔軟なマッチングロジック
+              const keyLower = key.toLowerCase();
+              const emailLower = currentEmail.toLowerCase();
+              const dataEmailLower = data.email ? data.email.toLowerCase() : '';
+              
+              const matchConditions = {
+                userIdExact: data.userId === userId,
+                userIdInKey: key.includes(userId),
+                emailInKey: keyLower.includes(emailLower),
+                emailExact: dataEmailLower === emailLower,
+                emailLocal: emailLower.split('@')[0] && keyLower.includes(emailLower.split('@')[0])
               };
-              break;
+              
+              debugLog('handleNewUserAuthentication: キーマッチング検証:', {
+                key: key,
+                timeDiff: timeDiff,
+                matchConditions: matchConditions,
+                data: data
+              });
+              
+              // いずれかの条件に一致すれば有効とみなす
+              if (matchConditions.userIdExact || 
+                  matchConditions.userIdInKey || 
+                  matchConditions.emailInKey || 
+                  matchConditions.emailExact || 
+                  matchConditions.emailLocal) {
+                
+                isRecentlyCreated = true;
+                createdTimeInfo = {
+                  timeDiff: timeDiff,
+                  key: key,
+                  data: data,
+                  matchedBy: Object.keys(matchConditions).filter(k => matchConditions[k])
+                };
+                
+                infoLog('handleNewUserAuthentication: ✅ 新規ユーザーマッチング成功:', {
+                  matchedBy: createdTimeInfo.matchedBy,
+                  timeDiff: timeDiff + 'ms'
+                });
+                break;
+              }
+            } else {
+              debugLog('handleNewUserAuthentication: タイムアウト:', {
+                key: key,
+                timeDiff: timeDiff,
+                timeoutThreshold: 300000
+              });
             }
           } catch (parseError) {
-            // パース失敗は無視して次へ
+            warnLog('handleNewUserAuthentication: JSONパースエラー:', {
+              key: key,
+              error: parseError.message
+            });
             continue;
           }
         }
       }
+      
+      // 検索結果のサマリーログ
+      if (!isRecentlyCreated && newUserKeys.length > 0) {
+        warnLog('handleNewUserAuthentication: 新規ユーザー検索で一致なし:', {
+          searchedUserId: userId,
+          searchedEmail: currentEmail,
+          availableNewUserKeys: newUserKeys,
+          totalNewUserRecords: newUserKeys.length
+        });
+      }
     } catch (propsError) {
-      warnLog('handleNewUserAuthentication: ScriptProperties取得でエラー:', propsError.message);
+      errorLog('handleNewUserAuthentication: ScriptProperties取得でエラー:', propsError.message);
     }
 
     if (isRecentlyCreated && createdTimeInfo) {

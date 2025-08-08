@@ -1183,12 +1183,32 @@ function handleAdminMode(params) {
       const scriptProps = PropertiesService.getScriptProperties();
       
       const userPropsData = userProps.getProperties();
-      const scriptPropsKeys = Object.keys(scriptProps.getProperties()).filter(k => k.startsWith('newUser_'));
+      const allScriptProps = scriptProps.getProperties();
+      const scriptPropsKeys = Object.keys(allScriptProps).filter(k => k.startsWith('newUser_'));
+      
+      // より詳細な診断情報
+      const newUserDetails = scriptPropsKeys.map(key => {
+        try {
+          const data = JSON.parse(allScriptProps[key]);
+          const timeDiff = Date.now() - parseInt(data.createdTime);
+          return {
+            key: key,
+            email: data.email,
+            userId: data.userId,
+            ageMinutes: Math.floor(timeDiff / 60000)
+          };
+        } catch (e) {
+          return { key: key, error: 'parse_failed' };
+        }
+      });
       
       propertiesDiagnostics = {
         userProperties: Object.keys(userPropsData).length,
         scriptProperties: scriptPropsKeys.length,
-        recentUsers: scriptPropsKeys.slice(0, 3) // 最新3件
+        recentUsers: scriptPropsKeys.slice(0, 3), // 最新3件のキー
+        newUserDetails: newUserDetails.slice(0, 5), // 詳細情報（最新5件）
+        currentUser: params.userId,
+        currentEmail: getCurrentUserEmail()
       };
     } catch (propError) {
       propertiesDiagnostics = 'error: ' + propError.message;
