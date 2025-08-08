@@ -61,10 +61,30 @@ function generateNewServiceAccountToken() {
     muteHttpExceptions: true
   });
 
-  if (response.getResponseCode() !== 200) {
-    errorLog('Token request failed. Status:', response.getResponseCode());
-    errorLog('Response:', response.getContentText());
-    throw new Error('サービスアカウントトークンの取得に失敗しました。認証情報を確認してください。Status: ' + response.getResponseCode());
+  // レスポンスオブジェクト検証（resilientUrlFetchで既に検証済みだが、念のため）
+  if (!response || typeof response.getResponseCode !== 'function') {
+    throw new Error('サービスアカウント認証: 無効なレスポンスオブジェクトが返されました');
+  }
+
+  const responseCode = response.getResponseCode();
+  if (responseCode !== 200) {
+    const responseText = response.getContentText();
+    errorLog('Token request failed. Status:', responseCode);
+    errorLog('Response:', responseText);
+    
+    // より詳細なエラーメッセージ
+    let errorMessage = 'サービスアカウントトークンの取得に失敗しました。';
+    if (responseCode === 400) {
+      errorMessage += ' 認証情報またはJWTの形式に問題があります。';
+    } else if (responseCode === 401) {
+      errorMessage += ' 認証情報が無効です。サービスアカウントキーを確認してください。';
+    } else if (responseCode === 403) {
+      errorMessage += ' 権限が不足しています。サービスアカウントの権限を確認してください。';
+    } else {
+      errorMessage += ` Status: ${responseCode}`;
+    }
+    
+    throw new Error(errorMessage);
   }
 
   var responseData = JSON.parse(response.getContentText());

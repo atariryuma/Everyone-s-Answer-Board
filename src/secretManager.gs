@@ -232,6 +232,11 @@ class UnifiedSecretManager {
         }
       );
 
+      // レスポンスオブジェクト検証
+      if (!response || typeof response.getResponseCode !== 'function') {
+        throw new Error('Secret Manager API: 無効なレスポンスオブジェクトが返されました');
+      }
+      
       if (response.getResponseCode() !== 200) {
         throw new Error(`Secret Manager API error: ${response.getResponseCode()}`);
       }
@@ -269,7 +274,13 @@ class UnifiedSecretManager {
         }
       );
 
-      let secretExists = existsResponse.getResponseCode() === 200;
+      // レスポンスオブジェクト検証
+      let secretExists = false;
+      if (existsResponse && typeof existsResponse.getResponseCode === 'function') {
+        secretExists = existsResponse.getResponseCode() === 200;
+      } else {
+        warnLog('Secret Manager: 存在確認でレスポンスオブジェクトが無効です');
+      }
 
       // シークレットが存在しない場合は作成
       if (!secretExists) {
@@ -287,6 +298,11 @@ class UnifiedSecretManager {
           })
         });
 
+        // レスポンスオブジェクト検証
+        if (!createResponse || typeof createResponse.getResponseCode !== 'function') {
+          throw new Error('Secret Manager: シークレット作成でレスポンスオブジェクトが無効です');
+        }
+        
         if (createResponse.getResponseCode() !== 200) {
           throw new Error(`Failed to create secret: ${createResponse.getContentText()}`);
         }
@@ -309,6 +325,11 @@ class UnifiedSecretManager {
         }
       );
 
+      // レスポンスオブジェクト検証
+      if (!addVersionResponse || typeof addVersionResponse.getResponseCode !== 'function') {
+        throw new Error('Secret Manager: バージョン追加でレスポンスオブジェクトが無効です');
+      }
+      
       if (addVersionResponse.getResponseCode() !== 200) {
         throw new Error(`Failed to add secret version: ${addVersionResponse.getContentText()}`);
       }

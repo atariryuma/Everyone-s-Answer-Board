@@ -832,7 +832,11 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
         muteHttpExceptions: true
       });
 
-      // HTTPステータスチェック
+      // レスポンスオブジェクト検証とHTTPステータスチェック
+      if (!response || typeof response.getResponseCode !== 'function') {
+        throw new Error('Cache API: 無効なレスポンスオブジェクトが返されました');
+      }
+      
       if (response.getResponseCode() !== 200) {
         throw new Error(`HTTP ${response.getResponseCode()}: ${response.getContentText()}`);
       }

@@ -1373,6 +1373,11 @@ function createSheetsService(accessToken) {
             validateHttpsCertificates: true
           });
 
+          // レスポンスオブジェクト検証
+          if (!response || typeof response.getResponseCode !== 'function') {
+            throw new Error('Sheets API: 無効なレスポンスオブジェクトが返されました');
+          }
+          
           if (response.getResponseCode() !== 200) {
             throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
           }
@@ -1393,6 +1398,11 @@ function createSheetsService(accessToken) {
           validateHttpsCertificates: true
         });
 
+        // レスポンスオブジェクト検証
+        if (!response || typeof response.getResponseCode !== 'function') {
+          throw new Error('Sheets API: 無効なレスポンスオブジェクトが返されました');
+        }
+        
         if (response.getResponseCode() !== 200) {
           throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
         }
@@ -1610,6 +1620,11 @@ function getSpreadsheetsData(service, spreadsheetId) {
       validateHttpsCertificates: true
     });
 
+    // レスポンスオブジェクト検証
+    if (!response || typeof response.getResponseCode !== 'function') {
+      throw new Error('Database API: 無効なレスポンスオブジェクトが返されました');
+    }
+    
     var responseCode = response.getResponseCode();
     var responseText = response.getContentText();
 

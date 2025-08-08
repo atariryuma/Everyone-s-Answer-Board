@@ -271,13 +271,62 @@ const resilientExecutor = new ResilientExecutor({
  * @returns {Promise<HTTPResponse>} レスポンス
  */
 function resilientUrlFetch(url, options = {}) {
-  return resilientExecutor.execute(
-    () => UrlFetchApp.fetch(url, options),
-    {
-      name: `UrlFetch-${url}`,
-      idempotent: options.method !== 'POST' && options.method !== 'PUT'
+  // 同期実行でリトライ機能付き
+  const maxRetries = 3;
+  const baseDelay = 1000;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      debugLog(`resilientUrlFetch: ${url} (試行 ${attempt + 1}/${maxRetries + 1})`);
+      
+      const response = UrlFetchApp.fetch(url, {
+        ...options,
+        muteHttpExceptions: true
+      });
+      
+      // レスポンス検証
+      if (!response || typeof response.getResponseCode !== 'function') {
+        throw new Error('無効なレスポンスオブジェクトが返されました');
+      }
+      
+      const responseCode = response.getResponseCode();
+      
+      // 成功時またはリトライ不要なエラー
+      if (responseCode >= 200 && responseCode < 300) {
+        if (attempt > 0) {
+          infoLog(`resilientUrlFetch: リトライで成功 ${url}`);
+        }
+        return response;
+      }
+      
+      // 4xx エラーはリトライしない
+      if (responseCode >= 400 && responseCode < 500) {
+        warnLog(`resilientUrlFetch: クライアントエラー ${responseCode} - ${url}`);
+        return response;
+      }
+      
+      // 最後の試行でない場合は待機してリトライ
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        warnLog(`resilientUrlFetch: ${responseCode}エラー、${delay}ms後にリトライ - ${url}`);
+        Utilities.sleep(delay);
+      } else {
+        warnLog(`resilientUrlFetch: 最大リトライ回数に達しました - ${url}`);
+        return response;
+      }
+      
+    } catch (error) {
+      // 最後の試行でない場合はリトライ
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        warnLog(`resilientUrlFetch: エラー、${delay}ms後にリトライ - ${url}: ${error.message}`);
+        Utilities.sleep(delay);
+      } else {
+        errorLog(`resilientUrlFetch: 最終的に失敗 - ${url}: ${error.message}`);
+        throw error;
+      }
     }
-  );
+  }
 }
 
 /**

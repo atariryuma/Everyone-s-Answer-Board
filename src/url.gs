@@ -62,19 +62,39 @@ function getWebAppUrl() {
       debugLog('AppsScript.Script.Deployments not available, using fallback method');
       finalUrl = getFallbackWebAppUrl();
     } else {
-      // AppsScript APIを使用してURL取得
-      const scriptId = ScriptApp.getScriptId();
-      const deployments = AppsScript.Script.Deployments.list(scriptId, {
-        fields: 'deployments(deploymentConfig(webApp(url)))'
-      }).deployments || [];
-      
-      const webApp = deployments.find(d => d.deploymentConfig && d.deploymentConfig.webApp);
-      finalUrl = webApp ? webApp.deploymentConfig.webApp.url : '';
-      
-      if (finalUrl) {
-        infoLog('Web app URL obtained via AppsScript API:', finalUrl);
-      } else {
-        infoLog('getWebAppUrl: no deployments found via API, falling back');
+      // AppsScript APIを使用してURL取得（本番環境での確実な動作を目指す）
+      try {
+        const scriptId = ScriptApp.getScriptId();
+        
+        // デプロイメント一覧取得を試行
+        const deploymentsList = AppsScript.Script.Deployments.list(scriptId, {
+          fields: 'deployments(deploymentId,deploymentConfig(webApp(url)),updateTime)'
+        });
+        
+        debugLog('AppsScript.Script.Deployments.list response:', JSON.stringify(deploymentsList, null, 2));
+        
+        const deployments = deploymentsList.deployments || [];
+        
+        if (deployments.length === 0) {
+          infoLog('getWebAppUrl: デプロイメントが見つからないため、フォールバック処理へ');
+          finalUrl = getFallbackWebAppUrl();
+        } else {
+          // 最新のWebアプリデプロイメントを取得
+          const webAppDeployments = deployments
+            .filter(d => d.deploymentConfig && d.deploymentConfig.webApp)
+            .sort((a, b) => new Date(b.updateTime) - new Date(a.updateTime));
+          
+          if (webAppDeployments.length > 0) {
+            finalUrl = webAppDeployments[0].deploymentConfig.webApp.url;
+            infoLog('Web app URL obtained via AppsScript API:', finalUrl);
+            debugLog('Selected deployment:', JSON.stringify(webAppDeployments[0], null, 2));
+          } else {
+            infoLog('getWebAppUrl: WebアプリデプロイメントなしファンドされないWebアプリ、フォールバック処理へ');
+            finalUrl = getFallbackWebAppUrl();
+          }
+        }
+      } catch (apiError) {
+        infoLog('getWebAppUrl API詳細エラー:', apiError.message);
         finalUrl = getFallbackWebAppUrl();
       }
     }
