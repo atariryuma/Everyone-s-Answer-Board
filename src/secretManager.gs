@@ -45,9 +45,9 @@ class UnifiedSecretManager {
    * 秘密情報の安全な取得
    * @param {string} secretName - 秘密情報名
    * @param {object} options - オプション
-   * @returns {Promise<string>} 秘密情報の値
+   * @returns {string} 秘密情報の値
    */
-  async getSecret(secretName, options = {}) {
+  getSecret(secretName, options = {}) {
     const {
       useCache = this.config.cacheSecretsLocally,
       version = 'latest',
@@ -60,21 +60,21 @@ class UnifiedSecretManager {
       throw new Error('SECURITY_ERROR: 無効な秘密情報名');
     }
 
-    // 監査ログ記録
-    if (auditLog) {
-      this.logSecretAccess('GET', secretName, {
-        useCache,
-        version,
-        timestamp: new Date().toISOString(),
-        userEmail: Session.getActiveUser().getEmail()
-      });
-    }
+    const logMeta = {
+      useCache,
+      version,
+      timestamp: new Date().toISOString(),
+      userEmail: Session.getActiveUser().getEmail()
+    };
 
     // キャッシュ確認
     if (useCache && this.isSecretCached(secretName)) {
       const cached = this.getSecretFromCache(secretName);
       if (cached && !this.isCacheExpired(secretName)) {
         debugLog(`🔐 秘密情報キャッシュヒット: ${secretName}`);
+        if (auditLog) {
+          this.logSecretAccess('CACHE_HIT', secretName, logMeta);
+        }
         return cached;
       }
     }
@@ -89,6 +89,12 @@ class UnifiedSecretManager {
           debugLog(`🔐 Secret Manager取得成功: ${secretName}`);
           if (useCache) {
             this.cacheSecret(secretName, secretValue);
+          }
+          if (auditLog) {
+            this.logSecretAccess('GET', secretName, {
+              ...logMeta,
+              source: 'secretManager'
+            });
           }
           return secretValue;
         }
@@ -109,6 +115,12 @@ class UnifiedSecretManager {
           if (useCache) {
             this.cacheSecret(secretName, secretValue);
           }
+          if (auditLog) {
+            this.logSecretAccess('GET', secretName, {
+              ...logMeta,
+              source: 'properties'
+            });
+          }
           return secretValue;
         }
       } catch (error) {
@@ -125,9 +137,9 @@ class UnifiedSecretManager {
    * @param {string} secretName - 秘密情報名
    * @param {string} secretValue - 秘密情報の値
    * @param {object} options - オプション
-   * @returns {Promise<boolean>} 設定成功フラグ
+   * @returns {boolean} 設定成功フラグ
    */
-  async setSecret(secretName, secretValue, options = {}) {
+  setSecret(secretName, secretValue, options = {}) {
     const {
       useSecretManager = this.config.useSecretManager,
       updateProperties = true,
@@ -204,7 +216,7 @@ class UnifiedSecretManager {
    * Google Secret Manager から秘密情報を取得
    * @private
    */
-  async getSecretFromManager(secretName, version = 'latest') {
+  getSecretFromManager(secretName, version = 'latest') {
     const secretPath = `projects/${this.config.projectId}/secrets/${secretName}/versions/${version}`;
     
     try {
@@ -240,7 +252,7 @@ class UnifiedSecretManager {
    * Google Secret Manager に秘密情報を保存
    * @private
    */
-  async setSecretInManager(secretName, secretValue) {
+  setSecretInManager(secretName, secretValue) {
     // まずシークレットが存在するか確認
     const secretsListUrl = `https://secretmanager.googleapis.com/v1/projects/${this.config.projectId}/secrets`;
     
@@ -313,7 +325,7 @@ class UnifiedSecretManager {
    * Properties Service から秘密情報を取得
    * @private
    */
-  async getSecretFromProperties(secretName) {
+  getSecretFromProperties(secretName) {
     try {
       const props = getResilientScriptProperties();
       let value = props.getProperty(secretName);
@@ -338,7 +350,7 @@ class UnifiedSecretManager {
    * Properties Service に秘密情報を保存
    * @private
    */
-  async setSecretInProperties(secretName, secretValue, options = {}) {
+  setSecretInProperties(secretName, secretValue, options = {}) {
     try {
       const props = getResilientScriptProperties();
       props.setProperty(secretName, secretValue);
@@ -538,7 +550,7 @@ class UnifiedSecretManager {
    * 秘密情報管理の健全性チェック
    * @returns {object} チェック結果
    */
-  async performHealthCheck() {
+  performHealthCheck() {
     const results = {
       timestamp: new Date().toISOString(),
       secretManagerStatus: 'UNKNOWN',
@@ -655,7 +667,7 @@ const unifiedSecretManager = new UnifiedSecretManager({
 
 /**
  * 安全なサービスアカウント認証情報取得
- * @returns {Promise<object>} サービスアカウント認証情報
+ * @returns {Object} サービスアカウント認証情報
  */
 function getSecureServiceAccountCreds() {
   const credsString = unifiedSecretManager.getSecret('SERVICE_ACCOUNT_CREDS');
@@ -676,7 +688,7 @@ function getSecureServiceAccountCreds() {
 
 /**
  * 安全なデータベースID取得
- * @returns {Promise<string>} データベーススプレッドシートID
+ * @returns {string} データベーススプレッドシートID
  */
 function getSecureDatabaseId() {
   return unifiedSecretManager.getSecret('DATABASE_SPREADSHEET_ID');
@@ -685,7 +697,7 @@ function getSecureDatabaseId() {
 /**
  * 秘密情報の安全な取得（既存コードとの互換性）
  * @param {string} key - 秘密情報キー
- * @returns {Promise<string>} 秘密情報の値
+ * @returns {string} 秘密情報の値
  */
 function getSecureProperty(key) {
   return unifiedSecretManager.getSecret(key);
@@ -696,7 +708,7 @@ function getSecureProperty(key) {
  * @param {string} key - 秘密情報キー  
  * @param {string} value - 秘密情報の値
  * @param {object} options - オプション
- * @returns {Promise<boolean>} 設定成功フラグ
+ * @returns {boolean} 設定成功フラグ
  */
 function setSecureProperty(key, value, options = {}) {
   return unifiedSecretManager.setSecret(key, value, options);
