@@ -62,9 +62,9 @@ class AdminPanelEventManager {
 
   addListener(element, event, handler, options = {}) {
     if (!element || !event || !handler) return;
-    const key = `${element.id || 'anonymous'}-${event}`;
+    const key = (element.id || 'anonymous') + '-' + event;
     if (this.listeners.has(key)) {
-      console.warn(`Duplicate listener for ${key}`);
+      console.warn('Duplicate listener for ' + key);
       return;
     }
     element.addEventListener(event, handler, options);
@@ -318,7 +318,7 @@ function setupCharacterCounters() {
   if (questionTextarea && questionCounter) {
     questionTextarea.addEventListener('input', function() {
       const count = this.value.length;
-      questionCounter.textContent = `${count}/500`;
+      questionCounter.textContent = count + '/500';
       questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
     });
   }
@@ -370,7 +370,7 @@ function navigateToStep(step) {
   // Update progress bar
   const progressBar = document.querySelector('.progress-bar');
   if (progressBar) {
-    progressBar.style.width = `${(step / 3) * 100}%`;
+    progressBar.style.width = ((step / 3) * 100) + '%';
   }
   
   if (typeof validateCurrentStep === 'function') {
@@ -407,7 +407,7 @@ function toggleSection(sectionId) {
   }
   
   // Find the toggle button for this section
-  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+  const toggleBtn = document.querySelector('[onclick*="' + sectionId + '"]');
   const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
   
   // Toggle the section visibility

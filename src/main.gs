@@ -18,6 +18,33 @@ function include(path) {
 }
 
 /**
+ * Template debugging function to identify syntax errors
+ */
+function debugTemplate() {
+  try {
+    const template = HtmlService.createTemplateFromFile('AdminPanel');
+    template.include = include;
+    template.userInfo = { userId: 'debug-user' };
+    template.mode = 'debug';
+    template.isDeployUser = true;
+    
+    console.log('Getting template code with comments...');
+    const codeWithComments = template.getCodeWithComments();
+    console.log('Template code with comments:');
+    console.log(codeWithComments);
+    
+    // Also try to evaluate to see where it fails
+    console.log('Attempting to evaluate template...');
+    const result = template.evaluate();
+    console.log('Template evaluated successfully');
+    
+  } catch (error) {
+    console.error('Template debug error:', error);
+    console.error('Error stack:', error.stack);
+  }
+}
+
+/**
  * JavaScript文字列エスケープ関数 (URL対応版)
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列

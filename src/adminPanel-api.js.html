@@ -32,18 +32,18 @@ class FlowExecutionManager {
     if (this.activeFlows.has(flowId)) {
       if (this.pendingOperations.has(flowId)) {
         if (this.debugMode) {
-          console.log(`🔒 Flow ${flowId} already in progress, returning existing promise`);
+          console.log('🔒 Flow ' + flowId + ' already in progress, returning existing promise');
         }
         return this.pendingOperations.get(flowId);
       }
       
       if (!allowQueue) {
-        throw new Error(`Flow ${flowId} is already in progress and queueing is disabled`);
+        throw new Error('Flow ' + flowId + ' is already in progress and queueing is disabled');
       }
       
       // キューに追加
       if (this.debugMode) {
-        console.log(`⏳ Flow ${flowId} queued for execution`);
+        console.log('⏳ Flow ' + flowId + ' queued for execution');
       }
       return this.queueOperation(flowId, operation, timeout);
     }
@@ -59,7 +59,7 @@ class FlowExecutionManager {
     this.activeFlows.add(flowId);
     
     if (this.debugMode) {
-      console.log(`🚀 Starting flow execution: ${flowId}`);
+      console.log('🚀 Starting flow execution: ' + flowId);
     }
 
     // AbortControllerを使用した適切なタイムアウト制御
@@ -69,7 +69,7 @@ class FlowExecutionManager {
     try {
       // タイムアウト設定
       timeoutId = setTimeout(() => {
-        console.warn(`⏰ Flow ${flowId} timeout after ${timeout}ms - aborting operation`);
+        console.warn('⏰ Flow ' + flowId + ' timeout after ' + timeout + 'ms - aborting operation');
         abortController.abort();
       }, timeout);
 
@@ -268,7 +268,7 @@ class FlowExecutionManager {
 
     } catch (error) {
       if (onProgress) {
-        onProgress(-1, 'error', `エラー: ${error.message}`);
+        onProgress(-1, 'error', 'エラー: ' + error.message);
       }
       throw error;
     } finally {
@@ -321,7 +321,7 @@ class TimingManager {
           cancel: () => {
             clearTimeout(timer);
             timingManager.activeTimers.delete(id);
-            reject(new Error(`Timer ${id} was cancelled`));
+            reject(new Error('Timer ' + id + ' was cancelled'));
           }
         });
       }
@@ -351,11 +351,11 @@ class TimingManager {
         
         // 最後の操作でない場合は間隔を設ける
         if (i < operations.length - 1) {
-          const delayId = sequenceId ? `${sequenceId}_delay_${i}` : null;
+          const delayId = sequenceId ? sequenceId + '_delay_' + i : null;
           await TimingManager.delay(intervalMs, delayId);
         }
       } catch (error) {
-        console.error(`Sequence operation ${i} failed:`, error);
+        console.error('Sequence operation ' + i + ' failed:', error);
         throw error;
       }
     }
@@ -406,7 +406,7 @@ class TimingManager {
       try {
         // プログレス開始通知
         if (onProgress) {
-          onProgress(i, 'active', step.text || `Step ${i + 1}`, step.detail || '実行中...');
+          onProgress(i, 'active', step.text || 'Step ' + (i + 1), step.detail || '実行中...');
         }
         
         // ステップ実行
