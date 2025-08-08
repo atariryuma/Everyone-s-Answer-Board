@@ -1191,25 +1191,12 @@
   <!-- Error handling system must be loaded first -->
   <?!= include('errorMessages.js'); ?>
   <script>
-  // Core functions must be loaded first
   <?!= include('adminPanel-core.js'); ?>
-  
-  // UI functions must be loaded before API functions
   <?!= include('adminPanel-ui.js'); ?>
-  
-  // Status functions depend on UI functions
   <?!= include('adminPanel-status.js'); ?>
-  
-  // API functions depend on UI and status functions
   <?!= include('adminPanel-api.js'); ?>
-  
-  // Form controls need to be available before events
   <?!= include('adminPanel-forms.js'); ?>
-  
-  // Events depend on all other modules
   <?!= include('adminPanel-events.js'); ?>
-  
-  // Main initialization script must be loaded last
   <?!= include('adminPanel.js'); ?>
   </script>
 
