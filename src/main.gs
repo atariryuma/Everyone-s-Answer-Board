@@ -1111,43 +1111,109 @@ function handleAppSetupMode() {
  * @returns {HtmlOutput} Admin panel or error page
  */
 function handleAdminMode(params) {
+  const requestStartTime = Date.now();
+  
   if (!params.userId) {
     return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
   }
 
-  // 管理者権限確認（詳細ログ付き）
-  debugLog('🔍 handleAdminMode: 管理者権限確認開始', {
+  // システム状態診断
+  const systemDiagnostics = {
+    requestTime: new Date().toISOString(),
     userId: params.userId,
-    timestamp: new Date().toISOString()
+    userEmail: getCurrentUserEmail(),
+    cacheStatus: {},
+    databaseConnectivity: 'unknown',
+    performanceMetrics: {}
+  };
+
+  try {
+    // キャッシュ状態確認
+    try {
+      const scriptCache = CacheService.getScriptCache();
+      systemDiagnostics.cacheStatus.scriptCache = 'available';
+      systemDiagnostics.cacheStatus.executionCache = 'available';
+    } catch (cacheError) {
+      systemDiagnostics.cacheStatus.error = cacheError.message;
+    }
+
+    // データベース接続性テスト
+    try {
+      const dbId = getSecureDatabaseId();
+      systemDiagnostics.databaseConnectivity = dbId ? 'connected' : 'disconnected';
+    } catch (dbError) {
+      systemDiagnostics.databaseConnectivity = 'error: ' + dbError.message;
+    }
+
+    infoLog('🔍 handleAdminMode: システム診断完了', systemDiagnostics);
+  } catch (diagError) {
+    warnLog('handleAdminMode: システム診断でエラー:', diagError.message);
+  }
+
+  // 管理者権限確認（詳細ログ付き）
+  debugLog('🔍 handleAdminMode: 統合管理者権限確認開始', {
+    userId: params.userId,
+    timestamp: new Date().toISOString(),
+    systemStatus: systemDiagnostics
   });
   
+  const authStartTime = Date.now();
   const adminAccessResult = verifyAdminAccess(params.userId);
+  const authDuration = Date.now() - authStartTime;
+  
+  systemDiagnostics.performanceMetrics.authDuration = authDuration + 'ms';
   
   if (!adminAccessResult) {
+    const totalRequestTime = Date.now() - requestStartTime;
+    systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
+    
     errorLog('🚨 handleAdminMode: 管理者権限確認失敗', {
       userId: params.userId,
       currentUser: getCurrentUserEmail(),
+      authDuration: authDuration + 'ms',
+      totalTime: totalRequestTime + 'ms',
+      systemDiagnostics: systemDiagnostics,
       timestamp: new Date().toISOString()
     });
     
-    // 権限確認失敗時に追加的な診断情報を提供
+    // 詳細な診断情報付きエラーページ
+    const diagnosticInfo = [
+      `ユーザーID: ${params.userId}`,
+      `認証時間: ${authDuration}ms`,
+      `総処理時間: ${totalRequestTime}ms`,
+      `データベース接続: ${systemDiagnostics.databaseConnectivity}`,
+      `時刻: ${new Date().toLocaleString('ja-JP')}`
+    ].join('\n');
+    
     return showErrorPage(
       'アクセス拒否', 
-      'この管理パネルにアクセスする権限がありません。\n\n' +
-      '考えられる原因:\n' +
-      '• ユーザー情報の同期待ちの可能性があります\n' +
-      '• ブラウザを更新して数秒待ってから再度お試しください\n\n' +
-      `ユーザーID: ${params.userId}\n` +
-      `時刻: ${new Date().toLocaleString('ja-JP')}`
+      '統合認証システムでアクセス権限を確認できませんでした。\n\n' +
+      '改善された診断:\n' +
+      '• データベース同期の自動リトライを実行しました\n' +
+      '• 複数の検索方法を試行しました\n' +
+      '• 新規ユーザー向けの特別処理を実行しました\n\n' +
+      '対処法:\n' +
+      '• 30秒待ってから再度アクセスしてください\n' +
+      '• それでも問題が続く場合は管理者にご連絡ください\n\n' +
+      '診断情報:\n' + diagnosticInfo
     );
   }
   
-  infoLog('✅ handleAdminMode: 管理者権限確認成功', params.userId);
+  const totalRequestTime = Date.now() - requestStartTime;
+  systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
+  
+  infoLog('✅ handleAdminMode: 統合管理者権限確認成功', {
+    userId: params.userId,
+    authDuration: authDuration + 'ms',
+    totalTime: totalRequestTime + 'ms',
+    systemDiagnostics: systemDiagnostics
+  });
 
   // Save admin session state
   const userProperties = PropertiesService.getUserProperties();
   userProperties.setProperty('lastAdminUserId', params.userId);
-  debugLog('Saved admin session state:', params.userId);
+  userProperties.setProperty('lastSuccessfulAdminAccess', Date.now().toString());
+  debugLog('Saved enhanced admin session state:', params.userId);
 
   const userInfo = findUserById(params.userId);
   return renderAdminPanel(userInfo, 'admin');

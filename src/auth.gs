@@ -120,13 +120,14 @@ function getServiceAccountEmail() {
 }
 
 /**
- * 指定されたuserIdと現在ログイン中のユーザーのメールアドレスが一致し、
- * かつアクティブな管理者権限を持っているかを確認します。
- * @param {string} userId - URLパラメータから受け取ったユーザーID
- * @returns {boolean} 検証に成功した場合は true、それ以外は false
+ * 指定されたユーザーの管理者権限を検証する - 統合検索システム対応版
+ * @param {string} userId - 検証するユーザーのID
+ * @returns {boolean} 管理者権限がある場合は true、そうでなければ false
  */
 function verifyAdminAccess(userId) {
   try {
+    const startTime = Date.now();
+    
     // 引数チェック
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
       warnLog('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
@@ -140,85 +141,18 @@ function verifyAdminAccess(userId) {
       return false;
     }
 
-    // データベースから指定されたIDのユーザー情報を取得
-    // セキュリティ認証では最新データが必要だが、過度なキャッシュクリアを避ける
-    debugLog('verifyAdminAccess: ユーザー検索開始 - userId:', userId);
-
-    // 複数段階でのユーザー情報取得（最新データ確保のため）
-    var userFromDb = null;
-    var searchAttempts = [];
-
-    // 第1段階: キャッシュからユーザー情報を取得を試行
-    try {
-      userFromDb = getOrFetchUserInfo(userId, 'userId', {
-        useExecutionCache: false, // セキュリティ認証のため実行時キャッシュは使用しない
-        ttl: 30 // より短いTTLで最新性を確保
-      });
-      searchAttempts.push({ method: 'getOrFetchUserInfo', success: !!userFromDb });
-    } catch (error) {
-      warnLog('verifyAdminAccess: getOrFetchUserInfo でエラー:', error.message);
-      searchAttempts.push({ method: 'getOrFetchUserInfo', error: error.message });
-    }
-
-    // 第2段階: 直接データベース検索にフォールバック
-    if (!userFromDb || !userFromDb.adminEmail) {
-      debugLog('verifyAdminAccess: 直接データベース検索にフォールバック');
-      try {
-        userFromDb = fetchUserFromDatabase('userId', userId);
-        searchAttempts.push({ method: 'fetchUserFromDatabase', success: !!userFromDb });
-      } catch (error) {
-        errorLog('verifyAdminAccess: fetchUserFromDatabase でエラー:', error.message);
-        searchAttempts.push({ method: 'fetchUserFromDatabase', error: error.message });
-      }
-    }
-
-    // 第3段階: findUserById による追加検証
-    if (!userFromDb) {
-      debugLog('verifyAdminAccess: findUserById による最終検証を実行');
-      try {
-        userFromDb = findUserById(userId, { useExecutionCache: false, forceRefresh: true });
-        searchAttempts.push({ method: 'findUserById', success: !!userFromDb });
-      } catch (error) {
-        errorLog('verifyAdminAccess: findUserById でエラー:', error.message);
-        searchAttempts.push({ method: 'findUserById', error: error.message });
-      }
-    }
-    
-    // 第4段階: 新規ユーザー対応の緊急検索（直接データベースアクセス）
-    if (!userFromDb) {
-      warnLog('verifyAdminAccess: 📡 緊急検索を実行（新規ユーザー対応）');
-      try {
-        // キャッシュを完全にバイパスして直接データベースから検索
-        userFromDb = fetchUserFromDatabase('userId', userId, { 
-          enableDiagnostics: false, 
-          autoRepair: false,
-          retryCount: 1
-        });
-        searchAttempts.push({ method: 'emergencyDirectSearch', success: !!userFromDb });
-        
-        if (userFromDb) {
-          infoLog('✅ verifyAdminAccess: 緊急検索でユーザーを発見!', userId);
-        }
-      } catch (error) {
-        errorLog('verifyAdminAccess: 緊急検索でエラー:', error.message);
-        searchAttempts.push({ method: 'emergencyDirectSearch', error: error.message });
-      }
-    }
-
-    // 検索結果の詳細ログ
-    const searchSummary = {
-      found: !!userFromDb,
-      userId: userFromDb ? userFromDb.userId : 'なし',
-      adminEmail: userFromDb ? userFromDb.adminEmail : 'なし',
-      isActive: userFromDb ? userFromDb.isActive : 'なし',
+    debugLog('🔍 verifyAdminAccess: 統合ユーザー検索開始', {
+      userId: userId,
       activeUserEmail: activeUserEmail,
-      searchAttempts: searchAttempts,
       timestamp: new Date().toISOString()
-    };
-    debugLog('verifyAdminAccess: ユーザー検索結果:', searchSummary);
+    });
+
+    // 統合ユーザー検索システムを使用
+    var userFromDb = unifiedUserSearch(userId);
+    const searchDuration = Date.now() - startTime;
 
     if (!userFromDb) {
-      // 最後の手段: 新規ユーザー作成直後かチェック
+      // 新規ユーザー作成直後の特別処理
       let isRecentlyCreated = false;
       try {
         const userProperties = PropertiesService.getUserProperties();
@@ -227,41 +161,59 @@ function verifyAdminAccess(userId) {
         
         if (lastCreatedUserId === userId && lastCreatedTime) {
           const timeDiff = Date.now() - parseInt(lastCreatedTime);
-          isRecentlyCreated = timeDiff < 30000; // 30秒以内に作成された場合
+          isRecentlyCreated = timeDiff < 60000; // 60秒以内に作成された場合（時間を延長）
           
           debugLog('verifyAdminAccess: 新規ユーザー作成チェック:', {
             userId: userId,
             lastCreatedUserId: lastCreatedUserId,
             timeDiff: timeDiff,
-            isRecentlyCreated: isRecentlyCreated
+            isRecentlyCreated: isRecentlyCreated,
+            threshold: '60秒'
           });
         }
       } catch (propError) {
-        debugLog('verifyAdminAccess: ユーザープロパティ取得エラー:', propError.message);
+        warnLog('verifyAdminAccess: ユーザープロパティ取得エラー:', propError.message);
       }
       
       if (isRecentlyCreated) {
-        warnLog('verifyAdminAccess: ⏰ 新規作成直後のユーザーです。データベース同期待ちの可能性があります:', userId);
-        // 新規作成直後の場合は、メールアドレス一致をチェックして仮承認
-        try {
+        warnLog('verifyAdminAccess: ⏰ 新規作成直後のユーザーです。段階的リトライを実行します:', userId);
+        
+        // 段階的リトライ（データベース同期を待つ）
+        for (let retryCount = 1; retryCount <= 3; retryCount++) {
+          const waitTime = retryCount * 1000; // 1秒、2秒、3秒
+          warnLog(`verifyAdminAccess: リトライ ${retryCount}/3 - ${waitTime}ms待機後に再検索`);
+          
+          Utilities.sleep(waitTime);
+          userFromDb = unifiedUserSearch(userId);
+          
+          if (userFromDb) {
+            infoLog(`✅ verifyAdminAccess: リトライ${retryCount}回目で成功!`, userId);
+            break;
+          }
+        }
+        
+        // まだ見つからない場合は仮承認
+        if (!userFromDb) {
+          warnLog('verifyAdminAccess: 🕒 リトライ後もデータなし - メールベースで仮承認を試行');
           const currentEmailLower = activeUserEmail ? activeUserEmail.toLowerCase().trim() : '';
-          // 新規作成直後なので、メールアドレス一致のみで仮承認
           if (currentEmailLower) {
-            warnLog('verifyAdminAccess: 🕒 新規ユーザー仮承認モード - メールアドレスベースで認証します');
+            infoLog('verifyAdminAccess: 🎫 新規ユーザー仮承認 - データベース同期完了を待つ間の暫定認証');
             return true; // 仮承認
           }
-        } catch (tempAuthError) {
-          warnLog('verifyAdminAccess: 仮承認処理でエラー:', tempAuthError.message);
         }
       }
       
-      errorLog('verifyAdminAccess: 🚨 全ての検索方法でユーザーが見つかりませんでした:', {
-        requestedUserId: userId,
-        activeUserEmail: activeUserEmail,
-        isRecentlyCreated: isRecentlyCreated,
-        searchSummary: searchSummary
-      });
-      return false;
+      if (!userFromDb) {
+        const errorDetail = {
+          requestedUserId: userId,
+          activeUserEmail: activeUserEmail,
+          isRecentlyCreated: isRecentlyCreated,
+          searchDuration: searchDuration + 'ms',
+          timestamp: new Date().toISOString()
+        };
+        errorLog('🚨 verifyAdminAccess: 統合検索システムでもユーザーが見つかりませんでした:', errorDetail);
+        return false;
+      }
     }
 
     // データベースのメールアドレスと、現在ログイン中のメールアドレスを比較

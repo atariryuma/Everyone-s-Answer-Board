@@ -2,7 +2,122 @@
  * @fileoverview データベース管理 - バッチ操作とキャッシュ最適化
  * GAS互換の関数ベースの実装
  * 回復力のある実行機構を統合
+ * 統合ユーザー検索システム
  */
+
+/**
+ * 統合ユーザー検索システム - 優先順位ベースの検索
+ * @param {string} userId - 検索するユーザーID
+ * @param {Object} options - 検索オプション
+ * @returns {Object|null} ユーザー情報またはnull
+ */
+function unifiedUserSearch(userId, options = {}) {
+  const startTime = Date.now();
+  const searchLog = {
+    userId: userId,
+    attempts: [],
+    totalTime: 0,
+    success: false,
+    timestamp: new Date().toISOString()
+  };
+  
+  // 検索方法を成功率順に定義
+  const searchMethods = [
+    {
+      name: 'cacheOptimized',
+      priority: 1,
+      method: () => getOrFetchUserInfo(userId, 'userId', {
+        useExecutionCache: false,
+        ttl: 15 // セキュリティ検証用なので短いTTL
+      })
+    },
+    {
+      name: 'directDatabase',
+      priority: 2,
+      method: () => fetchUserFromDatabase('userId', userId, {
+        enableDiagnostics: false,
+        autoRepair: false,
+        retryCount: 1
+      })
+    },
+    {
+      name: 'findUserById',
+      priority: 3,
+      method: () => findUserById(userId, {
+        useExecutionCache: false,
+        forceRefresh: true
+      })
+    },
+    {
+      name: 'emergencySearch',
+      priority: 4,
+      method: () => fetchUserFromDatabase('userId', userId, {
+        enableDiagnostics: false,
+        autoRepair: false,
+        retryCount: 0,
+        bypassAllCache: true
+      })
+    }
+  ];
+
+  for (const searchMethod of searchMethods) {
+    const attemptStart = Date.now();
+    const attempt = {
+      method: searchMethod.name,
+      priority: searchMethod.priority,
+      startTime: attemptStart,
+      success: false,
+      error: null,
+      duration: 0
+    };
+
+    try {
+      debugLog(`🔍 unifiedUserSearch: ${searchMethod.name}を試行中...`, userId);
+      const result = searchMethod.method();
+      
+      attempt.duration = Date.now() - attemptStart;
+      
+      if (result && result.userId) {
+        attempt.success = true;
+        searchLog.attempts.push(attempt);
+        searchLog.success = true;
+        searchLog.totalTime = Date.now() - startTime;
+        
+        infoLog(`✅ unifiedUserSearch: ${searchMethod.name}で成功`, {
+          userId: userId,
+          method: searchMethod.name,
+          duration: attempt.duration + 'ms',
+          totalTime: searchLog.totalTime + 'ms'
+        });
+        
+        return result;
+      } else {
+        attempt.error = 'データなし';
+        warnLog(`⚠️ unifiedUserSearch: ${searchMethod.name}でデータなし`, userId);
+      }
+    } catch (error) {
+      attempt.duration = Date.now() - attemptStart;
+      attempt.error = error.message;
+      warnLog(`❌ unifiedUserSearch: ${searchMethod.name}でエラー`, {
+        userId: userId,
+        error: error.message,
+        duration: attempt.duration + 'ms'
+      });
+    }
+    
+    searchLog.attempts.push(attempt);
+    
+    // 各試行間で短い待機（データベース負荷軽減）
+    if (searchMethod.priority < 4) {
+      Utilities.sleep(100);
+    }
+  }
+
+  searchLog.totalTime = Date.now() - startTime;
+  
+  errorLog('🚨 unifiedUserSearch: 全ての検索方法が失敗', searchLog);
+  return null;
+}
 
 // 回復力のあるProperties/Cache操作
 function getResilientScriptProperties() {
