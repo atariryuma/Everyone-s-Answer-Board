@@ -973,7 +973,7 @@ function routeRequestByMode(params) {
 function handleDefaultRoute() {
   debugLog('No mode parameter, checking previous admin session');
 
-  const activeUserEmail = Session.getActiveUser().getEmail();
+  const activeUserEmail = getCurrentUserEmail();
   if (!activeUserEmail) {
     return showLoginPage();
   }
@@ -1379,7 +1379,7 @@ function getAppSetupUrl() {
   try {
     // システム管理者権限チェック
     debugLog('getAppSetupUrl: Checking deploy user permissions...');
-    const currentUserEmail = Session.getActiveUser().getEmail();
+    const currentUserEmail = getCurrentUserEmail();
     debugLog('getAppSetupUrl: Current user email:', currentUserEmail);
     const deployUserCheckResult = isDeployUser();
     debugLog('getAppSetupUrl: isDeployUser() result:', deployUserCheckResult);

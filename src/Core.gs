@@ -935,7 +935,7 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
   verifyUserAccess(requestUserId); // 内部でキャッシュクリア済み
 
   try {
-    var reactingUserEmail = Session.getActiveUser().getEmail();
+    var reactingUserEmail = getCurrentUserEmail();
     var ownerUserId = requestUserId; // requestUserId を使用
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
@@ -1001,7 +1001,7 @@ function addReactionBatch(requestUserId, batchOperations) {
 
     debugLog('🔄 バッチリアクション処理開始:', batchOperations.length + '件');
 
-    var reactingUserEmail = Session.getActiveUser().getEmail();
+    var reactingUserEmail = getCurrentUserEmail();
     var ownerUserId = requestUserId;
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
@@ -1176,8 +1176,8 @@ function verifyUserAccess(requestUserId) {
 
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
 
-  // Session.getActiveUser().getEmail()を直接使用（verifyUserAccessではemail比較が必要）
-  const activeUserEmail = Session.getActiveUser().getEmail();
+  // getCurrentUserEmail()を使用して安全にメールアドレスを取得（verifyUserAccessではemail比較が必要）
+  const activeUserEmail = getCurrentUserEmail();
   debugLog(`verifyUserAccess start: userId=${requestUserId}, email=${activeUserEmail}`);
   if (!activeUserEmail) {
     throw new Error('認証エラー: アクティブユーザーの情報を取得できませんでした');
@@ -2120,9 +2120,9 @@ function checkAdmin(requestUserId) {
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
-    // Session.getActiveUser().getEmail() が requestUserId の adminEmail と一致するかどうかを verifyUserAccess で既にチェック済み
-    // ここでは単に userInfo.adminEmail と Session.getActiveUser().getEmail() が一致するかを返す
-    return Session.getActiveUser().getEmail() === userInfo.adminEmail;
+    // getCurrentUserEmail() が requestUserId の adminEmail と一致するかどうかを verifyUserAccess で既にチェック済み
+    // ここでは単に userInfo.adminEmail と getCurrentUserEmail() が一致するかを返す
+    return getCurrentUserEmail() === userInfo.adminEmail;
   } catch (e) {
     errorLog('checkAdmin エラー: ' + e.message);
     return false;
@@ -5544,7 +5544,7 @@ function processLoginFlow() {
  */
 function getLoginStatus() {
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }
@@ -5605,7 +5605,7 @@ function getLoginStatus() {
  */
 function confirmUserRegistration() {
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
     }
@@ -5634,7 +5634,7 @@ function getInitialData(requestUserId, targetSheetName) {
     var startTime = new Date().getTime();
 
     // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = getCurrentUserEmail();
     var currentUserId = requestUserId;
 
     // UserID の解決

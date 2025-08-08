@@ -80,7 +80,9 @@
         google.script.run
           .withSuccessHandler(response => {
             if (!response || !response.status) {
-              reject(new Error(response && response.message ? response.message : 'ログイン処理に失敗しました'));
+              const errorMessage = response && response.message ? response.message : 'ログイン処理に失敗しました';
+              console.error('Login response error:', response);
+              reject(new Error(errorMessage));
               return;
             }
 
@@ -99,7 +101,10 @@
               reject(new Error(response.message || 'ログイン処理に失敗しました'));
             }
           })
-          .withFailureHandler(reject)
+          .withFailureHandler(error => {
+            console.error('Login server error:', error);
+            reject(new Error(error.message || error.toString() || 'サーバーエラーが発生しました'));
+          })
           .getLoginStatus();
       });
     };
