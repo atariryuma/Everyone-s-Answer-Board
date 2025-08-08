@@ -1724,7 +1724,7 @@ function createSecureRedirect(targetUrl, message) {
         <h1 class="title">${message || 'アクセス確認'}</h1>
         <p class="subtitle">セキュリティのため、下のボタンをクリックして続行してください</p>
 
-        <a href="${sanitizedUrl}" target="_top" class="main-button">
+        <a href="${sanitizedUrl}" target="_top" class="main-button" onclick="handleSecureRedirect(event, '${sanitizedUrl}')">
           🚀 続行する
         </a>
 
@@ -1734,8 +1734,43 @@ function createSecureRedirect(targetUrl, message) {
 
         <div class="note">
           ✓ このリンクは安全です<br>
-          ✓ Google Apps Script公式のセキュリティガイドラインに準拠
+          ✓ Google Apps Script公式のセキュリティガイドラインに準拠<br>
+          ✓ iframe制約回避のため新しいタブで開きます
         </div>
+        
+        <script>
+          function handleSecureRedirect(event, url) {
+            try {
+              // iframe内かどうかを判定
+              const isInFrame = (window !== window.top);
+              
+              if (isInFrame) {
+                // iframe内の場合は親ウィンドウで開く
+                event.preventDefault();
+                console.log('🔄 iframe内からの遷移を検出、parent window で開きます');
+                window.top.location.href = url;
+              } else {
+                // 通常の場合はそのまま遷移
+                console.log('🚀 通常の遷移を実行します');
+                // target="_top" が有効になります
+              }
+            } catch (error) {
+              console.error('リダイレクト処理エラー:', error);
+              // エラーの場合はフォールバック
+              window.location.href = url;
+            }
+          }
+          
+          // 自動遷移オプション（5秒後）
+          setTimeout(function() {
+            console.log('⏱️ 自動遷移タイマーを開始');
+            const mainButton = document.querySelector('.main-button');
+            if (mainButton) {
+              console.log('🔄 5秒経過、自動で遷移します');
+              mainButton.click();
+            }
+          }, 5000);
+        </script>
       </div>
     </body>
     </html>
@@ -1743,13 +1778,23 @@ function createSecureRedirect(targetUrl, message) {
 
   const htmlOutput = HtmlService.createHtmlOutput(userActionRedirectHtml);
 
-  // XFrameOptionsMode を安全に設定
+  // XFrameOptionsMode を安全に設定（セキュアリダイレクト用）
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      debugLog('✅ Secure Redirect XFrameOptionsMode.ALLOWALL設定完了');
+    } else {
+      warnLog('⚠️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
     }
   } catch (e) {
-    warnLog('XFrameOptionsMode設定エラー:', e.message);
+    errorLog('❌ Secure Redirect XFrameOptionsMode設定エラー:', e.message);
+    // フォールバック: 従来の方法で設定を試行
+    try {
+      htmlOutput.setXFrameOptionsMode('ALLOWALL');
+      infoLog('💡 フォールバック方法でSecure Redirect XFrameOptionsMode設定完了');
+    } catch (fallbackError) {
+      errorLog('❌ フォールバック方法も失敗:', fallbackError.message);
+    }
   }
 
   return htmlOutput;
@@ -1877,13 +1922,23 @@ function renderAdminPanel(userInfo, mode) {
     .setTitle('StudyQuest - 管理パネル')
     .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 
-  // XFrameOptionsMode を安全に設定
+  // XFrameOptionsMode を安全に設定（iframe embedding許可）
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      debugLog('✅ Admin Panel XFrameOptionsMode.ALLOWALL設定完了 - iframe embedding許可');
+    } else {
+      warnLog('⚠️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
     }
   } catch (e) {
-    warnLog('XFrameOptionsMode設定エラー:', e.message);
+    errorLog('❌ Admin Panel XFrameOptionsMode設定エラー:', e.message);
+    // フォールバック: 従来の方法で設定を試行
+    try {
+      htmlOutput.setXFrameOptionsMode('ALLOWALL');
+      infoLog('💡 フォールバック方法でAdmin Panel XFrameOptionsMode設定完了');
+    } catch (fallbackError) {
+      errorLog('❌ フォールバック方法も失敗:', fallbackError.message);
+    }
   }
 
   return htmlOutput;

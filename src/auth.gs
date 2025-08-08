@@ -144,29 +144,64 @@ function verifyAdminAccess(userId) {
     // セキュリティ認証では最新データが必要だが、過度なキャッシュクリアを避ける
     debugLog('verifyAdminAccess: ユーザー検索開始 - userId:', userId);
 
-    // まずキャッシュからユーザー情報を取得を試行
-    var userFromDb = getOrFetchUserInfo(userId, 'userId', {
-      useExecutionCache: false, // セキュリティ認証のため実行時キャッシュは使用しない
-      ttl: 60 // 短いTTLで最新性を確保
-    });
+    // 複数段階でのユーザー情報取得（最新データ確保のため）
+    var userFromDb = null;
+    var searchAttempts = [];
 
-    // セキュリティクリティカルな場合のみ、追加検証として直接取得
-    if (!userFromDb || !userFromDb.adminEmail) {
-      debugLog('verifyAdminAccess: 直接データベース検索にフォールバック');
-      userFromDb = fetchUserFromDatabase('userId', userId);
+    // 第1段階: キャッシュからユーザー情報を取得を試行
+    try {
+      userFromDb = getOrFetchUserInfo(userId, 'userId', {
+        useExecutionCache: false, // セキュリティ認証のため実行時キャッシュは使用しない
+        ttl: 30 // より短いTTLで最新性を確保
+      });
+      searchAttempts.push({ method: 'getOrFetchUserInfo', success: !!userFromDb });
+    } catch (error) {
+      warnLog('verifyAdminAccess: getOrFetchUserInfo でエラー:', error.message);
+      searchAttempts.push({ method: 'getOrFetchUserInfo', error: error.message });
     }
 
-    debugLog('verifyAdminAccess: ユーザー検索結果:', {
+    // 第2段階: 直接データベース検索にフォールバック
+    if (!userFromDb || !userFromDb.adminEmail) {
+      debugLog('verifyAdminAccess: 直接データベース検索にフォールバック');
+      try {
+        userFromDb = fetchUserFromDatabase('userId', userId);
+        searchAttempts.push({ method: 'fetchUserFromDatabase', success: !!userFromDb });
+      } catch (error) {
+        errorLog('verifyAdminAccess: fetchUserFromDatabase でエラー:', error.message);
+        searchAttempts.push({ method: 'fetchUserFromDatabase', error: error.message });
+      }
+    }
+
+    // 第3段階: findUserById による追加検証
+    if (!userFromDb) {
+      debugLog('verifyAdminAccess: findUserById による最終検証を実行');
+      try {
+        userFromDb = findUserById(userId, { useExecutionCache: false, forceRefresh: true });
+        searchAttempts.push({ method: 'findUserById', success: !!userFromDb });
+      } catch (error) {
+        errorLog('verifyAdminAccess: findUserById でエラー:', error.message);
+        searchAttempts.push({ method: 'findUserById', error: error.message });
+      }
+    }
+
+    // 検索結果の詳細ログ
+    const searchSummary = {
       found: !!userFromDb,
       userId: userFromDb ? userFromDb.userId : 'なし',
       adminEmail: userFromDb ? userFromDb.adminEmail : 'なし',
       isActive: userFromDb ? userFromDb.isActive : 'なし',
       activeUserEmail: activeUserEmail,
-      cacheStrategy: 'optimized' // 最適化されたキャッシュ戦略を使用
-    });
+      searchAttempts: searchAttempts,
+      timestamp: new Date().toISOString()
+    };
+    debugLog('verifyAdminAccess: ユーザー検索結果:', searchSummary);
 
     if (!userFromDb) {
-      warnLog('verifyAdminAccess: 指定されたIDのユーザーが存在しません。ID:', userId);
+      errorLog('verifyAdminAccess: 🚨 全ての検索方法でユーザーが見つかりませんでした:', {
+        requestedUserId: userId,
+        activeUserEmail: activeUserEmail,
+        searchSummary: searchSummary
+      });
       return false;
     }
 
@@ -310,15 +345,32 @@ function processLoginFlow(userEmail) {
 
       // 3b. データベースに作成
       createUser(newUser);
-      if (!waitForUserRecord(newUser.userId, 3000, 500)) {
-        warnLog('processLoginFlow: user not found after create:', newUser.userId);
+      
+      // 3c. ユーザー作成後の検証を強化（待機時間とリトライ回数を増加）
+      debugLog('processLoginFlow: ユーザー作成完了、データベース検証を実行中...', newUser.userId);
+      if (!waitForUserRecord(newUser.userId, 5000, 300)) { // 5秒間待機、300ms間隔でリトライ
+        warnLog('processLoginFlow: ユーザーレコード検証でタイムアウト:', newUser.userId);
+        
+        // 追加検証: 直接データベースから取得を試行
+        const verifyUser = findUserById(newUser.userId, { useExecutionCache: false, forceRefresh: true });
+        if (!verifyUser) {
+          errorLog('processLoginFlow: 🚨 ユーザー作成後の検証に失敗 - ユーザーがデータベースに見つかりません:', newUser.userId);
+          throw new Error('ユーザー登録の処理中にエラーが発生しました。しばらく待ってから再度お試しください。');
+        } else {
+          infoLog('processLoginFlow: ✅ 直接検証でユーザーを確認しました:', newUser.userId);
+        }
+      } else {
+        infoLog('processLoginFlow: ✅ ユーザーレコード検証が完了しました:', newUser.userId);
       }
+      
       debugLog('processLoginFlow: New user creation completed:', newUser.userId);
 
-      // 3c. 新規ユーザーの管理パネルへリダイレクト
+      // 3d. 新規ユーザーの管理パネルへリダイレクト
       const adminUrl = buildUserAdminUrl(newUser.userId);
-      debugLog('processLoginFlow: Redirecting new user to admin panel:', adminUrl); // 追加
-      return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
+      debugLog('processLoginFlow: Redirecting new user to admin panel:', adminUrl);
+      
+      // 新規ユーザー登録完了メッセージを明確に表示
+      return createSecureRedirect(adminUrl, '✨ 新規ユーザー登録が完了しました！セットアップを開始してください');
     }
   } catch (error) {
     // 構造化エラーログの出力
