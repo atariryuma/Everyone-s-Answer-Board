@@ -1225,13 +1225,7 @@ function createUser(userData) {
     }
 
     // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
-    invalidateUserCache(
-      userData.userId,
-      userData.adminEmail,
-      userData.spreadsheetId,
-      false,
-      dbId
-    );
+    invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
 
     return userData;
   });
@@ -1247,7 +1241,7 @@ function createUser(userData) {
 function waitForUserRecord(userId, maxWaitMs, intervalMs) {
   var start = Date.now();
   while (Date.now() - start < maxWaitMs) {
-    if (fetchUserFromDatabase('userId', userId, { clearCache: true })) return true;
+    if (fetchUserFromDatabase('userId', userId)) return true;
     Utilities.sleep(intervalMs);
   }
   return false;
