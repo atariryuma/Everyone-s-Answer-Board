@@ -936,6 +936,52 @@ function registerNewUser(adminEmail) {
     infoLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
     // 生成されたユーザー情報のキャッシュをクリア
     invalidateUserCache(userId, adminEmail, null, false);
+    
+    // ScriptPropertiesに新規ユーザー作成を記録（管理パネルアクセス時の認証用）
+    try {
+      const createdTime = Date.now().toString();
+      const scriptProps = PropertiesService.getScriptProperties();
+      
+      const scriptKey = `newUser_${adminEmail}_${userId}`;
+      scriptProps.setProperty(scriptKey, JSON.stringify({
+        userId: userId,
+        email: adminEmail,
+        createdTime: createdTime,
+        timestamp: new Date().toISOString(),
+        source: 'registerNewUser'
+      }));
+      
+      debugLog('✅ registerNewUser: 新規ユーザー情報をScriptPropertiesに記録:', {
+        userId: userId,
+        email: adminEmail,
+        key: scriptKey
+      });
+      
+      // 古い記録をクリーンアップ（1時間以上前の記録）
+      try {
+        const allScriptProps = scriptProps.getProperties();
+        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+        
+        Object.keys(allScriptProps).forEach(key => {
+          if (key.startsWith('newUser_')) {
+            try {
+              const data = JSON.parse(allScriptProps[key]);
+              if (parseInt(data.createdTime) < oneHourAgo) {
+                scriptProps.deleteProperty(key);
+              }
+            } catch (e) {
+              // 無効なデータは削除
+              scriptProps.deleteProperty(key);
+            }
+          }
+        });
+      } catch (cleanupError) {
+        warnLog('registerNewUser: ScriptPropertiesクリーンアップでエラー:', cleanupError.message);
+      }
+    } catch (propError) {
+      warnLog('⚠️ registerNewUser: ScriptProperties記録でエラー:', propError.message);
+      // ScriptProperties記録の失敗はユーザー登録を阻害しない
+    }
   } catch (e) {
     logDatabaseError(e, 'userRegistration', { userId: userId, email: adminEmail });
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
