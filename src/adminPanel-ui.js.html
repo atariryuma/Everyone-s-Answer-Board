@@ -484,11 +484,11 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       if (typeof sheet === 'object' && sheet.name) {
         sheetName = sheet.name;
         option.value = sheet.name;
-        logDebug(`📄 Sheet ${index + 1}: ${sheet.name} (ID: ${sheet.id})`);
+        logDebug('📄 Sheet ' + (index + 1) + ': ' + sheet.name + ' (ID: ' + sheet.id + ')');
       } else if (typeof sheet === 'string') {
         sheetName = sheet;
         option.value = sheet;
-        logDebug(`📄 Sheet ${index + 1}: ${sheet}`);
+        logDebug('📄 Sheet ' + (index + 1) + ': ' + sheet);
       } else {
         console.warn('⚠️ Unknown sheet format:', sheet);
         return;
@@ -496,11 +496,11 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       
       // アクティブシートの表示を改善
       if (sheetName === activeSheetName) {
-        option.textContent = `${sheetName} (アクティブ)`;
+        option.textContent = sheetName + ' (アクティブ)';
         option.style.fontWeight = 'bold';
         option.style.color = '#10b981'; // 緑色でアクティブを表示
         option.className = 'active-sheet-option';
-        logDebug(`✅ Active sheet marked: ${sheetName}`);
+        logDebug('✅ Active sheet marked: ' + sheetName);
       } else {
         option.textContent = sheetName;
       }
@@ -834,7 +834,7 @@ function updateStepIndicators(currentStep, status = null) {
     }
 
     // データベース状態に基づく完了判定
-    const isStepComplete = completion[`step${stepNumber}`];
+    const isStepComplete = completion['step' + stepNumber];
     
     // 更新情報を配列に追加（実際のDOM更新は後で一括実行）
     updates.push({
@@ -3320,7 +3320,7 @@ async function selectHistoryItem(historyId) {
         if (item.config && item.config.opinionHeader) {
           const opinionSelect = document.getElementById('opinionHeader');
           if (opinionSelect) {
-            opinionSelect.innerHTML = `<option value="${item.config.opinionHeader}">${item.config.opinionHeader}</option>`;
+            opinionSelect.innerHTML = '<option value="' + item.config.opinionHeader + '">' + item.config.opinionHeader + '</option>';
             opinionSelect.value = item.config.opinionHeader;
             partiallyRestored = true;
           }
