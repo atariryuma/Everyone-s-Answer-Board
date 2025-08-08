@@ -1116,25 +1116,10 @@ function handleAdminMode(params) {
   }
 
   debugLog('handleAdminMode: verifying admin access for userId:', params.userId);
-
-  /** @type {boolean} */
-  let isVerified = verifyAdminAccess(params.userId);
-
-  // Fallback verification using active user email when standard check fails
-  if (!isVerified) {
-    const activeEmail = getCurrentUserEmail();
-    const userInfo = activeEmail ? findUserByEmail(activeEmail) : null;
-    if (userInfo && userInfo.userId === params.userId && userInfo.isActive) {
-      infoLog('handleAdminMode: admin access verified via fallback for userId:', params.userId);
-      isVerified = true;
-    }
-  }
-
-  if (!isVerified) {
+  if (!verifyAdminAccess(params.userId)) {
     infoLog('handleAdminMode: admin access denied for userId:', params.userId);
     return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
   }
-
   debugLog('handleAdminMode: admin access verified for userId:', params.userId);
 
   // Save admin session state
