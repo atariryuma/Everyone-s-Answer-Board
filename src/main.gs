@@ -913,41 +913,31 @@ function validateSystemDependencies() {
   const errors = [];
   
   try {
-    // PropertiesService テスト
+    // 軽量化されたシステム依存関係チェック（パフォーマンス最適化）
+    
+    // PropertiesService の基本的な存在確認のみ
     try {
       const props = PropertiesService.getScriptProperties();
       if (!props || typeof props.getProperty !== 'function') {
         errors.push('PropertiesService が利用できません');
-      } else {
-        // 実際にプロパティアクセスをテスト
-        props.getProperty('_DEPENDENCY_TEST_KEY'); // 存在しないキーでテスト
       }
+      // 実際のアクセステストは削除（パフォーマンス改善）
     } catch (propsError) {
       errors.push(`PropertiesService エラー: ${propsError.message}`);
     }
 
-    // resilientExecutor テスト
+    // resilientExecutor の基本存在確認のみ
     try {
       if (typeof resilientExecutor === 'undefined') {
         errors.push('resilientExecutor が定義されていません');
-      } else if (typeof resilientExecutor.getStats !== 'function') {
-        errors.push('resilientExecutor が正しく初期化されていません');
       }
+      // 詳細機能テストは削除（パフォーマンス改善）
     } catch (executorError) {
       errors.push(`resilientExecutor エラー: ${executorError.message}`);
     }
 
-    // secretManager テスト (存在する場合)
-    try {
-      if (typeof secretManager !== 'undefined' && typeof secretManager.isEnabled === 'function') {
-        // secretManagerが有効な場合のみテスト
-        if (secretManager.isEnabled()) {
-          secretManager.diagnose(); // 自己診断機能を呼び出し
-        }
-      }
-    } catch (secretError) {
-      errors.push(`SecretManager エラー: ${secretError.message}`);
-    }
+    // secretManager の詳細診断は削除（パフォーマンス改善）
+    // 必要に応じて後で実行
 
     // CacheService テスト
     try {
@@ -1716,6 +1706,11 @@ function createSecureRedirect(targetUrl, message) {
           margin-top: 20px;
           line-height: 1.4;
         }
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
       </style>
     </head>
     <body>
@@ -1761,15 +1756,19 @@ function createSecureRedirect(targetUrl, message) {
             }
           }
           
-          // 自動遷移オプション（5秒後）
+          // 自動遷移を無効化（X-Frame-Options制約のためユーザーアクション必須）
+          // ユーザーに明確なアクションを要求することで、より確実な遷移を実現
+          console.log('ℹ️ 自動遷移は無効です。ユーザーによるボタンクリックが必要です。');
+          
+          // 代わりに、5秒後にボタンを強調表示
           setTimeout(function() {
-            console.log('⏱️ 自動遷移タイマーを開始');
             const mainButton = document.querySelector('.main-button');
             if (mainButton) {
-              console.log('🔄 5秒経過、自動で遷移します');
-              mainButton.click();
+              mainButton.style.animation = 'pulse 1s infinite';
+              mainButton.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
+              console.log('✨ ボタンを強調表示しました');
             }
-          }, 5000);
+          }, 3000);
         </script>
       </div>
     </body>

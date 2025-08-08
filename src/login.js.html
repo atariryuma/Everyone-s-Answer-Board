@@ -617,10 +617,37 @@
         if (btnText) btnText.style.display = 'none';
         if (btnSpinner) btnSpinner.style.display = 'flex';
         
-        // 実際の遷移
-        setTimeout(() => {
-          window.location.href = adminUrl;
-        }, 100);
+        // iframe内検出とX-Frame-Options制約回避
+        try {
+          const isInFrame = (window !== window.top);
+          console.log('🔍 Frame detection:', { isInFrame, currentWindow: window.location.href });
+          
+          if (isInFrame) {
+            // iframe内の場合は親ウィンドウで開く（X-Frame-Options制約回避）
+            console.log('🔄 iframe内からの遷移を検出、parent window で開きます');
+            setTimeout(() => {
+              try {
+                window.top.location.href = adminUrl;
+              } catch (topError) {
+                console.error('❌ window.top.location アクセスエラー:', topError);
+                // フォールバック: 新しいタブで開く
+                window.open(adminUrl, '_blank');
+              }
+            }, 100);
+          } else {
+            // 通常のウィンドウの場合
+            console.log('🚀 通常ウィンドウでの遷移を実行');
+            setTimeout(() => {
+              window.location.href = adminUrl;
+            }, 100);
+          }
+        } catch (detectionError) {
+          console.error('❌ Frame detection エラー:', detectionError);
+          // エラー時のフォールバック: 新しいタブで開く
+          setTimeout(() => {
+            window.open(adminUrl, '_blank');
+          }, 100);
+        }
         
         return false;
       };

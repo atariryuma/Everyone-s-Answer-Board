@@ -549,7 +549,8 @@ function getSheetsServiceCached(forceRefresh) {
       throw new Error('Sheets APIサービスの初期化に失敗しました: 有効なサービスオブジェクトを作成できません');
     }
 
-    infoLog('✅ サービスオブジェクト検証成功:', {
+    // パフォーマンス最適化: 詳細ログを削減し、必要最小限の検証のみ実行
+    debugLog('✅ サービスオブジェクト検証成功:', {
       hasBaseUrl: true,
       hasAccessToken: true,
       hasSpreadsheets: !!service.spreadsheets,
@@ -557,16 +558,13 @@ function getSheetsServiceCached(forceRefresh) {
       baseUrl: service.baseUrl
     });
 
-    // 関数の存在確認（重要: Google Apps Scriptで関数が失われていないか確認）
+    // 簡略化された関数存在確認
     if (!service.spreadsheets || typeof service.spreadsheets.get !== 'function') {
-      errorLog('❌ 重要な関数が失われています:', {
-        hasSpreadsheets: !!service.spreadsheets,
-        getType: service.spreadsheets ? typeof service.spreadsheets.get : 'no spreadsheets'
-      });
+      errorLog('❌ 重要な関数が失われています: SheetsServiceの基本機能が利用できません');
       throw new Error('SheetsServiceオブジェクトの関数が正しく設定されていません');
     }
 
-    infoLog('✅ キャッシュ用新規Sheetsサービス作成完了（関数検証済み）');
+    debugLog('✅ Sheetsサービス作成完了（検証済み）');
     return service;
 
   } catch (error) {
@@ -737,11 +735,11 @@ function findUserByEmail(email) {
  * @returns {object|null} ユーザー情報
  */
 function fetchUserFromDatabase(field, value, options = {}) {
-  // オプションのデフォルト値
+  // オプションのデフォルト値（パフォーマンス最適化: 診断と自動修復はデフォルトで無効）
   const opts = {
     retryCount: options.retryCount || 2,
-    enableDiagnostics: options.enableDiagnostics !== false,
-    autoRepair: options.autoRepair !== false,
+    enableDiagnostics: options.enableDiagnostics === true, // 明示的にtrueの場合のみ有効
+    autoRepair: options.autoRepair === true, // 明示的にtrueの場合のみ有効
     ...options
   };
 
