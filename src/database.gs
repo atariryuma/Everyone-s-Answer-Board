@@ -1,7 +1,23 @@
 /**
  * @fileoverview データベース管理 - バッチ操作とキャッシュ最適化
  * GAS互換の関数ベースの実装
+ * 回復力のある実行機構を統合
  */
+
+// 回復力のあるProperties/Cache操作
+function getResilientScriptProperties() {
+  return resilientExecutor.execute(
+    () => PropertiesService.getScriptProperties(),
+    { name: 'PropertiesService.getScriptProperties', idempotent: true }
+  );
+}
+
+function getResilientUserProperties() {
+  return resilientExecutor.execute(
+    () => PropertiesService.getUserProperties(),
+    { name: 'PropertiesService.getUserProperties', idempotent: true }
+  );
+}
 
 // データベース管理のための定数
 const USER_CACHE_TTL = 300; // 5分
@@ -31,7 +47,7 @@ const DELETE_LOG_SHEET_CONFIG = {
  * @param {string} reason - 削除理由
  * @param {string} deleteType - 削除タイプ ("self" | "admin")
  */
-function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
+async function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, deleteType) {
   const transactionLog = {
     startTime: Date.now(),
     steps: [],
@@ -45,8 +61,8 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       throw new Error('必須パラメータが不足しています');
     }
 
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
 
     if (!dbId) {
       warnLog('削除ログの記録をスキップします: データベースIDが設定されていません');
@@ -124,7 +140,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 
         // 検証: 追加されたログエントリの確認
         Utilities.sleep(100); // 書き込み完了待機
-        const verificationData = batchGetSheetsData(service, dbId, [`'${logSheetName}'!A:F`]);
+        const verificationData = await batchGetSheetsData(service, dbId, [`'${logSheetName}'!A:F`]);
         const lastRow = verificationData.valueRanges[0].values?.slice(-1)[0];
 
         if (!lastRow || lastRow[1] !== executorEmail || lastRow[2] !== targetUserId) {
@@ -181,15 +197,15 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 /**
  * 全ユーザー一覧を取得（管理者用）
  */
-function getAllUsersForAdmin() {
+async function getAllUsersForAdmin() {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
       throw new Error('この機能にアクセスする権限がありません。');
     }
 
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
 
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
@@ -198,7 +214,7 @@ function getAllUsersForAdmin() {
     const service = getSheetsServiceCached();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    const data = await batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
     const values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
@@ -246,7 +262,7 @@ function getAllUsersForAdmin() {
  * @param {string} targetUserId - 削除対象のユーザーID
  * @param {string} reason - 削除理由
  */
-function deleteUserAccountByAdmin(targetUserId, reason) {
+async function deleteUserAccountByAdmin(targetUserId, reason) {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
@@ -303,8 +319,8 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
     // 統一ロック管理でデータベース削除実行
     return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccountByAdmin', () => {
       // データベースからユーザー行を削除
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      const props = await getResilientScriptProperties();
+      const dbId = await getSecureDatabaseId();
 
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
@@ -324,7 +340,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       }
 
       // データを取得してユーザー行を特定
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+      const data = await batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
       const values = data.valueRanges[0].values || [];
 
       let rowToDelete = -1;
@@ -390,7 +406,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
  * 削除権限チェック
  * @param {string} targetUserId - 対象ユーザーID
  */
-function canDeleteUser(targetUserId) {
+async function canDeleteUser(targetUserId) {
   try {
     const currentUserEmail = Session.getActiveUser().getEmail();
     const targetUser = findUserById(targetUserId);
@@ -410,15 +426,15 @@ function canDeleteUser(targetUserId) {
 /**
  * 削除ログ一覧を取得（管理者用）
  */
-function getDeletionLogs() {
+async function getDeletionLogs() {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
       throw new Error('この機能にアクセスする権限がありません。');
     }
 
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
 
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
@@ -712,7 +728,7 @@ function fetchUserFromDatabase(field, value, options = {}) {
         ': ' + field + '=' + value);
 
       var props = PropertiesService.getScriptProperties();
-      var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      var dbId = await getSecureDatabaseId();
 
       if (!dbId) {
         var configError = new Error('データベースIDが設定されていません');
@@ -993,8 +1009,8 @@ function updateUser(userId, updateData) {
       });
     }
     
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
 
     if (!dbId) {
       throw new Error('データ更新エラー: データベースIDが設定されていません');
@@ -1004,7 +1020,7 @@ function updateUser(userId, updateData) {
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
     // 現在のデータを取得
-    const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    const data = await batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
 
     if (values.length === 0) {
@@ -1154,8 +1170,8 @@ function createUser(userData) {
       throw new Error('このメールアドレスは既に登録されています。');
     }
 
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
     const service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
@@ -1324,7 +1340,7 @@ function createSheetsService(accessToken) {
           var url = 'https://sheets.googleapis.com/v4/spreadsheets/' +
                    options.spreadsheetId + '/values/' + encodeURIComponent(options.range);
 
-          var response = UrlFetchApp.fetch(url, {
+          var response = await resilientUrlFetch(url, {
             headers: { 'Authorization': 'Bearer ' + accessToken },
             muteHttpExceptions: true,
             followRedirects: true,
@@ -1344,7 +1360,7 @@ function createSheetsService(accessToken) {
           url += '?fields=' + encodeURIComponent(options.fields);
         }
 
-        var response = UrlFetchApp.fetch(url, {
+        var response = await resilientUrlFetch(url, {
           headers: { 'Authorization': 'Bearer ' + accessToken },
           muteHttpExceptions: true,
           followRedirects: true,
@@ -1368,8 +1384,8 @@ function createSheetsService(accessToken) {
  * @param {string[]} ranges - 取得範囲の配列
  * @returns {object} レスポンス
  */
-function batchGetSheetsData(service, spreadsheetId, ranges) {
-  debugLog('DEBUG: batchGetSheetsData - 安全なサービスオブジェクト処理開始');
+async function batchGetSheetsData(service, spreadsheetId, ranges) {
+  debugLog('DEBUG: batchGetSheetsData - 統一バッチ処理システムを使用');
 
   // 型安全性とバリデーション強化: 入力パラメータ検証
   if (!service) {
@@ -1410,98 +1426,13 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
     }
   }
 
-  // API効率化: 小さなバッチの統合とキャッシュ化
-  var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
-
-  return cacheManager.get(cacheKey, () => {
-    try {
-      // 防御的プログラミング: サービスオブジェクトのプロパティを安全に取得
-      var baseUrl = service.baseUrl;
-      var accessToken = service.accessToken;
-
-      // baseUrlが失われている場合の防御処理
-      if (!baseUrl || typeof baseUrl !== 'string') {
-        warnLog('⚠️ baseUrlが見つかりません。デフォルトのGoogleSheetsAPIエンドポイントを使用します');
-        baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
-      }
-
-      if (!accessToken || typeof accessToken !== 'string') {
-        throw new Error('アクセストークンが見つかりません。サービスオブジェクトが破損している可能性があります');
-      }
-
-      debugLog('DEBUG: 使用するbaseUrl:', baseUrl);
-
-      // 安全なURL構築
-      var url = baseUrl + '/' + encodeURIComponent(spreadsheetId) + '/values:batchGet?' +
-        ranges.map(function(range) {
-          return 'ranges=' + encodeURIComponent(range);
-        }).join('&');
-
-      debugLog('DEBUG: 構築されたURL:', url.substring(0, 100) + '...');
-
-      var response = UrlFetchApp.fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + accessToken },
-        muteHttpExceptions: true,
-        followRedirects: true,
-        validateHttpsCertificates: true
-      });
-
-      var responseCode = response.getResponseCode();
-      var responseText = response.getContentText();
-
-      if (responseCode !== 200) {
-        errorLog('Sheets API エラー詳細:', {
-          code: responseCode,
-          response: responseText,
-          url: url.substring(0, 100) + '...',
-          spreadsheetId: spreadsheetId
-        });
-        throw new Error('Sheets API error: ' + responseCode + ' - ' + responseText);
-      }
-
-      var result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        errorLog('❌ JSON解析エラー:', parseError.message);
-        errorLog('❌ Response text:', responseText.substring(0, 200));
-        throw new Error('APIレスポンスのJSON解析に失敗: ' + parseError.message);
-      }
-
-      // レスポンス構造の検証
-      if (!result || typeof result !== 'object') {
-        throw new Error('無効なAPIレスポンス: オブジェクトが期待されましたが ' + typeof result + ' を受信');
-      }
-
-      if (!result.valueRanges || !Array.isArray(result.valueRanges)) {
-        warnLog('⚠️ valueRanges配列が見つからないか、配列でありません:', typeof result.valueRanges);
-        result.valueRanges = []; // 空配列を設定
-      }
-
-      // リクエストした範囲数と一致するか確認
-      if (result.valueRanges.length !== ranges.length) {
-        warnLog(`⚠️ リクエスト範囲数(${ranges.length})とレスポンス数(${result.valueRanges.length})が一致しません`);
-      }
-
-      infoLog('✅ batchGetSheetsData 成功: 取得した範囲数:', result.valueRanges.length);
-
-      // 各範囲のデータ存在確認
-      result.valueRanges.forEach((valueRange, index) => {
-        const hasValues = valueRange.values && valueRange.values.length > 0;
-        debugLog(`📊 範囲[${index}] ${ranges[index]}: ${hasValues ? valueRange.values.length + '行' : 'データなし'}`);
-      if (hasValues) {
-        debugLog(`DEBUG: batchGetSheetsData - 範囲[${index}] データプレビュー:`, JSON.stringify(valueRange.values.slice(0, 5))); // 最初の5行をプレビュー
-      }
-      });
-
-      return result;
-
-    } catch (error) {
-      errorLog('❌ batchGetSheetsData error:', error.message);
-      errorLog('❌ Error stack:', error.stack);
-      throw new Error('データ取得に失敗しました: ' + error.message);
-    }
-  }, { ttl: 120 }); // 2分間キャッシュ（API制限対策）
+  // 統一バッチ処理システムを使用
+  return await unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, {
+    useCache: true,
+    ttl: 120, // 2分間キャッシュ（API制限対策）
+    valueRenderOption: 'UNFORMATTED_VALUE',
+    dateTimeRenderOption: 'SERIAL_NUMBER'
+  });
 }
 
 /**
@@ -1511,32 +1442,13 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
  * @param {object[]} requests - 更新リクエストの配列
  * @returns {object} レスポンス
  */
-function batchUpdateSheetsData(service, spreadsheetId, requests) {
-  try {
-    var url = service.baseUrl + '/' + spreadsheetId + '/values:batchUpdate';
-
-    var response = UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { 'Authorization': 'Bearer ' + service.accessToken },
-      payload: JSON.stringify({
-        data: requests,
-        valueInputOption: 'RAW'
-      }),
-      muteHttpExceptions: true,
-      followRedirects: true,
-      validateHttpsCertificates: true
-    });
-
-    if (response.getResponseCode() !== 200) {
-      throw new Error('Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText());
-    }
-
-    return JSON.parse(response.getContentText());
-  } catch (error) {
-    errorLog('batchUpdateSheetsData error:', error.message);
-    throw new Error('データ更新に失敗しました: ' + error.message);
-  }
+async function batchUpdateSheetsData(service, spreadsheetId, requests) {
+  // 統一バッチ処理システムを使用
+  return await unifiedBatchProcessor.batchUpdate(service, spreadsheetId, requests, {
+    valueInputOption: 'RAW',
+    includeValuesInResponse: false,
+    invalidateCache: true
+  });
 }
 
 /**
@@ -1547,18 +1459,31 @@ function batchUpdateSheetsData(service, spreadsheetId, requests) {
  * @param {array} values - 値の配列
  * @returns {object} レスポンス
  */
-function appendSheetsData(service, spreadsheetId, range, values) {
-  var url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) +
-    ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+async function appendSheetsData(service, spreadsheetId, range, values) {
+  // 回復力のある実行でappend操作を実行
+  return await resilientExecutor.execute(
+    async () => {
+      const url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) +
+        ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
 
-  var response = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'Authorization': 'Bearer ' + service.accessToken },
-    payload: JSON.stringify({ values: values })
-  });
+      const response = await resilientUrlFetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'Authorization': 'Bearer ' + service.accessToken },
+        payload: JSON.stringify({ values: values })
+      });
 
-  return JSON.parse(response.getContentText());
+      if (response.getResponseCode() !== 200) {
+        throw new Error('Append operation failed: ' + response.getResponseCode() + ' - ' + response.getContentText());
+      }
+
+      return JSON.parse(response.getContentText());
+    },
+    {
+      name: `AppendSheetsData_${spreadsheetId}`,
+      idempotent: false
+    }
+  );
 }
 
 /**
@@ -1674,12 +1599,12 @@ function getSpreadsheetsData(service, spreadsheetId) {
  */
 function getAllUsers() {
   try {
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
     const service = getSheetsServiceCached();
     var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-    const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    const data = await batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
@@ -1737,15 +1662,14 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  * @param {object} requestBody - リクエストボディ
  * @returns {object} レスポンス
  */
-function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
-  var url = service.baseUrl + '/' + spreadsheetId + ':batchUpdate';
-  var response = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'Authorization': 'Bearer ' + service.accessToken },
-    payload: JSON.stringify(requestBody)
+async function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
+  // 統一バッチ処理システムを使用
+  const requests = requestBody.requests || [];
+  return await unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
+    includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse || false,
+    responseRanges: requestBody.responseRanges || [],
+    invalidateCache: true
   });
-  return JSON.parse(response.getContentText());
 }
 
 /**
@@ -1757,8 +1681,8 @@ function diagnoseDatabase(targetUserId) {
   try {
     debugLog('🔍 データベース診断開始:', targetUserId || 'ALL_USERS');
 
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
 
     var diagnosticResult = {
       timestamp: new Date().toISOString(),
@@ -1984,7 +1908,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
 
     // 1. データベーススプレッドシートの権限確認
     var props = PropertiesService.getScriptProperties();
-    var dbId = spreadsheetId || props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = spreadsheetId || await getSecureDatabaseId();
 
     if (!dbId) {
       result.summary.issues.push('データベースIDが設定されていません');
@@ -2237,8 +2161,8 @@ function performDataIntegrityCheck(options = {}) {
     };
 
     // データベース接続確認
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
     if (!dbId) {
       result.summary.issues.push('データベースIDが設定されていません');
       result.summary.status = 'critical';
@@ -2549,8 +2473,8 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
  */
 function getDbSheet() {
   try {
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
     }
@@ -2807,8 +2731,8 @@ function performPerformanceCheck() {
   try {
     // データベースアクセス速度テスト
     var dbTestStart = Date.now();
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const props = await getResilientScriptProperties();
+    const dbId = await getSecureDatabaseId();
 
     if (dbId) {
       const service = getSheetsServiceCached();
@@ -3019,7 +2943,7 @@ function deleteUserAccount(userId) {
     return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccount', () => {
       // データベース（シート）からユーザー行を削除（サービスアカウント経由）
       var props = PropertiesService.getScriptProperties();
-      var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      var dbId = await getSecureDatabaseId();
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
       }
@@ -3049,7 +2973,7 @@ function deleteUserAccount(userId) {
       debugLog('Found database sheet with sheetId:', targetSheetId);
 
       // データを取得
-      const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+      const data = await batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
       const values = data.valueRanges[0].values || [];
 
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）

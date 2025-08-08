@@ -1,6 +1,7 @@
 /**
  * SpreadsheetApp.openById()呼び出し最適化システム
  * メモリキャッシュとセッションキャッシュを組み合わせた高速化
+ * 回復力のある実行機構を統合
  */
 
 // メモリキャッシュ - 実行セッション内で有効
@@ -20,7 +21,7 @@ const SPREADSHEET_CACHE_CONFIG = {
  * @param {boolean} forceRefresh - 強制リフレッシュフラグ
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Spreadsheetオブジェクト
  */
-function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
+async function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   if (!spreadsheetId || typeof spreadsheetId !== 'string') {
     throw new Error('有効なスプレッドシートIDが必要です');
   }
@@ -32,7 +33,10 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   if (forceRefresh) {
     delete spreadsheetMemoryCache[spreadsheetId];
     try {
-      PropertiesService.getScriptProperties().deleteProperty(cacheKey);
+      await resilientCacheOperation(
+        () => PropertiesService.getScriptProperties().deleteProperty(cacheKey),
+        'PropertiesService.deleteProperty'
+      );
     } catch (error) {
       debugLog('キャッシュクリアエラー:', error.message);
     }
@@ -47,12 +51,18 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
 
   // Phase 2: セッションキャッシュをチェック
   try {
-    const sessionCacheData = PropertiesService.getScriptProperties().getProperty(cacheKey);
+    const sessionCacheData = await resilientCacheOperation(
+      () => PropertiesService.getScriptProperties().getProperty(cacheKey),
+      'PropertiesService.getProperty'
+    );
     if (sessionCacheData) {
       const sessionEntry = JSON.parse(sessionCacheData);
       if ((now - sessionEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL) {
         // セッションキャッシュからSpreadsheetオブジェクトを再構築
-        const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        const spreadsheet = await resilientSpreadsheetOperation(
+          () => SpreadsheetApp.openById(spreadsheetId),
+          'SpreadsheetApp.openById'
+        );
         
         // メモリキャッシュに保存
         spreadsheetMemoryCache[spreadsheetId] = {

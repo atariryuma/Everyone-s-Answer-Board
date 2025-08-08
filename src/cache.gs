@@ -27,11 +27,15 @@ class CacheManager {
    * キャッシュから値を取得、なければ指定された関数で生成して保存します（最適化版）
    * @param {string} key - キャッシュキー
    * @param {function} valueFn - 値を生成する関数
-   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean }
+   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean, usePropertiesFallback: boolean }
    * @returns {*} キャッシュされた値
    */
   get(key, valueFn, options = {}) {
-    const { ttl = this.defaultTTL, enableMemoization = false } = options;
+    const { 
+      ttl = this.defaultTTL, 
+      enableMemoization = false, 
+      usePropertiesFallback = false 
+    } = options;
 
     // パフォーマンス監視とバリデーション
     this.stats.totalOps++;
@@ -41,7 +45,7 @@ class CacheManager {
     }
 
     // 階層化キャッシュアクセス（最適化）
-    const cacheResult = this.getFromCacheHierarchy(key, enableMemoization, ttl);
+    const cacheResult = this.getFromCacheHierarchy(key, enableMemoization, ttl, usePropertiesFallback);
     if (cacheResult.found) {
       this.stats.hits++;
       return cacheResult.value;
@@ -105,13 +109,14 @@ class CacheManager {
   }
 
   /**
-   * 階層化キャッシュから値を取得
+   * 階層化キャッシュから値を取得（PropertiesService統合版）
    * @param {string} key - キー
    * @param {boolean} enableMemoization - メモ化キャッシュ有効
    * @param {number} ttl - TTL
+   * @param {boolean} usePropertiesFallback - PropertiesServiceフォールバック有効
    * @returns {Object} { found: boolean, value: any }
    */
-  getFromCacheHierarchy(key, enableMemoization, ttl) {
+  getFromCacheHierarchy(key, enableMemoization, ttl, usePropertiesFallback = false) {
     // Level 1: メモ化キャッシュ（最高速）
     if (enableMemoization && this.memoCache.has(key)) {
       try {
@@ -146,6 +151,25 @@ class CacheManager {
       warnLog(`[Cache] L2(Script) error: ${key}`, e.message);
       this.stats.errors++;
       this.handleCorruptedCacheEntry(key);
+    }
+
+    // Level 3: PropertiesService フォールバック（設定値用）
+    if (usePropertiesFallback) {
+      try {
+        const propsValue = PropertiesService.getScriptProperties().getProperty(key);
+        if (propsValue !== null) {
+          debugLog(`[Cache] L3(Properties) hit: ${key}`);
+          const parsedValue = this.parsePropertiesValue(propsValue);
+          
+          // 上位キャッシュに昇格（長期TTL設定）
+          this.setToCacheHierarchy(key, parsedValue, Math.max(ttl, 3600), enableMemoization);
+          
+          return { found: true, value: parsedValue };
+        }
+      } catch (e) {
+        warnLog(`[Cache] L3(Properties) error: ${key}`, e.message);
+        this.stats.errors++;
+      }
     }
 
     return { found: false, value: null };
@@ -193,8 +217,64 @@ class CacheManager {
    * @param {object} [options] - オプション { ttl: number }
    * @returns {Object.<string, *>} キーと値のオブジェクト
    */
-  batchGet(keys, valuesFn, options = {}) {
+  async batchGet(keys, valuesFn, options = {}) {
     const { ttl = this.defaultTTL } = options;
+    
+    try {
+      // 統一バッチ処理システムでの処理を試行
+      if (typeof unifiedBatchProcessor !== 'undefined') {
+        const currentUserId = Session.getActiveUser().getEmail();
+        const cacheOperations = keys.map(key => ({ key: key }));
+        
+        const cachedResults = await unifiedBatchProcessor.batchCacheOperation(
+          'get', 
+          cacheOperations, 
+          currentUserId,
+          { concurrency: 5 }
+        );
+        
+        const results = {};
+        const missingKeys = [];
+        
+        for (let i = 0; i < keys.length; i++) {
+          const key = keys[i];
+          const cached = cachedResults[i];
+          
+          if (cached && !cached.error && cached !== null) {
+            try {
+              results[key] = JSON.parse(cached);
+            } catch (parseError) {
+              results[key] = cached;
+            }
+          } else {
+            missingKeys.push(key);
+          }
+        }
+        
+        if (missingKeys.length > 0) {
+          const newValues = await Promise.resolve(valuesFn(missingKeys));
+          const setCacheOps = Object.keys(newValues).map(key => ({
+            key: key,
+            value: JSON.stringify(newValues[key]),
+            ttl: ttl
+          }));
+          
+          for (const key in newValues) {
+            results[key] = newValues[key];
+          }
+          
+          if (setCacheOps.length > 0) {
+            await unifiedBatchProcessor.batchCacheOperation('set', setCacheOps, currentUserId, { concurrency: 5 });
+          }
+        }
+        
+        return results;
+      }
+    } catch (error) {
+      warnLog('[Cache] 統一バッチ処理エラー:', error.message);
+    }
+    
+    // フォールバック: 従来実装
     const results = {};
     let missingKeys = [];
 
@@ -1404,5 +1484,65 @@ CacheManager.prototype.resolvePendingClears = function(results) {
 CacheManager.prototype.rejectPendingClears = function(error) {
   const pending = this.pendingClears.splice(0);
   pending.forEach(({ reject }) => reject(error));
+};
+
+/**
+ * PropertiesServiceの値をパース（JSONまたはプリミティブ）
+ * @param {string} value - 値
+ * @returns {*} パースされた値
+ */
+CacheManager.prototype.parsePropertiesValue = function(value) {
+  if (!value) return value;
+  
+  try {
+    // JSON形式の場合はパース
+    return JSON.parse(value);
+  } catch (e) {
+    // プリミティブ値の場合はそのまま返す
+    return value;
+  }
+};
+
+/**
+ * 階層化キャッシュに値を設定
+ * @param {string} key - キー
+ * @param {*} value - 値
+ * @param {number} ttl - TTL
+ * @param {boolean} enableMemoization - メモ化有効
+ */
+CacheManager.prototype.setToCacheHierarchy = function(key, value, ttl, enableMemoization) {
+  try {
+    // Level 2: Apps Scriptキャッシュ
+    this.scriptCache.put(key, JSON.stringify(value), ttl);
+    
+    // Level 1: メモ化キャッシュ
+    if (enableMemoization) {
+      this.memoCache.set(key, { 
+        value: value, 
+        createdAt: Date.now(), 
+        ttl: ttl 
+      });
+    }
+  } catch (e) {
+    warnLog(`[Cache] setToCacheHierarchy error: ${key}`, e.message);
+  }
+};
+
+/**
+ * PropertiesService統合キャッシュヘルパー
+ * 設定値などの永続的なデータに特化
+ * @param {string} key - キー
+ * @param {function} valueFn - 値を生成する関数（オプション）
+ * @param {object} options - オプション
+ * @returns {*} 値
+ */
+CacheManager.prototype.getConfig = function(key, valueFn, options = {}) {
+  const { 
+    ttl = 3600,  // 設定値は1時間キャッシュ
+    enableMemoization = true,
+    usePropertiesFallback = true 
+  } = options;
+  
+  return this.get(key, valueFn, { ttl, enableMemoization, usePropertiesFallback });
 };
 

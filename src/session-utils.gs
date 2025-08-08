@@ -3,17 +3,39 @@
  * アカウント間のセッション分離と整合性管理を提供
  */
 
+// 回復力のある実行機構を使用
+function getResilientPropertiesService() {
+  return resilientExecutor.execute(
+    () => PropertiesService.getUserProperties(),
+    { name: 'PropertiesService.getUserProperties', idempotent: true }
+  );
+}
+
+function getResilientCacheService() {
+  return resilientExecutor.execute(
+    () => CacheService.getUserCache(),
+    { name: 'CacheService.getUserCache', idempotent: true }
+  );
+}
+
+function getResilientScriptCache() {
+  return resilientExecutor.execute(
+    () => CacheService.getScriptCache(),
+    { name: 'CacheService.getScriptCache', idempotent: true }
+  );
+}
+
 /**
  * アカウント切り替え時のセッションクリーンアップ
  * 異なるアカウントでログインした際に前のセッション情報をクリア
  * @param {string} currentEmail - 現在のユーザーメール
  */
-function cleanupSessionOnAccountSwitch(currentEmail) {
+async function cleanupSessionOnAccountSwitch(currentEmail) {
   try {
     debugLog('セッションクリーンアップを開始: ' + currentEmail);
 
-    const props = PropertiesService.getUserProperties();
-    const userCache = CacheService.getUserCache();
+    const props = await getResilientPropertiesService();
+    const userCache = await getResilientCacheService();
 
     // 現在のユーザーのハッシュキーを生成
     const currentUserKey = 'CURRENT_USER_ID_' + Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, currentEmail, Utilities.Charset.UTF_8)
@@ -42,7 +64,7 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
     }
 
     // スクリプトキャッシュの関連項目もクリア
-    const scriptCache = CacheService.getScriptCache();
+    const scriptCache = await getResilientScriptCache();
     if (scriptCache) {
       try {
         // 現在のユーザー以外のキャッシュをクリア
@@ -66,23 +88,23 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
  * ユーザー認証をリセットし、ログインページURLを返す
  * @returns {string} ログインページのURL
  */
-function resetUserAuthentication() {
+async function resetUserAuthentication() {
   try {
     debugLog('ユーザー認証をリセット中...');
-    const userCache = CacheService.getUserCache();
+    const userCache = await getResilientCacheService();
     if (userCache) {
       userCache.removeAll([]); // ユーザーキャッシュを全てクリア
       debugLog('ユーザーキャッシュをクリアしました。');
     }
 
-    const scriptCache = CacheService.getScriptCache();
+    const scriptCache = await getResilientScriptCache();
     if (scriptCache) {
       scriptCache.removeAll([]); // スクリプトキャッシュを全てクリア
       debugLog('スクリプトキャッシュをクリアしました。');
     }
 
     // PropertiesServiceもクリアする（LAST_ACCESS_EMAILなど）
-    const props = PropertiesService.getUserProperties();
+    const props = await getResilientPropertiesService();
     props.deleteAllProperties();
     debugLog('ユーザープロパティをクリアしました。');
 
@@ -101,7 +123,7 @@ function resetUserAuthentication() {
  * Google Apps ScriptのSandbox制限を完全に回避する最適解
  * @returns {HtmlOutput} サーバーサイドリダイレクトHTML
  */
-function forceLogoutAndRedirectToLogin() {
+async function forceLogoutAndRedirectToLogin() {
   debugLog('🔄 forceLogoutAndRedirectToLogin - 関数開始');
   debugLog('🔍 Function called at:', new Date().toISOString());
   debugLog('🔍 Available functions check:');
@@ -115,19 +137,19 @@ function forceLogoutAndRedirectToLogin() {
     // Step 1: セッションクリア処理（エラーハンドリング強化）
     try {
       debugLog('🧹 キャッシュクリア開始...');
-      const userCache = CacheService.getUserCache();
+      const userCache = await getResilientCacheService();
       if (userCache) {
         userCache.removeAll([]);
         debugLog('✅ ユーザーキャッシュクリア完了');
       }
 
-      const scriptCache = CacheService.getScriptCache();
+      const scriptCache = await getResilientScriptCache();
       if (scriptCache) {
         scriptCache.removeAll([]);
         debugLog('✅ スクリプトキャッシュクリア完了');
       }
 
-      const props = PropertiesService.getUserProperties();
+      const props = await getResilientPropertiesService();
       props.deleteAllProperties();
       debugLog('✅ ユーザープロパティクリア完了');
 
@@ -297,9 +319,9 @@ function forceLogoutAndRedirectToLogin() {
  * @param {string} currentEmail - 現在のユーザーメール
  * @returns {object} アカウント切り替え検出結果
  */
-function detectAccountSwitch(currentEmail) {
+async function detectAccountSwitch(currentEmail) {
   try {
-    const props = PropertiesService.getUserProperties();
+    const props = await getResilientPropertiesService();
     const lastEmailKey = 'last_active_email';
     const lastEmail = props.getProperty(lastEmailKey);
 
