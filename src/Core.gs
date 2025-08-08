@@ -81,20 +81,41 @@ class UnifiedErrorHandler {
    * @param {Object} [operationDetails={}] 操作詳細
    */
   logDatabaseError(error, operation, operationDetails = {}) {
-    const dbMetadata = {
-      operation: operation,
-      ...operationDetails,
-      retryable: this._isRetryableError(error),
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const dbMetadata = {
+        operation: operation,
+        ...operationDetails,
+        retryable: this._isRetryableError(error),
+        timestamp: new Date().toISOString(),
+      };
 
-    return this.logError(
-      error,
-      `database.${operation}`,
-      ERROR_SEVERITY.MEDIUM,
-      ERROR_CATEGORIES.DATABASE,
-      dbMetadata,
-    );
+      return this.logError(
+        error,
+        `database.${operation}`,
+        ERROR_SEVERITY.MEDIUM,
+        ERROR_CATEGORIES.DATABASE,
+        dbMetadata,
+      );
+    } catch (loggingError) {
+      // エラーログ処理でエラーが発生した場合は、基本的なconsole出力にフォールバック
+      console.error(`⚠️ LOGGING ERROR [database.${operation}]:`, {
+        originalError: error && error.message ? error.message : String(error),
+        loggingError: loggingError.message,
+        operationDetails,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 元のエラー情報を簡易的に返す
+      return {
+        message: error && error.message ? error.message : String(error),
+        context: `database.${operation}`,
+        severity: ERROR_SEVERITY.MEDIUM,
+        category: ERROR_CATEGORIES.DATABASE,
+        metadata: operationDetails,
+        timestamp: new Date().toISOString(),
+        loggingFallback: true
+      };
+    }
   }
 
   /**

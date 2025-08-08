@@ -328,6 +328,13 @@ class UnifiedSecretManager {
   getSecretFromProperties(secretName) {
     try {
       const props = getResilientScriptProperties();
+      
+      // propsがnullまたはundefinedの場合のチェック
+      if (!props || typeof props.getProperty !== 'function') {
+        warnLog(`Properties Service オブジェクトが無効です:`, { props: typeof props });
+        return null;
+      }
+      
       let value = props.getProperty(secretName);
       
       if (!value) {
@@ -336,13 +343,26 @@ class UnifiedSecretManager {
 
       // 暗号化されているかチェック
       if (this.isEncryptedValue(value)) {
-        value = this.decryptValue(value);
+        try {
+          value = this.decryptValue(value);
+        } catch (decryptError) {
+          warnLog(`暗号化値の復号化に失敗:`, { secretName, error: decryptError.message });
+          throw new Error(`シークレット値の復号化に失敗しました: ${secretName}`);
+        }
       }
 
       return value;
     } catch (error) {
-      errorLog(`Properties Service取得エラー:`, error.message);
-      throw error;
+      const errorMessage = `Properties Service取得エラー (${secretName}): ${error.message}`;
+      errorLog(errorMessage);
+      
+      // 重要なシークレットの場合はシステムを停止、そうでなければnullを返してフォールバック可能にする
+      if (this.isCriticalSecret(secretName)) {
+        throw new Error(errorMessage);
+      } else {
+        warnLog(`非クリティカルなシークレット取得失敗、nullを返します: ${secretName}`);
+        return null;
+      }
     }
   }
 

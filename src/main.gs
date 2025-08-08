@@ -906,12 +906,94 @@ function doGet(e) {
 }
 
 /**
+ * システムコンポーネントの依存関係をチェック
+ * @returns {Object} チェック結果
+ */
+function validateSystemDependencies() {
+  const errors = [];
+  
+  try {
+    // PropertiesService テスト
+    try {
+      const props = PropertiesService.getScriptProperties();
+      if (!props || typeof props.getProperty !== 'function') {
+        errors.push('PropertiesService が利用できません');
+      } else {
+        // 実際にプロパティアクセスをテスト
+        props.getProperty('_DEPENDENCY_TEST_KEY'); // 存在しないキーでテスト
+      }
+    } catch (propsError) {
+      errors.push(`PropertiesService エラー: ${propsError.message}`);
+    }
+
+    // resilientExecutor テスト
+    try {
+      if (typeof resilientExecutor === 'undefined') {
+        errors.push('resilientExecutor が定義されていません');
+      } else if (typeof resilientExecutor.getStats !== 'function') {
+        errors.push('resilientExecutor が正しく初期化されていません');
+      }
+    } catch (executorError) {
+      errors.push(`resilientExecutor エラー: ${executorError.message}`);
+    }
+
+    // secretManager テスト (存在する場合)
+    try {
+      if (typeof secretManager !== 'undefined' && typeof secretManager.isEnabled === 'function') {
+        // secretManagerが有効な場合のみテスト
+        if (secretManager.isEnabled()) {
+          secretManager.diagnose(); // 自己診断機能を呼び出し
+        }
+      }
+    } catch (secretError) {
+      errors.push(`SecretManager エラー: ${secretError.message}`);
+    }
+
+    // CacheService テスト
+    try {
+      CacheService.getScriptCache().get('_DEPENDENCY_TEST_KEY');
+    } catch (cacheError) {
+      errors.push(`CacheService エラー: ${cacheError.message}`);
+    }
+
+    // Utilities テスト
+    try {
+      if (typeof Utilities === 'undefined' || typeof Utilities.getUuid !== 'function') {
+        errors.push('Utilities サービスが利用できません');
+      }
+    } catch (utilsError) {
+      errors.push(`Utilities エラー: ${utilsError.message}`);
+    }
+
+  } catch (generalError) {
+    errors.push(`システムチェック中の一般エラー: ${generalError.message}`);
+  }
+
+  return {
+    success: errors.length === 0,
+    errors: errors,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
  * Initialize request processing with system checks
  * @returns {HtmlOutput|null} Early return result or null to continue
  */
 function initializeRequestProcessing() {
   // Clear execution-level cache for new request
   clearAllExecutionCache();
+
+  // システムコンポーネントの依存関係チェック
+  const dependencyCheck = validateSystemDependencies();
+  if (!dependencyCheck.success) {
+    errorLog('システムの依存関係チェックに失敗:', dependencyCheck.errors);
+    return showErrorPage(
+      'システム初期化エラー', 
+      'システムの初期化に失敗しました。管理者にご連絡ください。\n\n' +
+      `エラー詳細: ${dependencyCheck.errors.join(', ')}`
+    );
+  }
 
   // Check system setup (highest priority)
   if (!isSystemSetup()) {

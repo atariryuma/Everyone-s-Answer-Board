@@ -67,10 +67,50 @@
               showAdminPanelRedirect(res.adminUrl, '新規ユーザー登録が完了しました');
               resolve();
             } else {
-              reject(new Error(res.message || 'ユーザー登録に失敗しました'));
+              // より詳細なエラー情報を提供
+              let errorMessage = 'ユーザー登録に失敗しました';
+              if (res && res.message) {
+                errorMessage = res.message;
+              } else if (res && res.error) {
+                errorMessage = res.error;
+              }
+              
+              // 開発者向け詳細情報をコンソールに出力
+              console.error('User registration failed:', {
+                response: res,
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                location: window.location.href
+              });
+              
+              // システム管理者向けのヘルプ情報を追加
+              if (errorMessage.includes('PropertiesService') || errorMessage.includes('props.getProperty')) {
+                errorMessage += '\n\n技術的詳細: システムの初期化に問題があります。管理者にご連絡ください。';
+              }
+              
+              reject(new Error(errorMessage));
             }
           })
-          .withFailureHandler(reject)
+          .withFailureHandler(error => {
+            // 通信エラー時の詳細情報
+            console.error('Communication error during user registration:', {
+              error: error,
+              timestamp: new Date().toISOString(),
+              userAgent: navigator.userAgent,
+              location: window.location.href
+            });
+            
+            let errorMessage = 'ユーザー登録の通信エラーが発生しました';
+            if (error && error.message) {
+              if (error.message.includes('props.getProperty')) {
+                errorMessage = 'システムの初期化エラーが発生しました。管理者にご連絡ください。';
+              } else {
+                errorMessage = `通信エラー: ${error.message}`;
+              }
+            }
+            
+            reject(new Error(errorMessage));
+          })
           .confirmUserRegistration();
       });
     };

@@ -36,31 +36,64 @@ if (typeof infoLog === 'undefined') {
  * @returns {string} Web app URL or empty string on failure.
  */
 function getWebAppUrl() {
+  // キャッシュから結果を取得（5分間有効）
+  const cacheKey = 'WEB_APP_URL_CACHE';
   try {
-    // AppsScriptオブジェクトの存在チェックを追加
-    if (typeof AppsScript === 'undefined' || !AppsScript.Script || !AppsScript.Script.Deployments) {
-      infoLog('AppsScript API not available, using fallback method');
-      // フォールバック処理に直接移行
-      return getFallbackWebAppUrl();
+    const cachedUrl = CacheService.getScriptCache().get(cacheKey);
+    if (cachedUrl) {
+      debugLog('Web app URL retrieved from cache:', cachedUrl);
+      return cachedUrl;
     }
-    
-    const scriptId = ScriptApp.getScriptId();
-    const deployments = AppsScript.Script.Deployments.list(scriptId, {
-      fields: 'deployments(deploymentConfig(webApp(url)))'
-    }).deployments || [];
-    const webApp = deployments.find(d => d.deploymentConfig && d.deploymentConfig.webApp);
-    const url = webApp ? webApp.deploymentConfig.webApp.url : '';
-    if (url) {
-      infoLog('Web app URL obtained:', url);
-      return url;
+  } catch (cacheError) {
+    debugLog('Cache access failed:', cacheError.message);
+  }
+
+  let finalUrl = '';
+  
+  try {
+    // AppsScriptオブジェクトの詳細な存在チェック
+    if (typeof AppsScript === 'undefined') {
+      debugLog('AppsScript API not defined, using fallback method');
+      finalUrl = getFallbackWebAppUrl();
+    } else if (!AppsScript.Script) {
+      debugLog('AppsScript.Script not available, using fallback method');
+      finalUrl = getFallbackWebAppUrl();
+    } else if (!AppsScript.Script.Deployments) {
+      debugLog('AppsScript.Script.Deployments not available, using fallback method');
+      finalUrl = getFallbackWebAppUrl();
+    } else {
+      // AppsScript APIを使用してURL取得
+      const scriptId = ScriptApp.getScriptId();
+      const deployments = AppsScript.Script.Deployments.list(scriptId, {
+        fields: 'deployments(deploymentConfig(webApp(url)))'
+      }).deployments || [];
+      
+      const webApp = deployments.find(d => d.deploymentConfig && d.deploymentConfig.webApp);
+      finalUrl = webApp ? webApp.deploymentConfig.webApp.url : '';
+      
+      if (finalUrl) {
+        infoLog('Web app URL obtained via AppsScript API:', finalUrl);
+      } else {
+        infoLog('getWebAppUrl: no deployments found via API, falling back');
+        finalUrl = getFallbackWebAppUrl();
+      }
     }
-    infoLog('getWebAppUrl: no deployments found, falling back');
-  } catch (e) {
-    infoLog('getWebAppUrl API error (normal fallback):', e.message);
+  } catch (apiError) {
+    infoLog('getWebAppUrl API error (normal fallback):', apiError.message);
+    finalUrl = getFallbackWebAppUrl();
   }
   
-  // フォールバック処理に移行
-  return getFallbackWebAppUrl();
+  // 有効なURLが取得できた場合はキャッシュに保存（5分間）
+  if (finalUrl) {
+    try {
+      CacheService.getScriptCache().put(cacheKey, finalUrl, 300); // 5分間キャッシュ
+      debugLog('Web app URL cached for 5 minutes');
+    } catch (cacheError) {
+      debugLog('Failed to cache Web app URL:', cacheError.message);
+    }
+  }
+  
+  return finalUrl;
 }
 
 /**

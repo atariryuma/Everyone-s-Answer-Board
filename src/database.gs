@@ -6,17 +6,43 @@
 
 // 回復力のあるProperties/Cache操作
 function getResilientScriptProperties() {
-  return resilientExecutor.execute(
-    () => PropertiesService.getScriptProperties(),
-    { name: 'PropertiesService.getScriptProperties', idempotent: true }
-  );
+  try {
+    // 直接PropertiesServiceを呼び出し、エラー時のみリトライ
+    return PropertiesService.getScriptProperties();
+  } catch (error) {
+    // 1回だけリトライ
+    try {
+      Utilities.sleep(1000); // 1秒待機
+      return PropertiesService.getScriptProperties();
+    } catch (retryError) {
+      warnLog('getResilientScriptProperties: PropertiesService取得に失敗しました', {
+        originalError: error.message,
+        retryError: retryError.message
+      });
+      // nullを返してフォールバック処理を可能にする
+      throw new Error(`PropertiesService取得に失敗しました: ${retryError.message}`);
+    }
+  }
 }
 
 function getResilientUserProperties() {
-  return resilientExecutor.execute(
-    () => PropertiesService.getUserProperties(),
-    { name: 'PropertiesService.getUserProperties', idempotent: true }
-  );
+  try {
+    // 直接PropertiesServiceを呼び出し、エラー時のみリトライ
+    return PropertiesService.getUserProperties();
+  } catch (error) {
+    // 1回だけリトライ
+    try {
+      Utilities.sleep(1000); // 1秒待機
+      return PropertiesService.getUserProperties();
+    } catch (retryError) {
+      warnLog('getResilientUserProperties: UserProperties取得に失敗しました', {
+        originalError: error.message,
+        retryError: retryError.message
+      });
+      // nullを返してフォールバック処理を可能にする
+      throw new Error(`UserProperties取得に失敗しました: ${retryError.message}`);
+    }
+  }
 }
 
 // データベース管理のための定数
