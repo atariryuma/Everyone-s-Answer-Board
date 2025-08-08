@@ -56,6 +56,8 @@ describe('getInitialData header extraction', () => {
         Charset: { UTF_8: 'UTF-8' },
         sleep: (ms) => {} // モックのsleep関数
       },
+      getSecureDatabaseId: () => '1234567890123456789012345678901234567890', // 有効なスプレッドシートID形式に修正
+      generateNewServiceAccountToken: jest.fn(() => 'mock-service-account-token'), // generateNewServiceAccountToken のモック
     };
     vm.createContext(context);
     vm.runInContext(commonUtilitiesCode, context);
@@ -99,8 +101,29 @@ describe('getInitialData header extraction', () => {
       getResponsesData: jest.fn(() => ({ status: 'success', data: [] })),
       determineSetupStep: jest.fn(() => 3),
       getServiceAccountTokenCached: jest.fn(() => 'mock-token'),
-      getSheetsService: jest.fn(() => ({})),
-      getCachedSheetsService: jest.fn(() => ({})),
+      getSheetsService: jest.fn(() => ({ baseUrl: 'mock-base-url' })), // baseUrl を追加
+      getCachedSheetsService: jest.fn(() => ({ baseUrl: 'mock-base-url' })), // baseUrl を追加
+      unifiedBatchProcessor: { // unifiedBatchProcessor のモック
+        batchGet: jest.fn(() => ({
+          valueRanges: [{
+            values: [
+              ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'configJson'],
+              ['U', 'test@example.com', 'mock-sheet-id', 'mock-sheet-url', JSON.stringify({
+                publishedSheetName: 'ClassA',
+                sheet_ClassA: {
+                  opinionHeader: 'テーマ',
+                  nameHeader: '氏名',
+                  classHeader: 'クラス',
+                },
+              })]
+            ]
+          }]
+        })),
+        batchUpdate: jest.fn(() => ({})),
+        batchUpdateSpreadsheet: jest.fn(() => ({})),
+        batchCacheOperation: jest.fn(() => ({})),
+        getMetrics: jest.fn(() => ({})),
+      },
     });
   });
 

@@ -876,9 +876,6 @@ function fetchUserFromDatabase(field, value, options = {}) {
         'DEBUG: No user found for this query.': true
       });
       return null;
-        attempt: retryAttempt + 1,
-        availableUserIds: values.slice(1).map(row => row[headers.indexOf('userId')] || 'undefined').slice(0, 5)
-      });
 
       const notFoundError = new Error('ユーザー情報が見つかりません');
       notFoundError.type = 'USER_NOT_FOUND';
