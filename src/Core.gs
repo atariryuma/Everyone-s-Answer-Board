@@ -937,8 +937,8 @@ function registerNewUser(adminEmail) {
     // 生成されたユーザー情報のキャッシュをクリア
     invalidateUserCache(userId, adminEmail, null, false);
 
-    // DB反映を待機し、ユーザー情報をキャッシュに保存
-    if (!waitForUserRecord(userId, 5000, 300)) {
+    // DB反映を待機し、ユーザー情報をキャッシュに保存（待機ウィンドウを拡張）
+    if (!waitForUserRecord(userId, 12000, 400)) {
       throw new Error('ユーザーデータの作成を確認できませんでした。しばらくしてから再試行してください。');
     }
     try {
@@ -5506,6 +5506,20 @@ function getLoginStatus() {
       { ttl: 300, enableMemoization: true }
     );
 
+    // フォールバック: キャッシュ/通常検索で見つからない場合は、強制フレッシュで再検証
+    if (!userInfo) {
+      try {
+        debugLog('getLoginStatus: フォールバックで強制フレッシュ検索を実施');
+        userInfo = fetchUserFromDatabase('adminEmail', activeUserEmail, {
+          forceFresh: true,
+          clearCache: true,
+          retryCount: 1
+        });
+      } catch (fallbackErr) {
+        warnLog('getLoginStatus: フォールバック検索で警告:', fallbackErr.message);
+      }
+    }
+
     var result;
     if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {
       var urls = generateUserUrls(userInfo.userId);
@@ -5552,6 +5566,27 @@ function confirmUserRegistration() {
     if (!activeUserEmail) {
       return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
     }
+    // まずは最新状態で既存ユーザーか再検証（重複登録防止）
+    try {
+      var existing = fetchUserFromDatabase('adminEmail', activeUserEmail, {
+        forceFresh: true,
+        clearCache: true,
+        retryCount: 1
+      });
+      if (existing) {
+        var urls = generateUserUrls(existing.userId);
+        return {
+          status: 'existing_user',
+          userId: existing.userId,
+          adminUrl: urls.adminUrl,
+          viewUrl: urls.viewUrl,
+          message: '既に登録済みのため、管理パネルへ移動します'
+        };
+      }
+    } catch (recheckErr) {
+      warnLog('confirmUserRegistration: 既存ユーザー再検証で警告:', recheckErr.message);
+    }
+
     var result = registerNewUser(activeUserEmail);
     try {
       CacheService.getScriptCache().remove('login_status_' + activeUserEmail);

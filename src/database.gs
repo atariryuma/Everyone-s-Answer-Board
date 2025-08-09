@@ -837,8 +837,16 @@ function fetchUserFromDatabase(field, value, options = {}) {
         const currentValue = currentRow[fieldIndex];
 
         // 値の比較を厳密に行う（文字列の trim と型変換）
-        const normalizedCurrentValue = currentValue ? String(currentValue).trim() : '';
-        const normalizedSearchValue = value ? String(value).trim() : '';
+        let normalizedCurrentValue = currentValue ? String(currentValue).trim() : '';
+        let normalizedSearchValue = value ? String(value).trim() : '';
+
+        // メールアドレス検索は大文字小文字を無視
+        let isMatch;
+        if (field === 'adminEmail') {
+          isMatch = normalizedCurrentValue.toLowerCase() === normalizedSearchValue.toLowerCase();
+        } else {
+          isMatch = normalizedCurrentValue === normalizedSearchValue;
+        }
 
         // 詳細ログ（最初の試行時のみ）
         if (retryAttempt === 0) {
@@ -846,11 +854,12 @@ function fetchUserFromDatabase(field, value, options = {}) {
             original: currentValue,
             normalized: normalizedCurrentValue,
             searchValue: normalizedSearchValue,
-            isMatch: normalizedCurrentValue === normalizedSearchValue
+            isMatch: isMatch,
+            caseInsensitive: field === 'adminEmail'
           });
         }
 
-        if (normalizedCurrentValue === normalizedSearchValue) {
+        if (isMatch) {
           debugLog('fetchUserFromDatabase - ユーザー発見 at rowIndex:', i);
           const user = {};
           headers.forEach(function(header, index) {
@@ -1222,6 +1231,17 @@ function createUser(userData) {
 
     debugLog('createUser - データベース書き込み完了: userId=' + userData.userId);
 
+    // 書き込み直後の読み取り一貫性を高めるためにキャッシュを明示的に無効化し、短い待機を入れる
+    try {
+      if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
+        unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
+        debugLog('createUser - 統一バッチキャッシュを無効化: ' + dbId);
+      }
+    } catch (cacheInvalidationError) {
+      warnLog('createUser - キャッシュ無効化で警告:', cacheInvalidationError.message);
+    }
+    Utilities.sleep(150);
+
     // 新規ユーザー用の専用フォルダを作成
     try {
       debugLog('createUser - 専用フォルダ作成開始: ' + userData.adminEmail);
@@ -1252,8 +1272,18 @@ function createUser(userData) {
 function waitForUserRecord(userId, maxWaitMs, intervalMs) {
   var start = Date.now();
   while (Date.now() - start < maxWaitMs) {
-    // 登録直後はキャッシュを完全にバイパスして確認
-    if (fetchUserFromDatabase('userId', userId, { forceFresh: true, clearCache: true, retryCount: 0 })) return true;
+    try {
+      // 登録直後はキャッシュを完全にバイパスして確認
+      var found = fetchUserFromDatabase('userId', userId, { forceFresh: true, clearCache: true, retryCount: 0 });
+      if (found) return true;
+    } catch (e) {
+      // 一時的な読み取りエラーは待機して再試行
+      warnLog('waitForUserRecord: 一時的な検証エラーを検出。再試行します。', {
+        message: e && e.message,
+        type: e && e.type
+      });
+      // フィールド未検出などの致命的エラーは直ちに終了せず、ウィンドウ内で再試行
+    }
     Utilities.sleep(intervalMs);
   }
   return false;
