@@ -124,6 +124,7 @@ describe('getInitialData header extraction', () => {
         batchCacheOperation: jest.fn(() => ({})),
         getMetrics: jest.fn(() => ({})),
       },
+      synchronizeCacheAfterCriticalUpdate: jest.fn(), // synchronizeCacheAfterCriticalUpdate のモック
     });
   });
 

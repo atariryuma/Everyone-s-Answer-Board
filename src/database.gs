@@ -778,20 +778,23 @@ function fetchUserFromDatabase(field, value, options = {}) {
       debugLog('DEBUG: fetchUserFromDatabase - データベースID: ' + dbId);
       debugLog('DEBUG: fetchUserFromDatabase - シート名: ' + sheetName);
 
-      // キャッシュクリア（リトライ時は必須）
-      if (retryAttempt > 0 || opts.clearCache) {
-        const batchGetCacheKey = `batchGet_${dbId}_["'${sheetName}'!A:H"]`;
+      // キャッシュ無効化/バイパス（登録直後など強制フレッシュが必要な場合）
+      const needFresh = (retryAttempt > 0) || opts.clearCache === true || opts.forceFresh === true;
+      if (needFresh) {
         try {
-          cacheManager.remove(batchGetCacheKey);
+          if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
+            unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
+          }
         } catch (cacheError) {
-          warnLog('fetchUserFromDatabase - キャッシュクリア警告:', cacheError.message);
+          warnLog('fetchUserFromDatabase - キャッシュ無効化警告:', cacheError.message);
         }
       }
 
       // データ取得
       let data;
       try {
-        data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+        // 強制フレッシュ時はキャッシュを使わない
+        data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"], needFresh ? { useCache: false } : { useCache: true });
       } catch (dataError) {
         dataError.type = 'DATA_ACCESS_ERROR';
         throw dataError;
@@ -1244,7 +1247,8 @@ function createUser(userData) {
 function waitForUserRecord(userId, maxWaitMs, intervalMs) {
   var start = Date.now();
   while (Date.now() - start < maxWaitMs) {
-    if (fetchUserFromDatabase('userId', userId)) return true;
+    // 登録直後はキャッシュを完全にバイパスして確認
+    if (fetchUserFromDatabase('userId', userId, { forceFresh: true, clearCache: true, retryCount: 0 })) return true;
     Utilities.sleep(intervalMs);
   }
   return false;
@@ -1530,12 +1534,29 @@ function appendSheetsData(service, spreadsheetId, range, values) {
     }
 
     try {
-      return JSON.parse(responseText);
+      const parsed = JSON.parse(responseText);
+      // 重要: 追記後に該当スプレッドシートの読み取りキャッシュを無効化
+      try {
+        if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
+          unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
+        }
+      } catch (invalidateErr) {
+        warnLog('appendSheetsData: キャッシュ無効化に失敗しました', invalidateErr.message);
+      }
+      return parsed;
     } catch (parseError) {
       warnLog('appendSheetsData: レスポンス解析に失敗、元のレスポンスを返します', {
         parseError: parseError.message,
         responseText: responseText.substring(0, 200)
       });
+      // フォールバック返却前にもキャッシュ無効化を試行
+      try {
+        if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
+          unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
+        }
+      } catch (invalidateErr2) {
+        warnLog('appendSheetsData: フォールバック時のキャッシュ無効化に失敗', invalidateErr2.message);
+      }
       return { updates: { updatedRows: 1 } }; // フォールバック
     }
 
@@ -1566,6 +1587,14 @@ function appendSheetsData(service, spreadsheetId, range, values) {
         const retryCode = retryResponse.getResponseCode();
         if (retryCode === 200) {
           infoLog('appendSheetsData: リトライで成功しました');
+          // リトライ成功時もキャッシュ無効化
+          try {
+            if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
+              unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
+            }
+          } catch (invalidateErr3) {
+            warnLog('appendSheetsData: リトライ成功後のキャッシュ無効化に失敗', invalidateErr3.message);
+          }
           return JSON.parse(retryResponse.getContentText());
         }
       }
