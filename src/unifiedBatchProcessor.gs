@@ -556,21 +556,11 @@ const unifiedBatchProcessor = new UnifiedBatchProcessor({
  * @param {object} options - オプション
  * @returns {Promise<object>} バッチ取得結果
  */
-function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
-  return unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, options);
-}
-
-/**
- * 統一バッチ更新（既存のbatchUpdateSheetsData互換）
- * @param {object} service - Sheetsサービス
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {Array<object>} valueInputs - 更新データ
- * @param {object} options - オプション
- * @returns {Promise<object>} バッチ更新結果
- */
-function batchUpdateSheetsData(service, spreadsheetId, valueInputs, options = {}) {
-  return unifiedBatchProcessor.batchUpdate(service, spreadsheetId, valueInputs, options);
-}
+// 注意:
+// 以前はここで batchGetSheetsData / batchUpdateSheetsData のラッパー関数を定義していましたが、
+// 同名のグローバル関数が database.gs にも存在しており、Promise を返す実装と同期実装が競合していました。
+// 競合により「無効なデータ構造」エラーや長時間のリトライが発生したため、
+// 当該ラッパーは削除し、database.gs の同期実装に一本化しました。
 
 /**
  * 統一スプレッドシート構造更新（既存のbatchUpdateSpreadsheet互換）

@@ -840,6 +840,10 @@ function fetchUserFromDatabase(field, value, options = {}) {
         }
         
         data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`], cacheOptions);
+        // 予防: 非同期オブジェクトが返ってきた場合は即時エラー
+        if (data && typeof data.then === 'function') {
+          throw new Error('無効なデータ構造を受信');
+        }
         
         if (data && data.valueRanges && data.valueRanges[0]) {
           dataRetrieved = true;
@@ -848,6 +852,11 @@ function fetchUserFromDatabase(field, value, options = {}) {
         }
       } catch (dataError) {
         warnLog('fetchUserFromDatabase: データ取得エラー (試行' + (dataAttempt + 1) + '):', dataError.message);
+        // 構造不整合はプログラミングエラー相当として即時中断（深いリトライを避ける）
+        const msg = String(dataError && dataError.message || '');
+        if (msg.indexOf('無効なデータ構造') !== -1 || msg.toLowerCase().indexOf('invalid data structure') !== -1) {
+          throw new Error('データ取得に失敗しました: ' + dataError.message);
+        }
         if (dataAttempt === maxDataRetries - 1) {
           throw new Error('データ取得に失敗しました: ' + dataError.message);
         }
@@ -1453,58 +1462,77 @@ function createSheetsService(accessToken) {
  * @returns {object} レスポンス
  */
 function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
-  debugLog('DEBUG: batchGetSheetsData - 統一バッチ処理システムを使用');
+  // 同期実装（UrlFetchApp.fetch を使用）に統一
+  debugLog('DEBUG: batchGetSheetsData - 同期実装で実行');
 
-  // 型安全性とバリデーション強化: 入力パラメータ検証
-  if (!service) {
+  // 入力検証
+  if (!service || typeof service !== 'object') {
     throw new Error('Sheetsサービスオブジェクトが提供されていません');
   }
-  if (typeof service !== 'object' || !service.baseUrl) {
-    throw new Error('無効なSheetsサービスオブジェクトです: baseUrlが見つかりません');
+  if (!service.baseUrl || !service.accessToken) {
+    throw new Error('無効なSheetsサービスオブジェクトです: baseUrl/accessTokenが見つかりません');
   }
-
   if (!spreadsheetId || typeof spreadsheetId !== 'string') {
     throw new Error('無効なspreadsheetIDです: 文字列である必要があります');
   }
-  if (spreadsheetId.length < 20 || spreadsheetId.length > 60) {
-    throw new Error('無効なspreadsheetID形式です: 長さが不正です');
+  if (!/^[a-zA-Z0-9_-]{20,}$/.test(spreadsheetId)) {
+    throw new Error('無効なspreadsheetID形式です');
   }
-  if (!/^[a-zA-Z0-9_-]+$/.test(spreadsheetId)) {
-    throw new Error('無効なspreadsheetID形式です: 許可されていない文字が含まれています');
-  }
-
   if (!ranges || !Array.isArray(ranges) || ranges.length === 0) {
     throw new Error('無効な範囲配列です: 配列で1つ以上の範囲が必要です');
   }
-  if (ranges.length > 100) {
-    throw new Error('範囲配列が大きすぎます: 最大100個までです');
-  }
 
-  // 各範囲の検証
-  for (let i = 0; i < ranges.length; i++) {
-    const range = ranges[i];
-    if (!range || typeof range !== 'string') {
-      throw new Error(`範囲[${i}]が無効です: 文字列である必要があります`);
-    }
-    if (range.length === 0) {
-      throw new Error(`範囲[${i}]が空文字列です`);
-    }
-    if (range.length > 200) {
-      throw new Error(`範囲[${i}]が長すぎます: 最大200文字までです`);
-    }
-  }
-
-  // 呼び出し元の指定を尊重してオプションをマージ（デフォルトはキャッシュ利用）
   const opts = {
-    useCache: true,
-    ttl: 120, // 2分間キャッシュ（API制限対策）
     valueRenderOption: 'UNFORMATTED_VALUE',
     dateTimeRenderOption: 'SERIAL_NUMBER',
+    includeGridData: false,
     ...options
   };
 
-  // 統一バッチ処理システムを使用
-  return unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, opts);
+  // リクエストURL作成
+  const endpoint = service.baseUrl + '/' + encodeURIComponent(spreadsheetId) + '/values:batchGet';
+  const params = [];
+  for (let i = 0; i < ranges.length; i++) {
+    params.push('ranges=' + encodeURIComponent(ranges[i]));
+  }
+  params.push('valueRenderOption=' + encodeURIComponent(opts.valueRenderOption));
+  params.push('dateTimeRenderOption=' + encodeURIComponent(opts.dateTimeRenderOption));
+  params.push('includeGridData=' + String(!!opts.includeGridData));
+
+  const url = endpoint + '?' + params.join('&');
+
+  // リクエスト実行（同期）
+  const response = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: { 'Authorization': 'Bearer ' + service.accessToken },
+    muteHttpExceptions: true
+  });
+
+  if (!response || typeof response.getResponseCode !== 'function') {
+    throw new Error('無効なレスポンスオブジェクトが返されました');
+  }
+
+  const code = response.getResponseCode();
+  const text = response.getContentText();
+  if (code !== 200) {
+    throw new Error('BatchGet失敗: ' + code + ' - ' + text);
+  }
+
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch (e) {
+    throw new Error('BatchGetレスポンスのJSON解析に失敗しました');
+  }
+
+  if (!body || !Array.isArray(body.valueRanges)) {
+    throw new Error('無効なデータ構造を受信');
+  }
+
+  return {
+    spreadsheetId: spreadsheetId,
+    valueRanges: body.valueRanges
+  };
 }
 
 /**
@@ -1515,12 +1543,46 @@ function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
  * @returns {object} レスポンス
  */
 function batchUpdateSheetsData(service, spreadsheetId, requests) {
-  // 統一バッチ処理システムを使用
-  return  unifiedBatchProcessor.batchUpdate(service, spreadsheetId, requests, {
+  // 同期実装（UrlFetchApp.fetch）
+  if (!service || !service.baseUrl || !service.accessToken) {
+    throw new Error('無効なSheetsサービスオブジェクトです: baseUrl/accessTokenが見つかりません');
+  }
+  if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+    throw new Error('無効なspreadsheetIDです');
+  }
+  if (!Array.isArray(requests) || requests.length === 0) {
+    throw new Error('更新データが無効です');
+  }
+
+  const url = service.baseUrl + '/' + encodeURIComponent(spreadsheetId) + '/values:batchUpdate';
+  const body = {
     valueInputOption: 'RAW',
     includeValuesInResponse: false,
-    invalidateCache: true
+    data: requests
+  };
+
+  const response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + service.accessToken },
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true
   });
+
+  if (!response || typeof response.getResponseCode !== 'function') {
+    throw new Error('無効なレスポンスオブジェクトが返されました');
+  }
+  const code = response.getResponseCode();
+  if (code !== 200) {
+    throw new Error('BatchUpdate失敗: ' + code + ' - ' + response.getContentText());
+  }
+
+  // 必要最小限の情報を返す
+  try {
+    return JSON.parse(response.getContentText());
+  } catch (e) {
+    return { status: 'success' };
+  }
 }
 
 /**

@@ -219,6 +219,11 @@
         displayMessage += '\n\nネットワークの問題の可能性があります。';
         shouldShowRetry = true;
         retryDelay = 2000;
+      } else if (displayMessage.includes('無効なデータ構造') || displayMessage.toLowerCase().includes('invalid data structure')) {
+        // システム側の一時障害として扱い、短い待機でリトライ誘導
+        displayMessage = 'システム一時障害が発生しています。しばらくしてから再試行してください。';
+        shouldShowRetry = true;
+        retryDelay = 2000;
       }
 
       userEmailDisplay.textContent = displayMessage;
