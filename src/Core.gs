@@ -943,43 +943,109 @@ function registerNewUser(adminEmail) {
       // キャッシュクリアの失敗は無視
     }
 
-    // 作成直後の確認（シンプルな同期確認）
-    debugLog('registerNewUser: 作成したユーザーの確認中...');
-    let verificationAttempts = 0;
+    // 原子的な作成→検証フロー（最大15秒待機）
+    debugLog('registerNewUser: データベース同期検証を開始...');
+    let verificationSuccess = false;
     let createdUser = null;
-    const maxAttempts = 8; // 最大8回、約4秒待機
-    
-    while (verificationAttempts < maxAttempts && !createdUser) {
-      if (verificationAttempts > 0) {
-        Utilities.sleep(500); // 0.5秒待機
-      }
+    const maxWaitTime = 15000; // 15秒
+    const startTime = Date.now();
+    let attemptCount = 0;
+
+    // 段階的な検証戦略
+    const verificationStages = [
+      { delay: 500, method: 'immediate' },      // 即座に確認
+      { delay: 1000, method: 'delayed' },       // 1秒後確認  
+      { delay: 2000, method: 'extended' },      // 2秒後確認
+      { delay: 3000, method: 'persistent' }     // 3秒以降継続確認
+    ];
+
+    for (const stage of verificationStages) {
+      if (Date.now() - startTime > maxWaitTime) break;
+      
+      Utilities.sleep(stage.delay);
+      attemptCount++;
       
       try {
-        createdUser = fetchUserFromDatabase('userId', userId, { forceFresh: true });
-        if (createdUser) {
-          debugLog('✅ registerNewUser: 作成したユーザーを確認しました', { 
-            attempts: verificationAttempts + 1, 
-            userId: userId 
+        // 複数の検証方法を試行
+        const verificationMethods = [
+          () => fetchUserFromDatabase('userId', userId, { forceFresh: true }),
+          () => fetchUserFromDatabase('adminEmail', adminEmail, { forceFresh: true })
+        ];
+
+        for (const method of verificationMethods) {
+          try {
+            createdUser = method();
+            if (createdUser && createdUser.userId === userId) {
+              verificationSuccess = true;
+              debugLog('✅ registerNewUser: データベース同期確認成功', {
+                stage: stage.method,
+                attempts: attemptCount,
+                elapsed: Date.now() - startTime + 'ms',
+                userId: userId
+              });
+              break;
+            }
+          } catch (methodError) {
+            debugLog('registerNewUser: 検証方法でエラー:', methodError.message);
+          }
+        }
+        
+        if (verificationSuccess) break;
+        
+      } catch (stageError) {
+        warnLog('registerNewUser: 検証ステージでエラー:', {
+          stage: stage.method,
+          error: stageError.message,
+          elapsed: Date.now() - startTime + 'ms'
+        });
+      }
+    }
+
+    // 長期検証（3秒以降は継続チェック）
+    while (!verificationSuccess && (Date.now() - startTime) < maxWaitTime) {
+      Utilities.sleep(1000); // 1秒間隔
+      attemptCount++;
+      
+      try {
+        createdUser = fetchUserFromDatabase('userId', userId, { forceFresh: true, retryOnce: true });
+        if (createdUser && createdUser.userId === userId) {
+          verificationSuccess = true;
+          infoLog('✅ registerNewUser: 継続検証で成功', {
+            attempts: attemptCount,
+            elapsed: Date.now() - startTime + 'ms'
           });
           break;
         }
-      } catch (verifyError) {
-        warnLog('registerNewUser: 検証試行でエラー:', verifyError.message);
+      } catch (retryError) {
+        // 継続検証エラーは記録のみ
+        if (attemptCount % 5 === 0) { // 5回に1回ログ出力
+          debugLog('registerNewUser: 継続検証エラー:', retryError.message);
+        }
       }
+    }
+
+    // 検証結果の判定
+    if (!verificationSuccess || !createdUser) {
+      const elapsedTime = Date.now() - startTime;
+      errorLog('❌ registerNewUser: データベース同期検証失敗', {
+        userId,
+        email: adminEmail,
+        attempts: attemptCount,
+        elapsed: elapsedTime + 'ms',
+        maxWaitTime: maxWaitTime + 'ms'
+      });
       
-      verificationAttempts++;
+      throw new Error(`ユーザーデータの作成を確認できませんでした。${attemptCount}回の検証を実行しましたが、データベースの同期が完了していません。しばらく待ってから再試行してください。`);
     }
 
-    if (!createdUser) {
-      throw new Error('ユーザーデータの作成を確認できませんでした。データベースの同期に時間がかかっています。しばらく待ってから再試行してください。');
-    }
-
-    // 成功時のシンプルキャッシュ設定
+    // 検証成功時の確実なキャッシュ設定
     try {
-      CacheService.getScriptCache().put('user_' + userId, JSON.stringify(createdUser), 300);
-      CacheService.getScriptCache().put('email_' + adminEmail, JSON.stringify(createdUser), 300);
+      CacheService.getScriptCache().put('user_' + userId, JSON.stringify(createdUser), 600); // 10分キャッシュ
+      CacheService.getScriptCache().put('email_' + adminEmail, JSON.stringify(createdUser), 600);
+      debugLog('✅ registerNewUser: 検証成功後キャッシュ設定完了');
     } catch (cacheError) {
-      // キャッシュ設定の失敗は無視
+      warnLog('registerNewUser: キャッシュ設定でエラー:', cacheError.message);
+      // キャッシュ設定の失敗は登録成功を妨げない
     }
   } catch (e) {
     // 重複ユーザーエラーのシンプル処理
@@ -5491,43 +5557,110 @@ function activateSheetSimple(requestUserId, sheetName) {
 
 
 /**
- * シンプルなログイン状態確認（統一検索使用）
+ * 高信頼性ログイン状態確認（段階的検索戦略）
  * @returns {Object} Login status result
  */
 function getLoginStatus() {
+  const startTime = Date.now();
+  
   try {
     const activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }
     
-    debugLog('getLoginStatus: ログイン状態確認開始:', activeUserEmail);
+    debugLog('getLoginStatus: 高信頼性検索開始:', activeUserEmail);
 
-    // シンプルな短期キャッシュチェック
+    // 段階的検索戦略（書き込み直後の読み取り一貫性を考慮）
+    let userInfo = null;
+    let searchSuccess = false;
+    let searchAttempts = [];
+
+    // Stage 1: キャッシュ確認（短期間のみ）
     const cacheKey = 'login_status_' + activeUserEmail;
     try {
       const cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) {
         const parsedCache = JSON.parse(cached);
-        debugLog('getLoginStatus: キャッシュから結果取得:', parsedCache.status);
-        return parsedCache;
+        // キャッシュが古い場合（書き込み直後等）は無視
+        const cacheAge = Date.now() - (parsedCache._timestamp || 0);
+        if (cacheAge < 10000) { // 10秒以内のキャッシュのみ使用
+          debugLog('getLoginStatus: 新鮮なキャッシュ使用:', parsedCache.status);
+          return parsedCache;
+        } else {
+          debugLog('getLoginStatus: キャッシュが古いためスキップ');
+        }
       }
-    } catch (e) {
-      // キャッシュエラーは無視して続行
+    } catch (cacheError) {
+      debugLog('getLoginStatus: キャッシュ読み込みエラー:', cacheError.message);
     }
 
-    // 統一検索でユーザー情報を取得
-    let userInfo = findUserByEmail(activeUserEmail);
+    // Stage 2: 通常検索（キャッシュ付き）
+    try {
+      userInfo = findUserByEmail(activeUserEmail);
+      searchAttempts.push({ method: 'findUserByEmail', success: !!userInfo });
+      if (userInfo) {
+        searchSuccess = true;
+        debugLog('getLoginStatus: Stage 2成功 - キャッシュ検索でユーザー発見');
+      }
+    } catch (stage2Error) {
+      searchAttempts.push({ method: 'findUserByEmail', error: stage2Error.message });
+      warnLog('getLoginStatus: Stage 2失敗:', stage2Error.message);
+    }
+
+    // Stage 3: 強制フレッシュ検索（データベース直接）
+    if (!searchSuccess) {
+      try {
+        debugLog('getLoginStatus: Stage 3開始 - 強制フレッシュ検索');
+        userInfo = fetchUserFromDatabase('adminEmail', activeUserEmail, { 
+          forceFresh: true, 
+          retryOnce: true 
+        });
+        searchAttempts.push({ method: 'fetchUserFromDatabase_forceFresh', success: !!userInfo });
+        if (userInfo) {
+          searchSuccess = true;
+          debugLog('getLoginStatus: Stage 3成功 - 強制フレッシュでユーザー発見');
+        }
+      } catch (stage3Error) {
+        searchAttempts.push({ method: 'fetchUserFromDatabase_forceFresh', error: stage3Error.message });
+        warnLog('getLoginStatus: Stage 3失敗:', stage3Error.message);
+      }
+    }
+
+    // Stage 4: 最終確認検索（複数方法で確認）
+    if (!searchSuccess) {
+      debugLog('getLoginStatus: Stage 4開始 - 最終確認検索');
+      const finalMethods = [
+        () => fetchUserFromDatabase('adminEmail', activeUserEmail, { forceFresh: true }),
+        () => {
+          // 少し待ってから再度検索（書き込み直後の場合）
+          Utilities.sleep(1000);
+          return fetchUserFromDatabase('adminEmail', activeUserEmail, { forceFresh: true });
+        }
+      ];
+
+      for (let i = 0; i < finalMethods.length && !searchSuccess; i++) {
+        try {
+          userInfo = finalMethods[i]();
+          const methodName = `final_method_${i + 1}`;
+          searchAttempts.push({ method: methodName, success: !!userInfo });
+          if (userInfo) {
+            searchSuccess = true;
+            debugLog('getLoginStatus: Stage 4成功:', methodName);
+            break;
+          }
+        } catch (finalError) {
+          searchAttempts.push({ method: `final_method_${i + 1}`, error: finalError.message });
+        }
+      }
+    }
+
+    const searchElapsed = Date.now() - startTime;
     
-    // 見つからない場合は強制フレッシュで再試行
-    if (!userInfo) {
-      debugLog('getLoginStatus: 強制フレッシュで再検索中...');
-      userInfo = fetchUserFromDatabase('adminEmail', activeUserEmail, { forceFresh: true, retryOnce: true });
-    }
-
+    // 検索結果の処理
     let result;
     
-    if (userInfo) {
+    if (userInfo && searchSuccess) {
       // ユーザーが見つかった場合の状態判定
       const isActive = (userInfo.isActive === true || 
                        userInfo.isActive === 'true' || 
@@ -5541,110 +5674,247 @@ function getLoginStatus() {
           userId: userInfo.userId,
           adminUrl: urls.adminUrl,
           viewUrl: urls.viewUrl,
-          message: 'ログインが完了しました'
+          message: 'ログインが完了しました',
+          _timestamp: Date.now(),
+          _searchElapsed: searchElapsed
         };
-        infoLog('✅ getLoginStatus: アクティブユーザーを確認:', activeUserEmail);
+        infoLog('✅ getLoginStatus: アクティブユーザー確認完了', {
+          email: activeUserEmail,
+          userId: userInfo.userId,
+          elapsed: searchElapsed + 'ms',
+          attempts: searchAttempts.length
+        });
       } else {
         result = {
           status: 'setup_required',
           userId: userInfo.userId,
           adminUrl: urls.adminUrl,
           viewUrl: urls.viewUrl,
-          message: 'セットアップを完了してください'
+          message: 'セットアップを完了してください',
+          _timestamp: Date.now(),
+          _searchElapsed: searchElapsed
         };
-        warnLog('⚠️ getLoginStatus: 非アクティブユーザーを検出:', activeUserEmail);
+        warnLog('⚠️ getLoginStatus: 非アクティブユーザー検出', {
+          email: activeUserEmail,
+          userId: userInfo.userId
+        });
       }
     } else {
       // ユーザーが見つからない場合
       result = { 
         status: 'unregistered', 
-        userEmail: activeUserEmail
+        userEmail: activeUserEmail,
+        _timestamp: Date.now(),
+        _searchElapsed: searchElapsed,
+        searchAttempts: searchAttempts
       };
-      debugLog('⚠️ getLoginStatus: ユーザーが見つかりません:', activeUserEmail);
+      warnLog('⚠️ getLoginStatus: ユーザーが見つかりません', {
+        email: activeUserEmail,
+        attemptCount: searchAttempts.length,
+        elapsed: searchElapsed + 'ms',
+        attempts: searchAttempts
+      });
     }
     
-    // 結果を短期キャッシュ（30秒）
+    // 結果をキャッシュ（成功時は長め、失敗時は短め）
     try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
-    } catch (e) {
+      const cacheTtl = searchSuccess ? 60 : 15; // 成功時60秒、失敗時15秒
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), cacheTtl);
+    } catch (cacheError) {
       // キャッシュ保存エラーは無視
     }
     
     return result;
 
   } catch (error) {
-    errorLog('❌ getLoginStatus エラー:', error.message);
-    return { status: 'error', message: error.message };
+    errorLog('❌ getLoginStatus 重大エラー:', {
+      error: error.message,
+      email: activeUserEmail || 'unknown',
+      elapsed: (Date.now() - startTime) + 'ms'
+    });
+    return { 
+      status: 'error', 
+      message: error.message,
+      _timestamp: Date.now(),
+      _searchElapsed: Date.now() - startTime
+    };
   }
 }
 
 /**
- * シンプルなユーザー登録確認（統一検索使用）
+ * 統合ユーザー登録確認（高信頼性フロー）
  * @returns {Object} Registration result
  */
 function confirmUserRegistration() {
+  const startTime = Date.now();
+  
   try {
     const activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
     }
     
-    debugLog('confirmUserRegistration: 開始 -', activeUserEmail);
+    infoLog('confirmUserRegistration: 統合登録確認開始', { email: activeUserEmail });
     
-    // 既存ユーザーかどうかを確認（統一検索使用）
-    let existingUser = findUserByEmail(activeUserEmail);
-    
-    // 見つからない場合は強制フレッシュで再検索
-    if (!existingUser) {
-      debugLog('confirmUserRegistration: 強制フレッシュで再検索中...');
-      existingUser = fetchUserFromDatabase('adminEmail', activeUserEmail, { forceFresh: true });
+    // 関連キャッシュのクリア（登録確認時は新鮮な状態で開始）
+    try {
+      const cache = CacheService.getScriptCache();
+      cache.remove('login_status_' + activeUserEmail);
+      cache.remove('email_' + activeUserEmail);
+      debugLog('confirmUserRegistration: 関連キャッシュクリア完了');
+    } catch (cacheError) {
+      // キャッシュクリアの失敗は無視
+    }
+
+    // 段階的な既存ユーザー確認戦略
+    let existingUser = null;
+    let userFound = false;
+    const searchStages = [
+      { name: 'immediate', method: () => findUserByEmail(activeUserEmail) },
+      { name: 'forceFresh', method: () => fetchUserFromDatabase('adminEmail', activeUserEmail, { forceFresh: true }) },
+      { name: 'retryFresh', method: () => {
+        Utilities.sleep(500); // 短い待機後再検索
+        return fetchUserFromDatabase('adminEmail', activeUserEmail, { forceFresh: true, retryOnce: true });
+      }}
+    ];
+
+    for (const stage of searchStages) {
+      if (userFound) break;
+      
+      try {
+        debugLog('confirmUserRegistration: 検索ステージ実行:', stage.name);
+        existingUser = stage.method();
+        if (existingUser && existingUser.userId && existingUser.adminEmail) {
+          userFound = true;
+          infoLog('✅ confirmUserRegistration: 既存ユーザー発見', {
+            stage: stage.name,
+            userId: existingUser.userId,
+            email: activeUserEmail
+          });
+          break;
+        }
+      } catch (stageError) {
+        warnLog('confirmUserRegistration: 検索ステージエラー', {
+          stage: stage.name,
+          error: stageError.message
+        });
+      }
     }
     
-    if (existingUser) {
-      // 既存ユーザーの場合
+    if (existingUser && userFound) {
+      // 既存ユーザーの処理
       const isActive = (existingUser.isActive === true || 
                        String(existingUser.isActive).toLowerCase() === 'true');
       const urls = generateUserUrls(existingUser.userId);
       
-      infoLog('✅ confirmUserRegistration: 既存ユーザー確認', {
+      // ログイン状態を適切にキャッシュ
+      try {
+        const loginStatus = {
+          status: isActive ? 'existing_user' : 'setup_required',
+          userId: existingUser.userId,
+          _timestamp: Date.now()
+        };
+        CacheService.getScriptCache().put('login_status_' + activeUserEmail, JSON.stringify(loginStatus), 300);
+      } catch (cacheError) {
+        // キャッシュ設定失敗は無視
+      }
+      
+      const elapsedTime = Date.now() - startTime;
+      infoLog('✅ confirmUserRegistration: 既存ユーザー確認完了', {
         email: activeUserEmail,
         userId: existingUser.userId,
-        isActive: isActive
+        isActive: isActive,
+        elapsed: elapsedTime + 'ms'
       });
-      
-      // ログイン状態キャッシュをクリア
-      try {
-        CacheService.getScriptCache().remove('login_status_' + activeUserEmail);
-      } catch (cacheError) {
-        // キャッシュクリアの失敗は無視
-      }
       
       return {
         status: isActive ? 'existing_user' : 'setup_required',
         userId: existingUser.userId,
         adminUrl: urls.adminUrl,
         viewUrl: urls.viewUrl,
-        message: isActive ? '既に登録済みのため、管理パネルへ移動します' : 'セットアップを完了してください'
+        message: isActive ? '既に登録済みのため、管理パネルへ移動します' : 'セットアップを完了してください',
+        _processTime: elapsedTime
       };
     }
     
-    // 新規ユーザー登録を実行
+    // 新規ユーザー登録の実行
     debugLog('confirmUserRegistration: 新規ユーザー登録を開始');
-    const result = registerNewUser(activeUserEmail);
     
-    // 登録完了後のキャッシュクリア
     try {
-      CacheService.getScriptCache().remove('login_status_' + activeUserEmail);
-    } catch (cacheError) {
-      // キャッシュクリアの失敗は無視
+      const registrationResult = registerNewUser(activeUserEmail);
+      
+      // 登録成功の場合の追加検証
+      if (registrationResult && registrationResult.userId) {
+        // 登録直後の検証（登録が確実に完了したことを確認）
+        try {
+          const verificationUser = fetchUserFromDatabase('userId', registrationResult.userId, { 
+            forceFresh: true 
+          });
+          
+          if (!verificationUser) {
+            warnLog('confirmUserRegistration: 登録後検証で見つからない:', registrationResult.userId);
+          } else {
+            debugLog('✅ confirmUserRegistration: 登録後検証成功');
+          }
+        } catch (verifyError) {
+          warnLog('confirmUserRegistration: 登録後検証でエラー:', verifyError.message);
+        }
+        
+        // ログイン状態の適切なキャッシュ設定
+        try {
+          const loginStatus = {
+            status: 'existing_user',
+            userId: registrationResult.userId,
+            _timestamp: Date.now()
+          };
+          CacheService.getScriptCache().put('login_status_' + activeUserEmail, JSON.stringify(loginStatus), 300);
+        } catch (cacheError) {
+          // キャッシュ設定失敗は無視
+        }
+      }
+      
+      const totalElapsed = Date.now() - startTime;
+      infoLog('✅ confirmUserRegistration: 新規ユーザー登録完了', {
+        email: activeUserEmail,
+        userId: registrationResult?.userId,
+        elapsed: totalElapsed + 'ms'
+      });
+      
+      // 結果に処理時間を追加
+      if (registrationResult && typeof registrationResult === 'object') {
+        registrationResult._processTime = totalElapsed;
+      }
+      
+      return registrationResult;
+      
+    } catch (registrationError) {
+      const totalElapsed = Date.now() - startTime;
+      errorLog('❌ confirmUserRegistration: 登録処理エラー', {
+        email: activeUserEmail,
+        error: registrationError.message,
+        elapsed: totalElapsed + 'ms'
+      });
+      
+      return { 
+        status: 'error', 
+        message: registrationError.message,
+        _processTime: totalElapsed
+      };
     }
     
-    infoLog('✅ confirmUserRegistration: 新規ユーザー登録完了 -', activeUserEmail);
-    return result;
-    
   } catch (error) {
-    errorLog('❌ confirmUserRegistration エラー:', error.message);
-    return { status: 'error', message: error.message };
+    const totalElapsed = Date.now() - startTime;
+    errorLog('❌ confirmUserRegistration: 重大エラー', {
+      email: activeUserEmail || 'unknown',
+      error: error.message,
+      elapsed: totalElapsed + 'ms'
+    });
+    
+    return { 
+      status: 'error', 
+      message: error.message,
+      _processTime: totalElapsed
+    };
   }
 }
 

@@ -795,22 +795,76 @@ function fetchUserFromDatabase(field, value, options = {}) {
 
     debugLog('fetchUserFromDatabase: 検索開始', { field, value, forceFresh: opts.forceFresh });
 
-    // データ取得（強制フレッシュ時はキャッシュ無効化）
-    let cacheOptions = opts.forceFresh ? { useCache: false, ttl: 0 } : { useCache: true };
-    if (opts.forceFresh && typeof unifiedBatchProcessor !== 'undefined') {
+    // 強制フレッシュ時は全キャッシュ無効化
+    if (opts.forceFresh) {
       try {
-        unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
-      } catch (e) {
-        // キャッシュ無効化の失敗は無視
+        // 1. UnifiedBatchProcessorキャッシュ無効化
+        if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
+          unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
+        }
+        
+        // 2. CacheServiceの関連キャッシュ削除
+        const cache = CacheService.getScriptCache();
+        const prefixes = ['user_', 'email_', 'login_status_'];
+        prefixes.forEach(prefix => {
+          for (let i = 0; i < 50; i++) { // 想定範囲でクリア
+            cache.remove(prefix + i);
+          }
+        });
+        
+        debugLog('fetchUserFromDatabase: 強制フレッシュ - 全キャッシュ無効化完了');
+        
+        // キャッシュ無効化後の短い待機
+        Utilities.sleep(100);
+        
+      } catch (cacheError) {
+        warnLog('fetchUserFromDatabase: キャッシュ無効化でエラー:', cacheError.message);
       }
     }
 
-    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`], cacheOptions);
+    // データ取得オプション
+    let cacheOptions = opts.forceFresh ? 
+      { useCache: false, ttl: 0, forceRefresh: true } : 
+      { useCache: true, ttl: 300 };
+
+    // データ取得の信頼性確保（複数回試行）
+    let data = null;
+    let dataRetrieved = false;
+    const maxDataRetries = opts.forceFresh ? 3 : 1;
+    
+    for (let dataAttempt = 0; dataAttempt < maxDataRetries && !dataRetrieved; dataAttempt++) {
+      try {
+        if (dataAttempt > 0) {
+          debugLog('fetchUserFromDatabase: データ取得リトライ', dataAttempt);
+          Utilities.sleep(200 * dataAttempt); // 段階的待機
+        }
+        
+        data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`], cacheOptions);
+        
+        if (data && data.valueRanges && data.valueRanges[0]) {
+          dataRetrieved = true;
+        } else {
+          throw new Error('無効なデータ構造を受信');
+        }
+      } catch (dataError) {
+        warnLog('fetchUserFromDatabase: データ取得エラー (試行' + (dataAttempt + 1) + '):', dataError.message);
+        if (dataAttempt === maxDataRetries - 1) {
+          throw new Error('データ取得に失敗しました: ' + dataError.message);
+        }
+      }
+    }
+
     const values = data.valueRanges[0].values || [];
 
     if (values.length === 0) {
       throw new Error('データベースが空です');
     }
+
+    debugLog('fetchUserFromDatabase: データ取得完了', { 
+      rows: values.length, 
+      forceFresh: opts.forceFresh,
+      retries: maxDataRetries 
+    });
 
     // ヘッダーとフィールドインデックスの解決（シンプル版）
     const headers = values[0];
@@ -867,23 +921,49 @@ function fetchUserFromDatabase(field, value, options = {}) {
           user.isActive = (user.isActive === true || user.isActive === 'true' || user.isActive === 'TRUE');
         }
 
-        debugLog('✅ fetchUserFromDatabase: ユーザー検索成功', { 
+        // データ整合性の最終確認（重要フィールドの検証）
+        const dataIntegrity = {
+          hasUserId: !!user.userId,
+          hasEmail: !!user.adminEmail,
+          fieldsComplete: !!(user.userId && user.adminEmail),
+          searchMatch: user[field] === value || 
+                      (field === 'adminEmail' && user.adminEmail.toLowerCase() === value.toLowerCase())
+        };
+
+        if (!dataIntegrity.fieldsComplete) {
+          warnLog('fetchUserFromDatabase: データ整合性警告', {
+            user: user,
+            integrity: dataIntegrity,
+            rowIndex: i
+          });
+        }
+
+        infoLog('✅ fetchUserFromDatabase: ユーザー検索成功', { 
           field, 
           value, 
           userId: user.userId, 
-          isActive: user.isActive 
+          isActive: user.isActive,
+          dataIntegrity: dataIntegrity
         });
 
         return user;
       }
     }
 
-    // ユーザーが見つからない場合
-    debugLog('⚠️ fetchUserFromDatabase: ユーザーが見つかりません', { 
-      field, 
-      value, 
-      totalRows: values.length - 1 
-    });
+    // ユーザーが見つからない場合の詳細診断
+    const searchDiagnostics = {
+      searchCriteria: { field, value },
+      totalRows: values.length - 1,
+      fieldIndex: fieldIndex,
+      headerInfo: { available: headers, matched: headers[fieldIndex] },
+      sampleData: values.slice(1, Math.min(4, values.length)).map((row, idx) => ({
+        rowIndex: idx + 1,
+        targetValue: row[fieldIndex],
+        rawRow: row.slice(0, 3) // 最初の3列のみ表示
+      }))
+    };
+
+    warnLog('⚠️ fetchUserFromDatabase: ユーザーが見つかりません', searchDiagnostics);
     
     return null;
 
@@ -1456,9 +1536,13 @@ function appendSheetsData(service, spreadsheetId, range, values) {
     const url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) +
       ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
 
-    debugLog('appendSheetsData: リクエスト開始', { url, valueCount: values.length });
+    debugLog('appendSheetsData: 書き込み開始', { 
+      spreadsheetId: spreadsheetId.substring(0, 20) + '...', 
+      range, 
+      valueCount: values.length 
+    });
 
-    // 直接UrlFetchApp.fetchを使用（同期実行）
+    // 書き込み実行
     const response = UrlFetchApp.fetch(url, {
       method: 'post',
       contentType: 'application/json',
@@ -1467,7 +1551,7 @@ function appendSheetsData(service, spreadsheetId, range, values) {
       muteHttpExceptions: true
     });
 
-    // レスポンスオブジェクトの検証
+    // レスポンス検証
     if (!response || typeof response.getResponseCode !== 'function') {
       throw new Error('無効なレスポンスオブジェクトが返されました');
     }
@@ -1475,82 +1559,108 @@ function appendSheetsData(service, spreadsheetId, range, values) {
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
 
-    debugLog('appendSheetsData: レスポンス受信', { 
-      responseCode, 
-      contentLength: responseText ? responseText.length : 0 
-    });
-
     if (responseCode !== 200) {
-      throw new Error(`Append operation failed: ${responseCode} - ${responseText}`);
+      throw new Error(`書き込み失敗: ${responseCode} - ${responseText}`);
     }
 
+    // レスポンス解析と詳細確認
+    let parsed;
     try {
-      const parsed = JSON.parse(responseText);
-      // 重要: 追記後に該当スプレッドシートの読み取りキャッシュを無効化
-      try {
-        if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
-          unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
-        }
-      } catch (invalidateErr) {
-        warnLog('appendSheetsData: キャッシュ無効化に失敗しました', invalidateErr.message);
-      }
-      return parsed;
+      parsed = JSON.parse(responseText);
     } catch (parseError) {
-      warnLog('appendSheetsData: レスポンス解析に失敗、元のレスポンスを返します', {
-        parseError: parseError.message,
-        responseText: responseText.substring(0, 200)
-      });
-      // フォールバック返却前にもキャッシュ無効化を試行
-      try {
-        if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
-          unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
-        }
-      } catch (invalidateErr2) {
-        warnLog('appendSheetsData: フォールバック時のキャッシュ無効化に失敗', invalidateErr2.message);
-      }
-      return { updates: { updatedRows: 1 } }; // フォールバック
+      throw new Error(`レスポンス解析失敗: ${parseError.message}`);
     }
+
+    // 書き込み成功の詳細確認
+    const writeConfirmation = {
+      success: !!parsed.updates,
+      updatedRows: parsed.updates?.updatedRows || 0,
+      updatedColumns: parsed.updates?.updatedColumns || 0,
+      updatedCells: parsed.updates?.updatedCells || 0,
+      updatedRange: parsed.updates?.updatedRange || null
+    };
+
+    infoLog('✅ appendSheetsData: 書き込み成功確認', writeConfirmation);
+
+    // 書き込み成功が確認できない場合はエラー
+    if (!writeConfirmation.success || writeConfirmation.updatedRows === 0) {
+      throw new Error('書き込み応答は成功だが、実際の更新が確認できません');
+    }
+
+    // 全キャッシュの完全無効化（書き込み成功確認後）
+    try {
+      // 1. UnifiedBatchProcessorキャッシュ無効化
+      if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
+        unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
+      }
+      
+      // 2. CacheService個別削除（パターン削除をより確実に）
+      try {
+        const cache = CacheService.getScriptCache();
+        const prefixes = ['user_', 'email_', 'login_status_'];
+        // 既知のキーパターンを削除
+        prefixes.forEach(prefix => {
+          for (let i = 0; i < 100; i++) { // 合理的な範囲で削除
+            cache.remove(prefix + i);
+          }
+        });
+      } catch (cacheErr) {
+        warnLog('appendSheetsData: CacheService削除でエラー:', cacheErr.message);
+      }
+      
+      infoLog('✅ appendSheetsData: 全キャッシュ無効化完了');
+      
+    } catch (invalidateErr) {
+      warnLog('appendSheetsData: キャッシュ無効化でエラー:', invalidateErr.message);
+      // キャッシュ無効化の失敗は書き込み成功を妨げない
+    }
+
+    // 書き込み完了確認のための短い待機
+    Utilities.sleep(300); // 300ms待機でAPIの内部処理完了を待つ
+
+    debugLog('✅ appendSheetsData: 書き込み処理完了');
+    return parsed;
 
   } catch (error) {
-    errorLog('appendSheetsData: 処理中にエラーが発生しました', {
+    errorLog('❌ appendSheetsData エラー:', {
       error: error.message,
-      spreadsheetId,
+      spreadsheetId: spreadsheetId.substring(0, 20) + '...',
       range,
       valueCount: values ? values.length : 0
     });
 
-    // リトライ処理（1回のみ）
-    try {
-      Utilities.sleep(2000); // 2秒待機
-      
-      const url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range) +
-        ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+    // 重要なエラーの場合のみ1回リトライ
+    if (error.message.includes('429') || error.message.includes('503') || error.message.includes('timeout')) {
+      try {
+        warnLog('appendSheetsData: API制限/サーバーエラーのため2秒後にリトライします...');
+        Utilities.sleep(2000);
+        
+        const retryResponse = UrlFetchApp.fetch(url, {
+          method: 'post',
+          contentType: 'application/json',
+          headers: { 'Authorization': 'Bearer ' + service.accessToken },
+          payload: JSON.stringify({ values: values }),
+          muteHttpExceptions: true
+        });
 
-      const retryResponse = UrlFetchApp.fetch(url, {
-        method: 'post',
-        contentType: 'application/json',
-        headers: { 'Authorization': 'Bearer ' + service.accessToken },
-        payload: JSON.stringify({ values: values }),
-        muteHttpExceptions: true
-      });
-
-      if (retryResponse && typeof retryResponse.getResponseCode === 'function') {
-        const retryCode = retryResponse.getResponseCode();
-        if (retryCode === 200) {
-          infoLog('appendSheetsData: リトライで成功しました');
+        if (retryResponse.getResponseCode() === 200) {
+          infoLog('✅ appendSheetsData: リトライ成功');
+          const retryParsed = JSON.parse(retryResponse.getContentText());
+          
           // リトライ成功時もキャッシュ無効化
           try {
             if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
               unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
             }
-          } catch (invalidateErr3) {
-            warnLog('appendSheetsData: リトライ成功後のキャッシュ無効化に失敗', invalidateErr3.message);
+          } catch (invalidateErr) {
+            // キャッシュ無効化エラーは無視
           }
-          return JSON.parse(retryResponse.getContentText());
+          
+          return retryParsed;
         }
+      } catch (retryError) {
+        errorLog('❌ appendSheetsData: リトライも失敗:', retryError.message);
       }
-    } catch (retryError) {
-      errorLog('appendSheetsData: リトライも失敗しました', retryError.message);
     }
 
     throw error;
