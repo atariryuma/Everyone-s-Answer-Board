@@ -943,20 +943,18 @@ function registerNewUser(adminEmail) {
       // キャッシュクリアの失敗は無視
     }
 
-    // 原子的な作成→検証フロー（最大15秒待機）
+    // 原子的な作成→検証フロー（最大3秒待機）
     debugLog('registerNewUser: データベース同期検証を開始...');
     let verificationSuccess = false;
     let createdUser = null;
-    const maxWaitTime = 15000; // 15秒
+    const maxWaitTime = 3000; // 3秒に短縮
     const startTime = Date.now();
     let attemptCount = 0;
 
-    // 段階的な検証戦略
+    // 簡素化された検証戦略（2段階のみ）
     const verificationStages = [
-      { delay: 500, method: 'immediate' },      // 即座に確認
-      { delay: 1000, method: 'delayed' },       // 1秒後確認  
-      { delay: 2000, method: 'extended' },      // 2秒後確認
-      { delay: 3000, method: 'persistent' }     // 3秒以降継続確認
+      { delay: 500, method: 'immediate' },      // 500ms後確認
+      { delay: 1500, method: 'final' }          // 2秒後最終確認
     ];
 
     for (const stage of verificationStages) {
@@ -1001,28 +999,8 @@ function registerNewUser(adminEmail) {
       }
     }
 
-    // 長期検証（3秒以降は継続チェック）
-    while (!verificationSuccess && (Date.now() - startTime) < maxWaitTime) {
-      Utilities.sleep(1000); // 1秒間隔
-      attemptCount++;
-      
-      try {
-        createdUser = fetchUserFromDatabase('userId', userId, { forceFresh: true, retryOnce: true });
-        if (createdUser && createdUser.userId === userId) {
-          verificationSuccess = true;
-          infoLog('✅ registerNewUser: 継続検証で成功', {
-            attempts: attemptCount,
-            elapsed: Date.now() - startTime + 'ms'
-          });
-          break;
-        }
-      } catch (retryError) {
-        // 継続検証エラーは記録のみ
-        if (attemptCount % 5 === 0) { // 5回に1回ログ出力
-          debugLog('registerNewUser: 継続検証エラー:', retryError.message);
-        }
-      }
-    }
+    // 継続検証を削除（時間短縮のため）
+    // 2段階の検証で不十分な場合はエラーとして早期終了
 
     // 検証結果の判定
     if (!verificationSuccess || !createdUser) {

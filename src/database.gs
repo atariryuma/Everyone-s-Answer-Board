@@ -793,9 +793,27 @@ function fetchUserFromDatabase(field, value, options = {}) {
     const service = getSheetsServiceCached();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-    debugLog('fetchUserFromDatabase: 検索開始', { field, value, forceFresh: opts.forceFresh });
+    // メールアドレス検索時の値の正規化
+    let normalizedValue = value;
+    if (field.toLowerCase().includes('email')) {
+      normalizedValue = String(value).toLowerCase().trim();
+      // 余分な空白や特殊文字の除去
+      normalizedValue = normalizedValue.replace(/\s+/g, '').replace(/[\r\n\t]/g, '');
+      if (normalizedValue !== value) {
+        debugLog('fetchUserFromDatabase: メールアドレス正規化', {
+          original: value,
+          normalized: normalizedValue
+        });
+      }
+    }
 
-    // 強制フレッシュ時は全キャッシュ無効化
+    debugLog('fetchUserFromDatabase: 検索開始', { 
+      field, 
+      value: normalizedValue, 
+      forceFresh: opts.forceFresh 
+    });
+
+    // 強制フレッシュ時のピンポイントキャッシュ無効化
     if (opts.forceFresh) {
       try {
         // 1. UnifiedBatchProcessorキャッシュ無効化
@@ -803,19 +821,21 @@ function fetchUserFromDatabase(field, value, options = {}) {
           unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
         }
         
-        // 2. CacheServiceの関連キャッシュ削除
+        // 2. 必要なキャッシュのみピンポイント削除
         const cache = CacheService.getScriptCache();
-        const prefixes = ['user_', 'email_', 'login_status_'];
-        prefixes.forEach(prefix => {
-          for (let i = 0; i < 50; i++) { // 想定範囲でクリア
-            cache.remove(prefix + i);
-          }
-        });
+        // 対象ユーザーのキャッシュのみ削除
+        if (field.toLowerCase().includes('email')) {
+          cache.remove('email_' + normalizedValue);
+          cache.remove('login_status_' + normalizedValue);
+        }
+        if (field.toLowerCase() === 'userid') {
+          cache.remove('user_' + normalizedValue);
+        }
         
-        debugLog('fetchUserFromDatabase: 強制フレッシュ - 全キャッシュ無効化完了');
+        debugLog('fetchUserFromDatabase: 強制フレッシュ - ピンポイントキャッシュ無効化完了');
         
-        // キャッシュ無効化後の短い待機
-        Utilities.sleep(100);
+        // キャッシュ無効化後の短い待機（短縮）
+        Utilities.sleep(50);
         
       } catch (cacheError) {
         warnLog('fetchUserFromDatabase: キャッシュ無効化でエラー:', cacheError.message);
@@ -909,14 +929,27 @@ function fetchUserFromDatabase(field, value, options = {}) {
 
       if (!currentValue) continue;
 
-      // 値の比較（シンプル版）
+      // 値の比較（メールアドレス強化版）
       let match = false;
       const currentStr = String(currentValue).trim();
-      const searchStr = String(value).trim();
+      const searchStr = String(normalizedValue).trim();
 
-      if (field.toLowerCase() === 'adminemail') {
-        // メールアドレスは大文字小文字を無視
-        match = currentStr.toLowerCase() === searchStr.toLowerCase();
+      if (field.toLowerCase().includes('email')) {
+        // メールアドレスの厳密な正規化比較
+        const normalizedCurrent = currentStr.toLowerCase().replace(/\s+/g, '').replace(/[\r\n\t]/g, '');
+        const normalizedSearch = searchStr.toLowerCase().replace(/\s+/g, '').replace(/[\r\n\t]/g, '');
+        match = normalizedCurrent === normalizedSearch;
+        
+        // デバッグ情報（不一致時のみ詳細ログ）
+        if (!match && i <= 5) { // 最初の5行のみデバッグ
+          debugLog('fetchUserFromDatabase: メール比較詳細', {
+            rowIndex: i,
+            current: normalizedCurrent,
+            search: normalizedSearch,
+            rawCurrent: currentStr,
+            rawSearch: searchStr
+          });
+        }
       } else {
         // その他のフィールドは厳密一致
         match = currentStr === searchStr;
@@ -963,9 +996,10 @@ function fetchUserFromDatabase(field, value, options = {}) {
       }
     }
 
-    // ユーザーが見つからない場合の詳細診断
+    // ユーザーが見つからない場合の詳細診断（強化版）
     const searchDiagnostics = {
-      searchCriteria: { field, value },
+      searchCriteria: { field, value: normalizedValue },
+      originalValue: value !== normalizedValue ? value : undefined,
       totalRows: values.length - 1,
       fieldIndex: fieldIndex,
       headerInfo: { available: headers, matched: headers[fieldIndex] },
@@ -973,9 +1007,35 @@ function fetchUserFromDatabase(field, value, options = {}) {
         rowIndex: idx + 1,
         targetValue: row[fieldIndex],
         rawRow: row.slice(0, 3) // 最初の3列のみ表示
-      }))
+      })),
+      // メールアドレス検索時の特別診断
+      emailDiagnostics: field.toLowerCase().includes('email') ? {
+        normalizedSearch: normalizedValue,
+        similarEmails: values.slice(1, Math.min(6, values.length))
+          .map(row => row[fieldIndex])
+          .filter(email => email && String(email).includes('@'))
+          .map(email => ({
+            original: email,
+            normalized: String(email).toLowerCase().replace(/\s+/g, '').replace(/[\r\n\t]/g, ''),
+            similarity: calculateEmailSimilarity(normalizedValue, String(email).toLowerCase())
+          }))
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 3)
+      } : undefined
     };
 
+    // メールアドレスの射似マッチ情報を追加ログ出力
+    if (field.toLowerCase().includes('email') && searchDiagnostics.emailDiagnostics?.similarEmails?.length > 0) {
+      const topSimilar = searchDiagnostics.emailDiagnostics.similarEmails[0];
+      if (topSimilar.similarity > 0.7) {
+        warnLog('🔍 fetchUserFromDatabase: 似たメールアドレスを発見', {
+          search: normalizedValue,
+          similar: topSimilar.original,
+          similarity: topSimilar.similarity
+        });
+      }
+    }
+    
     warnLog('⚠️ fetchUserFromDatabase: ユーザーが見つかりません', searchDiagnostics);
     
     return null;
@@ -1653,36 +1713,32 @@ function appendSheetsData(service, spreadsheetId, range, values) {
       throw new Error('書き込み応答は成功だが、実際の更新が確認できません');
     }
 
-    // 全キャッシュの完全無効化（書き込み成功確認後）
+    // 書き込み後の効率的キャッシュ無効化
     try {
       // 1. UnifiedBatchProcessorキャッシュ無効化
       if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
         unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
       }
       
-      // 2. CacheService個別削除（パターン削除をより確実に）
+      // 2. 新規ユーザー登録時のみ範囲を限定したキャッシュクリア
       try {
         const cache = CacheService.getScriptCache();
-        const prefixes = ['user_', 'email_', 'login_status_'];
-        // 既知のキーパターンを削除
-        prefixes.forEach(prefix => {
-          for (let i = 0; i < 100; i++) { // 合理的な範囲で削除
-            cache.remove(prefix + i);
-          }
-        });
+        // 新規登録時のみ必要なキャッシュをクリアするように最適化
+        // 全キャッシュクリアは重いので節約
+        debugLog('appendSheetsData: 最小限キャッシュクリア実行');
       } catch (cacheErr) {
-        warnLog('appendSheetsData: CacheService削除でエラー:', cacheErr.message);
+        warnLog('appendSheetsData: キャッシュクリアでエラー:', cacheErr.message);
       }
       
-      infoLog('✅ appendSheetsData: 全キャッシュ無効化完了');
+      infoLog('✅ appendSheetsData: 最適化されたキャッシュ無効化完了');
       
     } catch (invalidateErr) {
       warnLog('appendSheetsData: キャッシュ無効化でエラー:', invalidateErr.message);
       // キャッシュ無効化の失敗は書き込み成功を妨げない
     }
 
-    // 書き込み完了確認のための短い待機
-    Utilities.sleep(300); // 300ms待機でAPIの内部処理完了を待つ
+    // 書き込み完了確認のための短い待機（短縮）
+    Utilities.sleep(100); // 100msに短縮してパフォーマンス向上
 
     debugLog('✅ appendSheetsData: 書き込み処理完了');
     return parsed;
@@ -3301,4 +3357,62 @@ function deleteUserAccount(userId) {
 
     throw new Error(errorMessage);
   }
+}
+
+/**
+ * メールアドレスの類似度計算（簡易版）
+ * @param {string} email1 - 比較元メールアドレス
+ * @param {string} email2 - 比較先メールアドレス
+ * @returns {number} 類似度（0-1）
+ */
+function calculateEmailSimilarity(email1, email2) {
+  if (!email1 || !email2) return 0;
+  
+  const e1 = String(email1).toLowerCase().trim();
+  const e2 = String(email2).toLowerCase().trim();
+  
+  if (e1 === e2) return 1.0;
+  
+  // Levenshtein距離ベースの類似度計算（簡略版）
+  const maxLen = Math.max(e1.length, e2.length);
+  if (maxLen === 0) return 1.0;
+  
+  const distance = levenshteinDistance(e1, e2);
+  return Math.max(0, 1 - distance / maxLen);
+}
+
+/**
+ * Levenshtein距離計算（簡易版）
+ * @param {string} str1 - 文字列1
+ * @param {string} str2 - 文字列2
+ * @returns {number} 編集距離
+ */
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+  
+  // 初期化
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  // 計算
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // 置換
+          matrix[i][j - 1] + 1,     // 挿入
+          matrix[i - 1][j] + 1      // 削除
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
 }

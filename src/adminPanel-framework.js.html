@@ -485,7 +485,10 @@ function updateUIWithNewStatus(status) {
   // Enhanced full implementation detection with multiple retries
   if (typeof window._fullUpdateUIWithNewStatus === 'function') {
     try {
-      console.log('updateUIWithNewStatus: Using full implementation');
+      // 本番環境でのログ量を減らす
+      if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
+        console.log('updateUIWithNewStatus: Using full implementation');
+      }
       return window._fullUpdateUIWithNewStatus(status);
     } catch (error) {
       console.warn('Full updateUIWithNewStatus failed, using fallback:', error);
@@ -786,7 +789,10 @@ window.AdminPanel.functionRegistry = {
     const fullFuncName = `_full${functionName.charAt(0).toUpperCase()}${functionName.slice(1)}`;
     if (typeof window[fullFuncName] === 'function') {
       this.fullImplementations.add(functionName);
-      console.log(`🔧 Full implementation registered: ${fullFuncName}`);
+      // デバッグモードのみログ出力（本番での重複ログを減らす）
+      if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
+        console.log(`🔧 Full implementation registered: ${fullFuncName}`);
+      }
     }
   },
   
@@ -814,7 +820,10 @@ window.AdminPanel.functionRegistry = {
       }
     });
     
-    console.log(`🔍 Full implementations check: ${foundCount}/${functionsToCheck.length} available`);
+    // 本番環境でのログ量を減らす
+    if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
+      console.log(`🔍 Full implementations check: ${foundCount}/${functionsToCheck.length} available`);
+    }
     return foundCount;
   },
   

@@ -466,10 +466,11 @@ function clearOldUserCache(currentEmail) {
     // 古い形式のキャッシュを削除
     props.deleteProperty('CURRENT_USER_ID');
 
-    // 現在のユーザー以外のキャッシュをクリア
+    // 現在のユーザー以外のキャッシュをクリア（API修正版）
     const userCache = CacheService.getUserCache();
     if (userCache) {
-      userCache.removeAll(['config_v3_', 'user_', 'email_']);
+      // GAS API仕様に合わせて全キャッシュクリア
+      userCache.removeAll();
     }
 
     debugLog('古いユーザーキャッシュをクリアしました: ' + currentEmail);

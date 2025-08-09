@@ -510,7 +510,10 @@ function populateSheetSelect(sheetNames, activeSheetName) {
     select.disabled = false;
     logDebug('✅ Sheet dropdown populated successfully');
   } else {
-    console.warn('⚠️ No sheets available:', sheetNames);
+    // 初期セットアップ時は正常なのでdebugレベルに変更
+    if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
+      console.warn('⚠️ No sheets available:', sheetNames);
+    }
     select.innerHTML = '<option value="">利用可能なシートがありません</option>';
     select.disabled = true;
   }

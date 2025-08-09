@@ -246,9 +246,9 @@ function emergencySystemReset() {
         unifiedSecretManager.clearSecretCache();
       }
 
-      // GASの標準キャッシュもクリア
-      CacheService.getScriptCache().removeAll([]);
-      CacheService.getUserCache().removeAll([]);
+      // GASの標準キャッシュもクリア（API修正版）
+      CacheService.getScriptCache().removeAll();
+      CacheService.getUserCache().removeAll();
     } catch (cacheError) {
       warnLog('キャッシュクリア中のエラー:', cacheError.message);
     }

@@ -397,11 +397,14 @@ function setupAccountManagementHandlers() {
   // Delete account handler - 防御的実装
   const deleteBtn = elements['delete-account-btn'] || getCachedElement('delete-account-btn');
   if (deleteBtn) {
-    // 既存のイベントリスナーを削除（重複を防ぐため）
-    deleteBtn.removeEventListener('click', handleDeleteRequest);
-    // 新しいイベントリスナーを追加
-    deleteBtn.addEventListener('click', handleDeleteRequest);
-    console.log('Delete account button event listener attached successfully');
+    // 重複登録防止のためフラグで管理
+    if (!deleteBtn._deleteListenerAttached) {
+      deleteBtn.addEventListener('click', handleDeleteRequest);
+      deleteBtn._deleteListenerAttached = true;
+      if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
+        console.log('Delete account button event listener attached successfully');
+      }
+    }
   } else {
     console.warn('Delete account button not found');
   }
@@ -580,25 +583,40 @@ function handleDeleteRequest() {
     function() {
       runGasWithUserId('deleteCurrentUserAccount', 'アカウントを完全に削除しています...')
         .then(function(response) {
-          showMessage(response.message || 'アカウントが削除されました', 'success');
-          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-            window.unifiedCache.clear();
+          showMessage(response.message || 'アカウントが削除されました。ログイン画面に移動します。', 'success');
+          
+          // 完全なキャッシュクリア実行
+          try {
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
+            if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+              window.gasOptimizer.clearCache();
+            }
+            if (window.localStorage) {
+              window.localStorage.clear();
+            }
+            if (window.sessionStorage) {
+              window.sessionStorage.clear();
+            }
+          } catch (clearError) {
+            console.warn('キャッシュクリアエラー:', clearError);
           }
-          if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
-            window.gasOptimizer.clearCache();
-          }
-          if (window.localStorage) {
-            window.localStorage.clear();
-          }
+          
+          // 強制的なログイン画面リダイレクト
           setTimeout(function() {
-            runGasWithUserId('getWebAppUrl')
-              .then(function(webAppUrl) {
-                window.location.href = webAppUrl;
+            // サーバーサイドのセッションをクリアしてログイン画面にリダイレクト
+            runGasWithUserId('resetUserAuthentication')
+              .then(function(loginUrl) {
+                console.log('ログイン画面にリダイレクト:', loginUrl);
+                window.location.href = loginUrl || window.location.origin + window.location.pathname;
               })
-              .catch(function() {
-                window.location.reload();
+              .catch(function(error) {
+                console.warn('リダイレクトエラー:', error);
+                // フォールバック: ページを強制リロードしてログイン状態をリセット
+                window.location.href = window.location.origin + window.location.pathname;
               });
-          }, 2000);
+          }, 1500);
         })
         .catch(function(error) {
           handleError(error, 'deleteAccount', 'アカウントの削除に失敗しました。');

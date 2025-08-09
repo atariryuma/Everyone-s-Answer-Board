@@ -54,10 +54,12 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
       }
     });
 
-    // ユーザーキャッシュを全面クリア
+    // ユーザーキャッシュを全面クリア（API修正版）
     if (userCache) {
       try {
-        userCache.removeAll(['config_v3_', 'user_', 'email_', 'hdr_', 'data_', 'sheets_']);
+        // GAS API仕様に合わせて引数なしで全キャッシュクリア
+        userCache.removeAll();
+        debugLog('ユーザーキャッシュ全クリア完了');
       } catch (cacheError) {
         warnLog('ユーザーキャッシュクリア中のエラー: ' + cacheError.message);
       }
@@ -93,13 +95,13 @@ function resetUserAuthentication() {
     debugLog('ユーザー認証をリセット中...');
     const userCache = getResilientCacheService();
     if (userCache) {
-      userCache.removeAll([]); // ユーザーキャッシュを全てクリア
+      userCache.removeAll(); // GAS API仕様に合わせて引数なし
       debugLog('ユーザーキャッシュをクリアしました。');
     }
 
     const scriptCache = getResilientScriptCache();
     if (scriptCache) {
-      scriptCache.removeAll([]); // スクリプトキャッシュを全てクリア
+      scriptCache.removeAll(); // GAS API仕様に合わせて引数なし
       debugLog('スクリプトキャッシュをクリアしました。');
     }
 
@@ -139,13 +141,13 @@ function forceLogoutAndRedirectToLogin() {
       debugLog('🧹 キャッシュクリア開始...');
       const userCache = getResilientCacheService();
       if (userCache) {
-        userCache.removeAll([]);
+        userCache.removeAll(); // GAS API仕様に合わせて引数なし
         debugLog('✅ ユーザーキャッシュクリア完了');
       }
 
       const scriptCache = getResilientScriptCache();
       if (scriptCache) {
-        scriptCache.removeAll([]);
+        scriptCache.removeAll(); // GAS API仕様に合わせて引数なし
         debugLog('✅ スクリプトキャッシュクリア完了');
       }
 
