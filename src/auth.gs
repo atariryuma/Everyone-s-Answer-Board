@@ -119,320 +119,96 @@ function getServiceAccountEmail() {
   }
 }
 
-/**
- * 合理的な新規ユーザー認証処理 - 適切なバランスでセキュリティと利便性を両立
- * @param {string} userId - 検証するユーザーID
- * @param {string} activeUserEmail - 現在のログインユーザーのメールアドレス
- * @param {Object} searchSummary - 基本検索の結果サマリー
- * @returns {Object} 認証結果 {approved: boolean, method: string, reason: string}
- */
-function handleNewUserAuthentication(userId, activeUserEmail, searchSummary) {
-  const authResult = {
-    approved: false,
-    method: 'none',
-    reason: 'no_new_user_criteria_met',
-    details: {}
-  };
-
-  try {
-    const currentEmail = activeUserEmail ? activeUserEmail.toLowerCase().trim() : '';
-    const emailDomain = currentEmail.split('@')[1];
-
-    // 新規ユーザーかどうかをScriptPropertiesで確認（UserPropertiesは使用しない）
-    let isRecentlyCreated = false;
-    let createdTimeInfo = null;
-
-    try {
-      const scriptProps = PropertiesService.getScriptProperties();
-      const allProps = scriptProps.getProperties();
-      
-      // デバッグログ: ScriptPropertiesの内容と検索パラメーターを記録
-      const newUserKeys = Object.keys(allProps).filter(k => k.startsWith('newUser_'));
-      debugLog('handleNewUserAuthentication: 検索パラメーター:', {
-        userId: userId,
-        currentEmail: currentEmail,
-        totalProps: Object.keys(allProps).length,
-        newUserKeys: newUserKeys.length,
-        availableKeys: newUserKeys.slice(0, 5) // 最初の5件のみ表示
-      });
-      
-      // 新規ユーザー記録を探す - より柔軟な検索ロジック
-      for (const [key, value] of Object.entries(allProps)) {
-        if (key.startsWith('newUser_')) {
-          try {
-            const data = JSON.parse(value);
-            const timeDiff = Date.now() - parseInt(data.createdTime);
-            
-            // 5分以内に作成されたユーザーのみ対象
-            if (timeDiff < 300000) { // 5分 = 300秒
-              // より柔軟なマッチングロジック
-              const keyLower = key.toLowerCase();
-              const emailLower = currentEmail.toLowerCase();
-              const dataEmailLower = data.email ? data.email.toLowerCase() : '';
-              
-              const matchConditions = {
-                userIdExact: data.userId === userId,
-                userIdInKey: key.includes(userId),
-                emailInKey: keyLower.includes(emailLower),
-                emailExact: dataEmailLower === emailLower,
-                emailLocal: emailLower.split('@')[0] && keyLower.includes(emailLower.split('@')[0])
-              };
-              
-              debugLog('handleNewUserAuthentication: キーマッチング検証:', {
-                key: key,
-                timeDiff: timeDiff,
-                matchConditions: matchConditions,
-                data: data
-              });
-              
-              // いずれかの条件に一致すれば有効とみなす
-              if (matchConditions.userIdExact || 
-                  matchConditions.userIdInKey || 
-                  matchConditions.emailInKey || 
-                  matchConditions.emailExact || 
-                  matchConditions.emailLocal) {
-                
-                isRecentlyCreated = true;
-                createdTimeInfo = {
-                  timeDiff: timeDiff,
-                  key: key,
-                  data: data,
-                  matchedBy: Object.keys(matchConditions).filter(k => matchConditions[k])
-                };
-                
-                infoLog('handleNewUserAuthentication: ✅ 新規ユーザーマッチング成功:', {
-                  matchedBy: createdTimeInfo.matchedBy,
-                  timeDiff: timeDiff + 'ms'
-                });
-                break;
-              }
-            } else {
-              debugLog('handleNewUserAuthentication: タイムアウト:', {
-                key: key,
-                timeDiff: timeDiff,
-                timeoutThreshold: 300000
-              });
-            }
-          } catch (parseError) {
-            warnLog('handleNewUserAuthentication: JSONパースエラー:', {
-              key: key,
-              error: parseError.message
-            });
-            continue;
-          }
-        }
-      }
-      
-      // 検索結果のサマリーログ
-      if (!isRecentlyCreated && newUserKeys.length > 0) {
-        warnLog('handleNewUserAuthentication: 新規ユーザー検索で一致なし:', {
-          searchedUserId: userId,
-          searchedEmail: currentEmail,
-          availableNewUserKeys: newUserKeys,
-          totalNewUserRecords: newUserKeys.length
-        });
-      }
-    } catch (propsError) {
-      errorLog('handleNewUserAuthentication: ScriptProperties取得でエラー:', propsError.message);
-    }
-
-    if (isRecentlyCreated && createdTimeInfo) {
-      warnLog('handleNewUserAuthentication: 新規作成ユーザーを検出、追加検証を実行');
-      
-      // 2-3秒待機してから追加検証
-      Utilities.sleep(2500); // 2.5秒待機
-      
-      // 追加検証: データベース同期を待ってもう一度検索
-      let retryUserFromDb = null;
-      try {
-        retryUserFromDb = fetchUserFromDatabase('userId', userId, {
-          enableDiagnostics: false,
-          autoRepair: false,
-          retryCount: 1
-        });
-      } catch (retryError) {
-        warnLog('handleNewUserAuthentication: 追加検索でエラー:', retryError.message);
-      }
-
-      if (retryUserFromDb) {
-        authResult.approved = true;
-        authResult.method = 'delayed_database_sync';
-        authResult.reason = 'new_user_found_after_sync_wait';
-        authResult.details = {
-          waitTime: '2.5秒',
-          createdTimeDiff: createdTimeInfo.timeDiff + 'ms',
-          domain: emailDomain
-        };
-        return authResult;
-      }
-
-      // 教育機関ドメインの場合のみ、合理的な緊急措置
-      if (emailDomain === 'naha-okinawa.ed.jp') {
-        warnLog('handleNewUserAuthentication: 教育機関ドメインによる合理的緊急措置を実行');
-        authResult.approved = true;
-        authResult.method = 'educational_emergency_measure';
-        authResult.reason = 'educational_domain_with_recent_creation';
-        authResult.details = {
-          domain: emailDomain,
-          createdTimeDiff: createdTimeInfo.timeDiff + 'ms',
-          securityNote: '5分以内の新規作成 + 教育機関ドメインによる限定的承認'
-        };
-        return authResult;
-      }
-    }
-
-    authResult.reason = 'no_recent_creation_or_invalid_domain';
-    authResult.details = {
-      domain: emailDomain,
-      isRecentlyCreated: isRecentlyCreated,
-      createdTimeInfo: createdTimeInfo
-    };
-
-  } catch (error) {
-    authResult.reason = 'new_user_auth_error';
-    authResult.details = { error: error.message };
-    errorLog('handleNewUserAuthentication: エラー:', error.message);
-  }
-
-  return authResult;
-}
+// handleNewUserAuthentication関数は簡素化により削除されました
+// 新規ユーザー認証は、confirmUserRegistrationとverifyAdminAccessの統合フローで処理されます
 
 // 不要な複雑な認証システムを削除（簡素化のため）
 
 /**
- * 指定されたユーザーの管理者権限を検証する - 安定版ベース + 合理的な新規ユーザー対応
+ * シンプル・確実な管理者権限検証（3重チェック）
+ * メールアドレス + ユーザーID + アクティブ状態の照合
  * @param {string} userId - 検証するユーザーのID
  * @returns {boolean} 管理者権限がある場合は true、そうでなければ false
  */
 function verifyAdminAccess(userId) {
   try {
-    // 引数チェック
+    // 基本的な引数チェック
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
       warnLog('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
       return false;
     }
 
-    // 現在操作しているGoogleアカウントのメールアドレスを取得
-    var activeUserEmail = getCurrentUserEmail();
+    // 現在のログインユーザーのメールアドレスを取得
+    const activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       warnLog('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
       return false;
     }
 
-    // データベースから指定されたIDのユーザー情報を取得
-    // セキュリティ認証では最新データが必要だが、過度なキャッシュクリアを避ける
-    debugLog('verifyAdminAccess: ユーザー検索開始 - userId:', userId);
+    debugLog('verifyAdminAccess: 認証開始', { userId, activeUserEmail });
 
-    // 3段階でのユーザー情報取得（安定版と同じロジック）
-    var userFromDb = null;
-    var searchAttempts = [];
+    // データベースからユーザー情報を取得（統一検索関数使用）
+    let userFromDb = null;
+    
+    // まずは通常のキャッシュ付き検索を試行
+    userFromDb = findUserById(userId);
+    
+    // 見つからない場合は強制フレッシュで再試行
+    if (!userFromDb) {
+      debugLog('verifyAdminAccess: 強制フレッシュで再検索中...');
+      userFromDb = fetchUserFromDatabase('userId', userId, { forceFresh: true });
+    }
 
-    // 第1段階: キャッシュからユーザー情報を取得を試行
-    try {
-      userFromDb = getOrFetchUserInfo(userId, 'userId', {
-        useExecutionCache: false, // セキュリティ認証のため実行時キャッシュは使用しない
-        ttl: 30 // より短いTTLで最新性を確保
+    // ユーザーが見つからない場合は認証失敗
+    if (!userFromDb) {
+      warnLog('verifyAdminAccess: ユーザーが見つかりません:', { 
+        userId, 
+        activeUserEmail 
       });
-      searchAttempts.push({ method: 'getOrFetchUserInfo', success: !!userFromDb });
-    } catch (error) {
-      warnLog('verifyAdminAccess: getOrFetchUserInfo でエラー:', error.message);
-      searchAttempts.push({ method: 'getOrFetchUserInfo', error: error.message });
+      return false;
     }
 
-    // 第2段階: 直接データベース検索にフォールバック
-    if (!userFromDb || !userFromDb.adminEmail) {
-      debugLog('verifyAdminAccess: 直接データベース検索にフォールバック');
-      try {
-        userFromDb = fetchUserFromDatabase('userId', userId);
-        searchAttempts.push({ method: 'fetchUserFromDatabase', success: !!userFromDb });
-      } catch (error) {
-        errorLog('verifyAdminAccess: fetchUserFromDatabase でエラー:', error.message);
-        searchAttempts.push({ method: 'fetchUserFromDatabase', error: error.message });
-      }
-    }
+    // 3重チェック実行
+    // 1. メールアドレス照合
+    const dbEmail = String(userFromDb.adminEmail || '').toLowerCase().trim();
+    const currentEmail = String(activeUserEmail).toLowerCase().trim();
+    const isEmailMatched = dbEmail && currentEmail && dbEmail === currentEmail;
 
-    // 第3段階: findUserById による追加検証
-    if (!userFromDb) {
-      debugLog('verifyAdminAccess: findUserById による最終検証を実行');
-      try {
-        userFromDb = findUserById(userId, { useExecutionCache: false, forceRefresh: true });
-        searchAttempts.push({ method: 'findUserById', success: !!userFromDb });
-      } catch (error) {
-        errorLog('verifyAdminAccess: findUserById でエラー:', error.message);
-        searchAttempts.push({ method: 'findUserById', error: error.message });
-      }
-    }
+    // 2. ユーザーID照合（念のため）
+    const isUserIdMatched = String(userFromDb.userId) === String(userId);
 
-    // 検索結果の詳細ログ
-    const searchSummary = {
-      found: !!userFromDb,
-      userId: userFromDb ? userFromDb.userId : 'なし',
-      adminEmail: userFromDb ? userFromDb.adminEmail : 'なし',
-      isActive: userFromDb ? userFromDb.isActive : 'なし',
-      activeUserEmail: activeUserEmail,
-      searchAttempts: searchAttempts,
-      timestamp: new Date().toISOString()
-    };
-    debugLog('verifyAdminAccess: ユーザー検索結果:', searchSummary);
+    // 3. アクティブ状態確認
+    const isActive = (userFromDb.isActive === true || 
+                     userFromDb.isActive === 'true' || 
+                     String(userFromDb.isActive).toLowerCase() === 'true');
 
-    // 新規ユーザー対応: 合理的な追加検証
-    if (!userFromDb) {
-      const newUserAuth = handleNewUserAuthentication(userId, activeUserEmail, searchSummary);
-      if (newUserAuth.approved) {
-        warnLog('verifyAdminAccess: 新規ユーザー認証で承認:', newUserAuth);
-        return true;
-      } else {
-        errorLog('verifyAdminAccess: 🚨 全ての検索方法でユーザーが見つかりませんでした:', {
-          requestedUserId: userId,
-          activeUserEmail: activeUserEmail,
-          searchSummary: searchSummary,
-          newUserAuthResult: newUserAuth
-        });
-        return false;
-      }
-    }
-
-    // データベースのメールアドレスと、現在ログイン中のメールアドレスを比較
-    var dbEmail = userFromDb.adminEmail ? String(userFromDb.adminEmail).trim() : '';
-    var currentEmail = activeUserEmail ? String(activeUserEmail).trim() : '';
-    var isEmailMatched = dbEmail && currentEmail &&
-                        dbEmail.toLowerCase() === currentEmail.toLowerCase();
-
-    debugLog('verifyAdminAccess: メールアドレス照合:', {
-      dbEmail: dbEmail,
-      currentEmail: currentEmail,
-      isEmailMatched: isEmailMatched
+    debugLog('verifyAdminAccess: 3重チェック結果:', {
+      isEmailMatched,
+      isUserIdMatched,
+      isActive,
+      dbEmail,
+      currentEmail
     });
 
-    // ユーザーがアクティブであるかを確認（型安全な判定）
-    debugLog('verifyAdminAccess: isActive検証 - raw:', userFromDb.isActive, 'type:', typeof userFromDb.isActive);
-    var isActive = (userFromDb.isActive === true ||
-                    userFromDb.isActive === 'true' ||
-                    String(userFromDb.isActive).toLowerCase() === 'true');
-    debugLog('verifyAdminAccess: isActive結果:', isActive);
-
-    if (isEmailMatched && isActive) {
-      infoLog('✅ 管理者本人によるアクセスを確認しました:', activeUserEmail, 'UserID:', userId);
-      return true; // メールが一致し、かつアクティブであれば成功
+    // 3つの条件すべてが満たされた場合のみ認証成功
+    if (isEmailMatched && isUserIdMatched && isActive) {
+      infoLog('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
+      return true;
     } else {
-      // セキュリティログの構造化
-      const securityAlert = {
-        timestamp: new Date().toISOString(),
-        event: 'unauthorized_access_attempt',
-        severity: 'high',
-        details: {
-          attemptedUserId: userId,
-          dbEmail: userFromDb.adminEmail,
-          activeUserEmail: activeUserEmail,
-          isUserActive: isActive,
-          sourceFunction: 'verifyAdminAccess'
+      warnLog('❌ verifyAdminAccess: 認証失敗', {
+        userId,
+        activeUserEmail,
+        failures: {
+          email: !isEmailMatched,
+          userId: !isUserIdMatched,
+          active: !isActive
         }
-      };
-      warnLog('🚨 セキュリティアラート:', JSON.stringify(securityAlert, null, 2));
-      return false; // 一致しない、またはアクティブでない場合は失敗
+      });
+      return false;
     }
-  } catch (e) {
-    errorLog('verifyAdminAccess: 管理者検証中にエラーが発生しました:', e.message);
+
+  } catch (error) {
+    errorLog('❌ verifyAdminAccess: 認証処理エラー:', error.message);
     return false;
   }
 }

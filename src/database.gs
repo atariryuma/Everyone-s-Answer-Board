@@ -622,12 +622,26 @@ function getSheetsService() {
  * @returns {object|null} ユーザー情報
  */
 function findUserById(userId) {
+  // シンプルなキャッシュ戦略: 短時間の基本キャッシュのみ
   const cacheKey = 'user_' + userId;
-  return cacheManager.get(
-    cacheKey,
-    function() { return fetchUserFromDatabase('userId', userId); },
-    { ttl: 300, enableMemoization: true }
-  );
+  try {
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    // キャッシュエラーは無視して直接検索
+  }
+
+  const user = fetchUserFromDatabase('userId', userId);
+  if (user) {
+    try {
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), 180); // 3分キャッシュ
+    } catch (e) {
+      // キャッシュ保存の失敗は無視
+    }
+  }
+  return user;
 }
 
 /**
@@ -722,368 +736,173 @@ function fixUserDataConsistency(userId) {
  * @returns {object|null} ユーザー情報
  */
 function findUserByEmail(email) {
+  // シンプルなキャッシュ戦略: 短時間の基本キャッシュのみ
   const cacheKey = 'email_' + email;
-  // 既存のキャッシュ戦略に合わせつつ、検索ロジックは柔軟化したfetchUserFromDatabaseに委譲
-  return cacheManager.get(
-    cacheKey,
-    function() { return fetchUserFromDatabase('adminEmail', email); },
-    { ttl: 300, enableMemoization: true }
-  );
-}
+  try {
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    // キャッシュエラーは無視して直接検索
+  }
 
-/**
- * 見出し文字列の正規化（大小/全角/不可視文字を吸収）
- */
-function _normalizeHeader(str) {
-  if (!str && str !== 0) return '';
-  var s = String(str).trim();
-  try { if (s.normalize) s = s.normalize('NFKC'); } catch (e) {}
-  // よくある表記揺れの簡易吸収
-  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, ''); // ゼロ幅系削除
-  return s.toLowerCase();
-}
-
-/**
- * 値の正規化（email比較用）
- */
-function _normalizeValue(str) {
-  if (!str && str !== 0) return '';
-  var s = String(str).trim();
-  try { if (s.normalize) s = s.normalize('NFKC'); } catch (e) {}
-  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
-  return s;
-}
-
-/**
- * 柔軟なフィールドインデックス解決
- * @param {string[]} headers
- * @param {string} requestedField
- * @returns {{index:number, matchedHeader:string}|null}
- */
-function _resolveFieldIndex(headers, requestedField) {
-  if (!headers || !headers.length) return null;
-  var normalized = headers.map(function(h){ return _normalizeHeader(h); });
-
-  /** 候補マップ（優先順） */
-  var candidatesMap = {
-    'adminemail': ['adminemail','email','メールアドレス','admin_email','admin e-mail'],
-    'userid': ['userid','user id','ユーザーid','id','ユーザーid（userId）']
-  };
-
-  var key = _normalizeHeader(requestedField);
-  var candidates = candidatesMap[key] || [key];
-
-  for (var i = 0; i < candidates.length; i++) {
-    var c = candidates[i];
-    var idx = normalized.indexOf(c);
-    if (idx !== -1) {
-      return { index: idx, matchedHeader: headers[idx] };
+  const user = fetchUserFromDatabase('adminEmail', email);
+  if (user) {
+    try {
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), 180); // 3分キャッシュ
+    } catch (e) {
+      // キャッシュ保存の失敗は無視
     }
   }
-  return null;
+  return user;
 }
 
+// 以下の複雑な正規化関数は簡素化により削除されました:
+// - _normalizeHeader
+// - _normalizeValue  
+// - _resolveFieldIndex
+// 新しい fetchUserFromDatabase では直接的なフィールドマッチングを使用しています
+
 /**
- * データベースからユーザーを取得（エラーハンドリング強化版）
- * @param {string} field - 検索フィールド
+ * シンプル・信頼性重視のユーザーDB検索（統一版）
+ * @param {string} field - 検索フィールド ('userId' | 'adminEmail')
  * @param {string} value - 検索値
  * @param {object} options - オプション設定
  * @returns {object|null} ユーザー情報
  */
 function fetchUserFromDatabase(field, value, options = {}) {
-  // オプションのデフォルト値（パフォーマンス最適化: 診断と自動修復はデフォルトで無効）
+  if (!field || !value) {
+    debugLog('❌ fetchUserFromDatabase: 無効なパラメーター');
+    return null;
+  }
+
   const opts = {
-    retryCount: options.retryCount || 2,
-    enableDiagnostics: options.enableDiagnostics === true, // 明示的にtrueの場合のみ有効
-    autoRepair: options.autoRepair === true, // 明示的にtrueの場合のみ有効
+    forceFresh: options.forceFresh === true,
+    retryOnce: options.retryOnce === true,
     ...options
   };
 
-  let retryAttempt = 0;
-  let lastError = null;
+  try {
+    // 基本設定の取得
+    const dbId = getSecureDatabaseId();
+    if (!dbId) {
+      throw new Error('データベースIDが設定されていません');
+    }
 
-  while (retryAttempt <= opts.retryCount) {
-    try {
-      debugLog('fetchUserFromDatabase - 試行 ' + (retryAttempt + 1) + '/' + (opts.retryCount + 1) +
-        ': ' + field + '=' + value);
+    const service = getSheetsServiceCached();
+    const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-      var props = PropertiesService.getScriptProperties();
-      var dbId =  getSecureDatabaseId();
+    debugLog('fetchUserFromDatabase: 検索開始', { field, value, forceFresh: opts.forceFresh });
 
-      if (!dbId) {
-        var configError = new Error('データベースIDが設定されていません');
-        configError.type = 'CONFIG_ERROR';
-        throw configError;
-      }
-
-      // サービス取得（リトライ時は強制リフレッシュ）
-      let service;
+    // データ取得（強制フレッシュ時はキャッシュ無効化）
+    let cacheOptions = opts.forceFresh ? { useCache: false, ttl: 0 } : { useCache: true };
+    if (opts.forceFresh && typeof unifiedBatchProcessor !== 'undefined') {
       try {
-        service = retryAttempt > 0 ? getSheetsServiceCached(true) : getCachedSheetsService();
-      } catch (serviceError) {
-        serviceError.type = 'SERVICE_ERROR';
-        throw serviceError;
-      }
-
-      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-
-      debugLog('DEBUG: fetchUserFromDatabase - 検索開始: ' + field + '=' + value);
-      debugLog('DEBUG: fetchUserFromDatabase - データベースID: ' + dbId);
-      debugLog('DEBUG: fetchUserFromDatabase - シート名: ' + sheetName);
-
-      // キャッシュ無効化/バイパス（登録直後など強制フレッシュが必要な場合）
-      const needFresh = (retryAttempt > 0) || opts.clearCache === true || opts.forceFresh === true;
-      if (needFresh) {
-        try {
-          if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor.invalidateCacheForSpreadsheet) {
-            unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
-          }
-        } catch (cacheError) {
-          warnLog('fetchUserFromDatabase - キャッシュ無効化警告:', cacheError.message);
-        }
-      }
-
-      // データ取得
-      let data;
-      try {
-        // 強制フレッシュ時はキャッシュを完全に無効化
-        data = batchGetSheetsData(
-          service,
-          dbId,
-          ["'" + sheetName + "'!A:H"],
-          needFresh ? { useCache: false, ttl: 0 } : { useCache: true }
-        );
-      } catch (dataError) {
-        dataError.type = 'DATA_ACCESS_ERROR';
-        throw dataError;
-      }
-
-      const values = data.valueRanges[0].values || [];
-
-      debugLog('fetchUserFromDatabase - データ取得完了: rows=' + values.length);
-      
-      // より詳細なデータベース状態ログ
-      infoLog('🔍 fetchUserFromDatabase - データベース詳細情報:', {
-        totalRows: values.length,
-        dataRows: values.length > 0 ? values.length - 1 : 0,
-        searchField: field,
-        searchValue: value,
-        timestamp: new Date().toISOString()
-      });
-
-      if (values.length === 0) {
-        errorLog('❌ fetchUserFromDatabase - データベースが完全に空です');
-        const noDataError = new Error('データベースが空です');
-        noDataError.type = 'NO_DATA_ERROR';
-        throw noDataError;
-      }
-
-      const headers = values[0];
-      infoLog('🏷️ fetchUserFromDatabase - ヘッダー情報:', {
-        headers: headers,
-        headerCount: headers.length
-      });
-      
-      // 柔軟なヘッダ解決（後方互換）
-      var resolved = _resolveFieldIndex(headers, field);
-      if (!resolved) {
-        errorLog('❌ fetchUserFromDatabase: 指定フィールドが見つかりません（互換探索失敗）:', {
-          requestedField: field,
-          availableHeaders: headers,
-          normalizedHeaders: headers.map(h => _normalizeHeader(h))
-        });
-        const fieldError = new Error('検索フィールド "' + field + '" が見つかりません');
-        fieldError.type = 'FIELD_ERROR';
-        throw fieldError;
-      }
-      const fieldIndex = resolved.index;
-      infoLog('✅ fetchUserFromDatabase - ヘッダ解決成功:', { 
-        requested: field, 
-        matchedHeader: resolved.matchedHeader, 
-        index: fieldIndex 
-      });
-
-      infoLog('🔍 fetchUserFromDatabase - 検索開始:', {
-        fieldIndex: fieldIndex,
-        dataRowsToSearch: values.length - 1,
-        searchCriteria: { field: field, value: value }
-      });
-
-      // 最初の数行のサンプルデータを表示（デバッグ用）
-      if (retryAttempt === 0 && values.length > 1) {
-        const sampleRows = values.slice(1, Math.min(4, values.length)).map((row, index) => ({
-          rowNumber: index + 2,
-          targetFieldValue: row[fieldIndex],
-          fullRow: row
-        }));
-        infoLog('📊 fetchUserFromDatabase - サンプルデータ（最初の3行）:', sampleRows);
-      }
-
-      // ユーザー検索
-      for (let i = 1; i < values.length; i++) { // i=0はヘッダー行のためスキップ
-        const currentRow = values[i];
-        const currentValue = currentRow[fieldIndex];
-
-        // 値の比較を厳密に行う（文字列の trim と型変換）
-        let normalizedCurrentValue = _normalizeValue(currentValue);
-        let normalizedSearchValue = _normalizeValue(value);
-
-        // メールアドレス検索は大文字小文字を無視
-        let isMatch;
-        const normalizedField = _normalizeHeader(field);
-        if (normalizedField === 'adminemail') {
-          isMatch = normalizedCurrentValue.toLowerCase() === normalizedSearchValue.toLowerCase();
-        } else {
-          isMatch = normalizedCurrentValue === normalizedSearchValue;
-        }
-
-        // 詳細ログ（最初の試行時と一致した場合）
-        if (retryAttempt === 0 || isMatch) {
-          const logLevel = isMatch ? 'info' : 'debug';
-          const logPrefix = isMatch ? '🎯 MATCH' : '🔍';
-          const logMessage = `${logPrefix} fetchUserFromDatabase - 行${i}検索:`;
-          const logData = {
-            rowNumber: i,
-            rawValue: currentValue,
-            normalizedValue: normalizedCurrentValue,
-            searchValue: normalizedSearchValue,
-            normalizedSearchValue: normalizedSearchValue,
-            fieldType: normalizedField,
-            isMatch: isMatch,
-            caseInsensitive: normalizedField === 'adminemail'
-          };
-          
-          if (isMatch) {
-            infoLog(logMessage, logData);
-          } else if (retryAttempt === 0 && i <= 3) { // 最初の3行のみ詳細ログ
-            debugLog(logMessage, logData);
-          }
-        }
-
-        if (isMatch) {
-          debugLog('fetchUserFromDatabase - ユーザー発見 at rowIndex:', i);
-          const user = {};
-          headers.forEach(function(header, index) {
-            const rawValue = currentRow[index];
-            user[header] = rawValue !== undefined && rawValue !== null ? rawValue : '';
-          });
-
-          // isActive フィールドの型変換
-          if (user.hasOwnProperty('isActive')) {
-            if (user.isActive === true || user.isActive === 'true' || user.isActive === 'TRUE') {
-              user.isActive = true;
-            } else if (user.isActive === false || user.isActive === 'false' || user.isActive === 'FALSE') {
-              user.isActive = false;
-            } else {
-              user.isActive = true; // デフォルト
-            }
-          }
-
-          infoLog('✅ fetchUserFromDatabase - ユーザー取得成功:', field + '=' + value,
-            'userId=' + user.userId, 'isActive=' + user.isActive, 'DEBUG: User data:', user);
-
-          return user;
-        }
-      }
-
-      // ユーザーが見つからない場合 - より詳細な診断情報
-      const allFieldValues = [];
-      for (let i = 1; i < Math.min(values.length, 6); i++) { // 最大5行まで
-        const row = values[i];
-        if (row && row[fieldIndex] !== undefined) {
-          allFieldValues.push({
-            row: i,
-            originalValue: row[fieldIndex],
-            normalizedValue: _normalizeValue(row[fieldIndex])
-          });
-        }
-      }
-      
-      errorLog('❌ fetchUserFromDatabase - ユーザーが見つかりません:', {
-        searchCriteria: { field: field, value: value },
-        normalizedSearchValue: _normalizeValue(value),
-        totalSearchedRows: values.length - 1,
-        fieldIndex: fieldIndex,
-        sampleFieldValues: allFieldValues,
-        headers: headers,
-        normalizedField: _normalizeHeader(field),
-        timestamp: new Date().toISOString()
-      });
-      return null;
-
-      const notFoundError = new Error('ユーザー情報が見つかりません');
-      notFoundError.type = 'USER_NOT_FOUND';
-      notFoundError.searchCriteria = { field: field, value: value };
-      throw notFoundError;
-
-    } catch (error) {
-      lastError = error;
-      retryAttempt++;
-
-      errorLog('❌ fetchUserFromDatabase - エラー発生 (試行 ' + retryAttempt + '/' + (opts.retryCount + 1) +
-        ') (' + field + ':' + value + '):', error.message);
-
-      // エラータイプ別の処理
-      if (error.type === 'CONFIG_ERROR' || error.type === 'FIELD_ERROR') {
-        // 設定エラーやフィールドエラーはリトライしても無駄
-        errorLog('❌ 致命的エラーのためリトライを中止:', error.type);
-        break;
-      }
-
-      // 最後の試行で失敗した場合の診断・修復
-      if (retryAttempt > opts.retryCount) {
-        errorLog('❌ 全ての試行が失敗しました');
-
-        // 診断実行（オプションが有効な場合）
-        if (opts.enableDiagnostics) {
-          try {
-            debugLog('🔍 エラー診断を実行中...');
-            var diagnosis = diagnoseDatabase(field === 'userId' ? value : null);
-            debugLog('📊 診断結果:', diagnosis.summary);
-
-            // 自動修復試行（オプションが有効で、診断で問題が見つかった場合）
-            if (opts.autoRepair && diagnosis.summary.criticalIssues.length > 0) {
-              debugLog('🔧 自動修復を試行中...');
-              var repairResult = performAutoRepair(field === 'userId' ? value : null);
-              debugLog('🔧 修復結果:', repairResult.summary);
-
-              if (repairResult.success) {
-                debugLog('♻️ 修復後に再試行します...');
-                // 修復成功時は1回だけ追加試行
-                return fetchUserFromDatabase(field, value, {
-                  retryCount: 0,
-                  enableDiagnostics: false,
-                  autoRepair: false,
-                  clearCache: true
-                });
-              }
-            }
-          } catch (diagError) {
-            errorLog('❌ 診断・修復処理でエラー:', diagError.message);
-          }
-        }
-
-        break;
-      }
-
-      // リトライ前の待機
-      if (retryAttempt <= opts.retryCount) {
-        const waitTime = Math.min(1000 * retryAttempt, 3000); // 最大3秒
-        debugLog('⏳ ' + waitTime + 'ms 待機後にリトライ...');
-        Utilities.sleep(waitTime);
+        unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
+      } catch (e) {
+        // キャッシュ無効化の失敗は無視
       }
     }
+
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`], cacheOptions);
+    const values = data.valueRanges[0].values || [];
+
+    if (values.length === 0) {
+      throw new Error('データベースが空です');
+    }
+
+    // ヘッダーとフィールドインデックスの解決（シンプル版）
+    const headers = values[0];
+    let fieldIndex = -1;
+    
+    // 直接的なフィールド名マッチング（正規化処理を簡素化）
+    for (let i = 0; i < headers.length; i++) {
+      const header = String(headers[i]).toLowerCase().trim();
+      const searchField = field.toLowerCase().trim();
+      
+      if (header === searchField || 
+          (searchField === 'adminemail' && (header === 'email' || header === 'adminemail')) ||
+          (searchField === 'userid' && header === 'userid')) {
+        fieldIndex = i;
+        break;
+      }
+    }
+
+    if (fieldIndex === -1) {
+      throw new Error(`検索フィールド "${field}" が見つかりません。利用可能: ${headers.join(', ')}`);
+    }
+
+    debugLog('fetchUserFromDatabase: フィールド解決完了', { field, fieldIndex, header: headers[fieldIndex] });
+
+    // ユーザー検索（シンプルな線形検索）
+    for (let i = 1; i < values.length; i++) {
+      const currentRow = values[i];
+      const currentValue = currentRow[fieldIndex];
+
+      if (!currentValue) continue;
+
+      // 値の比較（シンプル版）
+      let match = false;
+      const currentStr = String(currentValue).trim();
+      const searchStr = String(value).trim();
+
+      if (field.toLowerCase() === 'adminemail') {
+        // メールアドレスは大文字小文字を無視
+        match = currentStr.toLowerCase() === searchStr.toLowerCase();
+      } else {
+        // その他のフィールドは厳密一致
+        match = currentStr === searchStr;
+      }
+
+      if (match) {
+        // ユーザーオブジェクトの構築
+        const user = {};
+        headers.forEach((header, index) => {
+          user[header] = currentRow[index] || '';
+        });
+
+        // isActiveフィールドの正規化（ブール型に統一）
+        if (user.hasOwnProperty('isActive')) {
+          user.isActive = (user.isActive === true || user.isActive === 'true' || user.isActive === 'TRUE');
+        }
+
+        debugLog('✅ fetchUserFromDatabase: ユーザー検索成功', { 
+          field, 
+          value, 
+          userId: user.userId, 
+          isActive: user.isActive 
+        });
+
+        return user;
+      }
+    }
+
+    // ユーザーが見つからない場合
+    debugLog('⚠️ fetchUserFromDatabase: ユーザーが見つかりません', { 
+      field, 
+      value, 
+      totalRows: values.length - 1 
+    });
+    
+    return null;
+
+  } catch (error) {
+    errorLog('❌ fetchUserFromDatabase エラー:', error.message);
+    
+    // 1回だけリトライオプションが有効で、まだリトライしていない場合
+    if (opts.retryOnce && !opts._hasRetried) {
+      warnLog('fetchUserFromDatabase: 1回リトライします...');
+      Utilities.sleep(500); // 短い待機
+      return fetchUserFromDatabase(field, value, { 
+        ...opts, 
+        _hasRetried: true, 
+        forceFresh: true 
+      });
+    }
+    
+    return null;
   }
-
-  // すべてのリトライが失敗した場合
-  errorLog('❌ fetchUserFromDatabase - 全てのリトライが失敗:', lastError ? lastError.message : 'unknown error');
-
-  // エラーの詳細情報を付加
-  const finalError = lastError || new Error('ユーザー情報の取得に失敗しました');
-  finalError.searchCriteria = { field: field, value: value };
-  finalError.retryCount = retryAttempt - 1;
-
-  return null;
 }
 
 /**
@@ -1379,94 +1198,8 @@ function createUser(userData) {
   });
 }
 
-/**
- * Polls the database until a user record becomes available.
- * @param {string} userId - The ID of the user to fetch.
- * @param {number} maxWaitMs - Maximum wait time in milliseconds.
- * @param {number} intervalMs - Poll interval in milliseconds.
- * @returns {boolean} true if found within the wait window.
- */
-function waitForUserRecord(userId, maxWaitMs, intervalMs) {
-  debugLog('waitForUserRecord: 開始', {
-    userId: userId,
-    maxWaitMs: maxWaitMs,
-    intervalMs: intervalMs
-  });
-  
-  var start = Date.now();
-  var attemptCount = 0;
-  var lastError = null;
-  var verificationMethods = ['fetchUserFromDatabase', 'findUserById'];
-  
-  while (Date.now() - start < maxWaitMs) {
-    attemptCount++;
-    var elapsed = Date.now() - start;
-    
-    debugLog('waitForUserRecord: 試行', {
-      attempt: attemptCount,
-      elapsed: elapsed + 'ms',
-      remaining: (maxWaitMs - elapsed) + 'ms'
-    });
-    
-    // 複数の検証方法を試行
-    for (var methodIndex = 0; methodIndex < verificationMethods.length; methodIndex++) {
-      var method = verificationMethods[methodIndex];
-      
-      try {
-        var found = null;
-        
-        if (method === 'fetchUserFromDatabase') {
-          found = fetchUserFromDatabase('userId', userId, { 
-            forceFresh: true, 
-            clearCache: true, 
-            retryCount: 0 
-          });
-        } else if (method === 'findUserById') {
-          found = findUserById(userId, { 
-            useExecutionCache: false, 
-            forceRefresh: true 
-          });
-        }
-        
-        if (found && found.userId === userId) {
-          infoLog('✅ waitForUserRecord: ユーザー検証成功', {
-            method: method,
-            attempt: attemptCount,
-            elapsed: elapsed + 'ms',
-            userId: userId
-          });
-          return true;
-        }
-      } catch (e) {
-        lastError = e;
-        warnLog('waitForUserRecord: 検証エラー', {
-          method: method,
-          attempt: attemptCount,
-          error: e.message,
-          elapsed: elapsed + 'ms'
-        });
-        // 次の方法を試行
-      }
-    }
-    
-    // 短い間隔で再試行
-    if (Date.now() - start < maxWaitMs) {
-      Utilities.sleep(intervalMs);
-    }
-  }
-  
-  // 最終的な失敗をログ出力
-  errorLog('❌ waitForUserRecord: 最終失敗', {
-    userId: userId,
-    attempts: attemptCount,
-    totalTime: (Date.now() - start) + 'ms',
-    lastError: lastError ? lastError.message : 'unknown',
-    maxWaitMs: maxWaitMs,
-    intervalMs: intervalMs
-  });
-  
-  return false;
-}
+// waitForUserRecord関数は簡素化により削除されました
+// registerNewUser内のシンプルな検証ループで置き換えられています
 
 /**
  * データベースシートを初期化
