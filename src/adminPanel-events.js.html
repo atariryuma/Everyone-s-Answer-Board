@@ -6,6 +6,17 @@
 // DOM Elements Cache
 var elements = {};
 
+// Event handler state tracking to prevent duplicate attachments
+var eventHandlersAttached = {
+  setupEventListeners: false,
+  formConfigModal: false,
+  resourceHandlers: false,
+  accountManagement: false,
+  externalLinks: false,
+  modalHandlers: false,
+  realtimeValidation: false
+};
+
 // 履歴管理用定数 - adminPanel-ui.js.htmlで定義済みのため、ここでは参照のみ
 // const HISTORY_STORAGE_KEY = 'answerBoardHistory'; // 重複宣言を回避
 
@@ -14,7 +25,14 @@ var elements = {};
 // =============================================================================
 
 function setupEventListeners() {
+  // Prevent duplicate event handler attachment
+  if (eventHandlersAttached.setupEventListeners) {
+    console.log('⚠️ AdminPanel: Event handlers already attached, skipping duplicate setup');
+    return;
+  }
+  
   console.log('✅ AdminPanel: Initializing event handlers');
+  eventHandlersAttached.setupEventListeners = true;
   
   // Cache frequently used elements
   elements = {
@@ -54,7 +72,13 @@ function setupEventListeners() {
         function() {
           unpublishBoard()
             .then(function() {
-              return loadStatus(true);
+              // Use debounced loadStatus for event-triggered calls
+              if (window.AdminPanel && window.AdminPanel.debounce) {
+                window.AdminPanel.debounce.loadStatus(() => loadStatus(true), 500);
+                return Promise.resolve();
+              } else {
+                return loadStatus(true);
+              }
             })
             .then(function() {
               showMessage('回答ボードは非公開になりました。', 'success');
@@ -259,7 +283,13 @@ function setupEventListeners() {
     unpublishBoard()
       .then(function(response) {
         console.log('✅ 公開停止が完了しました:', response);
-        return loadStatus(true).then(() => response);
+        // Use debounced loadStatus to prevent rapid successive calls
+        if (window.AdminPanel && window.AdminPanel.debounce) {
+          window.AdminPanel.debounce.loadStatus(() => loadStatus(true), 300);
+          return Promise.resolve(response);
+        } else {
+          return loadStatus(true).then(() => response);
+        }
       })
       .then(function(response) {
         // 公開停止が確実に完了した旨を表示
@@ -333,6 +363,12 @@ function setupEventListeners() {
 // =============================================================================
 
 function setupFormConfigModalHandlers() {
+  if (eventHandlersAttached.formConfigModal) {
+    logDebug('Form config modal handlers already attached');
+    return;
+  }
+  eventHandlersAttached.formConfigModal = true;
+  
   var formConfigClose = document.getElementById('form-config-close');
   var formConfigCancel = document.getElementById('form-config-cancel');
   var formConfigCreate = document.getElementById('form-config-create');
@@ -367,6 +403,12 @@ function setupFormConfigModalHandlers() {
 // =============================================================================
 
 function setupResourceHandlers() {
+  if (eventHandlersAttached.resourceHandlers) {
+    logDebug('Resource handlers already attached');
+    return;
+  }
+  eventHandlersAttached.resourceHandlers = true;
+  
   var addResourceBtn = document.getElementById('add-resource-btn');
   var resourceUrlInput = document.getElementById('resource-url-input');
   var resetConfigBtn = document.getElementById('reset-config-btn');
@@ -394,6 +436,12 @@ function setupResourceHandlers() {
 // =============================================================================
 
 function setupAccountManagementHandlers() {
+  if (eventHandlersAttached.accountManagement) {
+    logDebug('Account management handlers already attached');
+    return;
+  }
+  eventHandlersAttached.accountManagement = true;
+  
   // Delete account handler - 防御的実装
   const deleteBtn = elements['delete-account-btn'] || getCachedElement('delete-account-btn');
   if (deleteBtn) {
@@ -424,6 +472,12 @@ function setupAccountManagementHandlers() {
 // =============================================================================
 
 function setupExternalLinkHandlers() {
+  if (eventHandlersAttached.externalLinks) {
+    logDebug('External link handlers already attached');
+    return;
+  }
+  eventHandlersAttached.externalLinks = true;
+  
   // Open spreadsheet
   if (elements['open-spreadsheet-btn']) {
     elements['open-spreadsheet-btn'].addEventListener('click', openDatabaseSpreadsheet);
@@ -458,6 +512,12 @@ function setupExternalLinkHandlers() {
 // =============================================================================
 
 function setupModalHandlers() {
+  if (eventHandlersAttached.modalHandlers) {
+    logDebug('Modal handlers already attached');
+    return;
+  }
+  eventHandlersAttached.modalHandlers = true;
+  
   // Privacy modal
   var privacyClose = document.getElementById('privacy-modal-close');
   var privacyCancel = document.getElementById('privacy-modal-cancel');
@@ -537,6 +597,12 @@ function setupBackdropClickHandlers() {
 // =============================================================================
 
 function setupRealtimeValidation() {
+  if (eventHandlersAttached.realtimeValidation) {
+    logDebug('Realtime validation handlers already attached');
+    return;
+  }
+  eventHandlersAttached.realtimeValidation = true;
+  
   // Opinion column validation
   var opinionSelect = document.getElementById('opinion-column');
   if (opinionSelect) {

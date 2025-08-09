@@ -2840,7 +2840,92 @@ function toggleDebugMode(enable) {
 }
 
 /**
- * 個別ユーザーのisActiveステータスを更新
+ * 個別ユーザー自身のアクセス状態を取得
+ * @returns {Object} 現在のアクセス状態
+ */
+function getUserActiveStatus() {
+  try {
+    const currentUser = getUserInfo();
+    if (!currentUser || !currentUser.userId) {
+      throw new Error('ユーザー情報が取得できません');
+    }
+    
+    // データベースから現在のユーザー情報を取得
+    const userData = fetchUserFromDatabase(currentUser.userId);
+    if (!userData) {
+      throw new Error('ユーザーデータが見つかりません');
+    }
+    
+    const isActive = userData.isActive !== false; // デフォルトはtrue
+    
+    return {
+      success: true,
+      isActive: isActive,
+      userId: currentUser.userId,
+      email: currentUser.adminEmail,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    errorLog('getUserActiveStatus error:', error.message);
+    return {
+      success: false,
+      error: 'アクセス状態の取得に失敗しました: ' + error.message,
+      isActive: true // フォールバック
+    };
+  }
+}
+
+/**
+ * 個別ユーザー自身のアクセス状態を更新
+ * @param {string} targetUserId - 対象ユーザーのID（現在のユーザーと一致する必要がある）
+ * @param {boolean} isActive - 新しいアクティブ状態
+ * @returns {Object} 操作結果
+ */
+function updateSelfActiveStatus(targetUserId, isActive) {
+  try {
+    const currentUser = getUserInfo();
+    if (!currentUser || !currentUser.userId) {
+      throw new Error('ユーザー情報が取得できません');
+    }
+    
+    // 自分自身のアクセス状態のみ変更可能
+    if (targetUserId !== currentUser.userId) {
+      throw new Error('自分自身のアクセス状態のみ変更できます');
+    }
+    
+    // データベースのユーザー情報を更新
+    const result = updateUserDatabaseField(targetUserId, 'isActive', isActive);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'データベース更新に失敗しました');
+    }
+    
+    // キャッシュをクリア
+    clearUserCache(targetUserId);
+    
+    debugLog(`User ${targetUserId} self-updated isActive to: ${isActive}`);
+    
+    return {
+      success: true,
+      message: `アクセス設定を${isActive ? '有効' : '無効'}に変更しました`,
+      userId: targetUserId,
+      isActive: isActive,
+      changed: true,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    errorLog('updateSelfActiveStatus error:', error.message);
+    return {
+      success: false,
+      message: 'アクセス設定の変更に失敗しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * 個別ユーザーのisActiveステータスを更新（管理者用）
  * @param {string} userId - 対象ユーザーのID
  * @param {boolean} isActive - 新しいアクティブ状態
  * @returns {Object} 操作結果

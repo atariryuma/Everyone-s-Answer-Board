@@ -4,6 +4,12 @@ let lastSelectedSheetName = null; // To prevent redundant sheet selection change
 // UI Update Mutex to prevent race conditions
 let isUIUpdateInProgress = false;
 let pendingUIUpdate = null;
+let lastStatusHash = null;
+let uiUpdateDebounceTimer = null;
+
+// UI update optimization tracking
+let duplicateUpdateCount = 0;
+let totalUpdateCount = 0;
 
 // =============================================================================
 // EARLY FUNCTION DEFINITIONS (Critical functions that must be available immediately)
@@ -140,12 +146,38 @@ function _fullUpdateUIWithNewStatus(status) {
     return;
   }
 
-  // UI Update Mutex: Prevent concurrent UI updates
-  if (isUIUpdateInProgress) {
-    logDebug('UI update in progress, queuing this update');
-    pendingUIUpdate = status;
+  totalUpdateCount++;
+  
+  // Generate status hash for duplicate detection
+  const statusHash = generateStatusHash(status);
+  
+  // Skip identical updates to prevent processing redundancy
+  if (lastStatusHash === statusHash) {
+    duplicateUpdateCount++;
+    logDebug(`🚫 Skipping duplicate UI update (${duplicateUpdateCount}/${totalUpdateCount} duplicates)`);
     return;
   }
+  
+  // Clear any pending debounced update
+  if (uiUpdateDebounceTimer) {
+    clearTimeout(uiUpdateDebounceTimer);
+    uiUpdateDebounceTimer = null;
+  }
+  
+  // UI Update Mutex: Prevent concurrent UI updates
+  if (isUIUpdateInProgress) {
+    logDebug('UI update in progress, debouncing this update');
+    
+    // Debounce rapid successive updates
+    uiUpdateDebounceTimer = setTimeout(() => {
+      pendingUIUpdate = status;
+      lastStatusHash = statusHash;
+      uiUpdateDebounceTimer = null;
+    }, 100); // 100ms debounce
+    return;
+  }
+  
+  lastStatusHash = statusHash;
 
   isUIUpdateInProgress = true;
   
@@ -253,11 +285,33 @@ function executeTasksInBatches(tasks, batchSize = 2) {
 function finishUIUpdate() {
   isUIUpdateInProgress = false;
   
-  // 待機中の更新があれば実行
+  // 待機中の更新があれば実行（デバウンス付き）
   if (pendingUIUpdate) {
     const nextUpdate = pendingUIUpdate;
     pendingUIUpdate = null;
-    updateUIWithNewStatus(nextUpdate);
+    
+    // Prevent immediate re-execution, allow small delay for system stability
+    setTimeout(() => {
+      updateUIWithNewStatus(nextUpdate);
+    }, 50);
+  }
+}
+
+// Generate hash for status comparison to detect duplicates
+function generateStatusHash(status) {
+  try {
+    const keyData = {
+      userId: (status.userInfo && status.userInfo.userId) || null,
+      activeSheet: status.activeSheetName || null,
+      setupStep: status.setupStep || null,
+      appPublished: status.appPublished || null,
+      timestamp: Math.floor(Date.now() / 1000) // Round to seconds to allow minor timing differences
+    };
+    
+    return JSON.stringify(keyData);
+  } catch (error) {
+    logWarn('Failed to generate status hash:', error);
+    return Math.random().toString(); // Fallback to prevent duplicate blocking on error
   }
 }
 

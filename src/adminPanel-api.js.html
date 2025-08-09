@@ -854,9 +854,25 @@ let loadStatusInProgress = null;
 let loadStatusQueue = [];
 
 function loadStatus(bypassCache = false) {
-  // 既に実行中の場合は同じPromiseを返す
+  const operationId = 'loadStatus';
+  
+  // Check operation mutex to prevent concurrent calls
+  if (!bypassCache && window.AdminPanel && window.AdminPanel.operationMutex) {
+    if (window.AdminPanel.operationMutex.isRunning(operationId)) {
+      logDebug('🚫 loadStatus already running, returning existing promise');
+      return loadStatusInProgress || Promise.resolve(currentStatus);
+    }
+  }
+  
+  // 既に実行中の場合は同じPromiseを返す（強化版）
   if (loadStatusInProgress && !bypassCache) {
+    logDebug('🔄 Reusing existing loadStatus promise');
     return loadStatusInProgress;
+  }
+
+  // Start operation mutex tracking
+  if (window.AdminPanel && window.AdminPanel.operationMutex) {
+    window.AdminPanel.operationMutex.start(operationId);
   }
 
   console.group('🔄 loadStatus - 一元管理版');
@@ -919,6 +935,11 @@ function loadStatus(bypassCache = false) {
         console.groupEnd();
         // 実行状態をリセット
         loadStatusInProgress = null;
+        
+        // End operation mutex tracking
+        if (window.AdminPanel && window.AdminPanel.operationMutex) {
+          window.AdminPanel.operationMutex.end(operationId);
+        }
       });
   }).catch(error => {
     console.error('❌ Error resolving userIdPromise in loadStatus:', error);
@@ -926,6 +947,12 @@ function loadStatus(bypassCache = false) {
     console.groupEnd();
     // エラー時も実行状態をリセット
     loadStatusInProgress = null;
+    
+    // End operation mutex tracking on error
+    if (window.AdminPanel && window.AdminPanel.operationMutex) {
+      window.AdminPanel.operationMutex.end(operationId);
+    }
+    
     throw error;
   });
 
@@ -4246,15 +4273,32 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
 // MISSING FUNCTIONS RESTORATION
 // =============================================================================
 
+// Debounced wrapper for loadStatus to prevent rapid successive calls
+function debouncedLoadStatus(bypassCache = false) {
+  if (window.AdminPanel && window.AdminPanel.debounce) {
+    window.AdminPanel.debounce.loadStatus(() => {
+      loadStatus(bypassCache);
+    });
+  } else {
+    // Fallback without debouncing
+    loadStatus(bypassCache);
+  }
+}
+
 // Wrapper for loadStatus to maintain compatibility
 function loadSystemStatus(bypassCache = false) {
-  loadStatus(bypassCache);
+  // Use debounced version unless bypassCache is true (urgent calls)
+  if (bypassCache) {
+    loadStatus(bypassCache);
+  } else {
+    debouncedLoadStatus(bypassCache);
+  }
 }
 
 // Basic loadUserInfo implementation
 function loadUserInfo() {
-  logDebug('📋 loadUserInfo called - delegating to loadStatus');
-  loadStatus();
+  logDebug('📋 loadUserInfo called - delegating to debounced loadStatus');
+  debouncedLoadStatus();
 }
 
 // Update answer count function

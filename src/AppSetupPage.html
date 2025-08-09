@@ -84,7 +84,7 @@
                     <div class="text-sm text-gray-400 mb-4">
                         <p><strong>有効 (ON):</strong> 全ユーザーがアプリにアクセス可能</p>
                         <p><strong>無効 (OFF):</strong> システム管理者以外のアクセスを制限</p>
-                        <p class="text-xs text-yellow-400 mt-2">⚠️ 注意: これはシステム全体の制御で、個別ユーザーのisActiveとは別の機能です</p>
+                        <p class="text-xs text-yellow-400 mt-2">⚠️ 注意: これはシステム全体の制御です。個別ユーザーのアクセス制御は各ユーザーのアカウント管理画面から設定可能です</p>
                     </div>
 
                     <!-- 変更ボタン -->
@@ -115,7 +115,7 @@
                         </div>
                         <div>
                             <h5 class="font-medium text-white mb-2">個別ユーザー制御との違い</h5>
-                            <p>これはシステム全体制御。個別ユーザーのisActive管理は別途ユーザー管理セクションで行います。</p>
+                            <p>これはシステム全体制御。個別ユーザーのアクセス制御は各ユーザーのアカウント管理画面から設定します。</p>
                         </div>
                     </div>
                 </div>
@@ -286,24 +286,12 @@
             <div class="space-y-4">
                 <!-- ユーザー一覧表示エリア -->
                 <div id="user-list-container" class="hidden">
-                    <!-- 一括アクセス制御パネル -->
-                    <div class="p-4 bg-gray-800 rounded-lg mb-4">
-                        <h4 class="text-lg font-medium text-white mb-3">🛡️ 一括アクセス制御</h4>
-                        <div class="flex flex-wrap gap-3 items-center justify-center">
-                            <button type="button" id="bulk-activate-btn" class="btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
-                                ✅ 全ユーザーを有効化
-                            </button>
-                            <button type="button" id="bulk-deactivate-btn" class="btn bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
-                                ❌ 全ユーザーを無効化
-                            </button>
-                            <button type="button" id="bulk-activate-selected-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-                                🔄 選択したユーザーを有効化
-                            </button>
-                            <button type="button" id="bulk-deactivate-selected-btn" class="btn bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm">
-                                🚫 選択したユーザーを無効化
-                            </button>
-                        </div>
-                        <p class="text-xs text-gray-400 mt-2 text-center">※ この操作は個別ユーザーのisActiveフラグを制御し、システム全体制御とは異なります</p>
+                    <!-- 簡素化された説明 -->
+                    <div class="p-3 bg-blue-900/30 border border-blue-500/30 rounded-lg mb-4">
+                        <p class="text-sm text-blue-200 text-center">
+                            💡 <strong>個別ユーザーのアクセス制御について:</strong><br>
+                            各ユーザーのアクセス権限は、各ユーザーのアカウント管理画面（削除ボタンエリア）から設定できます。
+                        </p>
                     </div>
                     
                     <div class="flex justify-between items-center mb-4">
@@ -1393,99 +1381,12 @@
                 .updateUserActiveStatus(userId, isActive);
         }
 
-        // 一括操作ボタンを設定
-        function setupBulkOperationButtons() {
-            // 全ユーザー有効化
-            document.getElementById('bulk-activate-btn').onclick = () => {
-                bulkUpdateAllUsers(true, '全ユーザーを有効化');
-            };
+        // 一括操作機能は簡素化のため削除されました
+        // 個別ユーザーのアクセス制御は各ユーザーのアカウント管理画面から設定できます
 
-            // 全ユーザー無効化  
-            document.getElementById('bulk-deactivate-btn').onclick = () => {
-                bulkUpdateAllUsers(false, '全ユーザーを無効化');
-            };
+        // 一括更新機能は簡素化のため削除されました
 
-            // 選択ユーザー有効化
-            document.getElementById('bulk-activate-selected-btn').onclick = () => {
-                if (selectedUserIds.size === 0) {
-                    showMessage('ユーザーを選択してください', 'warning');
-                    return;
-                }
-                bulkUpdateSelectedUsers(Array.from(selectedUserIds), true, `選択した${selectedUserIds.size}人のユーザーを有効化`);
-            };
-
-            // 選択ユーザー無効化
-            document.getElementById('bulk-deactivate-selected-btn').onclick = () => {
-                if (selectedUserIds.size === 0) {
-                    showMessage('ユーザーを選択してください', 'warning');
-                    return;
-                }
-                bulkUpdateSelectedUsers(Array.from(selectedUserIds), false, `選択した${selectedUserIds.size}人のユーザーを無効化`);
-            };
-        }
-
-        // 全ユーザー一括更新
-        function bulkUpdateAllUsers(isActive, actionDescription) {
-            if (!confirm(`${actionDescription}しますか？この操作はすべてのユーザーに影響します。`)) return;
-
-            const btn = isActive ? document.getElementById('bulk-activate-btn') : document.getElementById('bulk-deactivate-btn');
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '処理中...';
-
-            google.script.run
-                .withSuccessHandler((result) => {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
-                    
-                    if (result.status === 'success' || result.status === 'partial') {
-                        showMessage(result.message, result.status === 'success' ? 'success' : 'warning');
-                        // UIを全体更新
-                        loadUserList();
-                    } else {
-                        showMessage(`一括更新に失敗しました: ${result.message}`, 'error');
-                    }
-                })
-                .withFailureHandler((error) => {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
-                    showMessage(`一括更新エラー: ${error.message || error}`, 'error');
-                })
-                .bulkUpdateAllUsersActiveStatus(isActive);
-        }
-
-        // 選択ユーザー一括更新
-        function bulkUpdateSelectedUsers(userIds, isActive, actionDescription) {
-            if (!confirm(`${actionDescription}しますか？`)) return;
-
-            const btn = isActive ? document.getElementById('bulk-activate-selected-btn') : document.getElementById('bulk-deactivate-selected-btn');
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '処理中...';
-
-            google.script.run
-                .withSuccessHandler((result) => {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
-                    
-                    if (result.status === 'success' || result.status === 'partial') {
-                        showMessage(result.message, result.status === 'success' ? 'success' : 'warning');
-                        // 選択を解除
-                        selectedUserIds.clear();
-                        document.getElementById('select-all-users').checked = false;
-                        // UIを部分更新
-                        loadUserList();
-                    } else {
-                        showMessage(`一括更新に失敗しました: ${result.message}`, 'error');
-                    }
-                })
-                .withFailureHandler((error) => {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
-                    showMessage(`一括更新エラー: ${error.message || error}`, 'error');
-                })
-                .bulkUpdateUserActiveStatus(userIds, isActive);
-        }
+        // 選択ユーザー一括更新機能も簡素化のため削除されました
 
         // ページ読み込み時の初期化を拡張
         window.addEventListener('DOMContentLoaded', function() {

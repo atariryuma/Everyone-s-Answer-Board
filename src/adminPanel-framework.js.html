@@ -12,6 +12,15 @@ window.AdminPanel = window.AdminPanel || {
     updateStatus(status) {
       this.current = status;
     }
+  },
+  // Initialization state tracking to prevent redundant calls
+  initialization: {
+    isInProgress: false,
+    isCompleted: false,
+    completedPhases: new Set(),
+    startTime: null,
+    lastLoadStatusCall: null,
+    loadStatusCallCount: 0
   }
 };
 
@@ -273,12 +282,24 @@ function initializeAPI() {
   document.addEventListener('keypress', updateUserActivity);
   document.addEventListener('scroll', updateUserActivity);
 
-  // 初回ロード時にシステムステータスをロード
-  logDebug('🚀 loadStatus()を呼び出します');
-  if (checkFunctionAvailability('loadStatus')) {
-    safeCallFunction('loadStatus');
+  // 初回ロード時にシステムステータスをロード（重複呼び出し防止）
+  const now = Date.now();
+  const timeSinceLastCall = window.AdminPanel.initialization.lastLoadStatusCall ? 
+    now - window.AdminPanel.initialization.lastLoadStatusCall : Infinity;
+  
+  // Prevent rapid successive loadStatus calls (< 1000ms apart)
+  if (timeSinceLastCall > 1000) {
+    window.AdminPanel.initialization.lastLoadStatusCall = now;
+    window.AdminPanel.initialization.loadStatusCallCount++;
+    
+    logDebug(`🚀 loadStatus()を呼び出します (Call #${window.AdminPanel.initialization.loadStatusCallCount})`);
+    if (checkFunctionAvailability('loadStatus')) {
+      safeCallFunction('loadStatus');
+    } else {
+      console.warn('⚠️ loadStatus not available - manual status refresh required');
+    }
   } else {
-    console.warn('⚠️ loadStatus not available - manual status refresh required');
+    logDebug(`⏭️ Skipping redundant loadStatus call (${timeSinceLastCall}ms since last call)`);
   }
   
   logDebug('✅ API初期化完了');
@@ -1219,6 +1240,21 @@ function checkAndExpandAllSections() {
 // =============================================================================
 
 function initializeAdminPanelMaster() {
+  // Prevent redundant initialization calls
+  if (window.AdminPanel.initialization.isInProgress) {
+    logDebug('🔄 AdminPanel initialization already in progress, skipping duplicate call');
+    return;
+  }
+  
+  if (window.AdminPanel.initialization.isCompleted) {
+    logDebug('✅ AdminPanel already initialized, skipping duplicate call');
+    return;
+  }
+  
+  // Mark initialization as in progress
+  window.AdminPanel.initialization.isInProgress = true;
+  window.AdminPanel.initialization.startTime = Date.now();
+  
   logInfo('🚀 AdminPanel Master Initialization Started');
   updateSystemStatus('initializationStarted', true);
   
@@ -1265,6 +1301,7 @@ function initializeAdminPanelMaster() {
       logDebug('🚀 API module initialization starting...');
       initializeAPI();
       updateSystemStatus('apiInitialized', true);
+      window.AdminPanel.initialization.completedPhases.add('api');
       logDebug('✅ API module initialized');
     } catch (error) {
       updateSystemStatus('apiInitialized', false, error);
@@ -1357,6 +1394,12 @@ async function finalizeInitialization() {
       enableUserInteraction();
       updateSystemStatus('userDataSyncComplete', true);
       
+      // Mark initialization as completed
+      window.AdminPanel.initialization.isInProgress = false;
+      window.AdminPanel.initialization.isCompleted = true;
+      const initTime = Date.now() - window.AdminPanel.initialization.startTime;
+      logInfo(`✅ AdminPanel Master Initialization Completed in ${initTime}ms`);
+      
     } catch (error) {
       console.error('❌ Final sync error:', error);
       // エラーでもローディングは解除
@@ -1364,6 +1407,11 @@ async function finalizeInitialization() {
         window.unifiedLoading.hide();
       }
       enableUserInteraction();
+      
+      // Mark initialization as completed even on error
+      window.AdminPanel.initialization.isInProgress = false;
+      window.AdminPanel.initialization.isCompleted = true;
+      logWarn('⚠️ AdminPanel initialization completed with errors');
     }
   }, 500);
 }
@@ -1384,6 +1432,316 @@ window.addEventListener('resize', function() {
     adjustLayout();
   }
 });
+
+// =============================================================================
+// ACCOUNT MANAGEMENT MODAL FUNCTIONALITY
+// =============================================================================
+
+// Account management modal state
+window.AccountManagement = {
+  currentUserStatus: null,
+  modal: null,
+  
+  // Initialize account management modal
+  init: function() {
+    this.modal = document.getElementById('account-management-modal');
+    this.setupEventListeners();
+    logDebug('✅ Account management modal initialized');
+  },
+  
+  // Setup event listeners
+  setupEventListeners: function() {
+    const accountBtn = document.getElementById('account-management-btn');
+    const closeBtn = document.getElementById('account-modal-close');
+    const cancelBtn = document.getElementById('account-modal-cancel');
+    const saveBtn = document.getElementById('save-access-settings');
+    const deleteBtn = document.getElementById('delete-account-btn');
+    const toggle = document.getElementById('user-access-toggle');
+    
+    if (accountBtn) {
+      accountBtn.addEventListener('click', () => this.openModal());
+    }
+    
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.closeModal());
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => this.closeModal());
+    }
+    
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => this.saveAccessSettings());
+    }
+    
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => this.handleDeleteAccount());
+    }
+    
+    if (toggle) {
+      toggle.addEventListener('change', () => this.onToggleChange());
+    }
+    
+    // Close modal on backdrop click
+    if (this.modal) {
+      this.modal.addEventListener('click', (e) => {
+        if (e.target === this.modal) {
+          this.closeModal();
+        }
+      });
+    }
+  },
+  
+  // Open modal and load current status
+  openModal: function() {
+    if (!this.modal) return;
+    
+    this.modal.classList.remove('hidden');
+    this.modal.classList.add('flex');
+    this.modal.setAttribute('aria-hidden', 'false');
+    
+    // Focus management for accessibility
+    const firstFocusable = this.modal.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
+    if (firstFocusable) {
+      setTimeout(() => firstFocusable.focus(), 100);
+    }
+    
+    // Load current user access status
+    this.loadCurrentStatus();
+    
+    logDebug('📝 Account management modal opened');
+  },
+  
+  // Close modal
+  closeModal: function() {
+    if (!this.modal) return;
+    
+    this.modal.classList.add('hidden');
+    this.modal.classList.remove('flex');
+    this.modal.setAttribute('aria-hidden', 'true');
+    
+    // Reset form state
+    this.resetForm();
+    
+    logDebug('❌ Account management modal closed');
+  },
+  
+  // Load current user access status
+  loadCurrentStatus: function() {
+    const statusElement = document.getElementById('user-access-status');
+    const toggle = document.getElementById('user-access-toggle');
+    
+    if (statusElement) {
+      statusElement.textContent = '🔄 読み込み中...';
+      statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-gray-600 text-gray-300';
+    }
+    
+    if (toggle) {
+      toggle.disabled = true;
+    }
+    
+    // Get current user status from the global status
+    if (window.currentStatus && window.currentStatus.userInfo) {
+      const userInfo = window.currentStatus.userInfo;
+      const isActive = userInfo.isActive !== false; // Default to true if not specified
+      
+      this.updateStatusDisplay(isActive);
+      
+      if (toggle) {
+        toggle.checked = isActive;
+        toggle.disabled = false;
+      }
+      
+      this.currentUserStatus = isActive;
+      logDebug(`📊 Current user isActive status: ${isActive}`);
+    } else {
+      // Fallback: call API to get current status
+      if (typeof runGasWithUserId === 'function') {
+        runGasWithUserId('getUserActiveStatus')
+          .then((result) => {
+            if (result && typeof result.isActive === 'boolean') {
+              const isActive = result.isActive;
+              this.updateStatusDisplay(isActive);
+              
+              if (toggle) {
+                toggle.checked = isActive;
+                toggle.disabled = false;
+              }
+              
+              this.currentUserStatus = isActive;
+            } else {
+              this.showStatusError('ユーザー状態の取得に失敗しました');
+            }
+          })
+          .catch((error) => {
+            console.error('❗ Failed to load user status:', error);
+            this.showStatusError('ユーザー状態の取得エラー');
+          });
+      } else {
+        this.showStatusError('APIが利用できません');
+      }
+    }
+  },
+  
+  // Update status display
+  updateStatusDisplay: function(isActive) {
+    const statusElement = document.getElementById('user-access-status');
+    if (!statusElement) return;
+    
+    if (isActive) {
+      statusElement.textContent = '✅ 有効';
+      statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white';
+    } else {
+      statusElement.textContent = '❌ 無効';
+      statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-red-600 text-white';
+    }
+  },
+  
+  // Show status error
+  showStatusError: function(message) {
+    const statusElement = document.getElementById('user-access-status');
+    const toggle = document.getElementById('user-access-toggle');
+    
+    if (statusElement) {
+      statusElement.textContent = `❗ ${message}`;
+      statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-yellow-600 text-white';
+    }
+    
+    if (toggle) {
+      toggle.disabled = true;
+    }
+  },
+  
+  // Handle toggle change
+  onToggleChange: function() {
+    const toggle = document.getElementById('user-access-toggle');
+    const saveBtn = document.getElementById('save-access-settings');
+    
+    if (toggle && saveBtn) {
+      const hasChanges = toggle.checked !== this.currentUserStatus;
+      saveBtn.disabled = !hasChanges;
+      
+      if (hasChanges) {
+        saveBtn.textContent = '設定を保存';
+        saveBtn.classList.remove('bg-gray-600', 'cursor-not-allowed');
+        saveBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+      } else {
+        saveBtn.textContent = '変更なし';
+        saveBtn.classList.add('bg-gray-600', 'cursor-not-allowed');
+        saveBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+      }
+    }
+  },
+  
+  // Save access settings
+  saveAccessSettings: function() {
+    const toggle = document.getElementById('user-access-toggle');
+    const saveBtn = document.getElementById('save-access-settings');
+    
+    if (!toggle || toggle.disabled) return;
+    
+    const newStatus = toggle.checked;
+    const originalText = saveBtn.textContent;
+    
+    // Update UI
+    saveBtn.disabled = true;
+    saveBtn.textContent = '🔄 保存中...';
+    
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('updateSelfActiveStatus', false, userId, newStatus)
+        .then((result) => {
+          if (result && result.success) {
+            this.currentUserStatus = newStatus;
+            this.updateStatusDisplay(newStatus);
+            
+            // Show success message
+            if (window.showMessage) {
+              showMessage(`✅ アクセス設定を${newStatus ? '有効' : '無効'}に変更しました`, 'success');
+            }
+            
+            // Close modal after short delay
+            setTimeout(() => {
+              this.closeModal();
+            }, 1500);
+            
+          } else {
+            throw new Error(result.message || '設定の保存に失敗しました');
+          }
+        })
+        .catch((error) => {
+          console.error('❗ Failed to save access settings:', error);
+          
+          // Revert toggle state
+          toggle.checked = this.currentUserStatus;
+          
+          // Show error message
+          if (window.showMessage) {
+            showMessage(`❌ 設定の保存に失敗しました: ${error.message || error}`, 'error');
+          }
+        })
+        .finally(() => {
+          // Reset button state
+          saveBtn.textContent = originalText;
+          this.onToggleChange(); // Re-evaluate button state
+        });
+    } else {
+      console.error('❗ runGasWithUserId function not available');
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
+      
+      if (window.showMessage) {
+        showMessage('❌ APIが利用できません', 'error');
+      }
+    }
+  },
+  
+  // Handle account deletion
+  handleDeleteAccount: function() {
+    // Use existing delete account functionality
+    if (typeof handleDeleteRequest === 'function') {
+      this.closeModal(); // Close the modal first
+      setTimeout(() => {
+        handleDeleteRequest(); // Call existing delete function
+      }, 300);
+    } else {
+      console.error('❗ handleDeleteRequest function not available');
+      if (window.showMessage) {
+        showMessage('❌ アカウント削除機能が利用できません', 'error');
+      }
+    }
+  },
+  
+  // Reset form state
+  resetForm: function() {
+    const toggle = document.getElementById('user-access-toggle');
+    const saveBtn = document.getElementById('save-access-settings');
+    
+    if (toggle && this.currentUserStatus !== null) {
+      toggle.checked = this.currentUserStatus;
+      toggle.disabled = false;
+    }
+    
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = '設定を保存';
+      saveBtn.classList.add('bg-gray-600', 'cursor-not-allowed');
+      saveBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    }
+  }
+};
+
+// Initialize account management modal when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      window.AccountManagement.init();
+    }, 100); // Small delay to ensure other initialization is complete
+  });
+} else {
+  setTimeout(() => {
+    window.AccountManagement.init();
+  }, 100);
+}
 
 //# sourceURL=adminPanel-framework.js.html
 </script>

@@ -122,6 +122,58 @@ var debounce = function(func, delay, key) {
   }
 };
 
+// Enhanced debounce system for admin panel operations
+window.AdminPanel.debounce = {
+  timers: new Map(),
+  
+  // Specialized debounce for loadStatus operations
+  loadStatus: function(func, delay = 250) {
+    const key = 'loadStatus';
+    if (this.timers.has(key)) {
+      clearTimeout(this.timers.get(key));
+    }
+    
+    const timer = setTimeout(() => {
+      this.timers.delete(key);
+      logDebug('🎯 Executing debounced loadStatus');
+      func();
+    }, delay);
+    
+    this.timers.set(key, timer);
+    logDebug(`⏳ Debouncing loadStatus for ${delay}ms`);
+  },
+  
+  // General purpose debounce for UI operations
+  uiOperation: function(func, key, delay = 100) {
+    const fullKey = `ui-${key}`;
+    if (this.timers.has(fullKey)) {
+      clearTimeout(this.timers.get(fullKey));
+    }
+    
+    const timer = setTimeout(() => {
+      this.timers.delete(fullKey);
+      func();
+    }, delay);
+    
+    this.timers.set(fullKey, timer);
+  },
+  
+  // Clear specific debounce timer
+  clear: function(key) {
+    if (this.timers.has(key)) {
+      clearTimeout(this.timers.get(key));
+      this.timers.delete(key);
+    }
+  },
+  
+  // Clear all debounce timers
+  clearAll: function() {
+    this.timers.forEach(timer => clearTimeout(timer));
+    this.timers.clear();
+    logDebug('🧹 All debounce timers cleared');
+  }
+};
+
 // =============================================================================
 // DOM UTILITY FUNCTIONS - Use SharedUtilities
 // =============================================================================
@@ -214,6 +266,38 @@ function setupDelegatedHandler(parentElement, selector, event, callback) {
 
 // マルチテナント対応: ユーザーIDの安全な初期化
 var userId = '';
+
+// Operation mutex system to prevent concurrent operations
+window.AdminPanel.operationMutex = {
+  activeOperations: new Set(),
+  
+  // Check if operation is already running
+  isRunning: function(operationId) {
+    return this.activeOperations.has(operationId);
+  },
+  
+  // Start tracking an operation
+  start: function(operationId) {
+    if (this.activeOperations.has(operationId)) {
+      logWarn(`⚠️ Operation ${operationId} already running`);
+      return false;
+    }
+    this.activeOperations.add(operationId);
+    logDebug(`🔒 Starting operation: ${operationId}`);
+    return true;
+  },
+  
+  // End tracking an operation
+  end: function(operationId) {
+    this.activeOperations.delete(operationId);
+    logDebug(`🔓 Completed operation: ${operationId}`);
+  },
+  
+  // Get all active operations
+  getActive: function() {
+    return Array.from(this.activeOperations);
+  }
+};
 
 // User initialization is now handled in adminPanel-framework.js.html
 var currentActiveSheet = '';
