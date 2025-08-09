@@ -936,7 +936,19 @@ function registerNewUser(adminEmail) {
     infoLog('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
     // 生成されたユーザー情報のキャッシュをクリア
     invalidateUserCache(userId, adminEmail, null, false);
-    
+
+    // DB反映を待機し、ユーザー情報をキャッシュに保存
+    if (!waitForUserRecord(userId, 5000, 300)) {
+      throw new Error('ユーザーデータの作成を確認できませんでした。しばらくしてから再試行してください。');
+    }
+    try {
+      var freshUser = fetchUserFromDatabase('userId', userId);
+      cacheManager.get('user_' + userId, function() { return freshUser; }, { ttl: 300, enableMemoization: true });
+      cacheManager.get('email_' + adminEmail, function() { return freshUser; }, { ttl: 300, enableMemoization: true });
+    } catch (cacheError) {
+      warnLog('registerNewUser: キャッシュ設定でエラー:', cacheError.message);
+    }
+
     // ScriptPropertiesに新規ユーザー作成を記録（管理パネルアクセス時の認証用）
     try {
       const createdTime = Date.now().toString();
@@ -5468,148 +5480,6 @@ function activateSheetSimple(requestUserId, sheetName) {
  * @returns {object} パフォーマンステスト結果
  */
 
-/**
- * 統合ログインフロー処理 - セキュリティ強化とパフォーマンス最適化
- * 従来の複数API呼び出し（getCurrentUserStatus → getExistingBoard → registerNewUser）を1回に集約
- * @returns {object} ログイン結果とリダイレクトURL
- */
-function processLoginFlow() {
-  try {
-    // アクティブユーザーのメールアドレスを取得
-    var activeUserEmail = getCurrentUserEmail();
-    if (!activeUserEmail) {
-      return {
-        status: 'error',
-        message: 'ログインユーザーの情報を取得できませんでした。'
-      };
-    }
-
-    debugLog('processLoginFlow: ログインフロー開始 -', activeUserEmail);
-
-    // ログインフロー専用の短期キャッシュをチェック（30秒キャッシュ）
-    var cacheKey = 'login_flow_' + activeUserEmail;
-    var cached = null;
-    try {
-      var cachedString = CacheService.getScriptCache().get(cacheKey);
-      if (cachedString) {
-        cached = JSON.parse(cachedString);
-        debugLog('processLoginFlow: キャッシュから高速返却');
-        return cached;
-      }
-    } catch (e) {
-      warnLog('processLoginFlow: キャッシュ読み込みエラー -', e.message);
-      cached = null;
-    }
-
-    // ユーザー情報をメールアドレスで検索（キャッシュ活用）
-    var userInfo = cacheManager.get(
-      'email_' + activeUserEmail,
-      function() { return findUserByEmail(activeUserEmail); },
-      { ttl: 300, enableMemoization: true }
-    );
-
-    var result;
-
-    if (userInfo) {
-      // ユーザーが存在する場合（アクティブ状態に関係なく既存ユーザーとして処理）
-      debugLog('processLoginFlow: 既存ユーザー検出 -', userInfo.userId, 'isActive:', userInfo.isActive, 'type:', typeof userInfo.isActive);
-
-      // アクティブ状態の安全なチェック（undefinedの場合はtrueと仮定）
-      var isUserActive = (userInfo.isActive === undefined ||
-                         userInfo.isActive === true ||
-                         userInfo.isActive === 'true' ||
-                         String(userInfo.isActive).toLowerCase() === 'true');
-
-      if (isUserActive) {
-        // アクティブユーザー - 最終アクセス時刻のみ更新（設定は保護）
-        try {
-          updateUser(userInfo.userId, {
-            lastAccessedAt: new Date().toISOString(),
-            isActive: 'true'
-          });
-          debugLog('processLoginFlow: 既存ユーザーの最終アクセス時刻を更新しました（設定保護）');
-        } catch (updateError) {
-          warnLog('processLoginFlow: 最終アクセス時刻更新エラー:', updateError.message);
-          // 更新エラーは無視して続行
-        }
-
-        var appUrls = generateUserUrls(userInfo.userId);
-        result = {
-          status: 'existing_user',
-          userId: userInfo.userId,
-          adminUrl: appUrls.adminUrl,
-          viewUrl: appUrls.viewUrl,
-          message: 'おかえりなさい！'
-        };
-        debugLog('processLoginFlow: 既存アクティブユーザー（設定保護）-', userInfo.userId);
-      } else {
-        // 明示的に非アクティブなユーザー
-        var appUrls = generateUserUrls(userInfo.userId);
-        result = {
-          status: 'inactive_user',
-          userId: userInfo.userId,
-          adminUrl: appUrls.adminUrl,
-          viewUrl: appUrls.viewUrl,
-          message: 'アカウントが無効化されています。管理者にお問い合わせください。'
-        };
-        debugLog('processLoginFlow: 既存非アクティブユーザー -', userInfo.userId);
-      }
-    } else {
-      // 新規ユーザー - 自動登録処理
-      debugLog('processLoginFlow: 新規ユーザー登録開始 -', activeUserEmail);
-
-      // registerNewUser を呼び出して新規登録
-      var registrationResult = registerNewUser(activeUserEmail);
-
-      if (registrationResult && registrationResult.adminUrl) {
-        result = {
-          status: 'new_user',
-          userId: registrationResult.userId,
-          adminUrl: registrationResult.adminUrl,
-          viewUrl: registrationResult.viewUrl,
-          message: '新規ユーザー登録が完了しました'
-        };
-        debugLog('processLoginFlow: 新規ユーザー登録完了 -', registrationResult.userId);
-      } else {
-        throw new Error('新規ユーザー登録に失敗しました: ' + (registrationResult ? registrationResult.message : '不明なエラー'));
-      }
-    }
-
-    // 結果を短期キャッシュに保存（30秒）
-    try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
-    } catch (e) {
-      warnLog('processLoginFlow: キャッシュ保存エラー -', e.message);
-      // キャッシュ保存に失敗しても処理は続行
-    }
-
-    debugLog('processLoginFlow: 処理完了 -', result.status, result.userId);
-    return result;
-
-  } catch (error) {
-    errorLog('processLoginFlow: エラー発生 -', error.message);
-    errorLog('processLoginFlow: エラースタック -', error.stack);
-
-    // エラータイプに応じた詳細なメッセージを提供
-    var errorMessage = 'ログイン処理中にエラーが発生しました';
-    if (error.message.includes('not a function')) {
-      errorMessage = 'システム関数の呼び出しエラーが発生しました。しばらく待ってから再試行してください。';
-    } else if (error.message.includes('permission') || error.message.includes('権限')) {
-      errorMessage = 'アクセス権限に問題があります。管理者にお問い合わせください。';
-    } else if (error.message.includes('network') || error.message.includes('timeout')) {
-      errorMessage = 'ネットワークエラーが発生しました。接続を確認して再試行してください。';
-    } else {
-      errorMessage = 'ログイン処理中に予期しないエラーが発生しました: ' + error.message;
-    }
-
-    return {
-      status: 'error',
-      message: errorMessage,
-      errorType: error.name,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
 
 /**
  * Returns the current login status without auto-registering new users.
@@ -5682,7 +5552,13 @@ function confirmUserRegistration() {
     if (!activeUserEmail) {
       return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
     }
-    return registerNewUser(activeUserEmail);
+    var result = registerNewUser(activeUserEmail);
+    try {
+      CacheService.getScriptCache().remove('login_status_' + activeUserEmail);
+    } catch (cacheError) {
+      warnLog('confirmUserRegistration: ログイン状態キャッシュの削除に失敗:', cacheError.message);
+    }
+    return result;
   } catch (error) {
     errorLog('confirmUserRegistration error:', error);
     return { status: 'error', message: error.message };
