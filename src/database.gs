@@ -857,6 +857,10 @@ function fetchUserFromDatabase(field, value, options = {}) {
         if (msg.indexOf('無効なデータ構造') !== -1 || msg.toLowerCase().indexOf('invalid data structure') !== -1) {
           throw new Error('データ取得に失敗しました: ' + dataError.message);
         }
+        // 400 INVALID_ARGUMENT 等の恒久的エラーも即時中断
+        if (msg.indexOf('BatchGet失敗: 400') !== -1 || msg.indexOf('INVALID_ARGUMENT') !== -1) {
+          throw new Error('データ取得に失敗しました: ' + dataError.message);
+        }
         if (dataAttempt === maxDataRetries - 1) {
           throw new Error('データ取得に失敗しました: ' + dataError.message);
         }
@@ -1485,7 +1489,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
   const opts = {
     valueRenderOption: 'UNFORMATTED_VALUE',
     dateTimeRenderOption: 'SERIAL_NUMBER',
-    includeGridData: false,
+    // includeGridData は values:batchGet では無効（spreadsheets.get 系のみ）
     ...options
   };
 
@@ -1497,7 +1501,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
   }
   params.push('valueRenderOption=' + encodeURIComponent(opts.valueRenderOption));
   params.push('dateTimeRenderOption=' + encodeURIComponent(opts.dateTimeRenderOption));
-  params.push('includeGridData=' + String(!!opts.includeGridData));
+  // includeGridData は使用しない
 
   const url = endpoint + '?' + params.join('&');
 
