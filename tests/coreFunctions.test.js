@@ -108,7 +108,9 @@ describe('Core.gs utilities', () => {
         invalidateUserCache: jest.fn(),
         generateUserUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' })),
         getDeployUserDomainInfo: jest.fn(() => ({ deployDomain: '', isDomainMatch: true })),
-        logDatabaseError: jest.fn()
+        logDatabaseError: jest.fn(),
+        waitForUserRecord: jest.fn(() => true),
+        fetchUserFromDatabase: jest.fn(() => ({ userId: 'UUID', adminEmail: 'admin@example.com' }))
       });
     });
 
