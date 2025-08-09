@@ -61,26 +61,39 @@
     // 統合されたログインフロー処理 - 1回のAPI呼び出しで完了
     const registerAndRedirect = () => {
       return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(res => {
-          if (res && res.adminUrl) {
-            showAdminPanelRedirect(res.adminUrl, '新規ユーザー登録が完了しました');
-            resolve();
-          } else {
-            const msg = res && res.message ? res.message : 'ユーザー登録に失敗しました';
+        setLoading(true, 'ユーザー登録処理中...');
+        
+        google.script.run
+          .withSuccessHandler(res => {
+            console.log('Registration response:', res);
+            if (res && res.adminUrl) {
+              setLoading(true, '登録完了！管理パネルへリダイレクト中...');
+              showAdminPanelRedirect(res.adminUrl, '新規ユーザー登録が完了しました');
+              resolve();
+            } else if (res && res.status === 'existing_user') {
+              // 既存ユーザーだった場合
+              setLoading(true, '既存ユーザーを確認しました。管理パネルへリダイレクト中...');
+              showAdminPanelRedirect(res.adminUrl, '既に登録済みのため、管理パネルへ移動します');
+              resolve();
+            } else {
+              const msg = res && res.message ? res.message : 'ユーザー登録に失敗しました';
+              console.error('Registration failed:', res);
+              reject(new Error(msg));
+            }
+          })
+          .withFailureHandler(err => {
+            console.error('Registration server error:', err);
+            const msg = err && err.message ? err.message : 'ユーザー登録の通信エラーが発生しました';
             reject(new Error(msg));
-          }
-        })
-        .withFailureHandler(err => {
-          const msg = err && err.message ? err.message : 'ユーザー登録の通信エラーが発生しました';
-          reject(new Error(msg));
-        })
-        .confirmUserRegistration();
+          })
+          .confirmUserRegistration();
       });
     };
 
     const processUnifiedLogin = () => {
       return new Promise((resolve, reject) => {
+        setLoading(true, 'ユーザー状態を確認中...');
+        
         google.script.run
           .withSuccessHandler(response => {
             if (!response || !response.status) {
@@ -90,24 +103,34 @@
               return;
             }
 
+            console.log('Login status response:', response.status);
+            
             if (response.status === 'existing_user' || response.status === 'setup_required') {
               const msg = response.status === 'setup_required' ? 'セットアップを完了してください' : 'ログインが完了しました';
+              setLoading(true, '管理パネルへリダイレクト中...');
               showAdminPanelRedirect(response.adminUrl, msg);
               resolve();
             } else if (response.status === 'unregistered') {
-              if (confirm('このアカウントを登録しますか？')) {
+              setLoading(false);
+              const confirmMessage = 'このアカウントはまだ登録されていません。\n新規ユーザーとして登録しますか？';
+              if (confirm(confirmMessage)) {
+                setLoading(true, '新規ユーザー登録を開始中...');
                 registerAndRedirect().then(resolve).catch(reject);
               } else {
-                setLoading(false);
+                userEmailDisplay.textContent = 'ユーザー登録がキャンセルされました';
                 resolve();
               }
+            } else if (response.status === 'error') {
+              reject(new Error(response.message || 'ログイン状態の確認でエラーが発生しました'));
             } else {
-              reject(new Error(response.message || 'ログイン処理に失敗しました'));
+              console.warn('Unexpected login status:', response.status);
+              reject(new Error('予期しないレスポンス: ' + (response.status || 'unknown')));
             }
           })
           .withFailureHandler(error => {
-            console.error('Login server error:', error);
-            reject(new Error(error.message || error.toString() || 'サーバーエラーが発生しました'));
+            console.error('getLoginStatus failed:', error);
+            const msg = error && error.message ? error.message : 'ログイン状態の確認で通信エラーが発生しました';
+            reject(new Error(msg));
           })
           .getLoginStatus();
       });
@@ -153,6 +176,9 @@
       
       // エラーメッセージの改善
       let displayMessage = 'ログイン処理エラーが発生しました';
+      let shouldShowRetry = false;
+      let retryDelay = 3000;
+      
       if (err && err.message) {
         displayMessage = err.message;
       } else if (typeof err === 'string') {
@@ -168,29 +194,81 @@
           .then(() => { /* 遷移は成功ハンドラ内で実施 */ })
           .catch(innerErr => {
             console.warn('Re-check after duplicate hint failed:', innerErr);
+            // 失敗した場合は手動リトライボタンを表示
+            showRetryButton('状態確認に失敗しました。手動で再試行してください。');
           });
         return;
       }
 
-      // エラータイプに応じた追加処理
-      if (displayMessage.includes('システム関数の呼び出しエラー')) {
-        // 3秒後に自動リトライボタンを表示
-        setTimeout(() => {
-          if (userEmailDisplay && userEmailDisplay.textContent.includes('システム関数の呼び出しエラー')) {
-            const retryButton = document.createElement('button');
-            retryButton.textContent = '🔄 再試行';
-            retryButton.className = 'mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600';
-            retryButton.onclick = () => {
-              retryButton.remove();
-              handleSimpleLogin();
-            };
-            userEmailDisplay.parentNode.appendChild(retryButton);
-          }
-        }, 3000);
+      // エラータイプに応じた処理と自動リトライ設定
+      if (displayMessage.includes('システム関数の呼び出しエラー') || 
+          displayMessage.includes('Service temporarily unavailable') ||
+          displayMessage.includes('timeout') ||
+          displayMessage.includes('タイムアウト')) {
+        displayMessage += '\n\n自動的にリトライボタンが表示されます...';
+        shouldShowRetry = true;
+        retryDelay = 3000;
+      } else if (displayMessage.includes('ユーザー登録に失敗しました') ||
+                 displayMessage.includes('データの作成を確認できませんでした')) {
+        displayMessage += '\n\nデータベース同期の問題の可能性があります。しばらく待ってからリトライしてください。';
+        shouldShowRetry = true;
+        retryDelay = 5000; // 長めの待機時間
+      } else if (displayMessage.includes('通信エラー') ||
+                 displayMessage.includes('network') ||
+                 displayMessage.includes('fetch')) {
+        displayMessage += '\n\nネットワークの問題の可能性があります。';
+        shouldShowRetry = true;
+        retryDelay = 2000;
       }
-      
+
       userEmailDisplay.textContent = displayMessage;
       setLoading(false);
+
+      // リトライボタンを表示
+      if (shouldShowRetry) {
+        setTimeout(() => showRetryButton('問題が解決されない場合は、しばらく時間をおいてからお試しください。'), retryDelay);
+      }
+    };
+
+    // リトライボタンを表示する共通関数
+    const showRetryButton = (additionalMessage = '') => {
+      // 既存のリトライボタンを削除
+      const existingRetryBtn = document.querySelector('.retry-button');
+      if (existingRetryBtn) {
+        existingRetryBtn.remove();
+      }
+
+      if (userEmailDisplay) {
+        const retryContainer = document.createElement('div');
+        retryContainer.className = 'retry-container mt-3 text-center';
+        
+        if (additionalMessage) {
+          const messageEl = document.createElement('p');
+          messageEl.textContent = additionalMessage;
+          messageEl.className = 'text-sm text-gray-600 mb-2';
+          retryContainer.appendChild(messageEl);
+        }
+        
+        const retryButton = document.createElement('button');
+        retryButton.textContent = '🔄 再試行';
+        retryButton.className = 'retry-button px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mr-2';
+        retryButton.onclick = () => {
+          retryContainer.remove();
+          userEmailDisplay.textContent = 'リトライ中...';
+          handleSimpleLogin();
+        };
+        
+        const refreshButton = document.createElement('button');
+        refreshButton.textContent = '🔄 ページ更新';
+        refreshButton.className = 'px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors';
+        refreshButton.onclick = () => {
+          location.reload();
+        };
+        
+        retryContainer.appendChild(retryButton);
+        retryContainer.appendChild(refreshButton);
+        userEmailDisplay.parentNode.appendChild(retryContainer);
+      }
     };
 
     // 初期化処理 - 組織ポリシー制限を回避するため簡易認証を使用

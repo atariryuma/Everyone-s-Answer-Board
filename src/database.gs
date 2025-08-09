@@ -1325,22 +1325,84 @@ function createUser(userData) {
  * @returns {boolean} true if found within the wait window.
  */
 function waitForUserRecord(userId, maxWaitMs, intervalMs) {
+  debugLog('waitForUserRecord: 開始', {
+    userId: userId,
+    maxWaitMs: maxWaitMs,
+    intervalMs: intervalMs
+  });
+  
   var start = Date.now();
+  var attemptCount = 0;
+  var lastError = null;
+  var verificationMethods = ['fetchUserFromDatabase', 'findUserById'];
+  
   while (Date.now() - start < maxWaitMs) {
-    try {
-      // 登録直後はキャッシュを完全にバイパスして確認
-      var found = fetchUserFromDatabase('userId', userId, { forceFresh: true, clearCache: true, retryCount: 0 });
-      if (found) return true;
-    } catch (e) {
-      // 一時的な読み取りエラーは待機して再試行
-      warnLog('waitForUserRecord: 一時的な検証エラーを検出。再試行します。', {
-        message: e && e.message,
-        type: e && e.type
-      });
-      // フィールド未検出などの致命的エラーは直ちに終了せず、ウィンドウ内で再試行
+    attemptCount++;
+    var elapsed = Date.now() - start;
+    
+    debugLog('waitForUserRecord: 試行', {
+      attempt: attemptCount,
+      elapsed: elapsed + 'ms',
+      remaining: (maxWaitMs - elapsed) + 'ms'
+    });
+    
+    // 複数の検証方法を試行
+    for (var methodIndex = 0; methodIndex < verificationMethods.length; methodIndex++) {
+      var method = verificationMethods[methodIndex];
+      
+      try {
+        var found = null;
+        
+        if (method === 'fetchUserFromDatabase') {
+          found = fetchUserFromDatabase('userId', userId, { 
+            forceFresh: true, 
+            clearCache: true, 
+            retryCount: 0 
+          });
+        } else if (method === 'findUserById') {
+          found = findUserById(userId, { 
+            useExecutionCache: false, 
+            forceRefresh: true 
+          });
+        }
+        
+        if (found && found.userId === userId) {
+          infoLog('✅ waitForUserRecord: ユーザー検証成功', {
+            method: method,
+            attempt: attemptCount,
+            elapsed: elapsed + 'ms',
+            userId: userId
+          });
+          return true;
+        }
+      } catch (e) {
+        lastError = e;
+        warnLog('waitForUserRecord: 検証エラー', {
+          method: method,
+          attempt: attemptCount,
+          error: e.message,
+          elapsed: elapsed + 'ms'
+        });
+        // 次の方法を試行
+      }
     }
-    Utilities.sleep(intervalMs);
+    
+    // 短い間隔で再試行
+    if (Date.now() - start < maxWaitMs) {
+      Utilities.sleep(intervalMs);
+    }
   }
+  
+  // 最終的な失敗をログ出力
+  errorLog('❌ waitForUserRecord: 最終失敗', {
+    userId: userId,
+    attempts: attemptCount,
+    totalTime: (Date.now() - start) + 'ms',
+    lastError: lastError ? lastError.message : 'unknown',
+    maxWaitMs: maxWaitMs,
+    intervalMs: intervalMs
+  });
+  
   return false;
 }
 

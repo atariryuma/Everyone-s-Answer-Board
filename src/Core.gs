@@ -938,7 +938,7 @@ function registerNewUser(adminEmail) {
     invalidateUserCache(userId, adminEmail, null, false);
 
     // DB反映を待機し、ユーザー情報をキャッシュに保存（待機ウィンドウを拡張）
-    if (!waitForUserRecord(userId, 12000, 400)) {
+    if (!waitForUserRecord(userId, 6000, 200)) { // 6秒、200ms間隔に短縮
       throw new Error('ユーザーデータの作成を確認できませんでした。しばらくしてから再試行してください。');
     }
     try {
@@ -5513,34 +5513,90 @@ function getLoginStatus() {
     if (!activeUserEmail) {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }
-
+    
+    debugLog('getLoginStatus: ログイン状態確認開始:', activeUserEmail);
     var cacheKey = 'login_status_' + activeUserEmail;
+    
+    // キャッシュから既存の結果をチェック（短期間のみ）
     try {
       var cached = CacheService.getScriptCache().get(cacheKey);
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        var parsedCache = JSON.parse(cached);
+        debugLog('getLoginStatus: キャッシュヒット:', parsedCache.status);
+        return parsedCache;
+      }
     } catch (e) {
       warnLog('getLoginStatus: キャッシュ読み込みエラー -', e.message);
     }
 
-    var userInfo = cacheManager.get(
-      'email_' + activeUserEmail,
-      function() { return findUserByEmail(activeUserEmail); },
-      { ttl: 300, enableMemoization: true }
-    );
-
-    // フォールバック: キャッシュ/通常検索で見つからない場合は、強制フレッシュで再検証
+    var userInfo = null;
+    var searchAttempts = [];
+    
+    // Stage 1: 通常のキャッシュ検索
+    try {
+      userInfo = cacheManager.get(
+        'email_' + activeUserEmail,
+        function() { return findUserByEmail(activeUserEmail); },
+        { ttl: 300, enableMemoization: true }
+      );
+      searchAttempts.push({ method: 'cacheManager.findUserByEmail', success: !!userInfo });
+      if (userInfo) {
+        debugLog('getLoginStatus: Stage 1成功 - キャッシュ検索でユーザー発見');
+      }
+    } catch (e1) {
+      searchAttempts.push({ method: 'cacheManager.findUserByEmail', error: e1.message });
+      warnLog('getLoginStatus: Stage 1失敗:', e1.message);
+    }
+    
+    // Stage 2: 直接データベース検索（フォールバック）
     if (!userInfo) {
       try {
-        debugLog('getLoginStatus: フォールバックで強制フレッシュ検索を実施');
+        debugLog('getLoginStatus: Stage 2開始 - 直接データベース検索');
         userInfo = fetchUserFromDatabase('adminEmail', activeUserEmail, {
           forceFresh: true,
           clearCache: true,
-          retryCount: 1
+          retryCount: 2
         });
-      } catch (fallbackErr) {
-        warnLog('getLoginStatus: フォールバック検索で警告:', fallbackErr.message);
+        searchAttempts.push({ method: 'fetchUserFromDatabase', success: !!userInfo });
+        if (userInfo) {
+          debugLog('getLoginStatus: Stage 2成功 - データベース検索でユーザー発見');
+        }
+      } catch (e2) {
+        searchAttempts.push({ method: 'fetchUserFromDatabase', error: e2.message });
+        warnLog('getLoginStatus: Stage 2失敗:', e2.message);
       }
     }
+    
+    // Stage 3: 最終フォールバック（複数の検索方法を試行）
+    if (!userInfo) {
+      debugLog('getLoginStatus: Stage 3開始 - 最終フォールバック検索');
+      var finalAttempts = ['findUserByEmail', 'findUserById'];
+      
+      for (var i = 0; i < finalAttempts.length && !userInfo; i++) {
+        try {
+          if (finalAttempts[i] === 'findUserByEmail') {
+            // キャッシュをクリアして再検索
+            cacheManager.clearByPattern('email_*');
+            userInfo = findUserByEmail(activeUserEmail);
+          }
+          searchAttempts.push({ method: 'final_' + finalAttempts[i], success: !!userInfo });
+          if (userInfo) {
+            debugLog('getLoginStatus: Stage 3成功:', finalAttempts[i]);
+            break;
+          }
+        } catch (e3) {
+          searchAttempts.push({ method: 'final_' + finalAttempts[i], error: e3.message });
+        }
+      }
+    }
+    
+    debugLog('getLoginStatus: 検索結果サマリー:', {
+      userFound: !!userInfo,
+      userId: userInfo ? userInfo.userId : null,
+      isActive: userInfo ? userInfo.isActive : null,
+      searchAttempts: searchAttempts,
+      email: activeUserEmail
+    });
 
     var result;
     if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {
@@ -5552,7 +5608,9 @@ function getLoginStatus() {
         viewUrl: urls.viewUrl,
         message: 'ログインが完了しました'
       };
+      infoLog('✅ getLoginStatus: アクティブユーザーを確認:', activeUserEmail);
     } else if (userInfo) {
+      // 非アクティブだが存在するユーザー
       var urls = generateUserUrls(userInfo.userId);
       result = {
         status: 'setup_required',
@@ -5561,19 +5619,34 @@ function getLoginStatus() {
         viewUrl: urls.viewUrl,
         message: 'セットアップを完了してください'
       };
+      warnLog('⚠️ getLoginStatus: 非アクティブユーザーを検出:', activeUserEmail);
     } else {
-      result = { status: 'unregistered', userEmail: activeUserEmail };
+      // ユーザーが見つからない場合
+      result = { 
+        status: 'unregistered', 
+        userEmail: activeUserEmail,
+        searchAttempts: searchAttempts
+      };
+      warnLog('⚠️ getLoginStatus: ユーザーが見つかりません:', {
+        email: activeUserEmail,
+        attemptCount: searchAttempts.length
+      });
     }
-
+    
+    // 結果をキャッシュ（短期間）
     try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 20); // 20秒に短縮
     } catch (e) {
       warnLog('getLoginStatus: キャッシュ保存エラー -', e.message);
     }
-
+    
     return result;
   } catch (error) {
-    errorLog('getLoginStatus error:', error);
+    errorLog('🚨 getLoginStatus: 重大エラー:', {
+      email: activeUserEmail || 'unknown',
+      error: error.message,
+      stack: error.stack
+    });
     return { status: 'error', message: error.message };
   }
 }
@@ -5588,36 +5661,104 @@ function confirmUserRegistration() {
     if (!activeUserEmail) {
       return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
     }
-    // まずは最新状態で既存ユーザーか再検証（重複登録防止）
+    
+    debugLog('confirmUserRegistration: 開始 -', activeUserEmail);
+    
+    // 包括的な既存ユーザー検証（多段階チェック）
+    var existingUser = null;
+    var verificationAttempts = [];
+    
+    // Stage 1: 直接データベース検索
     try {
-      var existing = fetchUserFromDatabase('adminEmail', activeUserEmail, {
+      debugLog('confirmUserRegistration: Stage 1 - 直接データベース検索');
+      existingUser = fetchUserFromDatabase('adminEmail', activeUserEmail, {
         forceFresh: true,
         clearCache: true,
-        retryCount: 1
+        retryCount: 2
       });
-      if (existing) {
-        var urls = generateUserUrls(existing.userId);
-        return {
-          status: 'existing_user',
-          userId: existing.userId,
-          adminUrl: urls.adminUrl,
-          viewUrl: urls.viewUrl,
-          message: '既に登録済みのため、管理パネルへ移動します'
-        };
+      verificationAttempts.push({ method: 'fetchUserFromDatabase', success: !!existingUser });
+      if (existingUser) {
+        debugLog('confirmUserRegistration: Stage 1成功 - 既存ユーザー発見');
       }
-    } catch (recheckErr) {
-      warnLog('confirmUserRegistration: 既存ユーザー再検証で警告:', recheckErr.message);
+    } catch (e1) {
+      verificationAttempts.push({ method: 'fetchUserFromDatabase', error: e1.message });
+      warnLog('confirmUserRegistration: Stage 1失敗:', e1.message);
     }
-
+    
+    // Stage 2: 代替検索方法（findUserByEmail）
+    if (!existingUser) {
+      try {
+        debugLog('confirmUserRegistration: Stage 2 - findUserByEmail検索');
+        // キャッシュをクリアして新鮮な検索
+        cacheManager.clearByPattern('email_*');
+        existingUser = findUserByEmail(activeUserEmail);
+        verificationAttempts.push({ method: 'findUserByEmail', success: !!existingUser });
+        if (existingUser) {
+          debugLog('confirmUserRegistration: Stage 2成功 - findUserByEmailで既存ユーザー発見');
+        }
+      } catch (e2) {
+        verificationAttempts.push({ method: 'findUserByEmail', error: e2.message });
+        warnLog('confirmUserRegistration: Stage 2失敗:', e2.message);
+      }
+    }
+    
+    debugLog('confirmUserRegistration: 既存ユーザー検証結果:', {
+      userFound: !!existingUser,
+      userId: existingUser ? existingUser.userId : null,
+      isActive: existingUser ? existingUser.isActive : null,
+      verificationAttempts: verificationAttempts,
+      email: activeUserEmail
+    });
+    
+    // 既存ユーザーが見つかった場合
+    if (existingUser) {
+      var urls = generateUserUrls(existingUser.userId);
+      var isActive = (existingUser.isActive === true || String(existingUser.isActive).toLowerCase() === 'true');
+      
+      infoLog('✅ confirmUserRegistration: 既存ユーザー確認 -', {
+        email: activeUserEmail,
+        userId: existingUser.userId,
+        isActive: isActive
+      });
+      
+      // ログイン状態キャッシュをクリア（新鮮な状態にする）
+      try {
+        CacheService.getScriptCache().remove('login_status_' + activeUserEmail);
+        cacheManager.clearByPattern('email_*');
+      } catch (cacheError) {
+        warnLog('confirmUserRegistration: キャッシュクリア失敗:', cacheError.message);
+      }
+      
+      return {
+        status: isActive ? 'existing_user' : 'setup_required',
+        userId: existingUser.userId,
+        adminUrl: urls.adminUrl,
+        viewUrl: urls.viewUrl,
+        message: isActive ? '既に登録済みのため、管理パネルへ移動します' : 'セットアップを完了してください'
+      };
+    }
+    
+    // 新規ユーザー登録を実行
+    debugLog('confirmUserRegistration: 新規ユーザー登録を開始');
     var result = registerNewUser(activeUserEmail);
+    
+    // 登録完了後のキャッシュクリア
     try {
       CacheService.getScriptCache().remove('login_status_' + activeUserEmail);
+      cacheManager.clearByPattern('email_*');
+      debugLog('✅ confirmUserRegistration: 登録後キャッシュクリア完了');
     } catch (cacheError) {
       warnLog('confirmUserRegistration: ログイン状態キャッシュの削除に失敗:', cacheError.message);
     }
+    
+    infoLog('✅ confirmUserRegistration: 新規ユーザー登録完了 -', activeUserEmail);
     return result;
   } catch (error) {
-    errorLog('confirmUserRegistration error:', error);
+    errorLog('🚨 confirmUserRegistration: 重大エラー:', {
+      email: activeUserEmail || 'unknown',
+      error: error.message,
+      stack: error.stack
+    });
     return { status: 'error', message: error.message };
   }
 }
