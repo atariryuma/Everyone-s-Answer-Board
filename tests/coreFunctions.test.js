@@ -99,18 +99,42 @@ describe('Core.gs utilities', () => {
 
   describe('registerNewUser', () => {
     beforeEach(() => {
+      let createdUserData = null; // To store the user created by createUser
+
       Object.assign(context, {
+        debugLog: (...args) => console.log('[DEBUG]', ...args), // Add debugLog
+        infoLog: (...args) => console.log('[INFO]', ...args),   // Add infoLog
+        errorLog: (...args) => console.log('[ERROR]', ...args), // Add errorLog
+        warnLog: (...args) => console.log('[WARN]', ...args),   // Add warnLog
+        console, // Keep console for direct logging
+
         Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
-        Utilities: { getUuid: () => 'UUID' },
+        Utilities: {
+          getUuid: () => 'UUID',
+          computeDigest: () => [],
+          Charset: { UTF_8: 'UTF-8' },
+          sleep: jest.fn(),
+        },
         findUserByEmail: jest.fn(),
-        createUser: jest.fn(),
+        createUser: jest.fn((userData) => { // Modify createUser mock
+          console.log('MOCK: createUser called with:', userData); // Debug log
+          createdUserData = userData; // Store the created user data
+        }),
         updateUser: jest.fn(),
         invalidateUserCache: jest.fn(),
         generateUserUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' })),
         getDeployUserDomainInfo: jest.fn(() => ({ deployDomain: '', isDomainMatch: true })),
         logDatabaseError: jest.fn(),
         waitForUserRecord: jest.fn(() => true),
-        fetchUserFromDatabase: jest.fn(() => ({ userId: 'UUID', adminEmail: 'admin@example.com' }))
+        fetchUserFromDatabase: jest.fn((field, value, options) => { // Modify fetchUserFromDatabase mock
+          console.log('MOCK: fetchUserFromDatabase called with:', { field, value, options }); // Debug log
+          if (createdUserData && (field === 'userId' && value === createdUserData.userId || field === 'adminEmail' && value === createdUserData.adminEmail)) {
+            console.log('MOCK: fetchUserFromDatabase returning createdUserData:', createdUserData); // Debug log
+            return createdUserData; // Return the created user if found
+          }
+          console.log('MOCK: fetchUserFromDatabase returning null'); // Debug log
+          return null; // Otherwise, return null
+        })
       });
     });
 
