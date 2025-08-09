@@ -723,11 +723,64 @@ function fixUserDataConsistency(userId) {
  */
 function findUserByEmail(email) {
   const cacheKey = 'email_' + email;
+  // 既存のキャッシュ戦略に合わせつつ、検索ロジックは柔軟化したfetchUserFromDatabaseに委譲
   return cacheManager.get(
     cacheKey,
     function() { return fetchUserFromDatabase('adminEmail', email); },
     { ttl: 300, enableMemoization: true }
   );
+}
+
+/**
+ * 見出し文字列の正規化（大小/全角/不可視文字を吸収）
+ */
+function _normalizeHeader(str) {
+  if (!str && str !== 0) return '';
+  var s = String(str).trim();
+  try { if (s.normalize) s = s.normalize('NFKC'); } catch (e) {}
+  // よくある表記揺れの簡易吸収
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, ''); // ゼロ幅系削除
+  return s.toLowerCase();
+}
+
+/**
+ * 値の正規化（email比較用）
+ */
+function _normalizeValue(str) {
+  if (!str && str !== 0) return '';
+  var s = String(str).trim();
+  try { if (s.normalize) s = s.normalize('NFKC'); } catch (e) {}
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
+  return s;
+}
+
+/**
+ * 柔軟なフィールドインデックス解決
+ * @param {string[]} headers
+ * @param {string} requestedField
+ * @returns {{index:number, matchedHeader:string}|null}
+ */
+function _resolveFieldIndex(headers, requestedField) {
+  if (!headers || !headers.length) return null;
+  var normalized = headers.map(function(h){ return _normalizeHeader(h); });
+
+  /** 候補マップ（優先順） */
+  var candidatesMap = {
+    'adminemail': ['adminemail','email','メールアドレス','admin_email','admin e-mail'],
+    'userid': ['userid','user id','ユーザーid','id','ユーザーid（userId）']
+  };
+
+  var key = _normalizeHeader(requestedField);
+  var candidates = candidatesMap[key] || [key];
+
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    var idx = normalized.indexOf(c);
+    if (idx !== -1) {
+      return { index: idx, matchedHeader: headers[idx] };
+    }
+  }
+  return null;
 }
 
 /**
@@ -816,17 +869,19 @@ function fetchUserFromDatabase(field, value, options = {}) {
       }
 
       const headers = values[0];
-      const fieldIndex = headers.indexOf(field);
-
-      if (fieldIndex === -1) {
-        errorLog('fetchUserFromDatabase: 指定されたフィールドが見つかりません:', {
-          field: field,
+      // 柔軟なヘッダ解決（後方互換）
+      var resolved = _resolveFieldIndex(headers, field);
+      if (!resolved) {
+        errorLog('fetchUserFromDatabase: 指定フィールドが見つかりません（互換探索失敗）:', {
+          requestedField: field,
           availableHeaders: headers
         });
         const fieldError = new Error('検索フィールド "' + field + '" が見つかりません');
         fieldError.type = 'FIELD_ERROR';
         throw fieldError;
       }
+      const fieldIndex = resolved.index;
+      debugLog('fetchUserFromDatabase - ヘッダ解決:', { requested: field, matchedHeader: resolved.matchedHeader, index: fieldIndex });
 
       debugLog('fetchUserFromDatabase - フィールド検索開始: index=' + fieldIndex);
       debugLog('fetchUserFromDatabase - デバッグ: 検索対象データ行数=' + (values.length > 1 ? values.length - 1 : 0));
@@ -837,12 +892,12 @@ function fetchUserFromDatabase(field, value, options = {}) {
         const currentValue = currentRow[fieldIndex];
 
         // 値の比較を厳密に行う（文字列の trim と型変換）
-        let normalizedCurrentValue = currentValue ? String(currentValue).trim() : '';
-        let normalizedSearchValue = value ? String(value).trim() : '';
+        let normalizedCurrentValue = _normalizeValue(currentValue);
+        let normalizedSearchValue = _normalizeValue(value);
 
         // メールアドレス検索は大文字小文字を無視
         let isMatch;
-        if (field === 'adminEmail') {
+        if (_normalizeHeader(field) === 'adminemail') {
           isMatch = normalizedCurrentValue.toLowerCase() === normalizedSearchValue.toLowerCase();
         } else {
           isMatch = normalizedCurrentValue === normalizedSearchValue;

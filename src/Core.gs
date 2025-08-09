@@ -995,6 +995,28 @@ function registerNewUser(adminEmail) {
       // ScriptProperties記録の失敗はユーザー登録を阻害しない
     }
   } catch (e) {
+    // 既存メール重複などは既存ユーザーとして扱うフォールバック
+    var messageText = (e && (e.message || e.toString())) || '';
+    if (messageText.indexOf('既に登録されています') !== -1 || messageText.toLowerCase().indexOf('duplicate') !== -1) {
+      try {
+        var existing = fetchUserFromDatabase('adminEmail', adminEmail, { forceFresh: true, clearCache: true, retryCount: 1 });
+        if (existing && existing.userId) {
+          appUrls = generateUserUrls(existing.userId);
+          warnLog('registerNewUser: 重複検出のため既存ユーザーとして処理します:', adminEmail);
+          return {
+            userId: existing.userId,
+            adminUrl: appUrls.adminUrl,
+            viewUrl: appUrls.viewUrl,
+            setupRequired: !existing.spreadsheetId,
+            message: '既に登録済みのため、管理パネルへ移動します',
+            isExistingUser: true
+          };
+        }
+      } catch (exLookup) {
+        warnLog('registerNewUser: 重複フォールバック時の再検索で警告:', exLookup.message);
+      }
+    }
+
     logDatabaseError(e, 'userRegistration', { userId: userId, email: adminEmail });
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }

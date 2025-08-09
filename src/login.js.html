@@ -159,6 +159,19 @@
         displayMessage = err;
       }
       
+      // 既存登録が原因のメッセージの場合は再確認して遷移を試みる
+      const lowerMsg = (displayMessage || '').toLowerCase();
+      if (displayMessage.includes('既に登録') || lowerMsg.includes('already registered')) {
+        userEmailDisplay.textContent = '既に登録済みです。状態を確認しています…';
+        // 再度ログイン状態を問い合わせて成功時に遷移
+        processUnifiedLogin()
+          .then(() => { /* 遷移は成功ハンドラ内で実施 */ })
+          .catch(innerErr => {
+            console.warn('Re-check after duplicate hint failed:', innerErr);
+          });
+        return;
+      }
+
       // エラータイプに応じた追加処理
       if (displayMessage.includes('システム関数の呼び出しエラー')) {
         // 3秒後に自動リトライボタンを表示
