@@ -861,30 +861,63 @@ function fetchUserFromDatabase(field, value, options = {}) {
       const values = data.valueRanges[0].values || [];
 
       debugLog('fetchUserFromDatabase - データ取得完了: rows=' + values.length);
+      
+      // より詳細なデータベース状態ログ
+      infoLog('🔍 fetchUserFromDatabase - データベース詳細情報:', {
+        totalRows: values.length,
+        dataRows: values.length > 0 ? values.length - 1 : 0,
+        searchField: field,
+        searchValue: value,
+        timestamp: new Date().toISOString()
+      });
 
       if (values.length === 0) {
+        errorLog('❌ fetchUserFromDatabase - データベースが完全に空です');
         const noDataError = new Error('データベースが空です');
         noDataError.type = 'NO_DATA_ERROR';
         throw noDataError;
       }
 
       const headers = values[0];
+      infoLog('🏷️ fetchUserFromDatabase - ヘッダー情報:', {
+        headers: headers,
+        headerCount: headers.length
+      });
+      
       // 柔軟なヘッダ解決（後方互換）
       var resolved = _resolveFieldIndex(headers, field);
       if (!resolved) {
-        errorLog('fetchUserFromDatabase: 指定フィールドが見つかりません（互換探索失敗）:', {
+        errorLog('❌ fetchUserFromDatabase: 指定フィールドが見つかりません（互換探索失敗）:', {
           requestedField: field,
-          availableHeaders: headers
+          availableHeaders: headers,
+          normalizedHeaders: headers.map(h => _normalizeHeader(h))
         });
         const fieldError = new Error('検索フィールド "' + field + '" が見つかりません');
         fieldError.type = 'FIELD_ERROR';
         throw fieldError;
       }
       const fieldIndex = resolved.index;
-      debugLog('fetchUserFromDatabase - ヘッダ解決:', { requested: field, matchedHeader: resolved.matchedHeader, index: fieldIndex });
+      infoLog('✅ fetchUserFromDatabase - ヘッダ解決成功:', { 
+        requested: field, 
+        matchedHeader: resolved.matchedHeader, 
+        index: fieldIndex 
+      });
 
-      debugLog('fetchUserFromDatabase - フィールド検索開始: index=' + fieldIndex);
-      debugLog('fetchUserFromDatabase - デバッグ: 検索対象データ行数=' + (values.length > 1 ? values.length - 1 : 0));
+      infoLog('🔍 fetchUserFromDatabase - 検索開始:', {
+        fieldIndex: fieldIndex,
+        dataRowsToSearch: values.length - 1,
+        searchCriteria: { field: field, value: value }
+      });
+
+      // 最初の数行のサンプルデータを表示（デバッグ用）
+      if (retryAttempt === 0 && values.length > 1) {
+        const sampleRows = values.slice(1, Math.min(4, values.length)).map((row, index) => ({
+          rowNumber: index + 2,
+          targetFieldValue: row[fieldIndex],
+          fullRow: row
+        }));
+        infoLog('📊 fetchUserFromDatabase - サンプルデータ（最初の3行）:', sampleRows);
+      }
 
       // ユーザー検索
       for (let i = 1; i < values.length; i++) { // i=0はヘッダー行のためスキップ
@@ -897,21 +930,34 @@ function fetchUserFromDatabase(field, value, options = {}) {
 
         // メールアドレス検索は大文字小文字を無視
         let isMatch;
-        if (_normalizeHeader(field) === 'adminemail') {
+        const normalizedField = _normalizeHeader(field);
+        if (normalizedField === 'adminemail') {
           isMatch = normalizedCurrentValue.toLowerCase() === normalizedSearchValue.toLowerCase();
         } else {
           isMatch = normalizedCurrentValue === normalizedSearchValue;
         }
 
-        // 詳細ログ（最初の試行時のみ）
-        if (retryAttempt === 0) {
-          debugLog('fetchUserFromDatabase - 行' + i + '値比較:', {
-            original: currentValue,
-            normalized: normalizedCurrentValue,
+        // 詳細ログ（最初の試行時と一致した場合）
+        if (retryAttempt === 0 || isMatch) {
+          const logLevel = isMatch ? 'info' : 'debug';
+          const logPrefix = isMatch ? '🎯 MATCH' : '🔍';
+          const logMessage = `${logPrefix} fetchUserFromDatabase - 行${i}検索:`;
+          const logData = {
+            rowNumber: i,
+            rawValue: currentValue,
+            normalizedValue: normalizedCurrentValue,
             searchValue: normalizedSearchValue,
+            normalizedSearchValue: normalizedSearchValue,
+            fieldType: normalizedField,
             isMatch: isMatch,
-            caseInsensitive: field === 'adminEmail'
-          });
+            caseInsensitive: normalizedField === 'adminemail'
+          };
+          
+          if (isMatch) {
+            infoLog(logMessage, logData);
+          } else if (retryAttempt === 0 && i <= 3) { // 最初の3行のみ詳細ログ
+            debugLog(logMessage, logData);
+          }
         }
 
         if (isMatch) {
@@ -940,12 +986,28 @@ function fetchUserFromDatabase(field, value, options = {}) {
         }
       }
 
-      // ユーザーが見つからない場合
-      warnLog('⚠️ fetchUserFromDatabase - ユーザーが見つかりません:', {
-        field: field,
-        value: value,
+      // ユーザーが見つからない場合 - より詳細な診断情報
+      const allFieldValues = [];
+      for (let i = 1; i < Math.min(values.length, 6); i++) { // 最大5行まで
+        const row = values[i];
+        if (row && row[fieldIndex] !== undefined) {
+          allFieldValues.push({
+            row: i,
+            originalValue: row[fieldIndex],
+            normalizedValue: _normalizeValue(row[fieldIndex])
+          });
+        }
+      }
+      
+      errorLog('❌ fetchUserFromDatabase - ユーザーが見つかりません:', {
+        searchCriteria: { field: field, value: value },
+        normalizedSearchValue: _normalizeValue(value),
         totalSearchedRows: values.length - 1,
-        'DEBUG: No user found for this query.': true
+        fieldIndex: fieldIndex,
+        sampleFieldValues: allFieldValues,
+        headers: headers,
+        normalizedField: _normalizeHeader(field),
+        timestamp: new Date().toISOString()
       });
       return null;
 
