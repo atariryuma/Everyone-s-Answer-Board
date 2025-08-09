@@ -793,8 +793,13 @@ function fetchUserFromDatabase(field, value, options = {}) {
       // データ取得
       let data;
       try {
-        // 強制フレッシュ時はキャッシュを使わない
-        data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"], needFresh ? { useCache: false } : { useCache: true });
+        // 強制フレッシュ時はキャッシュを完全に無効化
+        data = batchGetSheetsData(
+          service,
+          dbId,
+          ["'" + sheetName + "'!A:H"],
+          needFresh ? { useCache: false, ttl: 0 } : { useCache: true }
+        );
       } catch (dataError) {
         dataError.type = 'DATA_ACCESS_ERROR';
         throw dataError;
@@ -1425,7 +1430,7 @@ function createSheetsService(accessToken) {
  * @param {string[]} ranges - 取得範囲の配列
  * @returns {object} レスポンス
  */
-function batchGetSheetsData(service, spreadsheetId, ranges) {
+function batchGetSheetsData(service, spreadsheetId, ranges, options = {}) {
   debugLog('DEBUG: batchGetSheetsData - 統一バッチ処理システムを使用');
 
   // 型安全性とバリデーション強化: 入力パラメータ検証
@@ -1467,13 +1472,17 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
     }
   }
 
-  // 統一バッチ処理システムを使用
-  return  unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, {
+  // 呼び出し元の指定を尊重してオプションをマージ（デフォルトはキャッシュ利用）
+  const opts = {
     useCache: true,
     ttl: 120, // 2分間キャッシュ（API制限対策）
     valueRenderOption: 'UNFORMATTED_VALUE',
-    dateTimeRenderOption: 'SERIAL_NUMBER'
-  });
+    dateTimeRenderOption: 'SERIAL_NUMBER',
+    ...options
+  };
+
+  // 統一バッチ処理システムを使用
+  return unifiedBatchProcessor.batchGet(service, spreadsheetId, ranges, opts);
 }
 
 /**
