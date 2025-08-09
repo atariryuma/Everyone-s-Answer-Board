@@ -327,13 +327,9 @@
                             <table class="w-full">
                                 <thead class="bg-gray-900">
                                     <tr>
-                                        <th class="px-2 py-3 text-center text-sm font-medium text-gray-300">
-                                            <input type="checkbox" id="select-all-users" class="rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-gray-700" title="全選択/全解除">
-                                        </th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">メールアドレス</th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">登録日</th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">状態</th>
-                                        <th class="px-4 py-3 text-center text-sm font-medium text-gray-300">アクセス制御</th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">最終アクセス</th>
                                         <th class="px-4 py-3 text-center text-sm font-medium text-gray-300">操作</th>
                                     </tr>
@@ -1248,8 +1244,12 @@
         let usersData = [];
         let selectedUserIds = new Set();
 
-        // ユーザーリストを更新してアクセス制御列を追加
+        // ユーザーリスト拡張機能は簡素化のため無効化されました
         function enhanceUserTableWithAccessControl(users) {
+            // この機能は無効化されました - 元のdisplayUserListを使用してください
+            console.log('enhanceUserTableWithAccessControl は無効化されています');
+            return;
+            
             usersData = users || [];
             const tableBody = document.getElementById('user-table-body');
             if (!tableBody || usersData.length === 0) return;
@@ -1398,16 +1398,17 @@
             
             // ユーザーリスト表示時に拡張機能を適用
             const originalLoadUserList = window.loadUserList;
-            if (originalLoadUserList) {
-                window.loadUserList = function() {
-                    originalLoadUserList().then(() => {
-                        // ユーザーリストが更新された後に拡張機能を適用
-                        setTimeout(() => {
-                            enhanceUserTableWithAccessControl(usersData);
-                        }, 100);
-                    });
-                };
-            }
+            // 拡張機能は無効化されました - 元のloadUserListをそのまま使用
+            // if (originalLoadUserList) {
+            //     window.loadUserList = function() {
+            //         originalLoadUserList().then(() => {
+            //             // 拡張機能は無効化されました
+            //             // setTimeout(() => {
+            //             //     enhanceUserTableWithAccessControl(usersData);
+            //             // }, 100);
+            //         });
+            //     };
+            // }
         });
     </script>
 </body>
