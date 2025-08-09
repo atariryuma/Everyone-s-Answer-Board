@@ -2756,3 +2756,258 @@ function checkCurrentPublicationStatus(userId) {
 /**
  * Base64エンコード/デコードのテスト
  */
+
+// =================================================================
+// DEBUG_MODE & USER ACCESS CONTROL API
+// =================================================================
+
+/**
+ * 現在のDEBUG_MODE状態を取得
+ * @returns {Object} DEBUG_MODEの状態情報
+ */
+function getDebugModeStatus() {
+  try {
+    const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+    
+    return {
+      status: 'success',
+      debugMode: debugMode,
+      message: debugMode ? 'デバッグモードが有効です' : 'デバッグモードが無効です',
+      lastModified: PropertiesService.getScriptProperties().getProperty('DEBUG_MODE_LAST_MODIFIED') || 'unknown'
+    };
+  } catch (error) {
+    errorLog('getDebugModeStatus error:', error.message);
+    return {
+      status: 'error',
+      message: 'DEBUG_MODE状態の取得に失敗しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * DEBUG_MODEの状態を切り替える（システム管理者のみ）
+ * @param {boolean} enable - デバッグモードを有効にするかどうか
+ * @returns {Object} 操作結果
+ */
+function toggleDebugMode(enable) {
+  try {
+    // システム管理者権限チェック
+    if (!isSystemAdmin()) {
+      throw new Error('システム管理者権限が必要です');
+    }
+    
+    const props = PropertiesService.getScriptProperties();
+    const newValue = enable ? 'true' : 'false';
+    const currentValue = props.getProperty('DEBUG_MODE');
+    
+    // 変更があるかチェック
+    if (currentValue === newValue) {
+      return {
+        status: 'success',
+        debugMode: enable,
+        message: `DEBUG_MODEは既に${enable ? '有効' : '無効'}です`,
+        changed: false
+      };
+    }
+    
+    // DEBUG_MODE設定を更新
+    props.setProperties({
+      'DEBUG_MODE': newValue,
+      'DEBUG_MODE_LAST_MODIFIED': new Date().toISOString()
+    });
+    
+    infoLog('DEBUG_MODE changed:', {
+      from: currentValue || 'undefined',
+      to: newValue,
+      by: getCurrentUserEmail()
+    });
+    
+    return {
+      status: 'success',
+      debugMode: enable,
+      message: `DEBUG_MODEを${enable ? '有効' : '無効'}にしました`,
+      changed: true,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    errorLog('toggleDebugMode error:', error.message);
+    return {
+      status: 'error',
+      message: 'DEBUG_MODE切り替えに失敗しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * 個別ユーザーのisActiveステータスを更新
+ * @param {string} userId - 対象ユーザーのID
+ * @param {boolean} isActive - 新しいアクティブ状態
+ * @returns {Object} 操作結果
+ */
+function updateUserActiveStatus(userId, isActive) {
+  try {
+    // システム管理者権限チェック
+    if (!isSystemAdmin()) {
+      throw new Error('システム管理者権限が必要です');
+    }
+    
+    if (!userId || typeof userId !== 'string') {
+      throw new Error('有効なユーザーIDが必要です');
+    }
+    
+    // ユーザー情報を取得
+    const userInfo = findUserById(userId);
+    if (!userInfo) {
+      throw new Error('指定されたユーザーが見つかりません');
+    }
+    
+    // 現在の状態と比較
+    const currentActive = userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true';
+    if (currentActive === isActive) {
+      return {
+        status: 'success',
+        userId: userId,
+        email: userInfo.adminEmail,
+        isActive: isActive,
+        message: `ユーザー ${userInfo.adminEmail} は既に${isActive ? 'アクティブ' : '非アクティブ'}です`,
+        changed: false
+      };
+    }
+    
+    // データベースを更新
+    updateUserInDatabase(userId, { isActive: isActive });
+    
+    infoLog('User active status changed:', {
+      userId: userId,
+      email: userInfo.adminEmail,
+      from: currentActive,
+      to: isActive,
+      by: getCurrentUserEmail()
+    });
+    
+    return {
+      status: 'success',
+      userId: userId,
+      email: userInfo.adminEmail,
+      isActive: isActive,
+      message: `ユーザー ${userInfo.adminEmail} を${isActive ? 'アクティブ' : '非アクティブ'}にしました`,
+      changed: true,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    errorLog('updateUserActiveStatus error:', error.message);
+    return {
+      status: 'error',
+      message: 'ユーザーステータス更新に失敗しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * 複数ユーザーのisActiveステータスを一括更新
+ * @param {string[]} userIds - 対象ユーザーIDの配列
+ * @param {boolean} isActive - 新しいアクティブ状態
+ * @returns {Object} 操作結果
+ */
+function bulkUpdateUserActiveStatus(userIds, isActive) {
+  try {
+    // システム管理者権限チェック
+    if (!isSystemAdmin()) {
+      throw new Error('システム管理者権限が必要です');
+    }
+    
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      throw new Error('有効なユーザーID配列が必要です');
+    }
+    
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // 各ユーザーを個別に更新
+    for (const userId of userIds) {
+      try {
+        const result = updateUserActiveStatus(userId, isActive);
+        results.push(result);
+        if (result.status === 'success') {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        results.push({
+          status: 'error',
+          userId: userId,
+          message: error.message
+        });
+        errorCount++;
+      }
+    }
+    
+    infoLog('Bulk user active status update:', {
+      totalUsers: userIds.length,
+      successCount: successCount,
+      errorCount: errorCount,
+      isActive: isActive,
+      by: getCurrentUserEmail()
+    });
+    
+    return {
+      status: errorCount === 0 ? 'success' : 'partial',
+      results: results,
+      summary: {
+        total: userIds.length,
+        success: successCount,
+        errors: errorCount
+      },
+      message: `${successCount}人のユーザーを${isActive ? 'アクティブ' : '非アクティブ'}にしました${errorCount > 0 ? ` (${errorCount}件のエラー)` : ''}`,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    errorLog('bulkUpdateUserActiveStatus error:', error.message);
+    return {
+      status: 'error',
+      message: '一括ユーザーステータス更新に失敗しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * 全ユーザーのisActiveステータスを一括更新
+ * @param {boolean} isActive - 新しいアクティブ状態
+ * @returns {Object} 操作結果
+ */
+function bulkUpdateAllUsersActiveStatus(isActive) {
+  try {
+    // システム管理者権限チェック
+    if (!isSystemAdmin()) {
+      throw new Error('システム管理者権限が必要です');
+    }
+    
+    // 全ユーザーリストを取得
+    const allUsers = getAllUsers();
+    if (!allUsers || allUsers.length === 0) {
+      return {
+        status: 'success',
+        message: '更新対象のユーザーがいません',
+        summary: { total: 0, success: 0, errors: 0 }
+      };
+    }
+    
+    // 全ユーザーのIDを抽出
+    const userIds = allUsers.map(user => user.userId).filter(id => id);
+    
+    // 一括更新を実行
+    return bulkUpdateUserActiveStatus(userIds, isActive);
+    
+  } catch (error) {
+    errorLog('bulkUpdateAllUsersActiveStatus error:', error.message);
+    return {
+      status: 'error',
+      message: '全ユーザー一括更新に失敗しました: ' + error.message
+    };
+  }
+}

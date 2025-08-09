@@ -187,6 +187,98 @@
             </div>
         </div>
 
+        <!-- DEBUG_MODE制御セクション -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">🐛 デバッグモード制御</h2>
+            
+            <div class="space-y-6">
+                <!-- DEBUG_MODE トグル -->
+                <div class="p-4 bg-gray-800 rounded-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-lg font-medium text-white">システムデバッグモード</h3>
+                            <p class="text-sm text-gray-400">開発者向けの詳細ログ出力とデバッグ情報を制御します</p>
+                        </div>
+                        <div class="flex items-center">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="debugModeToggle" class="sr-only peer" disabled aria-label="デバッグモードの有効/無効を切り替え">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                            </label>
+                            <span id="debug-status-text" class="ml-3 text-sm font-medium text-gray-400">読み込み中...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 詳細説明 -->
+                    <div class="text-sm text-gray-400 mb-4 space-y-2">
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <p><strong class="text-green-400">有効 (ON):</strong></p>
+                                <ul class="list-disc list-inside ml-2 text-xs space-y-1">
+                                    <li>詳細なコンソールログ出力</li>
+                                    <li>API呼び出しの詳細情報</li>
+                                    <li>UI更新プロセスの可視化</li>
+                                    <li>エラー詳細の完全表示</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p><strong class="text-orange-400">無効 (OFF):</strong></p>
+                                <ul class="list-disc list-inside ml-2 text-xs space-y-1">
+                                    <li>本番用の軽量ログ</li>
+                                    <li>パフォーマンス最適化</li>
+                                    <li>エンドユーザー向け表示</li>
+                                    <li>必要最小限の情報のみ</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="bg-yellow-900/20 border border-yellow-500/50 p-3 rounded-lg mt-3">
+                            <p class="text-yellow-200 text-xs">
+                                ⚠️ 注意: デバッグモードはPropertiesServiceで管理され、全ユーザーに影響します。本番環境では通常OFFに設定してください。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 変更ボタン -->
+                    <button type="button" 
+                        id="updateDebugModeBtn"
+                        class="w-full btn bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled>
+                        <span id="debug-update-text">デバッグモード設定を変更</span>
+                        <div id="debug-update-spinner" class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto hidden"></div>
+                    </button>
+                </div>
+
+                <!-- 使用シナリオの説明 -->
+                <div class="p-4 bg-gray-900 rounded-lg">
+                    <h4 class="text-md font-medium text-purple-400 mb-3">🎯 デバッグモードの使用シナリオ</h4>
+                    <div class="grid md:grid-cols-3 gap-4 text-sm text-gray-300">
+                        <div>
+                            <h5 class="font-medium text-white mb-2">🔍 問題調査</h5>
+                            <p class="text-xs">予期しない動作やエラーが発生した際の詳細調査</p>
+                        </div>
+                        <div>
+                            <h5 class="font-medium text-white mb-2">🚀 機能開発</h5>
+                            <p class="text-xs">新機能追加時の動作確認とデバッグ</p>
+                        </div>
+                        <div>
+                            <h5 class="font-medium text-white mb-2">📊 性能分析</h5>
+                            <p class="text-xs">パフォーマンス問題の特定と最適化</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 現在の状態表示 -->
+                <div id="debug-mode-status" class="p-3 bg-gray-800 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-400">現在のDEBUG_MODE状態:</span>
+                        <div id="debug-current-status" class="flex items-center">
+                            <div class="loading-spinner w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full mr-2"></div>
+                            <span class="text-sm text-gray-400">確認中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ユーザー管理セクション -->
         <div class="glass-panel rounded-xl p-6 mb-6">
             <h2 class="text-xl font-semibold text-white mb-4">👥 ユーザー管理</h2>
@@ -194,6 +286,26 @@
             <div class="space-y-4">
                 <!-- ユーザー一覧表示エリア -->
                 <div id="user-list-container" class="hidden">
+                    <!-- 一括アクセス制御パネル -->
+                    <div class="p-4 bg-gray-800 rounded-lg mb-4">
+                        <h4 class="text-lg font-medium text-white mb-3">🛡️ 一括アクセス制御</h4>
+                        <div class="flex flex-wrap gap-3 items-center justify-center">
+                            <button type="button" id="bulk-activate-btn" class="btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                                ✅ 全ユーザーを有効化
+                            </button>
+                            <button type="button" id="bulk-deactivate-btn" class="btn bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                                ❌ 全ユーザーを無効化
+                            </button>
+                            <button type="button" id="bulk-activate-selected-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                                🔄 選択したユーザーを有効化
+                            </button>
+                            <button type="button" id="bulk-deactivate-selected-btn" class="btn bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm">
+                                🚫 選択したユーザーを無効化
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2 text-center">※ この操作は個別ユーザーのisActiveフラグを制御し、システム全体制御とは異なります</p>
+                    </div>
+                    
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-medium text-white">登録ユーザー一覧</h3>
                         <div class="flex gap-2">
@@ -227,9 +339,13 @@
                             <table class="w-full">
                                 <thead class="bg-gray-900">
                                     <tr>
+                                        <th class="px-2 py-3 text-center text-sm font-medium text-gray-300">
+                                            <input type="checkbox" id="select-all-users" class="rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-gray-700" title="全選択/全解除">
+                                        </th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">メールアドレス</th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">登録日</th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">状態</th>
+                                        <th class="px-4 py-3 text-center text-sm font-medium text-gray-300">アクセス制御</th>
                                         <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">最終アクセス</th>
                                         <th class="px-4 py-3 text-center text-sm font-medium text-gray-300">操作</th>
                                     </tr>
@@ -990,6 +1106,408 @@
 
             contentDiv.classList.remove('hidden');
         }
+
+        // =================================================================
+        // DEBUG_MODE制御機能
+        // =================================================================
+        
+        let debugModeState = null;
+        let debugModeLoading = false;
+
+        // DEBUG_MODE状態を読み込み
+        function loadDebugModeStatus() {
+            if (debugModeLoading) return;
+            debugModeLoading = true;
+
+            const statusElement = document.getElementById('debug-current-status');
+            if (statusElement) {
+                statusElement.innerHTML = `
+                    <div class="loading-spinner w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full mr-2"></div>
+                    <span class="text-sm text-gray-400">確認中...</span>
+                `;
+            }
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    debugModeLoading = false;
+                    if (result.status === 'success') {
+                        debugModeState = result;
+                        updateDebugModeUI(result);
+                        enableDebugModeControls();
+                    } else {
+                        showMessage(`DEBUG_MODE状態取得に失敗しました: ${result.message}`, 'error');
+                        updateDebugModeUI({ debugMode: false, message: 'エラー' });
+                    }
+                })
+                .withFailureHandler((error) => {
+                    debugModeLoading = false;
+                    showMessage(`DEBUG_MODE状態取得エラー: ${error.message || error}`, 'error');
+                    updateDebugModeUI({ debugMode: false, message: 'エラー' });
+                })
+                .getDebugModeStatus();
+        }
+
+        // DEBUG_MODE UIを更新
+        function updateDebugModeUI(status) {
+            const toggle = document.getElementById('debugModeToggle');
+            const statusText = document.getElementById('debug-status-text');
+            const currentStatus = document.getElementById('debug-current-status');
+            const updateBtn = document.getElementById('updateDebugModeBtn');
+
+            if (toggle) {
+                toggle.checked = status.debugMode === true;
+                toggle.disabled = false;
+            }
+
+            if (statusText) {
+                statusText.textContent = status.debugMode ? 'ON' : 'OFF';
+                statusText.className = `ml-3 text-sm font-medium ${status.debugMode ? 'text-green-400' : 'text-gray-400'}`;
+            }
+
+            if (currentStatus) {
+                const lastModified = status.lastModified && status.lastModified !== 'unknown' ? 
+                    ` (${new Date(status.lastModified).toLocaleString('ja-JP')})` : '';
+                currentStatus.innerHTML = `
+                    <span class="text-sm ${status.debugMode ? 'text-green-400' : 'text-gray-400'}">
+                        ${status.debugMode ? '🟢 有効' : '🔴 無効'}${lastModified}
+                    </span>
+                `;
+            }
+
+            if (updateBtn) {
+                updateBtn.disabled = false;
+            }
+        }
+
+        // DEBUG_MODEを切り替え
+        function toggleDebugModeState() {
+            const toggle = document.getElementById('debugModeToggle');
+            const updateBtn = document.getElementById('updateDebugModeBtn');
+            const spinner = document.getElementById('debug-update-spinner');
+            const text = document.getElementById('debug-update-text');
+
+            if (!toggle || debugModeLoading) return;
+
+            const newState = toggle.checked;
+            debugModeLoading = true;
+
+            // UI feedback
+            updateBtn.disabled = true;
+            spinner.classList.remove('hidden');
+            text.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    debugModeLoading = false;
+                    spinner.classList.add('hidden');
+                    text.classList.remove('hidden');
+                    updateBtn.disabled = false;
+
+                    if (result.status === 'success') {
+                        debugModeState = result;
+                        updateDebugModeUI(result);
+                        
+                        const actionText = result.debugMode ? '有効化' : '無効化';
+                        const messageType = result.changed ? 'success' : 'info';
+                        showMessage(`DEBUG_MODEを${actionText}しました`, messageType);
+                        
+                        if (result.changed) {
+                            showMessage('変更を反映するには、ページをリロードすることをお勧めします。', 'info', 8000);
+                        }
+                    } else {
+                        showMessage(`DEBUG_MODE切り替えに失敗しました: ${result.message}`, 'error');
+                        toggle.checked = debugModeState?.debugMode || false; // revert
+                    }
+                })
+                .withFailureHandler((error) => {
+                    debugModeLoading = false;
+                    spinner.classList.add('hidden');
+                    text.classList.remove('hidden');
+                    updateBtn.disabled = false;
+                    toggle.checked = debugModeState?.debugMode || false; // revert
+                    showMessage(`DEBUG_MODE切り替えエラー: ${error.message || error}`, 'error');
+                })
+                .toggleDebugMode(newState);
+        }
+
+        // DEBUG_MODE制御を有効化
+        function enableDebugModeControls() {
+            const toggle = document.getElementById('debugModeToggle');
+            const updateBtn = document.getElementById('updateDebugModeBtn');
+
+            if (toggle) {
+                toggle.disabled = false;
+                toggle.addEventListener('change', () => {
+                    // Immediate visual feedback
+                    const statusText = document.getElementById('debug-status-text');
+                    if (statusText) {
+                        statusText.textContent = toggle.checked ? 'ON' : 'OFF';
+                        statusText.className = `ml-3 text-sm font-medium ${toggle.checked ? 'text-green-400' : 'text-gray-400'}`;
+                    }
+                });
+            }
+
+            if (updateBtn) {
+                updateBtn.disabled = false;
+                updateBtn.onclick = toggleDebugModeState;
+            }
+        }
+
+        // =================================================================
+        // 個別ユーザーアクセス制御機能
+        // =================================================================
+        
+        let usersData = [];
+        let selectedUserIds = new Set();
+
+        // ユーザーリストを更新してアクセス制御列を追加
+        function enhanceUserTableWithAccessControl(users) {
+            usersData = users || [];
+            const tableBody = document.getElementById('user-table-body');
+            if (!tableBody || usersData.length === 0) return;
+
+            tableBody.innerHTML = usersData.map(user => {
+                const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
+                const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '不明';
+                const lastAccessDate = user.lastAccessedAt ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP') : '未アクセス';
+                
+                const statusClass = isActive ? 'text-green-400' : 'text-red-400';
+                const statusIcon = isActive ? '🟢' : '🔴';
+                const statusText = isActive ? 'アクティブ' : '非アクティブ';
+
+                return `
+                    <tr class="hover:bg-gray-700/50" data-user-id="${user.userId}">
+                        <td class="px-2 py-3 text-center">
+                            <input type="checkbox" class="user-select rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-gray-700" 
+                                   data-user-id="${user.userId}" onchange="updateSelectedUsers()">
+                        </td>
+                        <td class="px-4 py-3 text-sm text-white" title="${user.adminEmail}">${user.adminEmail}</td>
+                        <td class="px-4 py-3 text-sm text-gray-300">${createdDate}</td>
+                        <td class="px-4 py-3 text-sm ${statusClass}">${statusIcon} ${statusText}</td>
+                        <td class="px-4 py-3 text-center">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer user-active-toggle" 
+                                       data-user-id="${user.userId}" data-email="${user.adminEmail}"
+                                       ${isActive ? 'checked' : ''} 
+                                       onchange="toggleUserActiveStatus('${user.userId}', this.checked, '${user.adminEmail}')">
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                            </label>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-300">${lastAccessDate}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button type="button" onclick="deleteUser('${user.userId}', '${user.adminEmail}')" 
+                                    class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
+                                🗑️ 削除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 全選択チェックボックスの設定
+            const selectAllCheckbox = document.getElementById('select-all-users');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.onchange = function() {
+                    const userCheckboxes = document.querySelectorAll('.user-select');
+                    userCheckboxes.forEach(cb => {
+                        cb.checked = this.checked;
+                    });
+                    updateSelectedUsers();
+                };
+            }
+
+            // 一括操作ボタンの設定
+            setupBulkOperationButtons();
+        }
+
+        // 選択されたユーザーIDを更新
+        function updateSelectedUsers() {
+            selectedUserIds.clear();
+            const checkedBoxes = document.querySelectorAll('.user-select:checked');
+            checkedBoxes.forEach(cb => {
+                selectedUserIds.add(cb.dataset.userId);
+            });
+
+            // 選択状態に応じてボタンの有効/無効を制御
+            const selectedCount = selectedUserIds.size;
+            const selectedBtns = document.querySelectorAll('#bulk-activate-selected-btn, #bulk-deactivate-selected-btn');
+            selectedBtns.forEach(btn => {
+                btn.disabled = selectedCount === 0;
+                btn.textContent = btn.textContent.replace(/\(\d+人\)/, selectedCount > 0 ? `(${selectedCount}人)` : '');
+            });
+        }
+
+        // 個別ユーザーのアクティブ状態を切り替え
+        function toggleUserActiveStatus(userId, isActive, userEmail) {
+            if (!userId) return;
+
+            // 楽観的UI更新
+            const statusCell = document.querySelector(`tr[data-user-id="${userId}"] td:nth-child(4)`);
+            if (statusCell) {
+                const newStatusClass = isActive ? 'text-green-400' : 'text-red-400';
+                const newStatusIcon = isActive ? '🟢' : '🔴';
+                const newStatusText = isActive ? 'アクティブ' : '非アクティブ';
+                statusCell.className = `px-4 py-3 text-sm ${newStatusClass}`;
+                statusCell.textContent = `${newStatusIcon} ${newStatusText}`;
+            }
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        const actionText = result.isActive ? 'アクティブ' : '非アクティブ';
+                        const messageType = result.changed ? 'success' : 'info';
+                        showMessage(`${result.email} を${actionText}にしました`, messageType);
+                        
+                        // データを更新
+                        const userIndex = usersData.findIndex(u => u.userId === userId);
+                        if (userIndex !== -1) {
+                            usersData[userIndex].isActive = result.isActive;
+                        }
+                    } else {
+                        showMessage(`ユーザーステータス変更に失敗しました: ${result.message}`, 'error');
+                        // UIを元に戻す
+                        const toggle = document.querySelector(`input[data-user-id="${userId}"].user-active-toggle`);
+                        if (toggle) toggle.checked = !isActive;
+                        if (statusCell) {
+                            const oldStatusClass = !isActive ? 'text-green-400' : 'text-red-400';
+                            const oldStatusIcon = !isActive ? '🟢' : '🔴';
+                            const oldStatusText = !isActive ? 'アクティブ' : '非アクティブ';
+                            statusCell.className = `px-4 py-3 text-sm ${oldStatusClass}`;
+                            statusCell.textContent = `${oldStatusIcon} ${oldStatusText}`;
+                        }
+                    }
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`ユーザーステータス変更エラー: ${error.message || error}`, 'error');
+                    // UIを元に戻す
+                    const toggle = document.querySelector(`input[data-user-id="${userId}"].user-active-toggle`);
+                    if (toggle) toggle.checked = !isActive;
+                    if (statusCell) {
+                        const oldStatusClass = !isActive ? 'text-green-400' : 'text-red-400';
+                        const oldStatusIcon = !isActive ? '🟢' : '🔴';
+                        const oldStatusText = !isActive ? 'アクティブ' : '非アクティブ';
+                        statusCell.className = `px-4 py-3 text-sm ${oldStatusClass}`;
+                        statusCell.textContent = `${oldStatusIcon} ${oldStatusText}`;
+                    }
+                })
+                .updateUserActiveStatus(userId, isActive);
+        }
+
+        // 一括操作ボタンを設定
+        function setupBulkOperationButtons() {
+            // 全ユーザー有効化
+            document.getElementById('bulk-activate-btn').onclick = () => {
+                bulkUpdateAllUsers(true, '全ユーザーを有効化');
+            };
+
+            // 全ユーザー無効化  
+            document.getElementById('bulk-deactivate-btn').onclick = () => {
+                bulkUpdateAllUsers(false, '全ユーザーを無効化');
+            };
+
+            // 選択ユーザー有効化
+            document.getElementById('bulk-activate-selected-btn').onclick = () => {
+                if (selectedUserIds.size === 0) {
+                    showMessage('ユーザーを選択してください', 'warning');
+                    return;
+                }
+                bulkUpdateSelectedUsers(Array.from(selectedUserIds), true, `選択した${selectedUserIds.size}人のユーザーを有効化`);
+            };
+
+            // 選択ユーザー無効化
+            document.getElementById('bulk-deactivate-selected-btn').onclick = () => {
+                if (selectedUserIds.size === 0) {
+                    showMessage('ユーザーを選択してください', 'warning');
+                    return;
+                }
+                bulkUpdateSelectedUsers(Array.from(selectedUserIds), false, `選択した${selectedUserIds.size}人のユーザーを無効化`);
+            };
+        }
+
+        // 全ユーザー一括更新
+        function bulkUpdateAllUsers(isActive, actionDescription) {
+            if (!confirm(`${actionDescription}しますか？この操作はすべてのユーザーに影響します。`)) return;
+
+            const btn = isActive ? document.getElementById('bulk-activate-btn') : document.getElementById('bulk-deactivate-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '処理中...';
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    
+                    if (result.status === 'success' || result.status === 'partial') {
+                        showMessage(result.message, result.status === 'success' ? 'success' : 'warning');
+                        // UIを全体更新
+                        loadUserList();
+                    } else {
+                        showMessage(`一括更新に失敗しました: ${result.message}`, 'error');
+                    }
+                })
+                .withFailureHandler((error) => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    showMessage(`一括更新エラー: ${error.message || error}`, 'error');
+                })
+                .bulkUpdateAllUsersActiveStatus(isActive);
+        }
+
+        // 選択ユーザー一括更新
+        function bulkUpdateSelectedUsers(userIds, isActive, actionDescription) {
+            if (!confirm(`${actionDescription}しますか？`)) return;
+
+            const btn = isActive ? document.getElementById('bulk-activate-selected-btn') : document.getElementById('bulk-deactivate-selected-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '処理中...';
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    
+                    if (result.status === 'success' || result.status === 'partial') {
+                        showMessage(result.message, result.status === 'success' ? 'success' : 'warning');
+                        // 選択を解除
+                        selectedUserIds.clear();
+                        document.getElementById('select-all-users').checked = false;
+                        // UIを部分更新
+                        loadUserList();
+                    } else {
+                        showMessage(`一括更新に失敗しました: ${result.message}`, 'error');
+                    }
+                })
+                .withFailureHandler((error) => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    showMessage(`一括更新エラー: ${error.message || error}`, 'error');
+                })
+                .bulkUpdateUserActiveStatus(userIds, isActive);
+        }
+
+        // ページ読み込み時の初期化を拡張
+        window.addEventListener('DOMContentLoaded', function() {
+            // 既存の初期化
+            loadCurrentStatus();
+            
+            // 新機能の初期化
+            loadDebugModeStatus();
+            
+            // ユーザーリスト表示時に拡張機能を適用
+            const originalLoadUserList = window.loadUserList;
+            if (originalLoadUserList) {
+                window.loadUserList = function() {
+                    originalLoadUserList().then(() => {
+                        // ユーザーリストが更新された後に拡張機能を適用
+                        setTimeout(() => {
+                            enhanceUserTableWithAccessControl(usersData);
+                        }, 100);
+                    });
+                };
+            }
+        });
     </script>
 </body>
 </html>
