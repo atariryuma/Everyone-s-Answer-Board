@@ -4924,9 +4924,9 @@ function isDeployUser() {
  * @param {string} targetUserId - 削除対象ユーザーID
  * @param {string} reason - 削除理由
  */
-function deleteUserAccountByAdminForUI(targetUserId, reason) {
+async function deleteUserAccountByAdminForUI(targetUserId, reason) {
   try {
-    const result = deleteUserAccountByAdmin(targetUserId, reason);
+    const result = await deleteUserAccountByAdmin(targetUserId, reason);
     return {
       status: 'success',
       message: result.message,
@@ -5522,13 +5522,13 @@ function createQuickStartFormUI(requestUserId) {
   }
 }
 
-function deleteCurrentUserAccount(requestUserId) {
+async function deleteCurrentUserAccount(requestUserId) {
   try {
     if (!requestUserId) {
       throw new Error('認証エラー: ユーザーIDが指定されていません');
     }
     verifyUserAccess(requestUserId);
-    const result = deleteUserAccount(requestUserId);
+    const result = await deleteUserAccount(requestUserId);
 
     return {
       status: 'success',

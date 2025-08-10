@@ -14,7 +14,7 @@ describe('deleteUserAccount cache handling', () => {
       errorLog: () => {},
       cacheManager: { invalidateRelated: jest.fn(), remove: jest.fn(), clearByPattern: jest.fn() },
       invalidateUserCache: jest.fn(),
-      executeWithStandardizedLock: (lock, name, fn) => fn(),
+      executeWithStandardizedLock: async (lock, name, fn) => await fn(),
       PropertiesService: {
         getScriptProperties: () => ({ getProperty: () => 'db123' }),
         getUserProperties: () => ({ deleteProperty: jest.fn() })
@@ -31,12 +31,12 @@ describe('deleteUserAccount cache handling', () => {
     context.getSheetsServiceCached = () => ({});
     context.getSpreadsheetsData = () => ({ sheets: [{ properties: { title: 'Users', sheetId: 0 } }] });
     context.batchGetSheetsData = () => ({ valueRanges: [{ values: [['userId'], ['U1']] }] });
-    context.batchUpdateSpreadsheet = jest.fn();
+    context.batchUpdateSpreadsheet = jest.fn().mockResolvedValue({});
     context.logAccountDeletion = jest.fn();
   });
 
-  test('passes database id to invalidateUserCache', () => {
-    context.deleteUserAccount('U1');
+  test('passes database id to invalidateUserCache', async () => {
+    await context.deleteUserAccount('U1');
     expect(context.invalidateUserCache).toHaveBeenCalledWith('U1', 'admin@example.com', 'userSheet', false, 'db123');
   });
 });

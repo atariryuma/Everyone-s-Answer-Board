@@ -291,7 +291,7 @@ function getAllUsersForAdmin() {
  * @param {string} targetUserId - 削除対象のユーザーID
  * @param {string} reason - 削除理由
  */
-function deleteUserAccountByAdmin(targetUserId, reason) {
+async function deleteUserAccountByAdmin(targetUserId, reason) {
   try {
     // 管理者権限チェック
     if (!isDeployUser()) {
@@ -346,7 +346,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
     }
 
     // 統一ロック管理でデータベース削除実行
-    return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccountByAdmin', () => {
+    return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccountByAdmin', async () => {
       // データベースからユーザー行を削除
       const props =  getResilientScriptProperties();
       const dbId =  getSecureDatabaseId();
@@ -410,11 +410,11 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
           }
         };
 
-        batchUpdateSpreadsheet(service, dbId, {
+        await batchUpdateSpreadsheet(service, dbId, {
           requests: [deleteRequest]
         });
 
-        infoLog(`✅ 管理者削除完了: row ${rowToDelete}, sheetId ${targetSheetId}`);
+        infoLog('✅ 管理者によるデータベース削除完了:', { targetUserId, rowToDelete, sheetId: targetSheetId });
       } else {
         throw new Error('削除対象のユーザー行が見つかりませんでした');
       }
@@ -3253,7 +3253,7 @@ function logSystemEvent(eventType, eventData) {
  * Google Drive 上の関連ファイルやフォルダは保持したままにする。
  * @returns {string} 成功メッセージ
  */
-function deleteUserAccount(userId) {
+async function deleteUserAccount(userId) {
   try {
     if (!userId) {
       throw new Error('ユーザーが特定できません。');
@@ -3266,7 +3266,7 @@ function deleteUserAccount(userId) {
     }
 
     // 統一ロック管理でアカウント削除実行
-    return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccount', () => {
+    return executeWithStandardizedLock('CRITICAL_OPERATION', 'deleteUserAccount', async () => {
       // データベース（シート）からユーザー行を削除（サービスアカウント経由）
       var props = PropertiesService.getScriptProperties();
       var dbId =  getSecureDatabaseId();
@@ -3344,11 +3344,11 @@ function deleteUserAccount(userId) {
           }
         };
 
-        batchUpdateSpreadsheet(service, dbId, {
+        await batchUpdateSpreadsheet(service, dbId, {
           requests: [deleteRequest]
         });
 
-        debugLog('Row deletion completed successfully');
+        infoLog('✅ データベースからのユーザー行削除完了:', { userId, rowToDelete, sheetId: targetSheetId });
       } else {
         // 削除対象の行が見つからない場合はエラーとして扱う
         const errorMessage = `削除対象のユーザー行が見つかりません。userId: ${userId}`;
