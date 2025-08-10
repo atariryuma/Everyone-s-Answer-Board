@@ -411,7 +411,7 @@ function setupResourceHandlers() {
   
   var addResourceBtn = document.getElementById('add-resource-btn');
   var resourceUrlInput = document.getElementById('resource-url-input');
-  var resetConfigBtn = document.getElementById('reset-config-btn');
+  var initializeSettingsBtn = document.getElementById('initialize-settings-btn');
   
   if (addResourceBtn) {
     addResourceBtn.addEventListener('click', addResource);
@@ -426,8 +426,8 @@ function setupResourceHandlers() {
     });
   }
   
-  if (resetConfigBtn) {
-    resetConfigBtn.addEventListener('click', resetConfigJson);
+  if (initializeSettingsBtn) {
+    initializeSettingsBtn.addEventListener('click', initializeUserSettingsWithUI);
   }
 }
 

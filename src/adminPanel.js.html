@@ -329,10 +329,18 @@
             // 🔧 公開成功後に状態整合性チェック・修復を実行
             setTimeout(() => {
               console.log('🔧 公開後の状態整合性チェックを実行中...');
-              if (typeof runSetupRepair === 'function') {
-                runSetupRepair();
+              if (typeof initializeUserSettings === 'function') {
+                initializeUserSettings()
+                  .then(result => {
+                    if (result.success) {
+                      console.log('✅ 公開後の状態チェック完了:', result.message);
+                    }
+                  })
+                  .catch(error => {
+                    console.warn('⚠️ 公開後の状態チェックで軽微な問題:', error.message);
+                  });
               } else {
-                console.warn('⚠️ runSetupRepair関数が利用できません');
+                console.warn('⚠️ initializeUserSettings関数が利用できません');
               }
             }, 500);
             

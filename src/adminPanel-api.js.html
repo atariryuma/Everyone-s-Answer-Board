@@ -1212,7 +1212,312 @@ function completeAIDetectionProcess() {
   }
 }
 
-// ✨ セットアップ状態の診断・修復機能
+// ✨ 設定初期化統一機能
+// 実行状態の管理
+let initializationInProgress = false;
+let lastInitializationTime = 0;
+const INITIALIZATION_COOLDOWN = 30000; // 30秒のクールダウン
+
+/**
+ * 統一設定初期化機能
+ * 自動診断→軽微修復→必要に応じて完全リセットの段階的アプローチ
+ */
+function initializeUserSettings() {
+  return new Promise((resolve, reject) => {
+    try {
+      // 重複実行防止チェック
+      const now = Date.now();
+      if (initializationInProgress) {
+        resolve({ 
+          success: false, 
+          message: '設定初期化が既に実行中です', 
+          skipped: true, 
+          reason: 'already_running' 
+        });
+        return;
+      }
+      
+      // クールダウンチェック
+      if (now - lastInitializationTime < INITIALIZATION_COOLDOWN) {
+        const remainingTime = Math.ceil((INITIALIZATION_COOLDOWN - (now - lastInitializationTime)) / 1000);
+        resolve({ 
+          success: false, 
+          message: `あと${remainingTime}秒後に実行可能です`, 
+          skipped: true, 
+          reason: 'cooldown', 
+          remainingTime 
+        });
+        return;
+      }
+      
+      initializationInProgress = true;
+      lastInitializationTime = now;
+      
+      console.log('🔄 設定初期化を開始...');
+      
+      // フェーズ1: 自動診断
+      performSystemDiagnostic()
+        .then(diagnosticResult => {
+          if (diagnosticResult.severity === 'none') {
+            // 問題なし
+            initializationInProgress = false;
+            resolve({
+              success: true,
+              phase: 'diagnostic',
+              message: '✅ 設定に問題は見つかりませんでした',
+              issues: [],
+              fixes: []
+            });
+          } else if (diagnosticResult.severity === 'minor') {
+            // 軽微な問題 - 自動修復実行
+            return performAutoRepair();
+          } else {
+            // 重大な問題 - ユーザーに選択を委ねる
+            initializationInProgress = false;
+            resolve({
+              success: false,
+              phase: 'needs_confirmation',
+              message: '重大な設定問題が見つかりました。完全な初期化が必要です。',
+              severity: diagnosticResult.severity,
+              issues: diagnosticResult.issues,
+              requiresFullReset: true
+            });
+          }
+        })
+        .then(repairResult => {
+          if (repairResult) {
+            initializationInProgress = false;
+            resolve({
+              success: true,
+              phase: 'auto_repair',
+              message: `🔧 ${repairResult.fixes?.length || 0}件の問題を自動修復しました`,
+              issues: repairResult.issues || [],
+              fixes: repairResult.fixes || []
+            });
+          }
+        })
+        .catch(error => {
+          initializationInProgress = false;
+          reject(new Error(`設定初期化エラー: ${error.message}`));
+        });
+        
+    } catch (error) {
+      initializationInProgress = false;
+      reject(error);
+    }
+  });
+}
+
+/**
+ * UI付き設定初期化実行関数
+ * ユーザーインタラクションとプログレス表示を含む
+ */
+function initializeUserSettingsWithUI() {
+  const button = document.getElementById('initialize-settings-btn');
+  const originalHTML = button ? button.innerHTML : '';
+  
+  // ボタンの状態を「処理中」に変更
+  if (button) {
+    button.disabled = true;
+    button.innerHTML = `
+      <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      診断中...
+    `;
+  }
+  
+  // プログレス表示
+  showMessage('🔍 システム診断を開始しています...', 'info');
+  
+  initializeUserSettings()
+    .then(result => {
+      // ボタンを元の状態に戻す
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+      }
+      
+      if (result.success) {
+        // 成功時の処理
+        if (result.phase === 'diagnostic') {
+          showMessage(result.message, 'success');
+        } else if (result.phase === 'auto_repair') {
+          showMessage(result.message, 'success');
+          if (result.fixes.length > 0) {
+            console.log('🔧 修復された問題:', result.fixes);
+          }
+        }
+      } else {
+        // 確認が必要な場合
+        if (result.requiresFullReset) {
+          const issuesList = result.issues.map(issue => `• ${issue}`).join('\n');
+          
+          showConfirmationModal(
+            '設定の完全初期化が必要です',
+            `以下の問題が見つかりました:\n\n${issuesList}\n\n設定を完全に初期化しますか？\n（アカウントは削除されません）`,
+            () => {
+              // ユーザーが確認した場合、完全リセットを実行
+              performFullReset()
+                .then(resetResult => {
+                  if (resetResult.success) {
+                    showMessage('✅ 設定が正常に初期化されました', 'success');
+                    // ページをリロードして最新状態を反映
+                    setTimeout(() => location.reload(), 1500);
+                  } else {
+                    showMessage('❌ 設定初期化に失敗しました', 'error');
+                  }
+                })
+                .catch(error => {
+                  console.error('Full reset failed:', error);
+                  showMessage('❌ 設定初期化中にエラーが発生しました', 'error');
+                });
+            }
+          );
+        } else {
+          showMessage(result.message, 'warning');
+        }
+      }
+    })
+    .catch(error => {
+      // ボタンを元の状態に戻す
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = originalHTML;
+      }
+      
+      console.error('Settings initialization failed:', error);
+      showMessage('❌ 設定初期化中にエラーが発生しました', 'error');
+    });
+}
+
+/**
+ * システム診断（問題の重要度を判定）
+ */
+function performSystemDiagnostic() {
+  return new Promise((resolve) => {
+    try {
+      if (!currentStatus || !currentStatus.userInfo) {
+        resolve({ severity: 'critical', issues: ['ユーザー情報が利用できません'] });
+        return;
+      }
+      
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+        
+      const issues = [];
+      let maxSeverity = 'none';
+      
+      // 軽微な問題の検出
+      const minorIssues = detectMinorIssues(config);
+      if (minorIssues.length > 0) {
+        issues.push(...minorIssues);
+        maxSeverity = 'minor';
+      }
+      
+      // 重大な問題の検出
+      const criticalIssues = detectCriticalIssues(config);
+      if (criticalIssues.length > 0) {
+        issues.push(...criticalIssues);
+        maxSeverity = 'critical';
+      }
+      
+      resolve({
+        severity: maxSeverity,
+        issues: issues
+      });
+      
+    } catch (error) {
+      resolve({ 
+        severity: 'critical', 
+        issues: [`診断エラー: ${error.message}`] 
+      });
+    }
+  });
+}
+
+/**
+ * 軽微な問題の検出
+ */
+function detectMinorIssues(config) {
+  const issues = [];
+  
+  // 既存の修復ルールから軽微なものを抽出
+  if (config.formUrl && config.formUrl.trim() && !config.formCreated) {
+    issues.push('フォームURLが存在するが作成フラグがfalse');
+  }
+  
+  if (config.formCreated && config.setupStatus !== 'completed') {
+    issues.push('フォーム作成済みだがセットアップ状態が未完了');
+  }
+  
+  if (config.appPublished && config.setupStatus === 'pending') {
+    issues.push('公開済みだがセットアップ状態がpending');
+  }
+  
+  if (currentStatus.sheetDetails?.guessedConfig?.opinionHeader && config.setupStatus === 'pending') {
+    issues.push('AI列判定完了済みだがセットアップ状態がpending');
+  }
+  
+  return issues;
+}
+
+/**
+ * 重大な問題の検出
+ */
+function detectCriticalIssues(config) {
+  const issues = [];
+  
+  // 設定が完全に破損している場合
+  if (!config || typeof config !== 'object') {
+    issues.push('設定データが破損しています');
+  }
+  
+  // 必須フィールドが欠落している場合
+  if (config && !config.hasOwnProperty('setupStatus')) {
+    issues.push('セットアップ状態情報が欠落しています');
+  }
+  
+  return issues;
+}
+
+/**
+ * 自動修復の実行
+ */
+function performAutoRepair() {
+  return new Promise((resolve, reject) => {
+    // 既存のrepairSetupStateInconsistencies()の核心部分を使用
+    repairSetupStateInconsistencies()
+      .then(result => resolve(result))
+      .catch(error => reject(error));
+  });
+}
+
+/**
+ * 完全リセットの実行（確認済み）
+ */
+function performFullReset() {
+  return new Promise((resolve, reject) => {
+    runGasWithUserId('resetConfigJson', '設定を完全初期化中...')
+      .then(result => {
+        if (result.success) {
+          resolve({
+            success: true,
+            phase: 'full_reset',
+            message: '✅ 設定を完全に初期化しました',
+            resetAt: result.resetAt
+          });
+        } else {
+          reject(new Error(result.message || '完全初期化に失敗しました'));
+        }
+      })
+      .catch(error => reject(error));
+  });
+}
+
+// ✨ レガシー診断・修復機能（後方互換性のため残存）
 // 診断実行状態の管理
 let diagnosticInProgress = false;
 let lastDiagnosticTime = 0;
@@ -1361,43 +1666,7 @@ function repairSetupStateInconsistencies() {
   });
 }
 
-// ✨ セットアップ診断・修復を実行するUI関数
-function runSetupRepair() {
-  const btn = document.getElementById('setup-repair-btn');
-  if (btn) {
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner mr-2"></div>修復中...';
-    
-    repairSetupStateInconsistencies()
-      .then(result => {
-        if (result.success) {
-          showMessage(result.message, 'success');
-          if (result.fixes.length > 0) {
-            console.log('修復詳細:', result.fixes);
-            
-            // 🔧 修復実行後は強制的にUI状態を更新
-            setTimeout(() => {
-              if (typeof loadSystemStatus === 'function') {
-                loadSystemStatus();
-              }
-              if (typeof validateCurrentStep === 'function') {
-                validateCurrentStep();
-              }
-            }, 200);
-          }
-        }
-      })
-      .catch(error => {
-        console.error('セットアップ修復エラー:', error);
-        showMessage(`セットアップ修復に失敗しました: ${error.message}`, 'error');
-      })
-      .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-      });
-  }
-}
+// Note: runSetupRepair function has been replaced by initializeUserSettingsWithUI
 
 // =============================================================================
 // SAVE AND PUBLISH OPERATIONS
