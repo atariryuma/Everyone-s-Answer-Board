@@ -30,6 +30,83 @@ function getResilientScriptCache() {
  * 異なるアカウントでログインした際に前のセッション情報をクリア
  * @param {string} currentEmail - 現在のユーザーメール
  */
+/**
+ * キャッシュを安全に消去するユーティリティ
+ * - removeAll() がサポートされる環境では全面削除
+ * - それ以外は既知のキーやプレフィックスでピンポイント削除
+ * @param {Cache} cache - GAS CacheService のキャッシュオブジェクト
+ * @param {Object} options
+ * @param {string} [options.label] - ログ用ラベル
+ * @param {string} [options.email] - キー生成に使うメール
+ * @param {string[]} [options.prefixes] - 削除対象キーのプレフィックス一覧（emailと組合せ）
+ * @param {string[]} [options.keys] - 直接削除するキー一覧
+ */
+function clearCacheSafely(cache, options) {
+  try {
+    if (!cache) return { success: true, method: 'none' };
+    const label = (options && options.label) || 'Cache';
+    const prefixes = (options && options.prefixes) || [];
+    const email = (options && options.email) || '';
+    const keys = (options && options.keys) || [];
+
+    // 1) 全消去が可能ならそれを試みる
+    if (typeof cache.removeAll === 'function') {
+      if (keys.length > 0) {
+        // removeAll(keys[]) が使える環境
+        try {
+          cache.removeAll(keys);
+          debugLog(label + ': removeAll(keys) でキャッシュを削除しました');
+          return { success: true, method: 'removeAll(keys)' };
+        } catch (e) {
+          warnLog(label + ': removeAll(keys) でエラー: ' + e.message);
+        }
+      }
+
+      // キー未指定でも removeAll() が使える環境（非標準だが一部で提供される可能性）
+      try {
+        cache.removeAll();
+        debugLog(label + ': removeAll() でキャッシュを全消去しました');
+        return { success: true, method: 'removeAll()' };
+      } catch (e) {
+        // 環境により未サポート
+        warnLog(label + ': removeAll() は未サポート: ' + e.message);
+      }
+    }
+
+    // 2) プレフィックス + email で個別削除（Cache.remove）
+    if (typeof cache.remove === 'function' && prefixes.length > 0 && email) {
+      prefixes.forEach(function(prefix) {
+        try {
+          cache.remove(prefix + email);
+        } catch (e) {
+          // 続行
+          warnLog(label + ': プレフィックス削除中のエラー: ' + e.message);
+        }
+      });
+      debugLog(label + ': 既知のプレフィックスキーを削除しました');
+      return { success: true, method: 'remove(prefix+email)' };
+    }
+
+    // 3) keys があれば removeAll(keys) を最終試行
+    if (typeof cache.removeAll === 'function' && keys.length > 0) {
+      try {
+        cache.removeAll(keys);
+        debugLog(label + ': removeAll(keys) でキャッシュを削除しました');
+        return { success: true, method: 'removeAll(keys)' };
+      } catch (e) {
+        warnLog(label + ': removeAll(keys) 最終試行で失敗: ' + e.message);
+      }
+    }
+
+    // 4) 何もできない環境
+    warnLog(label + ': キャッシュ全面削除 API 未提供のためスキップしました');
+    return { success: false, method: 'skipped' };
+  } catch (error) {
+    warnLog('clearCacheSafely エラー: ' + (error && error.message));
+    return { success: false, method: 'error', error: error && error.message };
+  }
+}
+
 function cleanupSessionOnAccountSwitch(currentEmail) {
   try {
     debugLog('セッションクリーンアップを開始: ' + currentEmail);
@@ -54,33 +131,12 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
       }
     });
 
-    // ユーザーキャッシュを全面クリア（API修正版）
-    if (userCache) {
-      try {
-        if (typeof userCache.removeAll === 'function') {
-          userCache.removeAll();
-          debugLog('ユーザーキャッシュ全クリア完了');
-        } else {
-          // removeAll未提供の環境。キー列挙ができないためスキップ
-          warnLog('UserCache.removeAll は未サポート。スキップします');
-        }
-      } catch (cacheError) {
-        warnLog('ユーザーキャッシュクリア中のエラー: ' + cacheError.message);
-      }
-    }
+    // ユーザーキャッシュを安全にクリア
+    clearCacheSafely(userCache, { label: 'UserCache' });
 
     // スクリプトキャッシュの関連項目もクリア
     const scriptCache = getResilientScriptCache();
-    if (scriptCache) {
-      try {
-        // 現在のユーザー以外のキャッシュをクリア
-        ['config_v3_', 'user_', 'email_'].forEach(function(prefix) {
-          scriptCache.remove(prefix + currentEmail);
-        });
-      } catch (scriptCacheError) {
-        warnLog('スクリプトキャッシュクリア中のエラー: ' + scriptCacheError.message);
-      }
-    }
+    clearCacheSafely(scriptCache, { label: 'ScriptCache', email: currentEmail, prefixes: ['config_v3_', 'user_', 'email_'] });
 
     debugLog('セッションクリーンアップ完了: ' + currentEmail);
 
@@ -98,29 +154,10 @@ function resetUserAuthentication() {
   try {
     debugLog('ユーザー認証をリセット中...');
     const userCache = getResilientCacheService();
-    if (userCache) {
-      userCache.removeAll(); // GAS API仕様に合わせて引数なし
-      debugLog('ユーザーキャッシュをクリアしました。');
-    }
+    clearCacheSafely(userCache, { label: 'UserCache' });
 
     const scriptCache = getResilientScriptCache();
-    if (scriptCache) {
-      if (typeof scriptCache.removeAll === 'function') {
-        scriptCache.removeAll();
-        debugLog('スクリプトキャッシュをクリアしました。');
-      } else {
-        // 既知のキーのみ削除（全消去APIは未提供）
-        try {
-          const email = getCurrentUserEmail();
-          ['config_v3_', 'user_', 'email_'].forEach(function(prefix) {
-            scriptCache.remove(prefix + email);
-          });
-          debugLog('スクリプトキャッシュ: 既知のキーを削除しました');
-        } catch (e) {
-          warnLog('スクリプトキャッシュのキー削除に失敗: ' + e.message);
-        }
-      }
-    }
+    clearCacheSafely(scriptCache, { label: 'ScriptCache', email: getCurrentUserEmail(), prefixes: ['config_v3_', 'user_', 'email_'] });
 
     // PropertiesServiceもクリアする（LAST_ACCESS_EMAILなど）
     const props = getResilientPropertiesService();
@@ -157,32 +194,10 @@ function forceLogoutAndRedirectToLogin() {
     try {
       debugLog('🧹 キャッシュクリア開始...');
       const userCache = getResilientCacheService();
-      if (userCache) {
-        if (typeof userCache.removeAll === 'function') {
-          userCache.removeAll();
-          debugLog('✅ ユーザーキャッシュクリア完了');
-        } else {
-          warnLog('UserCache.removeAll は未サポート。スキップします');
-        }
-      }
+      clearCacheSafely(userCache, { label: 'UserCache' });
 
       const scriptCache = getResilientScriptCache();
-      if (scriptCache) {
-        if (typeof scriptCache.removeAll === 'function') {
-          scriptCache.removeAll();
-          debugLog('✅ スクリプトキャッシュクリア完了');
-        } else {
-          try {
-            const email = getCurrentUserEmail();
-            ['config_v3_', 'user_', 'email_'].forEach(function(prefix) {
-              scriptCache.remove(prefix + email);
-            });
-            debugLog('スクリプトキャッシュ: 既知のキーを削除しました');
-          } catch (e) {
-            warnLog('スクリプトキャッシュのキー削除に失敗: ' + e.message);
-          }
-        }
-      }
+      clearCacheSafely(scriptCache, { label: 'ScriptCache', email: getCurrentUserEmail(), prefixes: ['config_v3_', 'user_', 'email_'] });
 
       const props = getResilientPropertiesService();
       props.deleteAllProperties();
@@ -386,7 +401,3 @@ function detectAccountSwitch(currentEmail) {
     };
   }
 }
-
-
-
-
