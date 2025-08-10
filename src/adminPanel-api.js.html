@@ -1749,9 +1749,22 @@ function unpublishBoard() {
                           (userInfo.customFormInfo && userInfo.customFormInfo.mainQuestion) ||
                           '（問題文未設定）';
       
-      // Determine display mode and count display from draft or defaults
-      const displayMode = (draftState && draftState.displayMode) || '通常表示';
-      const countDisplay = (draftState && draftState.countDisplay) || '表示';
+      // Get current UI state for accurate display settings at publish time
+      const getCurrentDisplaySettings = () => {
+        const anonymousCheckbox = document.getElementById('anonymous-mode');
+        const showCountsCheckbox = document.getElementById('show-counts');
+        
+        const displayMode = (anonymousCheckbox && anonymousCheckbox.checked) ? '匿名表示' : '通常表示';
+        const countDisplay = (showCountsCheckbox && showCountsCheckbox.checked) ? '表示' : '非表示';
+        
+        logDebug('Current UI state at publish time:', { displayMode, countDisplay });
+        return { displayMode, countDisplay };
+      };
+      
+      // Use current UI state first, then fall back to draft state or defaults
+      const currentSettings = getCurrentDisplaySettings();
+      const displayMode = currentSettings.displayMode || (draftState && draftState.displayMode) || '通常表示';
+      const countDisplay = currentSettings.countDisplay || (draftState && draftState.countDisplay) || '表示';
       
       // Create consolidated history entry
       const consolidatedHistoryItem = {
@@ -1769,6 +1782,14 @@ function unpublishBoard() {
         // Display settings
         displayMode: displayMode, // '通常表示' or '匿名表示'
         countDisplay: countDisplay, // '表示' or '非表示'
+        
+        // Simple format for quick display (based on configuration)
+        format: (() => {
+          const cfg = config || {};
+          if (cfg.multipleChoice || cfg.allowMultipleAnswers || (cfg.formElements && cfg.formElements.some(e => e.type === 'checkbox'))) return 'multi';
+          if (cfg.singleChoice || cfg.choices || cfg.options || (cfg.formElements && cfg.formElements.some(e => e.type === 'radio' || e.type === 'select'))) return 'select';
+          return 'text';
+        })(),
         
         // Form configuration and state
         config: config,
@@ -1813,8 +1834,8 @@ function unpublishBoard() {
         history.splice(MAX_HISTORY_ITEMS);
       }
       
-      // Save to localStorage
-      localStorage.setItem('answerboard_history', JSON.stringify(history));
+      // Save to localStorage (use shared key)
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
       
       // Sync to server (async with error handling)
       syncHistoryToServer(consolidatedHistoryItem).then(result => {
@@ -1884,6 +1905,9 @@ function unpublishBoard() {
         // Display settings (QuickStart provides explicit values)
         displayMode: quickStartResult.displayMode === 'anonymous' ? '匿名表示' : '通常表示',
         countDisplay: quickStartResult.showCounts ? '表示' : '非表示',
+        
+        // Simple format (QuickStart is typically text-based)
+        format: 'text',
         
         // Form configuration and state
         config: quickStartResult.config || {},

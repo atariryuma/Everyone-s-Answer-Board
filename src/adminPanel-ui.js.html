@@ -2470,7 +2470,15 @@ function saveToHistory(historyItem) {
       spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
       
       // 保存時点での設定完了状態
-      configurationComplete: !!(currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader)
+      configurationComplete: !!(currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader),
+      
+      // Simple format for quick display
+      format: (() => {
+        const cfg = historyItem.config || (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {};
+        if (cfg.multipleChoice || cfg.allowMultipleAnswers || (cfg.formElements && cfg.formElements.some(e => e.type === 'checkbox'))) return 'multi';
+        if (cfg.singleChoice || cfg.choices || cfg.options || (cfg.formElements && cfg.formElements.some(e => e.type === 'radio' || e.type === 'select'))) return 'select';
+        return 'text';
+      })()
     };
     
     history.unshift(newItem);
@@ -2541,7 +2549,14 @@ async function syncHistoryToServer(historyItem, retryCount = 0) {
       spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
       answerCount: historyItem.answerCount || 0,
       reactionCount: historyItem.reactionCount || 0,
-      setupType: historyItem.setupType || 'custom'
+      setupType: historyItem.setupType || 'custom',
+      // 簡易フォーマット（テキスト/選択/複数）
+      format: (function deriveFormat() {
+        const cfg = historyItem.config || (historyItem.sheetDetails && historyItem.sheetDetails.guessedConfig) || {};
+        if (cfg.multipleChoice || cfg.allowMultipleAnswers || (cfg.formElements && cfg.formElements.some(e => e.type === 'checkbox'))) return 'multi';
+        if (cfg.singleChoice || cfg.choices || cfg.options || (cfg.formElements && cfg.formElements.some(e => e.type === 'radio' || e.type === 'select'))) return 'select';
+        return 'text';
+      })()
     };
     const syncPromise = runGasWithUserId('saveHistoryToSheetAPI', false, compact);
     const response = await Promise.race([syncPromise, timeoutPromise]);
@@ -2639,28 +2654,69 @@ async function getMergedHistory() {
       }
     }
     
-    // 軽量統合処理：ID重複を除去
-    const mergedMap = new Map();
+    // 改善された統合処理：formId基準で重複排除し、詳細情報を保持
+    const mergedMap = new Map(); // formId -> merged item
+    const idMap = new Map(); // id -> merged item (for final deduplication)
     let totalItems = 0;
     
-    // ローカル履歴を追加（軽量検証）
-    for (const item of localHistory) {
-      if (item && item.id) {
-        mergedMap.set(item.id, Object.assign({}, item, { source: 'local' }));
-        totalItems++;
+    // Helper function to merge two history items
+    const mergeHistoryItems = (existing, newItem, source) => {
+      if (!existing) return Object.assign({}, newItem, { source });
+      
+      // Prefer server data for basic info, but preserve local sheetDetails
+      const merged = Object.assign({}, newItem, { source });
+      
+      // Preserve detailed local information if available
+      if (existing.sheetDetails && (!merged.sheetDetails || Object.keys(existing.sheetDetails).length > Object.keys(merged.sheetDetails || {}).length)) {
+        merged.sheetDetails = existing.sheetDetails;
+        logDebug('Preserved local sheetDetails for formId:', newItem.formId);
       }
-    }
-    
-    // サーバー履歴を追加（サーバー側優先）
-    for (const item of serverHistory) {
-      if (item && item.id) {
-        mergedMap.set(item.id, Object.assign({}, item, { source: 'server' }));
-        totalItems++;
+      
+      // Preserve format information if available
+      if (existing.format && !merged.format) {
+        merged.format = existing.format;
       }
-    }
+      
+      return merged;
+    };
     
-    // 軽量ソート（エラーハンドリング簡略化）
-    const mergedArray = Array.from(mergedMap.values()).sort((a, b) => {
+    // First pass: collect all items by formId
+    [...localHistory, ...serverHistory].forEach((item, index) => {
+      if (!item || !item.id) return;
+      
+      const isLocal = index < localHistory.length;
+      const source = isLocal ? 'local' : 'server';
+      
+      // Use formId for primary deduplication, fallback to id
+      const key = item.formId || item.id;
+      const existing = mergedMap.get(key);
+      
+      if (existing) {
+        // Merge with existing item
+        const merged = mergeHistoryItems(existing, item, source);
+        mergedMap.set(key, merged);
+        logDebug(`Merged duplicate formId: ${key} (${source})`);
+      } else {
+        // New item
+        mergedMap.set(key, Object.assign({}, item, { source }));
+      }
+      totalItems++;
+    });
+    
+    // Second pass: final deduplication by ID (in case formId wasn't unique enough)
+    mergedMap.forEach((item) => {
+      if (idMap.has(item.id)) {
+        const existing = idMap.get(item.id);
+        const merged = mergeHistoryItems(existing, item, item.source);
+        idMap.set(item.id, merged);
+        logDebug(`Final deduplication for ID: ${item.id}`);
+      } else {
+        idMap.set(item.id, item);
+      }
+    });
+    
+    // 軽量ソート（最終的にidMapからソート）
+    const mergedArray = Array.from(idMap.values()).sort((a, b) => {
       const aTime = new Date(a.timestamp || a.publishedAt || a.createdAt || 0).getTime();
       const bTime = new Date(b.timestamp || b.publishedAt || b.createdAt || 0).getTime();
       return bTime - aTime; // 降順
@@ -3085,6 +3141,15 @@ function createHistoryTableRow(item, index) {
   
   // 回答形式の表示ロジック（改善版）
   const getAnswerFormatDisplay = (item) => {
+    // 0. 事前に保存された簡易フォーマットがあれば最優先
+    if (item.format) {
+      switch (item.format) {
+        case 'multi': return `<span class="text-purple-400">複数</span>`;
+        case 'select': return `<span class="text-blue-400">選択</span>`;
+        case 'text':
+        default: return `<span class="text-green-400">テキスト</span>`;
+      }
+    }
     // 1. QuickStartの場合は確実にテキストと判定
     if (item.setupType === 'quickstart') {
       return `<span class="text-green-400">テキスト</span>`;
@@ -3101,7 +3166,7 @@ function createHistoryTableRow(item, index) {
       }
     }
     
-    const config = item.config;
+    const config = item.config || (item.sheetDetails && item.sheetDetails.guessedConfig) || null;
     if (!config) {
       // configがない場合もテキストとして扱う（"不明"を表示しない）
       return `<span class="text-green-400">テキスト</span>`;
