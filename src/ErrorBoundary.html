@@ -428,9 +428,10 @@
             border-radius: 16px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.1);
             padding: 40px;
-            max-width: 500px;
-            width: 90%;
+            max-width: 800px;
+            width: 95%;
             text-align: center;
+            position: relative;
         }
         .error-icon {
             font-size: 64px;
@@ -453,6 +454,13 @@
             color: #666;
             line-height: 1.6;
             margin-bottom: 24px;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
+            padding: 0 10px;
         }
         .error-actions {
             display: flex;
@@ -503,6 +511,131 @@
             color: #6c757d;
             font-size: 12px;
             margin-top: 16px;
+        }
+        
+        /* エラータイプ別スタイリング */
+        .error-container.error-critical {
+            border-left: 6px solid #dc3545;
+        }
+        .error-container.error-access {
+            border-left: 6px solid #fd7e14;
+        }
+        .error-container.error-validation {
+            border-left: 6px solid #ffc107;
+        }
+        .error-container.error-network {
+            border-left: 6px solid #17a2b8;
+        }
+        .error-container.error-user {
+            border-left: 6px solid #6c757d;
+        }
+        
+        /* 詳細情報セクション */
+        .diagnostic-section {
+            margin-top: 20px;
+            text-align: left;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
+            padding: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .diagnostic-toggle {
+            background: #e9ecef;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .diagnostic-toggle:hover {
+            background: #dee2e6;
+        }
+        
+        .diagnostic-content {
+            display: none;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        
+        .diagnostic-summary {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .diagnostic-summary h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #495057;
+        }
+        
+        .diagnostic-summary p {
+            margin: 4px 0;
+            font-size: 13px;
+        }
+        
+        .diagnostic-properties {
+            margin-top: 12px;
+            padding: 12px;
+            background: #f1f3f4;
+            border-radius: 6px;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+            .error-container {
+                width: 98%;
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .error-title {
+                font-size: 20px;
+            }
+            
+            .error-message {
+                font-size: 14px;
+                padding: 0 5px;
+            }
+            
+            .error-actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .error-container {
+                padding: 15px;
+            }
+            
+            .error-icon {
+                font-size: 48px;
+            }
+            
+            .error-title {
+                font-size: 18px;
+            }
+            
+            .diagnostic-section {
+                padding: 12px;
+            }
         }
     </style>
     <script>
@@ -603,10 +736,51 @@
     </script>
 </head>
 <body>
-    <div class="error-container">
-        <div class="error-icon">⚠️</div>
+    <div class="error-container <?= typeof errorType !== 'undefined' ? 'error-' + errorType : '' ?>">
+        <div class="error-icon"><?= typeof errorIcon !== 'undefined' ? errorIcon : '⚠️' ?></div>
         <h1 class="error-title"><?= htmlEncode(title || 'エラーが発生しました') ?></h1>
         <p class="error-message"><?= htmlEncode(message || 'システムエラーが発生しました。管理者にお問い合わせください。') ?></p>
+        
+        <!-- 構造化された診断情報表示 -->
+        <? if (typeof diagnosticInfo !== 'undefined' && diagnosticInfo) { ?>
+        <div class="diagnostic-section">
+            <div class="diagnostic-toggle" onclick="toggleDiagnosticInfo()">
+                📊 詳細情報を表示 <span id="diagnostic-arrow">▼</span>
+            </div>
+            <div class="diagnostic-content" id="diagnostic-content">
+                <? if (diagnosticInfo.summary && diagnosticInfo.summary.length > 0) { ?>
+                <div class="diagnostic-summary">
+                    <h4>📋 基本情報</h4>
+                    <? diagnosticInfo.summary.forEach(function(item) { ?>
+                        <p><?= htmlEncode(item) ?></p>
+                    <? }); ?>
+                </div>
+                <? } ?>
+                
+                <? if (diagnosticInfo.technical && diagnosticInfo.technical.length > 0) { ?>
+                <div class="diagnostic-summary">
+                    <h4>🔧 技術詳細</h4>
+                    <? diagnosticInfo.technical.forEach(function(item) { ?>
+                        <p><?= htmlEncode(item) ?></p>
+                    <? }); ?>
+                </div>
+                <? } ?>
+                
+                <? if (diagnosticInfo.properties) { ?>
+                <div class="diagnostic-properties">
+                    <h4>🗂️ システム状態</h4>
+                    <pre><?= htmlEncode(JSON.stringify(diagnosticInfo.properties, null, 2)) ?></pre>
+                </div>
+                <? } ?>
+                
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #dee2e6;">
+                    <button type="button" class="btn btn-secondary" onclick="copyDiagnosticInfo()" style="font-size: 12px;">
+                        📋 診断情報をコピー
+                    </button>
+                </div>
+            </div>
+        </div>
+        <? } ?>
         
         <div class="error-actions">
             <button type="button" class="btn btn-primary" onclick="location.reload()">
@@ -622,10 +796,16 @@
             </button>
         </div>
         
+        <!-- 従来のデバッグ情報（開発者向け） -->
         <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
         <div class="debug-info">
-            <strong>デバッグ情報:</strong><br>
-            <?= htmlEncode(debugInfo) ?>
+            <div class="diagnostic-toggle" onclick="toggleDebugInfo()" style="margin-bottom: 8px;">
+                🔍 開発者向け情報 <span id="debug-arrow">▼</span>
+            </div>
+            <div id="debug-content" style="display: none;">
+                <strong>デバッグ情報:</strong><br>
+                <?= htmlEncode(debugInfo) ?>
+            </div>
         </div>
         <? } ?>
         
@@ -633,6 +813,105 @@
             エラー発生時刻: <?= new Date().toLocaleString('ja-JP') ?>
         </div>
     </div>
+
+    <script>
+        // 詳細診断情報の表示切り替え
+        function toggleDiagnosticInfo() {
+            const content = document.getElementById('diagnostic-content');
+            const arrow = document.getElementById('diagnostic-arrow');
+            
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                arrow.textContent = '▲';
+            } else {
+                content.style.display = 'none';
+                arrow.textContent = '▼';
+            }
+        }
+        
+        // デバッグ情報の表示切り替え
+        function toggleDebugInfo() {
+            const content = document.getElementById('debug-content');
+            const arrow = document.getElementById('debug-arrow');
+            
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                arrow.textContent = '▲';
+            } else {
+                content.style.display = 'none';
+                arrow.textContent = '▼';
+            }
+        }
+        
+        // 診断情報をクリップボードにコピー
+        function copyDiagnosticInfo() {
+            try {
+                let copyText = '=== エラー診断レポート ===\n\n';
+                copyText += 'タイトル: <?= htmlEncode(title || "Unknown") ?>\n';
+                copyText += '発生時刻: <?= new Date().toLocaleString("ja-JP") ?>\n';
+                
+                // DOM から診断情報を直接取得
+                const diagnosticSections = document.querySelectorAll('.diagnostic-summary');
+                diagnosticSections.forEach(function(section) {
+                    const heading = section.querySelector('h4');
+                    if (heading && heading.textContent.includes('📋 基本情報')) {
+                        const summaryItems = section.querySelectorAll('p');
+                        if (summaryItems.length > 0) {
+                            copyText += '\n【基本情報】\n';
+                            summaryItems.forEach(function(item) {
+                                copyText += item.textContent.trim() + '\n';
+                            });
+                        }
+                    } else if (heading && heading.textContent.includes('🔧 技術詳細')) {
+                        const technicalItems = section.querySelectorAll('p');
+                        if (technicalItems.length > 0) {
+                            copyText += '\n【技術詳細】\n';
+                            technicalItems.forEach(function(item) {
+                                copyText += item.textContent.trim() + '\n';
+                            });
+                        }
+                    }
+                });
+                
+                const propertiesSection = document.querySelector('.diagnostic-properties pre');
+                if (propertiesSection) {
+                    copyText += '\n【システム状態】\n';
+                    copyText += propertiesSection.textContent.trim() + '\n';
+                }
+                
+                // クリップボードに書き込み
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(copyText).then(function() {
+                        alert('📋 診断情報がクリップボードにコピーされました');
+                    }).catch(function() {
+                        fallbackCopy(copyText);
+                    });
+                } else {
+                    fallbackCopy(copyText);
+                }
+                
+            } catch (error) {
+                console.error('Copy failed:', error);
+                alert('❌ コピーに失敗しました');
+            }
+        }
+        
+        // フォールバックコピー機能
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('📋 診断情報がクリップボードにコピーされました');
+            } catch (err) {
+                alert('❌ コピーに失敗しました。手動でテキストを選択してください。');
+                console.error('Fallback copy failed:', err);
+            }
+            document.body.removeChild(textArea);
+        }
+    </script>
 </body>
 </html>
 <? } ?>

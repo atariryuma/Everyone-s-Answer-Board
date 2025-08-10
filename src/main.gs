@@ -1227,15 +1227,11 @@ function handleAdminMode(params) {
     
     return showErrorPage(
       'アクセス拒否', 
-      'セキュリティ認証システムでアクセス権限を確認できませんでした。\n\n' +
-      '実行された認証:\n' +
-      '• メールアドレス + ユーザーID + アクティブ状態の3重チェック\n' +
-      '• 新規ユーザー向け合理的な同期待機処理\n' +
-      '• 教育機関ドメインでの適切な緊急措置\n\n' +
+      'アカウントが一時的に無効化されています。\n\n' +
       '対処法:\n' +
-      '• 新規登録から1-2分待ってから再度アクセスしてください\n' +
-      '• ブラウザを更新してから再度お試しください\n' +
-      '• 問題が続く場合は管理者にご連絡ください\n\n' +
+      '• 新規登録から1-2分お待ちください\n' +
+      '• ブラウザを更新してお試しください\n' +
+      '• 問題が続く場合は管理者にお問い合わせください\n\n' +
       '詳細診断情報:\n' + diagnosticInfo
     );
   }
@@ -1614,18 +1610,155 @@ function getAppSetupUrl() {
   }
 }
 
+// =================================================================
+// ERROR HANDLING & CATEGORIZATION
+// =================================================================
+
+// エラータイプ定義
+const ERROR_TYPES = {
+  CRITICAL: 'critical',      // 致命的システムエラー
+  ACCESS: 'access',          // アクセス・認証エラー  
+  VALIDATION: 'validation',  // データ検証エラー
+  NETWORK: 'network',        // ネットワーク・API エラー
+  USER: 'user'              // ユーザー操作エラー
+};
+
 /**
- * エラーページを表示
+ * エラータイプに基づいてメッセージを分類・整理する
  * @param {string} title - エラータイトル
  * @param {string} message - エラーメッセージ
- * @param {Error} [error] - (オプション) エラーオブジェクト
- * @returns {HtmlOutput}
+ * @returns {Object} 分類されたエラー情報
+ */
+function categorizeError(title, message) {
+  const titleLower = title.toLowerCase();
+  const messageLower = message.toLowerCase();
+  
+  // エラータイプの判定
+  let errorType = ERROR_TYPES.USER;
+  if (titleLower.includes('致命的') || titleLower.includes('システム')) {
+    errorType = ERROR_TYPES.CRITICAL;
+  } else if (titleLower.includes('アクセス') || titleLower.includes('認証') || titleLower.includes('権限')) {
+    errorType = ERROR_TYPES.ACCESS;
+  } else if (titleLower.includes('不正') || messageLower.includes('指定されていません')) {
+    errorType = ERROR_TYPES.VALIDATION;
+  } else if (messageLower.includes('ネットワーク') || messageLower.includes('接続')) {
+    errorType = ERROR_TYPES.NETWORK;
+  }
+  
+  return {
+    type: errorType,
+    icon: getErrorIcon(errorType),
+    severity: getErrorSeverity(errorType)
+  };
+}
+
+/**
+ * エラータイプに対応するアイコンを取得
+ */
+function getErrorIcon(errorType) {
+  const icons = {
+    [ERROR_TYPES.CRITICAL]: '🔥',
+    [ERROR_TYPES.ACCESS]: '🔒', 
+    [ERROR_TYPES.VALIDATION]: '⚠️',
+    [ERROR_TYPES.NETWORK]: '🌐',
+    [ERROR_TYPES.USER]: '❓'
+  };
+  return icons[errorType] || '⚠️';
+}
+
+/**
+ * エラータイプに対応する重要度を取得
+ */
+function getErrorSeverity(errorType) {
+  const severities = {
+    [ERROR_TYPES.CRITICAL]: 'high',
+    [ERROR_TYPES.ACCESS]: 'medium',
+    [ERROR_TYPES.VALIDATION]: 'medium', 
+    [ERROR_TYPES.NETWORK]: 'medium',
+    [ERROR_TYPES.USER]: 'low'
+  };
+  return severities[errorType] || 'low';
+}
+
+/**
+ * 長い診断情報を構造化して整理する
+ * @param {string} diagnosticInfo - 診断情報文字列
+ * @returns {Object} 構造化された診断情報
+ */
+function structureDiagnosticInfo(diagnosticInfo) {
+  if (!diagnosticInfo) return null;
+  
+  const lines = diagnosticInfo.split('\n');
+  const structured = {
+    summary: [],
+    technical: [],
+    properties: null
+  };
+  
+  let currentSection = 'summary';
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    
+    // プロパティ状態のJSON部分を検出
+    if (trimmed.includes('プロパティ状態:')) {
+      currentSection = 'properties';
+      const jsonStart = line.indexOf('{');
+      if (jsonStart !== -1) {
+        try {
+          const jsonStr = line.substring(jsonStart);
+          structured.properties = JSON.parse(jsonStr);
+        } catch (e) {
+          structured.technical.push(line);
+        }
+      }
+      continue;
+    }
+    
+    // 基本情報と技術情報を分類
+    if (trimmed.startsWith('ユーザーID:') || 
+        trimmed.startsWith('現在のメール:') || 
+        trimmed.startsWith('認証時間:') || 
+        trimmed.startsWith('時刻:')) {
+      structured.summary.push(trimmed);
+    } else {
+      structured.technical.push(trimmed);
+    }
+  }
+  
+  return structured;
+}
+
+/**
+ * エラーページを表示する関数（改善版）
+ * @param {string} title - エラータイトル
+ * @param {string} message - エラーメッセージ  
+ * @param {Error|string} error - エラーオブジェクトまたは診断情報
+ * @returns {HtmlOutput} エラーページのHTML出力
  */
 function showErrorPage(title, message, error) {
   const template = HtmlService.createTemplateFromFile('ErrorBoundary');
+  
+  // エラー分類
+  const errorInfo = categorizeError(title, message);
+  
+  // 基本情報設定
   template.title = title;
-  template.message = message;
-  template.mode = 'admin'; // エラーテンプレートが依存するmode変数にデフォルト値を提供
+  template.errorType = errorInfo.type;
+  template.errorIcon = errorInfo.icon;
+  template.errorSeverity = errorInfo.severity;
+  template.mode = 'admin';
+  
+  // メッセージを構造化
+  if (message && message.includes('詳細診断情報:')) {
+    const parts = message.split('詳細診断情報:');
+    template.message = parts[0].trim();
+    template.diagnosticInfo = structureDiagnosticInfo(parts[1]);
+  } else {
+    template.message = message;
+    template.diagnosticInfo = null;
+  }
   
   // 現在のユーザーがデータベースに登録されているかチェック
   let isRegisteredUser = false;
@@ -1643,11 +1776,19 @@ function showErrorPage(title, message, error) {
   template.isRegisteredUser = isRegisteredUser;
   template.userEmail = currentUserEmail;
   
+  // デバッグ情報設定
   if (DEBUG && error) {
-    template.debugInfo = error.stack;
+    if (typeof error === 'string') {
+      template.debugInfo = error;
+    } else if (error.stack) {
+      template.debugInfo = error.stack;
+    } else {
+      template.debugInfo = error.toString();
+    }
   } else {
     template.debugInfo = '';
   }
+  
   const htmlOutput = template.evaluate()
     .setTitle(`エラー - ${title}`);
 
