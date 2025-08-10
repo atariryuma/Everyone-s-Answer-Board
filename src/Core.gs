@@ -1953,6 +1953,21 @@ function getAppConfig(requestUserId) {
       warnLog('回答数の取得に失敗: ' + countError.message);
     }
 
+    // アクティブシートのフォームURLを優先（未設定時のみグローバルにフォールバック）
+    let activeFormUrl = '';
+    try {
+      const activeSheet = (configJson && typeof configJson === 'object') ? (configJson.publishedSheetName || '') : '';
+      if (activeSheet) {
+        const sheetCfg = configJson['sheet_' + activeSheet];
+        if (sheetCfg && typeof sheetCfg === 'object' && sheetCfg.formUrl) {
+          activeFormUrl = sheetCfg.formUrl;
+        }
+      }
+    } catch (e) {
+      // フォームURLの解決失敗は致命的ではない
+      debugLog('getAppConfig: activeFormUrl 解決スキップ:', e.message);
+    }
+
     return {
       status: 'success',
       userId: currentUserId,
@@ -1965,7 +1980,7 @@ function getAppConfig(requestUserId) {
       availableSheets: sheets,
       allSheets: sheets, // AdminPanel.htmlで使用される
       spreadsheetUrl: userInfo.spreadsheetUrl,
-      formUrl: configJson.formUrl || '',
+      formUrl: activeFormUrl || configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',
       webAppUrl: appUrls.webAppUrl,
       adminUrl: appUrls.adminUrl,

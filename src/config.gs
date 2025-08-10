@@ -1207,6 +1207,37 @@ function activateSheet(requestUserId, spreadsheetId, sheetName) {
     const switchResult = switchToSheet(requestUserId, spreadsheetId, sheetName);
     debugLog('activateSheet: シート切り替え完了');
 
+    // シート固有フォームURLの同期（同一スプレッドシートに複数フォームがあるケースに対応）
+    try {
+      const userInfoForForm = findUserById(currentUserId);
+      if (userInfoForForm) {
+        const cfg = JSON.parse(userInfoForForm.configJson || '{}');
+        const sheetKey = 'sheet_' + sheetName;
+        cfg[sheetKey] = cfg[sheetKey] || {};
+
+        // 該当シートのformUrlが未設定の場合は自動検出を試行
+        if (!cfg[sheetKey].formUrl) {
+          const detected = detectFormUrlFromSpreadsheet(spreadsheetId);
+          if (detected && detected.success && detected.formUrl) {
+            cfg[sheetKey].formUrl = detected.formUrl;
+            infoLog('✅ activateSheet: フォームURL自動設定 (sheet=' + sheetName + '): ' + detected.formUrl);
+          } else {
+            debugLog('ℹ️ activateSheet: フォームURL検出なし (sheet=' + sheetName + ')');
+          }
+        }
+
+        // アクティブシートのフォームURLをグローバルに同期
+        syncFormUrlForActiveSheet(cfg, sheetName);
+
+        // 変更をDBに反映
+        updateUser(currentUserId, {
+          configJson: JSON.stringify(cfg)
+        });
+      }
+    } catch (formSyncError) {
+      warnLog('activateSheet: フォームURL同期で警告:', formSyncError.message);
+    }
+
     // 最新のステータスを取得（キャッシュ活用）
     const finalStatus = getAppConfig(requestUserId);
     debugLog('activateSheet: 公開処理完了');
@@ -1397,10 +1428,32 @@ function addFormUrl(requestUserId, url) {
       throw new Error('ユーザー情報が見つかりません。');
     }
 
-    // フォームURLをユーザー情報に追加
-    updateUser(currentUserId, {
-      formUrl: url
-    });
+    // フォームURLをアクティブシートとグローバルに反映
+    try {
+      const cfg = JSON.parse(userInfo.configJson || '{}');
+      const activeSheet = cfg.publishedSheetName || '';
+
+      if (activeSheet) {
+        const sheetKey = 'sheet_' + activeSheet;
+        cfg[sheetKey] = cfg[sheetKey] || {};
+        cfg[sheetKey].formUrl = url;
+
+        // アクティブシートのフォームURLをグローバルに同期
+        syncFormUrlForActiveSheet(cfg, activeSheet);
+
+        updateUser(currentUserId, {
+          configJson: JSON.stringify(cfg),
+          formUrl: cfg.formUrl || url
+        });
+      } else {
+        // アクティブシート不明時は従来通りグローバルのみ更新
+        updateUser(currentUserId, { formUrl: url });
+      }
+    } catch (cfgErr) {
+      // 失敗時は従来通りグローバルのみ更新
+      warnLog('addFormUrl: シート固有の更新に失敗（グローバルのみ反映）:', cfgErr.message);
+      updateUser(currentUserId, { formUrl: url });
+    }
 
     // キャッシュを無効化
     invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
