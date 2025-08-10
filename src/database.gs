@@ -1999,16 +1999,38 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
   // 統一バッチ処理システムを使用
   const requests = requestBody.requests || [];
   
+  infoLog('🔍 Debug: About to extract requests from requestBody:', {
+    requestBodyType: typeof requestBody,
+    hasRequests: !!(requestBody.requests),
+    requestsLength: requests.length,
+    timestamp: new Date().toISOString()
+  });
+  
   infoLog('🔄 Calling unifiedBatchProcessor.batchUpdateSpreadsheet:', {
     requestCount: requests.length,
-    processorExists: typeof unifiedBatchProcessor !== 'undefined'
+    processorExists: typeof unifiedBatchProcessor !== 'undefined',
+    processorType: typeof unifiedBatchProcessor,
+    hasMethod: !!(unifiedBatchProcessor && unifiedBatchProcessor.batchUpdateSpreadsheet)
   });
   
   try {
+    infoLog('⏳ About to call unifiedBatchProcessor method...', {
+      methodExists: typeof unifiedBatchProcessor.batchUpdateSpreadsheet,
+      serviceValid: !!service,
+      spreadsheetIdValid: !!spreadsheetId,
+      requestsCount: requests.length
+    });
+    
     const result = unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
       includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse || false,
       responseRanges: requestBody.responseRanges || [],
       invalidateCache: true
+    });
+    
+    infoLog('✅ unifiedBatchProcessor.batchUpdateSpreadsheet returned:', {
+      resultType: typeof result,
+      isPromise: !!(result && typeof result.then === 'function'),
+      hasSpreadsheetId: !!(result && result.spreadsheetId)
     });
     
     infoLog('🎯 batchUpdateSpreadsheet wrapper completed:', {
