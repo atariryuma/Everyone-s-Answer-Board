@@ -2543,11 +2543,11 @@ function createQuickStartFiles(setupContext) {
 
         if (!isFormAlreadyInFolder) {
           debugLog('📝 フォームファイルを移動中: %s → %s', formFile.getId(), folder.getName());
-          folder.addFile(formFile);
-          // ルートフォルダから削除（適切なタイミングで実行）
-          DriveApp.getRootFolder().removeFile(formFile);
+          
+          // 推奨メソッドmoveTo()を使用してファイル移動
+          formFile.moveTo(folder);
           moveResults.form = true;
-          infoLog('✅ フォームファイル移動完了');
+          infoLog('✅ フォームファイル移動完了: %s (ID: %s)', folder.getName(), formFile.getId());
         } else {
           debugLog('ℹ️ フォームファイルは既にフォルダに存在します');
           moveResults.form = true;
@@ -2555,6 +2555,7 @@ function createQuickStartFiles(setupContext) {
       } catch (formMoveError) {
         moveErrors.push('フォームファイル移動エラー: ' + formMoveError.message);
         errorLog('❌ フォームファイルの移動に失敗:', formMoveError.message);
+        errorLog('フォームID: %s, フォルダID: %s', formAndSsInfo.formId, folder ? folder.getId() : 'なし');
       }
 
       // スプレッドシートファイルの移動処理
@@ -2572,11 +2573,11 @@ function createQuickStartFiles(setupContext) {
 
         if (!isSsAlreadyInFolder) {
           debugLog('📊 スプレッドシートファイルを移動中: %s → %s', ssFile.getId(), folder.getName());
-          folder.addFile(ssFile);
-          // ルートフォルダから削除（適切なタイミングで実行）
-          DriveApp.getRootFolder().removeFile(ssFile);
+          
+          // 推奨メソッドmoveTo()を使用してファイル移動
+          ssFile.moveTo(folder);
           moveResults.spreadsheet = true;
-          infoLog('✅ スプレッドシートファイル移動完了');
+          infoLog('✅ スプレッドシートファイル移動完了: %s (ID: %s)', folder.getName(), ssFile.getId());
         } else {
           debugLog('ℹ️ スプレッドシートファイルは既にフォルダに存在します');
           moveResults.spreadsheet = true;
@@ -2584,6 +2585,7 @@ function createQuickStartFiles(setupContext) {
       } catch (ssMoveError) {
         moveErrors.push('スプレッドシートファイル移動エラー: ' + ssMoveError.message);
         errorLog('❌ スプレッドシートファイルの移動に失敗:', ssMoveError.message);
+        errorLog('スプレッドシートID: %s, フォルダID: %s', formAndSsInfo.spreadsheetId, folder ? folder.getId() : 'なし');
       }
 
       // 移動結果のログ出力
@@ -3410,6 +3412,18 @@ function createFormFactory(options) {
     // フォーム作成
     var form = FormApp.create(formTitle);
     form.setDescription(formDescription);
+    
+    // フォームを即座にユーザーフォルダに移動（作成直後）
+    try {
+      const userFolder = createUserFolder(userEmail);
+      if (userFolder) {
+        const formFile = DriveApp.getFileById(form.getId());
+        formFile.moveTo(userFolder);
+        debugLog('✅ フォームを作成と同時にユーザーフォルダに配置: %s', userFolder.getName());
+      }
+    } catch (folderMoveError) {
+      warnLog('⚠️ フォーム作成直後の移動に失敗（後で再移動されます）:', folderMoveError.message);
+    }
 
     // 基本的な質問を追加
     addUnifiedQuestions(form, options.questions || 'default', options.customConfig || {});
@@ -3769,6 +3783,18 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     // 新しいスプレッドシートを作成
     var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
     var spreadsheetId = spreadsheetObj.getId();
+
+    // スプレッドシートを即座にユーザーフォルダに移動（作成直後）
+    try {
+      const userFolder = createUserFolder(userEmail);
+      if (userFolder) {
+        const ssFile = DriveApp.getFileById(spreadsheetId);
+        ssFile.moveTo(userFolder);
+        debugLog('✅ スプレッドシートを作成と同時にユーザーフォルダに配置: %s', userFolder.getName());
+      }
+    } catch (folderMoveError) {
+      warnLog('⚠️ スプレッドシート作成直後の移動に失敗（後で再移動されます）:', folderMoveError.message);
+    }
 
     // スプレッドシートの共有設定を同一ドメイン閲覧可能に設定
     try {
@@ -5330,10 +5356,10 @@ function createCustomFormUI(requestUserId, config) {
             }
 
             if (!isFormAlreadyInFolder) {
-              folder.addFile(formFile);
-              DriveApp.getRootFolder().removeFile(formFile);
+              // 推奨メソッドmoveTo()を使用してファイル移動
+              formFile.moveTo(folder);
               moveResults.form = true;
-              infoLog('✅ カスタムフォームファイル移動完了');
+              infoLog('✅ カスタムフォームファイル移動完了: %s (ID: %s)', folder.getName(), formFile.getId());
             }
           }
         } catch (formMoveError) {
@@ -5356,10 +5382,10 @@ function createCustomFormUI(requestUserId, config) {
             }
 
             if (!isSsAlreadyInFolder) {
-              folder.addFile(ssFile);
-              DriveApp.getRootFolder().removeFile(ssFile);
+              // 推奨メソッドmoveTo()を使用してファイル移動
+              ssFile.moveTo(folder);
               moveResults.spreadsheet = true;
-              infoLog('✅ カスタムスプレッドシートファイル移動完了');
+              infoLog('✅ カスタムスプレッドシートファイル移動完了: %s (ID: %s)', folder.getName(), ssFile.getId());
             }
           }
         } catch (ssMoveError) {
