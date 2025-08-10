@@ -232,11 +232,23 @@ class UnifiedBatchProcessor {
     return resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
-        infoLog('🔧 UnifiedBatchProcessor.batchUpdateSpreadsheet starting:', {
-          spreadsheetId,
-          requestCount: requests.length,
-          timestamp: new Date().toISOString()
-        });
+        
+        // 入力検証
+        if (!service || !spreadsheetId || !requests || requests.length === 0) {
+          throw new Error('Invalid parameters for batchUpdateSpreadsheet');
+        }
+        
+        // 認証トークン事前チェック
+        let token;
+        try {
+          token = getServiceAccountTokenCached();
+          if (!token) {
+            throw new Error('Failed to get service account token');
+          }
+        } catch (tokenError) {
+          errorLog('❌ Authentication failed in batchUpdateSpreadsheet:', tokenError.message);
+          throw new Error('Authentication failed: ' + tokenError.message);
+        }
 
         // バッチサイズ制限適用
         const chunkedRequests = this.chunkArray(requests, this.config.maxBatchSize);
@@ -252,21 +264,24 @@ class UnifiedBatchProcessor {
 
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}:batchUpdate`;
           
-          infoLog('🌐 Making API call to Sheets:', {
-            url,
-            requestBodySize: JSON.stringify(requestBody).length,
-            chunkSize: chunk.length,
-            requestType: chunk[0]?.deleteDimension ? 'DELETE_ROWS' : 'OTHER'
-          });
-          
-          const response = resilientUrlFetch(url, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
-              'Content-Type': 'application/json'
-            },
-            payload: JSON.stringify(requestBody)
-          });
+          let response;
+          try {
+            response = resilientUrlFetch(url, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              payload: JSON.stringify(requestBody)
+            });
+          } catch (fetchError) {
+            errorLog('❌ Failed to make API request to Sheets:', {
+              error: fetchError.message,
+              url: url,
+              requestType: chunk[0]?.deleteDimension ? 'DELETE_ROWS' : 'OTHER'
+            });
+            throw new Error('API request failed: ' + fetchError.message);
+          }
 
           // レスポンスオブジェクトの検証
           if (!response || typeof response.getResponseCode !== 'function') {

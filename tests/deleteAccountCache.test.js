@@ -30,9 +30,27 @@ describe('deleteUserAccount cache handling', () => {
     context.findUserById = jest.fn(() => ({ adminEmail: 'admin@example.com', spreadsheetId: 'userSheet' }));
     context.getSheetsServiceCached = () => ({});
     context.getSpreadsheetsData = () => ({ sheets: [{ properties: { title: 'Users', sheetId: 0 } }] });
-    context.batchGetSheetsData = () => ({ valueRanges: [{ values: [['userId'], ['U1']] }] });
+    // 最初の呼び出しでは削除対象のユーザーを返し、検証時には空の結果を返す
+    let callCount = 0;
+    context.batchGetSheetsData = () => {
+      callCount++;
+      if (callCount === 1) {
+        // 削除前: ユーザーが存在
+        return { valueRanges: [{ values: [['userId'], ['U1']] }] };
+      } else {
+        // 削除後の検証: ユーザーが削除済み
+        return { valueRanges: [{ values: [['userId']] }] };
+      }
+    };
     context.batchUpdateSpreadsheet = jest.fn().mockResolvedValue({});
     context.logAccountDeletion = jest.fn();
+    context.getServiceAccountTokenCached = jest.fn(() => 'mock-token');
+    context.UrlFetchApp = {
+      fetch: jest.fn(() => ({
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ replies: [] })
+      }))
+    };
   });
 
   test('passes database id to invalidateUserCache', async () => {

@@ -1989,61 +1989,19 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  * @returns {object} レスポンス
  */
 function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
-  infoLog('📞 batchUpdateSpreadsheet wrapper called:', {
-    spreadsheetId,
-    requestCount: (requestBody.requests || []).length,
-    hasService: !!service,
-    timestamp: new Date().toISOString()
-  });
-  
   // 統一バッチ処理システムを使用
   const requests = requestBody.requests || [];
   
-  infoLog('🔍 Debug: About to extract requests from requestBody:', {
-    requestBodyType: typeof requestBody,
-    hasRequests: !!(requestBody.requests),
-    requestsLength: requests.length,
-    timestamp: new Date().toISOString()
-  });
-  
-  infoLog('🔄 Calling unifiedBatchProcessor.batchUpdateSpreadsheet:', {
-    requestCount: requests.length,
-    processorExists: typeof unifiedBatchProcessor !== 'undefined',
-    processorType: typeof unifiedBatchProcessor,
-    hasMethod: !!(unifiedBatchProcessor && unifiedBatchProcessor.batchUpdateSpreadsheet)
-  });
-  
   try {
-    infoLog('⏳ About to call unifiedBatchProcessor method...', {
-      methodExists: typeof unifiedBatchProcessor.batchUpdateSpreadsheet,
-      serviceValid: !!service,
-      spreadsheetIdValid: !!spreadsheetId,
-      requestsCount: requests.length
-    });
-    
     const result = unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
       includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse || false,
       responseRanges: requestBody.responseRanges || [],
       invalidateCache: true
     });
     
-    infoLog('✅ unifiedBatchProcessor.batchUpdateSpreadsheet returned:', {
-      resultType: typeof result,
-      isPromise: !!(result && typeof result.then === 'function'),
-      hasSpreadsheetId: !!(result && result.spreadsheetId)
-    });
-    
-    infoLog('🎯 batchUpdateSpreadsheet wrapper completed:', {
-      hasResult: !!result,
-      resultType: typeof result
-    });
-    
     return result;
   } catch (wrapperError) {
-    errorLog('❌ batchUpdateSpreadsheet wrapper error:', {
-      error: wrapperError.message,
-      stack: wrapperError.stack
-    });
+    errorLog('❌ batchUpdateSpreadsheet wrapper error:', wrapperError.message);
     throw wrapperError;
   }
 }
@@ -3368,20 +3326,15 @@ async function deleteUserAccount(userId) {
         throw new Error('データベースに userId フィールドが見つかりません');
       }
       
-      infoLog('🔍 Found userId field at index:', userIdFieldIndex);
-      
       var rowToDelete = -1;
       for (let i = values.length - 1; i >= 1; i--) {
         if (values[i][userIdFieldIndex] === userId) {
           rowToDelete = i + 1; // スプレッドシートは1ベース
-          infoLog('🎯 Found user row to delete:', { index: i, rowToDelete, userId, cellValue: values[i][userIdFieldIndex] });
           break;
         }
       }
 
       if (rowToDelete !== -1) {
-        infoLog('🚀 Starting batchUpdateSpreadsheet:', { rowToDelete, sheetId: targetSheetId, userId });
-
         // 行を削除（正しいsheetIdを使用）
         var deleteRequest = {
           deleteDimension: {
@@ -3394,12 +3347,6 @@ async function deleteUserAccount(userId) {
           }
         };
 
-        infoLog('🔨 Calling batchUpdateSpreadsheet with request:', { 
-          deleteRequest, 
-          dbId, 
-          timestamp: new Date().toISOString() 
-        });
-
         try {
           infoLog('⏳ About to await batchUpdateSpreadsheet...', { timestamp: new Date().toISOString() });
           
@@ -3407,40 +3354,56 @@ async function deleteUserAccount(userId) {
           const startTime = Date.now();
           
           try {
-            const batchResult = await batchUpdateSpreadsheet(service, dbId, {
-              requests: [deleteRequest]
+            // 直接Sheets APIを呼び出し
+            const accessToken = getServiceAccountTokenCached();
+            if (!accessToken) {
+              throw new Error('認証トークンの取得に失敗しました');
+            }
+            
+            const requestBody = {
+              requests: [deleteRequest],
+              includeSpreadsheetInResponse: false,
+              responseRanges: []
+            };
+            
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(dbId)}:batchUpdate`;
+            const response = UrlFetchApp.fetch(url, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              payload: JSON.stringify(requestBody)
             });
             
+            if (response.getResponseCode() !== 200) {
+              const errorText = response.getContentText();
+              throw new Error(`Sheets API error (${response.getResponseCode()}): ${errorText}`);
+            }
+            
+            const result = JSON.parse(response.getContentText());
             const executionTime = Date.now() - startTime;
-            infoLog('✅ batchUpdateSpreadsheet completed successfully:', { 
-              result: batchResult, 
+            
+            infoLog('✅ User deletion completed:', { 
               userId, 
-              rowToDelete, 
-              sheetId: targetSheetId,
-              executionTime: executionTime + 'ms',
-              timestamp: new Date().toISOString()
+              rowDeleted: rowToDelete,
+              executionTime: executionTime + 'ms'
             });
             
-          } catch (awaitError) {
+          } catch (deletionError) {
             const executionTime = Date.now() - startTime;
-            errorLog('💥 batchUpdateSpreadsheet await error:', {
-              error: awaitError.message,
-              stack: awaitError.stack,
-              executionTime: executionTime + 'ms',
-              errorType: typeof awaitError,
+            errorLog('❌ User deletion failed:', {
+              error: deletionError.message,
               userId,
-              timestamp: new Date().toISOString()
+              executionTime: executionTime + 'ms'
             });
-            throw awaitError;
+            throw deletionError;
           }
           
         } catch (batchError) {
-          errorLog('❌ batchUpdateSpreadsheet failed:', {
+          errorLog('❌ Deletion operation failed:', {
             error: batchError.message,
-            stack: batchError.stack,
-            userId,
-            rowToDelete,
-            sheetId: targetSheetId
+            userId
           });
           throw batchError;
         }
@@ -3449,29 +3412,22 @@ async function deleteUserAccount(userId) {
         
         // 削除後の確認: データが実際に消えているかチェック
         try {
-          infoLog('🔍 削除後確認開始: データベースから削除されたかチェック');
           const verifyData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
           const verifyValues = verifyData.valueRanges[0].values || [];
           
-          let stillExists = false;
+          // ユーザーがまだ存在するかチェック
           for (let i = 1; i < verifyValues.length; i++) {
             if (verifyValues[i][userIdFieldIndex] === userId) {
-              stillExists = true;
-              errorLog('❌ 削除後確認失敗: ユーザーがまだデータベースに存在しています', { 
-                userId, 
-                rowIndex: i,
-                cellValue: verifyValues[i][userIdFieldIndex]
-              });
-              break;
+              errorLog('❌ Deletion verification failed: User still exists in database', { userId });
+              throw new Error('削除処理は成功しましたが、ユーザーがまだデータベースに存在しています');
             }
           }
           
-          if (!stillExists) {
-            infoLog('✅ 削除後確認成功: ユーザーがデータベースから正常に削除されました', { userId });
-          }
+          infoLog('✅ Deletion verified: User successfully removed from database', { userId });
           
         } catch (verifyError) {
-          warnLog('⚠️ 削除後確認でエラーが発生しました（削除自体は完了）:', verifyError.message);
+          errorLog('⚠️ Deletion verification error:', verifyError.message);
+          throw verifyError; // 検証失敗は削除失敗として扱う
         }
         
       } else {
