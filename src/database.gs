@@ -3318,19 +3318,19 @@ async function deleteUserAccount(userId) {
         throw new Error('データベースに userId フィールドが見つかりません');
       }
       
-      debugLog('Found userId field at index:', userIdFieldIndex);
+      infoLog('🔍 Found userId field at index:', userIdFieldIndex);
       
       var rowToDelete = -1;
       for (let i = values.length - 1; i >= 1; i--) {
         if (values[i][userIdFieldIndex] === userId) {
           rowToDelete = i + 1; // スプレッドシートは1ベース
-          debugLog('Found user row to delete at index:', i, 'rowToDelete:', rowToDelete);
+          infoLog('🎯 Found user row to delete:', { index: i, rowToDelete, userId, cellValue: values[i][userIdFieldIndex] });
           break;
         }
       }
 
       if (rowToDelete !== -1) {
-        debugLog('Deleting row:', rowToDelete, 'from sheetId:', targetSheetId);
+        infoLog('🚀 Starting batchUpdateSpreadsheet:', { rowToDelete, sheetId: targetSheetId, userId });
 
         // 行を削除（正しいsheetIdを使用）
         var deleteRequest = {
@@ -3344,11 +3344,65 @@ async function deleteUserAccount(userId) {
           }
         };
 
-        await batchUpdateSpreadsheet(service, dbId, {
-          requests: [deleteRequest]
+        infoLog('🔨 Calling batchUpdateSpreadsheet with request:', { 
+          deleteRequest, 
+          dbId, 
+          timestamp: new Date().toISOString() 
         });
 
+        try {
+          const batchResult = await batchUpdateSpreadsheet(service, dbId, {
+            requests: [deleteRequest]
+          });
+          
+          infoLog('✅ batchUpdateSpreadsheet completed successfully:', { 
+            result: batchResult, 
+            userId, 
+            rowToDelete, 
+            sheetId: targetSheetId,
+            timestamp: new Date().toISOString()
+          });
+          
+        } catch (batchError) {
+          errorLog('❌ batchUpdateSpreadsheet failed:', {
+            error: batchError.message,
+            stack: batchError.stack,
+            userId,
+            rowToDelete,
+            sheetId: targetSheetId
+          });
+          throw batchError;
+        }
+
         infoLog('✅ データベースからのユーザー行削除完了:', { userId, rowToDelete, sheetId: targetSheetId });
+        
+        // 削除後の確認: データが実際に消えているかチェック
+        try {
+          infoLog('🔍 削除後確認開始: データベースから削除されたかチェック');
+          const verifyData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+          const verifyValues = verifyData.valueRanges[0].values || [];
+          
+          let stillExists = false;
+          for (let i = 1; i < verifyValues.length; i++) {
+            if (verifyValues[i][userIdFieldIndex] === userId) {
+              stillExists = true;
+              errorLog('❌ 削除後確認失敗: ユーザーがまだデータベースに存在しています', { 
+                userId, 
+                rowIndex: i,
+                cellValue: verifyValues[i][userIdFieldIndex]
+              });
+              break;
+            }
+          }
+          
+          if (!stillExists) {
+            infoLog('✅ 削除後確認成功: ユーザーがデータベースから正常に削除されました', { userId });
+          }
+          
+        } catch (verifyError) {
+          warnLog('⚠️ 削除後確認でエラーが発生しました（削除自体は完了）:', verifyError.message);
+        }
+        
       } else {
         // 削除対象の行が見つからない場合はエラーとして扱う
         const errorMessage = `削除対象のユーザー行が見つかりません。userId: ${userId}`;

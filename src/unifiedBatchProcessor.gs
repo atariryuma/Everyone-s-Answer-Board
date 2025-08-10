@@ -232,9 +232,15 @@ class UnifiedBatchProcessor {
     return resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
+        infoLog('🔧 UnifiedBatchProcessor.batchUpdateSpreadsheet starting:', {
+          spreadsheetId,
+          requestCount: requests.length,
+          timestamp: new Date().toISOString()
+        });
 
         // バッチサイズ制限適用
         const chunkedRequests = this.chunkArray(requests, this.config.maxBatchSize);
+        infoLog('🔀 Chunked requests:', { originalCount: requests.length, chunkCount: chunkedRequests.length });
         let allReplies = [];
 
         for (const chunk of chunkedRequests) {
@@ -245,6 +251,14 @@ class UnifiedBatchProcessor {
           };
 
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}:batchUpdate`;
+          
+          infoLog('🌐 Making API call to Sheets:', {
+            url,
+            requestBodySize: JSON.stringify(requestBody).length,
+            chunkSize: chunk.length,
+            requestType: chunk[0]?.deleteDimension ? 'DELETE_ROWS' : 'OTHER'
+          });
+          
           const response = resilientUrlFetch(url, {
             method: 'POST',
             headers: {
@@ -256,14 +270,27 @@ class UnifiedBatchProcessor {
 
           // レスポンスオブジェクトの検証
           if (!response || typeof response.getResponseCode !== 'function') {
+            errorLog('❌ Invalid response object from resilientUrlFetch');
             throw new Error('BatchUpdateSpreadsheet: 無効なレスポンスオブジェクトが返されました');
           }
           
-          if (response.getResponseCode() !== 200) {
-            throw new Error(`BatchUpdateSpreadsheet failed: ${response.getResponseCode()} - ${response.getContentText()}`);
+          const responseCode = response.getResponseCode();
+          infoLog('📡 API Response received:', { 
+            responseCode, 
+            hasContent: !!response.getContentText 
+          });
+          
+          if (responseCode !== 200) {
+            const errorContent = response.getContentText();
+            errorLog('❌ BatchUpdateSpreadsheet API failed:', { responseCode, errorContent });
+            throw new Error(`BatchUpdateSpreadsheet failed: ${responseCode} - ${errorContent}`);
           }
 
           const chunkResult = JSON.parse(response.getContentText());
+          infoLog('✅ Chunk processed successfully:', { 
+            repliesCount: (chunkResult.replies || []).length,
+            chunkIndex: chunkedRequests.indexOf(chunk)
+          });
           allReplies = allReplies.concat(chunkResult.replies || []);
 
           // チャンク間の遅延
@@ -279,7 +306,16 @@ class UnifiedBatchProcessor {
         // キャッシュ無効化
         if (invalidateCache) {
           this.invalidateCacheForSpreadsheet(spreadsheetId);
+          infoLog('🗑️ Cache invalidated for spreadsheet:', spreadsheetId);
         }
+
+        const executionTime = Date.now() - startTime;
+        infoLog('🎉 UnifiedBatchProcessor.batchUpdateSpreadsheet completed:', {
+          spreadsheetId,
+          totalReplies: allReplies.length,
+          executionTime: executionTime + 'ms',
+          timestamp: new Date().toISOString()
+        });
 
         return {
           spreadsheetId: spreadsheetId,
