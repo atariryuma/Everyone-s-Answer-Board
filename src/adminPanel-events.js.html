@@ -66,7 +66,7 @@ function setupEventListeners() {
   // Unpublish button
   if (elements['unpublish-board-btn']) {
     elements['unpublish-board-btn'].addEventListener('click', function() {
-      showConfirmationModal(
+      showStopConfirmationModal(
         '公開停止の確認',
         '回答ボードの公開を停止しますか？',
         function() {
@@ -99,7 +99,7 @@ function setupEventListeners() {
       console.log('🗑️ 履歴クリアボタンがクリックされました');
       
         if (typeof showConfirmationModal === 'function') {
-          showConfirmationModal(
+          showHistoryClearConfirmationModal(
             '履歴削除の確認',
             'すべての履歴を削除しますか？この操作は取り消せません。',
             async function() {
@@ -244,7 +244,7 @@ function setupEventListeners() {
         console.log('🛑 公開停止処理を開始します...');
         
         // 公開停止の確認ダイアログを表示
-        window.sharedModals.showConfirmation(
+        showStopConfirmationModal(
           '公開停止の確認',
           '現在公開中のボードを停止してから、カスタムフォームを作成します。よろしいですか？',
           function() {
@@ -689,6 +689,104 @@ function handleDeleteRequest() {
         });
     }
   );
+}
+
+/**
+ * Show history clear confirmation modal with appropriate button text
+ * @param {string} title - Modal title
+ * @param {string} message - Modal message
+ * @param {Function} onConfirm - Confirmation callback
+ */
+function showHistoryClearConfirmationModal(title, message, onConfirm) {
+  const modal = document.getElementById('confirmation-modal');
+  const titleElement = document.getElementById('modal-title');
+  const messageElement = document.getElementById('modal-message');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  
+  if (modal && titleElement && messageElement && confirmBtn && cancelBtn) {
+    titleElement.textContent = title;
+    messageElement.textContent = message;
+    confirmBtn.textContent = '削除する';
+    cancelBtn.textContent = 'キャンセル';
+    
+    // Set up event handlers
+    const handleConfirm = () => {
+      modal.classList.add('hidden');
+      onConfirm();
+      cleanup();
+    };
+    
+    const handleCancel = () => {
+      modal.classList.add('hidden');
+      cleanup();
+    };
+    
+    const cleanup = () => {
+      confirmBtn.removeEventListener('click', handleConfirm);
+      cancelBtn.removeEventListener('click', handleCancel);
+    };
+    
+    confirmBtn.addEventListener('click', handleConfirm);
+    cancelBtn.addEventListener('click', handleCancel);
+    
+    // Show modal
+    modal.classList.remove('hidden');
+  } else {
+    console.warn('⚠️ Modal elements not found, using fallback');
+    if (confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+  }
+}
+
+/**
+ * Show stop/unpublish confirmation modal with appropriate button text
+ * @param {string} title - Modal title
+ * @param {string} message - Modal message
+ * @param {Function} onConfirm - Confirmation callback
+ */
+function showStopConfirmationModal(title, message, onConfirm) {
+  const modal = document.getElementById('confirmation-modal');
+  const titleElement = document.getElementById('modal-title');
+  const messageElement = document.getElementById('modal-message');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  
+  if (modal && titleElement && messageElement && confirmBtn && cancelBtn) {
+    titleElement.textContent = title;
+    messageElement.textContent = message;
+    confirmBtn.textContent = '停止する';
+    cancelBtn.textContent = 'キャンセル';
+    
+    // Set up event handlers
+    const handleConfirm = () => {
+      modal.classList.add('hidden');
+      onConfirm();
+      cleanup();
+    };
+    
+    const handleCancel = () => {
+      modal.classList.add('hidden');
+      cleanup();
+    };
+    
+    const cleanup = () => {
+      confirmBtn.removeEventListener('click', handleConfirm);
+      cancelBtn.removeEventListener('click', handleCancel);
+    };
+    
+    confirmBtn.addEventListener('click', handleConfirm);
+    cancelBtn.addEventListener('click', handleCancel);
+    
+    // Show modal
+    modal.classList.remove('hidden');
+  } else {
+    console.warn('⚠️ Modal elements not found, using fallback');
+    if (confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+  }
 }
 
 // Switch to another account

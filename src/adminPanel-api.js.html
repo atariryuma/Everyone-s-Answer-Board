@@ -2189,10 +2189,14 @@ function unpublishBoard() {
     try {
       logDebug('Creating QuickStart history entry:', quickStartResult);
       
-      // Extract question text from QuickStart config
+      // Extract question text from QuickStart config with better fallback
       const questionText = (quickStartResult.config && quickStartResult.config.opinionHeader) ||
                           (quickStartResult.config && quickStartResult.config.opinionColumn) ||
-                          'クイックスタート - あなたの考えや気づいたことを教えてください';
+                          (quickStartResult.config && quickStartResult.config.reasonHeader) ||
+                          (quickStartResult.config && quickStartResult.config.nameHeader) ||
+                          '質問が作成されました';
+      
+      console.log('📝 QuickStart question text extracted:', questionText);
       
       // Use completion time as both creation and publication time for QuickStart
       const completedAt = quickStartResult.completedAt || new Date().toISOString();
@@ -2240,7 +2244,32 @@ function unpublishBoard() {
         // Additional metadata
         activeSheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName,
         spreadsheetId: quickStartResult.spreadsheetId || '',
-        configurationComplete: true // QuickStart always completes configuration
+        configurationComplete: true, // QuickStart always completes configuration
+        
+        // Enhanced snapshot data for better restoration
+        configSnapshot: {
+          opinionHeader: (quickStartResult.config && quickStartResult.config.opinionHeader) || '',
+          nameHeader: (quickStartResult.config && quickStartResult.config.nameHeader) || '',
+          classHeader: (quickStartResult.config && quickStartResult.config.classHeader) || '',
+          reasonHeader: (quickStartResult.config && quickStartResult.config.reasonHeader) || '',
+          showNames: quickStartResult.showNames || false,
+          showCounts: quickStartResult.showCounts !== undefined ? quickStartResult.showCounts : true,
+          _source: 'quickstart',
+          _createdAt: completedAt
+        },
+        
+        headerSnapshot: {
+          allHeaders: quickStartResult.config ? Object.values(quickStartResult.config).filter(v => typeof v === 'string') : [],
+          mainQuestion: questionText,
+          criticalHeaders: {
+            opinionHeader: (quickStartResult.config && quickStartResult.config.opinionHeader) || '',
+            nameHeader: (quickStartResult.config && quickStartResult.config.nameHeader) || '',
+            classHeader: (quickStartResult.config && quickStartResult.config.classHeader) || '',
+            reasonHeader: (quickStartResult.config && quickStartResult.config.reasonHeader) || ''
+          },
+          _source: 'quickstart',
+          _createdAt: completedAt
+        }
       };
       
       // Save QuickStart history entry using unified localStorage mechanism

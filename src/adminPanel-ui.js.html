@@ -1203,35 +1203,70 @@ function updateTopicText(status) {
   // より包括的なconfig取得
   let cfg = status.config || {};
   
+  console.log('🔍 updateTopicText: status:', status);
+  
   // userInfo.configJsonからも情報を取得
   if (status.userInfo && status.userInfo.configJson) {
     try {
       const fullConfig = JSON.parse(status.userInfo.configJson);
       cfg = Object.assign({}, cfg, fullConfig);
+      console.log('📋 updateTopicText: merged config:', cfg);
     } catch (e) {
       console.warn('Failed to parse userInfo.configJson:', e);
+    }
+  }
+  
+  // publishedSheetNameに基づいてsheet-specific configを取得
+  if (status.userInfo && cfg.publishedSheetName) {
+    const sheetConfigKey = `sheet_${cfg.publishedSheetName}`;
+    if (cfg[sheetConfigKey] && cfg[sheetConfigKey].opinionHeader) {
+      topic = cfg[sheetConfigKey].opinionHeader;
+      console.log(`✅ Topic found from sheet config (${sheetConfigKey}):`, topic);
+    } else {
+      console.warn(`⚠️ No opinion header found in sheet config: ${sheetConfigKey}`, cfg[sheetConfigKey]);
     }
   }
 
   if (status.customFormInfo && status.customFormInfo.mainQuestion) {
     topic = status.customFormInfo.mainQuestion;
+    console.log('✅ Topic from customFormInfo:', topic);
   } else if (cfg.opinionHeader) {
     topic = cfg.opinionHeader;
+    console.log('✅ Topic from cfg.opinionHeader:', topic);
   } else {
     const sheetName = cfg.publishedSheetName || status.publishedSheetName;
-    if (sheetName) {
+    console.log('🔍 Looking for topic in sheet config, sheetName:', sheetName);
+    
+    if (sheetName && sheetName !== 'フォームの回答 1') {
       if (status.userInfo && status.userInfo.configJson) {
         try {
           const fullCfg = JSON.parse(status.userInfo.configJson);
           const sheetCfg = fullCfg['sheet_' + (sheetName || '')] || {};
+          console.log('📋 Sheet config found:', sheetCfg);
           
           // guessedConfig内のopinionHeaderを優先
           if (sheetCfg.guessedConfig && sheetCfg.guessedConfig.opinionHeader) {
             topic = sheetCfg.guessedConfig.opinionHeader;
+            console.log('✅ Topic from guessedConfig:', topic);
           } else if (sheetCfg.opinionHeader) {
             // フォールバック: 直接のopinionHeader
             topic = sheetCfg.opinionHeader;
+            console.log('✅ Topic from direct opinionHeader:', topic);
           } else {
+            console.warn('⚠️ No opinion header found in sheet config, trying alternatives');
+            // Try alternative headers
+            const alternativeHeaders = ['reasonHeader', 'nameHeader', 'classHeader'];
+            for (const header of alternativeHeaders) {
+              if (sheetCfg.guessedConfig && sheetCfg.guessedConfig[header]) {
+                topic = sheetCfg.guessedConfig[header];
+                console.log(`✅ Topic from alternative header (${header}):`, topic);
+                break;
+              } else if (sheetCfg[header]) {
+                topic = sheetCfg[header];
+                console.log(`✅ Topic from direct alternative header (${header}):`, topic);
+                break;
+              }
+            }
             // シート名ではなく、適切なデフォルトメッセージを表示
             topic = '（質問文が設定されていません）';
           }
