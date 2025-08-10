@@ -1989,13 +1989,41 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  * @returns {object} レスポンス
  */
 function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
+  infoLog('📞 batchUpdateSpreadsheet wrapper called:', {
+    spreadsheetId,
+    requestCount: (requestBody.requests || []).length,
+    hasService: !!service,
+    timestamp: new Date().toISOString()
+  });
+  
   // 統一バッチ処理システムを使用
   const requests = requestBody.requests || [];
-  return  unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
-    includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse || false,
-    responseRanges: requestBody.responseRanges || [],
-    invalidateCache: true
+  
+  infoLog('🔄 Calling unifiedBatchProcessor.batchUpdateSpreadsheet:', {
+    requestCount: requests.length,
+    processorExists: typeof unifiedBatchProcessor !== 'undefined'
   });
+  
+  try {
+    const result = unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
+      includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse || false,
+      responseRanges: requestBody.responseRanges || [],
+      invalidateCache: true
+    });
+    
+    infoLog('🎯 batchUpdateSpreadsheet wrapper completed:', {
+      hasResult: !!result,
+      resultType: typeof result
+    });
+    
+    return result;
+  } catch (wrapperError) {
+    errorLog('❌ batchUpdateSpreadsheet wrapper error:', {
+      error: wrapperError.message,
+      stack: wrapperError.stack
+    });
+    throw wrapperError;
+  }
 }
 
 /**
