@@ -4605,7 +4605,8 @@ class StudyQuestApp {
       
       const reasonText = document.createElement('p');
       reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-      reasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
+      // 空の場合はプレースホルダーを出さず、表示自体をスキップ
+      reasonText.textContent = (safeData.reason || '').trim();
       
       contentDiv.appendChild(opinionTitle);
       
@@ -4617,30 +4618,33 @@ class StudyQuestApp {
         reasonTextElement: !!reasonText
       });
       
-      // 理由テキストを常に追加（空の場合はプレースホルダー表示）
-      console.log('✅ 理由テキストを追加します:', safeData.reason || '（空の理由）');
+      // 理由テキストが空でない場合のみ追加
+      const shouldAddReason = !!(reasonText.textContent && reasonText.textContent.trim());
+      console.log('✅ 理由テキストの追加判定:', shouldAddReason ? '追加' : '未追加（空）');
       try {
         // 理由テキストの有効性を検証
-        if (reasonText && reasonText.textContent) {
+        if (shouldAddReason) {
           contentDiv.appendChild(reasonText);
           console.log('✅ 理由テキスト追加完了（既存要素使用）');
         } else {
-          // 理由テキスト要素の再作成が必要な場合
-          const newReasonText = document.createElement('p');
-          newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-          newReasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
-          contentDiv.appendChild(newReasonText);
-          console.log('✅ 理由テキスト追加完了（新規要素作成）');
+          // 何もしない（空の理由は表示しない）
+          console.log('ℹ️ 理由テキストは空のため追加しません');
         }
       } catch (reasonError) {
         // 理由テキスト追加でエラーが発生した場合の回復処理
         console.warn('createAnswerCard: Reason text append error, attempting recovery:', reasonError);
         try {
-          const fallbackReasonText = document.createElement('p');
-          fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-          fallbackReasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
-          contentDiv.appendChild(fallbackReasonText);
-          console.log('✅ 理由テキスト追加完了（フォールバック）');
+          // フォールバックでも空の場合は追加しない
+          const fallbackText = (safeData.reason || '').trim();
+          if (fallbackText) {
+            const fallbackReasonText = document.createElement('p');
+            fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+            fallbackReasonText.textContent = fallbackText;
+            contentDiv.appendChild(fallbackReasonText);
+            console.log('✅ 理由テキスト追加完了（フォールバック）');
+          } else {
+            console.log('ℹ️ フォールバックでも理由は空のため追加しません');
+          }
         } catch (fallbackError) {
           console.error('createAnswerCard: Failed to add reason text even with fallback:', fallbackError);
           // 理由テキストが追加できない場合でもカード生成は継続

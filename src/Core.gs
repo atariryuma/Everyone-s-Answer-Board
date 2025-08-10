@@ -1895,8 +1895,8 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
       opinionValue = row.opinion;
     }
 
-    if (!finalReasonValue && row.reason) {
-      // フォールバック: processedRowから取得
+    // フォールバックは「理由列がマッピングできない場合」のみに限定する
+    if ((reasonIndex === undefined || reasonIndex === null) && !finalReasonValue && row.reason) {
       finalReasonValue = row.reason;
     }
 
