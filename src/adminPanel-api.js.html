@@ -4007,13 +4007,7 @@ async function handleCustomSetup(config) {
     if (result.folderUrl) {
       console.log('📁 フォルダURL確認:', result.folderUrl);
       
-      // フォルダリンクの表示更新
-      const folderLinkElements = document.querySelectorAll('[data-folder-url], .folder-url-link, #folder-link');
-      folderLinkElements.forEach(element => {
-        element.href = result.folderUrl;
-        element.textContent = 'フォルダを開く';
-        element.style.display = 'inline-block';
-      });
+      // フォルダリンク機能は削除されました
     }
     
     // 管理パネルの状態表示を更新

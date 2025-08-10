@@ -3871,51 +3871,10 @@ function formatDateTime(date) {
   }
 }
 
-// 新しいリソースボタンを更新する関数
+// リソースボタンを更新する関数 (フォルダ機能は削除済み)
 function updateNewResourceButtons(resourceUrls) {
-  const folderBtn = document.getElementById('open-folder-btn');
-
-  // 複数のソースからフォルダURLを取得を試行
-  let folderUrl = resourceUrls.folder;
-  
-  // フォルダURLが見つからない場合、他のソースを確認
-  if (!folderUrl) {
-    // configJsonから直接取得を試行
-    const config = window.configJson || (window.AdminPanel && window.AdminPanel.status && window.AdminPanel.status.config);
-    if (config) {
-      folderUrl = config.folderUrl || (config.folderId && ('https://drive.google.com/drive/folders/' + String(config.folderId || '')));
-    }
-    
-    // フォルダIDから直接URLを構築
-    if (!folderUrl && config && config.folderId) {
-      folderUrl = 'https://drive.google.com/drive/folders/' + String(config.folderId || '');
-      console.log('📁 Folder URL constructed from folderId:', folderUrl);
-    }
-  }
-  
-  // フォルダボタンの有効化
-  if (folderBtn) {
-    folderBtn.disabled = false;
-    folderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    if (folderUrl) {
-      folderBtn.onclick = () => {
-        console.log('📁 Opening folder URL:', folderUrl);
-        const link = document.createElement('a');
-        link.href = folderUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      };
-      folderBtn.title = 'ドライブフォルダを開く';
-      console.log('✅ Folder button enabled with URL:', folderUrl);
-    } else {
-      folderBtn.onclick = () => showMessage('フォルダURLが未設定です', 'warning');
-      folderBtn.title = 'フォルダURLが未設定です';
-      console.log('⚠️ Folder button enabled - no URL available');
-    }
-  }
+  // ドライブフォルダ機能は削除されました
+  console.log('📊 Resource URLs updated:', resourceUrls);
 }
 
 // 初期化は adminPanel-core.js の統合初期化システムで管理されます
