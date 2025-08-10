@@ -2328,6 +2328,15 @@ function invalidateUserCacheTransaction(userId, userEmail, spreadsheetId) {
         }
       });
 
+      // 回答ボードの公開データ・シートデータのユーザー別キャッシュをパターンで無効化
+      try {
+        cacheManager.clearByPattern(`publishedData_${userId}_`, { strict: false, maxKeys: 200 });
+        cacheManager.clearByPattern(`sheetData_${userId}_`, { strict: false, maxKeys: 200 });
+        cacheManager.clearByPattern(`config_v3_${userId}_`, { strict: false, maxKeys: 200 });
+      } catch (patternErr) {
+        warnLog('invalidateUserCacheTransaction: user-scoped pattern clear failed:', patternErr.message);
+      }
+
       // スプレッドシート関連のキーを無効化
       if (spreadsheetId) {
         try {

@@ -976,6 +976,15 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSprea
   if (userId) {
     keysToRemove.push('user_' + userId);
     keysToRemove.push('unified_user_info_' + userId);
+    // 回答ボードの表示データ・シートデータのユーザー別キャッシュを確実に無効化
+    try {
+      cacheManager.clearByPattern(`publishedData_${userId}_`, { strict: false, maxKeys: 200 });
+      cacheManager.clearByPattern(`sheetData_${userId}_`, { strict: false, maxKeys: 200 });
+      // 設定キャッシュ（シート名と紐づく）もユーザー単位でクリア
+      cacheManager.clearByPattern(`config_v3_${userId}_`, { strict: false, maxKeys: 200 });
+    } catch (e) {
+      warnLog('invalidateUserCache: user-scoped pattern clear failed:', e.message);
+    }
   }
   if (email) {
     keysToRemove.push('email_' + email);
@@ -1549,4 +1558,3 @@ CacheManager.prototype.getConfig = function(key, valueFn, options = {}) {
   
   return this.get(key, valueFn, { ttl, enableMemoization, usePropertiesFallback });
 };
-
