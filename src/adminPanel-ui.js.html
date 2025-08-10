@@ -3089,6 +3089,28 @@ function createHistoryTableRow(item, index) {
     : 'hover:bg-gray-700/30 cursor-pointer transition-colors';
   
   row.onclick = () => selectHistoryItem(item.id);
+  // Change behavior: ask user via confirmation modal before applying history
+  row.onclick = () => {
+    try {
+      const question = item.questionText || item.sheetName || 'この履歴';
+      const truncated = question.length > 40 ? (question.substring(0, 40) + '...') : question;
+      const published = item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未設定';
+      const message = `「${truncated}」の設定を管理パネルに読み込みます。\n現在の未保存の設定は上書きされる可能性があります。\n\n公開日時: ${published}`;
+
+      if (typeof window.showConfirmationModal === 'function') {
+        window.showConfirmationModal('履歴の設定を読み込みますか？', message, () => {
+          selectHistoryItem(item.id);
+        });
+      } else {
+        if (confirm('履歴の設定を読み込みますか？\n\n' + message)) {
+          selectHistoryItem(item.id);
+        }
+      }
+    } catch (e) {
+      console.warn('History click confirmation failed, proceeding without modal:', e);
+      selectHistoryItem(item.id);
+    }
+  };
   
   const formatDateTime = (dateString) => {
     if (!dateString) return '<span class="text-gray-500 text-xs">未設定</span>';

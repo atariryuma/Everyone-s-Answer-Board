@@ -892,6 +892,90 @@ window.showMessage = function(message, type = 'info', duration = 5000) {
 };
 
 // =============================================================================
+// CONFIRMATION MODAL HELPER
+// =============================================================================
+
+// Unified confirmation modal function.
+// Falls back to window.confirm() if the modal DOM is unavailable.
+window.showConfirmationModal = function(title, message, onConfirm, onCancel, options = {}) {
+  try {
+    const modal = document.getElementById('confirmation-modal');
+    const hasModal = !!modal;
+
+    if (!hasModal) {
+      // Fallback to native confirm
+      const ok = window.confirm((title ? title + '\n\n' : '') + (message || 'この操作を実行しますか？'));
+      if (ok) { if (typeof onConfirm === 'function') onConfirm(); }
+      else { if (typeof onCancel === 'function') onCancel(); }
+      return;
+    }
+
+    const titleEl = modal.querySelector('#modal-title');
+    const msgEl = modal.querySelector('#modal-message');
+    const cancelBtn = modal.querySelector('#modal-cancel-btn');
+    const confirmBtn = modal.querySelector('#modal-confirm-btn');
+
+    if (titleEl) titleEl.textContent = title || '確認';
+    if (msgEl) msgEl.textContent = message || '';
+
+    // Show modal
+    modal.classList.remove('hidden');
+
+    // Focus management
+    const defaultAction = options.defaultAction === 'confirm' ? 'confirm' : 'cancel';
+    setTimeout(() => {
+      try {
+        (defaultAction === 'confirm' ? confirmBtn : cancelBtn)?.focus();
+      } catch (_) {}
+    }, 0);
+
+    // Cleanup helper
+    const cleanup = () => {
+      try {
+        modal.classList.add('hidden');
+        document.removeEventListener('keydown', onKeydown);
+        cancelBtn?.removeEventListener('click', onCancelClick);
+        confirmBtn?.removeEventListener('click', onConfirmClick);
+      } catch (e) {
+        console.warn('Confirmation modal cleanup error:', e);
+      }
+      // Restore focus if provided
+      if (options.restoreFocus && typeof options.restoreFocus.focus === 'function') {
+        try { options.restoreFocus.focus(); } catch (_) {}
+      }
+    };
+
+    const onCancelClick = () => {
+      cleanup();
+      if (typeof onCancel === 'function') onCancel();
+    };
+
+    const onConfirmClick = () => {
+      cleanup();
+      if (typeof onConfirm === 'function') onConfirm();
+    };
+
+    const onKeydown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancelClick();
+      }
+    };
+
+    // Wire listeners (once per show)
+    cancelBtn?.addEventListener('click', onCancelClick, { once: true });
+    confirmBtn?.addEventListener('click', onConfirmClick, { once: true });
+    document.addEventListener('keydown', onKeydown, { once: true });
+
+  } catch (e) {
+    console.warn('showConfirmationModal error:', e);
+    const ok = window.confirm((title ? title + '\n\n' : '') + (message || 'この操作を実行しますか？'));
+    if (ok) { if (typeof onConfirm === 'function') onConfirm(); }
+    else { if (typeof onCancel === 'function') onCancel(); }
+  }
+};
+
+// =============================================================================
 // UNIFIED LOADING MANAGER - Centralized loading overlay management
 // =============================================================================
 
