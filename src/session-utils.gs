@@ -57,9 +57,13 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
     // ユーザーキャッシュを全面クリア（API修正版）
     if (userCache) {
       try {
-        // GAS API仕様に合わせて引数なしで全キャッシュクリア
-        userCache.removeAll();
-        debugLog('ユーザーキャッシュ全クリア完了');
+        if (typeof userCache.removeAll === 'function') {
+          userCache.removeAll();
+          debugLog('ユーザーキャッシュ全クリア完了');
+        } else {
+          // removeAll未提供の環境。キー列挙ができないためスキップ
+          warnLog('UserCache.removeAll は未サポート。スキップします');
+        }
       } catch (cacheError) {
         warnLog('ユーザーキャッシュクリア中のエラー: ' + cacheError.message);
       }
@@ -101,8 +105,21 @@ function resetUserAuthentication() {
 
     const scriptCache = getResilientScriptCache();
     if (scriptCache) {
-      scriptCache.removeAll(); // GAS API仕様に合わせて引数なし
-      debugLog('スクリプトキャッシュをクリアしました。');
+      if (typeof scriptCache.removeAll === 'function') {
+        scriptCache.removeAll();
+        debugLog('スクリプトキャッシュをクリアしました。');
+      } else {
+        // 既知のキーのみ削除（全消去APIは未提供）
+        try {
+          const email = getCurrentUserEmail();
+          ['config_v3_', 'user_', 'email_'].forEach(function(prefix) {
+            scriptCache.remove(prefix + email);
+          });
+          debugLog('スクリプトキャッシュ: 既知のキーを削除しました');
+        } catch (e) {
+          warnLog('スクリプトキャッシュのキー削除に失敗: ' + e.message);
+        }
+      }
     }
 
     // PropertiesServiceもクリアする（LAST_ACCESS_EMAILなど）
@@ -141,14 +158,30 @@ function forceLogoutAndRedirectToLogin() {
       debugLog('🧹 キャッシュクリア開始...');
       const userCache = getResilientCacheService();
       if (userCache) {
-        userCache.removeAll(); // GAS API仕様に合わせて引数なし
-        debugLog('✅ ユーザーキャッシュクリア完了');
+        if (typeof userCache.removeAll === 'function') {
+          userCache.removeAll();
+          debugLog('✅ ユーザーキャッシュクリア完了');
+        } else {
+          warnLog('UserCache.removeAll は未サポート。スキップします');
+        }
       }
 
       const scriptCache = getResilientScriptCache();
       if (scriptCache) {
-        scriptCache.removeAll(); // GAS API仕様に合わせて引数なし
-        debugLog('✅ スクリプトキャッシュクリア完了');
+        if (typeof scriptCache.removeAll === 'function') {
+          scriptCache.removeAll();
+          debugLog('✅ スクリプトキャッシュクリア完了');
+        } else {
+          try {
+            const email = getCurrentUserEmail();
+            ['config_v3_', 'user_', 'email_'].forEach(function(prefix) {
+              scriptCache.remove(prefix + email);
+            });
+            debugLog('スクリプトキャッシュ: 既知のキーを削除しました');
+          } catch (e) {
+            warnLog('スクリプトキャッシュのキー削除に失敗: ' + e.message);
+          }
+        }
       }
 
       const props = getResilientPropertiesService();
@@ -353,7 +386,6 @@ function detectAccountSwitch(currentEmail) {
     };
   }
 }
-
 
 
 
