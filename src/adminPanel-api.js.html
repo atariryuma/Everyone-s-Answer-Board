@@ -2036,21 +2036,76 @@ function unpublishBoard() {
       
       // Create configuration snapshot for restoration
       const createConfigSnapshot = () => {
-        return {
-          opinionHeader: config.opinionHeader || '',
-          nameHeader: config.nameHeader || '',
-          classHeader: config.classHeader || '',
-          reasonHeader: config.reasonHeader || ''
+        // Get actual values from UI elements (primary source)
+        const getUIValue = (elementId) => {
+          const element = document.getElementById(elementId);
+          return element ? element.value || '' : '';
         };
+        
+        // Try multiple sources: UI elements first, then config, then fallbacks
+        const opinionHeader = getUIValue('opinionHeader') || 
+                             getUIValue('opinion-column') || 
+                             config.opinionHeader || '';
+        const nameHeader = getUIValue('name-column') || 
+                          config.nameHeader || '';
+        const classHeader = getUIValue('class-column') || 
+                           config.classHeader || '';
+        const reasonHeader = getUIValue('reason-column') || 
+                            config.reasonHeader || '';
+        
+        const snapshot = {
+          opinionHeader: opinionHeader,
+          nameHeader: nameHeader,
+          classHeader: classHeader,
+          reasonHeader: reasonHeader,
+          // Add display settings for complete restoration
+          showNames: document.getElementById('show-names') ? document.getElementById('show-names').checked : false,
+          showCounts: document.getElementById('show-counts') ? document.getElementById('show-counts').checked : true,
+          // Store current state for debugging
+          _createdAt: new Date().toISOString(),
+          _source: 'UI_elements_primary'
+        };
+        
+        console.log('📝 ConfigSnapshot created:', snapshot);
+        return snapshot;
       };
       
       // Create header snapshot for restoration
       const createHeaderSnapshot = () => {
         const allHeaders = (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [];
-        return {
-          allHeaders: allHeaders,
-          mainQuestion: questionText
+        
+        // Enhanced header snapshot with current selections
+        const getCurrentSelections = () => {
+          const selections = {};
+          const headerElements = ['opinionHeader', 'opinion-column', 'name-column', 'class-column', 'reason-column'];
+          
+          headerElements.forEach(elementId => {
+            const element = document.getElementById(elementId);
+            if (element && element.value) {
+              selections[elementId] = element.value;
+            }
+          });
+          
+          return selections;
         };
+        
+        const snapshot = {
+          allHeaders: allHeaders,
+          mainQuestion: questionText,
+          currentSelections: getCurrentSelections(),
+          // Store critical configuration for restoration validation
+          criticalHeaders: {
+            opinionHeader: config.opinionHeader || '',
+            nameHeader: config.nameHeader || '',
+            classHeader: config.classHeader || '',
+            reasonHeader: config.reasonHeader || ''
+          },
+          _createdAt: new Date().toISOString(),
+          _headersCount: allHeaders.length
+        };
+        
+        console.log('📋 HeaderSnapshot created:', snapshot);
+        return snapshot;
       };
       
       // Create history entry with restoration data

@@ -3114,26 +3114,12 @@ function createHistoryTableRow(item, index) {
     ? 'hover:bg-green-700/20 cursor-pointer transition-colors bg-green-900/10' 
     : 'hover:bg-gray-700/30 cursor-pointer transition-colors';
   
-  row.onclick = () => selectHistoryItem(item.id);
-  // Change behavior: ask user via confirmation modal before applying history
+  // Enhanced history click with detailed preview modal
   row.onclick = () => {
     try {
-      const question = item.questionText || item.sheetName || 'この履歴';
-      const truncated = question.length > 40 ? (question.substring(0, 40) + '...') : question;
-      const published = item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未設定';
-      const message = `「${truncated}」の設定を管理パネルに読み込みます。\n現在の未保存の設定は上書きされる可能性があります。\n\n公開日時: ${published}`;
-
-      if (typeof window.showConfirmationModal === 'function') {
-        window.showConfirmationModal('履歴の設定を読み込みますか？', message, () => {
-          selectHistoryItem(item.id);
-        });
-      } else {
-        if (confirm('履歴の設定を読み込みますか？\n\n' + message)) {
-          selectHistoryItem(item.id);
-        }
-      }
+      showHistoryRestorationPreview(item);
     } catch (e) {
-      console.warn('History click confirmation failed, proceeding without modal:', e);
+      console.warn('History click preview failed, proceeding with basic confirmation:', e);
       selectHistoryItem(item.id);
     }
   };
@@ -3253,6 +3239,306 @@ function createHistoryTableRow(item, index) {
 }
 
 /**
+ * Enhanced history restoration preview modal
+ * @param {Object} item - History item to preview
+ */
+function showHistoryRestorationPreview(item) {
+  try {
+    console.log('🔍 Showing history restoration preview:', item);
+    
+    // Extract preview information
+    const question = item.questionText || item.sheetName || 'この履歴';
+    const truncated = question.length > 50 ? (question.substring(0, 50) + '...') : question;
+    const published = item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未設定';
+    const status = item.isActive ? '公開中' : '終了';
+    const statusIcon = item.isActive ? '🌐' : '⏹️';
+    
+    // Get configuration preview
+    const configPreview = getConfigurationPreview(item);
+    const headerPreview = getHeaderPreview(item);
+    
+    // Build detailed message
+    const detailsHtml = `
+      <div class="space-y-4">
+        <div class="bg-gray-800/50 rounded-lg p-3">
+          <h4 class="text-sm font-semibold text-cyan-400 mb-2">📋 復元される設定内容</h4>
+          <div class="text-xs text-gray-300 space-y-1">
+            <div><span class="text-gray-400">質問:</span> ${truncated}</div>
+            <div><span class="text-gray-400">公開日時:</span> ${published}</div>
+            <div><span class="text-gray-400">状態:</span> ${statusIcon} ${status}</div>
+          </div>
+        </div>
+        
+        ${configPreview ? `
+        <div class="bg-blue-900/20 rounded-lg p-3">
+          <h4 class="text-sm font-semibold text-blue-400 mb-2">⚙️ 列設定</h4>
+          <div class="text-xs text-gray-300">${configPreview}</div>
+        </div>
+        ` : ''}
+        
+        ${headerPreview ? `
+        <div class="bg-green-900/20 rounded-lg p-3">
+          <h4 class="text-sm font-semibold text-green-400 mb-2">📊 利用可能ヘッダー</h4>
+          <div class="text-xs text-gray-300">${headerPreview}</div>
+        </div>
+        ` : ''}
+        
+        <div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+          <p class="text-xs text-yellow-200">
+            ⚠️ この操作により、現在の未保存の設定は上書きされます。
+          </p>
+        </div>
+      </div>
+    `;
+    
+    // Show enhanced confirmation modal
+    if (typeof window.showConfirmationModal === 'function') {
+      // Create a custom modal for detailed preview
+      showDetailedHistoryModal(truncated, detailsHtml, () => {
+        console.log('✅ User confirmed history restoration');
+        selectHistoryItem(item.id);
+      });
+    } else {
+      // Fallback to basic confirmation
+      const basicMessage = `「${truncated}」の設定を復元します。\n\n公開日時: ${published}\n状態: ${status}\n\n現在の未保存の設定は上書きされます。`;
+      if (confirm(basicMessage)) {
+        selectHistoryItem(item.id);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ History preview failed:', error);
+    // Fallback to direct restoration
+    selectHistoryItem(item.id);
+  }
+}
+
+/**
+ * Get configuration preview text
+ * @param {Object} item - History item
+ * @returns {string} Configuration preview HTML
+ */
+function getConfigurationPreview(item) {
+  try {
+    const config = item.configSnapshot || item.config || {};
+    const settings = [];
+    
+    if (config.opinionHeader) settings.push(`意見欄: ${config.opinionHeader}`);
+    if (config.nameHeader) settings.push(`名前欄: ${config.nameHeader}`);
+    if (config.classHeader) settings.push(`クラス欄: ${config.classHeader}`);
+    if (config.reasonHeader) settings.push(`理由欄: ${config.reasonHeader}`);
+    
+    // Display settings
+    if (config.showNames !== undefined) settings.push(`名前表示: ${config.showNames ? 'ON' : 'OFF'}`);
+    if (config.showCounts !== undefined) settings.push(`カウント表示: ${config.showCounts ? 'ON' : 'OFF'}`);
+    
+    return settings.length > 0 ? settings.join('<br>') : '設定情報なし';
+  } catch (error) {
+    console.warn('Config preview failed:', error);
+    return '設定プレビューエラー';
+  }
+}
+
+/**
+ * Get header preview text
+ * @param {Object} item - History item
+ * @returns {string} Header preview HTML
+ */
+function getHeaderPreview(item) {
+  try {
+    const headers = item.headerSnapshot?.allHeaders || item.sheetDetails?.allHeaders || [];
+    if (headers.length === 0) return null;
+    
+    const displayHeaders = headers.slice(0, 5).join(', ');
+    const remaining = headers.length > 5 ? ` (+${headers.length - 5}個)` : '';
+    
+    return `${displayHeaders}${remaining}`;
+  } catch (error) {
+    console.warn('Header preview failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Show detailed history restoration modal
+ * @param {string} title - Modal title
+ * @param {string} contentHtml - HTML content
+ * @param {Function} onConfirm - Confirmation callback
+ */
+function showDetailedHistoryModal(title, contentHtml, onConfirm) {
+  // Use existing confirmation modal but with enhanced content
+  const modal = document.getElementById('confirmation-modal');
+  const titleElement = document.getElementById('modal-title');
+  const messageElement = document.getElementById('modal-message');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  
+  if (modal && titleElement && messageElement && confirmBtn && cancelBtn) {
+    titleElement.textContent = '履歴設定の復元';
+    messageElement.innerHTML = contentHtml;
+    confirmBtn.textContent = '復元する';
+    
+    // Set up event handlers
+    const handleConfirm = () => {
+      modal.classList.add('hidden');
+      onConfirm();
+      cleanup();
+    };
+    
+    const handleCancel = () => {
+      modal.classList.add('hidden');
+      cleanup();
+    };
+    
+    const cleanup = () => {
+      confirmBtn.removeEventListener('click', handleConfirm);
+      cancelBtn.removeEventListener('click', handleCancel);
+    };
+    
+    confirmBtn.addEventListener('click', handleConfirm);
+    cancelBtn.addEventListener('click', handleCancel);
+    
+    // Show modal
+    modal.classList.remove('hidden');
+  } else {
+    console.warn('⚠️ Modal elements not found, using fallback');
+    if (confirm(`履歴設定「${title}」を復元しますか？`)) {
+      onConfirm();
+    }
+  }
+}
+
+/**
+ * Normalize history item format - migrate legacy format to new format
+ * @param {Object} rawItem - Raw history item (could be old or new format)
+ * @returns {Object} Normalized history item
+ */
+function normalizeHistoryItem(rawItem) {
+  try {
+    console.log('🔄 Normalizing history item:', rawItem);
+    
+    // If already normalized (has both snapshots), return as-is
+    if (rawItem.configSnapshot && rawItem.headerSnapshot) {
+      console.log('✅ Item already in new format');
+      return rawItem;
+    }
+    
+    // Create normalized item with backward compatibility
+    const normalizedItem = Object.assign({}, rawItem);
+    
+    // Migrate configuration data
+    if (!normalizedItem.configSnapshot && normalizedItem.config) {
+      console.log('🔧 Migrating config to configSnapshot format');
+      normalizedItem.configSnapshot = {
+        opinionHeader: normalizedItem.config.opinionHeader || '',
+        nameHeader: normalizedItem.config.nameHeader || '',
+        classHeader: normalizedItem.config.classHeader || '',
+        reasonHeader: normalizedItem.config.reasonHeader || '',
+        showNames: normalizedItem.config.showNames || false,
+        showCounts: normalizedItem.config.showCounts !== undefined ? normalizedItem.config.showCounts : true,
+        _migrated: true,
+        _migratedAt: new Date().toISOString()
+      };
+    }
+    
+    // Migrate header data
+    if (!normalizedItem.headerSnapshot && normalizedItem.sheetDetails) {
+      console.log('🔧 Migrating sheetDetails to headerSnapshot format');
+      normalizedItem.headerSnapshot = {
+        allHeaders: normalizedItem.sheetDetails.allHeaders || [],
+        mainQuestion: normalizedItem.questionText || '',
+        // Try to preserve critical header information
+        criticalHeaders: {
+          opinionHeader: normalizedItem.config?.opinionHeader || '',
+          nameHeader: normalizedItem.config?.nameHeader || '',
+          classHeader: normalizedItem.config?.classHeader || '',
+          reasonHeader: normalizedItem.config?.reasonHeader || ''
+        },
+        _migrated: true,
+        _migratedAt: new Date().toISOString()
+      };
+    }
+    
+    // Create minimal snapshots if none exist (very old items)
+    if (!normalizedItem.configSnapshot) {
+      console.log('⚠️ Creating minimal configSnapshot for very old item');
+      normalizedItem.configSnapshot = {
+        opinionHeader: '',
+        nameHeader: '',
+        classHeader: '',
+        reasonHeader: '',
+        showNames: false,
+        showCounts: true,
+        _minimal: true,
+        _createdAt: new Date().toISOString()
+      };
+    }
+    
+    if (!normalizedItem.headerSnapshot) {
+      console.log('⚠️ Creating minimal headerSnapshot for very old item');
+      normalizedItem.headerSnapshot = {
+        allHeaders: [],
+        mainQuestion: normalizedItem.questionText || '',
+        criticalHeaders: {},
+        _minimal: true,
+        _createdAt: new Date().toISOString()
+      };
+    }
+    
+    // Validate essential fields
+    normalizedItem.id = normalizedItem.id || generateHistoryId();
+    normalizedItem.questionText = normalizedItem.questionText || normalizedItem.sheetName || '無題';
+    normalizedItem.isActive = Boolean(normalizedItem.isActive);
+    
+    console.log('✅ History item normalized successfully');
+    return normalizedItem;
+    
+  } catch (error) {
+    console.error('❌ History normalization failed:', error);
+    // Return original item as fallback
+    return rawItem;
+  }
+}
+
+/**
+ * Validate normalized history item
+ * @param {Object} item - Normalized history item
+ * @returns {Object} Validation result
+ */
+function validateNormalizedHistoryItem(item) {
+  const issues = [];
+  const warnings = [];
+  
+  // Check essential fields
+  if (!item.id) issues.push('Missing history ID');
+  if (!item.questionText) warnings.push('Missing question text');
+  
+  // Check snapshot data
+  if (!item.configSnapshot) {
+    issues.push('Missing configSnapshot');
+  } else {
+    if (!item.configSnapshot.opinionHeader) {
+      warnings.push('Missing opinion header in config');
+    }
+  }
+  
+  if (!item.headerSnapshot) {
+    issues.push('Missing headerSnapshot');
+  } else {
+    if (!item.headerSnapshot.allHeaders || item.headerSnapshot.allHeaders.length === 0) {
+      warnings.push('No headers available in snapshot');
+    }
+  }
+  
+  return {
+    isValid: issues.length === 0,
+    issues,
+    warnings,
+    hasData: Boolean(item.configSnapshot?.opinionHeader || item.headerSnapshot?.allHeaders?.length)
+  };
+}
+
+/**
  * 履歴選択時の自動フロー処理
  * @param {string} historyId - 履歴ID
  */
@@ -3260,11 +3546,37 @@ async function selectHistoryItem(historyId) {
   try {
     // 統合履歴から検索（ローカル + サーバー）
     const mergedHistory = await getMergedHistory();
-    const item = mergedHistory.find(h => h.id === historyId);
+    const rawItem = mergedHistory.find(h => h.id === historyId);
     
-    if (!item) {
+    if (!rawItem) {
       showMessage('履歴アイテムが見つかりませんでした', 'error');
       return;
+    }
+    
+    // Normalize and migrate legacy format to new format
+    const item = normalizeHistoryItem(rawItem);
+    console.log('📝 Normalized history item:', item);
+    
+    // Validate normalized item
+    const validation = validateNormalizedHistoryItem(item);
+    console.log('🔍 Validation result:', validation);
+    
+    // Show warnings if any
+    if (validation.warnings.length > 0) {
+      console.warn('⚠️ History validation warnings:', validation.warnings);
+    }
+    
+    // If validation failed, show error
+    if (!validation.isValid) {
+      console.error('❌ History validation failed:', validation.issues);
+      showMessage('履歴データが不正です: ' + validation.issues.join(', '), 'error');
+      return;
+    }
+    
+    // If no usable data, show warning
+    if (!validation.hasData) {
+      console.warn('⚠️ History has minimal data, restoration may be incomplete');
+      showMessage('履歴データが最小限です。復元が不完全になる可能性があります。', 'warning');
     }
     
     // 復元プロセス開始の通知と進捗表示
@@ -3324,37 +3636,91 @@ async function selectHistoryItem(historyId) {
       setTimeout(() => {
         showProgress(progressSteps[currentStep++]); // AI列判定結果を復元中...
         
-        // 新しいスナップショット形式のヘッダー復元
-        if (item.headerSnapshot && item.headerSnapshot.allHeaders) {
-          if (!window.currentStatus) window.currentStatus = {};
-          if (!window.currentStatus.sheetDetails) window.currentStatus.sheetDetails = {};
+        // Enhanced header restoration with validation
+        const restoreHeaders = async () => {
+          let headersRestored = false;
+          let allHeaders = [];
           
-          // ヘッダー情報を設定
-          window.currentStatus.sheetDetails.allHeaders = item.headerSnapshot.allHeaders;
-          
-          // ヘッダー選択肢を設定
-          if (typeof populateHeaderOptions === 'function') {
-            populateHeaderOptions(item.headerSnapshot.allHeaders);
-            console.log('✅ Header options restored from snapshot');
-          } else {
-            logWarn('populateHeaderOptions function not available');
-          }
-          
-          logDebug('Restored headers from snapshot:', item.headerSnapshot.allHeaders);
-          resolve();
-        } else {
-          // 旧形式のsheetDetailsがある場合のフォールバック
-          if (item.sheetDetails && item.sheetDetails.allHeaders) {
+          // Try new snapshot format first
+          if (item.headerSnapshot && item.headerSnapshot.allHeaders) {
+            allHeaders = item.headerSnapshot.allHeaders;
+            
+            // Initialize currentStatus if needed
+            if (!window.currentStatus) window.currentStatus = {};
+            if (!window.currentStatus.sheetDetails) window.currentStatus.sheetDetails = {};
+            
+            // Set header information
+            window.currentStatus.sheetDetails.allHeaders = allHeaders;
+            
+            // Populate header options
             if (typeof populateHeaderOptions === 'function') {
-              populateHeaderOptions(item.sheetDetails.allHeaders);
-              console.log('✅ Header options restored from legacy format');
+              populateHeaderOptions(allHeaders);
+              console.log('✅ Header options restored from snapshot:', allHeaders.length, 'headers');
+              headersRestored = true;
+              
+              // Restore previous selections if available
+              if (item.headerSnapshot.currentSelections) {
+                console.log('🔄 Restoring previous header selections...');
+                Object.entries(item.headerSnapshot.currentSelections).forEach(([elementId, value]) => {
+                  const element = document.getElementById(elementId);
+                  if (element && value) {
+                    // Create option if it doesn't exist
+                    let optionExists = Array.from(element.options).some(option => option.value === value);
+                    if (!optionExists && value) {
+                      const option = new Option(value, value);
+                      element.appendChild(option);
+                    }
+                    element.value = value;
+                    console.log(`✅ Restored selection: ${elementId} = ${value}`);
+                  }
+                });
+              }
+            } else {
+              logWarn('populateHeaderOptions function not available');
             }
-            resolve();
-          } else {
-            logWarn('No header data available for restoration');
-            resolve();
           }
-        }
+          // Fallback to legacy format
+          else if (item.sheetDetails && item.sheetDetails.allHeaders) {
+            allHeaders = item.sheetDetails.allHeaders;
+            if (typeof populateHeaderOptions === 'function') {
+              populateHeaderOptions(allHeaders);
+              console.log('✅ Header options restored from legacy format:', allHeaders.length, 'headers');
+              headersRestored = true;
+            }
+          }
+          
+          // Final validation
+          if (headersRestored && allHeaders.length > 0) {
+            console.log('📋 Header restoration completed successfully');
+            
+            // Verify critical headers are available
+            const criticalHeaders = item.headerSnapshot?.criticalHeaders || {};
+            const missingHeaders = [];
+            
+            Object.entries(criticalHeaders).forEach(([key, value]) => {
+              if (value && !allHeaders.includes(value)) {
+                missingHeaders.push(value);
+              }
+            });
+            
+            if (missingHeaders.length > 0) {
+              console.warn('⚠️ Some critical headers are missing from restored data:', missingHeaders);
+            } else {
+              console.log('✅ All critical headers validated successfully');
+            }
+          } else {
+            console.warn('⚠️ No header data available for restoration');
+          }
+          
+          return headersRestored;
+        };
+        
+        restoreHeaders().then(() => {
+          resolve();
+        }).catch(error => {
+          console.error('❌ Header restoration failed:', error);
+          resolve();
+        });
       }, 500);
     });
     
@@ -3484,59 +3850,143 @@ async function selectHistoryItem(historyId) {
 }
 
 /**
- * 履歴から設定を復元
- * @param {Object} config - 設定オブジェクト
+ * Enhanced configuration restoration from history
+ * @param {Object} config - Configuration object with validation
  */
 function restoreConfigFromHistory(config) {
   try {
-    logDebug('Restoring config from history:', config);
+    console.log('🔄 Starting enhanced config restoration:', config);
     
-    // フォーム設定の復元（チェック付き）
+    // Validate config object
+    if (!config || typeof config !== 'object') {
+      console.warn('⚠️ Invalid config object provided for restoration');
+      return false;
+    }
+    
+    let restoredCount = 0;
+    
+    // Enhanced form setting restoration with multi-source fallback
     const configMappings = [
-      { configKey: 'opinionHeader', elementId: 'opinionHeader', label: 'Opinion Header' },
-      { configKey: 'nameHeader', elementId: 'name-column', label: 'Name Column' },
-      { configKey: 'classHeader', elementId: 'class-column', label: 'Class Column' },
-      { configKey: 'reasonHeader', elementId: 'reason-column', label: 'Reason Column' }
+      { 
+        configKey: 'opinionHeader', 
+        elementIds: ['opinionHeader', 'opinion-column'], 
+        label: 'Opinion Header',
+        critical: true
+      },
+      { 
+        configKey: 'nameHeader', 
+        elementIds: ['name-column'], 
+        label: 'Name Column',
+        critical: false
+      },
+      { 
+        configKey: 'classHeader', 
+        elementIds: ['class-column'], 
+        label: 'Class Column',
+        critical: false
+      },
+      { 
+        configKey: 'reasonHeader', 
+        elementIds: ['reason-column'], 
+        label: 'Reason Column',
+        critical: false
+      }
     ];
     
-    configMappings.forEach(({ configKey, elementId, label }) => {
-      if (config[configKey]) {
-        const element = document.getElementById(elementId);
-        if (element) {
-          element.value = config[configKey];
-          logDebug(`✅ ${label} restored:`, config[configKey]);
-          
-          // 変更イベントを発火して関連UIを更新
-          const event = new Event('change', { bubbles: true });
-          element.dispatchEvent(event);
-        } else {
-          logWarn(`⚠️ Element not found for ${label} (${elementId})`);
+    configMappings.forEach(({ configKey, elementIds, label, critical }) => {
+      const value = config[configKey];
+      if (value) {
+        let restored = false;
+        
+        // Try each possible element ID
+        for (const elementId of elementIds) {
+          const element = document.getElementById(elementId);
+          if (element) {
+            // Ensure the value is an option in select elements
+            if (element.tagName === 'SELECT') {
+              let optionExists = Array.from(element.options).some(option => option.value === value);
+              if (!optionExists) {
+                const option = new Option(value, value);
+                element.appendChild(option);
+                console.log(`📝 Created missing option: ${value} for ${elementId}`);
+              }
+            }
+            
+            element.value = value;
+            console.log(`✅ ${label} restored: ${value} (via ${elementId})`);
+            
+            // Fire change event to update related UI
+            const event = new Event('change', { bubbles: true });
+            element.dispatchEvent(event);
+            
+            restored = true;
+            restoredCount++;
+            break; // Successfully restored, no need to try other element IDs
+          }
+        }
+        
+        if (!restored) {
+          const message = `⚠️ Could not restore ${label} - elements not found: ${elementIds.join(', ')}`;
+          if (critical) {
+            console.error(message);
+          } else {
+            console.warn(message);
+          }
         }
       }
     });
     
-    // チェックボックスの復元（イベント付き）
+    // Enhanced checkbox restoration with validation
     const checkboxMappings = [
-      { configKey: 'showNames', elementId: 'show-names', label: 'Show Names' },
-      { configKey: 'showCounts', elementId: 'show-counts', label: 'Show Counts' }
+      { configKey: 'showNames', elementId: 'show-names', label: 'Show Names', defaultValue: false },
+      { configKey: 'showCounts', elementId: 'show-counts', label: 'Show Counts', defaultValue: true }
     ];
     
-    checkboxMappings.forEach(({ configKey, elementId, label }) => {
-      const checkbox = document.getElementById(elementId);
-      if (checkbox) {
-        const value = config[configKey] || false;
-        checkbox.checked = value;
-        logDebug(`✅ ${label} restored:`, value);
+    checkboxMappings.forEach(({ configKey, elementId, label, defaultValue }) => {
+      const element = document.getElementById(elementId);
+      if (element) {
+        const value = config.hasOwnProperty(configKey) ? config[configKey] : defaultValue;
+        element.checked = Boolean(value);
+        console.log(`✅ ${label} restored: ${value} (${elementId})`);
         
-        // 変更イベントを発火
+        // Fire change event to update related UI
         const event = new Event('change', { bubbles: true });
-        checkbox.dispatchEvent(event);
+        element.dispatchEvent(event);
+        restoredCount++;
       } else {
-        logWarn(`⚠️ Checkbox not found for ${label} (${elementId})`);
+        console.warn(`⚠️ Checkbox element not found: ${elementId} for ${label}`);
       }
     });
     
-    // 追加の設定項目の復元
+    // Final validation and reporting
+    const totalExpected = configMappings.length + checkboxMappings.length;
+    const successRate = Math.round((restoredCount / totalExpected) * 100);
+    
+    console.log(`📊 Configuration restoration completed: ${restoredCount}/${totalExpected} (${successRate}%)`);
+    
+    // Validate critical settings were restored
+    const criticalMissing = configMappings
+      .filter(mapping => mapping.critical && !config[mapping.configKey])
+      .map(mapping => mapping.label);
+    
+    if (criticalMissing.length > 0) {
+      console.error('❌ Critical settings missing:', criticalMissing);
+      showMessage('履歴復元が不完全です。必要な設定が見つかりません。', 'warning');
+      return false;
+    }
+    
+    return restoredCount > 0;
+    
+  } catch (error) {
+    console.error('❌ Config restoration failed:', error);
+    showMessage('設定の復元中にエラーが発生しました', 'error');
+    return false;
+  }
+}
+
+// 追加の設定項目の復元（レガシー関数の続き - 統合予定）
+function restoreAdditionalConfigSettings(config) {
+  try {
     if (config.displayMode) {
       const displayModeElements = document.querySelectorAll('input[name="displayMode"]');
       displayModeElements.forEach(radio => {

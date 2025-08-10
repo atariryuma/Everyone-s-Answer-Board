@@ -2999,6 +2999,31 @@ function saveSheetConfigInContext(context, spreadsheetId, sheetName, config) {
       lastModified: new Date().toISOString()
     };
 
+    // トップレベルにも現在のシートの重要ヘッダー設定を同期（後方互換性・参照簡略化のため）
+    // これにより旧ロジックがトップレベルのみ参照しても正しい列名が利用される
+    try {
+      const resolveValue = (a, b) => (typeof a === 'string' && a.trim() !== '') ? a : ((typeof b === 'string' && b.trim() !== '') ? b : undefined);
+      const topLevelUpdates = {};
+
+      const opinion = resolveValue(sheetConfig.opinionHeader, sheetConfig.opinionColumn);
+      const reason  = resolveValue(sheetConfig.reasonHeader,  sheetConfig.reasonColumn);
+      const name    = resolveValue(sheetConfig.nameHeader,    sheetConfig.nameColumn);
+      const clazz   = resolveValue(sheetConfig.classHeader,   sheetConfig.classColumn);
+
+      if (opinion) topLevelUpdates.opinionHeader = opinion;
+      if (reason)  topLevelUpdates.reasonHeader  = reason;
+      if (name)    topLevelUpdates.nameHeader    = name;
+      if (clazz)   topLevelUpdates.classHeader   = clazz;
+
+      // 何か更新がある場合のみ反映
+      if (Object.keys(topLevelUpdates).length > 0) {
+        Object.assign(configJson, topLevelUpdates);
+        debugLog('🔗 同期: トップレベルのヘッダー設定を更新', topLevelUpdates);
+      }
+    } catch (syncErr) {
+      warnLog('saveSheetConfigInContext: トップレベル同期で警告（処理継続）:', syncErr.message);
+    }
+
     // updateUserOptimizedを使用してコンテキストに変更を蓄積
     updateUserOptimized(context, {
       configJson: JSON.stringify(configJson)
