@@ -24,11 +24,11 @@ function acquireStandardizedLock(operationType, operationName = 'unknown') {
   }
 
   const lock = LockService.getScriptLock();
-  debugLog(`🔒 ロック取得試行: ${operationName} (${operationType}, ${timeout}ms)`);
+  infoLog(`🔒 ロック取得試行: ${operationName} (${operationType}, ${timeout}ms)`, { timestamp: new Date().toISOString() });
 
   try {
     lock.waitLock(timeout);
-    debugLog(`✅ ロック取得成功: ${operationName}`);
+    infoLog(`✅ ロック取得成功: ${operationName}`, { timestamp: new Date().toISOString() });
     return lock;
   } catch (error) {
     debugLog(`❌ ロック取得失敗: ${operationName} - ${error.message}`);
@@ -44,9 +44,9 @@ function acquireStandardizedLock(operationType, operationName = 'unknown') {
 function releaseStandardizedLock(lock, operationName = 'unknown') {
   try {
     lock.releaseLock();
-    debugLog(`🔓 ロック解放成功: ${operationName}`);
+    infoLog(`🔓 ロック解放成功: ${operationName}`, { timestamp: new Date().toISOString() });
   } catch (error) {
-    debugLog(`⚠️ ロック解放エラー: ${operationName} - ${error.message}`);
+    errorLog(`⚠️ ロック解放エラー: ${operationName} - ${error.message}`, { timestamp: new Date().toISOString() });
   }
 }
 

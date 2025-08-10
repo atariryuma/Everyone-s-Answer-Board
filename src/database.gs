@@ -3381,17 +3381,36 @@ async function deleteUserAccount(userId) {
         try {
           infoLog('⏳ About to await batchUpdateSpreadsheet...', { timestamp: new Date().toISOString() });
           
-          const batchResult = await batchUpdateSpreadsheet(service, dbId, {
-            requests: [deleteRequest]
-          });
+          // タイムアウト検出のためのタイマー
+          const startTime = Date.now();
           
-          infoLog('✅ batchUpdateSpreadsheet completed successfully:', { 
-            result: batchResult, 
-            userId, 
-            rowToDelete, 
-            sheetId: targetSheetId,
-            timestamp: new Date().toISOString()
-          });
+          try {
+            const batchResult = await batchUpdateSpreadsheet(service, dbId, {
+              requests: [deleteRequest]
+            });
+            
+            const executionTime = Date.now() - startTime;
+            infoLog('✅ batchUpdateSpreadsheet completed successfully:', { 
+              result: batchResult, 
+              userId, 
+              rowToDelete, 
+              sheetId: targetSheetId,
+              executionTime: executionTime + 'ms',
+              timestamp: new Date().toISOString()
+            });
+            
+          } catch (awaitError) {
+            const executionTime = Date.now() - startTime;
+            errorLog('💥 batchUpdateSpreadsheet await error:', {
+              error: awaitError.message,
+              stack: awaitError.stack,
+              executionTime: executionTime + 'ms',
+              errorType: typeof awaitError,
+              userId,
+              timestamp: new Date().toISOString()
+            });
+            throw awaitError;
+          }
           
         } catch (batchError) {
           errorLog('❌ batchUpdateSpreadsheet failed:', {
