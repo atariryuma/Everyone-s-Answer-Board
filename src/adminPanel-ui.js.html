@@ -2090,6 +2090,32 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
           }
         }
         
+        // フォールバック試行: spreadsheetIdを省略（サーバー側の既定スプレッドシート）
+        const maybeNotFound = error && (error.message.includes('が見つかりません') || error.message.includes('Unable to parse range'));
+        if (maybeNotFound && spreadsheetId && retryCount === 0) {
+          console.warn('⚠️ Fallback: Retrying getSheetDetails without spreadsheetId');
+          return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', null, sheetName)
+            .then(details => {
+              try {
+                populateHeaderOptions(details.allHeaders);
+                console.log('✅ Header options populated from fallback API');
+                populateConfig(details.guessedConfig);
+                console.log('✅ AI configuration applied from fallback API');
+                resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
+              } catch (err2) {
+                console.error('Error in fallback config population sequence:', err2);
+                showMessage('設定の適用中にエラーが発生しました', 'error');
+                reject(err2);
+              }
+            })
+            .catch(err2 => {
+              console.warn('Fallback getSheetDetails also failed:', err2);
+              showMessage(errorMessage, 'error');
+              // After fallback failure, proceed with normal retry handling below
+              // Intentionally no return here to fall through to retry logic
+            });
+        }
+
         showMessage(errorMessage, 'error');
         
         // エラー時のリトライオプションを提供
@@ -3259,6 +3285,7 @@ async function selectHistoryItem(historyId) {
     // 1. シートを選択してスプレッドシート情報を設定
     if (item.sheetName && item.spreadsheetId) {
       selectedSheet = item.sheetName;
+      lastSelectedSheetName = item.sheetName;
       
       // currentStatus にスプレッドシート情報を設定
       if (!currentStatus) {
@@ -3274,6 +3301,21 @@ async function selectHistoryItem(historyId) {
       const sheetSelect = document.getElementById('sheet-select');
       if (sheetSelect) {
         sheetSelect.value = item.sheetName;
+      }
+
+      // サーバー側のアクティブシートも更新（ユーザー設定に反映）
+      try {
+        if (typeof activateSelectedSheet === 'function') {
+          activateSelectedSheet(item.sheetName);
+        }
+      } catch (e) { console.warn('activateSelectedSheet failed (non-fatal):', e); }
+
+      // サーバーから最新のヘッダー/推定設定を取得（スナップショットより優先して整合性確保）
+      try {
+        showProgress('📄 シート情報を取得中...');
+        await loadConfigForSelected(item.sheetName, item.spreadsheetId);
+      } catch (e) {
+        console.warn('loadConfigForSelected failed, will rely on snapshot if available:', e);
       }
     }
     
