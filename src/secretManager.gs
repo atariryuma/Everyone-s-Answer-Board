@@ -571,11 +571,9 @@ class UnifiedSecretManager {
       this.auditLog.shift();
     }
 
-    // 重要な操作の場合は詳細ログ出力
-    if (this.isCriticalSecret(secretName)) {
-      infoLog(`🔐 重要秘密情報アクセス: ${action} ${secretName}`, logEntry);
-    } else {
-      debugLog(`🔐 秘密情報アクセス: ${action} ${secretName}`);
+    // エラー時のみログ出力（通常の GET/CACHE_HIT は記録しない）
+    if (action.includes('ERROR') || action.includes('FAILED')) {
+      errorLog(`🔐 秘密情報アクセスエラー: ${action} ${secretName}`, logEntry);
     }
   }
 

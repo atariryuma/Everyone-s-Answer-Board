@@ -98,14 +98,12 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       return { success: false, reason: 'no_database_id' };
     }
 
-    transactionLog.steps.push('validation_complete');
 
     const service = getSheetsServiceCached();
     const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
 
     // 統一ロック管理でトランザクション開始
     return executeWithStandardizedLock('WRITE_OPERATION', 'logAccountDeletion', () => {
-      transactionLog.steps.push('lock_acquired');
 
       // ログシートの存在確認・作成（トランザクション内）
       let sheetCreated = false;
@@ -117,7 +115,6 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 
         if (!logSheetExists) {
           // バッチ最適化: ログシート作成
-          debugLog('📊 トランザクション内ログシート作成開始');
 
           const addSheetRequest = {
             addSheet: {
@@ -136,20 +133,10 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
             requests: [addSheetRequest]
           });
 
-          transactionLog.steps.push('sheet_created');
           sheetCreated = true;
-
-          // ヘッダー行を追加（作成直後）
           appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [DELETE_LOG_SHEET_CONFIG.HEADERS]);
-          transactionLog.steps.push('headers_added');
-
-          infoLog('✅ ログシートとヘッダーの作成完了');
         }
       } catch (sheetError) {
-        // シート作成失敗時のロールバック
-        if (sheetCreated) {
-          transactionLog.rollbackActions.push('remove_created_sheet');
-        }
         throw new Error(`ログシートの準備に失敗: ${sheetError.message}`);
       }
 
@@ -165,7 +152,6 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 
       try {
         appendSheetsData(service, dbId, `'${logSheetName}'!A:F`, [logEntry]);
-        transactionLog.steps.push('log_entry_added');
 
         // 検証: 追加されたログエントリの確認
         Utilities.sleep(100); // 書き込み完了待機
@@ -176,20 +162,9 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
           throw new Error('ログエントリの検証に失敗しました');
         }
 
-        transactionLog.steps.push('verification_complete');
-        transactionLog.success = true;
-
-        infoLog('✅ 削除ログの安全な記録完了:', {
-          executor: executorEmail,
-          target: targetUserId,
-          type: deleteType,
-          steps: transactionLog.steps.length
-        });
-
         return {
           success: true,
-          logEntry: logEntry,
-          transactionLog: transactionLog
+          logEntry: logEntry
         };
 
       } catch (appendError) {
@@ -198,27 +173,11 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
     });
 
   } catch (error) {
-    transactionLog.duration = Date.now() - transactionLog.startTime;
-
-    // 構造化エラーログ
-    const errorInfo = {
-      timestamp: new Date().toISOString(),
-      function: 'logAccountDeletion',
-      severity: 'medium', // ログ記録失敗は削除処理自体を止めない
-      parameters: { executorEmail, targetUserId, targetEmail, deleteType },
-      error: error.message,
-      transactionLog: transactionLog
-    };
-
-    errorLog('🚨 削除ログ記録エラー:', JSON.stringify(errorInfo, null, 2));
-
-    // ロールバック処理（必要に応じて）
-    // 現在はログ記録のみなので、深刻なロールバックは不要
-
+    errorLog('🚨 削除ログ記録エラー:', error.message);
+    
     return {
       success: false,
-      error: error.message,
-      transactionLog: transactionLog
+      error: error.message
     };
   }
 }
@@ -791,7 +750,6 @@ function findUserByEmail(email) {
  */
 function fetchUserFromDatabase(field, value, options = {}) {
   if (!field || !value) {
-    debugLog('❌ fetchUserFromDatabase: 無効なパラメーター');
     return null;
   }
 
@@ -825,11 +783,6 @@ function fetchUserFromDatabase(field, value, options = {}) {
       }
     }
 
-    debugLog('fetchUserFromDatabase: 検索開始', { 
-      field, 
-      value: normalizedValue, 
-      forceFresh: opts.forceFresh 
-    });
 
     // 強制フレッシュ時のピンポイントキャッシュ無効化
     if (opts.forceFresh) {
@@ -1724,7 +1677,6 @@ function appendSheetsData(service, spreadsheetId, range, values) {
       updatedRange: parsed.updates?.updatedRange || null
     };
 
-    infoLog('✅ appendSheetsData: 書き込み成功確認', writeConfirmation);
 
     // 書き込み成功が確認できない場合はエラー
     if (!writeConfirmation.success || writeConfirmation.updatedRows === 0) {
@@ -3304,7 +3256,6 @@ async function deleteUserAccount(userId) {
         throw new Error('データベースシート「' + sheetName + '」が見つかりません');
       }
 
-      debugLog('Found database sheet with sheetId:', targetSheetId);
 
       // データを取得
       const data =  batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
@@ -3348,9 +3299,6 @@ async function deleteUserAccount(userId) {
         };
 
         try {
-          infoLog('⏳ About to await batchUpdateSpreadsheet...', { timestamp: new Date().toISOString() });
-          
-          // タイムアウト検出のためのタイマー
           const startTime = Date.now();
           
           try {
@@ -3384,31 +3332,18 @@ async function deleteUserAccount(userId) {
             const result = JSON.parse(response.getContentText());
             const executionTime = Date.now() - startTime;
             
-            infoLog('✅ User deletion completed:', { 
-              userId, 
-              rowDeleted: rowToDelete,
-              executionTime: executionTime + 'ms'
-            });
+            infoLog('✅ User deleted:', { userId, row: rowToDelete });
             
           } catch (deletionError) {
-            const executionTime = Date.now() - startTime;
-            errorLog('❌ User deletion failed:', {
-              error: deletionError.message,
-              userId,
-              executionTime: executionTime + 'ms'
-            });
+            errorLog('❌ User deletion failed:', deletionError.message);
             throw deletionError;
           }
           
         } catch (batchError) {
-          errorLog('❌ Deletion operation failed:', {
-            error: batchError.message,
-            userId
-          });
+          errorLog('❌ Deletion operation failed:', batchError.message);
           throw batchError;
         }
 
-        infoLog('✅ データベースからのユーザー行削除完了:', { userId, rowToDelete, sheetId: targetSheetId });
         
         // 削除後の確認: データが実際に消えているかチェック
         try {
@@ -3418,16 +3353,15 @@ async function deleteUserAccount(userId) {
           // ユーザーがまだ存在するかチェック
           for (let i = 1; i < verifyValues.length; i++) {
             if (verifyValues[i][userIdFieldIndex] === userId) {
-              errorLog('❌ Deletion verification failed: User still exists in database', { userId });
+              errorLog('❌ Deletion verification failed: User still exists');
               throw new Error('削除処理は成功しましたが、ユーザーがまだデータベースに存在しています');
             }
           }
           
-          infoLog('✅ Deletion verified: User successfully removed from database', { userId });
           
         } catch (verifyError) {
-          errorLog('⚠️ Deletion verification error:', verifyError.message);
-          throw verifyError; // 検証失敗は削除失敗として扱う
+          errorLog('⚠️ Deletion verification failed:', verifyError.message);
+          throw verifyError;
         }
         
       } else {
@@ -3456,7 +3390,6 @@ async function deleteUserAccount(userId) {
       userProps.deleteProperty('CURRENT_USER_ID');
 
       const successMessage = 'アカウント「' + userInfo.adminEmail + '」が正常に削除されました。';
-      infoLog(successMessage);
       return successMessage;
     });
 

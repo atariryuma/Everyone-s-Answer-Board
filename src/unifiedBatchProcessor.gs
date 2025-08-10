@@ -56,7 +56,6 @@ class UnifiedBatchProcessor {
       const cached = secureMultiTenantCacheOperation('get', cacheKey, spreadsheetId);
       if (cached) {
         this.updateCacheMetrics(true);
-        debugLog(`✅ 統一バッチ処理: キャッシュヒット - batchGet ${spreadsheetId}`);
         return JSON.parse(cached);
       }
     }
@@ -109,9 +108,7 @@ class UnifiedBatchProcessor {
           valueRanges: allValueRanges
         };
 
-        // メトリクス更新
         this.updateProcessingMetrics(Date.now() - startTime, true);
-        this.metrics.batchesProcessed++;
 
         return batchResult;
       },
@@ -191,9 +188,7 @@ class UnifiedBatchProcessor {
           }
         }
 
-        // メトリクス更新
         this.updateProcessingMetrics(Date.now() - startTime, true);
-        this.metrics.batchesProcessed++;
 
         // キャッシュ無効化
         if (invalidateCache) {
@@ -250,9 +245,7 @@ class UnifiedBatchProcessor {
           throw new Error('Authentication failed: ' + tokenError.message);
         }
 
-        // バッチサイズ制限適用
         const chunkedRequests = this.chunkArray(requests, this.config.maxBatchSize);
-        infoLog('🔀 Chunked requests:', { originalCount: requests.length, chunkCount: chunkedRequests.length });
         let allReplies = [];
 
         for (const chunk of chunkedRequests) {
@@ -290,10 +283,6 @@ class UnifiedBatchProcessor {
           }
           
           const responseCode = response.getResponseCode();
-          infoLog('📡 API Response received:', { 
-            responseCode, 
-            hasContent: !!response.getContentText 
-          });
           
           if (responseCode !== 200) {
             const errorContent = response.getContentText();
@@ -302,10 +291,6 @@ class UnifiedBatchProcessor {
           }
 
           const chunkResult = JSON.parse(response.getContentText());
-          infoLog('✅ Chunk processed successfully:', { 
-            repliesCount: (chunkResult.replies || []).length,
-            chunkIndex: chunkedRequests.indexOf(chunk)
-          });
           allReplies = allReplies.concat(chunkResult.replies || []);
 
           // チャンク間の遅延
@@ -314,23 +299,12 @@ class UnifiedBatchProcessor {
           }
         }
 
-        // メトリクス更新
         this.updateProcessingMetrics(Date.now() - startTime, true);
-        this.metrics.batchesProcessed++;
 
-        // キャッシュ無効化
         if (invalidateCache) {
           this.invalidateCacheForSpreadsheet(spreadsheetId);
-          infoLog('🗑️ Cache invalidated for spreadsheet:', spreadsheetId);
         }
 
-        const executionTime = Date.now() - startTime;
-        infoLog('🎉 UnifiedBatchProcessor.batchUpdateSpreadsheet completed:', {
-          spreadsheetId,
-          totalReplies: allReplies.length,
-          executionTime: executionTime + 'ms',
-          timestamp: new Date().toISOString()
-        });
 
         return {
           spreadsheetId: spreadsheetId,
@@ -391,9 +365,7 @@ class UnifiedBatchProcessor {
           }
         }
 
-        // メトリクス更新
         this.updateProcessingMetrics(Date.now() - startTime, true);
-        this.metrics.batchesProcessed++;
 
         return allResults;
       },
@@ -455,7 +427,6 @@ class UnifiedBatchProcessor {
         }
       }
 
-      debugLog(`🗑️ 統一バッチ処理: キャッシュ無効化完了 - ${spreadsheetId}`);
     } catch (error) {
       warnLog('キャッシュ無効化エラー:', error.message);
     }
@@ -650,10 +621,6 @@ function performUnifiedBatchHealthCheck() {
       results.issues.push('バッチ処理の統計データがありません（初回実行時は正常）');
     }
 
-    // 統合テスト（軽量）
-    const testRanges = ['A1:A1'];
-    const testService = { baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets' };
-    
     // テスト実行は実際のスプレッドシートIDが必要なためスキップ
     // 実際の運用では適切なテストスプレッドシートIDを使用
 
