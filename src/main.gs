@@ -375,62 +375,89 @@ function saveHistoryToSheet(historyItem, userInfo) {
       configJson.historyArray = [];
     }
 
-    // 新しい履歴アイテムを作成（標準化された構造）
+    // 軽量化: 大きな構造・長文を除去し、短いインデックス情報のみ保存
+    var question = historyItem.questionText || '（問題文未設定）';
+    var questionShort = String(question).substring(0, 140);
+    var sheetName = String(historyItem.sheetName || '').substring(0, 80);
+    var nowIso = new Date().toISOString();
+
+    // 表示モードを短い表現に正規化
+    var displayModeText = historyItem.displayMode || (historyItem.config && historyItem.config.displayMode) || '';
+    if (displayModeText === true || displayModeText === 'named') displayModeText = '通常表示';
+    if (displayModeText === false || displayModeText === 'anonymous') displayModeText = '匿名表示';
+    if (!displayModeText) displayModeText = '通常表示';
+
+    // ステータス正規化
+    var ended = !!historyItem.endTime;
+    var statusText = ended ? 'ended' : (historyItem.status || 'published');
+    var isActive = historyItem.isActive !== undefined ? !!historyItem.isActive : !ended;
+
+    // 可能ならIDベースに置換
+    var spreadsheetId = (userInfo && userInfo.spreadsheetId) || historyItem.spreadsheetId || '';
+    var formId = null;
+    try {
+      if (historyItem.formUrl && typeof extractFormIdFromUrl === 'function') {
+        formId = extractFormIdFromUrl(historyItem.formUrl);
+      }
+    } catch (e) {}
+
+    // 新しい履歴アイテム（軽量）
     const serverHistoryItem = {
-      // 基本ID
       id: historyItem.id || ('server_' + Date.now()),
-      formId: historyItem.formId || null,
-      
-      // タイムスタンプ（標準化）
-      timestamp: new Date().toISOString(),
-      createdAt: historyItem.createdAt || historyItem.timestamp || new Date().toISOString(),
-      publishedAt: historyItem.publishedAt || new Date().toISOString(),
-      publishedEndAt: historyItem.publishedEndAt || null,
-      endTime: historyItem.endTime || new Date().toISOString(),
+      timestamp: nowIso,
+      createdAt: historyItem.createdAt || historyItem.timestamp || nowIso,
+      publishedAt: historyItem.publishedAt || nowIso,
+      endTime: historyItem.endTime || null,
       scheduledEndTime: historyItem.scheduledEndTime || null,
-      savedAt: new Date().toISOString(),
-      
-      // フォーム内容
-      questionText: historyItem.questionText || '（問題文未設定）',
-      sheetName: historyItem.sheetName || '',
-      
-      // 表示設定
-      displayMode: historyItem.displayMode || '通常表示',
-      countDisplay: historyItem.countDisplay || '表示',
-      
-      // フォーム構成と状態
-      config: historyItem.config || {},
-      status: historyItem.status || 'published',
-      setupType: historyItem.setupType || 'custom',
-      isActive: historyItem.isActive !== undefined ? historyItem.isActive : true,
-      
-      // URL と集計
-      formUrl: historyItem.formUrl || '',
-      spreadsheetUrl: historyItem.spreadsheetUrl || '',
+      questionText: questionShort,
+      sheetName: sheetName,
+      displayMode: displayModeText,
+      status: statusText,
+      isActive: isActive,
+      spreadsheetId: spreadsheetId,
+      formId: formId,
       answerCount: historyItem.answerCount || 0,
       reactionCount: historyItem.reactionCount || 0,
-      
-      // シート詳細情報
-      sheetDetails: historyItem.sheetDetails || {},
-      
-      // サーバー固有のフィールド
-      endReason: historyItem.endReason || 'manual'
+      setupType: historyItem.setupType || 'custom'
     };
 
-    // 履歴配列の先頭に追加
-    configJson.historyArray.unshift(serverHistoryItem);
+    // 重複抑制（直近項目と同一ならスキップ）
+    var skipAdd = false;
+    if (configJson.historyArray.length > 0) {
+      var last = configJson.historyArray[0] || {};
+      if (last && last.sheetName === serverHistoryItem.sheetName &&
+          (last.questionText || '') === serverHistoryItem.questionText &&
+          (last.publishedAt || '') === serverHistoryItem.publishedAt) {
+        skipAdd = true;
+      }
+    }
+    if (!skipAdd) {
+      configJson.historyArray.unshift(serverHistoryItem);
+    }
 
     // 最大履歴件数まで保持
-    if (configJson.historyArray.length > MAX_HISTORY_ITEMS) {
-      configJson.historyArray.splice(MAX_HISTORY_ITEMS);
+    // 件数制御（サーバ側は軽量に20件まで）
+    var SERVER_MAX_HISTORY = 20;
+    if (configJson.historyArray.length > SERVER_MAX_HISTORY) {
+      configJson.historyArray.splice(SERVER_MAX_HISTORY);
     }
 
     // configJsonを更新
     configJson.lastModified = new Date().toISOString();
 
+    // サイズ制御: JSONが長すぎる場合は末尾から削除して調整
+    var serialized = JSON.stringify(configJson);
+    var safetyLimit = 9000; // 1万の制限に余裕を持たせる
+    var guard = 0;
+    while (serialized.length > safetyLimit && configJson.historyArray.length > 0 && guard < 100) {
+      configJson.historyArray.pop();
+      serialized = JSON.stringify(configJson);
+      guard++;
+    }
+
     // データベースに保存
     const updateResult = updateUser(userInfo.userId, {
-      configJson: JSON.stringify(configJson),
+      configJson: serialized,
       lastAccessedAt: new Date().toISOString()
     });
 

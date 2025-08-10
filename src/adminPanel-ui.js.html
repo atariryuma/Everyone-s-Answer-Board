@@ -2526,7 +2526,24 @@ async function syncHistoryToServer(historyItem, retryCount = 0) {
       setTimeout(() => reject(new Error('Server sync timeout')), 15000); // 30s→15sに短縮
     });
     
-    const syncPromise = runGasWithUserId('saveHistoryToSheetAPI', false, historyItem);
+    // 送信ペイロードを軽量化（サーバ側でさらにサニタイズ）
+    const compact = {
+      id: historyItem.id,
+      questionText: (historyItem.questionText || '').slice(0, 140),
+      sheetName: historyItem.sheetName || '',
+      publishedAt: historyItem.publishedAt || new Date().toISOString(),
+      endTime: historyItem.endTime || null,
+      scheduledEndTime: historyItem.scheduledEndTime || null,
+      isActive: !!historyItem.isActive,
+      // 表示モードはテキストで簡素化
+      displayMode: historyItem.displayMode || (historyItem.config && historyItem.config.displayMode) || '通常表示',
+      status: historyItem.status || 'published',
+      spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
+      answerCount: historyItem.answerCount || 0,
+      reactionCount: historyItem.reactionCount || 0,
+      setupType: historyItem.setupType || 'custom'
+    };
+    const syncPromise = runGasWithUserId('saveHistoryToSheetAPI', false, compact);
     const response = await Promise.race([syncPromise, timeoutPromise]);
     
     if (response && response.status === 'success') {
