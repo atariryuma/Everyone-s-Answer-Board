@@ -3139,68 +3139,7 @@ function createHistoryTableRow(item, index) {
     }
   };
   
-  // 回答形式の表示ロジック（改善版）
-  const getAnswerFormatDisplay = (item) => {
-    // 0. 事前に保存された簡易フォーマットがあれば最優先
-    if (item.format) {
-      switch (item.format) {
-        case 'multi': return `<span class="text-purple-400">複数</span>`;
-        case 'select': return `<span class="text-blue-400">選択</span>`;
-        case 'text':
-        default: return `<span class="text-green-400">テキスト</span>`;
-      }
-    }
-    // 1. QuickStartの場合は確実にテキストと判定
-    if (item.setupType === 'quickstart') {
-      return `<span class="text-green-400">テキスト</span>`;
-    }
-    
-    // 2. setupType が設定されている場合
-    if (item.setupType) {
-      switch (item.setupType) {
-        case 'external':
-          return `<span class="text-orange-400">外部</span>`;
-        case 'custom':
-          // カスタムの場合は詳細設定を確認（下記の判定に進む）
-          break;
-      }
-    }
-    
-    const config = item.config || (item.sheetDetails && item.sheetDetails.guessedConfig) || null;
-    if (!config) {
-      // configがない場合もテキストとして扱う（"不明"を表示しない）
-      return `<span class="text-green-400">テキスト</span>`;
-    }
-    
-    // 3. フォーム設定から判定
-    // 複数選択（checkbox）の判定
-    if (config.multipleChoice || 
-        config.allowMultipleAnswers || 
-        (config.formElements && config.formElements.some(elem => elem.type === 'checkbox'))) {
-      return `<span class="text-purple-400">複数</span>`;
-    }
-    
-    // 単一選択（radio/select）の判定
-    if (config.singleChoice || 
-        config.choices || 
-        config.options ||
-        (config.formElements && config.formElements.some(elem => elem.type === 'radio' || elem.type === 'select'))) {
-      return `<span class="text-blue-400">選択</span>`;
-    }
-    
-    // 4. 質問文の内容から推測（AIが推測した内容）
-    const questionText = item.questionText || '';
-    if (questionText.includes('選択') || questionText.includes('どれ')) {
-      if (questionText.includes('複数') || questionText.includes('いくつ')) {
-        return `<span class="text-purple-400">複数</span>`;
-      } else {
-        return `<span class="text-blue-400">選択</span>`;
-      }
-    }
-    
-    // 5. デフォルト：テキスト（自由記述）
-    return `<span class="text-green-400">テキスト</span>`;
-  };
+  // 回答形式の表示ロジックは削除 - 設定アイコンで表示を統一
   
   // Visual indicators for display options
   const getDisplayModeIcon = (displayMode) => {
@@ -3211,19 +3150,13 @@ function createHistoryTableRow(item, index) {
     return countDisplay === '非表示' ? '🚫' : '📊';
   };
   
-  const getStatusIcon = (status, isActive) => {
-    if (isActive && status === 'published') return '🌐';
-    if (status === 'ended') return '⏹️';
-    if (status === 'draft') return '📝';
-    return '🌐'; // default for published
+  const getStatusIcon = (isActive) => {
+    return isActive ? '🌐' : '⏹️';
   };
   
   // Helper functions for tooltip text descriptions
-  const getStatusText = (status, isActive) => {
-    if (isActive && status === 'published') return '公開中';
-    if (status === 'ended') return '終了';
-    if (status === 'draft') return '下書き';
-    return '公開済み';
+  const getStatusText = (isActive) => {
+    return isActive ? '公開中' : '終了';
   };
 
   const getDisplayModeText = (displayMode) => {
@@ -3235,52 +3168,37 @@ function createHistoryTableRow(item, index) {
   };
   
   // Format display mode and count display as compact visual indicators
-  const displayMode = item.displayMode || (item.config && item.config.displayMode) || '通常表示';
-  const countDisplay = item.countDisplay || (item.config && item.config.countDisplay) || '表示';
-  const status = item.status || (item.config && item.config.status) || 'published';
+  const displayMode = item.displayMode || '通常表示';
+  const countDisplay = item.countDisplay || '表示';
   const displayModeIcon = getDisplayModeIcon(displayMode);
   const countDisplayIcon = getCountDisplayIcon(countDisplay);
-  const statusIcon = getStatusIcon(status, isActive);
+  const statusIcon = getStatusIcon(isActive);
   
-  // Combine visual indicators
-  const visualIndicators = `${statusIcon} ${displayModeIcon} ${countDisplayIcon}`;
-
   // Enhanced question text display with truncation
   const questionText = item.questionText || '（質問文未設定）';
   const displayQuestionText = questionText.length > 40 
     ? questionText.substring(0, 40) + '...' 
     : questionText;
   
-  // Sheet name display (if available)
-  const sheetName = item.sheetName || '';
-  const sheetDisplay = sheetName ? `<div class="text-xs text-gray-500 mt-1">📊 ${escapeHtml(sheetName)}</div>` : '';
-  
-  // Create detailed tooltip text with better formatting
+  // Create simplified tooltip text
   const tooltipText = `質問: ${escapeHtml(questionText)}
-状態: ${getStatusText(status, isActive)}
+状態: ${getStatusText(isActive)}
 表示: ${getDisplayModeText(displayMode)}
 カウント: ${getCountDisplayText(countDisplay)}
-シート: ${sheetName || '未設定'}
-作成: ${item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '不明'}
 公開: ${item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未公開'}`;
 
   row.innerHTML = `
-    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.createdAt || item.timestamp)}</td>
     <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300" title="${escapeHtml(tooltipText)}" style="max-width: 250px;">
-      <div class="flex items-start gap-2">
-        <div class="flex-1 min-w-0">
-          <div class="truncate leading-tight">${escapeHtml(displayQuestionText)}</div>
-          ${sheetDisplay}
-        </div>
-        <div class="text-xs opacity-75 flex-shrink-0 flex gap-1">
-          <span title="状態: ${getStatusText(status, isActive)}">${statusIcon}</span>
-          <span title="表示モード: ${getDisplayModeText(displayMode)}">${displayModeIcon}</span>
-          <span title="カウント表示: ${getCountDisplayText(countDisplay)}">${countDisplayIcon}</span>
-        </div>
+    <td class="px-3 py-2 text-xs text-gray-300" title="${escapeHtml(tooltipText)}" style="max-width: 300px;">
+      <div class="truncate leading-tight">${escapeHtml(displayQuestionText)}</div>
+    </td>
+    <td class="px-3 py-2 text-xs text-center">
+      <div class="flex justify-center gap-1">
+        <span title="状態: ${getStatusText(isActive)}">${statusIcon}</span>
+        <span title="表示モード: ${getDisplayModeText(displayMode)}">${displayModeIcon}</span>
+        <span title="カウント表示: ${getCountDisplayText(countDisplay)}">${countDisplayIcon}</span>
       </div>
     </td>
-    <td class="px-3 py-2 text-xs text-center">${getAnswerFormatDisplay(item)}</td>
   `;
   
   return row;
@@ -3337,61 +3255,68 @@ async function selectHistoryItem(historyId) {
       }
     }
     
-    // 2. AI列判定結果を復元（Promise化で確実性向上）
+    // 2. ヘッダー情報を復元（新しいスナップショット形式対応）
     await new Promise(resolve => {
       setTimeout(() => {
         showProgress(progressSteps[currentStep++]); // AI列判定結果を復元中...
         
-        if (item.sheetDetails) {
+        // 新しいスナップショット形式のヘッダー復元
+        if (item.headerSnapshot && item.headerSnapshot.allHeaders) {
           if (!window.currentStatus) window.currentStatus = {};
-          window.currentStatus.sheetDetails = {
-            allHeaders: item.sheetDetails.allHeaders || [],
-            guessedConfig: item.sheetDetails.guessedConfig || {},
-            existingConfig: item.sheetDetails.existingConfig || {}
-          };
+          if (!window.currentStatus.sheetDetails) window.currentStatus.sheetDetails = {};
           
-          logDebug('Restored AI column prediction results:', window.currentStatus.sheetDetails);
+          // ヘッダー情報を設定
+          window.currentStatus.sheetDetails.allHeaders = item.headerSnapshot.allHeaders;
           
-          // 3. ヘッダー選択肢を設定
-          if (item.sheetDetails.allHeaders && item.sheetDetails.allHeaders.length > 0) {
+          // ヘッダー選択肢を設定
+          if (typeof populateHeaderOptions === 'function') {
+            populateHeaderOptions(item.headerSnapshot.allHeaders);
+            console.log('✅ Header options restored from snapshot');
+          } else {
+            logWarn('populateHeaderOptions function not available');
+          }
+          
+          logDebug('Restored headers from snapshot:', item.headerSnapshot.allHeaders);
+          resolve();
+        } else {
+          // 旧形式のsheetDetailsがある場合のフォールバック
+          if (item.sheetDetails && item.sheetDetails.allHeaders) {
             if (typeof populateHeaderOptions === 'function') {
               populateHeaderOptions(item.sheetDetails.allHeaders);
-              console.log('✅ Header options restored from history');
-            } else {
-              logWarn('populateHeaderOptions function not available');
+              console.log('✅ Header options restored from legacy format');
             }
-          }
-          
-          // 4. AI判定設定を適用
-          if (item.sheetDetails.guessedConfig) {
-            setTimeout(() => {
-              if (typeof populateConfig === 'function') {
-                populateConfig(item.sheetDetails.guessedConfig);
-                console.log('✅ AI configuration restored from history');
-              } else {
-                logWarn('populateConfig function not available');
-              }
-              resolve();
-            }, 100);
+            resolve();
           } else {
+            logWarn('No header data available for restoration');
             resolve();
           }
-        } else {
-          resolve();
         }
       }, 500);
     });
     
-    // 5. フォーム設定を復元（改善されたタイミング制御）
+    // 3. フォーム設定を復元（新しいスナップショット形式対応）
     showProgress(progressSteps[currentStep++]); // 設定を適用中...
     
-    if (item.config) {
+    // 新しいスナップショット形式の設定復元
+    if (item.configSnapshot) {
       await new Promise(resolve => {
         setTimeout(() => {
-          restoreConfigFromHistory(item.config);
+          restoreConfigFromHistory(item.configSnapshot);
+          console.log('✅ Configuration restored from snapshot');
           resolve();
         }, 200);
       });
+    } else if (item.config) {
+      // 旧形式のconfigがある場合のフォールバック
+      await new Promise(resolve => {
+        setTimeout(() => {
+          restoreConfigFromHistory(item.config);
+          console.log('✅ Configuration restored from legacy format');
+          resolve();
+        }, 200);
+      });
+    } else {
+      logWarn('No configuration data available for restoration');
     }
     
     // 6. UI状態をStep 3（設定完了）に更新
@@ -3456,11 +3381,13 @@ async function selectHistoryItem(historyId) {
           partiallyRestored = true;
         }
         
-        if (item.config && item.config.opinionHeader) {
+        // 設定復元を試行（新旧形式両対応）
+        const configData = item.configSnapshot || item.config;
+        if (configData && configData.opinionHeader) {
           const opinionSelect = document.getElementById('opinionHeader');
           if (opinionSelect) {
-            opinionSelect.innerHTML = '<option value="' + item.config.opinionHeader + '">' + item.config.opinionHeader + '</option>';
-            opinionSelect.value = item.config.opinionHeader;
+            opinionSelect.innerHTML = '<option value="' + configData.opinionHeader + '">' + configData.opinionHeader + '</option>';
+            opinionSelect.value = configData.opinionHeader;
             partiallyRestored = true;
           }
         }

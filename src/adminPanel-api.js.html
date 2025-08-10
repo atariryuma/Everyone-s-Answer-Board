@@ -2007,8 +2007,7 @@ function unpublishBoard() {
       // Get draft data from session storage
       const draftState = getDraftFromSession();
       
-      // Determine creation time and publication time
-      const createdAt = (draftState && draftState.createdAt) || new Date().toISOString();
+      // Get publication time
       const publishedAt = publishResponse.publishedAt || new Date().toISOString();
       
       // Extract question text from various sources
@@ -2035,54 +2034,40 @@ function unpublishBoard() {
       const displayMode = currentSettings.displayMode || (draftState && draftState.displayMode) || '通常表示';
       const countDisplay = currentSettings.countDisplay || (draftState && draftState.countDisplay) || '表示';
       
-      // Create consolidated history entry
+      // Create configuration snapshot for restoration
+      const createConfigSnapshot = () => {
+        return {
+          opinionHeader: config.opinionHeader || '',
+          nameHeader: config.nameHeader || '',
+          classHeader: config.classHeader || '',
+          reasonHeader: config.reasonHeader || ''
+        };
+      };
+      
+      // Create header snapshot for restoration
+      const createHeaderSnapshot = () => {
+        const allHeaders = (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [];
+        return {
+          allHeaders: allHeaders,
+          mainQuestion: questionText
+        };
+      };
+      
+      // Create history entry with restoration data
       const consolidatedHistoryItem = {
         id: generateHistoryId(),
         formId: `${userInfo.spreadsheetId || 'unknown'}_${config.publishedSheetName || 'unknown'}`,
-        
-        // Timestamps
-        createdAt: createdAt,
         publishedAt: publishedAt,
-        
-        // Form content
         questionText: questionText,
-        sheetName: config.publishedSheetName || '',
-        
-        // Display settings
         displayMode: displayMode, // '通常表示' or '匿名表示'
         countDisplay: countDisplay, // '表示' or '非表示'
-        
-        // Simple format for quick display (based on configuration)
-        format: (() => {
-          const cfg = config || {};
-          if (cfg.multipleChoice || cfg.allowMultipleAnswers || (cfg.formElements && cfg.formElements.some(e => e.type === 'checkbox'))) return 'multi';
-          if (cfg.singleChoice || cfg.choices || cfg.options || (cfg.formElements && cfg.formElements.some(e => e.type === 'radio' || e.type === 'select'))) return 'select';
-          return 'text';
-        })(),
-        
-        // Form configuration and state
-        config: config,
-        status: 'published',
-        setupType: determineSetupType(config, userInfo),
         isActive: true, // Set to true since we're publishing
         
-        // URLs and counts
-        formUrl: userInfo.formUrl || '',
-        spreadsheetUrl: userInfo.spreadsheetUrl || '',
-        answerCount: 0,
-        reactionCount: 0,
-        
-        // AI column prediction results (from draft or current state)
-        sheetDetails: (draftState && draftState.sheetDetails) || {
-          allHeaders: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [],
-          guessedConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {},
-          existingConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.existingConfig) || {}
-        },
-        
-        // Additional metadata
-        activeSheetName: (draftState && draftState.sheetName) || config.publishedSheetName,
+        // Restoration data (minimal but sufficient)
+        sheetName: config.publishedSheetName || '',
         spreadsheetId: userInfo.spreadsheetId || '',
-        configurationComplete: (draftState && draftState.configurationComplete) || !!(config.opinionHeader)
+        configSnapshot: createConfigSnapshot(),
+        headerSnapshot: createHeaderSnapshot()
       };
       
       // Save consolidated history entry using existing localStorage mechanism
