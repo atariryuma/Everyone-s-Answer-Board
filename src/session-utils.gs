@@ -25,11 +25,7 @@ function getResilientScriptCache() {
   );
 }
 
-/**
- * アカウント切り替え時のセッションクリーンアップ
- * 異なるアカウントでログインした際に前のセッション情報をクリア
- * @param {string} currentEmail - 現在のユーザーメール
- */
+
 /**
  * キャッシュを安全に消去するユーティリティ
  * - removeAll() がサポートされる環境では全面削除
@@ -107,6 +103,11 @@ function clearCacheSafely(cache, options) {
   }
 }
 
+/**
+ * アカウント切り替え時のセッションクリーンアップ
+ * 異なるアカウントでログインした際に前のセッション情報をクリア
+ * @param {string} currentEmail - 現在のユーザーメール
+ */
 function cleanupSessionOnAccountSwitch(currentEmail) {
   try {
     debugLog('セッションクリーンアップを開始: ' + currentEmail);
