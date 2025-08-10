@@ -152,26 +152,134 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
  * @returns {string} ログインページのURL
  */
 function resetUserAuthentication() {
+  let authResetResult = {
+    cacheCleared: false,
+    propertiesCleared: false,
+    loginUrl: null,
+    errors: []
+  };
+  
   try {
-    debugLog('ユーザー認証をリセット中...');
-    const userCache = getResilientCacheService();
-    clearCacheSafely(userCache, { label: 'UserCache' });
+    debugLog('🔄 ユーザー認証をリセット開始...');
+    const startTime = Date.now();
+    
+    // Step 1: キャッシュクリア（非致命的エラー許容）
+    try {
+      const userCache = CacheService.getUserCache();
+      if (userCache) {
+        clearCacheSafely(userCache, { label: 'UserCache' });
+      }
 
-    const scriptCache = getResilientScriptCache();
-    clearCacheSafely(scriptCache, { label: 'ScriptCache', email: getCurrentUserEmail(), prefixes: ['config_v3_', 'user_', 'email_'] });
+      const scriptCache = CacheService.getScriptCache();
+      if (scriptCache) {
+        clearCacheSafely(scriptCache, { label: 'ScriptCache', email: getCurrentUserEmail(), prefixes: ['config_v3_', 'user_', 'email_'] });
+      }
+      
+      authResetResult.cacheCleared = true;
+      debugLog('✅ キャッシュクリア完了');
+    } catch (cacheError) {
+      authResetResult.errors.push(`キャッシュクリアエラー: ${cacheError.message}`);
+      warnLog('⚠️ キャッシュクリアでエラーが発生しましたが、処理を続行します:', cacheError.message);
+    }
 
-    // PropertiesServiceもクリアする（LAST_ACCESS_EMAILなど）
-    const props = getResilientPropertiesService();
-    props.deleteAllProperties();
-    debugLog('ユーザープロパティをクリアしました。');
+    // Step 2: プロパティクリア（段階的実装）
+    try {
+      const props = PropertiesService.getUserProperties();
+      
+      // まず deleteAllProperties を試行
+      if (typeof props.deleteAllProperties === 'function') {
+        props.deleteAllProperties();
+        authResetResult.propertiesCleared = true;
+        debugLog('✅ PropertiesService.deleteAllProperties() でクリア完了');
+      } else {
+        // フォールバック: 重要なプロパティを個別削除
+        debugLog('⚠️ deleteAllProperties が利用できません。個別削除を実行します。');
+        const importantKeys = [
+          'LAST_ACCESS_EMAIL',
+          'lastAdminUserId', 
+          'CURRENT_USER_ID',
+          'USER_CACHE_KEY',
+          'SESSION_ID'
+        ];
+        
+        // 既存のプロパティをすべて取得して削除
+        try {
+          const allProps = props.getProperties();
+          const keys = Object.keys(allProps);
+          
+          if (keys.length > 0) {
+            debugLog(`📝 ${keys.length}個のプロパティを個別削除します:`, keys);
+            
+            for (const key of keys) {
+              try {
+                props.deleteProperty(key);
+              } catch (deleteError) {
+                authResetResult.errors.push(`プロパティ削除エラー(${key}): ${deleteError.message}`);
+              }
+            }
+            
+            authResetResult.propertiesCleared = true;
+            debugLog('✅ 個別プロパティ削除完了');
+          } else {
+            debugLog('ℹ️ 削除対象のプロパティはありませんでした');
+            authResetResult.propertiesCleared = true;
+          }
+        } catch (enumError) {
+          // プロパティ一覧取得に失敗した場合、重要なキーのみ削除を試行
+          debugLog('⚠️ プロパティ一覧取得に失敗。重要なキーのみ削除を試行します。');
+          for (const key of importantKeys) {
+            try {
+              props.deleteProperty(key);
+            } catch (deleteError) {
+              // 個別削除エラーは記録するが処理は続行
+              authResetResult.errors.push(`重要プロパティ削除エラー(${key}): ${deleteError.message}`);
+            }
+          }
+          authResetResult.propertiesCleared = true;
+        }
+      }
+    } catch (propsError) {
+      authResetResult.errors.push(`プロパティクリアエラー: ${propsError.message}`);
+      errorLog('❌ プロパティクリアでエラーが発生しました:', propsError.message);
+      
+      // プロパティクリアに失敗してもログアウト処理は続行
+      warnLog('⚠️ プロパティクリアに失敗しましたが、ログアウト処理を続行します');
+    }
 
-    // ログインページのURLを返す
-    const loginPageUrl = ScriptApp.getService().getUrl();
-    debugLog('リセット完了。ログインページURL:', loginPageUrl);
-    return loginPageUrl;
+    // Step 3: ログインページURLの取得
+    try {
+      const loginPageUrl = ScriptApp.getService().getUrl();
+      authResetResult.loginUrl = loginPageUrl;
+      
+      const executionTime = Date.now() - startTime;
+      debugLog(`✅ 認証リセット完了 (${executionTime}ms):`, {
+        cacheCleared: authResetResult.cacheCleared,
+        propertiesCleared: authResetResult.propertiesCleared,
+        errorsCount: authResetResult.errors.length,
+        loginUrl: loginPageUrl
+      });
+      
+      return loginPageUrl;
+    } catch (urlError) {
+      authResetResult.errors.push(`URL取得エラー: ${urlError.message}`);
+      throw new Error(`ログインページURL取得に失敗: ${urlError.message}`);
+    }
+    
   } catch (error) {
-    errorLog('ユーザー認証リセット中にエラーが発生しました:', error.message);
-    throw new Error('認証リセットに失敗しました: ' + error.message);
+    const executionTime = Date.now() - (authResetResult.startTime || Date.now());
+    errorLog('❌ ユーザー認証リセット中に致命的エラー:', {
+      error: error.message,
+      executionTime: executionTime + 'ms',
+      partialResults: authResetResult
+    });
+    
+    // エラーメッセージを詳細化
+    let errorMessage = `認証リセットに失敗しました: ${error.message}`;
+    if (authResetResult.errors.length > 0) {
+      errorMessage += ` (追加エラー: ${authResetResult.errors.join(', ')})`;
+    }
+    
+    throw new Error(errorMessage);
   }
 }
 
@@ -194,20 +302,81 @@ function forceLogoutAndRedirectToLogin() {
     // Step 1: セッションクリア処理（エラーハンドリング強化）
     try {
       debugLog('🧹 キャッシュクリア開始...');
-      const userCache = getResilientCacheService();
-      clearCacheSafely(userCache, { label: 'UserCache' });
+      
+      // キャッシュクリア（非致命的エラー許容）
+      try {
+        const userCache = CacheService.getUserCache();
+        if (userCache) {
+          clearCacheSafely(userCache, { label: 'UserCache' });
+        }
 
-      const scriptCache = getResilientScriptCache();
-      clearCacheSafely(scriptCache, { label: 'ScriptCache', email: getCurrentUserEmail(), prefixes: ['config_v3_', 'user_', 'email_'] });
+        const scriptCache = CacheService.getScriptCache();
+        if (scriptCache) {
+          clearCacheSafely(scriptCache, { label: 'ScriptCache', email: getCurrentUserEmail(), prefixes: ['config_v3_', 'user_', 'email_'] });
+        }
+        debugLog('✅ キャッシュクリア完了');
+      } catch (cacheError) {
+        warnLog('⚠️ キャッシュクリアでエラーが発生しましたが、処理を続行します:', cacheError.message);
+      }
 
-      const props = getResilientPropertiesService();
-      props.deleteAllProperties();
-      debugLog('✅ ユーザープロパティクリア完了');
+      // プロパティクリア（段階的実装）
+      try {
+        const props = PropertiesService.getUserProperties();
+        
+        // まず deleteAllProperties を試行
+        if (typeof props.deleteAllProperties === 'function') {
+          props.deleteAllProperties();
+          debugLog('✅ PropertiesService.deleteAllProperties() でクリア完了');
+        } else {
+          // フォールバック: 既存のプロパティをすべて取得して削除
+          debugLog('⚠️ deleteAllProperties が利用できません。個別削除を実行します。');
+          try {
+            const allProps = props.getProperties();
+            const keys = Object.keys(allProps);
+            
+            if (keys.length > 0) {
+              debugLog(`📝 ${keys.length}個のプロパティを個別削除します:`, keys);
+              
+              for (const key of keys) {
+                try {
+                  props.deleteProperty(key);
+                } catch (deleteError) {
+                  warnLog(`プロパティ削除エラー(${key}): ${deleteError.message}`);
+                }
+              }
+              
+              debugLog('✅ 個別プロパティ削除完了');
+            } else {
+              debugLog('ℹ️ 削除対象のプロパティはありませんでした');
+            }
+          } catch (enumError) {
+            // プロパティ一覧取得に失敗した場合、重要なキーのみ削除を試行
+            debugLog('⚠️ プロパティ一覧取得に失敗。重要なキーのみ削除を試行します。');
+            const importantKeys = [
+              'LAST_ACCESS_EMAIL',
+              'lastAdminUserId', 
+              'CURRENT_USER_ID',
+              'USER_CACHE_KEY',
+              'SESSION_ID'
+            ];
+            for (const key of importantKeys) {
+              try {
+                props.deleteProperty(key);
+              } catch (deleteError) {
+                warnLog(`重要プロパティ削除エラー(${key}): ${deleteError.message}`);
+              }
+            }
+          }
+        }
+        debugLog('✅ ユーザープロパティクリア完了');
+      } catch (propsError) {
+        warnLog('⚠️ プロパティクリアでエラーが発生しましたが、ログアウト処理を続行します:', propsError.message);
+      }
 
     } catch (cacheError) {
-      warnLog('⚠️ キャッシュクリア中に一部エラー:', cacheError.message);
+      warnLog('⚠️ セッションクリア中に一部エラー:', cacheError.message);
       warnLog('⚠️ エラースタック:', cacheError.stack);
-      // キャッシュクリアエラーは致命的ではないので継続
+      // セッションクリアエラーは致命的ではないので継続
     }
 
     // Step 2: ログインページURLの生成と適切なサニタイズ
