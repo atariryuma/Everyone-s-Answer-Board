@@ -3379,6 +3379,8 @@ async function deleteUserAccount(userId) {
         });
 
         try {
+          infoLog('⏳ About to await batchUpdateSpreadsheet...', { timestamp: new Date().toISOString() });
+          
           const batchResult = await batchUpdateSpreadsheet(service, dbId, {
             requests: [deleteRequest]
           });

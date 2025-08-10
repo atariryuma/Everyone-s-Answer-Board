@@ -61,8 +61,28 @@ function executeWithStandardizedLock(operationType, operationName, operation) {
   const lock = acquireStandardizedLock(operationType, operationName);
 
   try {
-    return operation();
-  } finally {
+    const result = operation();
+    
+    // async関数の場合、Promiseが返されるので適切に処理する
+    if (result && typeof result.then === 'function') {
+      // Promiseの場合は、完了を待ってからロックを解放
+      return result.then(
+        (value) => {
+          releaseStandardizedLock(lock, operationName);
+          return value;
+        },
+        (error) => {
+          releaseStandardizedLock(lock, operationName);
+          throw error;
+        }
+      );
+    } else {
+      // 同期処理の場合は従来通り
+      releaseStandardizedLock(lock, operationName);
+      return result;
+    }
+  } catch (error) {
     releaseStandardizedLock(lock, operationName);
+    throw error;
   }
 }
