@@ -609,18 +609,46 @@
 
         // 管理パネルに戻る
         function goBackToAdminPanel() {
+            // ボタンの視覚フィードバック: クリック時に無効化
+            const backButton = document.querySelector('[onclick="goBackToAdminPanel()"]');
+            const originalText = backButton ? backButton.textContent : '';
+            
+            if (backButton) {
+                backButton.disabled = true;
+                backButton.style.opacity = '0.6';
+                backButton.style.pointerEvents = 'none';
+                backButton.textContent = '← 移動中...';
+            }
+            
+            // ボタンを元に戻すヘルパー関数（エラー時のみ使用）
+            const restoreButton = () => {
+                if (backButton) {
+                    backButton.disabled = false;
+                    backButton.style.opacity = '';
+                    backButton.style.pointerEvents = '';
+                    backButton.textContent = originalText || '← 管理パネルに戻る';
+                }
+            };
+            
             google.script.run
                 .withSuccessHandler((webAppUrl) => {
                     const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
                     // サンドボックス環境では window.top への直接アクセスが制限されるため
                     // 確実に遷移させるために window.open を利用する
+                    // 成功時はページが切り替わるのでrestoreButton()は呼ばない
                     window.open(targetUrl, '_top');
                 })
                 .withFailureHandler((error) => {
                     console.error('WebApp URL取得エラー:', error);
-                    const currentUrl = window.location.href.split('?')[0];
-                    const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
-                    window.open(targetUrl, '_top');
+                    restoreButton(); // エラー時のみボタンを復元
+                    showMessage('管理パネルへの移動に失敗しました。再度お試しください。', 'error');
+                    
+                    // フォールバックとして現在のURLベースでの遷移も試みる
+                    setTimeout(() => {
+                        const currentUrl = window.location.href.split('?')[0];
+                        const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
+                        window.open(targetUrl, '_top');
+                    }, 2000);
                 })
                 .getWebAppUrl();
         }

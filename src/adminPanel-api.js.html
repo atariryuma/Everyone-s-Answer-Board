@@ -2300,6 +2300,33 @@ function openForm() {
 
 // Open app setup page
 function openAppSetupPage() {
+  // ボタンの視覚フィードバック: クリック時に無効化
+  const setupButton = document.querySelector('[onclick="openAppSetupPage()"]');
+  const originalText = setupButton ? setupButton.textContent : '';
+  
+  if (setupButton) {
+    setupButton.disabled = true;
+    setupButton.style.opacity = '0.6';
+    setupButton.style.pointerEvents = 'none';
+    const span = setupButton.querySelector('span');
+    if (span) {
+      span.textContent = '準備中...';
+    }
+  }
+  
+  // ボタンを元に戻すヘルパー関数
+  const restoreButton = () => {
+    if (setupButton) {
+      setupButton.disabled = false;
+      setupButton.style.opacity = '';
+      setupButton.style.pointerEvents = '';
+      const span = setupButton.querySelector('span');
+      if (span && originalText.includes('アプリ設定管理')) {
+        span.textContent = 'アプリ設定管理';
+      }
+    }
+  };
+
   const loadingMessage = 'アプリ設定ページを準備中...';
   const errorMessage = 'アプリ設定ページへの移動に失敗しました。';
   const timeoutMessage = 'リダイレクトがタイムアウトしました。新しいタブで開きます。';
@@ -2316,6 +2343,7 @@ function openAppSetupPage() {
       const redirectTimeout = setTimeout(() => {
         console.warn('Redirect to app setup page timed out. Attempting fallback.');
         window.unifiedLoading.hide();
+        restoreButton();
         showMessage(timeoutMessage, 'warning');
         window.open(setupUrl, '_blank'); // Fallback: open in new tab
       }, 10000); // 10秒でタイムアウト
@@ -2324,10 +2352,12 @@ function openAppSetupPage() {
       try {
         clearTimeout(redirectTimeout);
         window.unifiedLoading.hide();
+        // 成功時はページが切り替わるのでrestoreButton()は呼ばない
         window.open(setupUrl, '_top'); // _top を使用して現在のウィンドウで開く
       } catch (e) {
         console.error('Error opening app setup page:', e);
         window.unifiedLoading.hide();
+        restoreButton();
         showMessage(errorMessage + ' ' + (e.message || ''), 'error');
         // フォールバック: 新しいタブで開く
         showMessage(fallbackMessage, 'info');
@@ -2337,6 +2367,7 @@ function openAppSetupPage() {
     .catch(function(error) {
       console.error('Failed to get web app URL for app setup page:', error);
       window.unifiedLoading.hide();
+      restoreButton();
       showMessage('アプリ設定ページのURLを取得できませんでした。' + (error.message || ''), 'error');
     });
 }

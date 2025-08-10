@@ -5002,7 +5002,7 @@ function updateUserActiveStatusForUI(targetUserId, isActive) {
       lastAccessedAt: new Date().toISOString()
     });
 
-    if (updateResult && updateResult.success) {
+    if (updateResult && updateResult.status === 'success') {
       return {
         status: 'success',
         message: isActive ? 'ユーザーを有効化しました' : 'ユーザーを無効化しました',
