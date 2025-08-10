@@ -366,7 +366,7 @@
     <!-- 削除確認モーダル -->
     <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
         <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 class="text-xl font-semibold text-white mb-4">⚠️ ユーザーアカウント削除</h3>
+            <h3 class="text-xl font-semibold text-white mb-4">📋 ユーザー管理オプション</h3>
             
             <div class="mb-4">
                 <p class="text-gray-300 mb-2">以下のユーザーを削除しますか？</p>
@@ -375,7 +375,40 @@
                     <p class="text-sm text-gray-400" id="delete-user-id"></p>
                 </div>
             </div>
+            <!-- タブヘッダー -->
+            <div class="border-b border-gray-700 mb-4">
+                <nav class="-mb-px flex gap-2" aria-label="Tabs">
+                    <button id="tab-btn-access" class="px-3 py-2 text-sm rounded-t-lg bg-gray-800 text-gray-300 hidden" onclick="switchUserModalTab('access')">アクセス制御</button>
+                    <button id="tab-btn-delete" class="px-3 py-2 text-sm rounded-t-lg bg-gray-900 text-white" onclick="switchUserModalTab('delete')">アカウント削除</button>
+                </nav>
+            </div>
             
+            <!-- タブ: アクセス制御（管理者のみ表示） -->
+            <div id="tab-access" class="hidden">
+                <div class="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg mb-3">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h4 class="text-white text-sm font-medium">現在の状態: <span id="user-access-status" class="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-gray-600 text-gray-300">読み込み中...</span></h4>
+                        </div>
+                        <div class="flex items-center">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="user-access-toggle" class="sr-only peer" disabled>
+                                <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        <p><strong>有効:</strong> アプリケーションにアクセス可能</p>
+                        <p><strong>無効:</strong> アクセスが制限されます</p>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button id="save-access-settings" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>設定を保存</button>
+                </div>
+            </div>
+            
+            <!-- タブ: アカウント削除 -->
+            <div id="tab-delete">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-300 mb-2">削除理由 <span class="text-red-400">*</span></label>
                 <textarea 
@@ -405,6 +438,7 @@
                     class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg">
                     削除実行
                 </button>
+            </div>
             </div>
         </div>
     </div>
@@ -681,7 +715,8 @@
                                 <button 
                                     data-user-id="${user.userId}"
                                     data-user-email="${user.adminEmail}"
-                                    onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
+                                    data-is-active="${isActive}"
+                                    onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail, this.dataset.isActive === 'true')"
                                     class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
                                     削除
                                 </button>
@@ -695,14 +730,120 @@
         }
 
         // 削除確認モーダルを表示
-        function showDeleteConfirmation(userId, userEmail) {
-            userToDelete = { userId, userEmail };
+        function showDeleteConfirmation(userId, userEmail, isActive) {
+            userToDelete = { userId, userEmail, isActive: !!isActive };
             
             document.getElementById('delete-user-email').textContent = userEmail;
             document.getElementById('delete-user-id').textContent = `ID: ${userId}`;
             document.getElementById('deletion-reason').value = '';
+
+            // 権限に応じてタブの表示制御
+            const isAdmin = currentUserInfo && currentUserInfo.isSystemAdmin === true;
+            const accessTabBtn = document.getElementById('tab-btn-access');
+            const accessTab = document.getElementById('tab-access');
+            const deleteTabBtn = document.getElementById('tab-btn-delete');
+            const deleteTab = document.getElementById('tab-delete');
+
+            if (isAdmin) {
+                accessTabBtn.classList.remove('hidden');
+                // 初期状態を反映
+                const toggle = document.getElementById('user-access-toggle');
+                const status = document.getElementById('user-access-status');
+                if (toggle) {
+                    toggle.disabled = false;
+                    toggle.checked = !!isActive;
+                }
+                if (status) {
+                    if (isActive) {
+                        status.textContent = '✅ 有効';
+                        status.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white';
+                    } else {
+                        status.textContent = '❌ 無効';
+                        status.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-red-600 text-white';
+                    }
+                }
+                // デフォルトタブ: アクセス制御
+                switchUserModalTab('access');
+            } else {
+                // 管理者以外はアクセス制御を隠す
+                accessTabBtn.classList.add('hidden');
+                accessTab.classList.add('hidden');
+                // デフォルトタブ: 削除
+                switchUserModalTab('delete');
+            }
+
             document.getElementById('delete-modal').classList.remove('hidden');
         }
+
+        // タブ切り替え
+        function switchUserModalTab(tab) {
+            const accessTabBtn = document.getElementById('tab-btn-access');
+            const deleteTabBtn = document.getElementById('tab-btn-delete');
+            const accessTab = document.getElementById('tab-access');
+            const deleteTab = document.getElementById('tab-delete');
+
+            if (tab === 'access') {
+                accessTab.classList.remove('hidden');
+                deleteTab.classList.add('hidden');
+                accessTabBtn.classList.replace('bg-gray-800', 'bg-gray-900');
+                accessTabBtn.classList.replace('text-gray-300', 'text-white');
+                deleteTabBtn.classList.replace('bg-gray-900', 'bg-gray-800');
+                deleteTabBtn.classList.replace('text-white', 'text-gray-300');
+            } else {
+                accessTab.classList.add('hidden');
+                deleteTab.classList.remove('hidden');
+                deleteTabBtn.classList.replace('bg-gray-800', 'bg-gray-900');
+                deleteTabBtn.classList.replace('text-gray-300', 'text-white');
+                accessTabBtn.classList.replace('bg-gray-900', 'bg-gray-800');
+                accessTabBtn.classList.replace('text-white', 'text-gray-300');
+            }
+        }
+
+        // アクセス制御のUIとAPI連携
+        (function setupAccessControlHandlers() {
+            const toggle = document.getElementById('user-access-toggle');
+            const saveBtn = document.getElementById('save-access-settings');
+            if (!toggle || !saveBtn) return;
+
+            // トグル変更で保存ボタンの状態を更新
+            toggle.addEventListener('change', function() {
+                if (!userToDelete) return;
+                const hasChanges = this.checked !== !!userToDelete.isActive;
+                saveBtn.disabled = !hasChanges;
+            });
+
+            // 保存ボタンクリックでサーバー更新
+            saveBtn.addEventListener('click', function() {
+                if (!userToDelete) return;
+                const newStatus = !!document.getElementById('user-access-toggle').checked;
+                const originalText = saveBtn.textContent;
+                saveBtn.disabled = true;
+                saveBtn.textContent = '保存中...';
+
+                google.script.run
+                    .withSuccessHandler((result) => {
+                        if (result && result.status === 'success') {
+                            showMessage(`✅ アクセス設定を${newStatus ? '有効' : '無効'}に変更しました`, 'success');
+                            userToDelete.isActive = newStatus;
+                            // ボタン状態を更新
+                            saveBtn.disabled = true;
+                            // ユーザー一覧を再読み込み
+                            loadUserList();
+                        } else {
+                            showMessage(`❌ 設定の保存に失敗しました: ${(result && result.message) || ''}`, 'error');
+                            saveBtn.disabled = false;
+                        }
+                        saveBtn.textContent = originalText;
+                    })
+                    .withFailureHandler((error) => {
+                        console.error('updateUserActiveStatusForUI error:', error);
+                        showMessage(`❌ 設定の保存に失敗しました: ${error.message || error}`, 'error');
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = originalText;
+                    })
+                    .updateUserActiveStatusForUI(userToDelete.userId, newStatus);
+            });
+        })();
 
         // 削除をキャンセル
         function cancelDeletion() {

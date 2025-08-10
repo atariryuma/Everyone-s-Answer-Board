@@ -1433,21 +1433,9 @@ window.addEventListener('resize', function() {
   }
 });
 
-// =============================================================================
-// ACCOUNT MANAGEMENT MODAL FUNCTIONALITY
-// =============================================================================
-
-// Account management modal state
-window.AccountManagement = {
-  currentUserStatus: null,
-  modal: null,
-  
-  // Initialize account management modal
-  init: function() {
-    this.modal = document.getElementById('account-management-modal');
-    this.setupEventListeners();
-    logDebug('✅ Account management modal initialized');
-  },
+// Account management modal functionality has been removed
+// Individual user access control is now handled in AppSetupPage.html
+/*
   
   // Setup event listeners
   setupEventListeners: function() {
@@ -1730,18 +1718,8 @@ window.AccountManagement = {
   }
 };
 
-// Initialize account management modal when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-      window.AccountManagement.init();
-    }, 100); // Small delay to ensure other initialization is complete
-  });
-} else {
-  setTimeout(() => {
-    window.AccountManagement.init();
-  }, 100);
-}
+*/
+// Account management initialization has been removed
 
 //# sourceURL=adminPanel-framework.js.html
 </script>

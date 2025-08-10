@@ -1115,10 +1115,10 @@
             </div>
           </div>
           
-          <!-- アカウント・アクセス管理ボタン -->
-          <button type="button" id="account-management-btn" class="btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white w-full text-sm py-2">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-            <span>アカウント・アクセス管理</span>
+          <!-- アカウント削除ボタン -->
+          <button type="button" id="delete-account-btn" class="btn btn-danger w-full text-sm py-2">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            <span>自分のアカウントを完全に削除する</span>
           </button>
         </div>
       </details>
@@ -1183,97 +1183,6 @@
   <!-- 共通モーダルコンポーネントを読み込み -->
   <?!= include('SharedModals'); ?>
   
-  <!-- アカウント管理モーダル -->
-  <div id="account-management-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" role="dialog" aria-labelledby="account-modal-title" aria-hidden="true">
-    <div class="bg-gray-900 rounded-lg shadow-2xl max-w-md w-full mx-4 border border-gray-700">
-      <!-- ヘッダー -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-700">
-        <h2 id="account-modal-title" class="text-xl font-semibold text-white flex items-center gap-2">
-          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-          </svg>
-          アカウント・アクセス管理
-        </h2>
-        <button type="button" id="account-modal-close" class="text-gray-400 hover:text-white transition-colors" aria-label="モーダルを閉じる">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-      
-      <!-- モーツルコンテンツ -->
-      <div class="p-6 space-y-6">
-        <!-- アクセス制御セクション -->
-        <div class="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="text-lg font-medium text-white flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                </svg>
-                アクセス制御
-              </h3>
-              <p class="text-sm text-gray-400 mt-1">あなたのアカウントのアクセス状態を管理します</p>
-            </div>
-          </div>
-          
-          <div class="space-y-3">
-            <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <div>
-                <span class="text-gray-300">現在の状態:</span>
-                <span id="user-access-status" class="ml-2 px-2 py-1 rounded-full text-xs font-medium bg-gray-600 text-gray-300">
-                  読み込み中...
-                </span>
-              </div>
-            </div>
-            
-            <div class="flex items-center justify-between">
-              <span class="text-white font-medium">アクセス権限</span>
-              <div class="flex items-center">
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" id="user-access-toggle" class="sr-only peer" disabled>
-                  <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-            </div>
-            
-            <div class="text-xs text-gray-400">
-              <p><strong>有効:</strong> アプリケーションにアクセス可能</p>
-              <p><strong>無効:</strong> アクセスが制限されます</p>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 危険な操作セクション -->
-        <div class="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-          <h3 class="text-lg font-medium text-white flex items-center gap-2 mb-3">
-            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.19 2.5 1.732 2.5z"></path>
-            </svg>
-            危険な操作
-          </h3>
-          <p class="text-sm text-gray-400 mb-4">以下の操作は永久的で元に戻せません</p>
-          
-          <button type="button" id="delete-account-btn" class="w-full btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-            アカウントを完全に削除する
-          </button>
-        </div>
-        
-        <!-- フッターボタン -->
-        <div class="flex gap-3 pt-2">
-          <button type="button" id="account-modal-cancel" class="flex-1 btn bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg transition-colors">
-            キャンセル
-          </button>
-          <button type="button" id="save-access-settings" class="flex-1 btn bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors" disabled>
-            設定を保存
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
   <!-- Admin Panel JavaScript Components -->
   <!-- Constants must be loaded first -->
   <?!= include('constants.js'); ?>

@@ -4977,6 +4977,50 @@ function getAllUsersForAdminForUI(requestUserId) {
 }
 
 /**
+ * 管理者によるユーザーのisActive制御（AppSetupPage.html用ラッパー）
+ * @param {string} targetUserId - 対象ユーザーID
+ * @param {boolean} isActive - 設定する状態
+ * @returns {Object} 実行結果
+ */
+function updateUserActiveStatusForUI(targetUserId, isActive) {
+  try {
+    // 権限チェック: システム管理者のみ許可
+    if (!isSystemAdmin()) {
+      return {
+        status: 'error',
+        message: 'この操作を実行する権限がありません'
+      };
+    }
+
+    if (!targetUserId) {
+      return { status: 'error', message: 'ユーザーIDが指定されていません' };
+    }
+
+    var newIsActiveValue = isActive ? 'true' : 'false';
+    var updateResult = updateUser(targetUserId, {
+      isActive: newIsActiveValue,
+      lastAccessedAt: new Date().toISOString()
+    });
+
+    if (updateResult && updateResult.success) {
+      return {
+        status: 'success',
+        message: isActive ? 'ユーザーを有効化しました' : 'ユーザーを無効化しました',
+        newStatus: newIsActiveValue
+      };
+    } else {
+      return { status: 'error', message: 'データベースの更新に失敗しました' };
+    }
+  } catch (error) {
+    errorLog('updateUserActiveStatusForUI エラー:', error);
+    return {
+      status: 'error',
+      message: error.message || String(error)
+    };
+  }
+}
+
+/**
  * 統合カスタムセットアップ処理（QuickStart同様の完全自動化）
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {object} config - カスタムフォーム設定
