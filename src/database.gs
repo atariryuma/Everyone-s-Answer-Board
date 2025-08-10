@@ -372,10 +372,28 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       const data =  batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
       const values = data.valueRanges[0].values || [];
 
+      // userIdフィールドのインデックスを特定
+      const headers = values[0];
+      let userIdFieldIndex = -1;
+      
+      for (let j = 0; j < headers.length; j++) {
+        if (headers[j] === 'userId') {
+          userIdFieldIndex = j;
+          break;
+        }
+      }
+      
+      if (userIdFieldIndex === -1) {
+        throw new Error('データベースに userId フィールドが見つかりません');
+      }
+      
+      debugLog('Found userId field at index:', userIdFieldIndex, 'for admin deletion');
+
       let rowToDelete = -1;
       for (let i = values.length - 1; i >= 1; i--) {
-        if (values[i][0] === targetUserId) {
+        if (values[i][userIdFieldIndex] === targetUserId) {
           rowToDelete = i + 1; // スプレッドシートは1ベース
+          debugLog('Found target user row to delete at index:', i, 'rowToDelete:', rowToDelete);
           break;
         }
       }
@@ -3284,11 +3302,29 @@ function deleteUserAccount(userId) {
       const data =  batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
       const values = data.valueRanges[0].values || [];
 
-      // ユーザーIDに基づいて行を探す（A列がIDと仮定）
+      // ユーザーIDに基づいて行を探す（フィールドベース検索）
+      const headers = values[0];
+      let userIdFieldIndex = -1;
+      
+      // userIdフィールドのインデックスを特定
+      for (let j = 0; j < headers.length; j++) {
+        if (headers[j] === 'userId') {
+          userIdFieldIndex = j;
+          break;
+        }
+      }
+      
+      if (userIdFieldIndex === -1) {
+        throw new Error('データベースに userId フィールドが見つかりません');
+      }
+      
+      debugLog('Found userId field at index:', userIdFieldIndex);
+      
       var rowToDelete = -1;
       for (let i = values.length - 1; i >= 1; i--) {
-        if (values[i][0] === userId) {
+        if (values[i][userIdFieldIndex] === userId) {
           rowToDelete = i + 1; // スプレッドシートは1ベース
+          debugLog('Found user row to delete at index:', i, 'rowToDelete:', rowToDelete);
           break;
         }
       }
@@ -3314,7 +3350,10 @@ function deleteUserAccount(userId) {
 
         debugLog('Row deletion completed successfully');
       } else {
-        warnLog('User row not found for deletion, userId:', userId);
+        // 削除対象の行が見つからない場合はエラーとして扱う
+        const errorMessage = `削除対象のユーザー行が見つかりません。userId: ${userId}`;
+        errorLog(errorMessage);
+        throw new Error(errorMessage);
       }
 
       // 削除ログを記録
