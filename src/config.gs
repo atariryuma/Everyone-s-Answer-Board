@@ -3044,8 +3044,53 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
     configJson.autoStoppedAt = null; // 自動停止実行日時をリセット
     configJson.autoStopReason = null; // 自動停止理由をリセット
 
-    // シート固有のフォームURL同期
-    syncFormUrlForActiveSheet(configJson, sheetName);
+    // シート固有のフォームURL同期（不足時は当該シートから直接検出を試行）
+    try {
+      const sheetKey = `sheet_${sheetName}`;
+      const sheetCfg = configJson[sheetKey] || {};
+
+      if (!sheetCfg.formUrl) {
+        try {
+          const ss = openSpreadsheetOptimized(spreadsheetId);
+          const targetSheet = ss && ss.getSheetByName(sheetName);
+          if (targetSheet) {
+            try {
+              const url = targetSheet.getFormUrl();
+              if (url) {
+                sheetCfg.formUrl = url;
+                infoLog('✅ switchToSheetInContext: シートからフォームURLを直接取得:', url);
+              }
+            } catch (getFormErr) {
+              debugLog('getFormUrl 未取得（例外）:', getFormErr.message);
+            }
+          }
+        } catch (sheetOpenErr) {
+          debugLog('シートアクセス失敗（フォームURL検出スキップ）:', sheetOpenErr.message);
+        }
+
+        // 直接取得できない場合は既存の検出ロジックにフォールバック（スプレッドシート単位）
+        if (!sheetCfg.formUrl) {
+          const detected = detectFormUrlFromSpreadsheet(spreadsheetId);
+          if (detected && detected.success && detected.formUrl) {
+            sheetCfg.formUrl = detected.formUrl;
+            infoLog('✅ switchToSheetInContext: フォールバック検出でフォームURL設定:', detected.formUrl);
+          } else {
+            warnLog('⚠️ シート固有のフォームURLが見つかりません（検出不可）:', {
+              シート名: sheetName,
+              設定キー: sheetKey,
+              利用可能な設定: Object.keys(configJson).filter(k => k.startsWith('sheet_'))
+            });
+          }
+        }
+
+        configJson[sheetKey] = sheetCfg; // 修正反映
+      }
+
+      // アクティブシートのフォームURLをグローバルに同期
+      syncFormUrlForActiveSheet(configJson, sheetName);
+    } catch (formSyncErr) {
+      warnLog('switchToSheetInContext: フォームURL同期で警告:', formSyncErr.message);
+    }
 
     // updateUserOptimizedを使用してコンテキストに変更を蓄積
     updateUserOptimized(context, {

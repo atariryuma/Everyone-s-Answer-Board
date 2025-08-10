@@ -1365,8 +1365,15 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
 
   try {
-    // キャッシュキー生成（パフォーマンス向上）
-    var requestKey = `publishedData_${requestUserId}_${classFilter}_${sortOrder}_${adminMode}`;
+    // アクティブボード識別子（シート切替時にキーが変わるように）
+    var userInfoForKey = getOrFetchUserInfo(requestUserId, 'userId', { useExecutionCache: true, ttl: 120 });
+    var cfgForKey = {};
+    try { cfgForKey = JSON.parse(userInfoForKey && userInfoForKey.configJson || '{}'); } catch (e) { cfgForKey = {}; }
+    var activeSsId = cfgForKey.publishedSpreadsheetId || 'none';
+    var activeSheet = cfgForKey.publishedSheetName || 'none';
+
+    // キャッシュキー生成（アクティブなスプレッドシート/シート名を含める）
+    var requestKey = `publishedData_${requestUserId}_${activeSsId}_${activeSheet}_${classFilter}_${sortOrder}_${adminMode}`;
 
     // キャッシュバイパス時は直接実行
     if (bypassCache === true) {
