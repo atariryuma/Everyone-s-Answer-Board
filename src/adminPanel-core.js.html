@@ -45,14 +45,14 @@ function logDebug(...args) { adminLog('debug', ...args); }
 // removed to avoid duplication.
 
 // =============================================================================
-// UNIFIED MANAGEMENT SYSTEM API
+// UNIFIED MANAGEMENT SYSTEM API - 統一管理システムAPI
 // =============================================================================
 
 /**
- * Unified Management System - Entry point for all management classes
+ * 統一管理システム - 全管理クラスのエントリーポイント
  */
 window.unifiedManagement = {
-  // Cache management (CacheManager)
+  // キャッシュ管理 (CacheManager)
   cache: {
     get: (key, valueFn, options) => typeof cacheManager !== 'undefined' ? cacheManager.get(key, valueFn, options) : (valueFn ? valueFn() : null),
     remove: (key) => typeof cacheManager !== 'undefined' ? cacheManager.remove(key) : null,
@@ -63,7 +63,7 @@ window.unifiedManagement = {
     getHealth: () => typeof cacheManager !== 'undefined' ? cacheManager.getHealth() : { status: 'unavailable' }
   },
 
-  // Timing control (TimingManager)
+  // タイミング制御 (TimingManager)
   timing: {
     delay: (ms, id) => typeof TimingManager !== 'undefined' ? TimingManager.delay(ms, id) : new Promise(resolve => setTimeout(resolve, ms)),
     sequence: (operations, intervalMs, sequenceId) => typeof TimingManager !== 'undefined' ? TimingManager.sequence(operations, intervalMs, sequenceId) : Promise.resolve([]),
@@ -75,7 +75,7 @@ window.unifiedManagement = {
     clearAllTiming: () => typeof TimingManager !== 'undefined' ? TimingManager.clearAllTiming() : null
   },
 
-  // Flow execution control (FlowExecutionManager)
+  // フロー実行制御 (FlowExecutionManager)
   flow: {
     execute: (flowId, operation, options) => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.executeWithLock(flowId, operation, options) : operation(),
     executeWithLoading: (flowId, operation, options) => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.executeWithLoadingSync(flowId, operation, options) : operation(),
@@ -84,7 +84,7 @@ window.unifiedManagement = {
     diagnose: () => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.diagnoseExecution() : { activeFlows: [], pendingOperations: 0 }
   },
 
-  // UI management (UnifiedLoadingManager)
+  // UI管理 (UnifiedLoadingManager)
   ui: {
     showLoading: (message, options) => window.unifiedLoading && window.unifiedLoading.showSimple(message, options),
     showProgress: (message, step, percentage) => window.unifiedLoading && window.unifiedLoading.showAdminProgress(message, step, percentage),
@@ -92,7 +92,7 @@ window.unifiedManagement = {
     setLoading: (isLoading, message, step, percentage) => window.setLoading(isLoading, message, step, percentage)
   },
 
-  // System diagnostics
+  // システム診断
   diagnose: () => ({
     cache: typeof cacheManager !== 'undefined' ? cacheManager.diagnoseFrontendCache() : { available: false },
     flow: typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.diagnoseExecution() : { activeFlows: [], pendingOperations: 0 },
@@ -105,14 +105,14 @@ window.unifiedManagement = {
   })
 };
 
-// Global functions for legacy compatibility
+// レガシー互換性のためのグローバル関数
 var debounce = function(func, delay, key) {
   if (typeof TimingManager !== 'undefined') {
     return TimingManager.debounce(func, key || 'default', delay);
   } else if (window.sharedUtilities && window.sharedUtilities.debounce) {
     window.sharedUtilities.debounce.debounce(func, key || 'default', delay);
   } else {
-    // Fallback implementation
+    // フォールバック実装
     let timeouts = window._debounceTimeouts || (window._debounceTimeouts = {});
     return function(...args) {
       const timeoutKey = key || 'default';
@@ -264,7 +264,7 @@ function setupDelegatedHandler(parentElement, selector, event, callback) {
 // STATE MANAGEMENT
 // =============================================================================
 
-// Multi-tenant support: Safe user ID initialization
+// マルチテナント対応: ユーザーIDの安全な初期化
 var userId = '';
 
 // Operation mutex system to prevent concurrent operations

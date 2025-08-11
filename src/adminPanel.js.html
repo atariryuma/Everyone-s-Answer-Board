@@ -6,8 +6,11 @@
     const savePublishBtn = document.getElementById('save-publish-btn');
     if (!savePublishBtn) return;
     
+    // セットアップ状況を確認
     const setupStatus = getSetupStatusFromGlobalStatus();
     
+    // Note: ステップ制御は統一されたmanagedSectionStates()で管理
+    // enforceStepProgression()は無効化して競合を回避
     
     let isValid = false;
     
@@ -30,6 +33,7 @@
     savePublishBtn.disabled = !isValid;
   }
   
+  // セットアップ状況をグローバルステータスから取得
   function getSetupStatusFromGlobalStatus() {
     try {
       if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
@@ -40,15 +44,17 @@
       }
       return 'pending';
     } catch (error) {
-      console.warn('getSetupStatusFromGlobalStatus error:', error);
+      console.warn('getSetupStatusFromGlobalStatus エラー:', error);
       return 'pending';
     }
   }
   
+  // セットアップ未完了時の段階的制御を強制
   function enforceStepProgression() {
     const step1Completed = checkStep1Completion();
     const step2Completed = checkStep2Completion();
     
+    // Step 2の制御
     const step2Section = document.getElementById('sheet-selection-section');
     if (!step1Completed) {
       disableSection(step2Section, '⚠️ 先にデータ準備を完了してください');
@@ -56,19 +62,22 @@
       enableSection(step2Section);
     }
     
+    // Step 3の制御
     const step3Section = document.getElementById('config-section');
     if (!step1Completed || !step2Completed) {
-      disableSection(step3Section, '⚠️ 先に前のステップを完了してください');
+      disableSection(step3Section, '⚠️ 前のステップを完了してください');
     } else {
       enableSection(step3Section);
     }
   }
   
+  // Step 1完了チェック
   function checkStep1Completion() {
     return !!(selectedSheetId || selectedFormId || 
               (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
   }
   
+  // Step 2完了チェック - 統一されたconfigJson状態確認
   function checkStep2Completion() {
     if (!currentStatus?.userInfo?.configJson) {
       return false;
@@ -79,24 +88,27 @@
         ? JSON.parse(currentStatus.userInfo.configJson) 
         : currentStatus.userInfo.configJson;
       
+      // データベース状態に基づく統一判定
       const setupCompleted = config.setupStatus === 'completed' && 
                             config.formCreated === true && 
                             config.formUrl && config.formUrl.trim();
       
-      console.log('✅ Step 2 completion check (unified):', setupCompleted);
+      console.log('✅ Step 2完了チェック (統一版):', setupCompleted);
       return setupCompleted;
     } catch (error) {
-      console.warn('❌ Step 2 completion check error:', error);
+      console.warn('❌ Step 2完了チェックでエラー:', error);
       return false;
     }
   }
   
+  // セクションを無効化
   function disableSection(section, message) {
     if (!section) return;
     
     section.style.opacity = '0.5';
     section.style.pointerEvents = 'none';
     
+    // 警告メッセージを追加
     const existingWarning = section.querySelector('.step-warning');
     if (!existingWarning) {
       const warning = document.createElement('div');
@@ -106,12 +118,14 @@
     }
   }
   
+  // セクションを有効化
   function enableSection(section) {
     if (!section) return;
     
     section.style.opacity = '1';
     section.style.pointerEvents = 'auto';
     
+    // 警告メッセージを削除
     const warning = section.querySelector('.step-warning');
     if (warning) {
       warning.remove();
@@ -200,7 +214,7 @@
             ${columns.map(col => `<option value="${col.id}">${col.name}</option>`).join('')}
             <option value="content">回答内容</option>
             <option value="author">回答者名</option>
-            <option value="timestamp">回答日時</option>
+            <option value="timestamp">回答時刻</option>
             <option value="reaction">リアクション</option>
             <option value="ignore">無視</option>
           </select>
@@ -252,10 +266,12 @@
     return hasContent && hasAuthor;
   }
   
+  // Handle save and publish - 修正版（公開モーダル経由）
   function handleSaveAndPublish() {
     const btn = document.getElementById('save-publish-btn');
     if (!btn || btn.disabled) return;
     
+    // 設定の準備
     const config = {
       sheetId: selectedSheetId,
       formId: selectedFormId,
@@ -267,56 +283,64 @@
       }
     };
     
+    // 自動停止設定を準備
     const autoStopSettings = {
       enabled: true,
-      minutes: 360
+      minutes: 360 // 6時間 = 360分（config.gsと統一）
     };
     
+    // 公開モーダルを表示
     if (window.sharedModals && typeof window.sharedModals.showPublish === 'function') {
       window.sharedModals.showPublish(
+        // 公開実行時のコールバック
         () => {
-          console.log('📤 Publish selected from modal');
+          console.log('📤 公開モーダルで公開が選択されました');
           executePublishProcess(btn, config);
         },
+        // キャンセル時のコールバック
         () => {
-          console.log('❌ Publish cancelled');
+          console.log('❌ 公開がキャンセルされました');
         },
+        // 自動停止設定
         autoStopSettings
       );
     } else {
-      console.warn('⚠️ Publish modal not available. Executing directly.');
+      // フォールバック: モーダルが利用できない場合は直接実行
+      console.warn('⚠️ 公開モーダルが利用できません。直接実行します。');
       executePublishProcess(btn, config);
     }
   }
   
+  // 実際の公開処理実行
   function executePublishProcess(btn, config) {
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner mr-2"></div>保存して公開中...';
+    btn.innerHTML = '<div class="spinner mr-2"></div>保存・公開中...';
     
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('saveAndPublishBoard', config)
         .then(result => {
           if (result.success) {
-            showMessage('設定を保存し、ボードを公開しました。', 'success');
+            showMessage('設定が保存され、ボードが公開されました', 'success');
             if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
               window.unifiedCache.clear();
             }
             loadSystemStatus();
             
+            // 🔧 公開成功後に状態整合性チェック・修復を実行
             setTimeout(() => {
-              console.log('🔧 Running post-publish state integrity check...');
+              console.log('🔧 公開後の状態整合性チェックを実行中...');
               if (typeof initializeUserSettings === 'function') {
                 initializeUserSettings()
                   .then(result => {
                     if (result.success) {
-                      console.log('✅ Post-publish state check completed:', result.message);
+                      console.log('✅ 公開後の状態チェック完了:', result.message);
                     }
                   })
                   .catch(error => {
-                    console.warn('⚠️ Minor issue in post-publish state check:', error.message);
+                    console.warn('⚠️ 公開後の状態チェックで軽微な問題:', error.message);
                   });
               } else {
-                console.warn('⚠️ initializeUserSettings function not available');
+                console.warn('⚠️ initializeUserSettings関数が利用できません');
               }
             }, 500);
             
@@ -326,10 +350,11 @@
               console.warn('⚠️ navigateToStep function not available');
             }
             
+            // 自動停止確認モーダルを表示（公開成功後）
             setTimeout(() => {
               if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
                 window.sharedModals.showAutoStopConfirmation(result);
-                console.log('✅ Auto-stop confirmation modal shown after publish');
+                console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
               }
             }, 1000);
             
@@ -343,14 +368,14 @@
         })
         .finally(() => {
           btn.disabled = false;
-          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>保存して公開';
+          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>設定を保存して公開';
         });
     }
   }
   
   // Handle unpublish
   function handleUnpublish() {
-    if (!confirm('公開を停止しますか？')) return;
+    if (!confirm('ボードの公開を停止しますか？')) return;
     
     const btn = document.getElementById('unpublish-board-btn');
     btn.disabled = true;
@@ -360,7 +385,7 @@
       runGasWithUserId('unpublishBoard')
         .then(result => {
           if (result.success) {
-            showMessage('公開を停止しました', 'success');
+            showMessage('ボードの公開を停止しました', 'success');
             if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
               window.unifiedCache.clear();
             }
@@ -392,13 +417,15 @@
     logoutAndRedirect
   };
 
+  // StudyQuest アプリ設定への遷移
   function openAppSetupPage() {
     google.script.run
       .withSuccessHandler(function(url) {
         if (url) {
-          showAdminPanelRedirect(url, 'アプリ設定管理へ移動します');
+          // ログイン画面からの遷移と同じフローを再現
+          showAdminPanelRedirect(url, 'アプリ設定管理へ遷移します');
         } else {
-          showMessage('アプリ設定のURL取得に失敗しました', 'error');
+          showMessage('アプリ設定URLの取得に失敗しました', 'error');
         }
       })
       .withFailureHandler(function(error) {
@@ -408,6 +435,7 @@
       .getAppSetupUrl(); // この関数はバックエンドで実装されていると仮定
   }
 
+  // ログアウトしてログイン画面へリダイレクト
   function logoutAndRedirect() {
     if (confirm('ログアウトしてログイン画面に戻りますか？')) {
       google.script.run
@@ -422,23 +450,27 @@
     }
   }
   /**
-   * @param {string} targetUrl - Target URL
-   * @param {string} message - Display message
+   * 管理パネルから別のページへのリダイレクト画面を表示
+   * @param {string} targetUrl - 遷移先のURL
+   * @param {string} message - 表示メッセージ
    */
   function showAdminPanelRedirect(targetUrl, message) {
     try {
+      // 引数の妥当性チェック
       if (!targetUrl || typeof targetUrl !== 'string') {
-        console.error('showAdminPanelRedirect: Invalid targetUrl provided:', targetUrl);
-        showMessage('遷移先URLが不正です。ページを再読み込みしてください。', 'error');
+        console.error('showAdminPanelRedirect: 無効なtargetUrlが渡されました:', targetUrl);
+        showMessage('遷移URLが無効です。ページを再読み込みしてください。', 'error');
         return;
       }
       
-      console.log('Showing transition screen from admin panel:', targetUrl);
+      console.log('管理パネルからの遷移画面を表示:', targetUrl);
       
+      // ローディング状態を停止
       if (typeof setLoading === 'function') {
         setLoading(false);
       }
       
+      // 簡潔なリダイレクトページ
       const redirectHtml = `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -465,18 +497,19 @@
 <body>
   <div class="container">
     <div class="title">🚀 準備完了</div>
-    <div class="message">${message || 'ページ遷移の準備ができました'}</div>
-    <a href="${targetUrl}" class="btn" target="_top">アプリ設定を開く</a>
+    <div class="message">${message || 'ページ遷移の準備が完了しました'}</div>
+    <a href="${targetUrl}" class="btn" target="_top">アプリ設定画面を開く</a>
   </div>
 </body>
 </html>`;
       
+      // 新しいページに遷移
       document.open();
       document.write(redirectHtml);
       document.close();
       
     } catch (error) {
-      console.error('Error in showAdminPanelRedirect:', error);
+      console.error('showAdminPanelRedirectでエラー:', error);
       showMessage('ページ遷移中にエラーが発生しました: ' + error.message, 'error');
     }
   }
