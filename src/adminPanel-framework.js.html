@@ -1394,17 +1394,19 @@ async function finalizeInitialization() {
       enableUserInteraction();
       updateSystemStatus('userDataSyncComplete', true);
       
-      // Load history table after all initialization is complete
+      // Initialize and load history table after all initialization is complete
       try {
-        if (window.AdminPanel?.historyManager?.loadSimpleHistoryTable) {
+        console.log('🔄 Initializing HistoryManager...');
+        if (window.HistoryManager) {
+          window.HistoryManager.initialize();
           console.log('🔄 Loading history table after initialization...');
-          await window.AdminPanel.historyManager.loadSimpleHistoryTable();
+          window.HistoryManager.renderTable();
           console.log('✅ History table loaded successfully');
         } else {
-          console.warn('⚠️ History manager not available yet');
+          console.warn('⚠️ HistoryManager not available yet');
         }
       } catch (historyError) {
-        console.warn('⚠️ History table loading failed:', historyError);
+        console.warn('⚠️ History initialization/loading failed:', historyError);
       }
       
       // Mark initialization as completed
@@ -1735,281 +1737,362 @@ window.addEventListener('resize', function() {
 // Account management initialization has been removed
 
 // =============================================================================
-// SIMPLIFIED HISTORY MANAGEMENT SYSTEM
+// UNIFIED HISTORY MANAGEMENT SYSTEM 
 // =============================================================================
 
 /**
- * History Manager for Admin Panel
+ * Unified History Manager - Simple, Error-Resilient, Single Responsibility
  */
-window.AdminPanel.historyManager = {
+window.HistoryManager = {
+  // Constants
+  STORAGE_KEY: 'answerBoardHistory',
+  OLD_STORAGE_KEY: 'adminPanelHistory', // For migration
+  MAX_ITEMS: 5,
+  
+  // Initialization state
+  _initialized: false,
+  
   /**
-   * Load and display simplified history table
+   * Initialize the History Manager
    */
-  async loadSimpleHistoryTable() {
-    console.log('🔄 loadSimpleHistoryTable called');
-    const tableBody = document.getElementById('history-table-body');
-    
-    if (!tableBody) {
-      console.warn('❌ History table body element not found');
-      return;
-    }
-    
-    console.log('✅ History table body element found');
-    
+  initialize() {
     try {
-      // Loading display
+      if (this._initialized) {
+        console.log('🔄 HistoryManager already initialized');
+        return true;
+      }
+      
+      console.log('🚀 HistoryManager initializing...');
+      
+      // Migrate old data if exists
+      this._migrateOldData();
+      
+      this._initialized = true;
+      console.log('✅ HistoryManager initialized successfully');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ HistoryManager initialization failed:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Migrate data from old storage key to new key
+   */
+  _migrateOldData() {
+    try {
+      const oldData = localStorage.getItem(this.OLD_STORAGE_KEY);
+      const newData = localStorage.getItem(this.STORAGE_KEY);
+      
+      if (oldData && !newData) {
+        console.log('🔄 Migrating history data from old key...');
+        localStorage.setItem(this.STORAGE_KEY, oldData);
+        localStorage.removeItem(this.OLD_STORAGE_KEY);
+        console.log('✅ History data migrated successfully');
+      }
+    } catch (error) {
+      console.warn('⚠️ History data migration failed:', error);
+    }
+  },
+  
+  /**
+   * Load history from localStorage with error handling
+   */
+  load() {
+    try {
+      console.log('🔄 Loading history from localStorage...');
+      const data = localStorage.getItem(this.STORAGE_KEY);
+      const parsed = data ? JSON.parse(data) : [];
+      const validated = Array.isArray(parsed) ? parsed : [];
+      console.log(`✅ Loaded ${validated.length} history items`);
+      return validated;
+    } catch (error) {
+      console.error('❌ Failed to load history:', error);
+      return [];
+    }
+  },
+  
+  /**
+   * Save history to localStorage with error handling
+   */
+  save(items) {
+    try {
+      const safeItems = Array.isArray(items) ? items : [];
+      const limitedItems = safeItems.slice(0, this.MAX_ITEMS);
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(limitedItems));
+      console.log(`✅ Saved ${limitedItems.length} history items`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to save history:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Add new item to history
+   */
+  add(newItem) {
+    try {
+      if (!newItem || !newItem.id) {
+        console.warn('⚠️ Invalid history item provided');
+        return false;
+      }
+      
+      const history = this.load();
+      history.unshift(newItem);
+      return this.save(history);
+    } catch (error) {
+      console.error('❌ Failed to add history item:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Clear all history
+   */
+  clear() {
+    try {
+      localStorage.removeItem(this.STORAGE_KEY);
+      localStorage.removeItem(this.OLD_STORAGE_KEY); // Clean old key too
+      console.log('✅ History cleared successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to clear history:', error);
+      return false;
+    }
+  },
+  /**
+   * Render history table in the UI
+   */
+  renderTable() {
+    try {
+      if (!this._initialized) {
+        console.warn('⚠️ HistoryManager not initialized, initializing now...');
+        if (!this.initialize()) {
+          console.error('❌ Cannot render table - initialization failed');
+          return false;
+        }
+      }
+      
+      console.log('🔄 Rendering history table...');
+      const tableBody = document.getElementById('history-table-body');
+      
+      if (!tableBody) {
+        console.warn('❌ History table body element not found');
+        return false;
+      }
+      
+      // Show loading state
       tableBody.innerHTML = `
         <tr>
           <td colspan="4" class="px-3 py-6 text-center text-gray-500 text-sm">
             <div class="flex flex-col items-center justify-center">
               <div class="spinner mb-3"></div>
               <div>履歴を読み込み中...</div>
-              <div class="text-xs text-gray-600 mt-1">ローカルとサーバーの履歴を統合しています</div>
             </div>
           </td>
         </tr>
       `;
       
-      // Get merged history
-      console.log('🔄 Getting merged history...');
-      const mergedHistory = await this.getMergedHistory();
-      console.log('📊 Merged history result:', mergedHistory?.length || 0, 'items');
-      
-      // Clear table
+      // Load and display history
+      const history = this.load();
       tableBody.innerHTML = '';
       
-      if (!Array.isArray(mergedHistory) || mergedHistory.length === 0) {
-        console.log('📝 No history items found, showing empty state');
-        // Empty history case
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `
-          <td colspan="4" class="px-3 py-8 text-center text-gray-500 text-sm">
-            <div class="flex flex-col items-center">
-              <div class="text-4xl mb-2">📝</div>
-              <div class="font-medium mb-1">履歴がありません</div>
-              <div class="text-xs text-gray-600">フォームを公開すると履歴が表示されます</div>
-            </div>
-          </td>
-        `;
-        tableBody.appendChild(emptyRow);
-        return;
+      if (history.length === 0) {
+        this._renderEmptyState(tableBody);
+        return true;
       }
       
-      // Display history items
+      // Render history items
       let successCount = 0;
-      let errorCount = 0;
-      
-      mergedHistory.forEach((item, index) => {
+      history.forEach((item, index) => {
         try {
-          if (!item || !item.id) {
-            console.warn('Invalid history item at index', index, item);
-            errorCount++;
-            return;
-          }
-          
-          const row = this.createHistoryTableRow(item, index);
+          const row = this._createHistoryTableRow(item, index);
           if (row) {
             tableBody.appendChild(row);
             successCount++;
-          } else {
-            errorCount++;
           }
-        } catch (rowError) {
-          console.warn('Failed to create row for history item at index', index, rowError);
-          errorCount++;
+        } catch (error) {
+          console.warn('⚠️ Failed to render history item:', error);
         }
       });
       
-      console.log(`History table loaded: ${successCount} success, ${errorCount} errors`);
-      
-      if (errorCount > 0 && typeof showMessage === 'function') {
-        showMessage(`⚠️ 一部の履歴項目（${errorCount}件）の表示に問題がありました`, 'warning');
-      }
+      console.log(`✅ History table rendered: ${successCount}/${history.length} items`);
+      return true;
       
     } catch (error) {
-      console.error('Failed to load history table:', error);
-      
-      // Fallback to local storage only
-      const localHistory = this.getHistoryFromStorage();
-      tableBody.innerHTML = '';
-      
-      if (localHistory.length === 0) {
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `
-          <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
-            履歴の読み込みに失敗しました
-          </td>
-        `;
-        tableBody.appendChild(emptyRow);
-      } else {
-        localHistory.forEach((item, index) => {
-          const row = this.createHistoryTableRow(item, index);
-          if (row) tableBody.appendChild(row);
-        });
-      }
+      console.error('❌ Failed to render history table:', error);
+      this._renderErrorState();
+      return false;
     }
   },
-
+  
   /**
-   * Create history table row
+   * Render empty state for history table
    */
-  createHistoryTableRow(item, index) {
-    const row = document.createElement('tr');
-    
-    // Active items get green highlight
-    const isActive = !!item.isActive;
-    row.className = isActive 
-      ? 'hover:bg-green-700/20 cursor-pointer transition-colors bg-green-900/10' 
-      : 'hover:bg-gray-700/50 cursor-pointer transition-colors';
-    
-    // Format dates
-    const createdDate = item.createdDate ? new Date(item.createdDate).toLocaleDateString('ja-JP') : '不明';
-    const publishedAt = item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP', {
-      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-    }) : '不明';
-    
-    // Question text (truncated)
-    const questionText = item.questionText || item.opinionHeader || 'デフォルト問題文';
-    const truncatedText = questionText.length > 30 ? questionText.substring(0, 30) + '...' : questionText;
-    
-    // Display mode and settings
-    const displayMode = this.normalizeDisplayMode(item.displayMode);
-    const displayModeIcon = displayMode === 'anonymous' ? '🎭' : '👥';
-    const displayModeText = displayMode === 'anonymous' ? '匿名表示' : '通常表示';
-    
-    row.innerHTML = `
-      <td class="px-2 py-3 text-sm text-gray-300">${createdDate}</td>
-      <td class="px-2 py-3 text-sm text-gray-300">${publishedAt}</td>
-      <td class="px-3 py-3 text-sm text-gray-200">${this.escapeHtml(truncatedText)}</td>
-      <td class="px-2 py-3 text-center text-sm">
-        <div class="flex items-center justify-center gap-1">
-          <span title="${displayModeText}">${displayModeIcon}</span>
-          <span class="text-xs text-gray-400">${item.setupType || ''}</span>
+  _renderEmptyState(tableBody) {
+    const emptyRow = document.createElement('tr');
+    emptyRow.innerHTML = `
+      <td colspan="4" class="px-3 py-8 text-center text-gray-500 text-sm">
+        <div class="flex flex-col items-center">
+          <div class="text-4xl mb-2">📝</div>
+          <div class="font-medium mb-1">履歴がありません</div>
+          <div class="text-xs text-gray-600">フォームを公開すると履歴が表示されます</div>
         </div>
       </td>
     `;
-    
-    // Click handler for restoration
-    row.addEventListener('click', async () => {
-      await this.restoreFromSimpleHistory(item);
-    });
-    
-    return row;
+    tableBody.appendChild(emptyRow);
   },
-
+  
   /**
-   * Restore from simple history
+   * Render error state for history table
    */
-  async restoreFromSimpleHistory(item) {
+  _renderErrorState() {
+    const tableBody = document.getElementById('history-table-body');
+    if (tableBody) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="4" class="px-3 py-4 text-center text-red-500 text-sm">
+            履歴の読み込みに失敗しました
+          </td>
+        </tr>
+      `;
+    }
+  },
+  
+  /**
+   * Create a table row for a history item
+   */
+  _createHistoryTableRow(item, index) {
     try {
+      const row = document.createElement('tr');
+      
+      // Active items get green highlight
+      const isActive = !!item.isActive;
+      row.className = isActive 
+        ? 'bg-green-50 hover:bg-green-100' 
+        : 'hover:bg-gray-50';
+      
+      // Format date
+      const date = item.publishedAt ? new Date(item.publishedAt) : null;
+      const dateStr = date ? date.toLocaleDateString('ja-JP', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      }) : '-';
+      
+      // Truncate question text
+      const question = this._escapeHtml(item.questionText || '未設定');
+      const truncated = question.length > 30 ? question.substring(0, 30) + '...' : question;
+      
+      row.innerHTML = `
+        <td class="px-3 py-2 text-sm">${dateStr}</td>
+        <td class="px-3 py-2 text-sm" title="${question}">${truncated}</td>
+        <td class="px-3 py-2 text-xs text-gray-600">${item.setupType || 'カスタム'}</td>
+        <td class="px-3 py-2 text-right">
+          <button onclick="window.HistoryManager.showRestoreModal('${item.id}')" 
+                  class="btn btn-sm btn-secondary">
+            復元
+          </button>
+        </td>
+      `;
+      
+      return row;
+    } catch (error) {
+      console.error('❌ Failed to create history table row:', error);
+      return null;
+    }
+  },
+  
+  /**
+   * Show restore confirmation modal
+   */
+  showRestoreModal(itemId) {
+    try {
+      const history = this.load();
+      const item = history.find(h => h.id === itemId);
+      
+      if (!item) {
+        console.error('❌ History item not found:', itemId);
+        return;
+      }
+      
       if (typeof showMessage === 'function') {
         showMessage('🔄 設定を復元中...', 'info');
       }
       
-      // 1. Basic settings restoration
+      // Perform restoration
+      this._restoreHistoryItem(item);
+      
+    } catch (error) {
+      console.error('❌ Failed to show restore modal:', error);
+    }
+  },
+  
+  /**
+   * Restore configuration from history item
+   */
+  _restoreHistoryItem(item) {
+    try {
+      // Basic restoration - populate form fields
       if (item.opinionHeader) {
-        const opinionHeaderEl = document.getElementById('opinionHeader');
-        if (opinionHeaderEl) {
-          opinionHeaderEl.value = item.opinionHeader;
-          console.log('✅ Opinion header restored:', item.opinionHeader);
-        }
+        const opinionInput = document.getElementById('opinion-header');
+        if (opinionInput) opinionInput.value = item.opinionHeader;
       }
       
       if (item.nameHeader) {
-        const nameHeaderEl = document.getElementById('nameHeader');
-        if (nameHeaderEl) {
-          nameHeaderEl.value = item.nameHeader;
-          console.log('✅ Name header restored:', item.nameHeader);
+        const nameInput = document.getElementById('name-header');
+        if (nameInput) nameInput.value = item.nameHeader;
+      }
+      
+      // Set display mode
+      if (item.displayMode) {
+        const anonymousCheckbox = document.getElementById('anonymous-mode');
+        if (anonymousCheckbox) {
+          anonymousCheckbox.checked = (item.displayMode === 'anonymous');
         }
       }
       
-      // 2. Display mode restoration
-      const isAnonymous = item.displayMode === 'anonymous' || item.displayMode === '匿名表示';
-      const anonymousCheckbox = document.getElementById('anonymous-mode');
-      if (anonymousCheckbox) {
-        anonymousCheckbox.checked = isAnonymous;
-        console.log('✅ Display mode restored:', item.displayMode);
-      }
-      
-      // 3. Sheet selection restoration
-      if (item.sheetName) {
-        const sheetSelector = document.getElementById('sheet-selector');
-        if (sheetSelector) {
-          sheetSelector.value = item.sheetName;
-          console.log('✅ Sheet restored:', item.sheetName);
-        }
-      }
-      
-      // 4. UI state update
-      if (typeof managedSectionStates === 'function') {
-        managedSectionStates(3); // Navigate to Step 3
-      }
-      
+      // Show success message
       if (typeof showMessage === 'function') {
-        showMessage(`✅ 「${item.questionText}」の設定を復元しました`, 'success');
+        showMessage('✅ 設定が復元されました', 'success');
       }
+      
+      console.log('✅ History item restored successfully');
       
     } catch (error) {
-      console.error('❌ Simple history restoration failed:', error);
+      console.error('❌ Failed to restore history item:', error);
       if (typeof showMessage === 'function') {
-        showMessage('設定復元に失敗しました', 'error');
+        showMessage('❌ 設定の復元に失敗しました', 'error');
       }
     }
   },
-
+  
   /**
-   * Normalize display mode values
+   * Generate unique history ID
    */
-  normalizeDisplayMode(value) {
-    if (value === 'anonymous' || value === false || value === '匿名' || value === '匿名表示') return 'anonymous';
-    if (value === 'named' || value === true || value === '通常' || value === '通常表示') return 'named';
-    return 'named'; // Default
+  generateId() {
+    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
   },
-
-  /**
-   * Get history from localStorage
-   */
-  getHistoryFromStorage() {
-    try {
-      console.log('🔄 getHistoryFromStorage: Reading localStorage key "adminPanelHistory"...');
-      const historyData = localStorage.getItem('adminPanelHistory');
-      console.log('📊 getHistoryFromStorage: Raw data length:', historyData?.length || 0);
-      const parsed = historyData ? JSON.parse(historyData) : [];
-      console.log('✅ getHistoryFromStorage: Parsed', parsed?.length || 0, 'items');
-      return parsed;
-    } catch (error) {
-      console.warn('❌ getHistoryFromStorage: Failed to load history from localStorage:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Get merged history (placeholder - implement server merging if needed)
-   */
-  async getMergedHistory() {
-    // For now, just return local storage history
-    // In the future, merge with server-side history
-    console.log('🔄 getMergedHistory: Reading from localStorage...');
-    const history = this.getHistoryFromStorage();
-    console.log('📊 getMergedHistory: Retrieved', history?.length || 0, 'items from localStorage');
-    if (history && history.length > 0) {
-      console.log('🔍 getMergedHistory: Sample item:', history[0]);
-    }
-    return history;
-  },
-
+  
   /**
    * HTML escape utility
    */
-  escapeHtml(text) {
+  _escapeHtml(text) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text || '';
     return div.innerHTML;
   }
 };
 
-// Register history management functions globally for backward compatibility
-window.loadSimpleHistoryTable = () => window.AdminPanel.historyManager.loadSimpleHistoryTable();
+// Create compatibility layer for legacy code
+window.AdminPanel.historyManager = {
+  loadSimpleHistoryTable: () => window.HistoryManager.renderTable(),
+  restoreFromSimpleHistory: (item) => window.HistoryManager._restoreHistoryItem(item)
+};
+
+// Register global functions for backward compatibility
+window.loadSimpleHistoryTable = () => window.HistoryManager.renderTable();
 
 //# sourceURL=adminPanel-framework.js.html
 </script>

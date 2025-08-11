@@ -2064,22 +2064,36 @@ function unpublishBoard() {
    */
   function addToSimpleHistory(newItem) {
     try {
-      const history = getHistoryFromStorage();
-      
-      // 先頭に追加
-      history.unshift(newItem);
-      
-      // 5件に制限
-      const limitedHistory = history.slice(0, 5);
-      
-      // 保存
-      saveHistoryToStorage(limitedHistory);
-      
-      console.log(`✅ History saved with ${limitedHistory.length} items (max 5)`);
-      
-      // テーブル更新
-      if (typeof loadSimpleHistoryTable === 'function') {
-        loadSimpleHistoryTable();
+      if (window.HistoryManager) {
+        // Use new unified HistoryManager
+        const success = window.HistoryManager.add(newItem);
+        if (success) {
+          console.log('✅ History saved using HistoryManager');
+          // Update UI table
+          window.HistoryManager.renderTable();
+        } else {
+          console.warn('⚠️ Failed to save history using HistoryManager');
+        }
+      } else {
+        // Fallback to legacy method
+        console.warn('⚠️ HistoryManager not available, using legacy method');
+        const history = getHistoryFromStorage();
+        
+        // 先頭に追加
+        history.unshift(newItem);
+        
+        // 5件に制限
+        const limitedHistory = history.slice(0, 5);
+        
+        // 保存
+        saveHistoryToStorage(limitedHistory);
+        
+        console.log(`✅ History saved with ${limitedHistory.length} items (max 5)`);
+        
+        // テーブル更新
+        if (typeof loadSimpleHistoryTable === 'function') {
+          loadSimpleHistoryTable();
+        }
       }
       
     } catch (error) {
@@ -2146,10 +2160,8 @@ function unpublishBoard() {
       
       addToSimpleHistory(historyItem);
       
-      // Update UI
-      if (typeof loadSimpleHistoryTable === 'function') {
-        loadSimpleHistoryTable();
-      }
+      // Update UI - handled by addToSimpleHistory function
+      // No need for additional UI update call here
       
       logDebug('QuickStart simple history entry created successfully:', {
         id: historyItem.id,
