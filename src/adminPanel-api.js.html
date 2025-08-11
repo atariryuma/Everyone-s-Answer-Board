@@ -2106,33 +2106,7 @@ function unpublishBoard() {
   function generateHistoryId() {
     return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   }
-
-  // =============================================================================
-  // SIMPLE HISTORY STORAGE HELPERS
-  // =============================================================================
-  const SIMPLE_HISTORY_STORAGE_KEY = 'studyquest_simple_history';
-
-  function getHistoryFromStorage() {
-    try {
-      const raw = localStorage.getItem(SIMPLE_HISTORY_STORAGE_KEY);
-      if (!raw) return [];
-      const data = JSON.parse(raw);
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.warn('Failed to parse history from storage:', error);
-      return [];
-    }
-  }
-
-  function saveHistoryToStorage(historyArray) {
-    try {
-      const safe = Array.isArray(historyArray) ? historyArray : [];
-      localStorage.setItem(SIMPLE_HISTORY_STORAGE_KEY, JSON.stringify(safe));
-    } catch (error) {
-      console.error('Failed to save history to storage:', error);
-    }
-  }
-
+  
   // 古い複雑なcreateConsolidatedHistoryEntry関数は削除済み
   
   /**
