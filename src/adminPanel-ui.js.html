@@ -2668,6 +2668,19 @@ function getHistoryFromStorage() {
 }
 
 /**
+ * 履歴を localStorage に保存
+ * @param {Array} historyArray 保存する履歴配列
+ */
+function saveHistoryToStorage(historyArray) {
+  try {
+    const safe = Array.isArray(historyArray) ? historyArray : [];
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(safe));
+  } catch (error) {
+    logWarn('Failed to save history to storage:', error);
+  }
+}
+
+/**
  * サーバーサイドとローカルストレージの履歴を統合
  * @returns {Promise<Array>} 統合された履歴配列
  */
