@@ -2876,7 +2876,21 @@ function showHistoryRestorationPreview(item) {
     const configPreview = getConfigurationPreview(item);
     const headerPreview = getHeaderPreview(item);
     
-    // Build detailed message
+    // Build detailed message (avoid nested template literals for GAS compatibility)
+    const configSection = configPreview ? (
+      '<div class="bg-blue-900/20 rounded-lg p-3">\n' +
+      '  <h4 class="text-sm font-semibold text-blue-400 mb-2">⚙️ 列設定</h4>\n' +
+      '  <div class="text-xs text-gray-300">' + configPreview + '</div>\n' +
+      '</div>\n'
+    ) : '';
+
+    const headerSection = headerPreview ? (
+      '<div class="bg-green-900/20 rounded-lg p-3">\n' +
+      '  <h4 class="text-sm font-semibold text-green-400 mb-2">📊 利用可能ヘッダー</h4>\n' +
+      '  <div class="text-xs text-gray-300">' + headerPreview + '</div>\n' +
+      '</div>\n'
+    ) : '';
+
     const detailsHtml = `
       <div class="space-y-4">
         <div class="bg-gray-800/50 rounded-lg p-3">
@@ -2887,20 +2901,8 @@ function showHistoryRestorationPreview(item) {
             <div><span class="text-gray-400">状態:</span> ${statusIcon} ${status}</div>
           </div>
         </div>
-        
-        ${configPreview ? `
-        <div class="bg-blue-900/20 rounded-lg p-3">
-          <h4 class="text-sm font-semibold text-blue-400 mb-2">⚙️ 列設定</h4>
-          <div class="text-xs text-gray-300">${configPreview}</div>
-        </div>
-        ` : ''}
-        
-        ${headerPreview ? `
-        <div class="bg-green-900/20 rounded-lg p-3">
-          <h4 class="text-sm font-semibold text-green-400 mb-2">📊 利用可能ヘッダー</h4>
-          <div class="text-xs text-gray-300">${headerPreview}</div>
-        </div>
-        ` : ''}
+        ${configSection}
+        ${headerSection}
         
         <div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
           <p class="text-xs text-yellow-200">
