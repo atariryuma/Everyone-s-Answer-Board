@@ -3900,23 +3900,14 @@ function ensureRequiredFields(config) {
     config = {};
   }
   
-  const defaults = {
-    showNames: false,
-    showCounts: false,
-    highlightMode: false,
-    displayMode: 'named',
-    countDisplay: 'show',
-    autoStopEnabled: true,
-    autoStopMinutes: 360
-  };
-  
-  var keys = Object.keys(defaults);
-  for (var i = 0; i < keys.length; i++) {
-    var key = keys[i];
-    if (config[key] === undefined) {
-      config[key] = defaults[key];
-    }
-  }
+  // 個別設定（最も安全な方法）
+  if (config.showNames === undefined) config.showNames = false;
+  if (config.showCounts === undefined) config.showCounts = false;
+  if (config.highlightMode === undefined) config.highlightMode = false;
+  if (config.displayMode === undefined) config.displayMode = 'named';
+  if (config.countDisplay === undefined) config.countDisplay = 'show';
+  if (config.autoStopEnabled === undefined) config.autoStopEnabled = true;
+  if (config.autoStopMinutes === undefined) config.autoStopMinutes = 360;
   
   console.log('✅ ensureRequiredFields completed');
   return config;
