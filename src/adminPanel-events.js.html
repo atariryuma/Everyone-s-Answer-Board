@@ -17,8 +17,6 @@ var eventHandlersAttached = {
   realtimeValidation: false
 };
 
-// 履歴管理用定数 - adminPanel-ui.js.htmlで定義済みのため、ここでは参照のみ
-// const HISTORY_STORAGE_KEY = 'answerBoardHistory'; // 重複宣言を回避
 
 // =============================================================================
 // MAIN EVENT LISTENERS SETUP
@@ -56,7 +54,7 @@ function setupEventListeners() {
   if (elements['save-publish-btn']) {
     elements['save-publish-btn'].addEventListener('click', function() {
       if (!selectedSheet) {
-        showMessage('まずシートを選択してください。', 'warning');
+        showMessage('先にシートを選択してください。', 'warning');
         return;
       }
       saveAndPublish();

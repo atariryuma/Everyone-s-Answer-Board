@@ -1,19 +1,12 @@
 <script>
-/**
- * 多言語対応エラーメッセージシステム
- * UI/UX向上のための統一されたエラーハンドリング
- */
 
-// エラーメッセージの多言語定義
 const ERROR_MESSAGES = {
   ja: {
-    // 一般的なエラー
     GENERIC_ERROR: 'エラーが発生しました',
     NETWORK_ERROR: 'ネットワーク接続に問題があります',
     TIMEOUT_ERROR: 'リクエストがタイムアウトしました',
     PERMISSION_ERROR: 'アクセス権限がありません',
     
-    // CustomSetup関連
     CUSTOM_SETUP_FAILED: 'カスタムセットアップに失敗しました',
     CUSTOM_SETUP_CANCELLED: 'カスタムセットアップが中断されました',
     CUSTOM_SETUP_TIMEOUT: 'カスタムセットアップがタイムアウトしました',
@@ -21,25 +14,20 @@ const ERROR_MESSAGES = {
     FORM_CREATION_FAILED: 'フォーム作成に失敗しました',
     PUBLISH_FAILED: '公開処理に失敗しました',
     
-    // QuickStart関連
     QUICK_START_FAILED: 'クイックスタートに失敗しました',
     QUICK_START_TIMEOUT: 'クイックスタートがタイムアウトしました',
     
-    // キャッシュ関連
     CACHE_ERROR: 'キャッシュの処理中にエラーが発生しました',
     CACHE_CLEAR_FAILED: 'キャッシュのクリアに失敗しました',
     
-    // データベース関連
     DATABASE_ERROR: 'データベース処理中にエラーが発生しました',
     USER_NOT_FOUND: 'ユーザーが見つかりません',
     CONFIG_SAVE_FAILED: '設定の保存に失敗しました',
     
-    // Google Apps Script関連
     GAS_API_ERROR: 'Google Apps Script APIでエラーが発生しました',
     SPREADSHEET_ACCESS_ERROR: 'スプレッドシートにアクセスできません',
     FORM_ACCESS_ERROR: 'フォームにアクセスできません',
     
-    // 解決策の提案
     SOLUTIONS: {
       NETWORK_ERROR: '・インターネット接続を確認してください\n・しばらく時間をおいて再試行してください',
       TIMEOUT_ERROR: '・処理に時間がかかっています\n・しばらく待ってから再度確認してください',
@@ -93,7 +81,6 @@ const ERROR_MESSAGES = {
   }
 };
 
-// エラーの重要度レベル
 const ERROR_SEVERITY = {
   LOW: 'low',
   MEDIUM: 'medium',
@@ -101,7 +88,6 @@ const ERROR_SEVERITY = {
   CRITICAL: 'critical'
 };
 
-// エラータイプの定義
 const ERROR_TYPES = {
   NETWORK: 'network',
   TIMEOUT: 'timeout',
@@ -111,9 +97,6 @@ const ERROR_TYPES = {
   USER: 'user'
 };
 
-/**
- * 統一エラーハンドラークラス
- */
 class UnifiedErrorHandler {
   constructor() {
     this.language = this.detectLanguage();
@@ -121,68 +104,49 @@ class UnifiedErrorHandler {
     this.maxHistorySize = 50;
   }
   
-  /**
-   * 言語を自動検出
-   */
   detectLanguage() {
     const browserLang = navigator.language || navigator.userLanguage;
     return browserLang.startsWith('ja') ? 'ja' : 'en';
   }
   
-  /**
-   * エラーメッセージを取得
-   */
   getMessage(errorKey, fallbackMessage = null) {
     const messages = ERROR_MESSAGES[this.language] || ERROR_MESSAGES.ja;
     return messages[errorKey] || fallbackMessage || messages.GENERIC_ERROR;
   }
   
-  /**
-   * 解決策を取得
-   */
   getSolution(errorKey) {
     const messages = ERROR_MESSAGES[this.language] || ERROR_MESSAGES.ja;
     return messages.SOLUTIONS[errorKey] || null;
   }
   
-  /**
-   * エラーを処理して表示
-   */
   handleError(error, context = '', severity = ERROR_SEVERITY.MEDIUM, type = ERROR_TYPES.SYSTEM) {
     const errorInfo = this.categorizeError(error, context, severity, type);
     
-    // エラー履歴に追加
     this.addToHistory(errorInfo);
     
-    // 重要度に応じてログ出力
     this.logError(errorInfo);
     
-    // ユーザーに表示
     this.displayError(errorInfo);
     
     return errorInfo;
   }
   
-  /**
-   * エラーを分類
-   */
   categorizeError(error, context, severity, type) {
     let errorKey = 'GENERIC_ERROR';
     let specificMessage = error.message || error.toString();
     
-    // エラーメッセージからキーを推定
     if (specificMessage.includes('timeout') || specificMessage.includes('タイムアウト')) {
       errorKey = 'TIMEOUT_ERROR';
       type = ERROR_TYPES.TIMEOUT;
-    } else if (specificMessage.includes('network') || specificMessage.includes('ネットワーク')) {
+    } else if (specificMessage.includes('network')) {
       errorKey = 'NETWORK_ERROR';
       type = ERROR_TYPES.NETWORK;
-    } else if (specificMessage.includes('permission') || specificMessage.includes('権限')) {
+    } else if (specificMessage.includes('permission')) {
       errorKey = 'PERMISSION_ERROR';
       type = ERROR_TYPES.PERMISSION;
-    } else if (context.includes('customSetup') || context.includes('カスタムセットアップ')) {
+    } else if (context.includes('customSetup')) {
       errorKey = 'CUSTOM_SETUP_FAILED';
-    } else if (context.includes('quickStart') || context.includes('クイックスタート')) {
+    } else if (context.includes('quickStart')) {
       errorKey = 'QUICK_START_FAILED';
     }
     
@@ -201,9 +165,6 @@ class UnifiedErrorHandler {
     };
   }
   
-  /**
-   * エラー履歴に追加
-   */
   addToHistory(errorInfo) {
     this.errorHistory.unshift(errorInfo);
     if (this.errorHistory.length > this.maxHistorySize) {
@@ -211,9 +172,6 @@ class UnifiedErrorHandler {
     }
   }
   
-  /**
-   * エラーをログ出力
-   */
   logError(errorInfo) {
     const logMessage = `[${errorInfo.context}] ${errorInfo.message}`;
     
@@ -233,38 +191,27 @@ class UnifiedErrorHandler {
     }
   }
   
-  /**
-   * ユーザーにエラーを表示
-   */
   displayError(errorInfo) {
     const displayMessage = this.formatErrorDisplay(errorInfo);
     
-    // 既存のshowMessage関数を使用
     if (typeof showMessage === 'function') {
       const messageType = this.getMessageType(errorInfo.severity);
       showMessage(displayMessage, messageType);
     } else {
-      // フォールバック表示
       alert(displayMessage);
     }
   }
   
-  /**
-   * エラー表示をフォーマット
-   */
   formatErrorDisplay(errorInfo) {
     let message = errorInfo.message;
     
     if (errorInfo.solution && errorInfo.severity !== ERROR_SEVERITY.LOW) {
-      message += '\n\n' + (this.language === 'ja' ? '解決策:' : 'Solutions:') + '\n' + errorInfo.solution;
+      message += '\n\n' + (this.language === 'ja' ? '対処方法:' : 'Solutions:') + '\n' + errorInfo.solution;
     }
     
     return message;
   }
   
-  /**
-   * 重要度からメッセージタイプを取得
-   */
   getMessageType(severity) {
     switch (severity) {
       case ERROR_SEVERITY.CRITICAL:
@@ -279,23 +226,14 @@ class UnifiedErrorHandler {
     }
   }
   
-  /**
-   * エラー履歴を取得
-   */
   getErrorHistory() {
     return this.errorHistory;
   }
   
-  /**
-   * エラー履歴をクリア
-   */
   clearErrorHistory() {
     this.errorHistory = [];
   }
   
-  /**
-   * 言語を変更
-   */
   setLanguage(lang) {
     if (ERROR_MESSAGES[lang]) {
       this.language = lang;
@@ -303,7 +241,6 @@ class UnifiedErrorHandler {
   }
 }
 
-// グローバルインスタンスを作成
 window.unifiedErrorHandler = new UnifiedErrorHandler();
 
 // Attach to AdminPanel namespace

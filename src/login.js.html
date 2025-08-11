@@ -344,24 +344,24 @@
       }
     }
 
-    setLoading(true, '読み込み中…');
+    setLoading(true, 'Loading...');
     init();
   });
 
-  // アカウント切り替え機能
+  // Account switching function
   function switchAccount() {
     const userEmailDisplay = document.getElementById('user-email-display');
     const switchBtn = document.getElementById('switch-account-btn');
     
-    if (confirm('別のアカウントでログインしますか？\n現在のセッションがクリアされます。')) {
-      // ボタンを無効化
+    if (confirm('Login with a different account?\nCurrent session will be cleared.')) {
+      // Disable button
       if (switchBtn) {
         switchBtn.disabled = true;
-        switchBtn.textContent = 'セッションクリア中...';
+        switchBtn.textContent = 'Clearing session...';
       }
       
       if (userEmailDisplay) {
-        userEmailDisplay.textContent = 'アカウント切り替え中...';
+        userEmailDisplay.textContent = 'Switching account...';
       }
       
       // バックエンドのセッションクリーンアップ関数を呼び出し

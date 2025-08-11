@@ -186,10 +186,8 @@ function logDebug(...args) { adminLog('debug', ...args); }
 // USER AUTHENTICATION INITIALIZATION
 // =============================================================================
 
-// マルチテナント対応: ユーザーIDの安全な初期化
 var userId = '';
 
-// マルチテナント対応: バックエンドから安全にユーザーIDを取得
 function initializeUserId() {
   console.group('🔐 Initializing UserId');
   logDebug('📞 About to call getCurrentUserStatus');
@@ -222,7 +220,6 @@ function initializeUserId() {
   });
 }
 
-// ユーザーID取得の完了を待つPromise
 const userIdPromise = initializeUserId();
 
 // =============================================================================
@@ -263,7 +260,6 @@ function initializeMessageArea() {
 // Initialize UI components
 function initializeUI() {
   console.log('✅ AdminPanel: UI components ready');
-  // UI初期化のみ実行、loadStatusは adminPanel-api.js で処理される
 }
 
 // Initialize API functionality
@@ -282,7 +278,6 @@ function initializeAPI() {
   document.addEventListener('keypress', updateUserActivity);
   document.addEventListener('scroll', updateUserActivity);
 
-  // 初回ロード時にシステムステータスをロード（重複呼び出し防止）
   const now = Date.now();
   const timeSinceLastCall = window.AdminPanel.initialization.lastLoadStatusCall ? 
     now - window.AdminPanel.initialization.lastLoadStatusCall : Infinity;
@@ -347,7 +342,6 @@ function setupCharacterCounters() {
 
 // Setup modal character counter observers
 function setupModalCharacterCounters() {
-  // モーダルが表示されるたびにカウンターをセットアップ
   const observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
@@ -359,7 +353,6 @@ function setupModalCharacterCounters() {
     });
   });
   
-  // モーダルの監視を開始
   const modal = document.getElementById('form-config-modal');
   if (modal) {
     observer.observe(modal, { attributes: true });
@@ -506,7 +499,6 @@ function updateUIWithNewStatus(status) {
   // Enhanced full implementation detection with multiple retries
   if (typeof window._fullUpdateUIWithNewStatus === 'function') {
     try {
-      // 本番環境でのログ量を減らす
       if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
         console.log('updateUIWithNewStatus: Using full implementation');
       }
@@ -810,7 +802,6 @@ window.AdminPanel.functionRegistry = {
     const fullFuncName = `_full${functionName.charAt(0).toUpperCase()}${functionName.slice(1)}`;
     if (typeof window[fullFuncName] === 'function') {
       this.fullImplementations.add(functionName);
-      // デバッグモードのみログ出力（本番での重複ログを減らす）
       if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
         console.log(`🔧 Full implementation registered: ${fullFuncName}`);
       }
@@ -841,7 +832,6 @@ window.AdminPanel.functionRegistry = {
       }
     });
     
-    // 本番環境でのログ量を減らす
     if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
       console.log(`🔍 Full implementations check: ${foundCount}/${functionsToCheck.length} available`);
     }
@@ -1096,7 +1086,6 @@ setTimeout(checkFullImplementationsAvailability, 300);
 // SYSTEM STATUS AND USER INTERACTION MANAGEMENT
 // =============================================================================
 
-// システム監視用の状態管理
 window.systemStatus = {
   initializationStarted: false,
   coreInitialized: false,
@@ -1109,12 +1098,10 @@ window.systemStatus = {
   lastActivity: Date.now()
 };
 
-// 初期化中のユーザー操作防止 - DOM準備完了後に実行
 if (document.body) {
   document.body.style.pointerEvents = 'none';
   console.log('🛡️ User interaction disabled during initialization');
 } else {
-  // DOM読み込み完了を待ってから実行
   document.addEventListener('DOMContentLoaded', function() {
     if (document.body) {
       document.body.style.pointerEvents = 'none';
@@ -1123,63 +1110,52 @@ if (document.body) {
   });
 }
 
-// 主要なUI要素を無効化する関数
 function disableUserInteraction() {
-  // DOM準備完了チェック
   if (!document || !document.body) {
     console.warn('⚠️ DOM not ready for disableUserInteraction');
     return;
   }
   
-  // フォーム要素の無効化
   const forms = document.querySelectorAll('form, input, button, select, textarea');
   forms.forEach(element => {
     element.disabled = true;
     element.style.opacity = '0.6';
   });
   
-  // クリック可能な要素の無効化
   const clickables = document.querySelectorAll('[onclick], .btn, .button');
   clickables.forEach(element => {
     element.style.pointerEvents = 'none';
     element.style.opacity = '0.6';
   });
   
-  // body要素の無効化
   document.body.style.pointerEvents = 'none';
   
   console.log('🛡️ All interactive elements disabled');
 }
 
-// UI要素を有効化する関数
 function enableUserInteraction() {
-  // DOM準備完了チェック
   if (!document || !document.body) {
     console.warn('⚠️ DOM not ready for enableUserInteraction');
     return;
   }
   
-  // フォーム要素の有効化
   const forms = document.querySelectorAll('form, input, button, select, textarea');
   forms.forEach(element => {
     element.disabled = false;
     element.style.opacity = '';
   });
   
-  // クリック可能な要素の有効化
   const clickables = document.querySelectorAll('[onclick], .btn, .button');
   clickables.forEach(element => {
     element.style.pointerEvents = '';
     element.style.opacity = '';
   });
   
-  // body要素も有効化
   document.body.style.pointerEvents = 'auto';
   
   console.log('✅ All interactive elements enabled');
 }
 
-// DOM読み込み後に要素を無効化
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', disableUserInteraction);
 } else {
@@ -1195,14 +1171,12 @@ function updateSystemStatus(component, status, error = null) {
   logDebug(`📊 System Status: ${component} = ${status}`);
 }
 
-// 公開停止後の全セクション展開処理
 function checkAndExpandAllSections() {
   try {
     const expandAllFlag = localStorage.getItem('expandAllSections');
     if (expandAllFlag === 'true') {
       logInfo('📂 公開停止後のため全セクションを展開します');
       
-      // 少し遅延してからセクションを展開（DOM要素の準備を待つ）
       setTimeout(() => {
         const sectionIds = ['step1-content', 'step2-content', 'step3-content'];
         let expandedCount = 0;
@@ -1210,7 +1184,6 @@ function checkAndExpandAllSections() {
         sectionIds.forEach(sectionId => {
           const section = document.getElementById(sectionId);
           if (section) {
-            // セクションが折りたたまれている場合のみ展開
             if (section.classList.contains('hidden')) {
               if (typeof toggleSection === 'function') {
                 toggleSection(sectionId);
@@ -1225,7 +1198,6 @@ function checkAndExpandAllSections() {
           logInfo(`📂 ${expandedCount}個のセクションを展開しました`);
         }
         
-        // フラグをクリア（一度だけ実行）
         localStorage.removeItem('expandAllSections');
         logDebug('🧹 全セクション展開フラグをクリアしました');
       }, 500);
@@ -1258,7 +1230,6 @@ function initializeAdminPanelMaster() {
   logInfo('🚀 AdminPanel Master Initialization Started');
   updateSystemStatus('initializationStarted', true);
   
-  // Phase 1: Core初期化
   try {
     initCore();
     updateSystemStatus('coreInitialized', true);
@@ -1267,14 +1238,11 @@ function initializeAdminPanelMaster() {
     console.error('❌ Core initialization failed:', error);
   }
   
-  // 公開停止後の全セクション展開処理
   checkAndExpandAllSections();
   
-  // フォーム作成完了表示をクリア（新規アクセス時はデフォルトで非表示）
   setTimeout(() => {
     const formJustCreated = sessionStorage.getItem('form_just_created');
     if (formJustCreated !== 'true') {
-      // 新規作成ではない場合、セクションを非表示にする
       const formUrlSection = document.getElementById('form-url-section');
       if (formUrlSection && !formUrlSection.classList.contains('hidden')) {
         formUrlSection.classList.add('hidden');
@@ -1283,12 +1251,9 @@ function initializeAdminPanelMaster() {
     }
   }, 100);
   
-  // Phase 2: 各モジュールを並列初期化 (パフォーマンス向上)
-  // 遅延を最小限に抑制して即座に初期化
   setTimeout(() => {
     logDebug('🔧 Phase 2: 並列モジュール初期化開始');
     
-    // Status管理初期化
     try {
       initializeMessageArea();
       logDebug('✅ Status module initialized');
@@ -1296,7 +1261,6 @@ function initializeAdminPanelMaster() {
       logError('❌ Status module initialization failed:', error);
     }
     
-    // API通信初期化（最重要 - getInitialDataを呼び出す）
     try {
       logDebug('🚀 API module initialization starting...');
       initializeAPI();
@@ -1307,13 +1271,11 @@ function initializeAdminPanelMaster() {
       updateSystemStatus('apiInitialized', false, error);
       console.error('❌ API initialization failed:', error);
       
-      // フォールバック実装
       console.warn('⚠️ API functions not available, using fallback...');
       updateSystemStatus('apiInitialized', 'fallback');
       logDebug('✅ API module initialized with fallback');
     }
     
-    // UI初期化
     try {
       initializeUI();
       updateSystemStatus('uiInitialized', true);
@@ -1323,7 +1285,6 @@ function initializeAdminPanelMaster() {
       console.error('❌ UI initialization failed:', error);
     }
     
-    // フォーム管理初期化
     try {
       setupCharacterCounters();
       setupModalCharacterCounters();
@@ -1332,7 +1293,6 @@ function initializeAdminPanelMaster() {
       logError('❌ Forms module initialization failed:', error);
     }
     
-    // イベント管理初期化（最後に実行）
     setTimeout(() => {
       try {
         initializeEventListeners();
@@ -1341,17 +1301,14 @@ function initializeAdminPanelMaster() {
         logDebug('✅ Events module initialized');
         logInfo('🎉 AdminPanel Master Initialization Complete');
         
-        // システム状態の最終レポート
         console.log('📊 Final System Status:', window.systemStatus);
         
-        // ユーザー情報の同期と最終処理
         finalizeInitialization();
         
       } catch (error) {
         updateSystemStatus('eventsInitialized', false, error);
         console.error('❌ Events initialization failed:', error);
         
-        // エラーでも最終処理は実行
         finalizeInitialization();
       }
     }, 100);
@@ -1365,7 +1322,6 @@ async function finalizeInitialization() {
     try {
       console.log('🔄 Final user data synchronization...');
       
-      // ユーザーデータの最終同期を確実に実行
       if (typeof loadStatus === 'function') {
         try {
           await loadStatus(true);
@@ -1377,12 +1333,10 @@ async function finalizeInitialization() {
         console.warn('⚠️ loadStatus function not available');
       }
       
-      // すべての同期が完了したらローディングオーバーレイを非表示
       if (window.unifiedLoading) {
         window.unifiedLoading.hide();
         console.log('✅ Global loading overlay hidden after full sync');
       } else {
-        // フォールバック: 直接DOM操作
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
           overlay.classList.add('hidden');
@@ -1390,7 +1344,6 @@ async function finalizeInitialization() {
         }
       }
       
-      // UI要素の有効化
       enableUserInteraction();
       updateSystemStatus('userDataSyncComplete', true);
       
@@ -1402,7 +1355,6 @@ async function finalizeInitialization() {
       
     } catch (error) {
       console.error('❌ Final sync error:', error);
-      // エラーでもローディングは解除
       if (window.unifiedLoading) {
         window.unifiedLoading.hide();
       }
@@ -1416,7 +1368,6 @@ async function finalizeInitialization() {
   }, 500);
 }
 
-// 単一DOMContentLoadedハンドラー
 if (document.readyState !== 'loading') {
   initializeAdminPanelMaster();
 } else {

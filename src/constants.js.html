@@ -1,84 +1,73 @@
 <script>
-/**
- * システム定数管理
- * Magic Numbersを一元管理し、保守性を向上
- */
 
 const SYSTEM_CONSTANTS = {
-  // タイムアウト設定
   TIMEOUTS: {
-    DEFAULT_FLOW_TIMEOUT: 300000,        // 5分 (FlowExecutionManager default)
-    PROGRESS_HIDE_DELAY: 2000,           // 2秒 (プログレス表示非表示遅延)
-    POLLING_INTERVAL: 30000,             // 30秒 (バックエンド完了ポーリング間隔)
-    UI_UPDATE_DELAY: 300,                // 0.3秒 (UI更新遅延)
-    VERIFICATION_DELAY: 2000,            // 2秒 (完了確認遅延)
-    QUICK_START_HIDE_DELAY: 3000,        // 3秒 (QuickStartプログレス非表示遅延)
-    ERROR_DISPLAY_DURATION: 5000,        // 5秒 (エラーメッセージ表示時間)
-    SUCCESS_DISPLAY_DURATION: 3000       // 3秒 (成功メッセージ表示時間)
+    DEFAULT_FLOW_TIMEOUT: 300000,
+    PROGRESS_HIDE_DELAY: 2000,
+    POLLING_INTERVAL: 30000,
+    UI_UPDATE_DELAY: 300,
+    VERIFICATION_DELAY: 2000,
+    QUICK_START_HIDE_DELAY: 3000,
+    ERROR_DISPLAY_DURATION: 5000,
+    SUCCESS_DISPLAY_DURATION: 3000
   },
 
-  // CustomSetup関連定数
   CUSTOM_SETUP: {
     TOTAL_STEPS: 6,
     STEP_TIMES: {
-      ANALYSIS: 12,           // ステップ1: 入力検証 (12秒)
-      FORM_CREATION: 20,      // ステップ2: フォーム・スプレッドシート作成 (20秒)
-      AI_DETECTION: 25,       // ステップ3: AI列判定 (25秒)
-      CONFIG_SAVE: 8,         // ステップ4: 設定保存 (8秒)
-      CACHE_CLEAR: 8,         // ステップ5: キャッシュクリア (8秒)
-      RESPONSE: 5             // ステップ6: レスポンス生成 (5秒)
+      ANALYSIS: 12,
+      FORM_CREATION: 20,
+      AI_DETECTION: 25,
+      CONFIG_SAVE: 8,
+      CACHE_CLEAR: 8,
+      RESPONSE: 5
     },
-    PROGRESS_UPDATE_INTERVAL: 150,  // プログレス更新間隔 (150ms)
-    MAX_RETRY_COUNT: 3,             // 最大リトライ回数
-    CANCEL_CONFIRMATION_MESSAGE: 'カスタムセットアップを中断しますか？\n途中で中断すると、設定が不完全な状態になる可能性があります。'
+    PROGRESS_UPDATE_INTERVAL: 150,
+    MAX_RETRY_COUNT: 3,
+    CANCEL_CONFIRMATION_MESSAGE: 'カスタムセットアップをキャンセルしますか？\nキャンセルすると、セットアップが未完了の状態で残る可能性があります。'
   },
 
-  // QuickStart関連定数
   QUICK_START: {
     TOTAL_STEPS: 4,
     STEP_TIMES: {
-      FOLDER_CREATION: 30,    // ステップ1: フォルダ作成 (30秒)
-      FORM_CREATION: 60,      // ステップ2: フォーム作成 (60秒)
-      BOARD_SETUP: 45,        // ステップ3: ボード設定 (45秒)
-      COMPLETION: 15          // ステップ4: 完了処理 (15秒)
+      FOLDER_CREATION: 30,
+      FORM_CREATION: 60,
+      BOARD_SETUP: 45,
+      COMPLETION: 15
     },
-    PROGRESS_UPDATE_INTERVAL: 300,  // プログレス更新間隔 (300ms)
-    MAX_POLLING_ATTEMPTS: 10,       // 最大ポーリング試行回数
-    CONFIRMATION_MESSAGE: '現在公開中の回答ボードを停止して、新しいフォームとボードを作成しますか？\n\n• 既存の回答データは保持されます\n• 新しいフォームとスプレッドシートを作成\n• 高精度AI列判定を実行\n• 作成完了後に自動で再公開'
+    PROGRESS_UPDATE_INTERVAL: 300,
+    MAX_POLLING_ATTEMPTS: 10,
+    CONFIRMATION_MESSAGE: '現在公開中の回答ボードを停止し、新しいフォームとボードを作成しますか？\n\n・既存の回答データは保持されます\n・新しいフォームとスプレッドシートを作成します\n・高精度なAI列検出を実行します\n・作成後に自動的に再公開します'
   },
 
-  // FlowExecutionManager関連定数
   FLOW_EXECUTION: {
-    DEBUG_MODE: false,              // デバッグモード (本番ではfalse)
-    MAX_CONCURRENT_FLOWS: 5,        // 最大同時実行フロー数
-    QUEUE_TIMEOUT: 60000,           // キュー待機タイムアウト (1分)
-    CLEANUP_INTERVAL: 300000        // リソースクリーンアップ間隔 (5分)
+    DEBUG_MODE: false,
+    MAX_CONCURRENT_FLOWS: 5,
+    QUEUE_TIMEOUT: 60000,
+    CLEANUP_INTERVAL: 300000
   },
 
-  // エラー関連定数
   ERROR_HANDLING: {
-    MAX_ERROR_HISTORY: 50,          // エラー履歴最大保持数
+    MAX_ERROR_HISTORY: 50,
     LOG_LEVELS: {
       DEBUG: 3,
       INFO: 2,
       WARN: 1,
       ERROR: 0
     },
-    RETRY_DELAYS: [1000, 2000, 5000], // リトライ遅延 (1秒, 2秒, 5秒)
-    CRITICAL_ERROR_THRESHOLD: 5      // 致命的エラー閾値
+    RETRY_DELAYS: [1000, 2000, 5000],
+    CRITICAL_ERROR_THRESHOLD: 5
   },
 
-  // UI/UX関連定数
   UI: {
-    ANIMATION_DURATION: 300,        // アニメーション時間 (0.3秒)
-    FADE_DURATION: 200,             // フェード時間 (0.2秒)
-    PROGRESS_BAR_TRANSITION: 700,   // プログレスバー遷移時間 (0.7秒)
-    TOOLTIP_DELAY: 500,             // ツールチップ表示遅延 (0.5秒)
-    AUTO_SAVE_INTERVAL: 30000,      // 自動保存間隔 (30秒)
-    NOTIFICATION_STACK_LIMIT: 5     // 通知スタック制限
+    ANIMATION_DURATION: 300,
+    FADE_DURATION: 200,
+    PROGRESS_BAR_TRANSITION: 700,
+    TOOLTIP_DELAY: 500,
+    AUTO_SAVE_INTERVAL: 30000,
+    NOTIFICATION_STACK_LIMIT: 5
   },
 
-  // DOM要素ID
   ELEMENTS: {
     CUSTOM_PROGRESS: 'customsetup-progress',
     QUICK_PROGRESS: 'quickstart-progress',
@@ -89,7 +78,6 @@ const SYSTEM_CONSTANTS = {
     CUSTOM_PROGRESS_BAR: 'custom-progress-bar'
   },
 
-  // CSS Classes
   CSS_CLASSES: {
     HIDDEN: 'hidden',
     ACTIVE: 'active',
@@ -101,7 +89,6 @@ const SYSTEM_CONSTANTS = {
     FADE_OUT: 'fade-out'
   },
 
-  // ローカルストレージキー
   STORAGE_KEYS: {
     USER_PREFERENCES: 'studyquest_user_preferences',
     FORM_DRAFT: 'studyquest_form_draft',
@@ -110,17 +97,15 @@ const SYSTEM_CONSTANTS = {
     PERFORMANCE_METRICS: 'studyquest_performance_metrics'
   },
 
-  // パフォーマンス関連
   PERFORMANCE: {
-    DOM_CACHE_SIZE: 100,            // DOM要素キャッシュサイズ
-    DEBOUNCE_DELAY: 250,            // デバウンス遅延 (0.25秒)
-    THROTTLE_DELAY: 100,            // スロットル遅延 (0.1秒)
-    METRICS_SAMPLE_RATE: 0.1,       // メトリクス取得サンプリング率 (10%)
-    MEMORY_CLEANUP_THRESHOLD: 50    // メモリクリーンアップ閾値 (MB)
+    DOM_CACHE_SIZE: 100,
+    DEBOUNCE_DELAY: 250,
+    THROTTLE_DELAY: 100,
+    METRICS_SAMPLE_RATE: 0.1,
+    MEMORY_CLEANUP_THRESHOLD: 50
   }
 };
 
-// 定数の読み取り専用化
 Object.freeze(SYSTEM_CONSTANTS);
 Object.freeze(SYSTEM_CONSTANTS.TIMEOUTS);
 Object.freeze(SYSTEM_CONSTANTS.CUSTOM_SETUP);
@@ -133,10 +118,8 @@ Object.freeze(SYSTEM_CONSTANTS.CSS_CLASSES);
 Object.freeze(SYSTEM_CONSTANTS.STORAGE_KEYS);
 Object.freeze(SYSTEM_CONSTANTS.PERFORMANCE);
 
-// グローバルに公開
 window.SYSTEM_CONSTANTS = SYSTEM_CONSTANTS;
 
-// 便利な関数をエクスポート
 window.getTimeout = (key) => SYSTEM_CONSTANTS.TIMEOUTS[key] || SYSTEM_CONSTANTS.TIMEOUTS.DEFAULT_FLOW_TIMEOUT;
 window.getStepTime = (flow, step) => SYSTEM_CONSTANTS[flow.toUpperCase()]?.STEP_TIMES?.[step.toUpperCase()] || 30;
 window.getElement = (key) => document.getElementById(SYSTEM_CONSTANTS.ELEMENTS[key]);
