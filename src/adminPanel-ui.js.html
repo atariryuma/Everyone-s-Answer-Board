@@ -3898,19 +3898,12 @@ function ensureRequiredFields(config) {
     config = {};
   }
   
-  const defaults = {
-    showNames: false,
-    showCounts: false,
-    highlightMode: false,
-    autoStopEnabled: true,
-    autoStopMinutes: 360
-  };
-  
-  for (const key in defaults) {
-    if (defaults.hasOwnProperty(key) && config[key] === undefined) {
-      config[key] = defaults[key];
-    }
-  }
+  // Set required fields individually to avoid any bracket notation issues
+  if (config.showNames === undefined) config.showNames = false;
+  if (config.showCounts === undefined) config.showCounts = false;
+  if (config.highlightMode === undefined) config.highlightMode = false;
+  if (config.autoStopEnabled === undefined) config.autoStopEnabled = true;
+  if (config.autoStopMinutes === undefined) config.autoStopMinutes = 360;
   
   return config;
 }
