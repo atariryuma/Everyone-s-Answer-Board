@@ -6420,3 +6420,65 @@ function getFlowProgress(flowId) {
     };
   }
 }
+
+/**
+ * スプレッドシートの作成日を取得
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {string|null} 作成日のISO文字列、取得失敗時はnull
+ */
+function getSpreadsheetCreatedDate(spreadsheetId) {
+  try {
+    if (!spreadsheetId) {
+      warnLog('⚠️ getSpreadsheetCreatedDate: spreadsheetIdが指定されていません');
+      return null;
+    }
+    
+    const file = DriveApp.getFileById(spreadsheetId);
+    const createdDate = file.getDateCreated();
+    
+    debugLog('✅ スプレッドシート作成日取得成功:', {
+      spreadsheetId: spreadsheetId,
+      createdDate: createdDate.toISOString()
+    });
+    
+    return createdDate.toISOString();
+    
+  } catch (error) {
+    warnLog('⚠️ スプレッドシート作成日取得失敗:', error.message);
+    return null;
+  }
+}
+
+/**
+ * ユーザーのスプレッドシート作成日を取得（管理パネル用API）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @returns {object} API応答
+ */
+function getSpreadsheetCreatedDateAPI(requestUserId) {
+  try {
+    verifyUserAccess(requestUserId);
+    
+    const userInfo = getUserInfo(requestUserId);
+    if (!userInfo || !userInfo.spreadsheetId) {
+      return {
+        status: 'error',
+        message: 'スプレッドシートが見つかりません'
+      };
+    }
+    
+    const createdDate = getSpreadsheetCreatedDate(userInfo.spreadsheetId);
+    
+    return {
+      status: 'success',
+      createdDate: createdDate,
+      spreadsheetId: userInfo.spreadsheetId
+    };
+    
+  } catch (error) {
+    errorLog('❌ getSpreadsheetCreatedDateAPI エラー:', error);
+    return {
+      status: 'error',
+      message: '作成日取得中にエラーが発生しました: ' + error.message
+    };
+  }
+}

@@ -1982,204 +1982,132 @@ function unpublishBoard() {
       });
   }
 
-  // 公開時に履歴を保存する関数（新しい統合アプローチ）
-  function saveHistoryOnPublish(publishResponse, config) {
+  // シンプル履歴保存関数（公開時）
+  async function saveHistoryOnPublish(publishResponse, config) {
     try {
       const userInfo = publishResponse.userInfo || {};
       
-      // Create consolidated history entry with draft + publication data
-      createConsolidatedHistoryEntry(publishResponse, config, userInfo);
+      // スプレッドシート作成日を取得
+      let createdDate = null;
+      if (userInfo.spreadsheetId) {
+        try {
+          const createdDateResponse = await runGasWithUserId('getSpreadsheetCreatedDateAPI', false);
+          if (createdDateResponse && createdDateResponse.status === 'success') {
+            createdDate = createdDateResponse.createdDate;
+          }
+        } catch (error) {
+          console.warn('⚠️ 作成日取得失敗:', error);
+        }
+      }
       
-      logDebug('統合履歴保存完了（公開時）');
+      // シンプル履歴エントリ作成
+      await createSimpleHistoryEntry(publishResponse, config, userInfo, createdDate);
+      
+      logDebug('✅ シンプル履歴保存完了（公開時）');
     } catch (error) {
-      logWarn('公開時の履歴保存に失敗:', error);
+      logWarn('⚠️ 公開時の履歴保存に失敗:', error);
     }
   }
   
   /**
-   * Create consolidated history entry combining draft and publication data
-   * @param {Object} publishResponse - Response from publication API
-   * @param {Object} config - Form configuration
-   * @param {Object} userInfo - User information
+   * シンプル履歴エントリ作成
+   * @param {Object} publishResponse - 公開API応答
+   * @param {Object} config - フォーム設定
+   * @param {Object} userInfo - ユーザー情報
+   * @param {string} createdDate - スプレッドシート作成日
    */
-  function createConsolidatedHistoryEntry(publishResponse, config, userInfo) {
+  async function createSimpleHistoryEntry(publishResponse, config, userInfo, createdDate) {
     try {
-      // Get draft data from session storage
-      const draftState = getDraftFromSession();
-      
-      // Get publication time
-      const publishedAt = publishResponse.publishedAt || new Date().toISOString();
-      
-      // Extract question text from various sources
-      const questionText = (draftState && draftState.questionText) ||
-                          config.opinionHeader ||
-                          config.opinionColumn ||
-                          (userInfo.customFormInfo && userInfo.customFormInfo.mainQuestion) ||
-                          '（問題文未設定）';
-      
-      // Get current UI state for accurate display settings at publish time
-      const getCurrentDisplaySettings = () => {
+      // 現在のUI状態から設定取得
+      const getDisplayMode = () => {
         const anonymousCheckbox = document.getElementById('anonymous-mode');
-        const showCountsCheckbox = document.getElementById('show-counts');
-        
-        const displayMode = (anonymousCheckbox && anonymousCheckbox.checked) ? '匿名表示' : '通常表示';
-        const countDisplay = (showCountsCheckbox && showCountsCheckbox.checked) ? '表示' : '非表示';
-        
-        logDebug('Current UI state at publish time:', { displayMode, countDisplay });
-        return { displayMode, countDisplay };
+        return (anonymousCheckbox && anonymousCheckbox.checked) ? '匿名表示' : '通常表示';
       };
       
-      // Use current UI state first, then fall back to draft state or defaults
-      const currentSettings = getCurrentDisplaySettings();
-      const displayMode = currentSettings.displayMode || (draftState && draftState.displayMode) || '通常表示';
-      const countDisplay = currentSettings.countDisplay || (draftState && draftState.countDisplay) || '表示';
+      // 問題文を複数ソースから取得
+      const questionText = config.opinionHeader ||
+                          config.opinionColumn ||
+                          userInfo.customFormInfo?.mainQuestion ||
+                          'デフォルト問題文';
       
-      // Create configuration snapshot for restoration
-      const createConfigSnapshot = () => {
-        // Get actual values from UI elements (primary source)
-        const getUIValue = (elementId) => {
-          const element = document.getElementById(elementId);
-          return element ? element.value || '' : '';
-        };
-        
-        // Try multiple sources: UI elements first, then config, then fallbacks
-        const opinionHeader = getUIValue('opinionHeader') || 
-                             getUIValue('opinion-column') || 
-                             config.opinionHeader || '';
-        const nameHeader = getUIValue('name-column') || 
-                          config.nameHeader || '';
-        const classHeader = getUIValue('class-column') || 
-                           config.classHeader || '';
-        const reasonHeader = getUIValue('reason-column') || 
-                            config.reasonHeader || '';
-        
-        const snapshot = {
-          opinionHeader: opinionHeader,
-          nameHeader: nameHeader,
-          classHeader: classHeader,
-          reasonHeader: reasonHeader,
-          // Add display settings for complete restoration
-          showNames: document.getElementById('show-names') ? document.getElementById('show-names').checked : false,
-          showCounts: document.getElementById('show-counts') ? document.getElementById('show-counts').checked : true,
-          // Store current state for debugging
-          _createdAt: new Date().toISOString(),
-          _source: 'UI_elements_primary'
-        };
-        
-        console.log('📝 ConfigSnapshot created:', snapshot);
-        return snapshot;
-      };
-      
-      // Create header snapshot for restoration
-      const createHeaderSnapshot = () => {
-        const allHeaders = (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [];
-        
-        // Enhanced header snapshot with current selections
-        const getCurrentSelections = () => {
-          const selections = {};
-          const headerElements = ['opinionHeader', 'opinion-column', 'name-column', 'class-column', 'reason-column'];
-          
-          headerElements.forEach(elementId => {
-            const element = document.getElementById(elementId);
-            if (element && element.value) {
-              selections[elementId] = element.value;
-            }
-          });
-          
-          return selections;
-        };
-        
-        const snapshot = {
-          allHeaders: allHeaders,
-          mainQuestion: questionText,
-          currentSelections: getCurrentSelections(),
-          // Store critical configuration for restoration validation
-          criticalHeaders: {
-            opinionHeader: config.opinionHeader || '',
-            nameHeader: config.nameHeader || '',
-            classHeader: config.classHeader || '',
-            reasonHeader: config.reasonHeader || ''
-          },
-          _createdAt: new Date().toISOString(),
-          _headersCount: allHeaders.length
-        };
-        
-        console.log('📋 HeaderSnapshot created:', snapshot);
-        return snapshot;
-      };
-      
-      // Create history entry with restoration data
-      const consolidatedHistoryItem = {
+      // シンプルな履歴アイテム構造
+      const historyItem = {
         id: generateHistoryId(),
-        formId: `${userInfo.spreadsheetId || 'unknown'}_${config.publishedSheetName || 'unknown'}`,
-        publishedAt: publishedAt,
+        createdDate: createdDate,
+        publishedAt: publishResponse.publishedAt || new Date().toISOString(),
         questionText: questionText,
-        displayMode: displayMode, // '通常表示' or '匿名表示'
-        countDisplay: countDisplay, // '表示' or '非表示'
-        isActive: true, // Set to true since we're publishing
+        setupType: getSetupType(),
         
-        // Restoration data (minimal but sufficient)
-        sheetName: config.publishedSheetName || '',
-        spreadsheetId: userInfo.spreadsheetId || '',
-        configSnapshot: createConfigSnapshot(),
-        headerSnapshot: createHeaderSnapshot()
+        // 復元用の最小データ
+        opinionHeader: config.opinionHeader || '',
+        nameHeader: config.nameHeader || '名前',
+        displayMode: getDisplayMode(),
+        
+        // 復元用のシート情報
+        sheetName: publishResponse.activeSheetName || selectedSheet || '',
+        spreadsheetId: userInfo.spreadsheetId || ''
       };
       
-      // Save consolidated history entry using existing localStorage mechanism
+      // 履歴に追加（5件制限）
+      addToSimpleHistory(historyItem);
+      
+      console.log('✅ Simple history entry created:', historyItem.questionText);
+      
+    } catch (error) {
+      console.error('❌ Simple history entry creation failed:', error);
+    }
+  }
+  
+  /**
+   * シンプル履歴に追加（5件制限）
+   * @param {Object} newItem - 新しい履歴アイテム
+   */
+  function addToSimpleHistory(newItem) {
+    try {
       const history = getHistoryFromStorage();
       
-      // Check if entry with same formId already exists and remove it
-      const existingIndex = history.findIndex(item => item.formId === consolidatedHistoryItem.formId);
-      if (existingIndex !== -1) {
-        history.splice(existingIndex, 1);
-        logDebug('Removed existing draft entry for formId:', consolidatedHistoryItem.formId);
-      }
+      // 先頭に追加
+      history.unshift(newItem);
       
-      // Add new consolidated entry at the beginning
-      history.unshift(consolidatedHistoryItem);
+      // 5件に制限
+      const limitedHistory = history.slice(0, 5);
       
-      // Enforce maximum history items limit
-      if (history.length > MAX_HISTORY_ITEMS) {
-        history.splice(MAX_HISTORY_ITEMS);
-      }
+      // 保存
+      saveHistoryToStorage(limitedHistory);
       
-      // Save to localStorage (use shared key)
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+      console.log(`✅ History saved with ${limitedHistory.length} items (max 5)`);
       
-      // Sync to server (async with error handling)
-      syncHistoryToServer(consolidatedHistoryItem).then(result => {
-        if (result.status === 'error') {
-          logWarn('Consolidated history server sync failed:', result.message);
-        } else {
-          logDebug('Consolidated history server sync completed');
-        }
-      }).catch(error => {
-        logError('Unexpected error in consolidated history server sync:', error);
-      });
-      
-      // Update UI
+      // テーブル更新
       if (typeof loadSimpleHistoryTable === 'function') {
         loadSimpleHistoryTable();
       }
       
-      // Clear draft from session storage after successful save
-      clearDraftFromSession();
-      
-      logDebug('Consolidated history entry created:', {
-        formId: consolidatedHistoryItem.formId,
-        questionText: consolidatedHistoryItem.questionText,
-        createdAt: consolidatedHistoryItem.createdAt,
-        publishedAt: consolidatedHistoryItem.publishedAt,
-        displayMode: consolidatedHistoryItem.displayMode,
-        countDisplay: consolidatedHistoryItem.countDisplay
-      });
-      
     } catch (error) {
-      logError('Failed to create consolidated history entry:', error);
-      // Fallback: clear draft even if save failed
-      clearDraftFromSession();
+      console.error('❌ Failed to add to simple history:', error);
     }
   }
+  
+  /**
+   * セットアップタイプの取得
+   * @returns {string} セットアップタイプ
+   */
+  function getSetupType() {
+    // URLパラメータやセッション情報から判定
+    if (sessionStorage.getItem('quickStartActive')) {
+      return 'quickstart';
+    }
+    return 'custom';
+  }
+  
+  /**
+   * 履歴ID生成
+   * @returns {string} 一意のID
+   */
+  function generateHistoryId() {
+    return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+  
+  // 古い複雑なcreateConsolidatedHistoryEntry関数は削除済み
   
   /**
    * Create history entry for QuickStart completion

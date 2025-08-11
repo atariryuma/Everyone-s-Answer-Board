@@ -3210,9 +3210,18 @@ function createHistoryTableRow(item, index) {
   
   // 回答形式の表示ロジックは削除 - 設定アイコンで表示を統一
   
-  // Visual indicators for display options
+  // DisplayMode統一変換システム
+  const normalizeDisplayMode = (value) => {
+    if (value === 'anonymous' || value === false || value === '匿名') return '匿名表示';
+    if (value === 'named' || value === true || value === '通常') return '通常表示';
+    if (value === '匿名表示' || value === '通常表示') return value;
+    return '通常表示'; // デフォルト
+  };
+
+  // Visual indicators for display options (改善版 - 全形式対応)
   const getDisplayModeIcon = (displayMode) => {
-    return displayMode === '匿名表示' ? '🎭' : '👥';
+    const normalized = normalizeDisplayMode(displayMode);
+    return normalized === '匿名表示' ? '🎭' : '👥';
   };
   
   const getCountDisplayIcon = (countDisplay) => {
@@ -3229,7 +3238,7 @@ function createHistoryTableRow(item, index) {
   };
 
   const getDisplayModeText = (displayMode) => {
-    return displayMode === '匿名表示' ? '匿名表示' : '通常表示';
+    return normalizeDisplayMode(displayMode);
   };
 
   const getCountDisplayText = (countDisplay) => {
@@ -3237,7 +3246,7 @@ function createHistoryTableRow(item, index) {
   };
   
   // Format display mode and count display as compact visual indicators
-  const displayMode = item.displayMode || '通常表示';
+  const displayMode = normalizeDisplayMode(item.displayMode); // 統一変換適用
   const countDisplay = item.countDisplay || '表示';
   const displayModeIcon = getDisplayModeIcon(displayMode);
   const countDisplayIcon = getCountDisplayIcon(countDisplay);
@@ -3257,13 +3266,13 @@ function createHistoryTableRow(item, index) {
 公開: ${item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未公開'}`;
 
   row.innerHTML = `
-    <td class="px-3 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300" title="${escapeHtml(tooltipText)}" style="max-width: 300px;">
+    <td class="px-2 py-2 text-xs text-gray-300">${formatDateTime(item.createdDate)}</td>
+    <td class="px-2 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
+    <td class="px-3 py-2 text-xs text-gray-300" title="${escapeHtml(tooltipText)}" style="max-width: 200px;">
       <div class="truncate leading-tight">${escapeHtml(displayQuestionText)}</div>
     </td>
-    <td class="px-3 py-2 text-xs text-center">
+    <td class="px-2 py-2 text-xs text-center">
       <div class="flex justify-center gap-1">
-        <span title="状態: ${getStatusText(isActive)}">${statusIcon}</span>
         <span title="表示モード: ${getDisplayModeText(displayMode)}">${displayModeIcon}</span>
         <span title="カウント表示: ${getCountDisplayText(countDisplay)}">${countDisplayIcon}</span>
       </div>
@@ -3444,142 +3453,78 @@ function showDetailedHistoryModal(title, contentHtml, onConfirm) {
 }
 
 /**
- * Normalize history item format - migrate legacy format to new format
- * @param {Object} rawItem - Raw history item (could be old or new format)
- * @returns {Object} Normalized history item
+ * シンプル履歴アイテム正規化 - 新しい簡素な形式に統一
+ * @param {Object} rawItem - 生の履歴アイテム
+ * @returns {Object} 正規化された履歴アイテム
  */
 function normalizeHistoryItem(rawItem) {
   try {
-    console.log('🔄 Normalizing history item:', rawItem);
+    console.log('🔄 Normalizing history item to simple format:', rawItem);
     
-    // If already normalized (has both snapshots), return as-is
-    if (rawItem.configSnapshot && rawItem.headerSnapshot) {
-      console.log('✅ Item already in new format');
-      return rawItem;
-    }
+    // シンプルな新形式構造に変換
+    const normalizedItem = {
+      id: rawItem.id,
+      createdDate: rawItem.createdDate || null, // 後で追加予定
+      publishedAt: rawItem.publishedAt || rawItem.timestamp,
+      questionText: rawItem.questionText || 
+                   rawItem.config?.opinionHeader ||
+                   rawItem.configSnapshot?.opinionHeader ||
+                   'デフォルト質問',
+      setupType: rawItem.setupType || 'unknown',
+      
+      // 最小限の復元データ
+      opinionHeader: rawItem.config?.opinionHeader || 
+                    rawItem.configSnapshot?.opinionHeader || 
+                    rawItem.questionText || '',
+      nameHeader: rawItem.config?.nameHeader || 
+                 rawItem.configSnapshot?.nameHeader || 
+                 '名前',
+      displayMode: normalizeDisplayMode(rawItem.displayMode || 
+                                      rawItem.config?.displayMode ||
+                                      rawItem.configSnapshot?.displayMode),
+      
+      // 復元用データ
+      sheetName: rawItem.sheetName || '',
+      spreadsheetId: rawItem.spreadsheetId || ''
+    };
     
-    // Create normalized item with backward compatibility
-    const normalizedItem = Object.assign({}, rawItem);
-    
-    // Migrate configuration data
-    if (!normalizedItem.configSnapshot && normalizedItem.config) {
-      console.log('🔧 Migrating config to configSnapshot format');
-      normalizedItem.configSnapshot = {
-        opinionHeader: normalizedItem.config.opinionHeader || '',
-        nameHeader: normalizedItem.config.nameHeader || '',
-        classHeader: normalizedItem.config.classHeader || '',
-        reasonHeader: normalizedItem.config.reasonHeader || '',
-        showNames: normalizedItem.config.showNames || false,
-        showCounts: normalizedItem.config.showCounts !== undefined ? normalizedItem.config.showCounts : true,
-        _migrated: true,
-        _migratedAt: new Date().toISOString()
-      };
-    }
-    
-    // Migrate header data
-    if (!normalizedItem.headerSnapshot && normalizedItem.sheetDetails) {
-      console.log('🔧 Migrating sheetDetails to headerSnapshot format');
-      normalizedItem.headerSnapshot = {
-        allHeaders: normalizedItem.sheetDetails.allHeaders || [],
-        mainQuestion: normalizedItem.questionText || '',
-        // Try to preserve critical header information
-        criticalHeaders: {
-          opinionHeader: normalizedItem.config?.opinionHeader || '',
-          nameHeader: normalizedItem.config?.nameHeader || '',
-          classHeader: normalizedItem.config?.classHeader || '',
-          reasonHeader: normalizedItem.config?.reasonHeader || ''
-        },
-        _migrated: true,
-        _migratedAt: new Date().toISOString()
-      };
-    }
-    
-    // Create minimal snapshots if none exist (very old items)
-    if (!normalizedItem.configSnapshot) {
-      console.log('⚠️ Creating minimal configSnapshot for very old item');
-      normalizedItem.configSnapshot = {
-        opinionHeader: '',
-        nameHeader: '',
-        classHeader: '',
-        reasonHeader: '',
-        showNames: false,
-        showCounts: true,
-        _minimal: true,
-        _createdAt: new Date().toISOString()
-      };
-    }
-    
-    if (!normalizedItem.headerSnapshot) {
-      console.log('⚠️ Creating minimal headerSnapshot for very old item');
-      normalizedItem.headerSnapshot = {
-        allHeaders: [],
-        mainQuestion: normalizedItem.questionText || '',
-        criticalHeaders: {},
-        _minimal: true,
-        _createdAt: new Date().toISOString()
-      };
-    }
-    
-    // Validate essential fields
-    normalizedItem.id = normalizedItem.id || generateHistoryId();
-    normalizedItem.questionText = normalizedItem.questionText || normalizedItem.sheetName || '無題';
-    normalizedItem.isActive = Boolean(normalizedItem.isActive);
-    
-    console.log('✅ History item normalized successfully');
+    console.log('✅ Item normalized to simple format:', normalizedItem);
     return normalizedItem;
     
   } catch (error) {
-    console.error('❌ History normalization failed:', error);
-    // Return original item as fallback
-    return rawItem;
+    console.error('❌ Simple history normalization failed:', error);
+    // フォールバック: 最小限の構造を返す
+    return {
+      id: rawItem.id || generateHistoryId(),
+      createdDate: null,
+      publishedAt: rawItem.publishedAt || rawItem.timestamp || new Date().toISOString(),
+      questionText: rawItem.questionText || '不明',
+      setupType: rawItem.setupType || 'unknown',
+      opinionHeader: '',
+      nameHeader: '名前',
+      displayMode: '通常表示',
+      sheetName: rawItem.sheetName || '',
+      spreadsheetId: rawItem.spreadsheetId || ''
+    };
   }
 }
 
 /**
- * Validate normalized history item
- * @param {Object} item - Normalized history item
- * @returns {Object} Validation result
+ * シンプル履歴バリデーション
+ * @param {Object} item - 正規化済み履歴アイテム
+ * @returns {boolean} 有効かどうか
  */
-function validateNormalizedHistoryItem(item) {
-  const issues = [];
-  const warnings = [];
-  
-  // Check essential fields
-  if (!item.id) issues.push('Missing history ID');
-  if (!item.questionText) warnings.push('Missing question text');
-  
-  // Check snapshot data
-  if (!item.configSnapshot) {
-    issues.push('Missing configSnapshot');
-  } else {
-    if (!item.configSnapshot.opinionHeader) {
-      warnings.push('Missing opinion header in config');
-    }
-  }
-  
-  if (!item.headerSnapshot) {
-    issues.push('Missing headerSnapshot');
-  } else {
-    if (!item.headerSnapshot.allHeaders || item.headerSnapshot.allHeaders.length === 0) {
-      warnings.push('No headers available in snapshot');
-    }
-  }
-  
-  return {
-    isValid: issues.length === 0,
-    issues,
-    warnings,
-    hasData: Boolean(item.configSnapshot?.opinionHeader || item.headerSnapshot?.allHeaders?.length)
-  };
+function validateSimpleHistoryItem(item) {
+  return item && item.id && item.publishedAt;
 }
 
 /**
- * 履歴選択時の自動フロー処理
+ * シンプル履歴選択処理
  * @param {string} historyId - 履歴ID
  */
 async function selectHistoryItem(historyId) {
   try {
-    // 統合履歴から検索（ローカル + サーバー）
+    // 履歴を検索
     const mergedHistory = await getMergedHistory();
     const rawItem = mergedHistory.find(h => h.id === historyId);
     
@@ -3588,483 +3533,98 @@ async function selectHistoryItem(historyId) {
       return;
     }
     
-    // Normalize and migrate legacy format to new format
+    // シンプル正規化
     const item = normalizeHistoryItem(rawItem);
-    console.log('📝 Normalized history item:', item);
+    console.log('📝 Simple normalized history item:', item);
     
-    // Validate normalized item
-    const validation = validateNormalizedHistoryItem(item);
-    console.log('🔍 Validation result:', validation);
-    
-    // Show warnings if any
-    if (validation.warnings.length > 0) {
-      console.warn('⚠️ History validation warnings:', validation.warnings);
-    }
-    
-    // If validation failed, show error
-    if (!validation.isValid) {
-      console.error('❌ History validation failed:', validation.issues);
-      showMessage('履歴データが不正です: ' + validation.issues.join(', '), 'error');
+    // 基本バリデーション
+    if (!validateSimpleHistoryItem(item)) {
+      showMessage('履歴データが不正です', 'error');
       return;
     }
     
-    // If no usable data, show warning
-    if (!validation.hasData) {
-      console.warn('⚠️ History has minimal data, restoration may be incomplete');
-      showMessage('履歴データが最小限です。復元が不完全になる可能性があります。', 'warning');
-    }
-    
-    // 復元プロセス開始の通知と進捗表示
-    const progressSteps = [
-      '🔍 履歴データを解析中...',
-      '📊 AI列判定結果を読み込み中...',
-      '⚙️ 設定を適用中...',
-      '✅ 読み込み完了'
-    ];
-    
-    let currentStep = 0;
-    const showProgress = (message) => {
-      showMessage(message, 'info', 2000);
-    };
-    
-    showProgress(progressSteps[currentStep++]);
-    
-    // 1. シートを選択してスプレッドシート情報を設定
-    if (item.sheetName && item.spreadsheetId) {
-      selectedSheet = item.sheetName;
-      lastSelectedSheetName = item.sheetName;
-      
-      // currentStatus にスプレッドシート情報を設定
-      if (!currentStatus) {
-        currentStatus = {};
+    // シンプルな復元確認モーダル表示
+    showHistoryRestorationPreview(
+      '履歴復元の確認',
+      item,
+      // 確認後の復元実行
+      async () => {
+        console.log('✅ User confirmed simple history restoration');
+        await restoreFromSimpleHistory(item);
+      },
+      // キャンセル時の処理
+      () => {
+        console.log('❌ History restoration cancelled');
       }
-      if (!currentStatus.userInfo) {
-        currentStatus.userInfo = {};
-      }
-      currentStatus.userInfo.spreadsheetId = item.spreadsheetId;
-      currentStatus.activeSheetName = item.activeSheetName || item.sheetName;
-      
-      // sheet select UI を更新
-      const sheetSelect = document.getElementById('sheet-select');
-      if (sheetSelect) {
-        sheetSelect.value = item.sheetName;
-      }
-
-      // サーバー側のアクティブシートも更新（ユーザー設定に反映）
-      try {
-        if (typeof activateSelectedSheet === 'function') {
-          activateSelectedSheet(item.sheetName);
-        }
-      } catch (e) { console.warn('activateSelectedSheet failed (non-fatal):', e); }
-
-      // サーバーから最新のヘッダー/推定設定を取得（スナップショットより優先して整合性確保）
-      try {
-        showProgress('📄 シート情報を取得中...');
-        await loadConfigForSelected(item.sheetName, item.spreadsheetId);
-      } catch (e) {
-        console.warn('loadConfigForSelected failed, will rely on snapshot if available:', e);
-      }
-    }
-    
-    // 2. ヘッダー情報を復元（新しいスナップショット形式対応）
-    await new Promise(resolve => {
-      setTimeout(() => {
-        showProgress(progressSteps[currentStep++]); // AI列判定結果を復元中...
-        
-        // Enhanced header restoration with validation
-        const restoreHeaders = async () => {
-          let headersRestored = false;
-          let allHeaders = [];
-          
-          // Try new snapshot format first
-          if (item.headerSnapshot && item.headerSnapshot.allHeaders) {
-            allHeaders = item.headerSnapshot.allHeaders;
-            
-            // Initialize currentStatus if needed
-            if (!window.currentStatus) window.currentStatus = {};
-            if (!window.currentStatus.sheetDetails) window.currentStatus.sheetDetails = {};
-            
-            // Set header information
-            window.currentStatus.sheetDetails.allHeaders = allHeaders;
-            
-            // Populate header options
-            if (typeof populateHeaderOptions === 'function') {
-              populateHeaderOptions(allHeaders);
-              console.log('✅ Header options restored from snapshot:', allHeaders.length, 'headers');
-              headersRestored = true;
-              
-              // Restore previous selections if available
-              if (item.headerSnapshot.currentSelections) {
-                console.log('🔄 Restoring previous header selections...');
-                Object.entries(item.headerSnapshot.currentSelections).forEach(([elementId, value]) => {
-                  const element = document.getElementById(elementId);
-                  if (element && value) {
-                    // Create option if it doesn't exist
-                    let optionExists = Array.from(element.options).some(option => option.value === value);
-                    if (!optionExists && value) {
-                      const option = new Option(value, value);
-                      element.appendChild(option);
-                    }
-                    element.value = value;
-                    console.log(`✅ Restored selection: ${elementId} = ${value}`);
-                  }
-                });
-              }
-            } else {
-              logWarn('populateHeaderOptions function not available');
-            }
-          }
-          // Fallback to legacy format
-          else if (item.sheetDetails && item.sheetDetails.allHeaders) {
-            allHeaders = item.sheetDetails.allHeaders;
-            if (typeof populateHeaderOptions === 'function') {
-              populateHeaderOptions(allHeaders);
-              console.log('✅ Header options restored from legacy format:', allHeaders.length, 'headers');
-              headersRestored = true;
-            }
-          }
-          
-          // Final validation
-          if (headersRestored && allHeaders.length > 0) {
-            console.log('📋 Header restoration completed successfully');
-            
-            // Verify critical headers are available
-            const criticalHeaders = item.headerSnapshot?.criticalHeaders || {};
-            const missingHeaders = [];
-            
-            Object.entries(criticalHeaders).forEach(([key, value]) => {
-              if (value && !allHeaders.includes(value)) {
-                missingHeaders.push(value);
-              }
-            });
-            
-            if (missingHeaders.length > 0) {
-              console.warn('⚠️ Some critical headers are missing from restored data:', missingHeaders);
-            } else {
-              console.log('✅ All critical headers validated successfully');
-            }
-          } else {
-            console.warn('⚠️ No header data available for restoration');
-          }
-          
-          return headersRestored;
-        };
-        
-        restoreHeaders().then(() => {
-          resolve();
-        }).catch(error => {
-          console.error('❌ Header restoration failed:', error);
-          resolve();
-        });
-      }, 500);
-    });
-    
-    // 3. フォーム設定を復元（新しいスナップショット形式対応）
-    showProgress(progressSteps[currentStep++]); // 設定を適用中...
-    
-    // 新しいスナップショット形式の設定復元
-    if (item.configSnapshot) {
-      await new Promise(resolve => {
-        setTimeout(() => {
-          restoreConfigFromHistory(item.configSnapshot);
-          console.log('✅ Configuration restored from snapshot');
-          resolve();
-        }, 200);
-      });
-    } else if (item.config) {
-      // 旧形式のconfigがある場合のフォールバック
-      await new Promise(resolve => {
-        setTimeout(() => {
-          restoreConfigFromHistory(item.config);
-          console.log('✅ Configuration restored from legacy format');
-          resolve();
-        }, 200);
-      });
-    } else {
-      logWarn('No configuration data available for restoration');
-    }
-    
-    // 6. UI状態をStep 3（設定完了）に更新
-    const step3Section = document.getElementById('step3-content');
-    if (step3Section) {
-      step3Section.classList.remove('hidden');
-      step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-    
-    // ステップインジケーターを更新
-    if (typeof updateStepIndicators === 'function') {
-      updateStepIndicators(3);
-    }
-    if (typeof manageSectionStates === 'function') {
-      manageSectionStates(3);
-    }
-    
-    // 設定ボタンの状態を更新
-    if (typeof updateConfigButtons === 'function') {
-      updateConfigButtons();
-    }
-    
-    // 設定完了状態を反映
-    if (item.configurationComplete && typeof updateUIForSelectedSheet === 'function') {
-      updateUIForSelectedSheet();
-    }
-    
-    // 最終完了通知（確実な完了を保証）
-    await new Promise(resolve => {
-      setTimeout(() => {
-        showProgress(progressSteps[currentStep++]); // 復元完了
-        setTimeout(() => {
-          const truncatedQuestion = item.questionText && item.questionText.length > 50 
-            ? item.questionText.substring(0, 50) + '...'
-            : item.questionText || '履歴項目';
-          showMessage(`「${truncatedQuestion}」の設定を読み込みしました`, 'success');
-          resolve();
-        }, 500);
-      }, 300);
-    });
+    );
     
   } catch (error) {
-    logError('Failed to select history item:', error);
-    
-    // 詳細なエラー分析と部分復元の試行
-    let errorMessage = '履歴の選択に失敗しました';
-    let partiallyRestored = false;
-    
-    try {
-      // 部分復元を試行
-      const mergedHistory = await getMergedHistory();
-      const item = mergedHistory.find(h => h.id === historyId);
-      
-      if (item) {
-        // 最低限の設定復元を試行
-        if (item.sheetName) {
-          selectedSheet = item.sheetName;
-          const sheetSelect = document.getElementById('sheet-select');
-          if (sheetSelect) {
-            sheetSelect.value = item.sheetName;
-          }
-          partiallyRestored = true;
-        }
-        
-        // 設定復元を試行（新旧形式両対応）
-        const configData = item.configSnapshot || item.config;
-        if (configData && configData.opinionHeader) {
-          const opinionSelect = document.getElementById('opinionHeader');
-          if (opinionSelect) {
-            opinionSelect.innerHTML = '<option value="' + configData.opinionHeader + '">' + configData.opinionHeader + '</option>';
-            opinionSelect.value = configData.opinionHeader;
-            partiallyRestored = true;
-          }
-        }
-        
-        if (partiallyRestored) {
-          errorMessage = `「${item.questionText}」の基本設定のみ読み込みました。AI列判定は手動で実行してください。`;
-          showMessage(errorMessage, 'warning');
-          
-          // Step 2に移動（手動設定を促す）
-          updateStepIndicators(2);
-          manageSectionStates(2);
-          return;
-        }
-      }
-    } catch (partialError) {
-      logWarn('Partial restoration also failed:', partialError);
-    }
-    
-    // 完全な失敗時のメッセージ
-    if (error.message.includes('not found')) {
-      errorMessage = '指定された履歴が見つかりませんでした。サーバーとの同期に問題がある可能性があります。';
-    } else if (error.message.includes('network') || error.message.includes('timeout')) {
-      errorMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
-    } else if (error.message.includes('permission')) {
-      errorMessage = 'アクセス権限がありません。管理者にお問い合わせください。';
-    }
-    
-    showMessage(errorMessage, 'error');
+    console.error('❌ Simple history selection failed:', error);
+    showMessage('履歴選択に失敗しました', 'error');
   }
 }
 
 /**
- * Enhanced configuration restoration from history
- * @param {Object} config - Configuration object with validation
+ * シンプル履歴からの復元実行
+ * @param {Object} item - 正規化済み履歴アイテム
  */
-function restoreConfigFromHistory(config) {
+async function restoreFromSimpleHistory(item) {
   try {
-    console.log('🔄 Starting enhanced config restoration:', config);
+    showMessage('🔄 設定を復元中...', 'info');
     
-    // Validate config object
-    if (!config || typeof config !== 'object') {
-      console.warn('⚠️ Invalid config object provided for restoration');
-      return false;
+    // 1. 基本設定の復元
+    if (item.opinionHeader) {
+      const opinionHeaderEl = document.getElementById('opinionHeader');
+      if (opinionHeaderEl) {
+        opinionHeaderEl.value = item.opinionHeader;
+        console.log('✅ Opinion header restored:', item.opinionHeader);
+      }
     }
     
-    let restoredCount = 0;
-    
-    // Enhanced form setting restoration with multi-source fallback
-    const configMappings = [
-      { 
-        configKey: 'opinionHeader', 
-        elementIds: ['opinionHeader', 'opinion-column'], 
-        label: 'Opinion Header',
-        critical: true
-      },
-      { 
-        configKey: 'nameHeader', 
-        elementIds: ['name-column'], 
-        label: 'Name Column',
-        critical: false
-      },
-      { 
-        configKey: 'classHeader', 
-        elementIds: ['class-column'], 
-        label: 'Class Column',
-        critical: false
-      },
-      { 
-        configKey: 'reasonHeader', 
-        elementIds: ['reason-column'], 
-        label: 'Reason Column',
-        critical: false
+    if (item.nameHeader) {
+      const nameHeaderEl = document.getElementById('nameHeader');
+      if (nameHeaderEl) {
+        nameHeaderEl.value = item.nameHeader;
+        console.log('✅ Name header restored:', item.nameHeader);
       }
-    ];
-    
-    configMappings.forEach(({ configKey, elementIds, label, critical }) => {
-      const value = config[configKey];
-      if (value) {
-        let restored = false;
-        
-        // Try each possible element ID
-        for (const elementId of elementIds) {
-          const element = document.getElementById(elementId);
-          if (element) {
-            // Ensure the value is an option in select elements
-            if (element.tagName === 'SELECT') {
-              let optionExists = Array.from(element.options).some(option => option.value === value);
-              if (!optionExists) {
-                const option = new Option(value, value);
-                element.appendChild(option);
-                console.log(`📝 Created missing option: ${value} for ${elementId}`);
-              }
-            }
-            
-            element.value = value;
-            console.log(`✅ ${label} restored: ${value} (via ${elementId})`);
-            
-            // Fire change event to update related UI
-            const event = new Event('change', { bubbles: true });
-            element.dispatchEvent(event);
-            
-            restored = true;
-            restoredCount++;
-            break; // Successfully restored, no need to try other element IDs
-          }
-        }
-        
-        if (!restored) {
-          const message = `⚠️ Could not restore ${label} - elements not found: ${elementIds.join(', ')}`;
-          if (critical) {
-            console.error(message);
-          } else {
-            console.warn(message);
-          }
-        }
-      }
-    });
-    
-    // Enhanced checkbox restoration with validation
-    const checkboxMappings = [
-      { configKey: 'showNames', elementId: 'show-names', label: 'Show Names', defaultValue: false },
-      { configKey: 'showCounts', elementId: 'show-counts', label: 'Show Counts', defaultValue: true }
-    ];
-    
-    checkboxMappings.forEach(({ configKey, elementId, label, defaultValue }) => {
-      const element = document.getElementById(elementId);
-      if (element) {
-        const value = config.hasOwnProperty(configKey) ? config[configKey] : defaultValue;
-        element.checked = Boolean(value);
-        console.log(`✅ ${label} restored: ${value} (${elementId})`);
-        
-        // Fire change event to update related UI
-        const event = new Event('change', { bubbles: true });
-        element.dispatchEvent(event);
-        restoredCount++;
-      } else {
-        console.warn(`⚠️ Checkbox element not found: ${elementId} for ${label}`);
-      }
-    });
-    
-    // Final validation and reporting
-    const totalExpected = configMappings.length + checkboxMappings.length;
-    const successRate = Math.round((restoredCount / totalExpected) * 100);
-    
-    console.log(`📊 Configuration restoration completed: ${restoredCount}/${totalExpected} (${successRate}%)`);
-    
-    // Validate critical settings were restored
-    const criticalMissing = configMappings
-      .filter(mapping => mapping.critical && !config[mapping.configKey])
-      .map(mapping => mapping.label);
-    
-    if (criticalMissing.length > 0) {
-      console.error('❌ Critical settings missing:', criticalMissing);
-      showMessage('履歴復元が不完全です。必要な設定が見つかりません。', 'warning');
-      return false;
     }
     
-    return restoredCount > 0;
+    // 2. 表示設定の復元
+    const isAnonymous = item.displayMode === '匿名表示';
+    const anonymousCheckbox = document.getElementById('anonymous-mode');
+    if (anonymousCheckbox) {
+      anonymousCheckbox.checked = isAnonymous;
+      console.log('✅ Display mode restored:', item.displayMode);
+    }
+    
+    // 3. シート選択の復元
+    if (item.sheetName) {
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        sheetSelect.value = item.sheetName;
+        if (typeof handleSheetSelection === 'function') {
+          handleSheetSelection({ target: { value: item.sheetName } });
+        }
+        console.log('✅ Sheet selection restored:', item.sheetName);
+      }
+    }
+    
+    // 4. UI状態の更新
+    if (typeof managedSectionStates === 'function') {
+      managedSectionStates(3); // Step 3に移動
+    }
+    
+    showMessage(`✅ 「${item.questionText}」の設定を復元しました`, 'success');
     
   } catch (error) {
-    console.error('❌ Config restoration failed:', error);
-    showMessage('設定の復元中にエラーが発生しました', 'error');
-    return false;
+    console.error('❌ Simple history restoration failed:', error);
+    showMessage('設定復元に失敗しました', 'error');
   }
 }
 
-// 追加の設定項目の復元（レガシー関数の続き - 統合予定）
-function restoreAdditionalConfigSettings(config) {
-  try {
-    if (config.displayMode) {
-      const displayModeElements = document.querySelectorAll('input[name="displayMode"]');
-      displayModeElements.forEach(radio => {
-        if (radio.value === config.displayMode) {
-          radio.checked = true;
-          const event = new Event('change', { bubbles: true });
-          radio.dispatchEvent(event);
-        }
-      });
-      logDebug('✅ Display mode restored:', config.displayMode);
-    }
-    
-    if (config.countDisplay) {
-      const countDisplayElements = document.querySelectorAll('input[name="countDisplay"]');
-      countDisplayElements.forEach(radio => {
-        if (radio.value === config.countDisplay) {
-          radio.checked = true;
-          const event = new Event('change', { bubbles: true });
-          radio.dispatchEvent(event);
-        }
-      });
-      logDebug('✅ Count display restored:', config.countDisplay);
-    }
-    
-    // 設定ボタンの状態を更新
-    if (typeof updateConfigButtons === 'function') {
-      updateConfigButtons();
-      logDebug('✅ Config buttons updated');
-    }
-    
-    // UI状態の強制更新
-    setTimeout(() => {
-      if (typeof validateConfiguration === 'function') {
-        validateConfiguration();
-      }
-      logDebug('✅ Configuration validation completed');
-    }, 100);
-    
-  } catch (error) {
-    logError('Failed to restore config from history:', error);
-    showMessage('⚠️ 設定の復元に一部失敗しましたが、可能な項目は復元されました', 'warning');
-  }
-}
+// 古い複雑なrestoreConfigFromHistory関数は削除済み - restoreFromSimpleHistoryに統合
+
+// 古いrestoreAdditionalConfigSettings関数は削除済み - シンプル復元に統合
 
 // createHistoryItemElement関数は削除 - テーブル形式のcreateHistoryTableRowを使用
 
