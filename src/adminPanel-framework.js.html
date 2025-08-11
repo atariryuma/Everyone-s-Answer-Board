@@ -1394,6 +1394,19 @@ async function finalizeInitialization() {
       enableUserInteraction();
       updateSystemStatus('userDataSyncComplete', true);
       
+      // Load history table after all initialization is complete
+      try {
+        if (window.AdminPanel?.historyManager?.loadSimpleHistoryTable) {
+          console.log('🔄 Loading history table after initialization...');
+          await window.AdminPanel.historyManager.loadSimpleHistoryTable();
+          console.log('✅ History table loaded successfully');
+        } else {
+          console.warn('⚠️ History manager not available yet');
+        }
+      } catch (historyError) {
+        console.warn('⚠️ History table loading failed:', historyError);
+      }
+      
       // Mark initialization as completed
       window.AdminPanel.initialization.isInProgress = false;
       window.AdminPanel.initialization.isCompleted = true;
@@ -1733,12 +1746,15 @@ window.AdminPanel.historyManager = {
    * Load and display simplified history table
    */
   async loadSimpleHistoryTable() {
+    console.log('🔄 loadSimpleHistoryTable called');
     const tableBody = document.getElementById('history-table-body');
     
     if (!tableBody) {
-      console.warn('History table body not found');
+      console.warn('❌ History table body element not found');
       return;
     }
+    
+    console.log('✅ History table body element found');
     
     try {
       // Loading display
@@ -1755,12 +1771,15 @@ window.AdminPanel.historyManager = {
       `;
       
       // Get merged history
+      console.log('🔄 Getting merged history...');
       const mergedHistory = await this.getMergedHistory();
+      console.log('📊 Merged history result:', mergedHistory?.length || 0, 'items');
       
       // Clear table
       tableBody.innerHTML = '';
       
       if (!Array.isArray(mergedHistory) || mergedHistory.length === 0) {
+        console.log('📝 No history items found, showing empty state');
         // Empty history case
         const emptyRow = document.createElement('tr');
         emptyRow.innerHTML = `
@@ -1952,10 +1971,14 @@ window.AdminPanel.historyManager = {
    */
   getHistoryFromStorage() {
     try {
+      console.log('🔄 getHistoryFromStorage: Reading localStorage key "adminPanelHistory"...');
       const historyData = localStorage.getItem('adminPanelHistory');
-      return historyData ? JSON.parse(historyData) : [];
+      console.log('📊 getHistoryFromStorage: Raw data length:', historyData?.length || 0);
+      const parsed = historyData ? JSON.parse(historyData) : [];
+      console.log('✅ getHistoryFromStorage: Parsed', parsed?.length || 0, 'items');
+      return parsed;
     } catch (error) {
-      console.warn('Failed to load history from localStorage:', error);
+      console.warn('❌ getHistoryFromStorage: Failed to load history from localStorage:', error);
       return [];
     }
   },
@@ -1966,7 +1989,13 @@ window.AdminPanel.historyManager = {
   async getMergedHistory() {
     // For now, just return local storage history
     // In the future, merge with server-side history
-    return this.getHistoryFromStorage();
+    console.log('🔄 getMergedHistory: Reading from localStorage...');
+    const history = this.getHistoryFromStorage();
+    console.log('📊 getMergedHistory: Retrieved', history?.length || 0, 'items from localStorage');
+    if (history && history.length > 0) {
+      console.log('🔍 getMergedHistory: Sample item:', history[0]);
+    }
+    return history;
   },
 
   /**

@@ -2568,7 +2568,11 @@ function saveToHistory(historyItem) {
     });
     
     // UI を更新
-    window.AdminPanel.historyManager.loadSimpleHistoryTable();
+    if (window.AdminPanel?.historyManager?.loadSimpleHistoryTable) {
+      window.AdminPanel.historyManager.loadSimpleHistoryTable();
+    } else {
+      console.warn('⚠️ History manager not available for UI update');
+    }
     
   } catch (error) {
     logWarn('Failed to save history:', error);
@@ -3318,7 +3322,12 @@ async function selectHistoryItem(historyId) {
       // 確認後の復元実行
       async () => {
         console.log('✅ User confirmed simple history restoration');
-        await window.AdminPanel.historyManager.restoreFromSimpleHistory(item);
+        if (window.AdminPanel?.historyManager?.restoreFromSimpleHistory) {
+          await window.AdminPanel.historyManager.restoreFromSimpleHistory(item);
+        } else {
+          console.error('❌ History manager not available for restoration');
+          showMessage('履歴復元機能が利用できません', 'error');
+        }
       },
       // キャンセル時の処理
       () => {
@@ -3664,11 +3673,11 @@ function fixConfigForPublishedState(config) {
 }
 
 
-// 簡単な履歴テーブル初期化
+// 簡単な履歴テーブル初期化は initializeAdminPanel で実行されるように変更
+// DOMContentLoaded は削除
+
+// Draft recovery function - moved to standalone
 document.addEventListener('DOMContentLoaded', async function() {
-  // Load history table
-  window.AdminPanel.historyManager.loadSimpleHistoryTable();
-  
   // Check for and recover draft from session storage
   if (hasDraftInSession()) {
     await recoverDraftFromSession();
