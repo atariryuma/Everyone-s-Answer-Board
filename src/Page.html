@@ -81,7 +81,7 @@
         // オブジェクトの安全な表示
         const result = {};
         let count = 0;
-        for (const key in obj) {
+        for (let key in obj) {
           if (count >= 8) {
             result['...'] = `[${Object.keys(obj).length - 8} more properties]`;
             break;

@@ -3908,11 +3908,11 @@ function ensureRequiredFields(config) {
     autoStopMinutes: 360
   };
   
-  for (const key in defaults) {
-    if (defaults.hasOwnProperty(key) && config[key] === undefined) {
+  Object.keys(defaults).forEach(key => {
+    if (config[key] === undefined) {
       config[key] = defaults[key];
     }
-  }
+  });
   
   return config;
 }

@@ -259,7 +259,7 @@ class CacheManager {
             ttl: ttl
           }));
           
-          for (const key in newValues) {
+          for (let key in newValues) {
             results[key] = newValues[key];
           }
           
@@ -280,7 +280,7 @@ class CacheManager {
 
     try {
       const cachedValues = this.scriptCache.getAll(keys);
-      for (const key in cachedValues) {
+      for (let key in cachedValues) {
         results[key] = JSON.parse(cachedValues[key]);
       }
       missingKeys = keys.filter(k => !results.hasOwnProperty(k));
@@ -292,7 +292,7 @@ class CacheManager {
     if (missingKeys.length > 0) {
       const newValues = valuesFn(missingKeys);
       const newCacheValues = {};
-      for (const key in newValues) {
+      for (let key in newValues) {
         results[key] = newValues[key];
         newCacheValues[key] = JSON.stringify(newValues[key]);
       }
