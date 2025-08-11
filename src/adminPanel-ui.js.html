@@ -2515,8 +2515,8 @@ function saveToHistory(historyItem) {
       spreadsheetUrl: historyItem.spreadsheetUrl || '',
       setupType: historyItem.setupType || 'unknown', // クイックスタート、カスタムセットアップ、外部リソースを識別
       isActive: historyItem.isActive || false, // 現在公開中かどうか
-      displayMode: historyItem.displayMode || '通常表示',
-      countDisplay: historyItem.countDisplay || '表示',
+      displayMode: historyItem.displayMode || 'named',
+      countDisplay: historyItem.countDisplay || 'show',
       status: historyItem.status || 'published',
       
       // AI列判定結果の保存（復元時に必要）
@@ -2605,7 +2605,7 @@ async function syncHistoryToServer(historyItem, retryCount = 0) {
       scheduledEndTime: historyItem.scheduledEndTime || null,
       isActive: !!historyItem.isActive,
       // 表示モードはテキストで簡素化
-      displayMode: historyItem.displayMode || (historyItem.config && historyItem.config.displayMode) || '通常表示',
+      displayMode: historyItem.displayMode || (historyItem.config && historyItem.config.displayMode) || 'named',
       status: historyItem.status || 'published',
       spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
       answerCount: historyItem.answerCount || 0,
@@ -2837,8 +2837,8 @@ function saveDraftToSession(draftData) {
       questionText: draftData.questionText,
       sheetName: draftData.sheetName || selectedSheet,
       config: draftData.config || {},
-      displayMode: draftData.displayMode || '通常表示', // 通常表示 or 匿名表示
-      countDisplay: draftData.countDisplay || '表示', // 表示 or 非表示
+      displayMode: draftData.displayMode || 'named', // named or anonymous
+      countDisplay: draftData.countDisplay || 'show', // show or hide
       
       // AI column prediction results for recovery
       sheetDetails: {
@@ -2958,7 +2958,7 @@ async function recoverDraftFromSession() {
     // Restore display mode settings
     const anonymousCheckbox = document.getElementById('anonymous-mode');
     if (anonymousCheckbox) {
-      anonymousCheckbox.checked = draftState.displayMode === '匿名表示';
+      anonymousCheckbox.checked = draftState.displayMode === 'anonymous';
     }
     
     // Update UI to reflect recovered state
@@ -3210,44 +3210,44 @@ function createHistoryTableRow(item, index) {
   
   // 回答形式の表示ロジックは削除 - 設定アイコンで表示を統一
   
-  // DisplayMode統一変換システム
+  // DisplayMode統一変換システム（英語値に統一）
   function normalizeDisplayMode(value) {
-    if (value === 'anonymous' || value === false || value === '匿名') return '匿名表示';
-    if (value === 'named' || value === true || value === '通常') return '通常表示';
-    if (value === '匿名表示' || value === '通常表示') return value;
-    return '通常表示'; // デフォルト
+    if (value === 'anonymous' || value === false || value === '匿名' || value === '匿名表示') return 'anonymous';
+    if (value === 'named' || value === true || value === '通常' || value === '通常表示') return 'named';
+    return 'named'; // デフォルト
   }
 
-  // Visual indicators for display options (改善版 - 全形式対応)
+  // Visual indicators for display options (改善版 - 英語値対応)
   function getDisplayModeIcon(displayMode) {
     const normalized = normalizeDisplayMode(displayMode);
-    return normalized === '匿名表示' ? '🎭' : '👥';
+    return normalized === 'anonymous' ? '🎭' : '👥';
   }
   
   function getCountDisplayIcon(countDisplay) {
-    return countDisplay === '非表示' ? '🚫' : '📊';
+    return countDisplay === 'hide' ? '🚫' : '📊';
   }
   
   function getStatusIcon(isActive) {
     return isActive ? '🌐' : '⏹️';
   }
   
-  // Helper functions for tooltip text descriptions
+  // Helper functions for tooltip text descriptions（UI表示層で日本語化）
   function getStatusText(isActive) {
     return isActive ? '公開中' : '終了';
   }
 
   function getDisplayModeText(displayMode) {
-    return normalizeDisplayMode(displayMode);
+    const normalized = normalizeDisplayMode(displayMode);
+    return normalized === 'anonymous' ? '匿名表示' : '通常表示';
   }
 
   function getCountDisplayText(countDisplay) {
-    return countDisplay === '非表示' ? 'カウント非表示' : 'カウント表示';
+    return countDisplay === 'hide' ? 'カウント非表示' : 'カウント表示';
   }
   
   // Format display mode and count display as compact visual indicators
   const displayMode = normalizeDisplayMode(item.displayMode); // 統一変換適用
-  const countDisplay = item.countDisplay || '表示';
+  const countDisplay = item.countDisplay || 'show';
   const displayModeIcon = getDisplayModeIcon(displayMode);
   const countDisplayIcon = getCountDisplayIcon(countDisplay);
   const statusIcon = getStatusIcon(isActive);
@@ -3502,7 +3502,7 @@ function normalizeHistoryItem(rawItem) {
       setupType: rawItem.setupType || 'unknown',
       opinionHeader: '',
       nameHeader: '名前',
-      displayMode: '通常表示',
+      displayMode: 'named',
       sheetName: rawItem.sheetName || '',
       spreadsheetId: rawItem.spreadsheetId || ''
     };
@@ -3590,7 +3590,7 @@ async function restoreFromSimpleHistory(item) {
     }
     
     // 2. 表示設定の復元
-    const isAnonymous = item.displayMode === '匿名表示';
+    const isAnonymous = item.displayMode === 'anonymous';
     const anonymousCheckbox = document.getElementById('anonymous-mode');
     if (anonymousCheckbox) {
       anonymousCheckbox.checked = isAnonymous;
@@ -3902,6 +3902,8 @@ function ensureRequiredFields(config) {
     showNames: false,
     showCounts: false,
     highlightMode: false,
+    displayMode: 'named',
+    countDisplay: 'show',
     autoStopEnabled: true,
     autoStopMinutes: 360
   };

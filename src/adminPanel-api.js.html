@@ -1169,8 +1169,8 @@ function completeAIDetectionProcess() {
             questionText: config.opinionHeader || config.opinionColumn || '（問題文未設定）',
             sheetName: selectedSheet,
             config: config,
-            displayMode: (function() { const el = document.getElementById('anonymous-mode'); return el && el.checked ? '匿名表示' : '通常表示'; })(),
-            countDisplay: '表示' // Default, could be configured based on UI settings
+            displayMode: (function() { const el = document.getElementById('anonymous-mode'); return el && el.checked ? 'anonymous' : 'named'; })(),
+            countDisplay: 'show' // Default, could be configured based on UI settings
           };
           
           saveDraftToSession(draftData);
@@ -2021,7 +2021,7 @@ function unpublishBoard() {
       // 現在のUI状態から設定取得
       const getDisplayMode = () => {
         const anonymousCheckbox = document.getElementById('anonymous-mode');
-        return (anonymousCheckbox && anonymousCheckbox.checked) ? '匿名表示' : '通常表示';
+        return (anonymousCheckbox && anonymousCheckbox.checked) ? 'anonymous' : 'named';
       };
       
       // 問題文を複数ソースから取得
@@ -2144,8 +2144,8 @@ function unpublishBoard() {
         sheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName || '',
         
         // Display settings (QuickStart provides explicit values)
-        displayMode: quickStartResult.displayMode === 'anonymous' ? '匿名表示' : '通常表示',
-        countDisplay: quickStartResult.showCounts ? '表示' : '非表示',
+        displayMode: quickStartResult.displayMode === 'anonymous' ? 'anonymous' : 'named',
+        countDisplay: quickStartResult.showCounts ? 'show' : 'hide',
         
         // Simple format (QuickStart is typically text-based)
         format: 'text',
