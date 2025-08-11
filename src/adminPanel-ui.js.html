@@ -3211,39 +3211,39 @@ function createHistoryTableRow(item, index) {
   // 回答形式の表示ロジックは削除 - 設定アイコンで表示を統一
   
   // DisplayMode統一変換システム
-  const normalizeDisplayMode = (value) => {
+  function normalizeDisplayMode(value) {
     if (value === 'anonymous' || value === false || value === '匿名') return '匿名表示';
     if (value === 'named' || value === true || value === '通常') return '通常表示';
     if (value === '匿名表示' || value === '通常表示') return value;
     return '通常表示'; // デフォルト
-  };
+  }
 
   // Visual indicators for display options (改善版 - 全形式対応)
-  const getDisplayModeIcon = (displayMode) => {
+  function getDisplayModeIcon(displayMode) {
     const normalized = normalizeDisplayMode(displayMode);
     return normalized === '匿名表示' ? '🎭' : '👥';
-  };
+  }
   
-  const getCountDisplayIcon = (countDisplay) => {
+  function getCountDisplayIcon(countDisplay) {
     return countDisplay === '非表示' ? '🚫' : '📊';
-  };
+  }
   
-  const getStatusIcon = (isActive) => {
+  function getStatusIcon(isActive) {
     return isActive ? '🌐' : '⏹️';
-  };
+  }
   
   // Helper functions for tooltip text descriptions
-  const getStatusText = (isActive) => {
+  function getStatusText(isActive) {
     return isActive ? '公開中' : '終了';
-  };
+  }
 
-  const getDisplayModeText = (displayMode) => {
+  function getDisplayModeText(displayMode) {
     return normalizeDisplayMode(displayMode);
-  };
+  }
 
-  const getCountDisplayText = (countDisplay) => {
+  function getCountDisplayText(countDisplay) {
     return countDisplay === '非表示' ? 'カウント非表示' : 'カウント表示';
-  };
+  }
   
   // Format display mode and count display as compact visual indicators
   const displayMode = normalizeDisplayMode(item.displayMode); // 統一変換適用
@@ -3906,11 +3906,11 @@ function ensureRequiredFields(config) {
     autoStopMinutes: 360
   };
   
-  Object.keys(defaults).forEach(key => {
-    if (config[key] === undefined) {
+  for (const key in defaults) {
+    if (defaults.hasOwnProperty(key) && config[key] === undefined) {
       config[key] = defaults[key];
     }
-  });
+  }
   
   return config;
 }
