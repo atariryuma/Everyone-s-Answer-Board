@@ -1721,5 +1721,266 @@ window.addEventListener('resize', function() {
 */
 // Account management initialization has been removed
 
+// =============================================================================
+// SIMPLIFIED HISTORY MANAGEMENT SYSTEM
+// =============================================================================
+
+/**
+ * History Manager for Admin Panel
+ */
+window.AdminPanel.historyManager = {
+  /**
+   * Load and display simplified history table
+   */
+  async loadSimpleHistoryTable() {
+    const tableBody = document.getElementById('history-table-body');
+    
+    if (!tableBody) {
+      console.warn('History table body not found');
+      return;
+    }
+    
+    try {
+      // Loading display
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="4" class="px-3 py-6 text-center text-gray-500 text-sm">
+            <div class="flex flex-col items-center justify-center">
+              <div class="spinner mb-3"></div>
+              <div>履歴を読み込み中...</div>
+              <div class="text-xs text-gray-600 mt-1">ローカルとサーバーの履歴を統合しています</div>
+            </div>
+          </td>
+        </tr>
+      `;
+      
+      // Get merged history
+      const mergedHistory = await this.getMergedHistory();
+      
+      // Clear table
+      tableBody.innerHTML = '';
+      
+      if (!Array.isArray(mergedHistory) || mergedHistory.length === 0) {
+        // Empty history case
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `
+          <td colspan="4" class="px-3 py-8 text-center text-gray-500 text-sm">
+            <div class="flex flex-col items-center">
+              <div class="text-4xl mb-2">📝</div>
+              <div class="font-medium mb-1">履歴がありません</div>
+              <div class="text-xs text-gray-600">フォームを公開すると履歴が表示されます</div>
+            </div>
+          </td>
+        `;
+        tableBody.appendChild(emptyRow);
+        return;
+      }
+      
+      // Display history items
+      let successCount = 0;
+      let errorCount = 0;
+      
+      mergedHistory.forEach((item, index) => {
+        try {
+          if (!item || !item.id) {
+            console.warn('Invalid history item at index', index, item);
+            errorCount++;
+            return;
+          }
+          
+          const row = this.createHistoryTableRow(item, index);
+          if (row) {
+            tableBody.appendChild(row);
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (rowError) {
+          console.warn('Failed to create row for history item at index', index, rowError);
+          errorCount++;
+        }
+      });
+      
+      console.log(`History table loaded: ${successCount} success, ${errorCount} errors`);
+      
+      if (errorCount > 0 && typeof showMessage === 'function') {
+        showMessage(`⚠️ 一部の履歴項目（${errorCount}件）の表示に問題がありました`, 'warning');
+      }
+      
+    } catch (error) {
+      console.error('Failed to load history table:', error);
+      
+      // Fallback to local storage only
+      const localHistory = this.getHistoryFromStorage();
+      tableBody.innerHTML = '';
+      
+      if (localHistory.length === 0) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `
+          <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
+            履歴の読み込みに失敗しました
+          </td>
+        `;
+        tableBody.appendChild(emptyRow);
+      } else {
+        localHistory.forEach((item, index) => {
+          const row = this.createHistoryTableRow(item, index);
+          if (row) tableBody.appendChild(row);
+        });
+      }
+    }
+  },
+
+  /**
+   * Create history table row
+   */
+  createHistoryTableRow(item, index) {
+    const row = document.createElement('tr');
+    
+    // Active items get green highlight
+    const isActive = !!item.isActive;
+    row.className = isActive 
+      ? 'hover:bg-green-700/20 cursor-pointer transition-colors bg-green-900/10' 
+      : 'hover:bg-gray-700/50 cursor-pointer transition-colors';
+    
+    // Format dates
+    const createdDate = item.createdDate ? new Date(item.createdDate).toLocaleDateString('ja-JP') : '不明';
+    const publishedAt = item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    }) : '不明';
+    
+    // Question text (truncated)
+    const questionText = item.questionText || item.opinionHeader || 'デフォルト問題文';
+    const truncatedText = questionText.length > 30 ? questionText.substring(0, 30) + '...' : questionText;
+    
+    // Display mode and settings
+    const displayMode = this.normalizeDisplayMode(item.displayMode);
+    const displayModeIcon = displayMode === 'anonymous' ? '🎭' : '👥';
+    const displayModeText = displayMode === 'anonymous' ? '匿名表示' : '通常表示';
+    
+    row.innerHTML = `
+      <td class="px-2 py-3 text-sm text-gray-300">${createdDate}</td>
+      <td class="px-2 py-3 text-sm text-gray-300">${publishedAt}</td>
+      <td class="px-3 py-3 text-sm text-gray-200">${this.escapeHtml(truncatedText)}</td>
+      <td class="px-2 py-3 text-center text-sm">
+        <div class="flex items-center justify-center gap-1">
+          <span title="${displayModeText}">${displayModeIcon}</span>
+          <span class="text-xs text-gray-400">${item.setupType || ''}</span>
+        </div>
+      </td>
+    `;
+    
+    // Click handler for restoration
+    row.addEventListener('click', async () => {
+      await this.restoreFromSimpleHistory(item);
+    });
+    
+    return row;
+  },
+
+  /**
+   * Restore from simple history
+   */
+  async restoreFromSimpleHistory(item) {
+    try {
+      if (typeof showMessage === 'function') {
+        showMessage('🔄 設定を復元中...', 'info');
+      }
+      
+      // 1. Basic settings restoration
+      if (item.opinionHeader) {
+        const opinionHeaderEl = document.getElementById('opinionHeader');
+        if (opinionHeaderEl) {
+          opinionHeaderEl.value = item.opinionHeader;
+          console.log('✅ Opinion header restored:', item.opinionHeader);
+        }
+      }
+      
+      if (item.nameHeader) {
+        const nameHeaderEl = document.getElementById('nameHeader');
+        if (nameHeaderEl) {
+          nameHeaderEl.value = item.nameHeader;
+          console.log('✅ Name header restored:', item.nameHeader);
+        }
+      }
+      
+      // 2. Display mode restoration
+      const isAnonymous = item.displayMode === 'anonymous' || item.displayMode === '匿名表示';
+      const anonymousCheckbox = document.getElementById('anonymous-mode');
+      if (anonymousCheckbox) {
+        anonymousCheckbox.checked = isAnonymous;
+        console.log('✅ Display mode restored:', item.displayMode);
+      }
+      
+      // 3. Sheet selection restoration
+      if (item.sheetName) {
+        const sheetSelector = document.getElementById('sheet-selector');
+        if (sheetSelector) {
+          sheetSelector.value = item.sheetName;
+          console.log('✅ Sheet restored:', item.sheetName);
+        }
+      }
+      
+      // 4. UI state update
+      if (typeof managedSectionStates === 'function') {
+        managedSectionStates(3); // Navigate to Step 3
+      }
+      
+      if (typeof showMessage === 'function') {
+        showMessage(`✅ 「${item.questionText}」の設定を復元しました`, 'success');
+      }
+      
+    } catch (error) {
+      console.error('❌ Simple history restoration failed:', error);
+      if (typeof showMessage === 'function') {
+        showMessage('設定復元に失敗しました', 'error');
+      }
+    }
+  },
+
+  /**
+   * Normalize display mode values
+   */
+  normalizeDisplayMode(value) {
+    if (value === 'anonymous' || value === false || value === '匿名' || value === '匿名表示') return 'anonymous';
+    if (value === 'named' || value === true || value === '通常' || value === '通常表示') return 'named';
+    return 'named'; // Default
+  },
+
+  /**
+   * Get history from localStorage
+   */
+  getHistoryFromStorage() {
+    try {
+      const historyData = localStorage.getItem('adminPanelHistory');
+      return historyData ? JSON.parse(historyData) : [];
+    } catch (error) {
+      console.warn('Failed to load history from localStorage:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get merged history (placeholder - implement server merging if needed)
+   */
+  async getMergedHistory() {
+    // For now, just return local storage history
+    // In the future, merge with server-side history
+    return this.getHistoryFromStorage();
+  },
+
+  /**
+   * HTML escape utility
+   */
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+};
+
+// Register history management functions globally for backward compatibility
+window.loadSimpleHistoryTable = () => window.AdminPanel.historyManager.loadSimpleHistoryTable();
+
 //# sourceURL=adminPanel-framework.js.html
 </script>

@@ -2568,7 +2568,7 @@ function saveToHistory(historyItem) {
     });
     
     // UI を更新
-    loadSimpleHistoryTable();
+    window.AdminPanel.historyManager.loadSimpleHistoryTable();
     
   } catch (error) {
     logWarn('Failed to save history:', error);
@@ -3033,254 +3033,9 @@ function updateConfigPanelUI(config) {
  * 簡単な履歴テーブルを表示（新実装）
  */
 
-async function loadSimpleHistoryTable() {
-  const tableBody = document.getElementById('history-table-body');
-  
-  if (!tableBody) {
-    logWarn('History table body not found');
-    return;
-  }
-  
-  try {
-    // ローディング表示（改善されたスタイル）
-    tableBody.innerHTML = `
-      <tr>
-        <td colspan="4" class="px-3 py-6 text-center text-gray-500 text-sm">
-          <div class="flex flex-col items-center justify-center">
-            <div class="spinner mb-3"></div>
-            <div>履歴を読み込み中...</div>
-            <div class="text-xs text-gray-600 mt-1">ローカルとサーバーの履歴を統合しています</div>
-          </div>
-        </td>
-      </tr>
-    `;
-    
-    // サーバーサイドとローカルストレージの履歴を取得・統合
-    const mergedHistory = await getMergedHistory();
-    
-    // テーブルをクリア
-    tableBody.innerHTML = '';
-    
-    if (!Array.isArray(mergedHistory) || mergedHistory.length === 0) {
-      // 履歴が空の場合（改善されたメッセージ）
-      const emptyRow = document.createElement('tr');
-      emptyRow.innerHTML = `
-        <td colspan="4" class="px-3 py-8 text-center text-gray-500 text-sm">
-          <div class="flex flex-col items-center">
-            <div class="text-4xl mb-2">📝</div>
-            <div class="font-medium mb-1">履歴がありません</div>
-            <div class="text-xs text-gray-600">フォームを公開すると履歴が表示されます</div>
-          </div>
-        </td>
-      `;
-      tableBody.appendChild(emptyRow);
-      return;
-    }
-    
-    // 履歴アイテムをテーブル行として表示（エラーハンドリング付き）
-    let successCount = 0;
-    let errorCount = 0;
-    
-    mergedHistory.forEach((item, index) => {
-      try {
-        if (!item || !item.id) {
-          logWarn('Invalid history item at index', index, item);
-          errorCount++;
-          return;
-        }
-        
-        const row = createHistoryTableRow(item, index);
-        if (row) {
-          tableBody.appendChild(row);
-          successCount++;
-        } else {
-          errorCount++;
-        }
-      } catch (rowError) {
-        logWarn('Failed to create row for history item at index', index, rowError);
-        errorCount++;
-      }
-    });
-    
-    // 統計情報をログに出力
-    logDebug(`History table loaded: ${successCount} success, ${errorCount} errors`);
-    
-    if (errorCount > 0) {
-      showMessage(`⚠️ 一部の履歴項目（${errorCount}件）の表示に問題がありました`, 'warning');
-    }
-    
-    logDebug('History table loaded with', mergedHistory.length, 'items');
-  } catch (error) {
-    logError('Failed to load history table:', error);
-    
-    // エラー時はローカルストレージのみ使用
-    const localHistory = getHistoryFromStorage();
-    tableBody.innerHTML = '';
-    
-    if (localHistory.length === 0) {
-      const emptyRow = document.createElement('tr');
-      emptyRow.innerHTML = `
-        <td colspan="4" class="px-3 py-4 text-center text-gray-500 text-sm">
-          履歴の読み込みに失敗しました
-        </td>
-      `;
-      tableBody.appendChild(emptyRow);
-    } else {
-      localHistory.forEach((item, index) => {
-        const row = createHistoryTableRow(item, index);
-        tableBody.appendChild(row);
-      });
-    }
-  }
-}
+// loadSimpleHistoryTable moved to AdminPanel.historyManager
 
-/**
- * 履歴テーブル行を作成
- * @param {Object} item - 履歴アイテム
- * @param {number} index - インデックス
- * @returns {HTMLElement} テーブル行要素
- */
-function createHistoryTableRow(item, index) {
-  const row = document.createElement('tr');
-  
-  // 公開中の項目は緑色のハイライト
-  const isActive = !!item.isActive;
-  row.className = isActive 
-    ? 'hover:bg-green-700/20 cursor-pointer transition-colors bg-green-900/10' 
-    : 'hover:bg-gray-700/30 cursor-pointer transition-colors';
-  
-  // Enhanced history click with detailed preview modal
-  row.onclick = () => {
-    try {
-      showHistoryRestorationPreview(item);
-    } catch (e) {
-      console.warn('History click preview failed, proceeding with basic confirmation:', e);
-      selectHistoryItem(item.id);
-    }
-  };
-  
-  const formatDateTime = (dateString) => {
-    if (!dateString) return '<span class="text-gray-500 text-xs">未設定</span>';
-    
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return '<span class="text-red-400 text-xs">無効な日付</span>';
-      }
-      
-      const now = new Date();
-      const diffMs = now - date;
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMinutes = Math.floor(diffMs / (1000 * 60));
-      
-      let relativeTime = '';
-      if (diffDays > 7) {
-        // 1週間以上前は通常の日付表示
-        relativeTime = date.toLocaleString('ja-JP', {
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      } else if (diffDays > 0) {
-        relativeTime = `${diffDays}日前`;
-      } else if (diffHours > 0) {
-        relativeTime = `${diffHours}時間前`;
-      } else if (diffMinutes > 0) {
-        relativeTime = `${diffMinutes}分前`;
-      } else {
-        relativeTime = 'たった今';
-      }
-      
-      const fullDate = date.toLocaleString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        weekday: 'short'
-      });
-      
-      return `<span class="text-xs" title="${fullDate}">${relativeTime}</span>`;
-    } catch (error) {
-      return '<span class="text-red-400 text-xs">日付エラー</span>';
-    }
-  };
-  
-  // 回答形式の表示ロジックは削除 - 設定アイコンで表示を統一
-  
-  // DisplayMode統一変換システム（英語値に統一）
-  function normalizeDisplayMode(value) {
-    if (value === 'anonymous' || value === false || value === '匿名' || value === '匿名表示') return 'anonymous';
-    if (value === 'named' || value === true || value === '通常' || value === '通常表示') return 'named';
-    return 'named'; // デフォルト
-  }
-
-  // Visual indicators for display options (改善版 - 英語値対応)
-  function getDisplayModeIcon(displayMode) {
-    const normalized = normalizeDisplayMode(displayMode);
-    return normalized === 'anonymous' ? '🎭' : '👥';
-  }
-  
-  function getCountDisplayIcon(countDisplay) {
-    return countDisplay === 'hide' ? '🚫' : '📊';
-  }
-  
-  function getStatusIcon(isActive) {
-    return isActive ? '🌐' : '⏹️';
-  }
-  
-  // Helper functions for tooltip text descriptions（UI表示層で日本語化）
-  function getStatusText(isActive) {
-    return isActive ? '公開中' : '終了';
-  }
-
-  function getDisplayModeText(displayMode) {
-    const normalized = normalizeDisplayMode(displayMode);
-    return normalized === 'anonymous' ? '匿名表示' : '通常表示';
-  }
-
-  function getCountDisplayText(countDisplay) {
-    return countDisplay === 'hide' ? 'カウント非表示' : 'カウント表示';
-  }
-  
-  // Format display mode and count display as compact visual indicators
-  const displayMode = normalizeDisplayMode(item.displayMode); // 統一変換適用
-  const countDisplay = item.countDisplay || 'show';
-  const displayModeIcon = getDisplayModeIcon(displayMode);
-  const countDisplayIcon = getCountDisplayIcon(countDisplay);
-  const statusIcon = getStatusIcon(isActive);
-  
-  // Enhanced question text display with truncation
-  const questionText = item.questionText || '（質問文未設定）';
-  const displayQuestionText = questionText.length > 40 
-    ? questionText.substring(0, 40) + '...' 
-    : questionText;
-  
-  // Create simplified tooltip text
-  const tooltipText = `質問: ${escapeHtml(questionText)}
-状態: ${getStatusText(isActive)}
-表示: ${getDisplayModeText(displayMode)}
-カウント: ${getCountDisplayText(countDisplay)}
-公開: ${item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未公開'}`;
-
-  row.innerHTML = `
-    <td class="px-2 py-2 text-xs text-gray-300">${formatDateTime(item.createdDate)}</td>
-    <td class="px-2 py-2 text-xs text-gray-300">${formatDateTime(item.publishedAt)}</td>
-    <td class="px-3 py-2 text-xs text-gray-300" title="${escapeHtml(tooltipText)}" style="max-width: 200px;">
-      <div class="truncate leading-tight">${escapeHtml(displayQuestionText)}</div>
-    </td>
-    <td class="px-2 py-2 text-xs text-center">
-      <div class="flex justify-center gap-1">
-        <span title="表示モード: ${getDisplayModeText(displayMode)}">${displayModeIcon}</span>
-        <span title="カウント表示: ${getCountDisplayText(countDisplay)}">${countDisplayIcon}</span>
-      </div>
-    </td>
-  `;
-  
-  return row;
-}
+// createHistoryTableRow moved to AdminPanel.historyManager
 
 /**
  * Enhanced history restoration preview modal
@@ -3550,7 +3305,7 @@ async function selectHistoryItem(historyId) {
       // 確認後の復元実行
       async () => {
         console.log('✅ User confirmed simple history restoration');
-        await restoreFromSimpleHistory(item);
+        await window.AdminPanel.historyManager.restoreFromSimpleHistory(item);
       },
       // キャンセル時の処理
       () => {
@@ -3568,59 +3323,7 @@ async function selectHistoryItem(historyId) {
  * シンプル履歴からの復元実行
  * @param {Object} item - 正規化済み履歴アイテム
  */
-async function restoreFromSimpleHistory(item) {
-  try {
-    showMessage('🔄 設定を復元中...', 'info');
-    
-    // 1. 基本設定の復元
-    if (item.opinionHeader) {
-      const opinionHeaderEl = document.getElementById('opinionHeader');
-      if (opinionHeaderEl) {
-        opinionHeaderEl.value = item.opinionHeader;
-        console.log('✅ Opinion header restored:', item.opinionHeader);
-      }
-    }
-    
-    if (item.nameHeader) {
-      const nameHeaderEl = document.getElementById('nameHeader');
-      if (nameHeaderEl) {
-        nameHeaderEl.value = item.nameHeader;
-        console.log('✅ Name header restored:', item.nameHeader);
-      }
-    }
-    
-    // 2. 表示設定の復元
-    const isAnonymous = item.displayMode === 'anonymous';
-    const anonymousCheckbox = document.getElementById('anonymous-mode');
-    if (anonymousCheckbox) {
-      anonymousCheckbox.checked = isAnonymous;
-      console.log('✅ Display mode restored:', item.displayMode);
-    }
-    
-    // 3. シート選択の復元
-    if (item.sheetName) {
-      const sheetSelect = document.getElementById('sheet-select');
-      if (sheetSelect) {
-        sheetSelect.value = item.sheetName;
-        if (typeof handleSheetSelection === 'function') {
-          handleSheetSelection({ target: { value: item.sheetName } });
-        }
-        console.log('✅ Sheet selection restored:', item.sheetName);
-      }
-    }
-    
-    // 4. UI状態の更新
-    if (typeof managedSectionStates === 'function') {
-      managedSectionStates(3); // Step 3に移動
-    }
-    
-    showMessage(`✅ 「${item.questionText}」の設定を復元しました`, 'success');
-    
-  } catch (error) {
-    console.error('❌ Simple history restoration failed:', error);
-    showMessage('設定復元に失敗しました', 'error');
-  }
-}
+// restoreFromSimpleHistory moved to AdminPanel.historyManager
 
 // 古い複雑なrestoreConfigFromHistory関数は削除済み - restoreFromSimpleHistoryに統合
 
@@ -3951,7 +3654,7 @@ function fixConfigForPublishedState(config) {
 // 簡単な履歴テーブル初期化
 document.addEventListener('DOMContentLoaded', async function() {
   // Load history table
-  loadSimpleHistoryTable();
+  window.AdminPanel.historyManager.loadSimpleHistoryTable();
   
   // Check for and recover draft from session storage
   if (hasDraftInSession()) {
