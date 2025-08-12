@@ -4771,12 +4771,25 @@ class StudyQuestApp {
       return;
     }
     
-    // リアクションボタンを取得してローディング状態を設定
-    const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
-    this.setReactionButtonsLoading(buttons, true);
-    
     // UI状態の事前更新（楽観的更新）
     const currentState = item.reactions?.[reaction]?.reacted || false;
+    
+    // リアクションボタンを取得してローディング状態を設定
+    const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
+    
+    // クリック時のアニメーション効果を追加
+    buttons.forEach(btn => {
+      btn.classList.add('clicked');
+      setTimeout(() => {
+        btn.classList.remove('clicked');
+        if (!currentState) { // リアクションが追加される場合
+          btn.classList.add('just-reacted');
+          setTimeout(() => btn.classList.remove('just-reacted'), 400);
+        }
+      }, 200);
+    });
+    
+    this.setReactionButtonsLoading(buttons, true);
     if (item.reactions && item.reactions[reaction]) {
       item.reactions[reaction].reacted = !currentState;
       item.reactions[reaction].count = currentState 
@@ -7270,6 +7283,15 @@ class StudyQuestApp {
       
       .reaction-btn.reacted:hover:not(.loading) {
         transform: scale(1.1) !important;
+      }
+      
+      /* Ensure animations still work in low performance mode */
+      .reaction-btn.clicked {
+        animation: reactionClick 0.15s ease-out !important;
+      }
+      
+      .reaction-btn.just-reacted {
+        animation: reactionPulse 0.25s ease-out !important;
       }
       
       .game-btn:hover {

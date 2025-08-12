@@ -134,7 +134,6 @@ header {
   color: #000 !important;
   box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
   transform: scale(1.05);
-  animation: reactionPulse 0.3s ease-out;
 }
 .reaction-btn.reacted:hover:not(.loading) {
   transform: scale(1.15);
@@ -142,6 +141,12 @@ header {
 .reaction-btn.loading {
   opacity: 0.7;
   pointer-events: none;
+}
+.reaction-btn.clicked {
+  animation: reactionClick 0.2s ease-out;
+}
+.reaction-btn.just-reacted {
+  animation: reactionPulse 0.4s ease-out;
 }
 .fade-in {
   animation: fadeIn 0.5s ease-out;
@@ -196,8 +201,13 @@ header {
   60% { transform: translate(-50%, -5px); }
 }
 @keyframes reactionPulse {
-  0% { transform: scale(1.05); }
-  50% { transform: scale(1.15); }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1.05); }
+}
+@keyframes reactionClick {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.9); }
   100% { transform: scale(1.05); }
 }
 
