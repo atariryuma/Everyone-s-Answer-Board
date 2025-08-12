@@ -13,19 +13,37 @@ function getDynamicBatchSize(performanceMetrics = {}) {
   const memory = navigator.deviceMemory || 4;
   const cores = navigator.hardwareConcurrency || 4;
   const frameTime = performanceMetrics.frameTime || 16;
+  const connectionSpeed = performanceMetrics.connectionSpeed || 'fast';
   
-  // High performance: plenty of memory, many cores, fast frame time
-  if (memory >= 8 && cores >= 8 && frameTime < 12) {
-    return HIGH_PERF_BATCH_SIZE;
+  // Performance scoring
+  let performanceScore = 0;
+  
+  // Memory scoring (0-3 points)
+  if (memory >= 8) performanceScore += 3;
+  else if (memory >= 4) performanceScore += 2;
+  else if (memory >= 2) performanceScore += 1;
+  
+  // CPU cores scoring (0-3 points)
+  if (cores >= 8) performanceScore += 3;
+  else if (cores >= 4) performanceScore += 2;
+  else if (cores >= 2) performanceScore += 1;
+  
+  // Frame time scoring (0-3 points, inverted - lower is better)
+  if (frameTime < 12) performanceScore += 3;
+  else if (frameTime < 16) performanceScore += 2;
+  else if (frameTime < 20) performanceScore += 1;
+  
+  // Connection speed scoring (0-1 point)
+  if (connectionSpeed === 'fast') performanceScore += 1;
+  
+  // Dynamic batch size based on total score (0-10)
+  if (performanceScore >= 8) {
+    return HIGH_PERF_BATCH_SIZE; // Score 8-10: High performance
+  } else if (performanceScore >= 5) {
+    return BASE_RENDER_BATCH_SIZE; // Score 5-7: Normal performance
+  } else {
+    return LOW_PERF_BATCH_SIZE; // Score 0-4: Low performance
   }
-  
-  // Low performance: limited memory, few cores, slow frame time
-  if (memory <= 2 || cores <= 2 || frameTime > 20) {
-    return LOW_PERF_BATCH_SIZE;
-  }
-  
-  // Normal performance
-  return BASE_RENDER_BATCH_SIZE;
 }
 
 // Get optimal batch size for current device
@@ -4108,14 +4126,28 @@ class StudyQuestApp {
   
   performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
     const container = this.elements.answersContainer;
-    container.innerHTML = ''; // ここでコンテナをクリア
     
-    // 既存カードのマップを作成（リアクション状態を保持）
+    // 既存カードのマップを作成（クリア前にリアクション状態を保持）
     const existingMap = new Map();
     container.querySelectorAll('.answer-card').forEach(card => {
       existingMap.set(card.dataset.rowIndex, card);
     });
     
+    // コンテナをクリア
+    container.innerHTML = '';
+    
+    // DOM安定化のための適切な待機（初期ロード時のみ）
+    if (isInitialLoad) {
+      // DOM更新を即座に反映
+      requestAnimationFrame(() => {
+        this.executeMainRendering(newRows, oldRows, container, existingMap, isInitialLoad);
+      });
+    } else {
+      this.executeMainRendering(newRows, oldRows, container, existingMap, isInitialLoad);
+    }
+  }
+  
+  executeMainRendering(newRows, oldRows, container, existingMap, isInitialLoad) {
     // 不要なカードを削除
     existingMap.forEach((card, id) => {
       if (!newRows.some(r => String(r.rowIndex) === id)) {
@@ -4124,10 +4156,14 @@ class StudyQuestApp {
       }
     });
     
-    // メインレンダリング処理
-    if (newRows.length > RENDER_BATCH_SIZE) {
+    // メインレンダリング処理の判定を改善
+    const effectiveBatchSize = this.dynamicBatchSize || RENDER_BATCH_SIZE;
+    const shouldUseVirtualScrolling = newRows.length > effectiveBatchSize && !isInitialLoad;
+    
+    if (shouldUseVirtualScrolling) {
       this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad);
     } else {
+      // 初期ロードまたは少数のアイテムは直接レンダリング
       this.renderDirectly(newRows, oldRows, container, existingMap);
     }
   }
@@ -4164,23 +4200,41 @@ class StudyQuestApp {
     const container = this.elements.answersContainer;
     if (!container) {
       console.warn('calculateVisibleRange: answersContainer not found.');
-      return { startIndex: 0, endIndex: 0 };
+      return { startIndex: 0, endIndex: totalItems }; // 全件表示にフォールバック
     }
 
     const scrollTop = container.scrollTop;
-    const containerHeight = container.clientHeight;
+    let containerHeight = container.clientHeight;
     const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
+
+    // 高さが0の場合の動的計算
+    if (containerHeight === 0) {
+      // ビューポート高さから推定計算
+      const viewportHeight = window.innerHeight;
+      const containerTop = container.getBoundingClientRect().top;
+      const estimatedHeight = Math.max(viewportHeight - containerTop - 100, 400);
+      
+      console.warn(`calculateVisibleRange: containerHeight is 0, using estimated height: ${estimatedHeight}px`);
+      containerHeight = estimatedHeight;
+      
+      // 初期ロード時は全件表示を保証
+      if (this.state && !this.state.initialDataLoaded) {
+        console.log('calculateVisibleRange: Initial load detected, rendering all items.');
+        return { startIndex: 0, endIndex: totalItems };
+      }
+    }
 
     let startIndex = 0;
     let endIndex = totalItems;
 
     if (containerHeight > 0) {
+      const visibleItems = Math.ceil(containerHeight / cardHeight);
       startIndex = Math.floor(scrollTop / cardHeight);
-      endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+      endIndex = Math.min(totalItems, startIndex + visibleItems + 2); // バッファとして+2
     } else {
-      console.warn('calculateVisibleRange: containerHeight is 0, rendering all items as fallback.');
+      console.warn('calculateVisibleRange: Unable to determine container height, rendering all items.');
+      return { startIndex: 0, endIndex: totalItems };
     }
-
 
     return { startIndex, endIndex };
   }
@@ -4195,28 +4249,60 @@ class StudyQuestApp {
     // 仮想スクロールでも既存のリアクション状態を保持
     const fragment = this.getReusableFragment();
     const visibleRange = this.calculateVisibleRange(newRows.length);
+    
+    // フォールバック判定：高さ計算が失敗した場合は直接レンダリングに切り替え
+    if (visibleRange.startIndex === 0 && visibleRange.endIndex === newRows.length) {
+      console.warn('renderWithVirtualScrolling: Height calculation failed, switching to direct rendering');
+      this.renderDirectly(newRows, oldRows, container, existingMap);
+      return;
+    }
+    
     const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
-    debugLog('Virtual scroll rendering:', { visibleRows: visibleRows.length });
-
-    visibleRows.forEach((row) => {
-      const rowId = String(row.rowIndex);
-      let card = existingMap.get(rowId);
-      const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-
-      if (!card) {
-        card = this.createAnswerCard(row);
-        if (card) {
-          fragment.appendChild(card);
-        }
-      } else if (this.shouldUpdateCard(row, oldData)) {
-        // 既存カードを更新（リアクション状態を保持）
-        this.updateAnswerCard(card, row, oldData);
-      }
+    debugLog('Virtual scroll rendering:', { 
+      totalRows: newRows.length,
+      visibleStart: visibleRange.startIndex,
+      visibleEnd: visibleRange.endIndex,
+      renderingCount: visibleRows.length
     });
+
+    // 初期ロード時で可視範囲が小さすぎる場合の保護
+    if (isInitialLoad && visibleRows.length < Math.min(10, newRows.length)) {
+      console.warn('renderWithVirtualScrolling: Initial load with insufficient visible items, expanding range');
+      const expandedRows = newRows.slice(0, Math.min(20, newRows.length));
+      expandedRows.forEach((row) => {
+        this.renderSingleCard(row, oldRows, existingMap, fragment);
+      });
+    } else {
+      visibleRows.forEach((row) => {
+        this.renderSingleCard(row, oldRows, existingMap, fragment);
+      });
+    }
 
     debugLog('Virtual scroll completed:', { renderedCards: fragment.children.length });
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
+    } else {
+      console.warn('renderWithVirtualScrolling: No cards were rendered, falling back to direct rendering');
+      this.renderDirectly(newRows, oldRows, container, existingMap);
+    }
+  }
+  
+  renderSingleCard(row, oldRows, existingMap, fragment) {
+    const rowId = String(row.rowIndex);
+    let card = existingMap.get(rowId);
+    const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
+
+    if (!card) {
+      card = this.createAnswerCard(row);
+      if (card) {
+        fragment.appendChild(card);
+      }
+    } else if (this.shouldUpdateCard(row, oldData)) {
+      // 既存カードを更新（リアクション状態を保持）
+      this.updateAnswerCard(card, row, oldData);
+      if (card && !card.parentNode) {
+        fragment.appendChild(card);
+      }
     }
   }
   
@@ -7209,6 +7295,8 @@ class StudyQuestApp {
   setupPerformanceMonitoring() {
     let frameCount = 0;
     let lastTime = performance.now();
+    let frameTimeSamples = [];
+    let lastBatchAdjustment = 0;
     
     const measurePerformance = () => {
       const now = performance.now();
@@ -7216,6 +7304,19 @@ class StudyQuestApp {
       
       if (frameCount > 0) {
         this.performanceMetrics.frameTime = delta;
+        frameTimeSamples.push(delta);
+        
+        // Keep only last 10 samples for average calculation
+        if (frameTimeSamples.length > 10) {
+          frameTimeSamples.shift();
+        }
+        
+        // Adjust batch size every 30 frames (about every 500ms at 60fps)
+        if (frameCount % 30 === 0 && now - lastBatchAdjustment > 1000) {
+          const avgFrameTime = frameTimeSamples.reduce((sum, time) => sum + time, 0) / frameTimeSamples.length;
+          this.adjustBatchSizeDynamically(avgFrameTime);
+          lastBatchAdjustment = now;
+        }
         
         // If frame time is consistently over 16ms, enable low performance mode
         if (delta > PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
@@ -7356,6 +7457,83 @@ class StudyQuestApp {
       clearInterval(this.pollingInterval);
       this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 30000); // 30s instead of 15s
     }
+  }
+
+  adjustBatchSizeDynamically(avgFrameTime) {
+    const connectionType = navigator.connection?.effectiveType || 'fast';
+    const connectionSpeed = connectionType.includes('4g') ? 'fast' : 'slow';
+    
+    // Calculate new performance metrics
+    const performanceMetrics = {
+      frameTime: avgFrameTime,
+      connectionSpeed: connectionSpeed
+    };
+    
+    // Get new optimal batch size
+    const newBatchSize = getDynamicBatchSize(performanceMetrics);
+    const currentBatchSize = this.dynamicBatchSize || RENDER_BATCH_SIZE;
+    
+    // Only adjust if there's a significant change
+    if (Math.abs(newBatchSize - currentBatchSize) >= 2) {
+      this.dynamicBatchSize = newBatchSize;
+      
+      debugLog(`📊 動的バッチサイズ調整: ${currentBatchSize} → ${newBatchSize}`, {
+        avgFrameTime: avgFrameTime.toFixed(2),
+        connectionSpeed,
+        performanceScore: this.calculatePerformanceScore(performanceMetrics)
+      });
+      
+      // Adjust low performance mode threshold
+      if (avgFrameTime > PERFORMANCE_BUDGET * 1.5 && !this.isLowPerformanceMode) {
+        console.warn('⚠️ パフォーマンス劣化検出 - 低パフォーマンスモードを有効化');
+        this.isLowPerformanceMode = true;
+        this.optimizeForLowPerformance();
+      } else if (avgFrameTime < PERFORMANCE_BUDGET * 0.8 && this.isLowPerformanceMode) {
+        console.log('✅ パフォーマンス改善検出 - 低パフォーマンスモードを無効化');
+        this.disableLowPerformanceMode();
+      }
+    }
+  }
+  
+  calculatePerformanceScore(performanceMetrics) {
+    const memory = navigator.deviceMemory || 4;
+    const cores = navigator.hardwareConcurrency || 4;
+    const frameTime = performanceMetrics.frameTime || 16;
+    const connectionSpeed = performanceMetrics.connectionSpeed || 'fast';
+    
+    let score = 0;
+    if (memory >= 8) score += 3; else if (memory >= 4) score += 2; else if (memory >= 2) score += 1;
+    if (cores >= 8) score += 3; else if (cores >= 4) score += 2; else if (cores >= 2) score += 1;
+    if (frameTime < 12) score += 3; else if (frameTime < 16) score += 2; else if (frameTime < 20) score += 1;
+    if (connectionSpeed === 'fast') score += 1;
+    
+    return score;
+  }
+  
+  disableLowPerformanceMode() {
+    this.isLowPerformanceMode = false;
+    
+    // Remove low performance optimizations
+    const lowPerfStyle = document.getElementById('low-performance-optimizations');
+    if (lowPerfStyle) {
+      lowPerfStyle.remove();
+    }
+    
+    // Restore original CSS variables
+    document.documentElement.style.removeProperty('--transition-duration');
+    document.documentElement.style.removeProperty('--animation-duration');
+    document.documentElement.style.removeProperty('--backdrop-blur');
+    
+    // Remove low-performance class from body
+    document.body.classList.remove('low-performance');
+    
+    // Restore normal polling frequency
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 15000);
+    }
+    
+    debugLog('✅ 低パフォーマンスモード無効化完了');
   }
 
   setupObservers() {
@@ -7603,7 +7781,8 @@ class StudyQuestApp {
     
     // Use dynamic batch sizing for better performance adaptation
     const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
-    const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, dynamicBatchSize) : dynamicBatchSize;
+    const effectiveBatchSize = this.dynamicBatchSize || dynamicBatchSize;
+    const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, effectiveBatchSize) : effectiveBatchSize;
     
     // Find items that haven't been rendered yet
     const unrenderedItems = this.state.currentAnswers.filter(item => 
