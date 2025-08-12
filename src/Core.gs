@@ -1090,28 +1090,23 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
       reactingUserEmail
     );
 
-    // Page.html期待形式に変換
+    // processReactionの戻り値から直接リアクション状態を取得（API呼び出し削減）
     if (result && result.status === 'success') {
-      // 更新後のリアクション情報を取得
-      var updatedReactions = getRowReactions(boardOwnerInfo.spreadsheetId, sheetName, rowIndex, reactingUserEmail);
-
       return {
         status: "ok",
-        reactions: updatedReactions
+        reactions: result.reactionStates || {}
       };
     } else {
       throw new Error(result.message || 'リアクションの処理に失敗しました');
     }
   } catch (e) {
-    logError(e, 'addReaction', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId, rowIndex, reaction });
+    logError(e, 'addReaction', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId: requestUserId, rowIndex, reaction: reactionKey });
     return {
       status: "error",
       message: e.message
     };
-  } finally {
-    // 実行終了時にユーザー情報キャッシュをクリア
-    clearExecutionUserInfoCache();
   }
+  // finally節のキャッシュクリア削除（verifyUserAccess内でクリア済みのため不要）
 }
 
 /**
@@ -3339,11 +3334,30 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
         warnLog('リアクション後のキャッシュ無効化エラー:', cacheError.message);
       }
 
+      // 更新後のリアクション状態を計算（追加のAPI呼び出しなし）
+      var reactionStates = {};
+      var updateIndex = 0;
+      REACTION_KEYS.forEach(function(key) {
+        if (!allReactionColumns[key]) return;
+        
+        // 更新データから最終状態を取得
+        var updatedReactionString = updateData[updateIndex].values[0][0];
+        var updatedReactions = parseReactionString(updatedReactionString);
+        
+        reactionStates[key] = {
+          count: updatedReactions.length,
+          reacted: updatedReactions.indexOf(reactingUserEmail) !== -1
+        };
+        
+        updateIndex++;
+      });
+
       return {
         status: 'success',
         message: 'リアクションを更新しました。',
         action: userAction,
-        count: targetCount
+        count: targetCount,
+        reactionStates: reactionStates
       };
     });
 
@@ -4753,32 +4767,41 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
       CURIOUS: { count: 0, reacted: false }
     };
 
-    // 各リアクション列からデータを取得
-    ['UNDERSTAND', 'LIKE', 'CURIOUS'].forEach(function(reactionKey) {
+    // 全リアクション列の範囲を一括で構築
+    var ranges = [];
+    var validKeys = [];
+    REACTION_KEYS.forEach(function(reactionKey) {
       var columnName = COLUMN_HEADERS[reactionKey];
       var columnIndex = headerIndices[columnName];
-
+      
       if (columnIndex !== undefined) {
         var range = sheetName + '!' + String.fromCharCode(65 + columnIndex) + rowIndex;
-        try {
-          var response = batchGetSheetsData(service, spreadsheetId, [range]);
-          var cellValue = '';
-          if (response && response.valueRanges && response.valueRanges[0] &&
-              response.valueRanges[0].values && response.valueRanges[0].values[0] &&
-              response.valueRanges[0].values[0][0]) {
-            cellValue = response.valueRanges[0].values[0][0];
-          }
+        ranges.push(range);
+        validKeys.push(reactionKey);
+      }
+    });
 
+    // 1回のAPI呼び出しで全リアクション列データを取得
+    if (ranges.length > 0) {
+      var response = batchGetSheetsData(service, spreadsheetId, ranges);
+      
+      if (response && response.valueRanges) {
+        response.valueRanges.forEach(function(valueRange, index) {
+          var reactionKey = validKeys[index];
+          var cellValue = '';
+          
+          if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
+            cellValue = valueRange.values[0][0];
+          }
+          
           if (cellValue) {
             var reactions = parseReactionString(cellValue);
             reactionData[reactionKey].count = reactions.length;
             reactionData[reactionKey].reacted = reactions.indexOf(userEmail) !== -1;
           }
-        } catch (cellError) {
-          warnLog('リアクション取得エラー(' + reactionKey + '): ' + cellError.message);
-        }
+        });
       }
-    });
+    }
 
     return reactionData;
   } catch (e) {

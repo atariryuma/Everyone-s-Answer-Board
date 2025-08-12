@@ -4750,15 +4750,7 @@ class StudyQuestApp {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
-    // パフォーマンス最適化: 短時間での重複操作を防ぐ
-    const now = Date.now();
-    const lastOperation = this.lastReactionTimes?.get(reactionKey);
-    if (lastOperation && (now - lastOperation) < 500) { // 500ms以内の重複操作を防ぐ
-      console.log(`⚡ 重複操作スキップ: ${reactionKey}`);
-      return;
-    }
-    
-    // 処理中のリアクションチェック（競合状態回避）
+    // 重複操作防止（500ms）
     if (this.pendingReactions.has(reactionKey)) {
       console.log(`⏳ 処理中のためスキップ: ${reactionKey}`);
       return;
@@ -4771,57 +4763,21 @@ class StudyQuestApp {
       return;
     }
     
-    // UI状態の事前更新（楽観的更新）
-    const currentState = item.reactions?.[reaction]?.reacted || false;
-    
-    // リアクションボタンを取得してローディング状態を設定
+    // シンプルなローディング状態設定
     const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
-    
-    // クリック時のアニメーション効果を追加
     buttons.forEach(btn => {
-      btn.classList.add('clicked');
-      setTimeout(() => {
-        btn.classList.remove('clicked');
-        if (!currentState) { // リアクションが追加される場合
-          btn.classList.add('just-reacted');
-          setTimeout(() => {
-            btn.classList.remove('just-reacted');
-            // アニメーション後もreactedスタイルを確実に適用
-            btn.classList.add('reacted');
-          }, 400);
-        }
-      }, 200);
+      btn.classList.add('loading');
+      btn.disabled = true;
     });
-    
-    this.setReactionButtonsLoading(buttons, true);
-    if (item.reactions && item.reactions[reaction]) {
-      item.reactions[reaction].reacted = !currentState;
-      item.reactions[reaction].count = currentState 
-        ? Math.max(0, (item.reactions[reaction].count || 1) - 1)
-        : (item.reactions[reaction].count || 0) + 1;
-      
-      // UI即座更新
-      this.updateReactionButtonsForItem(item);
-    }
 
-    // 既存の個別キューシステム（常に維持）
+    // キューイング（既存システム保持）
     this.reactionQueue.set(reactionKey, {
       rowIndex: numericRowIndex,
       reaction,
-      timestamp: now,
-      originalState: currentState // 元の状態を記録（復旧用）
+      timestamp: Date.now()
     });
 
-    // 最後の操作時刻を記録
-    if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
-    this.lastReactionTimes.set(reactionKey, now);
-
-    // オプション: バッチ処理も並行実行（既存機能に影響なし）
-    if (this.enableBatchProcessing && !this.batchProcessingActive) {
-      this.addToBatchQueue(numericRowIndex, reaction);
-    }
-
-    // 既存のキュー処理を開始（既存機能を保持）
+    // キュー処理開始
     this.processReactionQueue();
   }
 
@@ -4897,9 +4853,6 @@ class StudyQuestApp {
     try {
         this.pendingReactions.add(reactionKey);
 
-        const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-        // ローディング状態は handleReaction で既に設定済みなので、ここでは設定しない
-
         const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
         if (!item) {
             throw new Error(`Item not found for rowIndex: ${rowIndex}`);
@@ -4907,29 +4860,63 @@ class StudyQuestApp {
 
         console.log('📡 リアクション送信 (Server-first):', { rowIndex, reaction, sheetName: this.state.sheetName });
 
-        // Server-first approach: サーバーに送信してから結果を適用
+        // サーバーファースト: 直接サーバー応答でUI更新
         const response = await this.sendReactionToServer(rowIndex, reaction);
-        await this.processReactionResponse(item, response, reaction);
-
-        // UI更新（サーバー応答後のみ）
-        await this.updateReactionUI(item, false);
+        this.updateItemFromServerResponse(rowIndex, response);
 
         console.log('✅ リアクション処理完了:', reactionKey);
-        
-        // 処理完了を通知
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
+
     } catch (error) {
         console.error('❌ リアクション処理エラー:', error);
-        await this.handleReactionError(error, rowIndex, reaction);
-        
-        // エラー完了を通知
+        // エラー時のロールバック処理
+        this.rollbackReactionUI(rowIndex, reaction);
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: false, error: error.message });
     } finally {
         this.pendingReactions.delete(reactionKey);
-
-        const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-        this.setReactionButtonsLoading(btns, false);
+        
+        // ローディング状態解除
+        const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+        buttons.forEach(btn => {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        });
     }
+  }
+
+  // サーバー応答からアイテムを更新
+  updateItemFromServerResponse(rowIndex, response) {
+    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    if (!item) {
+      console.warn(`⚠️ アイテムが見つかりません: rowIndex=${rowIndex}`);
+      return;
+    }
+
+    if (response && response.status === 'ok' && response.reactions) {
+      // サーバー応答でリアクション状態を上書き
+      item.reactions = response.reactions;
+      
+      // UI更新
+      this.updateReactionUI(item, true); // immediate=true
+      console.log('✅ サーバー状態でUI更新完了:', { rowIndex, reactions: response.reactions });
+    }
+  }
+
+  // エラー時のロールバック処理
+  rollbackReactionUI(rowIndex, reaction) {
+    const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+    buttons.forEach(btn => {
+      // ローディング状態とスタイルをクリア
+      btn.classList.remove('loading', 'clicked', 'just-reacted');
+      btn.disabled = false;
+      
+      // 元の状態に戻す（見た目だけリセット）
+      if (!btn.classList.contains('reacted')) {
+        btn.classList.remove('reacted');
+      }
+    });
+    
+    console.log('🔄 リアクションUIロールバック完了:', { rowIndex, reaction });
   }
 
   // リアクション処理完了通知システム
