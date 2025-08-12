@@ -360,7 +360,7 @@ class StudyQuestApp {
 
   // Unified state management synchronization (Phase 2.3)
   synchronizeStateAfterDataUpdate(newData, context = 'unknown') {
-    console.log(`🔄 Synchronizing state after data update (${context})...`);
+    debugLog(`Synchronizing state after data update (${context})...`);
     
     const dataLength = newData ? newData.length : 0;
     const previousLength = this.state.currentAnswers.length;
@@ -386,7 +386,7 @@ class StudyQuestApp {
     // Phase 4.1: Enhanced monitoring and logging
     this.logDataConsistencyMetrics(context, dataLength, previousLength);
     
-    console.log('✅ State synchronization completed:', {
+    debugLog('State synchronization completed:', {
       context,
       dataLength,
       previousLength,
@@ -403,8 +403,10 @@ class StudyQuestApp {
 
   // Comprehensive data consistency and cache monitoring (Phase 4.1)
   logDataConsistencyMetrics(context, currentDataLength, previousDataLength) {
-    const domCardCount = this.elements.answersContainer ? 
-      this.elements.answersContainer.querySelectorAll('.answer-card').length : 0;
+    // DOM チェックはレンダリング関連のコンテキストでのみ実行
+    const shouldCheckDOM = context.includes('render') || context.includes('validate') || context.includes('loadComplete');
+    const domCardCount = shouldCheckDOM && this.elements.answersContainer ? 
+      this.elements.answersContainer.querySelectorAll('.answer-card').length : null;
     
     const metrics = {
       timestamp: new Date().toISOString(),
@@ -415,10 +417,15 @@ class StudyQuestApp {
         lastSeenCount: this.state.lastSeenCount,
         changeAmount: currentDataLength - previousDataLength
       },
-      domMetrics: {
+      domMetrics: shouldCheckDOM ? {
         cardCount: domCardCount,
         dataVsDom: currentDataLength - domCardCount,
         isConsistent: currentDataLength === domCardCount
+      } : {
+        cardCount: null,
+        dataVsDom: null,
+        isConsistent: null,
+        note: 'DOM check skipped - not rendering context'
       },
       stateMetrics: {
         hasNewContent: this.state.hasNewContent,
@@ -432,7 +439,7 @@ class StudyQuestApp {
       }
     };
     
-    console.log('📊 Data Consistency Metrics (Phase 4.1):', metrics);
+    debugLog('Data Consistency Metrics:', metrics);
     
     // Store metrics for debugging (keep last 10 entries)
     if (!this.debugMetrics) this.debugMetrics = [];
@@ -441,8 +448,8 @@ class StudyQuestApp {
       this.debugMetrics.shift();
     }
     
-    // Alert on significant inconsistencies (simplified)
-    if (!metrics.domMetrics.isConsistent) {
+    // Alert on significant inconsistencies (only for DOM check contexts)
+    if (shouldCheckDOM && !metrics.domMetrics.isConsistent) {
       console.warn('⚠️ DOM-Data inconsistency detected:', {
         data: currentDataLength,
         dom: domCardCount,
@@ -3695,18 +3702,15 @@ class StudyQuestApp {
         // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
         // Step 1 & 2: Data acquisition and unified state synchronization
         const syncResult = this.synchronizeStateAfterDataUpdate(result.data, 'performDataLoad');
-        console.log('✅ Step 1-2: Data acquisition and state synchronization completed:', syncResult);
+        debugLog('Step 1-2: Data acquisition and state synchronization completed:', syncResult);
         
-        // 理由列デバッグ: 取得されたデータの詳細を確認
-        console.log('🔍 理由列デバッグ - 取得データ詳細:', result.data.map((item, index) => ({
+        // 理由列データチェック（デバッグモード時のみ）
+        debugLog('理由列データ詳細:', result.data.slice(0, 3).map((item, index) => ({
           index: index,
           rowIndex: item.rowIndex,
-          opinion: item.opinion?.substring(0, 50) + '...',
-          reason: item.reason,
+          opinion: item.opinion?.substring(0, 30) + '...',
           reasonLength: item.reason?.length || 0,
-          reasonExists: !!item.reason,
-          reasonTrimmed: item.reason?.trim(),
-          allKeys: Object.keys(item)
+          reasonExists: !!item.reason
         })));
         
         // サーバーからの質問文と現在表示の一致性をチェック
@@ -5688,7 +5692,7 @@ class StudyQuestApp {
       const key = this.getScopedKey('lastSeenCount');
       localStorage.setItem(key, count.toString());
       
-      console.log('💾 lastSeenCount保存:', { key, count });
+      debugLog('lastSeenCount保存:', { key, count });
     } catch (error) {
       console.warn('⚠️ lastSeenCount保存エラー:', error);
     }
@@ -5700,7 +5704,7 @@ class StudyQuestApp {
       this.state.lastSeenCount = newCount;
       this.saveLastSeenCount(newCount);
       
-      console.log('📊 lastSeenCount更新:', { 
+      debugLog('lastSeenCount更新:', { 
         oldCount, 
         newCount,
         timestamp: new Date().toISOString()
