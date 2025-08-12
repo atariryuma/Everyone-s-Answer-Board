@@ -2050,6 +2050,15 @@ function unpublishBoard() {
                           'デフォルト問題文';
       
       // シンプルな履歴アイテム構造
+      // 履歴保存前の詳細ログ
+      console.log('📝 Creating history item with:', {
+        questionText: questionText,
+        selectedSheet: selectedSheet,
+        activeSheetName: publishResponse.activeSheetName,
+        spreadsheetId: userInfo.spreadsheetId,
+        finalSheetName: publishResponse.activeSheetName || selectedSheet || ''
+      });
+      
       const historyItem = {
         id: generateHistoryId(),
         createdDate: createdDate,

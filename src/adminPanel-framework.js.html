@@ -2060,6 +2060,14 @@ window.HistoryManager = {
   async _restoreHistoryItem(item) {
     try {
       console.log('🔄 Restoring history:', item.questionText);
+      console.log('📊 History item details:', {
+        id: item.id,
+        questionText: item.questionText,
+        sheetName: item.sheetName,
+        spreadsheetId: item.spreadsheetId,
+        opinionHeader: item.opinionHeader,
+        nameHeader: item.nameHeader
+      });
       
       // 1. テキスト設定復元
       if (item.opinionHeader) {
@@ -2090,11 +2098,32 @@ window.HistoryManager = {
       }
       
       // 4. 完全プロジェクト復元（スプレッドシート + シート）
+      console.log('🔍 Restore conditions check:', {
+        hasSpreadsheetId: !!item.spreadsheetId,
+        hasSheetName: !!item.sheetName,
+        spreadsheetId: item.spreadsheetId,
+        sheetName: item.sheetName
+      });
+      
       if (item.spreadsheetId && item.sheetName) {
+        console.log('✅ Full project restore path selected');
         await this._restoreFullProject(item.spreadsheetId, item.sheetName);
       } else if (item.sheetName) {
+        console.log('✅ Sheet-only restore path selected');
         // シートのみ復元（下位互換性）
         await this._restoreSheetSelection(item.sheetName);
+      } else {
+        console.warn('⚠️ No valid restoration path found - missing sheet or spreadsheet info');
+        console.warn('🔧 Attempting fallback: trying to find sheet by question text');
+        
+        // フォールバック: 問題文からシート名を推測
+        const fallbackSheetName = await this._findSheetByQuestionText(item.questionText);
+        if (fallbackSheetName) {
+          console.log(`✅ Fallback found sheet: ${fallbackSheetName}`);
+          await this._restoreSheetSelection(fallbackSheetName);
+        } else {
+          console.error('❌ Fallback failed: unable to determine correct sheet');
+        }
       }
       
       // 5. UI完全更新
@@ -2111,6 +2140,38 @@ window.HistoryManager = {
       if (typeof showMessage === 'function') {
         showMessage('❌ 設定復元に失敗しました', 'error');
       }
+    }
+  },
+
+  /**
+   * Find sheet by question text as fallback mechanism
+   */
+  async _findSheetByQuestionText(questionText) {
+    try {
+      console.log(`🔍 Searching for sheet with question: "${questionText}"`);
+      
+      // 現在のステータスから設定情報を取得
+      if (window.AdminPanel?.currentStatus?.configJson) {
+        const configJson = window.AdminPanel.currentStatus.configJson;
+        
+        // 各シート設定を確認
+        for (const [key, sheetConfig] of Object.entries(configJson)) {
+          if (key.startsWith('sheet_') && sheetConfig.opinionHeader) {
+            if (sheetConfig.opinionHeader === questionText) {
+              const sheetName = sheetConfig.sheetName || key.replace('sheet_', '');
+              console.log(`✅ Found matching sheet: ${sheetName}`);
+              return sheetName;
+            }
+          }
+        }
+      }
+      
+      console.warn('⚠️ No matching sheet found for question text');
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Error in _findSheetByQuestionText:', error);
+      return null;
     }
   },
 
