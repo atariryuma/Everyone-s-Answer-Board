@@ -4753,7 +4753,7 @@ class StudyQuestApp {
     // パフォーマンス最適化: 短時間での重複操作を防ぐ
     const now = Date.now();
     const lastOperation = this.lastReactionTimes?.get(reactionKey);
-    if (lastOperation && (now - lastOperation) < 1000) { // 1秒以内の重複操作を防ぐ
+    if (lastOperation && (now - lastOperation) < 500) { // 500ms以内の重複操作を防ぐ
       console.log(`⚡ 重複操作スキップ: ${reactionKey}`);
       return;
     }
@@ -4784,7 +4784,11 @@ class StudyQuestApp {
         btn.classList.remove('clicked');
         if (!currentState) { // リアクションが追加される場合
           btn.classList.add('just-reacted');
-          setTimeout(() => btn.classList.remove('just-reacted'), 400);
+          setTimeout(() => {
+            btn.classList.remove('just-reacted');
+            // アニメーション後もreactedスタイルを確実に適用
+            btn.classList.add('reacted');
+          }, 400);
         }
       }, 200);
     });
@@ -7283,21 +7287,21 @@ class StudyQuestApp {
         background-color: rgba(239, 68, 68, 0.15) !important;
         color: #ef4444 !important;
         border-color: #ef4444 !important;
-        box-shadow: 0 0 6px rgba(239, 68, 68, 0.25) !important;
+        box-shadow: 0 0 3px rgba(239, 68, 68, 0.15) !important;
       }
       
       .reaction-btn.reacted.text-yellow-500 {
         background-color: rgba(245, 158, 11, 0.15) !important;
         color: #f59e0b !important;
         border-color: #f59e0b !important;
-        box-shadow: 0 0 6px rgba(245, 158, 11, 0.25) !important;
+        box-shadow: 0 0 3px rgba(245, 158, 11, 0.15) !important;
       }
       
       .reaction-btn.reacted.text-green-500 {
         background-color: rgba(34, 197, 94, 0.15) !important;
         color: #22c55e !important;
         border-color: #22c55e !important;
-        box-shadow: 0 0 6px rgba(34, 197, 94, 0.25) !important;
+        box-shadow: 0 0 3px rgba(34, 197, 94, 0.15) !important;
       }
       
       .reaction-btn.reacted:hover:not(.loading) {
