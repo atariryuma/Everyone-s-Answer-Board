@@ -441,7 +441,7 @@ class StudyQuestApp {
       this.debugMetrics.shift();
     }
     
-    // Alert on significant inconsistencies
+    // Alert on significant inconsistencies (simplified)
     if (!metrics.domMetrics.isConsistent) {
       console.warn('⚠️ DOM-Data inconsistency detected:', {
         data: currentDataLength,
@@ -594,8 +594,10 @@ class StudyQuestApp {
       // サーバーサイドでのリアルタイム状態確認
       const result = await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('Publication status check timeout'));
-        }, 10000); // 5秒→10秒に延長（サーバー処理時間を考慮）
+          // タイムアウト時はサイレントに処理（デバッグレベル）
+          debugLog('パブリケーション状態チェックタイムアウト（正常動作範囲内）');
+          resolve({ status: 'timeout', message: 'Check timed out but continuing' });
+        }, 15000); // 10秒→15秒に延長（サーバー負荷対応）
         
         google.script.run
           .withSuccessHandler((response) => {
@@ -641,11 +643,16 @@ class StudyQuestApp {
         return;
       }
       
-      // 公開状態の場合は正常継続
-      console.log('✅ ボードは正常に公開中です');
+      // 公開状態の場合は正常継続（デバッグモードでのみログ出力）
+      debugLog('ボードは正常に公開中です');
       
     } catch (error) {
-      console.warn('⚠️ パブリケーション状態チェックでエラー:', error.message);
+      // タイムアウトエラーの場合はデバッグレベルに下げる
+      if (error.message && error.message.includes('timeout')) {
+        debugLog('パブリケーション状態チェックタイムアウト:', error.message);
+      } else {
+        console.warn('⚠️ パブリケーション状態チェックでエラー:', error.message);
+      }
       // エラーの場合は継続（ネットワーク問題などを考慮）
     }
   }
@@ -2674,7 +2681,7 @@ class StudyQuestApp {
     const domCards = container.querySelectorAll('.answer-card');
     const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
     
-    console.log('🔍 validatePostLoadState: DOMカード数:', domCards.length, 'currentAnswers数:', dataLength);
+    debugLog('validatePostLoadState: DOM:', domCards.length, 'データ:', dataLength);
     
     // 空データなのにDOMにカードが残っている場合
     if (dataLength === 0 && domCards.length > 0) {
@@ -2686,17 +2693,18 @@ class StudyQuestApp {
       // 空状態を表示
       this.displayEmptyState();
       
-      console.log('✅ 状態不整合を修正しました');
+      debugLog('状態不整合を修正しました');
       
     } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
       console.warn('⚠️ 状態不整合検出: DOMカード数とデータ数が一致しません。DOM:', domCards.length, 'データ:', dataLength);
 
       // 不整合がある場合は再レンダリング
-      console.log('再レンダリングを実行します...');
+      debugLog('再レンダリングを実行します...');
       this.renderBoard(false, false);
       
     } else {
-      console.log('✅ 状態検証: DOMとデータの状態が一致しています');
+      // 正常状態のログは削除（デバッグモード時のみ出力）
+      debugLog('状態検証OK: DOM:', domCards.length, 'データ:', dataLength);
     }
     
     // 追加: 設定と表示内容の一致性を検証
@@ -3413,6 +3421,68 @@ class StudyQuestApp {
       // エラーがあっても処理は継続
     }
   }
+
+  async waitForCSSAndRender(result, isInitialLoad) {
+    // CSS読み込み完了とDOM準備状態を確認
+    const isReady = await this.ensureCSSAndDOMReady();
+    
+    if (!isReady) {
+      console.warn('⚠️ CSS/DOM準備未完了 - フォールバック処理を実行');
+    }
+    
+    // DOM高さ計算のための短時間待機（CSS適用完了を保証）
+    if (isInitialLoad) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // レンダリング実行
+    requestAnimationFrame(async () => {
+      try {
+        await this.renderBoard(false, isInitialLoad);
+        
+        // 一致性検証（ログレベルを下げて実行）
+        requestAnimationFrame(async () => {
+          await this.validatePostLoadState();
+        });
+      } catch (error) {
+        console.error('❌ DOM更新エラー:', error);
+      }
+    });
+  }
+
+  async ensureCSSAndDOMReady() {
+    // 1. 基本的なDOM要素の存在確認
+    if (!this.elements.answersContainer) {
+      console.warn('⚠️ answersContainer が見つかりません');
+      return false;
+    }
+    
+    // 2. CSS読み込み状況の確認
+    const stylesheets = document.styleSheets;
+    for (let i = 0; i < stylesheets.length; i++) {
+      try {
+        // CSSルールにアクセスできない場合はまだ読み込み中
+        if (!stylesheets[i].cssRules && !stylesheets[i].rules) {
+          console.warn('⚠️ CSS読み込み未完了を検出');
+          return false;
+        }
+      } catch (e) {
+        // CORS等でアクセスできないスタイルシートは無視
+        continue;
+      }
+    }
+    
+    // 3. コンテナの基本高さが設定されているかチェック
+    const containerStyle = window.getComputedStyle(this.elements.answersContainer);
+    const hasValidHeight = containerStyle.height && containerStyle.height !== '0px';
+    
+    if (!hasValidHeight) {
+      console.warn('⚠️ コンテナ高さが未設定: ', containerStyle.height);
+      // 高さが0pxでも処理は続行（フォールバック機構があるため）
+    }
+    
+    return true;
+  }
   
   async performDataLoad(config, oldAnswers) {
     // Get current filter and sort settings
@@ -3450,12 +3520,11 @@ class StudyQuestApp {
         bypassCache: config.bypassCache || false
       };
       
-      console.log('📤 データ取得パラメータ:', {
+      debugLog('データ取得パラメータ:', {
         ...fetchParams,
         originalSelectedClass: selectedClass,
         processedClassFilter: classFilter
       });
-      console.log('📡 Starting data fetch with parameters:', fetchParams);
       
       // エラーハンドリング強化版のデータ取得
       try {
@@ -3664,7 +3733,7 @@ class StudyQuestApp {
           opinionHeader: result.header || 'お題',
           lastUpdated: Date.now()
         };
-        console.log('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
+        debugLog('アクティブシート情報を更新:', this.state.activeSheetInfo);
 
         this.lastDataLoadTime = Date.now();
         
@@ -3685,17 +3754,8 @@ class StudyQuestApp {
           this.elements.headingLabel.textContent = result.header;
         }
 
-        // Step 3: DOM update with proper sequencing (Phase 2.1)
-        requestAnimationFrame(async () => {
-          console.log('✅ Step 3: DOM update starting...');
-          await this.renderBoard(false, isInitialLoad);
-          console.log('✅ Step 3: DOM update completed');
-          
-          // Step 4: Consistency validation after DOM update (Phase 2.1)
-          console.log('✅ Step 4: Consistency validation starting...');
-          await this.validatePostLoadState();
-          console.log('✅ Step 4: Consistency validation completed');
-        });
+        // Step 3: DOM update with CSS-ready check and proper sequencing
+        await this.waitForCSSAndRender(result, isInitialLoad);
 
         // Post-processing after successful data load
         this.adjustLayout();
@@ -4207,19 +4267,20 @@ class StudyQuestApp {
     let containerHeight = container.clientHeight;
     const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
 
-    // 高さが0の場合の動的計算
+    // 高さが0の場合の動的計算（ログレベルを情報に変更）
     if (containerHeight === 0) {
       // ビューポート高さから推定計算
       const viewportHeight = window.innerHeight;
       const containerTop = container.getBoundingClientRect().top;
       const estimatedHeight = Math.max(viewportHeight - containerTop - 100, 400);
       
-      console.warn(`calculateVisibleRange: containerHeight is 0, using estimated height: ${estimatedHeight}px`);
+      // 警告レベルを下げ、情報レベルに変更
+      debugLog(`calculateVisibleRange: containerHeight is 0, using estimated height: ${estimatedHeight}px`);
       containerHeight = estimatedHeight;
       
-      // 初期ロード時は全件表示を保証
+      // 初期ロード時は全件表示を保証（ログも情報レベルに）
       if (this.state && !this.state.initialDataLoaded) {
-        console.log('calculateVisibleRange: Initial load detected, rendering all items.');
+        debugLog('calculateVisibleRange: Initial load detected, rendering all items.');
         return { startIndex: 0, endIndex: totalItems };
       }
     }
@@ -4252,7 +4313,7 @@ class StudyQuestApp {
     
     // フォールバック判定：高さ計算が失敗した場合は直接レンダリングに切り替え
     if (visibleRange.startIndex === 0 && visibleRange.endIndex === newRows.length) {
-      console.warn('renderWithVirtualScrolling: Height calculation failed, switching to direct rendering');
+      debugLog('renderWithVirtualScrolling: Height calculation failed, switching to direct rendering');
       this.renderDirectly(newRows, oldRows, container, existingMap);
       return;
     }
@@ -4970,13 +5031,13 @@ class StudyQuestApp {
             throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
 
-        console.log('📡 リアクション送信 (Server-first):', { rowIndex, reaction, sheetName: this.state.sheetName });
+        debugLog('リアクション送信 (Server-first):', { rowIndex, reaction, sheetName: this.state.sheetName });
 
         // サーバーファースト: 直接サーバー応答でUI更新
         const response = await this.sendReactionToServer(rowIndex, reaction);
         this.updateItemFromServerResponse(rowIndex, response);
 
-        console.log('✅ リアクション処理完了:', reactionKey);
+        debugLog('リアクション処理完了:', reactionKey);
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
 
     } catch (error) {
@@ -5010,7 +5071,7 @@ class StudyQuestApp {
       
       // UI更新
       this.updateReactionUI(item, true); // immediate=true
-      console.log('✅ サーバー状態でUI更新完了:', { rowIndex, reactions: response.reactions });
+      debugLog('サーバー状態でUI更新完了:', { rowIndex, reactions: response.reactions });
     }
   }
 
@@ -5054,7 +5115,7 @@ class StudyQuestApp {
       }
     });
     
-    console.log('🔄 リアクションUIロールバック完了:', { 
+    debugLog('リアクションUIロールバック完了:', { 
       rowIndex, 
       reaction, 
       finalState: item.reactions?.[reaction] 
@@ -5500,7 +5561,7 @@ class StudyQuestApp {
           }
         }
 
-        console.log('⚡ リアクションUI即座更新完了:', {
+        debugLog('リアクションUI即座更新完了:', {
           rowIndex: item.rowIndex,
           reactions: item.reactions
         });
@@ -5533,7 +5594,7 @@ class StudyQuestApp {
                     }
                 }
 
-                console.log('✅ リアクションUI更新完了:', {
+                debugLog('リアクションUI更新完了:', {
                   rowIndex: item.rowIndex,
                   reactions: item.reactions
                 });
