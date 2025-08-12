@@ -4849,11 +4849,37 @@ class StudyQuestApp {
       return;
     }
     
-    // シンプルなローディング状態設定
+    // 楽観的UI更新：即座にリアクション状態を切り替え
+    const currentReacted = item.reactions?.[reaction]?.reacted || false;
+    const newReacted = !currentReacted;
+    
+    // データ状態を楽観的に更新
+    if (!item.reactions) item.reactions = {};
+    if (!item.reactions[reaction]) item.reactions[reaction] = { count: 0, reacted: false };
+    item.reactions[reaction].reacted = newReacted;
+    item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 0) + (newReacted ? 1 : -1));
+    
+    // UI即座更新（アイコンをsolid/outlineに切り替え）
     const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
     buttons.forEach(btn => {
       btn.classList.add('loading');
       btn.disabled = true;
+      
+      // アイコンを即座に切り替え
+      const rt = this.reactionTypes.find(r => r.key === reaction);
+      const iconSpan = btn.querySelector('span[aria-hidden="true"]');
+      if (iconSpan && rt) {
+        iconSpan.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', newReacted);
+      }
+      
+      // スタイルも即座に適用
+      btn.classList.toggle('reacted', newReacted);
+      
+      // カウント表示更新
+      const countEl = btn.querySelector('.reaction-count');
+      if (countEl && this.state.showCounts) {
+        countEl.textContent = item.reactions[reaction].count;
+      }
     });
 
     // キューイング（既存システム保持）
@@ -4988,21 +5014,51 @@ class StudyQuestApp {
     }
   }
 
-  // エラー時のロールバック処理
+  // エラー時のロールバック処理（楽観的更新を完全に巻き戻し）
   rollbackReactionUI(rowIndex, reaction) {
+    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    if (!item) {
+      console.warn(`⚠️ ロールバック対象アイテムが見つかりません: rowIndex=${rowIndex}`);
+      return;
+    }
+    
+    // 楽観的更新されたデータ状態を元に戻す
+    if (item.reactions && item.reactions[reaction]) {
+      const wasReacted = item.reactions[reaction].reacted;
+      item.reactions[reaction].reacted = !wasReacted; // トグル状態を元に戻す
+      item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 0) + (wasReacted ? 1 : -1));
+    }
+    
     const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
     buttons.forEach(btn => {
       // ローディング状態とスタイルをクリア
       btn.classList.remove('loading', 'clicked', 'just-reacted');
       btn.disabled = false;
       
-      // 元の状態に戻す（見た目だけリセット）
-      if (!btn.classList.contains('reacted')) {
-        btn.classList.remove('reacted');
+      // アイコンを元の状態に戻す
+      const rt = this.reactionTypes.find(r => r.key === reaction);
+      const iconSpan = btn.querySelector('span[aria-hidden="true"]');
+      if (iconSpan && rt && item.reactions && item.reactions[reaction]) {
+        const correctReacted = item.reactions[reaction].reacted;
+        iconSpan.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', correctReacted);
+      }
+      
+      // スタイル状態を正しく設定
+      const shouldBeReacted = item.reactions?.[reaction]?.reacted || false;
+      btn.classList.toggle('reacted', shouldBeReacted);
+      
+      // カウント表示を修正
+      const countEl = btn.querySelector('.reaction-count');
+      if (countEl && this.state.showCounts && item.reactions && item.reactions[reaction]) {
+        countEl.textContent = item.reactions[reaction].count;
       }
     });
     
-    console.log('🔄 リアクションUIロールバック完了:', { rowIndex, reaction });
+    console.log('🔄 リアクションUIロールバック完了:', { 
+      rowIndex, 
+      reaction, 
+      finalState: item.reactions?.[reaction] 
+    });
   }
 
   // リアクション処理完了通知システム
