@@ -237,6 +237,8 @@
         document.getElementById('republish-btn')?.addEventListener('click', function() {
             const button = this;
             const originalHTML = button.innerHTML;
+            const currentUrl = new URL(window.location.href);
+            const userId = currentUrl.searchParams.get('userId');
             
             // ローディング状態に変更
             button.disabled = true;
@@ -260,14 +262,13 @@
                     
                     // 公開後は公開ページに遷移（キャッシュバスティング対応）
                     setTimeout(() => {
-                        // 現在のURLから適切なview URLを生成
-                        const currentUrl = new URL(window.location.href);
+                        // 適切なview URLを生成
                         const viewUrl = new URL(currentUrl.origin + currentUrl.pathname);
                         
                         // パラメータ設定
-                        if (currentUrl.searchParams.get('userId')) {
+                        if (userId) {
                             viewUrl.searchParams.set('mode', 'view');
-                            viewUrl.searchParams.set('userId', currentUrl.searchParams.get('userId'));
+                            viewUrl.searchParams.set('userId', userId);
                         }
                         
                         // キャッシュバスティング
@@ -287,7 +288,7 @@
                     button.disabled = false;
                     button.innerHTML = originalHTML;
                 })
-                .republishBoard();
+                .republishBoard(userId);
         });
         
         // 管理パネルボタン
