@@ -89,13 +89,41 @@ class UnifiedUserManager {
   }
 
   /**
-   * フォールバック用ユーザー取得
+   * フォールバック用ユーザー取得 - 強化版
    * @private
    */
   static _fallbackUserFetch(identifier) {
-    warnLog('統一ユーザー管理: フォールバック実装を使用');
-    // 最小限の実装（既存システムを壊さないため）
-    return null;
+    warnLog('統一ユーザー管理: フォールバック実装を使用（強化版）');
+    
+    try {
+      // 既存の関数を活用してフォールバック実装を強化
+      if (typeof findUserById === 'function') {
+        debugLog('フォールバック: findUserByIdを使用');
+        return findUserById(identifier);
+      }
+      
+      if (typeof findUserByEmail === 'function') {
+        debugLog('フォールバック: findUserByEmailを使用');
+        return findUserByEmail(identifier);
+      }
+      
+      // 最後の手段として実行レベルキャッシュから取得を試行
+      if (typeof getUnifiedExecutionCache === 'function') {
+        const execCache = getUnifiedExecutionCache();
+        const cachedUser = execCache.getUserInfo(identifier);
+        if (cachedUser) {
+          debugLog('フォールバック: UnifiedExecutionCacheからユーザー情報を復旧');
+          return cachedUser;
+        }
+      }
+      
+      warnLog('⚠️ フォールバック: 全ての取得方法が失敗');
+      return null;
+      
+    } catch (fallbackError) {
+      errorLog('❌ フォールバック処理でエラー:', fallbackError.message);
+      return null;
+    }
   }
 
   /**

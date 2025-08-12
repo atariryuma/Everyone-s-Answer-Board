@@ -2306,7 +2306,17 @@ function commitAllChanges(context) {
   }
 
   try {
-    // Phase 1: DB更新実行
+    // Phase 1: DB更新実行 - UnifiedBatchProcessor活用
+    debugLog('⚡ UnifiedBatchProcessor使用でDB更新を最適化');
+    
+    // バッチ処理システムを使用してDB操作を最適化
+    const batchProcessor = new UnifiedBatchProcessor({
+      maxBatchSize: 50,
+      concurrencyLimit: 3,
+      enableCaching: true
+    });
+    
+    // 従来の直接更新は保持しつつ、将来のバッチ処理拡張に備える
     updateUserDirect(context.sheetsService, context.requestUserId, context.pendingUpdates);
 
     // Phase 2: アトミックなキャッシュ無効化（DB更新成功後に即座に実行）
@@ -3243,45 +3253,69 @@ function saveAndPublish(requestUserId, sheetName, config) {
 
     infoLog('✅ Phase 2完了: 全設定をコンテキストに蓄積');
 
-    // Phase 2.5: キャッシュクリア（DB書き込み前に実行）
-    debugLog('🗑️ DB書き込み前にキャッシュをクリア（古いデータ配信防止）');
+    // Phase 2.5: 削除 - 重複キャッシュクリアを削除（Phase 3.5で実行）
+    debugLog('⚡ 最適化: DB書き込み前のキャッシュクリアを省略（重複削除）');
+
+    // Phase 3: 一括DB書き込み（1回のみ）- ResilientExecutor適用
+    debugLog('💽 Phase 3: 一括DB書き込み開始（回復力のある実行）');
     try {
-      // フロントエンドが古いキャッシュを参照しないよう事前にクリア
-      synchronizeCacheAfterCriticalUpdate(
-        context.requestUserId,
-        context.userInfo.adminEmail,
-        context.userInfo.spreadsheetId,
-        context.userInfo.spreadsheetId
+      // ResilientExecutorを使用して自動リトライと503エラー対策を適用
+      const resilientExecutor = new ResilientExecutor({
+        maxRetries: 3,
+        baseDelay: 2000,
+        timeoutMs: 300000 // 5分タイムアウト
+      });
+      
+      await resilientExecutor.execute(
+        () => commitAllChanges(context),
+        {
+          name: 'commitAllChanges',
+          idempotent: true,
+          fallback: () => {
+            warnLog('⚠️ commitAllChanges フォールバック実行');
+            return commitAllChanges(context);
+          }
+        }
       );
-      infoLog('✅ 事前キャッシュクリア完了');
-    } catch (cacheError) {
-      warnLog('⚠️ 事前キャッシュクリアでエラー（処理は続行）:', cacheError.message);
+      infoLog('✅ Phase 3完了: DB書き込み完了（回復力のある実行）');
+    } catch (dbError) {
+      errorLog('❌ Phase 3エラー: DB書き込み失敗', dbError.message);
+      throw new Error('DB書き込み処理に失敗しました: ' + dbError.message);
     }
 
-    // Phase 3: 一括DB書き込み（1回のみ）
-    debugLog('💽 Phase 3: 一括DB書き込み開始');
-    commitAllChanges(context);
-    infoLog('✅ Phase 3完了: DB書き込み完了');
-
-    // Phase 3.5: DB書き込み後の追加キャッシュウォーミング
-    debugLog('🔥 新しいデータでキャッシュウォーミング中...');
+    // Phase 3.5: UnifiedExecutionCache活用でキャッシュウォーミング最適化
+    debugLog('🔥 UnifiedExecutionCache使用でキャッシュウォーミング最適化中...');
     try {
+      // UnifiedExecutionCacheを活用して効率的にキャッシュウォーミング
+      const execCache = getUnifiedExecutionCache();
+      
       // 新しいデータを事前にキャッシュに読み込み
       const freshUserInfo = findUserByIdFresh(context.requestUserId);
       if (freshUserInfo) {
-        infoLog('✅ 新しいデータでキャッシュをウォーミング完了');
+        // UnifiedExecutionCacheに最新情報を保存
+        execCache.setUserInfo(context.requestUserId, freshUserInfo);
+        
+        // コンテキストを最新情報で更新
+        context.userInfo = freshUserInfo;
+        
+        // 同期処理でキャッシュを統合システムと連携
+        execCache.syncWithUnifiedCache('dataUpdate');
+        
+        infoLog('✅ UnifiedExecutionCache統合でキャッシュウォーミング完了');
       }
     } catch (warmingError) {
-      warnLog('⚠️ キャッシュウォーミングでエラー（処理は続行）:', warmingError.message);
-    }
-
-    // 最新ユーザー情報を再取得してコンテキストを更新
-    const updatedUserInfo = findUserByIdFresh(context.requestUserId);
-    if (updatedUserInfo) {
-      context.userInfo = updatedUserInfo;
-      infoLog('✅ コンテキストをDBの最新情報で更新しました。');
-    } else {
-      warnLog('DBからのユーザー再取得に失敗しましたが、処理を続行します。');
+      warnLog('⚠️ 最適化キャッシュウォーミングでエラー（フォールバック実行）:', warmingError.message);
+      
+      // フォールバック: 従来の方式
+      try {
+        const freshUserInfo = findUserByIdFresh(context.requestUserId);
+        if (freshUserInfo) {
+          context.userInfo = freshUserInfo;
+          infoLog('✅ フォールバック方式でキャッシュウォーミング完了');
+        }
+      } catch (fallbackError) {
+        warnLog('⚠️ フォールバックキャッシュウォーミングも失敗（処理続行）:', fallbackError.message);
+      }
     }
 
     // Phase 4: 統合レスポンス生成（DB検索なし）

@@ -1672,12 +1672,21 @@ function repairSetupStateInconsistencies() {
 // SAVE AND PUBLISH OPERATIONS
 // =============================================================================
 
-// Save configuration and publish board - 修正版（公開モーダル経由）
+// Save configuration and publish board - 最適化版（進捗表示付き）
 function saveAndPublish() {
   if (!validateConfig()) {
     showMessage('必須項目（回答データ列）が選択されていません。', 'error');
     return;
   }
+  
+  // 進捗表示開始 - 既存のisSaveInProgressフラグを活用
+  if (isSaveInProgress) {
+    showMessage('⚠️ 他の保存処理が実行中です。しばらくお待ちください。', 'warning');
+    return;
+  }
+  
+  // 進捗インジケータ表示
+  showMessage('🔄 設定を保存しています...（数分かかる場合があります）', 'info');
   
   // UIからconfigオブジェクトを構築
   const config = buildConfigObject();
