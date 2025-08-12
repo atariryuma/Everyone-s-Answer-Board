@@ -2018,10 +2018,15 @@ function unpublishBoard() {
    */
   async function createSimpleHistoryEntry(publishResponse, config, userInfo, createdDate) {
     try {
-      // 現在のUI状態から設定取得
-      const getDisplayMode = () => {
-        const anonymousCheckbox = document.getElementById('anonymous-mode');
-        return (anonymousCheckbox && anonymousCheckbox.checked) ? 'anonymous' : 'named';
+      // 現在のUI状態から設定取得（showNamesベース）
+      const getShowNames = () => {
+        const showNamesCheckbox = document.getElementById('show-names');
+        return (showNamesCheckbox && showNamesCheckbox.checked) || false;
+      };
+      
+      const getShowCounts = () => {
+        const showCountsCheckbox = document.getElementById('show-counts');
+        return (showCountsCheckbox && showCountsCheckbox.checked) || false;
       };
       
       // 問題文を複数ソースから取得
@@ -2038,11 +2043,11 @@ function unpublishBoard() {
         questionText: questionText,
         setupType: getSetupType(),
         
-        // 復元用の最小データ
+        // 復元用の最小データ（showNames/showCountsベース）
         opinionHeader: config.opinionHeader || '',
         nameHeader: config.nameHeader || '名前',
-        displayMode: getDisplayMode(),
-        showCounts: config.showCounts || false,  // リアクション数表示設定
+        showNames: getShowNames(),      // UI状態を直接保存
+        showCounts: getShowCounts(),    // UI状態を直接保存
         
         // 復元用のシート情報
         sheetName: publishResponse.activeSheetName || selectedSheet || '',
@@ -2154,8 +2159,8 @@ function unpublishBoard() {
         setupType: 'quickstart',
         opinionHeader: (quickStartResult.config && quickStartResult.config.opinionHeader) || '',
         nameHeader: (quickStartResult.config && quickStartResult.config.nameHeader) || '名前',
-        displayMode: quickStartResult.displayMode || 'anonymous',  // デフォルトは匿名（英語統一）
-        showCounts: (quickStartResult.config && quickStartResult.config.showCounts) || false,  // デフォルトはfalse
+        showNames: false,   // QuickStartデフォルト: 名前表示OFF（匿名）
+        showCounts: false,  // QuickStartデフォルト: リアクション数表示OFF
         sheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName || '',
         spreadsheetId: quickStartResult.spreadsheetId || ''
       };

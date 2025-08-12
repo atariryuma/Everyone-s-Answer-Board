@@ -660,7 +660,21 @@ function handleDeleteRequest() {
               window.gasOptimizer.clearCache();
             }
             if (window.localStorage) {
-              window.localStorage.clear();
+              // 履歴キーを保護する選択的クリア
+              const historyKeys = ['answerBoardHistory', 'adminPanelHistory'];
+              const allKeys = Object.keys(localStorage);
+              
+              allKeys.forEach(key => {
+                if (!historyKeys.includes(key)) {
+                  try {
+                    localStorage.removeItem(key);
+                  } catch (e) {
+                    console.warn('⚠️ Failed to remove localStorage key:', key);
+                  }
+                }
+              });
+              
+              console.log('✅ Cache cleared while preserving history data');
             }
             if (window.sessionStorage) {
               window.sessionStorage.clear();

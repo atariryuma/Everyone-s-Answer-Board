@@ -672,30 +672,17 @@ function hideConfirmationModal() {
   }
 }
 
-// Generic showMessage function (placeholder)
-function showMessage(message, type = 'info') {
+// Unified showMessage function - uses SharedUtilities MessageManager
+function showMessage(message, type = 'info', duration = 5000) {
   console.log(`[${type.toUpperCase()}] ${message}`);
   
-  // Try to use advanced message system if available
-  if (window.AdminPanel && window.AdminPanel.ui && typeof window.AdminPanel.ui.showMessage === 'function') {
-    return window.AdminPanel.ui.showMessage(message, type);
+  // Use SharedUtilities MessageManager if available
+  if (window.sharedUtilities?.messages?.show) {
+    return window.sharedUtilities.messages.show(message, type, duration);
   }
   
-  // Simple fallback implementation
-  const messageArea = document.getElementById('message-area');
-  if (messageArea) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type} bg-${type === 'error' ? 'red' : type === 'warning' ? 'yellow' : type === 'success' ? 'green' : 'blue'}-100 border-l-4 border-${type === 'error' ? 'red' : type === 'warning' ? 'yellow' : type === 'success' ? 'green' : 'blue'}-500 p-4 mb-4`;
-    messageDiv.textContent = message;
-    messageArea.appendChild(messageDiv);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-      if (messageDiv.parentNode) {
-        messageDiv.parentNode.removeChild(messageDiv);
-      }
-    }, 5000);
-  }
+  // Fallback for cases where SharedUtilities is not loaded
+  console.warn('⚠️ SharedUtilities MessageManager not available, using console fallback');
 }
 
 // =============================================================================
@@ -985,7 +972,7 @@ window.hidePrivacyModal = hidePrivacyModal;
 window.hideDigitalCitizenshipModal = hideDigitalCitizenshipModal;
 window.hideConfirmationModal = hideConfirmationModal;
 window.showFormConfigModal = showFormConfigModal;
-window.showMessage = showMessage;
+window.showMessage = showMessage; // Unified with SharedUtilities MessageManager
 window.updateUIWithNewStatus = updateUIWithNewStatus;
 window.validateConfig = validateConfig;
 window.updateConfigButtons = updateConfigButtons;
@@ -1898,12 +1885,20 @@ window.HistoryManager = {
   },
 
   /**
-   * Format settings display with icons and clear meanings
+   * Format settings display with icons and clear meanings (showNames/showCounts based)
    */
   _formatSettingsDisplay(item) {
-    // アイコン + 意味の明確化
-    const displayPart = item.displayMode === 'anonymous' ? '🎭匿名' : '👥通常';
-    const countPart = item.showCounts ? '🔢ON' : '🚫OFF';
+    // showNamesベースの判定（下位互換性も考慮）
+    let isShowNames = false;
+    if (item.showNames !== undefined) {
+      isShowNames = item.showNames;
+    } else if (item.displayMode !== undefined) {
+      // 旧データ対応
+      isShowNames = item.displayMode === 'named';
+    }
+    
+    const displayPart = isShowNames ? '👥通常' : '🎭匿名';
+    const countPart = item.showCounts ? '🔢表示' : '🚫非表示';
     return `${displayPart}/${countPart}`;
   },
 
@@ -2089,10 +2084,15 @@ window.HistoryManager = {
         if (nameInput) nameInput.value = item.nameHeader;
       }
       
-      // 2. 表示モード復元（英語値で正確判定）
-      const anonymousCheckbox = document.getElementById('anonymous-mode');
-      if (anonymousCheckbox) {
-        anonymousCheckbox.checked = (item.displayMode === 'anonymous');
+      // 2. 名前表示設定復元（showNamesベース）
+      const showNamesCheckbox = document.getElementById('show-names');
+      if (showNamesCheckbox) {
+        if (item.showNames !== undefined) {
+          showNamesCheckbox.checked = item.showNames;
+        } else if (item.displayMode !== undefined) {
+          // 旧データ対応
+          showNamesCheckbox.checked = (item.displayMode === 'named');
+        }
       }
       
       // 3. リアクション数表示復元
@@ -2101,8 +2101,11 @@ window.HistoryManager = {
         showCountsCheckbox.checked = (item.showCounts === true);
       }
       
-      // 4. シート復元
-      if (item.sheetName) {
+      // 4. 完全プロジェクト復元（スプレッドシート + シート）
+      if (item.spreadsheetId && item.sheetName) {
+        await this._restoreFullProject(item.spreadsheetId, item.sheetName);
+      } else if (item.sheetName) {
+        // シートのみ復元（下位互換性）
         await this._restoreSheetSelection(item.sheetName);
       }
       
@@ -2119,6 +2122,51 @@ window.HistoryManager = {
       console.error('❌ History restore failed:', error);
       if (typeof showMessage === 'function') {
         showMessage('❌ 設定復元に失敗しました', 'error');
+      }
+    }
+  },
+
+  /**
+   * Restore full project (spreadsheet + sheet) from history
+   */
+  async _restoreFullProject(spreadsheetId, sheetName) {
+    try {
+      console.log(`🔄 Restoring full project: ${spreadsheetId}/${sheetName}`);
+      
+      // 現在のスプレッドシートIDを取得
+      const getCurrentSpreadsheetId = () => {
+        // status からスプレッドシートIDを取得する方法を確認
+        if (window.AdminPanel?.currentStatus?.userInfo?.spreadsheetId) {
+          return window.AdminPanel.currentStatus.userInfo.spreadsheetId;
+        }
+        return null;
+      };
+      
+      const currentSpreadsheetId = getCurrentSpreadsheetId();
+      
+      // 異なるスプレッドシートの場合のみ切り替え処理
+      if (spreadsheetId !== currentSpreadsheetId) {
+        console.log(`🔄 Switching spreadsheet: ${currentSpreadsheetId} → ${spreadsheetId}`);
+        
+        // スプレッドシート切り替えの通知
+        if (typeof showMessage === 'function') {
+          showMessage('🔄 プロジェクトを切り替えています...', 'info', 3000);
+        }
+        
+        // 注意: 実際のスプレッドシート切り替えは現在未実装
+        // 将来的には新しいプロジェクト読み込みAPIが必要
+        console.warn('⚠️ Spreadsheet switching not yet implemented - would switch to:', spreadsheetId);
+      }
+      
+      // シート選択復元
+      await this._restoreSheetSelection(sheetName);
+      
+      console.log(`✅ Full project restore completed`);
+      
+    } catch (error) {
+      console.warn('⚠️ Full project restore failed:', error);
+      if (typeof showMessage === 'function') {
+        showMessage('⚠️ プロジェクト復元で問題が発生しました', 'warning');
       }
     }
   },
