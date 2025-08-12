@@ -262,7 +262,6 @@ function initializeMessageArea() {
 
 // Initialize UI components
 function initializeUI() {
-  console.log('✅ AdminPanel: UI components ready');
   // UI初期化のみ実行、loadStatusは adminPanel-api.js で処理される
 }
 
@@ -314,7 +313,6 @@ function updateUserActivity() {
 
 // Initialize event listeners
 function initializeEventListeners() {
-  console.log('✅ AdminPanel: Setting up event listeners');
   
   // Use safe function calling with availability checks
   if (checkFunctionAvailability('setupEventListeners')) {
@@ -641,7 +639,6 @@ function updateUIWithNewStatus(status) {
       });
     }
     
-    console.log('✅ Enhanced minimal UI update completed successfully');
     
   } catch (error) {
     console.error('Error in enhanced minimal updateUIWithNewStatus:', error);
@@ -786,7 +783,6 @@ window.AdminPanel.functionRegistry = {
     if (typeof window[functionName] === 'function') {
       this.available.add(functionName);
       this.pending.delete(functionName);
-      console.log(`✅ Function registered: ${functionName}`);
     } else {
       this.pending.add(functionName);
       console.warn(`⚠️ Function pending: ${functionName}`);
@@ -1356,7 +1352,6 @@ async function finalizeInitialization() {
       if (typeof loadStatus === 'function') {
         try {
           await loadStatus(true);
-          console.log('✅ User data synchronization completed');
         } catch (syncError) {
           console.warn('⚠️ User data sync failed, but continuing:', syncError);
         }
@@ -1367,13 +1362,11 @@ async function finalizeInitialization() {
       // すべての同期が完了したらローディングオーバーレイを非表示
       if (window.unifiedLoading) {
         window.unifiedLoading.hide();
-        console.log('✅ Global loading overlay hidden after full sync');
       } else {
         // フォールバック: 直接DOM操作
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
           overlay.classList.add('hidden');
-          console.log('✅ Loading overlay hidden (fallback)');
         }
       }
       
@@ -1388,7 +1381,6 @@ async function finalizeInitialization() {
           window.HistoryManager.initialize();
           console.log('🔄 Loading history table after initialization...');
           window.HistoryManager.renderTable();
-          console.log('✅ History table loaded successfully');
         } else {
           console.warn('⚠️ HistoryManager not available yet');
         }
@@ -1755,7 +1747,6 @@ window.HistoryManager = {
       this._migrateOldData();
       
       this._initialized = true;
-      console.log('✅ HistoryManager initialized successfully');
       return true;
       
     } catch (error) {
@@ -1776,7 +1767,6 @@ window.HistoryManager = {
         console.log('🔄 Migrating history data from old key...');
         localStorage.setItem(this.STORAGE_KEY, oldData);
         localStorage.removeItem(this.OLD_STORAGE_KEY);
-        console.log('✅ History data migrated successfully');
       }
     } catch (error) {
       console.warn('⚠️ History data migration failed:', error);
@@ -1842,7 +1832,6 @@ window.HistoryManager = {
     try {
       localStorage.removeItem(this.STORAGE_KEY);
       localStorage.removeItem(this.OLD_STORAGE_KEY); // Clean old key too
-      console.log('✅ History cleared successfully');
       return true;
     } catch (error) {
       console.error('❌ Failed to clear history:', error);
@@ -1958,7 +1947,6 @@ window.HistoryManager = {
         }
       });
       
-      console.log(`✅ History table rendered: ${successCount}/${history.length} items`);
       return true;
       
     } catch (error) {

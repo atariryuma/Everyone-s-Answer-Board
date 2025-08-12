@@ -1891,21 +1891,26 @@ async function clearAllCachesForUnpublish() {
       window.sharedUtilities.dom.clearElementCache();
     }
     
-    // 2. ローカルストレージのキャッシュクリア（StudyQuest関連のみ）
+    // 2. ローカルストレージのキャッシュクリア（StudyQuest関連のみ、履歴保護）
     try {
       const localStorageKeys = Object.keys(localStorage);
+      const historyKeys = ['answerBoardHistory', 'adminPanelHistory']; // 履歴保護キー
+      
       const studyQuestKeys = localStorageKeys.filter(key => 
-        key.includes('studyquest') || 
-        key.includes('board') || 
-        key.includes('sheet') ||
-        key.includes('admin') ||
-        key.includes('publication') ||
-        key.includes('answer')
+        (key.includes('studyquest') || 
+         key.includes('board') || 
+         key.includes('sheet') ||
+         key.includes('admin') ||
+         key.includes('publication') ||
+         key.includes('answer')) &&
+        !historyKeys.includes(key) // 履歴キーは除外
       );
       
       studyQuestKeys.forEach(key => {
         localStorage.removeItem(key);
       });
+      
+      console.log('✅ Cache cleared while preserving history keys:', historyKeys);
       
     } catch (e) {
       console.warn('⚠️ localStorage clear warning:', e);

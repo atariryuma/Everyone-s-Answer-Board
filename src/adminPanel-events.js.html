@@ -31,7 +31,6 @@ function setupEventListeners() {
     return;
   }
   
-  console.log('✅ AdminPanel: Initializing event handlers');
   eventHandlersAttached.setupEventListeners = true;
   
   // Cache frequently used elements
@@ -103,7 +102,6 @@ function setupEventListeners() {
             '履歴削除の確認',
             'すべての履歴を削除しますか？この操作は取り消せません。',
             async function() {
-              console.log('📝 履歴削除が確認されました');
               
               try {
                 // ローディング表示
@@ -111,15 +109,12 @@ function setupEventListeners() {
                 
                 // 1. クライアント側の履歴をクリア
                 localStorage.removeItem(HISTORY_STORAGE_KEY);
-                console.log('✅ ローカルストレージから履歴を削除しました');
                 
                 // 2. サーバー側の履歴もクリア
                 if (typeof runGasWithUserId === 'function') {
-                  console.log('🔄 サーバー側履歴のクリアを開始...');
                   const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
                   
                   if (serverResponse && serverResponse.status === 'success') {
-                    console.log('✅ サーバー側履歴のクリア完了');
                     showMessage('✅ すべての履歴をクリアしました', 'success');
                   } else {
                     console.warn('⚠️ サーバー側履歴のクリアに失敗:', (serverResponse && serverResponse.message) || 'Unknown error');
@@ -133,7 +128,6 @@ function setupEventListeners() {
                 // 3. 履歴テーブルを更新
                 if (typeof loadSimpleHistoryTable === 'function') {
                   loadSimpleHistoryTable();
-                  console.log('📊 履歴テーブルを更新しました');
                 } else {
                   console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
                 }
@@ -155,15 +149,12 @@ function setupEventListeners() {
                 
                 // 1. クライアント側の履歴をクリア
                 localStorage.removeItem(HISTORY_STORAGE_KEY);
-                console.log('✅ ローカルストレージから履歴を削除しました（フォールバック）');
                 
                 // 2. サーバー側の履歴もクリア
                 if (typeof runGasWithUserId === 'function') {
-                  console.log('🔄 サーバー側履歴のクリアを開始...（フォールバック）');
                   const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
                   
                   if (serverResponse && serverResponse.status === 'success') {
-                    console.log('✅ サーバー側履歴のクリア完了（フォールバック）');
                     showMessage('✅ すべての履歴をクリアしました', 'success');
                   } else {
                     console.warn('⚠️ サーバー側履歴のクリアに失敗（フォールバック）:', (serverResponse && serverResponse.message) || 'Unknown error');
@@ -187,7 +178,6 @@ function setupEventListeners() {
           }
         }
     });
-    console.log('✅ 履歴クリアボタンのイベントリスナーを設定しました');
   } else {
     console.error('❌ clear-history-btnが見つかりません');
   }
@@ -214,7 +204,6 @@ function setupEventListeners() {
         // 公開中の場合、選択モーダルを表示
         window.sharedModals.showCustomSetupSelection(
           (selectedOption) => {
-            console.log('✅ ユーザーが選択:', selectedOption);
             if (selectedOption === 'stop') {
               // 停止して作成を選択
               proceedWithCustomFormCreation(true);
@@ -237,7 +226,6 @@ function setupEventListeners() {
   // カスタムフォーム作成を進行
   function proceedWithCustomFormCreation(shouldStop) {
     if (shouldStop) {
-      console.log('📝 公開停止してカスタムフォームを作成します');
       
       // 実際に公開停止処理を実行
       if (typeof unpublishBoard === 'function') {
@@ -260,12 +248,10 @@ function setupEventListeners() {
         showMessage('公開停止機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     } else {
-      console.log('📝 公開を継続してカスタムフォームを作成します');
       
       // カスタムセットアップ時は全セクション展開フラグを設定
       try {
         localStorage.setItem('expandAllSections', 'true');
-        console.log('📂 カスタムセットアップ用の全セクション展開フラグを設定しました');
       } catch (e) {
         console.warn('⚠️ localStorage設定に失敗:', e);
       }
@@ -277,12 +263,10 @@ function setupEventListeners() {
 
   // 公開停止→フォーム作成の実行
   function executeStopAndCreateForm() {
-    console.log('🛑 公開停止処理を実行中...');
 
     // unpublishBoard関数を呼び出し
     unpublishBoard()
       .then(function(response) {
-        console.log('✅ 公開停止が完了しました:', response);
         // Use debounced loadStatus to prevent rapid successive calls
         if (window.AdminPanel && window.AdminPanel.debounce) {
           window.AdminPanel.debounce.loadStatus(() => loadStatus(true), 300);
@@ -355,7 +339,6 @@ function setupEventListeners() {
   // Real-time validation
   setupRealtimeValidation();
   
-  console.log('✅ AdminPanel: Event handlers ready');
 }
 
 // =============================================================================
@@ -674,7 +657,6 @@ function handleDeleteRequest() {
                 }
               });
               
-              console.log('✅ Cache cleared while preserving history data');
             }
             if (window.sessionStorage) {
               window.sessionStorage.clear();
