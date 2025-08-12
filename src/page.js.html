@@ -2698,9 +2698,13 @@ class StudyQuestApp {
     } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
       console.warn('⚠️ 状態不整合検出: DOMカード数とデータ数が一致しません。DOM:', domCards.length, 'データ:', dataLength);
 
-      // 不整合がある場合は再レンダリング
-      debugLog('再レンダリングを実行します...');
-      this.renderBoard(false, false);
+      // 再レンダリング防止のため、既に実行中の場合はスキップ
+      if (!this.isRenderingInProgress) {
+        debugLog('再レンダリングを実行します...');
+        this.renderBoard(false, false);
+      } else {
+        debugLog('再レンダリングは既に進行中のためスキップ');
+      }
       
     } else {
       // 正常状態のログは削除（デバッグモード時のみ出力）
@@ -3435,19 +3439,18 @@ class StudyQuestApp {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // レンダリング実行
-    requestAnimationFrame(async () => {
-      try {
-        await this.renderBoard(false, isInitialLoad);
-        
-        // 一致性検証（ログレベルを下げて実行）
-        requestAnimationFrame(async () => {
-          await this.validatePostLoadState();
-        });
-      } catch (error) {
-        console.error('❌ DOM更新エラー:', error);
-      }
-    });
+    // レンダリング実行（重複防止チェック）
+    if (!this.isRenderingInProgress) {
+      requestAnimationFrame(async () => {
+        try {
+          await this.renderBoard(false, isInitialLoad);
+        } catch (error) {
+          console.error('❌ DOM更新エラー:', error);
+        }
+      });
+    } else {
+      debugLog('CSS待機中にレンダリング進行中のためスキップ');
+    }
   }
 
   async ensureCSSAndDOMReady() {
@@ -4108,6 +4111,13 @@ class StudyQuestApp {
     }
   }
   async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
+    // 重複レンダリング防止機構
+    if (this.isRenderingInProgress) {
+      debugLog('renderBoard: レンダリング進行中のためスキップ');
+      return;
+    }
+    this.isRenderingInProgress = true;
+    
     try {
       // Define newRows first to avoid TDZ error
       const newRows = this.state.currentAnswers;
@@ -4125,16 +4135,23 @@ class StudyQuestApp {
       // レンダリング前の状態準備
       this.prepareRenderingState(newRows);
       
-      // メインレンダリング処理
-      this.performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad);
+      // メインレンダリング処理（非同期待機で競合状態を解決）
+      await this.performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad);
       
       // レンダリング後の状態更新
       this.finalizeRenderingState();
-      this.validatePostLoadState();
+      
+      // 検証は非同期で実行（レンダリング完了後に実行）
+      requestAnimationFrame(() => {
+        this.validatePostLoadState();
+      });
       
     } catch (error) {
       console.error('❌ renderBoard: レンダリングエラー:', error);
       this.handleRenderingError(error);
+    } finally {
+      // レンダリング完了フラグをリセット
+      this.isRenderingInProgress = false;
     }
   }
   
@@ -4184,7 +4201,7 @@ class StudyQuestApp {
     this.batchDOMUpdates(updates);
   }
   
-  performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
+  async performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
     const container = this.elements.answersContainer;
     
     // 既存カードのマップを作成（クリア前にリアクション状態を保持）
@@ -4196,11 +4213,14 @@ class StudyQuestApp {
     // コンテナをクリア
     container.innerHTML = '';
     
-    // DOM安定化のための適切な待機（初期ロード時のみ）
+    // DOM安定化のための適切な待機（競合状態を防止）
     if (isInitialLoad) {
-      // DOM更新を即座に反映
-      requestAnimationFrame(() => {
-        this.executeMainRendering(newRows, oldRows, container, existingMap, isInitialLoad);
+      // DOM更新を非同期で実行し、完了を待機
+      return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          this.executeMainRendering(newRows, oldRows, container, existingMap, isInitialLoad);
+          resolve();
+        });
       });
     } else {
       this.executeMainRendering(newRows, oldRows, container, existingMap, isInitialLoad);
