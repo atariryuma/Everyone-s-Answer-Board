@@ -130,10 +130,29 @@ header {
   transform: scale(0.95);
 }
 .reaction-btn.reacted {
-  background-color: var(--color-primary) !important;
-  color: #000 !important;
-  box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
   transform: scale(1.05);
+}
+
+/* リアクションタイプ別の色設定 */
+.reaction-btn.reacted.text-red-500 {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+.reaction-btn.reacted.text-yellow-500 {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  color: #f59e0b !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.reaction-btn.reacted.text-green-500 {
+  background-color: rgba(34, 197, 94, 0.2) !important;
+  color: #22c55e !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
 }
 .reaction-btn.reacted:hover:not(.loading) {
   transform: scale(1.15);
@@ -147,6 +166,25 @@ header {
 }
 .reaction-btn.just-reacted {
   animation: reactionPulse 0.4s ease-out;
+}
+
+/* アニメーション中もリアクションタイプ別の色を維持 */
+.reaction-btn.just-reacted.text-red-500 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+.reaction-btn.just-reacted.text-yellow-500 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+
+.reaction-btn.just-reacted.text-green-500 {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  color: #22c55e !important;
+  border-color: #22c55e !important;
 }
 .fade-in {
   animation: fadeIn 0.5s ease-out;
@@ -383,7 +421,7 @@ header {
               transform var(--transition-duration) var(--transition-easing);
   fill: none;
 }
-.like-btn.liked svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
+.like-btn.reacted svg { stroke: transparent; fill: currentColor; transform: scale(1.1); }
 .like-btn.loading {   opacity: 0.7; position: relative; }
 .like-btn.loading::after { 
   content: ""; 
@@ -410,6 +448,11 @@ header {
 .highlight-btn.liked { 
   color: #9333ea; 
   text-shadow: 0 0 8px rgba(147, 51, 234, 0.6);
+}
+.highlight-btn.liked svg { 
+  stroke: transparent; 
+  fill: currentColor; 
+  transform: scale(1.1); 
 }
 #controlsFooter { pointer-events: none; }
 #controlsFooter > .glass-panel { pointer-events: auto; }

@@ -4376,7 +4376,7 @@ class StudyQuestApp {
                                update.reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
               btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
               btn.classList.add(colorClass);
-              btn.classList.toggle('liked', update.reacted);
+              btn.classList.toggle('reacted', update.reacted);
               btn.setAttribute('aria-pressed', update.reacted.toString());
               
               // 表示/非表示
@@ -4580,7 +4580,7 @@ class StudyQuestApp {
       const reactionButtonsHtml = this.reactionTypes.map(rt => {
         try {
           const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
-          const cls = info.reacted ? 'liked' : '';
+          const cls = info.reacted ? 'reacted' : '';
           const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
           const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
           const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
@@ -6846,7 +6846,7 @@ class StudyQuestApp {
         const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
         modalBtn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
         modalBtn.classList.add(colorClass);
-        modalBtn.classList.toggle('liked', info.reacted);
+        modalBtn.classList.toggle('reacted', info.reacted);
         modalBtn.setAttribute('aria-pressed', info.reacted.toString());
         
         // aria-label更新
@@ -6996,7 +6996,7 @@ class StudyQuestApp {
     this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-      const cls = info.reacted ? 'liked' : '';
+      const cls = info.reacted ? 'reacted' : '';
       const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
       const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
@@ -7036,7 +7036,7 @@ class StudyQuestApp {
     // リアクションボタンを更新
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-      const cls = info.reacted ? 'liked' : '';
+      const cls = info.reacted ? 'reacted' : '';
       const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
       const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
@@ -7276,9 +7276,28 @@ class StudyQuestApp {
       
       .reaction-btn.reacted {
         transform: scale(1.03) !important;
-        background-color: var(--color-primary) !important;
-        color: #000 !important;
-        box-shadow: 0 0 8px rgba(139, 233, 253, 0.4) !important;
+      }
+      
+      /* ローパフォーマンスモードでもリアクションタイプ別色設定を維持 */
+      .reaction-btn.reacted.text-red-500 {
+        background-color: rgba(239, 68, 68, 0.15) !important;
+        color: #ef4444 !important;
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.25) !important;
+      }
+      
+      .reaction-btn.reacted.text-yellow-500 {
+        background-color: rgba(245, 158, 11, 0.15) !important;
+        color: #f59e0b !important;
+        border-color: #f59e0b !important;
+        box-shadow: 0 0 6px rgba(245, 158, 11, 0.25) !important;
+      }
+      
+      .reaction-btn.reacted.text-green-500 {
+        background-color: rgba(34, 197, 94, 0.15) !important;
+        color: #22c55e !important;
+        border-color: #22c55e !important;
+        box-shadow: 0 0 6px rgba(34, 197, 94, 0.25) !important;
       }
       
       .reaction-btn.reacted:hover:not(.loading) {
@@ -7292,6 +7311,19 @@ class StudyQuestApp {
       
       .reaction-btn.just-reacted {
         animation: reactionPulse 0.25s ease-out !important;
+      }
+      
+      /* SVGスタイリングも統一 */
+      .like-btn.reacted svg {
+        stroke: transparent !important;
+        fill: currentColor !important;
+        transform: scale(1.1) !important;
+      }
+      
+      .highlight-btn.liked svg {
+        stroke: transparent !important;
+        fill: currentColor !important;
+        transform: scale(1.1) !important;
       }
       
       .game-btn:hover {
