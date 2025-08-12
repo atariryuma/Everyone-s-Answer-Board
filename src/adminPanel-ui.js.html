@@ -1893,6 +1893,10 @@ function handleSheetSelectionChange(event) {
 }
 
 // シートを即座にアクティブ化する関数
+/**
+ * シートを即座にアクティブ化し、UI上の選択状態も同期する
+ * @param {string} sheetName - アクティブにするシート名
+ */
 function activateSelectedSheet(sheetName) {
   if (!sheetName || !currentStatus || !currentStatus.userInfo) {
     console.warn('⚠️ シートアクティブ化に必要な情報が不足しています');
@@ -1914,8 +1918,8 @@ function activateSelectedSheet(sheetName) {
           currentStatus.userInfo.configJson = JSON.stringify(config);
           currentStatus.activeSheetName = sheetName;
           
-          // シートドロップダウンの表示を更新
-          updateSheetSelectActiveIndicator(sheetName);
+          // UI上のシート選択状態を更新
+          updateActiveSheetUI(sheetName);
           
           console.log('✅ ローカル状態更新完了');
         } catch (e) {
