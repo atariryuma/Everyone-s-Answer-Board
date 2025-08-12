@@ -2141,9 +2141,8 @@ window.HistoryManager = {
           showMessage('🔄 プロジェクトを切り替えています...', 'info', 3000);
         }
         
-        // 注意: 実際のスプレッドシート切り替えは現在未実装
-        // 将来的には新しいプロジェクト読み込みAPIが必要
-        console.warn('⚠️ Spreadsheet switching not yet implemented - would switch to:', spreadsheetId);
+        // 実際のスプレッドシート切り替えを実行
+        await this._performSpreadsheetSwitch(spreadsheetId);
       }
       
       // シート選択復元
@@ -2201,6 +2200,51 @@ window.HistoryManager = {
       console.log('✅ UI refreshed successfully');
     } catch (error) {
       console.warn('⚠️ UI refresh warning:', error);
+    }
+  },
+
+  /**
+   * Perform actual spreadsheet switching
+   */
+  async _performSpreadsheetSwitch(targetSpreadsheetId) {
+    try {
+      // 1. Update user's active spreadsheet in database
+      if (typeof runGasWithUserId === 'function') {
+        const updateResult = await runGasWithUserId('updateUserAPI', false, {
+          spreadsheetId: targetSpreadsheetId
+        });
+        
+        if (updateResult && updateResult.status === 'success') {
+          console.log('✅ Spreadsheet switched successfully in database');
+        } else {
+          throw new Error('Database update failed: ' + (updateResult?.message || 'Unknown error'));
+        }
+      } else {
+        throw new Error('runGasWithUserId function not available');
+      }
+
+      // 2. Clear caches to force reload with new spreadsheet
+      if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+        window.unifiedCache.clear();
+      }
+      if (window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+        window.gasOptimizer.clearCache();
+      }
+
+      // 3. Reload application state with new spreadsheet
+      if (typeof loadStatus === 'function') {
+        await loadStatus(true); // Force reload bypassing cache
+        console.log('✅ Application state reloaded with new spreadsheet');
+      } else {
+        console.warn('⚠️ loadStatus function not available for state reload');
+      }
+
+    } catch (error) {
+      console.error('❌ Spreadsheet switching failed:', error);
+      if (typeof showMessage === 'function') {
+        showMessage('❌ プロジェクト切り替えに失敗しました: ' + error.message, 'error');
+      }
+      throw error; // Re-throw to be handled by caller
     }
   },
   

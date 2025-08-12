@@ -6482,3 +6482,70 @@ function getSpreadsheetCreatedDateAPI(requestUserId) {
     };
   }
 }
+
+/**
+ * API function to update user data (e.g., switch active spreadsheet)
+ * @param {string} requestUserId - Requesting user ID
+ * @param {Object} updateData - Data to update (e.g., {spreadsheetId: "..."})
+ * @returns {Object} API response with status
+ */
+function updateUserAPI(requestUserId, updateData) {
+  try {
+    // Verify user access
+    verifyUserAccess(requestUserId);
+    
+    // Validate input data
+    if (!updateData || typeof updateData !== 'object') {
+      return {
+        status: 'error',
+        message: '更新データが無効です'
+      };
+    }
+    
+    // Allow only safe fields to be updated
+    const allowedFields = ['spreadsheetId'];
+    const filteredUpdateData = {};
+    
+    for (const field of allowedFields) {
+      if (updateData.hasOwnProperty(field)) {
+        filteredUpdateData[field] = updateData[field];
+      }
+    }
+    
+    if (Object.keys(filteredUpdateData).length === 0) {
+      return {
+        status: 'error',
+        message: '更新可能なフィールドが含まれていません'
+      };
+    }
+    
+    // Perform the update
+    updateUser(requestUserId, filteredUpdateData);
+    
+    // Clear relevant caches after spreadsheet switch
+    if (filteredUpdateData.spreadsheetId) {
+      debugLog('💾 Clearing caches after spreadsheet switch:', filteredUpdateData.spreadsheetId);
+      // Clear user-specific cache
+      clearExecutionUserInfoCache();
+      // Clear any sheet-specific cache
+      try {
+        invalidateUserCache(requestUserId, null, null, 'all', null);
+      } catch (cacheError) {
+        warnLog('Cache invalidation warning:', cacheError.message);
+      }
+    }
+    
+    return {
+      status: 'success',
+      message: 'ユーザー情報が正常に更新されました',
+      updatedFields: Object.keys(filteredUpdateData)
+    };
+    
+  } catch (error) {
+    errorLog('❌ updateUserAPI エラー:', error);
+    return {
+      status: 'error',
+      message: 'ユーザー情報更新中にエラーが発生しました: ' + error.message
+    };
+  }
+}
