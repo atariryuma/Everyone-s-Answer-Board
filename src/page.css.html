@@ -113,28 +113,35 @@ header {
 
 .answer-card.loading .reaction-btn,
 .answer-card.loading .highlight-btn {
-  opacity: 0.5;
+  opacity: 0.7;
 }
 .reaction-btn {
   transition: transform var(--transition-duration) var(--transition-easing),
               background-color var(--transition-duration) var(--transition-easing),
-              box-shadow var(--transition-duration) var(--transition-easing);
+              box-shadow var(--transition-duration) var(--transition-easing),
+              opacity var(--transition-duration) var(--transition-easing);
   position: relative;
   overflow: hidden;
 }
-.reaction-btn:hover {
+.reaction-btn:hover:not(.loading) {
   transform: scale(1.1);
 }
-.reaction-btn:active {
+.reaction-btn:active:not(.loading) {
   transform: scale(0.95);
 }
 .reaction-btn.reacted {
   background-color: var(--color-primary) !important;
   color: #000 !important;
   box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
+  transform: scale(1.05);
+  animation: reactionPulse 0.3s ease-out;
+}
+.reaction-btn.reacted:hover:not(.loading) {
+  transform: scale(1.15);
 }
 .reaction-btn.loading {
-  opacity: 0.6;
+  opacity: 0.7;
+  pointer-events: none;
 }
 .fade-in {
   animation: fadeIn 0.5s ease-out;
@@ -187,6 +194,11 @@ header {
   0%, 20%, 50%, 80%, 100% { transform: translate(-50%, 0); will-change: auto; }
   40% { transform: translate(-50%, -10px); will-change: transform; }
   60% { transform: translate(-50%, -5px); }
+}
+@keyframes reactionPulse {
+  0% { transform: scale(1.05); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1.05); }
 }
 
 

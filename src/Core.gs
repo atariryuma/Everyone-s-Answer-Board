@@ -2635,6 +2635,12 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   // クイックスタート用の適切な初期設定を作成（guessedConfig形式）
   var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
   var quickStartSheetConfig = {
+    // 実際の設定値（フロントエンドで使用される）
+    opinionHeader: DEFAULT_MAIN_QUESTION,
+    reasonHeader: DEFAULT_REASON_QUESTION,
+    nameHeader: '名前',
+    classHeader: 'クラス',
+    timestampHeader: 'タイムスタンプ',
     guessedConfig: {
       opinionHeader: DEFAULT_MAIN_QUESTION,
       reasonHeader: DEFAULT_REASON_QUESTION,

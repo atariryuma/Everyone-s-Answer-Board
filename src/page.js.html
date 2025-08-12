@@ -155,7 +155,7 @@ class StudyQuestApp {
     this.animationFrameId = null;
     this.idleCallbackId = null;
     this.domFragmentPool = [];
-    this.isLowPerformanceMode = true;
+    this.isLowPerformanceMode = this.detectLowEndDevice();
     this.elements = {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
@@ -723,8 +723,10 @@ class StudyQuestApp {
       this.setupCriticalElements();
       this.showMinimalSkeleton();
       
-      // Apply default low performance tweaks
-      this.optimizeForLowPerformance();
+      // Apply performance optimizations if needed
+      if (this.isLowPerformanceMode) {
+        this.optimizeForLowPerformance();
+      }
 
       // Show info modal while loading sheet data in the background
       this.showInfoModal();
@@ -7257,8 +7259,16 @@ class StudyQuestApp {
         box-shadow: var(--shadow-sm) !important;
       }
       
-      .reaction-btn:hover {
+      .reaction-btn:hover:not(.loading) {
+        transform: scale(1.05) !important;
+      }
+      
+      .reaction-btn.reacted {
         transform: scale(1.02) !important;
+      }
+      
+      .reaction-btn.reacted:hover:not(.loading) {
+        transform: scale(1.07) !important;
       }
       
       .game-btn:hover {
