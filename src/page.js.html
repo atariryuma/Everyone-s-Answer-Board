@@ -741,12 +741,12 @@ class StudyQuestApp {
       // 初期ロード状態を表示
       this.showLoadingOverlay();
       
-      // タイムアウト設定（30秒）
+      // タイムアウト設定（25秒）
       this.initTimeoutId = setTimeout(() => {
         this.hideLoadingOverlay();
         console.warn('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
-        this.showErrorMessage('初期化がタイムアウトしました。接続状況を確認して、ページを再読み込みしてください。', false);
-      }, 30000);
+        this.showTimeoutErrorMessage();
+      }, 25000);
       
       // Reset state for clean initialization
       this.resetStateForCleanInit();
@@ -3059,8 +3059,8 @@ class StudyQuestApp {
         // データ取得を Promise で実行
         const result = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            reject(new Error(`データ取得がタイムアウトしました (${attempt === 0 ? 30 : 20}秒)`));
-          }, attempt === 0 ? 30000 : 20000); // 初回は30秒、以降は20秒
+            reject(new Error(`データ取得がタイムアウトしました (${attempt === 0 ? 20 : 15}秒)`));
+          }, attempt === 0 ? 20000 : 15000); // 初回は20秒、以降は15秒
           
           google.script.run
             .withSuccessHandler(response => {
@@ -5144,6 +5144,37 @@ class StudyQuestApp {
       reaction, 
       finalState: item.reactions?.[reaction] 
     });
+  }
+
+  // タイムアウトエラー専用メッセージ
+  showTimeoutErrorMessage() {
+    const timeoutMessage = `
+      <div class="bg-red-600/20 border border-red-400/30 rounded-lg p-4 text-center">
+        <div class="text-red-400 text-lg font-semibold mb-2">⏰ 読み込みがタイムアウトしました</div>
+        <div class="text-red-300 text-sm mb-4">
+          ネットワーク接続が不安定か、サーバーの応答が遅れています。<br>
+          しばらく時間をおいてから再度お試しください。
+        </div>
+        <button onclick="location.reload()" 
+                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors">
+          ページを再読み込み
+        </button>
+      </div>
+    `;
+    
+    // メイン画面にエラーメッセージを表示
+    const mainContainer = document.getElementById('main-container');
+    if (mainContainer) {
+      mainContainer.innerHTML = timeoutMessage;
+    }
+    
+    // ローディングオーバーレイを非表示
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.classList.add('hidden');
+    }
+    
+    console.error('⏰ ページの初期化がタイムアウトしました');
   }
 
   // リアクション処理完了通知システム
