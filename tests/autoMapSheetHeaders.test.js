@@ -3,7 +3,20 @@ const vm = require('vm');
 
 describe('autoMapSheetHeaders override', () => {
   const code = fs.readFileSync('src/config.gs', 'utf8');
-  const context = { debugLog: () => {}, console };
+  const context = { 
+    debugLog: () => {}, 
+    errorLog: () => {},
+    infoLog: () => {},
+    warnLog: () => {},
+    console,
+    Utilities: {
+      sleep: () => {} // Add Utilities.sleep mock
+    },
+    getUnifiedExecutionCache: () => ({
+      setUserInfo: () => {},
+      syncWithUnifiedCache: () => {}
+    })
+  };
   vm.createContext(context);
   vm.runInContext(code, context);
   // Override dependencies after evaluation

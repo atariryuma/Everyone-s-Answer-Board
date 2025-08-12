@@ -3256,31 +3256,37 @@ function saveAndPublish(requestUserId, sheetName, config) {
     // Phase 2.5: 削除 - 重複キャッシュクリアを削除（Phase 3.5で実行）
     debugLog('⚡ 最適化: DB書き込み前のキャッシュクリアを省略（重複削除）');
 
-    // Phase 3: 一括DB書き込み（1回のみ）- ResilientExecutor適用
+    // Phase 3: 一括DB書き込み（1回のみ）- エラー処理強化
     debugLog('💽 Phase 3: 一括DB書き込み開始（回復力のある実行）');
-    try {
-      // ResilientExecutorを使用して自動リトライと503エラー対策を適用
-      const resilientExecutor = new ResilientExecutor({
-        maxRetries: 3,
-        baseDelay: 2000,
-        timeoutMs: 300000 // 5分タイムアウト
-      });
-      
-      await resilientExecutor.execute(
-        () => commitAllChanges(context),
-        {
-          name: 'commitAllChanges',
-          idempotent: true,
-          fallback: () => {
-            warnLog('⚠️ commitAllChanges フォールバック実行');
-            return commitAllChanges(context);
-          }
+    
+    // GAS環境ではcommitAllChanges実行をtry-catch強化で最適化
+    let dbWriteAttempts = 0;
+    const maxDbRetries = 3;
+    
+    while (dbWriteAttempts < maxDbRetries) {
+      try {
+        dbWriteAttempts++;
+        debugLog(`📊 DB書き込み試行 ${dbWriteAttempts}/${maxDbRetries}`);
+        
+        commitAllChanges(context);
+        infoLog('✅ Phase 3完了: DB書き込み完了（回復力のある実行）');
+        break; // 成功時はループを抜ける
+        
+      } catch (dbError) {
+        errorLog(`❌ DB書き込み失敗 (試行${dbWriteAttempts}):`, dbError.message);
+        
+        if (dbWriteAttempts >= maxDbRetries) {
+          errorLog('❌ Phase 3エラー: 最大リトライ回数に達しました');
+          throw new Error('DB書き込み処理に失敗しました: ' + dbError.message);
         }
-      );
-      infoLog('✅ Phase 3完了: DB書き込み完了（回復力のある実行）');
-    } catch (dbError) {
-      errorLog('❌ Phase 3エラー: DB書き込み失敗', dbError.message);
-      throw new Error('DB書き込み処理に失敗しました: ' + dbError.message);
+        
+        // 503エラーやAPI制限の場合は待機してリトライ
+        if (dbError.message.includes('503') || dbError.message.includes('429')) {
+          const retryDelay = 2000 * dbWriteAttempts; // 2秒, 4秒, 6秒
+          warnLog(`⏳ ${retryDelay}ms待機後にリトライします...`);
+          Utilities.sleep(retryDelay);
+        }
+      }
     }
 
     // Phase 3.5: UnifiedExecutionCache活用でキャッシュウォーミング最適化

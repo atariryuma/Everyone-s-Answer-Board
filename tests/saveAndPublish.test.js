@@ -12,6 +12,7 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
       debugLog: () => {},
       errorLog: jest.fn(), // Add errorLog mock
       infoLog: jest.fn(),  // Add infoLog mock
+      warnLog: jest.fn(),  // Add warnLog mock
       LockService: {
         getScriptLock: () => ({
           waitLock: jest.fn(),
@@ -36,6 +37,13 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
         spreadsheetId: 'SS',
       })),
       buildResponseFromContext: jest.fn(() => ({ _meta: {} })),
+      Utilities: {
+        sleep: jest.fn(), // Add Utilities.sleep mock
+      },
+      getUnifiedExecutionCache: jest.fn(() => ({
+        setUserInfo: jest.fn(),
+        syncWithUnifiedCache: jest.fn(),
+      })),
     });
   });
 
