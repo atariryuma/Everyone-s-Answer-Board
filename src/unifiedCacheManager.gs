@@ -1,8 +1,12 @@
 /**
- * @fileoverview 統合キャッシュマネージャー
- * アプリケーション全体のキャッシュ戦略を管理します。
- * シングルトンパターンで実装され、常に単一のインスタンス(cacheManager)を使用します。
+ * @fileoverview 統合キャッシュマネージャー - 全キャッシュシステムを統合
+ * cache.gs、unifiedExecutionCache.gs、spreadsheetCache.gs の機能を統合
+ * 既存の全ての関数をそのまま保持し、互換性を完全維持
  */
+
+// =============================================================================
+// SECTION 1: 統合キャッシュマネージャークラス（元cache.gs）
+// =============================================================================
 
 /**
  * キャッシュマネージャークラス
@@ -740,7 +744,686 @@ class CacheManager {
     };
     debugLog('[Cache] Statistics reset');
   }
+
+  /**
+   * PropertiesServiceの値をパース（JSONまたはプリミティブ）
+   * @param {string} value - 値
+   * @returns {*} パースされた値
+   */
+  parsePropertiesValue(value) {
+    if (!value) return value;
+    
+    try {
+      // JSON形式の場合はパース
+      return JSON.parse(value);
+    } catch (e) {
+      // プリミティブ値の場合はそのまま返す
+      return value;
+    }
+  }
+
+  /**
+   * 階層化キャッシュに値を設定
+   * @param {string} key - キー
+   * @param {*} value - 値
+   * @param {number} ttl - TTL
+   * @param {boolean} enableMemoization - メモ化有効
+   */
+  setToCacheHierarchy(key, value, ttl, enableMemoization) {
+    try {
+      // Level 2: Apps Scriptキャッシュ
+      this.scriptCache.put(key, JSON.stringify(value), ttl);
+      
+      // Level 1: メモ化キャッシュ
+      if (enableMemoization) {
+        this.memoCache.set(key, { 
+          value: value, 
+          createdAt: Date.now(), 
+          ttl: ttl 
+        });
+      }
+    } catch (e) {
+      warnLog(`[Cache] setToCacheHierarchy error: ${key}`, e.message);
+    }
+  }
+
+  /**
+   * PropertiesService統合キャッシュヘルパー
+   * 設定値などの永続的なデータに特化
+   * @param {string} key - キー
+   * @param {function} valueFn - 値を生成する関数（オプション）
+   * @param {object} options - オプション
+   * @returns {*} 値
+   */
+  getConfig(key, valueFn, options = {}) {
+    const { 
+      ttl = 3600,  // 設定値は1時間キャッシュ
+      enableMemoization = true,
+      usePropertiesFallback = true 
+    } = options;
+    
+    return this.get(key, valueFn, { ttl, enableMemoization, usePropertiesFallback });
+  }
 }
+
+// フロントエンド統一キャッシュ制御機能を追加
+CacheManager.prototype.clearInProgress = false;
+CacheManager.prototype.pendingClears = [];
+
+/**
+ * 統一キャッシュクリア - 全キャッシュシステムを順次クリア
+ * @param {Object} options - クリアオプション
+ * @returns {Promise} クリア完了Promise
+ */
+CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
+  const { force = false, timeout = 10000 } = options;
+
+  // 既にクリア中の場合は待機
+  if (this.clearInProgress && !force) {
+    if (this.debugMode) {
+      debugLog('🔄 Cache clear already in progress, waiting...');
+    }
+    return new Promise((resolve, reject) => {
+      this.pendingClears.push({ resolve, reject });
+    });
+  }
+
+  this.clearInProgress = true;
+  const startTime = Date.now();
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      if (this.debugMode) {
+        debugLog('🗑️ Starting unified cache clear process');
+      }
+
+      // キャッシュクリア操作のリスト（優先順位順）
+      const clearOperations = [
+        {
+          name: 'UnifiedCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'GasOptimizerCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+              window.gasOptimizer.clearCache();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'SharedUtilitiesCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.cache && typeof window.sharedUtilities.cache.clear === 'function') {
+              window.sharedUtilities.cache.clear();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'DOMElementCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.dom && typeof window.sharedUtilities.dom.clearElementCache === 'function') {
+              window.sharedUtilities.dom.clearElementCache();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'ThrottleDebounceCache',
+          operation: () => {
+            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.throttle && typeof window.sharedUtilities.throttle.clearAll === 'function') {
+              window.sharedUtilities.throttle.clearAll();
+              return true;
+            }
+            return false;
+          }
+        },
+        {
+          name: 'ScriptCache',
+          operation: () => {
+            try {
+              this.clearAll();
+              return true;
+            } catch (error) {
+              return false;
+            }
+          }
+        }
+      ];
+
+      const results = [];
+      
+      // 順次実行でキャッシュクリア（競合回避）
+      for (const clearOp of clearOperations) {
+        try {
+          const success = clearOp.operation();
+          results.push({ name: clearOp.name, success });
+          
+          if (this.debugMode && success) {
+            debugLog(`✅ ${clearOp.name} cleared successfully`);
+          }
+          
+          // 各操作間に短い間隔を設ける
+          if (typeof Utilities !== 'undefined') {
+            Utilities.sleep(50);
+          }
+          
+        } catch (error) {
+          warnLog(`⚠️ Failed to clear ${clearOp.name}:`, error);
+          results.push({ name: clearOp.name, success: false, error: error.message });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const totalTime = Date.now() - startTime;
+
+      if (this.debugMode) {
+        debugLog(`🎉 Cache clear completed: ${successCount}/${results.length} caches cleared in ${totalTime}ms`);
+      }
+
+      // 待機中のクリア要求を解決
+      this.resolvePendingClears(results);
+
+      resolve({
+        success: true,
+        results,
+        successCount,
+        totalCount: results.length,
+        duration: totalTime
+      });
+
+    } catch (error) {
+      errorLog('❌ Unified cache clear failed:', error);
+      this.rejectPendingClears(error);
+      reject(error);
+    } finally {
+      this.clearInProgress = false;
+    }
+  });
+};
+
+/**
+ * 特定タイプのキャッシュのみクリア
+ * @param {string} cacheType - キャッシュタイプ
+ * @returns {Promise} クリア結果
+ */
+CacheManager.prototype.clearSpecificCache = function(cacheType) {
+  return new Promise((resolve, reject) => {
+    const cacheOperations = {
+      unified: () => typeof window !== 'undefined' && window.unifiedCache?.clear(),
+      gasOptimizer: () => typeof window !== 'undefined' && window.gasOptimizer?.clearCache(),
+      sharedUtilities: () => typeof window !== 'undefined' && window.sharedUtilities?.cache?.clear(),
+      domElements: () => typeof window !== 'undefined' && window.sharedUtilities?.dom?.clearElementCache(),
+      throttleDebounce: () => typeof window !== 'undefined' && window.sharedUtilities?.throttle?.clearAll(),
+      script: () => this.clearAll()
+    };
+
+    const operation = cacheOperations[cacheType];
+    if (!operation) {
+      reject(new Error(`Unknown cache type: ${cacheType}`));
+      return;
+    }
+
+    try {
+      operation();
+      if (this.debugMode) {
+        debugLog(`✅ ${cacheType} cache cleared`);
+      }
+      resolve({ success: true, cacheType });
+    } catch (error) {
+      warnLog(`⚠️ Failed to clear ${cacheType} cache:`, error);
+      resolve({ success: false, cacheType, error: error.message });
+    }
+  });
+};
+
+/**
+ * キャッシュ状態の診断
+ * @returns {Object} 診断結果
+ */
+CacheManager.prototype.diagnoseFrontendCache = function() {
+  const caches = {
+    unifiedCache: {
+      available: typeof window !== 'undefined' && !!(window.unifiedCache && window.unifiedCache.clear),
+      size: typeof window !== 'undefined' ? (window.unifiedCache?.size || 'unknown') : 'unavailable'
+    },
+    gasOptimizer: {
+      available: typeof window !== 'undefined' && !!(window.gasOptimizer && window.gasOptimizer.clearCache),
+      size: typeof window !== 'undefined' ? (window.gasOptimizer?.cache?.size || 'unknown') : 'unavailable'
+    },
+    sharedUtilities: {
+      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.cache),
+      size: typeof window !== 'undefined' ? (window.sharedUtilities?.cache?.size || 'unknown') : 'unavailable'
+    },
+    domElements: {
+      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.dom),
+      size: 'unknown'
+    },
+    scriptCache: {
+      available: true,
+      size: this.memoCache.size
+    }
+  };
+
+  return {
+    clearInProgress: this.clearInProgress,
+    pendingClears: this.pendingClears.length,
+    caches,
+    health: this.getHealth()
+  };
+};
+
+/**
+ * 待機中のクリア要求を解決
+ */
+CacheManager.prototype.resolvePendingClears = function(results) {
+  const pending = this.pendingClears.splice(0);
+  pending.forEach(({ resolve }) => resolve(results));
+};
+
+/**
+ * 待機中のクリア要求を拒否
+ */
+CacheManager.prototype.rejectPendingClears = function(error) {
+  const pending = this.pendingClears.splice(0);
+  pending.forEach(({ reject }) => reject(error));
+};
+
+// =============================================================================
+// SECTION 2: 統一実行レベルキャッシュ管理システム（元unifiedExecutionCache.gs）
+// =============================================================================
+
+/**
+ * 統一実行レベルキャッシュ管理システム
+ * 全モジュール間でのキャッシュ共有と効率的な管理
+ */
+class UnifiedExecutionCache {
+  constructor() {
+    this.userInfoCache = null;
+    this.sheetsServiceCache = null;
+    this.lastUserIdKey = null;
+    this.executionStartTime = Date.now();
+    this.maxLifetime = 300000; // 5分間の最大ライフタイム
+  }
+
+  /**
+   * ユーザー情報キャッシュを取得
+   * @param {string} userId - ユーザーID
+   * @returns {object|null} キャッシュされたユーザー情報
+   */
+  getUserInfo(userId) {
+    if (this.isExpired()) {
+      this.clearAll();
+      return null;
+    }
+
+    if (this.userInfoCache && this.lastUserIdKey === userId) {
+      debugLog(`✅ 統一キャッシュヒット: ユーザー情報 (${userId})`);
+      return this.userInfoCache;
+    }
+
+    return null;
+  }
+
+  /**
+   * ユーザー情報をキャッシュに保存
+   * @param {string} userId - ユーザーID
+   * @param {object} userInfo - ユーザー情報
+   */
+  setUserInfo(userId, userInfo) {
+    this.userInfoCache = userInfo;
+    this.lastUserIdKey = userId;
+    debugLog(`💾 統一キャッシュ保存: ユーザー情報 (${userId})`);
+  }
+
+  /**
+   * SheetsServiceキャッシュを取得
+   * @returns {object|null} キャッシュされたSheetsService
+   */
+  getSheetsService() {
+    if (this.isExpired()) {
+      this.clearAll();
+      return null;
+    }
+
+    if (this.sheetsServiceCache) {
+      debugLog(`✅ 統一キャッシュヒット: SheetsService`);
+      return this.sheetsServiceCache;
+    }
+
+    return null;
+  }
+
+  /**
+   * SheetsServiceをキャッシュに保存
+   * @param {object} service - SheetsService
+   */
+  setSheetsService(service) {
+    this.sheetsServiceCache = service;
+    debugLog(`💾 統一キャッシュ保存: SheetsService`);
+  }
+
+  /**
+   * ユーザー情報キャッシュをクリア
+   */
+  clearUserInfo() {
+    this.userInfoCache = null;
+    this.lastUserIdKey = null;
+    debugLog(`🗑️ 統一キャッシュクリア: ユーザー情報`);
+  }
+
+  /**
+   * SheetsServiceキャッシュをクリア
+   */
+  clearSheetsService() {
+    this.sheetsServiceCache = null;
+    debugLog(`🗑️ 統一キャッシュクリア: SheetsService`);
+  }
+
+  /**
+   * 全キャッシュをクリア
+   */
+  clearAll() {
+    this.clearUserInfo();
+    this.clearSheetsService();
+    debugLog(`🗑️ 統一キャッシュ全クリア`);
+  }
+
+  /**
+   * キャッシュが期限切れかチェック
+   * @returns {boolean} 期限切れの場合true
+   */
+  isExpired() {
+    return (Date.now() - this.executionStartTime) > this.maxLifetime;
+  }
+
+  /**
+   * キャッシュ統計情報を取得
+   * @returns {object} キャッシュ統計
+   */
+  getStats() {
+    return {
+      hasUserInfo: !!this.userInfoCache,
+      hasSheetsService: !!this.sheetsServiceCache,
+      lastUserIdKey: this.lastUserIdKey,
+      executionTime: Date.now() - this.executionStartTime,
+      isExpired: this.isExpired()
+    };
+  }
+
+  /**
+   * 統一キャッシュマネージャーとの同期
+   * @param {string} operation - 操作タイプ ('userDataChange', 'configChange', 'systemChange')
+   */
+  syncWithUnifiedCache(operation) {
+    if (typeof cacheManager !== 'undefined' && cacheManager) {
+      try {
+        switch (operation) {
+          case 'userDataChange':
+            if (this.lastUserIdKey) {
+              cacheManager.remove(`user_${this.lastUserIdKey}`);
+              cacheManager.remove(`userinfo_${this.lastUserIdKey}`);
+            }
+            break;
+          case 'configChange':
+            cacheManager.remove('system_config');
+            break;
+          case 'systemChange':
+            // システム全体のキャッシュクリア
+            break;
+        }
+        debugLog(`🔄 統一キャッシュマネージャーと同期: ${operation}`);
+      } catch (error) {
+        debugLog(`⚠️ 統一キャッシュマネージャー同期エラー: ${error.message}`);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// SECTION 3: SpreadsheetApp最適化システム（元spreadsheetCache.gs）
+// =============================================================================
+
+// メモリキャッシュ - 実行セッション内で有効
+let spreadsheetMemoryCache = {};
+
+// キャッシュ設定
+const SPREADSHEET_CACHE_CONFIG = {
+  MEMORY_CACHE_TTL: 300000,    // 5分間（メモリキャッシュ）
+  SESSION_CACHE_TTL: 1800000,  // 30分間（PropertiesServiceキャッシュ）
+  MAX_CACHE_SIZE: 50,          // 最大キャッシュエントリ数
+  CACHE_KEY_PREFIX: 'ss_cache_'
+};
+
+/**
+ * キャッシュされたSpreadsheetオブジェクトを取得
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {boolean} forceRefresh - 強制リフレッシュフラグ
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Spreadsheetオブジェクト
+ */
+function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
+  if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+    throw new Error('有効なスプレッドシートIDが必要です');
+  }
+
+  const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
+  const now = Date.now();
+
+  // 強制リフレッシュの場合はキャッシュをクリア
+  if (forceRefresh) {
+    delete spreadsheetMemoryCache[spreadsheetId];
+    try {
+      resilientCacheOperation(
+        () => PropertiesService.getScriptProperties().deleteProperty(cacheKey),
+        'PropertiesService.deleteProperty'
+      );
+    } catch (error) {
+      debugLog('キャッシュクリアエラー:', error.message);
+    }
+  }
+
+  // Phase 1: メモリキャッシュをチェック
+  const memoryEntry = spreadsheetMemoryCache[spreadsheetId];
+  if (memoryEntry && (now - memoryEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+    debugLog('✅ SpreadsheetApp.openById メモリキャッシュヒット:', spreadsheetId.substring(0, 10));
+    return memoryEntry.spreadsheet;
+  }
+
+  // Phase 2: セッションキャッシュをチェック
+  try {
+    const sessionCacheData = resilientCacheOperation(
+      () => PropertiesService.getScriptProperties().getProperty(cacheKey),
+      'PropertiesService.getProperty'
+    );
+    if (sessionCacheData) {
+      const sessionEntry = JSON.parse(sessionCacheData);
+      if ((now - sessionEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL) {
+        // セッションキャッシュからSpreadsheetオブジェクトを再構築
+        const spreadsheet = resilientSpreadsheetOperation(
+          () => SpreadsheetApp.openById(spreadsheetId),
+          'SpreadsheetApp.openById'
+        );
+        
+        // メモリキャッシュに保存
+        spreadsheetMemoryCache[spreadsheetId] = {
+          spreadsheet: spreadsheet,
+          timestamp: now
+        };
+        
+        debugLog('✅ SpreadsheetApp.openById セッションキャッシュヒット:', spreadsheetId.substring(0, 10));
+        return spreadsheet;
+      }
+    }
+  } catch (error) {
+    debugLog('セッションキャッシュ読み込みエラー:', error.message);
+  }
+
+  // Phase 3: 新規取得とキャッシュ保存
+  debugLog('🔄 SpreadsheetApp.openById 新規取得:', spreadsheetId.substring(0, 10));
+  
+  try {
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    
+    // メモリキャッシュに保存
+    spreadsheetMemoryCache[spreadsheetId] = {
+      spreadsheet: spreadsheet,
+      timestamp: now
+    };
+    
+    // セッションキャッシュに保存（軽量データのみ）
+    try {
+      const sessionData = {
+        spreadsheetId: spreadsheetId,
+        timestamp: now,
+        url: spreadsheet.getUrl()
+      };
+      
+      PropertiesService.getScriptProperties().setProperty(
+        cacheKey, 
+        JSON.stringify(sessionData)
+      );
+    } catch (sessionError) {
+      debugLog('セッションキャッシュ保存エラー:', sessionError.message);
+    }
+    
+    // キャッシュサイズ管理
+    cleanupOldCacheEntries();
+    
+    return spreadsheet;
+    
+  } catch (error) {
+    logError(error, 'SpreadsheetApp.openById', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.DATABASE, { spreadsheetId });
+    throw new Error(`スプレッドシートの取得に失敗しました: ${error.message}`);
+  }
+}
+
+/**
+ * 古いキャッシュエントリをクリーンアップ
+ */
+function cleanupOldCacheEntries() {
+  const now = Date.now();
+  const memoryKeys = Object.keys(spreadsheetMemoryCache);
+  
+  // メモリキャッシュのクリーンアップ
+  if (memoryKeys.length > SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE) {
+    const sortedEntries = memoryKeys.map(key => ({
+      key: key,
+      timestamp: spreadsheetMemoryCache[key].timestamp
+    })).sort((a, b) => b.timestamp - a.timestamp);
+    
+    // 古いエントリを削除
+    const entriesToDelete = sortedEntries.slice(SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE);
+    entriesToDelete.forEach(entry => {
+      delete spreadsheetMemoryCache[entry.key];
+    });
+    
+    debugLog(`🧹 メモリキャッシュクリーンアップ: ${entriesToDelete.length}件削除`);
+  }
+  
+  // 期限切れエントリの削除
+  memoryKeys.forEach(key => {
+    const entry = spreadsheetMemoryCache[key];
+    if ((now - entry.timestamp) > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+      delete spreadsheetMemoryCache[key];
+    }
+  });
+}
+
+/**
+ * 特定のスプレッドシートのキャッシュを無効化
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function invalidateSpreadsheetCache(spreadsheetId) {
+  if (!spreadsheetId) return;
+  
+  // メモリキャッシュから削除
+  delete spreadsheetMemoryCache[spreadsheetId];
+  
+  // セッションキャッシュから削除
+  const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
+  try {
+    PropertiesService.getScriptProperties().deleteProperty(cacheKey);
+    debugLog('🗑️ SpreadsheetCache無効化:', spreadsheetId.substring(0, 10));
+  } catch (error) {
+    debugLog('キャッシュ無効化エラー:', error.message);
+  }
+}
+
+/**
+ * 全スプレッドシートキャッシュをクリア
+ */
+function clearAllSpreadsheetCache() {
+  // メモリキャッシュクリア
+  spreadsheetMemoryCache = {};
+  
+  // セッションキャッシュクリア
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const allProps = props.getProperties();
+    
+    Object.keys(allProps).forEach(key => {
+      if (key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)) {
+        props.deleteProperty(key);
+      }
+    });
+    
+    debugLog('🧹 全SpreadsheetCacheクリア完了');
+  } catch (error) {
+    debugLog('全キャッシュクリアエラー:', error.message);
+  }
+}
+
+/**
+ * キャッシュ統計情報を取得
+ * @returns {Object} キャッシュ統計
+ */
+function getSpreadsheetCacheStats() {
+  const memoryEntries = Object.keys(spreadsheetMemoryCache).length;
+  const now = Date.now();
+  
+  let sessionEntries = 0;
+  try {
+    const allProps = PropertiesService.getScriptProperties().getProperties();
+    sessionEntries = Object.keys(allProps).filter(key => 
+      key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)
+    ).length;
+  } catch (error) {
+    debugLog('キャッシュ統計取得エラー:', error.message);
+  }
+  
+  return {
+    memoryEntries: memoryEntries,
+    sessionEntries: sessionEntries,
+    maxCacheSize: SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE,
+    memoryTTL: SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL,
+    sessionTTL: SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL
+  };
+}
+
+/**
+ * SpreadsheetApp.openById()の最適化されたラッパー関数
+ * 既存コードの置き換え用
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Spreadsheetオブジェクト
+ */
+function openSpreadsheetOptimized(spreadsheetId) {
+  return getCachedSpreadsheet(spreadsheetId);
+}
+
+// =============================================================================
+// SECTION 4: 統合インスタンス作成と後方互換性関数
+// =============================================================================
 
 // --- シングルトンインスタンスの作成 ---
 const cacheManager = new CacheManager();
@@ -750,13 +1433,32 @@ if (typeof global !== 'undefined') {
   global.cacheManager = cacheManager;
 }
 
-// ==============================================
-// 後方互換性のためのラッパー関数（移行期間中）
-// ==============================================
+// グローバル統一キャッシュインスタンス
+let globalUnifiedCache = null;
 
 /**
- * @deprecated cacheManager.get() を使用してください
+ * 統一実行キャッシュのインスタンスを取得
+ * @returns {UnifiedExecutionCache} 統一キャッシュインスタンス
  */
+function getUnifiedExecutionCache() {
+  if (!globalUnifiedCache) {
+    globalUnifiedCache = new UnifiedExecutionCache();
+    debugLog(`🏗️ 統一実行キャッシュ初期化`);
+  }
+  return globalUnifiedCache;
+}
+
+/**
+ * 統一実行キャッシュをリセット
+ */
+function resetUnifiedExecutionCache() {
+  globalUnifiedCache = null;
+  debugLog(`🔄 統一実行キャッシュリセット`);
+}
+
+// =============================================================================
+// SECTION 5: 後方互換性のための関数群（元cache.gs）
+// =============================================================================
 
 /**
  * ヘッダーインデックスをキャッシュ付きで安定取得（リトライ機能付き）
@@ -1259,302 +1961,23 @@ function analyzeCacheEfficiency() {
 }
 
 // =============================================================================
-// UNIFIED FRONTEND CACHE CONTROLLER - フロントエンド統一キャッシュ制御
+// SECTION 6: 後方互換性のための関数群（元unifiedExecutionCache.gs）
 // =============================================================================
 
-/**
- * フロントエンド用統一キャッシュ制御システム
- * UnifiedCacheControllerの機能をCacheManagerに統合
- */
-CacheManager.prototype.clearInProgress = false;
-CacheManager.prototype.pendingClears = [];
+// 後方互換性のための関数
+function clearExecutionUserInfoCache() {
+  const cache = getUnifiedExecutionCache();
+  cache.clearUserInfo();
+  cache.syncWithUnifiedCache('userDataChange');
+}
 
-/**
- * 統一キャッシュクリア - 全キャッシュシステムを順次クリア
- * @param {Object} options - クリアオプション
- * @returns {Promise} クリア完了Promise
- */
-CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
-  const { force = false, timeout = 10000 } = options;
+function clearExecutionSheetsServiceCache() {
+  const cache = getUnifiedExecutionCache();
+  cache.clearSheetsService();
+}
 
-  // 既にクリア中の場合は待機
-  if (this.clearInProgress && !force) {
-    if (this.debugMode) {
-      debugLog('🔄 Cache clear already in progress, waiting...');
-    }
-    return new Promise((resolve, reject) => {
-      this.pendingClears.push({ resolve, reject });
-    });
-  }
-
-  this.clearInProgress = true;
-  const startTime = Date.now();
-
-  return new Promise(async (resolve, reject) => {
-    try {
-      if (this.debugMode) {
-        debugLog('🗑️ Starting unified cache clear process');
-      }
-
-      // キャッシュクリア操作のリスト（優先順位順）
-      const clearOperations = [
-        {
-          name: 'UnifiedCache',
-          operation: () => {
-            if (typeof window !== 'undefined' && window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-              window.unifiedCache.clear();
-              return true;
-            }
-            return false;
-          }
-        },
-        {
-          name: 'GasOptimizerCache',
-          operation: () => {
-            if (typeof window !== 'undefined' && window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
-              window.gasOptimizer.clearCache();
-              return true;
-            }
-            return false;
-          }
-        },
-        {
-          name: 'SharedUtilitiesCache',
-          operation: () => {
-            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.cache && typeof window.sharedUtilities.cache.clear === 'function') {
-              window.sharedUtilities.cache.clear();
-              return true;
-            }
-            return false;
-          }
-        },
-        {
-          name: 'DOMElementCache',
-          operation: () => {
-            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.dom && typeof window.sharedUtilities.dom.clearElementCache === 'function') {
-              window.sharedUtilities.dom.clearElementCache();
-              return true;
-            }
-            return false;
-          }
-        },
-        {
-          name: 'ThrottleDebounceCache',
-          operation: () => {
-            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.throttle && typeof window.sharedUtilities.throttle.clearAll === 'function') {
-              window.sharedUtilities.throttle.clearAll();
-              return true;
-            }
-            return false;
-          }
-        },
-        {
-          name: 'ScriptCache',
-          operation: () => {
-            try {
-              this.clearAll();
-              return true;
-            } catch (error) {
-              return false;
-            }
-          }
-        }
-      ];
-
-      const results = [];
-      
-      // 順次実行でキャッシュクリア（競合回避）
-      for (const clearOp of clearOperations) {
-        try {
-          const success = clearOp.operation();
-          results.push({ name: clearOp.name, success });
-          
-          if (this.debugMode && success) {
-            debugLog(`✅ ${clearOp.name} cleared successfully`);
-          }
-          
-          // 各操作間に短い間隔を設ける
-          if (typeof Utilities !== 'undefined') {
-            Utilities.sleep(50);
-          }
-          
-        } catch (error) {
-          warnLog(`⚠️ Failed to clear ${clearOp.name}:`, error);
-          results.push({ name: clearOp.name, success: false, error: error.message });
-        }
-      }
-
-      const successCount = results.filter(r => r.success).length;
-      const totalTime = Date.now() - startTime;
-
-      if (this.debugMode) {
-        debugLog(`🎉 Cache clear completed: ${successCount}/${results.length} caches cleared in ${totalTime}ms`);
-      }
-
-      // 待機中のクリア要求を解決
-      this.resolvePendingClears(results);
-
-      resolve({
-        success: true,
-        results,
-        successCount,
-        totalCount: results.length,
-        duration: totalTime
-      });
-
-    } catch (error) {
-      errorLog('❌ Unified cache clear failed:', error);
-      this.rejectPendingClears(error);
-      reject(error);
-    } finally {
-      this.clearInProgress = false;
-    }
-  });
-};
-
-/**
- * 特定タイプのキャッシュのみクリア
- * @param {string} cacheType - キャッシュタイプ
- * @returns {Promise} クリア結果
- */
-CacheManager.prototype.clearSpecificCache = function(cacheType) {
-  return new Promise((resolve, reject) => {
-    const cacheOperations = {
-      unified: () => typeof window !== 'undefined' && window.unifiedCache?.clear(),
-      gasOptimizer: () => typeof window !== 'undefined' && window.gasOptimizer?.clearCache(),
-      sharedUtilities: () => typeof window !== 'undefined' && window.sharedUtilities?.cache?.clear(),
-      domElements: () => typeof window !== 'undefined' && window.sharedUtilities?.dom?.clearElementCache(),
-      throttleDebounce: () => typeof window !== 'undefined' && window.sharedUtilities?.throttle?.clearAll(),
-      script: () => this.clearAll()
-    };
-
-    const operation = cacheOperations[cacheType];
-    if (!operation) {
-      reject(new Error(`Unknown cache type: ${cacheType}`));
-      return;
-    }
-
-    try {
-      operation();
-      if (this.debugMode) {
-        debugLog(`✅ ${cacheType} cache cleared`);
-      }
-      resolve({ success: true, cacheType });
-    } catch (error) {
-      warnLog(`⚠️ Failed to clear ${cacheType} cache:`, error);
-      resolve({ success: false, cacheType, error: error.message });
-    }
-  });
-};
-
-/**
- * キャッシュ状態の診断
- * @returns {Object} 診断結果
- */
-CacheManager.prototype.diagnoseFrontendCache = function() {
-  const caches = {
-    unifiedCache: {
-      available: typeof window !== 'undefined' && !!(window.unifiedCache && window.unifiedCache.clear),
-      size: typeof window !== 'undefined' ? (window.unifiedCache?.size || 'unknown') : 'unavailable'
-    },
-    gasOptimizer: {
-      available: typeof window !== 'undefined' && !!(window.gasOptimizer && window.gasOptimizer.clearCache),
-      size: typeof window !== 'undefined' ? (window.gasOptimizer?.cache?.size || 'unknown') : 'unavailable'
-    },
-    sharedUtilities: {
-      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.cache),
-      size: typeof window !== 'undefined' ? (window.sharedUtilities?.cache?.size || 'unknown') : 'unavailable'
-    },
-    domElements: {
-      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.dom),
-      size: 'unknown'
-    },
-    scriptCache: {
-      available: true,
-      size: this.memoCache.size
-    }
-  };
-
-  return {
-    clearInProgress: this.clearInProgress,
-    pendingClears: this.pendingClears.length,
-    caches,
-    health: this.getHealth()
-  };
-};
-
-/**
- * 待機中のクリア要求を解決
- */
-CacheManager.prototype.resolvePendingClears = function(results) {
-  const pending = this.pendingClears.splice(0);
-  pending.forEach(({ resolve }) => resolve(results));
-};
-
-/**
- * 待機中のクリア要求を拒否
- */
-CacheManager.prototype.rejectPendingClears = function(error) {
-  const pending = this.pendingClears.splice(0);
-  pending.forEach(({ reject }) => reject(error));
-};
-
-/**
- * PropertiesServiceの値をパース（JSONまたはプリミティブ）
- * @param {string} value - 値
- * @returns {*} パースされた値
- */
-CacheManager.prototype.parsePropertiesValue = function(value) {
-  if (!value) return value;
-  
-  try {
-    // JSON形式の場合はパース
-    return JSON.parse(value);
-  } catch (e) {
-    // プリミティブ値の場合はそのまま返す
-    return value;
-  }
-};
-
-/**
- * 階層化キャッシュに値を設定
- * @param {string} key - キー
- * @param {*} value - 値
- * @param {number} ttl - TTL
- * @param {boolean} enableMemoization - メモ化有効
- */
-CacheManager.prototype.setToCacheHierarchy = function(key, value, ttl, enableMemoization) {
-  try {
-    // Level 2: Apps Scriptキャッシュ
-    this.scriptCache.put(key, JSON.stringify(value), ttl);
-    
-    // Level 1: メモ化キャッシュ
-    if (enableMemoization) {
-      this.memoCache.set(key, { 
-        value: value, 
-        createdAt: Date.now(), 
-        ttl: ttl 
-      });
-    }
-  } catch (e) {
-    warnLog(`[Cache] setToCacheHierarchy error: ${key}`, e.message);
-  }
-};
-
-/**
- * PropertiesService統合キャッシュヘルパー
- * 設定値などの永続的なデータに特化
- * @param {string} key - キー
- * @param {function} valueFn - 値を生成する関数（オプション）
- * @param {object} options - オプション
- * @returns {*} 値
- */
-CacheManager.prototype.getConfig = function(key, valueFn, options = {}) {
-  const { 
-    ttl = 3600,  // 設定値は1時間キャッシュ
-    enableMemoization = true,
-    usePropertiesFallback = true 
-  } = options;
-  
-  return this.get(key, valueFn, { ttl, enableMemoization, usePropertiesFallback });
-};
+function clearAllExecutionCache() {
+  const cache = getUnifiedExecutionCache();
+  cache.clearAll();
+  cache.syncWithUnifiedCache('systemChange');
+}

@@ -3,7 +3,7 @@ const vm = require('vm');
 
 describe('isDeployUser uses ADMIN_EMAIL property', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
-  const commonUtilitiesCode = fs.readFileSync('src/commonUtilities.gs', 'utf8');
+  const unifiedUtilitiesCode = fs.readFileSync('src/unifiedUtilities.gs', 'utf8');
   let context;
   beforeEach(() => {
     const scriptProps = { getProperty: jest.fn((key) => {
@@ -23,7 +23,7 @@ describe('isDeployUser uses ADMIN_EMAIL property', () => {
       warnLog: () => {}
     };
     vm.createContext(context);
-    vm.runInContext(commonUtilitiesCode, context);
+    vm.runInContext(unifiedUtilitiesCode, context);
     vm.runInContext(coreCode, context);
   });
 

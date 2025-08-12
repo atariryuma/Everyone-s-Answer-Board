@@ -6,7 +6,7 @@ describe('getInitialData header extraction', () => {
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   const databaseCode = fs.readFileSync('src/database.gs', 'utf8');
-  const commonUtilitiesCode = fs.readFileSync('src/commonUtilities.gs', 'utf8');
+  const unifiedUtilitiesCode = fs.readFileSync('src/unifiedUtilities.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -60,7 +60,7 @@ describe('getInitialData header extraction', () => {
       generateNewServiceAccountToken: jest.fn(() => 'mock-service-account-token'), // generateNewServiceAccountToken のモック
     };
     vm.createContext(context);
-    vm.runInContext(commonUtilitiesCode, context);
+    vm.runInContext(unifiedUtilitiesCode, context);
     vm.runInContext(urlCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(databaseCode, context);

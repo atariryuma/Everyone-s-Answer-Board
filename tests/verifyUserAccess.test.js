@@ -3,7 +3,7 @@ const vm = require('vm');
 
 describe('verifyUserAccess security checks', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
-  const commonUtilitiesCode = fs.readFileSync('src/commonUtilities.gs', 'utf8');
+  const unifiedUtilitiesCode = fs.readFileSync('src/unifiedUtilities.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe('verifyUserAccess security checks', () => {
       fetchUserFromDatabase: jest.fn(() => ({ adminEmail: 'admin@example.com' })),
     };
     vm.createContext(context);
-    vm.runInContext(commonUtilitiesCode, context);
+    vm.runInContext(unifiedUtilitiesCode, context);
     vm.runInContext(coreCode, context);
   });
 

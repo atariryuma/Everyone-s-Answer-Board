@@ -4,7 +4,7 @@ const vm = require('vm');
 describe('getDataCount reflects new rows', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
-  const spreadsheetCacheCode = fs.readFileSync('src/spreadsheetCache.gs', 'utf8');
+  const unifiedCacheManagerCode = fs.readFileSync('src/unifiedCacheManager.gs', 'utf8');
   const debugConfigCode = fs.readFileSync('src/debugConfig.gs', 'utf8');
   let context;
   let sheetData;
@@ -40,6 +40,22 @@ describe('getDataCount reflects new rows', () => {
         openById: () => ({ getSheetByName: () => sheet }),
       },
       Utilities: { getUuid: () => 'test-uuid-' + Math.random() },
+      CacheService: {
+        getScriptCache: () => ({
+          get: jest.fn(),
+          put: jest.fn(),
+          remove: jest.fn(),
+          removeAll: jest.fn(),
+          getAll: jest.fn(),
+          putAll: jest.fn()
+        }),
+        getUserCache: () => ({
+          get: jest.fn(),
+          put: jest.fn(),
+          remove: jest.fn(),
+          removeAll: jest.fn()
+        })
+      },
       verifyUserAccess: jest.fn(),
       findUserById: jest.fn(() => ({
         userId: 'U1',
@@ -53,7 +69,7 @@ describe('getDataCount reflects new rows', () => {
     };
     vm.createContext(context);
     vm.runInContext(debugConfigCode, context);
-    vm.runInContext(spreadsheetCacheCode, context);
+    vm.runInContext(unifiedCacheManagerCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(coreCode, context);
     context.verifyUserAccess = jest.fn();

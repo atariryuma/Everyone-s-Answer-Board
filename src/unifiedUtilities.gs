@@ -1,7 +1,28 @@
 /**
  * 統一ユーティリティモジュール
  * StudyQuestの共通機能を統合し、重複コードを削減
+ * commonUtilities.gsの機能も統合
  */
+
+// =============================================================================
+// 統合：共通ユーティリティ関数（元commonUtilities.gs）
+// =============================================================================
+
+/**
+ * 現在のアクティブユーザーのメールアドレスを安全に取得
+ * @returns {string} ユーザーメールアドレス（取得失敗時は空文字）
+ */
+function getCurrentUserEmail() {
+  try {
+    const email = Session.getActiveUser().getEmail();
+    debugLog('getCurrentUserEmail: Retrieved email:', email); // 追加
+    return email || '';
+  } catch (error) {
+    logError(error, 'getCurrentUserEmail', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.AUTHENTICATION);
+    debugLog('getCurrentUserEmail: Error retrieving email, returning empty string. Error:', error.message); // 追加
+    return '';
+  }
+}
 
 /**
  * 統一ユーザー情報管理クラス
