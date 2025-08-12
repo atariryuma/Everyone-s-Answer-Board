@@ -1059,6 +1059,20 @@ function republishBoard(requestUserId) {
     // アプリを公開状態に設定
     configJson.appPublished = true;
     configJson.lastModified = new Date().toISOString();
+    
+    // 6時間自動停止機能の設定（再公開時にスケジュールリセット）
+    const publishedAt = new Date().toISOString();
+    const autoStopMinutes = 360; // 6時間 = 360分
+    const scheduledEndAt = new Date(Date.now() + (autoStopMinutes * 60 * 1000)).toISOString();
+    
+    configJson.publishedAt = publishedAt; // 公開開始時間
+    configJson.autoStopEnabled = true; // 6時間自動停止フラグ
+    configJson.autoStopMinutes = autoStopMinutes; // 6時間 = 360分
+    configJson.scheduledEndAt = scheduledEndAt; // 予定終了日時
+    configJson.lastPublishedAt = publishedAt; // 最後の公開日時
+    configJson.totalPublishCount = (configJson.totalPublishCount || 0) + 1; // 累計公開回数
+    configJson.autoStoppedAt = null; // 自動停止実行日時をリセット
+    configJson.autoStopReason = null; // 自動停止理由をリセット
 
     // 設定を保存
     updateUser(requestUserId, {
