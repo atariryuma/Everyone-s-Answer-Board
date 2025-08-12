@@ -155,7 +155,7 @@ class StudyQuestApp {
     this.animationFrameId = null;
     this.idleCallbackId = null;
     this.domFragmentPool = [];
-    this.isLowPerformanceMode = this.detectLowEndDevice();
+    this.isLowPerformanceMode = true;
     this.elements = {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
@@ -723,10 +723,8 @@ class StudyQuestApp {
       this.setupCriticalElements();
       this.showMinimalSkeleton();
       
-      // Apply performance optimizations if needed
-      if (this.isLowPerformanceMode) {
-        this.optimizeForLowPerformance();
-      }
+      // Apply default low performance tweaks
+      this.optimizeForLowPerformance();
 
       // Show info modal while loading sheet data in the background
       this.showInfoModal();
@@ -7260,15 +7258,18 @@ class StudyQuestApp {
       }
       
       .reaction-btn:hover:not(.loading) {
-        transform: scale(1.05) !important;
+        transform: scale(1.08) !important;
       }
       
       .reaction-btn.reacted {
-        transform: scale(1.02) !important;
+        transform: scale(1.03) !important;
+        background-color: var(--color-primary) !important;
+        color: #000 !important;
+        box-shadow: 0 0 8px rgba(139, 233, 253, 0.4) !important;
       }
       
       .reaction-btn.reacted:hover:not(.loading) {
-        transform: scale(1.07) !important;
+        transform: scale(1.1) !important;
       }
       
       .game-btn:hover {
@@ -7286,6 +7287,12 @@ class StudyQuestApp {
       /* Remove will-change to reduce GPU usage */
       * {
         will-change: auto !important;
+      }
+      
+      /* Ensure loading buttons maintain some visual feedback */
+      .reaction-btn.loading {
+        opacity: 0.75 !important;
+        pointer-events: none !important;
       }
       
       /* Simplify shadows */
