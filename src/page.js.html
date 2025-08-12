@@ -4366,9 +4366,9 @@ class StudyQuestApp {
               
               // アイコン更新
               const rt = this.reactionTypes.find(r => r.key === update.reaction);
-              const svgEl = btn.querySelector('svg');
-              if (svgEl && rt) {
-                svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
+              const iconSpan = btn.querySelector('span[aria-hidden="true"]');
+              if (iconSpan && rt) {
+                iconSpan.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
               }
               
               // スタイル更新
@@ -6828,9 +6828,9 @@ class StudyQuestApp {
         }
         
         // アイコン更新
-        const svgEl = modalBtn.querySelector('svg');
-        if (svgEl) {
-          svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', info.reacted);
+        const iconSpan = modalBtn.querySelector('span[aria-hidden="true"]');
+        if (iconSpan) {
+          iconSpan.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', info.reacted);
         }
         
         // スタイル更新
@@ -6897,9 +6897,9 @@ class StudyQuestApp {
           highlightBtn.setAttribute('aria-pressed', String(item.highlight));
           const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
           highlightBtn.setAttribute('aria-label', label);
-          const svgEl = highlightBtn.querySelector('svg');
-          if (svgEl) {
-            svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
+          const iconSpan = highlightBtn.querySelector('span[aria-hidden="true"]');
+          if (iconSpan) {
+            iconSpan.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
           }
         }
         let badge = card.querySelector('.highlight-badge');
