@@ -2042,6 +2042,7 @@ function unpublishBoard() {
         opinionHeader: config.opinionHeader || '',
         nameHeader: config.nameHeader || '名前',
         displayMode: getDisplayMode(),
+        showCounts: config.showCounts || false,  // リアクション数表示設定
         
         // 復元用のシート情報
         sheetName: publishResponse.activeSheetName || selectedSheet || '',
@@ -2153,7 +2154,8 @@ function unpublishBoard() {
         setupType: 'quickstart',
         opinionHeader: (quickStartResult.config && quickStartResult.config.opinionHeader) || '',
         nameHeader: (quickStartResult.config && quickStartResult.config.nameHeader) || '名前',
-        displayMode: quickStartResult.displayMode === 'anonymous' ? '匿名表示' : '通常表示',
+        displayMode: quickStartResult.displayMode || 'anonymous',  // デフォルトは匿名（英語統一）
+        showCounts: (quickStartResult.config && quickStartResult.config.showCounts) || false,  // デフォルトはfalse
         sheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName || '',
         spreadsheetId: quickStartResult.spreadsheetId || ''
       };

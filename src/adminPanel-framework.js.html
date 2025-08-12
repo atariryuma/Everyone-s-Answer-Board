@@ -1863,6 +1863,51 @@ window.HistoryManager = {
     }
   },
   /**
+   * Format date for created date column (日付のみ表示)
+   */
+  _formatCreatedDate(dateStr) {
+    if (!dateStr) return '未設定';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('ja-JP', {
+        month: '2-digit',
+        day: '2-digit'
+      }).replace(/\//g, '/');  // "08/12" 形式
+    } catch {
+      return dateStr;
+    }
+  },
+
+  /**
+   * Format date for published date column (年2桁省略 + 時間付き)
+   */
+  _formatPublishedDate(dateStr) {
+    if (!dateStr) return '未設定';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString('ja-JP', {
+        year: '2-digit',  // 25年表示
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).replace(/\//g, '/');  // "25/08/12 08:45" 形式
+    } catch {
+      return dateStr;
+    }
+  },
+
+  /**
+   * Format settings display with icons and clear meanings
+   */
+  _formatSettingsDisplay(item) {
+    // アイコン + 意味の明確化
+    const displayPart = item.displayMode === 'anonymous' ? '🎭匿名' : '👥通常';
+    const countPart = item.showCounts ? '🔢ON' : '🚫OFF';
+    return `${displayPart}/${countPart}`;
+  },
+
+  /**
    * Render history table in the UI
    */
   renderTable() {
@@ -1968,34 +2013,31 @@ window.HistoryManager = {
     try {
       const row = document.createElement('tr');
       
-      // Active items get green highlight
-      const isActive = !!item.isActive;
-      row.className = isActive 
-        ? 'bg-green-50 hover:bg-green-100' 
-        : 'hover:bg-gray-50';
+      // 日付フォーマット（仕様に合わせて修正）
+      const createdDate = this._formatCreatedDate(item.createdDate);      // "08/12"
+      const publishedDate = this._formatPublishedDate(item.publishedAt);  // "25/08/12 08:45"
       
-      // Format date
-      const date = item.publishedAt ? new Date(item.publishedAt) : null;
-      const dateStr = date ? date.toLocaleDateString('ja-JP', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit'
-      }) : '-';
-      
-      // Truncate question text
+      // 問題文処理
       const question = this._escapeHtml(item.questionText || '未設定');
       const truncated = question.length > 30 ? question.substring(0, 30) + '...' : question;
       
+      // 設定表示（アイコン/意味明確化）
+      const settingsDisplay = this._formatSettingsDisplay(item);
+      
+      // 4列HTML生成
       row.innerHTML = `
-        <td class="px-3 py-2 text-sm">${dateStr}</td>
+        <td class="px-3 py-2 text-sm">${createdDate}</td>
+        <td class="px-3 py-2 text-sm">${publishedDate}</td>
         <td class="px-3 py-2 text-sm" title="${question}">${truncated}</td>
-        <td class="px-3 py-2 text-xs text-gray-600">${item.setupType || 'カスタム'}</td>
-        <td class="px-3 py-2 text-right">
-          <button onclick="window.HistoryManager.showRestoreModal('${item.id}')" 
-                  class="btn btn-sm btn-secondary">
-            復元
-          </button>
-        </td>
+        <td class="px-3 py-2 text-xs text-gray-600">${settingsDisplay}</td>
       `;
+      
+      // 行クリック復元機能
+      row.style.cursor = 'pointer';
+      row.classList.add('hover:bg-gray-700', 'transition-colors');
+      row.addEventListener('click', () => {
+        this._restoreHistoryItem(item);
+      });
       
       return row;
     } catch (error) {
@@ -2032,9 +2074,11 @@ window.HistoryManager = {
   /**
    * Restore configuration from history item
    */
-  _restoreHistoryItem(item) {
+  async _restoreHistoryItem(item) {
     try {
-      // Basic restoration - populate form fields
+      console.log('🔄 Restoring history:', item.questionText);
+      
+      // 1. テキスト設定復元
       if (item.opinionHeader) {
         const opinionInput = document.getElementById('opinion-header');
         if (opinionInput) opinionInput.value = item.opinionHeader;
@@ -2045,26 +2089,82 @@ window.HistoryManager = {
         if (nameInput) nameInput.value = item.nameHeader;
       }
       
-      // Set display mode
-      if (item.displayMode) {
-        const anonymousCheckbox = document.getElementById('anonymous-mode');
-        if (anonymousCheckbox) {
-          anonymousCheckbox.checked = (item.displayMode === 'anonymous');
-        }
+      // 2. 表示モード復元（英語値で正確判定）
+      const anonymousCheckbox = document.getElementById('anonymous-mode');
+      if (anonymousCheckbox) {
+        anonymousCheckbox.checked = (item.displayMode === 'anonymous');
       }
       
-      // Show success message
+      // 3. リアクション数表示復元
+      const showCountsCheckbox = document.getElementById('show-counts');
+      if (showCountsCheckbox) {
+        showCountsCheckbox.checked = (item.showCounts === true);
+      }
+      
+      // 4. シート復元
+      if (item.sheetName) {
+        await this._restoreSheetSelection(item.sheetName);
+      }
+      
+      // 5. UI完全更新
+      await this._refreshAfterRestore();
+      
+      // Success message
       if (typeof showMessage === 'function') {
-        showMessage('✅ 設定が復元されました', 'success');
+        showMessage('✅ 履歴から設定を復元しました', 'success');
       }
-      
-      console.log('✅ History item restored successfully');
+      console.log('✅ Complete restore finished');
       
     } catch (error) {
-      console.error('❌ Failed to restore history item:', error);
+      console.error('❌ History restore failed:', error);
       if (typeof showMessage === 'function') {
-        showMessage('❌ 設定の復元に失敗しました', 'error');
+        showMessage('❌ 設定復元に失敗しました', 'error');
       }
+    }
+  },
+
+  /**
+   * Restore sheet selection from history
+   */
+  async _restoreSheetSelection(sheetName) {
+    try {
+      // グローバル状態更新
+      window.AdminPanel.selectedSheet = sheetName;
+      if (window.AdminPanel.stateManager) {
+        window.AdminPanel.stateManager.setState('selectedSheet', sheetName);  
+      }
+      
+      // シート選択UI更新
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect && sheetSelect.value !== sheetName) {
+        sheetSelect.value = sheetName;
+        sheetSelect.dispatchEvent(new Event('change'));
+      }
+      
+      console.log(`✅ Sheet restored: ${sheetName}`);
+    } catch (error) {
+      console.warn('⚠️ Sheet restore warning:', error);
+    }
+  },
+
+  /**
+   * Refresh UI after history restore
+   */
+  async _refreshAfterRestore() {
+    try {
+      // データ再読込
+      if (typeof loadData === 'function') {
+        await loadData();
+      }
+      
+      // 列判定更新
+      if (typeof updateColumnDetection === 'function') {
+        await updateColumnDetection();
+      }
+      
+      console.log('✅ UI refreshed successfully');
+    } catch (error) {
+      console.warn('⚠️ UI refresh warning:', error);
     }
   },
   
