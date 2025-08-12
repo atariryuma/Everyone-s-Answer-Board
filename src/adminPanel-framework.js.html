@@ -2012,7 +2012,7 @@ window.HistoryManager = {
         <td class="px-3 py-2 text-sm">${createdDate}</td>
         <td class="px-3 py-2 text-sm">${publishedDate}</td>
         <td class="px-3 py-2 text-sm" title="${question}">${truncated}</td>
-        <td class="px-3 py-2 text-xs text-gray-600">${settingsDisplay}</td>
+        <td class="px-3 py-2 text-xs text-white">${settingsDisplay}</td>
       `;
       
       // 行クリック復元機能
@@ -2181,6 +2181,11 @@ window.HistoryManager = {
       if (sheetSelect && sheetSelect.value !== sheetName) {
         sheetSelect.value = sheetName;
         sheetSelect.dispatchEvent(new Event('change'));
+        
+        // プルダウン表示の強制更新
+        if (typeof updateSheetSelectActiveIndicator === 'function') {
+          updateSheetSelectActiveIndicator(sheetName);
+        }
       }
       
       console.log(`✅ Sheet restored: ${sheetName}`);
