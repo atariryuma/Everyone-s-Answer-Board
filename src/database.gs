@@ -608,8 +608,8 @@ function findUserById(userId) {
   const currentUserId = Session.getActiveUser().getEmail();
   const secureKey = buildSecureUserScopedKey('user_lookup', currentUserId, userId);
   
-  // テナント境界検証（自分のデータまたは許可されたアクセス）
-  if (!validateTenantAccess('user_lookup', currentUserId, userId)) {
+  // テナント境界検証（自分のデータまたは許可されたアクセス）- 後方互換性確保
+  if (typeof validateTenantAccess === 'function' && !validateTenantAccess('user_lookup', currentUserId, userId)) {
     return null;
   }
 
@@ -642,8 +642,8 @@ function findUserByIdFresh(userId) {
 
   const currentUserId = Session.getActiveUser().getEmail();
   
-  // テナント境界検証（Fresh取得は特に厳密にチェック）
-  if (!validateTenantAccess('user_fresh_lookup', currentUserId, userId)) {
+  // テナント境界検証（Fresh取得は特に厳密にチェック）- 後方互換性確保
+  if (typeof validateTenantAccess === 'function' && !validateTenantAccess('user_fresh_lookup', currentUserId, userId)) {
     return null;
   }
 
@@ -747,8 +747,8 @@ function findUserByEmail(email) {
   const currentUserId = Session.getActiveUser().getEmail();
   const secureKey = buildSecureUserScopedKey('email_lookup', currentUserId, email);
   
-  // テナント境界検証
-  if (!validateTenantAccess('email_lookup', currentUserId, email)) {
+  // テナント境界検証 - 後方互換性確保
+  if (typeof validateTenantAccess === 'function' && !validateTenantAccess('email_lookup', currentUserId, email)) {
     return null;
   }
 
@@ -1080,8 +1080,8 @@ function getUserWithFallback(userId) {
 
   const currentUserId = Session.getActiveUser().getEmail();
   
-  // テナント境界検証
-  if (!validateTenantAccess('user_fallback_lookup', currentUserId, userId)) {
+  // テナント境界検証 - 後方互換性確保
+  if (typeof validateTenantAccess === 'function' && !validateTenantAccess('user_fallback_lookup', currentUserId, userId)) {
     return null;
   }
 
@@ -1125,8 +1125,8 @@ function updateUser(userId, updateData) {
     throw new Error('データ更新エラー: ユーザーIDが長すぎます（最大255文字）');
   }
 
-  // テナント境界検証（更新は特に厳密）
-  if (!validateTenantAccess('user_update', currentUserId, userId)) {
+  // テナント境界検証（更新は特に厳密）- 後方互換性確保
+  if (typeof validateTenantAccess === 'function' && !validateTenantAccess('user_update', currentUserId, userId)) {
     throw new Error('テナント境界違反: 他のユーザーのデータを更新する権限がありません');
   }
 

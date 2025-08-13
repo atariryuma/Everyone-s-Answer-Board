@@ -60,7 +60,7 @@ describe('getDataCount reflects new rows', () => {
           }),
         };
       })(),
-      verifyUserAccess: jest.fn(),
+      verifyUserAccess: jest.fn(() => {}), // 後方互換性確保
       findUserById: jest.fn(() => ({
         userId: 'U1',
         configJson: JSON.stringify({
@@ -71,6 +71,16 @@ describe('getDataCount reflects new rows', () => {
       getHeaderIndices: () => ({ クラス: 1 }),
       COLUMN_HEADERS: { CLASS: 'クラス' },
       getCurrentUserEmail: () => 'user@example.com',
+      // マルチテナント対応関数のモック
+      validateTenantAccess: jest.fn(() => true),
+      auditTenantAccess: jest.fn(),
+      auditSecurityViolation: jest.fn(),
+      buildSecureUserScopedKey: jest.fn((prefix, userId, key) => `${prefix}_${userId}_${key}`),
+      buildUserScopedKey: jest.fn((prefix, userId, key) => `${prefix}_${userId}_${key}`),
+      // スプレッドシート関数のモック
+      openSpreadsheetOptimized: jest.fn((id) => ({
+        getSheetByName: (name) => getFreshSheet(),
+      })),
     };
     context.global = context;
     vm.createContext(context);
@@ -83,10 +93,11 @@ describe('getDataCount reflects new rows', () => {
 
   test('returns updated count after adding row', () => {
     const first = context.getDataCount('U1', 'すべて', 'newest', false);
-    expect(first.count).toBe(1);
+    expect(first.count).toBe(1); // ヘッダー行 + 1データ行
 
     sheetData.push(['2024-01-02', 'A']);
-    context.cacheManager.remove('rowCount_SID_Sheet1_すべて');
+    // マルチテナント対応: すべてのキャッシュをクリア
+    context.cacheManager.clearAll();
 
     const second = context.getDataCount('U1', 'すべて', 'newest', false);
     expect(second.count).toBe(2);
