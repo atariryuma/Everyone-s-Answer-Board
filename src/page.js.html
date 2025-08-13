@@ -254,7 +254,7 @@ class StudyQuestApp {
     this.enableBatchProcessing = true; // バッチ処理有効フラグ（簡単に無効化可能）
     this.reactionBatchQueue = new Map(); // rowIndex -> reactions[] のバッチキュー
     this.batchTimer = null; // バッチ処理タイマー
-    this.BATCH_TIMEOUT = 200; // 200ms以内の操作をバッチ化（高速化）
+    this.BATCH_TIMEOUT = 100; // 100ms以内の操作をバッチ化（高速化）
     this.BATCH_SIZE_LIMIT = 5; // 最大バッチサイズ（控えめに設定）
     this.batchProcessingActive = false; // バッチ処理中フラグ
     

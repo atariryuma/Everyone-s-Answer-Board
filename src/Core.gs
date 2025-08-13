@@ -3231,7 +3231,7 @@ function extractFormIdFromUrl(url) {
 function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reactingUserEmail) {
   try {
     // 統一ロック管理でリアクション処理を実行
-    return executeWithStandardizedLock('READ_write_optimized', 'processReaction', () => {
+    return executeWithStandardizedLock('WRITE_OPERATION', 'processReaction', () => {
 
       var service = getSheetsServiceCached();
       var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
@@ -3324,8 +3324,15 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
         allColumns: Object.keys(allReactionColumns)
       });
 
-      // リアクション更新後のキャッシュ無効化（非同期実行で高速化）
-      Utilities.sleep(1); // 最小限の遅延でキャッシュ無効化を後回し
+      // リアクション更新後のキャッシュ無効化
+      try {
+        if (typeof cacheManager !== 'undefined' && typeof cacheManager.invalidateSheetData === 'function') {
+          cacheManager.invalidateSheetData(spreadsheetId, sheetName);
+          debugLog('リアクション更新後のキャッシュ無効化完了: ' + spreadsheetId);
+        }
+      } catch (cacheError) {
+        warnLog('リアクション後のキャッシュ無効化エラー:', cacheError.message);
+      }
 
       // 更新後のリアクション状態を計算（追加のAPI呼び出しなし）
       var reactionStates = {};
