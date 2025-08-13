@@ -1725,12 +1725,27 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSprea
  */
 function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
   try {
-    infoLog('🔄 クリティカル更新後のキャッシュ同期開始...');
+    infoLog('🔄 クリティカル更新後のキャッシュ同期開始...', {
+      userId,
+      email,
+      oldSpreadsheetId,
+      newSpreadsheetId
+    });
 
     // 段階1: 基本ユーザーキャッシュクリア
-    invalidateUserCache(userId, email, oldSpreadsheetId, true);
+    invalidateUserCache(userId, email, oldSpreadsheetId, false);
     if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
-      invalidateUserCache(userId, email, newSpreadsheetId, true);
+      invalidateUserCache(userId, email, newSpreadsheetId, false);
+
+      // 古いスプレッドシートオブジェクトのキャッシュも明示的に削除
+      if (oldSpreadsheetId) {
+        if (typeof invalidateSpreadsheetCache === 'function') {
+          invalidateSpreadsheetCache(oldSpreadsheetId);
+          infoLog(`✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
+        } else {
+          warnLog(`invalidateSpreadsheetCache 関数が見つかりません。手動で ${oldSpreadsheetId} のオブジェクトキャッシュをクリアしてください。`);
+        }
+      }
     }
 
     // 段階2: 実行レベルキャッシュクリア
@@ -1738,6 +1753,16 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
 
     // 段階3: 関連データベースキャッシュクリア
     clearDatabaseCache();
+
+    // 統一キャッシュマネージャーの関連エントリを追加でクリア
+    if (typeof cacheManager !== 'undefined' && cacheManager) {
+      cacheManager.clearByPattern('user_*');
+      cacheManager.clearByPattern('email_*');
+      cacheManager.clearByPattern('login_status_*');
+      cacheManager.clearByPattern('sheets_*');
+      cacheManager.clearByPattern('data_*');
+      cacheManager.clearByPattern('config_v3_*');
+    }
 
     // 段階4: メモ化キャッシュの強制リセット（利用可能な場合）
     try {
