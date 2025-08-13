@@ -1804,11 +1804,36 @@ function unpublishBoard(requestUserId) {
       configJson: JSON.stringify(configJson)
     });
 
-    // キャッシュを無効化して即座にUIに反映
+    // 強制的にキャッシュを無効化して即座にUIに反映
     try {
+      // 1. ユーザーキャッシュの無効化
       if (typeof invalidateUserCache === 'function') {
         invalidateUserCache(currentUserId, null, null, false);
       }
+      
+      // 2. Unified Cache の強制クリア
+      if (typeof getUnifiedExecutionCache === 'function') {
+        const cache = getUnifiedExecutionCache();
+        if (cache && typeof cache.clearUserInfo === 'function') {
+          cache.clearUserInfo();
+          debugLog('🧹 UnifiedCache cleared after unpublish');
+        }
+      }
+      
+      // 3. Properties Cache のクリア
+      if (typeof CacheService !== 'undefined') {
+        try {
+          CacheService.getScriptCache().removeAll([
+            'userInfo_' + currentUserId,
+            'appConfig_' + currentUserId,
+            'getInitialData_' + currentUserId
+          ]);
+          debugLog('🧹 CacheService cleared after unpublish');
+        } catch (cacheServiceError) {
+          debugLog('CacheService clear 警告:', cacheServiceError.message);
+        }
+      }
+      
     } catch (cacheError) {
       warnLog('キャッシュ無効化でエラーが発生しましたが、処理を続行します:', cacheError.message);
     }

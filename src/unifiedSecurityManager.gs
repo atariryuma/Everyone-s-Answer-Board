@@ -1266,9 +1266,9 @@ function getCurrentUserEmail() {
  */
 function isDeployUser() {
   try {
-    const deployUserEmail = ScriptApp.getProjectProperties().getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    const deployUserEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
     const currentUserEmail = Session.getEffectiveUser().getEmail();
-    return deployUserEmail === currentUserEmail;
+    return deployUserEmail && currentUserEmail && deployUserEmail === currentUserEmail;
   } catch (e) {
     errorLog('isDeployUser エラー: ' + e.message);
     return false;

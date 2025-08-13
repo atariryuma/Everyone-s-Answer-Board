@@ -43,67 +43,46 @@ function getPublicationState(status) {
   let isPublished = false;
   let reason = '';
   
-  // 1. Direct isPublished property
-  if (status.isPublished === true) {
-    isPublished = true;
-    reason = 'status.isPublished=true';
-  }
-  // 2. Direct appPublished property  
-  else if (status.appPublished === true) {
+  // 最優先: status.appPublishedをチェック（キャッシュクリア後の最新状態）
+  if (status.appPublished === true) {
     isPublished = true;
     reason = 'status.appPublished=true';
   }
-  // 3. Check configJson for appPublished
-  else if (status.userInfo && status.userInfo.configJson) {
-    try {
-      const config = JSON.parse(status.userInfo.configJson);
-      if (config.appPublished === true) {
-        isPublished = true;
-        reason = 'configJson.appPublished=true';
-        
-        // Enhanced validation: Verify setup completion indicators
-        const hasCompletedSetup = (
-          config.setupStatus === 'completed' &&
-          config.formCreated === true &&
-          config.publishedSheetName &&
-          config.publishedSpreadsheetId
-        );
-        
-        if (hasCompletedSetup) {
-          reason += ' (セットアップ済み)';
-        } else {
-          console.log('⚠️ Publication state: appPublished=true but setup incomplete', {
-            setupStatus: config.setupStatus,
-            formCreated: config.formCreated,
-            hasPublishedSheet: !!config.publishedSheetName,
-            hasPublishedSpreadsheet: !!config.publishedSpreadsheetId
-          });
-          reason += ' (セットアップ不完全)';
-        }
-      } 
-      // 4. Enhanced completion check: Allow recognition of completed but not yet published setups
-      else if (config.setupStatus === 'completed' && 
-               config.formCreated === true && 
-               config.publishedSheetName && 
-               config.publishedSpreadsheetId) {
-        // This covers cases where setup is complete but appPublished might not be properly set
-        console.log('🔧 Publication state: Setup complete but appPublished=false - potential state inconsistency');
-        reason = 'セットアップ完了だが公開状態不整合';
-        // Don't auto-publish, but log for debugging
+  else if (status.appPublished === false) {
+    isPublished = false;
+    reason = 'status.appPublished=false (明示的非公開)';
+  }
+  // appPublishedが未定義の場合のみconfigJsonを確認
+  else {
+    if (status.userInfo && status.userInfo.configJson) {
+      try {
+        const config = JSON.parse(status.userInfo.configJson);
+        isPublished = config.appPublished === true;
+        reason = `configJson.appPublished=${config.appPublished}`;
+      } catch (e) {
+        console.warn('Failed to parse configJson:', e);
+        isPublished = false;
+        reason = 'configJson解析エラー';
       }
-    } catch (e) {
-      console.warn('Failed to parse configJson:', e);
+    } else {
+      isPublished = false;
+      reason = 'appPublished情報なし';
     }
   }
   
-  // Maintained strict logic to prevent false positives
-  // Note: Removed loose fallback logic that assumed activeSheetName = published
+  // デバッグログ
+  if (shouldEnableDebugMode()) {
+    console.log('🔍 Publication check:', {
+      'status.appPublished': status.appPublished,
+      'final result': isPublished,
+      'reason': reason
+    });
+  }
   
   return { 
     isPublished, 
     reason,
-    // Add confidence level for better debugging
-    confidence: isPublished ? (reason.includes('セットアップ済み') ? 'high' : 'medium') : 'low'
+    confidence: 'high' // 簡略化により信頼性向上
   };
 }
 

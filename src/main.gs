@@ -2196,8 +2196,13 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
   const deployUserResult = isDeployUser();
+  const currentUserEmail = getCurrentUserEmail();
+  const adminEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+  
   debugLog('renderAdminPanel - isDeployUser() result:', deployUserResult);
-  debugLog('renderAdminPanel - current user email:', getCurrentUserEmail());
+  debugLog('renderAdminPanel - current user email:', currentUserEmail);
+  debugLog('renderAdminPanel - ADMIN_EMAIL property:', adminEmail);
+  debugLog('renderAdminPanel - emails match:', adminEmail === currentUserEmail);
   adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
 

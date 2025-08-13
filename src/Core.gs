@@ -4951,7 +4951,23 @@ function isSystemAdmin() {
 }
 
 function isDeployUser() {
-  return isSystemAdmin();
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    var currentUserEmail = getCurrentUserEmail();
+    
+    // デバッグログ
+    if (shouldEnableDebugMode()) {
+      infoLog('isDeployUser check - adminEmail: ' + adminEmail);
+      infoLog('isDeployUser check - currentUserEmail: ' + currentUserEmail);
+      infoLog('isDeployUser check - result: ' + (adminEmail === currentUserEmail));
+    }
+    
+    return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
+  } catch (e) {
+    errorLog('isDeployUser エラー: ' + e.message);
+    return false;
+  }
 }
 
 // =================================================================
