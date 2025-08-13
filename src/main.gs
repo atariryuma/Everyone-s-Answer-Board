@@ -12,7 +12,7 @@ function include(path) {
   try {
     return HtmlService.createHtmlOutputFromFile(path).getContent();
   } catch (error) {
-    logError(error, 'includeFile', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { filePath: path });
+    logError(error, 'includeFile', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
 }
@@ -53,6 +53,25 @@ const SCRIPT_PROPS_KEYS = {
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
   ADMIN_EMAIL: 'ADMIN_EMAIL'
+};
+
+// エラーハンドリング定数（main.gs独自）
+const MAIN_MAIN_ERROR_SEVERITY = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  CRITICAL: 'critical',
+};
+
+const MAIN_MAIN_ERROR_CATEGORIES = {
+  AUTHENTICATION: 'authentication',
+  AUTHORIZATION: 'authorization',
+  DATABASE: 'database',
+  CACHE: 'cache',
+  NETWORK: 'network',
+  VALIDATION: 'validation',
+  SYSTEM: 'system',
+  USER_INPUT: 'user_input',
 };
 
 const DB_SHEET_CONFIG = {
@@ -165,7 +184,7 @@ function checkAndHandleAutoStop(config, userInfo) {
     try {
       saveHistoryOnAutoStop(config, userInfo);
     } catch (historyError) {
-      logError(historyError, 'autoStopHistorySave', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE);
+      logError(historyError, 'autoStopHistorySave', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
       // 履歴保存エラーは処理を継続
     }
 
@@ -183,7 +202,7 @@ function checkAndHandleAutoStop(config, userInfo) {
       infoLog(`🔄 自動停止実行完了: ${userInfo.adminEmail} (期限: ${config.scheduledEndAt})`);
       return true; // 自動停止実行済み
     } catch (error) {
-      logError(error, 'autoStopProcess', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+      logError(error, 'autoStopProcess', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
       return false;
     }
   }
@@ -223,7 +242,7 @@ function saveHistoryOnAutoStop(config, userInfo) {
     saveHistoryToSheet(historyItem, userInfo);
     infoLog('✅ 自動停止履歴保存完了:', historyItem.questionText);
   } catch (error) {
-    logError(error, 'serverSideHistorySave', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE);
+    logError(error, 'serverSideHistorySave', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
   }
 }
 
@@ -410,8 +429,8 @@ function saveHistoryToSheet(historyItem, userInfo) {
     }
 
     // 最大履歴件数まで保持
-    // 件数制御（サーバ側は軽量に20件まで）
-    var SERVER_MAX_HISTORY = 20;
+    // 件数制御をMAX_HISTORY_ITEMSと同期（50件まで）
+    var SERVER_MAX_HISTORY = MAX_HISTORY_ITEMS; // 50件に拡大
     if (configJson.historyArray.length > SERVER_MAX_HISTORY) {
       configJson.historyArray.splice(SERVER_MAX_HISTORY);
     }
@@ -421,12 +440,24 @@ function saveHistoryToSheet(historyItem, userInfo) {
 
     // サイズ制御: JSONが長すぎる場合は末尾から削除して調整
     var serialized = JSON.stringify(configJson);
-    var safetyLimit = 9000; // 1万の制限に余裕を持たせる
+    var safetyLimit = 15000; // サイズ制限を緩和（15KBまで）
     var guard = 0;
-    while (serialized.length > safetyLimit && configJson.historyArray.length > 0 && guard < 100) {
+    var deletedCount = 0;
+    
+    while (serialized.length > safetyLimit && configJson.historyArray.length > 10 && guard < 100) {
       configJson.historyArray.pop();
       serialized = JSON.stringify(configJson);
       guard++;
+      deletedCount++;
+    }
+    
+    // 削除が発生した場合はログに記録
+    if (deletedCount > 0) {
+      warnLog('履歴サイズ制限により履歴を削減しました', { 
+        deletedCount, 
+        remainingCount: configJson.historyArray.length, 
+        finalSize: serialized.length 
+      });
     }
 
     // データベースに保存
@@ -446,7 +477,7 @@ function saveHistoryToSheet(historyItem, userInfo) {
     }
 
   } catch (error) {
-    logError(error, 'serverSideHistorySave', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE);
+    logError(error, 'serverSideHistorySave', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
     // エラーをログに記録するが、メイン処理は継続
   }
 }
@@ -477,7 +508,7 @@ function saveHistoryToSheetAPI(requestUserId, historyItem) {
     };
 
   } catch (error) {
-    logError(error, 'saveHistoryToSheetAPI', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE);
+    logError(error, 'saveHistoryToSheetAPI', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
     return {
       status: 'error',
       message: error.message
@@ -519,7 +550,7 @@ function getHistoryFromServerAPI(requestUserId) {
     };
 
   } catch (error) {
-    logError(error, 'getHistoryFromServerAPI', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE);
+    logError(error, 'getHistoryFromServerAPI', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
     return {
       status: 'error',
       message: error.message,
@@ -574,7 +605,7 @@ function clearHistoryFromServerAPI(requestUserId) {
     }
 
   } catch (error) {
-    logError(error, 'clearHistoryFromServerAPI', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE);
+    logError(error, 'clearHistoryFromServerAPI', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
     return {
       status: 'error',
       message: error.message
@@ -653,7 +684,7 @@ function log(level, message, details) {
 
     switch (level) {
       case 'error':
-        logError(message, 'debugLog', ERROR_SEVERITY.LOW, ERROR_CATEGORIES.SYSTEM, { details });
+        logError(message, 'debugLog', MAIN_ERROR_SEVERITY.LOW, MAIN_ERROR_CATEGORIES.SYSTEM, { details });
         break;
       case 'warn':
         warnLog(message, details || '');
@@ -713,7 +744,7 @@ function getDeployUserDomainInfo() {
       webAppUrl: webAppUrl
     };
   } catch (e) {
-    logError(e, 'getDeployUserDomainInfo', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    logError(e, 'getDeployUserDomainInfo', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
     return {
       currentDomain: '不明',
       deployDomain: '不明',
@@ -771,7 +802,7 @@ function getGoogleClientId() {
 
     return { status: 'success', message: 'Google Client IDを取得しました', data: { clientId: clientId } };
   } catch (error) {
-    logError(error, 'getGoogleClientId', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'getGoogleClientId', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
     return { status: 'error', message: 'Google Client IDの取得に失敗しました: ' + error.toString(), data: { clientId: '' } };
   }
 }
@@ -816,7 +847,7 @@ function checkSystemConfiguration() {
       setupComplete: isSystemSetup()
     };
   } catch (error) {
-    logError(error, 'checkSystemConfiguration', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'checkSystemConfiguration', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
     return {
       isFullyConfigured: false,
       error: error.toString()
@@ -849,7 +880,7 @@ function getSystemDomainInfo() {
       deployDomain: domainInfo.deployDomain || adminDomain
     };
   } catch (e) {
-    logError(e, 'getSystemDomainInfo', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    logError(e, 'getSystemDomainInfo', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
     return { error: e.message };
   }
 }
@@ -881,7 +912,7 @@ function doGet(e) {
     return routeRequestByMode(params);
 
   } catch (error) {
-    logError(error, 'doGet', ERROR_SEVERITY.CRITICAL, ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'doGet', MAIN_ERROR_SEVERITY.CRITICAL, MAIN_ERROR_CATEGORIES.SYSTEM);
     return showErrorPage('致命的なエラー', 'アプリケーションの処理中に予期せぬエラーが発生しました。', error);
   }
 }
@@ -1410,7 +1441,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
 
       const props = PropertiesService.getScriptProperties();
       if (!props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID)) {
-        logError('DATABASE_SPREADSHEET_ID not set', 'getUnifiedCache', ERROR_SEVERITY.CRITICAL, ERROR_CATEGORIES.SYSTEM);
+        logError('DATABASE_SPREADSHEET_ID not set', 'getUnifiedCache', MAIN_ERROR_SEVERITY.CRITICAL, MAIN_ERROR_CATEGORIES.SYSTEM);
         return null;
       }
 
@@ -1440,7 +1471,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
     }
 
   } catch (cacheError) {
-    logError(cacheError, 'getUnifiedCache', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CACHE);
+    logError(cacheError, 'getUnifiedCache', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.CACHE);
     // フォールバック: 直接データベースから取得
     if (userId) {
       userInfo = findUserById(userId);
@@ -1511,7 +1542,7 @@ function showAppSetupPage(userId) {
         return showErrorPage('アクセス権限がありません', 'この機能にアクセスする権限がありません。システム管理者にお問い合わせください。');
       }
     } catch (error) {
-      logError(error, 'checkDeployUserPermissions', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.AUTHORIZATION);
+      logError(error, 'checkDeployUserPermissions', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.AUTHORIZATION);
       return showErrorPage('認証エラー', '権限確認中にエラーが発生しました。');
     }
 
@@ -1551,7 +1582,7 @@ function getLastAdminUserId() {
       return null;
     }
   } catch (error) {
-    logError(error, 'getLastAdminUserId', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.DATABASE);
+    logError(error, 'getLastAdminUserId', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
     return null;
   }
 }
@@ -1586,7 +1617,7 @@ function getAppSetupUrl() {
 
     return appSetupUrl;
   } catch (error) {
-    logError(error, 'getAppSetupUrl', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'getAppSetupUrl', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
     throw new Error('アプリ設定URLの取得に失敗しました: ' + error.message);
   }
 }
@@ -2112,7 +2143,7 @@ function sanitizeRedirectUrl(url) {
 
     return cleanUrl;
   } catch (e) {
-    logError(e, 'urlSanitization', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+    logError(e, 'urlSanitization', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
     return getWebAppUrl();
   }
 }
@@ -2153,7 +2184,7 @@ function parseRequestParams(e) {
 function renderAdminPanel(userInfo, mode) {
   // ガード節: userInfoが存在しない場合はエラーページを表示して処理を中断
   if (!userInfo) {
-    logError('renderAdminPanelにuserInfoがnullで渡されました', 'renderAdminPanel', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+    logError('renderAdminPanelにuserInfoがnullで渡されました', 'renderAdminPanel', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
     return showErrorPage('エラー', 'ユーザー情報の読み込みに失敗したため、管理パネルを表示できません。');
   }
 
@@ -2288,7 +2319,7 @@ function renderUnpublishedPage(userInfo, params) {
     return htmlOutput;
 
   } catch (error) {
-    logError(error, 'renderUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, {
+    logError(error, 'renderUnpublishedPage', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, {
       userId: userInfo ? userInfo.userId : 'null',
       hasUserInfo: !!userInfo,
       errorMessage: error.message,
@@ -2371,7 +2402,7 @@ function renderMinimalUnpublishedPage(userInfo) {
     return htmlOutput;
 
   } catch (error) {
-    logError(error, 'renderMinimalUnpublishedPage', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, {
+    logError(error, 'renderMinimalUnpublishedPage', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, {
       userId: userInfo ? userInfo.userId : 'null',
       hasUserInfo: !!userInfo,
       errorMessage: error.message,
@@ -2781,8 +2812,8 @@ function renderAnswerBoard(userInfo, params) {
     logError(
       error,
       'renderAnswerBoard',
-      ERROR_SEVERITY.HIGH,
-      ERROR_CATEGORIES.SYSTEM,
+      MAIN_ERROR_SEVERITY.HIGH,
+      MAIN_ERROR_CATEGORIES.SYSTEM,
       {
         userId: userInfo.userId,
         spreadsheetId: userInfo.spreadsheetId,
@@ -2855,7 +2886,7 @@ function checkCurrentPublicationStatus(userId) {
     };
 
   } catch (error) {
-    logError(error, 'checkCurrentPublicationStatus', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'checkCurrentPublicationStatus', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
     return {
       error: error.message,
       isPublished: false,
