@@ -4,11 +4,7 @@
  */
 
 // Define basic logging helpers for GAS and test environments
-if (typeof debugLog === 'undefined') {
-  function debugLog(message, ...args) {
-    console.log('[DEBUG]', message, ...args);
-  }
-}
+// debugLog関数はdebugConfig.gsで統一定義されています
 
 if (typeof errorLog === 'undefined') {
   function errorLog(message, ...args) {

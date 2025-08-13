@@ -224,11 +224,7 @@ function logValidationError(field, value, rule, message) {
 }
 
 // デバッグログ関数の定義（テスト環境対応）
-if (typeof debugLog === 'undefined') {
-  function debugLog(message, ...args) {
-    console.log('[DEBUG]', message, ...args);
-  }
-}
+// debugLog関数はdebugConfig.gsで統一定義されています
 
 if (typeof warnLog === 'undefined') {
   function warnLog(message, ...args) {

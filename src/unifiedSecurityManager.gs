@@ -1266,9 +1266,18 @@ function getCurrentUserEmail() {
  */
 function isDeployUser() {
   try {
-    const deployUserEmail = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-    const currentUserEmail = Session.getEffectiveUser().getEmail();
-    return deployUserEmail && currentUserEmail && deployUserEmail === currentUserEmail;
+    var props = PropertiesService.getScriptProperties();
+    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    var currentUserEmail = getCurrentUserEmail();
+    
+    // デバッグログ
+    if (shouldEnableDebugMode()) {
+      infoLog('isDeployUser check - adminEmail: ' + adminEmail);
+      infoLog('isDeployUser check - currentUserEmail: ' + currentUserEmail);
+      infoLog('isDeployUser check - result: ' + (adminEmail === currentUserEmail));
+    }
+    
+    return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
     errorLog('isDeployUser エラー: ' + e.message);
     return false;

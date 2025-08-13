@@ -53,30 +53,22 @@ function getUserInfoCached(requestUserId) {
  * 実行レベルのユーザー情報キャッシュをクリア
  */
 function clearExecutionUserInfoCache() {
+  // レガシーキャッシュ変数のクリア
   _executionUserInfoCache = null;
   lastCacheUserIdKey = null;
 
-  // 統一キャッシュマネージャーの関連エントリもクリア
-  if (typeof cacheManager !== 'undefined' && cacheManager) {
-    try {
-      // ユーザー関連キャッシュのクリア
-      if (lastCacheUserIdKey) {
-        cacheManager.remove('user_' + lastCacheUserIdKey);
-        cacheManager.remove('userinfo_' + lastCacheUserIdKey);
-      }
-
-      // セッション関連キャッシュのクリア
-      const currentEmail = Session.getActiveUser().getEmail();
-      if (currentEmail) {
-        cacheManager.remove('session_' + currentEmail);
-      }
-
-      debugLog('[Memory] 実行レベル + 統一キャッシュの関連エントリをクリアしました');
-    } catch (error) {
-      debugLog('[Memory] 統一キャッシュクリア中にエラー:', error.message);
+  // 統一キャッシュマネージャーを使用した包括的なクリア
+  try {
+    if (typeof getUnifiedExecutionCache === 'function') {
+      const cache = getUnifiedExecutionCache();
+      cache.clearUserInfo();
+      cache.syncWithUnifiedCache('userDataChange');
+      debugLog('[Memory] 統一キャッシュマネージャーでキャッシュクリアしました');
+    } else {
+      debugLog('[Memory] レガシーキャッシュのみクリアしました');
     }
-  } else {
-    debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
+  } catch (error) {
+    debugLog('[Memory] キャッシュクリア中にエラー:', error.message);
   }
 }
 
@@ -506,14 +498,14 @@ function clearOldUserCache(currentEmail) {
   }
 }
 
-// 他の関数も同様に、存在することを確認
+// 統一されたユーザー情報取得関数（レガシー互換性維持）
 function getConfigUserInfo(requestUserId) {
   return getUserInfoCached(requestUserId);
 }
 
-// レガシー互換性のため保持
+// 標準ユーザー情報取得関数（推奨）
 function getUserInfo(requestUserId) {
-  return getConfigUserInfo(requestUserId);
+  return getUserInfoCached(requestUserId);
 }
 
 /**

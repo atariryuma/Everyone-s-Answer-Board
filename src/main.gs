@@ -97,23 +97,21 @@ let _executionUserInfoCache = null;
  * 実行中のユーザー情報キャッシュをクリア
  */
 function clearExecutionUserInfoCache() {
+  // レガシーキャッシュのクリア
   _executionUserInfoCache = null;
-
-  // 統一キャッシュマネージャーの関連エントリもクリア
-  if (typeof cacheManager !== 'undefined' && cacheManager) {
-    try {
-      // セッション関連キャッシュのクリア
-      const currentEmail = getCurrentUserEmail();
-      if (currentEmail) {
-        cacheManager.remove('session_' + currentEmail);
-      }
-
-      debugLog('[Memory] 実行レベル + 統一キャッシュの関連エントリをクリアしました');
-    } catch (error) {
-      debugLog('[Memory] 統一キャッシュクリア中にエラー:', error.message);
+  
+  // 統一キャッシュマネージャーを使用した包括的なクリア
+  try {
+    if (typeof getUnifiedExecutionCache === 'function') {
+      const cache = getUnifiedExecutionCache();
+      cache.clearUserInfo();
+      cache.syncWithUnifiedCache('userDataChange');
+      debugLog('[Memory] 統一キャッシュマネージャーでキャッシュクリアしました');
+    } else {
+      debugLog('[Memory] レガシーキャッシュのみクリアしました');
     }
-  } else {
-    debugLog('[Memory] 実行レベルユーザー情報キャッシュをクリアしました');
+  } catch (error) {
+    debugLog('[Memory] キャッシュクリア中にエラー:', error.message);
   }
 }
 
