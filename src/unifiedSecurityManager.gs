@@ -228,7 +228,7 @@ function updateUserLastAccess(userId) {
     debugLog('最終アクセス時刻を更新:', userId, now);
 
     // lastAccessedAtフィールドのみを更新（他の設定は保護）
-    updateUserField(userId, 'lastAccessedAt', now);
+    updateUser(userId, { lastAccessedAt: now });
 
   } catch (error) {
     errorLog('updateUserLastAccess エラー:', error.message);
@@ -289,7 +289,7 @@ class MultiTenantSecurityManager {
    * @param {string} operation - 実行しようとする操作
    * @returns {boolean} アクセス許可の可否
    */
-  async validateTenantBoundary(requestUserId, targetUserId, operation) {
+  validateTenantBoundary(requestUserId, targetUserId, operation) {
     if (!requestUserId || !targetUserId) {
       this.logSecurityViolation('MISSING_USER_ID', { requestUserId, targetUserId, operation });
       return false;
@@ -325,7 +325,7 @@ class MultiTenantSecurityManager {
    * @param {string} operation - 操作タイプ
    * @returns {boolean} アクセス許可の可否
    */
-  async validateDataAccessPattern(userId, dataType, operation) {
+  validateDataAccessPattern(userId, dataType, operation) {
     const allowedPatterns = {
       'user_data': ['read', 'write', 'delete'],
       'user_config': ['read', 'write'],
@@ -395,7 +395,7 @@ class MultiTenantSecurityManager {
    * @param {string} operation - 操作
    * @returns {boolean} 管理者権限の有無
    */
-  async checkAdminAccess(requestUserId, targetUserId, operation) {
+  checkAdminAccess(requestUserId, targetUserId, operation) {
     // 管理者権限は現在は実装しない（必要に応じて実装）
     // 実装する場合は、管理者ロールの検証ロジックをここに追加
     return false;
@@ -447,7 +447,7 @@ class MultiTenantSecurityManager {
    * 重大なセキュリティ違反の処理
    * @param {object} logEntry - ログエントリ
    */
-  async handleCriticalSecurityViolation(logEntry) {
+  handleCriticalSecurityViolation(logEntry) {
     // 重大な違反の場合の追加処理
     // 例：管理者への通知、一時的なアクセス制限など
     warnLog('🚨 重大なセキュリティ違反が発生しました', logEntry);
