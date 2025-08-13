@@ -465,12 +465,39 @@ function clearOldUserCache(currentEmail) {
 
     // 古い形式のキャッシュを削除
     props.deleteProperty('CURRENT_USER_ID');
+    
+    // 9cff8faからの強化: 孤立したプロパティの削除
+    try {
+      // 古いユーザーキーの検索と削除
+      const allProperties = props.getProperties();
+      for (const [key, value] of Object.entries(allProperties)) {
+        // 古い形式のユーザーキャッシュキーを削除
+        if (key.startsWith('CURRENT_USER_ID_') && key !== `CURRENT_USER_ID_${Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, currentEmail, Utilities.Charset.UTF_8).map(function(byte) { return (byte + 256).toString(16).slice(-2); }).join('')}`) {
+          props.deleteProperty(key);
+          debugLog('古い孤立ユーザーキーを削除: ' + key.substring(0, 20) + '...');
+        }
+      }
+    } catch (propertyError) {
+      warnLog('プロパティクリーンアップエラー:', propertyError.message);
+    }
 
     // 現在のユーザー以外のキャッシュをクリア（API修正版）
     const userCache = CacheService.getUserCache();
     if (userCache) {
       // GAS API仕様に合わせて全キャッシュクリア
       userCache.removeAll();
+    }
+
+    // スクリプトレベルキャッシュの期限切れエントリもクリア
+    const scriptCache = CacheService.getScriptCache();
+    if (scriptCache) {
+      try {
+        // 特定のパターンのキャッシュをクリア（全削除は避ける）
+        scriptCache.remove('userInfo_cache');
+        scriptCache.remove('config_cache');
+      } catch (scriptCacheError) {
+        debugLog('スクリプトキャッシュクリーンアップスキップ:', scriptCacheError.message);
+      }
     }
 
     debugLog('古いユーザーキャッシュをクリアしました: ' + currentEmail);
@@ -3660,5 +3687,60 @@ function checkApplicationAccess() {
       accessReason: 'アクセス確認中にエラーが発生しました',
       error: error.message
     };
+  }
+}
+
+/**
+ * グローバルメモリ管理機能（9cff8faからの抽出）
+ * スクリプトプロパティとキャッシュの自動クリーンアップ
+ */
+function performGlobalMemoryCleanup() {
+  try {
+    debugLog('🧹 グローバルメモリクリーンアップ開始');
+
+    // 1. 実行レベルキャッシュのクリア
+    clearExecutionUserInfoCache();
+
+    // 2. CacheManagerの期限切れキャッシュクリア
+    if (typeof cacheManager !== 'undefined' && cacheManager.clearExpired) {
+      cacheManager.clearExpired();
+    }
+
+    // 3. スクリプトプロパティの古いキャッシュクリア
+    try {
+      const props = PropertiesService.getUserProperties();
+      // 古い形式のキャッシュを削除
+      props.deleteProperty('CURRENT_USER_ID');
+      
+      // 古いキャッシュエントリを削除
+      const userCache = CacheService.getUserCache();
+      if (userCache) {
+        userCache.removeAll();
+      }
+    } catch (cleanupError) {
+      warnLog('プロパティクリーンアップエラー:', cleanupError.message);
+    }
+
+    infoLog('✅ グローバルメモリクリーンアップ完了');
+
+  } catch (error) {
+    logError(error, 'globalMemoryCleanup', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+  }
+}
+
+/**
+ * 定期的なクリーンアップを実行（9cff8faからの抽出）
+ * 長時間実行でのメモリリークを防止
+ */
+function schedulePeriodicCleanup() {
+  try {
+    // 30秒後にクリーンアップを実行
+    setTimeout(() => {
+      performGlobalMemoryCleanup();
+    }, 30000);
+    
+    debugLog('📅 定期クリーンアップをスケジュール');
+  } catch (error) {
+    warnLog('クリーンアップスケジュールエラー:', error.message);
   }
 }
