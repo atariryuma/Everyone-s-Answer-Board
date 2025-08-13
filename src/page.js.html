@@ -5424,16 +5424,26 @@ class StudyQuestApp {
         console.warn('無効なバッチレスポンス、個別処理で続行');
         return;
       }
-      
+
       // 各行のレスポンスを処理（既存の仕組みを再利用）
       responseData.forEach(rowData => {
         const item = this.state.currentAnswers.find(i => i.rowIndex == rowData.rowIndex);
         if (item) {
           // 既存のレスポンス処理システムを使用
-          this.processReactionResponse(rowData, item);
+          this.processReactionResponse(item, rowData);
+          // サーバー応答に基づいてUIを更新
+          this.updateReactionUI(item, true);
         }
       });
-      
+
+      // ローディング状態の解除
+      if (Array.isArray(originalOperations)) {
+        originalOperations.forEach(op => {
+          const buttons = document.querySelectorAll(`[data-row-index="${op.rowIndex}"][data-reaction="${op.reaction}"]`);
+          this.setReactionButtonsLoading(buttons, false);
+        });
+      }
+
       console.log('✅ バッチレスポンス処理完了');
     } catch (error) {
       console.error('バッチレスポンス処理エラー:', error);
