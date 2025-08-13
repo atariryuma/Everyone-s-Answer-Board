@@ -7,6 +7,7 @@
 const LOCK_TIMEOUTS = {
   READ_OPERATION: 5000,      // 読み取り専用操作: 5秒
   WRITE_OPERATION: 15000,    // 通常の書き込み操作: 15秒
+  read_write_optimized: 8000, // リアクション専用最適化: 8秒
   CRITICAL_OPERATION: 20000, // クリティカルな操作: 20秒
   BATCH_OPERATION: 30000     // バッチ処理: 30秒 (saveAndPublish等)
 };

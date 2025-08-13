@@ -31,7 +31,7 @@ function generateNewServiceAccountToken() {
   // 統一秘密情報管理システムで安全に取得
   const serviceAccountCreds = getSecureServiceAccountCreds();
   
-  const privateKey = serviceAccountCreds.private_key.replace(/\\n/g, '\n'); // 改行文字を正規化
+  const privateKey = serviceAccountCreds.private_key.replace(/\n/g, '\n'); // 改行文字を正規化
   const clientEmail = serviceAccountCreds.client_email;
   const tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
 
@@ -1002,5 +1002,365 @@ function runScheduledSecurityHealthCheck() {
 
   } catch (error) {
     errorLog('定期セキュリティヘルスチェック実行エラー:', error.message);
+  }
+}
+
+/**
+ * サービスアカウントをスプレッドシートに編集者として共有
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function addServiceAccountToSpreadsheet(spreadsheetId) {
+  try {
+    const serviceAccountEmail = getServiceAccountEmail();
+    if (serviceAccountEmail === 'メールアドレス取得エラー') {
+      warnLog('サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。');
+      return;
+    }
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const permissions = spreadsheet.getEditors();
+    const isAlreadyEditor = permissions.some(editor => editor.getEmail() === serviceAccountEmail);
+
+    if (!isAlreadyEditor) {
+      spreadsheet.addEditor(serviceAccountEmail);
+      infoLog(`✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
+    } else {
+      debugLog(`サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`);
+    }
+  } catch (error) {
+    errorLog(`サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`);
+    throw new Error(`サービスアカウントをスプレッドシートに共有できませんでした。手動で ${serviceAccountEmail} を編集者として追加してください。`);
+  }
+}
+
+/**
+ * スプレッドシートをサービスアカウントと共有
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function shareSpreadsheetWithServiceAccount(spreadsheetId) {
+  try {
+    const serviceAccountEmail = getServiceAccountEmail();
+    if (serviceAccountEmail === 'メールアドレス取得エラー') {
+      warnLog('サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。');
+      return;
+    }
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const permissions = spreadsheet.getEditors();
+    const isAlreadyEditor = permissions.some(editor => editor.getEmail() === serviceAccountEmail);
+
+    if (!isAlreadyEditor) {
+      spreadsheet.addEditor(serviceAccountEmail);
+      infoLog(`✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
+    } else {
+      debugLog(`サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`);
+    }
+  } catch (error) {
+    errorLog(`サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`);
+    throw new Error(`サービスアカウントをスプレッドシートに共有できませんでした。手動で ${serviceAccountEmail} を編集者として追加してください。`);
+  }
+}
+
+/**
+ * ユーザーのアクセス権限を検証
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ */
+function verifyUserAccess(requestUserId) {
+  const currentUserId = getUserId(); // 現在のセッションユーザーID
+  
+  if (currentUserId !== requestUserId) {
+    // ログに詳細を記録
+    warnLog('🚨 アクセス拒否: ユーザーID不一致', {
+      requested: requestUserId,
+      current: currentUserId,
+      activeUserEmail: Session.getActiveUser().getEmail(),
+      effectiveUserEmail: Session.getEffectiveUser().getEmail()
+    });
+    throw new Error('アクセスが拒否されました。この操作を実行する権限がありません。');
+  }
+  debugLog('✅ ユーザーアクセス検証成功:', requestUserId);
+}
+
+/**
+ * ユーザーのキャッシュを無効化
+ * @param {string} userId - ユーザーID
+ * @param {string} email - ユーザーのメールアドレス
+ * @param {string} spreadsheetId - ユーザーのスプレッドシートID
+ * @param {boolean} clearAll - 全てのキャッシュをクリアするかどうか
+ */
+function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
+  try {
+    debugLog('invalidateUserCache: キャッシュ無効化開始', { userId, email, spreadsheetId, clearAll });
+
+    // 1. ScriptCacheのクリア
+    const scriptCache = CacheService.getScriptCache();
+    if (scriptCache) {
+      if (userId) {
+        scriptCache.remove('user_' + userId);
+      }
+      if (email) {
+        scriptCache.remove('email_' + email);
+        scriptCache.remove('login_status_' + email);
+      }
+      // config_v3キャッシュはユーザーIDとシート名に依存するため、ここではクリアしない
+      // config.gsのgetConfig関数内で個別にクリアされるべき
+    }
+
+    // 2. UserCacheのクリア
+    const userCache = CacheService.getUserCache();
+    if (userCache) {
+      // UserCacheはユーザーセッションに紐づくため、特定のキーを削除する
+      // ただし、UserCacheは現在のユーザーにしか影響しないため、
+      // 他のユーザーのキャッシュをクリアする目的では使えない
+      if (userId) {
+        userCache.remove(buildUserScopedKey('config_v3', userId, '')); // シート名なしの汎用キー
+      }
+    }
+
+    // 3. UnifiedCacheManagerのクリア
+    if (typeof cacheManager !== 'undefined' && cacheManager) {
+      if (userId) {
+        cacheManager.remove('user_' + userId);
+        cacheManager.remove('userinfo_' + userId);
+      }
+      if (email) {
+        cacheManager.remove('session_' + email);
+      }
+      if (spreadsheetId) {
+        cacheManager.remove('sheets_' + spreadsheetId);
+        cacheManager.remove('data_' + spreadsheetId);
+      }
+      // UnifiedCacheManagerはより粒度の高いキャッシュ管理が可能
+      cacheManager.removeByPattern('config_v3_' + userId + '_*'); // ユーザーIDに紐づく設定キャッシュ
+    }
+
+    // 4. PropertiesServiceのクリア（CURRENT_USER_IDのみ）
+    try {
+      const userProps = PropertiesService.getUserProperties();
+      const allProps = userProps.getProperties();
+      for (const key in allProps) {
+        if (key.startsWith('CURRENT_USER_ID_')) {
+          userProps.deleteProperty(key);
+        }
+      }
+    } catch (propsError) {
+      warnLog('PropertiesServiceのキャッシュクリア中にエラー:', propsError.message);
+    }
+
+    // 5. 全てのキャッシュをクリアするオプション（最終手段）
+    if (clearAll) {
+      debugLog('invalidateUserCache: 全てのキャッシュを強制クリア');
+      CacheService.getScriptCache().removeAll();
+      CacheService.getUserCache().removeAll();
+      if (typeof cacheManager !== 'undefined' && cacheManager) {
+        cacheManager.clearAll();
+      }
+    }
+
+    infoLog('✅ invalidateUserCache: キャッシュ無効化完了');
+
+  } catch (error) {
+    errorLog('invalidateUserCache エラー:', error.message);
+    // エラーが発生しても処理は続行
+  }
+}
+
+/**
+ * クリティカルな更新後にキャッシュを同期
+ * @param {string} userId - ユーザーID
+ * @param {string} email - ユーザーのメールアドレス
+ * @param {string} oldSpreadsheetId - 変更前のスプレッドシートID
+ * @param {string} newSpreadsheetId - 変更後のスプレッドシートID
+ */
+function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
+  try {
+    debugLog('synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期開始', {
+      userId, email, oldSpreadsheetId, newSpreadsheetId
+    });
+
+    // 1. ユーザー固有のキャッシュを無効化
+    invalidateUserCache(userId, email, oldSpreadsheetId, false); // oldSpreadsheetIdのキャッシュをクリア
+
+    // 2. 新しいスプレッドシートIDに関連するキャッシュもクリア（もしあれば）
+    if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
+      invalidateUserCache(userId, email, newSpreadsheetId, false);
+      // 古いスプレッドシートオブジェクトのキャッシュを無効化
+      if (oldSpreadsheetId) {
+        invalidateSpreadsheetCache(oldSpreadsheetId);
+        infoLog(`✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
+      }
+    }
+
+    // 3. データベース全体のキャッシュをクリア（ユーザーリストなど）
+    clearDatabaseCache();
+
+    // 4. 統一キャッシュマネージャーの関連エントリをクリア
+    if (typeof cacheManager !== 'undefined' && cacheManager) {
+      cacheManager.removeByPattern('user_*');
+      cacheManager.removeByPattern('email_*');
+      cacheManager.removeByPattern('login_status_*');
+      cacheManager.removeByPattern('sheets_*');
+      cacheManager.removeByPattern('data_*');
+      cacheManager.removeByPattern('config_v3_*');
+    }
+
+    infoLog('✅ synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期完了');
+
+  } catch (error) {
+    errorLog('synchronizeCacheAfterCriticalUpdate エラー:', error.message);
+    // エラーが発生しても処理は続行
+  }
+}
+
+/**
+ * データベースキャッシュをクリア
+ */
+function clearDatabaseCache() {
+  try {
+    debugLog('clearDatabaseCache: データベースキャッシュをクリア');
+    CacheService.getScriptCache().removeAll();
+    CacheService.getUserCache().removeAll(); // 現在のユーザーのキャッシュもクリア
+    if (typeof cacheManager !== 'undefined' && cacheManager) {
+      cacheManager.clearAll();
+    }
+    infoLog('✅ データベースキャッシュクリア完了');
+  } catch (error) {
+    errorLog('clearDatabaseCache エラー:', error.message);
+  }
+}
+
+/**
+ * ユーザー固有のキーを構築
+ * @param {string} baseKey - ベースキー
+ * @param {string} userId - ユーザーID
+ * @param {string} sheetName - シート名 (オプション)
+ * @returns {string} ユーザー固有のキー
+ */
+function buildUserScopedKey(baseKey, userId, sheetName = '') {
+  if (!userId) {
+    throw new Error('ユーザーIDが指定されていません');
+  }
+  let key = `${baseKey}_${userId}`;
+  if (sheetName) {
+    key += `_${sheetName}`;
+  }
+  return key;
+}
+
+/**
+ * 現在のユーザーのメールアドレスを取得
+ * @returns {string} メールアドレス
+ */
+function getCurrentUserEmail() {
+  try {
+    return Session.getActiveUser().getEmail();
+  } catch (e) {
+    errorLog('getCurrentUserEmail エラー: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * デプロイユーザーかどうかを判定
+ * @returns {boolean} デプロイユーザーの場合true
+ */
+function isDeployUser() {
+  try {
+    const deployUserEmail = ScriptApp.getProjectProperties().getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    const currentUserEmail = Session.getEffectiveUser().getEmail();
+    return deployUserEmail === currentUserEmail;
+  } catch (e) {
+    errorLog('isDeployUser エラー: ' + e.message);
+    return false;
+  }
+}
+
+/**
+ * サービスアカウントのメールアドレスを取得
+ * @returns {string} サービスアカウントのメールアドレス
+ */
+function getServiceAccountEmail() {
+  try {
+    const serviceAccountCreds = getSecureServiceAccountCreds();
+    return serviceAccountCreds.client_email || 'メールアドレス取得エラー';
+  } catch (error) {
+    warnLog('サービスアカウントメール取得エラー:', error.message);
+    return 'メールアドレス取得エラー';
+  }
+}
+
+/**
+ * サービスアカウント認証情報を安全に取得
+ * @returns {object} サービスアカウント認証情報
+ */
+function getSecureServiceAccountCreds() {
+  try {
+    const credsJson = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    if (!credsJson) {
+      throw new Error('サービスアカウント認証情報が設定されていません。');
+    }
+    return JSON.parse(credsJson);
+  } catch (e) {
+    errorLog('getSecureServiceAccountCreds エラー: ' + e.message);
+    throw new Error('サービスアカウント認証情報の取得に失敗しました。');
+  }
+}
+
+/**
+ * データベーススプレッドシートIDを安全に取得
+ * @returns {string} データベーススプレッドシートID
+ */
+function getSecureDatabaseId() {
+  try {
+    const dbId = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    if (!dbId) {
+      throw new Error('データベーススプレッドシートIDが設定されていません。');
+    }
+    return dbId;
+  } catch (e) {
+    errorLog('getSecureDatabaseId エラー: ' + e.message);
+    throw new Error('データベーススプレッドシートIDの取得に失敗しました。');
+  }
+}
+
+/**
+ * ユーザーのメールアドレスからユーザーIDを取得
+ * @param {string} email - ユーザーのメールアドレス
+ * @returns {string} ユーザーID
+ */
+function getUserIdFromEmail(email) {
+  const userInfo = findUserByEmail(email);
+  return userInfo ? userInfo.userId : null;
+}
+
+/**
+ * ユーザーIDからメールアドレスを取得
+ * @param {string} userId - ユーザーID
+ * @returns {string} メールアドレス
+ */
+function getEmailFromUserId(userId) {
+  const userInfo = findUserById(userId);
+  return userInfo ? userInfo.adminEmail : null;
+}
+
+/**
+ * ユーザーのログイン状態をチェック
+ * @param {string} email - ユーザーのメールアドレス
+ * @returns {boolean} ログイン状態
+ */
+function checkLoginStatus(email) {
+  const userInfo = findUserByEmail(email);
+  return userInfo && userInfo.isActive;
+}
+
+/**
+ * ユーザーのログイン状態を更新
+ * @param {string} email - ユーザーのメールアドレス
+ * @param {boolean} status - ログイン状態
+ */
+function updateLoginStatus(email, status) {
+  const userInfo = findUserByEmail(email);
+  if (userInfo) {
+    updateUser(userInfo.userId, { isActive: status ? 'true' : 'false' });
   }
 }
