@@ -17,32 +17,6 @@ function include(path) {
   }
 }
 
-/**
- * Template debugging function to identify syntax errors
- */
-function debugTemplate() {
-  try {
-    const template = HtmlService.createTemplateFromFile('AdminPanel');
-    template.include = include;
-    template.userInfo = { userId: 'debug-user' };
-    template.mode = 'debug';
-    template.isDeployUser = true;
-    
-    console.log('Getting template code with comments...');
-    const codeWithComments = template.getCodeWithComments();
-    console.log('Template code with comments:');
-    console.log(codeWithComments);
-    
-    // Also try to evaluate to see where it fails
-    console.log('Attempting to evaluate template...');
-    const result = template.evaluate();
-    console.log('Template evaluated successfully');
-    
-  } catch (error) {
-    console.error('Template debug error:', error);
-    console.error('Error stack:', error.stack);
-  }
-}
 
 /**
  * JavaScript文字列エスケープ関数 (URL対応版)
@@ -644,18 +618,6 @@ function htmlEncode(text) {
  * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
  * @returns {HtmlOutput} 設定後のHtmlOutput
  */
-function safeSetXFrameOptionsDeny(htmlOutput) {
-  try {
-    if (htmlOutput && typeof htmlOutput.setXFrameOptionsMode === 'function' &&
-        HtmlService && HtmlService.XFrameOptionsMode &&
-        HtmlService.XFrameOptionsMode.DENY) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    }
-  } catch (e) {
-    warnLog('Failed to set XFrameOptionsMode:', e.message);
-  }
-  return htmlOutput;
-}
 
 // getSecurityHeaders function removed - not used in current implementation
 
@@ -708,14 +670,6 @@ function log(level, message, details) {
   }
 }
 
-function debugLog() {
-  if (!DEBUG) return;
-  try {
-    debugLog.apply(null, arguments);
-  } catch (e) {
-    // ignore logging errors
-  }
-}
 
 /**
  * デプロイされたWebアプリのドメイン情報と現在のユーザーのドメイン情報を取得

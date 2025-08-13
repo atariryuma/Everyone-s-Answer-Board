@@ -142,31 +142,3 @@ function infoLog(message, ...args) {
 /**
  * パフォーマンス計測用のタイマー
  */
-class PerformanceTimer {
-  constructor(operationName) {
-    this.operationName = operationName;
-    this.startTime = Date.now();
-    debugLog(`⏱️ ${operationName} 開始`);
-  }
-
-  lap(checkpointName) {
-    const elapsed = Date.now() - this.startTime;
-    debugLog(`⏱️ ${this.operationName} - ${checkpointName}: ${elapsed}ms`);
-    return elapsed;
-  }
-
-  end() {
-    const totalTime = Date.now() - this.startTime;
-    debugLog(`✅ ${this.operationName} 完了: ${totalTime}ms`);
-    return totalTime;
-  }
-}
-
-/**
- * デバッグ設定を動的に更新
- * @param {object} newConfig - 新しい設定
- */
-function updateDebugConfig(newConfig) {
-  Object.assign(DEBUG_CONFIG, newConfig);
-  infoLog('デバッグ設定を更新しました', newConfig);
-}
