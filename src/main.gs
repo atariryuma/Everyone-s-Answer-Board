@@ -925,10 +925,9 @@ function doGet(e) {
     // Parse and validate request parameters with enhanced security
     const params = parseRequestParams(e);
     
-    // マルチテナント対応: 特定モードでのみuserId パラメータ必須化
-    const userIdRequiredModes = ['admin', 'view', 'api', 'management'];
-    if (!params.userId && userIdRequiredModes.includes(params.mode)) {
-      safeAuditSecurityViolation('MISSING_USERID_PARAMETER', {
+    // マルチテナント対応: userId パラメータ必須化（view mode除く）
+    if (!params.userId && params.mode !== 'login' && params.mode !== 'default') {
+      auditSecurityViolation('MISSING_USERID_PARAMETER', {
         currentUser: currentUserId,
         mode: params.mode,
         requestParams: Object.keys(e?.parameter || {})
@@ -940,7 +939,7 @@ function doGet(e) {
     if (params.userId) {
       const accessType = params.mode === 'view' ? 'view_mode_access' : 'admin_access';
       if (!validateTenantAccess(accessType, currentUserId, params.userId)) {
-        safeAuditSecurityViolation('MAIN_TENANT_BOUNDARY_VIOLATION', {
+        auditSecurityViolation('MAIN_TENANT_BOUNDARY_VIOLATION', {
           currentUser: currentUserId,
           requestedUserId: params.userId,
           mode: params.mode,
@@ -962,7 +961,7 @@ function doGet(e) {
     // Handle app setup page requests with security validation
     if (params.setupParam === 'true') {
       if (!params.userId) {
-        safeAuditSecurityViolation('SETUP_WITHOUT_USERID', { currentUser: currentUserId });
+        auditSecurityViolation('SETUP_WITHOUT_USERID', { currentUser: currentUserId });
         return showErrorPage('セットアップエラー', 'ユーザーIDが必要です。', null);
       }
       return showAppSetupPage(params.userId);
@@ -1002,7 +1001,7 @@ function doGet(e) {
   } catch (error) {
     // 企業対応エラーハンドリング強化
     const totalDuration = Date.now() - requestStartTime;
-    safeAuditSecurityViolation('MAIN_ENTRY_POINT_ERROR', {
+    auditSecurityViolation('MAIN_ENTRY_POINT_ERROR', {
       currentUser: currentUserId,
       error: error.message,
       stack: error.stack?.substring(0, 500), // スタックトレースを制限
@@ -1145,7 +1144,7 @@ function validateActiveSession(userId, securityContext = {}) {
       if (securityContext.ipAddress && 
           cachedSession.ipAddress && 
           cachedSession.ipAddress !== securityContext.ipAddress) {
-        safeAuditSecurityViolation('SESSION_IP_MISMATCH', {
+        auditSecurityViolation('SESSION_IP_MISMATCH', {
           userId: userId,
           expectedIp: cachedSession.ipAddress,
           actualIp: securityContext.ipAddress
@@ -1198,7 +1197,7 @@ function verifyUnifiedSecurity(requestUserId, operation = 'general_access', secu
     
     // 1. 基本的なユーザー認証確認
     if (!currentUserId) {
-      safeAuditSecurityViolation('UNIFIED_SECURITY_NO_AUTH', {
+      auditSecurityViolation('UNIFIED_SECURITY_NO_AUTH', {
         requestUserId: requestUserId,
         operation: operation
       });
@@ -1209,7 +1208,7 @@ function verifyUnifiedSecurity(requestUserId, operation = 'general_access', secu
     try {
       verifyUserAccess(requestUserId);
     } catch (legacyVerifyError) {
-      safeAuditSecurityViolation('UNIFIED_SECURITY_LEGACY_VERIFY_FAILED', {
+      auditSecurityViolation('UNIFIED_SECURITY_LEGACY_VERIFY_FAILED', {
         currentUser: currentUserId,
         requestUserId: requestUserId,
         operation: operation,
@@ -1220,7 +1219,7 @@ function verifyUnifiedSecurity(requestUserId, operation = 'general_access', secu
     
     // 3. マルチテナント境界検証（新しいセキュリティ層）
     if (!validateTenantAccess(operation, currentUserId, requestUserId)) {
-      safeAuditSecurityViolation('UNIFIED_SECURITY_TENANT_BOUNDARY_VIOLATION', {
+      auditSecurityViolation('UNIFIED_SECURITY_TENANT_BOUNDARY_VIOLATION', {
         currentUser: currentUserId,
         requestUserId: requestUserId,
         operation: operation
@@ -1233,7 +1232,7 @@ function verifyUnifiedSecurity(requestUserId, operation = 'general_access', secu
     if (highSecurityOperations.includes(operation)) {
       const sessionValid = validateActiveSession(currentUserId, securityContext);
       if (!sessionValid) {
-        safeAuditSecurityViolation('UNIFIED_SECURITY_SESSION_INVALID', {
+        auditSecurityViolation('UNIFIED_SECURITY_SESSION_INVALID', {
           currentUser: currentUserId,
           requestUserId: requestUserId,
           operation: operation
@@ -1251,7 +1250,7 @@ function verifyUnifiedSecurity(requestUserId, operation = 'general_access', secu
     
     if (Date.now() - rateData.firstRequest < timeWindow) {
       if (rateData.count >= maxRequests) {
-        safeAuditSecurityViolation('UNIFIED_SECURITY_RATE_LIMIT_EXCEEDED', {
+        auditSecurityViolation('UNIFIED_SECURITY_RATE_LIMIT_EXCEEDED', {
           currentUser: currentUserId,
           operation: operation,
           requestCount: rateData.count,
@@ -1291,25 +1290,13 @@ function verifyUnifiedSecurity(requestUserId, operation = 'general_access', secu
     
   } catch (error) {
     logError(error, 'verifyUnifiedSecurity', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SECURITY);
-    safeAuditSecurityViolation('UNIFIED_SECURITY_VERIFICATION_ERROR', {
+    auditSecurityViolation('UNIFIED_SECURITY_VERIFICATION_ERROR', {
       currentUser: currentUserId,
       requestUserId: requestUserId,
       operation: operation,
       error: error.message
     });
     return false; // エラー時は安全側に倒す
-  }
-}
-
-/**
- * 後方互換性確保: auditSecurityViolation関数の安全な呼び出し
- */
-function safeAuditSecurityViolation(violationType, details) {
-  if (typeof auditSecurityViolation === 'function') {
-    safeAuditSecurityViolation(violationType, details);
-  } else {
-    // バックエンド用代替実装
-    errorLog(new Error(`SECURITY_VIOLATION: ${violationType}`), 'main:security', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SECURITY, details);
   }
 }
 
@@ -1344,7 +1331,7 @@ function validateUserAuthentication(requestedUserId = null, mode = 'default', se
   
   // 基本認証チェック: 現在のユーザーが認証されているか
   if (!currentUserId) {
-    safeAuditSecurityViolation('UNAUTHENTICATED_ACCESS_ATTEMPT', {
+    auditSecurityViolation('UNAUTHENTICATED_ACCESS_ATTEMPT', {
       mode: mode,
       requestedUserId: requestedUserId,
       securityContext: securityContext
@@ -1356,7 +1343,7 @@ function validateUserAuthentication(requestedUserId = null, mode = 'default', se
   // マルチテナント対応: userId必須モードでのパラメータ検証
   const userIdRequiredModes = ['admin', 'view', 'api', 'management'];
   if (userIdRequiredModes.includes(mode) && !requestedUserId) {
-    safeAuditSecurityViolation('MISSING_USERID_IN_REQUIRED_MODE', {
+    auditSecurityViolation('MISSING_USERID_IN_REQUIRED_MODE', {
       currentUser: currentUserId,
       mode: mode,
       securityContext: securityContext
@@ -1370,7 +1357,7 @@ function validateUserAuthentication(requestedUserId = null, mode = 'default', se
                       mode === 'admin' ? 'admin_access' : 'general_access';
     
     if (!validateTenantAccess(accessType, currentUserId, requestedUserId)) {
-      safeAuditSecurityViolation('TENANT_BOUNDARY_VIOLATION', {
+      auditSecurityViolation('TENANT_BOUNDARY_VIOLATION', {
         currentUser: currentUserId,
         requestedUserId: requestedUserId,
         mode: mode,
@@ -1385,7 +1372,7 @@ function validateUserAuthentication(requestedUserId = null, mode = 'default', se
     try {
       const sessionValid = validateActiveSession(currentUserId, securityContext);
       if (!sessionValid) {
-        safeAuditSecurityViolation('INVALID_SESSION_STATE', {
+        auditSecurityViolation('INVALID_SESSION_STATE', {
           currentUser: currentUserId,
           requestedUserId: requestedUserId,
           mode: mode
@@ -2172,33 +2159,20 @@ function showErrorPage(title, message, error, securityContext = {}) {
     // セキュリティ重要度の判定
     const securityLevel = determineSecurityLevel(title, sanitizedMessage, errorInfo);
     
-    // 企業セキュリティ監査ログ（バックエンド対応）
-    if (typeof auditLog === 'function') {
-      auditLog('ERROR_PAGE_DISPLAYED', {
-        errorId: errorId,
-        errorType: errorInfo.type,
-        errorSeverity: errorInfo.severity,
-        securityLevel: securityLevel,
-        currentUser: currentUserId,
-        sanitizedTitle: title,
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      // バックエンド用監査ログ代替実装
-      debugLog('🔒 BACKEND_AUDIT: ERROR_PAGE_DISPLAYED', {
-        errorId: errorId,
-        errorType: errorInfo.type,
-        errorSeverity: errorInfo.severity,
-        securityLevel: securityLevel,
-        currentUser: currentUserId?.substring(0, 8) + '...' || 'unknown',
-        sanitizedTitle: title,
-        timestamp: new Date().toISOString()
-      });
-    }
+    // 企業セキュリティ監査ログ
+    auditLog('ERROR_PAGE_DISPLAYED', {
+      errorId: errorId,
+      errorType: errorInfo.type,
+      errorSeverity: errorInfo.severity,
+      securityLevel: securityLevel,
+      currentUser: currentUserId,
+      sanitizedTitle: title,
+      timestamp: new Date().toISOString()
+    });
     
     // セキュリティインシデントの場合は追加監査
     if (securityLevel === 'HIGH' || securityLevel === 'CRITICAL') {
-      safeAuditSecurityViolation('HIGH_SECURITY_ERROR_INCIDENT', errorDetails);
+      auditSecurityViolation('HIGH_SECURITY_ERROR_INCIDENT', errorDetails);
       
       // 管理者通知（重要なセキュリティエラー）
       if (securityLevel === 'CRITICAL') {
@@ -2519,7 +2493,7 @@ function monitorPerformanceThresholds(performanceMetrics) {
   
   // 総処理時間の監視
   if (totalDuration > thresholds.CRITICAL) {
-    safeAuditSecurityViolation('PERFORMANCE_CRITICAL_SLOWDOWN', {
+    auditSecurityViolation('PERFORMANCE_CRITICAL_SLOWDOWN', {
       userId: userId,
       mode: mode,
       totalDuration: totalDuration,
