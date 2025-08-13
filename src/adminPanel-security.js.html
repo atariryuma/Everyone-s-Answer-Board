@@ -1,0 +1,349 @@
+<script>
+/**
+ * AdminPanel Enterprise Security Module
+ * マルチテナント対応セキュリティ機能の統合モジュール
+ */
+
+'use strict';
+
+// =============================================================================
+// ENTERPRISE SECURITY CORE
+// =============================================================================
+
+/**
+ * 企業レベルセキュリティマネージャー
+ */
+window.AdminPanelSecurity = (function() {
+  'use strict';
+  
+  let securityContext = null;
+  let monitoringInterval = null;
+  
+  /**
+   * セキュリティコンテキストの初期化
+   */
+  function initializeSecurityContext() {
+    const currentUrl = new URL(window.location.href);
+    const urlUserId = currentUrl.searchParams.get('userId');
+    
+    // セキュリティ検証: userIdパラメータの必須性確認
+    if (!urlUserId) {
+      handleSecurityViolation('MISSING_USERID_PARAMETER');
+      return false;
+    }
+    
+    // URLパラメータuserIdのセキュリティ検証（XSS防止）
+    const userIdPattern = /^[a-zA-Z0-9\-_.@]+$/;
+    if (!userIdPattern.test(urlUserId) || urlUserId.length > 255) {
+      handleSecurityViolation('INVALID_USERID_FORMAT');
+      return false;
+    }
+    
+    // セキュリティコンテキストの設定
+    securityContext = {
+      urlUserId: urlUserId,
+      sessionId: 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      initialized: Date.now(),
+      securityLevel: 'ENTERPRISE',
+      violations: [],
+      lastValidation: Date.now()
+    };
+    
+    // グローバルスコープでの設定
+    window.SECURE_URL_USER_ID = urlUserId;
+    window.MULTI_TENANT_CONTEXT = securityContext;
+    
+    console.log('✅ AdminPanel Security: セキュリティコンテキスト初期化完了', {
+      userId: urlUserId.substring(0, 8) + '...',
+      sessionId: securityContext.sessionId,
+      securityLevel: securityContext.securityLevel
+    });
+    
+    return true;
+  }
+  
+  /**
+   * 複数ソースからのuserID整合性検証
+   */
+  function validateSecureUserId(context = 'unknown') {
+    if (!securityContext) {
+      console.error('🚨 セキュリティエラー: セキュリティコンテキストが未初期化', context);
+      return null;
+    }
+    
+    const urlUserId = securityContext.urlUserId;
+    const frameworkUserId = window.userId; // adminPanel-framework.js.htmlから
+    
+    // マルチテナント対応: 複数ソースでの整合性確認
+    if (!urlUserId) {
+      console.error('🚨 セキュリティエラー: URL userIdが取得できません', context);
+      recordSecurityViolation('URL_USERID_MISSING', context);
+      return null;
+    }
+    
+    if (frameworkUserId && frameworkUserId !== urlUserId) {
+      console.error('🚨 セキュリティエラー: userId不整合検出', {
+        context: context,
+        urlUserId: urlUserId,
+        frameworkUserId: frameworkUserId
+      });
+      recordSecurityViolation('USERID_INCONSISTENCY', { context, urlUserId, frameworkUserId });
+      return null;
+    }
+    
+    // セキュリティ検証: userIdフォーマット再確認
+    const userIdPattern = /^[a-zA-Z0-9\-_.@]+$/;
+    if (!userIdPattern.test(urlUserId) || urlUserId.length > 255) {
+      console.error('🚨 セキュリティエラー: userId フォーマット違反', urlUserId);
+      recordSecurityViolation('USERID_FORMAT_VIOLATION', { context, urlUserId });
+      return null;
+    }
+    
+    // 最後の検証時刻を更新
+    securityContext.lastValidation = Date.now();
+    
+    return urlUserId;
+  }
+  
+  /**
+   * セキュリティ違反の記録
+   */
+  function recordSecurityViolation(violationType, details = {}) {
+    if (!securityContext) return;
+    
+    const violation = {
+      type: violationType,
+      timestamp: new Date().toISOString(),
+      details: details,
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    
+    securityContext.violations.push(violation);
+    
+    // 最新10件のみ保持
+    if (securityContext.violations.length > 10) {
+      securityContext.violations = securityContext.violations.slice(-10);
+    }
+    
+    console.warn('🔒 セキュリティ違反記録:', violation);
+  }
+  
+  /**
+   * セキュリティ違反ハンドラー
+   */
+  function handleSecurityViolation(violationType, details = {}) {
+    console.error('🚨 セキュリティ違反検出:', violationType, details);
+    
+    recordSecurityViolation(violationType, details);
+    
+    // 重大な違反の場合はページを無効化
+    const criticalViolations = [
+      'MISSING_USERID_PARAMETER',
+      'INVALID_USERID_FORMAT',
+      'REPEATED_VALIDATION_FAILURES'
+    ];
+    
+    if (criticalViolations.includes(violationType)) {
+      document.body.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1b26;color:#ef4444;text-align:center;font-family:system-ui">
+          <div>
+            <h1 style="margin-bottom:1rem">セキュリティエラー</h1>
+            <p>セキュリティ違反が検出されました。<br>管理者にお問い合わせください。</p>
+            <p style="margin-top:1rem;font-size:0.8em;color:#888">エラーコード: ${violationType}</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+    
+    // その他の違反は警告として記録
+    console.warn('🔒 セキュリティ警告: 継続監視中', violationType);
+  }
+  
+  /**
+   * 企業レベル監査ログ
+   */
+  function auditApiCall(functionName, userId, args, context = {}) {
+    if (securityContext?.securityLevel === 'ENTERPRISE') {
+      console.log('🔒 API監査ログ:', {
+        function: functionName,
+        userId: userId ? userId.substring(0, 8) + '...' : 'unknown',
+        argsCount: args?.length || 0,
+        sessionId: securityContext.sessionId,
+        timestamp: new Date().toISOString(),
+        context: context
+      });
+    }
+  }
+  
+  /**
+   * セキュリティ統計の取得
+   */
+  function getSecurityStats() {
+    if (!securityContext) {
+      return { error: 'セキュリティコンテキストが未初期化' };
+    }
+    
+    return {
+      sessionId: securityContext.sessionId,
+      userId: securityContext.urlUserId ? securityContext.urlUserId.substring(0, 8) + '...' : 'unknown',
+      violations: securityContext.violations.length,
+      lastValidation: new Date(securityContext.lastValidation).toLocaleString(),
+      uptime: Date.now() - securityContext.initialized,
+      securityLevel: securityContext.securityLevel
+    };
+  }
+  
+  /**
+   * 定期セキュリティチェックの開始
+   */
+  function startPeriodicSecurityCheck() {
+    if (monitoringInterval) {
+      clearInterval(monitoringInterval);
+    }
+    
+    monitoringInterval = setInterval(() => {
+      const secureUserId = validateSecureUserId('periodic-check');
+      if (!secureUserId) {
+        console.error('🚨 定期セキュリティチェック失敗: userID検証エラー');
+        handleSecurityViolation('PERIODIC_CHECK_FAILED');
+      }
+    }, 30000); // 30秒ごと
+    
+    console.log('🔒 定期セキュリティチェック開始 (30秒間隔)');
+  }
+  
+  /**
+   * セキュリティ監視の停止
+   */
+  function stopPeriodicSecurityCheck() {
+    if (monitoringInterval) {
+      clearInterval(monitoringInterval);
+      monitoringInterval = null;
+      console.log('🔒 定期セキュリティチェック停止');
+    }
+  }
+  
+  // 公開API
+  return {
+    init: initializeSecurityContext,
+    validateUserId: validateSecureUserId,
+    handleViolation: handleSecurityViolation,
+    auditApiCall: auditApiCall,
+    getStats: getSecurityStats,
+    startMonitoring: startPeriodicSecurityCheck,
+    stopMonitoring: stopPeriodicSecurityCheck
+  };
+})();
+
+// =============================================================================
+// SECURITY ENHANCED CACHE FUNCTIONS
+// =============================================================================
+
+/**
+ * マルチテナント対応: セキュア callWithCacheWithUserId関数
+ */
+function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+  // 後方互換性: 従来のuserIdをチェック
+  const legacyUserId = window.userId; // adminPanel-framework.js.htmlから
+  
+  // 企業セキュリティ: セキュリティ機能が有効な場合は強化検証
+  let finalUserId;
+  if (window.AdminPanelSecurity && window.MULTI_TENANT_CONTEXT?.securityLevel === 'ENTERPRISE') {
+    const secureUserId = window.AdminPanelSecurity.validateUserId(functionName);
+    if (!secureUserId) {
+      throw new Error('セキュアユーザーIDの検証に失敗しました。ページを再読み込みしてください。');
+    }
+    finalUserId = secureUserId;
+    
+    // テナント分離対応: キャッシュキーにuserIdを含める
+    const tenantSafeKey = `tenant_${secureUserId}_${cacheKey}`;
+    
+    // API監査ログ
+    window.AdminPanelSecurity.auditApiCall(functionName, secureUserId, args, { cacheKey: tenantSafeKey });
+    
+    return unifiedCache.getOrSet(tenantSafeKey, function() {
+      console.log('✅ セキュア callWithCacheWithUserId:', functionName, 'userId:', secureUserId.substring(0, 8) + '...');
+      return gasOptimizer.call(functionName, secureUserId, ...args);
+    }, ttl);
+  } else {
+    // 従来の動作（後方互換性）
+    if (!legacyUserId) {
+      console.error('❌  - No userId available for cached call:', functionName);
+      throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+    }
+    finalUserId = legacyUserId;
+    
+    return unifiedCache.getOrSet(cacheKey, function() {
+      console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', finalUserId);
+      return gasOptimizer.call(functionName, finalUserId, ...args);
+    }, ttl);
+  }
+}
+
+// =============================================================================
+// AUDIT LOGGING FUNCTIONS
+// =============================================================================
+
+/**
+ * 企業監査ログ関数 (フロントエンド用)
+ */
+function auditLog(action, details = {}) {
+  if (window.MULTI_TENANT_CONTEXT?.securityLevel === 'ENTERPRISE') {
+    console.log(`🔒 AUDIT: ${action}`, {
+      action: action,
+      details: details,
+      userId: window.SECURE_URL_USER_ID?.substring(0, 8) + '...' || 'unknown',
+      sessionId: window.MULTI_TENANT_CONTEXT?.sessionId || 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+/**
+ * テナントアクセス監査ログ (フロントエンド用)
+ */
+function auditTenantAccess(operation, userId, allowed, details = {}) {
+  auditLog('TENANT_ACCESS', {
+    operation: operation,
+    userId: userId?.substring(0, 8) + '...' || 'unknown',
+    allowed: allowed,
+    details: details
+  });
+}
+
+// =============================================================================
+// GLOBAL SECURITY INITIALIZATION
+// =============================================================================
+
+/**
+ * セキュリティの自動初期化
+ */
+(function autoInitializeSecurity() {
+  'use strict';
+  
+  // DOM読み込み完了後にセキュリティ初期化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeAdminPanelSecurity();
+    });
+  } else {
+    initializeAdminPanelSecurity();
+  }
+  
+  function initializeAdminPanelSecurity() {
+    console.log('🔒 AdminPanel Security 初期化開始...');
+    
+    const success = window.AdminPanelSecurity.init();
+    if (success) {
+      window.AdminPanelSecurity.startMonitoring();
+      console.log('✅ AdminPanel Security 初期化完了');
+    } else {
+      console.error('❌ AdminPanel Security 初期化失敗');
+    }
+  }
+})();
+
+console.log('📦 AdminPanel Security Module loaded');
+</script>

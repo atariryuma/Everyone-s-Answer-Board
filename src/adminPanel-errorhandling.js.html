@@ -1,0 +1,377 @@
+<script>
+/**
+ * AdminPanel Enterprise Error Handling Module
+ * 企業レベルエラーハンドリングとリカバリ機能
+ */
+
+'use strict';
+
+// =============================================================================
+// ENTERPRISE ERROR HANDLING
+// =============================================================================
+
+window.AdminPanelErrorHandler = (function() {
+  'use strict';
+  
+  let errorHistory = [];
+  let criticalErrorCount = 0;
+  let lastErrorTime = 0;
+  
+  /**
+   * 強化されたグローバルエラーハンドラー
+   */
+  function initializeGlobalErrorHandling() {
+    // Window error event handler
+    window.addEventListener('error', function(event) {
+      handleError(event.error, {
+        type: 'javascript_error',
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        message: event.message
+      });
+    });
+    
+    // Unhandled promise rejection handler
+    window.addEventListener('unhandledrejection', function(event) {
+      handleError(event.reason, {
+        type: 'promise_rejection',
+        promise: event.promise
+      });
+    });
+    
+    console.log('✅ Enterprise Error Handling 初期化完了');
+  }
+  
+  /**
+   * 統合エラーハンドラー
+   */
+  function handleError(error, context = {}) {
+    const errorMessage = error?.message || error?.toString() || 'Unknown error';
+    const errorStack = error?.stack || '';
+    const timestamp = new Date().toISOString();
+    
+    // セキュリティコンテキストの取得
+    const securityContext = {
+      userId: window.SECURE_URL_USER_ID || 'unknown',
+      sessionId: window.MULTI_TENANT_CONTEXT?.sessionId || 'unknown',
+      timestamp: timestamp,
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    
+    // エラー分類
+    const errorCategory = categorizeError(errorMessage, errorStack);
+    
+    // エラー履歴に記録
+    recordError({
+      message: errorMessage,
+      stack: errorStack,
+      context: context,
+      security: securityContext,
+      category: errorCategory,
+      timestamp: timestamp
+    });
+    
+    // エラー処理の実行
+    if (shouldSuppressError(errorMessage, errorStack)) {
+      handleSuppressedError(errorMessage, context);
+    } else if (isCriticalError(errorMessage, errorStack)) {
+      handleCriticalError(errorMessage, errorStack, context, securityContext);
+    } else {
+      handleStandardError(errorMessage, context);
+    }
+    
+    // エラー統計の更新
+    updateErrorStatistics(errorCategory);
+  }
+  
+  /**
+   * エラーの分類
+   */
+  function categorizeError(message, stack) {
+    const categories = {
+      SECURITY: ['security', 'violation', 'unauthorized', 'forbidden'],
+      NETWORK: ['network', 'fetch', 'ajax', 'connection', 'timeout'],
+      VALIDATION: ['validation', 'invalid', 'required', 'format'],
+      SYSTEM: ['system', 'internal', 'server', 'database'],
+      UI: ['element', 'undefined', 'null', 'not found'],
+      SCRIPT: ['script', 'syntax', 'reference', 'type'],
+      SUPPRESSED: ['document.write', 'mae_html_user', 'warden_bin', 'tailwindcss']
+    };
+    
+    const fullText = (message + ' ' + stack).toLowerCase();
+    
+    for (const [category, keywords] of Object.entries(categories)) {
+      if (keywords.some(keyword => fullText.includes(keyword))) {
+        return category;
+      }
+    }
+    
+    return 'UNKNOWN';
+  }
+  
+  /**
+   * エラー抑制判定
+   */
+  function shouldSuppressError(message, stack) {
+    const suppressedPatterns = [
+      'document.write',
+      'Unexpected token',
+      'Failed to execute \'write\' on \'Document\'',
+      'SyntaxError: Failed to execute \'write\'',
+      'Identifier \'userId\' has already been declared',
+      'mae_html_user_bin_i18n_mae_html_user',
+      'warden_bin_i18n_warden',
+      'unrecognized feature',
+      'Unrecognized feature',
+      'cdn.tailwindcss.com should not be used in production',
+      'tailwindcss.com/docs/installation',
+      'should not be used in production',
+      'PostCSS plugin',
+      'Tailwind CLI',
+      'navigateToStep is not defined',
+      'hidePrivacyModal is not defined', 
+      'updateUIWithNewStatus is not defined',
+      'showFormConfigModal is not defined',
+      'toggleSection is not defined',
+      'function not yet loaded',
+      'function not available'
+    ];
+    
+    return suppressedPatterns.some(pattern => 
+      message.includes(pattern) || stack.includes(pattern)
+    );
+  }
+  
+  /**
+   * 重要エラー判定
+   */
+  function isCriticalError(message, stack) {
+    const criticalPatterns = [
+      'await is only valid in async functions',
+      'Cannot set property',
+      'Cannot read property',
+      'is not defined',
+      'is not a function',
+      'security',
+      'violation',
+      'unauthorized'
+    ];
+    
+    return criticalPatterns.some(pattern => 
+      message.includes(pattern) || stack.includes(pattern)
+    );
+  }
+  
+  /**
+   * 抑制エラーの処理
+   */
+  function handleSuppressedError(message, context) {
+    console.debug('🔇 Suppressed Error:', message.substring(0, 100));
+    // 抑制エラーは静かに記録のみ
+  }
+  
+  /**
+   * 重要エラーの処理
+   */
+  function handleCriticalError(message, stack, context, securityContext) {
+    criticalErrorCount++;
+    lastErrorTime = Date.now();
+    
+    console.error('🚨 Critical Error Detected:', {
+      message: message,
+      context: context,
+      securityContext: securityContext,
+      criticalCount: criticalErrorCount
+    });
+    
+    // 企業セキュリティ: 重要エラーの監査ログ
+    if (window.MULTI_TENANT_CONTEXT?.securityLevel === 'ENTERPRISE') {
+      logSecurityIncident('CRITICAL_FRONTEND_ERROR', {
+        errorMessage: message.substring(0, 200), // 機密情報漏洩防止
+        userId: securityContext.userId,
+        sessionId: securityContext.sessionId,
+        timestamp: securityContext.timestamp,
+        criticalCount: criticalErrorCount
+      });
+    }
+    
+    // エラー監視パネルへの通知
+    if (window.AdminPanelMonitoring) {
+      window.AdminPanelMonitoring.showAlert(
+        `重要エラー: ${message.substring(0, 100)}...`,
+        'error'
+      );
+    }
+    
+    // 自動リカバリの試行
+    attemptRecovery(message, context);
+    
+    // 連続重要エラーの検出
+    if (criticalErrorCount >= 5) {
+      handleRepeatedCriticalErrors();
+    }
+  }
+  
+  /**
+   * 標準エラーの処理
+   */
+  function handleStandardError(message, context) {
+    console.warn('⚠️ Standard Error:', message, context);
+    
+    // エラー監視パネルへの通知
+    if (window.AdminPanelMonitoring) {
+      window.AdminPanelMonitoring.showAlert(
+        `エラー: ${message.substring(0, 80)}...`,
+        'warning'
+      );
+    }
+  }
+  
+  /**
+   * 自動リカバリの試行
+   */
+  function attemptRecovery(message, context) {
+    console.log('🔧 Attempting automatic recovery...');
+    
+    // 関数未定義エラーの場合の対応
+    if (message.includes('is not defined') || message.includes('is not a function')) {
+      setTimeout(() => {
+        if (typeof window.initializeAdminPanelMaster === 'function') {
+          console.log('🔄 Re-initializing admin panel...');
+          try {
+            window.initializeAdminPanelMaster();
+          } catch (reinitError) {
+            console.error('❌ Re-initialization failed:', reinitError);
+          }
+        }
+      }, 1000);
+    }
+    
+    // ユーザーへの復旧メッセージ表示
+    setTimeout(() => {
+      if (window.showMessage && typeof window.showMessage === 'function') {
+        window.showMessage('システムの自動復旧を試行中です。', 'info');
+      }
+    }, 2000);
+  }
+  
+  /**
+   * 連続重要エラーの処理
+   */
+  function handleRepeatedCriticalErrors() {
+    console.error('🚨 Repeated critical errors detected. Initiating emergency protocol.');
+    
+    // 緊急プロトコルの実行
+    if (window.AdminPanelMonitoring) {
+      window.AdminPanelMonitoring.handleEmergency(
+        'REPEATED_CRITICAL_ERRORS',
+        { count: criticalErrorCount, lastError: lastErrorTime }
+      );
+    }
+    
+    // セキュリティ違反として記録
+    if (window.AdminPanelSecurity) {
+      window.AdminPanelSecurity.handleViolation(
+        'REPEATED_CRITICAL_ERRORS',
+        { count: criticalErrorCount }
+      );
+    }
+    
+    // ユーザーに緊急通知
+    if (window.showMessage && typeof window.showMessage === 'function') {
+      window.showMessage(
+        '重要なエラーが連続して発生しています。ページを再読み込みすることをお勧めします。',
+        'error'
+      );
+    }
+  }
+  
+  /**
+   * エラーの記録
+   */
+  function recordError(errorData) {
+    errorHistory.push(errorData);
+    
+    // 最新50件のみ保持
+    if (errorHistory.length > 50) {
+      errorHistory = errorHistory.slice(-50);
+    }
+  }
+  
+  /**
+   * セキュリティインシデントのログ
+   */
+  function logSecurityIncident(incidentType, details) {
+    console.warn('🔒 Security Incident Logged:', {
+      type: incidentType,
+      details: details,
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  /**
+   * エラー統計の更新
+   */
+  function updateErrorStatistics(category) {
+    if (!window.ErrorStats) {
+      window.ErrorStats = {};
+    }
+    
+    if (!window.ErrorStats[category]) {
+      window.ErrorStats[category] = 0;
+    }
+    
+    window.ErrorStats[category]++;
+  }
+  
+  /**
+   * エラー統計の取得
+   */
+  function getErrorStatistics() {
+    return {
+      history: errorHistory.length,
+      critical: criticalErrorCount,
+      categories: window.ErrorStats || {},
+      lastError: lastErrorTime ? new Date(lastErrorTime).toLocaleString() : 'なし'
+    };
+  }
+  
+  /**
+   * エラー履歴のクリア
+   */
+  function clearErrorHistory() {
+    errorHistory = [];
+    criticalErrorCount = 0;
+    lastErrorTime = 0;
+    window.ErrorStats = {};
+    console.log('🧹 Error history cleared');
+  }
+  
+  // 公開API
+  return {
+    init: initializeGlobalErrorHandling,
+    handle: handleError,
+    getStats: getErrorStatistics,
+    clear: clearErrorHistory,
+    recover: attemptRecovery
+  };
+})();
+
+// =============================================================================
+// AUTO INITIALIZATION
+// =============================================================================
+
+/**
+ * エラーハンドリングの自動初期化
+ */
+(function autoInitializeErrorHandling() {
+  'use strict';
+  
+  // 即座に初期化（エラーハンドリングは最優先）
+  window.AdminPanelErrorHandler.init();
+  
+  console.log('📦 AdminPanel Error Handling Module loaded');
+})();
+</script>

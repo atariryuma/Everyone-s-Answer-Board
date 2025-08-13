@@ -599,25 +599,32 @@ function getSheetsService() {
  * @returns {object|null} ユーザー情報
  */
 function findUserById(userId) {
-  // シンプルなキャッシュ戦略: 短時間の基本キャッシュのみ
-  const cacheKey = 'user_' + userId;
-  try {
-    const cached = CacheService.getScriptCache().get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-  } catch (e) {
-    // キャッシュエラーは無視して直接検索
+  if (!userId || typeof userId !== 'string') {
+    auditSecurityViolation('INVALID_USERID_LOOKUP', { userId: userId });
+    return null;
   }
 
-  const user = fetchUserFromDatabase('userId', userId);
-  if (user) {
-    try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), 180); // 3分キャッシュ
-    } catch (e) {
-      // キャッシュ保存の失敗は無視
-    }
+  // マルチテナント対応: セキュアキーでキャッシュ
+  const currentUserId = Session.getActiveUser().getEmail();
+  const secureKey = buildSecureUserScopedKey('user_lookup', currentUserId, userId);
+  
+  // テナント境界検証（自分のデータまたは許可されたアクセス）
+  if (!validateTenantAccess('user_lookup', currentUserId, userId)) {
+    return null;
   }
+
+  // 統合キャッシュマネージャーを使用（メモ化 + セキュリティ監査付き）
+  const user = cacheManager.get(secureKey, () => {
+    auditTenantAccess('database_user_lookup', currentUserId, true, { 
+      targetUserId: userId,
+      operation: 'findUserById' 
+    });
+    return fetchUserFromDatabase('userId', userId);
+  }, { 
+    ttl: 180,  // 3分キャッシュ
+    enableMemoization: true 
+  });
+
   return user;
 }
 
@@ -628,18 +635,36 @@ function findUserById(userId) {
  * @returns {object|null} 最新のユーザー情報
  */
 function findUserByIdFresh(userId) {
-  // 既存キャッシュを強制削除
-  const cacheKey = 'user_' + userId;
-  cacheManager.remove(cacheKey);
+  if (!userId || typeof userId !== 'string') {
+    auditSecurityViolation('INVALID_USERID_FRESH_LOOKUP', { userId: userId });
+    return null;
+  }
 
-  // データベースから直接取得（範囲キャッシュも無効化）
+  const currentUserId = Session.getActiveUser().getEmail();
+  
+  // テナント境界検証（Fresh取得は特に厳密にチェック）
+  if (!validateTenantAccess('user_fresh_lookup', currentUserId, userId)) {
+    return null;
+  }
+
+  // マルチテナント対応キャッシュ無効化
+  const secureKey = buildSecureUserScopedKey('user_lookup', currentUserId, userId);
+  cacheManager.remove(secureKey);
+
+  // 関連キャッシュも無効化（セキュリティ強化）
+  cacheManager.invalidateRelated('user', userId, [currentUserId], { dryRun: false });
+
+  // データベースから直接取得（セキュリティ監査付き）
+  auditTenantAccess('database_user_fresh_lookup', currentUserId, true, { 
+    targetUserId: userId,
+    operation: 'findUserByIdFresh' 
+  });
+  
   const freshUserInfo = fetchUserFromDatabase('userId', userId, {
     clearCache: true
   });
 
-  // 次回の通常アクセス時にキャッシュされるため、ここでは手動設定不要
-  infoLog('✅ Fresh user data retrieved for:', userId);
-
+  infoLog('✅ Fresh user data retrieved for:', userId.substring(0, 10));
   return freshUserInfo;
 }
 
@@ -713,25 +738,32 @@ function fixUserDataConsistency(userId) {
  * @returns {object|null} ユーザー情報
  */
 function findUserByEmail(email) {
-  // シンプルなキャッシュ戦略: 短時間の基本キャッシュのみ
-  const cacheKey = 'email_' + email;
-  try {
-    const cached = CacheService.getScriptCache().get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-  } catch (e) {
-    // キャッシュエラーは無視して直接検索
+  if (!email || typeof email !== 'string') {
+    auditSecurityViolation('INVALID_EMAIL_LOOKUP', { email: email });
+    return null;
   }
 
-  const user = fetchUserFromDatabase('adminEmail', email);
-  if (user) {
-    try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), 180); // 3分キャッシュ
-    } catch (e) {
-      // キャッシュ保存の失敗は無視
-    }
+  // マルチテナント対応: セキュアキーでキャッシュ
+  const currentUserId = Session.getActiveUser().getEmail();
+  const secureKey = buildSecureUserScopedKey('email_lookup', currentUserId, email);
+  
+  // テナント境界検証
+  if (!validateTenantAccess('email_lookup', currentUserId, email)) {
+    return null;
   }
+
+  // 統合キャッシュマネージャーを使用（メモ化 + セキュリティ監査付き）
+  const user = cacheManager.get(secureKey, () => {
+    auditTenantAccess('database_email_lookup', currentUserId, true, { 
+      targetEmail: email,
+      operation: 'findUserByEmail' 
+    });
+    return fetchUserFromDatabase('adminEmail', email);
+  }, { 
+    ttl: 180,  // 3分キャッシュ
+    enableMemoization: true 
+  });
+
   return user;
 }
 
@@ -792,15 +824,19 @@ function fetchUserFromDatabase(field, value, options = {}) {
           unifiedBatchProcessor.invalidateCacheForSpreadsheet(dbId);
         }
         
-        // 2. 必要なキャッシュのみピンポイント削除
-        const cache = CacheService.getScriptCache();
-        // 対象ユーザーのキャッシュのみ削除
+        // 2. マルチテナント対応キャッシュ無効化
+        const currentUserId = Session.getActiveUser().getEmail();
+        
+        // 対象ユーザーのキャッシュのみ削除（セキュアキー使用）
         if (field.toLowerCase().includes('email')) {
-          cache.remove('email_' + normalizedValue);
-          cache.remove('login_status_' + normalizedValue);
+          const emailSecureKey = buildSecureUserScopedKey('email_lookup', currentUserId, normalizedValue);
+          const loginSecureKey = buildSecureUserScopedKey('login_status', currentUserId, normalizedValue);
+          cacheManager.remove(emailSecureKey);
+          cacheManager.remove(loginSecureKey);
         }
         if (field.toLowerCase() === 'userid') {
-          cache.remove('user_' + normalizedValue);
+          const userSecureKey = buildSecureUserScopedKey('user_lookup', currentUserId, normalizedValue);
+          cacheManager.remove(userSecureKey);
         }
         
         debugLog('fetchUserFromDatabase: 強制フレッシュ - ピンポイントキャッシュ無効化完了');
@@ -1037,13 +1073,25 @@ function fetchUserFromDatabase(field, value, options = {}) {
 function getUserWithFallback(userId) {
   // 入力検証
   if (!userId || typeof userId !== 'string') {
+    auditSecurityViolation('INVALID_USERID_FALLBACK', { userId: userId });
     warnLog('getUserWithFallback: Invalid userId:', userId);
     return null;
   }
 
-  // 可能な限りキャッシュを利用
+  const currentUserId = Session.getActiveUser().getEmail();
+  
+  // テナント境界検証
+  if (!validateTenantAccess('user_fallback_lookup', currentUserId, userId)) {
+    return null;
+  }
+
+  // 可能な限りキャッシュを利用（既にマルチテナント対応済み）
   const user = findUserById(userId);
   if (!user) {
+    auditTenantAccess('database_user_fallback_missing', currentUserId, false, {
+      targetUserId: userId,
+      operation: 'getUserWithFallback'
+    });
     handleMissingUser(userId);
   }
   return user;
@@ -1056,21 +1104,34 @@ function getUserWithFallback(userId) {
  * @returns {object} 更新結果
  */
 function updateUser(userId, updateData) {
+  // マルチテナント対応: セキュリティ検証を最初に実行
+  const currentUserId = Session.getActiveUser().getEmail();
+  
   // 型安全性とバリデーション強化: パラメータ検証
   if (!userId) {
+    auditSecurityViolation('MISSING_USERID_UPDATE', { currentUser: currentUserId });
     throw new Error('データ更新エラー: ユーザーIDが指定されていません');
   }
   if (typeof userId !== 'string') {
+    auditSecurityViolation('INVALID_USERID_TYPE_UPDATE', { userId: userId, currentUser: currentUserId });
     throw new Error('データ更新エラー: ユーザーIDは文字列である必要があります');
   }
   if (userId.trim().length === 0) {
+    auditSecurityViolation('EMPTY_USERID_UPDATE', { currentUser: currentUserId });
     throw new Error('データ更新エラー: ユーザーIDが空文字列です');
   }
   if (userId.length > 255) {
+    auditSecurityViolation('USERID_TOO_LONG_UPDATE', { userId: userId.substring(0, 50), currentUser: currentUserId });
     throw new Error('データ更新エラー: ユーザーIDが長すぎます（最大255文字）');
   }
 
+  // テナント境界検証（更新は特に厳密）
+  if (!validateTenantAccess('user_update', currentUserId, userId)) {
+    throw new Error('テナント境界違反: 他のユーザーのデータを更新する権限がありません');
+  }
+
   if (!updateData) {
+    auditSecurityViolation('MISSING_UPDATE_DATA', { userId: userId, currentUser: currentUserId });
     throw new Error('データ更新エラー: 更新データが指定されていません');
   }
   if (typeof updateData !== 'object' || Array.isArray(updateData)) {
@@ -1243,6 +1304,14 @@ function updateUser(userId, updateData) {
     // クリティカル更新時の包括的キャッシュ同期
     synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId);
 
+    // マルチテナント対応: 更新成功の監査ログ
+    auditTenantAccess('database_user_update_success', currentUserId, true, {
+      targetUserId: userId,
+      updatedFields: Object.keys(updateData),
+      operation: 'updateUser',
+      spreadsheetChanged: !!updateData.spreadsheetId
+    });
+
     // カスタムセットアップ関連の更新の場合の完了ログ
     if (updateData.spreadsheetId || updateData.folderId || (updateData.configJson && updateData.configJson.includes('formCreated'))) {
       infoLog('✅ updateUser: カスタムセットアップ関連の更新が完了しました', {
@@ -1266,9 +1335,28 @@ function updateUser(userId, updateData) {
  * @returns {object} 作成されたユーザーデータ
  */
 function createUser(userData) {
+  // マルチテナント対応: セキュリティ検証
+  const currentUserId = Session.getActiveUser().getEmail();
+  
+  if (!userData || typeof userData !== 'object') {
+    auditSecurityViolation('INVALID_USER_DATA_CREATE', { currentUser: currentUserId });
+    throw new Error('無効なユーザーデータです');
+  }
+  
+  if (!userData.adminEmail || typeof userData.adminEmail !== 'string') {
+    auditSecurityViolation('INVALID_EMAIL_CREATE', { currentUser: currentUserId });
+    throw new Error('有効なメールアドレスが必要です');
+  }
+
   // 統一ロック管理で重複登録を防ぐ
   return executeWithStandardizedLock('WRITE_OPERATION', 'createUser', () => {
-    // メールアドレスの重複チェック
+    // セキュリティ監査ログ
+    auditTenantAccess('database_user_create_attempt', currentUserId, true, {
+      targetEmail: userData.adminEmail,
+      operation: 'createUser'
+    });
+
+    // メールアドレスの重複チェック（既にマルチテナント対応済み）
     var existingUser = findUserByEmail(userData.adminEmail);
     if (existingUser) {
       throw new Error('このメールアドレスは既に登録されています。');
@@ -1690,12 +1778,16 @@ function appendSheetsData(service, spreadsheetId, range, values) {
         unifiedBatchProcessor.invalidateCacheForSpreadsheet(spreadsheetId);
       }
       
-      // 2. 新規ユーザー登録時のみ範囲を限定したキャッシュクリア
+      // 2. マルチテナント対応: 新規ユーザー登録時の最小限キャッシュクリア
       try {
-        const cache = CacheService.getScriptCache();
-        // 新規登録時のみ必要なキャッシュをクリアするように最適化
-        // 全キャッシュクリアは重いので節約
-        debugLog('appendSheetsData: 最小限キャッシュクリア実行');
+        // 統合キャッシュマネージャーを使用して効率的にクリア
+        // 全キャッシュクリアは重いので、関連キャッシュのみクリア
+        if (typeof cacheManager !== 'undefined') {
+          // データベース関連キャッシュのみクリア
+          cacheManager.clearByPattern('user_lookup_', { strict: false, maxKeys: 100 });
+          cacheManager.clearByPattern('email_lookup_', { strict: false, maxKeys: 100 });
+        }
+        debugLog('appendSheetsData: マルチテナント対応最小限キャッシュクリア実行');
       } catch (cacheErr) {
         warnLog('appendSheetsData: キャッシュクリアでエラー:', cacheErr.message);
       }

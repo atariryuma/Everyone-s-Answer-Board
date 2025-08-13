@@ -1070,15 +1070,47 @@ function registerNewUser(adminEmail) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
-  verifyUserAccess(requestUserId); // 内部でキャッシュクリア済み
+  // マルチテナント対応: View Mode でのリアクション追加セキュリティ
+  const currentUserId = Session.getActiveUser().getEmail();
+  const teacherUserId = requestUserId; // 学生は teacher の board にリアクション
+  
+  // View Mode リアクション用テナント境界検証
+  if (!validateTenantAccess('view_mode_reaction', currentUserId, teacherUserId)) {
+    auditSecurityViolation('VIEW_MODE_REACTION_BOUNDARY_VIOLATION', {
+      currentUser: currentUserId,
+      teacherUserId: teacherUserId,
+      operation: 'addReaction',
+      rowIndex: rowIndex,
+      reactionKey: reactionKey
+    });
+    throw new Error('リアクション追加権限がありません');
+  }
+
+  verifyUserAccess(teacherUserId); // teacher の userId で検証
 
   try {
-    var reactingUserEmail = getCurrentUserEmail();
-    var ownerUserId = requestUserId; // requestUserId を使用
+    var reactingUserEmail = getCurrentUserEmail(); // 実際にリアクションする学生のメール
+    var ownerUserId = teacherUserId; // teacher が board owner
 
-    // ボードオーナーの情報をDBから取得（キャッシュ利用）
+    // View Mode 監査ログ: リアクション追加開始
+    auditTenantAccess('view_mode_reaction_start', currentUserId, true, {
+      teacherUserId: teacherUserId,
+      reactingUserEmail: reactingUserEmail,
+      operation: 'addReaction',
+      sheetName: sheetName,
+      rowIndex: rowIndex,
+      reactionKey: reactionKey,
+      isViewMode: true
+    });
+
+    // teacher（ボードオーナー）の情報をDBから取得（既にマルチテナント対応済み）
     var boardOwnerInfo = findUserById(ownerUserId);
     if (!boardOwnerInfo) {
+      auditSecurityViolation('VIEW_MODE_BOARD_OWNER_NOT_FOUND', {
+        currentUser: currentUserId,
+        teacherUserId: teacherUserId,
+        operation: 'addReaction'
+      });
       throw new Error('無効なボードです。');
     }
 
@@ -1092,6 +1124,17 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
 
     // processReactionの戻り値から直接リアクション状態を取得（API呼び出し削減）
     if (result && result.status === 'success') {
+      // View Mode 監査ログ: リアクション追加成功
+      auditTenantAccess('view_mode_reaction_success', currentUserId, true, {
+        teacherUserId: teacherUserId,
+        reactingUserEmail: reactingUserEmail,
+        operation: 'addReaction',
+        sheetName: sheetName,
+        rowIndex: rowIndex,
+        reactionKey: reactionKey,
+        isViewMode: true
+      });
+
       return {
         status: "ok",
         reactions: result.reactionStates || {}
@@ -1100,13 +1143,25 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
       throw new Error(result.message || 'リアクションの処理に失敗しました');
     }
   } catch (e) {
-    logError(e, 'addReaction', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId: requestUserId, rowIndex, reaction: reactionKey });
+    // View Mode 監査ログ: リアクション追加エラー
+    auditSecurityViolation('VIEW_MODE_REACTION_ERROR', {
+      currentUser: currentUserId,
+      teacherUserId: teacherUserId,
+      operation: 'addReaction',
+      error: e.message
+    });
+    
+    logError(e, 'addReaction', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { 
+      userId: teacherUserId, 
+      currentUser: currentUserId,
+      rowIndex, 
+      reaction: reactionKey 
+    });
     return {
       status: "error",
       message: e.message
     };
   }
-  // finally節のキャッシュクリア削除（verifyUserAccess内でクリア済みのため不要）
 }
 
 /**
@@ -1356,29 +1411,56 @@ function verifyUserAccess(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode, bypassCache) {
-  verifyUserAccess(requestUserId);
+  // マルチテナント対応: View Mode専用セキュリティコンテキスト
+  const currentUserId = Session.getActiveUser().getEmail();
+  const teacherUserId = requestUserId; // 学生は teacher の userId でアクセス
+  
+  // View Mode用テナント境界検証（学生閲覧は teacher のテナント内でアクセス）
+  if (!validateTenantAccess('view_mode_access', currentUserId, teacherUserId)) {
+    auditSecurityViolation('VIEW_MODE_BOUNDARY_VIOLATION', {
+      currentUser: currentUserId,
+      teacherUserId: teacherUserId,
+      operation: 'getPublishedSheetData'
+    });
+    throw new Error('回答ボード閲覧権限がありません');
+  }
+
+  verifyUserAccess(teacherUserId);
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
 
   try {
-    // アクティブボード識別子（シート切替時にキーが変わるように）
-    var userInfoForKey = getOrFetchUserInfo(requestUserId, 'userId', { useExecutionCache: true, ttl: 120 });
+    // マルチテナント対応: teacher のユーザー情報取得（既にマルチテナント対応済み）
+    var userInfoForKey = getOrFetchUserInfo(teacherUserId, 'userId', { useExecutionCache: true, ttl: 120 });
     var cfgForKey = {};
     try { cfgForKey = JSON.parse(userInfoForKey && userInfoForKey.configJson || '{}'); } catch (e) { cfgForKey = {}; }
     var activeSsId = cfgForKey.publishedSpreadsheetId || 'none';
     var activeSheet = cfgForKey.publishedSheetName || 'none';
 
-    // キャッシュキー生成（アクティブなスプレッドシート/シート名を含める）
-    var requestKey = `publishedData_${requestUserId}_${activeSsId}_${activeSheet}_${classFilter}_${sortOrder}_${adminMode}`;
+    // マルチテナント対応: セキュアキーでキャッシュ管理（teacher のテナント内）
+    const secureKey = buildSecureUserScopedKey('published_data', currentUserId, 
+      `${teacherUserId}_${activeSsId}_${activeSheet}_${classFilter}_${sortOrder}_${adminMode}`);
+
+    // View Mode 専用監査ログ
+    auditTenantAccess('view_mode_data_access', currentUserId, true, {
+      teacherUserId: teacherUserId,
+      operation: 'getPublishedSheetData',
+      isViewMode: true,
+      bypassCache: bypassCache
+    });
 
     // キャッシュバイパス時は直接実行
     if (bypassCache === true) {
-      debugLog('🔄 キャッシュバイパス：最新データを直接取得');
-      return executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode);
+      debugLog('🔄 View Mode キャッシュバイパス：最新データを直接取得');
+      return executeGetPublishedSheetData(teacherUserId, classFilter, sortOrder, adminMode);
     }
 
-    return cacheManager.get(requestKey, () => {
-      return executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode);
-    }, { ttl: 600 }); // 10分間キャッシュ
+    // エンタープライズ対応: 統合キャッシュマネージャーでテナント分離
+    return cacheManager.get(secureKey, () => {
+      return executeGetPublishedSheetData(teacherUserId, classFilter, sortOrder, adminMode);
+    }, { 
+      ttl: 600, // 10分間キャッシュ
+      enableMemoization: true // View Mode のパフォーマンス最適化
+    });
   } finally {
     // 実行終了時にユーザー情報キャッシュをクリア
     clearExecutionUserInfoCache();
@@ -1390,17 +1472,36 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
  */
 function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode) {
     try {
-      var currentUserId = requestUserId; // requestUserId を使用
-      debugLog('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s, adminMode=%s', currentUserId, classFilter, sortOrder, adminMode);
+      // マルチテナント対応: View Mode のテナント境界コンテキスト
+      const currentUserId = Session.getActiveUser().getEmail();
+      const teacherUserId = requestUserId; // 学生は teacher の userId でアクセス
+      
+      // View Mode 専用セキュリティ検証
+      if (!validateTenantAccess('view_mode_data_execution', currentUserId, teacherUserId)) {
+        auditSecurityViolation('VIEW_MODE_EXECUTION_BOUNDARY_VIOLATION', {
+          currentUser: currentUserId,
+          teacherUserId: teacherUserId,
+          operation: 'executeGetPublishedSheetData'
+        });
+        throw new Error('データ取得権限がありません');
+      }
 
-      var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+      debugLog('executeGetPublishedSheetData: teacherUserId=%s, currentUser=%s, classFilter=%s, sortOrder=%s, adminMode=%s', 
+        teacherUserId, currentUserId, classFilter, sortOrder, adminMode);
+
+      // teacher のユーザー情報取得（既にマルチテナント対応済み）
+      var userInfo = getOrFetchUserInfo(teacherUserId, 'userId', {
         useExecutionCache: true,
         ttl: 300
       });
       if (!userInfo) {
-        throw new Error('ユーザー情報が見つかりません');
+        auditSecurityViolation('VIEW_MODE_TEACHER_NOT_FOUND', {
+          currentUser: currentUserId,
+          teacherUserId: teacherUserId
+        });
+        throw new Error('教師のユーザー情報が見つかりません');
       }
-      debugLog('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
+      debugLog('executeGetPublishedSheetData: teacher userInfo retrieved for %s', teacherUserId.substring(0, 10));
 
       var configJson = JSON.parse(userInfo.configJson || '{}');
       debugLog('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
@@ -1430,13 +1531,22 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     var sheetConfig = configJson[sheetKey] || {};
     debugLog('getPublishedSheetData: sheetConfig=%s', JSON.stringify(sheetConfig));
 
-    // Check if current user is the board owner
-    var isOwner = (configJson.ownerId === currentUserId);
-    debugLog('getPublishedSheetData: isOwner=%s, ownerId=%s, currentUserId=%s', isOwner, configJson.ownerId, currentUserId);
+    // View Mode: Owner チェック（teacher のテナント内での権限確認）
+    var isOwner = (configJson.ownerId === teacherUserId);
+    debugLog('executeGetPublishedSheetData: isOwner=%s, ownerId=%s, teacherUserId=%s', isOwner, configJson.ownerId, teacherUserId);
 
-    // データ取得
-    var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
-    debugLog('getPublishedSheetData: sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
+    // View Mode 監査ログ: データアクセス開始
+    auditTenantAccess('view_mode_sheet_data_access', currentUserId, true, {
+      teacherUserId: teacherUserId,
+      publishedSpreadsheetId: publishedSpreadsheetId,
+      publishedSheetName: publishedSheetName,
+      isViewMode: true,
+      operation: 'executeGetPublishedSheetData'
+    });
+
+    // マルチテナント対応データ取得（teacher のコンテキストで実行）
+    var sheetData = getSheetData(teacherUserId, publishedSheetName, classFilter, sortOrder, adminMode);
+    debugLog('executeGetPublishedSheetData: View Mode sheetData status=%s, totalCount=%s', sheetData.status, sheetData.totalCount);
 
     // 診断: スプレッドシートとシートの存在確認
     try {
@@ -1774,22 +1884,52 @@ function getSheetsList(userId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function refreshBoardData(requestUserId) {
-  verifyUserAccess(requestUserId);
-  try {
-    var currentUserId = requestUserId; // requestUserId を使用
+  // マルチテナント対応: セキュリティ検証
+  const currentUserId = Session.getActiveUser().getEmail();
+  const effectiveUserId = requestUserId || currentUserId;
+  
+  // テナント境界検証
+  if (!validateTenantAccess('refresh_board_data', currentUserId, effectiveUserId)) {
+    auditSecurityViolation('REFRESH_BOARD_BOUNDARY_VIOLATION', {
+      currentUser: currentUserId,
+      requestedUser: effectiveUserId,
+      operation: 'refreshBoardData'
+    });
+    throw new Error('ボードデータリフレッシュ権限がありません');
+  }
 
-    var userInfo = findUserById(currentUserId);
+  verifyUserAccess(effectiveUserId);
+  
+  try {
+    // 既にマルチテナント対応済みのfindUserByIdを使用
+    var userInfo = findUserById(effectiveUserId);
     if (!userInfo) {
+      auditSecurityViolation('REFRESH_BOARD_USER_NOT_FOUND', {
+        currentUser: currentUserId,
+        targetUser: effectiveUserId
+      });
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // キャッシュをクリア
-    invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+    // マルチテナント対応キャッシュ無効化
+    invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
 
-    // 最新のステータスを取得
-    return getAppConfig(requestUserId);
+    // 監査ログ記録
+    auditTenantAccess('refresh_board_data_success', currentUserId, true, {
+      targetUserId: effectiveUserId,
+      operation: 'refreshBoardData',
+      spreadsheetId: userInfo.spreadsheetId
+    });
+
+    // 最新のステータスを取得（既にマルチテナント対応済み）
+    return getAppConfig(effectiveUserId);
   } catch (e) {
-    logError(e, 'refreshBoardData', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
+    auditSecurityViolation('REFRESH_BOARD_ERROR', {
+      currentUser: currentUserId,
+      targetUser: effectiveUserId,
+      error: e.message
+    });
+    logError(e, 'refreshBoardData', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId: effectiveUserId });
     return { status: 'error', message: 'ボードデータの再読み込みに失敗しました: ' + e.message };
   }
 }

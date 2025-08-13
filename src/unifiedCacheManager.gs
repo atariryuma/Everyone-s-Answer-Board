@@ -1196,7 +1196,8 @@ class UnifiedExecutionCache {
 // =============================================================================
 
 // メモリキャッシュ - 実行セッション内で有効
-let spreadsheetMemoryCache = {};
+// ユーザー分離メモリキャッシュ - マルチテナント対応
+let userScopedMemoryCache = {}; // { userId: { spreadsheetId: data } }
 
 // キャッシュ設定
 const SPREADSHEET_CACHE_CONFIG = {
@@ -1207,22 +1208,47 @@ const SPREADSHEET_CACHE_CONFIG = {
 };
 
 /**
- * キャッシュされたSpreadsheetオブジェクトを取得
+ * マルチテナント対応キャッシュされたSpreadsheetオブジェクトを取得
  * @param {string} spreadsheetId - スプレッドシートID
- * @param {boolean} forceRefresh - 強制リフレッシュフラグ
+ * @param {string} userId - ユーザーID（テナント分離用・必須）
+ * @param {Object} options - オプション設定
+ * @param {boolean} options.forceRefresh - 強制リフレッシュフラグ
+ * @param {boolean} options.isViewMode - 生徒閲覧モードフラグ
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Spreadsheetオブジェクト
  */
-function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
+function getCachedSpreadsheet(spreadsheetId, userId, options = {}) {
+  const { forceRefresh = false, isViewMode = false } = options;
+  
+  // セキュリティ検証: userIdは必須（テナント分離のため）
+  if (!userId || typeof userId !== 'string') {
+    throw new Error('SECURITY_ERROR: userId is required for tenant isolation');
+  }
+  
   if (!spreadsheetId || typeof spreadsheetId !== 'string') {
     throw new Error('有効なスプレッドシートIDが必要です');
   }
 
-  const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
+  // テナント境界検証
+  const currentUserId = Session.getActiveUser().getEmail();
+  if (typeof multiTenantSecurity !== 'undefined') {
+    const operation = isViewMode ? 'view_mode_access' : 'spreadsheet_cache_access';
+    if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, operation)) {
+      throw new Error('TENANT_BOUNDARY_VIOLATION: Unauthorized cross-tenant access');
+    }
+  }
+
+  // テナント分離キャッシュキー生成
+  const cacheKey = buildUserScopedKey('ss_cache', userId, spreadsheetId);
   const now = Date.now();
+
+  // ユーザー分離メモリキャッシュの初期化
+  if (!userScopedMemoryCache[userId]) {
+    userScopedMemoryCache[userId] = {};
+  }
 
   // 強制リフレッシュの場合はキャッシュをクリア
   if (forceRefresh) {
-    delete spreadsheetMemoryCache[spreadsheetId];
+    delete userScopedMemoryCache[userId][spreadsheetId];
     try {
       resilientCacheOperation(
         () => PropertiesService.getScriptProperties().deleteProperty(cacheKey),
@@ -1233,10 +1259,10 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
     }
   }
 
-  // Phase 1: メモリキャッシュをチェック
-  const memoryEntry = spreadsheetMemoryCache[spreadsheetId];
+  // Phase 1: ユーザー分離メモリキャッシュをチェック
+  const memoryEntry = userScopedMemoryCache[userId][spreadsheetId];
   if (memoryEntry && (now - memoryEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
-    debugLog('✅ SpreadsheetApp.openById メモリキャッシュヒット:', spreadsheetId.substring(0, 10));
+    debugLog('✅ SpreadsheetApp.openById メモリキャッシュヒット:', `User:${userId.substring(0, 10)}, SS:${spreadsheetId.substring(0, 10)}`);
     return memoryEntry.spreadsheet;
   }
 
@@ -1255,13 +1281,13 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
           'SpreadsheetApp.openById'
         );
         
-        // メモリキャッシュに保存
-        spreadsheetMemoryCache[spreadsheetId] = {
+        // ユーザー分離メモリキャッシュに保存
+        userScopedMemoryCache[userId][spreadsheetId] = {
           spreadsheet: spreadsheet,
           timestamp: now
         };
         
-        debugLog('✅ SpreadsheetApp.openById セッションキャッシュヒット:', spreadsheetId.substring(0, 10));
+        debugLog('✅ SpreadsheetApp.openById セッションキャッシュヒット:', `User:${userId.substring(0, 10)}, SS:${spreadsheetId.substring(0, 10)}`);
         return spreadsheet;
       }
     }
@@ -1270,13 +1296,13 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   }
 
   // Phase 3: 新規取得とキャッシュ保存
-  debugLog('🔄 SpreadsheetApp.openById 新規取得:', spreadsheetId.substring(0, 10));
+  debugLog('🔄 SpreadsheetApp.openById 新規取得:', `User:${userId.substring(0, 10)}, SS:${spreadsheetId.substring(0, 10)}`);
   
   try {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     
-    // メモリキャッシュに保存
-    spreadsheetMemoryCache[spreadsheetId] = {
+    // ユーザー分離メモリキャッシュに保存
+    userScopedMemoryCache[userId][spreadsheetId] = {
       spreadsheet: spreadsheet,
       timestamp: now
     };
@@ -1309,116 +1335,258 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
 }
 
 /**
- * 古いキャッシュエントリをクリーンアップ
+ * ユーザー分離対応の古いキャッシュエントリをクリーンアップ
+ * @param {string} [targetUserId] - 特定ユーザーのみクリーンアップする場合のユーザーID
  */
-function cleanupOldCacheEntries() {
+function cleanupOldCacheEntries(targetUserId = null) {
   const now = Date.now();
-  const memoryKeys = Object.keys(spreadsheetMemoryCache);
+  let totalCleaned = 0;
   
-  // メモリキャッシュのクリーンアップ
-  if (memoryKeys.length > SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE) {
-    const sortedEntries = memoryKeys.map(key => ({
-      key: key,
-      timestamp: spreadsheetMemoryCache[key].timestamp
-    })).sort((a, b) => b.timestamp - a.timestamp);
-    
-    // 古いエントリを削除
-    const entriesToDelete = sortedEntries.slice(SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE);
-    entriesToDelete.forEach(entry => {
-      delete spreadsheetMemoryCache[entry.key];
-    });
-    
-    debugLog(`🧹 メモリキャッシュクリーンアップ: ${entriesToDelete.length}件削除`);
-  }
-  
-  // 期限切れエントリの削除
-  memoryKeys.forEach(key => {
-    const entry = spreadsheetMemoryCache[key];
-    if ((now - entry.timestamp) > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
-      delete spreadsheetMemoryCache[key];
-    }
-  });
-}
-
-/**
- * 特定のスプレッドシートのキャッシュを無効化
- * @param {string} spreadsheetId - スプレッドシートID
- */
-function invalidateSpreadsheetCache(spreadsheetId) {
-  if (!spreadsheetId) return;
-  
-  // メモリキャッシュから削除
-  delete spreadsheetMemoryCache[spreadsheetId];
-  
-  // セッションキャッシュから削除
-  const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
   try {
-    PropertiesService.getScriptProperties().deleteProperty(cacheKey);
-    debugLog('🗑️ SpreadsheetCache無効化:', spreadsheetId.substring(0, 10));
-  } catch (error) {
-    debugLog('キャッシュ無効化エラー:', error.message);
-  }
-}
-
-/**
- * 全スプレッドシートキャッシュをクリア
- */
-function clearAllSpreadsheetCache() {
-  // メモリキャッシュクリア
-  spreadsheetMemoryCache = {};
-  
-  // セッションキャッシュクリア
-  try {
-    const props = PropertiesService.getScriptProperties();
-    const allProps = props.getProperties();
+    // ユーザー分離メモリキャッシュのクリーンアップ
+    const userIds = targetUserId ? [targetUserId] : Object.keys(userScopedMemoryCache);
     
-    Object.keys(allProps).forEach(key => {
-      if (key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)) {
-        props.deleteProperty(key);
+    userIds.forEach(userId => {
+      if (!userScopedMemoryCache[userId]) return;
+      
+      const userCache = userScopedMemoryCache[userId];
+      const spreadsheetIds = Object.keys(userCache);
+      
+      // ユーザー別キャッシュサイズ制限チェック
+      if (spreadsheetIds.length > SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE) {
+        const sortedEntries = spreadsheetIds.map(spreadsheetId => ({
+          spreadsheetId: spreadsheetId,
+          timestamp: userCache[spreadsheetId].timestamp
+        })).sort((a, b) => b.timestamp - a.timestamp);
+        
+        // 古いエントリを削除
+        const entriesToDelete = sortedEntries.slice(SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE);
+        entriesToDelete.forEach(entry => {
+          delete userCache[entry.spreadsheetId];
+          totalCleaned++;
+        });
+        
+        debugLog(`🧹 ユーザー${userId.substring(0, 10)}のメモリキャッシュクリーンアップ: ${entriesToDelete.length}件削除`);
+      }
+      
+      // 期限切れエントリの削除
+      spreadsheetIds.forEach(spreadsheetId => {
+        const entry = userCache[spreadsheetId];
+        if (entry && (now - entry.timestamp) > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+          delete userCache[spreadsheetId];
+          totalCleaned++;
+        }
+      });
+      
+      // 空のユーザーキャッシュを削除
+      if (Object.keys(userCache).length === 0) {
+        delete userScopedMemoryCache[userId];
+        debugLog(`🗑️ 空のユーザーキャッシュを削除: ${userId.substring(0, 10)}`);
       }
     });
     
-    debugLog('🧹 全SpreadsheetCacheクリア完了');
+    if (totalCleaned > 0) {
+      debugLog(`✅ キャッシュクリーンアップ完了: ${totalCleaned}件のエントリを削除`);
+    }
+    
   } catch (error) {
-    debugLog('全キャッシュクリアエラー:', error.message);
+    debugLog('⚠️ キャッシュクリーンアップエラー:', error.message);
   }
 }
 
 /**
- * キャッシュ統計情報を取得
+ * マルチテナント対応特定スプレッドシートのキャッシュを無効化
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} [userId] - ユーザーID（指定時はそのユーザーのみ無効化）
+ */
+function invalidateSpreadsheetCache(spreadsheetId, userId = null) {
+  if (!spreadsheetId) return;
+  
+  let invalidatedCount = 0;
+  
+  try {
+    // ユーザー分離メモリキャッシュから削除
+    if (userId) {
+      // 特定ユーザーのキャッシュのみ削除
+      if (userScopedMemoryCache[userId] && userScopedMemoryCache[userId][spreadsheetId]) {
+        delete userScopedMemoryCache[userId][spreadsheetId];
+        invalidatedCount++;
+        debugLog(`🗑️ ユーザー${userId.substring(0, 10)}のSpreadsheetCache無効化: ${spreadsheetId.substring(0, 10)}`);
+      }
+    } else {
+      // 全ユーザーのキャッシュから削除
+      Object.keys(userScopedMemoryCache).forEach(uid => {
+        if (userScopedMemoryCache[uid] && userScopedMemoryCache[uid][spreadsheetId]) {
+          delete userScopedMemoryCache[uid][spreadsheetId];
+          invalidatedCount++;
+        }
+      });
+      debugLog(`🗑️ 全ユーザーのSpreadsheetCache無効化: ${spreadsheetId.substring(0, 10)} (${invalidatedCount}件)`);
+    }
+    
+    // セッションキャッシュから削除（ユーザー分離対応）
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const allProps = props.getProperties();
+      
+      Object.keys(allProps).forEach(key => {
+        if (key.includes(spreadsheetId) && key.startsWith('MT_ss_cache_')) {
+          props.deleteProperty(key);
+          invalidatedCount++;
+        }
+      });
+    } catch (sessionError) {
+      debugLog('セッションキャッシュ無効化エラー:', sessionError.message);
+    }
+    
+  } catch (error) {
+    debugLog('スプレッドシートキャッシュ無効化エラー:', error.message);
+  }
+  
+  return invalidatedCount;
+}
+
+/**
+ * マルチテナント対応全スプレッドシートキャッシュをクリア
+ * @param {string} [userId] - 特定ユーザーのみクリアする場合のユーザーID
+ */
+function clearAllSpreadsheetCache(userId = null) {
+  let clearedCount = 0;
+  
+  try {
+    // ユーザー分離メモリキャッシュクリア
+    if (userId) {
+      // 特定ユーザーのみクリア
+      if (userScopedMemoryCache[userId]) {
+        clearedCount = Object.keys(userScopedMemoryCache[userId]).length;
+        delete userScopedMemoryCache[userId];
+        debugLog(`🧹 ユーザー${userId.substring(0, 10)}のSpreadsheetCacheクリア: ${clearedCount}件`);
+      }
+    } else {
+      // 全ユーザーのキャッシュクリア
+      Object.keys(userScopedMemoryCache).forEach(uid => {
+        clearedCount += Object.keys(userScopedMemoryCache[uid] || {}).length;
+      });
+      userScopedMemoryCache = {};
+      debugLog(`🧹 全ユーザーのメモリキャッシュクリア: ${clearedCount}件`);
+    }
+    
+    // セッションキャッシュクリア（マルチテナント対応）
+    const props = PropertiesService.getScriptProperties();
+    const allProps = props.getProperties();
+    let sessionClearedCount = 0;
+    
+    Object.keys(allProps).forEach(key => {
+      // マルチテナント対応キー（MT_ss_cache_）とレガシーキー（ss_cache_）両方をクリア
+      if (key.startsWith('MT_ss_cache_') || key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)) {
+        if (userId) {
+          // 特定ユーザーのキーのみ削除
+          if (key.includes(userId.substring(0, 16))) { // ハッシュ化されたuserIdの一部で判定
+            props.deleteProperty(key);
+            sessionClearedCount++;
+          }
+        } else {
+          // 全てのキーを削除
+          props.deleteProperty(key);
+          sessionClearedCount++;
+        }
+      }
+    });
+    
+    debugLog(`🧹 セッションキャッシュクリア: ${sessionClearedCount}件`);
+    debugLog(`✅ SpreadsheetCacheクリア完了: メモリ${clearedCount}件 + セッション${sessionClearedCount}件`);
+    
+  } catch (error) {
+    debugLog('SpreadsheetCacheクリアエラー:', error.message);
+  }
+  
+  return clearedCount;
+}
+
+/**
+ * マルチテナント対応キャッシュ統計情報を取得
+ * @param {string} [userId] - 特定ユーザーの統計のみ取得する場合のユーザーID
  * @returns {Object} キャッシュ統計
  */
-function getSpreadsheetCacheStats() {
-  const memoryEntries = Object.keys(spreadsheetMemoryCache).length;
+function getSpreadsheetCacheStats(userId = null) {
   const now = Date.now();
+  let memoryEntries = 0;
+  let userCount = 0;
+  let expiredEntries = 0;
   
-  let sessionEntries = 0;
   try {
+    if (userId) {
+      // 特定ユーザーの統計
+      if (userScopedMemoryCache[userId]) {
+        memoryEntries = Object.keys(userScopedMemoryCache[userId]).length;
+        userCount = 1;
+        
+        // 期限切れエントリのカウント
+        Object.values(userScopedMemoryCache[userId]).forEach(entry => {
+          if ((now - entry.timestamp) > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+            expiredEntries++;
+          }
+        });
+      }
+    } else {
+      // 全ユーザーの統計
+      userCount = Object.keys(userScopedMemoryCache).length;
+      Object.values(userScopedMemoryCache).forEach(userCache => {
+        memoryEntries += Object.keys(userCache).length;
+        
+        // 期限切れエントリのカウント
+        Object.values(userCache).forEach(entry => {
+          if ((now - entry.timestamp) > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+            expiredEntries++;
+          }
+        });
+      });
+    }
+    
+    // セッションキャッシュ統計
+    let sessionEntries = 0;
     const allProps = PropertiesService.getScriptProperties().getProperties();
     sessionEntries = Object.keys(allProps).filter(key => 
-      key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)
+      key.startsWith('MT_ss_cache_') || key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)
     ).length;
+    
+    return {
+      memoryEntries: memoryEntries,
+      sessionEntries: sessionEntries,
+      userCount: userCount,
+      expiredEntries: expiredEntries,
+      maxCacheSize: SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE,
+      memoryTTL: SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL,
+      sessionTTL: SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL,
+      isMultiTenant: true
+    };
+    
   } catch (error) {
     debugLog('キャッシュ統計取得エラー:', error.message);
+    return {
+      error: error.message,
+      memoryEntries: 0,
+      sessionEntries: 0,
+      userCount: 0,
+      expiredEntries: 0,
+      maxCacheSize: SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE,
+      memoryTTL: SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL,
+      sessionTTL: SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL,
+      isMultiTenant: true
+    };
   }
-  
-  return {
-    memoryEntries: memoryEntries,
-    sessionEntries: sessionEntries,
-    maxCacheSize: SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE,
-    memoryTTL: SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL,
-    sessionTTL: SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL
-  };
 }
 
 /**
- * SpreadsheetApp.openById()の最適化されたラッパー関数
+ * SpreadsheetApp.openById()の最適化されたラッパー関数（マルチテナント対応）
  * 既存コードの置き換え用
  * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} [userId] - ユーザーID（省略時は現在のユーザー）
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Spreadsheetオブジェクト
  */
-function openSpreadsheetOptimized(spreadsheetId) {
-  return getCachedSpreadsheet(spreadsheetId);
+function openSpreadsheetOptimized(spreadsheetId, userId = null) {
+  const effectiveUserId = userId || Session.getActiveUser().getEmail();
+  return getCachedSpreadsheet(spreadsheetId, effectiveUserId);
 }
 
 // =============================================================================

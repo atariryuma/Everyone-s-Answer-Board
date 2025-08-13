@@ -792,22 +792,8 @@ function callWithCache(functionName, cacheKey, ttl, ...args) {
 }
 
 // runGasWithUserId with cache support
-function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
-  if (!userId) {
-    return userIdPromise.then(() => {
-      if (!userId) {
-        throw new Error('ユーザーIDが設定されていません。');
-      }
-      return unifiedCache.getOrSet(cacheKey, function() {
-        return gasOptimizer.call(functionName, userId, ...args);
-      }, ttl);
-    });
-  }
-  
-  return unifiedCache.getOrSet(cacheKey, function() {
-    return gasOptimizer.call(functionName, userId, ...args);
-  }, ttl);
-}
+// callWithCacheWithUserId function is now defined in adminPanel-security.js.html
+// This provides enhanced security validation and multi-tenant support
 
 // =============================================================================
 // STATUS AND DATA LOADING
