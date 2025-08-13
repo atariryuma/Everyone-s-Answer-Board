@@ -121,7 +121,8 @@ class StudyQuestApp {
     CACHE_TTL_MS: 1000,
     RETRY_DELAY_MS: 2000,
     POLLING_INTERVAL_MS: 5000,
-    INIT_TIMEOUT_MS: 30000
+    INIT_TIMEOUT_MS: 30000,
+    REACTION_TIMEOUT_MS: 8000
   };
 
   /**
@@ -5452,16 +5453,24 @@ class StudyQuestApp {
   }
 
   async sendReactionToServer(rowIndex, reaction) {
-    const response = await this.gas.addReaction(rowIndex, reaction, this.state.sheetName);
-    
+    const timeoutMs = StudyQuestApp.CONSTANTS.REACTION_TIMEOUT_MS;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('リアクション送信がタイムアウトしました')), timeoutMs)
+    );
+
+    const response = await Promise.race([
+      this.gas.addReaction(rowIndex, reaction, this.state.sheetName),
+      timeoutPromise
+    ]);
+
     if (!response) {
         throw new Error('サーバーからの応答がありません');
     }
-    
+
     if (response.status !== 'ok') {
         throw new Error(response.message || 'リアクション送信に失敗しました');
     }
-    
+
     return response;
   }
 
