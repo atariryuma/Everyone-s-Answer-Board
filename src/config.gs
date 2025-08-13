@@ -19,19 +19,6 @@ const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
  * @returns {object|null} ユーザー情報
  */
 function getUserInfoCached(requestUserId) {
-  // マルチテナント対応: セキュリティ検証を最初に実行
-  const currentUserId = Session.getActiveUser().getEmail();
-  const effectiveUserId = requestUserId || getUserId();
-  
-  // テナント境界検証
-  if (!validateTenantAccess('config_user_info', currentUserId, effectiveUserId)) {
-    auditSecurityViolation('CONFIG_USER_INFO_BOUNDARY_VIOLATION', {
-      currentUser: currentUserId,
-      requestedUser: effectiveUserId
-    });
-    return null;
-  }
-
   // 実行時間制限チェック
   if (Date.now() - executionStartTime > EXECUTION_MAX_LIFETIME) {
     warnLog('⚠️ 実行時間制限到達、キャッシュを自動クリア');
@@ -39,74 +26,53 @@ function getUserInfoCached(requestUserId) {
     executionStartTime = Date.now();
   }
 
-  // マルチテナント対応: セキュアキーでキャッシュ管理
-  const secureKey = buildSecureUserScopedKey('config_user_info', currentUserId, effectiveUserId);
+  const userIdKey = requestUserId || getUserId();
 
-  // 統合キャッシュマネージャーを使用（エンタープライズ対応）
-  const userInfo = cacheManager.get(secureKey, () => {
-    auditTenantAccess('config_user_info_fetch', currentUserId, true, {
-      targetUserId: effectiveUserId,
-      operation: 'getUserInfoCached'
-    });
-    
-    // 既にマルチテナント対応済みのfindUserByIdを使用
-    return findUserById(effectiveUserId);
-  }, {
-    ttl: 300, // 5分キャッシュ
-    enableMemoization: true
-  });
-
-  // レガシーキャッシュも更新（後方互換性）
-  if (userInfo) {
-    _executionUserInfoCache = userInfo;
-    lastCacheUserIdKey = effectiveUserId;
+  // キャッシュヒット条件：同じユーザーIDかつキャッシュが有効
+  if (_executionUserInfoCache && lastCacheUserIdKey === userIdKey) {
+    return _executionUserInfoCache;
   }
 
-  return userInfo;
+  // キャッシュミス：新規取得
+  try {
+    const userInfo = findUserById(userIdKey);
+    if (userInfo) {
+      _executionUserInfoCache = userInfo;
+      lastCacheUserIdKey = userIdKey;
+    }
+    return userInfo;
+  } catch (error) {
+    logError(error, 'getUserInfoCached', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CACHE);
+    // エラー時はキャッシュをクリア
+    clearExecutionUserInfoCache();
+    return null;
+  }
 }
 
 /**
  * 実行レベルのユーザー情報キャッシュをクリア
  */
 function clearExecutionUserInfoCache() {
-  const currentUserId = Session.getActiveUser().getEmail();
-  
-  // マルチテナント対応: セキュリティ検証
-  auditTenantAccess('config_cache_clear', currentUserId, true, {
-    operation: 'clearExecutionUserInfoCache',
-    clearedUserId: lastCacheUserIdKey
-  });
-
   _executionUserInfoCache = null;
-  const clearedUserId = lastCacheUserIdKey;
   lastCacheUserIdKey = null;
 
-  // マルチテナント対応統一キャッシュマネージャーの関連エントリクリア
+  // 統一キャッシュマネージャーの関連エントリもクリア
   if (typeof cacheManager !== 'undefined' && cacheManager) {
     try {
-      // セキュアキーによるユーザー関連キャッシュのクリア
-      if (clearedUserId) {
-        const userSecureKey = buildSecureUserScopedKey('config_user_info', currentUserId, clearedUserId);
-        const lookupSecureKey = buildSecureUserScopedKey('user_lookup', currentUserId, clearedUserId);
-        cacheManager.remove(userSecureKey);
-        cacheManager.remove(lookupSecureKey);
+      // ユーザー関連キャッシュのクリア
+      if (lastCacheUserIdKey) {
+        cacheManager.remove('user_' + lastCacheUserIdKey);
+        cacheManager.remove('userinfo_' + lastCacheUserIdKey);
       }
 
-      // セッション関連キャッシュのクリア（セキュアキー）
-      if (currentUserId) {
-        const sessionSecureKey = buildSecureUserScopedKey('session', currentUserId, 'current');
-        cacheManager.remove(sessionSecureKey);
+      // セッション関連キャッシュのクリア
+      const currentEmail = Session.getActiveUser().getEmail();
+      if (currentEmail) {
+        cacheManager.remove('session_' + currentEmail);
       }
 
-      // 設定関連キャッシュの包括的クリア
-      cacheManager.clearByPattern('MT_config_', { strict: false, maxKeys: 50 });
-
-      debugLog('[Memory] マルチテナント対応実行レベル + 統一キャッシュをクリアしました');
+      debugLog('[Memory] 実行レベル + 統一キャッシュの関連エントリをクリアしました');
     } catch (error) {
-      auditSecurityViolation('CONFIG_CACHE_CLEAR_ERROR', {
-        currentUser: currentUserId,
-        error: error.message
-      });
       debugLog('[Memory] 統一キャッシュクリア中にエラー:', error.message);
     }
   } else {
@@ -568,52 +534,23 @@ function getSheetHeaders(requestUserId, spreadsheetId, sheetName) {
  * @returns {object} 統一された設定オブジェクト
  */
 function getConfig(requestUserId, sheetName, forceRefresh = false) {
-  // マルチテナント対応: セキュリティ検証
-  const currentUserId = Session.getActiveUser().getEmail();
-  const effectiveUserId = requestUserId || currentUserId;
-  
-  // テナント境界検証
-  if (!validateTenantAccess('config_get', currentUserId, effectiveUserId)) {
-    auditSecurityViolation('CONFIG_GET_BOUNDARY_VIOLATION', {
-      currentUser: currentUserId,
-      requestedUser: effectiveUserId,
-      sheetName: sheetName
-    });
-    throw new Error('設定アクセス権限がありません');
-  }
+  verifyUserAccess(requestUserId);
+  const userId = requestUserId; // requestUserId を使用
+  const userCache = CacheService.getUserCache();
+  const cacheKey = buildUserScopedKey('config_v3', userId, sheetName);
 
-  // 企業セキュリティポリシー準拠の入力検証
-  if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
-    auditSecurityViolation('INVALID_SHEET_NAME_CONFIG', {
-      currentUser: currentUserId,
-      sheetName: sheetName
-    });
-    throw new Error('有効なシート名が必要です');
-  }
-
-  verifyUserAccess(effectiveUserId);
-  
-  // マルチテナント対応: セキュアキーでキャッシュ管理
-  const secureKey = buildSecureUserScopedKey('config_v3', currentUserId, `${effectiveUserId}_${sheetName}`);
-
-  // エンタープライズ対応: 統合キャッシュマネージャーを使用
   if (!forceRefresh) {
-    const cached = cacheManager.get(secureKey, null, { skipFetch: true });
+    const cached = userCache.get(cacheKey);
     if (cached) {
-      auditTenantAccess('config_cache_hit', currentUserId, true, {
-        targetUserId: effectiveUserId,
-        sheetName: sheetName,
-        operation: 'getConfig'
-      });
-      debugLog('設定セキュアキャッシュヒット: %s', secureKey.substring(0, 20) + '...');
-      return cached;
+      debugLog('設定キャッシュヒット: %s', cacheKey);
+      return JSON.parse(cached);
     }
   }
 
   try {
-    debugLog('設定を取得中: sheetName=%s, userId=%s', sheetName, effectiveUserId);
-    const userInfo = getUserInfo(effectiveUserId); // 依存関係を明確化
-    const headers = getSheetHeaders(effectiveUserId, userInfo.spreadsheetId, sheetName);
+    debugLog('設定を取得中: sheetName=%s, userId=%s', sheetName, userId);
+    const userInfo = getUserInfo(userId); // 依存関係を明確化
+    const headers = getSheetHeaders(userId, userInfo.spreadsheetId, sheetName);
 
     // 1. 返却する設定オブジェクトの器を準備
     const finalConfig = {
@@ -653,19 +590,8 @@ function getConfig(requestUserId, sheetName, forceRefresh = false) {
       finalConfig.classHeader = guessedConfig.classHeader || '';
     }
 
-    // 5. マルチテナント対応: セキュアキャッシュに保存
-    cacheManager.get(secureKey, () => finalConfig, {
-      ttl: 3600, // 1時間キャッシュ
-      enableMemoization: true
-    });
-
-    // 監査ログ記録
-    auditTenantAccess('config_generated', currentUserId, true, {
-      targetUserId: effectiveUserId,
-      sheetName: sheetName,
-      operation: 'getConfig',
-      hasExistingConfig: finalConfig.hasExistingConfig
-    });
+    // 5. 最終的な設定をキャッシュに保存
+    userCache.put(cacheKey, JSON.stringify(finalConfig), 3600); // 1時間キャッシュ
 
     debugLog('getConfig: 最終設定を返します: %s', JSON.stringify(finalConfig));
     return finalConfig;
@@ -1219,68 +1145,27 @@ function checkIfNewOrUpdatedForm(requestUserId, spreadsheetId, sheetName) {
  * @returns {object} 保存完了メッセージ
  */
 function saveDraftConfig(requestUserId, sheetName, config) {
-  // マルチテナント対応: セキュリティ検証
-  const currentUserId = Session.getActiveUser().getEmail();
-  const effectiveUserId = requestUserId || currentUserId;
-  
-  // テナント境界検証
-  if (!validateTenantAccess('config_save_draft', currentUserId, effectiveUserId)) {
-    auditSecurityViolation('CONFIG_SAVE_DRAFT_BOUNDARY_VIOLATION', {
-      currentUser: currentUserId,
-      requestedUser: effectiveUserId,
-      sheetName: sheetName
-    });
-    throw new Error('設定保存権限がありません');
-  }
-
-  verifyUserAccess(effectiveUserId);
-  
+  verifyUserAccess(requestUserId);
   try {
-    // 企業セキュリティポリシー準拠: 入力検証強化
-    if (typeof sheetName !== 'string' || !sheetName || sheetName.trim() === '') {
-      auditSecurityViolation('INVALID_SHEET_NAME_SAVE_DRAFT', {
-        currentUser: currentUserId,
-        sheetName: sheetName
-      });
+    if (typeof sheetName !== 'string' || !sheetName) {
       throw new Error('無効なsheetNameです。シート名は必須です。');
     }
     if (typeof config !== 'object' || config === null) {
-      auditSecurityViolation('INVALID_CONFIG_OBJECT_SAVE_DRAFT', {
-        currentUser: currentUserId,
-        sheetName: sheetName
-      });
       throw new Error('無効なconfigオブジェクトです。設定オブジェクトは必須です。');
     }
 
-    // 設定データの企業セキュリティ検証
-    if (!validateConfigSecurity(config, currentUserId)) {
-      throw new Error('設定にセキュリティポリシー違反が検出されました');
-    }
+    debugLog('saveDraftConfig開始: sheetName=%s', sheetName);
 
-    debugLog('saveDraftConfig開始: sheetName=%s, userId=%s', sheetName, effectiveUserId);
-
-    const userInfo = getUserInfo(effectiveUserId);
+    const userInfo = getUserInfo(requestUserId);
     if (!userInfo || !userInfo.spreadsheetId) {
-      auditSecurityViolation('MISSING_USER_SPREADSHEET_SAVE_DRAFT', {
-        currentUser: currentUserId,
-        targetUser: effectiveUserId
-      });
       throw new Error('ユーザーのスプレッドシート情報が見つかりません。');
     }
 
-    // 設定を保存（GDPR/HIPAA準拠の暗号化対応）
-    saveSheetConfig(effectiveUserId, userInfo.spreadsheetId, sheetName, config);
+    // 設定を保存
+    saveSheetConfig(requestUserId, userInfo.spreadsheetId, sheetName, config);
 
-    // マルチテナント対応キャッシュ無効化
+    // 関連キャッシュをクリア
     invalidateUserCache(userInfo.userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
-
-    // 成功時の監査ログ
-    auditTenantAccess('config_save_draft_success', currentUserId, true, {
-      targetUserId: effectiveUserId,
-      sheetName: sheetName,
-      operation: 'saveDraftConfig',
-      spreadsheetId: userInfo.spreadsheetId
-    });
 
     debugLog('saveDraftConfig: 設定保存完了');
 
@@ -3775,239 +3660,5 @@ function checkApplicationAccess() {
       accessReason: 'アクセス確認中にエラーが発生しました',
       error: error.message
     };
-  }
-}
-
-// =============================================================================
-// SECTION: 企業セキュリティポリシー準拠機能
-// =============================================================================
-
-/**
- * 企業セキュリティポリシー準拠の設定データ検証
- * GDPR/HIPAA/SOX準拠のデータ保護要件を適用
- * @param {object} config - 検証対象の設定オブジェクト
- * @param {string} currentUserId - 現在のユーザーID
- * @returns {boolean} 検証結果
- */
-function validateConfigSecurity(config, currentUserId) {
-  try {
-    // セキュリティ監査ログ開始
-    auditTenantAccess('config_security_validation_start', currentUserId, true, {
-      operation: 'validateConfigSecurity',
-      configKeys: Object.keys(config || {})
-    });
-
-    if (!config || typeof config !== 'object') {
-      auditSecurityViolation('INVALID_CONFIG_VALIDATION', { currentUser: currentUserId });
-      return false;
-    }
-
-    // 1. 機密データ漏洩防止検証
-    const sensitivePatterns = [
-      /password/i,
-      /secret/i,
-      /token/i,
-      /api[_-]?key/i,
-      /private[_-]?key/i,
-      /credential/i,
-      /ssn/i,          // Social Security Number
-      /credit[_-]?card/i,
-      /bank[_-]?account/i
-    ];
-
-    for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'string') {
-        // 機密データパターンチェック
-        for (const pattern of sensitivePatterns) {
-          if (pattern.test(key) || pattern.test(value)) {
-            auditSecurityViolation('SENSITIVE_DATA_IN_CONFIG', {
-              currentUser: currentUserId,
-              suspiciousKey: key,
-              pattern: pattern.toString()
-            });
-            return false;
-          }
-        }
-
-        // GDPR準拠: 個人識別情報（PII）検証
-        if (value.length > 1000) {
-          auditSecurityViolation('CONFIG_VALUE_TOO_LARGE', {
-            currentUser: currentUserId,
-            key: key,
-            size: value.length
-          });
-          return false;
-        }
-      }
-    }
-
-    // 2. SQLインジェクション/XSS防止
-    const maliciousPatterns = [
-      /<script[^>]*>/i,
-      /javascript:/i,
-      /on\w+\s*=/i,
-      /SELECT\s+.*FROM/i,
-      /INSERT\s+INTO/i,
-      /UPDATE\s+.*SET/i,
-      /DELETE\s+FROM/i,
-      /UNION\s+SELECT/i,
-      /DROP\s+TABLE/i
-    ];
-
-    for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'string') {
-        for (const pattern of maliciousPatterns) {
-          if (pattern.test(value)) {
-            auditSecurityViolation('MALICIOUS_PATTERN_DETECTED', {
-              currentUser: currentUserId,
-              key: key,
-              pattern: pattern.toString()
-            });
-            return false;
-          }
-        }
-      }
-    }
-
-    // 3. 設定項目ホワイトリスト検証（企業ポリシー準拠）
-    const allowedConfigKeys = [
-      'sheetName', 'opinionHeader', 'reasonHeader', 'nameHeader', 'classHeader',
-      'showNames', 'showCounts', 'availableHeaders', 'hasExistingConfig',
-      'publishedSheetName', 'publishedSpreadsheetId', 'appPublished',
-      'lastPublishedAt', 'publishCount', 'displayOptions'
-    ];
-
-    for (const key of Object.keys(config)) {
-      if (!allowedConfigKeys.includes(key)) {
-        auditSecurityViolation('UNAUTHORIZED_CONFIG_KEY', {
-          currentUser: currentUserId,
-          unauthorizedKey: key,
-          allowedKeys: allowedConfigKeys
-        });
-        return false;
-      }
-    }
-
-    // 4. データサイズ制限（DoS攻撃防止）
-    const configString = JSON.stringify(config);
-    if (configString.length > 50000) { // 50KB制限
-      auditSecurityViolation('CONFIG_SIZE_EXCEEDED', {
-        currentUser: currentUserId,
-        size: configString.length,
-        limit: 50000
-      });
-      return false;
-    }
-
-    // 検証成功
-    auditTenantAccess('config_security_validation_success', currentUserId, true, {
-      operation: 'validateConfigSecurity',
-      configSize: configString.length
-    });
-
-    return true;
-
-  } catch (error) {
-    auditSecurityViolation('CONFIG_VALIDATION_ERROR', {
-      currentUser: currentUserId,
-      error: error.message
-    });
-    return false;
-  }
-}
-
-/**
- * GDPR/HIPAA準拠設定データ暗号化
- * @param {object} config - 暗号化対象の設定
- * @param {string} userId - ユーザーID（暗号化キー生成用）
- * @returns {object} 暗号化された設定オブジェクト
- */
-function encryptConfigForCompliance(config, userId) {
-  try {
-    if (!config || typeof config !== 'object') {
-      return config;
-    }
-
-    // エンタープライズ要件: 機密フィールドの特定
-    const sensitiveFields = ['nameHeader', 'classHeader'];
-    const encryptedConfig = { ...config };
-
-    for (const field of sensitiveFields) {
-      if (encryptedConfig[field] && typeof encryptedConfig[field] === 'string') {
-        // 簡易暗号化（本番環境では企業標準の暗号化ライブラリを使用）
-        const encryptionKey = buildSecureUserScopedKey('encryption', userId, field);
-        const encrypted = Utilities.base64Encode(
-          Utilities.computeHmacSha256Signature(encryptedConfig[field], encryptionKey)
-        );
-        
-        encryptedConfig[field] = `ENC:${encrypted}`;
-      }
-    }
-
-    // 暗号化実行の監査ログ
-    auditTenantAccess('config_data_encrypted', userId, true, {
-      operation: 'encryptConfigForCompliance',
-      encryptedFields: sensitiveFields.filter(f => encryptedConfig[f]?.startsWith('ENC:'))
-    });
-
-    return encryptedConfig;
-
-  } catch (error) {
-    auditSecurityViolation('CONFIG_ENCRYPTION_ERROR', {
-      currentUser: userId,
-      error: error.message
-    });
-    return config; // 暗号化失敗時は元の設定を返す
-  }
-}
-
-/**
- * 設定データ復号化
- * @param {object} config - 復号化対象の設定
- * @param {string} userId - ユーザーID
- * @returns {object} 復号化された設定オブジェクト
- */
-function decryptConfigForCompliance(config, userId) {
-  try {
-    if (!config || typeof config !== 'object') {
-      return config;
-    }
-
-    const decryptedConfig = { ...config };
-    const decryptedFields = [];
-
-    for (const [key, value] of Object.entries(decryptedConfig)) {
-      if (typeof value === 'string' && value.startsWith('ENC:')) {
-        try {
-          // 復号化処理（簡易実装）
-          const encryptionKey = buildSecureUserScopedKey('encryption', userId, key);
-          // 実際の本番環境では適切な復号化アルゴリズムを使用
-          decryptedConfig[key] = value.replace('ENC:', ''); // 簡易実装
-          decryptedFields.push(key);
-        } catch (decryptError) {
-          auditSecurityViolation('CONFIG_DECRYPTION_FIELD_ERROR', {
-            currentUser: userId,
-            field: key,
-            error: decryptError.message
-          });
-        }
-      }
-    }
-
-    if (decryptedFields.length > 0) {
-      auditTenantAccess('config_data_decrypted', userId, true, {
-        operation: 'decryptConfigForCompliance',
-        decryptedFields: decryptedFields
-      });
-    }
-
-    return decryptedConfig;
-
-  } catch (error) {
-    auditSecurityViolation('CONFIG_DECRYPTION_ERROR', {
-      currentUser: userId,
-      error: error.message
-    });
-    return config; // 復号化失敗時は元の設定を返す
   }
 }

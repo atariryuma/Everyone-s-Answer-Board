@@ -8,19 +8,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
-  
-  <!-- 企業レベルセキュリティヘッダー -->
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="X-Frame-Options" content="DENY" />
-  <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
-  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://script.google.com https://script.googleusercontent.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src 'none'; object-src 'none';" />
-  
   <!-- Shared Security Headers -->
   <?!= include('SharedSecurityHeaders'); ?>
   
-  <!-- マルチテナント対応: セキュアユーザーID管理 -->
-  <!-- Security initialization is now handled by adminPanel-security.js.html -->
+  <!-- User ID will be retrieved dynamically from backend -->
 
   <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig'); ?>
@@ -32,92 +23,115 @@
   <!-- Admin Panel Specific Styles -->
   <?!= include('adminPanel-layout.css'); ?>
   
-  <!-- 企業アクセシビリティ対応スタイル -->
-  <style>
-    /* Screen reader only content */
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-    
-    /* Focus indicators for keyboard navigation */
-    .focus-visible:focus {
-      outline: 2px solid #3b82f6;
-      outline-offset: 2px;
-      border-radius: 0.25rem;
-    }
-    
-    /* High contrast mode support */
-    @media (prefers-contrast: high) {
-      .glass-panel {
-        background: rgba(0, 0, 0, 0.95) !important;
-        border: 2px solid #ffffff !important;
-      }
-    }
-    
-    /* Reduced motion support */
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
-    }
-    
-    /* Enterprise theme overrides */
-    .enterprise-button {
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .enterprise-button::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-      transition: left 0.5s;
-    }
-    
-    .enterprise-button:hover::before {
-      left: 100%;
-    }
-    
-    /* Loading state animations */
-    .loading-shimmer {
-      background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
-      background-size: 200% 100%;
-      animation: shimmer 2s infinite;
-    }
-    
-    @keyframes shimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-  </style>
-  
   <!-- Core JavaScript Libraries (must be loaded first) -->
   <?!= include('ClientOptimizer'); ?>
   <?!= include('UnifiedCache.js'); ?>
   <?!= include('adminPanel-framework.js.html'); ?>
   
-  <!-- Enterprise Security Modules -->
-  <?!= include('adminPanel-errorhandling.js.html'); ?>
-  <?!= include('adminPanel-security.js.html'); ?>
-  <?!= include('adminPanel-monitoring.js.html'); ?>
-  
   <script>
   // GASOptimizer and UnifiedCache are now guaranteed to be defined
-  // Error handling is now managed by adminPanel-errorhandling.js.html
+  // Enhanced Global Error Handling with Smart Recovery
+  window.addEventListener('error', function(event) {
+    const errorMessage = event.error?.message || '';
+    const errorStack = event.error?.stack || '';
+    const errorLine = event.lineno || 'unknown';
+    
+    // Non-critical GAS internal errors (suppress with logging)
+    const suppressedErrors = [
+      'document.write',
+      'Unexpected token',
+      'Failed to execute \'write\' on \'Document\'',
+      'SyntaxError: Failed to execute \'write\'',
+      'Identifier \'userId\' has already been declared',
+      'mae_html_user_bin_i18n_mae_html_user',
+      'warden_bin_i18n_warden',
+      'unrecognized feature',
+      'Unrecognized feature',
+      'cdn.tailwindcss.com should not be used in production',
+      'tailwindcss.com/docs/installation',
+      'should not be used in production',
+      'PostCSS plugin',
+      'Tailwind CLI',
+      'navigateToStep is not defined',
+      'hidePrivacyModal is not defined', 
+      'updateUIWithNewStatus is not defined',
+      'showFormConfigModal is not defined',
+      'toggleSection is not defined',
+      'function not yet loaded',
+      'function not available'
+    ];
+    
+    // Critical errors that need intervention
+    const criticalErrors = [
+      'await is only valid in async functions',
+      'Cannot set property',
+      'Cannot read property',
+      'is not defined',
+      'is not a function'
+    ];
+    
+    const shouldSuppress = suppressedErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
+    
+    const isCritical = criticalErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
+    
+    if (shouldSuppress) {
+      // Log suppressed error for debugging (optional)
+      console.debug('Suppressed Google Apps Script internal error:', errorMessage);
+      event.preventDefault();
+      return;
+    }
+    
+    if (isCritical) {
+      console.error('🚨 Critical Error Detected:', {
+        message: errorMessage,
+        line: errorLine,
+        stack: errorStack.substring(0, 500) // Truncate for readability
+      });
+      
+      // Attempt recovery for specific critical errors
+      if (errorMessage.includes('is not defined') || errorMessage.includes('is not a function')) {
+        console.log('🔧 Attempting function recovery...');
+        // Trigger fallback initialization after a short delay
+        setTimeout(() => {
+          if (typeof window.initializeAdminPanelMaster === 'function') {
+            console.log('🔄 Re-initializing admin panel...');
+            window.initializeAdminPanelMaster();
+          }
+        }, 1000);
+      }
+      
+      // Show user-friendly error message for critical issues
+      setTimeout(() => {
+        if (window.showMessage && typeof window.showMessage === 'function') {
+          window.showMessage('システムの初期化で問題が発生しました。ページを再読み込みしてください。', 'warning');
+        }
+      }, 2000);
+    }
+    
+    // Log important errors
+    console.error('Global error caught:', event.error);
+  });
+  
+  // Enhanced Promise rejection handling
+  window.addEventListener('unhandledrejection', function(event) {
+    const reason = event.reason?.toString() || '';
+    
+    // Suppress Google Apps Script internal promise rejections
+    if (reason.includes('document.write') || 
+        reason.includes('mae_html_user') ||
+        reason.includes('warden_bin')) {
+      console.debug('Suppressed internal promise rejection:', reason);
+      event.preventDefault();
+      return;
+    }
+    
+    console.error('Unhandled promise rejection:', event.reason);
+    event.preventDefault();
+  });
 
   // GASOptimizer インスタンスの初期化
   var gasOptimizer = new GASOptimizer();
@@ -141,35 +155,17 @@
     }, ttl);
   }
   
-  // マルチテナント対応: セキュア cache functions
-  // これらの関数は adminPanel-security.js.html で定義されています
-  
-  // Legacy support for existing code - 後方互換性重視
-  function validateSecureUserId(context) {
-    // まず新しいセキュリティシステムを試行
-    if (window.AdminPanelSecurity?.validateUserId) {
-      const secureUserId = window.AdminPanelSecurity.validateUserId(context);
-      if (secureUserId) return secureUserId;
+  // マルチテナント対応: callWithCacheWithUserId関数
+  function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+    if (!userId) {
+      console.error('❌  - No userId available for cached call:', functionName);
+      throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
     }
     
-    // セキュリティシステムが利用できない場合は従来のuserIdを返す
-    const legacyUserId = window.userId || userId;
-    if (legacyUserId) {
-      console.log('✅ Legacy validateSecureUserId:', context, 'userId:', legacyUserId);
-      return legacyUserId;
-    }
-    
-    console.warn('⚠️ validateSecureUserId: No userId available', context);
-    return null;
-  }
-  
-  function auditApiCall(functionName, userId, args, context) {
-    if (window.AdminPanelSecurity?.auditApiCall) {
-      window.AdminPanelSecurity.auditApiCall(functionName, userId, args, context);
-    } else {
-      // フォールバック: 基本的なコンソールログ
-      console.log('🔒 API Call:', functionName, 'userId:', userId?.substring?.(0, 8) + '...' || userId);
-    }
+    return unifiedCache.getOrSet(cacheKey, function() {
+      console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
+      return gasOptimizer.call(functionName, userId, ...args);
+    }, ttl);
   }
   </script>
   <script>
@@ -185,50 +181,21 @@
   </script>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
-  <!-- 企業セキュリティ監視パネル (開発・監査用) -->
-  <div id="security-monitor" 
-       class="hidden fixed top-4 right-4 z-[100] bg-gray-900 border border-red-500 rounded-lg p-3 text-xs text-red-400 max-w-xs" 
-       style="display: none;"
-       role="region"
-       aria-labelledby="security-monitor-title"
-       tabindex="0">
-    <div class="flex items-center gap-2 mb-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 19c-.77.833.192 2.5 1.732 2.5z"></path>
-      </svg>
-      <span id="security-monitor-title" class="font-semibold">セキュリティ監視</span>
-    </div>
-    <div id="security-status" class="space-y-1" role="status" aria-live="polite">
-      <div>テナント: <span id="monitor-tenant" class="text-green-400">検証中...</span></div>
-      <div>セッション: <span id="monitor-session" class="text-green-400">初期化中...</span></div>
-      <div>整合性: <span id="monitor-integrity" class="text-green-400">OK</span></div>
-    </div>
-    <div class="mt-2 text-xs text-gray-500">
-      <kbd class="px-1 py-0.5 bg-gray-700 rounded text-gray-300">Ctrl+Shift+S</kbd> で切替
-    </div>
-  </div>
-  
   <!-- Unified Loading Overlay - Content managed by UnifiedLoadingManager -->
   <div id="loading-overlay" class="loading-overlay page-specific hidden"></div>
-  
-  <header id="admin-header" 
-          class="glass-panel border-b border-gray-700 fixed top-1 sm:top-2 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg"
-          role="banner"
-          aria-label="管理パネルヘッダー">
+  <header id="admin-header" class="glass-panel border-b border-gray-700 fixed top-1 sm:top-2 left-2 right-2 sm:left-4 sm:right-4 z-50 rounded-lg sm:rounded-xl shadow-lg">
   <div class="relative -top-1 sm:-top-2 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-4">
         <!-- ロゴとタイトル -->
         <div class="flex items-center gap-3 flex-shrink-0">
-          <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0 enterprise-button" 
-               role="img" 
-               aria-label="StudyQuest ロゴ">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
           <div class="min-w-0">
             <div class="hidden sm:block">
               <h1 class="text-lg sm:text-xl font-bold text-white leading-tight truncate">みんなの回答ボード	管理パネル</h1>
-              <p class="text-xs text-gray-400">StudyQuest Enterprise</p>
+              <p class="text-xs text-gray-400">StudyQuest</p>
             </div>
             <div class="sm:hidden">
               <h1 class="text-base font-bold text-white truncate">みんなの回答ボード</h1>
@@ -349,13 +316,10 @@
               </button>
             </div>
             <button type="button" onclick="document.getElementById('auto-stop-notification').classList.add('hidden')" 
-                    class="text-gray-400 hover:text-white transition-colors"
-                    aria-label="自動停止通知を閉じる"
-                    title="自動停止通知を閉じる">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    class="text-gray-400 hover:text-white transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
-              <span class="sr-only">自動停止通知を閉じる</span>
             </button>
           </div>
         </div>
@@ -403,28 +367,18 @@
               
               <!-- 水平配置のボタン -->
               <div class="flex gap-3">
-                <button type="button" id="quickstart-btn" 
-                        class="btn btn-google flex-1 enterprise-button focus-visible"
-                        aria-describedby="quickstart-description">
-                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <button type="button" id="quickstart-btn" class="btn btn-google flex-1">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                   </svg>
                   <span id="quickstart-text">クイックスタート</span>
                 </button>
-                <div id="quickstart-description" class="sr-only">
-                  自動設定でフォームとボードを素早く作成します。高精度AI列判定により最適な設定を自動適用。
-                </div>
-                <button type="button" id="create-board-btn" 
-                        class="btn btn-google flex-1 enterprise-button focus-visible"
-                        aria-describedby="custom-description">
-                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <button type="button" id="create-board-btn" class="btn btn-google flex-1">
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                   </svg>
                   <span id="create-board-text">カスタムセットアップ</span>
                 </button>
-                <div id="custom-description" class="sr-only">
-                  詳細設定でカスタマイズしたフォームとボードを作成します。列の配置や表示設定を手動で調整可能。
-                </div>
               </div>
               
               <!-- フォーム作成完了表示（統合移動） -->
@@ -1196,26 +1150,6 @@
       </div>
     </div>
   </footer>
-  <!-- Enterprise Status Indicators -->
-  <div id="enterprise-status-bar" class="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-blue-900/50 to-purple-900/50 backdrop-blur-sm border-b border-blue-500/20 text-xs py-1 px-4 hidden">
-    <div class="flex items-center justify-between max-w-6xl mx-auto">
-      <div class="flex items-center gap-4 text-blue-200">
-        <span class="flex items-center gap-1">
-          <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-          <span>Enterprise Security Active</span>
-        </span>
-        <span class="flex items-center gap-1">
-          <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
-          <span id="tenant-status">Multi-Tenant: Ready</span>
-        </span>
-      </div>
-      <div class="flex items-center gap-2 text-gray-300">
-        <span>Session:</span>
-        <span id="session-indicator" class="font-mono text-xs">Loading...</span>
-      </div>
-    </div>
-  </div>
-
   <div id="message-area" class="fixed top-32 right-6 z-50" aria-live="polite" role="status"></div>
   
   <!-- 共通モーダルコンポーネントを読み込み -->
@@ -1243,131 +1177,6 @@
         window.sharedModals.loadAdminModals();
       }
     });
-  </script>
-  
-  <!-- Enterprise Security Monitoring -->
-  <!-- Security monitoring is now managed by adminPanel-monitoring.js.html -->
-  
-  <!-- Enterprise UI Enhancements -->
-  <script>
-    // Enterprise UI initialization
-    (function initializeEnterpriseUI() {
-      'use strict';
-      
-      // Module initialization status
-      console.log('📦 AdminPanel modules loading...');
-      console.log('  ✅ Error Handling Module');
-      console.log('  ✅ Security Module');
-      console.log('  ✅ Monitoring Module');
-      console.log('  ✅ Enterprise UI Module');
-      console.log('📦 All enterprise modules loaded successfully');
-      
-      // Enterprise status bar initialization
-      function initializeStatusBar() {
-        const statusBar = document.getElementById('enterprise-status-bar');
-        const sessionIndicator = document.getElementById('session-indicator');
-        const tenantStatus = document.getElementById('tenant-status');
-        
-        if (statusBar && window.MULTI_TENANT_CONTEXT?.securityLevel === 'ENTERPRISE') {
-          statusBar.classList.remove('hidden');
-          
-          // Update session indicator
-          if (sessionIndicator && window.MULTI_TENANT_CONTEXT?.sessionId) {
-            const shortSession = window.MULTI_TENANT_CONTEXT.sessionId.substring(0, 8);
-            sessionIndicator.textContent = shortSession + '...';
-          }
-          
-          // Update tenant status
-          if (tenantStatus && window.SECURE_URL_USER_ID) {
-            const shortUserId = window.SECURE_URL_USER_ID.substring(0, 8);
-            tenantStatus.textContent = `Multi-Tenant: ${shortUserId}...`;
-          }
-        }
-      }
-      
-      // Enhanced loading states
-      function enhanceLoadingStates() {
-        // Add shimmer effect to loading elements
-        const loadingElements = document.querySelectorAll('.loading, [data-loading="true"]');
-        loadingElements.forEach(element => {
-          if (!element.classList.contains('loading-shimmer')) {
-            element.classList.add('loading-shimmer');
-          }
-        });
-      }
-      
-      // Accessibility improvements
-      function improveAccessibility() {
-        // Add focus indicators to interactive elements
-        const interactiveElements = document.querySelectorAll('button, input, select, textarea, a[href]');
-        interactiveElements.forEach(element => {
-          if (!element.classList.contains('focus-visible')) {
-            element.classList.add('focus-visible');
-          }
-        });
-        
-        // Add skip navigation link
-        const skipLink = document.createElement('a');
-        skipLink.href = '#main-content';
-        skipLink.className = 'sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded';
-        skipLink.textContent = 'メインコンテンツにスキップ';
-        document.body.insertBefore(skipLink, document.body.firstChild);
-        
-        // Add main content landmark
-        const mainContent = document.querySelector('.glass-panel');
-        if (mainContent && !mainContent.id) {
-          mainContent.id = 'main-content';
-          mainContent.setAttribute('role', 'main');
-          mainContent.setAttribute('aria-label', 'メインコンテンツ');
-        }
-      }
-      
-      // Performance monitoring display
-      function addPerformanceIndicator() {
-        if (window.MULTI_TENANT_CONTEXT?.securityLevel === 'ENTERPRISE') {
-          const performanceIndicator = document.createElement('div');
-          performanceIndicator.id = 'performance-indicator';
-          performanceIndicator.className = 'fixed bottom-4 left-4 z-50 bg-gray-900/90 border border-gray-600 rounded-lg p-2 text-xs text-gray-400 hidden';
-          performanceIndicator.innerHTML = `
-            <div class="flex items-center gap-2">
-              <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span>Performance: <span id="perf-status">Good</span></span>
-            </div>
-          `;
-          document.body.appendChild(performanceIndicator);
-          
-          // Show performance indicator in development
-          if (window.location.hostname === 'localhost' || window.location.hostname.includes('dev')) {
-            performanceIndicator.classList.remove('hidden');
-          }
-        }
-      }
-      
-      // Initialize all enterprise UI features
-      document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(() => {
-          initializeStatusBar();
-          enhanceLoadingStates();
-          improveAccessibility();
-          addPerformanceIndicator();
-          
-          console.log('✨ Enterprise UI enhancements initialized');
-        }, 100);
-      });
-      
-      // Initialize immediately if DOM is already ready
-      if (document.readyState !== 'loading') {
-        setTimeout(() => {
-          initializeStatusBar();
-          enhanceLoadingStates();
-          improveAccessibility();
-          addPerformanceIndicator();
-          
-          console.log('✨ Enterprise UI enhancements initialized (immediate)');
-        }, 100);
-      }
-      
-    })();
   </script>
 
 </body>

@@ -906,112 +906,28 @@ function getSystemDomainInfo() {
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function doGet(e) {
-  const requestStartTime = Date.now();
-  const currentUserId = Session.getActiveUser().getEmail();
-  
   try {
-    // マルチテナント対応: メインエントリポイント監査ログ
-    auditTenantAccess('main_entry_point_access', currentUserId, true, {
-      operation: 'doGet',
-      userAgent: e?.parameter?.userAgent || 'unknown',
-      requestParams: Object.keys(e?.parameter || {}),
-      timestamp: new Date().toISOString()
-    });
-
     // Initialize request processing
     const initResult = initializeRequestProcessing();
     if (initResult) return initResult;
 
-    // Parse and validate request parameters with enhanced security
+    // Parse and validate request parameters
     const params = parseRequestParams(e);
     
-    // マルチテナント対応: userId パラメータ必須化（view mode除く）
-    if (!params.userId && params.mode !== 'login' && params.mode !== 'default') {
-      auditSecurityViolation('MISSING_USERID_PARAMETER', {
-        currentUser: currentUserId,
-        mode: params.mode,
-        requestParams: Object.keys(e?.parameter || {})
-      });
-      return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。', null);
-    }
-
-    // 企業セキュリティ: テナント境界検証（view mode は特別扱い）
-    if (params.userId) {
-      const accessType = params.mode === 'view' ? 'view_mode_access' : 'admin_access';
-      if (!validateTenantAccess(accessType, currentUserId, params.userId)) {
-        auditSecurityViolation('MAIN_TENANT_BOUNDARY_VIOLATION', {
-          currentUser: currentUserId,
-          requestedUserId: params.userId,
-          mode: params.mode,
-          accessType: accessType
-        });
-        return showErrorPage('アクセス権限エラー', 'このリソースへのアクセス権限がありません。', null);
-      }
-    }
-    
-    // Validate user authentication with enhanced multi-tenant context
-    const securityContext = {
-      requireSessionValidation: params.mode === 'admin' || params.mode === 'management',
-      ipAddress: e?.clientIP || 'unknown',
-      userAgent: e?.headers?.['User-Agent'] || 'unknown'
-    };
-    const authResult = validateUserAuthentication(params.userId, params.mode, securityContext);
+    // Validate user authentication
+    const authResult = validateUserAuthentication();
     if (authResult) return authResult;
 
-    // Handle app setup page requests with security validation
+    // Handle app setup page requests
     if (params.setupParam === 'true') {
-      if (!params.userId) {
-        auditSecurityViolation('SETUP_WITHOUT_USERID', { currentUser: currentUserId });
-        return showErrorPage('セットアップエラー', 'ユーザーIDが必要です。', null);
-      }
       return showAppSetupPage(params.userId);
     }
 
-    // Route request based on mode with performance monitoring
-    const routeStartTime = Date.now();
-    const result = routeRequestByMode(params);
-    const routeDuration = Date.now() - routeStartTime;
-
-    // 企業レベルパフォーマンス監視
-    const totalDuration = Date.now() - requestStartTime;
-    const performanceMetrics = {
-      totalDuration: totalDuration,
-      routeDuration: routeDuration,
-      initDuration: routeStartTime - requestStartTime,
-      mode: params.mode,
-      userId: params.userId,
-      userAgent: securityContext.userAgent,
-      timestamp: new Date().toISOString()
-    };
-    
-    // パフォーマンス閾値チェック
-    monitorPerformanceThresholds(performanceMetrics);
-    
-    // 成功時の企業監査ログ
-    auditLog('MAIN_REQUEST_COMPLETED', {
-      currentUser: currentUserId,
-      requestedUserId: params.userId,
-      mode: params.mode,
-      performanceMetrics: performanceMetrics,
-      timestamp: new Date().toISOString()
-    });
-
-    return result;
+    // Route request based on mode
+    return routeRequestByMode(params);
 
   } catch (error) {
-    // 企業対応エラーハンドリング強化
-    const totalDuration = Date.now() - requestStartTime;
-    auditSecurityViolation('MAIN_ENTRY_POINT_ERROR', {
-      currentUser: currentUserId,
-      error: error.message,
-      stack: error.stack?.substring(0, 500), // スタックトレースを制限
-      duration: totalDuration + 'ms'
-    });
-
-    logError(error, 'doGet', ERROR_SEVERITY.CRITICAL, ERROR_CATEGORIES.SYSTEM, {
-      currentUser: currentUserId,
-      requestDuration: totalDuration
-    });
+    logError(error, 'doGet', ERROR_SEVERITY.CRITICAL, ERROR_CATEGORIES.SYSTEM);
     return showErrorPage('致命的なエラー', 'アプリケーションの処理中に予期せぬエラーが発生しました。', error);
   }
 }
@@ -1112,299 +1028,18 @@ function initializeRequestProcessing() {
 }
 
 /**
- * Validate active session for enhanced security context
- * @param {string} userId - User ID to validate session for
- * @param {Object} securityContext - Security validation context
- * @returns {boolean} True if session is valid
- */
-function validateActiveSession(userId, securityContext = {}) {
-  try {
-    // 基本的なセッション存在確認
-    const currentSession = Session.getActiveUser();
-    if (!currentSession || currentSession.getEmail() !== userId) {
-      return false;
-    }
-    
-    // キャッシュベースのセッション検証（マルチテナント対応）
-    const sessionKey = buildSecureUserScopedKey('session', userId, 'validation');
-    const cachedSession = getCachedData(sessionKey);
-    
-    if (cachedSession) {
-      // セッションタイムアウト検証（企業セキュリティ要件：1時間）
-      const sessionAge = Date.now() - new Date(cachedSession.timestamp).getTime();
-      const maxSessionAge = 60 * 60 * 1000; // 1時間
-      
-      if (sessionAge > maxSessionAge) {
-        // 期限切れセッションをクリア
-        setCachedData(sessionKey, null, 1); // 即座に無効化
-        return false;
-      }
-      
-      // IP アドレス一致検証（追加セキュリティ）
-      if (securityContext.ipAddress && 
-          cachedSession.ipAddress && 
-          cachedSession.ipAddress !== securityContext.ipAddress) {
-        auditSecurityViolation('SESSION_IP_MISMATCH', {
-          userId: userId,
-          expectedIp: cachedSession.ipAddress,
-          actualIp: securityContext.ipAddress
-        });
-        return false;
-      }
-      
-      return true;
-    }
-    
-    // 新規セッション記録（初回アクセス時）
-    const sessionData = {
-      userId: userId,
-      timestamp: new Date().toISOString(),
-      ipAddress: securityContext.ipAddress || 'unknown',
-      userAgent: securityContext.userAgent || 'unknown'
-    };
-    
-    // セッション情報をキャッシュに保存（1時間の有効期限）
-    setCachedData(sessionKey, sessionData, 60); // 60分
-    
-    return true;
-    
-  } catch (error) {
-    logError(error, 'validateActiveSession', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SECURITY);
-    return false; // エラー時は安全側に倒す
-  }
-}
-
-/**
- * Unified security verification flow for multi-tenant access
- * @param {string} requestUserId - The user ID being requested
- * @param {string} operation - The operation being performed
- * @param {Object} securityContext - Additional security context
- * @returns {boolean} True if access is authorized
- */
-function verifyUnifiedSecurity(requestUserId, operation = 'general_access', securityContext = {}) {
-  const validationStartTime = Date.now();
-  const currentUserId = getCurrentUserEmail();
-  
-  try {
-    // 企業セキュリティ: 統一認証監査ログ
-    auditLog('UNIFIED_SECURITY_VERIFICATION_START', {
-      currentUser: currentUserId,
-      requestUserId: requestUserId,
-      operation: operation,
-      securityContext: securityContext,
-      timestamp: new Date().toISOString()
-    });
-    
-    // 1. 基本的なユーザー認証確認
-    if (!currentUserId) {
-      auditSecurityViolation('UNIFIED_SECURITY_NO_AUTH', {
-        requestUserId: requestUserId,
-        operation: operation
-      });
-      return false;
-    }
-    
-    // 2. Core.gsのverifyUserAccess関数を呼び出してレガシー検証を実行
-    try {
-      verifyUserAccess(requestUserId);
-    } catch (legacyVerifyError) {
-      auditSecurityViolation('UNIFIED_SECURITY_LEGACY_VERIFY_FAILED', {
-        currentUser: currentUserId,
-        requestUserId: requestUserId,
-        operation: operation,
-        error: legacyVerifyError.message
-      });
-      return false;
-    }
-    
-    // 3. マルチテナント境界検証（新しいセキュリティ層）
-    if (!validateTenantAccess(operation, currentUserId, requestUserId)) {
-      auditSecurityViolation('UNIFIED_SECURITY_TENANT_BOUNDARY_VIOLATION', {
-        currentUser: currentUserId,
-        requestUserId: requestUserId,
-        operation: operation
-      });
-      return false;
-    }
-    
-    // 4. セッション整合性検証（高セキュリティ操作）
-    const highSecurityOperations = ['admin_access', 'management_access', 'data_export'];
-    if (highSecurityOperations.includes(operation)) {
-      const sessionValid = validateActiveSession(currentUserId, securityContext);
-      if (!sessionValid) {
-        auditSecurityViolation('UNIFIED_SECURITY_SESSION_INVALID', {
-          currentUser: currentUserId,
-          requestUserId: requestUserId,
-          operation: operation
-        });
-        return false;
-      }
-    }
-    
-    // 5. レート制限チェック（DoS攻撃防止）
-    const rateKey = buildSecureUserScopedKey('rate_limit', currentUserId, operation);
-    const rateData = getCachedData(rateKey) || { count: 0, firstRequest: Date.now() };
-    
-    const timeWindow = 60 * 1000; // 1分間
-    const maxRequests = operation.includes('admin') ? 100 : 300; // 管理操作は制限強化
-    
-    if (Date.now() - rateData.firstRequest < timeWindow) {
-      if (rateData.count >= maxRequests) {
-        auditSecurityViolation('UNIFIED_SECURITY_RATE_LIMIT_EXCEEDED', {
-          currentUser: currentUserId,
-          operation: operation,
-          requestCount: rateData.count,
-          maxRequests: maxRequests
-        });
-        return false;
-      }
-      rateData.count++;
-    } else {
-      // 新しい時間窓の開始
-      rateData.count = 1;
-      rateData.firstRequest = Date.now();
-    }
-    
-    setCachedData(rateKey, rateData, 1); // 1分間キャッシュ
-    
-    // パフォーマンス監視
-    const validationDuration = Date.now() - validationStartTime;
-    if (validationDuration > 300) {
-      warnLog(`統一セキュリティ検証が遅延: ${validationDuration}ms`, {
-        currentUser: currentUserId,
-        operation: operation,
-        validationDuration: validationDuration
-      });
-    }
-    
-    // 成功時の監査ログ
-    auditLog('UNIFIED_SECURITY_VERIFICATION_SUCCESS', {
-      currentUser: currentUserId,
-      requestUserId: requestUserId,
-      operation: operation,
-      validationDuration: validationDuration,
-      timestamp: new Date().toISOString()
-    });
-    
-    return true;
-    
-  } catch (error) {
-    logError(error, 'verifyUnifiedSecurity', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SECURITY);
-    auditSecurityViolation('UNIFIED_SECURITY_VERIFICATION_ERROR', {
-      currentUser: currentUserId,
-      requestUserId: requestUserId,
-      operation: operation,
-      error: error.message
-    });
-    return false; // エラー時は安全側に倒す
-  }
-}
-
-/**
  * Validate user authentication
  * @returns {HtmlOutput|null} Early return result or null to continue
  */
-function validateUserAuthentication(requestedUserId = null, mode = 'default', securityContext = {}) {
-  const validationStartTime = Date.now();
-  const currentUserId = getCurrentUserEmail();
-  
-  // 後方互換性: 引数なしで呼ばれた場合の従来の動作
-  if (arguments.length === 0) {
-    debugLog('validateUserAuthentication: Starting authentication check (legacy mode)');
-    debugLog('validateUserAuthentication: userEmail from getCurrentUserEmail:', currentUserId);
-    if (!currentUserId) {
-      debugLog('validateUserAuthentication: userEmail is empty, showing login page.');
-      return showLoginPage();
-    }
-    debugLog('validateUserAuthentication: userEmail is present, continuing processing.');
-    return null; // Continue processing
-  }
-  
-  // マルチテナント対応: 企業レベル認証監査ログ
-  auditLog('AUTHENTICATION_VALIDATION_START', {
-    currentUser: currentUserId,
-    requestedUserId: requestedUserId,
-    mode: mode,
-    securityContext: securityContext,
-    timestamp: new Date().toISOString()
-  });
-  
-  // 基本認証チェック: 現在のユーザーが認証されているか
-  if (!currentUserId) {
-    auditSecurityViolation('UNAUTHENTICATED_ACCESS_ATTEMPT', {
-      mode: mode,
-      requestedUserId: requestedUserId,
-      securityContext: securityContext
-    });
-    debugLog('validateUserAuthentication: No authenticated user, redirecting to login');
+function validateUserAuthentication() {
+  debugLog('validateUserAuthentication: Starting authentication check.'); // 追加
+  const userEmail = getCurrentUserEmail();
+  debugLog('validateUserAuthentication: userEmail from getCurrentUserEmail:', userEmail); // 追加
+  if (!userEmail) {
+    debugLog('validateUserAuthentication: userEmail is empty, showing login page.'); // 追加
     return showLoginPage();
   }
-  
-  // マルチテナント対応: userId必須モードでのパラメータ検証
-  const userIdRequiredModes = ['admin', 'view', 'api', 'management'];
-  if (userIdRequiredModes.includes(mode) && !requestedUserId) {
-    auditSecurityViolation('MISSING_USERID_IN_REQUIRED_MODE', {
-      currentUser: currentUserId,
-      mode: mode,
-      securityContext: securityContext
-    });
-    return showErrorPage('認証エラー', 'このモードではユーザーIDの指定が必要です。', null);
-  }
-  
-  // テナント境界検証: 異なるユーザーのリソースアクセス時
-  if (requestedUserId && requestedUserId !== currentUserId) {
-    const accessType = mode === 'view' ? 'view_mode_access' : 
-                      mode === 'admin' ? 'admin_access' : 'general_access';
-    
-    if (!validateTenantAccess(accessType, currentUserId, requestedUserId)) {
-      auditSecurityViolation('TENANT_BOUNDARY_VIOLATION', {
-        currentUser: currentUserId,
-        requestedUserId: requestedUserId,
-        mode: mode,
-        accessType: accessType
-      });
-      return showErrorPage('アクセス権限エラー', 'このリソースへのアクセス権限がありません。', null);
-    }
-  }
-  
-  // セッション整合性検証（企業セキュリティ要件）
-  if (securityContext.requireSessionValidation) {
-    try {
-      const sessionValid = validateActiveSession(currentUserId, securityContext);
-      if (!sessionValid) {
-        auditSecurityViolation('INVALID_SESSION_STATE', {
-          currentUser: currentUserId,
-          requestedUserId: requestedUserId,
-          mode: mode
-        });
-        return showErrorPage('セッションエラー', 'セッションが無効です。再度ログインしてください。', null);
-      }
-    } catch (sessionError) {
-      logError(sessionError, 'validateUserAuthentication:sessionValidation', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SECURITY);
-      return showErrorPage('システムエラー', 'セッション検証中にエラーが発生しました。', null);
-    }
-  }
-  
-  // パフォーマンス監視: 認証処理の性能測定
-  const validationDuration = Date.now() - validationStartTime;
-  if (validationDuration > 500) { // 500ms以上の場合は警告
-    warnLog(`認証検証処理が遅延しています: ${validationDuration}ms`, {
-      currentUser: currentUserId,
-      mode: mode,
-      validationDuration: validationDuration
-    });
-  }
-  
-  // 認証成功時の監査ログ
-  auditLog('AUTHENTICATION_VALIDATION_SUCCESS', {
-    currentUser: currentUserId,
-    requestedUserId: requestedUserId,
-    mode: mode,
-    validationDuration: validationDuration,
-    timestamp: new Date().toISOString()
-  });
-  
-  debugLog('validateUserAuthentication: Authentication successful, continuing processing');
+  debugLog('validateUserAuthentication: userEmail is present, continuing processing.'); // 追加
   return null; // Continue processing
 }
 
@@ -2129,593 +1764,73 @@ function structureDiagnosticInfo(diagnosticInfo) {
  * @param {Error|string} error - エラーオブジェクトまたは診断情報
  * @returns {HtmlOutput} エラーページのHTML出力
  */
-function showErrorPage(title, message, error, securityContext = {}) {
-  const errorStartTime = Date.now();
-  const currentUserId = getCurrentUserEmail();
+function showErrorPage(title, message, error) {
+  const template = HtmlService.createTemplateFromFile('ErrorBoundary');
   
-  // 企業レベルエラー監査: セキュリティインシデント情報を含める
-  const errorId = Utilities.getUuid();
-  const errorDetails = {
-    errorId: errorId,
-    title: title,
-    message: message,
-    currentUser: currentUserId,
-    timestamp: new Date().toISOString(),
-    userAgent: securityContext.userAgent || 'unknown',
-    ipAddress: securityContext.ipAddress || 'unknown',
-    stackTrace: error?.stack || error?.toString() || 'No stack trace available'
-  };
+  // エラー分類
+  const errorInfo = categorizeError(title, message);
   
-  // 機密情報の漏洩防止: スタックトレースから機密データを除去
-  const sanitizedMessage = sanitizeErrorMessage(message);
-  const sanitizedError = sanitizeErrorDetails(error);
+  // 基本情報設定
+  template.title = title;
+  template.errorType = errorInfo.type;
+  template.errorIcon = errorInfo.icon;
+  template.errorSeverity = errorInfo.severity;
+  template.mode = 'admin';
   
-  try {
-    const template = HtmlService.createTemplateFromFile('ErrorBoundary');
-    
-    // エラー分類と重要度評価
-    const errorInfo = categorizeError(title, sanitizedMessage);
-    
-    // セキュリティ重要度の判定
-    const securityLevel = determineSecurityLevel(title, sanitizedMessage, errorInfo);
-    
-    // 企業セキュリティ監査ログ
-    auditLog('ERROR_PAGE_DISPLAYED', {
-      errorId: errorId,
-      errorType: errorInfo.type,
-      errorSeverity: errorInfo.severity,
-      securityLevel: securityLevel,
-      currentUser: currentUserId,
-      sanitizedTitle: title,
-      timestamp: new Date().toISOString()
-    });
-    
-    // セキュリティインシデントの場合は追加監査
-    if (securityLevel === 'HIGH' || securityLevel === 'CRITICAL') {
-      auditSecurityViolation('HIGH_SECURITY_ERROR_INCIDENT', errorDetails);
-      
-      // 管理者通知（重要なセキュリティエラー）
-      if (securityLevel === 'CRITICAL') {
-        try {
-          notifyAdminOfCriticalError(errorDetails);
-        } catch (notifyError) {
-          logError(notifyError, 'showErrorPage:adminNotification', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
-        }
-      }
-    }
-    
-    // テンプレート設定（企業対応強化）
-    template.title = title;
-    template.errorType = errorInfo.type;
-    template.errorIcon = errorInfo.icon;
-    template.errorSeverity = errorInfo.severity;
-    template.securityLevel = securityLevel;
-    template.errorId = errorId; // エラー追跡用ID
-    template.mode = 'admin';
-    
-    // メッセージ構造化（セキュリティ強化）
-    if (sanitizedMessage && sanitizedMessage.includes('詳細診断情報:')) {
-      const parts = sanitizedMessage.split('詳細診断情報:');
-      template.message = parts[0].trim();
-      template.diagnosticInfo = structureDiagnosticInfo(parts[1]);
-    } else {
-      template.message = sanitizedMessage;
-      template.diagnosticInfo = null;
-    }
-    
-    // ユーザー登録状態確認（マルチテナント対応）
-    let isRegisteredUser = false;
-    let userTenantInfo = null;
-    try {
-      if (currentUserId) {
-        const userInfo = findUserByEmail(currentUserId);
-        isRegisteredUser = !!userInfo;
-        if (userInfo) {
-          userTenantInfo = {
-            userId: userInfo.userId,
-            tenantId: buildSecureUserScopedKey('tenant', currentUserId, '').slice(0, 16),
-            lastAccess: userInfo.lastAccessedAt
-          };
-        }
-      }
-    } catch (userCheckError) {
-      logError(userCheckError, 'showErrorPage:userRegistrationCheck', ERROR_SEVERITY.LOW, ERROR_CATEGORIES.USER_MANAGEMENT);
-    }
-    
-    template.isRegisteredUser = isRegisteredUser;
-    template.userEmail = currentUserId;
-    template.userTenantInfo = userTenantInfo;
-    
-    // デバッグ情報（機密情報除去済み）
-    if (DEBUG && sanitizedError) {
-      template.debugInfo = typeof sanitizedError === 'string' ? sanitizedError : JSON.stringify(sanitizedError, null, 2);
-    } else {
-      template.debugInfo = '';
-    }
-    
-    // レート制限情報の表示（企業対応）
-    template.rateLimitInfo = getRateLimitInfoForDisplay(currentUserId);
-    
-    // 復旧手順の提案
-    template.recoveryActions = generateRecoveryActions(errorInfo.type, securityLevel);
-    
-    const htmlOutput = template.evaluate()
-      .setTitle(`エラー - ${title} [${errorId.slice(0, 8)}]`);
-
-    // セキュリティヘッダー強化
-    try {
-      if (HtmlService?.XFrameOptionsMode?.DENY) {
-        htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-      }
-      
-      // CSP ヘッダー設定（XSS防止）
-      const cspPolicy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'";
-      htmlOutput.addMetaTag('http-equiv', 'Content-Security-Policy', cspPolicy);
-      
-    } catch (securityHeaderError) {
-      warnLog('セキュリティヘッダー設定エラー:', securityHeaderError.message);
-    }
-    
-    // パフォーマンス監視
-    const errorHandlingDuration = Date.now() - errorStartTime;
-    if (errorHandlingDuration > 1000) {
-      warnLog(`エラーページ生成が遅延: ${errorHandlingDuration}ms`, {
-        errorId: errorId,
-        errorType: errorInfo.type,
-        duration: errorHandlingDuration
-      });
-    }
-
-    return htmlOutput;
-    
-  } catch (templateError) {
-    // フォールバック: テンプレートエラー時の緊急対応
-    logError(templateError, 'showErrorPage:templateGeneration', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
-    
-    // 最小限のHTMLエラーページを生成
-    return HtmlService.createHtmlOutput(`
-      <html>
-        <head><title>システムエラー</title></head>
-        <body>
-          <h1>システムエラーが発生しました</h1>
-          <p>エラーID: ${errorId}</p>
-          <p>申し訳ございませんが、一時的なシステムエラーが発生しました。</p>
-          <p>管理者にお問い合わせください。</p>
-        </body>
-      </html>
-    `).setTitle('システムエラー');
-  }
-}
-
-
-/**
- * エラーメッセージから機密情報を除去してサニタイズ
- * @param {string} message - 元のエラーメッセージ
- * @returns {string} サニタイズされたメッセージ
- */
-function sanitizeErrorMessage(message) {
-  if (!message || typeof message !== 'string') {
-    return '不明なエラー';
-  }
-  
-  // 機密情報パターンの除去
-  const sensitivePatterns = [
-    /\b[A-Za-z0-9+/]{20,}={0,2}\b/g, // Base64エンコードされた可能性のある文字列
-    /\b[0-9a-f]{32,}\b/gi, // ハッシュ値
-    /password[:\s=]*[^\s]+/gi,
-    /secret[:\s=]*[^\s]+/gi,
-    /token[:\s=]*[^\s]+/gi,
-    /key[:\s=]*[^\s]+/gi,
-    /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, // クレジットカード番号パターン
-    /\b\d{3}-\d{2}-\d{4}\b/g, // SSNパターン
-  ];
-  
-  let sanitizedMessage = message;
-  sensitivePatterns.forEach(pattern => {
-    sanitizedMessage = sanitizedMessage.replace(pattern, '[REDACTED]');
-  });
-  
-  return sanitizedMessage.slice(0, 500); // 長すぎるメッセージの切り詰め
-}
-
-/**
- * エラー詳細から機密情報を除去
- * @param {Error|string|Object} error - エラーオブジェクト
- * @returns {string} サニタイズされたエラー詳細
- */
-function sanitizeErrorDetails(error) {
-  if (!error) return '';
-  
-  let errorString = '';
-  if (typeof error === 'string') {
-    errorString = error;
-  } else if (error.stack) {
-    errorString = error.stack;
+  // メッセージを構造化
+  if (message && message.includes('詳細診断情報:')) {
+    const parts = message.split('詳細診断情報:');
+    template.message = parts[0].trim();
+    template.diagnosticInfo = structureDiagnosticInfo(parts[1]);
   } else {
-    errorString = error.toString();
+    template.message = message;
+    template.diagnosticInfo = null;
   }
   
-  return sanitizeErrorMessage(errorString);
-}
-
-/**
- * エラーのセキュリティレベルを判定
- * @param {string} title - エラータイトル
- * @param {string} message - エラーメッセージ
- * @param {Object} errorInfo - エラー分類情報
- * @returns {string} セキュリティレベル (LOW/MEDIUM/HIGH/CRITICAL)
- */
-function determineSecurityLevel(title, message, errorInfo) {
-  // 重大なセキュリティエラーパターン
-  const criticalPatterns = [
-    /認証.*失敗/i, /権限.*拒否/i, /アクセス.*制限/i,
-    /不正.*アクセス/i, /セキュリティ.*違反/i, /境界.*違反/i
-  ];
-  
-  // 高レベルセキュリティエラーパターン
-  const highPatterns = [
-    /データベース.*エラー/i, /システム.*障害/i, /内部.*エラー/i,
-    /設定.*エラー/i, /サービス.*利用不可/i
-  ];
-  
-  // 中レベルセキュリティエラーパターン
-  const mediumPatterns = [
-    /ネットワーク.*エラー/i, /タイムアウト/i, /一時的.*エラー/i,
-    /キャッシュ.*エラー/i, /データ.*不整合/i
-  ];
-  
-  const fullText = `${title} ${message}`.toLowerCase();
-  
-  if (criticalPatterns.some(pattern => pattern.test(fullText))) {
-    return 'CRITICAL';
-  }
-  if (highPatterns.some(pattern => pattern.test(fullText))) {
-    return 'HIGH';
-  }
-  if (mediumPatterns.some(pattern => pattern.test(fullText))) {
-    return 'MEDIUM';
-  }
-  
-  return 'LOW';
-}
-
-/**
- * 重要なエラーの管理者通知
- * @param {Object} errorDetails - エラー詳細情報
- */
-function notifyAdminOfCriticalError(errorDetails) {
+  // 現在のユーザーがデータベースに登録されているかチェック
+  let isRegisteredUser = false;
+  let currentUserEmail = '';
   try {
-    // 管理者メール設定を取得
-    const adminEmail = getConfigValue('ADMIN_EMAIL');
-    if (!adminEmail) {
-      warnLog('管理者メールが設定されていません - 重要エラー通知をスキップ');
-      return;
+    currentUserEmail = getCurrentUserEmail();
+    if (currentUserEmail) {
+      const userInfo = findUserByEmail(currentUserEmail);
+      isRegisteredUser = !!userInfo;
     }
-    
-    // メール送信（重要なセキュリティインシデント）
-    const subject = `[緊急] セキュリティインシデント: ${errorDetails.title}`;
-    const body = `
-セキュリティインシデントが発生しました。
-
-エラーID: ${errorDetails.errorId}
-発生時刻: ${errorDetails.timestamp}
-ユーザー: ${errorDetails.currentUser}
-タイトル: ${errorDetails.title}
-メッセージ: ${errorDetails.message}
-IPアドレス: ${errorDetails.ipAddress}
-UserAgent: ${errorDetails.userAgent}
-
-即座に調査と対応を行ってください。
-`;
-    
-    MailApp.sendEmail(adminEmail, subject, body);
-    
-  } catch (notificationError) {
-    logError(notificationError, 'notifyAdminOfCriticalError', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+  } catch (e) {
+    console.warn('⚠️ showErrorPage: ユーザー登録状態の確認でエラー:', e);
   }
-}
-
-/**
- * レート制限情報の表示用データ取得
- * @param {string} userId - ユーザーID
- * @returns {Object} レート制限情報
- */
-function getRateLimitInfoForDisplay(userId) {
-  if (!userId) return null;
   
+  template.isRegisteredUser = isRegisteredUser;
+  template.userEmail = currentUserEmail;
+  
+  // デバッグ情報設定
+  if (DEBUG && error) {
+    if (typeof error === 'string') {
+      template.debugInfo = error;
+    } else if (error.stack) {
+      template.debugInfo = error.stack;
+    } else {
+      template.debugInfo = error.toString();
+    }
+  } else {
+    template.debugInfo = '';
+  }
+  
+  const htmlOutput = template.evaluate()
+    .setTitle(`エラー - ${title}`);
+
+  // XFrameOptionsMode を安全に設定
   try {
-    const rateKey = buildSecureUserScopedKey('rate_limit', userId, 'general_access');
-    const rateData = getCachedData(rateKey);
-    
-    if (rateData) {
-      return {
-        requestCount: rateData.count,
-        timeWindow: '1分間',
-        maxRequests: 300,
-        resetTime: new Date(rateData.firstRequest + 60000).toLocaleTimeString()
-      };
+    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
-    
-    return null;
-  } catch (error) {
-    return null;
+  } catch (e) {
+    warnLog('XFrameOptionsMode設定エラー:', e.message);
   }
+
+  return htmlOutput;
 }
 
-/**
- * エラータイプに基づく復旧手順を生成
- * @param {string} errorType - エラータイプ
- * @param {string} securityLevel - セキュリティレベル
- * @returns {Array} 復旧手順の配列
- */
-function generateRecoveryActions(errorType, securityLevel) {
-  const baseActions = [
-    'ページを再読み込みしてください',
-    '一時的な問題の可能性があります。しばらく待ってから再試行してください'
-  ];
-  
-  const securityActions = [
-    '管理者に連絡してください',
-    'セキュリティログを確認してください',
-    '不審なアクティビティがないか確認してください'
-  ];
-  
-  const systemActions = [
-    'システム状態を確認してください',
-    'サービス依存関係を確認してください',
-    'ログファイルを確認してください'
-  ];
-  
-  if (securityLevel === 'CRITICAL' || securityLevel === 'HIGH') {
-    return [...securityActions, ...baseActions];
-  }
-  
-  if (errorType === 'system' || errorType === 'database') {
-    return [...systemActions, ...baseActions];
-  }
-  
-  return baseActions;
-}
-
-/**
- * パフォーマンス閾値を監視し、異常時にアラートを発生
- * @param {Object} performanceMetrics - パフォーマンス測定データ
- */
-function monitorPerformanceThresholds(performanceMetrics) {
-  const thresholds = {
-    CRITICAL: 10000,  // 10秒
-    HIGH: 5000,       // 5秒
-    MEDIUM: 2000,     // 2秒
-    LOW: 1000         // 1秒
-  };
-  
-  const { totalDuration, routeDuration, mode, userId } = performanceMetrics;
-  
-  // 総処理時間の監視
-  if (totalDuration > thresholds.CRITICAL) {
-    auditSecurityViolation('PERFORMANCE_CRITICAL_SLOWDOWN', {
-      userId: userId,
-      mode: mode,
-      totalDuration: totalDuration,
-      threshold: thresholds.CRITICAL,
-      severity: 'CRITICAL'
-    });
-    
-    // 重要な遅延は管理者に通知
-    try {
-      notifyAdminOfPerformanceIssue({
-        severity: 'CRITICAL',
-        userId: userId,
-        mode: mode,
-        duration: totalDuration,
-        type: 'TOTAL_DURATION'
-      });
-    } catch (notifyError) {
-      logError(notifyError, 'monitorPerformanceThresholds:adminNotification', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
-    }
-    
-  } else if (totalDuration > thresholds.HIGH) {
-    auditLog('PERFORMANCE_HIGH_SLOWDOWN', {
-      userId: userId,
-      mode: mode,
-      totalDuration: totalDuration,
-      threshold: thresholds.HIGH,
-      severity: 'HIGH'
-    });
-    
-  } else if (totalDuration > thresholds.MEDIUM) {
-    auditLog('PERFORMANCE_MEDIUM_SLOWDOWN', {
-      userId: userId,
-      mode: mode,
-      totalDuration: totalDuration,
-      threshold: thresholds.MEDIUM,
-      severity: 'MEDIUM'
-    });
-  }
-  
-  // ルート処理時間の個別監視
-  if (routeDuration > thresholds.MEDIUM) {
-    auditLog('PERFORMANCE_ROUTE_SLOWDOWN', {
-      userId: userId,
-      mode: mode,
-      routeDuration: routeDuration,
-      threshold: thresholds.MEDIUM,
-      component: 'route_processing'
-    });
-  }
-  
-  // パフォーマンス統計の更新
-  updatePerformanceStatistics(performanceMetrics);
-}
-
-/**
- * パフォーマンス問題の管理者通知
- * @param {Object} issueDetails - パフォーマンス問題の詳細
- */
-function notifyAdminOfPerformanceIssue(issueDetails) {
-  try {
-    const adminEmail = getConfigValue('ADMIN_EMAIL');
-    if (!adminEmail) {
-      warnLog('管理者メールが設定されていません - パフォーマンス通知をスキップ');
-      return;
-    }
-    
-    const subject = `[警告] パフォーマンス問題: ${issueDetails.severity}レベル`;
-    const body = `
-パフォーマンス問題が検出されました。
-
-重要度: ${issueDetails.severity}
-ユーザー: ${issueDetails.userId}
-モード: ${issueDetails.mode}
-処理時間: ${issueDetails.duration}ms
-問題タイプ: ${issueDetails.type}
-発生時刻: ${new Date().toISOString()}
-
-システムの負荷状況を確認し、必要に応じて対策を講じてください。
-`;
-    
-    // 重要度がCRITICALの場合のみメール送信（スパム防止）
-    if (issueDetails.severity === 'CRITICAL') {
-      MailApp.sendEmail(adminEmail, subject, body);
-    }
-    
-  } catch (notificationError) {
-    logError(notificationError, 'notifyAdminOfPerformanceIssue', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
-  }
-}
-
-/**
- * パフォーマンス統計の更新（企業レベル監視）
- * @param {Object} performanceMetrics - パフォーマンス測定データ
- */
-function updatePerformanceStatistics(performanceMetrics) {
-  try {
-    const { totalDuration, mode, userId, timestamp } = performanceMetrics;
-    
-    // 統計キーの生成（マルチテナント対応）
-    const statsKey = buildSecureUserScopedKey('perf_stats', userId || 'system', mode);
-    
-    // 既存統計の取得
-    let stats = getCachedData(statsKey) || {
-      requestCount: 0,
-      totalDuration: 0,
-      averageDuration: 0,
-      maxDuration: 0,
-      minDuration: Number.MAX_VALUE,
-      lastUpdate: timestamp
-    };
-    
-    // 統計の更新
-    stats.requestCount++;
-    stats.totalDuration += totalDuration;
-    stats.averageDuration = Math.round(stats.totalDuration / stats.requestCount);
-    stats.maxDuration = Math.max(stats.maxDuration, totalDuration);
-    stats.minDuration = Math.min(stats.minDuration, totalDuration);
-    stats.lastUpdate = timestamp;
-    
-    // 24時間のデータ保持
-    setCachedData(statsKey, stats, 1440); // 24時間 = 1440分
-    
-    // パフォーマンストレンド分析（毎100リクエストごと）
-    if (stats.requestCount % 100 === 0) {
-      analyzePerformanceTrends(mode, stats);
-    }
-    
-  } catch (error) {
-    logError(error, 'updatePerformanceStatistics', ERROR_SEVERITY.LOW, ERROR_CATEGORIES.PERFORMANCE);
-  }
-}
-
-/**
- * パフォーマンストレンドの分析
- * @param {string} mode - 処理モード
- * @param {Object} stats - パフォーマンス統計
- */
-function analyzePerformanceTrends(mode, stats) {
-  try {
-    const trendAnalysis = {
-      mode: mode,
-      averageDuration: stats.averageDuration,
-      maxDuration: stats.maxDuration,
-      requestCount: stats.requestCount,
-      timestamp: new Date().toISOString()
-    };
-    
-    // パフォーマンス劣化の検出
-    if (stats.averageDuration > 3000) { // 平均3秒以上
-      auditLog('PERFORMANCE_TREND_DEGRADATION', {
-        mode: mode,
-        averageDuration: stats.averageDuration,
-        requestCount: stats.requestCount,
-        recommendation: 'システム最適化を検討してください'
-      });
-    }
-    
-    // 高負荷状態の検出
-    if (stats.maxDuration > 8000) { // 最大8秒以上
-      auditLog('PERFORMANCE_TREND_HIGH_LOAD', {
-        mode: mode,
-        maxDuration: stats.maxDuration,
-        averageDuration: stats.averageDuration,
-        recommendation: 'スケーリングまたは最適化が必要です'
-      });
-    }
-    
-    debugLog(`パフォーマンストレンド分析完了: ${mode}`, trendAnalysis);
-    
-  } catch (error) {
-    logError(error, 'analyzePerformanceTrends', ERROR_SEVERITY.LOW, ERROR_CATEGORIES.PERFORMANCE);
-  }
-}
-
-/**
- * システム全体のパフォーマンス統計取得（管理者用）
- * @param {string} adminUserId - 管理者ユーザーID
- * @returns {Object} システムパフォーマンス統計
- */
-function getSystemPerformanceStats(adminUserId) {
-  try {
-    // 管理者権限の確認
-    if (!verifyUnifiedSecurity(adminUserId, 'admin_access')) {
-      throw new Error('管理者権限が必要です');
-    }
-    
-    const modes = ['admin', 'view', 'api', 'default'];
-    const systemStats = {
-      timestamp: new Date().toISOString(),
-      modes: {}
-    };
-    
-    modes.forEach(mode => {
-      const statsKey = buildSecureUserScopedKey('perf_stats', 'system', mode);
-      const modeStats = getCachedData(statsKey);
-      
-      if (modeStats) {
-        systemStats.modes[mode] = {
-          requestCount: modeStats.requestCount,
-          averageDuration: modeStats.averageDuration,
-          maxDuration: modeStats.maxDuration,
-          minDuration: modeStats.minDuration === Number.MAX_VALUE ? 0 : modeStats.minDuration,
-          lastUpdate: modeStats.lastUpdate
-        };
-      } else {
-        systemStats.modes[mode] = {
-          requestCount: 0,
-          averageDuration: 0,
-          maxDuration: 0,
-          minDuration: 0,
-          lastUpdate: null
-        };
-      }
-    });
-    
-    return systemStats;
-    
-  } catch (error) {
-    logError(error, 'getSystemPerformanceStats', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.PERFORMANCE);
-    return { error: error.message };
-  }
-}
 
 /**
  * ユーザー専用の一意の管理パネルURLを構築
