@@ -1306,10 +1306,10 @@ function verifyUnifiedSecurity(requestUserId, operation = 'general_access', secu
  */
 function safeAuditSecurityViolation(violationType, details) {
   if (typeof auditSecurityViolation === 'function') {
-    safeAuditSecurityViolation(violationType, details);
+    auditSecurityViolation(violationType, details);
   } else {
-    // バックエンド用代替実装
-    errorLog(new Error(`SECURITY_VIOLATION: ${violationType}`), 'main:security', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SECURITY, details);
+    // バックエンド用代替実装 - 無限再帰防止でdebugLogを使用
+    debugLog(`🚨 SECURITY_VIOLATION: ${violationType}`, details);
   }
 }
 
