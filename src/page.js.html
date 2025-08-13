@@ -4507,7 +4507,7 @@ class StudyQuestApp {
         reaction: reactionType.key,
         count: newCount,
         reacted,
-        shouldDisplay: newCount > 0
+        shouldDisplay: true
       });
     });
 
@@ -4943,7 +4943,7 @@ class StudyQuestApp {
     if (!item.reactions[reaction]) item.reactions[reaction] = { count: 0, reacted: false };
     item.reactions[reaction].reacted = newReacted;
     item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 0) + (newReacted ? 1 : -1));
-    
+
     // UI即座更新（アイコンをsolid/outlineに切り替え）
     const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
     buttons.forEach(btn => {
@@ -4966,6 +4966,42 @@ class StudyQuestApp {
         countEl.textContent = item.reactions[reaction].count;
       }
     });
+
+    // 他のリアクションを解除（単一リアクション制御）
+    if (newReacted) {
+      this.reactionTypes.forEach(rt => {
+        if (rt.key === reaction) return;
+        const info = item.reactions?.[rt.key];
+        if (info && info.reacted) {
+          info.reacted = false;
+          info.count = Math.max(0, (info.count || 0) - 1);
+
+          const otherButtons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${rt.key}"]`);
+          otherButtons.forEach(btn => {
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            const iconSpan = btn.querySelector('span[aria-hidden="true"]');
+            if (iconSpan) {
+              iconSpan.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', false);
+            }
+
+            btn.classList.toggle('reacted', false);
+            const countEl = btn.querySelector('.reaction-count');
+            if (countEl && this.state.showCounts) {
+              countEl.textContent = info.count;
+            }
+          });
+
+          const otherReactionKey = `${numericRowIndex}-${rt.key}`;
+          this.reactionQueue.set(otherReactionKey, {
+            rowIndex: numericRowIndex,
+            reaction: rt.key,
+            timestamp: Date.now()
+          });
+        }
+      });
+    }
 
     // キューイング（既存システム保持）
     this.reactionQueue.set(reactionKey, {
@@ -7141,7 +7177,7 @@ class StudyQuestApp {
             reaction: rt.key,
             count: item.reactions[rt.key].count,
             reacted: item.reactions[rt.key].reacted,
-            shouldDisplay: item.reactions[rt.key].count > 0
+            shouldDisplay: true
           });
         }
       });
