@@ -2644,7 +2644,7 @@ function buildResponseFromContext(context) {
           return {
             webAppUrl: fallbackBaseUrl,
             viewUrl: userInfo.viewUrl || (fallbackBaseUrl + '?userId=' + encodeURIComponent(context.requestUserId) + '&mode=view'),
-            setupUrl: fallbackBaseUrl + '?setup=true',
+            setupUrl: fallbackBaseUrl + '?setup=true&userId=' + encodeURIComponent(context.requestUserId),
             adminUrl: fallbackBaseUrl + '?mode=admin&userId=' + context.requestUserId,
             status: 'success'
           };
