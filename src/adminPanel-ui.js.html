@@ -1,15 +1,9 @@
 <script>
 let lastSelectedSheetName = null; // To prevent redundant sheet selection change events
 
-// UI Update Mutex to prevent race conditions
-let isUIUpdateInProgress = false;
-let pendingUIUpdate = null;
-let lastStatusHash = null;
-let uiUpdateDebounceTimer = null;
-
-// UI update optimization tracking
-let duplicateUpdateCount = 0;
-let totalUpdateCount = 0;
+// === シンプル化されたUI更新システム ===
+// 複雑な制御機構を除去し、必要最小限の変数のみ保持
+let currentStatus = null;
 
 // =============================================================================
 // EARLY FUNCTION DEFINITIONS (Critical functions that must be available immediately)
@@ -167,65 +161,79 @@ function generateViewUrl(status, userId) {
 // Update UI with new status data
 // Full implementation of updateUIWithNewStatus for later use
 function _fullUpdateUIWithNewStatus(status) {
-  console.log('🔧 _fullUpdateUIWithNewStatus called with status:', status);
+  console.log('🔧 Simple UI Update called with status:', status);
   
-  if (!validateStatus(status)) {
-    logWarn('Invalid status received, skipping UI update');
+  // 最小限の検証のみ
+  if (!status || !status.userInfo) {
+    console.warn('❌ Invalid status: missing userInfo');
     return;
   }
-  
-  console.log('✅ Status validation passed, proceeding with UI update');
-
-  totalUpdateCount++;
-  
-  // Generate status hash for duplicate detection
-  const statusHash = generateStatusHash(status);
-  
-  // Skip identical updates to prevent processing redundancy (temporarily disabled for debugging)
-  if (false && lastStatusHash === statusHash) {
-    duplicateUpdateCount++;
-    logDebug(`🚫 Skipping duplicate UI update (${duplicateUpdateCount}/${totalUpdateCount} duplicates)`);
-    return;
-  }
-  
-  console.log('🔧 Proceeding with UI update, statusHash:', statusHash);
-  
-  // Clear any pending debounced update
-  if (uiUpdateDebounceTimer) {
-    clearTimeout(uiUpdateDebounceTimer);
-    uiUpdateDebounceTimer = null;
-  }
-  
-  // UI Update Mutex: Prevent concurrent UI updates
-  if (isUIUpdateInProgress) {
-    logDebug('UI update in progress, debouncing this update');
-    
-    // Debounce rapid successive updates
-    uiUpdateDebounceTimer = setTimeout(() => {
-      pendingUIUpdate = status;
-      lastStatusHash = statusHash;
-      uiUpdateDebounceTimer = null;
-    }, 100); // 100ms debounce
-    return;
-  }
-  
-  lastStatusHash = statusHash;
-
-  isUIUpdateInProgress = true;
   
   try {
-    // Phase 1: データ準備（同期処理）
-    status = prepareStatusData(status);
-    currentStatus = status;
+    // === 直接的なUI更新（シンプル版） ===
+    console.log('🎯 Starting direct UI updates...');
     
-    // Phase 2: 並列UI更新（非同期処理の最適化）
-    executeParallelUIUpdates(status);
+    // 基本情報の更新
+    const adminEmail = status.userInfo.adminEmail || '-';
+    const userId = status.userInfo.userId || '-';
+    
+    console.log('📝 Updating basic info:', { adminEmail, userId });
+    
+    // メールアドレスの更新
+    const emailElement = document.getElementById('info-admin-email');
+    if (emailElement) {
+      emailElement.textContent = adminEmail;
+      console.log('✅ Email updated:', adminEmail);
+    } else {
+      console.warn('⚠️ Email element not found');
+    }
+    
+    // ユーザーIDの更新
+    const userIdElement = document.getElementById('info-user-id');
+    if (userIdElement) {
+      userIdElement.textContent = userId;
+      console.log('✅ User ID updated:', userId);
+    } else {
+      console.warn('⚠️ User ID element not found');
+    }
+    
+    // 公開状態の更新
+    const config = JSON.parse(status.userInfo.configJson || '{}');
+    const isPublished = config.appPublished || false;
+    const publishText = isPublished ? '公開中' : '停止中';
+    
+    console.log('📊 Updating publish status:', { isPublished, publishText });
+    
+    const publishTextElement = document.getElementById('info-publish-text');
+    if (publishTextElement) {
+      publishTextElement.textContent = publishText;
+      console.log('✅ Publish text updated:', publishText);
+    }
+    
+    // 公開状態インジケーター
+    const publishIndicator = document.getElementById('info-publish-indicator');
+    if (publishIndicator) {
+      publishIndicator.className = isPublished 
+        ? 'w-2 h-2 rounded-full bg-green-400' 
+        : 'w-2 h-2 rounded-full bg-gray-400';
+      console.log('✅ Publish indicator updated');
+    }
+    
+    // 公開シート名の更新
+    const publishedSheet = config.publishedSheetName || status.activeSheetName || 'なし';
+    const sheetElement = document.getElementById('info-published-sheet');
+    if (sheetElement) {
+      sheetElement.textContent = publishedSheet;
+      console.log('✅ Published sheet updated:', publishedSheet);
+    }
+    
+    // 現在のステータスを保存
+    window.currentStatus = status;
+    
+    console.log('🎉 Simple UI update completed successfully');
     
   } catch (error) {
-    logError('UI更新でエラー:', error);
-  } finally {
-    // 最後にMutexを解除
-    setTimeout(() => finishUIUpdate(), 0);
+    console.error('❌ Simple UI update failed:', error);
   }
 }
 
@@ -234,7 +242,8 @@ if (typeof window !== 'undefined') {
   window._fullUpdateUIWithNewStatus = _fullUpdateUIWithNewStatus;
 }
 
-// データ準備の最適化（同期処理部分）
+// === 旧版：複雑なデータ準備関数（現在は使用されていません） ===
+/*
 function prepareStatusData(status) {
   // 1. configJson正規化処理（包括的システム最適化）
   status.config = normalizeConfigJson(status.config, status.userInfo);
@@ -252,7 +261,10 @@ function prepareStatusData(status) {
   
   return status;
 }
+*/
 
+// === 旧版：複雑な並列処理関数群（現在は使用されていません） ===
+/*
 // 並列UI更新の実行（非同期処理の最適化）
 function executeParallelUIUpdates(status) {
   console.log('🔧 executeParallelUIUpdates called with:', {
@@ -336,6 +348,7 @@ function finishUIUpdate() {
     }, 50);
   }
 }
+*/
 
 // Generate hash for status comparison to detect duplicates
 function generateStatusHash(status) {
