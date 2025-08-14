@@ -262,8 +262,28 @@ function _fullUpdateUIWithNewStatus(status) {
       console.log('⚠️ No sheet data available for dropdown');
     }
     
+    // フッター表示用データ準備
+    console.log('🔧 Preparing footer data...');
+    const publicationState = getPublicationState(status);
+    const viewUrl = generateViewUrl(status, status.userInfo.userId);
+    status._normalized = {
+      isPublished: publicationState.isPublished,
+      publishReason: publicationState.reason,
+      viewUrl: viewUrl,
+      hasValidViewUrl: !!viewUrl
+    };
+    console.log('✅ Footer data prepared:', {
+      isPublished: publicationState.isPublished,
+      hasViewUrl: !!viewUrl,
+      reason: publicationState.reason
+    });
+    
     // 現在のステータスを保存（グローバルに）
     window.currentStatus = status;
+    
+    // 固定フッターの更新
+    console.log('🦶 Updating footer...');
+    updateFooterAndGuidance(status);
     
     console.log('🎉 Simple UI update completed successfully');
     
