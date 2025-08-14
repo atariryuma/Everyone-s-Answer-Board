@@ -4,7 +4,12 @@
  */
 
 // Define basic logging helpers for GAS and test environments
-// debugLog関数はdebugConfig.gsで統一定義されています
+// debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
+if (typeof debugLog === 'undefined') {
+  function debugLog(message, ...args) {
+    console.log('[DEBUG]', message, ...args);
+  }
+}
 
 if (typeof errorLog === 'undefined') {
   function errorLog(message, ...args) {
@@ -63,9 +68,16 @@ function getWebAppUrl() {
         const scriptId = ScriptApp.getScriptId();
         
         // デプロイメント一覧取得を試行
-        const deploymentsList = AppsScript.Script.Deployments.list(scriptId, {
-          fields: 'deployments(deploymentId,deploymentConfig(webApp(url)),updateTime)'
-        });
+        let deploymentsList;
+        try {
+          deploymentsList = AppsScript.Script.Deployments.list(scriptId, {
+            fields: 'deployments(deploymentId,deploymentConfig(webApp(url)),updateTime)'
+          });
+        } catch (apiError) {
+          debugLog('AppsScript API call failed, trying simple list:', apiError.message);
+          // テスト環境等で引数なしの場合のフォールバック
+          deploymentsList = AppsScript.Script.Deployments.list();
+        }
         
         debugLog('AppsScript.Script.Deployments.list response:', JSON.stringify(deploymentsList, null, 2));
         
