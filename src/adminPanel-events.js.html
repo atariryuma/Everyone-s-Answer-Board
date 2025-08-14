@@ -80,11 +80,11 @@ function setupEventListeners() {
               }
             })
             .then(function() {
-              console.log('🔧 公開停止後のUI更新開始');
+              console.log('🔧 公開停止後の完全リセットUI更新開始');
               
-              // 公開停止後、即座にUI更新でステップ1表示にリセット
+              // ステップ1に戻すためのUI更新
               if (typeof updateStepIndicators === 'function') {
-                console.log('🎯 updateStepIndicators実行中: ステップ1に設定');
+                console.log('🎯 updateStepIndicators実行中: ステップ1に完全リセット');
                 updateStepIndicators(1, null);
               } else {
                 console.warn('⚠️ updateStepIndicators関数が見つかりません');
@@ -102,8 +102,45 @@ function setupEventListeners() {
                 console.warn('⚠️ updateGuidanceForStep関数が見つかりません');
               }
               
-              console.log('✅ 公開停止後のUI更新完了');
-              showMessage('回答ボードは非公開になりました。', 'success');
+              // フォーム関連要素の初期化
+              try {
+                console.log('🧹 フォーム関連UI要素を初期状態にリセット');
+                
+                // シート選択ドロップダウンをクリア
+                const sheetSelect = document.getElementById('sheet-select');
+                if (sheetSelect) {
+                  sheetSelect.innerHTML = '<option value="">シートを選択してください</option>';
+                  sheetSelect.selectedIndex = 0;
+                  console.log('✅ シート選択ドロップダウンをリセット');
+                }
+                
+                // 列設定フォームをクリア
+                const columnSelects = ['opinion-column', 'name-column', 'reason-column', 'class-column'];
+                columnSelects.forEach(selectId => {
+                  const selectElement = document.getElementById(selectId);
+                  if (selectElement) {
+                    selectElement.innerHTML = '<option value="">選択してください</option>';
+                    selectElement.selectedIndex = 0;
+                  }
+                });
+                console.log('✅ 列設定フォームをリセット');
+                
+                // チェックボックスの初期化
+                const checkboxes = ['show-names', 'show-counts'];
+                checkboxes.forEach(checkboxId => {
+                  const checkbox = document.getElementById(checkboxId);
+                  if (checkbox) {
+                    checkbox.checked = false;
+                  }
+                });
+                console.log('✅ 表示設定チェックボックスをリセット');
+                
+              } catch (resetError) {
+                console.warn('⚠️ UI要素リセット中にエラー:', resetError);
+              }
+              
+              console.log('✅ 公開停止後の完全リセットUI更新完了');
+              showMessage('回答ボードは非公開になり、設定は初期状態にリセットされました。', 'success');
             })
             .catch(function(error) {
               console.error('❌ 公開停止に失敗しました:', error);

@@ -1831,11 +1831,12 @@ function unpublishBoard(requestUserId) {
 
     debugLog('🧹 公開停止: 設定を完全クリア完了（スプレッドシート情報も含む）');
 
-    // データベースを更新（ステップ2設定も完全リセット）
+    // データベースを更新（ステップ2・3を完全に初期状態にリセット）
     const updateData = {
       configJson: JSON.stringify(configJson),
-      spreadsheetId: null,      // ステップ2のスプレッドシート選択をリセット
-      spreadsheetUrl: null      // スプレッドシートURLもクリア
+      spreadsheetId: null,              // ステップ2: スプレッドシート選択をリセット
+      spreadsheetUrl: null,             // ステップ2: スプレッドシートURLをクリア
+      customFormInfo: null              // ステップ2・3: カスタムフォーム設定もクリア
       // Note: activeSheetNameは許可されていないフィールドのため除外
       // Note: formUrlは保持（ユーザーが作成したフォームリソース維持）
     };

@@ -269,20 +269,20 @@ function getSetupStep(userInfo, configJson) {
     unpublishReason: configJson ? configJson.unpublishReason : 'none'
   });
   
-  // Step 1: データソース未設定 または 公開停止によるリセット
-  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
-    debugLog('🔧 ステップ1判定: データソース未設定', { 
-      userInfo: !!userInfo, 
-      spreadsheetId: userInfo ? userInfo.spreadsheetId : 'none' 
+  // 公開停止後の明示的なリセット判定：手動停止時はステップ1に戻す（最優先）
+  if (configJson && configJson.appPublished === false && configJson.unpublishReason === 'manual_stop') {
+    debugLog('🔧 ステップ1判定: 手動停止による完全リセット', { 
+      appPublished: configJson.appPublished, 
+      unpublishReason: configJson.unpublishReason 
     });
     return 1;
   }
   
-  // 公開停止後の明示的なリセット判定：手動停止時はステップ1に戻す（設定状態に関係なく）
-  if (configJson && configJson.appPublished === false && configJson.unpublishReason === 'manual_stop') {
-    debugLog('🔧 ステップ1判定: 手動停止によるリセット', { 
-      appPublished: configJson.appPublished, 
-      unpublishReason: configJson.unpublishReason 
+  // Step 1: データソース未設定
+  if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+    debugLog('🔧 ステップ1判定: データソース未設定', { 
+      userInfo: !!userInfo, 
+      spreadsheetId: userInfo ? userInfo.spreadsheetId : 'none' 
     });
     return 1;
   }
