@@ -110,7 +110,14 @@ function getPublicationState(status) {
   }
   
   // デバッグログ
-  if (shouldEnableDebugMode()) {
+  if (typeof shouldEnableDebugMode === 'function' && shouldEnableDebugMode()) {
+    console.log('🔍 Enhanced Publication check:', {
+      result: isPublished,
+      reason,
+      confidence,
+      validation: validationDetails
+    });
+  } else if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
     console.log('🔍 Enhanced Publication check:', {
       result: isPublished,
       reason,
