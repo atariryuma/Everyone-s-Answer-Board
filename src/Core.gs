@@ -261,13 +261,23 @@ var DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教え�
  * @returns {number} setupStep (1-3)
  */
 function getSetupStep(userInfo, configJson) {
+  debugLog('🔍 getSetupStep: ステップ判定開始', {
+    hasUserInfo: !!userInfo,
+    spreadsheetId: userInfo ? userInfo.spreadsheetId : 'none',
+    hasConfigJson: !!configJson,
+    appPublished: configJson ? configJson.appPublished : 'none',
+    unpublishReason: configJson ? configJson.unpublishReason : 'none'
+  });
+  
   // Step 1: データソース未設定
   if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+    debugLog('🔧 ステップ1判定: データソース未設定', { userInfo: !!userInfo, spreadsheetId: userInfo ? userInfo.spreadsheetId : 'none' });
     return 1;
   }
   
   // configが存在しない場合は必ずStep 2
   if (!configJson || typeof configJson !== 'object') {
+    debugLog('🔧 ステップ2判定: config未設定', { configJson: typeof configJson });
     return 2;
   }
   
@@ -279,7 +289,16 @@ function getSetupStep(userInfo, configJson) {
      configJson.formUrl && configJson.formUrl.trim())
   );
   
+  debugLog('🔍 公開状態判定', {
+    appPublished: configJson.appPublished,
+    setupStatus: configJson.setupStatus,
+    formCreated: configJson.formCreated,
+    hasFormUrl: !!(configJson.formUrl && configJson.formUrl.trim()),
+    isCurrentlyPublished: isCurrentlyPublished
+  });
+  
   if (isCurrentlyPublished) {
+    debugLog('🔧 ステップ3判定: 公開中', { reason: 'isCurrentlyPublished=true' });
     return 3;
   }
   
@@ -293,6 +312,7 @@ function getSetupStep(userInfo, configJson) {
   }
   
   // デフォルト: セットアップ継続中
+  debugLog('🔧 ステップ2判定: デフォルト（セットアップ継続中）');
   return 2;
 }
 

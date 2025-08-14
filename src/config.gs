@@ -1771,6 +1771,11 @@ function unpublishBoard(requestUserId) {
     configJson.appPublished = false; // 公開停止
     configJson.unpublishReason = 'manual_stop'; // 手動停止フラグを追加（ステップ1復帰用）
 
+    debugLog('🔧 公開停止フラグ設定完了', {
+      appPublished: configJson.appPublished,
+      unpublishReason: configJson.unpublishReason
+    });
+
     // 回答ボード連携の解除（フォーム情報は保持）
     configJson.setupStatus = 'pending'; // ステップ1から再開（直感的な進行のため）
     // Note: setupStepは削除（計算プロパティのため保存不要）
@@ -1801,13 +1806,17 @@ function unpublishBoard(requestUserId) {
     debugLog('🧹 公開停止: 設定を完全クリア完了');
 
     // データベースを更新（ステップ2設定も完全リセット）
-    updateUser(currentUserId, {
+    const updateData = {
       configJson: JSON.stringify(configJson),
       spreadsheetId: null,      // ステップ2のスプレッドシート選択をリセット
       spreadsheetUrl: null      // スプレッドシートURLもクリア
       // Note: activeSheetNameは許可されていないフィールドのため除外
       // Note: formUrlは保持（ユーザーが作成したフォームリソース維持）
-    });
+    };
+    
+    debugLog('🔧 データベース更新データ:', updateData);
+    updateUser(currentUserId, updateData);
+    debugLog('🔧 データベース更新完了');
 
     // 強制的にキャッシュを無効化して即座にUIに反映
     try {
