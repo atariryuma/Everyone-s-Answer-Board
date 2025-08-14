@@ -484,7 +484,8 @@ class GASUtilities {
     const requestKey = `${functionName}_${JSON.stringify(args)}`;
     const isForceRequest = (
       window.FORCE_REQUEST_MODE ||  // グローバルフォースモード
-      (functionName === 'getInitialData' && args && args[0] === true) ||  // getInitialData(true)
+      (functionName === 'getInitialData' && args && args[1] === true) ||  // getInitialData(userId, true)
+      (functionName === 'getInitialData' && args && args[0] === true) ||  // getInitialData(true) - direct call
       (message && message.includes('bypassCache'))  // バイパスメッセージ
     );
     

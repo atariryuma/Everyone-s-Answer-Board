@@ -887,10 +887,10 @@ function loadStatus(bypassCache = false) {
       throw new Error('userId is not available');
     }
 
-    console.log('🌐 Calling getInitialData with userId:', userId);
+    console.log('🌐 Calling getInitialData with userId:', userId, 'bypassCache:', bypassCache);
 
     // runGasWithUserId を使用して getInitialData を呼び出す
-    return runGasWithUserId('getInitialData', 'システム情報を読み込み中...')
+    return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
       .then(response => {
         logDebug('✅ Integrated data loaded:', response);
         
