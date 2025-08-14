@@ -1797,9 +1797,13 @@ function unpublishBoard(requestUserId) {
 
     debugLog('🧹 公開停止: 設定を完全クリア完了');
 
-    // データベースを更新
+    // データベースを更新（ステップ2設定も完全リセット）
     updateUser(currentUserId, {
-      configJson: JSON.stringify(configJson)
+      configJson: JSON.stringify(configJson),
+      spreadsheetId: null,      // ステップ2のスプレッドシート選択をリセット
+      activeSheetName: null,    // アクティブシート名もクリア
+      spreadsheetUrl: null      // スプレッドシートURLもクリア
+      // Note: formUrl, editFormUrlは保持（ユーザーが作成したフォームリソース維持）
     });
 
     // 強制的にキャッシュを無効化して即座にUIに反映

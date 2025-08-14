@@ -285,6 +285,10 @@ function getSetupStep(userInfo, configJson) {
   
   // 公開停止後の明示的なリセット判定：手動停止時はステップ1に戻す
   if (configJson.appPublished === false && configJson.unpublishReason === 'manual_stop') {
+    debugLog('🔧 手動停止フラグ検出: ステップ1に復帰', { 
+      appPublished: configJson.appPublished, 
+      unpublishReason: configJson.unpublishReason 
+    });
     return 1;
   }
   

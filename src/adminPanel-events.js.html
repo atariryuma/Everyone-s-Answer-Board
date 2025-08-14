@@ -80,16 +80,29 @@ function setupEventListeners() {
               }
             })
             .then(function() {
+              console.log('🔧 公開停止後のUI更新開始');
+              
               // 公開停止後、即座にUI更新でステップ1表示にリセット
               if (typeof updateStepIndicators === 'function') {
+                console.log('🎯 updateStepIndicators実行中: ステップ1に設定');
                 updateStepIndicators(1, null);
+              } else {
+                console.warn('⚠️ updateStepIndicators関数が見つかりません');
               }
+              
               if (typeof updateGuidanceForStep === 'function') {
                 const guidanceText = document.getElementById('guidance-text');
                 if (guidanceText) {
+                  console.log('🎯 updateGuidanceForStep実行中: ステップ1ガイダンス');
                   updateGuidanceForStep(1, guidanceText);
+                } else {
+                  console.warn('⚠️ guidance-text要素が見つかりません');
                 }
+              } else {
+                console.warn('⚠️ updateGuidanceForStep関数が見つかりません');
               }
+              
+              console.log('✅ 公開停止後のUI更新完了');
               showMessage('回答ボードは非公開になりました。', 'success');
             })
             .catch(function(error) {
