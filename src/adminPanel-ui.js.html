@@ -370,16 +370,26 @@ function updateSpreadsheetButton() {
   const btn = document.getElementById('open-spreadsheet-btn-step2');
   if (!btn) return;
   
-  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) {
+  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) {
     btn.disabled = false;
     btn.onclick = function() {
-      window.open(currentStatus.userInfo.spreadsheetUrl, '_blank');
+      // 動的URL生成関数を使用
+      const dynamicUrl = typeof generateActiveSheetUrl === 'function' ? generateActiveSheetUrl() : null;
+      if (dynamicUrl) {
+        console.log('🔗 Step2 button: 動的URL使用', { url: dynamicUrl });
+        window.open(dynamicUrl, '_blank');
+      } else {
+        console.warn('⚠️ Step2 button: URL生成失敗、フォールバック使用');
+        const fallbackUrl = currentStatus.userInfo.spreadsheetUrl || 
+                            `https://docs.google.com/spreadsheets/d/${currentStatus.userInfo.spreadsheetId}/edit`;
+        window.open(fallbackUrl, '_blank');
+      }
     };
-    logDebug('✅ Spreadsheet button enabled with URL:', currentStatus.userInfo.spreadsheetUrl);
+    logDebug('✅ Spreadsheet button enabled with dynamic URL generation');
   } else {
     btn.disabled = true;
     btn.onclick = null;
-    logDebug('⚠️ Spreadsheet button disabled - no URL available');
+    logDebug('⚠️ Spreadsheet button disabled - no spreadsheet data available');
   }
 }
 
