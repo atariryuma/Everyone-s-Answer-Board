@@ -255,8 +255,16 @@ function prepareStatusData(status) {
 
 // 並列UI更新の実行（非同期処理の最適化）
 function executeParallelUIUpdates(status) {
+  console.log('🔧 executeParallelUIUpdates called with:', {
+    hasStatus: !!status,
+    hasUserInfo: !!status?.userInfo,
+    setupStep: status?.setupStep
+  });
+  
   const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
   const currentStep = status.setupStep || 1;
+  
+  console.log('🔧 executeParallelUIUpdates setup:', { setupStatus, currentStep });
   
   // 並列実行可能な更新タスクを定義
   const updateTasks = [
@@ -399,6 +407,11 @@ function updateSpreadsheetButton() {
 
 // Update static UI elements
 function updateStaticUI(status) {
+  console.log('🔧 updateStaticUI called with status:', {
+    hasStatus: !!status,
+    hasUserInfo: !!status?.userInfo
+  });
+  
   // Update database info panel
   updateDatabaseInfo(status);
   
