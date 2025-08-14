@@ -33,7 +33,7 @@ if (typeof window !== 'undefined') {
 // UTILITY FUNCTIONS
 // =============================================================================
 
-// Unified publication state detection with enhanced flow completion recognition
+// 強化された公開状態判定 - リソース整合性チェック付き
 function getPublicationState(status) {
   if (!status) {
     return { isPublished: false, reason: 'No status data' };
@@ -43,46 +43,93 @@ function getPublicationState(status) {
   let isPublished = false;
   let reason = '';
   
-  // 最優先: status.appPublishedをチェック（キャッシュクリア後の最新状態）
-  if (status.appPublished === true) {
-    isPublished = true;
-    reason = 'status.appPublished=true';
+  let confidence = 'high';
+  let validationDetails = {};
+
+  // 設定データの解析
+  let config = null;
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      config = JSON.parse(status.userInfo.configJson);
+    } catch (e) {
+      console.warn('Failed to parse configJson:', e);
+      return { isPublished: false, reason: 'configJson解析エラー', confidence: 'low' };
+    }
   }
-  else if (status.appPublished === false) {
+
+  // 1. 基本的な公開フラグチェック
+  const appPublishedFromStatus = status.appPublished;
+  const appPublishedFromConfig = config ? config.appPublished : undefined;
+  
+  // 2. 実際の公開リソースの存在確認
+  const hasFormUrl = !!(config && config.formUrl);
+  const hasPublishedSheet = !!(config && config.publishedSheetName);
+  const hasPublishedSpreadsheet = !!(config && config.publishedSpreadsheetId);
+  const setupCompleted = !!(config && config.setupStatus === 'completed');
+  const formCreated = !!(config && config.formCreated);
+  
+  validationDetails = {
+    appPublishedFromStatus,
+    appPublishedFromConfig,
+    hasFormUrl,
+    hasPublishedSheet,
+    hasPublishedSpreadsheet,
+    setupCompleted,
+    formCreated
+  };
+
+  // 3. 公開状態の判定ロジック（複数の条件を総合的に評価）
+  if (appPublishedFromStatus === true) {
+    // status.appPublished が明示的に true の場合
+    if (hasFormUrl && hasPublishedSheet && setupCompleted) {
+      isPublished = true;
+      reason = 'status.appPublished=true (リソース確認済み)';
+      confidence = 'high';
+    } else {
+      // appPublished=true だが必要なリソースが不足
+      isPublished = true;
+      reason = 'status.appPublished=true (リソース不完全)';
+      confidence = 'medium';
+    }
+  } else if (appPublishedFromStatus === false) {
     isPublished = false;
     reason = 'status.appPublished=false (明示的非公開)';
-  }
-  // appPublishedが未定義の場合のみconfigJsonを確認
-  else {
-    if (status.userInfo && status.userInfo.configJson) {
-      try {
-        const config = JSON.parse(status.userInfo.configJson);
-        isPublished = config.appPublished === true;
-        reason = `configJson.appPublished=${config.appPublished}`;
-      } catch (e) {
-        console.warn('Failed to parse configJson:', e);
-        isPublished = false;
-        reason = 'configJson解析エラー';
-      }
+  } else if (appPublishedFromConfig === true) {
+    // configJson から判定
+    if (hasFormUrl && hasPublishedSheet && setupCompleted) {
+      isPublished = true;
+      reason = 'configJson.appPublished=true (リソース確認済み)';
+      confidence = 'high';
     } else {
-      isPublished = false;
-      reason = 'appPublished情報なし';
+      isPublished = true;
+      reason = 'configJson.appPublished=true (リソース不完全)';
+      confidence = 'medium';
     }
+  } else if (hasFormUrl && hasPublishedSheet && setupCompleted && formCreated) {
+    // フラグはfalse/未定義だが、実際のリソースが存在する場合（QuickStart直後など）
+    isPublished = true;
+    reason = 'リソース存在による判定 (フラグ未更新)';
+    confidence = 'medium';
+  } else {
+    isPublished = false;
+    reason = appPublishedFromConfig === false ? 'configJson.appPublished=false' : '公開情報なし';
   }
   
   // デバッグログ
   if (shouldEnableDebugMode()) {
-    console.log('🔍 Publication check:', {
-      'status.appPublished': status.appPublished,
-      'final result': isPublished,
-      'reason': reason
+    console.log('🔍 Enhanced Publication check:', {
+      result: isPublished,
+      reason,
+      confidence,
+      validation: validationDetails
     });
   }
   
   return { 
     isPublished, 
     reason,
-    confidence: 'high' // 簡略化により信頼性向上
+    confidence,
+    validationDetails
   };
 }
 

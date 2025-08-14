@@ -480,10 +480,21 @@ class GASUtilities {
     }
     
     // 重複リクエスト防止: 同じ関数が実行中の場合は既存のPromiseを返す
+    // ただし、特定の条件下では強制実行を許可
     const requestKey = `${functionName}_${JSON.stringify(args)}`;
-    if (this.pendingRequests && this.pendingRequests.has(requestKey)) {
+    const isForceRequest = (
+      window.FORCE_REQUEST_MODE ||  // グローバルフォースモード
+      (functionName === 'getInitialData' && args && args[0] === true) ||  // getInitialData(true)
+      (message && message.includes('bypassCache'))  // バイパスメッセージ
+    );
+    
+    if (this.pendingRequests && this.pendingRequests.has(requestKey) && !isForceRequest) {
       console.log(`🚫 Duplicate request prevented: ${functionName}`);
       return this.pendingRequests.get(requestKey);
+    } else if (isForceRequest && this.pendingRequests && this.pendingRequests.has(requestKey)) {
+      console.log(`🔄 Force request override: ${functionName}`);
+      // 既存のリクエストを削除して新しいリクエストを許可
+      this.pendingRequests.delete(requestKey);
     }
     
     // pendingRequestsがない場合は初期化

@@ -3821,13 +3821,35 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     // スプレッドシート名を再設定（フォーム設定後に名前が変わる場合があるため）
     spreadsheetObj.rename(spreadsheetName);
 
-    // シート名を取得（通常は「フォームの回答 1」）
-    var sheets = spreadsheetObj.getSheets();
-    var sheetName = String(sheets[0].getName());
-    // シート名が不正な値でないことを確認
-    if (!sheetName || sheetName === 'true') {
-      sheetName = 'Sheet1'; // または適切なデフォルト値
-      warnLog('不正なシート名が検出されました。デフォルトのシート名を使用します: ' + sheetName);
+    // 重要: フォーム連携後のシート名を正確に取得（連携により変更される可能性があるため）
+    Utilities.sleep(1000); // フォーム連携完了を待つ
+    
+    // スプレッドシートを再読み込みして最新のシート情報を取得
+    try {
+      spreadsheetObj = SpreadsheetApp.openById(spreadsheetId);
+      var sheets = spreadsheetObj.getSheets();
+      var actualSheetName = String(sheets[0].getName());
+      
+      debugLog('📊 フォーム連携後のシート名確認:', {
+        originalName: 'Sheet1',
+        actualName: actualSheetName,
+        sheetCount: sheets.length
+      });
+      
+      // シート名が不正な値でないことを確認
+      if (!actualSheetName || actualSheetName === 'true' || actualSheetName.trim() === '') {
+        actualSheetName = 'フォームの回答 1'; // Google Formsのデフォルトシート名
+        warnLog('不正なシート名が検出されました。デフォルトのシート名を使用します: ' + actualSheetName);
+      }
+      
+      var sheetName = actualSheetName;
+      infoLog('✅ フォーム連携後の正確なシート名を取得:', sheetName);
+      
+    } catch (sheetNameError) {
+      errorLog('❌ フォーム連携後のシート名取得エラー:', sheetNameError.message);
+      // フォールバック: 標準的なシート名を使用
+      var sheetName = 'フォームの回答 1';
+      warnLog('⚠️ シート名取得エラーのため、標準名を使用:', sheetName);
     }
 
     // サービスアカウントとスプレッドシートを共有（失敗しても処理継続）
@@ -3840,9 +3862,42 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
       debugLog('スプレッドシート作成は完了しました。サービスアカウント共有は後で設定してください。');
     }
 
+    // スプレッドシートURL取得（リトライ機能付き）
+    let spreadsheetUrl = '';
+    try {
+      spreadsheetUrl = spreadsheetObj.getUrl();
+      if (!spreadsheetUrl) {
+        throw new Error('URL取得結果が空です');
+      }
+      debugLog('✅ スプレッドシートURL取得成功:', spreadsheetUrl);
+    } catch (urlError) {
+      warnLog('⚠️ 初回URL取得失敗、リトライします:', urlError.message);
+      
+      // リトライ処理（最大3回）
+      for (let retry = 0; retry < 3; retry++) {
+        try {
+          Utilities.sleep(1000 * (retry + 1)); // 1秒、2秒、3秒の間隔
+          spreadsheetObj = SpreadsheetApp.openById(spreadsheetId); // 再読み込み
+          spreadsheetUrl = spreadsheetObj.getUrl();
+          if (spreadsheetUrl) {
+            infoLog(`✅ スプレッドシートURL取得成功（${retry + 1}回目のリトライ）:`, spreadsheetUrl);
+            break;
+          }
+        } catch (retryError) {
+          warnLog(`❌ リトライ${retry + 1}回目失敗:`, retryError.message);
+        }
+      }
+      
+      if (!spreadsheetUrl) {
+        // 最後の手段: IDからURLを構築
+        spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+        warnLog('⚠️ URLを手動構築しました:', spreadsheetUrl);
+      }
+    }
+
     return {
       spreadsheetId: spreadsheetId,
-      spreadsheetUrl: spreadsheetObj.getUrl(),
+      spreadsheetUrl: spreadsheetUrl,
       sheetName: sheetName
     };
 
