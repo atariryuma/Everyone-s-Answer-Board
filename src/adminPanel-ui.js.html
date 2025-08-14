@@ -227,6 +227,29 @@ function _fullUpdateUIWithNewStatus(status) {
       console.log('✅ Published sheet updated:', publishedSheet);
     }
     
+    // 表示モードの更新
+    const displayMode = config.displayMode === 'named' ? '実名表示' : 
+                       config.displayMode === 'anonymous' ? '匿名表示' : '匿名表示';
+    const displayModeElement = document.getElementById('info-display-mode');
+    if (displayModeElement) {
+      displayModeElement.textContent = displayMode;
+      console.log('✅ Display mode updated:', displayMode);
+    } else {
+      console.warn('⚠️ Display mode element not found');
+    }
+    
+    // カウント表示の更新
+    const showCounts = config.showCounts === true ? '表示' : '非表示';
+    const showCountsElement = document.getElementById('info-show-counts');
+    if (showCountsElement) {
+      showCountsElement.textContent = showCounts;
+      console.log('✅ Show counts updated:', showCounts);
+    } else {
+      console.warn('⚠️ Show counts element not found');
+    }
+    
+    // ドメイン情報は既存のシステムで処理される
+    
     // 現在のステータスを保存（グローバルに）
     window.currentStatus = status;
     
@@ -3750,15 +3773,19 @@ function fixConfigForPublishedState(config) {
 
 
 // 簡単な履歴テーブル初期化は initializeAdminPanel で実行されるように変更
-// DOMContentLoaded は削除
+// DOMContentLoaded は削除 - framework.js.htmlで統一管理
 
-// Draft recovery function - moved to standalone
-document.addEventListener('DOMContentLoaded', async function() {
+// Draft recovery function - moved to initializeAdminPanelMaster
+function recoverDraftIfAvailable() {
   // Check for and recover draft from session storage
-  if (hasDraftInSession()) {
-    await recoverDraftFromSession();
+  if (typeof hasDraftInSession === 'function' && hasDraftInSession()) {
+    if (typeof recoverDraftFromSession === 'function') {
+      recoverDraftFromSession().catch(error => {
+        console.warn('⚠️ Draft recovery failed:', error);
+      });
+    }
   }
-});
+}
 
 // 日時フォーマット関数
 function formatDateTime(date) {

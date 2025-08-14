@@ -281,25 +281,12 @@ function initializeAPI() {
   document.addEventListener('keypress', updateUserActivity);
   document.addEventListener('scroll', updateUserActivity);
 
-  // 初回ロード時にシステムステータスをロード（重複呼び出し防止）
-  const now = Date.now();
-  const timeSinceLastCall = window.AdminPanel.initialization.lastLoadStatusCall ? 
-    now - window.AdminPanel.initialization.lastLoadStatusCall : Infinity;
-  
-  // Prevent rapid successive loadStatus calls (< 1000ms apart)
-  if (timeSinceLastCall > 1000) {
-    window.AdminPanel.initialization.lastLoadStatusCall = now;
-    window.AdminPanel.initialization.loadStatusCallCount++;
-    
-    logDebug(`🚀 loadStatus(true)を呼び出します (Call #${window.AdminPanel.initialization.loadStatusCallCount})`);
-    if (checkFunctionAvailability('loadStatus')) {
-      // 初期化時は必ずキャッシュをバイパスしてフレッシュなデータを取得
-      window.loadStatus(true);
-    } else {
-      console.warn('⚠️ loadStatus not available - manual status refresh required');
-    }
+  // 初期化時のステータスロード - シンプル化
+  logDebug('🚀 初期化時loadStatus(true)呼び出し');
+  if (checkFunctionAvailability('loadStatus')) {
+    window.loadStatus(true);
   } else {
-    logDebug(`⏭️ Skipping redundant loadStatus call (${timeSinceLastCall}ms since last call)`);
+    console.warn('⚠️ loadStatus not available');
   }
   
   logDebug('✅ API初期化完了');
@@ -1224,30 +1211,19 @@ function checkAndExpandAllSections() {
 // =============================================================================
 
 function initializeAdminPanelMaster() {
-  // Prevent redundant initialization calls
-  if (window.AdminPanel.initialization.isInProgress) {
-    logDebug('🔄 AdminPanel initialization already in progress, skipping duplicate call');
-    return;
-  }
-  
+  // シンプル化: 重複初期化チェックを簡素化
   if (window.AdminPanel.initialization.isCompleted) {
-    logDebug('✅ AdminPanel already initialized, skipping duplicate call');
+    logDebug('✅ AdminPanel already initialized');
     return;
   }
   
-  // Mark initialization as in progress
   window.AdminPanel.initialization.isInProgress = true;
-  window.AdminPanel.initialization.startTime = Date.now();
-  
   logInfo('🚀 AdminPanel Master Initialization Started');
-  updateSystemStatus('initializationStarted', true);
   
   // Phase 1: Core初期化
   try {
     initCore();
-    updateSystemStatus('coreInitialized', true);
   } catch (error) {
-    updateSystemStatus('coreInitialized', false, error);
     console.error('❌ Core initialization failed:', error);
   }
   
@@ -1280,30 +1256,20 @@ function initializeAdminPanelMaster() {
       logError('❌ Status module initialization failed:', error);
     }
     
-    // API通信初期化（最重要 - getInitialDataを呼び出す）
+    // API通信初期化
     try {
-      logDebug('🚀 API module initialization starting...');
+      logDebug('🚀 API module initialization...');
       initializeAPI();
-      updateSystemStatus('apiInitialized', true);
-      window.AdminPanel.initialization.completedPhases.add('api');
       logDebug('✅ API module initialized');
     } catch (error) {
-      updateSystemStatus('apiInitialized', false, error);
       console.error('❌ API initialization failed:', error);
-      
-      // フォールバック実装
-      console.warn('⚠️ API functions not available, using fallback...');
-      updateSystemStatus('apiInitialized', 'fallback');
-      logDebug('✅ API module initialized with fallback');
     }
     
     // UI初期化
     try {
       initializeUI();
-      updateSystemStatus('uiInitialized', true);
       logDebug('✅ UI module initialized');
     } catch (error) {
-      updateSystemStatus('uiInitialized', false, error);
       console.error('❌ UI initialization failed:', error);
     }
     
@@ -1320,13 +1286,8 @@ function initializeAdminPanelMaster() {
     setTimeout(() => {
       try {
         initializeEventListeners();
-        updateSystemStatus('eventsInitialized', true);
-        updateSystemStatus('initializationComplete', true);
         logDebug('✅ Events module initialized');
         logInfo('🎉 AdminPanel Master Initialization Complete');
-        
-        // システム状態の最終レポート
-        console.log('📊 Final System Status:', window.systemStatus);
         
         // ユーザー情報の同期と最終処理
         finalizeInitialization();
@@ -1373,7 +1334,6 @@ async function finalizeInitialization() {
       
       // UI要素の有効化
       enableUserInteraction();
-      updateSystemStatus('userDataSyncComplete', true);
       
       // Initialize and load history table after all initialization is complete
       try {
@@ -1389,11 +1349,20 @@ async function finalizeInitialization() {
         console.warn('⚠️ History initialization/loading failed:', historyError);
       }
       
-      // Mark initialization as completed
+      // Draft recovery after initialization complete
+      try {
+        console.log('🔄 Checking for draft recovery...');
+        if (typeof recoverDraftIfAvailable === 'function') {
+          recoverDraftIfAvailable();
+        }
+      } catch (draftError) {
+        console.warn('⚠️ Draft recovery failed:', draftError);
+      }
+      
+      // 初期化完了
       window.AdminPanel.initialization.isInProgress = false;
       window.AdminPanel.initialization.isCompleted = true;
-      const initTime = Date.now() - window.AdminPanel.initialization.startTime;
-      logInfo(`✅ AdminPanel Master Initialization Completed in ${initTime}ms`);
+      logInfo('✅ AdminPanel Master Initialization Completed');
       
     } catch (error) {
       console.error('❌ Final sync error:', error);
@@ -1403,7 +1372,7 @@ async function finalizeInitialization() {
       }
       enableUserInteraction();
       
-      // Mark initialization as completed even on error
+      // 初期化完了（エラーありでも）
       window.AdminPanel.initialization.isInProgress = false;
       window.AdminPanel.initialization.isCompleted = true;
       logWarn('⚠️ AdminPanel initialization completed with errors');
