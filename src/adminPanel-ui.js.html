@@ -288,6 +288,15 @@ function _fullUpdateUIWithNewStatus(status) {
     // 現在のステータスを保存（グローバルに）
     window.currentStatus = status;
     
+    // 公開停止ボタンの更新
+    console.log('🚫 Updating unpublish button...');
+    updateUnpublishButton(status);
+    
+    // ステップインジケーターの更新
+    console.log('📊 Updating step indicators...');
+    const currentStep = status.setupStep || 1;
+    updateStepIndicators(currentStep, status);
+    
     // 固定フッターの更新
     console.log('🦶 Updating footer...');
     updateFooterAndGuidance(status);
