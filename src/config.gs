@@ -1794,16 +1794,42 @@ function unpublishBoard(requestUserId) {
     configJson.showNames = false;
     configJson.showCounts = false;
     configJson.highlightMode = false;
+    
+    // 追加の表示・公開設定のクリア
+    configJson.allowAnonymous = false;      // 匿名投稿許可設定
+    configJson.enableRealtime = false;      // リアルタイム更新設定
+    configJson.publicAccess = false;        // パブリックアクセス設定
+    configJson.viewMode = '';               // 表示モード設定
+    configJson.theme = '';                  // テーマ設定
+    
+    // シート別の個別設定もクリア
+    const sheetConfigKeys = Object.keys(configJson).filter(key => key.startsWith('sheet_'));
+    sheetConfigKeys.forEach(key => {
+      debugLog(`🧹 シート別設定をクリア: ${key}`);
+      delete configJson[key];
+    });
 
     // カラムマッピングのクリア
     if (configJson.columnMappings) {
       configJson.columnMappings = {};
     }
+    
+    // 公開履歴・統計情報もクリア
+    if (configJson.publishHistory) {
+      configJson.publishHistory = [];
+    }
+    if (configJson.viewStats) {
+      configJson.viewStats = {};
+    }
 
-    // 注意: spreadsheetId, activeSheetName, formUrl等のデータソース情報は保持
+    // スプレッドシート情報もクリア（完全リセットのため）
+    configJson.spreadsheetId = '';        // configJson内のスプレッドシートIDもクリア
+    configJson.spreadsheetUrl = '';       // configJson内のスプレッドシートURLもクリア
+    
+    // 注意: formUrl等のユーザーが作成したリソースは保持
     // 注意: formCreated状態も保持（ユーザーが作成したフォームを維持）
 
-    debugLog('🧹 公開停止: 設定を完全クリア完了');
+    debugLog('🧹 公開停止: 設定を完全クリア完了（スプレッドシート情報も含む）');
 
     // データベースを更新（ステップ2設定も完全リセット）
     const updateData = {

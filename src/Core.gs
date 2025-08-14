@@ -261,7 +261,7 @@ var DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教え�
  * @returns {number} setupStep (1-3)
  */
 function getSetupStep(userInfo, configJson) {
-  debugLog('🔍 getSetupStep: ステップ判定開始', {
+  debugLog('🔍 getSetupStep: UI状態ベースのステップ判定開始', {
     hasUserInfo: !!userInfo,
     spreadsheetId: userInfo ? userInfo.spreadsheetId : 'none',
     hasConfigJson: !!configJson,
@@ -269,9 +269,21 @@ function getSetupStep(userInfo, configJson) {
     unpublishReason: configJson ? configJson.unpublishReason : 'none'
   });
   
-  // Step 1: データソース未設定
+  // Step 1: データソース未設定 または 公開停止によるリセット
   if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
-    debugLog('🔧 ステップ1判定: データソース未設定', { userInfo: !!userInfo, spreadsheetId: userInfo ? userInfo.spreadsheetId : 'none' });
+    debugLog('🔧 ステップ1判定: データソース未設定', { 
+      userInfo: !!userInfo, 
+      spreadsheetId: userInfo ? userInfo.spreadsheetId : 'none' 
+    });
+    return 1;
+  }
+  
+  // 公開停止後の明示的なリセット判定：手動停止時はステップ1に戻す（設定状態に関係なく）
+  if (configJson && configJson.appPublished === false && configJson.unpublishReason === 'manual_stop') {
+    debugLog('🔧 ステップ1判定: 手動停止によるリセット', { 
+      appPublished: configJson.appPublished, 
+      unpublishReason: configJson.unpublishReason 
+    });
     return 1;
   }
   
@@ -281,38 +293,36 @@ function getSetupStep(userInfo, configJson) {
     return 2;
   }
   
-  // 公開済み状態の最優先判定（データ不整合に関係なく公開済みならStep 3）
-  const isCurrentlyPublished = (
-    configJson.appPublished === true ||
-    (configJson.setupStatus === 'completed' && 
-     configJson.formCreated === true && 
-     configJson.formUrl && configJson.formUrl.trim())
-  );
-  
-  debugLog('🔍 公開状態判定', {
-    appPublished: configJson.appPublished,
-    setupStatus: configJson.setupStatus,
-    formCreated: configJson.formCreated,
-    hasFormUrl: !!(configJson.formUrl && configJson.formUrl.trim()),
-    isCurrentlyPublished: isCurrentlyPublished
-  });
-  
-  if (isCurrentlyPublished) {
-    debugLog('🔧 ステップ3判定: 公開中', { reason: 'isCurrentlyPublished=true' });
+  // Step 3: 公開中の判定（最優先）
+  if (configJson.appPublished === true) {
+    debugLog('🔧 ステップ3判定: 現在公開中', { appPublished: configJson.appPublished });
     return 3;
   }
   
-  // 公開停止後の明示的なリセット判定：手動停止時はステップ1に戻す
-  if (configJson.appPublished === false && configJson.unpublishReason === 'manual_stop') {
-    debugLog('🔧 手動停止フラグ検出: ステップ1に復帰', { 
-      appPublished: configJson.appPublished, 
-      unpublishReason: configJson.unpublishReason 
+  // Step 2 vs Step 3: UI設定状態に基づく判定
+  const hasRequiredSettings = (
+    configJson.opinionHeader && configJson.opinionHeader.trim() !== '' &&  // 意見列が設定済み
+    configJson.activeSheetName && configJson.activeSheetName.trim() !== '' // アクティブシートが選択済み
+  );
+  
+  debugLog('🔍 設定完成度チェック', {
+    opinionHeader: configJson.opinionHeader || '',
+    activeSheetName: configJson.activeSheetName || '',
+    hasRequiredSettings: hasRequiredSettings,
+    setupStatus: configJson.setupStatus || ''
+  });
+  
+  if (hasRequiredSettings) {
+    debugLog('🔧 ステップ3判定: 設定完了（公開可能状態）', { 
+      reason: '必要設定が完了済み' 
     });
-    return 1;
+    return 3;
   }
   
-  // デフォルト: セットアップ継続中
-  debugLog('🔧 ステップ2判定: デフォルト（セットアップ継続中）');
+  // デフォルト: ステップ2（設定継続中）
+  debugLog('🔧 ステップ2判定: 設定継続中', { 
+    reason: '必要設定が未完了' 
+  });
   return 2;
 }
 
