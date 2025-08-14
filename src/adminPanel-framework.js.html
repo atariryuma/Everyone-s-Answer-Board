@@ -222,8 +222,27 @@ function initializeUserId() {
   });
 }
 
-// ユーザーID取得の完了を待つPromise
-const userIdPromise = initializeUserId();
+// リトライ付きユーザーID取得
+async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await initializeUserId();
+    } catch (error) {
+      console.warn(`⚠️ UserId initialization failed (attempt ${i + 1}/${maxRetries}):`, error.message);
+      if (i < maxRetries - 1) {
+        console.log(`🔄 Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * 1.5, 5000); // 指数バックオフ（最大5秒）
+      } else {
+        console.error('❌ All userId initialization attempts failed');
+        throw error;
+      }
+    }
+  }
+}
+
+// ユーザーID取得の完了を待つPromise（リトライ機構付き）
+const userIdPromise = initializeUserIdWithRetry();
 
 // =============================================================================
 // CORE INITIALIZATION FUNCTIONS
@@ -281,13 +300,15 @@ function initializeAPI() {
   document.addEventListener('keypress', updateUserActivity);
   document.addEventListener('scroll', updateUserActivity);
 
-  // 初期化時のステータスロード - シンプル化
-  logDebug('🚀 初期化時loadStatus(true)呼び出し');
-  if (checkFunctionAvailability('loadStatus')) {
-    window.loadStatus(true);
-  } else {
-    console.warn('⚠️ loadStatus not available');
-  }
+  // 初期化時のステータスロード - タイミング調整版
+  logDebug('🚀 初期化時loadStatus(true)呼び出し（遅延あり）');
+  setTimeout(() => {
+    if (checkFunctionAvailability('loadStatus')) {
+      window.loadStatus(true);
+    } else {
+      console.warn('⚠️ loadStatus not available');
+    }
+  }, 500); // 500ms遅延でより安全な初期化
   
   logDebug('✅ API初期化完了');
 }

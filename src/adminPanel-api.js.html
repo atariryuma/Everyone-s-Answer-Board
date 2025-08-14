@@ -878,13 +878,40 @@ function loadStatus(bypassCache = false) {
   console.group('🔄 loadStatus - 一元管理版');
   console.log('🚀 Loading system status, bypassCache:', bypassCache);
 
-  // 新しい実行を開始
+  // 新しい実行を開始（フォールバック機構付き）
   loadStatusInProgress = userIdPromise.then(() => {
     if (!userId) {
       console.error('❌ userId is not available after userIdPromise resolution in loadStatus!');
       showMessage('ユーザーIDが取得できません。ページを再読み込みしてください。', 'error');
       console.groupEnd();
       throw new Error('userId is not available');
+    }
+  }).catch(error => {
+    console.error('❌ Error resolving userIdPromise in loadStatus:', error);
+    showMessage('ユーザーIDの初期化に失敗しました。ページを再読み込みしてください。', 'error');
+    
+    // フォールバック: 直接認証を再試行
+    console.warn('⚠️ Attempting direct authentication as fallback...');
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(response => {
+          console.log('🔄 Fallback authentication response:', response);
+          if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
+            userId = response.userInfo.userId;
+            console.log('✅ Fallback authentication successful, userId:', userId);
+            resolve(userId);
+          } else {
+            console.error('❌ Fallback authentication also failed:', response);
+            reject(new Error('フォールバック認証も失敗しました'));
+          }
+        })
+        .withFailureHandler(reject)
+        .getCurrentUserStatus();
+    });
+  }).then(() => {
+    if (!userId) {
+      console.error('❌ userId still not available after fallback');
+      throw new Error('userId is not available after fallback');
     }
 
     console.log('🌐 Calling getInitialData with userId:', userId, 'bypassCache:', bypassCache);
