@@ -3,7 +3,7 @@ let lastSelectedSheetName = null; // To prevent redundant sheet selection change
 
 // === シンプル化されたUI更新システム ===
 // 複雑な制御機構を除去し、必要最小限の変数のみ保持
-let currentStatus = null;
+// 注意: window.currentStatus は他のファイルでも使用されているため、ここでは別名を使用
 
 // =============================================================================
 // EARLY FUNCTION DEFINITIONS (Critical functions that must be available immediately)
@@ -227,7 +227,7 @@ function _fullUpdateUIWithNewStatus(status) {
       console.log('✅ Published sheet updated:', publishedSheet);
     }
     
-    // 現在のステータスを保存
+    // 現在のステータスを保存（グローバルに）
     window.currentStatus = status;
     
     console.log('🎉 Simple UI update completed successfully');
