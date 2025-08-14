@@ -489,6 +489,7 @@
     <script>
         let currentUserInfo = null;
         let setupInProgress = false;
+        let adminPanelUrl = '';
 
         // 統一されたメッセージ表示関数 - SharedUtilitiesを使用
         function showMessage(message, type = 'info', duration = 5000) {
@@ -615,6 +616,25 @@
         }
 
         /**
+         * 管理パネルのURLを取得して保存する。
+         * @returns {void}
+         */
+        function fetchAdminPanelUrl() {
+            google.script.run
+                .withSuccessHandler((urls) => {
+                    if (urls && urls.adminUrl) {
+                        adminPanelUrl = urls.adminUrl;
+                    } else {
+                        console.error('管理パネルURLの取得に失敗:', urls);
+                    }
+                })
+                .withFailureHandler((error) => {
+                    console.error('管理パネルURLの取得エラー:', error);
+                })
+                .generateUserUrls(__USER_ID__);
+        }
+
+        /**
          * 管理パネルに戻る。
          * 非同期処理を挟まずユーザー操作として認識されるよう同期的に遷移する。
          */
@@ -640,11 +660,14 @@
                 }
             };
 
-            const currentUrl = window.location.href.split('?')[0];
-            const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
+            if (!adminPanelUrl) {
+                restoreButton();
+                showMessage('管理パネルURLを取得できませんでした。ページを再読み込みして再試行してください。', 'error');
+                return;
+            }
 
             try {
-                window.open(targetUrl, '_top');
+                window.open(adminPanelUrl, '_top');
             } catch (error) {
                 console.error('管理パネルへの遷移に失敗:', error);
                 restoreButton();
@@ -655,6 +678,7 @@
         // ページ読み込み時の処理
         window.addEventListener('load', function() {
             loadCurrentStatus();
+            fetchAdminPanelUrl();
         });
 
         // ユーザー管理機能のJavaScript関数
