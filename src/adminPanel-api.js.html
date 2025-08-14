@@ -892,6 +892,13 @@ function loadStatus(bypassCache = false) {
     // runGasWithUserId を使用して getInitialData を呼び出す
     return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
       .then(response => {
+        console.log('🚀 getInitialData response received:', {
+          response: response,
+          hasUserInfo: !!response?.userInfo,
+          userInfoKeys: response?.userInfo ? Object.keys(response.userInfo) : [],
+          adminEmail: response?.userInfo?.adminEmail,
+          userId: response?.userInfo?.userId
+        });
         logDebug('✅ Integrated data loaded:', response);
         
         // エラーレスポンスの検証

@@ -320,9 +320,16 @@ let currentConfig = null;
 
 // Safe text content setter
 function safeSetText(elementId, text) {
+  console.log('🔧 safeSetText called:', { elementId, text, textType: typeof text });
+  
   var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
+  console.log('🔧 safeSetText element found:', !!element);
+  
   if (element) {
     setSafeTextContent(element, text || '');
+    console.log('🔧 safeSetText completed for:', elementId, 'with text:', text || '');
+  } else {
+    console.warn('⚠️ safeSetText: Element not found:', elementId);
   }
 }
 

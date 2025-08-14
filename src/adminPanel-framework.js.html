@@ -291,9 +291,10 @@ function initializeAPI() {
     window.AdminPanel.initialization.lastLoadStatusCall = now;
     window.AdminPanel.initialization.loadStatusCallCount++;
     
-    logDebug(`🚀 loadStatus()を呼び出します (Call #${window.AdminPanel.initialization.loadStatusCallCount})`);
+    logDebug(`🚀 loadStatus(true)を呼び出します (Call #${window.AdminPanel.initialization.loadStatusCallCount})`);
     if (checkFunctionAvailability('loadStatus')) {
-      safeCallFunction('loadStatus');
+      // 初期化時は必ずキャッシュをバイパスしてフレッシュなデータを取得
+      window.loadStatus(true);
     } else {
       console.warn('⚠️ loadStatus not available - manual status refresh required');
     }

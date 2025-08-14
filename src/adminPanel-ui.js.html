@@ -167,22 +167,28 @@ function generateViewUrl(status, userId) {
 // Update UI with new status data
 // Full implementation of updateUIWithNewStatus for later use
 function _fullUpdateUIWithNewStatus(status) {
+  console.log('🔧 _fullUpdateUIWithNewStatus called with status:', status);
+  
   if (!validateStatus(status)) {
     logWarn('Invalid status received, skipping UI update');
     return;
   }
+  
+  console.log('✅ Status validation passed, proceeding with UI update');
 
   totalUpdateCount++;
   
   // Generate status hash for duplicate detection
   const statusHash = generateStatusHash(status);
   
-  // Skip identical updates to prevent processing redundancy
-  if (lastStatusHash === statusHash) {
+  // Skip identical updates to prevent processing redundancy (temporarily disabled for debugging)
+  if (false && lastStatusHash === statusHash) {
     duplicateUpdateCount++;
     logDebug(`🚫 Skipping duplicate UI update (${duplicateUpdateCount}/${totalUpdateCount} duplicates)`);
     return;
   }
+  
+  console.log('🔧 Proceeding with UI update, statusHash:', statusHash);
   
   // Clear any pending debounced update
   if (uiUpdateDebounceTimer) {
@@ -432,6 +438,14 @@ function updateStaticUI(status) {
 // =============================================================================
 
 function updateDatabaseInfo(status) {
+  console.log('🔧 updateDatabaseInfo called with:', {
+    status: !!status,
+    userInfo: !!status?.userInfo,
+    adminEmail: status?.userInfo?.adminEmail,
+    userId: status?.userInfo?.userId,
+    configJson: status?.userInfo?.configJson
+  });
+  
   if (!status || !status.userInfo) {
     console.warn('System info update failed: No user info available');
     return;
@@ -445,6 +459,12 @@ function updateDatabaseInfo(status) {
   const cfg = status.config || {};
 
   // 基本情報の更新
+  console.log('🔧 Setting basic info with safeSetText:', {
+    adminEmail: status.userInfo.adminEmail,
+    userId: status.userInfo.userId,
+    publishedSheet: cfg.publishedSheetName || status.publishedSheetName || 'なし'
+  });
+  
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
   safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
