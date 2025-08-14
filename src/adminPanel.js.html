@@ -416,25 +416,6 @@
     openAppSetupPage,
     logoutAndRedirect
   };
-
-  // StudyQuest アプリ設定への遷移
-  function openAppSetupPage() {
-    google.script.run
-      .withSuccessHandler(function(url) {
-        if (url) {
-          // ログイン画面からの遷移と同じフローを再現
-          showAdminPanelRedirect(url, 'アプリ設定管理へ遷移します');
-        } else {
-          showMessage('アプリ設定URLの取得に失敗しました', 'error');
-        }
-      })
-      .withFailureHandler(function(error) {
-        console.error('Failed to get app setup URL:', error);
-        showMessage('アプリ設定URLの取得中にエラーが発生しました', 'error');
-      })
-      .getAppSetupUrl(); // この関数はバックエンドで実装されていると仮定
-  }
-
   // ログアウトしてログイン画面へリダイレクト
   function logoutAndRedirect() {
     if (confirm('ログアウトしてログイン画面に戻りますか？')) {
@@ -447,70 +428,6 @@
           showMessage('ログアウト処理中にエラーが発生しました', 'error');
         })
         .resetUserAuthentication(); // バックエンドの認証リセット関数を呼び出す
-    }
-  }
-  /**
-   * 管理パネルから別のページへのリダイレクト画面を表示
-   * @param {string} targetUrl - 遷移先のURL
-   * @param {string} message - 表示メッセージ
-   */
-  function showAdminPanelRedirect(targetUrl, message) {
-    try {
-      // 引数の妥当性チェック
-      if (!targetUrl || typeof targetUrl !== 'string') {
-        console.error('showAdminPanelRedirect: 無効なtargetUrlが渡されました:', targetUrl);
-        showMessage('遷移URLが無効です。ページを再読み込みしてください。', 'error');
-        return;
-      }
-      
-      console.log('管理パネルからの遷移画面を表示:', targetUrl);
-      
-      // ローディング状態を停止
-      if (typeof setLoading === 'function') {
-        setLoading(false);
-      }
-      
-      // 簡潔なリダイレクトページ
-      const redirectHtml = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <title>${message || 'ページ遷移中...'}</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { 
-      font-family: system-ui, sans-serif; background: #1a1b26; min-height: 100vh; 
-      margin: 0; display: flex; align-items: center; justify-content: center; padding: 20px; 
-    }
-    .container { 
-      background: rgba(26,27,38,0.9); border-radius: 16px; padding: 2rem; 
-      max-width: 420px; text-align: center; 
-    }
-    .title { color: #10b981; font-size: 1.5rem; margin-bottom: 1rem; }
-    .message { color: #94a3b8; margin-bottom: 2rem; }
-    .btn { 
-      background: #10b981; color: white; border: none; border-radius: 8px; 
-      padding: 12px 24px; margin: 0.5rem; text-decoration: none; display: inline-block; 
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="title">🚀 準備完了</div>
-    <div class="message">${message || 'ページ遷移の準備が完了しました'}</div>
-    <a href="${targetUrl}" class="btn" target="_top">アプリ設定画面を開く</a>
-  </div>
-</body>
-</html>`;
-      
-      // 新しいページに遷移
-      document.open();
-      document.write(redirectHtml);
-      document.close();
-      
-    } catch (error) {
-      console.error('showAdminPanelRedirectでエラー:', error);
-      showMessage('ページ遷移中にエラーが発生しました: ' + error.message, 'error');
     }
   }
 
