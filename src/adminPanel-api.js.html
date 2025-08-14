@@ -1029,26 +1029,46 @@ function handleSheetDetailsSuccess(details) {
     }
     
     if (details.guessedConfig) {
-      // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
-      setTimeout(() => {
-        populateConfig(details.guessedConfig);
-        
-        // Enhanced auto-detection success message with specifics
-        const detectedColumns = [];
-        if (details.guessedConfig.opinionColumn) detectedColumns.push(`回答列: ${details.guessedConfig.opinionColumn}`);
-        if (details.guessedConfig.nameColumn) detectedColumns.push(`名前列: ${details.guessedConfig.nameColumn}`);
-        if (details.guessedConfig.classColumn) detectedColumns.push(`クラス列: ${details.guessedConfig.classColumn}`);
-        
-        const message = detectedColumns.length > 0 
-          ? `🤖 AI列判定が自動実行されました！検出された列: ${detectedColumns.join(', ')}。設定を確認してください。`
-          : '🤖 AI列判定が自動実行されました。設定を確認してください。';
-        
-        showMessage(message, 'success');
-      }, 0);
+      // 履歴復元中はAI列判定をスキップ
+      if (window._historyRestoreInProgress) {
+        console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
+      } else {
+        // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
+        setTimeout(() => {
+          populateConfig(details.guessedConfig);
+          
+          // Enhanced auto-detection success message with specifics
+          const detectedColumns = [];
+          if (details.guessedConfig.opinionColumn) detectedColumns.push(`回答列: ${details.guessedConfig.opinionColumn}`);
+          if (details.guessedConfig.nameColumn) detectedColumns.push(`名前列: ${details.guessedConfig.nameColumn}`);
+          if (details.guessedConfig.classColumn) detectedColumns.push(`クラス列: ${details.guessedConfig.classColumn}`);
+          
+          const message = detectedColumns.length > 0 
+            ? `🤖 AI列判定が自動実行されました！検出された列: ${detectedColumns.join(', ')}。設定を確認してください。`
+            : '🤖 AI列判定が自動実行されました。設定を確認してください。';
+          
+          showMessage(message, 'success');
+        }, 0);
+      }
     }
+    
+    // 成功時の戻り値を返す
+    return {
+      success: true,
+      headers: details.allHeaders,
+      guessedConfig: details.guessedConfig || null,
+      message: 'シート設定の読み込みが完了しました'
+    };
   } else {
     logWarn('No headers in sheet details:', details);
     showMessage('シートの詳細情報を取得できませんでした。', 'warning');
+    
+    // エラー時の戻り値を返す
+    return {
+      success: false,
+      error: 'シートの詳細情報を取得できませんでした',
+      details: details
+    };
   }
 }
 
