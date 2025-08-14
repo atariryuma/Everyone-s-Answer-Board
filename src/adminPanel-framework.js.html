@@ -1308,18 +1308,7 @@ function initializeAdminPanelMaster() {
 async function finalizeInitialization() {
   setTimeout(async () => {
     try {
-      console.log('🔄 Final user data synchronization...');
-      
-      // ユーザーデータの最終同期を確実に実行
-      if (typeof loadStatus === 'function') {
-        try {
-          await loadStatus(true);
-        } catch (syncError) {
-          console.warn('⚠️ User data sync failed, but continuing:', syncError);
-        }
-      } else {
-        console.warn('⚠️ loadStatus function not available');
-      }
+      console.log('🔄 Final initialization steps...');
       
       // すべての同期が完了したらローディングオーバーレイを非表示
       if (window.unifiedLoading) {

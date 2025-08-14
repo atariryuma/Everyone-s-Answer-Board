@@ -248,7 +248,19 @@ function _fullUpdateUIWithNewStatus(status) {
       console.warn('⚠️ Show counts element not found');
     }
     
-    // ドメイン情報は既存のシステムで処理される
+    // ドメイン情報の更新
+    console.log('🌐 Updating domain display...');
+    clearInitialDisplayElements();
+    
+    // シートプルダウンの更新
+    console.log('📋 Updating sheet dropdown...');
+    const sheetsData = status.sheetNames || status.allSheets || [];
+    if (sheetsData.length > 0) {
+      populateSheetSelect(sheetsData, status.activeSheetName);
+      console.log('✅ Sheet dropdown updated with', sheetsData.length, 'sheets');
+    } else {
+      console.log('⚠️ No sheet data available for dropdown');
+    }
     
     // 現在のステータスを保存（グローバルに）
     window.currentStatus = status;
@@ -265,113 +277,7 @@ if (typeof window !== 'undefined') {
   window._fullUpdateUIWithNewStatus = _fullUpdateUIWithNewStatus;
 }
 
-// === 旧版：複雑なデータ準備関数（現在は使用されていません） ===
-/*
-function prepareStatusData(status) {
-  // 1. configJson正規化処理（包括的システム最適化）
-  status.config = normalizeConfigJson(status.config, status.userInfo);
-  
-  // 2. 正規化されたプロパティの追加（計算集約処理）
-  const publicationState = getPublicationState(status);
-  const viewUrl = generateViewUrl(status, userId);
-  
-  status._normalized = {
-    isPublished: publicationState.isPublished,
-    publishReason: publicationState.reason,
-    viewUrl: viewUrl,
-    hasValidViewUrl: !!viewUrl
-  };
-  
-  return status;
-}
-*/
-
-// === 旧版：複雑な並列処理関数群（現在は使用されていません） ===
-/*
-// 並列UI更新の実行（非同期処理の最適化）
-function executeParallelUIUpdates(status) {
-  console.log('🔧 executeParallelUIUpdates called with:', {
-    hasStatus: !!status,
-    hasUserInfo: !!status?.userInfo,
-    setupStep: status?.setupStep
-  });
-  
-  const setupStatus = getSetupStatusFromUserInfo(status.userInfo);
-  const currentStep = status.setupStep || 1;
-  
-  console.log('🔧 executeParallelUIUpdates setup:', { setupStatus, currentStep });
-  
-  // 並列実行可能な更新タスクを定義
-  const updateTasks = [
-    // Task 1: 静的要素の更新
-    () => {
-      clearInitialDisplayElements();
-      updateStaticUI(status);
-      updateUnpublishButton(status);
-      if (setupStatus === 'pending') {
-        updateButtonStatesForSetup(status);
-      }
-    },
-    
-    // Task 2: 動的コンテンツの更新
-    () => {
-      if (status.activeSheetName) {
-        updateDynamicContent(status);
-      } else {
-        updateUIForNoActiveSheet(status);
-      }
-    },
-    
-    // Task 3: フッターとガイダンスの更新
-    () => updateFooterAndGuidance(status),
-    
-    // Task 4: ステータスバーの更新（統合最適化版）
-    () => updateStepIndicators((status && status.setupStep) || currentStep, status)
-  ];
-  
-  // 並列実行（requestAnimationFrameで最適化）
-  requestAnimationFrame(() => {
-    // 重い処理を複数のフレームに分散
-    executeTasksInBatches(updateTasks);
-  });
-}
-
-// タスクのバッチ実行（フレーム分散最適化）
-function executeTasksInBatches(tasks, batchSize = 2) {
-  if (tasks.length === 0) return;
-  
-  // 現在のバッチを実行
-  const currentBatch = tasks.splice(0, batchSize);
-  currentBatch.forEach(task => {
-    try {
-      task();
-    } catch (error) {
-      logError('UI更新タスクエラー:', error);
-    }
-  });
-  
-  // 残りのタスクがある場合は次のフレームで実行
-  if (tasks.length > 0) {
-    requestAnimationFrame(() => executeTasksInBatches(tasks, batchSize));
-  }
-}
-
-// UI更新完了処理
-function finishUIUpdate() {
-  isUIUpdateInProgress = false;
-  
-  // 待機中の更新があれば実行（デバウンス付き）
-  if (pendingUIUpdate) {
-    const nextUpdate = pendingUIUpdate;
-    pendingUIUpdate = null;
-    
-    // Prevent immediate re-execution, allow small delay for system stability
-    setTimeout(() => {
-      updateUIWithNewStatus(nextUpdate);
-    }, 50);
-  }
-}
-*/
+// === 旧複雑システムは削除済み - シンプル化完了 ===
 
 // Generate hash for status comparison to detect duplicates
 function generateStatusHash(status) {
