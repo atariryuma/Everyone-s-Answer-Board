@@ -742,12 +742,12 @@ class StudyQuestApp {
       // 初期ロード状態を表示
       this.showLoadingOverlay();
       
-      // タイムアウト設定（25秒）
+      // タイムアウト設定（40秒） - データ取得リトライ（20+15秒）を考慮
       this.initTimeoutId = setTimeout(() => {
         this.hideLoadingOverlay();
         console.warn('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
         this.showTimeoutErrorMessage();
-      }, 25000);
+      }, 40000);
       
       // Reset state for clean initialization
       this.resetStateForCleanInit();
@@ -3669,9 +3669,8 @@ class StudyQuestApp {
             this.displayEmptyState();
             if (isInitialLoad) {
               this.state.lastSeenCount = 0;
-              // 初期データロード失敗フラグを設定
-              this.hadInitialDataLoadFailure = true;
-              console.log('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
+              // 空データは正常な状態なので失敗フラグは設定しない
+              console.log('✅ 初期データロード完了: 空データ（まだ回答なし）');
             }
             return;
           }
