@@ -1,7 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 
-describe('generateAppUrls admin url', () => {
+describe('generateUserUrls', () => {
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   let context;
@@ -70,5 +70,10 @@ describe('generateAppUrls admin url', () => {
   test('returns adminUrl with userId and mode parameter', () => {
     const urls = context.generateUserUrls('abc');
     expect(urls.adminUrl).toBe('https://script.google.com/macros/s/ID/exec?mode=admin&userId=abc');
+  });
+
+  test('returns setupUrl with userId parameter', () => {
+    const urls = context.generateUserUrls('abc');
+    expect(urls.setupUrl).toBe('https://script.google.com/macros/s/ID/exec?setup=true&userId=abc');
   });
 });

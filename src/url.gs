@@ -183,7 +183,7 @@ function generateUserUrls(userId) {
     webAppUrl: webAppUrl,
     adminUrl: `${webAppUrl}?mode=admin&userId=${encodedId}`,
     viewUrl: `${webAppUrl}?mode=view&userId=${encodedId}`,
-    setupUrl: `${webAppUrl}?setup=true`,
+    setupUrl: `${webAppUrl}?setup=true&userId=${encodedId}`,
     status: 'success'
   };
 }
