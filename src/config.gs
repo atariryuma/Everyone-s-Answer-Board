@@ -1079,6 +1079,11 @@ function republishBoard(requestUserId) {
     configJson.appPublished = true;
     configJson.lastModified = new Date().toISOString();
     
+    // 手動停止フラグをクリア（公開再開時）
+    if (configJson.unpublishReason) {
+      delete configJson.unpublishReason;
+    }
+    
     // 6時間自動停止機能の設定（再公開時にスケジュールリセット）
     const publishedAt = new Date().toISOString();
     const autoStopMinutes = 360; // 6時間 = 360分
@@ -1764,6 +1769,7 @@ function unpublishBoard(requestUserId) {
     configJson.publishedSheetName = ''; // 正しいプロパティ名
     configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
     configJson.appPublished = false; // 公開停止
+    configJson.unpublishReason = 'manual_stop'; // 手動停止フラグを追加（ステップ1復帰用）
 
     // 回答ボード連携の解除（フォーム情報は保持）
     configJson.setupStatus = 'pending'; // ステップ1から再開（直感的な進行のため）
@@ -3122,6 +3128,11 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
     configJson.publishedSheetName = sheetName;
     configJson.appPublished = true;
     configJson.lastModified = new Date().toISOString();
+    
+    // 手動停止フラグをクリア（公開再開時）
+    if (configJson.unpublishReason) {
+      delete configJson.unpublishReason;
+    }
 
     // 6時間自動停止機能の設定
     const publishedAt = new Date().toISOString();

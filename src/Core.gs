@@ -283,6 +283,11 @@ function getSetupStep(userInfo, configJson) {
     return 3;
   }
   
+  // 公開停止後の明示的なリセット判定：手動停止時はステップ1に戻す
+  if (configJson.appPublished === false && configJson.unpublishReason === 'manual_stop') {
+    return 1;
+  }
+  
   // デフォルト: セットアップ継続中
   return 2;
 }

@@ -80,6 +80,16 @@ function setupEventListeners() {
               }
             })
             .then(function() {
+              // 公開停止後、即座にUI更新でステップ1表示にリセット
+              if (typeof updateStepIndicators === 'function') {
+                updateStepIndicators(1, null);
+              }
+              if (typeof updateGuidanceForStep === 'function') {
+                const guidanceText = document.getElementById('guidance-text');
+                if (guidanceText) {
+                  updateGuidanceForStep(1, guidanceText);
+                }
+              }
               showMessage('回答ボードは非公開になりました。', 'success');
             })
             .catch(function(error) {
