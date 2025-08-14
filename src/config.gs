@@ -1775,6 +1775,9 @@ function unpublishBoard(requestUserId) {
     configJson.setupStatus = 'pending'; // ステップ1から再開（直感的な進行のため）
     // Note: setupStepは削除（計算プロパティのため保存不要）
 
+    // シート関連設定のクリア
+    configJson.activeSheetName = '';      // アクティブシート名をクリア
+    
     // 列設定のみクリア（データソース・シート選択は保持）
     configJson.opinionHeader = '';
     configJson.nameHeader = '';
@@ -1801,9 +1804,9 @@ function unpublishBoard(requestUserId) {
     updateUser(currentUserId, {
       configJson: JSON.stringify(configJson),
       spreadsheetId: null,      // ステップ2のスプレッドシート選択をリセット
-      activeSheetName: null,    // アクティブシート名もクリア
       spreadsheetUrl: null      // スプレッドシートURLもクリア
-      // Note: formUrl, editFormUrlは保持（ユーザーが作成したフォームリソース維持）
+      // Note: activeSheetNameは許可されていないフィールドのため除外
+      // Note: formUrlは保持（ユーザーが作成したフォームリソース維持）
     });
 
     // 強制的にキャッシュを無効化して即座にUIに反映
