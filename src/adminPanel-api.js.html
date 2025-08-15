@@ -4179,10 +4179,21 @@ async function handleCustomSetup(config) {
     const freshStatus = await simpleStatusRefresh();
     
     // カスタムセットアップ後は手動公開前提のため、公開状態を強制的に非公開に設定
+    // ただし、QuickStart完了時は自動公開が前提なのでスキップ
     if (freshStatus && freshStatus.userInfo && freshStatus.userInfo.configJson) {
       try {
         const config = JSON.parse(freshStatus.userInfo.configJson);
-        if (config.appPublished === true) {
+        
+        // QuickStart判定: QuickStartの場合は自動公開を維持
+        const isQuickStartCompletion = !!(
+          config.setupStatus === 'completed' && 
+          config.formCreated === true && 
+          config.appPublished === true &&
+          config.completedAt && // QuickStartでのみ設定される
+          config.publishedAt    // QuickStartでのみ設定される
+        );
+        
+        if (config.appPublished === true && !isQuickStartCompletion) {
           console.log('⚠️ カスタムセットアップ後に自動公開が検出されました - 手動公開前提に修正');
           config.appPublished = false;
           freshStatus.userInfo.configJson = JSON.stringify(config);
@@ -4191,6 +4202,12 @@ async function handleCustomSetup(config) {
           if (freshStatus._normalized) {
             freshStatus._normalized.isPublished = false;
           }
+        } else if (isQuickStartCompletion) {
+          console.log('✅ QuickStart完了後の自動公開状態を維持:', {
+            appPublished: config.appPublished,
+            setupStatus: config.setupStatus,
+            formCreated: config.formCreated
+          });
         }
       } catch (configError) {
         console.warn('⚠️ カスタムセットアップ後の設定解析エラー:', configError);

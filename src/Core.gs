@@ -6215,6 +6215,17 @@ function getInitialData(requestUserId, targetSheetName) {
     var nameHeader = activeSheetConfig.nameHeader || '';
     var classHeader = activeSheetConfig.classHeader || '';
 
+    // === QuickStart公開状態同期デバッグ ===
+    debugLog('🔍 QuickStart公開状態デバッグ:', {
+      userId: currentUserId,
+      configJsonString: userInfo.configJson,
+      appPublished: configJson.appPublished,
+      publishedSheetName: configJson.publishedSheetName,
+      publishedSpreadsheetId: configJson.publishedSpreadsheetId,
+      setupStatus: configJson.setupStatus,
+      formCreated: configJson.formCreated
+    });
+
     // === ベース応答の構築 ===
     var response = {
       // ユーザー情報
