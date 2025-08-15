@@ -48,14 +48,7 @@ function setupEventListeners() {
   // AI column detection button
   var reguessBtn = document.getElementById('reguess-headers-btn');
   if (reguessBtn) {
-    reguessBtn.addEventListener('click', function() {
-      if (typeof runHeaderGuessing === 'function') {
-        runHeaderGuessing();
-      } else {
-        console.error('runHeaderGuessing関数が見つかりません');
-        showMessage('AI列判定機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
-      }
-    });
+    reguessBtn.addEventListener('click', runHeaderGuessing);
   }
   
   // Save and publish button

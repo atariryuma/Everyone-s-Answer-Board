@@ -1082,7 +1082,7 @@ function updateUser(userId, updateData) {
 
   // 許可されたフィールドのホワイトリスト検証
   const allowedFields = ['adminEmail', 'spreadsheetId', 'spreadsheetUrl',
-    'configJson', 'lastAccessedAt', 'createdAt', 'formUrl', 'isActive', 'customFormInfo'];
+    'configJson', 'lastAccessedAt', 'createdAt', 'formUrl', 'isActive'];
   const updateFields = Object.keys(updateData);
   const invalidFields = updateFields.filter(field => !allowedFields.includes(field));
 

@@ -2547,72 +2547,10 @@ function copyFormUrl() {
 
 // Open database spreadsheet
 function openDatabaseSpreadsheet() {
-  try {
-    // 動的URL生成を試行
-    const dynamicUrl = generateDynamicSheetUrl();
-    if (dynamicUrl) {
-      console.log('🔗 動的シートURLで開きます:', dynamicUrl);
-      window.open(dynamicUrl, '_blank');
-      return;
-    }
-    
-    // フォールバック: 既存のURL使用
-    if (currentSpreadsheetUrl) {
-      console.log('🔗 既存のURLで開きます:', currentSpreadsheetUrl);
-      window.open(currentSpreadsheetUrl, '_blank');
-    } else {
-      showMessage('スプレッドシートのURLが見つかりません。', 'warning');
-    }
-  } catch (error) {
-    console.error('❌ スプレッドシートを開く際のエラー:', error);
-    // エラー時は既存のURLを使用
-    if (currentSpreadsheetUrl) {
-      window.open(currentSpreadsheetUrl, '_blank');
-    } else {
-      showMessage('スプレッドシートのURLが見つかりません。', 'warning');
-    }
-  }
-}
-
-// 動的シートURL生成関数（既存のuserInfoとcurrentSpreadsheetIdを使用）
-function generateDynamicSheetUrl() {
-  try {
-    if (!userInfo || !userInfo.spreadsheetId) {
-      return null;
-    }
-    
-    const spreadsheetId = userInfo.spreadsheetId;
-    let activeSheetName = null;
-    
-    // configJsonから現在のアクティブシート名を取得
-    if (userInfo.configJson) {
-      try {
-        const config = typeof userInfo.configJson === 'string' 
-          ? JSON.parse(userInfo.configJson) 
-          : userInfo.configJson;
-        
-        // 優先順位: publishedSheetName > activeSheetName
-        activeSheetName = config.publishedSheetName || config.activeSheetName;
-      } catch (error) {
-        console.warn('⚠️ configJson解析エラー:', error);
-      }
-    }
-
-    // アクティブシートが指定されている場合、シート固有URLを生成
-    if (activeSheetName && activeSheetName.trim() !== '') {
-      const sheetSpecificUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=0&range=${encodeURIComponent(activeSheetName)}!A1`;
-      console.log('✅ シート固有URL生成:', { sheetName: activeSheetName, url: sheetSpecificUrl });
-      return sheetSpecificUrl;
-    }
-
-    // フォールバック: ベーススプレッドシートURL
-    const fallbackUrl = userInfo.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
-    console.log('📋 フォールバックURL使用:', fallbackUrl);
-    return fallbackUrl;
-    
-  } catch (error) {
-    console.error('❌ 動的URL生成エラー:', error);
-    return null;
+  if (currentSpreadsheetUrl) {
+    window.open(currentSpreadsheetUrl, '_blank');
+  } else {
+    showMessage('スプレッドシートのURLが見つかりません。', 'warning');
   }
 }
 
