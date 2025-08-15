@@ -18,7 +18,17 @@ describe('getWebAppUrl', () => {
           }
         }
       },
-      console: { log: () => {}, error: () => {}, warn: () => {} }
+      console: { log: () => {}, error: () => {}, warn: () => {} },
+      debugLog: () => {},
+      errorLog: () => {},
+      warnLog: () => {},
+      infoLog: () => {},
+      CacheService: {
+        getScriptCache: () => ({
+          get: () => null,
+          put: () => {}
+        })
+      }
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
@@ -38,7 +48,17 @@ describe('getWebAppUrl', () => {
           }
         }
       },
-      console: { log: () => {}, error: () => {}, warn: () => {} }
+      console: { log: () => {}, error: () => {}, warn: () => {} },
+      debugLog: () => {},
+      errorLog: () => {},
+      warnLog: () => {},
+      infoLog: () => {},
+      CacheService: {
+        getScriptCache: () => ({
+          get: () => null,
+          put: () => {}
+        })
+      }
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);

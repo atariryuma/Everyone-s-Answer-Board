@@ -29,6 +29,10 @@ describe('generateUserUrls', () => {
         }
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
+      debugLog: () => {},
+      errorLog: () => {},
+      warnLog: () => {},
+      infoLog: () => {},
       PropertiesService: {
         getScriptProperties: () => ({
           getProperty: (key) => {
