@@ -373,9 +373,24 @@ function updateSpreadsheetButton() {
   if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) {
     btn.disabled = false;
     btn.onclick = function() {
-      window.open(currentStatus.userInfo.spreadsheetUrl, '_blank');
+      try {
+        // 動的URL生成を試行（adminPanel-api.js.htmlの関数を使用）
+        const dynamicUrl = typeof generateDynamicSheetUrl === 'function' ? generateDynamicSheetUrl() : null;
+        if (dynamicUrl) {
+          console.log('🔗 ステップ２ボタン: 動的URLで開きます:', dynamicUrl);
+          window.open(dynamicUrl, '_blank');
+        } else {
+          // フォールバック: 既存のURL使用
+          console.log('🔗 ステップ２ボタン: 既存URLで開きます:', currentStatus.userInfo.spreadsheetUrl);
+          window.open(currentStatus.userInfo.spreadsheetUrl, '_blank');
+        }
+      } catch (error) {
+        console.error('❌ ステップ２ボタンエラー:', error);
+        // エラー時は既存のURLを使用
+        window.open(currentStatus.userInfo.spreadsheetUrl, '_blank');
+      }
     };
-    logDebug('✅ Spreadsheet button enabled with URL:', currentStatus.userInfo.spreadsheetUrl);
+    logDebug('✅ Spreadsheet button enabled with dynamic URL support');
   } else {
     btn.disabled = true;
     btn.onclick = null;
