@@ -505,15 +505,33 @@ function updateDatabaseInfo(status) {
     return;
   }
 
-  // スプレッドシートURLを設定（簡素化版：常に最新URLを反映）
+  // スプレッドシートURLを設定（デバッグ強化版）
+  console.log('🔧 Setting currentSpreadsheetUrl:', {
+    fromUserInfo: status.userInfo.spreadsheetUrl || 'none',
+    currentGlobal: currentSpreadsheetUrl || 'none',
+    shouldUpdate: !!status.userInfo.spreadsheetUrl
+  });
+  
   if (status.userInfo.spreadsheetUrl) {
     currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
-    console.log('✅ Spreadsheet URL updated:', status.userInfo.spreadsheetUrl);
+    console.log('✅ currentSpreadsheetUrl updated:', currentSpreadsheetUrl);
+    
+    // 即座に検証
+    if (currentSpreadsheetUrl !== status.userInfo.spreadsheetUrl) {
+      console.error('❌ URL設定に失敗:', { expected: status.userInfo.spreadsheetUrl, actual: currentSpreadsheetUrl });
+    }
   } else if (status.userInfo.spreadsheetUrl === '') {
     // 明示的な空文字列の場合はクリア
     currentSpreadsheetUrl = '';
-    console.log('🗑️ Spreadsheet URL cleared');
+    console.log('🗑️ currentSpreadsheetUrl cleared (explicit empty string)');
+  } else {
+    console.log('⚠️ No spreadsheetUrl in userInfo, keeping current value:', currentSpreadsheetUrl || 'none');
   }
+  
+  // グローバル変数の最終確認
+  setTimeout(() => {
+    console.log('🔍 Final currentSpreadsheetUrl verification:', currentSpreadsheetUrl || 'still empty');
+  }, 100);
 
   const cfg = status.config || {};
 

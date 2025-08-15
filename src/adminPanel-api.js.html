@@ -2013,18 +2013,21 @@ async function clearAllCachesForUnpublish() {
       console.warn('⚠️ BroadcastChannel notification warning:', e);
     }
     
-    // 5. グローバル変数の完全クリア（URL配置問題の根本解決）
+    // 5. グローバル変数の条件付きクリア（公開停止時のみ）
     try {
-      // currentSpreadsheetUrlの完全リセット
+      console.log('🔧 Conditional global variable clear for unpublish');
+      
+      // currentSpreadsheetUrlのクリア（公開停止時のみ）
       if (typeof currentSpreadsheetUrl !== 'undefined') {
+        const oldUrl = currentSpreadsheetUrl;
         currentSpreadsheetUrl = '';
-        console.log('✅ currentSpreadsheetUrl cleared');
+        console.log('✅ currentSpreadsheetUrl cleared for unpublish:', oldUrl);
       }
       
-      // window.currentStatusの完全リセット
+      // window.currentStatusのクリア（公開停止時のみ）
       if (window.currentStatus) {
         window.currentStatus = null;
-        console.log('✅ window.currentStatus cleared');
+        console.log('✅ window.currentStatus cleared for unpublish');
       }
       
       // その他のURL関連グローバル変数のクリア
@@ -2598,12 +2601,76 @@ function copyFormUrl() {
   }
 }
 
-// Open database spreadsheet
+// Open database spreadsheet - 改善版（複数ソースからURL取得）
 function openDatabaseSpreadsheet() {
+  console.log('📊 openDatabaseSpreadsheet: URL取得を開始');
+  
+  // 複数ソースからスプレッドシートURLを取得
+  let spreadsheetUrl = null;
+  
+  // 1. グローバル変数から
   if (currentSpreadsheetUrl) {
-    window.open(currentSpreadsheetUrl, '_blank');
+    spreadsheetUrl = currentSpreadsheetUrl;
+    console.log('✅ URL from global variable:', spreadsheetUrl);
+  }
+  
+  // 2. 現在のステータスから（フォールバック）
+  if (!spreadsheetUrl && window.currentStatus && window.currentStatus.userInfo) {
+    spreadsheetUrl = window.currentStatus.userInfo.spreadsheetUrl;
+    console.log('📋 URL from currentStatus:', spreadsheetUrl || 'none');
+  }
+  
+  // 3. キャッシュされたステータスから（追加フォールバック）
+  if (!spreadsheetUrl && window.lastStatusCache && window.lastStatusCache.userInfo) {
+    spreadsheetUrl = window.lastStatusCache.userInfo.spreadsheetUrl;
+    console.log('🔄 URL from lastStatusCache:', spreadsheetUrl || 'none');
+  }
+  
+  // 4. getActiveResourceUrls関数を使用（最終フォールバック）
+  if (!spreadsheetUrl && typeof getActiveResourceUrls === 'function') {
+    const status = window.currentStatus || window.lastStatusCache;
+    if (status) {
+      const resourceUrls = getActiveResourceUrls(status);
+      spreadsheetUrl = resourceUrls.spreadsheet;
+      console.log('🔍 URL from getActiveResourceUrls:', spreadsheetUrl || 'none');
+    }
+  }
+  
+  // 5. 最終手段：リアルタイム状態取得
+  if (!spreadsheetUrl && typeof loadStatus === 'function') {
+    console.log('🔄 Attempting real-time status fetch as last resort');
+    try {
+      // 同期的に状態を取得（最終手段）
+      const button = event.target;
+      if (button) button.disabled = true;
+      
+      loadStatus(true).then(status => {
+        if (status && status.userInfo && status.userInfo.spreadsheetUrl) {
+          console.log('✅ Got URL from real-time fetch:', status.userInfo.spreadsheetUrl);
+          window.open(status.userInfo.spreadsheetUrl, '_blank');
+        } else {
+          console.warn('❌ Real-time fetch also failed');
+          showMessage('スプレッドシートのURLが見つかりません。ページを再読み込みしてお試しください。', 'warning');
+        }
+        if (button) button.disabled = false;
+      }).catch(error => {
+        console.error('❌ Real-time status fetch failed:', error);
+        showMessage('スプレッドシートのURLが見つかりません。ページを再読み込みしてお試しください。', 'warning');
+        if (button) button.disabled = false;
+      });
+      
+      return; // 非同期処理なので早期リターン
+    } catch (error) {
+      console.error('❌ Real-time fetch setup failed:', error);
+    }
+  }
+  
+  if (spreadsheetUrl) {
+    console.log('🚀 Opening spreadsheet:', spreadsheetUrl);
+    window.open(spreadsheetUrl, '_blank');
   } else {
-    showMessage('スプレッドシートのURLが見つかりません。', 'warning');
+    console.warn('❌ スプレッドシートのURL取得に失敗しました');
+    showMessage('スプレッドシートのURLが見つかりません。ページを再読み込みしてお試しください。', 'warning');
   }
 }
 
