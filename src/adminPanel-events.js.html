@@ -70,14 +70,30 @@ function setupEventListeners() {
         '回答ボードの公開を停止しますか？',
         function() {
           unpublishBoard()
-            .then(function() {
-              // Use debounced loadStatus for event-triggered calls
-              if (window.AdminPanel && window.AdminPanel.debounce) {
-                window.AdminPanel.debounce.loadStatus(() => loadStatus(true), 500);
-                return Promise.resolve();
-              } else {
-                return loadStatus(true);
+            .then(function(unpublishResult) {
+              console.log('✅ 公開停止完了:', unpublishResult);
+              
+              // 公開停止成功後、統合キャッシュクリアを実行（重複処理を避ける）
+              if (typeof clearAllCachesForUnpublish === 'function') {
+                clearAllCachesForUnpublish();
+                console.log('🧹 統合キャッシュクリア完了');
+              } else if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+                window.unifiedCache.clear();
+                console.log('🧹 基本キャッシュクリア完了');
               }
+              
+              // 少し遅延してから状態を再読み込み（サーバー側の更新完了を待つ）
+              return new Promise(resolve => {
+                setTimeout(() => {
+                  loadStatus(true).then(() => {
+                    console.log('🔄 公開停止後の状態更新完了');
+                    resolve(unpublishResult);
+                  }).catch(error => {
+                    console.warn('⚠️ 状態更新エラー:', error);
+                    resolve(unpublishResult); // エラーでも続行
+                  });
+                }, 1000); // 1秒待機してから状態更新
+              });
             })
             .then(function() {
               console.log('🔧 公開停止後の完全リセットUI更新開始');

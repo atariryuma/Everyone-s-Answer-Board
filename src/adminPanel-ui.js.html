@@ -1264,13 +1264,16 @@ function updateTopicText(status) {
     }
   }
 
-  if (status.customFormInfo && status.customFormInfo.mainQuestion) {
+  // 優先順位: customFormInfo > シート固有設定 > 一般設定
+  if (!topic && status.customFormInfo && status.customFormInfo.mainQuestion) {
     topic = status.customFormInfo.mainQuestion;
     console.log('✅ Topic from customFormInfo:', topic);
-  } else if (cfg.opinionHeader) {
+  } else if (!topic && cfg.opinionHeader) {
     topic = cfg.opinionHeader;
     console.log('✅ Topic from cfg.opinionHeader:', topic);
-  } else {
+  }
+  
+  if (!topic) {
     const sheetName = cfg.publishedSheetName || status.publishedSheetName;
     console.log('🔍 Looking for topic in sheet config, sheetName:', sheetName);
     
@@ -2304,7 +2307,7 @@ function showAppropriateHeaderStatus() {
     // ドメイン名を適切に設定
     const domainText = document.getElementById('header-domain-match-text');
     if (domainText) {
-      domainText.textContent = 'naha-okinawa.ed.jp';
+      domainText.textContent = 'naha-okinawa.ed.jp'; // cspell:disable-line
     }
     
     console.log('✅ ドメイン一致表示を有効化');
@@ -2873,7 +2876,7 @@ function generateHistoryId() {
  */
 
 // Draft session storage key
-const DRAFT_SESSION_KEY = 'answerboard_draft_state';
+const DRAFT_SESSION_KEY = 'answerboard_draft_state'; // cspell:disable-line
 
 /**
  * Save draft state to session storage
