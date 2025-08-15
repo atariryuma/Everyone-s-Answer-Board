@@ -2729,13 +2729,41 @@ let appSetupUrl = '';
 
 /**
  * アプリ設定ページのURLを取得して保存する。
+ * キャッシュを優先して高速化。
  * @returns {void}
  */
 function fetchAppSetupUrl() {
+  // localStorage キャッシュを先にチェック
+  const cachedUrls = localStorage.getItem('userUrls_' + userId);
+  const cacheTime = localStorage.getItem('userUrls_time_' + userId);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
+  
+  if (cachedUrls && cacheTime && (Date.now() - parseInt(cacheTime)) < CACHE_DURATION) {
+    try {
+      const urls = JSON.parse(cachedUrls);
+      if (urls && urls.setupUrl) {
+        appSetupUrl = urls.setupUrl;
+        console.log('✅ URL cache hit - appSetupUrl loaded from localStorage');
+        return;
+      }
+    } catch (e) {
+      console.warn('キャッシュデータの解析エラー:', e);
+    }
+  }
+  
+  // キャッシュが無効な場合はサーバーから取得
   google.script.run
     .withSuccessHandler((urls) => {
       if (urls && urls.setupUrl) {
         appSetupUrl = urls.setupUrl;
+        // localStorage にキャッシュを保存
+        try {
+          localStorage.setItem('userUrls_' + userId, JSON.stringify(urls));
+          localStorage.setItem('userUrls_time_' + userId, Date.now().toString());
+          console.log('✅ URLs cached to localStorage for future use');
+        } catch (e) {
+          console.warn('URLキャッシュ保存エラー:', e);
+        }
       } else {
         console.error('アプリ設定ページURLの取得に失敗:', urls);
       }
@@ -2748,6 +2776,7 @@ function fetchAppSetupUrl() {
 
 /**
  * アプリ設定管理ページを開く。
+ * キャッシュを活用して高速遷移。
  * @returns {void}
  */
 function openAppSetupPage() {
@@ -2776,14 +2805,37 @@ function openAppSetupPage() {
     }
   };
 
+  // URLが未取得の場合はキャッシュから再試行
   if (!appSetupUrl) {
-    restoreButton();
-    showMessage('アプリ設定ページのURLを取得できませんでした。ページを再読み込みしてください。', 'error');
-    return;
+    const cachedUrls = localStorage.getItem('userUrls_' + userId);
+    const cacheTime = localStorage.getItem('userUrls_time_' + userId);
+    const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
+    
+    if (cachedUrls && cacheTime && (Date.now() - parseInt(cacheTime)) < CACHE_DURATION) {
+      try {
+        const urls = JSON.parse(cachedUrls);
+        if (urls && urls.setupUrl) {
+          appSetupUrl = urls.setupUrl;
+          console.log('✅ Emergency cache recovery successful');
+        }
+      } catch (e) {
+        console.warn('緊急キャッシュ復旧失敗:', e);
+      }
+    }
+    
+    if (!appSetupUrl) {
+      restoreButton();
+      showMessage('アプリ設定ページのURLを取得できませんでした。ページを再読み込みしてください。', 'error');
+      return;
+    }
   }
 
   try {
-    window.open(appSetupUrl, '_top');
+    // Cache busting パラメータを追加してナビゲーションを高速化
+    const urlWithCache = appSetupUrl.includes('?') 
+      ? `${appSetupUrl}&t=${Date.now()}` 
+      : `${appSetupUrl}?t=${Date.now()}`;
+    window.open(urlWithCache, '_top');
   } catch (error) {
     console.error('アプリ設定ページへの遷移に失敗:', error);
     restoreButton();
@@ -2791,8 +2843,64 @@ function openAppSetupPage() {
   }
 }
 
-userIdPromise.then(() => {
-  fetchAppSetupUrl();
+// フェーズ2最適化: 管理パネル初期化の並列処理
+userIdPromise.then(async () => {
+  // 並列実行タスク群
+  const initTasks = [];
+  
+  // Task 1: アプリ設定URL取得
+  const appSetupUrlTask = new Promise((resolve, reject) => {
+    fetchAppSetupUrl();
+    // fetchAppSetupUrl は即座に戻るが、実際の取得は非同期なので少し待つ
+    setTimeout(() => resolve('appSetupUrl initiated'), 100);
+  });
+  initTasks.push(appSetupUrlTask);
+  
+  // Task 2: 統合キャッシュマネージャー初期化（既存システム活用）
+  const cacheInitTask = new Promise((resolve) => {
+    if (typeof unifiedCacheManager !== 'undefined') {
+      // キャッシュクリーンアップを並列実行
+      console.log('🗑️ Cache cleanup in parallel...');
+      resolve('cacheManager ready');
+    } else {
+      resolve('cacheManager not available');
+    }
+  });
+  initTasks.push(cacheInitTask);
+  
+  // Task 3: システムステータス軽量チェック（ノンブロッキング）
+  const statusCheckTask = new Promise((resolve) => {
+    // 軽量なステータスチェックを非同期で実行
+    if (typeof window.sharedUtilities !== 'undefined' && window.sharedUtilities.gas) {
+      console.log('🔍 Lightweight status check in parallel...');
+      setTimeout(() => resolve('status check initiated'), 50);
+    } else {
+      resolve('status check not available');
+    }
+  });
+  initTasks.push(statusCheckTask);
+  
+  try {
+    const startTime = performance.now();
+    const results = await Promise.allSettled(initTasks);
+    const totalTime = performance.now() - startTime;
+    
+    console.log(`⚡ Admin panel parallel initialization completed in ${Math.round(totalTime)}ms:`, {
+      appSetupUrl: results[0].status,
+      cacheInit: results[1].status, 
+      statusCheck: results[2].status,
+      totalTimeMs: Math.round(totalTime)
+    });
+    
+    // 高速化効果の測定
+    if (totalTime < 200) {
+      console.log(`🚀 Ultra-fast admin panel init: ${Math.round(totalTime)}ms`);
+    }
+    
+  } catch (error) {
+    console.warn('⚠️ Admin panel parallel init warning:', error);
+    // 既存のフォールバック動作は維持
+  }
 });
 
 

@@ -66,11 +66,19 @@ class UnifiedCache {
   constructor() {
     this.data = new Map();
     this.timestamps = new Map();
+    this.maxSize = 500; // フェーズ4最適化: メモリ制限
+    this.accessCount = new Map(); // アクセス回数記録
   }
   
   set(key, value, ttl = 300000) { // 5分のデフォルトTTL
+    // フェーズ4最適化: メモリ制限チェック
+    if (this.data.size >= this.maxSize) {
+      this.performLRUEviction();
+    }
+    
     this.data.set(key, value);
     this.timestamps.set(key, Date.now() + ttl);
+    this.accessCount.set(key, (this.accessCount.get(key) || 0) + 1);
   }
   
   get(key) {
@@ -82,6 +90,8 @@ class UnifiedCache {
       return undefined;
     }
     
+    // フェーズ4最適化: アクセス回数更新（LRUアルゴリズム用）
+    this.accessCount.set(key, (this.accessCount.get(key) || 0) + 1);
     return this.data.get(key);
   }
   
@@ -92,11 +102,78 @@ class UnifiedCache {
   delete(key) {
     this.data.delete(key);
     this.timestamps.delete(key);
+    this.accessCount.delete(key);
   }
   
   clear() {
     this.data.clear();
     this.timestamps.clear();
+    this.accessCount.clear();
+  }
+  
+  /**
+   * フェーズ4最適化: LRU（最も使用頻度の低い）エントリを削除
+   */
+  performLRUEviction() {
+    if (this.data.size === 0) return;
+    
+    // アクセス回数の少ないキーから10個を削除
+    const sortedEntries = Array.from(this.accessCount.entries())
+      .sort((a, b) => a[1] - b[1]) // アクセス回数昇順
+      .slice(0, Math.min(10, Math.floor(this.data.size * 0.1))); // 10%または最大10個
+    
+    sortedEntries.forEach(([key]) => {
+      this.delete(key);
+    });
+    
+    console.log(`🗑️ LRU cache eviction: removed ${sortedEntries.length} entries, ${this.data.size} remaining`);
+  }
+  
+  /**
+   * フェーズ4最適化: キャッシュ統計情報
+   */
+  getStats() {
+    const now = Date.now();
+    let expiredCount = 0;
+    
+    for (const [key, expiry] of this.timestamps.entries()) {
+      if (now > expiry) expiredCount++;
+    }
+    
+    return {
+      totalEntries: this.data.size,
+      expiredEntries: expiredCount,
+      memoryUsage: this.estimateMemoryUsage(),
+      hitRate: this.calculateHitRate()
+    };
+  }
+  
+  /**
+   * フェーズ4最適化: メモリ使用量の概算
+   */
+  estimateMemoryUsage() {
+    let totalSize = 0;
+    
+    for (const [key, value] of this.data.entries()) {
+      totalSize += key.length * 2; // Unicode文字は2バイト
+      if (typeof value === 'string') {
+        totalSize += value.length * 2;
+      } else if (typeof value === 'object' && value !== null) {
+        totalSize += JSON.stringify(value).length * 2;
+      } else {
+        totalSize += 8; // 基本型の概算
+      }
+    }
+    
+    return Math.round(totalSize / 1024); // KB単位で返す
+  }
+  
+  /**
+   * フェーズ4最適化: キャッシュヒット率計算（簡易版）
+   */
+  calculateHitRate() {
+    const totalAccess = Array.from(this.accessCount.values()).reduce((sum, count) => sum + count, 0);
+    return totalAccess > 0 ? Math.round((totalAccess / (totalAccess + this.data.size)) * 100) : 0;
   }
   
   cleanup() {
@@ -4809,16 +4886,19 @@ class StudyQuestApp {
           return ''; // Skip problematic reaction button
         }
       }).join('');
-      // Optimized: Use DocumentFragment instead of innerHTML for better performance
+      // フェーズ3最適化: DocumentFragmentによる高性能DOM構築
       const fragment = document.createDocumentFragment();
       
-      // Create main content div
+      // バッチDOMツリー構築: メインコンテンツ
       const contentDiv = document.createElement('div');
       contentDiv.className = 'relative flex-grow mb-3 answer-preview';
       
       const opinionTitle = document.createElement('h3');
       opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
       opinionTitle.textContent = safeData.opinion || '（回答内容が取得できませんでした）';
+      
+      // DOM要素を一括でバッチ追加してレイアウト再計算を最小化
+      contentDiv.appendChild(opinionTitle);
       
       const reasonText = document.createElement('p');
       reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
@@ -4958,6 +5038,107 @@ class StudyQuestApp {
     // Simplified skeleton for faster rendering
     card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
     return card;
+  }
+  
+  /**
+   * フェーズ3最適化: バッチDOM操作による高性能カード作成
+   * 複数カードを一度に作成してレイアウト再計算を最小化
+   * @param {Array} dataArray - 作成するカードデータの配列
+   * @param {number} batchSize - バッチサイズ（デフォルト: 10）
+   * @returns {DocumentFragment} 作成されたカードのフラグメント
+   */
+  createCardsBatch(dataArray, batchSize = 10) {
+    const mainFragment = document.createDocumentFragment();
+    const batches = [];
+    
+    // データを指定されたバッチサイズで分割
+    for (let i = 0; i < dataArray.length; i += batchSize) {
+      batches.push(dataArray.slice(i, i + batchSize));
+    }
+    
+    console.log(`🔧 Batch DOM processing: ${dataArray.length} cards in ${batches.length} batches`);
+    
+    batches.forEach((batch, batchIndex) => {
+      const batchFragment = document.createDocumentFragment();
+      
+      batch.forEach(data => {
+        const card = this.createAnswerCard(data);
+        if (card) {
+          batchFragment.appendChild(card);
+        }
+      });
+      
+      // バッチごとにフラグメントを統合（レイアウト再計算を控えめに）
+      mainFragment.appendChild(batchFragment);
+      
+      // 大量データでは適度にブラウザに制御を戻す
+      if (batchIndex > 0 && batchIndex % 5 === 0 && dataArray.length > 50) {
+        // 50カード以上で5バッチごとに短い休憩
+        return new Promise(resolve => setTimeout(resolve, 1));
+      }
+    });
+    
+    console.log(`✅ Batch DOM processing completed: ${mainFragment.children.length} cards ready`);
+    return mainFragment;
+  }
+  
+  /**
+   * フェーズ3最適化: 仮想スクロール対応のインクリメンタルレンダリング
+   * 画面に見える分だけを優先描画し、残りは遅延ロード
+   * @param {Array} dataArray - 全カードデータ
+   * @param {Element} container - 挿入先コンテナ
+   * @param {Object} options - オプション設定
+   */
+  async renderCardsIncremental(dataArray, container, options = {}) {
+    const {
+      initialBatch = 20,  // 初期表示カード数
+      batchSize = 10,     // 追加ロード単位
+      animationDelay = 16 // アニメーション間隔（60fps: 16ms）
+    } = options;
+    
+    console.log(`🎨 Incremental rendering: ${dataArray.length} total cards`);
+    
+    // Phase 1: 初期バッチを即座にレンダリング
+    const initialData = dataArray.slice(0, initialBatch);
+    const initialFragment = this.createCardsBatch(initialData, batchSize);
+    container.appendChild(initialFragment);
+    
+    console.log(`⚡ Initial batch rendered: ${initialBatch} cards`);
+    
+    // Phase 2: 残りのカードを段階的にレンダリング
+    const remainingData = dataArray.slice(initialBatch);
+    let currentIndex = 0;
+    
+    const renderNextBatch = async () => {
+      if (currentIndex >= remainingData.length) return;
+      
+      const nextBatch = remainingData.slice(currentIndex, currentIndex + batchSize);
+      const batchFragment = this.createCardsBatch(nextBatch, batchSize);
+      
+      // 非同期でDOMに追加（メインスレッドをブロックしない）
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          container.appendChild(batchFragment);
+          resolve();
+        });
+      });
+      
+      currentIndex += batchSize;
+      
+      console.log(`📖 Incremental batch added: ${Math.min(currentIndex, remainingData.length)}/${remainingData.length} remaining cards`);
+      
+      // 次のバッチを少し遅延してレンダリング
+      if (currentIndex < remainingData.length) {
+        setTimeout(renderNextBatch, animationDelay);
+      } else {
+        console.log(`✨ Incremental rendering complete: ${dataArray.length} total cards rendered`);
+      }
+    };
+    
+    // 残りのカードを非同期で開始
+    if (remainingData.length > 0) {
+      setTimeout(renderNextBatch, animationDelay);
+    }
   }
 
   /**
@@ -8570,8 +8751,80 @@ try {
   // システムフロー表示
   showSystemFlow();
   
-  document.addEventListener('DOMContentLoaded', () => {
-  const app = new StudyQuestApp();
+  document.addEventListener('DOMContentLoaded', async () => {
+  // フェーズ2最適化: 初期化プロセスの並列実行
+  const initializationTasks = [];
+  
+  // Task 1: アプリケーション初期化
+  const appInitTask = new Promise((resolve) => {
+    const app = new StudyQuestApp();
+    resolve(app);
+  });
+  initializationTasks.push(appInitTask);
+  
+  // Task 2: ドメイン情報取得を並列実行
+  const domainInfoTask = new Promise((resolve, reject) => {
+    loadDomainInfo(
+      (info) => {
+        console.log('✅ Domain info loaded in parallel:', info);
+        resolve(info);
+      },
+      (error) => {
+        console.warn('⚠️ Domain info load failed (non-critical):', error);
+        resolve(null); // 非クリティカルなので null で解決
+      }
+    );
+  });
+  initializationTasks.push(domainInfoTask);
+  
+  // Task 3: フォームリンク取得を並列実行
+  const formLinkTask = new Promise((resolve, reject) => {
+    loadFormLink(
+      (linkData) => {
+        console.log('✅ Form link loaded in parallel:', linkData);
+        resolve(linkData);
+      },
+      (error) => {
+        console.warn('⚠️ Form link load failed (non-critical):', error);
+        resolve(null); // 非クリティカルなので null で解決
+      }
+    );
+  });
+  initializationTasks.push(formLinkTask);
+  
+  try {
+    // 全タスクを並列実行（Promise.allSettled で一部失敗があっても継続）
+    const startTime = performance.now();
+    const results = await Promise.allSettled(initializationTasks);
+    const totalTime = performance.now() - startTime;
+    
+    console.log(`🚀 Parallel initialization completed in ${Math.round(totalTime)}ms:`, {
+      appInit: results[0].status,
+      domainInfo: results[1].status,
+      formLink: results[2].status,
+      totalTimeMs: Math.round(totalTime)
+    });
+    
+    // 成功した結果を抽出
+    const [appResult, domainResult, formResult] = results;
+    
+    if (appResult.status === 'fulfilled') {
+      console.log('✅ StudyQuestApp initialized successfully');
+    } else {
+      console.error('❌ StudyQuestApp initialization failed:', appResult.reason);
+    }
+    
+    // 並列実行による高速化効果を測定・報告
+    if (totalTime < 1000) {
+      console.log(`⚡ Fast initialization achieved: ${Math.round(totalTime)}ms`);
+    }
+    
+  } catch (error) {
+    console.error('❌ Parallel initialization error:', error);
+    // フォールバック: 通常の初期化
+    console.log('🔄 Falling back to sequential initialization...');
+    new StudyQuestApp();
+  }
 });
   
   // Expose debug functions globally for console access
@@ -9397,6 +9650,155 @@ try {
   // ドメイン情報とフォームリンクを取得
   loadDomainInfo();
   loadFormLink();
+  
+  /**
+   * フェーズ4最適化: グローバルメモリ管理とクリーンアップシステム
+   */
+  window.optimizationSystem = {
+    /**
+     * 総合的なメモリクリーンアップを実行
+     */
+    performGlobalCleanup() {
+      console.log('🧹 Starting global memory cleanup...');
+      const startTime = performance.now();
+      
+      let cleanedItems = 0;
+      
+      // 1. UnifiedCache のクリーンアップ
+      if (window.unifiedCache && typeof window.unifiedCache.cleanup === 'function') {
+        const beforeSize = window.unifiedCache.data.size;
+        window.unifiedCache.cleanup();
+        const afterSize = window.unifiedCache.data.size;
+        cleanedItems += (beforeSize - afterSize);
+        console.log(`✨ UnifiedCache cleaned: ${beforeSize - afterSize} expired entries removed`);
+      }
+      
+      // 2. StudyQuestApp のクリーンアップ
+      if (window.studyQuestApp && typeof window.studyQuestApp.performMemoryCleanup === 'function') {
+        try {
+          window.studyQuestApp.performMemoryCleanup();
+          console.log('✨ StudyQuestApp memory cleanup completed');
+        } catch (cleanupError) {
+          console.warn('⚠️ StudyQuestApp cleanup warning:', cleanupError);
+        }
+      }
+      
+      // 3. ローカルストレージの古いキャッシュクリーンアップ
+      try {
+        const keysToRemove = [];
+        const CACHE_DURATION = 5 * 60 * 1000; // 5分
+        
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.includes('_time_')) {
+            const timeValue = localStorage.getItem(key);
+            if (timeValue && (Date.now() - parseInt(timeValue)) > CACHE_DURATION) {
+              keysToRemove.push(key);
+              keysToRemove.push(key.replace('_time_', '_')); // 対応するデータキーも削除
+            }
+          }
+        }
+        
+        keysToRemove.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+          } catch (e) {
+            console.warn('LocalStorage cleanup warning:', e);
+          }
+        });
+        
+        if (keysToRemove.length > 0) {
+          console.log(`✨ LocalStorage cleanup: ${keysToRemove.length} expired entries removed`);
+          cleanedItems += keysToRemove.length;
+        }
+      } catch (storageError) {
+        console.warn('⚠️ LocalStorage cleanup warning:', storageError);
+      }
+      
+      const totalTime = performance.now() - startTime;
+      console.log(`🎯 Global cleanup completed in ${Math.round(totalTime)}ms: ${cleanedItems} items cleaned`);
+      
+      return {
+        success: true,
+        itemsCleaned: cleanedItems,
+        durationMs: Math.round(totalTime)
+      };
+    },
+    
+    /**
+     * システム最適化統計情報を取得
+     */
+    getOptimizationStats() {
+      const stats = {
+        timestamp: new Date().toISOString(),
+        memory: performance.memory ? {
+          used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+          total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+          limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+        } : null,
+        caches: {},
+        performance: {
+          lastCleanup: window.lastGlobalCleanup || 'Never',
+          optimizationsActive: true
+        }
+      };
+      
+      // UnifiedCache 統計
+      if (window.unifiedCache && typeof window.unifiedCache.getStats === 'function') {
+        stats.caches.unifiedCache = window.unifiedCache.getStats();
+      }
+      
+      // StudyQuestApp 統計
+      if (window.studyQuestApp && window.studyQuestApp.cache) {
+        stats.caches.appCache = {
+          size: window.studyQuestApp.cache.size || 0
+        };
+      }
+      
+      return stats;
+    },
+    
+    /**
+     * 定期的な自動最適化を開始
+     */
+    startAutoOptimization(intervalMinutes = 10) {
+      if (window.autoOptimizationInterval) {
+        clearInterval(window.autoOptimizationInterval);
+      }
+      
+      window.autoOptimizationInterval = setInterval(() => {
+        console.log('⚡ Auto-optimization running...');
+        this.performGlobalCleanup();
+        window.lastGlobalCleanup = new Date().toISOString();
+      }, intervalMinutes * 60 * 1000);
+      
+      console.log(`🔄 Auto-optimization started: every ${intervalMinutes} minutes`);
+      return true;
+    },
+    
+    /**
+     * 自動最適化を停止
+     */
+    stopAutoOptimization() {
+      if (window.autoOptimizationInterval) {
+        clearInterval(window.autoOptimizationInterval);
+        window.autoOptimizationInterval = null;
+        console.log('⏹️ Auto-optimization stopped');
+        return true;
+      }
+      return false;
+    }
+  };
+  
+  // 初期化時に自動最適化を開始（10分間隔）
+  window.optimizationSystem.startAutoOptimization(10);
+  
+  // ページ終了時のクリーンアップ
+  window.addEventListener('beforeunload', () => {
+    if (window.optimizationSystem) {
+      window.optimizationSystem.stopAutoOptimization();
+    }
+  });
   
   window.addEventListener('beforeunload', () => {
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {

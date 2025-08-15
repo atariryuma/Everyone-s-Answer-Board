@@ -617,13 +617,41 @@
 
         /**
          * 管理パネルのURLを取得して保存する。
+         * キャッシュを優先して高速化。
          * @returns {void}
          */
         function fetchAdminPanelUrl() {
+            // localStorageキャッシュを先にチェック
+            const cachedUrls = localStorage.getItem('userUrls_' + __USER_ID__);
+            const cacheTime = localStorage.getItem('userUrls_time_' + __USER_ID__);
+            const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
+            
+            if (cachedUrls && cacheTime && (Date.now() - parseInt(cacheTime)) < CACHE_DURATION) {
+                try {
+                    const urls = JSON.parse(cachedUrls);
+                    if (urls && urls.adminUrl) {
+                        adminPanelUrl = urls.adminUrl;
+                        console.log('✅ URL cache hit - adminPanelUrl loaded from localStorage');
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('キャッシュデータの解析エラー:', e);
+                }
+            }
+            
+            // キャッシュが無効な場合はサーバーから取得
             google.script.run
                 .withSuccessHandler((urls) => {
                     if (urls && urls.adminUrl) {
                         adminPanelUrl = urls.adminUrl;
+                        // localStorageにキャッシュを保存
+                        try {
+                            localStorage.setItem('userUrls_' + __USER_ID__, JSON.stringify(urls));
+                            localStorage.setItem('userUrls_time_' + __USER_ID__, Date.now().toString());
+                            console.log('✅ URLs cached to localStorage for future use');
+                        } catch (e) {
+                            console.warn('URLキャッシュ保存エラー:', e);
+                        }
                     } else {
                         console.error('管理パネルURLの取得に失敗:', urls);
                     }
@@ -636,7 +664,7 @@
 
         /**
          * 管理パネルに戻る。
-         * 非同期処理を挟まずユーザー操作として認識されるよう同期的に遷移する。
+         * キャッシュを活用して高速遷移。非同期処理を挟まずユーザー操作として認識されるよう同期的に遷移する。
          */
         function goBackToAdminPanel() {
             // ボタンの視覚フィードバック: クリック時に無効化
@@ -660,14 +688,37 @@
                 }
             };
 
+            // URLが未取得の場合はキャッシュから再試行
             if (!adminPanelUrl) {
-                restoreButton();
-                showMessage('管理パネルURLを取得できませんでした。ページを再読み込みして再試行してください。', 'error');
-                return;
+                const cachedUrls = localStorage.getItem('userUrls_' + __USER_ID__);
+                const cacheTime = localStorage.getItem('userUrls_time_' + __USER_ID__);
+                const CACHE_DURATION = 5 * 60 * 1000; // 5分間キャッシュ
+                
+                if (cachedUrls && cacheTime && (Date.now() - parseInt(cacheTime)) < CACHE_DURATION) {
+                    try {
+                        const urls = JSON.parse(cachedUrls);
+                        if (urls && urls.adminUrl) {
+                            adminPanelUrl = urls.adminUrl;
+                            console.log('✅ Emergency cache recovery successful');
+                        }
+                    } catch (e) {
+                        console.warn('緊急キャッシュ復旧失敗:', e);
+                    }
+                }
+                
+                if (!adminPanelUrl) {
+                    restoreButton();
+                    showMessage('管理パネルURLを取得できませんでした。ページを再読み込みして再試行してください。', 'error');
+                    return;
+                }
             }
 
             try {
-                window.open(adminPanelUrl, '_top');
+                // Cache bustingパラメータを追加してナビゲーションを高速化
+                const urlWithCache = adminPanelUrl.includes('?') 
+                    ? `${adminPanelUrl}&t=${Date.now()}` 
+                    : `${adminPanelUrl}?t=${Date.now()}`;
+                window.open(urlWithCache, '_top');
             } catch (error) {
                 console.error('管理パネルへの遷移に失敗:', error);
                 restoreButton();
