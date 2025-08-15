@@ -1635,6 +1635,18 @@ class StudyQuestApp {
   async refreshContentIncremental() {
     this.dismissNewContentBanner();
     
+    // 初期データ未ロード時または現在のデータが空の場合は全体リフレッシュにフォールバック
+    if (!this.initialDataLoaded || 
+        (this.state.currentAnswers?.length === 0 && this.state.lastSeenCount > 0)) {
+      console.log('🔄 初期状態検出 - 全体リフレッシュにフォールバック:', {
+        initialDataLoaded: this.initialDataLoaded,
+        currentAnswersLength: this.state.currentAnswers?.length || 0,
+        lastSeenCount: this.state.lastSeenCount
+      });
+      await this.refreshContentFull();
+      return;
+    }
+    
     try {
       const originalText = this.elements.refreshContentBtn ? this.elements.refreshContentBtn.textContent : '';
       if (this.elements.refreshContentBtn) {
@@ -1702,7 +1714,9 @@ class StudyQuestApp {
       const criticalInconsistency = {
         zeroStateWithServerData: preUpdateAnalysis.totalCount > 0 && 
                                 this.state.currentAnswers.length === 0 && 
-                                this.state.lastSeenCount > 0,
+                                this.state.lastSeenCount > 0 &&
+                                this.initialDataLoaded && // 初期データロード完了後のみ判定
+                                this.state.lastSeenCount !== preUpdateAnalysis.totalCount, // 数値が一致する場合は正常
         significantCountMismatch: Math.abs(preUpdateAnalysis.totalCount - this.state.lastSeenCount) > 10
       };
       
