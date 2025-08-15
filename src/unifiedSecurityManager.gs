@@ -1066,7 +1066,7 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function verifyUserAccess(requestUserId) {
-  const currentUserId = getUserId(); // 現在のセッションユーザーID
+  const currentUserId = getUserId(null); // 現在のセッションユーザーID（引数にnullを渡して現在のユーザーIDを取得）
   
   if (currentUserId !== requestUserId) {
     // ログに詳細を記録
