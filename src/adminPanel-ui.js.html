@@ -161,6 +161,47 @@ function generateViewUrl(status, userId) {
   return null;
 }
 
+/**
+ * 複数ソースから公開状態を確実に判定するヘルパー関数
+ * @param {object} status - システムステータスオブジェクト
+ * @returns {boolean} - 公開状態
+ */
+function determinePublicationStatus(status) {
+  if (!status) return false;
+  
+  // 1. _normalizedオブジェクトから（最優先）
+  if (status._normalized && typeof status._normalized.isPublished === 'boolean') {
+    console.log('📊 Publication status from _normalized:', status._normalized.isPublished);
+    return status._normalized.isPublished;
+  }
+  
+  // 2. configJsonから直接取得（フォールバック）
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      const config = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+      if (typeof config.appPublished === 'boolean') {
+        console.log('📋 Publication status from configJson:', config.appPublished);
+        return config.appPublished;
+      }
+    } catch (e) {
+      console.warn('⚠️ configJson parse failed in publication check:', e);
+    }
+  }
+  
+  // 3. status直下のプロパティから（追加フォールバック）
+  const directStatus = status.config?.isPublished || status.isPublished || status.appPublished;
+  if (typeof directStatus === 'boolean') {
+    console.log('🔍 Publication status from direct properties:', directStatus);
+    return directStatus;
+  }
+  
+  // 4. 最終フォールバック: 不明時は false
+  console.log('❓ Publication status unknown, defaulting to false');
+  return false;
+}
+
 // =============================================================================
 // MAIN UI UPDATE FUNCTIONS
 // =============================================================================
@@ -176,12 +217,27 @@ function _fullUpdateUIWithNewStatus(status) {
     return;
   }
   
-  // 公開状態チェック: 非公開状態での競合状態を防ぐ
-  const isPublished = status.config?.isPublished || status.isPublished || false;
-  if (!isPublished) {
-    console.log('🚫 UI update skipped: board is not published (avoiding race condition)');
+  // 改善された公開状態チェック: 新規作成・更新時の例外処理を含む
+  const isPublished = determinePublicationStatus(status);
+  
+  // 非公開でも以下の場合はUI更新を実行
+  const allowUpdateReasons = [
+    status.userInfo.configJson && status.userInfo.configJson.includes('formCreated'), // 新規作成完了時
+    status.userInfo.configJson && status.userInfo.configJson.includes('setupStatus'), // セットアップ中
+    status.setupStep && status.setupStep >= 1, // セットアップ進行中
+    status._meta && status._meta.source === 'quickstart', // クイックスタート
+    status._meta && status._meta.source === 'customSetup', // カスタムセットアップ
+    status.userInfo.spreadsheetUrl && status.userInfo.spreadsheetUrl.length > 0 // URL存在時
+  ];
+  
+  const shouldUpdate = isPublished || allowUpdateReasons.some(reason => reason);
+  
+  if (!shouldUpdate) {
+    console.log('🚫 UI update skipped: board not published and no update reasons');
     return;
   }
+  
+  console.log('✅ UI update proceeding:', { isPublished, hasUpdateReasons: allowUpdateReasons.some(r => r) });
   
   try {
     // === 直接的なUI更新（シンプル版） ===
@@ -449,18 +505,14 @@ function updateDatabaseInfo(status) {
     return;
   }
 
-  // スプレッドシートURLを設定（公開状態チェック付き）
+  // スプレッドシートURLを設定（簡素化版：常に最新URLを反映）
   if (status.userInfo.spreadsheetUrl) {
-    // 公開状態確認: 非公開時はURL更新をスキップ
-    const isPublished = status.config?.isPublished || status.isPublished || false;
-    if (isPublished) {
-      currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
-      console.log('✅ URL updated for published board:', status.userInfo.spreadsheetUrl);
-    } else {
-      console.log('🚫 URL update skipped: board is not published');
-      // 非公開時は既存のURLをクリア
-      currentSpreadsheetUrl = '';
-    }
+    currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    console.log('✅ Spreadsheet URL updated:', status.userInfo.spreadsheetUrl);
+  } else if (status.userInfo.spreadsheetUrl === '') {
+    // 明示的な空文字列の場合はクリア
+    currentSpreadsheetUrl = '';
+    console.log('🗑️ Spreadsheet URL cleared');
   }
 
   const cfg = status.config || {};
@@ -1124,40 +1176,17 @@ function updateFooterAndGuidanceImmediate(status) {
     return;
   }
 
-  // Use normalized publication state from status object with additional validation
-  const isPublished = (status._normalized && status._normalized.isPublished) || false;
-  const viewUrl = status._normalized && status._normalized.viewUrl;
+  // 改善された公開状態判定: 統一関数使用 + フォールバック処理
+  const finalIsPublished = determinePublicationStatus(status);
+  const viewUrl = (status._normalized && status._normalized.viewUrl) || 
+                  (status.appUrls && status.appUrls.viewUrl) ||
+                  generateViewUrl(status);
   
-  // Additional strict check: ensure appPublished is explicitly true
-  let explicitAppPublished = status.appPublished === true;
-  
-  if (!explicitAppPublished && status.userInfo && status.userInfo.configJson) {
-    try {
-      const config = JSON.parse(status.userInfo.configJson);
-      explicitAppPublished = config.appPublished === true;
-    } catch (configError) {
-      console.warn('❌ Failed to parse configJson for publication check:', configError);
-      explicitAppPublished = false;
-    }
-  }
-  
-  // Final publication decision: both normalized and explicit checks must agree
-  const finalIsPublished = isPublished && explicitAppPublished;
-  
-  // 本番環境では詳細ログを削減
-  if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-    console.log('🔍 Enhanced publication check:', {
-      'normalized isPublished': isPublished,
-      'explicit appPublished': explicitAppPublished,
-      'final decision': finalIsPublished,
-      'publish reason': status._normalized && status._normalized.publishReason,
-      'normalized viewUrl': viewUrl,
-      'has valid viewUrl': status._normalized && status._normalized.hasValidViewUrl,
-      'will show footer': finalIsPublished
-    });
-  } else {
-    console.log(`🔍 Publication check: ${finalIsPublished ? '公開中' : '非公開'}`);
-  }
+  // 簡潔なログ出力
+  console.log(`🔍 Publication check: ${finalIsPublished ? '公開中' : '非公開'}`, {
+    hasViewUrl: !!viewUrl,
+    source: status._normalized ? '_normalized' : 'fallback'
+  });
 
   // Show footer if published (with strict validation)
   if (finalIsPublished) {
@@ -2397,8 +2426,17 @@ function getActiveResourceUrls(status) {
     return urls; // ユーザー情報がなければ空のURLを返す
   }
 
-  // 1. スプレッドシートURLの取得 (userInfo直下から)
-  urls.spreadsheet = status.userInfo.spreadsheetUrl || null;
+  // 1. スプレッドシートURLの取得（複数ソースから確保）
+  urls.spreadsheet = status.userInfo.spreadsheetUrl || 
+                     status.appUrls?.spreadsheetUrl ||
+                     (typeof currentSpreadsheetUrl !== 'undefined' ? currentSpreadsheetUrl : null);
+  
+  console.log('📊 Spreadsheet URL determination:', {
+    fromUserInfo: status.userInfo.spreadsheetUrl || 'none',
+    fromAppUrls: status.appUrls?.spreadsheetUrl || 'none', 
+    fromGlobal: (typeof currentSpreadsheetUrl !== 'undefined' ? currentSpreadsheetUrl : 'none'),
+    final: urls.spreadsheet
+  });
 
   // 2. configJsonの解析 (一度だけ実行)
   let config = {};
@@ -2433,13 +2471,28 @@ function getActiveResourceUrls(status) {
     }
   }
   
-  // フォールバック: トップレベルのフォームURL
-  if (!urls.form && config.formUrl) {
-    urls.form = config.formUrl;
+  // フォールバック: 複数ソースからフォームURL取得
+  if (!urls.form) {
+    urls.form = config.formUrl || 
+                status.userInfo.formUrl ||
+                status.appUrls?.formUrl ||
+                null;
   }
-  if (!urls.editForm && config.editFormUrl) {
-    urls.editForm = config.editFormUrl;
+  
+  if (!urls.editForm) {
+    urls.editForm = config.editFormUrl || 
+                    status.userInfo.editFormUrl ||
+                    status.appUrls?.editFormUrl ||
+                    (urls.form ? urls.form.replace('/viewform', '/edit') : null);
   }
+  
+  console.log('📋 Form URL determination:', {
+    form: urls.form || 'none',
+    editForm: urls.editForm || 'none',
+    fromConfig: !!config.formUrl,
+    fromUserInfo: !!status.userInfo.formUrl,
+    fromAppUrls: !!status.appUrls?.formUrl
+  });
 
   return urls;
 }

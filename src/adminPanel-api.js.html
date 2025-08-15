@@ -2502,7 +2502,13 @@ function addResource() {
       if (result.status === 'success') {
         showMessage(result.message, 'success');
         urlInput.value = ''; // Clear input
-        loadStatus(true); // Refresh status
+        
+        // デバウンス制御による安全な状態更新
+        if (window.AdminPanel && window.AdminPanel.debounce) {
+          window.AdminPanel.debounce.loadStatus(() => loadStatus(true), 200);
+        } else {
+          loadStatus(true); // フォールバック
+        }
       } else {
         showMessage(result.message || `${resourceTypeText}の追加に失敗しました。`, 'error');
       }
@@ -3702,9 +3708,23 @@ async function simpleStatusRefresh() {
       window.unifiedCache.clear();
     }
     
-    // 直接的なloadStatus呼び出し
-    const status = await loadStatus(true);
-    return status;
+    // デバウンス制御による安全な状態更新
+    if (window.AdminPanel && window.AdminPanel.debounce) {
+      return new Promise((resolve) => {
+        window.AdminPanel.debounce.loadStatus(async () => {
+          try {
+            const status = await loadStatus(true);
+            resolve(status);
+          } catch (error) {
+            console.warn('⚠️ デバウンスloadStatus エラー:', error);
+            resolve(null);
+          }
+        }, 250);
+      });
+    } else {
+      const status = await loadStatus(true);
+      return status;
+    }
     
   } catch (error) {
     console.warn('⚠️ 簡素化状態同期でエラー:', error);
@@ -4514,10 +4534,12 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         setTimeout(() => {
           console.log('🔄 QuickStart完了: 統合UI更新を開始');
           
-          // 最重要: 強制キャッシュクリア後のステータス更新
-          console.log('🚀 Loading system status, bypassCache: true');
-          loadStatus(true).then(() => {
-            console.log('✅ QuickStart完了後のステータス更新完了');
+          // 最重要: デバウンス制御による安全なステータス更新
+          console.log('🚀 Loading system status with debounce control');
+          if (window.AdminPanel && window.AdminPanel.debounce) {
+            window.AdminPanel.debounce.loadStatus(() => {
+              loadStatus(true).then(() => {
+                console.log('✅ QuickStart完了後のステータス更新完了（デバウンス制御）');
             
             // すべてのUI更新を1回の処理でまとめて実行
             updateFormUrlDisplay();
@@ -4537,11 +4559,21 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
             if (window.updateFooterAndGuidance && typeof window.updateFooterAndGuidance === 'function') {
               window.updateFooterAndGuidance(window.lastStatusCache || result);
             }
-          }).catch(error => {
-            console.error('❌ QuickStart完了後のステータス更新エラー:', error);
-            // エラーでもUI更新は実行
-            updateFormUrlDisplay();
-          });
+              }).catch(error => {
+                console.error('❌ QuickStart完了後のステータス更新エラー:', error);
+                // エラーでもUI更新は実行
+                updateFormUrlDisplay();
+              });
+            }, 300); // デバウンス遅延
+          } else {
+            // フォールバック: デバウンス機能がない場合
+            loadStatus(true).then(() => {
+              console.log('✅ QuickStart完了後のステータス更新完了（フォールバック）');
+              updateFormUrlDisplay();
+            }).catch(error => {
+              console.error('❌ QuickStart完了後のステータス更新エラー（フォールバック）:', error);
+            });
+          }
           
         }, 1200); // 少し遅延を増やして他の処理の完了を待つ
         
