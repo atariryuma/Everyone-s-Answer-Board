@@ -4313,7 +4313,18 @@ function executeStopAndQuickStart(quickstartBtn, quickstartText) {
       })
       .catch(function(stopError) {
         console.error('❌ 公開停止に失敗しました:', stopError);
-        showMessage('❌ 公開停止に失敗しました。再度お試しください。', 'error');
+        let errorMessage = '❌ 公開停止に失敗しました。再度お試しください。';
+        
+        // エラーの種類に応じてより具体的なメッセージを表示
+        if (stopError.message && stopError.message.includes('customFormInfo')) {
+          errorMessage = '❌ カスタムフォーム設定の更新に失敗しました。ページを再読み込みしてから再度お試しください。';
+        } else if (stopError.message && stopError.message.includes('許可されていない')) {
+          errorMessage = '❌ データ更新権限エラーが発生しました。管理者にお問い合わせください。';
+        } else if (stopError.message && stopError.message.includes('ネットワーク')) {
+          errorMessage = '❌ ネットワークエラーが発生しました。インターネット接続を確認してください。';
+        }
+        
+        showMessage(errorMessage, 'error');
         resetQuickStartButton(quickstartBtn, quickstartText);
       });
   } else {
