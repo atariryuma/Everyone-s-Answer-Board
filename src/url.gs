@@ -5,11 +5,7 @@
 
 // Define basic logging helpers for GAS and test environments
 // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
-if (typeof debugLog === 'undefined') {
-  function debugLog(message, ...args) {
-    console.log('[DEBUG]', message, ...args);
-  }
-}
+// debugLog は debugConfig.gs で統一制御されるため、重複定義を削除
 
 if (typeof errorLog === 'undefined') {
   function errorLog(message, ...args) {

@@ -225,11 +225,7 @@ function logValidationError(field, value, rule, message) {
 
 // デバッグログ関数の定義（テスト環境対応）
 // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
-if (typeof debugLog === 'undefined') {
-  function debugLog(message, ...args) {
-    console.log('[DEBUG]', message, ...args);
-  }
-}
+// debugLog は debugConfig.gs で統一制御されるため、重複定義を削除
 
 if (typeof warnLog === 'undefined') {
   function warnLog(message, ...args) {
@@ -5030,7 +5026,17 @@ function getDriveService() {
  * @returns {boolean} デバッグモードを有効にすべき場合はtrue
  */
 function shouldEnableDebugMode() {
-  return isSystemAdmin();
+  try {
+    // PropertiesServiceでDEBUG_MODEが有効に設定されているかをチェック
+    const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+    
+    // デバッグモードが有効な場合のみtrueを返す
+    return debugMode;
+  } catch (error) {
+    // エラー時は安全側に倒してfalseを返す
+    warnLog('shouldEnableDebugMode error:', error.message);
+    return false;
+  }
 }
 
 /**
@@ -5121,6 +5127,26 @@ function getDeletionLogsForUI() {
     };
   } catch (error) {
     errorLog('getDeletionLogs wrapper error:', error.message);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * 診断ログ一覧を取得（UI用ラッパー）
+ * @param {number} limit - 取得する件数の上限
+ */
+function getDiagnosticLogsForUI(limit) {
+  try {
+    const logs = getDiagnosticLogs(limit || 50);
+    return {
+      status: 'success',
+      logs: logs
+    };
+  } catch (error) {
+    errorLog('getDiagnosticLogs wrapper error:', error.message);
     return {
       status: 'error',
       message: error.message

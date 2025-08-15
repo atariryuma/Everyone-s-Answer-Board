@@ -69,6 +69,14 @@ const DELETE_LOG_SHEET_CONFIG = {
 };
 
 /**
+ * 診断ログ用シート設定
+ */
+const DIAGNOSTIC_LOG_SHEET_CONFIG = {
+  SHEET_NAME: 'DiagnosticLogs',
+  HEADERS: ['timestamp', 'functionName', 'status', 'problemCount', 'repairCount', 'successfulRepairs', 'details', 'executor', 'summary']
+};
+
+/**
  * 削除ログを安全にトランザクション的に記録
  * @param {string} executorEmail - 削除実行者のメール
  * @param {string} targetUserId - 削除対象のユーザーID
@@ -175,6 +183,265 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
   } catch (error) {
     errorLog('🚨 削除ログ記録エラー:', error.message);
     
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 診断ログを安全にトランザクション的に記録
+ * @param {string} functionName - 実行された診断機能名
+ * @param {object} result - 診断結果オブジェクト
+ * @param {object} summary - 診断結果のサマリー
+ */
+function logDiagnosticResult(functionName, result, summary) {
+  const transactionLog = {
+    startTime: Date.now(),
+    steps: [],
+    success: false,
+    rollbackActions: []
+  };
+
+  try {
+    // 入力検証
+    if (!functionName || !result || !summary) {
+      throw new Error('必須パラメータが不足しています');
+    }
+
+    const props = getResilientScriptProperties();
+    const dbId = getSecureDatabaseId();
+
+    if (!dbId) {
+      warnLog('診断ログの記録をスキップします: データベースIDが設定されていません');
+      return { success: false, reason: 'no_database_id' };
+    }
+
+    const service = getSheetsServiceCached();
+    const logSheetName = DIAGNOSTIC_LOG_SHEET_CONFIG.SHEET_NAME;
+    const executorEmail = getCurrentUserEmail();
+
+    // 統一ロック管理でトランザクション開始
+    return executeWithStandardizedLock('WRITE_OPERATION', 'logDiagnosticResult', () => {
+
+      // ログシートの存在確認・作成（トランザクション内）
+      let sheetCreated = false;
+      try {
+        const logSheetData = batchGetSheetsData(service, dbId, [`'${logSheetName}'!A1:Z1`]);
+        if (!logSheetData.valueRanges[0].values || logSheetData.valueRanges[0].values.length === 0) {
+          // ヘッダーを作成
+          batchUpdateSheetsData(service, dbId, [
+            {
+              range: `'${logSheetName}'!A1:I1`,
+              values: [DIAGNOSTIC_LOG_SHEET_CONFIG.HEADERS]
+            }
+          ]);
+          sheetCreated = true;
+          transactionLog.steps.push('診断ログシートヘッダーを作成');
+        }
+      } catch (sheetError) {
+        if (sheetError.message && sheetError.message.includes('範囲が見つかりません')) {
+          // シート自体が存在しない場合は作成
+          batchUpdateSheetsData(service, dbId, [
+            {
+              range: `'${logSheetName}'!A1:I1`,
+              values: [DIAGNOSTIC_LOG_SHEET_CONFIG.HEADERS]
+            }
+          ]);
+          sheetCreated = true;
+          transactionLog.steps.push('診断ログシートを新規作成');
+        } else {
+          throw sheetError;
+        }
+      }
+
+      // ログエントリーを準備
+      const logEntry = [
+        new Date().toISOString(),
+        functionName,
+        summary.type || 'unknown',
+        summary.problemCount || 0,
+        summary.repairCount || 0,
+        summary.successfulRepairs || 0,
+        JSON.stringify(result).substring(0, 1000), // 詳細情報は1000文字まで
+        executorEmail,
+        summary.message || ''
+      ];
+
+      // 新しい行を追加
+      batchUpdateSheetsData(service, dbId, [
+        {
+          range: `'${logSheetName}'!A:I`,
+          values: [logEntry],
+          insertDataOption: 'INSERT_ROWS'
+        }
+      ]);
+
+      transactionLog.success = true;
+      transactionLog.steps.push('診断ログエントリーを追加');
+
+      debugLog('✅ 診断ログの記録完了:', {
+        functionName,
+        executorEmail,
+        sheetCreated,
+        steps: transactionLog.steps
+      });
+
+      return {
+        success: true,
+        sheetCreated,
+        steps: transactionLog.steps
+      };
+
+    });
+
+  } catch (error) {
+    errorLog('診断ログ記録エラー:', error.message);
+    debugLog('診断ログトランザクション詳細:', transactionLog);
+    
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 診断ログ一覧を取得（管理者用）
+ * @param {number} limit - 取得する件数の上限（デフォルト50件）
+ */
+function getDiagnosticLogs(limit = 50) {
+  try {
+    // 管理者権限チェック
+    if (!isDeployUser()) {
+      throw new Error('この機能にアクセスする権限がありません。');
+    }
+
+    const props = getResilientScriptProperties();
+    const dbId = getSecureDatabaseId();
+
+    if (!dbId) {
+      throw new Error('データベースIDが設定されていません');
+    }
+
+    const service = getSheetsServiceCached();
+    const sheetName = DIAGNOSTIC_LOG_SHEET_CONFIG.SHEET_NAME;
+
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
+    const values = data.valueRanges[0].values || [];
+
+    if (values.length <= 1) {
+      return []; // ヘッダーのみの場合
+    }
+
+    const headers = values[0];
+    const logs = [];
+
+    // 最新から指定件数取得（ヘッダーを除く）
+    const startIndex = Math.max(1, values.length - limit);
+    for (let i = values.length - 1; i >= startIndex; i--) {
+      const row = values[i];
+      const log = {};
+
+      headers.forEach((header, index) => {
+        log[header] = row[index] || '';
+      });
+
+      // 詳細情報をパース
+      try {
+        if (log.details) {
+          log.details = JSON.parse(log.details);
+        }
+      } catch (e) {
+        // パースエラーの場合はそのまま文字列として保持
+      }
+
+      logs.push(log);
+    }
+
+    infoLog(`✅ 診断ログ一覧を取得: ${logs.length}件`);
+    return logs;
+
+  } catch (error) {
+    errorLog('getDiagnosticLogs error:', error.message);
+    throw new Error('診断ログの取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 古い診断ログの自動クリーンアップ（30日以上前のログを削除）
+ */
+function cleanupOldDiagnosticLogs() {
+  try {
+    // 管理者権限チェック
+    if (!isDeployUser()) {
+      return { success: false, reason: 'no_permission' };
+    }
+
+    const props = getResilientScriptProperties();
+    const dbId = getSecureDatabaseId();
+
+    if (!dbId) {
+      return { success: false, reason: 'no_database_id' };
+    }
+
+    const service = getSheetsServiceCached();
+    const sheetName = DIAGNOSTIC_LOG_SHEET_CONFIG.SHEET_NAME;
+
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
+    const values = data.valueRanges[0].values || [];
+
+    if (values.length <= 1) {
+      return { success: true, deletedCount: 0, reason: 'no_logs' };
+    }
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 30); // 30日前
+
+    let deletedCount = 0;
+    const preservedRows = [values[0]]; // ヘッダーは保持
+
+    // タイムスタンプをチェックして新しいログのみ保持
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const timestamp = row[0]; // 最初の列はタイムスタンプ
+
+      try {
+        const logDate = new Date(timestamp);
+        if (logDate > cutoffDate) {
+          preservedRows.push(row);
+        } else {
+          deletedCount++;
+        }
+      } catch (e) {
+        // 日付パースエラーの場合は保持
+        preservedRows.push(row);
+      }
+    }
+
+    // データを更新（古いログを削除）
+    if (deletedCount > 0) {
+      // シートをクリアしてから新しいデータを設定
+      const range = `'${sheetName}'!A:I`;
+      batchUpdateSheetsData(service, dbId, [
+        {
+          range: range,
+          values: preservedRows
+        }
+      ]);
+
+      infoLog(`✅ 古い診断ログをクリーンアップ: ${deletedCount}件削除`);
+    }
+
+    return {
+      success: true,
+      deletedCount,
+      remainingCount: preservedRows.length - 1 // ヘッダーを除く
+    };
+
+  } catch (error) {
+    errorLog('cleanupOldDiagnosticLogs error:', error.message);
     return {
       success: false,
       error: error.message
@@ -2105,6 +2372,22 @@ function diagnoseDatabase(targetUserId) {
       diagnosticResult.summary.recommendations.push('キャッシュをクリアすることを推奨します');
     }
 
+    // 診断結果をログとして保存
+    try {
+      const summary = {
+        type: diagnosticResult.summary.overallStatus === 'critical' ? 'error' : 
+              diagnosticResult.summary.overallStatus === 'warning' ? 'warning' : 'success',
+        problemCount: diagnosticResult.summary.criticalIssues.length + diagnosticResult.summary.warnings.length,
+        repairCount: 0,
+        successfulRepairs: 0,
+        message: `データベース診断完了: ${diagnosticResult.summary.overallStatus} (問題: ${diagnosticResult.summary.criticalIssues.length}件, 警告: ${diagnosticResult.summary.warnings.length}件)`
+      };
+      
+      logDiagnosticResult('diagnoseDatabase', diagnosticResult, summary);
+    } catch (logError) {
+      warnLog('診断ログの保存に失敗:', logError.message);
+    }
+
     infoLog('✅ データベース診断完了:', diagnosticResult.summary.overallStatus);
     return diagnosticResult;
 
@@ -2330,87 +2613,6 @@ function verifyServiceAccountPermissions(spreadsheetId) {
  * @param {string} targetUserId - 修復対象のユーザーID（オプション）
  * @returns {object} 修復結果
  */
-function performAutoRepair(targetUserId) {
-  try {
-    debugLog('🔧 自動修復開始:', targetUserId || 'GENERAL');
-
-    var repairResult = {
-      timestamp: new Date().toISOString(),
-      targetUserId: targetUserId,
-      actions: [],
-      success: false,
-      summary: ''
-    };
-
-    // 1. キャッシュクリア
-    try {
-      if (targetUserId) {
-        // 特定ユーザーのキャッシュクリア
-        invalidateUserCache(targetUserId, null, null, false);
-        repairResult.actions.push('ユーザー固有キャッシュクリア: ' + targetUserId);
-      } else {
-        // 全体キャッシュクリア
-        clearDatabaseCache();
-        repairResult.actions.push('データベース全体キャッシュクリア');
-      }
-    } catch (cacheError) {
-      repairResult.actions.push('キャッシュクリア失敗: ' + cacheError.message);
-    }
-
-    // 2. サービス接続リフレッシュ
-    try {
-      getSheetsServiceCached(true); // forceRefresh = true
-      repairResult.actions.push('Sheets サービス接続リフレッシュ');
-    } catch (serviceError) {
-      repairResult.actions.push('サービスリフレッシュ失敗: ' + serviceError.message);
-    }
-
-    // 3. サービスアカウント権限確認・修復
-    try {
-      var permissionResult = verifyServiceAccountPermissions();
-      if (permissionResult.summary.status === 'repaired' ||
-          permissionResult.summary.status === 'healthy') {
-        repairResult.actions.push('サービスアカウント権限確認・修復完了');
-      } else {
-        repairResult.actions.push('サービスアカウント権限に問題あり: ' +
-          (permissionResult.summary.issues ? permissionResult.summary.issues.join(', ') : '不明'));
-      }
-    } catch (permError) {
-      repairResult.actions.push('サービスアカウント権限確認失敗: ' + permError.message);
-    }
-
-    // 4. 修復後の検証
-    try {
-      Utilities.sleep(2000); // 少し待機
-      var postRepairDiagnosis = diagnoseDatabase(targetUserId);
-
-      if (postRepairDiagnosis.summary.overallStatus === 'healthy' ||
-          postRepairDiagnosis.summary.overallStatus === 'warning') {
-        repairResult.success = true;
-        repairResult.summary = '修復成功: システム状態が改善されました';
-      } else {
-        repairResult.summary = '修復不完全: 追加の手動対応が必要です';
-      }
-
-      repairResult.postRepairStatus = postRepairDiagnosis.summary;
-
-    } catch (verifyError) {
-      repairResult.summary = '修復実行したが検証に失敗: ' + verifyError.message;
-    }
-
-    infoLog('✅ 自動修復完了:', repairResult.success ? '成功' : '要追加対応');
-    return repairResult;
-
-  } catch (error) {
-    errorLog('❌ 自動修復でエラー:', error);
-    return {
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      success: false,
-      summary: '修復処理自体が失敗: ' + error.message
-    };
-  }
-}
 
 /**
  * データベースの整合性を包括的にチェックする
@@ -2521,6 +2723,22 @@ function performDataIntegrityCheck(options = {}) {
       result.summary.status = result.summary.warnings.length > 0 ? 'warning' : 'healthy';
     } else {
       result.summary.status = 'critical';
+    }
+
+    // 診断結果をログとして保存
+    try {
+      const summary = {
+        type: result.summary.status === 'critical' ? 'error' : 
+              result.summary.status === 'warning' ? 'warning' : 'success',
+        problemCount: result.summary.issues.length + result.summary.warnings.length,
+        repairCount: result.summary.fixed ? result.summary.fixed.length : 0,
+        successfulRepairs: result.summary.fixed ? result.summary.fixed.length : 0,
+        message: `データ整合性チェック完了: ${result.summary.status} (問題: ${result.summary.issues.length}件, 警告: ${result.summary.warnings.length}件, 修復: ${result.summary.fixed ? result.summary.fixed.length : 0}件)`
+      };
+      
+      logDiagnosticResult('performDataIntegrityCheck', result, summary);
+    } catch (logError) {
+      warnLog('診断ログの保存に失敗:', logError.message);
     }
 
     infoLog('✅ データ整合性チェック完了:', result.summary.status);
@@ -2778,121 +2996,6 @@ function getDbSheet() {
   }
 }
 
-/**
- * システム監視とアラート機能
- * @param {object} options - 監視オプション
- * @returns {object} 監視結果
- */
-function performSystemMonitoring(options = {}) {
-  try {
-    debugLog('📊 システム監視開始');
-
-    const opts = {
-      checkHealth: options.checkHealth !== false,
-      checkPerformance: options.checkPerformance !== false,
-      checkSecurity: options.checkSecurity !== false,
-      enableAlerts: options.enableAlerts !== false,
-      ...options
-    };
-
-    var monitoringResult = {
-      timestamp: new Date().toISOString(),
-      summary: {
-        overallHealth: 'unknown',
-        alerts: [],
-        warnings: [],
-        metrics: {}
-      },
-      details: {
-        healthCheck: null,
-        performanceCheck: null,
-        securityCheck: null
-      }
-    };
-
-    // 1. ヘルスチェック
-    if (opts.checkHealth) {
-      try {
-        var healthResult = performHealthCheck();
-        monitoringResult.details.healthCheck = healthResult;
-
-        if (healthResult.summary.overallStatus === 'critical') {
-          monitoringResult.summary.alerts.push('システムヘルスが危険な状態です');
-        } else if (healthResult.summary.overallStatus === 'warning') {
-          monitoringResult.summary.warnings.push('システムヘルスに軽微な問題があります');
-        }
-      } catch (healthError) {
-        errorLog('❌ ヘルスチェックエラー:', healthError.message);
-        monitoringResult.summary.alerts.push('ヘルスチェック自体が失敗しました');
-      }
-    }
-
-    // 2. パフォーマンスチェック
-    if (opts.checkPerformance) {
-      try {
-        var perfResult = performPerformanceCheck();
-        monitoringResult.details.performanceCheck = perfResult;
-
-        if (perfResult.metrics.responseTime > 10000) { // 10秒以上
-          monitoringResult.summary.alerts.push('レスポンス時間が異常に長くなっています');
-        } else if (perfResult.metrics.responseTime > 5000) { // 5秒以上
-          monitoringResult.summary.warnings.push('レスポンス時間が少し長くなっています');
-        }
-
-        monitoringResult.summary.metrics.responseTime = perfResult.metrics.responseTime;
-        monitoringResult.summary.metrics.cacheHitRate = perfResult.metrics.cacheHitRate;
-      } catch (perfError) {
-        errorLog('❌ パフォーマンスチェックエラー:', perfError.message);
-        monitoringResult.summary.warnings.push('パフォーマンス測定に失敗しました');
-      }
-    }
-
-    // 3. セキュリティチェック
-    if (opts.checkSecurity) {
-      try {
-        var securityResult = performSecurityCheck();
-        monitoringResult.details.securityCheck = securityResult;
-
-        if (securityResult.vulnerabilities.length > 0) {
-          monitoringResult.summary.alerts.push(securityResult.vulnerabilities.length + '件のセキュリティ問題が検出されました');
-        }
-      } catch (securityError) {
-        errorLog('❌ セキュリティチェックエラー:', securityError.message);
-        monitoringResult.summary.warnings.push('セキュリティチェックに失敗しました');
-      }
-    }
-
-    // 4. 総合判定
-    if (monitoringResult.summary.alerts.length === 0) {
-      monitoringResult.summary.overallHealth = monitoringResult.summary.warnings.length > 0 ? 'warning' : 'healthy';
-    } else {
-      monitoringResult.summary.overallHealth = 'critical';
-    }
-
-    // 5. アラート通知
-    if (opts.enableAlerts && (monitoringResult.summary.alerts.length > 0 || monitoringResult.summary.warnings.length > 0)) {
-      try {
-        sendSystemAlert(monitoringResult);
-      } catch (alertError) {
-        errorLog('❌ アラート送信エラー:', alertError.message);
-      }
-    }
-
-    infoLog('✅ システム監視完了:', monitoringResult.summary.overallHealth);
-    return monitoringResult;
-
-  } catch (error) {
-    errorLog('❌ システム監視でエラー:', error);
-    return {
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      summary: {
-        overallHealth: 'error',
-        alerts: ['監視システム自体が失敗: ' + error.message]
-      }
-    };
-  }
-}
 
 /**
  * システムヘルスチェック

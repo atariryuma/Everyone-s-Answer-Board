@@ -57,18 +57,28 @@ function isProductionEnvironment() {
  * @param {...any} args - 追加引数
  */
 function controlledLog(level, category, message, ...args) {
-  // 本番環境ではERRORレベルのみ出力
-  if (isProductionEnvironment() && level !== 'ERROR') {
-    return;
+  // DEBUG_MODE設定をチェック（AppSetupPageでの設定を優先）
+  try {
+    const debugModeEnabled = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+    
+    // DEBUG_MODEが無効の場合はERRORレベルのみ出力
+    if (!debugModeEnabled && level !== 'ERROR') {
+      return;
+    }
+  } catch (error) {
+    // PropertiesService エラー時は従来の本番環境判定にフォールバック
+    if (isProductionEnvironment() && level !== 'ERROR') {
+      return;
+    }
   }
 
-  // ログレベルチェック
+  // ログレベルチェック（DEBUG_MODEが有効な場合のみ適用）
   const levelValue = DEBUG_CONFIG.logLevels[level] || DEBUG_CONFIG.logLevels.DEBUG;
   if (levelValue > DEBUG_CONFIG.currentLogLevel) {
     return;
   }
 
-  // カテゴリ別制御チェック
+  // カテゴリ別制御チェック（DEBUG_MODEが有効な場合のみ適用）
   if (category && DEBUG_CONFIG.categories[category] === false) {
     return;
   }

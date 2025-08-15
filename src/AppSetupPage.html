@@ -1487,69 +1487,6 @@
         let usersData = [];
         let selectedUserIds = new Set();
 
-        // ユーザーリスト拡張機能は簡素化のため無効化されました
-        function enhanceUserTableWithAccessControl(users) {
-            // この機能は無効化されました - 元のdisplayUserListを使用してください
-            console.log('enhanceUserTableWithAccessControl は無効化されています');
-            return;
-            
-            usersData = users || [];
-            const tableBody = document.getElementById('user-table-body');
-            if (!tableBody || usersData.length === 0) return;
-
-            tableBody.innerHTML = usersData.map(user => {
-                const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
-                const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '不明';
-                const lastAccessDate = user.lastAccessedAt ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP') : '未アクセス';
-                
-                const statusClass = isActive ? 'text-green-400' : 'text-red-400';
-                const statusIcon = isActive ? '🟢' : '🔴';
-                const statusText = isActive ? 'アクティブ' : '非アクティブ';
-
-                return `
-                    <tr class="hover:bg-gray-700/50" data-user-id="${user.userId}">
-                        <td class="px-2 py-3 text-center">
-                            <input type="checkbox" class="user-select rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-gray-700" 
-                                   data-user-id="${user.userId}" onchange="updateSelectedUsers()">
-                        </td>
-                        <td class="px-4 py-3 text-sm text-white" title="${user.adminEmail}">${user.adminEmail}</td>
-                        <td class="px-4 py-3 text-sm text-gray-300">${createdDate}</td>
-                        <td class="px-4 py-3 text-sm ${statusClass}">${statusIcon} ${statusText}</td>
-                        <td class="px-4 py-3 text-center">
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" class="sr-only peer user-active-toggle" 
-                                       data-user-id="${user.userId}" data-email="${user.adminEmail}"
-                                       ${isActive ? 'checked' : ''} 
-                                       onchange="toggleUserActiveStatus('${user.userId}', this.checked, '${user.adminEmail}')">
-                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                            </label>
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-300">${lastAccessDate}</td>
-                        <td class="px-4 py-3 text-center">
-                            <button type="button" onclick="deleteUser('${user.userId}', '${user.adminEmail}')" 
-                                    class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
-                                🗑️ 削除
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            // 全選択チェックボックスの設定
-            const selectAllCheckbox = document.getElementById('select-all-users');
-            if (selectAllCheckbox) {
-                selectAllCheckbox.onchange = function() {
-                    const userCheckboxes = document.querySelectorAll('.user-select');
-                    userCheckboxes.forEach(cb => {
-                        cb.checked = this.checked;
-                    });
-                    updateSelectedUsers();
-                };
-            }
-
-            // 一括操作ボタンの設定
-            setupBulkOperationButtons();
-        }
 
         // 選択されたユーザーIDを更新
         function updateSelectedUsers() {
@@ -1640,18 +1577,6 @@
             loadDebugModeStatus();
             
             // ユーザーリスト表示時に拡張機能を適用
-            const originalLoadUserList = window.loadUserList;
-            // 拡張機能は無効化されました - 元のloadUserListをそのまま使用
-            // if (originalLoadUserList) {
-            //     window.loadUserList = function() {
-            //         originalLoadUserList().then(() => {
-            //             // 拡張機能は無効化されました
-            //             // setTimeout(() => {
-            //             //     enhanceUserTableWithAccessControl(usersData);
-            //             // }, 100);
-            //         });
-            //     };
-            // }
         });
     </script>
 </body>
