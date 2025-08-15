@@ -176,6 +176,13 @@ function _fullUpdateUIWithNewStatus(status) {
     return;
   }
   
+  // 公開状態チェック: 非公開状態での競合状態を防ぐ
+  const isPublished = status.config?.isPublished || status.isPublished || false;
+  if (!isPublished) {
+    console.log('🚫 UI update skipped: board is not published (avoiding race condition)');
+    return;
+  }
+  
   try {
     // === 直接的なUI更新（シンプル版） ===
     console.log('🎯 Starting direct UI updates...');
@@ -442,9 +449,18 @@ function updateDatabaseInfo(status) {
     return;
   }
 
-  // スプレッドシートURLを設定
+  // スプレッドシートURLを設定（公開状態チェック付き）
   if (status.userInfo.spreadsheetUrl) {
-    currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    // 公開状態確認: 非公開時はURL更新をスキップ
+    const isPublished = status.config?.isPublished || status.isPublished || false;
+    if (isPublished) {
+      currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+      console.log('✅ URL updated for published board:', status.userInfo.spreadsheetUrl);
+    } else {
+      console.log('🚫 URL update skipped: board is not published');
+      // 非公開時は既存のURLをクリア
+      currentSpreadsheetUrl = '';
+    }
   }
 
   const cfg = status.config || {};

@@ -73,26 +73,28 @@ function setupEventListeners() {
             .then(function(unpublishResult) {
               console.log('✅ 公開停止完了:', unpublishResult);
               
-              // 公開停止成功後、統合キャッシュクリアを実行（重複処理を避ける）
-              if (typeof clearAllCachesForUnpublish === 'function') {
-                clearAllCachesForUnpublish();
-                console.log('🧹 統合キャッシュクリア完了');
-              } else if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-                window.unifiedCache.clear();
-                console.log('🧹 基本キャッシュクリア完了');
-              }
+              // unpublishBoard()内で既にキャッシュクリア処理が実行されているため、
+              // ここでは重複処理を避けて、状態同期に集中
+              console.log('🔄 公開停止後の状態同期を開始（キャッシュクリア済み）');
               
-              // 少し遅延してから状態を再読み込み（サーバー側の更新完了を待つ）
-              return new Promise(resolve => {
-                setTimeout(() => {
-                  loadStatus(true).then(() => {
-                    console.log('🔄 公開停止後の状態更新完了');
-                    resolve(unpublishResult);
-                  }).catch(error => {
-                    console.warn('⚠️ 状態更新エラー:', error);
-                    resolve(unpublishResult); // エラーでも続行
-                  });
-                }, 1000); // 1秒待機してから状態更新
+              // 改善された非同期処理完了待機
+              return new Promise(async (resolve) => {
+                try {
+                  // Step 1: DOM状態の安定化待機（短縮）
+                  await new Promise(r => setTimeout(r, 300));
+                  
+                  // Step 2: 状態再読み込み（強制リフレッシュ）
+                  await loadStatus(true);
+                  console.log('🔄 公開停止後の状態更新完了');
+                  
+                  // Step 3: 最終的なUI状態確認
+                  await new Promise(r => setTimeout(r, 100));
+                  
+                  resolve(unpublishResult);
+                } catch (error) {
+                  console.warn('⚠️ 状態同期エラー:', error);
+                  resolve(unpublishResult); // エラーでも続行
+                }
               });
             })
             .then(function() {

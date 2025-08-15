@@ -2013,7 +2013,36 @@ async function clearAllCachesForUnpublish() {
       console.warn('⚠️ BroadcastChannel notification warning:', e);
     }
     
-    // 5. キャッシュ無効化のためのタイムスタンプ更新
+    // 5. グローバル変数の完全クリア（URL配置問題の根本解決）
+    try {
+      // currentSpreadsheetUrlの完全リセット
+      if (typeof currentSpreadsheetUrl !== 'undefined') {
+        currentSpreadsheetUrl = '';
+        console.log('✅ currentSpreadsheetUrl cleared');
+      }
+      
+      // window.currentStatusの完全リセット
+      if (window.currentStatus) {
+        window.currentStatus = null;
+        console.log('✅ window.currentStatus cleared');
+      }
+      
+      // その他のURL関連グローバル変数のクリア
+      if (typeof webAppUrl !== 'undefined') {
+        webAppUrl = '';
+        console.log('✅ webAppUrl cleared');
+      }
+      
+      if (typeof currentActiveSheet !== 'undefined') {
+        currentActiveSheet = '';
+        console.log('✅ currentActiveSheet cleared');
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ Global variables clear warning:', e);
+    }
+    
+    // 6. キャッシュ無効化のためのタイムスタンプ更新
     try {
       localStorage.setItem('lastUnpublishTime', Date.now().toString());
       localStorage.setItem('cacheInvalidationToken', Math.random().toString(36));
@@ -2031,14 +2060,32 @@ async function clearAllCachesForUnpublish() {
 // Unpublish board
 function unpublishBoard() {
     return runGasWithUserId('unpublishBoard', 'ボードの公開を停止中...')
-      .then(function(response) {
+      .then(async function(response) {
         logDebug('公開停止レスポンス:', response);
 
-        // 強化されたキャッシュクリア処理（キャッシュバスティング対応）
-        clearAllCachesForUnpublish();
+        // 最適化された状態クリア順序：
+        // 1. まずサーバー側の公開停止処理が成功したことを確認
+        console.log('✅ サーバー側公開停止完了、クライアント側クリア開始');
+        
+        // 2. 強化されたキャッシュクリア処理（非同期で確実に実行）
+        try {
+          await clearAllCachesForUnpublish();
+          console.log('✅ 包括的キャッシュクリア完了');
+        } catch (clearError) {
+          console.warn('⚠️ キャッシュクリア中にエラー:', clearError);
+          // クリア失敗でも処理は継続
+        }
 
-        // Reset column selection dropdowns to default "--列を選択--" state
-        resetColumnSelections();
+        // 3. UI状態のリセット（カラム選択等）
+        try {
+          resetColumnSelections();
+          console.log('✅ カラム選択リセット完了');
+        } catch (resetError) {
+          console.warn('⚠️ カラム選択リセット中にエラー:', resetError);
+        }
+
+        // 4. 短い遅延でDOM状態を安定化
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // 公開停止処理が成功したことを返す
         return Promise.resolve(response);
