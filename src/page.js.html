@@ -1470,6 +1470,19 @@ class StudyQuestApp {
       return; // データ取得成功まで基準は更新しない
     }
 
+    // 通常の初期データロード時も新着チェックを実行
+    const lastSeen = this.state.lastSeenCount || 0;
+    if (newCount > lastSeen) {
+      console.log('🔔 初期データロード時の新着検出:', {
+        newCount,
+        lastSeenCount: lastSeen,
+        difference: newCount - lastSeen
+      });
+      
+      // 新着通知を表示してから基準値を更新
+      await this.checkForNewItems(newCount);
+    }
+
     this.updateLastSeenCount(newCount);
     this.initialDataLoaded = true;
     
