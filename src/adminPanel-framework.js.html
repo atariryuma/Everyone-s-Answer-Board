@@ -2047,8 +2047,164 @@ window.HistoryManager = {
         ? item.questionText.substring(0, 50) + '...' 
         : (item.questionText || '未設定');
       
-      const title = '履歴復元の確認';
-      const message = `以下の設定を復元しますか？現在の設定が上書きされます。
+      // 現在のスプレッドシート情報を取得
+      const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || null;
+      const targetSpreadsheetId = item.spreadsheetId || null;
+      const hasSpreadsheetDifference = currentSpreadsheetId && targetSpreadsheetId && 
+                                     currentSpreadsheetId !== targetSpreadsheetId;
+      
+      // 拡張されたモーダルHTMLを生成
+      this._showEnhancedRestoreModal(item, {
+        truncatedQuestion,
+        formattedDate,
+        hasSpreadsheetDifference,
+        currentSpreadsheetId,
+        targetSpreadsheetId
+      });
+      
+    } catch (error) {
+      console.error('❌ Failed to show restore confirmation modal:', error);
+      // フォールバック: 元のシンプルモーダル
+      this._showFallbackRestoreModal(item);
+    }
+  },
+
+  /**
+   * Show enhanced restore confirmation modal with detailed layout
+   */
+  _showEnhancedRestoreModal(item, details) {
+    const modal = document.getElementById('confirmation-modal');
+    if (!modal) {
+      console.warn('⚠️ confirmation-modal not found, using fallback');
+      this._showFallbackRestoreModal(item);
+      return;
+    }
+
+    // カスタムHTMLコンテンツを生成
+    const modalContent = this._generateRestoreModalHTML(item, details);
+    
+    // モーダルの内容を一時的に置き換え
+    const glassPanel = modal.querySelector('.glass-panel');
+    const originalContent = glassPanel.innerHTML;
+    glassPanel.innerHTML = modalContent;
+    
+    // モーダルを表示
+    modal.classList.remove('hidden');
+    
+    // イベントハンドラーを設定
+    const confirmBtn = modal.querySelector('#restore-confirm-btn');
+    const cancelBtn = modal.querySelector('#restore-cancel-btn');
+    
+    const cleanup = () => {
+      // 元のコンテンツに戻す
+      glassPanel.innerHTML = originalContent;
+      modal.classList.add('hidden');
+    };
+    
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        cleanup();
+        console.log('✅ User confirmed restoration');
+        this._restoreHistoryItem(item);
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        cleanup();
+        console.log('❌ User cancelled restoration');
+      };
+    }
+  },
+
+  /**
+   * Generate HTML content for enhanced restore modal
+   */
+  _generateRestoreModalHTML(item, details) {
+    const { truncatedQuestion, formattedDate, hasSpreadsheetDifference, currentSpreadsheetId, targetSpreadsheetId } = details;
+    
+    // スプレッドシートIDをマスク表示用に変換
+    const maskSpreadsheetId = (id) => {
+      if (!id || id.length < 8) return id || '未設定';
+      return '...' + id.slice(-6);
+    };
+    
+    const spreadsheetDiffSection = hasSpreadsheetDifference ? `
+      <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 mb-4">
+        <h4 class="text-sm font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h4a1 1 0 011 1v2h4a1 1 0 011 1v1a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1h4zM7 8v8a2 2 0 002 2h2a2 2 0 002-2V8M7 8H5a2 2 0 00-2 2v6a2 2 0 002 2h2M13 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2"></path>
+          </svg>
+          📁 スプレッドシート変更
+        </h4>
+        <div class="text-xs text-yellow-100 space-y-1">
+          <div><span class="text-yellow-200 font-medium">現在:</span> ${maskSpreadsheetId(currentSpreadsheetId)}</div>
+          <div><span class="text-yellow-200 font-medium">復元後:</span> ${maskSpreadsheetId(targetSpreadsheetId)}</div>
+        </div>
+      </div>
+    ` : '';
+    
+    return `
+      <h3 class="text-xl font-bold text-orange-400 mb-4 flex items-center gap-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        📋 履歴復元の確認
+      </h3>
+      <p class="text-gray-300 mb-4">
+        以下の設定を復元しますか？現在の設定が上書きされます。
+      </p>
+      
+      <!-- 復元予定の設定情報 -->
+      <div class="bg-orange-500/10 border border-orange-400/30 rounded-lg p-4 mb-4">
+        <h4 class="text-sm font-semibold text-orange-400 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+          </svg>
+          📝 復元予定の設定
+        </h4>
+        <div class="space-y-2 text-xs text-orange-100">
+          <div><span class="text-orange-200 font-medium">問題文:</span> ${truncatedQuestion}</div>
+          <div><span class="text-orange-200 font-medium">シート名:</span> ${item.sheetName || '未設定'}</div>
+          <div><span class="text-orange-200 font-medium">作成日:</span> ${formattedDate}</div>
+        </div>
+      </div>
+      
+      ${spreadsheetDiffSection}
+      
+      <!-- 警告メッセージ -->
+      <div class="bg-red-500/10 border border-red-400/30 rounded-lg p-3 mb-6">
+        <p class="text-xs text-red-200 flex items-center gap-2">
+          <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          この操作により現在の未保存の設定内容が変更されます。
+        </p>
+      </div>
+      
+      <div class="flex justify-end gap-3">
+        <button type="button" id="restore-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="restore-confirm-btn" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          復元する
+        </button>
+      </div>
+    `;
+  },
+
+  /**
+   * Fallback restore modal for compatibility
+   */
+  _showFallbackRestoreModal(item) {
+    const formattedDate = this._formatCreatedDate(item.createdDate);
+    const truncatedQuestion = item.questionText && item.questionText.length > 50 
+      ? item.questionText.substring(0, 50) + '...' 
+      : (item.questionText || '未設定');
+    
+    const title = '履歴復元の確認';
+    const message = `以下の設定を復元しますか？現在の設定が上書きされます。
 
 📝 問題文: ${truncatedQuestion}
 📊 シート名: ${item.sheetName || '未設定'}  
@@ -2056,45 +2212,38 @@ window.HistoryManager = {
 
 ⚠️ この操作により現在の設定内容が変更されます。`;
 
-      // SharedModalsシステムを優先的に使用
-      if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
-        console.log('✅ Using sharedModals.showConfirmation');
-        window.sharedModals.showConfirmation(
-          title,
-          message,
-          () => {
-            console.log('✅ User confirmed restoration');
-            this._restoreHistoryItem(item);
-          },
-          () => {
-            console.log('❌ User cancelled restoration');
-          }
-        );
-      } else if (typeof showConfirmationModal === 'function') {
-        console.log('✅ Using fallback showConfirmationModal');
-        showConfirmationModal(
-          title,
-          message,
-          () => {
-            console.log('✅ User confirmed restoration');
-            this._restoreHistoryItem(item);
-          }
-        );
-      } else {
-        console.warn('⚠️ No confirmation modal system available, using browser confirm');
-        if (confirm(`${title}\n\n${message.replace(/📝|📊|📅|⚠️/g, '')}`)) {
-          console.log('✅ User confirmed restoration via browser confirm');
+    // SharedModalsシステムを優先的に使用
+    if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
+      console.log('✅ Using sharedModals.showConfirmation fallback');
+      window.sharedModals.showConfirmation(
+        title,
+        message,
+        () => {
+          console.log('✅ User confirmed restoration');
           this._restoreHistoryItem(item);
-        } else {
-          console.log('❌ User cancelled restoration via browser confirm');
+        },
+        () => {
+          console.log('❌ User cancelled restoration');
         }
+      );
+    } else if (typeof showConfirmationModal === 'function') {
+      console.log('✅ Using showConfirmationModal fallback');
+      showConfirmationModal(
+        title,
+        message,
+        () => {
+          console.log('✅ User confirmed restoration');
+          this._restoreHistoryItem(item);
+        }
+      );
+    } else {
+      console.warn('⚠️ No confirmation modal system available, using browser confirm');
+      if (confirm(`${title}\n\n${message.replace(/📝|📊|📅|⚠️/g, '')}`)) {
+        console.log('✅ User confirmed restoration via browser confirm');
+        this._restoreHistoryItem(item);
+      } else {
+        console.log('❌ User cancelled restoration via browser confirm');
       }
-      
-    } catch (error) {
-      console.error('❌ Failed to show restore confirmation modal:', error);
-      // フォールバック: 直接復元を実行
-      console.log('🔄 Fallback: Executing direct restoration');
-      this._restoreHistoryItem(item);
     }
   },
   
@@ -2396,6 +2545,14 @@ window.HistoryManager = {
       if (typeof loadStatus === 'function') {
         await loadStatus(true); // Force reload bypassing cache
         console.log('✅ Application state reloaded with new spreadsheet');
+        
+        // 4. Force update currentSpreadsheetUrl after state reload
+        if (window.currentStatus?.userInfo?.spreadsheetUrl) {
+          currentSpreadsheetUrl = window.currentStatus.userInfo.spreadsheetUrl;
+          console.log('✅ currentSpreadsheetUrl force updated after switch:', currentSpreadsheetUrl);
+        } else {
+          console.warn('⚠️ No spreadsheetUrl available in reloaded currentStatus');
+        }
       } else {
         console.warn('⚠️ loadStatus function not available for state reload');
       }
