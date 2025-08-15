@@ -286,6 +286,7 @@ class StudyQuestApp {
     // Polling settings with dynamic interval adjustment
     this.pollingSettings = {
       enabled: true,
+      isRunning: false, // ポーリング実行状態フラグ（重複防止）
       baseInterval: 30000, // 基本30秒間隔
       currentInterval: 30000, // 現在の間隔
       minInterval: 15000, // 最小15秒 (高アクティビティ時)
@@ -1760,9 +1761,19 @@ class StudyQuestApp {
 
   // 新着回答のポーリング開始 (最適化版)
   startNewAnswerPolling() {
+    // 重複防止: 既に実行中の場合は何もしない
     if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
+      console.log('🔄 ポーリングは既に実行中です - スキップ');
+      return;
     }
+    
+    // 追加の安全策: ポーリング実行フラグ
+    if (this.pollingSettings.isRunning) {
+      console.log('🔄 ポーリング処理が既に実行中です - スキップ');
+      return;
+    }
+    
+    this.pollingSettings.isRunning = true;
 
     this.pollingInterval = setInterval(async () => {
       if (!this.pollingSettings.enabled) return;
@@ -1806,6 +1817,11 @@ class StudyQuestApp {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
       console.log('⏹️ 新着回答ポーリング停止');
+    }
+    
+    // ポーリング実行フラグをリセット
+    if (this.pollingSettings) {
+      this.pollingSettings.isRunning = false;
     }
   }
 
@@ -3043,6 +3059,33 @@ class StudyQuestApp {
   }
 
   /**
+   * エラーの種類を分類してより適切な処理を行う
+   * @param {Error} error - エラーオブジェクト
+   * @returns {string} エラータイプ
+   */
+  categorizeError(error) {
+    const message = error.message || '';
+    
+    if (message.includes('timeout') || message.includes('タイムアウト')) {
+      return 'timeout';
+    }
+    if (message.includes('network') || message.includes('ネットワーク')) {
+      return 'network';
+    }
+    if (message.includes('script runtime') || message.includes('実行時間')) {
+      return 'server';
+    }
+    if (message.includes('ユーザー情報が見つかりません')) {
+      return 'user_not_found';
+    }
+    if (message.includes('temporarily unavailable') || message.includes('一時的に利用できません')) {
+      return 'temporary';
+    }
+    
+    return 'unknown';
+  }
+
+  /**
    * リトライ機能付きデータ取得
    * @param {object} fetchParams - データ取得パラメータ
    * @param {boolean} isInitialLoad - 初期ロードかどうか
@@ -3051,7 +3094,7 @@ class StudyQuestApp {
   async performDataFetchWithRetry(fetchParams, isInitialLoad) {
     // 初期データロード時は高速リトライ、通常時は従来通り
     const MAX_ATTEMPTS = isInitialLoad ? 2 : 3;
-    const retryDelays = isInitialLoad ? [500, 1000] : [1000, 2000, 3000]; // 初期ロード時は高速化
+    const retryDelays = isInitialLoad ? [1000, 2000] : [1500, 3000, 5000]; // GAS環境に最適化されたリトライ間隔
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
@@ -3060,8 +3103,8 @@ class StudyQuestApp {
         // データ取得を Promise で実行
         const result = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            reject(new Error(`データ取得がタイムアウトしました (${attempt === 0 ? 20 : 15}秒)`));
-          }, attempt === 0 ? 20000 : 15000); // 初回は20秒、以降は15秒
+            reject(new Error(`データ取得がタイムアウトしました (${attempt === 0 ? 30 : 20}秒)`));
+          }, attempt === 0 ? 30000 : 20000); // 初回は30秒、以降は20秒（GAS環境に最適化）
           
           google.script.run
             .withSuccessHandler(response => {
@@ -3134,28 +3177,31 @@ class StudyQuestApp {
         }
         
       } catch (error) {
-        console.error(`❌ データ取得エラー (試行 ${attempt + 1}):`, error.message);
+        const errorType = this.categorizeError(error);
+        console.error(`❌ データ取得エラー (試行 ${attempt + 1}) [${errorType}]:`, error.message);
         
         // 最後の試行で失敗した場合
         if (attempt >= MAX_ATTEMPTS - 1) {
+          // タイムアウトエラーの場合は、より親切なメッセージを提供
+          if (errorType === 'timeout') {
+            const timeoutError = new Error(`データの読み込みに時間がかかっています。しばらく待ってから再度お試しください。`);
+            timeoutError.type = 'timeout';
+            throw timeoutError;
+          }
           throw error;
         }
         
         // 一時的なエラーの場合はリトライ
-        const isTemporaryError = 
-          error.message.includes('timeout') ||
-          error.message.includes('network') ||
-          error.message.includes('script runtime') ||
-          error.message.includes('temporarily unavailable');
+        const isTemporaryError = ['timeout', 'network', 'server', 'temporary'].includes(errorType);
           
-        if (!isTemporaryError && error.message.includes('ユーザー情報が見つかりません')) {
-          // ユーザー情報エラーは特別扱い（上記の処理に委ねる）
+        if (errorType === 'user_not_found') {
+          // ユーザー情報エラーは特別扱い（即座に終了）
           throw error;
         }
         
         if (isTemporaryError || attempt < MAX_ATTEMPTS - 1) {
           const delay = retryDelays[attempt] || 3000;
-          console.log(`⏳ ${delay}ms 待機後にリトライ...`);
+          console.log(`⏳ ${delay}ms 待機後にリトライ... [${errorType}エラーのため]`);
           await new Promise(resolve => setTimeout(resolve, delay));
         } else {
           throw error;
