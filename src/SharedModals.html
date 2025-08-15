@@ -3,7 +3,8 @@
 
 <!-- 確認モーダル -->
 <div id="confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center" role="dialog" aria-modal="true">
-  <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
     <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
     <p id="modal-message" class="text-gray-300 mb-6"></p>
     <div class="flex justify-end gap-3">
@@ -675,6 +676,79 @@
   </div>
 </div>
 
+<!-- 履歴復元確認モーダル -->
+<div id="history-restore-modal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19a2 2 0 002-2V7a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-blue-400">履歴復元の確認</h3>
+      </div>
+      
+      <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4 mb-4">
+        <h4 class="text-sm font-semibold text-blue-300 mb-3">📋 復元する設定の詳細</h4>
+        <div class="space-y-3 text-sm">
+          <div class="flex items-start gap-3">
+            <span class="text-blue-400 mt-0.5">📝</span>
+            <div>
+              <span class="text-gray-400">問題文:</span>
+              <div class="text-blue-100 font-medium mt-1" id="restore-question-text">---</div>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-blue-400 mt-0.5">📊</span>
+            <div>
+              <span class="text-gray-400">シート名:</span>
+              <span class="text-blue-100 font-medium ml-2" id="restore-sheet-name">---</span>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-blue-400 mt-0.5">📅</span>
+            <div>
+              <span class="text-gray-400">作成日時:</span>
+              <span class="text-blue-100 font-medium ml-2" id="restore-created-date">---</span>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-blue-400 mt-0.5">⚙️</span>
+            <div>
+              <span class="text-gray-400">列設定:</span>
+              <div class="text-blue-100 font-medium mt-1" id="restore-column-settings">---</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 mb-6">
+        <div class="flex items-start gap-2">
+          <svg class="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <p class="text-yellow-200 text-sm font-medium mb-1">⚠️ 重要な注意事項</p>
+            <p class="text-yellow-100 text-xs leading-relaxed">
+              この操作により、現在の設定内容が上記の履歴データで完全に上書きされます。<br>
+              復元後は、必要に応じて設定を再調整してください。
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3">
+        <button type="button" id="history-restore-cancel" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="history-restore-confirm" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          復元実行
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Google連携の利点モーダル -->
 <div id="google-integration-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
@@ -866,7 +940,8 @@ class SharedModals {
           'security-modal',
           'form-config-modal',
           'security-details-modal',
-          'google-integration-modal'
+          'google-integration-modal',
+          'history-restore-modal'
         ];
         
         modals.forEach(modalId => {
@@ -1446,6 +1521,111 @@ class SharedModals {
         this.hideModal('quickstart-stop-confirmation-modal');
         if (onCancel) onCancel();
       });
+    }
+  }
+
+  // 履歴復元確認モーダルの表示
+  showHistoryRestoreConfirmation(historyItem, onConfirm, onCancel) {
+    const modal = document.getElementById('history-restore-modal');
+    if (!modal) {
+      console.error('履歴復元モーダルが見つかりません');
+      if (onCancel) onCancel();
+      return;
+    }
+
+    // 履歴データの詳細を表示
+    const questionTextEl = document.getElementById('restore-question-text');
+    const sheetNameEl = document.getElementById('restore-sheet-name');
+    const createdDateEl = document.getElementById('restore-created-date');
+    const columnSettingsEl = document.getElementById('restore-column-settings');
+
+    if (questionTextEl) {
+      questionTextEl.textContent = historyItem.questionText || '未設定';
+    }
+    if (sheetNameEl) {
+      sheetNameEl.textContent = historyItem.sheetName || '未設定';
+    }
+    if (createdDateEl) {
+      const formattedDate = this.formatHistoryDate(historyItem.createdDate);
+      createdDateEl.textContent = formattedDate;
+    }
+    if (columnSettingsEl) {
+      const columnInfo = this.formatColumnSettings(historyItem);
+      columnSettingsEl.innerHTML = columnInfo;
+    }
+
+    modal.classList.remove('hidden');
+
+    // ボタンイベントの設定
+    const confirmBtn = document.getElementById('history-restore-confirm');
+    const cancelBtn = document.getElementById('history-restore-cancel');
+
+    // 既存のイベントリスナーを削除
+    const newConfirmBtn = confirmBtn?.cloneNode(true);
+    const newCancelBtn = cancelBtn?.cloneNode(true);
+
+    if (newConfirmBtn && confirmBtn) {
+      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+      newConfirmBtn.addEventListener('click', () => {
+        this.hideModal('history-restore-modal');
+        if (onConfirm) onConfirm();
+      });
+    }
+
+    if (newCancelBtn && cancelBtn) {
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      newCancelBtn.addEventListener('click', () => {
+        this.hideModal('history-restore-modal');
+        if (onCancel) onCancel();
+      });
+    }
+  }
+
+  // 履歴の日付フォーマット
+  formatHistoryDate(dateString) {
+    try {
+      if (!dateString) return '不明';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '日付形式エラー';
+      return date.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.warn('日付フォーマットエラー:', error);
+      return '日付解析エラー';
+    }
+  }
+
+  // 列設定の詳細表示フォーマット
+  formatColumnSettings(historyItem) {
+    try {
+      const settings = [];
+      
+      if (historyItem.opinionColumn) {
+        settings.push(`意見: ${historyItem.opinionColumn}`);
+      }
+      if (historyItem.nameColumn) {
+        settings.push(`名前: ${historyItem.nameColumn}`);
+      }
+      if (historyItem.reasonColumn) {
+        settings.push(`理由: ${historyItem.reasonColumn}`);
+      }
+      if (historyItem.classColumn) {
+        settings.push(`クラス: ${historyItem.classColumn}`);
+      }
+      
+      if (settings.length === 0) {
+        return '<span class="text-gray-400">列設定なし</span>';
+      }
+      
+      return settings.map(setting => `<div class="text-xs">${setting}</div>`).join('');
+    } catch (error) {
+      console.warn('列設定フォーマットエラー:', error);
+      return '<span class="text-red-300">設定解析エラー</span>';
     }
   }
 

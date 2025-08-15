@@ -370,7 +370,7 @@ function updateSpreadsheetButton() {
   const btn = document.getElementById('open-spreadsheet-btn-step2');
   if (!btn) return;
   
-  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) {
+  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) {
     btn.disabled = false;
     btn.onclick = function() {
       try {
@@ -394,7 +394,7 @@ function updateSpreadsheetButton() {
   } else {
     btn.disabled = true;
     btn.onclick = null;
-    logDebug('⚠️ Spreadsheet button disabled - no URL available');
+    logDebug('⚠️ Spreadsheet button disabled - no spreadsheet data available');
   }
 }
 
