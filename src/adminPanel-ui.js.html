@@ -175,26 +175,35 @@ function determinePublicationStatus(status) {
     return status._normalized.isPublished;
   }
   
-  // 2. configJsonから直接取得（フォールバック）
+  // 2. status直下のプロパティから（_normalized未生成時の優先フォールバック）
+  if (typeof status.isPublished === 'boolean') {
+    console.log('🔍 Publication status from status.isPublished:', status.isPublished);
+    return status.isPublished;
+  }
+  
+  if (status.config && typeof status.config.isPublished === 'boolean') {
+    console.log('🔍 Publication status from status.config.isPublished:', status.config.isPublished);
+    return status.config.isPublished;
+  }
+  
+  if (typeof status.appPublished === 'boolean') {
+    console.log('🔍 Publication status from status.appPublished:', status.appPublished);
+    return status.appPublished;
+  }
+  
+  // 3. configJsonから直接取得（より信頼性の低いフォールバック）
   if (status.userInfo && status.userInfo.configJson) {
     try {
       const config = typeof status.userInfo.configJson === 'string' 
         ? JSON.parse(status.userInfo.configJson) 
         : status.userInfo.configJson;
       if (typeof config.appPublished === 'boolean') {
-        console.log('📋 Publication status from configJson:', config.appPublished);
+        console.log('📋 Publication status from configJson (fallback):', config.appPublished);
         return config.appPublished;
       }
     } catch (e) {
       console.warn('⚠️ configJson parse failed in publication check:', e);
     }
-  }
-  
-  // 3. status直下のプロパティから（追加フォールバック）
-  const directStatus = status.config?.isPublished || status.isPublished || status.appPublished;
-  if (typeof directStatus === 'boolean') {
-    console.log('🔍 Publication status from direct properties:', directStatus);
-    return directStatus;
   }
   
   // 4. 最終フォールバック: 不明時は false
@@ -1185,6 +1194,25 @@ function updateFooterAndGuidance(status) {
 function updateFooterAndGuidanceImmediate(status) {
   console.group('🦶 updateFooterAndGuidance');
   
+  // より確実なステータス確保: グローバル状態とマージ
+  const effectiveStatus = status || window.currentStatus;
+  if (!effectiveStatus) {
+    console.warn('❌ No status available for footer update');
+    console.groupEnd();
+    return;
+  }
+  
+  // 引数ステータスの詳細確認（強化版）
+  console.log('🔍 Footer update with status:', {
+    hasStatus: !!effectiveStatus,
+    isPublished: effectiveStatus?.isPublished,
+    configIsPublished: effectiveStatus?.config?.isPublished,
+    appPublished: effectiveStatus?.appPublished,
+    normalizedIsPublished: effectiveStatus?._normalized?.isPublished,
+    configJson: effectiveStatus?.userInfo?.configJson ? 'exists' : 'missing',
+    statusSource: status ? 'provided' : 'global fallback'
+  });
+  
   const footer = document.getElementById('admin-footer');
   const guidanceText = document.getElementById('guidance-text');
   
@@ -1195,10 +1223,10 @@ function updateFooterAndGuidanceImmediate(status) {
   }
 
   // 改善された公開状態判定: 統一関数使用 + フォールバック処理
-  const finalIsPublished = determinePublicationStatus(status);
-  const viewUrl = (status._normalized && status._normalized.viewUrl) || 
-                  (status.appUrls && status.appUrls.viewUrl) ||
-                  generateViewUrl(status);
+  const finalIsPublished = determinePublicationStatus(effectiveStatus);
+  const viewUrl = (effectiveStatus._normalized && effectiveStatus._normalized.viewUrl) || 
+                  (effectiveStatus.appUrls && effectiveStatus.appUrls.viewUrl) ||
+                  generateViewUrl(effectiveStatus);
   
   // 簡潔なログ出力
   console.log(`🔍 Publication check: ${finalIsPublished ? '公開中' : '非公開'}`, {
