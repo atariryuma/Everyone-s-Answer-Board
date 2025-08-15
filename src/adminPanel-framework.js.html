@@ -2041,25 +2041,6 @@ window.HistoryManager = {
     try {
       console.log('🔄 Showing restore confirmation modal for:', item.questionText);
       
-      // 新しい履歴復元専用モーダルを優先的に使用
-      if (window.sharedModals && typeof window.sharedModals.showHistoryRestoreConfirmation === 'function') {
-        console.log('🎯 SharedModalsの履歴復元専用ダイアログを使用します');
-        window.sharedModals.showHistoryRestoreConfirmation(
-          item,
-          () => {
-            console.log('✅ 履歴復元が確認されました');
-            this._restoreHistoryItem(item);
-          },
-          () => {
-            console.log('❌ 履歴復元がキャンセルされました');
-          }
-        );
-        return;
-      }
-
-      // フォールバック: 従来の確認ダイアログ
-      console.warn('⚠️ 履歴復元専用モーダルが利用できません。従来の確認ダイアログを使用します');
-      
       // 復元する設定の詳細情報を準備
       const formattedDate = this._formatCreatedDate(item.createdDate);
       const truncatedQuestion = item.questionText && item.questionText.length > 50 
@@ -2075,18 +2056,18 @@ window.HistoryManager = {
 
 ⚠️ この操作により現在の設定内容が変更されます。`;
 
-      // SharedModalsの通常確認ダイアログを使用
+      // SharedModalsシステムを優先的に使用
       if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
-        console.log('🎯 SharedModalsの通常確認ダイアログを使用します');
+        console.log('✅ Using sharedModals.showConfirmation');
         window.sharedModals.showConfirmation(
           title,
           message,
           () => {
-            console.log('✅ 履歴復元が確認されました');
+            console.log('✅ User confirmed restoration');
             this._restoreHistoryItem(item);
           },
           () => {
-            console.log('❌ 履歴復元がキャンセルされました');
+            console.log('❌ User cancelled restoration');
           }
         );
       } else if (typeof showConfirmationModal === 'function') {
