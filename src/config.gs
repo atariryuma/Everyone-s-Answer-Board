@@ -1370,11 +1370,30 @@ function addSpreadsheetUrl(requestUserId, url) {
     // サービスアカウントをスプレッドシートに追加
     addServiceAccountToSpreadsheet(spreadsheetId);
 
-    // 公開設定をリセットしつつユーザー情報を更新
+    // 外部リソースインポート時の既存設定保護
     const configJson = userInfo.configJson ? JSON.parse(userInfo.configJson) : {};
+    
+    // 既存のQuickStartまたは他のフローの公開状態を保護
+    const shouldPreservePublishedState = !!(
+      (configJson.isQuickStart || configJson.setupType === 'quickstart') ||
+      (configJson.setupStatus === 'completed' && configJson.formCreated === true && 
+       (configJson.completedAt || configJson.publishedAt))
+    );
+    
+    const originalPublishedState = configJson.appPublished;
+    
     configJson.publishedSpreadsheetId = spreadsheetId;
     configJson.publishedSheetName = '';
-    configJson.appPublished = false;
+    configJson.isExternalResource = true; // 外部リソースフラグを設定
+    
+    // 既存の重要なフローの公開状態を保護
+    if (shouldPreservePublishedState) {
+      configJson.appPublished = originalPublishedState;
+      debugLog('✅ 外部リソースインポート時に既存の公開状態を保護:', originalPublishedState);
+    } else {
+      configJson.appPublished = false;
+      debugLog('🔄 外部リソースインポート - 公開状態をリセット');
+    }
 
     // スプレッドシートからフォームURLを自動検出（可能な場合）
     let formUrl = null;

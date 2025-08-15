@@ -4109,6 +4109,38 @@ async function handleCustomSetup(config) {
   
   return await flowExecutionManager.executeWithLock(flowId, async () => {
     console.log('🎨 カスタムセットアップ開始（統一フロー制御版）');
+    
+    // Phase 0: 既存状態の保護チェック
+    let existingFlowProtection = null;
+    try {
+      if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
+        const existingConfig = JSON.parse(currentStatus.userInfo.configJson);
+        
+        // QuickStartまたは外部リソースが既に実行済みかチェック
+        const isExistingQuickStart = !!(
+          (existingConfig.isQuickStart || existingConfig.setupType === 'quickstart') ||
+          (existingConfig.setupStatus === 'completed' && existingConfig.formCreated === true && 
+           (existingConfig.completedAt || existingConfig.publishedAt))
+        );
+        
+        const isExistingExternalResource = !!(
+          existingConfig.isExternalResource ||
+          (currentStatus.userInfo.customFormInfo && 
+           currentStatus.userInfo.customFormInfo.isExternalResource)
+        );
+        
+        if (isExistingQuickStart || isExistingExternalResource) {
+          existingFlowProtection = {
+            flowType: isExistingQuickStart ? 'QuickStart' : 'ExternalResource',
+            preservePublished: existingConfig.appPublished,
+            originalConfig: {...existingConfig}
+          };
+          console.log('🛡️ 既存フロー保護設定:', existingFlowProtection);
+        }
+      }
+    } catch (protectionError) {
+      console.warn('⚠️ 既存状態保護チェックでエラー:', protectionError);
+    }
   
   try {
     // Phase 1: プログレス表示開始
@@ -4184,16 +4216,66 @@ async function handleCustomSetup(config) {
       try {
         const config = JSON.parse(freshStatus.userInfo.configJson);
         
-        // QuickStart判定: QuickStartの場合は自動公開を維持
-        const isQuickStartCompletion = !!(
-          config.setupStatus === 'completed' && 
-          config.formCreated === true && 
-          config.appPublished === true &&
-          config.completedAt && // QuickStartでのみ設定される
-          config.publishedAt    // QuickStartでのみ設定される
+        // 改善されたフロー判定: より柔軟で包括的な判定条件
+        const isQuickStartFlow = !!(
+          (config.isQuickStart || config.setupType === 'quickstart') ||
+          (config.setupStatus === 'completed' && config.formCreated === true && 
+           (config.completedAt || config.publishedAt)) // いずれかが存在すれば十分
         );
         
-        if (config.appPublished === true && !isQuickStartCompletion) {
+        const isExternalResourceFlow = !!(
+          config.isExternalResource || 
+          (freshStatus.userInfo && freshStatus.userInfo.customFormInfo && 
+           freshStatus.userInfo.customFormInfo.isExternalResource)
+        );
+        
+        // カスタムセットアップの判定（明示的にカスタムフローかどうか）
+        const isCustomSetupFlow = !!(
+          !isQuickStartFlow && !isExternalResourceFlow &&
+          freshStatus.userInfo && freshStatus.userInfo.customFormInfo &&
+          !freshStatus.userInfo.customFormInfo.isExternalResource
+        );
+        
+        // 既存フロー保護の適用
+        const shouldProtectExistingFlow = existingFlowProtection && (
+          (existingFlowProtection.flowType === 'QuickStart' && isQuickStartFlow) ||
+          (existingFlowProtection.flowType === 'ExternalResource' && isExternalResourceFlow)
+        );
+        
+        console.log('🔍 フロー判定結果:', {
+          isQuickStart: isQuickStartFlow,
+          isExternalResource: isExternalResourceFlow,
+          isCustomSetup: isCustomSetupFlow,
+          appPublished: config.appPublished,
+          protectedFlow: shouldProtectExistingFlow ? existingFlowProtection.flowType : null
+        });
+        
+        // フロー別の公開状態処理
+        if (shouldProtectExistingFlow) {
+          console.log('🛡️ 既存フロー保護を適用:', existingFlowProtection.flowType);
+          
+          // 既存設定の重要部分を復元
+          config.appPublished = existingFlowProtection.preservePublished;
+          if (existingFlowProtection.originalConfig.isQuickStart) {
+            config.isQuickStart = existingFlowProtection.originalConfig.isQuickStart;
+          }
+          if (existingFlowProtection.originalConfig.isExternalResource) {
+            config.isExternalResource = existingFlowProtection.originalConfig.isExternalResource;
+          }
+          if (existingFlowProtection.originalConfig.setupType) {
+            config.setupType = existingFlowProtection.originalConfig.setupType;
+          }
+          
+          freshStatus.userInfo.configJson = JSON.stringify(config);
+          freshStatus.appPublished = config.appPublished;
+          freshStatus.isPublished = config.appPublished;
+          if (freshStatus._normalized) {
+            freshStatus._normalized.isPublished = config.appPublished;
+          }
+          
+          console.log('✅ 既存フロー設定を保護・復元しました');
+          
+        } else if (config.appPublished === true && isCustomSetupFlow) {
           console.log('⚠️ カスタムセットアップ後に自動公開が検出されました - 手動公開前提に修正');
           config.appPublished = false;
           freshStatus.userInfo.configJson = JSON.stringify(config);
@@ -4202,11 +4284,16 @@ async function handleCustomSetup(config) {
           if (freshStatus._normalized) {
             freshStatus._normalized.isPublished = false;
           }
-        } else if (isQuickStartCompletion) {
-          console.log('✅ QuickStart完了後の自動公開状態を維持:', {
+        } else if (isQuickStartFlow) {
+          console.log('✅ QuickStartフローの自動公開状態を維持:', {
             appPublished: config.appPublished,
             setupStatus: config.setupStatus,
             formCreated: config.formCreated
+          });
+        } else if (isExternalResourceFlow) {
+          console.log('✅ 外部リソースインポートフローの状態を維持:', {
+            appPublished: config.appPublished,
+            isExternalResource: config.isExternalResource
           });
         }
       } catch (configError) {
