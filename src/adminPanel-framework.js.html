@@ -1994,7 +1994,7 @@ window.HistoryManager = {
       }
       
       // Perform restoration
-      this._restoreHistoryItem(item);
+      this._restoreHistoryItemSimple(item);
       
     } catch (error) {
       console.error('❌ Failed to show restore modal:', error);
@@ -2008,7 +2008,7 @@ window.HistoryManager = {
     try {
       // 1) 専用の復元モーダルがある場合は優先使用
       if (window.sharedModals && typeof window.sharedModals.showRestoreConfirmation === 'function') {
-        window.sharedModals.showRestoreConfirmation(item, () => this._restoreHistoryItem(item), () => {});
+        window.sharedModals.showRestoreConfirmation(item, () => this._restoreHistoryItemSimple(item), () => {});
         return;
       }
 
@@ -2028,11 +2028,11 @@ window.HistoryManager = {
         if (!glass) {
           // フォールバック: 共有API or browser confirm
           if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
-            window.sharedModals.showConfirmation(title, message, () => this._restoreHistoryItem(item), () => {});
+            window.sharedModals.showConfirmation(title, message, () => this._restoreHistoryItemSimple(item), () => {});
           } else if (typeof showConfirmationModal === 'function') {
-            showConfirmationModal(title, message, () => this._restoreHistoryItem(item));
+            showConfirmationModal(title, message, () => this._restoreHistoryItemSimple(item));
           } else if (confirm(`${title}\n\n${message.replace(/📝|📊|📅/g, '')}`)) {
-            this._restoreHistoryItem(item);
+            this._restoreHistoryItemSimple(item);
           }
           return;
         }
@@ -2090,22 +2090,22 @@ window.HistoryManager = {
         };
         const confirmBtn = modal.querySelector('#restore-confirm-btn');
         const cancelBtn = modal.querySelector('#restore-cancel-btn');
-        if (confirmBtn) confirmBtn.onclick = () => { cleanup(); this._restoreHistoryItem(item); };
+        if (confirmBtn) confirmBtn.onclick = () => { cleanup(); this._restoreHistoryItemSimple(item); };
         if (cancelBtn) cancelBtn.onclick = () => cleanup();
         return;
       }
 
       // 2) DOMが無い場合は既存の共有モーダル / シンプル confirm
       if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
-        window.sharedModals.showConfirmation(title, message, () => this._restoreHistoryItem(item), () => {});
+        window.sharedModals.showConfirmation(title, message, () => this._restoreHistoryItemSimple(item), () => {});
         return;
       }
       if (typeof showConfirmationModal === 'function') {
-        showConfirmationModal(title, message, () => this._restoreHistoryItem(item));
+        showConfirmationModal(title, message, () => this._restoreHistoryItemSimple(item));
         return;
       }
       if (confirm(`${title}\n\n${message.replace(/📝|📊|📅/g, '')}`)) {
-        this._restoreHistoryItem(item);
+        this._restoreHistoryItemSimple(item);
       }
     } catch (error) {
       console.error('❌ Failed to show simple restore confirmation:', error);
@@ -2114,12 +2114,7 @@ window.HistoryManager = {
 
   
   
-  /**
-   * Restore configuration from history item with staged process
-   */
-  async _restoreHistoryItem(item, options = {}) {
-    return this._restoreHistoryItemSimple(item);
-  },
+  // 統合済み: _restoreHistoryItemSimpleに統合
 
   /**
    * Simple restore: 最小限の3ステップで復元
@@ -2170,6 +2165,13 @@ window.HistoryManager = {
         }
         // サーバのアクティブシートを即時更新し、後続APIが同じシートを見るようにする
         try {
+          // シート存在確認（選択肢にあるシートのみ処理）
+          const options = Array.from(select.options).map(o => o.value);
+          if (!options.includes(targetSheetName)) {
+            console.warn('⚠️ Target sheet not available in current spreadsheet, skipping server activation');
+            throw new Error(`Sheet "${targetSheetName}" not found in current options`);
+          }
+          
           const ssId = window.currentStatus?.userInfo?.spreadsheetId || item.spreadsheetId || null;
           await runGasWithUserId('activateSheet', 'シートをアクティブ化中...', ssId, targetSheetName);
           // ローカル状態も同期
@@ -2186,16 +2188,23 @@ window.HistoryManager = {
         } catch (e) {
           console.warn('⚠️ setActiveSheet failed in simple restore:', e);
         }
-        // UI側のハンドラにも伝播（必要最低限）
-        if (typeof handleSheetSelectionChange === 'function') {
-          handleSheetSelectionChange({ target: select, _isRestoreRefresh: true });
-        }
+        // 復元時はシート選択ハンドラーを呼ばない（サーバー設定変更を避けるため）
+        // UI更新のみを行う
+        console.log('📋 Sheet selection updated (restore mode, no server sync)');
       }
 
       // 3) ヘッダー取得と完全一致の列のみ適用
       let headers = [];
       try {
         if (effectiveSpreadsheetId && targetSheetName) {
+          // シート存在確認
+          const select = document.getElementById('sheet-select');
+          const options = select ? Array.from(select.options).map(o => o.value) : [];
+          if (!options.includes(targetSheetName)) {
+            console.warn('⚠️ Target sheet not available for header retrieval, skipping');
+            throw new Error(`Sheet "${targetSheetName}" not found for header retrieval`);
+          }
+          
           const details = await runGasWithUserId('getSheetDetails', 'シート情報を取得中...', effectiveSpreadsheetId, targetSheetName);
           headers = Array.isArray(details?.allHeaders) ? details.allHeaders : [];
         }
@@ -2225,23 +2234,11 @@ window.HistoryManager = {
         reason: setSelectIfExists('reason-column', item.reasonHeader || item.reasonColumn),
       };
 
-      // 設定保存（1回のみ、失敗時は警告）
-      await new Promise(resolve => {
-        if (!(google && google.script && google.script.run)) return resolve(false);
-        const cfg = {
-          sheetName: targetSheetName,
-          opinionHeader: applied.opinion ? (item.opinionHeader || '') : '',
-          nameColumn: applied.name ? (item.nameHeader || item.nameColumn || '') : '',
-          classColumn: applied.class ? (item.classHeader || item.classColumn || '') : '',
-          reasonColumn: applied.reason ? (item.reasonHeader || item.reasonColumn || '') : '',
-        };
-        google.script.run
-          .withSuccessHandler(() => resolve(true))
-          .withFailureHandler(err => {
-            console.warn('⚠️ Configuration sync failed (simple):', err);
-            resolve(false);
-          })
-          .syncConfigurationState(cfg, 'restore-simple');
+      // 復元時は設定をUIのみに反映（サーバー設定は保存しない）
+      // ユーザーが明示的に「公開」ボタンを押すまで実際の設定変更は行わない
+      console.log('📋 Restore completed (UI only, server settings not changed):', {
+        sheetName: targetSheetName,
+        appliedColumns: applied
       });
 
       // 復元内容のサマリーを作成
@@ -2249,7 +2246,7 @@ window.HistoryManager = {
       const totalColumns = Object.keys(applied).length;
       
       if (typeof showMessage === 'function') {
-        const summary = `✅ 復元が完了しました (${appliedCount}/${totalColumns}列を適用)`;
+        const summary = `✅ 復元プレビューが完了しました (${appliedCount}/${totalColumns}列を適用) - 「公開」ボタンで設定を保存してください`;
         showMessage(summary, 'success');
       }
       console.log('✅ Simple restore completed:', {
@@ -3856,7 +3853,7 @@ window.AdminPanel.historyManager = {
       console.error('❌ Failed to render history table from compatibility layer:', error);
     });
   },
-  restoreFromSimpleHistory: (item) => window.HistoryManager._restoreHistoryItem(item)
+  restoreFromSimpleHistory: (item) => window.HistoryManager._restoreHistoryItemSimple(item)
 };
 
 // Register global functions for backward compatibility
