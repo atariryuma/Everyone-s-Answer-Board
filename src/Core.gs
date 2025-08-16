@@ -227,7 +227,23 @@ function logValidationError(field, value, rule, message) {
 // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
 // debugLog は debugConfig.gs で統一制御されるため、重複定義を削除
 
-// Note: warnLog, errorLog, infoLog functions are defined in debugConfig.gs
+if (typeof warnLog === 'undefined') {
+  function warnLog(message, ...args) {
+    logWarn('[WARN]', message, ...args);
+  }
+}
+
+if (typeof errorLog === 'undefined') {
+  function errorLog(message, ...args) {
+    logError('[ERROR]', message, ...args);
+  }
+}
+
+if (typeof infoLog === 'undefined') {
+  function infoLog(message, ...args) {
+    logDebug('[INFO]', message, ...args);
+  }
+}
 
 // デフォルト質問文の共通定数
 var DEFAULT_MAIN_QUESTION = 'あなたの考えや気づいたことを教えてください';

@@ -7,7 +7,23 @@
 // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
 // debugLog は debugConfig.gs で統一制御されるため、重複定義を削除
 
-// Note: errorLog, warnLog, infoLog functions are defined in debugConfig.gs
+if (typeof errorLog === 'undefined') {
+  function errorLog(message, ...args) {
+    logError('[ERROR]', message, ...args);
+  }
+}
+
+if (typeof warnLog === 'undefined') {
+  function warnLog(message, ...args) {
+    logWarn('[WARN]', message, ...args);
+  }
+}
+
+if (typeof infoLog === 'undefined') {
+  function infoLog(message, ...args) {
+    logDebug('[INFO]', message, ...args);
+  }
+}
 
 /**
  * Retrieve the deployed Web App URL via Apps Script API.
