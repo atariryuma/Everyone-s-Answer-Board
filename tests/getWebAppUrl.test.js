@@ -6,19 +6,23 @@ describe('getWebAppUrl', () => {
 
   test('retrieves URL via Apps Script API', () => {
     const context = {
-      ScriptApp: { getScriptId: () => 'ID' },
+      ScriptApp: {getScriptId: () => 'ID'},
       AppsScript: {
         Script: {
           Deployments: {
             list: () => ({
               deployments: [
-                { deploymentConfig: { webApp: { url: 'https://script.google.com/macros/s/ID/exec' } } }
-              ]
-            })
-          }
-        }
+                {
+                  deploymentConfig: {
+                    webApp: {url: 'https://script.google.com/macros/s/ID/exec'},
+                  },
+                },
+              ],
+            }),
+          },
+        },
       },
-      console: { log: () => {}, error: () => {}, warn: () => {} },
+      console: {log: () => {}, error: () => {}, warn: () => {}},
       debugLog: () => {},
       errorLog: () => {},
       warnLog: () => {},
@@ -26,29 +30,35 @@ describe('getWebAppUrl', () => {
       CacheService: {
         getScriptCache: () => ({
           get: () => null,
-          put: () => {}
-        })
-      }
+          put: () => {},
+        }),
+      },
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
-    expect(context.getWebAppUrl()).toBe('https://script.google.com/macros/s/ID/exec');
+    expect(context.getWebAppUrl()).toBe(
+      'https://script.google.com/macros/s/ID/exec',
+    );
   });
 
   test('falls back to ScriptApp service URL when API fails', () => {
     const context = {
       ScriptApp: {
         getScriptId: () => 'ID',
-        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' })
+        getService: () => ({
+          getUrl: () => 'https://script.google.com/macros/s/ID/exec',
+        }),
       },
       AppsScript: {
         Script: {
           Deployments: {
-            list: () => { throw new Error('API disabled'); }
-          }
-        }
+            list: () => {
+              throw new Error('API disabled');
+            },
+          },
+        },
       },
-      console: { log: () => {}, error: () => {}, warn: () => {} },
+      console: {log: () => {}, error: () => {}, warn: () => {}},
       debugLog: () => {},
       errorLog: () => {},
       warnLog: () => {},
@@ -56,12 +66,14 @@ describe('getWebAppUrl', () => {
       CacheService: {
         getScriptCache: () => ({
           get: () => null,
-          put: () => {}
-        })
-      }
+          put: () => {},
+        }),
+      },
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
-    expect(context.getWebAppUrl()).toBe('https://script.google.com/macros/s/ID/exec');
+    expect(context.getWebAppUrl()).toBe(
+      'https://script.google.com/macros/s/ID/exec',
+    );
   });
 });

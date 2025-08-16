@@ -6,11 +6,13 @@ describe.skip('doGet flows', () => {
   let context;
   beforeEach(() => {
     context = {
-      cacheManager: { get: (_k, fn) => fn() },
+      cacheManager: {get: (_k, fn) => fn()},
       debugLog: () => {},
-      HtmlService: { createHtmlOutput: jest.fn(() => 'redirect') },
-      Session: { getActiveUser: () => ({ getEmail: () => 'me@example.com' }) },
-      PropertiesService: { getScriptProperties: () => ({ getProperty: jest.fn(() => 'id') }) }
+      HtmlService: {createHtmlOutput: jest.fn(() => 'redirect')},
+      Session: {getActiveUser: () => ({getEmail: () => 'me@example.com'})},
+      PropertiesService: {
+        getScriptProperties: () => ({getProperty: jest.fn(() => 'id')}),
+      },
     };
     vm.createContext(context);
     vm.runInContext(code, context);
@@ -20,26 +22,38 @@ describe.skip('doGet flows', () => {
     context.handleSetupPages = context.handleSetupPages || (() => null);
     context.validateUserSession = jest.fn(() => ({
       userEmail: 'me@example.com',
-      userInfo: { userId: '1', adminEmail: 'me@example.com' }
+      userInfo: {userId: '1', adminEmail: 'me@example.com'},
     }));
-    context.parseRequestParams = jest.fn(() => ({ mode: 'admin', isDirectPageAccess: false }));
+    context.parseRequestParams = jest.fn(() => ({
+      mode: 'admin',
+      isDirectPageAccess: false,
+    }));
   });
 
-
   test('renders answer board for direct access', () => {
-    context.parseRequestParams.mockReturnValue({ userId: '1', mode: 'view', isDirectPageAccess: true });
+    context.parseRequestParams.mockReturnValue({
+      userId: '1',
+      mode: 'view',
+      isDirectPageAccess: true,
+    });
     const result = context.doGet({});
     expect(result).toBe('board');
   });
 
   test('renders admin panel for admin mode', () => {
-    context.parseRequestParams.mockReturnValue({ mode: 'admin', isDirectPageAccess: false });
+    context.parseRequestParams.mockReturnValue({
+      mode: 'admin',
+      isDirectPageAccess: false,
+    });
     const result = context.doGet({});
     expect(result).toBe('admin');
   });
 
   test('shows registration when userInfo missing', () => {
-    context.validateUserSession.mockReturnValue({ userEmail: null, userInfo: null });
+    context.validateUserSession.mockReturnValue({
+      userEmail: null,
+      userInfo: null,
+    });
     const result = context.doGet({});
     expect(result).toBe('register');
   });

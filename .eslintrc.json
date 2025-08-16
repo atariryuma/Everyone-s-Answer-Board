@@ -1,0 +1,27 @@
+{
+  "extends": "./node_modules/gts/",
+  "env": {
+    "jest": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020
+  },
+  "globals": {
+    "localStorage": "readonly",
+    "global": "readonly"
+  },
+  "rules": {
+    "n/no-unsupported-features/es-syntax": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "tests/**/*.js"
+      ],
+      "rules": {
+        "no-unused-vars": "off",
+        "n/no-unpublished-require": "off"
+      }
+    }
+  ]
+}

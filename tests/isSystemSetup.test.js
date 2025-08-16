@@ -7,23 +7,23 @@ describe('isSystemSetup requires ADMIN_EMAIL and SERVICE_ACCOUNT_CREDS', () => {
 
   let scriptProps;
   beforeEach(() => {
-    scriptProps = { getProperty: jest.fn(() => null) };
+    scriptProps = {getProperty: jest.fn(() => null)};
     context = {
       console,
-      PropertiesService: { getScriptProperties: () => scriptProps }
+      PropertiesService: {getScriptProperties: () => scriptProps},
     };
     vm.createContext(context);
     vm.runInContext(code, context);
   });
 
   test('returns false when admin email missing', () => {
-    scriptProps.getProperty = (key) =>
+    scriptProps.getProperty = key =>
       key === 'DATABASE_SPREADSHEET_ID' ? 'id' : null;
     expect(context.isSystemSetup()).toBe(false);
   });
 
   test('returns false when service account missing', () => {
-    scriptProps.getProperty = (key) => {
+    scriptProps.getProperty = key => {
       if (key === 'DATABASE_SPREADSHEET_ID') return 'id';
       if (key === 'ADMIN_EMAIL') return 'admin@example.com';
       return null;
@@ -32,10 +32,11 @@ describe('isSystemSetup requires ADMIN_EMAIL and SERVICE_ACCOUNT_CREDS', () => {
   });
 
   test('returns true when all properties exist', () => {
-    scriptProps.getProperty = (key) => {
+    scriptProps.getProperty = key => {
       if (key === 'DATABASE_SPREADSHEET_ID') return 'id';
       if (key === 'ADMIN_EMAIL') return 'admin@example.com';
-      if (key === 'SERVICE_ACCOUNT_CREDS') return '{"client_email":"a","private_key":"b"}';
+      if (key === 'SERVICE_ACCOUNT_CREDS')
+        return '{"client_email":"a","private_key":"b"}';
       return null;
     };
     expect(context.isSystemSetup()).toBe(true);

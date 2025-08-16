@@ -4,7 +4,7 @@ const vm = require('vm');
 describe('getQuestionConfig simple', () => {
   const code = fs.readFileSync('src/Core.gs', 'utf8');
   const context = {
-    Utilities: { getUuid: () => 'test-uuid-' + Math.random() }
+    Utilities: {getUuid: () => 'test-uuid-' + Math.random()},
   };
   vm.createContext(context);
   vm.runInContext(code, context);
