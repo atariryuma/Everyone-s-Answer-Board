@@ -2410,18 +2410,34 @@ window.HistoryManager = {
             
             // 選択肢の中に目標値があるかチェック
             const options = Array.from(select.options);
-            const hasTargetOption = options.some(option => option.value === targetValue);
             
-            if (hasTargetOption) {
-              console.log(`✅ Column option found for ${selectId}: ${targetValue}`);
-              select.value = targetValue;
+            // 完全一致チェック
+            let targetOption = options.find(option => option.value === targetValue);
+            
+            // 完全一致がない場合、部分一致チェック
+            if (!targetOption && targetValue) {
+              const normalizedTarget = targetValue.replace(/[（）()]/g, '').trim();
+              targetOption = options.find(option => {
+                const normalizedOption = option.value.replace(/[（）()]/g, '').trim();
+                return normalizedOption.includes(normalizedTarget) || normalizedTarget.includes(normalizedOption);
+              });
+              
+              if (targetOption) {
+                console.log(`✅ Column option found via partial match for ${selectId}: ${targetValue} → ${targetOption.value}`);
+              }
+            }
+            
+            if (targetOption) {
+              const finalValue = targetOption.value;
+              console.log(`✅ Column option found for ${selectId}: ${finalValue}`);
+              select.value = finalValue;
               
               // 値が正しく設定されたかダブルチェック
-              if (select.value === targetValue) {
-                console.log(`✅ ${selectId} value successfully set to: ${targetValue}`);
+              if (select.value === finalValue) {
+                console.log(`✅ ${selectId} value successfully set to: ${finalValue}`);
                 resolve(true);
               } else {
-                console.warn(`⚠️ ${selectId} value setting failed. Expected: ${targetValue}, Actual: ${select.value}`);
+                console.warn(`⚠️ ${selectId} value setting failed. Expected: ${finalValue}, Actual: ${select.value}`);
                 resolve(false);
               }
               return;
@@ -2450,7 +2466,7 @@ window.HistoryManager = {
       
       if (item.opinionColumn) {
         columnRestorations.push(
-          waitForColumnOptions('opinion-column', item.opinionColumn)
+          waitForColumnOptions('opinionHeader', item.opinionColumn)
             .then(success => ({ type: 'opinion', value: item.opinionColumn, success }))
         );
       }
@@ -2726,6 +2742,8 @@ window.HistoryManager = {
       if (sheetSelect) {
         // 履歴復元フラグを設定（重複処理チェック回避）
         window._historyRestoreInProgress = true;
+        // 重複リクエスト防止の無効化（復元中は必要なAPI呼び出しを許可）
+        window.FORCE_REQUEST_MODE = true;
         
         // シート選択を実行
         if (sheetSelect.value !== sheetName) {
@@ -2745,14 +2763,23 @@ window.HistoryManager = {
         console.log(`✅ Sheet change event dispatched`);
         
         // シート選択変更ハンドラーを直接呼び出し（フォールバック）
+        // ただし、復元時はAPI呼び出しエラーを回避するため、シート存在確認後に実行
         if (typeof handleSheetSelectionChange === 'function') {
-          const mockEvent = { target: { value: sheetName } };
-          await handleSheetSelectionChange(mockEvent);
-          console.log(`✅ Sheet selection change handler called directly`);
+          try {
+            // 復元用の安全なハンドラー呼び出し
+            const mockEvent = { target: { value: sheetName }, _isHistoryRestore: true };
+            await handleSheetSelectionChange(mockEvent);
+            console.log(`✅ Sheet selection change handler called directly`);
+          } catch (handlerError) {
+            console.warn('⚠️ Sheet selection handler error during restore (non-critical):', handlerError.message);
+            // ハンドラーエラーは復元を停止しない
+          }
         }
         
         // 履歴復元フラグをクリア
         delete window._historyRestoreInProgress;
+        // 重複リクエスト防止を元に戻す
+        delete window.FORCE_REQUEST_MODE;
         
         // 少し待機してからUI更新を確認
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -2770,6 +2797,17 @@ window.HistoryManager = {
   async _refreshAfterRestore() {
     try {
       console.log('🔄 Refreshing UI after history restore...');
+      
+      // 最新の状態情報を強制取得
+      if (typeof loadStatus === 'function') {
+        console.log('🔄 Forcing status reload after restore...');
+        try {
+          await loadStatus(true); // キャッシュバイパス
+          console.log('✅ Status reloaded after restore');
+        } catch (statusError) {
+          console.warn('⚠️ Status reload failed:', statusError);
+        }
+      }
       
       // シートデータの再読み込み（シート変更後の列データ取得）
       if (typeof loadSheetDetailsAPI === 'function' && window.AdminPanel.selectedSheet) {
