@@ -2006,30 +2006,94 @@ window.HistoryManager = {
    */
   _showRestoreConfirmationModal(item) {
     try {
-      // シンプル方針: 直接確認モーダル（共有モーダル or ブラウザconfirm）のみ使用
       const formattedDate = this._formatCreatedDate(item.createdDate);
-      const truncatedQuestion = item.questionText && item.questionText.length > 50 
+      const truncatedQuestion = item.questionText && item.questionText.length > 50
         ? item.questionText.substring(0, 50) + '...'
         : (item.questionText || '未設定');
 
       const title = '履歴復元の確認';
       const message = `以下の設定を復元しますか？現在の設定が上書きされます。\n\n📝 問題文: ${truncatedQuestion}\n📊 シート名: ${item.sheetName || '未設定'}\n📅 作成日: ${formattedDate}`;
 
-      if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
-        window.sharedModals.showConfirmation(
-          title,
-          message,
-          () => this._restoreHistoryItem(item),
-          () => {}
-        );
+      // 1) 共有モーダルDOM（confirmation-modal）がある場合は、軽量リッチレイアウトで表示
+      const modal = document.getElementById('confirmation-modal');
+      if (modal) {
+        const glass = modal.querySelector('.glass-panel');
+        if (!glass) {
+          // フォールバック: 共有API or browser confirm
+          if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
+            window.sharedModals.showConfirmation(title, message, () => this._restoreHistoryItem(item), () => {});
+          } else if (typeof showConfirmationModal === 'function') {
+            showConfirmationModal(title, message, () => this._restoreHistoryItem(item));
+          } else if (confirm(`${title}\n\n${message.replace(/📝|📊|📅/g, '')}`)) {
+            this._restoreHistoryItem(item);
+          }
+          return;
+        }
+
+        const original = glass.innerHTML;
+        // 軽量な装飾を加えたレイアウト（内容はそのまま）
+        glass.innerHTML = `
+          <div class='flex items-center gap-3 mb-4'>
+            <div class='w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center'>
+              <svg class='w-6 h-6 text-orange-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'></path>
+              </svg>
+            </div>
+            <h3 class='text-lg font-bold text-white'>${title}</h3>
+          </div>
+          <div class='bg-gray-800/60 border border-gray-600/70 rounded-lg p-4 mb-4'>
+            <p class='text-gray-200 text-sm leading-relaxed whitespace-pre-line'>${message}</p>
+          </div>
+          <div class='grid grid-cols-1 gap-2 mb-5'>
+            <div class='flex items-start gap-2'>
+              <span class='text-gray-400 text-xs mt-0.5'>📝</span>
+              <div>
+                <div class='text-xs text-gray-400'>復元する問題文</div>
+                <div class='text-sm text-gray-100'>${truncatedQuestion}</div>
+              </div>
+            </div>
+            <div class='flex items-start gap-2'>
+              <span class='text-gray-400 text-xs mt-0.5'>📊</span>
+              <div>
+                <div class='text-xs text-gray-400'>シート名</div>
+                <div class='text-sm text-gray-100'>${item.sheetName || '未設定'}</div>
+              </div>
+            </div>
+            <div class='flex items-start gap-2'>
+              <span class='text-gray-400 text-xs mt-0.5'>📅</span>
+              <div>
+                <div class='text-xs text-gray-400'>作成日</div>
+                <div class='text-sm text-gray-100'>${formattedDate}</div>
+              </div>
+            </div>
+          </div>
+          <div class='flex justify-end gap-3'>
+            <button type='button' id='restore-cancel-btn' class='btn btn-secondary'>キャンセル</button>
+            <button type='button' id='restore-confirm-btn' class='btn btn-primary'>復元する</button>
+          </div>
+        `;
+
+        modal.classList.remove('hidden');
+        const cleanup = () => {
+          glass.innerHTML = original;
+          modal.classList.add('hidden');
+        };
+        const confirmBtn = modal.querySelector('#restore-confirm-btn');
+        const cancelBtn = modal.querySelector('#restore-cancel-btn');
+        if (confirmBtn) confirmBtn.onclick = () => { cleanup(); this._restoreHistoryItem(item); };
+        if (cancelBtn) cancelBtn.onclick = () => cleanup();
         return;
       }
 
+      // 2) DOMが無い場合は既存の共有モーダル / シンプル confirm
+      if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
+        window.sharedModals.showConfirmation(title, message, () => this._restoreHistoryItem(item), () => {});
+        return;
+      }
       if (typeof showConfirmationModal === 'function') {
         showConfirmationModal(title, message, () => this._restoreHistoryItem(item));
         return;
       }
-
       if (confirm(`${title}\n\n${message.replace(/📝|📊|📅/g, '')}`)) {
         this._restoreHistoryItem(item);
       }
@@ -2082,6 +2146,24 @@ window.HistoryManager = {
             targetSheetName = first;
           }
         }
+        // サーバのアクティブシートを即時更新し、後続APIが同じシートを見るようにする
+        try {
+          await runGasWithUserId('activateSheet', 'シートをアクティブ化中...', targetSheetName);
+          // ローカル状態も同期
+          if (window.currentStatus && window.currentStatus.userInfo) {
+            try {
+              const cfg = typeof window.currentStatus.userInfo.configJson === 'string'
+                ? JSON.parse(window.currentStatus.userInfo.configJson)
+                : (window.currentStatus.userInfo.configJson || {});
+              cfg.publishedSheetName = targetSheetName;
+              window.currentStatus.userInfo.configJson = JSON.stringify(cfg);
+              window.currentStatus.activeSheetName = targetSheetName;
+            } catch (e) { /* noop */ }
+          }
+        } catch (e) {
+          console.warn('⚠️ setActiveSheet failed in simple restore:', e);
+        }
+        // UI側のハンドラにも伝播（必要最低限）
         if (typeof handleSheetSelectionChange === 'function') {
           handleSheetSelectionChange({ target: select, _isRestoreRefresh: true });
         }
