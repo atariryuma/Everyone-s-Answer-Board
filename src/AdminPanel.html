@@ -125,7 +125,7 @@
     }
     
     if (isCritical) {
-      logError(' Critical Error Detected:', {
+      console.error('🚨 Critical Error Detected:', {
         message: errorMessage,
         line: errorLine,
         stack: errorStack.substring(0, 500) // Truncate for readability
@@ -133,11 +133,11 @@
       
       // Attempt recovery for specific critical errors
       if (errorMessage.includes('is not defined') || errorMessage.includes('is not a function')) {
-        logDebug(' Attempting function recovery...');
+        console.log('🔧 Attempting function recovery...');
         // Trigger fallback initialization after a short delay
         setTimeout(() => {
           if (typeof window.initializeAdminPanelMaster === 'function') {
-            logDebug(' Re-initializing admin panel...');
+            console.log('🔄 Re-initializing admin panel...');
             window.initializeAdminPanelMaster();
           }
         }, 1000);
@@ -152,7 +152,7 @@
     }
     
     // Log important errors
-    logError('Global error caught:', event.error);
+    console.error('Global error caught:', event.error);
   });
   
   // Enhanced Promise rejection handling
@@ -168,7 +168,7 @@
       return;
     }
     
-    logError('Unhandled promise rejection:', event.reason);
+    console.error('Unhandled promise rejection:', event.reason);
     event.preventDefault();
   });
 
@@ -197,12 +197,12 @@
   // マルチテナント対応: callWithCacheWithUserId関数
   function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
     if (!userId) {
-      logError('  - No userId available for cached call:', functionName);
+      console.error('❌  - No userId available for cached call:', functionName);
       throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
     }
     
     return unifiedCache.getOrSet(cacheKey, function() {
-      logDebug('  - callWithCacheWithUserId:', functionName, 'userId:', userId);
+      console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
       return gasOptimizer.call(functionName, userId, ...args);
     }, ttl);
   }
@@ -211,11 +211,11 @@
   const __IS_SYSTEM_ADMIN_RAW__ = '<?= escapeJavaScript(typeof isDeployUser !== "undefined" ? isDeployUser : "false") ?>';
   const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
   window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
-  logDebug('Template Debug:');
-  logDebug('- Raw template value:', __IS_SYSTEM_ADMIN_RAW__);
-  logDebug('- Raw template type:', typeof __IS_SYSTEM_ADMIN_RAW__);
-  logDebug('- Processed value:', __IS_SYSTEM_ADMIN__);
-  logDebug('- window.isSystemAdmin final:', window.isSystemAdmin);
+  console.log('Template Debug:');
+  console.log('- Raw template value:', __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Raw template type:', typeof __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Processed value:', __IS_SYSTEM_ADMIN__);
+  console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
   
   </script>
 </head>
@@ -1069,7 +1069,6 @@
           アプリの有効/無効状態を管理できます
         </p>
       </div>
-
 <? } ?>
       
       <!-- セキュリティと統合情報 -->
@@ -1216,7 +1215,7 @@
       if (window.sharedModals) {
         window.sharedModals.loadAdminModals();
       }
-      
+    });
   </script>
 
 </body>

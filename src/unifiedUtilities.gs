@@ -54,13 +54,13 @@ class UnifiedUserManager {
       if (useCache && !forceRefresh) {
         const cached = this._getCachedUser(identifier);
         if (cached) {
-          debugLog(` 統一ユーザー管理: キャッシュヒット (${identifier})`);
+          debugLog(`✅ 統一ユーザー管理: キャッシュヒット (${identifier})`);
           return cached;
         }
       }
 
       // データベースから取得
-      debugLog(` 統一ユーザー管理: DB検索 (${identifier})`);
+      debugLog(`🔍 統一ユーザー管理: DB検索 (${identifier})`);
       const userInfo = this._fetchUserFromDatabase(identifier);
 
       // キャッシュ保存
@@ -138,11 +138,11 @@ class UnifiedUserManager {
         }
       }
       
-      warnLog('️ フォールバック: 全ての取得方法が失敗');
+      warnLog('⚠️ フォールバック: 全ての取得方法が失敗');
       return null;
       
     } catch (fallbackError) {
-      errorLog(' フォールバック処理でエラー:', fallbackError.message);
+      errorLog('❌ フォールバック処理でエラー:', fallbackError.message);
       return null;
     }
   }
@@ -158,11 +158,11 @@ class UnifiedUserManager {
       if (identifier) {
         // 特定ユーザーのキャッシュクリア
         unifiedCache.clearUserInfo();
-        debugLog(`🗑 統一ユーザー管理: 特定ユーザーキャッシュクリア (${identifier})`);
+        debugLog(`🗑️ 統一ユーザー管理: 特定ユーザーキャッシュクリア (${identifier})`);
       } else {
         // 全ユーザーキャッシュクリア
         unifiedCache.clearAll();
-        debugLog('🗑 統一ユーザー管理: 全ユーザーキャッシュクリア');
+        debugLog('🗑️ 統一ユーザー管理: 全ユーザーキャッシュクリア');
       }
 
       // 統一キャッシュマネージャーとの同期
@@ -272,7 +272,7 @@ class UnifiedAPIClient {
     // リトライロジック
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        debugLog(` 統一API: ${method} ${url} (試行 ${attempt + 1}/${retries + 1})`);
+        debugLog(`🌐 統一API: ${method} ${url} (試行 ${attempt + 1}/${retries + 1})`);
 
         const response = resilientUrlFetch(url, requestConfig);
         
@@ -285,7 +285,7 @@ class UnifiedAPIClient {
 
         // 成功時
         if (statusCode >= 200 && statusCode < 300) {
-          infoLog(` 統一API成功: ${statusCode} ${method} ${url}`);
+          infoLog(`✅ 統一API成功: ${statusCode} ${method} ${url}`);
           return {
             success: true,
             status: statusCode,
@@ -296,7 +296,7 @@ class UnifiedAPIClient {
 
         // 4xxエラーはリトライしない
         if (statusCode >= 400 && statusCode < 500) {
-          warnLog(` 統一APIクライアントエラー: ${statusCode} ${method} ${url}`);
+          warnLog(`❌ 統一APIクライアントエラー: ${statusCode} ${method} ${url}`);
           return {
             success: false,
             status: statusCode,
@@ -310,7 +310,7 @@ class UnifiedAPIClient {
 
       } catch (error) {
         lastError = error;
-        warnLog(`️ 統一API例外 (試行 ${attempt + 1}): ${error.message}`);
+        warnLog(`⚠️ 統一API例外 (試行 ${attempt + 1}): ${error.message}`);
 
         // 最後の試行でない場合は待機
         if (attempt < retries) {
@@ -320,7 +320,7 @@ class UnifiedAPIClient {
     }
 
     // 全試行失敗
-    errorLog(' 統一API全試行失敗:', lastError.message);
+    errorLog('❌ 統一API全試行失敗:', lastError.message);
     return {
       success: false,
       status: 0,

@@ -23,7 +23,7 @@
         const configValid = currentConfig && validateConfiguration();
         const step2Complete = checkStep2Completion();
         isValid = configValid || step2Complete;
-        logDebug(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`);
+        console.log(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`);
         break;
       case 3:
         isValid = true;
@@ -44,7 +44,7 @@
       }
       return 'pending';
     } catch (error) {
-      logWarn('getSetupStatusFromGlobalStatus エラー:', error);
+      console.warn('getSetupStatusFromGlobalStatus エラー:', error);
       return 'pending';
     }
   }
@@ -57,7 +57,7 @@
     // Step 2の制御
     const step2Section = document.getElementById('sheet-selection-section');
     if (!step1Completed) {
-      disableSection(step2Section, '️ 先にデータ準備を完了してください');
+      disableSection(step2Section, '⚠️ 先にデータ準備を完了してください');
     } else {
       enableSection(step2Section);
     }
@@ -65,7 +65,7 @@
     // Step 3の制御
     const step3Section = document.getElementById('config-section');
     if (!step1Completed || !step2Completed) {
-      disableSection(step3Section, '️ 前のステップを完了してください');
+      disableSection(step3Section, '⚠️ 前のステップを完了してください');
     } else {
       enableSection(step3Section);
     }
@@ -93,10 +93,10 @@
                             config.formCreated === true && 
                             config.formUrl && config.formUrl.trim();
       
-      logDebug('Step 2完了チェック (統一版):', setupCompleted);
+      console.log('✅ Step 2完了チェック (統一版):', setupCompleted);
       return setupCompleted;
     } catch (error) {
-      logWarn('Step 2完了チェックでエラー:', error);
+      console.warn('❌ Step 2完了チェックでエラー:', error);
       return false;
     }
   }
@@ -164,7 +164,7 @@
           displayColumnMapping(columns);
         })
         .catch(error => {
-          logError('Failed to load sheet columns:', error);
+          console.error('Failed to load sheet columns:', error);
           showMessage('列の読み込みに失敗しました', 'error');
         });
     }
@@ -178,7 +178,7 @@
           displayColumnMapping(columns);
         })
         .catch(error => {
-          logError('Failed to load form columns:', error);
+          console.error('Failed to load form columns:', error);
           showMessage('フォーム項目の読み込みに失敗しました', 'error');
         });
     }
@@ -294,19 +294,19 @@
       window.sharedModals.showPublish(
         // 公開実行時のコールバック
         () => {
-          logDebug('公開モーダルで公開が選択されました');
+          console.log('📤 公開モーダルで公開が選択されました');
           executePublishProcess(btn, config);
         },
         // キャンセル時のコールバック
         () => {
-          logDebug('公開がキャンセルされました');
+          console.log('❌ 公開がキャンセルされました');
         },
         // 自動停止設定
         autoStopSettings
       );
     } else {
       // フォールバック: モーダルが利用できない場合は直接実行
-      logWarn('公開モーダルが利用できません。直接実行します。');
+      console.warn('⚠️ 公開モーダルが利用できません。直接実行します。');
       executePublishProcess(btn, config);
     }
   }
@@ -326,35 +326,35 @@
             }
             loadSystemStatus();
             
-            //  公開成功後に状態整合性チェック・修復を実行
+            // 🔧 公開成功後に状態整合性チェック・修復を実行
             setTimeout(() => {
-              logDebug('公開後の状態整合性チェックを実行中...');
+              console.log('🔧 公開後の状態整合性チェックを実行中...');
               if (typeof initializeUserSettings === 'function') {
                 initializeUserSettings()
                   .then(result => {
                     if (result.success) {
-                      logDebug('公開後の状態チェック完了:', result.message);
+                      console.log('✅ 公開後の状態チェック完了:', result.message);
                     }
                   })
                   .catch(error => {
-                    logWarn('公開後の状態チェックで軽微な問題:', error.message);
+                    console.warn('⚠️ 公開後の状態チェックで軽微な問題:', error.message);
                   });
               } else {
-                logWarn('initializeUserSettings関数が利用できません');
+                console.warn('⚠️ initializeUserSettings関数が利用できません');
               }
             }, 500);
             
             if (typeof navigateToStep === 'function') {
               navigateToStep(3);
             } else {
-              logWarn('navigateToStep function not available');
+              console.warn('⚠️ navigateToStep function not available');
             }
             
             // 自動停止確認モーダルを表示（公開成功後）
             setTimeout(() => {
               if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
                 window.sharedModals.showAutoStopConfirmation(result);
-                logDebug('通常公開後に自動停止確認モーダルを表示しました');
+                console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
               }
             }, 1000);
             
@@ -363,7 +363,7 @@
           }
         })
         .catch(error => {
-          logError('Save failed:', error);
+          console.error('Save failed:', error);
           showMessage('保存に失敗しました', 'error');
         })
         .finally(() => {
@@ -395,7 +395,7 @@
           }
         })
         .catch(error => {
-          logError('Unpublish failed:', error);
+          console.error('Unpublish failed:', error);
           showMessage('停止に失敗しました', 'error');
         })
         .finally(() => {
@@ -411,7 +411,7 @@
   window.adminPanel = {
     initializeAdminPanel: window.initializeAdminPanel, // Function moved to framework
     navigateToStep: window.navigateToStep, // Function moved to framework
-    showMessage: window.showMessage || function() { logWarn('showMessage not yet available'); },
+    showMessage: window.showMessage || function() { console.warn('showMessage not yet available'); },
     switchToAnotherAccount,
     openAppSetupPage,
     logoutAndRedirect
@@ -424,7 +424,7 @@
           window.location.href = url; // ログイン画面へリダイレクト
         })
         .withFailureHandler(function(error) {
-          logError('Logout failed:', error);
+          console.error('Logout failed:', error);
           showMessage('ログアウト処理中にエラーが発生しました', 'error');
         })
         .resetUserAuthentication(); // バックエンドの認証リセット関数を呼び出す

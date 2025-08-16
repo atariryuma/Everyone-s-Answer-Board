@@ -27,7 +27,7 @@ function setupApplication(credsJson, dbId) {
     // データベースシートの初期化
     initializeDatabaseSheet(dbId);
 
-    infoLog(' セットアップが正常に完了しました。');
+    infoLog('✅ セットアップが正常に完了しました。');
     return { status: 'success', message: 'セットアップが正常に完了しました。' };
   } catch (e) {
     logError(e, 'customSetup', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { userId });

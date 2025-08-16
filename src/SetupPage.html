@@ -30,7 +30,7 @@
 
         <!-- セットアップフォーム -->
         <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4"> システム設定</h2>
+            <h2 class="text-xl font-semibold text-white mb-4">🔧 システム設定</h2>
             
             <form id="setup-form" class="space-y-6">
                 <!-- サービスアカウントJSON -->
@@ -51,7 +51,7 @@
                 <!-- データベーススプレッドシートID -->
                 <div>
                     <label for="database-id" class="block text-sm font-medium text-gray-300 mb-2">
-                         データベーススプレッドシートID
+                        📊 データベーススプレッドシートID
                     </label>
                     <input 
                         type="text" 
@@ -78,12 +78,12 @@
 
         <!-- テストセクション（セットアップ後に表示） -->
         <div id="test-section" class="glass-panel rounded-xl p-6 hidden">
-            <h3 class="text-lg font-semibold text-white mb-4"> セットアップ完了</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">✅ セットアップ完了</h3>
             <p class="text-gray-300 mb-4">セットアップが正常に完了しました。システムの動作確認を行えます。</p>
             <button 
                 id="test-btn"
                 class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg">
-                 システムテスト実行
+                🔍 システムテスト実行
             </button>
             <div class="mt-4">
                 <button type="button" id="start-studyquest-btn" onclick="startApp()" class="inline-block btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2 px-4 rounded-lg">
@@ -94,7 +94,7 @@
 
         <!-- ヘルプセクション -->
         <div class="glass-panel rounded-xl p-6">
-            <h3 class="text-lg font-semibold text-white mb-4"> セットアップでお困りの場合</h3>
+            <h3 class="text-lg font-semibold text-white mb-4">❓ セットアップでお困りの場合</h3>
             <div class="space-y-3 text-sm text-gray-300">
                 <details class="cursor-pointer">
                     <summary class="font-medium text-cyan-400 hover:text-cyan-300">サービスアカウントJSONの取得方法</summary>
@@ -136,13 +136,13 @@
                 info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
             };
 
-            const sanitizedMessage = (message || '').replace(/^[❌⚠️ℹ️]\s*/, '');
+            const sanitizedMessage = (message || '').replace(/^[✅❌⚠️ℹ️]\s*/, '');
 
             messageArea.innerHTML = `
                 <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
                     <div class="flex items-center">
                         <div class="mr-3">
-                            ${type === 'success' ? '' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
+                            ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
                         </div>
                         <div class="flex-1">${sanitizedMessage}</div>
                         <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
@@ -211,13 +211,13 @@
                 await new Promise((resolve, reject) => {
                     google.script.run
                         .withSuccessHandler((result) => {
-                            showMessage(' セットアップが正常に完了しました！', 'success');
+                            showMessage('✅ セットアップが正常に完了しました！', 'success');
                             document.getElementById('test-section').classList.remove('hidden');
                             resolve(result);
                         })
                         .withFailureHandler((error) => {
-                            logError('Setup error:', error);
-                            let displayMessage = ` セットアップに失敗しました: ${error.message || error}`;
+                            console.error('Setup error:', error);
+                            let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
                             if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
                                 displayMessage = `
                                     <p class="font-bold">${error.message}</p>
@@ -232,7 +232,7 @@
                 });
                 
             } catch (error) {
-                showMessage(` ${error.message}`, 'error');
+                showMessage(`❌ ${error.message}`, 'error');
             } finally {
                 // ボタン状態をリセット
                 setupBtn.disabled = false;
@@ -251,12 +251,12 @@
                 .withSuccessHandler((result) => {
                     showMessage(`${result.message}`, result.status === 'success' ? 'success' : 'warning');
                     this.disabled = false;
-                    this.innerHTML = ' システムテスト実行';
+                    this.innerHTML = '🔍 システムテスト実行';
                 })
                 .withFailureHandler((error) => {
                     showMessage(`テスト実行に失敗しました: ${error.message || error}`, 'error');
                     this.disabled = false;
-                    this.innerHTML = ' システムテスト実行';
+                    this.innerHTML = '🔍 システムテスト実行';
                 })
                 .testSetup();
         });

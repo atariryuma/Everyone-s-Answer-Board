@@ -27,7 +27,7 @@ var eventHandlersAttached = {
 function setupEventListeners() {
   // Prevent duplicate event handler attachment
   if (eventHandlersAttached.setupEventListeners) {
-    logDebug('️ AdminPanel: Event handlers already attached, skipping duplicate setup');
+    console.log('⚠️ AdminPanel: Event handlers already attached, skipping duplicate setup');
     return;
   }
   
@@ -71,11 +71,11 @@ function setupEventListeners() {
         function() {
           unpublishBoard()
             .then(function(unpublishResult) {
-              logDebug(' 公開停止完了:', unpublishResult);
+              console.log('✅ 公開停止完了:', unpublishResult);
               
               // unpublishBoard()内で既にキャッシュクリア処理が実行されているため、
               // ここでは重複処理を避けて、状態同期に集中
-              logDebug(' 公開停止後の状態同期を開始（キャッシュクリア済み）');
+              console.log('🔄 公開停止後の状態同期を開始（キャッシュクリア済み）');
               
               // 改善された非同期処理完了待機
               return new Promise(async (resolve) => {
@@ -85,51 +85,51 @@ function setupEventListeners() {
                   
                   // Step 2: 状態再読み込み（強制リフレッシュ）
                   await loadStatus(true);
-                  logDebug(' 公開停止後の状態更新完了');
+                  console.log('🔄 公開停止後の状態更新完了');
                   
                   // Step 3: 最終的なUI状態確認
                   await new Promise(r => setTimeout(r, 100));
                   
                   resolve(unpublishResult);
                 } catch (error) {
-                  logWarn('️ 状態同期エラー:', error);
+                  console.warn('⚠️ 状態同期エラー:', error);
                   resolve(unpublishResult); // エラーでも続行
                 }
               });
             })
             .then(function() {
-              logDebug(' 公開停止後の完全リセットUI更新開始');
+              console.log('🔧 公開停止後の完全リセットUI更新開始');
               
               // ステップ1に戻すためのUI更新
               if (typeof updateStepIndicators === 'function') {
-                logDebug(' updateStepIndicators実行中: ステップ1に完全リセット');
+                console.log('🎯 updateStepIndicators実行中: ステップ1に完全リセット');
                 updateStepIndicators(1, null);
               } else {
-                logWarn('️ updateStepIndicators関数が見つかりません');
+                console.warn('⚠️ updateStepIndicators関数が見つかりません');
               }
               
               if (typeof updateGuidanceForStep === 'function') {
                 const guidanceText = document.getElementById('guidance-text');
                 if (guidanceText) {
-                  logDebug(' updateGuidanceForStep実行中: ステップ1ガイダンス');
+                  console.log('🎯 updateGuidanceForStep実行中: ステップ1ガイダンス');
                   updateGuidanceForStep(1, guidanceText);
                 } else {
-                  logWarn('️ guidance-text要素が見つかりません');
+                  console.warn('⚠️ guidance-text要素が見つかりません');
                 }
               } else {
-                logWarn('️ updateGuidanceForStep関数が見つかりません');
+                console.warn('⚠️ updateGuidanceForStep関数が見つかりません');
               }
               
               // フォーム関連要素の初期化
               try {
-                logDebug('🧹 フォーム関連UI要素を初期状態にリセット');
+                console.log('🧹 フォーム関連UI要素を初期状態にリセット');
                 
                 // シート選択ドロップダウンをクリア
                 const sheetSelect = document.getElementById('sheet-select');
                 if (sheetSelect) {
                   sheetSelect.innerHTML = '<option value="">シートを選択してください</option>';
                   sheetSelect.selectedIndex = 0;
-                  logDebug(' シート選択ドロップダウンをリセット');
+                  console.log('✅ シート選択ドロップダウンをリセット');
                 }
                 
                 // 列設定フォームをクリア
@@ -141,7 +141,7 @@ function setupEventListeners() {
                     selectElement.selectedIndex = 0;
                   }
                 });
-                logDebug(' 列設定フォームをリセット');
+                console.log('✅ 列設定フォームをリセット');
                 
                 // チェックボックスの初期化
                 const checkboxes = ['show-names', 'show-counts'];
@@ -151,26 +151,26 @@ function setupEventListeners() {
                     checkbox.checked = false;
                   }
                 });
-                logDebug(' 表示設定チェックボックスをリセット');
+                console.log('✅ 表示設定チェックボックスをリセット');
                 
               } catch (resetError) {
-                logWarn('️ UI要素リセット中にエラー:', resetError);
+                console.warn('⚠️ UI要素リセット中にエラー:', resetError);
               }
               
-              logDebug(' 公開停止後の完全リセットUI更新完了');
+              console.log('✅ 公開停止後の完全リセットUI更新完了');
               showMessage('回答ボードは非公開になり、設定は初期状態にリセットされました。', 'success');
             })
             .catch(function(error) {
-              logError(' 公開停止に失敗しました:', error);
-              let errorMessage = ' 公開停止に失敗しました。再度お試しください。';
+              console.error('❌ 公開停止に失敗しました:', error);
+              let errorMessage = '❌ 公開停止に失敗しました。再度お試しください。';
               
               // エラーの種類に応じてより具体的なメッセージを表示
               if (error.message && error.message.includes('customFormInfo')) {
-                errorMessage = ' カスタムフォーム設定の更新に失敗しました。ページを再読み込みしてから再度お試しください。';
+                errorMessage = '❌ カスタムフォーム設定の更新に失敗しました。ページを再読み込みしてから再度お試しください。';
               } else if (error.message && error.message.includes('許可されていない')) {
-                errorMessage = ' データ更新権限エラーが発生しました。管理者にお問い合わせください。';
+                errorMessage = '❌ データ更新権限エラーが発生しました。管理者にお問い合わせください。';
               } else if (error.message && error.message.includes('ネットワーク')) {
-                errorMessage = ' ネットワークエラーが発生しました。インターネット接続を確認してください。';
+                errorMessage = '❌ ネットワークエラーが発生しました。インターネット接続を確認してください。';
               }
               
               showMessage(errorMessage, 'error');
@@ -184,7 +184,7 @@ function setupEventListeners() {
   var clearHistoryBtn = document.getElementById('clear-history-btn');
   if (clearHistoryBtn) {
     clearHistoryBtn.addEventListener('click', function() {
-      logDebug('🗑 履歴クリアボタンがクリックされました');
+      console.log('🗑️ 履歴クリアボタンがクリックされました');
       
         if (typeof showConfirmationModal === 'function') {
           showHistoryClearConfirmationModal(
@@ -194,7 +194,7 @@ function setupEventListeners() {
               
               try {
                 // ローディング表示
-                showMessage(' 履歴をクリアしています...', 'info');
+                showMessage('🔄 履歴をクリアしています...', 'info');
                 
                 // 1. クライアント側の履歴をクリア
                 localStorage.removeItem(HISTORY_STORAGE_KEY);
@@ -204,37 +204,37 @@ function setupEventListeners() {
                   const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
                   
                   if (serverResponse && serverResponse.status === 'success') {
-                    showMessage(' すべての履歴をクリアしました', 'success');
+                    showMessage('✅ すべての履歴をクリアしました', 'success');
                   } else {
-                    logWarn('️ サーバー側履歴のクリアに失敗:', (serverResponse && serverResponse.message) || 'Unknown error');
-                    showMessage('️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
+                    console.warn('⚠️ サーバー側履歴のクリアに失敗:', (serverResponse && serverResponse.message) || 'Unknown error');
+                    showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
                   }
                 } else {
-                  logWarn('️ サーバー同期機能が利用できません');
-                  showMessage('️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
+                  console.warn('⚠️ サーバー同期機能が利用できません');
+                  showMessage('⚠️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
                 }
 
                 // 3. 履歴テーブルを更新
                 if (typeof loadSimpleHistoryTable === 'function') {
                   loadSimpleHistoryTable();
                 } else {
-                  logWarn('️ loadSimpleHistoryTable関数が見つかりません');
+                  console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
                 }
                 
               } catch (error) {
-                logError(' 履歴クリアに失敗:', error);
-                showMessage(' 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
+                console.error('❌ 履歴クリアに失敗:', error);
+                showMessage('❌ 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
               }
             }
           );
         } else {
-          logError(' showConfirmationModal関数が見つかりません');
+          console.error('❌ showConfirmationModal関数が見つかりません');
           // フォールバック: 直接確認
           if (confirm('すべての履歴を削除しますか？この操作は取り消せません。')) {
             (async function() {
               try {
                 // ローディング表示
-                showMessage(' 履歴をクリアしています...', 'info');
+                showMessage('🔄 履歴をクリアしています...', 'info');
                 
                 // 1. クライアント側の履歴をクリア
                 localStorage.removeItem(HISTORY_STORAGE_KEY);
@@ -244,14 +244,14 @@ function setupEventListeners() {
                   const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
                   
                   if (serverResponse && serverResponse.status === 'success') {
-                    showMessage(' すべての履歴をクリアしました', 'success');
+                    showMessage('✅ すべての履歴をクリアしました', 'success');
                   } else {
-                    logWarn('️ サーバー側履歴のクリアに失敗（フォールバック）:', (serverResponse && serverResponse.message) || 'Unknown error');
-                    showMessage('️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
+                    console.warn('⚠️ サーバー側履歴のクリアに失敗（フォールバック）:', (serverResponse && serverResponse.message) || 'Unknown error');
+                    showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
                   }
                 } else {
-                  logWarn('️ サーバー同期機能が利用できません（フォールバック）');
-                  showMessage('️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
+                  console.warn('⚠️ サーバー同期機能が利用できません（フォールバック）');
+                  showMessage('⚠️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
                 }
                 
                 // 3. 履歴テーブルを更新
@@ -260,15 +260,15 @@ function setupEventListeners() {
                 }
                 
               } catch (error) {
-                logError(' 履歴クリアに失敗:', error);
-                showMessage(' 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
+                console.error('❌ 履歴クリアに失敗:', error);
+                showMessage('❌ 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
               }
             })();
           }
         }
     });
   } else {
-    logError(' clear-history-btnが見つかりません');
+    console.error('❌ clear-history-btnが見つかりません');
   }
   
   // クイックスタートボタンのイベントリスナー
@@ -278,7 +278,7 @@ function setupEventListeners() {
       if (typeof handleQuickStart === 'function') {
         handleQuickStart();
       } else {
-        logError('handleQuickStart function not found');
+        console.error('handleQuickStart function not found');
         showMessage('クイックスタート機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     });
@@ -302,7 +302,7 @@ function setupEventListeners() {
             }
           },
           () => {
-            logDebug(' カスタムセットアップがキャンセルされました');
+            console.log('❌ カスタムセットアップがキャンセルされました');
           }
         );
       } else {
@@ -318,7 +318,7 @@ function setupEventListeners() {
       
       // 実際に公開停止処理を実行
       if (typeof unpublishBoard === 'function') {
-        logDebug('🛑 公開停止処理を開始します...');
+        console.log('🛑 公開停止処理を開始します...');
         
         // 公開停止の確認ダイアログを表示
         showStopConfirmationModal(
@@ -329,11 +329,11 @@ function setupEventListeners() {
             executeStopAndCreateForm();
           },
           function() {
-            logDebug(' 公開停止がキャンセルされました');
+            console.log('❌ 公開停止がキャンセルされました');
           }
         );
       } else {
-        logError('unpublishBoard function not found');
+        console.error('unpublishBoard function not found');
         showMessage('公開停止機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
       }
     } else {
@@ -342,7 +342,7 @@ function setupEventListeners() {
       try {
         localStorage.setItem('expandAllSections', 'true');
       } catch (e) {
-        logWarn('️ localStorage設定に失敗:', e);
+        console.warn('⚠️ localStorage設定に失敗:', e);
       }
       
       // 継続の場合は直接フォーム作成モーダルを表示
@@ -366,33 +366,33 @@ function setupEventListeners() {
       })
       .then(function(response) {
         // 公開停止が確実に完了した旨を表示
-        showMessage(' 公開停止が完了しました。カスタムフォームを作成できます。', 'success');
+        showMessage('✅ 公開停止が完了しました。カスタムフォームを作成できます。', 'success');
 
         // 全セクション展開フラグを設定（公開停止後の管理パネル表示改善）
         try {
           localStorage.setItem('expandAllSections', 'true');
-          logDebug('📂 公開停止後の全セクション展開フラグを設定しました');
+          console.log('📂 公開停止後の全セクション展開フラグを設定しました');
         } catch (e) {
-          logWarn('️ localStorage設定に失敗:', e);
+          console.warn('⚠️ localStorage設定に失敗:', e);
         }
 
         // 少し遅延してからフォーム作成モーダルを表示
         setTimeout(function() {
-          logDebug('🎨 フォーム作成モーダルを表示します');
+          console.log('🎨 フォーム作成モーダルを表示します');
           showFormConfigModalSafely();
         }, 1500); // 1.5秒後に表示（UIフィードバック時間を確保）
       })
       .catch(function(error) {
-        logError(' 公開停止に失敗しました:', error);
-        let errorMessage = ' 公開停止に失敗しました。再度お試しください。';
+        console.error('❌ 公開停止に失敗しました:', error);
+        let errorMessage = '❌ 公開停止に失敗しました。再度お試しください。';
         
         // エラーの種類に応じてより具体的なメッセージを表示
         if (error.message && error.message.includes('customFormInfo')) {
-          errorMessage = ' カスタムフォーム設定の更新に失敗しました。ページを再読み込みしてから再度お試しください。';
+          errorMessage = '❌ カスタムフォーム設定の更新に失敗しました。ページを再読み込みしてから再度お試しください。';
         } else if (error.message && error.message.includes('許可されていない')) {
-          errorMessage = ' データ更新権限エラーが発生しました。管理者にお問い合わせください。';
+          errorMessage = '❌ データ更新権限エラーが発生しました。管理者にお問い合わせください。';
         } else if (error.message && error.message.includes('ネットワーク')) {
-          errorMessage = ' ネットワークエラーが発生しました。インターネット接続を確認してください。';
+          errorMessage = '❌ ネットワークエラーが発生しました。インターネット接続を確認してください。';
         }
         
         showMessage(errorMessage, 'error');
@@ -404,7 +404,7 @@ function setupEventListeners() {
     if (typeof showFormConfigModal === 'function') {
       showFormConfigModal();
     } else {
-      logError('showFormConfigModal function not found');
+      console.error('showFormConfigModal function not found');
       showMessage('フォーム作成機能を読み込み中です。少し待ってから再度お試しください。', 'warning');
     }
   }
@@ -461,7 +461,7 @@ function setupFormConfigModalHandlers() {
       if (typeof hideFormConfigModal === 'function') {
         hideFormConfigModal();
       } else {
-        logWarn('hideFormConfigModal not available');
+        console.warn('hideFormConfigModal not available');
       }
     });
   }
@@ -471,7 +471,7 @@ function setupFormConfigModalHandlers() {
       if (typeof hideFormConfigModal === 'function') {
         hideFormConfigModal();
       } else {
-        logWarn('hideFormConfigModal not available');
+        console.warn('hideFormConfigModal not available');
       }
     });
   }
@@ -533,11 +533,11 @@ function setupAccountManagementHandlers() {
       deleteBtn.addEventListener('click', handleDeleteRequest);
       deleteBtn._deleteListenerAttached = true;
       if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
-        logDebug('Delete account button event listener attached successfully');
+        console.log('Delete account button event listener attached successfully');
       }
     }
   } else {
-    logWarn('Delete account button not found');
+    console.warn('Delete account button not found');
   }
   
   // Switch account handlers
@@ -752,7 +752,7 @@ function handleDeleteRequest() {
                   try {
                     localStorage.removeItem(key);
                   } catch (e) {
-                    logWarn('️ Failed to remove localStorage key:', key);
+                    console.warn('⚠️ Failed to remove localStorage key:', key);
                   }
                 }
               });
@@ -762,7 +762,7 @@ function handleDeleteRequest() {
               window.sessionStorage.clear();
             }
           } catch (clearError) {
-            logWarn('キャッシュクリアエラー:', clearError);
+            console.warn('キャッシュクリアエラー:', clearError);
           }
           
           // 強制的なログイン画面リダイレクト
@@ -770,11 +770,11 @@ function handleDeleteRequest() {
             // サーバーサイドのセッションをクリアしてログイン画面にリダイレクト
             runGasWithUserId('resetUserAuthentication')
               .then(function(loginUrl) {
-                logDebug('ログイン画面にリダイレクト:', loginUrl);
+                console.log('ログイン画面にリダイレクト:', loginUrl);
                 window.location.href = loginUrl || window.location.origin + window.location.pathname;
               })
               .catch(function(error) {
-                logWarn('リダイレクトエラー:', error);
+                console.warn('リダイレクトエラー:', error);
                 // フォールバック: ページを強制リロードしてログイン状態をリセット
                 window.location.href = window.location.origin + window.location.pathname;
               });
@@ -829,7 +829,7 @@ function showHistoryClearConfirmationModal(title, message, onConfirm) {
     // Show modal
     modal.classList.remove('hidden');
   } else {
-    logWarn('️ Modal elements not found, using fallback');
+    console.warn('⚠️ Modal elements not found, using fallback');
     if (confirm(`${title}\n\n${message}`)) {
       onConfirm();
     }
@@ -878,7 +878,7 @@ function showStopConfirmationModal(title, message, onConfirm) {
     // Show modal
     modal.classList.remove('hidden');
   } else {
-    logWarn('️ Modal elements not found, using fallback');
+    console.warn('⚠️ Modal elements not found, using fallback');
     if (confirm(`${title}\n\n${message}`)) {
       onConfirm();
     }
@@ -893,11 +893,11 @@ function switchToAnotherAccount() {
     function() {
       sharedUtilities.gas.callWithLoading('resetUserAuthentication', 'セッションをクリアしています...', 'overlay')
         .then(function(result) {
-          logDebug('Session cleanup result:', result);
+          console.log('Session cleanup result:', result);
           window.location.href = 'https://accounts.google.com/logout';
         })
         .catch(function(error) {
-          logError('Session cleanup failed:', error);
+          console.error('Session cleanup failed:', error);
           alert('セッションクリアに失敗しました。手動でGoogleアカウントからログアウトしてください。');
           window.location.href = 'https://accounts.google.com/logout';
         });

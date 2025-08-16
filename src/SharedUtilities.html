@@ -5,119 +5,6 @@
    ============================================================================= */
 
 // =============================================================================
-// UNIFIED DEBUG LOGGING SYSTEM
-// =============================================================================
-
-/**
- * 統一ログシステム - 100% DEBUG_MODE制御対応
- * すべてのクライアントサイドログをこのシステム経由で出力
- */
-window.UnifiedLogging = {
-  
-  /**
-   * DEBUG_MODEの状態を取得
-   */
-  isDebugEnabled() {
-    return window.DEBUG_MODE === true || window.DEBUG_MODE === 'true';
-  },
-  
-  /**
-   * 統一ログ関数 - レベル別制御
-   * @param {string} level - ログレベル: 'error', 'warn', 'info', 'debug'
-   * @param {string} message - メッセージ
-   * @param {...any} args - 追加引数
-   */
-  log(level, message, ...args) {
-    // エラーは常に出力、それ以外はDEBUG_MODE制御
-    if (level !== 'error' && !this.isDebugEnabled()) {
-      return;
-    }
-    
-    // シンプルな形式でログ出力
-    const timestamp = new Date().toISOString().substr(11, 8); // HH:mm:ss
-    const prefix = `[${timestamp}] ${level.toUpperCase()}:`;
-    
-    try {
-      switch (level) {
-        case 'error':
-          console.error(prefix, message, ...args);
-          break;
-        case 'warn':
-          console.warn(prefix, message, ...args);
-          break;
-        case 'info':
-          console.info(prefix, message, ...args);
-          break;
-        case 'debug':
-        default:
-          console.log(prefix, message, ...args);
-          break;
-      }
-    } catch (error) {
-      // ログ出力エラー時のフォールバック
-      console.log('Log error:', error.message);
-    }
-  },
-  
-  /**
-   * 便利メソッド群
-   */
-  error(message, ...args) { this.log('error', message, ...args); },
-  warn(message, ...args) { this.log('warn', message, ...args); },
-  info(message, ...args) { this.log('info', message, ...args); },
-  debug(message, ...args) { this.log('debug', message, ...args); },
-  
-  /**
-   * 統一設定管理
-   */
-  async getSystemConfig() {
-    try {
-      return await new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
-          .getSystemConfig();
-      });
-    } catch (error) {
-      this.error('Failed to get system config:', error);
-      return { DEBUG_MODE: false, error: error.message };
-    }
-  },
-  
-  async updateDebugMode(enabled) {
-    try {
-      return await new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
-          .setDebugMode(enabled);
-      });
-    } catch (error) {
-      this.error('Failed to update debug mode:', error);
-      return { success: false, error: error.message };
-    }
-  }
-};
-
-// グローバル関数として利用可能にする
-window.unifiedLog = function(level, message, ...args) {
-  window.UnifiedLogging.log(level, message, ...args);
-};
-
-// 個別関数も提供
-window.logError = function(message, ...args) { window.UnifiedLogging.error(message, ...args); };
-window.logWarn = function(message, ...args) { window.UnifiedLogging.warn(message, ...args); };
-window.logInfo = function(message, ...args) { window.UnifiedLogging.info(message, ...args); };
-window.logDebug = function(message, ...args) { window.UnifiedLogging.debug(message, ...args); };
-
-// 既存のdebugLogとの互換性を保持
-if (typeof window.debugLog === 'undefined') {
-  window.debugLog = function(message, ...args) {
-    window.UnifiedLogging.debug(message, ...args);
-  };
-}
-
-// =============================================================================
 // ENHANCED ERROR HANDLING FOR ASYNC/AWAIT ISSUES
 // =============================================================================
 
@@ -474,7 +361,7 @@ class ErrorHandler {
       }
 
       // Better error logging with more details
-      console.group(' Error Logged');
+      console.group('🚨 Error Logged');
       console.log('Message:', errorInfo.message);
       console.log('Type:', errorInfo.errorType);
       console.log('Context:', errorInfo.context);
@@ -603,10 +490,10 @@ class GASUtilities {
     );
     
     if (this.pendingRequests && this.pendingRequests.has(requestKey) && !isForceRequest) {
-      console.log(` Duplicate request prevented: ${functionName}`);
+      console.log(`🚫 Duplicate request prevented: ${functionName}`);
       return this.pendingRequests.get(requestKey);
     } else if (isForceRequest && this.pendingRequests && this.pendingRequests.has(requestKey)) {
-      console.log(` Force request override: ${functionName}`);
+      console.log(`🔄 Force request override: ${functionName}`);
       // 既存のリクエストを削除して新しいリクエストを許可
       this.pendingRequests.delete(requestKey);
     }
@@ -749,7 +636,7 @@ class MessageManager {
       this.messageContainer.className = this.getContainerClasses();
     }
 
-    const sanitizedMessage = (message || '').replace(/^[❌⚠️ℹ️]\s*/, '');
+    const sanitizedMessage = (message || '').replace(/^[✅❌⚠️ℹ️]\s*/, '');
 
     const messageEl = document.createElement('div');
     messageEl.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${this.getTypeClasses(type)}`;
@@ -792,10 +679,10 @@ class MessageManager {
 
   getIcon(type) {
     const icons = {
-      success: '',
-      error: '',
-      warning: '️',
-      info: '️'
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
     };
     return icons[type] || icons.info;
   }
@@ -880,22 +767,22 @@ window.testSharedUtilities = function() {
   window.sharedUtilities.debounce.debounce(testDebounce, 'test', 100);
 
   setTimeout(() => {
-    console.log('Debounce test:', debounceCount === 1 ? ' PASS' : '❌ FAIL');
+    console.log('Debounce test:', debounceCount === 1 ? '✅ PASS' : '❌ FAIL');
   }, 150);
 
   // Test cache
   window.sharedUtilities.cache.set('test', 'value', 1000);
   const cached = window.sharedUtilities.cache.get('test');
-  console.log('Cache test:', cached === 'value' ? ' PASS' : '❌ FAIL');
+  console.log('Cache test:', cached === 'value' ? '✅ PASS' : '❌ FAIL');
 
   // Test DOM utilities
   const testEl = window.sharedUtilities.dom.createSafeElement('div', 'test-class', 'test');
-  console.log('DOM creation test:', testEl.className === 'test-class' ? ' PASS' : '❌ FAIL');
+  console.log('DOM creation test:', testEl.className === 'test-class' ? '✅ PASS' : '❌ FAIL');
 
   // Test error handling
   window.sharedUtilities.errors.logError(new Error('Test error'), 'Integration test');
   const errors = window.sharedUtilities.errors.getRecentErrors(1);
-  console.log('Error handling test:', errors.length > 0 ? ' PASS' : '❌ FAIL');
+  console.log('Error handling test:', errors.length > 0 ? '✅ PASS' : '❌ FAIL');
 
   console.groupEnd();
   return window.getSharedUtilitiesStats();
@@ -1133,7 +1020,7 @@ class UnifiedLoadingManager {
     if (this.overlay) {
       if (!window.unifiedLoadingInitialized) {
         window.unifiedLoadingInitialized = true;
-        console.log(' UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
+        console.log('✅ UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
       }
       this.initialized = true;
       if (onSuccess) onSuccess();
@@ -1142,7 +1029,7 @@ class UnifiedLoadingManager {
 
     // Enhanced retry logic with DOM mutation observation
     if (retries > 0) {
-      console.warn(`️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`);
+      console.warn(`⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`);
       
       // Try to observe DOM changes for the loading-overlay element
       if (retries === 5) { // Only set up observer on first try
@@ -1151,8 +1038,8 @@ class UnifiedLoadingManager {
       
       setTimeout(() => this.init(retries - 1, delay * 1.5, onSuccess), delay); // Exponential backoff
     } else {
-      console.error(' UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
-      console.error(' UnifiedLoadingManager: Current DOM structure check:');
+      console.error('❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
+      console.error('❌ UnifiedLoadingManager: Current DOM structure check:');
       console.error('  - Document ready state:', document.readyState);
       console.error('  - Body exists:', !!document.body);
       console.error('  - Available IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id).join(', '));
@@ -1172,7 +1059,7 @@ class UnifiedLoadingManager {
         if (mutation.type === 'childList') {
           for (const node of mutation.addedNodes) {
             if (node.nodeType === 1 && (node.id === 'loading-overlay' || node.querySelector('#loading-overlay'))) {
-              console.log(' UnifiedLoadingManager: loading-overlay detected via DOM observer');
+              console.log('✅ UnifiedLoadingManager: loading-overlay detected via DOM observer');
               observer.disconnect();
               setTimeout(() => this.init(1, 50, onSuccess), 10); // Quick retry
               return;
@@ -1195,7 +1082,7 @@ class UnifiedLoadingManager {
   createFallbackOverlay() {
     if (document.getElementById('loading-overlay')) return;
     
-    console.warn('️ UnifiedLoadingManager: Creating fallback loading-overlay element');
+    console.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
     const fallbackOverlay = document.createElement('div');
     fallbackOverlay.id = 'loading-overlay';
     fallbackOverlay.className = 'loading-overlay page-specific hidden';
@@ -1205,7 +1092,7 @@ class UnifiedLoadingManager {
       document.body.insertBefore(fallbackOverlay, document.body.firstChild);
       this.overlay = fallbackOverlay;
       this.initialized = true;
-      console.log(' UnifiedLoadingManager: Fallback overlay created and initialized');
+      console.log('✅ UnifiedLoadingManager: Fallback overlay created and initialized');
       return true;
     }
     
@@ -1400,7 +1287,7 @@ function initializeTimingManagerIntegration() {
       clearAllTiming: TimingManager.clearAllTiming
     };
 
-    console.log(' TimingManager integration enabled - Advanced timing features available');
+    console.log('🔄 TimingManager integration enabled - Advanced timing features available');
     return true;
   } else {
     return false;
@@ -1499,6 +1386,6 @@ if (!initializeTimingManagerIntegration()) {
 // Prevent duplicate loading messages
 if (!window.sharedUtilitiesLoaded) {
   window.sharedUtilitiesLoaded = true;
-  console.log(' SharedUtilities loaded successfully - Version 1.2.0 (with GAS warnings suppression)');
+  console.log('✅ SharedUtilities loaded successfully - Version 1.2.0 (with GAS warnings suppression)');
 }
 </script>

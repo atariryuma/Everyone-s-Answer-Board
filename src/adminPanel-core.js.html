@@ -15,19 +15,19 @@ function adminLog(level, ...args) {
   
   switch (level) {
     case 'error':
-      logError('[AdminPanel]', ...args);
+      console.error('[AdminPanel]', ...args);
       break;
     case 'warn':
-      logWarn('[AdminPanel]', ...args);
+      console.warn('[AdminPanel]', ...args);
       break;
     case 'info':
-      logDebug('[AdminPanel]', ...args);
+      console.log('[AdminPanel]', ...args);
       break;
     case 'debug':
-      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) logDebug('[AdminPanel:DEBUG]', ...args);
+      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) console.log('[AdminPanel:DEBUG]', ...args);
       break;
     default:
-      logDebug('[AdminPanel]', ...args);
+      console.log('[AdminPanel]', ...args);
   }
 }
 
@@ -135,7 +135,7 @@ window.AdminPanel.debounce = {
     
     const timer = setTimeout(() => {
       this.timers.delete(key);
-      logDebug(' Executing debounced loadStatus');
+      logDebug('🎯 Executing debounced loadStatus');
       func();
     }, delay);
     
@@ -279,7 +279,7 @@ window.AdminPanel.operationMutex = {
   // Start tracking an operation
   start: function(operationId) {
     if (this.activeOperations.has(operationId)) {
-      logWarn(`️ Operation ${operationId} already running`);
+      logWarn(`⚠️ Operation ${operationId} already running`);
       return false;
     }
     this.activeOperations.add(operationId);
@@ -320,16 +320,16 @@ let currentConfig = null;
 
 // Safe text content setter
 function safeSetText(elementId, text) {
-  logDebug(' safeSetText called:', { elementId, text, textType: typeof text });
+  console.log('🔧 safeSetText called:', { elementId, text, textType: typeof text });
   
   var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
-  logDebug(' safeSetText element found:', !!element);
+  console.log('🔧 safeSetText element found:', !!element);
   
   if (element) {
     setSafeTextContent(element, text || '');
-    logDebug(' safeSetText completed for:', elementId, 'with text:', text || '');
+    console.log('🔧 safeSetText completed for:', elementId, 'with text:', text || '');
   } else {
-    logWarn('️ safeSetText: Element not found:', elementId);
+    console.warn('⚠️ safeSetText: Element not found:', elementId);
   }
 }
 
