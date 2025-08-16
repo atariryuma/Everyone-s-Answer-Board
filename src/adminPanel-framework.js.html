@@ -1962,7 +1962,7 @@ window.HistoryManager = {
         <td class="px-3 py-2 text-xs text-white">${settingsDisplay}</td>
       `;
       
-      // 行クリック復元機能（確認モーダル付き）
+      // 行クリックリストア機能（確認モーダル付き）
       row.style.cursor = 'pointer';
       row.classList.add('hover:bg-gray-700', 'transition-colors');
       row.addEventListener('click', () => {
@@ -1990,10 +1990,10 @@ window.HistoryManager = {
       }
       
       if (typeof showMessage === 'function') {
-        showMessage('🔄 設定を復元中...', 'info');
+        showMessage('🔄 設定をリストア中...', 'info');
       }
       
-      // Perform restoration
+      // Perform restore
       this._restoreHistoryItemSimple(item);
       
     } catch (error) {
@@ -2018,8 +2018,8 @@ window.HistoryManager = {
         ? item.questionText.substring(0, 50) + '...'
         : (item.questionText || '未設定');
 
-      const title = '履歴復元の確認';
-      const message = `以下の設定を復元しますか？現在の設定が上書きされます。\n\n📝 問題文: ${truncatedQuestion}\n📊 シート名: ${item.sheetName || '未設定'}\n📅 作成日: ${formattedDate}`;
+      const title = '履歴リストアの確認';
+      const message = `以下の設定をリストアしますか？現在の設定が上書きされます。\n\n📝 問題文: ${truncatedQuestion}\n📊 シート名: ${item.sheetName || '未設定'}\n📅 作成日: ${formattedDate}`;
 
       // 3) 共有モーダルDOM（confirmation-modal）がある場合は、軽量リッチレイアウトで表示
       const modal = document.getElementById('confirmation-modal');
@@ -2057,7 +2057,7 @@ window.HistoryManager = {
             <div class='flex items-start gap-3'>
               <div class='w-6 h-6 rounded-md bg-gray-700/60 flex items-center justify-center text-sm'>📝</div>
               <div>
-                <div class='text-xs text-gray-400 mb-0.5'>復元する問題文</div>
+                <div class='text-xs text-gray-400 mb-0.5'>リストアする問題文</div>
                 <div class='text-sm text-gray-100'>${truncatedQuestion}</div>
               </div>
             </div>
@@ -2079,7 +2079,7 @@ window.HistoryManager = {
 
           <div class='flex justify-end gap-3'>
             <button type='button' id='restore-cancel-btn' class='btn btn-secondary'>キャンセル</button>
-            <button type='button' id='restore-confirm-btn' class='btn btn-primary'>復元する</button>
+            <button type='button' id='restore-confirm-btn' class='btn btn-primary'>リストアする</button>
           </div>
         `;
 
@@ -2120,12 +2120,15 @@ window.HistoryManager = {
    * Simple restore: 最小限の3ステップで復元
    */
   async _restoreHistoryItemSimple(item) {
+    // リストア前の状態をバックアップ
+    const rollbackData = this._createRollbackSnapshot();
+    
     try {
       if (typeof showMessage === 'function') {
-        showMessage('🔄 復元中...', 'info');
+        showMessage('🔄 リストア中...', 'info');
       }
 
-      console.log('🔍 Starting restoration for item:', {
+      console.log('🔍 Starting restore for item:', {
         spreadsheetId: item.spreadsheetId,
         sheetName: item.sheetName,
         createdDate: item.createdDate
@@ -2193,14 +2196,14 @@ window.HistoryManager = {
           throw switchError;
         }
       } else {
-        console.log('📋 Same spreadsheet restoration - no switch needed');
+        console.log('📋 Same spreadsheet restore - no switch needed');
       }
 
       const effectiveSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || item.spreadsheetId || null;
       
       // 同一スプレッドシート内復元の場合は簡素化処理
       if (isSameSpreadsheet) {
-        console.log('⚡ Fast-track restoration for same spreadsheet');
+        console.log('⚡ Fast-track restore for same spreadsheet');
         return await this._performSameSpreadsheetRestore(item, effectiveSpreadsheetId);
       }
 
@@ -2393,7 +2396,7 @@ window.HistoryManager = {
       const totalColumns = Object.keys(applied).length;
       
       if (typeof showMessage === 'function') {
-        const summary = `✅ 復元プレビューが完了しました (${appliedCount}/${totalColumns}列を適用) - 「公開」ボタンで設定を保存してください`;
+        const summary = `✅ リストアプレビューが完了しました (${appliedCount}/${totalColumns}列を適用) - 「公開」ボタンで設定を保存してください`;
         showMessage(summary, 'success');
       }
       console.log('✅ Simple restore completed:', {
@@ -2406,8 +2409,17 @@ window.HistoryManager = {
     } catch (error) {
       console.error('❌ Simple restore failed:', error);
       
+      // リストア失敗時のロールバック実行
+      try {
+        console.log('🔄 リストア失敗 - ロールバック実行中...');
+        await this._performRollback(rollbackData);
+        console.log('✅ ロールバック完了');
+      } catch (rollbackError) {
+        console.error('❌ ロールバック失敗:', rollbackError);
+      }
+      
       // エラーの種類に応じたメッセージ表示
-      let errorMessage = '復元に失敗しました';
+      let errorMessage = 'リストアに失敗しました';
       if (error.message && error.message.includes('スプレッドシートの切り替えに失敗')) {
         errorMessage = 'スプレッドシートの切り替えに失敗しました。権限を確認してください。';
       } else if (error.message && error.message.includes('シート情報の取得に失敗')) {
@@ -2417,7 +2429,7 @@ window.HistoryManager = {
       }
       
       if (typeof showMessage === 'function') {
-        showMessage('❌ ' + errorMessage, 'error');
+        showMessage('❌ ' + errorMessage + ' 元の状態にロールバックしました。', 'error');
       }
       
       // エラー詳細をログに記録
@@ -2441,7 +2453,7 @@ window.HistoryManager = {
    */
   async _performSameSpreadsheetRestore(item, spreadsheetId) {
     try {
-      console.log('🚀 Starting same-spreadsheet restoration');
+      console.log('🚀 Starting same-spreadsheet restore');
       
       // 1) シート選択の更新
       let targetSheetName = item.sheetName || '';
@@ -2531,7 +2543,7 @@ window.HistoryManager = {
       const appliedCount = Object.values(applied).filter(Boolean).length;
       const totalColumns = Object.keys(applied).length;
       
-      console.log('✅ Same-spreadsheet restoration completed:', {
+      console.log('✅ Same-spreadsheet restore completed:', {
         sheetName: targetSheetName,
         appliedColumns: applied,
         appliedCount,
@@ -2539,23 +2551,105 @@ window.HistoryManager = {
       });
       
       if (typeof showMessage === 'function') {
-        const summary = `✅ 復元プレビューが完了しました (${appliedCount}/${totalColumns}列を適用) - 「公開」ボタンで設定を保存してください`;
+        const summary = `✅ リストアプレビューが完了しました (${appliedCount}/${totalColumns}列を適用) - 「公開」ボタンで設定を保存してください`;
         showMessage(summary, 'success');
       }
       
       return true;
       
     } catch (error) {
-      console.error('❌ Same-spreadsheet restoration failed:', error);
+      console.error('❌ Same-spreadsheet restore failed:', error);
       if (typeof showMessage === 'function') {
-        showMessage('❌ 復元に失敗しました: ' + (error.message || error), 'error');
+        showMessage('❌ リストアに失敗しました: ' + (error.message || error), 'error');
       }
       return false;
     }
   },
 
   /**
-   * Show restoration progress to user
+   * リストア前の状態をスナップショットとして保存
+   */
+  _createRollbackSnapshot() {
+    try {
+      const snapshot = {
+        questionText: '',
+        sheetSelection: '',
+        columnSelections: {},
+        timestamp: new Date().toISOString()
+      };
+
+      // 質問文の保存
+      const questionInput = document.getElementById('question-text');
+      if (questionInput) {
+        snapshot.questionText = questionInput.value;
+      }
+
+      // シート選択の保存
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        snapshot.sheetSelection = sheetSelect.value;
+      }
+
+      // 列選択の保存
+      const columnSelectors = [
+        'opinion-column', 'name-column', 'class-column', 'reason-column'
+      ];
+      columnSelectors.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          snapshot.columnSelections[id] = element.value;
+        }
+      });
+
+      console.log('📸 ロールバック用スナップショット作成:', snapshot);
+      return snapshot;
+    } catch (error) {
+      console.warn('⚠️ ロールバックスナップショット作成失敗:', error);
+      return null;
+    }
+  },
+
+  /**
+   * ロールバック実行
+   */
+  async _performRollback(rollbackData) {
+    if (!rollbackData) {
+      console.warn('⚠️ ロールバックデータが無効です');
+      return;
+    }
+
+    try {
+      console.log('🔄 ロールバック実行開始:', rollbackData);
+
+      // 質問文をリストア
+      const questionInput = document.getElementById('question-text');
+      if (questionInput) {
+        questionInput.value = rollbackData.questionText || '';
+      }
+
+      // シート選択をリストア
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect && rollbackData.sheetSelection) {
+        sheetSelect.value = rollbackData.sheetSelection;
+      }
+
+      // 列選択をリストア
+      Object.keys(rollbackData.columnSelections).forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.value = rollbackData.columnSelections[id] || '';
+        }
+      });
+
+      console.log('✅ ロールバック実行完了');
+    } catch (error) {
+      console.error('❌ ロールバック実行エラー:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Show restore progress to user
    */
   _showRestorationProgress(message, stages) {
     if (typeof showMessage === 'function') {
@@ -2565,7 +2659,7 @@ window.HistoryManager = {
   },
 
   /**
-   * Update restoration progress
+   * Update restore progress
    */
   _updateRestorationProgress(message, stages, stageIndex, status = 'info') {
     if (typeof showMessage === 'function') {
@@ -2576,7 +2670,7 @@ window.HistoryManager = {
   },
 
   /**
-   * Show restoration warning
+   * Show restore warning
    */
   _showRestorationWarning(message, stages) {
     if (typeof showMessage === 'function') {
@@ -2586,7 +2680,7 @@ window.HistoryManager = {
   },
 
   /**
-   * Show restoration error
+   * Show restore error
    */
   _showRestorationError(message, stages, stageIndex) {
     if (typeof showMessage === 'function') {
@@ -2597,7 +2691,7 @@ window.HistoryManager = {
   },
 
   /**
-   * Show restoration success
+   * Show restore success
    */
   _showRestorationSuccess(message, stages) {
     if (typeof showMessage === 'function') {
@@ -2607,7 +2701,7 @@ window.HistoryManager = {
   },
 
   /**
-   * Hide restoration progress
+   * Hide restore progress
    */
   _hideRestorationProgress() {
     if (typeof hideMessage === 'function') {
@@ -2686,17 +2780,17 @@ window.HistoryManager = {
           throw new Error(`シートUI更新失敗: ${uiUpdateResult.error}`);
         }
         
-        console.log('✅ Sheet restoration completed');
+        console.log('✅ Sheet restore completed');
         return { success: true, sheetName: targetSheetName };
         
       } catch (error) {
         lastError = error;
-        console.warn(`⚠️ Sheet restoration attempt ${attempt} failed:`, error);
+        console.warn(`⚠️ Sheet restore attempt ${attempt} failed:`, error);
         
         // リトライ可能エラーの場合のみリトライ
         if (this._isRetryableError(error) && attempt < maxRetries) {
           const delay = attempt * 1500; // 1.5秒ずつ増加
-          console.log(`⏳ Retrying sheet restoration in ${delay}ms...`);
+          console.log(`⏳ Retrying sheet restore in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -2894,7 +2988,7 @@ window.HistoryManager = {
       
       // 並列で列選択を復元（タイムアウト制御）
       const columnRestorations = [];
-      const restorationPromises = [];
+      const restorePromises = [];
       
       const columnMappings = [
         { key: 'opinionColumn', elementId: 'opinionHeader', type: 'opinion' },
@@ -2913,17 +3007,17 @@ window.HistoryManager = {
               ...result
             }));
           
-          restorationPromises.push(promise);
+          restorePromises.push(promise);
         }
       });
       
       // すべての列復元を待機（部分的失敗も許容）
-      if (restorationPromises.length > 0) {
-        console.log(`🔄 Waiting for ${restorationPromises.length} column selections to restore...`);
+      if (restorePromises.length > 0) {
+        console.log(`🔄 Waiting for ${restorePromises.length} column selections to restore...`);
         
         try {
           // Promise.allSettledを使用して部分的失敗を許容
-          const settledResults = await Promise.allSettled(restorationPromises);
+          const settledResults = await Promise.allSettled(restorePromises);
           
           const results = settledResults.map((result, index) => {
             if (result.status === 'fulfilled') {
@@ -2941,11 +3035,11 @@ window.HistoryManager = {
           const successCount = results.filter(r => r.success).length;
           const failedResults = results.filter(r => !r.success);
           
-          console.log(`✅ Column restoration completed: ${successCount}/${results.length} successful`);
+          console.log(`✅ Column restore completed: ${successCount}/${results.length} successful`);
           
           // 失敗した列の詳細をログ出力
           if (failedResults.length > 0) {
-            console.warn('⚠️ Failed column restorations:', failedResults.map(r => 
+            console.warn('⚠️ Failed column restores:', failedResults.map(r => 
               `${r.type}: ${r.error || '不明なエラー'}`
             ).join(', '));
           }
@@ -2963,7 +3057,7 @@ window.HistoryManager = {
             failedColumns: failedResults
           };
         } catch (globalError) {
-          console.error('❌ Global column restoration error:', globalError);
+          console.error('❌ Global column restore error:', globalError);
           return { 
             success: false, 
             error: `列復元で致命的エラー: ${globalError.message}`,
@@ -3064,17 +3158,17 @@ window.HistoryManager = {
           // UI更新失敗は致命的ではないため継続
         }
         
-        console.log('✅ Settings restoration completed');
+        console.log('✅ Settings restore completed');
         return { success: true };
         
       } catch (error) {
         lastError = error;
-        console.warn(`⚠️ Settings restoration attempt ${attempt} failed:`, error);
+        console.warn(`⚠️ Settings restore attempt ${attempt} failed:`, error);
         
         // リトライ可能エラーの場合のみリトライ
         if (this._isRetryableError(error) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-          console.log(`⏳ Retrying settings restoration in ${delay}ms...`);
+          console.log(`⏳ Retrying settings restore in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -3186,7 +3280,7 @@ window.HistoryManager = {
    */
   async _validateRestoration(item) {
     try {
-      console.log('🔍 Running comprehensive restoration validation...');
+      console.log('🔍 Running comprehensive restore validation...');
       const warnings = [];
       const recommendations = [];
       let qualityScore = 0;
@@ -3483,7 +3577,7 @@ window.HistoryManager = {
       
       // シート名の検証
       if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
-        console.warn('⚠️ Invalid sheet name for restoration:', sheetName);
+        console.warn('⚠️ Invalid sheet name for restore:', sheetName);
         throw new Error('有効なシート名が指定されていません');
       }
       
@@ -3616,7 +3710,7 @@ window.HistoryManager = {
       if (sheetSelect) {
         // 履歴復元フラグを設定（重複処理チェック回避）
         window._historyRestoreInProgress = true;
-        // 重複リクエスト防止の無効化（復元中は必要なAPI呼び出しを許可）
+        // 重複リクエスト防止の無効化（リストア中は必要なAPI呼び出しを許可）
         window.FORCE_REQUEST_MODE = true;
         
         // シート選択を実行

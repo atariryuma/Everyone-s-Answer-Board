@@ -1029,9 +1029,9 @@ function handleSheetDetailsSuccess(details) {
     }
     
     if (details.guessedConfig) {
-      // 履歴復元中はAI列判定をスキップ
+      // 履歴リストア中はAI列判定をスキップ
       if (window._historyRestoreInProgress) {
-        console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
+        console.log('🛡️ 履歴リストア中のため、AI列判定をスキップしました');
       } else {
         // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
         setTimeout(() => {
@@ -2201,7 +2201,7 @@ function unpublishBoard() {
         questionText: questionText,
         setupType: getSetupType(),
 
-        // 復元用の最小データ（統一フィールド名：*Header形式）
+        // リストア用の最小データ（統一フィールド名：*Header形式）
         opinionHeader: (document.getElementById('opinion-column') && document.getElementById('opinion-column').value) || config.opinionHeader || '',
         nameHeader: (document.getElementById('name-column') && document.getElementById('name-column').value) || config.nameHeader || '名前',
         classHeader: (document.getElementById('class-column') && document.getElementById('class-column').value) || config.classHeader || '',
@@ -2211,7 +2211,7 @@ function unpublishBoard() {
         showNames: getShowNames(),
         showCounts: getShowCounts(),
 
-        // 復元用のシート情報（確実なIDを使用）
+        // リストア用のシート情報（確実なIDを使用）
         sheetName: publishResponse.activeSheetName || selectedSheet || '',
         spreadsheetId: actualSpreadsheetId,
 
@@ -4066,6 +4066,27 @@ async function startQuickStartPolling(quickstartBtn, quickstartText) {
         // UI更新
         updateUIAfterQuickStart(status, quickstartBtn, quickstartText);
         
+        // クイックスタート完了時の履歴保存
+        try {
+          if (status.systemStatus && status.systemStatus.appPublished) {
+            const config = status.systemStatus;
+            const userInfo = status.userInfo;
+            const createdDate = config.completedAt || new Date().toISOString();
+            
+            // 模擬的な公開レスポンス作成
+            const publishResponse = {
+              status: 'success',
+              message: 'クイックスタートで自動公開されました',
+              autoPublished: true
+            };
+            
+            await createSimpleHistoryEntry(publishResponse, config, userInfo, createdDate);
+            logDebug('✅ クイックスタート履歴保存完了');
+          }
+        } catch (historyError) {
+          logWarn('⚠️ クイックスタート履歴保存エラー:', historyError);
+        }
+        
         // プログレス非表示
         setTimeout(() => {
           hideQuickStartProgress();
@@ -4298,7 +4319,7 @@ async function handleCustomSetup(config) {
         if (shouldProtectExistingFlow) {
           console.log('🛡️ 既存フロー保護を適用:', existingFlowProtection.flowType);
           
-          // 既存設定の重要部分を復元
+          // 既存設定の重要部分をリストア
           config.appPublished = existingFlowProtection.preservePublished;
           if (existingFlowProtection.originalConfig.isQuickStart) {
             config.isQuickStart = existingFlowProtection.originalConfig.isQuickStart;
@@ -4317,7 +4338,7 @@ async function handleCustomSetup(config) {
             freshStatus._normalized.isPublished = config.appPublished;
           }
           
-          console.log('✅ 既存フロー設定を保護・復元しました');
+          console.log('✅ 既存フロー設定を保護・リストアしました');
           
         } else if (config.appPublished === true && isCustomSetupFlow) {
           console.log('⚠️ カスタムセットアップ後に自動公開が検出されました - 手動公開前提に修正');

@@ -96,6 +96,20 @@ describe('getInitialData header extraction', () => {
           },
         }),
       })),
+      findUserByIdFresh: jest.fn(() => ({
+        userId: 'U',
+        adminEmail: 'test@example.com',
+        spreadsheetId: '',
+        spreadsheetUrl: '',
+        configJson: JSON.stringify({
+          publishedSheetName: 'ClassA',
+          sheet_ClassA: {
+            opinionHeader: 'テーマ',
+            nameHeader: '氏名',
+            classHeader: 'クラス',
+          },
+        }),
+      })),
       getSheetsList: jest.fn(() => []),
       generateUserUrls: jest.fn(() => ({ webApp: 'web', adminUrl: 'admin', viewUrl: 'view' })),
       getResponsesData: jest.fn(() => ({ status: 'success', data: [] })),
@@ -125,6 +139,20 @@ describe('getInitialData header extraction', () => {
         getMetrics: jest.fn(() => ({})),
       },
       synchronizeCacheAfterCriticalUpdate: jest.fn(), // synchronizeCacheAfterCriticalUpdate のモック
+      fetchUserFromDatabase: jest.fn(() => ({
+        userId: 'U',
+        adminEmail: 'test@example.com',
+        spreadsheetId: '',
+        spreadsheetUrl: '',
+        configJson: JSON.stringify({
+          publishedSheetName: 'ClassA',
+          sheet_ClassA: {
+            opinionHeader: 'テーマ',
+            nameHeader: '氏名',
+            classHeader: 'クラス',
+          },
+        }),
+      })),
     });
   });
 

@@ -1970,7 +1970,7 @@ function handleSheetSelectionChange(event) {
   }
 
   // Prevent redundant calls if the selected sheet hasn't actually changed
-  // ただし、履歴復元中または復元後のリフレッシュ中は強制実行する
+  // ただし、履歴リストア中またはリストア後のリフレッシュ中は強制実行する
   if (newSelectedSheet === lastSelectedSheetName && 
       !window._historyRestoreInProgress && 
       !event._isRestoreRefresh) {
@@ -1978,7 +1978,7 @@ function handleSheetSelectionChange(event) {
     return;
   }
   
-  // 履歴復元中または復元後リフレッシュ中は強制処理ログを出力
+  // 履歴リストア中またはリストア後リフレッシュ中は強制処理ログを出力
   if (window._historyRestoreInProgress) {
     console.log('🔄 History restore in progress - forcing sheet selection processing for:', newSelectedSheet);
   }
@@ -2689,14 +2689,14 @@ function saveToHistory(historyItem) {
       countDisplay: historyItem.countDisplay || 'show',
       status: historyItem.status || 'published',
       
-      // AI列判定結果の保存（復元時に必要）
+      // AI列判定結果の保存（リストア時に必要）
       sheetDetails: {
         allHeaders: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [],
         guessedConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {},
         existingConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.existingConfig) || {}
       },
       
-      // 復元に必要な追加情報
+      // リストアに必要な追加情報
       activeSheetName: (currentStatus && currentStatus.activeSheetName) || historyItem.sheetName,
       spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
       
@@ -3250,7 +3250,7 @@ function showHistoryRestorationPreview(title, item, onConfirm, onCancel) {
     const detailsHtml = `
       <div class="space-y-4">
         <div class="bg-gray-800/50 rounded-lg p-3">
-          <h4 class="text-sm font-semibold text-cyan-400 mb-2">📋 復元される設定内容</h4>
+          <h4 class="text-sm font-semibold text-cyan-400 mb-2">📋 リストアされる設定内容</h4>
           <div class="text-xs text-gray-300 space-y-1">
             <div><span class="text-gray-400">質問:</span> ${truncated}</div>
             <div><span class="text-gray-400">公開日時:</span> ${published}</div>
@@ -3291,7 +3291,7 @@ function showHistoryRestorationPreview(title, item, onConfirm, onCancel) {
       });
     } else {
       // Fallback to basic confirmation
-      const basicMessage = `「${truncated}」の設定を復元します。\n\n公開日時: ${published}\n状態: ${status}\n\n現在の未保存の設定は上書きされます。`;
+      const basicMessage = `「${truncated}」の設定をリストアします。\n\n公開日時: ${published}\n状態: ${status}\n\n現在の未保存の設定は上書きされます。`;
       if (confirm(basicMessage)) {
         if (onConfirm) onConfirm();
       } else if (onCancel) {
@@ -3369,7 +3369,7 @@ function showDetailedHistoryModal(title, contentHtml, onConfirm, onCancel) {
   if (modal && titleElement && messageElement && confirmBtn && cancelBtn) {
     titleElement.textContent = title;
     messageElement.innerHTML = contentHtml;
-    confirmBtn.textContent = '復元する';
+    confirmBtn.textContent = 'リストアする';
     
     // Set up event handlers
     const handleConfirm = () => {
@@ -3396,7 +3396,7 @@ function showDetailedHistoryModal(title, contentHtml, onConfirm, onCancel) {
     modal.classList.remove('hidden');
   } else {
     console.warn('⚠️ Modal elements not found, using fallback');
-    if (confirm(`履歴設定「${title}」を復元しますか？`)) {
+    if (confirm(`履歴設定「${title}」をリストアしますか？`)) {
       if (onConfirm) onConfirm();
     } else if (onCancel) {
       onCancel();
@@ -3424,7 +3424,7 @@ function normalizeHistoryItem(rawItem) {
                    'デフォルト質問',
       setupType: rawItem.setupType || 'unknown',
       
-      // 最小限の復元データ
+      // 最小限のリストアデータ
       opinionHeader: rawItem.config?.opinionHeader || 
                     rawItem.configSnapshot?.opinionHeader || 
                     rawItem.questionText || '',
@@ -3435,7 +3435,7 @@ function normalizeHistoryItem(rawItem) {
                                       rawItem.config?.displayMode ||
                                       rawItem.configSnapshot?.displayMode),
       
-      // 復元用データ
+      // リストア用データ
       sheetName: rawItem.sheetName || '',
       spreadsheetId: rawItem.spreadsheetId || ''
     };
@@ -3495,18 +3495,18 @@ async function selectHistoryItem(historyId) {
       return;
     }
     
-    // シンプルな復元確認モーダル表示
+    // シンプルなリストア確認モーダル表示
     showHistoryRestorationPreview(
-      '履歴復元の確認',
+      '履歴リストアの確認',
       item,
-      // 確認後の復元実行
+      // 確認後のリストア実行
       async () => {
         console.log('✅ User confirmed simple history restoration');
         if (window.AdminPanel?.historyManager?.restoreFromSimpleHistory) {
           await window.AdminPanel.historyManager.restoreFromSimpleHistory(item);
         } else {
           console.error('❌ History manager not available for restoration');
-          showMessage('履歴復元機能が利用できません', 'error');
+          showMessage('履歴リストア機能が利用できません', 'error');
         }
       },
       // キャンセル時の処理
@@ -3522,14 +3522,14 @@ async function selectHistoryItem(historyId) {
 }
 
 /**
- * シンプル履歴からの復元実行
+ * シンプル履歴からのリストア実行
  * @param {Object} item - 正規化済み履歴アイテム
  */
 // restoreFromSimpleHistory moved to AdminPanel.historyManager
 
 // 古い複雑なrestoreConfigFromHistory関数は削除済み - restoreFromSimpleHistoryに統合
 
-// 古いrestoreAdditionalConfigSettings関数は削除済み - シンプル復元に統合
+// 古いrestoreAdditionalConfigSettings関数は削除済み - シンプルリストアに統合
 
 // createHistoryItemElement関数は削除 - テーブル形式のcreateHistoryTableRowを使用
 

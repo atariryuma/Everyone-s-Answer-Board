@@ -13,6 +13,33 @@
   </div>
 </div>
 
+<!-- リストア確認モーダル -->
+<div id="restore-confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="glass-panel rounded-xl p-6 max-w-lg w-full mx-4">
+    <h3 class="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+      </svg>
+      履歴リストアの確認
+    </h3>
+    
+    <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3 mb-4">
+      <p class="text-yellow-200 text-sm">
+        ⚠️ 以下の設定をリストアしますか？現在の設定が上書きされます。
+      </p>
+    </div>
+    
+    <div id="restore-preview-content" class="space-y-3 mb-6">
+      <!-- リストア内容がここに動的に挿入される -->
+    </div>
+    
+    <div class="flex justify-end gap-3">
+      <button type="button" id="restore-modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
+      <button type="button" id="restore-modal-confirm-btn" class="btn btn-primary">リストアする</button>
+    </div>
+  </div>
+</div>
+
 <!-- 公開モーダル -->
 <div id="publish-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
@@ -151,7 +178,7 @@
   </div>
 </div>
 
-<!-- 履歴復元確認モーダル -->
+<!-- 履歴リストア確認モーダル -->
 <div id="restore-confirm-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -163,7 +190,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-purple-400">設定を復元</h3>
+            <h3 class="text-xl font-bold text-purple-400">設定をリストア</h3>
           </div>
           <button type="button" id="restore-confirm-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500" aria-label="閉じる">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,10 +200,10 @@
         </div>
         
         <div class="space-y-6">
-          <!-- 復元内容の詳細 -->
+          <!-- リストア内容の詳細 -->
           <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
             <h4 class="text-lg font-medium text-purple-400 mb-3 flex items-center gap-2">
-              📋 復元する設定
+              📋 リストアする設定
             </h4>
             <div class="space-y-3 text-sm text-gray-300">
               <div class="flex items-center justify-between">
@@ -205,8 +232,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
               </svg>
               <div>
-                <h5 class="text-yellow-400 font-medium mb-1">復元の注意</h5>
-                <p class="text-yellow-200 text-sm">現在の設定は上書きされます。設定の復元後は、必要に応じて保存・公開を行ってください。</p>
+                <h5 class="text-yellow-400 font-medium mb-1">リストアの注意</h5>
+                <p class="text-yellow-200 text-sm">現在の設定は上書きされます。設定のリストア後は、必要に応じて保存・公開を行ってください。</p>
               </div>
             </div>
           </div>
@@ -215,7 +242,7 @@
       
       <div class="p-6 border-t border-gray-600/30 flex justify-end gap-3">
         <button type="button" id="restore-cancel-btn" class="btn btn-secondary">キャンセル</button>
-        <button type="button" id="restore-confirm-btn" class="btn btn-primary">復元する</button>
+        <button type="button" id="restore-confirm-btn" class="btn btn-primary">リストアする</button>
       </div>
     </div>
   </div>
@@ -1625,17 +1652,17 @@ class SharedModals {
     }
   }
 
-  // 履歴復元確認モーダルの表示
+  // 履歴リストア確認モーダルの表示
   showRestoreConfirmation(item, onConfirm, onCancel) {
     this.loadAdminModals();
     const modal = document.getElementById('restore-confirm-modal');
     if (!modal) {
-      console.error('復元確認モーダルが見つかりません');
+      console.error('リストア確認モーダルが見つかりません');
       if (onCancel) onCancel();
       return;
     }
 
-    // 復元データを表示用に整理
+    // リストアデータを表示用に整理
     const formatDate = (timestamp) => {
       if (!timestamp) return '-';
       try {
@@ -1673,13 +1700,13 @@ class SharedModals {
 
     // 新しいイベントハンドラーを作成
     const handleConfirm = () => {
-      console.log('✅ 復元が確認されました');
+      console.log('✅ リストアが確認されました');
       this.hideModal('restore-confirm-modal');
       if (onConfirm) onConfirm();
     };
 
     const handleCancel = () => {
-      console.log('❌ 復元がキャンセルされました');
+      console.log('❌ リストアがキャンセルされました');
       this.hideModal('restore-confirm-modal');
       if (onCancel) onCancel();
     };
