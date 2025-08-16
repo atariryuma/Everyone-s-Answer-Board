@@ -715,11 +715,344 @@
             fetchAdminPanelUrl();
         });
 
-        // 古いユーザー管理機能は appSetup-userManagement.js に移行済み
+        // ユーザー管理機能のJavaScript関数
+        let userManagementVisible = false;
+        let currentUserList = [];
+        let userToDelete = null;
+
+        // ユーザー管理の表示/非表示を切り替え
+        function toggleUserManagement() {
+            const container = document.getElementById('user-list-container');
+            const btn = document.getElementById('manage-users-btn');
+            
+            if (userManagementVisible) {
+                container.classList.add('hidden');
+                btn.textContent = '👥 ユーザー管理を開く';
+                userManagementVisible = false;
+            } else {
+                container.classList.remove('hidden');
+                btn.textContent = '👥 ユーザー管理を閉じる';
+                userManagementVisible = true;
+                loadUserList();
+            }
+        }
+
+        // ユーザー一覧を取得して表示
+        function loadUserList() {
+            const loadingDiv = document.getElementById('user-loading');
+            const contentDiv = document.getElementById('user-table-content');
+            
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        currentUserList = result.users;
+                        displayUserList(result.users);
+                    } else {
+                        showMessage(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
+                    }
+                    loadingDiv.classList.add('hidden');
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    loadingDiv.classList.add('hidden');
+                })
+                .getAllUsersForAdminForUI(__USER_ID__);
+        }
+
+        // ユーザー一覧をテーブルに表示
+        function displayUserList(users) {
+            const tableBody = document.getElementById('user-table-body');
+            const contentDiv = document.getElementById('user-table-content');
+            
+            if (users.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            登録ユーザーが見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = users.map(user => {
+                    const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
+                    const statusBadge = isActive 
+                        ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
+                        : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';
+                    
+                    const lastAccess = user.lastAccessedAt 
+                        ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP')
+                        : '不明';
+                    
+                    const registrationDate = user.registrationDate 
+                        ? new Date(user.registrationDate).toLocaleDateString('ja-JP')
+                        : '不明';
+                    
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-white">${user.adminEmail}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${registrationDate}</td>
+                            <td class="px-4 py-3">${statusBadge}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button 
+                                    data-user-id="${user.userId}"
+                                    data-user-email="${user.adminEmail}"
+                                    data-is-active="${isActive}"
+                                    onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail, this.dataset.isActive === 'true')"
+                                    class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
+                                    削除
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            contentDiv.classList.remove('hidden');
+        }
+
+        // 削除確認モーダルを表示
+        function showDeleteConfirmation(userId, userEmail, isActive) {
+            userToDelete = { userId, userEmail, isActive: !!isActive };
+            
+            document.getElementById('delete-user-email').textContent = userEmail;
+            document.getElementById('delete-user-id').textContent = `ID: ${userId}`;
+            document.getElementById('deletion-reason').value = '';
+
+            // 権限に応じてタブの表示制御
+            const isAdmin = currentUserInfo && currentUserInfo.isSystemAdmin === true;
+            const accessTabBtn = document.getElementById('tab-btn-access');
+            const accessTab = document.getElementById('tab-access');
+            const deleteTabBtn = document.getElementById('tab-btn-delete');
+            const deleteTab = document.getElementById('tab-delete');
+
+            if (isAdmin) {
+                accessTabBtn.classList.remove('hidden');
+                // 初期状態を反映
+                const toggle = document.getElementById('user-access-toggle');
+                const status = document.getElementById('user-access-status');
+                if (toggle) {
+                    toggle.disabled = false;
+                    toggle.checked = !!isActive;
+                }
+                if (status) {
+                    if (isActive) {
+                        status.textContent = '✅ 有効';
+                        status.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white';
+                    } else {
+                        status.textContent = '❌ 無効';
+                        status.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-red-600 text-white';
+                    }
+                }
+                // デフォルトタブ: アクセス制御
+                switchUserModalTab('access');
+            } else {
+                // 管理者以外はアクセス制御を隠す
+                accessTabBtn.classList.add('hidden');
+                accessTab.classList.add('hidden');
+                // デフォルトタブ: 削除
+                switchUserModalTab('delete');
+            }
+
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
+
+        // タブ切り替え
+        function switchUserModalTab(tab) {
+            const accessTabBtn = document.getElementById('tab-btn-access');
+            const deleteTabBtn = document.getElementById('tab-btn-delete');
+            const accessTab = document.getElementById('tab-access');
+            const deleteTab = document.getElementById('tab-delete');
+
+            if (tab === 'access') {
+                accessTab.classList.remove('hidden');
+                deleteTab.classList.add('hidden');
+                accessTabBtn.classList.replace('bg-gray-800', 'bg-gray-900');
+                accessTabBtn.classList.replace('text-gray-300', 'text-white');
+                deleteTabBtn.classList.replace('bg-gray-900', 'bg-gray-800');
+                deleteTabBtn.classList.replace('text-white', 'text-gray-300');
+            } else {
+                accessTab.classList.add('hidden');
+                deleteTab.classList.remove('hidden');
+                deleteTabBtn.classList.replace('bg-gray-800', 'bg-gray-900');
+                deleteTabBtn.classList.replace('text-gray-300', 'text-white');
+                accessTabBtn.classList.replace('bg-gray-900', 'bg-gray-800');
+                accessTabBtn.classList.replace('text-white', 'text-gray-300');
+            }
+        }
+
+        // アクセス制御のUIとAPI連携
+        (function setupAccessControlHandlers() {
+            const toggle = document.getElementById('user-access-toggle');
+            const saveBtn = document.getElementById('save-access-settings');
+            if (!toggle || !saveBtn) return;
+
+            // トグル変更で保存ボタンの状態を更新
+            toggle.addEventListener('change', function() {
+                if (!userToDelete) return;
+                const hasChanges = this.checked !== !!userToDelete.isActive;
+                saveBtn.disabled = !hasChanges;
+            });
+
+            // 保存ボタンクリックでサーバー更新
+            saveBtn.addEventListener('click', function() {
+                if (!userToDelete) return;
+                const newStatus = !!document.getElementById('user-access-toggle').checked;
+                const originalText = saveBtn.textContent;
+                saveBtn.disabled = true;
+                saveBtn.textContent = '保存中...';
+
+                google.script.run
+                    .withSuccessHandler((result) => {
+                        if (result && result.status === 'success') {
+                            showMessage(`✅ アクセス設定を${newStatus ? '有効' : '無効'}に変更しました`, 'success');
+                            userToDelete.isActive = newStatus;
+                            // ボタン状態を更新
+                            saveBtn.disabled = true;
+                            // ユーザー一覧を再読み込み
+                            loadUserList();
+                        } else {
+                            showMessage(`❌ 設定の保存に失敗しました: ${(result && result.message) || ''}`, 'error');
+                            saveBtn.disabled = false;
+                        }
+                        saveBtn.textContent = originalText;
+                    })
+                    .withFailureHandler((error) => {
+                        console.error('updateUserActiveStatusForUI error:', error);
+                        showMessage(`❌ 設定の保存に失敗しました: ${error.message || error}`, 'error');
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = originalText;
+                    })
+                    .updateUserActiveStatusForUI(userToDelete.userId, newStatus);
+            });
+        })();
+
+        // 削除をキャンセル
+        function cancelDeletion() {
+            userToDelete = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        // 削除を実行
+        function confirmDeletion() {
+            if (!userToDelete) return;
+            
+            const reason = document.getElementById('deletion-reason').value.trim();
+            if (!reason) {
+                showMessage('削除理由を入力してください', 'warning');
+                return;
+            }
+            
+            const confirmBtn = document.getElementById('confirm-delete-btn');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '削除中...';
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        showMessage(`✅ ${result.message}`, 'success');
+                        cancelDeletion();
+                        loadUserList(); // ユーザー一覧を再読み込み
+                    } else {
+                        showMessage(`❌ ${result.message}`, 'error');
+                    }
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '削除実行';
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '削除実行';
+                })
+                .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
+        }
+
+        // 削除ログを表示
+        function viewDeletionLogs() {
+            const modal = document.getElementById('logs-modal');
+            const loadingDiv = document.getElementById('logs-loading');
+            const contentDiv = document.getElementById('logs-table-content');
+            const modalTitle = modal.querySelector('h3');
+
+            // タイトルを削除ログ用に戻す
+            modalTitle.textContent = '📋 削除ログ';
+            
+            modal.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+            
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        displayDeletionLogs(result.logs);
+                    } else {
+                        showMessage(`ログの取得に失敗しました: ${result.message}`, 'error');
+                    }
+                    loadingDiv.classList.add('hidden');
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`エラー: ${error.message || error}`, 'error');
+                    loadingDiv.classList.add('hidden');
+                })
+                .getDeletionLogsForUI(__USER_ID__);
+        }
+
+        // 削除ログをテーブルに表示
+        function displayDeletionLogs(logs) {
+            const tableBody = document.getElementById('logs-table-body');
+            const contentDiv = document.getElementById('logs-table-content');
+
+            // テーブルヘッダーを削除ログ用に戻す
+            const tableHead = contentDiv.querySelector('thead tr');
+            tableHead.innerHTML = `
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">削除日時</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">実行者</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">対象ユーザー</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">削除理由</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">タイプ</th>
+            `;
+            
+            if (logs.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            削除ログが見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = logs.map(log => {
+                    const deleteDate = new Date(log.timestamp).toLocaleString('ja-JP');
+                    const typeColor = log.deleteType === 'admin' ? 'text-red-400' : 'text-blue-400';
+                    const typeText = log.deleteType === 'admin' ? '管理者削除' : '自己削除';
+                    
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-gray-300">${deleteDate}</td>
+                            <td class="px-4 py-3 text-sm text-white">${log.executorEmail}</td>
+                            <td class="px-4 py-3 text-sm text-cyan-400">${log.targetEmail}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${log.reason || '理由なし'}</td>
+                            <td class="px-4 py-3 text-sm ${typeColor}">${typeText}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            contentDiv.classList.remove('hidden');
+        }
+
+        // 削除ログモーダルを閉じる
+        function closeDeletionLogs() {
+            document.getElementById('logs-modal').classList.add('hidden');
+        }
 
         // システム診断・監視機能は appSetup-diagnostics.js に移行済み
 
         // デバッグモード機能は appSetup-debugMode.js に移行済み
+        // ユーザー管理機能は appSetup-userManagement.js に移行済み
 
         // ページ読み込み時の初期化
         window.addEventListener('DOMContentLoaded', function() {
