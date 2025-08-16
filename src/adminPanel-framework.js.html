@@ -2134,123 +2134,67 @@ window.HistoryManager = {
    * Generate HTML content for enhanced restore modal
    */
   _generateRestoreModalHTML(item, details) {
-    const { truncatedQuestion, formattedDate, hasSpreadsheetDifference, currentSpreadsheetId, targetSpreadsheetId } = details;
-    
-    // スプレッドシートIDをマスク表示用に変換
-    const maskSpreadsheetId = (id) => {
-      if (!id || id.length < 8) return id || '未設定';
-      return '...' + id.slice(-6);
-    };
-    
-    const spreadsheetDiffSection = hasSpreadsheetDifference ? `
-      <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 mb-4">
-        <h4 class="text-sm font-semibold text-yellow-400 mb-2 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h4a1 1 0 011 1v2h4a1 1 0 011 1v1a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1h4zM7 8v8a2 2 0 002 2h2a2 2 0 002-2V8M7 8H5a2 2 0 00-2 2v6a2 2 0 002 2h2M13 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2"></path>
-          </svg>
-          📁 スプレッドシート変更
-        </h4>
-        <div class="text-xs text-yellow-100 space-y-1">
-          <div><span class="text-yellow-200 font-medium">現在:</span> ${maskSpreadsheetId(currentSpreadsheetId)}</div>
-          <div><span class="text-yellow-200 font-medium">復元後:</span> ${maskSpreadsheetId(targetSpreadsheetId)}</div>
-        </div>
-      </div>
-    ` : '';
-    
-    // 差分プレビューの生成
-    const getCurrentBool = (id) => {
-      const el = document.getElementById(id);
-      return el ? !!el.checked : undefined;
-    };
-    const getCurrentVal = (id) => {
-      const el = document.getElementById(id);
-      return el ? (el.value || '') : '';
-    };
-    const currentSheet = window.selectedSheet || window.currentStatus?.activeSheetName || '';
-    const diffs = [];
-    if ((currentSheet || '') !== (item.sheetName || '')) {
-      diffs.push(`シート: <span class=\"text-red-300\">${currentSheet || '未設定'}</span> → <span class=\"text-green-300\">${item.sheetName || '未設定'}</span>`);
-    }
-    const curShowNames = getCurrentBool('show-names');
-    if (item.showNames !== undefined && curShowNames !== undefined && curShowNames !== item.showNames) {
-      diffs.push(`名前表示: <span class=\"text-red-300\">${curShowNames ? 'ON' : 'OFF'}</span> → <span class=\"text-green-300\">${item.showNames ? 'ON' : 'OFF'}</span>`);
-    }
-    const curShowCounts = getCurrentBool('show-counts');
-    if (item.showCounts !== undefined && curShowCounts !== undefined && curShowCounts !== item.showCounts) {
-      diffs.push(`カウント表示: <span class=\"text-red-300\">${curShowCounts ? '表示' : '非表示'}</span> → <span class=\"text-green-300\">${item.showCounts ? '表示' : '非表示'}</span>`);
-    }
-    const curOpinion = getCurrentVal('opinion-column') || getCurrentVal('opinionHeader');
-    if (item.opinionColumn && curOpinion !== item.opinionColumn) {
-      diffs.push(`回答列: <span class=\"text-red-300\">${curOpinion || '未設定'}</span> → <span class=\"text-green-300\">${item.opinionColumn}</span>`);
-    }
-    const curName = getCurrentVal('name-column');
-    if (item.nameColumn && curName !== item.nameColumn) {
-      diffs.push(`名前列: <span class=\"text-red-300\">${curName || '未設定'}</span> → <span class=\"text-green-300\">${item.nameColumn}</span>`);
-    }
-    const curClass = getCurrentVal('class-column');
-    if (item.classColumn && curClass !== item.classColumn) {
-      diffs.push(`クラス列: <span class=\"text-red-300\">${curClass || '未設定'}</span> → <span class=\"text-green-300\">${item.classColumn}</span>`);
-    }
-    const curReason = getCurrentVal('reason-column');
-    if (item.reasonColumn && curReason !== item.reasonColumn) {
-      diffs.push(`理由列: <span class=\"text-red-300\">${curReason || '未設定'}</span> → <span class=\"text-green-300\">${item.reasonColumn}</span>`);
-    }
-    const diffsHtml = diffs.length > 0 ? `<ul class=\"list-disc list-inside text-xs space-y-1\">${diffs.map(x => `<li>${x}</li>`).join('')}</ul>` : '<div class=\"text-xs text-gray-300\">差分はありません</div>';
+    const { truncatedQuestion, formattedDate } = details;
 
     return `
-      <h3 class="text-xl font-bold text-orange-400 mb-4 flex items-center gap-2">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        📋 履歴復元の確認
-      </h3>
-      <p class="text-gray-300 mb-4">
-        以下の設定を復元しますか？現在の設定が上書きされます。
-      </p>
-      
-      <!-- 復元予定の設定情報 -->
-      <div class="bg-orange-500/10 border border-orange-400/30 rounded-lg p-4 mb-4">
-        <h4 class="text-sm font-semibold text-orange-400 mb-3 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+      <div class="text-center mb-6">
+        <div class="mx-auto w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
+          <svg class="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
           </svg>
-          📝 復元予定の設定
-        </h4>
-        <div class="space-y-2 text-xs text-orange-100">
-          <div><span class="text-orange-200 font-medium">問題文:</span> ${truncatedQuestion}</div>
-          <div><span class="text-orange-200 font-medium">シート名:</span> ${item.sheetName || '未設定'}</div>
-          <div><span class="text-orange-200 font-medium">作成日:</span> ${formattedDate}</div>
         </div>
-      </div>
-      
-      ${spreadsheetDiffSection}
-
-      <div class="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-4 mb-4">
-        <h4 class="text-sm font-semibold text-indigo-300 mb-2">🔎 差分プレビュー</h4>
-        ${diffsHtml}
-      </div>
-      
-      <!-- 警告メッセージ -->
-      <div class="bg-red-500/10 border border-red-400/30 rounded-lg p-3 mb-6">
-        <p class="text-xs text-red-200 flex items-center gap-2">
-          <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-          </svg>
-          この操作により現在の未保存の設定内容が変更されます。
+        <h3 class="text-xl font-bold text-white mb-2">設定を復元しますか？</h3>
+        <p class="text-gray-300 text-sm">
+          以前の設定に戻します。現在の設定は上書きされます。
         </p>
       </div>
       
-      <div class="bg-green-500/10 border border-green-400/30 rounded-lg p-3 mb-4">
-        <label class="flex items-center gap-2 text-sm text-green-200">
-          <input id="restore-auto-publish" type="checkbox" class="w-4 h-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-green-500">
-          復元後に自動で公開まで行う
+      <!-- 復元内容の表示 -->
+      <div class="bg-gray-800/50 border border-gray-600 rounded-lg p-4 mb-6">
+        <div class="space-y-3">
+          <div class="flex items-start gap-3">
+            <div class="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
+            <div>
+              <div class="text-sm font-medium text-white mb-1">復元する問題文</div>
+              <div class="text-sm text-gray-300">${truncatedQuestion}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-2 h-2 bg-orange-400 rounded-full flex-shrink-0"></div>
+            <div>
+              <div class="text-sm font-medium text-white">作成日時</div>
+              <div class="text-sm text-gray-300">${formattedDate}</div>
+            </div>
+          </div>
+          ${item.sheetName ? `
+          <div class="flex items-center gap-3">
+            <div class="w-2 h-2 bg-orange-400 rounded-full flex-shrink-0"></div>
+            <div>
+              <div class="text-sm font-medium text-white">対象シート</div>
+              <div class="text-sm text-gray-300">${item.sheetName}</div>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+      
+      <!-- 自動公開オプション -->
+      <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4 mb-6">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input id="restore-auto-publish" type="checkbox" class="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500">
+          <div>
+            <div class="text-sm font-medium text-blue-200">復元後に自動で公開する</div>
+            <div class="text-xs text-blue-300">設定復元と同時に回答ボードを公開します</div>
+          </div>
         </label>
       </div>
 
-      <div class="flex justify-end gap-3">
-        <button type="button" id="restore-cancel-btn" class="btn btn-secondary">キャンセル</button>
-        <button type="button" id="restore-confirm-btn" class="btn btn-primary">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="flex gap-3">
+        <button type="button" id="restore-cancel-btn" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors">
+          キャンセル
+        </button>
+        <button type="button" id="restore-confirm-btn" class="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
           </svg>
           復元する
@@ -2313,11 +2257,19 @@ window.HistoryManager = {
   },
   
   /**
-   * Restore configuration from history item
+   * Restore configuration from history item with staged process
    */
   async _restoreHistoryItem(item, options = {}) {
+    const stages = [
+      { name: 'プリフライト', status: 'pending', description: '復元可能性チェック' },
+      { name: 'シート復元', status: 'pending', description: 'スプレッドシートとシートの切り替え' },
+      { name: '列マッチング', status: 'pending', description: '列の自動検出と設定' },
+      { name: '設定復元', status: 'pending', description: '設定の保存と同期' },
+      { name: '検証', status: 'pending', description: '復元結果の確認' }
+    ];
+
     try {
-      console.log('🔄 Restoring history:', item.questionText);
+      console.log('🔄 Starting staged restore process:', item.questionText);
       console.log('📊 History item details:', {
         id: item.id,
         questionText: item.questionText,
@@ -2326,72 +2278,359 @@ window.HistoryManager = {
         opinionHeader: item.opinionHeader,
         nameHeader: item.nameHeader
       });
+
+      // 復元開始の通知
+      this._showRestorationProgress('復元を開始しています...', stages);
+
+      // Stage 1: プリフライトチェック
+      console.log('🛫 Stage 1: プリフライトチェック');
+      stages[0].status = 'running';
+      this._updateRestorationProgress('復元可能性をチェック中...', stages, 0);
+      
+      const preflightResult = await this._preflightCheck(item);
+      if (!preflightResult.success) {
+        stages[0].status = 'error';
+        const userFriendlyError = this._getUserFriendlyErrorMessage(preflightResult.error, preflightResult.category);
+        this._showRestorationError(userFriendlyError, stages, 0);
+        throw new Error(`プリフライトチェック失敗: ${preflightResult.error}`);
+      }
+      stages[0].status = 'success';
+      this._updateRestorationProgress('復元可能性チェック完了', stages, 0);
+      
+      // プリフライト警告の表示
+      if (preflightResult.warnings) {
+        this._showRestorationWarning(preflightResult.warnings.join('\n'), stages);
+      }
       
       // AI列判定による上書きを防止するフラグを設定
       window._historyRestoreInProgress = true;
+      window.FORCE_REQUEST_MODE = true;
       console.log('🛡️ AI列判定スキップフラグを設定しました');
+
+      // Stage 2: シート復元
+      console.log('📊 Stage 2: シート復元');
+      stages[1].status = 'running';
+      this._updateRestorationProgress('スプレッドシートを切り替え中...', stages, 1);
       
-      // 1. テキスト設定復元
-      if (item.opinionHeader) {
-        const opinionInput = document.getElementById('opinion-header');
-        if (opinionInput) opinionInput.value = item.opinionHeader;
+      const sheetResult = await this._restoreSheet(item, preflightResult);
+      if (!sheetResult.success) {
+        stages[1].status = 'error';
+        const userFriendlyError = this._getUserFriendlyErrorMessage(sheetResult.error, sheetResult.category);
+        this._showRestorationError(userFriendlyError, stages, 1);
+        throw new Error(`シート復元失敗: ${sheetResult.error}`);
       }
+      stages[1].status = 'success';
+      this._updateRestorationProgress('スプレッドシート切り替え完了', stages, 1);
+
+      // Stage 3: 列マッチング
+      console.log('🔍 Stage 3: 列マッチング');
+      stages[2].status = 'running';
+      this._updateRestorationProgress('列を自動検出中...', stages, 2);
       
-      if (item.nameHeader) {
-        const nameInput = document.getElementById('name-header');
-        if (nameInput) nameInput.value = item.nameHeader;
-      }
-      
-      // 2. 表示モード設定復元（列選択の前に実行）
-      if (item.showNames !== undefined) {
-        const showNamesCheckbox = document.getElementById('show-names');
-        if (showNamesCheckbox) {
-          showNamesCheckbox.checked = item.showNames;
-        }
-      }
-      
-      // showCountsの復元
-      const showCountsCheckbox = document.getElementById('show-counts');
-      if (showCountsCheckbox) {
-        showCountsCheckbox.checked = (item.showCounts === true);
-      }
-      
-      // 3. 完全プロジェクト復元（スプレッドシート + シート）
-      console.log('🔍 Restore conditions check:', {
-        hasSpreadsheetId: !!item.spreadsheetId,
-        hasSheetName: !!item.sheetName,
-        spreadsheetId: item.spreadsheetId,
-        sheetName: item.sheetName
-      });
-      
-      if (item.spreadsheetId && item.sheetName) {
-        console.log('✅ Full project restore path selected');
-        await this._restoreFullProject(item.spreadsheetId, item.sheetName);
-      } else if (item.sheetName) {
-        console.log('✅ Sheet-only restore path selected');
-        // シートのみ復元（下位互換性）
-        await this._restoreSheetSelection(item.sheetName);
+      const columnResult = await this._matchColumns(item);
+      if (!columnResult.success) {
+        stages[2].status = 'warning';
+        console.warn(`⚠️ 列マッチング失敗: ${columnResult.error}`);
+        this._updateRestorationProgress('列の一部を手動で確認してください', stages, 2, 'warning');
+        // 列マッチング失敗は致命的ではない
       } else {
-        console.warn('⚠️ No valid restoration path found - missing sheet or spreadsheet info');
-        console.warn('🔧 Attempting fallback: trying to find sheet by question text');
+        stages[2].status = 'success';
+        const successMsg = columnResult.partialFailure 
+          ? `列マッチング完了 (${columnResult.successCount}/${columnResult.totalCount}列)`
+          : '列マッチング完了';
+        this._updateRestorationProgress(successMsg, stages, 2);
         
-        // フォールバック: 問題文からシート名を推測
-        const fallbackSheetName = await this._findSheetByQuestionText(item.questionText);
-        if (fallbackSheetName) {
-          console.log(`✅ Fallback found sheet: ${fallbackSheetName}`);
-          await this._restoreSheetSelection(fallbackSheetName);
-        } else {
-          console.error('❌ Fallback failed: unable to determine correct sheet');
+        if (columnResult.partialFailure) {
+          this._showRestorationWarning('一部の列が自動復元できませんでした。手動で確認してください。', stages);
+        }
+      }
+
+      // Stage 4: 設定復元
+      console.log('⚙️ Stage 4: 設定復元');
+      stages[3].status = 'running';
+      this._updateRestorationProgress('設定を保存中...', stages, 3);
+      
+      const configResult = await this._restoreSettings(item, columnResult);
+      if (!configResult.success) {
+        stages[3].status = 'error';
+        const userFriendlyError = this._getUserFriendlyErrorMessage(configResult.error, configResult.category);
+        this._showRestorationError(userFriendlyError, stages, 3);
+        console.warn(`⚠️ 設定復元失敗: ${configResult.error}`);
+        // 部分的失敗でも継続
+      } else {
+        stages[3].status = 'success';
+        this._updateRestorationProgress('設定保存完了', stages, 3);
+      }
+
+      // Stage 5: 検証
+      console.log('🔍 Stage 5: 検証');
+      stages[4].status = 'running';
+      this._updateRestorationProgress('復元結果を確認中...', stages, 4);
+      
+      const validationResult = await this._validateRestoration(item);
+      if (!validationResult.success) {
+        stages[4].status = 'warning';
+        console.warn(`⚠️ 検証警告: ${validationResult.warnings?.join(', ')}`);
+        this._updateRestorationProgress('復元結果に注意点があります', stages, 4, 'warning');
+        if (validationResult.warnings) {
+          this._showRestorationWarning(validationResult.warnings.join('\n'), stages);
+        }
+      } else {
+        stages[4].status = 'success';
+        this._updateRestorationProgress('復元結果確認完了', stages, 4);
+      }
+
+      // オプション: 復元後に自動で公開
+      if (options.autoPublish && typeof saveAndPublish === 'function') {
+        try {
+          console.log('📤 復元後自動公開...');
+          this._updateRestorationProgress('自動公開中...', stages, -1);
+          saveAndPublish();
+        } catch (pubError) {
+          console.warn('⚠️ 自動公開失敗:', pubError);
+          this._showRestorationWarning('自動公開に失敗しました。手動で公開してください。', stages);
         }
       }
       
-      // 4. 列選択の復元（プロジェクト復元完了後に実行）
-      console.log('🔄 Restoring column selections from history');
+      // 成功メッセージ
+      this._showRestorationSuccess('✅ 履歴から設定を復元しました', stages);
+      console.log('✅ 段階的復元が完了しました');
       
-      // 列選択肢が読み込まれるまで待機する関数
-      const waitForColumnOptions = async (selectId, targetValue, maxWait = 3000) => {
+    } catch (error) {
+      console.error('❌ 段階的復元失敗:', error);
+      this._showRestorationError('設定復元に失敗しました', stages, -1);
+    } finally {
+      // AI列判定スキップフラグをクリア
+      if (window._historyRestoreInProgress) {
+        window._historyRestoreInProgress = false;
+        console.log('🛡️ AI列判定スキップフラグをクリアしました');
+      }
+      
+      // プログレス表示を隠す（少し遅延）
+      setTimeout(() => {
+        this._hideRestorationProgress();
+      }, 3000);
+    }
+  },
+
+  /**
+   * Show restoration progress to user
+   */
+  _showRestorationProgress(message, stages) {
+    if (typeof showMessage === 'function') {
+      showMessage(`🔄 ${message}`, 'info', 0); // 0 = 自動消去しない
+    }
+    console.log(`📊 Restoration Progress: ${message}`);
+  },
+
+  /**
+   * Update restoration progress
+   */
+  _updateRestorationProgress(message, stages, stageIndex, status = 'info') {
+    if (typeof showMessage === 'function') {
+      const stageInfo = stageIndex >= 0 ? `[${stageIndex + 1}/5] ` : '';
+      showMessage(`🔄 ${stageInfo}${message}`, status, 0);
+    }
+    console.log(`📊 Stage ${stageIndex + 1}: ${message}`);
+  },
+
+  /**
+   * Show restoration warning
+   */
+  _showRestorationWarning(message, stages) {
+    if (typeof showMessage === 'function') {
+      showMessage(`⚠️ ${message}`, 'warning', 8000);
+    }
+    console.warn(`⚠️ Restoration Warning: ${message}`);
+  },
+
+  /**
+   * Show restoration error
+   */
+  _showRestorationError(message, stages, stageIndex) {
+    if (typeof showMessage === 'function') {
+      const stageInfo = stageIndex >= 0 ? `[ステージ${stageIndex + 1}] ` : '';
+      showMessage(`❌ ${stageInfo}${message}`, 'error', 10000);
+    }
+    console.error(`❌ Restoration Error at stage ${stageIndex}: ${message}`);
+  },
+
+  /**
+   * Show restoration success
+   */
+  _showRestorationSuccess(message, stages) {
+    if (typeof showMessage === 'function') {
+      showMessage(message, 'success', 5000);
+    }
+    console.log(`✅ Restoration Success: ${message}`);
+  },
+
+  /**
+   * Hide restoration progress
+   */
+  _hideRestorationProgress() {
+    if (typeof hideMessage === 'function') {
+      hideMessage();
+    }
+  },
+
+  /**
+   * Get user-friendly error message based on error category
+   */
+  _getUserFriendlyErrorMessage(error, category) {
+    const baseError = error || '不明なエラーが発生しました';
+    
+    switch (category) {
+      case 'network':
+        return `ネットワーク接続に問題があります。インターネット接続を確認してから再試行してください。\n詳細: ${baseError}`;
+      
+      case 'timeout':
+        return `処理に時間がかかりすぎました。サーバーが混雑している可能性があります。少し待ってから再試行してください。\n詳細: ${baseError}`;
+      
+      case 'permission':
+        return `権限が不足しています。スプレッドシートの編集権限があることを確認してください。\n詳細: ${baseError}`;
+      
+      case 'quota':
+        return `Google APIの利用制限に達しました。しばらく待ってから再試行してください。\n詳細: ${baseError}`;
+      
+      case 'data':
+        return `復元しようとしたデータが見つかりません。スプレッドシートやシートが削除されていないか確認してください。\n詳細: ${baseError}`;
+      
+      case 'validation':
+        return `復元データに問題があります。履歴データが破損している可能性があります。\n詳細: ${baseError}`;
+      
+      case 'system':
+        return `システムエラーが発生しました。ページを再読み込みしてから再試行してください。\n詳細: ${baseError}`;
+      
+      default:
+        return `予期しないエラーが発生しました。\n詳細: ${baseError}`;
+    }
+  },
+
+  /**
+   * Stage 2: シート復元
+   */
+  async _restoreSheet(item, preflightResult) {
+    const maxRetries = 2;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📊 Restoring sheet and project (attempt ${attempt}/${maxRetries})...`);
+        
+        // スプレッドシート切り替えが必要かチェック
+        const currentSpreadsheetId = window.AdminPanel?.currentStatus?.userInfo?.configJson?.spreadsheetId;
+        if (item.spreadsheetId !== currentSpreadsheetId) {
+          console.log('🔄 Switching to target spreadsheet...');
+          
+          // スプレッドシート切り替えにもリトライを適用
+          const switchResult = await this._performSpreadsheetSwitchWithRetry(item.spreadsheetId, 2);
+          if (!switchResult.success) {
+            throw new Error(`スプレッドシート切り替え失敗: ${switchResult.error}`);
+          }
+        }
+        
+        // シート選択を復元
+        let targetSheetName = item.sheetName;
+        
+        // 代替シートがある場合は最初の候補を使用
+        if (preflightResult.alternatives && preflightResult.alternatives.length > 0) {
+          targetSheetName = preflightResult.alternatives[0];
+          console.log(`📊 Using alternative sheet: ${targetSheetName}`);
+        }
+        
+        // シート選択UIを更新（リトライ付き）
+        const uiUpdateResult = await this._restoreSheetSelectionWithRetry(targetSheetName, 2);
+        if (!uiUpdateResult.success) {
+          throw new Error(`シートUI更新失敗: ${uiUpdateResult.error}`);
+        }
+        
+        console.log('✅ Sheet restoration completed');
+        return { success: true, sheetName: targetSheetName };
+        
+      } catch (error) {
+        lastError = error;
+        console.warn(`⚠️ Sheet restoration attempt ${attempt} failed:`, error);
+        
+        // リトライ可能エラーの場合のみリトライ
+        if (this._isRetryableError(error) && attempt < maxRetries) {
+          const delay = attempt * 1500; // 1.5秒ずつ増加
+          console.log(`⏳ Retrying sheet restoration in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        break;
+      }
+    }
+    
+    return { 
+      success: false, 
+      error: `シート復元失敗 (${maxRetries}回試行): ${lastError?.message || '不明なエラー'}`,
+      category: this._categorizeError(lastError)
+    };
+  },
+
+  /**
+   * Enhanced spreadsheet switch with retry
+   */
+  async _performSpreadsheetSwitchWithRetry(targetSpreadsheetId, maxRetries = 2) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this._performSpreadsheetSwitch(targetSpreadsheetId);
+        return { success: true };
+      } catch (error) {
+        if (attempt === maxRetries) {
+          return { success: false, error: error.message };
+        }
+        console.warn(`⚠️ Spreadsheet switch attempt ${attempt} failed:`, error);
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      }
+    }
+    
+    return { success: false, error: 'スプレッドシート切り替えに失敗しました' };
+  },
+
+  /**
+   * Enhanced sheet selection UI update with retry
+   */
+  async _restoreSheetSelectionWithRetry(sheetName, maxRetries = 2) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this._restoreSheetSelection(sheetName);
+        
+        // UI更新の検証
+        const sheetSelect = document.getElementById('sheet-select');
+        if (sheetSelect && sheetSelect.value === sheetName) {
+          return { success: true };
+        } else if (attempt === maxRetries) {
+          return { success: false, error: 'シート選択UIの更新を検証できませんでした' };
+        }
+        
+      } catch (error) {
+        if (attempt === maxRetries) {
+          return { success: false, error: error.message };
+        }
+        console.warn(`⚠️ Sheet selection UI update attempt ${attempt} failed:`, error);
+        await new Promise(resolve => setTimeout(resolve, attempt * 800));
+      }
+    }
+    
+    return { success: false, error: 'シート選択UIの更新に失敗しました' };
+  },
+
+  /**
+   * Stage 3: 列マッチング
+   */
+  async _matchColumns(item) {
+    try {
+      console.log('🔍 Matching and restoring columns...');
+      
+      // 列選択肢が読み込まれるまで待機する関数（改良版）
+      const waitForColumnOptions = async (selectId, targetValue, maxWait = 5000) => {
         const startTime = Date.now();
-        const checkInterval = 200;
+        const checkInterval = 300;
+        let lastOptionsCount = 0;
         
         return new Promise((resolve) => {
           const checkOptions = () => {
@@ -2400,10 +2639,9 @@ window.HistoryManager = {
               const elapsed = Date.now() - startTime;
               if (elapsed >= maxWait) {
                 console.warn(`⚠️ Select element ${selectId} not found after ${elapsed}ms timeout`);
-                resolve(false);
+                resolve({ success: false, error: `要素 ${selectId} が見つかりません` });
                 return;
               }
-              // 要素が見つからない場合は少し待ってから再試行
               setTimeout(checkOptions, checkInterval);
               return;
             }
@@ -2411,34 +2649,51 @@ window.HistoryManager = {
             // 選択肢の中に目標値があるかチェック
             const options = Array.from(select.options);
             
+            // オプションが読み込み中の可能性をチェック
+            if (options.length !== lastOptionsCount) {
+              lastOptionsCount = options.length;
+              console.log(`📊 ${selectId} options updated: ${options.length} available`);
+            }
+            
             // 完全一致チェック
             let targetOption = options.find(option => option.value === targetValue);
+            let matchType = 'exact';
             
             // 完全一致がない場合、部分一致チェック
-            if (!targetOption && targetValue) {
+            if (!targetOption && targetValue && targetValue.trim() !== '') {
               const normalizedTarget = targetValue.replace(/[（）()]/g, '').trim();
-              targetOption = options.find(option => {
-                const normalizedOption = option.value.replace(/[（）()]/g, '').trim();
-                return normalizedOption.includes(normalizedTarget) || normalizedTarget.includes(normalizedOption);
-              });
-              
-              if (targetOption) {
-                console.log(`✅ Column option found via partial match for ${selectId}: ${targetValue} → ${targetOption.value}`);
+              if (normalizedTarget.length >= 3) {
+                targetOption = options.find(option => {
+                  const normalizedOption = option.value.replace(/[（）()]/g, '').trim();
+                  return normalizedOption.length > 0 && 
+                         (normalizedOption.includes(normalizedTarget) || normalizedTarget.includes(normalizedOption));
+                });
+                
+                if (targetOption) {
+                  matchType = 'partial';
+                  console.log(`✅ Column option found via partial match for ${selectId}: ${targetValue} → ${targetOption.value}`);
+                }
               }
             }
             
             if (targetOption) {
               const finalValue = targetOption.value;
-              console.log(`✅ Column option found for ${selectId}: ${finalValue}`);
-              select.value = finalValue;
+              console.log(`✅ Column option found for ${selectId}: ${finalValue} (${matchType} match)`);
               
-              // 値が正しく設定されたかダブルチェック
-              if (select.value === finalValue) {
-                console.log(`✅ ${selectId} value successfully set to: ${finalValue}`);
-                resolve(true);
-              } else {
-                console.warn(`⚠️ ${selectId} value setting failed. Expected: ${finalValue}, Actual: ${select.value}`);
-                resolve(false);
+              try {
+                select.value = finalValue;
+                
+                // 値が正しく設定されたかダブルチェック
+                if (select.value === finalValue) {
+                  console.log(`✅ ${selectId} value successfully set to: ${finalValue}`);
+                  resolve({ success: true, value: finalValue, matchType });
+                } else {
+                  console.warn(`⚠️ ${selectId} value setting failed. Expected: ${finalValue}, Actual: ${select.value}`);
+                  resolve({ success: false, error: '値の設定に失敗', attempted: finalValue });
+                }
+              } catch (setError) {
+                console.warn(`⚠️ Error setting ${selectId} value:`, setError);
+                resolve({ success: false, error: setError.message, attempted: finalValue });
               }
               return;
             }
@@ -2447,13 +2702,26 @@ window.HistoryManager = {
             const elapsed = Date.now() - startTime;
             if (elapsed >= maxWait) {
               console.warn(`⚠️ Timeout waiting for column option ${selectId}:${targetValue} (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
-              // タイムアウト時でも値の設定は試行
-              select.value = targetValue;
-              resolve(false);
+              
+              // 最後の試行として直接値を設定
+              try {
+                select.value = targetValue;
+                resolve({ 
+                  success: false, 
+                  error: 'タイムアウト（最後の試行済み）', 
+                  attempted: targetValue,
+                  availableOptions: options.slice(0, 5).map(o => o.value) // 最初の5つまで
+                });
+              } catch (finalError) {
+                resolve({ 
+                  success: false, 
+                  error: `タイムアウトおよび直接設定失敗: ${finalError.message}`,
+                  attempted: targetValue 
+                });
+              }
               return;
             }
             
-            // 再チェック
             setTimeout(checkOptions, checkInterval);
           };
           
@@ -2461,111 +2729,546 @@ window.HistoryManager = {
         });
       };
       
-      // 並列で列選択を復元
+      // 並列で列選択を復元（タイムアウト制御）
       const columnRestorations = [];
+      const restorationPromises = [];
       
-      if (item.opinionColumn) {
-        columnRestorations.push(
-          waitForColumnOptions('opinionHeader', item.opinionColumn)
-            .then(success => ({ type: 'opinion', value: item.opinionColumn, success }))
-        );
-      }
+      const columnMappings = [
+        { key: 'opinionColumn', elementId: 'opinionHeader', type: 'opinion' },
+        { key: 'nameColumn', elementId: 'name-column', type: 'name' },
+        { key: 'classColumn', elementId: 'class-column', type: 'class' },
+        { key: 'reasonColumn', elementId: 'reason-column', type: 'reason' }
+      ];
       
-      if (item.nameColumn) {
-        columnRestorations.push(
-          waitForColumnOptions('name-column', item.nameColumn)
-            .then(success => ({ type: 'name', value: item.nameColumn, success }))
-        );
-      }
-      
-      if (item.classColumn) {
-        columnRestorations.push(
-          waitForColumnOptions('class-column', item.classColumn)
-            .then(success => ({ type: 'class', value: item.classColumn, success }))
-        );
-      }
-      
-      if (item.reasonColumn) {
-        columnRestorations.push(
-          waitForColumnOptions('reason-column', item.reasonColumn)
-            .then(success => ({ type: 'reason', value: item.reasonColumn, success }))
-        );
-      }
-      
-      // すべての列復元を待機
-      if (columnRestorations.length > 0) {
-        console.log(`🔄 Waiting for ${columnRestorations.length} column selections to restore...`);
-        try {
-          const results = await Promise.all(columnRestorations);
-          const successCount = results.filter(r => r.success).length;
-          console.log(`✅ Column restoration completed: ${successCount}/${results.length} successful`);
+      columnMappings.forEach(mapping => {
+        if (item[mapping.key]) {
+          const promise = waitForColumnOptions(mapping.elementId, item[mapping.key])
+            .then(result => ({
+              type: mapping.type,
+              value: item[mapping.key],
+              elementId: mapping.elementId,
+              ...result
+            }));
           
-          results.forEach(result => {
-            if (result.success) {
-              console.log(`✅ ${result.type} column restored: ${result.value}`);
+          restorationPromises.push(promise);
+        }
+      });
+      
+      // すべての列復元を待機（部分的失敗も許容）
+      if (restorationPromises.length > 0) {
+        console.log(`🔄 Waiting for ${restorationPromises.length} column selections to restore...`);
+        
+        try {
+          // Promise.allSettledを使用して部分的失敗を許容
+          const settledResults = await Promise.allSettled(restorationPromises);
+          
+          const results = settledResults.map((result, index) => {
+            if (result.status === 'fulfilled') {
+              return result.value;
             } else {
-              console.warn(`⚠️ ${result.type} column restoration failed: ${result.value}`);
+              return {
+                type: columnMappings[index]?.type || 'unknown',
+                value: '',
+                success: false,
+                error: result.reason?.message || '不明なエラー'
+              };
             }
           });
-        } catch (restorationError) {
-          console.warn('⚠️ Column restoration error:', restorationError);
-        }
-      }
-      
-      // 5. 設定の永続化（バックエンドへ同期）
-      try {
-        if (typeof buildConfigObject === 'function' && typeof runGasWithUserId === 'function') {
-          const configToPersist = buildConfigObject();
-          // 復元したシート名を強制適用
-          if (item.sheetName) configToPersist.sheetName = item.sheetName;
-          // 復元の意図を明確化するためflowTypeは 'custom'
-          const syncResult = await runGasWithUserId('syncConfigurationState', '設定を復元中...', configToPersist, 'custom');
-          if (syncResult && (syncResult.status === 'success' || syncResult.success === true)) {
-            console.log('✅ Configuration synchronized after restore');
-          } else {
-            const errorMsg = syncResult?.message || syncResult || 'Unknown sync error';
-            console.warn('⚠️ Configuration sync after restore failed:', errorMsg);
-            // 同期失敗は致命的エラーではないため、処理は継続
+          
+          const successCount = results.filter(r => r.success).length;
+          const failedResults = results.filter(r => !r.success);
+          
+          console.log(`✅ Column restoration completed: ${successCount}/${results.length} successful`);
+          
+          // 失敗した列の詳細をログ出力
+          if (failedResults.length > 0) {
+            console.warn('⚠️ Failed column restorations:', failedResults.map(r => 
+              `${r.type}: ${r.error || '不明なエラー'}`
+            ).join(', '));
           }
-        } else {
-          console.warn('⚠️ Unable to persist configuration after restore (missing buildConfigObject or runGasWithUserId)');
-        }
-      } catch (persistError) {
-        console.warn('⚠️ Configuration persistence error:', persistError.message || persistError);
-        // 設定永続化エラーも致命的ではないため、処理は継続
-      }
-
-      // 6. UI完全更新
-      await this._refreshAfterRestore();
-
-      // 7. オプション: 復元後に自動で公開
-      if (options.autoPublish && typeof saveAndPublish === 'function') {
-        try {
-          console.log('📤 Auto-publishing after restore...');
-          saveAndPublish();
-        } catch (pubError) {
-          console.warn('⚠️ Auto publish failed:', pubError);
+          
+          // 部分的成功でも success: true とする（重要な列が復元されていれば）
+          const criticalColumns = results.filter(r => r.type === 'opinion');
+          const criticalSuccess = criticalColumns.length === 0 || criticalColumns.some(r => r.success);
+          
+          return { 
+            success: criticalSuccess && successCount > 0, 
+            results, 
+            successCount,
+            totalCount: results.length,
+            partialFailure: successCount > 0 && successCount < results.length,
+            failedColumns: failedResults
+          };
+        } catch (globalError) {
+          console.error('❌ Global column restoration error:', globalError);
+          return { 
+            success: false, 
+            error: `列復元で致命的エラー: ${globalError.message}`,
+            category: this._categorizeError(globalError)
+          };
         }
       }
       
-      // Success message
-      if (typeof showMessage === 'function') {
-        showMessage('✅ 履歴から設定を復元しました', 'success');
-      }
-      console.log('✅ Complete restore finished');
+      return { success: true, results: [], successCount: 0, totalCount: 0 };
       
     } catch (error) {
-      console.error('❌ History restore failed:', error);
-      if (typeof showMessage === 'function') {
-        showMessage('❌ 設定復元に失敗しました', 'error');
-      }
-    } finally {
-      // AI列判定スキップフラグをクリア
-      if (window._historyRestoreInProgress) {
-        window._historyRestoreInProgress = false;
-        console.log('🛡️ AI列判定スキップフラグをクリアしました');
+      console.error('❌ Column matching error:', error);
+      return { 
+        success: false, 
+        error: error.message,
+        category: this._categorizeError(error)
+      };
+    }
+  },
+
+  /**
+   * Stage 4: 設定復元
+   */
+  async _restoreSettings(item, columnResult) {
+    const maxRetries = 3;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`⚙️ Restoring settings and persisting configuration (attempt ${attempt}/${maxRetries})...`);
+        
+        // 設定の永続化（バックエンドへ同期）with retry
+        if (typeof buildConfigObject === 'function' && typeof runGasWithUserId === 'function') {
+          let configToPersist;
+          
+          try {
+            configToPersist = buildConfigObject();
+          } catch (buildError) {
+            throw new Error(`設定オブジェクト作成失敗: ${buildError.message}`);
+          }
+          
+          // 復元したシート名を強制適用
+          if (item.sheetName) {
+            configToPersist.sheetName = item.sheetName;
+          }
+          
+          // 列マッチング結果を反映
+          if (columnResult.success && columnResult.results) {
+            columnResult.results.forEach(result => {
+              if (result.success && result.value) {
+                switch (result.type) {
+                  case 'opinion':
+                    configToPersist.opinionHeader = result.value;
+                    break;
+                  case 'name':
+                    configToPersist.nameColumn = result.value;
+                    break;
+                  case 'class':
+                    configToPersist.classColumn = result.value;
+                    break;
+                  case 'reason':
+                    configToPersist.reasonColumn = result.value;
+                    break;
+                }
+              }
+            });
+          }
+          
+          console.log('📊 Configuration to persist:', {
+            sheetName: configToPersist.sheetName,
+            opinionHeader: configToPersist.opinionHeader,
+            columnCount: Object.keys(configToPersist).filter(k => k.includes('Column')).length
+          });
+          
+          // 復元の意図を明確化するためflowTypeは 'custom'
+          const syncResult = await this._syncConfigurationWithRetry(configToPersist, attempt);
+          
+          if (!syncResult.success) {
+            throw new Error(syncResult.error);
+          }
+          
+        } else {
+          throw new Error('設定永続化関数が見つかりません (buildConfigObject または runGasWithUserId が利用できません)');
+        }
+
+        // UI完全更新（リトライ付き）
+        const uiRefreshResult = await this._refreshAfterRestoreWithRetry(item, 2);
+        if (!uiRefreshResult.success) {
+          console.warn('⚠️ UI refresh failed but continuing:', uiRefreshResult.error);
+          // UI更新失敗は致命的ではないため継続
+        }
+        
+        console.log('✅ Settings restoration completed');
+        return { success: true };
+        
+      } catch (error) {
+        lastError = error;
+        console.warn(`⚠️ Settings restoration attempt ${attempt} failed:`, error);
+        
+        // リトライ可能エラーの場合のみリトライ
+        if (this._isRetryableError(error) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.log(`⏳ Retrying settings restoration in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        break;
       }
     }
+    
+    return { 
+      success: false, 
+      error: `設定復元失敗 (${maxRetries}回試行): ${lastError?.message || '不明なエラー'}`,
+      category: this._categorizeError(lastError)
+    };
+  },
+
+  /**
+   * Enhanced configuration sync with retry
+   */
+  async _syncConfigurationWithRetry(configToPersist, retryAttempt = 1) {
+    const timeout = 15000 + (retryAttempt * 5000); // 段階的にタイムアウトを延長
+    
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.warn(`⚠️ Configuration sync timeout after ${timeout}ms`);
+        resolve({ success: false, error: 'サーバー応答タイムアウト' });
+      }, timeout);
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          clearTimeout(timeoutId);
+          if (response && (response.status === 'success' || response.success === true)) {
+            console.log('✅ Configuration synchronized after restore');
+            resolve({ success: true });
+          } else {
+            const errorMsg = response?.message || response || 'Unknown sync error';
+            console.warn('⚠️ Configuration sync after restore failed:', errorMsg);
+            resolve({ success: false, error: `設定同期失敗: ${errorMsg}` });
+          }
+        })
+        .withFailureHandler(error => {
+          clearTimeout(timeoutId);
+          console.warn('⚠️ Configuration sync error:', error);
+          resolve({ 
+            success: false, 
+            error: `同期通信エラー: ${error.message || error}` 
+          });
+        })
+        .syncConfigurationState(configToPersist, 'custom');
+    });
+  },
+
+  /**
+   * Enhanced UI refresh with retry
+   */
+  async _refreshAfterRestoreWithRetry(item, maxRetries = 2) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this._refreshAfterRestore(item);
+        
+        // UI更新の検証
+        const success = await this._verifyUIRefresh(item);
+        if (success || attempt === maxRetries) {
+          return { success };
+        }
+        
+      } catch (error) {
+        if (attempt === maxRetries) {
+          return { success: false, error: error.message };
+        }
+        console.warn(`⚠️ UI refresh attempt ${attempt} failed:`, error);
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      }
+    }
+    
+    return { success: false, error: 'UI更新に失敗しました' };
+  },
+
+  /**
+   * Verify UI refresh was successful
+   */
+  async _verifyUIRefresh(item) {
+    try {
+      // 基本的な要素の存在確認
+      const questionInput = document.getElementById('opinionHeader');
+      const sheetSelect = document.getElementById('sheet-select');
+      
+      if (!questionInput || !sheetSelect) {
+        console.warn('⚠️ UI verification failed: missing essential elements');
+        return false;
+      }
+      
+      // 復元された値が適用されているかチェック
+      if (item.questionText && questionInput.value !== item.questionText) {
+        console.warn('⚠️ UI verification failed: question text mismatch');
+        return false;
+      }
+      
+      console.log('✅ UI refresh verification passed');
+      return true;
+      
+    } catch (error) {
+      console.warn('⚠️ UI verification error:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Stage 5: 検証（強化版）
+   */
+  async _validateRestoration(item) {
+    try {
+      console.log('🔍 Running comprehensive restoration validation...');
+      const warnings = [];
+      const recommendations = [];
+      let qualityScore = 0;
+      const maxScore = 100;
+      
+      // 1. 基本設定値の検証
+      if (item.questionText) {
+        const questionInput = document.getElementById('opinionHeader');
+        if (!questionInput) {
+          warnings.push('質問文入力欄が見つかりません');
+        } else if (questionInput.value !== item.questionText) {
+          warnings.push('質問文が正しく復元されていません');
+          recommendations.push('質問文を手動で入力し直してください');
+        } else {
+          qualityScore += 25; // 25点
+        }
+      }
+      
+      // 2. シート選択の検証（強化版）
+      if (item.sheetName) {
+        const sheetSelect = document.getElementById('sheet-select');
+        if (!sheetSelect) {
+          warnings.push('シート選択欄が見つかりません');
+        } else {
+          const selectedValue = sheetSelect.value;
+          if (selectedValue !== item.sheetName) {
+            // 類似度チェック
+            const similarity = this._calculateStringSimilarity(selectedValue, item.sheetName);
+            if (similarity > 0.7) {
+              qualityScore += 20; // 部分点
+              warnings.push(`シート選択が類似のものに変更されました: ${item.sheetName} → ${selectedValue}`);
+            } else {
+              warnings.push('シート選択が正しく復元されていません');
+              recommendations.push(`正しいシート（${item.sheetName}）を選択してください`);
+            }
+          } else {
+            qualityScore += 25; // 25点
+          }
+        }
+      }
+      
+      // 3. 列選択の検証（強化版）
+      const columnChecks = [
+        { id: 'opinionHeader', expected: item.opinionColumn, name: '回答列', critical: true },
+        { id: 'name-column', expected: item.nameColumn, name: '名前列', critical: false },
+        { id: 'class-column', expected: item.classColumn, name: 'クラス列', critical: false },
+        { id: 'reason-column', expected: item.reasonColumn, name: '理由列', critical: false }
+      ];
+      
+      let columnScore = 0;
+      const columnMaxScore = 50;
+      const columnWeight = columnChecks.filter(c => c.expected).length;
+      
+      columnChecks.forEach(check => {
+        if (check.expected) {
+          const element = document.getElementById(check.id);
+          if (!element) {
+            warnings.push(`${check.name}の選択欄が見つかりません`);
+          } else {
+            const selectedValue = element.value;
+            if (selectedValue !== check.expected) {
+              // 部分一致の品質チェック
+              const similarity = this._calculateStringSimilarity(selectedValue, check.expected);
+              if (similarity > 0.6) {
+                columnScore += (columnMaxScore / columnWeight) * 0.7; // 部分点
+                warnings.push(`${check.name}が類似のものに変更されました: ${check.expected} → ${selectedValue}`);
+              } else {
+                if (check.critical) {
+                  warnings.push(`${check.name}が正しく復元されていません（重要）`);
+                  recommendations.push(`${check.name}を手動で設定してください`);
+                } else {
+                  warnings.push(`${check.name}が正しく復元されていません`);
+                }
+              }
+            } else {
+              columnScore += columnMaxScore / columnWeight;
+            }
+          }
+        }
+      });
+      
+      qualityScore += columnScore;
+      
+      // 4. 高度な整合性チェック
+      const integrityChecks = await this._performIntegrityChecks(item);
+      if (integrityChecks.score > 0) {
+        qualityScore += Math.min(integrityChecks.score, 25); // 最大25点
+      }
+      if (integrityChecks.warnings) {
+        warnings.push(...integrityChecks.warnings);
+      }
+      if (integrityChecks.recommendations) {
+        recommendations.push(...integrityChecks.recommendations);
+      }
+      
+      // 5. 品質評価
+      const qualityPercentage = Math.round((qualityScore / maxScore) * 100);
+      let qualityLevel = 'poor';
+      if (qualityPercentage >= 90) qualityLevel = 'excellent';
+      else if (qualityPercentage >= 75) qualityLevel = 'good';
+      else if (qualityPercentage >= 50) qualityLevel = 'fair';
+      
+      console.log(`📊 Restoration Quality Score: ${qualityScore}/${maxScore} (${qualityPercentage}%) - ${qualityLevel}`);
+      
+      // 6. 結果の判定
+      const hasCriticalIssues = warnings.some(w => w.includes('重要') || w.includes('見つかりません'));
+      const success = !hasCriticalIssues && qualityPercentage >= 50;
+      
+      const result = {
+        success,
+        warnings: warnings.length > 0 ? warnings : undefined,
+        recommendations: recommendations.length > 0 ? recommendations : undefined,
+        qualityScore: qualityPercentage,
+        qualityLevel,
+        details: {
+          criticalIssues: hasCriticalIssues,
+          totalWarnings: warnings.length,
+          totalRecommendations: recommendations.length
+        }
+      };
+      
+      if (success) {
+        console.log('✅ Enhanced validation passed');
+      } else {
+        console.warn('⚠️ Enhanced validation found issues:', warnings);
+      }
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Enhanced validation error:', error);
+      return { 
+        success: false, 
+        warnings: [error.message],
+        qualityScore: 0,
+        qualityLevel: 'error'
+      };
+    }
+  },
+
+  /**
+   * Perform advanced integrity checks
+   */
+  async _performIntegrityChecks(item) {
+    const warnings = [];
+    const recommendations = [];
+    let score = 0;
+    
+    try {
+      // 1. スプレッドシートアクセス確認
+      const currentStatus = window.AdminPanel?.currentStatus;
+      if (currentStatus?.userInfo?.configJson) {
+        score += 5;
+      } else {
+        warnings.push('現在の設定状態にアクセスできません');
+      }
+      
+      // 2. フォームURL整合性
+      if (currentStatus?.userInfo?.configJson?.formUrl) {
+        const formUrl = currentStatus.userInfo.configJson.formUrl;
+        if (formUrl.includes('forms.gle') || formUrl.includes('docs.google.com/forms')) {
+          score += 5;
+        } else {
+          warnings.push('フォームURLが正しく設定されていない可能性があります');
+          recommendations.push('フォームURLを確認してください');
+        }
+      }
+      
+      // 3. 必須列の設定確認
+      const questionInput = document.getElementById('opinionHeader');
+      if (questionInput?.value?.trim()) {
+        score += 5;
+      } else {
+        warnings.push('質問文が設定されていません');
+        recommendations.push('質問文を入力してください');
+      }
+      
+      // 4. UIの応答性チェック
+      const essentialElements = [
+        'sheet-select',
+        'opinionHeader',
+        'name-column'
+      ];
+      
+      let responsiveElements = 0;
+      essentialElements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element && !element.disabled) {
+          responsiveElements++;
+        }
+      });
+      
+      score += (responsiveElements / essentialElements.length) * 10;
+      
+      if (responsiveElements < essentialElements.length) {
+        warnings.push('一部のUI要素が応答していません');
+        recommendations.push('ページを再読み込みしてください');
+      }
+      
+      console.log(`🔍 Integrity checks completed. Score: ${score}/25`);
+      
+      return { score, warnings, recommendations };
+      
+    } catch (error) {
+      console.warn('⚠️ Integrity check error:', error);
+      return { score: 0, warnings: ['整合性チェックでエラーが発生しました'], recommendations: [] };
+    }
+  },
+
+  /**
+   * Enhanced column matching with improved similarity algorithm
+   */
+  _calculateEnhancedStringSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    
+    // 基本の類似度計算
+    const basicSimilarity = this._calculateStringSimilarity(str1, str2);
+    
+    // 追加の重み付け
+    let enhancedScore = basicSimilarity;
+    
+    // 1. 完全一致ボーナス
+    if (str1 === str2) {
+      return 1.0;
+    }
+    
+    // 2. 部分的キーワード一致
+    const keywords1 = str1.toLowerCase().split(/[\s（）()]/);
+    const keywords2 = str2.toLowerCase().split(/[\s（）()]/);
+    
+    let keywordMatches = 0;
+    keywords1.forEach(k1 => {
+      if (k1.length > 1 && keywords2.some(k2 => k2.includes(k1) || k1.includes(k2))) {
+        keywordMatches++;
+      }
+    });
+    
+    if (keywordMatches > 0) {
+      enhancedScore += (keywordMatches / Math.max(keywords1.length, keywords2.length)) * 0.2;
+    }
+    
+    // 3. 数字や記号の一致
+    const numbers1 = str1.match(/\d+/g) || [];
+    const numbers2 = str2.match(/\d+/g) || [];
+    
+    if (numbers1.length > 0 && numbers2.length > 0) {
+      const numberMatch = numbers1.some(n1 => numbers2.includes(n1));
+      if (numberMatch) {
+        enhancedScore += 0.1;
+      }
+    }
+    
+    return Math.min(enhancedScore, 1.0);
   },
 
   /**
@@ -2794,7 +3497,7 @@ window.HistoryManager = {
   /**
    * Refresh UI after history restore
    */
-  async _refreshAfterRestore() {
+  async _refreshAfterRestore(item) {
     try {
       console.log('🔄 Refreshing UI after history restore...');
       
@@ -2824,7 +3527,11 @@ window.HistoryManager = {
       if (typeof handleSheetSelectionChange === 'function' && window.AdminPanel.selectedSheet) {
         console.log('📋 Updating column options via sheet selection handler...');
         try {
-          const mockEvent = { target: { value: window.AdminPanel.selectedSheet } };
+          // 復元後は強制更新のため、_isRestoreRefreshフラグを設定
+          const mockEvent = { 
+            target: { value: window.AdminPanel.selectedSheet }, 
+            _isRestoreRefresh: true 
+          };
           await handleSheetSelectionChange(mockEvent);
           console.log('✅ Column options updated via handler');
         } catch (handlerError) {
@@ -2854,10 +3561,294 @@ window.HistoryManager = {
         }
       }
       
+      // 復元後の最終確認と修正
+      if (item) {
+        console.log('🔧 Finalizing restore process...');
+        
+        // 復元されたシートが正しく選択されているか確認
+        const targetSheetName = item.sheetName;
+        if (targetSheetName) {
+          const sheetSelect = document.getElementById('sheet-select');
+          if (sheetSelect && sheetSelect.value !== targetSheetName) {
+            console.log(`🔧 Correcting sheet selection: ${sheetSelect.value} → ${targetSheetName}`);
+            sheetSelect.value = targetSheetName;
+            
+            // 状態も更新
+            window.AdminPanel.selectedSheet = targetSheetName;
+            window.selectedSheet = targetSheetName;
+            window.activeSheetName = targetSheetName;
+          }
+        }
+        
+        // 列選択の確認と修正
+        const columnMappings = [
+          { historyKey: 'opinionColumn', selectId: 'opinionHeader' },
+          { historyKey: 'nameColumn', selectId: 'name-column' },
+          { historyKey: 'classColumn', selectId: 'class-column' },
+          { historyKey: 'reasonColumn', selectId: 'reason-column' }
+        ];
+        
+        for (const mapping of columnMappings) {
+          const expectedValue = item[mapping.historyKey];
+          const select = document.getElementById(mapping.selectId);
+          
+          if (expectedValue && select) {
+            // 現在の値が空文字または期待値と異なる場合、再設定を試行
+            if (!select.value || select.value.trim() === '') {
+              console.log(`🔧 Attempting to fix empty column selection: ${mapping.selectId}`);
+              
+              // 利用可能なオプションから最適な値を探す
+              const options = Array.from(select.options);
+              const bestMatch = options.find(option => 
+                option.value && option.value.trim() !== '' && 
+                (option.value === expectedValue || 
+                 option.value.includes(expectedValue.substring(0, 10)))
+              );
+              
+              if (bestMatch) {
+                select.value = bestMatch.value;
+                console.log(`✅ Fixed column selection ${mapping.selectId}: ${bestMatch.value}`);
+              }
+            }
+          }
+        }
+        
+        console.log('✅ Restore finalization completed');
+      }
+      
       console.log('✅ UI refresh completed successfully');
     } catch (error) {
       console.warn('⚠️ UI refresh warning:', error);
     }
+  },
+
+  /**
+   * Stage 1: Preflight check for restore compatibility
+   */
+  async _preflightCheck(item) {
+    const maxRetries = 3;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔍 Running preflight checks (attempt ${attempt}/${maxRetries})...`);
+        
+        // 必須項目の確認
+        if (!item.sheetName) {
+          return { success: false, error: 'シート名が見つかりません', category: 'validation' };
+        }
+        
+        if (!item.spreadsheetId) {
+          return { success: false, error: 'スプレッドシートIDが見つかりません', category: 'validation' };
+        }
+        
+        // 現在のシステム状態確認
+        if (!window.AdminPanel) {
+          return { success: false, error: 'システムが初期化されていません', category: 'system' };
+        }
+        
+        // ネットワーク接続確認
+        if (!navigator.onLine) {
+          return { success: false, error: 'インターネット接続が必要です', category: 'network' };
+        }
+        
+        // シート存在確認（サーバーサイド）with retry
+        const sheetExists = await this._validateSheetOnServerWithRetry(item.spreadsheetId, item.sheetName, 2);
+        if (!sheetExists) {
+          // 代替シートを検索
+          const alternatives = await this._findAlternativeSheets(item.spreadsheetId, item.sheetName);
+          if (alternatives.length > 0) {
+            console.log(`⚠️ Target sheet not found, alternatives available: ${alternatives.join(', ')}`);
+            return { 
+              success: true, 
+              warnings: [`シート「${item.sheetName}」が見つかりません。類似シート: ${alternatives.join(', ')}`],
+              alternatives 
+            };
+          } else {
+            return { success: false, error: `シート「${item.sheetName}」が見つからず、代替シートもありません`, category: 'data' };
+          }
+        }
+        
+        console.log('✅ Preflight checks passed');
+        return { success: true };
+        
+      } catch (error) {
+        lastError = error;
+        console.warn(`⚠️ Preflight check attempt ${attempt} failed:`, error);
+        
+        // ネットワークエラーの場合はリトライ
+        if (this._isRetryableError(error) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.log(`⏳ Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        // 最終試行または非リトライ可能エラー
+        break;
+      }
+    }
+    
+    return { 
+      success: false, 
+      error: `プリフライトチェック失敗 (${maxRetries}回試行): ${lastError?.message || '不明なエラー'}`,
+      category: this._categorizeError(lastError)
+    };
+  },
+
+  /**
+   * Enhanced sheet validation with retry logic
+   */
+  async _validateSheetOnServerWithRetry(spreadsheetId, sheetName, maxRetries = 2) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await this._validateSheetOnServer(spreadsheetId, sheetName);
+        if (result || attempt === maxRetries) {
+          return result;
+        }
+        
+        // Wait before retry
+        const delay = attempt * 1000;
+        console.log(`⏳ Sheet validation retry in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+      } catch (error) {
+        if (attempt === maxRetries) throw error;
+        console.warn(`⚠️ Sheet validation attempt ${attempt} failed:`, error);
+      }
+    }
+    
+    return false;
+  },
+
+  /**
+   * Determine if an error is retryable
+   */
+  _isRetryableError(error) {
+    if (!error) return false;
+    
+    const retryablePatterns = [
+      /network/i,
+      /timeout/i,
+      /connection/i,
+      /temporarily/i,
+      /service.+unavailable/i,
+      /rate.+limit/i,
+      /quota.+exceeded/i
+    ];
+    
+    const errorMessage = error.message || error.toString();
+    return retryablePatterns.some(pattern => pattern.test(errorMessage));
+  },
+
+  /**
+   * Categorize errors for better user feedback
+   */
+  _categorizeError(error) {
+    if (!error) return 'unknown';
+    
+    const errorMessage = error.message || error.toString();
+    
+    if (/network|connection|internet/i.test(errorMessage)) return 'network';
+    if (/timeout/i.test(errorMessage)) return 'timeout';
+    if (/permission|auth/i.test(errorMessage)) return 'permission';
+    if (/quota|limit/i.test(errorMessage)) return 'quota';
+    if (/not.+found|missing/i.test(errorMessage)) return 'data';
+    if (/validation|invalid/i.test(errorMessage)) return 'validation';
+    
+    return 'system';
+  },
+
+  /**
+   * Find alternative sheets when target sheet is not found
+   */
+  async _findAlternativeSheets(spreadsheetId, targetSheetName) {
+    try {
+      // 現在利用可能なシート一覧を取得
+      if (window.AdminPanel?.currentStatus?.sheetNames) {
+        const availableSheets = window.AdminPanel.currentStatus.sheetNames
+          .map(sheet => sheet.name || sheet)
+          .filter(name => name && typeof name === 'string');
+        
+        // シート名の類似度チェック
+        const similarities = availableSheets.map(sheetName => {
+          const similarity = this._calculateStringSimilarity(targetSheetName, sheetName);
+          return { name: sheetName, similarity };
+        });
+        
+        // 類似度が高い順にソートし、閾値以上のものを返す
+        return similarities
+          .filter(item => item.similarity > 0.3) // 30%以上の類似度
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 3) // 上位3つまで
+          .map(item => item.name);
+      }
+      
+      return [];
+    } catch (error) {
+      console.warn('⚠️ Error finding alternative sheets:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Calculate string similarity for sheet name matching
+   */
+  _calculateStringSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    
+    // 正規化（ひらがな、カタカナ、英数字の統一）
+    const normalize = (str) => {
+      return str.toLowerCase()
+        .replace(/[ァ-ヶ]/g, match => String.fromCharCode(match.charCodeAt(0) - 0x60))
+        .replace(/\s+/g, '')
+        .replace(/[0-9０-９]/g, match => 
+          match.charCodeAt(0) < 0x100 ? match : String.fromCharCode(match.charCodeAt(0) - 0xFEE0)
+        );
+    };
+    
+    const norm1 = normalize(str1);
+    const norm2 = normalize(str2);
+    
+    if (norm1 === norm2) return 1.0;
+    
+    // Levenshtein距離による類似度計算
+    const maxLen = Math.max(norm1.length, norm2.length);
+    if (maxLen === 0) return 1.0;
+    
+    const distance = this._levenshteinDistance(norm1, norm2);
+    return 1 - (distance / maxLen);
+  },
+
+  /**
+   * Calculate Levenshtein distance
+   */
+  _levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
   },
 
   /**
