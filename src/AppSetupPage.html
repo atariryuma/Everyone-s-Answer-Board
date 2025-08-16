@@ -15,10 +15,7 @@
       const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
     </script>
     
-    <!-- Modular JavaScript Components -->
-    <?!= include('appSetup-diagnostics.js'); ?>
-    <?!= include('appSetup-userManagement.js'); ?>
-    <?!= include('appSetup-debugMode.js'); ?>
+    <!-- Integrated JavaScript Components -->
 </head>
 <body>
     <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[9999] hidden">
@@ -229,6 +226,7 @@
                     <!-- 変更ボタン -->
                     <button type="button" 
                         id="updateDebugModeBtn"
+                        onclick="toggleDebugModeState()"
                         class="w-full btn bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled>
                         <span id="debug-update-text">デバッグモード設定を変更</span>
@@ -294,7 +292,7 @@
                             </button>
                             <button 
                                 id="view-logs-btn"
-                                onclick="viewDeletionLogs()"
+                                onclick="showDeletionLogs()"
                                 class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs">
                                 📋 削除ログ
                             </button>
@@ -351,7 +349,7 @@
         <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 relative">
             <!-- 閉じるボタン -->
             <button 
-                onclick="cancelDeletion()"
+                onclick="closeDeleteModal()"
                 class="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors duration-200 text-2xl font-bold leading-none"
                 aria-label="モーダルを閉じる">
                 ×
@@ -368,8 +366,8 @@
             <!-- タブヘッダー -->
             <div class="border-b border-gray-700 mb-4">
                 <nav class="-mb-px flex gap-2" aria-label="Tabs">
-                    <button id="tab-btn-access" class="px-3 py-2 text-sm rounded-t-lg bg-gray-800 text-gray-300 hidden" onclick="switchUserModalTab('access')">アクセス制御</button>
-                    <button id="tab-btn-delete" class="px-3 py-2 text-sm rounded-t-lg bg-gray-900 text-white" onclick="switchUserModalTab('delete')">アカウント削除</button>
+                    <button id="tab-btn-access" class="px-3 py-2 text-sm rounded-t-lg bg-gray-800 text-gray-300 hidden" onclick="switchDeleteModalTab('access')">アクセス制御</button>
+                    <button id="tab-btn-delete" class="px-3 py-2 text-sm rounded-t-lg bg-gray-900 text-white" onclick="switchDeleteModalTab('delete')">アカウント削除</button>
                 </nav>
             </div>
             
@@ -418,7 +416,7 @@
             
             <div class="flex gap-3">
                 <button 
-                    onclick="cancelDeletion()"
+                    onclick="closeDeleteModal()"
                     class="flex-1 btn bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg">
                     キャンセル
                 </button>
@@ -439,7 +437,7 @@
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-semibold text-white">📋 削除ログ</h3>
                 <button 
-                    onclick="closeDeletionLogs()"
+                    onclick="closeLogsModal()"
                     class="text-gray-400 hover:text-white text-2xl">✕</button>
             </div>
             
@@ -709,27 +707,961 @@
             }
         }
 
-        // ページ読み込み時の処理
-        window.addEventListener('load', function() {
-            loadCurrentStatus();
-            fetchAdminPanelUrl();
-        });
+        // =================================================================
+        // システム診断・監視機能
+        // =================================================================
+        
+        // グローバル変数
+        let diagnosticHistoryCache = [];
 
-        // 古いユーザー管理機能は appSetup-userManagement.js に移行済み
+        /**
+         * システム診断を実行
+         */
+        function runSystemDiagnosis() {
+            executeSystemFunction('run-diagnosis-btn', 'システム診断中...', 'diagnoseDatabase', '診断実行');
+        }
 
-        // システム診断・監視機能は appSetup-diagnostics.js に移行済み
+        /**
+         * データ整合性チェックを実行
+         */
+        function runIntegrityCheck() {
+            executeSystemFunction('run-integrity-btn', '整合性チェック中...', 'performDataIntegrityCheck', '整合性チェック');
+        }
 
-        // デバッグモード機能は appSetup-debugMode.js に移行済み
+        /**
+         * 共通のシステム機能実行関数
+         */
+        function executeSystemFunction(buttonId, progressMessage, functionName, originalText) {
+            const button = document.getElementById(buttonId);
+            const spinner = button ? button.querySelector('.spinner') : null;
+            const text = button ? button.querySelector('.btn-text') : null;
+            
+            if (button) {
+                button.disabled = true;
+                if (spinner) spinner.classList.remove('hidden');
+                if (text) text.textContent = progressMessage;
+            }
+
+            google.script.run
+                .withSuccessHandler(result => {
+                    displayDiagnosticResult(functionName, result);
+                    
+                    // UI復元
+                    if (button) {
+                        button.disabled = false;
+                        if (spinner) spinner.classList.add('hidden');
+                        if (text) text.textContent = originalText;
+                    }
+                })
+                .withFailureHandler(error => {
+                    console.error(`${functionName} error:`, error);
+                    displayDiagnosticResult(functionName, {
+                        error: error.message,
+                        timestamp: new Date().toISOString(),
+                        summary: {
+                            overallStatus: 'error',
+                            criticalIssues: [`${functionName}の実行に失敗: ${error.message}`]
+                        }
+                    });
+                    
+                    // UI復元
+                    if (button) {
+                        button.disabled = false;
+                        if (spinner) spinner.classList.add('hidden');
+                        if (text) text.textContent = originalText;
+                    }
+                })
+                [functionName]();
+        }
+
+        /**
+         * 診断結果を表示
+         */
+        function displayDiagnosticResult(functionName, result) {
+            const resultsContainer = document.getElementById('diagnostic-results');
+            if (!resultsContainer) return;
+
+            // 結果のフォーマット
+            const formattedResult = formatDiagnosticResult(functionName, result);
+            
+            // 履歴にキャッシュ
+            cacheDiagnosticResult(functionName, result, formattedResult);
+            
+            // 新しい結果を上部に追加
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `diagnostic-result mt-4 p-4 rounded-lg border ${formattedResult.cssClass}`;
+            resultDiv.innerHTML = formattedResult.html;
+            
+            // 既存の結果の上に挿入
+            resultsContainer.insertBefore(resultDiv, resultsContainer.firstChild);
+            
+            // 5件以上ある場合は古いものを削除
+            const existingResults = resultsContainer.querySelectorAll('.diagnostic-result');
+            if (existingResults.length > 5) {
+                for (let i = 5; i < existingResults.length; i++) {
+                    existingResults[i].remove();
+                }
+            }
+        }
+
+        /**
+         * 診断結果をフォーマット
+         */
+        function formatDiagnosticResult(functionName, result) {
+            const timestamp = new Date(result.timestamp || Date.now()).toLocaleString('ja-JP');
+            let message, type, problemCount, repairCount, successfulRepairs;
+
+            // エラー処理
+            if (result.error) {
+                return {
+                    html: `
+                        <div class="flex items-start space-x-3">
+                            <span class="text-2xl">❌</span>
+                            <div>
+                                <h4 class="font-semibold text-red-400">${getFunctionDisplayName(functionName)} - エラー</h4>
+                                <p class="text-red-300 mt-1">${result.error}</p>
+                                <p class="text-gray-400 text-sm mt-2">${timestamp}</p>
+                            </div>
+                        </div>
+                    `,
+                    cssClass: 'border-red-500 bg-red-900/20',
+                    type: 'error',
+                    problemCount: 1,
+                    repairCount: 0,
+                    successfulRepairs: 0
+                };
+            }
+
+            // 通常の結果処理
+            if (functionName === 'diagnoseDatabase') {
+                problemCount = (result.summary?.criticalIssues?.length || 0) + (result.summary?.warnings?.length || 0);
+                repairCount = 0;
+                successfulRepairs = 0;
+                
+                if (result.summary?.overallStatus === 'critical') {
+                    message = `❌ ${getFunctionDisplayName(functionName)}: ${problemCount}件の重要な問題を検出`;
+                    type = 'error';
+                } else if (result.summary?.overallStatus === 'warning' || problemCount > 0) {
+                    message = `⚠️ ${getFunctionDisplayName(functionName)}: ${problemCount}件の警告を検出`;
+                    type = 'warning';
+                } else {
+                    message = `✅ ${getFunctionDisplayName(functionName)}: システムは正常です`;
+                    type = 'success';
+                }
+            } else if (functionName === 'performDataIntegrityCheck') {
+                problemCount = (result.summary?.issues?.length || 0) + (result.summary?.warnings?.length || 0);
+                repairCount = result.summary?.fixed?.length || 0;
+                successfulRepairs = repairCount;
+                
+                if (result.summary?.status === 'critical') {
+                    message = `❌ ${getFunctionDisplayName(functionName)}: ${problemCount}件の問題を検出。${successfulRepairs}/${repairCount}件の修復が成功しました。`;
+                    type = 'error';
+                } else if (result.summary?.status === 'warning' || problemCount > 0) {
+                    message = `⚠️ ${getFunctionDisplayName(functionName)}: ${problemCount}件の問題を検出。${successfulRepairs}/${repairCount}件の修復が成功しました。`;
+                    type = 'warning';
+                } else {
+                    message = `✅ ${getFunctionDisplayName(functionName)}: データ整合性に問題はありません`;
+                    type = 'success';
+                }
+            }
+
+            // CSS クラスの決定
+            let cssClass;
+            if (type === 'error') {
+                cssClass = 'border-red-500 bg-red-900/20';
+            } else if (type === 'warning') {
+                cssClass = 'border-yellow-500 bg-yellow-900/20';
+            } else {
+                cssClass = 'border-green-500 bg-green-900/20';
+            }
+
+            return {
+                html: `
+                    <div class="flex items-start space-x-3">
+                        <span class="text-2xl">${type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '✅'}</span>
+                        <div>
+                            <h4 class="font-semibold ${type === 'error' ? 'text-red-400' : type === 'warning' ? 'text-yellow-400' : 'text-green-400'}">${message}</h4>
+                            <p class="text-gray-400 text-sm mt-2">${timestamp}</p>
+                        </div>
+                    </div>
+                `,
+                cssClass,
+                type,
+                problemCount,
+                repairCount,
+                successfulRepairs
+            };
+        }
+
+        /**
+         * 関数名を表示用に変換
+         */
+        function getFunctionDisplayName(functionName) {
+            const displayNames = {
+                'diagnoseDatabase': 'データベース診断',
+                'performDataIntegrityCheck': 'データ整合性チェック'
+            };
+            return displayNames[functionName] || functionName;
+        }
+
+        /**
+         * 診断結果をローカルキャッシュに保存
+         */
+        function cacheDiagnosticResult(functionName, result, formattedResult) {
+            const cacheEntry = {
+                timestamp: result.timestamp || new Date().toISOString(),
+                functionName,
+                status: formattedResult.type,
+                problemCount: formattedResult.problemCount || 0,
+                repairCount: formattedResult.repairCount || 0,
+                successfulRepairs: formattedResult.successfulRepairs || 0,
+                summary: formattedResult.html.replace(/<[^>]*>/g, '').trim(),
+                details: result
+            };
+
+            // キャッシュに追加（最新順）
+            diagnosticHistoryCache.unshift(cacheEntry);
+            
+            // 最大50件に制限
+            if (diagnosticHistoryCache.length > 50) {
+                diagnosticHistoryCache = diagnosticHistoryCache.slice(0, 50);
+            }
+            
+            // localStorageに保存
+            try {
+                localStorage.setItem('diagnosticHistoryCache', JSON.stringify(diagnosticHistoryCache));
+            } catch (error) {
+                console.warn('Failed to save diagnostic history to localStorage:', error);
+            }
+        }
+
+        /**
+         * 診断履歴を表示
+         */
+        function showDiagnosticHistory() {
+            // サーバーから最新の診断ログを取得
+            google.script.run
+                .withSuccessHandler(result => {
+                    if (result.status === 'success') {
+                        showDiagnosticHistoryModal(result.logs);
+                    } else {
+                        // フォールバック: ローカルキャッシュを使用
+                        showDiagnosticHistoryModal(diagnosticHistoryCache);
+                    }
+                })
+                .withFailureHandler(error => {
+                    console.error('Failed to fetch diagnostic history:', error);
+                    // フォールバック: ローカルキャッシュを使用
+                    showDiagnosticHistoryModal(diagnosticHistoryCache);
+                })
+                .getDiagnosticLogsForUI(50);
+        }
+
+        /**
+         * 診断履歴モーダルを表示
+         */
+        function showDiagnosticHistoryModal(logs) {
+            const modal = document.getElementById('logs-modal');
+            const title = modal.querySelector('h3');
+            const header = document.getElementById('dynamic-header');
+            const tbody = document.getElementById('logs-table-body');
+            
+            if (!modal || !header || !tbody) return;
+            
+            title.textContent = '📊 診断履歴';
+            
+            // ヘッダーを設定
+            header.innerHTML = `
+                <tr>
+                    <th class="px-4 py-2 text-left">実行時刻</th>
+                    <th class="px-4 py-2 text-left">機能</th>
+                    <th class="px-4 py-2 text-left">状態</th>
+                    <th class="px-4 py-2 text-center">問題数</th>
+                    <th class="px-4 py-2 text-center">修復数</th>
+                    <th class="px-4 py-2 text-left">概要</th>
+                </tr>
+            `;
+            
+            // データを表示
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+                            診断履歴がありません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tbody.innerHTML = logs.map(log => {
+                    const timestamp = new Date(log.timestamp).toLocaleString('ja-JP');
+                    const functionDisplayName = getFunctionDisplayName(log.functionName);
+                    const statusIcon = log.status === 'error' ? '❌' : log.status === 'warning' ? '⚠️' : '✅';
+                    const statusClass = log.status === 'error' ? 'text-red-400' : log.status === 'warning' ? 'text-yellow-400' : 'text-green-400';
+                    
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-2 text-sm text-gray-300">${timestamp}</td>
+                            <td class="px-4 py-2 text-sm text-white">${functionDisplayName}</td>
+                            <td class="px-4 py-2 text-sm ${statusClass}">${statusIcon} ${log.status}</td>
+                            <td class="px-4 py-2 text-sm text-center text-gray-300">${log.problemCount || 0}</td>
+                            <td class="px-4 py-2 text-sm text-center text-gray-300">${log.successfulRepairs || 0}</td>
+                            <td class="px-4 py-2 text-sm text-gray-300">${log.summary || log.message || ''}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        /**
+         * 初期化時にローカルキャッシュを読み込み
+         */
+        function initializeDiagnosticHistory() {
+            try {
+                const cached = localStorage.getItem('diagnosticHistoryCache');
+                if (cached) {
+                    diagnosticHistoryCache = JSON.parse(cached);
+                }
+            } catch (error) {
+                console.warn('Failed to load diagnostic history from localStorage:', error);
+                diagnosticHistoryCache = [];
+            }
+        }
+
+        // =================================================================
+        // ユーザー管理機能
+        // =================================================================
+        
+        // グローバル変数
+        let currentUserList = [];
+        let userToDelete = null;
+        let userManagementVisible = false;
+
+        /**
+         * ユーザー管理パネルの表示/非表示を切り替え
+         */
+        function toggleUserManagement() {
+            const container = document.getElementById('user-list-container');
+            const button = document.querySelector('button[onclick="toggleUserManagement()"]');
+            
+            if (!container) return;
+            
+            userManagementVisible = !userManagementVisible;
+            
+            if (userManagementVisible) {
+                container.classList.remove('hidden');
+                if (button) button.textContent = '👥 ユーザー管理を閉じる';
+                loadUserList();
+            } else {
+                container.classList.add('hidden');
+                if (button) button.textContent = '👥 ユーザー管理を開く';
+            }
+        }
+
+        /**
+         * ユーザー一覧を読み込み
+         */
+        function loadUserList() {
+            const tableBody = document.getElementById('user-table-body');
+            const updateButton = document.querySelector('button[onclick="loadUserList()"]');
+            
+            if (tableBody) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-400">
+                            <div class="flex items-center justify-center space-x-2">
+                                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                                <span>ユーザー一覧を読み込み中...</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            if (updateButton) {
+                updateButton.disabled = true;
+                updateButton.textContent = '読み込み中...';
+            }
+
+            google.script.run
+                .withSuccessHandler(result => {
+                    if (result.status === 'success') {
+                        currentUserList = result.users || [];
+                        displayUserList(currentUserList);
+                    } else {
+                        displayUserListError('ユーザー一覧の取得に失敗しました: ' + result.message);
+                    }
+                    
+                    if (updateButton) {
+                        updateButton.disabled = false;
+                        updateButton.textContent = '🔄 更新';
+                    }
+                })
+                .withFailureHandler(error => {
+                    console.error('Load user list error:', error);
+                    displayUserListError('ユーザー一覧の取得に失敗しました: ' + error.message);
+                    
+                    if (updateButton) {
+                        updateButton.disabled = false;
+                        updateButton.textContent = '🔄 更新';
+                    }
+                })
+                .getAllUsersForAdminForUI();
+        }
+
+        /**
+         * ユーザー一覧を表示
+         */
+        function displayUserList(users) {
+            const tableBody = document.getElementById('user-table-body');
+            if (!tableBody) return;
+
+            if (!users || users.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-400">
+                            登録ユーザーがいません
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tableBody.innerHTML = users.map(user => {
+                const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
+                const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '不明';
+                const lastAccessDate = user.lastAccessedAt ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP') : '未アクセス';
+                
+                const statusClass = isActive ? 'text-green-400' : 'text-red-400';
+                const statusIcon = isActive ? '🟢' : '🔴';
+                const statusText = isActive ? 'アクティブ' : '非アクティブ';
+
+                return `
+                    <tr class="hover:bg-gray-700/50" data-user-id="${user.userId}">
+                        <td class="px-4 py-3 text-sm text-white" title="${user.adminEmail}">
+                            ${user.adminEmail}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-300">${createdDate}</td>
+                        <td class="px-4 py-3 text-sm ${statusClass}">${statusIcon} ${statusText}</td>
+                        <td class="px-4 py-3 text-center space-x-2">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer user-active-toggle" 
+                                       data-user-id="${user.userId}" data-email="${user.adminEmail}"
+                                       ${isActive ? 'checked' : ''} 
+                                       onchange="toggleUserActiveStatus('${user.userId}', this.checked, '${user.adminEmail}')">
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                            </label>
+                            <button type="button" onclick="deleteUser('${user.userId}', '${user.adminEmail}')" 
+                                    class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs ml-2">
+                                🗑️ 削除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        /**
+         * ユーザー一覧のエラー表示
+         */
+        function displayUserListError(errorMessage) {
+            const tableBody = document.getElementById('user-table-body');
+            if (!tableBody) return;
+
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="4" class="px-4 py-8 text-center text-red-400">
+                        <div class="flex items-center justify-center space-x-2">
+                            <span>❌</span>
+                            <span>${errorMessage}</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        /**
+         * ユーザーのアクティブ状態を切り替え
+         */
+        function toggleUserActiveStatus(userId, isActive, userEmail) {
+            console.log(`Toggling user active status: ${userId} -> ${isActive}`);
+            
+            // 楽観的UI更新
+            const toggle = document.querySelector(`[data-user-id="${userId}"].user-active-toggle`);
+            const row = document.querySelector(`tr[data-user-id="${userId}"]`);
+            
+            if (row) {
+                const statusCell = row.querySelector('td:nth-child(3)');
+                const statusClass = isActive ? 'text-green-400' : 'text-red-400';
+                const statusIcon = isActive ? '🟢' : '🔴';
+                const statusText = isActive ? 'アクティブ' : '非アクティブ';
+                
+                if (statusCell) {
+                    statusCell.className = `px-4 py-3 text-sm ${statusClass}`;
+                    statusCell.textContent = `${statusIcon} ${statusText}`;
+                }
+            }
+
+            google.script.run
+                .withSuccessHandler(result => {
+                    if (result.status === 'success') {
+                        console.log('User active status updated successfully:', result);
+                    } else {
+                        console.error('Failed to update user active status:', result);
+                        // UI をロールバック
+                        rollbackUserStatusUI(userId, !isActive, toggle, row);
+                        alert('ユーザー状態の更新に失敗しました: ' + result.message);
+                    }
+                })
+                .withFailureHandler(error => {
+                    console.error('Update user active status error:', error);
+                    // UI をロールバック
+                    rollbackUserStatusUI(userId, !isActive, toggle, row);
+                    alert('ユーザー状態の更新に失敗しました: ' + error.message);
+                })
+                .updateUserActiveStatusForUI(userId, isActive);
+        }
+
+        /**
+         * ユーザー状態UIのロールバック
+         */
+        function rollbackUserStatusUI(userId, originalState, toggle, row) {
+            if (toggle) toggle.checked = originalState;
+            if (row) {
+                const statusCell = row.querySelector('td:nth-child(3)');
+                const statusClass = originalState ? 'text-green-400' : 'text-red-400';
+                const statusIcon = originalState ? '🟢' : '🔴';
+                const statusText = originalState ? 'アクティブ' : '非アクティブ';
+                
+                if (statusCell) {
+                    statusCell.className = `px-4 py-3 text-sm ${statusClass}`;
+                    statusCell.textContent = `${statusIcon} ${statusText}`;
+                }
+            }
+        }
+
+        /**
+         * ユーザー削除の確認ダイアログを表示
+         */
+        function deleteUser(userId, userEmail) {
+            userToDelete = { userId, userEmail };
+            showDeleteConfirmation(userId, userEmail);
+        }
+
+        /**
+         * 削除確認モーダルを表示
+         */
+        function showDeleteConfirmation(userId, userEmail) {
+            const modal = document.getElementById('delete-modal');
+            const userEmailSpan = document.getElementById('user-email-to-delete');
+            const userIdSpan = document.getElementById('user-id-to-delete');
+            
+            if (!modal) return;
+            
+            if (userEmailSpan) userEmailSpan.textContent = userEmail;
+            if (userIdSpan) userIdSpan.textContent = userId;
+            
+            // アクセス制御タブとアカウント削除タブの初期設定
+            setupDeleteModalTabs(userId, userEmail);
+            
+            modal.classList.remove('hidden');
+        }
+
+        /**
+         * 削除モーダルのタブ設定
+         */
+        function setupDeleteModalTabs(userId, userEmail) {
+            const accessTab = document.getElementById('tab-access');
+            const deleteTab = document.getElementById('tab-delete');
+            const accessBtn = document.getElementById('tab-btn-access');
+            const deleteBtn = document.getElementById('tab-btn-delete');
+            
+            // 現在のユーザー状態を取得してアクセス制御タブを設定
+            const user = currentUserList.find(u => u.userId === userId);
+            if (user && accessTab) {
+                const userToggle = document.getElementById('user-access-toggle');
+                if (userToggle) {
+                    const isActive = user.isActive === true || String(user.isActive).toLowerCase() === 'true';
+                    userToggle.checked = isActive;
+                }
+            }
+            
+            // タブ切り替え機能
+            if (accessBtn && deleteBtn && accessTab && deleteTab) {
+                accessBtn.onclick = () => switchDeleteModalTab('access');
+                deleteBtn.onclick = () => switchDeleteModalTab('delete');
+                
+                // デフォルトでアクセス制御タブを表示
+                switchDeleteModalTab('access');
+            }
+        }
+
+        /**
+         * 削除モーダルのタブ切り替え
+         */
+        function switchDeleteModalTab(tabName) {
+            const accessTab = document.getElementById('tab-access');
+            const deleteTab = document.getElementById('tab-delete');
+            const accessBtn = document.getElementById('tab-btn-access');
+            const deleteBtn = document.getElementById('tab-btn-delete');
+            
+            if (tabName === 'access') {
+                if (accessTab) accessTab.classList.remove('hidden');
+                if (deleteTab) deleteTab.classList.add('hidden');
+                if (accessBtn) accessBtn.classList.add('border-purple-500', 'text-purple-400');
+                if (deleteBtn) deleteBtn.classList.remove('border-purple-500', 'text-purple-400');
+            } else {
+                if (accessTab) accessTab.classList.add('hidden');
+                if (deleteTab) deleteTab.classList.remove('hidden');
+                if (accessBtn) accessBtn.classList.remove('border-purple-500', 'text-purple-400');
+                if (deleteBtn) deleteBtn.classList.add('border-purple-500', 'text-purple-400');
+            }
+        }
+
+        /**
+         * ユーザーアクセス設定を保存
+         */
+        function saveUserAccessSettings() {
+            if (!userToDelete) return;
+            
+            const userToggle = document.getElementById('user-access-toggle');
+            const saveBtn = document.getElementById('save-access-settings');
+            
+            if (!userToggle || !saveBtn) return;
+            
+            const newActiveStatus = userToggle.checked;
+            const originalText = saveBtn.textContent;
+            
+            saveBtn.disabled = true;
+            saveBtn.textContent = '保存中...';
+            
+            google.script.run
+                .withSuccessHandler(result => {
+                    if (result.status === 'success') {
+                        alert('ユーザーアクセス設定を更新しました');
+                        // ユーザーリストを再読み込み
+                        loadUserList();
+                        // モーダルを閉じる
+                        closeDeleteModal();
+                    } else {
+                        alert('設定の更新に失敗しました: ' + result.message);
+                    }
+                    
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalText;
+                })
+                .withFailureHandler(error => {
+                    console.error('Save user access settings error:', error);
+                    alert('設定の更新に失敗しました: ' + error.message);
+                    
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalText;
+                })
+                .updateUserActiveStatusForUI(userToDelete.userId, newActiveStatus);
+        }
+
+        /**
+         * ユーザー削除を確定実行
+         */
+        function confirmDeletion() {
+            if (!userToDelete) return;
+            
+            const reasonTextarea = document.getElementById('deletion-reason');
+            const reason = reasonTextarea ? reasonTextarea.value.trim() : '';
+            
+            if (!reason || reason.length < 20) {
+                alert('削除理由を20文字以上で入力してください。');
+                return;
+            }
+            
+            if (!confirm(`本当に ${userToDelete.userEmail} を削除しますか？\\n\\nこの操作は取り消せません。`)) {
+                return;
+            }
+            
+            const deleteBtn = document.querySelector('button[onclick="confirmDeletion()"]');
+            const originalText = deleteBtn ? deleteBtn.textContent : '';
+            
+            if (deleteBtn) {
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = '削除中...';
+            }
+            
+            google.script.run
+                .withSuccessHandler(result => {
+                    if (result.status === 'success') {
+                        alert('ユーザーを削除しました');
+                        // ユーザーリストを再読み込み
+                        loadUserList();
+                        // モーダルを閉じる
+                        closeDeleteModal();
+                    } else {
+                        alert('削除に失敗しました: ' + result.message);
+                    }
+                    
+                    if (deleteBtn) {
+                        deleteBtn.disabled = false;
+                        deleteBtn.textContent = originalText;
+                    }
+                })
+                .withFailureHandler(error => {
+                    console.error('Delete user error:', error);
+                    alert('削除に失敗しました: ' + error.message);
+                    
+                    if (deleteBtn) {
+                        deleteBtn.disabled = false;
+                        deleteBtn.textContent = originalText;
+                    }
+                })
+                .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
+        }
+
+        /**
+         * 削除モーダルを閉じる
+         */
+        function closeDeleteModal() {
+            const modal = document.getElementById('delete-modal');
+            const reasonTextarea = document.getElementById('deletion-reason');
+            
+            if (modal) modal.classList.add('hidden');
+            if (reasonTextarea) reasonTextarea.value = '';
+            
+            userToDelete = null;
+        }
+
+        /**
+         * 削除ログを表示
+         */
+        function showDeletionLogs() {
+            google.script.run
+                .withSuccessHandler(result => {
+                    if (result.status === 'success') {
+                        showLogsModal(result.logs, 'deletion');
+                    } else {
+                        alert('削除ログの取得に失敗しました: ' + result.message);
+                    }
+                })
+                .withFailureHandler(error => {
+                    console.error('Failed to fetch deletion logs:', error);
+                    alert('削除ログの取得に失敗しました: ' + error.message);
+                })
+                .getDeletionLogsForUI();
+        }
+
+        /**
+         * ログモーダルを表示（削除ログ用）
+         */
+        function showLogsModal(logs, type) {
+            const modal = document.getElementById('logs-modal');
+            const title = modal.querySelector('h3');
+            const header = document.getElementById('dynamic-header');
+            const tbody = document.getElementById('logs-table-body');
+            
+            if (!modal || !header || !tbody) return;
+            
+            if (type === 'deletion') {
+                title.textContent = '📋 削除ログ';
+                
+                // ヘッダーを設定
+                header.innerHTML = `
+                    <tr>
+                        <th class="px-4 py-2 text-left">削除日時</th>
+                        <th class="px-4 py-2 text-left">実行者</th>
+                        <th class="px-4 py-2 text-left">対象ユーザー</th>
+                        <th class="px-4 py-2 text-left">削除理由</th>
+                        <th class="px-4 py-2 text-left">タイプ</th>
+                    </tr>
+                `;
+                
+                // データを表示
+                if (!logs || logs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                                削除ログがありません
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    tbody.innerHTML = logs.map(log => {
+                        const timestamp = new Date(log.timestamp).toLocaleString('ja-JP');
+                        return `
+                            <tr class="hover:bg-gray-700/50">
+                                <td class="px-4 py-2 text-sm text-gray-300">${timestamp}</td>
+                                <td class="px-4 py-2 text-sm text-white">${log.executorEmail || ''}</td>
+                                <td class="px-4 py-2 text-sm text-gray-300">${log.targetEmail || ''}</td>
+                                <td class="px-4 py-2 text-sm text-gray-300">${log.reason || ''}</td>
+                                <td class="px-4 py-2 text-sm text-gray-300">${log.deleteType || ''}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        // =================================================================
+        // デバッグモード制御機能
+        // =================================================================
+
+        // グローバル変数
+        let debugModeState = null;
+        let debugModeLoading = false;
+
+        /**
+         * デバッグモードの状態を読み込み
+         */
+        function loadDebugModeStatus() {
+            debugModeLoading = true;
+            
+            google.script.run
+                .withSuccessHandler(result => {
+                    debugModeLoading = false;
+                    
+                    if (result.status === 'success') {
+                        debugModeState = result.debugMode;
+                        updateDebugModeUI();
+                    } else {
+                        console.error('Failed to load debug mode status:', result);
+                        showDebugModeError('デバッグモード状態の取得に失敗しました');
+                    }
+                })
+                .withFailureHandler(error => {
+                    debugModeLoading = false;
+                    console.error('Load debug mode status error:', error);
+                    showDebugModeError('デバッグモード状態の取得に失敗しました: ' + error.message);
+                })
+                .getDebugModeStatus();
+        }
+
+        /**
+         * デバッグモードUIを更新
+         */
+        function updateDebugModeUI() {
+            const toggle = document.getElementById('debugModeToggle');
+            const statusText = document.getElementById('debug-mode-status');
+            const lastModifiedText = document.getElementById('debug-mode-last-modified');
+            
+            if (toggle && debugModeState !== null) {
+                toggle.checked = debugModeState;
+            }
+            
+            if (statusText) {
+                const statusIcon = debugModeState ? '🟢' : '🔴';
+                const statusMessage = debugModeState ? 'デバッグモードが有効です' : 'デバッグモードが無効です';
+                const statusClass = debugModeState ? 'text-green-400' : 'text-red-400';
+                
+                statusText.innerHTML = `<span class="${statusClass}">${statusIcon} ${statusMessage}</span>`;
+            }
+            
+            // 最終更新時刻を表示（利用可能な場合）
+            if (lastModifiedText) {
+                lastModifiedText.textContent = ''; // 必要に応じて実装
+            }
+        }
+
+        /**
+         * デバッグモードエラー表示
+         */
+        function showDebugModeError(errorMessage) {
+            const statusText = document.getElementById('debug-mode-status');
+            if (statusText) {
+                statusText.innerHTML = `<span class="text-red-400">❌ ${errorMessage}</span>`;
+            }
+        }
+
+        /**
+         * デバッグモード状態を切り替え
+         */
+        function toggleDebugModeState() {
+            const toggle = document.getElementById('debugModeToggle');
+            const updateBtn = document.getElementById('updateDebugModeBtn');
+            const spinner = document.getElementById('debug-update-spinner');
+            const text = document.getElementById('debug-update-text');
+
+            if (!toggle || debugModeLoading) return;
+
+            const newState = toggle.checked;
+            debugModeLoading = true;
+
+            // UI feedback
+            if (updateBtn) updateBtn.disabled = true;
+            if (spinner) spinner.classList.remove('hidden');
+            if (text) text.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler(result => {
+                    debugModeLoading = false;
+                    
+                    if (result.status === 'success') {
+                        debugModeState = result.debugMode;
+                        updateDebugModeUI();
+                        
+                        // 成功メッセージを表示
+                        showDebugModeSuccessMessage(newState);
+                    } else {
+                        console.error('Failed to toggle debug mode:', result);
+                        // UI をロールバック
+                        if (toggle) toggle.checked = debugModeState;
+                        showDebugModeError('デバッグモード切り替えに失敗しました: ' + result.message);
+                    }
+                    
+                    // UI復元
+                    if (updateBtn) updateBtn.disabled = false;
+                    if (spinner) spinner.classList.add('hidden');
+                    if (text) text.classList.remove('hidden');
+                })
+                .withFailureHandler(error => {
+                    debugModeLoading = false;
+                    console.error('Toggle debug mode error:', error);
+                    
+                    // UI をロールバック
+                    if (toggle) toggle.checked = debugModeState;
+                    showDebugModeError('デバッグモード切り替えに失敗しました: ' + error.message);
+                    
+                    // UI復元
+                    if (updateBtn) updateBtn.disabled = false;
+                    if (spinner) spinner.classList.add('hidden');
+                    if (text) text.classList.remove('hidden');
+                })
+                .toggleDebugMode(newState);
+        }
+
+        /**
+         * デバッグモード切り替え成功メッセージを表示
+         */
+        function showDebugModeSuccessMessage(newState) {
+            const statusText = document.getElementById('debug-mode-status');
+            if (!statusText) return;
+            
+            const message = newState ? 'デバッグモードを有効にしました' : 'デバッグモードを無効にしました';
+            const icon = newState ? '✅' : '⚪';
+            const color = newState ? 'text-green-400' : 'text-gray-400';
+            
+            // 一時的に成功メッセージを表示
+            statusText.innerHTML = `<span class="${color}">${icon} ${message}</span>`;
+            
+            // 3秒後に通常の状態表示に戻す
+            setTimeout(() => {
+                updateDebugModeUI();
+            }, 3000);
+        }
+
+        // ログモーダルを閉じる
+        function closeLogsModal() {
+            document.getElementById('logs-modal').classList.add('hidden');
+        }
 
         // ページ読み込み時の初期化
         window.addEventListener('DOMContentLoaded', function() {
-            // 既存の初期化
+            // 基本初期化
             loadCurrentStatus();
+            fetchAdminPanelUrl();
             
             // モジュール機能の初期化
-            if (typeof loadDebugModeStatus === 'function') {
-                loadDebugModeStatus();
-            }
+            initializeDiagnosticHistory();
+            loadDebugModeStatus();
         });
     </script>
 </body>
