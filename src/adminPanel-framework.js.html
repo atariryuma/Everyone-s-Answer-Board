@@ -2131,15 +2131,18 @@ window.HistoryManager = {
         createdDate: item.createdDate
       });
 
-      // 1) スプレッドシート切替（必要時のみ、リトライあり）
+      // 1) スプレッドシート状況の分析と復元戦略の決定
       const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || null;
-      console.log('🔍 Spreadsheet switching check:', {
+      const isSameSpreadsheet = !item.spreadsheetId || !currentSpreadsheetId || item.spreadsheetId === currentSpreadsheetId;
+      
+      console.log('🔍 Restoration analysis:', {
         itemSpreadsheetId: item.spreadsheetId,
         currentSpreadsheetId: currentSpreadsheetId,
-        needsSwitch: item.spreadsheetId && currentSpreadsheetId && item.spreadsheetId !== currentSpreadsheetId
+        isSameSpreadsheet: isSameSpreadsheet,
+        strategy: isSameSpreadsheet ? 'SAME_SPREADSHEET_RESTORE' : 'CROSS_SPREADSHEET_RESTORE'
       });
       
-      if (item.spreadsheetId && currentSpreadsheetId && item.spreadsheetId !== currentSpreadsheetId) {
+      if (!isSameSpreadsheet) {
         console.log('🔄 Switching spreadsheet from', currentSpreadsheetId, 'to', item.spreadsheetId);
         
         try {
@@ -2190,10 +2193,16 @@ window.HistoryManager = {
           throw switchError;
         }
       } else {
-        console.log('📋 No spreadsheet switch needed');
+        console.log('📋 Same spreadsheet restoration - no switch needed');
       }
 
       const effectiveSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || item.spreadsheetId || null;
+      
+      // 同一スプレッドシート内復元の場合は簡素化処理
+      if (isSameSpreadsheet) {
+        console.log('⚡ Fast-track restoration for same spreadsheet');
+        return await this._performSameSpreadsheetRestore(item, effectiveSpreadsheetId);
+      }
 
       // 2) シート選択（存在しない場合は最初の候補へフォールバック）
       let targetSheetName = item.sheetName || '';
@@ -2423,6 +2432,124 @@ window.HistoryManager = {
         }
       });
       
+      return false;
+    }
+  },
+
+  /**
+   * 同一スプレッドシート内での簡素化復元処理
+   */
+  async _performSameSpreadsheetRestore(item, spreadsheetId) {
+    try {
+      console.log('🚀 Starting same-spreadsheet restoration');
+      
+      // 1) シート選択の更新
+      let targetSheetName = item.sheetName || '';
+      const select = document.getElementById('sheet-select');
+      
+      if (select && targetSheetName) {
+        const options = Array.from(select.options).map(o => o.value).filter(v => v && v.trim().length > 0);
+        console.log('📋 Available sheets for same-spreadsheet restore:', options);
+        
+        if (options.includes(targetSheetName)) {
+          select.value = targetSheetName;
+          console.log('✅ Target sheet found and selected:', targetSheetName);
+        } else {
+          // フォールバック処理
+          const fallbackSheet = options[0] || '';
+          if (fallbackSheet) {
+            console.warn('⚠️ Target sheet not found, using fallback:', fallbackSheet);
+            select.value = fallbackSheet;
+            targetSheetName = fallbackSheet;
+            if (typeof showMessage === 'function') {
+              showMessage(`⚠️ 指定されたシート「${item.sheetName}」が見つからないため、「${fallbackSheet}」を選択しました`, 'warning');
+            }
+          }
+        }
+      }
+      
+      // 2) ヘッダー情報の取得（同一スプレッドシートなので高い成功率）
+      let headers = [];
+      try {
+        if (spreadsheetId && targetSheetName) {
+          console.log('🔄 Retrieving headers for same-spreadsheet restore...');
+          const details = await runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, targetSheetName);
+          headers = Array.isArray(details?.allHeaders) ? details.allHeaders : [];
+          console.log('✅ Headers retrieved successfully:', headers.length, 'headers');
+        }
+      } catch (e) {
+        console.warn('⚠️ Header retrieval failed, continuing with existing options:', e);
+      }
+      
+      // ヘッダー情報でUIを更新
+      if (headers.length && typeof populateHeaderOptions === 'function') {
+        populateHeaderOptions(headers);
+      }
+      
+      // 3) 列設定の適用（統一フィールド名使用）
+      const setSelectIfExists = (id, value, label) => {
+        if (!value) {
+          console.log(`📋 No value for ${label} (${id})`);
+          return false;
+        }
+        const el = document.getElementById(id);
+        if (!el) {
+          console.warn(`⚠️ Element not found: ${id} for ${label}`);
+          return false;
+        }
+        const opts = Array.from(el.options).map(o => o.value);
+        if (opts.includes(value)) {
+          el.value = value;
+          console.log(`✅ ${label} restored: ${value}`);
+          return true;
+        } else {
+          // 部分一致チェック
+          const partialMatch = opts.find(opt => 
+            opt && value && (
+              opt.toLowerCase().includes(value.toLowerCase()) ||
+              value.toLowerCase().includes(opt.toLowerCase())
+            )
+          );
+          if (partialMatch) {
+            el.value = partialMatch;
+            console.log(`🔍 ${label} auto-corrected: ${value} → ${partialMatch}`);
+            return true;
+          }
+          console.warn(`⚠️ ${label} value "${value}" not available`);
+          return false;
+        }
+      };
+
+      const applied = {
+        opinion: setSelectIfExists('opinionHeader', item.opinionHeader, '意見欄'),
+        name: setSelectIfExists('name-column', item.nameHeader || item.nameColumn, '名前欄'),
+        class: setSelectIfExists('class-column', item.classHeader || item.classColumn, 'クラス欄'),
+        reason: setSelectIfExists('reason-column', item.reasonHeader || item.reasonColumn, '理由欄'),
+      };
+
+      // 結果の表示
+      const appliedCount = Object.values(applied).filter(Boolean).length;
+      const totalColumns = Object.keys(applied).length;
+      
+      console.log('✅ Same-spreadsheet restoration completed:', {
+        sheetName: targetSheetName,
+        appliedColumns: applied,
+        appliedCount,
+        totalColumns
+      });
+      
+      if (typeof showMessage === 'function') {
+        const summary = `✅ 復元プレビューが完了しました (${appliedCount}/${totalColumns}列を適用) - 「公開」ボタンで設定を保存してください`;
+        showMessage(summary, 'success');
+      }
+      
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Same-spreadsheet restoration failed:', error);
+      if (typeof showMessage === 'function') {
+        showMessage('❌ 復元に失敗しました: ' + (error.message || error), 'error');
+      }
       return false;
     }
   },

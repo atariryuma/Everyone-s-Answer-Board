@@ -2147,11 +2147,41 @@ function unpublishBoard() {
         return (showCountsCheckbox && showCountsCheckbox.checked) || false;
       };
       
+      // より確実なスプレッドシートID取得
+      const getCurrentSpreadsheetId = () => {
+        // 1. 現在のステータスから取得
+        const currentId = window.currentStatus?.userInfo?.spreadsheetId;
+        if (currentId) {
+          console.log('📋 SpreadsheetID from currentStatus:', currentId);
+          return currentId;
+        }
+        
+        // 2. publishResponseから取得
+        const responseId = publishResponse?.userInfo?.spreadsheetId;
+        if (responseId) {
+          console.log('📋 SpreadsheetID from publishResponse:', responseId);
+          return responseId;
+        }
+        
+        // 3. userInfoから取得（フォールバック）
+        const userInfoId = userInfo?.spreadsheetId;
+        if (userInfoId) {
+          console.log('📋 SpreadsheetID from userInfo:', userInfoId);
+          return userInfoId;
+        }
+        
+        console.warn('⚠️ SpreadsheetID could not be determined');
+        return '';
+      };
+      
       // 問題文を複数ソースから取得
       const questionText = config.opinionHeader ||
                           config.opinionColumn ||
                           userInfo.customFormInfo?.mainQuestion ||
                           'デフォルト問題文';
+      
+      // 確実なスプレッドシートID取得
+      const actualSpreadsheetId = getCurrentSpreadsheetId();
       
       // シンプルな履歴アイテム構造
       // 履歴保存前の詳細ログ
@@ -2159,7 +2189,8 @@ function unpublishBoard() {
         questionText: questionText,
         selectedSheet: selectedSheet,
         activeSheetName: publishResponse.activeSheetName,
-        spreadsheetId: userInfo.spreadsheetId,
+        actualSpreadsheetId: actualSpreadsheetId,
+        userInfoSpreadsheetId: userInfo.spreadsheetId,
         finalSheetName: publishResponse.activeSheetName || selectedSheet || ''
       });
       
@@ -2170,17 +2201,21 @@ function unpublishBoard() {
         questionText: questionText,
         setupType: getSetupType(),
 
-        // 復元用の最小データ（showNames/showCountsベース）
-        opinionHeader: config.opinionHeader || '',
-        nameHeader: config.nameHeader || '名前',
-        showNames: getShowNames(),      // UI状態を直接保存
-        showCounts: getShowCounts(),    // UI状態を直接保存
+        // 復元用の最小データ（統一フィールド名：*Header形式）
+        opinionHeader: (document.getElementById('opinion-column') && document.getElementById('opinion-column').value) || config.opinionHeader || '',
+        nameHeader: (document.getElementById('name-column') && document.getElementById('name-column').value) || config.nameHeader || '名前',
+        classHeader: (document.getElementById('class-column') && document.getElementById('class-column').value) || config.classHeader || '',
+        reasonHeader: (document.getElementById('reason-column') && document.getElementById('reason-column').value) || config.reasonHeader || '',
+        
+        // UI状態を直接保存
+        showNames: getShowNames(),
+        showCounts: getShowCounts(),
 
-        // 復元用のシート情報
+        // 復元用のシート情報（確実なIDを使用）
         sheetName: publishResponse.activeSheetName || selectedSheet || '',
-        spreadsheetId: userInfo.spreadsheetId || '',
+        spreadsheetId: actualSpreadsheetId,
 
-        // 復元精度向上: 現在の列選択状態も保存（存在する場合）
+        // 下位互換性のための旧フィールド（将来的に削除予定）
         opinionColumn: (document.getElementById('opinion-column') && document.getElementById('opinion-column').value) || config.opinionHeader || '',
         nameColumn: (document.getElementById('name-column') && document.getElementById('name-column').value) || config.nameHeader || '',
         classColumn: (document.getElementById('class-column') && document.getElementById('class-column').value) || config.classHeader || '',
