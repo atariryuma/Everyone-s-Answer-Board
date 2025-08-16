@@ -4,43 +4,36 @@ const vm = require('vm');
 describe('Core.gs utilities', () => {
   const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
-  const unifiedUtilitiesCode = fs.readFileSync(
-    'src/unifiedUtilities.gs',
-    'utf8',
-  );
+  const unifiedUtilitiesCode = fs.readFileSync('src/unifiedUtilities.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   let context;
   beforeEach(() => {
     const store = {};
-    context = {
-      debugLog: () => {},
+    context = { 
+      debugLog: () => {}, 
       errorLog: () => {},
       infoLog: () => {},
       warnLog: () => {},
-      console,
+      console, 
       PropertiesService: {
         getScriptProperties: () => ({
-          getProperty: key => {
+          getProperty: (key) => {
             if (key === 'DEBUG_MODE') return 'false';
             if (key === 'DATABASE_SPREADSHEET_ID') return 'mock-spreadsheet-id';
             return null;
-          },
-        }),
+          }
+        })
       },
       CacheService: {
         getUserCache: () => ({
           get: () => null,
-          put: () => {},
+          put: () => {}
         }),
         getScriptCache: () => ({
-          get: k => store[k] || null,
-          put: (k, v) => {
-            store[k] = v;
-          },
-          remove: k => {
-            delete store[k];
-          },
-        }),
+          get: (k) => store[k] || null,
+          put: (k, v) => { store[k] = v; },
+          remove: (k) => { delete store[k]; }
+        })
       },
       cacheManager: {
         store,
@@ -50,31 +43,27 @@ describe('Core.gs utilities', () => {
           this.store[key] = val;
           return val;
         },
-        remove(key) {
-          delete this.store[key];
-        },
-        clearByPattern: pattern => {
+        remove(key) { delete this.store[key]; },
+        clearByPattern: (pattern) => {
           for (const key in store) {
             if (key.startsWith(pattern.replace('*', ''))) {
               delete store[key];
             }
           }
-        },
+        }
       },
       ScriptApp: {
-        getService: () => ({
-          getUrl: () => 'https://script.google.com/macros/s/ID/exec',
-        }),
-        getScriptId: () => 'ID',
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
+        getScriptId: () => 'ID'
       },
       Session: {
-        getActiveUser: () => ({getEmail: () => 'test@example.com'}),
+        getActiveUser: () => ({ getEmail: () => 'test@example.com' })
       },
       Utilities: {
         getUuid: () => 'mock-uuid',
         computeDigest: () => [],
-        Charset: {UTF_8: 'UTF-8'},
-      },
+        Charset: { UTF_8: 'UTF-8' }
+      }
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
@@ -100,8 +89,8 @@ describe('Core.gs utilities', () => {
       context.findUserById.mockReturnValue({
         configJson: JSON.stringify({
           publishedSheetName: 'Sheet1',
-          sheet_Sheet1: {opinionHeader: 'テーマ'},
-        }),
+          sheet_Sheet1: { opinionHeader: 'テーマ' }
+        })
       });
       const header = context.getOpinionHeaderSafely('uid', 'Sheet1');
       expect(header).toBe('テーマ');
@@ -114,54 +103,38 @@ describe('Core.gs utilities', () => {
 
       Object.assign(context, {
         debugLog: (...args) => console.log('[DEBUG]', ...args), // Add debugLog
-        infoLog: (...args) => console.log('[INFO]', ...args), // Add infoLog
+        infoLog: (...args) => console.log('[INFO]', ...args),   // Add infoLog
         errorLog: (...args) => console.log('[ERROR]', ...args), // Add errorLog
-        warnLog: (...args) => console.log('[WARN]', ...args), // Add warnLog
+        warnLog: (...args) => console.log('[WARN]', ...args),   // Add warnLog
         console, // Keep console for direct logging
 
-        Session: {getActiveUser: () => ({getEmail: () => 'admin@example.com'})},
+        Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
         Utilities: {
           getUuid: () => 'UUID',
           computeDigest: () => [],
-          Charset: {UTF_8: 'UTF-8'},
+          Charset: { UTF_8: 'UTF-8' },
           sleep: jest.fn(),
         },
         findUserByEmail: jest.fn(),
-        createUser: jest.fn(userData => {
-          // Modify createUser mock
+        createUser: jest.fn((userData) => { // Modify createUser mock
           console.log('MOCK: createUser called with:', userData); // Debug log
           createdUserData = userData; // Store the created user data
         }),
         updateUser: jest.fn(),
         invalidateUserCache: jest.fn(),
-        generateUserUrls: jest.fn(() => ({adminUrl: 'admin', viewUrl: 'view'})),
-        getDeployUserDomainInfo: jest.fn(() => ({
-          deployDomain: '',
-          isDomainMatch: true,
-        })),
+        generateUserUrls: jest.fn(() => ({ adminUrl: 'admin', viewUrl: 'view' })),
+        getDeployUserDomainInfo: jest.fn(() => ({ deployDomain: '', isDomainMatch: true })),
         logDatabaseError: jest.fn(),
         waitForUserRecord: jest.fn(() => true),
-        fetchUserFromDatabase: jest.fn((field, value, options) => {
-          // Modify fetchUserFromDatabase mock
-          console.log('MOCK: fetchUserFromDatabase called with:', {
-            field,
-            value,
-            options,
-          }); // Debug log
-          if (
-            createdUserData &&
-            ((field === 'userId' && value === createdUserData.userId) ||
-              (field === 'adminEmail' && value === createdUserData.adminEmail))
-          ) {
-            console.log(
-              'MOCK: fetchUserFromDatabase returning createdUserData:',
-              createdUserData,
-            ); // Debug log
+        fetchUserFromDatabase: jest.fn((field, value, options) => { // Modify fetchUserFromDatabase mock
+          console.log('MOCK: fetchUserFromDatabase called with:', { field, value, options }); // Debug log
+          if (createdUserData && (field === 'userId' && value === createdUserData.userId || field === 'adminEmail' && value === createdUserData.adminEmail)) {
+            console.log('MOCK: fetchUserFromDatabase returning createdUserData:', createdUserData); // Debug log
             return createdUserData; // Return the created user if found
           }
           console.log('MOCK: fetchUserFromDatabase returning null'); // Debug log
           return null; // Otherwise, return null
-        }),
+        })
       });
     });
 
@@ -173,11 +146,7 @@ describe('Core.gs utilities', () => {
     });
 
     test('updates existing user', () => {
-      context.findUserByEmail.mockReturnValue({
-        userId: 'U',
-        configJson: '{}',
-        spreadsheetId: 'SS',
-      });
+      context.findUserByEmail.mockReturnValue({ userId: 'U', configJson: '{}', spreadsheetId: 'SS' });
       const res = context.registerNewUser('admin@example.com');
       expect(context.updateUser).toHaveBeenCalled();
       expect(res.isExistingUser).toBe(true);
@@ -185,12 +154,8 @@ describe('Core.gs utilities', () => {
 
     test('logs and throws when createUser fails', () => {
       context.findUserByEmail.mockReturnValue(null);
-      context.createUser.mockImplementation(() => {
-        throw new Error('General DB Error');
-      });
-      expect(() => context.registerNewUser('admin@example.com')).toThrow(
-        'ユーザー登録に失敗しました。システム管理者に連絡してください。',
-      );
+      context.createUser.mockImplementation(() => { throw new Error('General DB Error'); });
+      expect(() => context.registerNewUser('admin@example.com')).toThrow('ユーザー登録に失敗しました。システム管理者に連絡してください。');
     });
   });
 });

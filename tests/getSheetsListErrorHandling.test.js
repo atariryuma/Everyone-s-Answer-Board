@@ -12,8 +12,8 @@ describe('getSheetsList error handling', () => {
       warnLog: jest.fn(),
       errorLog: jest.fn(),
       infoLog: () => {},
-      Utilities: {sleep: jest.fn(), getUuid: () => 'uuid'},
-      Session: {getActiveUser: () => ({getEmail: () => 'admin@example.com'})},
+      Utilities: { sleep: jest.fn(), getUuid: () => 'uuid' },
+      Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
     };
     vm.createContext(context);
     vm.runInContext(coreCode, context);
@@ -30,18 +30,14 @@ describe('getSheetsList error handling', () => {
 
   test('repairs only when a 403 error occurs', () => {
     context.getSpreadsheetsData
-      .mockImplementationOnce(() => {
-        throw new Error('Sheets API error: 403 - {}');
-      })
-      .mockImplementationOnce(() => ({
-        sheets: [{properties: {title: 'Sheet1', sheetId: 1}}],
-      }));
+      .mockImplementationOnce(() => { throw new Error('Sheets API error: 403 - {}'); })
+      .mockImplementationOnce(() => ({ sheets: [{ properties: { title: 'Sheet1', sheetId: 1 } }] }));
 
     const result = context.getSheetsList('user1');
 
     expect(context.addServiceAccountToSpreadsheet).toHaveBeenCalledTimes(1);
     expect(context.getSpreadsheetsData).toHaveBeenCalledTimes(2);
-    expect(result).toEqual([{name: 'Sheet1', id: 1}]);
+    expect(result).toEqual([{ name: 'Sheet1', id: 1 }]);
   });
 
   test('retries with backoff for server errors without repairing access', () => {
@@ -59,3 +55,4 @@ describe('getSheetsList error handling', () => {
     expect(context.Utilities.sleep).toHaveBeenNthCalledWith(2, 2000);
   });
 });
+

@@ -1,4 +1,4 @@
-const {JSDOM} = require('jsdom');
+const { JSDOM } = require('jsdom');
 
 function applyReactionState(answers) {
   const savedReactions = this.loadReactionState();
@@ -25,7 +25,7 @@ function applyReactionState(answers) {
             }
             savedReactions[answer.rowIndex][type] = {
               reacted: true,
-              timestamp: new Date().toISOString(),
+              timestamp: new Date().toISOString()
             };
             modified = true;
           }
@@ -42,17 +42,14 @@ function applyReactionState(answers) {
   });
 
   if (modified) {
-    localStorage.setItem(
-      this.reactionStorageKey,
-      JSON.stringify(savedReactions),
-    );
+    localStorage.setItem(this.reactionStorageKey, JSON.stringify(savedReactions));
   }
 }
 
 describe('applyReactionState', () => {
   let window, app;
   beforeEach(() => {
-    const dom = new JSDOM('', {url: 'http://localhost'});
+    const dom = new JSDOM('', { url: 'http://localhost' });
     window = dom.window;
     global.window = window;
     global.document = window.document;
@@ -60,26 +57,19 @@ describe('applyReactionState', () => {
     app = {
       reactionStorageKey: 'reactions_test_Sheet1',
       loadReactionState() {
-        return JSON.parse(
-          localStorage.getItem(this.reactionStorageKey) || '{}',
-        );
+        return JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
       },
-      applyReactionState,
+      applyReactionState
     };
     localStorage.clear();
   });
 
   test('clears stale local reactions when server shows none', () => {
-    localStorage.setItem(
-      app.reactionStorageKey,
-      JSON.stringify({
-        1: {LIKE: {reacted: true, timestamp: 't'}},
-      }),
-    );
+    localStorage.setItem(app.reactionStorageKey, JSON.stringify({
+      1: { LIKE: { reacted: true, timestamp: 't' } }
+    }));
 
-    const answers = [
-      {rowIndex: 1, reactions: {LIKE: {reacted: false, count: 0}}},
-    ];
+    const answers = [{ rowIndex: 1, reactions: { LIKE: { reacted: false, count: 0 } } }];
     app.applyReactionState(answers);
 
     expect(answers[0].reactions.LIKE.reacted).toBe(false);
@@ -87,14 +77,10 @@ describe('applyReactionState', () => {
   });
 
   test('stores reaction when server reacted true', () => {
-    const answers = [
-      {rowIndex: 2, reactions: {LIKE: {reacted: true, count: 1}}},
-    ];
+    const answers = [{ rowIndex: 2, reactions: { LIKE: { reacted: true, count: 1 } } }];
     app.applyReactionState(answers);
 
-    const stored = JSON.parse(
-      localStorage.getItem(app.reactionStorageKey) || '{}',
-    );
+    const stored = JSON.parse(localStorage.getItem(app.reactionStorageKey) || '{}');
     expect(stored['2']?.LIKE?.reacted).toBe(true);
     expect(answers[0].reactions.LIKE.reacted).toBe(true);
   });

@@ -11,41 +11,35 @@ describe('generateUserUrls', () => {
     context = {
       cacheManager: {
         store,
-        get(key, fn) {
-          return fn();
-        },
-        remove() {},
+        get(key, fn) { return fn(); },
+        remove() {}
       },
       ScriptApp: {
-        getScriptId: () => 'ID',
+        getScriptId: () => 'ID'
       },
       AppsScript: {
         Script: {
           Deployments: {
             list: () => ({
               deployments: [
-                {
-                  deploymentConfig: {
-                    webApp: {url: 'https://script.google.com/macros/s/ID/exec'},
-                  },
-                },
-              ],
-            }),
-          },
-        },
+                { deploymentConfig: { webApp: { url: 'https://script.google.com/macros/s/ID/exec' } } }
+              ]
+            })
+          }
+        }
       },
-      console: {error: () => {}, log: () => {}, warn: () => {}},
+      console: { error: () => {}, log: () => {}, warn: () => {} },
       debugLog: () => {},
       errorLog: () => {},
       warnLog: () => {},
       infoLog: () => {},
       PropertiesService: {
         getScriptProperties: () => ({
-          getProperty: key => {
+          getProperty: (key) => {
             if (key === 'DEBUG_MODE') return 'false';
             return null;
-          },
-        }),
+          }
+        })
       },
 
       CacheService: (() => {
@@ -53,28 +47,24 @@ describe('generateUserUrls', () => {
         return {
           getUserCache: () => ({
             get: () => null,
-            put: () => {},
+            put: () => {}
           }),
           getScriptCache: () => ({
-            get: k => store[k] || null,
-            put: (k, v) => {
-              store[k] = v;
-            },
-            remove: k => {
-              delete store[k];
-            },
-          }),
+            get: (k) => store[k] || null,
+            put: (k, v) => { store[k] = v; },
+            remove: (k) => { delete store[k]; }
+          })
         };
       })(),
-
+        
       Session: {
-        getActiveUser: () => ({getEmail: () => 'test@example.com'}),
+        getActiveUser: () => ({ getEmail: () => 'test@example.com' })
       },
       Utilities: {
         getUuid: () => 'mock-uuid',
         computeDigest: () => [],
-        Charset: {UTF_8: 'UTF-8'},
-      },
+        Charset: { UTF_8: 'UTF-8' }
+      }
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
@@ -83,15 +73,11 @@ describe('generateUserUrls', () => {
 
   test('returns adminUrl with userId and mode parameter', () => {
     const urls = context.generateUserUrls('abc');
-    expect(urls.adminUrl).toBe(
-      'https://script.google.com/macros/s/ID/exec?mode=admin&userId=abc',
-    );
+    expect(urls.adminUrl).toBe('https://script.google.com/macros/s/ID/exec?mode=admin&userId=abc');
   });
 
   test('returns setupUrl with userId parameter', () => {
     const urls = context.generateUserUrls('abc');
-    expect(urls.setupUrl).toBe(
-      'https://script.google.com/macros/s/ID/exec?setup=true&userId=abc',
-    );
+    expect(urls.setupUrl).toBe('https://script.google.com/macros/s/ID/exec?setup=true&userId=abc');
   });
 });

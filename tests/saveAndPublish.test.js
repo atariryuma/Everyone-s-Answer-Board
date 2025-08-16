@@ -11,8 +11,8 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
       console,
       debugLog: () => {},
       errorLog: jest.fn(), // Add errorLog mock
-      infoLog: jest.fn(), // Add infoLog mock
-      warnLog: jest.fn(), // Add warnLog mock
+      infoLog: jest.fn(),  // Add infoLog mock
+      warnLog: jest.fn(),  // Add warnLog mock
       LockService: {
         getScriptLock: () => ({
           waitLock: jest.fn(),
@@ -36,7 +36,7 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
         adminEmail: 'admin@example.com',
         spreadsheetId: 'SS',
       })),
-      buildResponseFromContext: jest.fn(() => ({_meta: {}})),
+      buildResponseFromContext: jest.fn(() => ({ _meta: {} })),
       Utilities: {
         sleep: jest.fn(), // Add Utilities.sleep mock
       },
@@ -53,10 +53,10 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
       adminEmail: 'admin@example.com',
       spreadsheetId: 'SS',
     }));
-    context.createExecutionContext = jest.fn(uid => ({
+    context.createExecutionContext = jest.fn((uid) => ({
       requestUserId: uid,
       userInfo: context.getCachedUserInfo(uid),
-      stats: {sheetsServiceCreations: 0, dbQueries: 0, operationsCount: 0},
+      stats: { sheetsServiceCreations: 0, dbQueries: 0, operationsCount: 0 },
     }));
 
     const res = context.saveAndPublish('U', 'Sheet1', {});
@@ -65,14 +65,10 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
 
   test('throws error when user info missing', () => {
     context.getCachedUserInfo = jest.fn(() => null);
-    context.createExecutionContext = jest.fn(uid => {
+    context.createExecutionContext = jest.fn((uid) => {
       const userInfo = context.getCachedUserInfo(uid);
       if (!userInfo) throw new Error('ユーザー情報が取得できません');
-      return {
-        requestUserId: uid,
-        userInfo,
-        stats: {sheetsServiceCreations: 0, dbQueries: 0, operationsCount: 0},
-      };
+      return { requestUserId: uid, userInfo, stats: { sheetsServiceCreations: 0, dbQueries: 0, operationsCount: 0 } };
     });
 
     expect(() => context.saveAndPublish('U', 'Sheet1', {})).toThrow(
