@@ -1150,6 +1150,11 @@ function updateFooterAndGuidanceImmediate(status) {
   const viewUrl = (effectiveStatus._normalized && effectiveStatus._normalized.viewUrl) || 
                   (effectiveStatus.appUrls && effectiveStatus.appUrls.viewUrl) ||
                   generateViewUrl(effectiveStatus);
+  
+  // 簡潔なログ出力
+    hasViewUrl: !!viewUrl,
+    source: status._normalized ? '_normalized' : 'fallback'
+  });
 
   // Show footer if published (with strict validation)
   if (finalIsPublished) {
