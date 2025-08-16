@@ -32,37 +32,32 @@
   // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
   (function() {
     try {
-      var originalLog = console.log;
-      var originalWarn = console.warn;
+      const originalLog = console.log;
+      const originalWarn = console.warn;
       // Read from injected DEBUG_MODE or SYSTEM_CONSTANTS fallback
-      var isDebug = !!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE));
+      const isDebug = !!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE));
 
-      var warningFilters = [
+      const warningFilters = [
         /Unrecognized feature.*ambient-light-sensor/i,
         /Unrecognized feature.*speaker/i,
         /Unrecognized feature.*vibrate/i,
         /Unrecognized feature.*vr/i,
-        /iframe.*allow-scripts.*allow-same-origin.*sandbox/i
+        /iframe.*allow-scripts.*allow-same-origin.*sandbox/i,
       ];
 
-      function shouldFilter(msg) {
-        var s = String(msg || '');
-        for (var i = 0; i < warningFilters.length; i++) {
-          if (warningFilters[i].test(s)) return true;
-        }
-        return false;
-      }
+      const shouldFilter = (msg) => {
+        const s = String(msg || '');
+        return warningFilters.some((re) => re.test(s));
+      };
 
-      console.log = function() {
+      console.log = function(...args) {
         if (!isDebug) return; // suppress in non-debug mode
-        var args = Array.prototype.slice.call(arguments);
         if (shouldFilter(args.join(' '))) return;
         try { originalLog.apply(console, args); } catch (_) {}
       };
 
-      console.warn = function() {
+      console.warn = function(...args) {
         if (!isDebug) return; // suppress in non-debug mode
-        var args = Array.prototype.slice.call(arguments);
         if (shouldFilter(args.join(' '))) return;
         try { originalWarn.apply(console, args); } catch (_) {}
       };
@@ -76,10 +71,9 @@
   // GASOptimizer and UnifiedCache are now guaranteed to be defined
   // Enhanced Global Error Handling with Smart Recovery
   window.addEventListener('error', function(event) {
-    var errorObj = event && event.error ? event.error : null;
-    var errorMessage = (errorObj && errorObj.message) || '';
-    var errorStack = (errorObj && errorObj.stack) || '';
-    var errorLine = event && event.lineno ? event.lineno : 'unknown';
+    const errorMessage = event.error?.message || '';
+    const errorStack = event.error?.stack || '';
+    const errorLine = event.lineno || 'unknown';
     
     // Non-critical GAS internal errors (suppress with logging)
     const suppressedErrors = [
@@ -115,13 +109,13 @@
       'is not a function'
     ];
     
-    var shouldSuppress = suppressedErrors.some(function(pattern) {
-      return (errorMessage.indexOf(pattern) !== -1) || (errorStack.indexOf(pattern) !== -1);
-    });
+    const shouldSuppress = suppressedErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
     
-    var isCritical = criticalErrors.some(function(pattern) {
-      return (errorMessage.indexOf(pattern) !== -1) || (errorStack.indexOf(pattern) !== -1);
-    });
+    const isCritical = criticalErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
     
     if (shouldSuppress) {
       // Log suppressed error for debugging (optional)
@@ -142,12 +136,12 @@
         logDebug(' Attempting function recovery...');
         // Trigger fallback initialization after a short delay
         setTimeout(() => {
-        if (typeof window.initializeAdminPanelMaster === 'function') {
-          logDebug(' Re-initializing admin panel...');
-          window.initializeAdminPanelMaster();
-        }
-      }, 1000);
-    }
+          if (typeof window.initializeAdminPanelMaster === 'function') {
+            logDebug(' Re-initializing admin panel...');
+            window.initializeAdminPanelMaster();
+          }
+        }, 1000);
+      }
       
       // Show user-friendly error message for critical issues
       setTimeout(() => {
@@ -158,16 +152,12 @@
     }
     
     // Log important errors
-    if (errorObj) {
-      logError('Global error caught:', errorObj);
-    } else {
-      logError('Global error caught (no error object)');
-    }
+    logError('Global error caught:', event.error);
   });
   
   // Enhanced Promise rejection handling
   window.addEventListener('unhandledrejection', function(event) {
-    var reason = (event && event.reason && event.reason.toString) ? event.reason.toString() : '';
+    const reason = event.reason?.toString() || '';
     
     // Suppress Google Apps Script internal promise rejections
     if (reason.includes('document.write') || 
