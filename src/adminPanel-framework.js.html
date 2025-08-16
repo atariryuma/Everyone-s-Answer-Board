@@ -2033,40 +2033,43 @@ window.HistoryManager = {
         const original = glass.innerHTML;
         // 軽量な装飾を加えたレイアウト（内容はそのまま）
         glass.innerHTML = `
-          <div class='flex items-center gap-3 mb-4'>
-            <div class='w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center'>
-              <svg class='w-6 h-6 text-orange-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+          <div class='flex items-center gap-3 mb-5'>
+            <div class='w-10 h-10 rounded-xl bg-cyan-500/15 ring-1 ring-cyan-400/30 flex items-center justify-center'>
+              <svg class='w-6 h-6 text-cyan-300' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                 <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'></path>
               </svg>
             </div>
-            <h3 class='text-lg font-bold text-white'>${title}</h3>
+            <h3 class='text-xl font-bold text-cyan-400 tracking-tight'>${title}</h3>
           </div>
-          <div class='bg-gray-800/60 border border-gray-600/70 rounded-lg p-4 mb-4'>
+
+          <div class='bg-gray-800/60 border border-gray-700/70 rounded-lg p-4 mb-4'>
             <p class='text-gray-200 text-sm leading-relaxed whitespace-pre-line'>${message}</p>
           </div>
-          <div class='grid grid-cols-1 gap-2 mb-5'>
-            <div class='flex items-start gap-2'>
-              <span class='text-gray-400 text-xs mt-0.5'>📝</span>
+
+          <div class='grid grid-cols-1 gap-3 mb-6'>
+            <div class='flex items-start gap-3'>
+              <div class='w-6 h-6 rounded-md bg-gray-700/60 flex items-center justify-center text-sm'>📝</div>
               <div>
-                <div class='text-xs text-gray-400'>復元する問題文</div>
+                <div class='text-xs text-gray-400 mb-0.5'>復元する問題文</div>
                 <div class='text-sm text-gray-100'>${truncatedQuestion}</div>
               </div>
             </div>
-            <div class='flex items-start gap-2'>
-              <span class='text-gray-400 text-xs mt-0.5'>📊</span>
+            <div class='flex items-start gap-3'>
+              <div class='w-6 h-6 rounded-md bg-gray-700/60 flex items-center justify-center text-sm'>📊</div>
               <div>
-                <div class='text-xs text-gray-400'>シート名</div>
+                <div class='text-xs text-gray-400 mb-0.5'>シート名</div>
                 <div class='text-sm text-gray-100'>${item.sheetName || '未設定'}</div>
               </div>
             </div>
-            <div class='flex items-start gap-2'>
-              <span class='text-gray-400 text-xs mt-0.5'>📅</span>
+            <div class='flex items-start gap-3'>
+              <div class='w-6 h-6 rounded-md bg-gray-700/60 flex items-center justify-center text-sm'>📅</div>
               <div>
-                <div class='text-xs text-gray-400'>作成日</div>
+                <div class='text-xs text-gray-400 mb-0.5'>作成日</div>
                 <div class='text-sm text-gray-100'>${formattedDate}</div>
               </div>
             </div>
           </div>
+
           <div class='flex justify-end gap-3'>
             <button type='button' id='restore-cancel-btn' class='btn btn-secondary'>キャンセル</button>
             <button type='button' id='restore-confirm-btn' class='btn btn-primary'>復元する</button>
@@ -2148,7 +2151,8 @@ window.HistoryManager = {
         }
         // サーバのアクティブシートを即時更新し、後続APIが同じシートを見るようにする
         try {
-          await runGasWithUserId('activateSheet', 'シートをアクティブ化中...', targetSheetName);
+          const ssId = window.currentStatus?.userInfo?.spreadsheetId || item.spreadsheetId || null;
+          await runGasWithUserId('activateSheet', 'シートをアクティブ化中...', ssId, targetSheetName);
           // ローカル状態も同期
           if (window.currentStatus && window.currentStatus.userInfo) {
             try {
