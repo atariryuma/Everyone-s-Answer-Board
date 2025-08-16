@@ -122,9 +122,9 @@
             </div>
         </div>
 
-        <!-- システム診断・監視セクション -->
+        <!-- システム診断・整合性セクション -->
         <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">🔍 システム診断・監視</h2>
+            <h2 class="text-xl font-semibold text-white mb-4">🔍 システム診断・整合性</h2>
             
             <div class="space-y-4">
                 <!-- 診断機能 -->
@@ -139,32 +139,10 @@
                             診断実行
                         </button>
                     </div>
-                    
-                    <div class="p-4 bg-gray-800 rounded-lg">
-                        <h3 class="text-lg font-medium text-white mb-3">🔧 自動修復</h3>
-                        <p class="text-sm text-gray-400 mb-4">検出された問題を自動的に修復します</p>
-                        <button 
-                            id="run-repair-btn"
-                            onclick="runAutoRepair()"
-                            class="btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg w-full">
-                            修復実行
-                        </button>
-                    </div>
                 </div>
                 
                 <!-- 監視機能 -->
                 <div class="grid md:grid-cols-2 gap-4">
-                    <div class="p-4 bg-gray-800 rounded-lg">
-                        <h3 class="text-lg font-medium text-white mb-3">📈 システム監視</h3>
-                        <p class="text-sm text-gray-400 mb-4">システム全体の健全性をチェックします</p>
-                        <button 
-                            id="run-monitoring-btn"
-                            onclick="runSystemMonitoring()"
-                            class="btn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg w-full">
-                            監視実行
-                        </button>
-                    </div>
-                    
                     <div class="p-4 bg-gray-800 rounded-lg">
                         <h3 class="text-lg font-medium text-white mb-3">✅ データ整合性</h3>
                         <p class="text-sm text-gray-400 mb-4">データベースの整合性をチェックします</p>
@@ -1071,13 +1049,7 @@
             executeSystemFunction('run-diagnosis-btn', 'システム診断中...', 'diagnoseDatabase', '診断実行');
         }
 
-        function runAutoRepair() {
-            executeSystemFunction('run-repair-btn', '自動修復中...', 'performAutoRepair', '修復実行');
-        }
-
-        function runSystemMonitoring() {
-            executeSystemFunction('run-monitoring-btn', 'システム監視中...', 'performSystemMonitoring', '監視実行');
-        }
+        // 自動修復・システム監視機能は削除済み（サーバー機能も廃止）
 
         function runIntegrityCheck() {
             executeSystemFunction('run-integrity-btn', '整合性チェック中...', 'performDataIntegrityCheck', '整合性チェック');

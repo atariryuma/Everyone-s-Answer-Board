@@ -3255,10 +3255,11 @@ class StudyQuestApp {
             try {
               console.log('🔧 サーバー側診断・修復を要求中...');
               await new Promise((resolve, reject) => {
+                // サーバー側の自動修復機能は廃止済みのため、ユーザー単位の整合性修正に切り替え
                 google.script.run
                   .withSuccessHandler(resolve)
                   .withFailureHandler(reject)
-                  .performAutoRepair(fetchParams.userId);
+                  .fixUserDataConsistency(fetchParams.userId);
               });
               console.log('✅ サーバー側修復完了、次の試行に進みます');
             } catch (repairError) {
