@@ -55,6 +55,9 @@ const SYSTEM_CONSTANTS = {
     CLEANUP_INTERVAL: 300000        // リソースクリーンアップ間隔 (5分)
   },
 
+  // Global DEBUG_MODE (will be set from window.DEBUG_MODE if available)
+  DEBUG_MODE: false,
+
   // エラー関連定数
   ERROR_HANDLING: {
     MAX_ERROR_HISTORY: 50,          // エラー履歴最大保持数
@@ -119,6 +122,11 @@ const SYSTEM_CONSTANTS = {
     MEMORY_CLEANUP_THRESHOLD: 50    // メモリクリーンアップ閾値 (MB)
   }
 };
+
+// DEBUG_MODEを動的に設定（window.DEBUG_MODEが利用可能な場合）
+if (typeof window !== 'undefined' && typeof window.DEBUG_MODE === 'boolean') {
+  SYSTEM_CONSTANTS.DEBUG_MODE = window.DEBUG_MODE;
+}
 
 // 定数の読み取り専用化
 Object.freeze(SYSTEM_CONSTANTS);

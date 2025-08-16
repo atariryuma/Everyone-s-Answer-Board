@@ -29,7 +29,11 @@
   <?!= include('UnifiedCache.js'); ?>
   <?!= include('adminPanel-framework.js.html'); ?>
   <script>
-  // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
+    // Initialize DEBUG_MODE from server-side template
+    const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
+    window.DEBUG_MODE = DEBUG_MODE;
+    
+    // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
   (function() {
     try {
       const originalLog = console.log;
