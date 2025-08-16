@@ -55,7 +55,7 @@ class AdminPanelStateManager {
       try {
         cb(value);
       } catch (e) {
-        console.warn('Subscriber callback failed', e);
+        logWarn('Subscriber callback failed', e);
       }
     });
   }
@@ -73,7 +73,7 @@ class AdminPanelEventManager {
     if (!element || !event || !handler) return;
     const key = (element.id || 'anonymous') + '-' + event;
     if (this.listeners.has(key)) {
-      console.warn('Duplicate listener for ' + key);
+      logWarn('Duplicate listener for ' + key);
       return;
     }
     element.addEventListener(event, handler, options);
@@ -160,19 +160,19 @@ function adminLog(level, ...args) {
   
   switch (level) {
     case 'error':
-      console.error('[AdminPanel]', ...args);
+      logError('[AdminPanel]', ...args);
       break;
     case 'warn':
-      console.warn('[AdminPanel]', ...args);
+      logWarn('[AdminPanel]', ...args);
       break;
     case 'info':
-      console.log('[AdminPanel]', ...args);
+      logDebug('[AdminPanel]', ...args);
       break;
     case 'debug':
-      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) console.log('[AdminPanel:DEBUG]', ...args);
+      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) logDebug('[AdminPanel:DEBUG]', ...args);
       break;
     default:
-      console.log('[AdminPanel]', ...args);
+      logDebug('[AdminPanel]', ...args);
   }
 }
 
@@ -201,20 +201,20 @@ function initializeUserId() {
         
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
           userId = response.userInfo.userId;
-          logDebug('✅ AdminPanel: User authenticated, userId:', userId);
+          logDebug(' AdminPanel: User authenticated, userId:', userId);
           console.groupEnd();
           resolve(userId);
         } else {
-          console.error('❌ Failed to get userId from backend:', response);
-          console.error('❌ Expected: {status: "success", userInfo: {userId: "..."}}');
+          logError(' Failed to get userId from backend:', response);
+          logError(' Expected: {status: "success", userInfo: {userId: "..."}}');
           console.groupEnd();
           reject(new Error('ユーザーIDの取得に失敗しました'));
         }
       })
       .withFailureHandler(error => {
-        console.error('❌ Backend error getting userId:', error);
-        console.error('❌ Error type:', typeof error);
-        console.error('❌ Error details:', error);
+        logError(' Backend error getting userId:', error);
+        logError(' Error type:', typeof error);
+        logError(' Error details:', error);
         console.groupEnd();
         reject(error);
       })
@@ -228,13 +228,13 @@ async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
     try {
       return await initializeUserId();
     } catch (error) {
-      console.warn(`⚠️ UserId initialization failed (attempt ${i + 1}/${maxRetries}):`, error.message);
+      logWarn(`️ UserId initialization failed (attempt ${i + 1}/${maxRetries}):`, error.message);
       if (i < maxRetries - 1) {
-        console.log(`🔄 Retrying in ${delay}ms...`);
+        logDebug(` Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         delay = Math.min(delay * 1.5, 5000); // 指数バックオフ（最大5秒）
       } else {
-        console.error('❌ All userId initialization attempts failed');
+        logError(' All userId initialization attempts failed');
         throw error;
       }
     }
@@ -286,13 +286,13 @@ function initializeUI() {
 
 // Initialize API functionality
 function initializeAPI() {
-  logDebug('🔧 API初期化開始');
+  logDebug(' API初期化開始');
   
   // Start background status updates with safe calling
   if (checkFunctionAvailability('startSystemStatusUpdate')) {
     safeCallFunction('startSystemStatusUpdate');
   } else {
-    console.warn('⚠️ startSystemStatusUpdate not available - background updates disabled');
+    logWarn('️ startSystemStatusUpdate not available - background updates disabled');
   }
   
   // Setup user activity tracking
@@ -306,11 +306,11 @@ function initializeAPI() {
     if (checkFunctionAvailability('loadStatus')) {
       window.loadStatus(true);
     } else {
-      console.warn('⚠️ loadStatus not available');
+      logWarn('️ loadStatus not available');
     }
   }, 500); // 500ms遅延でより安全な初期化
   
-  logDebug('✅ API初期化完了');
+  logDebug(' API初期化完了');
 }
 
 // Update user activity timestamp for polling optimization
@@ -327,13 +327,13 @@ function initializeEventListeners() {
   if (checkFunctionAvailability('setupEventListeners')) {
     safeCallFunction('setupEventListeners');
   } else {
-    console.warn('⚠️ setupEventListeners function not available, attempting graceful degradation');
+    logWarn('️ setupEventListeners function not available, attempting graceful degradation');
     
     // Basic fallback event listener setup
     if (checkFunctionAvailability('setupRealtimeValidation')) {
       safeCallFunction('setupRealtimeValidation');
     } else {
-      console.warn('⚠️ setupRealtimeValidation not available - real-time validation disabled');
+      logWarn('️ setupRealtimeValidation not available - real-time validation disabled');
     }
   }
 }
@@ -430,7 +430,7 @@ window.initializeAdminPanel = initializeAdminPanel;
 function toggleSection(sectionId) {
   const section = document.getElementById(sectionId);
   if (!section) {
-    console.warn('Section not found:', sectionId);
+    logWarn('Section not found:', sectionId);
     return;
   }
   
@@ -503,7 +503,7 @@ function showFormConfigModal() {
 // Enhanced updateUIWithNewStatus that works with both minimal and full implementations
 function updateUIWithNewStatus(status) {
   if (!status) {
-    console.warn('updateUIWithNewStatus: Invalid status received');
+    logWarn('updateUIWithNewStatus: Invalid status received');
     return;
   }
   
@@ -515,11 +515,11 @@ function updateUIWithNewStatus(status) {
     try {
       // 本番環境でのログ量を減らす
       if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
-        console.log('updateUIWithNewStatus: Using full implementation');
+        logDebug('updateUIWithNewStatus: Using full implementation');
       }
       return window._fullUpdateUIWithNewStatus(status);
     } catch (error) {
-      console.warn('Full updateUIWithNewStatus failed, using fallback:', error);
+      logWarn('Full updateUIWithNewStatus failed, using fallback:', error);
       // Continue with minimal implementation below
     }
   } else {
@@ -530,12 +530,12 @@ function updateUIWithNewStatus(status) {
     
     const tryFullImplementation = () => {
       if (typeof window._fullUpdateUIWithNewStatus === 'function') {
-        console.log(`updateUIWithNewStatus: Full implementation now available (retry ${retryCount + 1})`);
+        logDebug(`updateUIWithNewStatus: Full implementation now available (retry ${retryCount + 1})`);
         try {
           window._fullUpdateUIWithNewStatus(status);
           return;
         } catch (error) {
-          console.warn('Retried full updateUIWithNewStatus failed:', error);
+          logWarn('Retried full updateUIWithNewStatus failed:', error);
         }
       }
       
@@ -543,7 +543,7 @@ function updateUIWithNewStatus(status) {
         retryCount++;
         setTimeout(tryFullImplementation, retryDelays[retryCount - 1] || 1000);
       } else {
-        console.log('updateUIWithNewStatus: Max retries exceeded, using minimal implementation only');
+        logDebug('updateUIWithNewStatus: Max retries exceeded, using minimal implementation only');
       }
     };
     
@@ -552,7 +552,7 @@ function updateUIWithNewStatus(status) {
   }
   
   // Enhanced minimal implementation for comprehensive UI updates
-  console.log('updateUIWithNewStatus: Using enhanced minimal implementation');
+  logDebug('updateUIWithNewStatus: Using enhanced minimal implementation');
   
   // Update essential UI elements with comprehensive information
   try {
@@ -607,7 +607,7 @@ function updateUIWithNewStatus(status) {
             ? JSON.parse(status.userInfo.configJson) 
             : status.userInfo.configJson;
         } catch (e) {
-          console.warn('Failed to parse configJson in minimal implementation');
+          logWarn('Failed to parse configJson in minimal implementation');
         }
       }
       
@@ -650,7 +650,7 @@ function updateUIWithNewStatus(status) {
     
     
   } catch (error) {
-    console.error('Error in enhanced minimal updateUIWithNewStatus:', error);
+    logError('Error in enhanced minimal updateUIWithNewStatus:', error);
   }
 }
 
@@ -680,7 +680,7 @@ function hideConfirmationModal() {
 
 // Unified showMessage function - uses SharedUtilities MessageManager
 function showMessage(message, type = 'info', duration = 5000) {
-  console.log(`[${type.toUpperCase()}] ${message}`);
+  logDebug(`[${type.toUpperCase()}] ${message}`);
   
   // Use SharedUtilities MessageManager if available
   if (window.sharedUtilities?.messages?.show) {
@@ -688,7 +688,7 @@ function showMessage(message, type = 'info', duration = 5000) {
   }
   
   // Fallback for cases where SharedUtilities is not loaded
-  console.warn('⚠️ SharedUtilities MessageManager not available, using console fallback');
+  logWarn('️ SharedUtilities MessageManager not available, using console fallback');
 }
 
 // =============================================================================
@@ -702,12 +702,12 @@ function validateConfig() {
     try {
       return window._fullValidateConfig();
     } catch (error) {
-      console.warn('Full validateConfig failed, using fallback:', error);
+      logWarn('Full validateConfig failed, using fallback:', error);
     }
   }
   
   // Minimal implementation for essential validation
-  console.log('validateConfig: Using minimal implementation');
+  logDebug('validateConfig: Using minimal implementation');
   
   try {
     // Check primary element first, then fallback to secondary element
@@ -718,7 +718,7 @@ function validateConfig() {
     
     return opinionValue && opinionValue.trim() !== '';
   } catch (error) {
-    console.error('Error in minimal validateConfig:', error);
+    logError('Error in minimal validateConfig:', error);
     return false;
   }
 }
@@ -730,12 +730,12 @@ function updateConfigButtons() {
     try {
       return window._fullUpdateConfigButtons();
     } catch (error) {
-      console.warn('Full updateConfigButtons failed, using fallback:', error);
+      logWarn('Full updateConfigButtons failed, using fallback:', error);
     }
   }
   
   // Minimal implementation for essential button updates
-  console.log('updateConfigButtons: Using minimal implementation');
+  logDebug('updateConfigButtons: Using minimal implementation');
   
   try {
     const isValid = validateConfig();
@@ -750,7 +750,7 @@ function updateConfigButtons() {
       }
     }
   } catch (error) {
-    console.error('Error in minimal updateConfigButtons:', error);
+    logError('Error in minimal updateConfigButtons:', error);
   }
 }
 
@@ -762,7 +762,7 @@ function updateConfigButtons() {
 function checkFunctionAvailability(functionName) {
   const isAvailable = typeof window[functionName] === 'function';
   if (!isAvailable) {
-    console.warn(`⚠️ Function ${functionName} is not available`);
+    logWarn(`️ Function ${functionName} is not available`);
   }
   return isAvailable;
 }
@@ -773,11 +773,11 @@ function safeCallFunction(functionName, ...args) {
     if (checkFunctionAvailability(functionName)) {
       return window[functionName](...args);
     } else {
-      console.warn(`⚠️ Cannot call ${functionName} - function not available`);
+      logWarn(`️ Cannot call ${functionName} - function not available`);
       return null;
     }
   } catch (error) {
-    console.error(`❌ Error calling ${functionName}:`, error);
+    logError(` Error calling ${functionName}:`, error);
     return null;
   }
 }
@@ -794,7 +794,7 @@ window.AdminPanel.functionRegistry = {
       this.pending.delete(functionName);
     } else {
       this.pending.add(functionName);
-      console.warn(`⚠️ Function pending: ${functionName}`);
+      logWarn(`️ Function pending: ${functionName}`);
     }
   },
   
@@ -804,7 +804,7 @@ window.AdminPanel.functionRegistry = {
       this.fullImplementations.add(functionName);
       // デバッグモードのみログ出力（本番での重複ログを減らす）
       if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
-        console.log(`🔧 Full implementation registered: ${fullFuncName}`);
+        logDebug(` Full implementation registered: ${fullFuncName}`);
       }
     }
   },
@@ -835,7 +835,7 @@ window.AdminPanel.functionRegistry = {
     
     // 本番環境でのログ量を減らす
     if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
-      console.log(`🔍 Full implementations check: ${foundCount}/${functionsToCheck.length} available`);
+      logDebug(` Full implementations check: ${foundCount}/${functionsToCheck.length} available`);
     }
     return foundCount;
   },
@@ -872,12 +872,12 @@ function updateFormUrlDisplay(status = null) {
     try {
       return window._fullUpdateFormUrlDisplay(status);
     } catch (error) {
-      console.warn('Full updateFormUrlDisplay failed, using fallback:', error);
+      logWarn('Full updateFormUrlDisplay failed, using fallback:', error);
     }
   }
   
   // Minimal implementation for essential form URL updates
-  console.log('updateFormUrlDisplay: Using minimal implementation');
+  logDebug('updateFormUrlDisplay: Using minimal implementation');
   
   try {
     const formUrlInput = document.getElementById('form-url-input');
@@ -885,7 +885,7 @@ function updateFormUrlDisplay(status = null) {
     
     const currentStatusToUse = status || window.currentStatus;
     if (!currentStatusToUse || !currentStatusToUse.userInfo) {
-      console.warn('⚠️ updateFormUrlDisplay: status情報が不足しています');
+      logWarn('️ updateFormUrlDisplay: status情報が不足しています');
       return;
     }
     
@@ -898,7 +898,7 @@ function updateFormUrlDisplay(status = null) {
           : currentStatusToUse.userInfo.configJson;
         formUrl = config.formUrl;
       } catch (e) {
-        console.warn('Failed to parse configJson for form URL');
+        logWarn('Failed to parse configJson for form URL');
       }
     }
     
@@ -910,7 +910,7 @@ function updateFormUrlDisplay(status = null) {
       }
     }
   } catch (error) {
-    console.error('Error in minimal updateFormUrlDisplay:', error);
+    logError('Error in minimal updateFormUrlDisplay:', error);
   }
 }
 
@@ -921,12 +921,12 @@ function populateHeaderOptions(headers) {
     try {
       return window._fullPopulateHeaderOptions(headers);
     } catch (error) {
-      console.warn('Full populateHeaderOptions failed, using fallback:', error);
+      logWarn('Full populateHeaderOptions failed, using fallback:', error);
     }
   }
   
   // Minimal implementation for essential header population
-  console.log('populateHeaderOptions: Using minimal implementation');
+  logDebug('populateHeaderOptions: Using minimal implementation');
   
   try {
     if (window.populateHeaderOptionsRunning) {
@@ -966,7 +966,7 @@ function populateHeaderOptions(headers) {
       window.populateHeaderOptionsRunning = false;
     }, 100);
   } catch (error) {
-    console.error('Error in minimal populateHeaderOptions:', error);
+    logError('Error in minimal populateHeaderOptions:', error);
     window.populateHeaderOptionsRunning = false;
   }
 }
@@ -988,12 +988,12 @@ function populateConfig(cfg) {
     try {
       return window._fullPopulateConfig(cfg);
     } catch (error) {
-      console.warn('Full populateConfig failed, using fallback:', error);
+      logWarn('Full populateConfig failed, using fallback:', error);
     }
   }
   
   // Minimal implementation for essential config population
-  console.log('populateConfig: Using minimal implementation');
+  logDebug('populateConfig: Using minimal implementation');
   
   try {
     if (!cfg) return;
@@ -1029,7 +1029,7 @@ function populateConfig(cfg) {
       window.populateConfigRunning = false;
     }, 100);
   } catch (error) {
-    console.error('Error in minimal populateConfig:', error);
+    logError('Error in minimal populateConfig:', error);
     window.populateConfigRunning = false;
   }
 }
@@ -1062,11 +1062,11 @@ function checkFullImplementationsAvailability() {
   const foundCount = window.AdminPanel.functionRegistry.checkForFullImplementations();
   
   if (foundCount > 0) {
-    console.log(`🎉 Found ${foundCount} full implementations on attempt ${fullImplCheckCount}`);
+    logDebug(` Found ${foundCount} full implementations on attempt ${fullImplCheckCount}`);
     
     // Force retry of UI updates with full implementations now available
     if (window.currentStatus && foundCount >= 3) {
-      console.log('🔄 Retrying UI updates with full implementations');
+      logDebug(' Retrying UI updates with full implementations');
       setTimeout(() => {
         if (typeof window._fullUpdateUIWithNewStatus === 'function') {
           window._fullUpdateUIWithNewStatus(window.currentStatus);
@@ -1077,7 +1077,7 @@ function checkFullImplementationsAvailability() {
     // Continue checking for full implementations
     setTimeout(checkFullImplementationsAvailability, 500);
   } else {
-    console.warn('⚠️ Full implementations not found after maximum attempts');
+    logWarn('️ Full implementations not found after maximum attempts');
   }
 }
 
@@ -1104,13 +1104,13 @@ window.systemStatus = {
 // 初期化中のユーザー操作防止 - DOM準備完了後に実行
 if (document.body) {
   document.body.style.pointerEvents = 'none';
-  console.log('🛡️ User interaction disabled during initialization');
+  logDebug('🛡 User interaction disabled during initialization');
 } else {
   // DOM読み込み完了を待ってから実行
   document.addEventListener('DOMContentLoaded', function() {
     if (document.body) {
       document.body.style.pointerEvents = 'none';
-      console.log('🛡️ User interaction disabled during initialization (delayed)');
+      logDebug('🛡 User interaction disabled during initialization (delayed)');
     }
   });
 }
@@ -1119,7 +1119,7 @@ if (document.body) {
 function disableUserInteraction() {
   // DOM準備完了チェック
   if (!document || !document.body) {
-    console.warn('⚠️ DOM not ready for disableUserInteraction');
+    logWarn('️ DOM not ready for disableUserInteraction');
     return;
   }
   
@@ -1140,14 +1140,14 @@ function disableUserInteraction() {
   // body要素の無効化
   document.body.style.pointerEvents = 'none';
   
-  console.log('🛡️ All interactive elements disabled');
+  logDebug('🛡 All interactive elements disabled');
 }
 
 // UI要素を有効化する関数
 function enableUserInteraction() {
   // DOM準備完了チェック
   if (!document || !document.body) {
-    console.warn('⚠️ DOM not ready for enableUserInteraction');
+    logWarn('️ DOM not ready for enableUserInteraction');
     return;
   }
   
@@ -1168,7 +1168,7 @@ function enableUserInteraction() {
   // body要素も有効化
   document.body.style.pointerEvents = 'auto';
   
-  console.log('✅ All interactive elements enabled');
+  logDebug(' All interactive elements enabled');
 }
 
 // DOM読み込み後に要素を無効化
@@ -1184,7 +1184,7 @@ function updateSystemStatus(component, status, error = null) {
   if (error) {
     window.systemStatus.errors.push({ component, error: error.toString(), timestamp: Date.now() });
   }
-  logDebug(`📊 System Status: ${component} = ${status}`);
+  logDebug(` System Status: ${component} = ${status}`);
 }
 
 // 公開停止後の全セクション展開処理
@@ -1207,7 +1207,7 @@ function checkAndExpandAllSections() {
               if (typeof toggleSection === 'function') {
                 toggleSection(sectionId);
                 expandedCount++;
-                logDebug(`✅ セクション展開: ${sectionId}`);
+                logDebug(` セクション展開: ${sectionId}`);
               }
             }
           }
@@ -1223,7 +1223,7 @@ function checkAndExpandAllSections() {
       }, 500);
     }
   } catch (error) {
-    logWarn('⚠️ 全セクション展開処理でエラー:', error);
+    logWarn('️ 全セクション展開処理でエラー:', error);
   }
 }
 
@@ -1234,7 +1234,7 @@ function checkAndExpandAllSections() {
 function initializeAdminPanelMaster() {
   // シンプル化: 重複初期化チェックを簡素化
   if (window.AdminPanel.initialization.isCompleted) {
-    logDebug('✅ AdminPanel already initialized');
+    logDebug(' AdminPanel already initialized');
     return;
   }
   
@@ -1245,7 +1245,7 @@ function initializeAdminPanelMaster() {
   try {
     initCore();
   } catch (error) {
-    console.error('❌ Core initialization failed:', error);
+    logError(' Core initialization failed:', error);
   }
   
   // 公開停止後の全セクション展開処理
@@ -1259,7 +1259,7 @@ function initializeAdminPanelMaster() {
       const formUrlSection = document.getElementById('form-url-section');
       if (formUrlSection && !formUrlSection.classList.contains('hidden')) {
         formUrlSection.classList.add('hidden');
-        logDebug('📋 既存アクセス時はフォーム完了セクションを非表示');
+        logDebug(' 既存アクセス時はフォーム完了セクションを非表示');
       }
     }
   }, 100);
@@ -1267,55 +1267,55 @@ function initializeAdminPanelMaster() {
   // Phase 2: 各モジュールを並列初期化 (パフォーマンス向上)
   // 遅延を最小限に抑制して即座に初期化
   setTimeout(() => {
-    logDebug('🔧 Phase 2: 並列モジュール初期化開始');
+    logDebug(' Phase 2: 並列モジュール初期化開始');
     
     // Status管理初期化
     try {
       initializeMessageArea();
-      logDebug('✅ Status module initialized');
+      logDebug(' Status module initialized');
     } catch (error) {
-      logError('❌ Status module initialization failed:', error);
+      logError(' Status module initialization failed:', error);
     }
     
     // API通信初期化
     try {
       logDebug('🚀 API module initialization...');
       initializeAPI();
-      logDebug('✅ API module initialized');
+      logDebug(' API module initialized');
     } catch (error) {
-      console.error('❌ API initialization failed:', error);
+      logError(' API initialization failed:', error);
     }
     
     // UI初期化
     try {
       initializeUI();
-      logDebug('✅ UI module initialized');
+      logDebug(' UI module initialized');
     } catch (error) {
-      console.error('❌ UI initialization failed:', error);
+      logError(' UI initialization failed:', error);
     }
     
     // フォーム管理初期化
     try {
       setupCharacterCounters();
       setupModalCharacterCounters();
-      logDebug('✅ Forms module initialized');
+      logDebug(' Forms module initialized');
     } catch (error) {
-      logError('❌ Forms module initialization failed:', error);
+      logError(' Forms module initialization failed:', error);
     }
     
     // イベント管理初期化（最後に実行）
     setTimeout(() => {
       try {
         initializeEventListeners();
-        logDebug('✅ Events module initialized');
-        logInfo('🎉 AdminPanel Master Initialization Complete');
+        logDebug(' Events module initialized');
+        logInfo(' AdminPanel Master Initialization Complete');
         
         // ユーザー情報の同期と最終処理
         finalizeInitialization();
         
       } catch (error) {
         updateSystemStatus('eventsInitialized', false, error);
-        console.error('❌ Events initialization failed:', error);
+        logError(' Events initialization failed:', error);
         
         // エラーでも最終処理は実行
         finalizeInitialization();
@@ -1329,7 +1329,7 @@ function initializeAdminPanelMaster() {
 async function finalizeInitialization() {
   setTimeout(async () => {
     try {
-      console.log('🔄 Final initialization steps...');
+      logDebug(' Final initialization steps...');
       
       // すべての同期が完了したらローディングオーバーレイを非表示
       if (window.unifiedLoading) {
@@ -1347,35 +1347,35 @@ async function finalizeInitialization() {
       
       // Initialize and load history table after all initialization is complete
       try {
-        console.log('🔄 Initializing HistoryManager...');
+        logDebug(' Initializing HistoryManager...');
         if (window.HistoryManager) {
           window.HistoryManager.initialize();
-          console.log('🔄 Loading history table after initialization...');
+          logDebug(' Loading history table after initialization...');
           window.HistoryManager.renderTable();
         } else {
-          console.warn('⚠️ HistoryManager not available yet');
+          logWarn('️ HistoryManager not available yet');
         }
       } catch (historyError) {
-        console.warn('⚠️ History initialization/loading failed:', historyError);
+        logWarn('️ History initialization/loading failed:', historyError);
       }
       
       // Draft recovery after initialization complete
       try {
-        console.log('🔄 Checking for draft recovery...');
+        logDebug(' Checking for draft recovery...');
         if (typeof recoverDraftIfAvailable === 'function') {
           recoverDraftIfAvailable();
         }
       } catch (draftError) {
-        console.warn('⚠️ Draft recovery failed:', draftError);
+        logWarn('️ Draft recovery failed:', draftError);
       }
       
       // 初期化完了
       window.AdminPanel.initialization.isInProgress = false;
       window.AdminPanel.initialization.isCompleted = true;
-      logInfo('✅ AdminPanel Master Initialization Completed');
+      logInfo(' AdminPanel Master Initialization Completed');
       
     } catch (error) {
-      console.error('❌ Final sync error:', error);
+      logError(' Final sync error:', error);
       // エラーでもローディングは解除
       if (window.unifiedLoading) {
         window.unifiedLoading.hide();
@@ -1385,7 +1385,7 @@ async function finalizeInitialization() {
       // 初期化完了（エラーありでも）
       window.AdminPanel.initialization.isInProgress = false;
       window.AdminPanel.initialization.isCompleted = true;
-      logWarn('⚠️ AdminPanel initialization completed with errors');
+      logWarn('️ AdminPanel initialization completed with errors');
     }
   }, 500);
 }
@@ -1471,7 +1471,7 @@ window.addEventListener('resize', function() {
     // Load current user access status
     this.loadCurrentStatus();
     
-    logDebug('📝 Account management modal opened');
+    logDebug(' Account management modal opened');
   },
   
   // Close modal
@@ -1485,7 +1485,7 @@ window.addEventListener('resize', function() {
     // Reset form state
     this.resetForm();
     
-    logDebug('❌ Account management modal closed');
+    logDebug(' Account management modal closed');
   },
   
   // Load current user access status
@@ -1494,7 +1494,7 @@ window.addEventListener('resize', function() {
     const toggle = document.getElementById('user-access-toggle');
     
     if (statusElement) {
-      statusElement.textContent = '🔄 読み込み中...';
+      statusElement.textContent = ' 読み込み中...';
       statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-gray-600 text-gray-300';
     }
     
@@ -1515,7 +1515,7 @@ window.addEventListener('resize', function() {
       }
       
       this.currentUserStatus = isActive;
-      logDebug(`📊 Current user isActive status: ${isActive}`);
+      logDebug(` Current user isActive status: ${isActive}`);
     } else {
       // Fallback: call API to get current status
       if (typeof runGasWithUserId === 'function') {
@@ -1536,7 +1536,7 @@ window.addEventListener('resize', function() {
             }
           })
           .catch((error) => {
-            console.error('❗ Failed to load user status:', error);
+            logError('❗ Failed to load user status:', error);
             this.showStatusError('ユーザー状態の取得エラー');
           });
       } else {
@@ -1551,10 +1551,10 @@ window.addEventListener('resize', function() {
     if (!statusElement) return;
     
     if (isActive) {
-      statusElement.textContent = '✅ 有効';
+      statusElement.textContent = ' 有効';
       statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white';
     } else {
-      statusElement.textContent = '❌ 無効';
+      statusElement.textContent = ' 無効';
       statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-red-600 text-white';
     }
   },
@@ -1607,7 +1607,7 @@ window.addEventListener('resize', function() {
     
     // Update UI
     saveBtn.disabled = true;
-    saveBtn.textContent = '🔄 保存中...';
+    saveBtn.textContent = ' 保存中...';
     
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('updateSelfActiveStatus', false, userId, newStatus)
@@ -1618,7 +1618,7 @@ window.addEventListener('resize', function() {
             
             // Show success message
             if (window.showMessage) {
-              showMessage(`✅ アクセス設定を${newStatus ? '有効' : '無効'}に変更しました`, 'success');
+              showMessage(` アクセス設定を${newStatus ? '有効' : '無効'}に変更しました`, 'success');
             }
             
             // Close modal after short delay
@@ -1631,14 +1631,14 @@ window.addEventListener('resize', function() {
           }
         })
         .catch((error) => {
-          console.error('❗ Failed to save access settings:', error);
+          logError('❗ Failed to save access settings:', error);
           
           // Revert toggle state
           toggle.checked = this.currentUserStatus;
           
           // Show error message
           if (window.showMessage) {
-            showMessage(`❌ 設定の保存に失敗しました: ${error.message || error}`, 'error');
+            showMessage(` 設定の保存に失敗しました: ${error.message || error}`, 'error');
           }
         })
         .finally(() => {
@@ -1647,12 +1647,12 @@ window.addEventListener('resize', function() {
           this.onToggleChange(); // Re-evaluate button state
         });
     } else {
-      console.error('❗ runGasWithUserId function not available');
+      logError('❗ runGasWithUserId function not available');
       saveBtn.textContent = originalText;
       saveBtn.disabled = false;
       
       if (window.showMessage) {
-        showMessage('❌ APIが利用できません', 'error');
+        showMessage(' APIが利用できません', 'error');
       }
     }
   },
@@ -1666,9 +1666,9 @@ window.addEventListener('resize', function() {
         handleDeleteRequest(); // Call existing delete function
       }, 300);
     } else {
-      console.error('❗ handleDeleteRequest function not available');
+      logError('❗ handleDeleteRequest function not available');
       if (window.showMessage) {
-        showMessage('❌ アカウント削除機能が利用できません', 'error');
+        showMessage(' アカウント削除機能が利用できません', 'error');
       }
     }
   },
@@ -1717,11 +1717,11 @@ window.HistoryManager = {
   initialize() {
     try {
       if (this._initialized) {
-        console.log('🔄 HistoryManager already initialized');
+        logDebug(' HistoryManager already initialized');
         return true;
       }
       
-      console.log('🚀 HistoryManager initializing...');
+      logDebug('🚀 HistoryManager initializing...');
       
       // Migrate old data if exists
       this._migrateOldData();
@@ -1730,7 +1730,7 @@ window.HistoryManager = {
       return true;
       
     } catch (error) {
-      console.error('❌ HistoryManager initialization failed:', error);
+      logError(' HistoryManager initialization failed:', error);
       return false;
     }
   },
@@ -1744,12 +1744,12 @@ window.HistoryManager = {
       const newData = localStorage.getItem(this.STORAGE_KEY);
       
       if (oldData && !newData) {
-        console.log('🔄 Migrating history data from old key...');
+        logDebug(' Migrating history data from old key...');
         localStorage.setItem(this.STORAGE_KEY, oldData);
         localStorage.removeItem(this.OLD_STORAGE_KEY);
       }
     } catch (error) {
-      console.warn('⚠️ History data migration failed:', error);
+      logWarn('️ History data migration failed:', error);
     }
   },
   
@@ -1758,14 +1758,14 @@ window.HistoryManager = {
    */
   load() {
     try {
-      console.log('🔄 Loading history from localStorage...');
+      logDebug(' Loading history from localStorage...');
       const data = localStorage.getItem(this.STORAGE_KEY);
       const parsed = data ? JSON.parse(data) : [];
       const validated = Array.isArray(parsed) ? parsed : [];
-      console.log(`✅ Loaded ${validated.length} history items`);
+      logDebug(` Loaded ${validated.length} history items`);
       return validated;
     } catch (error) {
-      console.error('❌ Failed to load history:', error);
+      logError(' Failed to load history:', error);
       return [];
     }
   },
@@ -1778,10 +1778,10 @@ window.HistoryManager = {
       const safeItems = Array.isArray(items) ? items : [];
       const limitedItems = safeItems.slice(0, this.MAX_ITEMS);
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(limitedItems));
-      console.log(`✅ Saved ${limitedItems.length} history items`);
+      logDebug(` Saved ${limitedItems.length} history items`);
       return true;
     } catch (error) {
-      console.error('❌ Failed to save history:', error);
+      logError(' Failed to save history:', error);
       return false;
     }
   },
@@ -1792,7 +1792,7 @@ window.HistoryManager = {
   add(newItem) {
     try {
       if (!newItem || !newItem.id) {
-        console.warn('⚠️ Invalid history item provided');
+        logWarn('️ Invalid history item provided');
         return false;
       }
       
@@ -1800,7 +1800,7 @@ window.HistoryManager = {
       history.unshift(newItem);
       return this.save(history);
     } catch (error) {
-      console.error('❌ Failed to add history item:', error);
+      logError(' Failed to add history item:', error);
       return false;
     }
   },
@@ -1814,7 +1814,7 @@ window.HistoryManager = {
       localStorage.removeItem(this.OLD_STORAGE_KEY); // Clean old key too
       return true;
     } catch (error) {
-      console.error('❌ Failed to clear history:', error);
+      logError(' Failed to clear history:', error);
       return false;
     }
   },
@@ -1867,7 +1867,7 @@ window.HistoryManager = {
     }
     
     const displayPart = isShowNames ? '👥通常' : '🎭匿名';
-    const countPart = item.showCounts ? '🔢表示' : '🚫非表示';
+    const countPart = item.showCounts ? '🔢表示' : '非表示';
     return `${displayPart}/${countPart}`;
   },
 
@@ -1877,18 +1877,18 @@ window.HistoryManager = {
   renderTable() {
     try {
       if (!this._initialized) {
-        console.warn('⚠️ HistoryManager not initialized, initializing now...');
+        logWarn('️ HistoryManager not initialized, initializing now...');
         if (!this.initialize()) {
-          console.error('❌ Cannot render table - initialization failed');
+          logError(' Cannot render table - initialization failed');
           return false;
         }
       }
       
-      console.log('🔄 Rendering history table...');
+      logDebug(' Rendering history table...');
       const tableBody = document.getElementById('history-table-body');
       
       if (!tableBody) {
-        console.warn('❌ History table body element not found');
+        logWarn(' History table body element not found');
         return false;
       }
       
@@ -1923,14 +1923,14 @@ window.HistoryManager = {
             successCount++;
           }
         } catch (error) {
-          console.warn('⚠️ Failed to render history item:', error);
+          logWarn('️ Failed to render history item:', error);
         }
       });
       
       return true;
       
     } catch (error) {
-      console.error('❌ Failed to render history table:', error);
+      logError(' Failed to render history table:', error);
       this._renderErrorState();
       return false;
     }
@@ -1944,7 +1944,7 @@ window.HistoryManager = {
     emptyRow.innerHTML = `
       <td colspan="4" class="px-3 py-8 text-center text-gray-500 text-sm">
         <div class="flex flex-col items-center">
-          <div class="text-4xl mb-2">📝</div>
+          <div class="text-4xl mb-2"></div>
           <div class="font-medium mb-1">履歴がありません</div>
           <div class="text-xs text-gray-600">フォームを公開すると履歴が表示されます</div>
         </div>
@@ -2004,7 +2004,7 @@ window.HistoryManager = {
       
       return row;
     } catch (error) {
-      console.error('❌ Failed to create history table row:', error);
+      logError(' Failed to create history table row:', error);
       return null;
     }
   },
@@ -2018,19 +2018,19 @@ window.HistoryManager = {
       const item = history.find(h => h.id === itemId);
       
       if (!item) {
-        console.error('❌ History item not found:', itemId);
+        logError(' History item not found:', itemId);
         return;
       }
       
       if (typeof showMessage === 'function') {
-        showMessage('🔄 設定を復元中...', 'info');
+        showMessage(' 設定を復元中...', 'info');
       }
       
       // Perform restoration
       this._restoreHistoryItem(item);
       
     } catch (error) {
-      console.error('❌ Failed to show restore modal:', error);
+      logError(' Failed to show restore modal:', error);
     }
   },
 
@@ -2039,7 +2039,7 @@ window.HistoryManager = {
    */
   _showRestoreConfirmationModal(item) {
     try {
-      console.log('🔄 Showing restore confirmation modal for:', item.questionText);
+      logDebug(' Showing restore confirmation modal for:', item.questionText);
       
       // 復元する設定の詳細情報を準備
       const formattedDate = this._formatCreatedDate(item.createdDate);
@@ -2063,7 +2063,7 @@ window.HistoryManager = {
       });
       
     } catch (error) {
-      console.error('❌ Failed to show restore confirmation modal:', error);
+      logError(' Failed to show restore confirmation modal:', error);
       // フォールバック: 元のシンプルモーダル
       this._showFallbackRestoreModal(item);
     }
@@ -2075,7 +2075,7 @@ window.HistoryManager = {
   _showEnhancedRestoreModal(item, details) {
     const modal = document.getElementById('confirmation-modal');
     if (!modal) {
-      console.warn('⚠️ confirmation-modal not found, using fallback');
+      logWarn('️ confirmation-modal not found, using fallback');
       this._showFallbackRestoreModal(item);
       return;
     }
@@ -2106,7 +2106,7 @@ window.HistoryManager = {
         const autoPublishEl = modal.querySelector('#restore-auto-publish');
         const autoPublish = !!(autoPublishEl && autoPublishEl.checked);
         cleanup();
-        console.log('✅ User confirmed restoration', { autoPublish });
+        logDebug(' User confirmed restoration', { autoPublish });
         this._restoreHistoryItem(item, { autoPublish });
       };
     }
@@ -2114,7 +2114,7 @@ window.HistoryManager = {
     if (cancelBtn) {
       cancelBtn.onclick = () => {
         cleanup();
-        console.log('❌ User cancelled restoration');
+        logDebug(' User cancelled restoration');
       };
     }
   },
@@ -2191,7 +2191,7 @@ window.HistoryManager = {
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        📋 履歴復元の確認
+         履歴復元の確認
       </h3>
       <p class="text-gray-300 mb-4">
         以下の設定を復元しますか？現在の設定が上書きされます。
@@ -2203,7 +2203,7 @@ window.HistoryManager = {
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
           </svg>
-          📝 復元予定の設定
+           復元予定の設定
         </h4>
         <div class="space-y-2 text-xs text-orange-100">
           <div><span class="text-orange-200 font-medium">問題文:</span> ${truncatedQuestion}</div>
@@ -2260,43 +2260,43 @@ window.HistoryManager = {
     const title = '履歴復元の確認';
     const message = `以下の設定を復元しますか？現在の設定が上書きされます。
 
-📝 問題文: ${truncatedQuestion}
-📊 シート名: ${item.sheetName || '未設定'}  
+ 問題文: ${truncatedQuestion}
+ シート名: ${item.sheetName || '未設定'}  
 📅 作成日: ${formattedDate}
 
-⚠️ この操作により現在の設定内容が変更されます。`;
+️ この操作により現在の設定内容が変更されます。`;
 
     // SharedModalsシステムを優先的に使用
     if (window.sharedModals && typeof window.sharedModals.showConfirmation === 'function') {
-      console.log('✅ Using sharedModals.showConfirmation fallback');
+      logDebug(' Using sharedModals.showConfirmation fallback');
       window.sharedModals.showConfirmation(
         title,
         message,
         () => {
-          console.log('✅ User confirmed restoration');
+          logDebug(' User confirmed restoration');
           this._restoreHistoryItem(item);
         },
         () => {
-          console.log('❌ User cancelled restoration');
+          logDebug(' User cancelled restoration');
         }
       );
     } else if (typeof showConfirmationModal === 'function') {
-      console.log('✅ Using showConfirmationModal fallback');
+      logDebug(' Using showConfirmationModal fallback');
       showConfirmationModal(
         title,
         message,
         () => {
-          console.log('✅ User confirmed restoration');
+          logDebug(' User confirmed restoration');
           this._restoreHistoryItem(item);
         }
       );
     } else {
-      console.warn('⚠️ No confirmation modal system available, using browser confirm');
-      if (confirm(`${title}\n\n${message.replace(/📝|📊|📅|⚠️/g, '')}`)) {
-        console.log('✅ User confirmed restoration via browser confirm');
+      logWarn('️ No confirmation modal system available, using browser confirm');
+      if (confirm(`${title}\n\n${message.replace(/|📊|📅|⚠️/g, '')}`)) {
+        logDebug(' User confirmed restoration via browser confirm');
         this._restoreHistoryItem(item);
       } else {
-        console.log('❌ User cancelled restoration via browser confirm');
+        logDebug(' User cancelled restoration via browser confirm');
       }
     }
   },
@@ -2306,8 +2306,8 @@ window.HistoryManager = {
    */
   async _restoreHistoryItem(item, options = {}) {
     try {
-      console.log('🔄 Restoring history:', item.questionText);
-      console.log('📊 History item details:', {
+      logDebug(' Restoring history:', item.questionText);
+      logDebug(' History item details:', {
         id: item.id,
         questionText: item.questionText,
         sheetName: item.sheetName,
@@ -2318,7 +2318,7 @@ window.HistoryManager = {
       
       // AI列判定による上書きを防止するフラグを設定
       window._historyRestoreInProgress = true;
-      console.log('🛡️ AI列判定スキップフラグを設定しました');
+      logDebug('🛡 AI列判定スキップフラグを設定しました');
       
       // 1. テキスト設定復元
       if (item.opinionHeader) {
@@ -2332,7 +2332,7 @@ window.HistoryManager = {
       }
       
       // 1.5. 列選択の復元（履歴データから） - 強化版
-      console.log('🔄 Restoring column selections from history');
+      logDebug(' Restoring column selections from history');
       
       // 列選択肢が読み込まれるまで待機する関数
       const waitForColumnOptions = async (selectId, targetValue, maxWait = 3000) => {
@@ -2343,7 +2343,7 @@ window.HistoryManager = {
           const checkOptions = () => {
             const select = document.getElementById(selectId);
             if (!select) {
-              console.warn(`⚠️ Select element not found: ${selectId}`);
+              logWarn(`️ Select element not found: ${selectId}`);
               resolve(false);
               return;
             }
@@ -2353,15 +2353,15 @@ window.HistoryManager = {
             const hasTargetOption = options.some(option => option.value === targetValue);
             
             if (hasTargetOption) {
-              console.log(`✅ Column option found for ${selectId}: ${targetValue}`);
+              logDebug(` Column option found for ${selectId}: ${targetValue}`);
               select.value = targetValue;
               
               // 値が正しく設定されたかダブルチェック
               if (select.value === targetValue) {
-                console.log(`✅ ${selectId} value successfully set to: ${targetValue}`);
+                logDebug(` ${selectId} value successfully set to: ${targetValue}`);
                 resolve(true);
               } else {
-                console.warn(`⚠️ ${selectId} value setting failed. Expected: ${targetValue}, Actual: ${select.value}`);
+                logWarn(`️ ${selectId} value setting failed. Expected: ${targetValue}, Actual: ${select.value}`);
                 resolve(false);
               }
               return;
@@ -2370,7 +2370,7 @@ window.HistoryManager = {
             // タイムアウトチェック
             const elapsed = Date.now() - startTime;
             if (elapsed >= maxWait) {
-              console.warn(`⚠️ Timeout waiting for column option ${selectId}:${targetValue} (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
+              logWarn(`️ Timeout waiting for column option ${selectId}:${targetValue} (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
               // タイムアウト時でも値の設定は試行
               select.value = targetValue;
               resolve(false);
@@ -2418,21 +2418,21 @@ window.HistoryManager = {
       
       // すべての列復元を待機
       if (columnRestorations.length > 0) {
-        console.log(`🔄 Waiting for ${columnRestorations.length} column selections to restore...`);
+        logDebug(` Waiting for ${columnRestorations.length} column selections to restore...`);
         try {
           const results = await Promise.all(columnRestorations);
           const successCount = results.filter(r => r.success).length;
-          console.log(`✅ Column restoration completed: ${successCount}/${results.length} successful`);
+          logDebug(` Column restoration completed: ${successCount}/${results.length} successful`);
           
           results.forEach(result => {
             if (result.success) {
-              console.log(`✅ ${result.type} column restored: ${result.value}`);
+              logDebug(` ${result.type} column restored: ${result.value}`);
             } else {
-              console.warn(`⚠️ ${result.type} column restoration failed: ${result.value}`);
+              logWarn(`️ ${result.type} column restoration failed: ${result.value}`);
             }
           });
         } catch (restorationError) {
-          console.warn('⚠️ Column restoration error:', restorationError);
+          logWarn('️ Column restoration error:', restorationError);
         }
       }
       
@@ -2454,31 +2454,35 @@ window.HistoryManager = {
       }
       
       // 4. 完全プロジェクト復元（スプレッドシート + シート）
-      console.log('🔍 Restore conditions check:', {
+      // シート名の正規化処理（エンコーディング問題対策）
+      const normalizedSheetName = this._normalizeSheetName(item.sheetName);
+      
+      logDebug(' Restore conditions check:', {
         hasSpreadsheetId: !!item.spreadsheetId,
         hasSheetName: !!item.sheetName,
-        spreadsheetId: item.spreadsheetId,
-        sheetName: item.sheetName
+        originalSheetName: item.sheetName,
+        normalizedSheetName: normalizedSheetName,
+        spreadsheetId: item.spreadsheetId
       });
       
-      if (item.spreadsheetId && item.sheetName) {
-        console.log('✅ Full project restore path selected');
-        await this._restoreFullProject(item.spreadsheetId, item.sheetName);
-      } else if (item.sheetName) {
-        console.log('✅ Sheet-only restore path selected');
+      if (item.spreadsheetId && normalizedSheetName) {
+        logDebug(' Full project restore path selected');
+        await this._restoreFullProject(item.spreadsheetId, normalizedSheetName);
+      } else if (normalizedSheetName) {
+        logDebug(' Sheet-only restore path selected');
         // シートのみ復元（下位互換性）
-        await this._restoreSheetSelection(item.sheetName);
+        await this._restoreSheetSelection(normalizedSheetName);
       } else {
-        console.warn('⚠️ No valid restoration path found - missing sheet or spreadsheet info');
-        console.warn('🔧 Attempting fallback: trying to find sheet by question text');
+        logWarn('️ No valid restoration path found - missing sheet or spreadsheet info');
+        logWarn(' Attempting fallback: trying to find sheet by question text');
         
         // フォールバック: 問題文からシート名を推測
         const fallbackSheetName = await this._findSheetByQuestionText(item.questionText);
         if (fallbackSheetName) {
-          console.log(`✅ Fallback found sheet: ${fallbackSheetName}`);
+          logDebug(` Fallback found sheet: ${fallbackSheetName}`);
           await this._restoreSheetSelection(fallbackSheetName);
         } else {
-          console.error('❌ Fallback failed: unable to determine correct sheet');
+          logError(' Fallback failed: unable to determine correct sheet');
         }
       }
       
@@ -2491,15 +2495,15 @@ window.HistoryManager = {
           // 復元の意図を明確化するためflowTypeは 'custom'
           const syncResult = await runGasWithUserId('syncConfigurationState', '設定を復元中...', configToPersist, 'custom');
           if (syncResult && syncResult.status === 'success') {
-            console.log('✅ Configuration synchronized after restore');
+            logDebug(' Configuration synchronized after restore');
           } else {
-            console.warn('⚠️ Configuration sync after restore reported:', syncResult && syncResult.message);
+            logWarn('️ Configuration sync after restore reported:', syncResult && syncResult.message);
           }
         } else {
-          console.warn('⚠️ Unable to persist configuration after restore (missing helpers)');
+          logWarn('️ Unable to persist configuration after restore (missing helpers)');
         }
       } catch (persistError) {
-        console.warn('⚠️ Configuration persistence warning:', persistError);
+        logWarn('️ Configuration persistence warning:', persistError);
       }
 
       // 6. UI完全更新
@@ -2508,29 +2512,29 @@ window.HistoryManager = {
       // 7. オプション: 復元後に自動で公開
       if (options.autoPublish && typeof saveAndPublish === 'function') {
         try {
-          console.log('📤 Auto-publishing after restore...');
+          logDebug('📤 Auto-publishing after restore...');
           saveAndPublish();
         } catch (pubError) {
-          console.warn('⚠️ Auto publish failed:', pubError);
+          logWarn('️ Auto publish failed:', pubError);
         }
       }
       
       // Success message
       if (typeof showMessage === 'function') {
-        showMessage('✅ 履歴から設定を復元しました', 'success');
+        showMessage(' 履歴から設定を復元しました', 'success');
       }
-      console.log('✅ Complete restore finished');
+      logDebug(' Complete restore finished');
       
     } catch (error) {
-      console.error('❌ History restore failed:', error);
+      logError(' History restore failed:', error);
       if (typeof showMessage === 'function') {
-        showMessage('❌ 設定復元に失敗しました', 'error');
+        showMessage(' 設定復元に失敗しました', 'error');
       }
     } finally {
       // AI列判定スキップフラグをクリア
       if (window._historyRestoreInProgress) {
         window._historyRestoreInProgress = false;
-        console.log('🛡️ AI列判定スキップフラグをクリアしました');
+        logDebug('🛡 AI列判定スキップフラグをクリアしました');
       }
     }
   },
@@ -2540,7 +2544,7 @@ window.HistoryManager = {
    */
   async _findSheetByQuestionText(questionText) {
     try {
-      console.log(`🔍 Searching for sheet with question: "${questionText}"`);
+      logDebug(` Searching for sheet with question: "${questionText}"`);
       
       // 現在のステータスから設定情報を取得
       if (window.AdminPanel?.currentStatus?.configJson) {
@@ -2551,18 +2555,18 @@ window.HistoryManager = {
           if (key.startsWith('sheet_') && sheetConfig.opinionHeader) {
             if (sheetConfig.opinionHeader === questionText) {
               const sheetName = sheetConfig.sheetName || key.replace('sheet_', '');
-              console.log(`✅ Found matching sheet: ${sheetName}`);
+              logDebug(` Found matching sheet: ${sheetName}`);
               return sheetName;
             }
           }
         }
       }
       
-      console.warn('⚠️ No matching sheet found for question text');
+      logWarn('️ No matching sheet found for question text');
       return null;
       
     } catch (error) {
-      console.error('❌ Error in _findSheetByQuestionText:', error);
+      logError(' Error in _findSheetByQuestionText:', error);
       return null;
     }
   },
@@ -2572,7 +2576,7 @@ window.HistoryManager = {
    */
   async _restoreFullProject(spreadsheetId, sheetName) {
     try {
-      console.log(`🔄 Restoring full project: ${spreadsheetId}/${sheetName}`);
+      logDebug(` Restoring full project: ${spreadsheetId}/${sheetName}`);
       
       // 現在のスプレッドシートIDを取得
       const getCurrentSpreadsheetId = () => {
@@ -2587,33 +2591,33 @@ window.HistoryManager = {
       
       // 異なるスプレッドシートの場合のみ切り替え処理
       if (spreadsheetId !== currentSpreadsheetId) {
-        console.log(`🔄 Switching spreadsheet: ${currentSpreadsheetId} → ${spreadsheetId}`);
+        logDebug(` Switching spreadsheet: ${currentSpreadsheetId} → ${spreadsheetId}`);
         
         // スプレッドシート切り替えの通知
         if (typeof showMessage === 'function') {
-          showMessage('🔄 プロジェクトを切り替えています...', 'info', 3000);
+          showMessage(' プロジェクトを切り替えています...', 'info', 3000);
         }
         
         // 実際のスプレッドシート切り替えを実行
         await this._performSpreadsheetSwitch(spreadsheetId);
         
         // UI更新完了を待機してからシート選択復元
-        console.log(`🔄 Waiting for sheet options to include: ${sheetName}`);
+        logDebug(` Waiting for sheet options to include: ${sheetName}`);
         const sheetFound = await this._waitForSheetOptionsUpdate(sheetName);
         if (!sheetFound) {
-          console.warn(`⚠️ Sheet ${sheetName} not found in options after waiting, proceeding with fallback`);
+          logWarn(`️ Sheet ${sheetName} not found in options after waiting, proceeding with fallback`);
         }
       }
       
       // シート選択復元
       await this._restoreSheetSelection(sheetName);
       
-      console.log(`✅ Full project restore completed`);
+      logDebug(` Full project restore completed`);
       
     } catch (error) {
-      console.warn('⚠️ Full project restore failed:', error);
+      logWarn('️ Full project restore failed:', error);
       if (typeof showMessage === 'function') {
-        showMessage('⚠️ プロジェクト復元で問題が発生しました', 'warning');
+        showMessage('️ プロジェクト復元で問題が発生しました', 'warning');
       }
     }
   },
@@ -2623,7 +2627,7 @@ window.HistoryManager = {
    */
   async _restoreSheetSelection(sheetName) {
     try {
-      console.log(`🔄 Restoring sheet selection: ${sheetName}`);
+      logDebug(` Restoring sheet selection: ${sheetName}`);
       
       // グローバル状態更新
       window.AdminPanel.selectedSheet = sheetName;
@@ -2637,25 +2641,25 @@ window.HistoryManager = {
         // シート選択を実行
         if (sheetSelect.value !== sheetName) {
           sheetSelect.value = sheetName;
-          console.log(`✅ Sheet select value updated to: ${sheetName}`);
+          logDebug(` Sheet select value updated to: ${sheetName}`);
         }
         
         // プルダウン表示の強制更新
         if (typeof updateSheetSelectActiveIndicator === 'function') {
           updateSheetSelectActiveIndicator(sheetName);
-          console.log(`✅ Sheet active indicator updated`);
+          logDebug(` Sheet active indicator updated`);
         }
         
         // シート変更イベントを発火（列データ読み込みトリガー）
         const changeEvent = new Event('change', { bubbles: true });
         sheetSelect.dispatchEvent(changeEvent);
-        console.log(`✅ Sheet change event dispatched`);
+        logDebug(` Sheet change event dispatched`);
         
         // シート選択変更ハンドラーを直接呼び出し（フォールバック）
         if (typeof handleSheetSelectionChange === 'function') {
           const mockEvent = { target: { value: sheetName } };
           await handleSheetSelectionChange(mockEvent);
-          console.log(`✅ Sheet selection change handler called directly`);
+          logDebug(` Sheet selection change handler called directly`);
         }
         
         // 少し待機してからUI更新を確認
@@ -2667,9 +2671,9 @@ window.HistoryManager = {
         }
       }
       
-      console.log(`✅ Sheet restored: ${sheetName}`);
+      logDebug(` Sheet restored: ${sheetName}`);
     } catch (error) {
-      console.warn('⚠️ Sheet restore warning:', error);
+      logWarn('️ Sheet restore warning:', error);
     }
   },
 
@@ -2678,56 +2682,56 @@ window.HistoryManager = {
    */
   async _refreshAfterRestore() {
     try {
-      console.log('🔄 Refreshing UI after history restore...');
+      logDebug(' Refreshing UI after history restore...');
       
       // シートデータの再読み込み（シート変更後の列データ取得）
       if (typeof loadSheetDetailsAPI === 'function' && window.AdminPanel.selectedSheet) {
-        console.log('📊 Reloading sheet details for column data...');
+        logDebug(' Reloading sheet details for column data...');
         try {
           await loadSheetDetailsAPI(window.AdminPanel.selectedSheet);
-          console.log('✅ Sheet details reloaded successfully');
+          logDebug(' Sheet details reloaded successfully');
         } catch (sheetError) {
-          console.warn('⚠️ Sheet details reload failed:', sheetError);
+          logWarn('️ Sheet details reload failed:', sheetError);
         }
       }
       
       // 列選択肢の更新（フォールバック）
       if (typeof handleSheetSelectionChange === 'function' && window.AdminPanel.selectedSheet) {
-        console.log('📋 Updating column options via sheet selection handler...');
+        logDebug(' Updating column options via sheet selection handler...');
         try {
           const mockEvent = { target: { value: window.AdminPanel.selectedSheet } };
           await handleSheetSelectionChange(mockEvent);
-          console.log('✅ Column options updated via handler');
+          logDebug(' Column options updated via handler');
         } catch (handlerError) {
-          console.warn('⚠️ Sheet selection handler failed:', handlerError);
+          logWarn('️ Sheet selection handler failed:', handlerError);
         }
       }
       
       // UI状態の最終調整
       if (typeof updateUIForSelectedSheet === 'function') {
-        console.log('🎯 Updating UI for selected sheet...');
+        logDebug(' Updating UI for selected sheet...');
         try {
           updateUIForSelectedSheet();
-          console.log('✅ UI updated for selected sheet');
+          logDebug(' UI updated for selected sheet');
         } catch (uiError) {
-          console.warn('⚠️ UI update failed:', uiError);
+          logWarn('️ UI update failed:', uiError);
         }
       }
       
       // 設定ボタンの状態更新
       if (typeof updateConfigButtons === 'function') {
-        console.log('🔘 Updating config buttons state...');
+        logDebug('🔘 Updating config buttons state...');
         try {
           updateConfigButtons();
-          console.log('✅ Config buttons updated');
+          logDebug(' Config buttons updated');
         } catch (buttonError) {
-          console.warn('⚠️ Config buttons update failed:', buttonError);
+          logWarn('️ Config buttons update failed:', buttonError);
         }
       }
       
-      console.log('✅ UI refresh completed successfully');
+      logDebug(' UI refresh completed successfully');
     } catch (error) {
-      console.warn('⚠️ UI refresh warning:', error);
+      logWarn('️ UI refresh warning:', error);
     }
   },
 
@@ -2743,7 +2747,7 @@ window.HistoryManager = {
         });
         
         if (updateResult && updateResult.status === 'success') {
-          console.log('✅ Spreadsheet switched successfully in database');
+          logDebug(' Spreadsheet switched successfully in database');
         } else {
           throw new Error('Database update failed: ' + (updateResult?.message || 'Unknown error'));
         }
@@ -2762,23 +2766,23 @@ window.HistoryManager = {
       // 3. Reload application state with new spreadsheet
       if (typeof loadStatus === 'function') {
         await loadStatus(true); // Force reload bypassing cache
-        console.log('✅ Application state reloaded with new spreadsheet');
+        logDebug(' Application state reloaded with new spreadsheet');
         
         // 4. Force update currentSpreadsheetUrl after state reload
         if (window.currentStatus?.userInfo?.spreadsheetUrl) {
           currentSpreadsheetUrl = window.currentStatus.userInfo.spreadsheetUrl;
-          console.log('✅ currentSpreadsheetUrl force updated after switch:', currentSpreadsheetUrl);
+          logDebug(' currentSpreadsheetUrl force updated after switch:', currentSpreadsheetUrl);
         } else {
-          console.warn('⚠️ No spreadsheetUrl available in reloaded currentStatus');
+          logWarn('️ No spreadsheetUrl available in reloaded currentStatus');
         }
       } else {
-        console.warn('⚠️ loadStatus function not available for state reload');
+        logWarn('️ loadStatus function not available for state reload');
       }
 
     } catch (error) {
-      console.error('❌ Spreadsheet switching failed:', error);
+      logError(' Spreadsheet switching failed:', error);
       if (typeof showMessage === 'function') {
-        showMessage('❌ プロジェクト切り替えに失敗しました: ' + error.message, 'error');
+        showMessage(' プロジェクト切り替えに失敗しました: ' + error.message, 'error');
       }
       throw error; // Re-throw to be handled by caller
     }
@@ -2795,7 +2799,7 @@ window.HistoryManager = {
       const checkSheetOptions = () => {
         const select = document.getElementById('sheet-select');
         if (!select) {
-          console.warn('⚠️ Sheet select element not found during wait');
+          logWarn('️ Sheet select element not found during wait');
           resolve(false);
           return;
         }
@@ -2805,7 +2809,7 @@ window.HistoryManager = {
         const hasTargetSheet = options.some(option => option.value === targetSheetName);
         
         if (hasTargetSheet) {
-          console.log(`✅ Target sheet found in options: ${targetSheetName}`);
+          logDebug(` Target sheet found in options: ${targetSheetName}`);
           resolve(true);
           return;
         }
@@ -2813,7 +2817,7 @@ window.HistoryManager = {
         // Check timeout
         const elapsed = Date.now() - startTime;
         if (elapsed >= maxWaitTime) {
-          console.warn(`⚠️ Timeout waiting for sheet options update (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
+          logWarn(`️ Timeout waiting for sheet options update (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
           resolve(false); // Don't reject, allow fallback
           return;
         }
@@ -2825,6 +2829,41 @@ window.HistoryManager = {
       // Start checking
       checkSheetOptions();
     });
+  },
+  
+  /**
+   * Normalize sheet name for consistent handling across the system
+   * @param {string} sheetName - Original sheet name
+   * @returns {string} Normalized sheet name
+   */
+  _normalizeSheetName(sheetName) {
+    if (!sheetName) {
+      return 'フォームの回答 1'; // Default fallback
+    }
+    
+    // Convert to string and trim
+    let normalized = String(sheetName).trim();
+    
+    // Handle invalid values
+    if (!normalized || normalized === 'true' || normalized === 'false' || normalized === 'undefined' || normalized === 'null') {
+      logWarn(`️ Invalid sheet name detected: "${sheetName}" -> using default`);
+      return 'フォームの回答 1';
+    }
+    
+    // Remove surrounding quotes if present
+    if ((normalized.startsWith('"') && normalized.endsWith('"')) || 
+        (normalized.startsWith("'") && normalized.endsWith("'"))) {
+      normalized = normalized.slice(1, -1);
+    }
+    
+    // Length check
+    if (normalized.length > 100) {
+      logWarn(`️ Sheet name too long, truncating: "${normalized}"`);
+      normalized = normalized.substring(0, 100);
+    }
+    
+    logDebug(` Sheet name normalized: "${sheetName}" -> "${normalized}"`);
+    return normalized;
   },
   
   /**

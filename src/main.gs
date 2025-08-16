@@ -158,7 +158,7 @@ function checkAndHandleAutoStop(config, userInfo) {
 
   // 自動停止が無効、または必要な情報がない場合はスキップ
   if (!config.autoStopEnabled || !config.scheduledEndAt) {
-    debugLog('🔍 自動停止チェック: 無効またはデータ不足', {
+    debugLog(' 自動停止チェック: 無効またはデータ不足', {
       autoStopEnabled: config.autoStopEnabled,
       hasScheduledEndAt: !!config.scheduledEndAt
     });
@@ -168,7 +168,7 @@ function checkAndHandleAutoStop(config, userInfo) {
   const scheduledEndTime = new Date(config.scheduledEndAt);
   const now = new Date();
 
-  debugLog('🔍 自動停止チェック:', {
+  debugLog(' 自動停止チェック:', {
     scheduledEndAt: config.scheduledEndAt,
     now: now.toISOString(),
     isOverdue: now >= scheduledEndTime
@@ -176,7 +176,7 @@ function checkAndHandleAutoStop(config, userInfo) {
 
   // 期限切れチェック
   if (now >= scheduledEndTime) {
-    warnLog('⚠️ 期限切れ検出 - 自動停止を実行します');
+    warnLog('️ 期限切れ検出 - 自動停止を実行します');
 
     // 自動停止前に履歴を保存
     try {
@@ -197,7 +197,7 @@ function checkAndHandleAutoStop(config, userInfo) {
         configJson: JSON.stringify(config)
       });
 
-      infoLog(`🔄 自動停止実行完了: ${userInfo.adminEmail} (期限: ${config.scheduledEndAt})`);
+      infoLog(` 自動停止実行完了: ${userInfo.adminEmail} (期限: ${config.scheduledEndAt})`);
       return true; // 自動停止実行済み
     } catch (error) {
       logError(error, 'autoStopProcess', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
@@ -205,7 +205,7 @@ function checkAndHandleAutoStop(config, userInfo) {
     }
   }
 
-  debugLog('✅ まだ期限内です');
+  debugLog(' まだ期限内です');
   return false; // まだ期限内
 }
 
@@ -238,7 +238,7 @@ function saveHistoryOnAutoStop(config, userInfo) {
   // サーバーサイドでの履歴保存（スプレッドシート）
   try {
     saveHistoryToSheet(historyItem, userInfo);
-    infoLog('✅ 自動停止履歴保存完了:', historyItem.questionText);
+    infoLog(' 自動停止履歴保存完了:', historyItem.questionText);
   } catch (error) {
     logError(error, 'serverSideHistorySave', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
   }
@@ -339,7 +339,7 @@ function determineSetupTypeFromConfig(config, userInfo) {
  * @param {Object} userInfo - ユーザー情報
  */
 function saveHistoryToSheet(historyItem, userInfo) {
-  debugLog('📋 サーバーサイド履歴保存開始:', historyItem.questionText);
+  debugLog(' サーバーサイド履歴保存開始:', historyItem.questionText);
 
   try {
     if (!userInfo || !userInfo.userId) {
@@ -465,7 +465,7 @@ function saveHistoryToSheet(historyItem, userInfo) {
     });
 
     if (updateResult.status === 'success') {
-      infoLog('✅ サーバーサイド履歴保存完了:', {
+      infoLog(' サーバーサイド履歴保存完了:', {
         userId: userInfo.userId,
         questionText: serverHistoryItem.questionText,
         historyCount: configJson.historyArray.length
@@ -592,7 +592,7 @@ function clearHistoryFromServerAPI(requestUserId) {
     });
 
     if (updateResult.status === 'success') {
-      infoLog('✅ サーバーサイド履歴クリア完了:', requestUserId);
+      infoLog(' サーバーサイド履歴クリア完了:', requestUserId);
       return {
         status: 'success',
         message: 'サーバーサイドの履歴をクリアしました',
@@ -1156,13 +1156,13 @@ function handleAdminMode(params) {
       systemDiagnostics.databaseConnectivity = 'error: ' + dbError.message;
     }
 
-    infoLog('🔍 handleAdminMode: システム診断完了', systemDiagnostics);
+    infoLog(' handleAdminMode: システム診断完了', systemDiagnostics);
   } catch (diagError) {
     warnLog('handleAdminMode: システム診断でエラー:', diagError.message);
   }
 
   // 管理者権限確認（詳細ログ付き）
-  debugLog('🔍 handleAdminMode: 統合管理者権限確認開始', {
+  debugLog(' handleAdminMode: 統合管理者権限確認開始', {
     userId: params.userId,
     timestamp: new Date().toISOString(),
     systemStatus: systemDiagnostics
@@ -1178,7 +1178,7 @@ function handleAdminMode(params) {
     const totalRequestTime = Date.now() - requestStartTime;
     systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
     
-    errorLog('🚨 handleAdminMode: 管理者権限確認失敗', {
+    errorLog(' handleAdminMode: 管理者権限確認失敗', {
       userId: params.userId,
       currentUser: getCurrentUserEmail(),
       authDuration: authDuration + 'ms',
@@ -1249,7 +1249,7 @@ function handleAdminMode(params) {
   const totalRequestTime = Date.now() - requestStartTime;
   systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
   
-  infoLog('✅ handleAdminMode: 統合管理者権限確認成功', {
+  infoLog(' handleAdminMode: 統合管理者権限確認成功', {
     userId: params.userId,
     authDuration: authDuration + 'ms',
     totalTime: totalRequestTime + 'ms',
@@ -1307,7 +1307,7 @@ function processViewRequest(userInfo, params) {
   // Check for auto-stop and handle accordingly
   const wasAutoStopped = checkAndHandleAutoStop(config, userInfo);
   if (wasAutoStopped) {
-    infoLog('🔄 自動停止が実行されました - 非公開ページに誘導します');
+    infoLog(' 自動停止が実行されました - 非公開ページに誘導します');
   }
 
   // Check if currently published
@@ -1317,7 +1317,7 @@ function processViewRequest(userInfo, params) {
     typeof config.publishedSheetName === 'string' &&
     config.publishedSheetName.trim() !== '');
 
-  debugLog('🔍 Publication status check:', {
+  debugLog(' Publication status check:', {
     appPublished: config.appPublished,
     hasSpreadsheetId: !!config.publishedSpreadsheetId,
     hasSheetName: !!config.publishedSheetName,
@@ -1326,7 +1326,7 @@ function processViewRequest(userInfo, params) {
 
   // Redirect to unpublished page if not published
   if (!isCurrentlyPublished) {
-    infoLog('🚫 Board is unpublished, redirecting to Unpublished page');
+    infoLog(' Board is unpublished, redirecting to Unpublished page');
     return renderUnpublishedPage(userInfo, params);
   }
 
@@ -1379,7 +1379,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
       const correctUrl = buildUserAdminUrl(userInfo.userId);
       return redirectToUrl(correctUrl);
     }
-    debugLog(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
+    debugLog(` セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
   }
 
   return renderAdminPanel(userInfo, params.mode);
@@ -1465,7 +1465,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
     // 実行レベルキャッシュにも保存（オプション）
     if (userInfo && opts.useExecutionCache && (userId || userInfo.userId)) {
       _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
-      debugLog('✅ 実行レベルキャッシュに保存:', userId || userInfo.userId);
+      debugLog(' 実行レベルキャッシュに保存:', userId || userInfo.userId);
     }
 
   } catch (cacheError) {
@@ -1669,11 +1669,11 @@ function getErrorIcon(errorType) {
   const icons = {
     [ERROR_TYPES.CRITICAL]: '🔥',
     [ERROR_TYPES.ACCESS]: '🔒', 
-    [ERROR_TYPES.VALIDATION]: '⚠️',
-    [ERROR_TYPES.NETWORK]: '🌐',
-    [ERROR_TYPES.USER]: '❓'
+    [ERROR_TYPES.VALIDATION]: '️',
+    [ERROR_TYPES.NETWORK]: '',
+    [ERROR_TYPES.USER]: ''
   };
-  return icons[errorType] || '⚠️';
+  return icons[errorType] || '️';
 }
 
 /**
@@ -1780,7 +1780,7 @@ function showErrorPage(title, message, error) {
       isRegisteredUser = !!userInfo;
     }
   } catch (e) {
-    console.warn('⚠️ showErrorPage: ユーザー登録状態の確認でエラー:', e);
+    logWarn('️ showErrorPage: ユーザー登録状態の確認でエラー:', e);
   }
   
   template.isRegisteredUser = isRegisteredUser;
@@ -2025,15 +2025,15 @@ function createSecureRedirect(targetUrl, message) {
               if (isInFrame) {
                 // iframe内の場合は親ウィンドウで開く
                 event.preventDefault();
-                console.log('🔄 iframe内からの遷移を検出、parent window で開きます');
+                logDebug(' iframe内からの遷移を検出、parent window で開きます');
                 window.top.location.href = url;
               } else {
                 // 通常の場合はそのまま遷移
-                console.log('🚀 通常の遷移を実行します');
+                logDebug('🚀 通常の遷移を実行します');
                 // target="_top" が有効になります
               }
             } catch (error) {
-              console.error('リダイレクト処理エラー:', error);
+              logError('リダイレクト処理エラー:', error);
               // エラーの場合はフォールバック
               window.location.href = url;
             }
@@ -2041,7 +2041,7 @@ function createSecureRedirect(targetUrl, message) {
           
           // 自動遷移を無効化（X-Frame-Options制約のためユーザーアクション必須）
           // ユーザーに明確なアクションを要求することで、より確実な遷移を実現
-          console.log('ℹ️ 自動遷移は無効です。ユーザーによるボタンクリックが必要です。');
+          logDebug('️ 自動遷移は無効です。ユーザーによるボタンクリックが必要です。');
           
           // 代わりに、5秒後にボタンを強調表示
           setTimeout(function() {
@@ -2049,7 +2049,7 @@ function createSecureRedirect(targetUrl, message) {
             if (mainButton) {
               mainButton.style.animation = 'pulse 1s infinite';
               mainButton.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
-              console.log('✨ ボタンを強調表示しました');
+              logDebug(' ボタンを強調表示しました');
             }
           }, 3000);
         </script>
@@ -2064,18 +2064,18 @@ function createSecureRedirect(targetUrl, message) {
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-      debugLog('✅ Secure Redirect XFrameOptionsMode.ALLOWALL設定完了');
+      debugLog(' Secure Redirect XFrameOptionsMode.ALLOWALL設定完了');
     } else {
-      warnLog('⚠️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
+      warnLog('️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
     }
   } catch (e) {
-    errorLog('❌ Secure Redirect XFrameOptionsMode設定エラー:', e.message);
+    errorLog(' Secure Redirect XFrameOptionsMode設定エラー:', e.message);
     // フォールバック: 従来の方法で設定を試行
     try {
       htmlOutput.setXFrameOptionsMode('ALLOWALL');
-      infoLog('💡 フォールバック方法でSecure Redirect XFrameOptionsMode設定完了');
+      infoLog(' フォールバック方法でSecure Redirect XFrameOptionsMode設定完了');
     } catch (fallbackError) {
-      errorLog('❌ フォールバック方法も失敗:', fallbackError.message);
+      errorLog(' フォールバック方法も失敗:', fallbackError.message);
     }
   }
 
@@ -2213,18 +2213,18 @@ function renderAdminPanel(userInfo, mode) {
   try {
     if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-      debugLog('✅ Admin Panel XFrameOptionsMode.ALLOWALL設定完了 - iframe embedding許可');
+      debugLog(' Admin Panel XFrameOptionsMode.ALLOWALL設定完了 - iframe embedding許可');
     } else {
-      warnLog('⚠️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
+      warnLog('️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
     }
   } catch (e) {
-    errorLog('❌ Admin Panel XFrameOptionsMode設定エラー:', e.message);
+    errorLog(' Admin Panel XFrameOptionsMode設定エラー:', e.message);
     // フォールバック: 従来の方法で設定を試行
     try {
       htmlOutput.setXFrameOptionsMode('ALLOWALL');
-      infoLog('💡 フォールバック方法でAdmin Panel XFrameOptionsMode設定完了');
+      infoLog(' フォールバック方法でAdmin Panel XFrameOptionsMode設定完了');
     } catch (fallbackError) {
-      errorLog('❌ フォールバック方法も失敗:', fallbackError.message);
+      errorLog(' フォールバック方法も失敗:', fallbackError.message);
     }
   }
 
@@ -2246,14 +2246,14 @@ function renderAdminPanel(userInfo, mode) {
  */
 function renderUnpublishedPage(userInfo, params) {
   try {
-    debugLog('🚫 renderUnpublishedPage: Rendering unpublished page for userId:', userInfo.userId);
+    debugLog(' renderUnpublishedPage: Rendering unpublished page for userId:', userInfo.userId);
 
     let template;
     try {
       template = HtmlService.createTemplateFromFile('Unpublished');
-      debugLog('✅ renderUnpublishedPage: Template created successfully');
+      debugLog(' renderUnpublishedPage: Template created successfully');
     } catch (templateError) {
-      console.error('❌ renderUnpublishedPage: Template creation failed:', templateError);
+      logError(' renderUnpublishedPage: Template creation failed:', templateError);
       throw new Error('Unpublished.htmlテンプレートの読み込みに失敗: ' + templateError.message);
     }
     
@@ -2291,7 +2291,7 @@ function renderUnpublishedPage(userInfo, params) {
     template.adminPanelUrl = appUrls.adminUrl || '';
     template.boardUrl = appUrls.viewUrl || '';
 
-    debugLog('✅ renderUnpublishedPage: Template setup completed');
+    debugLog(' renderUnpublishedPage: Template setup completed');
 
     // キャッシュを無効化して確実なリダイレクトを保証
     const htmlOutput = template.evaluate()
@@ -2301,13 +2301,13 @@ function renderUnpublishedPage(userInfo, params) {
     try {
       htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
     } catch (e) {
-      console.warn('⚠️ addMetaTag(viewport) failed:', e.message);
+      logWarn('️ addMetaTag(viewport) failed:', e.message);
     }
     
     try {
       htmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
     } catch (e) {
-      console.warn('⚠️ addMetaTag(cache-control) failed:', e.message);
+      logWarn('️ addMetaTag(cache-control) failed:', e.message);
     }
 
     try {
@@ -2328,7 +2328,7 @@ function renderUnpublishedPage(userInfo, params) {
       errorMessage: error.message,
       errorStack: error.stack
     });
-    console.error('🚨 renderUnpublishedPage error details:', {
+    logError(' renderUnpublishedPage error details:', {
       error: error,
       userInfo: userInfo,
       userId: userInfo ? userInfo.userId : 'N/A',
@@ -2347,11 +2347,11 @@ function renderUnpublishedPage(userInfo, params) {
  */
 function renderMinimalUnpublishedPage(userInfo) {
   try {
-    debugLog('🚫 renderMinimalUnpublishedPage: Creating minimal unpublished page');
+    debugLog(' renderMinimalUnpublishedPage: Creating minimal unpublished page');
     
     // 安全にuserInfoを処理
     if (!userInfo) {
-      console.warn('⚠️ renderMinimalUnpublishedPage: userInfo is null/undefined');
+      logWarn('️ renderMinimalUnpublishedPage: userInfo is null/undefined');
       userInfo = { userId: '', adminEmail: '' };
     }
 
@@ -2393,13 +2393,13 @@ function renderMinimalUnpublishedPage(userInfo) {
     try {
       htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
     } catch (e) {
-      console.warn('⚠️ renderMinimalUnpublishedPage addMetaTag(viewport) failed:', e.message);
+      logWarn('️ renderMinimalUnpublishedPage addMetaTag(viewport) failed:', e.message);
     }
     
     try {
       htmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
     } catch (e) {
-      console.warn('⚠️ renderMinimalUnpublishedPage addMetaTag(cache-control) failed:', e.message);
+      logWarn('️ renderMinimalUnpublishedPage addMetaTag(cache-control) failed:', e.message);
     }
     
     return htmlOutput;
@@ -2411,7 +2411,7 @@ function renderMinimalUnpublishedPage(userInfo) {
       errorMessage: error.message,
       errorStack: error.stack
     });
-    console.error('🚨 renderMinimalUnpublishedPage error details:', {
+    logError(' renderMinimalUnpublishedPage error details:', {
       error: error,
       userInfo: userInfo,
       userId: userInfo ? userInfo.userId : 'N/A',
@@ -2643,13 +2643,13 @@ function renderMinimalUnpublishedPage(userInfo) {
                   
                   <div class="button-group">
                       <button onclick="republishBoard()" class="btn btn-primary">
-                          🔄 回答ボードを再公開
+                           回答ボードを再公開
                       </button>
                       <a href="?mode=admin&userId=${encodeURIComponent(userId)}" class="btn btn-secondary">
-                          ⚙️ 管理パネルを開く
+                          ⚙ 管理パネルを開く
                       </a>
                       <button onclick="location.reload()" class="btn btn-tertiary">
-                          🔄 ページを更新
+                           ページを更新
                       </button>
                   </div>
                   
@@ -2663,7 +2663,7 @@ function renderMinimalUnpublishedPage(userInfo) {
                   
                   <div class="error-notice">
                       <div class="error-notice-title">
-                          ⚠️ システム情報
+                          ️ システム情報
                       </div>
                       <div class="error-notice-text">
                           テンプレートの読み込みでエラーが発生したため、基本機能のみ表示しています。すべての管理機能は正常に動作します。
@@ -2691,13 +2691,13 @@ function renderMinimalUnpublishedPage(userInfo) {
                           .withFailureHandler((error) => {
                               alert('再公開に失敗しました: ' + error.message);
                               button.disabled = false;
-                              button.textContent = '🔄 回答ボードを再公開';
+                              button.textContent = ' 回答ボードを再公開';
                           })
                           .republishBoard('${userId}');
                   } catch (error) {
                       alert('エラーが発生しました: ' + error.message);
                       button.disabled = false;
-                      button.textContent = '🔄 回答ボードを再公開';
+                      button.textContent = ' 回答ボードを再公開';
                   }
               }
           </script>
@@ -2712,13 +2712,13 @@ function renderMinimalUnpublishedPage(userInfo) {
     try {
       finalHtmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
     } catch (e) {
-      console.warn('⚠️ Final fallback addMetaTag(viewport) failed:', e.message);
+      logWarn('️ Final fallback addMetaTag(viewport) failed:', e.message);
     }
     
     try {
       finalHtmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
     } catch (e) {
-      console.warn('⚠️ Final fallback addMetaTag(cache-control) failed:', e.message);
+      logWarn('️ Final fallback addMetaTag(cache-control) failed:', e.message);
     }
     
     return finalHtmlOutput;
@@ -2740,7 +2740,7 @@ function renderAnswerBoard(userInfo, params) {
       safePublishedSheetName = config.publishedSheetName;
     } else {
       logValidationError('publishedSheetName', config.publishedSheetName, 'string_type', `不正な型: ${typeof config.publishedSheetName}`);
-      warnLog('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
+      warnLog(' main.gs: publishedSheetNameを空文字にリセットしました');
       safePublishedSheetName = '';
     }
   }
@@ -2758,7 +2758,7 @@ function renderAnswerBoard(userInfo, params) {
   const sheetConfig = config[sheetConfigKey] || {};
 
   // この関数は公開ボード専用（非公開判定は呼び出し前に完了）
-  debugLog('✅ renderAnswerBoard: Rendering published board for userId:', userInfo.userId);
+  debugLog(' renderAnswerBoard: Rendering published board for userId:', userInfo.userId);
 
   const template = HtmlService.createTemplateFromFile('Page');
   template.include = include;
@@ -2836,7 +2836,7 @@ function renderAnswerBoard(userInfo, params) {
  */
 function checkCurrentPublicationStatus(userId) {
   try {
-    debugLog('🔍 checkCurrentPublicationStatus called for userId:', userId);
+    debugLog(' checkCurrentPublicationStatus called for userId:', userId);
 
     if (!userId) {
       warnLog('userId is required for publication status check');
@@ -2872,7 +2872,7 @@ function checkCurrentPublicationStatus(userId) {
       config.publishedSheetName.trim() !== ''
     );
 
-    debugLog('📊 Publication status check result:', {
+    debugLog(' Publication status check result:', {
       userId: userId,
       appPublished: config.appPublished,
       hasSpreadsheetId: !!config.publishedSpreadsheetId,

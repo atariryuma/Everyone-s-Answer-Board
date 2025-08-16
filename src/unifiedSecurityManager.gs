@@ -192,10 +192,10 @@ function verifyAdminAccess(userId) {
 
     // 3つの条件すべてが満たされた場合のみ認証成功
     if (isEmailMatched && isUserIdMatched && isActive) {
-      infoLog('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
+      infoLog(' verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
       return true;
     } else {
-      warnLog('❌ verifyAdminAccess: 認証失敗', {
+      warnLog(' verifyAdminAccess: 認証失敗', {
         userId,
         activeUserEmail,
         failures: {
@@ -208,7 +208,7 @@ function verifyAdminAccess(userId) {
     }
 
   } catch (error) {
-    errorLog('❌ verifyAdminAccess: 認証処理エラー:', error.message);
+    errorLog(' verifyAdminAccess: 認証処理エラー:', error.message);
     return false;
   }
 }
@@ -417,7 +417,7 @@ class MultiTenantSecurityManager {
       userAgent: Session.getActiveUser().getEmail()
     };
 
-    errorLog(`🚨 セキュリティ違反: ${violationType}`, JSON.stringify(logEntry));
+    errorLog(` セキュリティ違反: ${violationType}`, JSON.stringify(logEntry));
     
     // 重大な違反の場合は追加の通知を送信する可能性
     if (violationType === 'TENANT_BOUNDARY_VIOLATION') {
@@ -450,7 +450,7 @@ class MultiTenantSecurityManager {
   handleCriticalSecurityViolation(logEntry) {
     // 重大な違反の場合の追加処理
     // 例：管理者への通知、一時的なアクセス制限など
-    warnLog('🚨 重大なセキュリティ違反が発生しました', logEntry);
+    warnLog(' 重大なセキュリティ違反が発生しました', logEntry);
     
     // フューチャー実装: 通知システムとの連携
     // this.sendSecurityAlert(logEntry);
@@ -772,11 +772,11 @@ function performComprehensiveSecurityHealthCheck() {
 
     // 結果をログ出力
     if (healthCheckResult.overallStatus === 'CRITICAL') {
-      errorLog('🚨 統合セキュリティヘルスチェック: 重要な問題が検出されました', healthCheckResult);
+      errorLog(' 統合セキュリティヘルスチェック: 重要な問題が検出されました', healthCheckResult);
     } else if (healthCheckResult.overallStatus === 'WARNING') {
-      warnLog('⚠️ 統合セキュリティヘルスチェック: 警告があります', healthCheckResult);
+      warnLog('️ 統合セキュリティヘルスチェック: 警告があります', healthCheckResult);
     } else {
-      infoLog('✅ 統合セキュリティヘルスチェック: 正常', healthCheckResult);
+      infoLog(' 統合セキュリティヘルスチェック: 正常', healthCheckResult);
     }
 
     return healthCheckResult;
@@ -786,7 +786,7 @@ function performComprehensiveSecurityHealthCheck() {
     healthCheckResult.criticalIssues.push(`ヘルスチェック実行エラー: ${error.message}`);
     healthCheckResult.executionTime = Date.now() - startTime;
     
-    errorLog('❌ 統合セキュリティヘルスチェック実行エラー:', error);
+    errorLog(' 統合セキュリティヘルスチェック実行エラー:', error);
     return healthCheckResult;
   }
 }
@@ -989,7 +989,7 @@ function runScheduledSecurityHealthCheck() {
     // 重要な問題がある場合は管理者に通知
     if (healthResult.overallStatus === 'CRITICAL') {
       // フューチャー実装: 管理者への緊急通知
-      errorLog('🚨 緊急: セキュリティヘルスチェックで重要な問題を検出', healthResult);
+      errorLog(' 緊急: セキュリティヘルスチェックで重要な問題を検出', healthResult);
     }
 
     // 結果をログに記録
@@ -1023,7 +1023,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
 
     if (!isAlreadyEditor) {
       spreadsheet.addEditor(serviceAccountEmail);
-      infoLog(`✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
+      infoLog(` サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
     } else {
       debugLog(`サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`);
     }
@@ -1051,7 +1051,7 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
 
     if (!isAlreadyEditor) {
       spreadsheet.addEditor(serviceAccountEmail);
-      infoLog(`✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
+      infoLog(` サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
     } else {
       debugLog(`サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`);
     }
@@ -1070,7 +1070,7 @@ function verifyUserAccess(requestUserId) {
   
   if (currentUserId !== requestUserId) {
     // ログに詳細を記録
-    warnLog('🚨 アクセス拒否: ユーザーID不一致', {
+    warnLog(' アクセス拒否: ユーザーID不一致', {
       requested: requestUserId,
       current: currentUserId,
       activeUserEmail: Session.getActiveUser().getEmail(),
@@ -1078,7 +1078,7 @@ function verifyUserAccess(requestUserId) {
     });
     throw new Error('アクセスが拒否されました。この操作を実行する権限がありません。');
   }
-  debugLog('✅ ユーザーアクセス検証成功:', requestUserId);
+  debugLog(' ユーザーアクセス検証成功:', requestUserId);
 }
 
 /**
@@ -1157,7 +1157,7 @@ function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
       }
     }
 
-    infoLog('✅ invalidateUserCache: キャッシュ無効化完了');
+    infoLog(' invalidateUserCache: キャッシュ無効化完了');
 
   } catch (error) {
     errorLog('invalidateUserCache エラー:', error.message);
@@ -1187,7 +1187,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       // 古いスプレッドシートオブジェクトのキャッシュを無効化
       if (oldSpreadsheetId) {
         invalidateSpreadsheetCache(oldSpreadsheetId);
-        infoLog(`✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
+        infoLog(` 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
       }
     }
 
@@ -1204,7 +1204,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       cacheManager.removeByPattern('config_v3_*');
     }
 
-    infoLog('✅ synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期完了');
+    infoLog(' synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期完了');
 
   } catch (error) {
     errorLog('synchronizeCacheAfterCriticalUpdate エラー:', error.message);
@@ -1223,7 +1223,7 @@ function clearDatabaseCache() {
     if (typeof cacheManager !== 'undefined' && cacheManager) {
       cacheManager.clearAll();
     }
-    infoLog('✅ データベースキャッシュクリア完了');
+    infoLog(' データベースキャッシュクリア完了');
   } catch (error) {
     errorLog('clearDatabaseCache エラー:', error.message);
   }

@@ -241,7 +241,7 @@ class UnifiedBatchProcessor {
             throw new Error('Failed to get service account token');
           }
         } catch (tokenError) {
-          errorLog('❌ Authentication failed in batchUpdateSpreadsheet:', tokenError.message);
+          errorLog(' Authentication failed in batchUpdateSpreadsheet:', tokenError.message);
           throw new Error('Authentication failed: ' + tokenError.message);
         }
 
@@ -268,7 +268,7 @@ class UnifiedBatchProcessor {
               payload: JSON.stringify(requestBody)
             });
           } catch (fetchError) {
-            errorLog('❌ Failed to make API request to Sheets:', {
+            errorLog(' Failed to make API request to Sheets:', {
               error: fetchError.message,
               url: url,
               requestType: chunk[0]?.deleteDimension ? 'DELETE_ROWS' : 'OTHER'
@@ -278,7 +278,7 @@ class UnifiedBatchProcessor {
 
           // レスポンスオブジェクトの検証
           if (!response || typeof response.getResponseCode !== 'function') {
-            errorLog('❌ Invalid response object from resilientUrlFetch');
+            errorLog(' Invalid response object from resilientUrlFetch');
             throw new Error('BatchUpdateSpreadsheet: 無効なレスポンスオブジェクトが返されました');
           }
           
@@ -286,7 +286,7 @@ class UnifiedBatchProcessor {
           
           if (responseCode !== 200) {
             const errorContent = response.getContentText();
-            errorLog('❌ BatchUpdateSpreadsheet API failed:', { responseCode, errorContent });
+            errorLog(' BatchUpdateSpreadsheet API failed:', { responseCode, errorContent });
             throw new Error(`BatchUpdateSpreadsheet failed: ${responseCode} - ${errorContent}`);
           }
 
@@ -446,7 +446,11 @@ class UnifiedBatchProcessor {
       const valueRanges = [];
       for (const range of ranges.slice(0, 10)) { // 最大10個に制限
         try {
-          const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`;
+          // 範囲をダブルエンコーディングして確実に処理
+          const doubleEncodedRange = encodeURIComponent(encodeURIComponent(range));
+          const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}/values/${doubleEncodedRange}`;
+          
+          warnLog('フォールバック: 範囲取得 - ' + range + ' -> ' + doubleEncodedRange);
           const response = resilientUrlFetch(url, {
             method: 'GET',
             headers: {

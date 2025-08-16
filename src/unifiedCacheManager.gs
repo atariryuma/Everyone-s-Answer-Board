@@ -493,7 +493,7 @@ class CacheManager {
         relatedIds = relatedIds.slice(0, maxRelated);
       }
 
-      debugLog(`🔗 関連キャッシュ無効化開始: ${entityType}/${entityId} (${dryRun ? 'DRY RUN' : 'LIVE'})`);
+      debugLog(` 関連キャッシュ無効化開始: ${entityType}/${entityId} (${dryRun ? 'DRY RUN' : 'LIVE'})`);
 
       // 1. メインエンティティのキャッシュ無効化
       const patterns = this._getInvalidationPatterns(entityType, entityId);
@@ -541,9 +541,9 @@ class CacheManager {
       invalidationLog.duration = Date.now() - invalidationLog.startTime;
 
       if (invalidationLog.errors.length > 0) {
-        warnLog(`⚠️ 関連キャッシュ無効化で一部エラー: ${entityType}/${entityId}`, invalidationLog.errors);
+        warnLog(`️ 関連キャッシュ無効化で一部エラー: ${entityType}/${entityId}`, invalidationLog.errors);
       } else {
-        debugLog(`✅ 関連キャッシュ無効化完了: ${entityType}/${entityId} (${invalidationLog.totalRemoved} entries, ${invalidationLog.duration}ms)`);
+        debugLog(` 関連キャッシュ無効化完了: ${entityType}/${entityId} (${invalidationLog.totalRemoved} entries, ${invalidationLog.duration}ms)`);
       }
 
       return invalidationLog;
@@ -551,7 +551,7 @@ class CacheManager {
     } catch (error) {
       invalidationLog.errors.push(`Fatal: ${error.message}`);
       invalidationLog.duration = Date.now() - invalidationLog.startTime;
-      errorLog(`❌ 関連キャッシュ無効化致命的エラー: ${entityType}/${entityId}`, error);
+      errorLog(` 関連キャッシュ無効化致命的エラー: ${entityType}/${entityId}`, error);
       this.stats.errors++;
       return invalidationLog;
     }
@@ -821,7 +821,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
   // 既にクリア中の場合は待機
   if (this.clearInProgress && !force) {
     if (this.debugMode) {
-      debugLog('🔄 Cache clear already in progress, waiting...');
+      debugLog(' Cache clear already in progress, waiting...');
     }
     return new Promise((resolve, reject) => {
       this.pendingClears.push({ resolve, reject });
@@ -834,7 +834,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
   return new Promise(async (resolve, reject) => {
     try {
       if (this.debugMode) {
-        debugLog('🗑️ Starting unified cache clear process');
+        debugLog('🗑 Starting unified cache clear process');
       }
 
       // キャッシュクリア操作のリスト（優先順位順）
@@ -911,7 +911,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
           results.push({ name: clearOp.name, success });
           
           if (this.debugMode && success) {
-            debugLog(`✅ ${clearOp.name} cleared successfully`);
+            debugLog(` ${clearOp.name} cleared successfully`);
           }
           
           // 各操作間に短い間隔を設ける
@@ -920,7 +920,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
           }
           
         } catch (error) {
-          warnLog(`⚠️ Failed to clear ${clearOp.name}:`, error);
+          warnLog(`️ Failed to clear ${clearOp.name}:`, error);
           results.push({ name: clearOp.name, success: false, error: error.message });
         }
       }
@@ -929,7 +929,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
       const totalTime = Date.now() - startTime;
 
       if (this.debugMode) {
-        debugLog(`🎉 Cache clear completed: ${successCount}/${results.length} caches cleared in ${totalTime}ms`);
+        debugLog(` Cache clear completed: ${successCount}/${results.length} caches cleared in ${totalTime}ms`);
       }
 
       // 待機中のクリア要求を解決
@@ -944,7 +944,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
       });
 
     } catch (error) {
-      errorLog('❌ Unified cache clear failed:', error);
+      errorLog(' Unified cache clear failed:', error);
       this.rejectPendingClears(error);
       reject(error);
     } finally {
@@ -978,11 +978,11 @@ CacheManager.prototype.clearSpecificCache = function(cacheType) {
     try {
       operation();
       if (this.debugMode) {
-        debugLog(`✅ ${cacheType} cache cleared`);
+        debugLog(` ${cacheType} cache cleared`);
       }
       resolve({ success: true, cacheType });
     } catch (error) {
-      warnLog(`⚠️ Failed to clear ${cacheType} cache:`, error);
+      warnLog(`️ Failed to clear ${cacheType} cache:`, error);
       resolve({ success: false, cacheType, error: error.message });
     }
   });
@@ -1069,7 +1069,7 @@ class UnifiedExecutionCache {
     }
 
     if (this.userInfoCache && this.lastUserIdKey === userId) {
-      debugLog(`✅ 統一キャッシュヒット: ユーザー情報 (${userId})`);
+      debugLog(` 統一キャッシュヒット: ユーザー情報 (${userId})`);
       return this.userInfoCache;
     }
 
@@ -1098,7 +1098,7 @@ class UnifiedExecutionCache {
     }
 
     if (this.sheetsServiceCache) {
-      debugLog(`✅ 統一キャッシュヒット: SheetsService`);
+      debugLog(` 統一キャッシュヒット: SheetsService`);
       return this.sheetsServiceCache;
     }
 
@@ -1120,7 +1120,7 @@ class UnifiedExecutionCache {
   clearUserInfo() {
     this.userInfoCache = null;
     this.lastUserIdKey = null;
-    debugLog(`🗑️ 統一キャッシュクリア: ユーザー情報`);
+    debugLog(`🗑 統一キャッシュクリア: ユーザー情報`);
   }
 
   /**
@@ -1128,7 +1128,7 @@ class UnifiedExecutionCache {
    */
   clearSheetsService() {
     this.sheetsServiceCache = null;
-    debugLog(`🗑️ 統一キャッシュクリア: SheetsService`);
+    debugLog(`🗑 統一キャッシュクリア: SheetsService`);
   }
 
   /**
@@ -1137,7 +1137,7 @@ class UnifiedExecutionCache {
   clearAll() {
     this.clearUserInfo();
     this.clearSheetsService();
-    debugLog(`🗑️ 統一キャッシュ全クリア`);
+    debugLog(`🗑 統一キャッシュ全クリア`);
   }
 
   /**
@@ -1183,9 +1183,9 @@ class UnifiedExecutionCache {
             // システム全体のキャッシュクリア
             break;
         }
-        debugLog(`🔄 統一キャッシュマネージャーと同期: ${operation}`);
+        debugLog(` 統一キャッシュマネージャーと同期: ${operation}`);
       } catch (error) {
-        debugLog(`⚠️ 統一キャッシュマネージャー同期エラー: ${error.message}`);
+        debugLog(`️ 統一キャッシュマネージャー同期エラー: ${error.message}`);
       }
     }
   }
@@ -1236,7 +1236,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   // Phase 1: メモリキャッシュをチェック
   const memoryEntry = spreadsheetMemoryCache[spreadsheetId];
   if (memoryEntry && (now - memoryEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
-    debugLog('✅ SpreadsheetApp.openById メモリキャッシュヒット:', spreadsheetId.substring(0, 10));
+    debugLog(' SpreadsheetApp.openById メモリキャッシュヒット:', spreadsheetId.substring(0, 10));
     return memoryEntry.spreadsheet;
   }
 
@@ -1261,7 +1261,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
           timestamp: now
         };
         
-        debugLog('✅ SpreadsheetApp.openById セッションキャッシュヒット:', spreadsheetId.substring(0, 10));
+        debugLog(' SpreadsheetApp.openById セッションキャッシュヒット:', spreadsheetId.substring(0, 10));
         return spreadsheet;
       }
     }
@@ -1270,7 +1270,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   }
 
   // Phase 3: 新規取得とキャッシュ保存
-  debugLog('🔄 SpreadsheetApp.openById 新規取得:', spreadsheetId.substring(0, 10));
+  debugLog(' SpreadsheetApp.openById 新規取得:', spreadsheetId.substring(0, 10));
   
   try {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
@@ -1354,7 +1354,7 @@ function invalidateSpreadsheetCache(spreadsheetId) {
   const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
   try {
     PropertiesService.getScriptProperties().deleteProperty(cacheKey);
-    debugLog('🗑️ SpreadsheetCache無効化:', spreadsheetId.substring(0, 10));
+    debugLog('🗑 SpreadsheetCache無効化:', spreadsheetId.substring(0, 10));
   } catch (error) {
     debugLog('キャッシュ無効化エラー:', error.message);
   }
@@ -1443,7 +1443,7 @@ let globalUnifiedCache = null;
 function getUnifiedExecutionCache() {
   if (!globalUnifiedCache) {
     globalUnifiedCache = new UnifiedExecutionCache();
-    debugLog(`🏗️ 統一実行キャッシュ初期化`);
+    debugLog(`🏗 統一実行キャッシュ初期化`);
   }
   return globalUnifiedCache;
 }
@@ -1453,7 +1453,7 @@ function getUnifiedExecutionCache() {
  */
 function resetUnifiedExecutionCache() {
   globalUnifiedCache = null;
-  debugLog(`🔄 統一実行キャッシュリセット`);
+  debugLog(` 統一実行キャッシュリセット`);
 }
 
 // =============================================================================
@@ -1725,7 +1725,7 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSprea
  */
 function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
   try {
-    infoLog('🔄 クリティカル更新後のキャッシュ同期開始...', {
+    infoLog(' クリティカル更新後のキャッシュ同期開始...', {
       userId,
       email,
       oldSpreadsheetId,
@@ -1741,7 +1741,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       if (oldSpreadsheetId) {
         if (typeof invalidateSpreadsheetCache === 'function') {
           invalidateSpreadsheetCache(oldSpreadsheetId);
-          infoLog(`✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
+          infoLog(` 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
         } else {
           warnLog(`invalidateSpreadsheetCache 関数が見つかりません。手動で ${oldSpreadsheetId} のオブジェクトキャッシュをクリアしてください。`);
         }
@@ -1773,13 +1773,13 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       warnLog('メモ化キャッシュリセットをスキップ:', memoError.message);
     }
 
-    infoLog('✅ クリティカル更新後のキャッシュ同期完了');
+    infoLog(' クリティカル更新後のキャッシュ同期完了');
 
     // 少し待ってから検証用に短い待機
     Utilities.sleep(100);
 
   } catch (error) {
-    errorLog('❌ キャッシュ同期エラー:', error);
+    errorLog(' キャッシュ同期エラー:', error);
     throw new Error('キャッシュ同期に失敗しました: ' + error.message);
   }
 }
@@ -1886,10 +1886,10 @@ function preWarmCache(activeUserEmail) {
     results.duration = Date.now() - startTime;
     results.success = results.errors.length === 0;
 
-    infoLog('✅ キャッシュプリウォーミング完了:', results.preWarmedItems.length, 'items,', results.duration + 'ms');
+    infoLog(' キャッシュプリウォーミング完了:', results.preWarmedItems.length, 'items,', results.duration + 'ms');
 
     if (results.errors.length > 0) {
-      warnLog('⚠️ プリウォーミング中のエラー:', results.errors);
+      warnLog('️ プリウォーミング中のエラー:', results.errors);
     }
 
     return results;
@@ -1898,7 +1898,7 @@ function preWarmCache(activeUserEmail) {
     results.duration = Date.now() - startTime;
     results.success = false;
     results.errors.push('fatal_error: ' + error.message);
-    errorLog('❌ キャッシュプリウォーミングエラー:', error);
+    errorLog(' キャッシュプリウォーミングエラー:', error);
     return results;
   }
 }

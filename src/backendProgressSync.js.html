@@ -20,11 +20,11 @@ class BackendProgressSync {
    */
   startSync(flowId, callback) {
     if (!this.isEnabled) {
-      console.log('🔕 BackendProgressSync is disabled');
+      logDebug('🔕 BackendProgressSync is disabled');
       return;
     }
 
-    console.log(`🔄 Starting progress sync for flow: ${flowId}`);
+    logDebug(` Starting progress sync for flow: ${flowId}`);
     
     this.progressCallbacks.set(flowId, callback);
     this.activeFlows.add(flowId);
@@ -58,7 +58,7 @@ class BackendProgressSync {
           this.stopSync(flowId);
         }
       } catch (error) {
-        console.warn(`⚠️ Progress polling error for ${flowId}:`, error);
+        logWarn(`️ Progress polling error for ${flowId}:`, error);
         
         // 連続エラーが発生した場合はポーリング停止
         if (this.shouldStopOnError(flowId, error)) {
@@ -99,12 +99,12 @@ class BackendProgressSync {
     } catch (error) {
       // getFlowProgress関数が存在しない場合の特別なハンドリング
       if (error.message && error.message.includes('getFlowProgress is not a function')) {
-        console.log(`ℹ️ Backend progress sync not available for ${flowId}, using fallback mode`);
+        logDebug(`️ Backend progress sync not available for ${flowId}, using fallback mode`);
         this.isEnabled = false; // 将来のリクエストを無効化
         return null;
       }
       
-      console.warn(`⚠️ Failed to fetch progress for ${flowId}:`, error);
+      logWarn(`️ Failed to fetch progress for ${flowId}:`, error);
       return null;
     }
   }
@@ -177,7 +177,7 @@ class BackendProgressSync {
    * @param {string} flowId - フロー識別子
    */
   stopSync(flowId) {
-    console.log(`🛑 Stopping progress sync for flow: ${flowId}`);
+    logDebug(`🛑 Stopping progress sync for flow: ${flowId}`);
 
     this.stopPolling(flowId);
     this.progressCallbacks.delete(flowId);
@@ -201,7 +201,7 @@ class BackendProgressSync {
    * 全ての同期を停止
    */
   stopAllSync() {
-    console.log('🛑 Stopping all progress sync');
+    logDebug('🛑 Stopping all progress sync');
 
     for (const flowId of this.activeFlows) {
       this.stopSync(flowId);
@@ -263,5 +263,5 @@ window.addEventListener('beforeunload', () => {
   window.backendProgressSync.stopAllSync();
 });
 
-console.log('✅ BackendProgressSync initialized');
+logDebug(' BackendProgressSync initialized');
 </script>

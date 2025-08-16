@@ -61,7 +61,7 @@
             event.error.message.includes('await is only valid in async functions and the top level bodies of modules') ||
             event.error.message.includes('SyntaxError: await is only valid') ||
             event.error.message.includes('Failed to execute \'write\' on \'Document\'')) {
-          console.warn('Document.write, syntax error, or async error caught and handled:', event.error.message);
+          logWarn('Document.write, syntax error, or async error caught and handled:', event.error.message);
           event.preventDefault();
           return false;
         }
@@ -70,7 +70,7 @@
 
     // Handle unhandled promise rejections
     window.addEventListener('unhandledrejection', function(event) {
-      console.warn('Unhandled promise rejection:', event.reason);
+      logWarn('Unhandled promise rejection:', event.reason);
       event.preventDefault();
     });
 
@@ -92,7 +92,7 @@
           });
           console.log.apply(console, args);
         } catch (error) {
-          console.warn('debugLog error:', error.message);
+          logWarn('debugLog error:', error.message);
         }
       }
     }
@@ -174,7 +174,7 @@
         MAPPING = {};
       }
     } catch (e) {
-      console.warn('Failed to parse MAPPING:', e);
+      logWarn('Failed to parse MAPPING:', e);
       MAPPING = {};
     }
   </script>
@@ -197,7 +197,7 @@
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
           </svg>
-          <span class="font-medium">📝 回答フォーム</span>
+          <span class="font-medium"> 回答フォーム</span>
         </a>
         
         <!-- 管理モードボタンとドメイン情報（右側） -->
@@ -294,7 +294,7 @@
     <!-- 新着通知バナー -->
     <div id="newContentBanner" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300" role="alert" aria-live="polite">
       <div class="flex items-center gap-3">
-        <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true">📋</span>
+        <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true"></span>
         <span id="newContentText">新しい意見が投稿されました</span>
         <button type="button" id="refreshContentBtn" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm font-medium transition-colors" aria-label="新しいコンテンツを更新して表示">
           更新して表示

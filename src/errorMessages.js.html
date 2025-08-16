@@ -219,16 +219,16 @@ class UnifiedErrorHandler {
     
     switch (errorInfo.severity) {
       case ERROR_SEVERITY.CRITICAL:
-        console.error('🚨 CRITICAL:', logMessage, errorInfo);
+        logError(' CRITICAL:', logMessage, errorInfo);
         break;
       case ERROR_SEVERITY.HIGH:
-        console.error('❌ HIGH:', logMessage, errorInfo.specificMessage);
+        logError(' HIGH:', logMessage, errorInfo.specificMessage);
         break;
       case ERROR_SEVERITY.MEDIUM:
-        console.warn('⚠️ MEDIUM:', logMessage, errorInfo.specificMessage);
+        logWarn('️ MEDIUM:', logMessage, errorInfo.specificMessage);
         break;
       case ERROR_SEVERITY.LOW:
-        console.log('ℹ️ LOW:', logMessage);
+        logDebug('️ LOW:', logMessage);
         break;
     }
   }
@@ -318,5 +318,5 @@ window.handleError = window.AdminPanel.errors.handle;
 window.ERROR_SEVERITY = ERROR_SEVERITY;
 window.ERROR_TYPES = ERROR_TYPES;
 
-console.log('✅ Unified Error Handler initialized');
+logDebug(' Unified Error Handler initialized');
 </script>

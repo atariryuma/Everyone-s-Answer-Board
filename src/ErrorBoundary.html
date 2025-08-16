@@ -76,11 +76,11 @@
     errorBoundaryState.lastError = errorInfo;
     
     // Detailed logging
-    console.group('🚨 Error Boundary Triggered');
-    console.error('Error:', error);
-    console.log('Category:', errorInfo.category);
-    console.log('Context:', errorInfo.context);
-    console.log('Recovery Options:', recoveryOptions);
+    console.group(' Error Boundary Triggered');
+    logError('Error:', error);
+    logDebug('Category:', errorInfo.category);
+    logDebug('Context:', errorInfo.context);
+    logDebug('Recovery Options:', recoveryOptions);
     console.groupEnd();
     
     // Attempt recovery based on error category
@@ -116,17 +116,17 @@
   
   // Network error recovery
   const handleNetworkError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting network error recovery...');
+    logDebug(' Attempting network error recovery...');
     
     if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
       errorBoundaryState.retryCount++;
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
-          console.log('🔄 Retrying network operation...');
+          logDebug(' Retrying network operation...');
           recoveryOptions.retryCallback();
         } else {
-          console.log('🔄 Reloading page for network recovery...');
+          logDebug(' Reloading page for network recovery...');
           window.location.reload();
         }
       }, ERROR_BOUNDARY_CONFIG.retryDelay * errorBoundaryState.retryCount);
@@ -140,10 +140,10 @@
   
   // Authentication error recovery
   const handleAuthError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting authentication error recovery...');
+    logDebug(' Attempting authentication error recovery...');
     
     if (recoveryOptions.reauthenticate) {
-      console.log('🔄 Triggering re-authentication...');
+      logDebug(' Triggering re-authentication...');
       recoveryOptions.reauthenticate();
       return true;
     }
@@ -154,11 +154,11 @@
   
   // Google Apps Script error recovery
   const handleGoogleScriptError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting Google Apps Script error recovery...');
+    logDebug(' Attempting Google Apps Script error recovery...');
     
     // Try to reload Google Apps Script context
     if (typeof google !== 'undefined' && google.script) {
-      console.log('🔄 Google Apps Script context available, retrying...');
+      logDebug(' Google Apps Script context available, retrying...');
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
@@ -175,14 +175,14 @@
   
   // Timeout error recovery
   const handleTimeoutError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting timeout error recovery...');
+    logDebug(' Attempting timeout error recovery...');
     
     if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
       errorBoundaryState.retryCount++;
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
-          console.log('🔄 Retrying after timeout...');
+          logDebug(' Retrying after timeout...');
           recoveryOptions.retryCallback();
         }
       }, ERROR_BOUNDARY_CONFIG.retryDelay * 2); // Longer delay for timeouts
@@ -196,11 +196,11 @@
   
   // JavaScript error recovery
   const handleJavaScriptError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting JavaScript error recovery...');
+    logDebug(' Attempting JavaScript error recovery...');
     
     // Try to recover from common JavaScript errors
     if (errorInfo.message.includes('undefined') || errorInfo.message.includes('null')) {
-      console.log('🔄 Attempting to recover from null/undefined error...');
+      logDebug(' Attempting to recover from null/undefined error...');
       
       if (recoveryOptions.fallbackCallback) {
         recoveryOptions.fallbackCallback();
@@ -214,7 +214,7 @@
   
   // Generic error recovery
   const handleGenericError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting generic error recovery...');
+    logDebug(' Attempting generic error recovery...');
     
     if (recoveryOptions.fallbackCallback) {
       recoveryOptions.fallbackCallback();
@@ -254,7 +254,7 @@
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       ">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-          <span style="font-size: 18px;">⚠️</span>
+          <span style="font-size: 18px;">️</span>
           <strong>エラーが発生しました</strong>
         </div>
         <p style="margin: 0 0 12px 0; font-size: 14px;">${message}</p>
@@ -298,12 +298,12 @@
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withFailureHandler((error) => {
-            console.warn('Failed to report error to server:', error);
+            logWarn('Failed to report error to server:', error);
           })
           .reportClientError && google.script.run.reportClientError(errorInfo);
       }
     } catch (e) {
-      console.warn('Error reporting failed:', e);
+      logWarn('Error reporting failed:', e);
     }
   };
   
@@ -347,14 +347,14 @@
     // Global unhandled error handler
     window.addEventListener('error', (event) => {
       handleError(event.error || new Error(event.message), 'global', {
-        retryCallback: () => console.log('Global error retry not implemented')
+        retryCallback: () => logDebug('Global error retry not implemented')
       });
     });
     
     // Global unhandled promise rejection handler
     window.addEventListener('unhandledrejection', (event) => {
       handleError(event.reason || new Error('Unhandled promise rejection'), 'promise', {
-        retryCallback: () => console.log('Promise rejection retry not implemented')
+        retryCallback: () => logDebug('Promise rejection retry not implemented')
       });
     });
     
@@ -365,7 +365,7 @@
         get: function(target, prop) {
           if (typeof target[prop] === 'function') {
             return wrapFunctionWithErrorBoundary(target[prop], 'google-script', {
-              retryCallback: () => console.log('Google Script retry triggered')
+              retryCallback: () => logDebug('Google Script retry triggered')
             });
           }
           return target[prop];
@@ -376,7 +376,7 @@
   
   // Initialize error boundary system
   const initErrorBoundary = () => {
-    console.log('🛡️ Error Boundary System initialized');
+    logDebug('🛡 Error Boundary System initialized');
     setupGlobalErrorHandlers();
   };
   
@@ -641,12 +641,12 @@
     <script>
         // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
         function forceLogoutAndRedirect() {
-            console.log('🔄 サーバーサイド強制ログアウト開始...');
-            console.log('📍 現在のURL:', window.location.href);
+            logDebug(' サーバーサイド強制ログアウト開始...');
+            logDebug('📍 現在のURL:', window.location.href);
             
             // リダイレクトループ防止：既にログイン画面にいる場合は単純にリロード
             if (window.location.href.includes('mode=login')) {
-                console.log('⚠️ 既にログインモードです。ページをリロードします。');
+                logDebug('️ 既にログインモードです。ページをリロードします。');
                 window.location.reload();
                 return;
             }
@@ -655,47 +655,47 @@
             const logoutBtn = event.target;
             if (logoutBtn) {
                 logoutBtn.disabled = true;
-                logoutBtn.innerHTML = '🔄 処理中...';
+                logoutBtn.innerHTML = ' 処理中...';
             }
             
             try {
                 // サーバーサイドリダイレクト関数を呼び出し（全ての制約を回避）
                 google.script.run
                     .withSuccessHandler(function(htmlOutput) {
-                        console.log('✅ サーバーサイドリダイレクト取得成功');
-                        console.log('🔍 Response type:', typeof htmlOutput);
-                        console.log('🔍 Response value:', htmlOutput);
-                        console.log('🔍 Response length:', htmlOutput ? htmlOutput.length : 'N/A');
-                        console.log('🔍 Response preview:', htmlOutput ? htmlOutput.substring(0, 200) : 'NO CONTENT');
+                        logDebug(' サーバーサイドリダイレクト取得成功');
+                        logDebug(' Response type:', typeof htmlOutput);
+                        logDebug(' Response value:', htmlOutput);
+                        logDebug(' Response length:', htmlOutput ? htmlOutput.length : 'N/A');
+                        logDebug(' Response preview:', htmlOutput ? htmlOutput.substring(0, 200) : 'NO CONTENT');
                         
                         // サーバーから返されたHTMLを現在のページに設定（自動リダイレクト実行）
                         if (htmlOutput && htmlOutput.trim()) {
-                            console.log('✅ Valid HTML received, applying...');
+                            logDebug(' Valid HTML received, applying...');
                             document.open();
                             document.write(htmlOutput);
                             document.close();
                         } else {
-                            console.warn('⚠️ 空のHTMLOutput、フォールバック実行');
-                            console.warn('  - htmlOutput:', htmlOutput);
-                            console.warn('  - Trimmed:', htmlOutput ? htmlOutput.trim() : 'N/A');
+                            logWarn('️ 空のHTMLOutput、フォールバック実行');
+                            logWarn('  - htmlOutput:', htmlOutput);
+                            logWarn('  - Trimmed:', htmlOutput ? htmlOutput.trim() : 'N/A');
                             fallbackReload();
                         }
                     })
                     .withFailureHandler(function(error) {
-                        console.error('❌ サーバーサイドリダイレクト失敗:', error);
+                        logError(' サーバーサイドリダイレクト失敗:', error);
                         fallbackReload();
                     })
                     .forceLogoutAndRedirectToLogin();
                     
             } catch (error) {
-                console.error('❌ 強制ログアウト処理でエラー:', error);
+                logError(' 強制ログアウト処理でエラー:', error);
                 fallbackReload();
             }
         }
         
         // シンプルなフォールバック関数
         function fallbackReload() {
-            console.log('🔄 フォールバック：ページリロード実行');
+            logDebug(' フォールバック：ページリロード実行');
             const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
             if (confirm(confirmMessage)) {
                 window.location.reload();
@@ -704,7 +704,7 @@
         
         // テスト用関数
         function testServerFunction() {
-            console.log('🧪 Testing server function...');
+            logDebug('🧪 Testing server function...');
             
             // 関数存在チェック
             if (typeof google !== 'undefined' && 
@@ -714,22 +714,22 @@
                 try {
                     google.script.run
                         .withSuccessHandler(function(result) {
-                            console.log('🧪 Test Success:', result);
-                            console.log('🧪 Test Result Type:', typeof result);
-                            console.log('🧪 Test Result Length:', result ? result.length : 'N/A');
+                            logDebug('🧪 Test Success:', result);
+                            logDebug('🧪 Test Result Type:', typeof result);
+                            logDebug('🧪 Test Result Length:', result ? result.length : 'N/A');
                             alert('テスト成功: ' + (result ? '内容あり (' + result.length + ' chars)' : '空の結果'));
                         })
                         .withFailureHandler(function(error) {
-                            console.error('🧪 Test Error:', error);
+                            logError('🧪 Test Error:', error);
                             alert('テスト失敗: ' + error.message);
                         })
                         .testForceLogoutRedirect();
                 } catch (funcError) {
-                    console.warn('⚠️ testForceLogoutRedirect関数の呼び出しでエラー:', funcError);
+                    logWarn('️ testForceLogoutRedirect関数の呼び出しでエラー:', funcError);
                     alert('テスト機能でエラーが発生しました: ' + funcError.message);
                 }
             } else {
-                console.warn('⚠️ Google Apps Scriptランタイムが利用できません');
+                logWarn('️ Google Apps Scriptランタイムが利用できません');
                 alert('テスト機能は現在利用できません。管理者にお問い合わせください。');
             }
         }
@@ -737,7 +737,7 @@
 </head>
 <body>
     <div class="error-container <?= typeof errorType !== 'undefined' ? 'error-' + errorType : '' ?>">
-        <div class="error-icon"><?= typeof errorIcon !== 'undefined' ? errorIcon : '⚠️' ?></div>
+        <div class="error-icon"><?= typeof errorIcon !== 'undefined' ? errorIcon : '️' ?></div>
         <h1 class="error-title"><?= htmlEncode(title || 'エラーが発生しました') ?></h1>
         <p class="error-message"><?= htmlEncode(message || 'システムエラーが発生しました。管理者にお問い合わせください。') ?></p>
         
@@ -745,12 +745,12 @@
         <? if (typeof diagnosticInfo !== 'undefined' && diagnosticInfo) { ?>
         <div class="diagnostic-section">
             <div class="diagnostic-toggle" onclick="toggleDiagnosticInfo()">
-                📊 詳細情報を表示 <span id="diagnostic-arrow">▼</span>
+                 詳細情報を表示 <span id="diagnostic-arrow">▼</span>
             </div>
             <div class="diagnostic-content" id="diagnostic-content">
                 <? if (diagnosticInfo.summary && diagnosticInfo.summary.length > 0) { ?>
                 <div class="diagnostic-summary">
-                    <h4>📋 基本情報</h4>
+                    <h4> 基本情報</h4>
                     <? diagnosticInfo.summary.forEach(function(item) { ?>
                         <p><?= htmlEncode(item) ?></p>
                     <? }); ?>
@@ -759,7 +759,7 @@
                 
                 <? if (diagnosticInfo.technical && diagnosticInfo.technical.length > 0) { ?>
                 <div class="diagnostic-summary">
-                    <h4>🔧 技術詳細</h4>
+                    <h4> 技術詳細</h4>
                     <? diagnosticInfo.technical.forEach(function(item) { ?>
                         <p><?= htmlEncode(item) ?></p>
                     <? }); ?>
@@ -768,14 +768,14 @@
                 
                 <? if (diagnosticInfo.properties) { ?>
                 <div class="diagnostic-properties">
-                    <h4>🗂️ システム状態</h4>
+                    <h4>🗂 システム状態</h4>
                     <pre><?= htmlEncode(JSON.stringify(diagnosticInfo.properties, null, 2)) ?></pre>
                 </div>
                 <? } ?>
                 
                 <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #dee2e6;">
                     <button type="button" class="btn btn-secondary" onclick="copyDiagnosticInfo()" style="font-size: 12px;">
-                        📋 診断情報をコピー
+                         診断情報をコピー
                     </button>
                 </div>
             </div>
@@ -784,7 +784,7 @@
         
         <div class="error-actions">
             <button type="button" class="btn btn-primary" onclick="location.reload()">
-                🔄 ページを更新
+                 ページを更新
             </button>
             <? if (typeof isRegisteredUser !== 'undefined' && isRegisteredUser) { ?>
             <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
@@ -800,7 +800,7 @@
         <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
         <div class="debug-info">
             <div class="diagnostic-toggle" onclick="toggleDebugInfo()" style="margin-bottom: 8px;">
-                🔍 開発者向け情報 <span id="debug-arrow">▼</span>
+                 開発者向け情報 <span id="debug-arrow">▼</span>
             </div>
             <div id="debug-content" style="display: none;">
                 <strong>デバッグ情報:</strong><br>
@@ -854,7 +854,7 @@
                 const diagnosticSections = document.querySelectorAll('.diagnostic-summary');
                 diagnosticSections.forEach(function(section) {
                     const heading = section.querySelector('h4');
-                    if (heading && heading.textContent.includes('📋 基本情報')) {
+                    if (heading && heading.textContent.includes(' 基本情報')) {
                         const summaryItems = section.querySelectorAll('p');
                         if (summaryItems.length > 0) {
                             copyText += '\n【基本情報】\n';
@@ -862,7 +862,7 @@
                                 copyText += item.textContent.trim() + '\n';
                             });
                         }
-                    } else if (heading && heading.textContent.includes('🔧 技術詳細')) {
+                    } else if (heading && heading.textContent.includes(' 技術詳細')) {
                         const technicalItems = section.querySelectorAll('p');
                         if (technicalItems.length > 0) {
                             copyText += '\n【技術詳細】\n';
@@ -882,7 +882,7 @@
                 // クリップボードに書き込み
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(copyText).then(function() {
-                        alert('📋 診断情報がクリップボードにコピーされました');
+                        alert(' 診断情報がクリップボードにコピーされました');
                     }).catch(function() {
                         fallbackCopy(copyText);
                     });
@@ -891,8 +891,8 @@
                 }
                 
             } catch (error) {
-                console.error('Copy failed:', error);
-                alert('❌ コピーに失敗しました');
+                logError('Copy failed:', error);
+                alert(' コピーに失敗しました');
             }
         }
         
@@ -904,10 +904,10 @@
             textArea.select();
             try {
                 document.execCommand('copy');
-                alert('📋 診断情報がクリップボードにコピーされました');
+                alert(' 診断情報がクリップボードにコピーされました');
             } catch (err) {
-                alert('❌ コピーに失敗しました。手動でテキストを選択してください。');
-                console.error('Fallback copy failed:', err);
+                alert(' コピーに失敗しました。手動でテキストを選択してください。');
+                logError('Fallback copy failed:', err);
             }
             document.body.removeChild(textArea);
         }

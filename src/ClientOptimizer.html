@@ -55,7 +55,7 @@ class GASOptimizer {
       .withFailureHandler((error) => {
         this.activeCalls--;
         this.setLoadingState(functionName, false);
-        console.error(`GAS Function Error [${functionName}]:`, error);
+        logError(`GAS Function Error [${functionName}]:`, error);
         reject(this.enhanceError(error, functionName));
         this.processQueue();
       })[functionName](...args);
@@ -224,6 +224,6 @@ document.head.insertAdjacentHTML('beforeend', loadingCSS);
 
 // デバッグ用（開発時のみ）
 if (window.location.hostname === 'localhost' || window.location.hostname.includes('script.google.com')) {
-  window.gasDebug = () => console.log('GAS Optimizer Stats:', window.gasOptimizer.getStats());
+  window.gasDebug = () => logDebug('GAS Optimizer Stats:', window.gasOptimizer.getStats());
 }
 </script>

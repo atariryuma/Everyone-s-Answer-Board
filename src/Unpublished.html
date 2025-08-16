@@ -257,7 +257,7 @@
             // サーバーに再公開リクエスト
             google.script.run
                 .withSuccessHandler((result) => {
-                    console.log('✅ 再公開成功:', result);
+                    logDebug(' 再公開成功:', result);
                     showMessage(`${result.message || '回答ボードが再公開されました！'}`, 'success');
                     
                     // 公開後は公開ページに遷移（キャッシュバスティング対応）
@@ -275,12 +275,12 @@
                         viewUrl.searchParams.set('_cb', Date.now());
                         viewUrl.searchParams.set('_republished', Date.now());
                         
-                        console.log('🔄 Redirecting to published board:', viewUrl.toString());
+                        logDebug(' Redirecting to published board:', viewUrl.toString());
                         window.location.href = viewUrl.toString();
                     }, 1500);
                 })
                 .withFailureHandler((error) => {
-                    console.error('❌ 再公開エラー:', error);
+                    logError(' 再公開エラー:', error);
                     const errorMessage = error.message || error.toString() || '不明なエラー';
                     showMessage(`再公開に失敗しました: ${errorMessage}`, 'error');
                     
@@ -309,7 +309,7 @@
         
         // 非公開状態の包括的キャッシュ管理システム
         (function initUnpublishedStateManagement() {
-            console.log('🚫 Unpublished state management initialized');
+            logDebug(' Unpublished state management initialized');
             
             // 1. ページロード時のキャッシュクリア
             try {
@@ -321,7 +321,7 @@
                         key.includes('answer') ||
                         key.includes('publication')) {
                         localStorage.removeItem(key);
-                        console.log('🗑️ Cleared localStorage key:', key);
+                        logDebug('🗑 Cleared localStorage key:', key);
                     }
                 });
                 
@@ -330,7 +330,7 @@
                 localStorage.setItem('lastUnpublishedAccess', new Date().toISOString());
                 
             } catch (e) {
-                console.warn('Cache clear warning:', e);
+                logWarn('Cache clear warning:', e);
             }
             
             // 2. 定期的な状態確認（管理者以外の場合）
@@ -342,7 +342,7 @@
                 // ページの可視性変更時の状態確認
                 document.addEventListener('visibilitychange', () => {
                     if (!document.hidden) {
-                        console.log('📱 Page visible - checking publication status');
+                        logDebug('📱 Page visible - checking publication status');
                         checkPublicationStatusForStudents();
                     }
                 });
@@ -353,7 +353,7 @@
                 const channel = new BroadcastChannel('board-updates');
                 channel.addEventListener('message', (event) => {
                     if (event.data && event.data.type === 'BOARD_PUBLISHED') {
-                        console.log('📢 Board published notification received');
+                        logDebug('📢 Board published notification received');
                         showMessage('ボードが再公開されました！ページを更新します...', 'success');
                         setTimeout(() => {
                             // キャッシュバスティング付きでリロード
@@ -369,7 +369,7 @@
             // 4. ブラウザバック対策
             window.addEventListener('pageshow', (event) => {
                 if (event.persisted) {
-                    console.log('🔄 Page restored from cache - forcing reload');
+                    logDebug(' Page restored from cache - forcing reload');
                     // bfcacheから復元された場合は強制リロード
                     const currentUrl = new URL(window.location.href);
                     currentUrl.searchParams.set('_cb', Date.now());
@@ -409,7 +409,7 @@
                 }).then(response => {
                     if (response.ok) {
                         // 200 OKの場合は公開されている可能性
-                        console.log('📊 Status check: Board might be published');
+                        logDebug(' Status check: Board might be published');
                         // 実際のページ内容をチェック
                         return fetch(checkUrl, { cache: 'no-cache' });
                     }
@@ -421,7 +421,7 @@
                     return null;
                 }).then(html => {
                     if (html && !html.includes('準備中') && html.includes('StudyQuest')) {
-                        console.log('🎉 Board appears to be published - redirecting');
+                        logDebug(' Board appears to be published - redirecting');
                         showMessage('ボードが公開されました！', 'success');
                         setTimeout(() => {
                             const viewUrl = new URL(window.location.href);
@@ -431,12 +431,12 @@
                         }, 1500);
                     }
                 }).catch(error => {
-                    console.log('Status check failed (normal):', error.message);
+                    logDebug('Status check failed (normal):', error.message);
                     // エラーは正常（非公開状態での期待される動作）
                 });
                 
             } catch (error) {
-                console.log('Status check error (normal):', error.message);
+                logDebug('Status check error (normal):', error.message);
                 // エラーログのみ、ユーザーには影響しない
             }
         }

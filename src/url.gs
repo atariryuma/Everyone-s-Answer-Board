@@ -9,19 +9,19 @@
 
 if (typeof errorLog === 'undefined') {
   function errorLog(message, ...args) {
-    console.error('[ERROR]', message, ...args);
+    logError('[ERROR]', message, ...args);
   }
 }
 
 if (typeof warnLog === 'undefined') {
   function warnLog(message, ...args) {
-    console.warn('[WARN]', message, ...args);
+    logWarn('[WARN]', message, ...args);
   }
 }
 
 if (typeof infoLog === 'undefined') {
   function infoLog(message, ...args) {
-    console.log('[INFO]', message, ...args);
+    logDebug('[INFO]', message, ...args);
   }
 }
 

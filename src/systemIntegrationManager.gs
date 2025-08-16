@@ -60,14 +60,14 @@ class SystemIntegrationManager {
         try {
           this.initializeComponent(componentName, options);
           initResult.componentsInitialized.push(componentName);
-          infoLog(`✅ ${componentName} 初期化完了`);
+          infoLog(` ${componentName} 初期化完了`);
         } catch (error) {
           initResult.componentsFailedToInitialize.push({
             component: componentName,
             error: error.message
           });
           initResult.errors.push(`${componentName} 初期化失敗: ${error.message}`);
-          warnLog(`❌ ${componentName} 初期化失敗:`, error.message);
+          warnLog(` ${componentName} 初期化失敗:`, error.message);
 
           // 重要なコンポーネントが失敗した場合は初期化を中断
           if (this.isCriticalComponent(componentName)) {
@@ -100,7 +100,7 @@ class SystemIntegrationManager {
         this.schedulePeriodicTasks();
       }
 
-      infoLog(`🎉 統合システム初期化完了 (${initResult.initializationTime}ms)`, {
+      infoLog(` 統合システム初期化完了 (${initResult.initializationTime}ms)`, {
         success: initResult.success,
         initialized: initResult.componentsInitialized.length,
         failed: initResult.componentsFailedToInitialize.length
@@ -113,7 +113,7 @@ class SystemIntegrationManager {
       initResult.errors.push(`システム初期化エラー: ${error.message}`);
       initResult.initializationTime = Date.now() - startTime;
       
-      errorLog('❌ 統合システム初期化エラー:', error);
+      errorLog(' 統合システム初期化エラー:', error);
       return initResult;
     }
   }
@@ -347,7 +347,7 @@ class SystemIntegrationManager {
    */
   async shutdown() {
     try {
-      infoLog('🔄 システムシャットダウン開始');
+      infoLog(' システムシャットダウン開始');
 
       // 各コンポーネントのクリーンアップ
       for (const [name, component] of Object.entries(this.components)) {
@@ -370,7 +370,7 @@ class SystemIntegrationManager {
       }
 
       this.initialized = false;
-      infoLog('✅ システムシャットダウン完了');
+      infoLog(' システムシャットダウン完了');
       return true;
 
     } catch (error) {
@@ -443,7 +443,7 @@ function updateSystemMetrics() {
     systemIntegrationManager.systemMetrics.errorRate = totalOperations > 0 ? 
       ((totalErrors / totalOperations) * 100).toFixed(2) + '%' : '0%';
 
-    debugLog('📊 システムメトリクス更新完了', {
+    debugLog(' システムメトリクス更新完了', {
       totalRequests: systemIntegrationManager.systemMetrics.totalRequests,
       errorRate: systemIntegrationManager.systemMetrics.errorRate
     });
@@ -491,7 +491,7 @@ function diagnoseOptimizedSystem() {
       diagnostics.recommendations.push('エラー率が少し高めです。監視を継続してください。');
     }
 
-    infoLog('🔍 システム診断完了', diagnostics);
+    infoLog(' システム診断完了', diagnostics);
     return diagnostics;
 
   } catch (error) {

@@ -160,7 +160,7 @@ function resetUserAuthentication() {
   };
   
   try {
-    debugLog('🔄 ユーザー認証をリセット開始...');
+    debugLog(' ユーザー認証をリセット開始...');
     const startTime = Date.now();
     
     // Step 1: キャッシュクリア（非致命的エラー許容）
@@ -176,10 +176,10 @@ function resetUserAuthentication() {
       }
       
       authResetResult.cacheCleared = true;
-      debugLog('✅ キャッシュクリア完了');
+      debugLog(' キャッシュクリア完了');
     } catch (cacheError) {
       authResetResult.errors.push(`キャッシュクリアエラー: ${cacheError.message}`);
-      warnLog('⚠️ キャッシュクリアでエラーが発生しましたが、処理を続行します:', cacheError.message);
+      warnLog('️ キャッシュクリアでエラーが発生しましたが、処理を続行します:', cacheError.message);
     }
 
     // Step 2: プロパティクリア（段階的実装）
@@ -190,10 +190,10 @@ function resetUserAuthentication() {
       if (typeof props.deleteAllProperties === 'function') {
         props.deleteAllProperties();
         authResetResult.propertiesCleared = true;
-        debugLog('✅ PropertiesService.deleteAllProperties() でクリア完了');
+        debugLog(' PropertiesService.deleteAllProperties() でクリア完了');
       } else {
         // フォールバック: 重要なプロパティを個別削除
-        debugLog('⚠️ deleteAllProperties が利用できません。個別削除を実行します。');
+        debugLog('️ deleteAllProperties が利用できません。個別削除を実行します。');
         const importantKeys = [
           'LAST_ACCESS_EMAIL',
           'lastAdminUserId', 
@@ -208,7 +208,7 @@ function resetUserAuthentication() {
           const keys = Object.keys(allProps);
           
           if (keys.length > 0) {
-            debugLog(`📝 ${keys.length}個のプロパティを個別削除します:`, keys);
+            debugLog(` ${keys.length}個のプロパティを個別削除します:`, keys);
             
             for (const key of keys) {
               try {
@@ -219,14 +219,14 @@ function resetUserAuthentication() {
             }
             
             authResetResult.propertiesCleared = true;
-            debugLog('✅ 個別プロパティ削除完了');
+            debugLog(' 個別プロパティ削除完了');
           } else {
-            debugLog('ℹ️ 削除対象のプロパティはありませんでした');
+            debugLog('️ 削除対象のプロパティはありませんでした');
             authResetResult.propertiesCleared = true;
           }
         } catch (enumError) {
           // プロパティ一覧取得に失敗した場合、重要なキーのみ削除を試行
-          debugLog('⚠️ プロパティ一覧取得に失敗。重要なキーのみ削除を試行します。');
+          debugLog('️ プロパティ一覧取得に失敗。重要なキーのみ削除を試行します。');
           for (const key of importantKeys) {
             try {
               props.deleteProperty(key);
@@ -240,10 +240,10 @@ function resetUserAuthentication() {
       }
     } catch (propsError) {
       authResetResult.errors.push(`プロパティクリアエラー: ${propsError.message}`);
-      errorLog('❌ プロパティクリアでエラーが発生しました:', propsError.message);
+      errorLog(' プロパティクリアでエラーが発生しました:', propsError.message);
       
       // プロパティクリアに失敗してもログアウト処理は続行
-      warnLog('⚠️ プロパティクリアに失敗しましたが、ログアウト処理を続行します');
+      warnLog('️ プロパティクリアに失敗しましたが、ログアウト処理を続行します');
     }
 
     // Step 3: ログインページURLの取得
@@ -252,7 +252,7 @@ function resetUserAuthentication() {
       authResetResult.loginUrl = loginPageUrl;
       
       const executionTime = Date.now() - startTime;
-      debugLog(`✅ 認証リセット完了 (${executionTime}ms):`, {
+      debugLog(` 認証リセット完了 (${executionTime}ms):`, {
         cacheCleared: authResetResult.cacheCleared,
         propertiesCleared: authResetResult.propertiesCleared,
         errorsCount: authResetResult.errors.length,
@@ -267,7 +267,7 @@ function resetUserAuthentication() {
     
   } catch (error) {
     const executionTime = Date.now() - (authResetResult.startTime || Date.now());
-    errorLog('❌ ユーザー認証リセット中に致命的エラー:', {
+    errorLog(' ユーザー認証リセット中に致命的エラー:', {
       error: error.message,
       executionTime: executionTime + 'ms',
       partialResults: authResetResult
@@ -289,15 +289,15 @@ function resetUserAuthentication() {
  * @returns {HtmlOutput} サーバーサイドリダイレクトHTML
  */
 function forceLogoutAndRedirectToLogin() {
-  debugLog('🔄 forceLogoutAndRedirectToLogin - 関数開始');
-  debugLog('🔍 Function called at:', new Date().toISOString());
-  debugLog('🔍 Available functions check:');
+  debugLog(' forceLogoutAndRedirectToLogin - 関数開始');
+  debugLog(' Function called at:', new Date().toISOString());
+  debugLog(' Available functions check:');
   debugLog('  - getWebAppUrl:', typeof getWebAppUrl);
   debugLog('  - sanitizeRedirectUrl:', typeof sanitizeRedirectUrl);
   debugLog('  - HtmlService:', typeof HtmlService);
 
   try {
-    debugLog('✅ forceLogoutAndRedirectToLogin - try block内に入りました');
+    debugLog(' forceLogoutAndRedirectToLogin - try block内に入りました');
 
     // Step 1: セッションクリア処理（エラーハンドリング強化）
     try {
@@ -314,9 +314,9 @@ function forceLogoutAndRedirectToLogin() {
         if (scriptCache) {
           clearCacheSafely(scriptCache, { label: 'ScriptCache', email: getCurrentUserEmail(), prefixes: ['config_v3_', 'user_', 'email_'] });
         }
-        debugLog('✅ キャッシュクリア完了');
+        debugLog(' キャッシュクリア完了');
       } catch (cacheError) {
-        warnLog('⚠️ キャッシュクリアでエラーが発生しましたが、処理を続行します:', cacheError.message);
+        warnLog('️ キャッシュクリアでエラーが発生しましたが、処理を続行します:', cacheError.message);
       }
 
       // プロパティクリア（段階的実装）
@@ -326,16 +326,16 @@ function forceLogoutAndRedirectToLogin() {
         // まず deleteAllProperties を試行
         if (typeof props.deleteAllProperties === 'function') {
           props.deleteAllProperties();
-          debugLog('✅ PropertiesService.deleteAllProperties() でクリア完了');
+          debugLog(' PropertiesService.deleteAllProperties() でクリア完了');
         } else {
           // フォールバック: 既存のプロパティをすべて取得して削除
-          debugLog('⚠️ deleteAllProperties が利用できません。個別削除を実行します。');
+          debugLog('️ deleteAllProperties が利用できません。個別削除を実行します。');
           try {
             const allProps = props.getProperties();
             const keys = Object.keys(allProps);
             
             if (keys.length > 0) {
-              debugLog(`📝 ${keys.length}個のプロパティを個別削除します:`, keys);
+              debugLog(` ${keys.length}個のプロパティを個別削除します:`, keys);
               
               for (const key of keys) {
                 try {
@@ -345,13 +345,13 @@ function forceLogoutAndRedirectToLogin() {
                 }
               }
               
-              debugLog('✅ 個別プロパティ削除完了');
+              debugLog(' 個別プロパティ削除完了');
             } else {
-              debugLog('ℹ️ 削除対象のプロパティはありませんでした');
+              debugLog('️ 削除対象のプロパティはありませんでした');
             }
           } catch (enumError) {
             // プロパティ一覧取得に失敗した場合、重要なキーのみ削除を試行
-            debugLog('⚠️ プロパティ一覧取得に失敗。重要なキーのみ削除を試行します。');
+            debugLog('️ プロパティ一覧取得に失敗。重要なキーのみ削除を試行します。');
             const importantKeys = [
               'LAST_ACCESS_EMAIL',
               'lastAdminUserId', 
@@ -368,21 +368,21 @@ function forceLogoutAndRedirectToLogin() {
             }
           }
         }
-        debugLog('✅ ユーザープロパティクリア完了');
+        debugLog(' ユーザープロパティクリア完了');
       } catch (propsError) {
-        warnLog('⚠️ プロパティクリアでエラーが発生しましたが、ログアウト処理を続行します:', propsError.message);
+        warnLog('️ プロパティクリアでエラーが発生しましたが、ログアウト処理を続行します:', propsError.message);
       }
 
     } catch (cacheError) {
-      warnLog('⚠️ セッションクリア中に一部エラー:', cacheError.message);
-      warnLog('⚠️ エラースタック:', cacheError.stack);
+      warnLog('️ セッションクリア中に一部エラー:', cacheError.message);
+      warnLog('️ エラースタック:', cacheError.stack);
       // セッションクリアエラーは致命的ではないので継続
     }
 
     // Step 2: ログインページURLの生成と適切なサニタイズ
     let loginUrl;
     try {
-      debugLog('🔗 URL生成開始...');
+      debugLog(' URL生成開始...');
 
       // getWebAppUrl関数の存在確認
       if (typeof getWebAppUrl !== 'function') {
@@ -390,7 +390,7 @@ function forceLogoutAndRedirectToLogin() {
       }
 
       const rawUrl = getWebAppUrl() + '?mode=login';
-      debugLog('📝 Raw URL generated:', rawUrl);
+      debugLog(' Raw URL generated:', rawUrl);
 
       // sanitizeRedirectUrl関数の存在確認
       if (typeof sanitizeRedirectUrl !== 'function') {
@@ -398,24 +398,24 @@ function forceLogoutAndRedirectToLogin() {
       }
 
       loginUrl = sanitizeRedirectUrl(rawUrl);
-      debugLog('✅ ログインURL生成・サニタイズ成功:', loginUrl);
+      debugLog(' ログインURL生成・サニタイズ成功:', loginUrl);
 
     } catch (urlError) {
-      warnLog('⚠️ WebAppURL取得失敗、フォールバック使用:', urlError.message);
-      warnLog('⚠️ URLエラースタック:', urlError.stack);
+      warnLog('️ WebAppURL取得失敗、フォールバック使用:', urlError.message);
+      warnLog('️ URLエラースタック:', urlError.stack);
 
       const fallbackUrl = ScriptApp.getService().getUrl() + '?mode=login';
-      debugLog('📝 Fallback URL:', fallbackUrl);
+      debugLog(' Fallback URL:', fallbackUrl);
 
       try {
         loginUrl = sanitizeRedirectUrl(fallbackUrl);
       } catch (sanitizeError) {
-        errorLog('❌ Fallback URL sanitization failed:', sanitizeError.message);
+        errorLog(' Fallback URL sanitization failed:', sanitizeError.message);
         loginUrl = fallbackUrl; // 最終フォールバック
       }
     }
 
-    debugLog('🎯 Final login URL:', loginUrl);
+    debugLog(' Final login URL:', loginUrl);
 
     // Step 3: JavaScript文字列エスケープユーティリティ
     const escapeJavaScript = (str) => {
@@ -468,7 +468,7 @@ function forceLogoutAndRedirectToLogin() {
     }
 
     const htmlOutput = HtmlService.createHtmlOutput(redirectScript);
-    debugLog('✅ HtmlService.createHtmlOutput 成功');
+    debugLog(' HtmlService.createHtmlOutput 成功');
 
     // HtmlOutputの内容確認
     if (!htmlOutput) {
@@ -479,7 +479,7 @@ function forceLogoutAndRedirectToLogin() {
     try {
       if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
         htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-        debugLog('✅ XFrameOptionsMode.ALLOWALL設定完了');
+        debugLog(' XFrameOptionsMode.ALLOWALL設定完了');
       }
     } catch (frameError) {
       warnLog('XFrameOptionsMode設定失敗:', frameError.message);
@@ -488,20 +488,20 @@ function forceLogoutAndRedirectToLogin() {
     // 最終検証: HtmlOutputの内容を確認
     try {
       const outputContent = htmlOutput.getContent();
-      debugLog('📋 HtmlOutput content length:', outputContent ? outputContent.length : 'null/undefined');
-      debugLog('📋 HtmlOutput content preview:', outputContent ? outputContent.substring(0, 100) : 'NO CONTENT');
+      debugLog(' HtmlOutput content length:', outputContent ? outputContent.length : 'null/undefined');
+      debugLog(' HtmlOutput content preview:', outputContent ? outputContent.substring(0, 100) : 'NO CONTENT');
     } catch (contentError) {
-      warnLog('⚠️ Cannot access HtmlOutput content:', contentError.message);
+      warnLog('️ Cannot access HtmlOutput content:', contentError.message);
     }
 
-    debugLog('✅ サーバーサイドリダイレクトHTML生成完了 - 正常終了');
+    debugLog(' サーバーサイドリダイレクトHTML生成完了 - 正常終了');
     return htmlOutput;
 
   } catch (error) {
-    errorLog('❌ サーバーサイドログアウト処理でエラー:', error.message);
-    errorLog('❌ エラースタック:', error.stack);
-    errorLog('❌ エラーの型:', typeof error);
-    errorLog('❌ エラーオブジェクト:', error);
+    errorLog(' サーバーサイドログアウト処理でエラー:', error.message);
+    errorLog(' エラースタック:', error.stack);
+    errorLog(' エラーの型:', typeof error);
+    errorLog(' エラーオブジェクト:', error);
 
     // Step 5: エラー時のフォールバックHTML（安全なエスケープ）
     const safeErrorMessage = String(error.message || 'Unknown error')
@@ -523,10 +523,10 @@ function forceLogoutAndRedirectToLogin() {
 
     try {
       const fallbackOutput = HtmlService.createHtmlOutput(fallbackScript);
-      debugLog('✅ Fallback HtmlOutput created successfully');
+      debugLog(' Fallback HtmlOutput created successfully');
       return fallbackOutput;
     } catch (fallbackError) {
-      errorLog('❌ Fallback HTML creation failed:', fallbackError.message);
+      errorLog(' Fallback HTML creation failed:', fallbackError.message);
       // 最終手段として最小限のHTML
       return HtmlService.createHtmlOutput('<script>window.location.reload();</script>');
     }
