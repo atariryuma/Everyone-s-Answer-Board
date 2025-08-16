@@ -151,6 +151,76 @@
   </div>
 </div>
 
+<!-- 履歴復元確認モーダル -->
+<div id="restore-confirm-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold text-purple-400">設定を復元</h3>
+          </div>
+          <button type="button" id="restore-confirm-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500" aria-label="閉じる">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="space-y-6">
+          <!-- 復元内容の詳細 -->
+          <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+            <h4 class="text-lg font-medium text-purple-400 mb-3 flex items-center gap-2">
+              📋 復元する設定
+            </h4>
+            <div class="space-y-3 text-sm text-gray-300">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-400">保存日時:</span>
+                <span id="restore-timestamp" class="text-white font-medium">-</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-400">シート名:</span>
+                <span id="restore-sheet-name" class="text-white font-medium">-</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-400">意見列:</span>
+                <span id="restore-opinion-header" class="text-white font-medium">-</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-400">名前列:</span>
+                <span id="restore-name-header" class="text-white font-medium">-</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 注意事項 -->
+          <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <svg class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+              <div>
+                <h5 class="text-yellow-400 font-medium mb-1">復元の注意</h5>
+                <p class="text-yellow-200 text-sm">現在の設定は上書きされます。設定の復元後は、必要に応じて保存・公開を行ってください。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 flex justify-end gap-3">
+        <button type="button" id="restore-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="restore-confirm-btn" class="btn btn-primary">復元する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 6時間自動停止確認モーダル -->
 <div id="auto-stop-confirmation-modal" class="fixed inset-0 bg-black/80 z-[10001] hidden flex items-center justify-center" role="dialog" aria-modal="true">
   <div class="flex items-center justify-center min-h-full p-4">
@@ -758,7 +828,8 @@ class SharedModals {
       'google-integration-modal',
       'auto-stop-confirmation-modal',
       'quickstart-stop-confirmation-modal',
-      'custom-setup-selection-modal'
+      'custom-setup-selection-modal',
+      'restore-confirm-modal'
     ]);
   }
 
@@ -866,7 +937,8 @@ class SharedModals {
           'security-modal',
           'form-config-modal',
           'security-details-modal',
-          'google-integration-modal'
+          'google-integration-modal',
+          'restore-confirm-modal'
         ];
         
         modals.forEach(modalId => {
@@ -891,7 +963,9 @@ class SharedModals {
       'security-details-modal-close',
       'security-details-modal-confirm',
       'google-integration-modal-close',
-      'google-integration-modal-confirm'
+      'google-integration-modal-confirm',
+      'restore-confirm-close',
+      'restore-cancel-btn'
     ];
     
     closeButtons.forEach(buttonId => {
@@ -910,6 +984,8 @@ class SharedModals {
             this.hideModal('security-details-modal');
           } else if (buttonId.includes('google-integration')) {
             this.hideModal('google-integration-modal');
+          } else if (buttonId.includes('restore-confirm') || buttonId.includes('restore-cancel')) {
+            this.hideModal('restore-confirm-modal');
           }
         };
       }
@@ -1546,6 +1622,85 @@ class SharedModals {
         this.hideModal('custom-setup-selection-modal');
         if (onCancel) onCancel();
       });
+    }
+  }
+
+  // 履歴復元確認モーダルの表示
+  showRestoreConfirmation(item, onConfirm, onCancel) {
+    this.loadAdminModals();
+    const modal = document.getElementById('restore-confirm-modal');
+    if (!modal) {
+      console.error('復元確認モーダルが見つかりません');
+      if (onCancel) onCancel();
+      return;
+    }
+
+    // 復元データを表示用に整理
+    const formatDate = (timestamp) => {
+      if (!timestamp) return '-';
+      try {
+        const date = new Date(timestamp);
+        return date.toLocaleString('ja-JP', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return timestamp;
+      }
+    };
+
+    // データの表示
+    const timestampEl = document.getElementById('restore-timestamp');
+    const sheetNameEl = document.getElementById('restore-sheet-name');
+    const opinionHeaderEl = document.getElementById('restore-opinion-header');
+    const nameHeaderEl = document.getElementById('restore-name-header');
+
+    if (timestampEl) timestampEl.textContent = formatDate(item.timestamp);
+    if (sheetNameEl) sheetNameEl.textContent = item.sheetName || '-';
+    if (opinionHeaderEl) opinionHeaderEl.textContent = item.opinionHeader || '-';
+    if (nameHeaderEl) nameHeaderEl.textContent = item.nameHeader || item.nameColumn || '-';
+
+    // モーダル表示
+    modal.classList.remove('hidden');
+
+    // ボタンのイベント設定（一度だけ実行されるよう既存のイベントをクリア）
+    const confirmBtn = document.getElementById('restore-confirm-btn');
+    const cancelBtn = document.getElementById('restore-cancel-btn');
+    const closeBtn = document.getElementById('restore-confirm-close');
+
+    // 新しいイベントハンドラーを作成
+    const handleConfirm = () => {
+      console.log('✅ 復元が確認されました');
+      this.hideModal('restore-confirm-modal');
+      if (onConfirm) onConfirm();
+    };
+
+    const handleCancel = () => {
+      console.log('❌ 復元がキャンセルされました');
+      this.hideModal('restore-confirm-modal');
+      if (onCancel) onCancel();
+    };
+
+    // イベントリスナーを設定（重複登録を防ぐため、cloneNodeで新しい要素を作成）
+    if (confirmBtn) {
+      const newConfirmBtn = confirmBtn.cloneNode(true);
+      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+      newConfirmBtn.addEventListener('click', handleConfirm);
+    }
+
+    if (cancelBtn) {
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      newCancelBtn.addEventListener('click', handleCancel);
+    }
+
+    if (closeBtn) {
+      const newCloseBtn = closeBtn.cloneNode(true);
+      closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+      newCloseBtn.addEventListener('click', handleCancel);
     }
   }
 }

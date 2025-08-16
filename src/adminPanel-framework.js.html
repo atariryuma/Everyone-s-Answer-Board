@@ -2006,6 +2006,13 @@ window.HistoryManager = {
    */
   _showRestoreConfirmationModal(item) {
     try {
+      // 1) 専用の復元モーダルがある場合は優先使用
+      if (window.sharedModals && typeof window.sharedModals.showRestoreConfirmation === 'function') {
+        window.sharedModals.showRestoreConfirmation(item, () => this._restoreHistoryItem(item), () => {});
+        return;
+      }
+
+      // 2) フォールバック: 汎用確認モーダル
       const formattedDate = this._formatCreatedDate(item.createdDate);
       const truncatedQuestion = item.questionText && item.questionText.length > 50
         ? item.questionText.substring(0, 50) + '...'
@@ -2014,7 +2021,7 @@ window.HistoryManager = {
       const title = '履歴復元の確認';
       const message = `以下の設定を復元しますか？現在の設定が上書きされます。\n\n📝 問題文: ${truncatedQuestion}\n📊 シート名: ${item.sheetName || '未設定'}\n📅 作成日: ${formattedDate}`;
 
-      // 1) 共有モーダルDOM（confirmation-modal）がある場合は、軽量リッチレイアウトで表示
+      // 3) 共有モーダルDOM（confirmation-modal）がある場合は、軽量リッチレイアウトで表示
       const modal = document.getElementById('confirmation-modal');
       if (modal) {
         const glass = modal.querySelector('.glass-panel');
@@ -2141,12 +2148,24 @@ window.HistoryManager = {
         const options = Array.from(select.options).map(o => o.value);
         if (targetSheetName && options.includes(targetSheetName)) {
           select.value = targetSheetName;
+          console.log('✅ Target sheet found and selected:', targetSheetName);
         } else {
           const first = options.find(v => v && v.trim().length > 0) || '';
           if (first) {
             console.warn('⚠️ Sheet not found in options, fallback to:', first);
+            console.warn('⚠️ Available options:', options);
             select.value = first;
             targetSheetName = first;
+            // ユーザーに通知
+            if (typeof showMessage === 'function') {
+              showMessage(`⚠️ 指定されたシート「${item.sheetName}」が見つからないため、「${first}」に切り替えました`, 'warning');
+            }
+          } else {
+            console.error('❌ No valid sheet options available');
+            if (typeof showMessage === 'function') {
+              showMessage('❌ 利用可能なシートが見つかりません。スプレッドシートを確認してください。', 'error');
+            }
+            return;
           }
         }
         // サーバのアクティブシートを即時更新し、後続APIが同じシートを見るようにする
@@ -2225,10 +2244,20 @@ window.HistoryManager = {
           .syncConfigurationState(cfg, 'restore-simple');
       });
 
+      // 復元内容のサマリーを作成
+      const appliedCount = Object.values(applied).filter(Boolean).length;
+      const totalColumns = Object.keys(applied).length;
+      
       if (typeof showMessage === 'function') {
-        showMessage('✅ 復元が完了しました', 'success');
+        const summary = `✅ 復元が完了しました (${appliedCount}/${totalColumns}列を適用)`;
+        showMessage(summary, 'success');
       }
-      console.log('✅ Simple restore completed');
+      console.log('✅ Simple restore completed:', {
+        sheetName: targetSheetName,
+        appliedColumns: applied,
+        appliedCount,
+        totalColumns
+      });
       return true;
     } catch (error) {
       console.error('❌ Simple restore failed:', error);
