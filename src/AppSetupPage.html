@@ -124,36 +124,36 @@
 
         <!-- システム診断・整合性セクション -->
         <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">🔍 システム診断・整合性</h2>
-            
-            <div class="space-y-4">
-                <!-- 診断機能 -->
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div class="p-4 bg-gray-800 rounded-lg">
-                        <h3 class="text-lg font-medium text-white mb-3">📊 システム診断</h3>
-                        <p class="text-sm text-gray-400 mb-4">データベース接続、権限、データ整合性をチェックします</p>
-                        <button 
-                            id="run-diagnosis-btn"
-                            onclick="runSystemDiagnosis()"
-                            class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full">
-                            診断実行
-                        </button>
-                    </div>
+            <h2 class="text-xl font-semibold text-white mb-2">🔍 システム診断・整合性</h2>
+            <p class="text-sm text-gray-400 mb-4">システム管理者の視点で、アプリ全体を診断・修正・整合性チェックします。</p>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="p-4 bg-gray-800 rounded-lg">
+                    <h3 class="text-lg font-medium text-white mb-3">📊 システム診断（全体）</h3>
+                    <p class="text-sm text-gray-400 mb-4">DB接続・権限・整合性を全体診断します。</p>
+                    <button 
+                        id="run-diagnosis-btn"
+                        onclick="runSystemDiagnosis()"
+                        class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full">
+                        診断実行
+                    </button>
                 </div>
-                
-                <!-- 監視機能 -->
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div class="p-4 bg-gray-800 rounded-lg">
-                        <h3 class="text-lg font-medium text-white mb-3">✅ データ整合性</h3>
-                        <p class="text-sm text-gray-400 mb-4">データベースの整合性をチェックします</p>
-                        <button 
-                            id="run-integrity-btn"
-                            onclick="runIntegrityCheck()"
-                            class="btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full">
-                            整合性チェック
-                        </button>
+
+                <div class="p-4 bg-gray-800 rounded-lg">
+                    <h3 class="text-lg font-medium text-white mb-3">✅ データ整合性（全体）</h3>
+                    <p class="text-sm text-gray-400 mb-4">データの整合性を全体チェックします。必要に応じて修復も可能です。</p>
+                    <div class="flex items-center mb-3">
+                      <input id="autoFixToggle" type="checkbox" class="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500">
+                      <label for="autoFixToggle" class="ml-2 text-sm text-gray-300 select-none">自動修復を実行</label>
                     </div>
+                    <button 
+                        id="run-integrity-btn"
+                        onclick="runIntegrityCheck()"
+                        class="btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full">
+                        整合性チェック
+                    </button>
                 </div>
+            </div>
                 
                 <!-- 結果表示エリア -->
                 <div id="diagnostic-results" class="hidden mt-6">
@@ -1052,11 +1052,15 @@
         // 自動修復・システム監視機能は削除済み（サーバー機能も廃止）
 
         function runIntegrityCheck() {
-            executeSystemFunction('run-integrity-btn', '整合性チェック中...', 'performDataIntegrityCheck', '整合性チェック');
+            const autoFixEl = document.getElementById('autoFixToggle');
+            const autoFix = !!(autoFixEl && autoFixEl.checked);
+            const msg = autoFix ? '整合性チェック（自動修復あり）実行中...' : '整合性チェック中...';
+            const payload = { autoFix };
+            executeSystemFunction('run-integrity-btn', msg, 'performDataIntegrityCheck', '整合性チェック', payload);
         }
 
         // 共通のシステム機能実行関数
-        function executeSystemFunction(buttonId, progressMessage, functionName, originalText) {
+        function executeSystemFunction(buttonId, progressMessage, functionName, originalText, payload) {
             const button = document.getElementById(buttonId);
             const resultsDiv = document.getElementById('diagnostic-results');
             const outputElement = document.getElementById('diagnostic-output');
@@ -1073,7 +1077,7 @@
             showMessage(progressMessage, 'info');
 
             // Google Apps Script関数を呼び出し
-            google.script.run
+            const runner = google.script.run
                 .withSuccessHandler((result) => {
                     if (result && typeof result === 'object') {
                         // 結果を整形して表示
@@ -1102,8 +1106,20 @@
                     // ボタンを復元
                     button.disabled = false;
                     button.textContent = originalText;
-                })
-                [functionName]();
+                });
+
+            try {
+              if (typeof payload !== 'undefined') {
+                runner[functionName](payload);
+              } else {
+                runner[functionName]();
+              }
+            } catch (callError) {
+              outputElement.textContent = `エラーが発生しました:\n${callError.message || callError}`;
+              showMessage(`❌ ${functionName} の実行に失敗しました: ${callError.message || callError}`, 'error');
+              button.disabled = false;
+              button.textContent = originalText;
+            }
         }
 
         // 診断結果を整形する関数

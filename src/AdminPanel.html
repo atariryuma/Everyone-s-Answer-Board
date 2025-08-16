@@ -28,6 +28,44 @@
   <?!= include('ClientOptimizer'); ?>
   <?!= include('UnifiedCache.js'); ?>
   <?!= include('adminPanel-framework.js.html'); ?>
+  <script>
+  // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
+  (function() {
+    try {
+      const originalLog = console.log;
+      const originalWarn = console.warn;
+      // Read from injected DEBUG_MODE or SYSTEM_CONSTANTS fallback
+      const isDebug = !!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE));
+
+      const warningFilters = [
+        /Unrecognized feature.*ambient-light-sensor/i,
+        /Unrecognized feature.*speaker/i,
+        /Unrecognized feature.*vibrate/i,
+        /Unrecognized feature.*vr/i,
+        /iframe.*allow-scripts.*allow-same-origin.*sandbox/i,
+      ];
+
+      const shouldFilter = (msg) => {
+        const s = String(msg || '');
+        return warningFilters.some((re) => re.test(s));
+      };
+
+      console.log = function(...args) {
+        if (!isDebug) return; // suppress in non-debug mode
+        if (shouldFilter(args.join(' '))) return;
+        try { originalLog.apply(console, args); } catch (_) {}
+      };
+
+      console.warn = function(...args) {
+        if (!isDebug) return; // suppress in non-debug mode
+        if (shouldFilter(args.join(' '))) return;
+        try { originalWarn.apply(console, args); } catch (_) {}
+      };
+    } catch (e) {
+      // Fail open: keep default console behavior
+    }
+  })();
+  </script>
   
   <script>
   // GASOptimizer and UnifiedCache are now guaranteed to be defined
