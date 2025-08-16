@@ -2158,6 +2158,52 @@ function verifyUserAuthentication(requestUserId) {
  * @param {string} sheetName - シート名
  * @returns {object} { allHeaders: Array<string>, guessedConfig: object, existingConfig: object }
  */
+/**
+ * 履歴復元用のシート存在確認
+ * @param {string} spreadsheetId - スプレッドシートのID
+ * @param {string} sheetName - 確認するシート名
+ * @returns {Object} {exists: boolean, error?: string}
+ */
+function validateSheetExists(spreadsheetId, sheetName) {
+  debugLog('🔍 validateSheetExists - checking sheet existence:', { spreadsheetId, sheetName });
+  
+  try {
+    // パラメータ検証
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      throw new Error('有効なスプレッドシートIDが必要です');
+    }
+    
+    if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
+      throw new Error('有効なシート名が必要です');
+    }
+    
+    // スプレッドシートを開く
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    if (!spreadsheet) {
+      return { exists: false, error: 'スプレッドシートが見つかりません' };
+    }
+    
+    // シートの存在確認（大文字小文字を区別した完全一致）
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      debugLog('⚠️ Sheet not found with exact name match:', sheetName);
+      
+      // すべてのシート名を取得してログ出力（デバッグ用）
+      const allSheets = spreadsheet.getSheets().map(s => s.getName());
+      debugLog('Available sheets:', allSheets);
+      
+      return { exists: false, error: `シート「${sheetName}」が見つかりません` };
+    }
+    
+    debugLog('✅ Sheet validation successful:', sheetName);
+    return { exists: true };
+    
+  } catch (error) {
+    errorLog('❌ validateSheetExists error:', error.message);
+    return { exists: false, error: error.message };
+  }
+}
+
 function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
   // パラメータ型検証（従来版）
   debugLog('🔍 getSheetDetails (userId version) parameter validation:', {
@@ -2248,8 +2294,27 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
       // Sheets APIサービスを取得
       const sheetsService = getSheetsServiceCached();
 
-      // ヘッダー行を取得（1行目）
-      const range = `'${sheetName}'!1:1`;
+      // まずスプレッドシートのシート一覧を取得してシートの存在確認
+      let spreadsheetData;
+      try {
+        spreadsheetData = sheetsService.Spreadsheets.get(targetId, { includeGridData: false });
+        const existingSheets = spreadsheetData.sheets || [];
+        const existingSheetNames = existingSheets.map(sheet => sheet.properties.title);
+        
+        if (!existingSheetNames.includes(sheetName)) {
+          debugLog('🔍 利用可能なシート一覧:', existingSheetNames);
+          throw new Error(`シートが見つかりません: ${sheetName}。利用可能なシート: ${existingSheetNames.join(', ')}`);
+        }
+        
+        infoLog('✅ シートの存在確認完了:', sheetName);
+      } catch (spreadsheetGetError) {
+        errorLog('❌ スプレッドシート情報取得エラー:', spreadsheetGetError.message);
+        // 存在確認に失敗した場合もヘッダー取得を試行（フォールバック）
+      }
+
+      // ヘッダー行を取得（1行目）- シート名の適切なエスケープ
+      const escapedSheetName = sheetName.replace(/'/g, "''");  // シングルクォートをエスケープ
+      const range = `'${escapedSheetName}'!1:1`;
       const batch = batchGetSheetsData(sheetsService, targetId, [range]);
 
       if (batch && batch.valueRanges && batch.valueRanges[0] && batch.valueRanges[0].values) {

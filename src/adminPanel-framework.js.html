@@ -2591,6 +2591,12 @@ window.HistoryManager = {
     try {
       console.log(`🔄 Restoring full project: ${spreadsheetId}/${sheetName}`);
       
+      // シート名の検証
+      if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
+        console.warn('⚠️ Invalid sheet name for restoration:', sheetName);
+        throw new Error('有効なシート名が指定されていません');
+      }
+      
       // 現在のスプレッドシートIDを取得
       const getCurrentSpreadsheetId = () => {
         // status からスプレッドシートIDを取得する方法を確認
@@ -2618,7 +2624,19 @@ window.HistoryManager = {
         console.log(`🔄 Waiting for sheet options to include: ${sheetName}`);
         const sheetFound = await this._waitForSheetOptionsUpdate(sheetName);
         if (!sheetFound) {
-          console.warn(`⚠️ Sheet ${sheetName} not found in options after waiting, proceeding with fallback`);
+          console.warn(`⚠️ Sheet ${sheetName} not found in options after waiting, attempting server validation`);
+          
+          // サーバーサイドでシート存在確認
+          const isValidSheet = await this._validateSheetOnServer(spreadsheetId, sheetName);
+          if (!isValidSheet) {
+            throw new Error(`シート「${sheetName}」が見つかりません。削除されているか、名前が変更されている可能性があります。`);
+          }
+        }
+      } else {
+        // 同じスプレッドシートでもシート存在確認
+        const isValidSheet = await this._validateSheetOnServer(spreadsheetId, sheetName);
+        if (!isValidSheet) {
+          throw new Error(`シート「${sheetName}」が見つかりません。削除されているか、名前が変更されている可能性があります。`);
         }
       }
       
@@ -2630,8 +2648,51 @@ window.HistoryManager = {
     } catch (error) {
       console.warn('⚠️ Full project restore failed:', error);
       if (typeof showMessage === 'function') {
-        showMessage('⚠️ プロジェクト復元で問題が発生しました', 'warning');
+        showMessage(`⚠️ プロジェクト復元で問題が発生しました: ${error.message || error}`, 'error');
       }
+      throw error;
+    }
+  },
+
+  /**
+   * Server-side sheet validation for restore operations
+   */
+  async _validateSheetOnServer(spreadsheetId, sheetName) {
+    try {
+      console.log(`🔍 Validating sheet existence on server: ${spreadsheetId}/${sheetName}`);
+      
+      if (!spreadsheetId || !sheetName) {
+        console.warn('⚠️ Missing spreadsheetId or sheetName for validation');
+        return false;
+      }
+
+      return new Promise((resolve) => {
+        const timeoutId = setTimeout(() => {
+          console.warn('⚠️ Sheet validation timeout');
+          resolve(false);
+        }, 10000); // 10秒でタイムアウト
+
+        google.script.run
+          .withSuccessHandler(response => {
+            clearTimeout(timeoutId);
+            if (response && response.exists) {
+              console.log(`✅ Sheet validation successful: ${sheetName}`);
+              resolve(true);
+            } else {
+              console.warn(`⚠️ Sheet validation failed: ${sheetName} not found`);
+              resolve(false);
+            }
+          })
+          .withFailureHandler(error => {
+            clearTimeout(timeoutId);
+            console.warn('⚠️ Sheet validation error:', error);
+            resolve(false);
+          })
+          .validateSheetExists(spreadsheetId, sheetName);
+      });
+    } catch (error) {
+      console.warn('⚠️ Sheet validation exception:', error);
+      return false;
     }
   },
 
