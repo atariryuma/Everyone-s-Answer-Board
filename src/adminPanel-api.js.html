@@ -2209,7 +2209,9 @@ function unpublishBoard() {
         if (success) {
           console.log('✅ History saved using HistoryManager');
           // Update UI table
-          window.HistoryManager.renderTable();
+          window.HistoryManager.renderTable().catch(error => {
+            console.error('❌ Failed to update history table after save:', error);
+          });
         } else {
           console.warn('⚠️ Failed to save history using HistoryManager');
         }

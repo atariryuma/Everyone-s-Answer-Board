@@ -1351,7 +1351,9 @@ async function finalizeInitialization() {
         if (window.HistoryManager) {
           window.HistoryManager.initialize();
           console.log('🔄 Loading history table after initialization...');
-          window.HistoryManager.renderTable();
+          window.HistoryManager.renderTable().catch(error => {
+            console.error('❌ Failed to render history table during initialization:', error);
+          });
         } else {
           console.warn('⚠️ HistoryManager not available yet');
         }
@@ -1872,9 +1874,9 @@ window.HistoryManager = {
   },
 
   /**
-   * Render history table in the UI
+   * Render history table in the UI (async version using merged history)
    */
-  renderTable() {
+  async renderTable() {
     try {
       if (!this._initialized) {
         console.warn('⚠️ HistoryManager not initialized, initializing now...');
@@ -1904,8 +1906,16 @@ window.HistoryManager = {
         </tr>
       `;
       
-      // Load and display history
-      const history = this.load();
+      // Load merged history (server + local)
+      let history = [];
+      if (typeof getMergedHistory === 'function') {
+        history = await getMergedHistory();
+        console.log(`✅ Using merged history: ${history.length} items`);
+      } else {
+        console.warn('⚠️ getMergedHistory not available, falling back to local only');
+        history = this.load();
+      }
+      
       tableBody.innerHTML = '';
       
       if (history.length === 0) {
@@ -1927,6 +1937,7 @@ window.HistoryManager = {
         }
       });
       
+      console.log(`✅ Rendered ${successCount} history items`);
       return true;
       
     } catch (error) {
@@ -2846,12 +2857,20 @@ window.HistoryManager = {
 
 // Create compatibility layer for legacy code
 window.AdminPanel.historyManager = {
-  loadSimpleHistoryTable: () => window.HistoryManager.renderTable(),
+  loadSimpleHistoryTable: () => {
+    window.HistoryManager.renderTable().catch(error => {
+      console.error('❌ Failed to render history table from compatibility layer:', error);
+    });
+  },
   restoreFromSimpleHistory: (item) => window.HistoryManager._restoreHistoryItem(item)
 };
 
 // Register global functions for backward compatibility
-window.loadSimpleHistoryTable = () => window.HistoryManager.renderTable();
+window.loadSimpleHistoryTable = () => {
+  window.HistoryManager.renderTable().catch(error => {
+    console.error('❌ Failed to render history table from global function:', error);
+  });
+};
 
 //# sourceURL=adminPanel-framework.js.html
 </script>
