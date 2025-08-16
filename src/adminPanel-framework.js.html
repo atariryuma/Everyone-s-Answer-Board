@@ -2342,7 +2342,50 @@ window.HistoryManager = {
         if (nameInput) nameInput.value = item.nameHeader;
       }
       
-      // 1.5. 列選択の復元（履歴データから） - 強化版
+      // 2. 表示モード設定復元（列選択の前に実行）
+      if (item.showNames !== undefined) {
+        const showNamesCheckbox = document.getElementById('show-names');
+        if (showNamesCheckbox) {
+          showNamesCheckbox.checked = item.showNames;
+        }
+      }
+      
+      // showCountsの復元
+      const showCountsCheckbox = document.getElementById('show-counts');
+      if (showCountsCheckbox) {
+        showCountsCheckbox.checked = (item.showCounts === true);
+      }
+      
+      // 3. 完全プロジェクト復元（スプレッドシート + シート）
+      console.log('🔍 Restore conditions check:', {
+        hasSpreadsheetId: !!item.spreadsheetId,
+        hasSheetName: !!item.sheetName,
+        spreadsheetId: item.spreadsheetId,
+        sheetName: item.sheetName
+      });
+      
+      if (item.spreadsheetId && item.sheetName) {
+        console.log('✅ Full project restore path selected');
+        await this._restoreFullProject(item.spreadsheetId, item.sheetName);
+      } else if (item.sheetName) {
+        console.log('✅ Sheet-only restore path selected');
+        // シートのみ復元（下位互換性）
+        await this._restoreSheetSelection(item.sheetName);
+      } else {
+        console.warn('⚠️ No valid restoration path found - missing sheet or spreadsheet info');
+        console.warn('🔧 Attempting fallback: trying to find sheet by question text');
+        
+        // フォールバック: 問題文からシート名を推測
+        const fallbackSheetName = await this._findSheetByQuestionText(item.questionText);
+        if (fallbackSheetName) {
+          console.log(`✅ Fallback found sheet: ${fallbackSheetName}`);
+          await this._restoreSheetSelection(fallbackSheetName);
+        } else {
+          console.error('❌ Fallback failed: unable to determine correct sheet');
+        }
+      }
+      
+      // 4. 列選択の復元（プロジェクト復元完了後に実行）
       console.log('🔄 Restoring column selections from history');
       
       // 列選択肢が読み込まれるまで待機する関数
@@ -2354,8 +2397,14 @@ window.HistoryManager = {
           const checkOptions = () => {
             const select = document.getElementById(selectId);
             if (!select) {
-              console.warn(`⚠️ Select element not found: ${selectId}`);
-              resolve(false);
+              const elapsed = Date.now() - startTime;
+              if (elapsed >= maxWait) {
+                console.warn(`⚠️ Select element ${selectId} not found after ${elapsed}ms timeout`);
+                resolve(false);
+                return;
+              }
+              // 要素が見つからない場合は少し待ってから再試行
+              setTimeout(checkOptions, checkInterval);
               return;
             }
             
@@ -2447,52 +2496,6 @@ window.HistoryManager = {
         }
       }
       
-      // 2. 名前表示設定復元（showNamesベース）
-      const showNamesCheckbox = document.getElementById('show-names');
-      if (showNamesCheckbox) {
-        if (item.showNames !== undefined) {
-          showNamesCheckbox.checked = item.showNames;
-        } else if (item.displayMode !== undefined) {
-          // 旧データ対応
-          showNamesCheckbox.checked = (item.displayMode === 'named');
-        }
-      }
-      
-      // 3. リアクション数表示復元
-      const showCountsCheckbox = document.getElementById('show-counts');
-      if (showCountsCheckbox) {
-        showCountsCheckbox.checked = (item.showCounts === true);
-      }
-      
-      // 4. 完全プロジェクト復元（スプレッドシート + シート）
-      console.log('🔍 Restore conditions check:', {
-        hasSpreadsheetId: !!item.spreadsheetId,
-        hasSheetName: !!item.sheetName,
-        spreadsheetId: item.spreadsheetId,
-        sheetName: item.sheetName
-      });
-      
-      if (item.spreadsheetId && item.sheetName) {
-        console.log('✅ Full project restore path selected');
-        await this._restoreFullProject(item.spreadsheetId, item.sheetName);
-      } else if (item.sheetName) {
-        console.log('✅ Sheet-only restore path selected');
-        // シートのみ復元（下位互換性）
-        await this._restoreSheetSelection(item.sheetName);
-      } else {
-        console.warn('⚠️ No valid restoration path found - missing sheet or spreadsheet info');
-        console.warn('🔧 Attempting fallback: trying to find sheet by question text');
-        
-        // フォールバック: 問題文からシート名を推測
-        const fallbackSheetName = await this._findSheetByQuestionText(item.questionText);
-        if (fallbackSheetName) {
-          console.log(`✅ Fallback found sheet: ${fallbackSheetName}`);
-          await this._restoreSheetSelection(fallbackSheetName);
-        } else {
-          console.error('❌ Fallback failed: unable to determine correct sheet');
-        }
-      }
-      
       // 5. 設定の永続化（バックエンドへ同期）
       try {
         if (typeof buildConfigObject === 'function' && typeof runGasWithUserId === 'function') {
@@ -2504,13 +2507,16 @@ window.HistoryManager = {
           if (syncResult && syncResult.status === 'success') {
             console.log('✅ Configuration synchronized after restore');
           } else {
-            console.warn('⚠️ Configuration sync after restore reported:', syncResult && syncResult.message);
+            const errorMsg = syncResult?.message || syncResult || 'Unknown sync error';
+            console.warn('⚠️ Configuration sync after restore failed:', errorMsg);
+            // 同期失敗は致命的エラーではないため、処理は継続
           }
         } else {
-          console.warn('⚠️ Unable to persist configuration after restore (missing helpers)');
+          console.warn('⚠️ Unable to persist configuration after restore (missing buildConfigObject or runGasWithUserId)');
         }
       } catch (persistError) {
-        console.warn('⚠️ Configuration persistence warning:', persistError);
+        console.warn('⚠️ Configuration persistence error:', persistError.message || persistError);
+        // 設定永続化エラーも致命的ではないため、処理は継続
       }
 
       // 6. UI完全更新
