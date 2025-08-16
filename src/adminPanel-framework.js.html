@@ -2702,7 +2702,29 @@ window.HistoryManager = {
             const elapsed = Date.now() - startTime;
             if (elapsed >= maxWait) {
               console.warn(`⚠️ Timeout waiting for column option ${selectId}:${targetValue} (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
-              
+
+              // シンプルなフォールバック: 回答列（opinionHeader）なら既知の代表候補を優先選択
+              if (selectId === 'opinionHeader') {
+                const knownMainHeaders = [
+                  'あなたの考えや気づいたことを教えてください',
+                  'あなたの回答・意見',
+                  '回答・意見'
+                ];
+                const fallback = options.find(o => knownMainHeaders.includes(o.value));
+                if (fallback) {
+                  try {
+                    select.value = fallback.value;
+                    if (select.value === fallback.value) {
+                      console.log(`ℹ️ opinionHeader fallback selected: ${fallback.value}`);
+                      resolve({ success: true, value: fallback.value, matchType: 'fallback' });
+                      return;
+                    }
+                  } catch (e) {
+                    // 続行して次の直接設定へ
+                  }
+                }
+              }
+
               // 最後の試行として直接値を設定
               try {
                 select.value = targetValue;
@@ -2710,7 +2732,7 @@ window.HistoryManager = {
                   success: false, 
                   error: 'タイムアウト（最後の試行済み）', 
                   attempted: targetValue,
-                  availableOptions: options.slice(0, 5).map(o => o.value) // 最初の5つまで
+                  availableOptions: options.slice(0, 5).map(o => o.value)
                 });
               } catch (finalError) {
                 resolve({ 
@@ -2879,7 +2901,15 @@ window.HistoryManager = {
           const syncResult = await this._syncConfigurationWithRetry(configToPersist, attempt);
           
           if (!syncResult.success) {
-            throw new Error(syncResult.error);
+            // シンプルな扱い: 権限関連のエラーは警告化して継続
+            const errMsg = String(syncResult.error || '');
+            const isPermission = errMsg.includes('権限') || errMsg.includes('アクセスが拒否');
+            if (isPermission) {
+              console.warn('⚠️ Configuration sync permission issue, continuing with warning:', errMsg);
+              showMessage('⚠️ 設定の同期に権限が不足しています。管理者に確認してください。', 'warning');
+            } else {
+              throw new Error(syncResult.error);
+            }
           }
           
         } else {

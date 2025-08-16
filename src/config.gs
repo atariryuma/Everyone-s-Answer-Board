@@ -637,7 +637,7 @@ function autoMapHeaders(headers, sheetName = null) {
       low: ['テキスト', 'text', '記述', '入力', '自由記述']
     },
     reasonHeader: {
-      exact: ['そう考える理由や体験があれば教えてください', '理由・根拠', '根拠・理由'],
+      exact: ['そう考える理由や体験があれば教えてください', 'そう考える理由や体験があれば教えてください（任意）', '理由・根拠', '根拠・理由'],
       high: ['そう考える理由', '理由', '根拠', '説明'],
       medium: ['詳細', 'reason', '理由説明', '補足'],
       low: ['なぜ', 'why', '背景', '経験']
@@ -2300,12 +2300,19 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
         spreadsheetData = sheetsService.Spreadsheets.get(targetId, { includeGridData: false });
         const existingSheets = spreadsheetData.sheets || [];
         const existingSheetNames = existingSheets.map(sheet => sheet.properties.title);
-        
-        if (!existingSheetNames.includes(sheetName)) {
+
+        // シンプルな曖昧一致で存在確認（保守容易性優先）
+        const resolvedName = _resolveSheetNameSimple(existingSheetNames, sheetName);
+        if (!resolvedName) {
           debugLog('🔍 利用可能なシート一覧:', existingSheetNames);
-          throw new Error(`シートが見つかりません: ${sheetName}。利用可能なシート: ${existingSheetNames.join(', ')}`);
+          throw new Error(`シートが見つかりません: ${sheetName}。利用可能なシート: ${existingSheetNames.slice(0, 10).join(', ')}`);
         }
-        
+
+        if (resolvedName !== sheetName) {
+          infoLog('ℹ️ シート名を自動解決しました:', { requested: sheetName, resolved: resolvedName });
+          sheetName = resolvedName;
+        }
+
         infoLog('✅ シートの存在確認完了:', sheetName);
       } catch (spreadsheetGetError) {
         errorLog('❌ スプレッドシート情報取得エラー:', spreadsheetGetError.message);
@@ -2365,6 +2372,49 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
   } catch (error) {
     errorLog('getSheetDetails error:', error.message);
     throw new Error('シート情報の取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * 既存シート名の配列から、要求名に最も近いシート名をシンプルに解決します。
+ * ルール（簡易版）:
+ * - 完全一致があれば採用
+ * - 前後空白をtrimした一致
+ * - 空白を除去して一致（「フォームの回答 6」≒「フォームの回答6」）
+ * - 先頭一致で一意に決まる場合のみ採用（例: 「フォームの回答」で始まる）
+ * 一致しなければ null を返す
+ * @param {string[]} existingNames 既存のシート名一覧
+ * @param {string} requestedName 要求されたシート名
+ * @returns {string|null} 解決されたシート名
+ */
+function _resolveSheetNameSimple(existingNames, requestedName) {
+  try {
+    if (!Array.isArray(existingNames) || !requestedName) return null;
+
+    // 完全一致
+    if (existingNames.includes(requestedName)) return requestedName;
+
+    const reqTrim = String(requestedName).trim();
+    const namesTrim = existingNames.map(n => String(n).trim());
+    if (namesTrim.includes(reqTrim)) {
+      return existingNames[namesTrim.indexOf(reqTrim)];
+    }
+
+    // 空白除去で比較（全角/半角空白の差異も吸収）
+    const compact = s => String(s).replace(/[\s\u3000]+/g, '');
+    const reqCompact = compact(reqTrim);
+    for (let i = 0; i < existingNames.length; i++) {
+      if (compact(existingNames[i]) === reqCompact) return existingNames[i];
+    }
+
+    // 先頭一致で一意に決まるなら採用
+    const starts = existingNames.filter(n => String(n).startsWith(reqTrim));
+    if (starts.length === 1) return starts[0];
+
+    return null;
+  } catch (e) {
+    warnLog('resolveSheetNameSimple error:', e.message);
+    return null;
   }
 }
 
