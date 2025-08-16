@@ -2331,37 +2331,108 @@ window.HistoryManager = {
         if (nameInput) nameInput.value = item.nameHeader;
       }
       
-      // 1.5. 列選択の復元（履歴データから）
+      // 1.5. 列選択の復元（履歴データから） - 強化版
       console.log('🔄 Restoring column selections from history');
+      
+      // 列選択肢が読み込まれるまで待機する関数
+      const waitForColumnOptions = async (selectId, targetValue, maxWait = 3000) => {
+        const startTime = Date.now();
+        const checkInterval = 200;
+        
+        return new Promise((resolve) => {
+          const checkOptions = () => {
+            const select = document.getElementById(selectId);
+            if (!select) {
+              console.warn(`⚠️ Select element not found: ${selectId}`);
+              resolve(false);
+              return;
+            }
+            
+            // 選択肢の中に目標値があるかチェック
+            const options = Array.from(select.options);
+            const hasTargetOption = options.some(option => option.value === targetValue);
+            
+            if (hasTargetOption) {
+              console.log(`✅ Column option found for ${selectId}: ${targetValue}`);
+              select.value = targetValue;
+              
+              // 値が正しく設定されたかダブルチェック
+              if (select.value === targetValue) {
+                console.log(`✅ ${selectId} value successfully set to: ${targetValue}`);
+                resolve(true);
+              } else {
+                console.warn(`⚠️ ${selectId} value setting failed. Expected: ${targetValue}, Actual: ${select.value}`);
+                resolve(false);
+              }
+              return;
+            }
+            
+            // タイムアウトチェック
+            const elapsed = Date.now() - startTime;
+            if (elapsed >= maxWait) {
+              console.warn(`⚠️ Timeout waiting for column option ${selectId}:${targetValue} (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
+              // タイムアウト時でも値の設定は試行
+              select.value = targetValue;
+              resolve(false);
+              return;
+            }
+            
+            // 再チェック
+            setTimeout(checkOptions, checkInterval);
+          };
+          
+          checkOptions();
+        });
+      };
+      
+      // 並列で列選択を復元
+      const columnRestorations = [];
+      
       if (item.opinionColumn) {
-        const opinionSelect = document.getElementById('opinion-column');
-        if (opinionSelect) {
-          opinionSelect.value = item.opinionColumn;
-          console.log(`✅ Opinion column restored: ${item.opinionColumn}`);
-        }
+        columnRestorations.push(
+          waitForColumnOptions('opinion-column', item.opinionColumn)
+            .then(success => ({ type: 'opinion', value: item.opinionColumn, success }))
+        );
       }
       
       if (item.nameColumn) {
-        const nameSelect = document.getElementById('name-column');
-        if (nameSelect) {
-          nameSelect.value = item.nameColumn;
-          console.log(`✅ Name column restored: ${item.nameColumn}`);
-        }
+        columnRestorations.push(
+          waitForColumnOptions('name-column', item.nameColumn)
+            .then(success => ({ type: 'name', value: item.nameColumn, success }))
+        );
       }
       
       if (item.classColumn) {
-        const classSelect = document.getElementById('class-column');
-        if (classSelect) {
-          classSelect.value = item.classColumn;
-          console.log(`✅ Class column restored: ${item.classColumn}`);
-        }
+        columnRestorations.push(
+          waitForColumnOptions('class-column', item.classColumn)
+            .then(success => ({ type: 'class', value: item.classColumn, success }))
+        );
       }
       
       if (item.reasonColumn) {
-        const reasonSelect = document.getElementById('reason-column');
-        if (reasonSelect) {
-          reasonSelect.value = item.reasonColumn;
-          console.log(`✅ Reason column restored: ${item.reasonColumn}`);
+        columnRestorations.push(
+          waitForColumnOptions('reason-column', item.reasonColumn)
+            .then(success => ({ type: 'reason', value: item.reasonColumn, success }))
+        );
+      }
+      
+      // すべての列復元を待機
+      if (columnRestorations.length > 0) {
+        console.log(`🔄 Waiting for ${columnRestorations.length} column selections to restore...`);
+        try {
+          const results = await Promise.all(columnRestorations);
+          const successCount = results.filter(r => r.success).length;
+          console.log(`✅ Column restoration completed: ${successCount}/${results.length} successful`);
+          
+          results.forEach(result => {
+            if (result.success) {
+              console.log(`✅ ${result.type} column restored: ${result.value}`);
+            } else {
+              console.warn(`⚠️ ${result.type} column restoration failed: ${result.value}`);
+            }
+          });
+        } catch (restorationError) {
+          console.warn('⚠️ Column restoration error:', restorationError);
         }
       }
       
@@ -2552,6 +2623,8 @@ window.HistoryManager = {
    */
   async _restoreSheetSelection(sheetName) {
     try {
+      console.log(`🔄 Restoring sheet selection: ${sheetName}`);
+      
       // グローバル状態更新
       window.AdminPanel.selectedSheet = sheetName;
       if (window.AdminPanel.stateManager) {
@@ -2560,13 +2633,37 @@ window.HistoryManager = {
       
       // シート選択UI更新
       const sheetSelect = document.getElementById('sheet-select');
-      if (sheetSelect && sheetSelect.value !== sheetName) {
-        sheetSelect.value = sheetName;
-        sheetSelect.dispatchEvent(new Event('change'));
+      if (sheetSelect) {
+        // シート選択を実行
+        if (sheetSelect.value !== sheetName) {
+          sheetSelect.value = sheetName;
+          console.log(`✅ Sheet select value updated to: ${sheetName}`);
+        }
         
         // プルダウン表示の強制更新
         if (typeof updateSheetSelectActiveIndicator === 'function') {
           updateSheetSelectActiveIndicator(sheetName);
+          console.log(`✅ Sheet active indicator updated`);
+        }
+        
+        // シート変更イベントを発火（列データ読み込みトリガー）
+        const changeEvent = new Event('change', { bubbles: true });
+        sheetSelect.dispatchEvent(changeEvent);
+        console.log(`✅ Sheet change event dispatched`);
+        
+        // シート選択変更ハンドラーを直接呼び出し（フォールバック）
+        if (typeof handleSheetSelectionChange === 'function') {
+          const mockEvent = { target: { value: sheetName } };
+          await handleSheetSelectionChange(mockEvent);
+          console.log(`✅ Sheet selection change handler called directly`);
+        }
+        
+        // 少し待機してからUI更新を確認
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // selectedSheet グローバル変数も更新（互換性確保）
+        if (typeof window.selectedSheet !== 'undefined') {
+          window.selectedSheet = sheetName;
         }
       }
       
@@ -2581,17 +2678,54 @@ window.HistoryManager = {
    */
   async _refreshAfterRestore() {
     try {
-      // データ再読込
-      if (typeof loadData === 'function') {
-        await loadData();
+      console.log('🔄 Refreshing UI after history restore...');
+      
+      // シートデータの再読み込み（シート変更後の列データ取得）
+      if (typeof loadSheetDetailsAPI === 'function' && window.AdminPanel.selectedSheet) {
+        console.log('📊 Reloading sheet details for column data...');
+        try {
+          await loadSheetDetailsAPI(window.AdminPanel.selectedSheet);
+          console.log('✅ Sheet details reloaded successfully');
+        } catch (sheetError) {
+          console.warn('⚠️ Sheet details reload failed:', sheetError);
+        }
       }
       
-      // 列判定更新
-      if (typeof updateColumnDetection === 'function') {
-        await updateColumnDetection();
+      // 列選択肢の更新（フォールバック）
+      if (typeof handleSheetSelectionChange === 'function' && window.AdminPanel.selectedSheet) {
+        console.log('📋 Updating column options via sheet selection handler...');
+        try {
+          const mockEvent = { target: { value: window.AdminPanel.selectedSheet } };
+          await handleSheetSelectionChange(mockEvent);
+          console.log('✅ Column options updated via handler');
+        } catch (handlerError) {
+          console.warn('⚠️ Sheet selection handler failed:', handlerError);
+        }
       }
       
-      console.log('✅ UI refreshed successfully');
+      // UI状態の最終調整
+      if (typeof updateUIForSelectedSheet === 'function') {
+        console.log('🎯 Updating UI for selected sheet...');
+        try {
+          updateUIForSelectedSheet();
+          console.log('✅ UI updated for selected sheet');
+        } catch (uiError) {
+          console.warn('⚠️ UI update failed:', uiError);
+        }
+      }
+      
+      // 設定ボタンの状態更新
+      if (typeof updateConfigButtons === 'function') {
+        console.log('🔘 Updating config buttons state...');
+        try {
+          updateConfigButtons();
+          console.log('✅ Config buttons updated');
+        } catch (buttonError) {
+          console.warn('⚠️ Config buttons update failed:', buttonError);
+        }
+      }
+      
+      console.log('✅ UI refresh completed successfully');
     } catch (error) {
       console.warn('⚠️ UI refresh warning:', error);
     }
