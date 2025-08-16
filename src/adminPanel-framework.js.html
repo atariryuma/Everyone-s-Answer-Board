@@ -2125,7 +2125,13 @@ window.HistoryManager = {
         showMessage('🔄 復元中...', 'info');
       }
 
-      // 1) スプレッドシート切替（必要時のみ、リトライなし）
+      console.log('🔍 Starting restoration for item:', {
+        spreadsheetId: item.spreadsheetId,
+        sheetName: item.sheetName,
+        createdDate: item.createdDate
+      });
+
+      // 1) スプレッドシート切替（必要時のみ、リトライあり）
       const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || null;
       console.log('🔍 Spreadsheet switching check:', {
         itemSpreadsheetId: item.spreadsheetId,
@@ -2135,24 +2141,53 @@ window.HistoryManager = {
       
       if (item.spreadsheetId && currentSpreadsheetId && item.spreadsheetId !== currentSpreadsheetId) {
         console.log('🔄 Switching spreadsheet from', currentSpreadsheetId, 'to', item.spreadsheetId);
-        await runGasWithUserId('updateUserAPI', false, { spreadsheetId: item.spreadsheetId });
         
-        // スプレッドシート切り替え後、ステータスを再取得して新しいシート一覧を取得
-        if (typeof loadStatus === 'function') {
-          await loadStatus(true);
-          console.log('🔄 Status reloaded after spreadsheet switch');
-        }
-        
-        // 新しいステータスを確認
-        const newSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
-        console.log('✅ Spreadsheet switch completed:', {
-          requested: item.spreadsheetId,
-          actual: newSpreadsheetId,
-          success: newSpreadsheetId === item.spreadsheetId
-        });
-        
-        if (newSpreadsheetId !== item.spreadsheetId) {
-          console.warn('⚠️ Spreadsheet switch may have failed or taken longer than expected');
+        try {
+          await runGasWithUserId('updateUserAPI', false, { spreadsheetId: item.spreadsheetId });
+          
+          // スプレッドシート切り替え後、ステータスを再取得して新しいシート一覧を取得
+          if (typeof loadStatus === 'function') {
+            await loadStatus(true);
+            console.log('🔄 Status reloaded after spreadsheet switch');
+          }
+          
+          // 新しいステータスを確認（複数回チェック）
+          let newSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
+          let retryCount = 0;
+          const maxRetries = 3;
+          
+          while (newSpreadsheetId !== item.spreadsheetId && retryCount < maxRetries) {
+            console.log(`🔄 Retry ${retryCount + 1}/${maxRetries}: Waiting for spreadsheet switch to complete...`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒待機
+            
+            if (typeof loadStatus === 'function') {
+              await loadStatus(true);
+            }
+            newSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
+            retryCount++;
+          }
+          
+          console.log('✅ Spreadsheet switch result:', {
+            requested: item.spreadsheetId,
+            actual: newSpreadsheetId,
+            success: newSpreadsheetId === item.spreadsheetId,
+            retriesUsed: retryCount
+          });
+          
+          if (newSpreadsheetId !== item.spreadsheetId) {
+            const errorMsg = `スプレッドシートの切り替えに失敗しました。要求: ${item.spreadsheetId}, 実際: ${newSpreadsheetId}`;
+            console.error('❌ Spreadsheet switch failed:', errorMsg);
+            if (typeof showMessage === 'function') {
+              showMessage('❌ ' + errorMsg, 'error');
+            }
+            throw new Error(errorMsg);
+          }
+        } catch (switchError) {
+          console.error('❌ Failed to switch spreadsheet:', switchError);
+          if (typeof showMessage === 'function') {
+            showMessage('❌ スプレッドシートの切り替えに失敗しました: ' + switchError.message, 'error');
+          }
+          throw switchError;
         }
       } else {
         console.log('📋 No spreadsheet switch needed');
@@ -2241,23 +2276,47 @@ window.HistoryManager = {
         console.log('📋 Sheet selection updated (restore mode, no server sync)');
       }
 
-      // 3) ヘッダー取得と完全一致の列のみ適用
+      // 3) ヘッダー取得と完全一致の列のみ適用（前提条件チェック付き）
       let headers = [];
       try {
         if (effectiveSpreadsheetId && targetSheetName) {
+          // スプレッドシート切り替えが完了していることを確認
+          const currentId = window.currentStatus?.userInfo?.spreadsheetId;
+          if (item.spreadsheetId && currentId !== item.spreadsheetId) {
+            console.warn('⚠️ Spreadsheet switch incomplete, skipping header retrieval');
+            throw new Error(`Spreadsheet switch incomplete: expected ${item.spreadsheetId}, got ${currentId}`);
+          }
+          
           // シート存在確認
           const select = document.getElementById('sheet-select');
           const options = select ? Array.from(select.options).map(o => o.value) : [];
+          console.log('🔍 Checking sheet availability for header retrieval:', {
+            targetSheet: targetSheetName,
+            availableSheets: options,
+            sheetExists: options.includes(targetSheetName)
+          });
+          
           if (!options.includes(targetSheetName)) {
             console.warn('⚠️ Target sheet not available for header retrieval, skipping');
             throw new Error(`Sheet "${targetSheetName}" not found for header retrieval`);
           }
           
+          console.log('🔄 Retrieving sheet details for header population...');
           const details = await runGasWithUserId('getSheetDetails', 'シート情報を取得中...', effectiveSpreadsheetId, targetSheetName);
           headers = Array.isArray(details?.allHeaders) ? details.allHeaders : [];
+          console.log('✅ Headers retrieved successfully:', headers.length, 'headers found');
+        } else {
+          console.warn('⚠️ Missing prerequisites for header retrieval:', {
+            effectiveSpreadsheetId,
+            targetSheetName
+          });
         }
       } catch (e) {
         console.warn('⚠️ getSheetDetails failed in simple restore:', e);
+        // ヘッダー取得に失敗した場合でも復元処理は続行（UI設定のみ）
+        if (typeof showMessage === 'function') {
+          showMessage('⚠️ ヘッダー情報を取得できませんでした。既存の設定で続行します。', 'warning');
+        }
       }
       if (headers.length && typeof populateHeaderOptions === 'function') {
         populateHeaderOptions(headers);
@@ -2337,9 +2396,33 @@ window.HistoryManager = {
       return true;
     } catch (error) {
       console.error('❌ Simple restore failed:', error);
-      if (typeof showMessage === 'function') {
-        showMessage('❌ 復元に失敗しました', 'error');
+      
+      // エラーの種類に応じたメッセージ表示
+      let errorMessage = '復元に失敗しました';
+      if (error.message && error.message.includes('スプレッドシートの切り替えに失敗')) {
+        errorMessage = 'スプレッドシートの切り替えに失敗しました。権限を確認してください。';
+      } else if (error.message && error.message.includes('シート情報の取得に失敗')) {
+        errorMessage = 'シート情報の取得に失敗しました。シートが存在するか確認してください。';
+      } else if (error.message && error.message.includes('Sheet') && error.message.includes('not found')) {
+        errorMessage = '指定されたシートが見つかりません。';
       }
+      
+      if (typeof showMessage === 'function') {
+        showMessage('❌ ' + errorMessage, 'error');
+      }
+      
+      // エラー詳細をログに記録
+      console.error('📊 Restoration error details:', {
+        errorType: error.constructor.name,
+        errorMessage: error.message,
+        stack: error.stack,
+        itemData: {
+          spreadsheetId: item.spreadsheetId,
+          sheetName: item.sheetName,
+          createdDate: item.createdDate
+        }
+      });
+      
       return false;
     }
   },
