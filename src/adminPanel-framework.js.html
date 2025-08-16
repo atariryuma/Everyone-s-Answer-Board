@@ -2127,11 +2127,35 @@ window.HistoryManager = {
 
       // 1) スプレッドシート切替（必要時のみ、リトライなし）
       const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || null;
+      console.log('🔍 Spreadsheet switching check:', {
+        itemSpreadsheetId: item.spreadsheetId,
+        currentSpreadsheetId: currentSpreadsheetId,
+        needsSwitch: item.spreadsheetId && currentSpreadsheetId && item.spreadsheetId !== currentSpreadsheetId
+      });
+      
       if (item.spreadsheetId && currentSpreadsheetId && item.spreadsheetId !== currentSpreadsheetId) {
+        console.log('🔄 Switching spreadsheet from', currentSpreadsheetId, 'to', item.spreadsheetId);
         await runGasWithUserId('updateUserAPI', false, { spreadsheetId: item.spreadsheetId });
+        
+        // スプレッドシート切り替え後、ステータスを再取得して新しいシート一覧を取得
         if (typeof loadStatus === 'function') {
           await loadStatus(true);
+          console.log('🔄 Status reloaded after spreadsheet switch');
         }
+        
+        // 新しいステータスを確認
+        const newSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
+        console.log('✅ Spreadsheet switch completed:', {
+          requested: item.spreadsheetId,
+          actual: newSpreadsheetId,
+          success: newSpreadsheetId === item.spreadsheetId
+        });
+        
+        if (newSpreadsheetId !== item.spreadsheetId) {
+          console.warn('⚠️ Spreadsheet switch may have failed or taken longer than expected');
+        }
+      } else {
+        console.log('📋 No spreadsheet switch needed');
       }
 
       const effectiveSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || item.spreadsheetId || null;
@@ -2140,20 +2164,44 @@ window.HistoryManager = {
       let targetSheetName = item.sheetName || '';
       const select = document.getElementById('sheet-select');
       if (select) {
-        const options = Array.from(select.options).map(o => o.value);
+        const options = Array.from(select.options).map(o => o.value).filter(v => v && v.trim().length > 0);
+        console.log('🔍 Available sheet options:', options);
+        
         if (targetSheetName && options.includes(targetSheetName)) {
           select.value = targetSheetName;
           console.log('✅ Target sheet found and selected:', targetSheetName);
         } else {
-          const first = options.find(v => v && v.trim().length > 0) || '';
-          if (first) {
-            console.warn('⚠️ Sheet not found in options, fallback to:', first);
+          // より堅牢なフォールバック処理
+          let fallbackSheet = null;
+          
+          // 1. まず部分一致を試す
+          if (targetSheetName) {
+            fallbackSheet = options.find(opt => 
+              opt.toLowerCase().includes(targetSheetName.toLowerCase()) ||
+              targetSheetName.toLowerCase().includes(opt.toLowerCase())
+            );
+            if (fallbackSheet) {
+              console.log('🔍 Found partial match for fallback:', fallbackSheet);
+            }
+          }
+          
+          // 2. 部分一致がない場合は最初の有効な選択肢を使用
+          if (!fallbackSheet) {
+            fallbackSheet = options[0] || '';
+          }
+          
+          if (fallbackSheet) {
+            console.warn('⚠️ Sheet not found in options, fallback to:', fallbackSheet);
+            console.warn('⚠️ Requested sheet:', targetSheetName);
             console.warn('⚠️ Available options:', options);
-            select.value = first;
-            targetSheetName = first;
+            select.value = fallbackSheet;
+            targetSheetName = fallbackSheet;
             // ユーザーに通知
             if (typeof showMessage === 'function') {
-              showMessage(`⚠️ 指定されたシート「${item.sheetName}」が見つからないため、「${first}」に切り替えました`, 'warning');
+              const message = targetSheetName && targetSheetName !== fallbackSheet
+                ? `⚠️ 指定されたシート「${item.sheetName}」が見つからないため、「${fallbackSheet}」に切り替えました`
+                : `⚠️ シートが指定されていないため、「${fallbackSheet}」を選択しました`;
+              showMessage(message, 'warning');
             }
           } else {
             console.error('❌ No valid sheet options available');
@@ -2215,23 +2263,54 @@ window.HistoryManager = {
         populateHeaderOptions(headers);
       }
 
-      const setSelectIfExists = (id, value) => {
-        if (!value) return false;
+      const setSelectIfExists = (id, value, label) => {
+        if (!value) {
+          console.log(`⚠️ No value provided for ${label} (${id})`);
+          return false;
+        }
         const el = document.getElementById(id);
-        if (!el) return false;
+        if (!el) {
+          console.warn(`⚠️ Element not found: ${id} for ${label}`);
+          return false;
+        }
         const opts = Array.from(el.options).map(o => o.value);
         if (opts.includes(value)) {
           el.value = value;
+          console.log(`✅ ${label} set to: ${value}`);
           return true;
+        } else {
+          console.warn(`⚠️ ${label} value "${value}" not found in options:`, opts);
+          
+          // 部分一致による自動修正を試す
+          const partialMatch = opts.find(opt => 
+            opt && value && (
+              opt.toLowerCase().includes(value.toLowerCase()) ||
+              value.toLowerCase().includes(opt.toLowerCase())
+            )
+          );
+          
+          if (partialMatch) {
+            el.value = partialMatch;
+            console.log(`🔍 ${label} auto-corrected to partial match: ${partialMatch}`);
+            return true;
+          }
+          
+          return false;
         }
-        return false;
       };
 
+      console.log('🔍 Applying column settings from history item:', {
+        opinionHeader: item.opinionHeader,
+        nameHeader: item.nameHeader || item.nameColumn,
+        classHeader: item.classHeader || item.classColumn,
+        reasonHeader: item.reasonHeader || item.reasonColumn
+      });
+
       const applied = {
-        opinion: setSelectIfExists('opinionHeader', item.opinionHeader),
-        name: setSelectIfExists('name-column', item.nameHeader || item.nameColumn),
-        class: setSelectIfExists('class-column', item.classHeader || item.classColumn),
-        reason: setSelectIfExists('reason-column', item.reasonHeader || item.reasonColumn),
+        opinion: setSelectIfExists('opinionHeader', item.opinionHeader, '意見欄'),
+        name: setSelectIfExists('name-column', item.nameHeader || item.nameColumn, '名前欄'),
+        class: setSelectIfExists('class-column', item.classHeader || item.classColumn, 'クラス欄'),
+        reason: setSelectIfExists('reason-column', item.reasonHeader || item.reasonColumn, '理由欄'),
       };
 
       // 復元時は設定をUIのみに反映（サーバー設定は保存しない）
