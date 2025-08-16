@@ -14,11 +14,6 @@
     <script>
       const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
     </script>
-    
-    <!-- Modular JavaScript Components -->
-    <?!= include('appSetup-diagnostics.js'); ?>
-    <?!= include('appSetup-userManagement.js'); ?>
-    <?!= include('appSetup-debugMode.js'); ?>
 </head>
 <body>
     <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[9999] hidden">
@@ -129,48 +124,64 @@
 
         <!-- システム診断・監視セクション -->
         <div class="glass-panel rounded-xl p-6 mb-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold text-white">🔍 システム診断・監視</h2>
-                <button type="button" 
-                        onclick="showDiagnosticHistory()"
-                        class="btn bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
-                    📊 診断履歴
-                </button>
-            </div>
+            <h2 class="text-xl font-semibold text-white mb-4">🔍 システム診断・監視</h2>
             
             <div class="space-y-4">
                 <!-- 診断機能 -->
                 <div class="grid md:grid-cols-2 gap-4">
                     <div class="p-4 bg-gray-800 rounded-lg">
                         <h3 class="text-lg font-medium text-white mb-3">📊 システム診断</h3>
-                        <p class="text-sm text-gray-400 mb-4">データベース接続、権限、サービスアカウント設定をチェックします</p>
-                        <button type="button"
+                        <p class="text-sm text-gray-400 mb-4">データベース接続、権限、データ整合性をチェックします</p>
+                        <button 
                             id="run-diagnosis-btn"
                             onclick="runSystemDiagnosis()"
                             class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full">
-                            <span class="spinner hidden animate-spin">⟳</span>
-                            <span class="btn-text">診断実行</span>
+                            診断実行
+                        </button>
+                    </div>
+                    
+                    <div class="p-4 bg-gray-800 rounded-lg">
+                        <h3 class="text-lg font-medium text-white mb-3">🔧 自動修復</h3>
+                        <p class="text-sm text-gray-400 mb-4">検出された問題を自動的に修復します</p>
+                        <button 
+                            id="run-repair-btn"
+                            onclick="runAutoRepair()"
+                            class="btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg w-full">
+                            修復実行
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 監視機能 -->
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="p-4 bg-gray-800 rounded-lg">
+                        <h3 class="text-lg font-medium text-white mb-3">📈 システム監視</h3>
+                        <p class="text-sm text-gray-400 mb-4">システム全体の健全性をチェックします</p>
+                        <button 
+                            id="run-monitoring-btn"
+                            onclick="runSystemMonitoring()"
+                            class="btn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg w-full">
+                            監視実行
                         </button>
                     </div>
                     
                     <div class="p-4 bg-gray-800 rounded-lg">
                         <h3 class="text-lg font-medium text-white mb-3">✅ データ整合性</h3>
-                        <p class="text-sm text-gray-400 mb-4">データベースの整合性チェックと自動修復を実行します</p>
-                        <button type="button"
+                        <p class="text-sm text-gray-400 mb-4">データベースの整合性をチェックします</p>
+                        <button 
                             id="run-integrity-btn"
                             onclick="runIntegrityCheck()"
                             class="btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full">
-                            <span class="spinner hidden animate-spin">⟳</span>
-                            <span class="btn-text">整合性チェック</span>
+                            整合性チェック
                         </button>
                     </div>
                 </div>
                 
                 <!-- 結果表示エリア -->
-                <div id="diagnostic-results" class="mt-6">
-                    <h3 class="text-lg font-medium text-white mb-3">📋 最新の診断結果</h3>
-                    <div class="bg-gray-900 rounded-lg p-4 min-h-[100px]">
-                        <p class="text-gray-400 text-center py-8">診断を実行すると結果がここに表示されます</p>
+                <div id="diagnostic-results" class="hidden mt-6">
+                    <h3 class="text-lg font-medium text-white mb-3">📋 診断結果</h3>
+                    <div class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                        <pre id="diagnostic-output" class="text-sm text-gray-300 whitespace-pre-wrap"></pre>
                     </div>
                 </div>
             </div>
@@ -297,6 +308,12 @@
                                 onclick="viewDeletionLogs()"
                                 class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs">
                                 📋 削除ログ
+                            </button>
+                            <button 
+                                id="view-diagnostic-logs-btn"
+                                onclick="viewDiagnosticHistory()"
+                                class="btn bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs">
+                                📊 診断履歴
                             </button>
                         </div>
                     </div>
@@ -1049,20 +1066,517 @@
             document.getElementById('logs-modal').classList.add('hidden');
         }
 
-        // システム診断・監視機能は appSetup-diagnostics.js に移行済み
+        // システム診断・監視機能
+        function runSystemDiagnosis() {
+            executeSystemFunction('run-diagnosis-btn', 'システム診断中...', 'diagnoseDatabase', '診断実行');
+        }
 
-        // デバッグモード機能は appSetup-debugMode.js に移行済み
-        // ユーザー管理機能は appSetup-userManagement.js に移行済み
+        function runAutoRepair() {
+            executeSystemFunction('run-repair-btn', '自動修復中...', 'performAutoRepair', '修復実行');
+        }
 
-        // ページ読み込み時の初期化
+        function runSystemMonitoring() {
+            executeSystemFunction('run-monitoring-btn', 'システム監視中...', 'performSystemMonitoring', '監視実行');
+        }
+
+        function runIntegrityCheck() {
+            executeSystemFunction('run-integrity-btn', '整合性チェック中...', 'performDataIntegrityCheck', '整合性チェック');
+        }
+
+        // 共通のシステム機能実行関数
+        function executeSystemFunction(buttonId, progressMessage, functionName, originalText) {
+            const button = document.getElementById(buttonId);
+            const resultsDiv = document.getElementById('diagnostic-results');
+            const outputElement = document.getElementById('diagnostic-output');
+
+            // ボタンを無効化
+            button.disabled = true;
+            button.textContent = progressMessage;
+
+            // 結果エリアをクリア
+            outputElement.textContent = '実行中...';
+            resultsDiv.classList.remove('hidden');
+
+            // プログレス表示を更新
+            showMessage(progressMessage, 'info');
+
+            // Google Apps Script関数を呼び出し
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result && typeof result === 'object') {
+                        // 結果を整形して表示
+                        const formattedResult = formatDiagnosticResult(result, functionName);
+                        outputElement.textContent = formattedResult;
+
+                        // 診断結果の詳細なメッセージを表示
+                        const summary = createDiagnosticSummary(result, functionName);
+                        showMessage(summary.message, summary.type, 8000); // 8秒表示
+
+                        // 診断履歴に保存
+                        saveDiagnosticToHistory(functionName, result, summary);
+                    } else {
+                        outputElement.textContent = `結果: ${result}`;
+                        showMessage(`✅ ${functionName} が完了しました`, 'success');
+                    }
+
+                    // ボタンを復元
+                    button.disabled = false;
+                    button.textContent = originalText;
+                })
+                .withFailureHandler((error) => {
+                    outputElement.textContent = `エラーが発生しました:\n${error.message || error}`;
+                    showMessage(`❌ ${functionName} でエラーが発生しました: ${error.message || error}`, 'error');
+
+                    // ボタンを復元
+                    button.disabled = false;
+                    button.textContent = originalText;
+                })
+                [functionName]();
+        }
+
+        // 診断結果を整形する関数
+        function formatDiagnosticResult(result, functionName) {
+            const timestamp = new Date().toLocaleString('ja-JP');
+            let formatted = `【${functionName} 実行結果】\n実行時間: ${timestamp}\n\n`;
+
+            if (typeof result === 'object') {
+                if (result.status) {
+                    formatted += `ステータス: ${result.status}\n`;
+                }
+                if (result.message) {
+                    formatted += `メッセージ: ${result.message}\n`;
+                }
+                if (result.details && Array.isArray(result.details)) {
+                    formatted += '\n詳細:\n';
+                    result.details.forEach((detail, index) => {
+                        formatted += `  ${index + 1}. ${detail}\n`;
+                    });
+                }
+                if (result.checks && Array.isArray(result.checks)) {
+                    formatted += '\nチェック結果:\n';
+                    result.checks.forEach((check) => {
+                        const status = check.passed ? '✅ 正常' : '❌ 異常';
+                        formatted += `  ${status}: ${check.name}\n`;
+                        if (check.details) {
+                            formatted += `     詳細: ${check.details}\n`;
+                        }
+                    });
+                }
+                if (result.repairs && Array.isArray(result.repairs)) {
+                    formatted += '\n修復結果:\n';
+                    result.repairs.forEach((repair) => {
+                        const status = repair.success ? '✅ 成功' : '❌ 失敗';
+                        formatted += `  ${status}: ${repair.action}\n`;
+                        if (repair.details) {
+                            formatted += `     詳細: ${repair.details}\n`;
+                        }
+                    });
+                }
+                if (result.metrics) {
+                    formatted += '\nメトリクス:\n';
+                    Object.entries(result.metrics).forEach(([key, value]) => {
+                        formatted += `  ${key}: ${value}\n`;
+                    });
+                }
+            } else {
+                formatted += `結果: ${result}`;
+            }
+
+            return formatted;
+        }
+
+        // 診断結果の要約を作成
+        function createDiagnosticSummary(result, functionName) {
+            let problemCount = 0;
+            let repairCount = 0;
+            let successfulRepairs = 0;
+            let problems = [];
+
+            // 問題をカウント
+            if (result.checks && Array.isArray(result.checks)) {
+                result.checks.forEach(check => {
+                    if (!check.passed) {
+                        problemCount++;
+                        problems.push(check.name);
+                    }
+                });
+            }
+
+            // 修復をカウント
+            if (result.repairs && Array.isArray(result.repairs)) {
+                repairCount = result.repairs.length;
+                successfulRepairs = result.repairs.filter(repair => repair.success).length;
+            }
+
+            // メッセージを作成
+            let message, type;
+            
+            if (problemCount === 0) {
+                message = `✅ ${functionName}: 問題は検出されませんでした。システムは正常に動作しています。`;
+                type = 'success';
+            } else if (repairCount > 0) {
+                if (successfulRepairs === repairCount) {
+                    message = `🔧 ${functionName}: ${problemCount}件の問題を検出し、${successfulRepairs}件すべて修復しました。`;
+                    type = 'success';
+                } else {
+                    message = `⚠️ ${functionName}: ${problemCount}件の問題を検出。${successfulRepairs}/${repairCount}件の修復が成功しました。`;
+                    type = 'warning';
+                }
+            } else {
+                message = `❌ ${functionName}: ${problemCount}件の問題を検出しました（${problems.slice(0, 2).join(', ')}${problems.length > 2 ? ' など' : ''}）。修復が必要です。`;
+                type = 'error';
+            }
+
+            return {
+                message,
+                type,
+                problemCount,
+                repairCount,
+                successfulRepairs,
+                problems
+            };
+        }
+
+        // 診断履歴をローカルストレージに保存
+        function saveDiagnosticToHistory(functionName, result, summary) {
+            const history = JSON.parse(localStorage.getItem('diagnosticHistory') || '[]');
+            
+            const entry = {
+                timestamp: new Date().toISOString(),
+                functionName,
+                summary: summary.message,
+                status: summary.type,
+                problemCount: summary.problemCount,
+                repairCount: summary.repairCount,
+                successfulRepairs: summary.successfulRepairs,
+                details: result
+            };
+
+            history.unshift(entry); // 最新を先頭に
+            
+            // 最大50件まで保持
+            if (history.length > 50) {
+                history.splice(50);
+            }
+
+            localStorage.setItem('diagnosticHistory', JSON.stringify(history));
+        }
+
+        // 診断履歴を表示（既存の削除ログモーダルを活用）
+        function viewDiagnosticHistory() {
+            const modal = document.getElementById('logs-modal');
+            const loadingDiv = document.getElementById('logs-loading');
+            const contentDiv = document.getElementById('logs-table-content');
+            const modalTitle = modal.querySelector('h3');
+
+            // タイトルを変更
+            modalTitle.textContent = '📊 診断履歴';
+            
+            modal.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+
+            // 少し遅延させて履歴を表示
+            setTimeout(() => {
+                displayDiagnosticHistory();
+                loadingDiv.classList.add('hidden');
+            }, 500);
+        }
+
+        // 診断履歴をテーブルに表示
+        function displayDiagnosticHistory() {
+            const tableBody = document.getElementById('logs-table-body');
+            const contentDiv = document.getElementById('logs-table-content');
+            const history = JSON.parse(localStorage.getItem('diagnosticHistory') || '[]');
+
+            // テーブルヘッダーを診断用に変更
+            const tableHead = contentDiv.querySelector('thead tr');
+            tableHead.innerHTML = `
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">実行日時</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">機能</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">結果</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">問題/修復</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">ステータス</th>
+            `;
+
+            if (history.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            診断履歴が見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = history.map(entry => {
+                    const executeDate = new Date(entry.timestamp).toLocaleString('ja-JP');
+                    const statusColor = entry.status === 'success' ? 'text-green-400' : 
+                                       entry.status === 'warning' ? 'text-yellow-400' : 'text-red-400';
+                    const statusIcon = entry.status === 'success' ? '✅' : 
+                                      entry.status === 'warning' ? '⚠️' : '❌';
+                    
+                    const problemRepair = entry.repairCount > 0 ? 
+                        `${entry.problemCount}件検出 / ${entry.successfulRepairs}/${entry.repairCount}件修復` :
+                        entry.problemCount > 0 ? `${entry.problemCount}件検出` : '問題なし';
+
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-gray-300">${executeDate}</td>
+                            <td class="px-4 py-3 text-sm text-white">${entry.functionName}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300" title="${entry.summary}">${entry.summary.substring(0, 50)}...</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${problemRepair}</td>
+                            <td class="px-4 py-3 text-sm ${statusColor}">${statusIcon}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            contentDiv.classList.remove('hidden');
+        }
+
+        // =================================================================
+        // DEBUG_MODE制御機能
+        // =================================================================
+        
+        let debugModeState = null;
+        let debugModeLoading = false;
+
+        // DEBUG_MODE状態を読み込み
+        function loadDebugModeStatus() {
+            if (debugModeLoading) return;
+            debugModeLoading = true;
+
+            const statusElement = document.getElementById('debug-current-status');
+            if (statusElement) {
+                statusElement.innerHTML = `
+                    <div class="loading-spinner w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full mr-2"></div>
+                    <span class="text-sm text-gray-400">確認中...</span>
+                `;
+            }
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    debugModeLoading = false;
+                    if (result.status === 'success') {
+                        debugModeState = result;
+                        updateDebugModeUI(result);
+                        enableDebugModeControls();
+                    } else {
+                        showMessage(`DEBUG_MODE状態取得に失敗しました: ${result.message}`, 'error');
+                        updateDebugModeUI({ debugMode: false, message: 'エラー' });
+                    }
+                })
+                .withFailureHandler((error) => {
+                    debugModeLoading = false;
+                    showMessage(`DEBUG_MODE状態取得エラー: ${error.message || error}`, 'error');
+                    updateDebugModeUI({ debugMode: false, message: 'エラー' });
+                })
+                .getDebugModeStatus();
+        }
+
+        // DEBUG_MODE UIを更新
+        function updateDebugModeUI(status) {
+            const toggle = document.getElementById('debugModeToggle');
+            const statusText = document.getElementById('debug-status-text');
+            const currentStatus = document.getElementById('debug-current-status');
+            const updateBtn = document.getElementById('updateDebugModeBtn');
+
+            if (toggle) {
+                toggle.checked = status.debugMode === true;
+                toggle.disabled = false;
+            }
+
+            if (statusText) {
+                statusText.textContent = status.debugMode ? 'ON' : 'OFF';
+                statusText.className = `ml-3 text-sm font-medium ${status.debugMode ? 'text-green-400' : 'text-gray-400'}`;
+            }
+
+            if (currentStatus) {
+                const lastModified = status.lastModified && status.lastModified !== 'unknown' ? 
+                    ` (${new Date(status.lastModified).toLocaleString('ja-JP')})` : '';
+                currentStatus.innerHTML = `
+                    <span class="text-sm ${status.debugMode ? 'text-green-400' : 'text-gray-400'}">
+                        ${status.debugMode ? '🟢 有効' : '🔴 無効'}${lastModified}
+                    </span>
+                `;
+            }
+
+            if (updateBtn) {
+                updateBtn.disabled = false;
+            }
+        }
+
+        // DEBUG_MODEを切り替え
+        function toggleDebugModeState() {
+            const toggle = document.getElementById('debugModeToggle');
+            const updateBtn = document.getElementById('updateDebugModeBtn');
+            const spinner = document.getElementById('debug-update-spinner');
+            const text = document.getElementById('debug-update-text');
+
+            if (!toggle || debugModeLoading) return;
+
+            const newState = toggle.checked;
+            debugModeLoading = true;
+
+            // UI feedback
+            updateBtn.disabled = true;
+            spinner.classList.remove('hidden');
+            text.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    debugModeLoading = false;
+                    spinner.classList.add('hidden');
+                    text.classList.remove('hidden');
+                    updateBtn.disabled = false;
+
+                    if (result.status === 'success') {
+                        debugModeState = result;
+                        updateDebugModeUI(result);
+                        
+                        const actionText = result.debugMode ? '有効化' : '無効化';
+                        const messageType = result.changed ? 'success' : 'info';
+                        showMessage(`DEBUG_MODEを${actionText}しました`, messageType);
+                        
+                        if (result.changed) {
+                            showMessage('変更を反映するには、ページをリロードすることをお勧めします。', 'info', 8000);
+                        }
+                    } else {
+                        showMessage(`DEBUG_MODE切り替えに失敗しました: ${result.message}`, 'error');
+                        toggle.checked = debugModeState?.debugMode || false; // revert
+                    }
+                })
+                .withFailureHandler((error) => {
+                    debugModeLoading = false;
+                    spinner.classList.add('hidden');
+                    text.classList.remove('hidden');
+                    updateBtn.disabled = false;
+                    toggle.checked = debugModeState?.debugMode || false; // revert
+                    showMessage(`DEBUG_MODE切り替えエラー: ${error.message || error}`, 'error');
+                })
+                .toggleDebugMode(newState);
+        }
+
+        // DEBUG_MODE制御を有効化
+        function enableDebugModeControls() {
+            const toggle = document.getElementById('debugModeToggle');
+            const updateBtn = document.getElementById('updateDebugModeBtn');
+
+            if (toggle) {
+                toggle.disabled = false;
+                toggle.addEventListener('change', () => {
+                    // Immediate visual feedback
+                    const statusText = document.getElementById('debug-status-text');
+                    if (statusText) {
+                        statusText.textContent = toggle.checked ? 'ON' : 'OFF';
+                        statusText.className = `ml-3 text-sm font-medium ${toggle.checked ? 'text-green-400' : 'text-gray-400'}`;
+                    }
+                });
+            }
+
+            if (updateBtn) {
+                updateBtn.disabled = false;
+                updateBtn.onclick = toggleDebugModeState;
+            }
+        }
+
+        // =================================================================
+        // 個別ユーザーアクセス制御機能
+        // =================================================================
+        
+        let usersData = [];
+        let selectedUserIds = new Set();
+
+
+        // 選択されたユーザーIDを更新
+        function updateSelectedUsers() {
+            selectedUserIds.clear();
+            const checkedBoxes = document.querySelectorAll('.user-select:checked');
+            checkedBoxes.forEach(cb => {
+                selectedUserIds.add(cb.dataset.userId);
+            });
+
+            // 選択状態に応じてボタンの有効/無効を制御
+            const selectedCount = selectedUserIds.size;
+            const selectedBtns = document.querySelectorAll('#bulk-activate-selected-btn, #bulk-deactivate-selected-btn');
+            selectedBtns.forEach(btn => {
+                btn.disabled = selectedCount === 0;
+                btn.textContent = btn.textContent.replace(/\(\d+人\)/, selectedCount > 0 ? `(${selectedCount}人)` : '');
+            });
+        }
+
+        // 個別ユーザーのアクティブ状態を切り替え
+        function toggleUserActiveStatus(userId, isActive, userEmail) {
+            if (!userId) return;
+
+            // 楽観的UI更新
+            const statusCell = document.querySelector(`tr[data-user-id="${userId}"] td:nth-child(4)`);
+            if (statusCell) {
+                const newStatusClass = isActive ? 'text-green-400' : 'text-red-400';
+                const newStatusIcon = isActive ? '🟢' : '🔴';
+                const newStatusText = isActive ? 'アクティブ' : '非アクティブ';
+                statusCell.className = `px-4 py-3 text-sm ${newStatusClass}`;
+                statusCell.textContent = `${newStatusIcon} ${newStatusText}`;
+            }
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.status === 'success') {
+                        const actionText = result.isActive ? 'アクティブ' : '非アクティブ';
+                        const messageType = result.changed ? 'success' : 'info';
+                        showMessage(`${result.email} を${actionText}にしました`, messageType);
+                        
+                        // データを更新
+                        const userIndex = usersData.findIndex(u => u.userId === userId);
+                        if (userIndex !== -1) {
+                            usersData[userIndex].isActive = result.isActive;
+                        }
+                    } else {
+                        showMessage(`ユーザーステータス変更に失敗しました: ${result.message}`, 'error');
+                        // UIを元に戻す
+                        const toggle = document.querySelector(`input[data-user-id="${userId}"].user-active-toggle`);
+                        if (toggle) toggle.checked = !isActive;
+                        if (statusCell) {
+                            const oldStatusClass = !isActive ? 'text-green-400' : 'text-red-400';
+                            const oldStatusIcon = !isActive ? '🟢' : '🔴';
+                            const oldStatusText = !isActive ? 'アクティブ' : '非アクティブ';
+                            statusCell.className = `px-4 py-3 text-sm ${oldStatusClass}`;
+                            statusCell.textContent = `${oldStatusIcon} ${oldStatusText}`;
+                        }
+                    }
+                })
+                .withFailureHandler((error) => {
+                    showMessage(`ユーザーステータス変更エラー: ${error.message || error}`, 'error');
+                    // UIを元に戻す
+                    const toggle = document.querySelector(`input[data-user-id="${userId}"].user-active-toggle`);
+                    if (toggle) toggle.checked = !isActive;
+                    if (statusCell) {
+                        const oldStatusClass = !isActive ? 'text-green-400' : 'text-red-400';
+                        const oldStatusIcon = !isActive ? '🟢' : '🔴';
+                        const oldStatusText = !isActive ? 'アクティブ' : '非アクティブ';
+                        statusCell.className = `px-4 py-3 text-sm ${oldStatusClass}`;
+                        statusCell.textContent = `${oldStatusIcon} ${oldStatusText}`;
+                    }
+                })
+                .updateUserActiveStatus(userId, isActive);
+        }
+
+        // 一括操作機能は簡素化のため削除されました
+        // 個別ユーザーのアクセス制御は各ユーザーのアカウント管理画面から設定できます
+
+        // 一括更新機能は簡素化のため削除されました
+
+        // 選択ユーザー一括更新機能も簡素化のため削除されました
+
+        // ページ読み込み時の初期化を拡張
         window.addEventListener('DOMContentLoaded', function() {
             // 既存の初期化
             loadCurrentStatus();
             
-            // モジュール機能の初期化
-            if (typeof loadDebugModeStatus === 'function') {
-                loadDebugModeStatus();
-            }
+            // 新機能の初期化
+            loadDebugModeStatus();
+            
+            // ユーザーリスト表示時に拡張機能を適用
         });
     </script>
 </body>
