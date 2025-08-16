@@ -3215,9 +3215,12 @@ function updateConfigPanelUI(config) {
 
 /**
  * Enhanced history restoration preview modal
+ * @param {string} title - Modal title
  * @param {Object} item - History item to preview
+ * @param {Function} onConfirm - Confirmation callback
+ * @param {Function} onCancel - Cancellation callback
  */
-function showHistoryRestorationPreview(item) {
+function showHistoryRestorationPreview(title, item, onConfirm, onCancel) {
   try {
     console.log('🔍 Showing history restoration preview:', item);
     
@@ -3269,22 +3272,25 @@ function showHistoryRestorationPreview(item) {
     // Show enhanced confirmation modal
     if (typeof window.showConfirmationModal === 'function') {
       // Create a custom modal for detailed preview
-      showDetailedHistoryModal(truncated, detailsHtml, () => {
+      showDetailedHistoryModal(title, detailsHtml, () => {
         console.log('✅ User confirmed history restoration');
-        selectHistoryItem(item.id);
+        if (onConfirm) onConfirm();
+      }, () => {
+        if (onCancel) onCancel();
       });
     } else {
       // Fallback to basic confirmation
       const basicMessage = `「${truncated}」の設定を復元します。\n\n公開日時: ${published}\n状態: ${status}\n\n現在の未保存の設定は上書きされます。`;
       if (confirm(basicMessage)) {
-        selectHistoryItem(item.id);
+        if (onConfirm) onConfirm();
+      } else if (onCancel) {
+        onCancel();
       }
     }
-    
   } catch (error) {
     console.error('❌ History preview failed:', error);
     // Fallback to direct restoration
-    selectHistoryItem(item.id);
+    if (onConfirm) onConfirm();
   }
 }
 
@@ -3339,8 +3345,9 @@ function getHeaderPreview(item) {
  * @param {string} title - Modal title
  * @param {string} contentHtml - HTML content
  * @param {Function} onConfirm - Confirmation callback
+ * @param {Function} onCancel - Cancellation callback
  */
-function showDetailedHistoryModal(title, contentHtml, onConfirm) {
+function showDetailedHistoryModal(title, contentHtml, onConfirm, onCancel) {
   // Use existing confirmation modal but with enhanced content
   const modal = document.getElementById('confirmation-modal');
   const titleElement = document.getElementById('modal-title');
@@ -3349,19 +3356,20 @@ function showDetailedHistoryModal(title, contentHtml, onConfirm) {
   const cancelBtn = document.getElementById('modal-cancel-btn');
   
   if (modal && titleElement && messageElement && confirmBtn && cancelBtn) {
-    titleElement.textContent = '履歴設定の復元';
+    titleElement.textContent = title;
     messageElement.innerHTML = contentHtml;
     confirmBtn.textContent = '復元する';
     
     // Set up event handlers
     const handleConfirm = () => {
       modal.classList.add('hidden');
-      onConfirm();
+      if (onConfirm) onConfirm();
       cleanup();
     };
-    
+
     const handleCancel = () => {
       modal.classList.add('hidden');
+      if (onCancel) onCancel();
       cleanup();
     };
     
@@ -3378,7 +3386,9 @@ function showDetailedHistoryModal(title, contentHtml, onConfirm) {
   } else {
     console.warn('⚠️ Modal elements not found, using fallback');
     if (confirm(`履歴設定「${title}」を復元しますか？`)) {
-      onConfirm();
+      if (onConfirm) onConfirm();
+    } else if (onCancel) {
+      onCancel();
     }
   }
 }
