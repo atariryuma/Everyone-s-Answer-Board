@@ -6165,10 +6165,9 @@ function getInitialData(requestUserId, targetSheetName) {
 
     // ユーザー認証
     verifyUserAccess(currentUserId);
-    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-      useExecutionCache: true,
-      ttl: 300
-    }); // Use cached version
+    
+    // スプレッドシート切り替え後の状態整合性確保のため、キャッシュなしでフレッシュデータを取得
+    var userInfo = findUserByIdFresh(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -6682,14 +6681,26 @@ function updateUserAPI(requestUserId, updateData) {
     // Clear relevant caches after spreadsheet switch
     if (filteredUpdateData.spreadsheetId) {
       debugLog('💾 Clearing caches after spreadsheet switch:', filteredUpdateData.spreadsheetId);
-      // Clear user-specific cache
+      
+      // 1. まず、ユーザー情報を最新版で再取得（フレッシュデータ）
+      const freshUserInfo = findUserByIdFresh(requestUserId);
+      
+      // 2. 包括的なキャッシュクリア
       clearExecutionUserInfoCache();
-      // Clear any sheet-specific cache
+      
+      // 3. ユーザー関連のすべてのキャッシュを無効化
       try {
-        invalidateUserCache(requestUserId, null, null, 'all', null);
+        invalidateUserCache(requestUserId, freshUserInfo?.adminEmail, filteredUpdateData.spreadsheetId, 'all', null);
       } catch (cacheError) {
         warnLog('Cache invalidation warning:', cacheError.message);
       }
+      
+      // 4. スプレッドシート切り替え検証用ログ
+      debugLog('📊 スプレッドシート更新後の検証:', {
+        requestedId: filteredUpdateData.spreadsheetId,
+        freshUserSpreadsheetId: freshUserInfo?.spreadsheetId,
+        match: freshUserInfo?.spreadsheetId === filteredUpdateData.spreadsheetId
+      });
     }
     
     return {
