@@ -3409,8 +3409,8 @@ function startSystemStatusUpdate() {
       return;
     }
     
-    // キャッシュを利用して静かに更新
-    runGasWithUserId('getStatus', false)
+    // キャッシュを利用して静かに更新（統一API使用）
+    runGasWithUserId('getInitialData', false, getUserId(), false)
       .then(function(status) {
         // 変更があった場合のみUIを更新
         if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {
@@ -3418,7 +3418,8 @@ function startSystemStatusUpdate() {
         }
       })
       .catch(function(error) {
-        logWarn('Background status update failed:', error);
+        // バックグラウンド更新の失敗は警告レベルでログに記録
+        console.log('ℹ️ Background status update skipped:', error.message || error);
       });
   }, currentPollInterval);
 }
