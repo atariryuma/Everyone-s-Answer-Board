@@ -2169,16 +2169,22 @@ function unpublishBoard() {
         publishedAt: publishResponse.publishedAt || new Date().toISOString(),
         questionText: questionText,
         setupType: getSetupType(),
-        
+
         // 復元用の最小データ（showNames/showCountsベース）
         opinionHeader: config.opinionHeader || '',
         nameHeader: config.nameHeader || '名前',
         showNames: getShowNames(),      // UI状態を直接保存
         showCounts: getShowCounts(),    // UI状態を直接保存
-        
+
         // 復元用のシート情報
         sheetName: publishResponse.activeSheetName || selectedSheet || '',
-        spreadsheetId: userInfo.spreadsheetId || ''
+        spreadsheetId: userInfo.spreadsheetId || '',
+
+        // 復元精度向上: 現在の列選択状態も保存（存在する場合）
+        opinionColumn: (document.getElementById('opinion-column') && document.getElementById('opinion-column').value) || config.opinionHeader || '',
+        nameColumn: (document.getElementById('name-column') && document.getElementById('name-column').value) || config.nameHeader || '',
+        classColumn: (document.getElementById('class-column') && document.getElementById('class-column').value) || config.classHeader || '',
+        reasonColumn: (document.getElementById('reason-column') && document.getElementById('reason-column').value) || config.reasonHeader || ''
       };
       
       // 履歴に追加（5件制限）

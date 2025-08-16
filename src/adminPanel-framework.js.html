@@ -2103,9 +2103,11 @@ window.HistoryManager = {
     
     if (confirmBtn) {
       confirmBtn.onclick = () => {
+        const autoPublishEl = modal.querySelector('#restore-auto-publish');
+        const autoPublish = !!(autoPublishEl && autoPublishEl.checked);
         cleanup();
-        console.log('✅ User confirmed restoration');
-        this._restoreHistoryItem(item);
+        console.log('✅ User confirmed restoration', { autoPublish });
+        this._restoreHistoryItem(item, { autoPublish });
       };
     }
     
@@ -2144,6 +2146,46 @@ window.HistoryManager = {
       </div>
     ` : '';
     
+    // 差分プレビューの生成
+    const getCurrentBool = (id) => {
+      const el = document.getElementById(id);
+      return el ? !!el.checked : undefined;
+    };
+    const getCurrentVal = (id) => {
+      const el = document.getElementById(id);
+      return el ? (el.value || '') : '';
+    };
+    const currentSheet = window.selectedSheet || window.currentStatus?.activeSheetName || '';
+    const diffs = [];
+    if ((currentSheet || '') !== (item.sheetName || '')) {
+      diffs.push(`シート: <span class=\"text-red-300\">${currentSheet || '未設定'}</span> → <span class=\"text-green-300\">${item.sheetName || '未設定'}</span>`);
+    }
+    const curShowNames = getCurrentBool('show-names');
+    if (item.showNames !== undefined && curShowNames !== undefined && curShowNames !== item.showNames) {
+      diffs.push(`名前表示: <span class=\"text-red-300\">${curShowNames ? 'ON' : 'OFF'}</span> → <span class=\"text-green-300\">${item.showNames ? 'ON' : 'OFF'}</span>`);
+    }
+    const curShowCounts = getCurrentBool('show-counts');
+    if (item.showCounts !== undefined && curShowCounts !== undefined && curShowCounts !== item.showCounts) {
+      diffs.push(`カウント表示: <span class=\"text-red-300\">${curShowCounts ? '表示' : '非表示'}</span> → <span class=\"text-green-300\">${item.showCounts ? '表示' : '非表示'}</span>`);
+    }
+    const curOpinion = getCurrentVal('opinion-column') || getCurrentVal('opinionHeader');
+    if (item.opinionColumn && curOpinion !== item.opinionColumn) {
+      diffs.push(`回答列: <span class=\"text-red-300\">${curOpinion || '未設定'}</span> → <span class=\"text-green-300\">${item.opinionColumn}</span>`);
+    }
+    const curName = getCurrentVal('name-column');
+    if (item.nameColumn && curName !== item.nameColumn) {
+      diffs.push(`名前列: <span class=\"text-red-300\">${curName || '未設定'}</span> → <span class=\"text-green-300\">${item.nameColumn}</span>`);
+    }
+    const curClass = getCurrentVal('class-column');
+    if (item.classColumn && curClass !== item.classColumn) {
+      diffs.push(`クラス列: <span class=\"text-red-300\">${curClass || '未設定'}</span> → <span class=\"text-green-300\">${item.classColumn}</span>`);
+    }
+    const curReason = getCurrentVal('reason-column');
+    if (item.reasonColumn && curReason !== item.reasonColumn) {
+      diffs.push(`理由列: <span class=\"text-red-300\">${curReason || '未設定'}</span> → <span class=\"text-green-300\">${item.reasonColumn}</span>`);
+    }
+    const diffsHtml = diffs.length > 0 ? `<ul class=\"list-disc list-inside text-xs space-y-1\">${diffs.map(x => `<li>${x}</li>`).join('')}</ul>` : '<div class=\"text-xs text-gray-300\">差分はありません</div>';
+
     return `
       <h3 class="text-xl font-bold text-orange-400 mb-4 flex items-center gap-2">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2171,6 +2213,11 @@ window.HistoryManager = {
       </div>
       
       ${spreadsheetDiffSection}
+
+      <div class="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-4 mb-4">
+        <h4 class="text-sm font-semibold text-indigo-300 mb-2">🔎 差分プレビュー</h4>
+        ${diffsHtml}
+      </div>
       
       <!-- 警告メッセージ -->
       <div class="bg-red-500/10 border border-red-400/30 rounded-lg p-3 mb-6">
@@ -2182,6 +2229,13 @@ window.HistoryManager = {
         </p>
       </div>
       
+      <div class="bg-green-500/10 border border-green-400/30 rounded-lg p-3 mb-4">
+        <label class="flex items-center gap-2 text-sm text-green-200">
+          <input id="restore-auto-publish" type="checkbox" class="w-4 h-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-green-500">
+          復元後に自動で公開まで行う
+        </label>
+      </div>
+
       <div class="flex justify-end gap-3">
         <button type="button" id="restore-cancel-btn" class="btn btn-secondary">キャンセル</button>
         <button type="button" id="restore-confirm-btn" class="btn btn-primary">
@@ -2250,7 +2304,7 @@ window.HistoryManager = {
   /**
    * Restore configuration from history item
    */
-  async _restoreHistoryItem(item) {
+  async _restoreHistoryItem(item, options = {}) {
     try {
       console.log('🔄 Restoring history:', item.questionText);
       console.log('📊 History item details:', {
@@ -2357,8 +2411,38 @@ window.HistoryManager = {
         }
       }
       
-      // 5. UI完全更新
+      // 5. 設定の永続化（バックエンドへ同期）
+      try {
+        if (typeof buildConfigObject === 'function' && typeof runGasWithUserId === 'function') {
+          const configToPersist = buildConfigObject();
+          // 復元したシート名を強制適用
+          if (item.sheetName) configToPersist.sheetName = item.sheetName;
+          // 復元の意図を明確化するためflowTypeは 'custom'
+          const syncResult = await runGasWithUserId('syncConfigurationState', '設定を復元中...', configToPersist, 'custom');
+          if (syncResult && syncResult.status === 'success') {
+            console.log('✅ Configuration synchronized after restore');
+          } else {
+            console.warn('⚠️ Configuration sync after restore reported:', syncResult && syncResult.message);
+          }
+        } else {
+          console.warn('⚠️ Unable to persist configuration after restore (missing helpers)');
+        }
+      } catch (persistError) {
+        console.warn('⚠️ Configuration persistence warning:', persistError);
+      }
+
+      // 6. UI完全更新
       await this._refreshAfterRestore();
+
+      // 7. オプション: 復元後に自動で公開
+      if (options.autoPublish && typeof saveAndPublish === 'function') {
+        try {
+          console.log('📤 Auto-publishing after restore...');
+          saveAndPublish();
+        } catch (pubError) {
+          console.warn('⚠️ Auto publish failed:', pubError);
+        }
+      }
       
       // Success message
       if (typeof showMessage === 'function') {
