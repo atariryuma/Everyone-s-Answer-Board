@@ -1970,9 +1970,15 @@ function handleSheetSelectionChange(event) {
   }
 
   // Prevent redundant calls if the selected sheet hasn't actually changed
-  if (newSelectedSheet === lastSelectedSheetName) {
+  // ただし、履歴復元中は強制実行する
+  if (newSelectedSheet === lastSelectedSheetName && !window._historyRestoreInProgress) {
     console.log('📊 Sheet selection unchanged, skipping redundant processing.');
     return;
+  }
+  
+  // 履歴復元中は強制処理ログを出力
+  if (window._historyRestoreInProgress) {
+    console.log('🔄 History restore in progress - forcing sheet selection processing for:', newSelectedSheet);
   }
   
   sheetSelectionInProgress = true;

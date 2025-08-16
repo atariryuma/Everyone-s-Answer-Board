@@ -2504,7 +2504,7 @@ window.HistoryManager = {
           if (item.sheetName) configToPersist.sheetName = item.sheetName;
           // 復元の意図を明確化するためflowTypeは 'custom'
           const syncResult = await runGasWithUserId('syncConfigurationState', '設定を復元中...', configToPersist, 'custom');
-          if (syncResult && syncResult.status === 'success') {
+          if (syncResult && (syncResult.status === 'success' || syncResult.success === true)) {
             console.log('✅ Configuration synchronized after restore');
           } else {
             const errorMsg = syncResult?.message || syncResult || 'Unknown sync error';
@@ -2703,15 +2703,30 @@ window.HistoryManager = {
     try {
       console.log(`🔄 Restoring sheet selection: ${sheetName}`);
       
-      // グローバル状態更新
+      // 古いアクティブシート情報を完全にクリア
+      if (window.AdminPanel?.currentStatus?.userInfo) {
+        delete window.AdminPanel.currentStatus.userInfo.activeSheetName;
+        console.log(`🧹 Cleared old activeSheetName from AdminPanel.currentStatus`);
+      }
+      
+      // グローバル状態の完全クリアと更新
       window.AdminPanel.selectedSheet = sheetName;
       if (window.AdminPanel.stateManager) {
         window.AdminPanel.stateManager.setState('selectedSheet', sheetName);  
+        window.AdminPanel.stateManager.setState('activeSheetName', sheetName);
       }
+      
+      // すべてのグローバルシート変数を統一
+      window.selectedSheet = sheetName;
+      window.activeSheetName = sheetName;
+      console.log(`✅ All global sheet variables updated to: ${sheetName}`);
       
       // シート選択UI更新
       const sheetSelect = document.getElementById('sheet-select');
       if (sheetSelect) {
+        // 履歴復元フラグを設定（重複処理チェック回避）
+        window._historyRestoreInProgress = true;
+        
         // シート選択を実行
         if (sheetSelect.value !== sheetName) {
           sheetSelect.value = sheetName;
@@ -2736,13 +2751,11 @@ window.HistoryManager = {
           console.log(`✅ Sheet selection change handler called directly`);
         }
         
+        // 履歴復元フラグをクリア
+        delete window._historyRestoreInProgress;
+        
         // 少し待機してからUI更新を確認
         await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // selectedSheet グローバル変数も更新（互換性確保）
-        if (typeof window.selectedSheet !== 'undefined') {
-          window.selectedSheet = sheetName;
-        }
       }
       
       console.log(`✅ Sheet restored: ${sheetName}`);
