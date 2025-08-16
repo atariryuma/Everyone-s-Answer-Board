@@ -128,18 +128,18 @@
             <p class="text-sm text-gray-400 mb-4">システム管理者の視点で、アプリ全体を診断・修正・整合性チェックします。</p>
 
             <div class="grid md:grid-cols-2 gap-4">
-                <div class="p-4 bg-gray-800 rounded-lg">
+                <div class="p-4 bg-gray-800 rounded-lg flex flex-col min-h-[220px]">
                     <h3 class="text-lg font-medium text-white mb-3">📊 システム診断（全体）</h3>
                     <p class="text-sm text-gray-400 mb-4">DB接続・権限・整合性を全体診断します。</p>
                     <button 
                         id="run-diagnosis-btn"
                         onclick="runSystemDiagnosis()"
-                        class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full">
+                        class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full mt-auto">
                         診断実行
                     </button>
                 </div>
 
-                <div class="p-4 bg-gray-800 rounded-lg">
+                <div class="p-4 bg-gray-800 rounded-lg flex flex-col min-h-[220px]">
                     <h3 class="text-lg font-medium text-white mb-3">✅ データ整合性（全体）</h3>
                     <p class="text-sm text-gray-400 mb-4">データの整合性を全体チェックします。必要に応じて修復も可能です。</p>
                     <div class="flex items-center mb-3">
@@ -149,7 +149,7 @@
                     <button 
                         id="run-integrity-btn"
                         onclick="runIntegrityCheck()"
-                        class="btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full">
+                        class="btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full mt-auto">
                         整合性チェック
                     </button>
                 </div>
@@ -162,7 +162,6 @@
                         <pre id="diagnostic-output" class="text-sm text-gray-300 whitespace-pre-wrap"></pre>
                     </div>
                 </div>
-            </div>
         </div>
 
         <!-- DEBUG_MODE制御セクション -->
