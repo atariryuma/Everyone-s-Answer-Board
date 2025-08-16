@@ -1245,7 +1245,7 @@ function activateSheet(requestUserId, spreadsheetId, sheetName) {
     const switchResult = switchToSheet(requestUserId, spreadsheetId, sheetName);
     debugLog('activateSheet: シート切り替え完了');
 
-    // シート固有フォームURLの同期（同一スプレッドシートに複数フォームがあるケースに対応）
+    // シート固有フォームURLと公開情報の同期
     try {
       const userInfoForForm = findUserById(currentUserId);
       if (userInfoForForm) {
@@ -1264,6 +1264,10 @@ function activateSheet(requestUserId, spreadsheetId, sheetName) {
           }
         }
 
+        // 公開対象のグローバル情報を同期（後続のgetInitialDataで正しいシートが返るように）
+        cfg.publishedSheetName = sheetName;
+        cfg.publishedSpreadsheetId = spreadsheetId;
+
         // アクティブシートのフォームURLをグローバルに同期
         syncFormUrlForActiveSheet(cfg, sheetName);
 
@@ -1273,7 +1277,7 @@ function activateSheet(requestUserId, spreadsheetId, sheetName) {
         });
       }
     } catch (formSyncError) {
-      warnLog('activateSheet: フォームURL同期で警告:', formSyncError.message);
+      warnLog('activateSheet: 公開情報同期で警告:', formSyncError.message);
     }
 
     // 最新のステータスを取得（キャッシュ活用）
