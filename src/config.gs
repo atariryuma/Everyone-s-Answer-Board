@@ -1553,7 +1553,7 @@ function detectFormUrlFromSpreadsheet(spreadsheetId) {
         }
       } catch (formError) {
         // getFormUrl()がエラーになる場合があるのでcatchする
-        console.debug('️ getFormUrl failed for sheet:', sheet.getName(), formError.message);
+        debugLog('getFormUrl failed for sheet:', sheet.getName(), formError.message);
       }
     }
 
@@ -1566,7 +1566,7 @@ function detectFormUrlFromSpreadsheet(spreadsheetId) {
         return { success: true, formUrl: foundFormUrl, method: 'reverseSearch' };
       }
     } catch (reverseError) {
-      console.debug('️ 逆検索エラー:', reverseError.message);
+      debugLog('逆検索エラー:', reverseError.message);
     }
 
     // 方法3: 自動フォーム作成（最後の手段）
@@ -1650,7 +1650,7 @@ function findFormByDestinationSpreadsheet(targetSpreadsheetId) {
           }
         }
       } catch (formCheckError) {
-        console.debug('️ フォームチェックエラー:', formFile.getName(), formCheckError.message);
+        debugLog('フォームチェックエラー:', formFile.getName(), formCheckError.message);
       }
     }
 

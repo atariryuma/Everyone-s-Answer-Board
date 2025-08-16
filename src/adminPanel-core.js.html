@@ -31,11 +31,7 @@ function adminLog(level, ...args) {
   }
 }
 
-// Convenience functions for different log levels
-function logError(...args) { adminLog('error', ...args); }
-function logWarn(...args) { adminLog('warn', ...args); }
-function logInfo(...args) { adminLog('info', ...args); }
-function logDebug(...args) { adminLog('debug', ...args); }
+// Note: logError, logWarn, logInfo, logDebug functions are defined in adminPanel-framework.js.html
 
 // =============================================================================
 // ENHANCED MESSAGE SYSTEM FOR SETUP FLOW

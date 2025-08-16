@@ -489,26 +489,4 @@ class UnifiedValidation {
 
 // 後方互換性のためのラッパー関数群
 
-/**
- * 既存のgetUserInfoCached関数のラッパー
- * @deprecated UnifiedUserManager.getUser を使用してください
- */
-function getUserInfoCachedUnified(requestUserId) {
-  return UnifiedUserManager.getUser(requestUserId, { useCache: true });
-}
-
-/**
- * 既存のgetWebAppUrl関数のラッパー
- * @deprecated UnifiedURLManager.getWebAppURL を使用してください
- */
-function getWebAppUrlUnified() {
-  return UnifiedURLManager.getWebAppURL({ useCache: true });
-}
-
-/**
- * 既存のclearExecutionUserInfoCache関数のラッパー
- * @deprecated UnifiedUserManager.clearUserCache を使用してください
- */
-function clearExecutionUserInfoCacheUnified() {
-  return UnifiedUserManager.clearUserCache();
-}
+// Deprecated wrapper functions removed - use UnifiedUserManager and UnifiedURLManager directly

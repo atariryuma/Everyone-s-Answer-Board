@@ -13,6 +13,12 @@ describe('getInitialData header extraction', () => {
     const store = {};
     context = {
       debugLog: () => {},
+      logError: () => {},
+      logWarn: () => {},
+      logDebug: () => {},
+      errorLog: () => {},
+      warnLog: () => {},
+      infoLog: () => {},
       console,
       PropertiesService: {
         getScriptProperties: () => ({ 
