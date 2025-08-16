@@ -447,63 +447,69 @@ function updateStaticUI(status) {
 // =============================================================================
 
 function updateDatabaseInfo(status) {
+    status: !!status,
+    userInfo: !!status?.userInfo,
+    adminEmail: status?.userInfo?.adminEmail,
+    userId: status?.userInfo?.userId,
+    configJson: status?.userInfo?.configJson
+  });
+  
   if (!status || !status.userInfo) {
     logWarn('System info update failed: No user info available');
     return;
   }
 
   // スプレッドシートURLを設定（デバッグ強化版）
+    fromUserInfo: status.userInfo.spreadsheetUrl || 'none',
+    currentGlobal: currentSpreadsheetUrl || 'none',
+    shouldUpdate: !!status.userInfo.spreadsheetUrl
+  });
+  
   if (status.userInfo.spreadsheetUrl) {
     currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
-
+    
     // 即座に検証
     if (currentSpreadsheetUrl !== status.userInfo.spreadsheetUrl) {
-      logError(' URL設定に失敗:', {
-        expected: status.userInfo.spreadsheetUrl,
-        actual: currentSpreadsheetUrl,
-      });
+      logError(' URL設定に失敗:', { expected: status.userInfo.spreadsheetUrl, actual: currentSpreadsheetUrl });
     }
   } else if (status.userInfo.spreadsheetUrl === '') {
     // 明示的な空文字列の場合はクリア
     currentSpreadsheetUrl = '';
+  } else {
   }
-
+  
   // グローバル変数の最終確認
-  setTimeout(() => {}, 100);
+  setTimeout(() => {
+  }, 100);
 
   const cfg = status.config || {};
 
   // 基本情報の更新
+    adminEmail: status.userInfo.adminEmail,
+    userId: status.userInfo.userId,
+    publishedSheet: cfg.publishedSheetName || status.publishedSheetName || 'なし'
+  });
+  
   safeSetText('info-admin-email', status.userInfo.adminEmail);
   safeSetText('info-user-id', status.userInfo.userId);
-  safeSetText(
-    'info-published-sheet',
-    cfg.publishedSheetName || status.publishedSheetName || 'なし'
-  );
+  safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
+  
 
   // 公開状態の表示を更新
-  const isPublished =
-    cfg.isPublished !== undefined
-      ? cfg.isPublished
-      : status.appPublished ||
-        status.isPublished ||
-        (status.activeSheetName &&
-          (cfg.publishedSheetName || status.publishedSheetName));
+  const isPublished = cfg.isPublished !== undefined
+    ? cfg.isPublished
+    : status.appPublished || status.isPublished || (status.activeSheetName && (cfg.publishedSheetName || status.publishedSheetName));
   updatePublicationStatusUI(isPublished);
 
   // 表示モードの更新
-  const displayModeFlag =
-    cfg.showNames !== undefined ? cfg.showNames : status.showNames;
+  const displayModeFlag = cfg.showNames !== undefined ? cfg.showNames : status.showNames;
   const displayMode = displayModeFlag ? '名前表示' : '匿名表示';
   safeSetText('info-display-mode', displayMode);
 
   // カウント表示の更新
-  const showCountsFlag =
-    cfg.showCounts !== undefined
-      ? cfg.showCounts
-      : status.showCounts !== undefined
-      ? status.showCounts
-      : false;
+  const showCountsFlag = cfg.showCounts !== undefined
+    ? cfg.showCounts
+    : (status.showCounts !== undefined ? status.showCounts : false);
   const showCounts = showCountsFlag ? '表示' : '非表示';
   safeSetText('info-show-counts', showCounts);
 
@@ -1126,7 +1132,7 @@ function updateFooterAndGuidance(status) {
 // 実際のフッター更新処理
 function updateFooterAndGuidanceImmediate(status) {
   console.group(' updateFooterAndGuidance');
-
+  
   // より確実なステータス確保: グローバル状態とマージ
   const effectiveStatus = status || window.currentStatus;
   if (!effectiveStatus) {
@@ -1134,11 +1140,20 @@ function updateFooterAndGuidanceImmediate(status) {
     console.groupEnd();
     return;
   }
-
+  
   // 引数ステータスの詳細確認（強化版）
+    hasStatus: !!effectiveStatus,
+    isPublished: effectiveStatus?.isPublished,
+    configIsPublished: effectiveStatus?.config?.isPublished,
+    appPublished: effectiveStatus?.appPublished,
+    normalizedIsPublished: effectiveStatus?._normalized?.isPublished,
+    configJson: effectiveStatus?.userInfo?.configJson ? 'exists' : 'missing',
+    statusSource: status ? 'provided' : 'global fallback'
+  });
+  
   const footer = document.getElementById('admin-footer');
   const guidanceText = document.getElementById('guidance-text');
-
+  
   if (!footer || !guidanceText) {
     logWarn(' Footer or guidance elements not found');
     console.groupEnd();
@@ -2344,10 +2359,15 @@ function getActiveResourceUrls(status) {
   }
 
   // 1. スプレッドシートURLの取得（複数ソースから確保）
-  urls.spreadsheet =
-    status.userInfo.spreadsheetUrl ||
-    status.appUrls?.spreadsheetUrl ||
-    (typeof currentSpreadsheetUrl !== 'undefined' ? currentSpreadsheetUrl : null);
+  urls.spreadsheet = status.userInfo.spreadsheetUrl || 
+                     status.appUrls?.spreadsheetUrl ||
+                     (typeof currentSpreadsheetUrl !== 'undefined' ? currentSpreadsheetUrl : null);
+  
+    fromUserInfo: status.userInfo.spreadsheetUrl || 'none',
+    fromAppUrls: status.appUrls?.spreadsheetUrl || 'none', 
+    fromGlobal: (typeof currentSpreadsheetUrl !== 'undefined' ? currentSpreadsheetUrl : 'none'),
+    final: urls.spreadsheet
+  });
 
   // 2. configJsonの解析 (一度だけ実行)
   let config = {};
@@ -2384,20 +2404,25 @@ function getActiveResourceUrls(status) {
   
   // フォールバック: 複数ソースからフォームURL取得
   if (!urls.form) {
-    urls.form =
-      config.formUrl ||
-      status.userInfo.formUrl ||
-      status.appUrls?.formUrl ||
-      null;
+    urls.form = config.formUrl || 
+                status.userInfo.formUrl ||
+                status.appUrls?.formUrl ||
+                null;
   }
-
+  
   if (!urls.editForm) {
-    urls.editForm =
-      config.editFormUrl ||
-      status.userInfo.editFormUrl ||
-      status.appUrls?.editFormUrl ||
-      (urls.form ? urls.form.replace('/viewform', '/edit') : null);
+    urls.editForm = config.editFormUrl || 
+                    status.userInfo.editFormUrl ||
+                    status.appUrls?.editFormUrl ||
+                    (urls.form ? urls.form.replace('/viewform', '/edit') : null);
   }
+  
+    form: urls.form || 'none',
+    editForm: urls.editForm || 'none',
+    fromConfig: !!config.formUrl,
+    fromUserInfo: !!status.userInfo.formUrl,
+    fromAppUrls: !!status.appUrls?.formUrl
+  });
 
   return urls;
 }
@@ -3406,11 +3431,10 @@ function normalizeConfigJson(config, userInfo) {
   
   // 本番環境では詳細ログを削減
   if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-    logDebug('normalizeConfigJson: 入力config', {
       setupStatus: config.setupStatus,
       setupStep: config.setupStep,
       appPublished: config.appPublished,
-      publishedSheetName: config.publishedSheetName,
+      publishedSheetName: config.publishedSheetName
     });
   }
   
@@ -3431,10 +3455,9 @@ function normalizeConfigJson(config, userInfo) {
   
   // 本番環境では詳細ログを削減
   if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-    logDebug('normalizeConfigJson: 出力config', {
       setupStatus: config.setupStatus,
       appPublished: config.appPublished,
-      publishedSheetName: config.publishedSheetName,
+      publishedSheetName: config.publishedSheetName
     });
   }
   
@@ -3487,13 +3510,12 @@ function validateConfigJsonIntegrity(config, userInfo) {
   console.group(' ConfigJson整合性検証');
   
   // 基本状態の表示
-  logDebug('ConfigJson整合性検証:', {
     setupStatus,
     formCreated,
     appPublished,
     hasFormUrl,
     hasPublishedSheet,
-    hasSpreadsheet,
+    hasSpreadsheet
   });
   
   // 重要な不整合を検出
@@ -3550,9 +3572,8 @@ function fixPublishedSheetName(config) {
       config.publishedSheetName = questionText;
       
       if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-        logDebug('publishedSheetNameをAI判定結果から修復:', {
           元の名前: config.publishedSheetName,
-          新しい名前: questionText,
+          新しい名前: questionText
         });
       }
       return config;
@@ -3567,9 +3588,8 @@ function fixPublishedSheetName(config) {
       config.publishedSheetName = detectedSheetName;
       
       if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-        logDebug('publishedSheetNameをシートキーから修復:', {
           検出されたシート名: detectedSheetName,
-          利用可能なシート設定: sheetKeys,
+          利用可能なシート設定: sheetKeys
         });
       }
     }
@@ -3607,14 +3627,14 @@ function syncGlobalColumnSettings(config) {
     if (sheetConfig.formUrl) {
       config.formUrl = sheetConfig.formUrl;
       logDebug(' フォームURL同期:', {
-      sheetName: config.publishedSheetName,
-      formUrl: config.formUrl,
-    });
-
-    logDebug('グローバル列設定を同期:', {
+        sheetName: config.publishedSheetName,
+        formUrl: config.formUrl
+      });
+    }
+    
       sheetName: config.publishedSheetName,
       mainQuestion: config.opinionHeader,
-      nameColumn: config.nameHeader,
+      nameColumn: config.nameHeader
     });
   }
   
