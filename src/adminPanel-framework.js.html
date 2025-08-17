@@ -2270,23 +2270,30 @@ window.HistoryManager = {
       window._historyRestoreInProgress = true;
       console.log('🛡️ AI列判定スキップフラグを設定しました');
       
-      // 1. テキスト設定復元
-      if (item.opinionHeader) {
-        const opinionInput = document.getElementById('opinion-header');
-        if (opinionInput) opinionInput.value = item.opinionHeader;
-      }
+      // 1. テキスト設定復元（実在する要素IDに修正）
+      // 必須: 回答データ列（opinionHeader セレクト）
+      (function restoreOpinionHeader() {
+        const value = item.opinionHeader || item.opinionColumn || item.questionText || '';
+        const opinionSelect = document.getElementById('opinionHeader');
+        if (opinionSelect && value) {
+          opinionSelect.value = value;
+          console.log(`✅ Opinion header restored: ${value}`);
+        }
+      })();
       
+      // 参考: 名前列は name-column セレクトを使用（name-header要素は存在しない）
       if (item.nameHeader) {
-        const nameInput = document.getElementById('name-header');
-        if (nameInput) nameInput.value = item.nameHeader;
+        const nameSelectEl = document.getElementById('name-column');
+        if (nameSelectEl) nameSelectEl.value = item.nameHeader;
       }
       
       // 1.5. 列選択の復元（履歴データから）
       console.log('🔄 Restoring column selections from history');
+      // 回答列（履歴がopinionColumnで保持されていれば、意図的にopinionHeaderへ反映）
       if (item.opinionColumn) {
-        const opinionSelect = document.getElementById('opinion-column');
-        if (opinionSelect) {
-          opinionSelect.value = item.opinionColumn;
+        const opSel = document.getElementById('opinionHeader');
+        if (opSel) {
+          opSel.value = item.opinionColumn;
           console.log(`✅ Opinion column restored: ${item.opinionColumn}`);
         }
       }
@@ -2317,7 +2324,8 @@ window.HistoryManager = {
 
       // 復元完了まで再適用できるよう一時保存（populateHeaderOptions後に上書きされる対策）
       window._historyColumnSelections = {
-        opinionColumn: item.opinionColumn || '',
+        // opinionはopinionHeaderセレクトに統一
+        opinionColumn: item.opinionColumn || item.opinionHeader || item.questionText || '',
         nameColumn: item.nameColumn || '',
         classColumn: item.classColumn || '',
         reasonColumn: item.reasonColumn || '',

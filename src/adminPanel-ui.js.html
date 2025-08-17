@@ -2275,7 +2275,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
               const el = document.getElementById(id);
               if (el) el.value = val;
             };
-            applyIf('opinion-column', sel.opinionColumn);
+            applyIf('opinionHeader', sel.opinionColumn);
             applyIf('name-column', sel.nameColumn);
             applyIf('class-column', sel.classColumn);
             applyIf('reason-column', sel.reasonColumn);
@@ -2335,7 +2335,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
                       const el = document.getElementById(id);
                       if (el) el.value = val;
                     };
-                    applyIf('opinion-column', sel.opinionColumn);
+                    applyIf('opinionHeader', sel.opinionColumn);
                     applyIf('name-column', sel.nameColumn);
                     applyIf('class-column', sel.classColumn);
                     applyIf('reason-column', sel.reasonColumn);
@@ -2361,10 +2361,10 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
           // altIdがなければ従来のフォールバック（サーバ側既定）
           console.warn('⚠️ Fallback: Retrying getSheetDetails without spreadsheetId');
           return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', null, sheetName)
-            .then(details => {
-              try {
-                populateHeaderOptions(details.allHeaders);
-                console.log('✅ Header options populated from fallback API');
+              .then(details => {
+                try {
+                  populateHeaderOptions(details.allHeaders);
+                  console.log('✅ Header options populated from fallback API');
                 if (window._historyRestoreInProgress) {
                   const sel = window._historyColumnSelections || {};
                   const applyIf = (id, val) => {
@@ -2372,7 +2372,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
                     const el = document.getElementById(id);
                     if (el) el.value = val;
                   };
-                  applyIf('opinion-column', sel.opinionColumn);
+                  applyIf('opinionHeader', sel.opinionColumn);
                   applyIf('name-column', sel.nameColumn);
                   applyIf('class-column', sel.classColumn);
                   applyIf('reason-column', sel.reasonColumn);
