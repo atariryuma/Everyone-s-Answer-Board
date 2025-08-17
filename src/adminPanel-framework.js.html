@@ -2763,38 +2763,38 @@ window.HistoryManager = {
   },
 
   /**
-   * Verify spreadsheet consistency after loadStatus
-   * Ensures that the loaded spreadsheet matches the target spreadsheet
+   * Verify spreadsheet consistency after restoration - SIMPLIFIED
+   * Uses unified API approach - no additional server calls needed
    */
   async _verifySpreadsheetConsistency(targetSpreadsheetId) {
     try {
-      const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
-      
-      console.log('🔍 Verifying spreadsheet consistency:', {
+      console.log('🔍 Verifying spreadsheet consistency (simplified):', {
         target: targetSpreadsheetId,
-        current: currentSpreadsheetId,
-        match: currentSpreadsheetId === targetSpreadsheetId
+        checkingCurrentStatus: !!window.currentStatus?.userInfo
       });
       
+      // Use current status first (already loaded via unified API)
+      const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
+      
       if (currentSpreadsheetId !== targetSpreadsheetId) {
-        console.error('❌ CRITICAL: Spreadsheet ID mismatch detected!', {
+        console.warn('⚠️ Spreadsheet ID mismatch detected:', {
           expected: targetSpreadsheetId,
           actual: currentSpreadsheetId
         });
         
-        // Force correction by updating currentStatus
+        // Simply force-correct the current status (server update already completed)
         if (window.currentStatus?.userInfo) {
-          console.log('🔧 Force correcting spreadsheet ID in currentStatus');
+          console.log('🔧 Correcting currentStatus with target spreadsheet ID');
           window.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
         }
         
         // Also update AdminPanel state if available
         if (window.AdminPanel?.currentStatus?.userInfo) {
-          console.log('🔧 Force correcting spreadsheet ID in AdminPanel.currentStatus');
+          console.log('🔧 Correcting AdminPanel.currentStatus');
           window.AdminPanel.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
         }
         
-        console.log('✅ Spreadsheet ID force corrected');
+        console.log('✅ Client-side spreadsheet ID corrected');
       } else {
         console.log('✅ Spreadsheet consistency verified');
       }

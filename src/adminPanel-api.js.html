@@ -3406,8 +3406,8 @@ function startSystemStatusUpdate() {
       return;
     }
     
-    // キャッシュを利用して静かに更新
-    runGasWithUserId('getStatus', false)
+    // 統一APIを利用して軽量モードで更新（getInitialDataベース）
+    runGasWithUserId('getInitialData', false, false) // 第3引数はlightweightMode
       .then(function(status) {
         // 変更があった場合のみUIを更新
         if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {

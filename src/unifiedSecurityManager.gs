@@ -1165,52 +1165,8 @@ function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
   }
 }
 
-/**
- * クリティカルな更新後にキャッシュを同期
- * @param {string} userId - ユーザーID
- * @param {string} email - ユーザーのメールアドレス
- * @param {string} oldSpreadsheetId - 変更前のスプレッドシートID
- * @param {string} newSpreadsheetId - 変更後のスプレッドシートID
- */
-function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
-  try {
-    debugLog('synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期開始', {
-      userId, email, oldSpreadsheetId, newSpreadsheetId
-    });
-
-    // 1. ユーザー固有のキャッシュを無効化
-    invalidateUserCache(userId, email, oldSpreadsheetId, false); // oldSpreadsheetIdのキャッシュをクリア
-
-    // 2. 新しいスプレッドシートIDに関連するキャッシュもクリア（もしあれば）
-    if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
-      invalidateUserCache(userId, email, newSpreadsheetId, false);
-      // 古いスプレッドシートオブジェクトのキャッシュを無効化
-      if (oldSpreadsheetId) {
-        invalidateSpreadsheetCache(oldSpreadsheetId);
-        infoLog(`✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
-      }
-    }
-
-    // 3. データベース全体のキャッシュをクリア（ユーザーリストなど）
-    clearDatabaseCache();
-
-    // 4. 統一キャッシュマネージャーの関連エントリをクリア
-    if (typeof cacheManager !== 'undefined' && cacheManager) {
-      cacheManager.removeByPattern('user_*');
-      cacheManager.removeByPattern('email_*');
-      cacheManager.removeByPattern('login_status_*');
-      cacheManager.removeByPattern('sheets_*');
-      cacheManager.removeByPattern('data_*');
-      cacheManager.removeByPattern('config_v3_*');
-    }
-
-    infoLog('✅ synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期完了');
-
-  } catch (error) {
-    errorLog('synchronizeCacheAfterCriticalUpdate エラー:', error.message);
-    // エラーが発生しても処理は続行
-  }
-}
+// synchronizeCacheAfterCriticalUpdate関数はunifiedCacheManager.gsに統合されました
+// 重複を避けるため、この実装は削除されました
 
 /**
  * データベースキャッシュをクリア

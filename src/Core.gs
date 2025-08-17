@@ -6143,10 +6143,11 @@ function confirmUserRegistration() {
  * 従来の5つのAPI呼び出し（getCurrentUserStatus, getUserId, getAppConfig, getSheetDetails）を統合
  * @param {string} requestUserId - リクエスト元のユーザーID（省略可能）
  * @param {string} targetSheetName - 詳細を取得するシート名（省略可能）
+ * @param {boolean} lightweightMode - 軽量モード（シート詳細取得をスキップ）
  * @returns {Object} 統合された初期データ
  */
-function getInitialData(requestUserId, targetSheetName) {
-  debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName });
+function getInitialData(requestUserId, targetSheetName, lightweightMode) {
+  debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName, lightweightMode });
 
   try {
     var startTime = new Date().getTime();
@@ -6301,7 +6302,8 @@ function getInitialData(requestUserId, targetSheetName) {
     };
 
     // === ステップ6: シート詳細の取得（オプション）- 最適化版 ===
-    var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
+    // 軽量モード時はシート詳細の取得をスキップ
+    var includeSheetDetails = !lightweightMode && (targetSheetName || configJson.publishedSheetName);
 
     // デバッグ: シート詳細取得パラメータの確認
     debugLog('🔍 getInitialData: シート詳細取得パラメータ確認:', {
