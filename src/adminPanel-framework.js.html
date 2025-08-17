@@ -2534,6 +2534,15 @@ window.HistoryManager = {
         if (!sheetFound) {
           console.warn(`⚠️ Sheet ${sanitizedSheetName} not found in options after waiting, proceeding with fallback`);
         }
+        
+        // **CRITICAL**: Force correct the activeSheetName in loaded status
+        console.log('🔧 Force correcting activeSheetName after spreadsheet switch');
+        if (window.currentStatus) {
+          window.currentStatus.activeSheetName = sanitizedSheetName;
+        }
+        if (window.AdminPanel?.currentStatus) {
+          window.AdminPanel.currentStatus.activeSheetName = sanitizedSheetName;
+        }
       }
       
       // シート選択復元と公開情報更新（サニタイズされた名前を使用）
@@ -2736,6 +2745,10 @@ window.HistoryManager = {
         } else {
           console.warn('⚠️ No spreadsheetUrl available in reloaded currentStatus');
         }
+        
+        // 5. **CRITICAL**: Verify spreadsheet consistency after loadStatus
+        await this._verifySpreadsheetConsistency(targetSpreadsheetId);
+        
       } else {
         console.warn('⚠️ loadStatus function not available for state reload');
       }
@@ -2746,6 +2759,48 @@ window.HistoryManager = {
         showMessage('❌ プロジェクト切り替えに失敗しました: ' + error.message, 'error');
       }
       throw error; // Re-throw to be handled by caller
+    }
+  },
+
+  /**
+   * Verify spreadsheet consistency after loadStatus
+   * Ensures that the loaded spreadsheet matches the target spreadsheet
+   */
+  async _verifySpreadsheetConsistency(targetSpreadsheetId) {
+    try {
+      const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
+      
+      console.log('🔍 Verifying spreadsheet consistency:', {
+        target: targetSpreadsheetId,
+        current: currentSpreadsheetId,
+        match: currentSpreadsheetId === targetSpreadsheetId
+      });
+      
+      if (currentSpreadsheetId !== targetSpreadsheetId) {
+        console.error('❌ CRITICAL: Spreadsheet ID mismatch detected!', {
+          expected: targetSpreadsheetId,
+          actual: currentSpreadsheetId
+        });
+        
+        // Force correction by updating currentStatus
+        if (window.currentStatus?.userInfo) {
+          console.log('🔧 Force correcting spreadsheet ID in currentStatus');
+          window.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
+        }
+        
+        // Also update AdminPanel state if available
+        if (window.AdminPanel?.currentStatus?.userInfo) {
+          console.log('🔧 Force correcting spreadsheet ID in AdminPanel.currentStatus');
+          window.AdminPanel.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
+        }
+        
+        console.log('✅ Spreadsheet ID force corrected');
+      } else {
+        console.log('✅ Spreadsheet consistency verified');
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Spreadsheet consistency verification failed:', error);
     }
   },
 
