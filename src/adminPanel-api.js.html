@@ -567,7 +567,7 @@ const timingManager = new TimingManager();
 // TimingManagerをグローバルに公開
 window.TimingManager = TimingManager;
 
-// レガシー互換性のための関数
+// Global timing utilities
 window.debounce = TimingManager.debounce;
 window.throttle = TimingManager.throttle;
 

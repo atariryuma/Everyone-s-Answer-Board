@@ -902,7 +902,7 @@ function buildConfigObject() {
     nameHeader: nameValue,
     classHeader: classValue,
     reasonHeader: (document.getElementById('reason-column') && document.getElementById('reason-column').value) || '',
-    // Also provide legacy format for backward compatibility
+    // Column values
     opinionColumn: opinionValue,
     nameColumn: nameValue,
     classColumn: classValue,
@@ -1429,7 +1429,7 @@ function updateTopicText(status) {
 function updateScheduledEndTime(config, element) {
   // 複数のソースから scheduledEndAt を取得を試行
   const scheduledEndAt = config.scheduledEndAt || 
-                         config.scheduledEndTime ||  // 古いフィールド名との互換性
+                         config.scheduledEndTime ||
                          (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndAt) ||
                          (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndTime);
   
@@ -2178,7 +2178,7 @@ function _resolveSpreadsheetIdForApi(status) {
     const st = status || window.currentStatus || {};
     // 最優先: userInfo.spreadsheetId（直近の切替を反映）
     if (st.userInfo && st.userInfo.spreadsheetId) return st.userInfo.spreadsheetId;
-    // 次点: configJson.publishedSpreadsheetId（古い互換ロジック用）
+    // 次点: configJson.publishedSpreadsheetId
     if (st.configJson && st.configJson.publishedSpreadsheetId) return st.configJson.publishedSpreadsheetId;
     // フォールバック: URLから抽出
     const url = (st.userInfo && st.userInfo.spreadsheetUrl) || (st.appUrls && st.appUrls.spreadsheetUrl) || null;
@@ -2813,7 +2813,7 @@ function saveToHistory(historyItem) {
     
     history.unshift(newItem);
     
-    // 最大数を超えた場合は古いものを削除
+    // 最大数を超えた場合は過去のものを削除
     if (history.length > MAX_HISTORY_ITEMS) {
       history.splice(MAX_HISTORY_ITEMS);
     }
@@ -3319,9 +3319,6 @@ function updateConfigPanelUI(config) {
  * 簡単な履歴テーブルを表示（新実装）
  */
 
-// loadSimpleHistoryTable moved to AdminPanel.historyManager
-
-// createHistoryTableRow moved to AdminPanel.historyManager
 
 /**
  * Enhanced history restoration preview modal
@@ -3614,13 +3611,6 @@ async function selectHistoryItem(historyId) {
  * シンプル履歴からの復元実行
  * @param {Object} item - 正規化済み履歴アイテム
  */
-// restoreFromSimpleHistory moved to AdminPanel.historyManager
-
-// 古い複雑なrestoreConfigFromHistory関数は削除済み - restoreFromSimpleHistoryに統合
-
-// 古いrestoreAdditionalConfigSettings関数は削除済み - シンプル復元に統合
-
-// createHistoryItemElement関数は削除 - テーブル形式のcreateHistoryTableRowを使用
 
 /**
  * HTMLエスケープ関数
@@ -3945,7 +3935,7 @@ function fixConfigForPublishedState(config) {
 // 簡単な履歴テーブル初期化は initializeAdminPanel で実行されるように変更
 // DOMContentLoaded は削除 - framework.js.htmlで統一管理
 
-// Draft recovery function - moved to initializeAdminPanelMaster
+// Draft recovery utility function
 function recoverDraftIfAvailable() {
   // Check for and recover draft from session storage
   if (typeof hasDraftInSession === 'function' && hasDraftInSession()) {
