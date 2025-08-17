@@ -6164,14 +6164,42 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     // Phase3 Optimization: Use execution-level cache to avoid duplicate database queries
     clearExecutionUserInfoCache(); // Clear any stale cache
 
+    // 軽量モード時またはキャッシュバイパス時の追加キャッシュクリア
+    if (lightweightMode || targetSheetName === 'BYPASS_CACHE') {
+      debugLog('🧹 Additional cache clearing for fresh data retrieval');
+      try {
+        // 統一キャッシュクリアを実行
+        if (typeof performUnifiedCacheClear === 'function') {
+          performUnifiedCacheClear(currentUserId, activeUserEmail, null, 'execution');
+        }
+        // データベースキャッシュも強制クリア
+        if (typeof clearDatabaseCache === 'function') {
+          clearDatabaseCache();
+        }
+      } catch (cacheError) {
+        warnLog('⚠️ Additional cache clearing failed:', cacheError.message);
+      }
+    }
+
     // ユーザー認証
     verifyUserAccess(currentUserId);
-    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-      useExecutionCache: true,
-      ttl: 300
-    }); // Use cached version
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
+    
+    // 軽量モードまたは強制更新時は、確実に最新データを取得
+    var userInfo;
+    if (lightweightMode || targetSheetName === 'BYPASS_CACHE') {
+      debugLog('🔄 Force fresh user data retrieval for consistency');
+      userInfo = findUserByIdFresh(currentUserId);
+      if (!userInfo) {
+        throw new Error('ユーザー情報が見つかりません（強制更新）');
+      }
+    } else {
+      userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+        useExecutionCache: true,
+        ttl: 300
+      });
+      if (!userInfo) {
+        throw new Error('ユーザー情報が見つかりません');
+      }
     }
 
     // === ステップ1.5: データ整合性の自動チェックと修正 ===

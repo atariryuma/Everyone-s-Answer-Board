@@ -916,8 +916,12 @@ function loadStatus(bypassCache = false) {
 
     console.log('🌐 Calling getInitialData with userId:', userId, 'bypassCache:', bypassCache);
 
+    // 履歴復元時などの強制更新用フラグ
+    const forceRefresh = bypassCache && window._historyRestoreInProgress;
+    const targetSheetParam = forceRefresh ? 'BYPASS_CACHE' : null;
+
     // runGasWithUserId を使用して getInitialData を呼び出す
-    return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
+    return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', targetSheetParam, false)
       .then(response => {
         console.log('🚀 getInitialData response received:', {
           response: response,

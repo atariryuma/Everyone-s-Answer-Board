@@ -2924,10 +2924,16 @@ window.HistoryManager = {
         window.AdminPanel.currentStatus.config.publishedSheetName = sheetName;
       }
       
-      // UI表示を更新（エラーハンドリング付き）
+      // UI表示を更新（エラーハンドリング付き） - statusオブジェクトを適切に渡す
       if (typeof updateTopicText === 'function') {
         try {
-          updateTopicText(window.AdminPanel?.currentStatus);
+          // より適切なstatusオブジェクトを取得
+          const statusForUpdate = window.currentStatus || window.AdminPanel?.currentStatus;
+          if (statusForUpdate) {
+            updateTopicText(statusForUpdate);
+          } else {
+            console.warn('⚠️ No valid status object available for updateTopicText');
+          }
         } catch (error) {
           console.warn('⚠️ updateTopicText failed during published sheet info update:', error);
         }
