@@ -2043,9 +2043,10 @@ function handleSheetSelectionChange(event) {
     if (newSelectedSheet) {
       console.log('📋 Loading config for sheet:', newSelectedSheet);
 
-      // 履歴復元中は loadConfigForSelected をスキップ
+      // 履歴復元中は特別な処理を実行
       if (window._historyRestoreInProgress || window._historyColumnSelections) {
-        console.log('🛡️ 履歴復元中のため、シート設定読み込みをスキップしました');
+        console.log('🔄 履歴復元中: 専用の設定読み込み処理を実行します');
+        await _loadConfigForHistoryRestore(newSelectedSheet);
         updateUIForSelectedSheet();
         return;
       }
@@ -2732,6 +2733,83 @@ function _normalizeSheetName(sheetName) {
     .replace(/\s+/g, ' ')  // 複数の空白を1つに
     .replace(/[\u3000]/g, ' ')  // 全角空白を半角に
     .toLowerCase();
+}
+
+/**
+ * 履歴復元時専用の設定読み込み処理
+ */
+async function _loadConfigForHistoryRestore(sheetName) {
+  try {
+    console.log('📝 履歴復元用設定読み込み開始:', sheetName);
+    
+    // 履歴復元フラグを一時的に無効化して設定読み込み
+    const originalRestoreFlag = window._historyRestoreInProgress;
+    const originalColumnSelections = window._historyColumnSelections;
+    
+    window._historyRestoreInProgress = false;
+    window._historyColumnSelections = null;
+    
+    // 設定読み込み実行（強制読み込みフラグ付き）
+    const result = await loadConfigForSelected(sheetName, null, 0, 3, true);
+    
+    // フラグを元に戻す
+    window._historyRestoreInProgress = originalRestoreFlag;
+    window._historyColumnSelections = originalColumnSelections;
+    
+    console.log('✅ 履歴復元用設定読み込み完了:', result);
+    
+    // 履歴データの列設定を再適用
+    if (window._historyColumnSelections) {
+      console.log('🔄 履歴の列設定を再適用中...');
+      _applyHistoryColumnSettings(window._historyColumnSelections);
+    }
+    
+  } catch (error) {
+    console.error('❌ 履歴復元用設定読み込みエラー:', error);
+  }
+}
+
+/**
+ * 履歴の列設定をDOMに再適用
+ */
+function _applyHistoryColumnSettings(columnSelections) {
+  try {
+    // DOM要素への値設定
+    if (columnSelections.opinionHeader) {
+      const opinionEl = document.getElementById('opinionHeader');
+      if (opinionEl) {
+        opinionEl.value = columnSelections.opinionHeader;
+        console.log('✅ Opinion header reapplied:', columnSelections.opinionHeader);
+      }
+    }
+    
+    if (columnSelections.nameColumn) {
+      const nameEl = document.getElementById('name-column');
+      if (nameEl) {
+        nameEl.value = columnSelections.nameColumn;
+        console.log('✅ Name column reapplied:', columnSelections.nameColumn);
+      }
+    }
+    
+    if (columnSelections.classColumn) {
+      const classEl = document.getElementById('class-column');
+      if (classEl) {
+        classEl.value = columnSelections.classColumn;
+        console.log('✅ Class column reapplied:', columnSelections.classColumn);
+      }
+    }
+    
+    if (columnSelections.reasonHeader) {
+      const reasonEl = document.getElementById('reasonHeader');
+      if (reasonEl) {
+        reasonEl.value = columnSelections.reasonHeader;
+        console.log('✅ Reason header reapplied:', columnSelections.reasonHeader);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ 履歴列設定再適用エラー:', error);
+  }
 }
 
 function updateSystemStatusDisplay(status) {

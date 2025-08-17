@@ -998,9 +998,9 @@ function loadStatus(bypassCache = false) {
 }
 
 // Load sheet configuration for selected sheet with retry mechanism
-function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride = null, retryCount = 0, maxRetries = 3) {
-  // 履歴復元中は処理をスキップ
-  if (window._historyRestoreInProgress || window._historyColumnSelections) {
+function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride = null, retryCount = 0, maxRetries = 3, forceLoad = false) {
+  // 履歴復元中は処理をスキップ（強制読み込みフラグがある場合は除く）
+  if ((window._historyRestoreInProgress || window._historyColumnSelections) && !forceLoad) {
     console.log('🛡️ loadConfigForSelected: 履歴復元中のため処理をスキップしました');
     return Promise.resolve({ success: false, message: 'Skipped during history restore' });
   }
@@ -1064,12 +1064,17 @@ function handleSheetDetailsSuccess(details) {
     }
     
     if (details.guessedConfig) {
-      // 履歴復元中はAI列判定をスキップ
-      if (window._historyRestoreInProgress || window._historyColumnSelections) {
-        console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
+      // 履歴復元中はAI列判定をスキップ（強制読み込み時も含む）
+      if (window._historyRestoreInProgress || window._historyColumnSelections || forceLoad) {
+        if (forceLoad) {
+          console.log('🔄 強制読み込み時: AI列判定をスキップして履歴設定を優先');
+        } else {
+          console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
+        }
         console.log('🔍 Skip flags:', {
           historyRestoreInProgress: window._historyRestoreInProgress,
-          historyColumnSelections: !!window._historyColumnSelections
+          historyColumnSelections: !!window._historyColumnSelections,
+          forceLoad: forceLoad
         });
       } else {
         // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
