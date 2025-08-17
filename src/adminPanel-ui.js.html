@@ -1993,7 +1993,8 @@ function handleSheetSelectionChange(event) {
       }
 
       // アクティブシートの列データを取得して列選択を更新
-      loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId)
+      const effectiveId = _resolveSpreadsheetIdForApi(currentStatus);
+      loadConfigForSelected(newSelectedSheet, effectiveId)
         .then(result => {
           console.log('✅ シート設定読み込み完了:', result);
           updateUIForSelectedSheet();
@@ -2171,8 +2172,43 @@ function clearColumnSelections() {
 }
 
 // Load configuration for selected sheet - OPTIMIZED
+// 効率的にAPI用のスプレッドシートIDを解決
+function _resolveSpreadsheetIdForApi(status) {
+  try {
+    const st = status || window.currentStatus || {};
+    // 最優先: userInfo.spreadsheetId（直近の切替を反映）
+    if (st.userInfo && st.userInfo.spreadsheetId) return st.userInfo.spreadsheetId;
+    // 次点: configJson.publishedSpreadsheetId（古い互換ロジック用）
+    if (st.configJson && st.configJson.publishedSpreadsheetId) return st.configJson.publishedSpreadsheetId;
+    // フォールバック: URLから抽出
+    const url = (st.userInfo && st.userInfo.spreadsheetUrl) || (st.appUrls && st.appUrls.spreadsheetUrl) || null;
+    if (url) {
+      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      if (m && m[1]) return m[1];
+    }
+  } catch (e) {
+    console.warn('⚠️ _resolveSpreadsheetIdForApi failed:', e.message);
+  }
+  return null;
+}
+
+// 代替候補のID（userInfoとconfigJsonを入れ替え）
+function _resolveAltSpreadsheetId(status, primaryId) {
+  const st = status || window.currentStatus || {};
+  const cand1 = st.configJson && st.configJson.publishedSpreadsheetId;
+  const cand2 = st.userInfo && st.userInfo.spreadsheetId;
+  if (cand1 && cand1 !== primaryId) return cand1;
+  if (cand2 && cand2 !== primaryId) return cand2;
+  return null;
+}
+
 function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetries = 3) {
   console.log('📋 Loading config for: ' + sheetName);
+
+  // 足りない場合はその場で解決
+  if (!spreadsheetId) {
+    spreadsheetId = _resolveSpreadsheetIdForApi(window.currentStatus);
+  }
 
   if (!spreadsheetId || !sheetName) {
     console.error('スプレッドシート情報が不足しています。');
@@ -2226,10 +2262,30 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
         }
 
         try {
+          // 1) ヘッダー一覧をUIへ反映
           populateHeaderOptions(details.allHeaders);
           console.log('✅ Header options populated from API');
-          populateConfig(details.guessedConfig);
-          console.log('✅ AI configuration applied from API');
+
+          // 2) 履歴復元中はAI推定の上書きを避ける（列選択を再適用）
+          if (window._historyRestoreInProgress) {
+            console.log('🛡️ 履歴復元中: AI推定の適用をスキップし、履歴の列選択を再適用します');
+            const sel = window._historyColumnSelections || {};
+            const applyIf = (id, val) => {
+              if (!val) return;
+              const el = document.getElementById(id);
+              if (el) el.value = val;
+            };
+            applyIf('opinion-column', sel.opinionColumn);
+            applyIf('name-column', sel.nameColumn);
+            applyIf('class-column', sel.classColumn);
+            applyIf('reason-column', sel.reasonColumn);
+            // 一度適用したらクリア
+            window._historyColumnSelections = null;
+          } else {
+            // 通常時はAI推定を適用
+            populateConfig(details.guessedConfig);
+            console.log('✅ AI configuration applied from API');
+          }
           if (retryCount > 0) {
             showMessage('✅ シート情報が正常に読み込まれました！', 'success');
           }
@@ -2263,14 +2319,68 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
         // フォールバック試行: spreadsheetIdを省略（サーバー側の既定スプレッドシート）
         const maybeNotFound = error && (error.message.includes('が見つかりません') || error.message.includes('Unable to parse range'));
         if (maybeNotFound && spreadsheetId && retryCount === 0) {
+          // 代替のスプレッドシートIDで再試行（サーバー側フォールバックに依存しない）
+          const altId = _resolveAltSpreadsheetId(window.currentStatus, spreadsheetId);
+          if (altId) {
+            console.warn('⚠️ Fallback: Retrying getSheetDetails with alt spreadsheetId');
+            return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', altId, sheetName)
+              .then(details => {
+                try {
+                  populateHeaderOptions(details.allHeaders);
+                  console.log('✅ Header options populated from fallback API');
+                  if (window._historyRestoreInProgress) {
+                    const sel = window._historyColumnSelections || {};
+                    const applyIf = (id, val) => {
+                      if (!val) return;
+                      const el = document.getElementById(id);
+                      if (el) el.value = val;
+                    };
+                    applyIf('opinion-column', sel.opinionColumn);
+                    applyIf('name-column', sel.nameColumn);
+                    applyIf('class-column', sel.classColumn);
+                    applyIf('reason-column', sel.reasonColumn);
+                    window._historyColumnSelections = null;
+                  } else {
+                    populateConfig(details.guessedConfig);
+                    console.log('✅ AI configuration applied from fallback API');
+                  }
+                  resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
+                } catch (err2) {
+                  console.error('Error in fallback config population sequence:', err2);
+                  showMessage('設定の適用中にエラーが発生しました', 'error');
+                  reject(err2);
+                }
+              })
+              .catch(err2 => {
+                console.warn('Fallback getSheetDetails also failed:', err2);
+                showMessage(errorMessage, 'error');
+                // After fallback failure, proceed with normal retry handling below
+                // Intentionally no return here to fall through to retry logic
+              });
+          }
+          // altIdがなければ従来のフォールバック（サーバ側既定）
           console.warn('⚠️ Fallback: Retrying getSheetDetails without spreadsheetId');
           return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', null, sheetName)
             .then(details => {
               try {
                 populateHeaderOptions(details.allHeaders);
                 console.log('✅ Header options populated from fallback API');
-                populateConfig(details.guessedConfig);
-                console.log('✅ AI configuration applied from fallback API');
+                if (window._historyRestoreInProgress) {
+                  const sel = window._historyColumnSelections || {};
+                  const applyIf = (id, val) => {
+                    if (!val) return;
+                    const el = document.getElementById(id);
+                    if (el) el.value = val;
+                  };
+                  applyIf('opinion-column', sel.opinionColumn);
+                  applyIf('name-column', sel.nameColumn);
+                  applyIf('class-column', sel.classColumn);
+                  applyIf('reason-column', sel.reasonColumn);
+                  window._historyColumnSelections = null;
+                } else {
+                  populateConfig(details.guessedConfig);
+                  console.log('✅ AI configuration applied from fallback API');
+                }
                 resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
               } catch (err2) {
                 console.error('Error in fallback config population sequence:', err2);

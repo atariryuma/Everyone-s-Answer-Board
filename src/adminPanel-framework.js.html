@@ -2314,6 +2314,14 @@ window.HistoryManager = {
           console.log(`✅ Reason column restored: ${item.reasonColumn}`);
         }
       }
+
+      // 復元完了まで再適用できるよう一時保存（populateHeaderOptions後に上書きされる対策）
+      window._historyColumnSelections = {
+        opinionColumn: item.opinionColumn || '',
+        nameColumn: item.nameColumn || '',
+        classColumn: item.classColumn || '',
+        reasonColumn: item.reasonColumn || '',
+      };
       
       // 2. 名前表示設定復元（showNamesベース）
       const showNamesCheckbox = document.getElementById('show-names');
