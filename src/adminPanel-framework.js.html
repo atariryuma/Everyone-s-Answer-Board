@@ -2519,6 +2519,32 @@ window.HistoryManager = {
         await updateColumnDetection();
       }
       
+      // 履歴復元時は列選択を永続化（最小保存）
+      try {
+        if (window._historyRestoreInProgress) {
+          // ヘッダー描画・選択反映完了を少し待ってから保存
+          await new Promise(resolve => setTimeout(resolve, 400));
+          const sheetName = (window.AdminPanel && window.AdminPanel.selectedSheet) || (document.getElementById('sheet-select')?.value) || '';
+          const spreadsheetId = (window.currentStatus && window.currentStatus.userInfo && window.currentStatus.userInfo.spreadsheetId) || null;
+          if (sheetName && spreadsheetId && typeof buildConfigObject === 'function' && typeof runGasWithUserId === 'function') {
+            const config = buildConfigObject();
+            // シート固有設定を保存
+            try {
+              await runGasWithUserId('saveSheetConfig', '設定保存中...', spreadsheetId, sheetName, config);
+              // 公開対象シートも同期（ドロップダウンと表示の一貫性確保）
+              await runGasWithUserId('switchToSheet', false, spreadsheetId, sheetName);
+              console.log('✅ 復元後の設定を保存し、シートをアクティブ化しました:', sheetName);
+            } catch (persistErr) {
+              console.warn('⚠️ 復元後の自動保存で警告:', persistErr?.message || persistErr);
+            }
+          } else {
+            console.warn('⚠️ 自動保存スキップ（必要情報不足）:', { sheetName, hasId: !!spreadsheetId });
+          }
+        }
+      } catch (autoSaveErr) {
+        console.warn('⚠️ 自動保存処理で警告:', autoSaveErr?.message || autoSaveErr);
+      }
+
       console.log('✅ UI refreshed successfully');
     } catch (error) {
       console.warn('⚠️ UI refresh warning:', error);
