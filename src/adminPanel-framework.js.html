@@ -32,7 +32,8 @@ class AdminPanelStateManager {
     this.state = {
       currentStatus: null,
       selectedSheet: '',
-      isLoading: false
+      isLoading: false,
+      debugMode: false // DEBUG_MODE状態を追加
     };
     this.subscribers = new Map();
   }
@@ -156,7 +157,9 @@ Object.defineProperties(window, {
 // DEBUG_MODE is defined in constants.js.html
 
 function adminLog(level, ...args) {
-  if (!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE))) return;
+  // AdminPanel.stateManagerが初期化されているか、またはwindow.DEBUG_MODEが設定されているかを確認
+  const isDebugModeEnabled = window.AdminPanel && window.AdminPanel.stateManager && window.AdminPanel.stateManager.state.debugMode || window.DEBUG_MODE;
+  if (!isDebugModeEnabled) return;
   
   switch (level) {
     case 'error':
@@ -169,7 +172,8 @@ function adminLog(level, ...args) {
       console.log('[AdminPanel]', ...args);
       break;
     case 'debug':
-      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) console.log('[AdminPanel:DEBUG]', ...args);
+      // debugレベルのログは、debugModeが有効な場合のみ出力
+      if (isDebugModeEnabled) console.log('[AdminPanel:DEBUG]', ...args);
       break;
     default:
       console.log('[AdminPanel]', ...args);
