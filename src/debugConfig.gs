@@ -57,42 +57,44 @@ function isProductionEnvironment() {
  * @param {...any} args - 追加引数
  */
 function controlledLog(level, category, message, ...args) {
-  // DEBUG_MODE設定をチェック（AppSetupPageでの設定を優先）
+  /**
+   * ログレベル判定: 本番=WARN以上, 開発=DEBUGまで
+   */
+  let debugModeEnabled = false;
   try {
-    const debugModeEnabled = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
-    
-    // DEBUG_MODEが無効の場合はERRORレベルのみ出力
-    if (!debugModeEnabled && level !== 'ERROR') {
-      return;
-    }
+    debugModeEnabled = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
   } catch (error) {
-    // PropertiesService エラー時は従来の本番環境判定にフォールバック
-    if (isProductionEnvironment() && level !== 'ERROR') {
+    // エラー時は安全側（本番相当）
+    debugModeEnabled = false;
+  }
+
+  const levelValue = DEBUG_CONFIG.logLevels[level] ?? DEBUG_CONFIG.logLevels.DEBUG;
+  const effectiveLevel = debugModeEnabled ? DEBUG_CONFIG.logLevels.DEBUG : DEBUG_CONFIG.logLevels.WARN;
+  if (levelValue > effectiveLevel) {
+    return;
+  }
+
+  // カテゴリ別制御（falseなら抑制）※開発時はUIカテゴリを許可
+  if (category) {
+    const isDisabled = DEBUG_CONFIG.categories[category] === false;
+    const allowInDev = debugModeEnabled && category === 'UI';
+    if (isDisabled && !allowInDev) {
       return;
     }
   }
 
-  // ログレベルチェック（DEBUG_MODEが有効な場合のみ適用）
-  const levelValue = DEBUG_CONFIG.logLevels[level] || DEBUG_CONFIG.logLevels.DEBUG;
-  if (levelValue > DEBUG_CONFIG.currentLogLevel) {
-    return;
-  }
-
-  // カテゴリ別制御チェック（DEBUG_MODEが有効な場合のみ適用）
-  if (category && DEBUG_CONFIG.categories[category] === false) {
-    return;
-  }
-
-  // ログ出力
+  // 出力
   const timestamp = new Date().toISOString();
   const prefix = `[${timestamp}] ${level}${category ? `[${category}]` : ''}:`;
-
   switch (level) {
     case 'ERROR':
       console.error(prefix, message, ...args);
       break;
     case 'WARN':
       console.warn(prefix, message, ...args);
+      break;
+    case 'INFO':
+      console.log(prefix, message, ...args);
       break;
     default:
       console.log(prefix, message, ...args);
