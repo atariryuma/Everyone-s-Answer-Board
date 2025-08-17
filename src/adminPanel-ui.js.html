@@ -835,10 +835,15 @@ function _fullPopulateHeaderOptions(headers) {
 function _fullPopulateConfig(cfg) {
   if (!cfg) return;
   
-  // 履歴復元中はスキップ
-  if (window._historyRestoreInProgress || window._historyColumnSelections) {
+  // 履歴復元中はスキップ（ただし、ドラフトモードの場合は除く）
+  if ((window._historyRestoreInProgress || window._historyColumnSelections) && !window._draftModeActive) {
     console.log('🛡️ _fullPopulateConfig: 履歴復元中のため処理をスキップしました');
     return;
+  }
+  
+  // ドラフトモード時のログ出力
+  if (window._draftModeActive) {
+    console.log('📝 _fullPopulateConfig: ドラフトモードで設定を反映中');
   }
   
   // Throttle function calls to prevent spam

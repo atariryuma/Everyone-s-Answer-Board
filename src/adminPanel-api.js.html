@@ -1783,6 +1783,22 @@ function saveAndPublish() {
     return;
   }
   
+  // ドラフトモードが有効な場合は、公開前に実際の公開情報を更新
+  if (window._draftModeActive) {
+    console.log('📝 ドラフトモードから公開へ移行中...');
+    
+    // ドラフトモードを終了
+    window._draftModeActive = false;
+    
+    // ドラフトインジケーターを削除
+    const draftIndicator = document.getElementById('draft-mode-indicator');
+    if (draftIndicator) {
+      draftIndicator.remove();
+    }
+    
+    console.log('✅ ドラフトモードが終了しました。公開を実行します。');
+  }
+  
   // 進捗インジケータ表示
   showMessage('🔄 設定を保存しています...（数分かかる場合があります）', 'info');
   
