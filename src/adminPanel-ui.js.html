@@ -719,19 +719,34 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       lastSelectedSheetName = normalizedActiveSheet;
       logDebug('✅ Active sheet set successfully:', normalizedActiveSheet);
     } else {
-      // 部分一致またはフォールバック処理
-      console.warn('⚠️ Active sheet not found in options, attempting fallback:', {
+      // 改善されたフォールバック処理
+      console.warn('⚠️ Active sheet not found in options, attempting intelligent fallback:', {
         activeSheetName: normalizedActiveSheet,
         availableOptions: availableOptions.map(opt => opt.value)
       });
       
-      // 最初の有効なオプションを選択
-      if (availableOptions.length > 1) { // Skip the default "-- シートを選択 --"
-        const firstSheet = availableOptions[1].value;
-        select.value = firstSheet;
-        selectedSheet = firstSheet;
-        lastSelectedSheetName = firstSheet;
-        logDebug('🔄 Fallback to first available sheet:', firstSheet);
+      let fallbackSheet = null;
+      
+      // 1. 部分一致を試行（履歴復元で役立つ）
+      const partialMatch = availableOptions.find(option => 
+        option.value && normalizedActiveSheet && 
+        (option.value.includes(normalizedActiveSheet) || normalizedActiveSheet.includes(option.value))
+      );
+      
+      if (partialMatch) {
+        fallbackSheet = partialMatch.value;
+        console.log('✅ Found partial match:', fallbackSheet);
+      } else if (availableOptions.length > 1) {
+        // 2. 最初の有効なオプションを選択
+        fallbackSheet = availableOptions[1].value;
+        console.log('✅ Using first available option:', fallbackSheet);
+      }
+      
+      if (fallbackSheet) {
+        select.value = fallbackSheet;
+        selectedSheet = fallbackSheet;
+        lastSelectedSheetName = fallbackSheet;
+        logDebug('🔄 Fallback to sheet:', fallbackSheet);
       }
     }
     
@@ -1334,30 +1349,51 @@ function updateTopicText(status) {
   if (!topicTextElement) return;
 
   let topic = '（問題文未設定）';
-  // より包括的なconfig取得
-  let cfg = status.config || {};
+  
+  // SAFE: 設定オブジェクトの安全な取得
+  let cfg = {};
+  
+  // statusオブジェクトの安全性チェック
+  if (!status) {
+    console.warn('⚠️ updateTopicText: status is null or undefined');
+    topicTextElement.textContent = topic;
+    return;
+  }
+  
+  // status.configが存在し、かつオブジェクトの場合のみ使用
+  if (status.config && typeof status.config === 'object') {
+    cfg = Object.assign({}, status.config);
+  }
   
   console.log('🔍 updateTopicText: status:', status);
   
-  // userInfo.configJsonからも情報を取得
+  // userInfo.configJsonからも情報を取得（安全性チェック強化）
   if (status.userInfo && status.userInfo.configJson) {
     try {
       const fullConfig = JSON.parse(status.userInfo.configJson);
-      cfg = Object.assign({}, cfg, fullConfig);
-      console.log('📋 updateTopicText: merged config:', cfg);
+      if (fullConfig && typeof fullConfig === 'object') {
+        cfg = Object.assign({}, cfg, fullConfig);
+        console.log('📋 updateTopicText: merged config:', cfg);
+      } else {
+        console.warn('⚠️ Parsed configJson is not a valid object:', fullConfig);
+      }
     } catch (e) {
-      console.warn('Failed to parse userInfo.configJson:', e);
+      console.warn('⚠️ Failed to parse userInfo.configJson:', e);
     }
   }
   
-  // publishedSheetNameに基づいてsheet-specific configを取得
-  if (status.userInfo && cfg.publishedSheetName) {
-    const sheetConfigKey = `sheet_${cfg.publishedSheetName}`;
-    if (cfg[sheetConfigKey] && cfg[sheetConfigKey].opinionHeader) {
-      topic = cfg[sheetConfigKey].opinionHeader;
-      console.log(`✅ Topic found from sheet config (${sheetConfigKey}):`, topic);
-    } else {
-      console.warn(`⚠️ No opinion header found in sheet config: ${sheetConfigKey}`, cfg[sheetConfigKey]);
+  // publishedSheetNameに基づいてsheet-specific configを取得（安全性チェック強化）
+  if (status.userInfo && cfg && cfg.publishedSheetName) {
+    try {
+      const sheetConfigKey = `sheet_${cfg.publishedSheetName}`;
+      if (cfg[sheetConfigKey] && typeof cfg[sheetConfigKey] === 'object' && cfg[sheetConfigKey].opinionHeader) {
+        topic = cfg[sheetConfigKey].opinionHeader;
+        console.log(`✅ Topic found from sheet config (${sheetConfigKey}):`, topic);
+      } else {
+        console.warn(`⚠️ No opinion header found in sheet config: ${sheetConfigKey}`, cfg[sheetConfigKey]);
+      }
+    } catch (e) {
+      console.warn('⚠️ Error accessing sheet config:', e);
     }
   }
 

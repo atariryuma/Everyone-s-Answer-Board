@@ -6692,6 +6692,44 @@ function updateUserAPI(requestUserId, updateData) {
       } catch (cacheError) {
         warnLog('Cache invalidation warning:', cacheError.message);
       }
+      
+      // CRITICAL: Verify that the update was actually persisted
+      debugLog('🔍 Verifying update persistence...');
+      const maxVerificationAttempts = 3;
+      let verificationSuccess = false;
+      
+      for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
+        try {
+          // Small delay to allow for database consistency
+          Utilities.sleep(200 * attempt);
+          
+          // Force fresh read from database
+          clearExecutionUserInfoCache();
+          const verifiedUserInfo = findUserByIdFresh(requestUserId);
+          
+          if (verifiedUserInfo && verifiedUserInfo.spreadsheetId === filteredUpdateData.spreadsheetId) {
+            debugLog('✅ Update verification successful on attempt ' + attempt);
+            verificationSuccess = true;
+            break;
+          } else {
+            warnLog('⚠️ Update verification failed on attempt ' + attempt + ':', {
+              expected: filteredUpdateData.spreadsheetId,
+              actual: verifiedUserInfo ? verifiedUserInfo.spreadsheetId : 'null',
+              userInfo: !!verifiedUserInfo
+            });
+          }
+        } catch (verificationError) {
+          warnLog('⚠️ Update verification error on attempt ' + attempt + ':', verificationError.message);
+        }
+      }
+      
+      if (!verificationSuccess) {
+        errorLog('❌ CRITICAL: Update verification failed after ' + maxVerificationAttempts + ' attempts');
+        return {
+          status: 'error',
+          message: 'データベース更新の検証に失敗しました。管理者にお問い合わせください。'
+        };
+      }
     }
     
     return {

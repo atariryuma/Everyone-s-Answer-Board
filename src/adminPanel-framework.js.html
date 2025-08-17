@@ -2403,14 +2403,36 @@ window.HistoryManager = {
     } catch (error) {
       console.error('❌ History restore failed:', error);
       
-      // Provide more specific error messages to user
+      // Enhanced error handling with rollback capability
       let errorMessage = '❌ 設定復元に失敗しました';
+      let shouldAttemptRollback = false;
+      
       if (error.message?.includes('Unable to parse range') || error.message?.includes('Invalid range')) {
         errorMessage = '❌ シート名の形式に問題があります。管理者にご連絡ください。';
       } else if (error.message?.includes('spreadsheet') || error.message?.includes('spreadsheetId')) {
         errorMessage = '❌ スプレッドシートへのアクセスに失敗しました。権限を確認してください。';
+        shouldAttemptRollback = true;
       } else if (error.message?.includes('sheet') || error.message?.includes('sheetName')) {
         errorMessage = '❌ 指定されたシートが見つかりません。';
+      } else if (error.message?.includes('verification failed')) {
+        errorMessage = '❌ データベース更新の検証に失敗しました。しばらく待ってから再試行してください。';
+        shouldAttemptRollback = true;
+      }
+      
+      // Attempt rollback if appropriate
+      if (shouldAttemptRollback) {
+        try {
+          console.log('🔄 Attempting rollback...');
+          // Reload current status to restore previous state
+          if (typeof loadStatus === 'function') {
+            await loadStatus(true);
+            console.log('✅ Rollback completed');
+            errorMessage += ' 前の状態に復元しました。';
+          }
+        } catch (rollbackError) {
+          console.warn('⚠️ Rollback failed:', rollbackError);
+          errorMessage += ' 手動でページを再読み込みしてください。';
+        }
       }
       
       if (typeof showMessage === 'function') {
@@ -2763,12 +2785,12 @@ window.HistoryManager = {
   },
 
   /**
-   * Verify spreadsheet consistency after restoration - SIMPLIFIED
-   * Uses unified API approach - no additional server calls needed
+   * Verify spreadsheet consistency after restoration - ENHANCED
+   * Ensures both client and server state are properly synchronized
    */
   async _verifySpreadsheetConsistency(targetSpreadsheetId) {
     try {
-      console.log('🔍 Verifying spreadsheet consistency (simplified):', {
+      console.log('🔍 Verifying spreadsheet consistency (enhanced):', {
         target: targetSpreadsheetId,
         checkingCurrentStatus: !!window.currentStatus?.userInfo
       });
@@ -2782,10 +2804,20 @@ window.HistoryManager = {
           actual: currentSpreadsheetId
         });
         
-        // Simply force-correct the current status (server update already completed)
+        // Force-correct the current status in all relevant locations
         if (window.currentStatus?.userInfo) {
           console.log('🔧 Correcting currentStatus with target spreadsheet ID');
           window.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
+          
+          // Also update spreadsheet URL if available
+          if (window.currentStatus.userInfo.spreadsheetUrl) {
+            const correctedUrl = window.currentStatus.userInfo.spreadsheetUrl.replace(
+              /\/spreadsheets\/d\/[a-zA-Z0-9-_]+/,
+              `/spreadsheets/d/${targetSpreadsheetId}`
+            );
+            window.currentStatus.userInfo.spreadsheetUrl = correctedUrl;
+            console.log('🔗 Spreadsheet URL also corrected');
+          }
         }
         
         // Also update AdminPanel state if available
@@ -2794,7 +2826,15 @@ window.HistoryManager = {
           window.AdminPanel.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
         }
         
-        console.log('✅ Client-side spreadsheet ID corrected');
+        // Force-refresh the spreadsheet button URL
+        const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+        if (spreadsheetBtn) {
+          const correctedUrl = `https://docs.google.com/spreadsheets/d/${targetSpreadsheetId}/edit`;
+          spreadsheetBtn.href = correctedUrl;
+          console.log('🔗 Spreadsheet button URL updated');
+        }
+        
+        console.log('✅ Multi-layer spreadsheet ID correction completed');
       } else {
         console.log('✅ Spreadsheet consistency verified');
       }
