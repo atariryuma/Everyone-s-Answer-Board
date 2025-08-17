@@ -987,6 +987,12 @@ window.validateConfig = validateConfig;
 window.updateConfigButtons = updateConfigButtons;
 // Populate configuration (minimal implementation)
 function populateConfig(cfg) {
+  // 履歴復元中はスキップ
+  if (window._historyRestoreInProgress || window._historyColumnSelections) {
+    console.log('🛡️ populateConfig: 履歴復元中のため処理をスキップしました');
+    return;
+  }
+  
   // Try to use the full implementation if available
   if (typeof window._fullPopulateConfig === 'function') {
     try {
@@ -2301,7 +2307,7 @@ window.HistoryManager = {
         if (nameSelectEl) nameSelectEl.value = item.nameHeader;
       }
       
-      // 1.5. 列選択の復元（履歴データから）
+      // 1.5. 列選択の復元（履歴データから）- 強化版
       console.log('🔄 Restoring column selections from history');
       
       // 復元する列選択データを準備し、保護用に保存
@@ -2315,40 +2321,25 @@ window.HistoryManager = {
       // グローバルに保存してAI推定による上書きを防ぐ
       window._historyColumnSelections = columnSelections;
       
-      // 回答列の復元
-      if (columnSelections.opinionHeader) {
-        const opSel = document.getElementById('opinionHeader');
-        if (opSel) {
-          opSel.value = columnSelections.opinionHeader;
-          console.log(`✅ Opinion header restored: ${columnSelections.opinionHeader}`);
+      // DOM要素への値設定を関数化して確実に実行
+      const setSelectValue = (elementId, value, description) => {
+        if (!value) return;
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.value = value;
+          // change イベントを発火して、UIの更新をトリガー
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log(`✅ ${description} restored: ${value}`);
+        } else {
+          console.warn(`⚠️ Element not found: ${elementId}`);
         }
-      }
+      };
       
-      // 名前列の復元
-      if (columnSelections.nameColumn) {
-        const nameSelect = document.getElementById('name-column');
-        if (nameSelect) {
-          nameSelect.value = columnSelections.nameColumn;
-          console.log(`✅ Name column restored: ${columnSelections.nameColumn}`);
-        }
-      }
-      
-      // その他の列も復元
-      if (columnSelections.classColumn) {
-        const classSelect = document.getElementById('class-column');
-        if (classSelect) {
-          classSelect.value = columnSelections.classColumn;
-          console.log(`✅ Class column restored: ${columnSelections.classColumn}`);
-        }
-      }
-      
-      if (columnSelections.reasonHeader) {
-        const reasonSelect = document.getElementById('reasonHeader');
-        if (reasonSelect) {
-          reasonSelect.value = columnSelections.reasonHeader;
-          console.log(`✅ Reason header restored: ${columnSelections.reasonHeader}`);
-        }
-      }
+      // 各列の復元を実行
+      setSelectValue('opinionHeader', columnSelections.opinionHeader, 'Opinion header');
+      setSelectValue('name-column', columnSelections.nameColumn, 'Name column');
+      setSelectValue('class-column', columnSelections.classColumn, 'Class column');
+      setSelectValue('reasonHeader', columnSelections.reasonHeader, 'Reason header');
       
       // 2. 名前表示設定復元（showNamesベース）
       const showNamesCheckbox = document.getElementById('show-names');
@@ -2399,6 +2390,9 @@ window.HistoryManager = {
       // 5. UI完全更新
       await this._refreshAfterRestore();
       
+      // 復元完了後に少し待ってからフラグをクリア（UI反映完了を待つ）
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Success message with specific details
       if (typeof showMessage === 'function') {
         const sheetInfo = item.sheetName ? `シート「${item.sheetName}」` : '設定';
@@ -2432,11 +2426,20 @@ window.HistoryManager = {
         errorStack: error.stack
       });
     } finally {
-      // AI列判定スキップフラグをクリア
-      if (window._historyRestoreInProgress) {
-        window._historyRestoreInProgress = false;
-        console.log('🛡️ AI列判定スキップフラグをクリアしました');
-      }
+      // 遅延してフラグをクリア（UI更新が完全に完了するのを待つ）
+      setTimeout(() => {
+        // AI列判定スキップフラグをクリア
+        if (window._historyRestoreInProgress) {
+          window._historyRestoreInProgress = false;
+          console.log('🛡️ AI列判定スキップフラグをクリアしました');
+        }
+        
+        // 履歴列選択保護フラグもクリア
+        if (window._historyColumnSelections) {
+          window._historyColumnSelections = null;
+          console.log('🛡️ 履歴列選択保護フラグをクリアしました');
+        }
+      }, 1000); // 1秒後にクリア
       
       // 重複実行防止フラグをリセット
       this._isRestoreInProgress = false;
@@ -2599,8 +2602,8 @@ window.HistoryManager = {
    */
   async _refreshAfterRestore() {
     const refreshSteps = [
-      { name: 'データ再読込', fn: () => typeof loadData === 'function' ? loadData() : Promise.resolve() },
-      { name: '列判定更新', fn: () => typeof updateColumnDetection === 'function' ? updateColumnDetection() : Promise.resolve() }
+      { name: 'データ再読込', fn: () => typeof loadData === 'function' ? loadData() : Promise.resolve() }
+      // 列判定更新は履歴復元時はスキップ（復元した設定値を保持するため）
     ];
     
     // Execute each step with individual error handling
@@ -2818,11 +2821,21 @@ window.HistoryManager = {
       if (window.AdminPanel?.currentStatus) {
         window.AdminPanel.currentStatus.publishedSheetName = sheetName;
         window.AdminPanel.currentStatus.activeSheetName = sheetName;
+        
+        // config オブジェクトが存在しない場合は作成
+        if (!window.AdminPanel.currentStatus.config) {
+          window.AdminPanel.currentStatus.config = {};
+        }
+        window.AdminPanel.currentStatus.config.publishedSheetName = sheetName;
       }
       
-      // UI表示を更新
+      // UI表示を更新（エラーハンドリング付き）
       if (typeof updateTopicText === 'function') {
-        updateTopicText(window.AdminPanel?.currentStatus);
+        try {
+          updateTopicText(window.AdminPanel?.currentStatus);
+        } catch (error) {
+          console.warn('⚠️ updateTopicText failed during published sheet info update:', error);
+        }
       }
       
     } catch (error) {

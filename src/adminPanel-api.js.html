@@ -1053,11 +1053,20 @@ function handleSheetDetailsSuccess(details) {
     
     if (details.guessedConfig) {
       // 履歴復元中はAI列判定をスキップ
-      if (window._historyRestoreInProgress) {
+      if (window._historyRestoreInProgress || window._historyColumnSelections) {
         console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
+        console.log('🔍 Skip flags:', {
+          historyRestoreInProgress: window._historyRestoreInProgress,
+          historyColumnSelections: !!window._historyColumnSelections
+        });
       } else {
         // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
         setTimeout(() => {
+          // 遅延実行時にも再度チェック
+          if (window._historyRestoreInProgress || window._historyColumnSelections) {
+            console.log('🛡️ 遅延実行時: 履歴復元中のため、AI列判定をスキップしました');
+            return;
+          }
           populateConfig(details.guessedConfig);
           
           // Enhanced auto-detection success message with specifics

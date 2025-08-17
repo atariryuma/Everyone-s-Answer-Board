@@ -820,6 +820,12 @@ function _fullPopulateHeaderOptions(headers) {
 function _fullPopulateConfig(cfg) {
   if (!cfg) return;
   
+  // 履歴復元中はスキップ
+  if (window._historyRestoreInProgress || window._historyColumnSelections) {
+    console.log('🛡️ _fullPopulateConfig: 履歴復元中のため処理をスキップしました');
+    return;
+  }
+  
   // Throttle function calls to prevent spam
   if (window.populateConfigRunning) {
     return;
