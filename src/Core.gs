@@ -1561,13 +1561,20 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     debugLog('getPublishedSheetData: formattedData length=%s', formattedData.length);
     debugLog('getPublishedSheetData: formattedData content=%s', JSON.stringify(formattedData));
 
-    // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
+    // ボードのタイトルを設定された質問文から取得（優先）、フォールバックで実際のヘッダー
     let headerTitle = publishedSheetName || '今日のお題';
-    if (mappedIndices.opinionHeader !== undefined) {
+    
+    // 1. 設定された質問文（opinionHeader）を優先的に使用
+    if (mainHeaderName && mainHeaderName.trim()) {
+      headerTitle = mainHeaderName;
+      debugLog('getPublishedSheetData: Using configured opinion header as title: "%s"', headerTitle);
+    } 
+    // 2. フォールバック: 実際のスプレッドシートヘッダーから取得
+    else if (mappedIndices.opinionHeader !== undefined) {
       for (var actualHeader in headerIndices) {
         if (headerIndices[actualHeader] === mappedIndices.opinionHeader) {
           headerTitle = actualHeader;
-          debugLog('getPublishedSheetData: Using actual header as title: "%s"', headerTitle);
+          debugLog('getPublishedSheetData: Fallback to actual header as title: "%s"', headerTitle);
           break;
         }
       }
