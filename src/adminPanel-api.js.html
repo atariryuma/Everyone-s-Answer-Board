@@ -993,8 +993,8 @@ function loadStatus(bypassCache = false) {
   return loadStatusInProgress;
 }
 
-// Load sheet configuration for selected sheet
-function loadConfigForSelected() {
+// Load sheet configuration for selected sheet with retry mechanism
+function loadConfigForSelected(retryCount = 0, maxRetries = 3) {
   if (!selectedSheet) {
     logWarn('No sheet selected for config loading');
     return Promise.reject(new Error('No sheet selected for config loading'));
@@ -1006,9 +1006,32 @@ function loadConfigForSelected() {
     return Promise.reject(new Error('Missing required data for loadConfigForSelected'));
   }
   
-  return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
+  // Sanitize sheet name for API call
+  const sanitizedSheetName = selectedSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
+  
+  console.log(`🔄 Loading config for sheet: "${selectedSheet}" (sanitized: "${sanitizedSheetName}"), attempt ${retryCount + 1}/${maxRetries + 1}`);
+  
+  return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, sanitizedSheetName)
     .then(handleSheetDetailsSuccess)
-    .catch(handleSheetDetailsError);
+    .catch(error => {
+      console.warn(`❌ loadConfigForSelected attempt ${retryCount + 1} failed:`, error);
+      
+      // Check if this is a sheet parsing error and we have retries left
+      if (retryCount < maxRetries && (
+        error.message?.includes('Unable to parse range') ||
+        error.message?.includes('範囲を解析できません') ||
+        error.message?.includes('Invalid range')
+      )) {
+        const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+        console.log(`⏳ Retrying in ${retryDelay}ms...`);
+        
+        return new Promise(resolve => setTimeout(resolve, retryDelay))
+          .then(() => loadConfigForSelected(retryCount + 1, maxRetries));
+      }
+      
+      // If no more retries or different error, use original error handler
+      return handleSheetDetailsError(error);
+    });
 }
 
 // Handle successful sheet details loading
