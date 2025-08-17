@@ -994,24 +994,32 @@ function loadStatus(bypassCache = false) {
 }
 
 // Load sheet configuration for selected sheet with retry mechanism
-function loadConfigForSelected(retryCount = 0, maxRetries = 3) {
-  if (!selectedSheet) {
+function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride = null, retryCount = 0, maxRetries = 3) {
+  // 履歴復元中は処理をスキップ
+  if (window._historyRestoreInProgress || window._historyColumnSelections) {
+    console.log('🛡️ loadConfigForSelected: 履歴復元中のため処理をスキップしました');
+    return Promise.resolve({ success: false, message: 'Skipped during history restore' });
+  }
+  
+  const targetSheet = sheetNameOverride || selectedSheet;
+  if (!targetSheet) {
     logWarn('No sheet selected for config loading');
     return Promise.reject(new Error('No sheet selected for config loading'));
   }
   
-  if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+  const targetSpreadsheetId = spreadsheetIdOverride || (currentStatus?.userInfo?.spreadsheetId);
+  if (!targetSpreadsheetId) {
     logError('Missing required data for loadConfigForSelected');
     showMessage('スプレッドシートの情報が見つかりません。', 'error');
     return Promise.reject(new Error('Missing required data for loadConfigForSelected'));
   }
   
-  // Sanitize sheet name for API call
-  const sanitizedSheetName = selectedSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
+  // Sanitize sheet name for API call (already sanitized from caller, but double-check)
+  const sanitizedSheetName = targetSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
   
-  console.log(`🔄 Loading config for sheet: "${selectedSheet}" (sanitized: "${sanitizedSheetName}"), attempt ${retryCount + 1}/${maxRetries + 1}`);
+  console.log(`🔄 Loading config for sheet: "${targetSheet}" (sanitized: "${sanitizedSheetName}"), attempt ${retryCount + 1}/${maxRetries + 1}`);
   
-  return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, sanitizedSheetName)
+  return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', targetSpreadsheetId, sanitizedSheetName)
     .then(handleSheetDetailsSuccess)
     .catch(error => {
       console.warn(`❌ loadConfigForSelected attempt ${retryCount + 1} failed:`, error);
@@ -1026,7 +1034,7 @@ function loadConfigForSelected(retryCount = 0, maxRetries = 3) {
         console.log(`⏳ Retrying in ${retryDelay}ms...`);
         
         return new Promise(resolve => setTimeout(resolve, retryDelay))
-          .then(() => loadConfigForSelected(retryCount + 1, maxRetries));
+          .then(() => loadConfigForSelected(sheetNameOverride, spreadsheetIdOverride, retryCount + 1, maxRetries));
       }
       
       // If no more retries or different error, use original error handler

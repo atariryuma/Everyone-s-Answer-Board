@@ -1992,15 +1992,26 @@ function handleSheetSelectionChange(event) {
     if (newSelectedSheet) {
       console.log('📋 Loading config for sheet:', newSelectedSheet);
 
+      // 履歴復元中は loadConfigForSelected をスキップ
+      if (window._historyRestoreInProgress || window._historyColumnSelections) {
+        console.log('🛡️ 履歴復元中のため、シート設定読み込みをスキップしました');
+        updateUIForSelectedSheet();
+        return;
+      }
+
       // 基本検証
       if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
         console.error('スプレッドシート情報が見つかりません');
         return;
       }
 
+      // シート名をサニタイズしてからAPI呼び出し
+      const sanitizedSheetName = newSelectedSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
+      console.log(`🔄 Sanitized sheet name: "${newSelectedSheet}" → "${sanitizedSheetName}"`);
+
       // アクティブシートの列データを取得して列選択を更新
       const effectiveId = _resolveSpreadsheetIdForApi(currentStatus);
-      loadConfigForSelected(newSelectedSheet, effectiveId)
+      loadConfigForSelected(sanitizedSheetName, effectiveId)
         .then(result => {
           console.log('✅ シート設定読み込み完了:', result);
           updateUIForSelectedSheet();
