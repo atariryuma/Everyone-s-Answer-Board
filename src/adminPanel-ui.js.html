@@ -719,27 +719,37 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       lastSelectedSheetName = normalizedActiveSheet;
       logDebug('✅ Active sheet set successfully:', normalizedActiveSheet);
     } else {
-      // 改善されたフォールバック処理
-      console.warn('⚠️ Active sheet not found in options, attempting intelligent fallback:', {
+      // 強化されたインテリジェントフォールバック処理
+      logDebug('🔍 Active sheet not found in options, attempting intelligent fallback:', {
         activeSheetName: normalizedActiveSheet,
         availableOptions: availableOptions.map(opt => opt.value)
       });
       
       let fallbackSheet = null;
       
-      // 1. 部分一致を試行（履歴復元で役立つ）
-      const partialMatch = availableOptions.find(option => 
-        option.value && normalizedActiveSheet && 
-        (option.value.includes(normalizedActiveSheet) || normalizedActiveSheet.includes(option.value))
+      // 1. 完全一致を再試行（正規化後）
+      const exactMatch = availableOptions.find(option => 
+        _normalizeSheetName(option.value) === _normalizeSheetName(normalizedActiveSheet)
       );
       
-      if (partialMatch) {
-        fallbackSheet = partialMatch.value;
-        console.log('✅ Found partial match:', fallbackSheet);
-      } else if (availableOptions.length > 1) {
-        // 2. 最初の有効なオプションを選択
-        fallbackSheet = availableOptions[1].value;
-        console.log('✅ Using first available option:', fallbackSheet);
+      if (exactMatch) {
+        fallbackSheet = exactMatch.value;
+        console.log('✅ Found exact match after normalization:', fallbackSheet);
+      } else {
+        // 2. 部分一致を試行（履歴復元で役立つ）
+        const partialMatch = availableOptions.find(option => 
+          option.value && normalizedActiveSheet && 
+          (option.value.includes(normalizedActiveSheet) || normalizedActiveSheet.includes(option.value))
+        );
+        
+        if (partialMatch) {
+          fallbackSheet = partialMatch.value;
+          console.log('✅ Found partial match:', fallbackSheet);
+        } else if (availableOptions.length > 1) {
+          // 3. 最初の有効なオプションを選択
+          fallbackSheet = availableOptions[1].value;
+          console.log('✅ Using first available option:', fallbackSheet);
+        }
       }
       
       if (fallbackSheet) {
@@ -2709,6 +2719,19 @@ function getActiveResourceUrls(status) {
   });
 
   return urls;
+}
+
+/**
+ * シート名の正規化処理
+ */
+function _normalizeSheetName(sheetName) {
+  if (!sheetName) return '';
+  
+  return sheetName
+    .trim()
+    .replace(/\s+/g, ' ')  // 複数の空白を1つに
+    .replace(/[\u3000]/g, ' ')  // 全角空白を半角に
+    .toLowerCase();
 }
 
 function updateSystemStatusDisplay(status) {

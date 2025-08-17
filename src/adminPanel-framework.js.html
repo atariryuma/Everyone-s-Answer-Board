@@ -2820,37 +2820,8 @@ window.HistoryManager = {
           actual: currentSpreadsheetId
         });
         
-        // Force-correct the current status in all relevant locations
-        if (window.currentStatus?.userInfo) {
-          console.log('🔧 Correcting currentStatus with target spreadsheet ID');
-          window.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
-          
-          // Also update spreadsheet URL if available
-          if (window.currentStatus.userInfo.spreadsheetUrl) {
-            const correctedUrl = window.currentStatus.userInfo.spreadsheetUrl.replace(
-              /\/spreadsheets\/d\/[a-zA-Z0-9-_]+/,
-              `/spreadsheets/d/${targetSpreadsheetId}`
-            );
-            window.currentStatus.userInfo.spreadsheetUrl = correctedUrl;
-            console.log('🔗 Spreadsheet URL also corrected');
-          }
-        }
-        
-        // Also update AdminPanel state if available
-        if (window.AdminPanel?.currentStatus?.userInfo) {
-          console.log('🔧 Correcting AdminPanel.currentStatus');
-          window.AdminPanel.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
-        }
-        
-        // Force-refresh the spreadsheet button URL
-        const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
-        if (spreadsheetBtn) {
-          const correctedUrl = `https://docs.google.com/spreadsheets/d/${targetSpreadsheetId}/edit`;
-          spreadsheetBtn.href = correctedUrl;
-          console.log('🔗 Spreadsheet button URL updated');
-        }
-        
-        console.log('✅ Multi-layer spreadsheet ID correction completed');
+        // 統合的な不整合修正処理
+        await this._correctSpreadsheetIdInconsistency(targetSpreadsheetId, currentSpreadsheetId);
       } else {
         console.log('✅ Spreadsheet consistency verified');
       }
@@ -2987,6 +2958,9 @@ window.HistoryManager = {
       // ドラフト状態の視覚的インジケーターを表示
       this._showDraftModeIndicator();
       
+      // ドラフト状態をUIボタンに反映
+      this._updateDraftModeUI();
+      
       // フラグを元に戻す
       window._historyRestoreInProgress = originalRestoreFlag;
       window._historyColumnSelections = originalColumnSelections;
@@ -3027,36 +3001,116 @@ window.HistoryManager = {
   },
   
   /**
-   * ドラフトモード状態インジケーターの表示
+   * 統合されたドラフトモード状態インジケーターの表示
    */
   _showDraftModeIndicator() {
-    // 既存のインジケーターを削除
-    const existingIndicator = document.getElementById('draft-mode-indicator');
-    if (existingIndicator) {
-      existingIndicator.remove();
+    const indicatorSection = document.getElementById('draft-mode-indicator-section');
+    if (indicatorSection) {
+      indicatorSection.classList.remove('hidden');
+      console.log('✅ 統合ドラフトインジケーターを表示しました');
     }
     
-    // 新しいインジケーターを作成
-    const indicator = document.createElement('div');
-    indicator.id = 'draft-mode-indicator';
-    indicator.className = 'fixed top-4 right-4 bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded-md shadow-lg z-50';
-    indicator.innerHTML = `
-      <div class="flex items-center space-x-2">
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-        </svg>
-        <span class="text-sm font-medium">📝 ドラフト編集中</span>
-      </div>
-    `;
+    // ドラフト機能ヘルプも表示
+    const helpSection = document.getElementById('draft-help-section');
+    if (helpSection) {
+      helpSection.classList.remove('hidden');
+      console.log('💡 ドラフトヘルプセクションを表示しました');
+    }
+  },
+  
+  /**
+   * ドラフトモード状態インジケーターの非表示
+   */
+  _hideDraftModeIndicator() {
+    const indicatorSection = document.getElementById('draft-mode-indicator-section');
+    if (indicatorSection) {
+      indicatorSection.classList.add('hidden');
+      console.log('✅ 統合ドラフトインジケーターを非表示にしました');
+    }
     
-    document.body.appendChild(indicator);
+    // ドラフト機能ヘルプも非表示
+    const helpSection = document.getElementById('draft-help-section');
+    if (helpSection) {
+      helpSection.classList.add('hidden');
+      console.log('💡 ドラフトヘルプセクションを非表示にしました');
+    }
     
-    // 一定時間後に自動で非表示
-    setTimeout(() => {
-      if (indicator && indicator.parentNode) {
-        indicator.remove();
+    // ドラフトモードUIを通常に戻す
+    this._updateDraftModeUI(false);
+  },
+  
+  /**
+   * ドラフトモード状態に合わせてUIを更新
+   */
+  _updateDraftModeUI(isDraftMode = null) {
+    if (isDraftMode === null) {
+      isDraftMode = window._draftModeActive;
+    }
+    
+    const saveButton = document.getElementById('save-publish-btn');
+    const saveButtonText = document.getElementById('save-publish-text');
+    
+    if (saveButton && saveButtonText) {
+      if (isDraftMode) {
+        saveButtonText.textContent = 'ドラフトを保存して公開';
+        saveButton.className = saveButton.className.replace('btn-primary', 'btn-warning');
+        console.log('📝 UIをドラフトモードに変更');
+      } else {
+        saveButtonText.textContent = '設定を保存して公開';
+        saveButton.className = saveButton.className.replace('btn-warning', 'btn-primary');
+        console.log('✅ UIを通常モードに変更');
       }
-    }, 5000);
+    }
+  },
+
+  /**
+   * スプレッドシートID不整合の統合的修正処理
+   */
+  async _correctSpreadsheetIdInconsistency(targetSpreadsheetId, currentSpreadsheetId) {
+    try {
+      console.log('🔧 統合的なスプレッドシートID修正を開始');
+      
+      // 1. グローバル状態の修正
+      if (window.currentStatus?.userInfo) {
+        console.log('🔧 Correcting currentStatus with target spreadsheet ID');
+        window.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
+        
+        // Also update spreadsheet URL if available
+        if (window.currentStatus.userInfo.spreadsheetUrl) {
+          const correctedUrl = window.currentStatus.userInfo.spreadsheetUrl.replace(
+            /\/spreadsheets\/d\/[a-zA-Z0-9-_]+/,
+            `/spreadsheets/d/${targetSpreadsheetId}`
+          );
+          window.currentStatus.userInfo.spreadsheetUrl = correctedUrl;
+          console.log('🔗 Spreadsheet URL also corrected');
+        }
+      }
+      
+      // 2. AdminPanel状態の修正
+      if (window.AdminPanel?.currentStatus?.userInfo) {
+        console.log('🔧 Correcting AdminPanel.currentStatus');
+        window.AdminPanel.currentStatus.userInfo.spreadsheetId = targetSpreadsheetId;
+      }
+      
+      // 3. UI要素の修正
+      const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+      if (spreadsheetBtn) {
+        const correctedUrl = `https://docs.google.com/spreadsheets/d/${targetSpreadsheetId}/edit`;
+        spreadsheetBtn.href = correctedUrl;
+        console.log('🔗 Spreadsheet button URL updated');
+      }
+      
+      // 4. キャッシュクリア
+      if (typeof clearAllSpreadsheetCache === 'function') {
+        await clearAllSpreadsheetCache();
+        console.log('🧹 キャッシュクリア完了');
+      }
+      
+      console.log('✅ 統合的なスプレッドシートID修正が完了');
+      
+    } catch (error) {
+      console.error('❌ スプレッドシートID修正エラー:', error);
+    }
   },
 
   _escapeHtml(text) {

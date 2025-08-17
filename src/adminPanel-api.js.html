@@ -1790,10 +1790,9 @@ function saveAndPublish() {
     // ドラフトモードを終了
     window._draftModeActive = false;
     
-    // ドラフトインジケーターを削除
-    const draftIndicator = document.getElementById('draft-mode-indicator');
-    if (draftIndicator) {
-      draftIndicator.remove();
+    // ドラフトインジケーターを非表示
+    if (window.HistoryManager && typeof window.HistoryManager._hideDraftModeIndicator === 'function') {
+      window.HistoryManager._hideDraftModeIndicator();
     }
     
     console.log('✅ ドラフトモードが終了しました。公開を実行します。');
