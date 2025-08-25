@@ -23,7 +23,8 @@
       "Bash(clasp pull:*)",
       "Bash(clasp push:*)",
       "Bash(sed:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(for:*)"
     ],
     "deny": [],
     "ask": []

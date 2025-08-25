@@ -4656,3 +4656,271 @@ function getCurrentUserEmail() {
     return '';
   }
 }
+
+/**
+ * シンプル・確実な管理者権限検証（3重チェック）
+ * メールアドレス + ユーザーID + アクティブ状態の照合
+ * @param {string} userId - 検証するユーザーのID
+ * @returns {boolean} 管理者権限がある場合は true、そうでなければ false
+ */
+function verifyAdminAccess(userId) {
+  try {
+    // 基本的な引数チェック
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      warnLog('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
+      return false;
+    }
+
+    // 現在のログインユーザーのメールアドレスを取得
+    const activeUserEmail = getCurrentUserEmail();
+    if (!activeUserEmail) {
+      warnLog('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
+      return false;
+    }
+
+    debugLog('verifyAdminAccess: 認証開始', { userId, activeUserEmail });
+
+    // データベースからユーザー情報を取得
+    let userFromDb = null;
+    
+    // まずは通常のキャッシュ付き検索を試行
+    userFromDb = findUserById(userId);
+    
+    // 見つからない場合は強制フレッシュで再試行
+    if (!userFromDb) {
+      debugLog('verifyAdminAccess: 強制フレッシュで再検索中...');
+      userFromDb = fetchUserFromDatabase('userId', userId, { forceFresh: true });
+    }
+
+    // ユーザーが見つからない場合は認証失敗
+    if (!userFromDb) {
+      warnLog('verifyAdminAccess: ユーザーが見つかりません:', { 
+        userId, 
+        activeUserEmail 
+      });
+      return false;
+    }
+
+    // 3重チェック実行
+    // 1. メールアドレス照合
+    const dbEmail = String(userFromDb.adminEmail || '').toLowerCase().trim();
+    const currentEmail = String(activeUserEmail).toLowerCase().trim();
+    const isEmailMatched = dbEmail && currentEmail && dbEmail === currentEmail;
+
+    // 2. ユーザーID照合（念のため）
+    const isUserIdMatched = String(userFromDb.userId) === String(userId);
+
+    // 3. アクティブ状態確認
+    const isActive = (userFromDb.isActive === true || 
+                     userFromDb.isActive === 'true' || 
+                     String(userFromDb.isActive).toLowerCase() === 'true');
+
+    debugLog('verifyAdminAccess: 3重チェック結果:', {
+      isEmailMatched,
+      isUserIdMatched,
+      isActive,
+      dbEmail,
+      currentEmail
+    });
+
+    // 3つの条件すべてが満たされた場合のみ認証成功
+    if (isEmailMatched && isUserIdMatched && isActive) {
+      infoLog('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
+      return true;
+    } else {
+      warnLog('❌ verifyAdminAccess: 認証失敗', {
+        userId,
+        activeUserEmail,
+        failures: {
+          email: !isEmailMatched,
+          userId: !isUserIdMatched,
+          active: !isActive
+        }
+      });
+      return false;
+    }
+
+  } catch (error) {
+    errorLog('❌ verifyAdminAccess: 認証処理エラー:', error.message);
+    return false;
+  }
+}
+
+/**
+ * ユーザーの最終アクセス時刻のみを更新（設定は保護）
+ * @param {string} userId - 更新対象のユーザーID
+ */
+function updateUserLastAccess(userId) {
+  try {
+    if (!userId) {
+      warnLog('updateUserLastAccess: userIdが指定されていません');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    debugLog('最終アクセス時刻を更新:', userId, now);
+
+    // lastAccessedAtフィールドのみを更新（他の設定は保護）
+    updateUser(userId, { lastAccessedAt: now });
+
+  } catch (error) {
+    errorLog('updateUserLastAccess エラー:', error.message);
+  }
+}
+
+/**
+ * クイックスタートセットアップを実行する（AdminPanelから呼び出される）
+ * @param {string} requestUserId - リクエスト元のユーザーID（省略可能）
+ * @returns {Object} セットアップ結果
+ */
+function executeQuickStartSetup(requestUserId) {
+  try {
+    // 既存のquickStartSetup関数を呼び出す
+    return quickStartSetup(requestUserId);
+  } catch (error) {
+    logError(error, 'executeQuickStartSetup', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
+    return {
+      status: 'error',
+      message: 'クイックスタートセットアップに失敗しました: ' + error.message
+    };
+  }
+}
+
+/**
+ * クライアントサイドのエラーをサーバーサイドに報告する
+ * @param {Object} errorInfo - エラー情報オブジェクト
+ * @returns {Object} 報告結果
+ */
+function reportClientError(errorInfo) {
+  try {
+    // エラー情報の検証
+    if (!errorInfo || typeof errorInfo !== 'object') {
+      return { status: 'error', message: 'Invalid error info' };
+    }
+
+    // クライアントエラーとしてログに記録
+    const errorMessage = `[CLIENT ERROR] ${errorInfo.message || 'Unknown error'}`;
+    const errorContext = {
+      url: errorInfo.url || 'unknown',
+      userAgent: errorInfo.userAgent || 'unknown',
+      timestamp: errorInfo.timestamp || new Date().toISOString(),
+      stack: errorInfo.stack || '',
+      additional: errorInfo.additional || {}
+    };
+
+    // エラーの重要度を判定
+    const severity = errorInfo.severity || ERROR_SEVERITY.MEDIUM;
+    
+    // ログに記録
+    logError(
+      new Error(errorMessage), 
+      'CLIENT_ERROR', 
+      severity, 
+      ERROR_CATEGORIES.USER_INPUT,
+      errorContext
+    );
+
+    return { 
+      status: 'success', 
+      message: 'Error reported successfully',
+      errorId: Utilities.getUuid()
+    };
+  } catch (error) {
+    errorLog('reportClientError failed:', error.message);
+    return { 
+      status: 'error', 
+      message: 'Failed to report error: ' + error.message 
+    };
+  }
+}
+
+/**
+ * デバッグ用：現在のユーザー状態を詳細に確認する
+ * @returns {Object} デバッグ情報
+ */
+function debugCurrentUser() {
+  try {
+    const result = {
+      timestamp: new Date().toISOString(),
+      currentEmail: null,
+      databaseId: null,
+      searches: [],
+      users: []
+    };
+
+    // 1. 現在のユーザーメール取得
+    try {
+      result.currentEmail = getCurrentUserEmail();
+    } catch (error) {
+      result.emailError = error.message;
+    }
+
+    // 2. データベースID確認
+    try {
+      const props = PropertiesService.getScriptProperties();
+      result.databaseId = props.getProperty('DATABASE_SPREADSHEET_ID');
+    } catch (error) {
+      result.databaseError = error.message;
+    }
+
+    if (result.currentEmail) {
+      // 3. 各検索方法を試行
+      const searchMethods = [
+        { name: 'findUserByEmail', fn: () => findUserByEmail(result.currentEmail) },
+        { name: 'fetchUserFromDatabase', fn: () => fetchUserFromDatabase('adminEmail', result.currentEmail) },
+        { name: 'fetchUserFromDatabase_forceFresh', fn: () => fetchUserFromDatabase('adminEmail', result.currentEmail, { forceFresh: true }) }
+      ];
+
+      for (const method of searchMethods) {
+        try {
+          const user = method.fn();
+          result.searches.push({
+            method: method.name,
+            success: !!user,
+            user: user ? {
+              userId: user.userId,
+              adminEmail: user.adminEmail,
+              isActive: user.isActive,
+              hasSpreadsheetId: !!user.spreadsheetId
+            } : null
+          });
+        } catch (error) {
+          result.searches.push({
+            method: method.name,
+            success: false,
+            error: error.message
+          });
+        }
+      }
+
+      // 4. 全ユーザー一覧から該当ユーザーを探す
+      try {
+        const allUsers = getAllUsers();
+        result.totalUsers = allUsers ? allUsers.length : 0;
+        if (allUsers && allUsers.length > 0) {
+          const matchingUsers = allUsers.filter(user => 
+            user.adminEmail && user.adminEmail.toLowerCase() === result.currentEmail.toLowerCase()
+          );
+          result.matchingUsers = matchingUsers.length;
+          result.users = matchingUsers.map(user => ({
+            userId: user.userId,
+            adminEmail: user.adminEmail,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
+            lastAccessedAt: user.lastAccessedAt
+          }));
+        }
+      } catch (error) {
+        result.getAllUsersError = error.message;
+      }
+    }
+
+    return { status: 'success', debug: result };
+  } catch (error) {
+    return { 
+      status: 'error', 
+      message: error.message,
+      stack: error.stack 
+    };
+  }
+}
