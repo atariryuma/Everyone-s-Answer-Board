@@ -1,0 +1,29 @@
+{
+  "timeZone": "Asia/Tokyo",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/forms",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.container.ui"
+  ],
+  "webapp": {
+    "executeAs": "USER_ACCESSING",
+    "access": "ANYONE"
+  },
+  "filePushOrder": [
+    "services/ErrorService.gs",
+    "services/CacheService.gs",
+    "services/GASWrapper.gs",
+    "services/DatabaseService.gs",
+    "services/SpreadsheetService.gs",
+    "services/CoreFunctionsService.gs",
+    "services/APIService.gs",
+    "migration/bridge.gs",
+    "main-new.gs"
+  ]
+}

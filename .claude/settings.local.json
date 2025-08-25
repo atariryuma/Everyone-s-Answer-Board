@@ -16,7 +16,9 @@
       "Bash(do echo:*)",
       "Bash(for file in AdminPanel.html SharedSecurityHeaders.html adminPanel-core.js.html)",
       "Bash(head:*)",
-      "Bash(for file in src/*.html)"
+      "Bash(for file in src/*.html)",
+      "Bash(jest:*)",
+      "Bash(npx jest:*)"
     ],
     "deny": [],
     "ask": []
