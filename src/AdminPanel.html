@@ -33,14 +33,15 @@
   <!-- Core JavaScript Libraries (must be loaded first) -->
   <?!= include('ClientOptimizer'); ?>
   <?!= include('UnifiedCache.js'); ?>
-  <?!= include('adminPanel-framework.js.html'); ?>
-  <?!= include('adminPanel-api.js.html'); ?>
+  <?!= include('adminPanel-framework.js'); ?>
+  <?!= include('adminPanel-api.js'); ?>
   <script>
   // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
   (function() {
     try {
       const originalLog = console.log;
       const originalWarn = console.warn;
+      const originalInfo = console.info;
       // Read from injected DEBUG_MODE or SYSTEM_CONSTANTS fallback
       const isDebug = !!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE));
 
@@ -69,7 +70,18 @@
         /All interactive elements/i,
         /draft recovery/i,
         /getCurrentUserStatus/i,
-        /authenticated.*userId/i
+        /authenticated.*userId/i,
+        /INFO\[Logger\]/i,
+        /DEBUG\]/i,
+        /✅/i,
+        /🔧/i,
+        /🚀/i,
+        /📞/i,
+        /🔍/i,
+        /🎉/i,
+        /🔐/i,
+        /🛡️/i,
+        /🔄/i
       ];
 
       const shouldFilter = (msg) => {
@@ -98,6 +110,15 @@
         if (!isDebug && !msgStr.includes('⚠️') && !msgStr.includes('🚨')) return;
         try { originalWarn.apply(console, args); } catch (_) {}
       };
+
+      console.info = function(...args) {
+        const msgStr = args.join(' ');
+        // Filter known noisy info messages
+        if (shouldFilter(msgStr)) return;
+        // In production mode: suppress all info unless explicitly critical
+        if (!isDebug && !msgStr.includes('⚠️') && !msgStr.includes('🚨') && !msgStr.includes('CRITICAL')) return;
+        try { originalInfo.apply(console, args); } catch (_) {}
+      };
     } catch (e) {
       // Fail open: keep default console behavior
     }
@@ -118,6 +139,7 @@
       'Unexpected token',
       'Failed to execute \'write\' on \'Document\'',
       'SyntaxError: Failed to execute \'write\'',
+      'Unexpected end of input',
       'Identifier \'userId\' has already been declared',
       'mae_html_user_bin_i18n_mae_html_user',
       'warden_bin_i18n_warden',
@@ -134,7 +156,9 @@
       'showFormConfigModal is not defined',
       'toggleSection is not defined',
       'function not yet loaded',
-      'function not available'
+      'function not available',
+      'openAppSetupPage is not defined',
+      'runHeaderGuessing is not defined'
     ];
     
     // Critical errors that need intervention
@@ -1099,7 +1123,7 @@
       <!-- アプリ設定リンク -->
 <? if (isDeployUser) { ?>
       <div id="app-setup-link" class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
-        <button type="button" onclick="openAppSetupPage()" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
+        <button type="button" id="app-setup-btn" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
           <div class="flex items-center">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
@@ -1247,16 +1271,24 @@
   <?!= include('backendProgressSync.js'); ?>
   <!-- Error handling system must be loaded first -->
   <?!= include('errorMessages.js'); ?>
-  <?!= include('adminPanel-core.js.html'); ?>
-  <?!= include('adminPanel-ui.js.html'); ?>
-  <?!= include('adminPanel-status.js.html'); ?>
-  <?!= include('adminPanel-forms.js.html'); ?>
-  <?!= include('adminPanel-events.js.html'); ?>
-  <?!= include('adminPanel.js.html'); ?>
+  <?!= include('adminPanel-core.js'); ?>
+  <?!= include('adminPanel-ui.js'); ?>
+  <?!= include('adminPanel-status.js'); ?>
+  <?!= include('adminPanel-forms.js'); ?>
+  <?!= include('adminPanel-events.js'); ?>
+  <?!= include('adminPanel.js'); ?>
 
   <script>
     // 管理者モーダルの初期化
     document.addEventListener('DOMContentLoaded', function() {
+      // アプリ設定ボタンのイベントリスナー追加
+      const appSetupBtn = document.getElementById('app-setup-btn');
+      if (appSetupBtn && typeof openAppSetupPage === 'function') {
+        appSetupBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          openAppSetupPage();
+        });
+      }
       if (window.sharedModals) {
         window.sharedModals.loadAdminModals();
       }
