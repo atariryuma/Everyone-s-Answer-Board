@@ -13,7 +13,9 @@
       "Bash(echo:*)",
       "Bash(for file in adminPanel-*.js.html)",
       "Bash(for file in adminPanel*.js.html)",
-      "Bash(do echo:*)"
+      "Bash(do echo:*)",
+      "Bash(for file in AdminPanel.html SharedSecurityHeaders.html adminPanel-core.js.html)",
+      "Bash(head:*)"
     ],
     "deny": [],
     "ask": []
