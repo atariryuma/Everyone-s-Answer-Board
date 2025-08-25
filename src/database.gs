@@ -1078,6 +1078,31 @@ function fixUserDataConsistency(userId) {
 }
 
 /**
+ * セキュアなデータベースIDを取得
+ * @returns {string|null} データベーススプレッドシートID
+ */
+function getSecureDatabaseId() {
+  try {
+    const props = getResilientScriptProperties();
+    if (!props) {
+      warnLog('getSecureDatabaseId: PropertiesService取得に失敗しました');
+      return null;
+    }
+    
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+    if (!dbId || dbId.trim() === '') {
+      warnLog('getSecureDatabaseId: DATABASE_SPREADSHEET_IDが設定されていません');
+      return null;
+    }
+    
+    return dbId.trim();
+  } catch (error) {
+    errorLog('getSecureDatabaseId error:', error.message);
+    return null;
+  }
+}
+
+/**
  * メールアドレスでユーザー検索
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報
