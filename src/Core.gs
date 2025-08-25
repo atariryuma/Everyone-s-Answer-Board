@@ -367,7 +367,13 @@ function clearActiveSheet(requestUserId) {
       throw new Error('ユーザー情報が見つかりません。');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    let configJson = {};
+    try {
+      configJson = JSON.parse(userInfo.configJson || '{}');
+    } catch (parseError) {
+      warnLog('ConfigJson parse error in stopPublishing:', parseError.message);
+      configJson = {};
+    }
 
     debugLog('🔍 公開停止前の設定:', {
       publishedSheetName: configJson.publishedSheetName,
@@ -861,7 +867,13 @@ function getOpinionHeaderSafely(userId, sheetName) {
       return 'お題';
     }
 
-    const config = JSON.parse(userInfo.configJson || '{}');
+    let config = {};
+    try {
+      config = JSON.parse(userInfo.configJson || '{}');
+    } catch (parseError) {
+      warnLog('ConfigJson parse error in verifyUserAccessInternal:', parseError.message);
+      config = {};
+    }
     const sheetConfigKey = 'sheet_' + (config.publishedSheetName || sheetName);
     const sheetConfig = config[sheetConfigKey] || {};
 
@@ -909,7 +921,13 @@ function registerNewUser(adminEmail) {
   if (existingUser) {
     // 既存ユーザーの場合は最小限の更新のみ（設定は保護）
     userId = existingUser.userId;
-    const existingConfig = JSON.parse(existingUser.configJson || '{}');
+    let existingConfig = {};
+    try {
+      existingConfig = JSON.parse(existingUser.configJson || '{}');
+    } catch (parseError) {
+      warnLog('ConfigJson parse error in createOrUpdateUser:', parseError.message);
+      existingConfig = {};
+    }
 
     // 最終アクセス時刻とアクティブ状態のみ更新（設定は保護）
     updateUser(userId, {
@@ -1382,7 +1400,13 @@ function verifyUserAccess(requestUserId) {
 
   // 管理者かどうかを確認
   if (activeUserEmail !== requestedUserInfo.adminEmail) {
-    const config = JSON.parse(requestedUserInfo.configJson || '{}');
+    let config = {};
+    try {
+      config = JSON.parse(requestedUserInfo.configJson || '{}');
+    } catch (parseError) {
+      warnLog('ConfigJson parse error in getSheetDetails:', parseError.message);
+      config = {};
+    }
     if (config.appPublished === true) {
       debugLog(`✅ 公開ボード閲覧許可: ${activeUserEmail} -> ${requestUserId}`);
       return;
@@ -2374,7 +2398,13 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    let configJson = {};
+    try {
+      configJson = JSON.parse(userInfo.configJson || '{}');
+    } catch (parseError) {
+      warnLog('ConfigJson parse error in getUserIdByEmailAddress:', parseError.message);
+      configJson = {};
+    }
 
     if (!configJson.publishedSpreadsheetId || !configJson.publishedSheetName) {
       return {
@@ -6221,7 +6251,13 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     }
 
     // === ステップ2: 設定データの取得と自動修復 ===
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    var configJson = {};
+    try {
+      configJson = JSON.parse(userInfo.configJson || '{}');
+    } catch (parseError) {
+      warnLog('ConfigJson parse error, using empty config:', parseError.message);
+      configJson = {};
+    }
 
     // --- 統一された自動修復システム ---
     const healingResult = performAutoHealing(userInfo, configJson, currentUserId);

@@ -1452,8 +1452,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Update layout on resize
 window.addEventListener('resize', function() {
-  if (typeof debounce === 'function') {
-    debounce(adjustLayout, 250, 'layout-resize')();
+  if (typeof TimingManager !== 'undefined' && TimingManager.debounce) {
+    TimingManager.debounce(adjustLayout, 'layout-resize', 250);
+  } else if (window.sharedUtilities && window.sharedUtilities.debounce) {
+    window.sharedUtilities.debounce(adjustLayout, 'layout-resize', 250);
   } else {
     // Fallback without debounce
     adjustLayout();

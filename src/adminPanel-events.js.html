@@ -492,7 +492,13 @@ function setupExternalLinkHandlers() {
   
   // Open form
   if (elements['open-form-btn']) {
-    elements['open-form-btn'].addEventListener('click', openForm);
+    elements['open-form-btn'].addEventListener('click', function() {
+      if (typeof openForm === 'function') {
+        openForm();
+      } else {
+        console.warn('openForm function not available yet');
+      }
+    });
   }
   
   // Digital citizenship
