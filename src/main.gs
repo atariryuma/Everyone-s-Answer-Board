@@ -621,15 +621,7 @@ function validateSystemDependencies() {
       errors.push(`PropertiesService エラー: ${propsError.message}`);
     }
 
-    // resilientExecutor の基本存在確認のみ
-    try {
-      if (typeof resilientExecutor === 'undefined') {
-        errors.push('resilientExecutor が定義されていません');
-      }
-      // 詳細機能テストは削除（パフォーマンス改善）
-    } catch (executorError) {
-      errors.push(`resilientExecutor エラー: ${executorError.message}`);
-    }
+    // resilientExecutor 関連の診断は削除されました（ファイル削除済み）
 
     // secretManager の詳細診断は削除（パフォーマンス改善）
     // 必要に応じて後で実行
