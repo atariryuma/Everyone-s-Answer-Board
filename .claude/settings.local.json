@@ -24,7 +24,9 @@
       "Bash(clasp push:*)",
       "Bash(sed:*)",
       "Bash(git ls-tree:*)",
-      "Bash(for:*)"
+      "Bash(for:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)"
     ],
     "deny": [],
     "ask": []

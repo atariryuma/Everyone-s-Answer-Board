@@ -9730,8 +9730,8 @@ try {
   console.error('Error creating StudyQuestApp instance:', error);
   const container = document.getElementById('answers');
   if (container) {
-    const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
-    container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
+    const msg = (error.message || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    container.innerHTML = `<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ${msg}</div>`;
   }
 }
 </script>

@@ -215,47 +215,49 @@
   // =============================================================================
   // STATE MANAGER - Single Definition
   // =============================================================================
-  function AdminPanelStateManager() {
-    this.state = {
-      currentStatus: null,
-      selectedSheet: '',
-      isLoading: false,
-      debugMode: window.DEBUG_MODE || false
-    };
-    this.subscribers = new Map();
-  }
-
-  AdminPanelStateManager.prototype.setState = function(key, value) {
-    this.state[key] = value;
-    this.notifySubscribers(key, value);
-  };
-
-  AdminPanelStateManager.prototype.subscribe = function(key, callback) {
-    if (!this.subscribers.has(key)) {
-      this.subscribers.set(key, []);
+  class AdminPanelStateManager {
+    constructor() {
+      this.state = {
+        currentStatus: null,
+        selectedSheet: '',
+        isLoading: false,
+        debugMode: window.DEBUG_MODE || false
+      };
+      this.subscribers = new Map();
     }
-    this.subscribers.get(key).push(callback);
-  };
 
-  AdminPanelStateManager.prototype.notifySubscribers = function(key, value) {
-    const callbacks = this.subscribers.get(key) || [];
-    callbacks.forEach(callback => {
-      try {
-        callback(value);
-      } catch (error) {
-        logError('Subscriber callback error:', error);
+    setState(key, value) {
+      this.state[key] = value;
+      this.notifySubscribers(key, value);
+    }
+
+    subscribe(key, callback) {
+      if (!this.subscribers.has(key)) {
+        this.subscribers.set(key, []);
       }
-    });
-  };
+      this.subscribers.get(key).push(callback);
+    }
 
-  AdminPanelStateManager.prototype.getState = function() {
-    return Object.assign({}, this.state); // ES5 compatible spread
-  };
+    notifySubscribers(key, value) {
+      const callbacks = this.subscribers.get(key) || [];
+      callbacks.forEach(callback => {
+        try {
+          callback(value);
+        } catch (error) {
+          logError('Subscriber callback error:', error);
+        }
+      });
+    }
 
-  AdminPanelStateManager.prototype.updateStatus = function(data) {
-    this.setState('currentStatus', data);
-    this.setState('isLoading', false);
-  };
+    getState() {
+      return { ...this.state }; // ES6 spread operator
+    }
+
+    updateStatus(data) {
+      this.setState('currentStatus', data);
+      this.setState('isLoading', false);
+    }
+  }
 
   // Initialize state manager
   window.AdminPanel.stateManager = new AdminPanelStateManager();
@@ -285,7 +287,7 @@
   function initializeUserId() {
     logDebug('🔐 Initializing UserId');
     return AdminPanel_callGAS('getCurrentUserStatus')
-      .then(function(response) {
+      .then(response => {
         if (response && response.status === 'success') {
           window.AdminPanel.currentUserId = response.userInfo.userId;
           window.AdminPanel.userEmail = response.userInfo.adminEmail;
@@ -302,7 +304,7 @@
   // =============================================================================
   function initializeDomainStatus() {
     AdminPanel_callGAS('getSystemDomainInfo')
-      .then(function(info) {
+      .then(info => {
         if (info && info.adminDomain && !info.error) {
           if (info.isDomainMatch) {
             updateDomainDisplay('match', info.adminDomain, 'セキュアアクセス有効');
@@ -359,7 +361,7 @@
   // =============================================================================
   function loadStatus() {
     return AdminPanel_callGAS('getInitialData')
-      .then(function(response) {
+      .then(response => {
         // getInitialDataはstatusフィールドを持たないので、responseが存在すれば成功とみなす
         if (response && (response.userInfo || response.config)) {
           window.AdminPanel.state.updateStatus(response);
@@ -376,7 +378,7 @@
 
   function createBoard() {
     return AdminPanel_callGAS('executeQuickStartSetup')
-      .then(function(response) {
+      .then(response => {
         if (response && response.status === 'success') {
           logInfo('✅ Board created successfully');
           return response;
@@ -797,7 +799,7 @@
     
     // Initialize user authentication with fallback
     initializeUserId()
-      .then(function(response) {
+      .then(response => {
         logInfo('Admin panel initialized');
         updateUIStatus(response);
         // Initialize domain security status
@@ -810,14 +812,14 @@
         
         // Try emergency diagnostic
         AdminPanel_callGAS('emergencyDiagnostic')
-          .then(function(diagnostic) {
+          .then(diagnostic => {
             displayEmergencyDiagnostic(diagnostic);
           })
-          .catch(function(diagError) {
+          .catch(diagError => {
             logError('Emergency diagnostic failed:', diagError);
           });
       })
-      .then(function(statusResponse) {
+      .then(statusResponse => {
         logDebug('Initial status loaded:', statusResponse);
         
         // Store spreadsheet ID and other essential data
@@ -969,13 +971,13 @@
   function runEmergencyTest() {
     logInfo('🔧 Running emergency test...');
     AdminPanel_callGAS('testCoreFunction')
-      .then(function(result) {
+      .then(result => {
         logInfo('Emergency test result:', result);
         alert('テスト結果をコンソールで確認してください');
       })
       .catch(function(error) {
         logError('Emergency test failed:', error);
-        alert('テストに失敗しました: ' + error);
+        alert(`テストに失敗しました: ${error}`);
       });
   }
   
@@ -983,17 +985,17 @@
     if (confirm('緊急セットアップを実行しますか？新しいユーザーが作成されます。')) {
       logInfo('🚑 Running emergency setup...');
       AdminPanel_callGAS('createEmergencyUser')
-        .then(function(result) {
+        .then(result => {
           if (result.status === 'success') {
             alert('緊急セットアップが完了しました。ページをリロードしてください。');
             location.reload();
           } else {
-            alert('緊急セットアップに失敗しました: ' + result.message);
+            alert(`緊急セットアップに失敗しました: ${result.message}`);
           }
         })
         .catch(function(error) {
           logError('Emergency setup failed:', error);
-          alert('緊急セットアップエラー: ' + error);
+          alert(`緊急セットアップエラー: ${error}`);
         });
     }
   }
