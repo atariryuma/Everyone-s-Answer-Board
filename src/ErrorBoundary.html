@@ -360,7 +360,7 @@
 
 <!-- サーバーサイドエラー表示部分 -->
 <? if (typeof title !== 'undefined' && title) { ?>
-<? var loginUrl = getWebAppUrl(); ?>
+<? var loginUrl = ScriptApp.getService().getUrl(); ?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
