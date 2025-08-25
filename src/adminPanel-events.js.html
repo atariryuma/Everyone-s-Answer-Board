@@ -516,7 +516,14 @@ function setupExternalLinkHandlers() {
   // Copy form URL
   var copyFormUrlBtn = document.getElementById('copy-form-url-btn');
   if (copyFormUrlBtn) {
-    copyFormUrlBtn.addEventListener('click', copyFormUrl);
+    copyFormUrlBtn.addEventListener('click', function() {
+      if (typeof copyFormUrl === 'function') {
+        copyFormUrl();
+      } else {
+        console.error('CRITICAL: copyFormUrl is not available');
+        showMessage('フォームURLをコピーできません。ページを再読み込みしてください。', 'warning');
+      }
+    });
   }
 }
 
