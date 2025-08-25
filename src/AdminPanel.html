@@ -24,6 +24,17 @@
   const __DEBUG_MODE_RAW__ = '<?= escapeJavaScript(shouldEnableDebugMode()) ?>';
   window.DEBUG_MODE = (__DEBUG_MODE_RAW__ === 'true' || __DEBUG_MODE_RAW__ === true);
   
+  // Minimal log suppression for production
+  if (!window.DEBUG_MODE) {
+    const originalLog = console.log;
+    console.log = function(...args) {
+      const msg = args.join(' ');
+      if (msg.match(/[✅🔧🛡️🔍🎉📞🔐🚀🔄]/)) return; // Suppress emoji logs
+      if (msg.includes('loaded successfully') || msg.includes('initialized')) return;
+      originalLog.apply(console, args);
+    };
+  }
+  
   // Basic function stubs to prevent errors
   window.openAppSetupPage = window.openAppSetupPage || function() { 
     console.warn('openAppSetupPage not yet loaded'); 
@@ -36,6 +47,9 @@
   };
   window.loadStatus = window.loadStatus || function() { 
     return Promise.resolve({ status: 'loading' }); 
+  };
+  window.addResource = window.addResource || function() { 
+    console.warn('addResource function not yet implemented'); 
   };
   </script>
 

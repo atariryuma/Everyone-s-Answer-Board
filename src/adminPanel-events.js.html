@@ -411,7 +411,7 @@ function setupResourceHandlers() {
   var resourceUrlInput = document.getElementById('resource-url-input');
   var initializeSettingsBtn = document.getElementById('initialize-settings-btn');
   
-  if (addResourceBtn) {
+  if (addResourceBtn && typeof addResource === 'function') {
     addResourceBtn.addEventListener('click', addResource);
   }
   
@@ -419,7 +419,9 @@ function setupResourceHandlers() {
     resourceUrlInput.addEventListener('keypress', function(e) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        addResource();
+        if (typeof addResource === 'function') {
+          addResource();
+        }
       }
     });
   }
