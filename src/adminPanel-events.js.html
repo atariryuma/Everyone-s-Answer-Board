@@ -40,8 +40,7 @@ function setupEventListeners() {
     'unpublish-board-btn': getCachedElement('unpublish-board-btn'),
     'delete-account-btn': getCachedElement('delete-account-btn'),
     'open-spreadsheet-btn': getCachedElement('open-spreadsheet-btn'),
-    'open-form-btn': getCachedElement('open-form-btn'),
-    'clear-history-btn': getCachedElement('clear-history-btn')
+    'open-form-btn': getCachedElement('open-form-btn')
   };
   
   
@@ -178,97 +177,6 @@ function setupEventListeners() {
         }
       );
     });
-  }
-  
-  // Clear history button - 直接取得で確実に処理
-  var clearHistoryBtn = document.getElementById('clear-history-btn');
-  if (clearHistoryBtn) {
-    clearHistoryBtn.addEventListener('click', function() {
-      console.log('🗑️ 履歴クリアボタンがクリックされました');
-      
-        if (typeof showConfirmationModal === 'function') {
-          showHistoryClearConfirmationModal(
-            '履歴削除の確認',
-            'すべての履歴を削除しますか？この操作は取り消せません。',
-            async function() {
-              
-              try {
-                // ローディング表示
-                showMessage('🔄 履歴をクリアしています...', 'info');
-                
-                // 1. クライアント側の履歴をクリア
-                localStorage.removeItem(HISTORY_STORAGE_KEY);
-                
-                // 2. サーバー側の履歴もクリア
-                if (typeof runGasWithUserId === 'function') {
-                  const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
-                  
-                  if (serverResponse && serverResponse.status === 'success') {
-                    showMessage('✅ すべての履歴をクリアしました', 'success');
-                  } else {
-                    console.warn('⚠️ サーバー側履歴のクリアに失敗:', (serverResponse && serverResponse.message) || 'Unknown error');
-                    showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
-                  }
-                } else {
-                  console.warn('⚠️ サーバー同期機能が利用できません');
-                  showMessage('⚠️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
-                }
-
-                // 3. 履歴テーブルを更新
-                if (typeof loadSimpleHistoryTable === 'function') {
-                  loadSimpleHistoryTable();
-                } else {
-                  console.warn('⚠️ loadSimpleHistoryTable関数が見つかりません');
-                }
-                
-              } catch (error) {
-                console.error('❌ 履歴クリアに失敗:', error);
-                showMessage('❌ 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
-              }
-            }
-          );
-        } else {
-          console.error('❌ showConfirmationModal関数が見つかりません');
-          // フォールバック: 直接確認
-          if (confirm('すべての履歴を削除しますか？この操作は取り消せません。')) {
-            (async function() {
-              try {
-                // ローディング表示
-                showMessage('🔄 履歴をクリアしています...', 'info');
-                
-                // 1. クライアント側の履歴をクリア
-                localStorage.removeItem(HISTORY_STORAGE_KEY);
-                
-                // 2. サーバー側の履歴もクリア
-                if (typeof runGasWithUserId === 'function') {
-                  const serverResponse = await runGasWithUserId('clearHistoryFromServerAPI', false);
-                  
-                  if (serverResponse && serverResponse.status === 'success') {
-                    showMessage('✅ すべての履歴をクリアしました', 'success');
-                  } else {
-                    console.warn('⚠️ サーバー側履歴のクリアに失敗（フォールバック）:', (serverResponse && serverResponse.message) || 'Unknown error');
-                    showMessage('⚠️ ローカル履歴はクリアされましたが、サーバー同期に失敗しました', 'warning');
-                  }
-                } else {
-                  console.warn('⚠️ サーバー同期機能が利用できません（フォールバック）');
-                  showMessage('⚠️ ローカル履歴のみクリアしました（サーバー同期不可）', 'warning');
-                }
-                
-                // 3. 履歴テーブルを更新
-                if (typeof loadSimpleHistoryTable === 'function') {
-                  loadSimpleHistoryTable();
-                }
-                
-              } catch (error) {
-                console.error('❌ 履歴クリアに失敗:', error);
-                showMessage('❌ 履歴クリア中にエラーが発生しました: ' + error.message, 'error');
-              }
-            })();
-          }
-        }
-    });
-  } else {
-    console.error('❌ clear-history-btnが見つかりません');
   }
   
   // クイックスタートボタンのイベントリスナー
@@ -743,20 +651,14 @@ function handleDeleteRequest() {
               window.gasOptimizer.clearCache();
             }
             if (window.localStorage) {
-              // 履歴キーを保護する選択的クリア
-              const historyKeys = ['answerBoardHistory', 'adminPanelHistory'];
               const allKeys = Object.keys(localStorage);
-              
               allKeys.forEach(key => {
-                if (!historyKeys.includes(key)) {
-                  try {
-                    localStorage.removeItem(key);
-                  } catch (e) {
-                    console.warn('⚠️ Failed to remove localStorage key:', key);
-                  }
+                try {
+                  localStorage.removeItem(key);
+                } catch (e) {
+                  console.warn('⚠️ Failed to remove localStorage key:', key);
                 }
               });
-              
             }
             if (window.sessionStorage) {
               window.sessionStorage.clear();
@@ -785,55 +687,6 @@ function handleDeleteRequest() {
         });
     }
   );
-}
-
-/**
- * Show history clear confirmation modal with appropriate button text
- * @param {string} title - Modal title
- * @param {string} message - Modal message
- * @param {Function} onConfirm - Confirmation callback
- */
-function showHistoryClearConfirmationModal(title, message, onConfirm) {
-  const modal = document.getElementById('confirmation-modal');
-  const titleElement = document.getElementById('modal-title');
-  const messageElement = document.getElementById('modal-message');
-  const confirmBtn = document.getElementById('modal-confirm-btn');
-  const cancelBtn = document.getElementById('modal-cancel-btn');
-  
-  if (modal && titleElement && messageElement && confirmBtn && cancelBtn) {
-    titleElement.textContent = title;
-    messageElement.textContent = message;
-    confirmBtn.textContent = '削除する';
-    cancelBtn.textContent = 'キャンセル';
-    
-    // Set up event handlers
-    const handleConfirm = () => {
-      modal.classList.add('hidden');
-      onConfirm();
-      cleanup();
-    };
-    
-    const handleCancel = () => {
-      modal.classList.add('hidden');
-      cleanup();
-    };
-    
-    const cleanup = () => {
-      confirmBtn.removeEventListener('click', handleConfirm);
-      cancelBtn.removeEventListener('click', handleCancel);
-    };
-    
-    confirmBtn.addEventListener('click', handleConfirm);
-    cancelBtn.addEventListener('click', handleCancel);
-    
-    // Show modal
-    modal.classList.remove('hidden');
-  } else {
-    console.warn('⚠️ Modal elements not found, using fallback');
-    if (confirm(`${title}\n\n${message}`)) {
-      onConfirm();
-    }
-  }
 }
 
 /**
