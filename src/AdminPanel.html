@@ -222,11 +222,16 @@
   function loadStatus() {
     return AdminPanel_callGAS('getInitialData')
       .then(function(response) {
-        if (response && response.status === 'success') {
+        // getInitialDataはstatusフィールドを持たないので、responseが存在すれば成功とみなす
+        if (response && (response.userInfo || response.config)) {
           window.AdminPanel.state.updateStatus(response);
           return response;
+        } else if (response && response.status === 'error') {
+          throw new Error(response.message || 'Failed to load status');
         } else {
-          throw new Error('Failed to load status');
+          // デフォルトで成功とみなす（データが返ってきた場合）
+          window.AdminPanel.state.updateStatus(response);
+          return response;
         }
       });
   }
@@ -279,24 +284,177 @@
   }
 
   // =============================================================================
+  // DATA SAVE FUNCTIONS - Database Operations
+  // =============================================================================
+  function saveSheetConfiguration() {
+    const sheetSelect = document.getElementById('sheet-select');
+    const nameColumn = document.getElementById('name-column');
+    const showNames = document.getElementById('show-names');
+    const showCounts = document.getElementById('show-counts');
+    
+    if (!sheetSelect || !sheetSelect.value) {
+      logError('シートが選択されていません');
+      return Promise.reject(new Error('シートを選択してください'));
+    }
+    
+    const config = {
+      nameHeader: nameColumn ? nameColumn.value : '',
+      displayMode: showNames && showNames.checked ? 'NAMED' : 'ANONYMOUS',
+      showReactionCounts: showCounts ? showCounts.checked : false
+    };
+    
+    const userId = window.AdminPanel.currentUserId;
+    const spreadsheetId = window.AdminPanel.currentSpreadsheetId || '';
+    const sheetName = sheetSelect.value;
+    
+    logDebug('Saving sheet configuration:', { userId, spreadsheetId, sheetName, config });
+    
+    return AdminPanel_callGAS('saveSheetConfig', userId, spreadsheetId, sheetName, config)
+      .then(response => {
+        if (response && response.success) {
+          logInfo('✅ 設定が保存されました');
+          return response;
+        } else {
+          throw new Error(response ? response.message : '設定の保存に失敗しました');
+        }
+      });
+  }
+  
+  function saveAndPublish() {
+    return saveSheetConfiguration()
+      .then(() => {
+        const userId = window.AdminPanel.currentUserId;
+        const sheetName = document.getElementById('sheet-select').value;
+        const spreadsheetId = window.AdminPanel.currentSpreadsheetId || '';
+        
+        return AdminPanel_callGAS('activateSheet', userId, spreadsheetId, sheetName);
+      })
+      .then(response => {
+        if (response && response.success) {
+          logInfo('✅ ボードが公開されました');
+          updateUIStatus(response);
+          return response;
+        } else {
+          throw new Error(response ? response.message : '公開に失敗しました');
+        }
+      });
+  }
+  
+  function setDisplayOptions(options) {
+    const userId = window.AdminPanel.currentUserId;
+    
+    return AdminPanel_callGAS('setDisplayOptions', userId, options)
+      .then(response => {
+        if (response && response.success) {
+          logInfo('✅ 表示オプションが更新されました');
+          return response;
+        } else {
+          throw new Error(response ? response.message : '表示オプションの更新に失敗しました');
+        }
+      });
+  }
+  
+  function loadSheetConfiguration(sheetName) {
+    const userId = window.AdminPanel.currentUserId;
+    const spreadsheetId = window.AdminPanel.currentSpreadsheetId || '';
+    
+    logDebug('Loading configuration for sheet:', sheetName);
+    
+    return AdminPanel_callGAS('getSheetDetails', userId, spreadsheetId, sheetName)
+      .then(response => {
+        if (response && response.config) {
+          // Update UI with loaded configuration
+          const nameColumn = document.getElementById('name-column');
+          const showNames = document.getElementById('show-names');
+          const showCounts = document.getElementById('show-counts');
+          
+          if (nameColumn && response.config.nameHeader) {
+            nameColumn.value = response.config.nameHeader;
+          }
+          
+          if (showNames) {
+            showNames.checked = response.config.displayMode === 'NAMED';
+          }
+          
+          if (showCounts) {
+            showCounts.checked = response.config.showReactionCounts === true;
+          }
+          
+          logInfo('✅ シート設定を読み込みました');
+          return response;
+        }
+        return response;
+      })
+      .catch(error => {
+        logError('Sheet configuration load failed:', error);
+        return null;
+      });
+  }
+  
+  function switchToSheet(sheetName) {
+    const userId = window.AdminPanel.currentUserId;
+    const spreadsheetId = window.AdminPanel.currentSpreadsheetId || '';
+    
+    return AdminPanel_callGAS('switchToSheet', userId, spreadsheetId, sheetName)
+      .then(response => {
+        if (response && response.success) {
+          logInfo('✅ シートを切り替えました');
+          loadSheetConfiguration(sheetName);
+          return response;
+        } else {
+          throw new Error(response ? response.message : 'シートの切り替えに失敗しました');
+        }
+      });
+  }
+
+  // =============================================================================
   // ESSENTIAL EVENT HANDLERS - Unified
   // =============================================================================
   function setupEssentialEventHandlers() {
-    // Board creation button
-    const createBoardBtn = document.getElementById('save-publish-btn');
-    if (createBoardBtn) {
-      createBoardBtn.addEventListener('click', function() {
-        createBoard().catch(error => logError('Create board failed:', error));
+    // Save and publish button
+    const savePublishBtn = document.getElementById('save-publish-btn');
+    if (savePublishBtn) {
+      savePublishBtn.addEventListener('click', function() {
+        saveAndPublish().catch(error => logError('Save and publish failed:', error));
       });
     }
 
-    // Sheet selection
+    // Sheet selection with auto-load configuration
     const sheetSelect = document.getElementById('sheet-select');
     if (sheetSelect) {
       sheetSelect.addEventListener('change', function() {
         const selectedSheet = this.value;
         window.AdminPanel.state.selectedSheet = selectedSheet;
         logDebug('Sheet selected:', selectedSheet);
+        
+        // Load configuration for selected sheet
+        if (selectedSheet) {
+          loadSheetConfiguration(selectedSheet);
+        }
+      });
+    }
+    
+    // Display options change handlers
+    const showNames = document.getElementById('show-names');
+    const showCounts = document.getElementById('show-counts');
+    
+    if (showNames) {
+      showNames.addEventListener('change', function() {
+        const options = {
+          displayMode: this.checked ? 'NAMED' : 'ANONYMOUS',
+          showReactionCounts: showCounts ? showCounts.checked : false
+        };
+        setDisplayOptions(options).catch(error => logError('Display options update failed:', error));
+      });
+    }
+    
+    if (showCounts) {
+      showCounts.addEventListener('change', function() {
+        const options = {
+          displayMode: showNames && showNames.checked ? 'NAMED' : 'ANONYMOUS',
+          showReactionCounts: this.checked
+        };
+        setDisplayOptions(options).catch(error => logError('Display options update failed:', error));
       });
     }
 
@@ -348,8 +506,9 @@
 
     // Update user info display
     if (statusData.userInfo) {
-      safeSetText('user-email-display', statusData.userInfo.adminEmail || '');
-      safeSetText('user-name-display', statusData.userInfo.userId || '');
+      safeSetText('info-admin-email', statusData.userInfo.adminEmail || '');
+      safeSetText('info-user-id', statusData.userInfo.userId || '');
+      safeSetText('header-domain-name-initial', statusData.userInfo.adminEmail ? statusData.userInfo.adminEmail.split('@')[1] : 'ドメイン確認中');
     }
 
     // Update form status
@@ -417,6 +576,30 @@
       })
       .then(function(statusResponse) {
         logDebug('Initial status loaded:', statusResponse);
+        
+        // Store spreadsheet ID and other essential data
+        if (statusResponse && statusResponse.userInfo) {
+          window.AdminPanel.currentSpreadsheetId = statusResponse.userInfo.spreadsheetId || '';
+          window.AdminPanel.currentUserId = statusResponse.userInfo.userId || window.AdminPanel.currentUserId;
+        }
+        
+        // Populate sheet dropdown
+        if (statusResponse && statusResponse.allSheets) {
+          const sheetSelect = document.getElementById('sheet-select');
+          if (sheetSelect) {
+            sheetSelect.innerHTML = '<option value="">シートを選択してください</option>';
+            statusResponse.allSheets.forEach(sheet => {
+              const option = document.createElement('option');
+              option.value = sheet.name;
+              option.textContent = sheet.name;
+              if (statusResponse.activeSheetName === sheet.name) {
+                option.selected = true;
+              }
+              sheetSelect.appendChild(option);
+            });
+          }
+        }
+        
         updateUIStatus(statusResponse);
       })
       .catch(function(error) {
@@ -1406,7 +1589,7 @@
   <!-- Backend progress sync system -->
   <?!= include('backendProgressSync.js.html'); ?>
   <!-- Error handling system must be loaded first -->
-  <!-- <?!= include('errorMessages.js.html'); ?> -->
+  <?!= include('errorMessages.js.html'); ?>
 
   <script>
     // 管理者モーダルの初期化
