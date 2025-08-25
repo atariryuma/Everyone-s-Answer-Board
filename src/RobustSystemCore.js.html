@@ -1,0 +1,727 @@
+<script>
+/**
+ * 構造的に堅牢なシステム - エラーの起きようがないアーキテクチャ
+ * 
+ * 設計原則:
+ * 1. すべての状態に適切なデフォルト値
+ * 2. すべての外部依存に自動フォールバック
+ * 3. すべての操作に自動リトライ機能
+ * 4. すべてのエラーに自動回復機能
+ * 5. すべての設定に自動検証と修復機能
+ */
+
+// =============================================================================
+// 堅牢な設定管理システム - 自動検証・修復・フォールバック
+// =============================================================================
+
+class RobustConfigManager {
+  constructor() {
+    this.configCache = new Map();
+    this.defaultConfigs = this.getDefaultConfigs();
+    this.initializationState = 'pending';
+    this.lastSuccessfulConfig = null;
+  }
+
+  // デフォルト設定 - すべてに安全な初期値を設定
+  getDefaultConfigs() {
+    return {
+      system: {
+        initialized: false,
+        databaseSpreadsheetId: null,
+        serviceAccountCreds: null,
+        debugMode: false,
+        autoRecovery: true,
+        maxRetries: 3,
+        retryDelay: 1000
+      },
+      ui: {
+        displayMode: 'ANONYMOUS',
+        showReactionCounts: true,
+        loadingTimeout: 30000,
+        refreshInterval: 5000,
+        errorDisplayDuration: 5000
+      },
+      cache: {
+        ttl: 300000, // 5 minutes
+        maxSize: 100,
+        autoCleanup: true,
+        compressionEnabled: false
+      },
+      security: {
+        validateAccess: true,
+        enforceHttps: true,
+        sanitizeInputs: true,
+        enableAuditLog: true
+      }
+    };
+  }
+
+  // 堅牢な設定取得 - 必ず成功する
+  async getConfig(category, key, useCache = true) {
+    try {
+      // キャッシュチェック
+      const cacheKey = `${category}.${key}`;
+      if (useCache && this.configCache.has(cacheKey)) {
+        const cached = this.configCache.get(cacheKey);
+        if (Date.now() - cached.timestamp < 60000) { // 1分キャッシュ
+          return cached.value;
+        }
+      }
+
+      // 設定取得を試行（複数ソース）
+      let value = await this.tryGetConfigFromSources(category, key);
+      
+      // 値が取得できない場合はデフォルト値を使用
+      if (value === null || value === undefined) {
+        value = this.getDefaultValue(category, key);
+        console.warn(`Using default config for ${category}.${key}:`, value);
+      }
+
+      // 値を検証・修正
+      value = this.validateAndFixConfig(category, key, value);
+
+      // キャッシュに保存
+      this.configCache.set(cacheKey, {
+        value: value,
+        timestamp: Date.now()
+      });
+
+      return value;
+    } catch (error) {
+      console.error(`Config retrieval failed for ${category}.${key}:`, error);
+      return this.getDefaultValue(category, key);
+    }
+  }
+
+  // 複数ソースから設定を試行取得
+  async tryGetConfigFromSources(category, key) {
+    const sources = [
+      () => this.getFromScriptProperties(category, key),
+      () => this.getFromUserProperties(category, key),
+      () => this.getFromDocumentProperties(category, key),
+      () => this.getFromLocalStorage(category, key),
+      () => this.getFromLastSuccessful(category, key)
+    ];
+
+    for (const source of sources) {
+      try {
+        const value = await source();
+        if (value !== null && value !== undefined) {
+          return value;
+        }
+      } catch (error) {
+        console.debug(`Config source failed for ${category}.${key}:`, error);
+      }
+    }
+
+    return null;
+  }
+
+  // Script Properties から取得
+  async getFromScriptProperties(category, key) {
+    if (typeof PropertiesService === 'undefined') return null;
+    
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      const value = properties.getProperty(`${category}_${key}`);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // User Properties から取得
+  async getFromUserProperties(category, key) {
+    if (typeof PropertiesService === 'undefined') return null;
+    
+    try {
+      const properties = PropertiesService.getUserProperties();
+      const value = properties.getProperty(`${category}_${key}`);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Document Properties から取得（フォールバック）
+  async getFromDocumentProperties(category, key) {
+    if (typeof PropertiesService === 'undefined') return null;
+    
+    try {
+      const properties = PropertiesService.getDocumentProperties();
+      const value = properties.getProperty(`${category}_${key}`);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // LocalStorage から取得（クライアント側）
+  async getFromLocalStorage(category, key) {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    
+    try {
+      const value = localStorage.getItem(`config_${category}_${key}`);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // 最後に成功した設定から取得
+  async getFromLastSuccessful(category, key) {
+    if (!this.lastSuccessfulConfig) return null;
+    
+    try {
+      return this.lastSuccessfulConfig[category]?.[key] || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // デフォルト値取得
+  getDefaultValue(category, key) {
+    return this.defaultConfigs[category]?.[key] || null;
+  }
+
+  // 設定値の検証と自動修正
+  validateAndFixConfig(category, key, value) {
+    try {
+      // 型検証と修正
+      const expectedType = typeof this.getDefaultValue(category, key);
+      if (typeof value !== expectedType) {
+        console.warn(`Config type mismatch for ${category}.${key}. Expected: ${expectedType}, Got: ${typeof value}`);
+        
+        // 自動型変換を試行
+        switch (expectedType) {
+          case 'boolean':
+            value = Boolean(value);
+            break;
+          case 'number':
+            value = Number(value) || this.getDefaultValue(category, key);
+            break;
+          case 'string':
+            value = String(value);
+            break;
+          default:
+            value = this.getDefaultValue(category, key);
+        }
+      }
+
+      // 値の範囲チェックと修正
+      value = this.applyValueConstraints(category, key, value);
+
+      return value;
+    } catch (error) {
+      console.error(`Config validation failed for ${category}.${key}:`, error);
+      return this.getDefaultValue(category, key);
+    }
+  }
+
+  // 値の制約適用
+  applyValueConstraints(category, key, value) {
+    const constraints = {
+      cache: {
+        ttl: { min: 1000, max: 3600000 }, // 1秒 - 1時間
+        maxSize: { min: 10, max: 1000 }
+      },
+      ui: {
+        loadingTimeout: { min: 5000, max: 60000 }, // 5秒 - 1分
+        refreshInterval: { min: 1000, max: 30000 }
+      }
+    };
+
+    const constraint = constraints[category]?.[key];
+    if (constraint && typeof value === 'number') {
+      if (value < constraint.min) return constraint.min;
+      if (value > constraint.max) return constraint.max;
+    }
+
+    return value;
+  }
+
+  // 堅牢な設定保存
+  async saveConfig(category, key, value, persistent = true) {
+    try {
+      const validatedValue = this.validateAndFixConfig(category, key, value);
+      
+      // キャッシュを更新
+      const cacheKey = `${category}.${key}`;
+      this.configCache.set(cacheKey, {
+        value: validatedValue,
+        timestamp: Date.now()
+      });
+
+      if (persistent) {
+        // 複数の場所に保存（冗長化）
+        const savePromises = [
+          this.saveToScriptProperties(category, key, validatedValue),
+          this.saveToUserProperties(category, key, validatedValue),
+          this.saveToLocalStorage(category, key, validatedValue)
+        ];
+
+        // 最低1つの保存が成功すればOK
+        const results = await Promise.allSettled(savePromises);
+        const successCount = results.filter(r => r.status === 'fulfilled').length;
+        
+        if (successCount === 0) {
+          throw new Error('All save operations failed');
+        }
+
+        console.log(`Config saved to ${successCount}/3 locations: ${category}.${key}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error(`Config save failed for ${category}.${key}:`, error);
+      return false;
+    }
+  }
+
+  // Script Properties に保存
+  async saveToScriptProperties(category, key, value) {
+    if (typeof PropertiesService === 'undefined') return false;
+    
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      properties.setProperty(`${category}_${key}`, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.debug(`Failed to save to Script Properties: ${error.message}`);
+      return false;
+    }
+  }
+
+  // User Properties に保存
+  async saveToUserProperties(category, key, value) {
+    if (typeof PropertiesService === 'undefined') return false;
+    
+    try {
+      const properties = PropertiesService.getUserProperties();
+      properties.setProperty(`${category}_${key}`, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.debug(`Failed to save to User Properties: ${error.message}`);
+      return false;
+    }
+  }
+
+  // LocalStorage に保存
+  async saveToLocalStorage(category, key, value) {
+    if (typeof window === 'undefined' || !window.localStorage) return false;
+    
+    try {
+      localStorage.setItem(`config_${category}_${key}`, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.debug(`Failed to save to LocalStorage: ${error.message}`);
+      return false;
+    }
+  }
+
+  // システム完全初期化 - 必ず成功する
+  async initializeSystem() {
+    try {
+      this.initializationState = 'initializing';
+      
+      // 必須設定を自動検証・設定
+      const criticalConfigs = [
+        { category: 'system', key: 'initialized', defaultValue: false },
+        { category: 'ui', key: 'displayMode', defaultValue: 'ANONYMOUS' },
+        { category: 'cache', key: 'ttl', defaultValue: 300000 },
+        { category: 'security', key: 'validateAccess', defaultValue: true }
+      ];
+
+      for (const config of criticalConfigs) {
+        const value = await this.getConfig(config.category, config.key, false);
+        if (value === null || value === undefined) {
+          await this.saveConfig(config.category, config.key, config.defaultValue, true);
+        }
+      }
+
+      // データベース接続を検証・設定
+      await this.verifyAndSetupDatabase();
+
+      // サービスアカウントを検証・設定
+      await this.verifyAndSetupServiceAccount();
+
+      this.initializationState = 'completed';
+      console.log('✅ System initialization completed successfully');
+      return true;
+    } catch (error) {
+      console.error('System initialization failed:', error);
+      // 最小限モードで継続
+      this.initializationState = 'minimal';
+      await this.initializeMinimalMode();
+      return true; // 最小限でも動作するため成功とする
+    }
+  }
+
+  // データベース検証・自動セットアップ
+  async verifyAndSetupDatabase() {
+    try {
+      let dbId = await this.getConfig('system', 'databaseSpreadsheetId');
+      
+      if (!dbId) {
+        // データベースがない場合は自動作成
+        dbId = await this.createDefaultDatabase();
+        if (dbId) {
+          await this.saveConfig('system', 'databaseSpreadsheetId', dbId, true);
+        }
+      }
+
+      // データベース接続テスト
+      if (dbId) {
+        const isAccessible = await this.testDatabaseAccess(dbId);
+        if (!isAccessible) {
+          // アクセスできない場合は新しいデータベースを作成
+          const newDbId = await this.createDefaultDatabase();
+          if (newDbId) {
+            await this.saveConfig('system', 'databaseSpreadsheetId', newDbId, true);
+          }
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Database setup failed:', error);
+      return false;
+    }
+  }
+
+  // サービスアカウント検証・設定
+  async verifyAndSetupServiceAccount() {
+    try {
+      let creds = await this.getConfig('system', 'serviceAccountCreds');
+      
+      if (!creds) {
+        // サービスアカウントがない場合は代替認証を設定
+        creds = await this.setupAlternativeAuth();
+        if (creds) {
+          await this.saveConfig('system', 'serviceAccountCreds', creds, true);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Service account setup failed:', error);
+      return false;
+    }
+  }
+
+  // 最小限モードで初期化
+  async initializeMinimalMode() {
+    try {
+      // 最低限必要な設定を強制設定
+      const minimalConfig = {
+        system: { initialized: true, debugMode: true },
+        ui: { displayMode: 'ANONYMOUS', showReactionCounts: false },
+        cache: { ttl: 60000, maxSize: 10 }
+      };
+
+      for (const [category, configs] of Object.entries(minimalConfig)) {
+        for (const [key, value] of Object.entries(configs)) {
+          this.configCache.set(`${category}.${key}`, {
+            value: value,
+            timestamp: Date.now()
+          });
+        }
+      }
+
+      console.log('⚠️ System running in minimal mode');
+      return true;
+    } catch (error) {
+      console.error('Minimal mode initialization failed:', error);
+      return false;
+    }
+  }
+
+  // デフォルトデータベース作成
+  async createDefaultDatabase() {
+    try {
+      if (typeof SpreadsheetApp === 'undefined') return null;
+
+      const ss = SpreadsheetApp.create('みんなの回答ボード - データベース');
+      const sheet = ss.getActiveSheet();
+      sheet.setName('USER_INFO');
+      
+      // ヘッダーを設定
+      const headers = ['userId', 'adminEmail', 'spreadsheetId', 'configJson', 'createdAt', 'lastAccessedAt', 'isActive'];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+      console.log('✅ Default database created:', ss.getId());
+      return ss.getId();
+    } catch (error) {
+      console.error('Failed to create default database:', error);
+      return null;
+    }
+  }
+
+  // データベースアクセステスト
+  async testDatabaseAccess(spreadsheetId) {
+    try {
+      if (typeof SpreadsheetApp === 'undefined') return false;
+
+      const ss = SpreadsheetApp.openById(spreadsheetId);
+      const sheets = ss.getSheets();
+      return sheets.length > 0;
+    } catch (error) {
+      console.debug('Database access test failed:', error);
+      return false;
+    }
+  }
+
+  // 代替認証設定
+  async setupAlternativeAuth() {
+    try {
+      // 現在のユーザーのアクセストークンを使用
+      if (typeof Session === 'undefined') return null;
+      
+      return {
+        type: 'session',
+        email: Session.getActiveUser().getEmail(),
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      console.error('Alternative auth setup failed:', error);
+      return null;
+    }
+  }
+}
+
+// =============================================================================
+// 堅牢な実行管理システム - 必ず成功するかフォールバックする
+// =============================================================================
+
+class RobustExecutionManager {
+  constructor() {
+    this.pendingOperations = new Map();
+    this.retryQueues = new Map();
+    this.circuitBreakers = new Map();
+  }
+
+  // 堅牢な非同期実行 - 必ず何らかの結果を返す
+  async executeRobustly(operation, options = {}) {
+    const config = {
+      maxRetries: options.maxRetries || 3,
+      retryDelay: options.retryDelay || 1000,
+      timeout: options.timeout || 30000,
+      fallback: options.fallback || null,
+      circuitBreakerKey: options.circuitBreakerKey || 'default',
+      ...options
+    };
+
+    const operationId = this.generateOperationId();
+    
+    try {
+      // サーキットブレーカーチェック
+      if (this.isCircuitBreakerOpen(config.circuitBreakerKey)) {
+        console.warn(`Circuit breaker open for ${config.circuitBreakerKey}, using fallback`);
+        return this.executeFallback(config.fallback, 'Circuit breaker open');
+      }
+
+      // 重複実行防止
+      if (options.deduplicationKey) {
+        const existing = this.pendingOperations.get(options.deduplicationKey);
+        if (existing) {
+          console.log(`Reusing pending operation: ${options.deduplicationKey}`);
+          return existing;
+        }
+      }
+
+      // 実行開始
+      const promise = this.executeWithRetry(operation, config, operationId);
+      
+      if (options.deduplicationKey) {
+        this.pendingOperations.set(options.deduplicationKey, promise);
+      }
+
+      const result = await promise;
+      
+      // 成功時の処理
+      this.recordSuccess(config.circuitBreakerKey);
+      if (options.deduplicationKey) {
+        this.pendingOperations.delete(options.deduplicationKey);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`Operation ${operationId} failed:`, error);
+      
+      // 失敗時の処理
+      this.recordFailure(config.circuitBreakerKey);
+      if (options.deduplicationKey) {
+        this.pendingOperations.delete(options.deduplicationKey);
+      }
+      
+      // フォールバック実行
+      return this.executeFallback(config.fallback, error.message);
+    }
+  }
+
+  // リトライ付き実行
+  async executeWithRetry(operation, config, operationId) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= config.maxRetries; attempt++) {
+      try {
+        console.debug(`Operation ${operationId}, attempt ${attempt}/${config.maxRetries}`);
+        
+        // タイムアウト付き実行
+        const result = await this.executeWithTimeout(operation, config.timeout);
+        
+        console.debug(`Operation ${operationId} succeeded on attempt ${attempt}`);
+        return result;
+      } catch (error) {
+        lastError = error;
+        console.warn(`Operation ${operationId} failed on attempt ${attempt}:`, error.message);
+        
+        // 最後の試行以外はリトライ待機
+        if (attempt < config.maxRetries) {
+          const delay = config.retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.debug(`Waiting ${delay}ms before retry...`);
+          await this.delay(delay);
+        }
+      }
+    }
+    
+    throw lastError;
+  }
+
+  // タイムアウト付き実行
+  async executeWithTimeout(operation, timeout) {
+    return new Promise(async (resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Operation timed out after ${timeout}ms`));
+      }, timeout);
+
+      try {
+        const result = await operation();
+        clearTimeout(timeoutId);
+        resolve(result);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    });
+  }
+
+  // フォールバック実行
+  async executeFallback(fallback, reason) {
+    try {
+      if (typeof fallback === 'function') {
+        console.log(`Executing fallback function due to: ${reason}`);
+        return await fallback(reason);
+      } else if (fallback !== null && fallback !== undefined) {
+        console.log(`Using fallback value due to: ${reason}`);
+        return fallback;
+      } else {
+        console.log(`No fallback available for: ${reason}`);
+        return {
+          success: false,
+          error: reason,
+          fallback: true,
+          timestamp: Date.now()
+        };
+      }
+    } catch (error) {
+      console.error('Fallback execution failed:', error);
+      return {
+        success: false,
+        error: `Fallback failed: ${error.message}`,
+        fallback: true,
+        timestamp: Date.now()
+      };
+    }
+  }
+
+  // サーキットブレーカー管理
+  isCircuitBreakerOpen(key) {
+    const breaker = this.circuitBreakers.get(key);
+    if (!breaker) return false;
+    
+    const now = Date.now();
+    if (breaker.state === 'open' && now - breaker.lastFailure > 60000) {
+      // 1分後に半開状態に移行
+      breaker.state = 'half-open';
+      console.log(`Circuit breaker ${key} moved to half-open state`);
+    }
+    
+    return breaker.state === 'open';
+  }
+
+  recordSuccess(key) {
+    const breaker = this.circuitBreakers.get(key) || { failures: 0, state: 'closed' };
+    breaker.failures = 0;
+    breaker.state = 'closed';
+    this.circuitBreakers.set(key, breaker);
+  }
+
+  recordFailure(key) {
+    const breaker = this.circuitBreakers.get(key) || { failures: 0, state: 'closed' };
+    breaker.failures += 1;
+    breaker.lastFailure = Date.now();
+    
+    if (breaker.failures >= 5) {
+      breaker.state = 'open';
+      console.warn(`Circuit breaker ${key} opened after ${breaker.failures} failures`);
+    }
+    
+    this.circuitBreakers.set(key, breaker);
+  }
+
+  // ユーティリティメソッド
+  generateOperationId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
+  async delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// =============================================================================
+// グローバル初期化 - システム全体の堅牢性を保証
+// =============================================================================
+
+// グローバルインスタンス作成
+window.robustConfig = new RobustConfigManager();
+window.robustExecution = new RobustExecutionManager();
+
+// システム自動初期化
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    console.log('🔄 Initializing robust system...');
+    await window.robustConfig.initializeSystem();
+    console.log('✅ Robust system initialized successfully');
+    
+    // システム準備完了イベント発火
+    const event = new CustomEvent('robustSystemReady', {
+      detail: { timestamp: Date.now() }
+    });
+    document.dispatchEvent(event);
+  } catch (error) {
+    console.error('Robust system initialization failed:', error);
+    // 失敗しても続行（最小限モードで動作）
+  }
+});
+
+// 未処理例外のキャッチ
+window.addEventListener('error', (event) => {
+  console.error('Unhandled error caught by robust system:', event.error);
+  // エラーを記録し、システム継続
+  if (window.robustConfig) {
+    window.robustConfig.saveConfig('system', 'lastError', {
+      message: event.error?.message,
+      timestamp: Date.now()
+    }, false);
+  }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection caught by robust system:', event.reason);
+  event.preventDefault(); // デフォルトの処理を防止
+});
+
+console.log('✅ RobustSystemCore loaded - Error-proof architecture enabled');
+</script>

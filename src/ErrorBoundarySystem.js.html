@@ -1,0 +1,623 @@
+<script>
+/**
+ * 包括的エラーバウンダリーシステム
+ * システム全体をエラーから保護し、自動復旧機能を提供
+ */
+
+// =============================================================================
+// グローバルエラーバウンダリー - すべてのエラーをキャッチ
+// =============================================================================
+
+class GlobalErrorBoundary {
+  constructor() {
+    this.errorCount = 0;
+    this.errorLog = [];
+    this.maxErrorCount = 10;
+    this.recoveryMode = false;
+    this.lastErrorTime = 0;
+    this.errorThreshold = 5000; // 5秒間に複数エラーで回復モード
+    
+    this.setupGlobalHandlers();
+  }
+
+  setupGlobalHandlers() {
+    // JavaScript エラー
+    window.addEventListener('error', (event) => {
+      this.handleError(event.error, 'JavaScript Error', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+      });
+    });
+
+    // Promise 拒否
+    window.addEventListener('unhandledrejection', (event) => {
+      this.handleError(event.reason, 'Unhandled Promise Rejection', {
+        promise: event.promise
+      });
+      event.preventDefault(); // デフォルトの処理を防止
+    });
+
+    // リソース読み込みエラー
+    window.addEventListener('error', (event) => {
+      if (event.target !== window) {
+        this.handleResourceError(event);
+      }
+    }, true);
+
+    // ネットワークエラー
+    window.addEventListener('online', () => {
+      console.log('🟢 Network connection restored');
+      this.attemptRecovery();
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('🔴 Network connection lost');
+      this.enterOfflineMode();
+    });
+  }
+
+  handleError(error, type, context = {}) {
+    const now = Date.now();
+    this.errorCount++;
+    
+    // エラーログに記録
+    const errorRecord = {
+      timestamp: now,
+      type: type,
+      error: error,
+      message: error?.message || error?.toString() || 'Unknown error',
+      stack: error?.stack || 'No stack trace',
+      context: context,
+      userAgent: navigator.userAgent,
+      url: window.location.href,
+      recoveryMode: this.recoveryMode
+    };
+    
+    this.errorLog.push(errorRecord);
+    
+    // 古いエラーログを削除（最新100件のみ保持）
+    if (this.errorLog.length > 100) {
+      this.errorLog.shift();
+    }
+    
+    console.error(`🚨 ${type}:`, error, context);
+    
+    // 短時間に多数のエラーが発生した場合の対処
+    if (now - this.lastErrorTime < this.errorThreshold) {
+      if (this.errorCount >= 5 && !this.recoveryMode) {
+        console.warn('⚠️ Multiple errors detected, entering recovery mode');
+        this.enterRecoveryMode();
+      }
+    } else {
+      // エラーカウンターをリセット
+      this.errorCount = 1;
+    }
+    
+    this.lastErrorTime = now;
+    
+    // エラーの自動修復を試行
+    this.attemptErrorRecovery(errorRecord);
+  }
+
+  handleResourceError(event) {
+    const target = event.target;
+    const resourceType = target.tagName.toLowerCase();
+    
+    console.warn(`🔴 Resource loading failed: ${resourceType}`, target.src || target.href);
+    
+    // リソースの自動復旧を試行
+    this.attemptResourceRecovery(target, resourceType);
+  }
+
+  enterRecoveryMode() {
+    this.recoveryMode = true;
+    console.log('🔧 Entering recovery mode');
+    
+    // 回復モードUI表示
+    this.showRecoveryInterface();
+    
+    // 自動回復を試行
+    setTimeout(() => this.attemptFullRecovery(), 2000);
+  }
+
+  attemptErrorRecovery(errorRecord) {
+    const error = errorRecord.error;
+    const message = errorRecord.message;
+    
+    // 特定のエラーパターンに対する自動修復
+    if (message.includes('script error') || message.includes('network error')) {
+      this.handleNetworkError();
+    } else if (message.includes('permission') || message.includes('access')) {
+      this.handlePermissionError();
+    } else if (message.includes('quota') || message.includes('limit')) {
+      this.handleQuotaError();
+    } else if (message.includes('syntax') || message.includes('unexpected token')) {
+      this.handleSyntaxError();
+    } else {
+      this.handleGenericError(errorRecord);
+    }
+  }
+
+  handleNetworkError() {
+    console.log('🔄 Attempting network error recovery...');
+    
+    // ネットワーク接続確認
+    if (navigator.onLine) {
+      // オンラインの場合、少し待って再試行
+      setTimeout(() => {
+        if (window.location.reload) {
+          window.location.reload();
+        }
+      }, 3000);
+    } else {
+      this.enterOfflineMode();
+    }
+  }
+
+  handlePermissionError() {
+    console.log('🔐 Handling permission error...');
+    
+    // 権限エラーの場合、ユーザーに通知
+    this.showPermissionErrorDialog();
+  }
+
+  handleQuotaError() {
+    console.log('📊 Handling quota error...');
+    
+    // ストレージクリーンアップを実行
+    this.cleanupStorage();
+    
+    // ユーザーに通知
+    this.showQuotaErrorDialog();
+  }
+
+  handleSyntaxError() {
+    console.log('📝 Handling syntax error...');
+    
+    // キャッシュされたスクリプトをクリア
+    this.clearScriptCache();
+    
+    // ページリロードを提案
+    setTimeout(() => {
+      if (confirm('スクリプトエラーが発生しました。ページを再読み込みしますか？')) {
+        window.location.reload();
+      }
+    }, 1000);
+  }
+
+  handleGenericError(errorRecord) {
+    console.log('🔧 Handling generic error...');
+    
+    // エラーの重要度を判定
+    const isCritical = this.isErrorCritical(errorRecord);
+    
+    if (isCritical) {
+      // 重要なエラーの場合、システム復旧を試行
+      this.attemptSystemRecovery();
+    } else {
+      // 軽微なエラーの場合、ログのみ
+      console.debug('Minor error handled:', errorRecord);
+    }
+  }
+
+  isErrorCritical(errorRecord) {
+    const criticalPatterns = [
+      'cannot read property',
+      'is not a function',
+      'failed to fetch',
+      'network request failed',
+      'initialization failed'
+    ];
+    
+    const message = errorRecord.message.toLowerCase();
+    return criticalPatterns.some(pattern => message.includes(pattern));
+  }
+
+  attemptResourceRecovery(target, resourceType) {
+    const originalSrc = target.src || target.href;
+    
+    if (!originalSrc) return;
+    
+    console.log(`🔄 Attempting to recover ${resourceType}:`, originalSrc);
+    
+    // 少し待ってから再試行
+    setTimeout(() => {
+      try {
+        if (resourceType === 'script') {
+          this.reloadScript(target, originalSrc);
+        } else if (resourceType === 'link') {
+          this.reloadStylesheet(target, originalSrc);
+        } else if (resourceType === 'img') {
+          this.reloadImage(target, originalSrc);
+        }
+      } catch (error) {
+        console.error('Resource recovery failed:', error);
+      }
+    }, 1000);
+  }
+
+  reloadScript(originalScript, src) {
+    const newScript = document.createElement('script');
+    newScript.src = src + '?retry=' + Date.now();
+    newScript.onload = () => console.log('✅ Script recovered:', src);
+    newScript.onerror = () => console.error('❌ Script recovery failed:', src);
+    document.head.appendChild(newScript);
+  }
+
+  reloadStylesheet(originalLink, href) {
+    const newLink = document.createElement('link');
+    newLink.rel = 'stylesheet';
+    newLink.href = href + '?retry=' + Date.now();
+    newLink.onload = () => console.log('✅ Stylesheet recovered:', href);
+    newLink.onerror = () => console.error('❌ Stylesheet recovery failed:', href);
+    document.head.appendChild(newLink);
+  }
+
+  reloadImage(originalImg, src) {
+    originalImg.src = src + '?retry=' + Date.now();
+  }
+
+  enterOfflineMode() {
+    console.log('📱 Entering offline mode');
+    
+    // オフラインモードUI表示
+    this.showOfflineInterface();
+    
+    // オフライン機能を有効化
+    this.enableOfflineFeatures();
+  }
+
+  attemptRecovery() {
+    if (this.recoveryMode) {
+      console.log('🔄 Attempting system recovery...');
+      
+      // システムの健全性チェック
+      const isHealthy = this.performHealthCheck();
+      
+      if (isHealthy) {
+        this.exitRecoveryMode();
+      } else {
+        // 追加の修復を試行
+        this.performDeepRecovery();
+      }
+    }
+  }
+
+  performHealthCheck() {
+    try {
+      // 基本的な機能確認
+      const checks = [
+        () => typeof window !== 'undefined',
+        () => typeof document !== 'undefined',
+        () => document.body !== null,
+        () => window.localStorage !== null,
+        () => typeof JSON !== 'undefined'
+      ];
+      
+      return checks.every(check => {
+        try {
+          return check();
+        } catch (error) {
+          return false;
+        }
+      });
+    } catch (error) {
+      return false;
+    }
+  }
+
+  performDeepRecovery() {
+    console.log('🔧 Performing deep recovery...');
+    
+    const recoverySteps = [
+      () => this.clearAllStorage(),
+      () => this.resetGlobalState(),
+      () => this.reinitializeCore(),
+      () => this.validateRecovery()
+    ];
+    
+    let stepIndex = 0;
+    
+    const executeStep = async () => {
+      if (stepIndex < recoverySteps.length) {
+        try {
+          await recoverySteps[stepIndex]();
+          stepIndex++;
+          setTimeout(executeStep, 500);
+        } catch (error) {
+          console.error(`Recovery step ${stepIndex} failed:`, error);
+          stepIndex++;
+          setTimeout(executeStep, 1000);
+        }
+      } else {
+        console.log('🎯 Deep recovery completed');
+        this.attemptRecovery();
+      }
+    };
+    
+    executeStep();
+  }
+
+  exitRecoveryMode() {
+    this.recoveryMode = false;
+    this.errorCount = 0;
+    console.log('✅ Recovery mode exited - System restored');
+    
+    // 回復モードUIを隠す
+    this.hideRecoveryInterface();
+    
+    // システム復旧通知
+    this.showRecoverySuccessMessage();
+  }
+
+  // UI関連メソッド
+  showRecoveryInterface() {
+    if (document.getElementById('error-boundary-recovery')) return;
+    
+    const recoveryDiv = document.createElement('div');
+    recoveryDiv.id = 'error-boundary-recovery';
+    recoveryDiv.className = 'fixed top-0 left-0 right-0 bg-red-600 text-white p-3 z-50 text-center';
+    recoveryDiv.innerHTML = `
+      <div class="flex items-center justify-center space-x-2">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        <span>🔧 システム修復中... しばらくお待ちください</span>
+      </div>
+    `;
+    document.body.appendChild(recoveryDiv);
+  }
+
+  hideRecoveryInterface() {
+    const recoveryDiv = document.getElementById('error-boundary-recovery');
+    if (recoveryDiv) {
+      recoveryDiv.remove();
+    }
+  }
+
+  showOfflineInterface() {
+    if (document.getElementById('error-boundary-offline')) return;
+    
+    const offlineDiv = document.createElement('div');
+    offlineDiv.id = 'error-boundary-offline';
+    offlineDiv.className = 'fixed top-0 left-0 right-0 bg-yellow-600 text-white p-3 z-50 text-center';
+    offlineDiv.innerHTML = `
+      <div class="flex items-center justify-center space-x-2">
+        <span>📱 オフラインモード - ネットワーク接続を確認してください</span>
+      </div>
+    `;
+    document.body.appendChild(offlineDiv);
+  }
+
+  showPermissionErrorDialog() {
+    alert('権限エラーが発生しました。ブラウザの設定を確認するか、管理者にお問い合わせください。');
+  }
+
+  showQuotaErrorDialog() {
+    if (confirm('ストレージ容量が不足しています。不要なデータを削除しますか？')) {
+      this.cleanupStorage();
+    }
+  }
+
+  showRecoverySuccessMessage() {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'fixed top-4 right-4 bg-green-600 text-white p-4 rounded-lg shadow-lg z-50';
+    successDiv.innerHTML = '✅ システムが復旧しました';
+    document.body.appendChild(successDiv);
+    
+    setTimeout(() => successDiv.remove(), 3000);
+  }
+
+  // ユーティリティメソッド
+  clearAllStorage() {
+    try {
+      if (window.localStorage) {
+        localStorage.clear();
+      }
+      if (window.sessionStorage) {
+        sessionStorage.clear();
+      }
+    } catch (error) {
+      console.debug('Storage clear failed:', error);
+    }
+  }
+
+  cleanupStorage() {
+    try {
+      // 古いキャッシュエントリを削除
+      if (window.localStorage) {
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('cache_') || key.startsWith('temp_')) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+    } catch (error) {
+      console.debug('Storage cleanup failed:', error);
+    }
+  }
+
+  resetGlobalState() {
+    try {
+      // グローバル変数をリセット
+      if (window.AdminPanel) {
+        window.AdminPanel.initialized = false;
+      }
+      if (window.studyQuestApp) {
+        window.studyQuestApp = null;
+      }
+    } catch (error) {
+      console.debug('Global state reset failed:', error);
+    }
+  }
+
+  reinitializeCore() {
+    try {
+      // コアシステムの再初期化
+      if (window.RobustAdminPanel && typeof window.RobustAdminPanel.initialize === 'function') {
+        window.RobustAdminPanel.initialize();
+      }
+    } catch (error) {
+      console.debug('Core reinitialization failed:', error);
+    }
+  }
+
+  validateRecovery() {
+    try {
+      // 復旧の検証
+      return this.performHealthCheck();
+    } catch (error) {
+      return false;
+    }
+  }
+
+  clearScriptCache() {
+    try {
+      // Service Worker がある場合はキャッシュをクリア
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(registration => {
+            registration.unregister();
+          });
+        });
+      }
+    } catch (error) {
+      console.debug('Script cache clear failed:', error);
+    }
+  }
+
+  enableOfflineFeatures() {
+    // オフライン機能の実装（必要に応じて）
+    console.log('📱 Offline features enabled');
+  }
+
+  // デバッグ・診断メソッド
+  getErrorReport() {
+    return {
+      errorCount: this.errorCount,
+      recoveryMode: this.recoveryMode,
+      recentErrors: this.errorLog.slice(-10),
+      systemHealth: this.performHealthCheck(),
+      timestamp: Date.now()
+    };
+  }
+
+  exportErrorLog() {
+    const report = this.getErrorReport();
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `error-report-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+}
+
+// =============================================================================
+// 特定機能向けエラーバウンダリー
+// =============================================================================
+
+class APIErrorBoundary {
+  constructor() {
+    this.retryAttempts = new Map();
+    this.circuitBreakers = new Map();
+  }
+
+  async executeAPICall(apiFunction, options = {}) {
+    const config = {
+      maxRetries: options.maxRetries || 3,
+      retryDelay: options.retryDelay || 1000,
+      timeout: options.timeout || 10000,
+      circuitBreakerKey: options.circuitBreakerKey || apiFunction.name,
+      ...options
+    };
+
+    // サーキットブレーカーチェック
+    if (this.isCircuitBreakerOpen(config.circuitBreakerKey)) {
+      throw new Error(`Circuit breaker open for ${config.circuitBreakerKey}`);
+    }
+
+    const attemptKey = config.circuitBreakerKey + Date.now();
+    let attempt = 0;
+
+    while (attempt < config.maxRetries) {
+      attempt++;
+      
+      try {
+        const result = await Promise.race([
+          apiFunction(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), config.timeout)
+          )
+        ]);
+
+        this.recordAPISuccess(config.circuitBreakerKey);
+        return result;
+
+      } catch (error) {
+        console.warn(`API call attempt ${attempt} failed:`, error);
+        
+        this.recordAPIFailure(config.circuitBreakerKey);
+        
+        if (attempt >= config.maxRetries) {
+          throw error;
+        }
+
+        const delay = config.retryDelay * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  isCircuitBreakerOpen(key) {
+    const breaker = this.circuitBreakers.get(key);
+    if (!breaker) return false;
+
+    const now = Date.now();
+    if (breaker.state === 'open' && now - breaker.lastFailure > 30000) {
+      breaker.state = 'half-open';
+    }
+
+    return breaker.state === 'open';
+  }
+
+  recordAPISuccess(key) {
+    const breaker = this.circuitBreakers.get(key) || { failures: 0, state: 'closed' };
+    breaker.failures = 0;
+    breaker.state = 'closed';
+    this.circuitBreakers.set(key, breaker);
+  }
+
+  recordAPIFailure(key) {
+    const breaker = this.circuitBreakers.get(key) || { failures: 0, state: 'closed' };
+    breaker.failures += 1;
+    breaker.lastFailure = Date.now();
+
+    if (breaker.failures >= 3) {
+      breaker.state = 'open';
+      console.warn(`Circuit breaker opened for ${key}`);
+    }
+
+    this.circuitBreakers.set(key, breaker);
+  }
+}
+
+// =============================================================================
+// グローバル初期化
+// =============================================================================
+
+// グローバルインスタンス作成
+window.globalErrorBoundary = new GlobalErrorBoundary();
+window.apiErrorBoundary = new APIErrorBoundary();
+
+// デバッグコンソールコマンド
+window.getErrorReport = () => window.globalErrorBoundary.getErrorReport();
+window.exportErrorLog = () => window.globalErrorBoundary.exportErrorLog();
+
+console.log('🛡️ ErrorBoundarySystem loaded - Comprehensive error protection enabled');
+</script>
