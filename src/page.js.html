@@ -218,7 +218,6 @@ class StudyQuestApp {
         const fallbackUserId = urlParams.get('userId');
         
         if (fallbackUserId) {
-          console.log('✅ StudyQuestApp: Using fallback userId from URL parameters:', fallbackUserId);
           return fallbackUserId;
         }
       } catch (error) {
@@ -232,7 +231,6 @@ class StudyQuestApp {
     
     // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
     if (userId.length === 36 && userId.includes('-')) {
-      console.log('✅ StudyQuestApp: Valid userId format detected:', userId.substring(0, 8) + '...');
       return userId;
     }
     
@@ -389,7 +387,6 @@ class StudyQuestApp {
 
   // Reset state for clean initialization (Phase 1.2)
   resetStateForCleanInit() {
-    console.log('🔄 Resetting state for clean initialization...');
     
     // Reset core data arrays
     this.state.currentAnswers = [];
@@ -430,7 +427,6 @@ class StudyQuestApp {
     // Reset current active sheet state
     this.state.currentActiveSheet = SHEET_NAME;
     
-    console.log('✅ State reset completed', {
       currentAnswers: this.state.currentAnswers.length,
       initialDataLoaded: this.initialDataLoaded,
       currentActiveSheet: this.state.currentActiveSheet
@@ -581,16 +577,13 @@ class StudyQuestApp {
     try {
       switch (recoveryStrategy) {
         case 'retry':
-          console.log(`🔄 Attempting retry for ${context}...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           return await this.executeRecoveryRetry(context);
           
         case 'clearAndReload':
-          console.log(`🔄 Executing clear and reload for ${context}...`);
           return await this.executeRecoveryReload();
           
         case 'fallbackMode':
-          console.log(`🔄 Switching to fallback mode for ${context}...`);
           return await this.executeRecoveryFallback();
           
         default:
@@ -922,7 +915,6 @@ class StudyQuestApp {
             if (formLinkBtn && event.data.formUrl) {
               formLinkBtn.href = event.data.formUrl;
               formLinkBtn.classList.remove('hidden');
-              console.log('✅ フォームリンクが更新されました');
             }
           } catch (error) {
             console.warn('フォームリンク更新でエラー:', error);
@@ -959,7 +951,6 @@ class StudyQuestApp {
               if (formLinkBtn && event.data.formUrl) {
                 formLinkBtn.href = event.data.formUrl;
                 formLinkBtn.classList.remove('hidden');
-                console.log('✅ フォームリンクが更新されました（BroadcastChannel）');
               }
             } catch (error) {
               console.warn('BroadcastChannel フォームリンク更新でエラー:', error);
@@ -1382,7 +1373,6 @@ class StudyQuestApp {
   async clearCacheForContentCheck() {
     try {
       await this.gas.clearCache();
-      console.log('✅ Cache cleared for content check');
     } catch (error) {
       console.warn('⚠️ Failed to clear cache:', error.message);
       // Continue without cache clearing
@@ -1454,7 +1444,6 @@ class StudyQuestApp {
     
     // 初期データロード失敗後の初回成功ポーリング時の特別処理
     if (this.hadInitialDataLoadFailure && newCount > this.state.lastSeenCount) {
-      console.log('🔄 初期データロード失敗後の新着検出:', {
         newCount,
         lastSeenCount: this.state.lastSeenCount,
         difference: newCount - this.state.lastSeenCount
@@ -1480,7 +1469,6 @@ class StudyQuestApp {
     this.updateLastSeenCount(newCount);
     this.initialDataLoaded = true;
     
-    console.log('✅ Initial content load completed:', {
       viewKey: currentViewKey,
       count: newCount,
       hadPreviousFailure: this.hadInitialDataLoadFailure
@@ -1488,7 +1476,6 @@ class StudyQuestApp {
   }
   
   async handleViewChange(currentViewKey, newCount) {
-    console.log('🔄 View settings changed:', {
       from: this.lastViewKey,
       to: currentViewKey,
       newCount
@@ -1550,7 +1537,6 @@ class StudyQuestApp {
     setTimeout(() => {
       this.startPolling();
       this.state.pollingFailureCount = 0;
-      console.log('✅ Polling restarted after failure recovery');
     }, 5000);
   }
   
@@ -1620,7 +1606,6 @@ class StudyQuestApp {
     } catch (error) {
       console.error('コンテンツ更新エラー:', error);
       // 増分更新が失敗した場合はフル更新にフォールバック
-      console.log('🔄 フォールバック: 全体更新を実行');
       await this.refreshContentFull();
     }
   }
@@ -1632,7 +1617,6 @@ class StudyQuestApp {
     // 初期データ未ロード時または現在のデータが空の場合は全体リフレッシュにフォールバック
     if (!this.initialDataLoaded || 
         (this.state.currentAnswers?.length === 0 && this.state.lastSeenCount > 0)) {
-      console.log('🔄 初期状態検出 - 全体リフレッシュにフォールバック:', {
         initialDataLoaded: this.initialDataLoaded,
         currentAnswersLength: this.state.currentAnswers?.length || 0,
         lastSeenCount: this.state.lastSeenCount
@@ -1648,7 +1632,6 @@ class StudyQuestApp {
         this.elements.refreshContentBtn.disabled = true;
       }
       
-      console.log('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
       
       // 現在のフィルタ設定を取得
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
@@ -1753,7 +1736,6 @@ class StudyQuestApp {
       // Third: Clear server cache for consistency across sort orders
       this.gas.clearCache().catch(err => console.warn('Cache clear failed', err));
       
-      console.log('✅ 増分リフレッシュ完了:', {
         addedCards: incrementalData.newCount,
         totalCards: this.state.currentAnswers.length,
         newBaseline: this.state.lastSeenCount
@@ -1765,7 +1747,6 @@ class StudyQuestApp {
       console.error('増分コンテンツ更新に失敗:', error);
       
       // エラー時は従来の全体更新にフォールバック
-      console.log('🔄 フォールバック: 全体更新を実行');
       await this.refreshContentFull();
       
     } finally {
@@ -1786,7 +1767,6 @@ class StudyQuestApp {
       
       // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
       this.cache.clear();
-      console.log('🔄 全体リフレッシュ開始 - キャッシュクリア完了, lastSeenCount保持:', preservedLastSeenCount);
       
       await this.loadSheetData({ bypassCache: true });
       
@@ -1797,7 +1777,6 @@ class StudyQuestApp {
       if (shouldUpdateLastSeen) {
         // データが増加している場合のみ更新
         this.updateLastSeenCount(currentDataLength);
-        console.log('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
           newLastSeenCount: this.state.lastSeenCount,
           preservedCount: preservedLastSeenCount,
           currentAnswersLength: currentDataLength
@@ -1805,7 +1784,6 @@ class StudyQuestApp {
       } else if (currentDataLength === 0 && preservedLastSeenCount > 0) {
         // データが0件で以前に見たカードがある場合は、最小値として1を保持
         this.state.lastSeenCount = Math.max(1, preservedLastSeenCount);
-        console.log('🔄 全体リフレッシュ完了、新着基準保持（データ0件時の安定化）:', {
           adjustedLastSeenCount: this.state.lastSeenCount,
           preservedCount: preservedLastSeenCount,
           currentAnswersLength: currentDataLength
@@ -1813,7 +1791,6 @@ class StudyQuestApp {
       } else {
         // データが減少または同じ場合は保持
         this.state.lastSeenCount = preservedLastSeenCount;
-        console.log('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
           preservedLastSeenCount: preservedLastSeenCount,
           currentAnswersLength: currentDataLength,
           maintainedStability: true
@@ -1861,13 +1838,11 @@ class StudyQuestApp {
   startNewAnswerPolling() {
     // 重複防止: 既に実行中の場合は何もしない
     if (this.pollingInterval) {
-      console.log('🔄 ポーリングは既に実行中です - スキップ');
       return;
     }
     
     // 追加の安全策: ポーリング実行フラグ
     if (this.pollingSettings.isRunning) {
-      console.log('🔄 ポーリング処理が既に実行中です - スキップ');
       return;
     }
     
@@ -1902,7 +1877,6 @@ class StudyQuestApp {
       }
     }, this.pollingSettings.currentInterval);
 
-    console.log('🔄 新着回答ポーリング開始 (最適化版):', {
       currentInterval: this.pollingSettings.currentInterval,
       activityScore: this.pollingSettings.activityScore,
       enabled: this.pollingSettings.enabled
@@ -2146,7 +2120,6 @@ class StudyQuestApp {
           this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
         }
         
-        console.log('✅ ポーリング成功:', {
           successCount: this.pollSuccessCount,
           nextInterval: this.currentPollInterval
         });
@@ -2225,7 +2198,6 @@ class StudyQuestApp {
       // 仮想スクロール状態の最適化
       this.optimizeVirtualScrollState();
       
-      console.log('✅ Memory cleanup completed');
     } catch (error) {
       console.warn('⚠️ Memory cleanup failed:', error);
     }
@@ -2455,16 +2427,13 @@ class StudyQuestApp {
           isInitialLoad: true, 
           bypassCache: false // 初回読み込み最適化: キャッシュを活用
         });
-        console.log('✅ StudyQuestApp: Sheet data loaded, restoring differential cards...');
         
         // 差分カードの復元
         this.restoreDifferentialCards();
         
         // ポーリング開始を少し遅らせて初回読み込みを優先
-        console.log('✅ StudyQuestApp: Scheduling delayed polling start...');
         setTimeout(() => {
           this.startPolling();
-          console.log('✅ StudyQuestApp: Delayed polling started');
         }, 1000); // 1秒遅延でポーリング開始
       } catch (error) {
         console.error('❌ StudyQuestApp: Sheet data loading failed:', error);
@@ -2695,7 +2664,6 @@ class StudyQuestApp {
       
       if (result && result.status === 'success') {
         if (result.formUrl) {
-          console.log('✅ フォームURL取得成功:', result.formUrl);
           return result.formUrl;
         }
       }
@@ -2778,7 +2746,6 @@ class StudyQuestApp {
         
         // DOM clearing completion wait (Phase 1.3)
         await new Promise(resolve => requestAnimationFrame(resolve));
-        console.log('✅ DOM清除完了、次のフレームで差分復元準備完了');
       }
     }
     
@@ -2793,7 +2760,6 @@ class StudyQuestApp {
       };
     }
     
-    console.log('✅', isFirstTime ? '初回初期化完了' : 'clearAllCardsForEmptyData: クリア完了');
   }
   
   async validatePostLoadState() {
@@ -2864,7 +2830,6 @@ class StudyQuestApp {
   }
   
   async handleDataInconsistency() {
-    console.log('🔄 データ不整合を解決するため詳細分析を開始します...');
     
     try {
       // 1. 現在の状態を詳細に分析
@@ -2930,7 +2895,6 @@ class StudyQuestApp {
         break;
         
       case 'dom_state_mismatch':
-        console.log('🔄 DOM-State不整合を修復');
         await this.resyncDOMWithState();
         break;
         
@@ -2940,7 +2904,6 @@ class StudyQuestApp {
         break;
         
       default:
-        console.log('🔄 一般的な不整合修復');
         await this.forceDataRefresh();
     }
   }
@@ -2956,7 +2919,6 @@ class StudyQuestApp {
   }
 
   async performServerDataSync() {
-    console.log('🔄 サーバーデータ同期開始');
     
     // 軽量チェックで最新のカウントを取得
     const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
@@ -2995,7 +2957,6 @@ class StudyQuestApp {
   }
 
   async resyncDOMWithState() {
-    console.log('🔄 DOM-State再同期開始');
     
     // 現在のstateデータに基づいてDOMを再構築
     if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
@@ -3015,7 +2976,6 @@ class StudyQuestApp {
     // フロントエンドキャッシュをクリア
     if (this.cache) {
       this.cache.clear();
-      console.log('✅ フロントエンドキャッシュをクリア, lastSeenCount保持:', preservedLastSeenCount);
     }
     
     // サーバーキャッシュをクリア
@@ -3026,7 +2986,6 @@ class StudyQuestApp {
           .withFailureHandler(reject)
           .clearCache();
       });
-      console.log('✅ サーバーキャッシュをクリア');
     } catch (error) {
       console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
     }
@@ -3038,13 +2997,11 @@ class StudyQuestApp {
     const shouldPreserveLastSeen = this.state.currentAnswers.length <= preservedLastSeenCount;
     if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
       this.state.lastSeenCount = preservedLastSeenCount;
-      console.log('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
         preservedCount: preservedLastSeenCount,
         currentAnswersLength: this.state.currentAnswers.length,
         stabilityMaintained: true
       });
     } else {
-      console.log('✅ 強制データリフレッシュ完了、新データによりlastSeenCount更新:', {
         oldCount: preservedLastSeenCount,
         newCount: this.state.lastSeenCount,
         currentAnswersLength: this.state.currentAnswers.length
@@ -3107,7 +3064,6 @@ class StudyQuestApp {
         return false;
       }
       
-      console.log('✅ データ判定: 有効なデータ構造 -', {
         status: result.status || '(no status field)',
         dataLength: result.data.length,
         hasHeader: !!result.header,
@@ -3234,7 +3190,6 @@ class StudyQuestApp {
         
         // 成功した場合は結果を返す - 改善された判定条件
         if (result && this.isValidDataResult(result)) {
-          console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
           return result;
         }
         
@@ -3255,7 +3210,6 @@ class StudyQuestApp {
                   .withFailureHandler(reject)
                   .fixUserDataConsistency(fetchParams.userId);
               });
-              console.log('✅ サーバー側修復完了、次の試行に進みます');
             } catch (repairError) {
               console.warn('⚠️ サーバー側修復失敗:', repairError);
             }
@@ -3429,7 +3383,6 @@ class StudyQuestApp {
       console.log('🚀 初回読み込み最適化: キャッシュを活用します');
     } else if (config.isInitialLoad && options.bypassCache === true) {
       config.bypassCache = true;
-      console.log('🔄 初回読み込み: 明示的なキャッシュバイパス');
     }
     
     // Prevent concurrent loading
@@ -3571,7 +3524,6 @@ class StudyQuestApp {
       localStorage.setItem('lastUnpublishTime', Date.now().toString());
       localStorage.setItem('unpublishedRedirectTimestamp', new Date().toISOString());
       
-      console.log('✅ 非公開状態遷移用キャッシュクリア完了');
       
     } catch (error) {
       console.error('❌ 非公開状態キャッシュクリアでエラー:', error);
@@ -3764,7 +3716,6 @@ class StudyQuestApp {
                   if (expected > 0 && actual === 0 && expected !== lastSeen) {
                     console.warn('⚠️ Significant data inconsistency detected!', 
                       `Expected: ${expected}, Actual: ${actual}, LastSeen: ${lastSeen}`);
-                    console.log('🔄 Attempting simplified fallback...');
                     
                     // 簡素化されたフォールバック（待機時間短縮）
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -3783,7 +3734,6 @@ class StudyQuestApp {
                     });
                     
                     if (retryResult && retryResult.data && retryResult.data.length > 0) {
-                      console.log('✅ Fallback retry successful! Got', retryResult.data.length, 'items');
                       result = retryResult; // 成功した結果を使用
                     } else {
                       console.warn('❌ Fallback retry also returned empty data');
@@ -3804,7 +3754,6 @@ class StudyQuestApp {
                 !result.header.includes('読み込み') &&
                 result.header.trim() !== '') {
               this.elements.headingLabel.textContent = result.header;
-              console.log('✅ 空データ時でも問題文を表示:', result.header);
             }
             
             // 空データ受信時は古いカードを強制的にクリア
@@ -3815,7 +3764,6 @@ class StudyQuestApp {
             if (isInitialLoad) {
               this.state.lastSeenCount = 0;
               // 空データは正常な状態なので失敗フラグは設定しない
-              console.log('✅ 初期データロード完了: 空データ（まだ回答なし）');
             }
             return;
           }
@@ -3869,10 +3817,8 @@ class StudyQuestApp {
             });
             
             // 質問文を新しいものに更新
-            console.log('🔄 質問文をサーバー設定に合わせます');
             if (this.elements.headingLabel) {
               this.elements.headingLabel.textContent = result.header;
-              console.log('✅ 質問文を更新しました:', result.header);
             }
           }
         }
@@ -4014,7 +3960,6 @@ class StudyQuestApp {
       return;
     }
     
-    console.log('🔄 Starting sheet switch:', {
       from: this.state.currentActiveSheet,
       to: selectedSheet,
       userId: this.state.userId
@@ -4032,7 +3977,6 @@ class StudyQuestApp {
       // 後処理: 状態の確定
       await this.finalizeSheetSwitch(selectedSheet);
       
-      console.log('✅ Sheet switch completed:', {
         newSheet: selectedSheet,
         dataCount: this.state.currentAnswers?.length || 0
       });
@@ -4072,7 +4016,6 @@ class StudyQuestApp {
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🔄 Loading sheet data (attempt ${attempt}/${maxRetries}):`, targetSheet);
         
         await this.loadSheetData({ 
           bypassCache: true, 
@@ -4080,7 +4023,6 @@ class StudyQuestApp {
           showLoading: true
         });
         
-        console.log('✅ Sheet data loaded successfully on attempt', attempt);
         return; // 成功時は早期リターン
         
       } catch (error) {
@@ -4943,12 +4885,10 @@ class StudyQuestApp {
       
       // 理由テキストが空でない場合のみ追加
       const shouldAddReason = !!(reasonText.textContent && reasonText.textContent.trim());
-      console.log('✅ 理由テキストの追加判定:', shouldAddReason ? '追加' : '未追加（空）');
       try {
         // 理由テキストの有効性を検証
         if (shouldAddReason) {
           contentDiv.appendChild(reasonText);
-          console.log('✅ 理由テキスト追加完了（既存要素使用）');
         } else {
           // 何もしない（空の理由は表示しない）
           console.log('ℹ️ 理由テキストは空のため追加しません');
@@ -4964,7 +4904,6 @@ class StudyQuestApp {
             fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
             fallbackReasonText.textContent = fallbackText;
             contentDiv.appendChild(fallbackReasonText);
-            console.log('✅ 理由テキスト追加完了（フォールバック）');
           } else {
             console.log('ℹ️ フォールバックでも理由は空のため追加しません');
           }
@@ -5104,7 +5043,6 @@ class StudyQuestApp {
       }
     });
     
-    console.log(`✅ Batch DOM processing completed: ${mainFragment.children.length} cards ready`);
     return mainFragment;
   }
   
@@ -5276,7 +5214,6 @@ class StudyQuestApp {
     let errorCount = 0;
 
     try {
-      console.log(`🔄 リアクションキュー処理開始 (キューサイズ: ${this.reactionQueue.size})`);
       
       // バッチ処理が有効で、キューに複数アイテムがある場合はバッチ処理を試行
       if (this.enableBatchProcessing && this.reactionQueue.size > 1 && !this.batchProcessingActive) {
@@ -5285,7 +5222,6 @@ class StudyQuestApp {
           // バッチ処理成功時は個別キューをクリア
           processedCount = this.reactionQueue.size;
           this.reactionQueue.clear();
-          console.log(`✅ バッチ処理完了 (${processedCount}件処理)`);
           return;
         }
         // バッチ処理失敗時は既存の個別処理にフォールバック
@@ -5631,7 +5567,6 @@ class StudyQuestApp {
       }
 
       this.batchProcessingActive = true;
-      console.log('🔄 バッチ処理試行開始');
 
       // キューからバッチ操作を準備
       const batchOperations = Array.from(this.reactionQueue.values());
@@ -5646,7 +5581,6 @@ class StudyQuestApp {
       const result = await this.gas.addReactionBatch(batchOperations);
       
       if (result && result.success) {
-        console.log('✅ バッチ処理成功:', batchOperations.length + '件');
         
         // バッチレスポンスを処理
         this.processBatchReactionResponse(result.data, batchOperations);
@@ -5696,7 +5630,6 @@ class StudyQuestApp {
         });
       }
 
-      console.log('✅ バッチレスポンス処理完了');
     } catch (error) {
       console.error('バッチレスポンス処理エラー:', error);
       // エラー時は既存の個別処理システムが処理する
@@ -5737,7 +5670,6 @@ class StudyQuestApp {
   }
 
   async processReactionResponse(item, response, reaction) {
-    console.log('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
     
     // サーバー状態を絶対的に適用（楽観的更新なし）
     if (response.reactions && typeof response.reactions === 'object') {
@@ -5745,7 +5677,6 @@ class StudyQuestApp {
         const serverState = response.reactions;
         item.reactions = JSON.parse(JSON.stringify(serverState));
         
-        console.log('✅ サーバー状態適用完了:', {
           rowIndex: item.rowIndex,
           reaction,
           serverState: item.reactions
@@ -5755,7 +5686,6 @@ class StudyQuestApp {
         console.warn('⚠️ 期待されたリアクション形式ではありません:', response);
         // フォールバック処理（サーバー応答が不正な場合のみ）
         this.applyFallbackReactionUpdate(item, reaction);
-        console.log('🔄 フォールバック処理実行:', item.reactions);
     }
     
     // ローカルストレージに保存（サーバー状態を保存）
@@ -5805,7 +5735,6 @@ class StudyQuestApp {
       // 不整合を記録（デバッグ用）
       this.recordReactionInconsistency(rowIndex, inconsistencies);
     } else {
-      console.log('✅ リアクション状態整合性確認:', { rowIndex });
     }
     
     return inconsistencies;
@@ -6093,7 +6022,6 @@ class StudyQuestApp {
     const differentialCardIds = this.loadDifferentialCards();
     if (differentialCardIds.length === 0) return;
 
-    console.log('🔄 差分カード復元開始:', differentialCardIds.length + '件');
     
     const container = this.elements.answersContainer;
     if (!container) return;
@@ -6112,7 +6040,6 @@ class StudyQuestApp {
       }
     });
     
-    console.log('✅ 差分カード復元完了:', restoredCount + '件');
   }
 
   async handleReactionError(error, rowIndex, reaction) {
@@ -6139,7 +6066,6 @@ class StudyQuestApp {
         
         // UI再描画（差分更新で軽量化）
         this.updateReactionButtonsForItem(item);
-        console.log('✅ リアクションUI状態復旧完了:', { rowIndex, reaction });
       }
     } catch (recoveryError) {
       console.warn('⚠️ リアクションエラー復旧処理に失敗:', recoveryError);
@@ -6305,9 +6231,7 @@ class StudyQuestApp {
         item.highlight = expectedHighlight;
         requestAnimationFrame(() => this.applyUpdates([item]));
         
-        console.log('✅ ハイライト状態を修正しました');
       } else {
-        console.log('✅ ハイライト状態同期確認: 正常');
       }
     } catch (error) {
       console.error('ハイライト状態同期確認エラー:', error);
@@ -6416,7 +6340,6 @@ class StudyQuestApp {
       
       // 5. 結果出力
       if (issues.length === 0) {
-        console.log('✅ 同期状態ヘルスチェック: 問題なし');
         return { status: 'healthy', issues: [] };
       } else {
         console.warn('⚠️ 同期状態ヘルスチェック: 問題検出', issues);
@@ -6458,7 +6381,6 @@ class StudyQuestApp {
             
           case 'data_staleness':
             // データを強制リフレッシュ
-            console.log('🔄 古いデータを検出、強制リフレッシュ実行');
             await this.forceDataRefresh();
             fixed++;
             break;
@@ -6513,7 +6435,6 @@ class StudyQuestApp {
       }
     }, 5 * 60 * 1000); // 5分間隔
     
-    console.log('✅ 同期状態監視を開始しました（5分間隔）');
   }
 
   // 同期監視の停止
@@ -6569,7 +6490,6 @@ class StudyQuestApp {
       console.log(`📊 ${testOperations.length}件の操作でテスト実行`);
       
       // 1. バッチ処理のテスト
-      console.log('🔄 バッチ処理テスト開始');
       const batchStartTime = performance.now();
       
       try {
@@ -6586,14 +6506,12 @@ class StudyQuestApp {
           avgTimePerOp: (batchEndTime - batchStartTime) / testOperations.length
         };
         
-        console.log('✅ バッチ処理テスト完了:', testResults.batchTest);
       } catch (error) {
         console.error('❌ バッチ処理テストエラー:', error);
         testResults.batchTest = { error: error.message };
       }
       
       // 2. 個別処理のテスト（シミュレーション）
-      console.log('🔄 個別処理テスト開始');
       const individualStartTime = performance.now();
       
       try {
@@ -6612,7 +6530,6 @@ class StudyQuestApp {
           avgTimePerOp: (individualEndTime - individualStartTime) / testOperations.length
         };
         
-        console.log('✅ 個別処理テスト完了:', testResults.individualTest);
       } catch (error) {
         console.error('❌ 個別処理テストエラー:', error);
         testResults.individualTest = { error: error.message };
@@ -6685,7 +6602,6 @@ class StudyQuestApp {
     
     // 5. 結果
     if (issues.length === 0) {
-      console.log('✅ バッチ処理システム健全性: 正常');
       return { status: 'healthy', issues: [] };
     } else {
       console.warn('⚠️ バッチ処理システム健全性: 問題検出', issues);
@@ -6733,7 +6649,6 @@ class StudyQuestApp {
         }
       });
       
-      console.log('✅ 通知システムエッジケーステスト完了:', testResults.summary);
       return testResults;
       
     } catch (error) {
@@ -6960,7 +6875,6 @@ class StudyQuestApp {
     
     // 5. 結果
     if (issues.length === 0) {
-      console.log('✅ 通知システム健全性: 正常');
       return { status: 'healthy', issues: [] };
     } else {
       console.warn('⚠️ 通知システム健全性: 問題検出', issues);
@@ -7083,7 +6997,6 @@ class StudyQuestApp {
       this.loadSheetData({ bypassCache: true }).then(() => {
         // 管理モード切り替え後に新着チェックの基準を更新
         this.updateLastSeenCount(this.state.currentAnswers.length);
-        console.log('🔄 管理モード切り替え完了、新着チェック基準更新:', {
           newBaselineCount: this.state.lastSeenCount,
           adminMode: this.state.showAdminFeatures
         });
@@ -7189,12 +7102,10 @@ class StudyQuestApp {
     }
     
     try {
-      console.log('🔄 公開終了処理を開始します...');
       
       // サーバーに公開終了リクエストを送信
       const result = await this.runGas('clearActiveSheet');
       
-      console.log('✅ 公開終了処理が完了しました:', result);
       
       // 成功メッセージを表示
       const successMessage = result.message || '公開を終了しました。非公開画面に移動します。';
@@ -7243,7 +7154,6 @@ class StudyQuestApp {
     // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
     try {
       localStorage.setItem('expandAllSections', 'true');
-      console.log('✅ アコーディオン全展開フラグを設定しました');
     } catch (error) {
       console.warn('⚠️ localStorage設定に失敗:', error);
     }
@@ -7254,7 +7164,6 @@ class StudyQuestApp {
     unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
     unpublishedUrl.searchParams.set('_redirect', 'unpublished'); // リダイレクト理由
     
-    console.log('🔄 Redirecting to unpublished URL:', unpublishedUrl.toString());
     window.location.href = unpublishedUrl.toString();
   }
   
@@ -7968,7 +7877,6 @@ class StudyQuestApp {
         this.isLowPerformanceMode = true;
         this.optimizeForLowPerformance();
       } else if (avgFrameTime < PERFORMANCE_BUDGET * 0.8 && this.isLowPerformanceMode) {
-        console.log('✅ パフォーマンス改善検出 - 低パフォーマンスモードを無効化');
         this.disableLowPerformanceMode();
       }
     }
@@ -8654,7 +8562,6 @@ class StudyQuestApp {
           await this.autoRecoverReasonFields();
         }
       } else {
-        console.log('✅ Board data integrity validation passed');
       }
 
       return validationResults;
@@ -8681,7 +8588,6 @@ class StudyQuestApp {
       // データを再取得してカードを更新
       await this.loadBoardData();
       
-      console.log('✅ Reason field recovery completed');
     } catch (error) {
       console.error('❌ Automatic reason field recovery failed:', error);
     }
@@ -8792,7 +8698,6 @@ try {
   const domainInfoTask = new Promise((resolve, reject) => {
     loadDomainInfo(
       (info) => {
-        console.log('✅ Domain info loaded in parallel:', info);
         resolve(info);
       },
       (error) => {
@@ -8807,7 +8712,6 @@ try {
   const formLinkTask = new Promise((resolve, reject) => {
     loadFormLink(
       (linkData) => {
-        console.log('✅ Form link loaded in parallel:', linkData);
         resolve(linkData);
       },
       (error) => {
@@ -8835,7 +8739,6 @@ try {
     const [appResult, domainResult, formResult] = results;
     
     if (appResult.status === 'fulfilled') {
-      console.log('✅ StudyQuestApp initialized successfully');
     } else {
       console.error('❌ StudyQuestApp initialization failed:', appResult.reason);
     }
@@ -8848,7 +8751,6 @@ try {
   } catch (error) {
     console.error('❌ Parallel initialization error:', error);
     // フォールバック: 通常の初期化
-    console.log('🔄 Falling back to sequential initialization...');
     new StudyQuestApp();
   }
 });
@@ -9091,7 +8993,6 @@ try {
       if (verbose) console.log('📊 初期状態:', initialState);
 
       // Test 4: リアクション送信テスト
-      console.log('🔄 リアクション送信テスト開始...');
       
       const clickEvent = new MouseEvent('click', { bubbles: true });
       
@@ -9109,7 +9010,6 @@ try {
       try {
         const updateResult = await window.studyQuestApp.waitForReactionUpdate(rowIndex, reaction, null, 3000);
         if (updateResult.stateChanged || updateResult.changeDetectedAt) {
-          console.log('✅ 状態変化検出:', updateResult);
         } else if (updateResult.timeout) {
           console.warn('⚠️ 動的待機タイムアウト - フォールバック待機実行');
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -9150,7 +9050,6 @@ try {
       });
 
       // Test 6: 再度クリックして戻るかテスト
-      console.log('🔄 リアクション取消テスト開始...');
       
       // 2回目のリアクション完了を待機
       let secondReactionPromise = null;
@@ -9164,7 +9063,6 @@ try {
       try {
         const secondUpdateResult = await window.studyQuestApp.waitForReactionUpdate(rowIndex, reaction, null, 3000);
         if (secondUpdateResult.stateChanged || secondUpdateResult.changeDetectedAt) {
-          console.log('✅ 2回目状態変化検出:', secondUpdateResult);
         } else if (secondUpdateResult.timeout) {
           console.warn('⚠️ 2回目動的待機タイムアウト - フォールバック待機実行');
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -9206,7 +9104,6 @@ try {
 
       testResults.success = testResults.tests.every(test => test.status === 'passed');
 
-      console.log('✅ リアクションシステムテスト完了');
       console.table(testResults.tests.map(t => ({
         テスト名: t.name,
         結果: t.status,
@@ -9350,7 +9247,6 @@ try {
       app.state.lastSeenCount = originalLastSeenCount;
       app.showNewContentBanner = originalShowNewContentBanner;
       
-      console.log('✅ シミュレーション完了:', result);
       return result;
       
     } catch (error) {
@@ -9798,7 +9694,6 @@ try {
         window.lastGlobalCleanup = new Date().toISOString();
       }, intervalMinutes * 60 * 1000);
       
-      console.log(`🔄 Auto-optimization started: every ${intervalMinutes} minutes`);
       return true;
     },
     

@@ -684,7 +684,6 @@
           
           if (isInFrame) {
             // iframe内の場合は親ウィンドウで開く（X-Frame-Options制約回避）
-            console.log('🔄 iframe内からの遷移を検出、parent window で開きます');
             setTimeout(() => {
               try {
                 window.top.location.href = adminUrl;
@@ -717,7 +716,6 @@
         document.body.classList.add('success-transition');
       }, 300);
       
-      console.log('✅ ユーザーアクション待ち画面を表示しました');
       
     } catch (error) {
       console.error('成功画面表示エラー:', error);

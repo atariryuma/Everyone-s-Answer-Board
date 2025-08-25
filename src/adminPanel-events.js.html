@@ -77,11 +77,9 @@ function setupEventListeners() {
         function() {
           unpublishBoard()
             .then(function(unpublishResult) {
-              console.log('✅ 公開停止完了:', unpublishResult);
               
               // unpublishBoard()内で既にキャッシュクリア処理が実行されているため、
               // ここでは重複処理を避けて、状態同期に集中
-              console.log('🔄 公開停止後の状態同期を開始（キャッシュクリア済み）');
               
               // 改善された非同期処理完了待機
               return new Promise(async (resolve) => {
@@ -91,7 +89,6 @@ function setupEventListeners() {
                   
                   // Step 2: 状態再読み込み（強制リフレッシュ）
                   await loadStatus(true);
-                  console.log('🔄 公開停止後の状態更新完了');
                   
                   // Step 3: 最終的なUI状態確認
                   await new Promise(r => setTimeout(r, 100));
@@ -135,7 +132,6 @@ function setupEventListeners() {
                 if (sheetSelect) {
                   sheetSelect.innerHTML = '<option value="">シートを選択してください</option>';
                   sheetSelect.selectedIndex = 0;
-                  console.log('✅ シート選択ドロップダウンをリセット');
                 }
                 
                 // 列設定フォームをクリア
@@ -147,7 +143,6 @@ function setupEventListeners() {
                     selectElement.selectedIndex = 0;
                   }
                 });
-                console.log('✅ 列設定フォームをリセット');
                 
                 // チェックボックスの初期化
                 const checkboxes = ['show-names', 'show-counts'];
@@ -157,13 +152,11 @@ function setupEventListeners() {
                     checkbox.checked = false;
                   }
                 });
-                console.log('✅ 表示設定チェックボックスをリセット');
                 
               } catch (resetError) {
                 console.warn('⚠️ UI要素リセット中にエラー:', resetError);
               }
               
-              console.log('✅ 公開停止後の完全リセットUI更新完了');
               showMessage('回答ボードは非公開になり、設定は初期状態にリセットされました。', 'success');
             })
             .catch(function(error) {

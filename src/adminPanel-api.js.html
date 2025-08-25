@@ -895,10 +895,8 @@ function loadStatus(bypassCache = false) {
     return new Promise((resolve, reject) => {
       google.script.run
         .withSuccessHandler(response => {
-          console.log('🔄 Fallback authentication response:', response);
           if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
             userId = response.userInfo.userId;
-            console.log('✅ Fallback authentication successful, userId:', userId);
             resolve(userId);
           } else {
             console.error('❌ Fallback authentication also failed:', response);
@@ -1020,7 +1018,6 @@ function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride =
   // Sanitize sheet name for API call (already sanitized from caller, but double-check)
   const sanitizedSheetName = targetSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
   
-  console.log(`🔄 Loading config for sheet: "${targetSheet}" (sanitized: "${sanitizedSheetName}"), attempt ${retryCount + 1}/${maxRetries + 1}`);
   
   return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', targetSpreadsheetId, sanitizedSheetName)
     .then(handleSheetDetailsSuccess)
@@ -1335,7 +1332,6 @@ function initializeUserSettings() {
       initializationInProgress = true;
       lastInitializationTime = now;
       
-      console.log('🔄 設定初期化を開始...');
       
       // フェーズ1: 自動診断
       performSystemDiagnostic()
@@ -1779,7 +1775,6 @@ function saveAndPublish() {
       window.HistoryManager._hideDraftModeIndicator();
     }
     
-    console.log('✅ ドラフトモードが終了しました。公開を実行します。');
   }
   
   // 進捗インジケータ表示
@@ -2013,7 +2008,6 @@ async function clearAllCachesForUnpublish() {
         localStorage.removeItem(key);
       });
 
-      console.log('✅ Cache cleared');
 
     } catch (e) {
       console.warn('⚠️ localStorage clear warning:', e);
@@ -2061,24 +2055,20 @@ async function clearAllCachesForUnpublish() {
       if (typeof currentSpreadsheetUrl !== 'undefined') {
         const oldUrl = currentSpreadsheetUrl;
         currentSpreadsheetUrl = '';
-        console.log('✅ currentSpreadsheetUrl cleared for unpublish:', oldUrl);
       }
       
       // window.currentStatusのクリア（公開停止時のみ）
       if (window.currentStatus) {
         window.currentStatus = null;
-        console.log('✅ window.currentStatus cleared for unpublish');
       }
       
       // その他のURL関連グローバル変数のクリア
       if (typeof webAppUrl !== 'undefined') {
         webAppUrl = '';
-        console.log('✅ webAppUrl cleared');
       }
       
       if (typeof currentActiveSheet !== 'undefined') {
         currentActiveSheet = '';
-        console.log('✅ currentActiveSheet cleared');
       }
       
     } catch (e) {
@@ -2108,12 +2098,10 @@ function unpublishBoard() {
 
         // 最適化された状態クリア順序：
         // 1. まずサーバー側の公開停止処理が成功したことを確認
-        console.log('✅ サーバー側公開停止完了、クライアント側クリア開始');
         
         // 2. 強化されたキャッシュクリア処理（非同期で確実に実行）
         try {
           await clearAllCachesForUnpublish();
-          console.log('✅ 包括的キャッシュクリア完了');
         } catch (clearError) {
           console.warn('⚠️ キャッシュクリア中にエラー:', clearError);
           // クリア失敗でも処理は継続
@@ -2122,7 +2110,6 @@ function unpublishBoard() {
         // 3. UI状態のリセット（カラム選択等）
         try {
           resetColumnSelections();
-          console.log('✅ カラム選択リセット完了');
         } catch (resetError) {
           console.warn('⚠️ カラム選択リセット中にエラー:', resetError);
         }
@@ -2459,7 +2446,6 @@ function openDatabaseSpreadsheet() {
   // 1. グローバル変数から
   if (currentSpreadsheetUrl) {
     spreadsheetUrl = currentSpreadsheetUrl;
-    console.log('✅ URL from global variable:', spreadsheetUrl);
   }
   
   // 2. 現在のステータスから（フォールバック）
@@ -2471,7 +2457,6 @@ function openDatabaseSpreadsheet() {
   // 3. キャッシュされたステータスから（追加フォールバック）
   if (!spreadsheetUrl && window.lastStatusCache && window.lastStatusCache.userInfo) {
     spreadsheetUrl = window.lastStatusCache.userInfo.spreadsheetUrl;
-    console.log('🔄 URL from lastStatusCache:', spreadsheetUrl || 'none');
   }
   
   // 4. getActiveResourceUrls関数を使用（最終フォールバック）
@@ -2486,7 +2471,6 @@ function openDatabaseSpreadsheet() {
   
   // 5. 最終手段：リアルタイム状態取得
   if (!spreadsheetUrl && typeof loadStatus === 'function') {
-    console.log('🔄 Attempting real-time status fetch as last resort');
     try {
       // 同期的に状態を取得（最終手段）
       const button = event.target;
@@ -2494,7 +2478,6 @@ function openDatabaseSpreadsheet() {
       
       loadStatus(true).then(status => {
         if (status && status.userInfo && status.userInfo.spreadsheetUrl) {
-          console.log('✅ Got URL from real-time fetch:', status.userInfo.spreadsheetUrl);
           window.open(status.userInfo.spreadsheetUrl, '_blank');
         } else {
           console.warn('❌ Real-time fetch also failed');
@@ -2591,7 +2574,6 @@ function fetchAppSetupUrl() {
       const urls = JSON.parse(cachedUrls);
       if (urls && urls.setupUrl) {
         appSetupUrl = urls.setupUrl;
-        console.log('✅ URL cache hit - appSetupUrl loaded from localStorage');
         return;
       }
     } catch (e) {
@@ -2608,7 +2590,6 @@ function fetchAppSetupUrl() {
         try {
           localStorage.setItem('userUrls_' + userId, JSON.stringify(urls));
           localStorage.setItem('userUrls_time_' + userId, Date.now().toString());
-          console.log('✅ URLs cached to localStorage for future use');
         } catch (e) {
           console.warn('URLキャッシュ保存エラー:', e);
         }
@@ -2664,7 +2645,6 @@ function openAppSetupPage() {
         const urls = JSON.parse(cachedUrls);
         if (urls && urls.setupUrl) {
           appSetupUrl = urls.setupUrl;
-          console.log('✅ Emergency cache recovery successful');
         }
       } catch (e) {
         console.warn('緊急キャッシュ復旧失敗:', e);
@@ -2884,7 +2864,6 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
         });
         
         if (updateResult.status === 'success') {
-          console.log('✅ シート名自動修正完了:', sheetName);
           // issues配列から該当のエラーを削除
           const issueIndex = issues.findIndex(issue => issue.includes('publishedSheetName不一致'));
           if (issueIndex >= 0) {
@@ -4121,7 +4100,6 @@ async function handleCustomSetup(config) {
             freshStatus._normalized.isPublished = config.appPublished;
           }
           
-          console.log('✅ 既存フロー設定を保護・復元しました');
           
         } else if (config.appPublished === true && isCustomSetupFlow) {
           console.log('⚠️ カスタムセットアップ後に自動公開が検出されました - 手動公開前提に修正');
@@ -4133,13 +4111,11 @@ async function handleCustomSetup(config) {
             freshStatus._normalized.isPublished = false;
           }
         } else if (isQuickStartFlow) {
-          console.log('✅ QuickStartフローの自動公開状態を維持:', {
             appPublished: config.appPublished,
             setupStatus: config.setupStatus,
             formCreated: config.formCreated
           });
         } else if (isExternalResourceFlow) {
-          console.log('✅ 外部リソースインポートフローの状態を維持:', {
             appPublished: config.appPublished,
             isExternalResource: config.isExternalResource
           });
@@ -4648,14 +4624,12 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         
         // QuickStart完了時の統合UI更新処理（最適化版）
         setTimeout(() => {
-          console.log('🔄 QuickStart完了: 統合UI更新を開始');
           
           // 最重要: デバウンス制御による安全なステータス更新
           console.log('🚀 Loading system status with debounce control');
           if (window.AdminPanel && window.AdminPanel.debounce) {
             window.AdminPanel.debounce.loadStatus(() => {
               loadStatus(true).then(() => {
-                console.log('✅ QuickStart完了後のステータス更新完了（デバウンス制御）');
             
             // すべてのUI更新を1回の処理でまとめて実行
             updateFormUrlDisplay();
@@ -4684,7 +4658,6 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           } else {
             // フォールバック: デバウンス機能がない場合
             loadStatus(true).then(() => {
-              console.log('✅ QuickStart完了後のステータス更新完了（フォールバック）');
               updateFormUrlDisplay();
             }).catch(error => {
               console.error('❌ QuickStart完了後のステータス更新エラー（フォールバック）:', error);

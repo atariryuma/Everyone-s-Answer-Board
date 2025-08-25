@@ -89,7 +89,6 @@
                             config.formCreated === true && 
                             config.formUrl && config.formUrl.trim();
       
-      console.log('✅ Step 2完了チェック (統一版):', setupCompleted);
       return setupCompleted;
     } catch (error) {
       console.warn('❌ Step 2完了チェックでエラー:', error);
@@ -329,7 +328,6 @@
                 initializeUserSettings()
                   .then(result => {
                     if (result.success) {
-                      console.log('✅ 公開後の状態チェック完了:', result.message);
                     }
                   })
                   .catch(error => {
@@ -350,7 +348,6 @@
             setTimeout(() => {
               if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
                 window.sharedModals.showAutoStopConfirmation(result);
-                console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
               }
             }, 1000);
             

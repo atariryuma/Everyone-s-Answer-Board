@@ -109,7 +109,6 @@ function validateStatus(status) {
     } else {
       // 重複ヘッダー検証ログを防止
       if (shouldLogValidation) {
-        console.log('✅ シートヘッダー検証OK:', status.sheetDetails.allHeaders.length + '個のヘッダー');
       }
     }
     
@@ -121,9 +120,7 @@ function validateStatus(status) {
       // 本番環境では詳細ログを削減 + 重複防止
       if (shouldLogValidation) {
         if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-          console.log('✅ AI列判定結果が利用可能:', status.sheetDetails.guessedConfig);
         } else {
-          console.log('✅ AI列判定結果が利用可能');
         }
       }
     }
@@ -148,7 +145,6 @@ function validateStatus(status) {
   
   // 重複防止: 初回または重要な変更時のみ成功ログを出力
   if (shouldLogValidation) {
-    console.log('✅ レスポンス検証成功');
   }
   return true;
 }

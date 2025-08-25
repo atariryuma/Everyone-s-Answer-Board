@@ -234,7 +234,6 @@ async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
     } catch (error) {
       console.warn(`⚠️ UserId initialization failed (attempt ${i + 1}/${maxRetries}):`, error.message);
       if (i < maxRetries - 1) {
-        console.log(`🔄 Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         delay = Math.min(delay * 1.5, 5000); // 指数バックオフ（最大5秒）
       } else {
@@ -1075,7 +1074,6 @@ function checkFullImplementationsAvailability() {
     
     // Force retry of UI updates with full implementations now available
     if (window.currentStatus && foundCount >= 3) {
-      console.log('🔄 Retrying UI updates with full implementations');
       setTimeout(() => {
         if (typeof window._fullUpdateUIWithNewStatus === 'function') {
           window._fullUpdateUIWithNewStatus(window.currentStatus);
@@ -1177,7 +1175,6 @@ function enableUserInteraction() {
   // body要素も有効化
   document.body.style.pointerEvents = 'auto';
   
-  console.log('✅ All interactive elements enabled');
 }
 
 // DOM読み込み後に要素を無効化
@@ -1383,7 +1380,6 @@ async function initializeModulesSequentially() {
 async function finalizeInitialization() {
   setTimeout(async () => {
     try {
-      console.log('🔄 Final initialization steps...');
       
       // すべての同期が完了したらローディングオーバーレイを非表示
       if (window.unifiedLoading) {
@@ -1401,7 +1397,6 @@ async function finalizeInitialization() {
       
       // Draft recovery after initialization complete
       try {
-        console.log('🔄 Checking for draft recovery...');
         if (typeof recoverDraftIfAvailable === 'function') {
           recoverDraftIfAvailable();
         }

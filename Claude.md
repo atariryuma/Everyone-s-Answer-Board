@@ -1,298 +1,321 @@
-# コーディング指示書
+# みんなの回答ボード - サイロ型マルチテナントシステム要件定義
 
-## 1. 役割と基本姿勢 (Role & Mindset) 🤝
+## システムアーキテクチャ
 
-  * **思考のパートナー**: あなたは単なるコーダーではなく、要件定義から設計、実装、改善までを主体的に考える開発パートナーです。
-  * **要件駆動開発**: すべての機能追加や修正は、必ず`README.md`に記載されたプロジェクトの目的や要件に基づいている必要があります。
-  * **ユーザー中心設計**: 「この機能は、教師や生徒にとって最も直感的に使えるか？」を常に自問し、UX（ユーザー体験）を最優先してください。
+**基盤**: Google Apps Script V8 Runtime
+**データストア**: Google Sheets (マルチテナント対応)
+**認証**: Google OAuth2
+**フロントエンド**: HTML/CSS/JavaScript (外部ライブラリ不使用)
 
------
+## コアクラス構造
 
-## 2. 指示への応答と対話の原則 (Interaction Principles) 💬
-
-  * **応答は日本語で**: 私からの指示は日本語で行います。あなたからの応答（コード内のコメントを除く）も、すべて自然で分かりやすい日本語でお願いします。
-  * **分析と計画の先行**: **ユーザーが明示的に「実装してください」と指示するまで、コーディングを開始しないでください。**
-    1.  **要件分析**: まず、受け取った指示の内容を分析し、あなたの理解を要約して確認してください。
-    2.  **タスク提案**: 次に、その要求を実現するための具体的なタスクリストや作業計画をステップ・バイ・ステップで提案してください。
-    3.  **合意形成**: 私がその計画に同意してから、具体的な実装に着手してください。
-  * **思考の柔軟性 (stale contextの回避)**:
-      * 常に**最新の指示を最優先**してください。過去の対話や以前に生成したコード（`old_strings`）に固執せず、常に新しい文脈で最適な解決策を考えてください。
-      * もし提案に行き詰まったり、指示が不明瞭だったりした場合は、正直にそう伝え、質問や代替案を提示してください。ゼロベースで思考をリセットすることも厭わないでください。
-
------
-
-## 3. コーディング規約 (Coding Conventions) ✍️
-
-### 3.1 全般
-
-  * **インデント**: 半角スペース **2つ** を使用してください。
-  * **空白**: 行末の不要な空白（trailing whitespace）は削除してください。
-  * **最終行**: すべてのファイルの末尾には、必ず改行を1つだけ入れてください。
-  * **記法**:
-      * セミコロンは必ず付ける (`always`)。
-      * 文字列はシングルクォート (`'`) を優先する。
-      * オブジェクトや配列の末尾のカンマ (`trailing commas`) を許可する。
-      * ネストを浅くするため、**ガード節** (`guard clauses`) を積極的に利用する。
-
-### 3.2 命名規則
-
-  * **変数・関数**: `camelCase`
-  * **定数**: `UPPER_SNAKE_CASE`
-  * **クラス・コンストラクタ**: `PascalCase`
-  * **ファイル名**:
-      * 簡潔な英単語で命名する。
-      * 拡張子: `.gs`, `.html`, `.css.html`, `.js.html`
-
-### 3.3 コメントとドキュメント
-
-  * **JSDoc**: すべての関数には、その目的、引数、戻り値を説明するJSDocを記述してください。
-    ```javascript
-    /**
-     * 指定されたIDのユーザーデータを取得します。
-     * @param {string} userId ユーザーのID。
-     * @returns {Object|null} ユーザーデータオブジェクト。見つからない場合はnull。
-     */
-    function fetchUserData(userId) { /* ... */ }
-    ```
-  * **インラインコメント**: 複雑なロジックや、仕様上特別な意図がある箇所には、インラインコメントで「なぜ」そうなっているのかを説明してください。
-  * **TODO管理**: `// TODO(#123): APIエンドポイントを更新` のように、チケット番号や課題管理番号を付けてタスクを明記してください。
-
------
-
-## 4. アプリケーション設計 (Application Architecture) 🏗️
-
-### 4.1 サーバー (GAS) とクライアントの分離
-
-  * **サーバーサイド (`.gs`)**:
-      * ビジネスロジックに専念し、DOM操作などのUI関連コードは一切含めないでください。
-      * クライアントからのエントリーポイントは原則として `doGet(e)` と `doPost(e)` のみとし、実際の処理はモジュールに委譲してください。
-      * データの取得、更新、削除はすべてサーバーサイドの関数で実行します。
-  * **クライアントサイド (`.html`, `.js.html`, `.css.html`)**:
-      * UIはHTMLテンプレートと外部JS/CSSで構築します。
-      * データは**非同期**で取得し、初期表示では「読み込み中...」などのプレースホルダーを表示してください。
-      * `google.script.run` を使ってサーバー関数を呼び出します。
-
-### 4.2 モジュール管理 (Import/Exportの代替)
-
-Google Apps ScriptはES Modulesの`import`/`export`構文をネイティブサポートしていません。本プロジェクトでは、以下のいずれかの方法でモジュール管理を行います。大規模なプロジェクトでは`clasp`とバンドラーの利用を推奨します。
-
-#### 4.2.1 推奨: `clasp` とバンドラー (Webpack/Rollup/esbuild)
-
-ローカル開発環境でES Modules (`import`/`export`) を使用し、デプロイ時にGASが理解できる形式（単一のJavaScriptファイルなど）にバンドルする方法です。`clasp`はGASプロジェクトをローカルで管理するためのCLIツールです。
-
-**ワークフローの概要**:
-1.  ローカルで `clasp` をセットアップし、GASプロジェクトをクローンまたは作成します。
-2.  プロジェクトにNode.jsとnpm/yarnを使用して、Webpack, Rollup, またはesbuildなどのバンドラーをインストールします。
-3.  ソースコードをES Modules構文 (`.js` または `.ts`) で記述します。
-4.  バンドラーを設定し、すべてのモジュールを一つの`.gs`ファイル（または複数のファイルに分割して）にコンパイルするようにします。
-5.  `clasp push` コマンドで、バンドルされたファイルをGASプロジェクトにアップロードします。
-
-**例 (概念)**:
-
-`src/utils/MyUtility.js`:
 ```javascript
-// src/utils/MyUtility.js
-/**
- * 2つの数値を加算します。
- * @param {number} a 最初の数値。
- * @param {number} b 2番目の数値。
- * @returns {number} 合計値。
- */
-export function add(a, b) {
-  return a + b;
+// エラー処理
+UnifiedErrorHandler
+SystemIntegrationManager
+MultiTenantSecurityManager
+
+// キャッシュ管理
+CacheManager
+UnifiedExecutionCache
+ManagedExecutionContext
+
+// データ処理
+UnifiedBatchProcessor
+ResilientExecutor
+UnifiedSecretManager
+
+// ユーティリティ
+UnifiedUserManager
+UnifiedURLManager
+UnifiedAPIClient
+UnifiedValidation
+```
+
+## グローバル定数・変数
+
+```javascript
+// エラー定義
+ERROR_SEVERITY: {CRITICAL,HIGH,MEDIUM,LOW,INFO}
+ERROR_CATEGORIES: {SYSTEM,DATA,USER,EXTERNAL,CONFIG,SECURITY}
+
+// 表示モード
+DISPLAY_MODES: {ANONYMOUS,NAMED,EMAIL}
+
+// キャッシュ設定
+USER_CACHE_TTL: 300
+EXECUTION_MAX_LIFETIME: 300000
+LOCK_TIMEOUTS: {standard,critical,batch}
+
+// カラム定義
+COLUMN_HEADERS: {TIMESTAMP,CLASS,NAME,EMAIL,OPINION,REASON}
+
+// スコア設定
+SCORING_CONFIG: {weights,bonuses}
+REACTION_KEYS: ['UNDERSTAND','LIKE','CURIOUS']
+```
+
+## 主要関数マップ
+
+### エントリーポイント
+- `doGet(e)` → `routeRequestByMode(params)` → 各ハンドラー
+
+### ルーティング
+- `handleDefaultRoute()` - デフォルト
+- `handleLoginMode()` - ログイン画面
+- `handleAppSetupMode()` - セットアップ画面
+- `handleAdminMode(params)` - 管理画面
+- `handleViewMode(params)` - 閲覧画面
+
+### ユーザー管理
+- `findUserById(userId)` - ID検索
+- `findUserByEmail(email)` - メール検索
+- `createUser(userData)` - 新規作成
+- `updateUser(userId,data)` - 更新
+- `createOrUpdateUser(email,additionalData)` - 作成/更新
+- `verifyUserAccess(requestUserId)` - アクセス検証
+
+### データ取得
+- `getPublishedSheetData(requestUserId,classFilter,sortOrder,adminMode,bypassCache)`
+- `executeGetPublishedSheetData(requestUserId,classFilter,sortOrder,adminMode)`
+- `getSheetData(requestUserId,sheetName,classFilter,sortMode,adminMode)`
+- `executeGetSheetData(userId,sheetName,classFilter,sortMode,adminMode)`
+
+### セットアップ
+- `initializeQuickStartContext(requestUserId)` - クイックスタート初期化
+- `createFormAndSheet(email,userId,config)` - フォーム/シート作成
+- `executeCustomSetup(requestUserId,config)` - カスタムセットアップ
+- `autoMapHeaders(headers,sheetName)` - ヘッダー自動マッピング
+
+### 設定管理
+- `saveSheetConfig(userId,spreadsheetId,sheetName,config,options)`
+- `switchToSheet(userId,spreadsheetId,sheetName,options)`
+- `setDisplayOptions(requestUserId,displayOptions,options)`
+- `saveAndActivateSheet(requestUserId,spreadsheetId,sheetName,config)`
+
+### フォーム管理
+- `createGoogleForm(email,config)` - フォーム作成
+- `updateFormTitle(requestUserId,title,description)` - タイトル更新
+- `detectFormUrlFromSpreadsheet(spreadsheetId)` - フォームURL検出
+
+### キャッシュ管理
+- `cacheManager.get(key,generator,options)` - 取得
+- `cacheManager.set(key,value,options)` - 設定
+- `cacheManager.invalidate(patterns)` - 無効化
+- `clearExecutionUserInfoCache()` - 実行キャッシュクリア
+
+### セキュリティ
+- `getServiceAccountTokenCached()` - SAトークン取得
+- `validateConfigSecurity(config)` - 設定検証
+- `performComprehensiveSecurityHealthCheck()` - セキュリティ監査
+
+## データ構造
+
+### userInfo (データベースレコード)
+```javascript
+{
+  userId: string,           // 一意識別子
+  adminEmail: string,       // 管理者メール
+  spreadsheetId: string,    // スプレッドシートID
+  configJson: string,       // JSON設定文字列
+  createdAt: ISO8601,
+  lastAccessedAt: ISO8601,
+  isActive: boolean,
+  deletedAt: ISO8601|null
 }
 ```
 
-`src/main.js`:
+### configJson (解析後)
 ```javascript
-// src/main.js
-import { add } from './utils/MyUtility';
-
-/**
- * メイン関数。
- */
-function myFunction() {
-  const result = add(10, 20);
-  Logger.log('Result: ' + result);
-}
-
-// GASのエントリポイントとしてグローバルに公開
-// バンドラーの設定により、この部分が自動的に生成される場合もあります。
-global.myFunction = myFunction;
-```
-
-#### 4.2.2 代替: 即時実行関数式 (IIFE) と名前空間パターン
-
-小規模なプロジェクトや、バンドラーの導入が難しい場合に利用します。各`.gs`ファイルが1つのグローバルオブジェクト（モジュール）を公開し、他のファイルはそれを利用します。IIFEを使用することで、プライベートスコープを作成し、グローバルスコープの汚染を最小限に抑えます。
-
-**例**:
-
-`src/modules/DatabaseService.gs`:
-```javascript
-/**
- * データベース操作に関するサービスを提供します。
- */
-const DatabaseService = (function() {
-  // プライベート変数や関数
-  const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
-
-  /**
-   * @private
-   * スプレッドシートを取得します。
-   * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} スプレッドシートオブジェクト。
-   */
-  function _getSpreadsheet() {
-    return SpreadsheetApp.openById(SPREADSHEET_ID);
-  }
-
-  // 公開するメンバー
-  return {
-    /**
-     * 指定されたシートからすべてのデータを取得します。
-     * @param {string} sheetName シート名。
-     * @returns {Array<Array<any>>} シートの全データ。
-     */
-    getAllData: function(sheetName) {
-      const sheet = _getSpreadsheet().getSheetByName(sheetName);
-      if (!sheet) {
-        throw new Error(`Sheet "${sheetName}" not found.`);
-      }
-      return sheet.getDataRange().getValues();
-    },
-
-    /**
-     * 指定されたシートにデータを書き込みます。
-     * @param {string} sheetName シート名。
-     * @param {Array<Array<any>>} data 書き込むデータ。
-     */
-    writeData: function(sheetName, data) {
-      const sheet = _getSpreadsheet().getSheetByName(sheetName);
-      if (!sheet) {
-        throw new Error(`Sheet "${sheetName}" not found.`);
-      }
-      sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
-    }
-  };
-})();
-```
-
-`src/Code.gs` (または他のファイル):
-```javascript
-/**
- * DatabaseServiceの機能を使用する例です。
- */
-function processData() {
-  try {
-    const allUsers = DatabaseService.getAllData('Users');
-    Logger.log('Users data: ' + JSON.stringify(allUsers));
-
-    const newData = [['New User', 'new@example.com']];
-    DatabaseService.writeData('Logs', newData);
-    Logger.log('Data written to Logs sheet.');
-
-  } catch (e) {
-    Logger.log('Error: ' + e.message);
+{
+  // 基本設定
+  setupStatus: 'pending'|'completed',
+  ownerId: string,
+  
+  // 公開設定
+  appPublished: boolean,
+  publishedSpreadsheetId: string,
+  publishedSheetName: string,
+  
+  // フォーム設定
+  formCreated: boolean,
+  formUrl: string,
+  editFormUrl: string,
+  
+  // 表示設定
+  displayMode: 'ANONYMOUS'|'NAMED'|'EMAIL',
+  showReactionCounts: boolean,
+  savedClassChoices: string[],
+  
+  // シート固有設定 (sheet_${sheetName})
+  'sheet_xxx': {
+    timestampHeader: string,
+    classHeader: string,
+    nameHeader: string,
+    emailHeader: string,
+    opinionHeader: string,
+    reasonHeader: string,
+    guessedConfig: object,
+    lastModified: ISO8601
   }
 }
 ```
 
-### 4.3 APIラッパーの導入
+## マルチテナントフロー
 
-`DriveApp` や `SpreadsheetApp` などのGASネイティブサービスをビジネスロジックから直接呼び出すことは禁止します。必ずサービスごとにラッパーモジュールを作成してください。これにより、テスト時のモック化や将来の仕様変更が容易になります。
-
-```javascript
-// service/DriveService.gs
-const DriveService = {
-  /**
-   * ファイルIDでファイルを取得します。
-   * @param {string} fileId ファイルのID。
-   * @returns {GoogleAppsScript.Drive.File} Driveのファイルオブジェクト。
-   */
-  getFileById(fileId) {
-    return DriveApp.getFileById(fileId);
-  }
-};
+### 1. 初回セットアップ
+```
+ユーザーアクセス → doGet → handleDefaultRoute
+→ 新規ユーザー作成 → handleAppSetupMode
+→ initializeQuickStartContext → createFormAndSheet
+→ データベース初期化 → 管理画面リダイレクト
 ```
 
------
+### 2. 管理者アクセス
+```
+doGet(mode=admin,uid=xxx) → handleAdminMode
+→ verifyUserAccess → findUserById
+→ renderAdminPanel → 管理画面表示
+```
 
-## 5. API利用のベストプラクティス 🚀
+### 3. 閲覧者アクセス
+```
+doGet(mode=view,uid=xxx) → handleViewMode
+→ verifyUserAccess → getPublishedSheetData
+→ renderAnswerBoard → 回答ボード表示
+```
 
-### 5.1 パフォーマンス最適化
+### 4. データ更新
+```
+google.script.run.saveSheetConfig → verifyUserAccess
+→ updateUser → キャッシュ無効化
+→ 成功レスポンス
+```
 
-  * **バッチ処理**: 複数の読み取りや書き込みは、`getAllValues()`, `setValues()` や `batchUpdate` を利用してAPI呼び出し回数を最小限に抑えてください。
-  * **フィールド指定**: Drive APIなどのAdvanced Serviceを利用する際は、必ず `fields` パラメータで必要なフィールドのみを指定してください。
-    `Drive.Files.get(fileId, { fields: 'id, name, mimeType' });`
-  * **キャッシュ**:
-      * **CacheService**: 変更頻度の低いデータは `CacheService` を使って数分〜数時間キャッシュし、API呼び出しを削減してください。
-      * **localStorage**: クライアント側でUIの状態などを `localStorage` に保存し、不要なサーバー通信を避けてください。
+## キャッシュ戦略
 
-### 5.2 堅牢性
+### 階層構造
+1. **実行キャッシュ** (メモリ): 単一実行内
+2. **スクリプトキャッシュ** (6時間): CacheService.getScriptCache()
+3. **ユーザーキャッシュ** (無期限): PropertiesService.getUserProperties()
+4. **永続ストレージ**: Google Sheets
 
-  * **指数バックオフ**: APIの呼び出しが失敗した場合（特にネットワークエラーや割り当て超過）、`Utilities.sleep()` を使った指数バックオフ付きのリトライ処理を実装してください。
-  * **LockService**: 同時に実行される可能性があるトリガー処理など、競合が起きうる処理には `LockService` を使用して排他制御を行ってください。
+### キャッシュキー命名
+- ユーザー情報: `user_${userId}`
+- シートデータ: `publishedData_${userId}_${ssId}_${sheet}_${filter}_${sort}`
+- サービストークン: `SA_TOKEN_CACHE`
+- 設定: `config_${userId}_${sheetName}`
 
------
+## エラー処理パターン
 
-## 6. セキュリティ対策 (Security Measures) 🛡️
+### UnifiedErrorHandler
+```javascript
+try {
+  // 処理
+} catch (error) {
+  logError(error, functionName, severity, category, metadata);
+  throw createStructuredError(message, code, details);
+}
+```
 
-  * **機密情報の管理**: APIキーやパスワードなどの機密情報は、コードにハードコーディングせず、必ず **`PropertiesService`** を使用して安全に保管してください。
-  * **最小権限の原則**: `appsscript.json` に設定するOAuthスコープは、アプリケーションが必要とする最小限の範囲に限定してください。
-  * **XSS対策**: `HtmlService` を使用する際は、`setXssProtection(HtmlService.XssProtectionMode.V8)` を有効にし、クロスサイトスクリプティングを防止してください。
-  * **入力のサニタイズ**: ユーザーからの入力は、サーバー側で必ず検証・サニタイズ処理を行ってから使用してください。
+### ResilientExecutor
+```javascript
+resilientExecutor.execute(operation, {
+  maxRetries: 3,
+  retryDelay: 1000,
+  exponentialBackoff: true
+});
+```
 
------
+## セキュリティ要件
 
-## 7. テストとデバッグ (Testing & Debugging) 🐞
+### アクセス制御
+- `verifyUserAccess(requestUserId)` - 全API必須
+- `isOwner` チェック - 管理機能
+- `appPublished` チェック - 公開状態
 
-本プロジェクトでは、`jest` を使用したローカルでの単体テストを推奨します。
+### データ分離
+- userId基準の完全分離
+- configJson内で独立管理
+- クロステナントアクセス禁止
 
-  * **単体テスト**: サーバーサイドのビジネスロジックは、`jest` を使って単体テストを記述してください。
-  * **GASグローバルオブジェクトのモック化**: `SpreadsheetApp` や `DriveApp` など、GAS固有のグローバルオブジェクトは、Jestのセットアップファイルやテストファイル内でモック化してください。これにより、GAS環境に依存せずにテストを実行できます。
-    ```javascript
-    // jest.setup.js (例: Jestのセットアップファイル)
-    global.SpreadsheetApp = {
-      openById: jest.fn(() => ({
-        getSheetByName: jest.fn(() => ({
-          getDataRange: jest.fn(() => ({
-            getValues: jest.fn(() => [['header1', 'header2'], ['data1', 'data2']]),
-          })),
-          getRange: jest.fn(() => ({
-            setValues: jest.fn(),
-          })),
-        })),
-      })),
-    };
-    global.Logger = {
-      log: jest.fn(),
-    };
-    // 他のGASサービスも同様にモック化
-    ```
-  * **モック化**: 4.3で作成したAPIラッパーをモック化し、外部サービスへの依存を排除してください。
-  * **CI連携**: `clasp` とGitHub Actionsなどを連携させ、`npm test` が自動実行されるCI環境を構築してください。
-  * **ロギング**:
-      * デバッグ時には `Logger.log()` を、本番環境のモニタリングには `console.log()` (Google Cloud's operations suite) を使用してください。
-      * ログには `[DriveService] getFileById success: fileId=...` のように、どのモジュールのどの処理か分かるプレフィックスを付けてください。
+## パフォーマンス最適化
 
------
+### バッチ処理
+- `batchGetSheetsData()` - 複数範囲同時取得
+- `batchUpdateSheetsData()` - 複数更新同時実行
+- `UnifiedBatchProcessor` - 統合バッチ管理
 
-## 8. Gitとデプロイ (Git & Deployment) 🌿
+### 実行時間管理
+- 5分制限内での処理完了
+- `EXECUTION_MAX_LIFETIME` チェック
+- 長時間処理の分割実行
 
-  * **コミットメッセージ**: [Conventional Commits](https://www.conventionalcommits.org/) の規約に従ってください。
-      * `feat(server): ユーザー取得機能の追加`
-      * `fix(ui): モーダル表示の不具合を修正`
-  * **ブランチ戦略**: `feature/add-new-button`, `bugfix/login-error` のような命名規則でブランチを作成してください。
-  * **プルリクエスト**:
-      * PRは小さく、単一の関心事に集中させてください。
-      * 「何を」「なぜ」「どのように」変更したのかを明確に記述してください。
+## デプロイメント
 
------
+### 必須設定 (PropertiesService.getScriptProperties())
+```javascript
+SERVICE_ACCOUNT_CREDS  // サービスアカウント認証情報
+DATABASE_SPREADSHEET_ID  // データベースID
+CLIENT_ID  // OAuth クライアントID (オプション)
+DEBUG_MODE  // デバッグモード (true/false)
+```
 
-## 9. ドキュメント (Documentation) 📚
+### トリガー設定
+- `performPeriodicMaintenance()` - 1時間ごと
+- `cleanupOldLogs()` - 1日ごと
 
-  * **README.md**: プロジェクトの概要、目的、セットアップ手順、使い方を常に最新の状態に保ってください。
-  * **CHANGELOG.md**: 主要な機能追加や破壊的変更を記録してください。
+## 監視・診断
 
------
+### ヘルスチェック
+- `performHealthCheck()` - システム健全性
+- `performPerformanceCheck()` - パフォーマンス
+- `performSecurityCheck()` - セキュリティ
+- `diagnoseDatabase(targetUserId)` - データベース診断
 
-これらのガイドラインを遵守し、高品質で保守性の高いコードを協力して作成していきましょう。不明な点があれば、いつでもこのドキュメントを参照してください。
+### ログ管理
+- `infoLog()`, `warnLog()`, `errorLog()`, `debugLog()`
+- 診断ログ: DIAGNOSTIC_LOGS シート
+- 削除ログ: DELETE_LOGS シート
+
+## クライアント連携
+
+### google.script.run 主要API
+```javascript
+// データ取得
+getPublishedSheetData(userId, classFilter, sortOrder, adminMode)
+getAppConfig(userId)
+getActiveFormInfo(userId)
+
+// 設定管理
+saveSheetConfig(userId, spreadsheetId, sheetName, config)
+setDisplayOptions(userId, displayOptions)
+switchToSheet(userId, spreadsheetId, sheetName)
+
+// セットアップ
+executeQuickStartSetup(userId)
+executeCustomSetup(userId, config)
+
+// ユーザー管理
+updateUserActiveStatus(userId, isActive)
+getCurrentUserStatus(userId)
+```
+
+## 開発規約
+
+### 命名規則
+- 関数: `camelCase`
+- 定数: `UPPER_SNAKE_CASE`
+- クラス: `PascalCase`
+- プライベート変数: `_prefixedCamelCase`
+
+### コード構造
+- 早期リターン推奨
+- エラーは構造化して投げる
+- JSDoc必須
+- 日本語コメント可
+
+### テスト要件
+- 単体テスト: Jest
+- 統合テスト: 実環境検証
+- セキュリティ監査: 定期実行

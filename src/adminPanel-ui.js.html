@@ -246,7 +246,6 @@ function _fullUpdateUIWithNewStatus(status) {
     return;
   }
   
-  console.log('✅ UI update proceeding:', { isPublished, hasUpdateReasons: allowUpdateReasons.some(r => r) });
   
   try {
     // === 直接的なUI更新（シンプル版） ===
@@ -262,7 +261,6 @@ function _fullUpdateUIWithNewStatus(status) {
     const emailElement = document.getElementById('info-admin-email');
     if (emailElement) {
       emailElement.textContent = adminEmail;
-      console.log('✅ Email updated:', adminEmail);
     } else {
       console.warn('⚠️ Email element not found');
     }
@@ -271,7 +269,6 @@ function _fullUpdateUIWithNewStatus(status) {
     const userIdElement = document.getElementById('info-user-id');
     if (userIdElement) {
       userIdElement.textContent = userId;
-      console.log('✅ User ID updated:', userId);
     } else {
       console.warn('⚠️ User ID element not found');
     }
@@ -286,7 +283,6 @@ function _fullUpdateUIWithNewStatus(status) {
     const publishTextElement = document.getElementById('info-publish-text');
     if (publishTextElement) {
       publishTextElement.textContent = publishText;
-      console.log('✅ Publish text updated:', publishText);
     }
     
     // 公開状態インジケーター
@@ -295,7 +291,6 @@ function _fullUpdateUIWithNewStatus(status) {
       publishIndicator.className = isPublished 
         ? 'w-2 h-2 rounded-full bg-green-400' 
         : 'w-2 h-2 rounded-full bg-gray-400';
-      console.log('✅ Publish indicator updated');
     }
     
     // 公開シート名の更新
@@ -303,7 +298,6 @@ function _fullUpdateUIWithNewStatus(status) {
     const sheetElement = document.getElementById('info-published-sheet');
     if (sheetElement) {
       sheetElement.textContent = publishedSheet;
-      console.log('✅ Published sheet updated:', publishedSheet);
     }
     
     // 表示モードの更新
@@ -312,7 +306,6 @@ function _fullUpdateUIWithNewStatus(status) {
     const displayModeElement = document.getElementById('info-display-mode');
     if (displayModeElement) {
       displayModeElement.textContent = displayMode;
-      console.log('✅ Display mode updated:', displayMode);
     } else {
       console.warn('⚠️ Display mode element not found');
     }
@@ -322,7 +315,6 @@ function _fullUpdateUIWithNewStatus(status) {
     const showCountsElement = document.getElementById('info-show-counts');
     if (showCountsElement) {
       showCountsElement.textContent = showCounts;
-      console.log('✅ Show counts updated:', showCounts);
     } else {
       console.warn('⚠️ Show counts element not found');
     }
@@ -336,7 +328,6 @@ function _fullUpdateUIWithNewStatus(status) {
     const sheetsData = status.sheetNames || status.allSheets || [];
     if (sheetsData.length > 0) {
       populateSheetSelect(sheetsData, status.activeSheetName);
-      console.log('✅ Sheet dropdown updated with', sheetsData.length, 'sheets');
     } else {
       console.log('⚠️ No sheet data available for dropdown');
     }
@@ -351,7 +342,6 @@ function _fullUpdateUIWithNewStatus(status) {
       viewUrl: viewUrl,
       hasValidViewUrl: !!viewUrl
     };
-    console.log('✅ Footer data prepared:', {
       isPublished: publicationState.isPublished,
       hasViewUrl: !!viewUrl,
       reason: publicationState.reason
@@ -483,7 +473,6 @@ function updateStaticUI(status) {
     setTimeout(() => {
       const select = document.getElementById('sheet-select');
       if (select && select.value !== status.activeSheetName) {
-        console.log('🔄 Force updating active sheet selection:', status.activeSheetName);
         updateActiveSheetUI(status.activeSheetName);
       }
     }, 100);
@@ -523,7 +512,6 @@ function updateDatabaseInfo(status) {
   
   if (status.userInfo.spreadsheetUrl) {
     currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
-    console.log('✅ currentSpreadsheetUrl updated:', currentSpreadsheetUrl);
     
     // 即座に検証
     if (currentSpreadsheetUrl !== status.userInfo.spreadsheetUrl) {
@@ -734,7 +722,6 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       
       if (exactMatch) {
         fallbackSheet = exactMatch.value;
-        console.log('✅ Found exact match after normalization:', fallbackSheet);
       } else {
         // 2. 部分一致を試行（履歴復元で役立つ）
         const partialMatch = availableOptions.find(option => 
@@ -744,11 +731,9 @@ function populateSheetSelect(sheetNames, activeSheetName) {
         
         if (partialMatch) {
           fallbackSheet = partialMatch.value;
-          console.log('✅ Found partial match:', fallbackSheet);
         } else if (availableOptions.length > 1) {
           // 3. 最初の有効なオプションを選択
           fallbackSheet = availableOptions[1].value;
-          console.log('✅ Using first available option:', fallbackSheet);
         }
       }
       
@@ -1397,7 +1382,6 @@ function updateTopicText(status) {
       const sheetConfigKey = `sheet_${cfg.publishedSheetName}`;
       if (cfg[sheetConfigKey] && typeof cfg[sheetConfigKey] === 'object' && cfg[sheetConfigKey].opinionHeader) {
         topic = cfg[sheetConfigKey].opinionHeader;
-        console.log(`✅ Topic found from sheet config (${sheetConfigKey}):`, topic);
       } else {
         console.warn(`⚠️ No opinion header found in sheet config: ${sheetConfigKey}`, cfg[sheetConfigKey]);
       }
@@ -1409,10 +1393,8 @@ function updateTopicText(status) {
   // 優先順位: customFormInfo > シート固有設定 > 一般設定
   if (!topic && status.customFormInfo && status.customFormInfo.mainQuestion) {
     topic = status.customFormInfo.mainQuestion;
-    console.log('✅ Topic from customFormInfo:', topic);
   } else if (!topic && cfg.opinionHeader) {
     topic = cfg.opinionHeader;
-    console.log('✅ Topic from cfg.opinionHeader:', topic);
   }
   
   if (!topic) {
@@ -1429,11 +1411,9 @@ function updateTopicText(status) {
           // guessedConfig内のopinionHeaderを優先
           if (sheetCfg.guessedConfig && sheetCfg.guessedConfig.opinionHeader) {
             topic = sheetCfg.guessedConfig.opinionHeader;
-            console.log('✅ Topic from guessedConfig:', topic);
           } else if (sheetCfg.opinionHeader) {
             // フォールバック: 直接のopinionHeader
             topic = sheetCfg.opinionHeader;
-            console.log('✅ Topic from direct opinionHeader:', topic);
           } else {
             console.warn('⚠️ No opinion header found in sheet config, trying alternatives');
             // Try alternative headers
@@ -1441,11 +1421,9 @@ function updateTopicText(status) {
             for (const header of alternativeHeaders) {
               if (sheetCfg.guessedConfig && sheetCfg.guessedConfig[header]) {
                 topic = sheetCfg.guessedConfig[header];
-                console.log(`✅ Topic from alternative header (${header}):`, topic);
                 break;
               } else if (sheetCfg[header]) {
                 topic = sheetCfg[header];
-                console.log(`✅ Topic from direct alternative header (${header}):`, topic);
                 break;
               }
             }
@@ -1677,7 +1655,6 @@ function expandActiveSection(stepNumber) {
 
 // Manage section states based on current step (simplified - no visual effects)
 function manageSectionStates(currentStep) {
-  console.log(`🔄 Managing section states for step ${currentStep}`);
   
   // ステップごとのセクション制御
   for (let i = 1; i <= 3; i++) {
@@ -1697,13 +1674,11 @@ function manageSectionStates(currentStep) {
         }
       }
       
-      console.log(`🔄 Step ${i}: Active (current step)`);
     } else if (i < currentStep) {
       // 完了済みステップ: アクセス可能だが、展開は任意
       if (section) {
         section.classList.add('opacity-90'); // 完了した状態を視覚的に示す
       }
-      console.log(`✅ Step ${i}: Completed (accessible)`);
     } else {
       // 未来のステップ: Step 1の場合はpending状態でも全て閲覧可能
       if (currentStep === 1) {
@@ -1811,7 +1786,6 @@ function showConfirmationModal(title, message, onConfirm) {
     
     // 確認ボタンのクリックイベント
     confirmBtn.onclick = function() {
-      console.log('✅ 確認ボタンがクリックされました');
       hideConfirmationModal();
       if (onConfirm) {
         try {
@@ -1833,7 +1807,6 @@ function showConfirmationModal(title, message, onConfirm) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     manageFocusForModal('confirmation-modal', true);
-    console.log('✅ 確認モーダルを表示しました');
   } else {
     console.error('❌ モーダル要素が見つかりません。フォールバックを使用します。');
     // フォールバック: ブラウザ標準の確認ダイアログ
@@ -2045,13 +2018,11 @@ function handleSheetSelectionChange(event) {
 
       // シート名をサニタイズしてからAPI呼び出し
       const sanitizedSheetName = newSelectedSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
-      console.log(`🔄 Sanitized sheet name: "${newSelectedSheet}" → "${sanitizedSheetName}"`);
 
       // アクティブシートの列データを取得して列選択を更新
       const effectiveId = _resolveSpreadsheetIdForApi(currentStatus);
       loadConfigForSelected(sanitizedSheetName, effectiveId)
         .then(result => {
-          console.log('✅ シート設定読み込み完了:', result);
           updateUIForSelectedSheet();
         })
         .catch(error => {
@@ -2095,7 +2066,6 @@ function activateSelectedSheet(sheetName) {
   // サーバー側でアクティブシートを設定
   runGasWithUserId('setActiveSheet', 'シートをアクティブ化中...', sheetName)
     .then(response => {
-      console.log('✅ シートアクティブ化完了:', response);
       
       // currentStatusを更新
       if (currentStatus.userInfo.configJson) {
@@ -2108,7 +2078,6 @@ function activateSelectedSheet(sheetName) {
           // UI上のシート選択状態を更新
           updateActiveSheetUI(sheetName);
           
-          console.log('✅ ローカル状態更新完了');
         } catch (e) {
           console.warn('⚠️ configJson更新に失敗:', e);
         }
@@ -2160,7 +2129,6 @@ function updateActiveSheetUI(sheetName) {
     uiUpdateCount = 0; // 新しいシートの場合はカウントリセット
   }
   
-  console.log('🔄 updateActiveSheetUI called with:', sheetName);
   
   const select = document.getElementById('sheet-select');
   if (!select) {
@@ -2180,7 +2148,6 @@ function updateActiveSheetUI(sheetName) {
       lastSelectedSheetName = normalizedSheetName;
       lastUIUpdateSheet = normalizedSheetName;
       uiUpdateCount++;
-      console.log('✅ Active sheet UI updated:', normalizedSheetName);
       
       // アクティブ表示も更新
       updateSheetSelectActiveIndicator(normalizedSheetName);
@@ -2195,7 +2162,6 @@ function updateActiveSheetUI(sheetName) {
 
 // 新しい関数: シート選択の再同期
 function refreshSheetSelection() {
-  console.log('🔄 refreshSheetSelection called');
   
   // 現在の状態からアクティブシート情報を取得
   if (window.currentStatus && window.currentStatus.activeSheetName) {
@@ -2282,9 +2248,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
       console.log('⚡ Using cached sheet details from integrated API');
       try {
         populateHeaderOptions(currentStatus.sheetDetails.allHeaders);
-        console.log('✅ Header options populated from cache');
         populateConfig(currentStatus.sheetDetails.guessedConfig);
-        console.log('✅ AI configuration applied from cache');
         resolve({ source: 'cache', headers: currentStatus.sheetDetails.allHeaders, config: currentStatus.sheetDetails.guessedConfig });
         return; // Early return - no API call needed
       } catch (error) {
@@ -2295,14 +2259,12 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
 
   // Force fresh API call if fresh save protection is active or cache unavailable
   if (isFreshSaveActive) {
-    console.log('🔄 Fresh save protection active - forcing API call for latest data');
   } else {
     console.log('📞 Making API call for sheet details:', sheetName);
   }
   
     runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, sheetName)
       .then(function(details) {
-        console.log('✅ Sheet details loaded via API:', details);
         
         // If headers are empty, and we have retries left, try again after a delay
         if (details && (!details.allHeaders || details.allHeaders.length === 0) && retryCount < maxRetries) {
@@ -2319,11 +2281,9 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
         try {
           // 1) ヘッダー一覧をUIへ反映
           populateHeaderOptions(details.allHeaders);
-          console.log('✅ Header options populated from API');
 
           // 2) AI推定を適用
           populateConfig(details.guessedConfig);
-          console.log('✅ AI configuration applied from API');
           if (retryCount > 0) {
             showMessage('✅ シート情報が正常に読み込まれました！', 'success');
           }
@@ -2365,9 +2325,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
               .then(details => {
                 try {
                   populateHeaderOptions(details.allHeaders);
-                  console.log('✅ Header options populated from fallback API');
                   populateConfig(details.guessedConfig);
-                  console.log('✅ AI configuration applied from fallback API');
                   resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
                 } catch (err2) {
                   console.error('Error in fallback config population sequence:', err2);
@@ -2388,9 +2346,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
               .then(details => {
                 try {
                   populateHeaderOptions(details.allHeaders);
-                  console.log('✅ Header options populated from fallback API');
                 populateConfig(details.guessedConfig);
-                console.log('✅ AI configuration applied from fallback API');
                 resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
               } catch (err2) {
                 console.error('Error in fallback config population sequence:', err2);
@@ -2482,7 +2438,6 @@ function clearInitialDisplayElements() {
   const initialContainer = document.getElementById('header-domain-initial');
   if (initialContainer) {
     initialContainer.style.display = 'none';
-    console.log('✅ 初期ドメイン表示を非表示');
   }
   
   // 適切なドメイン情報を表示
@@ -2497,7 +2452,6 @@ function clearInitialDisplayElements() {
   existingGuides.forEach(guide => {
     if (guide) {
       guide.remove();
-      console.log('✅ 既存セットアップガイドを削除');
     }
   });
 }
@@ -2521,7 +2475,6 @@ function showAppropriateHeaderStatus() {
       domainText.textContent = 'naha-okinawa.ed.jp'; // cspell:disable-line
     }
     
-    console.log('✅ ドメイン一致表示を有効化');
   }
 }
 
@@ -2557,7 +2510,6 @@ function updateButtonStatesForSetup(status) {
     }
   });
   
-  console.log('✅ ボタン状態を適切に更新しました');
 }
 
 
@@ -2824,7 +2776,6 @@ function normalizeConfigJson(config, userInfo) {
   
   // 本番環境では詳細ログを削減
   if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-    console.log('✅ configJson正規化完了:', {
       setupStatus: config.setupStatus,
       appPublished: config.appPublished,
       publishedSheetName: config.publishedSheetName
@@ -2915,7 +2866,6 @@ function validateConfigJsonIntegrity(config, userInfo) {
   
   // 結果表示
   if (issues.length === 0) {
-    console.log('✅ 整合性検証完了: 問題なし');
   } else {
     console.warn('⚠️ 整合性問題検出:', issues);
   }
@@ -3038,7 +2988,6 @@ function ensureRequiredFields(config) {
   if (config.autoStopEnabled === undefined) config.autoStopEnabled = true;
   if (config.autoStopMinutes === undefined) config.autoStopMinutes = 360;
   
-  console.log('✅ ensureRequiredFields completed');
   return config;
 }
 
@@ -3134,7 +3083,6 @@ if (window.AdminPanel && window.AdminPanel.functionRegistry) {
   // Immediately check for full implementations after registration
   setTimeout(() => {
     const foundCount = window.AdminPanel.functionRegistry.checkForFullImplementations();
-    console.log(`✅ Full implementation registration complete: ${foundCount}/6 functions available`);
   }, 50);
 } else {
   console.warn('⚠️ AdminPanel.functionRegistry not available for full implementation registration');
