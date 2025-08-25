@@ -2212,7 +2212,7 @@ function getDeployUserDomainInfo() {
     const currentDomain = getEmailDomain(activeUserEmail);
 
     // 統一されたURL取得システムを使用（開発URL除去機能付き）
-    const webAppUrl = getWebAppUrl();
+    const webAppUrl = ScriptApp.getService().getUrl();
     let deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
 
     if (webAppUrl) {
@@ -3170,7 +3170,7 @@ function showErrorPage(title, message, error) {
  * @return {string}
  */
 function buildUserAdminUrl(userId) {
-  const baseUrl = getWebAppUrl();
+  const baseUrl = ScriptApp.getService().getUrl();
   return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
 }
 
@@ -3183,7 +3183,7 @@ const URLBuilder = {
    * @returns {string} ログインページURL
    */
   login: function() {
-    const baseUrl = getWebAppUrl();
+    const baseUrl = ScriptApp.getService().getUrl();
     return `${baseUrl}?mode=login`;
   },
 
@@ -3193,7 +3193,7 @@ const URLBuilder = {
    * @returns {string} 管理パネルURL
    */
   admin: function(userId) {
-    const baseUrl = getWebAppUrl();
+    const baseUrl = ScriptApp.getService().getUrl();
     return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
   },
 
@@ -3202,7 +3202,7 @@ const URLBuilder = {
    * @returns {string} アプリ設定ページURL
    */
   appSetup: function() {
-    const baseUrl = getWebAppUrl();
+    const baseUrl = ScriptApp.getService().getUrl();
     return `${baseUrl}?mode=appSetup`;
   },
 
@@ -3212,7 +3212,7 @@ const URLBuilder = {
    * @returns {string} 回答ボードURL
    */
   view: function(userId) {
-    const baseUrl = getWebAppUrl();
+    const baseUrl = ScriptApp.getService().getUrl();
     return `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`;
   },
 
@@ -3223,7 +3223,7 @@ const URLBuilder = {
    * @returns {string} 生成されたURL
    */
   build: function(mode, params = {}) {
-    const baseUrl = getWebAppUrl();
+    const baseUrl = ScriptApp.getService().getUrl();
     const url = new URL(baseUrl);
     url.searchParams.set('mode', mode);
 
@@ -3438,7 +3438,7 @@ function createSecureRedirect(targetUrl, message) {
  */
 function sanitizeRedirectUrl(url) {
   if (!url) {
-    return getWebAppUrl();
+    return ScriptApp.getService().getUrl();
   }
 
   try {
@@ -3469,13 +3469,13 @@ function sanitizeRedirectUrl(url) {
     // 基本的なURL形式チェック
     if (!cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
       warnLog('Invalid URL format after sanitization:', cleanUrl);
-      return getWebAppUrl();
+      return ScriptApp.getService().getUrl();
     }
 
     // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
     if (cleanUrl.includes('userCodeAppPanel')) {
       warnLog('Development URL detected in redirect, using fallback:', cleanUrl);
-      return getWebAppUrl();
+      return ScriptApp.getService().getUrl();
     }
 
     // 最終的な URL 妥当性チェック（googleusercontent.comも有効URLとして認識）
@@ -3485,13 +3485,13 @@ function sanitizeRedirectUrl(url) {
 
     if (!isValidUrl) {
       warnLog('Suspicious URL detected:', cleanUrl);
-      return getWebAppUrl();
+      return ScriptApp.getService().getUrl();
     }
 
     return cleanUrl;
   } catch (e) {
     logError(e, 'urlSanitization', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
-    return getWebAppUrl();
+    return ScriptApp.getService().getUrl();
   }
 }
 
@@ -3629,7 +3629,7 @@ function renderUnpublishedPage(userInfo, params) {
     } catch (urlError) {
       warnLog('URL生成エラー、フォールバック値を使用:', urlError);
       // フォールバック: 基本的なURL構造
-      const baseUrl = getWebAppUrl();
+      const baseUrl = ScriptApp.getService().getUrl();
       appUrls = {
         adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`,
         viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`,
@@ -4627,5 +4627,19 @@ function bulkUpdateAllUsersActiveStatus(isActive) {
       status: 'error',
       message: '全ユーザー一括更新に失敗しました: ' + error.message
     };
+  }
+}
+
+/**
+ * Web AppのURLを取得する関数
+ * クライアントサイドから呼び出されるAPI関数
+ * @returns {string} Web AppのURL
+ */
+function getWebAppUrl() {
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (error) {
+    logError(error, 'getWebAppUrl', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    return '';
   }
 }
