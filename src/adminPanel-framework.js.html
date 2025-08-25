@@ -1430,12 +1430,25 @@ async function finalizeInitialization() {
   }, 500);
 }
 
-// 単一DOMContentLoadedハンドラー
-if (document.readyState !== 'loading') {
-  initializeAdminPanelMaster();
-} else {
-  document.addEventListener('DOMContentLoaded', initializeAdminPanelMaster);
-}
+// Simple DOMContentLoaded handler
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM ready, initializing admin panel...');
+  
+  try {
+    // Basic initialization 
+    if (typeof initializeEventListeners === 'function') {
+      initializeEventListeners();
+    }
+    
+    if (typeof loadStatus === 'function') {
+      loadStatus();
+    }
+    
+    console.log('Admin panel initialized');
+  } catch (error) {
+    console.error('Initialization error:', error);
+  }
+});
 
 // Update layout on resize
 window.addEventListener('resize', function() {

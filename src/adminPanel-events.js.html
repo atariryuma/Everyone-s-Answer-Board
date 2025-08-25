@@ -391,7 +391,7 @@ function setupFormConfigModalHandlers() {
     });
   }
   
-  if (formConfigCreate) {
+  if (formConfigCreate && typeof createFormWithConfig === 'function') {
     formConfigCreate.addEventListener('click', createFormWithConfig);
   }
 }
