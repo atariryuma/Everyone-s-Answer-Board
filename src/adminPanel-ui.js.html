@@ -44,7 +44,7 @@ function getPublicationState(status) {
   let config = null;
   if (status.userInfo && status.userInfo.configJson) {
     try {
-      config = JSON.parse(status.userInfo.configJson);
+      config = parseUserConfig(status.userInfo.configJson);
     } catch (e) {
       console.warn('Failed to parse configJson:', e);
       return { isPublished: false, reason: 'configJson解析エラー', confidence: 'low' };
@@ -195,7 +195,7 @@ function determinePublicationStatus(status) {
   if (status.userInfo && status.userInfo.configJson) {
     try {
       const config = typeof status.userInfo.configJson === 'string' 
-        ? JSON.parse(status.userInfo.configJson) 
+        ? parseUserConfig(status.userInfo.configJson)
         : status.userInfo.configJson;
       if (typeof config.appPublished === 'boolean') {
         console.log('📋 Publication status from configJson (fallback):', config.appPublished);
@@ -277,7 +277,7 @@ function _fullUpdateUIWithNewStatus(status) {
     }
     
     // 公開状態の更新
-    const config = JSON.parse(status.userInfo.configJson || '{}');
+    const config = parseUserConfig(status.userInfo.configJson);
     const isPublished = config.appPublished || false;
     const publishText = isPublished ? '公開中' : '停止中';
     
@@ -420,7 +420,7 @@ function updateUnpublishButton(status) {
   
   if (!explicitAppPublished && status.userInfo && status.userInfo.configJson) {
     try {
-      const config = JSON.parse(status.userInfo.configJson);
+      const config = parseUserConfig(status.userInfo.configJson);
       explicitAppPublished = config.appPublished === true;
     } catch (configError) {
       console.warn('❌ Failed to parse configJson for unpublish button check:', configError);
@@ -610,7 +610,7 @@ function syncCheckboxStates(status) {
   } else if (status.userInfo && status.userInfo.configJson) {
     // 2. Fallback to raw configJson
     try {
-      const config = JSON.parse(status.userInfo.configJson);
+      const config = parseUserConfig(status.userInfo.configJson);
       if (config.showNames !== undefined) showNames = config.showNames;
       if (config.showCounts !== undefined) showCounts = config.showCounts;
     } catch (e) {
@@ -986,7 +986,7 @@ function getStepCompletionFromConfig(status) {
 
   try {
     const config = typeof status.userInfo.configJson === 'string' 
-      ? JSON.parse(status.userInfo.configJson) 
+      ? parseUserConfig(status.userInfo.configJson)
       : status.userInfo.configJson;
 
     // 公開状態の優先チェック（データ不整合に関係なく公開済みなら全ステップ完了）
@@ -1379,7 +1379,7 @@ function updateTopicText(status) {
   // userInfo.configJsonからも情報を取得（安全性チェック強化）
   if (status.userInfo && status.userInfo.configJson) {
     try {
-      const fullConfig = JSON.parse(status.userInfo.configJson);
+      const fullConfig = parseUserConfig(status.userInfo.configJson);
       if (fullConfig && typeof fullConfig === 'object') {
         cfg = Object.assign({}, cfg, fullConfig);
         console.log('📋 updateTopicText: merged config:', cfg);
@@ -1422,7 +1422,7 @@ function updateTopicText(status) {
     if (sheetName && sheetName !== 'フォームの回答 1') {
       if (status.userInfo && status.userInfo.configJson) {
         try {
-          const fullCfg = JSON.parse(status.userInfo.configJson);
+          const fullCfg = parseUserConfig(status.userInfo.configJson);
           const sheetCfg = fullCfg['sheet_' + (sheetName || '')] || {};
           console.log('📋 Sheet config found:', sheetCfg);
           
@@ -2100,7 +2100,7 @@ function activateSelectedSheet(sheetName) {
       // currentStatusを更新
       if (currentStatus.userInfo.configJson) {
         try {
-          const config = JSON.parse(currentStatus.userInfo.configJson);
+          const config = parseUserConfig(currentStatus.userInfo.configJson);
           config.publishedSheetName = sheetName;
           currentStatus.userInfo.configJson = JSON.stringify(config);
           currentStatus.activeSheetName = sheetName;
@@ -2450,7 +2450,7 @@ function getSetupStatusFromUserInfo(userInfo) {
     }
 
     const config = typeof userInfo.configJson === 'string'
-      ? JSON.parse(userInfo.configJson)
+      ? parseUserConfig(userInfo.configJson)
       : userInfo.configJson;
 
     // setupStatusが明示的に設定されている場合はそれを使用
@@ -2609,7 +2609,7 @@ function getActiveResourceUrls(status) {
   if (status.userInfo.configJson) {
     try {
       config = typeof status.userInfo.configJson === 'string' 
-        ? JSON.parse(status.userInfo.configJson) 
+        ? parseUserConfig(status.userInfo.configJson)
         : status.userInfo.configJson;
       console.log('getActiveResourceUrls: configJson parsed:', config); // Gemini Debug
     } catch (e) {

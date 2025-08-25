@@ -37,9 +37,7 @@
   function getSetupStatusFromGlobalStatus() {
     try {
       if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-        const config = typeof currentStatus.userInfo.configJson === 'string' 
-          ? JSON.parse(currentStatus.userInfo.configJson) 
-          : currentStatus.userInfo.configJson;
+        const config = parseUserConfig(currentStatus.userInfo.configJson);
         return config.setupStatus || 'pending';
       }
       return 'pending';
@@ -84,9 +82,7 @@
     }
     
     try {
-      const config = typeof currentStatus.userInfo.configJson === 'string' 
-        ? JSON.parse(currentStatus.userInfo.configJson) 
-        : currentStatus.userInfo.configJson;
+      const config = parseUserConfig(currentStatus.userInfo.configJson);
       
       // データベース状態に基づく統一判定
       const setupCompleted = config.setupStatus === 'completed' && 
