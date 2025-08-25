@@ -19,7 +19,11 @@
       "Bash(for file in src/*.html)",
       "Bash(jest:*)",
       "Bash(npx jest:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(clasp pull:*)",
+      "Bash(clasp push:*)",
+      "Bash(sed:*)",
+      "Bash(git ls-tree:*)"
     ],
     "deny": [],
     "ask": []

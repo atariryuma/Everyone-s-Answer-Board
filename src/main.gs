@@ -4643,3 +4643,16 @@ function getWebAppUrl() {
     return '';
   }
 }
+
+/**
+ * 現在のユーザーのメールアドレスを取得する関数
+ * @returns {string} 現在のユーザーのメールアドレス
+ */
+function getCurrentUserEmail() {
+  try {
+    return Session.getActiveUser().getEmail();
+  } catch (error) {
+    logError(error, 'getCurrentUserEmail', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
+    return '';
+  }
+}
