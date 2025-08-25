@@ -4,7 +4,7 @@
  */
 
 // デバッグ設定 - 本番環境では false に設定
-const DEBUG_CONFIG = {
+var DEBUG_CONFIG = DEBUG_CONFIG || {
   // 本番環境判定: PropertiesService で制御可能
   isProduction: false, // デプロイ時に true に変更
 

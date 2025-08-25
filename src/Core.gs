@@ -10,7 +10,7 @@
 /**
  * エラーの重要度レベル
  */
-const ERROR_SEVERITY = {
+var ERROR_SEVERITY = ERROR_SEVERITY || {
   LOW: 'low',
   MEDIUM: 'medium',
   HIGH: 'high',
@@ -20,7 +20,7 @@ const ERROR_SEVERITY = {
 /**
  * エラーカテゴリ
  */
-const ERROR_CATEGORIES = {
+var ERROR_CATEGORIES = ERROR_CATEGORIES || {
   AUTHENTICATION: 'authentication',
   AUTHORIZATION: 'authorization',
   DATABASE: 'database',

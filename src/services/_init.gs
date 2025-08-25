@@ -10,9 +10,8 @@
  */
 const _ORIGINAL_FUNCTIONS = {};
 
-// 既存の重要な関数を保存
+// 既存の重要な関数を保存（constは除く、エラーを避けるため）
 const functionsToSave = [
-  'resilientExecutor',
   'logError',
   'debugLog',
   'infoLog',
@@ -30,15 +29,17 @@ const functionsToSave = [
   'deleteUser',
   'getUserInfo',
   'getInitialData',
-  'handleCoreApiRequest',
-  'ERROR_SEVERITY',
-  'ERROR_CATEGORIES'
+  'handleCoreApiRequest'
 ];
 
-// 既存の関数を保存
+// 既存の関数を保存（関数のみ、変数は除く）
 functionsToSave.forEach(funcName => {
-  if (typeof global[funcName] !== 'undefined') {
-    _ORIGINAL_FUNCTIONS[funcName] = global[funcName];
+  try {
+    if (typeof global[funcName] === 'function') {
+      _ORIGINAL_FUNCTIONS[funcName] = global[funcName];
+    }
+  } catch (e) {
+    // エラーは無視（constなど再定義できないものがある場合）
   }
 });
 

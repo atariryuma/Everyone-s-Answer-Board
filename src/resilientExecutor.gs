@@ -253,7 +253,7 @@ class ResilientExecutor {
 /**
  * グローバルな回復力のある実行機構インスタンス
  */
-const resilientExecutor = new ResilientExecutor({
+var resilientExecutor = new ResilientExecutor({
   maxRetries: 3,
   baseDelay: 1000,
   maxDelay: 30000,
