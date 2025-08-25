@@ -10,22 +10,37 @@
  */
 const _ORIGINAL_FUNCTIONS = {};
 
+// 既存の重要な関数を保存
+const functionsToSave = [
+  'resilientExecutor',
+  'logError',
+  'debugLog',
+  'infoLog',
+  'warnLog',
+  'errorLog',
+  'cacheManager',
+  'getCacheValue',
+  'setCacheValue',
+  'removeCacheValue',
+  'clearAllCache',
+  'getUserById',
+  'getUserByEmail',
+  'createUser',
+  'updateUser',
+  'deleteUser',
+  'getUserInfo',
+  'getInitialData',
+  'handleCoreApiRequest',
+  'ERROR_SEVERITY',
+  'ERROR_CATEGORIES'
+];
+
 // 既存の関数を保存
-if (typeof resilientExecutor !== 'undefined') {
-  _ORIGINAL_FUNCTIONS.resilientExecutor = resilientExecutor;
-}
-
-if (typeof logError !== 'undefined') {
-  _ORIGINAL_FUNCTIONS.logError = logError;
-}
-
-if (typeof debugLog !== 'undefined') {
-  _ORIGINAL_FUNCTIONS.debugLog = debugLog;
-}
-
-if (typeof cacheManager !== 'undefined') {
-  _ORIGINAL_FUNCTIONS.cacheManager = cacheManager;
-}
+functionsToSave.forEach(funcName => {
+  if (typeof global[funcName] !== 'undefined') {
+    _ORIGINAL_FUNCTIONS[funcName] = global[funcName];
+  }
+});
 
 /**
  * 新アーキテクチャの有効化フラグ
