@@ -41,21 +41,99 @@
     };
   }
   
-  // Basic function stubs to prevent errors
+  // =============================================================================
+  // UTILITY FUNCTIONS - Core UI Interactions
+  // =============================================================================
+  function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    const button = document.querySelector(`[onclick="toggleSection('${sectionId}')"]`);
+    if (!section) return;
+    
+    const isExpanded = section.classList.contains('expanded');
+    if (isExpanded) {
+      section.classList.remove('expanded');
+      section.classList.add('collapsed');
+      if (button) button.setAttribute('aria-expanded', 'false');
+    } else {
+      section.classList.remove('collapsed');
+      section.classList.add('expanded');  
+      if (button) button.setAttribute('aria-expanded', 'true');
+    }
+    
+    // Rotate chevron icon
+    const chevron = button?.querySelector('svg');
+    if (chevron) {
+      chevron.style.transform = isExpanded ? 'rotate(90deg)' : 'rotate(0deg)';
+    }
+  }
+  
+  function copyBoardUrl(button) {
+    const urlInput = document.getElementById('board-url');
+    if (!urlInput || !urlInput.value) {
+      logError('Board URL not found or empty');
+      return;
+    }
+    
+    urlInput.select();
+    urlInput.setSelectionRange(0, 99999); // For mobile
+    
+    try {
+      document.execCommand('copy');
+      // Visual feedback
+      const originalText = button.innerHTML;
+      button.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+      setTimeout(() => {
+        button.innerHTML = originalText;
+      }, 1500);
+      logInfo('✅ URL copied to clipboard');
+    } catch (err) {
+      logError('Failed to copy URL:', err);
+    }
+  }
+  
+  function showSecurityInfo() {
+    if (window.sharedModals && window.sharedModals.showSecurityModal) {
+      window.sharedModals.showSecurityModal();
+    } else {
+      logInfo('セキュリティ情報: naha-okinawa.ed.jp ドメイン専用システム');
+    }
+  }
+  
+  function showGoogleIntegrationInfo() {
+    if (window.sharedModals && window.sharedModals.showGoogleIntegrationModal) {
+      window.sharedModals.showGoogleIntegrationModal();
+    } else {
+      logInfo('Google連携: スプレッドシートとフォームの自動作成・管理');
+    }
+  }
+  
+  window.adminPanel = window.adminPanel || {};
+  window.adminPanel.logoutAndRedirect = function() {
+    if (confirm('ログイン画面に戻りますか？')) {
+      const webAppUrl = getWebAppUrl?.() || ScriptApp?.getService()?.getUrl() || window.location.origin;
+      window.location.href = webAppUrl + '?mode=login';
+    }
+  };
+  
+  // Legacy function stubs for compatibility
   window.openAppSetupPage = window.openAppSetupPage || function() { 
-    console.warn('openAppSetupPage not yet loaded'); 
+    logInfo('アプリセットアップ機能は準備中です');
   };
-  window.runHeaderGuessing = window.runHeaderGuessing || function() { 
-    console.warn('runHeaderGuessing not yet loaded'); 
+  window.runHeaderGuessing = function() {
+    logInfo('🤖 AI列判定を実行中...');
+    AdminPanel_callGAS('autoMapHeaders', window.AdminPanel.currentUserId, window.AdminPanel.currentSpreadsheetId, document.getElementById('sheet-select').value)
+      .then(response => {
+        if (response && response.success) {
+          logInfo('✅ AI判定完了: 列設定を更新しました');
+          populateColumnSelects(response.headers);
+        } else {
+          logError('AI判定に失敗しました:', response?.message);
+        }
+      })
+      .catch(error => logError('AI判定エラー:', error));
   };
-  window.startSystemStatusUpdate = window.startSystemStatusUpdate || function() { 
-    return false; 
-  };
-  window.loadStatus = window.loadStatus || function() { 
-    return Promise.resolve({ status: 'loading' }); 
-  };
-  window.addResource = window.addResource || function() { 
-    console.warn('addResource function not yet implemented'); 
+  window.addResource = function() { 
+    logInfo('リソース追加機能は準備中です');
   };
   window.initializeUserSettingsWithUI = window.initializeUserSettingsWithUI || function() { 
     console.warn('initializeUserSettingsWithUI function not yet loaded'); 
@@ -217,6 +295,63 @@
   }
 
   // =============================================================================
+  // DOMAIN SECURITY STATUS FUNCTIONS
+  // =============================================================================
+  function initializeDomainStatus() {
+    AdminPanel_callGAS('getSystemDomainInfo')
+      .then(function(info) {
+        if (info && info.adminDomain && !info.error) {
+          if (info.isDomainMatch) {
+            updateDomainDisplay('match', info.adminDomain, 'セキュアアクセス有効');
+            logDebug('Domain security status: Secure access enabled');
+          } else {
+            updateDomainDisplay('mismatch', info.adminDomain, 'アクセス制限あり');
+            logDebug('Domain security status: Access restricted');
+          }
+        } else {
+          logDebug('Domain info not available, keeping initial display');
+          updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
+        }
+      })
+      .catch(function(error) {
+        logError('Failed to get domain info:', error);
+        updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
+      });
+  }
+  
+  function updateDomainDisplay(type, domainText, statusText) {
+    const initialDiv = document.getElementById('header-domain-initial');
+    const matchDiv = document.getElementById('header-domain-match');
+    const mismatchDiv = document.getElementById('header-domain-mismatch');
+
+    if (initialDiv) initialDiv.classList.add('hidden');
+    if (matchDiv) matchDiv.classList.add('hidden');
+    if (mismatchDiv) mismatchDiv.classList.add('hidden');
+
+    if (type === 'match') {
+      if (matchDiv) {
+        matchDiv.classList.remove('hidden');
+        const textEl = document.getElementById('header-domain-match-text');
+        if (textEl) textEl.textContent = domainText;
+      }
+    } else if (type === 'mismatch') {
+      if (mismatchDiv) {
+        mismatchDiv.classList.remove('hidden');
+        const textEl = document.getElementById('header-domain-mismatch-text');
+        if (textEl) textEl.textContent = domainText;
+      }
+    } else { // initial
+      if (initialDiv) {
+        initialDiv.classList.remove('hidden');
+        const domainEl = document.getElementById('header-domain-name-initial');
+        const statusEl = document.getElementById('header-status-text-initial');
+        if (domainEl) domainEl.textContent = domainText;
+        if (statusEl) statusEl.textContent = statusText;
+      }
+    }
+  }
+
+  // =============================================================================
   // CORE UI FUNCTIONS - Preserved Interface
   // =============================================================================
   function loadStatus() {
@@ -333,6 +468,7 @@
         if (response && response.success) {
           logInfo('✅ ボードが公開されました');
           updateUIStatus(response);
+          refreshAllDisplays();
           return response;
         } else {
           throw new Error(response ? response.message : '公開に失敗しました');
@@ -347,6 +483,7 @@
       .then(response => {
         if (response && response.success) {
           logInfo('✅ 表示オプションが更新されました');
+          refreshAllDisplays();
           return response;
         } else {
           throw new Error(response ? response.message : '表示オプションの更新に失敗しました');
@@ -559,6 +696,93 @@
   }
 
   // =============================================================================
+  // ADDITIONAL EVENT HANDLERS - Missing Button Functionality
+  // =============================================================================
+  function setupAdditionalEventHandlers() {
+    // AI Header guessing button
+    const reguessBtn = document.getElementById('reguess-headers-btn');
+    if (reguessBtn) {
+      reguessBtn.addEventListener('click', function() {
+        window.runHeaderGuessing();
+      });
+    }
+    
+    // Open spreadsheet buttons
+    const openSpreadsheetBtns = document.querySelectorAll('#open-spreadsheet-btn, #open-spreadsheet-btn-step2');
+    openSpreadsheetBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const spreadsheetId = window.AdminPanel.currentSpreadsheetId;
+        if (spreadsheetId) {
+          const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+          window.open(url, '_blank');
+          logInfo('📊 スプレッドシートを開いています...');
+        } else {
+          logError('スプレッドシートIDが見つかりません');
+        }
+      });
+    });
+    
+    // Open form button
+    const openFormBtn = document.getElementById('open-form-btn');
+    if (openFormBtn) {
+      openFormBtn.addEventListener('click', function() {
+        AdminPanel_callGAS('getActiveFormInfo', window.AdminPanel.currentUserId)
+          .then(response => {
+            if (response && response.formUrl) {
+              window.open(response.formUrl, '_blank');
+              logInfo('📝 フォームを開いています...');
+            } else {
+              logError('フォームURLが見つかりません');
+            }
+          })
+          .catch(error => logError('フォーム情報取得エラー:', error));
+      });
+    }
+    
+    // Preview board button
+    const previewBtn = document.getElementById('preview-board-btn');
+    if (previewBtn) {
+      previewBtn.addEventListener('click', function() {
+        const userId = window.AdminPanel.currentUserId;
+        if (userId) {
+          AdminPanel_callGAS('generateUserUrls', userId)
+            .then(response => {
+              if (response && response.viewUrl) {
+                window.open(response.viewUrl, '_blank');
+                logInfo('👀 プレビューを開いています...');
+              } else {
+                logError('プレビューURL生成に失敗しました');
+              }
+            })
+            .catch(error => logError('プレビューURL生成エラー:', error));
+        }
+      });
+    }
+    
+    // Refresh preview button
+    const refreshPreviewBtn = document.getElementById('refresh-preview-btn');
+    if (refreshPreviewBtn) {
+      refreshPreviewBtn.addEventListener('click', function() {
+        refreshAllDisplays();
+        logInfo('🔄 プレビューを更新しています...');
+      });
+    }
+    
+    // Republish after auto-stop button
+    const republishBtn = document.getElementById('republish-after-auto-stop-btn');
+    if (republishBtn) {
+      republishBtn.addEventListener('click', function() {
+        saveAndPublish()
+          .then(() => {
+            document.getElementById('auto-stop-notification')?.classList.add('hidden');
+            logInfo('✅ 再公開が完了しました');
+          })
+          .catch(error => logError('再公開エラー:', error));
+      });
+    }
+  }
+
+  // =============================================================================
   // INITIALIZATION - Auto-start
   // =============================================================================
   document.addEventListener('DOMContentLoaded', function() {
@@ -566,12 +790,15 @@
     
     // Setup essential event handlers
     setupEssentialEventHandlers();
+    setupAdditionalEventHandlers();
     
     // Initialize user authentication
     initializeUserId()
       .then(function(response) {
         logInfo('Admin panel initialized');
         updateUIStatus(response);
+        // Initialize domain security status
+        initializeDomainStatus();
         return loadStatus();
       })
       .then(function(statusResponse) {
@@ -601,11 +828,100 @@
         }
         
         updateUIStatus(statusResponse);
+        refreshAllDisplays();
       })
       .catch(function(error) {
         logError('Admin panel initialization failed:', error);
       });
   });
+  
+  // =============================================================================
+  // REAL-TIME DATA REFRESH SYSTEM
+  // =============================================================================
+  function refreshAllDisplays() {
+    Promise.all([
+      updateSystemInfo(),
+      updatePublishStatus(), 
+      updatePreviewPanel()
+    ]).then(() => {
+      logDebug('All displays refreshed');
+    }).catch(error => {
+      logError('Display refresh error:', error);
+    });
+  }
+  
+  function updateSystemInfo() {
+    return AdminPanel_callGAS('getCurrentUserStatus', window.AdminPanel.currentUserId)
+      .then(response => {
+        if (response && response.userInfo) {
+          safeSetText('info-admin-email', response.userInfo.adminEmail || '');
+          safeSetText('info-user-id', response.userInfo.userId || '');
+          window.AdminPanel.currentSpreadsheetId = response.userInfo.spreadsheetId;
+        }
+        return response;
+      })
+      .catch(error => logError('System info update failed:', error));
+  }
+  
+  function updatePublishStatus() {
+    return AdminPanel_callGAS('getInitialData', window.AdminPanel.currentUserId)
+      .then(response => {
+        if (response && response.config) {
+          const isPublished = response.config.appPublished || false;
+          const statusEl = document.getElementById('info-publish-status');
+          const indicatorEl = document.getElementById('info-publish-indicator');
+          const textEl = document.getElementById('info-publish-text');
+          
+          if (statusEl) {
+            statusEl.className = isPublished ? 'px-2 py-1 rounded text-xs font-medium bg-green-900/30 text-green-300' : 'px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-400';
+          }
+          if (indicatorEl) {
+            indicatorEl.className = isPublished ? 'w-2 h-2 rounded-full bg-green-400' : 'w-2 h-2 rounded-full bg-gray-500';
+          }
+          if (textEl) {
+            textEl.textContent = isPublished ? '公開中' : '非公開';
+          }
+          
+          safeSetText('info-published-sheet', response.config.publishedSheetName || '-');
+          safeSetText('info-display-mode', response.config.displayMode || '-');
+          safeSetText('info-show-counts', response.config.showReactionCounts ? 'ON' : 'OFF');
+          
+          // Update board URL
+          if (isPublished) {
+            AdminPanel_callGAS('generateUserUrls', window.AdminPanel.currentUserId)
+              .then(urlResponse => {
+                if (urlResponse && urlResponse.viewUrl) {
+                  const urlInput = document.getElementById('board-url');
+                  const viewLink = document.getElementById('view-board-link');
+                  if (urlInput) urlInput.value = urlResponse.viewUrl;
+                  if (viewLink) viewLink.href = urlResponse.viewUrl;
+                }
+              });
+          }
+        }
+        return response;
+      })
+      .catch(error => logError('Publish status update failed:', error));
+  }
+  
+  function updatePreviewPanel() {
+    const sheetSelect = document.getElementById('sheet-select');
+    if (!sheetSelect || !sheetSelect.value) return Promise.resolve();
+    
+    const previewPanel = document.getElementById('publish-preview-panel');
+    if (previewPanel && !previewPanel.classList.contains('hidden')) {
+      safeSetText('preview-sheet-name', sheetSelect.value);
+      const opinionSelect = document.getElementById('opinionHeader');
+      const nameSelect = document.getElementById('name-column');
+      const classSelect = document.getElementById('class-column');
+      
+      safeSetText('preview-opinion-column', opinionSelect?.value || '未設定');
+      safeSetText('preview-name-column', nameSelect?.value || '未設定');  
+      safeSetText('preview-class-column', classSelect?.value || '未設定');
+    }
+    
+    return Promise.resolve();
+  }
 
   </script>
 </head>
