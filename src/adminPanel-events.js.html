@@ -426,7 +426,7 @@ function setupResourceHandlers() {
     });
   }
   
-  if (initializeSettingsBtn) {
+  if (initializeSettingsBtn && typeof initializeUserSettingsWithUI === 'function') {
     initializeSettingsBtn.addEventListener('click', initializeUserSettingsWithUI);
   }
 }
