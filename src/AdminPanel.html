@@ -57,13 +57,15 @@
       };
 
       console.log = function(...args) {
-        if (!isDebug) return; // suppress in non-debug mode
-        if (shouldFilter(args.join(' '))) return;
+        // Only allow explicitly WARN/ERROR level logs in production
+        const msgStr = args.join(' ');
+        if (!isDebug && !msgStr.includes('⚠️') && !msgStr.includes('🚨') && !msgStr.includes('ERROR')) return;
+        if (shouldFilter(msgStr)) return;
         try { originalLog.apply(console, args); } catch (_) {}
       };
 
       console.warn = function(...args) {
-        if (!isDebug) return; // suppress in non-debug mode
+        // Allow warnings but filter noise
         if (shouldFilter(args.join(' '))) return;
         try { originalWarn.apply(console, args); } catch (_) {}
       };
@@ -124,8 +126,6 @@
     );
     
     if (shouldSuppress) {
-      // Log suppressed error for debugging (optional)
-      console.debug('Suppressed Google Apps Script internal error:', errorMessage);
       event.preventDefault();
       return;
     }
@@ -139,17 +139,15 @@
       
       // Attempt recovery for specific critical errors
       if (errorMessage.includes('is not defined') || errorMessage.includes('is not a function')) {
-        console.log('🔧 Attempting function recovery...');
+        console.warn('⚠️ Function recovery attempted');
         // 重複初期化を防ぐために初期化状態をチェック
         setTimeout(() => {
           if (typeof window.initializeAdminPanelMaster === 'function' && 
               window.AdminPanel && 
               !window.AdminPanel.initialization?.isCompleted &&
               !window.AdminPanel.initialization?.isInProgress) {
-            console.log('🔄 Re-initializing admin panel...');
+            console.warn('⚠️ Re-initializing admin panel due to error');
             window.initializeAdminPanelMaster();
-          } else {
-            console.log('🚫 Skipping re-initialization: already initialized or in progress');
           }
         }, 1000);
       }
@@ -174,7 +172,6 @@
     if (reason.includes('document.write') || 
         reason.includes('mae_html_user') ||
         reason.includes('warden_bin')) {
-      console.debug('Suppressed internal promise rejection:', reason);
       event.preventDefault();
       return;
     }
@@ -213,7 +210,7 @@
     }
     
     return unifiedCache.getOrSet(cacheKey, function() {
-      console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
+      // Caching operation complete - debug suppressed
       return gasOptimizer.call(functionName, userId, ...args);
     }, ttl);
   }
@@ -222,11 +219,7 @@
   const __IS_SYSTEM_ADMIN_RAW__ = '<?= escapeJavaScript(typeof isDeployUser !== "undefined" ? isDeployUser : "false") ?>';
   const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
   window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
-  console.log('Template Debug:');
-  console.log('- Raw template value:', __IS_SYSTEM_ADMIN_RAW__);
-  console.log('- Raw template type:', typeof __IS_SYSTEM_ADMIN_RAW__);
-  console.log('- Processed value:', __IS_SYSTEM_ADMIN__);
-  console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
+  // Template processing complete - debug info suppressed in production
   
   </script>
 </head>
