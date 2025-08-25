@@ -629,12 +629,6 @@ class StudyQuestApp {
     
     console.log('📝 Error Details (Phase 4.2):', errorDetails);
     
-    // Store error history
-    if (!this.errorHistory) this.errorHistory = [];
-    this.errorHistory.push(errorDetails);
-    if (this.errorHistory.length > 5) {
-      this.errorHistory.shift();
-    }
   }
 
   /**

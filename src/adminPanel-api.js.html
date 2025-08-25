@@ -917,7 +917,7 @@ function loadStatus(bypassCache = false) {
     console.log('🌐 Calling getInitialData with userId:', userId, 'bypassCache:', bypassCache);
 
     // 履歴復元時などの強制更新用フラグ
-    const forceRefresh = bypassCache && window._historyRestoreInProgress;
+    const forceRefresh = bypassCache;
     const targetSheetParam = forceRefresh ? 'BYPASS_CACHE' : null;
 
     // runGasWithUserId を使用して getInitialData を呼び出す
@@ -1000,9 +1000,8 @@ function loadStatus(bypassCache = false) {
 // Load sheet configuration for selected sheet with retry mechanism
 function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride = null, retryCount = 0, maxRetries = 3, forceLoad = false) {
   // 履歴復元中は処理をスキップ（強制読み込みフラグがある場合は除く）
-  if ((window._historyRestoreInProgress || window._historyColumnSelections) && !forceLoad) {
-    console.log('🛡️ loadConfigForSelected: 履歴復元中のため処理をスキップしました');
-    return Promise.resolve({ success: false, message: 'Skipped during history restore' });
+  if (!forceLoad) {
+    // no special restrictions
   }
   
   const targetSheet = sheetNameOverride || selectedSheet;
@@ -1064,41 +1063,21 @@ function handleSheetDetailsSuccess(details) {
     }
     
     if (details.guessedConfig) {
-      // 履歴復元中はAI列判定をスキップ（強制読み込み時も含む）
-      if (window._historyRestoreInProgress || window._historyColumnSelections || forceLoad) {
-        if (forceLoad) {
-          console.log('🔄 強制読み込み時: AI列判定をスキップして履歴設定を優先');
-        } else {
-          console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
-        }
-        console.log('🔍 Skip flags:', {
-          historyRestoreInProgress: window._historyRestoreInProgress,
-          historyColumnSelections: !!window._historyColumnSelections,
-          forceLoad: forceLoad
-        });
-      } else {
-        // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
-        setTimeout(() => {
-          // 遅延実行時にも再度チェック
-          if (window._historyRestoreInProgress || window._historyColumnSelections) {
-            console.log('🛡️ 遅延実行時: 履歴復元中のため、AI列判定をスキップしました');
-            return;
-          }
-          populateConfig(details.guessedConfig);
-          
-          // Enhanced auto-detection success message with specifics
-          const detectedColumns = [];
-          if (details.guessedConfig.opinionColumn) detectedColumns.push(`回答列: ${details.guessedConfig.opinionColumn}`);
-          if (details.guessedConfig.nameColumn) detectedColumns.push(`名前列: ${details.guessedConfig.nameColumn}`);
-          if (details.guessedConfig.classColumn) detectedColumns.push(`クラス列: ${details.guessedConfig.classColumn}`);
-          
-          const message = detectedColumns.length > 0 
-            ? `🤖 AI列判定が自動実行されました！検出された列: ${detectedColumns.join(', ')}。設定を確認してください。`
-            : '🤖 AI列判定が自動実行されました。設定を確認してください。';
-          
-          showMessage(message, 'success');
-        }, 0);
-      }
+      setTimeout(() => {
+        populateConfig(details.guessedConfig);
+
+        // Enhanced auto-detection success message with specifics
+        const detectedColumns = [];
+        if (details.guessedConfig.opinionColumn) detectedColumns.push(`回答列: ${details.guessedConfig.opinionColumn}`);
+        if (details.guessedConfig.nameColumn) detectedColumns.push(`名前列: ${details.guessedConfig.nameColumn}`);
+        if (details.guessedConfig.classColumn) detectedColumns.push(`クラス列: ${details.guessedConfig.classColumn}`);
+
+        const message = detectedColumns.length > 0
+          ? `🤖 AI列判定が自動実行されました！検出された列: ${detectedColumns.join(', ')}。設定を確認してください。`
+          : '🤖 AI列判定が自動実行されました。設定を確認してください。';
+
+        showMessage(message, 'success');
+      }, 0);
     }
     
     // 成功時の戻り値を返す
@@ -2018,27 +1997,24 @@ async function clearAllCachesForUnpublish() {
       window.sharedUtilities.dom.clearElementCache();
     }
     
-    // 2. ローカルストレージのキャッシュクリア（StudyQuest関連のみ、履歴保護）
+    // 2. ローカルストレージのキャッシュクリア（StudyQuest関連のみ）
     try {
       const localStorageKeys = Object.keys(localStorage);
-      const historyKeys = ['answerBoardHistory', 'adminPanelHistory']; // 履歴保護キー
-      
-      const studyQuestKeys = localStorageKeys.filter(key => 
-        (key.includes('studyquest') || 
-         key.includes('board') || 
-         key.includes('sheet') ||
-         key.includes('admin') ||
-         key.includes('publication') ||
-         key.includes('answer')) &&
-        !historyKeys.includes(key) // 履歴キーは除外
+      const studyQuestKeys = localStorageKeys.filter(key =>
+        key.includes('studyquest') ||
+        key.includes('board') ||
+        key.includes('sheet') ||
+        key.includes('admin') ||
+        key.includes('publication') ||
+        key.includes('answer')
       );
-      
+
       studyQuestKeys.forEach(key => {
         localStorage.removeItem(key);
       });
-      
-      console.log('✅ Cache cleared while preserving history keys:', historyKeys);
-      
+
+      console.log('✅ Cache cleared');
+
     } catch (e) {
       console.warn('⚠️ localStorage clear warning:', e);
     }
@@ -2182,198 +2158,6 @@ function unpublishBoard() {
         }
       }
       
-      // シンプル履歴エントリ作成
-      await createSimpleHistoryEntry(publishResponse, config, userInfo, createdDate);
-      
-      logDebug('✅ シンプル履歴保存完了（公開時）');
-    } catch (error) {
-      logWarn('⚠️ 公開時の履歴保存に失敗:', error);
-    }
-  }
-  
-  /**
-   * シンプル履歴エントリ作成
-   * @param {Object} publishResponse - 公開API応答
-   * @param {Object} config - フォーム設定
-   * @param {Object} userInfo - ユーザー情報
-   * @param {string} createdDate - スプレッドシート作成日
-   */
-  async function createSimpleHistoryEntry(publishResponse, config, userInfo, createdDate) {
-    try {
-      // 現在のUI状態から設定取得（showNamesベース）
-      const getShowNames = () => {
-        const showNamesCheckbox = document.getElementById('show-names');
-        return (showNamesCheckbox && showNamesCheckbox.checked) || false;
-      };
-      
-      const getShowCounts = () => {
-        const showCountsCheckbox = document.getElementById('show-counts');
-        return (showCountsCheckbox && showCountsCheckbox.checked) || false;
-      };
-      
-      // 問題文を複数ソースから取得
-      const questionText = config.opinionHeader ||
-                          config.opinionColumn ||
-                          userInfo.customFormInfo?.mainQuestion ||
-                          'デフォルト問題文';
-      
-      // シンプルな履歴アイテム構造
-      // 履歴保存前の詳細ログ
-      console.log('📝 Creating history item with:', {
-        questionText: questionText,
-        selectedSheet: selectedSheet,
-        activeSheetName: publishResponse.activeSheetName,
-        spreadsheetId: userInfo.spreadsheetId,
-        finalSheetName: publishResponse.activeSheetName || selectedSheet || ''
-      });
-      
-      const historyItem = {
-        id: generateHistoryId(),
-        createdDate: createdDate,
-        publishedAt: publishResponse.publishedAt || new Date().toISOString(),
-        questionText: questionText,
-        setupType: getSetupType(),
-        
-        // 復元用の最小データ（showNames/showCountsベース）
-        opinionHeader: config.opinionHeader || '',
-        nameHeader: config.nameHeader || '名前',
-        showNames: getShowNames(),      // UI状態を直接保存
-        showCounts: getShowCounts(),    // UI状態を直接保存
-        
-        // 復元用のシート情報
-        sheetName: publishResponse.activeSheetName || selectedSheet || '',
-        spreadsheetId: userInfo.spreadsheetId || ''
-      };
-      
-      // 履歴に追加（5件制限）
-      addToSimpleHistory(historyItem);
-      
-      console.log('✅ Simple history entry created:', historyItem.questionText);
-      
-    } catch (error) {
-      console.error('❌ Simple history entry creation failed:', error);
-    }
-  }
-  
-  /**
-   * シンプル履歴に追加（5件制限）
-   * @param {Object} newItem - 新しい履歴アイテム
-   */
-  function addToSimpleHistory(newItem) {
-    try {
-      if (window.HistoryManager) {
-        // Use new unified HistoryManager
-        const success = window.HistoryManager.add(newItem);
-        if (success) {
-          console.log('✅ History saved using HistoryManager');
-          // Update UI table
-          window.HistoryManager.renderTable();
-        } else {
-          console.warn('⚠️ Failed to save history using HistoryManager');
-        }
-      } else {
-        // Fallback to legacy method
-        console.warn('⚠️ HistoryManager not available, using legacy method');
-        const history = getHistoryFromStorage();
-        
-        // 先頭に追加
-        history.unshift(newItem);
-        
-        // 5件に制限
-        const limitedHistory = history.slice(0, 5);
-        
-        // 保存
-        saveHistoryToStorage(limitedHistory);
-        
-        console.log(`✅ History saved with ${limitedHistory.length} items (max 5)`);
-        
-        // テーブル更新
-        if (typeof loadSimpleHistoryTable === 'function') {
-          loadSimpleHistoryTable();
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to add to simple history:', error);
-    }
-  }
-  
-  /**
-   * セットアップタイプの取得
-   * @returns {string} セットアップタイプ
-   */
-  function getSetupType() {
-    // URLパラメータやセッション情報から判定
-    if (sessionStorage.getItem('quickStartActive')) {
-      return 'quickstart';
-    }
-    return 'custom';
-  }
-  
-  /**
-   * 履歴ID生成
-   * @returns {string} 一意のID
-   */
-  function generateHistoryId() {
-    return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-  
-  // 古い複雑なcreateConsolidatedHistoryEntry関数は削除済み
-  
-  /**
-   * Create history entry for QuickStart completion
-   * @param {Object} quickStartResult - QuickStart completion result
-   */
-  function createQuickStartHistoryEntry(quickStartResult) {
-    try {
-      logDebug('Creating QuickStart history entry:', quickStartResult);
-      
-      // Extract question text from QuickStart config with better fallback
-      const questionText = (quickStartResult.config && quickStartResult.config.opinionHeader) ||
-                          (quickStartResult.config && quickStartResult.config.opinionColumn) ||
-                          (quickStartResult.config && quickStartResult.config.reasonHeader) ||
-                          (quickStartResult.config && quickStartResult.config.nameHeader) ||
-                          'デフォルト問題文';
-      
-      console.log('📝 QuickStart question text extracted:', questionText);
-      
-      // Use completion time as both creation and publication time for QuickStart
-      const completedAt = quickStartResult.completedAt || new Date().toISOString();
-      const publishedAt = (quickStartResult.publishResult && quickStartResult.publishResult.publishedAt) || completedAt;
-      
-      // Create simplified QuickStart history entry
-      const historyItem = {
-        id: generateHistoryId(),
-        createdDate: completedAt, // QuickStart creates and publishes simultaneously
-        publishedAt: publishedAt,
-        questionText: questionText,
-        setupType: 'quickstart',
-        opinionHeader: (quickStartResult.config && quickStartResult.config.opinionHeader) || '',
-        nameHeader: (quickStartResult.config && quickStartResult.config.nameHeader) || '名前',
-        showNames: false,   // QuickStartデフォルト: 名前表示OFF（匿名）
-        showCounts: false,  // QuickStartデフォルト: リアクション数表示OFF
-        sheetName: quickStartResult.sheetName || quickStartResult.publishedSheetName || '',
-        spreadsheetId: quickStartResult.spreadsheetId || ''
-      };
-      
-      addToSimpleHistory(historyItem);
-      
-      // Update UI - handled by addToSimpleHistory function
-      // No need for additional UI update call here
-      
-      logDebug('QuickStart simple history entry created successfully:', {
-        id: historyItem.id,
-        questionText: historyItem.questionText,
-        createdDate: historyItem.createdDate,
-        publishedAt: historyItem.publishedAt,
-        setupType: historyItem.setupType
-      });
-      
-    } catch (error) {
-      logError('Failed to create QuickStart history entry:', error);
-    }
-  }
-
 // セットアップタイプを判定する補助関数
 function determineSetupType(config, userInfo) {
   if (userInfo.customFormInfo) {
@@ -4774,16 +4558,6 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
       if (result && result.status === 'success') {
         console.log('🎉 QuickStartバックエンド処理完了:', result);
         
-        // Save QuickStart history entry
-        if (result.setupComplete) {
-          try {
-            createQuickStartHistoryEntry(result);
-            console.log('📝 QuickStart履歴保存完了');
-          } catch (error) {
-            console.error('❌ QuickStart履歴保存に失敗:', error);
-          }
-        }
-        
         // Enhanced completion notification with detailed backend response
         updateOverallProgress(100, result.autoPublished ? 'クイックスタート完了！ボードが公開されました！' : 'クイックスタート完了！');
         updateProgressStep(2, 'completed', 'ボード設定と自動公開', '🎉 クイックスタートが完了しました！');
@@ -4868,7 +4642,6 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
         }, 2000);
         
         // 公開時は履歴保存を行わない（公開停止時に保存するため）
-        logDebug('QuickStart completed - history will be saved on unpublish');
         
         // フォーム作成完了フラグを設定
         sessionStorage.setItem('form_just_created', 'true');
