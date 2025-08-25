@@ -18,7 +18,8 @@
       "Bash(head:*)",
       "Bash(for file in src/*.html)",
       "Bash(jest:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

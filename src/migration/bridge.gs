@@ -144,34 +144,38 @@ function verifyUserAccess(userId) {
 // Utilities系のブリッジ
 // ===========================
 
-// 既存のresilientUrlFetch関数を簡易実装
-function resilientUrlFetch(url, options) {
-  try {
-    return Http.fetch(url, options);
-  } catch (error) {
-    // リトライ
-    Utils.sleep(1000);
-    return Http.fetch(url, options);
-  }
+// 既存のresilientUrlFetch関数をブリッジ（既存の関数がない場合のみ定義）
+if (typeof resilientUrlFetch === 'undefined') {
+  global.resilientUrlFetch = function(url, options) {
+    try {
+      return Http.fetch(url, options);
+    } catch (error) {
+      // リトライ
+      Utils.sleep(1000);
+      return Http.fetch(url, options);
+    }
+  };
 }
 
-// 既存のresilientExecutor関数を簡易実装
-function resilientExecutor(func, options = {}) {
-  const maxRetries = options.maxRetries || 3;
-  let lastError;
-  
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return func();
-    } catch (error) {
-      lastError = error;
-      if (i < maxRetries - 1) {
-        Utils.sleep(Math.pow(2, i) * 1000); // 指数バックオフ
+// 既存のresilientExecutor関数をブリッジ（既存の関数がない場合のみ定義）
+if (typeof resilientExecutor === 'undefined') {
+  global.resilientExecutor = function(func, options = {}) {
+    const maxRetries = options.maxRetries || 3;
+    let lastError;
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return func();
+      } catch (error) {
+        lastError = error;
+        if (i < maxRetries - 1) {
+          Utils.sleep(Math.pow(2, i) * 1000); // 指数バックオフ
+        }
       }
     }
-  }
-  
-  throw lastError;
+    
+    throw lastError;
+  };
 }
 
 // ===========================

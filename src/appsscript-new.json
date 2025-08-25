@@ -16,6 +16,7 @@
     "access": "ANYONE"
   },
   "filePushOrder": [
+    "services/_init.gs",
     "services/ErrorService.gs",
     "services/CacheService.gs",
     "services/GASWrapper.gs",
@@ -24,6 +25,6 @@
     "services/CoreFunctionsService.gs",
     "services/APIService.gs",
     "migration/bridge.gs",
-    "main-new.gs"
+    "migration/main-redirect.gs"
   ]
 }
