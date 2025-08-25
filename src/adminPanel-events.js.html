@@ -480,7 +480,14 @@ function setupExternalLinkHandlers() {
   
   // Open spreadsheet
   if (elements['open-spreadsheet-btn']) {
-    elements['open-spreadsheet-btn'].addEventListener('click', openDatabaseSpreadsheet);
+    elements['open-spreadsheet-btn'].addEventListener('click', function() {
+      if (typeof openDatabaseSpreadsheet === 'function') {
+        openDatabaseSpreadsheet();
+      } else {
+        console.error('CRITICAL: openDatabaseSpreadsheet is not available');
+        showMessage('スプレッドシートを開く機能が利用できません。', 'warning');
+      }
+    });
   }
   
   // Open form
