@@ -215,44 +215,47 @@
   // =============================================================================
   // STATE MANAGER - Single Definition
   // =============================================================================
-  class AdminPanelStateManager {
-    constructor() {
-      this.state = {
-        currentStatus: null,
-        selectedSheet: '',
-        isLoading: false,
-        debugMode: window.DEBUG_MODE || false
-      };
-      this.subscribers = new Map();
-    }
-
-    setState(key, value) {
-      this.state[key] = value;
-      this.notifySubscribers(key, value);
-    }
-
-    subscribe(key, callback) {
-      if (!this.subscribers.has(key)) {
-        this.subscribers.set(key, []);
-      }
-      this.subscribers.get(key).push(callback);
-    }
-
-    notifySubscribers(key, value) {
-      const callbacks = this.subscribers.get(key) || [];
-      callbacks.forEach(callback => {
-        try {
-          callback(value);
-        } catch (error) {
-          logError('Subscriber callback error:', error);
-        }
-      });
-    }
-
-    getState() {
-      return { ...this.state };
-    }
+  function AdminPanelStateManager() {
+    this.state = {
+      currentStatus: null,
+      selectedSheet: '',
+      isLoading: false,
+      debugMode: window.DEBUG_MODE || false
+    };
+    this.subscribers = new Map();
   }
+
+  AdminPanelStateManager.prototype.setState = function(key, value) {
+    this.state[key] = value;
+    this.notifySubscribers(key, value);
+  };
+
+  AdminPanelStateManager.prototype.subscribe = function(key, callback) {
+    if (!this.subscribers.has(key)) {
+      this.subscribers.set(key, []);
+    }
+    this.subscribers.get(key).push(callback);
+  };
+
+  AdminPanelStateManager.prototype.notifySubscribers = function(key, value) {
+    const callbacks = this.subscribers.get(key) || [];
+    callbacks.forEach(callback => {
+      try {
+        callback(value);
+      } catch (error) {
+        logError('Subscriber callback error:', error);
+      }
+    });
+  };
+
+  AdminPanelStateManager.prototype.getState = function() {
+    return Object.assign({}, this.state); // ES5 compatible spread
+  };
+
+  AdminPanelStateManager.prototype.updateStatus = function(data) {
+    this.setState('currentStatus', data);
+    this.setState('isLoading', false);
+  };
 
   // Initialize state manager
   window.AdminPanel.stateManager = new AdminPanelStateManager();
