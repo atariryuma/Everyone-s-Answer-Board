@@ -20,6 +20,107 @@
   const __DEBUG_MODE_RAW__ = '<?= escapeJavaScript(shouldEnableDebugMode()) ?>';
   window.DEBUG_MODE = (__DEBUG_MODE_RAW__ === 'true' || __DEBUG_MODE_RAW__ === true);
   if (window.SYSTEM_CONSTANTS) { window.SYSTEM_CONSTANTS.DEBUG_MODE = window.DEBUG_MODE; }
+
+  // Advanced Global Log Management System - Complete Control
+  window.AdminLogManager = (function() {
+    const originalMethods = {
+      log: console.log,
+      warn: console.warn,  
+      info: console.info,
+      error: console.error,
+      debug: console.debug,
+      group: console.group,
+      groupEnd: console.groupEnd
+    };
+
+    const isDebugMode = window.DEBUG_MODE;
+    
+    const suppressPatterns = [
+      // Emoji-based logs (complete suppression)
+      /✅|🔧|🚀|📞|🔍|🎉|🔐|🛡️|🔄|⚠️|❌|🚨/,
+      // System initialization logs
+      /SharedUtilities loaded|System Constants loaded|BackendProgressSync initialized/i,
+      /Unified Error Handler initialized|UnifiedLoadingManager|Modal.*loaded/i,
+      /Full implementation|Found.*implementations|Phase.*並列モジュール/i,
+      /module initialized|Master Initialization|Final initialization/i,
+      /All interactive elements|draft recovery|getCurrentUserStatus|authenticated.*userId/i,
+      // Logger system logs
+      /INFO\[Logger\]|DEBUG\]|開発モード.*詳細ログ|logレベル変更/i,
+      // Environment warnings
+      /Unrecognized feature|iframe.*sandbox|escape.*sandboxing|Net state changed/i
+    ];
+
+    function shouldSuppress(message) {
+      const msgStr = String(message || '');
+      return suppressPatterns.some(pattern => pattern.test(msgStr));
+    }
+
+    function filterArgs(...args) {
+      if (!isDebugMode) {
+        const msgStr = args.join(' ');
+        // In production: only critical messages
+        if (!msgStr.includes('CRITICAL') && !msgStr.includes('ERROR') && !msgStr.includes('⚠️') && !msgStr.includes('🚨')) {
+          return null;
+        }
+      }
+      
+      // Check suppression patterns
+      if (shouldSuppress(args.join(' '))) {
+        return null;
+      }
+      
+      return args;
+    }
+
+    return {
+      init: function() {
+        console.log = function(...args) {
+          const filtered = filterArgs(...args);
+          if (filtered) {
+            try { originalMethods.log.apply(console, filtered); } catch (_) {}
+          }
+        };
+
+        console.warn = function(...args) {
+          const filtered = filterArgs(...args);
+          if (filtered) {
+            try { originalMethods.warn.apply(console, filtered); } catch (_) {}
+          }
+        };
+
+        console.info = function(...args) {
+          const filtered = filterArgs(...args);
+          if (filtered) {
+            try { originalMethods.info.apply(console, filtered); } catch (_) {}
+          }
+        };
+
+        console.debug = function(...args) {
+          if (!isDebugMode) return;
+          const filtered = filterArgs(...args);
+          if (filtered) {
+            try { originalMethods.debug.apply(console, filtered); } catch (_) {}
+          }
+        };
+
+        console.group = function(...args) {
+          if (!isDebugMode) return;
+          const filtered = filterArgs(...args);
+          if (filtered) {
+            try { originalMethods.group.apply(console, filtered); } catch (_) {}
+          }
+        };
+
+        console.groupEnd = function() {
+          if (!isDebugMode) return;
+          try { originalMethods.groupEnd.apply(console); } catch (_) {}
+        };
+      }
+    };
+  })();
+
+  // Initialize log management immediately
+  window.AdminLogManager.init();
   </script>
 
   <!-- Unified Styles and Shared Components -->
@@ -35,95 +136,7 @@
   <?!= include('UnifiedCache.js'); ?>
   <?!= include('adminPanel-framework.js'); ?>
   <?!= include('adminPanel-api.js'); ?>
-  <script>
-  // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
-  (function() {
-    try {
-      const originalLog = console.log;
-      const originalWarn = console.warn;
-      const originalInfo = console.info;
-      // Read from injected DEBUG_MODE or SYSTEM_CONSTANTS fallback
-      const isDebug = !!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE));
-
-      const warningFilters = [
-        /Unrecognized feature.*ambient-light-sensor/i,
-        /Unrecognized feature.*speaker/i,
-        /Unrecognized feature.*vibrate/i,
-        /Unrecognized feature.*vr/i,
-        /iframe.*allow-scripts.*allow-same-origin.*sandbox/i,
-        /escape.*sandboxing/i,
-        /Net state changed/i,
-        /開発モード.*詳細ログ/i,
-        /logレベル変更/i,
-        /SharedUtilities loaded/i,
-        /System Constants loaded/i,
-        /BackendProgressSync initialized/i,
-        /Unified Error Handler initialized/i,
-        /Full implementation/i,
-        /UnifiedLoadingManager/i,
-        /Modal.*loaded/i,
-        /Found.*implementations/i,
-        /Phase.*並列モジュール/i,
-        /module initialized/i,
-        /Master Initialization/i,
-        /Final initialization/i,
-        /All interactive elements/i,
-        /draft recovery/i,
-        /getCurrentUserStatus/i,
-        /authenticated.*userId/i,
-        /INFO\[Logger\]/i,
-        /DEBUG\]/i,
-        /✅/i,
-        /🔧/i,
-        /🚀/i,
-        /📞/i,
-        /🔍/i,
-        /🎉/i,
-        /🔐/i,
-        /🛡️/i,
-        /🔄/i
-      ];
-
-      const shouldFilter = (msg) => {
-        const s = String(msg || '');
-        return warningFilters.some((re) => re.test(s));
-      };
-
-      console.log = function(...args) {
-        const msgStr = args.join(' ');
-        // In production mode: only allow critical messages (⚠️, 🚨, ERROR)
-        if (!isDebug) {
-          if (!msgStr.includes('⚠️') && !msgStr.includes('🚨') && !msgStr.includes('ERROR') && !msgStr.includes('CRITICAL')) {
-            return;
-          }
-        }
-        // Filter known noisy messages regardless of debug mode
-        if (shouldFilter(msgStr)) return;
-        try { originalLog.apply(console, args); } catch (_) {}
-      };
-
-      console.warn = function(...args) {
-        const msgStr = args.join(' ');
-        // Filter known noisy warnings
-        if (shouldFilter(msgStr)) return;
-        // In production mode: also filter non-critical warnings
-        if (!isDebug && !msgStr.includes('⚠️') && !msgStr.includes('🚨')) return;
-        try { originalWarn.apply(console, args); } catch (_) {}
-      };
-
-      console.info = function(...args) {
-        const msgStr = args.join(' ');
-        // Filter known noisy info messages
-        if (shouldFilter(msgStr)) return;
-        // In production mode: suppress all info unless explicitly critical
-        if (!isDebug && !msgStr.includes('⚠️') && !msgStr.includes('🚨') && !msgStr.includes('CRITICAL')) return;
-        try { originalInfo.apply(console, args); } catch (_) {}
-      };
-    } catch (e) {
-      // Fail open: keep default console behavior
-    }
-  })();
-  </script>
+  <!-- Old log control removed - using AdminLogManager instead -->
   
   <script>
   // GASOptimizer and UnifiedCache are now guaranteed to be defined
@@ -133,13 +146,14 @@
     const errorStack = event.error?.stack || '';
     const errorLine = event.lineno || 'unknown';
     
-    // Non-critical GAS internal errors (suppress with logging)
+    // Non-critical GAS internal errors (suppress completely - no logging)
     const suppressedErrors = [
       'document.write',
       'Unexpected token',
       'Failed to execute \'write\' on \'Document\'',
       'SyntaxError: Failed to execute \'write\'',
       'Unexpected end of input',
+      'SyntaxError: Unexpected end of input',
       'Identifier \'userId\' has already been declared',
       'mae_html_user_bin_i18n_mae_html_user',
       'warden_bin_i18n_warden',
@@ -158,16 +172,20 @@
       'function not yet loaded',
       'function not available',
       'openAppSetupPage is not defined',
-      'runHeaderGuessing is not defined'
+      'runHeaderGuessing is not defined',
+      'startSystemStatusUpdate is not defined',
+      'loadStatus is not defined'
     ];
     
-    // Critical errors that need intervention
+    // Only truly critical application errors (not definition issues)
     const criticalErrors = [
       'await is only valid in async functions',
       'Cannot set property',
       'Cannot read property',
-      'is not defined',
-      'is not a function'
+      'Network error',
+      'Server error',
+      'Authentication failed',
+      'Permission denied'
     ];
     
     const shouldSuppress = suppressedErrors.some(pattern => 

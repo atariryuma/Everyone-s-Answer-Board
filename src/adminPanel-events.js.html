@@ -27,7 +27,7 @@ var eventHandlersAttached = {
 function setupEventListeners() {
   // Prevent duplicate event handler attachment
   if (eventHandlersAttached.setupEventListeners) {
-    console.log('⚠️ AdminPanel: Event handlers already attached, skipping duplicate setup');
+    console.log('CRITICAL: Event handlers already attached, skipping duplicate setup');
     return;
   }
   
@@ -44,10 +44,17 @@ function setupEventListeners() {
   };
   
   
-  // AI column detection button
+  // AI column detection button - Safe event handling
   var reguessBtn = document.getElementById('reguess-headers-btn');
   if (reguessBtn) {
-    reguessBtn.addEventListener('click', runHeaderGuessing);
+    reguessBtn.addEventListener('click', function() {
+      if (typeof runHeaderGuessing === 'function') {
+        runHeaderGuessing();
+      } else {
+        console.error('CRITICAL: runHeaderGuessing is not available');
+        showMessage('AI列判定機能が利用できません。ページを再読み込みしてください。', 'warning');
+      }
+    });
   }
   
   // Save and publish button

@@ -11,7 +11,9 @@
       "Bash(do echo \"=== Checking $file ===\")",
       "Bash(node:*)",
       "Bash(echo:*)",
-      "Bash(for file in adminPanel-*.js.html)"
+      "Bash(for file in adminPanel-*.js.html)",
+      "Bash(for file in adminPanel*.js.html)",
+      "Bash(do echo:*)"
     ],
     "deny": [],
     "ask": []

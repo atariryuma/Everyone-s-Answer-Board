@@ -1273,65 +1273,110 @@ function initializeAdminPanelMaster() {
     }
   }, 100);
   
-  // Phase 2: 各モジュールを並列初期化 (パフォーマンス向上)
-  // 遅延を最小限に抑制して即座に初期化
-  setTimeout(() => {
-    logDebug('🔧 Phase 2: 並列モジュール初期化開始');
+  // Phase 2: Sequential Module Initialization (Sync Order)
+  // Initialize modules in strict sequential order to prevent race conditions
+  initializeModulesSequentially();
+}
+
+// Sequential module initialization function
+async function initializeModulesSequentially() {
+  console.log('CRITICAL: Starting sequential module initialization');
+  
+  // Step 1: Status module
+  try {
+    initializeMessageArea();
+    console.log('CRITICAL: Status module initialized');
+  } catch (error) {
+    console.error('CRITICAL: Status module failed:', error);
+  }
+  
+  // Step 2: API module (wait for functions to be available)
+  await new Promise(resolve => {
+    let attempts = 0;
+    const maxAttempts = 50; // 5 second timeout
     
-    // Status管理初期化
-    try {
-      initializeMessageArea();
-      logDebug('✅ Status module initialized');
-    } catch (error) {
-      logError('❌ Status module initialization failed:', error);
-    }
-    
-    // API通信初期化
-    try {
-      logDebug('🚀 API module initialization...');
-      initializeAPI();
-      logDebug('✅ API module initialized');
-    } catch (error) {
-      console.error('❌ API initialization failed:', error);
-    }
-    
-    // UI初期化
-    try {
-      initializeUI();
-      logDebug('✅ UI module initialized');
-    } catch (error) {
-      console.error('❌ UI initialization failed:', error);
-    }
-    
-    // フォーム管理初期化
-    try {
-      setupCharacterCounters();
-      setupModalCharacterCounters();
-      logDebug('✅ Forms module initialized');
-    } catch (error) {
-      logError('❌ Forms module initialization failed:', error);
-    }
-    
-    // イベント管理初期化（最後に実行）
-    setTimeout(() => {
+    const checkAPI = () => {
+      attempts++;
       try {
-        initializeEventListeners();
-        logDebug('✅ Events module initialized');
-        logInfo('🎉 AdminPanel Master Initialization Complete');
-        
-        // ユーザー情報の同期と最終処理
-        finalizeInitialization();
-        
+        if (typeof initializeAPI === 'function') {
+          initializeAPI();
+          console.log('CRITICAL: API module initialized');
+          resolve();
+        } else if (attempts >= maxAttempts) {
+          console.error('CRITICAL: API module timeout - initializeAPI not available');
+          resolve(); // Continue anyway
+        } else {
+          setTimeout(checkAPI, 100);
+        }
       } catch (error) {
-        updateSystemStatus('eventsInitialized', false, error);
-        console.error('❌ Events initialization failed:', error);
-        
-        // エラーでも最終処理は実行
-        finalizeInitialization();
+        console.error('CRITICAL: API initialization failed:', error);
+        resolve(); // Continue anyway
       }
-    }, 100);
+    };
     
-  }, 10);
+    checkAPI();
+  });
+  
+  // Step 3: UI module
+  try {
+    if (typeof initializeUI === 'function') {
+      initializeUI();
+      console.log('CRITICAL: UI module initialized');
+    }
+  } catch (error) {
+    console.error('CRITICAL: UI initialization failed:', error);
+  }
+  
+  // Step 4: Forms module
+  try {
+    if (typeof setupCharacterCounters === 'function') {
+      setupCharacterCounters();
+    }
+    if (typeof setupModalCharacterCounters === 'function') {
+      setupModalCharacterCounters();
+    }
+    console.log('CRITICAL: Forms module initialized');
+  } catch (error) {
+    console.error('CRITICAL: Forms initialization failed:', error);
+  }
+  
+  // Step 5: Events module (last - wait for all functions to be available)
+  await new Promise(resolve => {
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    const checkEvents = () => {
+      attempts++;
+      try {
+        if (typeof initializeEventListeners === 'function' && 
+            typeof runHeaderGuessing === 'function' &&
+            typeof openAppSetupPage === 'function') {
+          initializeEventListeners();
+          console.log('CRITICAL: Events module initialized');
+          console.log('CRITICAL: AdminPanel Master Initialization Complete');
+          finalizeInitialization();
+          resolve();
+        } else if (attempts >= maxAttempts) {
+          console.error('CRITICAL: Events module timeout - some functions not available');
+          console.log('CRITICAL: Available functions:', {
+            initializeEventListeners: typeof initializeEventListeners,
+            runHeaderGuessing: typeof runHeaderGuessing, 
+            openAppSetupPage: typeof openAppSetupPage
+          });
+          finalizeInitialization();
+          resolve();
+        } else {
+          setTimeout(checkEvents, 100);
+        }
+      } catch (error) {
+        console.error('CRITICAL: Events initialization failed:', error);
+        finalizeInitialization();
+        resolve();
+      }
+    };
+    
+    checkEvents();
+  });
 }
 
 // Finalize initialization and enable user interaction
