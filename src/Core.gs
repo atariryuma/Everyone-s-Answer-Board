@@ -2120,39 +2120,66 @@ function getResponsesData(userId, sheetName) {
 // =================================================================
 
 /**
- * 現在のユーザーのステータスを取得し、UIに表示するための情報を返します。(マルチテナント対応版)
- * @param {string} requestUserId - リクエスト元のユーザーID
- * @returns {object} ユーザーのステータス情報
+ * 現在のユーザーのステータスを取得し、UIに表示するための情報を返します。(統一スキーマ対応版)
+ * @param {string} [requestUserId] - リクエスト元のユーザーID (オプション、未指定時は自動取得)
+ * @returns {object} 統一スキーマのユーザーステータス情報
  */
-function getCurrentUserStatus(requestUserId) {
+function getCurrentUserStatus(requestUserId = null) {
   try {
     const activeUserEmail = getCurrentUserEmail();
 
-    // requestUserIdが無効な場合は、メールアドレスでユーザーを検索
+    // requestUserIdが未指定または無効な場合は、自動取得またはメールアドレスで検索
     let userInfo;
     if (requestUserId && requestUserId.trim() !== '') {
       verifyUserAccess(requestUserId);
       userInfo = findUserById(requestUserId);
     } else {
-      userInfo = findUserByEmail(activeUserEmail);
+      // 自動取得を試行
+      const autoUserId = getUserId();
+      if (autoUserId) {
+        userInfo = findUserById(autoUserId);
+      } else {
+        userInfo = findUserByEmail(activeUserEmail);
+      }
     }
 
     if (!userInfo) {
-      return { status: 'error', message: 'ユーザー情報が見つかりません。' };
+      return { 
+        status: 'error', 
+        message: 'ユーザー情報が見つかりません。',
+        data: null,
+        userInfo: null,
+        timestamp: new Date().toISOString()
+      };
     }
 
+    // 統一スキーマでの戻り値
     return {
       status: 'success',
+      data: {
+        userId: userInfo.userId,
+        adminEmail: userInfo.adminEmail,
+        isActive: userInfo.isActive,
+        lastAccessedAt: userInfo.lastAccessedAt
+      },
       userInfo: {
         userId: userInfo.userId,
         adminEmail: userInfo.adminEmail,
         isActive: userInfo.isActive,
         lastAccessedAt: userInfo.lastAccessedAt
-      }
+      },
+      message: null,
+      timestamp: new Date().toISOString()
     };
   } catch (e) {
-    logError(e, 'getCurrentUserStatus', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
-    return { status: 'error', message: 'ステータス取得に失敗しました: ' + e.message };
+    logError(e, 'getCurrentUserStatus', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { requestUserId });
+    return { 
+      status: 'error', 
+      message: 'ステータス取得に失敗しました: ' + e.message,
+      data: null,
+      userInfo: null,
+      timestamp: new Date().toISOString()
+    };
   }
 }
 
@@ -2780,41 +2807,40 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, p
   var sheetConfig = updatedConfig[sheetConfigKey] || {};
   
   // 拡張されたレスポンス情報
+  // 統一スキーマでの戻り値構造
   var response = {
     status: 'success',
     message: 'クイックスタートが完了しました！' + publishMessage,
-    webAppUrl: appUrls.webAppUrl,
-    adminUrl: appUrls.adminUrl,
-    viewUrl: appUrls.viewUrl,
-    setupUrl: appUrls.setupUrl,
-    formUrl: updatedConfig.formUrl,
-    editFormUrl: updatedConfig.editFormUrl,
-    spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
-    folderUrl: updatedConfig.folderUrl,
-    // 進捗システム用の詳細情報
-    setupComplete: true,
-    autoPublished: isPublished,
-    publishResult: publishResult,
-    sheetName: formAndSsInfo.sheetName,
-    formId: formAndSsInfo.formId,
-    spreadsheetId: formAndSsInfo.spreadsheetId,
-    // Display settings for UI
-    displayMode: updatedConfig.displayMode || 'anonymous',
-    showCounts: updatedConfig.showCounts === true,
-    // シート設定データ（フロントエンド同期用）
-    config: sheetConfig.guessedConfig || {},
-    publishedSheetName: formAndSsInfo.sheetName,
-    // フロントエンド完了通知用のタイムスタンプ
-    completedAt: new Date().toISOString(),
-    // 成功ステップの詳細
-    completedSteps: [
-      'ユーザー専用フォルダの作成',
-      'Googleフォームとスプレッドシートの作成',
-      'データベース更新とキャッシュ管理',
-      isPublished ? '回答ボードの自動公開' : '回答ボード作成（手動公開待ち）',
-      'キャッシュクリアと最終化',
-      'セットアップ完了'
-    ]
+    data: {
+      webAppUrl: appUrls.webAppUrl,
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
+      setupUrl: appUrls.setupUrl,
+      formUrl: updatedConfig.formUrl,
+      editFormUrl: updatedConfig.editFormUrl,
+      spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
+      folderUrl: updatedConfig.folderUrl,
+      setupComplete: true,
+      autoPublished: isPublished,
+      publishResult: publishResult,
+      sheetName: formAndSsInfo.sheetName,
+      formId: formAndSsInfo.formId,
+      spreadsheetId: formAndSsInfo.spreadsheetId,
+      displayMode: updatedConfig.displayMode || 'anonymous',
+      showCounts: updatedConfig.showCounts === true,
+      config: sheetConfig.guessedConfig || {},
+      publishedSheetName: formAndSsInfo.sheetName,
+      completedSteps: [
+        'ユーザー専用フォルダの作成',
+        'Googleフォームとスプレッドシートの作成',
+        'データベース更新とキャッシュ管理',
+        isPublished ? '回答ボードの自動公開' : '回答ボード作成（手動公開待ち）',
+        'キャッシュクリアと最終化',
+        'セットアップ完了'
+      ]
+    },
+    userInfo: null, // クイックスタート時は不要だが統一スキーマのため含める
+    timestamp: new Date().toISOString()
   };
   
   return response;
@@ -6136,10 +6162,13 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     return {
       status: 'error',
       message: error.message,
+      data: {
+        setupStep: 1,
+        appUrls: null,
+        activeSheetName: null
+      },
       userInfo: fallbackUserInfo,
-      setupStep: 1,
-      appUrls: null,
-      activeSheetName: null,
+      timestamp: new Date().toISOString(),
       _meta: {
         apiVersion: 'integrated_v1',
         error: error.message,

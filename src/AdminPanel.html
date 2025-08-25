@@ -73,15 +73,357 @@
   <!-- Core JavaScript Libraries (must be loaded first) -->
   <?!= include('ClientOptimizer.html'); ?>
   <?!= include('UnifiedCache.js.html'); ?>
-  <?!= include('adminPanel-framework.js.html'); ?>
-  <?!= include('adminPanel-api.js.html'); ?>
   
+  <!-- Unified Admin Panel JavaScript (no duplicates) -->
   <script>
   const __IS_SYSTEM_ADMIN_RAW__ = '<?= escapeJavaScript(typeof isDeployUser !== "undefined" ? isDeployUser : "false") ?>';
   const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
   window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
-  // Template processing complete - debug info suppressed in production
-  
+
+  // =============================================================================
+  // UNIFIED ADMIN PANEL NAMESPACE - No Function Duplication
+  // =============================================================================
+  window.AdminPanel = window.AdminPanel || {
+    errors: {},
+    ui: {},
+    state: {
+      current: null,
+      selectedSheet: '',
+      updateStatus(status) {
+        this.current = status;
+      }
+    },
+    initialization: {
+      isInProgress: false,
+      isCompleted: false,
+      completedPhases: new Set(),
+      startTime: null,
+      lastLoadStatusCall: null,
+      loadStatusCallCount: 0
+    }
+  };
+
+  // =============================================================================
+  // UNIFIED LOGGING SYSTEM - Single Definition
+  // =============================================================================
+  function AdminPanel_log(level, ...args) {
+    const isDebugModeEnabled = window.AdminPanel && window.AdminPanel.stateManager && window.AdminPanel.stateManager.state.debugMode || window.DEBUG_MODE;
+    if (!isDebugModeEnabled && level === 'debug') return;
+    
+    switch (level) {
+      case 'error':
+        console.error('[AdminPanel]', ...args);
+        break;
+      case 'warn':
+        console.warn('[AdminPanel]', ...args);
+        break;
+      case 'info':
+        console.log('[AdminPanel]', ...args);
+        break;
+      case 'debug':
+        if (isDebugModeEnabled) console.log('[AdminPanel:DEBUG]', ...args);
+        break;
+      default:
+        console.log('[AdminPanel]', ...args);
+    }
+  }
+
+  // Unified convenience functions
+  function logError(...args) { AdminPanel_log('error', ...args); }
+  function logWarn(...args) { AdminPanel_log('warn', ...args); }
+  function logInfo(...args) { AdminPanel_log('info', ...args); }
+  function logDebug(...args) { AdminPanel_log('debug', ...args); }
+
+  // =============================================================================
+  // STATE MANAGER - Single Definition
+  // =============================================================================
+  class AdminPanelStateManager {
+    constructor() {
+      this.state = {
+        currentStatus: null,
+        selectedSheet: '',
+        isLoading: false,
+        debugMode: window.DEBUG_MODE || false
+      };
+      this.subscribers = new Map();
+    }
+
+    setState(key, value) {
+      this.state[key] = value;
+      this.notifySubscribers(key, value);
+    }
+
+    subscribe(key, callback) {
+      if (!this.subscribers.has(key)) {
+        this.subscribers.set(key, []);
+      }
+      this.subscribers.get(key).push(callback);
+    }
+
+    notifySubscribers(key, value) {
+      const callbacks = this.subscribers.get(key) || [];
+      callbacks.forEach(callback => {
+        try {
+          callback(value);
+        } catch (error) {
+          logError('Subscriber callback error:', error);
+        }
+      });
+    }
+
+    getState() {
+      return { ...this.state };
+    }
+  }
+
+  // Initialize state manager
+  window.AdminPanel.stateManager = new AdminPanelStateManager();
+
+  // =============================================================================
+  // UNIFIED API COMMUNICATION - Single Definition
+  // =============================================================================
+  function AdminPanel_callGAS(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      logDebug(`📞 About to call ${functionName}`, args);
+      
+      google.script.run
+        .withSuccessHandler(function(response) {
+          logDebug(`📥 ${functionName} response:`, response);
+          resolve(response);
+        })
+        .withFailureHandler(function(error) {
+          logError(`❌ ${functionName} failed:`, error);
+          reject(error);
+        })[functionName](...args);
+    });
+  }
+
+  // =============================================================================
+  // USER INITIALIZATION - Unified Function
+  // =============================================================================
+  function initializeUserId() {
+    logDebug('🔐 Initializing UserId');
+    return AdminPanel_callGAS('getCurrentUserStatus')
+      .then(function(response) {
+        if (response && response.status === 'success') {
+          window.AdminPanel.currentUserId = response.userInfo.userId;
+          window.AdminPanel.userEmail = response.userInfo.adminEmail;
+          logDebug('✅ AdminPanel: User authenticated, userId:', window.AdminPanel.currentUserId);
+          return response;
+        } else {
+          throw new Error('User authentication failed');
+        }
+      });
+  }
+
+  // =============================================================================
+  // CORE UI FUNCTIONS - Preserved Interface
+  // =============================================================================
+  function loadStatus() {
+    return AdminPanel_callGAS('getInitialData')
+      .then(function(response) {
+        if (response && response.status === 'success') {
+          window.AdminPanel.state.updateStatus(response);
+          return response;
+        } else {
+          throw new Error('Failed to load status');
+        }
+      });
+  }
+
+  function createBoard() {
+    return AdminPanel_callGAS('executeQuickStartSetup')
+      .then(function(response) {
+        if (response && response.status === 'success') {
+          logInfo('✅ Board created successfully');
+          return response;
+        } else {
+          throw new Error(response.message || 'Failed to create board');
+        }
+      });
+  }
+
+  // =============================================================================
+  // DOM UTILITY FUNCTIONS - Preserved Interface
+  // =============================================================================
+  function safeSetText(elementId, text) {
+    try {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.textContent = text;
+        return true;
+      } else {
+        logWarn(`Element not found: ${elementId}`);
+        return false;
+      }
+    } catch (error) {
+      logError(`Error setting text for ${elementId}:`, error);
+      return false;
+    }
+  }
+
+  function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  }
+
+  function hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  }
+
+  // =============================================================================
+  // ESSENTIAL EVENT HANDLERS - Unified
+  // =============================================================================
+  function setupEssentialEventHandlers() {
+    // Board creation button
+    const createBoardBtn = document.getElementById('save-publish-btn');
+    if (createBoardBtn) {
+      createBoardBtn.addEventListener('click', function() {
+        createBoard().catch(error => logError('Create board failed:', error));
+      });
+    }
+
+    // Sheet selection
+    const sheetSelect = document.getElementById('sheet-select');
+    if (sheetSelect) {
+      sheetSelect.addEventListener('change', function() {
+        const selectedSheet = this.value;
+        window.AdminPanel.state.selectedSheet = selectedSheet;
+        logDebug('Sheet selected:', selectedSheet);
+      });
+    }
+
+    // Delete account button
+    const deleteAccountBtn = document.getElementById('delete-account-btn');
+    if (deleteAccountBtn) {
+      deleteAccountBtn.addEventListener('click', function() {
+        if (confirm('アカウントを削除してもよろしいですか？この操作は元に戻せません。')) {
+          AdminPanel_callGAS('deleteUserAccount')
+            .then(response => {
+              if (response.status === 'success') {
+                alert('アカウントが削除されました。');
+                window.location.href = '/';
+              }
+            })
+            .catch(error => logError('Delete account failed:', error));
+        }
+      });
+    }
+
+    // Modal handlers
+    const modals = ['form-config-modal', 'security-details-modal', 'google-integration-modal'];
+    modals.forEach(modalId => {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        // Close on backdrop click
+        modal.addEventListener('click', function(e) {
+          if (e.target === modal) {
+            hideModal(modalId);
+          }
+        });
+        
+        // Close button
+        const closeBtn = modal.querySelector('[data-modal-close]');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => hideModal(modalId));
+        }
+      }
+    });
+
+    logDebug('Essential event handlers attached');
+  }
+
+  // =============================================================================
+  // UI STATUS UPDATE FUNCTIONS - Preserved Interface
+  // =============================================================================
+  function updateUIStatus(statusData) {
+    if (!statusData) return;
+
+    // Update user info display
+    if (statusData.userInfo) {
+      safeSetText('user-email-display', statusData.userInfo.adminEmail || '');
+      safeSetText('user-name-display', statusData.userInfo.userId || '');
+    }
+
+    // Update form status
+    if (statusData.formUrl) {
+      const openFormBtn = document.getElementById('open-form-btn');
+      if (openFormBtn) {
+        openFormBtn.href = statusData.formUrl;
+        openFormBtn.classList.remove('hidden');
+      }
+    }
+
+    // Update spreadsheet link
+    if (statusData.spreadsheetUrl) {
+      const openSpreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+      if (openSpreadsheetBtn) {
+        openSpreadsheetBtn.href = statusData.spreadsheetUrl;
+        openSpreadsheetBtn.classList.remove('hidden');
+      }
+    }
+
+    logDebug('UI status updated');
+  }
+
+  // =============================================================================
+  // FORM HANDLING - Unified
+  // =============================================================================
+  function handleFormSubmission(formId, gasFunction) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      
+      AdminPanel_callGAS(gasFunction, data)
+        .then(response => {
+          if (response.status === 'success') {
+            logInfo('Form submitted successfully');
+            loadStatus(); // Refresh status
+          } else {
+            logError('Form submission failed:', response.message);
+          }
+        })
+        .catch(error => logError('Form submission error:', error));
+    });
+  }
+
+  // =============================================================================
+  // INITIALIZATION - Auto-start
+  // =============================================================================
+  document.addEventListener('DOMContentLoaded', function() {
+    logDebug('DOM ready, initializing admin panel...');
+    
+    // Setup essential event handlers
+    setupEssentialEventHandlers();
+    
+    // Initialize user authentication
+    initializeUserId()
+      .then(function(response) {
+        logInfo('Admin panel initialized');
+        updateUIStatus(response);
+        return loadStatus();
+      })
+      .then(function(statusResponse) {
+        logDebug('Initial status loaded:', statusResponse);
+        updateUIStatus(statusResponse);
+      })
+      .catch(function(error) {
+        logError('Admin panel initialization failed:', error);
+      });
+  });
+
   </script>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
@@ -1065,12 +1407,6 @@
   <?!= include('backendProgressSync.js.html'); ?>
   <!-- Error handling system must be loaded first -->
   <?!= include('errorMessages.js.html'); ?>
-  <?!= include('adminPanel-core.js.html'); ?>
-  <?!= include('adminPanel-ui.js.html'); ?>
-  <?!= include('adminPanel-status.js.html'); ?>
-  <?!= include('adminPanel-forms.js.html'); ?>
-  <?!= include('adminPanel-events.js.html'); ?>
-  <?!= include('adminPanel.js.html'); ?>
 
   <script>
     // 管理者モーダルの初期化
