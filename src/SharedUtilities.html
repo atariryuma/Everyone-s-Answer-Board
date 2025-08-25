@@ -1495,6 +1495,31 @@ if (!initializeTimingManagerIntegration()) {
   }
 })();
 
+// =============================================================================
+// JSON UTILITIES
+// =============================================================================
+
+/**
+ * userInfo.configJson を安全にパースします。
+ * 無効な文字列や空文字列の場合は空オブジェクトを返します。
+ * @param {string|Object|null|undefined} configJson JSON文字列またはオブジェクト
+ * @returns {Object} パース結果のオブジェクト。失敗時は空オブジェクト
+ */
+function parseUserConfig(configJson) {
+  if (!configJson) return {};
+  if (typeof configJson === 'object') return configJson;
+  try {
+    return JSON.parse(configJson);
+  } catch (error) {
+    if (typeof AppLogger !== 'undefined') {
+      AppLogger.warn('parseUserConfig', 'Invalid configJson detected', error);
+    } else {
+      console.warn('parseUserConfig: invalid configJson', error);
+    }
+    return {};
+  }
+}
+
 // Prevent duplicate loading messages
 if (!window.sharedUtilitiesLoaded) {
   window.sharedUtilitiesLoaded = true;
