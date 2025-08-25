@@ -2068,6 +2068,107 @@ function getQuestionTextFromConfig(config, userInfo) {
   return '（問題文未設定）';
 }
 
+// =============================================================================
+// EMERGENCY DIAGNOSTIC FUNCTIONS
+// =============================================================================
+/**
+ * 緊急診断用関数 - Script Properties と基本機能をチェック
+ * @returns {object} 診断結果
+ */
+function emergencyDiagnostic() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const result = {
+      timestamp: new Date().toISOString(),
+      scriptProperties: {
+        DATABASE_SPREADSHEET_ID: !!props.getProperty('DATABASE_SPREADSHEET_ID'),
+        SERVICE_ACCOUNT_CREDS: !!props.getProperty('SERVICE_ACCOUNT_CREDS'),
+        ADMIN_EMAIL: !!props.getProperty('ADMIN_EMAIL')
+      },
+      authentication: {
+        currentUserEmail: null,
+        error: null
+      },
+      database: {
+        accessible: false,
+        error: null
+      }
+    };
+    
+    // 認証テスト
+    try {
+      result.authentication.currentUserEmail = getCurrentUserEmail();
+    } catch (authError) {
+      result.authentication.error = authError.message;
+    }
+    
+    // データベース接続テスト
+    try {
+      const dbId = getSecureDatabaseId();
+      if (dbId) {
+        result.database.accessible = true;
+        result.database.id = dbId.substring(0, 10) + '...'; // 部分表示
+      } else {
+        result.database.error = 'DATABASE_SPREADSHEET_ID not configured';
+      }
+    } catch (dbError) {
+      result.database.error = dbError.message;
+    }
+    
+    return result;
+  } catch (error) {
+    return {
+      error: 'Emergency diagnostic failed: ' + error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * バックエンド機能直接テスト
+ * @returns {object} テスト結果
+ */
+function testCoreFunction() {
+  try {
+    return {
+      status: 'testing',
+      getCurrentUserStatus: getCurrentUserStatus(),
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * 緊急ユーザー作成（最終手段）
+ * @returns {object} 作成結果
+ */
+function createEmergencyUser() {
+  try {
+    const email = getCurrentUserEmail();
+    if (!email) {
+      throw new Error('No authenticated user found');
+    }
+    
+    return executeQuickStartSetup(null, { 
+      adminEmail: email,
+      emergencyMode: true 
+    });
+  } catch (error) {
+    return {
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
 /**
  * シートから回答数を取得
  * @param {Object} config - config情報
