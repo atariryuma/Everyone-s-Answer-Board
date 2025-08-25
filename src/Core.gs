@@ -5551,9 +5551,10 @@ function activateSheetSimple(requestUserId, sheetName) {
  */
 function getLoginStatus() {
   const startTime = Date.now();
+  let activeUserEmail = null;
   
   try {
-    const activeUserEmail = getCurrentUserEmail();
+    activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }

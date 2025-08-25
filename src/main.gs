@@ -4835,6 +4835,71 @@ function reportClientError(errorInfo) {
 }
 
 /**
+ * アプリケーション用のURL群を生成（最適化版）
+ * @param {string} userId - ユーザーID
+ * @returns {object} URL群
+ */
+function generateUserUrls(userId) {
+  try {
+    // userIdの妥当性チェック（簡素化）
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      errorLog('generateUserUrls: 無効なuserId:', userId);
+      return {
+        webAppUrl: '',
+        adminUrl: '',
+        viewUrl: '',
+        setupUrl: '',
+        status: 'error',
+        message: '無効なユーザーIDです'
+      };
+    }
+
+    // 最適化済みURL取得（リトライ処理内包）
+    var webAppUrl = getWebAppUrl();
+
+    // 基本的な妥当性チェック
+    if (!webAppUrl) {
+      errorLog('WebAppURL取得失敗、フォールバック使用');
+      webAppUrl = ScriptApp.getService().getUrl();
+    }
+
+    // URLが取得できない場合のエラーハンドリング
+    if (!webAppUrl) {
+      return {
+        webAppUrl: '',
+        adminUrl: '',
+        viewUrl: '',
+        setupUrl: '',
+        status: 'error',
+        message: 'WebアプリURLの取得に失敗しました'
+      };
+    }
+
+    // URL生成（エンコード処理）
+    var encodedUserId = encodeURIComponent(userId.trim());
+
+    return {
+      webAppUrl: webAppUrl,
+      adminUrl: webAppUrl + '?mode=admin&userId=' + encodedUserId,
+      viewUrl: webAppUrl + '?mode=view&userId=' + encodedUserId,
+      setupUrl: webAppUrl + '?setup=true',
+      status: 'success'
+    };
+
+  } catch (e) {
+    errorLog('generateUserUrls error:', e.message);
+    return {
+      webAppUrl: '',
+      adminUrl: '',
+      viewUrl: '',
+      setupUrl: '',
+      status: 'error',
+      message: 'URL生成エラー: ' + e.message
+    };
+  }
+}
+
+/**
  * デバッグ用：現在のユーザー状態を詳細に確認する
  * @returns {Object} デバッグ情報
  */
