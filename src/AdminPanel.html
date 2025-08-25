@@ -34,6 +34,7 @@
   <?!= include('ClientOptimizer'); ?>
   <?!= include('UnifiedCache.js'); ?>
   <?!= include('adminPanel-framework.js.html'); ?>
+  <?!= include('adminPanel-api.js.html'); ?>
   <script>
   // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
   (function() {
@@ -49,6 +50,26 @@
         /Unrecognized feature.*vibrate/i,
         /Unrecognized feature.*vr/i,
         /iframe.*allow-scripts.*allow-same-origin.*sandbox/i,
+        /escape.*sandboxing/i,
+        /Net state changed/i,
+        /開発モード.*詳細ログ/i,
+        /logレベル変更/i,
+        /SharedUtilities loaded/i,
+        /System Constants loaded/i,
+        /BackendProgressSync initialized/i,
+        /Unified Error Handler initialized/i,
+        /Full implementation/i,
+        /UnifiedLoadingManager/i,
+        /Modal.*loaded/i,
+        /Found.*implementations/i,
+        /Phase.*並列モジュール/i,
+        /module initialized/i,
+        /Master Initialization/i,
+        /Final initialization/i,
+        /All interactive elements/i,
+        /draft recovery/i,
+        /getCurrentUserStatus/i,
+        /authenticated.*userId/i
       ];
 
       const shouldFilter = (msg) => {
@@ -57,16 +78,24 @@
       };
 
       console.log = function(...args) {
-        // Only allow explicitly WARN/ERROR level logs in production
         const msgStr = args.join(' ');
-        if (!isDebug && !msgStr.includes('⚠️') && !msgStr.includes('🚨') && !msgStr.includes('ERROR')) return;
+        // In production mode: only allow critical messages (⚠️, 🚨, ERROR)
+        if (!isDebug) {
+          if (!msgStr.includes('⚠️') && !msgStr.includes('🚨') && !msgStr.includes('ERROR') && !msgStr.includes('CRITICAL')) {
+            return;
+          }
+        }
+        // Filter known noisy messages regardless of debug mode
         if (shouldFilter(msgStr)) return;
         try { originalLog.apply(console, args); } catch (_) {}
       };
 
       console.warn = function(...args) {
-        // Allow warnings but filter noise
-        if (shouldFilter(args.join(' '))) return;
+        const msgStr = args.join(' ');
+        // Filter known noisy warnings
+        if (shouldFilter(msgStr)) return;
+        // In production mode: also filter non-critical warnings
+        if (!isDebug && !msgStr.includes('⚠️') && !msgStr.includes('🚨')) return;
         try { originalWarn.apply(console, args); } catch (_) {}
       };
     } catch (e) {
@@ -142,12 +171,26 @@
         console.warn('⚠️ Function recovery attempted');
         // 重複初期化を防ぐために初期化状態をチェック
         setTimeout(() => {
+          // より厳格な初期化状態チェック
           if (typeof window.initializeAdminPanelMaster === 'function' && 
               window.AdminPanel && 
               !window.AdminPanel.initialization?.isCompleted &&
-              !window.AdminPanel.initialization?.isInProgress) {
+              !window.AdminPanel.initialization?.isInProgress &&
+              !window.AdminPanel._recoveryInProgress) {
+            // Recovery フラグをセット
+            window.AdminPanel._recoveryInProgress = true;
             console.warn('⚠️ Re-initializing admin panel due to error');
-            window.initializeAdminPanelMaster();
+            
+            try {
+              window.initializeAdminPanelMaster();
+            } catch (error) {
+              console.error('🚨 Recovery initialization failed:', error);
+            } finally {
+              // Recovery フラグをリセット
+              setTimeout(() => {
+                window.AdminPanel._recoveryInProgress = false;
+              }, 5000);
+            }
           }
         }, 1000);
       }
@@ -1207,7 +1250,6 @@
   <?!= include('adminPanel-core.js.html'); ?>
   <?!= include('adminPanel-ui.js.html'); ?>
   <?!= include('adminPanel-status.js.html'); ?>
-  <?!= include('adminPanel-api.js.html'); ?>
   <?!= include('adminPanel-forms.js.html'); ?>
   <?!= include('adminPanel-events.js.html'); ?>
   <?!= include('adminPanel.js.html'); ?>

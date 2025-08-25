@@ -6,7 +6,11 @@
       "Bash(for file in adminPanel-ui.js.html adminPanel-events.js.html)",
       "Bash(do echo \"=== $file ===\")",
       "Bash(tail:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(for file in *.js.html)",
+      "Bash(do echo \"=== Checking $file ===\")",
+      "Bash(node:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []
