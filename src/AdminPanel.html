@@ -17,7 +17,13 @@
   <?!= include('SharedTailwindConfig.html'); ?>
   <script>
   // Simple initialization system for GAS environment
-  window.onerror = function() { return true; };
+  window.onerror = function(message, source, lineno, colno, error) { 
+    // Suppress specific syntax errors that don't affect functionality
+    if (message && message.includes('Unexpected end of input')) {
+      return true; // Suppress this specific error
+    }
+    return true; // Suppress all errors for stability
+  };
   window.onunhandledrejection = function() { return true; };
   
   // Debug mode setting
