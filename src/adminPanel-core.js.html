@@ -123,6 +123,8 @@ var debounce = function(func, delay, key) {
 };
 
 // Enhanced debounce system for admin panel operations
+// 安全な初期化を行う
+window.AdminPanel = window.AdminPanel || {};
 window.AdminPanel.debounce = {
   timers: new Map(),
   

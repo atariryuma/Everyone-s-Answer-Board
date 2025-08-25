@@ -140,11 +140,16 @@
       // Attempt recovery for specific critical errors
       if (errorMessage.includes('is not defined') || errorMessage.includes('is not a function')) {
         console.log('🔧 Attempting function recovery...');
-        // Trigger fallback initialization after a short delay
+        // 重複初期化を防ぐために初期化状態をチェック
         setTimeout(() => {
-          if (typeof window.initializeAdminPanelMaster === 'function') {
+          if (typeof window.initializeAdminPanelMaster === 'function' && 
+              window.AdminPanel && 
+              !window.AdminPanel.initialization?.isCompleted &&
+              !window.AdminPanel.initialization?.isInProgress) {
             console.log('🔄 Re-initializing admin panel...');
             window.initializeAdminPanelMaster();
+          } else {
+            console.log('🚫 Skipping re-initialization: already initialized or in progress');
           }
         }, 1000);
       }
