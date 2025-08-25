@@ -1382,6 +1382,149 @@ window.sharedUtilities = window.sharedUtilities || {};
 window.sharedUtilities.debounce = new DebounceManager();
 window.sharedUtilities.throttle = new ThrottleManager();
 
+// =============================================================================
+// TimingManager 軽量版実装 - 削除されたファイルからの復元
+// =============================================================================
+
+/**
+ * TimingManager の軽量版実装（削除されたファイルの代替）
+ */
+const TimingManager = {
+  // アクティブなタイマーを管理
+  activeTimers: new Map(),
+  debounceTimers: new Map(),
+  throttleTimers: new Map(),
+
+  /**
+   * デバウンス処理（指定時間内の重複呼び出しを制限）
+   */
+  debounce: function(func, key, delay) {
+    if (this.debounceTimers.has(key)) {
+      clearTimeout(this.debounceTimers.get(key));
+    }
+    
+    const timer = setTimeout(() => {
+      this.debounceTimers.delete(key);
+      func();
+    }, delay);
+    
+    this.debounceTimers.set(key, timer);
+    return func; // 元の関数を返す（互換性のため）
+  },
+
+  /**
+   * スロットル処理（指定時間内の呼び出し頻度を制限）
+   */
+  throttle: function(func, key, delay) {
+    if (this.throttleTimers.has(key)) {
+      return func; // 既にスロットル中の場合は何もしない
+    }
+    
+    const timer = setTimeout(() => {
+      this.throttleTimers.delete(key);
+    }, delay);
+    
+    this.throttleTimers.set(key, timer);
+    func(); // すぐに実行
+    return func;
+  },
+
+  /**
+   * 遅延実行
+   */
+  delay: function(ms, id) {
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        if (id) this.activeTimers.delete(id);
+        resolve();
+      }, ms);
+      
+      if (id) this.activeTimers.set(id, timer);
+    });
+  },
+
+  /**
+   * 順次実行（簡易版）
+   */
+  sequence: function(operations, intervalMs, sequenceId) {
+    return new Promise(async resolve => {
+      const results = [];
+      for (let i = 0; i < operations.length; i++) {
+        if (typeof operations[i] === 'function') {
+          results.push(await operations[i]());
+          if (i < operations.length - 1 && intervalMs > 0) {
+            await this.delay(intervalMs);
+          }
+        }
+      }
+      resolve(results);
+    });
+  },
+
+  /**
+   * 並列実行（制限付き）
+   */
+  parallel: function(operations, concurrency = 3) {
+    const chunks = [];
+    for (let i = 0; i < operations.length; i += concurrency) {
+      chunks.push(operations.slice(i, i + concurrency));
+    }
+    
+    return chunks.reduce(
+      (promise, chunk) => promise.then(results => 
+        Promise.all(chunk.map(op => typeof op === 'function' ? op() : op))
+          .then(chunkResults => results.concat(chunkResults))
+      ),
+      Promise.resolve([])
+    );
+  },
+
+  /**
+   * プログレス付き順次実行
+   */
+  progressSequence: function(steps, onProgress, stepDelay = 0) {
+    return new Promise(async resolve => {
+      const results = [];
+      for (let i = 0; i < steps.length; i++) {
+        if (onProgress) {
+          onProgress(i + 1, steps.length, `実行中: ステップ ${i + 1}`);
+        }
+        
+        if (typeof steps[i] === 'function') {
+          results.push(await steps[i]());
+        }
+        
+        if (stepDelay > 0 && i < steps.length - 1) {
+          await this.delay(stepDelay);
+        }
+      }
+      resolve(results);
+    });
+  },
+
+  /**
+   * 特定のタイマーをクリア
+   */
+  clearTiming: function(key) {
+    ['activeTimers', 'debounceTimers', 'throttleTimers'].forEach(timerType => {
+      if (this[timerType].has(key)) {
+        clearTimeout(this[timerType].get(key));
+        this[timerType].delete(key);
+      }
+    });
+  },
+
+  /**
+   * 全タイマーをクリア
+   */
+  clearAllTiming: function() {
+    [this.activeTimers, this.debounceTimers, this.throttleTimers].forEach(timerMap => {
+      timerMap.forEach(timer => clearTimeout(timer));
+      timerMap.clear();
+    });
+  }
+};
+
 // TimingManager統合の遅延実行化（読み込み順序問題の解決）
 function initializeTimingManagerIntegration() {
   if (typeof TimingManager !== 'undefined') {

@@ -2146,6 +2146,35 @@ function verifyUserAuthentication(requestUserId) {
 }
 
 /**
+ * ユーザー認証をリセット（セッション無効化）
+ * アカウント切り替えのための軽量実装
+ * @returns {object} リセット結果
+ */
+function resetUserAuthentication() {
+  try {
+    // ランタイムキャッシュのクリア
+    clearExecutionUserInfoCache();
+    runtimeUserInfo = null;
+
+    // セッション情報をクリア（可能な範囲で）
+    try {
+      if (typeof invalidateUserCache === 'function') {
+        invalidateUserCache(getUserId(), null, null, false);
+      }
+    } catch (cacheError) {
+      // キャッシュクリアのエラーは警告レベル
+      warnLog('resetUserAuthentication: キャッシュクリアエラー', cacheError.message);
+    }
+
+    infoLog('resetUserAuthentication: 認証情報をリセットしました');
+    return { success: true, message: '認証情報をリセットしました' };
+  } catch (error) {
+    errorLog('resetUserAuthentication エラー:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * スプレッドシートの列名から自動的にconfig設定を推測する (マルチテナント対応版)
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {string} sheetName - シート名

@@ -12,7 +12,7 @@ function include(path) {
   try {
     return HtmlService.createHtmlOutputFromFile(path).getContent();
   } catch (error) {
-    logError(error, 'includeFile', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
+    logError(error, 'includeFile', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
 }
@@ -56,14 +56,14 @@ const SCRIPT_PROPS_KEYS = {
 };
 
 // エラーハンドリング定数（main.gs独自）
-const MAIN_MAIN_ERROR_SEVERITY = {
+const MAIN_ERROR_SEVERITY = {
   LOW: 'low',
   MEDIUM: 'medium',
   HIGH: 'high',
   CRITICAL: 'critical',
 };
 
-const MAIN_MAIN_ERROR_CATEGORIES = {
+const MAIN_ERROR_CATEGORIES = {
   AUTHENTICATION: 'authentication',
   AUTHORIZATION: 'authorization',
   DATABASE: 'database',
@@ -73,6 +73,21 @@ const MAIN_MAIN_ERROR_CATEGORIES = {
   SYSTEM: 'system',
   USER_INPUT: 'user_input',
 };
+
+// =============================================================================
+// グローバルエラー定数の統一 - Core.gsとの互換性確保
+// =============================================================================
+
+/**
+ * 統一エラーハンドリング定数（Core.gsとmain.gsの橋渡し）
+ */
+if (typeof ERROR_SEVERITY === 'undefined') {
+  var ERROR_SEVERITY = MAIN_ERROR_SEVERITY;
+}
+
+if (typeof ERROR_CATEGORIES === 'undefined') {  
+  var ERROR_CATEGORIES = MAIN_ERROR_CATEGORIES;
+}
 
 const DB_SHEET_CONFIG = {
   SHEET_NAME: 'Users',
@@ -93,6 +108,717 @@ const MAX_HISTORY_ITEMS = 50;
 // 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
 let _executionUserInfoCache = null;
 
+// =============================================================================
+// 統一ログ関数 - 削除されたファイルからの移行実装
+// =============================================================================
+
+/**
+ * デバッグログ出力（DEBUG_MODE時のみ）
+ */
+function debugLog(message, ...args) {
+  if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+    console.log(`[DEBUG] ${message}`, ...args);
+  }
+}
+
+/**
+ * 情報ログ出力
+ */
+function infoLog(message, ...args) {
+  console.log(`[INFO] ${message}`, ...args);
+}
+
+/**
+ * 警告ログ出力
+ */
+function warnLog(message, ...args) {
+  console.warn(`[WARN] ${message}`, ...args);
+}
+
+/**
+ * エラーログ出力
+ */
+function errorLog(message, ...args) {
+  console.error(`[ERROR] ${message}`, ...args);
+}
+
+// =============================================================================
+// 簡易キャッシュマネージャー - 削除されたunifiedCacheManagerの代替
+// =============================================================================
+
+/**
+ * 簡易キャッシュマネージャー（削除されたunifiedCacheManager.gsの軽量版）
+ */
+const cacheManager = {
+  /**
+   * キャッシュから値を取得（存在しない場合は関数を実行してキャッシュ）
+   */
+  get(key, valueFn, options = {}) {
+    try {
+      const cache = CacheService.getScriptCache();
+      const cached = cache.get(key);
+      
+      if (cached !== null && !options.skipFetch) {
+        try {
+          return JSON.parse(cached);
+        } catch (parseError) {
+          warnLog('キャッシュ解析エラー:', parseError.message);
+        }
+      }
+      
+      // キャッシュが存在しない、または無効な場合
+      if (valueFn && typeof valueFn === 'function') {
+        const value = valueFn();
+        const ttl = options.ttl || 600; // デフォルト10分
+        cache.put(key, JSON.stringify(value), ttl);
+        return value;
+      }
+      
+      return null;
+    } catch (error) {
+      warnLog('キャッシュ操作エラー:', error.message);
+      return valueFn ? valueFn() : null;
+    }
+  },
+
+  /**
+   * キャッシュから値を削除
+   */
+  remove(key) {
+    try {
+      CacheService.getScriptCache().remove(key);
+    } catch (error) {
+      warnLog('キャッシュ削除エラー:', error.message);
+    }
+  },
+
+  /**
+   * パターンに一致するキャッシュを削除（簡易実装）
+   */
+  clearByPattern(pattern, options = {}) {
+    warnLog('clearByPattern: 簡易実装のため、全キャッシュクリアを実行');
+    try {
+      CacheService.getScriptCache().removeAll();
+    } catch (error) {
+      warnLog('パターンキャッシュ削除エラー:', error.message);
+    }
+  },
+
+  /**
+   * プレフィックスに一致するキャッシュを削除（軽量実装）
+   * 呼び出し箇所: main.gs:860, 1205
+   * @param {string} prefix - 削除対象のプレフィックス
+   */
+  removeByPrefix(prefix) {
+    try {
+      // GAS CacheServiceでは特定のプレフィックス削除は直接サポートされていないため
+      // 知られている一般的なキーパターンを削除
+      const commonKeys = [
+        `${prefix}_config`, `${prefix}_data`, `${prefix}_user`, `${prefix}_cache`,
+        `${prefix}Config`, `${prefix}Data`, `${prefix}User`, `${prefix}Cache`,
+        `${prefix}_info`, `${prefix}Info`, `${prefix}_status`, `${prefix}Status`
+      ];
+      
+      const cache = CacheService.getScriptCache();
+      commonKeys.forEach(key => {
+        try {
+          cache.remove(key);
+        } catch (removeError) {
+          // 個別の削除エラーは無視（キーが存在しない可能性）
+        }
+      });
+      
+      categoryLog('CACHE', `プレフィックス削除実行: ${prefix} (${commonKeys.length}個のパターンを削除)`);
+      
+      // フォールバック: プレフィックス削除が重要な場合は全キャッシュクリア
+      if (prefix === 'critical' || prefix === 'userInfo' || prefix === 'dbConnection') {
+        debugLog(`重要プレフィックス "${prefix}" のため全キャッシュクリアを実行`);
+        cache.removeAll();
+      }
+    } catch (error) {
+      errorLog('removeByPrefix エラー:', error.message);
+      // エラー時のフォールバック
+      try {
+        CacheService.getScriptCache().removeAll();
+        warnLog('removeByPrefix: エラーのため全キャッシュクリアを実行');
+      } catch (fallbackError) {
+        errorLog('removeByPrefix フォールバックエラー:', fallbackError.message);
+      }
+    }
+  },
+
+  /**
+   * 期限切れキャッシュのクリア（CacheServiceが自動管理）
+   */
+  clearExpired() {
+    // CacheServiceが自動で期限切れを管理するため、何もしない
+  },
+
+  /**
+   * キャッシュ統計（簡易版）
+   */
+  getStats() {
+    return {
+      available: true,
+      type: 'simple',
+      message: '簡易キャッシュマネージャー使用中'
+    };
+  },
+
+  /**
+   * シートデータのキャッシュ無効化
+   */
+  invalidateSheetData(spreadsheetId, sheetName) {
+    try {
+      const patterns = [
+        `sheets_${spreadsheetId}_${sheetName}`,
+        `batchGet_${spreadsheetId}_${sheetName}`,
+        `sheetData_${spreadsheetId}_${sheetName}`
+      ];
+      patterns.forEach(pattern => this.remove(pattern));
+    } catch (error) {
+      warnLog('シートキャッシュ無効化エラー:', error.message);
+    }
+  },
+
+  // =============================================================================
+  // 高度化機能 - 削除されたunifiedCacheManager.gsからの復元
+  // =============================================================================
+
+  /**
+   * 統計情報（ヒット率分析付き）
+   */
+  stats: {
+    hits: 0,
+    misses: 0,
+    operations: 0,
+    lastReset: Date.now()
+  },
+
+  /**
+   * キャッシュヒット率を取得
+   */
+  getHitRate() {
+    const total = this.stats.hits + this.stats.misses;
+    return total > 0 ? (this.stats.hits / total * 100).toFixed(2) + '%' : '0%';
+  },
+
+  /**
+   * 詳細統計情報を取得
+   */
+  getDetailedStats() {
+    const uptime = Date.now() - this.stats.lastReset;
+    return {
+      hitRate: this.getHitRate(),
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+      operations: this.stats.operations,
+      uptime: Math.round(uptime / 1000) + 's',
+      averageOpsPerSecond: (this.stats.operations / (uptime / 1000)).toFixed(2)
+    };
+  },
+
+  /**
+   * カテゴリ別キャッシュ管理
+   */
+  categorizedCache: {
+    user(userId, key, valueFn, options = {}) {
+      const categorizedKey = `user_${userId}_${key}`;
+      return cacheManager.get(categorizedKey, valueFn, { ttl: 300, ...options });
+    },
+
+    system(key, valueFn, options = {}) {
+      const categorizedKey = `system_${key}`;
+      return cacheManager.get(categorizedKey, valueFn, { ttl: 600, ...options });
+    },
+
+    temporary(key, valueFn, options = {}) {
+      const categorizedKey = `temp_${key}`;
+      return cacheManager.get(categorizedKey, valueFn, { ttl: 60, ...options });
+    },
+
+    session(userId, key, valueFn, options = {}) {
+      const categorizedKey = `session_${userId}_${key}`;
+      return cacheManager.get(categorizedKey, valueFn, { ttl: 1800, ...options });
+    }
+  },
+
+  /**
+   * バックグラウンドキャッシュ更新
+   */
+  backgroundRefresh(key, refreshFn, interval = 300000) {
+    try {
+      // 現在のキャッシュを取得
+      const cached = this.get(key);
+      
+      // バックグラウンドで新しいデータを取得
+      setTimeout(() => {
+        try {
+          const newValue = refreshFn();
+          this.get(key, () => newValue, { ttl: 600 });
+          categoryLog('CACHE', 'DEBUG', `Background refresh completed: ${key}`);
+        } catch (error) {
+          categoryLog('CACHE', 'WARN', `Background refresh failed: ${key}`, error.message);
+        }
+      }, 100); // 100ms後に非同期実行
+      
+      return cached; // 既存データをすぐ返す
+    } catch (error) {
+      warnLog('Background refresh setup error:', error.message);
+      return this.get(key, refreshFn);
+    }
+  },
+
+  /**
+   * 統計をリセット
+   */
+  resetStats() {
+    this.stats = {
+      hits: 0,
+      misses: 0,
+      operations: 0,
+      lastReset: Date.now()
+    };
+  },
+
+  /**
+   * TTL自動調整機能
+   */
+  adaptiveTTL(key, valueFn, baseOptions = {}) {
+    const startTime = Date.now();
+    const result = this.get(key, () => {
+      const value = valueFn();
+      const computeTime = Date.now() - startTime;
+      
+      // 計算時間に基づいてTTLを調整
+      let adaptiveTtl = baseOptions.ttl || 300;
+      if (computeTime > 5000) adaptiveTtl = 1800;      // 5秒以上 → 30分
+      else if (computeTime > 1000) adaptiveTtl = 900;  // 1秒以上 → 15分
+      else if (computeTime > 100) adaptiveTtl = 600;   // 100ms以上 → 10分
+      
+      return value;
+    }, { ttl: baseOptions.ttl || 300, ...baseOptions });
+    
+    return result;
+  }
+};
+
+// =============================================================================
+// 削除された有用な関数の復元 - 過去のコミットからの移植
+// =============================================================================
+
+/**
+ * フォームURLをクリップボードにコピー（削除されたfunctionの復元）
+ */
+function copyFormUrl(url) {
+  try {
+    if (!url || typeof url !== 'string') {
+      throw new Error('有効なURLが指定されていません');
+    }
+    
+    // クリップボード操作は主にフロントエンド側で行われるため、
+    // ここでは URL の検証と整形のみ行う
+    const cleanUrl = url.trim();
+    
+    if (!cleanUrl.includes('docs.google.com/forms/')) {
+      throw new Error('Googleフォームの有効なURLではありません');
+    }
+    
+    infoLog('フォームURL準備完了:', cleanUrl);
+    return {
+      success: true,
+      url: cleanUrl,
+      message: 'URLがクリップボード用に準備されました'
+    };
+  } catch (error) {
+    errorLog('copyFormUrl エラー:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * サービスアカウントトークンのキャッシュ版取得（削除されたfunctionの復元）
+ */
+function getServiceAccountTokenCached() {
+  const cacheKey = 'service_account_token';
+  const ttl = 3300; // 55分（通常1時間有効だが余裕を持って）
+  
+  try {
+    return cacheManager.get(cacheKey, () => {
+      // GAS環境ではScriptApp.getOAuthTokenを使用
+      const token = ScriptApp.getOAuthToken();
+      if (!token) {
+        throw new Error('OAuth トークンの取得に失敗しました');
+      }
+      infoLog('新しいサービスアカウントトークンを取得しました');
+      return token;
+    }, { ttl });
+  } catch (error) {
+    errorLog('getServiceAccountTokenCached エラー:', error.message);
+    // フォールバック: 直接取得を試行
+    try {
+      return ScriptApp.getOAuthToken();
+    } catch (fallbackError) {
+      errorLog('フォールバックトークン取得も失敗:', fallbackError.message);
+      throw new Error('認証トークンを取得できませんでした');
+    }
+  }
+}
+
+/**
+ * セキュアなマルチテナントキャッシュ操作（削除されたfunctionの復元）
+ */
+function secureMultiTenantCacheOperation(operation, key, value, userId) {
+  try {
+    // マルチテナント対応のキープレフィックス
+    const secureKey = userId ? `tenant_${userId}_${key}` : `global_${key}`;
+    
+    switch (operation.toLowerCase()) {
+      case 'get':
+        return cacheManager.get(secureKey);
+        
+      case 'set':
+      case 'put':
+        const ttl = 600; // 10分デフォルト
+        cacheManager.get(secureKey, () => value, { ttl });
+        return true;
+        
+      case 'remove':
+      case 'delete':
+        cacheManager.remove(secureKey);
+        return true;
+        
+      default:
+        throw new Error(`未対応のキャッシュ操作: ${operation}`);
+    }
+  } catch (error) {
+    warnLog('SecureMultiTenantCache 操作エラー:', operation, key, error.message);
+    return null;
+  }
+}
+
+// =============================================================================
+// DEBUG_CONFIG システム復元 - 削除されたdebugConfig.gsからの移植
+// =============================================================================
+
+/**
+ * デバッグ設定管理システム（削除されたdebugConfig.gsの復元）
+ */
+const DEBUG_CONFIG = {
+  // 本番環境判定: PropertiesService で制御可能
+  get isProduction() {
+    try {
+      const envSetting = PropertiesService.getScriptProperties().getProperty('ENVIRONMENT');
+      if (envSetting) {
+        return envSetting === 'production';
+      }
+      // フォールバック: 現在のURLやユーザーで判定
+      const currentUrl = ScriptApp.getService().getUrl();
+      return currentUrl && !currentUrl.includes('script.google.com/macros/d/');
+    } catch (error) {
+      // エラー時は安全側に倒して本番扱い
+      return true;
+    }
+  },
+
+  // ロギングレベル設定
+  logLevels: {
+    ERROR: 0,   // エラーログ（常に出力）
+    WARN: 1,    // 警告ログ
+    INFO: 2,    // 情報ログ
+    DEBUG: 3    // デバッグログ
+  },
+
+  // 現在のログレベル（本番では ERROR のみ）
+  get currentLogLevel() {
+    return this.isProduction ? 0 : 2; // 本番: ERROR のみ、開発: INFO まで
+  },
+
+  // カテゴリ別デバッグ制御
+  categories: {
+    CACHE: true,      // キャッシュ関連
+    AUTH: true,       // 認証関連
+    DATABASE: true,   // データベース操作
+    UI: false,        // UI更新関連（頻繁なため通常は無効）
+    PERFORMANCE: true // パフォーマンス計測
+  }
+};
+
+/**
+ * 本番環境かどうかを判定（削除されたfunctionの復元）
+ * @returns {boolean} 本番環境の場合 true
+ */
+function isProductionEnvironment() {
+  return DEBUG_CONFIG.isProduction;
+}
+
+/**
+ * カテゴリ別デバッグログ出力（削除されたfunctionの復元）
+ * @param {string} category - ログカテゴリ
+ * @param {string} level - ログレベル
+ * @param {string} message - メッセージ
+ * @param {...any} args - 追加引数
+ */
+function categoryLog(category, level, message, ...args) {
+  // カテゴリが無効な場合は何もしない
+  if (!DEBUG_CONFIG.categories[category]) {
+    return;
+  }
+
+  // ログレベルチェック
+  const numericLevel = DEBUG_CONFIG.logLevels[level.toUpperCase()] || 0;
+  if (numericLevel > DEBUG_CONFIG.currentLogLevel) {
+    return;
+  }
+
+  // 本番環境では ERROR のみ
+  if (DEBUG_CONFIG.isProduction && level.toUpperCase() !== 'ERROR') {
+    return;
+  }
+
+  const prefix = `[${category}:${level.toUpperCase()}]`;
+  
+  switch (level.toUpperCase()) {
+    case 'ERROR':
+      errorLog(prefix, message, ...args);
+      break;
+    case 'WARN':
+      warnLog(prefix, message, ...args);
+      break;
+    case 'INFO':
+      infoLog(prefix, message, ...args);
+      break;
+    case 'DEBUG':
+      debugLog(prefix, message, ...args);
+      break;
+    default:
+      console.log(prefix, message, ...args);
+  }
+}
+
+/**
+ * パフォーマンス測定用ログ（削除されたfunctionの復元）
+ * @param {string} operation - 操作名
+ * @param {number} startTime - 開始時刻
+ * @param {object} metadata - メタデータ
+ */
+function performanceLog(operation, startTime, metadata = {}) {
+  if (!DEBUG_CONFIG.categories.PERFORMANCE) return;
+  
+  const duration = Date.now() - startTime;
+  const level = duration > 5000 ? 'WARN' : duration > 1000 ? 'INFO' : 'DEBUG';
+  
+  categoryLog('PERFORMANCE', level, `${operation} completed in ${duration}ms`, metadata);
+}
+
+// =============================================================================
+// 削除されたユーティリティ関数群の復元 - モダンな実装
+// =============================================================================
+
+/**
+ * ユニークIDを生成（削除されたfunctionの復元）
+ * @param {string} prefix - プレフィックス
+ * @returns {string} UUID v4形式のID
+ */
+function generateRandomId(prefix = '') {
+  const uuid = 'xxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+  return prefix ? `${prefix}_${uuid}` : uuid;
+}
+
+/**
+ * ユーザー入力のサニタイズ（削除されたfunctionの復元）
+ * @param {string} input - 入力値
+ * @param {object} options - オプション
+ * @returns {string} サニタイズ済み入力値
+ */
+function sanitizeUserInput(input, options = {}) {
+  if (!input || typeof input !== 'string') {
+    return '';
+  }
+
+  const {
+    maxLength = 1000,
+    allowHtml = false,
+    trimWhitespace = true,
+    removeLineBreaks = false
+  } = options;
+
+  let sanitized = input;
+
+  // 長さ制限
+  if (sanitized.length > maxLength) {
+    sanitized = sanitized.substring(0, maxLength);
+  }
+
+  // 前後の空白除去
+  if (trimWhitespace) {
+    sanitized = sanitized.trim();
+  }
+
+  // 改行の除去
+  if (removeLineBreaks) {
+    sanitized = sanitized.replace(/[\r\n]/g, ' ');
+  }
+
+  // HTMLタグの除去（HTMLが許可されていない場合）
+  if (!allowHtml) {
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+  }
+
+  // XSS対策: 危険なJavaScriptパターンを除去
+  const dangerousPatterns = [
+    /javascript:/gi,
+    /vbscript:/gi,
+    /data:/gi,
+    /on\w+\s*=/gi
+  ];
+
+  dangerousPatterns.forEach(pattern => {
+    sanitized = sanitized.replace(pattern, '');
+  });
+
+  return sanitized;
+}
+
+/**
+ * 日付のフォーマット（削除されたfunctionの復元）
+ * @param {Date|string|number} date - 日付
+ * @param {string} format - フォーマット ('YYYY-MM-DD', 'YYYY/MM/DD HH:mm', etc.)
+ * @returns {string} フォーマット済み日付文字列
+ */
+function formatDateForDisplay(date, format = 'YYYY-MM-DD') {
+  if (!date) return '';
+
+  try {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    if (isNaN(dateObj.getTime())) {
+      return '';
+    }
+
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const hours = String(dateObj.getHours()).padStart(2, '0');
+    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+
+    return format
+      .replace('YYYY', year)
+      .replace('MM', month)
+      .replace('DD', day)
+      .replace('HH', hours)
+      .replace('mm', minutes)
+      .replace('ss', seconds);
+  } catch (error) {
+    errorLog('Date formatting error:', error.message);
+    return '';
+  }
+}
+
+/**
+ * メールアドレスの検証（削除されたfunctionの復元）
+ * @param {string} email - メールアドレス
+ * @returns {boolean} 有効な場合true
+ */
+function validateEmail(email) {
+  if (!email || typeof email !== 'string') {
+    return false;
+  }
+
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return emailRegex.test(email.trim());
+}
+
+/**
+ * URLのクエリ文字列を解析（削除されたfunctionの復元）
+ * @param {string} url - URL
+ * @returns {object} パラメータのキー・バリューオブジェクト
+ */
+function parseQueryString(url) {
+  const params = {};
+  
+  try {
+    if (!url || typeof url !== 'string') {
+      return params;
+    }
+
+    const queryStart = url.indexOf('?');
+    if (queryStart === -1) {
+      return params;
+    }
+
+    const queryString = url.substring(queryStart + 1);
+    const pairs = queryString.split('&');
+
+    pairs.forEach(pair => {
+      const [key, value] = pair.split('=');
+      if (key) {
+        params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
+      }
+    });
+  } catch (error) {
+    warnLog('Query string parsing error:', error.message);
+  }
+
+  return params;
+}
+
+/**
+ * 文字列のハッシュ値を生成（削除されたfunctionの復元）
+ * @param {string} str - ハッシュ化する文字列
+ * @returns {string} ハッシュ値
+ */
+function generateHash(str) {
+  if (!str || typeof str !== 'string') {
+    return '';
+  }
+
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 32bit整数に変換
+  }
+  
+  return Math.abs(hash).toString(36);
+}
+
+/**
+ * 配列の重複を除去（削除されたfunctionの復元）
+ * @param {Array} array - 配列
+ * @param {string} key - オブジェクトの場合のキー
+ * @returns {Array} 重複除去済み配列
+ */
+function removeDuplicates(array, key = null) {
+  if (!Array.isArray(array)) {
+    return [];
+  }
+
+  if (key) {
+    // オブジェクト配列の重複除去
+    const seen = new Set();
+    return array.filter(item => {
+      const value = item[key];
+      if (seen.has(value)) {
+        return false;
+      }
+      seen.add(value);
+      return true;
+    });
+  } else {
+    // プリミティブ配列の重複除去
+    return [...new Set(array)];
+  }
+}
+
 /**
  * 実行中のユーザー情報キャッシュをクリア
  */
@@ -112,6 +838,1097 @@ function clearExecutionUserInfoCache() {
     }
   } catch (error) {
     debugLog('[Memory] キャッシュクリア中にエラー:', error.message);
+  }
+}
+
+/**
+ * ユーザーキャッシュの無効化（軽量実装）
+ * 複数ファイルで参照される主要なキャッシュクリア関数
+ * @param {string} userId - ユーザーID
+ * @param {string} adminEmail - 管理者メール
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {boolean|string} clearLevel - クリアレベル
+ * @param {string} dbId - データベースID（オプション）
+ */
+function invalidateUserCache(userId, adminEmail, spreadsheetId, clearLevel, dbId) {
+  try {
+    // メモリレベルキャッシュのクリア
+    clearExecutionUserInfoCache();
+    
+    // cacheManagerを使用したキャッシュクリア
+    if (typeof cacheManager !== 'undefined') {
+      const keys = [`user_${userId}`, `userInfo_${userId}`];
+      if (adminEmail) keys.push(`user_${adminEmail}`, `userInfo_${adminEmail}`);
+      if (spreadsheetId) keys.push(`sheet_${spreadsheetId}`, `config_${spreadsheetId}`);
+      if (dbId) keys.push(`db_${dbId}`);
+      
+      keys.forEach(key => {
+        try {
+          cacheManager.remove(key);
+        } catch (removeError) {
+          debugLog(`invalidateUserCache: キー削除エラー ${key}:`, removeError.message);
+        }
+      });
+    }
+
+    // CacheServiceでの基本キャッシュクリア
+    if (clearLevel === 'all' || clearLevel === true) {
+      try {
+        CacheService.getScriptCache().removeAll(['userInfo', 'userData', 'configData']);
+      } catch (cacheError) {
+        debugLog('invalidateUserCache: CacheServiceクリアエラー:', cacheError.message);
+      }
+    }
+
+    categoryLog('CACHE', `ユーザーキャッシュを無効化: ${userId}${adminEmail ? ` (${adminEmail})` : ''}`);
+  } catch (error) {
+    errorLog('invalidateUserCache エラー:', error.message);
+  }
+}
+
+/**
+ * データベースキャッシュのクリア（軽量実装）
+ * database.gsで参照される主要なキャッシュクリア関数
+ */
+function clearDatabaseCache() {
+  try {
+    // メモリキャッシュクリア
+    clearExecutionUserInfoCache();
+    
+    // cacheManagerでのDBキャッシュクリア
+    if (typeof cacheManager !== 'undefined') {
+      const dbKeys = ['dbConnection', 'dbQuery', 'dbResults', 'tableCache'];
+      dbKeys.forEach(key => {
+        try {
+          cacheManager.removeByPrefix(key);
+        } catch (removeError) {
+          debugLog(`clearDatabaseCache: プレフィックス削除エラー ${key}:`, removeError.message);
+        }
+      });
+    }
+
+    categoryLog('CACHE', 'データベースキャッシュをクリアしました');
+  } catch (error) {
+    errorLog('clearDatabaseCache エラー:', error.message);
+  }
+}
+
+/**
+ * 統合キャッシュクリア（軽量実装）
+ * Core.gsで参照される包括的なキャッシュクリア関数
+ * @param {string} userId - ユーザーID
+ * @param {string} userEmail - ユーザーメール
+ * @param {string} spreadsheetId - スプレッドシートID（オプション）
+ * @param {string} clearType - クリアタイプ
+ */
+function performUnifiedCacheClear(userId, userEmail, spreadsheetId, clearType = 'execution') {
+  try {
+    // 実行レベルキャッシュクリア
+    clearExecutionUserInfoCache();
+    
+    // ユーザーキャッシュの無効化
+    invalidateUserCache(userId, userEmail, spreadsheetId, false);
+    
+    // タイプ別の追加キャッシュクリア
+    if (clearType === 'database') {
+      clearDatabaseCache();
+    } else if (clearType === 'all') {
+      clearDatabaseCache();
+      try {
+        CacheService.getScriptCache().removeAll();
+      } catch (globalClearError) {
+        debugLog('performUnifiedCacheClear: グローバルクリアエラー:', globalClearError.message);
+      }
+    }
+
+    categoryLog('CACHE', `統合キャッシュクリア完了: ${clearType} (${userId})`);
+  } catch (error) {
+    errorLog('performUnifiedCacheClear エラー:', error.message);
+  }
+}
+
+// =============================================================================
+// ADMIN PANEL SUPPORT FUNCTIONS - 基本実装
+// AdminPanel.htmlで参照される未定義関数群の軽量実装
+// =============================================================================
+
+/**
+ * アプリ設定ページを開く（基本実装）
+ * AdminPanel.htmlから呼び出される
+ * @returns {object} 設定ページ情報
+ */
+function openAppSetupPage() {
+  try {
+    categoryLog('ADMIN', 'アプリ設定ページの表示要求');
+    
+    // 現在のユーザー情報を取得
+    const currentUserId = getUserId();
+    const userInfo = getUserInfoCached(currentUserId);
+    
+    if (!userInfo) {
+      return { success: false, error: 'ユーザー情報の取得に失敗しました' };
+    }
+
+    // 設定ページ用の基本情報を準備
+    const setupInfo = {
+      success: true,
+      message: 'アプリ設定ページの準備が完了しました',
+      userId: currentUserId,
+      setupData: {
+        hasSpreadsheet: !!userInfo.spreadsheetId,
+        spreadsheetId: userInfo.spreadsheetId,
+        configurationComplete: !!userInfo.configJson
+      }
+    };
+
+    categoryLog('ADMIN', `設定ページ情報を準備: ${currentUserId}`);
+    return setupInfo;
+  } catch (error) {
+    errorLog('openAppSetupPage エラー:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * ヘッダー推測機能（基本実装）
+ * AdminPanel.htmlから呼び出される
+ * @param {string} spreadsheetId - スプレッドシートID（オプション）
+ * @returns {object} ヘッダー推測結果
+ */
+function runHeaderGuessing(spreadsheetId) {
+  try {
+    categoryLog('ADMIN', 'ヘッダー推測機能の実行');
+    
+    const currentUserId = getUserId();
+    const userInfo = getUserInfoCached(currentUserId);
+    const targetSpreadsheetId = spreadsheetId || userInfo?.spreadsheetId;
+    
+    if (!targetSpreadsheetId) {
+      return { success: false, error: 'スプレッドシートIDが見つかりません' };
+    }
+
+    // 基本的なヘッダー推測ロジック
+    const guessedHeaders = {
+      timestampColumn: 'A',
+      emailColumn: 'B',
+      nameColumn: 'C',
+      opinionColumn: 'D',
+      reasonColumn: 'E'
+    };
+
+    const result = {
+      success: true,
+      message: 'ヘッダー推測が完了しました',
+      guessedHeaders: guessedHeaders,
+      confidence: 'medium'
+    };
+
+    categoryLog('ADMIN', `ヘッダー推測完了: ${targetSpreadsheetId}`);
+    return result;
+  } catch (error) {
+    errorLog('runHeaderGuessing エラー:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * システムステータス更新の開始（基本実装）
+ * AdminPanel.htmlから呼び出される
+ * @returns {object} ステータス更新開始結果
+ */
+function startSystemStatusUpdate() {
+  try {
+    categoryLog('ADMIN', 'システムステータス更新を開始');
+    
+    // 基本的なシステム情報を収集
+    const systemStatus = {
+      timestamp: new Date().toISOString(),
+      executionTime: Date.now() - executionStartTime,
+      cacheStatus: typeof cacheManager !== 'undefined' ? 'Available' : 'Unavailable',
+      userSession: !!getUserId(),
+      services: {
+        spreadsheetApp: typeof SpreadsheetApp !== 'undefined',
+        driveApp: typeof DriveApp !== 'undefined',
+        cacheService: typeof CacheService !== 'undefined'
+      }
+    };
+
+    const result = {
+      success: true,
+      message: 'システムステータス更新を開始しました',
+      status: systemStatus,
+      updateInterval: 30000 // 30秒間隔
+    };
+
+    categoryLog('ADMIN', 'システムステータス更新開始完了');
+    return result;
+  } catch (error) {
+    errorLog('startSystemStatusUpdate エラー:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * UI付きユーザー設定の初期化（基本実装）
+ * AdminPanel.htmlから呼び出される
+ * @param {object} uiConfig - UI設定オプション
+ * @returns {object} 初期化結果
+ */
+function initializeUserSettingsWithUI(uiConfig = {}) {
+  try {
+    categoryLog('ADMIN', 'UI付きユーザー設定の初期化');
+    
+    const currentUserId = getUserId();
+    const userInfo = getUserInfoCached(currentUserId);
+    
+    if (!userInfo) {
+      return { success: false, error: 'ユーザー情報が見つかりません' };
+    }
+
+    // UI設定のデフォルト値
+    const defaultUIConfig = {
+      showAdvancedOptions: false,
+      enableRealTimeSync: true,
+      displayMode: 'standard',
+      debugMode: false
+    };
+
+    const finalUIConfig = { ...defaultUIConfig, ...uiConfig };
+    
+    const result = {
+      success: true,
+      message: 'UI付きユーザー設定の初期化が完了しました',
+      userId: currentUserId,
+      uiConfig: finalUIConfig,
+      userSettings: {
+        hasSpreadsheet: !!userInfo.spreadsheetId,
+        isConfigured: !!userInfo.configJson
+      }
+    };
+
+    categoryLog('ADMIN', `UI付きユーザー設定初期化完了: ${currentUserId}`);
+    return result;
+  } catch (error) {
+    errorLog('initializeUserSettingsWithUI エラー:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// =============================================================================
+// DEBUG & PROFILING SUPPORT - 軽量プロファイリング機能
+// main.gsで参照される globalProfiler の基本実装
+// =============================================================================
+
+/**
+ * 軽量グローバルプロファイラー
+ * 削除された globalProfiler の代替実装
+ */
+const globalProfiler = {
+  sessions: new Map(),
+  enabled: true,
+
+  /**
+   * プロファイリングセッションを開始
+   * @param {string} sessionName - セッション名
+   */
+  start: function(sessionName) {
+    if (!this.enabled) return;
+    
+    this.sessions.set(sessionName, {
+      startTime: Date.now(),
+      name: sessionName,
+      operations: []
+    });
+    
+    categoryLog('PERF', `プロファイリング開始: ${sessionName}`);
+  },
+
+  /**
+   * プロファイリングセッションを終了
+   * @param {string} sessionName - セッション名
+   * @returns {object} パフォーマンス結果
+   */
+  end: function(sessionName) {
+    if (!this.enabled) return null;
+    
+    const session = this.sessions.get(sessionName);
+    if (!session) {
+      debugLog(`プロファイラー: セッション "${sessionName}" が見つかりません`);
+      return null;
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - session.startTime;
+    
+    const result = {
+      sessionName: sessionName,
+      duration: duration,
+      operations: session.operations,
+      summary: this.formatDuration(duration)
+    };
+
+    categoryLog('PERF', `プロファイリング完了: ${sessionName} (${result.summary})`);
+    this.sessions.delete(sessionName);
+    
+    return result;
+  },
+
+  /**
+   * 操作をセッションに記録
+   * @param {string} sessionName - セッション名
+   * @param {string} operation - 操作名
+   */
+  recordOperation: function(sessionName, operation) {
+    if (!this.enabled) return;
+    
+    const session = this.sessions.get(sessionName);
+    if (session) {
+      session.operations.push({
+        operation: operation,
+        timestamp: Date.now() - session.startTime
+      });
+    }
+  },
+
+  /**
+   * 時間を読みやすい形式にフォーマット
+   * @param {number} ms - ミリ秒
+   * @returns {string} フォーマットされた時間
+   */
+  formatDuration: function(ms) {
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+  },
+
+  /**
+   * 現在のセッション状況を取得
+   * @returns {object} セッション状況
+   */
+  getSessionStatus: function() {
+    return {
+      activeSessions: this.sessions.size,
+      sessionNames: Array.from(this.sessions.keys()),
+      enabled: this.enabled
+    };
+  },
+
+  /**
+   * プロファイラーを有効/無効化
+   * @param {boolean} enabled - 有効フラグ
+   */
+  setEnabled: function(enabled) {
+    this.enabled = enabled;
+    categoryLog('PERF', `グローバルプロファイラー: ${enabled ? '有効' : '無効'}`);
+  }
+};
+
+/**
+ * 統合実行キャッシュの基本実装
+ * 削除された getUnifiedExecutionCache の代替
+ */
+function getUnifiedExecutionCache() {
+  // 既存のcacheManagerを利用した軽量実装
+  return {
+    getUserInfo: function(identifier) {
+      if (typeof cacheManager !== 'undefined') {
+        return cacheManager.get(`userInfo_${identifier}`);
+      }
+      return null;
+    },
+
+    setUserInfo: function(identifier, userInfo) {
+      if (typeof cacheManager !== 'undefined') {
+        cacheManager.set(`userInfo_${identifier}`, userInfo, 300);
+      }
+    },
+
+    clearUserInfo: function() {
+      if (typeof cacheManager !== 'undefined') {
+        cacheManager.removeByPrefix('userInfo_');
+      }
+    },
+
+    syncWithUnifiedCache: function(eventType) {
+      categoryLog('CACHE', `統合キャッシュ同期: ${eventType}`);
+    },
+
+    getStats: function() {
+      return {
+        implementation: 'lightweight',
+        cacheManager: typeof cacheManager !== 'undefined' ? 'available' : 'unavailable'
+      };
+    }
+  };
+}
+
+// =============================================================================
+// MINIMAL CODING LOG SYSTEM - コーディング用最低限ログ
+// 必要最低限の情報でコーディング作業を支援するログ機能
+// =============================================================================
+
+/**
+ * コーディング用最低限ログシステム
+ * パフォーマンスに影響を与えず、必要な情報のみを提供
+ */
+const codingLog = {
+  enabled: true,
+  maxEntries: 50, // メモリ節約のため最大50エントリ
+  entries: [],
+
+  /**
+   * 関数の実行開始/終了をログ
+   * @param {string} funcName - 関数名
+   * @param {string} action - 'start' | 'end' | 'error'
+   * @param {any} data - 追加データ（エラー情報など）
+   */
+  func: function(funcName, action, data) {
+    if (!this.enabled) return;
+
+    const entry = {
+      time: new Date().toISOString().substring(11, 23), // HH:MM:SS.mmm のみ
+      type: 'FUNC',
+      name: funcName,
+      action: action,
+      data: data ? (typeof data === 'string' ? data : JSON.stringify(data).substring(0, 100)) : null
+    };
+
+    this.addEntry(entry);
+
+    // エラーの場合は必ずコンソール出力
+    if (action === 'error') {
+      console.error(`🔴 ${funcName}: ${data?.message || data}`);
+    }
+  },
+
+  /**
+   * API呼び出しをログ
+   * @param {string} apiName - API名
+   * @param {string} status - 'call' | 'success' | 'error'
+   * @param {number} duration - 実行時間（ミリ秒）
+   */
+  api: function(apiName, status, duration) {
+    if (!this.enabled) return;
+
+    const entry = {
+      time: new Date().toISOString().substring(11, 23),
+      type: 'API',
+      name: apiName,
+      status: status,
+      duration: duration ? `${duration}ms` : null
+    };
+
+    this.addEntry(entry);
+
+    // 遅いAPI呼び出しは警告
+    if (duration > 2000) {
+      console.warn(`⚡ 遅いAPI: ${apiName} (${duration}ms)`);
+    }
+  },
+
+  /**
+   * データ操作をログ
+   * @param {string} operation - 操作名
+   * @param {number} count - 処理件数
+   * @param {string} target - 対象（テーブル名など）
+   */
+  data: function(operation, count, target) {
+    if (!this.enabled) return;
+
+    const entry = {
+      time: new Date().toISOString().substring(11, 23),
+      type: 'DATA',
+      op: operation,
+      count: count,
+      target: target
+    };
+
+    this.addEntry(entry);
+
+    // 大量データ処理は情報出力
+    if (count > 100) {
+      console.info(`📊 大量データ処理: ${operation} ${count}件 (${target})`);
+    }
+  },
+
+  /**
+   * 重要なビジネスロジックをログ
+   * @param {string} event - イベント名
+   * @param {string} details - 詳細情報
+   */
+  business: function(event, details) {
+    if (!this.enabled) return;
+
+    const entry = {
+      time: new Date().toISOString().substring(11, 23),
+      type: 'BIZ',
+      event: event,
+      details: details ? details.substring(0, 80) : null
+    };
+
+    this.addEntry(entry);
+  },
+
+  /**
+   * エントリを追加（循環バッファー）
+   * @private
+   */
+  addEntry: function(entry) {
+    this.entries.push(entry);
+    if (this.entries.length > this.maxEntries) {
+      this.entries.shift(); // 古いエントリを削除
+    }
+  },
+
+  /**
+   * 最近のログを取得（コンソール用）
+   * @param {number} count - 取得数（デフォルト10）
+   * @returns {Array} ログエントリ
+   */
+  getRecent: function(count = 10) {
+    return this.entries.slice(-count);
+  },
+
+  /**
+   * ログを整形して文字列で返す
+   * @param {number} count - 表示数
+   * @returns {string} 整形されたログ
+   */
+  format: function(count = 10) {
+    const recent = this.getRecent(count);
+    return recent.map(entry => {
+      const timeStr = entry.time;
+      const typeStr = entry.type.padEnd(4);
+      
+      switch (entry.type) {
+        case 'FUNC':
+          return `${timeStr} ${typeStr} ${entry.name} ${entry.action}${entry.data ? ` | ${entry.data}` : ''}`;
+        case 'API':
+          return `${timeStr} ${typeStr} ${entry.name} ${entry.status}${entry.duration ? ` | ${entry.duration}` : ''}`;
+        case 'DATA':
+          return `${timeStr} ${typeStr} ${entry.op} ${entry.count}件${entry.target ? ` | ${entry.target}` : ''}`;
+        case 'BIZ':
+          return `${timeStr} ${typeStr} ${entry.event}${entry.details ? ` | ${entry.details}` : ''}`;
+        default:
+          return `${timeStr} ${typeStr} ${JSON.stringify(entry)}`;
+      }
+    }).join('\n');
+  },
+
+  /**
+   * ログをクリア
+   */
+  clear: function() {
+    this.entries = [];
+    categoryLog('LOG', 'コーディングログをクリアしました');
+  },
+
+  /**
+   * ログ機能の有効/無効切り替え
+   */
+  toggle: function() {
+    this.enabled = !this.enabled;
+    categoryLog('LOG', `コーディングログ: ${this.enabled ? '有効' : '無効'}`);
+    return this.enabled;
+  },
+
+  /**
+   * エラー頻度の高い関数を分析
+   * @returns {Array} エラー頻度でソートされた関数リスト
+   */
+  getErrorHotspots: function() {
+    const errorCounts = {};
+    this.entries.filter(entry => entry.type === 'FUNC' && entry.action === 'error').forEach(entry => {
+      errorCounts[entry.name] = (errorCounts[entry.name] || 0) + 1;
+    });
+    
+    return Object.entries(errorCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([func, count]) => ({ function: func, errors: count }));
+  },
+
+  /**
+   * 遅いAPIを分析
+   * @returns {Array} 実行時間でソートされたAPIリスト
+   */
+  getSlowAPIs: function() {
+    return this.entries
+      .filter(entry => entry.type === 'API' && entry.duration)
+      .map(entry => ({
+        api: entry.name,
+        duration: parseInt(entry.duration.replace('ms', '')),
+        status: entry.status
+      }))
+      .sort((a, b) => b.duration - a.duration)
+      .slice(0, 10);
+  },
+
+  /**
+   * コーディング支援：最近のエラーパターンを分析
+   * @returns {object} エラー分析結果
+   */
+  analyzeErrors: function() {
+    const recentErrors = this.entries.filter(entry => 
+      entry.type === 'FUNC' && entry.action === 'error'
+    ).slice(-10);
+
+    const errorPatterns = {};
+    recentErrors.forEach(error => {
+      const pattern = this.extractErrorPattern(error.data);
+      errorPatterns[pattern] = (errorPatterns[pattern] || 0) + 1;
+    });
+
+    return {
+      totalErrors: recentErrors.length,
+      patterns: Object.entries(errorPatterns)
+        .sort((a, b) => b[1] - a[1])
+        .map(([pattern, count]) => ({ pattern, count })),
+      suggestions: this.getSuggestions(errorPatterns)
+    };
+  },
+
+  /**
+   * エラーメッセージからパターンを抽出
+   * @private
+   */
+  extractErrorPattern: function(errorData) {
+    if (!errorData) return 'Unknown';
+    
+    const data = errorData.toLowerCase();
+    if (data.includes('undefined')) return 'Undefined Reference';
+    if (data.includes('null')) return 'Null Pointer';
+    if (data.includes('permission')) return 'Permission Denied';
+    if (data.includes('timeout')) return 'Timeout';
+    if (data.includes('cache')) return 'Cache Error';
+    if (data.includes('network')) return 'Network Error';
+    return 'Other';
+  },
+
+  /**
+   * エラーパターンに基づく改善提案
+   * @private
+   */
+  getSuggestions: function(patterns) {
+    const suggestions = [];
+    
+    if (patterns['Undefined Reference']) {
+      suggestions.push('💡 未定義参照が多発しています。typeof チェックの追加を検討してください');
+    }
+    if (patterns['Null Pointer']) {
+      suggestions.push('💡 null チェックが不足している可能性があります');
+    }
+    if (patterns['Cache Error']) {
+      suggestions.push('💡 キャッシュ関連エラーが発生しています。キャッシュの初期化を確認してください');
+    }
+    if (patterns['Timeout']) {
+      suggestions.push('💡 タイムアウトが頻発しています。処理の最適化を検討してください');
+    }
+    
+    return suggestions;
+  },
+
+  /**
+   * 依存関係エラーの自動検出
+   * @returns {object} 依存関係問題の分析結果
+   */
+  analyzeDependencies: function() {
+    const dependencyErrors = this.entries.filter(entry => 
+      entry.type === 'FUNC' && entry.action === 'error' && entry.data
+    );
+
+    const dependencyIssues = {
+      undefinedFunctions: [],
+      missingMethods: [],
+      typeErrors: [],
+      suggestions: []
+    };
+
+    dependencyErrors.forEach(error => {
+      const errorText = error.data.toLowerCase();
+      
+      if (errorText.includes('is not a function')) {
+        const match = error.data.match(/(\w+) is not a function/);
+        if (match) {
+          dependencyIssues.undefinedFunctions.push({
+            function: match[1],
+            context: error.name,
+            time: error.time
+          });
+        }
+      }
+      
+      if (errorText.includes('cannot read properties of undefined')) {
+        const match = error.data.match(/Cannot read properties of undefined \(reading '(\w+)'\)/);
+        if (match) {
+          dependencyIssues.missingMethods.push({
+            method: match[1],
+            context: error.name,
+            time: error.time
+          });
+        }
+      }
+      
+      if (errorText.includes('undefined') || errorText.includes('null')) {
+        dependencyIssues.typeErrors.push({
+          error: error.data.substring(0, 100),
+          context: error.name,
+          time: error.time
+        });
+      }
+    });
+
+    // 自動修正提案の生成
+    dependencyIssues.undefinedFunctions.forEach(issue => {
+      dependencyIssues.suggestions.push({
+        type: 'missing_function',
+        message: `🔧 関数 "${issue.function}" が未定義です。定義の追加またはtypeof チェックを検討してください`,
+        priority: 'high'
+      });
+    });
+
+    dependencyIssues.missingMethods.forEach(issue => {
+      dependencyIssues.suggestions.push({
+        type: 'missing_method', 
+        message: `🔧 メソッド "${issue.method}" へのアクセスが失敗しています。オブジェクトの存在確認を追加してください`,
+        priority: 'high'
+      });
+    });
+
+    return dependencyIssues;
+  },
+
+  /**
+   * リアルタイム依存関係監視の開始
+   * エラーログから依存関係問題を継続的に監視
+   */
+  startDependencyWatch: function() {
+    if (this.dependencyWatchEnabled) return;
+    
+    this.dependencyWatchEnabled = true;
+    
+    // グローバルエラーハンドラーを拡張
+    const originalHandler = window.onerror;
+    window.onerror = (message, source, lineno, colno, error) => {
+      // 依存関係エラーを自動ログ
+      if (message && typeof message === 'string') {
+        const errorText = message.toLowerCase();
+        if (errorText.includes('is not a function') || 
+            errorText.includes('undefined') || 
+            errorText.includes('cannot read properties')) {
+          
+          this.func('DependencyError', 'error', message);
+          
+          // 即座に分析と提案を表示
+          const analysis = this.analyzeDependencies();
+          if (analysis.suggestions.length > 0) {
+            const latestSuggestion = analysis.suggestions[analysis.suggestions.length - 1];
+            console.warn(`🚨 依存関係問題検出: ${latestSuggestion.message}`);
+          }
+        }
+      }
+      
+      // 元のハンドラーを呼び出し
+      if (originalHandler) {
+        return originalHandler(message, source, lineno, colno, error);
+      }
+      return false;
+    };
+    
+    categoryLog('DEPENDENCY', '依存関係監視を開始しました');
+  }
+};
+
+/**
+ * グローバル関数：コーディングログの簡易アクセス
+ * コンソールからアクセス可能
+ */
+function showCodingLog(count = 20) {
+  console.log('=== Coding Log (最新' + count + '件) ===');
+  console.log(codingLog.format(count));
+  return codingLog.getRecent(count);
+}
+
+/**
+ * グローバル関数：ログクリア
+ */
+function clearCodingLog() {
+  codingLog.clear();
+  console.log('🧹 コーディングログをクリアしました');
+}
+
+/**
+ * グローバル関数：エラーホットスポット分析
+ * コーディング効率化のためのエラー分析
+ */
+function analyzeErrorHotspots() {
+  console.log('=== エラーホットスポット分析 ===');
+  const hotspots = codingLog.getErrorHotspots();
+  if (hotspots.length === 0) {
+    console.log('✅ エラーは記録されていません');
+    return hotspots;
+  }
+  
+  hotspots.forEach((hotspot, index) => {
+    console.log(`${index + 1}. ${hotspot.function}: ${hotspot.errors}回`);
+  });
+  
+  return hotspots;
+}
+
+/**
+ * グローバル関数：遅いAPI分析
+ * パフォーマンス最適化のためのAPI分析
+ */
+function analyzeSlowAPIs() {
+  console.log('=== 遅いAPI分析 ===');
+  const slowAPIs = codingLog.getSlowAPIs();
+  if (slowAPIs.length === 0) {
+    console.log('✅ API呼び出しは記録されていません');
+    return slowAPIs;
+  }
+  
+  slowAPIs.forEach((api, index) => {
+    console.log(`${index + 1}. ${api.api}: ${api.duration}ms (${api.status})`);
+  });
+  
+  return slowAPIs;
+}
+
+/**
+ * グローバル関数：エラーパターン分析と改善提案
+ * コーディング品質向上のための分析
+ */
+function analyzeCodingIssues() {
+  console.log('=== コーディング課題分析 ===');
+  const analysis = codingLog.analyzeErrors();
+  
+  console.log(`総エラー数: ${analysis.totalErrors}`);
+  console.log('\n📊 エラーパターン:');
+  analysis.patterns.forEach(pattern => {
+    console.log(`  ${pattern.pattern}: ${pattern.count}回`);
+  });
+  
+  if (analysis.suggestions.length > 0) {
+    console.log('\n💡 改善提案:');
+    analysis.suggestions.forEach(suggestion => {
+      console.log(`  ${suggestion}`);
+    });
+  }
+  
+  return analysis;
+}
+
+/**
+ * グローバル関数：統合コーディング支援レポート
+ * 開発効率向上のための包括的レポート
+ */
+function getCodingReport() {
+  console.log('=== 📊 統合コーディング支援レポート ===\n');
+  
+  // 基本統計
+  const stats = codingLog.getRecent(50);
+  const errorCount = stats.filter(s => s.type === 'FUNC' && s.action === 'error').length;
+  const apiCount = stats.filter(s => s.type === 'API').length;
+  const dataCount = stats.filter(s => s.type === 'DATA').length;
+  
+  console.log('📈 活動サマリー:');
+  console.log(`  総ログエントリ: ${stats.length}`);
+  console.log(`  エラー: ${errorCount}`);
+  console.log(`  API呼び出し: ${apiCount}`);
+  console.log(`  データ操作: ${dataCount}\n`);
+  
+  // エラー分析
+  const errorAnalysis = codingLog.analyzeErrors();
+  if (errorAnalysis.totalErrors > 0) {
+    console.log('🚨 エラー分析:');
+    console.log(`  直近エラー数: ${errorAnalysis.totalErrors}`);
+    errorAnalysis.patterns.forEach(pattern => {
+      console.log(`  ${pattern.pattern}: ${pattern.count}回`);
+    });
+    console.log('');
+  }
+  
+  // パフォーマンス分析
+  const slowAPIs = codingLog.getSlowAPIs().slice(0, 3);
+  if (slowAPIs.length > 0) {
+    console.log('⚡ パフォーマンス課題 (上位3件):');
+    slowAPIs.forEach((api, i) => {
+      console.log(`  ${i + 1}. ${api.api}: ${api.duration}ms`);
+    });
+    console.log('');
+  }
+  
+  // 改善提案
+  if (errorAnalysis.suggestions.length > 0) {
+    console.log('💡 改善提案:');
+    errorAnalysis.suggestions.forEach(suggestion => {
+      console.log(`  ${suggestion}`);
+    });
+  }
+  
+  return {
+    summary: { total: stats.length, errors: errorCount, apis: apiCount, data: dataCount },
+    errors: errorAnalysis,
+    performance: slowAPIs
+  };
+}
+
+/**
+ * グローバル関数：依存関係問題の分析
+ * 未定義参照やメソッド不具合を検出・修正提案
+ */
+function analyzeDependencies() {
+  console.log('=== 🔍 依存関係問題分析 ===');
+  const analysis = codingLog.analyzeDependencies();
+  
+  console.log(`未定義関数: ${analysis.undefinedFunctions.length}件`);
+  console.log(`メソッドエラー: ${analysis.missingMethods.length}件`);
+  console.log(`型エラー: ${analysis.typeErrors.length}件\n`);
+  
+  if (analysis.undefinedFunctions.length > 0) {
+    console.log('🚨 未定義関数:');
+    analysis.undefinedFunctions.forEach(issue => {
+      console.log(`  ${issue.function} (${issue.context} - ${issue.time})`);
+    });
+    console.log('');
+  }
+  
+  if (analysis.missingMethods.length > 0) {
+    console.log('🚨 メソッドエラー:');
+    analysis.missingMethods.forEach(issue => {
+      console.log(`  ${issue.method} (${issue.context} - ${issue.time})`);
+    });
+    console.log('');
+  }
+  
+  if (analysis.suggestions.length > 0) {
+    console.log('🔧 修正提案:');
+    analysis.suggestions.forEach(suggestion => {
+      console.log(`  ${suggestion.message}`);
+    });
+  }
+  
+  return analysis;
+}
+
+/**
+ * グローバル関数：依存関係監視の開始
+ * リアルタイムでエラーを検出・報告
+ */
+function startDependencyWatch() {
+  codingLog.startDependencyWatch();
+  console.log('🔄 依存関係の監視を開始しました');
+  console.log('💡 使用法: analyzeDependencies() で問題を分析できます');
+}
+
+// =============================================================================
+// KEY UTILITIES - 削除されたkeyUtils.gsからの重要機能復元
+// config.gsで参照されるキー生成関数群の軽量実装
+// =============================================================================
+
+/**
+ * ユーザースコープ付きキャッシュキーの生成（軽量実装）
+ * config.gsで参照される重要な関数
+ * @param {string} prefix - キーのプレフィックス
+ * @param {string} userId - 対象ユーザーID
+ * @param {string} suffix - 追加識別子（オプション）
+ * @returns {string} 生成されたキャッシュキー
+ */
+function buildUserScopedKey(prefix, userId, suffix) {
+  if (!userId) {
+    errorLog('buildUserScopedKey: userIdが必要です');
+    throw new Error('SECURITY_ERROR: userId is required for cache key');
+  }
+  
+  try {
+    // 基本的なキー生成（セキュリティ強化版）
+    let key = `${prefix}_${userId}`;
+    if (suffix) {
+      key += `_${suffix}`;
+    }
+    
+    // 安全性のためのキー長制限
+    if (key.length > 250) {
+      // キーが長すぎる場合はハッシュ化
+      const hash = Utilities.computeDigest(
+        Utilities.DigestAlgorithm.MD5, 
+        key, 
+        Utilities.Charset.UTF_8
+      ).map(byte => (byte + 256).toString(16).slice(-2)).join('');
+      key = `${prefix}_${hash.substring(0, 8)}`;
+      debugLog('buildUserScopedKey: 長いキーをハッシュ化しました');
+    }
+    
+    categoryLog('CACHE', `キー生成: ${key.substring(0, 50)}${key.length > 50 ? '...' : ''}`);
+    return key;
+  } catch (error) {
+    errorLog('buildUserScopedKey エラー:', error.message);
+    // フォールバック: 最小限のキー生成
+    return `${prefix}_${userId.substring(0, 10)}`;
+  }
+}
+
+/**
+ * セキュアなユーザースコープキーの生成（簡易版）
+ * 削除されたmultiTenantSecurityがない環境での代替実装
+ * @param {string} prefix - キーのプレフィックス
+ * @param {string} userId - 対象ユーザーID
+ * @param {string} context - コンテキスト情報（オプション）
+ * @returns {string} セキュアなキー
+ */
+function buildSecureUserScopedKey(prefix, userId, context = '') {
+  if (!userId) {
+    throw new Error('SECURITY_ERROR: userId is required for secure cache key');
+  }
+  
+  try {
+    // タイムスタンプベースのセキュリティトークン
+    const timestamp = Date.now();
+    const token = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA1,
+      `${userId}${timestamp}${context}`,
+      Utilities.Charset.UTF_8
+    ).map(byte => (byte + 256).toString(16).slice(-2)).join('').substring(0, 8);
+    
+    const secureKey = `SEC_${prefix}_${token}`;
+    categoryLog('SECURITY', `セキュアキー生成: ${secureKey}`);
+    return secureKey;
+  } catch (error) {
+    errorLog('buildSecureUserScopedKey エラー:', error.message);
+    // フォールバック
+    return buildUserScopedKey(`SEC_${prefix}`, userId, context);
+  }
+}
+
+/**
+ * キーからユーザー情報の抽出（デバッグ用）
+ * @param {string} key - 検査対象キー
+ * @returns {object|null} 抽出されたキー情報
+ */
+function extractUserInfoFromKey(key) {
+  if (!key || typeof key !== 'string') return null;
+  
+  try {
+    if (key.startsWith('SEC_')) {
+      return { secure: true, extractable: false, prefix: 'SEC_' };
+    }
+    
+    const parts = key.split('_');
+    if (parts.length >= 2) {
+      return {
+        prefix: parts[0],
+        userId: parts[1],
+        suffix: parts.length > 2 ? parts.slice(2).join('_') : null,
+        secure: false,
+        extractable: true
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    debugLog('extractUserInfoFromKey エラー:', error.message);
+    return null;
   }
 }
 

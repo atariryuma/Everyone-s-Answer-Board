@@ -7,6 +7,109 @@
 
 // 統合ユーザー検索システムは削除（簡素化のため、既存の3段階検索で十分）
 
+// =============================================================================
+// UnifiedBatchProcessor 簡易実装 - 削除されたファイルからの復元
+// =============================================================================
+
+/**
+ * 統一バッチ処理システムの簡易実装（削除されたunifiedBatchProcessor.gsの代替）
+ */
+const unifiedBatchProcessor = {
+  /**
+   * スプレッドシートバッチ更新処理
+   */
+  batchUpdateSpreadsheet: function(service, spreadsheetId, requests, options = {}) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+      
+      const requestBody = {
+        requests: requests,
+        includeSpreadsheetInResponse: options.includeSpreadsheetInResponse || false,
+        responseRanges: options.responseRanges || []
+      };
+
+      const response = UrlFetchApp.fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getAccessToken()}`,
+          'Content-Type': 'application/json'
+        },
+        payload: JSON.stringify(requestBody),
+        muteHttpExceptions: true
+      });
+
+      if (response.getResponseCode() !== 200) {
+        throw new Error(`BatchUpdate failed: ${response.getResponseCode()} - ${response.getContentText()}`);
+      }
+
+      const result = JSON.parse(response.getContentText());
+      
+      // キャッシュ無効化
+      if (options.invalidateCache) {
+        this.invalidateCacheForSpreadsheet(spreadsheetId);
+      }
+
+      return result;
+    } catch (error) {
+      errorLog('UnifiedBatchProcessor batchUpdate error:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * スプレッドシートのキャッシュ無効化
+   */
+  invalidateCacheForSpreadsheet: function(spreadsheetId) {
+    try {
+      if (typeof cacheManager !== 'undefined') {
+        // パターンベースのキャッシュクリア
+        const patterns = [
+          `sheets_${spreadsheetId}_`,
+          `batchGet_${spreadsheetId}_`,
+          `sheetData_${spreadsheetId}_`,
+          `publishedData_${spreadsheetId}_`
+        ];
+        
+        patterns.forEach(pattern => {
+          try {
+            cacheManager.clearByPattern(pattern);
+          } catch (clearError) {
+            warnLog('キャッシュクリアエラー:', pattern, clearError.message);
+          }
+        });
+      }
+    } catch (error) {
+      warnLog('Cache invalidation error:', error.message);
+    }
+  },
+
+  /**
+   * アクセストークン取得（簡易版）
+   */
+  getAccessToken: function() {
+    try {
+      // ScriptApp.getOAuthTokenを使用（GAS環境での標準的な方法）
+      return ScriptApp.getOAuthToken();
+    } catch (error) {
+      errorLog('Failed to get OAuth token:', error.message);
+      throw new Error('認証トークンの取得に失敗しました');
+    }
+  },
+
+  /**
+   * メトリクス取得（簡易版）
+   */
+  getMetrics: function() {
+    return {
+      available: true,
+      type: 'simplified',
+      totalOperations: 0,
+      successfulOperations: 0,
+      failedOperations: 0
+    };
+  }
+};
+
 // 回復力のあるProperties/Cache操作
 function getResilientScriptProperties() {
   try {
@@ -1709,7 +1812,7 @@ function createSheetsService(accessToken) {
           var url = 'https://sheets.googleapis.com/v4/spreadsheets/' +
                    options.spreadsheetId + '/values/' + encodeURIComponent(options.range);
 
-          var response =  resilientUrlFetch(url, {
+          var response = UrlFetchApp.fetch(url, {
             headers: { 'Authorization': 'Bearer ' + accessToken },
             muteHttpExceptions: true,
             followRedirects: true,
@@ -1734,7 +1837,7 @@ function createSheetsService(accessToken) {
           url += '?fields=' + encodeURIComponent(options.fields);
         }
 
-        var response =  resilientUrlFetch(url, {
+        var response = UrlFetchApp.fetch(url, {
           headers: { 'Authorization': 'Bearer ' + accessToken },
           muteHttpExceptions: true,
           followRedirects: true,
