@@ -298,7 +298,7 @@ function logDiagnosticResult(functionName, result, summary) {
 
   } catch (error) {
     errorLog('診断ログ記録エラー:', error.message);
-    debugLog('診断ログトランザクション詳細:', transactionLog);
+    // トランザクション完了
     
     return {
       success: false,
@@ -500,7 +500,7 @@ function getAllUsersForAdmin() {
       }
 
       users.push(user);
-      debugLog(`DEBUG: getAllUsersForAdmin - User object: ${JSON.stringify(user)}`);
+      // ユーザーオブジェクト処理
     }
 
     infoLog(`✅ 管理者用ユーザー一覧を取得: ${users.length}件`);
@@ -613,13 +613,13 @@ async function deleteUserAccountByAdmin(targetUserId, reason) {
         throw new Error('データベースに userId フィールドが見つかりません');
       }
       
-      debugLog('Found userId field at index:', userIdFieldIndex, 'for admin deletion');
+      // userIdフィールドを発見
 
       let rowToDelete = -1;
       for (let i = values.length - 1; i >= 1; i--) {
         if (values[i][userIdFieldIndex] === targetUserId) {
           rowToDelete = i + 1; // スプレッドシートは1ベース
-          debugLog('Found target user row to delete at index:', i, 'rowToDelete:', rowToDelete);
+          // 削除対象行を発見
           break;
         }
       }
@@ -724,7 +724,7 @@ function getDeletionLogs() {
       );
 
       if (!logSheetExists) {
-        debugLog('削除ログシートが存在しません');
+        // 削除ログシートが存在しない
         return []; // ログシートがない場合は空の配列を返す
       }
 
@@ -771,11 +771,11 @@ function getDeletionLogs() {
  */
 function getSheetsServiceCached(forceRefresh) {
   try {
-    debugLog('🔧 getSheetsServiceCached: 新規サービス作成開始（キャッシュなし版）');
+    // Sheetsサービス作成開始
 
     let accessToken;
     if (forceRefresh) {
-      debugLog('🔐 認証トークンも強制リフレッシュ');
+      // 認証トークンリフレッシュ
       cacheManager.remove('service_account_token');
       accessToken = generateNewServiceAccountToken();
     } else {
@@ -811,7 +811,7 @@ function getSheetsServiceCached(forceRefresh) {
       throw new Error('SheetsServiceオブジェクトの関数が正しく設定されていません');
     }
 
-    debugLog('✅ Sheetsサービス作成完了（検証済み）');
+    // Sheetsサービス作成完了
     return service;
 
   } catch (error) {
@@ -826,7 +826,7 @@ function getSheetsServiceCached(forceRefresh) {
  */
 function getSheetsService() {
   try {
-    debugLog('🔧 getSheetsService: サービス取得開始');
+    // Sheetsサービス取得開始
 
     let accessToken;
     try {
@@ -850,7 +850,7 @@ function getSheetsService() {
     }
 
     infoLog('✅ Sheets service created successfully');
-    debugLog('DEBUG: getSheetsService returning service object with baseUrl:', service.baseUrl);
+    // サービスオブジェクトを返却
     return service;
 
   } catch (error) {

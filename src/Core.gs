@@ -6154,8 +6154,6 @@ function confirmUserRegistration() {
  * @returns {Object} 統合された初期データ
  */
 function getInitialData(requestUserId, targetSheetName, lightweightMode) {
-  debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName, lightweightMode });
-
   try {
     var startTime = new Date().getTime();
 
@@ -6173,7 +6171,6 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
 
     // 軽量モード時またはキャッシュバイパス時の追加キャッシュクリア
     if (lightweightMode || targetSheetName === 'BYPASS_CACHE') {
-      debugLog('🧹 Additional cache clearing for fresh data retrieval');
       try {
         // 統一キャッシュクリアを実行
         if (typeof performUnifiedCacheClear === 'function') {
@@ -6184,7 +6181,7 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
           clearDatabaseCache();
         }
       } catch (cacheError) {
-        warnLog('⚠️ Additional cache clearing failed:', cacheError.message);
+        // エラーは無視
       }
     }
 
@@ -6194,7 +6191,6 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     // 軽量モードまたは強制更新時は、確実に最新データを取得
     var userInfo;
     if (lightweightMode || targetSheetName === 'BYPASS_CACHE') {
-      debugLog('🔄 Force fresh user data retrieval for consistency');
       userInfo = findUserByIdFresh(currentUserId);
       if (!userInfo) {
         throw new Error('ユーザー情報が見つかりません（強制更新）');
@@ -6211,10 +6207,8 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
 
     // === ステップ1.5: データ整合性の自動チェックと修正 ===
     try {
-      debugLog('🔍 データ整合性の自動チェック開始...');
       var consistencyResult = fixUserDataConsistency(currentUserId);
       if (consistencyResult.updated) {
-        infoLog('✅ データ整合性が自動修正されました');
         // 修正後は最新データを再取得
         clearExecutionUserInfoCache();
         userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
@@ -6223,7 +6217,6 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
         });
       }
     } catch (consistencyError) {
-      warnLog('⚠️ データ整合性チェック中にエラー:', consistencyError.message);
       // エラーが発生しても初期化処理は続行
     }
 

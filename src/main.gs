@@ -742,8 +742,6 @@ function routeRequestByMode(params) {
  * @returns {HtmlOutput} Appropriate page response
  */
 function handleDefaultRoute() {
-  debugLog('No mode parameter, checking previous admin session');
-
   const activeUserEmail = getCurrentUserEmail();
   if (!activeUserEmail) {
     return showLoginPage();
@@ -753,8 +751,6 @@ function handleDefaultRoute() {
   const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
 
   if (lastAdminUserId && verifyAdminAccess(lastAdminUserId)) {
-    debugLog('Found previous admin session, redirecting to admin panel:', lastAdminUserId);
-    debugLog('DEBUG: Calling findUserById with lastAdminUserId:', lastAdminUserId);
     const userInfo = findUserById(lastAdminUserId);
     return renderAdminPanel(userInfo, 'admin');
   }
@@ -764,7 +760,6 @@ function handleDefaultRoute() {
     userProperties.deleteProperty('lastAdminUserId');
   }
 
-  debugLog('No previous admin session, showing login page');
   return showLoginPage();
 }
 
@@ -773,7 +768,6 @@ function handleDefaultRoute() {
  * @returns {HtmlOutput} Login page
  */
 function handleLoginMode() {
-  debugLog('Login mode requested, showing login page');
   return showLoginPage();
 }
 
@@ -782,22 +776,17 @@ function handleLoginMode() {
  * @returns {HtmlOutput} App setup page or error page
  */
 function handleAppSetupMode() {
-  debugLog('AppSetup mode requested');
-
   const userProperties = PropertiesService.getUserProperties();
   const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
 
   if (!lastAdminUserId) {
-    debugLog('No admin session found, redirecting to login');
     return showErrorPage('認証が必要です', 'アプリ設定にアクセスするにはログインが必要です。');
   }
 
   if (!verifyAdminAccess(lastAdminUserId)) {
-    warnLog('Admin access denied for userId:', lastAdminUserId);
     return showErrorPage('アクセス拒否', 'アプリ設定にアクセスする権限がありません。');
   }
 
-  debugLog('Showing app setup page for userId:', lastAdminUserId);
   return showAppSetupPage(lastAdminUserId);
 }
 
@@ -807,145 +796,27 @@ function handleAppSetupMode() {
  * @returns {HtmlOutput} Admin panel or error page
  */
 function handleAdminMode(params) {
-  const requestStartTime = Date.now();
-  
   if (!params.userId) {
     return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
   }
 
-  // システム状態診断
-  const systemDiagnostics = {
-    requestTime: new Date().toISOString(),
-    userId: params.userId,
-    userEmail: getCurrentUserEmail(),
-    cacheStatus: {},
-    databaseConnectivity: 'unknown',
-    performanceMetrics: {}
-  };
-
-  try {
-    // キャッシュ状態確認
-    try {
-      const scriptCache = CacheService.getScriptCache();
-      systemDiagnostics.cacheStatus.scriptCache = 'available';
-      systemDiagnostics.cacheStatus.executionCache = 'available';
-    } catch (cacheError) {
-      systemDiagnostics.cacheStatus.error = cacheError.message;
-    }
-
-    // データベース接続性テスト
-    try {
-      const dbId = getSecureDatabaseId();
-      systemDiagnostics.databaseConnectivity = dbId ? 'connected' : 'disconnected';
-    } catch (dbError) {
-      systemDiagnostics.databaseConnectivity = 'error: ' + dbError.message;
-    }
-
-    infoLog('🔍 handleAdminMode: システム診断完了', systemDiagnostics);
-  } catch (diagError) {
-    warnLog('handleAdminMode: システム診断でエラー:', diagError.message);
-  }
-
-  // 管理者権限確認（詳細ログ付き）
-  debugLog('🔍 handleAdminMode: 統合管理者権限確認開始', {
-    userId: params.userId,
-    timestamp: new Date().toISOString(),
-    systemStatus: systemDiagnostics
-  });
-  
-  const authStartTime = Date.now();
   const adminAccessResult = verifyAdminAccess(params.userId);
-  const authDuration = Date.now() - authStartTime;
-  
-  systemDiagnostics.performanceMetrics.authDuration = authDuration + 'ms';
   
   if (!adminAccessResult) {
-    const totalRequestTime = Date.now() - requestStartTime;
-    systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
-    
-    errorLog('🚨 handleAdminMode: 管理者権限確認失敗', {
-      userId: params.userId,
-      currentUser: getCurrentUserEmail(),
-      authDuration: authDuration + 'ms',
-      totalTime: totalRequestTime + 'ms',
-      systemDiagnostics: systemDiagnostics,
-      timestamp: new Date().toISOString()
-    });
-    
-    // 詳細な診断情報付きエラーページ
-    let propertiesDiagnostics = 'unknown';
-    try {
-      const userProps = PropertiesService.getUserProperties();
-      const scriptProps = PropertiesService.getScriptProperties();
-      
-      const userPropsData = userProps.getProperties();
-      const allScriptProps = scriptProps.getProperties();
-      const scriptPropsKeys = Object.keys(allScriptProps).filter(k => k.startsWith('newUser_'));
-      
-      // より詳細な診断情報
-      const newUserDetails = scriptPropsKeys.map(key => {
-        try {
-          const data = JSON.parse(allScriptProps[key]);
-          const timeDiff = Date.now() - parseInt(data.createdTime);
-          return {
-            key: key,
-            email: data.email,
-            userId: data.userId,
-            ageMinutes: Math.floor(timeDiff / 60000)
-          };
-        } catch (e) {
-          return { key: key, error: 'parse_failed' };
-        }
-      });
-      
-      propertiesDiagnostics = {
-        userProperties: Object.keys(userPropsData).length,
-        scriptProperties: scriptPropsKeys.length,
-        recentUsers: scriptPropsKeys.slice(0, 3), // 最新3件のキー
-        newUserDetails: newUserDetails.slice(0, 5), // 詳細情報（最新5件）
-        currentUser: params.userId,
-        currentEmail: getCurrentUserEmail()
-      };
-    } catch (propError) {
-      propertiesDiagnostics = 'error: ' + propError.message;
-    }
-    
-    const diagnosticInfo = [
-      `ユーザーID: ${params.userId}`,
-      `現在のメール: ${getCurrentUserEmail()}`,
-      `認証時間: ${authDuration}ms`,
-      `総処理時間: ${totalRequestTime}ms`,
-      `データベース接続: ${systemDiagnostics.databaseConnectivity}`,
-      `プロパティ状態: ${JSON.stringify(propertiesDiagnostics)}`,
-      `時刻: ${new Date().toLocaleString('ja-JP')}`
-    ].join('\n');
-    
     return showErrorPage(
       'アクセス拒否', 
       'アカウントが一時的に無効化されています。\n\n' +
       '対処法:\n' +
       '• 新規登録から1-2分お待ちください\n' +
       '• ブラウザを更新してお試しください\n' +
-      '• 問題が続く場合は管理者にお問い合わせください\n\n' +
-      '詳細診断情報:\n' + diagnosticInfo
+      '• 問題が続く場合は管理者にお問い合わせください'
     );
   }
-  
-  const totalRequestTime = Date.now() - requestStartTime;
-  systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
-  
-  infoLog('✅ handleAdminMode: 統合管理者権限確認成功', {
-    userId: params.userId,
-    authDuration: authDuration + 'ms',
-    totalTime: totalRequestTime + 'ms',
-    systemDiagnostics: systemDiagnostics
-  });
 
   // Save admin session state
   const userProperties = PropertiesService.getUserProperties();
   userProperties.setProperty('lastAdminUserId', params.userId);
   userProperties.setProperty('lastSuccessfulAdminAccess', Date.now().toString());
-  debugLog('Saved enhanced admin session state:', params.userId);
 
   const userInfo = findUserById(params.userId);
   return renderAdminPanel(userInfo, 'admin');
@@ -1002,16 +873,8 @@ function processViewRequest(userInfo, params) {
     typeof config.publishedSheetName === 'string' &&
     config.publishedSheetName.trim() !== '');
 
-  debugLog('🔍 Publication status check:', {
-    appPublished: config.appPublished,
-    hasSpreadsheetId: !!config.publishedSpreadsheetId,
-    hasSheetName: !!config.publishedSheetName,
-    isCurrentlyPublished: isCurrentlyPublished
-  });
-
   // Redirect to unpublished page if not published
   if (!isCurrentlyPublished) {
-    infoLog('🚫 Board is unpublished, redirecting to Unpublished page');
     return renderUnpublishedPage(userInfo, params);
   }
 
@@ -1024,18 +887,13 @@ function processViewRequest(userInfo, params) {
  * @returns {HtmlOutput} Appropriate page response
  */
 function handleUnknownMode(params) {
-  warnLog('Unknown mode received:', params.mode);
-  debugLog('Available modes: login, appSetup, admin, view');
-
   // If valid userId with admin access, redirect to admin panel
   if (params.userId && verifyAdminAccess(params.userId)) {
-    debugLog('Redirecting unknown mode to admin panel for valid user:', params.userId);
     const userInfo = findUserById(params.userId);
     return renderAdminPanel(userInfo, 'admin');
   }
 
   // Otherwise redirect to login
-  debugLog('Redirecting unknown mode to login page');
   return showLoginPage();
 }
 
@@ -1051,20 +909,17 @@ function handleAdminRoute(userInfo, params, userEmail) {
 
   // セキュリティチェック: アクセスしようとしているuserIdが自分のものでなければ、自分の管理画面にリダイレクト
   if (params.userId && params.userId !== userInfo.userId) {
-    warnLog(`不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`);
     const correctUrl = buildUserAdminUrl(userInfo.userId);
     return redirectToUrl(correctUrl);
   }
 
-  // 強化されたセキュリティ検証: 指定されたIDの登録メールアドレスと現在ログイン中のGoogleアカウントが一致するかを検証
+  // 強化されたセキュリティ検証
   if (params.userId) {
     const isVerified = verifyAdminAccess(params.userId);
     if (!isVerified) {
-      warnLog(`セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`);
       const correctUrl = buildUserAdminUrl(userInfo.userId);
       return redirectToUrl(correctUrl);
     }
-    debugLog(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
   }
 
   return renderAdminPanel(userInfo, params.mode);

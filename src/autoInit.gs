@@ -11,7 +11,6 @@ function autoInitializeSystem() {
   // 既に初期化済みの場合はスキップ
   if (typeof systemIntegrationManager !== 'undefined' && 
       systemIntegrationManager.initialized) {
-    debugLog('💨 システムは既に初期化済みです');
     return {
       success: true,
       message: 'システムは既に初期化済みです',
@@ -20,8 +19,6 @@ function autoInitializeSystem() {
   }
 
   try {
-    infoLog('🔄 自動システム初期化開始');
-    
     // 統合システムの初期化実行
     const initResult = initializeOptimizedSystem({
       enablePeriodicHealthCheck: true,
@@ -29,11 +26,6 @@ function autoInitializeSystem() {
     });
 
     if (initResult.success) {
-      infoLog('✅ 自動システム初期化完了', {
-        componentsInitialized: initResult.componentsInitialized.length,
-        initTime: initResult.initializationTime,
-        warnings: initResult.warnings.length
-      });
 
       // 初期化完了後の追加設定
       performPostInitializationTasks();
@@ -44,7 +36,6 @@ function autoInitializeSystem() {
         details: initResult
       };
     } else {
-      warnLog('⚠️ システム初期化に一部問題がありました', initResult);
       return {
         success: false,
         message: 'システム初期化に一部問題がありました',
@@ -82,7 +73,7 @@ function performPostInitializationTasks() {
     // 3. システム統計の初期設定
     updateSystemMetrics();
 
-    infoLog('✅ 初期化後タスク完了');
+    // 初期化後タスク完了
 
   } catch (error) {
     warnLog('初期化後タスクエラー:', error.message);
@@ -95,20 +86,14 @@ function performPostInitializationTasks() {
  */
 function warmupSystemCaches() {
   try {
-    debugLog('🔥 システムキャッシュウォームアップ開始');
-
     // 重要な設定情報のプリロード
     if (typeof getSecureDatabaseId !== 'undefined') {
       getSecureDatabaseId();
-      debugLog('📊 データベースID キャッシュ済み');
     }
 
     if (typeof getServiceAccountTokenCached !== 'undefined') {
       getServiceAccountTokenCached();
-      debugLog('🔐 サービスアカウントトークン キャッシュ済み');
     }
-
-    debugLog('✅ キャッシュウォームアップ完了');
 
   } catch (error) {
     warnLog('キャッシュウォームアップエラー:', error.message);
@@ -121,7 +106,6 @@ function warmupSystemCaches() {
  */
 function performPeriodicMaintenance() {
   try {
-    infoLog('🔧 定期メンテナンス開始');
 
     // 1. システム診断実行
     let diagnostics = null;
@@ -145,9 +129,7 @@ function performPeriodicMaintenance() {
     // 4. 古いログの削除（必要に応じて）
     cleanupOldLogs();
 
-    infoLog('✅ 定期メンテナンス完了', {
-      diagnosticsStatus: diagnostics?.healthCheck?.overallStatus || 'UNKNOWN'
-    });
+    // 定期メンテナンス完了
 
   } catch (error) {
     errorLog('定期メンテナンスエラー:', error);
@@ -160,8 +142,6 @@ function performPeriodicMaintenance() {
  */
 function performCacheCleanup() {
   try {
-    debugLog('🧹 キャッシュクリーンアップ開始');
-
     // 期限切れキャッシュのクリーンアップ
     if (typeof cacheManager !== 'undefined' && cacheManager.cleanupExpired) {
       cacheManager.cleanupExpired();
@@ -171,8 +151,6 @@ function performCacheCleanup() {
     if (typeof unifiedSecretManager !== 'undefined') {
       unifiedSecretManager.clearSecretCache();
     }
-
-    debugLog('✅ キャッシュクリーンアップ完了');
 
   } catch (error) {
     warnLog('キャッシュクリーンアップエラー:', error.message);
@@ -190,7 +168,6 @@ function cleanupOldLogs() {
       const auditLog = unifiedSecretManager.getAuditLog();
       if (auditLog.length > 1000) {
         // ログが1000件を超えた場合は古いものを削除
-        debugLog('📋 監査ログのクリーンアップ実行');
       }
     }
 
