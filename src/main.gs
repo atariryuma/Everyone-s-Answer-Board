@@ -2272,49 +2272,6 @@ const ULTRA_CONFIG = {
  * 簡素化されたエラーハンドリング関数群
  */
 
-// 不足しているログ関数を定義
-function logInfo(message, details) {
-  try {
-    console.log('[INFO]', message, details || '');
-  } catch (error) {
-    // ログ出力に失敗してもエラーを投げない
-  }
-}
-
-function logDebug(message, details) {
-  try {
-    console.log('[DEBUG]', message, details || '');
-  } catch (error) {
-    // ログ出力に失敗してもエラーを投げない
-  }
-}
-
-function logWarn(message, details) {
-  try {
-    console.warn('[WARN]', message, details || '');
-  } catch (error) {
-    // ログ出力に失敗してもエラーを投げない
-  }
-}
-
-function warnLog(message, details) {
-  logWarn(message, details);
-}
-
-function debugLog(message, details) {
-  logDebug(message, details);
-}
-
-// 安全なログ関数（EmergencyServerPatch.gs との互換性）
-function logSafe(level, message, data) {
-  try {
-    const logMessage = `[${level}] ${message}`;
-    console.log(logMessage, data || '');
-  } catch (error) {
-    // ログ出力すら失敗した場合は何もしない
-  }
-}
-
 // ログ出力の最適化
 function log(level, message, details) {
   try {
@@ -2537,21 +2494,10 @@ function getSystemDomainInfo() {
 function doGet(e) {
   // 絶対に500エラーを出さない多層防御実装
   try {
-    logSafe('INFO', 'doGet called', { 
-      hasParam: !!e,
-      hasParameter: !!(e && e.parameter),
-      mode: e && e.parameter ? e.parameter.mode : null,
-      userId: e && e.parameter ? e.parameter.userId : null
-    });
-    
+    console.log('🔄 doGet called with parameters:', e ? e.parameter : null);
     return executeRobustDoGet(e);
   } catch (criticalError) {
-    logSafe('ERROR', 'Critical doGet error', {
-      error: criticalError.toString(),
-      stack: criticalError.stack,
-      name: criticalError.name
-    });
-    
+    console.error('🚨 Critical doGet error:', criticalError);
     return createUltimateFallbackPage(criticalError, e);
   }
 }
@@ -2562,34 +2508,21 @@ function doGet(e) {
 function executeRobustDoGet(e) {
   // レベル1: 通常処理を試行
   try {
-    logSafe('DEBUG', 'Level 1: Normal execution starting');
-    const result = normalExecutionFlow(e);
-    logSafe('DEBUG', 'Level 1: Normal execution completed successfully');
-    return result;
+    console.log('📍 Level 1: Normal execution');
+    return normalExecutionFlow(e);
   } catch (normalError) {
-    logSafe('WARN', 'Level 1 failed, trying Level 2', {
-      error: normalError.toString(),
-      stack: normalError.stack
-    });
+    console.warn('⚠️ Level 1 failed, trying Level 2:', normalError);
     
     // レベル2: 安全モード処理
     try {
-      logSafe('DEBUG', 'Level 2: Safe mode execution starting');
-      const result = safeModeExecutionFlow(e);
-      logSafe('DEBUG', 'Level 2: Safe mode execution completed successfully');
-      return result;
+      console.log('📍 Level 2: Safe mode execution');
+      return safeModeExecutionFlow(e);
     } catch (safeError) {
-      logSafe('ERROR', 'Level 2 failed, using Level 3', {
-        error: safeError.toString(),
-        stack: safeError.stack,
-        originalError: normalError.toString()
-      });
+      console.error('❌ Level 2 failed, using Level 3:', safeError);
       
       // レベル3: 緊急モード処理
-      logSafe('DEBUG', 'Level 3: Emergency mode execution starting');
-      const result = emergencyModeExecutionFlow(e, safeError);
-      logSafe('DEBUG', 'Level 3: Emergency mode execution completed');
-      return result;
+      console.log('📍 Level 3: Emergency mode execution');
+      return emergencyModeExecutionFlow(e, safeError);
     }
   }
 }
@@ -2598,31 +2531,17 @@ function executeRobustDoGet(e) {
  * レベル1: 通常実行フロー（既存の処理）
  */
 function normalExecutionFlow(e) {
-  logSafe('DEBUG', 'Normal flow: Starting initialization');
-  
   const initResult = initializeRequestProcessing();
-  if (initResult) {
-    logSafe('DEBUG', 'Normal flow: Initialization returned early result');
-    return initResult;
-  }
+  if (initResult) return initResult;
 
-  logSafe('DEBUG', 'Normal flow: Parsing request parameters');
   const params = parseRequestParams(e);
-  logSafe('DEBUG', 'Normal flow: Parameters parsed', { mode: params?.mode, userId: params?.userId });
-
-  logSafe('DEBUG', 'Normal flow: Validating user authentication');
   const authResult = validateUserAuthentication();
-  if (authResult) {
-    logSafe('DEBUG', 'Normal flow: Authentication returned early result');
-    return authResult;
-  }
+  if (authResult) return authResult;
 
-  if (params && params.setupParam === 'true') {
-    logSafe('DEBUG', 'Normal flow: Showing app setup page');
+  if (params.setupParam === 'true') {
     return showAppSetupPage(params.userId);
   }
 
-  logSafe('DEBUG', 'Normal flow: Routing request by mode');
   return routeRequestByMode(params);
 }
 
@@ -3002,29 +2921,6 @@ function createSafeAppSetupPage() {
 
 function createEmergencyResponsePage(error, mode, userId) {
   return createUltimateFallbackPage(error, { parameter: { mode, userId } });
-}
-
-/**
- * ユーティリティ関数の追加定義
- */
-function htmlEscape(str) {
-  if (!str) return '';
-  return str.toString()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function sanitizeMode(mode) {
-  const allowed = ['default', 'admin', 'view', 'login', 'appSetup'];
-  return allowed.includes(mode) ? mode : 'emergency';
-}
-
-function sanitizeUserId(userId) {
-  if (!userId || typeof userId !== 'string') return null;
-  return userId.replace(/[^a-zA-Z0-9\-]/g, '') || null;
 }
 
 /**
