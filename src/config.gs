@@ -10,8 +10,8 @@ let runtimeUserInfo = null;
 // メモリ管理用の実行レベル変数 (main.gsと統一)
 let lastCacheUserIdKey = null;
 let executionStartTime = Date.now();
-/** @deprecated Use UNIFIED_CONSTANTS.TIMEOUTS.EXECUTION_MAX instead */
-const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
+// EXECUTION_MAX_LIFETIME はconstants.gsで統一管理
+// 使用時は getExecutionMaxLifetime() 関数を使用
 
 /**
  * 実行中に一度だけユーザー情報を取得して再利用する。
@@ -21,7 +21,7 @@ const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
  */
 function getUserInfoCached(requestUserId) {
   // 実行時間制限チェック
-  if (Date.now() - executionStartTime > EXECUTION_MAX_LIFETIME) {
+  if (Date.now() - executionStartTime > 300000) { // 5分 = 300000ms
     warnLog('⚠️ 実行時間制限到達、キャッシュを自動クリア');
     clearExecutionUserInfoCache();
     executionStartTime = Date.now();

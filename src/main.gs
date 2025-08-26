@@ -105,15 +105,9 @@ const DB_SHEET_CONFIG = {
   ]
 };
 
-/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.LOG instead */
-const LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'Logs',
-  HEADERS: ['timestamp', 'severity', 'category', 'message', 'userId', 'context']
-};
+// LOG_SHEET_CONFIG はconstants.gsで統一管理
 
-// 履歴管理の定数
-/** @deprecated Use UNIFIED_CONSTANTS.LIMITS.HISTORY_ITEMS instead */
-const MAX_HISTORY_ITEMS = 50;
+// MAX_HISTORY_ITEMS はconstants.gsで統一管理
 
 // 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
 let _executionUserInfoCache = null;

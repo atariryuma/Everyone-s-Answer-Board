@@ -253,66 +253,240 @@ Object.freeze(UNIFIED_CONSTANTS.SCRIPT_PROPS);
 Object.freeze(UNIFIED_CONSTANTS.DEBUG);
 Object.freeze(UNIFIED_CONSTANTS.REGEX);
 
-// 後方互換性のための別名エクスポート
+// 後方互換性のための別名エクスポート（直接値定義で循環参照を回避）
 /** @deprecated Use UNIFIED_CONSTANTS.ERROR.SEVERITY instead */
-const ERROR_SEVERITY = UNIFIED_CONSTANTS.ERROR.SEVERITY;
+const ERROR_SEVERITY = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high', 
+  CRITICAL: 'critical'
+};
 
 /** @deprecated Use UNIFIED_CONSTANTS.ERROR.CATEGORIES instead */
-const ERROR_CATEGORIES = UNIFIED_CONSTANTS.ERROR.CATEGORIES;
+const ERROR_CATEGORIES = {
+  AUTHENTICATION: 'authentication',
+  AUTHORIZATION: 'authorization',
+  DATABASE: 'database',
+  CACHE: 'cache',
+  NETWORK: 'network',
+  VALIDATION: 'validation',
+  SYSTEM: 'system',
+  USER_INPUT: 'user_input',
+  EXTERNAL: 'external',
+  CONFIG: 'config',
+  SECURITY: 'security'
+};
 
 /** @deprecated Use UNIFIED_CONSTANTS.COLUMNS instead */
-const COLUMN_HEADERS = UNIFIED_CONSTANTS.COLUMNS;
+const COLUMN_HEADERS = {
+  TIMESTAMP: 'タイムスタンプ',
+  EMAIL: 'メールアドレス',
+  CLASS: 'クラス',
+  OPINION: '回答',
+  REASON: '理由',
+  NAME: '名前',
+  UNDERSTAND: 'なるほど！',
+  LIKE: 'いいね！',
+  CURIOUS: 'もっと知りたい！',
+  HIGHLIGHT: 'ハイライト'
+};
 
 /** @deprecated Use UNIFIED_CONSTANTS.DISPLAY.MODES instead */
-const DISPLAY_MODES = UNIFIED_CONSTANTS.DISPLAY.MODES;
+const DISPLAY_MODES = {
+  ANONYMOUS: 'anonymous',
+  NAMED: 'named',
+  EMAIL: 'email'
+};
 
 /** @deprecated Use UNIFIED_CONSTANTS.SCORING.REACTION_KEYS instead */
-const REACTION_KEYS = UNIFIED_CONSTANTS.SCORING.REACTION_KEYS;
+const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
 /** @deprecated Use UNIFIED_CONSTANTS.CACHE.TTL.SHORT instead */
-const USER_CACHE_TTL = UNIFIED_CONSTANTS.CACHE.TTL.SHORT;
+const USER_CACHE_TTL = 300;
 
 /** @deprecated Use UNIFIED_CONSTANTS.TIMEOUTS.EXECUTION_MAX instead */
-const EXECUTION_MAX_LIFETIME = UNIFIED_CONSTANTS.TIMEOUTS.EXECUTION_MAX;
+const EXECUTION_MAX_LIFETIME = 300000;
 
 /** @deprecated Use UNIFIED_CONSTANTS.CACHE.BATCH_SIZE.LARGE instead */
-const DB_BATCH_SIZE = UNIFIED_CONSTANTS.CACHE.BATCH_SIZE.LARGE;
+const DB_BATCH_SIZE = 100;
 
 /** @deprecated Use UNIFIED_CONSTANTS.LIMITS.HISTORY_ITEMS instead */
-const MAX_HISTORY_ITEMS = UNIFIED_CONSTANTS.LIMITS.HISTORY_ITEMS;
+const MAX_HISTORY_ITEMS = 50;
 
 /** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION instead */
-const DEFAULT_MAIN_QUESTION = UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION;
+const DEFAULT_MAIN_QUESTION = 'あなたの考えや気づいたことを教えてください';
 
 /** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION instead */
-const DEFAULT_REASON_QUESTION = UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION;
+const DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教えてください（任意）';
 
 /** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DATABASE instead */
 const DB_SHEET_CONFIG = {
-  SHEET_NAME: UNIFIED_CONSTANTS.SHEETS.DATABASE.NAME,
-  HEADERS: UNIFIED_CONSTANTS.SHEETS.DATABASE.HEADERS
+  SHEET_NAME: 'Users',
+  HEADERS: ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'lastAccessedAt', 'isActive']
 };
 
 /** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DELETE_LOG instead */
 const DELETE_LOG_SHEET_CONFIG = {
-  SHEET_NAME: UNIFIED_CONSTANTS.SHEETS.DELETE_LOG.NAME,
-  HEADERS: UNIFIED_CONSTANTS.SHEETS.DELETE_LOG.HEADERS
+  SHEET_NAME: 'DeleteLogs',
+  HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
 };
 
 /** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG instead */
 const DIAGNOSTIC_LOG_SHEET_CONFIG = {
-  SHEET_NAME: UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG.NAME,
-  HEADERS: UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG.HEADERS
+  SHEET_NAME: 'DiagnosticLogs',
+  HEADERS: ['timestamp', 'functionName', 'status', 'problemCount', 'repairCount', 'successfulRepairs', 'details', 'executor', 'summary']
 };
 
 /** @deprecated Use UNIFIED_CONSTANTS.SHEETS.LOG instead */
 const LOG_SHEET_CONFIG = {
-  SHEET_NAME: UNIFIED_CONSTANTS.SHEETS.LOG.NAME,
-  HEADERS: UNIFIED_CONSTANTS.SHEETS.LOG.HEADERS
+  SHEET_NAME: 'Logs',
+  HEADERS: ['timestamp', 'severity', 'category', 'message', 'userId', 'context']
 };
 
 /** @deprecated Use UNIFIED_CONSTANTS.REGEX.EMAIL instead */
-const EMAIL_REGEX = UNIFIED_CONSTANTS.REGEX.EMAIL;
+const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 
 /** @deprecated Use UNIFIED_CONSTANTS.DEBUG.ENABLED instead */
-const DEBUG = UNIFIED_CONSTANTS.DEBUG.ENABLED;
+const DEBUG = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+
+// =============================================================================
+// 実行時定数アクセス関数（フォールバック機能付き）
+// =============================================================================
+
+/**
+ * 実行時に定数を安全に取得する関数
+ * @param {string} path - 定数パス（例: 'ERROR.SEVERITY.HIGH'）
+ * @param {*} fallback - フォールバック値
+ * @returns {*} 定数値またはフォールバック値
+ */
+function getConstant(path, fallback = null) {
+  try {
+    if (typeof UNIFIED_CONSTANTS === 'undefined') {
+      return fallback;
+    }
+    
+    const parts = path.split('.');
+    let value = UNIFIED_CONSTANTS;
+    
+    for (const part of parts) {
+      if (value && typeof value === 'object' && part in value) {
+        value = value[part];
+      } else {
+        return fallback;
+      }
+    }
+    
+    return value !== undefined ? value : fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+/**
+ * エラー重大度を安全に取得
+ * @param {string} level - レベル（LOW, MEDIUM, HIGH, CRITICAL）
+ * @returns {string} エラーレベル文字列
+ */
+function getErrorSeverity(level) {
+  const mapping = {
+    LOW: 'low',
+    MEDIUM: 'medium',
+    HIGH: 'high',
+    CRITICAL: 'critical'
+  };
+  return mapping[level] || 'medium';
+}
+
+/**
+ * エラーカテゴリを安全に取得
+ * @param {string} category - カテゴリ名
+ * @returns {string} エラーカテゴリ文字列
+ */
+function getErrorCategory(category) {
+  const mapping = {
+    AUTHENTICATION: 'authentication',
+    AUTHORIZATION: 'authorization',
+    DATABASE: 'database',
+    CACHE: 'cache',
+    NETWORK: 'network',
+    VALIDATION: 'validation',
+    SYSTEM: 'system',
+    USER_INPUT: 'user_input',
+    EXTERNAL: 'external',
+    CONFIG: 'config',
+    SECURITY: 'security'
+  };
+  return mapping[category] || 'system';
+}
+
+/**
+ * キャッシュTTLを安全に取得
+ * @param {string} duration - 期間（SHORT, MEDIUM, LONG, EXTENDED）
+ * @returns {number} TTL秒数
+ */
+function getCacheTTL(duration) {
+  const mapping = {
+    SHORT: 300,      // 5分
+    MEDIUM: 600,     // 10分
+    LONG: 3600,      // 1時間
+    EXTENDED: 21600  // 6時間
+  };
+  return mapping[duration] || 300;
+}
+
+/**
+ * タイムアウト値を安全に取得
+ * @param {string} type - タイムアウトタイプ
+ * @returns {number} タイムアウト値（ミリ秒）
+ */
+function getTimeout(type) {
+  const mapping = {
+    SHORT: 1000,       // 1秒
+    MEDIUM: 2000,      // 2秒
+    LONG: 5000,        // 5秒
+    POLLING: 30000,    // 30秒
+    QUEUE: 60000,      // 1分
+    EXECUTION_MAX: 300000  // 5分
+  };
+  return mapping[type] || 1000;
+}
+
+/**
+ * 実行時間制限を安全に取得
+ * @returns {number} 実行時間制限（ミリ秒）
+ */
+function getExecutionMaxLifetime() {
+  return getTimeout('EXECUTION_MAX');
+}
+
+/**
+ * ユーザーキャッシュTTLを安全に取得
+ * @returns {number} TTL秒数
+ */
+function getUserCacheTTL() {
+  return getCacheTTL('SHORT');
+}
+
+/**
+ * データベースバッチサイズを安全に取得
+ * @returns {number} バッチサイズ
+ */
+function getDbBatchSize() {
+  return getConstant('CACHE.BATCH_SIZE.LARGE', 100);
+}
+
+/**
+ * デフォルト質問文を安全に取得
+ * @param {string} type - 質問タイプ（MAIN, REASON）
+ * @returns {string} 質問文
+ */
+function getDefaultQuestion(type) {
+  const mapping = {
+    MAIN: 'あなたの考えや気づいたことを教えてください',
+    REASON: 'そう考える理由や体験があれば教えてください（任意）'
+  };
+  return mapping[type] || mapping.MAIN;
+}
+
+// 実行時定数アクセス関数ログ
+console.log('✅ 実行時定数アクセス関数が利用可能です');

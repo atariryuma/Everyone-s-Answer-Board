@@ -226,17 +226,9 @@ if (typeof infoLog === 'undefined') {
 }
 
 // デフォルト質問文の共通定数
-/**
- * @const {string} デフォルトメイン質問文
- */
-/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION instead */
-const DEFAULT_MAIN_QUESTION = 'あなたの考えや気づいたことを教えてください';
+// 'あなたの考えや気づいたことを教えてください' はconstants.gsで統一管理
 
-/**
- * @const {string} デフォルト理由質問文
- */
-/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION instead */
-const DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教えてください（任意）';
+// 'そう考える理由や体験があれば教えてください（任意）' はconstants.gsで統一管理
 
 /**
  * セットアップステップを判定する（サーバー側統一実装）
@@ -2755,14 +2747,14 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   /** @type {Object} クイックスタートシート設定 */
   const quickStartSheetConfig = {
     // 実際の設定値（フロントエンドで使用される）
-    opinionHeader: DEFAULT_MAIN_QUESTION,
-    reasonHeader: DEFAULT_REASON_QUESTION,
+    opinionHeader: 'あなたの考えや気づいたことを教えてください',
+    reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
     nameHeader: '名前',
     classHeader: 'クラス',
     timestampHeader: 'タイムスタンプ',
     guessedConfig: {
-      opinionHeader: DEFAULT_MAIN_QUESTION,
-      reasonHeader: DEFAULT_REASON_QUESTION,
+      opinionHeader: 'あなたの考えや気づいたことを教えてください',
+      reasonHeader: 'そう考える理由や体験があれば教えてください（任意）',
       nameHeader: '名前',
       classHeader: 'クラス',
       timestampHeader: 'タイムスタンプ',
@@ -3741,13 +3733,13 @@ function getQuestionConfig(questionType, customConfig) {
       helpText: ''
     },
     mainQuestion: {
-      title: DEFAULT_MAIN_QUESTION,
+      title: 'あなたの考えや気づいたことを教えてください',
       helpText: '',
       choices: ['気づいたことがある。', '疑問に思うことがある。', 'もっと知りたいことがある。'],
       type: 'paragraph'
     },
     reasonQuestion: {
-      title: DEFAULT_REASON_QUESTION,
+      title: 'そう考える理由や体験があれば教えてください（任意）',
       helpText: '',
       type: 'paragraph'
     }
@@ -3870,7 +3862,7 @@ const FORM_PRESETS = {
     questions: 'custom',
     description: 'このフォームは学校での学習や話し合いで使います。みんなで考えを共有して、お互いから学び合いましょう。\n\n【デジタル市民としてのお約束】\n• 相手を思いやる気持ちを持ち、建設的な意見を心がけましょう\n• 事実に基づいた正しい情報を共有しましょう\n• 多様な意見を尊重し、違いを学びの機会としましょう\n• 個人情報やプライバシーに関わる内容は書かないようにしましょう\n• 責任ある発言を心がけ、みんなが安心して参加できる環境を作りましょう\n\nあなたの意見や感想は、クラスメイトの学びを深める大切な資源です。',
     config: {
-      mainQuestion: DEFAULT_MAIN_QUESTION,
+      mainQuestion: 'あなたの考えや気づいたことを教えてください',
       questionType: 'text',
       enableClass: false,
       includeOthers: false
@@ -5632,7 +5624,7 @@ function customSetup(requestUserId, config) {
 function createCustomFormAndSheet(userEmail, requestUserId, config) {
   const convertedConfig = {
     mainQuestion: {
-      title: config.mainQuestion || DEFAULT_MAIN_QUESTION,
+      title: config.mainQuestion || 'あなたの考えや気づいたことを教えてください',
       type: config.responseType || config.questionType || 'text',
       choices: config.questionChoices || config.choices || [],
       includeOthers: config.includeOthers || false
@@ -5722,7 +5714,7 @@ function createCustomFormUI(requestUserId, config) {
     // AdminPanelのconfig構造を内部形式に変換（createCustomForm の処理を統合）
     const convertedConfig = {
       mainQuestion: {
-        title: config.mainQuestion || DEFAULT_MAIN_QUESTION,
+        title: config.mainQuestion || 'あなたの考えや気づいたことを教えてください',
         type: config.responseType || config.questionType || 'text', // responseTypeを優先して使用
         choices: config.questionChoices || config.choices || [], // questionChoicesを優先して使用
         includeOthers: config.includeOthers || false

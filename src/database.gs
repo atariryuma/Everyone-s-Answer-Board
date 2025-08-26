@@ -152,10 +152,7 @@ function getResilientUserProperties() {
 }
 
 // データベース管理のための定数
-/** @deprecated Use UNIFIED_CONSTANTS.CACHE.TTL.SHORT instead */
-const USER_CACHE_TTL = 300; // 5分
-/** @deprecated Use UNIFIED_CONSTANTS.CACHE.BATCH_SIZE.LARGE instead */
-const DB_BATCH_SIZE = 100;
+// USER_CACHE_TTL, DB_BATCH_SIZE はconstants.gsで統一管理
 
 // 簡易インデックス機能：ユーザー検索の高速化
 const userIndexCache = {
@@ -165,23 +162,9 @@ const userIndexCache = {
   TTL: 300000 // 5分間のキャッシュ
 };
 
-/**
- * 削除ログ用シート設定
- */
-/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DELETE_LOG instead */
-const DELETE_LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'DeleteLogs',
-  HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
-};
+// DELETE_LOG_SHEET_CONFIG はconstants.gsで統一管理
 
-/**
- * 診断ログ用シート設定
- */
-/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG instead */
-const DIAGNOSTIC_LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'DiagnosticLogs',
-  HEADERS: ['timestamp', 'functionName', 'status', 'problemCount', 'repairCount', 'successfulRepairs', 'details', 'executor', 'summary']
-};
+// DIAGNOSTIC_LOG_SHEET_CONFIG はconstants.gsで統一管理
 
 /**
  * 削除ログを安全にトランザクション的に記録
@@ -215,7 +198,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 
 
     const service = getSheetsServiceCached();
-    const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
+    const logSheetName = 'DeleteLogs';
 
     // 統一ロック管理でトランザクション開始
     return executeWithStandardizedLock('WRITE_OPERATION', 'logAccountDeletion', () => {
@@ -237,7 +220,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
                 title: logSheetName,
                 gridProperties: {
                   rowCount: 1000,
-                  columnCount: DELETE_LOG_SHEET_CONFIG.HEADERS.length
+                  columnCount: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'].length
                 }
               }
             }
@@ -249,7 +232,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
           });
 
           sheetCreated = true;
-          appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [DELETE_LOG_SHEET_CONFIG.HEADERS]);
+          appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']]);
         }
       } catch (sheetError) {
         throw new Error(`ログシートの準備に失敗: ${sheetError.message}`);
@@ -326,7 +309,7 @@ function logDiagnosticResult(functionName, result, summary) {
     }
 
     const service = getSheetsServiceCached();
-    const logSheetName = DIAGNOSTIC_LOG_SHEET_CONFIG.SHEET_NAME;
+    const logSheetName = 'DiagnosticLogs';
     const executorEmail = getCurrentUserEmail();
 
     // 統一ロック管理でトランザクション開始
@@ -341,7 +324,7 @@ function logDiagnosticResult(functionName, result, summary) {
           batchUpdateSheetsData(service, dbId, [
             {
               range: `'${logSheetName}'!A1:I1`,
-              values: [DIAGNOSTIC_LOG_SHEET_CONFIG.HEADERS]
+              values: [['timestamp', 'functionName', 'status', 'problemCount', 'repairCount', 'successfulRepairs', 'details', 'executor', 'summary']]
             }
           ]);
           sheetCreated = true;
@@ -353,7 +336,7 @@ function logDiagnosticResult(functionName, result, summary) {
           batchUpdateSheetsData(service, dbId, [
             {
               range: `'${logSheetName}'!A1:I1`,
-              values: [DIAGNOSTIC_LOG_SHEET_CONFIG.HEADERS]
+              values: [['timestamp', 'functionName', 'status', 'problemCount', 'repairCount', 'successfulRepairs', 'details', 'executor', 'summary']]
             }
           ]);
           sheetCreated = true;
@@ -433,7 +416,7 @@ function getDiagnosticLogs(limit = 50) {
     }
 
     const service = getSheetsServiceCached();
-    const sheetName = DIAGNOSTIC_LOG_SHEET_CONFIG.SHEET_NAME;
+    const sheetName = 'DiagnosticLogs';
 
     const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
     const values = data.valueRanges[0].values || [];
@@ -494,7 +477,7 @@ function cleanupOldDiagnosticLogs() {
     }
 
     const service = getSheetsServiceCached();
-    const sheetName = DIAGNOSTIC_LOG_SHEET_CONFIG.SHEET_NAME;
+    const sheetName = 'DiagnosticLogs';
 
     const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
     const values = data.valueRanges[0].values || [];
@@ -821,7 +804,7 @@ function getDeletionLogs() {
     }
 
     const service = getSheetsServiceCached();
-    const logSheetName = DELETE_LOG_SHEET_CONFIG.SHEET_NAME;
+    const logSheetName = 'DeleteLogs';
 
     try {
       // ログシートの存在確認
