@@ -13,13 +13,13 @@ const include = (path) => {
   try {
     const content = HtmlService.createHtmlOutputFromFile(path).getContent();
     if (!content) {
-      logWarn(`Empty content returned for include: ${path}`);
-      return `<!-- Warning: Empty content for ${path} -->`;
+      logWarn('Empty content returned for include: ' + path);
+      return '<!-- Warning: Empty content for ' + path + ' -->';
     }
     return content;
   } catch (error) {
     logError(error, 'includeFile', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
-    return `<!-- Error including ${path}: ${error.message} -->`;
+    return '<!-- Error including ' + path + ': ' + error.message + ' -->';
   }
 };
 
@@ -115,7 +115,7 @@ let _executionUserInfoCache = null;
  */
 function debugLog(message, ...args) {
   if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-    console.log(`[DEBUG] ${message}`, ...args);
+    console.log('[DEBUG] ' + message, ...args);
   }
 }
 
@@ -123,7 +123,7 @@ function debugLog(message, ...args) {
  * シンプルなクライアントエラーログ
  */
 function logClientError(errorInfo) {
-  console.error(`🚨 CLIENT: ${errorInfo.message} (${errorInfo.userId || 'unknown'})`);
+  console.error('🚨 CLIENT: ' + errorInfo.message + ' (' + (errorInfo.userId || 'unknown') + ')');
   return { status: 'success' };
 }
 
@@ -131,21 +131,21 @@ function logClientError(errorInfo) {
  * 情報ログ出力
  */
 function infoLog(message, ...args) {
-  console.log(`[INFO] ${message}`, ...args);
+  console.log('[INFO] ' + message, ...args);
 }
 
 /**
  * 警告ログ出力
  */
 function warnLog(message, ...args) {
-  console.warn(`[WARN] ${message}`, ...args);
+  console.warn('[WARN] ' + message, ...args);
 }
 
 /**
  * エラーログ出力
  */
 function errorLog(message, ...args) {
-  console.error(`[ERROR] ${message}`, ...args);
+  console.error('[ERROR] ' + message, ...args);
 }
 
 // =============================================================================
@@ -220,9 +220,9 @@ const cacheManager = {
       // GAS CacheServiceでは特定のプレフィックス削除は直接サポートされていないため
       // 知られている一般的なキーパターンを削除
       const commonKeys = [
-        `${prefix}_config`, `${prefix}_data`, `${prefix}_user`, `${prefix}_cache`,
-        `${prefix}Config`, `${prefix}Data`, `${prefix}User`, `${prefix}Cache`,
-        `${prefix}_info`, `${prefix}Info`, `${prefix}_status`, `${prefix}Status`
+        prefix + '_config', prefix + '_data', prefix + '_user', prefix + '_cache',
+        prefix + 'Config', prefix + 'Data', prefix + 'User', prefix + 'Cache',
+        prefix + '_info', prefix + 'Info', prefix + '_status', prefix + 'Status'
       ];
       
       const cache = CacheService.getScriptCache();
@@ -234,11 +234,11 @@ const cacheManager = {
         }
       });
       
-      categoryLog('CACHE', `プレフィックス削除実行: ${prefix} (${commonKeys.length}個のパターンを削除)`);
+      categoryLog('CACHE', 'プレフィックス削除実行: ' + prefix + ' (' + commonKeys.length + '個のパターンを削除)');
       
       // フォールバック: プレフィックス削除が重要な場合は全キャッシュクリア
       if (prefix === 'critical' || prefix === 'userInfo' || prefix === 'dbConnection') {
-        debugLog(`重要プレフィックス "${prefix}" のため全キャッシュクリアを実行`);
+        debugLog('重要プレフィックス "' + prefix + '" のため全キャッシュクリアを実行');
         cache.removeAll();
       }
     } catch (error) {
@@ -277,9 +277,9 @@ const cacheManager = {
   invalidateSheetData(spreadsheetId, sheetName) {
     try {
       const patterns = [
-        `sheets_${spreadsheetId}_${sheetName}`,
-        `batchGet_${spreadsheetId}_${sheetName}`,
-        `sheetData_${spreadsheetId}_${sheetName}`
+        'sheets_' + spreadsheetId + '_' + sheetName,
+        'batchGet_' + spreadsheetId + '_' + sheetName,
+        'sheetData_' + spreadsheetId + '_' + sheetName
       ];
       patterns.forEach(pattern => this.remove(pattern));
     } catch (error) {
@@ -329,22 +329,22 @@ const cacheManager = {
    */
   categorizedCache: {
     user(userId, key, valueFn, options = {}) {
-      const categorizedKey = `user_${userId}_${key}`;
+      const categorizedKey = 'user_' + userId + '_' + key;
       return cacheManager.get(categorizedKey, valueFn, { ttl: 300, ...options });
     },
 
     system(key, valueFn, options = {}) {
-      const categorizedKey = `system_${key}`;
+      const categorizedKey = 'system_' + key;
       return cacheManager.get(categorizedKey, valueFn, { ttl: 600, ...options });
     },
 
     temporary(key, valueFn, options = {}) {
-      const categorizedKey = `temp_${key}`;
+      const categorizedKey = 'temp_' + key;
       return cacheManager.get(categorizedKey, valueFn, { ttl: 60, ...options });
     },
 
     session(userId, key, valueFn, options = {}) {
-      const categorizedKey = `session_${userId}_${key}`;
+      const categorizedKey = 'session_' + userId + '_' + key;
       return cacheManager.get(categorizedKey, valueFn, { ttl: 1800, ...options });
     }
   },
@@ -362,9 +362,9 @@ const cacheManager = {
         try {
           const newValue = refreshFn();
           this.get(key, () => newValue, { ttl: 600 });
-          categoryLog('CACHE', 'DEBUG', `Background refresh completed: ${key}`);
+          categoryLog('CACHE', 'DEBUG', 'Background refresh completed: ' + key);
         } catch (error) {
-          categoryLog('CACHE', 'WARN', `Background refresh failed: ${key}`, error.message);
+          categoryLog('CACHE', 'WARN', 'Background refresh failed: ' + key, error.message);
         }
       }, 100); // 100ms後に非同期実行
       
@@ -480,7 +480,7 @@ function getServiceAccountTokenCached() {
 function secureMultiTenantCacheOperation(operation, key, value, userId) {
   try {
     // マルチテナント対応のキープレフィックス
-    const secureKey = userId ? `tenant_${userId}_${key}` : `global_${key}`;
+    const secureKey = userId ? ('tenant_' + userId + '_' + key) : ('global_' + key);
     
     switch (operation.toLowerCase()) {
       case 'get':
@@ -498,7 +498,7 @@ function secureMultiTenantCacheOperation(operation, key, value, userId) {
         return true;
         
       default:
-        throw new Error(`未対応のキャッシュ操作: ${operation}`);
+        throw new Error('未対応のキャッシュ操作: ' + operation);
     }
   } catch (error) {
     warnLog('SecureMultiTenantCache 操作エラー:', operation, key, error.message);
@@ -585,7 +585,7 @@ function categoryLog(category, level, message, ...args) {
     return;
   }
 
-  const prefix = `[${category}:${level.toUpperCase()}]`;
+  const prefix = '[' + category + ':' + level.toUpperCase() + ']';
   
   switch (level.toUpperCase()) {
     case 'ERROR':
@@ -617,7 +617,7 @@ function performanceLog(operation, startTime, metadata = {}) {
   const duration = Date.now() - startTime;
   const level = duration > 5000 ? 'WARN' : duration > 1000 ? 'INFO' : 'DEBUG';
   
-  categoryLog('PERFORMANCE', level, `${operation} completed in ${duration}ms`, metadata);
+  categoryLog('PERFORMANCE', level, operation + ' completed in ' + duration + 'ms', metadata);
 }
 
 // =============================================================================
@@ -635,7 +635,7 @@ function generateRandomId(prefix = '') {
     const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
-  return prefix ? `${prefix}_${uuid}` : uuid;
+  return prefix ? (prefix + '_' + uuid) : uuid;
 }
 
 /**
@@ -863,7 +863,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
   }
 
   try {
-    debugLog(`🔄 クリティカル更新後キャッシュ同期開始 - userId: ${userId}`, {
+    debugLog('🔄 クリティカル更新後キャッシュ同期開始 - userId: ' + userId, {
       oldSpreadsheetId: oldSpreadsheetId || 'null',
       newSpreadsheetId: newSpreadsheetId || 'null'
     });
@@ -875,7 +875,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
     try {
       if (typeof cacheManager !== 'undefined' && cacheManager) {
         // ユーザーデータキャッシュの無効化
-        const userCacheKey = `user_${userId}`;
+        const userCacheKey = 'user_' + userId;
         if (typeof cacheManager.invalidate === 'function') {
           cacheManager.invalidate([userCacheKey]);
         }
@@ -883,13 +883,13 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
         // 古いスプレッドシートのシートデータキャッシュを無効化
         if (oldSpreadsheetId && typeof cacheManager.invalidateSheetData === 'function') {
           cacheManager.invalidateSheetData(oldSpreadsheetId);
-          debugLog(`📝 旧スプレッドシート ${oldSpreadsheetId} のキャッシュを無効化`);
+          debugLog('📝 旧スプレッドシート ' + oldSpreadsheetId + ' のキャッシュを無効化');
         }
         
         // 新しいスプレッドシートのシートデータキャッシュを無効化（事前クリア）
         if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId && typeof cacheManager.invalidateSheetData === 'function') {
           cacheManager.invalidateSheetData(newSpreadsheetId);
-          debugLog(`📝 新スプレッドシート ${newSpreadsheetId} のキャッシュを無効化`);
+          debugLog('📝 新スプレッドシート ' + newSpreadsheetId + ' のキャッシュを無効化');
         }
       }
     } catch (cacheError) {
@@ -900,9 +900,9 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
     try {
       const scriptCache = CacheService.getScriptCache();
       const userKeys = [
-        `user_${userId}`,
-        `config_${userId}`,
-        `userInfo_${userId}`
+        'user_' + userId,
+        'config_' + userId,
+        'userInfo_' + userId
       ];
       
       // 複数キーを一括で削除
@@ -910,16 +910,16 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       
       // スプレッドシート関連のキャッシュも削除
       if (oldSpreadsheetId) {
-        const oldKeys = [`publishedData_${userId}_${oldSpreadsheetId}*`];
+        const oldKeys = ['publishedData_' + userId + '_' + oldSpreadsheetId + '*'];
         // パターンマッチングは直接サポートされていないため、明示的にクリア
         try {
-          scriptCache.remove(`publishedData_${userId}_${oldSpreadsheetId}`);
+          scriptCache.remove('publishedData_' + userId + '_' + oldSpreadsheetId);
         } catch (e) { /* ignore */ }
       }
       
       if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
         try {
-          scriptCache.remove(`publishedData_${userId}_${newSpreadsheetId}`);
+          scriptCache.remove('publishedData_' + userId + '_' + newSpreadsheetId);
         } catch (e) { /* ignore */ }
       }
       
@@ -941,7 +941,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       warnLog('synchronizeCacheAfterCriticalUpdate: 統一キャッシュ同期エラー', unifiedError.message);
     }
 
-    infoLog(`✅ クリティカル更新後キャッシュ同期完了 - userId: ${userId}`, {
+    infoLog('✅ クリティカル更新後キャッシュ同期完了 - userId: ' + userId, {
       oldSpreadsheetId: oldSpreadsheetId || 'null',
       newSpreadsheetId: newSpreadsheetId || 'null',
       email: email || 'unknown'
@@ -956,7 +956,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
     });
     
     // エラーが発生してもクリティカルな処理は継続できるようにする
-    warnLog(`⚠️  キャッシュ同期でエラーが発生しましたが処理は継続します: ${error.message}`);
+    warnLog('⚠️  キャッシュ同期でエラーが発生しましたが処理は継続します: ' + error.message);
   }
 }
 
@@ -993,7 +993,7 @@ function executeWithStandardizedLock(lockType, operationName, operation, options
       
       if (!acquired) {
         if (attempt === retries - 1) {
-          throw new Error(`ロック取得タイムアウト: ${operationName} (${lockType})`);
+          throw new Error('ロック取得タイムアウト: ' + operationName + ' (' + lockType + ')');
         }
         // リトライ前に遅延
         Utilities.sleep(retryDelay * Math.pow(2, attempt)); // 指数バックオフ
@@ -1001,18 +1001,18 @@ function executeWithStandardizedLock(lockType, operationName, operation, options
         continue;
       }
       
-      debugLog(`🔒 ロック取得成功: ${operationName} (${lockType})`);
+      debugLog('🔒 ロック取得成功: ' + operationName + ' (' + lockType + ')');
       
       // 操作を実行
       const result = operation();
       
-      debugLog(`✅ 操作完了: ${operationName}`);
+      debugLog('✅ 操作完了: ' + operationName);
       
       return result;
       
     } catch (error) {
       if (attempt === retries - 1) {
-        logError(error, `executeWithStandardizedLock_${operationName}`, 
+        logError(error, 'executeWithStandardizedLock_' + operationName, 
                 MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, {
           lockType,
           operationName,
@@ -1022,7 +1022,7 @@ function executeWithStandardizedLock(lockType, operationName, operation, options
         throw error;
       }
       
-      warnLog(`⚠️ 操作失敗 (リトライ ${attempt + 1}/${retries}): ${operationName}`, error.message);
+      warnLog('⚠️ 操作失敗 (リトライ ' + (attempt + 1) + '/' + retries + '): ' + operationName, error.message);
       Utilities.sleep(retryDelay * Math.pow(2, attempt));
       attempt++;
       
@@ -1030,12 +1030,12 @@ function executeWithStandardizedLock(lockType, operationName, operation, options
       // ロックを解放
       if (lock && lock.hasLock()) {
         lock.releaseLock();
-        debugLog(`🔓 ロック解放: ${operationName}`);
+        debugLog('🔓 ロック解放: ' + operationName);
       }
     }
   }
   
-  throw new Error(`操作失敗（全リトライ消費）: ${operationName}`);
+  throw new Error('操作失敗（全リトライ消費）: ' + operationName);
 }
 
 /**
@@ -1051,7 +1051,7 @@ function openSpreadsheetOptimized(spreadsheetId, options = {}) {
   }
   
   // メモリキャッシュのキー
-  const cacheKey = `spreadsheet_${spreadsheetId}`;
+  const cacheKey = 'spreadsheet_' + spreadsheetId;
   const useCache = options.useCache !== false;
   const maxRetries = options.retries || 3;
   const retryDelay = options.retryDelay || 1000;
@@ -1060,7 +1060,7 @@ function openSpreadsheetOptimized(spreadsheetId, options = {}) {
   if (useCache && typeof _spreadsheetCache !== 'undefined' && _spreadsheetCache[cacheKey]) {
     const cached = _spreadsheetCache[cacheKey];
     if (cached.timestamp && Date.now() - cached.timestamp < 60000) { // 1分間有効
-      debugLog(`📋 キャッシュからスプレッドシート取得: ${spreadsheetId}`);
+      debugLog('📋 キャッシュからスプレッドシート取得: ' + spreadsheetId);
       return cached.spreadsheet;
     }
   }
@@ -1073,7 +1073,7 @@ function openSpreadsheetOptimized(spreadsheetId, options = {}) {
       const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       
       if (!spreadsheet) {
-        throw new Error(`スプレッドシートが見つかりません: ${spreadsheetId}`);
+        throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
       }
       
       // キャッシュに保存
@@ -1087,7 +1087,7 @@ function openSpreadsheetOptimized(spreadsheetId, options = {}) {
         };
       }
       
-      debugLog(`✅ スプレッドシート開きました: ${spreadsheetId}`);
+      debugLog('✅ スプレッドシート開きました: ' + spreadsheetId);
       return spreadsheet;
       
     } catch (error) {
@@ -1100,15 +1100,15 @@ function openSpreadsheetOptimized(spreadsheetId, options = {}) {
           attempt: attempt + 1,
           maxRetries
         });
-        throw new Error(`スプレッドシートを開けません (${spreadsheetId}): ${error.message}`);
+        throw new Error('スプレッドシートを開けません (' + spreadsheetId + '): ' + error.message);
       }
       
-      warnLog(`⚠️ スプレッドシート開く失敗 (リトライ ${attempt + 1}/${maxRetries}): ${spreadsheetId}`);
+      warnLog('⚠️ スプレッドシート開く失敗 (リトライ ' + (attempt + 1) + '/' + maxRetries + '): ' + spreadsheetId);
       Utilities.sleep(retryDelay * Math.pow(2, attempt)); // 指数バックオフ
     }
   }
   
-  throw lastError || new Error(`スプレッドシート開けません: ${spreadsheetId}`);
+  throw lastError || new Error('スプレッドシート開けません: ' + spreadsheetId);
 }
 
 /**
@@ -1133,16 +1133,16 @@ function invalidateUserCache(userId, adminEmail, spreadsheetId, clearLevel, dbId
     
     // cacheManagerを使用したキャッシュクリア
     if (typeof cacheManager !== 'undefined') {
-      const keys = [`user_${userId}`, `userInfo_${userId}`];
-      if (adminEmail) keys.push(`user_${adminEmail}`, `userInfo_${adminEmail}`);
-      if (spreadsheetId) keys.push(`sheet_${spreadsheetId}`, `config_${spreadsheetId}`);
-      if (dbId) keys.push(`db_${dbId}`);
+      const keys = ['user_' + userId, 'userInfo_' + userId];
+      if (adminEmail) keys.push('user_' + adminEmail, 'userInfo_' + adminEmail);
+      if (spreadsheetId) keys.push('sheet_' + spreadsheetId, 'config_' + spreadsheetId);
+      if (dbId) keys.push('db_' + dbId);
       
       keys.forEach(key => {
         try {
           cacheManager.remove(key);
         } catch (removeError) {
-          debugLog(`invalidateUserCache: キー削除エラー ${key}:`, removeError.message);
+          debugLog('invalidateUserCache: キー削除エラー ' + key + ':', removeError.message);
         }
       });
     }
@@ -1156,7 +1156,7 @@ function invalidateUserCache(userId, adminEmail, spreadsheetId, clearLevel, dbId
       }
     }
 
-    categoryLog('CACHE', `ユーザーキャッシュを無効化: ${userId}${adminEmail ? ` (${adminEmail})` : ''}`);
+    categoryLog('CACHE', 'ユーザーキャッシュを無効化: ' + userId + (adminEmail ? (' (' + adminEmail + ')') : ''));
   } catch (error) {
     errorLog('invalidateUserCache エラー:', error.message);
   }
@@ -1178,7 +1178,7 @@ function clearDatabaseCache() {
         try {
           cacheManager.removeByPrefix(key);
         } catch (removeError) {
-          debugLog(`clearDatabaseCache: プレフィックス削除エラー ${key}:`, removeError.message);
+          debugLog('clearDatabaseCache: プレフィックス削除エラー ' + key + ':', removeError.message);
         }
       });
     }
@@ -1217,7 +1217,7 @@ function performUnifiedCacheClear(userId, userEmail, spreadsheetId, clearType = 
       }
     }
 
-    categoryLog('CACHE', `統合キャッシュクリア完了: ${clearType} (${userId})`);
+    categoryLog('CACHE', '統合キャッシュクリア完了: ' + clearType + ' (' + userId + ')');
   } catch (error) {
     errorLog('performUnifiedCacheClear エラー:', error.message);
   }
@@ -1257,7 +1257,7 @@ function openAppSetupPage() {
       }
     };
 
-    categoryLog('ADMIN', `設定ページ情報を準備: ${currentUserId}`);
+    categoryLog('ADMIN', '設定ページ情報を準備: ' + currentUserId);
     return setupInfo;
   } catch (error) {
     errorLog('openAppSetupPage エラー:', error.message);
@@ -1299,7 +1299,7 @@ function runHeaderGuessing(spreadsheetId) {
       confidence: 'medium'
     };
 
-    categoryLog('ADMIN', `ヘッダー推測完了: ${targetSpreadsheetId}`);
+    categoryLog('ADMIN', 'ヘッダー推測完了: ' + targetSpreadsheetId);
     return result;
   } catch (error) {
     errorLog('runHeaderGuessing エラー:', error.message);
@@ -1382,7 +1382,7 @@ function initializeUserSettingsWithUI(uiConfig = {}) {
       }
     };
 
-    categoryLog('ADMIN', `UI付きユーザー設定初期化完了: ${currentUserId}`);
+    categoryLog('ADMIN', 'UI付きユーザー設定初期化完了: ' + currentUserId);
     return result;
   } catch (error) {
     errorLog('initializeUserSettingsWithUI エラー:', error.message);
@@ -1416,7 +1416,7 @@ const globalProfiler = {
       operations: []
     });
     
-    categoryLog('PERF', `プロファイリング開始: ${sessionName}`);
+    categoryLog('PERF', 'プロファイリング開始: ' + sessionName);
   },
 
   /**
@@ -1429,7 +1429,7 @@ const globalProfiler = {
     
     const session = this.sessions.get(sessionName);
     if (!session) {
-      debugLog(`プロファイラー: セッション "${sessionName}" が見つかりません`);
+      debugLog('プロファイラー: セッション "' + sessionName + '" が見つかりません');
       return null;
     }
 
@@ -1443,7 +1443,7 @@ const globalProfiler = {
       summary: this.formatDuration(duration)
     };
 
-    categoryLog('PERF', `プロファイリング完了: ${sessionName} (${result.summary})`);
+    categoryLog('PERF', 'プロファイリング完了: ' + sessionName + ' (' + result.summary + ')');
     this.sessions.delete(sessionName);
     
     return result;
@@ -1472,9 +1472,9 @@ const globalProfiler = {
    * @returns {string} フォーマットされた時間
    */
   formatDuration: function(ms) {
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+    if (ms < 1000) return ms + 'ms';
+    if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+    return Math.floor(ms / 60000) + 'm ' + Math.floor((ms % 60000) / 1000) + 's';
   },
 
   /**
@@ -1495,7 +1495,7 @@ const globalProfiler = {
    */
   setEnabled: function(enabled) {
     this.enabled = enabled;
-    categoryLog('PERF', `グローバルプロファイラー: ${enabled ? '有効' : '無効'}`);
+    categoryLog('PERF', 'グローバルプロファイラー: ' + (enabled ? '有効' : '無効'));
   }
 };
 
@@ -1508,14 +1508,14 @@ function getUnifiedExecutionCache() {
   return {
     getUserInfo: function(identifier) {
       if (typeof cacheManager !== 'undefined') {
-        return cacheManager.get(`userInfo_${identifier}`);
+        return cacheManager.get('userInfo_' + identifier);
       }
       return null;
     },
 
     setUserInfo: function(identifier, userInfo) {
       if (typeof cacheManager !== 'undefined') {
-        cacheManager.set(`userInfo_${identifier}`, userInfo, 300);
+        cacheManager.set('userInfo_' + identifier, userInfo, 300);
       }
     },
 
@@ -1526,7 +1526,7 @@ function getUnifiedExecutionCache() {
     },
 
     syncWithUnifiedCache: function(eventType) {
-      categoryLog('CACHE', `統合キャッシュ同期: ${eventType}`);
+      categoryLog('CACHE', '統合キャッシュ同期: ' + eventType);
     },
 
     getStats: function() {
@@ -1573,7 +1573,7 @@ const codingLog = {
 
     // エラーの場合は必ずコンソール出力
     if (action === 'error') {
-      console.error(`🔴 ${funcName}: ${data?.message || data}`);
+      console.error('🔴 ' + funcName + ': ' + (data?.message || data));
     }
   },
 
@@ -1591,14 +1591,14 @@ const codingLog = {
       type: 'API',
       name: apiName,
       status: status,
-      duration: duration ? `${duration}ms` : null
+      duration: duration ? (duration + 'ms') : null
     };
 
     this.addEntry(entry);
 
     // 遅いAPI呼び出しは警告
     if (duration > 2000) {
-      console.warn(`⚡ 遅いAPI: ${apiName} (${duration}ms)`);
+      console.warn('⚡ 遅いAPI: ' + apiName + ' (' + duration + 'ms)');
     }
   },
 
@@ -1623,7 +1623,7 @@ const codingLog = {
 
     // 大量データ処理は情報出力
     if (count > 100) {
-      console.info(`📊 大量データ処理: ${operation} ${count}件 (${target})`);
+      console.info('📊 大量データ処理: ' + operation + ' ' + count + '件 (' + target + ')');
     }
   },
 
@@ -1678,15 +1678,15 @@ const codingLog = {
       
       switch (entry.type) {
         case 'FUNC':
-          return `${timeStr} ${typeStr} ${entry.name} ${entry.action}${entry.data ? ` | ${entry.data}` : ''}`;
+          return timeStr + ' ' + typeStr + ' ' + entry.name + ' ' + entry.action + (entry.data ? (' | ' + entry.data) : '');
         case 'API':
-          return `${timeStr} ${typeStr} ${entry.name} ${entry.status}${entry.duration ? ` | ${entry.duration}` : ''}`;
+          return timeStr + ' ' + typeStr + ' ' + entry.name + ' ' + entry.status + (entry.duration ? (' | ' + entry.duration) : '');
         case 'DATA':
-          return `${timeStr} ${typeStr} ${entry.op} ${entry.count}件${entry.target ? ` | ${entry.target}` : ''}`;
+          return timeStr + ' ' + typeStr + ' ' + entry.op + ' ' + entry.count + '件' + (entry.target ? (' | ' + entry.target) : '');
         case 'BIZ':
-          return `${timeStr} ${typeStr} ${entry.event}${entry.details ? ` | ${entry.details}` : ''}`;
+          return timeStr + ' ' + typeStr + ' ' + entry.event + (entry.details ? (' | ' + entry.details) : '');
         default:
-          return `${timeStr} ${typeStr} ${JSON.stringify(entry)}`;
+          return timeStr + ' ' + typeStr + ' ' + JSON.stringify(entry);
       }
     }).join('\n');
   },
@@ -1704,7 +1704,7 @@ const codingLog = {
    */
   toggle: function() {
     this.enabled = !this.enabled;
-    categoryLog('LOG', `コーディングログ: ${this.enabled ? '有効' : '無効'}`);
+    categoryLog('LOG', 'コーディングログ: ' + (this.enabled ? '有効' : '無効'));
     return this.enabled;
   },
 
@@ -1858,7 +1858,7 @@ const codingLog = {
     dependencyIssues.undefinedFunctions.forEach(issue => {
       dependencyIssues.suggestions.push({
         type: 'missing_function',
-        message: `🔧 関数 "${issue.function}" が未定義です。定義の追加またはtypeof チェックを検討してください`,
+        message: '🔧 関数 "' + issue.function + '" が未定義です。定義の追加またはtypeof チェックを検討してください',
         priority: 'high'
       });
     });
@@ -1866,7 +1866,7 @@ const codingLog = {
     dependencyIssues.missingMethods.forEach(issue => {
       dependencyIssues.suggestions.push({
         type: 'missing_method', 
-        message: `🔧 メソッド "${issue.method}" へのアクセスが失敗しています。オブジェクトの存在確認を追加してください`,
+        message: '🔧 メソッド "' + issue.method + '" へのアクセスが失敗しています。オブジェクトの存在確認を追加してください',
         priority: 'high'
       });
     });
@@ -1899,7 +1899,7 @@ const codingLog = {
           const analysis = this.analyzeDependencies();
           if (analysis.suggestions.length > 0) {
             const latestSuggestion = analysis.suggestions[analysis.suggestions.length - 1];
-            console.warn(`🚨 依存関係問題検出: ${latestSuggestion.message}`);
+            console.warn('🚨 依存関係問題検出: ' + latestSuggestion.message);
           }
         }
       }
@@ -1946,7 +1946,7 @@ function analyzeErrorHotspots() {
   }
   
   hotspots.forEach((hotspot, index) => {
-    console.log(`${index + 1}. ${hotspot.function}: ${hotspot.errors}回`);
+    console.log((index + 1) + '. ' + hotspot.function + ': ' + hotspot.errors + '回');
   });
   
   return hotspots;
@@ -1965,7 +1965,7 @@ function analyzeSlowAPIs() {
   }
   
   slowAPIs.forEach((api, index) => {
-    console.log(`${index + 1}. ${api.api}: ${api.duration}ms (${api.status})`);
+    console.log((index + 1) + '. ' + api.api + ': ' + api.duration + 'ms (' + api.status + ')');
   });
   
   return slowAPIs;
@@ -1979,16 +1979,16 @@ function analyzeCodingIssues() {
   console.log('=== コーディング課題分析 ===');
   const analysis = codingLog.analyzeErrors();
   
-  console.log(`総エラー数: ${analysis.totalErrors}`);
+  console.log('総エラー数: ' + analysis.totalErrors);
   console.log('\n📊 エラーパターン:');
   analysis.patterns.forEach(pattern => {
-    console.log(`  ${pattern.pattern}: ${pattern.count}回`);
+    console.log('  ' + pattern.pattern + ': ' + pattern.count + '回');
   });
   
   if (analysis.suggestions.length > 0) {
     console.log('\n💡 改善提案:');
     analysis.suggestions.forEach(suggestion => {
-      console.log(`  ${suggestion}`);
+      console.log('  ' + suggestion);
     });
   }
   
@@ -2009,18 +2009,18 @@ function getCodingReport() {
   const dataCount = stats.filter(s => s.type === 'DATA').length;
   
   console.log('📈 活動サマリー:');
-  console.log(`  総ログエントリ: ${stats.length}`);
-  console.log(`  エラー: ${errorCount}`);
-  console.log(`  API呼び出し: ${apiCount}`);
-  console.log(`  データ操作: ${dataCount}\n`);
+  console.log('  総ログエントリ: ' + stats.length);
+  console.log('  エラー: ' + errorCount);
+  console.log('  API呼び出し: ' + apiCount);
+  console.log('  データ操作: ' + dataCount + '\n');
   
   // エラー分析
   const errorAnalysis = codingLog.analyzeErrors();
   if (errorAnalysis.totalErrors > 0) {
     console.log('🚨 エラー分析:');
-    console.log(`  直近エラー数: ${errorAnalysis.totalErrors}`);
+    console.log('  直近エラー数: ' + errorAnalysis.totalErrors);
     errorAnalysis.patterns.forEach(pattern => {
-      console.log(`  ${pattern.pattern}: ${pattern.count}回`);
+      console.log('  ' + pattern.pattern + ': ' + pattern.count + '回');
     });
     console.log('');
   }
@@ -2030,7 +2030,7 @@ function getCodingReport() {
   if (slowAPIs.length > 0) {
     console.log('⚡ パフォーマンス課題 (上位3件):');
     slowAPIs.forEach((api, i) => {
-      console.log(`  ${i + 1}. ${api.api}: ${api.duration}ms`);
+      console.log('  ' + (i + 1) + '. ' + api.api + ': ' + api.duration + 'ms');
     });
     console.log('');
   }
@@ -2039,7 +2039,7 @@ function getCodingReport() {
   if (errorAnalysis.suggestions.length > 0) {
     console.log('💡 改善提案:');
     errorAnalysis.suggestions.forEach(suggestion => {
-      console.log(`  ${suggestion}`);
+      console.log('  ' + suggestion);
     });
   }
   
@@ -2058,14 +2058,14 @@ function analyzeDependencies() {
   console.log('=== 🔍 依存関係問題分析 ===');
   const analysis = codingLog.analyzeDependencies();
   
-  console.log(`未定義関数: ${analysis.undefinedFunctions.length}件`);
-  console.log(`メソッドエラー: ${analysis.missingMethods.length}件`);
-  console.log(`型エラー: ${analysis.typeErrors.length}件\n`);
+  console.log('未定義関数: ' + analysis.undefinedFunctions.length + '件');
+  console.log('メソッドエラー: ' + analysis.missingMethods.length + '件');
+  console.log('型エラー: ' + analysis.typeErrors.length + '件\n');
   
   if (analysis.undefinedFunctions.length > 0) {
     console.log('🚨 未定義関数:');
     analysis.undefinedFunctions.forEach(issue => {
-      console.log(`  ${issue.function} (${issue.context} - ${issue.time})`);
+      console.log('  ' + issue.function + ' (' + issue.context + ' - ' + issue.time + ')');
     });
     console.log('');
   }
@@ -2073,7 +2073,7 @@ function analyzeDependencies() {
   if (analysis.missingMethods.length > 0) {
     console.log('🚨 メソッドエラー:');
     analysis.missingMethods.forEach(issue => {
-      console.log(`  ${issue.method} (${issue.context} - ${issue.time})`);
+      console.log('  ' + issue.method + ' (' + issue.context + ' - ' + issue.time + ')');
     });
     console.log('');
   }
@@ -2081,7 +2081,7 @@ function analyzeDependencies() {
   if (analysis.suggestions.length > 0) {
     console.log('🔧 修正提案:');
     analysis.suggestions.forEach(suggestion => {
-      console.log(`  ${suggestion.message}`);
+      console.log('  ' + suggestion.message);
     });
   }
   
@@ -2119,9 +2119,9 @@ function buildUserScopedKey(prefix, userId, suffix) {
   
   try {
     // 基本的なキー生成（セキュリティ強化版）
-    let key = `${prefix}_${userId}`;
+    let key = prefix + '_' + userId;
     if (suffix) {
-      key += `_${suffix}`;
+      key += '_' + suffix;
     }
     
     // 安全性のためのキー長制限
@@ -2132,16 +2132,16 @@ function buildUserScopedKey(prefix, userId, suffix) {
         key, 
         Utilities.Charset.UTF_8
       ).map(byte => (byte + 256).toString(16).slice(-2)).join('');
-      key = `${prefix}_${hash.substring(0, 8)}`;
+      key = prefix + '_' + hash.substring(0, 8);
       debugLog('buildUserScopedKey: 長いキーをハッシュ化しました');
     }
     
-    categoryLog('CACHE', `キー生成: ${key.substring(0, 50)}${key.length > 50 ? '...' : ''}`);
+    categoryLog('CACHE', 'キー生成: ' + key.substring(0, 50) + (key.length > 50 ? '...' : ''));
     return key;
   } catch (error) {
     errorLog('buildUserScopedKey エラー:', error.message);
     // フォールバック: 最小限のキー生成
-    return `${prefix}_${userId.substring(0, 10)}`;
+    return prefix + '_' + userId.substring(0, 10);
   }
 }
 
@@ -2163,17 +2163,17 @@ function buildSecureUserScopedKey(prefix, userId, context = '') {
     const timestamp = Date.now();
     const token = Utilities.computeDigest(
       Utilities.DigestAlgorithm.SHA1,
-      `${userId}${timestamp}${context}`,
+      userId + timestamp + context,
       Utilities.Charset.UTF_8
     ).map(byte => (byte + 256).toString(16).slice(-2)).join('').substring(0, 8);
     
-    const secureKey = `SEC_${prefix}_${token}`;
-    categoryLog('SECURITY', `セキュアキー生成: ${secureKey}`);
+    const secureKey = 'SEC_' + prefix + '_' + token;
+    categoryLog('SECURITY', 'セキュアキー生成: ' + secureKey);
     return secureKey;
   } catch (error) {
     errorLog('buildSecureUserScopedKey エラー:', error.message);
     // フォールバック
-    return buildUserScopedKey(`SEC_${prefix}`, userId, context);
+    return buildUserScopedKey('SEC_' + prefix, userId, context);
   }
 }
 
@@ -2262,7 +2262,7 @@ function checkAndHandleAutoStop(config, userInfo) {
         configJson: JSON.stringify(config)
       });
 
-      infoLog(`🔄 自動停止実行完了: ${userInfo.adminEmail} (期限: ${config.scheduledEndAt})`);
+      infoLog('🔄 自動停止実行完了: ' + userInfo.adminEmail + ' (期限: ' + config.scheduledEndAt + ')');
       return true; // 自動停止実行済み
     } catch (error) {
       logError(error, 'autoStopProcess', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
@@ -2288,7 +2288,7 @@ function checkAndHandleAutoStop(config, userInfo) {
 function getQuestionTextFromConfig(config, userInfo) {
   // 1. sheet固有設定から取得（guessedConfig優先）
   if (config.publishedSheetName) {
-    const sheetConfigKey = `sheet_${config.publishedSheetName}`;
+    const sheetConfigKey = 'sheet_' + config.publishedSheetName;
     const sheetConfig = config[sheetConfigKey];
     if (sheetConfig) {
       // guessedConfig内のopinionHeaderを優先
@@ -2790,7 +2790,7 @@ function validateSystemDependencies() {
       }
       // 実際のアクセステストは削除（パフォーマンス改善）
     } catch (propsError) {
-      errors.push(`PropertiesService エラー: ${propsError.message}`);
+      errors.push('PropertiesService エラー: ' + propsError.message);
     }
 
     // resilientExecutor 関連の診断は削除されました（ファイル削除済み）
@@ -2802,7 +2802,7 @@ function validateSystemDependencies() {
     try {
       CacheService.getScriptCache().get('_DEPENDENCY_TEST_KEY');
     } catch (cacheError) {
-      errors.push(`CacheService エラー: ${cacheError.message}`);
+      errors.push('CacheService エラー: ' + cacheError.message);
     }
 
     // Utilities テスト
@@ -2811,11 +2811,11 @@ function validateSystemDependencies() {
         errors.push('Utilities サービスが利用できません');
       }
     } catch (utilsError) {
-      errors.push(`Utilities エラー: ${utilsError.message}`);
+      errors.push('Utilities エラー: ' + utilsError.message);
     }
 
   } catch (generalError) {
-    errors.push(`システムチェック中の一般エラー: ${generalError.message}`);
+    errors.push('システムチェック中の一般エラー: ' + generalError.message);
   }
 
   return {
@@ -2840,7 +2840,7 @@ function initializeRequestProcessing() {
     return showErrorPage(
       'システム初期化エラー', 
       'システムの初期化に失敗しました。管理者にご連絡ください。\n\n' +
-      `エラー詳細: ${dependencyCheck.errors.join(', ')}`
+      'エラー詳細: ' + dependencyCheck.errors.join(', ')
     );
   }
 
@@ -3124,7 +3124,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
   }
 
   // キャッシュキーの生成
-  const cacheKey = `unified_user_info_${userId || email}`;
+  const cacheKey = 'unified_user_info_' + (userId || email);
 
   // 実行レベルキャッシュの確認（オプション）
   if (opts.useExecutionCache && _executionUserInfoCache &&
@@ -3504,7 +3504,7 @@ function showErrorPage(title, message, error) {
   }
   
   const htmlOutput = template.evaluate()
-    .setTitle(`エラー - ${title}`);
+    .setTitle('エラー - ' + title);
 
   // XFrameOptionsMode を安全に設定
   try {
@@ -3526,7 +3526,7 @@ function showErrorPage(title, message, error) {
  */
 function buildUserAdminUrl(userId) {
   const baseUrl = ScriptApp.getService().getUrl();
-  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+  return baseUrl + '?mode=admin&userId=' + encodeURIComponent(userId);
 }
 
 /**
@@ -3539,7 +3539,7 @@ const URLBuilder = {
    */
   login: function() {
     const baseUrl = ScriptApp.getService().getUrl();
-    return `${baseUrl}?mode=login`;
+    return baseUrl + '?mode=login';
   },
 
   /**
@@ -3549,7 +3549,7 @@ const URLBuilder = {
    */
   admin: function(userId) {
     const baseUrl = ScriptApp.getService().getUrl();
-    return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+    return baseUrl + '?mode=admin&userId=' + encodeURIComponent(userId);
   },
 
   /**
@@ -3558,7 +3558,7 @@ const URLBuilder = {
    */
   appSetup: function() {
     const baseUrl = ScriptApp.getService().getUrl();
-    return `${baseUrl}?mode=appSetup`;
+    return baseUrl + '?mode=appSetup';
   },
 
   /**
@@ -3568,7 +3568,7 @@ const URLBuilder = {
    */
   view: function(userId) {
     const baseUrl = ScriptApp.getService().getUrl();
-    return `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`;
+    return baseUrl + '?mode=view&userId=' + encodeURIComponent(userId);
   },
 
   /**
@@ -3600,7 +3600,7 @@ const URLBuilder = {
 function redirectToUrl(url) {
   // XSS攻撃を防ぐため、URLをサニタイズ
   const sanitizedUrl = sanitizeRedirectUrl(url);
-  return HtmlService.createHtmlOutput().setContent(`<script>window.top.location.href = '${sanitizedUrl}';</script>`);
+  return HtmlService.createHtmlOutput().setContent('<script>window.top.location.href = \'' + sanitizedUrl + '\';</script>');
 }
 /**
  * セキュアなリダイレクトHTMLを作成 (シンプル版)
@@ -3986,8 +3986,8 @@ function renderUnpublishedPage(userInfo, params) {
       // フォールバック: 基本的なURL構造
       const baseUrl = ScriptApp.getService().getUrl();
       appUrls = {
-        adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`,
-        viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`,
+        adminUrl: baseUrl + '?mode=admin&userId=' + encodeURIComponent(userInfo.userId),
+        viewUrl: baseUrl + '?mode=view&userId=' + encodeURIComponent(userInfo.userId),
         status: 'fallback'
       };
     }
@@ -4443,7 +4443,7 @@ function renderAnswerBoard(userInfo, params) {
     if (typeof config.publishedSheetName === 'string') {
       safePublishedSheetName = config.publishedSheetName;
     } else {
-      logValidationError('publishedSheetName', config.publishedSheetName, 'string_type', `不正な型: ${typeof config.publishedSheetName}`);
+      logValidationError('publishedSheetName', config.publishedSheetName, 'string_type', '不正な型: ' + typeof config.publishedSheetName);
       warnLog('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
       safePublishedSheetName = '';
     }
@@ -4665,7 +4665,7 @@ function toggleDebugMode(enable) {
       return {
         status: 'success',
         debugMode: enable,
-        message: `DEBUG_MODEは既に${enable ? '有効' : '無効'}です`,
+        message: 'DEBUG_MODEは既に' + (enable ? '有効' : '無効') + 'です',
         changed: false
       };
     }
@@ -4685,7 +4685,7 @@ function toggleDebugMode(enable) {
     return {
       status: 'success',
       debugMode: enable,
-      message: `DEBUG_MODEを${enable ? '有効' : '無効'}にしました`,
+      message: 'DEBUG_MODEを' + (enable ? '有効' : '無効') + 'にしました',
       changed: true,
       timestamp: new Date().toISOString()
     };
@@ -4792,11 +4792,11 @@ function updateSelfActiveStatus(targetUserId, isActive) {
     // キャッシュをクリア
     clearUserCache(targetUserId);
     
-    debugLog(`User ${targetUserId} self-updated isActive to: ${isActive}`);
+    debugLog('User ' + targetUserId + ' self-updated isActive to: ' + isActive);
     
     return {
       success: true,
-      message: `アクセス設定を${isActive ? '有効' : '無効'}に変更しました`,
+      message: 'アクセス設定を' + (isActive ? '有効' : '無効') + 'に変更しました',
       userId: targetUserId,
       isActive: isActive,
       changed: true,
@@ -4843,7 +4843,7 @@ function updateUserActiveStatus(userId, isActive) {
         userId: userId,
         email: userInfo.adminEmail,
         isActive: isActive,
-        message: `ユーザー ${userInfo.adminEmail} は既に${isActive ? 'アクティブ' : '非アクティブ'}です`,
+        message: 'ユーザー ' + userInfo.adminEmail + ' は既に' + (isActive ? 'アクティブ' : '非アクティブ') + 'です',
         changed: false
       };
     }
@@ -4864,7 +4864,7 @@ function updateUserActiveStatus(userId, isActive) {
       userId: userId,
       email: userInfo.adminEmail,
       isActive: isActive,
-      message: `ユーザー ${userInfo.adminEmail} を${isActive ? 'アクティブ' : '非アクティブ'}にしました`,
+      message: 'ユーザー ' + userInfo.adminEmail + ' を' + (isActive ? 'アクティブ' : '非アクティブ') + 'にしました',
       changed: true,
       timestamp: new Date().toISOString()
     };
@@ -4935,7 +4935,7 @@ function bulkUpdateUserActiveStatus(userIds, isActive) {
         success: successCount,
         errors: errorCount
       },
-      message: `${successCount}人のユーザーを${isActive ? 'アクティブ' : '非アクティブ'}にしました${errorCount > 0 ? ` (${errorCount}件のエラー)` : ''}`,
+      message: successCount + '人のユーザーを' + (isActive ? 'アクティブ' : '非アクティブ') + 'にしました' + (errorCount > 0 ? (' (' + errorCount + '件のエラー)') : ''),
       timestamp: new Date().toISOString()
     };
     
@@ -5154,7 +5154,7 @@ function reportClientError(errorInfo) {
     }
 
     // クライアントエラーとしてログに記録
-    const errorMessage = `[CLIENT ERROR] ${errorInfo.message || 'Unknown error'}`;
+    const errorMessage = '[CLIENT ERROR] ' + (errorInfo.message || 'Unknown error');
     const errorContext = {
       url: errorInfo.url || 'unknown',
       userAgent: errorInfo.userAgent || 'unknown',

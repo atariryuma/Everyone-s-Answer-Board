@@ -177,7 +177,7 @@ class ManagedExecutionContext {
           resource.cleanup();
         }
         this.resources.delete(key);
-        debugLog(`🗑️ リソース削除: ${key}`);
+        debugLog('🗑️ リソース削除: ' + key);
       } catch (error) {
         warnLog('リソース削除エラー:', key, error.message);
       }
@@ -209,7 +209,7 @@ class ManagedExecutionContext {
             resource.cleanup();
           }
         } catch (cleanupError) {
-          warnLog(`リソースクリーンアップエラー (${key}):`, cleanupError.message);
+          warnLog('リソースクリーンアップエラー (' + key + '):', cleanupError.message);
         }
       }
 
@@ -223,7 +223,7 @@ class ManagedExecutionContext {
       this.isDestroyed = true;
 
       const lifetime = Date.now() - this.startTime;
-      debugLog(`✅ ExecutionContextクリーンアップ完了: ${this.requestUserId} (lifetime: ${lifetime}ms, peak memory: ${this.memoryUsage.peak})`);
+      debugLog('✅ ExecutionContextクリーンアップ完了: ' + this.requestUserId + ' (lifetime: ' + lifetime + 'ms, peak memory: ' + this.memoryUsage.peak + ')');
 
     } catch (error) {
       logError(error, 'ExecutionContextCleanup', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
@@ -268,7 +268,7 @@ const globalContextManager = {
     }
 
     this.activeContexts.set(context.requestUserId, context);
-    debugLog(`📝 コンテキスト登録: ${context.requestUserId} (total: ${this.activeContexts.size})`);
+    debugLog('📝 コンテキスト登録: ' + context.requestUserId + ' (total: ' + this.activeContexts.size + ')');
   },
 
   unregister(userId) {
@@ -276,7 +276,7 @@ const globalContextManager = {
       const context = this.activeContexts.get(userId);
       context.destroy();
       this.activeContexts.delete(userId);
-      debugLog(`🗑️ コンテキスト削除: ${userId} (remaining: ${this.activeContexts.size})`);
+      debugLog('🗑️ コンテキスト削除: ' + userId + ' (remaining: ' + this.activeContexts.size + ')');
     }
   },
 
@@ -348,7 +348,7 @@ function getCurrentSpreadsheet(requestUserId) {
     const spreadsheetIdPattern = /^[a-zA-Z0-9-_]{44}$/;
     if (!spreadsheetIdPattern.test(userInfo.spreadsheetId)) {
       logValidationError('spreadsheetId', userInfo.spreadsheetId, 'valid_format', '無効なスプレッドシートID形式');
-      throw new Error(`無効なスプレッドシートID形式です: ${userInfo.spreadsheetId}`);
+      throw new Error('無効なスプレッドシートID形式です: ' + userInfo.spreadsheetId);
     }
 
     // SpreadsheetApp.openById()で権限エラーが発生する可能性があるため、事前チェック
@@ -378,7 +378,7 @@ function getCurrentSpreadsheet(requestUserId) {
 3. スプレッドシートID: ${userInfo.spreadsheetId}
 詳細エラー: ${openError.message}`);
       } else {
-        throw new Error(`スプレッドシートの取得に失敗しました: ${openError.message}`);
+        throw new Error('スプレッドシートの取得に失敗しました: ' + openError.message);
       }
     }
   } catch (e) {
@@ -465,7 +465,7 @@ function clearOldUserCache(currentEmail) {
       const allProperties = props.getProperties();
       for (const [key, value] of Object.entries(allProperties)) {
         // 古い形式のユーザーキャッシュキーを削除
-        if (key.startsWith('CURRENT_USER_ID_') && key !== `CURRENT_USER_ID_${Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, currentEmail, Utilities.Charset.UTF_8).map(function(byte) { return (byte + 256).toString(16).slice(-2); }).join('')}`) {
+        if (key.startsWith('CURRENT_USER_ID_') && key !== ('CURRENT_USER_ID_' + Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, currentEmail, Utilities.Charset.UTF_8).map(function(byte) { return (byte + 256).toString(16).slice(-2); }).join(''))) {
           props.deleteProperty(key);
           debugLog('古い孤立ユーザーキーを削除: ' + key.substring(0, 20) + '...');
         }
@@ -538,7 +538,7 @@ function getSheetHeaders(requestUserId, spreadsheetId, sheetName) {
 
   const lastColumn = sheet.getLastColumn();
   if (lastColumn < 1) {
-    warnLog(`シート '${sheetName}' に列が存在しません`);
+    warnLog('シート \'' + sheetName + '\' に列が存在しません');
     return [];
   }
 
@@ -908,7 +908,7 @@ function analyzeColumnContent(sheetName, processedHeaders) {
           dataCount: columnData.length
         };
       } catch (e) {
-        warnLog(`列${index + 1}の分析でエラー:`, e.message);
+        warnLog('列' + (index + 1) + 'の分析でエラー:', e.message);
       }
     });
 
@@ -1690,7 +1690,7 @@ function createFormForSpreadsheet(spreadsheetId, sheetName) {
     }
 
     // フォームを作成
-    const formTitle = `回答フォーム - ${spreadsheet.getName()}`;
+    const formTitle = '回答フォーム - ' + spreadsheet.getName();
     const form = FormApp.create(formTitle);
 
     debugLog('📝 フォーム作成成功:', form.getEditUrl());
@@ -1725,7 +1725,7 @@ function createFormForSpreadsheet(spreadsheetId, sheetName) {
             item.setRequired(true); // 最初の質問は必須
           }
           questionCount++;
-          debugLog(`✅ 質問項目追加: ${headerStr}`);
+          debugLog('✅ 質問項目追加: ' + headerStr);
         }
       }
     });
@@ -1825,7 +1825,7 @@ function unpublishBoard(requestUserId) {
     // シート別の個別設定もクリア
     const sheetConfigKeys = Object.keys(configJson).filter(key => key.startsWith('sheet_'));
     sheetConfigKeys.forEach(key => {
-      debugLog(`🧹 シート別設定をクリア: ${key}`);
+      debugLog('🧹 シート別設定をクリア: ' + key);
       delete configJson[key];
     });
 
@@ -1959,7 +1959,7 @@ function setActiveSheet(requestUserId, sheetName) {
 
     return {
       success: true,
-      message: `シート「${sheetName}」をアクティブに設定しました`,
+      message: 'シート「' + sheetName + '」をアクティブに設定しました',
       activeSheetName: sheetName,
       timestamp: new Date().toISOString()
     };
@@ -2129,7 +2129,7 @@ function verifyUserAuthentication(requestUserId) {
         return {
           authenticated: false,
           email: null,
-          error: `ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}`
+          error: 'ドメインアクセスが制限されています。許可されたドメイン: ' + domainInfo.deployDomain + ', 現在のドメイン: ' + domainInfo.currentDomain
         };
       }
 
@@ -2265,7 +2265,7 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
         length: targetId.length,
         providedSpreadsheetId: spreadsheetId
       });
-      throw new Error(`無効なspreadsheetID形式です: "${targetId}" はシート名のようです。パラメータの順序を確認してください。`);
+      throw new Error('無効なspreadsheetID形式です: "' + targetId + '" はシート名のようです。パラメータの順序を確認してください。');
     }
     // SpreadsheetApp.openById()の代わりにSheets APIを使用（権限問題回避）
     debugLog('🔧 Sheets APIを使用してヘッダーを取得中:', { targetId, sheetName });
@@ -2276,7 +2276,7 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
       const sheetsService = getSheetsServiceCached();
 
       // ヘッダー行を取得（1行目）
-      const range = `'${sheetName}'!1:1`;
+      const range = '\'' + sheetName + '\'!1:1';
       const batch = batchGetSheetsData(sheetsService, targetId, [range]);
 
       if (batch && batch.valueRanges && batch.valueRanges[0] && batch.valueRanges[0].values) {
@@ -2300,13 +2300,13 @@ function getSheetDetails(requestUserId, spreadsheetId, sheetName) {
 
         const lastColumn = sheet.getLastColumn();
         if (lastColumn < 1) {
-          throw new Error(`シート '${sheetName}' に列が存在しません`);
+          throw new Error('シート \'' + sheetName + '\' に列が存在しません');
         }
         headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0] || [];
         infoLog('✅ SpreadsheetApp フォールバック成功');
       } catch (spreadsheetError) {
         errorLog('❌ SpreadsheetApp フォールバックも失敗:', spreadsheetError.message);
-        throw new Error(`ヘッダー取得に失敗しました。Sheets API: ${apiError.message}, SpreadsheetApp: ${spreadsheetError.message}`);
+        throw new Error('ヘッダー取得に失敗しました。Sheets API: ' + apiError.message + ', SpreadsheetApp: ' + spreadsheetError.message);
       }
     }
     const guessed = autoMapHeaders(headers);
@@ -2486,7 +2486,7 @@ function commitAllChanges(context) {
       // 3. SheetsServiceキャッシュの部分無効化（必要に応じて）
       if (context.pendingUpdates.spreadsheetId) {
         // スプレッドシートIDが変更された場合は関連キャッシュをクリア
-        cacheManager.clearByPattern(`batchGet_${context.pendingUpdates.spreadsheetId}_*`);
+        cacheManager.clearByPattern('batchGet_' + context.pendingUpdates.spreadsheetId + '_*');
       }
 
       infoLog('✅ キャッシュ無効化完了');
@@ -2530,10 +2530,10 @@ function invalidateUserCacheTransaction(userId, userEmail, spreadsheetId) {
     if (typeof cacheManager !== 'undefined' && cacheManager.remove) {
       // ユーザー関連のキーを無効化
       const userCacheKeys = [
-        `user_${userId}`,
-        `userInfo_${userId}`,
-        `config_${userId}`,
-        `appUrls_${userId}`
+        'user_' + userId,
+        'userInfo_' + userId,
+        'config_' + userId,
+        'appUrls_' + userId
       ];
 
       userCacheKeys.forEach(key => {
@@ -2546,9 +2546,9 @@ function invalidateUserCacheTransaction(userId, userEmail, spreadsheetId) {
 
       // 回答ボードの公開データ・シートデータのユーザー別キャッシュをパターンで無効化
       try {
-        cacheManager.clearByPattern(`publishedData_${userId}_`, { strict: false, maxKeys: 200 });
-        cacheManager.clearByPattern(`sheetData_${userId}_`, { strict: false, maxKeys: 200 });
-        cacheManager.clearByPattern(`config_v3_${userId}_`, { strict: false, maxKeys: 200 });
+        cacheManager.clearByPattern('publishedData_' + userId + '_', { strict: false, maxKeys: 200 });
+        cacheManager.clearByPattern('sheetData_' + userId + '_', { strict: false, maxKeys: 200 });
+        cacheManager.clearByPattern('config_v3_' + userId + '_', { strict: false, maxKeys: 200 });
       } catch (patternErr) {
         warnLog('invalidateUserCacheTransaction: user-scoped pattern clear failed:', patternErr.message);
       }
@@ -2556,8 +2556,8 @@ function invalidateUserCacheTransaction(userId, userEmail, spreadsheetId) {
       // スプレッドシート関連のキーを無効化
       if (spreadsheetId) {
         try {
-          cacheManager.clearByPattern(`sheets_${spreadsheetId}_*`);
-          cacheManager.clearByPattern(`batchGet_${spreadsheetId}_*`);
+          cacheManager.clearByPattern('sheets_' + spreadsheetId + '_*');
+          cacheManager.clearByPattern('batchGet_' + spreadsheetId + '_*');
         } catch (patternError) {
           warnLog('パターンベースキャッシュ削除エラー:', patternError.message);
         }
@@ -3017,7 +3017,7 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
 
         } catch (retryError) {
           errorLog('❌ 強制リフレッシュリトライも失敗:', retryError.message);
-          throw new Error(`Sheets APIサービスの復旧に完全に失敗しました。初期エラー: ${serviceError.message}, リトライエラー: ${retryError.message}`);
+          throw new Error('Sheets APIサービスの復旧に完全に失敗しました。初期エラー: ' + serviceError.message + ', リトライエラー: ' + retryError.message);
         }
       }
     }
@@ -3054,11 +3054,11 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
     // 指定されたシートが存在するか確認
     const targetSheet = data.sheets.find(sheet => sheet.properties.title === sheetName);
     if (!targetSheet) {
-      throw new Error(`指定されたシート '${sheetName}' が見つかりません。利用可能なシート: ${data.sheets.map(s => s.properties.title).join(', ')}`);
+      throw new Error('指定されたシート \'' + sheetName + '\' が見つかりません。利用可能なシート: ' + data.sheets.map(s => s.properties.title).join(', '));
     }
 
     // ヘッダー行をAPIで取得
-    const range = `'${sheetName}'!1:1`;
+    const range = '\'' + sheetName + '\'!1:1';
     debugLog('DEBUG: Fetching headers with range:', range);
     let batch;
     try {
@@ -3079,7 +3079,7 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
     debugLog('DEBUG: Retrieved headers:', headers.length, 'columns');
 
     if (headers.length === 0) {
-      throw new Error(`シート '${sheetName}' の1行目にヘッダーが見つかりません`);
+      throw new Error('シート \'' + sheetName + '\' の1行目にヘッダーが見つかりません');
     }
 
     const guessed = autoMapHeaders(headers);
@@ -3239,7 +3239,7 @@ function switchToSheetInContext(context, spreadsheetId, sheetName) {
 
     // シート固有のフォームURL同期（不足時は当該シートから直接検出を試行）
     try {
-      const sheetKey = `sheet_${sheetName}`;
+      const sheetKey = 'sheet_' + sheetName;
       const sheetCfg = configJson[sheetKey] || {};
 
       if (!sheetCfg.formUrl) {
@@ -3309,7 +3309,7 @@ function syncFormUrlForActiveSheet(configJson, sheetName) {
     return;
   }
 
-  const sheetConfigKey = `sheet_${sheetName}`;
+  const sheetConfigKey = 'sheet_' + sheetName;
   const sheetConfig = configJson[sheetConfigKey];
 
   if (sheetConfig && typeof sheetConfig === 'object' && sheetConfig.formUrl) {
@@ -3424,14 +3424,14 @@ function saveAndPublish(requestUserId, sheetName, config) {
     while (dbWriteAttempts < maxDbRetries) {
       try {
         dbWriteAttempts++;
-        debugLog(`📊 DB書き込み試行 ${dbWriteAttempts}/${maxDbRetries}`);
+        debugLog('📊 DB書き込み試行 ' + dbWriteAttempts + '/' + maxDbRetries);
         
         commitAllChanges(context);
         infoLog('✅ Phase 3完了: DB書き込み完了（回復力のある実行）');
         break; // 成功時はループを抜ける
         
       } catch (dbError) {
-        errorLog(`❌ DB書き込み失敗 (試行${dbWriteAttempts}):`, dbError.message);
+        errorLog('❌ DB書き込み失敗 (試行' + dbWriteAttempts + '):', dbError.message);
         
         if (dbWriteAttempts >= maxDbRetries) {
           errorLog('❌ Phase 3エラー: 最大リトライ回数に達しました');
@@ -3441,7 +3441,7 @@ function saveAndPublish(requestUserId, sheetName, config) {
         // 503エラーやAPI制限の場合は待機してリトライ
         if (dbError.message.includes('503') || dbError.message.includes('429')) {
           const retryDelay = 2000 * dbWriteAttempts; // 2秒, 4秒, 6秒
-          warnLog(`⏳ ${retryDelay}ms待機後にリトライします...`);
+          warnLog('⏳ ' + retryDelay + 'ms待機後にリトライします...');
           Utilities.sleep(retryDelay);
         }
       }
@@ -3630,7 +3630,7 @@ function syncConfigurationState(requestUserId, newConfig, flowType) {
 
     // 最終的なオブジェクト検証
     if (typeof newConfig !== 'object' || newConfig === null) {
-      const error = `無効な設定データです: 型=${typeof newConfig}`;
+      const error = '無効な設定データです: 型=' + typeof newConfig;
       logError(error, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
       return { success: false, errors: [error] };
     }
@@ -3679,7 +3679,7 @@ function syncConfigurationState(requestUserId, newConfig, flowType) {
     if (!skipStrictValidation) {
       const validation = validateConfigJsonState(mergedConfig, userInfo);
       if (!validation.isValid) {
-        logError(`設定検証失敗: ${validation.errors.join(', ')}`, 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
+        logError('設定検証失敗: ' + validation.errors.join(', '), 'syncConfigurationState', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION);
         return { 
           success: false, 
           errors: validation.errors,

@@ -60,7 +60,7 @@ function generateNewServiceAccountToken() {
     const requiredFields = ['client_email', 'private_key', 'token_uri'];
     for (const field of requiredFields) {
       if (!serviceAccountCreds[field]) {
-        throw new Error(`サービスアカウント設定に${field}が不足しています`);
+        throw new Error('サービスアカウント設定に' + field + 'が不足しています');
       }
     }
 
@@ -139,7 +139,7 @@ function generateNewServiceAccountToken() {
     const responseCode = response.getResponseCode();
     
     if (responseCode !== 200) {
-      throw new Error(`Token request failed with status ${responseCode}: ${response.getContentText()}`);
+      throw new Error('Token request failed with status ' + responseCode + ': ' + response.getContentText());
     }
 
     /** @type {Object} レスポンスデータ */
@@ -207,12 +207,12 @@ function checkServiceAccountConfiguration() {
       if (missingFields.length === 0) {
         result.hasRequiredFields = true;
       } else {
-        result.errors.push(`必要なフィールドが不足: ${missingFields.join(', ')}`);
+        result.errors.push('必要なフィールドが不足: ' + missingFields.join(', '));
       }
 
       // タイプチェック
       if (serviceAccountCreds.type !== 'service_account') {
-        result.errors.push(`認証情報のタイプが不正: ${serviceAccountCreds.type} (期待値: service_account)`);
+        result.errors.push('認証情報のタイプが不正: ' + serviceAccountCreds.type + ' (期待値: service_account)');
       }
 
     } catch (parseError) {
@@ -254,7 +254,7 @@ function setupServiceAccount(serviceAccountJson) {
 
     // タイプ検証
     if (serviceAccountCreds.type !== 'service_account') {
-      throw new Error(`認証情報のタイプが不正: ${serviceAccountCreds.type} (期待値: service_account)`);
+      throw new Error('認証情報のタイプが不正: ' + serviceAccountCreds.type + ' (期待値: service_account)');
     }
 
     // 必要フィールド検証
@@ -271,7 +271,7 @@ function setupServiceAccount(serviceAccountJson) {
     }
 
     if (missingFields.length > 0) {
-      throw new Error(`必要なフィールドが不足: ${missingFields.join(', ')}`);
+      throw new Error('必要なフィールドが不足: ' + missingFields.join(', '));
     }
 
     // プロパティに保存

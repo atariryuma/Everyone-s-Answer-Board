@@ -27,109 +27,106 @@ window.AdminPanel = window.AdminPanel || {
 // -----------------------------------------------------------------------------
 // State Manager
 // -----------------------------------------------------------------------------
-class AdminPanelStateManager {
-  constructor() {
-    this.state = {
-      currentStatus: null,
-      selectedSheet: '',
-      isLoading: false,
-      debugMode: false // DEBUG_MODE状態を追加
-    };
-    this.subscribers = new Map();
-  }
-
-  setState(key, value) {
-    this.state[key] = value;
-    this.notifySubscribers(key, value);
-  }
-
-  subscribe(key, callback) {
-    if (!this.subscribers.has(key)) {
-      this.subscribers.set(key, []);
-    }
-    this.subscribers.get(key).push(callback);
-  }
-
-  notifySubscribers(key, value) {
-    const subs = this.subscribers.get(key) || [];
-    subs.forEach(cb => {
-      try {
-        cb(value);
-      } catch (e) {
-        console.warn('Subscriber callback failed', e);
-      }
-    });
-  }
+function AdminPanelStateManager() {
+  this.state = {
+    currentStatus: null,
+    selectedSheet: '',
+    isLoading: false,
+    debugMode: false // DEBUG_MODE状態を追加
+  };
+  this.subscribers = new Map();
 }
+
+AdminPanelStateManager.prototype.setState = function(key, value) {
+  this.state[key] = value;
+  this.notifySubscribers(key, value);
+};
+
+AdminPanelStateManager.prototype.subscribe = function(key, callback) {
+  if (!this.subscribers.has(key)) {
+    this.subscribers.set(key, []);
+  }
+  this.subscribers.get(key).push(callback);
+};
+
+AdminPanelStateManager.prototype.notifySubscribers = function(key, value) {
+  var subs = this.subscribers.get(key) || [];
+  subs.forEach(function(cb) {
+    try {
+      cb(value);
+    } catch (e) {
+      console.warn('Subscriber callback failed', e);
+    }
+  });
+};
 
 // -----------------------------------------------------------------------------
 // Event Manager
 // -----------------------------------------------------------------------------
-class AdminPanelEventManager {
-  constructor() {
-    this.listeners = new Map();
-  }
-
-  addListener(element, event, handler, options = {}) {
-    if (!element || !event || !handler) return;
-    const key = `${element.id || 'anonymous'}-${event}`;
-    if (this.listeners.has(key)) {
-      console.warn('Duplicate listener for ' + key);
-      return;
-    }
-    element.addEventListener(event, handler, options);
-    this.listeners.set(key, { element, event, handler, options });
-  }
+function AdminPanelEventManager() {
+  this.listeners = new Map();
 }
+
+AdminPanelEventManager.prototype.addListener = function(element, event, handler, options) {
+  options = options || {};
+  if (!element || !event || !handler) return;
+  var key = (element.id || 'anonymous') + '-' + event;
+  if (this.listeners.has(key)) {
+    console.warn('Duplicate listener for ' + key);
+    return;
+  }
+  element.addEventListener(event, handler, options);
+  this.listeners.set(key, { element: element, event: event, handler: handler, options: options });
+};
 
 // -----------------------------------------------------------------------------
 // Async Manager
 // -----------------------------------------------------------------------------
-class AdminPanelAsyncManager {
-  constructor() {
-    this.runningOperations = new Map();
-  }
-
-  async executeExclusive(operationId, operation) {
-    if (this.runningOperations.has(operationId)) {
-      return this.runningOperations.get(operationId);
-    }
-    const promise = Promise.resolve().then(operation);
-    this.runningOperations.set(operationId, promise);
-    try {
-      return await promise;
-    } finally {
-      this.runningOperations.delete(operationId);
-    }
-  }
+function AdminPanelAsyncManager() {
+  this.runningOperations = new Map();
 }
+
+AdminPanelAsyncManager.prototype.executeExclusive = function(operationId, operation) {
+  var self = this;
+  if (this.runningOperations.has(operationId)) {
+    return this.runningOperations.get(operationId);
+  }
+  var promise = Promise.resolve().then(operation);
+  this.runningOperations.set(operationId, promise);
+  return promise.then(function(result) {
+    self.runningOperations.delete(operationId);
+    return result;
+  }).catch(function(error) {
+    self.runningOperations.delete(operationId);
+    throw error;
+  });
+};
 
 // -----------------------------------------------------------------------------
 // DOM Manager
 // -----------------------------------------------------------------------------
-class AdminPanelDOMManager {
-  constructor() {
-    this.elementCache = new Map();
-    this.operationQueue = [];
-  }
-
-  getElement(id) {
-    if (!this.elementCache.has(id)) {
-      this.elementCache.set(id, document.getElementById(id));
-    }
-    return this.elementCache.get(id);
-  }
-
-  queueOperation(operation) {
-    this.operationQueue.push(operation);
-    return new Promise(resolve => {
-      requestAnimationFrame(() => {
-        const op = this.operationQueue.shift();
-        resolve(op());
-      });
-    });
-  }
+function AdminPanelDOMManager() {
+  this.elementCache = new Map();
+  this.operationQueue = [];
 }
+
+AdminPanelDOMManager.prototype.getElement = function(id) {
+  if (!this.elementCache.has(id)) {
+    this.elementCache.set(id, document.getElementById(id));
+  }
+  return this.elementCache.get(id);
+};
+
+AdminPanelDOMManager.prototype.queueOperation = function(operation) {
+  var self = this;
+  this.operationQueue.push(operation);
+  return new Promise(function(resolve) {
+    requestAnimationFrame(function() {
+      var op = self.operationQueue.shift();
+      resolve(op());
+    });
+  });
+};
 
 // Instantiate managers and expose via namespace
 window.AdminPanel.stateManager = new AdminPanelStateManager();
@@ -140,12 +137,12 @@ window.AdminPanel.domManager = new AdminPanelDOMManager();
 // Link legacy globals to state manager for compatibility
 Object.defineProperties(window, {
   currentStatus: {
-    get() { return window.AdminPanel.stateManager.state.currentStatus; },
-    set(v) { window.AdminPanel.stateManager.setState('currentStatus', v); }
+    get: function() { return window.AdminPanel.stateManager.state.currentStatus; },
+    set: function(v) { window.AdminPanel.stateManager.setState('currentStatus', v); }
   },
   selectedSheet: {
-    get() { return window.AdminPanel.stateManager.state.selectedSheet; },
-    set(v) { window.AdminPanel.stateManager.setState('selectedSheet', v); }
+    get: function() { return window.AdminPanel.stateManager.state.selectedSheet; },
+    set: function(v) { window.AdminPanel.stateManager.setState('selectedSheet', v); }
   }
 });
 
@@ -185,16 +182,16 @@ function logDebug(...args) { adminLog('debug', ...args); }
 // =============================================================================
 
 // マルチテナント対応: ユーザーIDの安全な初期化
-let userId = '';
+var userId = '';
 
 // マルチテナント対応: バックエンドから安全にユーザーIDを取得
 function initializeUserId() {
   console.group('🔐 Initializing UserId');
   logDebug('📞 About to call getCurrentUserStatus');
   
-  return new Promise((resolve, reject) => {
+  return new Promise(function(resolve, reject) {
     google.script.run
-      .withSuccessHandler(response => {
+      .withSuccessHandler(function(response) {
         logDebug('📥 getCurrentUserStatus response:', response);
         
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
@@ -209,7 +206,7 @@ function initializeUserId() {
           reject(new Error('ユーザーIDの取得に失敗しました'));
         }
       })
-      .withFailureHandler(error => {
+      .withFailureHandler(function(error) {
         console.error('❌ Backend error getting userId:', error);
         console.error('❌ Error type:', typeof error);
         console.error('❌ Error details:', error);
@@ -222,14 +219,14 @@ function initializeUserId() {
 
 // リトライ付きユーザーID取得
 async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
-  for (let i = 0; i < maxRetries; i++) {
+  for (var i = 0; i < maxRetries; i++) {
     try {
       return await initializeUserId();
     } catch (error) {
-      console.warn(`⚠️ UserId initialization failed (attempt ${i + 1}/${maxRetries}):`, error.message);
+      console.warn('⚠️ UserId initialization failed (attempt ' + (i + 1) + '/' + maxRetries + '):', error.message);
       if (i < maxRetries - 1) {
-        console.log(`🔄 Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        console.log('🔄 Retrying in ' + delay + 'ms...');
+        await new Promise(function(resolve) { setTimeout(resolve, delay); });
         delay = Math.min(delay * 1.5, 5000); // 指数バックオフ（最大5秒）
       } else {
         logError(error, 'All userId initialization attempts failed');
@@ -240,16 +237,16 @@ async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
 }
 
 // ユーザーID取得の完了を待つPromise（リトライ機構付き）
-const userIdPromise = initializeUserIdWithRetry();
+var userIdPromise = initializeUserIdWithRetry();
 
 // =============================================================================
 // CORE INITIALIZATION FUNCTIONS
 // =============================================================================
 
 // Layout adjustment for responsive design
-const adjustLayout = () => {
-  const isMobile = window.innerWidth < 768;
-  const body = document.body;
+function adjustLayout() {
+  var isMobile = window.innerWidth < 768;
+  var body = document.body;
   
   if (isMobile) {
     body.classList.add('mobile-layout');
@@ -261,13 +258,13 @@ const adjustLayout = () => {
 }
 
 // Initialize core functionality
-const initCore = () => {
+function initCore() {
   adjustLayout();
 }
 
 // Initialize message area
-const initializeMessageArea = () => {
-  let messageArea = document.getElementById('message-area');
+function initializeMessageArea() {
+  var messageArea = document.getElementById('message-area');
   if (!messageArea) {
     // Create message area if it doesn't exist
     messageArea = document.createElement('div');
@@ -278,7 +275,7 @@ const initializeMessageArea = () => {
 }
 
 // Initialize UI components
-const initializeUI = () => {
+function initializeUI() {
   // UI初期化のみ実行、loadStatusは adminPanel-api.js で処理される
 }
 
@@ -300,7 +297,7 @@ function initializeAPI() {
 
   // 初期化時のステータスロード - タイミング調整版
   logDebug('🚀 初期化時loadStatus(true)呼び出し（遅延あり）');
-  setTimeout(() => {
+  setTimeout(function() {
     if (checkFunctionAvailability('loadStatus')) {
       window.loadStatus(true);
     } else {
@@ -338,12 +335,12 @@ function initializeEventListeners() {
 
 // Setup character counters
 function setupCharacterCounters() {
-  const questionTextarea = document.getElementById('custom-main-question');
-  const questionCounter = document.getElementById('question-counter');
+  var questionTextarea = document.getElementById('custom-main-question');
+  var questionCounter = document.getElementById('question-counter');
 
   if (questionTextarea && questionCounter) {
     questionTextarea.addEventListener('input', function() {
-      const count = this.value.length;
+      var count = this.value.length;
       questionCounter.textContent = count + '/500';
       questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
     });
@@ -353,10 +350,10 @@ function setupCharacterCounters() {
 // Setup modal character counter observers
 function setupModalCharacterCounters() {
   // モーダルが表示されるたびにカウンターをセットアップ
-  const observer = new MutationObserver(function(mutations) {
-    mutations.forEach((mutation) => {
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        const modal = document.getElementById('form-config-modal');
+        var modal = document.getElementById('form-config-modal');
         if (modal && !modal.classList.contains('hidden')) {
           setTimeout(setupCharacterCounters, 100);
         }
@@ -365,7 +362,7 @@ function setupModalCharacterCounters() {
   });
   
   // モーダルの監視を開始
-  const modal = document.getElementById('form-config-modal');
+  var modal = document.getElementById('form-config-modal');
   if (modal) {
     observer.observe(modal, { attributes: true });
   }
@@ -381,20 +378,20 @@ function navigateToStep(step) {
   }
   
   // Update step indicators
-  document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
-    const stepNumber = index + 1;
+  document.querySelectorAll('.step-indicator').forEach(function(indicator, index) {
+    var stepNumber = index + 1;
     indicator.classList.toggle('completed', stepNumber < step);
     indicator.classList.toggle('active', stepNumber === step);
   });
   
   // Show/hide step content
-  document.querySelectorAll('.step-content').forEach((content, index) => {
-    const stepNumber = index + 1;
+  document.querySelectorAll('.step-content').forEach(function(content, index) {
+    var stepNumber = index + 1;
     content.classList.toggle('hidden', stepNumber !== step);
   });
   
   // Update progress bar
-  const progressBar = document.querySelector('.progress-bar');
+  var progressBar = document.querySelector('.progress-bar');
   if (progressBar) {
     progressBar.style.width = ((step / 3) * 100) + '%';
   }
@@ -426,15 +423,15 @@ window.initializeAdminPanel = initializeAdminPanel;
 
 // Toggle section visibility
 function toggleSection(sectionId) {
-  const section = document.getElementById(sectionId);
+  var section = document.getElementById(sectionId);
   if (!section) {
     console.warn('Section not found:', sectionId);
     return;
   }
   
   // Find the toggle button for this section
-  const toggleBtn = document.querySelector('[onclick*="' + sectionId + '"]');
-  const arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
+  var toggleBtn = document.querySelector('[onclick*="' + sectionId + '"]');
+  var arrow = toggleBtn ? toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up') : null;
   
   // Toggle the section visibility
   if (section.classList.contains('hidden')) {
@@ -462,7 +459,7 @@ function toggleSection(sectionId) {
 
 // Hide privacy modal
 function hidePrivacyModal() {
-  const modal = document.getElementById('privacy-modal');
+  var modal = document.getElementById('privacy-modal');
   if (modal) {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -484,7 +481,7 @@ function showFormConfigModal() {
     }
   } else {
     // Fallback for legacy support
-    const modal = document.getElementById('form-config-modal');
+    var modal = document.getElementById('form-config-modal');
     if (modal) {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -522,13 +519,13 @@ function updateUIWithNewStatus(status) {
     }
   } else {
     // Enhanced retry mechanism with multiple attempts
-    let retryCount = 0;
-    const maxRetries = 3;
-    const retryDelays = [200, 500, 1000]; // Progressive delays
+    var retryCount = 0;
+    var maxRetries = 3;
+    var retryDelays = [200, 500, 1000]; // Progressive delays
     
-    const tryFullImplementation = () => {
+    var tryFullImplementation = function() {
       if (typeof window._fullUpdateUIWithNewStatus === 'function') {
-        console.log(`updateUIWithNewStatus: Full implementation now available (retry ${retryCount + 1})`);
+        console.log('updateUIWithNewStatus: Full implementation now available (retry ' + (retryCount + 1) + ')');
         try {
           window._fullUpdateUIWithNewStatus(status);
           return;
@@ -556,15 +553,15 @@ function updateUIWithNewStatus(status) {
   try {
     // 1. Update publication status with indicators
     if (status._normalized && typeof status._normalized.isPublished !== 'undefined') {
-      const publishStatus = status._normalized.isPublished ? '公開中' : '停止中';
-      const publishElement = document.getElementById('info-publish-text');
+      var publishStatus = status._normalized.isPublished ? '公開中' : '停止中';
+      var publishElement = document.getElementById('info-publish-text');
       if (publishElement) {
         publishElement.textContent = publishStatus;
       }
       
       // Update publish indicator
-      const indicatorElement = document.getElementById('info-publish-indicator');
-      const statusElement = document.getElementById('info-publish-status');
+      var indicatorElement = document.getElementById('info-publish-indicator');
+      var statusElement = document.getElementById('info-publish-status');
       if (status._normalized.isPublished) {
         if (statusElement) statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
         if (indicatorElement) indicatorElement.className = 'w-2 h-2 rounded-full bg-green-400';
@@ -576,8 +573,8 @@ function updateUIWithNewStatus(status) {
     
     // 2. Update user information section
     if (status.userInfo) {
-      const adminEmailEl = document.getElementById('info-admin-email');
-      const userIdEl = document.getElementById('info-user-id');
+      var adminEmailEl = document.getElementById('info-admin-email');
+      var userIdEl = document.getElementById('info-user-id');
       
       if (adminEmailEl && status.userInfo.adminEmail) {
         adminEmailEl.textContent = status.userInfo.adminEmail;
@@ -588,17 +585,17 @@ function updateUIWithNewStatus(status) {
       
       // Update spreadsheet access
       if (status.userInfo.spreadsheetUrl) {
-        const spreadsheetBtn = document.getElementById('open-spreadsheet-btn-step2');
+        var spreadsheetBtn = document.getElementById('open-spreadsheet-btn-step2');
         if (spreadsheetBtn) {
           spreadsheetBtn.disabled = false;
-          spreadsheetBtn.onclick = () => window.open(status.userInfo.spreadsheetUrl, '_blank');
+          spreadsheetBtn.onclick = function() { window.open(status.userInfo.spreadsheetUrl, '_blank'); };
         }
       }
     }
     
     // 3. Update configuration display
     if (status.config || (status.userInfo && status.userInfo.configJson)) {
-      let config = status.config;
+      var config = status.config;
       if (!config && status.userInfo.configJson) {
         try {
           config = typeof status.userInfo.configJson === 'string' 
@@ -611,19 +608,19 @@ function updateUIWithNewStatus(status) {
       
       if (config) {
         // Update published sheet name
-        const publishedSheetEl = document.getElementById('info-published-sheet');
+        var publishedSheetEl = document.getElementById('info-published-sheet');
         if (publishedSheetEl) {
           publishedSheetEl.textContent = config.publishedSheetName || status.activeSheetName || 'なし';
         }
         
         // Update display mode
-        const displayModeEl = document.getElementById('info-display-mode');
+        var displayModeEl = document.getElementById('info-display-mode');
         if (displayModeEl) {
           displayModeEl.textContent = config.showNames ? '名前表示' : '匿名表示';
         }
         
         // Update show counts setting
-        const showCountsEl = document.getElementById('info-show-counts');
+        var showCountsEl = document.getElementById('info-show-counts');
         if (showCountsEl) {
           showCountsEl.textContent = config.showCounts ? '表示' : '非表示';
         }
@@ -632,7 +629,7 @@ function updateUIWithNewStatus(status) {
     
     // 4. Update answer count if available
     if (status.answerCount !== undefined) {
-      const answerCountElement = document.getElementById('answer-count');
+      var answerCountElement = document.getElementById('answer-count');
       if (answerCountElement) {
         answerCountElement.textContent = status.answerCount || '0';
       }
@@ -640,8 +637,8 @@ function updateUIWithNewStatus(status) {
     
     // 5. Update active sheet information
     if (status.activeSheetName) {
-      const sheetNameElements = document.querySelectorAll('.active-sheet-name');
-      sheetNameElements.forEach(element => {
+      var sheetNameElements = document.querySelectorAll('.active-sheet-name');
+      sheetNameElements.forEach(function(element) {
         element.textContent = status.activeSheetName;
       });
     }
@@ -654,7 +651,7 @@ function updateUIWithNewStatus(status) {
 
 // Hide digital citizenship modal
 function hideDigitalCitizenshipModal() {
-  const modal = document.getElementById('digital-citizenship-modal');
+  var modal = document.getElementById('digital-citizenship-modal');
   if (modal) {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -666,7 +663,7 @@ function hideDigitalCitizenshipModal() {
 
 // Hide confirmation modal
 function hideConfirmationModal() {
-  const modal = document.getElementById('confirmation-modal');
+  var modal = document.getElementById('confirmation-modal');
   if (modal) {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -678,7 +675,7 @@ function hideConfirmationModal() {
 
 // Unified showMessage function - uses SharedUtilities MessageManager
 function showMessage(message, type = 'info', duration = 5000) {
-  console.log(`[${type.toUpperCase()}] ${message}`);
+  console.log('[' + type.toUpperCase() + '] ' + message);
   
   // Use SharedUtilities MessageManager if available
   if (window.sharedUtilities?.messages?.show) {
@@ -709,9 +706,9 @@ function validateConfig() {
   
   try {
     // Check primary element first, then fallback to secondary element
-    const opinionValueEl1 = document.getElementById('opinionHeader');
-    const opinionValueEl2 = document.getElementById('reason-column');
-    const opinionValue = (opinionValueEl1 && opinionValueEl1.value) || 
+    var opinionValueEl1 = document.getElementById('opinionHeader');
+    var opinionValueEl2 = document.getElementById('reason-column');
+    var opinionValue = (opinionValueEl1 && opinionValueEl1.value) || 
                         (opinionValueEl2 && opinionValueEl2.value) || '';
     
     return opinionValue && opinionValue.trim() !== '';
@@ -736,8 +733,8 @@ function updateConfigButtons() {
   console.log('updateConfigButtons: Using minimal implementation');
   
   try {
-    const isValid = validateConfig();
-    const saveBtn = document.getElementById('save-publish-btn');
+    var isValid = validateConfig();
+    var saveBtn = document.getElementById('save-publish-btn');
     
     if (saveBtn) {
       saveBtn.disabled = !isValid;
@@ -758,9 +755,9 @@ function updateConfigButtons() {
 
 // Central function availability checker
 function checkFunctionAvailability(functionName) {
-  const isAvailable = typeof window[functionName] === 'function';
+  var isAvailable = typeof window[functionName] === 'function';
   if (!isAvailable) {
-    console.warn(`⚠️ Function ${functionName} is not available`);
+    console.warn('⚠️ Function ' + functionName + ' is not available');
   }
   return isAvailable;
 }
@@ -771,11 +768,11 @@ function safeCallFunction(functionName, ...args) {
     if (checkFunctionAvailability(functionName)) {
       return window[functionName](...args);
     } else {
-      console.warn(`⚠️ Cannot call ${functionName} - function not available`);
+      console.warn('⚠️ Cannot call ' + functionName + ' - function not available');
       return null;
     }
   } catch (error) {
-    console.error(`❌ Error calling ${functionName}:`, error);
+    console.error('❌ Error calling ' + functionName + ':', error);
     return null;
   }
 }
@@ -792,12 +789,12 @@ window.AdminPanel.functionRegistry = {
       this.pending.delete(functionName);
     } else {
       this.pending.add(functionName);
-      console.warn(`⚠️ Function pending: ${functionName}`);
+      console.warn('⚠️ Function pending: ' + functionName);
     }
   },
   
   registerFullImplementation(functionName) {
-    const fullFuncName = `_full${functionName.charAt(0).toUpperCase()}${functionName.slice(1)}`;
+    var fullFuncName = '_full' + functionName.charAt(0).toUpperCase() + functionName.slice(1);
     if (typeof window[fullFuncName] === 'function') {
       this.fullImplementations.add(functionName);
       // Verbose implementation logging disabled for performance
@@ -805,7 +802,7 @@ window.AdminPanel.functionRegistry = {
   },
   
   hasFullImplementation(functionName) {
-    const fullFuncName = `_full${functionName.charAt(0).toUpperCase()}${functionName.slice(1)}`;
+    var fullFuncName = '_full' + functionName.charAt(0).toUpperCase() + functionName.slice(1);
     return typeof window[fullFuncName] === 'function';
   },
   
@@ -815,13 +812,13 @@ window.AdminPanel.functionRegistry = {
   
   // Enhanced full implementation detection
   checkForFullImplementations() {
-    const functionsToCheck = [
+    var functionsToCheck = [
       'updateUIWithNewStatus', 'populateHeaderOptions', 'populateConfig', 
       'updateFormUrlDisplay', 'validateConfig', 'updateConfigButtons'
     ];
     
-    let foundCount = 0;
-    functionsToCheck.forEach(funcName => {
+    var foundCount = 0;
+    functionsToCheck.forEach(function(funcName) {
       if (this.hasFullImplementation(funcName)) {
         this.registerFullImplementation(funcName);
         foundCount++;
@@ -830,26 +827,26 @@ window.AdminPanel.functionRegistry = {
     
     // 本番環境でのログ量を減らす
     if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
-      console.log(`🔍 Full implementations check: ${foundCount}/${functionsToCheck.length} available`);
+      console.log('🔍 Full implementations check: ' + foundCount + '/' + functionsToCheck.length + ' available');
     }
     return foundCount;
   },
   
   waitFor(functionName, timeout = 5000) {
-    return new Promise((resolve, reject) => {
+    return new Promise(function(resolve, reject) {
       if (this.isAvailable(functionName)) {
         resolve(window[functionName]);
         return;
       }
       
-      const startTime = Date.now();
-      const checkInterval = setInterval(() => {
+      var startTime = Date.now();
+      var checkInterval = setInterval(function() {
         if (this.isAvailable(functionName)) {
           clearInterval(checkInterval);
           resolve(window[functionName]);
         } else if (Date.now() - startTime > timeout) {
           clearInterval(checkInterval);
-          reject(new Error(`Function ${functionName} not available after ${timeout}ms`));
+          reject(new Error('Function ' + functionName + ' not available after ' + timeout + 'ms'));
         }
       }, 100);
     });
@@ -875,20 +872,20 @@ function updateFormUrlDisplay(status = null) {
   console.log('updateFormUrlDisplay: Using minimal implementation');
   
   try {
-    const formUrlInput = document.getElementById('form-url-input');
+    var formUrlInput = document.getElementById('form-url-input');
     if (!formUrlInput) return;
     
-    const currentStatusToUse = status || window.currentStatus;
+    var currentStatusToUse = status || window.currentStatus;
     if (!currentStatusToUse || !currentStatusToUse.userInfo) {
       console.warn('⚠️ updateFormUrlDisplay: status情報が不足しています');
       return;
     }
     
     // Simple form URL extraction
-    let formUrl = null;
+    var formUrl = null;
     if (currentStatusToUse.userInfo.configJson) {
       try {
-        const config = typeof currentStatusToUse.userInfo.configJson === 'string' 
+        var config = typeof currentStatusToUse.userInfo.configJson === 'string' 
           ? JSON.parse(currentStatusToUse.userInfo.configJson) 
           : currentStatusToUse.userInfo.configJson;
         formUrl = config.formUrl;
@@ -899,7 +896,7 @@ function updateFormUrlDisplay(status = null) {
     
     if (formUrl) {
       formUrlInput.value = formUrl;
-      const openFormLink = document.getElementById('open-form-url-link');
+      var openFormLink = document.getElementById('open-form-url-link');
       if (openFormLink) {
         openFormLink.href = formUrl;
       }
@@ -929,18 +926,18 @@ function populateHeaderOptions(headers) {
     }
     window.populateHeaderOptionsRunning = true;
     
-    const selects = ['opinionHeader', 'reason-column', 'name-column', 'class-column'];
+    var selects = ['opinionHeader', 'reason-column', 'name-column', 'class-column'];
     
-    selects.forEach(selectId => {
-      const select = document.getElementById(selectId);
+    selects.forEach(function(selectId) {
+      var select = document.getElementById(selectId);
       if (select) {
-        const currentValue = select.value;
+        var currentValue = select.value;
         
         if (headers && headers.length > 0) {
           select.innerHTML = '<option value="">-- 列を選択 --</option>';
-          headers.forEach(header => {
+          headers.forEach(function(header) {
             if (header && typeof header === 'string' && header.trim()) {
-              const option = document.createElement('option');
+              var option = document.createElement('option');
               option.value = header;
               option.textContent = header;
               select.appendChild(option);
@@ -957,7 +954,7 @@ function populateHeaderOptions(headers) {
       }
     });
     
-    setTimeout(() => {
+    setTimeout(function() {
       window.populateHeaderOptionsRunning = false;
     }, 100);
   } catch (error) {
@@ -1009,7 +1006,7 @@ function populateConfig(cfg) {
     }
     window.populateConfigRunning = true;
     
-    const mappings = {
+    var mappings = {
       'opinionHeader': cfg.opinionHeader || cfg.opinionColumn,
       'reason-column': cfg.reasonColumn || cfg.reasonHeader,
       'name-column': cfg.nameColumn || cfg.nameHeader,
@@ -1018,9 +1015,9 @@ function populateConfig(cfg) {
       'show-counts': cfg.showCounts
     };
     
-    Object.keys(mappings).forEach(elementId => {
-      const element = document.getElementById(elementId);
-      const value = mappings[elementId];
+    Object.keys(mappings).forEach(function(elementId) {
+      var element = document.getElementById(elementId);
+      var value = mappings[elementId];
       
       if (element && value !== undefined) {
         if (element.type === 'checkbox') {
@@ -1031,7 +1028,7 @@ function populateConfig(cfg) {
       }
     });
     
-    setTimeout(() => {
+    setTimeout(function() {
       window.populateConfigRunning = false;
     }, 100);
   } catch (error) {
@@ -1047,7 +1044,7 @@ window.checkFunctionAvailability = checkFunctionAvailability;
 window.safeCallFunction = safeCallFunction;
 
 // Register all critical functions
-const criticalFunctions = [
+var criticalFunctions = [
   'toggleSection', 'hidePrivacyModal', 'hideDigitalCitizenshipModal', 
   'hideConfirmationModal', 'showFormConfigModal', 'showMessage', 
   'updateUIWithNewStatus', 'validateConfig', 'updateConfigButtons', 
@@ -1055,25 +1052,25 @@ const criticalFunctions = [
   'navigateToStep', 'initializeAdminPanel'
 ];
 
-criticalFunctions.forEach(funcName => {
+criticalFunctions.forEach(function(funcName) {
   window.AdminPanel.functionRegistry.register(funcName);
 });
 
 // Full implementation monitoring with periodic checks
-let fullImplCheckCount = 0;
-const maxFullImplChecks = 10;
+var fullImplCheckCount = 0;
+var maxFullImplChecks = 10;
 
 function checkFullImplementationsAvailability() {
   fullImplCheckCount++;
-  const foundCount = window.AdminPanel.functionRegistry.checkForFullImplementations();
+  var foundCount = window.AdminPanel.functionRegistry.checkForFullImplementations();
   
   if (foundCount > 0) {
-    console.log(`🎉 Found ${foundCount} full implementations on attempt ${fullImplCheckCount}`);
+    console.log('🎉 Found ' + foundCount + ' full implementations on attempt ' + fullImplCheckCount);
     
     // Force retry of UI updates with full implementations now available
     if (window.currentStatus && foundCount >= 3) {
       console.log('🔄 Retrying UI updates with full implementations');
-      setTimeout(() => {
+      setTimeout(function() {
         if (typeof window._fullUpdateUIWithNewStatus === 'function') {
           window._fullUpdateUIWithNewStatus(window.currentStatus);
         }
@@ -1130,15 +1127,15 @@ function disableUserInteraction() {
   }
   
   // フォーム要素の無効化
-  const forms = document.querySelectorAll('form, input, button, select, textarea');
-  forms.forEach(element => {
+  var forms = document.querySelectorAll('form, input, button, select, textarea');
+  forms.forEach(function(element) {
     element.disabled = true;
     element.style.opacity = '0.6';
   });
   
   // クリック可能な要素の無効化
-  const clickables = document.querySelectorAll('[onclick], .btn, .button');
-  clickables.forEach(element => {
+  var clickables = document.querySelectorAll('[onclick], .btn, .button');
+  clickables.forEach(function(element) {
     element.style.pointerEvents = 'none';
     element.style.opacity = '0.6';
   });
@@ -1158,15 +1155,15 @@ function enableUserInteraction() {
   }
   
   // フォーム要素の有効化
-  const forms = document.querySelectorAll('form, input, button, select, textarea');
-  forms.forEach(element => {
+  var forms = document.querySelectorAll('form, input, button, select, textarea');
+  forms.forEach(function(element) {
     element.disabled = false;
     element.style.opacity = '';
   });
   
   // クリック可能な要素の有効化
-  const clickables = document.querySelectorAll('[onclick], .btn, .button');
-  clickables.forEach(element => {
+  var clickables = document.querySelectorAll('[onclick], .btn, .button');
+  clickables.forEach(function(element) {
     element.style.pointerEvents = '';
     element.style.opacity = '';
   });
@@ -1190,37 +1187,37 @@ function updateSystemStatus(component, status, error = null) {
   if (error) {
     window.systemStatus.errors.push({ component, error: error.toString(), timestamp: Date.now() });
   }
-  logDebug(`📊 System Status: ${component} = ${status}`);
+  logDebug('📊 System Status: ' + component + ' = ' + status);
 }
 
 // 公開停止後の全セクション展開処理
 function checkAndExpandAllSections() {
   try {
-    const expandAllFlag = localStorage.getItem('expandAllSections');
+    var expandAllFlag = localStorage.getItem('expandAllSections');
     if (expandAllFlag === 'true') {
       logInfo('📂 公開停止後のため全セクションを展開します');
       
       // 少し遅延してからセクションを展開（DOM要素の準備を待つ）
-      setTimeout(() => {
-        const sectionIds = ['step1-content', 'step2-content', 'step3-content'];
-        let expandedCount = 0;
+      setTimeout(function() {
+        var sectionIds = ['step1-content', 'step2-content', 'step3-content'];
+        var expandedCount = 0;
         
-        sectionIds.forEach(sectionId => {
-          const section = document.getElementById(sectionId);
+        sectionIds.forEach(function(sectionId) {
+          var section = document.getElementById(sectionId);
           if (section) {
             // セクションが折りたたまれている場合のみ展開
             if (section.classList.contains('hidden')) {
               if (typeof toggleSection === 'function') {
                 toggleSection(sectionId);
                 expandedCount++;
-                logDebug(`✅ セクション展開: ${sectionId}`);
+                logDebug('✅ セクション展開: ' + sectionId);
               }
             }
           }
         });
         
         if (expandedCount > 0) {
-          logInfo(`📂 ${expandedCount}個のセクションを展開しました`);
+          logInfo('📂 ' + expandedCount + '個のセクションを展開しました');
         }
         
         // フラグをクリア（一度だけ実行）
@@ -1258,11 +1255,11 @@ function initializeAdminPanelMaster() {
   checkAndExpandAllSections();
   
   // フォーム作成完了表示をクリア（新規アクセス時はデフォルトで非表示）
-  setTimeout(() => {
-    const formJustCreated = sessionStorage.getItem('form_just_created');
+  setTimeout(function() {
+    var formJustCreated = sessionStorage.getItem('form_just_created');
     if (formJustCreated !== 'true') {
       // 新規作成ではない場合、セクションを非表示にする
-      const formUrlSection = document.getElementById('form-url-section');
+      var formUrlSection = document.getElementById('form-url-section');
       if (formUrlSection && !formUrlSection.classList.contains('hidden')) {
         formUrlSection.classList.add('hidden');
         logDebug('📋 既存アクセス時はフォーム完了セクションを非表示');
@@ -1272,7 +1269,7 @@ function initializeAdminPanelMaster() {
   
   // Phase 2: 各モジュールを並列初期化 (パフォーマンス向上)
   // 遅延を最小限に抑制して即座に初期化
-  setTimeout(() => {
+  setTimeout(function() {
     logDebug('🔧 Phase 2: 並列モジュール初期化開始');
     
     // Status管理初期化
@@ -1310,7 +1307,7 @@ function initializeAdminPanelMaster() {
     }
     
     // イベント管理初期化（最後に実行）
-    setTimeout(() => {
+    setTimeout(function() {
       try {
         initializeEventListeners();
         logDebug('✅ Events module initialized');
@@ -1333,7 +1330,7 @@ function initializeAdminPanelMaster() {
 
 // Finalize initialization and enable user interaction
 async function finalizeInitialization() {
-  setTimeout(async () => {
+  setTimeout(function() {
     try {
       console.log('🔄 Final initialization steps...');
       
@@ -1342,7 +1339,7 @@ async function finalizeInitialization() {
         window.unifiedLoading.hide();
       } else {
         // フォールバック: 直接DOM操作
-        const overlay = document.getElementById('loading-overlay');
+        var overlay = document.getElementById('loading-overlay');
         if (overlay) {
           overlay.classList.add('hidden');
         }
@@ -1419,19 +1416,19 @@ window.addEventListener('resize', function() {
   
   // Setup event listeners
   setupEventListeners: function() {
-    const accountBtn = document.getElementById('account-management-btn');
-    const closeBtn = document.getElementById('account-modal-close');
-    const cancelBtn = document.getElementById('account-modal-cancel');
-    const saveBtn = document.getElementById('save-access-settings');
-    const deleteBtn = document.getElementById('delete-account-btn');
-    const toggle = document.getElementById('user-access-toggle');
+    var accountBtn = document.getElementById('account-management-btn');
+    var closeBtn = document.getElementById('account-modal-close');
+    var cancelBtn = document.getElementById('account-modal-cancel');
+    var saveBtn = document.getElementById('save-access-settings');
+    var deleteBtn = document.getElementById('delete-account-btn');
+    var toggle = document.getElementById('user-access-toggle');
     
     if (accountBtn) {
-      accountBtn.addEventListener('click', () => this.openModal());
+      accountBtn.addEventListener('click', function() { self.openModal(); });
     }
     
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.closeModal());
+      closeBtn.addEventListener('click', function() { self.closeModal(); });
     }
     
     if (cancelBtn) {
@@ -1469,9 +1466,9 @@ window.addEventListener('resize', function() {
     this.modal.setAttribute('aria-hidden', 'false');
     
     // Focus management for accessibility
-    const firstFocusable = this.modal.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
+    var firstFocusable = this.modal.querySelector('button, input, textarea, select, [tabindex]:not([tabindex="-1"])');
     if (firstFocusable) {
-      setTimeout(() => firstFocusable.focus(), 100);
+      setTimeout(function() { firstFocusable.focus(); }, 100);
     }
     
     // Load current user access status
@@ -1496,8 +1493,8 @@ window.addEventListener('resize', function() {
   
   // Load current user access status
   loadCurrentStatus: function() {
-    const statusElement = document.getElementById('user-access-status');
-    const toggle = document.getElementById('user-access-toggle');
+    var statusElement = document.getElementById('user-access-status');
+    var toggle = document.getElementById('user-access-toggle');
     
     if (statusElement) {
       statusElement.textContent = '🔄 読み込み中...';
@@ -1510,8 +1507,8 @@ window.addEventListener('resize', function() {
     
     // Get current user status from the global status
     if (window.currentStatus && window.currentStatus.userInfo) {
-      const userInfo = window.currentStatus.userInfo;
-      const isActive = userInfo.isActive !== false; // Default to true if not specified
+      var userInfo = window.currentStatus.userInfo;
+      var isActive = userInfo.isActive !== false; // Default to true if not specified
       
       this.updateStatusDisplay(isActive);
       
@@ -1521,14 +1518,14 @@ window.addEventListener('resize', function() {
       }
       
       this.currentUserStatus = isActive;
-      logDebug(`📊 Current user isActive status: ${isActive}`);
+      logDebug('📊 Current user isActive status: ' + isActive);
     } else {
       // Fallback: call API to get current status
       if (typeof runGasWithUserId === 'function') {
         runGasWithUserId('getUserActiveStatus')
-          .then((result) => {
+          .then(function(result) {
             if (result && typeof result.isActive === 'boolean') {
-              const isActive = result.isActive;
+              var isActive = result.isActive;
               this.updateStatusDisplay(isActive);
               
               if (toggle) {
@@ -1541,7 +1538,7 @@ window.addEventListener('resize', function() {
               this.showStatusError('ユーザー状態の取得に失敗しました');
             }
           })
-          .catch((error) => {
+          .catch(function(error) {
             console.error('❗ Failed to load user status:', error);
             this.showStatusError('ユーザー状態の取得エラー');
           });
@@ -1553,7 +1550,7 @@ window.addEventListener('resize', function() {
   
   // Update status display
   updateStatusDisplay: function(isActive) {
-    const statusElement = document.getElementById('user-access-status');
+    var statusElement = document.getElementById('user-access-status');
     if (!statusElement) return;
     
     if (isActive) {
@@ -1567,11 +1564,11 @@ window.addEventListener('resize', function() {
   
   // Show status error
   showStatusError: function(message) {
-    const statusElement = document.getElementById('user-access-status');
-    const toggle = document.getElementById('user-access-toggle');
+    var statusElement = document.getElementById('user-access-status');
+    var toggle = document.getElementById('user-access-toggle');
     
     if (statusElement) {
-      statusElement.textContent = `❗ ${message}`;
+      statusElement.textContent = '❗ ' + message;
       statusElement.className = 'ml-2 px-2 py-1 rounded-full text-xs font-medium bg-yellow-600 text-white';
     }
     
@@ -1582,11 +1579,11 @@ window.addEventListener('resize', function() {
   
   // Handle toggle change
   onToggleChange: function() {
-    const toggle = document.getElementById('user-access-toggle');
-    const saveBtn = document.getElementById('save-access-settings');
+    var toggle = document.getElementById('user-access-toggle');
+    var saveBtn = document.getElementById('save-access-settings');
     
     if (toggle && saveBtn) {
-      const hasChanges = toggle.checked !== this.currentUserStatus;
+      var hasChanges = toggle.checked !== this.currentUserStatus;
       saveBtn.disabled = !hasChanges;
       
       if (hasChanges) {
@@ -1603,13 +1600,13 @@ window.addEventListener('resize', function() {
   
   // Save access settings
   saveAccessSettings: function() {
-    const toggle = document.getElementById('user-access-toggle');
-    const saveBtn = document.getElementById('save-access-settings');
+    var toggle = document.getElementById('user-access-toggle');
+    var saveBtn = document.getElementById('save-access-settings');
     
     if (!toggle || toggle.disabled) return;
     
-    const newStatus = toggle.checked;
-    const originalText = saveBtn.textContent;
+    var newStatus = toggle.checked;
+    var originalText = saveBtn.textContent;
     
     // Update UI
     saveBtn.disabled = true;
@@ -1617,18 +1614,18 @@ window.addEventListener('resize', function() {
     
     if (typeof runGasWithUserId === 'function') {
       runGasWithUserId('updateSelfActiveStatus', false, userId, newStatus)
-        .then((result) => {
+        .then(function(result) {
           if (result && result.success) {
             this.currentUserStatus = newStatus;
             this.updateStatusDisplay(newStatus);
             
             // Show success message
             if (window.showMessage) {
-              showMessage(`✅ アクセス設定を${newStatus ? '有効' : '無効'}に変更しました`, 'success');
+              showMessage('✅ アクセス設定を' + (newStatus ? '有効' : '無効') + 'に変更しました', 'success');
             }
             
             // Close modal after short delay
-            setTimeout(() => {
+            setTimeout(function() {
               this.closeModal();
             }, 1500);
             
@@ -1636,7 +1633,7 @@ window.addEventListener('resize', function() {
             throw new Error(result.message || '設定の保存に失敗しました');
           }
         })
-        .catch((error) => {
+        .catch(function(error) {
           console.error('❗ Failed to save access settings:', error);
           
           // Revert toggle state
@@ -1644,10 +1641,10 @@ window.addEventListener('resize', function() {
           
           // Show error message
           if (window.showMessage) {
-            showMessage(`❌ 設定の保存に失敗しました: ${error.message || error}`, 'error');
+            showMessage('❌ 設定の保存に失敗しました: ' + (error.message || error), 'error');
           }
         })
-        .finally(() => {
+        .finally(function() {
           // Reset button state
           saveBtn.textContent = originalText;
           this.onToggleChange(); // Re-evaluate button state
@@ -1668,7 +1665,7 @@ window.addEventListener('resize', function() {
     // Use existing delete account functionality
     if (typeof handleDeleteRequest === 'function') {
       this.closeModal(); // Close the modal first
-      setTimeout(() => {
+      setTimeout(function() {
         handleDeleteRequest(); // Call existing delete function
       }, 300);
     } else {
@@ -1681,8 +1678,8 @@ window.addEventListener('resize', function() {
   
   // Reset form state
   resetForm: function() {
-    const toggle = document.getElementById('user-access-toggle');
-    const saveBtn = document.getElementById('save-access-settings');
+    var toggle = document.getElementById('user-access-toggle');
+    var saveBtn = document.getElementById('save-access-settings');
     
     if (toggle && this.currentUserStatus !== null) {
       toggle.checked = this.currentUserStatus;
@@ -1746,8 +1743,8 @@ window.HistoryManager = {
    */
   _migrateOldData() {
     try {
-      const oldData = localStorage.getItem(this.OLD_STORAGE_KEY);
-      const newData = localStorage.getItem(this.STORAGE_KEY);
+      var oldData = localStorage.getItem(this.OLD_STORAGE_KEY);
+      var newData = localStorage.getItem(this.STORAGE_KEY);
       
       if (oldData && !newData) {
         console.log('🔄 Migrating history data from old key...');
@@ -1765,10 +1762,10 @@ window.HistoryManager = {
   load() {
     try {
       console.log('🔄 Loading history from localStorage...');
-      const data = localStorage.getItem(this.STORAGE_KEY);
-      const parsed = data ? JSON.parse(data) : [];
-      const validated = Array.isArray(parsed) ? parsed : [];
-      console.log(`✅ Loaded ${validated.length} history items`);
+      var data = localStorage.getItem(this.STORAGE_KEY);
+      var parsed = data ? JSON.parse(data) : [];
+      var validated = Array.isArray(parsed) ? parsed : [];
+      console.log('✅ Loaded ' + validated.length + ' history items');
       return validated;
     } catch (error) {
       console.error('❌ Failed to load history:', error);
@@ -1781,10 +1778,10 @@ window.HistoryManager = {
    */
   save(items) {
     try {
-      const safeItems = Array.isArray(items) ? items : [];
-      const limitedItems = safeItems.slice(0, this.MAX_ITEMS);
+      var safeItems = Array.isArray(items) ? items : [];
+      var limitedItems = safeItems.slice(0, this.MAX_ITEMS);
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(limitedItems));
-      console.log(`✅ Saved ${limitedItems.length} history items`);
+      console.log('✅ Saved ' + limitedItems.length + ' history items');
       return true;
     } catch (error) {
       console.error('❌ Failed to save history:', error);
@@ -1802,7 +1799,7 @@ window.HistoryManager = {
         return false;
       }
       
-      const history = this.load();
+      var history = this.load();
       history.unshift(newItem);
       return this.save(history);
     } catch (error) {
@@ -1830,7 +1827,7 @@ window.HistoryManager = {
   _formatCreatedDate(dateStr) {
     if (!dateStr) return '未設定';
     try {
-      const date = new Date(dateStr);
+      var date = new Date(dateStr);
       return date.toLocaleDateString('ja-JP', {
         month: '2-digit',
         day: '2-digit'
@@ -1846,7 +1843,7 @@ window.HistoryManager = {
   _formatPublishedDate(dateStr) {
     if (!dateStr) return '未設定';
     try {
-      const date = new Date(dateStr);
+      var date = new Date(dateStr);
       return date.toLocaleString('ja-JP', {
         year: '2-digit',  // 25年表示
         month: '2-digit',
@@ -1864,7 +1861,7 @@ window.HistoryManager = {
    */
   _formatSettingsDisplay(item) {
     // showNamesベースの判定（下位互換性も考慮）
-    let isShowNames = false;
+    var isShowNames = false;
     if (item.showNames !== undefined) {
       isShowNames = item.showNames;
     } else if (item.displayMode !== undefined) {
@@ -1872,9 +1869,9 @@ window.HistoryManager = {
       isShowNames = item.displayMode === 'named';
     }
     
-    const displayPart = isShowNames ? '👥通常' : '🎭匿名';
-    const countPart = item.showCounts ? '🔢表示' : '🚫非表示';
-    return `${displayPart}/${countPart}`;
+    var displayPart = isShowNames ? '👥通常' : '🎭匿名';
+    var countPart = item.showCounts ? '🔢表示' : '🚫非表示';
+    return displayPart + '/' + countPart;
   },
 
   /**
@@ -1891,7 +1888,7 @@ window.HistoryManager = {
       }
       
       console.log('🔄 Rendering history table...');
-      const tableBody = document.getElementById('history-table-body');
+      var tableBody = document.getElementById('history-table-body');
       
       if (!tableBody) {
         console.warn('❌ History table body element not found');
@@ -1911,7 +1908,7 @@ window.HistoryManager = {
       `;
       
       // Load and display history
-      const history = this.load();
+      var history = this.load();
       tableBody.innerHTML = '';
       
       if (history.length === 0) {
@@ -1920,10 +1917,10 @@ window.HistoryManager = {
       }
       
       // Render history items
-      let successCount = 0;
-      history.forEach((item, index) => {
+      var successCount = 0;
+      history.forEach(function(item, index) {
         try {
-          const row = this._createHistoryTableRow(item, index);
+          var row = this._createHistoryTableRow(item, index);
           if (row) {
             tableBody.appendChild(row);
             successCount++;
@@ -1946,7 +1943,7 @@ window.HistoryManager = {
    * Render empty state for history table
    */
   _renderEmptyState(tableBody) {
-    const emptyRow = document.createElement('tr');
+    var emptyRow = document.createElement('tr');
     emptyRow.innerHTML = `
       <td colspan="4" class="px-3 py-8 text-center text-gray-500 text-sm">
         <div class="flex flex-col items-center">
@@ -1963,7 +1960,7 @@ window.HistoryManager = {
    * Render error state for history table
    */
   _renderErrorState() {
-    const tableBody = document.getElementById('history-table-body');
+    var tableBody = document.getElementById('history-table-body');
     if (tableBody) {
       tableBody.innerHTML = `
         <tr>
@@ -1980,18 +1977,18 @@ window.HistoryManager = {
    */
   _createHistoryTableRow(item, index) {
     try {
-      const row = document.createElement('tr');
+      var row = document.createElement('tr');
       
       // 日付フォーマット（仕様に合わせて修正）
-      const createdDate = this._formatCreatedDate(item.createdDate);      // "08/12"
-      const publishedDate = this._formatPublishedDate(item.publishedAt);  // "25/08/12 08:45"
+      var createdDate = this._formatCreatedDate(item.createdDate);      // "08/12"
+      var publishedDate = this._formatPublishedDate(item.publishedAt);  // "25/08/12 08:45"
       
       // 問題文処理
-      const question = this._escapeHtml(item.questionText || '未設定');
-      const truncated = question.length > 30 ? question.substring(0, 30) + '...' : question;
+      var question = this._escapeHtml(item.questionText || '未設定');
+      var truncated = question.length > 30 ? question.substring(0, 30) + '...' : question;
       
       // 設定表示（アイコン/意味明確化）
-      const settingsDisplay = this._formatSettingsDisplay(item);
+      var settingsDisplay = this._formatSettingsDisplay(item);
       
       // 4列HTML生成
       row.innerHTML = `
@@ -2004,7 +2001,7 @@ window.HistoryManager = {
       // 行クリック復元機能（確認モーダル付き）
       row.style.cursor = 'pointer';
       row.classList.add('hover:bg-gray-700', 'transition-colors');
-      row.addEventListener('click', () => {
+      row.addEventListener('click', function() {
         this._showRestoreConfirmationModal(item);
       });
       
@@ -2020,8 +2017,8 @@ window.HistoryManager = {
    */
   showRestoreModal(itemId) {
     try {
-      const history = this.load();
-      const item = history.find(h => h.id === itemId);
+      var history = this.load();
+      var item = history.find(function(h) { return h.id === itemId; });
       
       if (!item) {
         console.error('❌ History item not found:', itemId);
@@ -2054,15 +2051,15 @@ window.HistoryManager = {
       console.log('🔄 Showing restore confirmation modal for:', item.questionText);
       
       // 復元する設定の詳細情報を準備
-      const formattedDate = this._formatCreatedDate(item.createdDate);
-      const truncatedQuestion = item.questionText && item.questionText.length > 50 
+      var formattedDate = this._formatCreatedDate(item.createdDate);
+      var truncatedQuestion = item.questionText && item.questionText.length > 50 
         ? item.questionText.substring(0, 50) + '...' 
         : (item.questionText || '未設定');
       
       // 現在のスプレッドシート情報を取得
-      const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || null;
-      const targetSpreadsheetId = item.spreadsheetId || null;
-      const hasSpreadsheetDifference = currentSpreadsheetId && targetSpreadsheetId && 
+      var currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId || null;
+      var targetSpreadsheetId = item.spreadsheetId || null;
+      var hasSpreadsheetDifference = currentSpreadsheetId && targetSpreadsheetId && 
                                      currentSpreadsheetId !== targetSpreadsheetId;
       
       // 拡張されたモーダルHTMLを生成
@@ -2085,7 +2082,7 @@ window.HistoryManager = {
    * Show enhanced restore confirmation modal with detailed layout
    */
   _showEnhancedRestoreModal(item, details) {
-    const modal = document.getElementById('confirmation-modal');
+    var modal = document.getElementById('confirmation-modal');
     if (!modal) {
       console.warn('⚠️ confirmation-modal not found, using fallback');
       this._showFallbackRestoreModal(item);
@@ -2093,28 +2090,28 @@ window.HistoryManager = {
     }
 
     // カスタムHTMLコンテンツを生成
-    const modalContent = this._generateRestoreModalHTML(item, details);
+    var modalContent = this._generateRestoreModalHTML(item, details);
     
     // モーダルの内容を一時的に置き換え
-    const glassPanel = modal.querySelector('.glass-panel');
-    const originalContent = glassPanel.innerHTML;
+    var glassPanel = modal.querySelector('.glass-panel');
+    var originalContent = glassPanel.innerHTML;
     glassPanel.innerHTML = modalContent;
     
     // モーダルを表示
     modal.classList.remove('hidden');
     
     // イベントハンドラーを設定
-    const confirmBtn = modal.querySelector('#restore-confirm-btn');
-    const cancelBtn = modal.querySelector('#restore-cancel-btn');
+    var confirmBtn = modal.querySelector('#restore-confirm-btn');
+    var cancelBtn = modal.querySelector('#restore-cancel-btn');
     
-    const cleanup = () => {
+    var cleanup = function() {
       // 元のコンテンツに戻す
       glassPanel.innerHTML = originalContent;
       modal.classList.add('hidden');
     };
     
     if (confirmBtn) {
-      confirmBtn.onclick = () => {
+      confirmBtn.onclick = function() {
         cleanup();
         console.log('✅ User confirmed restoration');
         this._restoreHistoryItem(item);
@@ -2122,7 +2119,7 @@ window.HistoryManager = {
     }
     
     if (cancelBtn) {
-      cancelBtn.onclick = () => {
+      cancelBtn.onclick = function() {
         cleanup();
         console.log('❌ User cancelled restoration');
       };
@@ -2133,15 +2130,19 @@ window.HistoryManager = {
    * Generate HTML content for enhanced restore modal
    */
   _generateRestoreModalHTML(item, details) {
-    const { truncatedQuestion, formattedDate, hasSpreadsheetDifference, currentSpreadsheetId, targetSpreadsheetId } = details;
+    var truncatedQuestion = details.truncatedQuestion;
+    var formattedDate = details.formattedDate;
+    var hasSpreadsheetDifference = details.hasSpreadsheetDifference;
+    var currentSpreadsheetId = details.currentSpreadsheetId;
+    var targetSpreadsheetId = details.targetSpreadsheetId;
     
     // スプレッドシートIDをマスク表示用に変換
-    const maskSpreadsheetId = (id) => {
+    var maskSpreadsheetId = function(id) {
       if (!id || id.length < 8) return id || '未設定';
       return '...' + id.slice(-6);
     };
     
-    const spreadsheetDiffSection = hasSpreadsheetDifference ? `
+    var spreadsheetDiffSection = hasSpreadsheetDifference ? `
       <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4 mb-4">
         <h4 class="text-sm font-semibold text-yellow-400 mb-2 flex items-center gap-2">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2210,13 +2211,13 @@ window.HistoryManager = {
    * Fallback restore modal for compatibility
    */
   _showFallbackRestoreModal(item) {
-    const formattedDate = this._formatCreatedDate(item.createdDate);
-    const truncatedQuestion = item.questionText && item.questionText.length > 50 
+    var formattedDate = this._formatCreatedDate(item.createdDate);
+    var truncatedQuestion = item.questionText && item.questionText.length > 50 
       ? item.questionText.substring(0, 50) + '...' 
       : (item.questionText || '未設定');
     
-    const title = '履歴復元の確認';
-    const message = `以下の設定を復元しますか？現在の設定が上書きされます。
+    var title = '履歴復元の確認';
+    var message = `以下の設定を復元しますか？現在の設定が上書きされます。
 
 📝 問題文: ${truncatedQuestion}
 📊 シート名: ${item.sheetName || '未設定'}  
@@ -2230,11 +2231,11 @@ window.HistoryManager = {
       window.sharedModals.showConfirmation(
         title,
         message,
-        () => {
+        function() {
           console.log('✅ User confirmed restoration');
           this._restoreHistoryItem(item);
         },
-        () => {
+        function() {
           console.log('❌ User cancelled restoration');
         }
       );
@@ -2243,14 +2244,14 @@ window.HistoryManager = {
       showConfirmationModal(
         title,
         message,
-        () => {
+        function() {
           console.log('✅ User confirmed restoration');
           this._restoreHistoryItem(item);
         }
       );
     } else {
       console.warn('⚠️ No confirmation modal system available, using browser confirm');
-      if (confirm(`${title}\n\n${message.replace(/📝|📊|📅|⚠️/g, '')}`)) {
+      if (confirm(title + '\n\n' + message.replace(/📝|📊|📅|⚠️/g, ''))) {
         console.log('✅ User confirmed restoration via browser confirm');
         this._restoreHistoryItem(item);
       } else {
@@ -2290,17 +2291,17 @@ window.HistoryManager = {
       // 1. テキスト設定復元（実在する要素IDに修正）
       // 必須: 回答データ列（opinionHeader セレクト）
       (function restoreOpinionHeader() {
-        const value = item.opinionHeader || item.opinionColumn || item.questionText || '';
-        const opinionSelect = document.getElementById('opinionHeader');
+        var value = item.opinionHeader || item.opinionColumn || item.questionText || '';
+        var opinionSelect = document.getElementById('opinionHeader');
         if (opinionSelect && value) {
           opinionSelect.value = value;
-          console.log(`✅ Opinion header restored: ${value}`);
+          console.log('✅ Opinion header restored: ' + value);
         }
       })();
       
       // 参考: 名前列は name-column セレクトを使用（name-header要素は存在しない）
       if (item.nameHeader) {
-        const nameSelectEl = document.getElementById('name-column');
+        var nameSelectEl = document.getElementById('name-column');
         if (nameSelectEl) nameSelectEl.value = item.nameHeader;
       }
       
@@ -2308,7 +2309,7 @@ window.HistoryManager = {
       console.log('🔄 Restoring column selections from history');
       
       // 復元する列選択データを準備し、保護用に保存
-      const columnSelections = {
+      var columnSelections = {
         opinionHeader: item.opinionHeader || item.opinionColumn || item.questionText || '',
         nameColumn: item.nameHeader || item.nameColumn || '',
         classColumn: item.classColumn || '',
@@ -2319,16 +2320,16 @@ window.HistoryManager = {
       window._historyColumnSelections = columnSelections;
       
       // DOM要素への値設定を関数化して確実に実行
-      const setSelectValue = (elementId, value, description) => {
+      var setSelectValue = function(elementId, value, description) {
         if (!value) return;
-        const element = document.getElementById(elementId);
+        var element = document.getElementById(elementId);
         if (element) {
           element.value = value;
           // change イベントを発火して、UIの更新をトリガー
           element.dispatchEvent(new Event('change', { bubbles: true }));
-          console.log(`✅ ${description} restored: ${value}`);
+          console.log('✅ ' + description + ' restored: ' + value);
         } else {
-          console.warn(`⚠️ Element not found: ${elementId}`);
+          console.warn('⚠️ Element not found: ' + elementId);
         }
       };
       
@@ -2339,7 +2340,7 @@ window.HistoryManager = {
       setSelectValue('reasonHeader', columnSelections.reasonHeader, 'Reason header');
       
       // 2. 名前表示設定復元（showNamesベース）
-      const showNamesCheckbox = document.getElementById('show-names');
+      var showNamesCheckbox = document.getElementById('show-names');
       if (showNamesCheckbox) {
         if (item.showNames !== undefined) {
           showNamesCheckbox.checked = item.showNames;
@@ -2350,7 +2351,7 @@ window.HistoryManager = {
       }
       
       // 3. リアクション数表示復元
-      const showCountsCheckbox = document.getElementById('show-counts');
+      var showCountsCheckbox = document.getElementById('show-counts');
       if (showCountsCheckbox) {
         showCountsCheckbox.checked = (item.showCounts === true);
       }
@@ -2375,9 +2376,9 @@ window.HistoryManager = {
         console.warn('🔧 Attempting fallback: trying to find sheet by question text');
         
         // フォールバック: 問題文からシート名を推測
-        const fallbackSheetName = await this._findSheetByQuestionText(item.questionText);
+        var fallbackSheetName = await this._findSheetByQuestionText(item.questionText);
         if (fallbackSheetName) {
-          console.log(`✅ Fallback found sheet: ${fallbackSheetName}`);
+          console.log('✅ Fallback found sheet: ' + fallbackSheetName);
           await this._restoreSheetSelection(fallbackSheetName);
         } else {
           console.error('❌ Fallback failed: unable to determine correct sheet');
@@ -2388,12 +2389,12 @@ window.HistoryManager = {
       await this._refreshAfterRestore();
       
       // 復元完了後に少し待ってからフラグをクリア（UI反映完了を待つ）
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(function(resolve) { setTimeout(resolve, 500); });
       
       // Success message with specific details
       if (typeof showMessage === 'function') {
-        const sheetInfo = item.sheetName ? `シート「${item.sheetName}」` : '設定';
-        showMessage(`✅ 履歴から${sheetInfo}を復元しました`, 'success');
+        var sheetInfo = item.sheetName ? 'シート「' + item.sheetName + '」' : '設定';
+        showMessage('✅ 履歴から' + sheetInfo + 'を復元しました', 'success');
       }
       console.log('✅ Complete restore finished successfully');
       
@@ -2401,8 +2402,8 @@ window.HistoryManager = {
       console.error('❌ History restore failed:', error);
       
       // Enhanced error handling with rollback capability
-      let errorMessage = '❌ 設定復元に失敗しました';
-      let shouldAttemptRollback = false;
+      var errorMessage = '❌ 設定復元に失敗しました';
+      var shouldAttemptRollback = false;
       
       if (error.message?.includes('Unable to parse range') || error.message?.includes('Invalid range')) {
         errorMessage = '❌ シート名の形式に問題があります。管理者にご連絡ください。';
@@ -2446,7 +2447,7 @@ window.HistoryManager = {
       });
     } finally {
       // 遅延してフラグをクリア（UI更新が完全に完了するのを待つ）
-      setTimeout(() => {
+      setTimeout(function() {
         // AI列判定スキップフラグをクリア
         if (window._historyRestoreInProgress) {
           window._historyRestoreInProgress = false;
@@ -2475,18 +2476,18 @@ window.HistoryManager = {
    */
   async _findSheetByQuestionText(questionText) {
     try {
-      console.log(`🔍 Searching for sheet with question: "${questionText}"`);
+      console.log('🔍 Searching for sheet with question: "' + questionText + '"');
       
       // 現在のステータスから設定情報を取得
       if (window.AdminPanel?.currentStatus?.configJson) {
-        const configJson = window.AdminPanel.currentStatus.configJson;
+        var configJson = window.AdminPanel.currentStatus.configJson;
         
         // 各シート設定を確認
-        for (const [key, sheetConfig] of Object.entries(configJson)) {
+        for (var [key, sheetConfig] of Object.entries(configJson)) {
           if (key.startsWith('sheet_') && sheetConfig.opinionHeader) {
             if (sheetConfig.opinionHeader === questionText) {
-              const sheetName = sheetConfig.sheetName || key.replace('sheet_', '');
-              console.log(`✅ Found matching sheet: ${sheetName}`);
+              var sheetName = sheetConfig.sheetName || key.replace('sheet_', '');
+              console.log('✅ Found matching sheet: ' + sheetName);
               return sheetName;
             }
           }
@@ -2510,7 +2511,7 @@ window.HistoryManager = {
     
     // Remove potentially problematic characters but preserve most Unicode
     // Keep: letters, numbers, spaces, basic punctuation
-    const sanitized = sheetName
+    var sanitized = sheetName
       .replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '') // Keep alphanumeric, spaces, and Japanese characters
       .trim();
     
@@ -2523,22 +2524,22 @@ window.HistoryManager = {
   async _restoreFullProject(spreadsheetId, sheetName) {
     try {
       // シート名をサニタイズ
-      const sanitizedSheetName = this._sanitizeSheetName(sheetName);
-      console.log(`🔄 Restoring full project: ${spreadsheetId}/${sheetName} (sanitized: ${sanitizedSheetName})`);
+      var sanitizedSheetName = this._sanitizeSheetName(sheetName);
+      console.log('🔄 Restoring full project: ' + spreadsheetId + '/' + sheetName + ' (sanitized: ' + sanitizedSheetName + ')');
       
       // 現在のスプレッドシートIDを取得
-      const getCurrentSpreadsheetId = () => {
+      var getCurrentSpreadsheetId = function() {
         if (window.AdminPanel?.currentStatus?.userInfo?.spreadsheetId) {
           return window.AdminPanel.currentStatus.userInfo.spreadsheetId;
         }
         return null;
       };
       
-      const currentSpreadsheetId = getCurrentSpreadsheetId();
+      var currentSpreadsheetId = getCurrentSpreadsheetId();
       
       // 異なるスプレッドシートの場合のみ切り替え処理
       if (spreadsheetId !== currentSpreadsheetId) {
-        console.log(`🔄 Switching spreadsheet: ${currentSpreadsheetId} → ${spreadsheetId}`);
+        console.log('🔄 Switching spreadsheet: ' + currentSpreadsheetId + ' → ' + spreadsheetId);
         
         // スプレッドシート切り替えの通知
         if (typeof showMessage === 'function') {
@@ -2550,13 +2551,13 @@ window.HistoryManager = {
         
         // スプレッドシート切り替え後の安定化待機
         console.log('⏳ Waiting for spreadsheet switch to stabilize...');
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(function(resolve) { setTimeout(resolve, 1500); });
         
         // UI更新完了を待機してからシート選択復元
-        console.log(`🔄 Waiting for sheet options to include: ${sanitizedSheetName}`);
-        const sheetFound = await this._waitForSheetOptionsUpdate(sanitizedSheetName);
+        console.log('🔄 Waiting for sheet options to include: ' + sanitizedSheetName);
+        var sheetFound = await this._waitForSheetOptionsUpdate(sanitizedSheetName);
         if (!sheetFound) {
-          console.warn(`⚠️ Sheet ${sanitizedSheetName} not found in options after waiting, proceeding with fallback`);
+          console.warn('⚠️ Sheet ' + sanitizedSheetName + ' not found in options after waiting, proceeding with fallback');
         }
         
         // **CRITICAL**: Force correct the activeSheetName in loaded status
@@ -2596,8 +2597,8 @@ window.HistoryManager = {
   async _restoreSheetSelection(sheetName) {
     try {
       // サニタイズされたシート名を使用
-      const sanitizedSheetName = this._sanitizeSheetName(sheetName);
-      console.log(`🔄 Restoring sheet selection: "${sheetName}" (sanitized: "${sanitizedSheetName}")`);
+      var sanitizedSheetName = this._sanitizeSheetName(sheetName);
+      console.log('🔄 Restoring sheet selection: "' + sheetName + '" (sanitized: "' + sanitizedSheetName + '")');
       
       // グローバル状態更新（サニタイズされた名前を使用）
       window.AdminPanel.selectedSheet = sanitizedSheetName;
@@ -2606,13 +2607,13 @@ window.HistoryManager = {
       }
       
       // シート選択UI更新
-      const sheetSelect = document.getElementById('sheet-select');
+      var sheetSelect = document.getElementById('sheet-select');
       if (sheetSelect) {
         // Find the option that matches either the original or sanitized name
-        const options = Array.from(sheetSelect.options);
-        const matchingOption = options.find(option => 
-          option.value === sheetName || option.value === sanitizedSheetName
-        );
+        var options = Array.from(sheetSelect.options);
+        var matchingOption = options.find(function(option) { 
+          return option.value === sheetName || option.value === sanitizedSheetName;
+        });
         
         if (matchingOption && sheetSelect.value !== matchingOption.value) {
           sheetSelect.value = matchingOption.value;
@@ -2623,13 +2624,13 @@ window.HistoryManager = {
             updateSheetSelectActiveIndicator(matchingOption.value);
           }
           
-          console.log(`✅ Sheet selection UI updated to: ${matchingOption.value}`);
+          console.log('✅ Sheet selection UI updated to: ' + matchingOption.value);
         } else if (!matchingOption) {
-          console.warn(`⚠️ Sheet "${sheetName}" not found in options. Available: ${options.map(o => o.value).join(', ')}`);
+          console.warn('⚠️ Sheet "' + sheetName + '" not found in options. Available: ' + options.map(function(o) { return o.value; }).join(', '));
         }
       }
       
-      console.log(`✅ Sheet restored: ${sanitizedSheetName}`);
+      console.log('✅ Sheet restored: ' + sanitizedSheetName);
     } catch (error) {
       console.warn('⚠️ Sheet restore warning:', error);
     }
@@ -2639,19 +2640,19 @@ window.HistoryManager = {
    * Refresh UI after history restore with enhanced error handling
    */
   async _refreshAfterRestore() {
-    const refreshSteps = [
-      { name: 'データ再読込', fn: () => typeof loadData === 'function' ? loadData() : Promise.resolve() }
+    var refreshSteps = [
+      { name: 'データ再読込', fn: function() { return typeof loadData === 'function' ? loadData() : Promise.resolve(); } }
       // 列判定更新は履歴復元時はスキップ（復元した設定値を保持するため）
     ];
     
     // Execute each step with individual error handling
-    for (const step of refreshSteps) {
+    for (var step of refreshSteps) {
       try {
-        console.log(`🔄 Executing refresh step: ${step.name}`);
+        console.log('🔄 Executing refresh step: ' + step.name);
         await step.fn();
-        console.log(`✅ ${step.name} completed`);
+        console.log('✅ ' + step.name + ' completed');
       } catch (error) {
-        console.warn(`⚠️ ${step.name} failed, continuing with next step:`, error);
+        console.warn('⚠️ ' + step.name + ' failed, continuing with next step:', error);
         // Continue with other steps even if one fails
       }
     }
@@ -2660,14 +2661,14 @@ window.HistoryManager = {
     if (window._historyRestoreInProgress) {
       try {
         // ヘッダー描画・選択反映完了を少し待ってから保存
-        await new Promise(resolve => setTimeout(resolve, 600)); // Increased wait time
+        await new Promise(function(resolve) { setTimeout(resolve, 600); }); // Increased wait time
         
-        const sheetName = (window.AdminPanel && window.AdminPanel.selectedSheet) || (document.getElementById('sheet-select')?.value) || '';
-        const spreadsheetId = (window.currentStatus && window.currentStatus.userInfo && window.currentStatus.userInfo.spreadsheetId) || null;
+        var sheetName = (window.AdminPanel && window.AdminPanel.selectedSheet) || (document.getElementById('sheet-select')?.value) || '';
+        var spreadsheetId = (window.currentStatus && window.currentStatus.userInfo && window.currentStatus.userInfo.spreadsheetId) || null;
         
         if (sheetName && spreadsheetId && typeof buildConfigObject === 'function' && typeof runGasWithUserId === 'function') {
-          const config = buildConfigObject();
-          console.log(`🔄 Saving restored configuration for sheet: ${sheetName}`);
+          var config = buildConfigObject();
+          console.log('🔄 Saving restored configuration for sheet: ' + sheetName);
           
           // Save sheet configuration with retry
           await this._saveConfigWithRetry(spreadsheetId, sheetName, config);
@@ -2699,17 +2700,17 @@ window.HistoryManager = {
    * Save configuration with retry mechanism
    */
   async _saveConfigWithRetry(spreadsheetId, sheetName, config, maxRetries = 2) {
-    for (let i = 0; i <= maxRetries; i++) {
+    for (var i = 0; i <= maxRetries; i++) {
       try {
         await runGasWithUserId('saveSheetConfig', '設定保存中...', spreadsheetId, sheetName, config);
-        console.log(`✅ Configuration saved successfully for sheet: ${sheetName}`);
+        console.log('✅ Configuration saved successfully for sheet: ' + sheetName);
         return;
       } catch (error) {
-        console.warn(`❌ Save config attempt ${i + 1} failed:`, error);
+        console.warn('❌ Save config attempt ' + (i + 1) + ' failed:', error);
         if (i === maxRetries) {
           throw error; // Re-throw on final attempt
         }
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Progressive delay
+        await new Promise(function(resolve) { setTimeout(resolve, 1000 * (i + 1)); }); // Progressive delay
       }
     }
   },
@@ -2718,18 +2719,18 @@ window.HistoryManager = {
    * Activate sheet with retry mechanism
    */
   async _activateSheetWithRetry(spreadsheetId, sheetName, maxRetries = 2) {
-    for (let i = 0; i <= maxRetries; i++) {
+    for (var i = 0; i <= maxRetries; i++) {
       try {
         await runGasWithUserId('switchToSheet', false, spreadsheetId, sheetName);
-        console.log(`✅ Sheet activated successfully: ${sheetName}`);
+        console.log('✅ Sheet activated successfully: ' + sheetName);
         return;
       } catch (error) {
-        console.warn(`❌ Activate sheet attempt ${i + 1} failed:`, error);
+        console.warn('❌ Activate sheet attempt ' + (i + 1) + ' failed:', error);
         if (i === maxRetries) {
           console.warn('⚠️ Failed to activate sheet after all retries, but continuing');
           return; // Don't throw for sheet activation failure
         }
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Progressive delay
+        await new Promise(function(resolve) { setTimeout(resolve, 1000 * (i + 1)); }); // Progressive delay
       }
     }
   },
@@ -2741,7 +2742,7 @@ window.HistoryManager = {
     try {
       // 1. Update user's active spreadsheet in database
       if (typeof runGasWithUserId === 'function') {
-        const updateResult = await runGasWithUserId('updateUserAPI', false, {
+        var updateResult = await runGasWithUserId('updateUserAPI', false, {
           spreadsheetId: targetSpreadsheetId
         });
         
@@ -2803,7 +2804,7 @@ window.HistoryManager = {
       });
       
       // Use current status first (already loaded via unified API)
-      const currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
+      var currentSpreadsheetId = window.currentStatus?.userInfo?.spreadsheetId;
       
       if (currentSpreadsheetId !== targetSpreadsheetId) {
         console.warn('⚠️ Spreadsheet ID mismatch detected:', {
@@ -2826,12 +2827,12 @@ window.HistoryManager = {
    * Wait for sheet options to be updated with target sheet
    */
   async _waitForSheetOptionsUpdate(targetSheetName, maxWaitTime = 3000) {
-    const startTime = Date.now();
-    const checkInterval = 100; // Check every 100ms
+    var startTime = Date.now();
+    var checkInterval = 100; // Check every 100ms
     
-    return new Promise((resolve, reject) => {
-      const checkSheetOptions = () => {
-        const select = document.getElementById('sheet-select');
+    return new Promise(function(resolve, reject) {
+      var checkSheetOptions = function() {
+        var select = document.getElementById('sheet-select');
         if (!select) {
           console.warn('⚠️ Sheet select element not found during wait');
           resolve(false);
@@ -2839,19 +2840,19 @@ window.HistoryManager = {
         }
         
         // Check if target sheet is in options
-        const options = Array.from(select.options);
-        const hasTargetSheet = options.some(option => option.value === targetSheetName);
+        var options = Array.from(select.options);
+        var hasTargetSheet = options.some(function(option) { return option.value === targetSheetName; });
         
         if (hasTargetSheet) {
-          console.log(`✅ Target sheet found in options: ${targetSheetName}`);
+          console.log('✅ Target sheet found in options: ' + targetSheetName);
           resolve(true);
           return;
         }
         
         // Check timeout
-        const elapsed = Date.now() - startTime;
+        var elapsed = Date.now() - startTime;
         if (elapsed >= maxWaitTime) {
-          console.warn(`⚠️ Timeout waiting for sheet options update (${elapsed}ms). Available: ${options.map(o => o.value).join(', ')}`);
+          console.warn('⚠️ Timeout waiting for sheet options update (' + elapsed + 'ms). Available: ' + options.map(function(o) { return o.value; }).join(', '));
           resolve(false); // Don't reject, allow fallback
           return;
         }
@@ -2880,13 +2881,13 @@ window.HistoryManager = {
    */
   async _updatePublishedSheetInfo(sheetName) {
     try {
-      console.log(`🔄 Updating published sheet info to: ${sheetName}`);
+      console.log('🔄 Updating published sheet info to: ' + sheetName);
       
       // サーバーサイドで公開シート情報を更新
       if (typeof runGasWithUserId === 'function') {
-        const response = await runGasWithUserId('activateSheetSimple', false, sheetName);
+        var response = await runGasWithUserId('activateSheetSimple', false, sheetName);
         if (response && response.status === 'success') {
-          console.log(`✅ Published sheet info updated on server: ${sheetName}`);
+          console.log('✅ Published sheet info updated on server: ' + sheetName);
         }
       }
       
@@ -2906,7 +2907,7 @@ window.HistoryManager = {
       if (typeof updateTopicText === 'function') {
         try {
           // より適切なstatusオブジェクトを取得
-          const statusForUpdate = window.currentStatus || window.AdminPanel?.currentStatus;
+          var statusForUpdate = window.currentStatus || window.AdminPanel?.currentStatus;
           if (statusForUpdate) {
             updateTopicText(statusForUpdate);
           } else {
@@ -2930,14 +2931,14 @@ window.HistoryManager = {
       console.log('📝 ドラフトモードでのUI更新を適用中...');
       
       // 履歴復元の保護フラグを一時的に無効化してUI更新を実行
-      const originalRestoreFlag = window._historyRestoreInProgress;
-      const originalColumnSelections = window._historyColumnSelections;
+      var originalRestoreFlag = window._historyRestoreInProgress;
+      var originalColumnSelections = window._historyColumnSelections;
       
       window._historyRestoreInProgress = false;
       window._historyColumnSelections = null;
       
       // 現在のフォーム値を読み取って設定オブジェクトを構築
-      const currentConfig = this._getDraftConfiguration();
+      var currentConfig = this._getDraftConfiguration();
       
       // populateConfigを呼び出してUI更新
       if (typeof window._fullPopulateConfig === 'function') {
@@ -2967,25 +2968,25 @@ window.HistoryManager = {
    * 現在のドラフト設定を取得
    */
   _getDraftConfiguration() {
-    const config = {};
+    var config = {};
     
     // 各フォーム要素から現在の値を取得
-    const opinionHeaderEl = document.getElementById('opinionHeader');
+    var opinionHeaderEl = document.getElementById('opinionHeader');
     if (opinionHeaderEl) config.opinionHeader = opinionHeaderEl.value;
     
-    const nameColumnEl = document.getElementById('name-column');
+    var nameColumnEl = document.getElementById('name-column');
     if (nameColumnEl) config.nameColumn = nameColumnEl.value;
     
-    const classColumnEl = document.getElementById('class-column');
+    var classColumnEl = document.getElementById('class-column');
     if (classColumnEl) config.classColumn = classColumnEl.value;
     
-    const reasonHeaderEl = document.getElementById('reasonHeader');
+    var reasonHeaderEl = document.getElementById('reasonHeader');
     if (reasonHeaderEl) config.reasonHeader = reasonHeaderEl.value;
     
-    const showNamesEl = document.getElementById('show-names');
+    var showNamesEl = document.getElementById('show-names');
     if (showNamesEl) config.showNames = showNamesEl.checked;
     
-    const showCountsEl = document.getElementById('show-counts');
+    var showCountsEl = document.getElementById('show-counts');
     if (showCountsEl) config.showCounts = showCountsEl.checked;
     
     return config;
@@ -2995,14 +2996,14 @@ window.HistoryManager = {
    * 統合されたドラフトモード状態インジケーターの表示
    */
   _showDraftModeIndicator() {
-    const indicatorSection = document.getElementById('draft-mode-indicator-section');
+    var indicatorSection = document.getElementById('draft-mode-indicator-section');
     if (indicatorSection) {
       indicatorSection.classList.remove('hidden');
       console.log('✅ 統合ドラフトインジケーターを表示しました');
     }
     
     // ドラフト機能ヘルプも表示
-    const helpSection = document.getElementById('draft-help-section');
+    var helpSection = document.getElementById('draft-help-section');
     if (helpSection) {
       helpSection.classList.remove('hidden');
       console.log('💡 ドラフトヘルプセクションを表示しました');
@@ -3013,14 +3014,14 @@ window.HistoryManager = {
    * ドラフトモード状態インジケーターの非表示
    */
   _hideDraftModeIndicator() {
-    const indicatorSection = document.getElementById('draft-mode-indicator-section');
+    var indicatorSection = document.getElementById('draft-mode-indicator-section');
     if (indicatorSection) {
       indicatorSection.classList.add('hidden');
       console.log('✅ 統合ドラフトインジケーターを非表示にしました');
     }
     
     // ドラフト機能ヘルプも非表示
-    const helpSection = document.getElementById('draft-help-section');
+    var helpSection = document.getElementById('draft-help-section');
     if (helpSection) {
       helpSection.classList.add('hidden');
       console.log('💡 ドラフトヘルプセクションを非表示にしました');
@@ -3038,8 +3039,8 @@ window.HistoryManager = {
       isDraftMode = window._draftModeActive;
     }
     
-    const saveButton = document.getElementById('save-publish-btn');
-    const saveButtonText = document.getElementById('save-publish-text');
+    var saveButton = document.getElementById('save-publish-btn');
+    var saveButtonText = document.getElementById('save-publish-text');
     
     if (saveButton && saveButtonText) {
       if (isDraftMode) {
@@ -3068,9 +3069,9 @@ window.HistoryManager = {
         
         // Also update spreadsheet URL if available
         if (window.currentStatus.userInfo.spreadsheetUrl) {
-          const correctedUrl = window.currentStatus.userInfo.spreadsheetUrl.replace(
+          var correctedUrl = window.currentStatus.userInfo.spreadsheetUrl.replace(
             /\/spreadsheets\/d\/[a-zA-Z0-9-_]+/,
-            `/spreadsheets/d/${targetSpreadsheetId}`
+            '/spreadsheets/d/' + targetSpreadsheetId
           );
           window.currentStatus.userInfo.spreadsheetUrl = correctedUrl;
           console.log('🔗 Spreadsheet URL also corrected');
@@ -3084,9 +3085,9 @@ window.HistoryManager = {
       }
       
       // 3. UI要素の修正
-      const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+      var spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
       if (spreadsheetBtn) {
-        const correctedUrl = `https://docs.google.com/spreadsheets/d/${targetSpreadsheetId}/edit`;
+        var correctedUrl = 'https://docs.google.com/spreadsheets/d/' + targetSpreadsheetId + '/edit';
         spreadsheetBtn.href = correctedUrl;
         console.log('🔗 Spreadsheet button URL updated');
       }
@@ -3105,7 +3106,7 @@ window.HistoryManager = {
   },
 
   _escapeHtml(text) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = text || '';
     return div.innerHTML;
   }
@@ -3113,8 +3114,8 @@ window.HistoryManager = {
 
 // History manager integration
 window.AdminPanel.historyManager = {
-  loadSimpleHistoryTable: () => window.HistoryManager.renderTable(),
-  restoreFromSimpleHistory: (item) => window.HistoryManager._restoreHistoryItem(item)
+  loadSimpleHistoryTable: function() { return window.HistoryManager.renderTable(); },
+  restoreFromSimpleHistory: function(item) { return window.HistoryManager._restoreHistoryItem(item); }
 };
 
 //# sourceURL=adminPanel-framework.js.html

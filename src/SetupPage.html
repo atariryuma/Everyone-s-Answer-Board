@@ -164,7 +164,7 @@
                 const required = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email'];
                 for (const field of required) {
                     if (!parsed[field]) {
-                        throw new Error(`必須フィールド '${field}' が見つかりません`);
+                        throw new Error('必須フィールド \'' + field + '\' が見つかりません');
                     }
                 }
                 if (parsed.type !== 'service_account') {
@@ -172,7 +172,7 @@
                 }
                 return true;
             } catch (e) {
-                throw new Error(`JSON形式が無効です: ${e.message}`);
+                throw new Error('JSON形式が無効です: ' + e.message);
             }
         }
 
@@ -223,13 +223,9 @@
                         })
                         .withFailureHandler((error) => {
                             console.error('Setup error:', error);
-                            let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
+                            let displayMessage = '❌ セットアップに失敗しました: ' + (error.message || error);
                             if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
-                                displayMessage = `
-                                    <p class="font-bold">${error.message}</p>
-                                    <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
-                                    <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
-                                `;
+                                displayMessage = '\n                                    <p class="font-bold">' + error.message + '</p>\n                                    <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>\n                                    <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>\n                                ';
                             }
                             showMessage(displayMessage, 'error');
                             reject(error);
@@ -238,7 +234,7 @@
                 });
                 
             } catch (error) {
-                showMessage(`❌ ${error.message}`, 'error');
+                showMessage('❌ ' + error.message, 'error');
             } finally {
                 // ボタン状態をリセット
                 setupBtn.disabled = false;
@@ -255,12 +251,12 @@
             
             google.script.run
                 .withSuccessHandler((result) => {
-                    showMessage(`${result.message}`, result.status === 'success' ? 'success' : 'warning');
+                    showMessage(result.message, result.status === 'success' ? 'success' : 'warning');
                     this.disabled = false;
                     this.innerHTML = '🔍 システムテスト実行';
                 })
                 .withFailureHandler((error) => {
-                    showMessage(`テスト実行に失敗しました: ${error.message || error}`, 'error');
+                    showMessage('テスト実行に失敗しました: ' + (error.message || error), 'error');
                     this.disabled = false;
                     this.innerHTML = '🔍 システムテスト実行';
                 })

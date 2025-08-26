@@ -77,29 +77,30 @@ window.cacheManager = window.cacheManager || {
 /**
  * フロー実行制御マネージャー - 重複実行・競合状態を防止
  */
-class FlowExecutionManager {
-  constructor() {
-    this.activeFlows = new Set();
-    this.pendingOperations = new Map();
-    this.executionQueue = new Map();
-    this.debugMode = window.DEBUG_MODE || false;
-  }
+function FlowExecutionManager() {
+  this.activeFlows = new Set();
+  this.pendingOperations = new Map();
+  this.executionQueue = new Map();
+  this.debugMode = window.DEBUG_MODE || false;
+}
 
-  /**
-   * 排他実行制御付きでフロー実行
-   * @param {string} flowId - フロー識別子
-   * @param {Function} operation - 実行する操作
-   * @param {Object} options - 実行オプション
-   * @returns {Promise} 実行結果
-   */
-  async executeWithLock(flowId, operation, options = {}) {
-    const { timeout = SYSTEM_CONSTANTS.TIMEOUTS.DEFAULT_FLOW_TIMEOUT, allowQueue = false } = options;
+/**
+ * 排他実行制御付きでフロー実行
+ * @param {string} flowId - フロー識別子
+ * @param {Function} operation - 実行する操作
+ * @param {Object} options - 実行オプション
+ * @returns {Promise} 実行結果
+ */
+FlowExecutionManager.prototype.executeWithLock = function(flowId, operation, options) {
+  options = options || {};
+  var timeout = options.timeout || SYSTEM_CONSTANTS.TIMEOUTS.DEFAULT_FLOW_TIMEOUT;
+  var allowQueue = options.allowQueue || false;
 
     // 既に実行中の場合の処理
     if (this.activeFlows.has(flowId)) {
       if (this.pendingOperations.has(flowId)) {
         if (this.debugMode) {
-          logDebug(`🔒 Flow ${flowId} already in progress, returning existing promise`);
+          logDebug('🔒 Flow ' + flowId + ' already in progress, returning existing promise');
         }
         return this.pendingOperations.get(flowId);
       }
@@ -110,174 +111,198 @@ class FlowExecutionManager {
       
       // キューに追加
       if (this.debugMode) {
-        logDebug(`⏳ Flow ${flowId} queued for execution`);
+        logDebug('⏳ Flow ' + flowId + ' queued for execution');
       }
       return this.queueOperation(flowId, operation, timeout);
     }
 
     // 新規実行
     return this.executeOperation(flowId, operation, timeout);
-  }
+};
 
-  /**
-   * 操作を実行（改良版 - AbortController対応）
-   */
-  async executeOperation(flowId, operation, timeout) {
-    this.activeFlows.add(flowId);
+/**
+ * 操作を実行（改良版 - AbortController対応）
+ */
+FlowExecutionManager.prototype.executeOperation = function(flowId, operation, timeout) {
+    var self = this;
+    self.activeFlows.add(flowId);
     
-    if (this.debugMode) {
+    if (self.debugMode) {
       console.log('🚀 Starting flow execution: ' + flowId);
     }
 
     // AbortControllerを使用した適切なタイムアウト制御
-    const abortController = new AbortController();
-    let timeoutId = null;
+    var abortController = new AbortController();
+    var timeoutId = null;
     
     try {
       // タイムアウト設定
-      timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(function() {
         console.warn('⏰ Flow ' + flowId + ' timeout after ' + timeout + 'ms - aborting operation');
         abortController.abort();
       }, timeout);
 
       // 操作実行（AbortSignalを渡す）
-      const operationPromise = Promise.resolve(operation(abortController.signal));
-      this.pendingOperations.set(flowId, operationPromise);
+      var operationPromise = Promise.resolve(operation(abortController.signal));
+      self.pendingOperations.set(flowId, operationPromise);
 
-      const result = await operationPromise;
-      
-      // 正常完了時はタイムアウトをクリア
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      
-      
-      return result;
+      return operationPromise.then(function(result) {
+        // 正常完了時はタイムアウトをクリア
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        
+        return result;
+      }).catch(function(error) {
+        // タイムアウトをクリア
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+
+        // AbortErrorの場合はより詳細なエラーメッセージ
+        if (error.name === 'AbortError' || abortController.signal.aborted) {
+          var timeoutError = new Error('Flow ' + flowId + ' was aborted due to timeout (' + timeout + 'ms)');
+          timeoutError.name = 'TimeoutError';
+          timeoutError.flowId = flowId;
+          timeoutError.timeout = timeout;
+          console.error('❌ Flow ' + flowId + ' aborted due to timeout');
+          throw timeoutError;
+        }
+
+        console.error('❌ Flow ' + flowId + ' failed:', error);
+        throw error;
+      }).then(function(result) {
+        // リソースクリーンアップ
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        
+        self.activeFlows.delete(flowId);
+        self.pendingOperations.delete(flowId);
+        
+        // キューされた操作を実行
+        self.processQueue(flowId);
+        
+        return result;
+      });
     } catch (error) {
-      // タイムアウトをクリア
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-
-      // AbortErrorの場合はより詳細なエラーメッセージ
-      if (error.name === 'AbortError' || abortController.signal.aborted) {
-        const timeoutError = new Error(`Flow ${flowId} was aborted due to timeout (${timeout}ms)`);
-        timeoutError.name = 'TimeoutError';
-        timeoutError.flowId = flowId;
-        timeoutError.timeout = timeout;
-        console.error(`❌ Flow ${flowId} aborted due to timeout`);
-        throw timeoutError;
-      }
-
-      console.error(`❌ Flow ${flowId} failed:`, error);
-      throw error;
-    } finally {
       // リソースクリーンアップ
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       
-      this.activeFlows.delete(flowId);
-      this.pendingOperations.delete(flowId);
+      self.activeFlows.delete(flowId);
+      self.pendingOperations.delete(flowId);
       
       // キューされた操作を実行
-      this.processQueue(flowId);
+      self.processQueue(flowId);
+      
+      throw error;
     }
-  }
+};
 
-  /**
-   * 操作をキューに追加
-   */
-  async queueOperation(flowId, operation, timeout) {
-    return new Promise((resolve, reject) => {
-      if (!this.executionQueue.has(flowId)) {
-        this.executionQueue.set(flowId, []);
+/**
+ * 操作をキューに追加
+ */
+FlowExecutionManager.prototype.queueOperation = function(flowId, operation, timeout) {
+    var self = this;
+    return new Promise(function(resolve, reject) {
+      if (!self.executionQueue.has(flowId)) {
+        self.executionQueue.set(flowId, []);
       }
       
-      this.executionQueue.get(flowId).push({
-        operation,
-        timeout,
-        resolve,
-        reject
+      self.executionQueue.get(flowId).push({
+        operation: operation,
+        timeout: timeout,
+        resolve: resolve,
+        reject: reject
       });
     });
-  }
+};
 
-  /**
-   * キューされた操作を処理
-   */
-  async processQueue(flowId) {
-    const queue = this.executionQueue.get(flowId);
+/**
+ * キューされた操作を処理
+ */
+FlowExecutionManager.prototype.processQueue = function(flowId) {
+    var self = this;
+    var queue = self.executionQueue.get(flowId);
     if (!queue || queue.length === 0) return;
 
-    const next = queue.shift();
+    var next = queue.shift();
     if (queue.length === 0) {
-      this.executionQueue.delete(flowId);
+      self.executionQueue.delete(flowId);
     }
 
     try {
-      const result = await this.executeOperation(flowId, next.operation, next.timeout);
-      next.resolve(result);
+      var resultPromise = self.executeOperation(flowId, next.operation, next.timeout);
+      resultPromise.then(function(result) {
+        next.resolve(result);
+      }).catch(function(error) {
+        next.reject(error);
+      });
     } catch (error) {
       next.reject(error);
     }
-  }
+};
 
-  /**
-   * 指定フローの実行状態を確認
-   */
-  isFlowActive(flowId) {
+/**
+ * 指定フローの実行状態を確認
+ */
+FlowExecutionManager.prototype.isFlowActive = function(flowId) {
     return this.activeFlows.has(flowId);
-  }
+};
 
-  /**
-   * 全てのアクティブフローを取得
-   */
-  getActiveFlows() {
+/**
+ * 全てのアクティブフローを取得
+ */
+FlowExecutionManager.prototype.getActiveFlows = function() {
     return Array.from(this.activeFlows);
-  }
+};
 
-  /**
-   * 緊急停止: 全フローをキャンセル
-   */
-  cancelAllFlows() {
+/**
+ * 緊急停止: 全フローをキャンセル
+ */
+FlowExecutionManager.prototype.cancelAllFlows = function() {
     console.warn('🚨 Emergency stop: Cancelling all active flows');
     this.activeFlows.clear();
     this.pendingOperations.clear();
     this.executionQueue.clear();
-  }
+};
 
-  /**
-   * 実行状態の診断
-   * @returns {Object} 診断結果
-   */
-  diagnoseExecution() {
+/**
+ * 実行状態の診断
+ * @returns {Object} 診断結果
+ */
+FlowExecutionManager.prototype.diagnoseExecution = function() {
+    var self = this;
     return {
-      activeFlows: Array.from(this.activeFlows),
-      pendingOperations: this.pendingOperations.size,
-      queuedOperations: Array.from(this.executionQueue.keys()).map(flowId => ({
-        flowId,
-        queueLength: this.executionQueue.get(flowId).length
-      })),
-      totalActiveFlows: this.activeFlows.size,
+      activeFlows: Array.from(self.activeFlows),
+      pendingOperations: self.pendingOperations.size,
+      queuedOperations: Array.from(self.executionQueue.keys()).map(function(flowId) {
+        return {
+          flowId: flowId,
+          queueLength: self.executionQueue.get(flowId).length
+        };
+      }),
+      totalActiveFlows: self.activeFlows.size,
       timestamp: Date.now()
     };
-  }
+};
 
-  /**
-   * LoadingManagerとの連携 - 統一ローディング制御
-   * @param {string} flowId - フローID
-   * @param {string} message - ローディングメッセージ
-   * @param {boolean} isActive - アクティブ状態
-   */
-  updateLoadingState(flowId, message, isActive) {
+/**
+ * LoadingManagerとの連携 - 統一ローディング制御
+ * @param {string} flowId - フローID
+ * @param {string} message - ローディングメッセージ
+ * @param {boolean} isActive - アクティブ状態
+ */
+FlowExecutionManager.prototype.updateLoadingState = function(flowId, message, isActive) {
     try {
       // UnifiedLoadingManagerが利用可能な場合
       if (typeof window !== 'undefined' && window.unifiedLoading) {
         if (isActive) {
-          window.unifiedLoading.showSimple(message || `実行中: ${flowId}`);
+          window.unifiedLoading.showSimple(message || '実行中: ' + flowId);
         } else {
           window.unifiedLoading.hide();
         }
@@ -291,63 +316,89 @@ class FlowExecutionManager {
     } catch (error) {
       console.warn('⚠️ Failed to update loading state:', error);
     }
-  }
+};
 
-  /**
-   * 強化されたexecuteWithLock - ローディング連携版
-   * @param {string} flowId - フローID
-   * @param {Function} operation - 実行する操作
-   * @param {Object} options - オプション
-   * @returns {Promise} 実行結果
-   */
-  async executeWithLoadingSync(flowId, operation, options = {}) {
-    const { 
-      timeout = 30000,
-      loadingMessage = null,
-      showLoading = true,
-      onProgress = null,
-      priority = 0,
-      retries = 0
-    } = options;
+/**
+ * 強化されたexecuteWithLock - ローディング連携版
+ * @param {string} flowId - フローID
+ * @param {Function} operation - 実行する操作
+ * @param {Object} options - オプション
+ * @returns {Promise} 実行結果
+ */
+FlowExecutionManager.prototype.executeWithLoadingSync = function(flowId, operation, options) {
+    var self = this;
+    options = options || {};
+    var timeout = options.timeout || 30000;
+    var loadingMessage = options.loadingMessage || null;
+    var showLoading = options.showLoading !== undefined ? options.showLoading : true;
+    var onProgress = options.onProgress || null;
+    var priority = options.priority || 0;
+    var retries = options.retries || 0;
 
     try {
       // ローディング表示開始
       if (showLoading) {
-        this.updateLoadingState(flowId, loadingMessage || `処理中: ${flowId}`, true);
+        self.updateLoadingState(flowId, loadingMessage || '処理中: ' + flowId, true);
       }
 
       // プログレス付きで実行
-      const result = await this.executeWithLock(flowId, async () => {
-        if (onProgress) {
-          onProgress(0, 'starting', '実行開始');
-        }
-        
-        const operationResult = await operation();
-        
-        if (onProgress) {
-          onProgress(100, 'completed', '実行完了');
-        }
-        
-        return operationResult;
-      }, { timeout, priority, retries });
+      var executionPromise = self.executeWithLock(flowId, function() {
+        return new Promise(function(resolve, reject) {
+          try {
+            if (onProgress) {
+              onProgress(0, 'starting', '実行開始');
+            }
+            
+            var operationPromise = Promise.resolve(operation());
+            operationPromise.then(function(operationResult) {
+              if (onProgress) {
+                onProgress(100, 'completed', '実行完了');
+              }
+              
+              resolve(operationResult);
+            }).catch(reject);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }, { timeout: timeout, priority: priority, retries: retries });
 
-      return result;
+      return executionPromise.catch(function(error) {
+        if (onProgress) {
+          onProgress(-1, 'error', 'エラー: ' + error.message);
+        }
+        throw error;
+      }).then(function(result) {
+        // ローディング表示終了
+        if (showLoading) {
+          setTimeout(function() {
+            self.updateLoadingState(flowId, null, false);
+          }, 500); // 少し遅延してからローディングを隠す
+        }
+        return result;
+      }).catch(function(error) {
+        // ローディング表示終了（エラー時も）
+        if (showLoading) {
+          setTimeout(function() {
+            self.updateLoadingState(flowId, null, false);
+          }, 500);
+        }
+        throw error;
+      });
 
     } catch (error) {
       if (onProgress) {
         onProgress(-1, 'error', 'エラー: ' + error.message);
       }
-      throw error;
-    } finally {
-      // ローディング表示終了
+      // ローディング表示終了（同期エラー時も）
       if (showLoading) {
-        setTimeout(() => {
-          this.updateLoadingState(flowId, null, false);
-        }, 500); // 少し遅延してからローディングを隠す
+        setTimeout(function() {
+          self.updateLoadingState(flowId, null, false);
+        }, 500);
       }
+      throw error;
     }
-  }
-}
+};
 
 // グローバルフロー実行マネージャーのインスタンス
 const flowExecutionManager = new FlowExecutionManager();
@@ -359,33 +410,33 @@ const flowExecutionManager = new FlowExecutionManager();
 /**
  * タイミング管理システム - setTimeout/setIntervalの代替
  */
-class TimingManager {
-  constructor() {
-    this.activeTimers = new Map();
-    this.debugMode = window.DEBUG_MODE || false;
-  }
+function TimingManager() {
+  this.activeTimers = new Map();
+  this.debugMode = window.DEBUG_MODE || false;
+}
 
-  /**
-   * 遅延実行（setTimeoutの代替）
-   * @param {number} ms - 遅延ミリ秒
-   * @param {string} id - タイマーID（オプション）
-   * @returns {Promise} 完了Promise
-   */
-  static async delay(ms, id = null) {
+/**
+ * 遅延実行（setTimeoutの代替）
+ * @param {number} ms - 遅延ミリ秒
+ * @param {string} id - タイマーID（オプション）
+ * @returns {Promise} 完了Promise
+ */
+TimingManager.delay = function(ms, id) {
+    id = id || null;
     if (id && timingManager.activeTimers.has(id)) {
       timingManager.activeTimers.get(id).cancel();
     }
 
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+    return new Promise(function(resolve, reject) {
+      var timer = setTimeout(function() {
         if (id) timingManager.activeTimers.delete(id);
         resolve();
       }, ms);
 
       if (id) {
         timingManager.activeTimers.set(id, {
-          timer,
-          cancel: () => {
+          timer: timer,
+          cancel: function() {
             clearTimeout(timer);
             timingManager.activeTimers.delete(id);
             reject(new Error('Timer ' + id + ' was cancelled'));
@@ -393,56 +444,82 @@ class TimingManager {
         });
       }
     });
-  }
+};
 
-  /**
-   * 順次実行システム（複数のsetTimeoutの代替）
-   * @param {Array} operations - 実行する操作の配列
-   * @param {number} intervalMs - 各操作間の間隔
-   * @param {string} sequenceId - シーケンスID（オプション）
-   * @returns {Promise} 完了Promise
-   */
-  static async sequence(operations, intervalMs = 100, sequenceId = null) {
-    const results = [];
+/**
+ * 順次実行システム（複数のsetTimeoutの代替）
+ * @param {Array} operations - 実行する操作の配列
+ * @param {number} intervalMs - 各操作間の間隔
+ * @param {string} sequenceId - シーケンスID（オプション）
+ * @returns {Promise} 完了Promise
+ */
+TimingManager.sequence = function(operations, intervalMs, sequenceId) {
+    intervalMs = intervalMs || 100;
+    sequenceId = sequenceId || null;
+    var results = [];
     
-    for (let i = 0; i < operations.length; i++) {
-      const operation = operations[i];
+    function processNextOperation(index) {
+      if (index >= operations.length) {
+        return Promise.resolve(results);
+      }
+      
+      var operation = operations[index];
       
       try {
+        var operationPromise;
         if (typeof operation === 'function') {
-          const result = await operation();
-          results.push(result);
+          operationPromise = Promise.resolve(operation());
         } else {
-          results.push(operation);
+          operationPromise = Promise.resolve(operation);
         }
         
-        // 最後の操作でない場合は間隔を設ける
-        if (i < operations.length - 1) {
-          const delayId = sequenceId ? `${sequenceId}_delay_${i}` : null;
-          await TimingManager.delay(intervalMs, delayId);
-        }
+        return operationPromise.then(function(result) {
+          results.push(result);
+          
+          // 最後の操作でない場合は間隔を設ける
+          if (index < operations.length - 1) {
+            var delayId = sequenceId ? sequenceId + '_delay_' + index : null;
+            return TimingManager.delay(intervalMs, delayId).then(function() {
+              return processNextOperation(index + 1);
+            });
+          } else {
+            return processNextOperation(index + 1);
+          }
+        }).catch(function(error) {
+          console.error('Sequence operation ' + index + ' failed:', error);
+          throw error;
+        });
       } catch (error) {
-        console.error('Sequence operation ' + i + ' failed:', error);
-        throw error;
+        console.error('Sequence operation ' + index + ' failed:', error);
+        return Promise.reject(error);
       }
     }
     
-    return results;
-  }
+    return processNextOperation(0);
+};
 
-  /**
-   * 並列実行システム（制御された並列性）
-   * @param {Array} operations - 実行する操作の配列
-   * @param {number} concurrency - 同時実行数
-   * @returns {Promise} 完了Promise
-   */
-  static async parallel(operations, concurrency = 3) {
-    const results = [];
-    const executing = [];
+/**
+ * 並列実行システム（制御された並列性）
+ * @param {Array} operations - 実行する操作の配列
+ * @param {number} concurrency - 同時実行数
+ * @returns {Promise} 完了Promise
+ */
+TimingManager.parallel = function(operations, concurrency) {
+    concurrency = concurrency || 3;
+    var results = [];
+    var executing = [];
     
-    for (const operation of operations) {
-      const promise = Promise.resolve(operation()).then(result => {
-        executing.splice(executing.indexOf(promise), 1);
+    function processOperations(index) {
+      if (index >= operations.length) {
+        return Promise.all(results);
+      }
+      
+      var operation = operations[index];
+      var promise = Promise.resolve(operation()).then(function(result) {
+        var executeIndex = executing.indexOf(promise);
+        if (executeIndex !== -1) {
+          executing.splice(executeIndex, 1);
+        }
         return result;
       });
       
@@ -450,120 +527,148 @@ class TimingManager {
       executing.push(promise);
       
       if (executing.length >= concurrency) {
-        await Promise.race(executing);
+        return Promise.race(executing).then(function() {
+          return processOperations(index + 1);
+        });
+      } else {
+        return processOperations(index + 1);
       }
     }
     
-    return await Promise.all(results);
-  }
+    return processOperations(0);
+};
 
-  /**
-   * プログレス実行システム（プログレスバー用）
-   * @param {Array} steps - ステップの配列
-   * @param {Function} onProgress - プログレスコールバック
-   * @param {number} stepDelay - ステップ間遅延
-   * @returns {Promise} 完了Promise
-   */
-  static async progressSequence(steps, onProgress, stepDelay = 1000) {
-    const results = [];
+/**
+ * プログレス実行システム（プログレスバー用）
+ * @param {Array} steps - ステップの配列
+ * @param {Function} onProgress - プログレスコールバック
+ * @param {number} stepDelay - ステップ間遅延
+ * @returns {Promise} 完了Promise
+ */
+TimingManager.progressSequence = function(steps, onProgress, stepDelay) {
+    stepDelay = stepDelay || 1000;
+    var results = [];
     
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
+    function processStep(index) {
+      if (index >= steps.length) {
+        return Promise.resolve(results);
+      }
+      
+      var step = steps[index];
       
       try {
         // プログレス開始通知
         if (onProgress) {
-          onProgress(i, 'active', step.text || 'Step ' + (i + 1), step.detail || '実行中...');
+          onProgress(index, 'active', step.text || 'Step ' + (index + 1), step.detail || '実行中...');
         }
         
         // ステップ実行
-        let result;
+        var operationPromise;
         if (typeof step.operation === 'function') {
-          result = await step.operation();
+          operationPromise = Promise.resolve(step.operation());
+        } else {
+          operationPromise = Promise.resolve(undefined);
         }
         
-        // プログレス完了通知
-        if (onProgress) {
-          onProgress(i, 'completed', step.text || `Step ${i + 1}`, step.completedText || '✅ 完了');
-        }
-        
-        results.push(result);
-        
-        // 最後のステップでない場合は遅延
-        if (i < steps.length - 1) {
-          await TimingManager.delay(stepDelay);
-        }
+        return operationPromise.then(function(result) {
+          // プログレス完了通知
+          if (onProgress) {
+            onProgress(index, 'completed', step.text || 'Step ' + (index + 1), step.completedText || '✅ 完了');
+          }
+          
+          results.push(result);
+          
+          // 最後のステップでない場合は遅延
+          if (index < steps.length - 1) {
+            return TimingManager.delay(stepDelay).then(function() {
+              return processStep(index + 1);
+            });
+          } else {
+            return processStep(index + 1);
+          }
+        }).catch(function(error) {
+          // プログレスエラー通知
+          if (onProgress) {
+            onProgress(index, 'error', step.text || 'Step ' + (index + 1), '❌ エラー: ' + error.message);
+          }
+          throw error;
+        });
         
       } catch (error) {
         // プログレスエラー通知
         if (onProgress) {
-          onProgress(i, 'error', step.text || `Step ${i + 1}`, `❌ エラー: ${error.message}`);
+          onProgress(index, 'error', step.text || 'Step ' + (index + 1), '❌ エラー: ' + error.message);
         }
-        throw error;
+        return Promise.reject(error);
       }
     }
     
-    return results;
-  }
+    return processStep(0);
+};
 
-  /**
-   * タイマーをキャンセル
-   * @param {string} id - タイマーID
-   */
-  static cancelTimer(id) {
+/**
+ * タイマーをキャンセル
+ * @param {string} id - タイマーID
+ */
+TimingManager.cancelTimer = function(id) {
     if (timingManager.activeTimers.has(id)) {
       timingManager.activeTimers.get(id).cancel();
     }
-  }
+};
 
-  /**
-   * 全タイマーをキャンセル
-   */
-  static cancelAllTimers() {
-    for (const [id, timer] of timingManager.activeTimers.entries()) {
+/**
+ * 全タイマーをキャンセル
+ */
+TimingManager.cancelAllTimers = function() {
+    timingManager.activeTimers.forEach(function(timer, id) {
       timer.cancel();
-    }
+    });
     timingManager.activeTimers.clear();
-  }
+};
 
   // =============================================================================
   // DEBOUNCE & THROTTLE INTEGRATION - SharedUtilities統合
   // =============================================================================
 
-  /**
-   * Debounce関数 - 連続実行を防止
-   * @param {Function} func - 実行する関数
-   * @param {string} key - デバウンスキー
-   * @param {number} delay - 遅延時間（ミリ秒）
-   * @returns {Function} デバウンス化された関数
-   */
-  static debounce(func, key, delay = 1000) {
+/**
+ * Debounce関数 - 連続実行を防止
+ * @param {Function} func - 実行する関数
+ * @param {string} key - デバウンスキー
+ * @param {number} delay - 遅延時間（ミリ秒）
+ * @returns {Function} デバウンス化された関数
+ */
+TimingManager.debounce = function(func, key, delay) {
+    delay = delay || 1000;
     if (!timingManager.debounceTimers) {
       timingManager.debounceTimers = new Map();
     }
 
-    return function(...args) {
+    return function() {
+      var args = Array.prototype.slice.call(arguments);
+      var context = this;
+      
       if (timingManager.debounceTimers.has(key)) {
         clearTimeout(timingManager.debounceTimers.get(key));
       }
 
-      const timeoutId = setTimeout(() => {
-        func.apply(this, args);
+      var timeoutId = setTimeout(function() {
+        func.apply(context, args);
         timingManager.debounceTimers.delete(key);
       }, delay);
 
       timingManager.debounceTimers.set(key, timeoutId);
     };
-  }
+};
 
-  /**
-   * Throttle関数 - 実行頻度を制限
-   * @param {Function} func - 実行する関数
-   * @param {string} key - スロットルキー
-   * @param {number} delay - 実行間隔（ミリ秒）
-   * @returns {Function} スロットル化された関数
-   */
-  static throttle(func, key, delay = 100) {
+/**
+ * Throttle関数 - 実行頻度を制限
+ * @param {Function} func - 実行する関数
+ * @param {string} key - スロットルキー
+ * @param {number} delay - 実行間隔（ミリ秒）
+ * @returns {Function} スロットル化された関数
+ */
+TimingManager.throttle = function(func, key, delay) {
+    delay = delay || 100;
     if (!timingManager.throttleTimers) {
       timingManager.throttleTimers = new Map();
     }
@@ -571,29 +676,31 @@ class TimingManager {
       timingManager.lastExecution = new Map();
     }
 
-    return function(...args) {
-      const now = Date.now();
-      const lastRun = timingManager.lastExecution.get(key) || 0;
+    return function() {
+      var args = Array.prototype.slice.call(arguments);
+      var context = this;
+      var now = Date.now();
+      var lastRun = timingManager.lastExecution.get(key) || 0;
 
       if (now - lastRun >= delay) {
-        func.apply(this, args);
+        func.apply(context, args);
         timingManager.lastExecution.set(key, now);
       } else if (!timingManager.throttleTimers.has(key)) {
-        const timeoutId = setTimeout(() => {
-          func.apply(this, args);
+        var timeoutId = setTimeout(function() {
+          func.apply(context, args);
           timingManager.lastExecution.set(key, Date.now());
           timingManager.throttleTimers.delete(key);
         }, delay - (now - lastRun));
         timingManager.throttleTimers.set(key, timeoutId);
       }
     };
-  }
+};
 
-  /**
-   * 特定キーのデバウンス/スロットルをクリア
-   * @param {string} key - クリアするキー
-   */
-  static clearTiming(key) {
+/**
+ * 特定キーのデバウンス/スロットルをクリア
+ * @param {string} key - クリアするキー
+ */
+TimingManager.clearTiming = function(key) {
     if (timingManager.debounceTimers && timingManager.debounceTimers.has(key)) {
       clearTimeout(timingManager.debounceTimers.get(key));
       timingManager.debounceTimers.delete(key);
@@ -605,28 +712,31 @@ class TimingManager {
     if (timingManager.lastExecution) {
       timingManager.lastExecution.delete(key);
     }
-  }
+};
 
-  /**
-   * 全デバウンス/スロットルをクリア
-   */
-  static clearAllTiming() {
+/**
+ * 全デバウンス/スロットルをクリア
+ */
+TimingManager.clearAllTiming = function() {
     // デバウンスタイマーをクリア
     if (timingManager.debounceTimers) {
-      timingManager.debounceTimers.forEach(timer => clearTimeout(timer));
+      timingManager.debounceTimers.forEach(function(timer) {
+        clearTimeout(timer);
+      });
       timingManager.debounceTimers.clear();
     }
     // スロットルタイマーをクリア
     if (timingManager.throttleTimers) {
-      timingManager.throttleTimers.forEach(timer => clearTimeout(timer));
+      timingManager.throttleTimers.forEach(function(timer) {
+        clearTimeout(timer);
+      });
       timingManager.throttleTimers.clear();
     }
     // 実行履歴をクリア
     if (timingManager.lastExecution) {
       timingManager.lastExecution.clear();
     }
-  }
-}
+};
 
 // グローバルタイミングマネージャーのインスタンス
 const timingManager = new TimingManager();
@@ -657,27 +767,36 @@ window.throttle = TimingManager.throttle;
 /**
  * UI更新バッチャー - UI更新の重複を防ぎ効率化
  */
-class UIUpdateBatcher {
-  constructor() {
-    this.pendingUpdates = [];
-    this.batchTimeout = null;
-    this.isProcessing = false;
-    this.batchDelay = 100; // バッチ処理の遅延（ms）
-    this.debugMode = window.DEBUG_MODE || false;
-  }
+function UIUpdateBatcher() {
+  this.pendingUpdates = [];
+  this.batchTimeout = null;
+  this.isProcessing = false;
+  this.batchDelay = 100; // バッチ処理の遅延（ms）
+  this.debugMode = window.DEBUG_MODE || false;
+}
 
-  /**
-   * UI更新をキューに追加
-   * @param {Function} updateFn - 更新関数
-   * @param {string} updateId - 更新ID（重複排除用）
-   * @param {number} priority - 優先度（高いほど先に実行）
-   */
-  queueUpdate(updateFn, updateId = null, priority = 0) {
+/**
+ * UI更新をキューに追加
+ * @param {Function} updateFn - 更新関数
+ * @param {string} updateId - 更新ID（重複排除用）
+ * @param {number} priority - 優先度（高いほど先に実行）
+ */
+UIUpdateBatcher.prototype.queueUpdate = function(updateFn, updateId, priority) {
+    updateId = updateId || null;
+    priority = priority || 0;
+    
     // 重複排除: 同じIDの更新があれば置き換え
     if (updateId) {
-      const existingIndex = this.pendingUpdates.findIndex(update => update.id === updateId);
+      var existingIndex = this.pendingUpdates.findIndex(function(update) {
+        return update.id === updateId;
+      });
       if (existingIndex !== -1) {
-        this.pendingUpdates[existingIndex] = { fn: updateFn, id: updateId, priority, timestamp: Date.now() };
+        this.pendingUpdates[existingIndex] = { 
+          fn: updateFn, 
+          id: updateId, 
+          priority: priority, 
+          timestamp: Date.now() 
+        };
         return;
       }
     }
@@ -685,95 +804,120 @@ class UIUpdateBatcher {
     // 新規追加
     this.pendingUpdates.push({
       fn: updateFn,
-      id: updateId || `update_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      priority,
+      id: updateId || 'update_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      priority: priority,
       timestamp: Date.now()
     });
 
     if (this.debugMode) {
-      console.log(`➕ UI update queued: ${updateId || 'anonymous'}, queue size: ${this.pendingUpdates.length}`);
+      console.log('➕ UI update queued: ' + (updateId || 'anonymous') + ', queue size: ' + this.pendingUpdates.length);
     }
 
     this.scheduleBatch();
-  }
+};
 
-  /**
-   * バッチ処理をスケジュール
-   */
-  scheduleBatch() {
-    if (this.batchTimeout || this.isProcessing) return;
+/**
+ * バッチ処理をスケジュール
+ */
+UIUpdateBatcher.prototype.scheduleBatch = function() {
+    var self = this;
+    if (self.batchTimeout || self.isProcessing) return;
 
-    this.batchTimeout = setTimeout(async () => {
-      await this.processBatch();
-    }, this.batchDelay);
-  }
+    self.batchTimeout = setTimeout(function() {
+      self.processBatch();
+    }, self.batchDelay);
+};
 
-  /**
-   * バッチ処理を実行
-   */
-  async processBatch() {
-    if (this.isProcessing || this.pendingUpdates.length === 0) return;
+/**
+ * バッチ処理を実行
+ */
+UIUpdateBatcher.prototype.processBatch = function() {
+    var self = this;
+    if (self.isProcessing || self.pendingUpdates.length === 0) return;
 
-    this.isProcessing = true;
-    this.batchTimeout = null;
+    self.isProcessing = true;
+    self.batchTimeout = null;
 
     try {
       // 優先度順でソート（高い順）
-      const sortedUpdates = [...this.pendingUpdates].sort((a, b) => {
+      var sortedUpdates = self.pendingUpdates.slice().sort(function(a, b) {
         if (b.priority !== a.priority) return b.priority - a.priority;
         return a.timestamp - b.timestamp; // 同じ優先度なら古い順
       });
 
-      this.pendingUpdates = [];
+      self.pendingUpdates = [];
 
-      if (this.debugMode) {
-        console.log(`🎯 Processing UI update batch: ${sortedUpdates.length} updates`);
+      if (self.debugMode) {
+        console.log('🎯 Processing UI update batch: ' + sortedUpdates.length + ' updates');
       }
 
       // 順次実行（並列実行だと競合する可能性があるため）
-      for (const update of sortedUpdates) {
-        try {
-          await Promise.resolve(update.fn());
-        } catch (error) {
-          console.error(`❌ UI update failed: ${update.id}`, error);
+      function processNextUpdate(index) {
+        if (index >= sortedUpdates.length) {
+          if (self.debugMode) {
+            console.log('🎉 UI update batch completed: ' + sortedUpdates.length + ' updates processed');
+          }
+          
+          self.isProcessing = false;
+          
+          // 処理中に新しい更新が追加されていたら再スケジュール
+          if (self.pendingUpdates.length > 0) {
+            self.scheduleBatch();
+          }
+          return;
         }
         
-        // 各更新間に短い間隔を設ける
-        await TimingManager.delay(10);
+        var update = sortedUpdates[index];
+        try {
+          var updatePromise = Promise.resolve(update.fn());
+          updatePromise.then(function() {
+            // 各更新間に短い間隔を設ける
+            return TimingManager.delay(10);
+          }).then(function() {
+            processNextUpdate(index + 1);
+          }).catch(function(error) {
+            console.error('❌ UI update failed: ' + update.id, error);
+            TimingManager.delay(10).then(function() {
+              processNextUpdate(index + 1);
+            });
+          });
+        } catch (error) {
+          console.error('❌ UI update failed: ' + update.id, error);
+          TimingManager.delay(10).then(function() {
+            processNextUpdate(index + 1);
+          });
+        }
       }
-
-      if (this.debugMode) {
-        console.log(`🎉 UI update batch completed: ${sortedUpdates.length} updates processed`);
-      }
-
+      
+      processNextUpdate(0);
+      
     } catch (error) {
       console.error('❌ UI update batch processing failed:', error);
-    } finally {
-      this.isProcessing = false;
+      self.isProcessing = false;
       
       // 処理中に新しい更新が追加されていたら再スケジュール
-      if (this.pendingUpdates.length > 0) {
-        this.scheduleBatch();
+      if (self.pendingUpdates.length > 0) {
+        self.scheduleBatch();
       }
     }
-  }
+};
 
-  /**
-   * 即座にバッチ処理を実行
-   */
-  async flushUpdates() {
+/**
+ * 即座にバッチ処理を実行
+ */
+UIUpdateBatcher.prototype.flushUpdates = function() {
     if (this.batchTimeout) {
       clearTimeout(this.batchTimeout);
       this.batchTimeout = null;
     }
     
-    await this.processBatch();
-  }
+    this.processBatch();
+};
 
-  /**
-   * 待機中の更新をクリア
-   */
-  clearPendingUpdates() {
+/**
+ * 待機中の更新をクリア
+ */
+UIUpdateBatcher.prototype.clearPendingUpdates = function() {
     this.pendingUpdates = [];
     if (this.batchTimeout) {
       clearTimeout(this.batchTimeout);
@@ -783,19 +927,18 @@ class UIUpdateBatcher {
     if (this.debugMode) {
       console.log('🧹 Pending UI updates cleared');
     }
-  }
+};
 
-  /**
-   * バッチャーの状態を取得
-   */
-  getStatus() {
+/**
+ * バッチャーの状態を取得
+ */
+UIUpdateBatcher.prototype.getStatus = function() {
     return {
       pendingUpdates: this.pendingUpdates.length,
       isProcessing: this.isProcessing,
       batchScheduled: !!this.batchTimeout
     };
-  }
-}
+};
 
 // グローバルUI更新バッチャーのインスタンス
 const uiUpdateBatcher = new UIUpdateBatcher();
@@ -1088,12 +1231,12 @@ function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride =
   // Sanitize sheet name for API call (already sanitized from caller, but double-check)
   const sanitizedSheetName = targetSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
   
-  console.log(`🔄 Loading config for sheet: "${targetSheet}" (sanitized: "${sanitizedSheetName}"), attempt ${retryCount + 1}/${maxRetries + 1}`);
+  console.log('🔄 Loading config for sheet: "' + targetSheet + '" (sanitized: "' + sanitizedSheetName + '"), attempt ' + (retryCount + 1) + '/' + (maxRetries + 1));
   
   return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', targetSpreadsheetId, sanitizedSheetName)
     .then(handleSheetDetailsSuccess)
     .catch(error => {
-      console.warn(`❌ loadConfigForSelected attempt ${retryCount + 1} failed:`, error);
+      console.warn('❌ loadConfigForSelected attempt ' + (retryCount + 1) + ' failed:', error);
       
       // Check if this is a sheet parsing error and we have retries left
       if (retryCount < maxRetries && (
@@ -1102,7 +1245,7 @@ function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride =
         error.message?.includes('Invalid range')
       )) {
         const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
-        console.log(`⏳ Retrying in ${retryDelay}ms...`);
+        console.log('⏳ Retrying in ' + retryDelay + 'ms...');
         
         return new Promise(resolve => setTimeout(resolve, retryDelay))
           .then(() => loadConfigForSelected(sheetNameOverride, spreadsheetIdOverride, retryCount + 1, maxRetries));
@@ -1155,12 +1298,12 @@ function handleSheetDetailsSuccess(details) {
           
           // Enhanced auto-detection success message with specifics
           const detectedColumns = [];
-          if (details.guessedConfig.opinionColumn) detectedColumns.push(`回答列: ${details.guessedConfig.opinionColumn}`);
-          if (details.guessedConfig.nameColumn) detectedColumns.push(`名前列: ${details.guessedConfig.nameColumn}`);
-          if (details.guessedConfig.classColumn) detectedColumns.push(`クラス列: ${details.guessedConfig.classColumn}`);
+          if (details.guessedConfig.opinionColumn) detectedColumns.push('回答列: ' + details.guessedConfig.opinionColumn);
+          if (details.guessedConfig.nameColumn) detectedColumns.push('名前列: ' + details.guessedConfig.nameColumn);
+          if (details.guessedConfig.classColumn) detectedColumns.push('クラス列: ' + details.guessedConfig.classColumn);
           
           const message = detectedColumns.length > 0 
-            ? `🤖 AI列判定が自動実行されました！検出された列: ${detectedColumns.join(', ')}。設定を確認してください。`
+            ? ('🤖 AI列判定が自動実行されました！検出された列: ' + detectedColumns.join(', ') + '。設定を確認してください。')
             : '🤖 AI列判定が自動実行されました。設定を確認してください。';
           
           showMessage(message, 'success');
@@ -1252,13 +1395,13 @@ function runHeaderGuessing() {
           
           // Enhanced completion notification with analysis details
           const detectedColumns = [];
-          if (configToUse.opinionColumn) detectedColumns.push(`💬 回答列: ${configToUse.opinionColumn}`);
-          if (configToUse.nameColumn) detectedColumns.push(`👤 名前列: ${configToUse.nameColumn}`);
-          if (configToUse.classColumn) detectedColumns.push(`🏫 クラス列: ${configToUse.classColumn}`);
-          if (configToUse.reasonColumn) detectedColumns.push(`💭 理由列: ${configToUse.reasonColumn}`);
+          if (configToUse.opinionColumn) detectedColumns.push('💬 回答列: ' + configToUse.opinionColumn);
+          if (configToUse.nameColumn) detectedColumns.push('👤 名前列: ' + configToUse.nameColumn);
+          if (configToUse.classColumn) detectedColumns.push('🏫 クラス列: ' + configToUse.classColumn);
+          if (configToUse.reasonColumn) detectedColumns.push('💭 理由列: ' + configToUse.reasonColumn);
           
           const message = detectedColumns.length > 0 
-            ? `🎉 高精度AI判定が完了しました！\n\n検出された列:\n${detectedColumns.join('\n')}\n\n設定を保存して公開してください。`
+            ? ('🎉 高精度AI判定が完了しました！\n\n検出された列:\n' + detectedColumns.join('\n') + '\n\n設定を保存して公開してください。')
             : '🎉 高精度AI判定が完了しました！設定を保存して公開してください。';
           
           showMessage(message, 'success');
@@ -1373,7 +1516,7 @@ function completeAIDetectionProcess() {
       })
       .catch(error => {
         console.error('❌ AI判定完了処理でエラー:', error);
-        showMessage(`⚠️ AI判定後の処理でエラーが発生しました: ${error.message}\n手動で「保存・公開」を実行してください。`, 'warning');
+        showMessage('⚠️ AI判定後の処理でエラーが発生しました: ' + error.message + '\n手動で「保存・公開」を実行してください。', 'warning');
       });
       
   } catch (error) {
@@ -1412,7 +1555,7 @@ function initializeUserSettings() {
         const remainingTime = Math.ceil((INITIALIZATION_COOLDOWN - (now - lastInitializationTime)) / 1000);
         resolve({ 
           success: false, 
-          message: `あと${remainingTime}秒後に実行可能です`, 
+          message: 'あと' + remainingTime + '秒後に実行可能です', 
           skipped: true, 
           reason: 'cooldown', 
           remainingTime 
@@ -1460,7 +1603,7 @@ function initializeUserSettings() {
             resolve({
               success: true,
               phase: 'auto_repair',
-              message: `🔧 ${repairResult.fixes?.length || 0}件の問題を自動修復しました`,
+              message: '🔧 ' + (repairResult.fixes?.length || 0) + '件の問題を自動修復しました',
               issues: repairResult.issues || [],
               fixes: repairResult.fixes || []
             });
@@ -1468,7 +1611,7 @@ function initializeUserSettings() {
         })
         .catch(error => {
           initializationInProgress = false;
-          reject(new Error(`設定初期化エラー: ${error.message}`));
+          reject(new Error('設定初期化エラー: ' + error.message));
         });
         
     } catch (error) {
@@ -1522,11 +1665,11 @@ function initializeUserSettingsWithUI() {
       } else {
         // 確認が必要な場合
         if (result.requiresFullReset) {
-          const issuesList = result.issues.map(issue => `• ${issue}`).join('\n');
+          const issuesList = result.issues.map(issue => '• ' + issue).join('\n');
           
           showConfirmationModal(
             '設定の完全初期化が必要です',
-            `以下の問題が見つかりました:\n\n${issuesList}\n\n設定を完全に初期化しますか？\n（アカウントは削除されません）`,
+            '以下の問題が見つかりました:\n\n' + issuesList + '\n\n設定を完全に初期化しますか？\n（アカウントは削除されません）',
             () => {
               // ユーザーが確認した場合、完全リセットを実行
               performFullReset()
@@ -1602,7 +1745,7 @@ function performSystemDiagnostic() {
     } catch (error) {
       resolve({ 
         severity: 'critical', 
-        issues: [`診断エラー: ${error.message}`] 
+        issues: ['診断エラー: ' + error.message] 
       });
     }
   });
@@ -1706,7 +1849,7 @@ function repairSetupStateInconsistencies() {
       // クールダウンチェック
       if (now - lastDiagnosticTime < DIAGNOSTIC_COOLDOWN) {
         const remainingTime = Math.ceil((DIAGNOSTIC_COOLDOWN - (now - lastDiagnosticTime)) / 1000);
-        console.log(`⏳ クールダウン中です。あと${remainingTime}秒後に実行可能です。`);
+        console.log('⏳ クールダウン中です。あと' + remainingTime + '秒後に実行可能です。');
         resolve({ issues: [], fixes: [], skipped: true, reason: 'cooldown', remainingTime });
         return;
       }
@@ -1814,7 +1957,7 @@ function repairSetupStateInconsistencies() {
             diagnosticInProgress = false;
             resolve({
               success: true,
-              message: `🔧 ${fixes.length}件のセットアップ問題を修復しました`,
+              message: '🔧 ' + fixes.length + '件のセットアップ問題を修復しました',
               issues,
               fixes
             });
@@ -1825,7 +1968,7 @@ function repairSetupStateInconsistencies() {
         })
         .catch(saveError => {
           diagnosticInProgress = false;
-          reject(new Error(`設定保存エラー: ${saveError.message}`));
+          reject(new Error('設定保存エラー: ' + saveError.message));
         });
         
     } catch (error) {
@@ -1895,7 +2038,7 @@ function saveAndPublish() {
       if (showNames) privacySettings.push('名前表示');
       if (showCounts) privacySettings.push('リアクション数表示');
       
-      console.log(`⚠️ プライバシー警告: ${privacySettings.join('・')}が有効です`);
+      console.log('⚠️ プライバシー警告: ' + privacySettings.join('・') + 'が有効です');
       
       window.sharedModals.showPrivacyWarning(
         // onConfirm - show publish modal after privacy confirmation
@@ -2360,7 +2503,7 @@ function unpublishBoard() {
         // 保存
         saveHistoryToStorage(limitedHistory);
         
-        console.log(`✅ History saved with ${limitedHistory.length} items (max 5)`);
+        console.log('✅ History saved with ' + limitedHistory.length + ' items (max 5)');
         
         // テーブル更新
         if (typeof loadSimpleHistoryTable === 'function') {
@@ -2390,7 +2533,7 @@ function unpublishBoard() {
    * @returns {string} 一意のID
    */
   function generateHistoryId() {
-    return `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   }
   
   // 古い複雑なcreateConsolidatedHistoryEntry関数は削除済み
@@ -2530,7 +2673,7 @@ function generateQuickstartFormTitle() {
   const formatted = formatter.format(now);
   const [datePart, timePart] = formatted.split(' ');
   const [year, month, day] = datePart.split('/');
-  return `みんなの回答ボード ${year}年${month}月${day}日 ${timePart}`;
+  return 'みんなの回答ボード ' + year + '年' + month + '月' + day + '日 ' + timePart;
 }
 
 function createFormWithConfig() {
@@ -2639,7 +2782,7 @@ function addResource() {
   
   const resourceTypeText = 'スプレッドシート';
 
-  runGasWithUserId(backendFunction, `${resourceTypeText}を追加しています...`, url)
+  runGasWithUserId(backendFunction, resourceTypeText + 'を追加しています...', url)
     .then(function(result) {
       if (result.status === 'success') {
         showMessage(result.message, 'success');
@@ -2652,11 +2795,11 @@ function addResource() {
           loadStatus(true); // フォールバック
         }
       } else {
-        showMessage(result.message || `${resourceTypeText}の追加に失敗しました。`, 'error');
+        showMessage(result.message || (resourceTypeText + 'の追加に失敗しました。'), 'error');
       }
     })
     .catch(function(error) {
-      handleError(error, 'addResource', `${resourceTypeText}の追加に失敗しました。`);
+      handleError(error, 'addResource', resourceTypeText + 'の追加に失敗しました。');
     });
 }
 
@@ -2972,8 +3115,8 @@ function openAppSetupPage() {
   try {
     // Cache busting パラメータを追加してナビゲーションを高速化
     const urlWithCache = appSetupUrl.includes('?') 
-      ? `${appSetupUrl}&t=${Date.now()}` 
-      : `${appSetupUrl}?t=${Date.now()}`;
+      ? (appSetupUrl + '&t=' + Date.now()) 
+      : (appSetupUrl + '?t=' + Date.now());
     window.open(urlWithCache, '_top');
   } catch (error) {
     console.error('アプリ設定ページへの遷移に失敗:', error);
@@ -3024,7 +3167,7 @@ userIdPromise.then(async () => {
     const results = await Promise.allSettled(initTasks);
     const totalTime = performance.now() - startTime;
     
-    console.log(`⚡ Admin panel parallel initialization completed in ${Math.round(totalTime)}ms:`, {
+    console.log('⚡ Admin panel parallel initialization completed in ' + Math.round(totalTime) + 'ms:', {
       appSetupUrl: results[0].status,
       cacheInit: results[1].status, 
       statusCheck: results[2].status,
@@ -3033,7 +3176,7 @@ userIdPromise.then(async () => {
     
     // 高速化効果の測定
     if (totalTime < 200) {
-      console.log(`🚀 Ultra-fast admin panel init: ${Math.round(totalTime)}ms`);
+      console.log('🚀 Ultra-fast admin panel init: ' + Math.round(totalTime) + 'ms');
     }
     
   } catch (error) {
@@ -3121,7 +3264,7 @@ async function verifyConfigAfterSave(expectedSheetName, expectedConfig) {
  */
 async function verifySetupFlowCompletion(flowType, sheetName) {
   try {
-    console.log(`🎯 ${flowType}フロー完了確認開始:`, sheetName);
+    console.log('🎯 ' + flowType + 'フロー完了確認開始:', sheetName);
     
     // 設定が安定するまで少し待つ
     await new Promise(resolve => setTimeout(resolve, 3000));
@@ -3140,24 +3283,24 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     
     // 1. setupStatus='completed' 確認
     if (configJson.setupStatus !== 'completed') {
-      issues.push(`❌ setupStatus: "${configJson.setupStatus}" → "completed"が必要`);
+      issues.push('❌ setupStatus: "' + configJson.setupStatus + '" → "completed"が必要');
     }
     
     // 2. appPublished=true 確認  
     if (configJson.appPublished !== true) {
-      issues.push(`❌ appPublished: ${configJson.appPublished} → trueが必要`);
+      issues.push('❌ appPublished: ' + configJson.appPublished + ' → trueが必要');
     }
     
     // 3. formCreated=true 確認
     if (configJson.formCreated !== true) {
-      issues.push(`❌ formCreated: ${configJson.formCreated} → trueが必要`);
+      issues.push('❌ formCreated: ' + configJson.formCreated + ' → trueが必要');
     }
     
     // 4. 公開情報の確認と自動修正
     if (!configJson.publishedSheetName) {
-      issues.push(`❌ publishedSheetName未設定 → "${sheetName}"が必要`);
+      issues.push('❌ publishedSheetName未設定 → "' + sheetName + '"が必要');
     } else if (configJson.publishedSheetName !== sheetName) {
-      issues.push(`❌ publishedSheetName不一致: "${configJson.publishedSheetName}" → "${sheetName}"`);
+      issues.push('❌ publishedSheetName不一致: "' + configJson.publishedSheetName + '" → "' + sheetName + '"');
       
       // 自動修正機能: シート名不整合の修正を試行
       try {
@@ -3194,7 +3337,7 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     if (!configJson.publishedSpreadsheetId) {
       // completionStatusからspreadsheetIdを取得してフォールバック
       if (completionStatus.userInfo && completionStatus.userInfo.spreadsheetId) {
-        console.log(`🔧 publishedSpreadsheetIdをuserInfo.spreadsheetIdで補完: ${completionStatus.userInfo.spreadsheetId}`);
+        console.log('🔧 publishedSpreadsheetIdをuserInfo.spreadsheetIdで補完: ' + completionStatus.userInfo.spreadsheetId);
         // この値は後で同期修正で設定される
       } else {
         issues.push('❌ publishedSpreadsheetId未設定');
@@ -3209,16 +3352,16 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     if (!hasSheetConfig) {
       // カスタムフローで設定が完了している場合は警告に格下げ
       if (flowType === 'custom' && configJson.setupStatus === 'completed') {
-        console.warn(`⚠️ シート設定が見つかりませんが、カスタムフロー完了のためスキップ: ${sheetKey}`);
+        console.warn('⚠️ シート設定が見つかりませんが、カスタムフロー完了のためスキップ: ' + sheetKey);
       } else {
-        issues.push(`❌ シート設定未保存: ${sheetKey}`);
+        issues.push('❌ シート設定未保存: ' + sheetKey);
       }
     }
     
     if (issues.length === 0) {
       return {
         success: true,
-        message: `${flowType}フローが正常に完了しました`,
+        message: flowType + 'フローが正常に完了しました',
         details: {
           setupStatus: configJson.setupStatus,
           appPublished: configJson.appPublished,
@@ -3228,10 +3371,10 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
         }
       };
     } else {
-      console.warn(`⚠️ ${flowType}フロー完了確認: 未完了項目があります`, issues);
+      console.warn('⚠️ ' + flowType + 'フロー完了確認: 未完了項目があります', issues);
       return {
         success: false,
-        message: `${flowType}フローに未完了項目があります`,
+        message: flowType + 'フローに未完了項目があります',
         issues: issues,
         details: {
           setupStatus: configJson.setupStatus,
@@ -3244,10 +3387,10 @@ async function verifySetupFlowCompletion(flowType, sheetName) {
     }
     
   } catch (error) {
-    console.error(`❌ ${flowType}フロー完了確認エラー:`, error);
+    console.error('❌ ' + flowType + 'フロー完了確認エラー:', error);
     return { 
       success: false, 
-      message: `フロー完了確認でエラーが発生しました: ${error.message}` 
+      message: 'フロー完了確認でエラーが発生しました: ' + error.message 
     };
   }
 }
@@ -3286,7 +3429,7 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
     
     for (const [key, expectedValue] of Object.entries(requiredStates)) {
       if (configJson[key] !== expectedValue) {
-        synchronizationIssues.push(`${key}: "${configJson[key]}" → "${expectedValue}"`);
+        synchronizationIssues.push(key + ': "' + configJson[key] + '" → "' + expectedValue + '"');
         updatedConfig[key] = expectedValue;
         needsSync = true;
       }
@@ -3299,20 +3442,20 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       
       
       if (!currentSheetConfig || !currentSheetConfig.guessedConfig) {
-        synchronizationIssues.push(`シート設定未保存: ${sheetKey}`);
+        synchronizationIssues.push('シート設定未保存: ' + sheetKey);
         updatedConfig[sheetKey] = {
           guessedConfig: expectedState.config,
           lastUpdated: new Date().toISOString(),
           flowType: flowType
         };
         needsSync = true;
-        console.log(`📝 ${flowType}フロー: シート設定を作成 ${sheetKey}`);
+        console.log('📝 ' + flowType + 'フロー: シート設定を作成 ' + sheetKey);
       }
     }
     
     // 3. 設定の同期適用（必要な場合のみ）
     if (needsSync) {
-      console.log(`🔧 ${flowType}フロー: 設定不整合を検出 - 同期修正を実行`, synchronizationIssues);
+      console.log('🔧 ' + flowType + 'フロー: 設定不整合を検出 - 同期修正を実行', synchronizationIssues);
       
       // バックエンドに同期修正を依頼（パラメータ順序修正）
       const syncResult = await runGasWithUserId('syncConfigurationState', '設定同期を実行中...', 
@@ -3332,10 +3475,10 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
           success: true,
           synchronized: true,
           appliedFixes: appliedFixes,
-          message: `${flowType}フローの設定同期が完了しました`
+          message: flowType + 'フローの設定同期が完了しました'
         };
       } else {
-        console.warn(`⚠️ ${flowType}フロー: 設定同期修正に失敗`, syncResult);
+        console.warn('⚠️ ' + flowType + 'フロー: 設定同期修正に失敗', syncResult);
         return {
           success: false,
           synchronized: false,
@@ -3353,17 +3496,17 @@ async function enhanceConfigSynchronization(flowType, expectedState) {
       return {
         success: true,
         synchronized: false,
-        message: `${flowType}フローの設定は既に正しく同期されています`
+        message: flowType + 'フローの設定は既に正しく同期されています'
       };
     }
     
   } catch (error) {
-    console.error(`❌ ${flowType}フロー設定同期エラー:`, error);
+    console.error('❌ ' + flowType + 'フロー設定同期エラー:', error);
     return {
       success: false,
       synchronized: false,
       error: error.message,
-      message: `設定同期処理でエラーが発生しました: ${error.message}`
+      message: '設定同期処理でエラーが発生しました: ' + error.message
     };
   }
 }
@@ -3432,7 +3575,7 @@ function performIntegratedConfigConsistencyCheck(status) {
       const sheetConfig = configJson[sheetKey];
       
       if (!sheetConfig || !sheetConfig.guessedConfig) {
-        issues.push(`シート固有設定が未保存です: ${configJson.publishedSheetName}`);
+        issues.push('シート固有設定が未保存です: ' + configJson.publishedSheetName);
         recommendations.push('列設定を確認・保存してください');
       }
     }
@@ -3444,7 +3587,7 @@ function performIntegratedConfigConsistencyCheck(status) {
       issues: issues,
       recommendations: recommendations,
       severity: issues.length > 3 ? 'high' : issues.length > 1 ? 'medium' : 'low',
-      summary: isConsistent ? '設定は整合性が保たれています' : `${issues.length}件の整合性問題が見つかりました`
+      summary: isConsistent ? '設定は整合性が保たれています' : (issues.length + '件の整合性問題が見つかりました')
     };
     
   } catch (error) {
@@ -3651,10 +3794,10 @@ function resetProgressSteps() {
 
 // Update individual progress step
 function updateProgressStep(stepId, status, text, detail) {
-  const stepElement = document.getElementById(`progress-step-${stepId}`);
-  const dotElement = document.getElementById(`progress-step-${stepId}-dot`);
-  const textElement = document.getElementById(`progress-step-${stepId}-text`);
-  const detailElement = document.getElementById(`progress-step-${stepId}-detail`);
+  const stepElement = document.getElementById('progress-step-' + stepId);
+  const dotElement = document.getElementById('progress-step-' + stepId + '-dot');
+  const textElement = document.getElementById('progress-step-' + stepId + '-text');
+  const detailElement = document.getElementById('progress-step-' + stepId + '-detail');
   
   if (!stepElement || !dotElement || !textElement || !detailElement) return;
   
@@ -3694,11 +3837,11 @@ function updateOverallProgress(percentage, statusMessage) {
   const progressStatus = document.getElementById('progress-status');
   
   if (progressBar) {
-    progressBar.style.width = `${percentage}%`;
+    progressBar.style.width = percentage + '%';
   }
   
   if (progressPercentage) {
-    progressPercentage.textContent = `${percentage}%`;
+    progressPercentage.textContent = percentage + '%';
   }
   
   if (progressStatus) {
@@ -3863,11 +4006,11 @@ function resetCustomSetupProgressSteps() {
 
 // CustomSetup専用のプログレス更新関数
 function updateCustomProgressStep(stepId, status, text, detail) {
-  const stepElement = document.getElementById(`custom-progress-step-${stepId}`);
-  const dotElement = document.getElementById(`custom-progress-step-${stepId}-dot`);
-  const textElement = document.getElementById(`custom-progress-step-${stepId}-text`);
-  const detailElement = document.getElementById(`custom-progress-step-${stepId}-detail`);
-  const timeElement = document.getElementById(`custom-progress-step-${stepId}-time`);
+  const stepElement = document.getElementById('custom-progress-step-' + stepId);
+  const dotElement = document.getElementById('custom-progress-step-' + stepId + '-dot');
+  const textElement = document.getElementById('custom-progress-step-' + stepId + '-text');
+  const detailElement = document.getElementById('custom-progress-step-' + stepId + '-detail');
+  const timeElement = document.getElementById('custom-progress-step-' + stepId + '-time');
   
   if (!stepElement || !dotElement || !textElement || !detailElement) return;
   
@@ -3912,11 +4055,11 @@ function updateCustomOverallProgress(percentage, statusMessage, estimatedTimeRem
   const progressEta = document.getElementById('custom-progress-eta');
   
   if (progressBar) {
-    progressBar.style.width = `${Math.min(percentage, 100)}%`;
+    progressBar.style.width = Math.min(percentage, 100) + '%';
   }
   
   if (progressPercentage) {
-    progressPercentage.textContent = `${Math.round(percentage)}%`;
+    progressPercentage.textContent = Math.round(percentage) + '%';
   }
   
   if (progressStatus) {
@@ -3925,7 +4068,7 @@ function updateCustomOverallProgress(percentage, statusMessage, estimatedTimeRem
   
   if (progressEta && estimatedTimeRemaining !== null) {
     const minutes = Math.ceil(estimatedTimeRemaining / 60);
-    progressEta.textContent = `推定残り時間: ${minutes}分`;
+    progressEta.textContent = '推定残り時間: ' + minutes + '分';
   }
 }
 
@@ -3994,15 +4137,15 @@ async function simulateCustomSetupProgress() {
         const remainingTime = Math.max(estimatedTotalTime - totalElapsed, 0);
         
         // 詳細なステップ情報を追加
-        const detailWithProgress = `${step.detail} (${Math.round(stepProgress * 100)}%)`;
+        const detailWithProgress = step.detail + ' (' + Math.round(stepProgress * 100) + '%)';
         updateCustomOverallProgress(currentProgress, detailWithProgress, remainingTime);
         lastProgressUpdate = currentProgress;
       }
     }
     
     // ステップ完了
-    updateCustomProgressStep(step.id, 'completed', step.text, `✅ ${step.text}完了`);
-    updateCustomOverallProgress(nextProgress, `${step.text}完了`);
+    updateCustomProgressStep(step.id, 'completed', step.text, '✅ ' + step.text + '完了');
+    updateCustomOverallProgress(nextProgress, step.text + '完了');
     
     // 短い完了表示待機
     await TimingManager.delay(SYSTEM_CONSTANTS.UI.ANIMATION_DURATION);
@@ -4087,10 +4230,10 @@ async function startBackendCompletionPolling() {
       }
       
       // 進行状況表示更新
-      updateProgressStep(6, 'active', 'カスタムセットアップ継続中', `⏳ 処理確認中... (${attempt}/${maxAttempts})`);
+      updateProgressStep(6, 'active', 'カスタムセットアップ継続中', '⏳ 処理確認中... (' + attempt + '/' + maxAttempts + ')');
       
     } catch (error) {
-      console.warn(`⚠️ ポーリング試行 ${attempt} でエラー:`, error);
+      console.warn('⚠️ ポーリング試行 ' + attempt + ' でエラー:', error);
     }
   }
   
@@ -4170,7 +4313,7 @@ async function startQuickStartPolling(quickstartBtn, quickstartText) {
       }
       
     } catch (error) {
-      console.warn(`⚠️ QuickStartポーリング試行 ${attempt} でエラー:`, error);
+      console.warn('⚠️ QuickStartポーリング試行 ' + attempt + ' でエラー:', error);
     }
   }
   
@@ -4576,7 +4719,7 @@ async function handleCustomSetup(config) {
       
       // 1. freshStatusから取得を試行
       if (freshStatus && (freshStatus.viewUrl || (freshStatus.webAppUrl && freshStatus.userId))) {
-        boardUrl = freshStatus.viewUrl || `${freshStatus.webAppUrl}?mode=view&userId=${freshStatus.userId}`;
+        boardUrl = freshStatus.viewUrl || (freshStatus.webAppUrl + '?mode=view&userId=' + freshStatus.userId);
         console.log('🔗 回答ボードURL生成 (freshStatus):', boardUrl);
       }
       
@@ -4585,7 +4728,7 @@ async function handleCustomSetup(config) {
         const webAppUrl = currentStatus.webAppUrl || (currentStatus.appUrls && currentStatus.appUrls.webAppUrl);
         const userId = currentStatus.userId || (currentStatus.userInfo && currentStatus.userInfo.userId);
         if (webAppUrl && userId) {
-          boardUrl = `${webAppUrl}?mode=view&userId=${userId}`;
+          boardUrl = webAppUrl + '?mode=view&userId=' + userId;
           console.log('🔗 回答ボードURL生成 (currentStatus):', boardUrl);
         }
       }
@@ -4595,7 +4738,7 @@ async function handleCustomSetup(config) {
         // Apps ScriptのWebアプリURLパターンを使用
         const fallbackUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbyq0CohJCpwb8KYJQrba4pWhvtss5HD2nKDPMuzPBX2EOftIAI2UbtjjyEn4N52TCzX/exec';
         const userId = 'b3b2fba8-6565-4cd3-96e9-c47ea6660a80'; // ログから取得したuserId
-        boardUrl = `${fallbackUrl}?mode=view&userId=${userId}`;
+        boardUrl = fallbackUrl + '?mode=view&userId=' + userId;
         console.log('🔗 回答ボードURL生成 (fallback):', boardUrl);
       }
       
@@ -4687,7 +4830,7 @@ async function handleCustomSetup(config) {
         userFriendlyMessage = 'シート設定エラー: デフォルトシート名で継続処理します';
         console.log('ℹ️ シート名エラーは無視して継続処理');
       } else {
-        userFriendlyMessage = `カスタムセットアップに失敗しました: ${error.message}`;
+        userFriendlyMessage = 'カスタムセットアップに失敗しました: ' + error.message;
       }
       
       // 軽微なエラーの場合は警告レベルで表示
@@ -4881,7 +5024,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           
           detailMessage = 'フォームとボードが作成されました。';
           if (publishError) {
-            detailMessage += `自動公開に失敗したため（${publishError}）、`;
+            detailMessage += '自動公開に失敗したため（' + publishError + '）、';
           }
           if (manualInstructions) {
             detailMessage += manualInstructions;
@@ -4890,7 +5033,7 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
           }
         }
         
-        showMessage(`🎉 クイックスタートが完了しました！${detailMessage}`, 'success');
+        showMessage('🎉 クイックスタートが完了しました！' + detailMessage, 'success');
         
         // Update progress step with auto-publish status
         updateProgressStep(5, 'completed', '回答ボード作成完了', '📝 設定を保存して公開してください');

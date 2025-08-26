@@ -49,7 +49,7 @@ function addToSimpleHistory(historyItem) {
 
     const history = getSimpleHistory();
     const newItem = {
-      id: `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
       questionText: historyItem.questionText,
       publishedAt: new Date().toISOString(),
       displayMode: historyItem.displayMode || 'NAMED',
@@ -101,7 +101,7 @@ async function restoreFromSimpleHistory(historyId) {
     }
 
     // 確認ダイアログ
-    const confirmed = confirm(`「${selectedItem.questionText}」の設定を復元しますか？\n\n現在の設定は上書きされます。`);
+    const confirmed = confirm('「' + selectedItem.questionText + '」の設定を復元しますか？\n\n現在の設定は上書きされます。');
     if (!confirmed) return;
 
     // 設定データを直接データベースに保存

@@ -49,7 +49,7 @@ GASOptimizer.prototype.executeCall = function(functionName, args, resolve, rejec
 
     // GAS function call validation
     if (typeof google === 'undefined' || !google.script || !google.script.run || typeof google.script.run[functionName] !== 'function') {
-      throw new Error(`GAS function '${functionName}' is not available`);
+      throw new Error('GAS function \'' + functionName + '\' is not available');
     }
 
   google.script.run

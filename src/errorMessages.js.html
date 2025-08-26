@@ -219,7 +219,7 @@ UnifiedErrorHandler.prototype.addToHistory = function(errorInfo) {
  * エラーをログ出力
  */
 UnifiedErrorHandler.prototype.logError = function(errorInfo) {
-    const logMessage = `[${errorInfo.context}] ${errorInfo.message}`;
+    const logMessage = '[' + errorInfo.context + '] ' + errorInfo.message;
     
     switch (errorInfo.severity) {
       case ERROR_SEVERITY.CRITICAL:
