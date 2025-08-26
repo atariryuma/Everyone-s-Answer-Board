@@ -213,54 +213,9 @@
   function logDebug(...args) { AdminPanel_log('debug', ...args); }
 
   // =============================================================================
-  // STATE MANAGER - Single Definition
+  // STATE MANAGER - Using framework definition
   // =============================================================================
-  class AdminPanelStateManager {
-    constructor() {
-      this.state = {
-        currentStatus: null,
-        selectedSheet: '',
-        isLoading: false,
-        debugMode: window.DEBUG_MODE || false
-      };
-      this.subscribers = new Map();
-    }
-
-    setState(key, value) {
-      this.state[key] = value;
-      this.notifySubscribers(key, value);
-    }
-
-    subscribe(key, callback) {
-      if (!this.subscribers.has(key)) {
-        this.subscribers.set(key, []);
-      }
-      this.subscribers.get(key).push(callback);
-    }
-
-    notifySubscribers(key, value) {
-      const callbacks = this.subscribers.get(key) || [];
-      callbacks.forEach(callback => {
-        try {
-          callback(value);
-        } catch (error) {
-          logError('Subscriber callback error:', error);
-        }
-      });
-    }
-
-    getState() {
-      return { ...this.state }; // ES6 spread operator
-    }
-
-    updateStatus(data) {
-      this.setState('currentStatus', data);
-      this.setState('isLoading', false);
-    }
-  }
-
-  // Initialize state manager
-  window.AdminPanel.stateManager = new AdminPanelStateManager();
+  // State manager is defined in adminPanel-framework.js.html
 
   // =============================================================================
   // UNIFIED API COMMUNICATION - Single Definition
@@ -2103,8 +2058,15 @@
   <?!= include('constants.js.html'); ?>
   <!-- Backend progress sync system -->
   <?!= include('backendProgressSync.js.html'); ?>
+  <!-- Admin Panel Framework - must be loaded before other admin panel components -->
+  <?!= include('adminPanel-framework.js.html'); ?>
   <!-- Error handling system must be loaded first -->
   <?!= include('errorMessages.js.html'); ?>
+  <!-- Admin Panel Core Components -->
+  <?!= include('adminPanel-core.js.html'); ?>
+  <?!= include('adminPanel-api.js.html'); ?>
+  <?!= include('adminPanel-ui.js.html'); ?>
+  <?!= include('adminPanel-events.js.html'); ?>
   <!-- Simple history management system -->
   <?!= include('adminPanel-simple-history.js.html'); ?>
   <!-- History compatibility layer -->
