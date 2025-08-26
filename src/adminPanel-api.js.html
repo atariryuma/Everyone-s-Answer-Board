@@ -4,6 +4,73 @@
 // =============================================================================
 
 // =============================================================================
+// CACHE MANAGER STUB - フロントエンド用キャッシュマネージャー
+// =============================================================================
+
+/**
+ * フロントエンド用キャッシュマネージャースタブ
+ * バックエンドのcacheManagerが参照される場合のフォールバック
+ */
+window.cacheManager = window.cacheManager || {
+  /**
+   * フロントエンドキャッシュをクリア
+   * @returns {Promise} クリア結果
+   */
+  clearAllFrontendCaches: function() {
+    return new Promise((resolve) => {
+      try {
+        // localStorage のクリア（必要に応じて）
+        const keysToPreserve = ['userId', 'adminEmail', 'debugMode'];
+        const preservedData = {};
+        
+        keysToPreserve.forEach(key => {
+          if (localStorage.getItem(key)) {
+            preservedData[key] = localStorage.getItem(key);
+          }
+        });
+        
+        // 一時的にクリア
+        localStorage.clear();
+        
+        // 保存すべきデータを復元
+        Object.keys(preservedData).forEach(key => {
+          localStorage.setItem(key, preservedData[key]);
+        });
+        
+        // sessionStorageもクリア
+        sessionStorage.clear();
+        
+        console.log('✅ Frontend caches cleared successfully');
+        resolve({ success: true, message: 'Frontend caches cleared' });
+      } catch (error) {
+        console.warn('⚠️ Cache clear failed:', error);
+        resolve({ success: false, error: error.message });
+      }
+    });
+  },
+  
+  /**
+   * 特定のキャッシュキーを無効化
+   * @param {Array} patterns - 無効化するパターン
+   */
+  invalidate: function(patterns) {
+    console.log('Cache invalidation requested for patterns:', patterns);
+    // フロントエンドでは実装不要（バックエンド側で処理）
+    return Promise.resolve();
+  },
+  
+  /**
+   * シートデータキャッシュを無効化
+   * @param {string} spreadsheetId - スプレッドシートID
+   */
+  invalidateSheetData: function(spreadsheetId) {
+    console.log('Sheet data cache invalidation requested for:', spreadsheetId);
+    // フロントエンドでは実装不要（バックエンド側で処理）
+    return Promise.resolve();
+  }
+};
+
+// =============================================================================
 // UNIFIED FLOW EXECUTION MANAGER - 統一実行制御システム
 // =============================================================================
 

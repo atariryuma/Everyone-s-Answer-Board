@@ -1,0 +1,35 @@
+<script>
+/**
+ * @fileoverview Admin Panel Simple History Compatibility Layer
+ * 互換性レイヤーファイル - 将来の履歴機能拡張用
+ * 
+ * このファイルは AdminPanel.html から参照されていますが、
+ * 現在は空の実装として機能しています。
+ * 将来的に履歴機能の互換性レイヤーが必要になった場合に
+ * ここに実装を追加できます。
+ */
+
+(function() {
+  'use strict';
+  
+  // 履歴システムの互換性チェック
+  if (typeof window.HistoryManager === 'undefined') {
+    console.log('HistoryManager not found, compatibility layer ready for future implementation');
+  } else {
+    console.log('HistoryManager detected, compatibility layer active');
+    
+    // 将来の互換性実装用のフック
+    const originalInit = window.HistoryManager.prototype.init;
+    if (originalInit) {
+      window.HistoryManager.prototype.init = function() {
+        console.log('HistoryManager init intercepted by compatibility layer');
+        return originalInit.apply(this, arguments);
+      };
+    }
+  }
+  
+  // グローバル互換性フラグ
+  window.HISTORY_COMPAT_LAYER_LOADED = true;
+  
+})();
+</script>

@@ -112,61 +112,65 @@ const ERROR_TYPES = {
 };
 
 /**
- * 統一エラーハンドラークラス
+ * 統一エラーハンドラー（ES5互換）
  */
-class UnifiedErrorHandler {
-  constructor() {
-    this.language = this.detectLanguage();
-    this.errorHistory = [];
-    this.maxHistorySize = 50;
-  }
+function UnifiedErrorHandler() {
+  this.language = this.detectLanguage();
+  this.errorHistory = [];
+  this.maxHistorySize = 50;
+}
   
-  /**
-   * 言語を自動検出
-   */
-  detectLanguage() {
-    const browserLang = navigator.language || navigator.userLanguage;
-    return browserLang.startsWith('ja') ? 'ja' : 'en';
-  }
+/**
+ * 言語を自動検出
+ */
+UnifiedErrorHandler.prototype.detectLanguage = function() {
+  const browserLang = navigator.language || navigator.userLanguage;
+  return browserLang.startsWith('ja') ? 'ja' : 'en';
+};
   
-  /**
-   * エラーメッセージを取得
-   */
-  getMessage(errorKey, fallbackMessage = null) {
-    const messages = ERROR_MESSAGES[this.language] || ERROR_MESSAGES.ja;
-    return messages[errorKey] || fallbackMessage || messages.GENERIC_ERROR;
-  }
+/**
+ * エラーメッセージを取得
+ */
+UnifiedErrorHandler.prototype.getMessage = function(errorKey, fallbackMessage) {
+  fallbackMessage = fallbackMessage || null;
+  const messages = ERROR_MESSAGES[this.language] || ERROR_MESSAGES.ja;
+  return messages[errorKey] || fallbackMessage || messages.GENERIC_ERROR;
+};
   
-  /**
-   * 解決策を取得
-   */
-  getSolution(errorKey) {
-    const messages = ERROR_MESSAGES[this.language] || ERROR_MESSAGES.ja;
-    return messages.SOLUTIONS[errorKey] || null;
-  }
+/**
+ * 解決策を取得
+ */
+UnifiedErrorHandler.prototype.getSolution = function(errorKey) {
+  const messages = ERROR_MESSAGES[this.language] || ERROR_MESSAGES.ja;
+  return messages.SOLUTIONS[errorKey] || null;
+};
   
-  /**
-   * エラーを処理して表示
-   */
-  handleError(error, context = '', severity = ERROR_SEVERITY.MEDIUM, type = ERROR_TYPES.SYSTEM) {
-    const errorInfo = this.categorizeError(error, context, severity, type);
-    
-    // エラー履歴に追加
-    this.addToHistory(errorInfo);
-    
-    // 重要度に応じてログ出力
-    this.logError(errorInfo);
-    
-    // ユーザーに表示
-    this.displayError(errorInfo);
-    
-    return errorInfo;
-  }
+/**
+ * エラーを処理して表示
+ */
+UnifiedErrorHandler.prototype.handleError = function(error, context, severity, type) {
+  context = context || '';
+  severity = severity || ERROR_SEVERITY.MEDIUM;
+  type = type || ERROR_TYPES.SYSTEM;
   
-  /**
-   * エラーを分類
-   */
-  categorizeError(error, context, severity, type) {
+  const errorInfo = this.categorizeError(error, context, severity, type);
+  
+  // エラー履歴に追加
+  this.addToHistory(errorInfo);
+  
+  // 重要度に応じてログ出力
+  this.logError(errorInfo);
+  
+  // ユーザーに表示
+  this.displayError(errorInfo);
+  
+  return errorInfo;
+};
+  
+/**
+ * エラーを分類
+ */
+UnifiedErrorHandler.prototype.categorizeError = function(error, context, severity, type) {
     let errorKey = 'GENERIC_ERROR';
     let specificMessage = error.message || error.toString();
     
@@ -199,22 +203,22 @@ class UnifiedErrorHandler {
       userAgent: navigator.userAgent,
       url: window.location.href
     };
+};
+
+/**
+ * エラー履歴に追加
+ */
+UnifiedErrorHandler.prototype.addToHistory = function(errorInfo) {
+  this.errorHistory.unshift(errorInfo);
+  if (this.errorHistory.length > this.maxHistorySize) {
+    this.errorHistory = this.errorHistory.slice(0, this.maxHistorySize);
   }
-  
-  /**
-   * エラー履歴に追加
-   */
-  addToHistory(errorInfo) {
-    this.errorHistory.unshift(errorInfo);
-    if (this.errorHistory.length > this.maxHistorySize) {
-      this.errorHistory = this.errorHistory.slice(0, this.maxHistorySize);
-    }
-  }
-  
-  /**
-   * エラーをログ出力
-   */
-  logError(errorInfo) {
+};
+
+/**
+ * エラーをログ出力
+ */
+UnifiedErrorHandler.prototype.logError = function(errorInfo) {
     const logMessage = `[${errorInfo.context}] ${errorInfo.message}`;
     
     switch (errorInfo.severity) {
@@ -247,12 +251,12 @@ class UnifiedErrorHandler {
       // フォールバック表示
       alert(displayMessage);
     }
-  }
-  
-  /**
-   * エラー表示をフォーマット
-   */
-  formatErrorDisplay(errorInfo) {
+};
+
+/**
+ * エラー表示をフォーマット
+ */
+UnifiedErrorHandler.prototype.formatErrorDisplay = function(errorInfo) {
     let message = errorInfo.message;
     
     if (errorInfo.solution && errorInfo.severity !== ERROR_SEVERITY.LOW) {
@@ -260,12 +264,12 @@ class UnifiedErrorHandler {
     }
     
     return message;
-  }
-  
-  /**
-   * 重要度からメッセージタイプを取得
-   */
-  getMessageType(severity) {
+};
+
+/**
+ * 重要度からメッセージタイプを取得
+ */
+UnifiedErrorHandler.prototype.getMessageType = function(severity) {
     switch (severity) {
       case ERROR_SEVERITY.CRITICAL:
       case ERROR_SEVERITY.HIGH:
@@ -277,31 +281,30 @@ class UnifiedErrorHandler {
       default:
         return 'error';
     }
+};
+
+/**
+ * エラー履歴を取得
+ */
+UnifiedErrorHandler.prototype.getErrorHistory = function() {
+  return this.errorHistory;
+};
+
+/**
+ * エラー履歴をクリア
+ */
+UnifiedErrorHandler.prototype.clearErrorHistory = function() {
+  this.errorHistory = [];
+};
+
+/**
+ * 言語を変更
+ */
+UnifiedErrorHandler.prototype.setLanguage = function(lang) {
+  if (ERROR_MESSAGES[lang]) {
+    this.language = lang;
   }
-  
-  /**
-   * エラー履歴を取得
-   */
-  getErrorHistory() {
-    return this.errorHistory;
-  }
-  
-  /**
-   * エラー履歴をクリア
-   */
-  clearErrorHistory() {
-    this.errorHistory = [];
-  }
-  
-  /**
-   * 言語を変更
-   */
-  setLanguage(lang) {
-    if (ERROR_MESSAGES[lang]) {
-      this.language = lang;
-    }
-  }
-}
+};
 
 // グローバルインスタンスを作成
 window.unifiedErrorHandler = new UnifiedErrorHandler();

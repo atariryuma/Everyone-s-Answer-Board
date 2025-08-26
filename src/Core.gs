@@ -3979,12 +3979,15 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     Utilities.sleep(1000); // フォーム連携完了を待つ
     
     // スプレッドシートを再読み込みして最新のシート情報を取得
+    /** @type {string} シート名 - スコープを外側に定義 */
+    let sheetName = 'フォームの回答 1'; // デフォルト値
+    
     try {
       spreadsheetObj = SpreadsheetApp.openById(spreadsheetId);
       /** @type {Array} シート配列 */
       const sheets = spreadsheetObj.getSheets();
       /** @type {string} 実際のシート名 */
-      const actualSheetName = String(sheets[0].getName());
+      let actualSheetName = String(sheets[0].getName());
       
       // シート名が不正な値でないことを確認
       if (!actualSheetName || actualSheetName === 'true' || actualSheetName.trim() === '') {
@@ -3992,15 +3995,12 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
         warnLog('不正なシート名が検出されました。デフォルトのシート名を使用します: ' + actualSheetName);
       }
       
-      /** @type {string} シート名 */
-      const sheetName = actualSheetName;
+      sheetName = actualSheetName;
       infoLog('✅ フォーム連携後の正確なシート名を取得:', sheetName);
       
     } catch (sheetNameError) {
       errorLog('❌ フォーム連携後のシート名取得エラー:', sheetNameError.message);
-      // フォールバック: 標準的なシート名を使用
-      /** @type {string} シート名 */
-      const sheetName = 'フォームの回答 1';
+      // フォールバック: 標準的なシート名を使用（既に設定済み）
       warnLog('⚠️ シート名取得エラーのため、標準名を使用:', sheetName);
     }
 
