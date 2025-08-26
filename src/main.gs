@@ -5,17 +5,23 @@
 
 /**
  * HTML ファイルを読み込む include ヘルパー
+ * エラー処理とロギングを強化
  * @param {string} path ファイルパス
  * @return {string} HTML content
  */
-function include(path) {
+const include = (path) => {
   try {
-    return HtmlService.createHtmlOutputFromFile(path).getRawContent();
+    const content = HtmlService.createHtmlOutputFromFile(path).getContent();
+    if (!content) {
+      logWarn(`Empty content returned for include: ${path}`);
+      return `<!-- Warning: Empty content for ${path} -->`;
+    }
+    return content;
   } catch (error) {
     logError(error, 'includeFile', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
-}
+};
 
 
 /**
@@ -23,7 +29,7 @@ function include(path) {
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列
  */
-function escapeJavaScript(str) {
+const escapeJavaScript = (str) => {
   if (!str) return '';
 
   const strValue = str.toString();

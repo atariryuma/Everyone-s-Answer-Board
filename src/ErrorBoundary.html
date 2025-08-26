@@ -154,11 +154,19 @@
   
   // Google Apps Script error recovery
   const handleGoogleScriptError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting Google Apps Script error recovery...');
+    if (typeof logInfo === 'function') {
+      logInfo('Attempting Google Apps Script error recovery...');
+    } else {
+      console.log('🔄 Attempting Google Apps Script error recovery...');
+    }
     
     // Try to reload Google Apps Script context
     if (typeof google !== 'undefined' && google.script) {
-      console.log('🔄 Google Apps Script context available, retrying...');
+      if (typeof logInfo === 'function') {
+        logInfo('Google Apps Script context available, retrying...');
+      } else {
+        console.log('🔄 Google Apps Script context available, retrying...');
+      }
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
@@ -175,14 +183,22 @@
   
   // Timeout error recovery
   const handleTimeoutError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting timeout error recovery...');
+    if (typeof logInfo === 'function') {
+      logInfo('Attempting timeout error recovery...');
+    } else {
+      console.log('🔄 Attempting timeout error recovery...');
+    }
     
     if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
       errorBoundaryState.retryCount++;
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
-          console.log('🔄 Retrying after timeout...');
+          if (typeof logInfo === 'function') {
+            logInfo('Retrying after timeout...');
+          } else {
+            console.log('🔄 Retrying after timeout...');
+          }
           recoveryOptions.retryCallback();
         }
       }, ERROR_BOUNDARY_CONFIG.retryDelay * 2); // Longer delay for timeouts
@@ -196,11 +212,19 @@
   
   // JavaScript error recovery
   const handleJavaScriptError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting JavaScript error recovery...');
+    if (typeof logInfo === 'function') {
+      logInfo('Attempting JavaScript error recovery...');
+    } else {
+      console.log('🔄 Attempting JavaScript error recovery...');
+    }
     
     // Try to recover from common JavaScript errors
     if (errorInfo.message.includes('undefined') || errorInfo.message.includes('null')) {
-      console.log('🔄 Attempting to recover from null/undefined error...');
+      if (typeof logInfo === 'function') {
+        logInfo('Attempting to recover from null/undefined error...');
+      } else {
+        console.log('🔄 Attempting to recover from null/undefined error...');
+      }
       
       if (recoveryOptions.fallbackCallback) {
         recoveryOptions.fallbackCallback();
@@ -214,7 +238,11 @@
   
   // Generic error recovery
   const handleGenericError = (errorInfo, recoveryOptions) => {
-    console.log('🔄 Attempting generic error recovery...');
+    if (typeof logInfo === 'function') {
+      logInfo('Attempting generic error recovery...');
+    } else {
+      console.log('🔄 Attempting generic error recovery...');
+    }
     
     if (recoveryOptions.fallbackCallback) {
       recoveryOptions.fallbackCallback();
@@ -626,13 +654,13 @@
                 
                 // DOM から診断情報を直接取得
                 const diagnosticSections = document.querySelectorAll('.diagnostic-summary');
-                diagnosticSections.forEach(function(section) {
+                diagnosticSections.forEach((section) => {
                     const heading = section.querySelector('h4');
                     if (heading && heading.textContent.includes('📋 基本情報')) {
                         const summaryItems = section.querySelectorAll('p');
                         if (summaryItems.length > 0) {
                             copyText += '\n【基本情報】\n';
-                            summaryItems.forEach(function(item) {
+                            summaryItems.forEach((item) => {
                                 copyText += item.textContent.trim() + '\n';
                             });
                         }
@@ -640,7 +668,7 @@
                         const technicalItems = section.querySelectorAll('p');
                         if (technicalItems.length > 0) {
                             copyText += '\n【技術詳細】\n';
-                            technicalItems.forEach(function(item) {
+                            technicalItems.forEach((item) => {
                                 copyText += item.textContent.trim() + '\n';
                             });
                         }

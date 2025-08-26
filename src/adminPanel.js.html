@@ -1,0 +1,435 @@
+<script>
+  // Admin Panel JavaScript
+
+  // Validate current step with setup status consideration
+  const validateCurrentStep = () => {
+    const savePublishBtn = document.getElementById('save-publish-btn');
+    if (!savePublishBtn) return;
+    
+    // セットアップ状況を確認
+    const setupStatus = getSetupStatusFromGlobalStatus();
+    
+    // Note: ステップ制御は統一されたmanagedSectionStates()で管理
+    // enforceStepProgression()は無効化して競合を回避
+    
+    let isValid = false;
+    
+    switch (currentStep) {
+      case 1:
+        isValid = selectedSheetId || selectedFormId;
+        break;
+      case 2:
+        // Step 2 validation: check for both config validation AND setup completion
+        const configValid = currentConfig && validateConfiguration();
+        const step2Complete = checkStep2Completion();
+        isValid = configValid || step2Complete;
+        logDebug(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`);
+        break;
+      case 3:
+        isValid = true;
+        break;
+    }
+    
+    savePublishBtn.disabled = !isValid;
+  }
+  
+  // セットアップ状況をグローバルステータスから取得
+  const getSetupStatusFromGlobalStatus = () => {
+    try {
+      if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
+        const config = typeof currentStatus.userInfo.configJson === 'string' 
+          ? JSON.parse(currentStatus.userInfo.configJson) 
+          : currentStatus.userInfo.configJson;
+        return config.setupStatus || 'pending';
+      }
+      return 'pending';
+    } catch (error) {
+      logWarn('getSetupStatusFromGlobalStatus エラー:', error);
+      return 'pending';
+    }
+  }
+  
+  // セットアップ未完了時の段階的制御を強制
+  const enforceStepProgression = () => {
+    const step1Completed = checkStep1Completion();
+    const step2Completed = checkStep2Completion();
+    
+    // Step 2の制御
+    const step2Section = document.getElementById('sheet-selection-section');
+    if (!step1Completed) {
+      disableSection(step2Section, '⚠️ 先にデータ準備を完了してください');
+    } else {
+      enableSection(step2Section);
+    }
+    
+    // Step 3の制御
+    const step3Section = document.getElementById('config-section');
+    if (!step1Completed || !step2Completed) {
+      disableSection(step3Section, '⚠️ 前のステップを完了してください');
+    } else {
+      enableSection(step3Section);
+    }
+  }
+  
+  // Step 1完了チェック
+  const checkStep1Completion = () => {
+    return !!(selectedSheetId || selectedFormId || 
+              (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
+  }
+  
+  // Step 2完了チェック - 統一されたconfigJson状態確認
+  const checkStep2Completion = () => {
+    if (!currentStatus?.userInfo?.configJson) {
+      return false;
+    }
+    
+    try {
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+      
+      // データベース状態に基づく統一判定
+      const setupCompleted = config.setupStatus === 'completed' && 
+                            config.formCreated === true && 
+                            config.formUrl && config.formUrl.trim();
+      
+      logDebug('Step 2完了チェック (統一版):', setupCompleted);
+      return setupCompleted;
+    } catch (error) {
+      logWarn('Step 2完了チェックでエラー:', error);
+      return false;
+    }
+  }
+  
+  // セクションを無効化
+  const disableSection = (section, message) => {
+    if (!section) return;
+    
+    section.style.opacity = '0.5';
+    section.style.pointerEvents = 'none';
+    
+    // 警告メッセージを追加
+    const existingWarning = section.querySelector('.step-warning');
+    if (!existingWarning) {
+      const warning = document.createElement('div');
+      warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
+      warning.innerHTML = `<span class="font-semibold">${message}</span>`;
+      section.insertBefore(warning, section.firstChild);
+    }
+  }
+  
+  // セクションを有効化
+  const enableSection = (section) => {
+    if (!section) return;
+    
+    section.style.opacity = '1';
+    section.style.pointerEvents = 'auto';
+    
+    // 警告メッセージを削除
+    const warning = section.querySelector('.step-warning');
+    if (warning) {
+      warning.remove();
+    }
+  }
+  
+  // Handle sheet selection
+  const handleSheetSelection = (event) => {
+    selectedSheetId = event.target.value;
+    selectedFormId = null; // Clear form selection
+    
+    if (selectedSheetId) {
+      loadSheetColumns(selectedSheetId);
+    }
+    
+    validateCurrentStep();
+  }
+  
+  // Handle form selection
+  const handleFormSelection = (event) => {
+    selectedFormId = event.target.value;
+    selectedSheetId = null; // Clear sheet selection
+    
+    if (selectedFormId) {
+      loadFormColumns(selectedFormId);
+    }
+    
+    validateCurrentStep();
+  }
+  
+  // Load sheet columns
+  const loadSheetColumns = (sheetId) => {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getSheetColumns', sheetId)
+        .then(columns => {
+          displayColumnMapping(columns);
+        })
+        .catch(error => {
+          logError(error, 'loadSheetColumns');
+          showMessage('列の読み込みに失敗しました', 'error');
+        });
+    }
+  }
+  
+  // Load form columns
+  const loadFormColumns = (formId) => {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getFormColumns', formId)
+        .then(columns => {
+          displayColumnMapping(columns);
+        })
+        .catch(error => {
+          logError(error, 'loadFormColumns');
+          showMessage('フォーム項目の読み込みに失敗しました', 'error');
+        });
+    }
+  }
+  
+  // Display column mapping interface
+  const displayColumnMapping = (columns) => {
+    const configPlaceholder = document.getElementById('config-placeholder');
+    const configContent = document.getElementById('config-content');
+    
+    if (configPlaceholder) configPlaceholder.classList.add('hidden');
+    if (configContent) configContent.classList.remove('hidden');
+    
+    const mappingContainer = document.getElementById('column-mappings');
+    if (!mappingContainer) return;
+    
+    mappingContainer.innerHTML = '';
+    
+    columns.forEach((column, index) => {
+      const mappingDiv = document.createElement('div');
+      mappingDiv.className = 'column-mapping';
+      mappingDiv.innerHTML = `
+        <div>
+          <label class="block text-sm font-medium text-gray-200 mb-2">
+            ${column.name}
+            ${column.required ? '<span class="text-red-400">*</span>' : ''}
+          </label>
+          <p class="text-xs text-gray-400">${column.description || ''}</p>
+        </div>
+        <div>
+          <select class="form-control form-select column-mapping-select" data-column="${column.id}">
+            <option value="">選択してください</option>
+            ${columns.map(col => `<option value="${col.id}">${col.name}</option>`).join('')}
+            <option value="content">回答内容</option>
+            <option value="author">回答者名</option>
+            <option value="timestamp">回答時刻</option>
+            <option value="reaction">リアクション</option>
+            <option value="ignore">無視</option>
+          </select>
+        </div>
+      `;
+      mappingContainer.appendChild(mappingDiv);
+    });
+  }
+  
+  // Handle column mapping
+  function handleColumnMapping(select) {
+    const columnId = select.dataset.column;
+    const mappingType = select.value;
+    const mappingDiv = select.closest('.column-mapping');
+    
+    // Update visual feedback
+    mappingDiv.classList.remove('required', 'mapped');
+    if (mappingType && mappingType !== 'ignore') {
+      mappingDiv.classList.add('mapped');
+    }
+    
+    // Update configuration
+    if (!currentConfig) currentConfig = {};
+    if (!currentConfig.columnMappings) currentConfig.columnMappings = {};
+    currentConfig.columnMappings[columnId] = mappingType;
+    
+    validateCurrentStep();
+  }
+  
+  // Handle toggle changes
+  function handleToggleChange(event) {
+    const toggleName = event.target.name;
+    const isChecked = event.target.checked;
+    
+    if (!currentConfig) currentConfig = {};
+    currentConfig[toggleName] = isChecked;
+    
+    validateCurrentStep();
+  }
+  
+  // Validate configuration
+  function validateConfiguration() {
+    if (!currentConfig || !currentConfig.columnMappings) return false;
+    
+    const mappings = currentConfig.columnMappings;
+    const hasContent = Object.values(mappings).includes('content');
+    const hasAuthor = Object.values(mappings).includes('author');
+    
+    return hasContent && hasAuthor;
+  }
+  
+  // Handle save and publish - 修正版（公開モーダル経由）
+  function handleSaveAndPublish() {
+    const btn = document.getElementById('save-publish-btn');
+    if (!btn || btn.disabled) return;
+    
+    // 設定の準備
+    const config = {
+      sheetId: selectedSheetId,
+      formId: selectedFormId,
+      columnMappings: currentConfig.columnMappings,
+      displaySettings: {
+        showCounts: currentConfig.showCounts || false,
+        allowReactions: currentConfig.allowReactions || true,
+        anonymousMode: currentConfig.anonymousMode || false
+      }
+    };
+    
+    // 自動停止設定を準備
+    const autoStopSettings = {
+      enabled: true,
+      minutes: 360 // 6時間 = 360分（config.gsと統一）
+    };
+    
+    // 公開モーダルを表示
+    if (window.sharedModals && typeof window.sharedModals.showPublish === 'function') {
+      window.sharedModals.showPublish(
+        // 公開実行時のコールバック
+        () => {
+          console.log('📤 公開モーダルで公開が選択されました');
+          executePublishProcess(btn, config);
+        },
+        // キャンセル時のコールバック
+        () => {
+          console.log('❌ 公開がキャンセルされました');
+        },
+        // 自動停止設定
+        autoStopSettings
+      );
+    } else {
+      // フォールバック: モーダルが利用できない場合は直接実行
+      console.warn('⚠️ 公開モーダルが利用できません。直接実行します。');
+      executePublishProcess(btn, config);
+    }
+  }
+  
+  // 実際の公開処理実行
+  function executePublishProcess(btn, config) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>保存・公開中...';
+    
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('saveAndPublishBoard', config)
+        .then(result => {
+          if (result.success) {
+            showMessage('設定が保存され、ボードが公開されました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
+            loadSystemStatus();
+            
+            // 🔧 公開成功後に状態整合性チェック・修復を実行
+            setTimeout(() => {
+              console.log('🔧 公開後の状態整合性チェックを実行中...');
+              if (typeof initializeUserSettings === 'function') {
+                initializeUserSettings()
+                  .then(result => {
+                    if (result.success) {
+                      console.log('✅ 公開後の状態チェック完了:', result.message);
+                    }
+                  })
+                  .catch(error => {
+                    console.warn('⚠️ 公開後の状態チェックで軽微な問題:', error.message);
+                  });
+              } else {
+                console.warn('⚠️ initializeUserSettings関数が利用できません');
+              }
+            }, 500);
+            
+            if (typeof navigateToStep === 'function') {
+              navigateToStep(3);
+            } else {
+              console.warn('⚠️ navigateToStep function not available');
+            }
+            
+            // 自動停止確認モーダルを表示（公開成功後）
+            setTimeout(() => {
+              if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
+                window.sharedModals.showAutoStopConfirmation(result);
+                console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
+              }
+            }, 1000);
+            
+          } else {
+            showMessage(result.message || '保存に失敗しました', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Save failed:', error);
+          showMessage('保存に失敗しました', 'error');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>設定を保存して公開';
+        });
+    }
+  }
+  
+  // Handle unpublish
+  function handleUnpublish() {
+    if (!confirm('ボードの公開を停止しますか？')) return;
+    
+    const btn = document.getElementById('unpublish-board-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>停止中...';
+    
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('unpublishBoard')
+        .then(result => {
+          if (result.success) {
+            showMessage('ボードの公開を停止しました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
+            loadSystemStatus();
+          } else {
+            showMessage(result.message || '停止に失敗しました', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Unpublish failed:', error);
+          showMessage('停止に失敗しました', 'error');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path></svg>公開を停止';
+        });
+    }
+  }
+
+  // Initialization is triggered from AdminPanel.html after userId is ready.
+
+  // Export functions for global access
+  window.adminPanel = {
+    initializeAdminPanel: window.initializeAdminPanel, // Function moved to framework
+    navigateToStep: window.navigateToStep, // Function moved to framework
+    showMessage: window.showMessage || function() { console.warn('showMessage not yet available'); },
+    switchToAnotherAccount,
+    openAppSetupPage,
+    logoutAndRedirect
+  };
+  // ログアウトしてログイン画面へリダイレクト
+  function logoutAndRedirect() {
+    if (confirm('ログアウトしてログイン画面に戻りますか？')) {
+      google.script.run
+        .withSuccessHandler(function(url) {
+          window.location.href = url; // ログイン画面へリダイレクト
+        })
+        .withFailureHandler(function(error) {
+          console.error('Logout failed:', error);
+          showMessage('ログアウト処理中にエラーが発生しました', 'error');
+        })
+        .resetUserAuthentication(); // バックエンドの認証リセット関数を呼び出す
+    }
+  }
+
+//# sourceURL=adminPanel.js.html
+</script>

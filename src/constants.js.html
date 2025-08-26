@@ -141,4 +141,10 @@ window.getElement = (key) => document.getElementById(SYSTEM_CONSTANTS.ELEMENTS[k
 window.addClass = (element, className) => element?.classList.add(SYSTEM_CONSTANTS.CSS_CLASSES[className]);
 window.removeClass = (element, className) => element?.classList.remove(SYSTEM_CONSTANTS.CSS_CLASSES[className]);
 
+// Use structured logging if available, otherwise fallback to console
+if (typeof logInfo === 'function') {
+  logInfo('System Constants loaded and frozen');
+} else {
+  console.log('✅ System Constants loaded and frozen');
+}
 </script>
