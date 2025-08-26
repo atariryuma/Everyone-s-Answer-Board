@@ -149,6 +149,8 @@
   
   
   <!-- Core JavaScript Libraries (must be loaded first) -->
+  <!-- ES5 Compatibility Layer - MUST LOAD FIRST -->
+  <?!= include('es5-compatibility-layer.js.html'); ?>
   <?!= include('ClientOptimizer.html'); ?>
   <!-- UnifiedCache.js.html removed - class is defined in page.js.html -->
   
@@ -2043,13 +2045,11 @@
   <?!= include('adminPanel-framework.js.html'); ?>
   <!-- Error handling system must be loaded first -->
   <?!= include('errorMessages.js.html'); ?>
-  <!-- Admin Panel Core Components -->
-  <?!= include('adminPanel-core.js.html'); ?>
+  <!-- Consolidated Admin Panel Components -->
+  <?!= include('admin-consolidated.js.html'); ?>
   <?!= include('adminPanel-api.js.html'); ?>
   <?!= include('adminPanel-ui.js.html'); ?>
   <?!= include('adminPanel-events.js.html'); ?>
-  <!-- Simple history management system -->
-  <?!= include('adminPanel-simple-history.js.html'); ?>
   <!-- History compatibility layer -->
   <?!= include('adminPanel-simple-history-compat.js.html'); ?>
 

@@ -1,0 +1,308 @@
+<script>
+// =============================================================================
+// CONSOLIDATED ADMIN PANEL CORE FUNCTIONALITY
+// =============================================================================
+// This file consolidates adminPanel.js.html and adminPanel-core.js.html
+// to reduce redundancy and improve maintainability
+
+// =============================================================================
+// UNIFIED MANAGEMENT SYSTEM API - 統一管理システムAPI
+// =============================================================================
+
+/**
+ * 統一管理システム - 全管理クラスのエントリーポイント
+ */
+window.unifiedManagement = {
+  // キャッシュ管理 (CacheManager)
+  cache: {
+    get: function(key, valueFn, options) {
+      return typeof cacheManager !== 'undefined' ? cacheManager.get(key, valueFn, options) : (valueFn ? valueFn() : null);
+    },
+    remove: function(key) {
+      return typeof cacheManager !== 'undefined' ? cacheManager.remove(key) : null;
+    },
+    clearAll: function() {
+      return typeof cacheManager !== 'undefined' ? cacheManager.clearAll() : null;
+    },
+    clearFrontend: function(options) {
+      return typeof cacheManager !== 'undefined' ? cacheManager.clearAllFrontendCaches(options) : Promise.resolve({ success: false });
+    },
+    clearSpecific: function(type) {
+      return typeof cacheManager !== 'undefined' ? cacheManager.clearSpecificCache(type) : Promise.resolve({ success: false });
+    },
+    diagnose: function() {
+      return typeof cacheManager !== 'undefined' ? cacheManager.diagnoseFrontendCache() : { available: false };
+    },
+    getHealth: function() {
+      return typeof cacheManager !== 'undefined' ? cacheManager.getHealth() : { status: 'unavailable' };
+    }
+  },
+
+  // タイミング制御 (TimingManager)  
+  timing: {
+    delay: function(ms, id) {
+      return typeof TimingManager !== 'undefined' ? TimingManager.delay(ms, id) : new Promise(function(resolve) {
+        setTimeout(resolve, ms);
+      });
+    },
+    sequence: function(operations, intervalMs, sequenceId) {
+      return typeof TimingManager !== 'undefined' ? TimingManager.sequence(operations, intervalMs, sequenceId) : Promise.resolve([]);
+    },
+    parallel: function(operations, concurrency) {
+      return typeof TimingManager !== 'undefined' ? TimingManager.parallel(operations, concurrency) : Promise.all(operations.map(function(op) {
+        return op();
+      }));
+    },
+    debounce: function(func, key, delay) {
+      return typeof TimingManager !== 'undefined' ? TimingManager.debounce(func, key, delay) : func;
+    },
+    throttle: function(func, key, delay) {
+      return typeof TimingManager !== 'undefined' ? TimingManager.throttle(func, key, delay) : func;
+    }
+  },
+
+  // ローディング制御
+  loading: {
+    show: function(options) {
+      if (typeof UnifiedLoadingManager !== 'undefined') {
+        return UnifiedLoadingManager.showLoading(options);
+      }
+      return { success: false };
+    },
+    hide: function(options) {
+      if (typeof UnifiedLoadingManager !== 'undefined') {
+        return UnifiedLoadingManager.hideLoading(options);
+      }
+      return { success: false };
+    },
+    update: function(progress, message) {
+      if (typeof UnifiedLoadingManager !== 'undefined') {
+        return UnifiedLoadingManager.updateProgress(progress, message);
+      }
+      return { success: false };
+    }
+  }
+};
+
+// =============================================================================
+// STEP VALIDATION AND MANAGEMENT
+// =============================================================================
+
+/**
+ * セットアップ状況をグローバルステータスから取得
+ */
+function getSetupStatusFromGlobalStatus() {
+  try {
+    if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
+      var config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+      return config.setupStatus || 'pending';
+    }
+    return 'pending';
+  } catch (error) {
+    logWarn('getSetupStatusFromGlobalStatus エラー:', error);
+    return 'pending';
+  }
+}
+
+/**
+ * 現在のステップを検証し、UI状態を更新
+ */
+function validateCurrentStep() {
+  var savePublishBtn = document.getElementById('save-publish-btn');
+  if (!savePublishBtn) return;
+  
+  // セットアップ状況を確認
+  var setupStatus = getSetupStatusFromGlobalStatus();
+  
+  var isValid = false;
+  
+  // currentStepがグローバルに定義されていることを確認
+  if (typeof currentStep === 'undefined') {
+    console.warn('currentStep is not defined, defaulting to 1');
+    currentStep = 1;
+  }
+  
+  switch (currentStep) {
+    case 1:
+      isValid = (typeof selectedSheetId !== 'undefined' && selectedSheetId) || 
+                (typeof selectedFormId !== 'undefined' && selectedFormId);
+      break;
+    case 2:
+      // Step 2 validation: check for both config validation AND setup completion
+      var configValid = (typeof currentConfig !== 'undefined' && currentConfig) && 
+                       (typeof validateConfiguration === 'function' ? validateConfiguration() : true);
+      var step2Complete = typeof checkStep2Completion === 'function' ? checkStep2Completion() : false;
+      isValid = configValid || step2Complete;
+      logDebug('Step 2 validation: configValid=' + configValid + ', step2Complete=' + step2Complete + ', isValid=' + isValid);
+      break;
+    case 3:
+      isValid = true;
+      break;
+    default:
+      isValid = false;
+  }
+  
+  savePublishBtn.disabled = !isValid;
+}
+
+/**
+ * Step 2の完了状態をチェック
+ */
+function checkStep2Completion() {
+  try {
+    // 基本的な設定項目の存在チェック
+    var hasValidConfig = currentConfig && 
+                        typeof currentConfig === 'object' && 
+                        Object.keys(currentConfig).length > 0;
+    
+    // UI要素の状態チェック  
+    var hasFormSelection = document.querySelector('input[name="form-option"]:checked');
+    var hasSheetSelection = document.getElementById('sheet-select') && 
+                           document.getElementById('sheet-select').value;
+    
+    return hasValidConfig || hasFormSelection || hasSheetSelection;
+  } catch (error) {
+    logWarn('checkStep2Completion エラー:', error);
+    return false;
+  }
+}
+
+/**
+ * 設定の妥当性を検証
+ */
+function validateConfiguration() {
+  try {
+    if (!currentConfig || typeof currentConfig !== 'object') {
+      return false;
+    }
+    
+    // 基本的な必須項目のチェック
+    var requiredFields = ['timestampHeader', 'opinionHeader'];
+    for (var i = 0; i < requiredFields.length; i++) {
+      var field = requiredFields[i];
+      if (!currentConfig[field]) {
+        logDebug('Missing required field: ' + field);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    logWarn('validateConfiguration エラー:', error);
+    return false;
+  }
+}
+
+// =============================================================================
+// UI HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * 安全なDOM要素取得
+ */
+function safeGetElement(selector) {
+  try {
+    return document.querySelector(selector);
+  } catch (error) {
+    console.warn('DOM要素の取得に失敗:', selector, error);
+    return null;
+  }
+}
+
+/**
+ * 安全なイベントリスナー登録
+ */
+function safeAddEventListener(element, event, handler) {
+  if (!element) return false;
+  
+  try {
+    element.addEventListener(event, handler);
+    return true;
+  } catch (error) {
+    console.warn('イベントリスナーの登録に失敗:', event, error);
+    return false;
+  }
+}
+
+/**
+ * 要素の表示/非表示を安全に切り替え
+ */
+function safeToggleVisibility(selector, isVisible) {
+  var element = safeGetElement(selector);
+  if (!element) return false;
+  
+  try {
+    if (isVisible) {
+      element.style.display = '';
+      element.classList.remove('hidden');
+    } else {
+      element.style.display = 'none';
+      element.classList.add('hidden');
+    }
+    return true;
+  } catch (error) {
+    console.warn('要素の表示切り替えに失敗:', selector, error);
+    return false;
+  }
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+/**
+ * 統合コア機能の初期化
+ */
+function initializeAdminCore() {
+  console.log('🔧 Admin Core initializing...');
+  
+  try {
+    // 基本的なUI状態の初期化
+    if (typeof validateCurrentStep === 'function') {
+      validateCurrentStep();
+    }
+    
+    // グローバルエラーハンドリングの設定
+    window.addEventListener('error', function(event) {
+      if (event.error && event.error.message) {
+        logError('Global error caught:', event.error.message);
+      }
+    });
+    
+    // Promiseエラーハンドリング
+    window.addEventListener('unhandledrejection', function(event) {
+      logError('Unhandled promise rejection:', event.reason);
+      event.preventDefault(); // ブラウザのデフォルトエラー表示を防ぐ
+    });
+    
+    console.log('✅ Admin Core initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Admin Core initialization failed:', error);
+    return false;
+  }
+}
+
+// DOM準備完了後に初期化実行
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeAdminCore);
+} else {
+  initializeAdminCore();
+}
+
+// =============================================================================
+// LEGACY COMPATIBILITY
+// =============================================================================
+
+// 既存コードとの互換性のため、主要な関数をグローバルスコープに配置
+window.validateCurrentStep = validateCurrentStep;
+window.getSetupStatusFromGlobalStatus = getSetupStatusFromGlobalStatus;
+window.checkStep2Completion = checkStep2Completion;
+window.validateConfiguration = validateConfiguration;
+window.safeGetElement = safeGetElement;
+window.safeAddEventListener = safeAddEventListener;
+window.safeToggleVisibility = safeToggleVisibility;
+
+</script>
