@@ -10,7 +10,7 @@
  */
 function include(path) {
   try {
-    return HtmlService.createHtmlOutputFromFile(path).getContent();
+    return HtmlService.createHtmlOutputFromFile(path).getRawContent();
   } catch (error) {
     logError(error, 'includeFile', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
     return `<!-- Error including ${path}: ${error.message} -->`;

@@ -182,535 +182,521 @@
 // =============================================================================
 
 // Debounce function with key-based tracking
-function DebounceManager() {
-  this.timers = new Map();
-}
-
-DebounceManager.prototype.debounce = function(func, key, delay) {
-  if (typeof delay === 'undefined') delay = 1000;
-  if (this.timers.has(key)) {
-    clearTimeout(this.timers.get(key));
+class DebounceManager {
+  constructor() {
+    this.timers = new Map();
   }
-  var self = this;
-  var timeoutId = setTimeout(function() {
-    func();
-    self.timers.delete(key);
-  }, delay);
-  this.timers.set(key, timeoutId);
-};
 
-DebounceManager.prototype.clear = function(key) {
-  if (this.timers.has(key)) {
-    clearTimeout(this.timers.get(key));
-    this.timers.delete(key);
-  }
-};
-
-DebounceManager.prototype.clearAll = function() {
-  var self = this;
-  this.timers.forEach(function(timer) {
-    clearTimeout(timer);
-  });
-  this.timers.clear();
-};
-
-// Throttle function with key-based tracking
-function ThrottleManager() {
-  this.timers = new Map();
-  this.lastExecution = new Map();
-}
-
-ThrottleManager.prototype.throttle = function(func, key, delay) {
-  if (typeof delay === 'undefined') delay = 100;
-  var now = Date.now();
-  var lastRun = this.lastExecution.get(key) || 0;
-  var self = this;
-
-  if (now - lastRun >= delay) {
-    func();
-    this.lastExecution.set(key, now);
-  } else if (!this.timers.has(key)) {
-    var timeoutId = setTimeout(function() {
+  debounce(func, key, delay = 1000) {
+    if (this.timers.has(key)) {
+      clearTimeout(this.timers.get(key));
+    }
+    
+    const timeoutId = setTimeout(() => {
       func();
-      self.lastExecution.set(key, Date.now());
-      self.timers.delete(key);
-    }, delay - (now - lastRun));
+      this.timers.delete(key);
+    }, delay);
+    
     this.timers.set(key, timeoutId);
   }
-};
 
-ThrottleManager.prototype.clear = function(key) {
-  if (this.timers.has(key)) {
-    clearTimeout(this.timers.get(key));
-    this.timers.delete(key);
+  clear(key) {
+    if (this.timers.has(key)) {
+      clearTimeout(this.timers.get(key));
+      this.timers.delete(key);
+    }
   }
-  this.lastExecution.delete(key);
-};
 
-ThrottleManager.prototype.clearAll = function() {
-  var self = this;
-  this.timers.forEach(function(timer) {
-    clearTimeout(timer);
-  });
-  this.timers.clear();
-  this.lastExecution.clear();
-};
+  clearAll() {
+    this.timers.forEach(timer => {
+      clearTimeout(timer);
+    });
+    this.timers.clear();
+  }
+}
+
+// Throttle function with key-based tracking
+class ThrottleManager {
+  constructor() {
+    this.timers = new Map();
+    this.lastExecution = new Map();
+  }
+
+  throttle(func, key, delay = 100) {
+    const now = Date.now();
+    const lastRun = this.lastExecution.get(key) || 0;
+
+    if (now - lastRun >= delay) {
+      func();
+      this.lastExecution.set(key, now);
+    } else if (!this.timers.has(key)) {
+      const timeoutId = setTimeout(() => {
+        func();
+        this.lastExecution.set(key, Date.now());
+        this.timers.delete(key);
+      }, delay - (now - lastRun));
+      this.timers.set(key, timeoutId);
+    }
+  }
+
+  clear(key) {
+    if (this.timers.has(key)) {
+      clearTimeout(this.timers.get(key));
+      this.timers.delete(key);
+    }
+    this.lastExecution.delete(key);
+  }
+
+  clearAll() {
+    this.timers.forEach(timer => {
+      clearTimeout(timer);
+    });
+    this.timers.clear();
+    this.lastExecution.clear();
+  }
+}
 
 // =============================================================================
 // DOM UTILITIES
 // =============================================================================
 
 // Enhanced DOM utility functions
-function DOMUtilities() {
-  this.elementCache = new Map();
+class DOMUtilities {
+  constructor() {
+    this.elementCache = new Map();
+  }
+
+  // Safe element creation
+  createSafeElement(tag, className, textContent) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (textContent) element.textContent = textContent;
+    return element;
+  }
+
+  // Safe element selection with caching
+  getCachedElement(id) {
+    if (this.elementCache.has(id)) {
+      return this.elementCache.get(id);
+    }
+
+    const element = document.getElementById(id);
+    if (element) {
+      this.elementCache.set(id, element);
+    } else {
+      console.warn('Element not found:', id);
+    }
+    return element;
+  }
+
+  // Batch cache multiple elements
+  cacheElements(elementIds) {
+    const cached = {};
+    elementIds.forEach(id => {
+      cached[id] = this.getCachedElement(id);
+    });
+    return cached;
+  }
+
+  // Clear element cache
+  clearElementCache(id = null) {
+    if (id) {
+      this.elementCache.delete(id);
+    } else {
+      this.elementCache.clear();
+    }
+  }
+
+  // Safe button state management
+  setButtonState(button, isDisabled, text) {
+    if (!button) return;
+    button.disabled = isDisabled;
+    if (text) button.textContent = text;
+  }
+
+  // Safe text content setting
+  setSafeTextContent(element, text) {
+    if (!element) return;
+    element.textContent = text || '';
+  }
+
+  // Safe class toggling
+  toggleClass(element, className, condition) {
+    if (!element) return;
+    if (condition) {
+      element.classList.add(className);
+    } else {
+      element.classList.remove(className);
+    }
+  }
+
+  // Safe event listener management
+  addSafeEventListener(element, event, handler, options = {}) {
+    if (!element) return null;
+    element.addEventListener(event, handler, options);
+    return handler;
+  }
+
+  removeSafeEventListener(element, event, handler) {
+    if (!element || !handler) return;
+    element.removeEventListener(event, handler);
+  }
 }
-
-// Safe element creation
-DOMUtilities.prototype.createSafeElement = function(tag, className, textContent) {
-  var element = document.createElement(tag);
-  if (className) element.className = className;
-  if (textContent) element.textContent = textContent;
-  return element;
-};
-
-// Safe element selection with caching
-DOMUtilities.prototype.getCachedElement = function(id) {
-  if (this.elementCache.has(id)) {
-    return this.elementCache.get(id);
-  }
-
-  var element = document.getElementById(id);
-  if (element) {
-    this.elementCache.set(id, element);
-  } else {
-    console.warn('Element not found:', id);
-  }
-  return element;
-};
-
-// Batch cache multiple elements
-DOMUtilities.prototype.cacheElements = function(elementIds) {
-  var cached = {};
-  var self = this;
-  elementIds.forEach(function(id) {
-    cached[id] = self.getCachedElement(id);
-  });
-  return cached;
-};
-
-// Clear element cache
-DOMUtilities.prototype.clearElementCache = function(id) {
-  if (typeof id === 'undefined') id = null;
-  if (id) {
-    this.elementCache.delete(id);
-  } else {
-    this.elementCache.clear();
-  }
-};
-
-// Safe button state management
-DOMUtilities.prototype.setButtonState = function(button, isDisabled, text) {
-  if (!button) return;
-  button.disabled = isDisabled;
-  if (text) button.textContent = text;
-};
-
-// Safe text content setting
-DOMUtilities.prototype.setSafeTextContent = function(element, text) {
-  if (!element) return;
-  element.textContent = text || '';
-};
-
-// Safe class toggling
-DOMUtilities.prototype.toggleClass = function(element, className, condition) {
-  if (!element) return;
-  if (condition) {
-    element.classList.add(className);
-  } else {
-    element.classList.remove(className);
-  }
-};
-
-// Safe event listener management
-DOMUtilities.prototype.addSafeEventListener = function(element, event, handler, options) {
-  if (typeof options === 'undefined') options = {};
-  if (!element) return null;
-  element.addEventListener(event, handler, options);
-  return handler;
-};
-
-DOMUtilities.prototype.removeSafeEventListener = function(element, event, handler) {
-  if (!element || !handler) return;
-  element.removeEventListener(event, handler);
-};
 
 // =============================================================================
 // CACHE MANAGEMENT
 // =============================================================================
 
 // Enhanced cache manager with TTL and size limits
-function EnhancedCache(maxSize, defaultTTL) {
-  if (typeof maxSize === 'undefined') maxSize = 100;
-  if (typeof defaultTTL === 'undefined') defaultTTL = 300000; // 5 minutes default
-  this.cache = new Map();
-  this.timestamps = new Map();
-  this.ttls = new Map();
-  this.maxSize = maxSize;
-  this.defaultTTL = defaultTTL;
-}
-
-EnhancedCache.prototype.set = function(key, value, ttl) {
-  if (typeof ttl === 'undefined') ttl = null;
-  var now = Date.now();
-  var actualTTL = ttl || this.defaultTTL;
-
-  // If cache is full, remove oldest entry
-  if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
-    this.removeOldest();
+class EnhancedCache {
+  constructor(maxSize = 100, defaultTTL = 300000) { // 5 minutes default
+    this.cache = new Map();
+    this.timestamps = new Map();
+    this.ttls = new Map();
+    this.maxSize = maxSize;
+    this.defaultTTL = defaultTTL;
   }
 
-  this.cache.set(key, value);
-  this.timestamps.set(key, now);
-  this.ttls.set(key, actualTTL);
-};
+  set(key, value, ttl = null) {
+    const now = Date.now();
+    const actualTTL = ttl || this.defaultTTL;
 
-EnhancedCache.prototype.get = function(key) {
-  if (!this.cache.has(key)) {
-    return null;
-  }
-
-  var now = Date.now();
-  var timestamp = this.timestamps.get(key);
-  var ttl = this.ttls.get(key);
-
-  if (now - timestamp > ttl) {
-    this.delete(key);
-    return null;
-  }
-
-  return this.cache.get(key);
-};
-
-EnhancedCache.prototype.has = function(key) {
-  return this.get(key) !== null;
-};
-
-EnhancedCache.prototype.delete = function(key) {
-  this.cache.delete(key);
-  this.timestamps.delete(key);
-  this.ttls.delete(key);
-};
-
-EnhancedCache.prototype.clear = function() {
-  this.cache.clear();
-  this.timestamps.clear();
-  this.ttls.clear();
-};
-
-EnhancedCache.prototype.removeOldest = function() {
-  var oldestKey = null;
-  var oldestTime = Infinity;
-
-  var self = this;
-  this.timestamps.forEach(function(timestamp, key) {
-    if (timestamp < oldestTime) {
-      oldestTime = timestamp;
-      oldestKey = key;
+    // If cache is full, remove oldest entry
+    if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
+      this.removeOldest();
     }
-  });
 
-  if (oldestKey) {
-    this.delete(oldestKey);
+    this.cache.set(key, value);
+    this.timestamps.set(key, now);
+    this.ttls.set(key, actualTTL);
   }
-};
 
-EnhancedCache.prototype.cleanup = function() {
-  var now = Date.now();
-  var expiredKeys = [];
-  var self = this;
+  get(key) {
+    if (!this.cache.has(key)) {
+      return null;
+    }
 
-  this.timestamps.forEach(function(timestamp, key) {
-    var ttl = self.ttls.get(key);
+    const now = Date.now();
+    const timestamp = this.timestamps.get(key);
+    const ttl = this.ttls.get(key);
+
     if (now - timestamp > ttl) {
-      expiredKeys.push(key);
+      this.delete(key);
+      return null;
     }
-  });
 
-  expiredKeys.forEach(function(key) {
-    self.delete(key);
-  });
-};
+    return this.cache.get(key);
+  }
 
-Object.defineProperty(EnhancedCache.prototype, 'size', {
-  get: function() {
+  has(key) {
+    return this.get(key) !== null;
+  }
+
+  delete(key) {
+    this.cache.delete(key);
+    this.timestamps.delete(key);
+    this.ttls.delete(key);
+  }
+
+  clear() {
+    this.cache.clear();
+    this.timestamps.clear();
+    this.ttls.clear();
+  }
+
+  removeOldest() {
+    let oldestKey = null;
+    let oldestTime = Infinity;
+
+    this.timestamps.forEach((timestamp, key) => {
+      if (timestamp < oldestTime) {
+        oldestTime = timestamp;
+        oldestKey = key;
+      }
+    });
+
+    if (oldestKey) {
+      this.delete(oldestKey);
+    }
+  }
+
+  cleanup() {
+    const now = Date.now();
+    const expiredKeys = [];
+
+    this.timestamps.forEach((timestamp, key) => {
+      const ttl = this.ttls.get(key);
+      if (now - timestamp > ttl) {
+        expiredKeys.push(key);
+      }
+    });
+
+    expiredKeys.forEach(key => {
+      this.delete(key);
+    });
+  }
+
+  get size() {
     this.cleanup(); // Clean expired entries before returning size
     return this.cache.size;
   }
-});
 
-EnhancedCache.prototype.getStats = function() {
-  this.cleanup();
-  return {
-    size: this.cache.size,
-    maxSize: this.maxSize,
-    defaultTTL: this.defaultTTL
-  };
-};
+  getStats() {
+    this.cleanup();
+    return {
+      size: this.cache.size,
+      maxSize: this.maxSize,
+      defaultTTL: this.defaultTTL
+    };
+  }
+}
 
 // =============================================================================
 // ERROR HANDLING UTILITIES
 // =============================================================================
 
-function ErrorHandler() {
-  this.errors = [];
-  this.maxErrors = 50;
-}
-
-ErrorHandler.prototype.logError = function(error, context) {
-  if (typeof context === 'undefined') context = '';
-  try {
-    var errorInfo = {
-      message: (error && error.message) ? error.message : (error && error.toString) ? error.toString() : 'Unknown error',
-      stack: (error && error.stack) ? error.stack : 'No stack trace available',
-      context: context || 'No context provided',
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      errorType: typeof error,
-      isObject: typeof error === 'object'
-    };
-
-    this.errors.push(errorInfo);
-
-    // Keep only recent errors
-    if (this.errors.length > this.maxErrors) {
-      this.errors.shift();
-    }
-
-    // Better error logging with more details
-    console.group('🚨 Error Logged');
-    console.log('Message:', errorInfo.message);
-    console.log('Type:', errorInfo.errorType);
-    console.log('Context:', errorInfo.context);
-    console.log('Stack:', errorInfo.stack);
-    console.log('Full Error Object:', error);
-    console.groupEnd();
-  } catch (loggingError) {
-    console.error('Error in error logging:', loggingError);
-    console.error('Original error:', error);
+class ErrorHandler {
+  constructor() {
+    this.errors = [];
+    this.maxErrors = 50;
   }
-};
 
-ErrorHandler.prototype.getRecentErrors = function(count) {
-  if (typeof count === 'undefined') count = 10;
-  return this.errors.slice(-count);
-};
+  logError(error, context = '') {
+    try {
+      const errorInfo = {
+        message: (error && error.message) ? error.message : (error && error.toString) ? error.toString() : 'Unknown error',
+        stack: (error && error.stack) ? error.stack : 'No stack trace available',
+        context: context || 'No context provided',
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        errorType: typeof error,
+        isObject: typeof error === 'object'
+      };
 
-ErrorHandler.prototype.clearErrors = function() {
-  this.errors = [];
-};
+      this.errors.push(errorInfo);
 
-ErrorHandler.prototype.setupGlobalErrorHandling = function() {
-  var self = this;
-  window.addEventListener('error', function(event) {
-    self.logError(event.error, 'Global error handler');
-  });
+      // Keep only recent errors
+      if (this.errors.length > this.maxErrors) {
+        this.errors.shift();
+      }
 
-  window.addEventListener('unhandledrejection', function(event) {
-    self.logError(event.reason, 'Unhandled promise rejection');
-  });
-};
+      // Better error logging with more details
+      console.group('🚨 Error Logged');
+      console.log('Message:', errorInfo.message);
+      console.log('Type:', errorInfo.errorType);
+      console.log('Context:', errorInfo.context);
+      console.log('Stack:', errorInfo.stack);
+      console.log('Full Error Object:', error);
+      console.groupEnd();
+    } catch (loggingError) {
+      console.error('Error in error logging:', loggingError);
+      console.error('Original error:', error);
+    }
+  }
+
+  getRecentErrors(count = 10) {
+    return this.errors.slice(-count);
+  }
+
+  clearErrors() {
+    this.errors = [];
+  }
+
+  setupGlobalErrorHandling() {
+    window.addEventListener('error', (event) => {
+      this.logError(event.error, 'Global error handler');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      this.logError(event.reason, 'Unhandled promise rejection');
+    });
+  }
+}
 
 // =============================================================================
 // LOADING STATE MANAGEMENT
 // =============================================================================
 
-function LoadingManager() {
-  this.loadingStates = new Map();
+class LoadingManager {
+  constructor() {
+    this.loadingStates = new Map();
+  }
+
+  setLoading(key, isLoading, message = '') {
+    this.loadingStates.set(key, { isLoading: isLoading, message: message, timestamp: Date.now() });
+
+    // Emit custom event for UI updates
+    const event = new CustomEvent('loadingStateChange', {
+      detail: { key: key, isLoading: isLoading, message: message }
+    });
+    document.dispatchEvent(event);
+  }
+
+  isLoading(key) {
+    const state = this.loadingStates.get(key);
+    return state ? state.isLoading : false;
+  }
+
+  getLoadingMessage(key) {
+    const state = this.loadingStates.get(key);
+    return state ? state.message : '';
+  }
+
+  clearLoading(key) {
+    this.loadingStates.delete(key);
+    this.setLoading(key, false);
+  }
+
+  clearAllLoading() {
+    const keys = Array.from(this.loadingStates.keys());
+    keys.forEach(key => {
+      this.clearLoading(key);
+    });
+  }
 }
-
-LoadingManager.prototype.setLoading = function(key, isLoading, message) {
-  if (typeof message === 'undefined') message = '';
-  this.loadingStates.set(key, { isLoading: isLoading, message: message, timestamp: Date.now() });
-
-  // Emit custom event for UI updates
-  var event = new CustomEvent('loadingStateChange', {
-    detail: { key: key, isLoading: isLoading, message: message }
-  });
-  document.dispatchEvent(event);
-};
-
-LoadingManager.prototype.isLoading = function(key) {
-  var state = this.loadingStates.get(key);
-  return state ? state.isLoading : false;
-};
-
-LoadingManager.prototype.getLoadingMessage = function(key) {
-  var state = this.loadingStates.get(key);
-  return state ? state.message : '';
-};
-
-LoadingManager.prototype.clearLoading = function(key) {
-  this.loadingStates.delete(key);
-  this.setLoading(key, false);
-};
-
-LoadingManager.prototype.clearAllLoading = function() {
-  var keys = Array.from(this.loadingStates.keys());
-  var self = this;
-  keys.forEach(function(key) {
-    self.clearLoading(key);
-  });
-};
 
 // =============================================================================
 // GAS INTEGRATION UTILITIES
 // =============================================================================
 
-function GASUtilities() {
-  this.callCache = new EnhancedCache(50, 1000); // 1 second cache for API calls
-}
-
-// Cached GAS function call
-GASUtilities.prototype.callWithCache = function(functionName, cacheKey, ttl) {
-  var args = Array.prototype.slice.call(arguments, 3);
-  var cached = this.callCache.get(cacheKey);
-  if (cached) {
-    return Promise.resolve(cached);
+class GASUtilities {
+  constructor() {
+    this.callCache = new EnhancedCache(50, 1000); // 1 second cache for API calls
   }
 
-  var self = this;
-  return new Promise(function(resolve, reject) {
-    google.script.run
-      .withSuccessHandler(function(result) {
-        self.callCache.set(cacheKey, result, ttl);
-        resolve(result);
-      })
-      .withFailureHandler(reject)
-      [functionName].apply(null, args);
-  });
-};
-
-// Simple GAS function call
-GASUtilities.prototype.call = function(functionName) {
-  var args = Array.prototype.slice.call(arguments, 1);
-  return new Promise(function(resolve, reject) {
-    google.script.run
-      .withSuccessHandler(resolve)
-      .withFailureHandler(reject)
-      [functionName].apply(null, args);
-  });
-};
-
-// GAS function call with loading overlay - 重複リクエスト防止版
-GASUtilities.prototype.callWithLoading = function(functionName, message, loadingType) {
-  if (typeof message === 'undefined') message = '処理中...';
-  if (typeof loadingType === 'undefined') loadingType = 'overlay';
-  var args = Array.prototype.slice.call(arguments, 3);
-  var self = this;
-  
-  // Support legacy calls where message is an object with config
-  if (typeof message === 'object' && message !== null) {
-    var config = message;
-    message = config.message || '処理中...';
-    loadingType = config.type || loadingType;
-  }
-  
-  // 重複リクエスト防止: 同じ関数が実行中の場合は既存のPromiseを返す
-  // ただし、特定の条件下では強制実行を許可
-  var requestKey = functionName + '_' + JSON.stringify(args);
-  var isForceRequest = (
-    window.FORCE_REQUEST_MODE ||  // グローバルフォースモード
-    (functionName === 'getInitialData' && args && args[1] === true) ||  // getInitialData(userId, true)
-    (functionName === 'getInitialData' && args && args[0] === true) ||  // getInitialData(true) - direct call
-    (message && message.includes('bypassCache'))  // バイパスメッセージ
-  );
-  
-  if (this.pendingRequests && this.pendingRequests.has(requestKey) && !isForceRequest) {
-    console.log('🚫 Duplicate request prevented: ' + functionName);
-    return this.pendingRequests.get(requestKey);
-  } else if (isForceRequest && this.pendingRequests && this.pendingRequests.has(requestKey)) {
-    console.log('🔄 Force request override: ' + functionName);
-    // 既存のリクエストを削除して新しいリクエストを許可
-    this.pendingRequests.delete(requestKey);
-  }
-  
-  // pendingRequestsがない場合は初期化
-  if (!this.pendingRequests) {
-    this.pendingRequests = new Map();
-  }
-  
-  var promise = new Promise(function(resolve, reject) {
-    // Use appropriate loading method based on type
-    if (loadingType === 'transparent') {
-      window.unifiedLoading.showTransparent(message);
-    } else {
-      window.unifiedLoading.showSimple(message);
+  // Cached GAS function call
+  callWithCache(functionName, cacheKey, ttl, ...args) {
+    const cached = this.callCache.get(cacheKey);
+    if (cached) {
+      return Promise.resolve(cached);
     }
 
-    google.script.run
-      .withSuccessHandler(function(result) {
-        window.unifiedLoading.hide(); // Hide loading overlay on success
-        self.pendingRequests.delete(requestKey); // 完了後にキャッシュから削除
-        resolve(result);
-      })
-      .withFailureHandler(function(error) {
-        window.unifiedLoading.hide(); // Hide loading overlay on failure
-        self.pendingRequests.delete(requestKey); // エラー時にもキャッシュから削除
-        // Log the error using the shared error handler
-        window.sharedUtilities.errors.logError(error, 'GAS call failed: ' + functionName);
-        reject(error);
-      })
-      [functionName].apply(null, args);
-  });
-  
-  // 実行中リクエストとしてキャッシュ
-  this.pendingRequests.set(requestKey, promise);
-  return promise;
-};
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(result => {
+          this.callCache.set(cacheKey, result, ttl);
+          resolve(result);
+        })
+        .withFailureHandler(reject)
+        [functionName](...args);
+    });
+  }
 
-// Check if running in GAS environment
-GASUtilities.prototype.isGASEnvironment = function() {
-  return typeof google !== 'undefined' &&
-         google.script &&
-         google.script.run;
-};
+  // Simple GAS function call
+  call(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        [functionName](...args);
+    });
+  }
+
+  // GAS function call with loading overlay - 重複リクエスト防止版
+  callWithLoading(functionName, message = '処理中...', loadingType = 'overlay', ...args) {
+    // Support legacy calls where message is an object with config
+    if (typeof message === 'object' && message !== null) {
+      const config = message;
+      message = config.message || '処理中...';
+      loadingType = config.type || loadingType;
+    }
+    
+    // 重複リクエスト防止: 同じ関数が実行中の場合は既存のPromiseを返す
+    // ただし、特定の条件下では強制実行を許可
+    const requestKey = `${functionName}_${JSON.stringify(args)}`;
+    const isForceRequest = (
+      window.FORCE_REQUEST_MODE ||  // グローバルフォースモード
+      (functionName === 'getInitialData' && args && args[1] === true) ||  // getInitialData(userId, true)
+      (functionName === 'getInitialData' && args && args[0] === true) ||  // getInitialData(true) - direct call
+      (message && message.includes('bypassCache'))  // バイパスメッセージ
+    );
+    
+    if (this.pendingRequests && this.pendingRequests.has(requestKey) && !isForceRequest) {
+      console.log(`🚫 Duplicate request prevented: ${functionName}`);
+      return this.pendingRequests.get(requestKey);
+    } else if (isForceRequest && this.pendingRequests && this.pendingRequests.has(requestKey)) {
+      console.log(`🔄 Force request override: ${functionName}`);
+      // 既存のリクエストを削除して新しいリクエストを許可
+      this.pendingRequests.delete(requestKey);
+    }
+    
+    // pendingRequestsがない場合は初期化
+    if (!this.pendingRequests) {
+      this.pendingRequests = new Map();
+    }
+    
+    const promise = new Promise((resolve, reject) => {
+      // Use appropriate loading method based on type
+      if (loadingType === 'transparent') {
+        window.unifiedLoading.showTransparent(message);
+      } else {
+        window.unifiedLoading.showSimple(message);
+      }
+
+      google.script.run
+        .withSuccessHandler(result => {
+          window.unifiedLoading.hide(); // Hide loading overlay on success
+          this.pendingRequests.delete(requestKey); // 完了後にキャッシュから削除
+          resolve(result);
+        })
+        .withFailureHandler(error => {
+          window.unifiedLoading.hide(); // Hide loading overlay on failure
+          this.pendingRequests.delete(requestKey); // エラー時にもキャッシュから削除
+          // Log the error using the shared error handler
+          window.sharedUtilities.errors.logError(error, `GAS call failed: ${functionName}`);
+          reject(error);
+        })
+        [functionName](...args);
+    });
+    
+    // 実行中リクエストとしてキャッシュ
+    this.pendingRequests.set(requestKey, promise);
+    return promise;
+  }
+
+  // Check if running in GAS environment
+  isGASEnvironment() {
+    return typeof google !== 'undefined' &&
+           google.script &&
+           google.script.run;
+  }
+}
 
 // =============================================================================
 // SECURITY UTILITIES
 // =============================================================================
 
 // Security utilities for XSS prevention and data sanitization
-function SecurityUtilities() {
+class SecurityUtilities {
+  // Escape HTML characters to prevent XSS attacks
+  escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Sanitize HTML content by removing dangerous tags
+  sanitizeHtml(html) {
+    if (!html) return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    
+    // Remove script tags and other dangerous elements
+    const scripts = div.querySelectorAll('script, object, embed, iframe, form');
+    scripts.forEach(script => {
+      script.remove();
+    });
+    
+    return div.innerHTML;
+  }
+
+  // Validate email format
+  isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
 }
-
-// Escape HTML characters to prevent XSS attacks
-SecurityUtilities.prototype.escapeHtml = function(text) {
-  if (!text) return '';
-  var div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
-
-// Sanitize HTML content by removing dangerous tags
-SecurityUtilities.prototype.sanitizeHtml = function(html) {
-  if (!html) return '';
-  var div = document.createElement('div');
-  div.innerHTML = html;
-  
-  // Remove script tags and other dangerous elements
-  var scripts = div.querySelectorAll('script, object, embed, iframe, form');
-  scripts.forEach(function(script) {
-    script.remove();
-  });
-  
-  return div.innerHTML;
-};
-
-// Validate email format
-SecurityUtilities.prototype.isValidEmail = function(email) {
-  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
 
 // =============================================================================
 // MESSAGE DISPLAY UTILITIES
@@ -720,116 +706,114 @@ SecurityUtilities.prototype.isValidEmail = function(email) {
  * 統一されたメッセージ表示システム
  * アプリ設定管理のデザインを基準とし、ヘッダーに応じて動的に位置調整
  */
-function MessageManager() {
-  this.messageContainer = null;
-  var self = this;
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      self.init();
-    });
-  } else {
-    this.init();
-  }
-}
-
-MessageManager.prototype.init = function() {
-  // メッセージコンテナの作成
-  if (!document.getElementById('notification-container')) {
-    var container = document.createElement('div');
-    container.id = 'notification-container';
-    container.className = this.getContainerClasses();
-    document.body.appendChild(container);
-    this.messageContainer = container;
-  } else {
-    this.messageContainer = document.getElementById('notification-container');
-    // 既存コンテナのクラスを更新
-    this.messageContainer.className = this.getContainerClasses();
-  }
-};
-
-// ヘッダーの有無に応じて動的に位置を調整
-MessageManager.prototype.getContainerClasses = function() {
-  var header = document.querySelector('header, .header, #header, [class*="header"]');
-  var adminHeader = document.querySelector('.admin-header, #admin-header');
-  
-  var topPosition = 'top-4'; // デフォルト位置
-  
-  if (adminHeader) {
-    // 管理パネルヘッダーがある場合 - より下に配置
-    topPosition = 'top-28';
-  } else if (header) {
-    // 一般的なヘッダーがある場合
-    var headerHeight = header.offsetHeight;
-    if (headerHeight > 60) {
-      topPosition = 'top-32';
+class MessageManager {
+  constructor() {
+    this.messageContainer = null;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        this.init();
+      });
     } else {
-      topPosition = 'top-20';
+      this.init();
     }
   }
-  
-  return 'fixed ' + topPosition + ' right-4 z-50 space-y-2 max-w-md min-w-80';
-};
 
-MessageManager.prototype.show = function(message, type, duration) {
-  if (typeof type === 'undefined') type = 'info';
-  if (typeof duration === 'undefined') duration = 5000;
-  
-  // コンテナの位置を再チェック（動的対応）
-  if (this.messageContainer) {
-    this.messageContainer.className = this.getContainerClasses();
+  init() {
+    // メッセージコンテナの作成
+    if (!document.getElementById('notification-container')) {
+      const container = document.createElement('div');
+      container.id = 'notification-container';
+      container.className = this.getContainerClasses();
+      document.body.appendChild(container);
+      this.messageContainer = container;
+    } else {
+      this.messageContainer = document.getElementById('notification-container');
+      // 既存コンテナのクラスを更新
+      this.messageContainer.className = this.getContainerClasses();
+    }
   }
 
-  var sanitizedMessage = (message || '').replace(/^[✅❌⚠️ℹ️]\s*/, '');
-
-  var messageEl = document.createElement('div');
-  messageEl.className = 'notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ' + this.getTypeClasses(type);
-
-  messageEl.innerHTML = 
-    '<div class="mr-3 text-2xl">' + this.getIcon(type) + '</div>' +
-    '<div class="flex-1 text-sm">' + sanitizedMessage + '</div>' +
-    '<button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest(\'.notification\').remove()">✕</button>';
-
-  this.messageContainer.appendChild(messageEl);
-
-  // アニメーションで表示
-  setTimeout(function() {
-    messageEl.classList.remove('translate-x-full', 'opacity-0');
-    messageEl.classList.add('translate-x-0', 'opacity-100');
-  }, 10);
-
-  // 自動削除
-  if (duration > 0) {
-    setTimeout(function() {
-      messageEl.classList.remove('translate-x-0', 'opacity-100');
-      messageEl.classList.add('translate-x-full', 'opacity-0');
-      messageEl.addEventListener('transitionend', function() {
-        messageEl.remove();
-      });
-    }, duration);
+  // ヘッダーの有無に応じて動的に位置を調整
+  getContainerClasses() {
+    const header = document.querySelector('header, .header, #header, [class*="header"]');
+    const adminHeader = document.querySelector('.admin-header, #admin-header');
+    
+    let topPosition = 'top-4'; // デフォルト位置
+    
+    if (adminHeader) {
+      // 管理パネルヘッダーがある場合 - より下に配置
+      topPosition = 'top-28';
+    } else if (header) {
+      // 一般的なヘッダーがある場合
+      const headerHeight = header.offsetHeight;
+      if (headerHeight > 60) {
+        topPosition = 'top-32';
+      } else {
+        topPosition = 'top-20';
+      }
+    }
+    
+    return `fixed ${topPosition} right-4 z-50 space-y-2 max-w-md min-w-80`;
   }
 
-  return messageEl;
-};
+  show(message, type = 'info', duration = 5000) {
+    // コンテナの位置を再チェック（動的対応）
+    if (this.messageContainer) {
+      this.messageContainer.className = this.getContainerClasses();
+    }
 
-MessageManager.prototype.getTypeClasses = function(type) {
-  var classes = {
-    success: 'bg-green-600/20 border-green-500/50 text-green-100',
-    error: 'bg-red-600/20 border-red-500/50 text-red-100',
-    warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
-    info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
-  };
-  return classes[type] || classes.info;
-};
+    const sanitizedMessage = (message || '').replace(/^[✅❌⚠️ℹ️]\s*/, '');
 
-MessageManager.prototype.getIcon = function(type) {
-  var icons = {
-    success: '✅',
-    error: '❌',
-    warning: '⚠️',
-    info: 'ℹ️'
-  };
-  return icons[type] || icons.info;
-};
+    const messageEl = document.createElement('div');
+    messageEl.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${this.getTypeClasses(type)}`;
+
+    messageEl.innerHTML = 
+      `<div class="mr-3 text-2xl">${this.getIcon(type)}</div>` +
+      `<div class="flex-1 text-sm">${sanitizedMessage}</div>` +
+      `<button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>`;
+
+    this.messageContainer.appendChild(messageEl);
+
+    // アニメーションで表示
+    setTimeout(() => {
+      messageEl.classList.remove('translate-x-full', 'opacity-0');
+      messageEl.classList.add('translate-x-0', 'opacity-100');
+    }, 10);
+
+    // 自動削除
+    if (duration > 0) {
+      setTimeout(() => {
+        messageEl.classList.remove('translate-x-0', 'opacity-100');
+        messageEl.classList.add('translate-x-full', 'opacity-0');
+        messageEl.addEventListener('transitionend', () => {
+          messageEl.remove();
+        });
+      }, duration);
+    }
+
+    return messageEl;
+  }
+
+  getTypeClasses(type) {
+    const classes = {
+      success: 'bg-green-600/20 border-green-500/50 text-green-100',
+      error: 'bg-red-600/20 border-red-500/50 text-red-100',
+      warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
+      info: 'bg-blue-600/20 border-blue-500/50 text-blue-100'
+    };
+    return classes[type] || classes.info;
+  }
+
+  getIcon(type) {
+    const icons = {
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
+    };
+    return icons[type] || icons.info;
+  }
+}
 
 // =============================================================================
 // INITIALIZATION AND GLOBAL SETUP
@@ -1134,297 +1118,273 @@ window.showConfirmationModal = function(title, message, onConfirm, onCancel, opt
 // UNIFIED LOADING MANAGER - Centralized loading overlay management
 // =============================================================================
 
-function UnifiedLoadingManager() {
-  this.currentState = null;
-  this.overlay = null;
-  this.initialized = false;
-  this.variantClasses = ['transparent', 'modal', 'progress', 'quickstart', 'page-specific'];
-}
-
-// Initialize the loading manager with enhanced error handling and DOM monitoring.
-UnifiedLoadingManager.prototype.init = function(retries, delay, onSuccess) {
-  if (typeof retries === 'undefined') retries = 5;
-  if (typeof delay === 'undefined') delay = 100;
-  if (typeof onSuccess === 'undefined') onSuccess = null;
-  
-  if (this.initialized) {
-    console.log('UnifiedLoadingManager: Already initialized.');
-    if (onSuccess) onSuccess();
-    return true;
+class UnifiedLoadingManager {
+  constructor() {
+    this.currentState = null;
+    this.overlay = null;
+    this.initialized = false;
+    this.variantClasses = ['transparent', 'modal', 'progress', 'quickstart', 'page-specific'];
   }
 
-  // Enhanced DOM readiness check
-  if (document.readyState === 'loading') {
-    console.log('UnifiedLoadingManager: DOM still loading, waiting for DOMContentLoaded...');
-    var self = this;
-    document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(function() {
-        self.init(retries, delay, onSuccess);
-      }, 50);
-    }, { once: true });
+  // Initialize the loading manager with enhanced error handling and DOM monitoring.
+  init(retries = 5, delay = 100, onSuccess = null) {
+    if (this.initialized) {
+      console.log('UnifiedLoadingManager: Already initialized.');
+      if (onSuccess) onSuccess();
+      return true;
+    }
+
+    // Enhanced DOM readiness check
+    if (document.readyState === 'loading') {
+      console.log('UnifiedLoadingManager: DOM still loading, waiting for DOMContentLoaded...');
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          this.init(retries, delay, onSuccess);
+        }, 50);
+      }, { once: true });
+      return false;
+    }
+
+    this.overlay = document.getElementById('loading-overlay');
+    if (this.overlay) {
+      if (!window.unifiedLoadingInitialized) {
+        window.unifiedLoadingInitialized = true;
+        console.log('✅ UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
+      }
+      this.initialized = true;
+      if (onSuccess) onSuccess();
+      return true;
+    }
+
+    // Enhanced retry logic with DOM mutation observation
+    if (retries > 0) {
+      console.warn(`⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`);
+      
+      // Try to observe DOM changes for the loading-overlay element
+      if (retries === 5) { // Only set up observer on first try
+        this.setupDOMObserver(onSuccess);
+      }
+      
+      setTimeout(() => {
+        this.init(retries - 1, delay * 1.5, onSuccess);
+      }, delay); // Exponential backoff
+    } else {
+      console.error('❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
+      console.error('❌ UnifiedLoadingManager: Current DOM structure check:');
+      console.error('  - Document ready state:', document.readyState);
+      console.error('  - Body exists:', !!document.body);
+      console.error('  - Available IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id).join(', '));
+      
+      // Create fallback overlay as last resort
+      this.createFallbackOverlay();
+    }
     return false;
   }
 
-  this.overlay = document.getElementById('loading-overlay');
-  if (this.overlay) {
-    if (!window.unifiedLoadingInitialized) {
-      window.unifiedLoadingInitialized = true;
-      console.log('✅ UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
-    }
-    this.initialized = true;
-    if (onSuccess) onSuccess();
-    return true;
-  }
-
-  // Enhanced retry logic with DOM mutation observation
-  if (retries > 0) {
-    console.warn('⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ' + document.readyState + '. Retrying in ' + delay + 'ms (' + retries + ' retries left)...');
+  // Setup DOM observer to watch for the loading-overlay element
+  setupDOMObserver(onSuccess) {
+    if (typeof MutationObserver === 'undefined') return;
     
-    // Try to observe DOM changes for the loading-overlay element
-    if (retries === 5) { // Only set up observer on first try
-      this.setupDOMObserver(onSuccess);
-    }
-    
-    var self = this;
-    setTimeout(function() {
-      self.init(retries - 1, delay * 1.5, onSuccess);
-    }, delay); // Exponential backoff
-  } else {
-    console.error('❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
-    console.error('❌ UnifiedLoadingManager: Current DOM structure check:');
-    console.error('  - Document ready state:', document.readyState);
-    console.error('  - Body exists:', !!document.body);
-    console.error('  - Available IDs:', Array.from(document.querySelectorAll('[id]')).map(function(el) { return el.id; }).join(', '));
-    
-    // Create fallback overlay as last resort
-    this.createFallbackOverlay();
-  }
-  return false;
-};
-
-// Setup DOM observer to watch for the loading-overlay element
-UnifiedLoadingManager.prototype.setupDOMObserver = function(onSuccess) {
-  if (typeof MutationObserver === 'undefined') return;
-  
-  var self = this;
-  var observer = new MutationObserver(function(mutations) {
-    for (var i = 0; i < mutations.length; i++) {
-      var mutation = mutations[i];
-      if (mutation.type === 'childList') {
-        for (var j = 0; j < mutation.addedNodes.length; j++) {
-          var node = mutation.addedNodes[j];
-          if (node.nodeType === 1 && (node.id === 'loading-overlay' || node.querySelector('#loading-overlay'))) {
-            console.log('✅ UnifiedLoadingManager: loading-overlay detected via DOM observer');
-            observer.disconnect();
-            setTimeout(function() {
-              self.init(1, 50, onSuccess);
-            }, 10); // Quick retry
-            return;
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === 1 && (node.id === 'loading-overlay' || node.querySelector('#loading-overlay'))) {
+              console.log('✅ UnifiedLoadingManager: loading-overlay detected via DOM observer');
+              observer.disconnect();
+              setTimeout(() => {
+                this.init(1, 50, onSuccess);
+              }, 10); // Quick retry
+              return;
+            }
           }
         }
       }
-    }
-  });
-  
-  observer.observe(document.body || document.documentElement, {
-    childList: true,
-    subtree: true
-  });
-  
-  // Disconnect observer after 10 seconds to prevent memory leaks
-  setTimeout(function() {
-    observer.disconnect();
-  }, 10000);
-};
-
-// Create a fallback overlay if none exists
-UnifiedLoadingManager.prototype.createFallbackOverlay = function() {
-  if (document.getElementById('loading-overlay')) return;
-  
-  console.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
-  var fallbackOverlay = document.createElement('div');
-  fallbackOverlay.id = 'loading-overlay';
-  fallbackOverlay.className = 'loading-overlay page-specific hidden';
-  
-  // Insert at the beginning of body
-  if (document.body) {
-    document.body.insertBefore(fallbackOverlay, document.body.firstChild);
-    this.overlay = fallbackOverlay;
-    this.initialized = true;
-    console.log('✅ UnifiedLoadingManager: Fallback overlay created and initialized');
-    return true;
-  }
-  
-  return false;
-};
-
-// Main loading function with a unified API and enhanced error handling.
-UnifiedLoadingManager.prototype.setLoading = function(isLoading, options) {
-  if (typeof options === 'undefined') options = {};
-  if (!this.initialized) {
-    console.warn('UnifiedLoadingManager: Not initialized, attempting initialization...');
-    if (!this.init()) {
-      console.error('UnifiedLoadingManager: Cannot manage loading state - initialization failed.');
-      return;
-    }
-  }
-
-  try {
-    if (isLoading) {
-      this.show(options);
-    } else {
-      this.hide();
-    }
-  } catch (error) {
-    console.error('UnifiedLoadingManager: Error during loading state change:', error);
-  }
-};
-
-// Show loading overlay with options.
-UnifiedLoadingManager.prototype.show = function(options) {
-  if (typeof options === 'undefined') options = {};
-  var config = {
-    message: options.message || '処理中...',
-    type: options.type || 'overlay',
-    progress: options.progress || null,
-    steps: options.steps || null,
-    disableInteraction: options.disableInteraction !== false
-  };
-  
-  // Copy other properties from options
-  for (var key in options) {
-    if (options.hasOwnProperty(key) && !config.hasOwnProperty(key)) {
-      config[key] = options[key];
-    }
-  }
-
-  this.currentState = config;
-  
-  // Clean up previous variant classes
-  var self = this;
-  this.variantClasses.forEach(function(vc) {
-    self.overlay.classList.remove(vc);
-  });
-  
-  // Add the new variant class if it's not the default overlay
-  if (config.type !== 'overlay') {
-    this.overlay.classList.add(config.type);
-  }
-  
-  // Update content and show the overlay with enhanced visibility enforcement
-  this.updateContent(config);
-  this.overlay.classList.remove('hidden');
-  // Force display override with highest specificity
-  this.overlay.style.setProperty('display', 'flex', 'important');
-  this.overlay.style.setProperty('visibility', 'visible', 'important');
-  this.overlay.style.setProperty('opacity', '1', 'important');
-  
-  // Manage user interaction
-  if (config.disableInteraction && config.type !== 'transparent') {
-    document.body.style.overflow = 'hidden';
-    document.body.style.pointerEvents = 'none';
-    this.overlay.style.pointerEvents = 'auto';
-  } else {
-    // Allow interaction for transparent overlays or when not disabled
-    this.overlay.style.pointerEvents = 'none';
-  }
-};
-
-// Hide loading overlay.
-UnifiedLoadingManager.prototype.hide = function() {
-  if (!this.overlay) return;
-  
-  this.overlay.classList.add('hidden');
-  this.overlay.style.display = 'none'; // 明示的にdisplayをnoneに設定
-  this.overlay.style.visibility = 'hidden'; // 明示的にvisibilityをhiddenに設定
-  
-  // Restore interaction
-  document.body.style.overflow = '';
-  document.body.style.pointerEvents = '';
-  
-  this.currentState = null;
-};
-
-// Update loading content based on configuration.
-UnifiedLoadingManager.prototype.updateContent = function(config) {
-  var content = '<div class="loading-content">';
-  
-  if (config.message) {
-    content += '<div class="loading-message">' + this.escapeHtml(config.message) + '</div>';
-  }
-  
-  if (config.type === 'overlay' || config.type === 'modal') {
-    content += '<div class="loading-spinner"></div>';
-  }
-  
-  if (config.progress !== null) {
-    var progressValue = typeof config.progress === 'object' 
-      ? Math.round((config.progress.current / config.progress.total) * 100)
-      : config.progress;
-    content += 
-      '<div class="loading-progress">' +
-        '<div class="loading-progress-bar"><div class="loading-progress-fill" style="width: ' + progressValue + '%"></div></div>' +
-        '<div class="loading-percentage">' + progressValue + '%</div>' +
-      '</div>';
-  }
-  
-  if (config.steps && Array.isArray(config.steps)) {
-    content += '<div class="loading-steps">';
-    var self = this;
-    config.steps.forEach(function(step) {
-      var stepClass = step.status === 'completed' ? 'completed' : (step.status === 'active' ? 'active' : '');
-      content += '<div class="loading-step ' + stepClass + '"><div class="loading-step-dot"></div><div class="loading-step-text">' + self.escapeHtml(step.text) + '</div></div>';
     });
+    
+    observer.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Disconnect observer after 10 seconds to prevent memory leaks
+    setTimeout(() => {
+      observer.disconnect();
+    }, 10000);
+  }
+
+  // Create a fallback overlay if none exists
+  createFallbackOverlay() {
+    if (document.getElementById('loading-overlay')) return;
+    
+    console.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
+    const fallbackOverlay = document.createElement('div');
+    fallbackOverlay.id = 'loading-overlay';
+    fallbackOverlay.className = 'loading-overlay page-specific hidden';
+    
+    // Insert at the beginning of body
+    if (document.body) {
+      document.body.insertBefore(fallbackOverlay, document.body.firstChild);
+      this.overlay = fallbackOverlay;
+      this.initialized = true;
+      console.log('✅ UnifiedLoadingManager: Fallback overlay created and initialized');
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Main loading function with a unified API and enhanced error handling.
+  setLoading(isLoading, options = {}) {
+    if (!this.initialized) {
+      console.warn('UnifiedLoadingManager: Not initialized, attempting initialization...');
+      if (!this.init()) {
+        console.error('UnifiedLoadingManager: Cannot manage loading state - initialization failed.');
+        return;
+      }
+    }
+
+    try {
+      if (isLoading) {
+        this.show(options);
+      } else {
+        this.hide();
+      }
+    } catch (error) {
+      console.error('UnifiedLoadingManager: Error during loading state change:', error);
+    }
+  }
+
+  // Show loading overlay with options.
+  show(options = {}) {
+    const config = {
+      message: options.message || '処理中...',
+      type: options.type || 'overlay',
+      progress: options.progress || null,
+      steps: options.steps || null,
+      disableInteraction: options.disableInteraction !== false,
+      ...options
+    };
+
+    this.currentState = config;
+    
+    // Clean up previous variant classes
+    this.variantClasses.forEach(vc => {
+      this.overlay.classList.remove(vc);
+    });
+    
+    // Add the new variant class if it's not the default overlay
+    if (config.type !== 'overlay') {
+      this.overlay.classList.add(config.type);
+    }
+    
+    // Update content and show the overlay with enhanced visibility enforcement
+    this.updateContent(config);
+    this.overlay.classList.remove('hidden');
+    // Force display override with highest specificity
+    this.overlay.style.setProperty('display', 'flex', 'important');
+    this.overlay.style.setProperty('visibility', 'visible', 'important');
+    this.overlay.style.setProperty('opacity', '1', 'important');
+    
+    // Manage user interaction
+    if (config.disableInteraction && config.type !== 'transparent') {
+      document.body.style.overflow = 'hidden';
+      document.body.style.pointerEvents = 'none';
+      this.overlay.style.pointerEvents = 'auto';
+    } else {
+      // Allow interaction for transparent overlays or when not disabled
+      this.overlay.style.pointerEvents = 'none';
+    }
+  }
+
+  // Hide loading overlay.
+  hide() {
+    if (!this.overlay) return;
+    
+    this.overlay.classList.add('hidden');
+    this.overlay.style.display = 'none'; // 明示的にdisplayをnoneに設定
+    this.overlay.style.visibility = 'hidden'; // 明示的にvisibilityをhiddenに設定
+    
+    // Restore interaction
+    document.body.style.overflow = '';
+    document.body.style.pointerEvents = '';
+    
+    this.currentState = null;
+  }
+
+  // Update loading content based on configuration.
+  updateContent(config) {
+    let content = '<div class="loading-content">';
+    
+    if (config.message) {
+      content += `<div class="loading-message">${this.escapeHtml(config.message)}</div>`;
+    }
+    
+    if (config.type === 'overlay' || config.type === 'modal') {
+      content += '<div class="loading-spinner"></div>';
+    }
+    
+    if (config.progress !== null) {
+      const progressValue = typeof config.progress === 'object' 
+        ? Math.round((config.progress.current / config.progress.total) * 100)
+        : config.progress;
+      content += 
+        `<div class="loading-progress">` +
+          `<div class="loading-progress-bar"><div class="loading-progress-fill" style="width: ${progressValue}%"></div></div>` +
+          `<div class="loading-percentage">${progressValue}%</div>` +
+        `</div>`;
+    }
+    
+    if (config.steps && Array.isArray(config.steps)) {
+      content += '<div class="loading-steps">';
+      config.steps.forEach(step => {
+        const stepClass = step.status === 'completed' ? 'completed' : (step.status === 'active' ? 'active' : '');
+        content += `<div class="loading-step ${stepClass}"><div class="loading-step-dot"></div><div class="loading-step-text">${this.escapeHtml(step.text)}</div></div>`;
+      });
+      content += '</div>';
+    }
+    
     content += '</div>';
+    this.overlay.innerHTML = content;
   }
-  
-  content += '</div>';
-  this.overlay.innerHTML = content;
-};
 
-// Simple HTML escaping.
-UnifiedLoadingManager.prototype.escapeHtml = function(text) {
-  var div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
-
-// Convenience methods for common use cases.
-UnifiedLoadingManager.prototype.showSimple = function(message) {
-  if (typeof message === 'undefined') message = '処理中...';
-  this.setLoading(true, { message: message, type: 'overlay' });
-};
-
-UnifiedLoadingManager.prototype.showProgress = function(message, progress) {
-  if (typeof message === 'undefined') message = '処理中...';
-  if (typeof progress === 'undefined') progress = 0;
-  this.setLoading(true, { message: message, type: 'progress', progress: progress });
-};
-
-UnifiedLoadingManager.prototype.showTransparent = function(message) {
-  if (typeof message === 'undefined') message = '処理中...';
-  this.setLoading(true, { message: message, type: 'transparent' });
-};
-
-UnifiedLoadingManager.prototype.showQuickStart = function(message) {
-  if (typeof message === 'undefined') message = 'セットアップ中...';
-  this.setLoading(true, { message: message, type: 'quickstart' });
-};
-
-UnifiedLoadingManager.prototype.showAdminProgress = function(message, step, percentage) {
-  if (typeof step === 'undefined') step = 0;
-  if (typeof percentage === 'undefined') percentage = 0;
-  var options = { message: message, type: 'progress', progress: percentage, disableInteraction: true };
-  if (step > 0) {
-    options.steps = [
-      { text: 'システム情報を読み込み中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
-      { text: 'ユーザー情報を取得中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
-      { text: 'シート情報と設定を適用中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
-      { text: 'UIを最終調整中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' }
-    ];
+  // Simple HTML escaping.
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
-  this.setLoading(true, options);
-};
+
+  // Convenience methods for common use cases.
+  showSimple(message = '処理中...') {
+    this.setLoading(true, { message: message, type: 'overlay' });
+  }
+
+  showProgress(message = '処理中...', progress = 0) {
+    this.setLoading(true, { message: message, type: 'progress', progress: progress });
+  }
+
+  showTransparent(message = '処理中...') {
+    this.setLoading(true, { message: message, type: 'transparent' });
+  }
+
+  showQuickStart(message = 'セットアップ中...') {
+    this.setLoading(true, { message: message, type: 'quickstart' });
+  }
+
+  showAdminProgress(message, step = 0, percentage = 0) {
+    const options = { message: message, type: 'progress', progress: percentage, disableInteraction: true };
+    if (step > 0) {
+      options.steps = [
+        { text: 'システム情報を読み込み中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
+        { text: 'ユーザー情報を取得中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
+        { text: 'シート情報と設定を適用中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
+        { text: 'UIを最終調整中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' }
+      ];
+    }
+    this.setLoading(true, options);
+  }
+}
 
 // Create and initialize the global instance once the DOM is ready.
 window.unifiedLoading = new UnifiedLoadingManager();

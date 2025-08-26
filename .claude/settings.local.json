@@ -27,7 +27,8 @@
       "Bash(for:*)",
       "WebSearch",
       "WebFetch(domain:developers.google.com)",
-      "Bash(clasp open:*)"
+      "Bash(clasp open:*)",
+      "WebFetch(domain:stackoverflow.com)"
     ],
     "deny": [],
     "ask": []
