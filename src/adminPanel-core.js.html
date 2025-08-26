@@ -10,32 +10,9 @@
 // Simple logging utility with conditional output based on DEBUG mode  
 // DEBUG_MODE is defined in constants.js.html
 
-function adminLog(level, ...args) {
-  if (!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE))) return;
-  
-  switch (level) {
-    case 'error':
-      console.error('[AdminPanel]', ...args);
-      break;
-    case 'warn':
-      console.warn('[AdminPanel]', ...args);
-      break;
-    case 'info':
-      console.log('[AdminPanel]', ...args);
-      break;
-    case 'debug':
-      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) console.log('[AdminPanel:DEBUG]', ...args);
-      break;
-    default:
-      console.log('[AdminPanel]', ...args);
-  }
-}
+// adminLog and logging functions are defined in adminPanel-framework.js.html
 
-// Convenience functions for different log levels
-function logError(...args) { adminLog('error', ...args); }
-function logWarn(...args) { adminLog('warn', ...args); }
-function logInfo(...args) { adminLog('info', ...args); }
-function logDebug(...args) { adminLog('debug', ...args); }
+// Logging functions are defined in adminPanel-framework.js.html
 
 // =============================================================================
 // ENHANCED MESSAGE SYSTEM FOR SETUP FLOW
@@ -336,19 +313,7 @@ function safeSetText(elementId, text) {
 // LAYOUT AND VIEWPORT UTILITIES
 // =============================================================================
 
-// Layout adjustment for responsive design
-function adjustLayout() {
-  const isMobile = window.innerWidth < 768;
-  const body = document.body;
-  
-  if (isMobile) {
-    body.classList.add('mobile-layout');
-    body.classList.remove('desktop-layout');
-  } else {
-    body.classList.add('desktop-layout');
-    body.classList.remove('mobile-layout');
-  }
-}
+// Layout adjustment is defined in adminPanel-framework.js.html
 
 // AdminPanel no longer overrides global setLoading
 // Uses unified loading system with admin-specific configurations

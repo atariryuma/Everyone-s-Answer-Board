@@ -33,16 +33,29 @@ function setupEventListeners() {
   
   eventHandlersAttached.setupEventListeners = true;
   
-  // Cache frequently used elements
-  elements = {
-    'sheet-select': getCachedElement('sheet-select'),
-    'save-publish-btn': getCachedElement('save-publish-btn'),
-    'unpublish-board-btn': getCachedElement('unpublish-board-btn'),
-    'delete-account-btn': getCachedElement('delete-account-btn'),
-    'open-spreadsheet-btn': getCachedElement('open-spreadsheet-btn'),
-    'open-form-btn': getCachedElement('open-form-btn'),
-    'clear-history-btn': getCachedElement('clear-history-btn')
-  };
+  // Cache frequently used elements (with safety check)
+  if (typeof getCachedElement === 'function') {
+    elements = {
+      'sheet-select': getCachedElement('sheet-select'),
+      'save-publish-btn': getCachedElement('save-publish-btn'),
+      'unpublish-board-btn': getCachedElement('unpublish-board-btn'),
+      'delete-account-btn': getCachedElement('delete-account-btn'),
+      'open-spreadsheet-btn': getCachedElement('open-spreadsheet-btn'),
+      'open-form-btn': getCachedElement('open-form-btn'),
+      'clear-history-btn': getCachedElement('clear-history-btn')
+    };
+  } else {
+    console.warn('getCachedElement not available, using fallback');
+    elements = {
+      'sheet-select': document.getElementById('sheet-select'),
+      'save-publish-btn': document.getElementById('save-publish-btn'),
+      'unpublish-board-btn': document.getElementById('unpublish-board-btn'),
+      'delete-account-btn': document.getElementById('delete-account-btn'),
+      'open-spreadsheet-btn': document.getElementById('open-spreadsheet-btn'),
+      'open-form-btn': document.getElementById('open-form-btn'),
+      'clear-history-btn': document.getElementById('clear-history-btn')
+    };
+  }
   
   
   // AI column detection button

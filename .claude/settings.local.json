@@ -35,6 +35,9 @@
       "Bash(./check-src.sh)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "/"
+    ]
   }
 }
