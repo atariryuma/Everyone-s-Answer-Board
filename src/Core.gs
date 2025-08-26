@@ -230,13 +230,13 @@ if (typeof infoLog === 'undefined') {
  * @const {string} デフォルトメイン質問文
  */
 /** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION instead */
-const DEFAULT_MAIN_QUESTION = UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION;
+const DEFAULT_MAIN_QUESTION = 'あなたの考えや気づいたことを教えてください';
 
 /**
  * @const {string} デフォルト理由質問文
  */
 /** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION instead */
-const DEFAULT_REASON_QUESTION = UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION;
+const DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教えてください（任意）';
 
 /**
  * セットアップステップを判定する（サーバー側統一実装）
@@ -5400,12 +5400,12 @@ function executeCustomSetup(requestUserId, config) {
     // ステップ3: 設定の構築
     /** @type {Object} シート設定 */
     const sheetConfig = {
-      timestampHeader: headerMapping.mapping.timestamp || UNIFIED_CONSTANTS.COLUMNS.TIMESTAMP,
-      classHeader: headerMapping.mapping.class || UNIFIED_CONSTANTS.COLUMNS.CLASS,
-      nameHeader: headerMapping.mapping.name || UNIFIED_CONSTANTS.COLUMNS.NAME,
-      emailHeader: headerMapping.mapping.email || UNIFIED_CONSTANTS.COLUMNS.EMAIL,
-      opinionHeader: headerMapping.mapping.opinion || UNIFIED_CONSTANTS.COLUMNS.OPINION,
-      reasonHeader: headerMapping.mapping.reason || UNIFIED_CONSTANTS.COLUMNS.REASON,
+      timestampHeader: headerMapping.mapping.timestamp || 'タイムスタンプ',
+      classHeader: headerMapping.mapping.class || 'クラス',
+      nameHeader: headerMapping.mapping.name || '名前',
+      emailHeader: headerMapping.mapping.email || 'メールアドレス',
+      opinionHeader: headerMapping.mapping.opinion || '回答',
+      reasonHeader: headerMapping.mapping.reason || '理由',
       guessedConfig: headerMapping.mapping,
       lastModified: new Date().toISOString()
     };
@@ -5451,7 +5451,7 @@ function executeCustomSetup(requestUserId, config) {
     };
 
   } catch (error) {
-    logError(error, 'executeCustomSetup', UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH, UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM);
+    logError(error, 'executeCustomSetup', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM);
     
     return {
       success: false,

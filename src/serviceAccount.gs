@@ -13,7 +13,7 @@ function getServiceAccountEmail() {
     const props = PropertiesService.getScriptProperties();
     
     /** @type {string|null} サービスアカウント認証情報JSON */
-    const serviceAccountCredsJson = props.getProperty(UNIFIED_CONSTANTS.SCRIPT_PROPS.SERVICE_ACCOUNT_CREDS);
+    const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
     
     if (!serviceAccountCredsJson) {
       logWarn('サービスアカウント認証情報が設定されていません');
@@ -31,7 +31,7 @@ function getServiceAccountEmail() {
     return serviceAccountCreds.client_email;
     
   } catch (error) {
-    logError(error, 'getServiceAccountEmail', UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM, UNIFIED_CONSTANTS.ERROR.CATEGORIES.AUTHENTICATION);
+    logError(error, 'getServiceAccountEmail', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.AUTHENTICATION);
     return 'サービスアカウント設定エラー';
   }
 }
@@ -46,7 +46,7 @@ function generateNewServiceAccountToken() {
     const props = PropertiesService.getScriptProperties();
     
     /** @type {string|null} サービスアカウント認証情報JSON */
-    const serviceAccountCredsJson = props.getProperty(UNIFIED_CONSTANTS.SCRIPT_PROPS.SERVICE_ACCOUNT_CREDS);
+    const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
     
     if (!serviceAccountCredsJson) {
       logWarn('サービスアカウント認証情報が設定されていません');
@@ -154,7 +154,7 @@ function generateNewServiceAccountToken() {
     return responseData.access_token;
     
   } catch (error) {
-    logError(error, 'generateNewServiceAccountToken', UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH, UNIFIED_CONSTANTS.ERROR.CATEGORIES.AUTHENTICATION);
+    logError(error, 'generateNewServiceAccountToken', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.AUTHENTICATION);
     return null;
   }
 }
@@ -169,7 +169,7 @@ function checkServiceAccountConfiguration() {
     const props = PropertiesService.getScriptProperties();
     
     /** @type {string|null} サービスアカウント認証情報JSON */
-    const serviceAccountCredsJson = props.getProperty(UNIFIED_CONSTANTS.SCRIPT_PROPS.SERVICE_ACCOUNT_CREDS);
+    const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
     
     /** @type {Object} 結果 */
     const result = {
@@ -222,7 +222,7 @@ function checkServiceAccountConfiguration() {
     return result;
     
   } catch (error) {
-    logError(error, 'checkServiceAccountConfiguration', UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM, UNIFIED_CONSTANTS.ERROR.CATEGORIES.CONFIG);
+    logError(error, 'checkServiceAccountConfiguration', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CONFIG);
     return {
       configured: false,
       email: null,
@@ -277,7 +277,7 @@ function setupServiceAccount(serviceAccountJson) {
     // プロパティに保存
     /** @type {Object} プロパティサービス */
     const props = PropertiesService.getScriptProperties();
-    props.setProperty(UNIFIED_CONSTANTS.SCRIPT_PROPS.SERVICE_ACCOUNT_CREDS, serviceAccountJson);
+    props.setProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
 
     // テスト用にトークン生成を試行
     /** @type {string|null} テストトークン */
@@ -297,7 +297,7 @@ function setupServiceAccount(serviceAccountJson) {
     };
 
   } catch (error) {
-    logError(error, 'setupServiceAccount', UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH, UNIFIED_CONSTANTS.ERROR.CATEGORIES.CONFIG);
+    logError(error, 'setupServiceAccount', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.CONFIG);
     
     return {
       success: false,
@@ -315,7 +315,7 @@ function clearServiceAccountConfiguration() {
   try {
     /** @type {Object} プロパティサービス */
     const props = PropertiesService.getScriptProperties();
-    props.deleteProperty(UNIFIED_CONSTANTS.SCRIPT_PROPS.SERVICE_ACCOUNT_CREDS);
+    props.deleteProperty('SERVICE_ACCOUNT_CREDS');
 
     // キャッシュもクリア
     if (typeof cacheManager !== 'undefined' && cacheManager.remove) {
@@ -330,7 +330,7 @@ function clearServiceAccountConfiguration() {
     };
     
   } catch (error) {
-    logError(error, 'clearServiceAccountConfiguration', UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM, UNIFIED_CONSTANTS.ERROR.CATEGORIES.CONFIG);
+    logError(error, 'clearServiceAccountConfiguration', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CONFIG);
     
     return {
       success: false,
@@ -392,7 +392,7 @@ function performServiceAccountHealthCheck() {
     return result;
     
   } catch (error) {
-    logError(error, 'performServiceAccountHealthCheck', UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM, UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM);
+    logError(error, 'performServiceAccountHealthCheck', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
     
     return {
       timestamp: new Date().toISOString(),

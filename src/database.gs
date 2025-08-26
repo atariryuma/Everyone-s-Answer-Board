@@ -153,9 +153,9 @@ function getResilientUserProperties() {
 
 // データベース管理のための定数
 /** @deprecated Use UNIFIED_CONSTANTS.CACHE.TTL.SHORT instead */
-const USER_CACHE_TTL = UNIFIED_CONSTANTS.CACHE.TTL.SHORT; // 5分
+const USER_CACHE_TTL = 300; // 5分
 /** @deprecated Use UNIFIED_CONSTANTS.CACHE.BATCH_SIZE.LARGE instead */
-const DB_BATCH_SIZE = UNIFIED_CONSTANTS.CACHE.BATCH_SIZE.LARGE;
+const DB_BATCH_SIZE = 100;
 
 // 簡易インデックス機能：ユーザー検索の高速化
 const userIndexCache = {
@@ -170,8 +170,8 @@ const userIndexCache = {
  */
 /** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DELETE_LOG instead */
 const DELETE_LOG_SHEET_CONFIG = {
-  SHEET_NAME: UNIFIED_CONSTANTS.SHEETS.DELETE_LOG.NAME,
-  HEADERS: UNIFIED_CONSTANTS.SHEETS.DELETE_LOG.HEADERS
+  SHEET_NAME: 'DeleteLogs',
+  HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
 };
 
 /**
@@ -179,8 +179,8 @@ const DELETE_LOG_SHEET_CONFIG = {
  */
 /** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG instead */
 const DIAGNOSTIC_LOG_SHEET_CONFIG = {
-  SHEET_NAME: UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG.NAME,
-  HEADERS: UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG.HEADERS
+  SHEET_NAME: 'DiagnosticLogs',
+  HEADERS: ['timestamp', 'functionName', 'status', 'problemCount', 'repairCount', 'successfulRepairs', 'details', 'executor', 'summary']
 };
 
 /**
