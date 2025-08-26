@@ -480,14 +480,15 @@ class ErrorHandler {
         this.errors.shift();
       }
 
-      // Better error logging with more details
-      console.group('🚨 Error Logged');
-      console.log('Message:', errorInfo.message);
-      console.log('Type:', errorInfo.errorType);
-      console.log('Context:', errorInfo.context);
-      console.log('Stack:', errorInfo.stack);
-      console.log('Full Error Object:', error);
-      console.groupEnd();
+      // シンプルなエラーログ
+      console.error(`🚨 ${errorInfo.context}: ${errorInfo.message}`);
+      
+      // Syntax Errorなど重要なエラーのみ自動送信
+      if (errorInfo.message.includes('Unexpected token') || 
+          errorInfo.message.includes('SyntaxError') ||
+          errorInfo.message.includes('is not defined')) {
+        this.sendToBackend(errorInfo);
+      }
     } catch (loggingError) {
       console.error('Error in error logging:', loggingError);
       console.error('Original error:', error);
@@ -500,6 +501,17 @@ class ErrorHandler {
 
   clearErrors() {
     this.errors = [];
+  }
+
+  sendToBackend(errorInfo) {
+    try {
+      if (typeof google !== 'undefined' && google.script?.run) {
+        google.script.run.logClientError({
+          message: errorInfo.message,
+          userId: window.AdminPanel?.currentUserId || 'unknown'
+        });
+      }
+    } catch (e) { /* ignore */ }
   }
 
   setupGlobalErrorHandling() {
@@ -842,6 +854,11 @@ window.debounce = (func, delay, key = 'default') => {
 
 window.throttle = (func, delay, key = 'default') => {
   window.sharedUtilities.throttle.throttle(func, key, delay);
+};
+
+// Global DOM utility functions for backward compatibility
+window.getCachedElement = (id) => {
+  return window.sharedUtilities.dom.getCachedElement(id);
 };
 
 // Global cache instance for backward compatibility
@@ -1420,147 +1437,10 @@ window.sharedUtilities.debounce = new DebounceManager();
 window.sharedUtilities.throttle = new ThrottleManager();
 
 // =============================================================================
-// TimingManager 軽量版実装 - 削除されたファイルからの復元
+// TimingManager 定義
 // =============================================================================
 
-/**
- * TimingManager の軽量版実装（削除されたファイルの代替）
- */
-const TimingManager = {
-  // アクティブなタイマーを管理
-  activeTimers: new Map(),
-  debounceTimers: new Map(),
-  throttleTimers: new Map(),
-
-  /**
-   * デバウンス処理（指定時間内の重複呼び出しを制限）
-   */
-  debounce: function(func, key, delay) {
-    if (this.debounceTimers.has(key)) {
-      clearTimeout(this.debounceTimers.get(key));
-    }
-    
-    const timer = setTimeout(() => {
-      this.debounceTimers.delete(key);
-      func();
-    }, delay);
-    
-    this.debounceTimers.set(key, timer);
-    return func; // 元の関数を返す（互換性のため）
-  },
-
-  /**
-   * スロットル処理（指定時間内の呼び出し頻度を制限）
-   */
-  throttle: function(func, key, delay) {
-    if (this.throttleTimers.has(key)) {
-      return func; // 既にスロットル中の場合は何もしない
-    }
-    
-    const timer = setTimeout(() => {
-      this.throttleTimers.delete(key);
-    }, delay);
-    
-    this.throttleTimers.set(key, timer);
-    func(); // すぐに実行
-    return func;
-  },
-
-  /**
-   * 遅延実行
-   */
-  delay: function(ms, id) {
-    return new Promise(resolve => {
-      const timer = setTimeout(() => {
-        if (id) this.activeTimers.delete(id);
-        resolve();
-      }, ms);
-      
-      if (id) this.activeTimers.set(id, timer);
-    });
-  },
-
-  /**
-   * 順次実行（簡易版）
-   */
-  sequence: function(operations, intervalMs, sequenceId) {
-    return new Promise(async resolve => {
-      const results = [];
-      for (let i = 0; i < operations.length; i++) {
-        if (typeof operations[i] === 'function') {
-          results.push(await operations[i]());
-          if (i < operations.length - 1 && intervalMs > 0) {
-            await this.delay(intervalMs);
-          }
-        }
-      }
-      resolve(results);
-    });
-  },
-
-  /**
-   * 並列実行（制限付き）
-   */
-  parallel: function(operations, concurrency = 3) {
-    const chunks = [];
-    for (let i = 0; i < operations.length; i += concurrency) {
-      chunks.push(operations.slice(i, i + concurrency));
-    }
-    
-    return chunks.reduce(
-      (promise, chunk) => promise.then(results => 
-        Promise.all(chunk.map(op => typeof op === 'function' ? op() : op))
-          .then(chunkResults => results.concat(chunkResults))
-      ),
-      Promise.resolve([])
-    );
-  },
-
-  /**
-   * プログレス付き順次実行
-   */
-  progressSequence: function(steps, onProgress, stepDelay = 0) {
-    return new Promise(async resolve => {
-      const results = [];
-      for (let i = 0; i < steps.length; i++) {
-        if (onProgress) {
-          onProgress(i + 1, steps.length, `実行中: ステップ ${i + 1}`);
-        }
-        
-        if (typeof steps[i] === 'function') {
-          results.push(await steps[i]());
-        }
-        
-        if (stepDelay > 0 && i < steps.length - 1) {
-          await this.delay(stepDelay);
-        }
-      }
-      resolve(results);
-    });
-  },
-
-  /**
-   * 特定のタイマーをクリア
-   */
-  clearTiming: function(key) {
-    ['activeTimers', 'debounceTimers', 'throttleTimers'].forEach(timerType => {
-      if (this[timerType].has(key)) {
-        clearTimeout(this[timerType].get(key));
-        this[timerType].delete(key);
-      }
-    });
-  },
-
-  /**
-   * 全タイマーをクリア
-   */
-  clearAllTiming: function() {
-    [this.activeTimers, this.debounceTimers, this.throttleTimers].forEach(timerMap => {
-      timerMap.forEach(timer => clearTimeout(timer));
-      timerMap.clear();
-    });
-  }
-};
+// TimingManager は adminPanel-api.js.html で定義されています
 
 // TimingManager統合の遅延実行化（読み込み順序問題の解決）
 function initializeTimingManagerIntegration() {

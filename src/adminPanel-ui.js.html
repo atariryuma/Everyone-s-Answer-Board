@@ -2017,7 +2017,7 @@ function checkAutoPublishDialog(status) {
 let sheetSelectionInProgress = false;
 
 // Handle sheet selection change (最適化版)
-function handleSheetSelectionChange(event) {
+async function handleSheetSelectionChange(event) {
   const newSelectedSheet = event.target.value;
 
   // 重複実行防止

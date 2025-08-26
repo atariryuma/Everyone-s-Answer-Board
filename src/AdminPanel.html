@@ -314,22 +314,7 @@
   // =============================================================================
   // CORE UI FUNCTIONS - Preserved Interface
   // =============================================================================
-  function loadStatus() {
-    return AdminPanel_callGAS('getInitialData')
-      .then(response => {
-        // getInitialDataはstatusフィールドを持たないので、responseが存在すれば成功とみなす
-        if (response && (response.userInfo || response.config)) {
-          window.AdminPanel.state.updateStatus(response);
-          return response;
-        } else if (response && response.status === 'error') {
-          throw new Error(response.message || 'Failed to load status');
-        } else {
-          // デフォルトで成功とみなす（データが返ってきた場合）
-          window.AdminPanel.state.updateStatus(response);
-          return response;
-        }
-      });
-  }
+  // loadStatus function is defined in adminPanel-api.js.html
 
   function createBoard() {
     return AdminPanel_callGAS('executeQuickStartSetup')

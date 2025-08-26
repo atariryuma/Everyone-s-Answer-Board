@@ -128,6 +128,14 @@ function debugLog(message, ...args) {
 }
 
 /**
+ * シンプルなクライアントエラーログ
+ */
+function logClientError(errorInfo) {
+  console.error(`🚨 CLIENT: ${errorInfo.message} (${errorInfo.userId || 'unknown'})`);
+  return { status: 'success' };
+}
+
+/**
  * 情報ログ出力
  */
 function infoLog(message, ...args) {

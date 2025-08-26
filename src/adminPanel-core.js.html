@@ -264,8 +264,7 @@ function setupDelegatedHandler(parentElement, selector, event, callback) {
 // STATE MANAGEMENT
 // =============================================================================
 
-// マルチテナント対応: ユーザーIDの安全な初期化
-let userId = '';
+// マルチテナント対応: ユーザーIDは adminPanel-framework.js.html で管理
 
 // Operation mutex system to prevent concurrent operations
 window.AdminPanel.operationMutex = {
