@@ -19,12 +19,19 @@
     console.log('HistoryManager detected, compatibility layer active');
     
     // 将来の互換性実装用のフック
-    const originalInit = window.HistoryManager.prototype.init;
-    if (originalInit) {
-      window.HistoryManager.prototype.init = function() {
-        console.log('HistoryManager init intercepted by compatibility layer');
-        return originalInit.apply(this, arguments);
-      };
+    try {
+      if (window.HistoryManager && window.HistoryManager.prototype && 
+          typeof window.HistoryManager.prototype.init === 'function') {
+        const originalInit = window.HistoryManager.prototype.init;
+        window.HistoryManager.prototype.init = function() {
+          console.log('HistoryManager init intercepted by compatibility layer');
+          return originalInit.apply(this, arguments);
+        };
+      } else {
+        console.log('HistoryManager.prototype.init not available, skipping hook');
+      }
+    } catch (error) {
+      console.warn('Error setting up HistoryManager compatibility hook:', error.message);
     }
   }
   

@@ -4,37 +4,44 @@
  * GAS HTML Service用の最適化されたクライアント関数群
  */
 
-class GASOptimizer {
-  constructor() {
-    this.cache = new Map();
-    this.loadingStates = new Map();
-    this.concurrentLimit = 10;
-    this.activeCalls = 0;
-    this.callQueue = [];
+/**
+ * GAS最適化クラス（ES5互換版）
+ */
+function GASOptimizer() {
+  this.cache = new Map();
+  this.loadingStates = new Map();
+  this.concurrentLimit = 10;
+  this.activeCalls = 0;
+  this.callQueue = [];
+}
+
+/**
+ * Promise化されたgoogle.script.run呼び出し
+ * @param {string} functionName - 呼び出す関数名
+ * @param {...any} args - 関数の引数
+ * @returns {Promise} 結果のPromise
+ */
+GASOptimizer.prototype.call = function(functionName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  var self = this;
+  return new Promise(function(resolve, reject) {
+    // 同時実行制限の確認
+    if (self.activeCalls >= self.concurrentLimit) {
+      self.callQueue.push(function() {
+        self.executeCall(functionName, args, resolve, reject);
+      });
+      return;
+    }
+
+    self.executeCall(functionName, args, resolve, reject);
+  });
   }
 
-  /**
-   * Promise化されたgoogle.script.run呼び出し
-   * @param {string} functionName - 呼び出す関数名
-   * @param {...any} args - 関数の引数
-   * @returns {Promise} 結果のPromise
-   */
-  async call(functionName, ...args) {
-    return new Promise((resolve, reject) => {
-      // 同時実行制限の確認
-      if (this.activeCalls >= this.concurrentLimit) {
-        this.callQueue.push(() => this.executeCall(functionName, args, resolve, reject));
-        return;
-      }
-
-      this.executeCall(functionName, args, resolve, reject);
-    });
-  }
-
-  /**
-   * 実際の関数呼び出し実行
-   */
-  executeCall(functionName, args, resolve, reject) {
+/**
+ * 実際の関数呼び出し実行
+ */
+GASOptimizer.prototype.executeCall = function(functionName, args, resolve, reject) {
+  var self = this;
     this.activeCalls++;
     
     // ローディング状態の管理
@@ -45,130 +52,152 @@ class GASOptimizer {
       throw new Error(`GAS function '${functionName}' is not available`);
     }
 
-    google.script.run
-      .withSuccessHandler((result) => {
-        this.activeCalls--;
-        this.setLoadingState(functionName, false);
-        resolve(result);
-        this.processQueue();
-      })
-      .withFailureHandler((error) => {
-        this.activeCalls--;
-        this.setLoadingState(functionName, false);
-        console.error(`GAS Function Error [${functionName}]:`, error);
-        reject(this.enhanceError(error, functionName));
-        this.processQueue();
-      })[functionName](...args);
+  google.script.run
+    .withSuccessHandler(function(result) {
+      self.activeCalls--;
+      self.setLoadingState(functionName, false);
+      resolve(result);
+      self.processQueue();
+    })
+    .withFailureHandler(function(error) {
+      self.activeCalls--;
+      self.setLoadingState(functionName, false);
+      console.error('GAS Function Error [' + functionName + ']:', error);
+      reject(self.enhanceError(error, functionName));
+      self.processQueue();
+    })[functionName].apply(null, args);
   }
 
-  /**
-   * キューの処理
-   */
-  processQueue() {
-    if (this.callQueue.length > 0 && this.activeCalls < this.concurrentLimit) {
-      const nextCall = this.callQueue.shift();
-      nextCall();
+/**
+ * キューの処理
+ */
+GASOptimizer.prototype.processQueue = function() {
+  if (this.callQueue.length > 0 && this.activeCalls < this.concurrentLimit) {
+    var nextCall = this.callQueue.shift();
+    nextCall();
+  }
+};
+
+/**
+ * エラー情報の拡張
+ */
+GASOptimizer.prototype.enhanceError = function(error, functionName) {
+  var enhanced = {};
+  for (var key in error) {
+    if (error.hasOwnProperty(key)) {
+      enhanced[key] = error[key];
     }
   }
+  enhanced.function = functionName;
+  enhanced.timestamp = new Date().toISOString();
+  enhanced.userMessage = this.getUserFriendlyErrorMessage(error.message);
+  return enhanced;
+};
 
-  /**
-   * エラー情報の拡張
-   */
-  enhanceError(error, functionName) {
-    return {
-      ...error,
-      function: functionName,
-      timestamp: new Date().toISOString(),
-      userMessage: this.getUserFriendlyErrorMessage(error.message)
-    };
-  }
+/**
+ * ユーザーフレンドリーなエラーメッセージ
+ */
+GASOptimizer.prototype.getUserFriendlyErrorMessage = function(originalMessage) {
+  var errorMap = {
+    'Exception: 認証エラー': 'ログインセッションが期限切れです。ページを更新してから再度お試しください。',
+    'Exception: 無効なユーザーID': 'アクセス権限に問題があります。管理者にお問い合わせください。',
+    'Exception: データベース': 'データの保存に失敗しました。しばらく待ってから再度お試しください。',
+    'ScriptError': 'システムエラーが発生しました。管理者にお問い合わせください。'
+  };
 
-  /**
-   * ユーザーフレンドリーなエラーメッセージ
-   */
-  getUserFriendlyErrorMessage(originalMessage) {
-    const errorMap = {
-      'Exception: 認証エラー': 'ログインセッションが期限切れです。ページを更新してから再度お試しください。',
-      'Exception: 無効なユーザーID': 'アクセス権限に問題があります。管理者にお問い合わせください。',
-      'Exception: データベース': 'データの保存に失敗しました。しばらく待ってから再度お試しください。',
-      'ScriptError': 'システムエラーが発生しました。管理者にお問い合わせください。'
-    };
-
-    for (const [key, message] of Object.entries(errorMap)) {
-      if (originalMessage && originalMessage.includes(key)) {
-        return message;
-      }
+  for (var key in errorMap) {
+    if (errorMap.hasOwnProperty(key) && originalMessage && originalMessage.indexOf(key) !== -1) {
+      return errorMap[key];
     }
+  }
     
-    return '予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
-  }
+  return '予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
+};
 
-  /**
-   * ローディング状態の管理
-   */
-  setLoadingState(functionName, isLoading) {
-    this.loadingStates.set(functionName, isLoading);
-    this.updateGlobalLoadingIndicator();
-  }
+/**
+ * ローディング状態の管理
+ */
+GASOptimizer.prototype.setLoadingState = function(functionName, isLoading) {
+  this.loadingStates.set(functionName, isLoading);
+  this.updateGlobalLoadingIndicator();
+};
 
-  /**
-   * グローバルローディングインジケーターの更新
-   */
-  updateGlobalLoadingIndicator() {
-    const hasActiveLoading = Array.from(this.loadingStates.values()).some(state => state);
-    document.body.classList.toggle('gas-loading', hasActiveLoading);
-  }
-
-  /**
-   * キャッシュ付きの関数呼び出し
-   */
-  async callWithCache(functionName, args, ttl = 5 * 60 * 1000) {
-    const cacheKey = `${functionName}_${JSON.stringify(args)}`;
-    const cached = this.cache.get(cacheKey);
-    
-    if (cached && (Date.now() - cached.timestamp) < ttl) {
-      return cached.data;
+/**
+ * グローバルローディングインジケーターの更新
+ */
+GASOptimizer.prototype.updateGlobalLoadingIndicator = function() {
+  var hasActiveLoading = false;
+  var values = Array.from(this.loadingStates.values());
+  for (var i = 0; i < values.length; i++) {
+    if (values[i]) {
+      hasActiveLoading = true;
+      break;
     }
+  }
+  document.body.classList.toggle('gas-loading', hasActiveLoading);
+};
 
-    const result = await this.call(functionName, ...args);
-    this.cache.set(cacheKey, {
+/**
+ * キャッシュ付きの関数呼び出し
+ */
+GASOptimizer.prototype.callWithCache = function(functionName, args, ttl) {
+  ttl = ttl || 5 * 60 * 1000;
+  var self = this;
+  var cacheKey = functionName + '_' + JSON.stringify(args);
+  var cached = this.cache.get(cacheKey);
+  
+  if (cached && (Date.now() - cached.timestamp) < ttl) {
+    return Promise.resolve(cached.data);
+  }
+
+  return this.call.apply(this, [functionName].concat(args)).then(function(result) {
+    self.cache.set(cacheKey, {
       data: result,
       timestamp: Date.now()
     });
-
     return result;
-  }
+  });
+};
 
-  /**
-   * バッチ処理対応の関数呼び出し
-   */
-  async batchCall(calls) {
-    const promises = calls.map(({ functionName, args }) => 
-      this.call(functionName, ...args).catch(error => ({ error, functionName }))
-    );
+/**
+ * バッチ処理対応の関数呼び出し
+ */
+GASOptimizer.prototype.batchCall = function(calls) {
+  var self = this;
+  var promises = calls.map(function(call) {
+    return self.call.apply(self, [call.functionName].concat(call.args || []))
+      .catch(function(error) {
+        return { error: error, functionName: call.functionName };
+      });
+  });
 
-    return Promise.all(promises);
-  }
+  return Promise.all(promises);
+};
 
-  /**
-   * キャッシュのクリア
-   */
-  clearCache() {
-    this.cache.clear();
-  }
+/**
+ * キャッシュのクリア
+ */
+GASOptimizer.prototype.clearCache = function() {
+  this.cache.clear();
+};
 
-  /**
-   * 統計情報の取得
-   */
-  getStats() {
-    return {
-      activeCalls: this.activeCalls,
-      queueLength: this.callQueue.length,
-      cacheSize: this.cache.size,
-      loadingStates: Object.fromEntries(this.loadingStates)
-    };
+/**
+ * 統計情報の取得
+ */
+GASOptimizer.prototype.getStats = function() {
+  var loadingStatesObj = {};
+  var entries = Array.from(this.loadingStates.entries());
+  for (var i = 0; i < entries.length; i++) {
+    loadingStatesObj[entries[i][0]] = entries[i][1];
   }
-}
+  
+  return {
+    activeCalls: this.activeCalls,
+    queueLength: this.callQueue.length,
+    cacheSize: this.cache.size,
+    loadingStates: loadingStatesObj
+  };
+};
 
 // グローバルインスタンスの作成
 window.gasOptimizer = new GASOptimizer();
@@ -176,8 +205,13 @@ window.gasOptimizer = new GASOptimizer();
 /**
  * 便利な関数のエイリアス
  */
-window.gasCall = (functionName, ...args) => window.gasOptimizer.call(functionName, ...args);
-window.gasCacheCall = (functionName, args, ttl) => window.gasOptimizer.callWithCache(functionName, args, ttl);
+window.gasCall = function(functionName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return window.gasOptimizer.call.apply(window.gasOptimizer, [functionName].concat(args));
+};
+window.gasCacheCall = function(functionName, args, ttl) {
+  return window.gasOptimizer.callWithCache(functionName, args, ttl);
+};
 
 /**
  * メッセージ表示の最適化 - SharedUtilitiesに移行済み
