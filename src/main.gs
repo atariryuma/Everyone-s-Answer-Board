@@ -848,6 +848,119 @@ function clearExecutionUserInfoCache() {
 }
 
 /**
+ * クリティカル更新後の包括的キャッシュ同期
+ * ユーザー情報の重要な変更（スプレッドシート変更、セットアップ完了など）後に
+ * 全キャッシュレイヤーを同期させる
+ * @param {string} userId - 対象ユーザーID
+ * @param {string} email - ユーザーメール
+ * @param {string|null} oldSpreadsheetId - 旧スプレッドシートID
+ * @param {string|null} newSpreadsheetId - 新スプレッドシートID
+ */
+function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
+  if (!userId) {
+    warnLog('synchronizeCacheAfterCriticalUpdate: userIdが指定されていません');
+    return;
+  }
+
+  try {
+    debugLog(`🔄 クリティカル更新後キャッシュ同期開始 - userId: ${userId}`, {
+      oldSpreadsheetId: oldSpreadsheetId || 'null',
+      newSpreadsheetId: newSpreadsheetId || 'null'
+    });
+
+    // 1. 実行レベルのユーザー情報キャッシュをクリア
+    clearExecutionUserInfoCache();
+
+    // 2. ユーザー固有のキャッシュエントリを無効化
+    try {
+      if (typeof cacheManager !== 'undefined' && cacheManager) {
+        // ユーザーデータキャッシュの無効化
+        const userCacheKey = `user_${userId}`;
+        if (typeof cacheManager.invalidate === 'function') {
+          cacheManager.invalidate([userCacheKey]);
+        }
+        
+        // 古いスプレッドシートのシートデータキャッシュを無効化
+        if (oldSpreadsheetId && typeof cacheManager.invalidateSheetData === 'function') {
+          cacheManager.invalidateSheetData(oldSpreadsheetId);
+          debugLog(`📝 旧スプレッドシート ${oldSpreadsheetId} のキャッシュを無効化`);
+        }
+        
+        // 新しいスプレッドシートのシートデータキャッシュを無効化（事前クリア）
+        if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId && typeof cacheManager.invalidateSheetData === 'function') {
+          cacheManager.invalidateSheetData(newSpreadsheetId);
+          debugLog(`📝 新スプレッドシート ${newSpreadsheetId} のキャッシュを無効化`);
+        }
+      }
+    } catch (cacheError) {
+      warnLog('synchronizeCacheAfterCriticalUpdate: cacheManager操作エラー', cacheError.message);
+    }
+
+    // 3. Google Apps Scriptキャッシュサービスの関連キャッシュをクリア
+    try {
+      const scriptCache = CacheService.getScriptCache();
+      const userKeys = [
+        `user_${userId}`,
+        `config_${userId}`,
+        `userInfo_${userId}`
+      ];
+      
+      // 複数キーを一括で削除
+      scriptCache.removeAll(userKeys);
+      
+      // スプレッドシート関連のキャッシュも削除
+      if (oldSpreadsheetId) {
+        const oldKeys = [`publishedData_${userId}_${oldSpreadsheetId}*`];
+        // パターンマッチングは直接サポートされていないため、明示的にクリア
+        try {
+          scriptCache.remove(`publishedData_${userId}_${oldSpreadsheetId}`);
+        } catch (e) { /* ignore */ }
+      }
+      
+      if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
+        try {
+          scriptCache.remove(`publishedData_${userId}_${newSpreadsheetId}`);
+        } catch (e) { /* ignore */ }
+      }
+      
+      debugLog('📦 ScriptCacheからユーザー関連キャッシュを削除');
+    } catch (scriptCacheError) {
+      warnLog('synchronizeCacheAfterCriticalUpdate: ScriptCache操作エラー', scriptCacheError.message);
+    }
+
+    // 4. 統一キャッシュシステムとの同期
+    try {
+      if (typeof getUnifiedExecutionCache === 'function') {
+        const unifiedCache = getUnifiedExecutionCache();
+        if (unifiedCache && typeof unifiedCache.syncWithUnifiedCache === 'function') {
+          unifiedCache.syncWithUnifiedCache('criticalUserUpdate');
+          debugLog('🔄 統一キャッシュシステムと同期完了');
+        }
+      }
+    } catch (unifiedError) {
+      warnLog('synchronizeCacheAfterCriticalUpdate: 統一キャッシュ同期エラー', unifiedError.message);
+    }
+
+    infoLog(`✅ クリティカル更新後キャッシュ同期完了 - userId: ${userId}`, {
+      oldSpreadsheetId: oldSpreadsheetId || 'null',
+      newSpreadsheetId: newSpreadsheetId || 'null',
+      email: email || 'unknown'
+    });
+
+  } catch (error) {
+    logError(error, 'synchronizeCacheAfterCriticalUpdate', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.CACHE, {
+      userId,
+      email,
+      oldSpreadsheetId,
+      newSpreadsheetId
+    });
+    
+    // エラーが発生してもクリティカルな処理は継続できるようにする
+    warnLog(`⚠️  キャッシュ同期でエラーが発生しましたが処理は継続します: ${error.message}`);
+  }
+}
+
+/**
  * ユーザーキャッシュの無効化（軽量実装）
  * 複数ファイルで参照される主要なキャッシュクリア関数
  * @param {string} userId - ユーザーID
