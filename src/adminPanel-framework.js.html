@@ -157,26 +157,20 @@ Object.defineProperties(window, {
 // DEBUG_MODE is defined in constants.js.html
 
 function adminLog(level, ...args) {
-  // AdminPanel.stateManagerが初期化されているか、またはwindow.DEBUG_MODEが設定されているかを確認
-  const isDebugModeEnabled = window.AdminPanel && window.AdminPanel.stateManager && window.AdminPanel.stateManager.state.debugMode || window.DEBUG_MODE;
-  if (!isDebugModeEnabled) return;
-  
+  // Only show errors and critical warnings - disable verbose logging
   switch (level) {
     case 'error':
       console.error('[AdminPanel]', ...args);
       break;
     case 'warn':
-      console.warn('[AdminPanel]', ...args);
+      // Only show warnings in debug mode
+      if (window.DEBUG_MODE) console.warn('[AdminPanel]', ...args);
       break;
     case 'info':
-      console.log('[AdminPanel]', ...args);
-      break;
     case 'debug':
-      // debugレベルのログは、debugModeが有効な場合のみ出力
-      if (isDebugModeEnabled) console.log('[AdminPanel:DEBUG]', ...args);
-      break;
     default:
-      console.log('[AdminPanel]', ...args);
+      // All info/debug logs disabled for performance
+      return;
   }
 }
 
@@ -806,10 +800,7 @@ window.AdminPanel.functionRegistry = {
     const fullFuncName = `_full${functionName.charAt(0).toUpperCase()}${functionName.slice(1)}`;
     if (typeof window[fullFuncName] === 'function') {
       this.fullImplementations.add(functionName);
-      // デバッグモードのみログ出力（本番での重複ログを減らす）
-      if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
-        console.log(`🔧 Full implementation registered: ${fullFuncName}`);
-      }
+      // Verbose implementation logging disabled for performance
     }
   },
   
@@ -2774,7 +2765,7 @@ window.HistoryManager = {
       // 3. Reload application state with new spreadsheet
       if (typeof loadStatus === 'function') {
         await loadStatus(true); // Force reload bypassing cache
-        console.log('✅ Application state reloaded with new spreadsheet');
+        // Application state reloaded - verbose logging disabled
         
         // 4. Force update currentSpreadsheetUrl after state reload
         if (window.currentStatus?.userInfo?.spreadsheetUrl) {

@@ -1580,9 +1580,159 @@ function parseUserConfig(configJson) {
   }
 }
 
+// =============================================================================
+// 共通ユーティリティ関数（重複排除）
+// =============================================================================
+
+/**
+ * HTMLエスケープ（全システム共通）
+ * @param {string} text エスケープするテキスト
+ * @returns {string} エスケープされたテキスト
+ */
+if (typeof window.escapeHtml === 'undefined') {
+  window.escapeHtml = function(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+}
+
+/**
+ * 日付フォーマット（全システム共通）
+ * @param {Date|string} date 日付
+ * @param {Object} options オプション
+ * @returns {string} フォーマットされた日付
+ */
+if (typeof window.formatDate === 'undefined') {
+  window.formatDate = function(date, options = {}) {
+    try {
+      const d = new Date(date);
+      const defaultOptions = {
+        year: 'numeric',
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      return d.toLocaleDateString('ja-JP', { ...defaultOptions, ...options });
+    } catch (error) {
+      if (typeof logWarn === 'function') {
+        logWarn('日付フォーマットエラー:', error);
+      } else {
+        console.warn('日付フォーマットエラー:', error);
+      }
+      return '';
+    }
+  };
+}
+
+/**
+ * メッセージ表示（全システム共通）
+ * @param {string} message メッセージ
+ * @param {string} type タイプ ('success'|'error'|'info'|'warning')
+ * @param {number} duration 表示時間（ミリ秒）
+ */
+if (typeof window.showMessage === 'undefined') {
+  window.showMessage = function(message, type = 'info', duration = 3000) {
+    try {
+      // 既存のメッセージエリアを探す
+      let messageArea = document.getElementById('message-area') || 
+                       document.getElementById('messageArea') ||
+                       document.querySelector('.message-area');
+
+      if (!messageArea) {
+        // メッセージエリアが存在しない場合は作成
+        messageArea = document.createElement('div');
+        messageArea.id = 'message-area';
+        messageArea.className = 'fixed top-4 right-4 z-50 max-w-sm';
+        document.body.appendChild(messageArea);
+      }
+
+      // メッセージ要素を作成
+      const messageEl = document.createElement('div');
+      const baseClasses = 'p-4 mb-2 rounded-lg shadow-lg transition-all duration-300 transform';
+      const typeClasses = {
+        success: 'bg-green-100 border-green-500 text-green-700',
+        error: 'bg-red-100 border-red-500 text-red-700',
+        warning: 'bg-yellow-100 border-yellow-500 text-yellow-700',
+        info: 'bg-blue-100 border-blue-500 text-blue-700'
+      };
+      
+      messageEl.className = `${baseClasses} ${typeClasses[type] || typeClasses.info}`;
+      messageEl.textContent = message;
+
+      // アニメーション付きで表示
+      messageEl.style.opacity = '0';
+      messageEl.style.transform = 'translateX(100%)';
+      messageArea.appendChild(messageEl);
+
+      // フェードイン
+      setTimeout(() => {
+        messageEl.style.opacity = '1';
+        messageEl.style.transform = 'translateX(0)';
+      }, 10);
+
+      // 自動削除
+      setTimeout(() => {
+        messageEl.style.opacity = '0';
+        messageEl.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+          if (messageEl.parentNode) {
+            messageEl.parentNode.removeChild(messageEl);
+          }
+        }, 300);
+      }, duration);
+
+    } catch (error) {
+      if (typeof logWarn === 'function') {
+        logWarn('メッセージ表示エラー:', error);
+      } else {
+        console.warn('メッセージ表示エラー:', error);
+      }
+      // フォールバック
+      alert(`${type.toUpperCase()}: ${message}`);
+    }
+  };
+}
+
+/**
+ * 非同期待機関数
+ * @param {number} ms 待機時間（ミリ秒）
+ * @returns {Promise}
+ */
+if (typeof window.sleep === 'undefined') {
+  window.sleep = function(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  };
+}
+
+/**
+ * オブジェクトのディープコピー
+ * @param {*} obj コピー対象
+ * @returns {*} コピー結果
+ */
+if (typeof window.deepCopy === 'undefined') {
+  window.deepCopy = function(obj) {
+    try {
+      return JSON.parse(JSON.stringify(obj));
+    } catch (error) {
+      if (typeof logWarn === 'function') {
+        logWarn('ディープコピーエラー:', error);
+      } else {
+        console.warn('ディープコピーエラー:', error);
+      }
+      return obj;
+    }
+  };
+}
+
 // Prevent duplicate loading messages
 if (!window.sharedUtilitiesLoaded) {
   window.sharedUtilitiesLoaded = true;
-  console.log('✅ SharedUtilities loaded successfully - Version 1.2.0 (with GAS warnings suppression)');
+  console.log('✅ SharedUtilities with common functions loaded');
 }
 </script>

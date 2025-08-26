@@ -7,29 +7,9 @@
 // エラーハンドリング
 // =================================================================
 
-/**
- * エラーの重要度レベル
- */
-var ERROR_SEVERITY = ERROR_SEVERITY || {
-  LOW: 'low',
-  MEDIUM: 'medium',
-  HIGH: 'high',
-  CRITICAL: 'critical',
-};
-
-/**
- * エラーカテゴリ
- */
-var ERROR_CATEGORIES = ERROR_CATEGORIES || {
-  AUTHENTICATION: 'authentication',
-  AUTHORIZATION: 'authorization',
-  DATABASE: 'database',
-  CACHE: 'cache',
-  NETWORK: 'network',
-  VALIDATION: 'validation',
-  SYSTEM: 'system',
-  USER_INPUT: 'user_input',
-};
+// 統合定数使用（constants.gsから）
+// 注意: constants.gsがロードされた後に実行される前提
+// これらの定数は既にconstants.gsで定義されており、後方互換性のため存在
 
 /**
  * 統一エラーハンドラークラス
@@ -246,8 +226,17 @@ if (typeof infoLog === 'undefined') {
 }
 
 // デフォルト質問文の共通定数
-var DEFAULT_MAIN_QUESTION = 'あなたの考えや気づいたことを教えてください';
-var DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教えてください（任意）';
+/**
+ * @const {string} デフォルトメイン質問文
+ */
+/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION instead */
+const DEFAULT_MAIN_QUESTION = UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION;
+
+/**
+ * @const {string} デフォルト理由質問文
+ */
+/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION instead */
+const DEFAULT_REASON_QUESTION = UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION;
 
 /**
  * セットアップステップを判定する（サーバー側統一実装）
@@ -890,7 +879,8 @@ function registerNewUser(adminEmail) {
   // 新規ユーザーの場合
   userId = Utilities.getUuid();
 
-  var initialConfig = {
+  /** @type {Object} 初期設定オブジェクト */
+  const initialConfig = {
     // セットアップ管理
     setupStatus: 'pending',
     createdAt: new Date().toISOString(),
@@ -915,7 +905,8 @@ function registerNewUser(adminEmail) {
     lastModified: new Date().toISOString()
   };
 
-  var userData = {
+  /** @type {Object} ユーザーデータオブジェクト */
+  const userData = {
     userId: userId,
     adminEmail: adminEmail,
     spreadsheetId: '',
@@ -1013,11 +1004,13 @@ function registerNewUser(adminEmail) {
     }
   } catch (e) {
     // 重複ユーザーエラーのシンプル処理
-    var messageText = (e && (e.message || e.toString())) || '';
+    /** @type {string} エラーメッセージテキスト */
+    const messageText = (e && (e.message || e.toString())) || '';
     if (messageText.indexOf('既に登録されています') !== -1 || messageText.toLowerCase().indexOf('duplicate') !== -1) {
       warnLog('registerNewUser: メール重複検出、既存ユーザー検索中...', adminEmail);
       try {
-        var existing = fetchUserFromDatabase('adminEmail', adminEmail, { forceFresh: true });
+        /** @type {Object|null} 既存ユーザー情報 */
+        const existing = fetchUserFromDatabase('adminEmail', adminEmail, { forceFresh: true });
         if (existing && existing.userId) {
           appUrls = generateUserUrls(existing.userId);
           return {
@@ -1059,16 +1052,20 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
   verifyUserAccess(requestUserId); // 内部でキャッシュクリア済み
 
   try {
-    var reactingUserEmail = getCurrentUserEmail();
-    var ownerUserId = requestUserId; // requestUserId を使用
+    /** @type {string} リアクション実行ユーザーのメールアドレス */
+    const reactingUserEmail = getCurrentUserEmail();
+    /** @type {string} ボードオーナーのユーザーID */
+    const ownerUserId = requestUserId; // requestUserId を使用
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
-    var boardOwnerInfo = findUserById(ownerUserId);
+    /** @type {Object|null} ボードオーナー情報 */
+    const boardOwnerInfo = findUserById(ownerUserId);
     if (!boardOwnerInfo) {
       throw new Error('無効なボードです。');
     }
 
-    var result = processReaction(
+    /** @type {Object} リアクション処理結果 */
+    const result = processReaction(
       boardOwnerInfo.spreadsheetId,
       sheetName,
       rowIndex,
@@ -1117,25 +1114,32 @@ function addReactionBatch(requestUserId, batchOperations) {
     if (batchOperations.length > MAX_BATCH_SIZE) {
       throw new Error(`バッチサイズが制限を超えています (最大${MAX_BATCH_SIZE}件)`);
     }
-    var reactingUserEmail = getCurrentUserEmail();
-    var ownerUserId = requestUserId;
+    /** @type {string} リアクション実行ユーザーのメールアドレス */
+    const reactingUserEmail = getCurrentUserEmail();
+    /** @type {string} ボードオーナーのユーザーID */
+    const ownerUserId = requestUserId;
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
-    var boardOwnerInfo = findUserById(ownerUserId);
+    /** @type {Object|null} ボードオーナー情報 */
+    const boardOwnerInfo = findUserById(ownerUserId);
     if (!boardOwnerInfo) {
       throw new Error('無効なボードです。');
     }
 
     // バッチ処理結果を格納
-    var batchResults = [];
-    var processedRows = new Set(); // 重複行の追跡
+    /** @type {Array} バッチ処理結果配列 */
+    const batchResults = [];
+    /** @type {Set<number>} 重複行の追跡用Set */
+    const processedRows = new Set(); // 重複行の追跡
 
     // 既存のsheetNameを取得（最初の操作から）
-    var sheetName = getCurrentSheetName(boardOwnerInfo.spreadsheetId);
+    /** @type {string} シート名 */
+    const sheetName = getCurrentSheetName(boardOwnerInfo.spreadsheetId);
 
     // バッチ操作を順次処理（既存のprocessReaction関数を再利用）
-    for (var i = 0; i < batchOperations.length; i++) {
-      var operation = batchOperations[i];
+    for (let i = 0; i < batchOperations.length; i++) {
+      /** @type {Object} 現在の操作オブジェクト */
+      const operation = batchOperations[i];
 
       try {
         // 入力検証
@@ -1145,7 +1149,8 @@ function addReactionBatch(requestUserId, batchOperations) {
         }
 
         // 既存のprocessReaction関数を使用（100%互換性保証）
-        var result = processReaction(
+        /** @type {Object} リアクション処理結果 */
+        const result = processReaction(
           boardOwnerInfo.spreadsheetId,
           sheetName,
           operation.rowIndex,
@@ -1155,7 +1160,8 @@ function addReactionBatch(requestUserId, batchOperations) {
 
         if (result && result.status === 'success') {
           // 更新後のリアクション情報を取得
-          var updatedReactions = getRowReactions(
+          /** @type {Object} 更新されたリアクション情報 */
+          const updatedReactions = getRowReactions(
             boardOwnerInfo.spreadsheetId,
             sheetName,
             operation.rowIndex,
@@ -1192,10 +1198,12 @@ function addReactionBatch(requestUserId, batchOperations) {
     }
 
     // 成功した行の最新状態を収集
-    var finalResults = [];
+    /** @type {Array} 最終結果配列 */
+    const finalResults = [];
     processedRows.forEach(function(rowIndex) {
       try {
-        var latestReactions = getRowReactions(
+        /** @type {Object} 最新のリアクション情報 */
+        const latestReactions = getRowReactions(
           boardOwnerInfo.spreadsheetId,
           sheetName,
           rowIndex,
@@ -1249,8 +1257,10 @@ function addReactionBatch(requestUserId, batchOperations) {
  */
 function getCurrentSheetName(spreadsheetId) {
   try {
-    var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
-    var sheets = spreadsheet.getSheets();
+    /** @type {Object} スプレッドシートオブジェクト */
+    const spreadsheet = openSpreadsheetOptimized(spreadsheetId);
+    /** @type {Array} シート配列 */
+    const sheets = spreadsheet.getSheets();
 
     // デフォルトでは最初のシートを使用
     if (sheets.length > 0) {
@@ -1346,14 +1356,19 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
 
   try {
     // アクティブボード識別子（シート切替時にキーが変わるように）
-    var userInfoForKey = getOrFetchUserInfo(requestUserId, 'userId', { useExecutionCache: true, ttl: 120 });
-    var cfgForKey = {};
+    /** @type {Object|null} キー作成用ユーザー情報 */
+    const userInfoForKey = getOrFetchUserInfo(requestUserId, 'userId', { useExecutionCache: true, ttl: 120 });
+    /** @type {Object} キー作成用設定 */
+    let cfgForKey = {};
     try { cfgForKey = JSON.parse(userInfoForKey && userInfoForKey.configJson || '{}'); } catch (e) { cfgForKey = {}; }
-    var activeSsId = cfgForKey.publishedSpreadsheetId || 'none';
-    var activeSheet = cfgForKey.publishedSheetName || 'none';
+    /** @type {string} アクティブなスプレッドシートID */
+    const activeSsId = cfgForKey.publishedSpreadsheetId || 'none';
+    /** @type {string} アクティブなシート名 */
+    const activeSheet = cfgForKey.publishedSheetName || 'none';
 
     // キャッシュキー生成（アクティブなスプレッドシート/シート名を含める）
-    var requestKey = `publishedData_${requestUserId}_${activeSsId}_${activeSheet}_${classFilter}_${sortOrder}_${adminMode}`;
+    /** @type {string} キャッシュリクエストキー */
+    const requestKey = `publishedData_${requestUserId}_${activeSsId}_${activeSheet}_${classFilter}_${sortOrder}_${adminMode}`;
 
     // キャッシュバイパス時は直接実行
     if (bypassCache === true) {
@@ -1374,9 +1389,11 @@ function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode,
  */
 function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode) {
     try {
-      var currentUserId = requestUserId; // requestUserId を使用
+      /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
-      var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+      /** @type {Object} ユーザー情報 */
+      const userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
         useExecutionCache: true,
         ttl: 300
       });
@@ -1384,7 +1401,8 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
         throw new Error('ユーザー情報が見つかりません');
       }
 
-      var configJson = {};
+      /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
       try {
         configJson = JSON.parse(userInfo.configJson || '{}');
       } catch (parseError) {
@@ -1393,11 +1411,14 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       }
 
     // セットアップ状況を確認
-    var setupStatus = configJson.setupStatus || 'pending';
+    /** @type {string} セットアップ状態 */
+    const setupStatus = configJson.setupStatus || 'pending';
 
     // 公開対象のスプレッドシートIDとシート名を取得
-    var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
-    var publishedSheetName = configJson.publishedSheetName;
+    /** @type {string} 公開されたスプレッドシートID */
+    const publishedSpreadsheetId = configJson.publishedSpreadsheetId;
+    /** @type {string} 公開されたシート名 */
+    const publishedSheetName = configJson.publishedSheetName;
 
     if (!publishedSpreadsheetId || !publishedSheetName) {
       if (setupStatus === 'pending') {
@@ -1413,23 +1434,31 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     }
 
     // シート固有の設定を取得 (sheetKey is based only on sheet name)
-    var sheetKey = 'sheet_' + publishedSheetName;
-    var sheetConfig = configJson[sheetKey] || {};
+    /** @type {string} シート設定キー */
+    const sheetKey = 'sheet_' + publishedSheetName;
+    /** @type {Object} シート固有の設定 */
+    const sheetConfig = configJson[sheetKey] || {};
 
     // Check if current user is the board owner
-    var isOwner = (configJson.ownerId === currentUserId);
+    /** @type {boolean} オーナー権限フラグ */
+    const isOwner = (configJson.ownerId === currentUserId);
 
     // データ取得
-    var sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
+    /** @type {Object} シートデータ */
+    const sheetData = getSheetData(currentUserId, publishedSheetName, classFilter, sortOrder, adminMode);
 
     // 診断: スプレッドシートとシートの存在確認
     try {
       if (sheetData.totalCount === 0) {
-        var spreadsheet = openSpreadsheetOptimized(publishedSpreadsheetId);
-        var sheet = spreadsheet.getSheetByName(publishedSheetName);
+        /** @type {Object} スプレッドシートオブジェクト */
+        const spreadsheet = openSpreadsheetOptimized(publishedSpreadsheetId);
+        /** @type {Object} 指定されたシート */
+        const sheet = spreadsheet.getSheetByName(publishedSheetName);
         if (sheet) {
-          var lastRow = sheet.getLastRow();
-          var lastColumn = sheet.getLastColumn();
+          /** @type {number} 最終行番号 */
+          const lastRow = sheet.getLastRow();
+          /** @type {number} 最終列番号 */
+    const lastColumn = sheet.getLastColumn();
 
           if (lastRow <= 1) {
           }
@@ -1445,7 +1474,8 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
 
     // Page.html期待形式に変換
     // 設定からヘッダー名を取得。setupStatus未完了時は安全なデフォルト値を使用。
-    var mainHeaderName;
+    /** @type {string|undefined} メインヘッダー名 */
+    let mainHeaderName;
     if (setupStatus === 'pending') {
       mainHeaderName = 'セットアップ中...';
     } else {
@@ -1453,7 +1483,12 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     }
 
     // その他のヘッダーフィールドも安全に取得
-    var reasonHeaderName, classHeaderName, nameHeaderName;
+    /** @type {string} 理由ヘッダー名 */
+    let reasonHeaderName;
+    /** @type {string} クラスヘッダー名 */
+    let classHeaderName;
+    /** @type {string} 名前ヘッダー名 */
+    let nameHeaderName;
     if (setupStatus === 'pending') {
       reasonHeaderName = 'セットアップ中...';
       classHeaderName = 'セットアップ中...';
@@ -1465,17 +1500,20 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     }
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
-    var headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
+    /** @type {Object} ヘッダーインデックス */
+    const headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
 
     // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
-    var mappedIndices = mapConfigToActualHeaders({
+    /** @type {Object} マップされたヘッダーインデックス */
+    const mappedIndices = mapConfigToActualHeaders({
       opinionHeader: mainHeaderName,
       reasonHeader: reasonHeaderName,
       classHeader: classHeaderName,
       nameHeader: nameHeaderName
     }, headerIndices);
 
-    var formattedData = formatSheetDataForFrontend(sheetData.data, mappedIndices, headerIndices, adminMode, isOwner, sheetData.displayMode);
+    /** @type {Array} フォーマット済みデータ */
+    const formattedData = formatSheetDataForFrontend(sheetData.data, mappedIndices, headerIndices, adminMode, isOwner, sheetData.displayMode);
     // ボードのタイトルを設定された質問文から取得（優先）、フォールバックで実際のヘッダー
     let headerTitle = publishedSheetName || '今日のお題';
     
@@ -1493,9 +1531,11 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       }
     }
 
-    var finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (configJson.displayMode || DISPLAY_MODES.ANONYMOUS);
+    /** @type {string} 最終表示モード */
+    const finalDisplayMode = (adminMode === true) ? DISPLAY_MODES.NAMED : (configJson.displayMode || DISPLAY_MODES.ANONYMOUS);
 
-    var result = {
+    /** @type {Object} レスポンス結果 */
+    const result = {
       header: headerTitle,
       sheetName: publishedSheetName,
       showCounts: (adminMode === true) ? true : (configJson.showCounts === true),
@@ -1530,9 +1570,11 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
   verifyUserAccess(requestUserId);
   try {
 
-    var currentUserId = requestUserId; // requestUserId を使用
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+    /** @type {Object} ユーザー情報 */
+    const userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
       useExecutionCache: true,
       ttl: 300
     });
@@ -1540,16 +1582,20 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
       warnLog('ConfigJson parse error in getSheetData:', parseError.message);
       configJson = {};
     }
-    var setupStatus = configJson.setupStatus || 'pending';
-    var publishedSpreadsheetId = configJson.publishedSpreadsheetId;
-    var publishedSheetName = configJson.publishedSheetName;
+    /** @type {string} セットアップ状態 */
+    const setupStatus = configJson.setupStatus || 'pending';
+    /** @type {string} 公開されたスプレッドシートID */
+    const publishedSpreadsheetId = configJson.publishedSpreadsheetId;
+    /** @type {string} 公開されたシート名 */
+    const publishedSheetName = configJson.publishedSheetName;
 
     if (!publishedSpreadsheetId || !publishedSheetName) {
       if (setupStatus === 'pending') {
@@ -1565,20 +1611,25 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     }
 
     // スプレッドシートとシートを取得
-    var ss = openSpreadsheetOptimized(publishedSpreadsheetId);
+    /** @type {Object} スプレッドシートオブジェクト */
+    const ss = openSpreadsheetOptimized(publishedSpreadsheetId);
 
-      var sheet = ss.getSheetByName(publishedSheetName);
+      /** @type {Object} 指定されたシート */
+      const sheet = ss.getSheetByName(publishedSheetName);
 
     if (!sheet) {
       throw new Error('指定されたシートが見つかりません: ' + publishedSheetName);
     }
 
-    var lastRow = sheet.getLastRow(); // スプレッドシートの最終行
-    var headerRow = 1; // ヘッダー行は1行目と仮定
+    /** @type {number} スプレッドシートの最終行 */
+    const lastRow = sheet.getLastRow(); // スプレッドシートの最終行
+    /** @type {number} ヘッダー行は1行目と仮定 */
+    const headerRow = 1; // ヘッダー行は1行目と仮定
 
     // 実際に読み込むべき開始行を計算 (sinceRowCountはデータ行数なので、+1してヘッダーを考慮)
     // sinceRowCountが0の場合、ヘッダーの次の行から読み込む
-    var startRowToRead = sinceRowCount + headerRow + 1;
+    /** @type {number} 読み取り開始行 */
+    let startRowToRead = sinceRowCount + headerRow + 1;
 
     // 新しいデータがない場合
     if (lastRow < startRowToRead) {
@@ -1596,23 +1647,33 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     }
 
     // 読み込む行数
-    var numRowsToRead = lastRow - startRowToRead + 1;
+    /** @type {number} 読み取る行数 */
+    const numRowsToRead = lastRow - startRowToRead + 1;
 
     // 必要なデータのみをスプレッドシートから直接取得
     // getRange(row, column, numRows, numColumns)
     // ここでは全列を取得すると仮定 (A列から最終列まで)
-    var lastColumn = sheet.getLastColumn();
-    var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
+    /** @type {number} 最終列番号 */
+    const lastColumn = sheet.getLastColumn();
+    /** @type {Array} 生のスプレッドシートデータ */
+    const rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
-    var headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
+    /** @type {Object} ヘッダーインデックス */
+    const headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
 
     // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
-    var sheetConfig = configJson['sheet_' + publishedSheetName] || {};
-    var mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
-    var reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
-    var classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
-    var nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
-    var mappedIndices = mapConfigToActualHeaders({
+    /** @type {Object} シート設定 */
+    const sheetConfig = configJson['sheet_' + publishedSheetName] || {};
+    /** @type {string} メインヘッダー名 */
+    const mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
+    /** @type {string} 理由ヘッダー名 */
+    const reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
+    /** @type {string} クラスヘッダー名 */
+    const classHeaderName = sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+    /** @type {string} 名前ヘッダー名 */
+    const nameHeaderName = sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+    /** @type {Object} マップされたヘッダーインデックス */
+    const mappedIndices = mapConfigToActualHeaders({
       opinionHeader: mainHeaderName,
       reasonHeader: reasonHeaderName,
       classHeader: classHeaderName,
@@ -1620,18 +1681,24 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     }, headerIndices);
 
     // ユーザー情報と管理者モードの取得
-    var isOwner = (configJson.ownerId === currentUserId);
-    var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+    /** @type {boolean} オーナー権限フラグ */
+    const isOwner = (configJson.ownerId === currentUserId);
+    /** @type {string} 表示モード */
+    const displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
 
     // 新しいデータを既存の処理パイプラインと同様に加工
-    var headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
-    var rosterMap = buildRosterMap([]); // roster is not used
-    var processedData = rawNewData.map(function(row, idx) {
+    /** @type {Array} ヘッダー行の値 */
+    const headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
+    /** @type {Map} 名簿マップ（未使用） */
+    const rosterMap = buildRosterMap([]); // roster is not used
+    /** @type {Array} 処理されたデータ */
+    const processedData = rawNewData.map(function(row, idx) {
       return processRowData(row, headers, headerIndices, rosterMap, displayMode, startRowToRead + idx, isOwner);
     });
 
     // 取得した生データをPage.htmlが期待する形式にフォーマット
-    var formattedNewData = formatSheetDataForFrontend(processedData, mappedIndices, headerIndices, adminMode, isOwner, displayMode);
+    /** @type {Array} フォーマット済みデータ */
+    const formattedNewData = formatSheetDataForFrontend(processedData, mappedIndices, headerIndices, adminMode, isOwner, displayMode);
 
     infoLog('✅ 増分データ取得完了: %s件の新しいデータを返します', formattedNewData.length);
 
@@ -1663,14 +1730,16 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
 function getAvailableSheets(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId; // requestUserId を使用
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
     if (!currentUserId) {
       warnLog('getAvailableSheets: No current user ID set');
       return [];
     }
 
-    var sheets = getSheetsList(currentUserId);
+    /** @type {Array} シートリスト */
+    const sheets = getSheetsList(currentUserId);
 
     if (!sheets || sheets.length === 0) {
       warnLog('getAvailableSheets: No sheets found for user:', currentUserId);
@@ -1697,16 +1766,20 @@ function getAvailableSheets(requestUserId) {
  */
 function getSheetsList(userId) {
   try {
-    var userInfo = findUserById(userId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(userId);
     if (!userInfo || !userInfo.spreadsheetId) {
       warnLog('getSheetsList: User info or spreadsheetId not found for userId:', userId);
       return [];
     }
 
-    var spreadsheet = openSpreadsheetOptimized(userInfo.spreadsheetId);
-    var sheets = spreadsheet.getSheets();
+    /** @type {Object} スプレッドシートオブジェクト */
+    const spreadsheet = openSpreadsheetOptimized(userInfo.spreadsheetId);
+    /** @type {Array} シート配列 */
+    const sheets = spreadsheet.getSheets();
 
-    var sheetList = sheets.map(function(sheet) {
+    /** @type {Array} シートリスト */
+    const sheetList = sheets.map(function(sheet) {
       return {
         name: sheet.getName(),
         id: sheet.getSheetId() // シートIDも必要に応じて取得
@@ -1729,9 +1802,11 @@ function getSheetsList(userId) {
 function refreshBoardData(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId; // requestUserId を使用
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1759,24 +1834,34 @@ function refreshBoardData(requestUserId) {
  */
 function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, adminMode, isOwner, displayMode) {
   // 現在のユーザーメールを取得（リアクション状態判定用）
-  var currentUserEmail = getCurrentUserEmail();
+  /** @type {string} 現在のユーザーメールアドレス */
+  const currentUserEmail = getCurrentUserEmail();
 
   return rawData.map(function(row, index) {
-    var classIndex = mappedIndices.classHeader;
-    var opinionIndex = mappedIndices.opinionHeader;
-    var reasonIndex = mappedIndices.reasonHeader;
-    var nameIndex = mappedIndices.nameHeader;
-    var nameValue = '';
-    var shouldShowName = (adminMode === true || displayMode === DISPLAY_MODES.NAMED || isOwner);
-    var hasNameIndex = nameIndex !== undefined;
-    var hasOriginalData = row.originalData && row.originalData.length > 0;
+    /** @type {number|undefined} クラス列インデックス */
+    const classIndex = mappedIndices.classHeader;
+    /** @type {number|undefined} 意見列インデックス */
+    const opinionIndex = mappedIndices.opinionHeader;
+    /** @type {number|undefined} 理由列インデックス */
+    const reasonIndex = mappedIndices.reasonHeader;
+    /** @type {number|undefined} 名前列インデックス */
+    const nameIndex = mappedIndices.nameHeader;
+    /** @type {string} 名前の値 */
+    let nameValue = '';
+    /** @type {boolean} 名前表示フラグ */
+    const shouldShowName = (adminMode === true || displayMode === DISPLAY_MODES.NAMED || isOwner);
+    /** @type {boolean} 名前列インデックスの存在フラグ */
+    const hasNameIndex = nameIndex !== undefined;
+    /** @type {boolean} 元データ存在フラグ */
+    const hasOriginalData = row.originalData && row.originalData.length > 0;
 
     if (shouldShowName && hasNameIndex && hasOriginalData) {
       nameValue = row.originalData[nameIndex] || '';
     }
 
     if (!nameValue && shouldShowName && hasOriginalData) {
-      var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+      /** @type {number|undefined} メールインデックス */
+      const emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
       if (emailIndex !== undefined && row.originalData[emailIndex]) {
         nameValue = row.originalData[emailIndex].split('@')[0];
       }
@@ -1784,15 +1869,21 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
 
     // リアクション状態を判定するヘルパー関数
     function checkReactionState(reactionKey) {
-      var columnName = COLUMN_HEADERS[reactionKey];
-      var columnIndex = headerIndices[columnName];
-      var count = 0;
-      var reacted = false;
+      /** @type {string} カラム名 */
+      const columnName = COLUMN_HEADERS[reactionKey];
+      /** @type {number|undefined} カラムインデックス */
+      const columnIndex = headerIndices[columnName];
+      /** @type {number} カウンター */
+    let count = 0;
+      /** @type {boolean} リアクション済みフラグ */
+      let reacted = false;
 
       if (columnIndex !== undefined && row.originalData && row.originalData[columnIndex]) {
-        var reactionString = row.originalData[columnIndex].toString();
+        /** @type {string} リアクション文字列 */
+        const reactionString = row.originalData[columnIndex].toString();
         if (reactionString) {
-          var reactions = parseReactionString(reactionString);
+          /** @type {Array} リアクション配列 */
+          const reactions = parseReactionString(reactionString);
           count = reactions.length;
           reacted = reactions.indexOf(currentUserEmail) !== -1;
         }
@@ -1809,14 +1900,17 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
     }
 
     // 理由列の値を取得
-    var reasonValue = '';
+    /** @type {string} 理由の値 */
+    let reasonValue = '';
     if (reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex] !== undefined) {
       reasonValue = row.originalData[reasonIndex] || '';
     }
 
     // 意見と理由の取得（マッピングが利用できない場合はprocessedRowから取得）
-    var opinionValue = '';
-    var finalReasonValue = reasonValue;
+    /** @type {string} 意見の値 */
+    let opinionValue = '';
+    /** @type {string} 最終理由値 */
+    let finalReasonValue = reasonValue;
 
     if (opinionIndex !== undefined && row.originalData && row.originalData[opinionIndex]) {
       opinionValue = row.originalData[opinionIndex];
@@ -1854,13 +1948,16 @@ function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, admin
 function getAppConfig(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId;
-    var userInfo = findUserById(currentUserId);
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId;
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -1874,15 +1971,20 @@ function getAppConfig(requestUserId) {
       configJson = healingResult.configJson;
     }
 
-    var sheets = getSheetsList(currentUserId);
-    var appUrls = generateUserUrls(currentUserId);
+    /** @type {Array} シートリスト */
+    const sheets = getSheetsList(currentUserId);
+    /** @type {Object} アプリケーションURL群 */
+    const appUrls = generateUserUrls(currentUserId);
 
     // 回答数を取得
-    var answerCount = 0;
-    var totalReactions = 0;
+    /** @type {number} 回答数 */
+    let answerCount = 0;
+    /** @type {number} 総リアクション数 */
+    let totalReactions = 0;
     try {
       if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
+        /** @type {Object} レスポンスデータ */
+        const responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
           // リアクション数の概算計算（詳細実装は後回し）
@@ -1987,15 +2089,18 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
       throw new Error('無効なconfigです: ' + config);
     }
 
-    var currentUserId = userId;
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = userId;
 
     // 最適化モード: 事前取得済みuserInfoを使用、なければ取得
-    var userInfo = options.userInfo || findUserById(currentUserId);
+    /** @type {Object} ユーザー情報 */
+    const userInfo = options.userInfo || findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -2004,7 +2109,8 @@ function saveSheetConfig(userId, spreadsheetId, sheetName, config, options = {})
     }
 
     // シート設定を更新
-    var sheetKey = 'sheet_' + sheetName;
+    /** @type {string} シートキー */
+    const sheetKey = 'sheet_' + sheetName;
     configJson[sheetKey] = {
       ...config,
       lastModified: new Date().toISOString()
@@ -2048,15 +2154,18 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
       throw new Error('無効なsheetNameです: ' + sheetName);
     }
 
-    var currentUserId = userId;
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = userId;
 
     // 最適化モード: 事前取得済みuserInfoを使用、なければ取得
-    var userInfo = options.userInfo || findUserById(currentUserId);
+    /** @type {Object} ユーザー情報 */
+    const userInfo = options.userInfo || findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -2084,7 +2193,8 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
 
 // include 関数は main.gs で定義されています
 function getResponsesData(userId, sheetName) {
-  var userInfo = getOrFetchUserInfo(userId, 'userId', {
+  /** @type {Object} ユーザー情報 */
+  const userInfo = getOrFetchUserInfo(userId, 'userId', {
     useExecutionCache: true,
     ttl: 300
   });
@@ -2093,12 +2203,17 @@ function getResponsesData(userId, sheetName) {
   }
 
   try {
-    var service = getSheetsServiceCached();
-    var spreadsheetId = userInfo.spreadsheetId;
-    var range = "'" + (sheetName || 'フォームの回答 1') + "'!A:Z";
+    /** @type {Object} Google Sheets APIサービス */
+    const service = getSheetsServiceCached();
+    /** @type {string} スプレッドシートID */
+    const spreadsheetId = userInfo.spreadsheetId;
+    /** @type {string} 範囲文字列 */
+    const range = "'" + (sheetName || 'フォームの回答 1') + "'!A:Z";
 
-    var response = batchGetSheetsData(service, spreadsheetId, [range]);
-    var values = response.valueRanges[0].values || [];
+    /** @type {Object} API応答データ */
+    const response = batchGetSheetsData(service, spreadsheetId, [range]);
+    /** @type {Array} スプレッドシート値の配列 */
+    const values = response.valueRanges[0].values || [];
 
     if (values.length === 0) {
       return { status: 'success', data: [], headers: [] };
@@ -2191,14 +2306,17 @@ function getCurrentUserStatus(requestUserId = null) {
 function getActiveFormInfo(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId; // requestUserId を使用
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -2207,10 +2325,12 @@ function getActiveFormInfo(requestUserId) {
     }
 
     // フォーム回答数を取得
-    var answerCount = 0;
+    /** @type {number} 回答数 */
+    let answerCount = 0;
     try {
       if (configJson.publishedSpreadsheetId && configJson.publishedSheet) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheet);
+        /** @type {Object} レスポンスデータ */
+        const responseData = getResponsesData(currentUserId, configJson.publishedSheet);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
         }
@@ -2345,14 +2465,17 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
 function updateFormSettings(requestUserId, title, description) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId; // requestUserId を使用
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -2362,8 +2485,10 @@ function updateFormSettings(requestUserId, title, description) {
 
     if (configJson.editFormUrl) {
       try {
-        var formId = extractFormIdFromUrl(configJson.editFormUrl);
-        var form = FormApp.openById(formId);
+        /** @type {string} フォームID */
+        const formId = extractFormIdFromUrl(configJson.editFormUrl);
+        /** @type {Object} Google Form オブジェクト */
+        const form = FormApp.openById(formId);
 
         if (title) {
           form.setTitle(title);
@@ -2396,14 +2521,17 @@ function updateFormSettings(requestUserId, title, description) {
 function saveSystemConfig(requestUserId, config) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId; // requestUserId を使用
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -2441,9 +2569,11 @@ function saveSystemConfig(requestUserId, config) {
 function toggleHighlight(requestUserId, rowIndex, sheetName) {
   verifyUserAccess(requestUserId);
   try {
-    var currentUserId = requestUserId; // requestUserId を使用
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = findUserById(currentUserId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -2453,7 +2583,8 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
       throw new Error('ハイライト機能は管理者のみ使用できます');
     }
 
-    var result = processHighlightToggle(
+    /** @type {Object} 処理結果 */
+    const result = processHighlightToggle(
       userInfo.spreadsheetId,
       sheetName || 'フォームの回答 1',
       rowIndex
@@ -2493,29 +2624,39 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
  * @returns {object} 作成されたファイル情報
  */
 function createQuickStartFiles(setupContext) {
-  var userEmail = setupContext.userEmail;
-  var requestUserId = setupContext.requestUserId;
+  /** @type {string} セットアップコンテキストからのユーザーメール */
+  const userEmail = setupContext.userEmail;
+  /** @type {string} セットアップコンテキストからのリクエストユーザーID */
+  const requestUserId = setupContext.requestUserId;
 
   // ステップ1: ユーザー専用フォルダを作成
-  var folder = createUserFolder(userEmail);
+  /** @type {Object} ユーザーフォルダ */
+    const folder = createUserFolder(userEmail);
 
   // ステップ2: Googleフォームとスプレッドシートを作成
-  var formAndSsInfo = createUnifiedForm('study', userEmail, requestUserId);
+  /** @type {Object} フォーム・スプレッドシート作成情報 */
+    const formAndSsInfo = createUnifiedForm('study', userEmail, requestUserId);
 
   // 作成したファイルをフォルダに移動（改善版：冗長処理除去と安全な移動処理）
   if (folder) {
-    var moveResults = { form: false, spreadsheet: false };
-    var moveErrors = [];
+    /** @type {Object} 移動結果 */
+    const moveResults = { form: false, spreadsheet: false };
+    /** @type {Array} 移動エラー */
+    const moveErrors = [];
 
     try {
-      var formFile = DriveApp.getFileById(formAndSsInfo.formId);
-      var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
+      /** @type {Object} フォームファイル */
+      const formFile = DriveApp.getFileById(formAndSsInfo.formId);
+      /** @type {Object} スプレッドシートファイル */
+      const ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
 
       // フォームファイルの移動処理
       try {
         // 既にフォルダに存在するかチェック（重複移動を防止）
-        var formParents = formFile.getParents();
-        var isFormAlreadyInFolder = false;
+        /** @type {Object} フォーム親フォルダー */
+        const formParents = formFile.getParents();
+        /** @type {boolean} フォームが既にフォルダーに存在するか */
+        let isFormAlreadyInFolder = false;
 
         while (formParents.hasNext()) {
           if (formParents.next().getId() === folder.getId()) {
@@ -2542,8 +2683,10 @@ function createQuickStartFiles(setupContext) {
       // スプレッドシートファイルの移動処理
       try {
         // 既にフォルダに存在するかチェック（重複移動を防止）
-        var ssParents = ssFile.getParents();
-        var isSsAlreadyInFolder = false;
+        /** @type {Object} スプレッドシート親フォルダー */
+        const ssParents = ssFile.getParents();
+        /** @type {boolean} スプレッドシートが既にフォルダーに存在するか */
+        let isSsAlreadyInFolder = false;
 
         while (ssParents.hasNext()) {
           if (ssParents.next().getId() === folder.getId()) {
@@ -2596,14 +2739,21 @@ function createQuickStartFiles(setupContext) {
  * @returns {object} 更新された設定オブジェクト
  */
 function updateQuickStartDatabase(setupContext, createdFiles) {
-  var requestUserId = setupContext.requestUserId;
-  var configJson = setupContext.configJson;
-  var userEmail = setupContext.userEmail;
-  var formAndSsInfo = createdFiles.formAndSsInfo;
-  var folder = createdFiles.folder;
+  /** @type {string} セットアップコンテキストからのリクエストユーザーID */
+  const requestUserId = setupContext.requestUserId;
+  /** @type {Object} セットアップコンテキストからの設定JSON */
+  const configJson = setupContext.configJson;
+  /** @type {string} セットアップコンテキストからのユーザーメール */
+  const userEmail = setupContext.userEmail;
+  /** @type {Object} フォーム・スプレッドシート情報 */
+  const formAndSsInfo = createdFiles.formAndSsInfo;
+  /** @type {Object} 作成されたフォルダ */
+  const folder = createdFiles.folder;
   // クイックスタート用の適切な初期設定を作成（guessedConfig形式）
-  var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
-  var quickStartSheetConfig = {
+  /** @type {string} シート設定キー */
+  const sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
+  /** @type {Object} クイックスタートシート設定 */
+  const quickStartSheetConfig = {
     // 実際の設定値（フロントエンドで使用される）
     opinionHeader: DEFAULT_MAIN_QUESTION,
     reasonHeader: DEFAULT_REASON_QUESTION,
@@ -2629,7 +2779,8 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
     flowType: 'quickstart' // 作成フロー識別用
   };
   // 型安全性確保: publishedSheetNameの明示的文字列変換
-  var safeSheetName = formAndSsInfo.sheetName;
+  /** @type {string} 安全なシート名 */
+  let safeSheetName = formAndSsInfo.sheetName;
   if (typeof safeSheetName !== 'string') {
     errorLog('❌ quickStartSetup: formAndSsInfo.sheetNameが文字列ではありません:', typeof safeSheetName, safeSheetName);
     safeSheetName = String(safeSheetName); // 強制的に文字列化
@@ -2640,11 +2791,15 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   }
 
   // 6時間自動停止機能の設定
-  var publishedAt = new Date().toISOString();
-  var autoStopMinutes = 360; // 6時間 = 360分
-  var scheduledEndAt = new Date(Date.now() + (autoStopMinutes * 60 * 1000)).toISOString();
+  /** @type {string} 公開日時 */
+  const publishedAt = new Date().toISOString();
+  /** @type {number} 自動停止分数 */
+  const autoStopMinutes = 360; // 6時間 = 360分
+  /** @type {string} スケジュール終了日時 */
+  const scheduledEndAt = new Date(Date.now() + (autoStopMinutes * 60 * 1000)).toISOString();
 
-  var updatedConfig = {
+  /** @type {Object} 更新された設定 */
+  const updatedConfig = {
     ...configJson,
     setupStatus: 'completed',
     formCreated: true,
@@ -2669,7 +2824,8 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   };
 
   // ユーザーデータベースを新しいセットアップ情報で完全に更新
-  var updateData = {
+  /** @type {Object} 更新データ */
+  const updateData = {
     spreadsheetId: formAndSsInfo.spreadsheetId,
     spreadsheetUrl: formAndSsInfo.spreadsheetUrl,
     configJson: JSON.stringify(updatedConfig),
@@ -2689,7 +2845,8 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   // 少し待ってからデータベースを確認（更新の反映を待つ）
   Utilities.sleep(500);
 
-  var verificationUserInfo = findUserByIdFresh(requestUserId);
+  /** @type {Object} 検証ユーザー情報 */
+  const verificationUserInfo = findUserByIdFresh(requestUserId);
 
   if (verificationUserInfo && verificationUserInfo.spreadsheetId === formAndSsInfo.spreadsheetId) {
     infoLog('✅ データベース更新検証成功: 新しいスプレッドシートID確認');
@@ -2787,28 +2944,36 @@ function performAutoPublish(requestUserId, sheetName) {
  * @returns {object} 成功レスポンス
  */
 function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, publishResult) {
-  var requestUserId = setupContext.requestUserId;
-  var formAndSsInfo = createdFiles.formAndSsInfo;
+  /** @type {string} セットアップコンテキストからのリクエストユーザーID */
+  const requestUserId = setupContext.requestUserId;
+  /** @type {Object} フォーム・スプレッドシート情報 */
+  const formAndSsInfo = createdFiles.formAndSsInfo;
 
   // 最終検証：新規作成されたファイルの確認
 
   // 公開結果の検証
-  var isPublished = publishResult && publishResult.success && publishResult.published;
-  var publishMessage = isPublished 
+  /** @type {boolean} 公開状態 */
+  const isPublished = publishResult && publishResult.success && publishResult.published;
+  /** @type {string} 公開メッセージ */
+  const publishMessage = isPublished 
     ? '回答ボードが自動的に公開されました！' 
     : '回答ボードが作成されました。管理パネルから手動で公開してください。';
 
   infoLog('✅ クイックスタートセットアップ完了: ' + requestUserId);
 
-  var appUrls = generateUserUrls(requestUserId);
+  /** @type {Object} アプリケーションURL */
+  const appUrls = generateUserUrls(requestUserId);
   
   // シート設定データの取得
-  var sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
-  var sheetConfig = updatedConfig[sheetConfigKey] || {};
+  /** @type {string} シート設定キー */
+  const sheetConfigKey = 'sheet_' + formAndSsInfo.sheetName;
+  /** @type {Object} シート設定 */
+  const sheetConfig = updatedConfig[sheetConfigKey] || {};
   
   // 拡張されたレスポンス情報
   // 統一スキーマでの戻り値構造
-  var response = {
+  /** @type {Object} レスポンスオブジェクト */
+  const response = {
     status: 'success',
     message: 'クイックスタートが完了しました！' + publishMessage,
     data: {
@@ -2854,19 +3019,22 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig, p
 function initializeQuickStartContext(requestUserId) {
 
   // ユーザー情報の取得
-  var userInfo = findUserById(requestUserId);
+  /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(requestUserId);
   if (!userInfo) {
     throw new Error('ユーザー情報が見つかりません');
   }
 
-  var configJson = {};
+  /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
   try {
     configJson = JSON.parse(userInfo.configJson || '{}');
   } catch (parseError) {
     warnLog('ConfigJson parse error in initializeQuickStartContext:', parseError.message);
     configJson = {};
   }
-  var userEmail = userInfo.adminEmail;
+  /** @type {string} ユーザーメールアドレス */
+  const userEmail = userInfo.adminEmail;
 
   // クイックスタート繰り返し実行を許可
   // 既存のセットアップがある場合は完全にリセットして新しいセットアップで上書きする
@@ -2914,28 +3082,38 @@ function quickStartSetup(requestUserId) {
   try {
     
     // ステップ0: セットアップコンテキストを初期化
-    var setupContext = initializeQuickStartContext(requestUserId);
-    var configJson = setupContext.configJson;
-    var userEmail = setupContext.userEmail;
-    var userInfo = setupContext.userInfo;
+    /** @type {Object} セットアップコンテキスト */
+    const setupContext = initializeQuickStartContext(requestUserId);
+    /** @type {Object} セットアップコンテキストからの設定JSON */
+  const configJson = setupContext.configJson;
+    /** @type {string} セットアップコンテキストからのユーザーメール */
+  const userEmail = setupContext.userEmail;
+    /** @type {Object} セットアップコンテキストからのユーザー情報 */
+    const userInfo = setupContext.userInfo;
 
     // ステップ1-2: ファイル作成とフォルダ管理を実行
-    var createdFiles = createQuickStartFiles(setupContext);
-    var formAndSsInfo = createdFiles.formAndSsInfo;
-    var folder = createdFiles.folder;
+    /** @type {Object} 作成されたファイル情報 */
+    const createdFiles = createQuickStartFiles(setupContext);
+    /** @type {Object} フォーム・スプレッドシート情報 */
+  const formAndSsInfo = createdFiles.formAndSsInfo;
+    /** @type {Object} 作成されたフォルダ */
+  const folder = createdFiles.folder;
 
     // ステップ3: データベース更新とキャッシュ管理を実行
-    var updatedConfig = updateQuickStartDatabase(setupContext, createdFiles);
+    /** @type {Object} 更新された設定 */
+    const updatedConfig = updateQuickStartDatabase(setupContext, createdFiles);
 
     // ステップ4: 自動公開処理（重要な新機能）
-    var publishResult = performAutoPublish(requestUserId, formAndSsInfo.sheetName);
+    /** @type {Object} 自動公開結果 */
+    const publishResult = performAutoPublish(requestUserId, formAndSsInfo.sheetName);
 
     // ステップ5: キャッシュクリアと最終化
     clearExecutionUserInfoCache();
     invalidateUserCache(requestUserId, userEmail, createdFiles.formAndSsInfo.spreadsheetId, true);
 
     // ステップ6: 最終レスポンス生成
-    var finalResponse = generateQuickStartResponse(setupContext, createdFiles, updatedConfig, publishResult);
+    /** @type {Object} 最終レスポンス */
+    const finalResponse = generateQuickStartResponse(setupContext, createdFiles, updatedConfig, publishResult);
     
     return finalResponse;
 
@@ -2944,7 +3122,8 @@ function quickStartSetup(requestUserId) {
 
     // エラー時はセットアップ状態をリセット
     try {
-      var currentConfig = JSON.parse(userInfo.configJson || '{}');
+      /** @type {Object} 現在の設定 */
+      let currentConfig = JSON.parse(userInfo.configJson || '{}');
       currentConfig.setupStatus = 'error';
       currentConfig.lastError = e.message;
       currentConfig.errorAt = new Date().toISOString();
@@ -2974,12 +3153,16 @@ function quickStartSetup(requestUserId) {
  */
 function createUserFolder(userEmail) {
   try {
-    var rootFolderName = "StudyQuest - ユーザーデータ";
-    var userFolderName = "StudyQuest - " + userEmail + " - ファイル";
+    /** @type {string} ルートフォルダ名 */
+    const rootFolderName = "StudyQuest - ユーザーデータ";
+    /** @type {string} ユーザーフォルダ名 */
+    const userFolderName = "StudyQuest - " + userEmail + " - ファイル";
 
     // ルートフォルダを検索または作成
-    var rootFolder;
-    var folders = DriveApp.getFoldersByName(rootFolderName);
+    /** @type {Object|undefined} ルートフォルダ */
+    let rootFolder;
+    /** @type {Object} フォルダイテレータ */
+    const folders = DriveApp.getFoldersByName(rootFolderName);
     if (folders.hasNext()) {
       rootFolder = folders.next();
     } else {
@@ -2987,7 +3170,8 @@ function createUserFolder(userEmail) {
     }
 
     // ユーザー専用フォルダを作成
-    var userFolders = rootFolder.getFoldersByName(userFolderName);
+    /** @type {Object} ユーザーフォルダイテレータ */
+    const userFolders = rootFolder.getFoldersByName(userFolderName);
     if (userFolders.hasNext()) {
       return userFolders.next(); // 既存フォルダを返す
     } else {
@@ -3005,18 +3189,24 @@ function createUserFolder(userEmail) {
  */
 function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
   try {
-    var service = getSheetsServiceCached();
-    var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
-    var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+    /** @type {Object} Google Sheets APIサービス */
+    const service = getSheetsServiceCached();
+    /** @type {Object} ヘッダーインデックス */
+    const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+    /** @type {number} ハイライト列インデックス */
+    const highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
 
     if (highlightColumnIndex === undefined) {
       throw new Error('ハイライト列が見つかりません');
     }
 
     // 現在の値を取得
-    var range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
-    var response = batchGetSheetsData(service, spreadsheetId, [range]);
-    var isHighlighted = false;
+    /** @type {string} ハイライト列のレンジ */
+    const range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
+    /** @type {Object} API応答データ */
+    const response = batchGetSheetsData(service, spreadsheetId, [range]);
+    /** @type {boolean} ハイライト状態 */
+    let isHighlighted = false;
     if (response && response.valueRanges && response.valueRanges[0] &&
         response.valueRanges[0].values && response.valueRanges[0].values[0] &&
         response.valueRanges[0].values[0][0]) {
@@ -3024,7 +3214,8 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
     }
 
     // 値を切り替え
-    var newValue = isHighlighted ? 'false' : 'true';
+    /** @type {string} 新しい値 */
+    const newValue = isHighlighted ? 'false' : 'true';
     updateSheetsData(service, spreadsheetId, range, [[newValue]]);
 
     // ハイライト更新後のキャッシュ無効化
@@ -3054,14 +3245,17 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
 // getWebAppUrl function removed - now using the unified version from url.gs
 function getHeaderIndices(spreadsheetId, sheetName) {
 
-  var cacheKey = 'hdr_' + spreadsheetId + '_' + sheetName;
-  var indices = getHeadersCached(spreadsheetId, sheetName);
+  /** @type {string} キャッシュキー */
+  const cacheKey = 'hdr_' + spreadsheetId + '_' + sheetName;
+  /** @type {Object} インデックス */
+  let indices = getHeadersCached(spreadsheetId, sheetName);
 
   // 理由列が取得できていない場合のみキャッシュを無効化して再取得
   if (!indices || indices[COLUMN_HEADERS.REASON] === undefined) {
     cacheManager.remove(cacheKey);
     // 直接再取得は避け、getHeadersCachedの内部ロジックに委譲
-    var refreshedIndices = getHeadersCached(spreadsheetId, sheetName);
+    /** @type {Object} 更新されたインデックス */
+    const refreshedIndices = getHeadersCached(spreadsheetId, sheetName);
     if (refreshedIndices && Object.keys(refreshedIndices).length > 0) {
       indices = refreshedIndices;
     }
@@ -3073,27 +3267,33 @@ function getHeaderIndices(spreadsheetId, sheetName) {
 function getSheetColumns(userId, sheetId) {
   verifyUserAccess(userId);
   try {
-    var userInfo = findUserById(userId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(userId);
     if (!userInfo || !userInfo.spreadsheetId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
 
-    var spreadsheet = openSpreadsheetOptimized(userInfo.spreadsheetId);
-    var sheet = spreadsheet.getSheetById(sheetId);
+    /** @type {Object} スプレッドシートオブジェクト */
+    const spreadsheet = openSpreadsheetOptimized(userInfo.spreadsheetId);
+    /** @type {Object} シートオブジェクト */
+    const sheet = spreadsheet.getSheetById(sheetId);
 
     if (!sheet) {
       throw new Error('指定されたシートが見つかりません: ' + sheetId);
     }
 
-    var lastColumn = sheet.getLastColumn();
+    /** @type {number} 最終列番号 */
+    const lastColumn = sheet.getLastColumn();
     if (lastColumn === 0) {
       return []; // 列がない場合
     }
 
-    var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    /** @type {Array} ヘッダー配列 */
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
 
     // クライアントサイドが期待する形式に変換
-    var columns = headers.map(function(headerName) {
+    /** @type {Array} カラム配列 */
+    const columns = headers.map(function(headerName) {
       return {
         id: headerName,
         name: headerName
@@ -3118,13 +3318,15 @@ function extractFormIdFromUrl(url) {
 
   try {
     // Regular expression to extract form ID from Google Forms URLs
-    var formIdMatch = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+    /** @type {Array|null} フォームIDマッチ */
+    const formIdMatch = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
     if (formIdMatch && formIdMatch[1]) {
       return formIdMatch[1];
     }
 
     // Alternative pattern for e/ URLs
-    var eFormIdMatch = url.match(/\/forms\/d\/e\/([a-zA-Z0-9-_]+)/);
+    /** @type {Array|null} eフォームIDマッチ */
+    const eFormIdMatch = url.match(/\/forms\/d\/e\/([a-zA-Z0-9-_]+)/);
     if (eFormIdMatch && eFormIdMatch[1]) {
       return eFormIdMatch[1];
     }
@@ -3148,20 +3350,28 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
     // 統一ロック管理でリアクション処理を実行
     return executeWithStandardizedLock('WRITE_OPERATION', 'processReaction', () => {
 
-      var service = getSheetsServiceCached();
-      var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+      /** @type {Object} Google Sheets APIサービス */
+    const service = getSheetsServiceCached();
+      /** @type {Object} ヘッダーインデックス */
+      const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
 
       // すべてのリアクション列を取得してユーザーの重複リアクションをチェック
-      var allReactionRanges = [];
-      var allReactionColumns = {};
-      var targetReactionColumnIndex = null;
+      /** @type {Array} 全リアクション範囲 */
+      const allReactionRanges = [];
+      /** @type {Object} 全リアクションカラム */
+      const allReactionColumns = {};
+      /** @type {number|null} ターゲットリアクションカラムインデックス */
+      let targetReactionColumnIndex = null;
 
       // 全リアクション列の情報を準備
       REACTION_KEYS.forEach(function(key) {
-        var columnName = COLUMN_HEADERS[key];
-        var columnIndex = headerIndices[columnName];
+        /** @type {string} カラム名 */
+        const columnName = COLUMN_HEADERS[key];
+        /** @type {number|undefined} カラムインデックス */
+        const columnIndex = headerIndices[columnName];
         if (columnIndex !== undefined) {
-          var range = "'" + sheetName + "'!" + String.fromCharCode(65 + columnIndex) + rowIndex;
+          /** @type {string} 範囲文字列 */
+          const range = "'" + sheetName + "'!" + String.fromCharCode(65 + columnIndex) + rowIndex;
           allReactionRanges.push(range);
           allReactionColumns[key] = {
             columnIndex: columnIndex,
@@ -3178,25 +3388,33 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       }
 
       // 全リアクション列の現在の値を一括取得
-      var response = batchGetSheetsData(service, spreadsheetId, allReactionRanges);
-      var updateData = [];
-      var userAction = null;
-      var targetCount = 0;
+      /** @type {Object} APIレスポンス */
+      const response = batchGetSheetsData(service, spreadsheetId, allReactionRanges);
+      /** @type {Array} 更新データ */
+      const updateData = [];
+      /** @type {string|null} ユーザーアクション */
+      let userAction = null;
+      /** @type {number} ターゲットカウント */
+      let targetCount = 0;
 
       // 各リアクション列を処理
-      var rangeIndex = 0;
+      /** @type {number} 範囲インデックス */
+      let rangeIndex = 0;
       REACTION_KEYS.forEach(function(key) {
         if (!allReactionColumns[key]) return;
 
-        var currentReactionString = '';
+        /** @type {string} 現在のリアクション文字列 */
+        let currentReactionString = '';
         if (response && response.valueRanges && response.valueRanges[rangeIndex] &&
             response.valueRanges[rangeIndex].values && response.valueRanges[rangeIndex].values[0] &&
             response.valueRanges[rangeIndex].values[0][0]) {
           currentReactionString = response.valueRanges[rangeIndex].values[0][0];
         }
 
-        var currentReactions = parseReactionString(currentReactionString);
-        var userIndex = currentReactions.indexOf(reactingUserEmail);
+        /** @type {Array} 現在のリアクション */
+        const currentReactions = parseReactionString(currentReactionString);
+        /** @type {number} ユーザーインデックス */
+        const userIndex = currentReactions.indexOf(reactingUserEmail);
 
         if (key === reactionKey) {
           // 対象リアクション列の処理
@@ -3218,7 +3436,8 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
         }
 
         // 更新データを準備
-        var updatedReactionString = currentReactions.join(', ');
+        /** @type {string} 更新されたリアクション文字列 */
+        const updatedReactionString = currentReactions.join(', ');
         updateData.push({
           range: allReactionColumns[key].range,
           values: [[updatedReactionString]]
@@ -3242,14 +3461,18 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       }
 
       // 更新後のリアクション状態を計算（追加のAPI呼び出しなし）
-      var reactionStates = {};
-      var updateIndex = 0;
+      /** @type {Object} リアクション状態 */
+      const reactionStates = {};
+      /** @type {number} 更新インデックス */
+      let updateIndex = 0;
       REACTION_KEYS.forEach(function(key) {
         if (!allReactionColumns[key]) return;
         
         // 更新データから最終状態を取得
-        var updatedReactionString = updateData[updateIndex].values[0][0];
-        var updatedReactions = parseReactionString(updatedReactionString);
+        /** @type {string} 更新されたリアクション文字列 */
+        const updatedReactionString = updateData[updateIndex].values[0][0];
+        /** @type {Array} 更新されたリアクション */
+        const updatedReactions = parseReactionString(updatedReactionString);
         
         reactionStates[key] = {
           count: updatedReactions.length,
@@ -3299,19 +3522,26 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
  */
 function createFormFactory(options) {
   try {
-    var userEmail = options.userEmail;
-    var userId = options.userId;
-    var formDescription = options.formDescription || 'みんなの回答ボードへの投稿フォームです。';
+    /** @type {string} ユーザーメール */
+    const userEmail = options.userEmail;
+    /** @type {string} ユーザーID */
+    const userId = options.userId;
+    /** @type {string} フォーム説明 */
+    const formDescription = options.formDescription || 'みんなの回答ボードへの投稿フォームです。';
 
     // タイムスタンプ生成（日時を含む）
-    var now = new Date();
-    var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
+    /** @type {Date} 現在日時 */
+    const now = new Date();
+    /** @type {string} 日時文字列 */
+    const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
 
     // フォームタイトル生成
-    var formTitle = options.formTitle || ('みんなの回答ボード ' + dateTimeString);
+    /** @type {string} フォームタイトル */
+    const formTitle = options.formTitle || ('みんなの回答ボード ' + dateTimeString);
 
     // フォーム作成
-    var form = FormApp.create(formTitle);
+    /** @type {Object} 新規作成されたGoogle Form */
+    const form = FormApp.create(formTitle);
     form.setDescription(formDescription);
     
     // フォームを即座にユーザーフォルダに移動（作成直後）
@@ -3340,7 +3570,8 @@ function createFormFactory(options) {
     }
 
     // スプレッドシート作成
-    var spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
+    /** @type {Object} スプレッドシート結果 */
+    const spreadsheetResult = createLinkedSpreadsheet(userEmail, form, dateTimeString);
 
     // リアクション関連列を追加
     addReactionColumnsToSpreadsheet(spreadsheetResult.spreadsheetId, spreadsheetResult.sheetName);
@@ -3369,28 +3600,34 @@ function createFormFactory(options) {
  */
 function addUnifiedQuestions(form, questionType, customConfig) {
   try {
-    var config = getQuestionConfig(questionType, customConfig);
+    /** @type {Object} 設定オブジェクト */
+    const config = getQuestionConfig(questionType, customConfig);
 
     form.setCollectEmail(false);
 
     if (questionType === 'simple') {
-      var classItem = form.addListItem();
+      /** @type {Object} クラスアイテム */
+      const classItem = form.addListItem();
       classItem.setTitle(config.classQuestion.title);
       classItem.setChoiceValues(config.classQuestion.choices);
       classItem.setRequired(true);
 
-      var nameItem = form.addTextItem();
+      /** @type {Object} 名前アイテム */
+      const nameItem = form.addTextItem();
       nameItem.setTitle(config.nameQuestion.title);
       nameItem.setRequired(true);
 
-      var mainItem = form.addTextItem();
+      /** @type {Object} メインアイテム */
+      const mainItem = form.addTextItem();
       mainItem.setTitle(config.mainQuestion.title);
       mainItem.setRequired(true);
 
-      var reasonItem = form.addParagraphTextItem();
+      /** @type {Object} 理由アイテム */
+      const reasonItem = form.addParagraphTextItem();
       reasonItem.setTitle(config.reasonQuestion.title);
       reasonItem.setHelpText(config.reasonQuestion.helpText);
-      var validation = FormApp.createParagraphTextValidation()
+      /** @type {Object} バリデーション */
+      const validation = FormApp.createParagraphTextValidation()
         .requireTextLengthLessThanOrEqualTo(140)
         .build();
       reasonItem.setValidation(validation);
@@ -3399,21 +3636,26 @@ function addUnifiedQuestions(form, questionType, customConfig) {
 
       // クラス選択肢（有効な場合のみ）
       if (customConfig.enableClass && customConfig.classQuestion && customConfig.classQuestion.choices && customConfig.classQuestion.choices.length > 0) {
-        var classItem = form.addListItem();
+        /** @type {Object} クラスアイテム */
+        const classItem = form.addListItem();
         classItem.setTitle('クラス');
         classItem.setChoiceValues(customConfig.classQuestion.choices);
         classItem.setRequired(true);
       }
 
       // 名前欄（常にオン）
-      var nameItem = form.addTextItem();
+      /** @type {Object} 名前アイテム */
+      const nameItem = form.addTextItem();
       nameItem.setTitle('名前');
       nameItem.setRequired(false);
 
       // メイン質問
-      var mainQuestionTitle = customConfig.mainQuestion ? customConfig.mainQuestion.title : '今回のテーマについて、あなたの考えや意見を聞かせてください';
-      var mainItem;
-      var questionType = customConfig.mainQuestion ? customConfig.mainQuestion.type : 'text';
+      /** @type {string} メイン質問タイトル */
+      const mainQuestionTitle = customConfig.mainQuestion ? customConfig.mainQuestion.title : '今回のテーマについて、あなたの考えや意見を聞かせてください';
+      /** @type {Object|undefined} メインアイテム */
+      let mainItem;
+      /** @type {string} 質問タイプ */
+      const questionType = customConfig.mainQuestion ? customConfig.mainQuestion.type : 'text';
 
       switch(questionType) {
         case 'text':
@@ -3444,26 +3686,31 @@ function addUnifiedQuestions(form, questionType, customConfig) {
       mainItem.setRequired(true);
 
       // 理由欄（常にオン）
-      var reasonItem = form.addParagraphTextItem();
+      /** @type {Object} 理由アイテム */
+      const reasonItem = form.addParagraphTextItem();
       reasonItem.setTitle('そう考える理由や体験があれば教えてください。');
       reasonItem.setRequired(false);
     } else {
-      var classItem = form.addTextItem();
+      /** @type {Object} クラスアイテム */
+      const classItem = form.addTextItem();
       classItem.setTitle(config.classQuestion.title);
       classItem.setHelpText(config.classQuestion.helpText);
       classItem.setRequired(true);
 
-      var mainItem = form.addParagraphTextItem();
+      /** @type {Object} メインアイテム */
+      const mainItem = form.addParagraphTextItem();
       mainItem.setTitle(config.mainQuestion.title);
       mainItem.setHelpText(config.mainQuestion.helpText);
       mainItem.setRequired(true);
 
-      var reasonItem = form.addParagraphTextItem();
+      /** @type {Object} 理由アイテム */
+      const reasonItem = form.addParagraphTextItem();
       reasonItem.setTitle(config.reasonQuestion.title);
       reasonItem.setHelpText(config.reasonQuestion.helpText);
       reasonItem.setRequired(false);
 
-      var nameItem = form.addTextItem();
+      /** @type {Object} 名前アイテム */
+      const nameItem = form.addTextItem();
       nameItem.setTitle(config.nameQuestion.title);
       nameItem.setHelpText(config.nameQuestion.helpText);
       nameItem.setRequired(false);
@@ -3482,7 +3729,8 @@ function addUnifiedQuestions(form, questionType, customConfig) {
  */
 function getQuestionConfig(questionType, customConfig) {
   // 統一されたテンプレート設定（simple のみ使用）
-  var config = {
+  /** @type {Object} 設定オブジェクト */
+  const config = {
     classQuestion: {
       title: 'クラス',
       helpText: '',
@@ -3547,13 +3795,16 @@ function doGetQuestionConfig() {
  */
 function saveClassChoices(userId, classChoices) {
   try {
-    var currentUserId = userId;
-    var userInfo = findUserById(currentUserId);
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = userId;
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -3579,20 +3830,24 @@ function saveClassChoices(userId, classChoices) {
  */
 function getSavedClassChoices(userId) {
   try {
-    var currentUserId = userId;
-    var userInfo = findUserById(currentUserId);
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = userId;
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(currentUserId);
     if (!userInfo) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
 
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
       warnLog('ConfigJson parse error in getSavedClassChoices:', parseError.message);
       configJson = {};
     }
-    var savedClassChoices = configJson.savedClassChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4'];
+    /** @type {Array} 保存されたクラス選択肢 */
+    const savedClassChoices = configJson.savedClassChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4'];
 
     return {
       status: 'success',
@@ -3685,11 +3940,14 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
 function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
   try {
     // スプレッドシート名を設定
-    var spreadsheetName = userEmail + ' - 回答データ - ' + dateTimeString;
+    /** @type {string} スプレッドシート名 */
+    const spreadsheetName = userEmail + ' - 回答データ - ' + dateTimeString;
 
     // 新しいスプレッドシートを作成
-    var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
-    var spreadsheetId = spreadsheetObj.getId();
+    /** @type {Object} スプレッドシートオブジェクト */
+    const spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
+    /** @type {string} スプレッドシートID */
+    const spreadsheetId = spreadsheetObj.getId();
 
     // スプレッドシートを即座にユーザーフォルダに移動（作成直後）
     try {
@@ -3704,7 +3962,8 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
 
     // スプレッドシートの共有設定を同一ドメイン閲覧可能に設定
     try {
-      var file = DriveApp.getFileById(spreadsheetId);
+      /** @type {Object} ファイルオブジェクト */
+      const file = DriveApp.getFileById(spreadsheetId);
       if (!file) {
         throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
       }
@@ -3730,8 +3989,10 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     // スプレッドシートを再読み込みして最新のシート情報を取得
     try {
       spreadsheetObj = SpreadsheetApp.openById(spreadsheetId);
-      var sheets = spreadsheetObj.getSheets();
-      var actualSheetName = String(sheets[0].getName());
+      /** @type {Array} シート配列 */
+      const sheets = spreadsheetObj.getSheets();
+      /** @type {string} 実際のシート名 */
+      const actualSheetName = String(sheets[0].getName());
       
       // シート名が不正な値でないことを確認
       if (!actualSheetName || actualSheetName === 'true' || actualSheetName.trim() === '') {
@@ -3739,13 +4000,15 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
         warnLog('不正なシート名が検出されました。デフォルトのシート名を使用します: ' + actualSheetName);
       }
       
-      var sheetName = actualSheetName;
+      /** @type {string} シート名 */
+      const sheetName = actualSheetName;
       infoLog('✅ フォーム連携後の正確なシート名を取得:', sheetName);
       
     } catch (sheetNameError) {
       errorLog('❌ フォーム連携後のシート名取得エラー:', sheetNameError.message);
       // フォールバック: 標準的なシート名を使用
-      var sheetName = 'フォームの回答 1';
+      /** @type {string} シート名 */
+      const sheetName = 'フォームの回答 1';
       warnLog('⚠️ シート名取得エラーのため、標準名を使用:', sheetName);
     }
 
@@ -3807,14 +4070,16 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
  */
 function shareSpreadsheetWithServiceAccount(spreadsheetId) {
   try {
-    var serviceAccountEmail = getServiceAccountEmail();
+    /** @type {string} サービスアカウントメール */
+    const serviceAccountEmail = getServiceAccountEmail();
 
     if (!serviceAccountEmail || serviceAccountEmail === 'サービスアカウント未設定' || serviceAccountEmail === 'サービスアカウント設定エラー') {
       throw new Error('サービスアカウントのメールアドレスが取得できません: ' + serviceAccountEmail);
     }
     // DriveAppを使用してスプレッドシートをサービスアカウントと共有
     try {
-      var file = DriveApp.getFileById(spreadsheetId);
+      /** @type {Object} ファイルオブジェクト */
+      const file = DriveApp.getFileById(spreadsheetId);
       if (!file) {
         throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
       }
@@ -3836,13 +4101,18 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
 function shareAllSpreadsheetsWithServiceAccount() {
   try {
 
-    var allUsers = getAllUsers();
-    var results = [];
-    var successCount = 0;
-    var errorCount = 0;
+    /** @type {Array} 全ユーザー */
+    const allUsers = getAllUsers();
+    /** @type {Array} 結果配列 */
+    const results = [];
+    /** @type {number} 成功カウント */
+    let successCount = 0;
+    /** @type {number} エラーカウント */
+    let errorCount = 0;
 
-    for (var i = 0; i < allUsers.length; i++) {
-      var user = allUsers[i];
+    for (let i = 0; i < allUsers.length; i++) {
+      /** @type {Object} ユーザーオブジェクト */
+      const user = allUsers[i];
       if (user.spreadsheetId && user.isActive === 'true') {
         try {
           shareSpreadsheetWithServiceAccount(user.spreadsheetId);
@@ -3889,11 +4159,15 @@ function shareAllSpreadsheetsWithServiceAccount() {
  */
 function addServiceAccountToSpreadsheet(spreadsheetId) {
   try {
-    var props = PropertiesService.getScriptProperties();
-    var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
-    var serviceAccountEmail = serviceAccountCreds.client_email;
+    /** @type {Object} プロパティ */
+    const props = PropertiesService.getScriptProperties();
+    /** @type {Object} サービスアカウント認証情報 */
+    const serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
+    /** @type {string} サービスアカウントメール */
+    const serviceAccountEmail = serviceAccountCreds.client_email;
 
-    var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
+    /** @type {Object} スプレッドシートオブジェクト */
+    const spreadsheet = openSpreadsheetOptimized(spreadsheetId);
 
     // サービスアカウントを編集者として追加
     if (serviceAccountEmail) {
@@ -3931,7 +4205,8 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
   try {
 
     // DriveApp経由で共有設定を変更
-    var file;
+    /** @type {Object|undefined} ファイル */
+    let file;
     try {
       file = DriveApp.getFileById(spreadsheetId);
       if (!file) {
@@ -3958,16 +4233,20 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
 
     // SpreadsheetApp経由でも編集者として追加
     try {
-      var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
+      /** @type {Object} スプレッドシートオブジェクト */
+    const spreadsheet = openSpreadsheetOptimized(spreadsheetId);
       spreadsheet.addEditor(userEmail);
     } catch (spreadsheetAddError) {
       warnLog('SpreadsheetApp経由の追加で警告: ' + spreadsheetAddError.message);
     }
 
     // サービスアカウントも確認
-    var props = PropertiesService.getScriptProperties();
-    var serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
-    var serviceAccountEmail = serviceAccountCreds.client_email;
+    /** @type {Object} プロパティ */
+    const props = PropertiesService.getScriptProperties();
+    /** @type {Object} サービスアカウント認証情報 */
+    const serviceAccountCreds = JSON.parse(props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
+    /** @type {string} サービスアカウントメール */
+    const serviceAccountEmail = serviceAccountCreds.client_email;
 
     if (serviceAccountEmail) {
       try {
@@ -3999,10 +4278,13 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
  */
 function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
   try {
-    var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
-    var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+    /** @type {Object} スプレッドシートオブジェクト */
+    const spreadsheet = openSpreadsheetOptimized(spreadsheetId);
+    /** @type {Object} シートオブジェクト */
+    const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
 
-    var additionalHeaders = [
+    /** @type {Array} 追加ヘッダー */
+    const additionalHeaders = [
       COLUMN_HEADERS.UNDERSTAND,
       COLUMN_HEADERS.LIKE,
       COLUMN_HEADERS.CURIOUS,
@@ -4010,14 +4292,17 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
     ];
 
     // 効率的にヘッダー情報を取得
-    var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var startCol = currentHeaders.length + 1;
+    /** @type {Array} 現在のヘッダー */
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    /** @type {number} 開始カラム */
+    const startCol = currentHeaders.length + 1;
 
     // バッチでヘッダーを追加
     sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
 
     // スタイリングを一括適用
-    var allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
+    /** @type {Object} 全ヘッダー範囲 */
+    const allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
     allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
 
     // 自動リサイズ（エラーが出ても続行）
@@ -4041,7 +4326,8 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
  */
 function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
   // キャッシュキー生成（ユーザー、シート、フィルタ条件ごとに個別キャッシュ）
-  var cacheKey = `sheetData_${userId}_${sheetName}_${classFilter}_${sortMode}`;
+  /** @type {string} キャッシュキー */
+  const cacheKey = `sheetData_${userId}_${sheetName}_${classFilter}_${sortMode}`;
 
   // 管理モードの場合はキャッシュをバイパス（最新データを取得）
   if (adminMode === true) {
@@ -4058,7 +4344,8 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
  */
 function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     try {
-      var userInfo = getOrFetchUserInfo(userId, 'userId', {
+      /** @type {Object} ユーザー情報 */
+      const userInfo = getOrFetchUserInfo(userId, 'userId', {
     useExecutionCache: true,
     ttl: 300
   });
@@ -4066,17 +4353,23 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
         throw new Error('ユーザー情報が見つかりません');
       }
 
-      var spreadsheetId = userInfo.spreadsheetId;
-      var service = getSheetsServiceCached();
+      /** @type {string} スプレッドシートID */
+    const spreadsheetId = userInfo.spreadsheetId;
+      /** @type {Object} Google Sheets APIサービス */
+    const service = getSheetsServiceCached();
 
       // フォーム回答データのみを取得（名簿機能は使用しない）
-      var ranges = [sheetName + '!A:Z'];
+      /** @type {Array} 範囲配列 */
+      const ranges = [sheetName + '!A:Z'];
 
-      var responses = batchGetSheetsData(service, spreadsheetId, ranges);
-      var sheetData = responses.valueRanges[0].values || [];
+      /** @type {Object} APIレスポンス */
+      const responses = batchGetSheetsData(service, spreadsheetId, ranges);
+      /** @type {Array} シートデータ */
+      const sheetData = responses.valueRanges[0].values || [];
 
     // 名簿機能は使用せず、空の配列を設定
-    var rosterData = [];
+    /** @type {Array} 名簿データ */
+    const rosterData = [];
     if (sheetData.length === 0) {
       return {
         status: 'success',
@@ -4086,31 +4379,40 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       };
     }
 
-    var headers = sheetData[0];
-    var dataRows = sheetData.slice(1);
+    /** @type {Array} ヘッダー */
+    const headers = sheetData[0];
+    /** @type {Array} データ行 */
+    const dataRows = sheetData.slice(1);
 
     // ヘッダーインデックスを取得（キャッシュ利用）
-    var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+    /** @type {Object} ヘッダーインデックス */
+    const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
 
     // 名簿マップを作成（キャッシュ利用）
-    var rosterMap = buildRosterMap(rosterData);
+    /** @type {Object} 名簿マップ */
+    const rosterMap = buildRosterMap(rosterData);
 
     // 表示モードとシート固有設定を取得
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
       warnLog('ConfigJson parse error in executeGetSheetData:', parseError.message);
       configJson = {};
     }
-    var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+    /** @type {string} 表示モード */
+    const displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
 
     // シート固有の設定を取得（最新のAI判定結果を反映）
-    var sheetKey = 'sheet_' + sheetName;
-    var sheetConfig = configJson[sheetKey] || {};
+    /** @type {string} シートキー */
+    const sheetKey = 'sheet_' + sheetName;
+    /** @type {Object} シート固有の設定 */
+    const sheetConfig = configJson[sheetKey] || {};
 
     // AI判定結果またはguessedConfigがある場合、それを優先使用
-    var effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
+    /** @type {Object} 有効なヘッダー設定 */
+    const effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
 
     // フォールバック設定: 設定が空の場合はデフォルト構造を提供
     if (!effectiveHeaderConfig.opinionHeader && headers.length > 1) {
@@ -4122,17 +4424,21 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
 
 
     // Check if current user is the board owner
-    var isOwner = (configJson.ownerId === userId);
+    /** @type {boolean} オーナーかどうか */
+    const isOwner = (configJson.ownerId === userId);
 
     // データを処理
-    var processedData = dataRows.map(function(row, index) {
+    /** @type {Array} 処理されたデータ */
+    const processedData = dataRows.map(function(row, index) {
       return processRowData(row, headers, headerIndices, rosterMap, displayMode, index + 2, isOwner);
     });
 
     // フィルタリング
-    var filteredData = processedData;
+    /** @type {Array} フィルターされたデータ */
+    let filteredData = processedData;
     if (classFilter && classFilter !== 'すべて') {
-      var classIndex = headerIndices[COLUMN_HEADERS.CLASS];
+      /** @type {number|undefined} クラスインデックス */
+      const classIndex = headerIndices[COLUMN_HEADERS.CLASS];
       if (classIndex !== undefined) {
         filteredData = processedData.filter(function(row) {
           return row.originalData[classIndex] === classFilter;
@@ -4141,15 +4447,19 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     }
 
     // ソート適用
-    var sortedData = applySortMode(filteredData, sortMode || 'newest');
+    /** @type {Array} ソートされたデータ */
+    const sortedData = applySortMode(filteredData, sortMode || 'newest');
 
     // カスタムフォーム設定がある場合のヘッダー情報を優先
-    var effectiveHeaders = headers;
-    var mainQuestionHeader = headers[0]; // デフォルトは最初の列をメイン質問とする
+    /** @type {Array} 有効なヘッダー */
+    const effectiveHeaders = headers;
+    /** @type {string} メイン質問ヘッダー */
+    let mainQuestionHeader = headers[0]; // デフォルトは最初の列をメイン質問とする
 
     // AI判定結果またはシート設定からメイン質問を特定
     if (effectiveHeaderConfig.opinionHeader) {
-      var opinionIndex = headers.indexOf(effectiveHeaderConfig.opinionHeader);
+      /** @type {number} 意見インデックス */
+      const opinionIndex = headers.indexOf(effectiveHeaderConfig.opinionHeader);
       if (opinionIndex !== -1) {
         mainQuestionHeader = effectiveHeaderConfig.opinionHeader;
       }
@@ -4175,20 +4485,26 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
 
     // データ取得失敗時のフォールバック処理
     try {
-      var userInfo = findUserById(userId);
-      var configJson = {};
+      /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(userId);
+      /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
       try {
         configJson = JSON.parse(userInfo.configJson || '{}');
       } catch (parseError) {
         warnLog('ConfigJson parse error in executeGetSheetData fallback:', parseError.message);
         configJson = {};
       }
-      var sheetKey = 'sheet_' + sheetName;
-      var sheetConfig = configJson[sheetKey] || {};
-      var effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
+      /** @type {string} シートキー */
+    const sheetKey = 'sheet_' + sheetName;
+      /** @type {Object} シート固有の設定 */
+    const sheetConfig = configJson[sheetKey] || {};
+      /** @type {Object} 有効なヘッダー設定 */
+    const effectiveHeaderConfig = sheetConfig.guessedConfig || sheetConfig || {};
 
       // 設定からメインヘッダーを復元
-      var fallbackHeader = effectiveHeaderConfig.opinionHeader || sheetName;
+      /** @type {string} フォールバックヘッダー */
+      const fallbackHeader = effectiveHeaderConfig.opinionHeader || sheetName;
 
       warnLog('🔄 データ取得失敗 - フォールバック情報で応答: header=' + fallbackHeader);
 
@@ -4224,7 +4540,8 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
  */
 function getSheetsList(userId) {
   try {
-    var userInfo = findUserById(userId);
+    /** @type {Object|null} ユーザー情報 */
+    const userInfo = findUserById(userId);
     if (!userInfo) {
       warnLog('getSheetsList: User not found:', userId);
       return [];
@@ -4234,19 +4551,23 @@ function getSheetsList(userId) {
       warnLog('getSheetsList: No spreadsheet ID for user:', userId);
       return [];
     }
-    var service = getSheetsServiceCached();
+    /** @type {Object} Google Sheets APIサービス */
+    const service = getSheetsServiceCached();
     if (!service) {
       errorLog('❌ getSheetsList: Sheets service not initialized');
       return [];
     }
 
     infoLog('✅ getSheetsList: Service validated successfully');
-    var spreadsheet;
+    /** @type {Object|undefined} スプレッドシート */
+    let spreadsheet;
     try {
       spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
     } catch (accessError) {
-      var statusMatch = (accessError && accessError.message || '').match(/Sheets API error:\s*(\d+)/);
-      var statusCode = statusMatch ? parseInt(statusMatch[1], 10) : null;
+      /** @type {Array|null} ステータスマッチ */
+      const statusMatch = (accessError && accessError.message || '').match(/Sheets API error:\s*(\d+)/);
+      /** @type {number|null} ステータスコード */
+      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : null;
 
       if (statusCode === 403) {
         warnLog('getSheetsList: アクセスエラーを検出。サービスアカウント権限を修復中...', accessError.message);
@@ -4264,7 +4585,8 @@ function getSheetsList(userId) {
 
           // 最終手段：ユーザー権限での修復も試行
           try {
-            var currentUserEmail = getCurrentUserEmail();
+            /** @type {string} 現在のユーザーメールアドレス */
+  const currentUserEmail = getCurrentUserEmail();
             if (currentUserEmail === userInfo.adminEmail) {
               repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
             }
@@ -4275,8 +4597,9 @@ function getSheetsList(userId) {
           return [];
         }
       } else if (statusCode >= 500 && statusCode < 600) {
-        var maxRetries = 2;
-        for (var attempt = 0; attempt < maxRetries; attempt++) {
+        /** @type {number} 最大リトライ数 */
+        const maxRetries = 2;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
           Utilities.sleep(Math.pow(2, attempt) * 1000);
           try {
             spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
@@ -4307,7 +4630,8 @@ function getSheetsList(userId) {
       return [];
     }
 
-    var sheets = spreadsheet.sheets.map(function(sheet) {
+    /** @type {Array} シート配列 */
+    const sheets = spreadsheet.sheets.map(function(sheet) {
       if (!sheet.properties) {
         warnLog('getSheetsList: Sheet missing properties:', sheet);
         return null;
@@ -4342,7 +4666,8 @@ function buildRosterMap(rosterData) {
  * 行データを処理（スコア計算、名前変換など）
  */
 function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber, isOwner) {
-  var processedRow = {
+  /** @type {Object} 処理された行 */
+  const processedRow = {
     rowNumber: rowNumber,
     originalData: row,
     score: 0,
@@ -4354,12 +4679,16 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
 
   // リアクションカウント計算
   REACTION_KEYS.forEach(function(reactionKey) {
-    var columnName = COLUMN_HEADERS[reactionKey];
-    var columnIndex = headerIndices[columnName];
+    /** @type {string} カラム名 */
+    const columnName = COLUMN_HEADERS[reactionKey];
+    /** @type {number|undefined} カラムインデックス */
+    const columnIndex = headerIndices[columnName];
 
     if (columnIndex !== undefined && row[columnIndex]) {
-      var reactions = parseReactionString(row[columnIndex]);
-      var count = reactions.length;
+      /** @type {Array} リアクション配列 */
+      const reactions = parseReactionString(row[columnIndex]);
+      /** @type {number} カウント */
+      const count = reactions.length;
 
       switch (reactionKey) {
         case 'LIKE':
@@ -4376,7 +4705,8 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
   });
 
   // ハイライト状態チェック
-  var highlightIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+  /** @type {number|undefined} ハイライトインデックス */
+  const highlightIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
   if (highlightIndex !== undefined && row[highlightIndex]) {
     processedRow.isHighlighted = row[highlightIndex].toString().toLowerCase() === 'true';
   }
@@ -4385,7 +4715,8 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
   processedRow.score = calculateRowScore(processedRow);
 
   // 名前の表示処理（フォーム入力の名前を使用）
-  var nameIndex = headerIndices[COLUMN_HEADERS.NAME];
+  /** @type {number|undefined} 名前インデックス */
+  const nameIndex = headerIndices[COLUMN_HEADERS.NAME];
   if (nameIndex !== undefined && row[nameIndex] && (displayMode === DISPLAY_MODES.NAMED || isOwner)) {
     processedRow.displayName = row[nameIndex];
   } else if (displayMode === DISPLAY_MODES.NAMED || isOwner) {
@@ -4402,13 +4733,15 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
   processedRow.reason = row.length > 2 ? (row[2] || '') : '';
 
   // メールアドレス（フォーム回答者の識別用）
-  var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+  /** @type {number|undefined} メールインデックス */
+  const emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
   if (emailIndex !== undefined && row[emailIndex]) {
     processedRow.email = row[emailIndex];
   }
 
   // タイムスタンプ（フォーム回答時刻）
-  var timestampIndex = headerIndices[COLUMN_HEADERS.TIMESTAMP];
+  /** @type {number|undefined} タイムスタンプインデックス */
+  const timestampIndex = headerIndices[COLUMN_HEADERS.TIMESTAMP];
   if (timestampIndex !== undefined && row[timestampIndex]) {
     processedRow.timestamp = row[timestampIndex];
   }
@@ -4420,19 +4753,24 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
  * 行のスコアを計算
  */
 function calculateRowScore(rowData) {
-  var baseScore = 1.0;
+  /** @type {number} ベーススコア */
+  const baseScore = 1.0;
 
   // いいね！による加算
-  var likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
+  /** @type {number} いいねボーナス */
+  const likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
 
   // その他のリアクションも軽微な加算
-  var reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
+  /** @type {number} リアクションボーナス */
+  const reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
 
   // ハイライトによる大幅加算
-  var highlightBonus = rowData.isHighlighted ? 0.5 : 0;
+  /** @type {number} ハイライトボーナス */
+  const highlightBonus = rowData.isHighlighted ? 0.5 : 0;
 
   // ランダム要素（同じスコアの項目をランダムに並べるため）
-  var randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
+  /** @type {number} ランダムファクター */
+  const randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
 
   return baseScore + likeBonus + reactionBonus + highlightBonus + randomFactor;
 }
@@ -4462,8 +4800,10 @@ function applySortMode(data, sortMode) {
  */
 function shuffleArray(array) {
   for (var i = array.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var temp = array[i];
+    /** @type {number} ランダムインデックス */
+    const j = Math.floor(Math.random() * (i + 1));
+    /** @type {*} 一時変数 */
+    const temp = array[i];
     array[i] = array[j];
     array[j] = temp;
   }
@@ -4510,22 +4850,28 @@ function getColumnHeaderName(columnKey) {
  * @returns {Object} マッピングされたインデックス
  */
 function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
-  var mappedIndices = {};
-  var availableHeaders = Object.keys(actualHeaderIndices);
+  /** @type {Object} マッピングされたインデックス */
+  const mappedIndices = {};
+  /** @type {Array} 利用可能ヘッダー */
+  const availableHeaders = Object.keys(actualHeaderIndices);
 
   // 各設定ヘッダーでマッピングを試行
   for (var configKey in configHeaders) {
-    var configHeaderName = configHeaders[configKey];
-    var mappedIndex = undefined;
+    /** @type {string} 設定ヘッダー名 */
+    const configHeaderName = configHeaders[configKey];
+    /** @type {number|undefined} マッピングインデックス */
+    let mappedIndex = undefined;
     if (configHeaderName && actualHeaderIndices.hasOwnProperty(configHeaderName)) {
       // 完全一致
       mappedIndex = actualHeaderIndices[configHeaderName];
     } else if (configHeaderName) {
       // 部分一致で検索（大文字小文字を区別しない）
-      var normalizedConfigName = configHeaderName.toLowerCase().trim();
+      /** @type {string} 正規化された設定名 */
+      const normalizedConfigName = configHeaderName.toLowerCase().trim();
 
       for (var actualHeader in actualHeaderIndices) {
-        var normalizedActualHeader = actualHeader.toLowerCase().trim();
+        /** @type {string} 正規化された実際ヘッダー */
+        const normalizedActualHeader = actualHeader.toLowerCase().trim();
         if (normalizedActualHeader === normalizedConfigName) {
           mappedIndex = actualHeaderIndices[actualHeader];
           break;
@@ -4535,7 +4881,8 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
       // 部分一致検索
       if (mappedIndex === undefined) {
         for (var actualHeader in actualHeaderIndices) {
-          var normalizedActualHeader = actualHeader.toLowerCase().trim();
+          /** @type {string} 正規化された実際ヘッダー */
+        const normalizedActualHeader = actualHeader.toLowerCase().trim();
           if (normalizedActualHeader.includes(normalizedConfigName) || normalizedConfigName.includes(normalizedActualHeader)) {
             mappedIndex = actualHeaderIndices[actualHeader];
             break;
@@ -4546,11 +4893,14 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 
     // opinionHeader（メイン質問）の特別処理：見つからない場合は最も長い質問様ヘッダーを使用
     if (mappedIndex === undefined && configKey === 'opinionHeader') {
-      var standardHeaders = ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '理由', 'なるほど！', 'いいね！', 'もっと知りたい！', 'ハイライト'];
-      var questionHeaders = [];
+      /** @type {Array} 標準ヘッダー */
+      const standardHeaders = ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', '理由', 'なるほど！', 'いいね！', 'もっと知りたい！', 'ハイライト'];
+      /** @type {Array} 質問ヘッダー */
+      const questionHeaders = [];
 
       for (var header in actualHeaderIndices) {
-        var isStandardHeader = false;
+        /** @type {boolean} 標準ヘッダーかどうか */
+        let isStandardHeader = false;
         for (var i = 0; i < standardHeaders.length; i++) {
           if (header.toLowerCase().includes(standardHeaders[i].toLowerCase()) ||
               standardHeaders[i].toLowerCase().includes(header.toLowerCase())) {
@@ -4566,7 +4916,8 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 
       if (questionHeaders.length > 0) {
         // 最も長いヘッダーを選択（通常メイン質問が最も長い）
-        var longestHeader = questionHeaders.reduce(function(prev, current) {
+        /** @type {string} 最長ヘッダー */
+        const longestHeader = questionHeaders.reduce(function(prev, current) {
           return (prev.header.length > current.header.length) ? prev : current;
         });
         mappedIndex = longestHeader.index;
@@ -4575,9 +4926,11 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 
     // reasonHeader（理由列）の特別処理：見つからない場合は理由らしいヘッダーを自動検出
     if (mappedIndex === undefined && configKey === 'reasonHeader') {
-      var reasonKeywords = ['理由', 'reason', 'なぜ', 'why', '根拠', 'わけ'];
+      /** @type {Array} 理由キーワード */
+      const reasonKeywords = ['理由', 'reason', 'なぜ', 'why', '根拠', 'わけ'];
       for (var header in actualHeaderIndices) {
-        var normalizedHeader = header.toLowerCase().trim();
+        /** @type {string} 正規化されたヘッダー */
+        const normalizedHeader = header.toLowerCase().trim();
         for (var k = 0; k < reasonKeywords.length; k++) {
           if (normalizedHeader.includes(reasonKeywords[k]) || reasonKeywords[k].includes(normalizedHeader)) {
             mappedIndex = actualHeaderIndices[header];
@@ -4590,7 +4943,8 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
       // より広範囲の検索（部分一致）
       if (mappedIndex === undefined) {
         for (var header in actualHeaderIndices) {
-          var normalizedHeader = header.toLowerCase().trim();
+          /** @type {string} 正規化されたヘッダー */
+        const normalizedHeader = header.toLowerCase().trim();
           if (normalizedHeader.indexOf('理由') !== -1 || normalizedHeader.indexOf('reason') !== -1) {
             mappedIndex = actualHeaderIndices[header];
             break;
@@ -4624,24 +4978,32 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
  */
 function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
   try {
-    var service = getSheetsServiceCached();
-    var headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+    /** @type {Object} Google Sheets APIサービス */
+    const service = getSheetsServiceCached();
+    /** @type {Object} ヘッダーインデックス */
+    const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
 
-    var reactionData = {
+    /** @type {Object} リアクションデータ */
+    const reactionData = {
       UNDERSTAND: { count: 0, reacted: false },
       LIKE: { count: 0, reacted: false },
       CURIOUS: { count: 0, reacted: false }
     };
 
     // 全リアクション列の範囲を一括で構築
-    var ranges = [];
-    var validKeys = [];
+    /** @type {Array} 範囲配列 */
+    const ranges = [];
+    /** @type {Array} 有効キー */
+    const validKeys = [];
     REACTION_KEYS.forEach(function(reactionKey) {
-      var columnName = COLUMN_HEADERS[reactionKey];
-      var columnIndex = headerIndices[columnName];
+      /** @type {string} カラム名 */
+      const columnName = COLUMN_HEADERS[reactionKey];
+      /** @type {number|undefined} カラムインデックス */
+      const columnIndex = headerIndices[columnName];
       
       if (columnIndex !== undefined) {
-        var range = sheetName + '!' + String.fromCharCode(65 + columnIndex) + rowIndex;
+        /** @type {string} 範囲 */
+        const range = sheetName + '!' + String.fromCharCode(65 + columnIndex) + rowIndex;
         ranges.push(range);
         validKeys.push(reactionKey);
       }
@@ -4649,19 +5011,23 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
 
     // 1回のAPI呼び出しで全リアクション列データを取得
     if (ranges.length > 0) {
-      var response = batchGetSheetsData(service, spreadsheetId, ranges);
+      /** @type {Object} APIレスポンス */
+      const response = batchGetSheetsData(service, spreadsheetId, ranges);
       
       if (response && response.valueRanges) {
         response.valueRanges.forEach(function(valueRange, index) {
-          var reactionKey = validKeys[index];
-          var cellValue = '';
+          /** @type {string} リアクションキー */
+          const reactionKey = validKeys[index];
+          /** @type {string} セル値 */
+          let cellValue = '';
           
           if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
             cellValue = valueRange.values[0][0];
           }
           
           if (cellValue) {
-            var reactions = parseReactionString(cellValue);
+            /** @type {Array} リアクション配列 */
+            const reactions = parseReactionString(cellValue);
             reactionData[reactionKey].count = reactions.length;
             reactionData[reactionKey].reacted = reactions.indexOf(userEmail) !== -1;
           }
@@ -4709,7 +5075,8 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
 function updateIsActiveStatus(requestUserId, isActive) {
   verifyUserAccess(requestUserId);
   try {
-    var activeUserEmail = getCurrentUserEmail();
+    /** @type {string} アクティブユーザーメール */
+    const activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return {
         status: 'error',
@@ -4718,7 +5085,8 @@ function updateIsActiveStatus(requestUserId, isActive) {
     }
 
     // 現在のユーザー情報を取得
-    var userInfo = findUserByEmail(activeUserEmail);
+    /** @type {Object} ユーザー情報 */
+    const userInfo = findUserByEmail(activeUserEmail);
     if (!userInfo) {
       return {
         status: 'error',
@@ -4735,14 +5103,17 @@ function updateIsActiveStatus(requestUserId, isActive) {
     }
 
     // isActive状態を更新
-    var newIsActiveValue = isActive ? 'true' : 'false';
-    var updateResult = updateUser(userInfo.userId, {
+    /** @type {string} 新しいアクティブ値 */
+    const newIsActiveValue = isActive ? 'true' : 'false';
+    /** @type {Object} 更新結果 */
+    const updateResult = updateUser(userInfo.userId, {
       isActive: newIsActiveValue,
       lastAccessedAt: new Date().toISOString()
     });
 
     if (updateResult.success) {
-      var statusMessage = isActive
+      /** @type {string} ステータスメッセージ */
+      const statusMessage = isActive
         ? 'アプリが正常に有効化されました'
         : 'アプリが正常に無効化されました';
 
@@ -4772,13 +5143,15 @@ function updateIsActiveStatus(requestUserId, isActive) {
  */
 function hasSetupPageAccess() {
   try {
-    var activeUserEmail = getCurrentUserEmail();
+    /** @type {string} アクティブユーザーメール */
+    const activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
       return false;
     }
 
     // データベースに登録され、かつisActiveがtrueのユーザーのみアクセス可能
-    var userInfo = findUserByEmail(activeUserEmail);
+    /** @type {Object} ユーザー情報 */
+    const userInfo = findUserByEmail(activeUserEmail);
     return userInfo && isTrue(userInfo.isActive);
   } catch (e) {
     errorLog('hasSetupPageAccess エラー: ' + e.message);
@@ -4800,14 +5173,17 @@ function getEmailDomain(email) {
  * @returns {object} Drive APIサービス
  */
 function getDriveService() {
-  var accessToken = getServiceAccountTokenCached();
+  /** @type {string} アクセストークン */
+  const accessToken = getServiceAccountTokenCached();
   return {
     accessToken: accessToken,
     baseUrl: 'https://www.googleapis.com/drive/v3',
     files: {
       get: function(params) {
-        var url = this.baseUrl + '/files/' + params.fileId + '?fields=' + encodeURIComponent(params.fields);
-        var response = UrlFetchApp.fetch(url, {
+        /** @type {string} URL */
+        const url = this.baseUrl + '/files/' + params.fileId + '?fields=' + encodeURIComponent(params.fields);
+        /** @type {Object} レスポンス */
+        const response = UrlFetchApp.fetch(url, {
           headers: { 'Authorization': 'Bearer ' + this.accessToken }
         });
         return JSON.parse(response.getContentText());
@@ -4842,9 +5218,12 @@ function shouldEnableDebugMode() {
  */
 function isSystemAdmin() {
   try {
-    var props = PropertiesService.getScriptProperties();
-    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-    var currentUserEmail = getCurrentUserEmail();
+    /** @type {Object} プロパティ */
+    const props = PropertiesService.getScriptProperties();
+    /** @type {string} 管理者メール */
+    const adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    /** @type {string} 現在のユーザーメールアドレス */
+  const currentUserEmail = getCurrentUserEmail();
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
     errorLog('isSystemAdmin エラー: ' + e.message);
@@ -4854,9 +5233,12 @@ function isSystemAdmin() {
 
 function isDeployUser() {
   try {
-    var props = PropertiesService.getScriptProperties();
-    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-    var currentUserEmail = getCurrentUserEmail();
+    /** @type {Object} プロパティ */
+    const props = PropertiesService.getScriptProperties();
+    /** @type {string} 管理者メール */
+    const adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    /** @type {string} 現在のユーザーメールアドレス */
+  const currentUserEmail = getCurrentUserEmail();
     
     // デバッグログ
     if (shouldEnableDebugMode()) {
@@ -4966,6 +5348,120 @@ function getAllUsersForAdminForUI(requestUserId) {
 }
 
 /**
+ * カスタムセットアップの実行
+ * @param {string} requestUserId リクエストユーザーID
+ * @param {Object} config セットアップ設定
+ * @returns {Object} 実行結果
+ */
+function executeCustomSetup(requestUserId, config) {
+  try {
+    // アクセス権限確認
+    if (!verifyUserAccess(requestUserId)) {
+      throw new Error('アクセス権限がありません');
+    }
+
+    // 設定検証
+    if (!config || typeof config !== 'object') {
+      throw new Error('設定情報が不正です');
+    }
+
+    // 必要な設定項目の確認
+    const requiredFields = ['spreadsheetId', 'sheetName'];
+    for (const field of requiredFields) {
+      if (!config[field]) {
+        throw new Error(`必要な設定項目が不足しています: ${field}`);
+      }
+    }
+
+    /** @type {Object} ユーザー情報 */
+    const userInfo = findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+
+    // ステップ1: スプレッドシートアクセス確認
+    try {
+      const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+      if (!spreadsheet) {
+        throw new Error('指定されたスプレッドシートにアクセスできません');
+      }
+    } catch (accessError) {
+      throw new Error('スプレッドシートアクセスエラー: ' + accessError.message);
+    }
+
+    // ステップ2: ヘッダー自動マッピング
+    /** @type {Object} ヘッダーマッピング結果 */
+    const headerMapping = autoMapHeaders(config.headers || [], config.sheetName);
+    
+    if (!headerMapping || !headerMapping.success) {
+      throw new Error('ヘッダーの自動マッピングに失敗しました');
+    }
+
+    // ステップ3: 設定の構築
+    /** @type {Object} シート設定 */
+    const sheetConfig = {
+      timestampHeader: headerMapping.mapping.timestamp || UNIFIED_CONSTANTS.COLUMNS.TIMESTAMP,
+      classHeader: headerMapping.mapping.class || UNIFIED_CONSTANTS.COLUMNS.CLASS,
+      nameHeader: headerMapping.mapping.name || UNIFIED_CONSTANTS.COLUMNS.NAME,
+      emailHeader: headerMapping.mapping.email || UNIFIED_CONSTANTS.COLUMNS.EMAIL,
+      opinionHeader: headerMapping.mapping.opinion || UNIFIED_CONSTANTS.COLUMNS.OPINION,
+      reasonHeader: headerMapping.mapping.reason || UNIFIED_CONSTANTS.COLUMNS.REASON,
+      guessedConfig: headerMapping.mapping,
+      lastModified: new Date().toISOString()
+    };
+
+    // ステップ4: 設定保存
+    const saveResult = saveSheetConfig(
+      requestUserId,
+      config.spreadsheetId,
+      config.sheetName,
+      sheetConfig,
+      { updatePublished: true }
+    );
+
+    if (!saveResult || !saveResult.success) {
+      throw new Error('設定の保存に失敗しました');
+    }
+
+    // ステップ5: キャッシュクリア
+    if (typeof clearExecutionUserInfoCache === 'function') {
+      clearExecutionUserInfoCache();
+    }
+    
+    if (typeof cacheManager !== 'undefined' && cacheManager.clearByPattern) {
+      cacheManager.clearByPattern(`publishedData_${requestUserId}_`);
+    }
+
+    // ステップ6: 成功レスポンス
+    logInfo('カスタムセットアップが完了しました', {
+      userId: requestUserId,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName
+    });
+
+    return {
+      success: true,
+      message: 'カスタムセットアップが完了しました',
+      data: {
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName,
+        headerMapping: headerMapping.mapping,
+        setupTimestamp: new Date().toISOString()
+      }
+    };
+
+  } catch (error) {
+    logError(error, 'executeCustomSetup', UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH, UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM);
+    
+    return {
+      success: false,
+      error: error.message,
+      message: 'カスタムセットアップに失敗しました'
+    };
+  }
+}
+
+/**
  * 管理者によるユーザーのisActive制御（AppSetupPage.html用ラッパー）
  * @param {string} targetUserId - 対象ユーザーID
  * @param {boolean} isActive - 設定する状態
@@ -4985,8 +5481,10 @@ function updateUserActiveStatusForUI(targetUserId, isActive) {
       return { status: 'error', message: 'ユーザーIDが指定されていません' };
     }
 
-    var newIsActiveValue = isActive ? 'true' : 'false';
-    var updateResult = updateUser(targetUserId, {
+    /** @type {string} 新しいアクティブ値 */
+    const newIsActiveValue = isActive ? 'true' : 'false';
+    /** @type {Object} 更新結果 */
+    const updateResult = updateUser(targetUserId, {
       isActive: newIsActiveValue,
       lastAccessedAt: new Date().toISOString()
     });
@@ -5908,11 +6406,14 @@ function confirmUserRegistration() {
  */
 function getInitialData(requestUserId, targetSheetName, lightweightMode) {
   try {
-    var startTime = new Date().getTime();
+    /** @type {number} 開始時間 */
+    const startTime = new Date().getTime();
 
     // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
-    var activeUserEmail = getCurrentUserEmail();
-    var currentUserId = requestUserId;
+    /** @type {string} アクティブユーザーメール */
+    const activeUserEmail = getCurrentUserEmail();
+    /** @type {string} 現在のユーザーID */
+    const currentUserId = requestUserId;
 
     // UserID の解決
     if (!currentUserId) {
@@ -5942,7 +6443,8 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     verifyUserAccess(currentUserId);
     
     // 軽量モードまたは強制更新時は、確実に最新データを取得
-    var userInfo;
+    /** @type {Object|undefined} ユーザー情報 */
+    let userInfo;
     if (lightweightMode || targetSheetName === 'BYPASS_CACHE') {
       userInfo = findUserByIdFresh(currentUserId);
       if (!userInfo) {
@@ -5960,7 +6462,8 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
 
     // === ステップ1.5: データ整合性の自動チェックと修正 ===
     try {
-      var consistencyResult = fixUserDataConsistency(currentUserId);
+      /** @type {Object} 整合性結果 */
+      const consistencyResult = fixUserDataConsistency(currentUserId);
       if (consistencyResult.updated) {
         // 修正後は最新データを再取得
         clearExecutionUserInfoCache();
@@ -5974,7 +6477,8 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     }
 
     // === ステップ2: 設定データの取得と自動修復 ===
-    var configJson = {};
+    /** @type {Object} 設定JSONオブジェクト */
+    let configJson = {};
     try {
       configJson = JSON.parse(userInfo.configJson || '{}');
     } catch (parseError) {
@@ -5990,15 +6494,20 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     }
 
     // === ステップ3: シート一覧とアプリURL生成 ===
-    var sheets = getSheetsList(currentUserId);
-    var appUrls = generateUserUrls(currentUserId);
+    /** @type {Array} シートリスト */
+    const sheets = getSheetsList(currentUserId);
+    /** @type {Object} アプリケーションURL群 */
+    const appUrls = generateUserUrls(currentUserId);
 
     // === ステップ4: 回答数とリアクション数の取得 ===
-    var answerCount = 0;
-    var totalReactions = 0;
+    /** @type {number} 回答数 */
+    let answerCount = 0;
+    /** @type {number} 総リアクション数 */
+    let totalReactions = 0;
     try {
       if (configJson.publishedSpreadsheetId && configJson.publishedSheetName) {
-        var responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
+        /** @type {Object} レスポンスデータ */
+        const responseData = getResponsesData(currentUserId, configJson.publishedSheetName);
         if (responseData.status === 'success') {
           answerCount = responseData.data.length;
           totalReactions = answerCount * 2; // 暫定値
@@ -6009,7 +6518,8 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     }
 
     // === ステップ5: セットアップステップの決定 ===
-    var setupStep = 1;
+    /** @type {number} セットアップステップ */
+    let setupStep = 1;
     try {
       setupStep = getSetupStep(userInfo, configJson);
     } catch (stepError) {
@@ -6018,18 +6528,25 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     }
 
     // 公開シート設定とヘッダー情報を取得
-    var publishedSheetName = configJson.publishedSheetName || '';
-    var sheetConfigKey = publishedSheetName ? 'sheet_' + publishedSheetName : '';
-    var activeSheetConfig = sheetConfigKey && configJson[sheetConfigKey]
+    /** @type {string} 公開シート名 */
+    const publishedSheetName = configJson.publishedSheetName || '';
+    /** @type {string} シート設定キー */
+    const sheetConfigKey = publishedSheetName ? 'sheet_' + publishedSheetName : '';
+    /** @type {Object|undefined} アクティブシート設定 */
+    const activeSheetConfig = sheetConfigKey && configJson[sheetConfigKey]
       ? configJson[sheetConfigKey]
       : {};
 
-    var opinionHeader = activeSheetConfig.opinionHeader || '';
-    var nameHeader = activeSheetConfig.nameHeader || '';
-    var classHeader = activeSheetConfig.classHeader || '';
+    /** @type {string} 意見ヘッダー */
+    const opinionHeader = activeSheetConfig.opinionHeader || '';
+    /** @type {string} 名前ヘッダー */
+    const nameHeader = activeSheetConfig.nameHeader || '';
+    /** @type {string} クラスヘッダー */
+    const classHeader = activeSheetConfig.classHeader || '';
 
     // === ベース応答の構築 ===
-    var response = {
+    /** @type {Object} レスポンスオブジェクト */
+    const response = {
       // ユーザー情報
       userInfo: {
         userId: userInfo.userId,
@@ -6078,7 +6595,8 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
 
     // === ステップ6: シート詳細の取得（オプション）- 最適化版 ===
     // 軽量モード時はシート詳細の取得をスキップ
-    var includeSheetDetails = !lightweightMode && (targetSheetName || configJson.publishedSheetName);
+    /** @type {boolean} シート詳細を含むか */
+    const includeSheetDetails = !lightweightMode && (targetSheetName || configJson.publishedSheetName);
 
     // publishedSheetNameが空の場合のフォールバック処理
     if (!includeSheetDetails && userInfo.spreadsheetId && configJson) {
@@ -6113,14 +6631,16 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     if (includeSheetDetails && userInfo.spreadsheetId) {
       try {
         // 最適化: getSheetsServiceの重複呼び出しを避けるため、一度だけ作成して再利用
-        var sharedSheetsService = getSheetsServiceCached();
+        /** @type {Object} 共有シーツサービス */
+        const sharedSheetsService = getSheetsServiceCached();
 
         // ExecutionContext を最適化版で作成（sheetsService と userInfo を渡して重複作成を回避）
         const context = createExecutionContext(currentUserId, {
           reuseService: sharedSheetsService,
           reuseUserInfo: userInfo
         });
-        var sheetDetails = getSheetDetailsFromContext(context, userInfo.spreadsheetId, includeSheetDetails);
+        /** @type {Object} シート詳細 */
+        const sheetDetails = getSheetDetailsFromContext(context, userInfo.spreadsheetId, includeSheetDetails);
         response.sheetDetails = sheetDetails;
         response._meta.includedApis.push('getSheetDetails');
         infoLog('✅ シート詳細を統合応答に追加 (最適化版):', includeSheetDetails);
@@ -6133,7 +6653,8 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     }
 
     // === 実行時間の記録 ===
-    var endTime = new Date().getTime();
+    /** @type {number} 終了時間 */
+    const endTime = new Date().getTime();
     response._meta.executionTime = endTime - startTime;
 
     return response;
@@ -6189,7 +6710,8 @@ function fixDataConsistencyManual(requestUserId) {
   try {
     verifyUserAccess(requestUserId);
 
-    var result = fixUserDataConsistency(requestUserId);
+    /** @type {Object} 結果 */
+    const result = fixUserDataConsistency(requestUserId);
 
     if (result.status === 'success') {
       if (result.updated) {

@@ -88,11 +88,13 @@ const MAIN_ERROR_CATEGORIES = {
  * 統一エラーハンドリング定数（Core.gsとmain.gsの橋渡し）
  */
 if (typeof ERROR_SEVERITY === 'undefined') {
-  var ERROR_SEVERITY = MAIN_ERROR_SEVERITY;
+  /** @type {Object} エラー重大度 */
+  const ERROR_SEVERITY = MAIN_ERROR_SEVERITY;
 }
 
 if (typeof ERROR_CATEGORIES === 'undefined') {  
-  var ERROR_CATEGORIES = MAIN_ERROR_CATEGORIES;
+  /** @type {Object} エラーカテゴリ */
+  const ERROR_CATEGORIES = MAIN_ERROR_CATEGORIES;
 }
 
 const DB_SHEET_CONFIG = {
@@ -103,13 +105,15 @@ const DB_SHEET_CONFIG = {
   ]
 };
 
+/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.LOG instead */
 const LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'Logs',
-  HEADERS: ['timestamp', 'userId', 'action', 'details']
+  SHEET_NAME: UNIFIED_CONSTANTS.SHEETS.LOG.NAME,
+  HEADERS: UNIFIED_CONSTANTS.SHEETS.LOG.HEADERS
 };
 
 // 履歴管理の定数
-const MAX_HISTORY_ITEMS = 50;
+/** @deprecated Use UNIFIED_CONSTANTS.LIMITS.HISTORY_ITEMS instead */
+const MAX_HISTORY_ITEMS = UNIFIED_CONSTANTS.LIMITS.HISTORY_ITEMS;
 
 // 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
 let _executionUserInfoCache = null;
@@ -4970,7 +4974,8 @@ function generateUserUrls(userId) {
     }
 
     // 最適化済みURL取得（リトライ処理内包）
-    var webAppUrl = getWebAppUrl();
+    /** @type {string} ウェブアプリURL */
+    const webAppUrl = getWebAppUrl();
 
     // 基本的な妥当性チェック
     if (!webAppUrl) {
@@ -4991,7 +4996,8 @@ function generateUserUrls(userId) {
     }
 
     // URL生成（エンコード処理）
-    var encodedUserId = encodeURIComponent(userId.trim());
+    /** @type {string} エンコードされたユーザーID */
+    const encodedUserId = encodeURIComponent(userId.trim());
 
     return {
       webAppUrl: webAppUrl,

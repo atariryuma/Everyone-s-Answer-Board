@@ -180,24 +180,67 @@ function updateHistoryTable() {
   }
 }
 
-/**
- * HTMLエスケープ
- * @param {string} text エスケープするテキスト
- * @returns {string} エスケープされたテキスト
- */
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+// HTMLエスケープはSharedUtilities.htmlで定義されています
 
 // 初期化時に履歴テーブルを更新
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(updateHistoryTable, 100);
 });
+
+// =============================================================================
+// 互換性レイヤー - 複雑な履歴システムとの互換性を維持
+// =============================================================================
+
+// 互換性関数: loadSimpleHistoryTable
+if (typeof loadSimpleHistoryTable === 'undefined') {
+  window.loadSimpleHistoryTable = function() {
+    if (typeof updateHistoryTable === 'function') {
+      updateHistoryTable();
+    } else {
+      console.warn('⚠️ updateHistoryTable関数が利用できません');
+    }
+  };
+}
+
+// 互換性関数: getHistoryFromStorage（レガシー）
+if (typeof getHistoryFromStorage === 'undefined') {
+  window.getHistoryFromStorage = function() {
+    return getSimpleHistory();
+  };
+}
+
+// 互換性関数: saveHistoryToStorage（レガシー）
+if (typeof saveHistoryToStorage === 'undefined') {
+  window.saveHistoryToStorage = function(historyArray) {
+    saveSimpleHistory(historyArray);
+  };
+}
+
+// 互換性関数: saveToHistory（レガシー）
+if (typeof saveToHistory === 'undefined') {
+  window.saveToHistory = function(historyItem) {
+    addToSimpleHistory(historyItem);
+  };
+}
+
+// HistoryManager の互換レイヤー
+if (!window.HistoryManager) {
+  window.HistoryManager = {
+    renderTable: function() {
+      if (typeof updateHistoryTable === 'function') {
+        updateHistoryTable();
+      }
+      return true;
+    },
+    addToHistory: function(item) {
+      if (typeof addToSimpleHistory === 'function') {
+        addToSimpleHistory(item);
+      }
+    },
+    _initialized: true
+  };
+}
+
+console.log('✅ 履歴システム（互換性レイヤー含む）初期化完了');
 
 </script>

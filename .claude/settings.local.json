@@ -32,7 +32,8 @@
       "Bash(git add:*)",
       "Bash(git push:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(./check-src.sh)"
+      "Bash(./check-src.sh)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": [],

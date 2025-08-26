@@ -2815,7 +2815,7 @@ function fetchAppSetupUrl() {
       const urls = JSON.parse(cachedUrls);
       if (urls && urls.setupUrl) {
         appSetupUrl = urls.setupUrl;
-        console.log('✅ URL cache hit - appSetupUrl loaded from localStorage');
+        // URL cache hit - verbose logging disabled
         return;
       }
     } catch (e) {

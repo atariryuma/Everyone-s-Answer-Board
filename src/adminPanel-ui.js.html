@@ -2316,7 +2316,7 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
   
     runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, sheetName)
       .then(function(details) {
-        console.log('✅ Sheet details loaded via API:', details);
+        // Sheet details loaded - verbose logging disabled
         
         // If headers are empty, and we have retries left, try again after a delay
         if (details && (!details.allHeaders || details.allHeaders.length === 0) && retryCount < maxRetries) {
@@ -2909,8 +2909,7 @@ function validateConfiguration() {
 // =============================================================================
 
 // 履歴管理の定数
-// HISTORY_STORAGE_KEY is defined in adminPanel-simple-history.js.html
-const MAX_HISTORY_ITEMS = 50;
+// HISTORY_STORAGE_KEY and MAX_HISTORY_ITEMS are defined in adminPanel-simple-history.js.html
 
 /**
  * 回答ボードの履歴を保存
