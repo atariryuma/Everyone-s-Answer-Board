@@ -734,24 +734,23 @@
 
 <script>
 // 共通モーダル管理クラス
-class SharedModals {
-  constructor() {
-    this.loadedModals = new Set();
-    this.setupEventListeners();
-  }
+function SharedModals() {
+  this.loadedModals = new Set();
+  this.setupEventListeners();
+}
 
-  // 選択的モーダル読み込み
-  loadModals(modalIds) {
+// 選択的モーダル読み込み
+SharedModals.prototype.loadModals = function(modalIds) {
     modalIds.forEach(modalId => {
       if (!this.loadedModals.has(modalId)) {
         this.loadedModals.add(modalId);
         console.log(`Modal ${modalId} loaded`);
       }
     });
-  }
+};
 
-  // 管理者専用モーダルの読み込み
-  loadAdminModals() {
+// 管理者専用モーダルの読み込み
+SharedModals.prototype.loadAdminModals = function() {
     this.loadModals([
       'form-config-modal',
       'security-details-modal',
@@ -760,10 +759,10 @@ class SharedModals {
       'quickstart-stop-confirmation-modal',
       'custom-setup-selection-modal'
     ]);
-  }
+};
 
-  // 確認モーダルの表示
-  showConfirmation(title, message, onConfirm, onCancel) {
+// 確認モーダルの表示
+SharedModals.prototype.showConfirmation = function(title, message, onConfirm, onCancel) {
     const modal = document.getElementById('confirmation-modal');
     const titleEl = document.getElementById('modal-title');
     const messageEl = document.getElementById('modal-message');
@@ -795,7 +794,8 @@ class SharedModals {
   }
 
   // アラートモーダルの表示
-  showAlert(title, message, type = 'info') {
+SharedModals.prototype.showAlert = function(title, message, type) {
+    type = type || 'info';
     const modal = document.getElementById('alert-modal');
     const titleEl = document.getElementById('alert-modal-title');
     const messageEl = document.getElementById('alert-modal-message');
@@ -827,10 +827,12 @@ class SharedModals {
     modal.classList.remove('hidden');
     
     closeBtn.onclick = () => this.hideModal('alert-modal');
-  }
+};
 
   // ローディングモーダルの表示
-  showLoading(title = '処理中...', message = 'しばらくお待ちください') {
+SharedModals.prototype.showLoading = function(title, message) {
+    title = title || '処理中...';
+    message = message || 'しばらくお待ちください';
     const modal = document.getElementById('loading-modal');
     const titleEl = document.getElementById('loading-modal-title');
     const messageEl = document.getElementById('loading-modal-message');
@@ -839,19 +841,19 @@ class SharedModals {
     if (messageEl) messageEl.textContent = message;
     
     if (modal) modal.classList.remove('hidden');
-  }
+};
 
   // モーダルの非表示
-  hideModal(modalId) {
+SharedModals.prototype.hideModal = function(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     }
-  }
+};
 
   // イベントリスナーの設定
-  setupEventListeners() {
+SharedModals.prototype.setupEventListeners = function() {
     // ESCキーでモーダルを閉じる
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -914,10 +916,10 @@ class SharedModals {
         };
       }
     });
-  }
+};
 
   // プライバシーモーダルの表示
-  showPrivacy(onContinue) {
+SharedModals.prototype.showPrivacy = function(onContinue) {
     const modal = document.getElementById('privacy-modal');
     if (!modal) {
       console.error('プライバシーモーダルが見つかりません');
@@ -941,10 +943,10 @@ class SharedModals {
         this.hideModal('privacy-modal');
       };
     }
-  }
+};
 
   // デジタル・シティズンシップモーダルの表示
-  showDigitalCitizenship() {
+SharedModals.prototype.showDigitalCitizenship = function() {
     const modal = document.getElementById('digital-citizenship-modal');
     if (!modal) {
       console.error('デジタル・シティズンシップモーダルが見つかりません');
@@ -952,10 +954,10 @@ class SharedModals {
     }
     
     modal.classList.remove('hidden');
-  }
+};
 
   // 6時間自動停止確認モーダルの表示（完全版エラーハンドリング）
-  showAutoStopConfirmation(publishResult) {
+SharedModals.prototype.showAutoStopConfirmation = function(publishResult) {
     // ローディングオーバーレイを確実に非表示にする
     if (window.unifiedLoadingManager) {
       window.unifiedLoadingManager.setLoading(false);
@@ -1070,10 +1072,10 @@ class SharedModals {
         alert('時間延長機能は今後実装予定です。');
       };
     }
-  }
+};
 
   // 公開結果データの完全性検証
-  validatePublishResult(publishResult) {
+SharedModals.prototype.validatePublishResult = function(publishResult) {
     const errors = [];
     let isValid = true;
     let hasValidUrl = false;
@@ -1181,10 +1183,10 @@ class SharedModals {
           `⚠️ ${warningErrors.length}個の軽微な問題があります` : 
           '✅ データは正常です')
     };
-  }
+};
 
   // URL状態表示の更新（改善版）
-  updateUrlStatusDisplay(publishResult, validationResult) {
+SharedModals.prototype.updateUrlStatusDisplay = function(publishResult, validationResult) {
     const urlStatusText = document.getElementById('url-status-text');
     const urlPreview = document.getElementById('url-preview');
     const urlStatusSection = document.getElementById('url-status-section');
@@ -1214,15 +1216,15 @@ class SharedModals {
       urlPreview.textContent = '公開URLが正常に生成されていません';
       urlPreview.className = 'text-xs text-red-100 break-all';
     }
-  }
+};
 
   // 旧displayUrlStatus関数（互換性のため保持）
-  displayUrlStatus(publishResult, validationResult) {
+SharedModals.prototype.displayUrlStatus = function(publishResult, validationResult) {
     this.updateUrlStatusDisplay(publishResult, validationResult);
-  }
+};
 
   // 残り時間カウントダウン
-  startCountdown(stopTime) {
+SharedModals.prototype.startCountdown = function(stopTime) {
     const updateRemainingTime = () => {
       const now = new Date();
       const remaining = stopTime - now;
@@ -1258,10 +1260,10 @@ class SharedModals {
       });
       observer.observe(modal, { attributes: true });
     }
-  }
+};
 
   // フォーム設定モーダルの表示
-  showFormConfig() {
+SharedModals.prototype.showFormConfig = function() {
     this.loadAdminModals();
     const modal = document.getElementById('form-config-modal');
     if (!modal) {
@@ -1294,10 +1296,10 @@ class SharedModals {
       mainQuestionTypeSelect.removeEventListener('change', toggleChoicesVisibility); // 重複登録防止
       mainQuestionTypeSelect.addEventListener('change', toggleChoicesVisibility);
     }
-  }
+};
 
   // セキュリティ詳細モーダルの表示
-  showSecurityDetails() {
+SharedModals.prototype.showSecurityDetails = function() {
     this.loadAdminModals();
     const modal = document.getElementById('security-details-modal');
     if (!modal) {
@@ -1307,10 +1309,10 @@ class SharedModals {
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-  }
+};
 
   // Google連携モーダルの表示
-  showGoogleIntegration() {
+SharedModals.prototype.showGoogleIntegration = function() {
     this.loadAdminModals();
     const modal = document.getElementById('google-integration-modal');
     if (!modal) {
@@ -1320,7 +1322,7 @@ class SharedModals {
     
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-  }
+};
 
   // プライバシー警告モーダルの表示
   showPrivacyWarning(onConfirm, onCancel) {

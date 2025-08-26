@@ -16,7 +16,7 @@ window.cacheManager = window.cacheManager || {
    * フロントエンドキャッシュをクリア
    * @returns {Promise} クリア結果
    */
-  clearAllFrontendCaches: function() {
+  clearAllFrontendCaches() {
     return new Promise((resolve) => {
       try {
         // localStorage のクリア（必要に応じて）
@@ -53,7 +53,7 @@ window.cacheManager = window.cacheManager || {
    * 特定のキャッシュキーを無効化
    * @param {Array} patterns - 無効化するパターン
    */
-  invalidate: function(patterns) {
+  invalidate(patterns) {
     console.log('Cache invalidation requested for patterns:', patterns);
     // フロントエンドでは実装不要（バックエンド側で処理）
     return Promise.resolve();
@@ -63,7 +63,7 @@ window.cacheManager = window.cacheManager || {
    * シートデータキャッシュを無効化
    * @param {string} spreadsheetId - スプレッドシートID
    */
-  invalidateSheetData: function(spreadsheetId) {
+  invalidateSheetData(spreadsheetId) {
     console.log('Sheet data cache invalidation requested for:', spreadsheetId);
     // フロントエンドでは実装不要（バックエンド側で処理）
     return Promise.resolve();
@@ -77,48 +77,48 @@ window.cacheManager = window.cacheManager || {
 /**
  * フロー実行制御マネージャー - 重複実行・競合状態を防止
  */
-function FlowExecutionManager() {
-  this.activeFlows = new Set();
-  this.pendingOperations = new Map();
-  this.executionQueue = new Map();
-  this.debugMode = window.DEBUG_MODE || false;
-}
+class FlowExecutionManager {
+  constructor() {
+    this.activeFlows = new Set();
+    this.pendingOperations = new Map();
+    this.executionQueue = new Map();
+    this.debugMode = window.DEBUG_MODE || false;
+  }
 
-/**
- * 排他実行制御付きでフロー実行
- * @param {string} flowId - フロー識別子
- * @param {Function} operation - 実行する操作
- * @param {Object} options - 実行オプション
- * @returns {Promise} 実行結果
- */
-FlowExecutionManager.prototype.executeWithLock = function(flowId, operation, options) {
-  options = options || {};
-  var timeout = options.timeout || SYSTEM_CONSTANTS.TIMEOUTS.DEFAULT_FLOW_TIMEOUT;
-  var allowQueue = options.allowQueue || false;
+  /**
+   * 排他実行制御付きでフロー実行
+   * @param {string} flowId - フロー識別子
+   * @param {Function} operation - 実行する操作
+   * @param {Object} options - 実行オプション
+   * @returns {Promise} 実行結果
+   */
+  executeWithLock(flowId, operation, options = {}) {
+    const timeout = options.timeout || SYSTEM_CONSTANTS.TIMEOUTS.DEFAULT_FLOW_TIMEOUT;
+    const allowQueue = options.allowQueue || false;
 
     // 既に実行中の場合の処理
     if (this.activeFlows.has(flowId)) {
       if (this.pendingOperations.has(flowId)) {
         if (this.debugMode) {
-          logDebug('🔒 Flow ' + flowId + ' already in progress, returning existing promise');
+          logDebug(`🔒 Flow ${flowId} already in progress, returning existing promise`);
         }
         return this.pendingOperations.get(flowId);
       }
       
       if (!allowQueue) {
-        throw new Error('Flow ' + flowId + ' is already in progress and queueing is disabled');
+        throw new Error(`Flow ${flowId} is already in progress and queueing is disabled`);
       }
       
       // キューに追加
       if (this.debugMode) {
-        logDebug('⏳ Flow ' + flowId + ' queued for execution');
+        logDebug(`⏳ Flow ${flowId} queued for execution`);
       }
       return this.queueOperation(flowId, operation, timeout);
     }
 
     // 新規実行
     return this.executeOperation(flowId, operation, timeout);
-};
+  }
 
 /**
  * 操作を実行（改良版 - AbortController対応）

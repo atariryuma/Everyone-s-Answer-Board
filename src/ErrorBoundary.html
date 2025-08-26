@@ -96,7 +96,7 @@
   
   // Recovery strategies based on error category
   const attemptRecovery = (errorInfo, recoveryOptions) => {
-    var category = errorInfo.category;
+    const category = errorInfo.category;
     
     switch (category) {
       case ERROR_CATEGORIES.NETWORK:
@@ -442,7 +442,7 @@
     </style>
     <script>
         // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
-        function forceLogoutAndRedirect() {
+        const forceLogoutAndRedirect = () => {
             console.log('🔄 サーバーサイド強制ログアウト開始...');
             console.log('📍 現在のURL:', window.location.href);
             
@@ -496,7 +496,7 @@
         }
         
         // シンプルなフォールバック関数
-        function fallbackReload() {
+        const fallbackReload = () => {
             console.log('🔄 フォールバック：ページリロード実行');
             const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
             if (confirm(confirmMessage)) {
@@ -505,7 +505,7 @@
         }
         
         // テスト用関数
-        function testServerFunction() {
+        const testServerFunction = () => {
             console.log('🧪 Testing server function...');
             
             // 関数存在チェック
@@ -618,7 +618,7 @@
 
     <script>
         // 詳細診断情報の表示切り替え
-        function toggleDiagnosticInfo() {
+        const toggleDiagnosticInfo = () => {
             const content = document.getElementById('diagnostic-content');
             const arrow = document.getElementById('diagnostic-arrow');
             
@@ -632,7 +632,7 @@
         }
         
         // デバッグ情報の表示切り替え
-        function toggleDebugInfo() {
+        const toggleDebugInfo = () => {
             const content = document.getElementById('debug-content');
             const arrow = document.getElementById('debug-arrow');
             
@@ -646,7 +646,7 @@
         }
         
         // 診断情報をクリップボードにコピー
-        function copyDiagnosticInfo() {
+        const copyDiagnosticInfo = () => {
             try {
                 let copyText = '=== エラー診断レポート ===\n\n';
                 copyText += 'タイトル: <?= htmlEncode(title || "Unknown") ?>\n';
@@ -654,26 +654,26 @@
                 
                 // DOM から診断情報を直接取得
                 const diagnosticSections = document.querySelectorAll('.diagnostic-summary');
-                diagnosticSections.forEach((section) => {
+                for (const section of diagnosticSections) {
                     const heading = section.querySelector('h4');
                     if (heading && heading.textContent.includes('📋 基本情報')) {
                         const summaryItems = section.querySelectorAll('p');
                         if (summaryItems.length > 0) {
                             copyText += '\n【基本情報】\n';
-                            summaryItems.forEach((item) => {
+                            for (const item of summaryItems) {
                                 copyText += item.textContent.trim() + '\n';
-                            });
+                            }
                         }
                     } else if (heading && heading.textContent.includes('🔧 技術詳細')) {
                         const technicalItems = section.querySelectorAll('p');
                         if (technicalItems.length > 0) {
                             copyText += '\n【技術詳細】\n';
-                            technicalItems.forEach((item) => {
+                            for (const item of technicalItems) {
                                 copyText += item.textContent.trim() + '\n';
-                            });
+                            }
                         }
                     }
-                });
+                }
                 
                 const propertiesSection = document.querySelector('.diagnostic-properties pre');
                 if (propertiesSection) {
@@ -683,9 +683,9 @@
                 
                 // クリップボードに書き込み
                 if (navigator.clipboard) {
-                    navigator.clipboard.writeText(copyText).then(function() {
+                    navigator.clipboard.writeText(copyText).then(() => {
                         alert('📋 診断情報がクリップボードにコピーされました');
-                    }).catch(function() {
+                    }).catch(() => {
                         fallbackCopy(copyText);
                     });
                 } else {
@@ -699,7 +699,7 @@
         }
         
         // フォールバックコピー機能
-        function fallbackCopy(text) {
+        const fallbackCopy = (text) => {
             const textArea = document.createElement('textarea');
             textArea.value = text;
             document.body.appendChild(textArea);

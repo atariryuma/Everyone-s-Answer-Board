@@ -27,106 +27,111 @@ window.AdminPanel = window.AdminPanel || {
 // -----------------------------------------------------------------------------
 // State Manager
 // -----------------------------------------------------------------------------
-function AdminPanelStateManager() {
-  this.state = {
-    currentStatus: null,
-    selectedSheet: '',
-    isLoading: false,
-    debugMode: false // DEBUG_MODE状態を追加
-  };
-  this.subscribers = new Map();
-}
-
-AdminPanelStateManager.prototype.setState = function(key, value) {
-  this.state[key] = value;
-  this.notifySubscribers(key, value);
-};
-
-AdminPanelStateManager.prototype.subscribe = function(key, callback) {
-  if (!this.subscribers.has(key)) {
-    this.subscribers.set(key, []);
+class AdminPanelStateManager {
+  constructor() {
+    this.state = {
+      currentStatus: null,
+      selectedSheet: '',
+      isLoading: false,
+      debugMode: false // DEBUG_MODE状態を追加
+    };
+    this.subscribers = new Map();
   }
-  this.subscribers.get(key).push(callback);
-};
 
-AdminPanelStateManager.prototype.notifySubscribers = function(key, value) {
-  var subs = this.subscribers.get(key) || [];
-  subs.forEach(function(cb) {
-    try {
-      cb(value);
-    } catch (e) {
-      console.warn('Subscriber callback failed', e);
+  setState(key, value) {
+    this.state[key] = value;
+    this.notifySubscribers(key, value);
+  }
+
+  subscribe(key, callback) {
+    if (!this.subscribers.has(key)) {
+      this.subscribers.set(key, []);
     }
-  });
-};
+    this.subscribers.get(key).push(callback);
+  }
+
+  notifySubscribers(key, value) {
+    const subs = this.subscribers.get(key) || [];
+    subs.forEach((cb) => {
+      try {
+        cb(value);
+      } catch (e) {
+        console.warn('Subscriber callback failed', e);
+      }
+    });
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Event Manager
 // -----------------------------------------------------------------------------
-function AdminPanelEventManager() {
-  this.listeners = new Map();
-}
-
-AdminPanelEventManager.prototype.addListener = function(element, event, handler, options) {
-  options = options || {};
-  if (!element || !event || !handler) return;
-  var key = (element.id || 'anonymous') + '-' + event;
-  if (this.listeners.has(key)) {
-    console.warn('Duplicate listener for ' + key);
-    return;
+class AdminPanelEventManager {
+  constructor() {
+    this.listeners = new Map();
   }
-  element.addEventListener(event, handler, options);
-  this.listeners.set(key, { element: element, event: event, handler: handler, options: options });
-};
+
+  addListener(element, event, handler, options = {}) {
+    if (!element || !event || !handler) return;
+    const key = `${element.id || 'anonymous'}-${event}`;
+    if (this.listeners.has(key)) {
+      console.warn(`Duplicate listener for ${key}`);
+      return;
+    }
+    element.addEventListener(event, handler, options);
+    this.listeners.set(key, { element, event, handler, options });
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Async Manager
 // -----------------------------------------------------------------------------
-function AdminPanelAsyncManager() {
-  this.runningOperations = new Map();
-}
-
-AdminPanelAsyncManager.prototype.executeExclusive = function(operationId, operation) {
-  var self = this;
-  if (this.runningOperations.has(operationId)) {
-    return this.runningOperations.get(operationId);
+class AdminPanelAsyncManager {
+  constructor() {
+    this.runningOperations = new Map();
   }
-  var promise = Promise.resolve().then(operation);
-  this.runningOperations.set(operationId, promise);
-  return promise.then(function(result) {
-    self.runningOperations.delete(operationId);
-    return result;
-  }).catch(function(error) {
-    self.runningOperations.delete(operationId);
-    throw error;
-  });
-};
+
+  executeExclusive(operationId, operation) {
+    if (this.runningOperations.has(operationId)) {
+      return this.runningOperations.get(operationId);
+    }
+    const promise = Promise.resolve().then(operation);
+    this.runningOperations.set(operationId, promise);
+    return promise.then((result) => {
+      this.runningOperations.delete(operationId);
+      return result;
+    }).catch((error) => {
+      this.runningOperations.delete(operationId);
+      throw error;
+    });
+  }
+}
 
 // -----------------------------------------------------------------------------
 // DOM Manager
 // -----------------------------------------------------------------------------
-function AdminPanelDOMManager() {
-  this.elementCache = new Map();
-  this.operationQueue = [];
-}
-
-AdminPanelDOMManager.prototype.getElement = function(id) {
-  if (!this.elementCache.has(id)) {
-    this.elementCache.set(id, document.getElementById(id));
+class AdminPanelDOMManager {
+  constructor() {
+    this.elementCache = new Map();
+    this.operationQueue = [];
   }
-  return this.elementCache.get(id);
-};
 
-AdminPanelDOMManager.prototype.queueOperation = function(operation) {
-  var self = this;
-  this.operationQueue.push(operation);
-  return new Promise(function(resolve) {
-    requestAnimationFrame(function() {
-      var op = self.operationQueue.shift();
-      resolve(op());
+  getElement(id) {
+    if (!this.elementCache.has(id)) {
+      this.elementCache.set(id, document.getElementById(id));
+    }
+    return this.elementCache.get(id);
+  }
+
+  queueOperation(operation) {
+    this.operationQueue.push(operation);
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        const op = this.operationQueue.shift();
+        resolve(op());
+      });
     });
-  });
-};
+  }
+}
 
 // Instantiate managers and expose via namespace
 window.AdminPanel.stateManager = new AdminPanelStateManager();
@@ -153,7 +158,7 @@ Object.defineProperties(window, {
 // Simple logging utility with conditional output based on DEBUG mode
 // DEBUG_MODE is defined in constants.js.html
 
-function adminLog(level, ...args) {
+const adminLog = (level, ...args) => {
   // Only show errors and critical warnings - disable verbose logging
   switch (level) {
     case 'error':
@@ -169,29 +174,29 @@ function adminLog(level, ...args) {
       // All info/debug logs disabled for performance
       return;
   }
-}
+};
 
 // Convenience functions for different log levels
-function logError(...args) { adminLog('error', ...args); }
-function logWarn(...args) { adminLog('warn', ...args); }
-function logInfo(...args) { adminLog('info', ...args); }
-function logDebug(...args) { adminLog('debug', ...args); }
+const logError = (...args) => adminLog('error', ...args);
+const logWarn = (...args) => adminLog('warn', ...args);
+const logInfo = (...args) => adminLog('info', ...args);
+const logDebug = (...args) => adminLog('debug', ...args);
 
 // =============================================================================
 // USER AUTHENTICATION INITIALIZATION
 // =============================================================================
 
 // マルチテナント対応: ユーザーIDの安全な初期化
-var userId = '';
+let userId = '';
 
 // マルチテナント対応: バックエンドから安全にユーザーIDを取得
-function initializeUserId() {
+const initializeUserId = () => {
   console.group('🔐 Initializing UserId');
   logDebug('📞 About to call getCurrentUserStatus');
   
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
     google.script.run
-      .withSuccessHandler(function(response) {
+      .withSuccessHandler((response) => {
         logDebug('📥 getCurrentUserStatus response:', response);
         
         if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
@@ -206,7 +211,7 @@ function initializeUserId() {
           reject(new Error('ユーザーIDの取得に失敗しました'));
         }
       })
-      .withFailureHandler(function(error) {
+      .withFailureHandler((error) => {
         console.error('❌ Backend error getting userId:', error);
         console.error('❌ Error type:', typeof error);
         console.error('❌ Error details:', error);
@@ -218,15 +223,15 @@ function initializeUserId() {
 }
 
 // リトライ付きユーザーID取得
-async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
-  for (var i = 0; i < maxRetries; i++) {
+const initializeUserIdWithRetry = async (maxRetries = 3, delay = 1000) => {
+  for (let i = 0; i < maxRetries; i++) {
     try {
       return await initializeUserId();
     } catch (error) {
-      console.warn('⚠️ UserId initialization failed (attempt ' + (i + 1) + '/' + maxRetries + '):', error.message);
+      console.warn(`⚠️ UserId initialization failed (attempt ${i + 1}/${maxRetries}):`, error.message);
       if (i < maxRetries - 1) {
-        console.log('🔄 Retrying in ' + delay + 'ms...');
-        await new Promise(function(resolve) { setTimeout(resolve, delay); });
+        console.log(`🔄 Retrying in ${delay}ms...`);
+        await new Promise((resolve) => { setTimeout(resolve, delay); });
         delay = Math.min(delay * 1.5, 5000); // 指数バックオフ（最大5秒）
       } else {
         logError(error, 'All userId initialization attempts failed');
@@ -234,19 +239,19 @@ async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
       }
     }
   }
-}
+};
 
 // ユーザーID取得の完了を待つPromise（リトライ機構付き）
-var userIdPromise = initializeUserIdWithRetry();
+const userIdPromise = initializeUserIdWithRetry();
 
 // =============================================================================
 // CORE INITIALIZATION FUNCTIONS
 // =============================================================================
 
 // Layout adjustment for responsive design
-function adjustLayout() {
-  var isMobile = window.innerWidth < 768;
-  var body = document.body;
+const adjustLayout = () => {
+  const isMobile = window.innerWidth < 768;
+  const body = document.body;
   
   if (isMobile) {
     body.classList.add('mobile-layout');
@@ -255,16 +260,16 @@ function adjustLayout() {
     body.classList.add('desktop-layout');
     body.classList.remove('mobile-layout');
   }
-}
+};
 
 // Initialize core functionality
-function initCore() {
+const initCore = () => {
   adjustLayout();
-}
+};
 
 // Initialize message area
-function initializeMessageArea() {
-  var messageArea = document.getElementById('message-area');
+const initializeMessageArea = () => {
+  let messageArea = document.getElementById('message-area');
   if (!messageArea) {
     // Create message area if it doesn't exist
     messageArea = document.createElement('div');
@@ -272,15 +277,15 @@ function initializeMessageArea() {
     messageArea.className = 'fixed top-32 right-4 z-50 max-w-sm';
     document.body.appendChild(messageArea);
   }
-}
+};
 
 // Initialize UI components
-function initializeUI() {
+const initializeUI = () => {
   // UI初期化のみ実行、loadStatusは adminPanel-api.js で処理される
-}
+};
 
 // Initialize API functionality
-function initializeAPI() {
+const initializeAPI = () => {
   logDebug('🔧 API初期化開始');
   
   // Start background status updates with safe calling
@@ -297,7 +302,7 @@ function initializeAPI() {
 
   // 初期化時のステータスロード - タイミング調整版
   logDebug('🚀 初期化時loadStatus(true)呼び出し（遅延あり）');
-  setTimeout(function() {
+  setTimeout(() => {
     if (checkFunctionAvailability('loadStatus')) {
       window.loadStatus(true);
     } else {
@@ -306,17 +311,17 @@ function initializeAPI() {
   }, 500); // 500ms遅延でより安全な初期化
   
   logDebug('✅ API初期化完了');
-}
+};
 
 // Update user activity timestamp for polling optimization
-function updateUserActivity() {
+const updateUserActivity = () => {
   if (typeof lastUserActivity !== 'undefined') {
     lastUserActivity = Date.now();
   }
-}
+};
 
 // Initialize event listeners
-function initializeEventListeners() {
+const initializeEventListeners = () => {
   
   // Use safe function calling with availability checks
   if (checkFunctionAvailability('setupEventListeners')) {
@@ -331,29 +336,29 @@ function initializeEventListeners() {
       console.warn('⚠️ setupRealtimeValidation not available - real-time validation disabled');
     }
   }
-}
+};
 
 // Setup character counters
-function setupCharacterCounters() {
-  var questionTextarea = document.getElementById('custom-main-question');
-  var questionCounter = document.getElementById('question-counter');
+const setupCharacterCounters = () => {
+  const questionTextarea = document.getElementById('custom-main-question');
+  const questionCounter = document.getElementById('question-counter');
 
   if (questionTextarea && questionCounter) {
     questionTextarea.addEventListener('input', function() {
-      var count = this.value.length;
-      questionCounter.textContent = count + '/500';
+      const count = this.value.length;
+      questionCounter.textContent = `${count}/500`;
       questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
     });
   }
-}
+};
 
 // Setup modal character counter observers
-function setupModalCharacterCounters() {
+const setupModalCharacterCounters = () => {
   // モーダルが表示されるたびにカウンターをセットアップ
-  var observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
       if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        var modal = document.getElementById('form-config-modal');
+        const modal = document.getElementById('form-config-modal');
         if (modal && !modal.classList.contains('hidden')) {
           setTimeout(setupCharacterCounters, 100);
         }
@@ -362,14 +367,14 @@ function setupModalCharacterCounters() {
   });
   
   // モーダルの監視を開始
-  var modal = document.getElementById('form-config-modal');
+  const modal = document.getElementById('form-config-modal');
   if (modal) {
     observer.observe(modal, { attributes: true });
   }
-}
+};
 
 // Navigate to specific step in admin panel
-function navigateToStep(step) {
+const navigateToStep = (step) => {
   if (typeof currentStep !== 'undefined') {
     currentStep = step;
   } else {
@@ -378,28 +383,28 @@ function navigateToStep(step) {
   }
   
   // Update step indicators
-  document.querySelectorAll('.step-indicator').forEach(function(indicator, index) {
-    var stepNumber = index + 1;
+  document.querySelectorAll('.step-indicator').forEach((indicator, index) => {
+    const stepNumber = index + 1;
     indicator.classList.toggle('completed', stepNumber < step);
     indicator.classList.toggle('active', stepNumber === step);
   });
   
   // Show/hide step content
-  document.querySelectorAll('.step-content').forEach(function(content, index) {
-    var stepNumber = index + 1;
+  document.querySelectorAll('.step-content').forEach((content, index) => {
+    const stepNumber = index + 1;
     content.classList.toggle('hidden', stepNumber !== step);
   });
   
   // Update progress bar
-  var progressBar = document.querySelector('.progress-bar');
+  const progressBar = document.querySelector('.progress-bar');
   if (progressBar) {
-    progressBar.style.width = ((step / 3) * 100) + '%';
+    progressBar.style.width = `${(step / 3) * 100}%`;
   }
   
   if (typeof validateCurrentStep === 'function') {
     validateCurrentStep();
   }
-}
+};
 
 // Make navigateToStep globally available
 window.navigateToStep = navigateToStep;
@@ -458,8 +463,8 @@ function toggleSection(sectionId) {
 }
 
 // Hide privacy modal
-function hidePrivacyModal() {
-  var modal = document.getElementById('privacy-modal');
+const hidePrivacyModal = () => {
+  const modal = document.getElementById('privacy-modal');
   if (modal) {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -467,7 +472,7 @@ function hidePrivacyModal() {
       manageFocusForModal('privacy-modal', false);
     }
   }
-}
+};
 
 // Show form configuration modal
 function showFormConfigModal() {
@@ -481,7 +486,7 @@ function showFormConfigModal() {
     }
   } else {
     // Fallback for legacy support
-    var modal = document.getElementById('form-config-modal');
+    const modal = document.getElementById('form-config-modal');
     if (modal) {
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -818,9 +823,10 @@ window.AdminPanel.functionRegistry = {
     ];
     
     var foundCount = 0;
+    var self = this;
     functionsToCheck.forEach(function(funcName) {
-      if (this.hasFullImplementation(funcName)) {
-        this.registerFullImplementation(funcName);
+      if (self.hasFullImplementation(funcName)) {
+        self.registerFullImplementation(funcName);
         foundCount++;
       }
     });

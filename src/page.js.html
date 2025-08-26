@@ -9,7 +9,7 @@ const CHUNK_SIZE = 5; // DOM operations per chunk
 const IDLE_TIMEOUT = 5000; // Idle timeout for cleanup
 
 // Dynamic batch size calculation based on device performance
-function getDynamicBatchSize(performanceMetrics = {}) {
+const getDynamicBatchSize = (performanceMetrics = {}) => {
   const memory = navigator.deviceMemory || 4;
   const cores = navigator.hardwareConcurrency || 4;
   const frameTime = performanceMetrics.frameTime || 16;
@@ -44,7 +44,7 @@ function getDynamicBatchSize(performanceMetrics = {}) {
   } else {
     return LOW_PERF_BATCH_SIZE; // Score 0-4: Low performance
   }
-}
+};
 
 // Get optimal batch size for current device
 const RENDER_BATCH_SIZE = getDynamicBatchSize();
@@ -62,161 +62,142 @@ const ICONS = {
   'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
 };
 
-function UnifiedCache() {
-  this.data = new Map();
-  this.timestamps = new Map();
-  this.maxSize = 500; // フェーズ4最適化: メモリ制限
-  this.accessCount = new Map(); // アクセス回数記録
-}
-
-UnifiedCache.prototype.set = function(key, value, ttl) {
-  if (typeof ttl === 'undefined') ttl = 300000; // 5分のデフォルトTTL
-  
-  // フェーズ4最適化: メモリ制限チェック
-  if (this.data.size >= this.maxSize) {
-    this.performLRUEviction();
+class UnifiedCache {
+  constructor() {
+    this.data = new Map();
+    this.timestamps = new Map();
+    this.maxSize = 500; // フェーズ4最適化: メモリ制限
+    this.accessCount = new Map(); // アクセス回数記録
   }
-  
-  this.data.set(key, value);
-  this.timestamps.set(key, Date.now() + ttl);
-  this.accessCount.set(key, (this.accessCount.get(key) || 0) + 1);
-};
 
-UnifiedCache.prototype.get = function(key) {
-  if (!this.data.has(key)) return undefined;
-  
-  var expiry = this.timestamps.get(key);
-  if (expiry && Date.now() > expiry) {
-    this.delete(key);
-    return undefined;
-  }
-  
-  // フェーズ4最適化: アクセス回数更新（LRUアルゴリズム用）
-  this.accessCount.set(key, (this.accessCount.get(key) || 0) + 1);
-  return this.data.get(key);
-};
-
-UnifiedCache.prototype.has = function(key) {
-  return this.get(key) !== undefined;
-};
-
-UnifiedCache.prototype.delete = function(key) {
-  this.data.delete(key);
-  this.timestamps.delete(key);
-  this.accessCount.delete(key);
-};
-
-UnifiedCache.prototype.clear = function() {
-  this.data.clear();
-  this.timestamps.clear();
-  this.accessCount.clear();
-};
-
-/**
- * フェーズ4最適化: LRU（最も使用頻度の低い）エントリを削除
- */
-UnifiedCache.prototype.performLRUEviction = function() {
-  if (this.data.size === 0) return;
-  
-  var self = this;
-  // アクセス回数の少ないキーから10個を削除
-  var sortedEntries = Array.from(this.accessCount.entries())
-    .sort(function(a, b) { return a[1] - b[1]; }) // アクセス回数昇順
-    .slice(0, Math.min(10, Math.floor(this.data.size * 0.1))); // 10%または最大10個
-  
-  sortedEntries.forEach(function(entry) {
-    var key = entry[0];
-    self.delete(key);
-  });
-  
-  console.log('🗑️ LRU cache eviction: removed ' + sortedEntries.length + ' entries, ' + this.data.size + ' remaining');
-};
-
-/**
- * フェーズ4最適化: キャッシュ統計情報
- */
-UnifiedCache.prototype.getStats = function() {
-  var now = Date.now();
-  var expiredCount = 0;
-  
-  var entriesIterator = this.timestamps.entries();
-  var entry = entriesIterator.next();
-  while (!entry.done) {
-    var key = entry.value[0];
-    var expiry = entry.value[1];
-    if (now > expiry) expiredCount++;
-    entry = entriesIterator.next();
-  }
-  
-  return {
-    totalEntries: this.data.size,
-    expiredEntries: expiredCount,
-    memoryUsage: this.estimateMemoryUsage(),
-    hitRate: this.calculateHitRate()
-  };
-};
-
-/**
- * フェーズ4最適化: メモリ使用量の概算
- */
-UnifiedCache.prototype.estimateMemoryUsage = function() {
-  var totalSize = 0;
-  
-  var entriesIterator = this.data.entries();
-  var entry = entriesIterator.next();
-  while (!entry.done) {
-    var key = entry.value[0];
-    var value = entry.value[1];
-    totalSize += key.length * 2; // Unicode文字は2バイト
-    if (typeof value === 'string') {
-      totalSize += value.length * 2;
-    } else if (typeof value === 'object' && value !== null) {
-      totalSize += JSON.stringify(value).length * 2;
-    } else {
-      totalSize += 8; // 基本型の概算
+  set(key, value, ttl) {
+    if (typeof ttl === 'undefined') ttl = 300000; // 5分のデフォルトTTL
+    
+    // フェーズ4最適化: メモリ制限チェック
+    if (this.data.size >= this.maxSize) {
+      this.performLRUEviction();
     }
-    entry = entriesIterator.next();
+    
+    this.data.set(key, value);
+    this.timestamps.set(key, Date.now() + ttl);
+    this.accessCount.set(key, (this.accessCount.get(key) || 0) + 1);
   }
-  
-  return Math.round(totalSize / 1024); // KB単位で返す
-};
 
-/**
- * フェーズ4最適化: キャッシュヒット率計算（簡易版）
- */
-UnifiedCache.prototype.calculateHitRate = function() {
-  var totalAccess = Array.from(this.accessCount.values()).reduce(function(sum, count) {
-    return sum + count;
-  }, 0);
-  return totalAccess > 0 ? Math.round((totalAccess / (totalAccess + this.data.size)) * 100) : 0;
-};
-
-UnifiedCache.prototype.cleanup = function() {
-  var self = this;
-  var now = Date.now();
-  var entriesIterator = this.timestamps.entries();
-  var keysToDelete = [];
-  
-  var entry = entriesIterator.next();
-  while (!entry.done) {
-    var key = entry.value[0];
-    var expiry = entry.value[1];
-    if (now > expiry) {
-      keysToDelete.push(key);
+  get(key) {
+    if (!this.data.has(key)) return undefined;
+    
+    const expiry = this.timestamps.get(key);
+    if (expiry && Date.now() > expiry) {
+      this.delete(key);
+      return undefined;
     }
-    entry = entriesIterator.next();
+    
+    // フェーズ4最適化: アクセス回数更新（LRUアルゴリズム用）
+    this.accessCount.set(key, (this.accessCount.get(key) || 0) + 1);
+    return this.data.get(key);
   }
-  
-  keysToDelete.forEach(function(key) {
-    self.delete(key);
-  });
-};
 
-Object.defineProperty(UnifiedCache.prototype, 'size', {
-  get: function() {
+  has(key) {
+    return this.get(key) !== undefined;
+  }
+
+  delete(key) {
+    this.data.delete(key);
+    this.timestamps.delete(key);
+    this.accessCount.delete(key);
+  }
+
+  clear() {
+    this.data.clear();
+    this.timestamps.clear();
+    this.accessCount.clear();
+  }
+
+  /**
+   * フェーズ4最適化: LRU（最も使用頻度の低い）エントリを削除
+   */
+  performLRUEviction() {
+    if (this.data.size === 0) return;
+    
+    // アクセス回数の少ないキーから10個を削除
+    const sortedEntries = Array.from(this.accessCount.entries())
+      .sort((a, b) => a[1] - b[1]) // アクセス回数昇順
+      .slice(0, Math.min(10, Math.floor(this.data.size * 0.1))); // 10%または最大10個
+    
+    sortedEntries.forEach((entry) => {
+      const key = entry[0];
+      this.delete(key);
+    });
+    
+    console.log(`🗑️ LRU cache eviction: removed ${sortedEntries.length} entries, ${this.data.size} remaining`);
+  }
+
+  /**
+   * フェーズ4最適化: キャッシュ統計情報
+   */
+  getStats() {
+    const now = Date.now();
+    let expiredCount = 0;
+    
+    for (const [key, expiry] of this.timestamps.entries()) {
+      if (now > expiry) expiredCount++;
+    }
+    
+    return {
+      totalEntries: this.data.size,
+      expiredEntries: expiredCount,
+      memoryUsage: this.estimateMemoryUsage(),
+      hitRate: this.calculateHitRate()
+    };
+  }
+
+  /**
+   * フェーズ4最適化: メモリ使用量の概算
+   */
+  estimateMemoryUsage() {
+    let totalSize = 0;
+    
+    for (const [key, value] of this.data.entries()) {
+      totalSize += key.length * 2; // Unicode文字は2バイト
+      if (typeof value === 'string') {
+        totalSize += value.length * 2;
+      } else if (typeof value === 'object' && value !== null) {
+        totalSize += JSON.stringify(value).length * 2;
+      } else {
+        totalSize += 8; // 基本型の概算
+      }
+    }
+    
+    return Math.round(totalSize / 1024); // KB単位で返す
+  }
+
+  /**
+   * フェーズ4最適化: キャッシュヒット率計算（簡易版）
+   */
+  calculateHitRate() {
+    const totalAccess = Array.from(this.accessCount.values()).reduce((sum, count) => sum + count, 0);
+    return totalAccess > 0 ? Math.round((totalAccess / (totalAccess + this.data.size)) * 100) : 0;
+  }
+
+  cleanup() {
+    const now = Date.now();
+    const keysToDelete = [];
+    
+    for (const [key, expiry] of this.timestamps.entries()) {
+      if (now > expiry) {
+        keysToDelete.push(key);
+      }
+    }
+    
+    keysToDelete.forEach((key) => {
+      this.delete(key);
+    });
+  }
+
+  get size() {
     return this.data.size;
   }
-});
+}
 
 // アプリケーション定数
 StudyQuestApp.CONSTANTS = {
@@ -230,7 +211,8 @@ StudyQuestApp.CONSTANTS = {
 };
 
 
-function StudyQuestApp() {
+class StudyQuestApp {
+  constructor() {
     this.cache = new UnifiedCache();
     this.weakCache = new WeakMap(); // For DOM element caching
     this.performanceMetrics = { frameTime: 0, domOperations: 0 };
@@ -8577,8 +8559,8 @@ function StudyQuestApp() {
     * @param {Function} onSuccess - 成功時のコールバック（オプション）
     * @param {Function} onError - エラー時のコールバック（オプション）
     */
-    function loadDomainInfo(onSuccess, onError) {
-  google.script.run
+  loadDomainInfo(onSuccess, onError) {
+    google.script.run
     .withSuccessHandler(info => {
       displayDomainInfo(info);
       if (onSuccess) onSuccess(info);
@@ -8588,14 +8570,14 @@ function StudyQuestApp() {
       displayDomainInfo({ error: error.message || error });
       if (onError) onError(error);
     })
-    .getDeployUserDomainInfo();
-    }
+      .getDeployUserDomainInfo();
+  }
 
-    /**
-    * ドメイン情報を表示する共通関数
-    * @param {Object} info - ドメイン情報オブジェクト
-    */
-    function displayDomainInfo(info) {
+  /**
+   * ドメイン情報を表示する共通関数
+   * @param {Object} info - ドメイン情報オブジェクト
+   */
+  displayDomainInfo(info) {
   const headerDomainMatch = document.getElementById('header-domain-match');
   const headerDomainMismatch = document.getElementById('header-domain-mismatch');
   const headerDomainInitial = document.getElementById('header-domain-initial');
@@ -8635,7 +8617,7 @@ function StudyQuestApp() {
     /**
     * フォームリンクを取得して表示する関数
     */
-    function loadFormLink() {
+  loadFormLink() {
   google.script.run
     .withSuccessHandler(formInfo => {
   if (formInfo && formInfo.formUrl) {
@@ -8649,10 +8631,11 @@ function StudyQuestApp() {
     .withFailureHandler(error => {
       console.warn('フォーム情報の取得に失敗しました:', error);
     })
-    .getActiveFormInfo(USER_ID);
-    }
+      .getActiveFormInfo(USER_ID);
+  }
+}
 
-    try {
+try {
   if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
     window.studyQuestApp.destroy();
   }

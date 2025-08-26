@@ -149,8 +149,6 @@
   
   
   <!-- Core JavaScript Libraries (must be loaded first) -->
-  <!-- ES5 Compatibility Layer - MUST LOAD FIRST -->
-  <?!= include('es5-compatibility-layer.js.html'); ?>
   <?!= include('ClientOptimizer.html'); ?>
   <!-- UnifiedCache.js.html removed - class is defined in page.js.html -->
   
@@ -2036,7 +2034,7 @@
   <!-- 共通モーダルコンポーネントを読み込み -->
   <?!= include('SharedModals.html'); ?>
   
-  <!-- Admin Panel JavaScript Components - ES5 Compatible Load Order -->
+  <!-- Admin Panel JavaScript Components -->
   <!-- Constants must be loaded first -->
   <?!= include('constants.js.html'); ?>
   <!-- Error handling system must be loaded early for proper error management -->
@@ -2050,7 +2048,6 @@
   <?!= include('adminPanel-api.js.html'); ?>
   <?!= include('adminPanel-ui.js.html'); ?>
   <?!= include('adminPanel-events.js.html'); ?>
-  <!-- History compatibility layer - load last for safety -->
   <?!= include('adminPanel-simple-history-compat.js.html'); ?>
 
   <script>

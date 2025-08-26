@@ -15,67 +15,65 @@
 window.unifiedManagement = {
   // キャッシュ管理 (CacheManager)
   cache: {
-    get: function(key, valueFn, options) {
+    get(key, valueFn, options) {
       return typeof cacheManager !== 'undefined' ? cacheManager.get(key, valueFn, options) : (valueFn ? valueFn() : null);
     },
-    remove: function(key) {
+    remove(key) {
       return typeof cacheManager !== 'undefined' ? cacheManager.remove(key) : null;
     },
-    clearAll: function() {
+    clearAll() {
       return typeof cacheManager !== 'undefined' ? cacheManager.clearAll() : null;
     },
-    clearFrontend: function(options) {
+    clearFrontend(options) {
       return typeof cacheManager !== 'undefined' ? cacheManager.clearAllFrontendCaches(options) : Promise.resolve({ success: false });
     },
-    clearSpecific: function(type) {
+    clearSpecific(type) {
       return typeof cacheManager !== 'undefined' ? cacheManager.clearSpecificCache(type) : Promise.resolve({ success: false });
     },
-    diagnose: function() {
+    diagnose() {
       return typeof cacheManager !== 'undefined' ? cacheManager.diagnoseFrontendCache() : { available: false };
     },
-    getHealth: function() {
+    getHealth() {
       return typeof cacheManager !== 'undefined' ? cacheManager.getHealth() : { status: 'unavailable' };
     }
   },
 
   // タイミング制御 (TimingManager)  
   timing: {
-    delay: function(ms, id) {
-      return typeof TimingManager !== 'undefined' ? TimingManager.delay(ms, id) : new Promise(function(resolve) {
+    delay(ms, id) {
+      return typeof TimingManager !== 'undefined' ? TimingManager.delay(ms, id) : new Promise((resolve) => {
         setTimeout(resolve, ms);
       });
     },
-    sequence: function(operations, intervalMs, sequenceId) {
+    sequence(operations, intervalMs, sequenceId) {
       return typeof TimingManager !== 'undefined' ? TimingManager.sequence(operations, intervalMs, sequenceId) : Promise.resolve([]);
     },
-    parallel: function(operations, concurrency) {
-      return typeof TimingManager !== 'undefined' ? TimingManager.parallel(operations, concurrency) : Promise.all(operations.map(function(op) {
-        return op();
-      }));
+    parallel(operations, concurrency) {
+      return typeof TimingManager !== 'undefined' ? TimingManager.parallel(operations, concurrency) : Promise.all(operations.map((op) => op()));
     },
-    debounce: function(func, key, delay) {
+    debounce(func, key, delay) {
       return typeof TimingManager !== 'undefined' ? TimingManager.debounce(func, key, delay) : func;
     },
-    throttle: function(func, key, delay) {
+    throttle(func, key, delay) {
       return typeof TimingManager !== 'undefined' ? TimingManager.throttle(func, key, delay) : func;
     }
   },
 
   // ローディング制御
   loading: {
-    show: function(options) {
+    show(options) {
       if (typeof UnifiedLoadingManager !== 'undefined') {
         return UnifiedLoadingManager.showLoading(options);
       }
       return { success: false };
     },
-    hide: function(options) {
+    hide(options) {
       if (typeof UnifiedLoadingManager !== 'undefined') {
         return UnifiedLoadingManager.hideLoading(options);
       }
       return { success: false };
     },
-    update: function(progress, message) {
+    update(progress, message) {
       if (typeof UnifiedLoadingManager !== 'undefined') {
         return UnifiedLoadingManager.updateProgress(progress, message);
       }
@@ -91,10 +89,10 @@ window.unifiedManagement = {
 /**
  * セットアップ状況をグローバルステータスから取得
  */
-function getSetupStatusFromGlobalStatus() {
+const getSetupStatusFromGlobalStatus = () => {
   try {
     if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
-      var config = typeof currentStatus.userInfo.configJson === 'string' 
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
         ? JSON.parse(currentStatus.userInfo.configJson) 
         : currentStatus.userInfo.configJson;
       return config.setupStatus || 'pending';
