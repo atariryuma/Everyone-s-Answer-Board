@@ -961,6 +961,163 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
 }
 
 /**
+ * 標準化されたロック機構による排他制御実行
+ * 複数箇所から呼び出される重要な同期制御関数
+ * @param {string} lockType - ロックタイプ（'CRITICAL_OPERATION', 'WRITE_OPERATION', 'BATCH_OPERATION'）
+ * @param {string} operationName - 操作名（ログ用）
+ * @param {Function} operation - 実行する操作
+ * @param {Object} options - オプション設定
+ * @returns {*} 操作の実行結果
+ */
+function executeWithStandardizedLock(lockType, operationName, operation, options = {}) {
+  // ロックタイプ別のタイムアウト設定
+  const lockTimeouts = {
+    'CRITICAL_OPERATION': 30000,  // 30秒
+    'WRITE_OPERATION': 15000,     // 15秒
+    'BATCH_OPERATION': 20000,     // 20秒
+    'READ_OPERATION': 10000       // 10秒
+  };
+  
+  const timeout = options.timeout || lockTimeouts[lockType] || 10000;
+  const retries = options.retries || 3;
+  const retryDelay = options.retryDelay || 1000;
+  
+  let lock = null;
+  let attempt = 0;
+  
+  while (attempt < retries) {
+    try {
+      // ロック取得を試行
+      lock = LockService.getScriptLock();
+      const acquired = lock.tryLock(timeout);
+      
+      if (!acquired) {
+        if (attempt === retries - 1) {
+          throw new Error(`ロック取得タイムアウト: ${operationName} (${lockType})`);
+        }
+        // リトライ前に遅延
+        Utilities.sleep(retryDelay * Math.pow(2, attempt)); // 指数バックオフ
+        attempt++;
+        continue;
+      }
+      
+      debugLog(`🔒 ロック取得成功: ${operationName} (${lockType})`);
+      
+      // 操作を実行
+      const result = operation();
+      
+      debugLog(`✅ 操作完了: ${operationName}`);
+      
+      return result;
+      
+    } catch (error) {
+      if (attempt === retries - 1) {
+        logError(error, `executeWithStandardizedLock_${operationName}`, 
+                MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, {
+          lockType,
+          operationName,
+          attempt: attempt + 1,
+          maxRetries: retries
+        });
+        throw error;
+      }
+      
+      warnLog(`⚠️ 操作失敗 (リトライ ${attempt + 1}/${retries}): ${operationName}`, error.message);
+      Utilities.sleep(retryDelay * Math.pow(2, attempt));
+      attempt++;
+      
+    } finally {
+      // ロックを解放
+      if (lock && lock.hasLock()) {
+        lock.releaseLock();
+        debugLog(`🔓 ロック解放: ${operationName}`);
+      }
+    }
+  }
+  
+  throw new Error(`操作失敗（全リトライ消費）: ${operationName}`);
+}
+
+/**
+ * 最適化されたスプレッドシート開く関数
+ * キャッシュとエラーハンドリングを含む高速化実装
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {Object} options - オプション設定
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} スプレッドシートオブジェクト
+ */
+function openSpreadsheetOptimized(spreadsheetId, options = {}) {
+  if (!spreadsheetId) {
+    throw new Error('スプレッドシートIDが指定されていません');
+  }
+  
+  // メモリキャッシュのキー
+  const cacheKey = `spreadsheet_${spreadsheetId}`;
+  const useCache = options.useCache !== false;
+  const maxRetries = options.retries || 3;
+  const retryDelay = options.retryDelay || 1000;
+  
+  // キャッシュチェック（短期メモリキャッシュ）
+  if (useCache && typeof _spreadsheetCache !== 'undefined' && _spreadsheetCache[cacheKey]) {
+    const cached = _spreadsheetCache[cacheKey];
+    if (cached.timestamp && Date.now() - cached.timestamp < 60000) { // 1分間有効
+      debugLog(`📋 キャッシュからスプレッドシート取得: ${spreadsheetId}`);
+      return cached.spreadsheet;
+    }
+  }
+  
+  let lastError = null;
+  
+  // リトライロジック付きで開く
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      
+      if (!spreadsheet) {
+        throw new Error(`スプレッドシートが見つかりません: ${spreadsheetId}`);
+      }
+      
+      // キャッシュに保存
+      if (useCache) {
+        if (typeof _spreadsheetCache === 'undefined') {
+          _spreadsheetCache = {};
+        }
+        _spreadsheetCache[cacheKey] = {
+          spreadsheet: spreadsheet,
+          timestamp: Date.now()
+        };
+      }
+      
+      debugLog(`✅ スプレッドシート開きました: ${spreadsheetId}`);
+      return spreadsheet;
+      
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === maxRetries - 1) {
+        logError(error, 'openSpreadsheetOptimized', 
+                MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, {
+          spreadsheetId,
+          attempt: attempt + 1,
+          maxRetries
+        });
+        throw new Error(`スプレッドシートを開けません (${spreadsheetId}): ${error.message}`);
+      }
+      
+      warnLog(`⚠️ スプレッドシート開く失敗 (リトライ ${attempt + 1}/${maxRetries}): ${spreadsheetId}`);
+      Utilities.sleep(retryDelay * Math.pow(2, attempt)); // 指数バックオフ
+    }
+  }
+  
+  throw lastError || new Error(`スプレッドシート開けません: ${spreadsheetId}`);
+}
+
+/**
+ * スプレッドシートキャッシュ（実行時メモリ）
+ * @private
+ */
+let _spreadsheetCache = {};
+
+/**
  * ユーザーキャッシュの無効化（軽量実装）
  * 複数ファイルで参照される主要なキャッシュクリア関数
  * @param {string} userId - ユーザーID
