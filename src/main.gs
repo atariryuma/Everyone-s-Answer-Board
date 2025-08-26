@@ -97,13 +97,7 @@ if (typeof ERROR_CATEGORIES === 'undefined') {
   const ERROR_CATEGORIES = MAIN_ERROR_CATEGORIES;
 }
 
-const DB_SHEET_CONFIG = {
-  SHEET_NAME: 'Users',
-  HEADERS: [
-    'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
-    'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
-  ]
-};
+// DB_SHEET_CONFIG はconstants.gsで統一管理
 
 // LOG_SHEET_CONFIG はconstants.gsで統一管理
 
@@ -1944,27 +1938,7 @@ function extractUserInfoFromKey(key) {
   }
 }
 
-const COLUMN_HEADERS = {
-  TIMESTAMP: 'タイムスタンプ',
-  EMAIL: 'メールアドレス',
-  CLASS: 'クラス',
-  OPINION: '回答',
-  REASON: '理由',
-  NAME: '名前',
-  UNDERSTAND: 'なるほど！',
-  LIKE: 'いいね！',
-  CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト'
-};
-
-// 表示モード定数
-const DISPLAY_MODES = {
-  ANONYMOUS: 'anonymous',
-  NAMED: 'named'
-};
-
-// リアクション関連定数
-const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+// COLUMN_HEADERS, DISPLAY_MODES, REACTION_KEYS はconstants.gsで統一管理
 
 // スコア計算設定
 const SCORING_CONFIG = {
@@ -2226,9 +2200,7 @@ function determineSetupTypeFromConfig(config, userInfo) {
 }
 
 
-const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
-const DEBUG = PropertiesService.getScriptProperties()
-  .getProperty('DEBUG_MODE') === 'true';
+// EMAIL_REGEX, DEBUG はconstants.gsで統一管理
 
 /**
  * Determine if a value represents boolean true.
