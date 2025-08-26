@@ -28,7 +28,11 @@
       "WebSearch",
       "WebFetch(domain:developers.google.com)",
       "Bash(clasp open:*)",
-      "WebFetch(domain:stackoverflow.com)"
+      "WebFetch(domain:stackoverflow.com)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(./check-src.sh)"
     ],
     "deny": [],
     "ask": []

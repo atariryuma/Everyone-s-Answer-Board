@@ -1833,10 +1833,7 @@ function unpublishBoard(requestUserId) {
       configJson.columnMappings = {};
     }
     
-    // 公開履歴・統計情報もクリア
-    if (configJson.publishHistory) {
-      configJson.publishHistory = [];
-    }
+    // 統計情報をクリア（履歴管理はローカル完結）
     if (configJson.viewStats) {
       configJson.viewStats = {};
     }

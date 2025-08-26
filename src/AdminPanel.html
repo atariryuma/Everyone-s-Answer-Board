@@ -1963,6 +1963,40 @@
         </div>
       </div>
       
+      <!-- 履歴管理 (シンプル版) -->
+      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-medium text-gray-200 flex items-center gap-2">
+            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            公開履歴
+          </h4>
+          <button type="button" id="clear-history-btn" 
+                  class="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-400/50 hover:bg-red-500/10 transition-colors"
+                  title="履歴をクリア">
+            クリア
+          </button>
+        </div>
+        
+        <div class="max-h-48 overflow-y-auto">
+          <table class="w-full text-xs">
+            <thead class="border-b border-gray-600/50">
+              <tr>
+                <th class="text-left py-2 px-2 text-gray-400 font-medium">設問</th>
+                <th class="text-left py-2 px-2 text-gray-400 font-medium w-20">日時</th>
+                <th class="text-right py-2 px-2 text-gray-400 font-medium w-12">操作</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body">
+              <tr>
+                <td colspan="3" class="text-gray-500 text-center py-4">履歴がありません</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
       <details id="account-deletion-section" class="bg-red-900/10 border border-red-500/30 rounded-lg transition-all hover:border-red-500/50">
         <summary class="p-3 cursor-pointer text-sm font-medium text-red-300 hover:text-red-200 flex items-center justify-between">
           <span>アカウントの管理</span>
@@ -2071,6 +2105,10 @@
   <?!= include('backendProgressSync.js.html'); ?>
   <!-- Error handling system must be loaded first -->
   <?!= include('errorMessages.js.html'); ?>
+  <!-- Simple history management system -->
+  <?!= include('adminPanel-simple-history.js.html'); ?>
+  <!-- History compatibility layer -->
+  <?!= include('adminPanel-simple-history-compat.js.html'); ?>
 
   <script>
     // 管理者モーダルの初期化

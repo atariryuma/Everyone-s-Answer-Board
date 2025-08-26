@@ -1888,8 +1888,16 @@ function proceedWithSaveAndPublish(config) {
       if (result && (result.userInfo || result.status === 'success')) {
         showMessage('✅ 設定が保存され、ボードが公開されました！', 'success');
         
-        // 履歴に保存（公開時）
-        saveHistoryOnPublish(result, config);
+        // 履歴に保存（公開時）- シンプル版
+        if (typeof addToSimpleHistory === 'function') {
+          const questionText = config.opinionHeader || config.opinionColumn || 'デフォルト問題文';
+          const historyItem = {
+            questionText: questionText,
+            displayMode: document.getElementById('show-names')?.checked ? 'NAMED' : 'ANONYMOUS',
+            configData: result.userInfo?.configJson ? JSON.parse(result.userInfo.configJson) : {}
+          };
+          addToSimpleHistory(historyItem);
+        }
         
         // ボードビューアーに即座更新を通知
         try {
@@ -4774,11 +4782,16 @@ function executeQuickStartProcess(quickstartBtn, quickstartText, autoPublish = f
       if (result && result.status === 'success') {
         console.log('🎉 QuickStartバックエンド処理完了:', result);
         
-        // Save QuickStart history entry
-        if (result.setupComplete) {
+        // Save QuickStart history entry - シンプル版
+        if (result.setupComplete && typeof addToSimpleHistory === 'function') {
           try {
-            createQuickStartHistoryEntry(result);
-            console.log('📝 QuickStart履歴保存完了');
+            const historyItem = {
+              questionText: result.userInfo?.customFormInfo?.mainQuestion || 'QuickStart設定',
+              displayMode: 'NAMED',
+              configData: result.userInfo?.configJson ? JSON.parse(result.userInfo.configJson) : {}
+            };
+            addToSimpleHistory(historyItem);
+            console.log('📝 QuickStart履歴保存完了（シンプル版）');
           } catch (error) {
             console.error('❌ QuickStart履歴保存に失敗:', error);
           }
