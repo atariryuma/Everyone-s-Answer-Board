@@ -237,10 +237,10 @@ UnifiedErrorHandler.prototype.logError = function(errorInfo) {
     }
   }
   
-  /**
-   * ユーザーにエラーを表示
-   */
-  displayError(errorInfo) {
+/**
+ * ユーザーにエラーを表示
+ */
+UnifiedErrorHandler.prototype.displayError = function(errorInfo) {
     const displayMessage = this.formatErrorDisplay(errorInfo);
     
     // 既存のshowMessage関数を使用

@@ -113,9 +113,10 @@ let _executionUserInfoCache = null;
 /**
  * デバッグログ出力（DEBUG_MODE時のみ）
  */
-function debugLog(message, ...args) {
+function debugLog(message) {
   if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-    console.log('[DEBUG] ' + message, ...args);
+    var args = Array.prototype.slice.call(arguments, 1);
+    console.log.apply(console, ['[DEBUG] ' + message].concat(args));
   }
 }
 
@@ -130,22 +131,25 @@ function logClientError(errorInfo) {
 /**
  * 情報ログ出力
  */
-function infoLog(message, ...args) {
-  console.log('[INFO] ' + message, ...args);
+function infoLog(message) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  console.log.apply(console, ['[INFO] ' + message].concat(args));
 }
 
 /**
  * 警告ログ出力
  */
-function warnLog(message, ...args) {
-  console.warn('[WARN] ' + message, ...args);
+function warnLog(message) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  console.warn.apply(console, ['[WARN] ' + message].concat(args));
 }
 
 /**
  * エラーログ出力
  */
-function errorLog(message, ...args) {
-  console.error('[ERROR] ' + message, ...args);
+function errorLog(message) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  console.error.apply(console, ['[ERROR] ' + message].concat(args));
 }
 
 // =============================================================================
@@ -328,24 +332,52 @@ const cacheManager = {
    * カテゴリ別キャッシュ管理
    */
   categorizedCache: {
-    user(userId, key, valueFn, options = {}) {
-      const categorizedKey = 'user_' + userId + '_' + key;
-      return cacheManager.get(categorizedKey, valueFn, { ttl: 300, ...options });
+    user: function(userId, key, valueFn, options) {
+      options = options || {};
+      var categorizedKey = 'user_' + userId + '_' + key;
+      var defaultOptions = { ttl: 300 };
+      for (var prop in options) {
+        if (options.hasOwnProperty(prop)) {
+          defaultOptions[prop] = options[prop];
+        }
+      }
+      return cacheManager.get(categorizedKey, valueFn, defaultOptions);
     },
 
-    system(key, valueFn, options = {}) {
-      const categorizedKey = 'system_' + key;
-      return cacheManager.get(categorizedKey, valueFn, { ttl: 600, ...options });
+    system: function(key, valueFn, options) {
+      options = options || {};
+      var categorizedKey = 'system_' + key;
+      var defaultOptions = { ttl: 600 };
+      for (var prop in options) {
+        if (options.hasOwnProperty(prop)) {
+          defaultOptions[prop] = options[prop];
+        }
+      }
+      return cacheManager.get(categorizedKey, valueFn, defaultOptions);
     },
 
-    temporary(key, valueFn, options = {}) {
-      const categorizedKey = 'temp_' + key;
-      return cacheManager.get(categorizedKey, valueFn, { ttl: 60, ...options });
+    temporary: function(key, valueFn, options) {
+      options = options || {};
+      var categorizedKey = 'temp_' + key;
+      var defaultOptions = { ttl: 60 };
+      for (var prop in options) {
+        if (options.hasOwnProperty(prop)) {
+          defaultOptions[prop] = options[prop];
+        }
+      }
+      return cacheManager.get(categorizedKey, valueFn, defaultOptions);
     },
 
-    session(userId, key, valueFn, options = {}) {
-      const categorizedKey = 'session_' + userId + '_' + key;
-      return cacheManager.get(categorizedKey, valueFn, { ttl: 1800, ...options });
+    session: function(userId, key, valueFn, options) {
+      options = options || {};
+      var categorizedKey = 'session_' + userId + '_' + key;
+      var defaultOptions = { ttl: 1800 };
+      for (var prop in options) {
+        if (options.hasOwnProperty(prop)) {
+          defaultOptions[prop] = options[prop];
+        }
+      }
+      return cacheManager.get(categorizedKey, valueFn, defaultOptions);
     }
   },
 

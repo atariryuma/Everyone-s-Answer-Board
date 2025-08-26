@@ -35,7 +35,7 @@ GASOptimizer.prototype.call = function(functionName) {
 
     self.executeCall(functionName, args, resolve, reject);
   });
-  }
+};
 
 /**
  * 実際の関数呼び出し実行
@@ -66,7 +66,7 @@ GASOptimizer.prototype.executeCall = function(functionName, args, resolve, rejec
       reject(self.enhanceError(error, functionName));
       self.processQueue();
     })[functionName].apply(null, args);
-  }
+};
 
 /**
  * キューの処理

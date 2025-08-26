@@ -2036,21 +2036,21 @@
   <!-- 共通モーダルコンポーネントを読み込み -->
   <?!= include('SharedModals.html'); ?>
   
-  <!-- Admin Panel JavaScript Components -->
+  <!-- Admin Panel JavaScript Components - ES5 Compatible Load Order -->
   <!-- Constants must be loaded first -->
   <?!= include('constants.js.html'); ?>
+  <!-- Error handling system must be loaded early for proper error management -->
+  <?!= include('errorMessages.js.html'); ?>
   <!-- Backend progress sync system -->
   <?!= include('backendProgressSync.js.html'); ?>
   <!-- Admin Panel Framework - must be loaded before other admin panel components -->
   <?!= include('adminPanel-framework.js.html'); ?>
-  <!-- Error handling system must be loaded first -->
-  <?!= include('errorMessages.js.html'); ?>
   <!-- Consolidated Admin Panel Components -->
   <?!= include('admin-consolidated.js.html'); ?>
   <?!= include('adminPanel-api.js.html'); ?>
   <?!= include('adminPanel-ui.js.html'); ?>
   <?!= include('adminPanel-events.js.html'); ?>
-  <!-- History compatibility layer -->
+  <!-- History compatibility layer - load last for safety -->
   <?!= include('adminPanel-simple-history-compat.js.html'); ?>
 
   <script>

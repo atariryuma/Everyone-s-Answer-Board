@@ -96,7 +96,7 @@
   
   // Recovery strategies based on error category
   const attemptRecovery = (errorInfo, recoveryOptions) => {
-    const { category } = errorInfo;
+    var category = errorInfo.category;
     
     switch (category) {
       case ERROR_CATEGORIES.NETWORK:

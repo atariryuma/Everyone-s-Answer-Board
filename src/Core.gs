@@ -3052,12 +3052,12 @@ function initializeQuickStartContext(requestUserId) {
       configJson: JSON.stringify(configJson)
     });
 
-    // userInfo オブジェクトもクリア
-    userInfo.spreadsheetId = null;
-    userInfo.spreadsheetUrl = null;
+    // userInfo オブジェクトもクリア  
+    userInfo.spreadsheetId = '';
+    userInfo.spreadsheetUrl = '';
 
     // 更新後のキャッシュを強制同期
-    synchronizeCacheAfterCriticalUpdate(requestUserId, userEmail, userInfo.spreadsheetId, null);
+    synchronizeCacheAfterCriticalUpdate(requestUserId, userEmail, '', null);
   } else {
   }
 
@@ -4539,8 +4539,9 @@ function getSheetsList(userId) {
       return [];
     }
 
-    if (!userInfo.spreadsheetId) {
+    if (!userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
       warnLog('getSheetsList: No spreadsheet ID for user:', userId);
+      // 空のシートリストを返すが、ユーザーにスプレッドシート設定を促すメッセージも考慮
       return [];
     }
     /** @type {Object} Google Sheets APIサービス */
