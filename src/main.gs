@@ -786,20 +786,28 @@ function confirmUserRegistration(email) {
       throw new Error('Invalid email parameter');
     }
     
-    // ユーザーの登録状態を確認
-    const properties = PropertiesService.getUserProperties();
-    const userKey = `user_${email}`;
-    const userData = properties.getProperty(userKey);
+    // データベースから既存ユーザーをチェック
+    let existingUser = null;
+    try {
+      existingUser = fetchUserFromDatabase('adminEmail', email);
+    } catch (dbError) {
+      // データベースエラーは警告として記録するが、継続
+      logError(dbError, 'confirmUserRegistration-fetchUser', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATA);
+    }
     
-    if (userData) {
+    // 既存ユーザーが見つかった場合
+    if (existingUser) {
       return {
         status: 'success',
         isRegistered: true,
-        message: 'ユーザーは登録済みです'
+        message: 'ユーザーは既にデータベースに登録済みです',
+        userId: existingUser.userId
       };
     }
     
-    // 新規ユーザーとして登録
+    // 新規ユーザーとしてPropertiesServiceに記録（セットアップ用）
+    const properties = PropertiesService.getUserProperties();
+    const userKey = `user_${email}`;
     const newUserData = {
       email: email,
       registeredAt: new Date().toISOString(),
@@ -811,7 +819,7 @@ function confirmUserRegistration(email) {
     return {
       status: 'success',
       isRegistered: false,
-      message: '新規ユーザーとして登録しました',
+      message: '新規ユーザーとして登録準備が完了しました',
       userId: newUserData.userId
     };
     
