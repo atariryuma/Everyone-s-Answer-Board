@@ -1197,7 +1197,9 @@ window.adminPanel = {
   ui,
   handlers,
   utils,
-  state
+  state,
+  // ログアウト機能を公開
+  logoutAndRedirect: () => auth.logout()
 };
 
 // グローバル関数（onclick属性との互換性確保）
