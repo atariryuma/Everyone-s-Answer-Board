@@ -9,14 +9,6 @@
     <?!= include('SharedSecurityHeaders'); ?>
     <!-- Shared TailwindCSS Configuration -->
     <?!= include('SharedTailwindConfig'); ?>
-    <script>
-      // Inject DEBUG_MODE from server into window before utilities load
-      const __DEBUG_MODE_RAW__ = '<?= escapeJavaScript(shouldEnableDebugMode()) ?>';
-      window.DEBUG_MODE = (__DEBUG_MODE_RAW__ === 'true' || __DEBUG_MODE_RAW__ === true);
-      if (window.SYSTEM_CONSTANTS) {
-        window.SYSTEM_CONSTANTS.DEBUG_MODE = window.DEBUG_MODE;
-      }
-    </script>
     <?!= include('UnifiedStyles'); ?>
     <?!= include('SharedUtilities'); ?>
     <script>
@@ -1432,16 +1424,6 @@
                         const actionText = result.debugMode ? '有効化' : '無効化';
                         const messageType = result.changed ? 'success' : 'info';
                         showMessage(`DEBUG_MODEを${actionText}しました`, messageType);
-                        
-                        // クライアントサイドのDEBUG_MODEを更新
-                        window.DEBUG_MODE = result.debugMode;
-                        if (window.SYSTEM_CONSTANTS) {
-                            window.SYSTEM_CONSTANTS.DEBUG_MODE = result.debugMode;
-                        }
-                        // AdminPanel.stateManagerのdebugModeを更新
-                        if (window.AdminPanel && window.AdminPanel.stateManager) {
-                            window.AdminPanel.stateManager.setState('debugMode', result.debugMode);
-                        }
                         
                         if (result.changed) {
                             showMessage('変更を反映するには、ページをリロードすることをお勧めします。', 'info', 8000);

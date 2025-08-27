@@ -2996,37 +2996,9 @@ function toggleDebugMode(enable) {
 }
 
 /**
- * 簡易ステータス取得API（バックグラウンド監視用のハートビート）
- * クライアント側が存在しない関数を呼び出して失敗する問題を防ぎます。
- * 必要十分な最小情報のみを返し、将来の拡張に備えてフィールドを追加しやすくします。
- * @param {string=} userId 任意のユーザーID（呼び出し元から渡される場合）
- * @returns {Object} 現在時刻などの軽量ステータス
- */
-function getStatus(userId) {
-  try {
-    // 軽量なハートビート情報のみ返す（高頻度呼び出しを想定）
-    const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
-    return {
-      status: 'success',
-      message: 'ok',
-      timestamp: new Date().toISOString(),
-      debugMode: debugMode,
-      userId: userId || null,
-    };
-  } catch (error) {
-    // 失敗時も呼び出し側での復帰を容易にするため、簡潔なエラー応答を返す
-    return {
-      status: 'error',
-      message: 'getStatus failed: ' + error.message,
-      timestamp: new Date().toISOString(),
-    };
-  }
-}
-
-/**
  * 個別ユーザー自身のアクセス状態を取得
  * @returns {Object} 現在のアクセス状態
-*/
+ */
 function getUserActiveStatus() {
   try {
     const currentUser = getUserInfo();

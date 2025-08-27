@@ -52,7 +52,9 @@
       "Bash(npm test:*)",
       "Bash(clasp status:*)",
       "Bash(git checkout:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm run deploy:*)",
+      "Bash(npm run push:*)"
     ],
     "deny": [],
     "ask": [],

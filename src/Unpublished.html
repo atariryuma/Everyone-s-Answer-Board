@@ -11,12 +11,6 @@
     
     <!-- Shared TailwindCSS Configuration -->
     <?!= include('SharedTailwindConfig'); ?>
-    <script>
-      // Inject DEBUG_MODE before utilities
-      const __DEBUG_MODE_RAW__ = '<?= escapeJavaScript(shouldEnableDebugMode()) ?>';
-      window.DEBUG_MODE = (__DEBUG_MODE_RAW__ === 'true' || __DEBUG_MODE_RAW__ === true);
-      if (window.SYSTEM_CONSTANTS) { window.SYSTEM_CONSTANTS.DEBUG_MODE = window.DEBUG_MODE; }
-    </script>
     <?!= include('UnifiedStyles'); ?>
     <?!= include('SharedUtilities'); ?>
     <style>

@@ -567,7 +567,7 @@ const timingManager = new TimingManager();
 // TimingManagerをグローバルに公開
 window.TimingManager = TimingManager;
 
-// Global timing utilities
+// レガシー互換性のための関数
 window.debounce = TimingManager.debounce;
 window.throttle = TimingManager.throttle;
 
@@ -916,12 +916,8 @@ function loadStatus(bypassCache = false) {
 
     console.log('🌐 Calling getInitialData with userId:', userId, 'bypassCache:', bypassCache);
 
-    // 履歴復元時などの強制更新用フラグ
-    const forceRefresh = bypassCache && window._historyRestoreInProgress;
-    const targetSheetParam = forceRefresh ? 'BYPASS_CACHE' : null;
-
     // runGasWithUserId を使用して getInitialData を呼び出す
-    return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', targetSheetParam, false)
+    return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
       .then(response => {
         console.log('🚀 getInitialData response received:', {
           response: response,
@@ -997,53 +993,22 @@ function loadStatus(bypassCache = false) {
   return loadStatusInProgress;
 }
 
-// Load sheet configuration for selected sheet with retry mechanism
-function loadConfigForSelected(sheetNameOverride = null, spreadsheetIdOverride = null, retryCount = 0, maxRetries = 3, forceLoad = false) {
-  // 履歴復元中は処理をスキップ（強制読み込みフラグがある場合は除く）
-  if ((window._historyRestoreInProgress || window._historyColumnSelections) && !forceLoad) {
-    console.log('🛡️ loadConfigForSelected: 履歴復元中のため処理をスキップしました');
-    return Promise.resolve({ success: false, message: 'Skipped during history restore' });
-  }
-  
-  const targetSheet = sheetNameOverride || selectedSheet;
-  if (!targetSheet) {
+// Load sheet configuration for selected sheet
+function loadConfigForSelected() {
+  if (!selectedSheet) {
     logWarn('No sheet selected for config loading');
     return Promise.reject(new Error('No sheet selected for config loading'));
   }
   
-  const targetSpreadsheetId = spreadsheetIdOverride || (currentStatus?.userInfo?.spreadsheetId);
-  if (!targetSpreadsheetId) {
+  if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
     logError('Missing required data for loadConfigForSelected');
     showMessage('スプレッドシートの情報が見つかりません。', 'error');
     return Promise.reject(new Error('Missing required data for loadConfigForSelected'));
   }
   
-  // Sanitize sheet name for API call (already sanitized from caller, but double-check)
-  const sanitizedSheetName = targetSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
-  
-  console.log(`🔄 Loading config for sheet: "${targetSheet}" (sanitized: "${sanitizedSheetName}"), attempt ${retryCount + 1}/${maxRetries + 1}`);
-  
-  return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', targetSpreadsheetId, sanitizedSheetName)
+  return runGasWithUserId('getSheetDetails', 'シート情報を読み込み中...', currentStatus.userInfo.spreadsheetId, selectedSheet)
     .then(handleSheetDetailsSuccess)
-    .catch(error => {
-      console.warn(`❌ loadConfigForSelected attempt ${retryCount + 1} failed:`, error);
-      
-      // Check if this is a sheet parsing error and we have retries left
-      if (retryCount < maxRetries && (
-        error.message?.includes('Unable to parse range') ||
-        error.message?.includes('範囲を解析できません') ||
-        error.message?.includes('Invalid range')
-      )) {
-        const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
-        console.log(`⏳ Retrying in ${retryDelay}ms...`);
-        
-        return new Promise(resolve => setTimeout(resolve, retryDelay))
-          .then(() => loadConfigForSelected(sheetNameOverride, spreadsheetIdOverride, retryCount + 1, maxRetries));
-      }
-      
-      // If no more retries or different error, use original error handler
-      return handleSheetDetailsError(error);
-    });
+    .catch(handleSheetDetailsError);
 }
 
 // Handle successful sheet details loading
@@ -1064,26 +1029,12 @@ function handleSheetDetailsSuccess(details) {
     }
     
     if (details.guessedConfig) {
-      // 履歴復元中はAI列判定をスキップ（強制読み込み時も含む）
-      if (window._historyRestoreInProgress || window._historyColumnSelections || forceLoad) {
-        if (forceLoad) {
-          console.log('🔄 強制読み込み時: AI列判定をスキップして履歴設定を優先');
-        } else {
-          console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
-        }
-        console.log('🔍 Skip flags:', {
-          historyRestoreInProgress: window._historyRestoreInProgress,
-          historyColumnSelections: !!window._historyColumnSelections,
-          forceLoad: forceLoad
-        });
+      // 履歴復元中はAI列判定をスキップ
+      if (window._historyRestoreInProgress) {
+        console.log('🛡️ 履歴復元中のため、AI列判定をスキップしました');
       } else {
         // DOMの更新が完了するのを待ってからpopulateConfigを呼び出す
         setTimeout(() => {
-          // 遅延実行時にも再度チェック
-          if (window._historyRestoreInProgress || window._historyColumnSelections) {
-            console.log('🛡️ 遅延実行時: 履歴復元中のため、AI列判定をスキップしました');
-            return;
-          }
           populateConfig(details.guessedConfig);
           
           // Enhanced auto-detection success message with specifics
@@ -1786,21 +1737,6 @@ function saveAndPublish() {
   if (isSaveInProgress) {
     showMessage('⚠️ 他の保存処理が実行中です。しばらくお待ちください。', 'warning');
     return;
-  }
-  
-  // ドラフトモードが有効な場合は、公開前に実際の公開情報を更新
-  if (window._draftModeActive) {
-    console.log('📝 ドラフトモードから公開へ移行中...');
-    
-    // ドラフトモードを終了
-    window._draftModeActive = false;
-    
-    // ドラフトインジケーターを非表示
-    if (window.HistoryManager && typeof window.HistoryManager._hideDraftModeIndicator === 'function') {
-      window.HistoryManager._hideDraftModeIndicator();
-    }
-    
-    console.log('✅ ドラフトモードが終了しました。公開を実行します。');
   }
   
   // 進捗インジケータ表示
@@ -3430,8 +3366,8 @@ function startSystemStatusUpdate() {
       return;
     }
     
-    // 統一APIを利用して軽量モードで更新（getInitialDataベース）
-    runGasWithUserId('getInitialData', false, false) // 第3引数はlightweightMode
+    // キャッシュを利用して静かに更新
+    runGasWithUserId('getStatus', false)
       .then(function(status) {
         // 変更があった場合のみUIを更新
         if (JSON.stringify(status) !== JSON.stringify(currentStatus)) {

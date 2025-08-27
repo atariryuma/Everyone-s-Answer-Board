@@ -80,9 +80,6 @@
   <?!= include('SharedTailwindConfig'); ?>
   <script>
     const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
-    // Expose to global for unified logging
-    window.DEBUG_MODE = DEBUG_MODE;
-    if (window.SYSTEM_CONSTANTS) { window.SYSTEM_CONSTANTS.DEBUG_MODE = DEBUG_MODE; }
     function debugLog() {
       if (DEBUG_MODE && console && console.log) {
         try {

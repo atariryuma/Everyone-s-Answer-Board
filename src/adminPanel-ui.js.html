@@ -719,44 +719,19 @@ function populateSheetSelect(sheetNames, activeSheetName) {
       lastSelectedSheetName = normalizedActiveSheet;
       logDebug('✅ Active sheet set successfully:', normalizedActiveSheet);
     } else {
-      // 強化されたインテリジェントフォールバック処理
-      logDebug('🔍 Active sheet not found in options, attempting intelligent fallback:', {
+      // 部分一致またはフォールバック処理
+      console.warn('⚠️ Active sheet not found in options, attempting fallback:', {
         activeSheetName: normalizedActiveSheet,
         availableOptions: availableOptions.map(opt => opt.value)
       });
       
-      let fallbackSheet = null;
-      
-      // 1. 完全一致を再試行（正規化後）
-      const exactMatch = availableOptions.find(option => 
-        _normalizeSheetName(option.value) === _normalizeSheetName(normalizedActiveSheet)
-      );
-      
-      if (exactMatch) {
-        fallbackSheet = exactMatch.value;
-        console.log('✅ Found exact match after normalization:', fallbackSheet);
-      } else {
-        // 2. 部分一致を試行（履歴復元で役立つ）
-        const partialMatch = availableOptions.find(option => 
-          option.value && normalizedActiveSheet && 
-          (option.value.includes(normalizedActiveSheet) || normalizedActiveSheet.includes(option.value))
-        );
-        
-        if (partialMatch) {
-          fallbackSheet = partialMatch.value;
-          console.log('✅ Found partial match:', fallbackSheet);
-        } else if (availableOptions.length > 1) {
-          // 3. 最初の有効なオプションを選択
-          fallbackSheet = availableOptions[1].value;
-          console.log('✅ Using first available option:', fallbackSheet);
-        }
-      }
-      
-      if (fallbackSheet) {
-        select.value = fallbackSheet;
-        selectedSheet = fallbackSheet;
-        lastSelectedSheetName = fallbackSheet;
-        logDebug('🔄 Fallback to sheet:', fallbackSheet);
+      // 最初の有効なオプションを選択
+      if (availableOptions.length > 1) { // Skip the default "-- シートを選択 --"
+        const firstSheet = availableOptions[1].value;
+        select.value = firstSheet;
+        selectedSheet = firstSheet;
+        lastSelectedSheetName = firstSheet;
+        logDebug('🔄 Fallback to first available sheet:', firstSheet);
       }
     }
     
@@ -845,17 +820,6 @@ function _fullPopulateHeaderOptions(headers) {
 function _fullPopulateConfig(cfg) {
   if (!cfg) return;
   
-  // 履歴復元中はスキップ（ただし、ドラフトモードの場合は除く）
-  if ((window._historyRestoreInProgress || window._historyColumnSelections) && !window._draftModeActive) {
-    console.log('🛡️ _fullPopulateConfig: 履歴復元中のため処理をスキップしました');
-    return;
-  }
-  
-  // ドラフトモード時のログ出力
-  if (window._draftModeActive) {
-    console.log('📝 _fullPopulateConfig: ドラフトモードで設定を反映中');
-  }
-  
   // Throttle function calls to prevent spam
   if (window.populateConfigRunning) {
     return;
@@ -938,7 +902,7 @@ function buildConfigObject() {
     nameHeader: nameValue,
     classHeader: classValue,
     reasonHeader: (document.getElementById('reason-column') && document.getElementById('reason-column').value) || '',
-    // Column values
+    // Also provide legacy format for backward compatibility
     opinionColumn: opinionValue,
     nameColumn: nameValue,
     classColumn: classValue,
@@ -1364,51 +1328,30 @@ function updateTopicText(status) {
   if (!topicTextElement) return;
 
   let topic = '（問題文未設定）';
-  
-  // SAFE: 設定オブジェクトの安全な取得
-  let cfg = {};
-  
-  // statusオブジェクトの安全性チェック
-  if (!status) {
-    console.warn('⚠️ updateTopicText: status is null or undefined');
-    topicTextElement.textContent = topic;
-    return;
-  }
-  
-  // status.configが存在し、かつオブジェクトの場合のみ使用
-  if (status.config && typeof status.config === 'object') {
-    cfg = Object.assign({}, status.config);
-  }
+  // より包括的なconfig取得
+  let cfg = status.config || {};
   
   console.log('🔍 updateTopicText: status:', status);
   
-  // userInfo.configJsonからも情報を取得（安全性チェック強化）
+  // userInfo.configJsonからも情報を取得
   if (status.userInfo && status.userInfo.configJson) {
     try {
       const fullConfig = JSON.parse(status.userInfo.configJson);
-      if (fullConfig && typeof fullConfig === 'object') {
-        cfg = Object.assign({}, cfg, fullConfig);
-        console.log('📋 updateTopicText: merged config:', cfg);
-      } else {
-        console.warn('⚠️ Parsed configJson is not a valid object:', fullConfig);
-      }
+      cfg = Object.assign({}, cfg, fullConfig);
+      console.log('📋 updateTopicText: merged config:', cfg);
     } catch (e) {
-      console.warn('⚠️ Failed to parse userInfo.configJson:', e);
+      console.warn('Failed to parse userInfo.configJson:', e);
     }
   }
   
-  // publishedSheetNameに基づいてsheet-specific configを取得（安全性チェック強化）
-  if (status.userInfo && cfg && cfg.publishedSheetName) {
-    try {
-      const sheetConfigKey = `sheet_${cfg.publishedSheetName}`;
-      if (cfg[sheetConfigKey] && typeof cfg[sheetConfigKey] === 'object' && cfg[sheetConfigKey].opinionHeader) {
-        topic = cfg[sheetConfigKey].opinionHeader;
-        console.log(`✅ Topic found from sheet config (${sheetConfigKey}):`, topic);
-      } else {
-        console.warn(`⚠️ No opinion header found in sheet config: ${sheetConfigKey}`, cfg[sheetConfigKey]);
-      }
-    } catch (e) {
-      console.warn('⚠️ Error accessing sheet config:', e);
+  // publishedSheetNameに基づいてsheet-specific configを取得
+  if (status.userInfo && cfg.publishedSheetName) {
+    const sheetConfigKey = `sheet_${cfg.publishedSheetName}`;
+    if (cfg[sheetConfigKey] && cfg[sheetConfigKey].opinionHeader) {
+      topic = cfg[sheetConfigKey].opinionHeader;
+      console.log(`✅ Topic found from sheet config (${sheetConfigKey}):`, topic);
+    } else {
+      console.warn(`⚠️ No opinion header found in sheet config: ${sheetConfigKey}`, cfg[sheetConfigKey]);
     }
   }
 
@@ -1486,7 +1429,7 @@ function updateTopicText(status) {
 function updateScheduledEndTime(config, element) {
   // 複数のソースから scheduledEndAt を取得を試行
   const scheduledEndAt = config.scheduledEndAt || 
-                         config.scheduledEndTime ||
+                         config.scheduledEndTime ||  // 古いフィールド名との互換性
                          (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndAt) ||
                          (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndTime);
   
@@ -2043,27 +1986,14 @@ function handleSheetSelectionChange(event) {
     if (newSelectedSheet) {
       console.log('📋 Loading config for sheet:', newSelectedSheet);
 
-      // 履歴復元中は特別な処理を実行
-      if (window._historyRestoreInProgress || window._historyColumnSelections) {
-        console.log('🔄 履歴復元中: 専用の設定読み込み処理を実行します');
-        await _loadConfigForHistoryRestore(newSelectedSheet);
-        updateUIForSelectedSheet();
-        return;
-      }
-
       // 基本検証
       if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
         console.error('スプレッドシート情報が見つかりません');
         return;
       }
 
-      // シート名をサニタイズしてからAPI呼び出し
-      const sanitizedSheetName = newSelectedSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
-      console.log(`🔄 Sanitized sheet name: "${newSelectedSheet}" → "${sanitizedSheetName}"`);
-
       // アクティブシートの列データを取得して列選択を更新
-      const effectiveId = _resolveSpreadsheetIdForApi(currentStatus);
-      loadConfigForSelected(sanitizedSheetName, effectiveId)
+      loadConfigForSelected(newSelectedSheet, currentStatus.userInfo.spreadsheetId)
         .then(result => {
           console.log('✅ シート設定読み込み完了:', result);
           updateUIForSelectedSheet();
@@ -2241,43 +2171,8 @@ function clearColumnSelections() {
 }
 
 // Load configuration for selected sheet - OPTIMIZED
-// 効率的にAPI用のスプレッドシートIDを解決
-function _resolveSpreadsheetIdForApi(status) {
-  try {
-    const st = status || window.currentStatus || {};
-    // 最優先: userInfo.spreadsheetId（直近の切替を反映）
-    if (st.userInfo && st.userInfo.spreadsheetId) return st.userInfo.spreadsheetId;
-    // 次点: configJson.publishedSpreadsheetId
-    if (st.configJson && st.configJson.publishedSpreadsheetId) return st.configJson.publishedSpreadsheetId;
-    // フォールバック: URLから抽出
-    const url = (st.userInfo && st.userInfo.spreadsheetUrl) || (st.appUrls && st.appUrls.spreadsheetUrl) || null;
-    if (url) {
-      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-      if (m && m[1]) return m[1];
-    }
-  } catch (e) {
-    console.warn('⚠️ _resolveSpreadsheetIdForApi failed:', e.message);
-  }
-  return null;
-}
-
-// 代替候補のID（userInfoとconfigJsonを入れ替え）
-function _resolveAltSpreadsheetId(status, primaryId) {
-  const st = status || window.currentStatus || {};
-  const cand1 = st.configJson && st.configJson.publishedSpreadsheetId;
-  const cand2 = st.userInfo && st.userInfo.spreadsheetId;
-  if (cand1 && cand1 !== primaryId) return cand1;
-  if (cand2 && cand2 !== primaryId) return cand2;
-  return null;
-}
-
 function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetries = 3) {
   console.log('📋 Loading config for: ' + sheetName);
-
-  // 足りない場合はその場で解決
-  if (!spreadsheetId) {
-    spreadsheetId = _resolveSpreadsheetIdForApi(window.currentStatus);
-  }
 
   if (!spreadsheetId || !sheetName) {
     console.error('スプレッドシート情報が不足しています。');
@@ -2331,30 +2226,10 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
         }
 
         try {
-          // 1) ヘッダー一覧をUIへ反映
           populateHeaderOptions(details.allHeaders);
           console.log('✅ Header options populated from API');
-
-          // 2) 履歴復元中はAI推定の上書きを避ける（列選択を再適用）
-          if (window._historyRestoreInProgress) {
-            console.log('🛡️ 履歴復元中: AI推定の適用をスキップし、履歴の列選択を再適用します');
-            const sel = window._historyColumnSelections || {};
-            const applyIf = (id, val) => {
-              if (!val) return;
-              const el = document.getElementById(id);
-              if (el) el.value = val;
-            };
-            applyIf('opinionHeader', sel.opinionColumn);
-            applyIf('name-column', sel.nameColumn);
-            applyIf('class-column', sel.classColumn);
-            applyIf('reason-column', sel.reasonColumn);
-            // 一度適用したらクリア
-            window._historyColumnSelections = null;
-          } else {
-            // 通常時はAI推定を適用
-            populateConfig(details.guessedConfig);
-            console.log('✅ AI configuration applied from API');
-          }
+          populateConfig(details.guessedConfig);
+          console.log('✅ AI configuration applied from API');
           if (retryCount > 0) {
             showMessage('✅ シート情報が正常に読み込まれました！', 'success');
           }
@@ -2388,68 +2263,14 @@ function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetr
         // フォールバック試行: spreadsheetIdを省略（サーバー側の既定スプレッドシート）
         const maybeNotFound = error && (error.message.includes('が見つかりません') || error.message.includes('Unable to parse range'));
         if (maybeNotFound && spreadsheetId && retryCount === 0) {
-          // 代替のスプレッドシートIDで再試行（サーバー側フォールバックに依存しない）
-          const altId = _resolveAltSpreadsheetId(window.currentStatus, spreadsheetId);
-          if (altId) {
-            console.warn('⚠️ Fallback: Retrying getSheetDetails with alt spreadsheetId');
-            return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', altId, sheetName)
-              .then(details => {
-                try {
-                  populateHeaderOptions(details.allHeaders);
-                  console.log('✅ Header options populated from fallback API');
-                  if (window._historyRestoreInProgress) {
-                    const sel = window._historyColumnSelections || {};
-                    const applyIf = (id, val) => {
-                      if (!val) return;
-                      const el = document.getElementById(id);
-                      if (el) el.value = val;
-                    };
-                    applyIf('opinionHeader', sel.opinionColumn);
-                    applyIf('name-column', sel.nameColumn);
-                    applyIf('class-column', sel.classColumn);
-                    applyIf('reason-column', sel.reasonColumn);
-                    window._historyColumnSelections = null;
-                  } else {
-                    populateConfig(details.guessedConfig);
-                    console.log('✅ AI configuration applied from fallback API');
-                  }
-                  resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
-                } catch (err2) {
-                  console.error('Error in fallback config population sequence:', err2);
-                  showMessage('設定の適用中にエラーが発生しました', 'error');
-                  reject(err2);
-                }
-              })
-              .catch(err2 => {
-                console.warn('Fallback getSheetDetails also failed:', err2);
-                showMessage(errorMessage, 'error');
-                // After fallback failure, proceed with normal retry handling below
-                // Intentionally no return here to fall through to retry logic
-              });
-          }
-          // altIdがなければ従来のフォールバック（サーバ側既定）
           console.warn('⚠️ Fallback: Retrying getSheetDetails without spreadsheetId');
           return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', null, sheetName)
-              .then(details => {
-                try {
-                  populateHeaderOptions(details.allHeaders);
-                  console.log('✅ Header options populated from fallback API');
-                if (window._historyRestoreInProgress) {
-                  const sel = window._historyColumnSelections || {};
-                  const applyIf = (id, val) => {
-                    if (!val) return;
-                    const el = document.getElementById(id);
-                    if (el) el.value = val;
-                  };
-                  applyIf('opinionHeader', sel.opinionColumn);
-                  applyIf('name-column', sel.nameColumn);
-                  applyIf('class-column', sel.classColumn);
-                  applyIf('reason-column', sel.reasonColumn);
-                  window._historyColumnSelections = null;
-                } else {
-                  populateConfig(details.guessedConfig);
-                  console.log('✅ AI configuration applied from fallback API');
-                }
+            .then(details => {
+              try {
+                populateHeaderOptions(details.allHeaders);
+                console.log('✅ Header options populated from fallback API');
+                populateConfig(details.guessedConfig);
+                console.log('✅ AI configuration applied from fallback API');
                 resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
               } catch (err2) {
                 console.error('Error in fallback config population sequence:', err2);
@@ -2722,96 +2543,6 @@ function getActiveResourceUrls(status) {
   return urls;
 }
 
-/**
- * シート名の正規化処理
- */
-function _normalizeSheetName(sheetName) {
-  if (!sheetName) return '';
-  
-  return sheetName
-    .trim()
-    .replace(/\s+/g, ' ')  // 複数の空白を1つに
-    .replace(/[\u3000]/g, ' ')  // 全角空白を半角に
-    .toLowerCase();
-}
-
-/**
- * 履歴復元時専用の設定読み込み処理
- */
-async function _loadConfigForHistoryRestore(sheetName) {
-  try {
-    console.log('📝 履歴復元用設定読み込み開始:', sheetName);
-    
-    // 履歴復元フラグを一時的に無効化して設定読み込み
-    const originalRestoreFlag = window._historyRestoreInProgress;
-    const originalColumnSelections = window._historyColumnSelections;
-    
-    window._historyRestoreInProgress = false;
-    window._historyColumnSelections = null;
-    
-    // 設定読み込み実行（強制読み込みフラグ付き）
-    const result = await loadConfigForSelected(sheetName, null, 0, 3, true);
-    
-    // フラグを元に戻す
-    window._historyRestoreInProgress = originalRestoreFlag;
-    window._historyColumnSelections = originalColumnSelections;
-    
-    console.log('✅ 履歴復元用設定読み込み完了:', result);
-    
-    // 履歴データの列設定を再適用
-    if (window._historyColumnSelections) {
-      console.log('🔄 履歴の列設定を再適用中...');
-      _applyHistoryColumnSettings(window._historyColumnSelections);
-    }
-    
-  } catch (error) {
-    console.error('❌ 履歴復元用設定読み込みエラー:', error);
-  }
-}
-
-/**
- * 履歴の列設定をDOMに再適用
- */
-function _applyHistoryColumnSettings(columnSelections) {
-  try {
-    // DOM要素への値設定
-    if (columnSelections.opinionHeader) {
-      const opinionEl = document.getElementById('opinionHeader');
-      if (opinionEl) {
-        opinionEl.value = columnSelections.opinionHeader;
-        console.log('✅ Opinion header reapplied:', columnSelections.opinionHeader);
-      }
-    }
-    
-    if (columnSelections.nameColumn) {
-      const nameEl = document.getElementById('name-column');
-      if (nameEl) {
-        nameEl.value = columnSelections.nameColumn;
-        console.log('✅ Name column reapplied:', columnSelections.nameColumn);
-      }
-    }
-    
-    if (columnSelections.classColumn) {
-      const classEl = document.getElementById('class-column');
-      if (classEl) {
-        classEl.value = columnSelections.classColumn;
-        console.log('✅ Class column reapplied:', columnSelections.classColumn);
-      }
-    }
-    
-    if (columnSelections.reasonHeader) {
-      const reasonEl = document.getElementById('reasonHeader');
-      if (reasonEl) {
-        reasonEl.value = columnSelections.reasonHeader;
-        console.log('✅ Reason header reapplied:', columnSelections.reasonHeader);
-      }
-    }
-    
-  } catch (error) {
-    console.error('❌ 履歴列設定再適用エラー:', error);
-  }
-}
-
 function updateSystemStatusDisplay(status) {
   console.log('--- Entering updateSystemStatusDisplay ---'); // Gemini Debug
   if (!status) return;
@@ -2972,7 +2703,7 @@ function saveToHistory(historyItem) {
     
     history.unshift(newItem);
     
-    // 最大数を超えた場合は過去のものを削除
+    // 最大数を超えた場合は古いものを削除
     if (history.length > MAX_HISTORY_ITEMS) {
       history.splice(MAX_HISTORY_ITEMS);
     }
@@ -3478,6 +3209,9 @@ function updateConfigPanelUI(config) {
  * 簡単な履歴テーブルを表示（新実装）
  */
 
+// loadSimpleHistoryTable moved to AdminPanel.historyManager
+
+// createHistoryTableRow moved to AdminPanel.historyManager
 
 /**
  * Enhanced history restoration preview modal
@@ -3770,6 +3504,13 @@ async function selectHistoryItem(historyId) {
  * シンプル履歴からの復元実行
  * @param {Object} item - 正規化済み履歴アイテム
  */
+// restoreFromSimpleHistory moved to AdminPanel.historyManager
+
+// 古い複雑なrestoreConfigFromHistory関数は削除済み - restoreFromSimpleHistoryに統合
+
+// 古いrestoreAdditionalConfigSettings関数は削除済み - シンプル復元に統合
+
+// createHistoryItemElement関数は削除 - テーブル形式のcreateHistoryTableRowを使用
 
 /**
  * HTMLエスケープ関数
@@ -4094,7 +3835,7 @@ function fixConfigForPublishedState(config) {
 // 簡単な履歴テーブル初期化は initializeAdminPanel で実行されるように変更
 // DOMContentLoaded は削除 - framework.js.htmlで統一管理
 
-// Draft recovery utility function
+// Draft recovery function - moved to initializeAdminPanelMaster
 function recoverDraftIfAvailable() {
   // Check for and recover draft from session storage
   if (typeof hasDraftInSession === 'function' && hasDraftInSession()) {

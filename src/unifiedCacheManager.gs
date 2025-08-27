@@ -1457,59 +1457,6 @@ function resetUnifiedExecutionCache() {
 }
 
 // =============================================================================
-// SECTION 4.5: 統一キャッシュクリア関数群
-// =============================================================================
-
-/**
- * 統一キャッシュクリア - 履歴復元用に最適化
- * 複数のキャッシュシステムを一括で適切にクリア
- * @param {string} userId - ユーザーID
- * @param {string} email - メールアドレス
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} mode - クリアモード: 'execution', 'user', 'all'
- */
-function performUnifiedCacheClear(userId, email, spreadsheetId, mode = 'user') {
-  try {
-    debugLog('🧹 統一キャッシュクリア開始:', { userId, email, spreadsheetId, mode });
-    
-    switch (mode) {
-      case 'execution':
-        // 実行レベルキャッシュのみクリア
-        if (globalUnifiedCache) {
-          globalUnifiedCache.clearAll();
-        }
-        clearExecutionUserInfoCache();
-        clearExecutionSheetsServiceCache();
-        break;
-        
-      case 'user':
-        // ユーザー関連キャッシュをクリア
-        if (userId && email) {
-          invalidateUserCache(userId, email, spreadsheetId, false);
-        }
-        performUnifiedCacheClear(userId, email, spreadsheetId, 'execution');
-        break;
-        
-      case 'all':
-        // 全キャッシュクリア
-        cacheManager.clearAll();
-        clearAllSpreadsheetCache();
-        performUnifiedCacheClear(userId, email, spreadsheetId, 'user');
-        clearDatabaseCache();
-        break;
-        
-      default:
-        warnLog('⚠️ 不明なキャッシュクリアモード:', mode);
-        performUnifiedCacheClear(userId, email, spreadsheetId, 'user');
-    }
-    
-    debugLog('✅ 統一キャッシュクリア完了:', mode);
-  } catch (error) {
-    warnLog('⚠️ 統一キャッシュクリアでエラー:', error.message);
-  }
-}
-
-// =============================================================================
 // SECTION 5: 後方互換性のための関数群（元cache.gs）
 // =============================================================================
 

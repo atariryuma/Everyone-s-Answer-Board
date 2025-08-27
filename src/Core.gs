@@ -1561,20 +1561,13 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     debugLog('getPublishedSheetData: formattedData length=%s', formattedData.length);
     debugLog('getPublishedSheetData: formattedData content=%s', JSON.stringify(formattedData));
 
-    // ボードのタイトルを設定された質問文から取得（優先）、フォールバックで実際のヘッダー
+    // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
     let headerTitle = publishedSheetName || '今日のお題';
-    
-    // 1. 設定された質問文（opinionHeader）を優先的に使用
-    if (mainHeaderName && mainHeaderName.trim()) {
-      headerTitle = mainHeaderName;
-      debugLog('getPublishedSheetData: Using configured opinion header as title: "%s"', headerTitle);
-    } 
-    // 2. フォールバック: 実際のスプレッドシートヘッダーから取得
-    else if (mappedIndices.opinionHeader !== undefined) {
+    if (mappedIndices.opinionHeader !== undefined) {
       for (var actualHeader in headerIndices) {
         if (headerIndices[actualHeader] === mappedIndices.opinionHeader) {
           headerTitle = actualHeader;
-          debugLog('getPublishedSheetData: Fallback to actual header as title: "%s"', headerTitle);
+          debugLog('getPublishedSheetData: Using actual header as title: "%s"', headerTitle);
           break;
         }
       }
@@ -6150,11 +6143,10 @@ function confirmUserRegistration() {
  * 従来の5つのAPI呼び出し（getCurrentUserStatus, getUserId, getAppConfig, getSheetDetails）を統合
  * @param {string} requestUserId - リクエスト元のユーザーID（省略可能）
  * @param {string} targetSheetName - 詳細を取得するシート名（省略可能）
- * @param {boolean} lightweightMode - 軽量モード（シート詳細取得をスキップ）
  * @returns {Object} 統合された初期データ
  */
-function getInitialData(requestUserId, targetSheetName, lightweightMode) {
-  debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName, lightweightMode });
+function getInitialData(requestUserId, targetSheetName) {
+  debugLog('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName });
 
   try {
     var startTime = new Date().getTime();
@@ -6171,42 +6163,14 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     // Phase3 Optimization: Use execution-level cache to avoid duplicate database queries
     clearExecutionUserInfoCache(); // Clear any stale cache
 
-    // 軽量モード時またはキャッシュバイパス時の追加キャッシュクリア
-    if (lightweightMode || targetSheetName === 'BYPASS_CACHE') {
-      debugLog('🧹 Additional cache clearing for fresh data retrieval');
-      try {
-        // 統一キャッシュクリアを実行
-        if (typeof performUnifiedCacheClear === 'function') {
-          performUnifiedCacheClear(currentUserId, activeUserEmail, null, 'execution');
-        }
-        // データベースキャッシュも強制クリア
-        if (typeof clearDatabaseCache === 'function') {
-          clearDatabaseCache();
-        }
-      } catch (cacheError) {
-        warnLog('⚠️ Additional cache clearing failed:', cacheError.message);
-      }
-    }
-
     // ユーザー認証
     verifyUserAccess(currentUserId);
-    
-    // 軽量モードまたは強制更新時は、確実に最新データを取得
-    var userInfo;
-    if (lightweightMode || targetSheetName === 'BYPASS_CACHE') {
-      debugLog('🔄 Force fresh user data retrieval for consistency');
-      userInfo = findUserByIdFresh(currentUserId);
-      if (!userInfo) {
-        throw new Error('ユーザー情報が見つかりません（強制更新）');
-      }
-    } else {
-      userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-        useExecutionCache: true,
-        ttl: 300
-      });
-      if (!userInfo) {
-        throw new Error('ユーザー情報が見つかりません');
-      }
+    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
+      useExecutionCache: true,
+      ttl: 300
+    }); // Use cached version
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
     }
 
     // === ステップ1.5: データ整合性の自動チェックと修正 ===
@@ -6337,8 +6301,7 @@ function getInitialData(requestUserId, targetSheetName, lightweightMode) {
     };
 
     // === ステップ6: シート詳細の取得（オプション）- 最適化版 ===
-    // 軽量モード時はシート詳細の取得をスキップ
-    var includeSheetDetails = !lightweightMode && (targetSheetName || configJson.publishedSheetName);
+    var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
 
     // デバッグ: シート詳細取得パラメータの確認
     debugLog('🔍 getInitialData: シート詳細取得パラメータ確認:', {
@@ -6726,44 +6689,6 @@ function updateUserAPI(requestUserId, updateData) {
         invalidateUserCache(requestUserId, null, null, 'all', null);
       } catch (cacheError) {
         warnLog('Cache invalidation warning:', cacheError.message);
-      }
-      
-      // CRITICAL: Verify that the update was actually persisted
-      debugLog('🔍 Verifying update persistence...');
-      const maxVerificationAttempts = 3;
-      let verificationSuccess = false;
-      
-      for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
-        try {
-          // Small delay to allow for database consistency
-          Utilities.sleep(200 * attempt);
-          
-          // Force fresh read from database
-          clearExecutionUserInfoCache();
-          const verifiedUserInfo = findUserByIdFresh(requestUserId);
-          
-          if (verifiedUserInfo && verifiedUserInfo.spreadsheetId === filteredUpdateData.spreadsheetId) {
-            debugLog('✅ Update verification successful on attempt ' + attempt);
-            verificationSuccess = true;
-            break;
-          } else {
-            warnLog('⚠️ Update verification failed on attempt ' + attempt + ':', {
-              expected: filteredUpdateData.spreadsheetId,
-              actual: verifiedUserInfo ? verifiedUserInfo.spreadsheetId : 'null',
-              userInfo: !!verifiedUserInfo
-            });
-          }
-        } catch (verificationError) {
-          warnLog('⚠️ Update verification error on attempt ' + attempt + ':', verificationError.message);
-        }
-      }
-      
-      if (!verificationSuccess) {
-        errorLog('❌ CRITICAL: Update verification failed after ' + maxVerificationAttempts + ' attempts');
-        return {
-          status: 'error',
-          message: 'データベース更新の検証に失敗しました。管理者にお問い合わせください。'
-        };
       }
     }
     
