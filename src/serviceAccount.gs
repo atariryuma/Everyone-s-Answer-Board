@@ -16,7 +16,7 @@ function getServiceAccountEmail() {
     const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
     
     if (!serviceAccountCredsJson) {
-      logWarn('サービスアカウント認証情報が設定されていません');
+      console.warn('サービスアカウント認証情報が設定されていません');
       return 'サービスアカウント未設定';
     }
 
@@ -24,7 +24,7 @@ function getServiceAccountEmail() {
     const serviceAccountCreds = JSON.parse(serviceAccountCredsJson);
     
     if (!serviceAccountCreds.client_email) {
-      logWarn('サービスアカウントのclient_emailが見つかりません');
+      console.warn('サービスアカウントのclient_emailが見つかりません');
       return 'サービスアカウント設定エラー';
     }
 
@@ -33,6 +33,46 @@ function getServiceAccountEmail() {
   } catch (error) {
     logError(error, 'getServiceAccountEmail', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.AUTHENTICATION);
     return 'サービスアカウント設定エラー';
+  }
+}
+
+/**
+ * サービスアカウントのアクセストークンをキャッシュ付きで取得
+ * @param {boolean} forceRefresh - 強制的に新しいトークンを取得するかどうか
+ * @returns {string|null} アクセストークン
+ */
+function getServiceAccountTokenCached(forceRefresh = false) {
+  try {
+    const cacheKey = 'service_account_token';
+    const cache = CacheService.getScriptCache();
+    
+    // 強制リフレッシュでない場合はキャッシュから取得を試行
+    if (!forceRefresh) {
+      const cachedToken = cache.get(cacheKey);
+      if (cachedToken) {
+        return cachedToken;
+      }
+    }
+    
+    // 新しいトークンを生成
+    const newToken = generateNewServiceAccountToken();
+    if (!newToken) {
+      return null;
+    }
+    
+    // トークンをキャッシュに保存（55分間 = 3300秒、通常1時間の有効期限より少し短く）
+    try {
+      cache.put(cacheKey, newToken, 3300);
+    } catch (cacheError) {
+      // キャッシュ保存に失敗してもトークンは返す
+      console.warn('トークンキャッシュの保存に失敗しましたが、トークンは有効です:', cacheError.message);
+    }
+    
+    return newToken;
+    
+  } catch (error) {
+    logError(error, 'getServiceAccountTokenCached', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.AUTHENTICATION);
+    return null;
   }
 }
 
@@ -49,7 +89,7 @@ function generateNewServiceAccountToken() {
     const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
     
     if (!serviceAccountCredsJson) {
-      logWarn('サービスアカウント認証情報が設定されていません');
+      console.warn('サービスアカウント認証情報が設定されていません');
       return null;
     }
 
@@ -149,7 +189,7 @@ function generateNewServiceAccountToken() {
       throw new Error(`アクセストークンが含まれていません: ${  response.getContentText()}`);
     }
 
-    logInfo('サービスアカウントのアクセストークンを生成しました');
+    console.log('サービスアカウントのアクセストークンを生成しました');
     
     return responseData.access_token;
     
@@ -287,7 +327,7 @@ function setupServiceAccount(serviceAccountJson) {
       throw new Error('サービスアカウント設定後のトークン生成に失敗');
     }
 
-    logInfo('サービスアカウント設定が完了しました', { email: serviceAccountCreds.client_email });
+    console.log('サービスアカウント設定が完了しました:', serviceAccountCreds.client_email);
 
     return {
       success: true,
@@ -322,7 +362,7 @@ function clearServiceAccountConfiguration() {
       cacheManager.remove('service_account_token');
     }
 
-    logInfo('サービスアカウント設定をクリアしました');
+    console.log('サービスアカウント設定をクリアしました');
     
     return {
       success: true,
