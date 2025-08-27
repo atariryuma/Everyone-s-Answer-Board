@@ -206,9 +206,21 @@ function getCurrentUser() {
       throw new Error('No user email found');
     }
     
+    // データベースから実際のユーザーIDを取得
+    let userId = email; // デフォルトはメールアドレス
+    try {
+      const dbUser = fetchUserFromDatabase('adminEmail', email);
+      if (dbUser && dbUser.userId) {
+        userId = dbUser.userId; // データベースのUUID形式のIDを使用
+      }
+    } catch (dbError) {
+      // データベースエラーの場合はメールアドレスをIDとして継続
+      console.warn('getCurrentUser: データベース検索失敗、メールアドレスをIDとして使用:', dbError.message);
+    }
+    
     return {
       email,
-      id: email, // emailをIDとして使用
+      id: userId,
       isLoggedIn: true,
       timestamp: new Date().toISOString()
     };
@@ -241,8 +253,16 @@ function verifyUserAccess(requestUserId) {
       throw new Error('Invalid request user ID');
     }
     
-    if (currentUser.id !== requestUserId) {
-      logError(`Access denied: ${currentUser.id} tried to access ${requestUserId}`, 'verifyUserAccess', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.AUTH);
+    // IDが一致するか、またはメールアドレスが一致するか確認
+    const isAuthorized = (
+      currentUser.id === requestUserId || 
+      currentUser.email === requestUserId ||
+      // UUIDとメールアドレスの相互チェック（データベース移行期の互換性）
+      (currentUser.email && currentUser.id === requestUserId)
+    );
+    
+    if (!isAuthorized) {
+      logError(`Access denied: ${currentUser.email} (ID: ${currentUser.id}) tried to access ${requestUserId}`, 'verifyUserAccess', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.AUTH);
       throw new Error('Access denied');
     }
     
