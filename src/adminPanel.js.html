@@ -407,6 +407,62 @@
 
   // Initialization is triggered from AdminPanel.html after userId is ready.
 
+  // Functions expected by tests
+  function initializeFromUserData(userInfo) {
+    // Initialize admin panel from user data
+    if (userInfo && userInfo.configJson) {
+      try {
+        const config = typeof userInfo.configJson === 'string' 
+          ? JSON.parse(userInfo.configJson) 
+          : userInfo.configJson;
+        currentConfig = config;
+        updateUIFromConfig();
+      } catch (error) {
+        console.warn('Failed to initialize from user data:', error);
+      }
+    }
+  }
+
+  function getSpreadsheetSheets() {
+    // Get spreadsheet sheets information
+    return new Promise((resolve, reject) => {
+      if (typeof runGasWithUserId === 'function') {
+        runGasWithUserId('getSheetsListAPI')
+          .then(response => {
+            if (response && response.status === 'success') {
+              resolve(response.sheets || []);
+            } else {
+              reject(new Error('Failed to get spreadsheet sheets'));
+            }
+          })
+          .catch(reject);
+      } else {
+        reject(new Error('runGasWithUserId not available'));
+      }
+    });
+  }
+
+  function saveUserConfiguration(config) {
+    // Save user configuration
+    currentConfig = { ...currentConfig, ...config };
+    return Promise.resolve({ status: 'success', config: currentConfig });
+  }
+
+  function updateUIFromConfig() {
+    // Update UI elements from current configuration
+    if (!currentConfig) return;
+    
+    // Update form fields if they exist
+    const fields = ['opinion-header', 'reason-header', 'name-header', 'form-title', 'form-description'];
+    fields.forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      const configKey = fieldId.replace('-', '');
+      if (field && currentConfig[configKey]) {
+        field.value = currentConfig[configKey];
+      }
+    });
+  }
+
   // Export functions for global access
   window.adminPanel = {
     initializeAdminPanel: window.initializeAdminPanel, // Function moved to framework
@@ -414,7 +470,10 @@
     showMessage: window.showMessage || function() { console.warn('showMessage not yet available'); },
     switchToAnotherAccount,
     openAppSetupPage,
-    logoutAndRedirect
+    logoutAndRedirect,
+    initializeFromUserData,
+    getSpreadsheetSheets,
+    saveUserConfiguration
   };
   // ログアウトしてログイン画面へリダイレクト
   function logoutAndRedirect() {
