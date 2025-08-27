@@ -1232,6 +1232,103 @@
             };
         }
 
+        // 診断履歴をローカルストレージに保存
+        function saveDiagnosticToHistory(functionName, result, summary) {
+            const history = JSON.parse(localStorage.getItem('diagnosticHistory') || '[]');
+            
+            const entry = {
+                timestamp: new Date().toISOString(),
+                functionName,
+                summary: summary.message,
+                status: summary.type,
+                problemCount: summary.problemCount,
+                repairCount: summary.repairCount,
+                successfulRepairs: summary.successfulRepairs,
+                details: result
+            };
+
+            history.unshift(entry); // 最新を先頭に
+            
+            // 最大50件まで保持
+            if (history.length > 50) {
+                history.splice(50);
+            }
+
+            localStorage.setItem('diagnosticHistory', JSON.stringify(history));
+        }
+
+        // 診断履歴を表示（既存の削除ログモーダルを活用）
+        function viewDiagnosticHistory() {
+            const modal = document.getElementById('logs-modal');
+            const loadingDiv = document.getElementById('logs-loading');
+            const contentDiv = document.getElementById('logs-table-content');
+            const modalTitle = modal.querySelector('h3');
+
+            // タイトルを変更
+            modalTitle.textContent = '📊 診断履歴';
+            
+            modal.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            contentDiv.classList.add('hidden');
+
+            // 少し遅延させて履歴を表示
+            setTimeout(() => {
+                displayDiagnosticHistory();
+                loadingDiv.classList.add('hidden');
+            }, 500);
+        }
+
+        // 診断履歴をテーブルに表示
+        function displayDiagnosticHistory() {
+            const tableBody = document.getElementById('logs-table-body');
+            const contentDiv = document.getElementById('logs-table-content');
+            const history = JSON.parse(localStorage.getItem('diagnosticHistory') || '[]');
+
+            // テーブルヘッダーを診断用に変更
+            const tableHead = contentDiv.querySelector('thead tr');
+            tableHead.innerHTML = `
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">実行日時</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">機能</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">結果</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">問題/修復</th>
+                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">ステータス</th>
+            `;
+
+            if (history.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                            診断履歴が見つかりません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tableBody.innerHTML = history.map(entry => {
+                    const executeDate = new Date(entry.timestamp).toLocaleString('ja-JP');
+                    const statusColor = entry.status === 'success' ? 'text-green-400' : 
+                                       entry.status === 'warning' ? 'text-yellow-400' : 'text-red-400';
+                    const statusIcon = entry.status === 'success' ? '✅' : 
+                                      entry.status === 'warning' ? '⚠️' : '❌';
+                    
+                    const problemRepair = entry.repairCount > 0 ? 
+                        `${entry.problemCount}件検出 / ${entry.successfulRepairs}/${entry.repairCount}件修復` :
+                        entry.problemCount > 0 ? `${entry.problemCount}件検出` : '問題なし';
+
+                    return `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3 text-sm text-gray-300">${executeDate}</td>
+                            <td class="px-4 py-3 text-sm text-white">${entry.functionName}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300" title="${entry.summary}">${entry.summary.substring(0, 50)}...</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${problemRepair}</td>
+                            <td class="px-4 py-3 text-sm ${statusColor}">${statusIcon}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            contentDiv.classList.remove('hidden');
+        }
+
         // =================================================================
         // DEBUG_MODE制御機能
         // =================================================================

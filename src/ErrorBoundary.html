@@ -96,7 +96,7 @@
   
   // Recovery strategies based on error category
   const attemptRecovery = (errorInfo, recoveryOptions) => {
-    const category = errorInfo.category;
+    const { category } = errorInfo;
     
     switch (category) {
       case ERROR_CATEGORIES.NETWORK:
@@ -154,19 +154,11 @@
   
   // Google Apps Script error recovery
   const handleGoogleScriptError = (errorInfo, recoveryOptions) => {
-    if (typeof logInfo === 'function') {
-      logInfo('Attempting Google Apps Script error recovery...');
-    } else {
-      console.log('🔄 Attempting Google Apps Script error recovery...');
-    }
+    console.log('🔄 Attempting Google Apps Script error recovery...');
     
     // Try to reload Google Apps Script context
     if (typeof google !== 'undefined' && google.script) {
-      if (typeof logInfo === 'function') {
-        logInfo('Google Apps Script context available, retrying...');
-      } else {
-        console.log('🔄 Google Apps Script context available, retrying...');
-      }
+      console.log('🔄 Google Apps Script context available, retrying...');
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
@@ -183,22 +175,14 @@
   
   // Timeout error recovery
   const handleTimeoutError = (errorInfo, recoveryOptions) => {
-    if (typeof logInfo === 'function') {
-      logInfo('Attempting timeout error recovery...');
-    } else {
-      console.log('🔄 Attempting timeout error recovery...');
-    }
+    console.log('🔄 Attempting timeout error recovery...');
     
     if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
       errorBoundaryState.retryCount++;
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
-          if (typeof logInfo === 'function') {
-            logInfo('Retrying after timeout...');
-          } else {
-            console.log('🔄 Retrying after timeout...');
-          }
+          console.log('🔄 Retrying after timeout...');
           recoveryOptions.retryCallback();
         }
       }, ERROR_BOUNDARY_CONFIG.retryDelay * 2); // Longer delay for timeouts
@@ -212,19 +196,11 @@
   
   // JavaScript error recovery
   const handleJavaScriptError = (errorInfo, recoveryOptions) => {
-    if (typeof logInfo === 'function') {
-      logInfo('Attempting JavaScript error recovery...');
-    } else {
-      console.log('🔄 Attempting JavaScript error recovery...');
-    }
+    console.log('🔄 Attempting JavaScript error recovery...');
     
     // Try to recover from common JavaScript errors
     if (errorInfo.message.includes('undefined') || errorInfo.message.includes('null')) {
-      if (typeof logInfo === 'function') {
-        logInfo('Attempting to recover from null/undefined error...');
-      } else {
-        console.log('🔄 Attempting to recover from null/undefined error...');
-      }
+      console.log('🔄 Attempting to recover from null/undefined error...');
       
       if (recoveryOptions.fallbackCallback) {
         recoveryOptions.fallbackCallback();
@@ -238,11 +214,7 @@
   
   // Generic error recovery
   const handleGenericError = (errorInfo, recoveryOptions) => {
-    if (typeof logInfo === 'function') {
-      logInfo('Attempting generic error recovery...');
-    } else {
-      console.log('🔄 Attempting generic error recovery...');
-    }
+    console.log('🔄 Attempting generic error recovery...');
     
     if (recoveryOptions.fallbackCallback) {
       recoveryOptions.fallbackCallback();
@@ -266,7 +238,48 @@
     // Create error UI
     const errorUI = document.createElement('div');
     errorUI.id = 'error-boundary-ui';
-    errorUI.innerHTML = "<div style=\"position: fixed; top: 20px; right: 20px; background: #fee2e2; color: #dc2626; padding: 16px; border-radius: 8px; border: 1px solid #fecaca; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); z-index: 10000; max-width: 400px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\"><div style=\"display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">  <span style=\"font-size: 18px;">⚠️</span>  <strong>エラーが発生しました</strong></div><p style=\"margin: 0 0 12px 0; font-size: 14px;">${message}</p><div style=\"display: flex; gap: 8px;">  <button onclick=\"window.location.reload()\" style=\"background: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;\">再読み込み</button>  <button onclick=\"document.getElementById('error-boundary-ui').remove()\" style=\"background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;\">閉じる</button></div></div>";
+    errorUI.innerHTML = `
+      <div style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #fee2e2;
+        color: #dc2626;
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid #fecaca;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 10000;
+        max-width: 400px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      ">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <span style="font-size: 18px;">⚠️</span>
+          <strong>エラーが発生しました</strong>
+        </div>
+        <p style="margin: 0 0 12px 0; font-size: 14px;">${message}</p>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="window.location.reload()" style="
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+          ">再読み込み</button>
+          <button onclick="document.getElementById('error-boundary-ui').remove()" style="
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+          ">閉じる</button>
+        </div>
+      </div>
+    `;
     
     document.body.appendChild(errorUI);
     
@@ -287,7 +300,7 @@
           .withFailureHandler((error) => {
             console.warn('Failed to report error to server:', error);
           })
-          .logClientError && google.script.run.logClientError(errorInfo);
+          .reportClientError && google.script.run.reportClientError(errorInfo);
       }
     } catch (e) {
       console.warn('Error reporting failed:', e);
@@ -388,7 +401,7 @@
 
 <!-- サーバーサイドエラー表示部分 -->
 <? if (typeof title !== 'undefined' && title) { ?>
-<? var loginUrl = ScriptApp.getService().getUrl(); ?>
+<? var loginUrl = getWebAppUrl(); ?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -396,53 +409,238 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= title || 'エラー' ?> - StudyQuest</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #333; }
-        .error-container { background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); padding: 40px; max-width: 800px; width: 95%; text-align: center; position: relative; }
-        .error-icon { font-size: 64px; margin-bottom: 20px; animation: bounce 2s infinite; }
-        @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 60% { transform: translateY(-5px); } }
-        .error-title { font-size: 24px; font-weight: bold; color: #e53e3e; margin-bottom: 16px; }
-        .error-message { font-size: 16px; color: #666; line-height: 1.6; margin-bottom: 24px; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap; max-height: 300px; overflow-y: auto; text-align: left; padding: 0 10px; }
-        .error-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-        .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; transition: all 0.3s ease; }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-primary:hover { background: #5a6fd8; transform: translateY(-2px); }
-        .btn-secondary { background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; }
-        .btn-secondary:hover { background: #edf2f7; }
-        .debug-info { margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8; text-align: left; font-family: 'Monaco', 'Menlo', monospace; font-size: 12px; color: #495057; max-height: 200px; overflow-y: auto; }
-        .timestamp { color: #6c757d; font-size: 12px; margin-top: 16px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        .error-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 95%;
+            text-align: center;
+            position: relative;
+        }
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        .error-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e53e3e;
+            margin-bottom: 16px;
+        }
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 24px;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
+            padding: 0 10px;
+        }
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+        .debug-info {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
+            text-align: left;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #495057;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 16px;
+        }
         
         /* エラータイプ別スタイリング */
-        .error-container.error-critical { border-left: 6px solid #dc3545; }
-        .error-container.error-access { border-left: 6px solid #fd7e14; }
-        .error-container.error-validation { border-left: 6px solid #ffc107; }
-        .error-container.error-network { border-left: 6px solid #17a2b8; }
-        .error-container.error-user { border-left: 6px solid #6c757d; }
+        .error-container.error-critical {
+            border-left: 6px solid #dc3545;
+        }
+        .error-container.error-access {
+            border-left: 6px solid #fd7e14;
+        }
+        .error-container.error-validation {
+            border-left: 6px solid #ffc107;
+        }
+        .error-container.error-network {
+            border-left: 6px solid #17a2b8;
+        }
+        .error-container.error-user {
+            border-left: 6px solid #6c757d;
+        }
         
         /* 詳細情報セクション */
-        .diagnostic-section { margin-top: 20px; text-align: left; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8; padding: 16px; max-height: 400px; overflow-y: auto; }
+        .diagnostic-section {
+            margin-top: 20px;
+            text-align: left;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
+            padding: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
         
-        .diagnostic-toggle { background: #e9ecef; border: 1px solid #dee2e6; border-radius: 6px; padding: 8px 16px; margin-bottom: 16px; cursor: pointer; font-size: 14px; transition: background-color 0.3s ease; }
+        .diagnostic-toggle {
+            background: #e9ecef;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 16px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
         
-        .diagnostic-toggle:hover { background: #dee2e6; }
+        .diagnostic-toggle:hover {
+            background: #dee2e6;
+        }
         
-        .diagnostic-content { display: none; font-family: 'Monaco', 'Menlo', monospace; font-size: 12px; line-height: 1.4; }
+        .diagnostic-content {
+            display: none;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
         
-        .diagnostic-summary { margin-bottom: 16px; padding: 12px; background: white; border-radius: 6px; border: 1px solid #dee2e6; }
+        .diagnostic-summary {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
         
-        .diagnostic-summary h4 { margin: 0 0 8px 0; font-size: 14px; color: #495057; }
+        .diagnostic-summary h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #495057;
+        }
         
-        .diagnostic-summary p { margin: 4px 0; font-size: 13px; }
+        .diagnostic-summary p {
+            margin: 4px 0;
+            font-size: 13px;
+        }
         
-        .diagnostic-properties { margin-top: 12px; padding: 12px; background: #f1f3f4; border-radius: 6px; font-size: 11px; max-height: 200px; overflow-y: auto; }
+        .diagnostic-properties {
+            margin-top: 12px;
+            padding: 12px;
+            background: #f1f3f4;
+            border-radius: 6px;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
         
         /* レスポンシブ対応 */
-        @media (max-width: 768px) { .error-container { width: 98%; padding: 20px; margin: 10px; } .error-title { font-size: 20px; } .error-message { font-size: 14px; padding: 0 5px; } .error-actions { flex-direction: column; gap: 8px; } .btn { width: 100%; } }
-        @media (max-width: 480px) { .error-container { padding: 15px; } .error-icon { font-size: 48px; } .error-title { font-size: 18px; } .diagnostic-section { padding: 12px; } }
+        @media (max-width: 768px) {
+            .error-container {
+                width: 98%;
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .error-title {
+                font-size: 20px;
+            }
+            
+            .error-message {
+                font-size: 14px;
+                padding: 0 5px;
+            }
+            
+            .error-actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .error-container {
+                padding: 15px;
+            }
+            
+            .error-icon {
+                font-size: 48px;
+            }
+            
+            .error-title {
+                font-size: 18px;
+            }
+            
+            .diagnostic-section {
+                padding: 12px;
+            }
+        }
     </style>
     <script>
         // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
-        const forceLogoutAndRedirect = () => {
+        function forceLogoutAndRedirect() {
             console.log('🔄 サーバーサイド強制ログアウト開始...');
             console.log('📍 現在のURL:', window.location.href);
             
@@ -496,7 +694,7 @@
         }
         
         // シンプルなフォールバック関数
-        const fallbackReload = () => {
+        function fallbackReload() {
             console.log('🔄 フォールバック：ページリロード実行');
             const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
             if (confirm(confirmMessage)) {
@@ -505,7 +703,7 @@
         }
         
         // テスト用関数
-        const testServerFunction = () => {
+        function testServerFunction() {
             console.log('🧪 Testing server function...');
             
             // 関数存在チェック
@@ -618,7 +816,7 @@
 
     <script>
         // 詳細診断情報の表示切り替え
-        const toggleDiagnosticInfo = () => {
+        function toggleDiagnosticInfo() {
             const content = document.getElementById('diagnostic-content');
             const arrow = document.getElementById('diagnostic-arrow');
             
@@ -632,7 +830,7 @@
         }
         
         // デバッグ情報の表示切り替え
-        const toggleDebugInfo = () => {
+        function toggleDebugInfo() {
             const content = document.getElementById('debug-content');
             const arrow = document.getElementById('debug-arrow');
             
@@ -646,7 +844,7 @@
         }
         
         // 診断情報をクリップボードにコピー
-        const copyDiagnosticInfo = () => {
+        function copyDiagnosticInfo() {
             try {
                 let copyText = '=== エラー診断レポート ===\n\n';
                 copyText += 'タイトル: <?= htmlEncode(title || "Unknown") ?>\n';
@@ -654,26 +852,26 @@
                 
                 // DOM から診断情報を直接取得
                 const diagnosticSections = document.querySelectorAll('.diagnostic-summary');
-                for (const section of diagnosticSections) {
+                diagnosticSections.forEach(function(section) {
                     const heading = section.querySelector('h4');
                     if (heading && heading.textContent.includes('📋 基本情報')) {
                         const summaryItems = section.querySelectorAll('p');
                         if (summaryItems.length > 0) {
                             copyText += '\n【基本情報】\n';
-                            for (const item of summaryItems) {
+                            summaryItems.forEach(function(item) {
                                 copyText += item.textContent.trim() + '\n';
-                            }
+                            });
                         }
                     } else if (heading && heading.textContent.includes('🔧 技術詳細')) {
                         const technicalItems = section.querySelectorAll('p');
                         if (technicalItems.length > 0) {
                             copyText += '\n【技術詳細】\n';
-                            for (const item of technicalItems) {
+                            technicalItems.forEach(function(item) {
                                 copyText += item.textContent.trim() + '\n';
-                            }
+                            });
                         }
                     }
-                }
+                });
                 
                 const propertiesSection = document.querySelector('.diagnostic-properties pre');
                 if (propertiesSection) {
@@ -683,9 +881,9 @@
                 
                 // クリップボードに書き込み
                 if (navigator.clipboard) {
-                    navigator.clipboard.writeText(copyText).then(() => {
+                    navigator.clipboard.writeText(copyText).then(function() {
                         alert('📋 診断情報がクリップボードにコピーされました');
-                    }).catch(() => {
+                    }).catch(function() {
                         fallbackCopy(copyText);
                     });
                 } else {
@@ -699,7 +897,7 @@
         }
         
         // フォールバックコピー機能
-        const fallbackCopy = (text) => {
+        function fallbackCopy(text) {
             const textArea = document.createElement('textarea');
             textArea.value = text;
             document.body.appendChild(textArea);

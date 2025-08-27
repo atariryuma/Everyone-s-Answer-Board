@@ -24,6 +24,7 @@ class BackendProgressSync {
       return;
     }
 
+    console.log(`🔄 Starting progress sync for flow: ${flowId}`);
     
     this.progressCallbacks.set(flowId, callback);
     this.activeFlows.add(flowId);
@@ -262,4 +263,5 @@ window.addEventListener('beforeunload', () => {
   window.backendProgressSync.stopAllSync();
 });
 
+console.log('✅ BackendProgressSync initialized');
 </script>

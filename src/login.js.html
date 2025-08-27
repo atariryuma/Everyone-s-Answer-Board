@@ -107,29 +107,10 @@
             
             if (response.status === 'existing_user' || response.status === 'setup_required') {
               const msg = response.status === 'setup_required' ? 'セットアップを完了してください' : 'ログインが完了しました';
-              
-              // 認証成功時にドメイン表示を更新
-              if (response.email) {
-                const domain = response.email.split('@')[1];
-                const isWorkspace = domain && !domain.includes('gmail.com');
-                const statusText = response.status === 'existing_user' ? 
-                  (isWorkspace ? 'Workspace認証済み' : 'Googleアカウント認証済み') : 
-                  'セットアップ完了待ち';
-                updateDomainDisplay('match', domain, statusText);
-              }
-              
               setLoading(true, '管理パネルへリダイレクト中...');
               showAdminPanelRedirect(response.adminUrl, msg);
               resolve();
             } else if (response.status === 'unregistered') {
-              // 未登録ユーザーの場合もドメイン表示を更新
-              if (response.email) {
-                const domain = response.email.split('@')[1];
-                const isWorkspace = domain && !domain.includes('gmail.com');
-                const statusText = isWorkspace ? 'Workspace認証済み (未登録)' : 'Googleアカウント認証済み (未登録)';
-                updateDomainDisplay('match', domain, statusText);
-              }
-              
               setLoading(false);
               const confirmMessage = 'このアカウントはまだ登録されていません。\n新規ユーザーとして登録しますか？';
               if (confirm(confirmMessage)) {
@@ -703,6 +684,7 @@
           
           if (isInFrame) {
             // iframe内の場合は親ウィンドウで開く（X-Frame-Options制約回避）
+            console.log('🔄 iframe内からの遷移を検出、parent window で開きます');
             setTimeout(() => {
               try {
                 window.top.location.href = adminUrl;
@@ -735,6 +717,7 @@
         document.body.classList.add('success-transition');
       }, 300);
       
+      console.log('✅ ユーザーアクション待ち画面を表示しました');
       
     } catch (error) {
       console.error('成功画面表示エラー:', error);

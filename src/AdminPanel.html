@@ -9,28 +9,221 @@
   <meta name="theme-color" content="#1a1b26" />
   <meta name="description" content="StudyQuestの回答ボード管理パネル - 直感的で使いやすい教育ツール" />
   <!-- Shared Security Headers -->
-  <?!= include('SharedSecurityHeaders.html'); ?>
+  <?!= include('SharedSecurityHeaders'); ?>
   
   <!-- User ID will be retrieved dynamically from backend -->
 
   <!-- Shared TailwindCSS Configuration -->
-  <?!= include('SharedTailwindConfig.html'); ?>
-  <?!= include('adminPanel.js.html'); ?>
+  <?!= include('SharedTailwindConfig'); ?>
+  <script>
+  // Inject DEBUG_MODE from server into window before utilities load
+  const __DEBUG_MODE_RAW__ = '<?= escapeJavaScript(shouldEnableDebugMode()) ?>';
+  window.DEBUG_MODE = (__DEBUG_MODE_RAW__ === 'true' || __DEBUG_MODE_RAW__ === true);
+  if (window.SYSTEM_CONSTANTS) { window.SYSTEM_CONSTANTS.DEBUG_MODE = window.DEBUG_MODE; }
+  </script>
 
   <!-- Unified Styles and Shared Components -->
-  <?!= include('UnifiedStyles.html'); ?>
-  <?!= include('SharedUtilities.html'); ?>
+  <?!= include('UnifiedStyles'); ?>
+  <?!= include('SharedUtilities'); ?>
   
   <!-- Admin Panel Specific Styles -->
-  <?!= include('adminPanel-layout.css.html'); ?>
+  <?!= include('adminPanel-layout.css'); ?>
   
   
   <!-- Core JavaScript Libraries (must be loaded first) -->
-  <?!= include('ClientOptimizer.html'); ?>
-  <!-- UnifiedCache.js.html removed - class is defined in page.js.html -->
+  <?!= include('ClientOptimizer'); ?>
+  <?!= include('UnifiedCache.js'); ?>
+  <?!= include('adminPanel-framework.js.html'); ?>
+  <script>
+  // Console output control: respect global DEBUG_MODE and filter noisy GAS warnings
+  (function() {
+    try {
+      const originalLog = console.log;
+      const originalWarn = console.warn;
+      // Read from injected DEBUG_MODE or SYSTEM_CONSTANTS fallback
+      const isDebug = !!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE));
+
+      const warningFilters = [
+        /Unrecognized feature.*ambient-light-sensor/i,
+        /Unrecognized feature.*speaker/i,
+        /Unrecognized feature.*vibrate/i,
+        /Unrecognized feature.*vr/i,
+        /iframe.*allow-scripts.*allow-same-origin.*sandbox/i,
+      ];
+
+      const shouldFilter = (msg) => {
+        const s = String(msg || '');
+        return warningFilters.some((re) => re.test(s));
+      };
+
+      console.log = function(...args) {
+        if (!isDebug) return; // suppress in non-debug mode
+        if (shouldFilter(args.join(' '))) return;
+        try { originalLog.apply(console, args); } catch (_) {}
+      };
+
+      console.warn = function(...args) {
+        if (!isDebug) return; // suppress in non-debug mode
+        if (shouldFilter(args.join(' '))) return;
+        try { originalWarn.apply(console, args); } catch (_) {}
+      };
+    } catch (e) {
+      // Fail open: keep default console behavior
+    }
+  })();
+  </script>
   
-  <!-- Unified Admin Panel JavaScript (no duplicates) -->
-  <!-- JavaScript implementation is in adminPanel.js.html -->
+  <script>
+  // GASOptimizer and UnifiedCache are now guaranteed to be defined
+  // Enhanced Global Error Handling with Smart Recovery
+  window.addEventListener('error', function(event) {
+    const errorMessage = event.error?.message || '';
+    const errorStack = event.error?.stack || '';
+    const errorLine = event.lineno || 'unknown';
+    
+    // Non-critical GAS internal errors (suppress with logging)
+    const suppressedErrors = [
+      'document.write',
+      'Unexpected token',
+      'Failed to execute \'write\' on \'Document\'',
+      'SyntaxError: Failed to execute \'write\'',
+      'Identifier \'userId\' has already been declared',
+      'mae_html_user_bin_i18n_mae_html_user',
+      'warden_bin_i18n_warden',
+      'unrecognized feature',
+      'Unrecognized feature',
+      'cdn.tailwindcss.com should not be used in production',
+      'tailwindcss.com/docs/installation',
+      'should not be used in production',
+      'PostCSS plugin',
+      'Tailwind CLI',
+      'navigateToStep is not defined',
+      'hidePrivacyModal is not defined', 
+      'updateUIWithNewStatus is not defined',
+      'showFormConfigModal is not defined',
+      'toggleSection is not defined',
+      'function not yet loaded',
+      'function not available'
+    ];
+    
+    // Critical errors that need intervention
+    const criticalErrors = [
+      'await is only valid in async functions',
+      'Cannot set property',
+      'Cannot read property',
+      'is not defined',
+      'is not a function'
+    ];
+    
+    const shouldSuppress = suppressedErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
+    
+    const isCritical = criticalErrors.some(pattern => 
+      errorMessage.includes(pattern) || errorStack.includes(pattern)
+    );
+    
+    if (shouldSuppress) {
+      // Log suppressed error for debugging (optional)
+      console.debug('Suppressed Google Apps Script internal error:', errorMessage);
+      event.preventDefault();
+      return;
+    }
+    
+    if (isCritical) {
+      console.error('🚨 Critical Error Detected:', {
+        message: errorMessage,
+        line: errorLine,
+        stack: errorStack.substring(0, 500) // Truncate for readability
+      });
+      
+      // Attempt recovery for specific critical errors
+      if (errorMessage.includes('is not defined') || errorMessage.includes('is not a function')) {
+        console.log('🔧 Attempting function recovery...');
+        // Trigger fallback initialization after a short delay
+        setTimeout(() => {
+          if (typeof window.initializeAdminPanelMaster === 'function') {
+            console.log('🔄 Re-initializing admin panel...');
+            window.initializeAdminPanelMaster();
+          }
+        }, 1000);
+      }
+      
+      // Show user-friendly error message for critical issues
+      setTimeout(() => {
+        if (window.showMessage && typeof window.showMessage === 'function') {
+          window.showMessage('システムの初期化で問題が発生しました。ページを再読み込みしてください。', 'warning');
+        }
+      }, 2000);
+    }
+    
+    // Log important errors
+    console.error('Global error caught:', event.error);
+  });
+  
+  // Enhanced Promise rejection handling
+  window.addEventListener('unhandledrejection', function(event) {
+    const reason = event.reason?.toString() || '';
+    
+    // Suppress Google Apps Script internal promise rejections
+    if (reason.includes('document.write') || 
+        reason.includes('mae_html_user') ||
+        reason.includes('warden_bin')) {
+      console.debug('Suppressed internal promise rejection:', reason);
+      event.preventDefault();
+      return;
+    }
+    
+    console.error('Unhandled promise rejection:', event.reason);
+    event.preventDefault();
+  });
+
+  // GASOptimizer インスタンスの初期化
+  var gasOptimizer = new GASOptimizer();
+  
+  // UnifiedCache インスタンスの初期化
+  var unifiedCache = (typeof UnifiedCache !== 'undefined')
+    ? new UnifiedCache()
+    : { getOrSet: function(_, fn) { return fn(); } };
+  
+  // runGas ラッパー関数 - キャッシュ対応
+  function runGas(functionName, ...args) {
+    return gasOptimizer.call(functionName, ...args);
+  }
+  
+  // runGasWithUserId function is defined in adminPanel-api.js.html to avoid duplication
+  
+  // callWithCache 関数 - 読み取り専用操作用
+  function callWithCache(functionName, cacheKey, ttl, ...args) {
+    return unifiedCache.getOrSet(cacheKey, function() {
+      return gasOptimizer.call(functionName, ...args);
+    }, ttl);
+  }
+  
+  // マルチテナント対応: callWithCacheWithUserId関数
+  function callWithCacheWithUserId(functionName, cacheKey, ttl, ...args) {
+    if (!userId) {
+      console.error('❌  - No userId available for cached call:', functionName);
+      throw new Error('ユーザーIDが設定されていません。ページを再読み込みしてください。');
+    }
+    
+    return unifiedCache.getOrSet(cacheKey, function() {
+      console.log('✅  - callWithCacheWithUserId:', functionName, 'userId:', userId);
+      return gasOptimizer.call(functionName, userId, ...args);
+    }, ttl);
+  }
+  </script>
+  <script>
+  const __IS_SYSTEM_ADMIN_RAW__ = '<?= escapeJavaScript(typeof isDeployUser !== "undefined" ? isDeployUser : "false") ?>';
+  const __IS_SYSTEM_ADMIN__ = __IS_SYSTEM_ADMIN_RAW__ === 'true' || __IS_SYSTEM_ADMIN_RAW__ === true;
+  window.isSystemAdmin = __IS_SYSTEM_ADMIN__;
+  console.log('Template Debug:');
+  console.log('- Raw template value:', __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Raw template type:', typeof __IS_SYSTEM_ADMIN_RAW__);
+  console.log('- Processed value:', __IS_SYSTEM_ADMIN__);
+  console.log('- window.isSystemAdmin final:', window.isSystemAdmin);
+  
+  </script>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
   <!-- Unified Loading Overlay - Content managed by UnifiedLoadingManager -->
@@ -472,6 +665,40 @@
                 <p class="text-xs text-green-300">作成したデータシートから質問文と回答タイプを設定します</p>
               </div>
               
+              <!-- 履歴テーブル -->
+              <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h4 class="text-sm font-medium text-blue-200">過去の設定から選択</h4>
+                  </div>
+                  <button type="button" id="clear-history-btn" class="text-xs text-red-400 hover:text-red-300 hover:underline">
+                    履歴をクリア
+                  </button>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-800">
+                      <tr>
+                        <th class="px-2 py-2 text-left text-xs text-gray-300 w-16">作成日</th>
+                        <th class="px-2 py-2 text-left text-xs text-gray-300 w-32">公開日時</th>
+                        <th class="px-3 py-2 text-left text-xs text-gray-300 flex-1">問題文</th>
+                        <th class="px-2 py-2 text-center text-xs text-gray-300 w-28">名前/カウント</th>
+                      </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                      <tr>
+                        <td colspan="4" class="px-3 py-4 text-center text-gray-400 text-sm">
+                          履歴がありません
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
               <!-- Enhanced Sheet Selection Control -->
               <div class="space-y-4">
                 <label for="sheet-select" class="block text-sm font-medium text-white">
@@ -865,7 +1092,7 @@
       <!-- アプリ設定リンク -->
 <? if (isDeployUser) { ?>
       <div id="app-setup-link" class="bg-blue-900/10 border border-blue-500/30 rounded-lg p-3 transition-all hover:border-blue-500/50">
-        <button type="button" id="app-setup-btn" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
+        <button type="button" onclick="openAppSetupPage()" class="w-full flex items-center justify-between text-sm font-medium text-blue-300 hover:text-blue-200 transition-colors">
           <div class="flex items-center">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
@@ -902,40 +1129,6 @@
               Google連携の利点
             </a>
           </div>
-        </div>
-      </div>
-      
-      <!-- 履歴管理 (シンプル版) -->
-      <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="text-sm font-medium text-gray-200 flex items-center gap-2">
-            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            公開履歴
-          </h4>
-          <button type="button" id="clear-history-btn" 
-                  class="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-400/50 hover:bg-red-500/10 transition-colors"
-                  title="履歴をクリア">
-            クリア
-          </button>
-        </div>
-        
-        <div class="max-h-48 overflow-y-auto">
-          <table class="w-full text-xs">
-            <thead class="border-b border-gray-600/50">
-              <tr>
-                <th class="text-left py-2 px-2 text-gray-400 font-medium">設問</th>
-                <th class="text-left py-2 px-2 text-gray-400 font-medium w-20">日時</th>
-                <th class="text-right py-2 px-2 text-gray-400 font-medium w-12">操作</th>
-              </tr>
-            </thead>
-            <tbody id="history-table-body">
-              <tr>
-                <td colspan="3" class="text-gray-500 text-center py-4">履歴がありません</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
       
@@ -1038,17 +1231,31 @@
   <div id="message-area" class="fixed top-32 right-6 z-50" aria-live="polite" role="status"></div>
   
   <!-- 共通モーダルコンポーネントを読み込み -->
-  <?!= include('SharedModals.html'); ?>
+  <?!= include('SharedModals'); ?>
   
   <!-- Admin Panel JavaScript Components -->
   <!-- Constants must be loaded first -->
-  <?!= include('constants.js.html'); ?>
-  <!-- Error handling system must be loaded early for proper error management -->
-  <?!= include('errorMessages.js.html'); ?>
+  <?!= include('constants.js'); ?>
   <!-- Backend progress sync system -->
-  <?!= include('backendProgressSync.js.html'); ?>
-  <!-- Admin Panel JavaScript - Simplified implementation -->
-  <!-- All JavaScript functionality is loaded via adminPanel.js.html in the head section -->
+  <?!= include('backendProgressSync.js'); ?>
+  <!-- Error handling system must be loaded first -->
+  <?!= include('errorMessages.js'); ?>
+  <?!= include('adminPanel-core.js.html'); ?>
+  <?!= include('adminPanel-ui.js.html'); ?>
+  <?!= include('adminPanel-status.js.html'); ?>
+  <?!= include('adminPanel-api.js.html'); ?>
+  <?!= include('adminPanel-forms.js.html'); ?>
+  <?!= include('adminPanel-events.js.html'); ?>
+  <?!= include('adminPanel.js.html'); ?>
+
+  <script>
+    // 管理者モーダルの初期化
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.sharedModals) {
+        window.sharedModals.loadAdminModals();
+      }
+    });
+  </script>
 
 </body>
 </html>

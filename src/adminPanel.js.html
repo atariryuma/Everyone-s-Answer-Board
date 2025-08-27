@@ -1,1156 +1,435 @@
 <script>
-/**
- * Admin Panel JavaScript - シンプル実装版
- * 
- * 目的：複雑なadminPanel-bundle.js.htmlをシンプルで保守しやすい実装に置換
- * 要件：サービスアカウント、サイロ型マルチテナント、既存UI要素との互換性維持
- */
+  // Admin Panel JavaScript
 
-// =============================================================================
-// 1. 設定とユーティリティ
-// =============================================================================
-
-const CONFIG = {
-  API_TIMEOUT: 30000,
-  POLL_INTERVAL: 5000,
-  MESSAGE_TIMEOUT: 5000,
-  DEBUG: true
-};
-
-const utils = {
-  // 要素取得（安全版）
-  getElement: (id) => {
-    const element = document.getElementById(id);
-    if (!element && CONFIG.DEBUG) {
-      console.warn(`Element not found: ${id}`);
+  // Validate current step with setup status consideration
+  function validateCurrentStep() {
+    const savePublishBtn = document.getElementById('save-publish-btn');
+    if (!savePublishBtn) return;
+    
+    // セットアップ状況を確認
+    const setupStatus = getSetupStatusFromGlobalStatus();
+    
+    // Note: ステップ制御は統一されたmanagedSectionStates()で管理
+    // enforceStepProgression()は無効化して競合を回避
+    
+    let isValid = false;
+    
+    switch (currentStep) {
+      case 1:
+        isValid = selectedSheetId || selectedFormId;
+        break;
+      case 2:
+        // Step 2 validation: check for both config validation AND setup completion
+        const configValid = currentConfig && validateConfiguration();
+        const step2Complete = checkStep2Completion();
+        isValid = configValid || step2Complete;
+        console.log(`Step 2 validation: configValid=${configValid}, step2Complete=${step2Complete}, isValid=${isValid}`);
+        break;
+      case 3:
+        isValid = true;
+        break;
     }
-    return element;
-  },
-
-  // 安全なテキスト設定
-  setText: (id, text) => {
-    const element = utils.getElement(id);
-    if (element) {
-      element.textContent = text || '';
-    }
-  },
-
-  // 安全なHTML設定
-  setHTML: (id, html) => {
-    const element = utils.getElement(id);
-    if (element) {
-      element.innerHTML = html || '';
-    }
-  },
-
-  // 要素の表示/非表示切り替え
-  show: (id) => {
-    const element = utils.getElement(id);
-    if (element) {
-      element.classList.remove('hidden');
-    }
-  },
-
-  hide: (id) => {
-    const element = utils.getElement(id);
-    if (element) {
-      element.classList.add('hidden');
-    }
-  },
-
-  // ボタン状態設定
-  setButtonState: (id, enabled, text) => {
-    const button = utils.getElement(id);
-    if (button) {
-      button.disabled = !enabled;
-      if (text) {
-        const span = button.querySelector('span');
-        if (span) span.textContent = text;
-      }
-    }
-  },
-
-  // メッセージ表示
-  showMessage: (message, type = 'info', duration = CONFIG.MESSAGE_TIMEOUT) => {
-    const messageArea = utils.getElement('message-area');
-    if (!messageArea) return;
-
-    const messageEl = document.createElement('div');
-    messageEl.className = `message message-${type} p-4 mb-4 rounded-lg border shadow-lg`;
-    messageEl.innerHTML = `
-      <div class="flex items-center gap-3">
-        <span class="message-text">${message}</span>
-        <button class="message-close ml-auto text-gray-400 hover:text-white">×</button>
-      </div>
-    `;
-
-    // スタイル適用
-    const typeStyles = {
-      info: 'bg-blue-900/30 border-blue-500/30 text-blue-200',
-      success: 'bg-green-900/30 border-green-500/30 text-green-200',
-      warning: 'bg-yellow-900/30 border-yellow-500/30 text-yellow-200',
-      error: 'bg-red-900/30 border-red-500/30 text-red-200'
-    };
-    messageEl.classList.add(...typeStyles[type].split(' '));
-
-    // 閉じるボタンのイベント
-    const closeBtn = messageEl.querySelector('.message-close');
-    closeBtn.addEventListener('click', () => messageEl.remove());
-
-    messageArea.appendChild(messageEl);
-
-    // 自動消去
-    if (duration > 0) {
-      setTimeout(() => {
-        if (messageEl.parentNode) messageEl.remove();
-      }, duration);
-    }
-  },
-
-  // API呼び出し（Promise版）
-  callAPI: async (functionName, params = {}) => {
-    try {
-      // ローディング表示
-      utils.show('loading-overlay');
-      
-      return await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error('API呼び出しがタイムアウトしました'));
-        }, CONFIG.API_TIMEOUT);
-
-        google.script.run
-          .withSuccessHandler((result) => {
-            clearTimeout(timeoutId);
-            utils.hide('loading-overlay');
-            resolve(result);
-          })
-          .withFailureHandler((error) => {
-            clearTimeout(timeoutId);
-            utils.hide('loading-overlay');
-            reject(new Error(error.message || 'API呼び出しに失敗しました'));
-          })
-          [functionName](params);
-      });
-    } catch (error) {
-      utils.hide('loading-overlay');
-      console.error(`API Error (${functionName}):`, error);
-      throw error;
-    }
-  },
-
-  // ローディング表示制御
-  showLoading: (message = 'Loading...') => {
-    utils.show('loading-overlay');
-    const loadingText = document.querySelector('#loading-overlay .loading-text');
-    if (loadingText) {
-      loadingText.textContent = message;
-    }
-  },
-
-  hideLoading: () => {
-    utils.hide('loading-overlay');
+    
+    savePublishBtn.disabled = !isValid;
   }
-};
-
-// =============================================================================
-// 2. 状態管理
-// =============================================================================
-
-const state = {
-  user: {
-    id: null,
-    email: null,
-    domain: null,
-    isAuthenticated: false
-  },
-  system: {
-    isInitialized: false,
-    currentSheet: null,
-    spreadsheetId: null,
-    formUrl: null,
-    boardUrl: null,
-    isPublished: false
-  },
-  config: {
-    opinionColumn: null,
-    reasonColumn: null,
-    nameColumn: null,
-    classColumn: null,
-    showNames: false,
-    showCounts: false
-  }
-};
-
-// =============================================================================
-// 3. コア機能モジュール
-// =============================================================================
-
-const auth = {
-  // 認証初期化（統合初期化により非推奨 - 後方互換性のため保持）
-  async init() {
-    console.warn('auth.init() is deprecated. Use initializeFromUserData() instead.');
-    try {
-      const response = await utils.callAPI('getCurrentUserStatus', null);
-      if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
-        initializeFromUserData(response.userInfo);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Authentication failed:', error);
-      utils.showMessage('認証に失敗しました', 'error');
-      return false;
-    }
-  },
-
-  // UI更新
-  updateUI() {
-    if (state.user.isAuthenticated) {
-      utils.setText('info-admin-email', state.user.email);
-      utils.setText('info-user-id', state.user.id);
-      
-      // ドメイン情報更新
-      if (state.user.domain) {
-        utils.setText('header-domain-match-text', state.user.domain);
-        utils.show('header-domain-match');
-        utils.hide('header-domain-initial');
-        utils.hide('header-domain-mismatch');
-      }
-    }
-  },
-
-  // ログアウト
-  async logout() {
-    if (confirm('ログアウトしますか？')) {
-      try {
-        // API呼び出しでログアウトURLを取得
-        const logoutUrl = await utils.callAPI('getLogoutUrl', null);
-        window.top.location.href = logoutUrl;
-      } catch (error) {
-        console.error('API呼び出し失敗、代替ログアウトを実行:', error);
-        // フォールバック: 直接Googleアカウントログアウトページに遷移
-        window.top.location.href = 'https://accounts.google.com/logout?continue=' + encodeURIComponent(window.location.origin);
-      }
-    }
-  }
-};
-
-const data = {
-  // クイックスタート実行
-  async executeQuickStart() {
-    try {
-      utils.showMessage('クイックスタートを実行しています...', 'info');
-      const result = await utils.callAPI('executeQuickStartSetup', state.user.id);
-      
-      if (result && result.status === 'success') {
-        if (result.formUrl) {
-          state.system.formUrl = result.formUrl;
-          const formInput = utils.getElement('form-url-input');
-          if (formInput) {
-            formInput.value = result.formUrl;
-          }
-          
-          const formLink = utils.getElement('open-form-url-link');
-          if (formLink) {
-            formLink.href = result.formUrl;
-          }
-          
-          utils.show('form-url-section');
-        }
-        
-        if (result.spreadsheetId) {
-          state.system.spreadsheetId = result.spreadsheetId;
-        }
-        
-        utils.showMessage('クイックスタートが完了しました', 'success');
-        return result;
-      } else {
-        throw new Error(result.message || 'クイックスタートに失敗しました');
-      }
-    } catch (error) {
-      console.error('QuickStart failed:', error);
-      utils.showMessage('クイックスタートに失敗しました: ' + error.message, 'error');
-      return null;
-    }
-  },
-
-  // カスタムセットアップ（フォーム作成）
-  async createCustomForm() {
-    try {
-      utils.showMessage('カスタムフォームを作成しています...', 'info');
-      const result = await utils.callAPI('createCustomBoard', state.user.id);
-      
-      if (result && result.status === 'success') {
-        state.system.formUrl = result.formUrl;
-        state.system.spreadsheetId = result.spreadsheetId;
-        
-        // UI更新
-        const formInput = utils.getElement('form-url-input');
-        if (formInput) {
-          formInput.value = result.formUrl;
-        }
-        
-        const formLink = utils.getElement('open-form-url-link');
-        if (formLink) {
-          formLink.href = result.formUrl;
-        }
-        
-        utils.show('form-url-section');
-        utils.showMessage('カスタムフォームが作成されました', 'success');
-        
-        return result;
-      } else {
-        throw new Error(result.message || 'フォーム作成に失敗しました');
-      }
-    } catch (error) {
-      console.error('Form creation failed:', error);
-      utils.showMessage('フォーム作成に失敗しました: ' + error.message, 'error');
-      return null;
-    }
-  },
-
-  // シート一覧取得
-  async getSheets() {
-    if (!state.system.spreadsheetId) {
-      utils.showMessage('スプレッドシートIDが設定されていません', 'error');
-      return [];
-    }
-
-    try {
-      const sheets = await utils.callAPI('getSpreadsheetSheets', state.user.id);
-      
-      if (sheets && !sheets.error) {
-        return sheets;
-      } else {
-        throw new Error(sheets.error || 'シート取得に失敗しました');
-      }
-    } catch (error) {
-      console.error('Failed to get sheets:', error);
-      utils.showMessage('シート取得に失敗しました: ' + error.message, 'error');
-      return [];
-    }
-  },
-
-  // 列取得
-  async getColumns(sheetName) {
-    if (!state.system.spreadsheetId || !sheetName) {
-      return [];
-    }
-
-    try {
-      const result = await utils.callAPI('getSheetHeaders', state.user.id, state.system.spreadsheetId, sheetName);
-      
-      if (result && !result.error) {
-        return result.headers || [];
-      } else {
-        throw new Error(result.error || '列取得に失敗しました');
-      }
-    } catch (error) {
-      console.error('Failed to get columns:', error);
-      utils.showMessage('列取得に失敗しました: ' + error.message, 'error');
-      return [];
-    }
-  }
-};
-
-const config = {
-  // 設定保存
-  async save() {
-    try {
-      const result = await utils.callAPI('saveUserConfiguration', 
-        state.user.id,
-        state.system.spreadsheetId,
-        state.system.currentSheet,
-        state.config.opinionColumn,
-        state.config.reasonColumn,
-        state.config.nameColumn,
-        state.config.classColumn,
-        state.config.showNames,
-        state.config.showCounts
-      );
-      
-      if (result && result.status === 'success') {
-        utils.showMessage('設定を保存しました', 'success');
-        return result;
-      } else {
-        throw new Error(result.message || '設定保存に失敗しました');
-      }
-    } catch (error) {
-      console.error('Failed to save config:', error);
-      utils.showMessage('設定保存に失敗しました: ' + error.message, 'error');
-      return null;
-    }
-  },
-
-  // 設定検証
-  validate() {
-    const errors = [];
-    
-    if (!state.user.isAuthenticated) {
-      errors.push('ユーザー認証が必要です');
-    }
-    
-    if (!state.system.spreadsheetId) {
-      errors.push('スプレッドシートが選択されていません');
-    }
-    
-    if (!state.system.currentSheet) {
-      errors.push('シートが選択されていません');
-    }
-    
-    if (!state.config.opinionColumn) {
-      errors.push('回答データ列が選択されていません');
-    }
-    
-    return errors;
-  },
-
-  // プレビューデータ取得
-  async getPreviewData() {
-    if (!state.system.spreadsheetId || !state.system.currentSheet) {
-      return null;
-    }
-
-    try {
-      const result = await utils.callAPI('getSheetPreviewData', 
-        state.user.id,
-        state.system.currentSheet,
-        null, // classFilter
-        'default', // sortMode
-        true // adminMode
-      );
-      
-      if (result && result.status === 'success') {
-        return result.previewData;
-      } else {
-        throw new Error(result.message || 'プレビューデータ取得に失敗しました');
-      }
-    } catch (error) {
-      console.error('Failed to get preview data:', error);
-      utils.showMessage('プレビューデータ取得に失敗しました: ' + error.message, 'warning');
-      return null;
-    }
-  },
-
-  // AI列判定
-  async guessColumns() {
-    if (!state.system.spreadsheetId || !state.system.currentSheet) {
-      utils.showMessage('シートが選択されていません', 'warning');
-      return;
-    }
-
-    try {
-      utils.showMessage('AI列判定を実行しています...', 'info');
-      const result = await utils.callAPI('guessColumnMapping', 
-        state.user.id,
-        state.system.currentSheet,
-        {} // overrides (空のオブジェクト)
-      );
-      
-      if (result && result.status === 'success' && result.columnMapping) {
-        const mapping = result.columnMapping;
-        
-        // AI推定結果をUIに反映
-        if (mapping.opinionColumn) {
-          state.config.opinionColumn = mapping.opinionColumn;
-          const opinionSelect = utils.getElement('opinionHeader');
-          if (opinionSelect) opinionSelect.value = mapping.opinionColumn;
-        }
-        
-        if (mapping.reasonColumn) {
-          state.config.reasonColumn = mapping.reasonColumn;
-          const reasonSelect = utils.getElement('reason-column');
-          if (reasonSelect) reasonSelect.value = mapping.reasonColumn;
-        }
-        
-        if (mapping.nameColumn) {
-          state.config.nameColumn = mapping.nameColumn;
-          const nameSelect = utils.getElement('name-column');
-          if (nameSelect) nameSelect.value = mapping.nameColumn;
-        }
-        
-        if (mapping.classColumn) {
-          state.config.classColumn = mapping.classColumn;
-          const classSelect = utils.getElement('class-column');
-          if (classSelect) classSelect.value = mapping.classColumn;
-        }
-        
-        // 設定ボタンの状態更新
-        handlers.onConfigChange();
-        
-        utils.showMessage('AI列判定が完了しました', 'success');
-        return mapping;
-      } else {
-        throw new Error(result.message || 'AI列判定に失敗しました');
-      }
-    } catch (error) {
-      console.error('Failed to guess columns:', error);
-      utils.showMessage('AI列判定に失敗しました: ' + error.message, 'error');
-      return null;
-    }
-  }
-};
-
-const board = {
-  // 公開
-  async publish() {
-    const errors = config.validate();
-    if (errors.length > 0) {
-      utils.showMessage('設定に不備があります: ' + errors.join(', '), 'error');
-      return false;
-    }
-
-    try {
-      // 設定を保存して公開
-      utils.showMessage('設定を保存してボードを公開しています...', 'info');
-      
-      const result = await utils.callAPI('saveAndPublishBoard',
-        state.user.id,
-        state.system.spreadsheetId,
-        state.system.currentSheet,
-        state.config.opinionColumn,
-        state.config.reasonColumn,
-        state.config.nameColumn,
-        state.config.classColumn,
-        state.config.showNames,
-        state.config.showCounts
-      );
-      
-      if (result && result.status === 'success') {
-        state.system.isPublished = true;
-        state.system.boardUrl = result.boardUrl;
-        
-        // UI更新
-        const boardUrlInput = utils.getElement('board-url');
-        if (boardUrlInput && result.boardUrl) {
-          boardUrlInput.value = result.boardUrl;
-        }
-        
-        const viewBoardLink = utils.getElement('view-board-link');
-        if (viewBoardLink && result.boardUrl) {
-          viewBoardLink.href = result.boardUrl;
-        }
-        
-        // 現在のトピック更新
-        if (result.currentTopic) {
-          utils.setText('current-topic-text', result.currentTopic);
-        }
-        
-        utils.show('admin-footer');
-        utils.setButtonState('save-publish-btn', false, '公開済み');
-        utils.show('unpublish-board-btn');
-        
-        utils.showMessage('ボードが公開されました', 'success');
-        
-        
-        return true;
-      } else {
-        throw new Error(result.message || '公開に失敗しました');
-      }
-    } catch (error) {
-      console.error('Publishing failed:', error);
-      utils.showMessage('公開に失敗しました: ' + error.message, 'error');
-      return false;
-    }
-  },
-
-  // 公開停止
-  async unpublish() {
-    if (!confirm('ボードの公開を停止しますか？回答ボードは見えなくなります。')) return false;
-
-    try {
-      const result = await utils.callAPI('unpublishAnswerBoard', state.user.id);
-      
-      if (result && result.status === 'success') {
-        state.system.isPublished = false;
-        
-        // UI更新
-        utils.hide('admin-footer');
-        utils.setButtonState('save-publish-btn', true, '設定を保存して公開');
-        utils.hide('unpublish-board-btn');
-        
-        utils.showMessage('ボードの公開を停止しました', 'success');
-        return true;
-      } else {
-        throw new Error(result.message || '公開停止に失敗しました');
-      }
-    } catch (error) {
-      console.error('Unpublishing failed:', error);
-      utils.showMessage('公開停止に失敗しました: ' + error.message, 'error');
-      return false;
-    }
-  },
-
-  // 履歴機能は削除されました - シンプル化のため
-
-  // プレビュー
-  preview() {
-    if (state.system.boardUrl) {
-      window.open(state.system.boardUrl, '_blank');
-    } else {
-      utils.showMessage('まず設定を保存して公開してください', 'warning');
-    }
-  }
-};
-
-const ui = {
-  // セクション切り替え
-  toggleSection(sectionId) {
-    const section = utils.getElement(sectionId + '-content');
-    const button = utils.getElement(sectionId + '-toggle');
-    
-    if (section && button) {
-      const isExpanded = !section.classList.contains('hidden');
-      
-      if (isExpanded) {
-        section.classList.add('hidden');
-        button.setAttribute('aria-expanded', 'false');
-      } else {
-        section.classList.remove('hidden');
-        button.setAttribute('aria-expanded', 'true');
-      }
-    }
-  },
-
-  // 進捗表示更新
-  updateProgress(stepId, percentage, status) {
-    const progressBar = utils.getElement(stepId + '-progress-bar');
-    const progressText = utils.getElement(stepId + '-progress-status');
-    const progressPercent = utils.getElement(stepId + '-progress-percentage');
-    
-    if (progressBar) progressBar.style.width = percentage + '%';
-    if (progressText) progressText.textContent = status;
-    if (progressPercent) progressPercent.textContent = percentage + '%';
-  },
-
-  // シート選択肢を設定
-  populateSheetSelect(sheets) {
-    const select = utils.getElement('sheet-select');
-    if (!select) return;
-
-    // 既存オプションをクリア
-    select.innerHTML = '<option value="">シートを選択してください</option>';
-    
-    sheets.forEach(sheet => {
-      const option = document.createElement('option');
-      option.value = sheet.name;
-      option.textContent = sheet.name;
-      select.appendChild(option);
-    });
-    
-    // Step 2を表示
-    utils.show('step2-content');
-    utils.show('sheet-selection-section');
-  },
-
-  // 列選択肢を設定
-  populateColumnSelects(columns) {
-    const selects = [
-      'opinionHeader',
-      'reason-column', 
-      'name-column',
-      'class-column'
-    ];
-    
-    selects.forEach(selectId => {
-      const select = utils.getElement(selectId);
-      if (!select) return;
-      
-      // デフォルトオプション以外をクリア
-      const defaultOption = select.querySelector('option[value=""]');
-      select.innerHTML = '';
-      if (defaultOption) {
-        select.appendChild(defaultOption);
-      } else {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = '選択してください';
-        select.appendChild(option);
-      }
-      
-      // 新しいオプションを追加
-      columns.forEach(column => {
-        const option = document.createElement('option');
-        option.value = column;
-        option.textContent = column;
-        select.appendChild(option);
-      });
-    });
-  },
-
-  // プレビューパネル更新
-  updatePreviewPanel(previewData) {
-    // 設定の要約を更新
-    utils.setText('preview-sheet-name', state.system.currentSheet || '未選択');
-    utils.setText('preview-opinion-column', state.config.opinionColumn || '未設定');
-    utils.setText('preview-name-column', state.config.nameColumn || '未設定');
-    utils.setText('preview-class-column', state.config.classColumn || '未設定');
-
-    // サンプルデータを更新
-    const sampleDataList = utils.getElement('sample-data-list');
-    if (sampleDataList && previewData && previewData.length > 0) {
-      sampleDataList.innerHTML = '';
-      
-      previewData.slice(0, 3).forEach((row, index) => {
-        const rowElement = document.createElement('div');
-        rowElement.className = 'text-xs text-gray-300 p-2 bg-gray-800/50 rounded';
-        
-        let rowContent = `${index + 1}. `;
-        if (state.config.opinionColumn && row[state.config.opinionColumn]) {
-          rowContent += row[state.config.opinionColumn].substring(0, 50);
-          if (row[state.config.opinionColumn].length > 50) {
-            rowContent += '...';
-          }
-        } else {
-          rowContent += 'データなし';
-        }
-        
-        rowElement.textContent = rowContent;
-        sampleDataList.appendChild(rowElement);
-      });
-    }
-    
-    // プレビューパネルを表示
-    utils.show('publish-preview-panel');
-  },
-
-  // 設定要約を更新
-  updateConfigSummary() {
-    utils.setText('preview-sheet-name', state.system.currentSheet || '未選択');
-    utils.setText('preview-opinion-column', state.config.opinionColumn || '未設定');
-    utils.setText('preview-name-column', state.config.nameColumn || '未設定');
-    utils.setText('preview-class-column', state.config.classColumn || '未設定');
-    
-    // 必要に応じてプレビューパネルを表示
-    const errors = config.validate();
-    if (errors.length === 0) {
-      utils.show('publish-preview-panel');
-    } else {
-      utils.hide('publish-preview-panel');
-    }
-  }
-};
-
-// =============================================================================
-// 4. イベントハンドラー
-// =============================================================================
-
-const handlers = {
-  // クイックスタート実行
-  async onQuickStart() {
-    utils.show('quickstart-progress');
-    ui.updateProgress('progress', 20, 'クイックスタートを開始中...');
-    
-    const quickStartResult = await data.executeQuickStart();
-    if (!quickStartResult) {
-      utils.hide('quickstart-progress');
-      return;
-    }
-    
-    ui.updateProgress('progress', 60, '自動設定中...');
-    
-    // クイックスタートが成功した場合の処理
-    if (quickStartResult.isPublished) {
-      state.system.isPublished = true;
-      state.system.boardUrl = quickStartResult.boardUrl;
-      
-      // 公開済みUIの更新
-      const boardUrlInput = utils.getElement('board-url');
-      if (boardUrlInput && quickStartResult.boardUrl) {
-        boardUrlInput.value = quickStartResult.boardUrl;
-      }
-      
-      const viewBoardLink = utils.getElement('view-board-link');
-      if (viewBoardLink && quickStartResult.boardUrl) {
-        viewBoardLink.href = quickStartResult.boardUrl;
-      }
-      
-      utils.show('admin-footer');
-      utils.setButtonState('save-publish-btn', false, '公開済み');
-      utils.show('unpublish-board-btn');
-    } else {
-      // 自動的にシートを取得して設定セクションを表示
-      const sheets = await data.getSheets();
-      if (sheets.length > 0) {
-        ui.populateSheetSelect(sheets);
-        utils.show('step2-content');
-      }
-    }
-    
-    ui.updateProgress('progress', 100, '完了');
-    utils.hide('quickstart-progress');
-  },
-
-  // カスタムセットアップ
-  async onCustomSetup() {
-    const formResult = await data.createCustomForm();
-    if (formResult) {
-      // シート一覧を取得してStep 2を表示
-      const sheets = await data.getSheets();
-      if (sheets.length > 0) {
-        ui.populateSheetSelect(sheets);
-      }
-      utils.show('step2-content');
-    }
-  },
-
-  // シート選択時
-  async onSheetSelect() {
-    const sheetSelect = utils.getElement('sheet-select');
-    if (!sheetSelect) return;
-    
-    const sheetName = sheetSelect.value;
-    if (!sheetName) {
-      utils.hide('config-section');
-      return;
-    }
-    
-    state.system.currentSheet = sheetName;
-    utils.showMessage(`シート "${sheetName}" を読み込んでいます...`, 'info', 2000);
-    
-    // 列を取得して選択肢を更新
-    const columns = await data.getColumns(sheetName);
-    if (columns.length > 0) {
-      ui.populateColumnSelects(columns);
-      utils.show('config-section');
-      utils.showMessage(`${columns.length}個の列を読み込みました`, 'success', 2000);
-    } else {
-      utils.showMessage('列データを取得できませんでした', 'warning');
-      utils.hide('config-section');
-    }
-  },
-
-  // 設定変更時
-  onConfigChange() {
-    const opinionSelect = utils.getElement('opinionHeader');
-    const reasonSelect = utils.getElement('reason-column');
-    const nameSelect = utils.getElement('name-column');
-    const classSelect = utils.getElement('class-column');
-    const showNamesCheck = utils.getElement('show-names');
-    const showCountsCheck = utils.getElement('show-counts');
-    
-    if (opinionSelect) state.config.opinionColumn = opinionSelect.value;
-    if (reasonSelect) state.config.reasonColumn = reasonSelect.value;
-    if (nameSelect) state.config.nameColumn = nameSelect.value;
-    if (classSelect) state.config.classColumn = classSelect.value;
-    if (showNamesCheck) state.config.showNames = showNamesCheck.checked;
-    if (showCountsCheck) state.config.showCounts = showCountsCheck.checked;
-    
-    // 保存ボタンの有効化
-    const errors = config.validate();
-    utils.setButtonState('save-publish-btn', errors.length === 0);
-    
-    // 設定要約を更新
-    ui.updateConfigSummary();
-  },
-
-  // 公開ボタン
-  async onPublish() {
-    await board.publish();
-  },
-
-  // 公開停止ボタン
-  async onUnpublish() {
-    await board.unpublish();
-  },
-
-  // URLコピー
-  copyUrl(inputId) {
-    const input = utils.getElement(inputId);
-    if (input && input.value) {
-      input.select();
-      document.execCommand('copy');
-      utils.showMessage('URLをコピーしました', 'success', 2000);
-    }
-  },
-
-  // AI列判定実行
-  async onAIColumnGuess() {
-    await config.guessColumns();
-  },
-
-  // プレビューデータ更新
-  async onUpdatePreview() {
-    const previewData = await config.getPreviewData();
-    if (previewData && previewData.length > 0) {
-      ui.updatePreviewPanel(previewData);
-      utils.show('sample-data-preview');
-    } else {
-      utils.hide('sample-data-preview');
-    }
-  },
-
-  // ボードプレビュー
-  async onBoardPreview() {
-    try {
-      const result = await utils.callAPI('generatePreviewUrl',
-        state.user.id,
-        state.system.spreadsheetId,
-        state.system.currentSheet,
-        state.config.opinionColumn,
-        state.config.reasonColumn,
-        state.config.nameColumn,
-        state.config.classColumn,
-        state.config.showNames,
-        state.config.showCounts
-      );
-      
-      if (result && result.status === 'success' && result.previewUrl) {
-        window.open(result.previewUrl, '_blank');
-      } else {
-        throw new Error(result.message || 'プレビューURL生成に失敗しました');
-      }
-    } catch (error) {
-      console.error('Preview failed:', error);
-      utils.showMessage('プレビューに失敗しました: ' + error.message, 'error');
-    }
-  }
-};
-
-// =============================================================================
-// 5. 初期化
-// =============================================================================
-
-async function init() {
-  console.log('Admin Panel initializing...');
   
-  try {
-    // 統合初期化: 認証と状態を1回のAPI呼び出しで処理
-    const response = await utils.callAPI('getCurrentUserStatus', null);
-    
-    if (!response || response.status !== 'success' || !response.userInfo || !response.userInfo.userId) {
-      showFallbackUI('認証に失敗しました。ログインし直してください。');
-      return;
-    }
-    
-    // ユーザー状態を設定
-    initializeFromUserData(response.userInfo);
-    
-    // イベントリスナー設定（エラーが起きても続行）
+  // セットアップ状況をグローバルステータスから取得
+  function getSetupStatusFromGlobalStatus() {
     try {
-      setupEventListeners();
-    } catch (listenerError) {
-      console.warn('Event listener setup failed:', listenerError);
+      if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.configJson) {
+        const config = typeof currentStatus.userInfo.configJson === 'string' 
+          ? JSON.parse(currentStatus.userInfo.configJson) 
+          : currentStatus.userInfo.configJson;
+        return config.setupStatus || 'pending';
+      }
+      return 'pending';
+    } catch (error) {
+      console.warn('getSetupStatusFromGlobalStatus エラー:', error);
+      return 'pending';
+    }
+  }
+  
+  // セットアップ未完了時の段階的制御を強制
+  function enforceStepProgression() {
+    const step1Completed = checkStep1Completion();
+    const step2Completed = checkStep2Completion();
+    
+    // Step 2の制御
+    const step2Section = document.getElementById('sheet-selection-section');
+    if (!step1Completed) {
+      disableSection(step2Section, '⚠️ 先にデータ準備を完了してください');
+    } else {
+      enableSection(step2Section);
     }
     
-    state.system.isInitialized = true;
-    utils.showMessage('管理パネルが初期化されました', 'success', 3000);
-    
-  } catch (error) {
-    console.error('Initialization failed:', error);
-    showFallbackUI('初期化に失敗しました: ' + error.message);
+    // Step 3の制御
+    const step3Section = document.getElementById('config-section');
+    if (!step1Completed || !step2Completed) {
+      disableSection(step3Section, '⚠️ 前のステップを完了してください');
+    } else {
+      enableSection(step3Section);
+    }
   }
-}
-
-// フォールバック UI 表示
-function showFallbackUI(errorMessage) {
-  utils.showMessage(errorMessage, 'error', 0); // 永続表示
   
-  // 基本的なUI要素だけでも使えるようにする
-  try {
-    setupBasicEventListeners();
-  } catch (e) {
-    console.error('Even basic setup failed:', e);
+  // Step 1完了チェック
+  function checkStep1Completion() {
+    return !!(selectedSheetId || selectedFormId || 
+              (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId));
   }
-}
-
-// 基本的なイベントリスナー設定（最小限の機能を保証）
-function setupBasicEventListeners() {
-  // ログアウトボタンだけは確実に動作させる
-  const logoutBtn = document.querySelector('[onclick*="logout"]');
-  if (logoutBtn && !logoutBtn.hasEventListener) {
-    logoutBtn.addEventListener('click', () => {
-      if (confirm('ログアウトしますか？')) {
-        window.top.location.href = 'https://accounts.google.com/logout';
-      }
+  
+  // Step 2完了チェック - 統一されたconfigJson状態確認
+  function checkStep2Completion() {
+    if (!currentStatus?.userInfo?.configJson) {
+      return false;
+    }
+    
+    try {
+      const config = typeof currentStatus.userInfo.configJson === 'string' 
+        ? JSON.parse(currentStatus.userInfo.configJson) 
+        : currentStatus.userInfo.configJson;
+      
+      // データベース状態に基づく統一判定
+      const setupCompleted = config.setupStatus === 'completed' && 
+                            config.formCreated === true && 
+                            config.formUrl && config.formUrl.trim();
+      
+      console.log('✅ Step 2完了チェック (統一版):', setupCompleted);
+      return setupCompleted;
+    } catch (error) {
+      console.warn('❌ Step 2完了チェックでエラー:', error);
+      return false;
+    }
+  }
+  
+  // セクションを無効化
+  function disableSection(section, message) {
+    if (!section) return;
+    
+    section.style.opacity = '0.5';
+    section.style.pointerEvents = 'none';
+    
+    // 警告メッセージを追加
+    const existingWarning = section.querySelector('.step-warning');
+    if (!existingWarning) {
+      const warning = document.createElement('div');
+      warning.className = 'step-warning bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4 text-sm text-yellow-800';
+      warning.innerHTML = `<span class="font-semibold">${message}</span>`;
+      section.insertBefore(warning, section.firstChild);
+    }
+  }
+  
+  // セクションを有効化
+  function enableSection(section) {
+    if (!section) return;
+    
+    section.style.opacity = '1';
+    section.style.pointerEvents = 'auto';
+    
+    // 警告メッセージを削除
+    const warning = section.querySelector('.step-warning');
+    if (warning) {
+      warning.remove();
+    }
+  }
+  
+  // Handle sheet selection
+  function handleSheetSelection(event) {
+    selectedSheetId = event.target.value;
+    selectedFormId = null; // Clear form selection
+    
+    if (selectedSheetId) {
+      loadSheetColumns(selectedSheetId);
+    }
+    
+    validateCurrentStep();
+  }
+  
+  // Handle form selection
+  function handleFormSelection(event) {
+    selectedFormId = event.target.value;
+    selectedSheetId = null; // Clear sheet selection
+    
+    if (selectedFormId) {
+      loadFormColumns(selectedFormId);
+    }
+    
+    validateCurrentStep();
+  }
+  
+  // Load sheet columns
+  function loadSheetColumns(sheetId) {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getSheetColumns', sheetId)
+        .then(columns => {
+          displayColumnMapping(columns);
+        })
+        .catch(error => {
+          console.error('Failed to load sheet columns:', error);
+          showMessage('列の読み込みに失敗しました', 'error');
+        });
+    }
+  }
+  
+  // Load form columns
+  function loadFormColumns(formId) {
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('getFormColumns', formId)
+        .then(columns => {
+          displayColumnMapping(columns);
+        })
+        .catch(error => {
+          console.error('Failed to load form columns:', error);
+          showMessage('フォーム項目の読み込みに失敗しました', 'error');
+        });
+    }
+  }
+  
+  // Display column mapping interface
+  function displayColumnMapping(columns) {
+    const configPlaceholder = document.getElementById('config-placeholder');
+    const configContent = document.getElementById('config-content');
+    
+    if (configPlaceholder) configPlaceholder.classList.add('hidden');
+    if (configContent) configContent.classList.remove('hidden');
+    
+    const mappingContainer = document.getElementById('column-mappings');
+    if (!mappingContainer) return;
+    
+    mappingContainer.innerHTML = '';
+    
+    columns.forEach((column, index) => {
+      const mappingDiv = document.createElement('div');
+      mappingDiv.className = 'column-mapping';
+      mappingDiv.innerHTML = `
+        <div>
+          <label class="block text-sm font-medium text-gray-200 mb-2">
+            ${column.name}
+            ${column.required ? '<span class="text-red-400">*</span>' : ''}
+          </label>
+          <p class="text-xs text-gray-400">${column.description || ''}</p>
+        </div>
+        <div>
+          <select class="form-control form-select column-mapping-select" data-column="${column.id}">
+            <option value="">選択してください</option>
+            ${columns.map(col => `<option value="${col.id}">${col.name}</option>`).join('')}
+            <option value="content">回答内容</option>
+            <option value="author">回答者名</option>
+            <option value="timestamp">回答時刻</option>
+            <option value="reaction">リアクション</option>
+            <option value="ignore">無視</option>
+          </select>
+        </div>
+      `;
+      mappingContainer.appendChild(mappingDiv);
     });
-    logoutBtn.hasEventListener = true;
   }
-}
-
-// 統合初期化関数: ユーザーデータから認証と状態を同時設定
-function initializeFromUserData(userInfo) {
-  try {
-    // 認証情報を設定
-    state.user = {
-      id: userInfo.userId,
-      email: userInfo.email,
-      domain: userInfo.domain,
-      isAuthenticated: true
+  
+  // Handle column mapping
+  function handleColumnMapping(select) {
+    const columnId = select.dataset.column;
+    const mappingType = select.value;
+    const mappingDiv = select.closest('.column-mapping');
+    
+    // Update visual feedback
+    mappingDiv.classList.remove('required', 'mapped');
+    if (mappingType && mappingType !== 'ignore') {
+      mappingDiv.classList.add('mapped');
+    }
+    
+    // Update configuration
+    if (!currentConfig) currentConfig = {};
+    if (!currentConfig.columnMappings) currentConfig.columnMappings = {};
+    currentConfig.columnMappings[columnId] = mappingType;
+    
+    validateCurrentStep();
+  }
+  
+  // Handle toggle changes
+  function handleToggleChange(event) {
+    const toggleName = event.target.name;
+    const isChecked = event.target.checked;
+    
+    if (!currentConfig) currentConfig = {};
+    currentConfig[toggleName] = isChecked;
+    
+    validateCurrentStep();
+  }
+  
+  // Validate configuration
+  function validateConfiguration() {
+    if (!currentConfig || !currentConfig.columnMappings) return false;
+    
+    const mappings = currentConfig.columnMappings;
+    const hasContent = Object.values(mappings).includes('content');
+    const hasAuthor = Object.values(mappings).includes('author');
+    
+    return hasContent && hasAuthor;
+  }
+  
+  // Handle save and publish - 修正版（公開モーダル経由）
+  function handleSaveAndPublish() {
+    const btn = document.getElementById('save-publish-btn');
+    if (!btn || btn.disabled) return;
+    
+    // 設定の準備
+    const config = {
+      sheetId: selectedSheetId,
+      formId: selectedFormId,
+      columnMappings: currentConfig.columnMappings,
+      displaySettings: {
+        showCounts: currentConfig.showCounts || false,
+        allowReactions: currentConfig.allowReactions || true,
+        anonymousMode: currentConfig.anonymousMode || false
+      }
     };
     
-    // 認証UIを更新
-    auth.updateUI();
+    // 自動停止設定を準備
+    const autoStopSettings = {
+      enabled: true,
+      minutes: 360 // 6時間 = 360分（config.gsと統一）
+    };
     
-    // システム状態を復元
-    if (userInfo.isPublished) {
-      state.system.isPublished = true;
-      state.system.boardUrl = userInfo.boardUrl;
-      state.system.spreadsheetId = userInfo.spreadsheetId;
-      
-      // 公開済みUI更新
-      const boardUrlInput = utils.getElement('board-url');
-      if (boardUrlInput && userInfo.boardUrl) {
-        boardUrlInput.value = userInfo.boardUrl;
-      }
-      
-      const viewBoardLink = utils.getElement('view-board-link');
-      if (viewBoardLink && userInfo.boardUrl) {
-        viewBoardLink.href = userInfo.boardUrl;
-      }
-      
-      utils.show('admin-footer');
-      utils.setButtonState('save-publish-btn', false, '公開済み');
-      utils.show('unpublish-board-btn');
+    // 公開モーダルを表示
+    if (window.sharedModals && typeof window.sharedModals.showPublish === 'function') {
+      window.sharedModals.showPublish(
+        // 公開実行時のコールバック
+        () => {
+          console.log('📤 公開モーダルで公開が選択されました');
+          executePublishProcess(btn, config);
+        },
+        // キャンセル時のコールバック
+        () => {
+          console.log('❌ 公開がキャンセルされました');
+        },
+        // 自動停止設定
+        autoStopSettings
+      );
+    } else {
+      // フォールバック: モーダルが利用できない場合は直接実行
+      console.warn('⚠️ 公開モーダルが利用できません。直接実行します。');
+      executePublishProcess(btn, config);
     }
+  }
+  
+  // 実際の公開処理実行
+  function executePublishProcess(btn, config) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>保存・公開中...';
     
-    // 現在のトピックを更新
-    if (userInfo.currentTopic) {
-      utils.setText('current-topic-text', userInfo.currentTopic);
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('saveAndPublishBoard', config)
+        .then(result => {
+          if (result.success) {
+            showMessage('設定が保存され、ボードが公開されました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
+            loadSystemStatus();
+            
+            // 🔧 公開成功後に状態整合性チェック・修復を実行
+            setTimeout(() => {
+              console.log('🔧 公開後の状態整合性チェックを実行中...');
+              if (typeof initializeUserSettings === 'function') {
+                initializeUserSettings()
+                  .then(result => {
+                    if (result.success) {
+                      console.log('✅ 公開後の状態チェック完了:', result.message);
+                    }
+                  })
+                  .catch(error => {
+                    console.warn('⚠️ 公開後の状態チェックで軽微な問題:', error.message);
+                  });
+              } else {
+                console.warn('⚠️ initializeUserSettings関数が利用できません');
+              }
+            }, 500);
+            
+            if (typeof navigateToStep === 'function') {
+              navigateToStep(3);
+            } else {
+              console.warn('⚠️ navigateToStep function not available');
+            }
+            
+            // 自動停止確認モーダルを表示（公開成功後）
+            setTimeout(() => {
+              if (window.sharedModals && typeof window.sharedModals.showAutoStopConfirmation === 'function') {
+                window.sharedModals.showAutoStopConfirmation(result);
+                console.log('✅ 通常公開後に自動停止確認モーダルを表示しました');
+              }
+            }, 1000);
+            
+          } else {
+            showMessage(result.message || '保存に失敗しました', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Save failed:', error);
+          showMessage('保存に失敗しました', 'error');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>設定を保存して公開';
+        });
     }
+  }
+  
+  // Handle unpublish
+  function handleUnpublish() {
+    if (!confirm('ボードの公開を停止しますか？')) return;
     
-    // 設定状態を復元
-    if (userInfo.currentConfig) {
-      const cfg = userInfo.currentConfig;
-      state.system.currentSheet = cfg.sheetName;
-      state.config.opinionColumn = cfg.opinionColumn;
-      state.config.reasonColumn = cfg.reasonColumn;
-      state.config.nameColumn = cfg.nameColumn;
-      state.config.classColumn = cfg.classColumn;
-      state.config.showNames = cfg.showNames;
-      state.config.showCounts = cfg.showCounts;
-      
-      // UI要素を更新
-      const sheetSelect = utils.getElement('sheet-select');
-      if (sheetSelect && cfg.sheetName) {
-        sheetSelect.value = cfg.sheetName;
-      }
-      
-      const opinionSelect = utils.getElement('opinionHeader');
-      if (opinionSelect && cfg.opinionColumn) {
-        opinionSelect.value = cfg.opinionColumn;
-      }
-      
-      ui.updateConfigSummary();
-    }
+    const btn = document.getElementById('unpublish-board-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner mr-2"></div>停止中...';
     
-    console.log('User data initialized successfully:', userInfo.email);
-  } catch (error) {
-    console.warn('Failed to initialize from user data:', error);
-    // エラーでも基本的な認証情報だけは設定
-    if (userInfo && userInfo.userId) {
-      state.user = {
-        id: userInfo.userId,
-        email: userInfo.email,
-        domain: userInfo.domain,
-        isAuthenticated: true
-      };
+    if (typeof runGasWithUserId === 'function') {
+      runGasWithUserId('unpublishBoard')
+        .then(result => {
+          if (result.success) {
+            showMessage('ボードの公開を停止しました', 'success');
+            if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+              window.unifiedCache.clear();
+            }
+            loadSystemStatus();
+          } else {
+            showMessage(result.message || '停止に失敗しました', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Unpublish failed:', error);
+          showMessage('停止に失敗しました', 'error');
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path></svg>公開を停止';
+        });
     }
   }
-}
 
-// イベントリスナー設定
-function setupEventListeners() {
-  // ボタンイベント
-  const quickStartBtn = utils.getElement('quickstart-btn');
-  if (quickStartBtn) {
-    quickStartBtn.addEventListener('click', handlers.onQuickStart);
-  }
-  
-  const customSetupBtn = utils.getElement('create-board-btn');
-  if (customSetupBtn) {
-    customSetupBtn.addEventListener('click', handlers.onCustomSetup);
-  }
-  
-  const publishBtn = utils.getElement('save-publish-btn');
-  if (publishBtn) {
-    publishBtn.addEventListener('click', handlers.onPublish);
-  }
-  
-  const unpublishBtn = utils.getElement('unpublish-board-btn');
-  if (unpublishBtn) {
-    unpublishBtn.addEventListener('click', handlers.onUnpublish);
-  }
-  
-  // セレクトボックスイベント
-  const sheetSelect = utils.getElement('sheet-select');
-  if (sheetSelect) {
-    sheetSelect.addEventListener('change', handlers.onSheetSelect);
-  }
-  
-  // 設定変更イベント
-  const configElements = [
-    'opinionHeader', 'reason-column', 'name-column', 'class-column',
-    'show-names', 'show-counts'
-  ];
-  
-  configElements.forEach(id => {
-    const element = utils.getElement(id);
-    if (element) {
-      const eventType = element.type === 'checkbox' ? 'change' : 'change';
-      element.addEventListener(eventType, handlers.onConfigChange);
+  // Initialization is triggered from AdminPanel.html after userId is ready.
+
+  // Export functions for global access
+  window.adminPanel = {
+    initializeAdminPanel: window.initializeAdminPanel, // Function moved to framework
+    navigateToStep: window.navigateToStep, // Function moved to framework
+    showMessage: window.showMessage || function() { console.warn('showMessage not yet available'); },
+    switchToAnotherAccount,
+    openAppSetupPage,
+    logoutAndRedirect
+  };
+  // ログアウトしてログイン画面へリダイレクト
+  function logoutAndRedirect() {
+    if (confirm('ログアウトしてログイン画面に戻りますか？')) {
+      google.script.run
+        .withSuccessHandler(function(url) {
+          window.location.href = url; // ログイン画面へリダイレクト
+        })
+        .withFailureHandler(function(error) {
+          console.error('Logout failed:', error);
+          showMessage('ログアウト処理中にエラーが発生しました', 'error');
+        })
+        .resetUserAuthentication(); // バックエンドの認証リセット関数を呼び出す
     }
-  });
-  
-  // URLコピーボタン
-  const copyFormUrlBtn = utils.getElement('copy-form-url-btn');
-  if (copyFormUrlBtn) {
-    copyFormUrlBtn.addEventListener('click', () => handlers.copyUrl('form-url-input'));
-  }
-  
-  const boardUrlCopyBtn = document.querySelector('[onclick*="copyBoardUrl"]');
-  if (boardUrlCopyBtn) {
-    boardUrlCopyBtn.addEventListener('click', () => handlers.copyUrl('board-url'));
   }
 
-  // AI列判定ボタン
-  const aiGuessBtn = utils.getElement('reguess-headers-btn');
-  if (aiGuessBtn) {
-    aiGuessBtn.addEventListener('click', handlers.onAIColumnGuess);
-  }
-
-  // プレビューボタン
-  const previewBoardBtn = utils.getElement('preview-board-btn');
-  if (previewBoardBtn) {
-    previewBoardBtn.addEventListener('click', handlers.onBoardPreview);
-  }
-
-  const refreshPreviewBtn = utils.getElement('refresh-preview-btn');
-  if (refreshPreviewBtn) {
-    refreshPreviewBtn.addEventListener('click', handlers.onUpdatePreview);
-  }
-
-}
-
-// DOM読み込み完了後に初期化
-document.addEventListener('DOMContentLoaded', init);
-
-// レガシー対応（既存コードとの互換性）
-window.adminPanel = {
-  init,
-  auth,
-  data,
-  config,
-  board,
-  ui,
-  handlers,
-  utils,
-  state,
-  // ログアウト機能を公開
-  logoutAndRedirect: () => auth.logout()
-};
-
-// グローバル関数（onclick属性との互換性確保）
-window.toggleSection = function(sectionId) {
-  ui.toggleSection(sectionId);
-};
-
-window.copyBoardUrl = function(button) {
-  handlers.copyUrl('board-url');
-};
-
-window.copyFormUrl = function(button) {
-  handlers.copyUrl('form-url-input');
-};
-
+//# sourceURL=adminPanel.js.html
 </script>

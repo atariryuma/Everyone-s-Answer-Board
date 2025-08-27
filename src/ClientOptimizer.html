@@ -4,9 +4,6 @@
  * GAS HTML Service用の最適化されたクライアント関数群
  */
 
-/**
- * GAS最適化クラス
- */
 class GASOptimizer {
   constructor() {
     this.cache = new Map();
@@ -22,13 +19,11 @@ class GASOptimizer {
    * @param {...any} args - 関数の引数
    * @returns {Promise} 結果のPromise
    */
-  call(functionName, ...args) {
+  async call(functionName, ...args) {
     return new Promise((resolve, reject) => {
       // 同時実行制限の確認
       if (this.activeCalls >= this.concurrentLimit) {
-        this.callQueue.push(() => {
-          this.executeCall(functionName, args, resolve, reject);
-        });
+        this.callQueue.push(() => this.executeCall(functionName, args, resolve, reject));
         return;
       }
 
@@ -47,24 +42,23 @@ class GASOptimizer {
 
     // GAS function call validation
     if (typeof google === 'undefined' || !google.script || !google.script.run || typeof google.script.run[functionName] !== 'function') {
-      throw new Error('GAS function \'' + functionName + '\' is not available');
+      throw new Error(`GAS function '${functionName}' is not available`);
     }
 
-    const self = this;
     google.script.run
-      .withSuccessHandler(function(result) {
-        self.activeCalls--;
-        self.setLoadingState(functionName, false);
+      .withSuccessHandler((result) => {
+        this.activeCalls--;
+        this.setLoadingState(functionName, false);
         resolve(result);
-        self.processQueue();
+        this.processQueue();
       })
-      .withFailureHandler(function(error) {
-        self.activeCalls--;
-        self.setLoadingState(functionName, false);
-        console.error('GAS Function Error [' + functionName + ']:', error);
-        reject(self.enhanceError(error, functionName));
-        self.processQueue();
-      })[functionName].apply(null, args);
+      .withFailureHandler((error) => {
+        this.activeCalls--;
+        this.setLoadingState(functionName, false);
+        console.error(`GAS Function Error [${functionName}]:`, error);
+        reject(this.enhanceError(error, functionName));
+        this.processQueue();
+      })[functionName](...args);
   }
 
   /**
@@ -81,11 +75,12 @@ class GASOptimizer {
    * エラー情報の拡張
    */
   enhanceError(error, functionName) {
-    const enhanced = { ...error };
-    enhanced.function = functionName;
-    enhanced.timestamp = new Date().toISOString();
-    enhanced.userMessage = this.getUserFriendlyErrorMessage(error.message);
-    return enhanced;
+    return {
+      ...error,
+      function: functionName,
+      timestamp: new Date().toISOString(),
+      userMessage: this.getUserFriendlyErrorMessage(error.message)
+    };
   }
 
   /**
@@ -127,31 +122,31 @@ class GASOptimizer {
   /**
    * キャッシュ付きの関数呼び出し
    */
-  callWithCache(functionName, args, ttl = 5 * 60 * 1000) {
+  async callWithCache(functionName, args, ttl = 5 * 60 * 1000) {
     const cacheKey = `${functionName}_${JSON.stringify(args)}`;
     const cached = this.cache.get(cacheKey);
     
     if (cached && (Date.now() - cached.timestamp) < ttl) {
-      return Promise.resolve(cached.data);
+      return cached.data;
     }
 
-    return this.call(functionName, ...args).then(result => {
-      this.cache.set(cacheKey, {
-        data: result,
-        timestamp: Date.now()
-      });
-      return result;
+    const result = await this.call(functionName, ...args);
+    this.cache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
     });
+
+    return result;
   }
 
   /**
    * バッチ処理対応の関数呼び出し
    */
-  batchCall(calls) {
-    const promises = calls.map(call => 
-      this.call(call.functionName, ...(call.args || []))
-        .catch(error => ({ error, functionName: call.functionName }))
+  async batchCall(calls) {
+    const promises = calls.map(({ functionName, args }) => 
+      this.call(functionName, ...args).catch(error => ({ error, functionName }))
     );
+
     return Promise.all(promises);
   }
 
@@ -181,19 +176,15 @@ window.gasOptimizer = new GASOptimizer();
 /**
  * 便利な関数のエイリアス
  */
-window.gasCall = (functionName, ...args) => {
-  return window.gasOptimizer.call(functionName, ...args);
-};
-window.gasCacheCall = (functionName, args, ttl) => {
-  return window.gasOptimizer.callWithCache(functionName, args, ttl);
-};
+window.gasCall = (functionName, ...args) => window.gasOptimizer.call(functionName, ...args);
+window.gasCacheCall = (functionName, args, ttl) => window.gasOptimizer.callWithCache(functionName, args, ttl);
 
 /**
  * メッセージ表示の最適化 - SharedUtilitiesに移行済み
- * グローバル関数のエイリアス
+ * 後方互換性のためのエイリアス
  */
 // MessageManagerはSharedUtilitiesに移行済み
-// グローバル関数のエイリアス設定
+// 後方互換性のためのエイリアス設定
 window.messageManager = window.sharedUtilities?.messages;
 // showMessage関数はSharedUtilitiesで定義済み
 

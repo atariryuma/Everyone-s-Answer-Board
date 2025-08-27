@@ -1,14 +1,9 @@
 <script>
 /**
- * フロントエンド定数管理
- * UI/UX関連のMagic Numbersを一元管理し、保守性を向上
- * バックエンド定数はconstants.gsで管理
+ * システム定数管理
+ * Magic Numbersを一元管理し、保守性を向上
  */
 
-/**
- * フロントエンド専用システム定数
- * @namespace SYSTEM_CONSTANTS
- */
 const SYSTEM_CONSTANTS = {
   // タイムアウト設定
   TIMEOUTS: {
@@ -62,6 +57,7 @@ const SYSTEM_CONSTANTS = {
 
   // エラー関連定数
   ERROR_HANDLING: {
+    MAX_ERROR_HISTORY: 50,          // エラー履歴最大保持数
     LOG_LEVELS: {
       DEBUG: 3,
       INFO: 2,
@@ -110,6 +106,7 @@ const SYSTEM_CONSTANTS = {
     USER_PREFERENCES: 'studyquest_user_preferences',
     FORM_DRAFT: 'studyquest_form_draft',
     SESSION_STATE: 'studyquest_session_state',
+    ERROR_HISTORY: 'studyquest_error_history',
     PERFORMANCE_METRICS: 'studyquest_performance_metrics'
   },
 
@@ -136,36 +133,8 @@ Object.freeze(SYSTEM_CONSTANTS.CSS_CLASSES);
 Object.freeze(SYSTEM_CONSTANTS.STORAGE_KEYS);
 Object.freeze(SYSTEM_CONSTANTS.PERFORMANCE);
 
-// バックエンド定数との互換性確保
-const FRONTEND_BACKEND_BRIDGE = {
-  // バックエンドと共通する定数（同期が必要）
-  ERROR_SEVERITY: {
-    LOW: 'low',
-    MEDIUM: 'medium',
-    HIGH: 'high',
-    CRITICAL: 'critical'
-  },
-  
-  DISPLAY_MODES: {
-    ANONYMOUS: 'anonymous',
-    NAMED: 'named',
-    EMAIL: 'email'
-  },
-  
-  REACTION_KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
-  
-  // フロントエンドでよく使うタイムアウト値
-  COMMON_TIMEOUTS: {
-    SHORT: 1000,      // 1秒
-    MEDIUM: 2000,     // 2秒
-    LONG: 5000,       // 5秒
-    EXECUTION: 300000 // 5分
-  }
-};
-
 // グローバルに公開
 window.SYSTEM_CONSTANTS = SYSTEM_CONSTANTS;
-window.FRONTEND_BACKEND_BRIDGE = FRONTEND_BACKEND_BRIDGE;
 
 // 便利な関数をエクスポート
 window.getTimeout = (key) => SYSTEM_CONSTANTS.TIMEOUTS[key] || SYSTEM_CONSTANTS.TIMEOUTS.DEFAULT_FLOW_TIMEOUT;
@@ -174,16 +143,5 @@ window.getElement = (key) => document.getElementById(SYSTEM_CONSTANTS.ELEMENTS[k
 window.addClass = (element, className) => element?.classList.add(SYSTEM_CONSTANTS.CSS_CLASSES[className]);
 window.removeClass = (element, className) => element?.classList.remove(SYSTEM_CONSTANTS.CSS_CLASSES[className]);
 
-// バックエンド定数へのアクセサー
-window.getErrorSeverity = (key) => FRONTEND_BACKEND_BRIDGE.ERROR_SEVERITY[key];
-window.getDisplayMode = (key) => FRONTEND_BACKEND_BRIDGE.DISPLAY_MODES[key];
-window.getReactionKeys = () => FRONTEND_BACKEND_BRIDGE.REACTION_KEYS;
-window.getCommonTimeout = (key) => FRONTEND_BACKEND_BRIDGE.COMMON_TIMEOUTS[key];
-
-// Use structured logging if available, otherwise fallback to console
-if (typeof logInfo === 'function') {
-  logInfo('System Constants loaded and frozen');
-} else {
-  // System Constants loaded - verbose logging disabled
-}
+console.log('✅ System Constants loaded and frozen');
 </script>

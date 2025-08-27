@@ -1,0 +1,4158 @@
+<script>
+let lastSelectedSheetName = null; // To prevent redundant sheet selection change events
+
+// === シンプル化されたUI更新システム ===
+// 複雑な制御機構を除去し、必要最小限の変数のみ保持
+// 注意: window.currentStatus は他のファイルでも使用されているため、ここでは別名を使用
+
+// =============================================================================
+// EARLY FUNCTION DEFINITIONS (Critical functions that must be available immediately)
+// =============================================================================
+
+// Define critical functions early and register them globally
+if (typeof window !== 'undefined') {
+  // Placeholder functions that will be properly defined later
+  // All critical functions are now defined in adminPanel-framework.js.html which loads first
+  // Keeping only functions not moved to framework
+  window.hideFormConfigModal = window.hideFormConfigModal || function() { console.warn('hideFormConfigModal not yet loaded'); };
+  window.showPrivacyModal = window.showPrivacyModal || function() { console.warn('showPrivacyModal not yet loaded'); };
+}
+
+
+// =============================================================================
+// ADMIN PANEL UI UPDATES & DISPLAY CONTROL
+// =============================================================================
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+// 強化された公開状態判定 - リソース整合性チェック付き
+function getPublicationState(status) {
+  if (!status) {
+    return { isPublished: false, reason: 'No status data' };
+  }
+  
+  // Check multiple possible publication indicators in priority order
+  let isPublished = false;
+  let reason = '';
+  
+  let confidence = 'high';
+  let validationDetails = {};
+
+  // 設定データの解析
+  let config = null;
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      config = JSON.parse(status.userInfo.configJson);
+    } catch (e) {
+      console.warn('Failed to parse configJson:', e);
+      return { isPublished: false, reason: 'configJson解析エラー', confidence: 'low' };
+    }
+  }
+
+  // 1. 基本的な公開フラグチェック
+  const appPublishedFromStatus = status.appPublished;
+  const appPublishedFromConfig = config ? config.appPublished : undefined;
+  
+  // 2. 実際の公開リソースの存在確認
+  const hasFormUrl = !!(config && config.formUrl);
+  const hasPublishedSheet = !!(config && config.publishedSheetName);
+  const hasPublishedSpreadsheet = !!(config && config.publishedSpreadsheetId);
+  const setupCompleted = !!(config && config.setupStatus === 'completed');
+  const formCreated = !!(config && config.formCreated);
+  
+  validationDetails = {
+    appPublishedFromStatus,
+    appPublishedFromConfig,
+    hasFormUrl,
+    hasPublishedSheet,
+    hasPublishedSpreadsheet,
+    setupCompleted,
+    formCreated
+  };
+
+  // 3. 公開状態の判定ロジック（複数の条件を総合的に評価）
+  if (appPublishedFromStatus === true) {
+    // status.appPublished が明示的に true の場合
+    if (hasFormUrl && hasPublishedSheet && setupCompleted) {
+      isPublished = true;
+      reason = 'status.appPublished=true (リソース確認済み)';
+      confidence = 'high';
+    } else {
+      // appPublished=true だが必要なリソースが不足
+      isPublished = true;
+      reason = 'status.appPublished=true (リソース不完全)';
+      confidence = 'medium';
+    }
+  } else if (appPublishedFromStatus === false) {
+    isPublished = false;
+    reason = 'status.appPublished=false (明示的非公開)';
+  } else if (appPublishedFromConfig === true) {
+    // configJson から判定
+    if (hasFormUrl && hasPublishedSheet && setupCompleted) {
+      isPublished = true;
+      reason = 'configJson.appPublished=true (リソース確認済み)';
+      confidence = 'high';
+    } else {
+      isPublished = true;
+      reason = 'configJson.appPublished=true (リソース不完全)';
+      confidence = 'medium';
+    }
+  } else if (hasFormUrl && hasPublishedSheet && setupCompleted && formCreated) {
+    // フラグはfalse/未定義だが、実際のリソースが存在する場合（QuickStart直後など）
+    isPublished = true;
+    reason = 'リソース存在による判定 (フラグ未更新)';
+    confidence = 'medium';
+  } else {
+    isPublished = false;
+    reason = appPublishedFromConfig === false ? 'configJson.appPublished=false' : '公開情報なし';
+  }
+  
+  // デバッグログ
+  if (typeof shouldEnableDebugMode === 'function' && shouldEnableDebugMode()) {
+    console.log('🔍 Enhanced Publication check:', {
+      result: isPublished,
+      reason,
+      confidence,
+      validation: validationDetails
+    });
+  } else if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+    console.log('🔍 Enhanced Publication check:', {
+      result: isPublished,
+      reason,
+      confidence,
+      validation: validationDetails
+    });
+  }
+  
+  return { 
+    isPublished, 
+    reason,
+    confidence,
+    validationDetails
+  };
+}
+
+// Generate viewUrl with comprehensive fallback logic
+function generateViewUrl(status, userId) {
+  // 1. Use existing viewUrl if available
+  let viewUrl = status.appUrls && status.appUrls.viewUrl;
+  if (viewUrl) {
+    return viewUrl;
+  }
+  
+  // 2. Generate from appUrls.webApp with userId
+  if (status.appUrls && status.appUrls.webApp && userId) {
+    return status.appUrls.webApp + '?userId=' + encodeURIComponent(userId) + '&mode=view';
+  }
+  
+  // 3. Generate from status.webAppUrl with userId
+  if (status.webAppUrl && userId) {
+    return status.webAppUrl + '?userId=' + encodeURIComponent(userId) + '&mode=view';
+  }
+  
+  // 4. Simple fallback without userId
+  if (status.appUrls && status.appUrls.webApp) {
+    return status.appUrls.webApp + '?mode=view';
+  }
+  
+  logWarn('Could not generate viewUrl');
+  return null;
+}
+
+/**
+ * 複数ソースから公開状態を確実に判定するヘルパー関数
+ * @param {object} status - システムステータスオブジェクト
+ * @returns {boolean} - 公開状態
+ */
+function determinePublicationStatus(status) {
+  if (!status) return false;
+  
+  // 1. _normalizedオブジェクトから（最優先）
+  if (status._normalized && typeof status._normalized.isPublished === 'boolean') {
+    console.log('📊 Publication status from _normalized:', status._normalized.isPublished);
+    return status._normalized.isPublished;
+  }
+  
+  // 2. status直下のプロパティから（_normalized未生成時の優先フォールバック）
+  if (typeof status.isPublished === 'boolean') {
+    console.log('🔍 Publication status from status.isPublished:', status.isPublished);
+    return status.isPublished;
+  }
+  
+  if (status.config && typeof status.config.isPublished === 'boolean') {
+    console.log('🔍 Publication status from status.config.isPublished:', status.config.isPublished);
+    return status.config.isPublished;
+  }
+  
+  if (typeof status.appPublished === 'boolean') {
+    console.log('🔍 Publication status from status.appPublished:', status.appPublished);
+    return status.appPublished;
+  }
+  
+  // 3. configJsonから直接取得（より信頼性の低いフォールバック）
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      const config = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+      if (typeof config.appPublished === 'boolean') {
+        console.log('📋 Publication status from configJson (fallback):', config.appPublished);
+        return config.appPublished;
+      }
+    } catch (e) {
+      console.warn('⚠️ configJson parse failed in publication check:', e);
+    }
+  }
+  
+  // 4. 最終フォールバック: 不明時は false
+  console.log('❓ Publication status unknown, defaulting to false');
+  return false;
+}
+
+// =============================================================================
+// MAIN UI UPDATE FUNCTIONS
+// =============================================================================
+
+// Update UI with new status data
+// Full implementation of updateUIWithNewStatus for later use
+function _fullUpdateUIWithNewStatus(status) {
+  console.log('🔧 Simple UI Update called with status:', status);
+  
+  // 最小限の検証のみ
+  if (!status || !status.userInfo) {
+    console.warn('❌ Invalid status: missing userInfo');
+    return;
+  }
+  
+  // 改善された公開状態チェック: 新規作成・更新時の例外処理を含む
+  const isPublished = determinePublicationStatus(status);
+  
+  // 非公開でも以下の場合はUI更新を実行
+  const allowUpdateReasons = [
+    status.userInfo.configJson && status.userInfo.configJson.includes('formCreated'), // 新規作成完了時
+    status.userInfo.configJson && status.userInfo.configJson.includes('setupStatus'), // セットアップ中
+    status.setupStep && status.setupStep >= 1, // セットアップ進行中
+    status._meta && status._meta.source === 'quickstart', // クイックスタート
+    status._meta && status._meta.source === 'customSetup', // カスタムセットアップ
+    status.userInfo.spreadsheetUrl && status.userInfo.spreadsheetUrl.length > 0 // URL存在時
+  ];
+  
+  const shouldUpdate = isPublished || allowUpdateReasons.some(reason => reason);
+  
+  if (!shouldUpdate) {
+    console.log('🚫 UI update skipped: board not published and no update reasons');
+    return;
+  }
+  
+  console.log('✅ UI update proceeding:', { isPublished, hasUpdateReasons: allowUpdateReasons.some(r => r) });
+  
+  try {
+    // === 直接的なUI更新（シンプル版） ===
+    console.log('🎯 Starting direct UI updates...');
+    
+    // 基本情報の更新
+    const adminEmail = status.userInfo.adminEmail || '-';
+    const userId = status.userInfo.userId || '-';
+    
+    console.log('📝 Updating basic info:', { adminEmail, userId });
+    
+    // メールアドレスの更新
+    const emailElement = document.getElementById('info-admin-email');
+    if (emailElement) {
+      emailElement.textContent = adminEmail;
+      console.log('✅ Email updated:', adminEmail);
+    } else {
+      console.warn('⚠️ Email element not found');
+    }
+    
+    // ユーザーIDの更新
+    const userIdElement = document.getElementById('info-user-id');
+    if (userIdElement) {
+      userIdElement.textContent = userId;
+      console.log('✅ User ID updated:', userId);
+    } else {
+      console.warn('⚠️ User ID element not found');
+    }
+    
+    // 公開状態の更新
+    const config = JSON.parse(status.userInfo.configJson || '{}');
+    const isPublished = config.appPublished || false;
+    const publishText = isPublished ? '公開中' : '停止中';
+    
+    console.log('📊 Updating publish status:', { isPublished, publishText });
+    
+    const publishTextElement = document.getElementById('info-publish-text');
+    if (publishTextElement) {
+      publishTextElement.textContent = publishText;
+      console.log('✅ Publish text updated:', publishText);
+    }
+    
+    // 公開状態インジケーター
+    const publishIndicator = document.getElementById('info-publish-indicator');
+    if (publishIndicator) {
+      publishIndicator.className = isPublished 
+        ? 'w-2 h-2 rounded-full bg-green-400' 
+        : 'w-2 h-2 rounded-full bg-gray-400';
+      console.log('✅ Publish indicator updated');
+    }
+    
+    // 公開シート名の更新
+    const publishedSheet = config.publishedSheetName || status.activeSheetName || 'なし';
+    const sheetElement = document.getElementById('info-published-sheet');
+    if (sheetElement) {
+      sheetElement.textContent = publishedSheet;
+      console.log('✅ Published sheet updated:', publishedSheet);
+    }
+    
+    // 表示モードの更新
+    const displayMode = config.displayMode === 'named' ? '実名表示' : 
+                       config.displayMode === 'anonymous' ? '匿名表示' : '匿名表示';
+    const displayModeElement = document.getElementById('info-display-mode');
+    if (displayModeElement) {
+      displayModeElement.textContent = displayMode;
+      console.log('✅ Display mode updated:', displayMode);
+    } else {
+      console.warn('⚠️ Display mode element not found');
+    }
+    
+    // カウント表示の更新
+    const showCounts = config.showCounts === true ? '表示' : '非表示';
+    const showCountsElement = document.getElementById('info-show-counts');
+    if (showCountsElement) {
+      showCountsElement.textContent = showCounts;
+      console.log('✅ Show counts updated:', showCounts);
+    } else {
+      console.warn('⚠️ Show counts element not found');
+    }
+    
+    // ドメイン情報の更新
+    console.log('🌐 Updating domain display...');
+    clearInitialDisplayElements();
+    
+    // シートプルダウンの更新
+    console.log('📋 Updating sheet dropdown...');
+    const sheetsData = status.sheetNames || status.allSheets || [];
+    if (sheetsData.length > 0) {
+      populateSheetSelect(sheetsData, status.activeSheetName);
+      console.log('✅ Sheet dropdown updated with', sheetsData.length, 'sheets');
+    } else {
+      console.log('⚠️ No sheet data available for dropdown');
+    }
+    
+    // フッター表示用データ準備
+    console.log('🔧 Preparing footer data...');
+    const publicationState = getPublicationState(status);
+    const viewUrl = generateViewUrl(status, status.userInfo.userId);
+    status._normalized = {
+      isPublished: publicationState.isPublished,
+      publishReason: publicationState.reason,
+      viewUrl: viewUrl,
+      hasValidViewUrl: !!viewUrl
+    };
+    console.log('✅ Footer data prepared:', {
+      isPublished: publicationState.isPublished,
+      hasViewUrl: !!viewUrl,
+      reason: publicationState.reason
+    });
+    
+    // 現在のステータスを保存（グローバルに）
+    window.currentStatus = status;
+    
+    // 公開停止ボタンの更新
+    console.log('🚫 Updating unpublish button...');
+    updateUnpublishButton(status);
+    
+    // ステップインジケーターの更新
+    console.log('📊 Updating step indicators...');
+    const currentStep = status.setupStep || 1;
+    updateStepIndicators(currentStep, status);
+    
+    // 固定フッターの更新
+    console.log('🦶 Updating footer...');
+    updateFooterAndGuidance(status);
+    
+    console.log('🎉 Simple UI update completed successfully');
+    
+  } catch (error) {
+    console.error('❌ Simple UI update failed:', error);
+  }
+}
+
+// Make the full implementation available for the framework version
+if (typeof window !== 'undefined') {
+  window._fullUpdateUIWithNewStatus = _fullUpdateUIWithNewStatus;
+}
+
+// === 旧複雑システムは削除済み - シンプル化完了 ===
+
+// Generate hash for status comparison to detect duplicates
+function generateStatusHash(status) {
+  try {
+    const keyData = {
+      userId: (status.userInfo && status.userInfo.userId) || null,
+      activeSheet: status.activeSheetName || null,
+      setupStep: status.setupStep || null,
+      appPublished: status.appPublished || null,
+      timestamp: Math.floor(Date.now() / 1000) // Round to seconds to allow minor timing differences
+    };
+    
+    return JSON.stringify(keyData);
+  } catch (error) {
+    logWarn('Failed to generate status hash:', error);
+    return Math.random().toString(); // Fallback to prevent duplicate blocking on error
+  }
+}
+
+// =============================================================================
+// HELPER FUNCTIONS FOR UI UPDATES
+// =============================================================================
+
+// Update unpublish button state
+function updateUnpublishButton(status) {
+  const unpublishBtn = document.getElementById('unpublish-board-btn');
+  if (!unpublishBtn) return;
+
+  // Use same strict logic as footer: both normalized and explicit checks
+  const isPublished = (status._normalized && status._normalized.isPublished) || false;
+  let explicitAppPublished = status.appPublished === true;
+  
+  if (!explicitAppPublished && status.userInfo && status.userInfo.configJson) {
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      explicitAppPublished = config.appPublished === true;
+    } catch (configError) {
+      console.warn('❌ Failed to parse configJson for unpublish button check:', configError);
+      explicitAppPublished = false;
+    }
+  }
+  
+  const finalIsPublished = isPublished && explicitAppPublished;
+
+  if (finalIsPublished) {
+    unpublishBtn.classList.remove('hidden');
+  } else {
+    unpublishBtn.classList.add('hidden');
+  }
+}
+
+// Update spreadsheet access button state
+function updateSpreadsheetButton() {
+  const btn = document.getElementById('open-spreadsheet-btn-step2');
+  if (!btn) return;
+  
+  if (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetUrl) {
+    btn.disabled = false;
+    btn.onclick = function() {
+      window.open(currentStatus.userInfo.spreadsheetUrl, '_blank');
+    };
+    logDebug('✅ Spreadsheet button enabled with URL:', currentStatus.userInfo.spreadsheetUrl);
+  } else {
+    btn.disabled = true;
+    btn.onclick = null;
+    logDebug('⚠️ Spreadsheet button disabled - no URL available');
+  }
+}
+
+// Update static UI elements
+function updateStaticUI(status) {
+  console.log('🔧 updateStaticUI called with status:', {
+    hasStatus: !!status,
+    hasUserInfo: !!status?.userInfo
+  });
+  
+  // Update database info panel
+  updateDatabaseInfo(status);
+  
+  // Update existing user section
+  updateExistingUserSection(status);
+  
+  // Populate sheet selection - fix property name mismatch
+  logDebug('🔍 Debug: Checking sheet data properties', {
+    allSheets: status.allSheets,
+    sheetNames: status.sheetNames,
+    activeSheetName: status.activeSheetName
+  });
+  
+  const sheetsData = status.sheetNames || status.allSheets || [];
+  populateSheetSelect(sheetsData, status.activeSheetName);
+  
+  // アクティブシートの確実な反映（強化）
+  if (status.activeSheetName) {
+    setTimeout(() => {
+      const select = document.getElementById('sheet-select');
+      if (select && select.value !== status.activeSheetName) {
+        console.log('🔄 Force updating active sheet selection:', status.activeSheetName);
+        updateActiveSheetUI(status.activeSheetName);
+      }
+    }, 100);
+  }
+  
+  // Update custom form info
+  updateCustomFormInfo(status);
+  
+  // Check for auto-publish dialog
+  checkAutoPublishDialog(status);
+}
+
+// =============================================================================
+// DATABASE INFO PANEL UPDATES
+// =============================================================================
+
+function updateDatabaseInfo(status) {
+  console.log('🔧 updateDatabaseInfo called with:', {
+    status: !!status,
+    userInfo: !!status?.userInfo,
+    adminEmail: status?.userInfo?.adminEmail,
+    userId: status?.userInfo?.userId,
+    configJson: status?.userInfo?.configJson
+  });
+  
+  if (!status || !status.userInfo) {
+    console.warn('System info update failed: No user info available');
+    return;
+  }
+
+  // スプレッドシートURLを設定（デバッグ強化版）
+  console.log('🔧 Setting currentSpreadsheetUrl:', {
+    fromUserInfo: status.userInfo.spreadsheetUrl || 'none',
+    currentGlobal: currentSpreadsheetUrl || 'none',
+    shouldUpdate: !!status.userInfo.spreadsheetUrl
+  });
+  
+  if (status.userInfo.spreadsheetUrl) {
+    currentSpreadsheetUrl = status.userInfo.spreadsheetUrl;
+    console.log('✅ currentSpreadsheetUrl updated:', currentSpreadsheetUrl);
+    
+    // 即座に検証
+    if (currentSpreadsheetUrl !== status.userInfo.spreadsheetUrl) {
+      console.error('❌ URL設定に失敗:', { expected: status.userInfo.spreadsheetUrl, actual: currentSpreadsheetUrl });
+    }
+  } else if (status.userInfo.spreadsheetUrl === '') {
+    // 明示的な空文字列の場合はクリア
+    currentSpreadsheetUrl = '';
+    console.log('🗑️ currentSpreadsheetUrl cleared (explicit empty string)');
+  } else {
+    console.log('⚠️ No spreadsheetUrl in userInfo, keeping current value:', currentSpreadsheetUrl || 'none');
+  }
+  
+  // グローバル変数の最終確認
+  setTimeout(() => {
+    console.log('🔍 Final currentSpreadsheetUrl verification:', currentSpreadsheetUrl || 'still empty');
+  }, 100);
+
+  const cfg = status.config || {};
+
+  // 基本情報の更新
+  console.log('🔧 Setting basic info with safeSetText:', {
+    adminEmail: status.userInfo.adminEmail,
+    userId: status.userInfo.userId,
+    publishedSheet: cfg.publishedSheetName || status.publishedSheetName || 'なし'
+  });
+  
+  safeSetText('info-admin-email', status.userInfo.adminEmail);
+  safeSetText('info-user-id', status.userInfo.userId);
+  safeSetText('info-published-sheet', cfg.publishedSheetName || status.publishedSheetName || 'なし');
+  
+
+  // 公開状態の表示を更新
+  const isPublished = cfg.isPublished !== undefined
+    ? cfg.isPublished
+    : status.appPublished || status.isPublished || (status.activeSheetName && (cfg.publishedSheetName || status.publishedSheetName));
+  updatePublicationStatusUI(isPublished);
+
+  // 表示モードの更新
+  const displayModeFlag = cfg.showNames !== undefined ? cfg.showNames : status.showNames;
+  const displayMode = displayModeFlag ? '名前表示' : '匿名表示';
+  safeSetText('info-display-mode', displayMode);
+
+  // カウント表示の更新
+  const showCountsFlag = cfg.showCounts !== undefined
+    ? cfg.showCounts
+    : (status.showCounts !== undefined ? status.showCounts : false);
+  const showCounts = showCountsFlag ? '表示' : '非表示';
+  safeSetText('info-show-counts', showCounts);
+
+  // チェックボックスの状態同期
+  syncCheckboxStates(status);
+}
+
+// Update publication status UI
+function updatePublicationStatusUI(isPublished) {
+  const statusElement = safeGetElement('info-publish-status');
+  const indicatorElement = safeGetElement('info-publish-indicator');
+  const textElement = safeGetElement('info-publish-text');
+  
+  if (statusElement) {
+    if (isPublished) {
+      statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-green-600 text-white';
+      if (indicatorElement) indicatorElement.className = 'w-2 h-2 rounded-full bg-green-400';
+      if (textElement) textElement.textContent = '公開中';
+    } else {
+      statusElement.className = 'px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300';
+      if (indicatorElement) indicatorElement.className = 'w-2 h-2 rounded-full bg-gray-400';
+      if (textElement) textElement.textContent = '非公開';
+    }
+  }
+}
+
+// チェックボックスの状態を同期する関数
+function syncCheckboxStates(status) {
+  // Priority: Database config (configJson) > status properties > defaults
+  let showNames = false;
+  let showCounts = false;
+  
+  // 1. Prefer status.config if available
+  if (status.config) {
+    if (status.config.showNames !== undefined) showNames = status.config.showNames;
+    if (status.config.showCounts !== undefined) showCounts = status.config.showCounts;
+  } else if (status.userInfo && status.userInfo.configJson) {
+    // 2. Fallback to raw configJson
+    try {
+      const config = JSON.parse(status.userInfo.configJson);
+      if (config.showNames !== undefined) showNames = config.showNames;
+      if (config.showCounts !== undefined) showCounts = config.showCounts;
+    } catch (e) {
+      logWarn('Failed to parse configJson, using status properties');
+      if (status.showNames !== undefined) showNames = status.showNames;
+      if (status.showCounts !== undefined) showCounts = status.showCounts;
+    }
+  } else {
+    // 3. Use status properties as last resort
+    if (status.showNames !== undefined) showNames = status.showNames;
+    if (status.showCounts !== undefined) showCounts = status.showCounts;
+  }
+
+  // Update checkbox elements
+  const showNamesCheckbox = safeGetElement('show-names');
+  const showCountsCheckbox = safeGetElement('show-counts');
+  
+  if (showNamesCheckbox) {
+    showNamesCheckbox.checked = showNames;
+  }
+  
+  if (showCountsCheckbox) {
+    showCountsCheckbox.checked = showCounts;
+  }
+}
+
+// =============================================================================
+// SHEET SELECTION AND CONFIGURATION
+// =============================================================================
+
+// Populate sheet selection dropdown
+function populateSheetSelect(sheetNames, activeSheetName) {
+  const select = document.getElementById('sheet-select');
+  if (!select) {
+    logWarn('Sheet select element not found');
+    return;
+  }
+
+  logDebug('📋 Populating sheet select with data:', {
+    sheetNames: sheetNames,
+    activeSheetName: activeSheetName,
+    dataType: typeof sheetNames,
+    isArray: Array.isArray(sheetNames)
+  });
+
+  // Clear existing options
+  select.innerHTML = '<option value="">-- シートを選択 --</option>';
+  
+  if (sheetNames && sheetNames.length > 0) {
+    logDebug('✅ Adding sheets to dropdown:', sheetNames.length);
+    
+    sheetNames.forEach((sheet, index) => {
+      const option = document.createElement('option');
+      
+      // Handle both object and string formats
+      let sheetName;
+      if (typeof sheet === 'object' && sheet.name) {
+        sheetName = sheet.name;
+        option.value = sheet.name;
+        logDebug('📄 Sheet ' + (index + 1) + ': ' + sheet.name + ' (ID: ' + sheet.id + ')');
+      } else if (typeof sheet === 'string') {
+        sheetName = sheet;
+        option.value = sheet;
+        logDebug('📄 Sheet ' + (index + 1) + ': ' + sheet);
+      } else {
+        console.warn('⚠️ Unknown sheet format:', sheet);
+        return;
+      }
+      
+      // アクティブシートの表示を改善
+      if (sheetName === activeSheetName) {
+        option.textContent = sheetName + ' (アクティブ)';
+        option.style.fontWeight = 'bold';
+        option.style.color = '#10b981'; // 緑色でアクティブを表示
+        option.className = 'active-sheet-option';
+        logDebug('✅ Active sheet marked: ' + sheetName);
+      } else {
+        option.textContent = sheetName;
+      }
+      
+      select.appendChild(option);
+    });
+    select.disabled = false;
+    logDebug('✅ Sheet dropdown populated successfully');
+  } else {
+    // 初期セットアップ時は正常なのでdebugレベルに変更
+    if (window.DEBUG_MODE || window.location.hostname === 'localhost') {
+      console.warn('⚠️ No sheets available:', sheetNames);
+    }
+    select.innerHTML = '<option value="">利用可能なシートがありません</option>';
+    select.disabled = true;
+  }
+  
+  // Set active sheet if available (強化された選択ロジック)
+  if (activeSheetName) {
+    // シート名の正規化を考慮した選択処理
+    const normalizedActiveSheet = activeSheetName.trim();
+    
+    // 正確な一致を確認
+    const availableOptions = Array.from(select.options);
+    const matchingOption = availableOptions.find(option => option.value === normalizedActiveSheet);
+    
+    if (matchingOption) {
+      select.value = normalizedActiveSheet;
+      selectedSheet = normalizedActiveSheet;
+      lastSelectedSheetName = normalizedActiveSheet;
+      logDebug('✅ Active sheet set successfully:', normalizedActiveSheet);
+    } else {
+      // 強化されたインテリジェントフォールバック処理
+      logDebug('🔍 Active sheet not found in options, attempting intelligent fallback:', {
+        activeSheetName: normalizedActiveSheet,
+        availableOptions: availableOptions.map(opt => opt.value)
+      });
+      
+      let fallbackSheet = null;
+      
+      // 1. 完全一致を再試行（正規化後）
+      const exactMatch = availableOptions.find(option => 
+        _normalizeSheetName(option.value) === _normalizeSheetName(normalizedActiveSheet)
+      );
+      
+      if (exactMatch) {
+        fallbackSheet = exactMatch.value;
+        console.log('✅ Found exact match after normalization:', fallbackSheet);
+      } else {
+        // 2. 部分一致を試行（履歴復元で役立つ）
+        const partialMatch = availableOptions.find(option => 
+          option.value && normalizedActiveSheet && 
+          (option.value.includes(normalizedActiveSheet) || normalizedActiveSheet.includes(option.value))
+        );
+        
+        if (partialMatch) {
+          fallbackSheet = partialMatch.value;
+          console.log('✅ Found partial match:', fallbackSheet);
+        } else if (availableOptions.length > 1) {
+          // 3. 最初の有効なオプションを選択
+          fallbackSheet = availableOptions[1].value;
+          console.log('✅ Using first available option:', fallbackSheet);
+        }
+      }
+      
+      if (fallbackSheet) {
+        select.value = fallbackSheet;
+        selectedSheet = fallbackSheet;
+        lastSelectedSheetName = fallbackSheet;
+        logDebug('🔄 Fallback to sheet:', fallbackSheet);
+      }
+    }
+    
+    // 選択状態を確認
+    if (select.value) {
+      logDebug('✅ Final sheet selection confirmed:', select.value);
+    } else {
+      console.error('❌ Sheet selection failed - no sheet selected');
+    }
+  }
+  
+  // Add change event listener for data preview
+  select.removeEventListener('change', handleSheetSelectionChange);
+  select.addEventListener('change', handleSheetSelectionChange);
+  
+  // Update UI for selected sheet and enable spreadsheet button
+  updateUIForSelectedSheet();
+  updateSpreadsheetButton();
+}
+
+// Populate header options for configuration
+// Full implementation of populateHeaderOptions (framework has minimal version)
+function _fullPopulateHeaderOptions(headers) {
+  // Throttle function calls to prevent spam
+  if (window.populateHeaderOptionsRunning) {
+    return;
+  }
+  window.populateHeaderOptionsRunning = true;
+  
+  const selects = [
+    'opinionHeader',      // Main required field
+    'reason-column',     // Optional details field (reason column)
+    'name-column', 
+    'class-column'
+  ];
+  
+  selects.forEach(selectId => {
+    const select = document.getElementById(selectId);
+    
+    if (select) {
+      // Store current value
+      const currentValue = select.value;
+      
+      // Clear and repopulate with appropriate placeholder
+      if (headers && headers.length > 0) {
+        select.innerHTML = '<option value="">-- 列を選択 --</option>';
+        select.disabled = false;
+      } else {
+        select.innerHTML = '<option value="">-- シートを選択してください --</option>';
+        select.disabled = true;
+      }
+      
+      const excludedHeaders = [
+        'なるほど！',
+        'いいね！',
+        'もっと知りたい！',
+        'ハイライト',
+        'メールアドレス', // フォームで自動収集されるため、マッピング対象から除外
+        'タイムスタンプ' // ユーザーの要望により除外
+      ];
+
+      const filteredHeaders = headers.filter(header => !excludedHeaders.includes(header));
+
+      filteredHeaders.forEach(header => {
+        const option = document.createElement('option');
+        option.value = header;
+        option.textContent = header;
+        select.appendChild(option);
+      });
+      
+      // Restore previous value if still valid
+      if (currentValue && headers.includes(currentValue)) {
+        select.value = currentValue;
+      }
+    }
+  });
+  
+  // Reset throttle after a delay
+  setTimeout(() => {
+    window.populateHeaderOptionsRunning = false;
+  }, 100);
+}
+
+// Populate configuration with guessed values
+// Full implementation of populateConfig (framework has minimal version)
+function _fullPopulateConfig(cfg) {
+  if (!cfg) return;
+  
+  // 履歴復元中はスキップ（ただし、ドラフトモードの場合は除く）
+  if ((window._historyRestoreInProgress || window._historyColumnSelections) && !window._draftModeActive) {
+    console.log('🛡️ _fullPopulateConfig: 履歴復元中のため処理をスキップしました');
+    return;
+  }
+  
+  // ドラフトモード時のログ出力
+  if (window._draftModeActive) {
+    console.log('📝 _fullPopulateConfig: ドラフトモードで設定を反映中');
+  }
+  
+  // Throttle function calls to prevent spam
+  if (window.populateConfigRunning) {
+    return;
+  }
+  window.populateConfigRunning = true;
+  
+  const mappings = {
+    // Main opinion dropdown (primary target)
+    'opinionHeader': cfg.opinionHeader || cfg.opinionColumn,
+    
+    // Detail configuration dropdowns (secondary targets with property name fixes)
+    'reason-column': cfg.reasonColumn || cfg.reasonHeader,
+    'name-column': cfg.nameColumn || cfg.nameHeader,
+    'class-column': cfg.classColumn || cfg.classHeader,
+    'show-names': cfg.showNames,
+    'show-counts': cfg.showCounts
+  };
+  
+  Object.keys(mappings).forEach(elementId => {
+    const element = document.getElementById(elementId);
+    const value = mappings[elementId];
+    
+    if (element && value !== undefined) {
+      if (element.type === 'checkbox') {
+        element.checked = Boolean(value);
+      } else {
+        element.value = value;
+      }
+    }
+  });
+  
+  // Reset throttle after a delay
+  setTimeout(() => {
+    window.populateConfigRunning = false;
+  }, 100);
+  
+  updateConfigButtons();
+}
+
+// Clear configuration fields
+function clearConfigFields() {
+  const fieldIds = [
+    'opinionHeader',      // Main required field
+    'reason-column',
+    'name-column',
+    'class-column'
+  ];
+  
+  fieldIds.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.value = '';
+    }
+  });
+  
+  updateConfigButtons();
+}
+
+// Build configuration object from form
+function buildConfigObject() {
+  // Get values from primary elements (with fallback to secondary elements)
+  const opinionHeaderEl = document.getElementById('opinionHeader');
+  const reasonColumnEl = document.getElementById('reason-column');
+  const nameColumnEl = document.getElementById('name-column');
+  const classColumnEl = document.getElementById('class-column');
+  const showNamesEl = document.getElementById('show-names');
+  const showCountsEl = document.getElementById('show-counts');
+  
+  const opinionValue = (opinionHeaderEl ? opinionHeaderEl.value : '') || 
+                      (reasonColumnEl ? reasonColumnEl.value : '') || '';
+  const nameValue = nameColumnEl ? nameColumnEl.value : '';
+  const classValue = classColumnEl ? classColumnEl.value : '';
+  const showNames = showNamesEl ? showNamesEl.checked : false;
+  const showCounts = showCountsEl ? showCountsEl.checked : false;
+  
+  return {
+    sheetName: selectedSheet,
+    // Use property names that match backend expectations (opinionHeader format)
+    opinionHeader: opinionValue,
+    nameHeader: nameValue,
+    classHeader: classValue,
+    reasonHeader: (document.getElementById('reason-column') && document.getElementById('reason-column').value) || '',
+    // Column values
+    opinionColumn: opinionValue,
+    nameColumn: nameValue,
+    classColumn: classValue,
+    showNames: showNames,
+    showCounts: showCounts
+  };
+}
+
+// Full implementation of validateConfig (framework has minimal version)
+function _fullValidateConfig() {
+  // Check primary element first, then fallback to secondary element
+  const opinionHeaderEl = document.getElementById('opinionHeader');
+  const reasonColumnEl = document.getElementById('reason-column');
+  const opinionValue = (opinionHeaderEl ? opinionHeaderEl.value : '') || 
+                      (reasonColumnEl ? reasonColumnEl.value : '') || '';
+  
+  return opinionValue && opinionValue.trim() !== '';
+}
+
+// Full implementation of updateConfigButtons (framework has minimal version)
+function _fullUpdateConfigButtons() {
+  const isValid = (typeof _fullValidateConfig === 'function') ? _fullValidateConfig() : validateConfig();
+  const saveBtn = document.getElementById('save-publish-btn');
+  
+  if (saveBtn) {
+    saveBtn.disabled = !isValid;
+    if (isValid) {
+      saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+      saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+  }
+}
+
+// Make full implementations globally available for framework fallback
+window._fullValidateConfig = _fullValidateConfig;
+window._fullUpdateConfigButtons = _fullUpdateConfigButtons;
+window._fullUpdateFormUrlDisplay = _fullUpdateFormUrlDisplay;
+window._fullPopulateHeaderOptions = _fullPopulateHeaderOptions;
+window._fullPopulateConfig = _fullPopulateConfig;
+
+// =============================================================================
+// STEP INDICATORS AND GUIDANCE
+// =============================================================================
+
+// 統一されたステップ完了チェック - 公開状態優先判定対応版
+function getStepCompletionFromConfig(status) {
+  if (!(status && status.userInfo && status.userInfo.configJson)) {
+    return { step1: false, step2: false, step3: false, isPublished: false };
+  }
+
+  try {
+    const config = typeof status.userInfo.configJson === 'string' 
+      ? JSON.parse(status.userInfo.configJson) 
+      : status.userInfo.configJson;
+
+    // 公開状態の優先チェック（データ不整合に関係なく公開済みなら全ステップ完了）
+    const publicationState = getPublicationState(status);
+    if (publicationState.isPublished) {
+      return {
+        step1: true,
+        step2: true,
+        step3: true,
+        isPublished: true
+      };
+    }
+
+    // 通常のステップ完了判定
+    // Step 1: スプレッドシートIDの存在確認
+    const step1Complete = !!(status.userInfo.spreadsheetId);
+    
+    // Step 2: セットアップ完了状態の確認
+    const step2Complete = config.setupStatus === 'completed' && 
+                          config.formCreated === true && 
+                          config.formUrl && config.formUrl.trim();
+    
+    // Step 3: 公開状態の確認
+    const step3Complete = config.appPublished === true;
+    
+    return {
+      step1: step1Complete,
+      step2: step2Complete,
+      step3: step3Complete,
+      isPublished: step3Complete
+    };
+  } catch (error) {
+    console.warn('❌ configJsonの解析に失敗:', error);
+    return { step1: false, step2: false, step3: false, isPublished: false };
+  }
+}
+
+// Update step indicators - 最適化版（バッチDOM更新）
+function updateStepIndicators(currentStep, status = null) {
+  const steps = [
+    document.getElementById('step-1-indicator'),
+    document.getElementById('step-2-indicator'),
+    document.getElementById('step-3-indicator')
+  ];
+
+  // データベース状態から実際の完了状況を取得
+  const completion = getStepCompletionFromConfig(status);
+  logDebug('📊 Step completion from database:', completion);
+
+  // DOM更新をバッチ化するための設定配列を作成
+  const updates = [];
+  
+  steps.forEach((step, index) => {
+    if (!step) return;
+    
+    const stepNumber = index + 1;
+    const circle = step.querySelector('div');
+    const text = step.querySelector('span');
+
+    // 既存のバッジを削除（最適化）
+    const existingBadge = step.querySelector('.publication-badge');
+    if (existingBadge) {
+      existingBadge.remove();
+    }
+
+    // データベース状態に基づく完了判定
+    const isStepComplete = completion['step' + stepNumber];
+    
+    // 更新情報を配列に追加（実際のDOM更新は後で一括実行）
+    updates.push({
+      circle,
+      text,
+      stepNumber,
+      isStepComplete,
+      isCurrentStep: stepNumber === currentStep
+    });
+  });
+  
+  // バッチDOM更新実行（リフローを最小化）
+  requestAnimationFrame(() => {
+    executeBatchStepUpdates(updates);
+    // 進行状況メッセージの更新（同じアニメーションフレーム内で実行）
+    updateProgressMessage(currentStep, status, completion);
+  });
+}
+
+// バッチDOM更新の実行（最適化されたDOM操作）
+function executeBatchStepUpdates(updates) {
+  const styleConfigs = {
+    completed: {
+      circleClass: 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all',
+      circleContent: '✓',
+      textClasses: { remove: ['text-gray-500', 'text-cyan-400'], add: ['text-green-400', 'font-medium'] }
+    },
+    current: {
+      circleClass: 'w-6 h-6 bg-cyan-500 text-white rounded-full flex items-center justify-center font-bold text-xs transition-all ring-2 ring-cyan-400 ring-offset-2 ring-offset-gray-900 animate-pulse',
+      textClasses: { remove: ['text-gray-500', 'text-green-400'], add: ['text-cyan-400', 'font-bold'] }
+    },
+    pending: {
+      circleClass: 'w-6 h-6 bg-gray-700 text-gray-500 rounded-full flex items-center justify-center font-bold text-xs transition-all border border-gray-600',
+      textClasses: { remove: ['text-white', 'text-green-400', 'text-cyan-400', 'font-bold', 'font-medium'], add: ['text-gray-500'] }
+    }
+  };
+
+  updates.forEach(({ circle, text, stepNumber, isStepComplete, isCurrentStep }) => {
+    let config;
+    
+    if (isStepComplete) {
+      config = styleConfigs.completed;
+    } else if (isCurrentStep) {
+      config = styleConfigs.current;
+    } else {
+      config = styleConfigs.pending;
+    }
+
+    // Circle要素の更新
+    if (circle) {
+      circle.className = config.circleClass;
+      circle.innerHTML = config.circleContent || stepNumber;
+    }
+
+    // Text要素の更新（クラス操作の最適化）
+    if (text && config.textClasses) {
+      if (config.textClasses.remove && config.textClasses.remove.length > 0) {
+        for (const className of config.textClasses.remove) {
+          text.classList.remove(className);
+        }
+      }
+      if (config.textClasses.add && config.textClasses.add.length > 0) {
+        for (const className of config.textClasses.add) {
+          text.classList.add(className);
+        }
+      }
+    }
+  });
+}
+
+function updateProgressMessage(currentStep, status = null, completion = null) {
+  const messageElement = document.getElementById('progress-message');
+  if (!messageElement) return;
+  
+  // completionが渡されていない場合は取得
+  if (!completion) {
+    completion = getStepCompletionFromConfig(status);
+  }
+  
+  // 改善されたメッセージとガイダンス
+  const messageData = getEnhancedProgressMessage(currentStep, completion, status);
+  
+  messageElement.textContent = messageData.message;
+  messageElement.className = `text-sm ${messageData.colorClass} font-medium transition-colors duration-300`;
+}
+
+// 強化されたプログレスメッセージの生成
+function getEnhancedProgressMessage(currentStep, completion, status) {
+  const messageConfigs = {
+    1: {
+      completed: {
+        message: '✅ データ準備完了：フォーム・スプレッドシートが利用可能です',
+        colorClass: 'text-green-400'
+      },
+      inProgress: {
+        message: '📋 クイックスタート（自動）またはカスタムセットアップ（既存データ）を選択',
+        colorClass: 'text-cyan-400'
+      }
+    },
+    2: {
+      completed: {
+        message: '✅ シート設定完了：回答データの表示準備ができました',
+        colorClass: 'text-green-400'  
+      },
+      inProgress: {
+        message: '⚙️ シートを選択して、表示する列（質問・回答など）を設定してください',
+        colorClass: 'text-yellow-400'
+      }
+    },
+    3: {
+      published: {
+        message: '🎉 ボード公開中：参加者が回答を投稿・閲覧できます',
+        colorClass: 'text-green-400'
+      },
+      readyToPublish: {
+        message: '🚀 公開準備完了：「ボードを公開」で参加者に共有しましょう',
+        colorClass: 'text-purple-400'
+      },
+      needsConfiguration: {
+        message: '🔧 列設定を完了してから公開してください',
+        colorClass: 'text-orange-400'
+      }
+    }
+  };
+  
+  // ステップごとの状態判定とメッセージ選択
+  switch (currentStep) {
+    case 1:
+      return completion.step1 ? 
+        messageConfigs[1].completed : 
+        messageConfigs[1].inProgress;
+        
+    case 2:
+      return completion.step2 ? 
+        messageConfigs[2].completed : 
+        messageConfigs[2].inProgress;
+        
+    case 3:
+      if (completion.isPublished) {
+        return messageConfigs[3].published;
+      } else if (completion.step2) {
+        return messageConfigs[3].readyToPublish;
+      } else {
+        return messageConfigs[3].needsConfiguration;
+      }
+      
+    default:
+      return {
+        message: '🎉 セットアップ完了：StudyQuestをお楽しみください！',
+        colorClass: 'text-green-400'
+      };
+  }
+}
+
+// デバウンス機能用のタイムアウト管理
+let footerUpdateTimeout = null;
+
+// Update footer and guidance text (with debounce)
+function updateFooterAndGuidance(status) {
+  // デバウンス処理：短時間の連続呼び出しを制御
+  clearTimeout(footerUpdateTimeout);
+  footerUpdateTimeout = setTimeout(() => {
+    updateFooterAndGuidanceImmediate(status);
+  }, 150); // 150ms遅延
+}
+
+// 実際のフッター更新処理
+function updateFooterAndGuidanceImmediate(status) {
+  console.group('🦶 updateFooterAndGuidance');
+  
+  // より確実なステータス確保: グローバル状態とマージ
+  const effectiveStatus = status || window.currentStatus;
+  if (!effectiveStatus) {
+    console.warn('❌ No status available for footer update');
+    console.groupEnd();
+    return;
+  }
+  
+  // 引数ステータスの詳細確認（強化版）
+  console.log('🔍 Footer update with status:', {
+    hasStatus: !!effectiveStatus,
+    isPublished: effectiveStatus?.isPublished,
+    configIsPublished: effectiveStatus?.config?.isPublished,
+    appPublished: effectiveStatus?.appPublished,
+    normalizedIsPublished: effectiveStatus?._normalized?.isPublished,
+    configJson: effectiveStatus?.userInfo?.configJson ? 'exists' : 'missing',
+    statusSource: status ? 'provided' : 'global fallback'
+  });
+  
+  const footer = document.getElementById('admin-footer');
+  const guidanceText = document.getElementById('guidance-text');
+  
+  if (!footer || !guidanceText) {
+    console.warn('❌ Footer or guidance elements not found');
+    console.groupEnd();
+    return;
+  }
+
+  // 改善された公開状態判定: 統一関数使用 + フォールバック処理
+  const finalIsPublished = determinePublicationStatus(effectiveStatus);
+  const viewUrl = (effectiveStatus._normalized && effectiveStatus._normalized.viewUrl) || 
+                  (effectiveStatus.appUrls && effectiveStatus.appUrls.viewUrl) ||
+                  generateViewUrl(effectiveStatus);
+  
+  // 簡潔なログ出力
+  console.log(`🔍 Publication check: ${finalIsPublished ? '公開中' : '非公開'}`, {
+    hasViewUrl: !!viewUrl,
+    source: status._normalized ? '_normalized' : 'fallback'
+  });
+
+  // Show footer if published (with strict validation)
+  if (finalIsPublished) {
+    footer.classList.remove('hidden');
+    
+    // Update board URL using our generated viewUrl (if available)
+    const boardUrlInput = document.getElementById('board-url');
+    const viewBoardLink = document.getElementById('view-board-link');
+    
+    if (boardUrlInput) {
+      boardUrlInput.value = viewUrl || 'URL生成中...';
+      console.log('📝 Board URL input updated:', viewUrl || 'URL generation pending');
+    }
+    if (viewBoardLink && viewUrl) {
+      viewBoardLink.href = viewUrl;
+      console.log('🔗 View board link updated:', viewUrl);
+    } else if (viewBoardLink) {
+      viewBoardLink.removeAttribute('href');
+      console.log('🔗 View board link cleared - no URL available');
+    }
+    
+    // Update topic text
+    updateTopicText(status);
+    
+    guidanceText.textContent = '回答ボードは現在公開中です。';
+  } else {
+    footer.classList.add('hidden');
+    console.log('❌ Footer hidden - board not published');
+    
+    // Update guidance based on setup step
+    updateGuidanceForStep(status.setupStep || 1, guidanceText);
+  }
+  
+  console.groupEnd();
+  
+  // 自動停止通知の表示チェック
+  checkAndShowAutoStopNotification(status);
+  
+  adjustLayout();
+}
+
+// Update UI for selected sheet
+function updateUIForSelectedSheet() {
+  var hasSelection = selectedSheet && selectedSheet.trim() !== '';
+  
+  // Update step indicators based on server-provided setupStep
+  const currentStep = currentStatus.setupStep || 1;
+  updateStepIndicators(currentStep);
+  
+  // Enable/disable configuration section
+  var configSection = document.getElementById('config-section');
+  if (configSection) {
+    if (hasSelection) {
+      configSection.classList.remove('opacity-50', 'pointer-events-none');
+      
+      // 防御的ロジック: config-areaが確実に表示されるようにする
+      var configArea = document.getElementById('config-area');
+      if (configArea) {
+        configArea.classList.remove('hidden');
+        console.log('🛡️ updateUIForSelectedSheet: Config area shown defensively');
+      }
+    } else {
+      configSection.classList.add('opacity-50', 'pointer-events-none');
+    }
+  }
+  
+  // Update guidance text
+  var guidanceText = document.getElementById('guidance-text');
+  if (guidanceText) {
+    if (hasSelection) {
+      guidanceText.textContent = 'ステップ3: 列を設定してボードを公開しましょう';
+    } else {
+      guidanceText.textContent = 'ステップ2: 表示したいシートを選択してください。';
+    }
+  }
+
+  // Toggle placeholder visibility
+  var configPlaceholder = document.getElementById('config-placeholder');
+  if (configPlaceholder) {
+    if (hasSelection) {
+      configPlaceholder.classList.add('hidden');
+    } else {
+      configPlaceholder.classList.remove('hidden');
+    }
+  }
+}
+
+// Update topic text in footer
+function updateTopicText(status) {
+  const topicTextElement = document.getElementById('current-topic-text');
+  const scheduledEndTimeElement = document.getElementById('scheduled-end-time');
+  
+  if (!topicTextElement) return;
+
+  let topic = '（問題文未設定）';
+  
+  // SAFE: 設定オブジェクトの安全な取得
+  let cfg = {};
+  
+  // statusオブジェクトの安全性チェック
+  if (!status) {
+    console.warn('⚠️ updateTopicText: status is null or undefined');
+    topicTextElement.textContent = topic;
+    return;
+  }
+  
+  // status.configが存在し、かつオブジェクトの場合のみ使用
+  if (status.config && typeof status.config === 'object') {
+    cfg = Object.assign({}, status.config);
+  }
+  
+  console.log('🔍 updateTopicText: status:', status);
+  
+  // userInfo.configJsonからも情報を取得（安全性チェック強化）
+  if (status.userInfo && status.userInfo.configJson) {
+    try {
+      const fullConfig = JSON.parse(status.userInfo.configJson);
+      if (fullConfig && typeof fullConfig === 'object') {
+        cfg = Object.assign({}, cfg, fullConfig);
+        console.log('📋 updateTopicText: merged config:', cfg);
+      } else {
+        console.warn('⚠️ Parsed configJson is not a valid object:', fullConfig);
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to parse userInfo.configJson:', e);
+    }
+  }
+  
+  // publishedSheetNameに基づいてsheet-specific configを取得（安全性チェック強化）
+  if (status.userInfo && cfg && cfg.publishedSheetName) {
+    try {
+      const sheetConfigKey = `sheet_${cfg.publishedSheetName}`;
+      if (cfg[sheetConfigKey] && typeof cfg[sheetConfigKey] === 'object' && cfg[sheetConfigKey].opinionHeader) {
+        topic = cfg[sheetConfigKey].opinionHeader;
+        console.log(`✅ Topic found from sheet config (${sheetConfigKey}):`, topic);
+      } else {
+        console.warn(`⚠️ No opinion header found in sheet config: ${sheetConfigKey}`, cfg[sheetConfigKey]);
+      }
+    } catch (e) {
+      console.warn('⚠️ Error accessing sheet config:', e);
+    }
+  }
+
+  // 優先順位: customFormInfo > シート固有設定 > 一般設定
+  if (!topic && status.customFormInfo && status.customFormInfo.mainQuestion) {
+    topic = status.customFormInfo.mainQuestion;
+    console.log('✅ Topic from customFormInfo:', topic);
+  } else if (!topic && cfg.opinionHeader) {
+    topic = cfg.opinionHeader;
+    console.log('✅ Topic from cfg.opinionHeader:', topic);
+  }
+  
+  if (!topic) {
+    const sheetName = cfg.publishedSheetName || status.publishedSheetName;
+    console.log('🔍 Looking for topic in sheet config, sheetName:', sheetName);
+    
+    if (sheetName && sheetName !== 'フォームの回答 1') {
+      if (status.userInfo && status.userInfo.configJson) {
+        try {
+          const fullCfg = JSON.parse(status.userInfo.configJson);
+          const sheetCfg = fullCfg['sheet_' + (sheetName || '')] || {};
+          console.log('📋 Sheet config found:', sheetCfg);
+          
+          // guessedConfig内のopinionHeaderを優先
+          if (sheetCfg.guessedConfig && sheetCfg.guessedConfig.opinionHeader) {
+            topic = sheetCfg.guessedConfig.opinionHeader;
+            console.log('✅ Topic from guessedConfig:', topic);
+          } else if (sheetCfg.opinionHeader) {
+            // フォールバック: 直接のopinionHeader
+            topic = sheetCfg.opinionHeader;
+            console.log('✅ Topic from direct opinionHeader:', topic);
+          } else {
+            console.warn('⚠️ No opinion header found in sheet config, trying alternatives');
+            // Try alternative headers
+            const alternativeHeaders = ['reasonHeader', 'nameHeader', 'classHeader'];
+            for (const header of alternativeHeaders) {
+              if (sheetCfg.guessedConfig && sheetCfg.guessedConfig[header]) {
+                topic = sheetCfg.guessedConfig[header];
+                console.log(`✅ Topic from alternative header (${header}):`, topic);
+                break;
+              } else if (sheetCfg[header]) {
+                topic = sheetCfg[header];
+                console.log(`✅ Topic from direct alternative header (${header}):`, topic);
+                break;
+              }
+            }
+            // シート名ではなく、適切なデフォルトメッセージを表示
+            topic = '（質問文が設定されていません）';
+          }
+        } catch (e) {
+          // クイックスタート直後のフォールバック改善
+          if (sheetName && fullCfg['sheet_' + (sheetName || '')] && fullCfg['sheet_' + (sheetName || '')].flowType === 'quickstart') {
+            // クイックスタート用デフォルト質問文を表示
+            topic = 'あなたの考えや気づいたことを教えてください';
+          } else {
+            topic = '（質問文が設定されていません）';
+          }
+        }
+      } else {
+        // シート名をそのまま表示せず、適切なメッセージを表示
+        topic = '（質問文が設定されていません）';
+      }
+    }
+  }
+
+  topicTextElement.textContent = topic;
+  
+  // 予定終了日時の更新
+  if (scheduledEndTimeElement) {
+    updateScheduledEndTime(cfg, scheduledEndTimeElement);
+  }
+}
+
+// 予定終了日時を更新する関数
+function updateScheduledEndTime(config, element) {
+  // 複数のソースから scheduledEndAt を取得を試行
+  const scheduledEndAt = config.scheduledEndAt || 
+                         config.scheduledEndTime ||
+                         (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndAt) ||
+                         (window.lastStatusCache && window.lastStatusCache.config && window.lastStatusCache.config.scheduledEndTime);
+  
+  // scheduledEndAtが設定されていない場合は、publishedAt + autoStopMinutesから計算
+  let finalScheduledEndTime = scheduledEndAt;
+  
+  if (!finalScheduledEndTime && config.publishedAt && config.autoStopMinutes) {
+    const publishedTime = new Date(config.publishedAt);
+    const autoStopMs = config.autoStopMinutes * 60 * 1000;
+    finalScheduledEndTime = new Date(publishedTime.getTime() + autoStopMs).toISOString();
+    console.log('🕐 終了予定時刻を計算しました:', finalScheduledEndTime);
+  }
+  
+  if (finalScheduledEndTime) {
+    try {
+      const endDate = new Date(finalScheduledEndTime);
+      const formattedTime = endDate.toLocaleString('ja-JP', {
+        year: '2-digit',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      // 現在時刻との比較
+      const now = new Date();
+      const isOverdue = endDate < now;
+      const timeRemaining = endDate.getTime() - now.getTime();
+      const oneHourMs = 60 * 60 * 1000; // 1時間のミリ秒
+      
+      if (isOverdue) {
+        element.textContent = `${formattedTime} (期限切れ)`;
+        element.className = 'text-xs font-medium text-red-400';
+      } else if (timeRemaining <= oneHourMs) {
+        // 1時間以内の場合は警告表示
+        const minutesRemaining = Math.floor(timeRemaining / (60 * 1000));
+        element.textContent = `${formattedTime} (残り${minutesRemaining}分)`;
+        element.className = 'text-xs font-medium text-red-400 animate-pulse';
+        console.log('⚠️ 期限まで1時間以内です:', minutesRemaining + '分');
+      } else {
+        element.textContent = formattedTime;
+        element.className = 'text-xs font-medium text-orange-400';
+      }
+    } catch (e) {
+      element.textContent = '設定エラー';
+      element.className = 'text-xs font-medium text-gray-400';
+    }
+  } else {
+    element.textContent = '未設定';
+    element.className = 'text-xs font-medium text-gray-400';
+  }
+}
+
+// Update guidance text for specific step
+function updateGuidanceForStep(step, guidanceElement) {
+  const messages = {
+    1: 'ステップ1: ボードを作成または既存のリソースを追加してください。',
+    2: 'ステップ2: 表示したいシートを選択してください。',
+    3: 'ステップ3: 列を設定してボードを公開しましょう'
+  };
+  
+  // 公開終了後のステップ1では、明確にセットアップ再開のメッセージを表示
+  if (step === 1) {
+    guidanceElement.textContent = 'セットアップを開始してください';
+  } else {
+    guidanceElement.textContent = messages[step] || 'セットアップを開始してください';
+  }
+}
+
+// 自動停止通知の表示チェック
+function checkAndShowAutoStopNotification(status) {
+  const notificationElement = document.getElementById('auto-stop-notification');
+  const autoStoppedTimeElement = document.getElementById('auto-stopped-time');
+  
+  if (!notificationElement || !autoStoppedTimeElement) return;
+  
+  const config = status.config || {};
+  
+  // 自動停止されている場合のみ通知を表示
+  if (config.autoStoppedAt && config.autoStopReason === 'scheduled_timeout') {
+    console.log('🔔 自動停止通知を表示します:', config.autoStoppedAt);
+    
+    // 停止時刻を表示
+    try {
+      const stoppedDate = new Date(config.autoStoppedAt);
+      const formattedTime = stoppedDate.toLocaleString('ja-JP', {
+        year: '2-digit',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      autoStoppedTimeElement.textContent = formattedTime;
+    } catch (e) {
+      autoStoppedTimeElement.textContent = '時刻不明';
+    }
+    
+    // 通知を表示
+    notificationElement.classList.remove('hidden');
+    
+    // 再公開ボタンのイベントリスナーを設定
+    const republishBtn = document.getElementById('republish-after-auto-stop-btn');
+    if (republishBtn) {
+      // 既存のイベントリスナーを削除
+      republishBtn.replaceWith(republishBtn.cloneNode(true));
+      
+      // 新しいイベントリスナーを追加
+      const newRepublishBtn = document.getElementById('republish-after-auto-stop-btn');
+      newRepublishBtn.addEventListener('click', function() {
+        // Step 3に移動して再公開を促す
+        const step3Section = document.getElementById('step3-content');
+        if (step3Section) {
+          step3Section.classList.remove('hidden');
+          step3Section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        // 通知を非表示
+        notificationElement.classList.add('hidden');
+        
+        showMessage('表示設定を確認して再公開してください', 'info');
+      });
+    }
+  } else {
+    // 自動停止されていない場合は通知を非表示
+    notificationElement.classList.add('hidden');
+  }
+}
+
+// =============================================================================
+// SECTION TOGGLE FUNCTIONALITY
+// =============================================================================
+
+// Toggle section expansion/collapse
+// toggleSection function is now defined in adminPanel-framework.js.html
+
+// Automatically collapse completed sections
+function collapseCompletedSection(stepNumber) {
+  const sectionId = `step${stepNumber}-content`;
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  
+  console.log(`📁 Auto-collapsing completed step ${stepNumber}`);
+  
+  // Collapse the section
+  section.classList.add('hidden');
+  
+  // Update toggle button state
+  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+  if (toggleBtn) {
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    const arrow = toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up');
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-down');
+      arrow.classList.add('fa-chevron-up');
+    }
+  }
+  
+  // Note: Visual indicators are now managed by manageSectionStates()
+}
+
+// Automatically expand active section
+function expandActiveSection(stepNumber) {
+  const sectionId = `step${stepNumber}-content`;
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  
+  console.log(`📂 Auto-expanding active step ${stepNumber}`);
+  
+  // Expand the section
+  section.classList.remove('hidden');
+  
+  // Special handling for Step 3: ensure config-area is visible
+  if (stepNumber === 3) {
+    const configArea = document.getElementById('config-area');
+    if (configArea && currentStatus && currentStatus.activeSheetName) {
+      configArea.classList.remove('hidden');
+      console.log(`📋 expandActiveSection: Config area shown for Step 3`);
+    }
+  }
+  
+  // Update toggle button state
+  const toggleBtn = document.querySelector(`[onclick*="${sectionId}"]`);
+  if (toggleBtn) {
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    const arrow = toggleBtn.querySelector('.fa-chevron-down, .fa-chevron-up');
+    if (arrow) {
+      arrow.classList.remove('fa-chevron-up');
+      arrow.classList.add('fa-chevron-down');
+    }
+  }
+  
+  // Note: Visual indicators are now managed by manageSectionStates()
+}
+
+// Manage section states based on current step (simplified - no visual effects)
+function manageSectionStates(currentStep) {
+  console.log(`🔄 Managing section states for step ${currentStep}`);
+  
+  // ステップごとのセクション制御
+  for (let i = 1; i <= 3; i++) {
+    const sectionId = `step${i}-content`;
+    const section = document.getElementById(sectionId);
+    
+    if (i === currentStep) {
+      // 現在のステップ: 展開して有効化
+      expandActiveSection(i);
+      
+      // Step 3の特別処理: config-areaの表示
+      if (i === 3) {
+        const configArea = document.getElementById('config-area');
+        if (configArea && currentStatus && currentStatus.activeSheetName) {
+          configArea.classList.remove('hidden');
+          console.log(`📋 Step 3: Config area shown for sheet: ${currentStatus.activeSheetName}`);
+        }
+      }
+      
+      console.log(`🔄 Step ${i}: Active (current step)`);
+    } else if (i < currentStep) {
+      // 完了済みステップ: アクセス可能だが、展開は任意
+      if (section) {
+        section.classList.add('opacity-90'); // 完了した状態を視覚的に示す
+      }
+      console.log(`✅ Step ${i}: Completed (accessible)`);
+    } else {
+      // 未来のステップ: Step 1の場合はpending状態でも全て閲覧可能
+      if (currentStep === 1) {
+        // Step 1では全ステップにアクセス可能（データ確認のため）
+        if (section) {
+          section.classList.add('opacity-75'); // 未来のステップとして軽く表示
+        }
+        console.log(`⏭️ Step ${i}: Available for preview`);
+      } else {
+        // Step 2以降では順次開放
+        if (section) {
+          section.classList.add('opacity-50'); // 未来のステップとして表示
+        }
+        console.log(`⏭️ Step ${i}: Future step (available)`);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// MODAL MANAGEMENT
+// =============================================================================
+
+// Show form configuration modal
+// showFormConfigModal function is now defined in adminPanel-framework.js.html
+
+// Hide form configuration modal
+function hideFormConfigModal() {
+  if (window.sharedModals) {
+    window.sharedModals.hideModal('form-config-modal');
+    manageFocusForModal('form-config-modal', false);
+  } else {
+    // Fallback for legacy support
+    const modal = document.getElementById('form-config-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      manageFocusForModal('form-config-modal', false);
+    }
+  }
+}
+
+// Override placeholder with actual function
+if (typeof window !== 'undefined') {
+  window.hideFormConfigModal = hideFormConfigModal;
+}
+
+// Show privacy modal
+function showPrivacyModal(onContinue) {
+  const modal = document.getElementById('privacy-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    manageFocusForModal('privacy-modal', true);
+    
+    // Set up continue handler
+    const continueBtn = document.getElementById('privacy-modal-continue');
+    if (continueBtn && onContinue) {
+      continueBtn.onclick = onContinue;
+    }
+  }
+}
+
+// Override placeholder with actual function
+if (typeof window !== 'undefined') {
+  window.showPrivacyModal = showPrivacyModal;
+}
+
+// Hide privacy modal
+// hidePrivacyModal function is now defined in adminPanel-framework.js.html
+
+// Show digital citizenship modal
+function showDigitalCitizenshipModal() {
+  const modal = document.getElementById('digital-citizenship-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    manageFocusForModal('digital-citizenship-modal', true);
+  }
+}
+
+// Hide digital citizenship modal
+function hideDigitalCitizenshipModal() {
+  const modal = document.getElementById('digital-citizenship-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    manageFocusForModal('digital-citizenship-modal', false);
+  }
+}
+
+// Show confirmation modal
+function showConfirmationModal(title, message, onConfirm) {
+  const modal = document.getElementById('confirmation-modal');
+  const titleElement = document.getElementById('modal-title');
+  const messageElement = document.getElementById('modal-message');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  
+  console.log('🔍 showConfirmationModal: 要素検索完了');
+  
+  if (modal && titleElement && messageElement && confirmBtn) {
+    titleElement.textContent = title;
+    messageElement.textContent = message;
+    
+    // 確認ボタンのクリックイベント
+    confirmBtn.onclick = function() {
+      console.log('✅ 確認ボタンがクリックされました');
+      hideConfirmationModal();
+      if (onConfirm) {
+        try {
+          onConfirm();
+        } catch (error) {
+          console.error('❌ 確認コールバック実行エラー:', error);
+        }
+      }
+    };
+    
+    // キャンセルボタンのクリックイベント
+    if (cancelBtn) {
+      cancelBtn.onclick = function() {
+        console.log('❌ キャンセルボタンがクリックされました');
+        hideConfirmationModal();
+      };
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    manageFocusForModal('confirmation-modal', true);
+    console.log('✅ 確認モーダルを表示しました');
+  } else {
+    console.error('❌ モーダル要素が見つかりません。フォールバックを使用します。');
+    // フォールバック: ブラウザ標準の確認ダイアログ
+    if (window.confirm(`${title}\n\n${message}`)) {
+      if (onConfirm) {
+        try {
+          onConfirm();
+        } catch (error) {
+          console.error('❌ フォールバック確認コールバック実行エラー:', error);
+        }
+      }
+    }
+  }
+}
+
+// Hide confirmation modal
+function hideConfirmationModal() {
+  const modal = document.getElementById('confirmation-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    manageFocusForModal('confirmation-modal', false);
+  }
+}
+
+// =============================================================================
+// DYNAMIC CONTENT UPDATES
+// =============================================================================
+
+// Update dynamic content when board is active
+function updateDynamicContent(status) {
+  // Enable buttons that require active state
+  const buttons = [
+    'open-spreadsheet-btn'
+  ];
+  
+  buttons.forEach(buttonId => {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      button.disabled = false;
+      button.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+  });
+}
+
+// Update UI when no sheet is active
+function updateUIForNoActiveSheet(status) {
+  // Disable buttons that require active state
+  const buttons = [
+    // No form buttons to disable since we only support spreadsheets
+  ];
+  
+  buttons.forEach(buttonId => {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      button.disabled = true;
+      button.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+  });
+}
+
+// Update existing user section
+function updateExistingUserSection(status) {
+  // Update any user-specific UI elements
+  if (status.userInfo) {
+    // Update user-specific elements here if needed
+  }
+}
+
+// Update custom form info
+function updateCustomFormInfo(status) {
+  if (status.customFormInfo) {
+    // Update form-related UI elements
+    const formTitle = document.getElementById('form-title-display');
+    const formQuestion = document.getElementById('form-question-display');
+    
+    if (formTitle) {
+      formTitle.textContent = status.customFormInfo.title || 'フォーム未作成';
+    }
+    
+    if (formQuestion) {
+      formQuestion.textContent = status.customFormInfo.mainQuestion || '';
+    }
+  }
+  
+  // フォームURL表示の更新（configJsonから確実に取得）
+  updateFormUrlDisplay(status);
+}
+
+// フォームURL表示を確実に更新
+// Full implementation of updateFormUrlDisplay (framework has minimal version)
+function _fullUpdateFormUrlDisplay(status = null) {
+  const formUrlInput = document.getElementById('form-url-input');
+  const formUrlSection = document.getElementById('form-url-section');
+  const openFormLink = document.getElementById('open-form-url-link');
+
+  if (!formUrlInput) return;
+
+  // 現在のstatusの最適化された取得
+  const currentStatusToUse = status || currentStatus;
+  if (!currentStatusToUse || !currentStatusToUse.userInfo) {
+    logWarn('⚠️ updateFormUrlDisplay: status情報が不足しています');
+    return;
+  }
+
+  // 新しい統一ヘルパー関数からフォームURLを取得
+  const resourceUrls = getActiveResourceUrls(currentStatusToUse);
+  const formUrl = resourceUrls.form;
+
+  // UI更新の最適化
+  if (formUrl) {
+    updateFormUrlElements(formUrlInput, openFormLink, formUrl);
+    handleFormUrlSectionVisibility(formUrlSection);
+    logDebug('🔗 FormURL UI更新完了:', formUrl);
+  } else {
+    clearFormUrlElements(formUrlInput, formUrlSection);
+    logDebug('📭 FormURL未設定のためUI非表示');
+  }
+}
+
+// フォームURL要素更新の最適化
+function updateFormUrlElements(input, link, url) {
+  input.value = url;
+  if (link) {
+    link.href = url;
+  }
+}
+
+// フォームURL要素クリアの最適化
+function clearFormUrlElements(input, section) {
+  input.value = '';
+  if (section) {
+    section.classList.add('hidden');
+  }
+}
+
+// フォームURLセクション表示制御の最適化
+function handleFormUrlSectionVisibility(section) {
+  if (!section) return;
+  
+  const formJustCreated = sessionStorage.getItem('form_just_created');
+  if (formJustCreated === 'true') {
+    section.classList.remove('hidden');
+    logDebug('🆕 新規フォーム作成セクション表示');
+    
+    // フラグクリアの最適化（タイマー処理）
+    setTimeout(() => {
+      sessionStorage.removeItem('form_just_created');
+      logDebug('🧹 フォーム作成フラグクリア');
+    }, 10000);
+  } else {
+    section.classList.add('hidden');
+  }
+}
+
+// Check for auto-publish dialog
+function checkAutoPublishDialog(status) {
+  // Implementation for auto-publish dialog if needed
+  if (status.needsAutoPublish) {
+    // Show auto-publish confirmation
+  }
+}
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+// UI initialization is now handled in adminPanel-framework.js.html
+
+// =============================================================================
+// SHEET SELECTION FUNCTIONALITY  
+// =============================================================================
+
+// シート選択処理中フラグ（重複防止）
+let sheetSelectionInProgress = false;
+
+// Handle sheet selection change (最適化版)
+function handleSheetSelectionChange(event) {
+  const newSelectedSheet = event.target.value;
+
+  // 重複実行防止
+  if (sheetSelectionInProgress) {
+    console.log('📊 Sheet selection already in progress, skipping...');
+    return;
+  }
+
+  // Prevent redundant calls if the selected sheet hasn't actually changed
+  if (newSelectedSheet === lastSelectedSheetName) {
+    console.log('📊 Sheet selection unchanged, skipping redundant processing.');
+    return;
+  }
+  
+  sheetSelectionInProgress = true;
+  console.log('📊 Sheet selection changed: ' + newSelectedSheet);
+  
+  try {
+    // Update global selected sheet variable and last selected sheet
+    selectedSheet = newSelectedSheet;
+    lastSelectedSheetName = newSelectedSheet;
+    
+    if (newSelectedSheet) {
+      console.log('📋 Loading config for sheet:', newSelectedSheet);
+
+      // 履歴復元中は特別な処理を実行
+      if (window._historyRestoreInProgress || window._historyColumnSelections) {
+        console.log('🔄 履歴復元中: 専用の設定読み込み処理を実行します');
+        await _loadConfigForHistoryRestore(newSelectedSheet);
+        updateUIForSelectedSheet();
+        return;
+      }
+
+      // 基本検証
+      if (!currentStatus || !currentStatus.userInfo || !currentStatus.userInfo.spreadsheetId) {
+        console.error('スプレッドシート情報が見つかりません');
+        return;
+      }
+
+      // シート名をサニタイズしてからAPI呼び出し
+      const sanitizedSheetName = newSelectedSheet.replace(/[^\w\s\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF-]/g, '').trim();
+      console.log(`🔄 Sanitized sheet name: "${newSelectedSheet}" → "${sanitizedSheetName}"`);
+
+      // アクティブシートの列データを取得して列選択を更新
+      const effectiveId = _resolveSpreadsheetIdForApi(currentStatus);
+      loadConfigForSelected(sanitizedSheetName, effectiveId)
+        .then(result => {
+          console.log('✅ シート設定読み込み完了:', result);
+          updateUIForSelectedSheet();
+        })
+        .catch(error => {
+          console.error('❌ シート設定読み込み失敗:', error);
+          showMessage('シートの設定読み込みに失敗しました', 'error');
+          updateUIForSelectedSheet();
+        })
+        .finally(() => {
+          // 処理フラグをリセット
+          sheetSelectionInProgress = false;
+        });
+        
+      // 即座にシートをアクティブ化
+      activateSelectedSheet(newSelectedSheet);
+    } else {
+      // シート選択が解除された場合
+      clearColumnSelections();
+      updateUIForSelectedSheet();
+    }
+  } catch (error) {
+    console.error('❌ Sheet selection error:', error);
+  } finally {
+    // 処理フラグをリセット（エラー時も確実に）
+    sheetSelectionInProgress = false;
+  }
+}
+
+// シートを即座にアクティブ化する関数
+/**
+ * シートを即座にアクティブ化し、UI上の選択状態も同期する
+ * @param {string} sheetName - アクティブにするシート名
+ */
+function activateSelectedSheet(sheetName) {
+  if (!sheetName || !currentStatus || !currentStatus.userInfo) {
+    console.warn('⚠️ シートアクティブ化に必要な情報が不足しています');
+    return;
+  }
+
+  console.log(`🎯 シートを即座にアクティブ化: ${sheetName}`);
+  
+  // サーバー側でアクティブシートを設定
+  runGasWithUserId('setActiveSheet', 'シートをアクティブ化中...', sheetName)
+    .then(response => {
+      console.log('✅ シートアクティブ化完了:', response);
+      
+      // currentStatusを更新
+      if (currentStatus.userInfo.configJson) {
+        try {
+          const config = JSON.parse(currentStatus.userInfo.configJson);
+          config.publishedSheetName = sheetName;
+          currentStatus.userInfo.configJson = JSON.stringify(config);
+          currentStatus.activeSheetName = sheetName;
+          
+          // UI上のシート選択状態を更新
+          updateActiveSheetUI(sheetName);
+          
+          console.log('✅ ローカル状態更新完了');
+        } catch (e) {
+          console.warn('⚠️ configJson更新に失敗:', e);
+        }
+      }
+    })
+    .catch(error => {
+      console.error('❌ シートアクティブ化失敗:', error);
+      showMessage('シートのアクティブ化に失敗しました', 'warning');
+    });
+}
+
+// シートドロップダウンのアクティブ表示を更新
+function updateSheetSelectActiveIndicator(activeSheetName) {
+  const select = document.getElementById('sheet-select');
+  if (!select) return;
+  
+  // 全てのオプションからアクティブ表示を削除
+  Array.from(select.options).forEach(option => {
+    if (option.value && option.textContent.includes(' (アクティブ)')) {
+      option.textContent = option.value;
+      option.style.fontWeight = 'normal';
+      option.style.color = '';
+      option.className = '';
+    }
+  });
+  
+  // 新しいアクティブシートに表示を追加
+  const activeOption = Array.from(select.options).find(option => option.value === activeSheetName);
+  if (activeOption) {
+    activeOption.textContent = `${activeSheetName} (アクティブ)`;
+    activeOption.style.fontWeight = 'bold';
+    activeOption.style.color = '#10b981';
+    activeOption.className = 'active-sheet-option';
+  }
+}
+
+// 重複UI更新防止用キャッシュ
+let lastUIUpdateSheet = null;
+let uiUpdateCount = 0;
+
+// 新しい関数: アクティブシートUI更新
+function updateActiveSheetUI(sheetName) {
+  // 重複防止: 同じシートに対する連続更新を制限
+  if (lastUIUpdateSheet === sheetName && uiUpdateCount >= 2) {
+    return; // 重複更新をスキップ
+  }
+  
+  if (lastUIUpdateSheet !== sheetName) {
+    uiUpdateCount = 0; // 新しいシートの場合はカウントリセット
+  }
+  
+  console.log('🔄 updateActiveSheetUI called with:', sheetName);
+  
+  const select = document.getElementById('sheet-select');
+  if (!select) {
+    console.warn('⚠️ Sheet select element not found');
+    return;
+  }
+  
+  // シート選択を更新
+  if (sheetName && select.value !== sheetName) {
+    const normalizedSheetName = sheetName.trim();
+    const availableOptions = Array.from(select.options);
+    const matchingOption = availableOptions.find(option => option.value === normalizedSheetName);
+    
+    if (matchingOption) {
+      select.value = normalizedSheetName;
+      selectedSheet = normalizedSheetName;
+      lastSelectedSheetName = normalizedSheetName;
+      lastUIUpdateSheet = normalizedSheetName;
+      uiUpdateCount++;
+      console.log('✅ Active sheet UI updated:', normalizedSheetName);
+      
+      // アクティブ表示も更新
+      updateSheetSelectActiveIndicator(normalizedSheetName);
+      
+      // UI状態も更新
+      updateUIForSelectedSheet();
+    } else {
+      console.warn('⚠️ Sheet not found in select options:', normalizedSheetName);
+    }
+  }
+}
+
+// 新しい関数: シート選択の再同期
+function refreshSheetSelection() {
+  console.log('🔄 refreshSheetSelection called');
+  
+  // 現在の状態からアクティブシート情報を取得
+  if (window.currentStatus && window.currentStatus.activeSheetName) {
+    updateActiveSheetUI(window.currentStatus.activeSheetName);
+  } else if (selectedSheet) {
+    updateActiveSheetUI(selectedSheet);
+  }
+}
+
+// 列選択をクリアする関数
+function clearColumnSelections() {
+  console.log('🧹 列選択をクリア');
+  
+  const columnSelects = [
+    'opinion-column',
+    'name-column', 
+    'reason-column',
+    'class-column',
+    'timestamp-column'
+  ];
+  
+  columnSelects.forEach(selectId => {
+    const select = document.getElementById(selectId);
+    if (select) {
+      select.innerHTML = '<option value="">-- シートを選択してください --</option>';
+      select.disabled = true;
+    }
+  });
+}
+
+// Load configuration for selected sheet - OPTIMIZED
+// 効率的にAPI用のスプレッドシートIDを解決
+function _resolveSpreadsheetIdForApi(status) {
+  try {
+    const st = status || window.currentStatus || {};
+    // 最優先: userInfo.spreadsheetId（直近の切替を反映）
+    if (st.userInfo && st.userInfo.spreadsheetId) return st.userInfo.spreadsheetId;
+    // 次点: configJson.publishedSpreadsheetId
+    if (st.configJson && st.configJson.publishedSpreadsheetId) return st.configJson.publishedSpreadsheetId;
+    // フォールバック: URLから抽出
+    const url = (st.userInfo && st.userInfo.spreadsheetUrl) || (st.appUrls && st.appUrls.spreadsheetUrl) || null;
+    if (url) {
+      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      if (m && m[1]) return m[1];
+    }
+  } catch (e) {
+    console.warn('⚠️ _resolveSpreadsheetIdForApi failed:', e.message);
+  }
+  return null;
+}
+
+// 代替候補のID（userInfoとconfigJsonを入れ替え）
+function _resolveAltSpreadsheetId(status, primaryId) {
+  const st = status || window.currentStatus || {};
+  const cand1 = st.configJson && st.configJson.publishedSpreadsheetId;
+  const cand2 = st.userInfo && st.userInfo.spreadsheetId;
+  if (cand1 && cand1 !== primaryId) return cand1;
+  if (cand2 && cand2 !== primaryId) return cand2;
+  return null;
+}
+
+function loadConfigForSelected(sheetName, spreadsheetId, retryCount = 0, maxRetries = 3) {
+  console.log('📋 Loading config for: ' + sheetName);
+
+  // 足りない場合はその場で解決
+  if (!spreadsheetId) {
+    spreadsheetId = _resolveSpreadsheetIdForApi(window.currentStatus);
+  }
+
+  if (!spreadsheetId || !sheetName) {
+    console.error('スプレッドシート情報が不足しています。');
+    return Promise.reject(new Error('スプレッドシート情報が不足しています'));
+  }
+
+  return new Promise((resolve, reject) => {
+
+  // Check if fresh save protection is active - skip cache if so
+  const timeSinceFreshSave = Date.now() - (window.freshSaveTimestamp || 0);
+  const isFreshSaveActive = timeSinceFreshSave < 30000; // 30 seconds
+  
+    // Check if we already have sheet details from integrated API
+    if (!isFreshSaveActive && currentStatus && currentStatus.sheetDetails && 
+        currentStatus.activeSheetName === sheetName && currentStatus.sheetDetails.allHeaders && currentStatus.sheetDetails.allHeaders.length > 0) {
+      console.log('⚡ Using cached sheet details from integrated API');
+      try {
+        populateHeaderOptions(currentStatus.sheetDetails.allHeaders);
+        console.log('✅ Header options populated from cache');
+        populateConfig(currentStatus.sheetDetails.guessedConfig);
+        console.log('✅ AI configuration applied from cache');
+        resolve({ source: 'cache', headers: currentStatus.sheetDetails.allHeaders, config: currentStatus.sheetDetails.guessedConfig });
+        return; // Early return - no API call needed
+      } catch (error) {
+        console.error('Error in cached config population:', error);
+        // Fall through to API call if cache fails
+      }
+    }
+
+  // Force fresh API call if fresh save protection is active or cache unavailable
+  if (isFreshSaveActive) {
+    console.log('🔄 Fresh save protection active - forcing API call for latest data');
+  } else {
+    console.log('📞 Making API call for sheet details:', sheetName);
+  }
+  
+    runGasWithUserId('getSheetDetails', 'シート情報を取得中...', spreadsheetId, sheetName)
+      .then(function(details) {
+        console.log('✅ Sheet details loaded via API:', details);
+        
+        // If headers are empty, and we have retries left, try again after a delay
+        if (details && (!details.allHeaders || details.allHeaders.length === 0) && retryCount < maxRetries) {
+          console.warn(`⚠️ No headers found for ${sheetName}. Retrying in 2 seconds... (Attempt ${retryCount + 1}/${maxRetries})`);
+          showMessage(`シート情報を再取得中... (${retryCount + 1}/${maxRetries})`, 'info');
+          setTimeout(() => {
+            loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries)
+              .then(resolve)
+              .catch(reject);
+          }, 2000); // Retry after 2 seconds
+          return;
+        }
+
+        try {
+          // 1) ヘッダー一覧をUIへ反映
+          populateHeaderOptions(details.allHeaders);
+          console.log('✅ Header options populated from API');
+
+          // 2) 履歴復元中はAI推定の上書きを避ける（列選択を再適用）
+          if (window._historyRestoreInProgress) {
+            console.log('🛡️ 履歴復元中: AI推定の適用をスキップし、履歴の列選択を再適用します');
+            const sel = window._historyColumnSelections || {};
+            const applyIf = (id, val) => {
+              if (!val) return;
+              const el = document.getElementById(id);
+              if (el) el.value = val;
+            };
+            applyIf('opinionHeader', sel.opinionColumn);
+            applyIf('name-column', sel.nameColumn);
+            applyIf('class-column', sel.classColumn);
+            applyIf('reason-column', sel.reasonColumn);
+            // 一度適用したらクリア
+            window._historyColumnSelections = null;
+          } else {
+            // 通常時はAI推定を適用
+            populateConfig(details.guessedConfig);
+            console.log('✅ AI configuration applied from API');
+          }
+          if (retryCount > 0) {
+            showMessage('✅ シート情報が正常に読み込まれました！', 'success');
+          }
+          resolve({ source: 'api', headers: details.allHeaders, config: details.guessedConfig });
+        } catch (error) {
+          console.error('Error in API config population sequence:', error);
+          showMessage('設定の適用中にエラーが発生しました', 'error');
+          reject(error);
+        }
+      })
+      .catch(function(error) {
+        console.error('Failed to load sheet config via API:', error);
+        
+        // より詳細なエラーメッセージの表示
+        let errorMessage = 'シート設定の読み込みに失敗しました';
+        
+        if (error && error.message) {
+          if (error.message.includes('が見つかりません')) {
+            errorMessage = `指定されたシート "${sheetName}" が見つかりません。`;
+          } else if (error.message.includes('ヘッダーが見つかりません')) {
+            errorMessage = `シート "${sheetName}" の1行目にヘッダーが見つかりません。`;
+          } else if (error.message.includes('アクセス権限')) {
+            errorMessage = 'スプレッドシートへのアクセス権限がありません。管理者にお問い合わせください。';
+          } else if (error.message.includes('SheetsService')) {
+            errorMessage = 'Google Sheets APIサービスでエラーが発生しました。しばらく時間をおいて再試行してください。';
+          } else {
+            errorMessage = `エラーの詳細: ${error.message}`;
+          }
+        }
+        
+        // フォールバック試行: spreadsheetIdを省略（サーバー側の既定スプレッドシート）
+        const maybeNotFound = error && (error.message.includes('が見つかりません') || error.message.includes('Unable to parse range'));
+        if (maybeNotFound && spreadsheetId && retryCount === 0) {
+          // 代替のスプレッドシートIDで再試行（サーバー側フォールバックに依存しない）
+          const altId = _resolveAltSpreadsheetId(window.currentStatus, spreadsheetId);
+          if (altId) {
+            console.warn('⚠️ Fallback: Retrying getSheetDetails with alt spreadsheetId');
+            return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', altId, sheetName)
+              .then(details => {
+                try {
+                  populateHeaderOptions(details.allHeaders);
+                  console.log('✅ Header options populated from fallback API');
+                  if (window._historyRestoreInProgress) {
+                    const sel = window._historyColumnSelections || {};
+                    const applyIf = (id, val) => {
+                      if (!val) return;
+                      const el = document.getElementById(id);
+                      if (el) el.value = val;
+                    };
+                    applyIf('opinionHeader', sel.opinionColumn);
+                    applyIf('name-column', sel.nameColumn);
+                    applyIf('class-column', sel.classColumn);
+                    applyIf('reason-column', sel.reasonColumn);
+                    window._historyColumnSelections = null;
+                  } else {
+                    populateConfig(details.guessedConfig);
+                    console.log('✅ AI configuration applied from fallback API');
+                  }
+                  resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
+                } catch (err2) {
+                  console.error('Error in fallback config population sequence:', err2);
+                  showMessage('設定の適用中にエラーが発生しました', 'error');
+                  reject(err2);
+                }
+              })
+              .catch(err2 => {
+                console.warn('Fallback getSheetDetails also failed:', err2);
+                showMessage(errorMessage, 'error');
+                // After fallback failure, proceed with normal retry handling below
+                // Intentionally no return here to fall through to retry logic
+              });
+          }
+          // altIdがなければ従来のフォールバック（サーバ側既定）
+          console.warn('⚠️ Fallback: Retrying getSheetDetails without spreadsheetId');
+          return runGasWithUserId('getSheetDetails', 'シート情報を再取得中...', null, sheetName)
+              .then(details => {
+                try {
+                  populateHeaderOptions(details.allHeaders);
+                  console.log('✅ Header options populated from fallback API');
+                if (window._historyRestoreInProgress) {
+                  const sel = window._historyColumnSelections || {};
+                  const applyIf = (id, val) => {
+                    if (!val) return;
+                    const el = document.getElementById(id);
+                    if (el) el.value = val;
+                  };
+                  applyIf('opinionHeader', sel.opinionColumn);
+                  applyIf('name-column', sel.nameColumn);
+                  applyIf('class-column', sel.classColumn);
+                  applyIf('reason-column', sel.reasonColumn);
+                  window._historyColumnSelections = null;
+                } else {
+                  populateConfig(details.guessedConfig);
+                  console.log('✅ AI configuration applied from fallback API');
+                }
+                resolve({ source: 'api-fallback', headers: details.allHeaders, config: details.guessedConfig });
+              } catch (err2) {
+                console.error('Error in fallback config population sequence:', err2);
+                showMessage('設定の適用中にエラーが発生しました', 'error');
+                reject(err2);
+              }
+            })
+            .catch(err2 => {
+              console.warn('Fallback getSheetDetails also failed:', err2);
+              showMessage(errorMessage, 'error');
+              // After fallback failure, proceed with normal retry handling below
+              // Intentionally no return here to fall through to retry logic
+            });
+        }
+
+        showMessage(errorMessage, 'error');
+        
+        // エラー時のリトライオプションを提供
+        if (retryCount < maxRetries) {
+          setTimeout(() => {
+            const retryButton = document.createElement('button');
+            retryButton.textContent = '再試行';
+            retryButton.className = 'ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600';
+            retryButton.onclick = () => {
+              retryButton.remove();
+              loadConfigForSelected(sheetName, spreadsheetId, retryCount + 1, maxRetries)
+                .then(resolve)
+                .catch(reject);
+            };
+            
+            const messageElement = document.querySelector('.message');
+            if (messageElement) {
+              messageElement.appendChild(retryButton);
+            }
+          }, 1000);
+        } else {
+          reject(error);
+        }
+      });
+  }); // Promise終了
+}
+
+
+// =============================================================================
+// SETUP STATUS HANDLING FUNCTIONS
+// =============================================================================
+
+/**
+ * userInfoからsetupStatusを安全に取得
+ * @param {Object} userInfo - ユーザー情報オブジェクト
+ * @returns {string} setupStatus ('pending', 'completed', 'error')
+ */
+function getSetupStatusFromUserInfo(userInfo) {
+  try {
+    if (!userInfo || !userInfo.configJson) {
+      return 'pending'; // ユーザー情報がない場合はセットアップ未完了とみなす
+    }
+
+    const config = typeof userInfo.configJson === 'string'
+      ? JSON.parse(userInfo.configJson)
+      : userInfo.configJson;
+
+    // setupStatusが明示的に設定されている場合はそれを使用
+    if (config.setupStatus) {
+      console.log('🔧 configJson setupStatus:', config.setupStatus);
+      return config.setupStatus;
+    }
+    
+    // setupStatusがない場合、他のフィールドから推測（循環参照回避）
+    // Note: この推測ロジックは循環参照を避けるため、formUrlベースに変更
+    if (config.formCreated === true && config.formUrl && config.formUrl.trim()) {
+      return 'completed';
+    }
+    
+    return 'pending';
+    
+  } catch (error) {
+    console.warn('getSetupStatusFromUserInfo JSON解析エラー:', error.message);
+    return 'pending'; // エラー時はセットアップ未完了とみなす
+  }
+}
+
+
+/**
+ * 初期表示要素をクリアして適切なドメイン表示に切り替え
+ */
+function clearInitialDisplayElements() {
+  // 初期表示を非表示にして、適切なドメイン表示に切り替え
+  const initialContainer = document.getElementById('header-domain-initial');
+  if (initialContainer) {
+    initialContainer.style.display = 'none';
+    console.log('✅ 初期ドメイン表示を非表示');
+  }
+  
+  // 適切なドメイン情報を表示
+  showAppropriateHeaderStatus();
+  
+  // 既存のセットアップガイドのみ削除
+  const existingGuides = [
+    document.getElementById('setup-pending-guide'),
+    document.querySelector('.setup-guide')
+  ];
+  
+  existingGuides.forEach(guide => {
+    if (guide) {
+      guide.remove();
+      console.log('✅ 既存セットアップガイドを削除');
+    }
+  });
+}
+
+/**
+ * ヘッダーに適切なステータス表示を設定
+ */
+function showAppropriateHeaderStatus() {
+  // ドメイン一致表示（仮）を表示
+  const domainMatch = document.getElementById('header-domain-match');
+  const domainMismatch = document.getElementById('header-domain-mismatch');
+  
+  if (domainMatch && domainMismatch) {
+    // 現在はドメイン一致として表示（実際のドメインチェックは別途実装）
+    domainMatch.style.display = 'block';
+    domainMismatch.style.display = 'none';
+    
+    // ドメイン名を適切に設定
+    const domainText = document.getElementById('header-domain-match-text');
+    if (domainText) {
+      domainText.textContent = 'naha-okinawa.ed.jp'; // cspell:disable-line
+    }
+    
+    console.log('✅ ドメイン一致表示を有効化');
+  }
+}
+
+/**
+ * セットアップ状況に応じてボタン状態を更新
+ * @param {Object} status - ステータスオブジェクト
+ */
+function updateButtonStatesForSetup(status) {
+  // より穏やかなUI制御（セットアップ無効化ではなく、適切なガイダンス）
+
+  // 最低限無効化すべき公開関連ボタンのみ
+  const criticalPublishButtons = [
+    'save-publish-btn',
+    'unpublish-board-btn'
+  ];
+  
+  criticalPublishButtons.forEach(buttonId => {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      // データが不足している場合のみ無効化
+      const hasSpreadsheet = status.userInfo && status.userInfo.spreadsheetId;
+      const hasActiveSheet = status.activeSheetName;
+      
+      if (!hasSpreadsheet || !hasActiveSheet) {
+        button.disabled = true;
+        button.classList.add('opacity-75');
+        button.title = '先にデータソースとシートを設定してください';
+      } else {
+        button.disabled = false;
+        button.classList.remove('opacity-75');
+        button.title = '';
+      }
+    }
+  });
+  
+  console.log('✅ ボタン状態を適切に更新しました');
+}
+
+
+/**
+ * 基本的な静的UI要素のみ更新
+ * @param {Object} status - ステータスオブジェクト
+ */
+function updateBasicStaticUI(status) {
+  // ユーザー情報など最低限の情報のみ更新
+  if (status.userInfo) {
+    // 既存のupdateDatabaseInfo関数を使用して重複を避ける
+    updateDatabaseInfo(status);
+  }
+}
+
+// Update system status display
+/**
+ * 現在アクティブなすべてのリソースURLを取得し、統一されたオブジェクトとして返す。
+ * @param {object} status - 最新のシステムステータスオブジェクト
+ * @returns {object} - 各リソースのURLを格納したオブジェクト
+ */
+function getActiveResourceUrls(status) {
+  const urls = {
+    spreadsheet: null,
+    folder: null,
+    form: null,
+    editForm: null
+  };
+
+  if (!status || !status.userInfo) {
+    console.log('getActiveResourceUrls: status or userInfo missing', status); // Gemini Debug
+    return urls; // ユーザー情報がなければ空のURLを返す
+  }
+
+  // 1. スプレッドシートURLの取得（複数ソースから確保）
+  urls.spreadsheet = status.userInfo.spreadsheetUrl || 
+                     status.appUrls?.spreadsheetUrl ||
+                     (typeof currentSpreadsheetUrl !== 'undefined' ? currentSpreadsheetUrl : null);
+  
+  console.log('📊 Spreadsheet URL determination:', {
+    fromUserInfo: status.userInfo.spreadsheetUrl || 'none',
+    fromAppUrls: status.appUrls?.spreadsheetUrl || 'none', 
+    fromGlobal: (typeof currentSpreadsheetUrl !== 'undefined' ? currentSpreadsheetUrl : 'none'),
+    final: urls.spreadsheet
+  });
+
+  // 2. configJsonの解析 (一度だけ実行)
+  let config = {};
+  if (status.userInfo.configJson) {
+    try {
+      config = typeof status.userInfo.configJson === 'string' 
+        ? JSON.parse(status.userInfo.configJson) 
+        : status.userInfo.configJson;
+      console.log('getActiveResourceUrls: configJson parsed:', config); // Gemini Debug
+    } catch (e) {
+      console.warn("configJsonの解析に失敗しました", e);
+    }
+  }
+
+  // 3. フォルダURLの取得 (configJsonから、またはfolderId から構築)
+  urls.folder = config.folderUrl || null;
+  
+  // フォルダURLが設定されていない場合、folderIdから構築を試行
+  if (!urls.folder && config.folderId) {
+    const safeFolderId = String(config.folderId || '');
+    urls.folder = 'https://drive.google.com/drive/folders/' + safeFolderId;
+    console.log('📁 Folder URL constructed from folderId:', urls.folder);
+  }
+
+  // 4. フォームURLの取得 (configJsonから、公開シートを優先)
+  const publishedSheetName = config.publishedSheetName;
+  if (publishedSheetName) {
+    const sheetConfig = config['sheet_' + String(publishedSheetName || '')];
+    if (sheetConfig) {
+      urls.form = sheetConfig.formUrl || urls.form;
+      urls.editForm = sheetConfig.editFormUrl || urls.editForm;
+    }
+  }
+  
+  // フォールバック: 複数ソースからフォームURL取得
+  if (!urls.form) {
+    urls.form = config.formUrl || 
+                status.userInfo.formUrl ||
+                status.appUrls?.formUrl ||
+                null;
+  }
+  
+  if (!urls.editForm) {
+    urls.editForm = config.editFormUrl || 
+                    status.userInfo.editFormUrl ||
+                    status.appUrls?.editFormUrl ||
+                    (urls.form ? urls.form.replace('/viewform', '/edit') : null);
+  }
+  
+  console.log('📋 Form URL determination:', {
+    form: urls.form || 'none',
+    editForm: urls.editForm || 'none',
+    fromConfig: !!config.formUrl,
+    fromUserInfo: !!status.userInfo.formUrl,
+    fromAppUrls: !!status.appUrls?.formUrl
+  });
+
+  return urls;
+}
+
+/**
+ * シート名の正規化処理
+ */
+function _normalizeSheetName(sheetName) {
+  if (!sheetName) return '';
+  
+  return sheetName
+    .trim()
+    .replace(/\s+/g, ' ')  // 複数の空白を1つに
+    .replace(/[\u3000]/g, ' ')  // 全角空白を半角に
+    .toLowerCase();
+}
+
+/**
+ * 履歴復元時専用の設定読み込み処理
+ */
+async function _loadConfigForHistoryRestore(sheetName) {
+  try {
+    console.log('📝 履歴復元用設定読み込み開始:', sheetName);
+    
+    // 履歴復元フラグを一時的に無効化して設定読み込み
+    const originalRestoreFlag = window._historyRestoreInProgress;
+    const originalColumnSelections = window._historyColumnSelections;
+    
+    window._historyRestoreInProgress = false;
+    window._historyColumnSelections = null;
+    
+    // 設定読み込み実行（強制読み込みフラグ付き）
+    const result = await loadConfigForSelected(sheetName, null, 0, 3, true);
+    
+    // フラグを元に戻す
+    window._historyRestoreInProgress = originalRestoreFlag;
+    window._historyColumnSelections = originalColumnSelections;
+    
+    console.log('✅ 履歴復元用設定読み込み完了:', result);
+    
+    // 履歴データの列設定を再適用
+    if (window._historyColumnSelections) {
+      console.log('🔄 履歴の列設定を再適用中...');
+      _applyHistoryColumnSettings(window._historyColumnSelections);
+    }
+    
+  } catch (error) {
+    console.error('❌ 履歴復元用設定読み込みエラー:', error);
+  }
+}
+
+/**
+ * 履歴の列設定をDOMに再適用
+ */
+function _applyHistoryColumnSettings(columnSelections) {
+  try {
+    // DOM要素への値設定
+    if (columnSelections.opinionHeader) {
+      const opinionEl = document.getElementById('opinionHeader');
+      if (opinionEl) {
+        opinionEl.value = columnSelections.opinionHeader;
+        console.log('✅ Opinion header reapplied:', columnSelections.opinionHeader);
+      }
+    }
+    
+    if (columnSelections.nameColumn) {
+      const nameEl = document.getElementById('name-column');
+      if (nameEl) {
+        nameEl.value = columnSelections.nameColumn;
+        console.log('✅ Name column reapplied:', columnSelections.nameColumn);
+      }
+    }
+    
+    if (columnSelections.classColumn) {
+      const classEl = document.getElementById('class-column');
+      if (classEl) {
+        classEl.value = columnSelections.classColumn;
+        console.log('✅ Class column reapplied:', columnSelections.classColumn);
+      }
+    }
+    
+    if (columnSelections.reasonHeader) {
+      const reasonEl = document.getElementById('reasonHeader');
+      if (reasonEl) {
+        reasonEl.value = columnSelections.reasonHeader;
+        console.log('✅ Reason header reapplied:', columnSelections.reasonHeader);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ 履歴列設定再適用エラー:', error);
+  }
+}
+
+function updateSystemStatusDisplay(status) {
+  console.log('--- Entering updateSystemStatusDisplay ---'); // Gemini Debug
+  if (!status) return;
+
+  // すべてのリソースURLを一括取得
+  console.log('Calling getActiveResourceUrls...'); // Gemini Debug
+  const resourceUrls = getActiveResourceUrls(status);
+  console.log('resourceUrls received:', resourceUrls); // Gemini Debug
+
+  // Update publish status
+  const publishIndicator = document.getElementById('info-publish-indicator');
+  const publishText = document.getElementById('info-publish-text');
+
+  if (status.isPublished) {
+    publishIndicator.className = 'w-2 h-2 rounded-full bg-green-400';
+    publishText.textContent = '公開中';
+  } else {
+    publishIndicator.className = 'w-2 h-2 rounded-full bg-gray-400';
+    publishText.textContent = '非公開';
+  }
+
+  // Update other status fields
+  document.getElementById('info-published-sheet').textContent = status.sheetName || '-';
+  document.getElementById('info-display-mode').textContent = status.displayMode || '-';
+  document.getElementById('info-show-counts').textContent = status.showCounts ? '表示' : '非表示';
+
+  // Enable resource buttons if URLs are available
+  const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+  if (spreadsheetBtn) {
+    spreadsheetBtn.disabled = !resourceUrls.spreadsheet;
+    if (resourceUrls.spreadsheet) {
+      spreadsheetBtn.onclick = () => window.open(resourceUrls.spreadsheet, '_blank');
+      spreadsheetBtn.title = 'スプレッドシートを開く';
+    } else {
+      spreadsheetBtn.title = 'スプレッドシートURLが未設定です';
+    }
+  }
+
+  // フォームボタンの有効化
+  const formBtn = document.getElementById('open-form-btn');
+  if (formBtn) {
+    formBtn.disabled = false;
+    formBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    if (resourceUrls.form) {
+      formBtn.onclick = () => window.open(resourceUrls.form, '_blank');
+      formBtn.title = 'フォームを開く';
+    } else {
+      formBtn.onclick = () => showMessage('フォームURLが未設定です。フォームを作成してください。', 'warning');
+      formBtn.title = 'フォームURLが未設定です。フォームを作成してください。';
+    }
+  }
+
+  // Handle generic resource button in Step 1 (any resource)
+  const resourceBtn = document.getElementById('add-resource-btn');
+  if (resourceBtn) {
+    const anyResourceUrl = resourceUrls.spreadsheet || resourceUrls.folder || resourceUrls.form || resourceUrls.editForm;
+    resourceBtn.disabled = false;
+    if (anyResourceUrl) {
+      resourceBtn.onclick = () => window.open(anyResourceUrl, '_blank');
+      resourceBtn.title = 'リソースを開く';
+    } else {
+      resourceBtn.onclick = () => showMessage('リソースURLが未設定です', 'warning');
+      resourceBtn.title = 'リソースURLが未設定です';
+    }
+  }
+
+  // Handle new resource buttons
+  console.log('resourceUrls:', resourceUrls); // Gemini Debug
+  updateNewResourceButtons(resourceUrls);
+}
+
+// Navigate to specific step
+// navigateToStep function is now defined in adminPanel-framework.js.html
+
+
+// セットアップ状況をグローバルステータスから取得
+
+
+
+
+// Validate configuration
+function validateConfiguration() {
+  if (!currentConfig || !currentConfig.columnMappings) return false;
+  
+  const mappings = currentConfig.columnMappings;
+  const hasContent = Object.values(mappings).includes('content');
+  const hasAuthor = Object.values(mappings).includes('author');
+  
+  return hasContent && hasAuthor;
+}
+
+
+// =============================================================================
+// HISTORY MANAGEMENT FUNCTIONS
+// =============================================================================
+
+// 履歴管理の定数
+const HISTORY_STORAGE_KEY = 'answerBoardHistory';
+const MAX_HISTORY_ITEMS = 50;
+
+/**
+ * 回答ボードの履歴を保存
+ * @param {Object} historyItem - 保存する履歴アイテム
+ */
+function saveToHistory(historyItem) {
+  try {
+    if (!historyItem || !historyItem.questionText) {
+      logWarn('Invalid history item, skipping save');
+      return;
+    }
+
+    const history = getHistoryFromStorage();
+    
+    // AI列判定結果を含む拡張された履歴アイテムを作成
+    const newItem = {
+      id: generateHistoryId(),
+      timestamp: new Date().toISOString(),
+      publishedAt: historyItem.publishedAt || new Date().toISOString(),
+      publishedEndAt: historyItem.publishedEndAt || null,
+      // 新しいフィールド: 終了関連
+      endTime: historyItem.endTime || null, // 実際の終了日時（終了時に記録）
+      scheduledEndTime: historyItem.scheduledEndTime || null, // 予定終了日時
+      questionText: historyItem.questionText,
+      sheetName: historyItem.sheetName || '',
+      answerCount: historyItem.answerCount || 0,
+      reactionCount: historyItem.reactionCount || 0,
+      config: historyItem.config || {},
+      formUrl: historyItem.formUrl || '',
+      spreadsheetUrl: historyItem.spreadsheetUrl || '',
+      setupType: historyItem.setupType || 'unknown', // クイックスタート、カスタムセットアップ、外部リソースを識別
+      isActive: historyItem.isActive || false, // 現在公開中かどうか
+      displayMode: historyItem.displayMode || 'named',
+      countDisplay: historyItem.countDisplay || 'show',
+      status: historyItem.status || 'published',
+      
+      // AI列判定結果の保存（復元時に必要）
+      sheetDetails: {
+        allHeaders: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [],
+        guessedConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {},
+        existingConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.existingConfig) || {}
+      },
+      
+      // 復元に必要な追加情報
+      activeSheetName: (currentStatus && currentStatus.activeSheetName) || historyItem.sheetName,
+      spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
+      
+      // 保存時点での設定完了状態
+      configurationComplete: !!(currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader),
+      
+      // Simple format for quick display
+      format: (() => {
+        const cfg = historyItem.config || (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {};
+        if (cfg.multipleChoice || cfg.allowMultipleAnswers || (cfg.formElements && cfg.formElements.some(e => e.type === 'checkbox'))) return 'multi';
+        if (cfg.singleChoice || cfg.choices || cfg.options || (cfg.formElements && cfg.formElements.some(e => e.type === 'radio' || e.type === 'select'))) return 'select';
+        return 'text';
+      })()
+    };
+    
+    history.unshift(newItem);
+    
+    // 最大数を超えた場合は過去のものを削除
+    if (history.length > MAX_HISTORY_ITEMS) {
+      history.splice(MAX_HISTORY_ITEMS);
+    }
+    
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+    logDebug('Enhanced history saved:', newItem);
+    
+    // サーバーサイドに同期（非同期、エラーハンドリング付き）
+    syncHistoryToServer(newItem).then(result => {
+      if (result.status === 'error') {
+        logWarn('Server sync failed after retries:', result.message);
+        // サーバー同期失敗をユーザーに通知（オプション）
+        if (typeof showMessage === 'function' && result.retryCount > 2) {
+          showMessage('⚠️ サーバーへの同期に失敗しましたが、ローカルには保存されました', 'warning');
+        }
+      } else {
+        logDebug('Server sync completed successfully');
+      }
+    }).catch(error => {
+      logError('Unexpected error in server sync:', error);
+    });
+    
+    // UI を更新
+    if (window.AdminPanel?.historyManager?.loadSimpleHistoryTable) {
+      window.AdminPanel.historyManager.loadSimpleHistoryTable();
+    } else {
+      console.warn('⚠️ History manager not available for UI update');
+    }
+    
+  } catch (error) {
+    logWarn('Failed to save history:', error);
+  }
+}
+
+/**
+ * 履歴をサーバーサイドに同期
+ * @param {Object} historyItem - 同期する履歴アイテム
+ */
+async function syncHistoryToServer(historyItem, retryCount = 0) {
+  const MAX_RETRIES = 1; // 2→1に削減でパフォーマンス向上
+  
+  try {
+    if (!historyItem || !historyItem.id) {
+      logWarn('Invalid history item for server sync:', historyItem);
+      return { status: 'error', message: 'Invalid history item' };
+    }
+    
+    logDebug('Syncing history to server (attempt ' + (retryCount + 1) + '):', historyItem.questionText);
+    
+    // 軽量タイムアウトでサーバー同期を実行  
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Server sync timeout')), 15000); // 30s→15sに短縮
+    });
+    
+    // 送信ペイロードを軽量化（サーバ側でさらにサニタイズ）
+    const compact = {
+      id: historyItem.id,
+      questionText: (historyItem.questionText || '').slice(0, 140),
+      sheetName: historyItem.sheetName || '',
+      publishedAt: historyItem.publishedAt || new Date().toISOString(),
+      endTime: historyItem.endTime || null,
+      scheduledEndTime: historyItem.scheduledEndTime || null,
+      isActive: !!historyItem.isActive,
+      // 表示モードはテキストで簡素化
+      displayMode: historyItem.displayMode || (historyItem.config && historyItem.config.displayMode) || 'named',
+      status: historyItem.status || 'published',
+      spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
+      answerCount: historyItem.answerCount || 0,
+      reactionCount: historyItem.reactionCount || 0,
+      setupType: historyItem.setupType || 'custom',
+      // 簡易フォーマット（テキスト/選択/複数）
+      format: (function deriveFormat() {
+        const cfg = historyItem.config || (historyItem.sheetDetails && historyItem.sheetDetails.guessedConfig) || {};
+        if (cfg.multipleChoice || cfg.allowMultipleAnswers || (cfg.formElements && cfg.formElements.some(e => e.type === 'checkbox'))) return 'multi';
+        if (cfg.singleChoice || cfg.choices || cfg.options || (cfg.formElements && cfg.formElements.some(e => e.type === 'radio' || e.type === 'select'))) return 'select';
+        return 'text';
+      })()
+    };
+    const syncPromise = runGasWithUserId('saveHistoryToSheetAPI', false, compact);
+    const response = await Promise.race([syncPromise, timeoutPromise]);
+    
+    if (response && response.status === 'success') {
+      logDebug('History synced to server successfully');
+      return { status: 'success', message: 'Server sync completed' };
+    } else {
+      const errorMsg = (response && response.message) || 'Unknown server error';
+      logWarn('Server history sync failed:', errorMsg);
+      
+      // リトライロジック
+      if (retryCount < MAX_RETRIES) {
+        logDebug('Retrying server sync in 2 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return await syncHistoryToServer(historyItem, retryCount + 1);
+      }
+      
+      return { status: 'error', message: errorMsg, retryCount: retryCount + 1 };
+    }
+  } catch (error) {
+    const errorMsg = error.message || 'Server sync failed';
+    logWarn('Failed to sync history to server:', errorMsg);
+    
+    // リトライロジック
+    if (retryCount < MAX_RETRIES && !errorMsg.includes('timeout')) {
+      logDebug('Retrying server sync due to error in 2 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return await syncHistoryToServer(historyItem, retryCount + 1);
+    }
+    
+    return { status: 'error', message: errorMsg, retryCount: retryCount + 1 };
+  }
+}
+
+/**
+ * 履歴を localStorage から取得
+ * @returns {Array} 履歴配列
+ */
+function getHistoryFromStorage() {
+  try {
+    const historyJson = localStorage.getItem(HISTORY_STORAGE_KEY);
+    return historyJson ? JSON.parse(historyJson) : [];
+  } catch (error) {
+    logWarn('Failed to parse history from storage:', error);
+    return [];
+  }
+}
+
+/**
+ * 履歴を localStorage に保存
+ * @param {Array} historyArray 保存する履歴配列
+ */
+function saveHistoryToStorage(historyArray) {
+  try {
+    const safe = Array.isArray(historyArray) ? historyArray : [];
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(safe));
+  } catch (error) {
+    logWarn('Failed to save history to storage:', error);
+  }
+}
+
+/**
+ * サーバーサイドとローカルストレージの履歴を統合
+ * @returns {Promise<Array>} 統合された履歴配列
+ */
+async function getMergedHistory() {
+  try {
+    // ローカルストレージから取得（検証付き）
+    let localHistory = [];
+    try {
+      localHistory = getHistoryFromStorage();
+      if (!Array.isArray(localHistory)) {
+        logWarn('Local history is not an array, resetting to empty');
+        localHistory = [];
+      }
+    } catch (localError) {
+      logWarn('Failed to load local history:', localError);
+      localHistory = [];
+    }
+    
+    // サーバーサイドから取得（タイムアウト付き）
+    let serverHistory = [];
+    try {
+      logDebug('Loading server history...');
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Server history timeout')), 8000); // 15s→8sに短縮
+      });
+      
+      const historyPromise = runGasWithUserId('getHistoryFromServerAPI', false);
+      const response = await Promise.race([historyPromise, timeoutPromise]);
+      
+      if (response && response.status === 'success') {
+        if (Array.isArray(response.historyArray)) {
+          serverHistory = response.historyArray.filter(item => item && item.id); // 軽量検証
+          if (serverHistory.length > 0) logDebug('Server history loaded:', serverHistory.length, 'items');
+        } else {
+          logWarn('Server response historyArray is not an array');
+        }
+      } else {
+        logWarn('Server history response failed:', (response && response.message) || 'Unknown error');
+      }
+    } catch (serverError) {
+      if (serverError.message.includes('timeout')) {
+        logWarn('Server history request timed out, using local only');
+      } else {
+        logWarn('Failed to load server history:', serverError.message);
+      }
+    }
+    
+    // 改善された統合処理：formId基準で重複排除し、詳細情報を保持
+    const mergedMap = new Map(); // formId -> merged item
+    const idMap = new Map(); // id -> merged item (for final deduplication)
+    let totalItems = 0;
+    
+    // Helper function to merge two history items
+    const mergeHistoryItems = (existing, newItem, source) => {
+      if (!existing) return Object.assign({}, newItem, { source });
+      
+      // Prefer server data for basic info, but preserve local sheetDetails
+      const merged = Object.assign({}, newItem, { source });
+      
+      // Preserve detailed local information if available
+      if (existing.sheetDetails && (!merged.sheetDetails || Object.keys(existing.sheetDetails).length > Object.keys(merged.sheetDetails || {}).length)) {
+        merged.sheetDetails = existing.sheetDetails;
+        logDebug('Preserved local sheetDetails for formId:', newItem.formId);
+      }
+      
+      // Preserve format information if available
+      if (existing.format && !merged.format) {
+        merged.format = existing.format;
+      }
+      
+      return merged;
+    };
+    
+    // First pass: collect all items by formId
+    [...localHistory, ...serverHistory].forEach((item, index) => {
+      if (!item || !item.id) return;
+      
+      const isLocal = index < localHistory.length;
+      const source = isLocal ? 'local' : 'server';
+      
+      // Use formId for primary deduplication, fallback to id
+      const key = item.formId || item.id;
+      const existing = mergedMap.get(key);
+      
+      if (existing) {
+        // Merge with existing item
+        const merged = mergeHistoryItems(existing, item, source);
+        mergedMap.set(key, merged);
+        logDebug(`Merged duplicate formId: ${key} (${source})`);
+      } else {
+        // New item
+        mergedMap.set(key, Object.assign({}, item, { source }));
+      }
+      totalItems++;
+    });
+    
+    // Second pass: final deduplication by ID (in case formId wasn't unique enough)
+    mergedMap.forEach((item) => {
+      if (idMap.has(item.id)) {
+        const existing = idMap.get(item.id);
+        const merged = mergeHistoryItems(existing, item, item.source);
+        idMap.set(item.id, merged);
+        logDebug(`Final deduplication for ID: ${item.id}`);
+      } else {
+        idMap.set(item.id, item);
+      }
+    });
+    
+    // 軽量ソート（最終的にidMapからソート）
+    const mergedArray = Array.from(idMap.values()).sort((a, b) => {
+      const aTime = new Date(a.timestamp || a.publishedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.timestamp || b.publishedAt || b.createdAt || 0).getTime();
+      return bTime - aTime; // 降順
+    });
+    
+    if (mergedArray.length > 0) {
+      logDebug(`History merged: ${mergedArray.length} items (${localHistory.length} local, ${serverHistory.length} server)`);
+    }
+    
+    return mergedArray;
+  } catch (error) {
+    logError('Critical error in getMergedHistory:', error);
+    // フォールバック：ローカルのみ（さらに安全に）
+    try {
+      const fallbackHistory = getHistoryFromStorage();
+      logDebug('Using fallback local history:', fallbackHistory.length, 'items');
+      return Array.isArray(fallbackHistory) ? fallbackHistory : [];
+    } catch (fallbackError) {
+      logError('Even fallback failed:', fallbackError);
+      return [];
+    }
+  }
+}
+
+/**
+ * 履歴用のユニークIDを生成
+ * @returns {string} ユニークID
+ */
+function generateHistoryId() {
+  return 'history_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
+ * Draft session storage management functions
+ */
+
+// Draft session storage key
+const DRAFT_SESSION_KEY = 'answerboard_draft_state'; // cspell:disable-line
+
+/**
+ * Save draft state to session storage
+ * @param {Object} draftData - Draft form data
+ */
+function saveDraftToSession(draftData) {
+  try {
+    if (!draftData || !draftData.questionText) {
+      logWarn('Invalid draft data, skipping session save');
+      return;
+    }
+
+    // Create unique form identifier
+    const formId = `${(currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || 'unknown'}_${draftData.sheetName || selectedSheet || 'unknown'}`;
+    
+    const draftState = {
+      formId,
+      createdAt: new Date().toISOString(),
+      questionText: draftData.questionText,
+      sheetName: draftData.sheetName || selectedSheet,
+      config: draftData.config || {},
+      displayMode: draftData.displayMode || 'named', // named or anonymous
+      countDisplay: draftData.countDisplay || 'show', // show or hide
+      
+      // AI column prediction results for recovery
+      sheetDetails: {
+        allHeaders: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.allHeaders) || [],
+        guessedConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig) || {},
+        existingConfig: (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.existingConfig) || {}
+      },
+      
+      // Form configuration state
+      spreadsheetId: (currentStatus && currentStatus.userInfo && currentStatus.userInfo.spreadsheetId) || '',
+      configurationComplete: !!(currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader),
+      
+      // Timestamp for draft management
+      lastUpdated: new Date().toISOString()
+    };
+    
+    sessionStorage.setItem(DRAFT_SESSION_KEY, JSON.stringify(draftState));
+    logDebug('Draft saved to session storage:', draftState.questionText);
+    
+  } catch (error) {
+    logWarn('Failed to save draft to session:', error);
+  }
+}
+
+/**
+ * Get draft state from session storage
+ * @returns {Object|null} Draft state or null if not found
+ */
+function getDraftFromSession() {
+  try {
+    const draftJson = sessionStorage.getItem(DRAFT_SESSION_KEY);
+    if (!draftJson) return null;
+    
+    const draftState = JSON.parse(draftJson);
+    logDebug('Draft loaded from session storage:', draftState.questionText);
+    return draftState;
+    
+  } catch (error) {
+    logWarn('Failed to load draft from session:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear draft from session storage
+ */
+function clearDraftFromSession() {
+  try {
+    sessionStorage.removeItem(DRAFT_SESSION_KEY);
+    logDebug('Draft cleared from session storage');
+  } catch (error) {
+    logWarn('Failed to clear draft from session:', error);
+  }
+}
+
+/**
+ * Check if draft exists in session storage
+ * @returns {boolean} True if draft exists
+ */
+function hasDraftInSession() {
+  try {
+    return !!sessionStorage.getItem(DRAFT_SESSION_KEY);
+  } catch (error) {
+    logWarn('Failed to check draft in session:', error);
+    return false;
+  }
+}
+
+/**
+ * Recover draft state from session storage on page load
+ * @returns {Promise<boolean>} True if draft was recovered successfully
+ */
+async function recoverDraftFromSession() {
+  try {
+    const draftState = getDraftFromSession();
+    if (!draftState) {
+      logDebug('No draft found in session storage');
+      return false;
+    }
+    
+    logDebug('Attempting to recover draft from session:', draftState.questionText);
+    
+    // Show recovery notification
+    showMessage('下書きを読み込んでいます...', 'info');
+    
+    // Restore basic form state
+    if (draftState.sheetName) {
+      selectedSheet = draftState.sheetName;
+      const sheetSelect = document.getElementById('sheet-select');
+      if (sheetSelect) {
+        sheetSelect.value = draftState.sheetName;
+      }
+    }
+    
+    // Restore spreadsheet ID if available
+    if (draftState.spreadsheetId && currentStatus && currentStatus.userInfo) {
+      currentStatus.userInfo.spreadsheetId = draftState.spreadsheetId;
+    }
+    
+    // Restore sheet details and AI prediction results
+    if (draftState.sheetDetails && currentStatus) {
+      if (!currentStatus.sheetDetails) {
+        currentStatus.sheetDetails = {};
+      }
+      
+      currentStatus.sheetDetails.allHeaders = draftState.sheetDetails.allHeaders || [];
+      currentStatus.sheetDetails.guessedConfig = draftState.sheetDetails.guessedConfig || {};
+      currentStatus.sheetDetails.existingConfig = draftState.sheetDetails.existingConfig || {};
+    }
+    
+    // Restore question text
+    const questionInput = document.getElementById('question-input');
+    if (questionInput && draftState.questionText) {
+      questionInput.value = draftState.questionText;
+    }
+    
+    // Restore display mode settings
+    const anonymousCheckbox = document.getElementById('anonymous-mode');
+    if (anonymousCheckbox) {
+      anonymousCheckbox.checked = draftState.displayMode === 'anonymous';
+    }
+    
+    // Update UI to reflect recovered state
+    if (draftState.configurationComplete) {
+      // Show that AI column prediction is completed
+      const currentStep = document.querySelector('[data-step="4"]');
+      if (currentStep) {
+        updateStepProgress(4, currentStatus);
+      }
+    }
+    
+    // Update any config panels if they exist
+    if (draftState.config && Object.keys(draftState.config).length > 0) {
+      updateConfigPanelUI(draftState.config);
+    }
+    
+    // Show success message
+    const ageMinutes = Math.floor((new Date() - new Date(draftState.createdAt)) / (1000 * 60));
+    const ageText = ageMinutes < 1 ? '直前' : `${ageMinutes}分前`;
+    showMessage(`下書きを読み込みました（${ageText}に作成）`, 'success');
+    
+    logDebug('Draft recovered successfully from session storage');
+    return true;
+    
+  } catch (error) {
+    logError('Failed to recover draft from session:', error);
+    showMessage('下書きの読み込みに失敗しました', 'error');
+    return false;
+  }
+}
+
+/**
+ * Update config panel UI with recovered settings
+ * @param {Object} config - Configuration object
+ */
+function updateConfigPanelUI(config) {
+  try {
+    // Update opinion header if available
+    if (config.opinionHeader) {
+      const opinionSelect = document.getElementById('opinion-header-select');
+      if (opinionSelect) {
+        opinionSelect.value = config.opinionHeader;
+      }
+    }
+    
+    // Update name header if available
+    if (config.nameHeader) {
+      const nameSelect = document.getElementById('name-header-select');
+      if (nameSelect) {
+        nameSelect.value = config.nameHeader;
+      }
+    }
+    
+    // Update reaction settings if available
+    if (config.allowReactions !== undefined) {
+      const reactionCheckbox = document.getElementById('allow-reactions');
+      if (reactionCheckbox) {
+        reactionCheckbox.checked = !!config.allowReactions;
+      }
+    }
+    
+    logDebug('Config panel UI updated with recovered settings');
+    
+  } catch (error) {
+    logWarn('Failed to update config panel UI:', error);
+  }
+}
+
+// 旧来のカード形式の履歴表示は削除 - 簡単なテーブル形式のみ使用
+
+/**
+ * 簡単な履歴テーブルを表示（新実装）
+ */
+
+
+/**
+ * Enhanced history restoration preview modal
+ * @param {Object} item - History item to preview
+ */
+function showHistoryRestorationPreview(item) {
+  try {
+    console.log('🔍 Showing history restoration preview:', item);
+    
+    // Extract preview information
+    const question = item.questionText || item.sheetName || 'この履歴';
+    const truncated = question.length > 50 ? (question.substring(0, 50) + '...') : question;
+    const published = item.publishedAt ? new Date(item.publishedAt).toLocaleString('ja-JP') : '未設定';
+    const status = item.isActive ? '公開中' : '終了';
+    const statusIcon = item.isActive ? '🌐' : '⏹️';
+    
+    // Get configuration preview
+    const configPreview = getConfigurationPreview(item);
+    const headerPreview = getHeaderPreview(item);
+    
+    // Build detailed message
+    const detailsHtml = `
+      <div class="space-y-4">
+        <div class="bg-gray-800/50 rounded-lg p-3">
+          <h4 class="text-sm font-semibold text-cyan-400 mb-2">📋 復元される設定内容</h4>
+          <div class="text-xs text-gray-300 space-y-1">
+            <div><span class="text-gray-400">質問:</span> ${truncated}</div>
+            <div><span class="text-gray-400">公開日時:</span> ${published}</div>
+            <div><span class="text-gray-400">状態:</span> ${statusIcon} ${status}</div>
+          </div>
+        </div>
+        
+        ${configPreview ? `
+        <div class="bg-blue-900/20 rounded-lg p-3">
+          <h4 class="text-sm font-semibold text-blue-400 mb-2">⚙️ 列設定</h4>
+          <div class="text-xs text-gray-300">${configPreview}</div>
+        </div>
+        ` : ''}
+        
+        ${headerPreview ? `
+        <div class="bg-green-900/20 rounded-lg p-3">
+          <h4 class="text-sm font-semibold text-green-400 mb-2">📊 利用可能ヘッダー</h4>
+          <div class="text-xs text-gray-300">${headerPreview}</div>
+        </div>
+        ` : ''}
+        
+        <div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3">
+          <p class="text-xs text-yellow-200">
+            ⚠️ この操作により、現在の未保存の設定は上書きされます。
+          </p>
+        </div>
+      </div>
+    `;
+    
+    // Show enhanced confirmation modal
+    if (typeof window.showConfirmationModal === 'function') {
+      // Create a custom modal for detailed preview
+      showDetailedHistoryModal(truncated, detailsHtml, () => {
+        console.log('✅ User confirmed history restoration');
+        selectHistoryItem(item.id);
+      });
+    } else {
+      // Fallback to basic confirmation
+      const basicMessage = `「${truncated}」の設定を復元します。\n\n公開日時: ${published}\n状態: ${status}\n\n現在の未保存の設定は上書きされます。`;
+      if (confirm(basicMessage)) {
+        selectHistoryItem(item.id);
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ History preview failed:', error);
+    // Fallback to direct restoration
+    selectHistoryItem(item.id);
+  }
+}
+
+/**
+ * Get configuration preview text
+ * @param {Object} item - History item
+ * @returns {string} Configuration preview HTML
+ */
+function getConfigurationPreview(item) {
+  try {
+    const config = item.configSnapshot || item.config || {};
+    const settings = [];
+    
+    if (config.opinionHeader) settings.push(`意見欄: ${config.opinionHeader}`);
+    if (config.nameHeader) settings.push(`名前欄: ${config.nameHeader}`);
+    if (config.classHeader) settings.push(`クラス欄: ${config.classHeader}`);
+    if (config.reasonHeader) settings.push(`理由欄: ${config.reasonHeader}`);
+    
+    // Display settings
+    if (config.showNames !== undefined) settings.push(`名前表示: ${config.showNames ? 'ON' : 'OFF'}`);
+    if (config.showCounts !== undefined) settings.push(`カウント表示: ${config.showCounts ? 'ON' : 'OFF'}`);
+    
+    return settings.length > 0 ? settings.join('<br>') : '設定情報なし';
+  } catch (error) {
+    console.warn('Config preview failed:', error);
+    return '設定プレビューエラー';
+  }
+}
+
+/**
+ * Get header preview text
+ * @param {Object} item - History item
+ * @returns {string} Header preview HTML
+ */
+function getHeaderPreview(item) {
+  try {
+    const headers = item.headerSnapshot?.allHeaders || item.sheetDetails?.allHeaders || [];
+    if (headers.length === 0) return null;
+    
+    const displayHeaders = headers.slice(0, 5).join(', ');
+    const remaining = headers.length > 5 ? ` (+${headers.length - 5}個)` : '';
+    
+    return `${displayHeaders}${remaining}`;
+  } catch (error) {
+    console.warn('Header preview failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Show detailed history restoration modal
+ * @param {string} title - Modal title
+ * @param {string} contentHtml - HTML content
+ * @param {Function} onConfirm - Confirmation callback
+ */
+function showDetailedHistoryModal(title, contentHtml, onConfirm) {
+  // Use existing confirmation modal but with enhanced content
+  const modal = document.getElementById('confirmation-modal');
+  const titleElement = document.getElementById('modal-title');
+  const messageElement = document.getElementById('modal-message');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+  
+  if (modal && titleElement && messageElement && confirmBtn && cancelBtn) {
+    titleElement.textContent = '履歴設定の復元';
+    messageElement.innerHTML = contentHtml;
+    confirmBtn.textContent = '復元する';
+    
+    // Set up event handlers
+    const handleConfirm = () => {
+      modal.classList.add('hidden');
+      onConfirm();
+      cleanup();
+    };
+    
+    const handleCancel = () => {
+      modal.classList.add('hidden');
+      cleanup();
+    };
+    
+    const cleanup = () => {
+      confirmBtn.removeEventListener('click', handleConfirm);
+      cancelBtn.removeEventListener('click', handleCancel);
+    };
+    
+    confirmBtn.addEventListener('click', handleConfirm);
+    cancelBtn.addEventListener('click', handleCancel);
+    
+    // Show modal
+    modal.classList.remove('hidden');
+  } else {
+    console.warn('⚠️ Modal elements not found, using fallback');
+    if (confirm(`履歴設定「${title}」を復元しますか？`)) {
+      onConfirm();
+    }
+  }
+}
+
+/**
+ * シンプル履歴アイテム正規化 - 新しい簡素な形式に統一
+ * @param {Object} rawItem - 生の履歴アイテム
+ * @returns {Object} 正規化された履歴アイテム
+ */
+function normalizeHistoryItem(rawItem) {
+  try {
+    console.log('🔄 Normalizing history item to simple format:', rawItem);
+    
+    // シンプルな新形式構造に変換
+    const normalizedItem = {
+      id: rawItem.id,
+      createdDate: rawItem.createdDate || null, // 後で追加予定
+      publishedAt: rawItem.publishedAt || rawItem.timestamp,
+      questionText: rawItem.questionText || 
+                   rawItem.config?.opinionHeader ||
+                   rawItem.configSnapshot?.opinionHeader ||
+                   'デフォルト質問',
+      setupType: rawItem.setupType || 'unknown',
+      
+      // 最小限の復元データ
+      opinionHeader: rawItem.config?.opinionHeader || 
+                    rawItem.configSnapshot?.opinionHeader || 
+                    rawItem.questionText || '',
+      nameHeader: rawItem.config?.nameHeader || 
+                 rawItem.configSnapshot?.nameHeader || 
+                 '名前',
+      displayMode: normalizeDisplayMode(rawItem.displayMode || 
+                                      rawItem.config?.displayMode ||
+                                      rawItem.configSnapshot?.displayMode),
+      
+      // 復元用データ
+      sheetName: rawItem.sheetName || '',
+      spreadsheetId: rawItem.spreadsheetId || ''
+    };
+    
+    console.log('✅ Item normalized to simple format:', normalizedItem);
+    return normalizedItem;
+    
+  } catch (error) {
+    console.error('❌ Simple history normalization failed:', error);
+    // フォールバック: 最小限の構造を返す
+    return {
+      id: rawItem.id || generateHistoryId(),
+      createdDate: null,
+      publishedAt: rawItem.publishedAt || rawItem.timestamp || new Date().toISOString(),
+      questionText: rawItem.questionText || '不明',
+      setupType: rawItem.setupType || 'unknown',
+      opinionHeader: '',
+      nameHeader: '名前',
+      displayMode: 'named',
+      sheetName: rawItem.sheetName || '',
+      spreadsheetId: rawItem.spreadsheetId || ''
+    };
+  }
+}
+
+/**
+ * シンプル履歴バリデーション
+ * @param {Object} item - 正規化済み履歴アイテム
+ * @returns {boolean} 有効かどうか
+ */
+function validateSimpleHistoryItem(item) {
+  return item && item.id && item.publishedAt;
+}
+
+/**
+ * シンプル履歴選択処理
+ * @param {string} historyId - 履歴ID
+ */
+async function selectHistoryItem(historyId) {
+  try {
+    // 履歴を検索
+    const mergedHistory = await getMergedHistory();
+    const rawItem = mergedHistory.find(h => h.id === historyId);
+    
+    if (!rawItem) {
+      showMessage('履歴アイテムが見つかりませんでした', 'error');
+      return;
+    }
+    
+    // シンプル正規化
+    const item = normalizeHistoryItem(rawItem);
+    console.log('📝 Simple normalized history item:', item);
+    
+    // 基本バリデーション
+    if (!validateSimpleHistoryItem(item)) {
+      showMessage('履歴データが不正です', 'error');
+      return;
+    }
+    
+    // シンプルな復元確認モーダル表示
+    showHistoryRestorationPreview(
+      '履歴復元の確認',
+      item,
+      // 確認後の復元実行
+      async () => {
+        console.log('✅ User confirmed simple history restoration');
+        if (window.AdminPanel?.historyManager?.restoreFromSimpleHistory) {
+          await window.AdminPanel.historyManager.restoreFromSimpleHistory(item);
+        } else {
+          console.error('❌ History manager not available for restoration');
+          showMessage('履歴復元機能が利用できません', 'error');
+        }
+      },
+      // キャンセル時の処理
+      () => {
+        console.log('❌ History restoration cancelled');
+      }
+    );
+    
+  } catch (error) {
+    console.error('❌ Simple history selection failed:', error);
+    showMessage('履歴選択に失敗しました', 'error');
+  }
+}
+
+/**
+ * シンプル履歴からの復元実行
+ * @param {Object} item - 正規化済み履歴アイテム
+ */
+
+/**
+ * HTMLエスケープ関数
+ * @param {string} text - エスケープするテキスト
+ * @returns {string} エスケープされたテキスト
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// 旧来の複雑な履歴管理関数群は削除 - selectHistoryItem()による自動フローのみ使用
+
+// =============================================================================
+// CONFIG JSON 正規化・修復システム
+// =============================================================================
+
+/**
+ * configJsonの整合性を確保し、矛盾した状態を修復する
+ * @param {Object} config - 修復対象のconfig
+ * @param {Object} userInfo - ユーザー情報
+ * @return {Object} 正規化されたconfig
+ */
+function normalizeConfigJson(config, userInfo) {
+  if (!config || typeof config !== 'object') {
+    console.warn('⚠️ normalizeConfigJson: 無効なconfigオブジェクト');
+    return config;
+  }
+  
+  // キャッシュチェック（同じデータの重複処理を防止）
+  if (window.processCache && window.generateSimpleHash && window.isCacheValid) {
+    const configHash = window.generateSimpleHash(config);
+    const cacheEntry = window.processCache.configNormalization;
+    
+    if (window.isCacheValid(cacheEntry) && cacheEntry.dataHash === configHash) {
+      console.log('🚀 configJson正規化: キャッシュから結果を取得');
+      return cacheEntry.data;
+    }
+  }
+  
+  // 本番環境では詳細ログを削減
+  if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+    console.log('🔧 configJson正規化開始:', {
+      setupStatus: config.setupStatus,
+      setupStep: config.setupStep,
+      appPublished: config.appPublished,
+      publishedSheetName: config.publishedSheetName
+    });
+  }
+  
+  // Step 1: publishedSheetName修復
+  config = fixPublishedSheetName(config);
+  
+  // Step 2: setupStep再計算（統一関数使用）
+  // Note: setupStepは計算プロパティとして常に動的に算出され、configJsonには保存されません
+  
+  // Step 3: グローバル列設定同期
+  config = syncGlobalColumnSettings(config);
+  
+  // Step 4: 必須フィールドの補完
+  config = ensureRequiredFields(config);
+  
+  // Step 5: 冗長フィールドの削除
+  config = removeRedundantFields(config);
+  
+  // 本番環境では詳細ログを削減
+  if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+    console.log('✅ configJson正規化完了:', {
+      setupStatus: config.setupStatus,
+      appPublished: config.appPublished,
+      publishedSheetName: config.publishedSheetName
+    });
+  }
+  
+  // キャッシュ更新
+  if (window.processCache && window.generateSimpleHash) {
+    const configHash = window.generateSimpleHash(config);
+    const cacheEntry = window.processCache.configNormalization;
+    cacheEntry.data = config;
+    cacheEntry.dataHash = configHash;
+    cacheEntry.timestamp = Date.now();
+  }
+  
+  return config;
+}
+
+/**
+ * 冗長フィールドの削除（データ整合性向上）
+ * @param {Object} config - 対象config
+ * @return {Object} クリーンアップされたconfig
+ */
+function removeRedundantFields(config) {
+  const cleanConfig = Object.assign({}, config);
+  
+  // setupStepは計算プロパティのため、保存済みの値を削除
+  delete cleanConfig.setupStep;
+  
+  console.log('🧹 冗長フィールド削除: setupStep');
+  
+  return cleanConfig;
+}
+
+/**
+ * ConfigJsonの整合性検証機能（フロントエンド専用）
+ * @param {Object} config - 検証対象のconfig
+ * @param {Object} userInfo - ユーザー情報
+ */
+function validateConfigJsonIntegrity(config, userInfo) {
+  if (!config || !userInfo) {
+    console.warn('⚠️ 整合性検証: 無効なパラメータ');
+    return;
+  }
+  
+  const setupStatus = config.setupStatus || 'pending';
+  const formCreated = !!config.formCreated;
+  const appPublished = !!config.appPublished;
+  const hasFormUrl = !!(config.formUrl && config.formUrl.trim());
+  const hasPublishedSheet = !!(config.publishedSheetName && config.publishedSheetName.trim());
+  const hasSpreadsheet = !!(userInfo.spreadsheetId && userInfo.spreadsheetId.trim());
+  
+  console.group('🔍 ConfigJson整合性検証');
+  
+  // 基本状態の表示
+  console.log('📊 現在の状態:', {
+    setupStatus,
+    formCreated,
+    appPublished,
+    hasFormUrl,
+    hasPublishedSheet,
+    hasSpreadsheet
+  });
+  
+  // 重要な不整合を検出
+  const issues = [];
+  
+  if (setupStatus === 'completed' && !formCreated) {
+    issues.push('❌ setupStatus=completedなのにformCreated=false');
+  }
+  
+  if (formCreated && !hasFormUrl) {
+    issues.push('❌ formCreated=trueなのにformUrlが未設定');
+  }
+  
+  if (appPublished && !hasPublishedSheet) {
+    issues.push('❌ appPublished=trueなのにpublishedSheetNameが未設定');
+  }
+  
+  if (!hasSpreadsheet && (setupStatus === 'completed' || formCreated || appPublished)) {
+    issues.push('❌ データソース未設定なのに高度な設定が有効');
+  }
+  
+  // setupStepが保存されている場合の警告
+  if (config.setupStep !== undefined) {
+    issues.push('⚠️ setupStepがconfigJsonに保存されています（冗長）');
+  }
+  
+  // 結果表示
+  if (issues.length === 0) {
+    console.log('✅ 整合性検証完了: 問題なし');
+  } else {
+    console.warn('⚠️ 整合性問題検出:', issues);
+  }
+  
+  console.groupEnd();
+}
+
+/**
+ * publishedSheetName修復関数
+ * @param {Object} config - 修復対象のconfig
+ * @return {Object} 修復されたconfig
+ */
+function fixPublishedSheetName(config) {
+  // publishedSheetNameが'フォームの回答 1'のようなデフォルト名の場合も修復対象
+  const isDefaultSheetName = config.publishedSheetName === 'フォームの回答 1' || 
+                            config.publishedSheetName && config.publishedSheetName.startsWith('フォームの回答');
+                            
+  if ((!config.publishedSheetName || 
+       config.publishedSheetName.trim() === '' || 
+       isDefaultSheetName) && 
+      config.publishedSpreadsheetId) {
+    
+    // AI列判定結果から質問文を取得を試行
+    if (currentStatus && currentStatus.sheetDetails && currentStatus.sheetDetails.guessedConfig && currentStatus.sheetDetails.guessedConfig.opinionHeader) {
+      const questionText = currentStatus.sheetDetails.guessedConfig.opinionHeader;
+      config.publishedSheetName = questionText;
+      
+      if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+        console.log('🔧 publishedSheetName修復 (AI列判定結果使用):', {
+          元の名前: config.publishedSheetName,
+          新しい名前: questionText
+        });
+      }
+      return config;
+    }
+    
+    // AI列判定結果が無い場合は従来のsheet_キー検索
+    const sheetKeys = Object.keys(config).filter(key => key.startsWith('sheet_'));
+    
+    if (sheetKeys.length > 0) {
+      // 最初に見つかったシート名を使用
+      const detectedSheetName = sheetKeys[0].replace('sheet_', '');
+      config.publishedSheetName = detectedSheetName;
+      
+      if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
+        console.log('🔧 publishedSheetName修復 (シートキー使用):', {
+          検出されたシート名: detectedSheetName,
+          利用可能なシート設定: sheetKeys
+        });
+      }
+    }
+  }
+  
+  return config;
+}
+
+
+
+
+
+/**
+ * グローバル列設定を最新のシート設定と同期
+ * @param {Object} config - 同期対象のconfig
+ * @return {Object} 同期されたconfig
+ */
+function syncGlobalColumnSettings(config) {
+  if (!config.publishedSheetName) {
+    return config; // シート名が不明な場合はスキップ
+  }
+  
+  const sheetConfigKey = 'sheet_' + String(config.publishedSheetName || '');
+  const sheetConfig = config[sheetConfigKey];
+  
+  if (sheetConfig && typeof sheetConfig === 'object') {
+    // シート固有設定をグローバル設定に同期
+    config.opinionHeader = sheetConfig.opinionHeader || config.opinionHeader || '';
+    config.nameHeader = sheetConfig.nameHeader || config.nameHeader || '';
+    config.reasonHeader = sheetConfig.reasonHeader || config.reasonHeader || '';
+    config.classHeader = sheetConfig.classHeader || config.classHeader || '';
+    config.timestampHeader = sheetConfig.timestampHeader || config.timestampHeader || '';
+    
+    // フォームURL同期 - シート固有のformUrlをグローバル設定に同期
+    if (sheetConfig.formUrl) {
+      config.formUrl = sheetConfig.formUrl;
+      console.log('🔗 フォームURL同期:', {
+        sheetName: config.publishedSheetName,
+        formUrl: config.formUrl
+      });
+    }
+    
+    console.log('🔧 グローバル列設定同期完了:', {
+      sheetName: config.publishedSheetName,
+      mainQuestion: config.opinionHeader,
+      nameColumn: config.nameHeader
+    });
+  }
+  
+  return config;
+}
+
+/**
+ * 必須フィールドの補完
+ * @param {Object} config - 補完対象のconfig
+ * @return {Object} 補完されたconfig
+ */
+function ensureRequiredFields(config) {
+  console.log('🔧 ensureRequiredFields called with:', typeof config);
+  
+  // Ensure config is a valid object
+  if (!config || typeof config !== 'object') {
+    config = {};
+  }
+  
+  // 個別設定（最も安全な方法）
+  if (config.showNames === undefined) config.showNames = false;
+  if (config.showCounts === undefined) config.showCounts = false;
+  if (config.highlightMode === undefined) config.highlightMode = false;
+  if (config.displayMode === undefined) config.displayMode = 'named';
+  if (config.countDisplay === undefined) config.countDisplay = 'show';
+  if (config.autoStopEnabled === undefined) config.autoStopEnabled = true;
+  if (config.autoStopMinutes === undefined) config.autoStopMinutes = 360;
+  
+  console.log('✅ ensureRequiredFields completed');
+  return config;
+}
+
+
+/**
+ * 公開済み状態用configJson修復関数
+ * @param {Object} config - 修復対象のconfig
+ * @return {Object} 修復されたconfig
+ */
+function fixConfigForPublishedState(config) {
+  const fixedConfig = Object.assign({}, config);
+  
+  // 公開済み状態の必須フィールドを修復
+  if (fixedConfig.setupStatus !== 'completed') {
+    console.log('🔧 setupStatus fixed from pending to completed');
+    fixedConfig.setupStatus = 'completed';
+  }
+  
+  if (!fixedConfig.formCreated) {
+    console.log('🔧 formCreated status fixed from false to true');
+    fixedConfig.formCreated = true;
+  }
+  
+  if (!fixedConfig.appPublished) {
+    console.log('🔧 appPublished status fixed from false to true');
+    fixedConfig.appPublished = true;
+  }
+  
+  // Form URL temporary setting (if actual form URL is unknown)
+  if (!fixedConfig.formUrl || fixedConfig.formUrl.trim() === '') {
+    console.log('🔧 formUrl temporary setting for published state maintenance');
+    fixedConfig.formUrl = 'https://docs.google.com/temp-form-url'; // Temporary license URL
+  }
+  
+  return fixedConfig;
+}
+
+
+// 簡単な履歴テーブル初期化は initializeAdminPanel で実行されるように変更
+// DOMContentLoaded は削除 - framework.js.htmlで統一管理
+
+// Draft recovery utility function
+function recoverDraftIfAvailable() {
+  // Check for and recover draft from session storage
+  if (typeof hasDraftInSession === 'function' && hasDraftInSession()) {
+    if (typeof recoverDraftFromSession === 'function') {
+      recoverDraftFromSession().catch(error => {
+        console.warn('⚠️ Draft recovery failed:', error);
+      });
+    }
+  }
+}
+
+// 日時フォーマット関数
+function formatDateTime(date) {
+  try {
+    const options = {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Tokyo'
+    };
+    // Google Apps Script compatible date formatting
+    return date.toLocaleDateString('ja-JP', options).replace(/\//g, '-');
+  } catch (error) {
+    console.warn('⚠️ Date formatting failed:', error);
+    return date.toISOString().split('T')[0] + ' ' + date.toISOString().split('T')[1].substring(0, 5);
+  }
+}
+
+// リソースボタンを更新する関数 (フォルダ機能は削除済み)
+function updateNewResourceButtons(resourceUrls) {
+  // ドライブフォルダ機能は削除されました
+  console.log('📊 Resource URLs updated:', resourceUrls);
+}
+
+// 初期化は adminPanel-core.js の統合初期化システムで管理されます
+
+// Explicitly register full implementations when this file loads
+if (window.AdminPanel && window.AdminPanel.functionRegistry) {
+  console.log('🔧 Registering full implementations from adminPanel-ui.js.html');
+  const fullImplFunctions = [
+    'updateUIWithNewStatus', 'populateHeaderOptions', 'populateConfig', 
+    'updateFormUrlDisplay', 'validateConfig', 'updateConfigButtons'
+  ];
+  
+  fullImplFunctions.forEach(funcName => {
+    window.AdminPanel.functionRegistry.registerFullImplementation(funcName);
+  });
+  
+  // Immediately check for full implementations after registration
+  setTimeout(() => {
+    const foundCount = window.AdminPanel.functionRegistry.checkForFullImplementations();
+    console.log(`✅ Full implementation registration complete: ${foundCount}/6 functions available`);
+  }, 50);
+} else {
+  console.warn('⚠️ AdminPanel.functionRegistry not available for full implementation registration');
+}
+
+//# sourceURL=adminPanel-ui.js.html
+</script>
