@@ -1719,7 +1719,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function getAvailableSheets(requestUserId) {
+function getSpreadsheetSheets(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     /** @type {string} 現在のユーザーID */
@@ -4328,7 +4328,7 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
  * @param {string} spreadsheetId - チェックするスプレッドシートのID
  * @returns {object} status ('success' or 'error') と message
  */
-function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
+function getSheetPreviewData(userId, sheetName, classFilter, sortMode, adminMode) {
   // キャッシュキー生成（ユーザー、シート、フィルタ条件ごとに個別キャッシュ）
   /** @type {string} キャッシュキー */
   const cacheKey = `sheetData_${  userId  }_${  sheetName  }_${  classFilter  }_${  sortMode}`;

@@ -1299,7 +1299,7 @@ function activateSheet(requestUserId, spreadsheetId, sheetName) {
  * @param {string} sheetName - シート名
  * @param {object} overrides - 上書き設定
  */
-function autoMapSheetHeaders(requestUserId, sheetName, overrides) {
+function guessColumnMapping(requestUserId, sheetName, overrides) {
   verifyUserAccess(requestUserId);
   try {
     const headers = getSheetHeaders(requestUserId, getCurrentSpreadsheet(requestUserId).getId(), sheetName);
@@ -1758,7 +1758,7 @@ function createFormForSpreadsheet(spreadsheetId, sheetName) {
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function unpublishBoard(requestUserId) {
+function unpublishAnswerBoard(requestUserId) {
   debugLog('🔧 unpublishBoard: 公開停止処理開始', { requestUserId });
   verifyUserAccess(requestUserId);
   try {
@@ -2026,7 +2026,7 @@ function setDisplayOptions(requestUserId, displayOptions, options = {}) {
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function createBoardFromAdmin(requestUserId) {
+function createCustomBoard(requestUserId) {
   verifyUserAccess(requestUserId);
   try {
     const activeUserEmail = Session.getActiveUser().getEmail();
@@ -3377,7 +3377,7 @@ function setDisplayOptionsInContext(context, displayOptions) {
  * @param {object} config - 設定オブジェクト
  * @returns {object} 最新のステータスオブジェクト
  */
-function saveAndPublish(requestUserId, sheetName, config) {
+function saveAndPublishBoard(requestUserId, sheetName, config) {
   verifyUserAccess(requestUserId);
   
   // 統一ロック管理で設定保存・公開処理を実行
@@ -3587,7 +3587,7 @@ function resetConfigJson(requestUserId) {
  * @param {string} flowType 呼び出し元フロー種別
  * @returns {Object} 同期結果
  */
-function syncConfigurationState(requestUserId, newConfig, flowType) {
+function saveUserConfiguration(requestUserId, newConfig, flowType) {
   try {
     verifyUserAccess(requestUserId);
 

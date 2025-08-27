@@ -189,7 +189,8 @@ const auth = {
   // 認証初期化
   async init() {
     try {
-      const response = await utils.callAPI('getCurrentUserStatus');
+      // null引数を明示的に渡してオブジェクト化を回避
+      const response = await utils.callAPI('getCurrentUserStatus', null);
       if (response && response.status === 'success' && response.userInfo && response.userInfo.userId) {
         state.user = {
           id: response.userInfo.userId,
@@ -225,9 +226,17 @@ const auth = {
   },
 
   // ログアウト
-  logout() {
+  async logout() {
     if (confirm('ログアウトしますか？')) {
-      window.location.href = utils.callAPI('getLogoutUrl');
+      try {
+        // API呼び出しでログアウトURLを取得
+        const logoutUrl = await utils.callAPI('getLogoutUrl', null);
+        window.top.location.href = logoutUrl;
+      } catch (error) {
+        console.error('API呼び出し失敗、代替ログアウトを実行:', error);
+        // フォールバック: 直接Googleアカウントログアウトページに遷移
+        window.top.location.href = 'https://accounts.google.com/logout?continue=' + encodeURIComponent(window.location.origin);
+      }
     }
   }
 };
@@ -275,7 +284,7 @@ const data = {
   async createCustomForm() {
     try {
       utils.showMessage('カスタムフォームを作成しています...', 'info');
-      const result = await utils.callAPI('createCustomBoard');
+      const result = await utils.callAPI('createCustomBoard', null);
       
       if (result && result.status === 'success') {
         state.system.formUrl = result.formUrl;
@@ -1029,7 +1038,7 @@ async function init() {
 // 既存状態の復元
 async function loadCurrentStatus() {
   try {
-    const response = await utils.callAPI('getCurrentUserStatus');
+    const response = await utils.callAPI('getCurrentUserStatus', null);
     if (response && response.status === 'success') {
       const status = response.userInfo;
       
