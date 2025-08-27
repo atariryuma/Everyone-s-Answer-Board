@@ -34,7 +34,17 @@
       "mcp__ide__getDiagnostics",
       "Bash(./check-src.sh)",
       "Bash(git commit:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(do)",
+      "Bash(if [ -f \"/Users/ryuma/Everyone-s-Answer-Board/src/$file\" ])",
+      "Bash(then)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(npm install:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run test:*)",
+      "Bash(./scripts/new-feature.sh:*)"
     ],
     "deny": [],
     "ask": [],

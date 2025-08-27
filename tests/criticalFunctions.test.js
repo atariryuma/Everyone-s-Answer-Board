@@ -255,7 +255,7 @@ describe('クリティカル機能テスト', () => {
         configJson.formCreated = true;
         
         return {
-          userInfo: userInfo,
+          userInfo,
           appUrls: global.generateUserUrls(requestUserId),
           setupStep: global.getSetupStep(userInfo, configJson),
           activeSheetName: configJson.publishedSheetName,
@@ -306,7 +306,7 @@ describe('クリティカル機能テスト', () => {
         }
         
         const data = global.getSheetData(requestUserId, 'Sheet1', classFilter, sortOrder, adminMode);
-        return { success: true, data: data, fromCache: false };
+        return { success: true, data, fromCache: false };
       };
 
       const result = global.getPublishedSheetData('user123', null, 'newest', false, false);

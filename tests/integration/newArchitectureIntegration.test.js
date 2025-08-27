@@ -88,7 +88,7 @@ const setupMocks = () => {
   };
 
   global.Utilities = {
-    getUuid: jest.fn(() => 'uuid-' + Date.now()),
+    getUuid: jest.fn(() => `uuid-${  Date.now()}`),
     base64Encode: jest.fn((data) => Buffer.from(data).toString('base64')),
     base64Decode: jest.fn((data) => Buffer.from(data, 'base64').toString()),
     sleep: jest.fn(),
@@ -325,7 +325,7 @@ const loadServices = () => {
   
   global.createUser = (userData) => {
     return {
-      userId: userData.userId || 'uuid-' + Date.now(),
+      userId: userData.userId || `uuid-${  Date.now()}`,
       adminEmail: userData.adminEmail,
       spreadsheetId: userData.spreadsheetId || '',
       spreadsheetUrl: userData.spreadsheetUrl || '',

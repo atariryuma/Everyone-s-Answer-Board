@@ -744,7 +744,7 @@ SharedModals.prototype.loadModals = function(modalIds) {
     modalIds.forEach(modalId => {
       if (!this.loadedModals.has(modalId)) {
         this.loadedModals.add(modalId);
-        console.log(`Modal ${modalId} loaded`);
+        console.log('Modal ' + modalId + ' loaded');
       }
     });
 };
@@ -820,8 +820,8 @@ SharedModals.prototype.showAlert = function(title, message, type) {
     };
     
     const config = typeConfig[type] || typeConfig.info;
-    titleEl.className = `text-xl font-bold ${config.color}`;
-    iconEl.className = `w-8 h-8 ${config.color}`;
+    titleEl.className = 'text-xl font-bold ' + config.color;
+    iconEl.className = 'w-8 h-8 ' + config.color;
     iconEl.querySelector('path').setAttribute('d', config.icon);
     
     modal.classList.remove('hidden');
@@ -1033,7 +1033,7 @@ SharedModals.prototype.showAutoStopConfirmation = function(publishResult) {
       if (remainingTimeEl) {
         if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
           const errorCount = validationResult.criticalErrors.length;
-          remainingTimeEl.textContent = `⚠️ ${errorCount}個の重要な問題を検出 - 設定を確認してください`;
+          remainingTimeEl.textContent = '⚠️ ' + errorCount + '個の重要な問題を検出 - 設定を確認してください';
           remainingTimeEl.className = 'font-medium text-yellow-100';
         } else {
           // Critical errors がない場合は通常のカウントダウンを開始
@@ -1178,9 +1178,9 @@ SharedModals.prototype.validatePublishResult = function(publishResult) {
       criticalErrors: criticalErrors,
       warningErrors: warningErrors,
       summary: hasCriticalErrors ? 
-        `❌ ${criticalErrors.length}個の重要な問題があります` : 
+        '❌ ' + criticalErrors.length + '個の重要な問題があります' : 
         (warningErrors.length > 0 ? 
-          `⚠️ ${warningErrors.length}個の軽微な問題があります` : 
+          '⚠️ ' + warningErrors.length + '個の軽微な問題があります' : 
           '✅ データは正常です')
     };
 };
@@ -1236,7 +1236,7 @@ SharedModals.prototype.startCountdown = function(stopTime) {
       
       const hours = Math.floor(remaining / (1000 * 60 * 60));
       const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-      document.getElementById('remaining-time').textContent = `${hours}時間${minutes}分`;
+      document.getElementById('remaining-time').textContent = hours + '時間' + minutes + '分';
     };
 
     // 初回実行
@@ -1380,11 +1380,11 @@ SharedModals.prototype.showGoogleIntegration = function() {
         const remainingMinutes = minutes % 60;
         
         if (hours > 0 && remainingMinutes > 0) {
-          autoStopDisplay.textContent = `${hours}時間${remainingMinutes}分後に自動停止`;
+          autoStopDisplay.textContent = hours + '時間' + remainingMinutes + '分後に自動停止';
         } else if (hours > 0) {
-          autoStopDisplay.textContent = `${hours}時間後に自動停止`;
+          autoStopDisplay.textContent = hours + '時間後に自動停止';
         } else {
-          autoStopDisplay.textContent = `${minutes}分後に自動停止`;
+          autoStopDisplay.textContent = minutes + '分後に自動停止';
         }
         autoStopDisplay.className = 'text-blue-100';
       } else {

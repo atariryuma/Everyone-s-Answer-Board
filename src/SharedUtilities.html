@@ -506,10 +506,10 @@ class ErrorHandler {
   sendToBackend(errorInfo) {
     try {
       if (typeof google !== 'undefined' && google.script?.run) {
-        google.script.run.logClientError({
-          message: errorInfo.message,
-          userId: window.AdminPanel?.currentUserId || 'unknown'
-        });
+        google.script.run.logClientError(
+          errorInfo.message,
+          window.AdminPanel?.currentUserId || 'unknown'
+        );
       }
     } catch (e) { /* ignore */ }
   }

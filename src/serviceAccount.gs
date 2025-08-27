@@ -60,7 +60,7 @@ function generateNewServiceAccountToken() {
     const requiredFields = ['client_email', 'private_key', 'token_uri'];
     for (const field of requiredFields) {
       if (!serviceAccountCreds[field]) {
-        throw new Error('サービスアカウント設定に' + field + 'が不足しています');
+        throw new Error(`サービスアカウント設定に${  field  }が不足しています`);
       }
     }
 
@@ -88,7 +88,7 @@ function generateNewServiceAccountToken() {
       ].join(' '),
       aud: serviceAccountCreds.token_uri || 'https://oauth2.googleapis.com/token',
       iat: now,
-      exp: exp
+      exp
     };
 
     // JWT を作成
@@ -99,7 +99,7 @@ function generateNewServiceAccountToken() {
     const encodedPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=+$/, '');
     
     /** @type {string} 署名対象文字列 */
-    const signatureInput = encodedHeader + '.' + encodedPayload;
+    const signatureInput = `${encodedHeader  }.${  encodedPayload}`;
     
     // 秘密鍵で署名
     /** @type {string} クリーンアップされた秘密鍵 */
@@ -112,7 +112,7 @@ function generateNewServiceAccountToken() {
     const encodedSignature = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
     
     /** @type {string} 完成したJWT */
-    const jwt = signatureInput + '.' + encodedSignature;
+    const jwt = `${signatureInput  }.${  encodedSignature}`;
 
     // トークンエンドポイントにリクエスト
     /** @type {Object} リクエストパラメータ */
@@ -128,7 +128,7 @@ function generateNewServiceAccountToken() {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       payload: Object.keys(tokenRequestPayload)
-        .map(key => key + '=' + encodeURIComponent(tokenRequestPayload[key]))
+        .map(key => `${key  }=${  encodeURIComponent(tokenRequestPayload[key])}`)
         .join('&')
     };
 
@@ -139,14 +139,14 @@ function generateNewServiceAccountToken() {
     const responseCode = response.getResponseCode();
     
     if (responseCode !== 200) {
-      throw new Error('Token request failed with status ' + responseCode + ': ' + response.getContentText());
+      throw new Error(`Token request failed with status ${  responseCode  }: ${  response.getContentText()}`);
     }
 
     /** @type {Object} レスポンスデータ */
     const responseData = JSON.parse(response.getContentText());
     
     if (!responseData.access_token) {
-      throw new Error('アクセストークンが含まれていません: ' + response.getContentText());
+      throw new Error(`アクセストークンが含まれていません: ${  response.getContentText()}`);
     }
 
     logInfo('サービスアカウントのアクセストークンを生成しました');
@@ -207,16 +207,16 @@ function checkServiceAccountConfiguration() {
       if (missingFields.length === 0) {
         result.hasRequiredFields = true;
       } else {
-        result.errors.push('必要なフィールドが不足: ' + missingFields.join(', '));
+        result.errors.push(`必要なフィールドが不足: ${  missingFields.join(', ')}`);
       }
 
       // タイプチェック
       if (serviceAccountCreds.type !== 'service_account') {
-        result.errors.push('認証情報のタイプが不正: ' + serviceAccountCreds.type + ' (期待値: service_account)');
+        result.errors.push(`認証情報のタイプが不正: ${  serviceAccountCreds.type  } (期待値: service_account)`);
       }
 
     } catch (parseError) {
-      result.errors.push('サービスアカウント認証情報のJSON解析に失敗: ' + parseError.message);
+      result.errors.push(`サービスアカウント認証情報のJSON解析に失敗: ${  parseError.message}`);
     }
 
     return result;
@@ -227,7 +227,7 @@ function checkServiceAccountConfiguration() {
       configured: false,
       email: null,
       hasRequiredFields: false,
-      errors: ['設定確認中にエラーが発生: ' + error.message]
+      errors: [`設定確認中にエラーが発生: ${  error.message}`]
     };
   }
 }
@@ -249,12 +249,12 @@ function setupServiceAccount(serviceAccountJson) {
     try {
       serviceAccountCreds = JSON.parse(serviceAccountJson);
     } catch (parseError) {
-      throw new Error('サービスアカウントJSONの解析に失敗: ' + parseError.message);
+      throw new Error(`サービスアカウントJSONの解析に失敗: ${  parseError.message}`);
     }
 
     // タイプ検証
     if (serviceAccountCreds.type !== 'service_account') {
-      throw new Error('認証情報のタイプが不正: ' + serviceAccountCreds.type + ' (期待値: service_account)');
+      throw new Error(`認証情報のタイプが不正: ${  serviceAccountCreds.type  } (期待値: service_account)`);
     }
 
     // 必要フィールド検証
@@ -271,7 +271,7 @@ function setupServiceAccount(serviceAccountJson) {
     }
 
     if (missingFields.length > 0) {
-      throw new Error('必要なフィールドが不足: ' + missingFields.join(', '));
+      throw new Error(`必要なフィールドが不足: ${  missingFields.join(', ')}`);
     }
 
     // プロパティに保存
@@ -374,7 +374,7 @@ function performServiceAccountHealthCheck() {
           result.details.tokenErrors.push('トークン生成に失敗しました');
         }
       } catch (tokenError) {
-        result.details.tokenErrors.push('トークン生成エラー: ' + tokenError.message);
+        result.details.tokenErrors.push(`トークン生成エラー: ${  tokenError.message}`);
       }
     } else {
       result.details.tokenErrors.push('設定が不完全なためトークン生成をスキップ');
@@ -403,7 +403,7 @@ function performServiceAccountHealthCheck() {
       overallStatus: 'error',
       details: {
         configurationErrors: [],
-        tokenErrors: ['ヘルスチェック実行エラー: ' + error.message]
+        tokenErrors: [`ヘルスチェック実行エラー: ${  error.message}`]
       }
     };
   }
