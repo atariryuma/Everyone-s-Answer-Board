@@ -10,26 +10,12 @@
 /**
  * エラーの重要度レベル
  */
-const ERROR_SEVERITY = {
-  LOW: 'low',
-  MEDIUM: 'medium',
-  HIGH: 'high',
-  CRITICAL: 'critical',
-};
+// ERROR_SEVERITY is defined in constants.gs
 
 /**
  * エラーカテゴリ
  */
-const ERROR_CATEGORIES = {
-  AUTHENTICATION: 'authentication',
-  AUTHORIZATION: 'authorization',
-  DATABASE: 'database',
-  CACHE: 'cache',
-  NETWORK: 'network',
-  VALIDATION: 'validation',
-  SYSTEM: 'system',
-  USER_INPUT: 'user_input',
-};
+// ERROR_CATEGORIES is defined in constants.gs
 
 /**
  * 統一エラーハンドラークラス

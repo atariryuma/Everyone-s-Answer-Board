@@ -74,21 +74,12 @@ const MAIN_MAIN_ERROR_CATEGORIES = {
   USER_INPUT: 'user_input',
 };
 
-const DB_SHEET_CONFIG = {
-  SHEET_NAME: 'Users',
-  HEADERS: [
-    'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
-    'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
-  ]
-};
+// DB_SHEET_CONFIG is defined in constants.gs
 
-const LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'Logs',
-  HEADERS: ['timestamp', 'userId', 'action', 'details']
-};
+// LOG_SHEET_CONFIG is defined in constants.gs
 
 // 履歴管理の定数
-const MAX_HISTORY_ITEMS = 50;
+// MAX_HISTORY_ITEMS is defined in constants.gs
 
 // 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
 let _executionUserInfoCache = null;
@@ -115,27 +106,13 @@ function clearExecutionUserInfoCache() {
   }
 }
 
-const COLUMN_HEADERS = {
-  TIMESTAMP: 'タイムスタンプ',
-  EMAIL: 'メールアドレス',
-  CLASS: 'クラス',
-  OPINION: '回答',
-  REASON: '理由',
-  NAME: '名前',
-  UNDERSTAND: 'なるほど！',
-  LIKE: 'いいね！',
-  CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト'
-};
+// COLUMN_HEADERS is defined in constants.gs
 
 // 表示モード定数
-const DISPLAY_MODES = {
-  ANONYMOUS: 'anonymous',
-  NAMED: 'named'
-};
+// DISPLAY_MODES is defined in constants.gs
 
 // リアクション関連定数
-const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+// REACTION_KEYS is defined in constants.gs
 
 // スコア計算設定
 const SCORING_CONFIG = {
@@ -611,9 +588,8 @@ function clearHistoryFromServerAPI(requestUserId) {
   }
 }
 
-const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
-const DEBUG = PropertiesService.getScriptProperties()
-  .getProperty('DEBUG_MODE') === 'true';
+// EMAIL_REGEX is defined in constants.gs
+// DEBUG is defined in constants.gs
 
 /**
  * Determine if a value represents boolean true.
@@ -1625,13 +1601,7 @@ function getAppSetupUrl() {
 // =================================================================
 
 // エラータイプ定義
-const ERROR_TYPES = {
-  CRITICAL: 'critical',      // 致命的システムエラー
-  ACCESS: 'access',          // アクセス・認証エラー  
-  VALIDATION: 'validation',  // データ検証エラー
-  NETWORK: 'network',        // ネットワーク・API エラー
-  USER: 'user'              // ユーザー操作エラー
-};
+// ERROR_TYPES is defined in constants.gs
 
 /**
  * エラータイプに基づいてメッセージを分類・整理する

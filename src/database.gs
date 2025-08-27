@@ -49,8 +49,8 @@ function getResilientUserProperties() {
 }
 
 // データベース管理のための定数
-const USER_CACHE_TTL = 300; // 5分
-const DB_BATCH_SIZE = 100;
+// USER_CACHE_TTL is defined in constants.gs // 5分
+// DB_BATCH_SIZE is defined in constants.gs
 
 // 簡易インデックス機能：ユーザー検索の高速化
 const userIndexCache = {
@@ -63,18 +63,12 @@ const userIndexCache = {
 /**
  * 削除ログ用シート設定
  */
-const DELETE_LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'DeleteLogs',
-  HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
-};
+// DELETE_LOG_SHEET_CONFIG is defined in constants.gs
 
 /**
  * 診断ログ用シート設定
  */
-const DIAGNOSTIC_LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'DiagnosticLogs',
-  HEADERS: ['timestamp', 'functionName', 'status', 'problemCount', 'repairCount', 'successfulRepairs', 'details', 'executor', 'summary']
-};
+// DIAGNOSTIC_LOG_SHEET_CONFIG is defined in constants.gs
 
 /**
  * 削除ログを安全にトランザクション的に記録

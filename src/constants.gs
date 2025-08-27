@@ -313,11 +313,9 @@ const DB_BATCH_SIZE = 100;
 /** @deprecated Use UNIFIED_CONSTANTS.LIMITS.HISTORY_ITEMS instead */
 const MAX_HISTORY_ITEMS = 50;
 
-/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION instead */
-const DEFAULT_MAIN_QUESTION = 'あなたの考えや気づいたことを教えてください';
+/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION instead (defined in Core.gs) */
 
-/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION instead */
-const DEFAULT_REASON_QUESTION = 'そう考える理由や体験があれば教えてください（任意）';
+/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION instead (defined in Core.gs) */
 
 /** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DATABASE instead */
 const DB_SHEET_CONFIG = {
