@@ -825,27 +825,87 @@ function confirmUserRegistration(email) {
 }
 
 /**
- * ログイン状態を取得
- * @returns {object} ログイン状態
+ * ログイン状態を取得（フロントエンド期待値対応）
+ * @returns {object} ログイン状態とユーザーステータス
  */
 function getLoginStatus() {
   try {
     const user = getCurrentUser();
     
-    return {
-      status: 'success',
-      isLoggedIn: user.isLoggedIn,
-      email: user.email,
-      userId: user.id,
-      timestamp: new Date().toISOString()
-    };
+    // ログインしていない場合
+    if (!user.isLoggedIn || !user.email) {
+      return {
+        status: 'error',
+        isLoggedIn: false,
+        message: 'ユーザーがログインしていません'
+      };
+    }
+    
+    // ユーザーの登録状態をチェック
+    const properties = PropertiesService.getUserProperties();
+    const userKey = `user_${user.email}`;
+    const userData = properties.getProperty(userKey);
+    
+    // 未登録ユーザー
+    if (!userData) {
+      return {
+        status: 'unregistered',
+        isLoggedIn: true,
+        email: user.email,
+        message: '新規ユーザー登録が必要です'
+      };
+    }
+    
+    // 登録済みユーザーの場合、セットアップ状況をチェック
+    try {
+      const parsedUserData = JSON.parse(userData);
+      
+      // セットアップ完了状況の確認
+      const appConfig = properties.getProperty('app_config');
+      const hasSetup = !!appConfig;
+      
+      // 管理パネルURLを生成
+      const webAppUrl = getWebAppUrl();
+      const adminUrl = `${webAppUrl}?page=admin`;
+      
+      if (!hasSetup) {
+        return {
+          status: 'setup_required',
+          isLoggedIn: true,
+          email: user.email,
+          userId: parsedUserData.userId || user.id,
+          adminUrl: adminUrl,
+          message: 'セットアップを完了してください'
+        };
+      }
+      
+      // 既存ユーザー（セットアップ完了済み）
+      return {
+        status: 'existing_user',
+        isLoggedIn: true,
+        email: user.email,
+        userId: parsedUserData.userId || user.id,
+        adminUrl: adminUrl,
+        message: 'ログイン完了'
+      };
+      
+    } catch (parseError) {
+      // ユーザーデータの解析に失敗した場合は再登録を促す
+      logError(parseError, 'getLoginStatus-parseUserData', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATA);
+      return {
+        status: 'unregistered',
+        isLoggedIn: true,
+        email: user.email,
+        message: 'ユーザーデータの再登録が必要です'
+      };
+    }
     
   } catch (error) {
     logError(error, 'getLoginStatus', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.AUTH);
     return {
       status: 'error',
       isLoggedIn: false,
-      message: error.message
+      message: error.message || 'ログイン状態の確認に失敗しました'
     };
   }
 }
