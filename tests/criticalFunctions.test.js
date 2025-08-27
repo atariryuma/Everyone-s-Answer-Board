@@ -23,7 +23,7 @@ const setupTest = () => {
   };
 
   global.SpreadsheetApp = {
-    openById: jest.fn((id) => ({
+    openById: jest.fn((_id) => ({
       getSheetByName: jest.fn((name) => ({
         getDataRange: jest.fn(() => ({
           getValues: jest.fn(() => {
@@ -84,7 +84,7 @@ const setupTest = () => {
   };
 
   global.FormApp = {
-    create: jest.fn((title) => ({
+    create: jest.fn((_title) => ({
       getId: jest.fn(() => 'form-123'),
       getPublishedUrl: jest.fn(() => 'https://forms.google.com/123'),
       setDescription: jest.fn(),
@@ -113,7 +113,7 @@ const setupTest = () => {
   };
 
   global.ContentService = {
-    createTextOutput: jest.fn((text) => ({
+    createTextOutput: jest.fn((_text) => ({
       setMimeType: jest.fn().mockReturnThis()
     })),
     MimeType: { JSON: 'JSON' }
@@ -208,9 +208,9 @@ const setupTest = () => {
     return 4;
   };
 
-  global.getSheetsList = (userId) => ['Sheet1', 'Sheet2'];
+  global.getSheetsList = (_userId) => ['Sheet1', 'Sheet2'];
   
-  global.generateUserUrls = (userId) => ({
+  global.generateUserUrls = (_userId) => ({
     webApp: 'https://script.google.com/test',
     admin: 'https://script.google.com/test?mode=admin',
     setup: 'https://script.google.com/test?mode=setup',
@@ -248,7 +248,7 @@ describe('クリティカル機能テスト', () => {
   describe('getInitialData', () => {
     test('正常に初期データを取得できる', () => {
       // CoreFunctionsServiceのgetInitialData関数を模擬
-      global.getInitialData = (requestUserId, targetSheetName, lightweightMode) => {
+      global.getInitialData = (requestUserId, _targetSheetName, _lightweightMode) => {
         const userInfo = global.getUserInfo(requestUserId);
         const configJson = JSON.parse(userInfo.configJson);
         // formCreatedを追加してステップ4になるようにする
@@ -299,7 +299,7 @@ describe('クリティカル機能テスト', () => {
 
   describe('getPublishedSheetData', () => {
     test('公開シートデータを取得できる', () => {
-      global.getPublishedSheetData = (requestUserId, classFilter, sortOrder, adminMode, bypassCache) => {
+      global.getPublishedSheetData = (requestUserId, classFilter, sortOrder, adminMode, _bypassCache) => {
         const userInfo = global.getUserInfo(requestUserId);
         if (!userInfo) {
           return { success: false, error: 'ユーザーが見つかりません' };

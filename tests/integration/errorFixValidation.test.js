@@ -57,7 +57,7 @@ describe('エラー修正統合検証', () => {
 
           return {
             status: 'success',
-            userInfo: userInfo,
+            userInfo,
             timestamp: new Date().toISOString()
           };
         } catch (e) {

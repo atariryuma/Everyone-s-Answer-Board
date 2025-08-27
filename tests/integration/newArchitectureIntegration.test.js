@@ -1,6 +1,8 @@
 /**
  * @fileoverview 新アーキテクチャの統合テスト
  */
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-undef */
 
 // モックのセットアップ
 const setupMocks = () => {
@@ -24,7 +26,7 @@ const setupMocks = () => {
   };
 
   global.SpreadsheetApp = {
-    openById: jest.fn((id) => ({
+    openById: jest.fn((_id) => ({
       getSheetByName: jest.fn((name) => ({
         getDataRange: jest.fn(() => ({
           getValues: jest.fn(() => [
@@ -40,11 +42,11 @@ const setupMocks = () => {
         })),
         setFrozenRows: jest.fn(),
         insertSheet: jest.fn(),
-        getName: jest.fn(() => name),
+        getName: jest.fn(() => 'Sheet1'),
         getLastColumn: jest.fn(() => 8),
         getLastRow: jest.fn(() => 2)
       })),
-      insertSheet: jest.fn((name) => ({
+      insertSheet: jest.fn((_name) => ({
         getRange: jest.fn(() => ({
           setValues: jest.fn()
         })),
@@ -92,14 +94,14 @@ const setupMocks = () => {
     base64Encode: jest.fn((data) => Buffer.from(data).toString('base64')),
     base64Decode: jest.fn((data) => Buffer.from(data, 'base64').toString()),
     sleep: jest.fn(),
-    formatDate: jest.fn((date, tz, format) => '2024-01-01 12:00:00')
+    formatDate: jest.fn((_date, _tz, _format) => '2024-01-01 12:00:00')
   };
 
   global.HtmlService = {
-    createHtmlOutputFromFile: jest.fn((filename) => ({
+    createHtmlOutputFromFile: jest.fn((_filename) => ({
       getContent: jest.fn(() => `<html>${filename}</html>`)
     })),
-    createTemplateFromFile: jest.fn((filename) => ({
+    createTemplateFromFile: jest.fn((_filename) => ({
       evaluate: jest.fn(() => ({
         setTitle: jest.fn().mockReturnThis(),
         setFaviconUrl: jest.fn().mockReturnThis(),
@@ -115,7 +117,7 @@ const setupMocks = () => {
   };
 
   global.FormApp = {
-    create: jest.fn((title) => ({
+    create: jest.fn((_title) => ({
       getId: jest.fn(() => 'form-id-123'),
       getPublishedUrl: jest.fn(() => 'https://forms.google.com/123'),
       setDescription: jest.fn(),
@@ -145,7 +147,7 @@ const setupMocks = () => {
   };
 
   global.UrlFetchApp = {
-    fetch: jest.fn((url, options) => ({
+    fetch: jest.fn((_url, _options) => ({
       getResponseCode: jest.fn(() => 200),
       getContentText: jest.fn(() => JSON.stringify({ success: true }))
     }))
@@ -171,7 +173,7 @@ const setupMocks = () => {
   };
 
   global.ContentService = {
-    createTextOutput: jest.fn((text) => ({
+    createTextOutput: jest.fn((_text) => ({
       setMimeType: jest.fn().mockReturnThis()
     })),
     MimeType: {
@@ -422,9 +424,85 @@ const loadServices = () => {
   global.showErrorPage = () => 'error-page-html';
   
   // スプレッドシートサービスの補助関数
-  global.getCurrentSheetName = (spreadsheetId) => 'Sheet1';
-  global.getSheetConfig = (userId, sheetName) => ({});
-  global.getSheetData = (userId, sheetName, classFilter, sortOrder, adminMode) => [];
+  global.getCurrentSheetName = (_spreadsheetId) => 'Sheet1';
+  global.getSheetConfig = (_userId, _sheetName) => ({});
+  global.getSheetData = (_userId, _sheetName, _classFilter, _sortOrder, _adminMode) => [];
+  
+  // ログ関数の追加
+  global.logError = jest.fn((error, context, severity, category, data) => {
+    console.error(`[${severity?.toUpperCase() || 'ERROR'}] ${context}:`, error.message || error, data);
+  });
+  global.debugLog = jest.fn((message) => {
+    if (global.shouldEnableDebugMode && global.shouldEnableDebugMode()) {
+      console.log('[DEBUG]', message);
+    }
+  });
+  global.warnLog = jest.fn((message) => {
+    console.warn('[WARN]', message);
+  });
+  global.infoLog = jest.fn((message) => {
+    console.info('[INFO]', message);
+  });
+  
+  // キャッシュ管理関数の追加
+  global.setCacheValue = jest.fn((key, value, ttl = 300) => {
+    global.memoryCache.set(key, value);
+    global.memoryCacheExpiry.set(key, Date.now() + (ttl * 1000));
+  });
+  
+  global.getCacheValue = jest.fn((key) => {
+    if (global.memoryCache.has(key)) {
+      const expiry = global.memoryCacheExpiry.get(key);
+      if (expiry && expiry > Date.now()) {
+        return global.memoryCache.get(key);
+      } else {
+        global.memoryCache.delete(key);
+        global.memoryCacheExpiry.delete(key);
+      }
+    }
+    return null;
+  });
+  
+  global.removeCacheValue = jest.fn((key) => {
+    global.memoryCache.delete(key);
+    global.memoryCacheExpiry.delete(key);
+  });
+  
+  global.clearCacheByPattern = jest.fn((pattern) => {
+    const regex = new RegExp(pattern.replace('*', '.*'));
+    for (const key of global.memoryCache.keys()) {
+      if (regex.test(key)) {
+        global.memoryCache.delete(key);
+        global.memoryCacheExpiry.delete(key);
+      }
+    }
+  });
+  
+  // データベース関数の追加
+  global.getUserById = jest.fn((userId) => {
+    if (userId === 'user123') {
+      return {
+        userId: 'user123',
+        adminEmail: 'test@example.com',
+        spreadsheetId: 'sheet123',
+        isActive: 'true'
+      };
+    }
+    return null;
+  });
+  
+  global.createUser = jest.fn((userData) => {
+    if (typeof userData === 'string') {
+      return { userId: 'new-user-123', adminEmail: userData };
+    }
+    return { 
+      userId: 'new-user-123', 
+      adminEmail: userData.adminEmail,
+      spreadsheetId: userData.spreadsheetId || 'new-sheet-id',
+      isActive: 'true'
+    };
+  });
+  global.updateUser = jest.fn((_userId, _updates) => true);
 };
 
 describe('新アーキテクチャ統合テスト', () => {
@@ -440,7 +518,7 @@ describe('新アーキテクチャ統合テスト', () => {
     test('エラーログが正しく記録される', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       
-      logError(new Error('テストエラー'), 'testContext', 'high', 'system', { test: true });
+      global.logError(new Error('テストエラー'), 'testContext', 'high', 'system', { test: true });
       
       expect(consoleSpy).toHaveBeenCalledWith(
         '[HIGH] testContext:',

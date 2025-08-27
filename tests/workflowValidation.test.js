@@ -60,7 +60,7 @@ function validateWorkflow(data) {
   return {
     valid: true,
     message: 'Workflow validation successful',
-    data: data
+    data
   };
 }
 

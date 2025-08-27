@@ -6,7 +6,7 @@
 // SpreadsheetApp モック
 global.SpreadsheetApp = {
   getActiveSpreadsheet: jest.fn(() => ({
-    getSheetByName: jest.fn((name) => ({
+    getSheetByName: jest.fn((_name) => ({
       getRange: jest.fn((row, col, numRows, numCols) => ({
         getValues: jest.fn(() => Array(numRows || 1).fill(Array(numCols || 1).fill(''))),
         setValues: jest.fn(),
@@ -190,7 +190,7 @@ global.DriveApp = {
     setSharing: jest.fn(),
     makeCopy: jest.fn(),
   })),
-  getFolderById: jest.fn((id) => ({
+  getFolderById: jest.fn((_id) => ({
     getName: jest.fn(() => 'folder'),
     createFile: jest.fn(),
     createFolder: jest.fn(),
