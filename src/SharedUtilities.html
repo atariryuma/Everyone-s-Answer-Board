@@ -506,19 +506,56 @@ class ErrorHandler {
   sendToBackend(errorInfo) {
     try {
       if (typeof google !== 'undefined' && google.script?.run) {
-        // バックエンドのlogClientErrorに適切な形式でデータを送信
+        // 安全で最小限のデータを送信
         const clientErrorData = {
-          message: errorInfo.message || errorInfo.error || 'unknown error',
+          message: this.extractSafeMessage(errorInfo),
           userId: window.AdminPanel?.currentUserId || 'unknown',
-          url: window.location.href,
+          url: window.location.href ? window.location.href.substring(0, 200) : 'unknown',
           timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          stack: errorInfo.stack
+          userAgent: navigator.userAgent ? navigator.userAgent.substring(0, 150) : 'unknown',
+          type: errorInfo.name || errorInfo.type || 'unknown'
         };
         
         google.script.run.logClientError(clientErrorData);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { 
+      // フォールバック：最小限の情報のみ送信
+      try {
+        google.script.run.logClientError('Error in error reporting');
+      } catch (fallbackError) { /* complete silence */ }
+    }
+  }
+
+  extractSafeMessage(errorInfo) {
+    try {
+      // エラーメッセージを安全に抽出
+      if (typeof errorInfo === 'string') {
+        return errorInfo.substring(0, 300);
+      }
+      
+      if (errorInfo && typeof errorInfo === 'object') {
+        // 基本的なエラー情報を優先
+        const message = errorInfo.message || errorInfo.error || errorInfo.toString();
+        if (typeof message === 'string') {
+          return message.substring(0, 300);
+        }
+        
+        // オブジェクトの場合は重要なプロパティのみ取得
+        const safeProps = {
+          name: errorInfo.name,
+          type: errorInfo.type,
+          code: errorInfo.code,
+          lineno: errorInfo.lineno,
+          colno: errorInfo.colno
+        };
+        
+        return JSON.stringify(safeProps).substring(0, 300);
+      }
+      
+      return 'Unable to extract error message';
+    } catch (e) {
+      return 'Error message extraction failed';
+    }
   }
 
   setupGlobalErrorHandling() {

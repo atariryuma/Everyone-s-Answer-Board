@@ -48,7 +48,8 @@
       "Bash(./scripts/merge-feature.sh:*)",
       "Bash(./scripts/cleanup-branches.sh:*)",
       "Bash(npm test)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": [],

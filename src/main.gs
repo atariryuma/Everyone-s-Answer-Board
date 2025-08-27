@@ -121,6 +121,47 @@ function debugLog(message) {
 }
 
 /**
+ * 循環参照対応の安全なJSON.stringify
+ * @param {*} obj - シリアライズするオブジェクト
+ * @param {number} maxLength - 最大文字数（デフォルト: 500）
+ * @return {string} 安全にシリアライズされた文字列
+ */
+function safeStringify(obj, maxLength = 500) {
+  try {
+    const seen = new WeakSet();
+    const result = JSON.stringify(obj, (key, val) => {
+      // 循環参照の検出
+      if (typeof val === 'object' && val !== null) {
+        if (seen.has(val)) {
+          return '[Circular Reference]';
+        }
+        seen.add(val);
+      }
+      
+      // 関数やDOM要素などを安全に処理
+      if (typeof val === 'function') {
+        return '[Function]';
+      }
+      if (val && typeof val === 'object' && val.nodeType) {
+        return '[DOM Element]';
+      }
+      if (val instanceof Error) {
+        return val.message;
+      }
+      
+      return val;
+    });
+    
+    // 文字数制限
+    return result && result.length > maxLength ? 
+      `${result.substring(0, maxLength)}...[truncated]` : 
+      result || '[Unable to serialize]';
+  } catch (e) {
+    return `[Stringify Error: ${e.message}]`;
+  }
+}
+
+/**
  * シンプルなクライアントエラーログ
  * @param {string|Object} errorInfo - エラー情報（文字列またはオブジェクト）
  */
@@ -133,14 +174,29 @@ function logClientError(errorInfo) {
     if (typeof errorInfo === 'string') {
       message = errorInfo;
     } else if (errorInfo && typeof errorInfo === 'object') {
-      message = errorInfo.message || errorInfo.error || JSON.stringify(errorInfo);
+      // 安全な情報抽出
+      message = errorInfo.message || errorInfo.error;
       userId = errorInfo.userId || errorInfo.user || 'unknown';
+      
+      // messageが取得できない場合のみ安全なStringifyを使用
+      if (!message) {
+        // 重要な情報のみを抽出
+        const safeInfo = {
+          type: errorInfo.type || errorInfo.name,
+          url: errorInfo.url,
+          timestamp: errorInfo.timestamp,
+          userAgent: errorInfo.userAgent ? errorInfo.userAgent.substring(0, 100) : undefined
+        };
+        message = safeStringify(safeInfo, 300);
+      }
     }
 
     console.error(`🚨 CLIENT: ${message} (${userId})`);
     return { status: 'success', logged: true };
   } catch (e) {
+    // フォールバック: 最小限の情報でログ出力
     console.error(`🚨 CLIENT ERROR LOGGING FAILED: ${e.message}`);
+    console.error(`🚨 CLIENT: [Error processing failed] (unknown)`);
     return { status: 'error', message: e.message };
   }
 }
