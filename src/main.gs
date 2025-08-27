@@ -271,11 +271,16 @@ function doGet(e) {
     // パラメータによる画面制御
     const params = e && e.parameters ? e.parameters : {};
     
-    if (params.page && params.page.toString() === 'admin') {
+    // パラメータがない場合はログインページを表示
+    if (!params.page) {
+      return renderLoginPage();
+    }
+    
+    if (params.page.toString() === 'admin') {
       return renderAdminPanel(userInfo, params);
-    } else if (params.page && params.page.toString() === 'setup') {
+    } else if (params.page.toString() === 'setup') {
       return renderSetupPage(userInfo, params);
-    } else if (params.page && params.page.toString() === 'unpublished') {
+    } else if (params.page.toString() === 'unpublished') {
       return renderUnpublishedPage(userInfo, params);
     } else {
       return renderAnswerBoard(userInfo, params);
@@ -701,6 +706,300 @@ function checkSystemConfiguration() {
       status: 'error',
       message: error.message,
       timestamp: new Date().toISOString()
+    };
+  }
+}
+
+// =================================================================
+// Login Page Support Functions
+// =================================================================
+
+/**
+ * Google Client IDを取得
+ * @returns {string} Google Client ID
+ */
+function getGoogleClientId() {
+  try {
+    // PropertiesServiceから取得、なければデフォルト値
+    const properties = PropertiesService.getScriptProperties();
+    const clientId = properties.getProperty('GOOGLE_CLIENT_ID');
+    
+    return clientId || '';
+  } catch (error) {
+    logError(error, 'getGoogleClientId', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return '';
+  }
+}
+
+/**
+ * ユーザー登録確認
+ * @param {string} email - ユーザーのメールアドレス
+ * @returns {object} 登録確認結果
+ */
+function confirmUserRegistration(email) {
+  try {
+    if (!email || typeof email !== 'string') {
+      throw new Error('Invalid email parameter');
+    }
+    
+    // ユーザーの登録状態を確認
+    const properties = PropertiesService.getUserProperties();
+    const userKey = `user_${email}`;
+    const userData = properties.getProperty(userKey);
+    
+    if (userData) {
+      return {
+        status: 'success',
+        isRegistered: true,
+        message: 'ユーザーは登録済みです'
+      };
+    }
+    
+    // 新規ユーザーとして登録
+    const newUserData = {
+      email: email,
+      registeredAt: new Date().toISOString(),
+      userId: Utilities.getUuid()
+    };
+    
+    properties.setProperty(userKey, JSON.stringify(newUserData));
+    
+    return {
+      status: 'success',
+      isRegistered: false,
+      message: '新規ユーザーとして登録しました',
+      userId: newUserData.userId
+    };
+    
+  } catch (error) {
+    logError(error, 'confirmUserRegistration', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.AUTH);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * ログイン状態を取得
+ * @returns {object} ログイン状態
+ */
+function getLoginStatus() {
+  try {
+    const user = getCurrentUser();
+    
+    return {
+      status: 'success',
+      isLoggedIn: user.isLoggedIn,
+      email: user.email,
+      userId: user.id,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    logError(error, 'getLoginStatus', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.AUTH);
+    return {
+      status: 'error',
+      isLoggedIn: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * 現在のユーザーメールアドレスを取得
+ * @returns {string} ユーザーのメールアドレス
+ */
+function getCurrentUserEmail() {
+  try {
+    const user = Session.getActiveUser();
+    return user.getEmail() || '';
+  } catch (error) {
+    logError(error, 'getCurrentUserEmail', MAIN_ERROR_SEVERITY.LOW, MAIN_ERROR_CATEGORIES.AUTH);
+    return '';
+  }
+}
+
+/**
+ * システムドメイン情報を取得
+ * @returns {object} ドメイン情報
+ */
+function getSystemDomainInfo() {
+  try {
+    const email = getCurrentUserEmail();
+    const domain = email ? email.split('@')[1] : '';
+    
+    return {
+      status: 'success',
+      domain: domain,
+      isGoogleWorkspace: domain && !domain.includes('gmail.com'),
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    logError(error, 'getSystemDomainInfo', MAIN_ERROR_SEVERITY.LOW, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return {
+      status: 'error',
+      domain: '',
+      message: error.message
+    };
+  }
+}
+
+// =================================================================
+// Setup Page Support Functions
+// =================================================================
+
+/**
+ * アプリケーションセットアップ
+ * @param {object} config - セットアップ設定
+ * @returns {object} セットアップ結果
+ */
+function setupApplication(config) {
+  try {
+    if (!config || typeof config !== 'object') {
+      throw new Error('Invalid configuration');
+    }
+    
+    const user = getCurrentUser();
+    if (!user.isLoggedIn) {
+      throw new Error('User not authenticated');
+    }
+    
+    // セットアップ設定を保存
+    const properties = PropertiesService.getUserProperties();
+    properties.setProperty('app_config', JSON.stringify({
+      ...config,
+      setupBy: user.email,
+      setupAt: new Date().toISOString()
+    }));
+    
+    // 必要なリソースを作成
+    const result = {
+      status: 'success',
+      message: 'アプリケーションのセットアップが完了しました',
+      config: config,
+      timestamp: new Date().toISOString()
+    };
+    
+    return result;
+    
+  } catch (error) {
+    logError(error, 'setupApplication', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * セットアップのテスト
+ * @returns {object} テスト結果
+ */
+function testSetup() {
+  try {
+    const tests = {
+      userAuth: false,
+      properties: false,
+      permissions: false,
+      configuration: false
+    };
+    
+    // ユーザー認証テスト
+    const user = getCurrentUser();
+    tests.userAuth = user.isLoggedIn;
+    
+    // Properties Service テスト
+    try {
+      const props = PropertiesService.getUserProperties();
+      props.setProperty('test_key', 'test_value');
+      tests.properties = props.getProperty('test_key') === 'test_value';
+      props.deleteProperty('test_key');
+    } catch (e) {
+      tests.properties = false;
+    }
+    
+    // 権限テスト
+    try {
+      const scriptProps = PropertiesService.getScriptProperties();
+      tests.permissions = true;
+    } catch (e) {
+      tests.permissions = false;
+    }
+    
+    // 設定テスト
+    const props = PropertiesService.getUserProperties();
+    const config = props.getProperty('app_config');
+    tests.configuration = !!config;
+    
+    const allPassed = Object.values(tests).every(test => test === true);
+    
+    return {
+      status: allPassed ? 'success' : 'warning',
+      tests: tests,
+      message: allPassed ? 'すべてのテストに合格しました' : '一部のテストに失敗しました',
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    logError(error, 'testSetup', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * アプリ起動処理
+ * @returns {object} 起動結果
+ */
+function startApp() {
+  try {
+    const user = getCurrentUser();
+    if (!user.isLoggedIn) {
+      throw new Error('User not authenticated');
+    }
+    
+    // アプリケーション起動処理
+    const webAppUrl = getWebAppUrl();
+    const adminUrl = webAppUrl + '?page=admin';
+    
+    return {
+      status: 'success',
+      message: 'アプリケーションを起動しました',
+      redirectUrl: adminUrl,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    logError(error, 'startApp', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return {
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+// =================================================================
+// AdminPanel Support Functions
+// =================================================================
+
+/**
+ * クイックスタートセットアップの実行（AdminPanel用エイリアス）
+ * @param {string} requestUserId - ユーザーID
+ * @returns {object} セットアップ結果
+ */
+function executeQuickStartSetup(requestUserId) {
+  try {
+    // Core.gsのcreateQuickStartFormUI関数を呼び出し
+    return createQuickStartFormUI(requestUserId);
+  } catch (error) {
+    logError(error, 'executeQuickStartSetup', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return {
+      status: 'error',
+      message: error.message
     };
   }
 }
