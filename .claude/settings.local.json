@@ -45,7 +45,8 @@
       "Bash(npm run lint:*)",
       "Bash(npm run test:*)",
       "Bash(./scripts/new-feature.sh:*)",
-      "Bash(./scripts/merge-feature.sh:*)"
+      "Bash(./scripts/merge-feature.sh:*)",
+      "Bash(./scripts/cleanup-branches.sh:*)"
     ],
     "deny": [],
     "ask": [],

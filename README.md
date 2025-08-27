@@ -1,16 +1,77 @@
-# みんなの回答ボード - サイロ型マルチテナントシステム実装仕様
+# みんなの回答ボード - Claude Code AI開発対応システム
 
-## システムアーキテクチャ（実装ベース）
+🤖 **Claude Code AI開発環境完全対応プロジェクト**
 
-**基盤**: Google Apps Script V8 Runtime
+## 🚀 クイックスタート
+
+### 新機能開発（推奨ワークフロー）
+```bash
+# 1. 新機能開発開始
+./scripts/new-feature.sh "機能名"
+
+# 2. 別ターミナルでテスト監視
+npm run test:watch
+
+# 3. Claude Codeで「feature/機能名 ブランチで開発します」
+#    → TDD→実装→修正のサイクル
+
+# 4. 開発完了後
+./scripts/merge-feature.sh "機能名"
+```
+
+### 緊急修正
+```bash
+./scripts/quick-fix.sh      # 修正作業
+./scripts/hotfix-deploy.sh  # 即座にデプロイ
+```
+
+## 🏗️ システムアーキテクチャ
+
+**基盤**: Google Apps Script V8 Runtime + Claude Code AI開発環境
+**テスト**: Jest + GAS API完全モック
+**品質管理**: ESLint + Prettier + 自動化CI/CD
+**開発フロー**: TDD + feature/main ブランチ戦略
 **データストア**: Google Sheets（テナント分離型）
 **認証**: Google OAuth2（email-based ownership）
-**フロントエンド**: HTML/CSS/JavaScript（外部ライブラリ不使用）
+**フロントエンド**: HTML/CSS/JavaScript
 **マルチテナンシー**: サイロ型（テナントごとに独立スプレッドシート）
 
-## 実装済み中核システム
+## 🧪 Claude Code AI開発環境
 
-### エラー処理
+### テスト環境
+```javascript
+// Jest + GAS API完全モック環境
+SpreadsheetApp     // モック実装済み
+PropertiesService  // モック実装済み  
+CacheService       // モック実装済み
+UrlFetchApp       // モック実装済み
+HtmlService       // モック実装済み
+Utilities         // モック実装済み
++ 全GAS API対応
+```
+
+### 品質管理ツール
+```bash
+npm run test        # Jest単体テスト
+npm run test:watch  # テスト監視モード（開発時推奨）
+npm run lint        # ESLint品質チェック
+npm run format      # Prettier自動整形
+npm run check       # 統合品質チェック
+npm run deploy      # テスト→GASデプロイ
+```
+
+### 自動化スクリプト
+```bash
+./scripts/new-feature.sh <名前>     # feature開発開始
+./scripts/merge-feature.sh <名前>   # マージ・デプロイ
+./scripts/quick-fix.sh              # 緊急修正モード
+./scripts/hotfix-deploy.sh          # ホットフィックスデプロイ
+./scripts/cleanup-branches.sh       # ブランチ整理
+```
+
+## 🏗️ 実装済み中核システム
+
+### エラー処理 
 ```javascript
 UnifiedErrorHandler        // 実装済み - 構造化ログ管理
 ManagedExecutionContext   // 実装済み - 実行コンテキスト管理
