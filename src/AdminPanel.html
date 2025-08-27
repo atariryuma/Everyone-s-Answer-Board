@@ -2041,14 +2041,8 @@
   <?!= include('errorMessages.js.html'); ?>
   <!-- Backend progress sync system -->
   <?!= include('backendProgressSync.js.html'); ?>
-  <!-- Admin Panel Framework - must be loaded before other admin panel components -->
-  <?!= include('adminPanel-framework.js.html'); ?>
-  <!-- Consolidated Admin Panel Components -->
-  <?!= include('admin-consolidated.js.html'); ?>
-  <?!= include('adminPanel-api.js.html'); ?>
-  <?!= include('adminPanel-ui.js.html'); ?>
-  <?!= include('adminPanel-events.js.html'); ?>
-  <?!= include('adminPanel-simple-history-compat.js.html'); ?>
+  <!-- Admin Panel Bundle - All admin panel components in one file -->
+  <?!= include('adminPanel-bundle.js.html'); ?>
 
   <script>
     // 管理者モーダルの初期化

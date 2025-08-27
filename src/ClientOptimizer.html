@@ -50,21 +50,22 @@ class GASOptimizer {
       throw new Error('GAS function \'' + functionName + '\' is not available');
     }
 
-  google.script.run
-    .withSuccessHandler(function(result) {
-      self.activeCalls--;
-      self.setLoadingState(functionName, false);
-      resolve(result);
-      self.processQueue();
-    })
-    .withFailureHandler(function(error) {
-      self.activeCalls--;
-      self.setLoadingState(functionName, false);
-      console.error('GAS Function Error [' + functionName + ']:', error);
-      reject(self.enhanceError(error, functionName));
-      self.processQueue();
-    })[functionName].apply(null, args);
-};
+    const self = this;
+    google.script.run
+      .withSuccessHandler(function(result) {
+        self.activeCalls--;
+        self.setLoadingState(functionName, false);
+        resolve(result);
+        self.processQueue();
+      })
+      .withFailureHandler(function(error) {
+        self.activeCalls--;
+        self.setLoadingState(functionName, false);
+        console.error('GAS Function Error [' + functionName + ']:', error);
+        reject(self.enhanceError(error, functionName));
+        self.processQueue();
+      })[functionName].apply(null, args);
+  }
 
   /**
    * キューの処理
