@@ -107,10 +107,29 @@
             
             if (response.status === 'existing_user' || response.status === 'setup_required') {
               const msg = response.status === 'setup_required' ? 'セットアップを完了してください' : 'ログインが完了しました';
+              
+              // 認証成功時にドメイン表示を更新
+              if (response.email) {
+                const domain = response.email.split('@')[1];
+                const isWorkspace = domain && !domain.includes('gmail.com');
+                const statusText = response.status === 'existing_user' ? 
+                  (isWorkspace ? 'Workspace認証済み' : 'Googleアカウント認証済み') : 
+                  'セットアップ完了待ち';
+                updateDomainDisplay('match', domain, statusText);
+              }
+              
               setLoading(true, '管理パネルへリダイレクト中...');
               showAdminPanelRedirect(response.adminUrl, msg);
               resolve();
             } else if (response.status === 'unregistered') {
+              // 未登録ユーザーの場合もドメイン表示を更新
+              if (response.email) {
+                const domain = response.email.split('@')[1];
+                const isWorkspace = domain && !domain.includes('gmail.com');
+                const statusText = isWorkspace ? 'Workspace認証済み (未登録)' : 'Googleアカウント認証済み (未登録)';
+                updateDomainDisplay('match', domain, statusText);
+              }
+              
               setLoading(false);
               const confirmMessage = 'このアカウントはまだ登録されていません。\n新規ユーザーとして登録しますか？';
               if (confirm(confirmMessage)) {
