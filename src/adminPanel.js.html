@@ -284,7 +284,7 @@ const data = {
   async createCustomForm() {
     try {
       utils.showMessage('カスタムフォームを作成しています...', 'info');
-      const result = await utils.callAPI('createCustomBoard', null);
+      const result = await utils.callAPI('createCustomBoard', state.user.id);
       
       if (result && result.status === 'success') {
         state.system.formUrl = result.formUrl;
@@ -323,7 +323,7 @@ const data = {
     }
 
     try {
-      const sheets = await utils.callAPI('getSpreadsheetSheets', state.system.spreadsheetId);
+      const sheets = await utils.callAPI('getSpreadsheetSheets', state.user.id);
       
       if (sheets && !sheets.error) {
         return sheets;
@@ -344,7 +344,7 @@ const data = {
     }
 
     try {
-      const result = await utils.callAPI('getSheetHeaders', state.system.spreadsheetId, sheetName);
+      const result = await utils.callAPI('getSheetHeaders', state.user.id, state.system.spreadsheetId, sheetName);
       
       if (result && !result.error) {
         return result.headers || [];
@@ -420,9 +420,10 @@ const config = {
     try {
       const result = await utils.callAPI('getSheetPreviewData', 
         state.user.id,
-        state.system.spreadsheetId,
         state.system.currentSheet,
-        3
+        null, // classFilter
+        'default', // sortMode
+        true // adminMode
       );
       
       if (result && result.status === 'success') {
@@ -448,8 +449,8 @@ const config = {
       utils.showMessage('AI列判定を実行しています...', 'info');
       const result = await utils.callAPI('guessColumnMapping', 
         state.user.id,
-        state.system.spreadsheetId,
-        state.system.currentSheet
+        state.system.currentSheet,
+        {} // overrides (空のオブジェクト)
       );
       
       if (result && result.status === 'success' && result.columnMapping) {

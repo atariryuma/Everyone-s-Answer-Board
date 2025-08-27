@@ -249,6 +249,50 @@ function verifyUserAccess(requestUserId) {
   }
 }
 
+/**
+ * API パラメータ検証ヘルパー
+ * @param {string} functionName - 関数名
+ * @param {Array} params - パラメータ配列
+ * @param {Array} expectedTypes - 期待する型の配列
+ * @throws {Error} パラメータが無効な場合
+ */
+function validateApiParameters(functionName, params, expectedTypes) {
+  try {
+    if (!Array.isArray(params)) {
+      throw new Error(`Invalid parameters for ${functionName}: not an array`);
+    }
+    
+    if (params.length !== expectedTypes.length) {
+      throw new Error(`Invalid parameter count for ${functionName}: expected ${expectedTypes.length}, got ${params.length}`);
+    }
+    
+    for (let i = 0; i < params.length; i++) {
+      const param = params[i];
+      const expectedType = expectedTypes[i];
+      
+      if (expectedType === 'string' && (typeof param !== 'string' || param === '')) {
+        throw new Error(`Parameter ${i + 1} for ${functionName} must be a non-empty string`);
+      }
+      
+      if (expectedType === 'object' && (typeof param !== 'object' || param === null)) {
+        throw new Error(`Parameter ${i + 1} for ${functionName} must be an object`);
+      }
+      
+      if (expectedType === 'boolean' && typeof param !== 'boolean') {
+        throw new Error(`Parameter ${i + 1} for ${functionName} must be a boolean`);
+      }
+      
+      if (expectedType === 'number' && typeof param !== 'number') {
+        throw new Error(`Parameter ${i + 1} for ${functionName} must be a number`);
+      }
+    }
+    
+  } catch (error) {
+    logError(error, 'validateApiParameters', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.VALIDATION);
+    throw error;
+  }
+}
+
 // =================================================================
 // Main Rendering Functions
 // =================================================================
@@ -1001,5 +1045,37 @@ function executeQuickStartSetup(requestUserId) {
       status: 'error',
       message: error.message
     };
+  }
+}
+
+/**
+ * JavaScript文字列のエスケープ処理
+ * @param {*} value - エスケープする値
+ * @returns {string} エスケープされた文字列
+ */
+function escapeJavaScript(value) {
+  try {
+    if (value === null || value === undefined) {
+      return 'null';
+    }
+    
+    const str = String(value);
+    return str
+      .replace(/\\/g, '\\\\')    // バックスラッシュ
+      .replace(/'/g, "\\'")      // シングルクォート
+      .replace(/"/g, '\\"')      // ダブルクォート
+      .replace(/\n/g, '\\n')     // 改行
+      .replace(/\r/g, '\\r')     // キャリッジリターン
+      .replace(/\t/g, '\\t')     // タブ
+      .replace(/\f/g, '\\f')     // フォームフィード
+      .replace(/\b/g, '\\b')     // バックスペース
+      .replace(/\v/g, '\\v')     // 垂直タブ
+      .replace(/\0/g, '\\0')     // NULL文字
+      .replace(/\u2028/g, '\\u2028')  // ライン区切り文字
+      .replace(/\u2029/g, '\\u2029'); // 段落区切り文字
+      
+  } catch (error) {
+    logError(error, 'escapeJavaScript', MAIN_ERROR_SEVERITY.LOW, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return 'null';
   }
 }
