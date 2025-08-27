@@ -287,7 +287,7 @@
           .withFailureHandler((error) => {
             console.warn('Failed to report error to server:', error);
           })
-          .reportClientError && google.script.run.reportClientError(errorInfo);
+          .logClientError && google.script.run.logClientError(errorInfo);
       }
     } catch (e) {
       console.warn('Error reporting failed:', e);
