@@ -841,13 +841,21 @@ function getLoginStatus() {
       };
     }
     
-    // ユーザーの登録状態をチェック
-    const properties = PropertiesService.getUserProperties();
-    const userKey = `user_${user.email}`;
-    const userData = properties.getProperty(userKey);
+    // データベースから既存ユーザーをチェック
+    let existingUser = null;
+    try {
+      existingUser = fetchUserFromDatabase('adminEmail', user.email);
+    } catch (dbError) {
+      // データベースエラーは警告として記録するが、継続
+      logError(dbError, 'getLoginStatus-fetchUser', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATA);
+    }
     
-    // 未登録ユーザー
-    if (!userData) {
+    // 管理パネルURLを生成
+    const webAppUrl = getWebAppUrl();
+    const adminUrl = `${webAppUrl}?page=admin`;
+    
+    // データベースに既存ユーザーが見つからない場合
+    if (!existingUser) {
       return {
         status: 'unregistered',
         isLoggedIn: true,
@@ -856,49 +864,32 @@ function getLoginStatus() {
       };
     }
     
-    // 登録済みユーザーの場合、セットアップ状況をチェック
-    try {
-      const parsedUserData = JSON.parse(userData);
-      
-      // セットアップ完了状況の確認
-      const appConfig = properties.getProperty('app_config');
-      const hasSetup = !!appConfig;
-      
-      // 管理パネルURLを生成
-      const webAppUrl = getWebAppUrl();
-      const adminUrl = `${webAppUrl}?page=admin`;
-      
-      if (!hasSetup) {
-        return {
-          status: 'setup_required',
-          isLoggedIn: true,
-          email: user.email,
-          userId: parsedUserData.userId || user.id,
-          adminUrl: adminUrl,
-          message: 'セットアップを完了してください'
-        };
-      }
-      
-      // 既存ユーザー（セットアップ完了済み）
+    // 既存ユーザーの場合、セットアップ状況をチェック
+    // PropertiesServiceでセットアップ状況を確認
+    const properties = PropertiesService.getUserProperties();
+    const appConfig = properties.getProperty('app_config');
+    const hasSetup = !!appConfig;
+    
+    if (!hasSetup) {
       return {
-        status: 'existing_user',
+        status: 'setup_required',
         isLoggedIn: true,
         email: user.email,
-        userId: parsedUserData.userId || user.id,
+        userId: existingUser.userId || user.id,
         adminUrl: adminUrl,
-        message: 'ログイン完了'
-      };
-      
-    } catch (parseError) {
-      // ユーザーデータの解析に失敗した場合は再登録を促す
-      logError(parseError, 'getLoginStatus-parseUserData', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATA);
-      return {
-        status: 'unregistered',
-        isLoggedIn: true,
-        email: user.email,
-        message: 'ユーザーデータの再登録が必要です'
+        message: 'セットアップを完了してください'
       };
     }
+    
+    // 既存ユーザー（セットアップ完了済み）
+    return {
+      status: 'existing_user',
+      isLoggedIn: true,
+      email: user.email,
+      userId: existingUser.userId || user.id,
+      adminUrl: adminUrl,
+      message: 'ログイン完了'
+    };
     
   } catch (error) {
     logError(error, 'getLoginStatus', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.AUTH);
@@ -925,7 +916,7 @@ function getCurrentUserEmail() {
 }
 
 /**
- * システムドメイン情報を取得
+ * システムドメイン情報を取得（フロントエンド期待値対応）
  * @returns {object} ドメイン情報
  */
 function getSystemDomainInfo() {
@@ -933,18 +924,39 @@ function getSystemDomainInfo() {
     const email = getCurrentUserEmail();
     const domain = email ? email.split('@')[1] : '';
     
-    return {
-      status: 'success',
-      domain: domain,
-      isGoogleWorkspace: domain && !domain.includes('gmail.com'),
-      timestamp: new Date().toISOString()
-    };
+    // ドメインが存在する場合は適切な表示に更新
+    if (domain) {
+      const isGoogleWorkspace = !domain.includes('gmail.com');
+      
+      return {
+        status: 'success',
+        domain: domain,
+        adminDomain: domain, // フロントエンドが期待するプロパティ名
+        isDomainMatch: true, // 認証済みなので常にtrue
+        isGoogleWorkspace: isGoogleWorkspace,
+        displayStatus: isGoogleWorkspace ? 'Workspace認証済み' : 'Googleアカウント認証済み',
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      // ドメイン情報がない場合
+      return {
+        status: 'success',
+        domain: '',
+        adminDomain: '不明なドメイン',
+        isDomainMatch: false,
+        isGoogleWorkspace: false,
+        displayStatus: 'ドメイン確認中',
+        timestamp: new Date().toISOString()
+      };
+    }
     
   } catch (error) {
     logError(error, 'getSystemDomainInfo', MAIN_ERROR_SEVERITY.LOW, MAIN_ERROR_CATEGORIES.SYSTEM);
     return {
       status: 'error',
       domain: '',
+      adminDomain: 'エラー',
+      isDomainMatch: false,
       message: error.message
     };
   }

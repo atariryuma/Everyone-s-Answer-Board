@@ -31,6 +31,7 @@ function loadGetLoginStatusFunction() {
   const mockGetCurrentUser = jest.fn();
   const mockLogError = jest.fn();
   const mockGetWebAppUrl = jest.fn(() => 'https://script.google.com/test');
+  const mockFetchUserFromDatabase = jest.fn();
   const mockPropertiesService = {
     getUserProperties: jest.fn(() => ({
       getProperty: jest.fn()
@@ -41,16 +42,17 @@ function loadGetLoginStatusFunction() {
     const getCurrentUser = arguments[0];
     const logError = arguments[1];
     const getWebAppUrl = arguments[2];
-    const PropertiesService = arguments[3];
+    const fetchUserFromDatabase = arguments[3];
+    const PropertiesService = arguments[4];
     const MAIN_ERROR_SEVERITY = { MEDIUM: 'medium' };
     const MAIN_ERROR_CATEGORIES = { AUTH: 'auth', DATA: 'data' };
     const JSON = global.JSON;
     
     ${fnStr}; 
-    return { getLoginStatus, getCurrentUser, PropertiesService };
-  `)(mockGetCurrentUser, mockLogError, mockGetWebAppUrl, mockPropertiesService);
+    return { getLoginStatus, getCurrentUser, fetchUserFromDatabase, PropertiesService };
+  `)(mockGetCurrentUser, mockLogError, mockGetWebAppUrl, mockFetchUserFromDatabase, mockPropertiesService);
   
-  return { ...fn, mockGetCurrentUser, mockLogError, mockGetWebAppUrl, mockPropertiesService };
+  return { ...fn, mockGetCurrentUser, mockLogError, mockGetWebAppUrl, mockFetchUserFromDatabase, mockPropertiesService };
 }
 
 describe('getLoginStatus関数テスト', () => {
@@ -81,10 +83,8 @@ describe('getLoginStatus関数テスト', () => {
       id: 'test-id'
     });
     
-    const mockUserProperties = {
-      getProperty: jest.fn(() => null) // ユーザーデータなし
-    };
-    functions.mockPropertiesService.getUserProperties.mockReturnValue(mockUserProperties);
+    // データベースにユーザーが見つからない
+    functions.mockFetchUserFromDatabase.mockReturnValue(null);
 
     const result = functions.getLoginStatus();
     
@@ -92,6 +92,7 @@ describe('getLoginStatus関数テスト', () => {
     expect(result.isLoggedIn).toBe(true);
     expect(result.email).toBe('test@example.com');
     expect(result.message).toContain('新規ユーザー登録が必要');
+    expect(functions.mockFetchUserFromDatabase).toHaveBeenCalledWith('adminEmail', 'test@example.com');
   });
 
   test('セットアップ未完了の場合はsetup_requiredを返す', () => {
@@ -101,11 +102,14 @@ describe('getLoginStatus関数テスト', () => {
       id: 'test-id'
     });
     
+    // データベースにユーザーが存在
+    functions.mockFetchUserFromDatabase.mockReturnValue({
+      userId: 'test-id',
+      adminEmail: 'test@example.com'
+    });
+    
     const mockUserProperties = {
       getProperty: jest.fn((key) => {
-        if (key === 'user_test@example.com') {
-          return JSON.stringify({ userId: 'test-id' });
-        }
         if (key === 'app_config') {
           return null; // セットアップ未完了
         }
@@ -120,6 +124,7 @@ describe('getLoginStatus関数テスト', () => {
     expect(result.isLoggedIn).toBe(true);
     expect(result.adminUrl).toContain('page=admin');
     expect(result.message).toContain('セットアップを完了');
+    expect(functions.mockFetchUserFromDatabase).toHaveBeenCalledWith('adminEmail', 'test@example.com');
   });
 
   test('既存ユーザーの場合はexisting_userを返す', () => {
@@ -129,11 +134,14 @@ describe('getLoginStatus関数テスト', () => {
       id: 'test-id'
     });
     
+    // データベースにユーザーが存在
+    functions.mockFetchUserFromDatabase.mockReturnValue({
+      userId: 'test-id',
+      adminEmail: 'test@example.com'
+    });
+    
     const mockUserProperties = {
       getProperty: jest.fn((key) => {
-        if (key === 'user_test@example.com') {
-          return JSON.stringify({ userId: 'test-id' });
-        }
         if (key === 'app_config') {
           return JSON.stringify({ setupComplete: true }); // セットアップ完了
         }
@@ -148,28 +156,25 @@ describe('getLoginStatus関数テスト', () => {
     expect(result.isLoggedIn).toBe(true);
     expect(result.adminUrl).toContain('page=admin');
     expect(result.message).toContain('ログイン完了');
+    expect(functions.mockFetchUserFromDatabase).toHaveBeenCalledWith('adminEmail', 'test@example.com');
   });
 
-  test('ユーザーデータ解析エラーの場合は再登録を促す', () => {
+  test('データベースエラーの場合でも動作する', () => {
     functions.mockGetCurrentUser.mockReturnValue({
       isLoggedIn: true,
       email: 'test@example.com',
       id: 'test-id'
     });
     
-    const mockUserProperties = {
-      getProperty: jest.fn((key) => {
-        if (key === 'user_test@example.com') {
-          return 'invalid json'; // 不正なJSONデータ
-        }
-        return null;
-      })
-    };
-    functions.mockPropertiesService.getUserProperties.mockReturnValue(mockUserProperties);
+    // データベース検索でエラーが発生
+    functions.mockFetchUserFromDatabase.mockImplementation(() => {
+      throw new Error('Database connection failed');
+    });
 
     const result = functions.getLoginStatus();
     
     expect(result.status).toBe('unregistered');
-    expect(result.message).toContain('再登録が必要');
+    expect(result.message).toContain('新規ユーザー登録が必要');
+    expect(functions.mockFetchUserFromDatabase).toHaveBeenCalledWith('adminEmail', 'test@example.com');
   });
 });
