@@ -50,7 +50,8 @@
       "Bash(npm test)",
       "Bash(git log:*)",
       "Bash(npm test:*)",
-      "Bash(clasp status:*)"
+      "Bash(clasp status:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": [],
