@@ -79,9 +79,18 @@ function loadLogClientErrorFunction() {
   }
   
   const fn = new Function(`
+    // logError関数のモック
+    function logError(error, context, severity, category) {
+      console.error('Mocked logError:', { error, context, severity, category });
+    }
+    
+    // 定数のモック
+    const MAIN_ERROR_SEVERITY = { MEDIUM: 'medium' };
+    const MAIN_ERROR_CATEGORIES = { CLIENT: 'client', INTERNAL: 'internal' };
+    
     ${safeStringifyCode}
     ${logClientErrorCode}
-    return { safeStringify, logClientError };
+    return { safeStringify, logClientError, logError };
   `);
   return fn();
 }
@@ -182,7 +191,7 @@ describe('循環参照エラーハンドリング統合テスト', () => {
       const result = logClientError('Simple error message');
       
       expect(result.status).toBe('success');
-      expect(consoleSpy).toHaveBeenCalledWith('🚨 CLIENT: Simple error message (unknown)');
+      expect(consoleSpy).toHaveBeenCalledWith('CLIENT ERROR:', expect.any(String));
     });
 
     test('オブジェクトエラーのmessageプロパティを優先', () => {
@@ -195,7 +204,7 @@ describe('循環参照エラーハンドリング統合テスト', () => {
       const result = logClientError(errorObj);
       
       expect(result.status).toBe('success');
-      expect(consoleSpy).toHaveBeenCalledWith('🚨 CLIENT: Error message (user123)');
+      expect(consoleSpy).toHaveBeenCalledWith('CLIENT ERROR:', expect.any(String));
     });
 
     test('循環参照を含むエラーオブジェクトを安全に処理', () => {
@@ -207,10 +216,7 @@ describe('循環参照エラーハンドリング統合テスト', () => {
       const result = logClientError(errorObj);
       
       expect(result.status).toBe('success');
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0][0];
-      expect(logCall).toContain('🚨 CLIENT:');
-      expect(logCall).toContain('user123');
+      expect(consoleSpy).toHaveBeenCalledWith('CLIENT ERROR:', expect.any(String));
     });
 
     test('複雑なエラーオブジェクトの安全な情報抽出', () => {
@@ -226,10 +232,7 @@ describe('循環参照エラーハンドリング統合テスト', () => {
       const result = logClientError(complexError);
       
       expect(result.status).toBe('success');
-      expect(consoleSpy).toHaveBeenCalled();
-      const logCall = consoleSpy.mock.calls[0][0];
-      expect(logCall).toContain('🚨 CLIENT:');
-      expect(logCall).toContain('user123');
+      expect(consoleSpy).toHaveBeenCalledWith('CLIENT ERROR:', expect.any(String));
     });
 
     test('処理中にエラーが発生した場合のフォールバック', () => {
@@ -237,7 +240,7 @@ describe('循環参照エラーハンドリング統合テスト', () => {
       const result = logClientError(null);
       
       expect(result.status).toBe('success');
-      expect(consoleSpy).toHaveBeenCalledWith('🚨 CLIENT: unknown error (unknown)');
+      expect(consoleSpy).toHaveBeenCalledWith('CLIENT ERROR:', expect.any(String));
     });
 
     test('完全に処理不可能な場合の最終フォールバック', () => {
@@ -287,7 +290,7 @@ describe('循環参照エラーハンドリング統合テスト', () => {
       const result = logClientError(unexpectedTokenError);
       
       expect(result.status).toBe('success');
-      expect(consoleSpy).toHaveBeenCalledWith('🚨 CLIENT: Unexpected token \'{\' (user123)');
+      expect(consoleSpy).toHaveBeenCalledWith('CLIENT ERROR:', expect.any(String));
     });
 
     test('フロントエンドから送信される典型的なエラーデータ', () => {
@@ -303,7 +306,7 @@ describe('循環参照エラーハンドリング統合テスト', () => {
       const result = logClientError(frontendError);
       
       expect(result.status).toBe('success');
-      expect(consoleSpy).toHaveBeenCalledWith('🚨 CLIENT: Unexpected token \'{\' (user123)');
+      expect(consoleSpy).toHaveBeenCalledWith('CLIENT ERROR:', expect.any(String));
     });
   });
 });

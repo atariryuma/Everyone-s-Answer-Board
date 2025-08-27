@@ -160,9 +160,12 @@ function logClientError(errorData) {
     // サーバーサイドエラーログにも記録
     logError(`CLIENT: ${processedError.message}`, 'clientError', MAIN_ERROR_SEVERITY.LOW, MAIN_ERROR_CATEGORIES.EXTERNAL);
     
+    return { status: 'success', logged: true };
+    
   } catch (e) {
     console.error('logClientError failed:', e.message);
     logError(`Failed to process client error: ${e.message}`, 'logClientError', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
+    return { status: 'error', message: e.message };
   }
 }
 
