@@ -15,7 +15,7 @@
 
   <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig.html'); ?>
-  <?!= HtmlService.createHtmlOutputFromFile('adminPanel-bundle.js').getContent() ?>
+  <?!= HtmlService.createHtmlOutputFromFile('adminPanel.js').getContent() ?>
 
   <!-- Unified Styles and Shared Components -->
   <?!= include('UnifiedStyles.html'); ?>
@@ -30,9 +30,7 @@
   <!-- UnifiedCache.js.html removed - class is defined in page.js.html -->
   
   <!-- Unified Admin Panel JavaScript (no duplicates) -->
-  <!-- Large JavaScript section moved to adminPanel-bundle.js.html -->
-
-  <!-- Remaining JavaScript sections moved to adminPanel-bundle.js.html -->
+  <!-- JavaScript implementation is in adminPanel.js.html -->
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
   <!-- Unified Loading Overlay - Content managed by UnifiedLoadingManager -->
@@ -1049,10 +1047,8 @@
   <?!= include('errorMessages.js.html'); ?>
   <!-- Backend progress sync system -->
   <?!= include('backendProgressSync.js.html'); ?>
-  <!-- Admin Panel Bundle - All admin panel components in one file -->
-  <?!= include('adminPanel-bundle.js.html'); ?>
-
-  <!-- Modal initialization moved to adminPanel-bundle.js.html -->
+  <!-- Admin Panel JavaScript - Simplified implementation -->
+  <!-- All JavaScript functionality is loaded via adminPanel.js.html in the head section -->
 
 </body>
 </html>
