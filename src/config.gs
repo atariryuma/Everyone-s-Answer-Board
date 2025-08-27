@@ -10,7 +10,7 @@ let runtimeUserInfo = null;
 // メモリ管理用の実行レベル変数 (main.gsと統一)
 let lastCacheUserIdKey = null;
 let executionStartTime = Date.now();
-const EXECUTION_MAX_LIFETIME = 300000; // 5分間の最大実行時間
+// EXECUTION_MAX_LIFETIME is defined in constants.gs
 
 /**
  * 実行中に一度だけユーザー情報を取得して再利用する。
