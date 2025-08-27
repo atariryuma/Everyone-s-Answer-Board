@@ -122,10 +122,27 @@ function debugLog(message) {
 
 /**
  * シンプルなクライアントエラーログ
+ * @param {string|Object} errorInfo - エラー情報（文字列またはオブジェクト）
  */
 function logClientError(errorInfo) {
-  console.error(`🚨 CLIENT: ${  errorInfo.message  } (${  errorInfo.userId || 'unknown'  })`);
-  return { status: 'success' };
+  try {
+    let message = 'unknown error';
+    let userId = 'unknown';
+
+    // errorInfoの型チェックと正規化
+    if (typeof errorInfo === 'string') {
+      message = errorInfo;
+    } else if (errorInfo && typeof errorInfo === 'object') {
+      message = errorInfo.message || errorInfo.error || JSON.stringify(errorInfo);
+      userId = errorInfo.userId || errorInfo.user || 'unknown';
+    }
+
+    console.error(`🚨 CLIENT: ${message} (${userId})`);
+    return { status: 'success', logged: true };
+  } catch (e) {
+    console.error(`🚨 CLIENT ERROR LOGGING FAILED: ${e.message}`);
+    return { status: 'error', message: e.message };
+  }
 }
 
 /**

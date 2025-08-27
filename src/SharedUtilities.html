@@ -506,10 +506,17 @@ class ErrorHandler {
   sendToBackend(errorInfo) {
     try {
       if (typeof google !== 'undefined' && google.script?.run) {
-        google.script.run.logClientError(
-          errorInfo.message,
-          window.AdminPanel?.currentUserId || 'unknown'
-        );
+        // バックエンドのlogClientErrorに適切な形式でデータを送信
+        const clientErrorData = {
+          message: errorInfo.message || errorInfo.error || 'unknown error',
+          userId: window.AdminPanel?.currentUserId || 'unknown',
+          url: window.location.href,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          stack: errorInfo.stack
+        };
+        
+        google.script.run.logClientError(clientErrorData);
       }
     } catch (e) { /* ignore */ }
   }

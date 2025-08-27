@@ -2235,9 +2235,21 @@ function getCurrentUserStatus(requestUserId = null) {
   try {
     const activeUserEmail = getCurrentUserEmail();
 
+    // 型安全性強化: requestUserIdの型チェック
+    if (requestUserId != null && typeof requestUserId !== 'string') {
+      logError(new Error(`Invalid requestUserId type: ${typeof requestUserId}`), 'getCurrentUserStatus', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.VALIDATION, { requestUserId, type: typeof requestUserId });
+      return {
+        status: 'error',
+        message: 'requestUserIdは文字列である必要があります',
+        data: null,
+        userInfo: null,
+        timestamp: new Date().toISOString()
+      };
+    }
+
     // requestUserIdが未指定または無効な場合は、自動取得またはメールアドレスで検索
     let userInfo;
-    if (requestUserId && requestUserId.trim() !== '') {
+    if (requestUserId && typeof requestUserId === 'string' && requestUserId.trim() !== '') {
       verifyUserAccess(requestUserId);
       userInfo = findUserById(requestUserId);
     } else {
