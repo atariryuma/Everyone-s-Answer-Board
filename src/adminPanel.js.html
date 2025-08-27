@@ -237,7 +237,7 @@ const data = {
   async executeQuickStart() {
     try {
       utils.showMessage('クイックスタートを実行しています...', 'info');
-      const result = await utils.callAPI('executeQuickStartSetup', { userId: state.user.id });
+      const result = await utils.callAPI('executeQuickStartSetup', state.user.id);
       
       if (result && result.status === 'success') {
         if (result.formUrl) {
@@ -314,9 +314,7 @@ const data = {
     }
 
     try {
-      const sheets = await utils.callAPI('getSpreadsheetSheets', {
-        spreadsheetId: state.system.spreadsheetId
-      });
+      const sheets = await utils.callAPI('getSpreadsheetSheets', state.system.spreadsheetId);
       
       if (sheets && !sheets.error) {
         return sheets;
@@ -337,10 +335,7 @@ const data = {
     }
 
     try {
-      const result = await utils.callAPI('getSheetHeaders', {
-        spreadsheetId: state.system.spreadsheetId,
-        sheetName: sheetName
-      });
+      const result = await utils.callAPI('getSheetHeaders', state.system.spreadsheetId, sheetName);
       
       if (result && !result.error) {
         return result.headers || [];
@@ -358,20 +353,18 @@ const data = {
 const config = {
   // 設定保存
   async save() {
-    const configData = {
-      userId: state.user.id,
-      spreadsheetId: state.system.spreadsheetId,
-      sheetName: state.system.currentSheet,
-      opinionColumn: state.config.opinionColumn,
-      reasonColumn: state.config.reasonColumn,
-      nameColumn: state.config.nameColumn,
-      classColumn: state.config.classColumn,
-      showNames: state.config.showNames,
-      showCounts: state.config.showCounts
-    };
-
     try {
-      const result = await utils.callAPI('saveUserConfiguration', configData);
+      const result = await utils.callAPI('saveUserConfiguration', 
+        state.user.id,
+        state.system.spreadsheetId,
+        state.system.currentSheet,
+        state.config.opinionColumn,
+        state.config.reasonColumn,
+        state.config.nameColumn,
+        state.config.classColumn,
+        state.config.showNames,
+        state.config.showCounts
+      );
       
       if (result && result.status === 'success') {
         utils.showMessage('設定を保存しました', 'success');
@@ -416,12 +409,12 @@ const config = {
     }
 
     try {
-      const result = await utils.callAPI('getSheetPreviewData', {
-        userId: state.user.id,
-        spreadsheetId: state.system.spreadsheetId,
-        sheetName: state.system.currentSheet,
-        limit: 3
-      });
+      const result = await utils.callAPI('getSheetPreviewData', 
+        state.user.id,
+        state.system.spreadsheetId,
+        state.system.currentSheet,
+        3
+      );
       
       if (result && result.status === 'success') {
         return result.previewData;
@@ -444,11 +437,11 @@ const config = {
 
     try {
       utils.showMessage('AI列判定を実行しています...', 'info');
-      const result = await utils.callAPI('guessColumnMapping', {
-        userId: state.user.id,
-        spreadsheetId: state.system.spreadsheetId,
-        sheetName: state.system.currentSheet
-      });
+      const result = await utils.callAPI('guessColumnMapping', 
+        state.user.id,
+        state.system.spreadsheetId,
+        state.system.currentSheet
+      );
       
       if (result && result.status === 'success' && result.columnMapping) {
         const mapping = result.columnMapping;
@@ -507,19 +500,17 @@ const board = {
       // 設定を保存して公開
       utils.showMessage('設定を保存してボードを公開しています...', 'info');
       
-      const configData = {
-        userId: state.user.id,
-        spreadsheetId: state.system.spreadsheetId,
-        sheetName: state.system.currentSheet,
-        opinionColumn: state.config.opinionColumn,
-        reasonColumn: state.config.reasonColumn,
-        nameColumn: state.config.nameColumn,
-        classColumn: state.config.classColumn,
-        showNames: state.config.showNames,
-        showCounts: state.config.showCounts
-      };
-      
-      const result = await utils.callAPI('saveAndPublishBoard', configData);
+      const result = await utils.callAPI('saveAndPublishBoard',
+        state.user.id,
+        state.system.spreadsheetId,
+        state.system.currentSheet,
+        state.config.opinionColumn,
+        state.config.reasonColumn,
+        state.config.nameColumn,
+        state.config.classColumn,
+        state.config.showNames,
+        state.config.showCounts
+      );
       
       if (result && result.status === 'success') {
         state.system.isPublished = true;
@@ -566,9 +557,7 @@ const board = {
     if (!confirm('ボードの公開を停止しますか？回答ボードは見えなくなります。')) return false;
 
     try {
-      const result = await utils.callAPI('unpublishAnswerBoard', {
-        userId: state.user.id
-      });
+      const result = await utils.callAPI('unpublishAnswerBoard', state.user.id);
       
       if (result && result.status === 'success') {
         state.system.isPublished = false;
@@ -595,12 +584,12 @@ const board = {
     if (!publishResult.currentTopic) return;
     
     try {
-      await utils.callAPI('addPublishHistory', {
-        userId: state.user.id,
-        topic: publishResult.currentTopic,
-        publishedAt: new Date().toISOString(),
-        boardUrl: publishResult.boardUrl
-      });
+      await utils.callAPI('addPublishHistory',
+        state.user.id,
+        publishResult.currentTopic,
+        new Date().toISOString(),
+        publishResult.boardUrl
+      );
     } catch (error) {
       console.warn('Failed to add to history:', error);
     }
@@ -609,9 +598,7 @@ const board = {
   // 履歴の取得と表示
   async loadHistory() {
     try {
-      const result = await utils.callAPI('getPublishHistory', {
-        userId: state.user.id
-      });
+      const result = await utils.callAPI('getPublishHistory', state.user.id);
       
       if (result && result.status === 'success' && result.history) {
         board.updateHistoryTable(result.history);
@@ -665,10 +652,7 @@ const board = {
     if (!confirm(`「${historyItem.topic}」の設定を復元しますか？`)) return;
     
     try {
-      const result = await utils.callAPI('restoreFromHistory', {
-        userId: state.user.id,
-        historyId: historyItem.id
-      });
+      const result = await utils.callAPI('restoreFromHistory', state.user.id, historyItem.id);
       
       if (result && result.status === 'success') {
         // ページをリロードして復元された設定を反映
@@ -984,21 +968,19 @@ const handlers = {
 
   // ボードプレビュー
   async onBoardPreview() {
-    // 設定を一時保存してからプレビューURLを生成
-    const configData = {
-      userId: state.user.id,
-      spreadsheetId: state.system.spreadsheetId,
-      sheetName: state.system.currentSheet,
-      opinionColumn: state.config.opinionColumn,
-      reasonColumn: state.config.reasonColumn,
-      nameColumn: state.config.nameColumn,
-      classColumn: state.config.classColumn,
-      showNames: state.config.showNames,
-      showCounts: state.config.showCounts
-    };
-    
     try {
-      const result = await utils.callAPI('generatePreviewUrl', configData);
+      const result = await utils.callAPI('generatePreviewUrl',
+        state.user.id,
+        state.system.spreadsheetId,
+        state.system.currentSheet,
+        state.config.opinionColumn,
+        state.config.reasonColumn,
+        state.config.nameColumn,
+        state.config.classColumn,
+        state.config.showNames,
+        state.config.showCounts
+      );
+      
       if (result && result.status === 'success' && result.previewUrl) {
         window.open(result.previewUrl, '_blank');
       } else {
@@ -1185,9 +1167,7 @@ function setupEventListeners() {
     clearHistoryBtn.addEventListener('click', async () => {
       if (confirm('履歴をすべて削除しますか？この操作は取り消せません。')) {
         try {
-          const result = await utils.callAPI('clearPublishHistory', {
-            userId: state.user.id
-          });
+          const result = await utils.callAPI('clearPublishHistory', state.user.id);
           
           if (result && result.status === 'success') {
             await board.loadHistory(); // 履歴テーブルを更新
