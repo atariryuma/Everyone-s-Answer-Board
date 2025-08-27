@@ -321,6 +321,30 @@ Object.defineProperties(window, {
   }
 });
 
+// =============================================================================
+// GLOBAL VARIABLES - Declared at top to prevent hoisting issues
+// =============================================================================
+
+// User activity tracking
+let lastUserActivity = Date.now();
+
+// API polling configuration
+let currentPollInterval = 5 * 60 * 1000; // Start with 5-minute intervals
+
+// Status loading progress tracking
+let loadStatusInProgress = null;
+
+// Event handler attachment tracking
+const eventHandlersAttached = {
+  setupEventListeners: false,
+  formConfigModal: false,
+  resourceHandlers: false,
+  accountManagement: false,
+  externalLinks: false,
+  modalHandlers: false,
+  realtimeValidation: false
+};
+
 // Initialization functions
 
 // Simple logging utility with conditional output based on DEBUG mode
@@ -4377,7 +4401,7 @@ window.generateSimpleHash = generateSimpleHash;
 window.isCacheValid = isCacheValid;
 
 // loadStatus実行管理
-let loadStatusInProgress = null;
+// loadStatusInProgress moved to top of file
 let loadStatusQueue = [];
 
 function loadStatus(bypassCache = false) {
@@ -6509,8 +6533,7 @@ userIdPromise.then(async () => {
 // =============================================================================
 
 // System status polling variables
-let lastUserActivity = Date.now();
-let currentPollInterval = 5 * 60 * 1000; // 開始は5分間隔
+// lastUserActivity and currentPollInterval moved to top of file
 let statusPollTimer = null;
 
 // Fresh save management to prevent interference
@@ -12836,15 +12859,7 @@ if (window.AdminPanel && window.AdminPanel.functionRegistry) {
 let elements = {};
 
 // Event handler state tracking to prevent duplicate attachments
-const eventHandlersAttached = {
-  setupEventListeners: false,
-  formConfigModal: false,
-  resourceHandlers: false,
-  accountManagement: false,
-  externalLinks: false,
-  modalHandlers: false,
-  realtimeValidation: false
-};
+// eventHandlersAttached moved to top of file
 
 // 履歴管理用定数 - adminPanel-ui.js.htmlで定義済みのため、ここでは参照のみ
 // const HISTORY_STORAGE_KEY = 'answerBoardHistory'; // 重複宣言を回避
