@@ -94,10 +94,21 @@ const ERROR_MESSAGES = {
 };
 
 // エラーの重要度レベル
-// ERROR_SEVERITY is defined in constants.gs
+const ERROR_SEVERITY = {
+  CRITICAL: 'critical',
+  HIGH: 'high', 
+  MEDIUM: 'medium',
+  LOW: 'low'
+};
 
 // エラータイプの定義
-// ERROR_TYPES is defined in constants.gs
+const ERROR_TYPES = {
+  SYSTEM: 'system',
+  AUTH: 'auth',
+  VALIDATION: 'validation',
+  NETWORK: 'network',
+  USER: 'user'
+};
 
 /**
  * 統一エラーハンドラークラス
