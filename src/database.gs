@@ -883,6 +883,36 @@ function findUserById(userId) {
 }
 
 /**
+ * 閲覧者向けの軽量ユーザー情報取得（公開状態確認用）
+ * キャッシュ優先で応答性を重視
+ * @param {string} userId - ユーザーID
+ * @returns {object|null} 軽量ユーザー情報
+ */
+function findUserByIdForViewer(userId) {
+  const cacheKey = 'viewer_user_' + userId;
+  try {
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    // キャッシュエラーは無視
+  }
+
+  // 通常のfindUserByIdを使用（既にキャッシュ戦略あり）
+  const user = findUserById(userId);
+  if (user) {
+    try {
+      // 閲覧者用に5分の長めキャッシュ
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), 300);
+    } catch (e) {
+      // キャッシュ保存失敗は無視
+    }
+  }
+  return user;
+}
+
+/**
  * キャッシュをバイパスして最新のユーザー情報を強制取得
  * クリティカルな更新操作直後に使用
  * @param {string} userId - ユーザーID
@@ -1030,18 +1060,10 @@ function fetchUserFromDatabase(field, value, options = {}) {
     const service = getSheetsServiceCached();
     const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
 
-    // メールアドレス検索時の値の正規化
+    // メールアドレス検索時の値の正規化（簡素化）
     let normalizedValue = value;
     if (field.toLowerCase().includes('email')) {
-      normalizedValue = String(value).toLowerCase().trim();
-      // 余分な空白や特殊文字の除去
-      normalizedValue = normalizedValue.replace(/\s+/g, '').replace(/[\r\n\t]/g, '');
-      if (normalizedValue !== value) {
-        debugLog('fetchUserFromDatabase: メールアドレス正規化', {
-          original: value,
-          normalized: normalizedValue
-        });
-      }
+      normalizedValue = String(value).toLowerCase().trim().replace(/\s+/g, '');
     }
 
 
@@ -1082,13 +1104,12 @@ function fetchUserFromDatabase(field, value, options = {}) {
     // データ取得の信頼性確保（複数回試行）
     let data = null;
     let dataRetrieved = false;
-    const maxDataRetries = opts.forceFresh ? 3 : 1;
+    const maxDataRetries = opts.forceFresh ? 2 : 1; // 閲覧者向けにリトライ回数削減
     
     for (let dataAttempt = 0; dataAttempt < maxDataRetries && !dataRetrieved; dataAttempt++) {
       try {
         if (dataAttempt > 0) {
-          debugLog('fetchUserFromDatabase: データ取得リトライ', dataAttempt);
-          Utilities.sleep(200 * dataAttempt); // 段階的待機
+          Utilities.sleep(100 * dataAttempt); // 待機時間短縮
         }
         
         data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`], cacheOptions);
@@ -1103,7 +1124,10 @@ function fetchUserFromDatabase(field, value, options = {}) {
           throw new Error('無効なデータ構造を受信');
         }
       } catch (dataError) {
-        warnLog('fetchUserFromDatabase: データ取得エラー (試行' + (dataAttempt + 1) + '):', dataError.message);
+        // 閲覧者用に詳細ログを削減
+        if (opts.forceFresh) {
+          warnLog('fetchUserFromDatabase: データ取得エラー (試行' + (dataAttempt + 1) + '):', dataError.message);
+        }
         // 構造不整合はプログラミングエラー相当として即時中断（深いリトライを避ける）
         const msg = String(dataError && dataError.message || '');
         if (msg.indexOf('無効なデータ構造') !== -1 || msg.toLowerCase().indexOf('invalid data structure') !== -1) {
@@ -1125,11 +1149,13 @@ function fetchUserFromDatabase(field, value, options = {}) {
       throw new Error('データベースが空です');
     }
 
-    debugLog('fetchUserFromDatabase: データ取得完了', { 
-      rows: values.length, 
-      forceFresh: opts.forceFresh,
-      retries: maxDataRetries 
-    });
+    // 閲覧者向けにログ量削減
+    if (opts.forceFresh) {
+      debugLog('fetchUserFromDatabase: データ取得完了', { 
+        rows: values.length, 
+        forceFresh: opts.forceFresh
+      });
+    }
 
     // ヘッダーとフィールドインデックスの解決（シンプル版）
     const headers = values[0];
@@ -1152,7 +1178,10 @@ function fetchUserFromDatabase(field, value, options = {}) {
       throw new Error(`検索フィールド "${field}" が見つかりません。利用可能: ${headers.join(', ')}`);
     }
 
-    debugLog('fetchUserFromDatabase: フィールド解決完了', { field, fieldIndex, header: headers[fieldIndex] });
+    // フィールド解決完了ログを閲覧者向けに削減
+    if (opts.forceFresh) {
+      debugLog('fetchUserFromDatabase: フィールド解決完了', { field, fieldIndex, header: headers[fieldIndex] });
+    }
 
     // ユーザー検索（シンプルな線形検索）
     for (let i = 1; i < values.length; i++) {

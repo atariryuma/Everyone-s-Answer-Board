@@ -12,7 +12,7 @@ function include(path) {
   try {
     return HtmlService.createHtmlOutputFromFile(path).getContent();
   } catch (error) {
-    logError(error, 'includeFile', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
+    logError(error, 'includeFile', MAIN_MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
 }
@@ -56,14 +56,14 @@ const SCRIPT_PROPS_KEYS = {
 };
 
 // エラーハンドリング定数（main.gs独自）
-const MAIN_MAIN_ERROR_SEVERITY = {
+const MAIN_MAIN_MAIN_ERROR_SEVERITY = {
   LOW: 'low',
   MEDIUM: 'medium',
   HIGH: 'high',
   CRITICAL: 'critical',
 };
 
-const MAIN_MAIN_ERROR_CATEGORIES = {
+const MAIN_MAIN_MAIN_ERROR_CATEGORIES = {
   AUTHENTICATION: 'authentication',
   AUTHORIZATION: 'authorization',
   DATABASE: 'database',
@@ -159,7 +159,7 @@ function checkAndHandleAutoStop(config, userInfo) {
     try {
       saveHistoryOnAutoStop(config, userInfo);
     } catch (historyError) {
-      logError(historyError, 'autoStopHistorySave', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
+      logError(historyError, 'autoStopHistorySave', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.DATABASE);
       // 履歴保存エラーは処理を継続
     }
 
@@ -177,7 +177,7 @@ function checkAndHandleAutoStop(config, userInfo) {
       infoLog(`🔄 自動停止実行完了: ${userInfo.adminEmail} (期限: ${config.scheduledEndAt})`);
       return true; // 自動停止実行済み
     } catch (error) {
-      logError(error, 'autoStopProcess', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+      logError(error, 'autoStopProcess', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
       return false;
     }
   }
@@ -217,7 +217,7 @@ function saveHistoryOnAutoStop(config, userInfo) {
     saveHistoryToSheet(historyItem, userInfo);
     infoLog('✅ 自動停止履歴保存完了:', historyItem.questionText);
   } catch (error) {
-    logError(error, 'serverSideHistorySave', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
+    logError(error, 'serverSideHistorySave', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.DATABASE);
   }
 }
 
@@ -452,7 +452,7 @@ function saveHistoryToSheet(historyItem, userInfo) {
     }
 
   } catch (error) {
-    logError(error, 'serverSideHistorySave', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
+    logError(error, 'serverSideHistorySave', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.DATABASE);
     // エラーをログに記録するが、メイン処理は継続
   }
 }
@@ -483,7 +483,7 @@ function saveHistoryToSheetAPI(requestUserId, historyItem) {
     };
 
   } catch (error) {
-    logError(error, 'saveHistoryToSheetAPI', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
+    logError(error, 'saveHistoryToSheetAPI', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.DATABASE);
     return {
       status: 'error',
       message: error.message
@@ -525,7 +525,7 @@ function getHistoryFromServerAPI(requestUserId) {
     };
 
   } catch (error) {
-    logError(error, 'getHistoryFromServerAPI', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
+    logError(error, 'getHistoryFromServerAPI', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.DATABASE);
     return {
       status: 'error',
       message: error.message,
@@ -580,7 +580,7 @@ function clearHistoryFromServerAPI(requestUserId) {
     }
 
   } catch (error) {
-    logError(error, 'clearHistoryFromServerAPI', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
+    logError(error, 'clearHistoryFromServerAPI', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.DATABASE);
     return {
       status: 'error',
       message: error.message
@@ -658,7 +658,7 @@ function log(level, message, details) {
 
     switch (level) {
       case 'error':
-        logError(message, 'debugLog', MAIN_ERROR_SEVERITY.LOW, MAIN_ERROR_CATEGORIES.SYSTEM, { details });
+        logError(message, 'debugLog', MAIN_MAIN_ERROR_SEVERITY.LOW, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, { details });
         break;
       case 'warn':
         warnLog(message, details || '');
@@ -718,7 +718,7 @@ function getDeployUserDomainInfo() {
       webAppUrl: webAppUrl
     };
   } catch (e) {
-    logError(e, 'getDeployUserDomainInfo', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(e, 'getDeployUserDomainInfo', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return {
       currentDomain: '不明',
       deployDomain: '不明',
@@ -776,7 +776,7 @@ function getGoogleClientId() {
 
     return { status: 'success', message: 'Google Client IDを取得しました', data: { clientId: clientId } };
   } catch (error) {
-    logError(error, 'getGoogleClientId', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'getGoogleClientId', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return { status: 'error', message: 'Google Client IDの取得に失敗しました: ' + error.toString(), data: { clientId: '' } };
   }
 }
@@ -821,7 +821,7 @@ function checkSystemConfiguration() {
       setupComplete: isSystemSetup()
     };
   } catch (error) {
-    logError(error, 'checkSystemConfiguration', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'checkSystemConfiguration', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return {
       isFullyConfigured: false,
       error: error.toString()
@@ -854,7 +854,7 @@ function getSystemDomainInfo() {
       deployDomain: domainInfo.deployDomain || adminDomain
     };
   } catch (e) {
-    logError(e, 'getSystemDomainInfo', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(e, 'getSystemDomainInfo', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return { error: e.message };
   }
 }
@@ -886,7 +886,7 @@ function doGet(e) {
     return routeRequestByMode(params);
 
   } catch (error) {
-    logError(error, 'doGet', MAIN_ERROR_SEVERITY.CRITICAL, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'doGet', MAIN_MAIN_ERROR_SEVERITY.CRITICAL, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return showErrorPage('致命的なエラー', 'アプリケーションの処理中に予期せぬエラーが発生しました。', error);
   }
 }
@@ -1252,11 +1252,8 @@ function handleViewMode(params) {
     return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
   }
 
-  // Get user info with cache bypass for accurate publication status
-  const userInfo = findUserById(params.userId, {
-    useExecutionCache: false,
-    forceRefresh: true
-  });
+  // Get user info optimized for viewer access with enhanced caching
+  const userInfo = findUserByIdForViewer(params.userId);
 
   if (!userInfo) {
     return showErrorPage('エラー', '指定されたユーザーが見つかりません。');
@@ -1415,7 +1412,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
 
       const props = PropertiesService.getScriptProperties();
       if (!props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID)) {
-        logError('DATABASE_SPREADSHEET_ID not set', 'getUnifiedCache', MAIN_ERROR_SEVERITY.CRITICAL, MAIN_ERROR_CATEGORIES.SYSTEM);
+        logError('DATABASE_SPREADSHEET_ID not set', 'getUnifiedCache', MAIN_MAIN_ERROR_SEVERITY.CRITICAL, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
         return null;
       }
 
@@ -1445,7 +1442,7 @@ function getOrFetchUserInfo(identifier, type = null, options = {}) {
     }
 
   } catch (cacheError) {
-    logError(cacheError, 'getUnifiedCache', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.CACHE);
+    logError(cacheError, 'getUnifiedCache', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.CACHE);
     // フォールバック: 直接データベースから取得
     if (userId) {
       userInfo = findUserById(userId);
@@ -1516,7 +1513,7 @@ function showAppSetupPage(userId) {
         return showErrorPage('アクセス権限がありません', 'この機能にアクセスする権限がありません。システム管理者にお問い合わせください。');
       }
     } catch (error) {
-      logError(error, 'checkDeployUserPermissions', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.AUTHORIZATION);
+      logError(error, 'checkDeployUserPermissions', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.AUTHORIZATION);
       return showErrorPage('認証エラー', '権限確認中にエラーが発生しました。');
     }
 
@@ -1556,7 +1553,7 @@ function getLastAdminUserId() {
       return null;
     }
   } catch (error) {
-    logError(error, 'getLastAdminUserId', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.DATABASE);
+    logError(error, 'getLastAdminUserId', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.DATABASE);
     return null;
   }
 }
@@ -1591,7 +1588,7 @@ function getAppSetupUrl() {
 
     return appSetupUrl;
   } catch (error) {
-    logError(error, 'getAppSetupUrl', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'getAppSetupUrl', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     throw new Error('アプリ設定URLの取得に失敗しました: ' + error.message);
   }
 }
@@ -2111,7 +2108,7 @@ function sanitizeRedirectUrl(url) {
 
     return cleanUrl;
   } catch (e) {
-    logError(e, 'urlSanitization', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(e, 'urlSanitization', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return getWebAppUrl();
   }
 }
@@ -2152,7 +2149,7 @@ function parseRequestParams(e) {
 function renderAdminPanel(userInfo, mode) {
   // ガード節: userInfoが存在しない場合はエラーページを表示して処理を中断
   if (!userInfo) {
-    logError('renderAdminPanelにuserInfoがnullで渡されました', 'renderAdminPanel', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError('renderAdminPanelにuserInfoがnullで渡されました', 'renderAdminPanel', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return showErrorPage('エラー', 'ユーザー情報の読み込みに失敗したため、管理パネルを表示できません。');
   }
 
@@ -2292,7 +2289,7 @@ function renderUnpublishedPage(userInfo, params) {
     return htmlOutput;
 
   } catch (error) {
-    logError(error, 'renderUnpublishedPage', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, {
+    logError(error, 'renderUnpublishedPage', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, {
       userId: userInfo ? userInfo.userId : 'null',
       hasUserInfo: !!userInfo,
       errorMessage: error.message,
@@ -2375,7 +2372,7 @@ function renderMinimalUnpublishedPage(userInfo) {
     return htmlOutput;
 
   } catch (error) {
-    logError(error, 'renderMinimalUnpublishedPage', MAIN_ERROR_SEVERITY.HIGH, MAIN_ERROR_CATEGORIES.SYSTEM, {
+    logError(error, 'renderMinimalUnpublishedPage', MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, {
       userId: userInfo ? userInfo.userId : 'null',
       hasUserInfo: !!userInfo,
       errorMessage: error.message,
@@ -2785,8 +2782,8 @@ function renderAnswerBoard(userInfo, params) {
     logError(
       error,
       'renderAnswerBoard',
-      MAIN_ERROR_SEVERITY.HIGH,
-      MAIN_ERROR_CATEGORIES.SYSTEM,
+      MAIN_MAIN_ERROR_SEVERITY.HIGH,
+      MAIN_MAIN_ERROR_CATEGORIES.SYSTEM,
       {
         userId: userInfo.userId,
         spreadsheetId: userInfo.spreadsheetId,
@@ -2859,7 +2856,7 @@ function checkCurrentPublicationStatus(userId) {
     };
 
   } catch (error) {
-    logError(error, 'checkCurrentPublicationStatus', MAIN_ERROR_SEVERITY.MEDIUM, MAIN_ERROR_CATEGORIES.SYSTEM);
+    logError(error, 'checkCurrentPublicationStatus', MAIN_MAIN_ERROR_SEVERITY.MEDIUM, MAIN_MAIN_ERROR_CATEGORIES.SYSTEM);
     return {
       error: error.message,
       isPublished: false,
