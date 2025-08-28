@@ -1429,12 +1429,12 @@ const reload = () => console.log('[RELOAD] Page reload not applicable in GAS');
 const preventDefault = () => console.log('[PREVENT_DEFAULT] Event handling not applicable in GAS');
 const querySelector = () => null;
 
-// 代用可能な関数群のエイリアス
+// 代用可能な関数群のエイリアス（ダミー実装）
 const Functions = {
-  // FormApp APIの参照先
-  setEmailCollectionType: FormApp.create().setEmailCollectionType,
-  getPublishedUrl: (form) => form.getPublishedUrl(),
-  getEditUrl: (form) => form.getEditUrl()
+  // FormApp APIのダミー参照（実際には使用されない）
+  setEmailCollectionType: () => console.log('[FORM] setEmailCollectionType'),
+  getPublishedUrl: (form) => form ? form.getPublishedUrl() : '',
+  getEditUrl: (form) => form ? form.getEditUrl() : ''
 };
 
 
