@@ -1,25 +1,58 @@
 <script>
-  // Character counter functionality is now handled in adminPanel-framework.js.html
+// 文字数カウンター機能
+function setupCharacterCounters() {
+  const questionTextarea = document.getElementById('custom-main-question');
+  const questionCounter = document.getElementById('question-counter');
 
-  // セキュリティ情報表示関数
-  function showSecurityInfo() {
-    if (window.sharedModals) {
-      window.sharedModals.showSecurityDetails();
-    } else {
-      showModal('security-details-modal');
-    }
+  if (questionTextarea && questionCounter) {
+    questionTextarea.addEventListener('input', function() {
+      const count = this.value.length;
+      questionCounter.textContent = `${count}/500`;
+      questionCounter.className = count > 450 ? 'text-xs text-red-400' : 'text-xs text-gray-500';
+    });
   }
+}
 
-  // Google連携の利点表示関数
-  function showGoogleIntegrationInfo() {
-    if (window.sharedModals) {
-      window.sharedModals.showGoogleIntegration();
-    } else {
-      showModal('google-integration-modal');
-    }
+// セキュリティ情報表示関数
+function showSecurityInfo() {
+  if (window.sharedModals) {
+    window.sharedModals.showSecurityDetails();
+  } else {
+    showModal('security-details-modal');
   }
+}
 
-  // Modal counter initialization and event listeners are now handled in adminPanel-framework.js.html
+// Google連携の利点表示関数
+function showGoogleIntegrationInfo() {
+  if (window.sharedModals) {
+    window.sharedModals.showGoogleIntegration();
+  } else {
+    showModal('google-integration-modal');
+  }
+}
 
-  //# sourceURL=adminPanel-forms.js.html
+// モーダル表示時にカウンターを初期化
+// 初期化は adminPanel-core.js の統合初期化システムで管理されます
+
+// フォーム設定モーダルが開かれたときにカウンターをリセット
+// この機能は既にshowFormConfigModal内で適切に処理されています
+document.addEventListener('DOMContentLoaded', function() {
+  // モーダルが表示されるたびにカウンターをセットアップ
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        const modal = document.getElementById('form-config-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+          setTimeout(setupCharacterCounters, 100);
+        }
+      }
+    });
+  });
+  
+  // モーダルの監視を開始
+  const modal = document.getElementById('form-config-modal');
+  if (modal) {
+    observer.observe(modal, { attributes: true });
+  }
+});
 </script>

@@ -1,264 +1,244 @@
 <!-- Comprehensive Error Boundary System -->
 <script>
-  (function () {
-    // Global error boundary configuration
-    const ERROR_BOUNDARY_CONFIG = {
-      maxRetries: 3,
-      retryDelay: 1000,
-      enableReporting: true,
-      fallbackUI: true,
-      autoRecover: true,
-    };
-
-    // Error categories
-    // Constants will be loaded from backend
-    let ERROR_CATEGORIES = {
-      NETWORK: 'network',
-      AUTHENTICATION: 'authentication',
-      PERMISSION: 'permission',
-      API: 'api',
-      JAVASCRIPT: 'javascript',
-      TEMPLATE: 'template',
-      GOOGLE_SCRIPT: 'google_script',
-      TIMEOUT: 'timeout',
-      UNKNOWN: 'unknown',
-    };
-
-    // Load constants from backend asynchronously
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run
-        .withSuccessHandler((constants) => {
-          ERROR_CATEGORIES = Object.assign(ERROR_CATEGORIES, constants.ERROR_CATEGORIES);
-        })
-        .withFailureHandler((error) => {
-          console.warn('ErrorBoundary: Failed to load backend constants:', error);
-        })
-        .getFrontendConstants();
+(function() {
+  // Global error boundary configuration
+  const ERROR_BOUNDARY_CONFIG = {
+    maxRetries: 3,
+    retryDelay: 1000,
+    enableReporting: true,
+    fallbackUI: true,
+    autoRecover: true
+  };
+  
+  // Error categories
+  const ERROR_CATEGORIES = {
+    NETWORK: 'network',
+    AUTHENTICATION: 'authentication',
+    PERMISSION: 'permission',
+    API: 'api',
+    JAVASCRIPT: 'javascript',
+    TEMPLATE: 'template',
+    GOOGLE_SCRIPT: 'google_script',
+    TIMEOUT: 'timeout',
+    UNKNOWN: 'unknown'
+  };
+  
+  // Error boundary state
+  let errorBoundaryState = {
+    errors: [],
+    retryCount: 0,
+    lastError: null,
+    recoveryMode: false
+  };
+  
+  // Categorize errors based on message and context
+  const categorizeError = (error, context) => {
+    const message = error.message || error.toString();
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('network') || lowerMessage.includes('fetch')) {
+      return ERROR_CATEGORIES.NETWORK;
+    } else if (lowerMessage.includes('auth') || lowerMessage.includes('token') || lowerMessage.includes('credential')) {
+      return ERROR_CATEGORIES.AUTHENTICATION;
+    } else if (lowerMessage.includes('permission') || lowerMessage.includes('access')) {
+      return ERROR_CATEGORIES.PERMISSION;
+    } else if (lowerMessage.includes('api') || lowerMessage.includes('googleapis')) {
+      return ERROR_CATEGORIES.API;
+    } else if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out')) {
+      return ERROR_CATEGORIES.TIMEOUT;
+    } else if (lowerMessage.includes('google.script') || lowerMessage.includes('apps script')) {
+      return ERROR_CATEGORIES.GOOGLE_SCRIPT;
+    } else if (lowerMessage.includes('template') || lowerMessage.includes('include')) {
+      return ERROR_CATEGORIES.TEMPLATE;
+    } else if (error instanceof TypeError || error instanceof ReferenceError) {
+      return ERROR_CATEGORIES.JAVASCRIPT;
+    } else {
+      return ERROR_CATEGORIES.UNKNOWN;
     }
-
-    // Error boundary state
-    let errorBoundaryState = {
-      errors: [],
-      retryCount: 0,
-      lastError: null,
-      recoveryMode: false,
+  };
+  
+  // Enhanced error handler with recovery strategies
+  const handleError = (error, context, recoveryOptions = {}) => {
+    const errorInfo = {
+      timestamp: new Date().toISOString(),
+      message: error.message || error.toString(),
+      category: categorizeError(error, context),
+      context: context || 'unknown',
+      stack: error.stack,
+      userAgent: navigator.userAgent,
+      url: window.location.href,
+      sessionId: getSessionId(),
+      recovery: recoveryOptions
     };
-
-    // Categorize errors based on message and context
-    const categorizeError = (error, context) => {
-      const message = error.message || error.toString();
-      const lowerMessage = message.toLowerCase();
-
-      if (lowerMessage.includes('network') || lowerMessage.includes('fetch')) {
-        return ERROR_CATEGORIES.NETWORK;
-      } else if (
-        lowerMessage.includes('auth') ||
-        lowerMessage.includes('token') ||
-        lowerMessage.includes('credential')
-      ) {
-        return ERROR_CATEGORIES.AUTHENTICATION;
-      } else if (lowerMessage.includes('permission') || lowerMessage.includes('access')) {
-        return ERROR_CATEGORIES.PERMISSION;
-      } else if (lowerMessage.includes('api') || lowerMessage.includes('googleapis')) {
-        return ERROR_CATEGORIES.API;
-      } else if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out')) {
-        return ERROR_CATEGORIES.TIMEOUT;
-      } else if (lowerMessage.includes('google.script') || lowerMessage.includes('apps script')) {
-        return ERROR_CATEGORIES.GOOGLE_SCRIPT;
-      } else if (lowerMessage.includes('template') || lowerMessage.includes('include')) {
-        return ERROR_CATEGORIES.TEMPLATE;
-      } else if (error instanceof TypeError || error instanceof ReferenceError) {
-        return ERROR_CATEGORIES.JAVASCRIPT;
-      } else {
-        return ERROR_CATEGORIES.UNKNOWN;
-      }
-    };
-
-    // Enhanced error handler with recovery strategies
-    const handleError = (error, context, recoveryOptions = {}) => {
-      const errorInfo = {
-        timestamp: new Date().toISOString(),
-        message: error.message || error.toString(),
-        category: categorizeError(error, context),
-        context: context || 'unknown',
-        stack: error.stack,
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-        sessionId: getSessionId(),
-        recovery: recoveryOptions,
-      };
-
-      // Store error in boundary state
-      errorBoundaryState.errors.push(errorInfo);
-      errorBoundaryState.lastError = errorInfo;
-
-      // Detailed logging
-      console.group('🚨 Error Boundary Triggered');
-      console.error('Error:', error);
-      console.log('Category:', errorInfo.category);
-      console.log('Context:', errorInfo.context);
-      console.log('Recovery Options:', recoveryOptions);
-      console.groupEnd();
-
-      // Attempt recovery based on error category
-      attemptRecovery(errorInfo, recoveryOptions);
-
-      // Report error if enabled
-      if (ERROR_BOUNDARY_CONFIG.enableReporting) {
-        reportError(errorInfo);
-      }
-
-      return errorInfo;
-    };
-
-    // Recovery strategies based on error category
-    const attemptRecovery = (errorInfo, recoveryOptions) => {
-      const { category } = errorInfo;
-
-      switch (category) {
-        case ERROR_CATEGORIES.NETWORK:
-          return handleNetworkError(errorInfo, recoveryOptions);
-        case ERROR_CATEGORIES.AUTHENTICATION:
-          return handleAuthError(errorInfo, recoveryOptions);
-        case ERROR_CATEGORIES.GOOGLE_SCRIPT:
-          return handleGoogleScriptError(errorInfo, recoveryOptions);
-        case ERROR_CATEGORIES.TIMEOUT:
-          return handleTimeoutError(errorInfo, recoveryOptions);
-        case ERROR_CATEGORIES.JAVASCRIPT:
-          return handleJavaScriptError(errorInfo, recoveryOptions);
-        default:
-          return handleGenericError(errorInfo, recoveryOptions);
-      }
-    };
-
-    // Network error recovery
-    const handleNetworkError = (errorInfo, recoveryOptions) => {
-      console.log('🔄 Attempting network error recovery...');
-
-      if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
-        errorBoundaryState.retryCount++;
-
-        setTimeout(() => {
-          if (recoveryOptions.retryCallback) {
-            console.log('🔄 Retrying network operation...');
-            recoveryOptions.retryCallback();
-          } else {
-            console.log('🔄 Reloading page for network recovery...');
-            window.location.reload();
-          }
-        }, ERROR_BOUNDARY_CONFIG.retryDelay * errorBoundaryState.retryCount);
-
-        return true;
-      }
-
-      showErrorUI('ネットワークエラーが発生しました。接続を確認してください。', 'network');
-      return false;
-    };
-
-    // Authentication error recovery
-    const handleAuthError = (errorInfo, recoveryOptions) => {
-      console.log('🔄 Attempting authentication error recovery...');
-
-      if (recoveryOptions.reauthenticate) {
-        console.log('🔄 Triggering re-authentication...');
-        recoveryOptions.reauthenticate();
-        return true;
-      }
-
-      showErrorUI('認証エラーが発生しました。再度ログインしてください。', 'auth');
-      return false;
-    };
-
-    // Google Apps Script error recovery
-    const handleGoogleScriptError = (errorInfo, recoveryOptions) => {
-      console.log('🔄 Attempting Google Apps Script error recovery...');
-
-      // Try to reload Google Apps Script context
-      if (typeof google !== 'undefined' && google.script) {
-        console.log('🔄 Google Apps Script context available, retrying...');
-
-        setTimeout(() => {
-          if (recoveryOptions.retryCallback) {
-            recoveryOptions.retryCallback();
-          }
-        }, ERROR_BOUNDARY_CONFIG.retryDelay);
-
-        return true;
-      }
-
-      showErrorUI(
-        'Google Apps Scriptエラーが発生しました。ページを再読み込みしてください。',
-        'google-script'
-      );
-      return false;
-    };
-
-    // Timeout error recovery
-    const handleTimeoutError = (errorInfo, recoveryOptions) => {
-      console.log('🔄 Attempting timeout error recovery...');
-
-      if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
-        errorBoundaryState.retryCount++;
-
-        setTimeout(() => {
-          if (recoveryOptions.retryCallback) {
-            console.log('🔄 Retrying after timeout...');
-            recoveryOptions.retryCallback();
-          }
-        }, ERROR_BOUNDARY_CONFIG.retryDelay * 2); // Longer delay for timeouts
-
-        return true;
-      }
-
-      showErrorUI('処理がタイムアウトしました。再試行してください。', 'timeout');
-      return false;
-    };
-
-    // JavaScript error recovery
-    const handleJavaScriptError = (errorInfo, recoveryOptions) => {
-      console.log('🔄 Attempting JavaScript error recovery...');
-
-      // Try to recover from common JavaScript errors
-      if (errorInfo.message.includes('undefined') || errorInfo.message.includes('null')) {
-        console.log('🔄 Attempting to recover from null/undefined error...');
-
-        if (recoveryOptions.fallbackCallback) {
-          recoveryOptions.fallbackCallback();
-          return true;
+    
+    // Store error in boundary state
+    errorBoundaryState.errors.push(errorInfo);
+    errorBoundaryState.lastError = errorInfo;
+    
+    // Detailed logging
+    console.group('🚨 Error Boundary Triggered');
+    console.error('Error:', error);
+    console.log('Category:', errorInfo.category);
+    console.log('Context:', errorInfo.context);
+    console.log('Recovery Options:', recoveryOptions);
+    console.groupEnd();
+    
+    // Attempt recovery based on error category
+    attemptRecovery(errorInfo, recoveryOptions);
+    
+    // Report error if enabled
+    if (ERROR_BOUNDARY_CONFIG.enableReporting) {
+      reportError(errorInfo);
+    }
+    
+    return errorInfo;
+  };
+  
+  // Recovery strategies based on error category
+  const attemptRecovery = (errorInfo, recoveryOptions) => {
+    const { category } = errorInfo;
+    
+    switch (category) {
+      case ERROR_CATEGORIES.NETWORK:
+        return handleNetworkError(errorInfo, recoveryOptions);
+      case ERROR_CATEGORIES.AUTHENTICATION:
+        return handleAuthError(errorInfo, recoveryOptions);
+      case ERROR_CATEGORIES.GOOGLE_SCRIPT:
+        return handleGoogleScriptError(errorInfo, recoveryOptions);
+      case ERROR_CATEGORIES.TIMEOUT:
+        return handleTimeoutError(errorInfo, recoveryOptions);
+      case ERROR_CATEGORIES.JAVASCRIPT:
+        return handleJavaScriptError(errorInfo, recoveryOptions);
+      default:
+        return handleGenericError(errorInfo, recoveryOptions);
+    }
+  };
+  
+  // Network error recovery
+  const handleNetworkError = (errorInfo, recoveryOptions) => {
+    console.log('🔄 Attempting network error recovery...');
+    
+    if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
+      errorBoundaryState.retryCount++;
+      
+      setTimeout(() => {
+        if (recoveryOptions.retryCallback) {
+          console.log('🔄 Retrying network operation...');
+          recoveryOptions.retryCallback();
+        } else {
+          console.log('🔄 Reloading page for network recovery...');
+          window.location.reload();
         }
-      }
-
-      showErrorUI('JavaScriptエラーが発生しました。ページを再読み込みしてください。', 'javascript');
-      return false;
-    };
-
-    // Generic error recovery
-    const handleGenericError = (errorInfo, recoveryOptions) => {
-      console.log('🔄 Attempting generic error recovery...');
-
+      }, ERROR_BOUNDARY_CONFIG.retryDelay * errorBoundaryState.retryCount);
+      
+      return true;
+    }
+    
+    showErrorUI('ネットワークエラーが発生しました。接続を確認してください。', 'network');
+    return false;
+  };
+  
+  // Authentication error recovery
+  const handleAuthError = (errorInfo, recoveryOptions) => {
+    console.log('🔄 Attempting authentication error recovery...');
+    
+    if (recoveryOptions.reauthenticate) {
+      console.log('🔄 Triggering re-authentication...');
+      recoveryOptions.reauthenticate();
+      return true;
+    }
+    
+    showErrorUI('認証エラーが発生しました。再度ログインしてください。', 'auth');
+    return false;
+  };
+  
+  // Google Apps Script error recovery
+  const handleGoogleScriptError = (errorInfo, recoveryOptions) => {
+    console.log('🔄 Attempting Google Apps Script error recovery...');
+    
+    // Try to reload Google Apps Script context
+    if (typeof google !== 'undefined' && google.script) {
+      console.log('🔄 Google Apps Script context available, retrying...');
+      
+      setTimeout(() => {
+        if (recoveryOptions.retryCallback) {
+          recoveryOptions.retryCallback();
+        }
+      }, ERROR_BOUNDARY_CONFIG.retryDelay);
+      
+      return true;
+    }
+    
+    showErrorUI('Google Apps Scriptエラーが発生しました。ページを再読み込みしてください。', 'google-script');
+    return false;
+  };
+  
+  // Timeout error recovery
+  const handleTimeoutError = (errorInfo, recoveryOptions) => {
+    console.log('🔄 Attempting timeout error recovery...');
+    
+    if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
+      errorBoundaryState.retryCount++;
+      
+      setTimeout(() => {
+        if (recoveryOptions.retryCallback) {
+          console.log('🔄 Retrying after timeout...');
+          recoveryOptions.retryCallback();
+        }
+      }, ERROR_BOUNDARY_CONFIG.retryDelay * 2); // Longer delay for timeouts
+      
+      return true;
+    }
+    
+    showErrorUI('処理がタイムアウトしました。再試行してください。', 'timeout');
+    return false;
+  };
+  
+  // JavaScript error recovery
+  const handleJavaScriptError = (errorInfo, recoveryOptions) => {
+    console.log('🔄 Attempting JavaScript error recovery...');
+    
+    // Try to recover from common JavaScript errors
+    if (errorInfo.message.includes('undefined') || errorInfo.message.includes('null')) {
+      console.log('🔄 Attempting to recover from null/undefined error...');
+      
       if (recoveryOptions.fallbackCallback) {
         recoveryOptions.fallbackCallback();
         return true;
       }
-
-      showErrorUI('エラーが発生しました。ページを再読み込みしてください。', 'generic');
-      return false;
-    };
-
-    // Show error UI to user
-    const showErrorUI = (message, category) => {
-      if (!ERROR_BOUNDARY_CONFIG.fallbackUI) return;
-
-      // Remove existing error UI
-      const existingError = document.getElementById('error-boundary-ui');
-      if (existingError) {
-        existingError.remove();
-      }
-
-      // Create error UI
-      const errorUI = document.createElement('div');
-      errorUI.id = 'error-boundary-ui';
-      errorUI.innerHTML = `
+    }
+    
+    showErrorUI('JavaScriptエラーが発生しました。ページを再読み込みしてください。', 'javascript');
+    return false;
+  };
+  
+  // Generic error recovery
+  const handleGenericError = (errorInfo, recoveryOptions) => {
+    console.log('🔄 Attempting generic error recovery...');
+    
+    if (recoveryOptions.fallbackCallback) {
+      recoveryOptions.fallbackCallback();
+      return true;
+    }
+    
+    showErrorUI('エラーが発生しました。ページを再読み込みしてください。', 'generic');
+    return false;
+  };
+  
+  // Show error UI to user
+  const showErrorUI = (message, category) => {
+    if (!ERROR_BOUNDARY_CONFIG.fallbackUI) return;
+    
+    // Remove existing error UI
+    const existingError = document.getElementById('error-boundary-ui');
+    if (existingError) {
+      existingError.remove();
+    }
+    
+    // Create error UI
+    const errorUI = document.createElement('div');
+    errorUI.id = 'error-boundary-ui';
+    errorUI.innerHTML = `
       <div style="
         position: fixed;
         top: 20px;
@@ -300,657 +280,343 @@
         </div>
       </div>
     `;
-
-      document.body.appendChild(errorUI);
-
-      // Auto-hide after 10 seconds
-      setTimeout(() => {
-        if (document.getElementById('error-boundary-ui')) {
-          document.getElementById('error-boundary-ui').remove();
-        }
-      }, 10000);
-    };
-
-    // Report error to server (if available)
-    const reportError = (errorInfo) => {
-      try {
-        // Only report if Google Apps Script is available
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          google.script.run.withFailureHandler((error) => {
+    
+    document.body.appendChild(errorUI);
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+      if (document.getElementById('error-boundary-ui')) {
+        document.getElementById('error-boundary-ui').remove();
+      }
+    }, 10000);
+  };
+  
+  // Report error to server (if available)
+  const reportError = (errorInfo) => {
+    try {
+      // Only report if Google Apps Script is available
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withFailureHandler((error) => {
             console.warn('Failed to report error to server:', error);
-          }).reportClientError && google.script.run.reportClientError(errorInfo);
-        }
-      } catch (e) {
-        console.warn('Error reporting failed:', e);
+          })
+          .reportClientError && google.script.run.reportClientError(errorInfo);
       }
-    };
-
-    // Get or create session ID
-    const getSessionId = () => {
-      let sessionId = sessionStorage.getItem('error-boundary-session');
-      if (!sessionId) {
-        sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-        sessionStorage.setItem('error-boundary-session', sessionId);
-      }
-      return sessionId;
-    };
-
-    // Enhanced Promise wrapper with error boundary
-    const wrapWithErrorBoundary = (promise, context, recoveryOptions = {}) => {
-      return promise.catch((error) => {
-        return handleError(error, context, recoveryOptions);
-      });
-    };
-
-    // Enhanced function wrapper with error boundary
-    const wrapFunctionWithErrorBoundary = (fn, context, recoveryOptions = {}) => {
-      return function (...args) {
-        try {
-          const result = fn.apply(this, args);
-
-          // Handle promise results
-          if (result && typeof result.then === 'function') {
-            return wrapWithErrorBoundary(result, context, recoveryOptions);
-          }
-
-          return result;
-        } catch (error) {
-          return handleError(error, context, recoveryOptions);
-        }
-      };
-    };
-
-    // Set up global error handlers
-    const setupGlobalErrorHandlers = () => {
-      // Global unhandled error handler
-      window.addEventListener('error', (event) => {
-        handleError(event.error || new Error(event.message), 'global', {
-          retryCallback: () => console.log('Global error retry not implemented'),
-        });
-      });
-
-      // Global unhandled promise rejection handler
-      window.addEventListener('unhandledrejection', (event) => {
-        handleError(event.reason || new Error('Unhandled promise rejection'), 'promise', {
-          retryCallback: () => console.log('Promise rejection retry not implemented'),
-        });
-      });
-
-      // Google Apps Script specific error handler
-      if (typeof google !== 'undefined' && google.script) {
-        const originalRun = google.script.run;
-        google.script.run = new Proxy(originalRun, {
-          get: function (target, prop) {
-            if (typeof target[prop] === 'function') {
-              return wrapFunctionWithErrorBoundary(target[prop], 'google-script', {
-                retryCallback: () => console.log('Google Script retry triggered'),
-              });
-            }
-            return target[prop];
-          },
-        });
-      }
-    };
-
-    // Initialize error boundary system
-    const initErrorBoundary = () => {
-      console.log('🛡️ Error Boundary System initialized');
-      setupGlobalErrorHandlers();
-    };
-
-    // Expose error boundary utilities globally
-    window.ErrorBoundary = {
-      handleError,
-      wrapWithErrorBoundary,
-      wrapFunctionWithErrorBoundary,
-      state: errorBoundaryState,
-      config: ERROR_BOUNDARY_CONFIG,
-      categories: ERROR_CATEGORIES,
-    };
-
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initErrorBoundary);
-    } else {
-      initErrorBoundary();
+    } catch (e) {
+      console.warn('Error reporting failed:', e);
     }
-  })();
+  };
+  
+  // Get or create session ID
+  const getSessionId = () => {
+    let sessionId = sessionStorage.getItem('error-boundary-session');
+    if (!sessionId) {
+      sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+      sessionStorage.setItem('error-boundary-session', sessionId);
+    }
+    return sessionId;
+  };
+  
+  // Enhanced Promise wrapper with error boundary
+  const wrapWithErrorBoundary = (promise, context, recoveryOptions = {}) => {
+    return promise.catch(error => {
+      return handleError(error, context, recoveryOptions);
+    });
+  };
+  
+  // Enhanced function wrapper with error boundary
+  const wrapFunctionWithErrorBoundary = (fn, context, recoveryOptions = {}) => {
+    return function(...args) {
+      try {
+        const result = fn.apply(this, args);
+        
+        // Handle promise results
+        if (result && typeof result.then === 'function') {
+          return wrapWithErrorBoundary(result, context, recoveryOptions);
+        }
+        
+        return result;
+      } catch (error) {
+        return handleError(error, context, recoveryOptions);
+      }
+    };
+  };
+  
+  // Set up global error handlers
+  const setupGlobalErrorHandlers = () => {
+    // Global unhandled error handler
+    window.addEventListener('error', (event) => {
+      handleError(event.error || new Error(event.message), 'global', {
+        retryCallback: () => console.log('Global error retry not implemented')
+      });
+    });
+    
+    // Global unhandled promise rejection handler
+    window.addEventListener('unhandledrejection', (event) => {
+      handleError(event.reason || new Error('Unhandled promise rejection'), 'promise', {
+        retryCallback: () => console.log('Promise rejection retry not implemented')
+      });
+    });
+    
+    // Google Apps Script specific error handler
+    if (typeof google !== 'undefined' && google.script) {
+      const originalRun = google.script.run;
+      google.script.run = new Proxy(originalRun, {
+        get: function(target, prop) {
+          if (typeof target[prop] === 'function') {
+            return wrapFunctionWithErrorBoundary(target[prop], 'google-script', {
+              retryCallback: () => console.log('Google Script retry triggered')
+            });
+          }
+          return target[prop];
+        }
+      });
+    }
+  };
+  
+  // Initialize error boundary system
+  const initErrorBoundary = () => {
+    console.log('🛡️ Error Boundary System initialized');
+    setupGlobalErrorHandlers();
+  };
+  
+  // Expose error boundary utilities globally
+  window.ErrorBoundary = {
+    handleError,
+    wrapWithErrorBoundary,
+    wrapFunctionWithErrorBoundary,
+    state: errorBoundaryState,
+    config: ERROR_BOUNDARY_CONFIG,
+    categories: ERROR_CATEGORIES
+  };
+  
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initErrorBoundary);
+  } else {
+    initErrorBoundary();
+  }
+})();
 </script>
 
 <!-- サーバーサイドエラー表示部分 -->
-<? if (typeof title !== 'undefined' && title) { ?> <? var loginUrl = getWebAppUrl(); ?>
-<!doctype html>
+<? if (typeof title !== 'undefined' && title) { ?>
+<? var loginUrl = getWebAppUrl(); ?>
+<!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= title || 'エラー' ?> - StudyQuest</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #333;
-      }
-      .error-container {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-        padding: 40px;
-        max-width: 800px;
-        width: 95%;
-        text-align: center;
-        position: relative;
-      }
-      .error-icon {
-        font-size: 64px;
-        margin-bottom: 20px;
-        animation: bounce 2s infinite;
-      }
-      @keyframes bounce {
-        0%,
-        20%,
-        50%,
-        80%,
-        100% {
-          transform: translateY(0);
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        40% {
-          transform: translateY(-10px);
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
         }
-        60% {
-          transform: translateY(-5px);
-        }
-      }
-      .error-title {
-        font-size: 24px;
-        font-weight: bold;
-        color: #e53e3e;
-        margin-bottom: 16px;
-      }
-      .error-message {
-        font-size: 16px;
-        color: #666;
-        line-height: 1.6;
-        margin-bottom: 24px;
-        word-break: break-word;
-        overflow-wrap: break-word;
-        white-space: pre-wrap;
-        max-height: 300px;
-        overflow-y: auto;
-        text-align: left;
-        padding: 0 10px;
-      }
-      .error-actions {
-        display: flex;
-        gap: 12px;
-        justify-content: center;
-        flex-wrap: wrap;
-      }
-      .btn {
-        padding: 12px 24px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        text-decoration: none;
-        transition: all 0.3s ease;
-      }
-      .btn-primary {
-        background: #667eea;
-        color: white;
-      }
-      .btn-primary:hover {
-        background: #5a6fd8;
-        transform: translateY(-2px);
-      }
-      .btn-secondary {
-        background: #f7fafc;
-        color: #4a5568;
-        border: 1px solid #e2e8f0;
-      }
-      .btn-secondary:hover {
-        background: #edf2f7;
-      }
-      .debug-info {
-        margin-top: 20px;
-        padding: 16px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border-left: 4px solid #17a2b8;
-        text-align: left;
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 12px;
-        color: #495057;
-        max-height: 200px;
-        overflow-y: auto;
-      }
-      .timestamp {
-        color: #6c757d;
-        font-size: 12px;
-        margin-top: 16px;
-      }
-
-      /* エラータイプ別スタイリング */
-      .error-container.error-critical {
-        border-left: 6px solid #dc3545;
-      }
-      .error-container.error-access {
-        border-left: 6px solid #fd7e14;
-      }
-      .error-container.error-validation {
-        border-left: 6px solid #ffc107;
-      }
-      .error-container.error-network {
-        border-left: 6px solid #17a2b8;
-      }
-      .error-container.error-user {
-        border-left: 6px solid #6c757d;
-      }
-
-      /* 詳細情報セクション */
-      .diagnostic-section {
-        margin-top: 20px;
-        text-align: left;
-        background: #f8f9fa;
-        border-radius: 8px;
-        border-left: 4px solid #17a2b8;
-        padding: 16px;
-        max-height: 400px;
-        overflow-y: auto;
-      }
-
-      .diagnostic-toggle {
-        background: #e9ecef;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 8px 16px;
-        margin-bottom: 16px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: background-color 0.3s ease;
-      }
-
-      .diagnostic-toggle:hover {
-        background: #dee2e6;
-      }
-
-      .diagnostic-content {
-        display: none;
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 12px;
-        line-height: 1.4;
-      }
-
-      .diagnostic-summary {
-        margin-bottom: 16px;
-        padding: 12px;
-        background: white;
-        border-radius: 6px;
-        border: 1px solid #dee2e6;
-      }
-
-      .diagnostic-summary h4 {
-        margin: 0 0 8px 0;
-        font-size: 14px;
-        color: #495057;
-      }
-
-      .diagnostic-summary p {
-        margin: 4px 0;
-        font-size: 13px;
-      }
-
-      .diagnostic-properties {
-        margin-top: 12px;
-        padding: 12px;
-        background: #f1f3f4;
-        border-radius: 6px;
-        font-size: 11px;
-        max-height: 200px;
-        overflow-y: auto;
-      }
-
-      /* レスポンシブ対応 */
-      @media (max-width: 768px) {
         .error-container {
-          width: 98%;
-          padding: 20px;
-          margin: 10px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
         }
-
-        .error-title {
-          font-size: 20px;
-        }
-
-        .error-message {
-          font-size: 14px;
-          padding: 0 5px;
-        }
-
-        .error-actions {
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .btn {
-          width: 100%;
-        }
-      }
-
-      @media (max-width: 480px) {
-        .error-container {
-          padding: 15px;
-        }
-
         .error-icon {
-          font-size: 48px;
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
         }
-
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
         .error-title {
-          font-size: 18px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #e53e3e;
+            margin-bottom: 16px;
         }
-
-        .diagnostic-section {
-          padding: 12px;
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 24px;
         }
-      }
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+        .debug-info {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
+            text-align: left;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #495057;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 16px;
+        }
     </style>
     <script>
-      // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
-      function forceLogoutAndRedirect() {
-        console.log('🔄 サーバーサイド強制ログアウト開始...');
-        console.log('📍 現在のURL:', window.location.href);
-
-        // リダイレクトループ防止：既にログイン画面にいる場合は単純にリロード
-        if (window.location.href.includes('mode=login')) {
-          console.log('⚠️ 既にログインモードです。ページをリロードします。');
-          window.location.reload();
-          return;
-        }
-
-        // ボタンを無効化して重複実行を防ぐ
-        const logoutBtn = event.target;
-        if (logoutBtn) {
-          logoutBtn.disabled = true;
-          logoutBtn.innerHTML = '🔄 処理中...';
-        }
-
-        try {
-          // サーバーサイドリダイレクト関数を呼び出し（全ての制約を回避）
-          google.script.run
-            .withSuccessHandler(function (htmlOutput) {
-              console.log('✅ サーバーサイドリダイレクト取得成功');
-              console.log('🔍 Response type:', typeof htmlOutput);
-              console.log('🔍 Response value:', htmlOutput);
-              console.log('🔍 Response length:', htmlOutput ? htmlOutput.length : 'N/A');
-              console.log(
-                '🔍 Response preview:',
-                htmlOutput ? htmlOutput.substring(0, 200) : 'NO CONTENT'
-              );
-
-              // サーバーから返されたHTMLを現在のページに設定（自動リダイレクト実行）
-              if (htmlOutput && htmlOutput.trim()) {
-                console.log('✅ Valid HTML received, applying...');
-                document.open();
-                document.write(htmlOutput);
-                document.close();
-              } else {
-                console.warn('⚠️ 空のHTMLOutput、フォールバック実行');
-                console.warn('  - htmlOutput:', htmlOutput);
-                console.warn('  - Trimmed:', htmlOutput ? htmlOutput.trim() : 'N/A');
-                fallbackReload();
-              }
-            })
-            .withFailureHandler(function (error) {
-              console.error('❌ サーバーサイドリダイレクト失敗:', error);
-              fallbackReload();
-            })
-            .forceLogoutAndRedirectToLogin();
-        } catch (error) {
-          console.error('❌ 強制ログアウト処理でエラー:', error);
-          fallbackReload();
-        }
-      }
-
-      // シンプルなフォールバック関数
-      function fallbackReload() {
-        console.log('🔄 フォールバック：ページリロード実行');
-        const confirmMessage =
-          'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
-        if (confirm(confirmMessage)) {
-          window.location.reload();
-        }
-      }
-
-      // テスト用関数
-      function testServerFunction() {
-        console.log('🧪 Testing server function...');
-
-        // 関数存在チェック
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          try {
-            google.script.run
-              .withSuccessHandler(function (result) {
-                console.log('🧪 Test Success:', result);
-                console.log('🧪 Test Result Type:', typeof result);
-                console.log('🧪 Test Result Length:', result ? result.length : 'N/A');
-                alert(
-                  'テスト成功: ' + (result ? '内容あり (' + result.length + ' chars)' : '空の結果')
-                );
-              })
-              .withFailureHandler(function (error) {
-                console.error('🧪 Test Error:', error);
-                alert('テスト失敗: ' + error.message);
-              })
-              .testForceLogoutRedirect();
-          } catch (funcError) {
-            console.warn('⚠️ testForceLogoutRedirect関数の呼び出しでエラー:', funcError);
-            alert('テスト機能でエラーが発生しました: ' + funcError.message);
-          }
-        } else {
-          console.warn('⚠️ Google Apps Scriptランタイムが利用できません');
-          alert('テスト機能は現在利用できません。管理者にお問い合わせください。');
-        }
-      }
-    </script>
-  </head>
-  <body>
-    <div
-      class="error-container <?= typeof errorType !== 'undefined' ? 'error-' + errorType : '' ?>"
-    >
-      <div class="error-icon"><?= typeof errorIcon !== 'undefined' ? errorIcon : '⚠️' ?></div>
-      <h1 class="error-title"><?= htmlEncode(title || 'エラーが発生しました') ?></h1>
-      <p class="error-message">
-        <?= htmlEncode(message || 'システムエラーが発生しました。管理者にお問い合わせください。') ?>
-      </p>
-
-      <!-- 構造化された診断情報表示 -->
-      <? if (typeof diagnosticInfo !== 'undefined' && diagnosticInfo) { ?>
-      <div class="diagnostic-section">
-        <div class="diagnostic-toggle" onclick="toggleDiagnosticInfo()">
-          📊 詳細情報を表示 <span id="diagnostic-arrow">▼</span>
-        </div>
-        <div class="diagnostic-content" id="diagnostic-content">
-          <? if (diagnosticInfo.summary && diagnosticInfo.summary.length > 0) { ?>
-          <div class="diagnostic-summary">
-            <h4>📋 基本情報</h4>
-            <? diagnosticInfo.summary.forEach(function(item) { ?>
-            <p><?= htmlEncode(item) ?></p>
-            <? }); ?>
-          </div>
-          <? } ?> <? if (diagnosticInfo.technical && diagnosticInfo.technical.length > 0) { ?>
-          <div class="diagnostic-summary">
-            <h4>🔧 技術詳細</h4>
-            <? diagnosticInfo.technical.forEach(function(item) { ?>
-            <p><?= htmlEncode(item) ?></p>
-            <? }); ?>
-          </div>
-          <? } ?> <? if (diagnosticInfo.properties) { ?>
-          <div class="diagnostic-properties">
-            <h4>🗂️ システム状態</h4>
-            <pre><?= htmlEncode(JSON.stringify(diagnosticInfo.properties, null, 2)) ?></pre>
-          </div>
-          <? } ?>
-
-          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #dee2e6">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              onclick="copyDiagnosticInfo()"
-              style="font-size: 12px"
-            >
-              📋 診断情報をコピー
-            </button>
-          </div>
-        </div>
-      </div>
-      <? } ?>
-
-      <div class="error-actions">
-        <button type="button" class="btn btn-primary" onclick="location.reload()">
-          🔄 ページを更新
-        </button>
-        <? if (typeof isRegisteredUser !== 'undefined' && isRegisteredUser) { ?>
-        <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
-          🏠 ログイン画面へ
-        </button>
-        <? } ?>
-        <button
-          type="button"
-          class="btn btn-secondary"
-          onclick="testServerFunction()"
-          style="font-size: 12px"
-        >
-          🧪 接続テスト
-        </button>
-      </div>
-
-      <!-- 従来のデバッグ情報（開発者向け） -->
-      <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
-      <div class="debug-info">
-        <div class="diagnostic-toggle" onclick="toggleDebugInfo()" style="margin-bottom: 8px">
-          🔍 開発者向け情報 <span id="debug-arrow">▼</span>
-        </div>
-        <div id="debug-content" style="display: none">
-          <strong>デバッグ情報:</strong><br />
-          <?= htmlEncode(debugInfo) ?>
-        </div>
-      </div>
-      <? } ?>
-
-      <div class="timestamp">エラー発生時刻: <?= new Date().toLocaleString('ja-JP') ?></div>
-    </div>
-
-    <script>
-      // 詳細診断情報の表示切り替え
-      function toggleDiagnosticInfo() {
-        const content = document.getElementById('diagnostic-content');
-        const arrow = document.getElementById('diagnostic-arrow');
-
-        if (content.style.display === 'none' || content.style.display === '') {
-          content.style.display = 'block';
-          arrow.textContent = '▲';
-        } else {
-          content.style.display = 'none';
-          arrow.textContent = '▼';
-        }
-      }
-
-      // デバッグ情報の表示切り替え
-      function toggleDebugInfo() {
-        const content = document.getElementById('debug-content');
-        const arrow = document.getElementById('debug-arrow');
-
-        if (content.style.display === 'none' || content.style.display === '') {
-          content.style.display = 'block';
-          arrow.textContent = '▲';
-        } else {
-          content.style.display = 'none';
-          arrow.textContent = '▼';
-        }
-      }
-
-      // 診断情報をクリップボードにコピー
-      function copyDiagnosticInfo() {
-        try {
-          let copyText = '=== エラー診断レポート ===\n\n';
-          copyText += 'タイトル: <?= htmlEncode(title || "Unknown") ?>\n';
-          copyText += '発生時刻: <?= new Date().toLocaleString("ja-JP") ?>\n';
-
-          // DOM から診断情報を直接取得
-          const diagnosticSections = document.querySelectorAll('.diagnostic-summary');
-          diagnosticSections.forEach(function (section) {
-            const heading = section.querySelector('h4');
-            if (heading && heading.textContent.includes('📋 基本情報')) {
-              const summaryItems = section.querySelectorAll('p');
-              if (summaryItems.length > 0) {
-                copyText += '\n【基本情報】\n';
-                summaryItems.forEach(function (item) {
-                  copyText += item.textContent.trim() + '\n';
-                });
-              }
-            } else if (heading && heading.textContent.includes('🔧 技術詳細')) {
-              const technicalItems = section.querySelectorAll('p');
-              if (technicalItems.length > 0) {
-                copyText += '\n【技術詳細】\n';
-                technicalItems.forEach(function (item) {
-                  copyText += item.textContent.trim() + '\n';
-                });
-              }
+        // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
+        function forceLogoutAndRedirect() {
+            console.log('🔄 サーバーサイド強制ログアウト開始...');
+            console.log('📍 現在のURL:', window.location.href);
+            
+            // リダイレクトループ防止：既にログインページにいる場合は単純にリロード
+            if (window.location.href.includes('mode=login')) {
+                console.log('⚠️ 既にログインモードです。ページをリロードします。');
+                window.location.reload();
+                return;
             }
-          });
-
-          const propertiesSection = document.querySelector('.diagnostic-properties pre');
-          if (propertiesSection) {
-            copyText += '\n【システム状態】\n';
-            copyText += propertiesSection.textContent.trim() + '\n';
-          }
-
-          // クリップボードに書き込み
-          if (navigator.clipboard) {
-            navigator.clipboard
-              .writeText(copyText)
-              .then(function () {
-                alert('📋 診断情報がクリップボードにコピーされました');
-              })
-              .catch(function () {
-                fallbackCopy(copyText);
-              });
-          } else {
-            fallbackCopy(copyText);
-          }
-        } catch (error) {
-          console.error('Copy failed:', error);
-          alert('❌ コピーに失敗しました');
+            
+            // ボタンを無効化して重複実行を防ぐ
+            const logoutBtn = event.target;
+            if (logoutBtn) {
+                logoutBtn.disabled = true;
+                logoutBtn.innerHTML = '🔄 処理中...';
+            }
+            
+            try {
+                // サーバーサイドリダイレクト関数を呼び出し（全ての制約を回避）
+                google.script.run
+                    .withSuccessHandler(function(htmlOutput) {
+                        console.log('✅ サーバーサイドリダイレクト取得成功');
+                        console.log('🔍 Response type:', typeof htmlOutput);
+                        console.log('🔍 Response value:', htmlOutput);
+                        console.log('🔍 Response length:', htmlOutput ? htmlOutput.length : 'N/A');
+                        console.log('🔍 Response preview:', htmlOutput ? htmlOutput.substring(0, 200) : 'NO CONTENT');
+                        
+                        // サーバーから返されたHTMLを現在のページに設定（自動リダイレクト実行）
+                        if (htmlOutput && htmlOutput.trim()) {
+                            console.log('✅ Valid HTML received, applying...');
+                            document.open();
+                            document.write(htmlOutput);
+                            document.close();
+                        } else {
+                            console.warn('⚠️ 空のHTMLOutput、フォールバック実行');
+                            console.warn('  - htmlOutput:', htmlOutput);
+                            console.warn('  - Trimmed:', htmlOutput ? htmlOutput.trim() : 'N/A');
+                            fallbackReload();
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('❌ サーバーサイドリダイレクト失敗:', error);
+                        fallbackReload();
+                    })
+                    .forceLogoutAndRedirectToLogin();
+                    
+            } catch (error) {
+                console.error('❌ 強制ログアウト処理でエラー:', error);
+                fallbackReload();
+            }
         }
-      }
-
-      // フォールバックコピー機能
-      function fallbackCopy(text) {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-          document.execCommand('copy');
-          alert('📋 診断情報がクリップボードにコピーされました');
-        } catch (err) {
-          alert('❌ コピーに失敗しました。手動でテキストを選択してください。');
-          console.error('Fallback copy failed:', err);
+        
+        // シンプルなフォールバック関数
+        function fallbackReload() {
+            console.log('🔄 フォールバック：ページリロード実行');
+            const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
+            if (confirm(confirmMessage)) {
+                window.location.reload();
+            }
         }
-        document.body.removeChild(textArea);
-      }
+        
+        // テスト用関数
+        function testServerFunction() {
+            console.log('🧪 Testing server function...');
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('🧪 Test Success:', result);
+                    console.log('🧪 Test Result Type:', typeof result);
+                    console.log('🧪 Test Result Length:', result ? result.length : 'N/A');
+                    alert('テスト成功: ' + (result ? '内容あり (' + result.length + ' chars)' : '空の結果'));
+                })
+                .withFailureHandler(function(error) {
+                    console.error('🧪 Test Error:', error);
+                    alert('テスト失敗: ' + error.message);
+                })
+                .testForceLogoutRedirect();
+        }
     </script>
-  </body>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1 class="error-title"><?= htmlEncode(title || 'エラーが発生しました') ?></h1>
+        <p class="error-message"><?= htmlEncode(message || 'システムエラーが発生しました。管理者にお問い合わせください。') ?></p>
+        
+        <div class="error-actions">
+            <button type="button" class="btn btn-primary" onclick="location.reload()">
+                🔄 再読み込み
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
+                🏠 ログイン画面に戻る
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="testServerFunction()" style="font-size: 12px;">
+                🧪 テスト
+            </button>
+        </div>
+        
+        <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
+        <div class="debug-info">
+            <strong>デバッグ情報:</strong><br>
+            <?= htmlEncode(debugInfo) ?>
+        </div>
+        <? } ?>
+        
+        <div class="timestamp">
+            エラー発生時刻: <?= new Date().toLocaleString('ja-JP') ?>
+        </div>
+    </div>
+</body>
 </html>
 <? } ?>

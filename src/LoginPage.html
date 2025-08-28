@@ -1,398 +1,307 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <base target="_top" />
-    <title>StudyQuest - ログイン</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#1a1b26" />
-    <meta name="description" content="StudyQuest 回答ボードシステム - ログイン" />
-    <!-- Shared Security Headers -->
-    <?!= include('SharedSecurityHeaders'); ?>
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <title>StudyQuest - ログイン</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a1b26">
+  <meta name="description" content="StudyQuest 回答ボードシステム - ログイン">
+  <!-- Shared Security Headers -->
+  <?!= include('SharedSecurityHeaders'); ?>
 
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?>
+  <!-- Shared TailwindCSS Configuration -->
+  <?!= include('SharedTailwindConfig'); ?>
 
-    <!-- Unified Styles and Shared Components -->
-    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
-
-    <!-- Global Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay page-specific hidden">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <div class="loading-message">読み込み中...</div>
-        <div class="loading-progress">
-          <div class="loading-progress-bar">
-            <div class="loading-progress-fill" style="width: 0%"></div>
-          </div>
-          <div class="loading-percentage">0%</div>
+  <!-- Unified Styles and Shared Components -->
+  <?!= include('UnifiedStyles'); ?>
+  <?!= include('SharedUtilities'); ?>
+  
+  <!-- Global Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay page-specific hidden">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-message">読み込み中...</div>
+      <div class="loading-progress">
+        <div class="loading-progress-bar">
+          <div class="loading-progress-fill" style="width: 0%"></div>
         </div>
-        <div class="loading-steps"></div>
+        <div class="loading-percentage">0%</div>
       </div>
+      <div class="loading-steps"></div>
     </div>
-
-    <style>
-      /* Login Page Specific Styles - Unified with Admin Panel */
-      .login-background {
-        background: var(--color-background);
-        min-height: 100vh;
-        position: relative;
-        overflow: auto;
-        animation: fadeIn 0.5s ease-out;
-      }
-
-      .login-background::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-image:
-          radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-          radial-gradient(circle at 40% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
-        pointer-events: none;
-      }
-
+  </div>
+  
+  <style>
+    /* Login Page Specific Styles - Unified with Admin Panel */
+    .login-background {
+      background: var(--color-background);
+      min-height: 100vh;
+      position: relative;
+      overflow: auto;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    .login-background::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    
+    .login-container {
+      max-width: 420px;
+      width: 90%;
+      min-height: 580px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.6s ease-out;
+    }
+    
+    /* Responsive design matching admin panel breakpoints */
+    @media (max-width: 640px) {
       .login-container {
-        max-width: 420px;
-        width: 90%;
-        min-height: 580px;
-        max-height: 90vh;
-        overflow-y: auto;
-        animation: slideUp 0.6s ease-out;
+        width: 95%;
+        max-width: 380px;
+        min-height: 520px;
+        padding: 1.5rem;
       }
-
-      /* Responsive design matching admin panel breakpoints */
-      @media (max-width: 640px) {
-        .login-container {
-          width: 95%;
-          max-width: 380px;
-          min-height: 520px;
-          padding: 1.5rem;
-        }
-
-        .login-btn {
-          min-height: 48px;
-          padding: 1rem 1.5rem;
-          font-size: 16px;
-        }
-      }
-
-      @media (max-width: 768px) {
-        .login-container {
-          padding: 1rem;
-        }
-      }
-
-      @media (max-height: 700px) {
-        .login-container {
-          min-height: auto;
-          max-height: 85vh;
-        }
-      }
-
-      @media (min-width: 768px) {
-        .login-container {
-          padding: 2rem;
-        }
-      }
-
-      @media (min-width: 1024px) {
-        .login-container {
-          max-width: 450px;
-          padding: 2.5rem;
-        }
-      }
-
-      /* Button animation enhancements */
+      
       .login-btn {
-        position: relative;
-        overflow: hidden;
-        transition: all var(--transition-duration) var(--transition-easing);
+        min-height: 48px;
+        padding: 1rem 1.5rem;
+        font-size: 16px;
       }
-
-      .login-btn::before {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 0;
-        height: 0;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.3);
-        transition: all var(--animation-duration) var(--transition-easing);
-        transform: translate(-50%, -50%);
-        z-index: 0;
+    }
+    
+    @media (max-width: 768px) {
+      .login-container {
+        padding: 1rem;
       }
-
-      .login-btn:not(:disabled):active::before {
-        width: 200%;
-        height: 200%;
+    }
+    
+    @media (max-height: 700px) {
+      .login-container {
+        min-height: auto;
+        max-height: 85vh;
       }
-
-      .login-btn > * {
-        position: relative;
-        z-index: 1;
+    }
+    
+    @media (min-width: 768px) {
+      .login-container {
+        padding: 2rem;
       }
-
-      /* Form field focus animations */
-      .form-control {
-        transition:
-          all var(--transition-duration) var(--transition-easing),
-          box-shadow var(--animation-duration) var(--transition-easing);
+    }
+    
+    @media (min-width: 1024px) {
+      .login-container {
+        max-width: 450px;
+        padding: 2.5rem;
       }
+    }
+    
+    /* Button animation enhancements */
+    .login-btn {
+      position: relative;
+      overflow: hidden;
+      transition: all var(--transition-duration) var(--transition-easing);
+    }
+    
+    .login-btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transition: all var(--animation-duration) var(--transition-easing);
+      transform: translate(-50%, -50%);
+      z-index: 0;
+    }
+    
+    .login-btn:not(:disabled):active::before {
+      width: 200%;
+      height: 200%;
+    }
+    
+    .login-btn > * {
+      position: relative;
+      z-index: 1;
+    }
+    
+    /* Form field focus animations */
+    .form-control {
+      transition: all var(--transition-duration) var(--transition-easing), 
+                  box-shadow var(--animation-duration) var(--transition-easing);
+    }
+    
+    .form-control:focus {
+      transform: translateY(-1px);
+      animation: subtle-bounce 0.4s ease-out;
+    }
+    
+    .form-control:hover:not(:focus) {
+      transform: translateY(-0.5px);
+    }
+    
+    /* Form field subtle bounce animation */
+    @keyframes subtle-bounce {
+      0% { transform: translateY(0); }
+      30% { transform: translateY(-2px); }
+      100% { transform: translateY(-1px); }
+    }
+    
+    /* Enhanced transition for interactive elements */
+    .text-cyan-400:hover, .underline:hover {
+      transition: all var(--transition-duration) var(--transition-easing);
+    }
 
-      .form-control:focus {
-        transform: translateY(-1px);
-        animation: subtle-bounce 0.4s ease-out;
-      }
+    /* Keyframe for fade-in animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="login-background">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="login-container glass-panel rounded-2xl p-8">
+    <!-- ヘッダー -->
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-cyan-400 mb-2">🎓 StudyQuest</h1>
+      <p class="text-xl text-gray-300">ログイン</p>
+      <p class="text-sm text-gray-400 mt-2">初回利用時は自動的にアカウントが作成されます</p>
+    </div>
 
-      .form-control:hover:not(:focus) {
-        transform: translateY(-0.5px);
-      }
-
-      /* Form field subtle bounce animation */
-      @keyframes subtle-bounce {
-        0% {
-          transform: translateY(0);
-        }
-        30% {
-          transform: translateY(-2px);
-        }
-        100% {
-          transform: translateY(-1px);
-        }
-      }
-
-      /* Enhanced transition for interactive elements */
-      .text-cyan-400:hover,
-      .underline:hover {
-        transition: all var(--transition-duration) var(--transition-easing);
-      }
-
-      /* Keyframe for fade-in animation */
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-    </style>
-  </head>
-  <body class="login-background">
-    <div class="min-h-screen flex items-center justify-center p-4">
-      <div class="login-container glass-panel rounded-2xl p-8">
-        <!-- ヘッダー -->
-        <div class="text-center mb-8">
-          <h1 class="text-4xl font-bold text-cyan-400 mb-2">🎓 StudyQuest</h1>
-          <p class="text-xl text-gray-300">ログイン</p>
-          <p class="text-sm text-gray-400 mt-2">初回利用時は自動的にアカウントが作成されます</p>
-        </div>
-
-        <!-- ドメイン・ステータス情報 -->
-        <div id="header-domain-info" class="mb-6">
-          <!-- ドメイン一致表示（緑色パネル） -->
-          <div
-            id="header-domain-match"
-            class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden"
-          >
-            <div class="flex items-center gap-2">
-              <svg
-                class="w-5 h-5 text-green-400 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                ></path>
-              </svg>
-              <div>
-                <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">
-                  G Suite ドメイン
-                </div>
-                <div class="text-green-200 text-xs">セキュアアクセス有効</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ドメイン不一致表示（Login.htmlスタイル） -->
-          <div
-            id="header-domain-mismatch"
-            class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden"
-          >
-            <div class="flex items-center gap-2">
-              <svg
-                class="w-5 h-5 text-yellow-400 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                ></path>
-              </svg>
-              <div>
-                <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">
-                  ドメイン不一致
-                </div>
-                <div class="text-yellow-200 text-xs">アクセス制限あり</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 初期状態表示 -->
-          <div
-            id="header-domain-initial"
-            class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30"
-          >
-            <div class="flex items-center gap-2">
-              <div
-                id="header-status-dot"
-                class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"
-              ></div>
-              <div>
-                <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">
-                  ドメイン確認中
-                </div>
-                <div class="text-blue-200 text-xs" id="header-status-text-initial">
-                  セットアップ中
-                </div>
-              </div>
-            </div>
+    <!-- ドメイン・ステータス情報 -->
+    <div id="header-domain-info" class="mb-6">
+      <!-- ドメイン一致表示（緑色パネル） -->
+      <div id="header-domain-match" class="glass-panel bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-3 border border-green-400/30 hidden">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <div class="text-green-400 font-semibold text-sm" id="header-domain-match-text">G Suite ドメイン</div>
+            <div class="text-green-200 text-xs">セキュアアクセス有効</div>
           </div>
         </div>
-
-        <!-- アカウント情報 -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-          <h2 class="text-lg font-semibold text-white mb-4">📧 使用するアカウント</h2>
-          <div class="form-control">
-            <div class="text-cyan-400 font-medium" id="user-email-display">
-              ユーザー情報を取得中...
-            </div>
+      </div>
+      
+      <!-- ドメイン不一致表示（Login.htmlスタイル） -->
+      <div id="header-domain-mismatch" class="glass-panel bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-3 border border-yellow-400/30 hidden">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+          <div>
+            <div class="text-yellow-400 font-semibold text-sm" id="header-domain-mismatch-text">ドメイン不一致</div>
+            <div class="text-yellow-200 text-xs">アクセス制限あり</div>
           </div>
         </div>
-
-        <!-- ログインアクション -->
-        <div class="space-y-4">
-          <button
-            type="button"
-            id="login-btn"
-            class="w-full btn btn-primary login-btn font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled
-          >
-            はじめる
-          </button>
-
-          <div class="text-center space-y-3">
-            <button
-              id="switch-account-btn"
-              onclick="switchAccount()"
-              class="text-sm text-cyan-400 hover:text-cyan-300 underline"
-            >
-              別のアカウントでログイン
-            </button>
-            <br />
-            <button
-              onclick="showSecurityModal()"
-              class="text-xs text-gray-500 hover:text-gray-400 underline transition-colors duration-200"
-            >
-              セキュリティ仕様について
-            </button>
+      </div>
+      
+      <!-- 初期状態表示 -->
+      <div id="header-domain-initial" class="glass-panel bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-400/30">
+        <div class="flex items-center gap-2">
+          <div id="header-status-dot" class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
+          <div>
+            <div class="text-blue-400 font-semibold text-sm" id="header-domain-name-initial">ドメイン確認中</div>
+            <div class="text-blue-200 text-xs" id="header-status-text-initial">セットアップ中</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- セキュリティ仕様モーダル -->
-    <div
-      id="security-modal"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50"
-      style="animation: modalFade 0.3s ease-out"
-    >
-      <div
-        class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
-        style="animation: modalScale 0.3s ease-out"
-      >
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-semibold text-white">🔒 セキュリティ仕様</h3>
-          <button onclick="closeSecurityModal()" class="text-gray-400 hover:text-white text-2xl">
-            ✕
-          </button>
-        </div>
-
-        <div class="space-y-4 text-sm text-gray-300">
-          <div class="bg-gray-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-400 mb-2">🏢 ドメイン制限</h4>
-            <p>
-              このシステムは<strong>naha-okinawa.ed.jp</strong>ドメインのユーザーのみアクセス可能です。組織外からのアクセスは制限されています。
-            </p>
-          </div>
-
-          <div class="bg-gray-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-400 mb-2">🔐 認証システム</h4>
-            <p>
-              Google
-              Workspace内部OAuth認証を使用しており、外部認証は受け付けません。組織のセキュリティポリシーに準拠しています。
-            </p>
-          </div>
-
-          <div class="bg-gray-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-400 mb-2">🛡️ データ保護</h4>
-            <ul class="list-disc list-inside space-y-1">
-              <li>Content Security Policy (CSP) による外部リソース制限</li>
-              <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
-              <li>Referrer-Policy による情報漏洩防止</li>
-              <li>ユーザーデータの暗号化と安全な保存</li>
-            </ul>
-          </div>
-
-          <div class="bg-gray-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-400 mb-2">👥 アクセス制御</h4>
-            <p>
-              マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。
-            </p>
-          </div>
-
-          <div class="bg-gray-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-400 mb-2">📝 監査ログ</h4>
-            <p>
-              システムの全操作は監査ログに記録され、セキュリティインシデントの追跡と分析が可能です。
-            </p>
-          </div>
-
-          <div class="bg-gray-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-400 mb-2">⚙️ システム設計</h4>
-            <p>
-              Google Apps
-              Script環境での実行により、Googleのインフラストラクチャのセキュリティ基準を活用しています。
-            </p>
-          </div>
-        </div>
-
-        <div class="mt-6 text-center">
-          <button
-            onclick="closeSecurityModal()"
-            class="btn btn-secondary text-white py-2 px-6 rounded-lg"
-          >
-            閉じる
-          </button>
-        </div>
+    <!-- アカウント情報 -->
+    <div class="glass-panel rounded-xl p-6 mb-6">
+      <h2 class="text-lg font-semibold text-white mb-4">📧 使用するアカウント</h2>
+      <div class="form-control">
+        <div class="text-cyan-400 font-medium" id="user-email-display">ユーザー情報を取得中...</div>
       </div>
     </div>
 
-    <?!= include('login.js'); ?>
-  </body>
+    <!-- ログインアクション -->
+    <div class="space-y-4">
+      <button type="button" id="login-btn" class="w-full btn btn-primary login-btn font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+        はじめる
+      </button>
+
+      <div class="text-center space-y-3">
+        <button id="switch-account-btn" onclick="switchAccount()" class="text-sm text-cyan-400 hover:text-cyan-300 underline">
+          別のアカウントでログイン
+        </button>
+        <br>
+        <button onclick="showSecurityModal()" class="text-xs text-gray-500 hover:text-gray-400 underline transition-colors duration-200">
+          セキュリティ仕様について
+        </button>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- セキュリティ仕様モーダル -->
+  <div id="security-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50" style="animation: modalFade 0.3s ease-out;">
+    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" style="animation: modalScale 0.3s ease-out;">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold text-white">🔒 セキュリティ仕様</h3>
+        <button onclick="closeSecurityModal()" class="text-gray-400 hover:text-white text-2xl">✕</button>
+      </div>
+      
+      <div class="space-y-4 text-sm text-gray-300">
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">🏢 ドメイン制限</h4>
+          <p>このシステムは<strong>naha-okinawa.ed.jp</strong>ドメインのユーザーのみアクセス可能です。組織外からのアクセスは制限されています。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">🔐 認証システム</h4>
+          <p>Google Workspace内部OAuth認証を使用しており、外部認証は受け付けません。組織のセキュリティポリシーに準拠しています。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">🛡️ データ保護</h4>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Content Security Policy (CSP) による外部リソース制限</li>
+            <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
+            <li>Referrer-Policy による情報漏洩防止</li>
+            <li>ユーザーデータの暗号化と安全な保存</li>
+          </ul>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">👥 アクセス制御</h4>
+          <p>マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">📝 監査ログ</h4>
+          <p>システムの全操作は監査ログに記録され、セキュリティインシデントの追跡と分析が可能です。</p>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded-lg">
+          <h4 class="font-medium text-cyan-400 mb-2">⚙️ システム設計</h4>
+          <p>Google Apps Script環境での実行により、Googleのインフラストラクチャのセキュリティ基準を活用しています。</p>
+        </div>
+      </div>
+      
+      <div class="mt-6 text-center">
+        <button onclick="closeSecurityModal()" class="btn btn-secondary text-white py-2 px-6 rounded-lg">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <?!= include('login.js'); ?>
+
+</body>
 </html>

@@ -1,178 +1,212 @@
 <script>
-  // =============================================================================
-  // ADMIN PANEL ERROR HANDLING & STATUS MANAGEMENT
-  // =============================================================================
+// =============================================================================
+// ADMIN PANEL ERROR HANDLING & STATUS MANAGEMENT
+// =============================================================================
 
-  // =============================================================================
-  // ERROR HANDLING SYSTEM
-  // =============================================================================
-  // handleError implementation is now provided by window.AdminPanel.errors.handle
-  // defined in adminPanel-framework.js.html. All calls in this file rely on the
-  // global handleError for unified error processing.
+// =============================================================================
+// ERROR HANDLING SYSTEM
+// =============================================================================
 
-  // Safe GAS call wrapper with error handling
-  function safeGASCall(methodName, successHandler, errorMessage) {
-    return function (...args) {
-      try {
-        return google.script.run
-          .withSuccessHandler(successHandler)
-          .withFailureHandler(function (error) {
-            handleError(error, methodName, errorMessage);
-          })
-          [methodName](...args);
-      } catch (e) {
-        handleError(e, methodName, errorMessage);
-      }
-    };
-  }
-
-  // Show error with context
-  function showError(error) {
-    handleError(error, 'UI', null);
-  }
-
-  // =============================================================================
-  // STATUS VALIDATION AND UPDATES
-  // =============================================================================
-
-  // 検証ログの重複防止用キャッシュ
-  let lastValidationHash = null;
-  let validationLogCount = 0;
-
-  // API レスポンス標準化: 強化された検証とエラーハンドリング
-  function validateStatus(status) {
-    if (!status) {
-      console.error('❌ レスポンス検証失敗: ステータスオブジェクトがnullまたはundefined');
-      showMessage('システムからの応答が無効です。ページを再読み込みしてください。', 'error');
-      return false;
-    }
-
-    // エラーレスポンスの処理
-    if (status.status === 'error') {
-      console.error('❌ APIエラーレスポンス:', status.message);
-      showMessage('エラー: ' + status.message, 'error');
-      return false;
-    }
-
-    // 重複検証防止: 同じデータに対する検証ログを制限
-    const validationKey = JSON.stringify({
-      userId: (status.userInfo && status.userInfo.userId) || 'unknown',
-      activeSheet: status.activeSheetName || null,
-      headerCount:
-        (status.sheetDetails &&
-          status.sheetDetails.allHeaders &&
-          status.sheetDetails.allHeaders.length) ||
-        0,
-      setupStep: status.setupStep || 1,
+function handleError(error, context, userMessage) {
+  console.error(`❌ Error in ${context}:`, error);
+  
+  if (error && typeof error === 'object') {
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
     });
-
-    const shouldLogValidation = lastValidationHash !== validationKey || validationLogCount < 2;
-    if (shouldLogValidation) {
-      lastValidationHash = validationKey;
-      validationLogCount++;
-    }
-
-    // 必須プロパティの検証
-    const validationErrors = [];
-
-    if (!status.userInfo) {
-      validationErrors.push('ユーザー情報が見つかりません');
-    } else {
-      // ユーザー情報の詳細検証
-      if (!status.userInfo.userId) {
-        validationErrors.push('ユーザーIDが設定されていません');
-      }
-      if (!status.userInfo.adminEmail) {
-        validationErrors.push('管理者メールアドレスが設定されていません');
-      }
-    }
-
-    // 設定情報の検証
-    if (!status.config) {
-      validationErrors.push('設定情報が見つかりません');
-      console.warn('⚠️ status.config が存在しません、空のオブジェクトで初期化します');
-      status.config = {};
-    }
-
-    // appUrlsの検証
-    if (!status.appUrls) {
-      validationErrors.push('アプリケーションURLが設定されていません');
-      console.warn('⚠️ status.appUrls が存在しません');
-    }
-
-    // シート情報の検証（警告レベル）
-    if (!status.allSheets || !Array.isArray(status.allSheets)) {
-      console.warn('⚠️ シート一覧が無効または存在しません:', status.allSheets);
-      status.allSheets = []; // フォールバック
-    }
-
-    // シート詳細の検証（オプショナル）- 重複ログ防止
-    if (status.sheetDetails) {
-      if (!status.sheetDetails.allHeaders || !Array.isArray(status.sheetDetails.allHeaders)) {
-        console.warn('⚠️ シートヘッダー情報が無効です:', status.sheetDetails.allHeaders);
-        console.warn(
-          'これは「No headers found for フォームの回答」エラーの原因となる可能性があります'
-        );
-      } else {
-        // 重複ヘッダー検証ログを防止
-        if (shouldLogValidation) {
-          console.log(
-            '✅ シートヘッダー検証OK:',
-            status.sheetDetails.allHeaders.length + '個のヘッダー'
-          );
-        }
-      }
-
-      if (!status.sheetDetails.guessedConfig) {
-        if (shouldLogValidation) {
-          console.warn('⚠️ AI列判定結果が存在しません - 手動設定が必要です');
-        }
-      } else {
-        // 本番環境では詳細ログを削減 + 重複防止
-        if (shouldLogValidation) {
-          if (typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE) {
-            console.log('✅ AI列判定結果が利用可能:', status.sheetDetails.guessedConfig);
-          } else {
-            console.log('✅ AI列判定結果が利用可能');
-          }
-        }
-      }
-    } else {
-      if (shouldLogValidation) {
-        console.log('ℹ️ シート詳細はオプショナルなので存在しません（正常）');
-      }
-    }
-
-    // セットアップステップの検証
-    if (typeof status.setupStep !== 'number') {
-      console.warn('⚠️ セットアップステップが数値ではありません:', status.setupStep);
-      status.setupStep = 1; // デフォルト値
-    }
-
-    // 検証エラーがある場合
-    if (validationErrors.length > 0) {
-      console.error('❌ レスポンス検証エラー:', validationErrors);
-      showMessage('データ検証エラー: ' + validationErrors.join(', '), 'error');
-      return false;
-    }
-
-    // 重複防止: 初回または重要な変更時のみ成功ログを出力
-    if (shouldLogValidation) {
-      console.log('✅ レスポンス検証成功');
-    }
-    return true;
   }
 
-  // Update user activity timestamp for polling optimization
-  function updateUserActivity() {
-    lastUserActivity = Date.now();
+  var displayMessage = userMessage || translateErrorMessage(error?.message || String(error), context);
+  showMessage(displayMessage, 'error');
+}
+
+// Error message translation for better UX
+function translateErrorMessage(errorMsg, context) {
+  const lowerMsg = errorMsg.toLowerCase();
+  
+  // 範囲エラー
+  if (lowerMsg.includes('範囲の列数には') || lowerMsg.includes('range')) {
+    return '選択した範囲にデータが見つかりません。シートにデータがあることを確認してください。';
   }
+  
+  // シート情報取得エラー
+  if (lowerMsg.includes('シート情報の取得に失敗') || lowerMsg.includes('sheet')) {
+    return 'シート情報の取得に失敗しました。スプレッドシートのアクセス権限を確認してください。';
+  }
+  
+  // 権限エラー
+  if (lowerMsg.includes('permission') || lowerMsg.includes('権限') || lowerMsg.includes('access denied')) {
+    return 'スプレッドシートへのアクセス権限がありません。管理者に権限を確認してください。';
+  }
+  
+  // ネットワークエラー
+  if (lowerMsg.includes('network') || lowerMsg.includes('timeout') || lowerMsg.includes('fetch')) {
+    return 'ネットワークエラーが発生しました。インターネット接続を確認して再試行してください。';
+  }
+  
+  // フォーム関連エラー
+  if (lowerMsg.includes('form') && lowerMsg.includes('not found')) {
+    return 'フォームが見つかりません。新しいフォームを作成してください。';
+  }
+  
+  // バリデーションエラー
+  if (lowerMsg.includes('validation') || lowerMsg.includes('invalid')) {
+    return '入力内容に問題があります。必須項目が入力されているか確認してください。';
+  }
+  
+  // 認証エラー
+  if (lowerMsg.includes('authentication') || lowerMsg.includes('login') || lowerMsg.includes('unauthorized')) {
+    return '認証が必要です。ページを再読み込みしてください。';
+  }
+  
+  // サーバーエラー
+  if (lowerMsg.includes('server error') || lowerMsg.includes('500') || lowerMsg.includes('503')) {
+    return 'サーバーエラーが発生しました。しばらく待ってから再試行してください。';
+  }
+  
+  // 設定エラー
+  if (context && context.includes('config') || lowerMsg.includes('configuration')) {
+    return '設定の保存に失敗しました。入力内容を確認して再試行してください。';
+  }
+  
+  // 一般的なエラー
+  if (lowerMsg.includes('failed') || lowerMsg.includes('error')) {
+    return '処理に失敗しました。しばらく待ってから再試行してください。';
+  }
+  
+  return errorMsg || '不明なエラーが発生しました。';
+}
 
-  // =============================================================================
-  // INITIALIZATION HELPERS
-  // =============================================================================
+// Safe GAS call wrapper with error handling
+function safeGASCall(methodName, successHandler, errorMessage) {
+  return function(...args) {
+    try {
+      return google.script.run
+        .withSuccessHandler(successHandler)
+        .withFailureHandler(function(error) {
+          handleError(error, methodName, errorMessage);
+        })[methodName](...args);
+    } catch (e) {
+      handleError(e, methodName, errorMessage);
+    }
+  };
+}
 
-  // Message area initialization is now handled in adminPanel-framework.js.html
+// Show error with context
+function showError(error) {
+  handleError(error, 'UI', null);
+}
 
-  //# sourceURL=adminPanel-status.js.html
+// =============================================================================
+// STATUS VALIDATION AND UPDATES
+// =============================================================================
+
+// API レスポンス標準化: 強化された検証とエラーハンドリング
+function validateStatus(status) {
+  if (!status) {
+    console.error('❌ レスポンス検証失敗: ステータスオブジェクトがnullまたはundefined');
+    showMessage('システムからの応答が無効です。ページを再読み込みしてください。', 'error');
+    return false;
+  }
+  
+  // エラーレスポンスの処理
+  if (status.status === 'error') {
+    console.error('❌ APIエラーレスポンス:', status.message);
+    showMessage('エラー: ' + status.message, 'error');
+    return false;
+  }
+  
+  // 必須プロパティの検証
+  const validationErrors = [];
+  
+  if (!status.userInfo) {
+    validationErrors.push('ユーザー情報が見つかりません');
+  } else {
+    // ユーザー情報の詳細検証
+    if (!status.userInfo.userId) {
+      validationErrors.push('ユーザーIDが設定されていません');
+    }
+    if (!status.userInfo.adminEmail) {
+      validationErrors.push('管理者メールアドレスが設定されていません');
+    }
+  }
+  
+  // 設定情報の検証
+  if (!status.config) {
+    validationErrors.push('設定情報が見つかりません');
+    console.warn('⚠️ status.config が存在しません、空のオブジェクトで初期化します');
+    status.config = {};
+  }
+  
+  // appUrlsの検証
+  if (!status.appUrls) {
+    validationErrors.push('アプリケーションURLが設定されていません');
+    console.warn('⚠️ status.appUrls が存在しません');
+  }
+  
+  // シート情報の検証（警告レベル）
+  if (!status.allSheets || !Array.isArray(status.allSheets)) {
+    console.warn('⚠️ シート一覧が無効または存在しません:', status.allSheets);
+    status.allSheets = []; // フォールバック
+  }
+  
+  // シート詳細の検証（オプショナル）
+  if (status.sheetDetails) {
+    if (!status.sheetDetails.allHeaders || !Array.isArray(status.sheetDetails.allHeaders)) {
+      console.warn('⚠️ シートヘッダー情報が無効です:', status.sheetDetails.allHeaders);
+      console.warn('これは「No headers found for フォームの回答」エラーの原因となる可能性があります');
+    } else {
+      console.log('✅ シートヘッダー検証OK:', status.sheetDetails.allHeaders.length + '個のヘッダー');
+    }
+    
+    if (!status.sheetDetails.guessedConfig) {
+      console.warn('⚠️ AI列判定結果が存在しません - 手動設定が必要です');
+    } else {
+      console.log('✅ AI列判定結果が利用可能:', status.sheetDetails.guessedConfig);
+    }
+  } else {
+    console.log('ℹ️ シート詳細はオプショナルなので存在しません（正常）');
+  }
+  
+  // セットアップステップの検証
+  if (typeof status.setupStep !== 'number') {
+    console.warn('⚠️ セットアップステップが数値ではありません:', status.setupStep);
+    status.setupStep = 1; // デフォルト値
+  }
+  
+  // 検証エラーがある場合
+  if (validationErrors.length > 0) {
+    console.error('❌ レスポンス検証エラー:', validationErrors);
+    showMessage('データ検証エラー: ' + validationErrors.join(', '), 'error');
+    return false;
+  }
+  
+  console.log('✅ レスポンス検証成功');
+  return true;
+}
+
+// Update user activity timestamp for polling optimization
+function updateUserActivity() {
+  lastUserActivity = Date.now();
+}
+
+// =============================================================================
+// INITIALIZATION HELPERS
+// =============================================================================
+
+// Initialize message area
+function initializeMessageArea() {
+  var messageArea = document.getElementById('message-area');
+  if (!messageArea) {
+    // Create message area if it doesn't exist
+    messageArea = document.createElement('div');
+    messageArea.id = 'message-area';
+    messageArea.className = 'fixed top-4 right-4 z-50 max-w-sm';
+    document.body.appendChild(messageArea);
+  }
+}
+
+// 初期化は adminPanel-core.js の統合初期化システムで管理されます
 </script>

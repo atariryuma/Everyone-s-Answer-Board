@@ -1,86 +1,84 @@
 <style>
-  * {
-    box-sizing: border-box;
-  }
+* {
+  box-sizing: border-box;
+}
 
-  html,
-  body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    overflow-x: hidden;
-  }
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
 
-  body {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
 
-  main {
-    flex: 1;
-    width: 100%;
-  }
+main {
+  flex: 1;
+  width: 100%;
+}
 
-  /* ヘッダー固定に対応したレイアウト調整 */
+/* ヘッダー固定に対応したレイアウト調整 */
 
-  /* Admin Panel Layout Fixes */
+
+/* Admin Panel Layout Fixes */
+.responsive-grid {
+  display: grid;
+  gap: 1rem; /* モバイルのギャップ */
+  grid-template-columns: 1fr; /* モバイル: 単一カラム */
+  padding: 1rem; /* 全体的な余白を追加 */
+}
+
+@media (min-width: 768px) { /* タブレット向けブレークポイント */
   .responsive-grid {
-    display: grid;
-    gap: 1rem; /* モバイルのギャップ */
-    grid-template-columns: 1fr; /* モバイル: 単一カラム */
-    padding: 1rem; /* 全体的な余白を追加 */
+    grid-template-columns: 2fr 1fr; /* 左: 2/3、右: 1/3 */
+    gap: 1rem; /* タブレットのギャップ */
+    padding: 1.5rem; /* タブレットでの余白を増加 */
   }
-
-  @media (min-width: 768px) {
-    /* タブレット向けブレークポイント */
-    .responsive-grid {
-      grid-template-columns: 2fr 1fr; /* 左: 2/3、右: 1/3 */
-      gap: 1rem; /* タブレットのギャップ */
-      padding: 1.5rem; /* タブレットでの余白を増加 */
-    }
-    .right-panel {
-      min-width: 200px; /* タブレットでの右パネルの最小幅 */
-    }
+  .right-panel {
+    min-width: 200px; /* タブレットでの右パネルの最小幅 */
   }
+}
 
-  @media (min-width: 1024px) {
-    /* デスクトップ向けブレークポイント */
-    .responsive-grid {
-      grid-template-columns: minmax(400px, 1fr) 350px; /* 左: 最小400px、柔軟。右: 固定350px */
-      gap: 1.5rem; /* デスクトップのギャップ */
-      padding: 2rem; /* デスクトップでの余白をさらに増加 */
-    }
-    .right-panel {
-      min-width: 300px; /* デスクトップでの右パネルの最小幅（安全のため） */
-    }
+@media (min-width: 1024px) { /* デスクトップ向けブレークポイント */
+  .responsive-grid {
+    grid-template-columns: minmax(400px, 1fr) 350px; /* 左: 最小400px、柔軟。右: 固定350px */
+    gap: 1.5rem; /* デスクトップのギャップ */
+    padding: 2rem; /* デスクトップでの余白をさらに増加 */
   }
-
-  /* Ensure proper main content layout */
-  main.flex-1 {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
+  .right-panel {
+    min-width: 300px; /* デスクトップでの右パネルの最小幅（安全のため） */
   }
+}
 
-  .left-panel {
-    flex: 1;
-    min-height: 0;
-  }
+/* Ensure proper main content layout */
+main.flex-1 {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
 
-  /* Adjust fixed header and main padding for extra height */
+.left-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Adjust fixed header and main padding for extra height */
+#admin-header {
+  height: calc(4rem + 2mm);
+}
+#admin-main {
+  padding-top: calc(4rem + 2mm);
+}
+@media (min-width: 640px) {
   #admin-header {
-    height: calc(4rem + 2mm);
+    height: calc(5rem + 2mm);
   }
   #admin-main {
-    padding-top: calc(4rem + 2mm);
+    padding-top: calc(5rem + 2mm);
   }
-  @media (min-width: 640px) {
-    #admin-header {
-      height: calc(5rem + 2mm);
-    }
-    #admin-main {
-      padding-top: calc(5rem + 2mm);
-    }
-  }
+}
 </style>
