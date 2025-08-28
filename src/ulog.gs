@@ -4,34 +4,6 @@
  */
 
 class ULog {
-  // ログレベル定数
-  static LEVELS = {
-    DEBUG: 0,
-    INFO: 1,
-    WARN: 2,
-    ERROR: 3,
-    CRITICAL: 4
-  };
-  
-  // ログカテゴリ定数
-  static CATEGORIES = {
-    AUTH: 'AUTH',
-    API: 'API', 
-    DB: 'DB',
-    CACHE: 'CACHE',
-    SECURITY: 'SECURITY',
-    VALIDATION: 'VALIDATION',
-    PERFORMANCE: 'PERFORMANCE',
-    SYSTEM: 'SYSTEM',
-    UI: 'UI',
-    INTEGRATION: 'INTEGRATION'
-  };
-  
-  // 現在のログレベル (本番環境では INFO 以上)
-  static currentLevel = ULog.LEVELS.DEBUG;
-  
-  // プリフィックス設定
-  static prefix = '[StudyQuest]';
   
   /**
    * 汎用ログメソッド
@@ -218,6 +190,35 @@ class ULog {
     };
   }
 }
+
+// ログレベル定数 (GAS互換性のため静的プロパティとして定義)
+ULog.LEVELS = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+  CRITICAL: 4
+};
+
+// ログカテゴリ定数
+ULog.CATEGORIES = {
+  AUTH: 'AUTH',
+  API: 'API', 
+  DB: 'DB',
+  CACHE: 'CACHE',
+  SECURITY: 'SECURITY',
+  VALIDATION: 'VALIDATION',
+  PERFORMANCE: 'PERFORMANCE',
+  SYSTEM: 'SYSTEM',
+  UI: 'UI',
+  INTEGRATION: 'INTEGRATION'
+};
+
+// 現在のログレベル (本番環境では INFO 以上)
+ULog.currentLevel = ULog.LEVELS.DEBUG;
+
+// プリフィックス設定
+ULog.prefix = '[StudyQuest]';
 
 // グローバル関数としてもエクスポート（レガシーサポート用）
 function ULog(level, functionName, message, data, category) {
