@@ -513,7 +513,14 @@ function getFrontendConstants() {
   return {
     ERROR_SEVERITY: UNIFIED_CONSTANTS.ERROR.SEVERITY,
     ERROR_CATEGORIES: UNIFIED_CONSTANTS.ERROR.CATEGORIES,
-    ERROR_TYPES: UNIFIED_CONSTANTS.ERROR.CATEGORIES, // alias for legacy support
+    ERROR_TYPES: {
+      CRITICAL: 'critical',
+      ACCESS: 'access',
+      VALIDATION: 'validation',
+      NETWORK: 'network',
+      USER: 'user',
+      SYSTEM: 'system'
+    }, // Legacy support
     DISPLAY_MODES: UNIFIED_CONSTANTS.DISPLAY.MODES,
     REACTION_KEYS: UNIFIED_CONSTANTS.SCORING.REACTION_KEYS,
     DEFAULT_QUESTIONS: UNIFIED_CONSTANTS.FORMS.DEFAULT_QUESTIONS,
@@ -1231,6 +1238,16 @@ const Functions = {
   getEditUrl: (form) => form ? form.getEditUrl() : ''
 };
 
+
+// エラータイプの互換性定義
+const ERROR_TYPES = {
+  CRITICAL: 'critical',
+  ACCESS: 'access',
+  VALIDATION: 'validation',
+  NETWORK: 'network',
+  USER: 'user',
+  SYSTEM: 'system'
+};
 
 // 利用可能性ログ
 console.log('✅ 統一コード品質最適化関数群が利用可能です');
