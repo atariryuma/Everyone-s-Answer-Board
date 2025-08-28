@@ -2440,7 +2440,7 @@ function getCurrentUserStatus(requestUserId) {
     }
 
     // フロントエンドが期待する形式に統一
-    return {
+    var response = {
       status: 'success',
       userInfo: {
         userId: userInfo.userId,
@@ -2449,6 +2449,20 @@ function getCurrentUserStatus(requestUserId) {
         lastAccessedAt: userInfo.lastAccessedAt,
       }
     };
+
+    // getCurrentUserStatus通信診断ログ
+    ULog.debug('📤 getCurrentUserStatus: return直前のレスポンス詳細診断:', {
+      responseType: typeof response,
+      responseIsNull: response === null,
+      responseIsUndefined: response === undefined,
+      hasStatus: !!(response && response.status),
+      hasUserInfo: !!(response && response.userInfo),
+      statusValue: response ? response.status : 'undefined',
+      responseKeys: response ? Object.keys(response) : 'response is null/undefined',
+      responseStringified: response ? JSON.stringify(response) : 'null/undefined'
+    });
+
+    return response;
   } catch (e) {
     logError(
       e,
@@ -6717,6 +6731,17 @@ function getInitialData(requestUserId, targetSheetName) {
       userId: currentUserId,
       setupStep: setupStep,
       hasSheetDetails: !!response.sheetDetails,
+    });
+
+    // フロントエンドnull受信問題の診断: return直前のレスポンス詳細ログ
+    ULog.debug('📤 getInitialData: return直前のレスポンス詳細診断:', {
+      responseType: typeof response,
+      responseIsNull: response === null,
+      responseIsUndefined: response === undefined,
+      hasUserInfo: !!(response && response.userInfo),
+      hasSetupStep: !!(response && response.setupStep !== undefined),
+      responseKeys: response ? Object.keys(response) : 'response is null/undefined',
+      responseStringified: response ? JSON.stringify(response).substring(0, 200) + '...' : 'null/undefined'
     });
 
     return response;

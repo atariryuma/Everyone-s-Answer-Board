@@ -514,11 +514,38 @@
           .withSuccessHandler((result) => {
             window.unifiedLoading.hide(); // Hide loading overlay on success
             this.pendingRequests.delete(requestKey); // 完了後にキャッシュから削除
+
+            // google.script.run 通信監視: SuccessHandler
+            console.log(`📡 google.script.run SuccessHandler for ${functionName}:`, {
+              resultReceived: result !== undefined,
+              resultIsNull: result === null,
+              resultIsUndefined: result === undefined,
+              resultType: typeof result,
+              resultStringified: result ? JSON.stringify(result).substring(0, 100) + '...' : 'null/undefined',
+              functionName: functionName,
+              args: args,
+              timestamp: new Date().toISOString()
+            });
+
             resolve(result);
           })
           .withFailureHandler((error) => {
             window.unifiedLoading.hide(); // Hide loading overlay on failure
             this.pendingRequests.delete(requestKey); // エラー時にもキャッシュから削除
+
+            // google.script.run 通信監視: FailureHandler
+            console.error(`📡 google.script.run FailureHandler for ${functionName}:`, {
+              errorReceived: error !== undefined,
+              errorIsNull: error === null,
+              errorIsUndefined: error === undefined,
+              errorType: typeof error,
+              errorMessage: error ? error.message : 'no message',
+              errorStringified: error ? JSON.stringify(error) : 'null/undefined',
+              functionName: functionName,
+              args: args,
+              timestamp: new Date().toISOString()
+            });
+
             // Log the error using the shared error handler
             window.sharedUtilities.errors.logError(error, `GAS call failed: ${functionName}`);
             reject(error);
