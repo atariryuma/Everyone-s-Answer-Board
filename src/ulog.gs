@@ -221,6 +221,6 @@ ULog.currentLevel = ULog.LEVELS.DEBUG;
 ULog.prefix = '[StudyQuest]';
 
 // グローバル関数としてもエクスポート（レガシーサポート用）
-function ULog(level, functionName, message, data, category) {
+function ulogFunction(level, functionName, message, data, category) {
   return ULog.log(level, functionName, message, data, category);
 }

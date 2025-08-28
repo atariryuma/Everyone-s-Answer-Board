@@ -1274,7 +1274,6 @@ class URLSearchParams {
 }
 
 // 必要最小限の関数エイリアス（未定義エラー解決用）
-const Functions = {}; // 空オブジェクト（Core.gsで参照される）
 const UnifiedErrorHandler = handleUnifiedError; // UErrorと同じ実装
 
 // 本当に必要な未定義関数の最小実装
@@ -1441,48 +1440,6 @@ const Functions = {
   getEditUrl: (form) => form.getEditUrl()
 };
 
-// ULogの簡単な代用実装（console.logベース）
-if (typeof ULog === 'undefined') {
-  const ULog = {
-    CATEGORIES: {
-      AUTH: 'AUTH', API: 'API', DB: 'DB', CACHE: 'CACHE',
-      SECURITY: 'SECURITY', VALIDATION: 'VALIDATION', 
-      PERFORMANCE: 'PERFORMANCE', SYSTEM: 'SYSTEM'
-    },
-    
-    info: (message, data, category) => {
-      const prefix = category ? `[${category}]` : '';
-      const msg = `[INFO]${prefix} ${message}`;
-      console.log(msg, data || '');
-      Logger.log(msg + (data ? ' ' + JSON.stringify(data) : ''));
-    },
-    
-    debug: (message, data, category) => {
-      const prefix = category ? `[${category}]` : '';
-      console.log(`[DEBUG]${prefix} ${message}`, data || '');
-    },
-    
-    warn: (message, data, category) => {
-      const prefix = category ? `[${category}]` : '';
-      const msg = `[WARN]${prefix} ${message}`;
-      console.warn(msg, data || '');
-      Logger.log(msg + (data ? ' ' + JSON.stringify(data) : ''));
-    },
-    
-    error: (message, data, category) => {
-      const prefix = category ? `[${category}]` : '';
-      const msg = `[ERROR]${prefix} ${message}`;
-      console.error(msg, data || '');
-      Logger.log(msg + (data ? ' ' + JSON.stringify(data) : ''));
-    }
-  };
-  
-  // グローバル関数としてもエクスポート
-  function ULog(level, functionName, message, data, category) {
-    const logMethod = ULog[level.toLowerCase()] || ULog.info;
-    logMethod(`${functionName}: ${message}`, data, category);
-  }
-}
 
 // 利用可能性ログ
 console.log('✅ 統一コード品質最適化関数群が利用可能です');
