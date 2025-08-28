@@ -1,3 +1,52 @@
 {
-    "livePreview.defaultPreviewPath": "/src/Page.html"
+    "livePreview.defaultPreviewPath": "/src/Page.html",
+    
+    // Google Apps Script 用設定
+    "files.associations": {
+        "*.gs": "javascript"
+    },
+    
+    // JavaScript/GAS構文チェック設定
+    "javascript.suggest.autoImports": false,
+    "javascript.validate.enable": true,
+    "javascript.format.enable": true,
+    "javascript.preferences.includePackageJsonAutoImports": "off",
+    "typescript.preferences.includePackageJsonAutoImports": "off",
+    "javascript.suggestionActions.enabled": false,
+    
+    // TypeScript設定（IntelliSense用）
+    "typescript.suggest.autoImports": false,
+    "typescript.validate.enable": true,
+    "typescript.preferences.includeAllImports": false,
+    
+    // ESLint設定（GAS用）
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "eslint.validate": [
+        "javascript",
+        "gas"
+    ],
+    "eslint.options": {
+        "extensions": [".js", ".gs"]
+    },
+    
+    // エディター設定
+    "emmet.includeLanguages": {
+        "gas": "javascript"
+    },
+    
+    // ファイル除外設定
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/node_modules": true,
+        "**/*.log": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/.git": true,
+        "**/dist": true
+    }
 }
