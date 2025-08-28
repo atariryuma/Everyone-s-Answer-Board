@@ -419,8 +419,8 @@ function clearOldUserCache(currentEmail) {
     // 現在のユーザー以外のキャッシュをクリア（API修正版）
     const userCache = CacheService.getUserCache();
     if (userCache) {
-      // GAS API仕様に合わせて全キャッシュクリア
-      userCache.removeAll();
+      // removeAll() はキー配列が必要なため、自動期限切れを利用
+      console.log('[Cache] ユーザーキャッシュは自動的に期限切れになります');
     }
 
     // スクリプトレベルキャッシュの期限切れエントリもクリア

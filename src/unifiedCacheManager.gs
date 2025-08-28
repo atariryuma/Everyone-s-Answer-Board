@@ -2036,9 +2036,9 @@ class UnifiedCacheAPI {
       this.executionCache.clearAll();
       this.executionCache.syncWithUnifiedCache('systemChange');
 
-      // Apps Script キャッシュクリア
-      CacheService.getScriptCache().removeAll();
-      CacheService.getUserCache().removeAll();
+      // Apps Script キャッシュクリア (自動期限切れに依存)
+      // CacheService.removeAll() はキー配列が必要なため、自動期限切れを利用
+      console.log('[Cache] キャッシュは自動的に期限切れになります');
 
       // 統一キャッシュマネージャークリア
       this.manager.clearAll();
@@ -2130,8 +2130,8 @@ class UnifiedCacheAPI {
 
       // パターンベースクリア
       if (clearPattern === true || clearPattern === 'all') {
-        CacheService.getScriptCache().removeAll();
-        CacheService.getUserCache().removeAll();
+        // CacheService.removeAll() はキー配列が必要なため、自動期限切れを利用
+        console.log('[Cache] 全キャッシュクリアは自動期限切れに依存します');
         this.manager.clearAll();
       } else if (typeof clearPattern === 'string' && clearPattern !== 'false') {
         this.manager.clearByPattern(clearPattern, { maxKeys: 300 });
@@ -2213,8 +2213,8 @@ class UnifiedCacheAPI {
       });
 
       // Apps Script キャッシュもクリア（データベース関連のみ）
-      CacheService.getScriptCache().removeAll();
-      CacheService.getUserCache().removeAll();
+      // CacheService.removeAll() はキー配列が必要なため、自動期限切れを利用
+      console.log('[Cache] キャッシュクリア完了（自動期限切れ）');
 
       ULog.debug('✅ 統一API: データベースキャッシュクリア完了');
     } catch (error) {

@@ -2,7 +2,7 @@
 
 ## errorInfo
   - const in Core.gs:48
-  - const in constants.gs:576
+  - const in constants.gs:583
   - const in main.gs:1695
 
 ## errorMessage
@@ -14,16 +14,6 @@
   - const in secretManager.gs:371
   - let in session-utils.gs:288
   - let in unifiedSecurityManager.gs:81
-
-## warnLog
-  - function in Core.gs:223
-  - function in debugConfig.gs:148
-  - function in url.gs:13
-
-## infoLog
-  - function in Core.gs:231
-  - function in debugConfig.gs:157
-  - function in url.gs:19
 
 ## userInfo
   - const in Core.gs:366
@@ -162,7 +152,7 @@
   - const in Core.gs:692
   - var in Core.gs:1543
   - var in Core.gs:1774
-  - const in constants.gs:1307
+  - const in constants.gs:1128
   - const in main.gs:2764
   - const in unifiedSheetDataManager.gs:147
   - const in unifiedSheetDataManager.gs:191
@@ -185,8 +175,8 @@
   - const in Core.gs:6824
   - let in config.gs:589
   - const in config.gs:3149
-  - const in constants.gs:952
-  - const in constants.gs:1215
+  - const in constants.gs:773
+  - const in constants.gs:1036
   - var in database.gs:1725
   - var in database.gs:2057
   - var in database.gs:2219
@@ -237,9 +227,9 @@
 ## errors
   - const in Core.gs:475
   - const in Core.gs:675
-  - const in constants.gs:822
-  - const in constants.gs:884
-  - const in constants.gs:1116
+  - const in constants.gs:643
+  - const in constants.gs:705
+  - const in constants.gs:937
   - const in main.gs:913
   - const in validationMigration.gs:467
 
@@ -416,7 +406,7 @@
   - const in config.gs:2309
   - const in config.gs:2426
   - const in config.gs:2628
-  - const in constants.gs:945
+  - const in constants.gs:766
   - var in database.gs:2715
   - const in database.gs:3016
   - const in session-utils.gs:170
@@ -662,10 +652,6 @@
   - var in database.gs:2363
   - var in database.gs:2448
 
-## checkReactionState
-  - function in Core.gs:2067
-  - const in constants.gs:1281
-
 ## columnIndex
   - var in Core.gs:2069
   - var in Core.gs:3532
@@ -752,8 +738,8 @@
   - var in Core.gs:5326
   - var in Core.gs:6566
   - const in config.gs:2704
-  - const in constants.gs:531
-  - const in constants.gs:1415
+  - const in constants.gs:538
+  - const in constants.gs:1216
   - var in database.gs:1308
   - var in database.gs:1335
   - const in database.gs:1407
@@ -903,7 +889,7 @@
   - const in unifiedUserManager.gs:50
   - const in unifiedUserManager.gs:121
   - const in unifiedUserManager.gs:189
-  - const in url.gs:33
+  - const in url.gs:23
   - const in workflowValidation.gs:25
 
 ## formIdMatch
@@ -930,8 +916,7 @@
 
 ## timestamp
   - const in Core.gs:3943
-  - const in constants.gs:575
-  - const in constants.gs:678
+  - const in constants.gs:582
   - const in database.gs:398
   - const in debugConfig.gs:88
   - const in ulog.gs:24
@@ -949,7 +934,7 @@
 
 ## results
   - var in Core.gs:4257
-  - const in constants.gs:1115
+  - const in constants.gs:936
   - const in main.gs:3192
   - const in secretManager.gs:587
   - const in unifiedBatchProcessor.gs:639
@@ -1093,8 +1078,8 @@
   - const in unifiedBatchProcessor.gs:473
   - const in unifiedCacheManager.gs:1622
   - const in unifiedSheetDataManager.gs:403
-  - const in url.gs:200
-  - const in url.gs:250
+  - const in url.gs:190
+  - const in url.gs:240
 
 ## adminEmail
   - var in Core.gs:5362
@@ -1177,7 +1162,7 @@
 
 ## setupStep
   - var in Core.gs:6535
-  - const in constants.gs:1280
+  - const in constants.gs:1101
 
 ## activeSheetConfig
   - var in Core.gs:6547
@@ -1267,10 +1252,6 @@
   - const in session-utils.gs:179
   - const in session-utils.gs:324
 
-## currentPriority
-  - const in config.gs:649
-  - const in constants.gs:662
-
 ## analysis
   - const in config.gs:825
   - const in config.gs:880
@@ -1298,13 +1279,6 @@
   - const in database.gs:3047
   - const in session-utils.gs:266
   - const in session-utils.gs:280
-
-## match
-  - const in config.gs:1274
-  - const in config.gs:1278
-  - const in config.gs:1282
-  - const in config.gs:1286
-  - const in constants.gs:767
 
 ## mapping
   - const in config.gs:1292
@@ -1378,7 +1352,7 @@
 
 ## resolveValue
   - const in config.gs:3228
-  - const in constants.gs:1284
+  - const in constants.gs:1105
 
 ## totalTime
   - const in config.gs:3572
@@ -1387,7 +1361,7 @@
 ## value
   - const in config.gs:3818
   - let in constants.gs:383
-  - const in constants.gs:897
+  - const in constants.gs:718
   - const in database.gs:895
   - const in main.gs:815
   - let in secretManager.gs:353
@@ -1401,100 +1375,46 @@
   - const in constants.gs:382
   - const in main.gs:1706
 
-## ULog
-  - const in constants.gs:613
-  - class in ulog.gs:6
+## missing
+  - const in constants.gs:642
+  - var in database.gs:2412
+  - const in unifiedCacheManager.gs:1731
+  - const in unifiedSheetDataManager.gs:455
+
+## duration
+  - const in constants.gs:774
+  - const in constants.gs:782
+  - const in ulog.gs:186
+  - const in unifiedValidationSystem.gs:861
+  - const in unifiedValidationSystem.gs:892
+
+## lastError
+  - let in constants.gs:810
+  - let in resilientExecutor.gs:68
+  - let in unifiedCacheManager.gs:1605
+  - let in unifiedSheetDataManager.gs:389
+
+## waitTime
+  - const in constants.gs:823
+  - const in unifiedCacheManager.gs:1687
+
+## chunks
+  - const in constants.gs:861
+  - const in constants.gs:935
+  - const in unifiedBatchProcessor.gs:349
+  - const in unifiedBatchProcessor.gs:400
+
+## chunkResults
+  - const in constants.gs:947
+  - const in unifiedBatchProcessor.gs:373
 
 ## logEntry
-  - const in constants.gs:679
   - const in database.gs:146
   - const in database.gs:253
   - var in database.gs:2911
   - const in secretManager.gs:553
   - const in unifiedSecurityManager.gs:414
   - const in unifiedSecurityManager.gs:438
-
-## formattedMessage
-  - const in constants.gs:692
-  - const in debugConfig.gs:89
-  - const in ulog.gs:26
-
-## stack
-  - const in constants.gs:761
-  - const in ulog.gs:132
-
-## stackLines
-  - const in constants.gs:762
-  - const in ulog.gs:133
-
-## missing
-  - const in constants.gs:821
-  - var in database.gs:2412
-  - const in unifiedCacheManager.gs:1731
-  - const in unifiedSheetDataManager.gs:455
-
-## duration
-  - const in constants.gs:953
-  - const in constants.gs:961
-  - const in ulog.gs:186
-  - const in unifiedValidationSystem.gs:861
-  - const in unifiedValidationSystem.gs:892
-
-## lastError
-  - let in constants.gs:989
-  - let in resilientExecutor.gs:68
-  - let in unifiedCacheManager.gs:1605
-  - let in unifiedSheetDataManager.gs:389
-
-## waitTime
-  - const in constants.gs:1002
-  - const in unifiedCacheManager.gs:1687
-
-## chunks
-  - const in constants.gs:1040
-  - const in constants.gs:1114
-  - const in unifiedBatchProcessor.gs:349
-  - const in unifiedBatchProcessor.gs:400
-
-## chunkResults
-  - const in constants.gs:1126
-  - const in unifiedBatchProcessor.gs:373
-
-## SystemIntegrationManager
-  - const in constants.gs:1366
-  - class in systemIntegrationManager.gs:10
-
-## UnifiedSheetDataManager
-  - const in constants.gs:1369
-  - class in unifiedSheetDataManager.gs:24
-
-## UnifiedCacheAPI
-  - const in constants.gs:1372
-  - class in unifiedCacheManager.gs:1986
-
-## MultiTenantSecurityManager
-  - const in constants.gs:1375
-  - class in unifiedSecurityManager.gs:277
-
-## UnifiedValidationSystem
-  - const in constants.gs:1378
-  - class in unifiedValidationSystem.gs:9
-
-## CacheManager
-  - const in constants.gs:1381
-  - class in unifiedCacheManager.gs:14
-
-## UnifiedExecutionCache
-  - const in constants.gs:1384
-  - class in unifiedCacheManager.gs:1121
-
-## UnifiedBatchProcessor
-  - const in constants.gs:1389
-  - class in unifiedBatchProcessor.gs:10
-
-## UnifiedSecretManager
-  - const in constants.gs:1392
-  - class in secretManager.gs:10
 
 ## row
   - const in database.gs:335
@@ -1559,8 +1479,8 @@
   - const in main.gs:1805
   - const in main.gs:1816
   - const in main.gs:2249
-  - const in url.gs:234
-  - const in url.gs:257
+  - const in url.gs:224
+  - const in url.gs:247
 
 ## stats
   - var in database.gs:2031
@@ -1611,6 +1531,10 @@
   - const in debugConfig.gs:77
   - const in ulog.gs:17
 
+## formattedMessage
+  - const in debugConfig.gs:89
+  - const in ulog.gs:26
+
 ## logData
   - const in debugConfig.gs:90
   - const in main.gs:3145
@@ -1621,7 +1545,7 @@
 
 ## webAppUrl
   - const in main.gs:687
-  - const in url.gs:164
+  - const in url.gs:154
 
 ## properties
   - const in main.gs:761

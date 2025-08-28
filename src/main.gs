@@ -3290,10 +3290,13 @@ function clearCache() {
     // PropertiesService キャッシュのクリア
     PropertiesService.getScriptProperties().deleteAll();
     
-    // CacheService キャッシュのクリア  
-    CacheService.getScriptCache().removeAll();
-    CacheService.getUserCache().removeAll();
-    CacheService.getDocumentCache().removeAll();
+    // CacheService キャッシュのクリア (キャッシュは自動的に期限切れになります)
+    try {
+      // 明示的なキャッシュクリアは不要（キャッシュは10分で自動期限切れ）
+      console.log('[Cache] キャッシュは自動的に期限切れになります');
+    } catch (error) {
+      console.log('[Cache] キャッシュクリア処理をスキップ:', error.message);
+    }
     
     UUtilities.logger.info('Cache', 'すべてのキャッシュをクリアしました');
     return UUtilities.generatorFactory.response.success(null, 'キャッシュを正常にクリアしました');

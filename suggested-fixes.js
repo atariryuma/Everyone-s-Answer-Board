@@ -19,13 +19,12 @@ const CATEGORIES = 'categories';
 const URL = 'url';
 const SEVERITY = 'severity';
 const API = 'api';
-const MAIN_MAIN_UNIFIED_CONSTANTS = 'main_main_unified_constants';
 const SYSTEM = 'system';
+const MAIN_MAIN_UNIFIED_CONSTANTS = 'main_main_unified_constants';
 const MEDIUM = 'medium';
 const CRITICAL = 'critical';
 
 // error_constant
-const ERROR_TYPES = UNIFIED_CONSTANTS.ERROR.CATEGORIES.ERROR_TYPES;
 const SECURITY_ERROR = UNIFIED_CONSTANTS.ERROR.CATEGORIES.SECURITY_ERROR;
 
 // cache_object
