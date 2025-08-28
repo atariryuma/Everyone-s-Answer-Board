@@ -28,9 +28,15 @@ function setupApplication(credsJson, dbId) {
     initializeDatabaseSheet(dbId);
 
     infoLog('✅ セットアップが正常に完了しました。');
-    return { status: 'success', message: 'セットアップが正常に完了しました。' };
+    return createSuccessResponse(null, 'セットアップが正常に完了しました。');
   } catch (e) {
-    logError(e, 'customSetup', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { userId });
+    logError(
+      e,
+      'customSetup',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH,
+      UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM,
+      { userId }
+    );
     throw new Error('セットアップに失敗しました: ' + e.message);
   }
 }
@@ -46,18 +52,28 @@ function testSetup() {
     var creds = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
 
     if (!dbId) {
-      return { status: 'error', message: 'データベーススプレッドシートIDが設定されていません。' };
+      return {
+        success: false,
+        data: null,
+        message: 'データベーススプレッドシートIDが設定されていません。',
+        error: 'DATABASE_ID_NOT_SET',
+      };
     }
 
     if (!creds) {
-      return { status: 'error', message: 'サービスアカウント認証情報が設定されていません。' };
+      return {
+        success: false,
+        data: null,
+        message: 'サービスアカウント認証情報が設定されていません。',
+        error: 'SERVICE_ACCOUNT_NOT_SET',
+      };
     }
 
     // データベースへの接続テスト
     try {
       var userInfo = findUserByEmail(getCurrentUserEmail());
       return {
-        status: 'success',
+        success: true,
         message: 'セットアップは正常に完了しています。システムは使用準備が整いました。',
         details: {
           databaseConnected: true,
@@ -73,7 +89,18 @@ function testSetup() {
       };
     }
   } catch (e) {
-    logError(e, 'testCustomSetup', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM, { userId });
-    return { status: 'error', message: 'セットアップテストに失敗しました: ' + e.message };
+    logError(
+      e,
+      'testCustomSetup',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
+      UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM,
+      { userId }
+    );
+    return {
+      success: false,
+      data: null,
+      message: 'セットアップテストに失敗しました: ' + e.message,
+      error: e.message,
+    };
   }
 }

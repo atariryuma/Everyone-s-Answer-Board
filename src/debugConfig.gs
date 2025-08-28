@@ -10,10 +10,10 @@ const DEBUG_CONFIG = {
 
   // ロギングレベル設定
   logLevels: {
-    ERROR: 0,   // エラーログ（常に出力）
-    WARN: 1,    // 警告ログ
-    INFO: 2,    // 情報ログ
-    DEBUG: 3    // デバッグログ
+    ERROR: 0, // エラーログ（常に出力）
+    WARN: 1, // 警告ログ
+    INFO: 2, // 情報ログ
+    DEBUG: 3, // デバッグログ
   },
 
   // 現在のログレベル（本番では ERROR のみ）
@@ -21,12 +21,12 @@ const DEBUG_CONFIG = {
 
   // カテゴリ別デバッグ制御
   categories: {
-    CACHE: true,      // キャッシュ関連
-    AUTH: true,       // 認証関連
-    DATABASE: true,   // データベース操作
-    UI: false,        // UI更新関連（頻繁なため通常は無効）
-    PERFORMANCE: true // パフォーマンス計測
-  }
+    CACHE: true, // キャッシュ関連
+    AUTH: true, // 認証関連
+    DATABASE: true, // データベース操作
+    UI: false, // UI更新関連（頻繁なため通常は無効）
+    PERFORMANCE: true, // パフォーマンス計測
+  },
 };
 
 /**
@@ -59,8 +59,9 @@ function isProductionEnvironment() {
 function controlledLog(level, category, message, ...args) {
   // DEBUG_MODE設定をチェック（AppSetupPageでの設定を優先）
   try {
-    const debugModeEnabled = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
-    
+    const debugModeEnabled =
+      PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+
     // DEBUG_MODEが無効の場合はERRORレベルのみ出力
     if (!debugModeEnabled && level !== 'ERROR') {
       return;
@@ -111,11 +112,19 @@ function debugLog(message, ...args) {
     category = 'CACHE';
   } else if (message.includes('認証') || message.includes('auth') || message.includes('Auth')) {
     category = 'AUTH';
-  } else if (message.includes('データベース') || message.includes('database') || message.includes('DB')) {
+  } else if (
+    message.includes('データベース') ||
+    message.includes('database') ||
+    message.includes('DB')
+  ) {
     category = 'DATABASE';
   } else if (message.includes('UI') || message.includes('表示') || message.includes('更新')) {
     category = 'UI';
-  } else if (message.includes('パフォーマンス') || message.includes('performance') || message.includes('時間')) {
+  } else if (
+    message.includes('パフォーマンス') ||
+    message.includes('performance') ||
+    message.includes('時間')
+  ) {
     category = 'PERFORMANCE';
   }
 

@@ -7,33 +7,16 @@
  * サービスアカウントのメールアドレスを取得
  * @returns {string} サービスアカウントのメールアドレス
  */
+/**
+ * @deprecated この関数は削除予定です。unifiedSecurityManager.gsのgetServiceAccountEmail()を使用してください。
+ */
 function getServiceAccountEmail() {
-  try {
-    /** @type {Object} プロパティサービス */
-    const props = PropertiesService.getScriptProperties();
-    
-    /** @type {string|null} サービスアカウント認証情報JSON */
-    const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
-    
-    if (!serviceAccountCredsJson) {
-      console.warn('サービスアカウント認証情報が設定されていません');
-      return 'サービスアカウント未設定';
-    }
-
-    /** @type {Object} サービスアカウント認証情報 */
-    const serviceAccountCreds = JSON.parse(serviceAccountCredsJson);
-    
-    if (!serviceAccountCreds.client_email) {
-      console.warn('サービスアカウントのclient_emailが見つかりません');
-      return 'サービスアカウント設定エラー';
-    }
-
-    return serviceAccountCreds.client_email;
-    
-  } catch (error) {
-    logError(error, 'getServiceAccountEmail', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.AUTHENTICATION);
-    return 'サービスアカウント設定エラー';
+  // 統一セキュリティマネージャーに委譲
+  if (typeof getSecureServiceAccountCreds === 'function') {
+    const creds = getSecureServiceAccountCreds();
+    return creds.client_email || 'メールアドレス不明';
   }
+  return 'セキュリティマネージャー未利用可能';
 }
 
 /**
@@ -41,39 +24,15 @@ function getServiceAccountEmail() {
  * @param {boolean} forceRefresh - 強制的に新しいトークンを取得するかどうか
  * @returns {string|null} アクセストークン
  */
+/**
+ * @deprecated この関数は削除予定です。unifiedSecurityManager.gsのgetServiceAccountTokenCached()を使用してください。
+ */
 function getServiceAccountTokenCached(forceRefresh = false) {
-  try {
-    const cacheKey = 'service_account_token';
-    const cache = CacheService.getScriptCache();
-    
-    // 強制リフレッシュでない場合はキャッシュから取得を試行
-    if (!forceRefresh) {
-      const cachedToken = cache.get(cacheKey);
-      if (cachedToken) {
-        return cachedToken;
-      }
-    }
-    
-    // 新しいトークンを生成
-    const newToken = generateNewServiceAccountToken();
-    if (!newToken) {
-      return null;
-    }
-    
-    // トークンをキャッシュに保存（55分間 = 3300秒、通常1時間の有効期限より少し短く）
-    try {
-      cache.put(cacheKey, newToken, 3300);
-    } catch (cacheError) {
-      // キャッシュ保存に失敗してもトークンは返す
-      console.warn('トークンキャッシュの保存に失敗しましたが、トークンは有効です:', cacheError.message);
-    }
-    
-    return newToken;
-    
-  } catch (error) {
-    logError(error, 'getServiceAccountTokenCached', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.AUTHENTICATION);
-    return null;
+  // 統一セキュリティマネージャーに委譲
+  if (typeof getSecureServiceAccountToken === 'function') {
+    return getSecureServiceAccountToken(forceRefresh);
   }
+  return null;
 }
 
 /**
@@ -84,10 +43,10 @@ function generateNewServiceAccountToken() {
   try {
     /** @type {Object} プロパティサービス */
     const props = PropertiesService.getScriptProperties();
-    
+
     /** @type {string|null} サービスアカウント認証情報JSON */
     const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
-    
+
     if (!serviceAccountCredsJson) {
       console.warn('サービスアカウント認証情報が設定されていません');
       return null;
@@ -95,18 +54,18 @@ function generateNewServiceAccountToken() {
 
     /** @type {Object} サービスアカウント認証情報 */
     const serviceAccountCreds = JSON.parse(serviceAccountCredsJson);
-    
+
     // 必要なフィールドの検証
     const requiredFields = ['client_email', 'private_key', 'token_uri'];
     for (const field of requiredFields) {
       if (!serviceAccountCreds[field]) {
-        throw new Error(`サービスアカウント設定に${  field  }が不足しています`);
+        throw new Error(`サービスアカウント設定に${field}が不足しています`);
       }
     }
 
     /** @type {number} 現在時刻（UNIX秒） */
     const now = Math.floor(Date.now() / 1000);
-    
+
     /** @type {number} トークン有効期限（1時間後） */
     const exp = now + 3600;
 
@@ -114,7 +73,7 @@ function generateNewServiceAccountToken() {
     /** @type {Object} JWTヘッダー */
     const header = {
       alg: 'RS256',
-      typ: 'JWT'
+      typ: 'JWT',
     };
 
     // JWT ペイロード（Google OAuth2の要求）
@@ -124,77 +83,86 @@ function generateNewServiceAccountToken() {
       scope: [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive',
-        'https://www.googleapis.com/auth/forms'
+        'https://www.googleapis.com/auth/forms',
       ].join(' '),
       aud: serviceAccountCreds.token_uri || 'https://oauth2.googleapis.com/token',
       iat: now,
-      exp
+      exp,
     };
 
     // JWT を作成
     /** @type {string} Base64エンコードされたヘッダー */
     const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=+$/, '');
-    
+
     /** @type {string} Base64エンコードされたペイロード */
-    const encodedPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=+$/, '');
-    
+    const encodedPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(
+      /=+$/,
+      ''
+    );
+
     /** @type {string} 署名対象文字列 */
-    const signatureInput = `${encodedHeader  }.${  encodedPayload}`;
-    
+    const signatureInput = `${encodedHeader}.${encodedPayload}`;
+
     // 秘密鍵で署名
     /** @type {string} クリーンアップされた秘密鍵 */
     const privateKey = serviceAccountCreds.private_key.replace(/\\n/g, '\n');
-    
+
     /** @type {Uint8Array} 署名 */
     const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
-    
+
     /** @type {string} Base64エンコードされた署名 */
     const encodedSignature = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
-    
+
     /** @type {string} 完成したJWT */
-    const jwt = `${signatureInput  }.${  encodedSignature}`;
+    const jwt = `${signatureInput}.${encodedSignature}`;
 
     // トークンエンドポイントにリクエスト
     /** @type {Object} リクエストパラメータ */
     const tokenRequestPayload = {
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt
+      assertion: jwt,
     };
 
     /** @type {Object} HTTPリクエストオプション */
     const options = {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
       payload: Object.keys(tokenRequestPayload)
-        .map(key => `${key  }=${  encodeURIComponent(tokenRequestPayload[key])}`)
-        .join('&')
+        .map((key) => `${key}=${encodeURIComponent(tokenRequestPayload[key])}`)
+        .join('&'),
     };
 
     /** @type {Object} HTTPレスポンス */
     const response = UrlFetchApp.fetch(serviceAccountCreds.token_uri, options);
-    
+
     /** @type {number} レスポンスコード */
     const responseCode = response.getResponseCode();
-    
+
     if (responseCode !== 200) {
-      throw new Error(`Token request failed with status ${  responseCode  }: ${  response.getContentText()}`);
+      throw new Error(
+        `Token request failed with status ${responseCode}: ${response.getContentText()}`
+      );
     }
 
     /** @type {Object} レスポンスデータ */
     const responseData = JSON.parse(response.getContentText());
-    
+
     if (!responseData.access_token) {
-      throw new Error(`アクセストークンが含まれていません: ${  response.getContentText()}`);
+      throw new Error(`アクセストークンが含まれていません: ${response.getContentText()}`);
     }
 
     console.log('サービスアカウントのアクセストークンを生成しました');
-    
+
     return responseData.access_token;
-    
   } catch (error) {
-    logError(error, 'generateNewServiceAccountToken', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.AUTHENTICATION);
+    logError(
+      error,
+      'generateNewServiceAccountToken',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH,
+      ERROR_CATEGORIES.AUTHENTICATION
+    );
     return null;
   }
 }
@@ -207,16 +175,16 @@ function checkServiceAccountConfiguration() {
   try {
     /** @type {Object} プロパティサービス */
     const props = PropertiesService.getScriptProperties();
-    
+
     /** @type {string|null} サービスアカウント認証情報JSON */
     const serviceAccountCredsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
-    
+
     /** @type {Object} 結果 */
     const result = {
       configured: false,
       email: null,
       hasRequiredFields: false,
-      errors: []
+      errors: [],
     };
 
     if (!serviceAccountCredsJson) {
@@ -227,14 +195,20 @@ function checkServiceAccountConfiguration() {
     try {
       /** @type {Object} サービスアカウント認証情報 */
       const serviceAccountCreds = JSON.parse(serviceAccountCredsJson);
-      
+
       result.email = serviceAccountCreds.client_email || null;
       result.configured = true;
 
       // 必要なフィールドをチェック
       const requiredFields = [
-        'type', 'project_id', 'private_key_id', 'private_key', 
-        'client_email', 'client_id', 'auth_uri', 'token_uri'
+        'type',
+        'project_id',
+        'private_key_id',
+        'private_key',
+        'client_email',
+        'client_id',
+        'auth_uri',
+        'token_uri',
       ];
 
       const missingFields = [];
@@ -247,27 +221,32 @@ function checkServiceAccountConfiguration() {
       if (missingFields.length === 0) {
         result.hasRequiredFields = true;
       } else {
-        result.errors.push(`必要なフィールドが不足: ${  missingFields.join(', ')}`);
+        result.errors.push(`必要なフィールドが不足: ${missingFields.join(', ')}`);
       }
 
       // タイプチェック
       if (serviceAccountCreds.type !== 'service_account') {
-        result.errors.push(`認証情報のタイプが不正: ${  serviceAccountCreds.type  } (期待値: service_account)`);
+        result.errors.push(
+          `認証情報のタイプが不正: ${serviceAccountCreds.type} (期待値: service_account)`
+        );
       }
-
     } catch (parseError) {
-      result.errors.push(`サービスアカウント認証情報のJSON解析に失敗: ${  parseError.message}`);
+      result.errors.push(`サービスアカウント認証情報のJSON解析に失敗: ${parseError.message}`);
     }
 
     return result;
-    
   } catch (error) {
-    logError(error, 'checkServiceAccountConfiguration', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CONFIG);
+    logError(
+      error,
+      'checkServiceAccountConfiguration',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
+      ERROR_CATEGORIES.CONFIG
+    );
     return {
       configured: false,
       email: null,
       hasRequiredFields: false,
-      errors: [`設定確認中にエラーが発生: ${  error.message}`]
+      errors: [`設定確認中にエラーが発生: ${error.message}`],
     };
   }
 }
@@ -289,18 +268,26 @@ function setupServiceAccount(serviceAccountJson) {
     try {
       serviceAccountCreds = JSON.parse(serviceAccountJson);
     } catch (parseError) {
-      throw new Error(`サービスアカウントJSONの解析に失敗: ${  parseError.message}`);
+      throw new Error(`サービスアカウントJSONの解析に失敗: ${parseError.message}`);
     }
 
     // タイプ検証
     if (serviceAccountCreds.type !== 'service_account') {
-      throw new Error(`認証情報のタイプが不正: ${  serviceAccountCreds.type  } (期待値: service_account)`);
+      throw new Error(
+        `認証情報のタイプが不正: ${serviceAccountCreds.type} (期待値: service_account)`
+      );
     }
 
     // 必要フィールド検証
     const requiredFields = [
-      'type', 'project_id', 'private_key_id', 'private_key', 
-      'client_email', 'client_id', 'auth_uri', 'token_uri'
+      'type',
+      'project_id',
+      'private_key_id',
+      'private_key',
+      'client_email',
+      'client_id',
+      'auth_uri',
+      'token_uri',
     ];
 
     const missingFields = [];
@@ -311,7 +298,7 @@ function setupServiceAccount(serviceAccountJson) {
     }
 
     if (missingFields.length > 0) {
-      throw new Error(`必要なフィールドが不足: ${  missingFields.join(', ')}`);
+      throw new Error(`必要なフィールドが不足: ${missingFields.join(', ')}`);
     }
 
     // プロパティに保存
@@ -322,7 +309,7 @@ function setupServiceAccount(serviceAccountJson) {
     // テスト用にトークン生成を試行
     /** @type {string|null} テストトークン */
     const testToken = generateNewServiceAccountToken();
-    
+
     if (!testToken) {
       throw new Error('サービスアカウント設定後のトークン生成に失敗');
     }
@@ -333,16 +320,20 @@ function setupServiceAccount(serviceAccountJson) {
       success: true,
       email: serviceAccountCreds.client_email,
       projectId: serviceAccountCreds.project_id,
-      message: 'サービスアカウント設定が完了しました'
+      message: 'サービスアカウント設定が完了しました',
     };
-
   } catch (error) {
-    logError(error, 'setupServiceAccount', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.CONFIG);
-    
+    logError(
+      error,
+      'setupServiceAccount',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH,
+      ERROR_CATEGORIES.CONFIG
+    );
+
     return {
       success: false,
       error: error.message,
-      message: 'サービスアカウント設定に失敗しました'
+      message: 'サービスアカウント設定に失敗しました',
     };
   }
 }
@@ -363,19 +354,23 @@ function clearServiceAccountConfiguration() {
     }
 
     console.log('サービスアカウント設定をクリアしました');
-    
+
     return {
       success: true,
-      message: 'サービスアカウント設定をクリアしました'
+      message: 'サービスアカウント設定をクリアしました',
     };
-    
   } catch (error) {
-    logError(error, 'clearServiceAccountConfiguration', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.CONFIG);
-    
+    logError(
+      error,
+      'clearServiceAccountConfiguration',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
+      ERROR_CATEGORIES.CONFIG
+    );
+
     return {
       success: false,
       error: error.message,
-      message: 'サービスアカウント設定のクリアに失敗しました'
+      message: 'サービスアカウント設定のクリアに失敗しました',
     };
   }
 }
@@ -388,7 +383,7 @@ function performServiceAccountHealthCheck() {
   try {
     /** @type {Object} 設定確認結果 */
     const configCheck = checkServiceAccountConfiguration();
-    
+
     /** @type {Object} 結果 */
     const result = {
       timestamp: new Date().toISOString(),
@@ -399,8 +394,8 @@ function performServiceAccountHealthCheck() {
       overallStatus: 'unknown',
       details: {
         configurationErrors: configCheck.errors,
-        tokenErrors: []
-      }
+        tokenErrors: [],
+      },
     };
 
     // 設定が正常な場合のみトークン生成テスト
@@ -409,12 +404,12 @@ function performServiceAccountHealthCheck() {
         /** @type {string|null} テストトークン */
         const testToken = generateNewServiceAccountToken();
         result.tokenGeneration = !!testToken;
-        
+
         if (!testToken) {
           result.details.tokenErrors.push('トークン生成に失敗しました');
         }
       } catch (tokenError) {
-        result.details.tokenErrors.push(`トークン生成エラー: ${  tokenError.message}`);
+        result.details.tokenErrors.push(`トークン生成エラー: ${tokenError.message}`);
       }
     } else {
       result.details.tokenErrors.push('設定が不完全なためトークン生成をスキップ');
@@ -430,10 +425,14 @@ function performServiceAccountHealthCheck() {
     }
 
     return result;
-    
   } catch (error) {
-    logError(error, 'performServiceAccountHealthCheck', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.SYSTEM);
-    
+    logError(
+      error,
+      'performServiceAccountHealthCheck',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
+      ERROR_CATEGORIES.SYSTEM
+    );
+
     return {
       timestamp: new Date().toISOString(),
       configured: false,
@@ -443,8 +442,8 @@ function performServiceAccountHealthCheck() {
       overallStatus: 'error',
       details: {
         configurationErrors: [],
-        tokenErrors: [`ヘルスチェック実行エラー: ${  error.message}`]
-      }
+        tokenErrors: [`ヘルスチェック実行エラー: ${error.message}`],
+      },
     };
   }
 }

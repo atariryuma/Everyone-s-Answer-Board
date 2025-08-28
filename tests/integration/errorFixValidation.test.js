@@ -17,7 +17,7 @@ describe('エラー修正統合検証', () => {
         userId: id,
         adminEmail: '35t22@naha-okinawa.ed.jp',
         isActive: true,
-        spreadsheetId: 'test-sheet-id'
+        spreadsheetId: 'test-sheet-id',
       }));
       global.ERROR_SEVERITY = { MEDIUM: 'MEDIUM' };
       global.ERROR_CATEGORIES = { VALIDATION: 'VALIDATION', SYSTEM: 'SYSTEM' };
@@ -42,7 +42,7 @@ describe('エラー修正統合検証', () => {
               message: 'requestUserIdは文字列である必要があります',
               data: null,
               userInfo: null,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             };
           }
 
@@ -58,16 +58,22 @@ describe('エラー修正統合検証', () => {
           return {
             status: 'success',
             userInfo,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         } catch (e) {
-          global.logError(e, 'getCurrentUserStatus', global.ERROR_SEVERITY.MEDIUM, global.ERROR_CATEGORIES.SYSTEM, { requestUserId });
+          global.logError(
+            e,
+            'getCurrentUserStatus',
+            global.ERROR_SEVERITY.MEDIUM,
+            global.ERROR_CATEGORIES.SYSTEM,
+            { requestUserId }
+          );
           return {
             status: 'error',
             message: `ステータス取得に失敗しました: ${e.message}`,
             data: null,
             userInfo: null,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
       }
@@ -97,7 +103,7 @@ describe('エラー修正統合検証', () => {
             message: 'requestUserIdは文字列である必要があります',
             data: null,
             userInfo: null,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
         return { status: 'success' };
@@ -160,7 +166,7 @@ describe('エラー修正統合検証', () => {
         message: 'Frontend error',
         userId: 'user123',
         url: 'https://example.com',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       const result = mockLogClientError(errorObj);
@@ -208,7 +214,7 @@ describe('エラー修正統合検証', () => {
           url: 'https://mock-url.com',
           timestamp: new Date().toISOString(),
           userAgent: 'Mock User Agent',
-          stack: errorInfo.stack
+          stack: errorInfo.stack,
         };
 
         // バックエンドのlogClientErrorをシミュレート
@@ -231,7 +237,7 @@ describe('エラー修正統合検証', () => {
 
       const frontendError = {
         message: 'JavaScript error occurred',
-        stack: 'Error at line 100'
+        stack: 'Error at line 100',
       };
 
       const result = mockSendToBackend(frontendError);

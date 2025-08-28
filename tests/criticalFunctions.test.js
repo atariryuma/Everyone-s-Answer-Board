@@ -9,17 +9,17 @@ const setupTest = () => {
     getScriptProperties: jest.fn(() => ({
       getProperty: jest.fn((key) => {
         const props = {
-          'DATABASE_SPREADSHEET_ID': 'test-db-id',
-          'ADMIN_EMAIL': 'admin@example.com',
-          'SERVICE_ACCOUNT_CREDS': JSON.stringify({
+          DATABASE_SPREADSHEET_ID: 'test-db-id',
+          ADMIN_EMAIL: 'admin@example.com',
+          SERVICE_ACCOUNT_CREDS: JSON.stringify({
             client_email: 'service@example.com',
-            private_key: 'test-key'
-          })
+            private_key: 'test-key',
+          }),
         };
         return props[key];
       }),
-      setProperty: jest.fn()
-    }))
+      setProperty: jest.fn(),
+    })),
   };
 
   global.SpreadsheetApp = {
@@ -29,58 +29,79 @@ const setupTest = () => {
           getValues: jest.fn(() => {
             if (name === 'Users') {
               return [
-                ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'lastAccessedAt', 'isActive'],
-                ['user123', 'test@example.com', 'sheet123', 'https://sheets.google.com/123', '2024-01-01', '{"appPublished":true,"publishedSheetName":"Sheet1"}', '2024-01-02', 'true']
+                [
+                  'userId',
+                  'adminEmail',
+                  'spreadsheetId',
+                  'spreadsheetUrl',
+                  'createdAt',
+                  'configJson',
+                  'lastAccessedAt',
+                  'isActive',
+                ],
+                [
+                  'user123',
+                  'test@example.com',
+                  'sheet123',
+                  'https://sheets.google.com/123',
+                  '2024-01-01',
+                  '{"appPublished":true,"publishedSheetName":"Sheet1"}',
+                  '2024-01-02',
+                  'true',
+                ],
               ];
             }
-            return [['header1', 'header2'], ['data1', 'data2']];
-          })
+            return [
+              ['header1', 'header2'],
+              ['data1', 'data2'],
+            ];
+          }),
         })),
         appendRow: jest.fn(),
         getRange: jest.fn(() => ({
           setValues: jest.fn(),
           getValue: jest.fn(() => ''),
           setValue: jest.fn(),
-          getValues: jest.fn(() => [['header1', 'header2']])
+          getValues: jest.fn(() => [['header1', 'header2']]),
         })),
         getLastColumn: jest.fn(() => 2),
         getLastRow: jest.fn(() => 2),
         getName: jest.fn(() => name),
-        getSheetId: jest.fn(() => 1)
+        getSheetId: jest.fn(() => 1),
       })),
       getSheets: jest.fn(() => [
         { getName: jest.fn(() => 'Sheet1'), getSheetId: jest.fn(() => 1) },
-        { getName: jest.fn(() => 'Sheet2'), getSheetId: jest.fn(() => 2) }
+        { getName: jest.fn(() => 'Sheet2'), getSheetId: jest.fn(() => 2) },
       ]),
       getActiveSheet: jest.fn(() => ({
-        getName: jest.fn(() => 'Sheet1')
-      }))
-    }))
+        getName: jest.fn(() => 'Sheet1'),
+      })),
+    })),
   };
 
   global.Session = {
     getActiveUser: jest.fn(() => ({
-      getEmail: jest.fn(() => 'test@example.com')
-    }))
+      getEmail: jest.fn(() => 'test@example.com'),
+    })),
   };
 
   global.CacheService = {
     getScriptCache: jest.fn(() => ({
       get: jest.fn(() => null),
       put: jest.fn(),
-      remove: jest.fn()
-    }))
+      remove: jest.fn(),
+    })),
   };
 
   global.Utilities = {
     getUuid: jest.fn(() => 'uuid-test-123'),
-    formatDate: jest.fn(() => '2024-01-01 12:00:00')
+    formatDate: jest.fn(() => '2024-01-01 12:00:00'),
   };
 
   global.ScriptApp = {
     getService: jest.fn(() => ({
-      getUrl: jest.fn(() => 'https://script.google.com/test')
-    }))
+      getUrl: jest.fn(() => 'https://script.google.com/test'),
+    })),
   };
 
   global.FormApp = {
@@ -90,11 +111,11 @@ const setupTest = () => {
       setDescription: jest.fn(),
       addTextItem: jest.fn(() => ({
         setTitle: jest.fn().mockReturnThis(),
-        setRequired: jest.fn().mockReturnThis()
+        setRequired: jest.fn().mockReturnThis(),
       })),
-      setDestination: jest.fn()
+      setDestination: jest.fn(),
     })),
-    DestinationType: { SPREADSHEET: 'SPREADSHEET' }
+    DestinationType: { SPREADSHEET: 'SPREADSHEET' },
   };
 
   global.HtmlService = {
@@ -103,20 +124,20 @@ const setupTest = () => {
         setTitle: jest.fn().mockReturnThis(),
         setFaviconUrl: jest.fn().mockReturnThis(),
         addMetaTag: jest.fn().mockReturnThis(),
-        setSandboxMode: jest.fn().mockReturnThis()
-      }))
+        setSandboxMode: jest.fn().mockReturnThis(),
+      })),
     })),
     createHtmlOutputFromFile: jest.fn(() => ({
-      getContent: jest.fn(() => '<html>test</html>')
+      getContent: jest.fn(() => '<html>test</html>'),
     })),
-    SandboxMode: { IFRAME: 'IFRAME' }
+    SandboxMode: { IFRAME: 'IFRAME' },
   };
 
   global.ContentService = {
     createTextOutput: jest.fn((_text) => ({
-      setMimeType: jest.fn().mockReturnThis()
+      setMimeType: jest.fn().mockReturnThis(),
     })),
-    MimeType: { JSON: 'JSON' }
+    MimeType: { JSON: 'JSON' },
   };
 
   // サービス関数の定義
@@ -124,14 +145,14 @@ const setupTest = () => {
     LOW: 'low',
     MEDIUM: 'medium',
     HIGH: 'high',
-    CRITICAL: 'critical'
+    CRITICAL: 'critical',
   };
-  
+
   global.ERROR_CATEGORIES = {
     AUTHENTICATION: 'authentication',
     DATABASE: 'database',
     CACHE: 'cache',
-    SYSTEM: 'system'
+    SYSTEM: 'system',
   };
 
   global.logError = jest.fn();
@@ -155,7 +176,7 @@ const setupTest = () => {
 
   global.setCacheValue = (key, value, ttl = 300) => {
     global.memoryCache.set(key, value);
-    global.memoryCacheExpiry.set(key, Date.now() + (ttl * 1000));
+    global.memoryCacheExpiry.set(key, Date.now() + ttl * 1000);
   };
 
   global.clearUserCache = (userId) => {
@@ -177,7 +198,7 @@ const setupTest = () => {
         spreadsheetUrl: 'https://sheets.google.com/123',
         configJson: '{"appPublished":true,"publishedSheetName":"Sheet1","setupStatus":"completed"}',
         isActive: 'true',
-        lastAccessedAt: '2024-01-02'
+        lastAccessedAt: '2024-01-02',
       };
     }
     return null;
@@ -189,15 +210,15 @@ const setupTest = () => {
 
   // スプレッドシートサービス
   global.Spreadsheet = {
-    openById: (id) => global.SpreadsheetApp.openById(id)
+    openById: (id) => global.SpreadsheetApp.openById(id),
   };
 
   global.Properties = {
-    getScriptProperty: (key) => global.PropertiesService.getScriptProperties().getProperty(key)
+    getScriptProperty: (key) => global.PropertiesService.getScriptProperties().getProperty(key),
   };
 
   global.SessionService = {
-    getActiveUserEmail: () => global.Session.getActiveUser().getEmail()
+    getActiveUserEmail: () => global.Session.getActiveUser().getEmail(),
   };
 
   // コア機能のインポート（実際の関数を使用）
@@ -209,32 +230,32 @@ const setupTest = () => {
   };
 
   global.getSheetsList = (_userId) => ['Sheet1', 'Sheet2'];
-  
+
   global.generateUserUrls = (_userId) => ({
     webApp: 'https://script.google.com/test',
     admin: 'https://script.google.com/test?mode=admin',
     setup: 'https://script.google.com/test?mode=setup',
-    published: 'https://script.google.com/test'
+    published: 'https://script.google.com/test',
   });
 
   global.getWebAppUrl = () => 'https://script.google.com/test';
-  
+
   global.getSheetData = jest.fn(() => [
-    { rowIndex: 1, name: 'Test User', opinion: 'Test Opinion' }
+    { rowIndex: 1, name: 'Test User', opinion: 'Test Opinion' },
   ]);
 
   global.getResponsesData = jest.fn(() => ({
     status: 'success',
-    data: [{ id: 1 }, { id: 2 }]
+    data: [{ id: 1 }, { id: 2 }],
   }));
 
   global.verifyUserAccess = jest.fn(() => true);
-  
+
   global.createQuickStartForm = jest.fn(() => ({
     formId: 'form-123',
     formUrl: 'https://forms.google.com/123',
     spreadsheetId: 'sheet-new-123',
-    spreadsheetUrl: 'https://sheets.google.com/new'
+    spreadsheetUrl: 'https://sheets.google.com/new',
   }));
 };
 
@@ -253,7 +274,7 @@ describe('クリティカル機能テスト', () => {
         const configJson = JSON.parse(userInfo.configJson);
         // formCreatedを追加してステップ4になるようにする
         configJson.formCreated = true;
-        
+
         return {
           userInfo,
           appUrls: global.generateUserUrls(requestUserId),
@@ -267,13 +288,13 @@ describe('クリティカル機能テスト', () => {
           allSheets: global.getSheetsList(requestUserId),
           _meta: {
             apiVersion: 'integrated_v1',
-            executionTime: null
-          }
+            executionTime: null,
+          },
         };
       };
 
       const result = global.getInitialData('user123', 'Sheet1', false);
-      
+
       expect(result).toBeDefined();
       expect(result.userInfo.userId).toBe('user123');
       expect(result.setupStep).toBe(4); // 全て完了
@@ -283,7 +304,7 @@ describe('クリティカル機能テスト', () => {
 
     test('ユーザーが見つからない場合エラーをスロー', () => {
       global.getUserInfo = jest.fn(() => null);
-      
+
       global.getInitialData = (requestUserId) => {
         const userInfo = global.getUserInfo(requestUserId);
         if (!userInfo) {
@@ -299,18 +320,30 @@ describe('クリティカル機能テスト', () => {
 
   describe('getPublishedSheetData', () => {
     test('公開シートデータを取得できる', () => {
-      global.getPublishedSheetData = (requestUserId, classFilter, sortOrder, adminMode, _bypassCache) => {
+      global.getPublishedSheetData = (
+        requestUserId,
+        classFilter,
+        sortOrder,
+        adminMode,
+        _bypassCache
+      ) => {
         const userInfo = global.getUserInfo(requestUserId);
         if (!userInfo) {
           return { success: false, error: 'ユーザーが見つかりません' };
         }
-        
-        const data = global.getSheetData(requestUserId, 'Sheet1', classFilter, sortOrder, adminMode);
+
+        const data = global.getSheetData(
+          requestUserId,
+          'Sheet1',
+          classFilter,
+          sortOrder,
+          adminMode
+        );
         return { success: true, data, fromCache: false };
       };
 
       const result = global.getPublishedSheetData('user123', null, 'newest', false, false);
-      
+
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
       expect(result.data.length).toBeGreaterThan(0);
@@ -319,7 +352,7 @@ describe('クリティカル機能テスト', () => {
     test('キャッシュから取得できる', () => {
       const testData = [{ id: 1, cached: true }];
       global.setCacheValue('sheet_data_user123_Sheet1_null_newest_false', testData, 60);
-      
+
       global.getPublishedSheetData = (requestUserId) => {
         const cacheKey = `sheet_data_${requestUserId}_Sheet1_null_newest_false`;
         const cached = global.getCacheValue(cacheKey);
@@ -330,7 +363,7 @@ describe('クリティカル機能テスト', () => {
       };
 
       const result = global.getPublishedSheetData('user123');
-      
+
       expect(result.fromCache).toBe(true);
       expect(result.data[0].cached).toBe(true);
     });
@@ -343,24 +376,24 @@ describe('クリティカル機能テスト', () => {
         if (!userInfo) {
           throw new Error('ユーザーが見つかりません');
         }
-        
+
         const result = global.createQuickStartForm(userInfo.adminEmail, requestUserId);
-        
+
         global.updateUser(requestUserId, {
           spreadsheetId: result.spreadsheetId,
-          spreadsheetUrl: result.spreadsheetUrl
+          spreadsheetUrl: result.spreadsheetUrl,
         });
-        
+
         return {
           success: true,
           formUrl: result.formUrl,
           spreadsheetUrl: result.spreadsheetUrl,
-          setupStep: 3
+          setupStep: 3,
         };
       };
 
       const result = global.createQuickStartFormUI('user123');
-      
+
       expect(result.success).toBe(true);
       expect(result.formUrl).toBeDefined();
       expect(result.spreadsheetUrl).toBeDefined();
@@ -376,29 +409,31 @@ describe('クリティカル機能テスト', () => {
         if (!userInfo) {
           return false;
         }
-        
+
         const configJson = JSON.parse(userInfo.configJson || '{}');
         configJson[`sheet_${sheetName}`] = config;
-        
+
         if (options.setAsPublished) {
           configJson.publishedSheetName = sheetName;
           configJson.appPublished = true;
         }
-        
+
         global.updateUser(userId, { configJson: JSON.stringify(configJson) });
         global.clearUserCache(userId);
-        
+
         return true;
       };
 
       const config = {
         opinionHeader: '意見',
         nameHeader: '名前',
-        classHeader: 'クラス'
+        classHeader: 'クラス',
       };
-      
-      const result = global.saveSheetConfig('user123', 'sheet123', 'Sheet1', config, { setAsPublished: true });
-      
+
+      const result = global.saveSheetConfig('user123', 'sheet123', 'Sheet1', config, {
+        setAsPublished: true,
+      });
+
       expect(result).toBe(true);
       expect(global.updateUser).toHaveBeenCalled();
     });

@@ -9,7 +9,7 @@ const path = require('path');
 function loadDatabaseFunctions() {
   const dbFile = fs.readFileSync(path.join(__dirname, '../src/database.gs'), 'utf8');
   const coreFile = fs.readFileSync(path.join(__dirname, '../src/Core.gs'), 'utf8');
-  
+
   return { dbFile, coreFile };
 }
 

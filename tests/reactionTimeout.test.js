@@ -9,10 +9,7 @@ async function sendReactionToServer(rowIndex, reaction) {
     setTimeout(() => reject(new Error('リアクション送信がタイムアウトしました')), timeoutMs)
   );
   const gas = { addReaction: () => new Promise(() => {}) };
-  return Promise.race([
-    gas.addReaction(rowIndex, reaction, 'Sheet1'),
-    timeoutPromise
-  ]);
+  return Promise.race([gas.addReaction(rowIndex, reaction, 'Sheet1'), timeoutPromise]);
 }
 
 describe('sendReactionToServer timeout', () => {

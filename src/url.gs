@@ -34,85 +34,90 @@ function getWebAppUrl() {
   try {
     const cachedUrl = CacheService.getScriptCache().get(cacheKey);
     if (cachedUrl) {
-      debugLog('Web app URL retrieved from cache:', cachedUrl);
+      ULog.debug('Web app URL retrieved from cache:', cachedUrl);
       return cachedUrl;
     }
   } catch (cacheError) {
-    debugLog('Cache access failed:', cacheError.message);
+    ULog.debug('Cache access failed:', cacheError.message);
   }
 
   let finalUrl = '';
-  
+
   try {
     // AppsScriptオブジェクトの詳細な存在チェック
     if (typeof AppsScript === 'undefined') {
-      debugLog('AppsScript API not defined, using fallback method');
+      ULog.debug('AppsScript API not defined, using fallback method');
       finalUrl = getFallbackWebAppUrl();
     } else if (!AppsScript.Script) {
-      debugLog('AppsScript.Script not available, using fallback method');
+      ULog.debug('AppsScript.Script not available, using fallback method');
       finalUrl = getFallbackWebAppUrl();
     } else if (!AppsScript.Script.Deployments) {
-      debugLog('AppsScript.Script.Deployments not available, using fallback method');
+      ULog.debug('AppsScript.Script.Deployments not available, using fallback method');
       finalUrl = getFallbackWebAppUrl();
     } else {
       // AppsScript APIを使用してURL取得（本番環境での確実な動作を目指す）
       try {
         const scriptId = ScriptApp.getScriptId();
-        
+
         // デプロイメント一覧取得を試行
         let deploymentsList;
         try {
           deploymentsList = AppsScript.Script.Deployments.list(scriptId, {
-            fields: 'deployments(deploymentId,deploymentConfig(webApp(url)),updateTime)'
+            fields: 'deployments(deploymentId,deploymentConfig(webApp(url)),updateTime)',
           });
         } catch (apiError) {
-          debugLog('AppsScript API call failed, trying simple list:', apiError.message);
+          ULog.debug('AppsScript API call failed, trying simple list:', apiError.message);
           // テスト環境等で引数なしの場合のフォールバック
           deploymentsList = AppsScript.Script.Deployments.list();
         }
-        
-        debugLog('AppsScript.Script.Deployments.list response:', JSON.stringify(deploymentsList, null, 2));
-        
+
+        ULog.debug(
+          'AppsScript.Script.Deployments.list response:',
+          JSON.stringify(deploymentsList, null, 2)
+        );
+
         const deployments = deploymentsList.deployments || [];
-        
+
         if (deployments.length === 0) {
-          infoLog('getWebAppUrl: デプロイメントが見つからないため、フォールバック処理へ');
+          ULog.info('getWebAppUrl: デプロイメントが見つからないため、フォールバック処理へ');
           finalUrl = getFallbackWebAppUrl();
         } else {
           // 最新のWebアプリデプロイメントを取得
           const webAppDeployments = deployments
-            .filter(d => d.deploymentConfig && d.deploymentConfig.webApp)
+            .filter((d) => d.deploymentConfig && d.deploymentConfig.webApp)
             .sort((a, b) => new Date(b.updateTime) - new Date(a.updateTime));
-          
+
           if (webAppDeployments.length > 0) {
             finalUrl = webAppDeployments[0].deploymentConfig.webApp.url;
-            infoLog('Web app URL obtained via AppsScript API:', finalUrl);
-            debugLog('Selected deployment:', JSON.stringify(webAppDeployments[0], null, 2));
+            ULog.info('Web app URL obtained via AppsScript API:', finalUrl);
+            ULog.debug('Selected deployment:', JSON.stringify(webAppDeployments[0], null, 2));
           } else {
-            infoLog('getWebAppUrl: WebアプリデプロイメントなしファンドされないWebアプリ、フォールバック処理へ');
+            ULog.info(
+              'getWebAppUrl: WebアプリデプロイメントなしファンドされないWebアプリ、フォールバック処理へ'
+            );
             finalUrl = getFallbackWebAppUrl();
           }
         }
       } catch (apiError) {
-        infoLog('getWebAppUrl API詳細エラー:', apiError.message);
+        ULog.info('getWebAppUrl API詳細エラー:', apiError.message);
         finalUrl = getFallbackWebAppUrl();
       }
     }
   } catch (apiError) {
-    infoLog('getWebAppUrl API error (normal fallback):', apiError.message);
+    ULog.info('getWebAppUrl API error (normal fallback):', apiError.message);
     finalUrl = getFallbackWebAppUrl();
   }
-  
+
   // 有効なURLが取得できた場合はキャッシュに保存（5分間）
   if (finalUrl) {
     try {
       CacheService.getScriptCache().put(cacheKey, finalUrl, 300); // 5分間キャッシュ
-      debugLog('Web app URL cached for 5 minutes');
+      ULog.debug('Web app URL cached for 5 minutes');
     } catch (cacheError) {
-      debugLog('Failed to cache Web app URL:', cacheError.message);
+      ULog.debug('Failed to cache Web app URL:', cacheError.message);
     }
   }
-  
+
   return finalUrl;
 }
 
@@ -121,19 +126,17 @@ function getWebAppUrl() {
  * @returns {string} Web app URL or empty string on failure
  */
 function getFallbackWebAppUrl() {
-
   // Fallback to ScriptApp service URL if API is unavailable or returns nothing
   try {
-    const serviceUrl = ScriptApp.getService && ScriptApp.getService().getUrl
-      ? ScriptApp.getService().getUrl()
-      : '';
+    const serviceUrl =
+      ScriptApp.getService && ScriptApp.getService().getUrl ? ScriptApp.getService().getUrl() : '';
     if (serviceUrl) {
-      infoLog('Web app URL fallback obtained:', serviceUrl);
+      ULog.info('Web app URL fallback obtained:', serviceUrl);
       return serviceUrl;
     }
-    warnLog('getWebAppUrl fallback failed: service URL unavailable');
+    ULog.warn('getWebAppUrl fallback failed: service URL unavailable');
   } catch (e) {
-    console.error('[ERROR]','getWebAppUrl fallback error:', e.message);
+    console.error('[ERROR]', 'getWebAppUrl fallback error:', e.message);
   }
 
   return '';
@@ -147,14 +150,14 @@ function getFallbackWebAppUrl() {
  */
 function generateUserUrls(userId) {
   if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-    console.error('[ERROR]','generateUserUrls: invalid userId:', userId);
+    console.error('[ERROR]', 'generateUserUrls: invalid userId:', userId);
     return {
       webAppUrl: '',
       adminUrl: '',
       viewUrl: '',
       setupUrl: '',
-      status: 'error',
-      message: '無効なユーザーIDです'
+      success: false,
+      message: '無効なユーザーIDです',
     };
   }
 
@@ -165,8 +168,8 @@ function generateUserUrls(userId) {
       adminUrl: '',
       viewUrl: '',
       setupUrl: '',
-      status: 'error',
-      message: 'WebアプリURLの取得に失敗しました'
+      success: false,
+      message: 'WebアプリURLの取得に失敗しました',
     };
   }
 
@@ -176,7 +179,7 @@ function generateUserUrls(userId) {
     adminUrl: `${webAppUrl}?mode=admin&userId=${encodedId}`,
     viewUrl: `${webAppUrl}?mode=view&userId=${encodedId}`,
     setupUrl: `${webAppUrl}?setup=true&userId=${encodedId}`,
-    status: 'success'
+    success: true,
   };
 }
 
@@ -190,7 +193,7 @@ function generateUserUrls(userId) {
 function addCacheBustingParams(baseUrl, options = {}) {
   try {
     if (!baseUrl || typeof baseUrl !== 'string') {
-      warnLog('addCacheBustingParams: 無効なbaseUrlが渡されました:', baseUrl);
+      ULog.warn('addCacheBustingParams: 無効なbaseUrlが渡されました:', baseUrl);
       return baseUrl;
     }
 
@@ -215,7 +218,7 @@ function addCacheBustingParams(baseUrl, options = {}) {
 
     return url.toString();
   } catch (error) {
-    console.error('[ERROR]','addCacheBustingParams error:', error.message);
+    console.error('[ERROR]', 'addCacheBustingParams error:', error.message);
     return baseUrl;
   }
 }
@@ -230,17 +233,18 @@ function generateUnpublishedStateUrl(userId) {
   try {
     const baseUrl = getWebAppUrl();
     if (!baseUrl) {
-      console.error('[ERROR]','generateUnpublishedStateUrl: ベースURLの取得に失敗');
+      console.error('[ERROR]', 'generateUnpublishedStateUrl: ベースURLの取得に失敗');
       return '';
     }
 
     const cacheBustedUrl = addCacheBustingParams(baseUrl, {
       forceFresh: true,
       publicationStatus: 'unpublished',
-      sessionId: (typeof Session !== 'undefined' && Session.getTemporaryActiveUserKey)
-        ? Session.getTemporaryActiveUserKey() || 'session_' + Date.now()
-        : 'session_' + Date.now(),
-      version: Date.now().toString()
+      sessionId:
+        typeof Session !== 'undefined' && Session.getTemporaryActiveUserKey
+          ? Session.getTemporaryActiveUserKey() || 'session_' + Date.now()
+          : 'session_' + Date.now(),
+      version: Date.now().toString(),
     });
 
     const url = new URL(cacheBustedUrl);
@@ -249,7 +253,7 @@ function generateUnpublishedStateUrl(userId) {
     }
     return url.toString();
   } catch (error) {
-    console.error('[ERROR]','generateUnpublishedStateUrl error:', error.message);
+    console.error('[ERROR]', 'generateUnpublishedStateUrl error:', error.message);
     const baseUrl = getWebAppUrl();
     return baseUrl + (userId ? `?userId=${userId}&_cb=${Date.now()}` : `?_cb=${Date.now()}`);
   }
@@ -265,14 +269,18 @@ function generateUnpublishedStateUrl(userId) {
 function generateUserUrlsWithCacheBusting(userId, options = {}) {
   try {
     const standardUrls = generateUserUrls(userId);
-    if (standardUrls.status === 'error') {
+    if (!standardUrls.success) {
       return standardUrls;
     }
 
     const cacheBustOptions = {
       forceFresh: options.forceFresh || false,
       publicationStatus: options.publicationStatus || 'unknown',
-      sessionId: options.sessionId || (typeof Session !== 'undefined' && Session.getTemporaryActiveUserKey ? Session.getTemporaryActiveUserKey() : null)
+      sessionId:
+        options.sessionId ||
+        (typeof Session !== 'undefined' && Session.getTemporaryActiveUserKey
+          ? Session.getTemporaryActiveUserKey()
+          : null),
     };
 
     return {
@@ -282,10 +290,10 @@ function generateUserUrlsWithCacheBusting(userId, options = {}) {
       setupUrl: addCacheBustingParams(standardUrls.setupUrl, cacheBustOptions),
       unpublishedUrl: generateUnpublishedStateUrl(userId),
       cacheBustingApplied: true,
-      cacheBustOptions: cacheBustOptions
+      cacheBustOptions: cacheBustOptions,
     };
   } catch (error) {
-    console.error('[ERROR]','generateUserUrlsWithCacheBusting error:', error.message);
+    console.error('[ERROR]', 'generateUserUrlsWithCacheBusting error:', error.message);
     return generateUserUrls(userId);
   }
 }

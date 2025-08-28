@@ -10,7 +10,7 @@ describe.skip('doGet flows', () => {
       debugLog: () => {},
       HtmlService: { createHtmlOutput: jest.fn(() => 'redirect') },
       Session: { getActiveUser: () => ({ getEmail: () => 'me@example.com' }) },
-      PropertiesService: { getScriptProperties: () => ({ getProperty: jest.fn(() => 'id') }) }
+      PropertiesService: { getScriptProperties: () => ({ getProperty: jest.fn(() => 'id') }) },
     };
     vm.createContext(context);
     vm.runInContext(code, context);
@@ -20,14 +20,17 @@ describe.skip('doGet flows', () => {
     context.handleSetupPages = context.handleSetupPages || (() => null);
     context.validateUserSession = jest.fn(() => ({
       userEmail: 'me@example.com',
-      userInfo: { userId: '1', adminEmail: 'me@example.com' }
+      userInfo: { userId: '1', adminEmail: 'me@example.com' },
     }));
     context.parseRequestParams = jest.fn(() => ({ mode: 'admin', isDirectPageAccess: false }));
   });
 
-
   test('renders answer board for direct access', () => {
-    context.parseRequestParams.mockReturnValue({ userId: '1', mode: 'view', isDirectPageAccess: true });
+    context.parseRequestParams.mockReturnValue({
+      userId: '1',
+      mode: 'view',
+      isDirectPageAccess: true,
+    });
     const result = context.doGet({});
     expect(result).toBe('board');
   });

@@ -4,13 +4,13 @@ function applyReactionState(answers) {
   const savedReactions = this.loadReactionState();
   let modified = false;
 
-  answers.forEach(answer => {
+  answers.forEach((answer) => {
     if (!savedReactions[answer.rowIndex]) {
       savedReactions[answer.rowIndex] = {};
     }
     const savedReaction = savedReactions[answer.rowIndex];
     if (answer.reactions) {
-      Object.keys(answer.reactions).forEach(type => {
+      Object.keys(answer.reactions).forEach((type) => {
         const info = answer.reactions[type];
         if (!info) return;
         const serverReacted = !!info.reacted;
@@ -25,7 +25,7 @@ function applyReactionState(answers) {
             }
             savedReactions[answer.rowIndex][type] = {
               reacted: true,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             };
             modified = true;
           }
@@ -59,15 +59,18 @@ describe('applyReactionState', () => {
       loadReactionState() {
         return JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
       },
-      applyReactionState
+      applyReactionState,
     };
     localStorage.clear();
   });
 
   test('clears stale local reactions when server shows none', () => {
-    localStorage.setItem(app.reactionStorageKey, JSON.stringify({
-      1: { LIKE: { reacted: true, timestamp: 't' } }
-    }));
+    localStorage.setItem(
+      app.reactionStorageKey,
+      JSON.stringify({
+        1: { LIKE: { reacted: true, timestamp: 't' } },
+      })
+    );
 
     const answers = [{ rowIndex: 1, reactions: { LIKE: { reacted: false, count: 0 } } }];
     app.applyReactionState(answers);

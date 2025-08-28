@@ -15,18 +15,26 @@ describe('getInitialData header extraction', () => {
       debugLog: () => {},
       console,
       PropertiesService: {
-        getScriptProperties: () => ({ 
+        getScriptProperties: () => ({
           getProperty: (key) => {
             if (key === 'DATABASE_SPREADSHEET_ID') return 'test-spreadsheet-id';
             if (key === 'ADMIN_EMAIL') return 'admin@example.com';
             if (key === 'SERVICE_ACCOUNT_CREDS') return '{}';
             return null;
-          }
+          },
         }),
       },
       CacheService: {
         getUserCache: () => ({ get: () => null, put: () => {} }),
-        getScriptCache: () => ({ get: (k) => store[k] || null, put: (k, v) => { store[k] = v; }, remove: (k) => { delete store[k]; } })
+        getScriptCache: () => ({
+          get: (k) => store[k] || null,
+          put: (k, v) => {
+            store[k] = v;
+          },
+          remove: (k) => {
+            delete store[k];
+          },
+        }),
       },
       cacheManager: {
         store,
@@ -36,25 +44,27 @@ describe('getInitialData header extraction', () => {
           this.store[key] = val;
           return val;
         },
-        remove(key) { delete this.store[key]; },
+        remove(key) {
+          delete this.store[key];
+        },
         clearByPattern: (pattern) => {
           for (const key in store) {
             if (key.startsWith(pattern.replace('*', ''))) {
               delete store[key];
             }
           }
-        }
+        },
       },
       ScriptApp: {
         getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
-        getScriptId: () => 'ID'
+        getScriptId: () => 'ID',
       },
       Session: { getActiveUser: () => ({ getEmail: () => 'test@example.com' }) },
-      Utilities: { 
-        getUuid: () => 'uid', 
-        computeDigest: () => [], 
+      Utilities: {
+        getUuid: () => 'uid',
+        computeDigest: () => [],
         Charset: { UTF_8: 'UTF-8' },
-        sleep: (ms) => {} // モックのsleep関数
+        sleep: (ms) => {}, // モックのsleep関数
       },
       getSecureDatabaseId: () => '1234567890123456789012345678901234567890', // 有効なスプレッドシートID形式に修正
       generateNewServiceAccountToken: jest.fn(() => 'mock-service-account-token'), // generateNewServiceAccountToken のモック
@@ -103,21 +113,30 @@ describe('getInitialData header extraction', () => {
       getServiceAccountTokenCached: jest.fn(() => 'mock-token'),
       getSheetsService: jest.fn(() => ({ baseUrl: 'mock-base-url' })), // baseUrl を追加
       getCachedSheetsService: jest.fn(() => ({ baseUrl: 'mock-base-url' })), // baseUrl を追加
-      unifiedBatchProcessor: { // unifiedBatchProcessor のモック
+      unifiedBatchProcessor: {
+        // unifiedBatchProcessor のモック
         batchGet: jest.fn(() => ({
-          valueRanges: [{
-            values: [
-              ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'configJson'],
-              ['U', 'test@example.com', 'mock-sheet-id', 'mock-sheet-url', JSON.stringify({
-                publishedSheetName: 'ClassA',
-                sheet_ClassA: {
-                  opinionHeader: 'テーマ',
-                  nameHeader: '氏名',
-                  classHeader: 'クラス',
-                },
-              })]
-            ]
-          }]
+          valueRanges: [
+            {
+              values: [
+                ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'configJson'],
+                [
+                  'U',
+                  'test@example.com',
+                  'mock-sheet-id',
+                  'mock-sheet-url',
+                  JSON.stringify({
+                    publishedSheetName: 'ClassA',
+                    sheet_ClassA: {
+                      opinionHeader: 'テーマ',
+                      nameHeader: '氏名',
+                      classHeader: 'クラス',
+                    },
+                  }),
+                ],
+              ],
+            },
+          ],
         })),
         batchUpdate: jest.fn(() => ({})),
         batchUpdateSpreadsheet: jest.fn(() => ({})),

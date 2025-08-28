@@ -11,22 +11,28 @@ describe('generateUserUrls', () => {
     context = {
       cacheManager: {
         store,
-        get(key, fn) { return fn(); },
-        remove() {}
+        get(key, fn) {
+          return fn();
+        },
+        remove() {},
       },
       ScriptApp: {
-        getScriptId: () => 'ID'
+        getScriptId: () => 'ID',
       },
       AppsScript: {
         Script: {
           Deployments: {
             list: () => ({
               deployments: [
-                { deploymentConfig: { webApp: { url: 'https://script.google.com/macros/s/ID/exec' } } }
-              ]
-            })
-          }
-        }
+                {
+                  deploymentConfig: {
+                    webApp: { url: 'https://script.google.com/macros/s/ID/exec' },
+                  },
+                },
+              ],
+            }),
+          },
+        },
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
       debugLog: () => {},
@@ -38,8 +44,8 @@ describe('generateUserUrls', () => {
           getProperty: (key) => {
             if (key === 'DEBUG_MODE') return 'false';
             return null;
-          }
-        })
+          },
+        }),
       },
 
       CacheService: (() => {
@@ -47,24 +53,28 @@ describe('generateUserUrls', () => {
         return {
           getUserCache: () => ({
             get: () => null,
-            put: () => {}
+            put: () => {},
           }),
           getScriptCache: () => ({
             get: (k) => store[k] || null,
-            put: (k, v) => { store[k] = v; },
-            remove: (k) => { delete store[k]; }
-          })
+            put: (k, v) => {
+              store[k] = v;
+            },
+            remove: (k) => {
+              delete store[k];
+            },
+          }),
         };
       })(),
-        
+
       Session: {
-        getActiveUser: () => ({ getEmail: () => 'test@example.com' })
+        getActiveUser: () => ({ getEmail: () => 'test@example.com' }),
       },
       Utilities: {
         getUuid: () => 'mock-uuid',
         computeDigest: () => [],
-        Charset: { UTF_8: 'UTF-8' }
-      }
+        Charset: { UTF_8: 'UTF-8' },
+      },
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);

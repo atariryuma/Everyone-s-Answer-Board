@@ -20,7 +20,7 @@ describe('ワークフロー検証', () => {
       expect(result).toEqual({
         valid: true,
         message: 'Workflow validation successful',
-        data: 'test-data'
+        data: 'test-data',
       });
     });
   });
@@ -29,7 +29,7 @@ describe('ワークフロー検証', () => {
     test('SpreadsheetApp モックが動作する', () => {
       const sheet = SpreadsheetApp.getActiveSheet();
       const range = sheet.getRange(1, 1, 5, 3);
-      
+
       expect(range.getValues).toBeDefined();
       expect(typeof range.getValues()).toBe('object');
     });
@@ -37,7 +37,7 @@ describe('ワークフロー検証', () => {
     test('PropertiesService モックが動作する', () => {
       const props = PropertiesService.getScriptProperties();
       props.setProperty('test-key', 'test-value');
-      
+
       expect(props.setProperty).toHaveBeenCalledWith('test-key', 'test-value');
     });
   });
@@ -53,14 +53,14 @@ function validateWorkflow(data) {
     return {
       valid: false,
       message: 'Data is required',
-      data: null
+      data: null,
     };
   }
 
   return {
     valid: true,
     message: 'Workflow validation successful',
-    data
+    data,
   };
 }
 

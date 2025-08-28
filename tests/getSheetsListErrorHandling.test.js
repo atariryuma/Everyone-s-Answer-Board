@@ -30,8 +30,12 @@ describe('getSheetsList error handling', () => {
 
   test('repairs only when a 403 error occurs', () => {
     context.getSpreadsheetsData
-      .mockImplementationOnce(() => { throw new Error('Sheets API error: 403 - {}'); })
-      .mockImplementationOnce(() => ({ sheets: [{ properties: { title: 'Sheet1', sheetId: 1 } }] }));
+      .mockImplementationOnce(() => {
+        throw new Error('Sheets API error: 403 - {}');
+      })
+      .mockImplementationOnce(() => ({
+        sheets: [{ properties: { title: 'Sheet1', sheetId: 1 } }],
+      }));
 
     const result = context.getSheetsList('user1');
 
@@ -55,4 +59,3 @@ describe('getSheetsList error handling', () => {
     expect(context.Utilities.sleep).toHaveBeenNthCalledWith(2, 2000);
   });
 });
-

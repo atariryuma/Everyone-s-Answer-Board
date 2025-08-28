@@ -15,15 +15,15 @@ class SystemIntegrationManager {
       unifiedBatchProcessor: { status: 'NOT_INITIALIZED', instance: null },
       multiTenantSecurity: { status: 'NOT_INITIALIZED', instance: null },
       unifiedSecretManager: { status: 'NOT_INITIALIZED', instance: null },
-      cacheManager: { status: 'NOT_INITIALIZED', instance: null }
+      cacheManager: { status: 'NOT_INITIALIZED', instance: null },
     };
 
     this.initializationOrder = [
       'unifiedSecretManager',
-      'resilientExecutor', 
+      'resilientExecutor',
       'multiTenantSecurity',
       'cacheManager',
-      'unifiedBatchProcessor'
+      'unifiedBatchProcessor',
     ];
 
     this.systemMetrics = {
@@ -31,7 +31,7 @@ class SystemIntegrationManager {
       lastHealthCheck: null,
       totalRequests: 0,
       errorRate: 0,
-      averageResponseTime: 0
+      averageResponseTime: 0,
     };
   }
 
@@ -49,7 +49,7 @@ class SystemIntegrationManager {
       componentsInitialized: [],
       componentsFailedToInitialize: [],
       warnings: [],
-      errors: []
+      errors: [],
     };
 
     try {
@@ -64,7 +64,7 @@ class SystemIntegrationManager {
         } catch (error) {
           initResult.componentsFailedToInitialize.push({
             component: componentName,
-            error: error.message
+            error: error.message,
           });
           initResult.errors.push(`${componentName} 初期化失敗: ${error.message}`);
           warnLog(`❌ ${componentName} 初期化失敗:`, error.message);
@@ -80,7 +80,7 @@ class SystemIntegrationManager {
       try {
         const healthResult = this.performInitialHealthCheck();
         initResult.initialHealthCheck = healthResult;
-        
+
         if (healthResult.overallStatus === 'CRITICAL') {
           initResult.warnings.push('初期ヘルスチェックで重要な問題を検出');
         }
@@ -103,17 +103,16 @@ class SystemIntegrationManager {
       infoLog(`🎉 統合システム初期化完了 (${initResult.initializationTime}ms)`, {
         success: initResult.success,
         initialized: initResult.componentsInitialized.length,
-        failed: initResult.componentsFailedToInitialize.length
+        failed: initResult.componentsFailedToInitialize.length,
       });
 
       return initResult;
-
     } catch (error) {
       initResult.success = false;
       initResult.errors.push(`システム初期化エラー: ${error.message}`);
       initResult.initializationTime = Date.now() - startTime;
-      
-      console.error("[ERROR]", '❌ 統合システム初期化エラー:', error);
+
+      console.error('[ERROR]', '❌ 統合システム初期化エラー:', error);
       return initResult;
     }
   }
@@ -149,8 +148,8 @@ class SystemIntegrationManager {
         if (typeof multiTenantSecurity !== 'undefined') {
           // マルチテナントセキュリティの初期検証
           const testResult = multiTenantSecurity.validateTenantBoundary(
-            'test@example.com', 
-            'test@example.com', 
+            'test@example.com',
+            'test@example.com',
             'init_test'
           );
           if (!testResult) {
@@ -193,10 +192,7 @@ class SystemIntegrationManager {
    * @private
    */
   isCriticalComponent(componentName) {
-    const criticalComponents = [
-      'unifiedSecretManager',
-      'resilientExecutor'
-    ];
+    const criticalComponents = ['unifiedSecretManager', 'resilientExecutor'];
     return criticalComponents.includes(componentName);
   }
 
@@ -218,7 +214,7 @@ class SystemIntegrationManager {
       return {
         overallStatus: 'ERROR',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -232,7 +228,7 @@ class SystemIntegrationManager {
       overallStatus: 'UNKNOWN',
       timestamp: new Date().toISOString(),
       components: {},
-      issues: []
+      issues: [],
     };
 
     let healthyComponents = 0;
@@ -287,20 +283,16 @@ class SystemIntegrationManager {
   scheduleMetricsUpdate() {
     try {
       const triggers = ScriptApp.getProjectTriggers();
-      
+
       // 既存のメトリクス更新トリガーを削除
-      triggers.forEach(trigger => {
+      triggers.forEach((trigger) => {
         if (trigger.getHandlerFunction() === 'updateSystemMetrics') {
           ScriptApp.deleteTrigger(trigger);
         }
       });
 
       // 新しいメトリクス更新トリガーを作成（15分間隔）
-      ScriptApp.newTrigger('updateSystemMetrics')
-        .timeBased()
-        .everyMinutes(15)
-        .create();
-
+      ScriptApp.newTrigger('updateSystemMetrics').timeBased().everyMinutes(15).create();
     } catch (error) {
       warnLog('メトリクス更新タスクスケジュールエラー:', error.message);
     }
@@ -314,7 +306,7 @@ class SystemIntegrationManager {
     const metrics = {
       ...this.systemMetrics,
       components: {},
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     // 各コンポーネントのメトリクスを収集
@@ -372,9 +364,8 @@ class SystemIntegrationManager {
       this.initialized = false;
       infoLog('✅ システムシャットダウン完了');
       return true;
-
     } catch (error) {
-      console.error("[ERROR]", 'システムシャットダウンエラー:', error);
+      console.error('[ERROR]', 'システムシャットダウンエラー:', error);
       return false;
     }
   }
@@ -388,12 +379,12 @@ class SystemIntegrationManager {
       initialized: this.initialized,
       components: Object.fromEntries(
         Object.entries(this.components).map(([name, component]) => [
-          name, 
-          { status: component.status }
+          name,
+          { status: component.status },
         ])
       ),
       metrics: this.systemMetrics,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -440,14 +431,13 @@ function updateSystemMetrics() {
 
     // エラー率の計算
     systemIntegrationManager.systemMetrics.totalRequests = totalOperations;
-    systemIntegrationManager.systemMetrics.errorRate = totalOperations > 0 ? 
-      ((totalErrors / totalOperations) * 100).toFixed(2) + '%' : '0%';
+    systemIntegrationManager.systemMetrics.errorRate =
+      totalOperations > 0 ? ((totalErrors / totalOperations) * 100).toFixed(2) + '%' : '0%';
 
     debugLog('📊 システムメトリクス更新完了', {
       totalRequests: systemIntegrationManager.systemMetrics.totalRequests,
-      errorRate: systemIntegrationManager.systemMetrics.errorRate
+      errorRate: systemIntegrationManager.systemMetrics.errorRate,
     });
-
   } catch (error) {
     warnLog('システムメトリクス更新エラー:', error.message);
   }
@@ -463,7 +453,7 @@ function diagnoseOptimizedSystem() {
     systemStatus: systemIntegrationManager.getSystemStatus(),
     systemMetrics: systemIntegrationManager.getSystemMetrics(),
     healthCheck: null,
-    recommendations: []
+    recommendations: [],
   };
 
   try {
@@ -475,9 +465,13 @@ function diagnoseOptimizedSystem() {
     // 推奨事項の生成
     if (diagnostics.healthCheck) {
       if (diagnostics.healthCheck.overallStatus === 'CRITICAL') {
-        diagnostics.recommendations.push('緊急: 重要な問題があります。システム管理者にお問い合わせください。');
+        diagnostics.recommendations.push(
+          '緊急: 重要な問題があります。システム管理者にお問い合わせください。'
+        );
       } else if (diagnostics.healthCheck.overallStatus === 'WARNING') {
-        diagnostics.recommendations.push('警告: いくつかの問題が検出されました。定期メンテナンスを検討してください。');
+        diagnostics.recommendations.push(
+          '警告: いくつかの問題が検出されました。定期メンテナンスを検討してください。'
+        );
       } else {
         diagnostics.recommendations.push('システムは正常に動作しています。');
       }
@@ -493,10 +487,9 @@ function diagnoseOptimizedSystem() {
 
     infoLog('🔍 システム診断完了', diagnostics);
     return diagnostics;
-
   } catch (error) {
     diagnostics.error = error.message;
-    console.error("[ERROR]", 'システム診断エラー:', error);
+    console.error('[ERROR]', 'システム診断エラー:', error);
     return diagnostics;
   }
 }

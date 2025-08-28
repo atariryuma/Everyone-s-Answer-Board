@@ -19,7 +19,7 @@ const TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
 function getServiceAccountTokenCached() {
   return cacheManager.get(AUTH_CACHE_KEY, generateNewServiceAccountToken, {
     ttl: 3500,
-    enableMemoization: true
+    enableMemoization: true,
   }); // メモ化対応でトークン取得を高速化
 }
 
@@ -30,22 +30,22 @@ function getServiceAccountTokenCached() {
 function generateNewServiceAccountToken() {
   // 統一秘密情報管理システムで安全に取得
   const serviceAccountCreds = getSecureServiceAccountCreds();
-  
+
   const privateKey = serviceAccountCreds.private_key.replace(/\n/g, '\n'); // 改行文字を正規化
   const clientEmail = serviceAccountCreds.client_email;
-  const tokenUrl = "https://www.googleapis.com/oauth2/v4/token";
+  const tokenUrl = 'https://www.googleapis.com/oauth2/v4/token';
 
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + 3600; // 1時間後
 
   // JWT生成
-  const jwtHeader = { alg: "RS256", typ: "JWT" };
+  const jwtHeader = { alg: 'RS256', typ: 'JWT' };
   const jwtClaimSet = {
     iss: clientEmail,
-    scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
+    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
     aud: tokenUrl,
     exp: expiresAt,
-    iat: now
+    iat: now,
   };
 
   const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
@@ -57,13 +57,13 @@ function generateNewServiceAccountToken() {
 
   // トークンリクエスト
   const response = resilientUrlFetch(tokenUrl, {
-    method: "post",
-    contentType: "application/x-www-form-urlencoded",
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
     payload: {
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
     },
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
   });
 
   // レスポンスオブジェクト検証（resilientUrlFetchで既に検証済みだが、念のため）
@@ -74,9 +74,9 @@ function generateNewServiceAccountToken() {
   const responseCode = response.getResponseCode();
   if (responseCode !== 200) {
     const responseText = response.getContentText();
-    console.error("[ERROR]", 'Token request failed. Status:', responseCode);
-    console.error("[ERROR]", 'Response:', responseText);
-    
+    console.error('[ERROR]', 'Token request failed. Status:', responseCode);
+    console.error('[ERROR]', 'Response:', responseText);
+
     // より詳細なエラーメッセージ
     let errorMessage = 'サービスアカウントトークンの取得に失敗しました。';
     if (responseCode === 400) {
@@ -88,17 +88,19 @@ function generateNewServiceAccountToken() {
     } else {
       errorMessage += ` Status: ${responseCode}`;
     }
-    
+
     throw new Error(errorMessage);
   }
 
   var responseData = JSON.parse(response.getContentText());
   if (!responseData.access_token) {
-    console.error("[ERROR]", 'No access token in response:', responseData);
-    throw new Error('アクセストークンが返されませんでした。サービスアカウント設定を確認してください。');
+    console.error('[ERROR]', 'No access token in response:', responseData);
+    throw new Error(
+      'アクセストークンが返されませんでした。サービスアカウント設定を確認してください。'
+    );
   }
 
-  infoLog('Service account token generated successfully for:', clientEmail);
+  ULog.info('Service account token generated successfully for:', clientEmail);
   return responseData.access_token;
 }
 
@@ -107,7 +109,7 @@ function generateNewServiceAccountToken() {
  */
 function clearServiceAccountTokenCache() {
   cacheManager.remove(AUTH_CACHE_KEY);
-  debugLog('トークンキャッシュをクリアしました');
+  ULog.debug('トークンキャッシュをクリアしました');
 }
 
 /**
@@ -119,7 +121,7 @@ function getServiceAccountEmail() {
     const serviceAccountCreds = getSecureServiceAccountCreds();
     return serviceAccountCreds.client_email || 'メールアドレス不明';
   } catch (error) {
-    warnLog('サービスアカウントメール取得エラー:', error.message);
+    ULog.warn('サービスアカウントメール取得エラー:', error.message);
     return 'メールアドレス取得エラー';
   }
 }
@@ -134,43 +136,45 @@ function verifyAdminAccess(userId) {
   try {
     // 基本的な引数チェック
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      warnLog('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
+      ULog.warn('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
       return false;
     }
 
     // 現在のログインユーザーのメールアドレスを取得
     const activeUserEmail = getCurrentUserEmail();
     if (!activeUserEmail) {
-      warnLog('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
+      ULog.warn('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
       return false;
     }
 
-    debugLog('verifyAdminAccess: 認証開始', { userId, activeUserEmail });
+    ULog.debug('verifyAdminAccess: 認証開始', { userId, activeUserEmail });
 
     // データベースからユーザー情報を取得（統一検索関数使用）
     let userFromDb = null;
-    
+
     // まずは通常のキャッシュ付き検索を試行
     userFromDb = findUserById(userId);
-    
+
     // 見つからない場合は強制フレッシュで再試行
     if (!userFromDb) {
-      debugLog('verifyAdminAccess: 強制フレッシュで再検索中...');
+      ULog.debug('verifyAdminAccess: 強制フレッシュで再検索中...');
       userFromDb = fetchUserFromDatabase('userId', userId, { forceFresh: true });
     }
 
     // ユーザーが見つからない場合は認証失敗
     if (!userFromDb) {
-      warnLog('verifyAdminAccess: ユーザーが見つかりません:', { 
-        userId, 
-        activeUserEmail 
+      ULog.warn('verifyAdminAccess: ユーザーが見つかりません:', {
+        userId,
+        activeUserEmail,
       });
       return false;
     }
 
     // 3重チェック実行
     // 1. メールアドレス照合
-    const dbEmail = String(userFromDb.adminEmail || '').toLowerCase().trim();
+    const dbEmail = String(userFromDb.adminEmail || '')
+      .toLowerCase()
+      .trim();
     const currentEmail = String(activeUserEmail).toLowerCase().trim();
     const isEmailMatched = dbEmail && currentEmail && dbEmail === currentEmail;
 
@@ -178,37 +182,34 @@ function verifyAdminAccess(userId) {
     const isUserIdMatched = String(userFromDb.userId) === String(userId);
 
     // 3. アクティブ状態確認
-    const isActive = (userFromDb.isActive === true || 
-                     userFromDb.isActive === 'true' || 
-                     String(userFromDb.isActive).toLowerCase() === 'true');
+    const isActive = Boolean(userFromDb.isActive);
 
-    debugLog('verifyAdminAccess: 3重チェック結果:', {
+    ULog.debug('verifyAdminAccess: 3重チェック結果:', {
       isEmailMatched,
       isUserIdMatched,
       isActive,
       dbEmail,
-      currentEmail
+      currentEmail,
     });
 
     // 3つの条件すべてが満たされた場合のみ認証成功
     if (isEmailMatched && isUserIdMatched && isActive) {
-      infoLog('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
+      ULog.info('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
       return true;
     } else {
-      warnLog('❌ verifyAdminAccess: 認証失敗', {
+      ULog.warn('❌ verifyAdminAccess: 認証失敗', {
         userId,
         activeUserEmail,
         failures: {
           email: !isEmailMatched,
           userId: !isUserIdMatched,
-          active: !isActive
-        }
+          active: !isActive,
+        },
       });
       return false;
     }
-
   } catch (error) {
-    console.error("[ERROR]", '❌ verifyAdminAccess: 認証処理エラー:', error.message);
+    console.error('[ERROR]', '❌ verifyAdminAccess: 認証処理エラー:', error.message);
     return false;
   }
 }
@@ -220,18 +221,17 @@ function verifyAdminAccess(userId) {
 function updateUserLastAccess(userId) {
   try {
     if (!userId) {
-      warnLog('updateUserLastAccess: userIdが指定されていません');
+      ULog.warn('updateUserLastAccess: userIdが指定されていません');
       return;
     }
 
     const now = new Date().toISOString();
-    debugLog('最終アクセス時刻を更新:', userId, now);
+    ULog.debug('最終アクセス時刻を更新:', userId, now);
 
     // lastAccessedAtフィールドのみを更新（他の設定は保護）
     updateUser(userId, { lastAccessedAt: now });
-
   } catch (error) {
-    console.error("[ERROR]", 'updateUserLastAccess エラー:', error.message);
+    console.error('[ERROR]', 'updateUserLastAccess エラー:', error.message);
   }
 }
 
@@ -260,9 +260,8 @@ function getSetupStatusFromConfig(configJsonString) {
     }
 
     return 'pending';
-
   } catch (error) {
-    warnLog('getSetupStatusFromConfig JSON解析エラー:', error.message);
+    ULog.warn('getSetupStatusFromConfig JSON解析エラー:', error.message);
     return 'pending'; // エラー時はセットアップ未完了とみなす
   }
 }
@@ -312,9 +311,9 @@ class MultiTenantSecurityManager {
     this.logSecurityViolation('TENANT_BOUNDARY_VIOLATION', {
       requestUserId,
       targetUserId,
-      operation
+      operation,
     });
-    
+
     return false;
   }
 
@@ -327,10 +326,10 @@ class MultiTenantSecurityManager {
    */
   validateDataAccessPattern(userId, dataType, operation) {
     const allowedPatterns = {
-      'user_data': ['read', 'write', 'delete'],
-      'user_config': ['read', 'write'],
-      'user_cache': ['read', 'write', 'delete'],
-      'shared_config': ['read'], // 共有設定は読み取りのみ
+      user_data: ['read', 'write', 'delete'],
+      user_config: ['read', 'write'],
+      user_cache: ['read', 'write', 'delete'],
+      shared_config: ['read'], // 共有設定は読み取りのみ
     };
 
     if (!allowedPatterns[dataType] || !allowedPatterns[dataType].includes(operation)) {
@@ -356,15 +355,15 @@ class MultiTenantSecurityManager {
     // ユーザーIDの暗号化ハッシュを使用してテナント分離を強化
     const userHash = this.generateUserHash(userId);
     const timestamp = Math.floor(Date.now() / 3600000); // 1時間単位
-    
+
     let secureKey = `MT_${userHash}_${baseKey}`;
     if (context) {
       secureKey += `_${context}`;
     }
-    
+
     // タイムベースの検証情報を追加
     secureKey += `_T${timestamp}`;
-    
+
     return secureKey;
   }
 
@@ -375,17 +374,20 @@ class MultiTenantSecurityManager {
    */
   generateUserHash(userId) {
     if (!userId) return null;
-    
+
     // MD5ハッシュを使用してユーザーIDを匿名化
     const digest = Utilities.computeDigest(
       Utilities.DigestAlgorithm.MD5,
       userId + '_TENANT_SALT_2024',
       Utilities.Charset.UTF_8
     );
-    
-    return digest.map(function(byte) {
-      return (byte + 256).toString(16).slice(-2);
-    }).join('').substring(0, 16); // 16文字に短縮
+
+    return digest
+      .map(function (byte) {
+        return (byte + 256).toString(16).slice(-2);
+      })
+      .join('')
+      .substring(0, 16); // 16文字に短縮
   }
 
   /**
@@ -414,11 +416,11 @@ class MultiTenantSecurityManager {
       type: 'SECURITY_VIOLATION',
       violation: violationType,
       details: details,
-      userAgent: Session.getActiveUser().getEmail()
+      userAgent: Session.getActiveUser().getEmail(),
     };
 
-    console.error("[ERROR]", `🚨 セキュリティ違反: ${violationType}`, JSON.stringify(logEntry));
-    
+    console.error('[ERROR]', `🚨 セキュリティ違反: ${violationType}`, JSON.stringify(logEntry));
+
     // 重大な違反の場合は追加の通知を送信する可能性
     if (violationType === 'TENANT_BOUNDARY_VIOLATION') {
       this.handleCriticalSecurityViolation(logEntry);
@@ -437,10 +439,10 @@ class MultiTenantSecurityManager {
       timestamp: new Date().toISOString(),
       type: 'DATA_ACCESS',
       access: accessType,
-      details: details
+      details: details,
     };
 
-    debugLog(`🔒 データアクセス: ${accessType}`, JSON.stringify(logEntry));
+    ULog.debug(`🔒 データアクセス: ${accessType}`, JSON.stringify(logEntry));
   }
 
   /**
@@ -450,8 +452,8 @@ class MultiTenantSecurityManager {
   handleCriticalSecurityViolation(logEntry) {
     // 重大な違反の場合の追加処理
     // 例：管理者への通知、一時的なアクセス制限など
-    warnLog('🚨 重大なセキュリティ違反が発生しました', logEntry);
-    
+    ULog.warn('🚨 重大なセキュリティ違反が発生しました', logEntry);
+
     // フューチャー実装: 通知システムとの連携
     // this.sendSecurityAlert(logEntry);
   }
@@ -465,7 +467,7 @@ class MultiTenantSecurityManager {
       tenantBoundaryEnforcement: this.tenantBoundaryEnforcement,
       strictDataIsolation: this.strictDataIsolation,
       auditTrailEnabled: this.auditTrailEnabled,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -498,7 +500,7 @@ function secureMultiTenantCacheOperation(operation, baseKey, userId, value = nul
 
   // セキュアキー生成
   const secureKey = multiTenantSecurity.generateSecureKey(baseKey, userId, options.context);
-  
+
   // 回復力のある実行で操作実行
   try {
     switch (operation) {
@@ -530,7 +532,7 @@ function secureMultiTenantCacheOperation(operation, baseKey, userId, value = nul
       operation,
       baseKey,
       userId,
-      error: error.message
+      error: error.message,
     });
     throw error;
   }
@@ -542,16 +544,16 @@ function secureMultiTenantCacheOperation(operation, baseKey, userId, value = nul
  * @param {object} options - オプション
  * @returns {object|null} ユーザー情報
  */
+/**
+ * @deprecated 統合実装：unifiedUserManager.getSecureUserInfo() を使用してください
+ */
 function getSecureUserInfo(userId, options = {}) {
-  const currentUserId = Session.getActiveUser().getEmail();
-  
-  // テナント境界検証
-  if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, 'user_info_access')) {
-    throw new Error('SECURITY_ERROR: ユーザー情報アクセス拒否 - テナント境界違反');
-  }
-
-  // セキュアなキャッシュキーでユーザー情報を取得
-  return secureMultiTenantCacheOperation('get', 'user_info', userId, null, options);
+  // 統合実装にリダイレクト（セキュリティ検証付き）
+  return coreGetUserFromDatabase('userId', userId, {
+    cacheLayer: 'secure',
+    securityCheck: true,
+    ...options,
+  });
 }
 
 /**
@@ -563,7 +565,7 @@ function getSecureUserInfo(userId, options = {}) {
  */
 function getSecureUserConfig(userId, configKey, options = {}) {
   const currentUserId = Session.getActiveUser().getEmail();
-  
+
   // テナント境界検証
   if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, 'user_config_access')) {
     throw new Error('SECURITY_ERROR: ユーザー設定アクセス拒否 - テナント境界違反');
@@ -582,7 +584,7 @@ function performMultiTenantHealthCheck() {
     securityManagerStatus: 'OK',
     tenantIsolationTest: 'OK',
     cacheSecurityTest: 'OK',
-    issues: []
+    issues: [],
   };
 
   try {
@@ -596,7 +598,7 @@ function performMultiTenantHealthCheck() {
     // テナント分離テスト
     const testUserId1 = 'test_user_1@example.com';
     const testUserId2 = 'test_user_2@example.com';
-    
+
     const isolation1 = multiTenantSecurity.validateTenantBoundary(testUserId1, testUserId2, 'test');
     if (isolation1) {
       results.issues.push('テナント分離テストが失敗 - 異なるテナント間のアクセスが許可されました');
@@ -612,12 +614,13 @@ function performMultiTenantHealthCheck() {
     // キャッシュセキュリティテスト
     const secureKey1 = multiTenantSecurity.generateSecureKey('test', testUserId1);
     const secureKey2 = multiTenantSecurity.generateSecureKey('test', testUserId2);
-    
+
     if (secureKey1 === secureKey2) {
-      results.issues.push('セキュアキー生成テストが失敗 - 異なるユーザーで同じキーが生成されました');
+      results.issues.push(
+        'セキュアキー生成テストが失敗 - 異なるユーザーで同じキーが生成されました'
+      );
       results.cacheSecurityTest = 'FAILED';
     }
-
   } catch (error) {
     results.issues.push(`健全性チェック中にエラー: ${error.message}`);
     results.securityManagerStatus = 'ERROR';
@@ -636,7 +639,7 @@ function performMultiTenantHealthCheck() {
  */
 function performComprehensiveSecurityHealthCheck() {
   const startTime = Date.now();
-  
+
   const healthCheckResult = {
     timestamp: new Date().toISOString(),
     executionTime: 0,
@@ -644,24 +647,26 @@ function performComprehensiveSecurityHealthCheck() {
     components: {},
     criticalIssues: [],
     warnings: [],
-    recommendations: []
+    recommendations: [],
   };
 
   try {
-    infoLog('🔒 統合セキュリティヘルスチェック開始');
+    ULog.info('🔒 統合セキュリティヘルスチェック開始');
 
     // 1. 統一秘密情報管理システム
     try {
       const secretManagerHealth = unifiedSecretManager.performHealthCheck();
       healthCheckResult.components.secretManager = secretManagerHealth;
-      
+
       if (secretManagerHealth.issues.length > 0) {
-        healthCheckResult.warnings.push(`秘密情報管理: ${secretManagerHealth.issues.length}件の問題`);
+        healthCheckResult.warnings.push(
+          `秘密情報管理: ${secretManagerHealth.issues.length}件の問題`
+        );
       }
     } catch (error) {
-      healthCheckResult.components.secretManager = { 
-        status: 'ERROR', 
-        error: error.message 
+      healthCheckResult.components.secretManager = {
+        status: 'ERROR',
+        error: error.message,
       };
       healthCheckResult.criticalIssues.push(`秘密情報管理システムエラー: ${error.message}`);
     }
@@ -670,14 +675,16 @@ function performComprehensiveSecurityHealthCheck() {
     try {
       const multiTenantHealth = performMultiTenantHealthCheck();
       healthCheckResult.components.multiTenantSecurity = multiTenantHealth;
-      
+
       if (multiTenantHealth.issues.length > 0) {
-        healthCheckResult.criticalIssues.push(`マルチテナントセキュリティ: ${multiTenantHealth.issues.length}件の問題`);
+        healthCheckResult.criticalIssues.push(
+          `マルチテナントセキュリティ: ${multiTenantHealth.issues.length}件の問題`
+        );
       }
     } catch (error) {
-      healthCheckResult.components.multiTenantSecurity = { 
-        status: 'ERROR', 
-        error: error.message 
+      healthCheckResult.components.multiTenantSecurity = {
+        status: 'ERROR',
+        error: error.message,
       };
       healthCheckResult.criticalIssues.push(`マルチテナントセキュリティエラー: ${error.message}`);
     }
@@ -686,14 +693,16 @@ function performComprehensiveSecurityHealthCheck() {
     try {
       const batchProcessorHealth = performUnifiedBatchHealthCheck();
       healthCheckResult.components.batchProcessor = batchProcessorHealth;
-      
+
       if (batchProcessorHealth.issues.length > 0) {
-        healthCheckResult.warnings.push(`バッチ処理: ${batchProcessorHealth.issues.length}件の問題`);
+        healthCheckResult.warnings.push(
+          `バッチ処理: ${batchProcessorHealth.issues.length}件の問題`
+        );
       }
     } catch (error) {
-      healthCheckResult.components.batchProcessor = { 
-        status: 'ERROR', 
-        error: error.message 
+      healthCheckResult.components.batchProcessor = {
+        status: 'ERROR',
+        error: error.message,
       };
       healthCheckResult.warnings.push(`バッチ処理システムエラー: ${error.message}`);
     }
@@ -704,7 +713,7 @@ function performComprehensiveSecurityHealthCheck() {
       healthCheckResult.components.resilientExecutor = {
         status: 'OK',
         stats: resilientExecutorStats,
-        circuitBreakerState: resilientExecutorStats.circuitBreakerState
+        circuitBreakerState: resilientExecutorStats.circuitBreakerState,
       };
 
       if (resilientExecutorStats.circuitBreakerState === 'OPEN') {
@@ -713,12 +722,14 @@ function performComprehensiveSecurityHealthCheck() {
 
       const successRate = parseFloat(resilientExecutorStats.successRate.replace('%', ''));
       if (successRate < 95) {
-        healthCheckResult.warnings.push(`回復力のある実行機構: 成功率が低下 (${resilientExecutorStats.successRate})`);
+        healthCheckResult.warnings.push(
+          `回復力のある実行機構: 成功率が低下 (${resilientExecutorStats.successRate})`
+        );
       }
     } catch (error) {
-      healthCheckResult.components.resilientExecutor = { 
-        status: 'ERROR', 
-        error: error.message 
+      healthCheckResult.components.resilientExecutor = {
+        status: 'ERROR',
+        error: error.message,
       };
       healthCheckResult.warnings.push(`回復力のある実行機構エラー: ${error.message}`);
     }
@@ -727,14 +738,14 @@ function performComprehensiveSecurityHealthCheck() {
     try {
       const authHealth = checkAuthenticationHealth();
       healthCheckResult.components.authentication = authHealth;
-      
+
       if (!authHealth.serviceAccountValid) {
         healthCheckResult.criticalIssues.push('認証システム: サービスアカウント認証情報が無効');
       }
     } catch (error) {
-      healthCheckResult.components.authentication = { 
-        status: 'ERROR', 
-        error: error.message 
+      healthCheckResult.components.authentication = {
+        status: 'ERROR',
+        error: error.message,
       };
       healthCheckResult.criticalIssues.push(`認証システムエラー: ${error.message}`);
     }
@@ -743,14 +754,14 @@ function performComprehensiveSecurityHealthCheck() {
     try {
       const dbHealth = checkDatabaseHealth();
       healthCheckResult.components.database = dbHealth;
-      
+
       if (!dbHealth.accessible) {
         healthCheckResult.criticalIssues.push('データベース: 接続不可');
       }
     } catch (error) {
-      healthCheckResult.components.database = { 
-        status: 'ERROR', 
-        error: error.message 
+      healthCheckResult.components.database = {
+        status: 'ERROR',
+        error: error.message,
       };
       healthCheckResult.criticalIssues.push(`データベース接続エラー: ${error.message}`);
     }
@@ -764,7 +775,9 @@ function performComprehensiveSecurityHealthCheck() {
       healthCheckResult.recommendations.push('警告があります。確認と対処を推奨します。');
     } else {
       healthCheckResult.overallStatus = 'HEALTHY';
-      healthCheckResult.recommendations.push('全てのセキュリティコンポーネントが正常に動作しています。');
+      healthCheckResult.recommendations.push(
+        '全てのセキュリティコンポーネントが正常に動作しています。'
+      );
     }
 
     // 実行時間を記録
@@ -772,21 +785,24 @@ function performComprehensiveSecurityHealthCheck() {
 
     // 結果をログ出力
     if (healthCheckResult.overallStatus === 'CRITICAL') {
-      console.error("[ERROR]", '🚨 統合セキュリティヘルスチェック: 重要な問題が検出されました', healthCheckResult);
+      console.error(
+        '[ERROR]',
+        '🚨 統合セキュリティヘルスチェック: 重要な問題が検出されました',
+        healthCheckResult
+      );
     } else if (healthCheckResult.overallStatus === 'WARNING') {
-      warnLog('⚠️ 統合セキュリティヘルスチェック: 警告があります', healthCheckResult);
+      ULog.warn('⚠️ 統合セキュリティヘルスチェック: 警告があります', healthCheckResult);
     } else {
-      infoLog('✅ 統合セキュリティヘルスチェック: 正常', healthCheckResult);
+      ULog.info('✅ 統合セキュリティヘルスチェック: 正常', healthCheckResult);
     }
 
     return healthCheckResult;
-
   } catch (error) {
     healthCheckResult.overallStatus = 'ERROR';
     healthCheckResult.criticalIssues.push(`ヘルスチェック実行エラー: ${error.message}`);
     healthCheckResult.executionTime = Date.now() - startTime;
-    
-    console.error("[ERROR]", '❌ 統合セキュリティヘルスチェック実行エラー:', error);
+
+    console.error('[ERROR]', '❌ 統合セキュリティヘルスチェック実行エラー:', error);
     return healthCheckResult;
   }
 }
@@ -801,13 +817,17 @@ function checkAuthenticationHealth() {
     serviceAccountValid: false,
     tokenGenerationWorking: false,
     lastTokenGeneration: null,
-    issues: []
+    issues: [],
   };
 
   try {
     // サービスアカウント認証情報の検証
     const serviceAccountCreds = getSecureServiceAccountCreds();
-    if (serviceAccountCreds && serviceAccountCreds.client_email && serviceAccountCreds.private_key) {
+    if (
+      serviceAccountCreds &&
+      serviceAccountCreds.client_email &&
+      serviceAccountCreds.private_key
+    ) {
       authHealth.serviceAccountValid = true;
     } else {
       authHealth.issues.push('サービスアカウント認証情報が不完全');
@@ -825,7 +845,6 @@ function checkAuthenticationHealth() {
     }
 
     authHealth.status = authHealth.issues.length === 0 ? 'OK' : 'WARNING';
-
   } catch (error) {
     authHealth.status = 'ERROR';
     authHealth.issues.push(`認証ヘルスチェックエラー: ${error.message}`);
@@ -845,7 +864,7 @@ function checkDatabaseHealth() {
     databaseId: null,
     sheetsServiceWorking: false,
     lastAccess: null,
-    issues: []
+    issues: [],
   };
 
   try {
@@ -868,19 +887,16 @@ function checkDatabaseHealth() {
         // 軽量なデータベースアクセステスト
         const testResponse = resilientExecutor.execute(
           async () => {
-            return resilientUrlFetch(
-              `${service.baseUrl}/${encodeURIComponent(dbId)}`,
-              {
-                method: 'GET',
-                headers: {
-                  'Authorization': `Bearer ${service.accessToken}`
-                }
-              }
-            );
+            return resilientUrlFetch(`${service.baseUrl}/${encodeURIComponent(dbId)}`, {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${service.accessToken}`,
+              },
+            });
           },
           {
             name: 'DatabaseHealthCheck',
-            idempotent: true
+            idempotent: true,
           }
         );
 
@@ -888,7 +904,9 @@ function checkDatabaseHealth() {
           dbHealth.accessible = true;
           dbHealth.lastAccess = new Date().toISOString();
         } else {
-          dbHealth.issues.push(`データベースアクセステスト失敗: ${testResponse ? testResponse.getResponseCode() : 'No response'}`);
+          dbHealth.issues.push(
+            `データベースアクセステスト失敗: ${testResponse ? testResponse.getResponseCode() : 'No response'}`
+          );
         }
       }
     } catch (serviceError) {
@@ -896,7 +914,6 @@ function checkDatabaseHealth() {
     }
 
     dbHealth.status = dbHealth.accessible ? 'OK' : 'ERROR';
-
   } catch (error) {
     dbHealth.status = 'ERROR';
     dbHealth.issues.push(`データベースヘルスチェックエラー: ${error.message}`);
@@ -915,7 +932,7 @@ function getSecurityMetrics() {
     resilientExecutor: null,
     secretManager: null,
     multiTenantSecurity: null,
-    batchProcessor: null
+    batchProcessor: null,
   };
 
   try {
@@ -939,12 +956,11 @@ function getSecurityMetrics() {
       const auditLog = unifiedSecretManager.getAuditLog();
       metrics.secretManager = {
         auditLogEntries: auditLog.length,
-        lastAccess: auditLog.length > 0 ? auditLog[auditLog.length - 1].timestamp : null
+        lastAccess: auditLog.length > 0 ? auditLog[auditLog.length - 1].timestamp : null,
       };
     }
-
   } catch (error) {
-    warnLog('セキュリティメトリクス取得エラー:', error.message);
+    ULog.warn('セキュリティメトリクス取得エラー:', error.message);
   }
 
   return metrics;
@@ -958,9 +974,9 @@ function scheduleSecurityHealthCheck(intervalMinutes = 60) {
   try {
     // GAS環境では時間ベースのトリガーを使用
     const triggers = ScriptApp.getProjectTriggers();
-    
+
     // 既存のヘルスチェック トリガーを削除
-    triggers.forEach(trigger => {
+    triggers.forEach((trigger) => {
       if (trigger.getHandlerFunction() === 'runScheduledSecurityHealthCheck') {
         ScriptApp.deleteTrigger(trigger);
       }
@@ -972,10 +988,9 @@ function scheduleSecurityHealthCheck(intervalMinutes = 60) {
       .everyMinutes(intervalMinutes)
       .create();
 
-    infoLog(`📅 定期セキュリティヘルスチェックを${intervalMinutes}分間隔で設定しました`);
-
+    ULog.info(`📅 定期セキュリティヘルスチェックを${intervalMinutes}分間隔で設定しました`);
   } catch (error) {
-    console.error("[ERROR]", '定期セキュリティヘルスチェック設定エラー:', error.message);
+    console.error('[ERROR]', '定期セキュリティヘルスチェック設定エラー:', error.message);
   }
 }
 
@@ -985,23 +1000,26 @@ function scheduleSecurityHealthCheck(intervalMinutes = 60) {
 function runScheduledSecurityHealthCheck() {
   try {
     const healthResult = performComprehensiveSecurityHealthCheck();
-    
+
     // 重要な問題がある場合は管理者に通知
     if (healthResult.overallStatus === 'CRITICAL') {
       // フューチャー実装: 管理者への緊急通知
-      console.error("[ERROR]", '🚨 緊急: セキュリティヘルスチェックで重要な問題を検出', healthResult);
+      console.error(
+        '[ERROR]',
+        '🚨 緊急: セキュリティヘルスチェックで重要な問題を検出',
+        healthResult
+      );
     }
 
     // 結果をログに記録
-    infoLog('🔒 定期セキュリティヘルスチェック完了', {
+    ULog.info('🔒 定期セキュリティヘルスチェック完了', {
       status: healthResult.overallStatus,
       criticalIssues: healthResult.criticalIssues.length,
       warnings: healthResult.warnings.length,
-      executionTime: healthResult.executionTime
+      executionTime: healthResult.executionTime,
     });
-
   } catch (error) {
-    console.error("[ERROR]", '定期セキュリティヘルスチェック実行エラー:', error.message);
+    console.error('[ERROR]', '定期セキュリティヘルスチェック実行エラー:', error.message);
   }
 }
 
@@ -1013,23 +1031,34 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
   try {
     const serviceAccountEmail = getServiceAccountEmail();
     if (serviceAccountEmail === 'メールアドレス取得エラー') {
-      warnLog('サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。');
+      ULog.warn(
+        'サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。'
+      );
       return;
     }
 
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const permissions = spreadsheet.getEditors();
-    const isAlreadyEditor = permissions.some(editor => editor.getEmail() === serviceAccountEmail);
+    const isAlreadyEditor = permissions.some((editor) => editor.getEmail() === serviceAccountEmail);
 
     if (!isAlreadyEditor) {
       spreadsheet.addEditor(serviceAccountEmail);
-      infoLog(`✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
+      ULog.info(
+        `✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`
+      );
     } else {
-      debugLog(`サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`);
+      ULog.debug(
+        `サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`
+      );
     }
   } catch (error) {
-    console.error("[ERROR]", `サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`);
-    throw new Error(`サービスアカウントをスプレッドシートに共有できませんでした。手動で ${serviceAccountEmail} を編集者として追加してください。`);
+    console.error(
+      '[ERROR]',
+      `サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`
+    );
+    throw new Error(
+      `サービスアカウントをスプレッドシートに共有できませんでした。手動で ${serviceAccountEmail} を編集者として追加してください。`
+    );
   }
 }
 
@@ -1041,23 +1070,34 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
   try {
     const serviceAccountEmail = getServiceAccountEmail();
     if (serviceAccountEmail === 'メールアドレス取得エラー') {
-      warnLog('サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。');
+      ULog.warn(
+        'サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。'
+      );
       return;
     }
 
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const permissions = spreadsheet.getEditors();
-    const isAlreadyEditor = permissions.some(editor => editor.getEmail() === serviceAccountEmail);
+    const isAlreadyEditor = permissions.some((editor) => editor.getEmail() === serviceAccountEmail);
 
     if (!isAlreadyEditor) {
       spreadsheet.addEditor(serviceAccountEmail);
-      infoLog(`✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`);
+      ULog.info(
+        `✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`
+      );
     } else {
-      debugLog(`サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`);
+      ULog.debug(
+        `サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`
+      );
     }
   } catch (error) {
-    console.error("[ERROR]", `サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`);
-    throw new Error(`サービスアカウントをスプレッドシートに共有できませんでした。手動で ${serviceAccountEmail} を編集者として追加してください。`);
+    console.error(
+      '[ERROR]',
+      `サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`
+    );
+    throw new Error(
+      `サービスアカウントをスプレッドシートに共有できませんでした。手動で ${serviceAccountEmail} を編集者として追加してください。`
+    );
   }
 }
 
@@ -1065,32 +1105,15 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
  * ユーザーのアクセス権限を検証
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function verifyUserAccess(requestUserId) {
-  const currentUserId = getUserId(null); // 現在のセッションユーザーID（引数にnullを渡して現在のユーザーIDを取得）
-  
-  if (currentUserId !== requestUserId) {
-    // ログに詳細を記録
-    warnLog('🚨 アクセス拒否: ユーザーID不一致', {
-      requested: requestUserId,
-      current: currentUserId,
-      activeUserEmail: Session.getActiveUser().getEmail(),
-      effectiveUserEmail: Session.getEffectiveUser().getEmail()
-    });
-    throw new Error('アクセスが拒否されました。この操作を実行する権限がありません。');
-  }
-  debugLog('✅ ユーザーアクセス検証成功:', requestUserId);
-}
+// verifyUserAccess は Core.gs の詳細実装にリダイレクト
+// 統一APIアーキテクチャの一部として、最も完全な実装を使用
 
 /**
- * ユーザーのキャッシュを無効化
- * @param {string} userId - ユーザーID
- * @param {string} email - ユーザーのメールアドレス
- * @param {string} spreadsheetId - ユーザーのスプレッドシートID
- * @param {boolean} clearAll - 全てのキャッシュをクリアするかどうか
+ * @deprecated この関数は削除されました。unifiedCacheManager.gs の invalidateUserCache() を使用してください。
  */
 function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
-  try {
-    debugLog('invalidateUserCache: キャッシュ無効化開始', { userId, email, spreadsheetId, clearAll });
+  return unifiedCacheAPI.invalidateUserCache(userId, email, spreadsheetId, clearAll);
+}
 
     // 1. ScriptCacheのクリア
     const scriptCache = CacheService.getScriptCache();
@@ -1144,12 +1167,12 @@ function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
         }
       }
     } catch (propsError) {
-      warnLog('PropertiesServiceのキャッシュクリア中にエラー:', propsError.message);
+      ULog.warn('PropertiesServiceのキャッシュクリア中にエラー:', propsError.message);
     }
 
     // 5. 全てのキャッシュをクリアするオプション（最終手段）
     if (clearAll) {
-      debugLog('invalidateUserCache: 全てのキャッシュを強制クリア');
+      ULog.debug('invalidateUserCache: 全てのキャッシュを強制クリア');
       CacheService.getScriptCache().removeAll();
       CacheService.getUserCache().removeAll();
       if (typeof cacheManager !== 'undefined' && cacheManager) {
@@ -1157,10 +1180,9 @@ function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
       }
     }
 
-    infoLog('✅ invalidateUserCache: キャッシュ無効化完了');
-
+    ULog.info('✅ invalidateUserCache: キャッシュ無効化完了');
   } catch (error) {
-    console.error("[ERROR]", 'invalidateUserCache エラー:', error.message);
+    console.error('[ERROR]', 'invalidateUserCache エラー:', error.message);
     // エラーが発生しても処理は続行
   }
 }
@@ -1174,8 +1196,11 @@ function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
  */
 function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
   try {
-    debugLog('synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期開始', {
-      userId, email, oldSpreadsheetId, newSpreadsheetId
+    ULog.debug('synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期開始', {
+      userId,
+      email,
+      oldSpreadsheetId,
+      newSpreadsheetId,
     });
 
     // 1. ユーザー固有のキャッシュを無効化
@@ -1187,7 +1212,9 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       // 古いスプレッドシートオブジェクトのキャッシュを無効化
       if (oldSpreadsheetId) {
         invalidateSpreadsheetCache(oldSpreadsheetId);
-        infoLog(`✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
+        ULog.info(
+          `✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`
+        );
       }
     }
 
@@ -1204,10 +1231,9 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
       cacheManager.removeByPattern('config_v3_*');
     }
 
-    infoLog('✅ synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期完了');
-
+    ULog.info('✅ synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期完了');
   } catch (error) {
-    console.error("[ERROR]", 'synchronizeCacheAfterCriticalUpdate エラー:', error.message);
+    console.error('[ERROR]', 'synchronizeCacheAfterCriticalUpdate エラー:', error.message);
     // エラーが発生しても処理は続行
   }
 }
@@ -1217,15 +1243,15 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
  */
 function clearDatabaseCache() {
   try {
-    debugLog('clearDatabaseCache: データベースキャッシュをクリア');
+    ULog.debug('clearDatabaseCache: データベースキャッシュをクリア');
     CacheService.getScriptCache().removeAll();
     CacheService.getUserCache().removeAll(); // 現在のユーザーのキャッシュもクリア
     if (typeof cacheManager !== 'undefined' && cacheManager) {
       cacheManager.clearAll();
     }
-    infoLog('✅ データベースキャッシュクリア完了');
+    ULog.info('✅ データベースキャッシュクリア完了');
   } catch (error) {
-    console.error("[ERROR]", 'clearDatabaseCache エラー:', error.message);
+    console.error('[ERROR]', 'clearDatabaseCache エラー:', error.message);
   }
 }
 
@@ -1248,19 +1274,6 @@ function buildUserScopedKey(baseKey, userId, sheetName = '') {
 }
 
 /**
- * 現在のユーザーのメールアドレスを取得
- * @returns {string} メールアドレス
- */
-function getCurrentUserEmail() {
-  try {
-    return Session.getActiveUser().getEmail();
-  } catch (e) {
-    console.error("[ERROR]", 'getCurrentUserEmail エラー: ' + e.message);
-    return null;
-  }
-}
-
-/**
  * デプロイユーザーかどうかを判定
  * @returns {boolean} デプロイユーザーの場合true
  */
@@ -1269,34 +1282,22 @@ function isDeployUser() {
     var props = PropertiesService.getScriptProperties();
     var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
     var currentUserEmail = getCurrentUserEmail();
-    
+
     // デバッグログ
     if (shouldEnableDebugMode()) {
-      infoLog('isDeployUser check - adminEmail: ' + adminEmail);
-      infoLog('isDeployUser check - currentUserEmail: ' + currentUserEmail);
-      infoLog('isDeployUser check - result: ' + (adminEmail === currentUserEmail));
+      ULog.info('isDeployUser check - adminEmail: ' + adminEmail);
+      ULog.info('isDeployUser check - currentUserEmail: ' + currentUserEmail);
+      ULog.info('isDeployUser check - result: ' + (adminEmail === currentUserEmail));
     }
-    
+
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
-    console.error("[ERROR]", 'isDeployUser エラー: ' + e.message);
+    console.error('[ERROR]', 'isDeployUser エラー: ' + e.message);
     return false;
   }
 }
 
-/**
- * サービスアカウントのメールアドレスを取得
- * @returns {string} サービスアカウントのメールアドレス
- */
-function getServiceAccountEmail() {
-  try {
-    const serviceAccountCreds = getSecureServiceAccountCreds();
-    return serviceAccountCreds.client_email || 'メールアドレス取得エラー';
-  } catch (error) {
-    warnLog('サービスアカウントメール取得エラー:', error.message);
-    return 'メールアドレス取得エラー';
-  }
-}
+// この重複関数は削除されました。L117のgetServiceAccountEmail()を使用してください。
 
 /**
  * サービスアカウント認証情報を安全に取得
@@ -1304,13 +1305,15 @@ function getServiceAccountEmail() {
  */
 function getSecureServiceAccountCreds() {
   try {
-    const credsJson = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    const credsJson = PropertiesService.getScriptProperties().getProperty(
+      SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS
+    );
     if (!credsJson) {
       throw new Error('サービスアカウント認証情報が設定されていません。');
     }
     return JSON.parse(credsJson);
   } catch (e) {
-    console.error("[ERROR]", 'getSecureServiceAccountCreds エラー: ' + e.message);
+    console.error('[ERROR]', 'getSecureServiceAccountCreds エラー: ' + e.message);
     throw new Error('サービスアカウント認証情報の取得に失敗しました。');
   }
 }
@@ -1321,13 +1324,15 @@ function getSecureServiceAccountCreds() {
  */
 function getSecureDatabaseId() {
   try {
-    const dbId = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const dbId = PropertiesService.getScriptProperties().getProperty(
+      SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID
+    );
     if (!dbId) {
       throw new Error('データベーススプレッドシートIDが設定されていません。');
     }
     return dbId;
   } catch (e) {
-    console.error("[ERROR]", 'getSecureDatabaseId エラー: ' + e.message);
+    console.error('[ERROR]', 'getSecureDatabaseId エラー: ' + e.message);
     throw new Error('データベーススプレッドシートIDの取得に失敗しました。');
   }
 }
@@ -1370,6 +1375,6 @@ function checkLoginStatus(email) {
 function updateLoginStatus(email, status) {
   const userInfo = findUserByEmail(email);
   if (userInfo) {
-    updateUser(userInfo.userId, { isActive: status ? 'true' : 'false' });
+    updateUser(userInfo.userId, { isActive: status });
   }
 }

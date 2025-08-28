@@ -11,17 +11,11 @@
 /**
  * 現在のアクティブユーザーのメールアドレスを安全に取得
  * @returns {string} ユーザーメールアドレス（取得失敗時は空文字）
+ * @deprecated 統合実装：unifiedUserManager.getCurrentUserEmail() を使用してください
  */
 function getCurrentUserEmail() {
-  try {
-    const email = Session.getActiveUser().getEmail();
-    debugLog('getCurrentUserEmail: Retrieved email:', email); // 追加
-    return email || '';
-  } catch (error) {
-    logError(error, 'getCurrentUserEmail', ERROR_SEVERITY.MEDIUM, ERROR_CATEGORIES.AUTHENTICATION);
-    debugLog('getCurrentUserEmail: Error retrieving email, returning empty string. Error:', error.message); // 追加
-    return '';
-  }
+  // 統合実装にリダイレクト
+  return coreGetCurrentUserEmail();
 }
 
 /**
@@ -29,7 +23,6 @@ function getCurrentUserEmail() {
  * 複数の重複関数を統合
  */
 class UnifiedUserManager {
-
   /**
    * ユーザー情報を統一的に取得
    * getUserInfoCached, getOrFetchUserInfo, findUserById を統合
@@ -38,11 +31,7 @@ class UnifiedUserManager {
    * @returns {object|null} ユーザー情報
    */
   static getUser(identifier, options = {}) {
-    const {
-      forceRefresh = false,
-      useCache = true,
-      authCheck = true
-    } = options;
+    const { forceRefresh = false, useCache = true, authCheck = true } = options;
 
     try {
       // 認証チェック（必要時）
@@ -69,9 +58,8 @@ class UnifiedUserManager {
       }
 
       return userInfo;
-
     } catch (error) {
-      console.error("[ERROR]", '統一ユーザー管理エラー:', error.message);
+      console.error('[ERROR]', '統一ユーザー管理エラー:', error.message);
       return null;
     }
   }
@@ -114,20 +102,20 @@ class UnifiedUserManager {
    * @private
    */
   static _fallbackUserFetch(identifier) {
-    warnLog('統一ユーザー管理: フォールバック実装を使用（強化版）');
-    
+    UUtilities.logger.warn('ユーザー管理', 'フォールバック実装を使用（Phase 7最適化）', identifier);
+
     try {
       // 既存の関数を活用してフォールバック実装を強化
       if (typeof findUserById === 'function') {
-        debugLog('フォールバック: findUserByIdを使用');
+        UUtilities.logger.debug('ユーザー管理', 'findUserByIdを使用');
         return findUserById(identifier);
       }
-      
+
       if (typeof findUserByEmail === 'function') {
-        debugLog('フォールバック: findUserByEmailを使用');
+        UUtilities.logger.debug('ユーザー管理', 'findUserByEmailを使用');
         return findUserByEmail(identifier);
       }
-      
+
       // 最後の手段として実行レベルキャッシュから取得を試行
       if (typeof getUnifiedExecutionCache === 'function') {
         const execCache = getUnifiedExecutionCache();
@@ -137,12 +125,11 @@ class UnifiedUserManager {
           return cachedUser;
         }
       }
-      
+
       warnLog('⚠️ フォールバック: 全ての取得方法が失敗');
       return null;
-      
     } catch (fallbackError) {
-      console.error("[ERROR]", '❌ フォールバック処理でエラー:', fallbackError.message);
+      console.error('[ERROR]', '❌ フォールバック処理でエラー:', fallbackError.message);
       return null;
     }
   }
@@ -167,9 +154,8 @@ class UnifiedUserManager {
 
       // 統一キャッシュマネージャーとの同期
       unifiedCache.syncWithUnifiedCache('userDataChange');
-
     } catch (error) {
-      console.error("[ERROR]", 'ユーザーキャッシュクリアエラー:', error.message);
+      console.error('[ERROR]', 'ユーザーキャッシュクリアエラー:', error.message);
     }
   }
 }
@@ -179,7 +165,6 @@ class UnifiedUserManager {
  * URL関連の重複機能を統合
  */
 class UnifiedURLManager {
-
   /**
    * WebアプリURLを統一的に取得
    * @returns {string}
@@ -189,14 +174,153 @@ class UnifiedURLManager {
   }
 
   /**
-   * ユーザー用URLを生成
+   * ユーザー用URLを生成（統合ファクトリ）
    * @param {string} userId - ユーザーID
    * @param {object} options - URL生成オプション
    * @returns {object} 各種URL
    */
   static generateUserURLs(userId, options = {}) {
-    return generateUserUrlsWithCacheBusting(userId, options);
+    return this.urlFactory.generateUserUrls(userId, options);
   }
+
+  // 後方互換性のためのurlFactoryエイリアス（generatorFactory.urlに統合済み）
+  static urlFactory = {
+    generateUserUrls: (userId, options = {}) => UUtilities.generatorFactory.url.user(userId, options),
+    generateUnpublishedUrl: (userId) => UUtilities.generatorFactory.url.unpublished(userId),
+    buildAdminUrl: (userId) => UUtilities.generatorFactory.url.admin(userId)
+  };
+
+  // 後方互換性のためのformFactoryエイリアス（generatorFactory.formに統合済み）
+  static formFactory = {
+    create: (type, options) => UUtilities.generatorFactory.form.create(type, options),
+    createCustomUI: (requestUserId, config) => UUtilities.generatorFactory.form.customUI(requestUserId, config),
+    createQuickStartUI: (requestUserId) => UUtilities.generatorFactory.form.quickStartUI(requestUserId)
+  };
+
+  // 後方互換性のためのuserFactoryエイリアス（generatorFactory.userに統合済み）
+  static userFactory = {
+    create: (userData) => UUtilities.generatorFactory.user.create(userData),
+    createFolder: (userEmail) => UUtilities.generatorFactory.user.folder(userEmail)
+  };
+
+  /**
+   * 【Phase 6最適化】統合生成ファクトリ - 28個の生成関数を一元管理
+   * すべてのcreate/generate/build関数を統合し、重複を排除
+   */
+  static generatorFactory = {
+    /**
+     * レスポンス生成統合（既存responseFactoryを統合）
+     */
+    response: {
+      success: (data = null, message = null) => createSuccessResponse(data, message),
+      error: (error, message = null, data = null) => createErrorResponse(error, message, data),
+      unified: (success, data = null, message = null, error = null) => createUnifiedResponse(success, data, message, error)
+    },
+
+    /**
+     * HTML生成統合 - HtmlServiceの統一管理
+     */
+    html: {
+      output: (content) => HtmlService.createHtmlOutput(content),
+      template: (fileName) => HtmlService.createTemplateFromFile(fileName),
+      templateWithData: (fileName, data) => {
+        const template = HtmlService.createTemplateFromFile(fileName);
+        Object.keys(data).forEach(key => template[key] = data[key]);
+        return template;
+      },
+      secureRedirect: (targetUrl, message) => createSecureRedirect(targetUrl, message)
+    },
+
+    /**
+     * キー生成統合 - 各種キー生成の統一管理
+     */
+    key: {
+      userScoped: (prefix, userId, suffix) => buildUserScopedKey(prefix, userId, suffix),
+      secure: (prefix, userId, context = '') => buildSecureUserScopedKey(prefix, userId, context),
+      batchCache: (operation, id, params, options = {}) => {
+        if (typeof options.cachePrefix === 'string') {
+          return `${options.cachePrefix}:${operation}:${id}:${JSON.stringify(params)}`;
+        }
+        return `batch:${operation}:${id}:${JSON.stringify(params)}`;
+      },
+      sheetDataCache: (operation, spreadsheetId, params) => `sheetData:${operation}:${spreadsheetId}:${JSON.stringify(params)}`
+    },
+
+    /**
+     * URL生成統合（既存urlFactoryを統合）
+     */
+    url: {
+      user: (userId, options = {}) => {
+        if (options.cacheBusting || options.forceFresh) {
+          return generateUserUrlsWithCacheBusting(userId, options);
+        }
+        return generateUserUrls(userId);
+      },
+      unpublished: (userId) => generateUnpublishedStateUrl(userId),
+      admin: (userId) => buildUserAdminUrl(userId)
+    },
+
+    /**
+     * フォーム生成統合（既存formFactoryを統合）
+     */
+    form: {
+      unified: (type, userEmail, userId, overrides) => createUnifiedForm(type, userEmail, userId, overrides),
+      factory: (options) => createFormFactory(options),
+      customUI: (requestUserId, config) => createCustomFormUI(requestUserId, config),
+      quickStartUI: (requestUserId) => createQuickStartFormUI(requestUserId),
+      forSpreadsheet: (spreadsheetId, sheetName) => createFormForSpreadsheet(spreadsheetId, sheetName),
+      create: (type, options) => {
+        switch (type) {
+          case 'quickstart':
+          case 'custom':
+          case 'study':
+            return createUnifiedForm(type, options.userEmail, options.userId, options.overrides);
+          case 'factory':
+            return createFormFactory(options);
+          default:
+            throw new Error(`未対応のフォームタイプ: ${type}`);
+        }
+      }
+    },
+
+    /**
+     * ユーザー生成統合（既存userFactoryを統合）
+     */
+    user: {
+      create: (userData) => createUser(userData),
+      folder: (userEmail) => createUserFolder(userEmail)
+    },
+
+    /**
+     * サービス関連生成統合
+     */
+    service: {
+      sheetsService: (accessToken) => createSheetsService(accessToken),
+      serviceAccountToken: () => generateNewServiceAccountToken()
+    },
+
+    /**
+     * コンテキスト生成統合
+     */
+    context: {
+      execution: (requestUserId, options = {}) => createExecutionContext(requestUserId, options),
+      response: (context) => buildResponseFromContext(context)
+    },
+
+    /**
+     * ボード生成統合
+     */
+    board: {
+      fromAdmin: (requestUserId) => createBoardFromAdmin(requestUserId)
+    }
+  };
+
+  // 後方互換性のためのresponseFactoryエイリアス（generatorFactory.responseに統合済み）
+  static responseFactory = {
+    success: (data = null, message = null) => UUtilities.generatorFactory.response.success(data, message),
+    error: (error, message = null, data = null) => UUtilities.generatorFactory.response.error(error, message, data),
+    unified: (success, data = null, message = null, error = null) => UUtilities.generatorFactory.response.unified(success, data, message, error)
+  };
 
   /**
    * URL検証・サニタイズ
@@ -210,24 +334,109 @@ class UnifiedURLManager {
 
     try {
       let sanitized = String(url).trim();
-      if ((sanitized.startsWith('"') && sanitized.endsWith('"')) ||
-          (sanitized.startsWith("'") && sanitized.endsWith("'"))) {
+      if (
+        (sanitized.startsWith('"') && sanitized.endsWith('"')) ||
+        (sanitized.startsWith("'") && sanitized.endsWith("'"))
+      ) {
         sanitized = sanitized.slice(1, -1);
       }
       sanitized = sanitized.replace(/\\"/g, '"').replace(/\\'/g, "'");
 
       if (sanitized.includes('javascript:') || sanitized.includes('data:')) {
-        warnLog('統一URL管理: 危険なURLスキームを検出');
+        UUtilities.logger.warn('URL検証', '危険なURLスキームを検出', sanitized);
         return '';
       }
 
       return sanitized;
-
     } catch (error) {
-      console.error("[ERROR]", 'URL検証エラー:', error.message);
+      UUtilities.logger.error('URL検証', 'URL検証エラー', error.message);
       return '';
     }
   }
+  /**
+   * 【Phase 7最適化】統合ログ管理
+   * 冗長なログ出力パターン（258箇所）を統一
+   */
+  static logger = {
+    error: (context, message, details = null) => {
+      const logMessage = `[ERROR] ${context}: ${message}`;
+      if (details) {
+        console.error(logMessage, details);
+      } else {
+        console.error(logMessage);
+      }
+    },
+    warn: (context, message, details = null) => {
+      const logMessage = `[WARN] ${context}: ${message}`;
+      if (details) {
+        console.warn(logMessage, details);
+      } else {
+        console.warn(logMessage);
+      }
+    },
+    info: (context, message, details = null) => {
+      const logMessage = `[INFO] ${context}: ${message}`;
+      if (details) {
+        console.log(logMessage, details);
+      } else {
+        console.log(logMessage);
+      }
+    },
+    debug: (context, message, details = null) => {
+      const logMessage = `[DEBUG] ${context}: ${message}`;
+      if (details) {
+        console.log(logMessage, details);
+      } else {
+        console.log(logMessage);
+      }
+    }
+  };
+
+  /**
+   * 【Phase 7最適化】統合エラーハンドリングヘルパー
+   * try-catchパターンの冗長性を削減
+   */
+  static safeExecute = {
+    /**
+     * 安全な関数実行（エラー時はレスポンス返却）
+     */
+    withResponse: (fn, context, errorMessage = '処理中にエラーが発生しました') => {
+      try {
+        const result = fn();
+        return result;
+      } catch (error) {
+        UUtilities.logger.error(context, errorMessage, error.message);
+        return UUtilities.generatorFactory.response.error(error.message, errorMessage);
+      }
+    },
+    
+    /**
+     * 安全な非同期関数実行
+     */
+    async: async (fn, context, errorMessage = '非同期処理中にエラーが発生しました') => {
+      try {
+        const result = await fn();
+        return result;
+      } catch (error) {
+        UUtilities.logger.error(context, errorMessage, error.message);
+        throw error;
+      }
+    },
+
+    /**
+     * 安全なサービス初期化
+     */
+    service: (fn, serviceName) => {
+      try {
+        const service = fn();
+        UUtilities.logger.debug('Service', `${serviceName}初期化成功`);
+        return service;
+      } catch (error) {
+        UUtilities.logger.error('Service', `${serviceName}初期化失敗`, error.message);
+        throw error;
+      }
+    }
+  };
 }
 
 /**
@@ -235,7 +444,6 @@ class UnifiedURLManager {
  * UrlFetchAppの重複パターンを統合
  */
 class UnifiedAPIClient {
-
   /**
    * 統一API呼び出し
    * @param {string} url - API URL
@@ -249,7 +457,7 @@ class UnifiedAPIClient {
       payload = null,
       timeout = 30000,
       retries = 2,
-      authToken = null
+      authToken = null,
     } = options;
 
     // 認証ヘッダー追加
@@ -260,7 +468,7 @@ class UnifiedAPIClient {
     const requestConfig = {
       method: method,
       headers: headers,
-      muteHttpExceptions: true
+      muteHttpExceptions: true,
     };
 
     if (payload) {
@@ -275,12 +483,12 @@ class UnifiedAPIClient {
         debugLog(`🌐 統一API: ${method} ${url} (試行 ${attempt + 1}/${retries + 1})`);
 
         const response = resilientUrlFetch(url, requestConfig);
-        
+
         // レスポンスオブジェクトの検証
         if (!response || typeof response.getResponseCode !== 'function') {
           throw new Error('無効なレスポンスオブジェクトが返されました');
         }
-        
+
         const statusCode = response.getResponseCode();
 
         // 成功時
@@ -290,7 +498,7 @@ class UnifiedAPIClient {
             success: true,
             status: statusCode,
             data: response.getContentText(),
-            response: response
+            response: response,
           };
         }
 
@@ -301,13 +509,12 @@ class UnifiedAPIClient {
             success: false,
             status: statusCode,
             error: response.getContentText(),
-            response: response
+            response: response,
           };
         }
 
         // 5xxエラーはリトライ
         lastError = new Error(`サーバーエラー: ${statusCode}`);
-
       } catch (error) {
         lastError = error;
         warnLog(`⚠️ 統一API例外 (試行 ${attempt + 1}): ${error.message}`);
@@ -320,11 +527,11 @@ class UnifiedAPIClient {
     }
 
     // 全試行失敗
-    console.error("[ERROR]", '❌ 統一API全試行失敗:', lastError.message);
+    console.error('[ERROR]', '❌ 統一API全試行失敗:', lastError.message);
     return {
       success: false,
       status: 0,
-      error: lastError.message
+      error: lastError.message,
     };
   }
 
@@ -339,9 +546,9 @@ class UnifiedAPIClient {
     const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
 
     const endpoints = {
-      'get': `${baseUrl}`,
-      'batchUpdate': `${baseUrl}:batchUpdate`,
-      'values': `${baseUrl}/values/${data.range || 'A1'}`
+      get: `${baseUrl}`,
+      batchUpdate: `${baseUrl}:batchUpdate`,
+      values: `${baseUrl}/values/${data.range || 'A1'}`,
     };
 
     const url = endpoints[operation];
@@ -353,8 +560,8 @@ class UnifiedAPIClient {
       method: operation === 'get' ? 'GET' : 'POST',
       authToken: token,
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     };
 
     if (data && Object.keys(data).length > 0) {
@@ -370,7 +577,6 @@ class UnifiedAPIClient {
  * 各種検証関数を統合
  */
 class UnifiedValidation {
-
   /**
    * 統一バリデーション関数
    * @param {any} data - 検証対象データ
@@ -397,15 +603,14 @@ class UnifiedValidation {
       return {
         isValid: errors.length === 0,
         errors: errors,
-        warnings: warnings
+        warnings: warnings,
       };
-
     } catch (error) {
-      console.error("[ERROR]", '統一バリデーションエラー:', error.message);
+      console.error('[ERROR]', '統一バリデーションエラー:', error.message);
       return {
         isValid: false,
         errors: [`バリデーション処理エラー: ${error.message}`],
-        warnings: []
+        warnings: [],
       };
     }
   }
@@ -457,10 +662,10 @@ class UnifiedValidation {
       email: {
         required: true,
         type: 'string',
-        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       },
       spreadsheetId: { type: 'string' },
-      configJson: { type: 'string' }
+      configJson: { type: 'string' },
     };
 
     return this.validate(userInfo, rules);
@@ -475,12 +680,12 @@ class UnifiedValidation {
     const rules = {
       setupStatus: {
         required: true,
-        type: 'string'
+        type: 'string',
       },
       formCreated: { required: true, type: 'boolean' },
       appPublished: { required: true, type: 'boolean' },
       publishedSheetName: { type: 'string' },
-      publishedSpreadsheetId: { type: 'string' }
+      publishedSpreadsheetId: { type: 'string' },
     };
 
     return this.validate(config, rules);
@@ -489,27 +694,8 @@ class UnifiedValidation {
 
 // 後方互換性のためのラッパー関数群
 
-/**
- * @deprecated 削除予定。database.gsのfindUserById()を使用してください。
- * 既存のgetUserInfoCached関数のラッパー
- * @deprecated UnifiedUserManager.getUser を使用してください
- */
-function getUserInfoCachedUnified(requestUserId) {
-  return findUserById(requestUserId);
-}
+// 削除済み: getUserInfoCachedUnified()
+// 直接 database.gs の findUserById() を使用してください
 
-/**
- * 既存のgetWebAppUrl関数のラッパー
- * @deprecated UnifiedURLManager.getWebAppURL を使用してください
- */
-function getWebAppUrlUnified() {
-  return UnifiedURLManager.getWebAppURL({ useCache: true });
-}
-
-/**
- * 既存のclearExecutionUserInfoCache関数のラッパー
- * @deprecated UnifiedUserManager.clearUserCache を使用してください
- */
-function clearExecutionUserInfoCacheUnified() {
-  return UnifiedUserManager.clearUserCache();
-}
+// 後方互換性ラッパー関数は削除済み
+// 直接 UnifiedURLManager.getWebAppURL() および UnifiedUserManager.clearUserCache() を使用してください

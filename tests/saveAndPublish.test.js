@@ -11,8 +11,8 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
       console,
       debugLog: () => {},
       errorLog: jest.fn(), // Add errorLog mock
-      infoLog: jest.fn(),  // Add infoLog mock
-      warnLog: jest.fn(),  // Add warnLog mock
+      infoLog: jest.fn(), // Add infoLog mock
+      warnLog: jest.fn(), // Add warnLog mock
       LockService: {
         getScriptLock: () => ({
           waitLock: jest.fn(),
@@ -68,11 +68,13 @@ describe('saveAndPublish with mocked getCachedUserInfo', () => {
     context.createExecutionContext = jest.fn((uid) => {
       const userInfo = context.getCachedUserInfo(uid);
       if (!userInfo) throw new Error('ユーザー情報が取得できません');
-      return { requestUserId: uid, userInfo, stats: { sheetsServiceCreations: 0, dbQueries: 0, operationsCount: 0 } };
+      return {
+        requestUserId: uid,
+        userInfo,
+        stats: { sheetsServiceCreations: 0, dbQueries: 0, operationsCount: 0 },
+      };
     });
 
-    expect(() => context.saveAndPublish('U', 'Sheet1', {})).toThrow(
-      'ユーザー情報が取得できません',
-    );
+    expect(() => context.saveAndPublish('U', 'Sheet1', {})).toThrow('ユーザー情報が取得できません');
   });
 });

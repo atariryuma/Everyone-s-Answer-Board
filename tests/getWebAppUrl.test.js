@@ -12,11 +12,15 @@ describe('getWebAppUrl', () => {
           Deployments: {
             list: () => ({
               deployments: [
-                { deploymentConfig: { webApp: { url: 'https://script.google.com/macros/s/ID/exec' } } }
-              ]
-            })
-          }
-        }
+                {
+                  deploymentConfig: {
+                    webApp: { url: 'https://script.google.com/macros/s/ID/exec' },
+                  },
+                },
+              ],
+            }),
+          },
+        },
       },
       console: { log: () => {}, error: () => {}, warn: () => {} },
       debugLog: () => {},
@@ -26,9 +30,9 @@ describe('getWebAppUrl', () => {
       CacheService: {
         getScriptCache: () => ({
           get: () => null,
-          put: () => {}
-        })
-      }
+          put: () => {},
+        }),
+      },
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);
@@ -39,14 +43,16 @@ describe('getWebAppUrl', () => {
     const context = {
       ScriptApp: {
         getScriptId: () => 'ID',
-        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' })
+        getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
       },
       AppsScript: {
         Script: {
           Deployments: {
-            list: () => { throw new Error('API disabled'); }
-          }
-        }
+            list: () => {
+              throw new Error('API disabled');
+            },
+          },
+        },
       },
       console: { log: () => {}, error: () => {}, warn: () => {} },
       debugLog: () => {},
@@ -56,9 +62,9 @@ describe('getWebAppUrl', () => {
       CacheService: {
         getScriptCache: () => ({
           get: () => null,
-          put: () => {}
-        })
-      }
+          put: () => {},
+        }),
+      },
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);

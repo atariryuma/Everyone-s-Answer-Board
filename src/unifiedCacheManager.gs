@@ -23,7 +23,7 @@ class CacheManager {
       misses: 0,
       errors: 0,
       totalOps: 0,
-      lastReset: Date.now()
+      lastReset: Date.now(),
     };
   }
 
@@ -35,10 +35,10 @@ class CacheManager {
    * @returns {*} キャッシュされた値
    */
   get(key, valueFn, options = {}) {
-    const { 
-      ttl = this.defaultTTL, 
-      enableMemoization = false, 
-      usePropertiesFallback = false 
+    const {
+      ttl = this.defaultTTL,
+      enableMemoization = false,
+      usePropertiesFallback = false,
     } = options;
 
     // パフォーマンス監視とバリデーション
@@ -49,14 +49,19 @@ class CacheManager {
     }
 
     // 階層化キャッシュアクセス（最適化）
-    const cacheResult = this.getFromCacheHierarchy(key, enableMemoization, ttl, usePropertiesFallback);
+    const cacheResult = this.getFromCacheHierarchy(
+      key,
+      enableMemoization,
+      ttl,
+      usePropertiesFallback
+    );
     if (cacheResult.found) {
       this.stats.hits++;
       return cacheResult.value;
     }
 
     // キャッシュミス: 新しい値を生成
-    debugLog(`[Cache] Miss for key: ${key}. Generating new value.`);
+    ULog.debug(`[Cache] Miss for key: ${key}. Generating new value.`);
     this.stats.misses++;
 
     let newValue;
@@ -64,7 +69,7 @@ class CacheManager {
     try {
       newValue = valueFn();
     } catch (e) {
-      console.error("[ERROR]", `[Cache] Value generation failed for key: ${key}`, e.message);
+      console.error('[ERROR]', `[Cache] Value generation failed for key: ${key}`, e.message);
       this.stats.errors++;
       throw e;
     }
@@ -77,15 +82,17 @@ class CacheManager {
         this.memoCache.set(key, { value: newValue, createdAt: Date.now(), ttl });
       }
     } catch (e) {
-      console.error("[ERROR]", `[Cache] Failed to cache value for key: ${key}`, e.message);
+      console.error('[ERROR]', `[Cache] Failed to cache value for key: ${key}`, e.message);
       this.stats.errors++;
       // キャッシュ保存に失敗しても値は返す
     }
 
     // パフォーマンス監視ログ（低頻度）
     if (this.stats.totalOps % 100 === 0) {
-      const hitRate = (this.stats.hits / this.stats.totalOps * 100).toFixed(1);
-      debugLog(`[Cache] Performance: ${hitRate}% hit rate (${this.stats.hits}/${this.stats.totalOps}), ${this.stats.errors} errors`);
+      const hitRate = ((this.stats.hits / this.stats.totalOps) * 100).toFixed(1);
+      ULog.debug(
+        `[Cache] Performance: ${hitRate}% hit rate (${this.stats.hits}/${this.stats.totalOps}), ${this.stats.errors} errors`
+      );
     }
 
     return newValue;
@@ -102,11 +109,11 @@ class CacheManager {
    */
   validateKey(key) {
     if (!key || typeof key !== 'string') {
-      console.error("[ERROR]", `[Cache] Invalid key: ${key}`);
+      console.error('[ERROR]', `[Cache] Invalid key: ${key}`);
       return false;
     }
     if (key.length > 100) {
-      warnLog(`[Cache] Key too long: ${key}`);
+      ULog.warn(`[Cache] Key too long: ${key}`);
       return false;
     }
     return true;
@@ -125,14 +132,14 @@ class CacheManager {
     if (enableMemoization && this.memoCache.has(key)) {
       try {
         const memoEntry = this.memoCache.get(key);
-        if (!memoEntry.ttl || (memoEntry.createdAt + memoEntry.ttl * 1000 > Date.now())) {
-          debugLog(`[Cache] L1(Memo) hit: ${key}`);
+        if (!memoEntry.ttl || memoEntry.createdAt + memoEntry.ttl * 1000 > Date.now()) {
+          ULog.debug(`[Cache] L1(Memo) hit: ${key}`);
           return { found: true, value: memoEntry.value };
         } else {
           this.memoCache.delete(key); // 期限切れを削除
         }
       } catch (e) {
-        warnLog(`[Cache] L1(Memo) error: ${key}`, e.message);
+        ULog.warn(`[Cache] L1(Memo) error: ${key}`, e.message);
         this.memoCache.delete(key);
       }
     }
@@ -141,7 +148,7 @@ class CacheManager {
     try {
       const cachedValue = this.scriptCache.get(key);
       if (cachedValue !== null) {
-        debugLog(`[Cache] L2(Script) hit: ${key}`);
+        ULog.debug(`[Cache] L2(Script) hit: ${key}`);
         const parsedValue = this.parseScriptCacheValue(key, cachedValue);
 
         // メモ化キャッシュに昇格
@@ -152,7 +159,7 @@ class CacheManager {
         return { found: true, value: parsedValue };
       }
     } catch (e) {
-      warnLog(`[Cache] L2(Script) error: ${key}`, e.message);
+      ULog.warn(`[Cache] L2(Script) error: ${key}`, e.message);
       this.stats.errors++;
       this.handleCorruptedCacheEntry(key);
     }
@@ -162,16 +169,16 @@ class CacheManager {
       try {
         const propsValue = PropertiesService.getScriptProperties().getProperty(key);
         if (propsValue !== null) {
-          debugLog(`[Cache] L3(Properties) hit: ${key}`);
+          ULog.debug(`[Cache] L3(Properties) hit: ${key}`);
           const parsedValue = this.parsePropertiesValue(propsValue);
-          
+
           // 上位キャッシュに昇格（長期TTL設定）
           this.setToCacheHierarchy(key, parsedValue, Math.max(ttl, 3600), enableMemoization);
-          
+
           return { found: true, value: parsedValue };
         }
       } catch (e) {
-        warnLog(`[Cache] L3(Properties) error: ${key}`, e.message);
+        ULog.warn(`[Cache] L3(Properties) error: ${key}`, e.message);
         this.stats.errors++;
       }
     }
@@ -195,7 +202,7 @@ class CacheManager {
     try {
       return JSON.parse(cachedValue);
     } catch (e) {
-      warnLog(`[Cache] Parse failed for ${key}, returning raw string`);
+      ULog.warn(`[Cache] Parse failed for ${key}, returning raw string`);
       return cachedValue;
     }
   }
@@ -208,9 +215,9 @@ class CacheManager {
     try {
       this.scriptCache.remove(key);
       this.memoCache.delete(key);
-      debugLog(`[Cache] Cleaned corrupted entry: ${key}`);
+      ULog.debug(`[Cache] Cleaned corrupted entry: ${key}`);
     } catch (removeError) {
-      warnLog(`[Cache] Failed to clean corrupted entry: ${key}`, removeError.message);
+      ULog.warn(`[Cache] Failed to clean corrupted entry: ${key}`, removeError.message);
     }
   }
 
@@ -223,27 +230,27 @@ class CacheManager {
    */
   async batchGet(keys, valuesFn, options = {}) {
     const { ttl = this.defaultTTL } = options;
-    
+
     try {
       // 統一バッチ処理システムでの処理を試行
       if (typeof unifiedBatchProcessor !== 'undefined') {
         const currentUserId = Session.getActiveUser().getEmail();
-        const cacheOperations = keys.map(key => ({ key: key }));
-        
+        const cacheOperations = keys.map((key) => ({ key: key }));
+
         const cachedResults = unifiedBatchProcessor.batchCacheOperation(
-          'get', 
-          cacheOperations, 
+          'get',
+          cacheOperations,
           currentUserId,
           { concurrency: 5 }
         );
-        
+
         const results = {};
         const missingKeys = [];
-        
+
         for (let i = 0; i < keys.length; i++) {
           const key = keys[i];
           const cached = cachedResults[i];
-          
+
           if (cached && !cached.error && cached !== null) {
             try {
               results[key] = JSON.parse(cached);
@@ -254,30 +261,32 @@ class CacheManager {
             missingKeys.push(key);
           }
         }
-        
+
         if (missingKeys.length > 0) {
           const newValues = Promise.resolve(valuesFn(missingKeys));
-          const setCacheOps = Object.keys(newValues).map(key => ({
+          const setCacheOps = Object.keys(newValues).map((key) => ({
             key: key,
             value: JSON.stringify(newValues[key]),
-            ttl: ttl
+            ttl: ttl,
           }));
-          
+
           for (let key in newValues) {
             results[key] = newValues[key];
           }
-          
+
           if (setCacheOps.length > 0) {
-            unifiedBatchProcessor.batchCacheOperation('set', setCacheOps, currentUserId, { concurrency: 5 });
+            unifiedBatchProcessor.batchCacheOperation('set', setCacheOps, currentUserId, {
+              concurrency: 5,
+            });
           }
         }
-        
+
         return results;
       }
     } catch (error) {
-      warnLog('[Cache] 統一バッチ処理エラー:', error.message);
+      ULog.warn('[Cache] 統一バッチ処理エラー:', error.message);
     }
-    
+
     // フォールバック: 従来実装
     const results = {};
     let missingKeys = [];
@@ -287,9 +296,9 @@ class CacheManager {
       for (let key in cachedValues) {
         results[key] = JSON.parse(cachedValues[key]);
       }
-      missingKeys = keys.filter(k => !results.hasOwnProperty(k));
+      missingKeys = keys.filter((k) => !results.hasOwnProperty(k));
     } catch (e) {
-      warnLog('[Cache] batchGet failed', e.message);
+      ULog.warn('[Cache] batchGet failed', e.message);
       missingKeys = keys;
     }
 
@@ -312,23 +321,23 @@ class CacheManager {
    */
   remove(key) {
     if (!key || typeof key !== 'string') {
-      warnLog(`[Cache] Invalid key for removal: ${key}`);
+      ULog.warn(`[Cache] Invalid key for removal: ${key}`);
       return;
     }
 
     try {
       this.scriptCache.remove(key);
     } catch (e) {
-      warnLog(`[Cache] Failed to remove scriptCache for key: ${key}`, e.message);
+      ULog.warn(`[Cache] Failed to remove scriptCache for key: ${key}`, e.message);
     }
 
     try {
       this.memoCache.delete(key);
     } catch (e) {
-      warnLog(`[Cache] Failed to remove memoCache for key: ${key}`, e.message);
+      ULog.warn(`[Cache] Failed to remove memoCache for key: ${key}`, e.message);
     }
 
-    debugLog(`[Cache] Removed cache for key: ${key}`);
+    ULog.debug(`[Cache] Removed cache for key: ${key}`);
   }
 
   /**
@@ -342,7 +351,7 @@ class CacheManager {
       const patterns = [
         `batchGet_${spreadsheetId}_`,
         `sheet_data_${spreadsheetId}_`,
-        `published_data_${spreadsheetId}_`
+        `published_data_${spreadsheetId}_`,
       ];
 
       if (sheetName) {
@@ -369,10 +378,12 @@ class CacheManager {
         }
       }
 
-      debugLog(`[Cache] Invalidated sheet data cache for ${spreadsheetId}, removed ${removedCount} entries`);
+      ULog.debug(
+        `[Cache] Invalidated sheet data cache for ${spreadsheetId}, removed ${removedCount} entries`
+      );
       return removedCount;
     } catch (e) {
-      warnLog(`[Cache] Failed to invalidate sheet data cache: ${e.message}`);
+      ULog.warn(`[Cache] Failed to invalidate sheet data cache: ${e.message}`);
       this.stats.errors++;
       return 0;
     }
@@ -387,13 +398,15 @@ class CacheManager {
     const { strict = false, maxKeys = 1000 } = options;
 
     if (!pattern || typeof pattern !== 'string') {
-      warnLog(`[Cache] Invalid pattern for clearByPattern: ${pattern}`);
+      ULog.warn(`[Cache] Invalid pattern for clearByPattern: ${pattern}`);
       return 0;
     }
 
     // セキュリティチェック: 過度に広範囲な削除を防ぐ
     if (!strict && (pattern.length < 3 || pattern === '*' || pattern === '.*')) {
-      warnLog(`[Cache] Pattern too broad for safe removal: ${pattern}. Use strict=true to override.`);
+      ULog.warn(
+        `[Cache] Pattern too broad for safe removal: ${pattern}. Use strict=true to override.`
+      );
       return 0;
     }
 
@@ -415,27 +428,29 @@ class CacheManager {
 
           // 大量削除の防止
           if (keysToRemove.length >= maxKeys) {
-            warnLog(`[Cache] Reached maxKeys limit (${maxKeys}) for pattern: ${pattern}`);
+            ULog.warn(`[Cache] Reached maxKeys limit (${maxKeys}) for pattern: ${pattern}`);
             break;
           }
         }
       }
     } catch (e) {
-      warnLog(`[Cache] Failed to iterate memoCache keys for pattern: ${pattern}`, e.message);
+      ULog.warn(`[Cache] Failed to iterate memoCache keys for pattern: ${pattern}`, e.message);
       this.stats.errors++;
     }
 
     // 削除前の確認ログ
     if (keysToRemove.length > 100) {
-      warnLog(`[Cache] Large pattern deletion detected: ${keysToRemove.length} keys for pattern: ${pattern}`);
+      ULog.warn(
+        `[Cache] Large pattern deletion detected: ${keysToRemove.length} keys for pattern: ${pattern}`
+      );
     }
 
-    keysToRemove.forEach(key => {
+    keysToRemove.forEach((key) => {
       try {
         this.memoCache.delete(key);
         this.scriptCache.remove(key);
       } catch (e) {
-        warnLog(`[Cache] Failed to remove key during pattern clear: ${key}`, e.message);
+        ULog.warn(`[Cache] Failed to remove key during pattern clear: ${key}`, e.message);
         failedRemovals++;
         this.stats.errors++;
       }
@@ -443,7 +458,9 @@ class CacheManager {
 
     const successCount = keysToRemove.length - failedRemovals;
 
-    debugLog(`[Cache] Pattern clear completed: ${successCount} removed, ${failedRemovals} failed, ${skippedCount} protected (pattern: ${pattern})`);
+    ULog.debug(
+      `[Cache] Pattern clear completed: ${successCount} removed, ${failedRemovals} failed, ${skippedCount} protected (pattern: ${pattern})`
+    );
 
     return successCount;
   }
@@ -454,13 +471,13 @@ class CacheManager {
    */
   _isProtectedKey(key) {
     const protectedPatterns = [
-      'SA_TOKEN_CACHE',           // サービスアカウントトークン
-      'WEB_APP_URL',             // WebアプリURL
-      'SYSTEM_CONFIG',           // システム設定
-      'DOMAIN_INFO'              // ドメイン情報
+      'SA_TOKEN_CACHE', // サービスアカウントトークン
+      'WEB_APP_URL', // WebアプリURL
+      'SYSTEM_CONFIG', // システム設定
+      'DOMAIN_INFO', // ドメイン情報
     ];
 
-    return protectedPatterns.some(pattern => key.includes(pattern));
+    return protectedPatterns.some((pattern) => key.includes(pattern));
   }
 
   /**
@@ -478,7 +495,7 @@ class CacheManager {
       totalRemoved: 0,
       errors: [],
       patterns: [],
-      startTime: Date.now()
+      startTime: Date.now(),
     };
 
     try {
@@ -489,23 +506,25 @@ class CacheManager {
 
       // 関連IDの数制限
       if (relatedIds.length > maxRelated) {
-        warnLog(`[Cache] Too many related IDs (${relatedIds.length}), limiting to ${maxRelated}`);
+        ULog.warn(`[Cache] Too many related IDs (${relatedIds.length}), limiting to ${maxRelated}`);
         relatedIds = relatedIds.slice(0, maxRelated);
       }
 
-      debugLog(`🔗 関連キャッシュ無効化開始: ${entityType}/${entityId} (${dryRun ? 'DRY RUN' : 'LIVE'})`);
+      ULog.debug(
+        `🔗 関連キャッシュ無効化開始: ${entityType}/${entityId} (${dryRun ? 'DRY RUN' : 'LIVE'})`
+      );
 
       // 1. メインエンティティのキャッシュ無効化
       const patterns = this._getInvalidationPatterns(entityType, entityId);
       invalidationLog.patterns.push(...patterns);
 
-      patterns.forEach(pattern => {
+      patterns.forEach((pattern) => {
         try {
           if (!dryRun) {
             const removed = this.clearByPattern(pattern, { strict: false, maxKeys: 100 });
             invalidationLog.totalRemoved += removed;
           } else {
-            debugLog(`[Cache] DRY RUN: Would clear pattern: ${pattern}`);
+            ULog.debug(`[Cache] DRY RUN: Would clear pattern: ${pattern}`);
           }
         } catch (error) {
           invalidationLog.errors.push(`Pattern ${pattern}: ${error.message}`);
@@ -513,19 +532,19 @@ class CacheManager {
       });
 
       // 2. 関連エンティティのキャッシュ無効化（検証付き）
-      relatedIds.forEach(relatedId => {
+      relatedIds.forEach((relatedId) => {
         if (!relatedId || relatedId === entityId) {
           return; // 無効な関連IDまたは自分自身はスキップ
         }
 
         try {
           const relatedPatterns = this._getInvalidationPatterns(entityType, relatedId);
-          relatedPatterns.forEach(pattern => {
+          relatedPatterns.forEach((pattern) => {
             if (!dryRun) {
               const removed = this.clearByPattern(pattern, { strict: false, maxKeys: 50 });
               invalidationLog.totalRemoved += removed;
             } else {
-              debugLog(`[Cache] DRY RUN: Would clear related pattern: ${pattern}`);
+              ULog.debug(`[Cache] DRY RUN: Would clear related pattern: ${pattern}`);
             }
           });
         } catch (error) {
@@ -541,17 +560,25 @@ class CacheManager {
       invalidationLog.duration = Date.now() - invalidationLog.startTime;
 
       if (invalidationLog.errors.length > 0) {
-        warnLog(`⚠️ 関連キャッシュ無効化で一部エラー: ${entityType}/${entityId}`, invalidationLog.errors);
+        ULog.warn(
+          `⚠️ 関連キャッシュ無効化で一部エラー: ${entityType}/${entityId}`,
+          invalidationLog.errors
+        );
       } else {
-        debugLog(`✅ 関連キャッシュ無効化完了: ${entityType}/${entityId} (${invalidationLog.totalRemoved} entries, ${invalidationLog.duration}ms)`);
+        ULog.debug(
+          `✅ 関連キャッシュ無効化完了: ${entityType}/${entityId} (${invalidationLog.totalRemoved} entries, ${invalidationLog.duration}ms)`
+        );
       }
 
       return invalidationLog;
-
     } catch (error) {
       invalidationLog.errors.push(`Fatal: ${error.message}`);
       invalidationLog.duration = Date.now() - invalidationLog.startTime;
-      console.error("[ERROR]", `❌ 関連キャッシュ無効化致命的エラー: ${entityType}/${entityId}`, error);
+      console.error(
+        '[ERROR]',
+        `❌ 関連キャッシュ無効化致命的エラー: ${entityType}/${entityId}`,
+        error
+      );
       this.stats.errors++;
       return invalidationLog;
     }
@@ -585,11 +612,7 @@ class CacheManager {
         break;
 
       case 'form':
-        patterns.push(
-          `form_${entityId}*`,
-          `formUrl_${entityId}*`,
-          `formResponse_${entityId}*`
-        );
+        patterns.push(`form_${entityId}*`, `formUrl_${entityId}*`, `formResponse_${entityId}*`);
         break;
 
       default:
@@ -607,12 +630,16 @@ class CacheManager {
     try {
       // ユーザー変更時は関連するスプレッドシート・フォームキャッシュも無効化
       if (entityType === 'user' && relatedIds.length > 0) {
-        relatedIds.forEach(relatedId => {
+        relatedIds.forEach((relatedId) => {
           if (relatedId && typeof relatedId === 'string' && relatedId.length > 0) {
             try {
-              const removed1 = this.clearByPattern(`user_${entityId}_spreadsheet_${relatedId}`, { maxKeys: 20 });
-              const removed2 = this.clearByPattern(`user_${entityId}_form_${relatedId}`, { maxKeys: 20 });
-              invalidationLog.totalRemoved += (removed1 + removed2);
+              const removed1 = this.clearByPattern(`user_${entityId}_spreadsheet_${relatedId}`, {
+                maxKeys: 20,
+              });
+              const removed2 = this.clearByPattern(`user_${entityId}_form_${relatedId}`, {
+                maxKeys: 20,
+              });
+              invalidationLog.totalRemoved += removed1 + removed2;
             } catch (error) {
               invalidationLog.errors.push(`Cross-entity user-${relatedId}: ${error.message}`);
             }
@@ -622,12 +649,14 @@ class CacheManager {
 
       // スプレッドシート変更時は関連するユーザーキャッシュも無効化
       if (entityType === 'spreadsheet' && relatedIds.length > 0) {
-        relatedIds.forEach(userId => {
+        relatedIds.forEach((userId) => {
           if (userId && typeof userId === 'string' && userId.length > 0) {
             try {
-              const removed1 = this.clearByPattern(`user_${userId}_spreadsheet_${entityId}`, { maxKeys: 20 });
+              const removed1 = this.clearByPattern(`user_${userId}_spreadsheet_${entityId}`, {
+                maxKeys: 20,
+              });
               const removed2 = this.clearByPattern(`config_${userId}`, { maxKeys: 10 }); // ユーザー設定も無効化
-              invalidationLog.totalRemoved += (removed1 + removed2);
+              invalidationLog.totalRemoved += removed1 + removed2;
             } catch (error) {
               invalidationLog.errors.push(`Cross-entity spreadsheet-${userId}: ${error.message}`);
             }
@@ -637,10 +666,12 @@ class CacheManager {
 
       // フォーム変更時の追加ロジック
       if (entityType === 'form' && relatedIds.length > 0) {
-        relatedIds.forEach(userId => {
+        relatedIds.forEach((userId) => {
           if (userId && typeof userId === 'string' && userId.length > 0) {
             try {
-              const removed = this.clearByPattern(`user_${userId}_form_${entityId}`, { maxKeys: 10 });
+              const removed = this.clearByPattern(`user_${userId}_form_${entityId}`, {
+                maxKeys: 10,
+              });
               invalidationLog.totalRemoved += removed;
             } catch (error) {
               invalidationLog.errors.push(`Cross-entity form-${userId}: ${error.message}`);
@@ -648,10 +679,9 @@ class CacheManager {
           }
         });
       }
-
     } catch (error) {
       invalidationLog.errors.push(`Cross-entity fatal: ${error.message}`);
-      warnLog('クロスエンティティキャッシュ無効化エラー:', error.message);
+      ULog.warn('クロスエンティティキャッシュ無効化エラー:', error.message);
       this.stats.errors++;
     }
   }
@@ -662,7 +692,7 @@ class CacheManager {
    */
   clearExpired() {
     this.memoCache.clear();
-    debugLog('[Cache] Cleared memoization cache.');
+    ULog.debug('[Cache] Cleared memoization cache.');
   }
 
   /**
@@ -677,33 +707,35 @@ class CacheManager {
       // メモ化キャッシュをクリア
       this.memoCache.clear();
       memoCacheCleared = true;
-      debugLog('[Cache] Cleared memoization cache.');
+      ULog.debug('[Cache] Cleared memoization cache.');
     } catch (e) {
-      warnLog('[Cache] Failed to clear memoization cache:', e.message);
+      ULog.warn('[Cache] Failed to clear memoization cache:', e.message);
     }
 
     try {
       // スクリプトキャッシュを完全にクリア
       this.scriptCache.removeAll();
       scriptCacheCleared = true;
-      debugLog('[Cache] Cleared script cache.');
+      ULog.debug('[Cache] Cleared script cache.');
     } catch (e) {
-      warnLog('[Cache] Failed to clear script cache:', e.message);
+      ULog.warn('[Cache] Failed to clear script cache:', e.message);
     }
 
     // 統計をリセット
     try {
       this.resetStats();
     } catch (e) {
-      warnLog('[Cache] Failed to reset stats:', e.message);
+      ULog.warn('[Cache] Failed to reset stats:', e.message);
     }
 
-    debugLog(`[Cache] clearAll() completed - MemoCache: ${memoCacheCleared ? 'OK' : 'FAILED'}, ScriptCache: ${scriptCacheCleared ? 'OK' : 'FAILED'}`);
+    ULog.debug(
+      `[Cache] clearAll() completed - MemoCache: ${memoCacheCleared ? 'OK' : 'FAILED'}, ScriptCache: ${scriptCacheCleared ? 'OK' : 'FAILED'}`
+    );
 
     return {
       memoCacheCleared,
       scriptCacheCleared,
-      success: memoCacheCleared && scriptCacheCleared
+      success: memoCacheCleared && scriptCacheCleared,
     };
   }
 
@@ -713,8 +745,10 @@ class CacheManager {
    */
   getHealth() {
     const uptime = Date.now() - this.stats.lastReset;
-    const hitRate = this.stats.totalOps > 0 ? (this.stats.hits / this.stats.totalOps * 100).toFixed(1) : 0;
-    const errorRate = this.stats.totalOps > 0 ? (this.stats.errors / this.stats.totalOps * 100).toFixed(1) : 0;
+    const hitRate =
+      this.stats.totalOps > 0 ? ((this.stats.hits / this.stats.totalOps) * 100).toFixed(1) : 0;
+    const errorRate =
+      this.stats.totalOps > 0 ? ((this.stats.errors / this.stats.totalOps) * 100).toFixed(1) : 0;
 
     return {
       memoCacheSize: this.memoCache.size,
@@ -726,8 +760,8 @@ class CacheManager {
         errors: this.stats.errors,
         hitRate: hitRate + '%',
         errorRate: errorRate + '%',
-        uptimeMs: uptime
-      }
+        uptimeMs: uptime,
+      },
     };
   }
 
@@ -740,9 +774,9 @@ class CacheManager {
       misses: 0,
       errors: 0,
       totalOps: 0,
-      lastReset: Date.now()
+      lastReset: Date.now(),
     };
-    debugLog('[Cache] Statistics reset');
+    ULog.debug('[Cache] Statistics reset');
   }
 
   /**
@@ -752,7 +786,7 @@ class CacheManager {
    */
   parsePropertiesValue(value) {
     if (!value) return value;
-    
+
     try {
       // JSON形式の場合はパース
       return JSON.parse(value);
@@ -773,17 +807,17 @@ class CacheManager {
     try {
       // Level 2: Apps Scriptキャッシュ
       this.scriptCache.put(key, JSON.stringify(value), ttl);
-      
+
       // Level 1: メモ化キャッシュ
       if (enableMemoization) {
-        this.memoCache.set(key, { 
-          value: value, 
-          createdAt: Date.now(), 
-          ttl: ttl 
+        this.memoCache.set(key, {
+          value: value,
+          createdAt: Date.now(),
+          ttl: ttl,
         });
       }
     } catch (e) {
-      warnLog(`[Cache] setToCacheHierarchy error: ${key}`, e.message);
+      ULog.warn(`[Cache] setToCacheHierarchy error: ${key}`, e.message);
     }
   }
 
@@ -796,12 +830,12 @@ class CacheManager {
    * @returns {*} 値
    */
   getConfig(key, valueFn, options = {}) {
-    const { 
-      ttl = 3600,  // 設定値は1時間キャッシュ
+    const {
+      ttl = 3600, // 設定値は1時間キャッシュ
       enableMemoization = true,
-      usePropertiesFallback = true 
+      usePropertiesFallback = true,
     } = options;
-    
+
     return this.get(key, valueFn, { ttl, enableMemoization, usePropertiesFallback });
   }
 }
@@ -815,13 +849,13 @@ CacheManager.prototype.pendingClears = [];
  * @param {Object} options - クリアオプション
  * @returns {Promise} クリア完了Promise
  */
-CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
+CacheManager.prototype.clearAllFrontendCaches = function (options = {}) {
   const { force = false, timeout = 10000 } = options;
 
   // 既にクリア中の場合は待機
   if (this.clearInProgress && !force) {
     if (this.debugMode) {
-      debugLog('🔄 Cache clear already in progress, waiting...');
+      ULog.debug('🔄 Cache clear already in progress, waiting...');
     }
     return new Promise((resolve, reject) => {
       this.pendingClears.push({ resolve, reject });
@@ -834,7 +868,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
   return new Promise(async (resolve, reject) => {
     try {
       if (this.debugMode) {
-        debugLog('🗑️ Starting unified cache clear process');
+        ULog.debug('🗑️ Starting unified cache clear process');
       }
 
       // キャッシュクリア操作のリスト（優先順位順）
@@ -842,52 +876,75 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
         {
           name: 'UnifiedCache',
           operation: () => {
-            if (typeof window !== 'undefined' && window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+            if (
+              typeof window !== 'undefined' &&
+              window.unifiedCache &&
+              typeof window.unifiedCache.clear === 'function'
+            ) {
               window.unifiedCache.clear();
               return true;
             }
             return false;
-          }
+          },
         },
         {
           name: 'GasOptimizerCache',
           operation: () => {
-            if (typeof window !== 'undefined' && window.gasOptimizer && typeof window.gasOptimizer.clearCache === 'function') {
+            if (
+              typeof window !== 'undefined' &&
+              window.gasOptimizer &&
+              typeof window.gasOptimizer.clearCache === 'function'
+            ) {
               window.gasOptimizer.clearCache();
               return true;
             }
             return false;
-          }
+          },
         },
         {
           name: 'SharedUtilitiesCache',
           operation: () => {
-            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.cache && typeof window.sharedUtilities.cache.clear === 'function') {
+            if (
+              typeof window !== 'undefined' &&
+              window.sharedUtilities &&
+              window.sharedUtilities.cache &&
+              typeof window.sharedUtilities.cache.clear === 'function'
+            ) {
               window.sharedUtilities.cache.clear();
               return true;
             }
             return false;
-          }
+          },
         },
         {
           name: 'DOMElementCache',
           operation: () => {
-            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.dom && typeof window.sharedUtilities.dom.clearElementCache === 'function') {
+            if (
+              typeof window !== 'undefined' &&
+              window.sharedUtilities &&
+              window.sharedUtilities.dom &&
+              typeof window.sharedUtilities.dom.clearElementCache === 'function'
+            ) {
               window.sharedUtilities.dom.clearElementCache();
               return true;
             }
             return false;
-          }
+          },
         },
         {
           name: 'ThrottleDebounceCache',
           operation: () => {
-            if (typeof window !== 'undefined' && window.sharedUtilities && window.sharedUtilities.throttle && typeof window.sharedUtilities.throttle.clearAll === 'function') {
+            if (
+              typeof window !== 'undefined' &&
+              window.sharedUtilities &&
+              window.sharedUtilities.throttle &&
+              typeof window.sharedUtilities.throttle.clearAll === 'function'
+            ) {
               window.sharedUtilities.throttle.clearAll();
               return true;
             }
             return false;
-          }
+          },
         },
         {
           name: 'ScriptCache',
@@ -898,38 +955,39 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
             } catch (error) {
               return false;
             }
-          }
-        }
+          },
+        },
       ];
 
       const results = [];
-      
+
       // 順次実行でキャッシュクリア（競合回避）
       for (const clearOp of clearOperations) {
         try {
           const success = clearOp.operation();
           results.push({ name: clearOp.name, success });
-          
+
           if (this.debugMode && success) {
-            debugLog(`✅ ${clearOp.name} cleared successfully`);
+            ULog.debug(`✅ ${clearOp.name} cleared successfully`);
           }
-          
+
           // 各操作間に短い間隔を設ける
           if (typeof Utilities !== 'undefined') {
             Utilities.sleep(50);
           }
-          
         } catch (error) {
-          warnLog(`⚠️ Failed to clear ${clearOp.name}:`, error);
+          ULog.warn(`⚠️ Failed to clear ${clearOp.name}:`, error);
           results.push({ name: clearOp.name, success: false, error: error.message });
         }
       }
 
-      const successCount = results.filter(r => r.success).length;
+      const successCount = results.filter((r) => r.success).length;
       const totalTime = Date.now() - startTime;
 
       if (this.debugMode) {
-        debugLog(`🎉 Cache clear completed: ${successCount}/${results.length} caches cleared in ${totalTime}ms`);
+        ULog.debug(
+          `🎉 Cache clear completed: ${successCount}/${results.length} caches cleared in ${totalTime}ms`
+        );
       }
 
       // 待機中のクリア要求を解決
@@ -940,11 +998,10 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
         results,
         successCount,
         totalCount: results.length,
-        duration: totalTime
+        duration: totalTime,
       });
-
     } catch (error) {
-      console.error("[ERROR]", '❌ Unified cache clear failed:', error);
+      console.error('[ERROR]', '❌ Unified cache clear failed:', error);
       this.rejectPendingClears(error);
       reject(error);
     } finally {
@@ -958,15 +1015,18 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
  * @param {string} cacheType - キャッシュタイプ
  * @returns {Promise} クリア結果
  */
-CacheManager.prototype.clearSpecificCache = function(cacheType) {
+CacheManager.prototype.clearSpecificCache = function (cacheType) {
   return new Promise((resolve, reject) => {
     const cacheOperations = {
       unified: () => typeof window !== 'undefined' && window.unifiedCache?.clear(),
       gasOptimizer: () => typeof window !== 'undefined' && window.gasOptimizer?.clearCache(),
-      sharedUtilities: () => typeof window !== 'undefined' && window.sharedUtilities?.cache?.clear(),
-      domElements: () => typeof window !== 'undefined' && window.sharedUtilities?.dom?.clearElementCache(),
-      throttleDebounce: () => typeof window !== 'undefined' && window.sharedUtilities?.throttle?.clearAll(),
-      script: () => this.clearAll()
+      sharedUtilities: () =>
+        typeof window !== 'undefined' && window.sharedUtilities?.cache?.clear(),
+      domElements: () =>
+        typeof window !== 'undefined' && window.sharedUtilities?.dom?.clearElementCache(),
+      throttleDebounce: () =>
+        typeof window !== 'undefined' && window.sharedUtilities?.throttle?.clearAll(),
+      script: () => this.clearAll(),
     };
 
     const operation = cacheOperations[cacheType];
@@ -978,11 +1038,11 @@ CacheManager.prototype.clearSpecificCache = function(cacheType) {
     try {
       operation();
       if (this.debugMode) {
-        debugLog(`✅ ${cacheType} cache cleared`);
+        ULog.debug(`✅ ${cacheType} cache cleared`);
       }
       resolve({ success: true, cacheType });
     } catch (error) {
-      warnLog(`⚠️ Failed to clear ${cacheType} cache:`, error);
+      ULog.warn(`⚠️ Failed to clear ${cacheType} cache:`, error);
       resolve({ success: false, cacheType, error: error.message });
     }
   });
@@ -992,42 +1052,52 @@ CacheManager.prototype.clearSpecificCache = function(cacheType) {
  * キャッシュ状態の診断
  * @returns {Object} 診断結果
  */
-CacheManager.prototype.diagnoseFrontendCache = function() {
+CacheManager.prototype.diagnoseFrontendCache = function () {
   const caches = {
     unifiedCache: {
-      available: typeof window !== 'undefined' && !!(window.unifiedCache && window.unifiedCache.clear),
-      size: typeof window !== 'undefined' ? (window.unifiedCache?.size || 'unknown') : 'unavailable'
+      available:
+        typeof window !== 'undefined' && !!(window.unifiedCache && window.unifiedCache.clear),
+      size: typeof window !== 'undefined' ? window.unifiedCache?.size || 'unknown' : 'unavailable',
     },
     gasOptimizer: {
-      available: typeof window !== 'undefined' && !!(window.gasOptimizer && window.gasOptimizer.clearCache),
-      size: typeof window !== 'undefined' ? (window.gasOptimizer?.cache?.size || 'unknown') : 'unavailable'
+      available:
+        typeof window !== 'undefined' && !!(window.gasOptimizer && window.gasOptimizer.clearCache),
+      size:
+        typeof window !== 'undefined'
+          ? window.gasOptimizer?.cache?.size || 'unknown'
+          : 'unavailable',
     },
     sharedUtilities: {
-      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.cache),
-      size: typeof window !== 'undefined' ? (window.sharedUtilities?.cache?.size || 'unknown') : 'unavailable'
+      available:
+        typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.cache),
+      size:
+        typeof window !== 'undefined'
+          ? window.sharedUtilities?.cache?.size || 'unknown'
+          : 'unavailable',
     },
     domElements: {
-      available: typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.dom),
-      size: 'unknown'
+      available:
+        typeof window !== 'undefined' && !!(window.sharedUtilities && window.sharedUtilities.dom),
+      size: 'unknown',
     },
     scriptCache: {
       available: true,
-      size: this.memoCache.size
-    }
+      size: this.memoCache.size,
+    },
   };
 
   return {
     clearInProgress: this.clearInProgress,
     pendingClears: this.pendingClears.length,
     caches,
-    health: this.getHealth()
+    health: this.getHealth(),
   };
 };
 
 /**
  * 待機中のクリア要求を解決
  */
-CacheManager.prototype.resolvePendingClears = function(results) {
+CacheManager.prototype.resolvePendingClears = function (results) {
   const pending = this.pendingClears.splice(0);
   pending.forEach(({ resolve }) => resolve(results));
 };
@@ -1035,7 +1105,7 @@ CacheManager.prototype.resolvePendingClears = function(results) {
 /**
  * 待機中のクリア要求を拒否
  */
-CacheManager.prototype.rejectPendingClears = function(error) {
+CacheManager.prototype.rejectPendingClears = function (error) {
   const pending = this.pendingClears.splice(0);
   pending.forEach(({ reject }) => reject(error));
 };
@@ -1069,7 +1139,7 @@ class UnifiedExecutionCache {
     }
 
     if (this.userInfoCache && this.lastUserIdKey === userId) {
-      debugLog(`✅ 統一キャッシュヒット: ユーザー情報 (${userId})`);
+      ULog.debug(`✅ 統一キャッシュヒット: ユーザー情報 (${userId})`);
       return this.userInfoCache;
     }
 
@@ -1084,7 +1154,7 @@ class UnifiedExecutionCache {
   setUserInfo(userId, userInfo) {
     this.userInfoCache = userInfo;
     this.lastUserIdKey = userId;
-    debugLog(`💾 統一キャッシュ保存: ユーザー情報 (${userId})`);
+    ULog.debug(`💾 統一キャッシュ保存: ユーザー情報 (${userId})`);
   }
 
   /**
@@ -1098,7 +1168,7 @@ class UnifiedExecutionCache {
     }
 
     if (this.sheetsServiceCache) {
-      debugLog(`✅ 統一キャッシュヒット: SheetsService`);
+      ULog.debug(`✅ 統一キャッシュヒット: SheetsService`);
       return this.sheetsServiceCache;
     }
 
@@ -1111,7 +1181,7 @@ class UnifiedExecutionCache {
    */
   setSheetsService(service) {
     this.sheetsServiceCache = service;
-    debugLog(`💾 統一キャッシュ保存: SheetsService`);
+    ULog.debug(`💾 統一キャッシュ保存: SheetsService`);
   }
 
   /**
@@ -1120,7 +1190,7 @@ class UnifiedExecutionCache {
   clearUserInfo() {
     this.userInfoCache = null;
     this.lastUserIdKey = null;
-    debugLog(`🗑️ 統一キャッシュクリア: ユーザー情報`);
+    ULog.debug(`🗑️ 統一キャッシュクリア: ユーザー情報`);
   }
 
   /**
@@ -1128,7 +1198,7 @@ class UnifiedExecutionCache {
    */
   clearSheetsService() {
     this.sheetsServiceCache = null;
-    debugLog(`🗑️ 統一キャッシュクリア: SheetsService`);
+    ULog.debug(`🗑️ 統一キャッシュクリア: SheetsService`);
   }
 
   /**
@@ -1137,7 +1207,7 @@ class UnifiedExecutionCache {
   clearAll() {
     this.clearUserInfo();
     this.clearSheetsService();
-    debugLog(`🗑️ 統一キャッシュ全クリア`);
+    ULog.debug(`🗑️ 統一キャッシュ全クリア`);
   }
 
   /**
@@ -1145,7 +1215,7 @@ class UnifiedExecutionCache {
    * @returns {boolean} 期限切れの場合true
    */
   isExpired() {
-    return (Date.now() - this.executionStartTime) > this.maxLifetime;
+    return Date.now() - this.executionStartTime > this.maxLifetime;
   }
 
   /**
@@ -1158,7 +1228,7 @@ class UnifiedExecutionCache {
       hasSheetsService: !!this.sheetsServiceCache,
       lastUserIdKey: this.lastUserIdKey,
       executionTime: Date.now() - this.executionStartTime,
-      isExpired: this.isExpired()
+      isExpired: this.isExpired(),
     };
   }
 
@@ -1183,9 +1253,9 @@ class UnifiedExecutionCache {
             // システム全体のキャッシュクリア
             break;
         }
-        debugLog(`🔄 統一キャッシュマネージャーと同期: ${operation}`);
+        ULog.debug(`🔄 統一キャッシュマネージャーと同期: ${operation}`);
       } catch (error) {
-        debugLog(`⚠️ 統一キャッシュマネージャー同期エラー: ${error.message}`);
+        ULog.debug(`⚠️ 統一キャッシュマネージャー同期エラー: ${error.message}`);
       }
     }
   }
@@ -1200,10 +1270,10 @@ let spreadsheetMemoryCache = {};
 
 // キャッシュ設定
 const SPREADSHEET_CACHE_CONFIG = {
-  MEMORY_CACHE_TTL: 300000,    // 5分間（メモリキャッシュ）
-  SESSION_CACHE_TTL: 1800000,  // 30分間（PropertiesServiceキャッシュ）
-  MAX_CACHE_SIZE: 50,          // 最大キャッシュエントリ数
-  CACHE_KEY_PREFIX: 'ss_cache_'
+  MEMORY_CACHE_TTL: 300000, // 5分間（メモリキャッシュ）
+  SESSION_CACHE_TTL: 1800000, // 30分間（PropertiesServiceキャッシュ）
+  MAX_CACHE_SIZE: 50, // 最大キャッシュエントリ数
+  CACHE_KEY_PREFIX: 'ss_cache_',
 };
 
 /**
@@ -1229,14 +1299,14 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
         'PropertiesService.deleteProperty'
       );
     } catch (error) {
-      debugLog('キャッシュクリアエラー:', error.message);
+      ULog.debug('キャッシュクリアエラー:', error.message);
     }
   }
 
   // Phase 1: メモリキャッシュをチェック
   const memoryEntry = spreadsheetMemoryCache[spreadsheetId];
-  if (memoryEntry && (now - memoryEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
-    debugLog('✅ SpreadsheetApp.openById メモリキャッシュヒット:', spreadsheetId.substring(0, 10));
+  if (memoryEntry && now - memoryEntry.timestamp < SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+    ULog.debug('✅ SpreadsheetApp.openById メモリキャッシュヒット:', spreadsheetId.substring(0, 10));
     return memoryEntry.spreadsheet;
   }
 
@@ -1248,62 +1318,67 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
     );
     if (sessionCacheData) {
       const sessionEntry = JSON.parse(sessionCacheData);
-      if ((now - sessionEntry.timestamp) < SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL) {
+      if (now - sessionEntry.timestamp < SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL) {
         // セッションキャッシュからSpreadsheetオブジェクトを再構築
         const spreadsheet = resilientSpreadsheetOperation(
           () => SpreadsheetApp.openById(spreadsheetId),
           'SpreadsheetApp.openById'
         );
-        
+
         // メモリキャッシュに保存
         spreadsheetMemoryCache[spreadsheetId] = {
           spreadsheet: spreadsheet,
-          timestamp: now
+          timestamp: now,
         };
-        
-        debugLog('✅ SpreadsheetApp.openById セッションキャッシュヒット:', spreadsheetId.substring(0, 10));
+
+        ULog.debug(
+          '✅ SpreadsheetApp.openById セッションキャッシュヒット:',
+          spreadsheetId.substring(0, 10)
+        );
         return spreadsheet;
       }
     }
   } catch (error) {
-    debugLog('セッションキャッシュ読み込みエラー:', error.message);
+    ULog.debug('セッションキャッシュ読み込みエラー:', error.message);
   }
 
   // Phase 3: 新規取得とキャッシュ保存
-  debugLog('🔄 SpreadsheetApp.openById 新規取得:', spreadsheetId.substring(0, 10));
-  
+  ULog.debug('🔄 SpreadsheetApp.openById 新規取得:', spreadsheetId.substring(0, 10));
+
   try {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    
+
     // メモリキャッシュに保存
     spreadsheetMemoryCache[spreadsheetId] = {
       spreadsheet: spreadsheet,
-      timestamp: now
+      timestamp: now,
     };
-    
+
     // セッションキャッシュに保存（軽量データのみ）
     try {
       const sessionData = {
         spreadsheetId: spreadsheetId,
         timestamp: now,
-        url: spreadsheet.getUrl()
+        url: spreadsheet.getUrl(),
       };
-      
-      PropertiesService.getScriptProperties().setProperty(
-        cacheKey, 
-        JSON.stringify(sessionData)
-      );
+
+      PropertiesService.getScriptProperties().setProperty(cacheKey, JSON.stringify(sessionData));
     } catch (sessionError) {
-      debugLog('セッションキャッシュ保存エラー:', sessionError.message);
+      ULog.debug('セッションキャッシュ保存エラー:', sessionError.message);
     }
-    
+
     // キャッシュサイズ管理
     cleanupOldCacheEntries();
-    
+
     return spreadsheet;
-    
   } catch (error) {
-    logError(error, 'SpreadsheetApp.openById', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.DATABASE, { spreadsheetId });
+    logError(
+      error,
+      'SpreadsheetApp.openById',
+      UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH,
+      ERROR_CATEGORIES.DATABASE,
+      { spreadsheetId }
+    );
     throw new Error(`スプレッドシートの取得に失敗しました: ${error.message}`);
   }
 }
@@ -1314,27 +1389,29 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
 function cleanupOldCacheEntries() {
   const now = Date.now();
   const memoryKeys = Object.keys(spreadsheetMemoryCache);
-  
+
   // メモリキャッシュのクリーンアップ
   if (memoryKeys.length > SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE) {
-    const sortedEntries = memoryKeys.map(key => ({
-      key: key,
-      timestamp: spreadsheetMemoryCache[key].timestamp
-    })).sort((a, b) => b.timestamp - a.timestamp);
-    
+    const sortedEntries = memoryKeys
+      .map((key) => ({
+        key: key,
+        timestamp: spreadsheetMemoryCache[key].timestamp,
+      }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
     // 古いエントリを削除
     const entriesToDelete = sortedEntries.slice(SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE);
-    entriesToDelete.forEach(entry => {
+    entriesToDelete.forEach((entry) => {
       delete spreadsheetMemoryCache[entry.key];
     });
-    
-    debugLog(`🧹 メモリキャッシュクリーンアップ: ${entriesToDelete.length}件削除`);
+
+    ULog.debug(`🧹 メモリキャッシュクリーンアップ: ${entriesToDelete.length}件削除`);
   }
-  
+
   // 期限切れエントリの削除
-  memoryKeys.forEach(key => {
+  memoryKeys.forEach((key) => {
     const entry = spreadsheetMemoryCache[key];
-    if ((now - entry.timestamp) > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+    if (now - entry.timestamp > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
       delete spreadsheetMemoryCache[key];
     }
   });
@@ -1346,17 +1423,17 @@ function cleanupOldCacheEntries() {
  */
 function invalidateSpreadsheetCache(spreadsheetId) {
   if (!spreadsheetId) return;
-  
+
   // メモリキャッシュから削除
   delete spreadsheetMemoryCache[spreadsheetId];
-  
+
   // セッションキャッシュから削除
   const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
   try {
     PropertiesService.getScriptProperties().deleteProperty(cacheKey);
-    debugLog('🗑️ SpreadsheetCache無効化:', spreadsheetId.substring(0, 10));
+    ULog.debug('🗑️ SpreadsheetCache無効化:', spreadsheetId.substring(0, 10));
   } catch (error) {
-    debugLog('キャッシュ無効化エラー:', error.message);
+    ULog.debug('キャッシュ無効化エラー:', error.message);
   }
 }
 
@@ -1366,21 +1443,21 @@ function invalidateSpreadsheetCache(spreadsheetId) {
 function clearAllSpreadsheetCache() {
   // メモリキャッシュクリア
   spreadsheetMemoryCache = {};
-  
+
   // セッションキャッシュクリア
   try {
     const props = PropertiesService.getScriptProperties();
     const allProps = props.getProperties();
-    
-    Object.keys(allProps).forEach(key => {
+
+    Object.keys(allProps).forEach((key) => {
       if (key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)) {
         props.deleteProperty(key);
       }
     });
-    
-    debugLog('🧹 全SpreadsheetCacheクリア完了');
+
+    ULog.debug('🧹 全SpreadsheetCacheクリア完了');
   } catch (error) {
-    debugLog('全キャッシュクリアエラー:', error.message);
+    ULog.debug('全キャッシュクリアエラー:', error.message);
   }
 }
 
@@ -1391,23 +1468,23 @@ function clearAllSpreadsheetCache() {
 function getSpreadsheetCacheStats() {
   const memoryEntries = Object.keys(spreadsheetMemoryCache).length;
   const now = Date.now();
-  
+
   let sessionEntries = 0;
   try {
     const allProps = PropertiesService.getScriptProperties().getProperties();
-    sessionEntries = Object.keys(allProps).filter(key => 
+    sessionEntries = Object.keys(allProps).filter((key) =>
       key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)
     ).length;
   } catch (error) {
-    debugLog('キャッシュ統計取得エラー:', error.message);
+    ULog.debug('キャッシュ統計取得エラー:', error.message);
   }
-  
+
   return {
     memoryEntries: memoryEntries,
     sessionEntries: sessionEntries,
     maxCacheSize: SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE,
     memoryTTL: SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL,
-    sessionTTL: SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL
+    sessionTTL: SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL,
   };
 }
 
@@ -1443,7 +1520,7 @@ let globalUnifiedCache = null;
 function getUnifiedExecutionCache() {
   if (!globalUnifiedCache) {
     globalUnifiedCache = new UnifiedExecutionCache();
-    debugLog(`🏗️ 統一実行キャッシュ初期化`);
+    ULog.debug(`🏗️ 統一実行キャッシュ初期化`);
   }
   return globalUnifiedCache;
 }
@@ -1453,7 +1530,7 @@ function getUnifiedExecutionCache() {
  */
 function resetUnifiedExecutionCache() {
   globalUnifiedCache = null;
-  debugLog(`🔄 統一実行キャッシュリセット`);
+  ULog.debug(`🔄 統一実行キャッシュリセット`);
 }
 
 // =============================================================================
@@ -1467,21 +1544,31 @@ function getHeadersCached(spreadsheetId, sheetName) {
   const key = `hdr_${spreadsheetId}_${sheetName}`;
   const validationKey = `hdr_validation_${spreadsheetId}_${sheetName}`;
 
-  const indices = cacheManager.get(key, () => {
-    return getHeadersWithRetry(spreadsheetId, sheetName, 3);
-  }, { ttl: 1800, enableMemoization: true }); // 30分間キャッシュ + メモ化
+  const indices = cacheManager.get(
+    key,
+    () => {
+      return getHeadersWithRetry(spreadsheetId, sheetName, 3);
+    },
+    { ttl: 1800, enableMemoization: true }
+  ); // 30分間キャッシュ + メモ化
 
   // 必須列の存在チェック（改善された復旧メカニズム + 重複防止）
   if (indices && Object.keys(indices).length > 0) {
     // バリデーション結果もキャッシュして重複処理を防止
-    const hasRequiredColumns = cacheManager.get(validationKey, () => {
-      return validateRequiredHeaders(indices);
-    }, { ttl: 1800, enableMemoization: true });
+    const hasRequiredColumns = cacheManager.get(
+      validationKey,
+      () => {
+        return validateRequiredHeaders(indices);
+      },
+      { ttl: 1800, enableMemoization: true }
+    );
     if (!hasRequiredColumns.isValid) {
       // 完全に必須列が不足している場合のみ復旧を試行
       // 片方でも存在する場合は設定によるものとして受け入れる
       if (!hasRequiredColumns.hasReasonColumn && !hasRequiredColumns.hasOpinionColumn) {
-        warnLog(`[getHeadersCached] Critical headers missing: ${hasRequiredColumns.missing.join(', ')}, attempting recovery`);
+        ULog.warn(
+          `[getHeadersCached] Critical headers missing: ${hasRequiredColumns.missing.join(', ')}, attempting recovery`
+        );
         cacheManager.remove(key);
 
         // 即座に再取得を試行（リトライ回数を削減）
@@ -1489,13 +1576,15 @@ function getHeadersCached(spreadsheetId, sheetName) {
         if (recoveredIndices && Object.keys(recoveredIndices).length > 0) {
           const recoveredValidation = validateRequiredHeaders(recoveredIndices);
           if (recoveredValidation.hasReasonColumn || recoveredValidation.hasOpinionColumn) {
-            debugLog(`[getHeadersCached] Successfully recovered headers with basic columns`);
+            ULog.debug(`[getHeadersCached] Successfully recovered headers with basic columns`);
             return recoveredIndices;
           }
         }
       } else {
         // 一部の列が存在する場合は警告のみで継続
-        debugLog(`[getHeadersCached] Partial header validation - continuing with available columns: reason=${hasRequiredColumns.hasReasonColumn}, opinion=${hasRequiredColumns.hasOpinionColumn}`);
+        ULog.debug(
+          `[getHeadersCached] Partial header validation - continuing with available columns: reason=${hasRequiredColumns.hasReasonColumn}, opinion=${hasRequiredColumns.hasOpinionColumn}`
+        );
       }
     }
   }
@@ -1517,7 +1606,9 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      debugLog(`[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`);
+      ULog.debug(
+        `[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`
+      );
 
       const service = getSheetsServiceCached();
       if (!service) {
@@ -1525,51 +1616,54 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
       }
 
       const range = sheetName + '!1:1';
-      debugLog(`[getHeadersWithRetry] Fetching range: ${range}`);
+      ULog.debug(`[getHeadersWithRetry] Fetching range: ${range}`);
 
       // Use the updated API pattern consistent with other functions
       const url = service.baseUrl + '/' + spreadsheetId + '/values/' + encodeURIComponent(range);
       const response = UrlFetchApp.fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + service.accessToken },
-        muteHttpExceptions: true
+        headers: { Authorization: 'Bearer ' + service.accessToken },
+        muteHttpExceptions: true,
       });
 
       // レスポンスオブジェクト検証とHTTPステータスチェック
       if (!response || typeof response.getResponseCode !== 'function') {
         throw new Error('Cache API: 無効なレスポンスオブジェクトが返されました');
       }
-      
+
       if (response.getResponseCode() !== 200) {
         throw new Error(`HTTP ${response.getResponseCode()}: ${response.getContentText()}`);
       }
 
       const responseData = JSON.parse(response.getContentText());
-      debugLog(`[getHeadersWithRetry] API response (attempt ${attempt}):`, JSON.stringify(responseData, null, 2));
+      ULog.debug(
+        `[getHeadersWithRetry] API response (attempt ${attempt}):`,
+        JSON.stringify(responseData, null, 2)
+      );
 
       if (!responseData) {
         throw new Error('API response is null or undefined');
       }
 
       if (!responseData.values) {
-        warnLog(`[getHeadersWithRetry] No values in response for ${range} (attempt ${attempt})`);
+        ULog.warn(`[getHeadersWithRetry] No values in response for ${range} (attempt ${attempt})`);
         throw new Error('No values in response');
       }
 
       if (!responseData.values[0] || responseData.values[0].length === 0) {
-        warnLog(`[getHeadersWithRetry] Empty header row for ${range} (attempt ${attempt})`);
+        ULog.warn(`[getHeadersWithRetry] Empty header row for ${range} (attempt ${attempt})`);
         throw new Error('Empty header row');
       }
 
       const headers = responseData.values[0];
-      debugLog(`[getHeadersWithRetry] Headers found (attempt ${attempt}):`, headers);
+      ULog.debug(`[getHeadersWithRetry] Headers found (attempt ${attempt}):`, headers);
 
       const indices = {};
 
       // タイムスタンプ列を除外してヘッダーのインデックスを生成
-      headers.forEach(function(headerName, index) {
+      headers.forEach(function (headerName, index) {
         if (headerName && headerName.trim() !== '' && headerName !== 'タイムスタンプ') {
           indices[headerName] = index;
-          debugLog(`[getHeadersWithRetry] Mapped ${headerName} -> ${index}`);
+          ULog.debug(`[getHeadersWithRetry] Mapped ${headerName} -> ${index}`);
         }
       });
 
@@ -1578,26 +1672,33 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
         throw new Error('No valid headers found');
       }
 
-      debugLog(`[getHeadersWithRetry] Final indices (attempt ${attempt}):`, indices);
+      ULog.debug(`[getHeadersWithRetry] Final indices (attempt ${attempt}):`, indices);
       return indices;
-
     } catch (error) {
       lastError = error;
-      console.error("[ERROR]", `[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} failed:`, error.toString());
+      console.error(
+        '[ERROR]',
+        `[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} failed:`,
+        error.toString()
+      );
 
       // 最後の試行でない場合は待機してリトライ
       if (attempt < maxRetries) {
         const waitTime = attempt * 1000; // 1秒、2秒、3秒...
-        debugLog(`[getHeadersWithRetry] Waiting ${waitTime}ms before retry...`);
+        ULog.debug(`[getHeadersWithRetry] Waiting ${waitTime}ms before retry...`);
         Utilities.sleep(waitTime);
       }
     }
   }
 
   // 全てのリトライが失敗した場合
-  console.error("[ERROR]", `[getHeadersWithRetry] All ${maxRetries} attempts failed. Last error:`, lastError.toString());
+  console.error(
+    '[ERROR]',
+    `[getHeadersWithRetry] All ${maxRetries} attempts failed. Last error:`,
+    lastError.toString()
+  );
   if (lastError.stack) {
-    console.error("[ERROR]", 'Error stack:', lastError.stack);
+    console.error('[ERROR]', 'Error stack:', lastError.stack);
   }
 
   return {};
@@ -1612,19 +1713,19 @@ function validateRequiredHeaders(indices) {
   // 理由列・回答列は設定によって名前が変わる可能性があるため、
   // より柔軟な検証を実装
   const reasonPatterns = [
-    COLUMN_HEADERS.REASON,     // 理由
+    COLUMN_HEADERS.REASON, // 理由
     '理由',
     'そう思う理由',
-    'reason'
+    'reason',
   ];
-  
+
   const opinionPatterns = [
-    COLUMN_HEADERS.OPINION,    // 回答
+    COLUMN_HEADERS.OPINION, // 回答
     '回答',
     '意見',
     '考え',
     'opinion',
-    'answer'
+    'answer',
   ];
 
   const missing = [];
@@ -1661,7 +1762,7 @@ function validateRequiredHeaders(indices) {
     isValid: hasBasicHeaders && (hasReasonColumn || hasOpinionColumn), // 最低1つは必要
     missing: missing,
     hasReasonColumn: hasReasonColumn,
-    hasOpinionColumn: hasOpinionColumn
+    hasOpinionColumn: hasOpinionColumn,
   };
 }
 
@@ -1672,48 +1773,7 @@ function validateRequiredHeaders(indices) {
  * @param {string} [spreadsheetId] - 関連スプレッドシートID
  * @param {boolean} [clearPattern=false] - パターンベースのクリアを行うか
  */
-function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId) {
-  const keysToRemove = [];
-
-  if (userId) {
-    keysToRemove.push('user_' + userId);
-    keysToRemove.push('unified_user_info_' + userId);
-    // 回答ボードの表示データ・シートデータのユーザー別キャッシュを確実に無効化
-    try {
-      cacheManager.clearByPattern(`publishedData_${userId}_`, { strict: false, maxKeys: 200 });
-      cacheManager.clearByPattern(`sheetData_${userId}_`, { strict: false, maxKeys: 200 });
-      // 設定キャッシュ（シート名と紐づく）もユーザー単位でクリア
-      cacheManager.clearByPattern(`config_v3_${userId}_`, { strict: false, maxKeys: 200 });
-    } catch (e) {
-      warnLog('invalidateUserCache: user-scoped pattern clear failed:', e.message);
-    }
-  }
-  if (email) {
-    keysToRemove.push('email_' + email);
-    keysToRemove.push('unified_user_info_' + email);
-  }
-  if (spreadsheetId) {
-    // スプレッドシートIDを含むキーを削除
-    keysToRemove.push('hdr_' + spreadsheetId);
-    keysToRemove.push('data_' + spreadsheetId);
-    keysToRemove.push('sheets_' + spreadsheetId);
-  }
-
-  keysToRemove.forEach(key => {
-    cacheManager.remove(key);
-  });
-
-  // さらに包括的なパターンマッチングが必要な場合
-  if (clearPattern && spreadsheetId) {
-    cacheManager.clearByPattern(spreadsheetId);
-  }
-
-  if (dbSpreadsheetId) {
-    cacheManager.invalidateRelated('spreadsheet', dbSpreadsheetId);
-  }
-
-  debugLog(`[Cache] Invalidated user cache for userId: ${userId}, email: ${email}, spreadsheetId: ${spreadsheetId}`);
-}
+// 古いinvalidateUserCache実装は削除（統一APIバージョンを下部で使用）
 
 /**
  * クリティカル更新時の包括的キャッシュ同期化
@@ -1723,88 +1783,13 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSprea
  * @param {string} oldSpreadsheetId - 古いスプレッドシートID
  * @param {string} newSpreadsheetId - 新しいスプレッドシートID
  */
-function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
-  try {
-    infoLog('🔄 クリティカル更新後のキャッシュ同期開始...', {
-      userId,
-      email,
-      oldSpreadsheetId,
-      newSpreadsheetId
-    });
-
-    // 段階1: 基本ユーザーキャッシュクリア
-    invalidateUserCache(userId, email, oldSpreadsheetId, false);
-    if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
-      invalidateUserCache(userId, email, newSpreadsheetId, false);
-
-      // 古いスプレッドシートオブジェクトのキャッシュも明示的に削除
-      if (oldSpreadsheetId) {
-        if (typeof invalidateSpreadsheetCache === 'function') {
-          invalidateSpreadsheetCache(oldSpreadsheetId);
-          infoLog(`✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`);
-        } else {
-          warnLog(`invalidateSpreadsheetCache 関数が見つかりません。手動で ${oldSpreadsheetId} のオブジェクトキャッシュをクリアしてください。`);
-        }
-      }
-    }
-
-    // 段階2: 実行レベルキャッシュクリア
-    clearExecutionUserInfoCache();
-
-    // 段階3: 関連データベースキャッシュクリア
-    clearDatabaseCache();
-
-    // 統一キャッシュマネージャーの関連エントリを追加でクリア
-    if (typeof cacheManager !== 'undefined' && cacheManager) {
-      cacheManager.clearByPattern('user_*');
-      cacheManager.clearByPattern('email_*');
-      cacheManager.clearByPattern('login_status_*');
-      cacheManager.clearByPattern('sheets_*');
-      cacheManager.clearByPattern('data_*');
-      cacheManager.clearByPattern('config_v3_*');
-    }
-
-    // 段階4: メモ化キャッシュの強制リセット（利用可能な場合）
-    try {
-      if (typeof resetMemoizationCache === 'function') {
-        resetMemoizationCache();
-      }
-    } catch (memoError) {
-      warnLog('メモ化キャッシュリセットをスキップ:', memoError.message);
-    }
-
-    infoLog('✅ クリティカル更新後のキャッシュ同期完了');
-
-    // 少し待ってから検証用に短い待機
-    Utilities.sleep(100);
-
-  } catch (error) {
-    console.error("[ERROR]", '❌ キャッシュ同期エラー:', error);
-    throw new Error('キャッシュ同期に失敗しました: ' + error.message);
-  }
-}
+// 古いsynchronizeCacheAfterCriticalUpdate実装は削除（統一APIバージョンを下部で使用）
 
 /**
  * データベース関連キャッシュをクリアします。
  * エラー時やデータ整合性が必要な場合に使用します。
  */
-function clearDatabaseCache() {
-  try {
-    // データベース関連のキャッシュパターンをクリア
-    cacheManager.clearByPattern('user_');
-    cacheManager.clearByPattern('email_');
-    cacheManager.clearByPattern('hdr_');
-    cacheManager.clearByPattern('data_');
-    cacheManager.clearByPattern('sheets_');
-
-    // サービスアカウントトークンは保持（パフォーマンス向上のため）
-
-    debugLog('[Cache] Database cache cleared successfully');
-  } catch (error) {
-    console.error("[ERROR]", 'clearDatabaseCache error:', error.message);
-    // エラーが発生しても処理を継続
-  }
-}
+// 古いclearDatabaseCache実装は削除（統一APIバージョンを下部で使用）
 
 /**
  * 頻繁にアクセスされるデータを事前にキャッシュに読み込みます（プリウォーミング）
@@ -1818,17 +1803,17 @@ function preWarmCache(activeUserEmail) {
     preWarmedItems: [],
     errors: [],
     duration: 0,
-    success: true
+    success: true,
   };
 
   try {
-    infoLog('🔥 キャッシュプリウォーミング開始:', activeUserEmail);
+    ULog.info('🔥 キャッシュプリウォーミング開始:', activeUserEmail);
 
     // 1. サービスアカウントトークンの事前取得
     try {
       getServiceAccountTokenCached();
       results.preWarmedItems.push('service_account_token');
-      debugLog('[Cache] Pre-warmed service account token');
+      ULog.debug('[Cache] Pre-warmed service account token');
     } catch (error) {
       results.errors.push('service_account_token: ' + error.message);
     }
@@ -1859,7 +1844,7 @@ function preWarmCache(activeUserEmail) {
             }
           }
         }
-        debugLog('[Cache] Pre-warmed user data for:', activeUserEmail);
+        ULog.debug('[Cache] Pre-warmed user data for:', activeUserEmail);
       } catch (error) {
         results.errors.push('user_data: ' + error.message);
       }
@@ -1869,7 +1854,7 @@ function preWarmCache(activeUserEmail) {
     try {
       getWebAppUrl();
       results.preWarmedItems.push('webapp_url');
-      debugLog('[Cache] Pre-warmed webapp URL');
+      ULog.debug('[Cache] Pre-warmed webapp URL');
     } catch (error) {
       results.errors.push('webapp_url: ' + error.message);
     }
@@ -1878,7 +1863,7 @@ function preWarmCache(activeUserEmail) {
     try {
       getDeployUserDomainInfo();
       results.preWarmedItems.push('domain_info');
-      debugLog('[Cache] Pre-warmed domain info');
+      ULog.debug('[Cache] Pre-warmed domain info');
     } catch (error) {
       results.errors.push('domain_info: ' + error.message);
     }
@@ -1886,19 +1871,23 @@ function preWarmCache(activeUserEmail) {
     results.duration = Date.now() - startTime;
     results.success = results.errors.length === 0;
 
-    infoLog('✅ キャッシュプリウォーミング完了:', results.preWarmedItems.length, 'items,', results.duration + 'ms');
+    ULog.info(
+      '✅ キャッシュプリウォーミング完了:',
+      results.preWarmedItems.length,
+      'items,',
+      results.duration + 'ms'
+    );
 
     if (results.errors.length > 0) {
-      warnLog('⚠️ プリウォーミング中のエラー:', results.errors);
+      ULog.warn('⚠️ プリウォーミング中のエラー:', results.errors);
     }
 
     return results;
-
   } catch (error) {
     results.duration = Date.now() - startTime;
     results.success = false;
     results.errors.push('fatal_error: ' + error.message);
-    console.error("[ERROR]", '❌ キャッシュプリウォーミングエラー:', error);
+    console.error('[ERROR]', '❌ キャッシュプリウォーミングエラー:', error);
     return results;
   }
 }
@@ -1915,7 +1904,7 @@ function analyzeCacheEfficiency() {
       currentHealth: health,
       efficiency: 'unknown',
       recommendations: [],
-      optimizationOpportunities: []
+      optimizationOpportunities: [],
     };
 
     const hitRate = parseFloat(health.stats.hitRate);
@@ -1938,7 +1927,7 @@ function analyzeCacheEfficiency() {
       analysis.recommendations.push({
         priority: 'high',
         action: 'キャッシュヒット率向上',
-        details: 'TTL設定の見直し、メモ化の活用、キャッシュキー設計の最適化を検討してください。'
+        details: 'TTL設定の見直し、メモ化の活用、キャッシュキー設計の最適化を検討してください。',
       });
     }
 
@@ -1946,7 +1935,7 @@ function analyzeCacheEfficiency() {
       analysis.recommendations.push({
         priority: 'medium',
         action: 'エラー率削減',
-        details: 'キャッシュアクセスエラーの原因調査とエラーハンドリングの改善が必要です。'
+        details: 'キャッシュアクセスエラーの原因調査とエラーハンドリングの改善が必要です。',
       });
     }
 
@@ -1954,7 +1943,7 @@ function analyzeCacheEfficiency() {
       analysis.recommendations.push({
         priority: 'low',
         action: 'メモリ使用量最適化',
-        details: 'メモ化キャッシュサイズが大きくなっています。定期的なクリアを検討してください。'
+        details: 'メモ化キャッシュサイズが大きくなっています。定期的なクリアを検討してください。',
       });
     }
 
@@ -1967,42 +1956,418 @@ function analyzeCacheEfficiency() {
       analysis.optimizationOpportunities.push('TTL延長によるさらなる高速化');
     }
 
-    debugLog('[Cache] Efficiency analysis completed:', analysis.efficiency);
+    ULog.debug('[Cache] Efficiency analysis completed:', analysis.efficiency);
     return analysis;
-
   } catch (error) {
-    console.error("[ERROR]", 'analyzeCacheEfficiency error:', error);
+    console.error('[ERROR]', 'analyzeCacheEfficiency error:', error);
     return {
       timestamp: new Date().toISOString(),
       error: error.message,
       efficiency: 'error',
-      recommendations: [{
-        priority: 'high',
-        action: '分析エラー対応',
-        details: 'キャッシュ分析中にエラーが発生しました。システムの状態を確認してください。'
-      }]
+      recommendations: [
+        {
+          priority: 'high',
+          action: '分析エラー対応',
+          details: 'キャッシュ分析中にエラーが発生しました。システムの状態を確認してください。',
+        },
+      ],
     };
   }
 }
 
 // =============================================================================
-// SECTION 6: 後方互換性のための関数群（元unifiedExecutionCache.gs）
+// SECTION 6: 統一キャッシュAPI - 全システムで使用する統一インターフェース
 // =============================================================================
 
-// 後方互換性のための関数
-function clearExecutionUserInfoCache() {
-  const cache = getUnifiedExecutionCache();
-  cache.clearUserInfo();
-  cache.syncWithUnifiedCache('userDataChange');
+/**
+ * 統一キャッシュAPI - 全分散実装を統合した統一インターフェース
+ * 既存のすべてのキャッシュ関数はこのAPIを通して動作します
+ */
+class UnifiedCacheAPI {
+  constructor() {
+    this.manager = cacheManager;
+    this.executionCache = getUnifiedExecutionCache();
+  }
+
+  /**
+   * ユーザー情報キャッシュをクリア（複数の分散実装を統合）
+   * @param {string} [identifier] - ユーザーID、メールアドレス、または null
+   */
+  clearUserInfoCache(identifier = null) {
+    try {
+      // 実行レベルキャッシュクリア
+      this.executionCache.clearUserInfo();
+      this.executionCache.syncWithUnifiedCache('userDataChange');
+
+      if (identifier) {
+        // 特定ユーザーのキャッシュクリア
+        this.manager.remove(`user_${identifier}`);
+        this.manager.remove(`userinfo_${identifier}`);
+        this.manager.remove(`unified_user_info_${identifier}`);
+        this.manager.remove(`email_${identifier}`);
+        this.manager.remove(`login_status_${identifier}`);
+        
+        // パターンベースクリア
+        this.manager.clearByPattern(`publishedData_${identifier}_`, { maxKeys: 200 });
+        this.manager.clearByPattern(`sheetData_${identifier}_`, { maxKeys: 200 });
+        this.manager.clearByPattern(`config_v3_${identifier}_`, { maxKeys: 200 });
+      } else {
+        // 全ユーザー情報キャッシュクリア
+        this.manager.clearByPattern('user_', { maxKeys: 500 });
+        this.manager.clearByPattern('userinfo_', { maxKeys: 500 });
+        this.manager.clearByPattern('unified_user_info_', { maxKeys: 500 });
+        this.manager.clearByPattern('email_', { maxKeys: 500 });
+        this.manager.clearByPattern('login_status_', { maxKeys: 500 });
+      }
+
+      ULog.debug(`✅ 統一API: ユーザー情報キャッシュクリア完了 (identifier: ${identifier || 'all'})`);
+    } catch (error) {
+      console.error('[ERROR]', `統一API: ユーザー情報キャッシュクリア失敗:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 全実行キャッシュをクリア（複数の分散実装を統合）
+   */
+  clearAllExecutionCache() {
+    try {
+      // 実行レベルキャッシュ全クリア
+      this.executionCache.clearAll();
+      this.executionCache.syncWithUnifiedCache('systemChange');
+
+      // Apps Script キャッシュクリア
+      CacheService.getScriptCache().removeAll();
+      CacheService.getUserCache().removeAll();
+
+      // 統一キャッシュマネージャークリア
+      this.manager.clearAll();
+
+      ULog.debug('✅ 統一API: 全実行キャッシュクリア完了');
+    } catch (error) {
+      console.error('[ERROR]', `統一API: 全実行キャッシュクリア失敗:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * SheetsServiceキャッシュの統合管理
+   * @param {boolean} [forceRefresh=false] - 強制リフレッシュ
+   * @returns {Object} SheetsService
+   */
+  getSheetsServiceCached(forceRefresh = false) {
+    try {
+      // 強制リフレッシュの場合はキャッシュクリア
+      if (forceRefresh) {
+        this.executionCache.clearSheetsService();
+        this.manager.remove('sheets_service');
+      }
+
+      // 実行レベルキャッシュから取得を試行
+      let service = this.executionCache.getSheetsService();
+      if (service) {
+        ULog.debug('✅ 統一API: SheetsService 実行キャッシュヒット');
+        return service;
+      }
+
+      // 新しいサービスを生成
+      const token = getServiceAccountTokenCached();
+      service = {
+        accessToken: token,
+        baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets'
+      };
+
+      // キャッシュに保存
+      this.executionCache.setSheetsService(service);
+      this.manager.get('sheets_service', () => service, { ttl: 3600 });
+
+      ULog.debug('✅ 統一API: SheetsService 新規作成・キャッシュ保存完了');
+      return service;
+    } catch (error) {
+      console.error('[ERROR]', `統一API: SheetsService取得失敗:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ユーザーキャッシュ無効化の統合（複数の分散実装を統合）
+   * @param {string} userId - ユーザーID
+   * @param {string} email - メールアドレス  
+   * @param {string} [spreadsheetId] - スプレッドシートID
+   * @param {boolean|string} [clearPattern=false] - パターンクリア（true='all', string=パターン）
+   * @param {string} [dbSpreadsheetId] - データベーススプレッドシートID
+   */
+  invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
+    try {
+      ULog.debug(`🗑️ 統一API: ユーザーキャッシュ無効化開始`, {
+        userId, email, spreadsheetId, clearPattern, dbSpreadsheetId
+      });
+
+      // 基本ユーザーキャッシュクリア
+      if (userId) {
+        this.manager.remove(`user_${userId}`);
+        this.manager.remove(`unified_user_info_${userId}`);
+        this.manager.remove(`userinfo_${userId}`);
+        
+        // ユーザー関連パターンクリア
+        this.manager.clearByPattern(`publishedData_${userId}_`, { maxKeys: 200 });
+        this.manager.clearByPattern(`sheetData_${userId}_`, { maxKeys: 200 });
+        this.manager.clearByPattern(`config_v3_${userId}_`, { maxKeys: 200 });
+      }
+      
+      if (email) {
+        this.manager.remove(`email_${email}`);
+        this.manager.remove(`unified_user_info_${email}`);
+        this.manager.remove(`login_status_${email}`);
+      }
+      
+      if (spreadsheetId) {
+        this.manager.remove(`hdr_${spreadsheetId}`);
+        this.manager.remove(`data_${spreadsheetId}`);
+        this.manager.remove(`sheets_${spreadsheetId}`);
+        this.invalidateSpreadsheetCache(spreadsheetId);
+      }
+
+      // パターンベースクリア
+      if (clearPattern === true || clearPattern === 'all') {
+        CacheService.getScriptCache().removeAll();
+        CacheService.getUserCache().removeAll();
+        this.manager.clearAll();
+      } else if (typeof clearPattern === 'string' && clearPattern !== 'false') {
+        this.manager.clearByPattern(clearPattern, { maxKeys: 300 });
+      }
+
+      // データベーススプレッドシート関連クリア
+      if (dbSpreadsheetId) {
+        this.manager.invalidateRelated('spreadsheet', dbSpreadsheetId, [userId]);
+      }
+
+      // 実行キャッシュも同期クリア
+      this.clearUserInfoCache(userId || email);
+
+      ULog.debug('✅ 統一API: ユーザーキャッシュ無効化完了');
+    } catch (error) {
+      console.error('[ERROR]', `統一API: ユーザーキャッシュ無効化失敗:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * クリティカル更新後のキャッシュ同期化（分散実装を統合）
+   * @param {string} userId - ユーザーID
+   * @param {string} email - メールアドレス
+   * @param {string} oldSpreadsheetId - 古いスプレッドシートID
+   * @param {string} newSpreadsheetId - 新しいスプレッドシートID
+   */
+  synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
+    try {
+      ULog.info('🔄 統一API: クリティカル更新後のキャッシュ同期開始', {
+        userId, email, oldSpreadsheetId, newSpreadsheetId
+      });
+
+      // 段階1: 基本ユーザーキャッシュクリア
+      this.invalidateUserCache(userId, email, oldSpreadsheetId, false);
+      
+      if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
+        this.invalidateUserCache(userId, email, newSpreadsheetId, false);
+        
+        // 古いスプレッドシートオブジェクトキャッシュクリア
+        if (oldSpreadsheetId) {
+          this.invalidateSpreadsheetCache(oldSpreadsheetId);
+        }
+      }
+
+      // 段階2: 実行レベルキャッシュクリア
+      this.clearUserInfoCache();
+
+      // 段階3: データベースキャッシュクリア
+      this.clearDatabaseCache();
+
+      // 段階4: 関連パターンクリア
+      const patterns = ['user_*', 'email_*', 'login_status_*', 'sheets_*', 'data_*', 'config_v3_*'];
+      patterns.forEach(pattern => {
+        this.manager.clearByPattern(pattern, { maxKeys: 100 });
+      });
+
+      // 段階5: 少し待ってから検証
+      Utilities.sleep(100);
+
+      ULog.info('✅ 統一API: クリティカル更新後のキャッシュ同期完了');
+    } catch (error) {
+      console.error('[ERROR]', '統一API: キャッシュ同期失敗:', error.message);
+      throw new Error(`キャッシュ同期に失敗しました: ${error.message}`);
+    }
+  }
+
+  /**
+   * データベースキャッシュクリア（分散実装を統合）
+   */
+  clearDatabaseCache() {
+    try {
+      ULog.debug('🗑️ 統一API: データベースキャッシュクリア開始');
+      
+      // データベース関連パターンクリア
+      const dbPatterns = ['user_', 'email_', 'hdr_', 'data_', 'sheets_', 'config_v3_'];
+      dbPatterns.forEach(pattern => {
+        this.manager.clearByPattern(pattern, { maxKeys: 200 });
+      });
+
+      // Apps Script キャッシュもクリア（データベース関連のみ）
+      CacheService.getScriptCache().removeAll();
+      CacheService.getUserCache().removeAll();
+
+      ULog.debug('✅ 統一API: データベースキャッシュクリア完了');
+    } catch (error) {
+      console.error('[ERROR]', '統一API: データベースキャッシュクリア失敗:', error.message);
+      // エラーが発生しても処理を継続
+    }
+  }
+
+  /**
+   * スプレッドシートキャッシュ無効化
+   * @param {string} spreadsheetId - スプレッドシートID
+   */
+  invalidateSpreadsheetCache(spreadsheetId) {
+    if (!spreadsheetId) return;
+    
+    try {
+      // メモリキャッシュから削除（spreadsheetCache.gsの機能）
+      if (typeof spreadsheetMemoryCache !== 'undefined' && spreadsheetMemoryCache[spreadsheetId]) {
+        delete spreadsheetMemoryCache[spreadsheetId];
+      }
+
+      // セッションキャッシュから削除
+      const cacheKey = `ss_cache_${spreadsheetId}`;
+      try {
+        PropertiesService.getScriptProperties().deleteProperty(cacheKey);
+      } catch (propsError) {
+        ULog.debug('PropertiesService削除エラー:', propsError.message);
+      }
+
+      // 統一キャッシュマネージャーからも削除
+      this.manager.clearByPattern(spreadsheetId, { maxKeys: 50 });
+      this.manager.invalidateSheetData(spreadsheetId);
+
+      ULog.debug(`✅ 統一API: スプレッドシートキャッシュ無効化完了: ${spreadsheetId.substring(0, 10)}`);
+    } catch (error) {
+      console.error('[ERROR]', `統一API: スプレッドシートキャッシュ無効化失敗:`, error.message);
+    }
+  }
+
+  /**
+   * キャッシュプリウォーミング（事前読み込み）
+   * @param {string} [activeUserEmail] - アクティブユーザーのメール
+   * @returns {Object} プリウォーミング結果
+   */
+  preWarmCache(activeUserEmail) {
+    return preWarmCache(activeUserEmail);
+  }
+
+  /**
+   * キャッシュ効率分析
+   * @returns {Object} 分析結果
+   */
+  analyzeCacheEfficiency() {
+    return analyzeCacheEfficiency();
+  }
+
+  /**
+   * キャッシュヘルスチェック
+   * @returns {Object} ヘルス情報
+   */
+  getHealth() {
+    return this.manager.getHealth();
+  }
+
+  /**
+   * 統計情報取得
+   * @returns {Object} 統計情報
+   */
+  getStats() {
+    return {
+      manager: this.manager.getHealth(),
+      execution: this.executionCache.getStats(),
+      spreadsheet: typeof getSpreadsheetCacheStats === 'function' ? getSpreadsheetCacheStats() : null
+    };
+  }
 }
 
+// =============================================================================
+// SECTION 7: 統一APIシングルトンインスタンス
+// =============================================================================
+
+// 統一キャッシュAPIのシングルトンインスタンス
+const unifiedCacheAPI = new UnifiedCacheAPI();
+
+// グローバルアクセス用
+if (typeof global !== 'undefined') {
+  global.unifiedCacheAPI = unifiedCacheAPI;
+}
+
+// =============================================================================
+// SECTION 8: 後方互換性のための関数群（統一APIへのラッパー）
+// =============================================================================
+
+/**
+ * 後方互換性: clearExecutionUserInfoCache()
+ * 複数ファイルの分散実装を統一APIで置き換え
+ */
+function clearExecutionUserInfoCache() {
+  return unifiedCacheAPI.clearUserInfoCache();
+}
+
+/**
+ * 後方互換性: clearAllExecutionCache()
+ * 複数ファイルの分散実装を統一APIで置き換え
+ */
+function clearAllExecutionCache() {
+  return unifiedCacheAPI.clearAllExecutionCache();
+}
+
+/**
+ * 後方互換性: getSheetsServiceCached()
+ * database.gs等の分散実装を統一APIで置き換え
+ */
+function getSheetsServiceCached(forceRefresh = false) {
+  return unifiedCacheAPI.getSheetsServiceCached(forceRefresh);
+}
+
+/**
+ * 後方互換性: getCachedSheetsService()
+ * Core.gsの実装を統一APIで置き換え
+ */
+function getCachedSheetsService() {
+  return unifiedCacheAPI.getSheetsServiceCached();
+}
+
+/**
+ * 後方互換性: invalidateUserCache()
+ * 複数ファイルの分散実装を統一APIで置き換え
+ */
+function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId) {
+  return unifiedCacheAPI.invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId);
+}
+
+/**
+ * 後方互換性: synchronizeCacheAfterCriticalUpdate()
+ * unifiedSecurityManager.gsの実装を統一APIで置き換え
+ */
+function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
+  return unifiedCacheAPI.synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId);
+}
+
+/**
+ * 後方互換性: clearDatabaseCache()
+ * unifiedSecurityManager.gsの実装を統一APIで置き換え
+ */
+function clearDatabaseCache() {
+  return unifiedCacheAPI.clearDatabaseCache();
+}
+
+/**
+ * 後方互換性: clearExecutionSheetsServiceCache()
+ */
 function clearExecutionSheetsServiceCache() {
   const cache = getUnifiedExecutionCache();
   cache.clearSheetsService();
-}
-
-function clearAllExecutionCache() {
-  const cache = getUnifiedExecutionCache();
-  cache.clearAll();
-  cache.syncWithUnifiedCache('systemChange');
 }

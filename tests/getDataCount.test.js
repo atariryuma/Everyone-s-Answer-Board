@@ -5,6 +5,7 @@ describe('getDataCount reflects new rows', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   const unifiedCacheManagerCode = fs.readFileSync('src/unifiedCacheManager.gs', 'utf8');
+  const unifiedSheetDataManagerCode = fs.readFileSync('src/unifiedSheetDataManager.gs', 'utf8');
   const debugConfigCode = fs.readFileSync('src/debugConfig.gs', 'utf8');
   let context;
   let sheetData;
@@ -17,9 +18,10 @@ describe('getDataCount reflects new rows', () => {
     const getFreshSheet = () => ({
       getLastRow: () => sheetData.length,
       getRange: (row, col, numRows, numCols) => ({
-        getValues: () => sheetData
-          .slice(row - 1, row - 1 + numRows)
-          .map(r => r.slice(col - 1, col - 1 + numCols)),
+        getValues: () =>
+          sheetData
+            .slice(row - 1, row - 1 + numRows)
+            .map((r) => r.slice(col - 1, col - 1 + numCols)),
       }),
     });
     context = {
@@ -36,21 +38,34 @@ describe('getDataCount reflects new rows', () => {
           getSheetByName: () => getFreshSheet(),
         })),
       },
-      Utilities: { getUuid: () => 'test-uuid-' + Math.random() },
+      Utilities: { getUuid: () => `test-uuid-${Math.random()}` },
       CacheService: (() => {
         const scriptCacheStore = {};
         return {
           getScriptCache: () => ({
-            get: jest.fn(key => (scriptCacheStore[key] === undefined ? null : scriptCacheStore[key])),
-            put: jest.fn((key, value) => { scriptCacheStore[key] = value; }),
-            remove: jest.fn(key => { delete scriptCacheStore[key]; }),
-            removeAll: jest.fn(() => { Object.keys(scriptCacheStore).forEach(key => delete scriptCacheStore[key]); }),
-            getAll: jest.fn(keys => {
+            get: jest.fn((key) =>
+              scriptCacheStore[key] === undefined ? null : scriptCacheStore[key]
+            ),
+            put: jest.fn((key, value) => {
+              scriptCacheStore[key] = value;
+            }),
+            remove: jest.fn((key) => {
+              delete scriptCacheStore[key];
+            }),
+            removeAll: jest.fn(() => {
+              Object.keys(scriptCacheStore).forEach((key) => delete scriptCacheStore[key]);
+            }),
+            getAll: jest.fn((keys) => {
               const result = {};
-              keys.forEach(key => { if (Object.prototype.hasOwnProperty.call(scriptCacheStore, key)) result[key] = scriptCacheStore[key]; });
+              keys.forEach((key) => {
+                if (Object.prototype.hasOwnProperty.call(scriptCacheStore, key))
+                  result[key] = scriptCacheStore[key];
+              });
               return result;
             }),
-            putAll: jest.fn(values => { Object.assign(scriptCacheStore, values); }),
+            putAll: jest.fn((values) => {
+              Object.assign(scriptCacheStore, values);
+            }),
           }),
           getUserCache: () => ({
             get: jest.fn(),
@@ -72,11 +87,26 @@ describe('getDataCount reflects new rows', () => {
       getHeaderIndices: () => ({ クラス: 1 }),
       COLUMN_HEADERS: { CLASS: 'クラス' },
       getCurrentUserEmail: () => 'user@example.com',
+      // 統一システム必須関数の事前定義
+      ULog: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      },
+      createSuccessResponse: (data) => ({ status: 'success', data }),
+      createErrorResponse: (error) => ({ status: 'error', error }),
+      cacheManager: {
+        get: jest.fn(),
+        put: jest.fn(),
+        remove: jest.fn(),
+      },
     };
     context.global = context;
     vm.createContext(context);
     vm.runInContext(debugConfigCode, context);
     vm.runInContext(unifiedCacheManagerCode, context);
+    vm.runInContext(unifiedSheetDataManagerCode, context);
     vm.runInContext(mainCode, context);
     vm.runInContext(coreCode, context);
     context.verifyUserAccess = jest.fn();

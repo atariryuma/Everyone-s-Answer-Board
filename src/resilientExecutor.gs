@@ -11,8 +11,8 @@ class ResilientExecutor {
   constructor(options = {}) {
     this.config = {
       maxRetries: options.maxRetries || 3,
-      baseDelay: options.baseDelay || 1000,  // 1秒
-      maxDelay: options.maxDelay || 30000,   // 30秒
+      baseDelay: options.baseDelay || 1000, // 1秒
+      maxDelay: options.maxDelay || 30000, // 30秒
       backoffFactor: options.backoffFactor || 2,
       jitterEnabled: options.jitterEnabled !== false, // デフォルトtrue
       timeoutMs: options.timeoutMs || 120000, // 2分
@@ -25,7 +25,7 @@ class ResilientExecutor {
       lastFailureTime: 0,
       successThreshold: 3, // HALF_OPENでの成功回数しきい値
       failureThreshold: 5, // OPENになる連続失敗回数
-      openTimeout: 60000,  // OPEN状態の継続時間（1分）
+      openTimeout: 60000, // OPEN状態の継続時間（1分）
     };
 
     // 実行統計
@@ -55,7 +55,9 @@ class ResilientExecutor {
     if (this.circuitBreaker.state === 'OPEN') {
       const timeSinceLastFailure = Date.now() - this.circuitBreaker.lastFailureTime;
       if (timeSinceLastFailure < this.circuitBreaker.openTimeout) {
-        throw new Error(`Circuit breaker is OPEN for ${operationName}. Remaining: ${this.circuitBreaker.openTimeout - timeSinceLastFailure}ms`);
+        throw new Error(
+          `Circuit breaker is OPEN for ${operationName}. Remaining: ${this.circuitBreaker.openTimeout - timeSinceLastFailure}ms`
+        );
       } else {
         this.circuitBreaker.state = 'HALF_OPEN';
         this.circuitBreaker.failures = 0;
@@ -64,36 +66,41 @@ class ResilientExecutor {
     }
 
     let lastError = null;
-    
+
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
       try {
-        debugLog(`[ResilientExecutor] Executing ${operationName} (attempt ${attempt + 1}/${this.config.maxRetries + 1})`);
-        
+        debugLog(
+          `[ResilientExecutor] Executing ${operationName} (attempt ${attempt + 1}/${this.config.maxRetries + 1})`
+        );
+
         const result = this.executeWithTimeout(operation, this.config.timeoutMs);
-        
+
         // 成功時の回路ブレーカー処理
         this.handleSuccess(operationName);
-        
+
         if (attempt > 0) {
           this.stats.retriedExecutions++;
         }
         this.stats.successfulExecutions++;
-        
+
         return result;
-        
       } catch (error) {
         lastError = error;
-        
+
         // リトライ不可能なエラーかチェック
         if (!this.isRetryableError(error) || !isIdempotent) {
-          debugLog(`[ResilientExecutor] Non-retryable error for ${operationName}: ${error.message}`);
+          debugLog(
+            `[ResilientExecutor] Non-retryable error for ${operationName}: ${error.message}`
+          );
           break;
         }
-        
+
         // 最後の試行でない場合は待機
         if (attempt < this.config.maxRetries) {
           const delay = this.calculateBackoffDelay(attempt);
-          debugLog(`[ResilientExecutor] ${operationName} failed (attempt ${attempt + 1}). Retrying in ${delay}ms: ${error.message}`);
+          debugLog(
+            `[ResilientExecutor] ${operationName} failed (attempt ${attempt + 1}). Retrying in ${delay}ms: ${error.message}`
+          );
           this.sleep(delay);
         }
       }
@@ -109,7 +116,9 @@ class ResilientExecutor {
         debugLog(`[ResilientExecutor] Executing fallback for ${operationName}`);
         return fallback(lastError);
       } catch (fallbackError) {
-        warnLog(`[ResilientExecutor] Fallback failed for ${operationName}: ${fallbackError.message}`);
+        warnLog(
+          `[ResilientExecutor] Fallback failed for ${operationName}: ${fallbackError.message}`
+        );
       }
     }
 
@@ -128,12 +137,13 @@ class ResilientExecutor {
         reject(new Error(`Operation timed out after ${timeoutMs}ms`));
       }, timeoutMs);
 
-      Promise.resolve().then(() => operation())
-        .then(result => {
+      Promise.resolve()
+        .then(() => operation())
+        .then((result) => {
           clearTimeout(timeoutId);
           resolve(result);
         })
-        .catch(error => {
+        .catch((error) => {
           clearTimeout(timeoutId);
           reject(error);
         });
@@ -174,13 +184,11 @@ class ResilientExecutor {
       'temporarily unavailable',
       'Service Unavailable',
       'Bad Gateway',
-      'Gateway Timeout'
+      'Gateway Timeout',
     ];
 
     const errorMessage = error.message || error.toString();
-    return retryableMessages.some(msg => 
-      errorMessage.toLowerCase().includes(msg.toLowerCase())
-    );
+    return retryableMessages.some((msg) => errorMessage.toLowerCase().includes(msg.toLowerCase()));
   }
 
   /**
@@ -207,7 +215,9 @@ class ResilientExecutor {
     if (this.circuitBreaker.failures >= this.circuitBreaker.failureThreshold) {
       this.circuitBreaker.state = 'OPEN';
       this.stats.circuitBreakerActivations++;
-      warnLog(`[ResilientExecutor] Circuit breaker for ${operationName} moved to OPEN after ${this.circuitBreaker.failures} failures`);
+      warnLog(
+        `[ResilientExecutor] Circuit breaker for ${operationName} moved to OPEN after ${this.circuitBreaker.failures} failures`
+      );
     }
   }
 
@@ -217,7 +227,7 @@ class ResilientExecutor {
    * @returns {Promise<void>}
    */
   sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -228,9 +238,10 @@ class ResilientExecutor {
     return {
       ...this.stats,
       circuitBreakerState: this.circuitBreaker.state,
-      successRate: this.stats.totalExecutions > 0 
-        ? (this.stats.successfulExecutions / this.stats.totalExecutions * 100).toFixed(2) + '%'
-        : '0%'
+      successRate:
+        this.stats.totalExecutions > 0
+          ? ((this.stats.successfulExecutions / this.stats.totalExecutions) * 100).toFixed(2) + '%'
+          : '0%',
     };
   }
 
@@ -274,23 +285,23 @@ function resilientUrlFetch(url, options = {}) {
   // 同期実行でリトライ機能付き
   const maxRetries = 3;
   const baseDelay = 1000;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       debugLog(`resilientUrlFetch: ${url} (試行 ${attempt + 1}/${maxRetries + 1})`);
-      
+
       const response = UrlFetchApp.fetch(url, {
         ...options,
-        muteHttpExceptions: true
+        muteHttpExceptions: true,
       });
-      
+
       // レスポンス検証
       if (!response || typeof response.getResponseCode !== 'function') {
         throw new Error('無効なレスポンスオブジェクトが返されました');
       }
-      
+
       const responseCode = response.getResponseCode();
-      
+
       // 成功時またはリトライ不要なエラー
       if (responseCode >= 200 && responseCode < 300) {
         if (attempt > 0) {
@@ -298,13 +309,13 @@ function resilientUrlFetch(url, options = {}) {
         }
         return response;
       }
-      
+
       // 4xx エラーはリトライしない
       if (responseCode >= 400 && responseCode < 500) {
         warnLog(`resilientUrlFetch: クライアントエラー ${responseCode} - ${url}`);
         return response;
       }
-      
+
       // 最後の試行でない場合は待機してリトライ
       if (attempt < maxRetries) {
         const delay = baseDelay * Math.pow(2, attempt);
@@ -314,7 +325,6 @@ function resilientUrlFetch(url, options = {}) {
         warnLog(`resilientUrlFetch: 最大リトライ回数に達しました - ${url}`);
         return response;
       }
-      
     } catch (error) {
       // 最後の試行でない場合はリトライ
       if (attempt < maxRetries) {
@@ -322,7 +332,7 @@ function resilientUrlFetch(url, options = {}) {
         warnLog(`resilientUrlFetch: エラー、${delay}ms後にリトライ - ${url}: ${error.message}`);
         Utilities.sleep(delay);
       } else {
-        console.error("[ERROR]", `resilientUrlFetch: 最終的に失敗 - ${url}: ${error.message}`);
+        console.error('[ERROR]', `resilientUrlFetch: 最終的に失敗 - ${url}: ${error.message}`);
         throw error;
       }
     }
@@ -353,6 +363,6 @@ function resilientCacheOperation(operation, operationName = 'CacheOperation', fa
   return resilientExecutor.execute(operation, {
     name: operationName,
     idempotent: true,
-    fallback: fallback
+    fallback: fallback,
   });
 }

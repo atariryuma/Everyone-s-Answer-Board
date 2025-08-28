@@ -8,13 +8,13 @@ const path = require('path');
 // serviceAccount.gsからgetServiceAccountTokenCached関数を抽出
 function loadGetServiceAccountTokenCachedFunction() {
   const file = fs.readFileSync(path.join(__dirname, '../src/serviceAccount.gs'), 'utf8');
-  
+
   // getServiceAccountTokenCached関数を抽出
   const start = file.indexOf('function getServiceAccountTokenCached');
   if (start === -1) {
     throw new Error('getServiceAccountTokenCached function not found');
   }
-  
+
   let i = file.indexOf('{', start);
   let depth = 1;
   i += 1;
@@ -24,23 +24,23 @@ function loadGetServiceAccountTokenCachedFunction() {
     if (char === '}') depth -= 1;
     i += 1;
   }
-  
+
   const fnStr = file.slice(start, i);
-  
+
   // 必要なグローバル関数とサービスのモック
   const mockCacheService = {
     getScriptCache: jest.fn(() => ({
       get: jest.fn(),
-      put: jest.fn()
-    }))
+      put: jest.fn(),
+    })),
   };
-  
+
   const mockGenerateNewServiceAccountToken = jest.fn();
   const mockLogError = jest.fn();
   const mockConsole = {
-    warn: jest.fn()
+    warn: jest.fn(),
   };
-  
+
   const fn = new Function(`
     const CacheService = arguments[0];
     const generateNewServiceAccountToken = arguments[1];
@@ -52,25 +52,25 @@ function loadGetServiceAccountTokenCachedFunction() {
     ${fnStr}; 
     return { getServiceAccountTokenCached, CacheService, generateNewServiceAccountToken };
   `)(mockCacheService, mockGenerateNewServiceAccountToken, mockLogError, mockConsole);
-  
-  return { 
-    ...fn, 
-    mockCacheService, 
-    mockGenerateNewServiceAccountToken, 
+
+  return {
+    ...fn,
+    mockCacheService,
+    mockGenerateNewServiceAccountToken,
     mockLogError,
-    mockConsole
+    mockConsole,
   };
 }
 
 describe('getServiceAccountTokenCached関数テスト', () => {
   let functions;
   let mockCache;
-  
+
   beforeEach(() => {
     functions = loadGetServiceAccountTokenCachedFunction();
     mockCache = {
       get: jest.fn(),
-      put: jest.fn()
+      put: jest.fn(),
     };
     functions.mockCacheService.getScriptCache.mockReturnValue(mockCache);
     jest.clearAllMocks();
@@ -81,7 +81,7 @@ describe('getServiceAccountTokenCached関数テスト', () => {
     mockCache.get.mockReturnValue(cachedToken);
 
     const result = functions.getServiceAccountTokenCached();
-    
+
     expect(result).toBe(cachedToken);
     expect(mockCache.get).toHaveBeenCalledWith('service_account_token');
     expect(functions.mockGenerateNewServiceAccountToken).not.toHaveBeenCalled();
@@ -94,7 +94,7 @@ describe('getServiceAccountTokenCached関数テスト', () => {
     functions.mockGenerateNewServiceAccountToken.mockReturnValue(newToken);
 
     const result = functions.getServiceAccountTokenCached();
-    
+
     expect(result).toBe(newToken);
     expect(mockCache.get).toHaveBeenCalledWith('service_account_token');
     expect(functions.mockGenerateNewServiceAccountToken).toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe('getServiceAccountTokenCached関数テスト', () => {
     functions.mockGenerateNewServiceAccountToken.mockReturnValue(newToken);
 
     const result = functions.getServiceAccountTokenCached(true);
-    
+
     expect(result).toBe(newToken);
     expect(mockCache.get).not.toHaveBeenCalled();
     expect(functions.mockGenerateNewServiceAccountToken).toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe('getServiceAccountTokenCached関数テスト', () => {
     functions.mockGenerateNewServiceAccountToken.mockReturnValue(null);
 
     const result = functions.getServiceAccountTokenCached();
-    
+
     expect(result).toBeNull();
     expect(functions.mockGenerateNewServiceAccountToken).toHaveBeenCalled();
     expect(mockCache.put).not.toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe('getServiceAccountTokenCached関数テスト', () => {
     });
 
     const result = functions.getServiceAccountTokenCached();
-    
+
     expect(result).toBe(newToken);
     expect(functions.mockConsole.warn).toHaveBeenCalledWith(
       expect.stringContaining('トークンキャッシュの保存に失敗'),
@@ -149,7 +149,7 @@ describe('getServiceAccountTokenCached関数テスト', () => {
     });
 
     const result = functions.getServiceAccountTokenCached();
-    
+
     expect(result).toBeNull();
     expect(functions.mockLogError).toHaveBeenCalledWith(
       expect.any(Error),

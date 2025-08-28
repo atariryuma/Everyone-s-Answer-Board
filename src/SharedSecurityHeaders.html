@@ -1,46 +1,52 @@
 <!-- Shared Security Headers Configuration -->
 <!-- Content Security Policy for enhanced security -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;"
+/>
 
 <!-- Permissions Policy for Google Apps Script environment -->
 <!-- Explicitly disable problematic features that cause console warnings -->
 <!-- Include all known problematic features to prevent warnings -->
-<meta http-equiv="Permissions-Policy" content="accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), navigation-override=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=(), clipboard-read=(), clipboard-write=(), gamepad=(), speaker-selection=(), conversion-measurement=(), focus-without-user-activation=(), hid=(), idle-detection=(), interest-cohort=(), join-ad-interest-group=(), run-ad-auction=(), serial=(), shared-autofill=(), storage-access-api=(), trust-token-redemption=(), unload=(), window-placement=(), vertical-scroll=(), speaker=(), vibrate=(), vr=()">
+<meta
+  http-equiv="Permissions-Policy"
+  content="accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), navigation-override=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=(), clipboard-read=(), clipboard-write=(), gamepad=(), speaker-selection=(), conversion-measurement=(), focus-without-user-activation=(), hid=(), idle-detection=(), interest-cohort=(), join-ad-interest-group=(), run-ad-auction=(), serial=(), shared-autofill=(), storage-access-api=(), trust-token-redemption=(), unload=(), window-placement=(), vertical-scroll=(), speaker=(), vibrate=(), vr=()"
+/>
 
 <!-- Additional JavaScript-based warning suppression for persistent warnings -->
 <script>
-(function() {
-  // Override console methods to filter out known GAS warnings
-  const originalWarn = console.warn;
-  const originalError = console.error;
-  
-  const warningFilters = [
-    /Unrecognized feature.*ambient-light-sensor/,
-    /Unrecognized feature.*speaker/,
-    /Unrecognized feature.*vibrate/,
-    /Unrecognized feature.*vr/,
-    /iframe.*allow-scripts.*allow-same-origin.*sandbox/
-  ];
-  
-  console.warn = function(...args) {
-    const message = args.join(' ');
-    if (!warningFilters.some(filter => filter.test(message))) {
-      originalWarn.apply(console, args);
-    }
-  };
-  
-  console.error = function(...args) {
-    const message = args.join(' ');
-    if (!warningFilters.some(filter => filter.test(message))) {
-      originalError.apply(console, args);
-    }
-  };
-})();
+  (function () {
+    // Override console methods to filter out known GAS warnings
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    const warningFilters = [
+      /Unrecognized feature.*ambient-light-sensor/,
+      /Unrecognized feature.*speaker/,
+      /Unrecognized feature.*vibrate/,
+      /Unrecognized feature.*vr/,
+      /iframe.*allow-scripts.*allow-same-origin.*sandbox/,
+    ];
+
+    console.warn = function (...args) {
+      const message = args.join(' ');
+      if (!warningFilters.some((filter) => filter.test(message))) {
+        originalWarn.apply(console, args);
+      }
+    };
+
+    console.error = function (...args) {
+      const message = args.join(' ');
+      if (!warningFilters.some((filter) => filter.test(message))) {
+        originalError.apply(console, args);
+      }
+    };
+  })();
 </script>
 
 <!-- Additional security headers -->
-<meta name="referrer" content="no-referrer">
-<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="no-referrer" />
+<meta http-equiv="X-Content-Type-Options" content="nosniff" />
 
 <!-- 
 Security Note: 

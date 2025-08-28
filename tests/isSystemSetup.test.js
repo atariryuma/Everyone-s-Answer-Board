@@ -10,15 +10,14 @@ describe('isSystemSetup requires ADMIN_EMAIL and SERVICE_ACCOUNT_CREDS', () => {
     scriptProps = { getProperty: jest.fn(() => null) };
     context = {
       console,
-      PropertiesService: { getScriptProperties: () => scriptProps }
+      PropertiesService: { getScriptProperties: () => scriptProps },
     };
     vm.createContext(context);
     vm.runInContext(code, context);
   });
 
   test('returns false when admin email missing', () => {
-    scriptProps.getProperty = (key) =>
-      key === 'DATABASE_SPREADSHEET_ID' ? 'id' : null;
+    scriptProps.getProperty = (key) => (key === 'DATABASE_SPREADSHEET_ID' ? 'id' : null);
     expect(context.isSystemSetup()).toBe(false);
   });
 

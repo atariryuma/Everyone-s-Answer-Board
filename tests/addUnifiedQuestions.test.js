@@ -6,7 +6,7 @@ function createMockItem() {
     setTitle: jest.fn(),
     setRequired: jest.fn(),
     setChoiceValues: jest.fn(),
-    showOtherOption: jest.fn()
+    showOtherOption: jest.fn(),
   };
 }
 
@@ -15,7 +15,7 @@ describe('addUnifiedQuestions other option', () => {
   const context = {
     console,
     debugLog: () => {},
-    Utilities: { getUuid: () => 'test-uuid-' + Math.random() }
+    Utilities: { getUuid: () => `test-uuid-${Math.random()}` },
   };
   vm.createContext(context);
   vm.runInContext(code, context);
@@ -28,16 +28,16 @@ describe('addUnifiedQuestions other option', () => {
       addParagraphTextItem: jest.fn(() => createMockItem()),
       addTextItem: jest.fn(() => createMockItem()),
       addMultipleChoiceItem: jest.fn(() => createMockItem()),
-      addListItem: jest.fn(() => createMockItem())
+      addListItem: jest.fn(() => createMockItem()),
     };
 
     context.addUnifiedQuestions(form, 'custom', {
       mainQuestion: {
         type: 'multiple',
         choices: ['A', 'B'],
-        includeOthers: true
+        includeOthers: true,
       },
-      enableClass: false
+      enableClass: false,
     });
 
     expect(mainItem.showOtherOption).toHaveBeenCalledWith(true);
@@ -51,16 +51,16 @@ describe('addUnifiedQuestions other option', () => {
       addParagraphTextItem: jest.fn(() => createMockItem()),
       addTextItem: jest.fn(() => createMockItem()),
       addCheckboxItem: jest.fn(() => createMockItem()),
-      addListItem: jest.fn(() => createMockItem())
+      addListItem: jest.fn(() => createMockItem()),
     };
 
     context.addUnifiedQuestions(form, 'custom', {
       mainQuestion: {
         type: 'choice',
         choices: ['A', 'B'],
-        includeOthers: true
+        includeOthers: true,
       },
-      enableClass: false
+      enableClass: false,
     });
 
     expect(mainItem.showOtherOption).toHaveBeenCalledWith(true);

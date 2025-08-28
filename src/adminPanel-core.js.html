@@ -1,372 +1,436 @@
 <script>
-// =============================================================================
-// ADMIN PANEL CORE UTILITIES & DOM OPERATIONS
-// =============================================================================
+  // =============================================================================
+  // ADMIN PANEL CORE UTILITIES & DOM OPERATIONS
+  // =============================================================================
 
-// =============================================================================
-// LOGGING UTILITIES - Standardized logging with levels
-// =============================================================================
+  // =============================================================================
+  // LOGGING UTILITIES - Standardized logging with levels
+  // =============================================================================
 
-// Simple logging utility with conditional output based on DEBUG mode  
-// DEBUG_MODE is defined in constants.js.html
+  // Simple logging utility with conditional output based on DEBUG mode
+  // DEBUG_MODE is defined in constants.js.html
 
-function adminLog(level, ...args) {
-  if (!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE))) return;
-  
-  switch (level) {
-    case 'error':
-      console.error('[AdminPanel]', ...args);
-      break;
-    case 'warn':
-      console.warn('[AdminPanel]', ...args);
-      break;
-    case 'info':
-      console.log('[AdminPanel]', ...args);
-      break;
-    case 'debug':
-      if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)) console.log('[AdminPanel:DEBUG]', ...args);
-      break;
-    default:
-      console.log('[AdminPanel]', ...args);
+  function adminLog(level, ...args) {
+    if (!(window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE)))
+      return;
+
+    switch (level) {
+      case 'error':
+        console.error('[AdminPanel]', ...args);
+        break;
+      case 'warn':
+        console.warn('[AdminPanel]', ...args);
+        break;
+      case 'info':
+        console.log('[AdminPanel]', ...args);
+        break;
+      case 'debug':
+        if (window.DEBUG_MODE || (window.SYSTEM_CONSTANTS && window.SYSTEM_CONSTANTS.DEBUG_MODE))
+          console.log('[AdminPanel:DEBUG]', ...args);
+        break;
+      default:
+        console.log('[AdminPanel]', ...args);
+    }
   }
-}
 
-// Convenience functions for different log levels
-function logError(...args) { adminLog('error', ...args); }
-function logWarn(...args) { adminLog('warn', ...args); }
-function logInfo(...args) { adminLog('info', ...args); }
-function logDebug(...args) { adminLog('debug', ...args); }
+  // Convenience functions for different log levels
+  function logError(...args) {
+    adminLog('error', ...args);
+  }
+  function logWarn(...args) {
+    adminLog('warn', ...args);
+  }
+  function logInfo(...args) {
+    adminLog('info', ...args);
+  }
+  function logDebug(...args) {
+    adminLog('debug', ...args);
+  }
 
-// =============================================================================
-// ENHANCED MESSAGE SYSTEM FOR SETUP FLOW
-// =============================================================================
-// Message handling is now centralized in AdminPanel.ui.showMessage defined in
-// adminPanel-framework.js.html. The previous inline implementation has been
-// removed to avoid duplication.
+  // =============================================================================
+  // ENHANCED MESSAGE SYSTEM FOR SETUP FLOW
+  // =============================================================================
+  // Message handling is now centralized in AdminPanel.ui.showMessage defined in
+  // adminPanel-framework.js.html. The previous inline implementation has been
+  // removed to avoid duplication.
 
-// =============================================================================
-// UNIFIED MANAGEMENT SYSTEM API - 統一管理システムAPI
-// =============================================================================
+  // =============================================================================
+  // UNIFIED MANAGEMENT SYSTEM API - 統一管理システムAPI
+  // =============================================================================
 
-/**
- * 統一管理システム - 全管理クラスのエントリーポイント
- */
-window.unifiedManagement = {
-  // キャッシュ管理 (CacheManager)
-  cache: {
-    get: (key, valueFn, options) => typeof cacheManager !== 'undefined' ? cacheManager.get(key, valueFn, options) : (valueFn ? valueFn() : null),
-    remove: (key) => typeof cacheManager !== 'undefined' ? cacheManager.remove(key) : null,
-    clearAll: () => typeof cacheManager !== 'undefined' ? cacheManager.clearAll() : null,
-    clearFrontend: (options) => typeof cacheManager !== 'undefined' ? cacheManager.clearAllFrontendCaches(options) : Promise.resolve({ success: false }),
-    clearSpecific: (type) => typeof cacheManager !== 'undefined' ? cacheManager.clearSpecificCache(type) : Promise.resolve({ success: false }),
-    diagnose: () => typeof cacheManager !== 'undefined' ? cacheManager.diagnoseFrontendCache() : { available: false },
-    getHealth: () => typeof cacheManager !== 'undefined' ? cacheManager.getHealth() : { status: 'unavailable' }
-  },
-
-  // タイミング制御 (TimingManager)
-  timing: {
-    delay: (ms, id) => typeof TimingManager !== 'undefined' ? TimingManager.delay(ms, id) : new Promise(resolve => setTimeout(resolve, ms)),
-    sequence: (operations, intervalMs, sequenceId) => typeof TimingManager !== 'undefined' ? TimingManager.sequence(operations, intervalMs, sequenceId) : Promise.resolve([]),
-    parallel: (operations, concurrency) => typeof TimingManager !== 'undefined' ? TimingManager.parallel(operations, concurrency) : Promise.all(operations.map(op => op())),
-    progressSequence: (steps, onProgress, stepDelay) => typeof TimingManager !== 'undefined' ? TimingManager.progressSequence(steps, onProgress, stepDelay) : Promise.resolve([]),
-    debounce: (func, key, delay) => typeof TimingManager !== 'undefined' ? TimingManager.debounce(func, key, delay) : func,
-    throttle: (func, key, delay) => typeof TimingManager !== 'undefined' ? TimingManager.throttle(func, key, delay) : func,
-    clearTiming: (key) => typeof TimingManager !== 'undefined' ? TimingManager.clearTiming(key) : null,
-    clearAllTiming: () => typeof TimingManager !== 'undefined' ? TimingManager.clearAllTiming() : null
-  },
-
-  // フロー実行制御 (FlowExecutionManager)
-  flow: {
-    execute: (flowId, operation, options) => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.executeWithLock(flowId, operation, options) : operation(),
-    executeWithLoading: (flowId, operation, options) => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.executeWithLoadingSync(flowId, operation, options) : operation(),
-    cancel: (flowId) => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.cancelFlow(flowId) : null,
-    cancelAll: () => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.cancelAllFlows() : null,
-    diagnose: () => typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.diagnoseExecution() : { activeFlows: [], pendingOperations: 0 }
-  },
-
-  // UI管理 (UnifiedLoadingManager)
-  ui: {
-    showLoading: (message, options) => window.unifiedLoading && window.unifiedLoading.showSimple(message, options),
-    showProgress: (message, step, percentage) => window.unifiedLoading && window.unifiedLoading.showAdminProgress(message, step, percentage),
-    hideLoading: () => window.unifiedLoading && window.unifiedLoading.hide(),
-    setLoading: (isLoading, message, step, percentage) => window.setLoading(isLoading, message, step, percentage)
-  },
-
-  // システム診断
-  diagnose: () => ({
-    cache: typeof cacheManager !== 'undefined' ? cacheManager.diagnoseFrontendCache() : { available: false },
-    flow: typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.diagnoseExecution() : { activeFlows: [], pendingOperations: 0 },
-    timing: {
-      activeTimers: typeof timingManager !== 'undefined' ? timingManager.activeTimers.size : 0,
-      debounceTimers: typeof timingManager !== 'undefined' ? ((timingManager.debounceTimers && timingManager.debounceTimers.size) || 0) : 0,
-      throttleTimers: typeof timingManager !== 'undefined' ? ((timingManager.throttleTimers && timingManager.throttleTimers.size) || 0) : 0
+  /**
+   * 統一管理システム - 全管理クラスのエントリーポイント
+   */
+  window.unifiedManagement = {
+    // キャッシュ管理 (CacheManager)
+    cache: {
+      get: (key, valueFn, options) =>
+        typeof cacheManager !== 'undefined'
+          ? cacheManager.get(key, valueFn, options)
+          : valueFn
+            ? valueFn()
+            : null,
+      remove: (key) => (typeof cacheManager !== 'undefined' ? cacheManager.remove(key) : null),
+      clearAll: () => (typeof cacheManager !== 'undefined' ? cacheManager.clearAll() : null),
+      clearFrontend: (options) =>
+        typeof cacheManager !== 'undefined'
+          ? cacheManager.clearAllFrontendCaches(options)
+          : Promise.resolve({ success: false }),
+      clearSpecific: (type) =>
+        typeof cacheManager !== 'undefined'
+          ? cacheManager.clearSpecificCache(type)
+          : Promise.resolve({ success: false }),
+      diagnose: () =>
+        typeof cacheManager !== 'undefined'
+          ? cacheManager.diagnoseFrontendCache()
+          : { available: false },
+      getHealth: () =>
+        typeof cacheManager !== 'undefined' ? cacheManager.getHealth() : { status: 'unavailable' },
     },
-    timestamp: Date.now()
-  })
-};
 
-// レガシー互換性のためのグローバル関数
-var debounce = function(func, delay, key) {
-  if (typeof TimingManager !== 'undefined') {
-    return TimingManager.debounce(func, key || 'default', delay);
-  } else if (window.sharedUtilities && window.sharedUtilities.debounce) {
-    window.sharedUtilities.debounce.debounce(func, key || 'default', delay);
-  } else {
-    // フォールバック実装
-    let timeouts = window._debounceTimeouts || (window._debounceTimeouts = {});
-    return function(...args) {
-      const timeoutKey = key || 'default';
-      clearTimeout(timeouts[timeoutKey]);
-      timeouts[timeoutKey] = setTimeout(() => func.apply(this, args), delay);
-    };
+    // タイミング制御 (TimingManager)
+    timing: {
+      delay: (ms, id) =>
+        typeof TimingManager !== 'undefined'
+          ? TimingManager.delay(ms, id)
+          : new Promise((resolve) => setTimeout(resolve, ms)),
+      sequence: (operations, intervalMs, sequenceId) =>
+        typeof TimingManager !== 'undefined'
+          ? TimingManager.sequence(operations, intervalMs, sequenceId)
+          : Promise.resolve([]),
+      parallel: (operations, concurrency) =>
+        typeof TimingManager !== 'undefined'
+          ? TimingManager.parallel(operations, concurrency)
+          : Promise.all(operations.map((op) => op())),
+      progressSequence: (steps, onProgress, stepDelay) =>
+        typeof TimingManager !== 'undefined'
+          ? TimingManager.progressSequence(steps, onProgress, stepDelay)
+          : Promise.resolve([]),
+      debounce: (func, key, delay) =>
+        typeof TimingManager !== 'undefined' ? TimingManager.debounce(func, key, delay) : func,
+      throttle: (func, key, delay) =>
+        typeof TimingManager !== 'undefined' ? TimingManager.throttle(func, key, delay) : func,
+      clearTiming: (key) =>
+        typeof TimingManager !== 'undefined' ? TimingManager.clearTiming(key) : null,
+      clearAllTiming: () =>
+        typeof TimingManager !== 'undefined' ? TimingManager.clearAllTiming() : null,
+    },
+
+    // フロー実行制御 (FlowExecutionManager)
+    flow: {
+      execute: (flowId, operation, options) =>
+        typeof flowExecutionManager !== 'undefined'
+          ? flowExecutionManager.executeWithLock(flowId, operation, options)
+          : operation(),
+      executeWithLoading: (flowId, operation, options) =>
+        typeof flowExecutionManager !== 'undefined'
+          ? flowExecutionManager.executeWithLoadingSync(flowId, operation, options)
+          : operation(),
+      cancel: (flowId) =>
+        typeof flowExecutionManager !== 'undefined'
+          ? flowExecutionManager.cancelFlow(flowId)
+          : null,
+      cancelAll: () =>
+        typeof flowExecutionManager !== 'undefined' ? flowExecutionManager.cancelAllFlows() : null,
+      diagnose: () =>
+        typeof flowExecutionManager !== 'undefined'
+          ? flowExecutionManager.diagnoseExecution()
+          : { activeFlows: [], pendingOperations: 0 },
+    },
+
+    // UI管理 (UnifiedLoadingManager)
+    ui: {
+      showLoading: (message, options) =>
+        window.unifiedLoading && window.unifiedLoading.showSimple(message, options),
+      showProgress: (message, step, percentage) =>
+        window.unifiedLoading && window.unifiedLoading.showAdminProgress(message, step, percentage),
+      hideLoading: () => window.unifiedLoading && window.unifiedLoading.hide(),
+      setLoading: (isLoading, message, step, percentage) =>
+        window.setLoading(isLoading, message, step, percentage),
+    },
+
+    // システム診断
+    diagnose: () => ({
+      cache:
+        typeof cacheManager !== 'undefined'
+          ? cacheManager.diagnoseFrontendCache()
+          : { available: false },
+      flow:
+        typeof flowExecutionManager !== 'undefined'
+          ? flowExecutionManager.diagnoseExecution()
+          : { activeFlows: [], pendingOperations: 0 },
+      timing: {
+        activeTimers: typeof timingManager !== 'undefined' ? timingManager.activeTimers.size : 0,
+        debounceTimers:
+          typeof timingManager !== 'undefined'
+            ? (timingManager.debounceTimers && timingManager.debounceTimers.size) || 0
+            : 0,
+        throttleTimers:
+          typeof timingManager !== 'undefined'
+            ? (timingManager.throttleTimers && timingManager.throttleTimers.size) || 0
+            : 0,
+      },
+      timestamp: Date.now(),
+    }),
+  };
+
+  // レガシー互換性のためのグローバル関数
+  var debounce = function (func, delay, key) {
+    if (typeof TimingManager !== 'undefined') {
+      return TimingManager.debounce(func, key || 'default', delay);
+    } else if (window.sharedUtilities && window.sharedUtilities.debounce) {
+      window.sharedUtilities.debounce.debounce(func, key || 'default', delay);
+    } else {
+      // フォールバック実装
+      let timeouts = window._debounceTimeouts || (window._debounceTimeouts = {});
+      return function (...args) {
+        const timeoutKey = key || 'default';
+        clearTimeout(timeouts[timeoutKey]);
+        timeouts[timeoutKey] = setTimeout(() => func.apply(this, args), delay);
+      };
+    }
+  };
+
+  // Enhanced debounce system for admin panel operations
+  window.AdminPanel.debounce = {
+    timers: new Map(),
+
+    // Specialized debounce for loadStatus operations
+    loadStatus: function (func, delay = 250) {
+      const key = 'loadStatus';
+      if (this.timers.has(key)) {
+        clearTimeout(this.timers.get(key));
+      }
+
+      const timer = setTimeout(() => {
+        this.timers.delete(key);
+        logDebug('🎯 Executing debounced loadStatus');
+        func();
+      }, delay);
+
+      this.timers.set(key, timer);
+      logDebug(`⏳ Debouncing loadStatus for ${delay}ms`);
+    },
+
+    // General purpose debounce for UI operations
+    uiOperation: function (func, key, delay = 100) {
+      const fullKey = `ui-${key}`;
+      if (this.timers.has(fullKey)) {
+        clearTimeout(this.timers.get(fullKey));
+      }
+
+      const timer = setTimeout(() => {
+        this.timers.delete(fullKey);
+        func();
+      }, delay);
+
+      this.timers.set(fullKey, timer);
+    },
+
+    // Clear specific debounce timer
+    clear: function (key) {
+      if (this.timers.has(key)) {
+        clearTimeout(this.timers.get(key));
+        this.timers.delete(key);
+      }
+    },
+
+    // Clear all debounce timers
+    clearAll: function () {
+      this.timers.forEach((timer) => clearTimeout(timer));
+      this.timers.clear();
+      logDebug('🧹 All debounce timers cleared');
+    },
+  };
+
+  // =============================================================================
+  // DOM UTILITY FUNCTIONS - Use SharedUtilities
+  // =============================================================================
+
+  // Backward compatibility functions using SharedUtilities
+  var dom = window.sharedUtilities.dom;
+  var createSafeElement = dom.createSafeElement.bind(dom);
+  var getCachedElement = dom.getCachedElement.bind(dom);
+  var safeGetElement = getCachedElement;
+  var setButtonState = dom.setButtonState.bind(dom);
+  var setSafeTextContent = dom.setSafeTextContent.bind(dom);
+  var toggleClass = dom.toggleClass.bind(dom);
+  var addSafeEventListener = dom.addSafeEventListener.bind(dom);
+  var removeSafeEventListener = dom.removeSafeEventListener.bind(dom);
+  var clearElementCache = dom.clearElementCache.bind(dom);
+  var cacheElements = dom.cacheElements.bind(dom);
+
+  // =============================================================================
+  // EVENT HANDLER UTILITIES - Consolidated patterns
+  // =============================================================================
+
+  // Utility for setting up multiple event listeners efficiently
+  function setupMultipleListeners(elementHandlerMap) {
+    Object.keys(elementHandlerMap).forEach(function (elementId) {
+      var element = elementId.startsWith('#')
+        ? document.querySelector(elementId)
+        : elements[elementId] || getCachedElement(elementId);
+
+      if (element) {
+        var handlers = elementHandlerMap[elementId];
+        if (Array.isArray(handlers)) {
+          handlers.forEach(function (handler) {
+            addSafeEventListener(element, handler.event, handler.callback, handler.options);
+          });
+        } else {
+          addSafeEventListener(element, handlers.event, handlers.callback, handlers.options);
+        }
+      }
+    });
   }
-};
 
-// Enhanced debounce system for admin panel operations
-window.AdminPanel.debounce = {
-  timers: new Map(),
-  
-  // Specialized debounce for loadStatus operations
-  loadStatus: function(func, delay = 250) {
-    const key = 'loadStatus';
-    if (this.timers.has(key)) {
-      clearTimeout(this.timers.get(key));
-    }
-    
-    const timer = setTimeout(() => {
-      this.timers.delete(key);
-      logDebug('🎯 Executing debounced loadStatus');
-      func();
-    }, delay);
-    
-    this.timers.set(key, timer);
-    logDebug(`⏳ Debouncing loadStatus for ${delay}ms`);
-  },
-  
-  // General purpose debounce for UI operations
-  uiOperation: function(func, key, delay = 100) {
-    const fullKey = `ui-${key}`;
-    if (this.timers.has(fullKey)) {
-      clearTimeout(this.timers.get(fullKey));
-    }
-    
-    const timer = setTimeout(() => {
-      this.timers.delete(fullKey);
-      func();
-    }, delay);
-    
-    this.timers.set(fullKey, timer);
-  },
-  
-  // Clear specific debounce timer
-  clear: function(key) {
-    if (this.timers.has(key)) {
-      clearTimeout(this.timers.get(key));
-      this.timers.delete(key);
-    }
-  },
-  
-  // Clear all debounce timers
-  clearAll: function() {
-    this.timers.forEach(timer => clearTimeout(timer));
-    this.timers.clear();
-    logDebug('🧹 All debounce timers cleared');
-  }
-};
-
-// =============================================================================
-// DOM UTILITY FUNCTIONS - Use SharedUtilities
-// =============================================================================
-
-// Backward compatibility functions using SharedUtilities
-var dom = window.sharedUtilities.dom;
-var createSafeElement = dom.createSafeElement.bind(dom);
-var getCachedElement = dom.getCachedElement.bind(dom);
-var safeGetElement = getCachedElement;
-var setButtonState = dom.setButtonState.bind(dom);
-var setSafeTextContent = dom.setSafeTextContent.bind(dom);
-var toggleClass = dom.toggleClass.bind(dom);
-var addSafeEventListener = dom.addSafeEventListener.bind(dom);
-var removeSafeEventListener = dom.removeSafeEventListener.bind(dom);
-var clearElementCache = dom.clearElementCache.bind(dom);
-var cacheElements = dom.cacheElements.bind(dom);
-
-// =============================================================================
-// EVENT HANDLER UTILITIES - Consolidated patterns
-// =============================================================================
-
-// Utility for setting up multiple event listeners efficiently
-function setupMultipleListeners(elementHandlerMap) {
-  Object.keys(elementHandlerMap).forEach(function(elementId) {
-    var element = elementId.startsWith('#') ? 
-      document.querySelector(elementId) : 
-      (elements[elementId] || getCachedElement(elementId));
-    
+  // Utility for setting up click handlers with confirmation
+  function setupConfirmationHandler(elementId, confirmTitle, confirmMessage, callback) {
+    var element = elements[elementId] || getCachedElement(elementId);
     if (element) {
-      var handlers = elementHandlerMap[elementId];
-      if (Array.isArray(handlers)) {
-        handlers.forEach(function(handler) {
-          addSafeEventListener(element, handler.event, handler.callback, handler.options);
-        });
-      } else {
-        addSafeEventListener(element, handlers.event, handlers.callback, handlers.options);
-      }
-    }
-  });
-}
-
-// Utility for setting up click handlers with confirmation
-function setupConfirmationHandler(elementId, confirmTitle, confirmMessage, callback) {
-  var element = elements[elementId] || getCachedElement(elementId);
-  if (element) {
-    addSafeEventListener(element, 'click', function(e) {
-      e.preventDefault();
-      showConfirmationModal(
-        confirmTitle,
-        confirmMessage,
-        callback
-      );
-    });
-  }
-}
-
-// Utility for setting up handlers with privacy consent
-function setupPrivacyHandler(elementId, callback) {
-  var element = elements[elementId] || getCachedElement(elementId);
-  if (element) {
-    addSafeEventListener(element, 'click', function(e) {
-      e.preventDefault();
-      showPrivacyModal(function() {
-        hidePrivacyModal();
-        callback();
+      addSafeEventListener(element, 'click', function (e) {
+        e.preventDefault();
+        showConfirmationModal(confirmTitle, confirmMessage, callback);
       });
-    });
-  }
-}
-
-// Utility for delegated event handling (useful for dynamic content)
-function setupDelegatedHandler(parentElement, selector, event, callback) {
-  if (typeof parentElement === 'string') {
-    parentElement = getCachedElement(parentElement);
-  }
-  
-  if (parentElement) {
-    addSafeEventListener(parentElement, event, function(e) {
-      var target = e.target.closest(selector);
-      if (target) {
-        callback.call(target, e);
-      }
-    });
-  }
-}
-
-// =============================================================================
-// STATE MANAGEMENT
-// =============================================================================
-
-// マルチテナント対応: ユーザーIDの安全な初期化
-var userId = '';
-
-// Operation mutex system to prevent concurrent operations
-window.AdminPanel.operationMutex = {
-  activeOperations: new Set(),
-  
-  // Check if operation is already running
-  isRunning: function(operationId) {
-    return this.activeOperations.has(operationId);
-  },
-  
-  // Start tracking an operation
-  start: function(operationId) {
-    if (this.activeOperations.has(operationId)) {
-      logWarn(`⚠️ Operation ${operationId} already running`);
-      return false;
     }
-    this.activeOperations.add(operationId);
-    logDebug(`🔒 Starting operation: ${operationId}`);
-    return true;
-  },
-  
-  // End tracking an operation
-  end: function(operationId) {
-    this.activeOperations.delete(operationId);
-    logDebug(`🔓 Completed operation: ${operationId}`);
-  },
-  
-  // Get all active operations
-  getActive: function() {
-    return Array.from(this.activeOperations);
   }
-};
 
-// User initialization is now handled in adminPanel-framework.js.html
-var currentActiveSheet = '';
-var webAppUrl = '';
-var currentSpreadsheetUrl = '';
-
-// Global variables from adminPanel.js.html
-let currentStep = 1;
-let selectedSheetId = null;
-let selectedFormId = null;
-let availableSheets = [];
-let availableForms = [];
-let currentConfig = null;
-
-// Admin panel initialization is now handled in adminPanel-framework.js.html
-
-// =============================================================================
-// LEGACY UTILITIES (for backward compatibility)
-// =============================================================================
-
-// Safe text content setter
-function safeSetText(elementId, text) {
-  console.log('🔧 safeSetText called:', { elementId, text, textType: typeof text });
-  
-  var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
-  console.log('🔧 safeSetText element found:', !!element);
-  
-  if (element) {
-    setSafeTextContent(element, text || '');
-    console.log('🔧 safeSetText completed for:', elementId, 'with text:', text || '');
-  } else {
-    console.warn('⚠️ safeSetText: Element not found:', elementId);
+  // Utility for setting up handlers with privacy consent
+  function setupPrivacyHandler(elementId, callback) {
+    var element = elements[elementId] || getCachedElement(elementId);
+    if (element) {
+      addSafeEventListener(element, 'click', function (e) {
+        e.preventDefault();
+        showPrivacyModal(function () {
+          hidePrivacyModal();
+          callback();
+        });
+      });
+    }
   }
-}
 
-// =============================================================================
-// LAYOUT AND VIEWPORT UTILITIES
-// =============================================================================
+  // Utility for delegated event handling (useful for dynamic content)
+  function setupDelegatedHandler(parentElement, selector, event, callback) {
+    if (typeof parentElement === 'string') {
+      parentElement = getCachedElement(parentElement);
+    }
 
-// Layout adjustment for responsive design
-function adjustLayout() {
-  var isMobile = window.innerWidth < 768;
-  var body = document.body;
-  
-  if (isMobile) {
-    body.classList.add('mobile-layout');
-    body.classList.remove('desktop-layout');
-  } else {
-    body.classList.add('desktop-layout');
-    body.classList.remove('mobile-layout');
+    if (parentElement) {
+      addSafeEventListener(parentElement, event, function (e) {
+        var target = e.target.closest(selector);
+        if (target) {
+          callback.call(target, e);
+        }
+      });
+    }
   }
-}
 
-// AdminPanel no longer overrides global setLoading
-// Uses unified loading system with admin-specific configurations
+  // =============================================================================
+  // STATE MANAGEMENT
+  // =============================================================================
 
+  // マルチテナント対応: ユーザーIDの安全な初期化
+  var userId = '';
 
-// =============================================================================
-// INITIALIZATION
-// =============================================================================
+  // Operation mutex system to prevent concurrent operations
+  window.AdminPanel.operationMutex = {
+    activeOperations: new Set(),
 
-// Initialize layout on load
-// Core initialization is now handled in adminPanel-framework.js.html
+    // Check if operation is already running
+    isRunning: function (operationId) {
+      return this.activeOperations.has(operationId);
+    },
 
-// Section expansion is now handled in adminPanel-framework.js.html
+    // Start tracking an operation
+    start: function (operationId) {
+      if (this.activeOperations.has(operationId)) {
+        logWarn(`⚠️ Operation ${operationId} already running`);
+        return false;
+      }
+      this.activeOperations.add(operationId);
+      logDebug(`🔒 Starting operation: ${operationId}`);
+      return true;
+    },
 
-// System status and user interaction management is now handled in adminPanel-framework.js.html
+    // End tracking an operation
+    end: function (operationId) {
+      this.activeOperations.delete(operationId);
+      logDebug(`🔓 Completed operation: ${operationId}`);
+    },
 
-// Master initialization system is now handled in adminPanel-framework.js.html
+    // Get all active operations
+    getActive: function () {
+      return Array.from(this.activeOperations);
+    },
+  };
 
-//# sourceURL=adminPanel-core.js.html
+  // User initialization is now handled in adminPanel-framework.js.html
+  var currentActiveSheet = '';
+  var webAppUrl = '';
+  var currentSpreadsheetUrl = '';
+
+  // Global variables from adminPanel.js.html
+  let currentStep = 1;
+  let selectedSheetId = null;
+  let selectedFormId = null;
+  let availableSheets = [];
+  let availableForms = [];
+  let currentConfig = null;
+
+  // Admin panel initialization is now handled in adminPanel-framework.js.html
+
+  // =============================================================================
+  // LEGACY UTILITIES (for backward compatibility)
+  // =============================================================================
+
+  // Safe text content setter
+  function safeSetText(elementId, text) {
+    console.log('🔧 safeSetText called:', { elementId, text, textType: typeof text });
+
+    var element = typeof elementId === 'string' ? getCachedElement(elementId) : elementId;
+    console.log('🔧 safeSetText element found:', !!element);
+
+    if (element) {
+      setSafeTextContent(element, text || '');
+      console.log('🔧 safeSetText completed for:', elementId, 'with text:', text || '');
+    } else {
+      console.warn('⚠️ safeSetText: Element not found:', elementId);
+    }
+  }
+
+  // =============================================================================
+  // LAYOUT AND VIEWPORT UTILITIES
+  // =============================================================================
+
+  // Layout adjustment for responsive design
+  function adjustLayout() {
+    var isMobile = window.innerWidth < 768;
+    var body = document.body;
+
+    if (isMobile) {
+      body.classList.add('mobile-layout');
+      body.classList.remove('desktop-layout');
+    } else {
+      body.classList.add('desktop-layout');
+      body.classList.remove('mobile-layout');
+    }
+  }
+
+  // AdminPanel no longer overrides global setLoading
+  // Uses unified loading system with admin-specific configurations
+
+  // =============================================================================
+  // INITIALIZATION
+  // =============================================================================
+
+  // Initialize layout on load
+  // Core initialization is now handled in adminPanel-framework.js.html
+
+  // Section expansion is now handled in adminPanel-framework.js.html
+
+  // System status and user interaction management is now handled in adminPanel-framework.js.html
+
+  // Master initialization system is now handled in adminPanel-framework.js.html
+
+  //# sourceURL=adminPanel-core.js.html
 </script>

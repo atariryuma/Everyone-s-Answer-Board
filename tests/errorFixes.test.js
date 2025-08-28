@@ -22,7 +22,7 @@ describe('重要エラー修正テスト', () => {
       expect(() => {
         validateRequestUserId(null);
       }).not.toThrow();
-      
+
       expect(() => {
         validateRequestUserId(undefined);
       }).not.toThrow();
@@ -57,12 +57,12 @@ describe('重要エラー修正テスト', () => {
       global.findUserById = jest.fn(() => ({
         userId: '6d222374-e377-44fa-ac72-4acb8bd80e08',
         adminEmail: '35t22@naha-okinawa.ed.jp',
-        isActive: true
+        isActive: true,
       }));
       global.verifyUserAccess = jest.fn();
 
       const result = mockGetCurrentUserStatus('6d222374-e377-44fa-ac72-4acb8bd80e08');
-      
+
       expect(result.status).toBe('success');
       expect(result.userInfo).toBeDefined();
       expect(result.userInfo.userId).toBe('6d222374-e377-44fa-ac72-4acb8bd80e08');
@@ -70,7 +70,7 @@ describe('重要エラー修正テスト', () => {
 
     test('オブジェクトが渡された場合のエラーハンドリング', () => {
       const result = mockGetCurrentUserStatus({ userId: 'test' });
-      
+
       expect(result.status).toBe('error');
       expect(result.message).toContain('requestUserIdは文字列である必要があります');
     });
@@ -84,9 +84,9 @@ describe('重要エラー修正テスト', () => {
           userId: '6d222374-e377-44fa-ac72-4acb8bd80e08',
           email: '35t22@naha-okinawa.ed.jp',
           domain: 'naha-okinawa.ed.jp',
-          isActive: true
+          isActive: true,
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       // レスポンス構造の検証
@@ -102,10 +102,11 @@ describe('重要エラー修正テスト', () => {
 
 /**
  * requestUserIdの型安全性検証関数（テスト用）
- * @param {*} requestUserId 
+ * @param {*} requestUserId
  */
 function validateRequestUserId(requestUserId) {
-  if (requestUserId != null) { // null と undefined をチェック
+  if (requestUserId != null) {
+    // null と undefined をチェック
     if (typeof requestUserId !== 'string') {
       throw new Error('requestUserIdは文字列である必要があります');
     }
@@ -117,7 +118,7 @@ function validateRequestUserId(requestUserId) {
 
 /**
  * getCurrentUserStatusのモック実装（テスト用）
- * @param {*} requestUserId 
+ * @param {*} requestUserId
  * @returns {Object}
  */
 function mockGetCurrentUserStatus(requestUserId = null) {
@@ -131,16 +132,16 @@ function mockGetCurrentUserStatus(requestUserId = null) {
         userId: requestUserId || '6d222374-e377-44fa-ac72-4acb8bd80e08',
         email: '35t22@naha-okinawa.ed.jp',
         domain: 'naha-okinawa.ed.jp',
-        isActive: true
+        isActive: true,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   } catch (error) {
     return {
       status: 'error',
       message: error.message,
       userInfo: null,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }

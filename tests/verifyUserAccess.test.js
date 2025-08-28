@@ -12,7 +12,7 @@ describe('verifyUserAccess security checks', () => {
       debugLog: () => {},
       clearExecutionUserInfoCache: jest.fn(),
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
-      Utilities: { getUuid: () => 'test-uuid-' + Math.random() },
+      Utilities: { getUuid: () => `test-uuid-${Math.random()}` },
       findUserById: jest.fn(() => ({
         adminEmail: 'admin@example.com',
         configJson: JSON.stringify({ appPublished: false }),
@@ -48,4 +48,3 @@ describe('verifyUserAccess security checks', () => {
     expect(context.fetchUserFromDatabase).toHaveBeenCalled();
   });
 });
-

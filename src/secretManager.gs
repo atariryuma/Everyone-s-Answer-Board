@@ -17,27 +17,27 @@ class UnifiedSecretManager {
       auditLogging: options.auditLogging !== false, // デフォルトtrue
       rotationEnabled: options.rotationEnabled === true, // デフォルトfalse
       cacheSecretsLocally: options.cacheSecretsLocally !== false, // デフォルトtrue
-      cacheTTL: options.cacheTTL || 300 // 5分
+      cacheTTL: options.cacheTTL || 300, // 5分
     };
 
     // セキュリティ監査ログ
     this.auditLog = [];
     this.secretCache = new Map();
-    
+
     // 秘密情報のタイプ分類
     this.secretTypes = {
       SERVICE_ACCOUNT: 'service_account',
-      API_KEY: 'api_key', 
+      API_KEY: 'api_key',
       DATABASE_CREDS: 'database_creds',
       WEBHOOK_SECRET: 'webhook_secret',
-      ENCRYPTION_KEY: 'encryption_key'
+      ENCRYPTION_KEY: 'encryption_key',
     };
 
     // 重要な秘密情報のマッピング
     this.criticalSecrets = {
-      'SERVICE_ACCOUNT_CREDS': this.secretTypes.SERVICE_ACCOUNT,
-      'DATABASE_SPREADSHEET_ID': this.secretTypes.DATABASE_CREDS,
-      'WEBHOOK_SECRET': this.secretTypes.WEBHOOK_SECRET
+      SERVICE_ACCOUNT_CREDS: this.secretTypes.SERVICE_ACCOUNT,
+      DATABASE_SPREADSHEET_ID: this.secretTypes.DATABASE_CREDS,
+      WEBHOOK_SECRET: this.secretTypes.WEBHOOK_SECRET,
     };
   }
 
@@ -52,7 +52,7 @@ class UnifiedSecretManager {
       useCache = this.config.cacheSecretsLocally,
       version = 'latest',
       fallback = this.config.fallbackToProperties,
-      auditLog = this.config.auditLogging
+      auditLog = this.config.auditLogging,
     } = options;
 
     // 入力検証
@@ -64,7 +64,7 @@ class UnifiedSecretManager {
       useCache,
       version,
       timestamp: new Date().toISOString(),
-      userEmail: Session.getActiveUser().getEmail()
+      userEmail: Session.getActiveUser().getEmail(),
     };
 
     // キャッシュ確認
@@ -93,7 +93,7 @@ class UnifiedSecretManager {
           if (auditLog) {
             this.logSecretAccess('GET', secretName, {
               ...logMeta,
-              source: 'secretManager'
+              source: 'secretManager',
             });
           }
           return secretValue;
@@ -118,13 +118,13 @@ class UnifiedSecretManager {
           if (auditLog) {
             this.logSecretAccess('GET', secretName, {
               ...logMeta,
-              source: 'properties'
+              source: 'properties',
             });
           }
           return secretValue;
         }
       } catch (error) {
-        console.error("[ERROR]", `Properties Service取得エラー (${secretName}):`, error.message);
+        console.error('[ERROR]', `Properties Service取得エラー (${secretName}):`, error.message);
         throw error;
       }
     }
@@ -144,7 +144,7 @@ class UnifiedSecretManager {
       useSecretManager = this.config.useSecretManager,
       updateProperties = true,
       encrypt = this.config.encryptionEnabled,
-      auditLog = this.config.auditLogging
+      auditLog = this.config.auditLogging,
     } = options;
 
     // 入力検証とセキュリティチェック
@@ -171,7 +171,7 @@ class UnifiedSecretManager {
         encrypt,
         valueLength: secretValue.length,
         timestamp: new Date().toISOString(),
-        userEmail: Session.getActiveUser().getEmail()
+        userEmail: Session.getActiveUser().getEmail(),
       });
     }
 
@@ -199,7 +199,7 @@ class UnifiedSecretManager {
         success = true;
         debugLog(`🔐 Properties Service保存成功: ${secretName}`);
       } catch (error) {
-        console.error("[ERROR]", `Properties Service保存エラー (${secretName}):`, error.message);
+        console.error('[ERROR]', `Properties Service保存エラー (${secretName}):`, error.message);
         if (!success) {
           throw error;
         }
@@ -218,7 +218,7 @@ class UnifiedSecretManager {
    */
   getSecretFromManager(secretName, version = 'latest') {
     const secretPath = `projects/${this.config.projectId}/secrets/${secretName}/versions/${version}`;
-    
+
     try {
       // Google Cloud Secret Manager API 呼び出し
       const response = resilientUrlFetch(
@@ -226,9 +226,9 @@ class UnifiedSecretManager {
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+            'Content-Type': 'application/json',
+          },
         }
       );
 
@@ -236,14 +236,15 @@ class UnifiedSecretManager {
       if (!response || typeof response.getResponseCode !== 'function') {
         throw new Error('Secret Manager API: 無効なレスポンスオブジェクトが返されました');
       }
-      
+
       if (response.getResponseCode() !== 200) {
         throw new Error(`Secret Manager API error: ${response.getResponseCode()}`);
       }
 
       const data = JSON.parse(response.getContentText());
-      return data.payload ? Utilities.newBlob(Utilities.base64Decode(data.payload.data)).getDataAsString() : null;
-
+      return data.payload
+        ? Utilities.newBlob(Utilities.base64Decode(data.payload.data)).getDataAsString()
+        : null;
     } catch (error) {
       if (error.message.includes('404')) {
         debugLog(`Secret not found in Secret Manager: ${secretName}`);
@@ -260,19 +261,16 @@ class UnifiedSecretManager {
   setSecretInManager(secretName, secretValue) {
     // まずシークレットが存在するか確認
     const secretsListUrl = `https://secretmanager.googleapis.com/v1/projects/${this.config.projectId}/secrets`;
-    
+
     try {
       // シークレットの存在確認
-      const existsResponse = resilientUrlFetch(
-        `${secretsListUrl}/${secretName}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const existsResponse = resilientUrlFetch(`${secretsListUrl}/${secretName}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       // レスポンスオブジェクト検証
       let secretExists = false;
@@ -287,57 +285,53 @@ class UnifiedSecretManager {
         const createResponse = resilientUrlFetch(secretsListUrl, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+            'Content-Type': 'application/json',
           },
           payload: JSON.stringify({
             secretId: secretName,
             secret: {
-              replication: { automatic: {} }
-            }
-          })
+              replication: { automatic: {} },
+            },
+          }),
         });
 
         // レスポンスオブジェクト検証
         if (!createResponse || typeof createResponse.getResponseCode !== 'function') {
           throw new Error('Secret Manager: シークレット作成でレスポンスオブジェクトが無効です');
         }
-        
+
         if (createResponse.getResponseCode() !== 200) {
           throw new Error(`Failed to create secret: ${createResponse.getContentText()}`);
         }
       }
 
       // バージョンを追加
-      const addVersionResponse = resilientUrlFetch(
-        `${secretsListUrl}/${secretName}:addVersion`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
-            'Content-Type': 'application/json'
+      const addVersionResponse = resilientUrlFetch(`${secretsListUrl}/${secretName}:addVersion`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+          'Content-Type': 'application/json',
+        },
+        payload: JSON.stringify({
+          payload: {
+            data: Utilities.base64Encode(secretValue),
           },
-          payload: JSON.stringify({
-            payload: {
-              data: Utilities.base64Encode(secretValue)
-            }
-          })
-        }
-      );
+        }),
+      });
 
       // レスポンスオブジェクト検証
       if (!addVersionResponse || typeof addVersionResponse.getResponseCode !== 'function') {
         throw new Error('Secret Manager: バージョン追加でレスポンスオブジェクトが無効です');
       }
-      
+
       if (addVersionResponse.getResponseCode() !== 200) {
         throw new Error(`Failed to add secret version: ${addVersionResponse.getContentText()}`);
       }
 
       return true;
-
     } catch (error) {
-      console.error("[ERROR]", `Secret Manager保存エラー:`, error.message);
+      console.error('[ERROR]', `Secret Manager保存エラー:`, error.message);
       throw error;
     }
   }
@@ -349,15 +343,15 @@ class UnifiedSecretManager {
   getSecretFromProperties(secretName) {
     try {
       const props = getResilientScriptProperties();
-      
+
       // propsがnullまたはundefinedの場合のチェック
       if (!props || typeof props.getProperty !== 'function') {
         warnLog(`Properties Service オブジェクトが無効です:`, { props: typeof props });
         return null;
       }
-      
+
       let value = props.getProperty(secretName);
-      
+
       if (!value) {
         return null;
       }
@@ -375,8 +369,8 @@ class UnifiedSecretManager {
       return value;
     } catch (error) {
       const errorMessage = `Properties Service取得エラー (${secretName}): ${error.message}`;
-      console.error("[ERROR]", errorMessage);
-      
+      console.error('[ERROR]', errorMessage);
+
       // 重要なシークレットの場合はシステムを停止、そうでなければnullを返してフォールバック可能にする
       if (this.isCriticalSecret(secretName)) {
         throw new Error(errorMessage);
@@ -395,15 +389,15 @@ class UnifiedSecretManager {
     try {
       const props = getResilientScriptProperties();
       props.setProperty(secretName, secretValue);
-      
+
       // 暗号化メタデータの保存
       if (options.encrypted) {
         props.setProperty(`${secretName}_ENCRYPTED`, 'true');
       }
-      
+
       return true;
     } catch (error) {
-      console.error("[ERROR]", `Properties Service保存エラー:`, error.message);
+      console.error('[ERROR]', `Properties Service保存エラー:`, error.message);
       throw error;
     }
   }
@@ -417,12 +411,12 @@ class UnifiedSecretManager {
       // 簡易暗号化（Base64エンコード + 固定キーでのXOR）
       const key = 'ENCRYPTION_KEY_2024';
       let encrypted = '';
-      
+
       for (let i = 0; i < value.length; i++) {
         const charCode = value.charCodeAt(i) ^ key.charCodeAt(i % key.length);
         encrypted += String.fromCharCode(charCode);
       }
-      
+
       return 'ENC:' + Utilities.base64Encode(encrypted);
     } catch (error) {
       warnLog('暗号化エラー:', error.message);
@@ -439,17 +433,17 @@ class UnifiedSecretManager {
       if (!encryptedValue.startsWith('ENC:')) {
         return encryptedValue;
       }
-      
+
       const encrypted = Utilities.base64Decode(encryptedValue.substring(4));
       const encryptedString = Utilities.newBlob(encrypted).getDataAsString();
       const key = 'ENCRYPTION_KEY_2024';
       let decrypted = '';
-      
+
       for (let i = 0; i < encryptedString.length; i++) {
         const charCode = encryptedString.charCodeAt(i) ^ key.charCodeAt(i % key.length);
         decrypted += String.fromCharCode(charCode);
       }
-      
+
       return decrypted;
     } catch (error) {
       warnLog('復号化エラー:', error.message);
@@ -479,7 +473,7 @@ class UnifiedSecretManager {
    */
   validateCriticalSecret(secretName, secretValue) {
     const secretType = this.criticalSecrets[secretName];
-    
+
     switch (secretType) {
       case this.secretTypes.SERVICE_ACCOUNT:
         try {
@@ -488,15 +482,15 @@ class UnifiedSecretManager {
         } catch {
           return false;
         }
-        
+
       case this.secretTypes.DATABASE_CREDS:
         // スプレッドシートIDの形式チェック
         return /^[a-zA-Z0-9_-]{44}$/.test(secretValue);
-        
+
       case this.secretTypes.WEBHOOK_SECRET:
         // Webhook秘密情報の最小長チェック
         return secretValue.length >= 32;
-        
+
       default:
         return true;
     }
@@ -530,14 +524,14 @@ class UnifiedSecretManager {
   isCacheExpired(secretName) {
     const cached = this.secretCache.get(secretName);
     if (!cached) return true;
-    
-    return (Date.now() - cached.timestamp) > (this.config.cacheTTL * 1000);
+
+    return Date.now() - cached.timestamp > this.config.cacheTTL * 1000;
   }
 
   cacheSecret(secretName, secretValue) {
     this.secretCache.set(secretName, {
       value: secretValue,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -561,11 +555,11 @@ class UnifiedSecretManager {
       action: action,
       secretName: secretName,
       userEmail: metadata.userEmail,
-      metadata: metadata
+      metadata: metadata,
     };
 
     this.auditLog.push(logEntry);
-    
+
     // ログサイズ制限（最大1000件）
     if (this.auditLog.length > 1000) {
       this.auditLog.shift();
@@ -573,7 +567,7 @@ class UnifiedSecretManager {
 
     // エラー時のみログ出力（通常の GET/CACHE_HIT は記録しない）
     if (action.includes('ERROR') || action.includes('FAILED')) {
-      console.error("[ERROR]", `🔐 秘密情報アクセスエラー: ${action} ${secretName}`, logEntry);
+      console.error('[ERROR]', `🔐 秘密情報アクセスエラー: ${action} ${secretName}`, logEntry);
     }
   }
 
@@ -596,7 +590,7 @@ class UnifiedSecretManager {
       propertiesServiceStatus: 'UNKNOWN',
       encryptionStatus: 'UNKNOWN',
       criticalSecretsStatus: 'UNKNOWN',
-      issues: []
+      issues: [],
     };
 
     try {
@@ -608,8 +602,8 @@ class UnifiedSecretManager {
             {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${getServiceAccountTokenCached()}`
-              }
+                Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+              },
             }
           );
           results.secretManagerStatus = 'OK';
@@ -637,7 +631,7 @@ class UnifiedSecretManager {
           const testValue = 'test_encryption_value';
           const encrypted = this.encryptValue(testValue);
           const decrypted = this.decryptValue(encrypted);
-          
+
           if (decrypted === testValue) {
             results.encryptionStatus = 'OK';
           } else {
@@ -679,7 +673,6 @@ class UnifiedSecretManager {
         results.criticalSecretsStatus = 'ERROR';
         results.issues.push(`重要秘密情報チェックエラー: ${error.message}`);
       }
-
     } catch (error) {
       results.issues.push(`ヘルスチェック中にエラー: ${error.message}`);
     }
@@ -697,7 +690,7 @@ const unifiedSecretManager = new UnifiedSecretManager({
   encryptionEnabled: true,
   auditLogging: true,
   cacheSecretsLocally: true,
-  cacheTTL: 300 // 5分
+  cacheTTL: 300, // 5分
 });
 
 /**
@@ -744,7 +737,7 @@ function getSecureProperty(key) {
 
 /**
  * 秘密情報の安全な設定（既存コードとの互換性）
- * @param {string} key - 秘密情報キー  
+ * @param {string} key - 秘密情報キー
  * @param {string} value - 秘密情報の値
  * @param {object} options - オプション
  * @returns {boolean} 設定成功フラグ

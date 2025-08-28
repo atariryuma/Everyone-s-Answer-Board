@@ -41,6 +41,61 @@ global.SpreadsheetApp = {
   })),
 };
 
+// 統一ログシステム モック
+global.ULog = {
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+};
+
+// 統一レスポンス関数 モック
+global.createSuccessResponse = jest.fn((data) => ({
+  status: 'success',
+  data: data,
+  timestamp: new Date().toISOString()
+}));
+
+global.createErrorResponse = jest.fn((error) => ({
+  status: 'error',
+  error: error,
+  timestamp: new Date().toISOString()
+}));
+
+// 統一キャッシュマネージャー モック
+global.cacheManager = {
+  get: jest.fn(),
+  put: jest.fn(),
+  remove: jest.fn(),
+  clear: jest.fn(),
+  getStats: jest.fn(() => ({ hits: 0, misses: 0 })),
+};
+
+// その他の統一システム関数 モック
+global.findUserById = jest.fn();
+global.findUserByEmail = jest.fn();
+global.getOrFetchUserInfo = jest.fn();
+global.getCurrentUserEmail = jest.fn(() => 'test@example.com');
+global.getSheetsServiceCached = jest.fn();
+global.batchGetSheetsData = jest.fn();
+global.openSpreadsheetOptimized = jest.fn();
+global.isPublishedBoard = jest.fn(() => true);
+global.formatSheetDataForFrontend = jest.fn();
+global.getSpreadsheetsData = jest.fn();
+global.clearExecutionUserInfoCache = jest.fn();
+
+// 統一Sheet管理システム関数のモック
+global.getPublishedSheetDataUnified = jest.fn();
+global.getSheetDataUnified = jest.fn();
+global.getIncrementalSheetDataUnified = jest.fn();
+global.getSheetHeadersUnified = jest.fn();
+global.getHeadersCachedUnified = jest.fn();
+global.getHeaderIndicesUnified = jest.fn();
+global.getCurrentSpreadsheetUnified = jest.fn();
+global.getEffectiveSpreadsheetIdUnified = jest.fn();
+global.getAvailableSheetsUnified = jest.fn();
+global.getSheetDetailsUnified = jest.fn();
+
 // PropertiesService モック
 global.PropertiesService = {
   getScriptProperties: jest.fn(() => ({

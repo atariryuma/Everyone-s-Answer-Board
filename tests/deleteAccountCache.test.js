@@ -17,19 +17,24 @@ describe('deleteUserAccount cache handling', () => {
       executeWithStandardizedLock: async (lock, name, fn) => await fn(),
       PropertiesService: {
         getScriptProperties: () => ({ getProperty: () => 'db123' }),
-        getUserProperties: () => ({ deleteProperty: jest.fn() })
+        getUserProperties: () => ({ deleteProperty: jest.fn() }),
       },
       DB_SHEET_CONFIG: { SHEET_NAME: 'Users', HEADERS: ['userId'] },
       SCRIPT_PROPS_KEYS: { DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID' },
       getSecureDatabaseId: () => 'db123',
       getResilientScriptProperties: () => ({ getProperty: () => 'db123' }),
-      resilientExecutor: { execute: (fn) => fn() }
+      resilientExecutor: { execute: (fn) => fn() },
     };
     vm.createContext(context);
     vm.runInContext(dbCode, context);
-    context.findUserById = jest.fn(() => ({ adminEmail: 'admin@example.com', spreadsheetId: 'userSheet' }));
+    context.findUserById = jest.fn(() => ({
+      adminEmail: 'admin@example.com',
+      spreadsheetId: 'userSheet',
+    }));
     context.getSheetsServiceCached = () => ({});
-    context.getSpreadsheetsData = () => ({ sheets: [{ properties: { title: 'Users', sheetId: 0 } }] });
+    context.getSpreadsheetsData = () => ({
+      sheets: [{ properties: { title: 'Users', sheetId: 0 } }],
+    });
     // 最初の呼び出しでは削除対象のユーザーを返し、検証時には空の結果を返す
     let callCount = 0;
     context.batchGetSheetsData = () => {
@@ -48,13 +53,19 @@ describe('deleteUserAccount cache handling', () => {
     context.UrlFetchApp = {
       fetch: jest.fn(() => ({
         getResponseCode: () => 200,
-        getContentText: () => JSON.stringify({ replies: [] })
-      }))
+        getContentText: () => JSON.stringify({ replies: [] }),
+      })),
     };
   });
 
   test('passes database id to invalidateUserCache', async () => {
     await context.deleteUserAccount('U1');
-    expect(context.invalidateUserCache).toHaveBeenCalledWith('U1', 'admin@example.com', 'userSheet', false, 'db123');
+    expect(context.invalidateUserCache).toHaveBeenCalledWith(
+      'U1',
+      'admin@example.com',
+      'userSheet',
+      false,
+      'db123'
+    );
   });
 });

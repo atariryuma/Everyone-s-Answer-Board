@@ -15,7 +15,7 @@ class UnifiedBatchProcessor {
       retryAttempts: options.retryAttempts || 3,
       chunkDelay: options.chunkDelay || 100, // ms
       enableCaching: options.enableCaching !== false,
-      enableMetrics: options.enableMetrics !== false
+      enableMetrics: options.enableMetrics !== false,
     };
 
     this.metrics = {
@@ -24,7 +24,7 @@ class UnifiedBatchProcessor {
       failedOperations: 0,
       batchesProcessed: 0,
       averageProcessingTime: 0,
-      cacheHitRate: 0
+      cacheHitRate: 0,
     };
 
     this.operationQueue = [];
@@ -45,12 +45,12 @@ class UnifiedBatchProcessor {
       ttl = 300,
       includeGridData = false,
       dateTimeRenderOption = 'SERIAL_NUMBER',
-      valueRenderOption = 'UNFORMATTED_VALUE'
+      valueRenderOption = 'UNFORMATTED_VALUE',
     } = options;
 
     // キャッシュキー生成
     const cacheKey = this.generateBatchCacheKey('batchGet', spreadsheetId, ranges, options);
-    
+
     // キャッシュ確認
     if (useCache) {
       const cached = secureMultiTenantCacheOperation('get', cacheKey, spreadsheetId);
@@ -64,7 +64,7 @@ class UnifiedBatchProcessor {
     const result = resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
-        
+
         // バッチサイズ制限適用
         const chunkedRanges = this.chunkArray(ranges, this.config.maxBatchSize);
         let allValueRanges = [];
@@ -75,23 +75,25 @@ class UnifiedBatchProcessor {
             ranges: chunk.join('&ranges='),
             dateTimeRenderOption: dateTimeRenderOption,
             valueRenderOption: valueRenderOption,
-            includeGridData: includeGridData.toString()
+            includeGridData: includeGridData.toString(),
           });
 
           const response = resilientUrlFetch(`${url}?${params.toString()}`, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${getServiceAccountTokenCached()}`
-            }
+              Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+            },
           });
 
           // レスポンスオブジェクトの検証
           if (!response || typeof response.getResponseCode !== 'function') {
             throw new Error('BatchGet: 無効なレスポンスオブジェクトが返されました');
           }
-          
+
           if (response.getResponseCode() !== 200) {
-            throw new Error(`BatchGet failed: ${response.getResponseCode()} - ${response.getContentText()}`);
+            throw new Error(
+              `BatchGet failed: ${response.getResponseCode()} - ${response.getContentText()}`
+            );
           }
 
           const chunkResult = JSON.parse(response.getContentText());
@@ -105,7 +107,7 @@ class UnifiedBatchProcessor {
 
         const batchResult = {
           spreadsheetId: spreadsheetId,
-          valueRanges: allValueRanges
+          valueRanges: allValueRanges,
         };
 
         this.updateProcessingMetrics(Date.now() - startTime, true);
@@ -115,13 +117,15 @@ class UnifiedBatchProcessor {
       {
         name: `UnifiedBatchGet_${spreadsheetId}`,
         idempotent: true,
-        fallback: () => this.fallbackBatchGet(service, spreadsheetId, ranges)
+        fallback: () => this.fallbackBatchGet(service, spreadsheetId, ranges),
       }
     );
 
     // キャッシュ保存
     if (useCache && result) {
-      secureMultiTenantCacheOperation('set', cacheKey, spreadsheetId, JSON.stringify(result), { ttl });
+      secureMultiTenantCacheOperation('set', cacheKey, spreadsheetId, JSON.stringify(result), {
+        ttl,
+      });
       this.updateCacheMetrics(false);
     }
 
@@ -141,7 +145,7 @@ class UnifiedBatchProcessor {
       valueInputOption = 'USER_ENTERED',
       includeValuesInResponse = false,
       responseValueRenderOption = 'UNFORMATTED_VALUE',
-      invalidateCache = true
+      invalidateCache = true,
     } = options;
 
     return resilientExecutor.execute(
@@ -157,26 +161,28 @@ class UnifiedBatchProcessor {
             valueInputOption: valueInputOption,
             data: chunk,
             includeValuesInResponse: includeValuesInResponse,
-            responseValueRenderOption: responseValueRenderOption
+            responseValueRenderOption: responseValueRenderOption,
           };
 
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}/values:batchUpdate`;
           const response = resilientUrlFetch(url, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${getServiceAccountTokenCached()}`,
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+              'Content-Type': 'application/json',
             },
-            payload: JSON.stringify(requestBody)
+            payload: JSON.stringify(requestBody),
           });
 
           // レスポンスオブジェクトの検証
           if (!response || typeof response.getResponseCode !== 'function') {
             throw new Error('BatchUpdate: 無効なレスポンスオブジェクトが返されました');
           }
-          
+
           if (response.getResponseCode() !== 200) {
-            throw new Error(`BatchUpdate failed: ${response.getResponseCode()} - ${response.getContentText()}`);
+            throw new Error(
+              `BatchUpdate failed: ${response.getResponseCode()} - ${response.getContentText()}`
+            );
           }
 
           const chunkResult = JSON.parse(response.getContentText());
@@ -199,12 +205,12 @@ class UnifiedBatchProcessor {
           spreadsheetId: spreadsheetId,
           totalUpdatedCells: allResponses.reduce((sum, r) => sum + (r.totalUpdatedCells || 0), 0),
           totalUpdatedRows: allResponses.reduce((sum, r) => sum + (r.totalUpdatedRows || 0), 0),
-          responses: allResponses
+          responses: allResponses,
         };
       },
       {
         name: `UnifiedBatchUpdate_${spreadsheetId}`,
-        idempotent: false // 更新操作は冪等ではない
+        idempotent: false, // 更新操作は冪等ではない
       }
     );
   }
@@ -221,18 +227,18 @@ class UnifiedBatchProcessor {
     const {
       includeSpreadsheetInResponse = false,
       responseRanges = [],
-      invalidateCache = true
+      invalidateCache = true,
     } = options;
 
     return resilientExecutor.execute(
       async () => {
         const startTime = Date.now();
-        
+
         // 入力検証
         if (!service || !spreadsheetId || !requests || requests.length === 0) {
           throw new Error('Invalid parameters for batchUpdateSpreadsheet');
         }
-        
+
         // 認証トークン事前チェック
         let token;
         try {
@@ -241,7 +247,11 @@ class UnifiedBatchProcessor {
             throw new Error('Failed to get service account token');
           }
         } catch (tokenError) {
-          console.error('[ERROR]','❌ Authentication failed in batchUpdateSpreadsheet:', tokenError.message);
+          console.error(
+            '[ERROR]',
+            '❌ Authentication failed in batchUpdateSpreadsheet:',
+            tokenError.message
+          );
           throw new Error('Authentication failed: ' + tokenError.message);
         }
 
@@ -252,41 +262,44 @@ class UnifiedBatchProcessor {
           const requestBody = {
             requests: chunk,
             includeSpreadsheetInResponse: includeSpreadsheetInResponse,
-            responseRanges: responseRanges
+            responseRanges: responseRanges,
           };
 
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}:batchUpdate`;
-          
+
           let response;
           try {
             response = resilientUrlFetch(url, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
               },
-              payload: JSON.stringify(requestBody)
+              payload: JSON.stringify(requestBody),
             });
           } catch (fetchError) {
-            console.error('[ERROR]','❌ Failed to make API request to Sheets:', {
+            console.error('[ERROR]', '❌ Failed to make API request to Sheets:', {
               error: fetchError.message,
               url: url,
-              requestType: chunk[0]?.deleteDimension ? 'DELETE_ROWS' : 'OTHER'
+              requestType: chunk[0]?.deleteDimension ? 'DELETE_ROWS' : 'OTHER',
             });
             throw new Error('API request failed: ' + fetchError.message);
           }
 
           // レスポンスオブジェクトの検証
           if (!response || typeof response.getResponseCode !== 'function') {
-            console.error('[ERROR]','❌ Invalid response object from resilientUrlFetch');
+            console.error('[ERROR]', '❌ Invalid response object from resilientUrlFetch');
             throw new Error('BatchUpdateSpreadsheet: 無効なレスポンスオブジェクトが返されました');
           }
-          
+
           const responseCode = response.getResponseCode();
-          
+
           if (responseCode !== 200) {
             const errorContent = response.getContentText();
-            console.error('[ERROR]','❌ BatchUpdateSpreadsheet API failed:', { responseCode, errorContent });
+            console.error('[ERROR]', '❌ BatchUpdateSpreadsheet API failed:', {
+              responseCode,
+              errorContent,
+            });
             throw new Error(`BatchUpdateSpreadsheet failed: ${responseCode} - ${errorContent}`);
           }
 
@@ -305,15 +318,14 @@ class UnifiedBatchProcessor {
           this.invalidateCacheForSpreadsheet(spreadsheetId);
         }
 
-
         return {
           spreadsheetId: spreadsheetId,
-          replies: allReplies
+          replies: allReplies,
         };
       },
       {
         name: `UnifiedBatchUpdateSpreadsheet_${spreadsheetId}`,
-        idempotent: false
+        idempotent: false,
       }
     );
   }
@@ -344,7 +356,9 @@ class UnifiedBatchProcessor {
                 case 'get':
                   return secureMultiTenantCacheOperation('get', op.key, userId);
                 case 'set':
-                  return secureMultiTenantCacheOperation('set', op.key, userId, op.value, { ttl: op.ttl });
+                  return secureMultiTenantCacheOperation('set', op.key, userId, op.value, {
+                    ttl: op.ttl,
+                  });
                 case 'delete':
                   return secureMultiTenantCacheOperation('delete', op.key, userId);
                 default:
@@ -371,7 +385,7 @@ class UnifiedBatchProcessor {
       },
       {
         name: `UnifiedBatchCache_${operation}`,
-        idempotent: operation === 'get'
+        idempotent: operation === 'get',
       }
     );
   }
@@ -399,13 +413,23 @@ class UnifiedBatchProcessor {
    * @returns {string} キャッシュキー
    */
   generateBatchCacheKey(operation, spreadsheetId, params, options = {}) {
+    // Phase 6最適化: 統合generatorFactory使用
+    // MD5ハッシュ化でキーを短縮
     const paramsHash = Utilities.computeDigest(
       Utilities.DigestAlgorithm.MD5,
       JSON.stringify({ params, options }),
       Utilities.Charset.UTF_8
-    ).map(byte => (byte + 256).toString(16).slice(-2)).join('').substring(0, 8);
-    
-    return `${operation}_${spreadsheetId}_${paramsHash}`;
+    )
+      .map((byte) => (byte + 256).toString(16).slice(-2))
+      .join('')
+      .substring(0, 8);
+
+    return UUtilities.generatorFactory.key.batchCache(
+      operation,
+      spreadsheetId,
+      paramsHash,
+      { cachePrefix: 'batch_v2_hash' }
+    );
   }
 
   /**
@@ -417,7 +441,7 @@ class UnifiedBatchProcessor {
       const patterns = [
         `batchGet_${spreadsheetId}_*`,
         `batchUpdate_${spreadsheetId}_*`,
-        `MT_*_${spreadsheetId}_*`
+        `MT_*_${spreadsheetId}_*`,
       ];
 
       for (const pattern of patterns) {
@@ -426,7 +450,6 @@ class UnifiedBatchProcessor {
           cacheManager.clearByPattern(pattern);
         }
       }
-
     } catch (error) {
       warnLog('キャッシュ無効化エラー:', error.message);
     }
@@ -442,24 +465,29 @@ class UnifiedBatchProcessor {
   async fallbackBatchGet(service, spreadsheetId, ranges) {
     try {
       warnLog('統一バッチ処理: フォールバック実行 - 個別取得に切り替え');
-      
+
       const valueRanges = [];
-      for (const range of ranges.slice(0, 10)) { // 最大10個に制限
+      for (const range of ranges.slice(0, 10)) {
+        // 最大10個に制限
         try {
           const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`;
           const response = resilientUrlFetch(url, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${getServiceAccountTokenCached()}`
-            }
+              Authorization: `Bearer ${getServiceAccountTokenCached()}`,
+            },
           });
 
           // レスポンスオブジェクトの検証
-          if (response && typeof response.getResponseCode === 'function' && response.getResponseCode() === 200) {
+          if (
+            response &&
+            typeof response.getResponseCode === 'function' &&
+            response.getResponseCode() === 200
+          ) {
             const data = JSON.parse(response.getContentText());
             valueRanges.push({
               range: range,
-              values: data.values || []
+              values: data.values || [],
             });
           }
         } catch (error) {
@@ -471,10 +499,10 @@ class UnifiedBatchProcessor {
 
       return {
         spreadsheetId: spreadsheetId,
-        valueRanges: valueRanges
+        valueRanges: valueRanges,
       };
     } catch (error) {
-      console.error('[ERROR]','フォールバック処理エラー:', error.message);
+      console.error('[ERROR]', 'フォールバック処理エラー:', error.message);
       return null;
     }
   }
@@ -488,7 +516,7 @@ class UnifiedBatchProcessor {
     if (!this.config.enableMetrics) return;
 
     this.metrics.totalOperations++;
-    
+
     if (success) {
       this.metrics.successfulOperations++;
     } else {
@@ -499,8 +527,8 @@ class UnifiedBatchProcessor {
     if (this.metrics.averageProcessingTime === 0) {
       this.metrics.averageProcessingTime = processingTime;
     } else {
-      this.metrics.averageProcessingTime = 
-        (this.metrics.averageProcessingTime * 0.9) + (processingTime * 0.1);
+      this.metrics.averageProcessingTime =
+        this.metrics.averageProcessingTime * 0.9 + processingTime * 0.1;
     }
   }
 
@@ -511,9 +539,9 @@ class UnifiedBatchProcessor {
   updateCacheMetrics(hit) {
     if (!this.config.enableMetrics) return;
 
-    const totalCacheOps = (this.metrics.cacheHitRate * this.metrics.totalOperations) + 1;
-    const hitCount = (this.metrics.cacheHitRate * this.metrics.totalOperations) + (hit ? 1 : 0);
-    
+    const totalCacheOps = this.metrics.cacheHitRate * this.metrics.totalOperations + 1;
+    const hitCount = this.metrics.cacheHitRate * this.metrics.totalOperations + (hit ? 1 : 0);
+
     this.metrics.cacheHitRate = hitCount / totalCacheOps;
   }
 
@@ -522,7 +550,7 @@ class UnifiedBatchProcessor {
    * @param {number} ms - 待機時間（ミリ秒）
    */
   sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -532,10 +560,12 @@ class UnifiedBatchProcessor {
   getMetrics() {
     return {
       ...this.metrics,
-      successRate: this.metrics.totalOperations > 0 
-        ? (this.metrics.successfulOperations / this.metrics.totalOperations * 100).toFixed(2) + '%'
-        : '0%',
-      timestamp: new Date().toISOString()
+      successRate:
+        this.metrics.totalOperations > 0
+          ? ((this.metrics.successfulOperations / this.metrics.totalOperations) * 100).toFixed(2) +
+            '%'
+          : '0%',
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -549,7 +579,7 @@ class UnifiedBatchProcessor {
       failedOperations: 0,
       batchesProcessed: 0,
       averageProcessingTime: 0,
-      cacheHitRate: 0
+      cacheHitRate: 0,
     };
   }
 }
@@ -563,7 +593,7 @@ const unifiedBatchProcessor = new UnifiedBatchProcessor({
   retryAttempts: 3,
   chunkDelay: 100,
   enableCaching: true,
-  enableMetrics: true
+  enableMetrics: true,
 });
 
 /**
@@ -597,7 +627,7 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody, options = {
   return unifiedBatchProcessor.batchUpdateSpreadsheet(service, spreadsheetId, requests, {
     ...options,
     includeSpreadsheetInResponse: requestBody.includeSpreadsheetInResponse,
-    responseRanges: requestBody.responseRanges
+    responseRanges: requestBody.responseRanges,
   });
 }
 
@@ -611,7 +641,7 @@ function performUnifiedBatchHealthCheck() {
     batchProcessorStatus: 'OK',
     metricsStatus: 'OK',
     integrationTest: 'OK',
-    issues: []
+    issues: [],
   };
 
   try {
@@ -623,7 +653,6 @@ function performUnifiedBatchHealthCheck() {
 
     // テスト実行は実際のスプレッドシートIDが必要なためスキップ
     // 実際の運用では適切なテストスプレッドシートIDを使用
-
   } catch (error) {
     results.issues.push(`ヘルスチェック中にエラー: ${error.message}`);
     results.batchProcessorStatus = 'ERROR';
