@@ -1437,12 +1437,22 @@ function verifyUserAccess(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode, bypassCache) {
-  verifyUserAccess(requestUserId);
+  // 修正: データベース未登録ユーザーでも公開中の回答ボードなら閲覧可能
+  const userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('ユーザー情報が見つかりません');
+  }
+  
+  // 公開状態チェック：公開中でない場合はアクセス拒否
+  if (!isPublishedBoard(userInfo)) {
+    throw new Error('この回答ボードは現在公開されていません');
+  }
+  
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
 
   try {
     // アクティブボード識別子（シート切替時にキーが変わるように）
-    var userInfoForKey = getOrFetchUserInfo(requestUserId, 'userId', { useExecutionCache: true, ttl: 120 });
+    var userInfoForKey = userInfo;
     var cfgForKey = {};
     try { cfgForKey = JSON.parse(userInfoForKey && userInfoForKey.configJson || '{}'); } catch (e) { cfgForKey = {}; }
     var activeSsId = cfgForKey.publishedSpreadsheetId || 'none';
@@ -1654,19 +1664,21 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
  * @returns {object} 新しいデータのみを含む結果
  */
 function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount) {
-  verifyUserAccess(requestUserId);
+  // 修正: データベース未登録ユーザーでも公開中の回答ボードなら閲覧可能
+  const userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('ユーザー情報が見つかりません');
+  }
+  
+  // 公開状態チェック：公開中でない場合はアクセス拒否
+  if (!isPublishedBoard(userInfo)) {
+    throw new Error('この回答ボードは現在公開されていません');
+  }
+  
   try {
     debugLog('🔄 増分データ取得開始: sinceRowCount=%s', sinceRowCount);
 
     var currentUserId = requestUserId; // requestUserId を使用
-
-    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-      useExecutionCache: true,
-      ttl: 300
-    });
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
 
     var configJson = JSON.parse(userInfo.configJson || '{}');
     var setupStatus = configJson.setupStatus || 'pending';
@@ -2400,12 +2412,18 @@ function countSheetRows(spreadsheetId, sheetName, classFilter) {
  * @returns {number} データ数
  */
 function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
-  verifyUserAccess(requestUserId);
+  // 修正: データベース未登録ユーザーでも公開中の回答ボードなら閲覧可能
+  const userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('ユーザー情報が見つかりません');
+  }
+  
+  // 公開状態チェック：公開中でない場合はアクセス拒否
+  if (!isPublishedBoard(userInfo)) {
+    throw new Error('この回答ボードは現在公開されていません');
+  }
+  
   try {
-    const userInfo = findUserById(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
     const configJson = JSON.parse(userInfo.configJson || '{}');
 
     if (!configJson.publishedSpreadsheetId || !configJson.publishedSheetName) {
@@ -4267,7 +4285,9 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
         throw new Error('ユーザー情報が見つかりません');
       }
 
-      var spreadsheetId = userInfo.spreadsheetId;
+      // 公開用のスプレッドシートIDを取得（閲覧者アクセス対応）
+      var configJson = JSON.parse(userInfo.configJson || '{}');
+      var spreadsheetId = configJson.publishedSpreadsheetId || userInfo.spreadsheetId;
       var service = getSheetsServiceCached();
 
       // フォーム回答データのみを取得（名簿機能は使用しない）
@@ -4300,8 +4320,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     // 名簿マップを作成（キャッシュ利用）
     var rosterMap = buildRosterMap(rosterData);
 
-    // 表示モードとシート固有設定を取得
-    var configJson = JSON.parse(userInfo.configJson || '{}');
+    // 表示モードとシート固有設定を取得（既にconfigJsonは解析済み）
     var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
 
     // シート固有の設定を取得（最新のAI判定結果を反映）

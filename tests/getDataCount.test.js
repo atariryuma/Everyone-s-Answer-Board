@@ -66,6 +66,7 @@ describe('getDataCount reflects new rows', () => {
         configJson: JSON.stringify({
           publishedSpreadsheetId: 'SID',
           publishedSheetName: 'Sheet1',
+          appPublished: true,
         }),
       })),
       getHeaderIndices: () => ({ クラス: 1 }),
