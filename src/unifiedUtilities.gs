@@ -175,30 +175,37 @@ class UnifiedURLManager {
   }
 
   // 後方互換性のためのurlFactoryエイリアス（generatorFactory.urlに統合済み）
-  static urlFactory = {
-    generateUserUrls: (userId, options = {}) => UUtilities.generatorFactory.url.user(userId, options),
-    generateUnpublishedUrl: (userId) => UUtilities.generatorFactory.url.unpublished(userId),
-    buildAdminUrl: (userId) => UUtilities.generatorFactory.url.admin(userId)
-  };
+  static get urlFactory() {
+    return {
+      generateUserUrls: (userId, options = {}) => UUtilities.generatorFactory.url.user(userId, options),
+      generateUnpublishedUrl: (userId) => UUtilities.generatorFactory.url.unpublished(userId),
+      buildAdminUrl: (userId) => UUtilities.generatorFactory.url.admin(userId)
+    };
+  }
 
   // 後方互換性のためのformFactoryエイリアス（generatorFactory.formに統合済み）
-  static formFactory = {
-    create: (type, options) => UUtilities.generatorFactory.form.create(type, options),
-    createCustomUI: (requestUserId, config) => UUtilities.generatorFactory.form.customUI(requestUserId, config),
-    createQuickStartUI: (requestUserId) => UUtilities.generatorFactory.form.quickStartUI(requestUserId)
-  };
+  static get formFactory() {
+    return {
+      create: (type, options) => UUtilities.generatorFactory.form.create(type, options),
+      createCustomUI: (requestUserId, config) => UUtilities.generatorFactory.form.customUI(requestUserId, config),
+      createQuickStartUI: (requestUserId) => UUtilities.generatorFactory.form.quickStartUI(requestUserId)
+    };
+  }
 
   // 後方互換性のためのuserFactoryエイリアス（generatorFactory.userに統合済み）
-  static userFactory = {
-    create: (userData) => UUtilities.generatorFactory.user.create(userData),
-    createFolder: (userEmail) => UUtilities.generatorFactory.user.folder(userEmail)
-  };
+  static get userFactory() {
+    return {
+      create: (userData) => UUtilities.generatorFactory.user.create(userData),
+      createFolder: (userEmail) => UUtilities.generatorFactory.user.folder(userEmail)
+    };
+  }
 
   /**
    * 【Phase 6最適化】統合生成ファクトリ - 28個の生成関数を一元管理
    * すべてのcreate/generate/build関数を統合し、重複を排除
    */
-  static generatorFactory = {
+  static get generatorFactory() {
+    return {
     /**
      * レスポンス生成統合（既存responseFactoryを統合）
      */
@@ -304,14 +311,17 @@ class UnifiedURLManager {
     board: {
       fromAdmin: (requestUserId) => createBoardFromAdmin(requestUserId)
     }
-  };
+    };
+  }
 
   // 後方互換性のためのresponseFactoryエイリアス（generatorFactory.responseに統合済み）
-  static responseFactory = {
-    success: (data = null, message = null) => UUtilities.generatorFactory.response.success(data, message),
-    error: (error, message = null, data = null) => UUtilities.generatorFactory.response.error(error, message, data),
-    unified: (success, data = null, message = null, error = null) => UUtilities.generatorFactory.response.unified(success, data, message, error)
-  };
+  static get responseFactory() {
+    return {
+      success: (data = null, message = null) => UUtilities.generatorFactory.response.success(data, message),
+      error: (error, message = null, data = null) => UUtilities.generatorFactory.response.error(error, message, data),
+      unified: (success, data = null, message = null, error = null) => UUtilities.generatorFactory.response.unified(success, data, message, error)
+    };
+  }
 
   /**
    * URL検証・サニタイズ
@@ -348,7 +358,8 @@ class UnifiedURLManager {
    * 【Phase 7最適化】統合ログ管理
    * 冗長なログ出力パターン（258箇所）を統一
    */
-  static logger = {
+  static get logger() {
+    return {
     error: (context, message, details = null) => {
       const logMessage = `[ERROR] ${context}: ${message}`;
       if (details) {
@@ -381,13 +392,15 @@ class UnifiedURLManager {
         console.log(logMessage);
       }
     }
-  };
+    };
+  }
 
   /**
    * 【Phase 7最適化】統合エラーハンドリングヘルパー
    * try-catchパターンの冗長性を削減
    */
-  static safeExecute = {
+  static get safeExecute() {
+    return {
     /**
      * 安全な関数実行（エラー時はレスポンス返却）
      */
@@ -427,7 +440,8 @@ class UnifiedURLManager {
         throw error;
       }
     }
-  };
+    };
+  }
 }
 
 /**
