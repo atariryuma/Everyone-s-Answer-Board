@@ -547,14 +547,8 @@ function secureMultiTenantCacheOperation(operation, baseKey, userId, value = nul
 /**
  * @deprecated 統合実装：unifiedUserManager.getSecureUserInfo() を使用してください
  */
-function getSecureUserInfo(userId, options = {}) {
-  // 統合実装にリダイレクト（セキュリティ検証付き）
-  return coreGetUserFromDatabase('userId', userId, {
-    cacheLayer: 'secure',
-    securityCheck: true,
-    ...options,
-  });
-}
+// getSecureUserInfo - 重複削除済み
+// → unifiedUserManager.gsの実装を使用してください
 
 /**
  * セキュアなユーザー設定情報取得
@@ -563,16 +557,8 @@ function getSecureUserInfo(userId, options = {}) {
  * @param {object} options - オプション
  * @returns {any} 設定値
  */
-function getSecureUserConfig(userId, configKey, options = {}) {
-  const currentUserId = Session.getActiveUser().getEmail();
-
-  // テナント境界検証
-  if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, 'user_config_access')) {
-    throw new Error('SECURITY_ERROR: ユーザー設定アクセス拒否 - テナント境界違反');
-  }
-
-  return secureMultiTenantCacheOperation('get', `config_${configKey}`, userId, null, options);
-}
+// getSecureUserConfig - 重複削除済み
+// → unifiedUserManager.gsの実装を使用してください
 
 /**
  * マルチテナントセキュリティの健全性チェック

@@ -2344,9 +2344,8 @@ function getCachedSheetsService() {
  * 後方互換性: invalidateUserCache()
  * 複数ファイルの分散実装を統一APIで置き換え
  */
-function invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId) {
-  return unifiedCacheAPI.invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId);
-}
+// invalidateUserCache - 重複削除済み
+// → unifiedUserManager.gsの実装を使用してください
 
 /**
  * 後方互換性: synchronizeCacheAfterCriticalUpdate()

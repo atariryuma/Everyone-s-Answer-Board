@@ -788,9 +788,8 @@ let _executionSheetsServiceCache = null;
 /**
  * @deprecated この関数は削除されました。unifiedCacheManager.gs の getSheetsServiceCached() を使用してください。
  */
-function getCachedSheetsService() {
-  return getSheetsServiceCached();
-}
+// getCachedSheetsService - 重複削除済み
+// → unifiedCacheManager.gsの実装を使用してください
 
 /**
  * ヘッダー整合性検証（リアルタイム検証用）
@@ -4243,43 +4242,8 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
  * スプレッドシートをサービスアカウントと共有
  * @param {string} spreadsheetId - スプレッドシートID
  */
-function shareSpreadsheetWithServiceAccount(spreadsheetId) {
-  try {
-    var serviceAccountEmail = getServiceAccountEmail();
-
-    if (
-      !serviceAccountEmail ||
-      serviceAccountEmail === 'サービスアカウント未設定' ||
-      serviceAccountEmail === 'サービスアカウント設定エラー'
-    ) {
-      throw new Error('サービスアカウントのメールアドレスが取得できません: ' + serviceAccountEmail);
-    }
-
-    ULog.debug(
-      'サービスアカウント共有開始:',
-      serviceAccountEmail,
-      'スプレッドシート:',
-      spreadsheetId
-    );
-
-    // DriveAppを使用してスプレッドシートをサービスアカウントと共有
-    try {
-      var file = DriveApp.getFileById(spreadsheetId);
-      if (!file) {
-        throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
-      }
-      file.addEditor(serviceAccountEmail);
-    } catch (driveError) {
-      ULog.error('[ERROR]', 'DriveApp error:', driveError.message);
-      throw new Error('Drive API操作に失敗しました: ' + driveError.message);
-    }
-
-    ULog.debug('サービスアカウント共有成功:', serviceAccountEmail);
-  } catch (error) {
-    ULog.error('[ERROR]', 'shareSpreadsheetWithServiceAccount エラー:', error.message);
-    throw new Error('サービスアカウントとの共有に失敗しました: ' + error.message);
-  }
-}
+// shareSpreadsheetWithServiceAccount - 重複削除済み
+// → unifiedSecurityManager.gsの実装を使用してください
 
 /**
  * すべての既存スプレッドシートをサービスアカウントと共有
@@ -4340,50 +4304,8 @@ function shareAllSpreadsheetsWithServiceAccount() {
  * フォーム作成
  */
 
-/**
- * サービスアカウントをスプレッドシートに追加
- */
-function addServiceAccountToSpreadsheet(spreadsheetId) {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var serviceAccountCreds = JSON.parse(
-      props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
-    );
-    var serviceAccountEmail = serviceAccountCreds.client_email;
-
-    var spreadsheet = openSpreadsheetOptimized(spreadsheetId);
-
-    // サービスアカウントを編集者として追加
-    if (serviceAccountEmail) {
-      spreadsheet.addEditor(serviceAccountEmail);
-      ULog.debug(
-        'サービスアカウント (' +
-          serviceAccountEmail +
-          ') をスプレッドシートの編集者として追加しました。'
-      );
-
-      // セッション管理：サービスアカウントアクセス権限の記録
-      try {
-        const sessionData = {
-          serviceAccountEmail: serviceAccountEmail,
-          spreadsheetId: spreadsheetId,
-          accessGranted: new Date().toISOString(),
-          accessType: 'service_account_editor',
-          securityLevel: 'domain_view',
-        };
-        ULog.debug('サービスアカウントアクセス権限を記録しました:', JSON.stringify(sessionData));
-      } catch (sessionLogError) {
-        ULog.warn('セッション記録でエラー:', sessionLogError.message);
-      }
-    }
-
-    // 同一ドメインユーザーは共有設定により閲覧可能
-    ULog.debug('同一ドメインユーザーは共有設定により閲覧可能です');
-  } catch (e) {
-    ULog.error('[ERROR]', 'サービスアカウントの追加に失敗: ' + e.message);
-    // エラーでも処理は継続
-  }
-}
+// addServiceAccountToSpreadsheet - 重複削除済み
+// → unifiedSecurityManager.gsの実装を使用してください
 
 /**
  * 既存ユーザーのスプレッドシートアクセス権限を修復

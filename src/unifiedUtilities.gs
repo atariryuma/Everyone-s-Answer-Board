@@ -74,7 +74,7 @@ class UUtilities {
      */
     key: {
       userScoped: (prefix, userId, suffix) => buildUserScopedKey(prefix, userId, suffix),
-      secure: (prefix, userId, context = '') => buildSecureUserScopedKey(prefix, userId, context),
+      // secure: 未実装関数のため削除
       batchCache: (operation, id, params, options = {}) => {
         if (typeof options.cachePrefix === 'string') {
           return `${options.cachePrefix}:${operation}:${id}:${JSON.stringify(params)}`;

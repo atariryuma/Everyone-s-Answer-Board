@@ -12,12 +12,7 @@ let lastCacheUserIdKey = null;
 let executionStartTime = Date.now();
 // EXECUTION_MAX_LIFETIME is defined in constants.gs
 
-/**
- * @deprecated この関数は削除されました。unifiedCacheManager.gs の clearExecutionUserInfoCache() を使用してください。
- */
-function clearExecutionUserInfoCache() {
-  return unifiedCacheAPI.clearUserInfoCache();
-}
+// clearExecutionUserInfoCache() は unifiedCacheManager.gs に統合済み
 
 /**
  * リソース管理を自動化するContextクラス
@@ -3907,47 +3902,7 @@ function checkApplicationAccess() {
   }
 }
 
-/**
- * グローバルメモリ管理機能（9cff8faからの抽出）
- * スクリプトプロパティとキャッシュの自動クリーンアップ
- */
-function performGlobalMemoryCleanup() {
-  try {
-    ULog.debug('🧹 グローバルメモリクリーンアップ開始');
-
-    // 1. 実行レベルキャッシュのクリア
-    clearExecutionUserInfoCache();
-
-    // 2. CacheManagerの期限切れキャッシュクリア
-    if (typeof cacheManager !== 'undefined' && cacheManager.clearExpired) {
-      cacheManager.clearExpired();
-    }
-
-    // 3. スクリプトプロパティの古いキャッシュクリア
-    try {
-      const props = PropertiesService.getUserProperties();
-      // 古い形式のキャッシュを削除
-      props.deleteProperty('CURRENT_USER_ID');
-
-      // 古いキャッシュエントリを削除
-      const userCache = CacheService.getUserCache();
-      if (userCache) {
-        userCache.removeAll();
-      }
-    } catch (cleanupError) {
-      ULog.warn('プロパティクリーンアップエラー:', cleanupError.message);
-    }
-
-    ULog.info('✅ グローバルメモリクリーンアップ完了');
-  } catch (error) {
-    logError(
-      error,
-      'globalMemoryCleanup',
-      UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
-      UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM
-    );
-  }
-}
+// performGlobalMemoryCleanup() は上部で定義済み（重複削除）
 
 /**
  * 定期的なクリーンアップを実行（9cff8faからの抽出）

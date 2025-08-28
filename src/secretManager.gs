@@ -701,30 +701,15 @@ const unifiedSecretManager = new UnifiedSecretManager({
  * 安全なサービスアカウント認証情報取得
  * @returns {Object} サービスアカウント認証情報
  */
-function getSecureServiceAccountCreds() {
-  const credsString = unifiedSecretManager.getSecret('SERVICE_ACCOUNT_CREDS');
-  if (!credsString) {
-    throw new Error('SECURITY_ERROR: サービスアカウント認証情報が設定されていません');
-  }
-
-  try {
-    const creds = JSON.parse(credsString);
-    if (!creds.client_email || !creds.private_key) {
-      throw new Error('SECURITY_ERROR: 不完全なサービスアカウント認証情報');
-    }
-    return creds;
-  } catch (error) {
-    throw new Error(`SECURITY_ERROR: サービスアカウント認証情報の解析に失敗: ${error.message}`);
-  }
-}
+// getSecureServiceAccountCreds - 重複削除済み
+// → unifiedSecurityManager.gsの実装を使用してください
 
 /**
  * 安全なデータベースID取得
  * @returns {string} データベーススプレッドシートID
  */
-function getSecureDatabaseId() {
-  return unifiedSecretManager.getSecret('DATABASE_SPREADSHEET_ID');
-}
+// getSecureDatabaseId - 重複削除済み
+// → unifiedSecurityManager.gsの実装を使用してください
 
 /**
  * 秘密情報の安全な取得（既存コードとの互換性）
