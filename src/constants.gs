@@ -1330,10 +1330,7 @@ const getTemporaryActiveUserKey = () => `temp_${Date.now()}`;
 const argumentMapper = (args) => args;
 
 // delete関連関数（実際には不要だが、参照エラー回避用ダミー）
-const deleteUserAccountByAdminForUI = (userId, reason) => console.log(`[DELETE_UI] ${userId}: ${reason}`);
-const deleteUserAccountByAdmin = (userId, reason) => console.log(`[DELETE_ADMIN] ${userId}: ${reason}`);
-const deleteCurrentUserAccount = (userId) => console.log(`[DELETE_CURRENT] ${userId}`);
-const deleteUserAccount = (userId) => console.log(`[DELETE_USER] ${userId}`);
+// deleteUserAccount関数群は実際の実装がdatabase.gs、Core.gsに存在するため削除
 
 // 残りのUI/Factory関数のダミー実装
 const urlFactory = {
