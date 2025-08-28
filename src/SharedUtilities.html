@@ -510,6 +510,14 @@
           window.unifiedLoading.showSimple(message);
         }
 
+        // 📍 DIRECT DEBUG: google.script.run呼び出し直前
+        console.log(`📍 DIRECT DEBUG - About to call google.script.run.${functionName}:`, {
+          functionExists: typeof google?.script?.run?.[functionName] === 'function',
+          argsCount: args.length,
+          args: args,
+          timestamp: new Date().toISOString()
+        });
+
         google.script.run
           .withSuccessHandler((result) => {
             window.unifiedLoading.hide(); // Hide loading overlay on success

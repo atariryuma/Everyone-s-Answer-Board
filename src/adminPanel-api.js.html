@@ -973,6 +973,33 @@
 
         console.log('🌐 Calling getInitialData with userId:', userId, 'bypassCache:', bypassCache);
 
+        // 📍 DIRECT DEBUG: google.script.run呼び出し直前の詳細状態
+        console.log('📍 DIRECT DEBUG - Pre-call state:', {
+          hasGoogle: typeof google !== 'undefined',
+          hasGoogleScript: typeof google?.script !== 'undefined', 
+          hasGoogleScriptRun: typeof google?.script?.run !== 'undefined',
+          userIdType: typeof userId,
+          userIdValue: userId,
+          targetSheetNameType: typeof null,
+          targetSheetNameValue: null,
+          timestamp: new Date().toISOString()
+        });
+
+        // 📍 PING TEST: 最初にシンプルなテスト関数を呼び出し
+        console.log('📍 PING TEST: Attempting simple testConnection call...');
+        try {
+          google.script.run
+            .withSuccessHandler((pingResult) => {
+              console.log('📍 PING SUCCESS:', pingResult);
+            })
+            .withFailureHandler((pingError) => {
+              console.error('📍 PING FAILED:', pingError);
+            })
+            .testConnection();
+        } catch (pingException) {
+          console.error('📍 PING EXCEPTION:', pingException);
+        }
+
         // runGasWithUserId を使用して getInitialData を呼び出す
         // 第3引数: targetSheetName（bypassCacheの場合はtrueではなく適切なシート名またはnullを渡す）
         const targetSheetName = bypassCache ? null : null; // bypassCacheはboolean、targetSheetNameは文字列またはnull
