@@ -1362,36 +1362,16 @@ const clearElementCache = (element) => console.log(`[CACHE] Cleared ${element}`)
 const resolvePendingClears = () => console.log('[CACHE] Resolved pending clears');
 const rejectPendingClears = () => console.log('[CACHE] Rejected pending clears');
 
-// 自己参照クラス問題の解決（グローバルエイリアス）
-const SystemIntegrationManager = class {
-  static getInstance() { return new this(); }
-};
-const UnifiedSheetDataManager = class {
-  static getInstance() { return new this(); }
-};
-const UnifiedCacheAPI = class {
-  static getInstance() { return new this(); }
-};
-const MultiTenantSecurityManager = class {
-  static getInstance() { return new this(); }
-};
-const UnifiedValidationSystem = class {
-  static getInstance() { return new this(); }
-};
-const CacheManager = class {
-  static getInstance() { return new this(); }
-};
-const UnifiedExecutionCache = class {
-  static getInstance() { return new this(); }
-};
+// SystemIntegrationManager は systemIntegrationManager.gs で定義済み
+// UnifiedSheetDataManager は unifiedSheetDataManager.gs で定義済み
+// UnifiedCacheAPI は unifiedCacheManager.gs で定義済み
+// MultiTenantSecurityManager は unifiedSecurityManager.gs で定義済み
+// UnifiedValidationSystem は unifiedValidationSystem.gs で定義済み
+// CacheManager は unifiedCacheManager.gs で定義済み
+// UnifiedExecutionCache は unifiedCacheManager.gs で定義済み
 
-// 残りの必要なクラス参照
-const UnifiedBatchProcessor = class {
-  static getInstance() { return new this(); }
-};
-const UnifiedSecretManager = class {
-  static getInstance() { return new this(); }
-};
+// UnifiedBatchProcessor は unifiedBatchProcessor.gs で定義済み
+// UnifiedSecretManager は secretManager.gs で定義済み
 
 // 既存関数による代用エイリアス（未定義エラー解決用）
 const alert = (message) => {
