@@ -368,12 +368,12 @@ class UnifiedSecretManager {
 
       return value;
     } catch (error) {
-      const errorMessage = `Properties Service取得エラー (${secretName}): ${error.message}`;
-      console.error('[ERROR]', errorMessage);
+      const secretErrorMessage = `Properties Service取得エラー (${secretName}): ${error.message}`;
+      console.error('[ERROR]', secretErrorMessage);
 
       // 重要なシークレットの場合はシステムを停止、そうでなければnullを返してフォールバック可能にする
       if (this.isCriticalSecret(secretName)) {
-        throw new Error(errorMessage);
+        throw new Error(secretErrorMessage);
       } else {
         warnLog(`非クリティカルなシークレット取得失敗、nullを返します: ${secretName}`);
         return null;

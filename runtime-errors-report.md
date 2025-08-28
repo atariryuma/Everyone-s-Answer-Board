@@ -550,7 +550,7 @@ Total: 943 undefined identifiers
 - Occurrences: 18
 - Files: Core.gs, config.gs, constants.gs, database.gs, secretManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(errorMessage));
+  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
   - config.gs:307: if (!spreadsheetIdPattern.test(userInfo.spreadsheetId)) {
   - config.gs:605: hasJapanese: /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(cleaned),
 
@@ -630,7 +630,7 @@ Total: 943 undefined identifiers
 - Occurrences: 16
 - Files: Core.gs, config.gs, database.gs, resilientExecutor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(errorMessage));
+  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
   - Core.gs:6646: if (spreadsheetInfo.sheets.some((sheet) => sheet.properties.title === commonName)) {
   - config.gs:786: return metadataPatterns.some((pattern) => headerLower.includes(pattern.toLowerCase()));
 
@@ -1062,7 +1062,7 @@ Total: 943 undefined identifiers
 - Occurrences: 10
 - Files: Core.gs, config.gs, database.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(errorMessage));
+  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
   - config.gs:692: if (header === pattern.toLowerCase()) {
   - config.gs:695: if (header.includes(pattern.toLowerCase())) {
 
@@ -6158,7 +6158,7 @@ Total: 943 undefined identifiers
 - Occurrences: 1
 - Files: resilientExecutor.gs
 - Samples:
-  - resilientExecutor.gs:191: return retryableMessages.some((msg) => errorMessage.toLowerCase().includes(msg.toLowerCase()));
+  - resilientExecutor.gs:191: return retryableMessages.some((msg) => resilientErrorMessage.toLowerCase().includes(msg.toLowerCase(
 
 ## API_KEY
 - Occurrences: 1

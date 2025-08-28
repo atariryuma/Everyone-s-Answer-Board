@@ -187,8 +187,8 @@ class ResilientExecutor {
       'Gateway Timeout',
     ];
 
-    const errorMessage = error.message || error.toString();
-    return retryableMessages.some((msg) => errorMessage.toLowerCase().includes(msg.toLowerCase()));
+    const resilientErrorMessage = error.message || error.toString();
+    return retryableMessages.some((msg) => resilientErrorMessage.toLowerCase().includes(msg.toLowerCase()));
   }
 
   /**

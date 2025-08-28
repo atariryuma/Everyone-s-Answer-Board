@@ -182,8 +182,8 @@ class UnifiedErrorHandler {
       /quota/i,
     ];
 
-    const errorMessage = error.message || String(error);
-    return retryablePatterns.some((pattern) => pattern.test(errorMessage));
+    const coreErrorMessage = error.message || String(error);
+    return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
   }
 }
 

@@ -2616,7 +2616,7 @@ function renderMinimalUnpublishedPage(userInfo) {
                   </p>
                   
                   <div class="button-group">
-                      <button onclick="republishBoard()" class="btn btn-primary">
+                      <button onclick="republishBoardClient()" class="btn btn-primary">
                           🔄 回答ボードを再公開
                       </button>
                       <a href="?mode=admin&userId=${encodeURIComponent(userId)}" class="btn btn-secondary">
@@ -2647,7 +2647,7 @@ function renderMinimalUnpublishedPage(userInfo) {
           </div>
           
           <script>
-              function republishBoard() {
+              function republishBoardClient() {
                   if (!confirm('回答ボードを再公開しますか？')) return;
                   
                   const button = event.target;
