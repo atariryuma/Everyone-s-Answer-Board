@@ -1274,7 +1274,7 @@ class URLSearchParams {
 }
 
 // 必要最小限の関数エイリアス（未定義エラー解決用）
-const UnifiedErrorHandler = handleUnifiedError; // UErrorと同じ実装
+// UnifiedErrorHandler は Core.gs で定義済みのため削除
 
 // 本当に必要な未定義関数の最小実装
 const setupStep = (step) => console.log(`[SETUP] ${step}`);
