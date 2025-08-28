@@ -606,18 +606,204 @@ function handleUnifiedError(
   );
 }
 
+/**
+ * 統一ログシステム（ULog）
+ * 全アプリケーションの統一ログ出力とレベル管理
+ */
+const ULog = {
+  // ログレベル定義
+  LEVELS: {
+    ERROR: 'ERROR',
+    WARN: 'WARN', 
+    INFO: 'INFO',
+    DEBUG: 'DEBUG'
+  },
+
+  // ログレベル優先度（数値が高い程重要）
+  LEVEL_PRIORITY: {
+    DEBUG: 1,
+    INFO: 2,
+    WARN: 3,
+    ERROR: 4
+  },
+
+  // 現在のログレベル設定（これ以上の優先度のみ出力）
+  currentLogLevel: 'INFO',
+
+  // カテゴリ定義
+  CATEGORIES: {
+    SYSTEM: 'SYSTEM',
+    AUTH: 'AUTH', 
+    API: 'API',
+    DATABASE: 'DATABASE',
+    UI: 'UI',
+    CACHE: 'CACHE',
+    SECURITY: 'SECURITY',
+    BATCH: 'BATCH',
+    WORKFLOW: 'WORKFLOW'
+  },
+
+  /**
+   * ログレベル設定
+   * @param {string} level - ログレベル（ERROR, WARN, INFO, DEBUG）
+   */
+  setLogLevel(level) {
+    if (this.LEVELS[level]) {
+      this.currentLogLevel = level;
+    }
+  },
+
+  /**
+   * ログレベルチェック
+   * @param {string} level - チェックするログレベル
+   * @return {boolean} 出力すべきかどうか
+   */
+  shouldLog(level) {
+    const currentPriority = this.LEVEL_PRIORITY[this.currentLogLevel] || 2;
+    const checkPriority = this.LEVEL_PRIORITY[level] || 2;
+    return checkPriority >= currentPriority;
+  },
+
+  /**
+   * 統一ログ出力のコア関数
+   * @param {string} level - ログレベル
+   * @param {string} functionName - 関数名
+   * @param {string} message - ログメッセージ
+   * @param {Object|Error} data - 追加データまたはエラーオブジェクト
+   * @param {string} category - ログカテゴリ
+   */
+  _logCore(level, functionName, message, data = {}, category = 'SYSTEM') {
+    if (!this.shouldLog(level)) return;
+
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      level: level,
+      category: category,
+      function: functionName,
+      message: message,
+      timestamp: timestamp,
+      data: data instanceof Error ? {
+        name: data.name,
+        message: data.message,
+        stack: data.stack
+      } : data,
+    };
+
+    const formattedMessage = `[${level}][${category}] ${functionName}: ${message}`;
+
+    switch (level) {
+      case this.LEVELS.ERROR:
+        console.error(formattedMessage, logEntry);
+        break;
+      case this.LEVELS.WARN:
+        console.warn(formattedMessage, logEntry);
+        break;
+      case this.LEVELS.DEBUG:
+        console.log(formattedMessage, logEntry);
+        break;
+      case this.LEVELS.INFO:
+      default:
+        console.log(formattedMessage, logEntry);
+        break;
+    }
+  },
+
+  /**
+   * ERRORレベルログ出力
+   * @param {string} message - ログメッセージ
+   * @param {Object|Error} data - 追加データまたはエラーオブジェクト
+   * @param {string} category - ログカテゴリ（オプション）
+   */
+  error(message, data = {}, category = 'SYSTEM') {
+    const functionName = this._getFunctionName();
+    this._logCore(this.LEVELS.ERROR, functionName, message, data, category);
+  },
+
+  /**
+   * WARNレベルログ出力
+   * @param {string} message - ログメッセージ
+   * @param {Object} data - 追加データ
+   * @param {string} category - ログカテゴリ（オプション）
+   */
+  warn(message, data = {}, category = 'SYSTEM') {
+    const functionName = this._getFunctionName();
+    this._logCore(this.LEVELS.WARN, functionName, message, data, category);
+  },
+
+  /**
+   * INFOレベルログ出力
+   * @param {string} message - ログメッセージ
+   * @param {Object} data - 追加データ
+   * @param {string} category - ログカテゴリ（オプション）
+   */
+  info(message, data = {}, category = 'SYSTEM') {
+    const functionName = this._getFunctionName();
+    this._logCore(this.LEVELS.INFO, functionName, message, data, category);
+  },
+
+  /**
+   * DEBUGレベルログ出力
+   * @param {string} message - ログメッセージ
+   * @param {Object} data - 追加データ
+   * @param {string} category - ログカテゴリ（オプション）
+   */
+  debug(message, data = {}, category = 'SYSTEM') {
+    const functionName = this._getFunctionName();
+    this._logCore(this.LEVELS.DEBUG, functionName, message, data, category);
+  },
+
+  /**
+   * 呼び出し元の関数名を取得
+   * @return {string} 関数名
+   */
+  _getFunctionName() {
+    try {
+      const stack = new Error().stack;
+      const stackLines = stack.split('\n');
+      // スタックから適切な関数名を抽出（通常は3-4番目の行）
+      for (let i = 3; i < Math.min(6, stackLines.length); i++) {
+        const line = stackLines[i];
+        if (line && !line.includes('_logCore') && !line.includes('ULog.')) {
+          const match = line.match(/at (\w+)/);
+          if (match && match[1] !== 'Object') {
+            return match[1];
+          }
+        }
+      }
+      return 'Unknown';
+    } catch (e) {
+      return 'Unknown';
+    }
+  },
+
+  // 互換性のための旧関数
+  legacy: {
+    /**
+     * 旧logUnified関数との互換性
+     * @param {string} level - ログレベル
+     * @param {string} functionName - 関数名  
+     * @param {string} message - ログメッセージ
+     * @param {Object} data - 追加データ
+     */
+    logUnified(level, functionName, message, data = {}) {
+      ULog._logCore(level, functionName, message, data);
+    }
+  }
+};
+
+// デバッグモード対応
+if (UNIFIED_CONSTANTS.DEBUG.ENABLED) {
+  ULog.setLogLevel('DEBUG');
+} else {
+  ULog.setLogLevel('INFO');
+}
 
 /**
  * 旧logUnified関数（互換性のため保持）
  * @deprecated ULog.info(), ULog.warn(), ULog.error(), ULog.debug() を使用してください
  */
 function logUnified(level, functionName, message, data = {}) {
-  // ULogクラスはulog.gsで定義されている
-  if (typeof ULog !== 'undefined' && ULog.log) {
-    ULog.log(level, functionName, message, data);
-  } else {
-    console.log(`[${level}] ${functionName}: ${message}`, data);
-  }
+  ULog.legacy.logUnified(level, functionName, message, data);
 }
 
 /**

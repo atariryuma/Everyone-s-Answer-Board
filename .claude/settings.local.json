@@ -55,7 +55,8 @@
       "Bash(rm:*)",
       "Bash(npm run deploy:*)",
       "Bash(npm run push:*)",
-      "Bash(npm run format:*)"
+      "Bash(npm run format:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": [],
