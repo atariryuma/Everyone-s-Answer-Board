@@ -86,17 +86,24 @@ function controlledLog(level, category, message, ...args) {
 
   // ログ出力
   const timestamp = new Date().toISOString();
-  const prefix = `[${timestamp}] ${level}${category ? `[${category}]` : ''}:`;
+  const formattedMessage = `[${timestamp}] ${level}${category ? `[${category}]` : ''}: ${message}`;
+  const logData = args.length > 0 ? { additionalData: args } : {};
+  
+  // ULogのカテゴリにマッピング
+  const ulogCategory = category ? ULog.CATEGORIES[category] || ULog.CATEGORIES.SYSTEM : ULog.CATEGORIES.SYSTEM;
 
   switch (level) {
     case 'ERROR':
-      console.error(prefix, message, ...args);
+      ULog.error(formattedMessage, logData, ulogCategory);
       break;
     case 'WARN':
-      console.warn(prefix, message, ...args);
+      ULog.warn(formattedMessage, logData, ulogCategory);
+      break;
+    case 'INFO':
+      ULog.info(formattedMessage, logData, ulogCategory);
       break;
     default:
-      console.log(prefix, message, ...args);
+      ULog.debug(formattedMessage, logData, ulogCategory);
   }
 }
 

@@ -866,12 +866,7 @@ function validateHeaderIntegrity(userId) {
   }
 }
 
-/**
- * @deprecated この関数は削除されました。unifiedCacheManager.gs の clearAllExecutionCache() を使用してください。
- */
-function clearAllExecutionCache() {
-  return unifiedCacheAPI.clearAllExecutionCache();
-}
+// clearAllExecutionCache() は unifiedCacheManager.gs に統合済み
 // =================================================================
 // メインロジック
 // =================================================================
@@ -5451,25 +5446,7 @@ function isSystemAdmin() {
   }
 }
 
-function isDeployUser() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-    var currentUserEmail = getCurrentUserEmail();
-
-    // デバッグログ
-    if (shouldEnableDebugMode()) {
-      ULog.info('isDeployUser check - adminEmail: ' + adminEmail);
-      ULog.info('isDeployUser check - currentUserEmail: ' + currentUserEmail);
-      ULog.info('isDeployUser check - result: ' + (adminEmail === currentUserEmail));
-    }
-
-    return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
-  } catch (e) {
-    ULog.error('[ERROR]', 'isDeployUser エラー: ' + e.message);
-    return false;
-  }
-}
+// isDeployUser() は unifiedSecurityManager.gs に統合済み
 
 // =================================================================
 // マルチテナント対応関数（同時アクセス対応）

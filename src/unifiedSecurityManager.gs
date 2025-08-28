@@ -1108,84 +1108,7 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
 // verifyUserAccess は Core.gs の詳細実装にリダイレクト
 // 統一APIアーキテクチャの一部として、最も完全な実装を使用
 
-/**
- * @deprecated この関数は削除されました。unifiedCacheManager.gs の invalidateUserCache() を使用してください。
- */
-function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
-  return unifiedCacheAPI.invalidateUserCache(userId, email, spreadsheetId, clearAll);
-}
-
-    // 1. ScriptCacheのクリア
-    const scriptCache = CacheService.getScriptCache();
-    if (scriptCache) {
-      if (userId) {
-        scriptCache.remove('user_' + userId);
-      }
-      if (email) {
-        scriptCache.remove('email_' + email);
-        scriptCache.remove('login_status_' + email);
-      }
-      // config_v3キャッシュはユーザーIDとシート名に依存するため、ここではクリアしない
-      // config.gsのgetConfig関数内で個別にクリアされるべき
-    }
-
-    // 2. UserCacheのクリア
-    const userCache = CacheService.getUserCache();
-    if (userCache) {
-      // UserCacheはユーザーセッションに紐づくため、特定のキーを削除する
-      // ただし、UserCacheは現在のユーザーにしか影響しないため、
-      // 他のユーザーのキャッシュをクリアする目的では使えない
-      if (userId) {
-        userCache.remove(buildUserScopedKey('config_v3', userId, '')); // シート名なしの汎用キー
-      }
-    }
-
-    // 3. UnifiedCacheManagerのクリア
-    if (typeof cacheManager !== 'undefined' && cacheManager) {
-      if (userId) {
-        cacheManager.remove('user_' + userId);
-        cacheManager.remove('userinfo_' + userId);
-      }
-      if (email) {
-        cacheManager.remove('session_' + email);
-      }
-      if (spreadsheetId) {
-        cacheManager.remove('sheets_' + spreadsheetId);
-        cacheManager.remove('data_' + spreadsheetId);
-      }
-      // UnifiedCacheManagerはより粒度の高いキャッシュ管理が可能
-      cacheManager.removeByPattern('config_v3_' + userId + '_*'); // ユーザーIDに紐づく設定キャッシュ
-    }
-
-    // 4. PropertiesServiceのクリア（CURRENT_USER_IDのみ）
-    try {
-      const userProps = PropertiesService.getUserProperties();
-      const allProps = userProps.getProperties();
-      for (const key in allProps) {
-        if (key.startsWith('CURRENT_USER_ID_')) {
-          userProps.deleteProperty(key);
-        }
-      }
-    } catch (propsError) {
-      ULog.warn('PropertiesServiceのキャッシュクリア中にエラー:', propsError.message);
-    }
-
-    // 5. 全てのキャッシュをクリアするオプション（最終手段）
-    if (clearAll) {
-      ULog.debug('invalidateUserCache: 全てのキャッシュを強制クリア');
-      CacheService.getScriptCache().removeAll();
-      CacheService.getUserCache().removeAll();
-      if (typeof cacheManager !== 'undefined' && cacheManager) {
-        cacheManager.clearAll();
-      }
-    }
-
-    ULog.info('✅ invalidateUserCache: キャッシュ無効化完了');
-  } catch (error) {
-    console.error('[ERROR]', 'invalidateUserCache エラー:', error.message);
-    // エラーが発生しても処理は続行
-  }
-}
+// invalidateUserCache() は unifiedCacheManager.gs に統合済み
 
 /**
  * クリティカルな更新後にキャッシュを同期
@@ -1194,66 +1117,9 @@ function invalidateUserCache(userId, email, spreadsheetId, clearAll = false) {
  * @param {string} oldSpreadsheetId - 変更前のスプレッドシートID
  * @param {string} newSpreadsheetId - 変更後のスプレッドシートID
  */
-function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
-  try {
-    ULog.debug('synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期開始', {
-      userId,
-      email,
-      oldSpreadsheetId,
-      newSpreadsheetId,
-    });
+// synchronizeCacheAfterCriticalUpdate() は unifiedCacheManager.gs に統合済み
 
-    // 1. ユーザー固有のキャッシュを無効化
-    invalidateUserCache(userId, email, oldSpreadsheetId, false); // oldSpreadsheetIdのキャッシュをクリア
-
-    // 2. 新しいスプレッドシートIDに関連するキャッシュもクリア（もしあれば）
-    if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
-      invalidateUserCache(userId, email, newSpreadsheetId, false);
-      // 古いスプレッドシートオブジェクトのキャッシュを無効化
-      if (oldSpreadsheetId) {
-        invalidateSpreadsheetCache(oldSpreadsheetId);
-        ULog.info(
-          `✅ 古いスプレッドシート (${oldSpreadsheetId}) のオブジェクトキャッシュを無効化しました。`
-        );
-      }
-    }
-
-    // 3. データベース全体のキャッシュをクリア（ユーザーリストなど）
-    clearDatabaseCache();
-
-    // 4. 統一キャッシュマネージャーの関連エントリをクリア
-    if (typeof cacheManager !== 'undefined' && cacheManager) {
-      cacheManager.removeByPattern('user_*');
-      cacheManager.removeByPattern('email_*');
-      cacheManager.removeByPattern('login_status_*');
-      cacheManager.removeByPattern('sheets_*');
-      cacheManager.removeByPattern('data_*');
-      cacheManager.removeByPattern('config_v3_*');
-    }
-
-    ULog.info('✅ synchronizeCacheAfterCriticalUpdate: クリティカル更新後のキャッシュ同期完了');
-  } catch (error) {
-    console.error('[ERROR]', 'synchronizeCacheAfterCriticalUpdate エラー:', error.message);
-    // エラーが発生しても処理は続行
-  }
-}
-
-/**
- * データベースキャッシュをクリア
- */
-function clearDatabaseCache() {
-  try {
-    ULog.debug('clearDatabaseCache: データベースキャッシュをクリア');
-    CacheService.getScriptCache().removeAll();
-    CacheService.getUserCache().removeAll(); // 現在のユーザーのキャッシュもクリア
-    if (typeof cacheManager !== 'undefined' && cacheManager) {
-      cacheManager.clearAll();
-    }
-    ULog.info('✅ データベースキャッシュクリア完了');
-  } catch (error) {
-    console.error('[ERROR]', 'clearDatabaseCache エラー:', error.message);
-  }
-}
+// clearDatabaseCache() は unifiedCacheManager.gs に統合済み
 
 /**
  * ユーザー固有のキーを構築
@@ -1342,39 +1208,6 @@ function getSecureDatabaseId() {
  * @param {string} email - ユーザーのメールアドレス
  * @returns {string} ユーザーID
  */
-function getUserIdFromEmail(email) {
-  const userInfo = findUserByEmail(email);
-  return userInfo ? userInfo.userId : null;
-}
+// getUserIdFromEmail() は unifiedUserManager.gs に統合済み
 
-/**
- * ユーザーIDからメールアドレスを取得
- * @param {string} userId - ユーザーID
- * @returns {string} メールアドレス
- */
-function getEmailFromUserId(userId) {
-  const userInfo = findUserById(userId);
-  return userInfo ? userInfo.adminEmail : null;
-}
-
-/**
- * ユーザーのログイン状態をチェック
- * @param {string} email - ユーザーのメールアドレス
- * @returns {boolean} ログイン状態
- */
-function checkLoginStatus(email) {
-  const userInfo = findUserByEmail(email);
-  return userInfo && userInfo.isActive;
-}
-
-/**
- * ユーザーのログイン状態を更新
- * @param {string} email - ユーザーのメールアドレス
- * @param {boolean} status - ログイン状態
- */
-function updateLoginStatus(email, status) {
-  const userInfo = findUserByEmail(email);
-  if (userInfo) {
-    updateUser(userInfo.userId, { isActive: status });
-  }
-}
+// getEmailFromUserId(), checkLoginStatus(), updateLoginStatus() は unifiedUserManager.gs に統合済み

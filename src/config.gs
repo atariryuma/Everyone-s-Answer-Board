@@ -382,13 +382,6 @@ function openActiveSpreadsheet(requestUserId) {
  * @param {string} [requestUserId] - リクエスト元のユーザーID (オプション)
  * @returns {string} 現在のユーザーのユニークID
  */
-/**
- * @deprecated 統合実装：unifiedUserManager.getUserId() を使用してください
- */
-function getUserId(requestUserId) {
-  // 統合実装にリダイレクト
-  return coreGetUserId(requestUserId);
-}
 
 /**
  * 古いユーザーキャッシュをクリアしてセッション混在を防ぐ
@@ -453,15 +446,6 @@ function clearOldUserCache(currentEmail) {
   }
 }
 
-/**
- * 統一されたユーザー情報取得関数（レガシー互換性維持）
- * @deprecated 統合実装：unifiedUserManager.getConfigUserInfo() を使用してください
- */
-function getConfigUserInfo(requestUserId) {
-  return coreGetUserFromDatabase('userId', requestUserId, {
-    cacheLayer: 'standard',
-  });
-}
 
 /**
  * 現在有効なスプレッドシートIDを取得します。(マルチテナント対応版)

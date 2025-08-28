@@ -172,7 +172,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
       }
     });
   } catch (error) {
-    console.error('[ERROR]', '🚨 削除ログ記録エラー:', error.message);
+    ULog.error('🚨 削除ログ記録エラー', { error: error.message }, ULog.CATEGORIES.DATABASE);
 
     return {
       success: false,
@@ -288,7 +288,7 @@ function logDiagnosticResult(functionName, result, summary) {
       };
     });
   } catch (error) {
-    console.error('[ERROR]', '診断ログ記録エラー:', error.message);
+    ULog.error('診断ログ記録エラー', { error: error.message }, ULog.CATEGORIES.DATABASE);
     ULog.debug('診断ログトランザクション詳細:', transactionLog);
 
     return {
@@ -438,59 +438,7 @@ function cleanupOldDiagnosticLogs() {
   }
 }
 
-/**
- * 全ユーザー一覧を取得（管理者用）
- * @deprecated 統合実装：unifiedUserManager.getAllUsersForAdmin() を使用してください
- */
-function getAllUsersForAdmin() {
-  try {
-    // 管理者権限チェック
-    if (!isDeployUser()) {
-      throw new Error('この機能にアクセスする権限がありません。');
-    }
-
-    // 統合実装にリダイレクト
-    return coreGetAllUsers();
-  } catch (error) {
-    console.error('[ERROR] getAllUsersForAdmin:', error.message);
-    throw new Error('全ユーザー取得に失敗しました: ' + error.message);
-  }
-}
-
-    const headers = values[0];
-    const users = [];
-
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i];
-      const user = {};
-
-      headers.forEach((header, index) => {
-        user[header] = row[index] || '';
-      });
-
-      // createdAt を registrationDate にマッピング
-      if (user.createdAt) {
-        user.registrationDate = user.createdAt;
-      }
-
-      // 設定情報をパース
-      try {
-        user.configJson = JSON.parse(user.configJson || '{}');
-      } catch (e) {
-        user.configJson = {};
-      }
-
-      users.push(user);
-      ULog.debug(`DEBUG: getAllUsersForAdmin - User object: ${JSON.stringify(user)}`);
-    }
-
-    ULog.info(`✅ 管理者用ユーザー一覧を取得: ${users.length}件`);
-    return users;
-  } catch (error) {
-    console.error('[ERROR]', 'getAllUsersForAdmin error:', error.message);
-    throw new Error('ユーザー一覧の取得に失敗しました: ' + error.message);
-  }
-}
+// getAllUsersForAdmin() は unifiedUserManager.gs に統合済み
 
 /**
  * 管理者による他ユーザーアカウント削除
@@ -759,17 +707,7 @@ function getDeletionLogs() {
   }
 }
 
-/**
- * 長期キャッシュ対応Sheetsサービスを取得
- * @returns {object} Sheets APIサービス
- */
-/**
- * @deprecated 統合実装：unifiedCacheManager.getSheetsServiceCached() を使用してください
- */
-function getSheetsServiceCached(forceRefresh) {
-  // 統合実装にリダイレクト
-  return unifiedCacheAPI.getSheetsServiceCached(forceRefresh);
-}
+// getSheetsServiceCached() は unifiedCacheManager.gs に統合済み
 
 /**
  * 最適化されたSheetsサービスを取得
@@ -810,53 +748,7 @@ function getSheetsService() {
   }
 }
 
-/**
- * ユーザー情報を効率的に検索（キャッシュ優先）
- * @param {string} userId - ユーザーID
- * @returns {object|null} ユーザー情報
- * @deprecated 統合実装：unifiedUserManager.findUserById() を使用してください
- */
-function findUserById(userId) {
-  // 統合実装にリダイレクト
-  return coreGetUserFromDatabase('userId', userId, {
-    cacheLayer: 'standard',
-  });
-}
-
-/**
- * 閲覧者向けの軽量ユーザー情報取得（公開状態確認用）
- * キャッシュ優先で応答性を重視
- * @param {string} userId - ユーザーID
- * @returns {object|null} 軽量ユーザー情報
- * @deprecated 統合実装：unifiedUserManager.findUserByIdForViewer() を使用してください
- */
-function findUserByIdForViewer(userId) {
-  // 統合実装にリダイレクト（閲覧者向け長期キャッシュ）
-  return coreGetUserFromDatabase('userId', userId, {
-    cacheLayer: 'extended',
-  });
-}
-
-/**
- * キャッシュをバイパスして最新のユーザー情報を強制取得
- * クリティカルな更新操作直後に使用
- * @param {string} userId - ユーザーID
- * @returns {object|null} 最新のユーザー情報
- * @deprecated 統合実装：unifiedUserManager.findUserByIdFresh() を使用してください
- */
-function findUserByIdFresh(userId) {
-  // 統合実装にリダイレクト（フレッシュ取得）
-  const result = coreGetUserFromDatabase('userId', userId, {
-    forceFresh: true,
-    cacheLayer: 'standard',
-  });
-
-  if (result) {
-    ULog.info('✅ Fresh user data retrieved for:', userId);
-  }
-
-  return result;
-}
+// findUserById(), findUserByIdForViewer(), findUserByIdFresh() は unifiedUserManager.gs に統合済み
 
 /**
  * ユーザーデータの整合性を修正する
@@ -2210,44 +2102,7 @@ function getSpreadsheetsData(service, spreadsheetId) {
   }
 }
 
-/**
- * すべてのユーザー情報を取得
- * @returns {Array} ユーザー情報配列
- */
-function getAllUsers() {
-  try {
-    const props = getResilientScriptProperties();
-    const dbId = getSecureDatabaseId();
-    const service = getSheetsServiceCached();
-    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-
-    const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
-    var values = data.valueRanges[0].values || [];
-
-    if (values.length <= 1) {
-      return []; // ヘッダーのみの場合は空配列を返す
-    }
-
-    const headers = values[0];
-    var users = [];
-
-    for (let i = 1; i < values.length; i++) {
-      var row = values[i];
-      var user = {};
-
-      for (var j = 0; j < headers.length; j++) {
-        user[headers[j]] = row[j] || '';
-      }
-
-      users.push(user);
-    }
-
-    return users;
-  } catch (error) {
-    console.error('[ERROR]', 'getAllUsers エラー:', error.message);
-    throw new Error('全ユーザー情報の取得に失敗しました: ' + error.message);
-  }
-}
+// getAllUsers() は unifiedUserManager.gs に統合済み
 
 /**
  * データ更新

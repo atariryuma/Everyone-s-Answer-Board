@@ -43,23 +43,85 @@ global.SpreadsheetApp = {
 
 // 統一ログシステム モック
 global.ULog = {
+  // ログレベル定義（実際のULogと同じ）
+  LEVELS: {
+    ERROR: 'ERROR',
+    WARN: 'WARN', 
+    INFO: 'INFO',
+    DEBUG: 'DEBUG'
+  },
+
+  // ログレベル優先度
+  LEVEL_PRIORITY: {
+    DEBUG: 1,
+    INFO: 2,
+    WARN: 3,
+    ERROR: 4
+  },
+
+  // 現在のログレベル設定
+  currentLogLevel: 'INFO',
+
+  // カテゴリ定義
+  CATEGORIES: {
+    SYSTEM: 'SYSTEM',
+    AUTH: 'AUTH',
+    API: 'API',
+    DATABASE: 'DATABASE',
+    UI: 'UI',
+    CACHE: 'CACHE',
+    SECURITY: 'SECURITY',
+    BATCH: 'BATCH',
+    WORKFLOW: 'WORKFLOW'
+  },
+
+  // ログレベル設定
+  setLogLevel: jest.fn(function(level) {
+    if (this.LEVELS[level]) {
+      this.currentLogLevel = level;
+    }
+  }),
+
+  // ログレベルチェック
+  shouldLog: jest.fn(function(level) {
+    const currentPriority = this.LEVEL_PRIORITY[this.currentLogLevel] || 2;
+    const checkPriority = this.LEVEL_PRIORITY[level] || 2;
+    return checkPriority >= currentPriority;
+  }),
+
+  // 関数名取得（モック）
+  _getFunctionName: jest.fn(() => 'testFunction'),
+
+  // コアログ機能
+  _logCore: jest.fn(),
+
+  // ログメソッド
   debug: jest.fn(),
   info: jest.fn(),
   warn: jest.fn(),
-  error: jest.fn(),
+  error: jest.fn()
 };
 
 // 統一レスポンス関数 モック
-global.createSuccessResponse = jest.fn((data) => ({
-  status: 'success',
+global.createSuccessResponse = jest.fn((data = null, message = null) => ({
+  success: true,
   data: data,
-  timestamp: new Date().toISOString()
+  message: message,
+  error: null
 }));
 
-global.createErrorResponse = jest.fn((error) => ({
-  status: 'error',
-  error: error,
-  timestamp: new Date().toISOString()
+global.createErrorResponse = jest.fn((error, message = null, data = null) => ({
+  success: false,
+  data: data,
+  message: message,
+  error: error
+}));
+
+global.createUnifiedResponse = jest.fn((success, data = null, message = null, error = null) => ({
+  success: success,
+  data: data,
+  message: message,
+  error: error
 }));
 
 // 統一キャッシュマネージャー モック
@@ -76,6 +138,53 @@ global.findUserById = jest.fn();
 global.findUserByEmail = jest.fn();
 global.getOrFetchUserInfo = jest.fn();
 global.getCurrentUserEmail = jest.fn(() => 'test@example.com');
+global.coreGetCurrentUserEmail = jest.fn(() => 'test@example.com');
+
+// 統合システム定数 モック
+global.UNIFIED_CONSTANTS = {
+  ERROR: {
+    SEVERITY: {
+      LOW: 'low',
+      MEDIUM: 'medium', 
+      HIGH: 'high',
+      CRITICAL: 'critical'
+    },
+    CATEGORIES: {
+      AUTHENTICATION: 'authentication',
+      AUTHORIZATION: 'authorization',
+      DATABASE: 'database',
+      CACHE: 'cache',
+      NETWORK: 'network',
+      VALIDATION: 'validation',
+      SYSTEM: 'system',
+      USER_INPUT: 'user_input',
+      EXTERNAL: 'external',
+      CONFIG: 'config',
+      SECURITY: 'security'
+    }
+  },
+  CACHE: {
+    TTL: {
+      SHORT: 300,
+      MEDIUM: 600,
+      LONG: 3600,
+      EXTENDED: 21600
+    },
+    BATCH_SIZE: {
+      SMALL: 20,
+      MEDIUM: 50,
+      LARGE: 100,
+      XLARGE: 200
+    }
+  },
+  TIMEOUTS: {
+    SHORT: 5000,
+    MEDIUM: 15000,
+    LONG: 30000,
+    EXTENDED: 60000
+  }
+};
+
 global.getSheetsServiceCached = jest.fn();
 global.batchGetSheetsData = jest.fn();
 global.openSpreadsheetOptimized = jest.fn();
@@ -83,6 +192,66 @@ global.isPublishedBoard = jest.fn(() => true);
 global.formatSheetDataForFrontend = jest.fn();
 global.getSpreadsheetsData = jest.fn();
 global.clearExecutionUserInfoCache = jest.fn();
+global.invalidateUserCache = jest.fn();
+global.getUnifiedExecutionCache = jest.fn(() => ({
+  clearUserInfo: jest.fn(),
+  clearSheetsService: jest.fn(),
+  clearAll: jest.fn()
+}));
+
+// セキュリティ・権限関数 モック
+global.isDeployUser = jest.fn(() => true);
+global.executeWithStandardizedLock = jest.fn((callback) => callback());
+global.getSecureDatabaseId = jest.fn(() => 'mock-database-id');
+global.getServiceAccountTokenCached = jest.fn(() => 'mock-token');
+global.generateNewServiceAccountToken = jest.fn(() => 'new-mock-token');
+global.getServiceAccountEmail = jest.fn(() => 'service@example.com');
+
+// データベース操作関数 モック
+global.DB_SHEET_CONFIG = {
+  sheetName: 'UserDatabase',
+  headers: ['userId', 'adminEmail', 'createdAt']
+};
+global.DELETE_LOG_SHEET_CONFIG = {
+  sheetName: 'DeleteLog',
+  headers: ['userId', 'deletedAt', 'reason']
+};
+global.DIAGNOSTIC_LOG_SHEET_CONFIG = {
+  sheetName: 'DiagnosticLog',
+  headers: ['timestamp', 'level', 'message']
+};
+
+// スクリプトプロパティキー モック
+global.SCRIPT_PROPS_KEYS = {
+  DATABASE_ID: 'DATABASE_ID',
+  SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
+  ADMIN_EMAIL: 'ADMIN_EMAIL'
+};
+
+// バッチプロセッサ モック
+global.unifiedBatchProcessor = {
+  batchUpdateSheet: jest.fn(),
+  batchReadSheet: jest.fn()
+};
+
+// キャッシュ操作 モック
+global.clearDatabaseCache = jest.fn();
+global.synchronizeCacheAfterCriticalUpdate = jest.fn();
+
+// ユーティリティ関数 モック
+global.resilientUrlFetch = jest.fn(() => ({ getResponseCode: () => 200 }));
+global.shareSpreadsheetWithServiceAccount = jest.fn();
+global.createUserFolder = jest.fn(() => 'mock-folder-id');
+
+// 正規表現 モック
+global.EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// unifiedCacheAPI モック
+global.unifiedCacheAPI = {
+  invalidateUserCache: jest.fn(),
+  clearDatabaseCache: jest.fn(),
+  synchronizeCacheAfterCriticalUpdate: jest.fn()
+};
 
 // 統一Sheet管理システム関数のモック
 global.getPublishedSheetDataUnified = jest.fn();

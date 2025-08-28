@@ -8,15 +8,6 @@
 // 統合：共通ユーティリティ関数（元commonUtilities.gs）
 // =============================================================================
 
-/**
- * 現在のアクティブユーザーのメールアドレスを安全に取得
- * @returns {string} ユーザーメールアドレス（取得失敗時は空文字）
- * @deprecated 統合実装：unifiedUserManager.getCurrentUserEmail() を使用してください
- */
-function getCurrentUserEmail() {
-  // 統合実装にリダイレクト
-  return coreGetCurrentUserEmail();
-}
 
 /**
  * 統一ユーザー情報管理クラス

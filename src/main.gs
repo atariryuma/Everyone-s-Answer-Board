@@ -1417,13 +1417,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
  * @param {Object} [options] - キャッシュオプション
  * @returns {Object|null} ユーザー情報オブジェクト、見つからない場合はnull
  */
-/**
- * @deprecated 統合実装：unifiedUserManager.getOrFetchUserInfo() を使用してください
- */
-function getOrFetchUserInfo(identifier, type = null, options = {}) {
-  // 統合実装にリダイレクト
-  return unifiedUserManager.getOrFetchUserInfo(identifier, type, options);
-}
+// getOrFetchUserInfo() は unifiedUserManager.gs に統合済み
 /**
  * ログインページを表示
  * @returns {HtmlOutput}
@@ -1633,19 +1627,7 @@ function getErrorIcon(errorType) {
   return icons[errorType] || '⚠️';
 }
 
-/**
- * エラータイプに対応する重要度を取得
- */
-function getErrorSeverity(errorType) {
-  const severities = {
-    [ERROR_TYPES.CRITICAL]: 'high',
-    [ERROR_TYPES.ACCESS]: 'medium',
-    [ERROR_TYPES.VALIDATION]: 'medium',
-    [ERROR_TYPES.NETWORK]: 'medium',
-    [ERROR_TYPES.USER]: 'low',
-  };
-  return severities[errorType] || 'low';
-}
+// getErrorSeverity() は constants.gs に統合済み
 
 /**
  * 長い診断情報を構造化して整理する

@@ -148,7 +148,7 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
 
     ULog.debug('セッションクリーンアップ完了: ' + currentEmail);
   } catch (error) {
-    console.error('[ERROR]', 'セッションクリーンアップでエラー: ' + error.message);
+    ULog.error('セッションクリーンアップでエラー', { error: error.message }, ULog.CATEGORIES.AUTH);
     // エラーが発生してもアプリケーションを停止させない
   }
 }
@@ -252,7 +252,7 @@ function resetUserAuthentication() {
       }
     } catch (propsError) {
       authResetResult.errors.push(`プロパティクリアエラー: ${propsError.message}`);
-      console.error('[ERROR]', '❌ プロパティクリアでエラーが発生しました:', propsError.message);
+      ULog.error('プロパティクリアでエラーが発生しました', { error: propsError.message }, ULog.CATEGORIES.AUTH);
 
       // プロパティクリアに失敗してもログアウト処理は続行
       ULog.warn('⚠️ プロパティクリアに失敗しましたが、ログアウト処理を続行します');
@@ -278,11 +278,11 @@ function resetUserAuthentication() {
     }
   } catch (error) {
     const executionTime = Date.now() - (authResetResult.startTime || Date.now());
-    console.error('[ERROR]', '❌ ユーザー認証リセット中に致命的エラー:', {
+    ULog.error('ユーザー認証リセット中に致命的エラー', {
       error: error.message,
       executionTime: executionTime + 'ms',
       partialResults: authResetResult,
-    });
+    }, ULog.CATEGORIES.AUTH);
 
     // エラーメッセージを詳細化
     let errorMessage = `認証リセットに失敗しました: ${error.message}`;
@@ -429,7 +429,7 @@ function forceLogoutAndRedirectToLogin() {
       try {
         loginUrl = sanitizeRedirectUrl(fallbackUrl);
       } catch (sanitizeError) {
-        console.error('[ERROR]', '❌ Fallback URL sanitization failed:', sanitizeError.message);
+        ULog.error('Fallback URL sanitization failed', { error: sanitizeError.message }, ULog.CATEGORIES.AUTH);
         loginUrl = fallbackUrl; // 最終フォールバック
       }
     }
@@ -466,7 +466,7 @@ function forceLogoutAndRedirectToLogin() {
             // フォールバック：現在のウィンドウでリダイレクト
             window.location.href = '${safeLoginUrl}';
           } catch (currentError) {
-            console.error('[ERROR]','リダイレクト完全失敗:', currentError);
+            ULog.error('リダイレクト完全失敗', { error: currentError }, ULog.CATEGORIES.AUTH);
             // 最終手段：ページリロード
             window.location.reload();
           }
@@ -522,10 +522,10 @@ function forceLogoutAndRedirectToLogin() {
     ULog.debug('✅ サーバーサイドリダイレクトHTML生成完了 - 正常終了');
     return htmlOutput;
   } catch (error) {
-    console.error('[ERROR]', '❌ サーバーサイドログアウト処理でエラー:', error.message);
-    console.error('[ERROR]', '❌ エラースタック:', error.stack);
-    console.error('[ERROR]', '❌ エラーの型:', typeof error);
-    console.error('[ERROR]', '❌ エラーオブジェクト:', error);
+    ULog.error('サーバーサイドログアウト処理でエラー', { error: error.message }, ULog.CATEGORIES.AUTH);
+    ULog.error('エラースタック', { stack: error.stack }, ULog.CATEGORIES.AUTH);
+    ULog.error('エラーの型', { type: typeof error }, ULog.CATEGORIES.AUTH);
+    ULog.error('エラーオブジェクト', { error }, ULog.CATEGORIES.AUTH);
 
     // Step 5: エラー時のフォールバックHTML（安全なエスケープ）
     const safeErrorMessage = String(error.message || 'Unknown error')
@@ -535,7 +535,7 @@ function forceLogoutAndRedirectToLogin() {
 
     const fallbackScript = `
       <script>
-        console.error('[ERROR]','サーバーサイドログアウトエラー: ${safeErrorMessage}');
+        ULog.error('サーバーサイドログアウトエラー', { message: safeErrorMessage }, ULog.CATEGORIES.AUTH);
         alert('ログアウト処理中にエラーが発生しました。\\n\\n詳細: ${safeErrorMessage}\\n\\nページを再読み込みします。');
         window.location.reload();
       </script>
@@ -550,7 +550,7 @@ function forceLogoutAndRedirectToLogin() {
       ULog.debug('✅ Fallback HtmlOutput created successfully');
       return fallbackOutput;
     } catch (fallbackError) {
-      console.error('[ERROR]', '❌ Fallback HTML creation failed:', fallbackError.message);
+      ULog.error('Fallback HTML creation failed', { error: fallbackError.message }, ULog.CATEGORIES.AUTH);
       // 最終手段として最小限のHTML
       return HtmlService.createHtmlOutput('<script>window.location.reload();</script>');
     }
@@ -585,7 +585,7 @@ function detectAccountSwitch(currentEmail) {
       currentEmail: currentEmail,
     };
   } catch (error) {
-    console.error('[ERROR]', 'アカウント切り替え検出中にエラー:', error.message);
+    ULog.error('アカウント切り替え検出中にエラー', { error: error.message }, ULog.CATEGORIES.AUTH);
     return {
       isAccountSwitch: false,
       previousEmail: null,
