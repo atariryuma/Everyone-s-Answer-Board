@@ -71,7 +71,7 @@ class UnifiedUserManager {
       return userInfo;
 
     } catch (error) {
-      errorLog('統一ユーザー管理エラー:', error.message);
+      console.error("[ERROR]", '統一ユーザー管理エラー:', error.message);
       return null;
     }
   }
@@ -142,7 +142,7 @@ class UnifiedUserManager {
       return null;
       
     } catch (fallbackError) {
-      errorLog('❌ フォールバック処理でエラー:', fallbackError.message);
+      console.error("[ERROR]", '❌ フォールバック処理でエラー:', fallbackError.message);
       return null;
     }
   }
@@ -169,7 +169,7 @@ class UnifiedUserManager {
       unifiedCache.syncWithUnifiedCache('userDataChange');
 
     } catch (error) {
-      errorLog('ユーザーキャッシュクリアエラー:', error.message);
+      console.error("[ERROR]", 'ユーザーキャッシュクリアエラー:', error.message);
     }
   }
 }
@@ -224,7 +224,7 @@ class UnifiedURLManager {
       return sanitized;
 
     } catch (error) {
-      errorLog('URL検証エラー:', error.message);
+      console.error("[ERROR]", 'URL検証エラー:', error.message);
       return '';
     }
   }
@@ -320,7 +320,7 @@ class UnifiedAPIClient {
     }
 
     // 全試行失敗
-    errorLog('❌ 統一API全試行失敗:', lastError.message);
+    console.error("[ERROR]", '❌ 統一API全試行失敗:', lastError.message);
     return {
       success: false,
       status: 0,
@@ -401,7 +401,7 @@ class UnifiedValidation {
       };
 
     } catch (error) {
-      errorLog('統一バリデーションエラー:', error.message);
+      console.error("[ERROR]", '統一バリデーションエラー:', error.message);
       return {
         isValid: false,
         errors: [`バリデーション処理エラー: ${error.message}`],
@@ -490,11 +490,12 @@ class UnifiedValidation {
 // 後方互換性のためのラッパー関数群
 
 /**
+ * @deprecated 削除予定。database.gsのfindUserById()を使用してください。
  * 既存のgetUserInfoCached関数のラッパー
  * @deprecated UnifiedUserManager.getUser を使用してください
  */
 function getUserInfoCachedUnified(requestUserId) {
-  return UnifiedUserManager.getUser(requestUserId, { useCache: true });
+  return findUserById(requestUserId);
 }
 
 /**

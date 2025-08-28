@@ -113,7 +113,7 @@ class SystemIntegrationManager {
       initResult.errors.push(`システム初期化エラー: ${error.message}`);
       initResult.initializationTime = Date.now() - startTime;
       
-      errorLog('❌ 統合システム初期化エラー:', error);
+      console.error("[ERROR]", '❌ 統合システム初期化エラー:', error);
       return initResult;
     }
   }
@@ -374,7 +374,7 @@ class SystemIntegrationManager {
       return true;
 
     } catch (error) {
-      errorLog('システムシャットダウンエラー:', error);
+      console.error("[ERROR]", 'システムシャットダウンエラー:', error);
       return false;
     }
   }
@@ -496,7 +496,7 @@ function diagnoseOptimizedSystem() {
 
   } catch (error) {
     diagnostics.error = error.message;
-    errorLog('システム診断エラー:', error);
+    console.error("[ERROR]", 'システム診断エラー:', error);
     return diagnostics;
   }
 }

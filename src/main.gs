@@ -946,7 +946,7 @@ function initializeRequestProcessing() {
   // システムコンポーネントの依存関係チェック
   const dependencyCheck = validateSystemDependencies();
   if (!dependencyCheck.success) {
-    errorLog('システムの依存関係チェックに失敗:', dependencyCheck.errors);
+    console.error('[ERROR]','システムの依存関係チェックに失敗:', dependencyCheck.errors);
     return showErrorPage(
       'システム初期化エラー', 
       'システムの初期化に失敗しました。管理者にご連絡ください。\n\n' +
@@ -1137,7 +1137,7 @@ function handleAdminMode(params) {
     const totalRequestTime = Date.now() - requestStartTime;
     systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
     
-    errorLog('🚨 handleAdminMode: 管理者権限確認失敗', {
+    console.error('[ERROR]','🚨 handleAdminMode: 管理者権限確認失敗', {
       userId: params.userId,
       currentUser: getCurrentUserEmail(),
       authDuration: authDuration + 'ms',
@@ -2019,13 +2019,13 @@ function createSecureRedirect(targetUrl, message) {
       warnLog('⚠️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
     }
   } catch (e) {
-    errorLog('❌ Secure Redirect XFrameOptionsMode設定エラー:', e.message);
+    console.error('[ERROR]','❌ Secure Redirect XFrameOptionsMode設定エラー:', e.message);
     // フォールバック: 従来の方法で設定を試行
     try {
       htmlOutput.setXFrameOptionsMode('ALLOWALL');
       infoLog('💡 フォールバック方法でSecure Redirect XFrameOptionsMode設定完了');
     } catch (fallbackError) {
-      errorLog('❌ フォールバック方法も失敗:', fallbackError.message);
+      console.error('[ERROR]','❌ フォールバック方法も失敗:', fallbackError.message);
     }
   }
 
@@ -2168,13 +2168,13 @@ function renderAdminPanel(userInfo, mode) {
       warnLog('⚠️ HtmlService.XFrameOptionsMode.ALLOWALLが利用できません');
     }
   } catch (e) {
-    errorLog('❌ Admin Panel XFrameOptionsMode設定エラー:', e.message);
+    console.error('[ERROR]','❌ Admin Panel XFrameOptionsMode設定エラー:', e.message);
     // フォールバック: 従来の方法で設定を試行
     try {
       htmlOutput.setXFrameOptionsMode('ALLOWALL');
       infoLog('💡 フォールバック方法でAdmin Panel XFrameOptionsMode設定完了');
     } catch (fallbackError) {
-      errorLog('❌ フォールバック方法も失敗:', fallbackError.message);
+      console.error('[ERROR]','❌ フォールバック方法も失敗:', fallbackError.message);
     }
   }
 
@@ -2882,7 +2882,7 @@ function getDebugModeStatus() {
       lastModified: PropertiesService.getScriptProperties().getProperty('DEBUG_MODE_LAST_MODIFIED') || 'unknown'
     };
   } catch (error) {
-    errorLog('getDebugModeStatus error:', error.message);
+    console.error('[ERROR]','getDebugModeStatus error:', error.message);
     return {
       status: 'error',
       message: 'DEBUG_MODE状態の取得に失敗しました: ' + error.message
@@ -2937,7 +2937,7 @@ function toggleDebugMode(enable) {
     };
     
   } catch (error) {
-    errorLog('toggleDebugMode error:', error.message);
+    console.error('[ERROR]','toggleDebugMode error:', error.message);
     return {
       status: 'error',
       message: 'DEBUG_MODE切り替えに失敗しました: ' + error.message
@@ -2973,7 +2973,7 @@ function getUserActiveStatus() {
     };
     
   } catch (error) {
-    errorLog('getUserActiveStatus error:', error.message);
+    console.error('[ERROR]','getUserActiveStatus error:', error.message);
     return {
       success: false,
       error: 'アクセス状態の取得に失敗しました: ' + error.message,
@@ -3022,7 +3022,7 @@ function updateSelfActiveStatus(targetUserId, isActive) {
     };
     
   } catch (error) {
-    errorLog('updateSelfActiveStatus error:', error.message);
+    console.error('[ERROR]','updateSelfActiveStatus error:', error.message);
     return {
       success: false,
       message: 'アクセス設定の変更に失敗しました: ' + error.message
@@ -3088,7 +3088,7 @@ function updateUserActiveStatus(userId, isActive) {
     };
     
   } catch (error) {
-    errorLog('updateUserActiveStatus error:', error.message);
+    console.error('[ERROR]','updateUserActiveStatus error:', error.message);
     return {
       status: 'error',
       message: 'ユーザーステータス更新に失敗しました: ' + error.message
@@ -3158,7 +3158,7 @@ function bulkUpdateUserActiveStatus(userIds, isActive) {
     };
     
   } catch (error) {
-    errorLog('bulkUpdateUserActiveStatus error:', error.message);
+    console.error('[ERROR]','bulkUpdateUserActiveStatus error:', error.message);
     return {
       status: 'error',
       message: '一括ユーザーステータス更新に失敗しました: ' + error.message
@@ -3195,7 +3195,7 @@ function bulkUpdateAllUsersActiveStatus(isActive) {
     return bulkUpdateUserActiveStatus(userIds, isActive);
     
   } catch (error) {
-    errorLog('bulkUpdateAllUsersActiveStatus error:', error.message);
+    console.error('[ERROR]','bulkUpdateAllUsersActiveStatus error:', error.message);
     return {
       status: 'error',
       message: '全ユーザー一括更新に失敗しました: ' + error.message

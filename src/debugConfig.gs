@@ -122,14 +122,7 @@ function debugLog(message, ...args) {
   controlledLog('DEBUG', category, message, ...args);
 }
 
-/**
- * エラーログ出力（本番環境でも常に出力）
- * @param {string} message - エラーメッセージ
- * @param {...any} args - 追加引数
- */
-function errorLog(message, ...args) {
-  controlledLog('ERROR', null, message, ...args);
-}
+// errorLog統合: Core.gsのlogErrorに統一。この関数は削除し、Core.gsを使用
 
 /**
  * 警告ログ出力

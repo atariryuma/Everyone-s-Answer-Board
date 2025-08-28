@@ -124,7 +124,7 @@ class UnifiedSecretManager {
           return secretValue;
         }
       } catch (error) {
-        errorLog(`Properties Service取得エラー (${secretName}):`, error.message);
+        console.error("[ERROR]", `Properties Service取得エラー (${secretName}):`, error.message);
         throw error;
       }
     }
@@ -199,7 +199,7 @@ class UnifiedSecretManager {
         success = true;
         debugLog(`🔐 Properties Service保存成功: ${secretName}`);
       } catch (error) {
-        errorLog(`Properties Service保存エラー (${secretName}):`, error.message);
+        console.error("[ERROR]", `Properties Service保存エラー (${secretName}):`, error.message);
         if (!success) {
           throw error;
         }
@@ -337,7 +337,7 @@ class UnifiedSecretManager {
       return true;
 
     } catch (error) {
-      errorLog(`Secret Manager保存エラー:`, error.message);
+      console.error("[ERROR]", `Secret Manager保存エラー:`, error.message);
       throw error;
     }
   }
@@ -375,7 +375,7 @@ class UnifiedSecretManager {
       return value;
     } catch (error) {
       const errorMessage = `Properties Service取得エラー (${secretName}): ${error.message}`;
-      errorLog(errorMessage);
+      console.error("[ERROR]", errorMessage);
       
       // 重要なシークレットの場合はシステムを停止、そうでなければnullを返してフォールバック可能にする
       if (this.isCriticalSecret(secretName)) {
@@ -403,7 +403,7 @@ class UnifiedSecretManager {
       
       return true;
     } catch (error) {
-      errorLog(`Properties Service保存エラー:`, error.message);
+      console.error("[ERROR]", `Properties Service保存エラー:`, error.message);
       throw error;
     }
   }
@@ -573,7 +573,7 @@ class UnifiedSecretManager {
 
     // エラー時のみログ出力（通常の GET/CACHE_HIT は記録しない）
     if (action.includes('ERROR') || action.includes('FAILED')) {
-      errorLog(`🔐 秘密情報アクセスエラー: ${action} ${secretName}`, logEntry);
+      console.error("[ERROR]", `🔐 秘密情報アクセスエラー: ${action} ${secretName}`, logEntry);
     }
   }
 

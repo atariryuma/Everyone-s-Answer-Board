@@ -219,11 +219,7 @@ if (typeof warnLog === 'undefined') {
   }
 }
 
-if (typeof errorLog === 'undefined') {
-  function errorLog(message, ...args) {
-    console.error('[ERROR]', message, ...args);
-  }
-}
+// errorLog統合: 上記のlogError関数を使用。重複定義削除
 
 if (typeof infoLog === 'undefined') {
   function infoLog(message, ...args) {
@@ -1033,7 +1029,7 @@ function registerNewUser(adminEmail) {
     // 検証結果の判定
     if (!verificationSuccess || !createdUser) {
       const elapsedTime = Date.now() - startTime;
-      errorLog('❌ registerNewUser: データベース同期検証失敗', {
+      console.error("[ERROR]", '❌ registerNewUser: データベース同期検証失敗', {
         userId,
         email: adminEmail,
         attempts: attemptCount,
@@ -1076,7 +1072,7 @@ function registerNewUser(adminEmail) {
       }
     }
 
-    errorLog('❌ registerNewUser: ユーザー登録失敗:', { error: e.message, userId, email: adminEmail });
+    console.error("[ERROR]", '❌ registerNewUser: ユーザー登録失敗:', { error: e.message, userId, email: adminEmail });
     throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
   }
 
@@ -2372,7 +2368,7 @@ function checkAdmin(requestUserId) {
     // ここでは単に userInfo.adminEmail と getCurrentUserEmail() が一致するかを返す
     return getCurrentUserEmail() === userInfo.adminEmail;
   } catch (e) {
-    errorLog('checkAdmin エラー: ' + e.message);
+    console.error("[ERROR]", 'checkAdmin エラー: ' + e.message);
     return false;
   }
 }
@@ -2446,7 +2442,7 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
       status: 'success'
     };
   } catch (e) {
-    errorLog('getDataCount エラー: ' + e.message);
+    console.error("[ERROR]", 'getDataCount エラー: ' + e.message);
     return {
       count: 0,
       lastUpdate: new Date().toISOString(),
@@ -2492,14 +2488,14 @@ function updateFormSettings(requestUserId, title, description) {
           message: 'フォーム設定が更新されました'
         };
       } catch (formError) {
-        errorLog('フォーム更新エラー: ' + formError.message);
+        console.error("[ERROR]", 'フォーム更新エラー: ' + formError.message);
         return { status: 'error', message: 'フォームの更新に失敗しました: ' + formError.message };
       }
     } else {
       return { status: 'error', message: 'フォームが見つかりません' };
     }
   } catch (e) {
-    errorLog('updateFormSettings エラー: ' + e.message);
+    console.error("[ERROR]", 'updateFormSettings エラー: ' + e.message);
     return { status: 'error', message: 'フォーム設定の更新に失敗しました: ' + e.message };
   }
 }
@@ -2537,7 +2533,7 @@ function saveSystemConfig(requestUserId, config) {
       message: 'システム設定が保存されました'
     };
   } catch (e) {
-    errorLog('saveSystemConfig エラー: ' + e.message);
+    console.error("[ERROR]", 'saveSystemConfig エラー: ' + e.message);
     return { status: 'error', message: 'システム設定の保存に失敗しました: ' + e.message };
   }
 }
@@ -2578,7 +2574,7 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
       throw new Error(result.message || 'ハイライト切り替えに失敗しました');
     }
   } catch (e) {
-    errorLog('toggleHighlight エラー: ' + e.message);
+    console.error("[ERROR]", 'toggleHighlight エラー: ' + e.message);
     return {
       status: "error",
       message: e.message
@@ -2648,8 +2644,8 @@ function createQuickStartFiles(setupContext) {
         }
       } catch (formMoveError) {
         moveErrors.push('フォームファイル移動エラー: ' + formMoveError.message);
-        errorLog('❌ フォームファイルの移動に失敗:', formMoveError.message);
-        errorLog('フォームID: %s, フォルダID: %s', formAndSsInfo.formId, folder ? folder.getId() : 'なし');
+        console.error("[ERROR]", '❌ フォームファイルの移動に失敗:', formMoveError.message);
+        console.error("[ERROR]", 'フォームID: %s, フォルダID: %s', formAndSsInfo.formId, folder ? folder.getId() : 'なし');
       }
 
       // スプレッドシートファイルの移動処理
@@ -2678,8 +2674,8 @@ function createQuickStartFiles(setupContext) {
         }
       } catch (ssMoveError) {
         moveErrors.push('スプレッドシートファイル移動エラー: ' + ssMoveError.message);
-        errorLog('❌ スプレッドシートファイルの移動に失敗:', ssMoveError.message);
-        errorLog('スプレッドシートID: %s, フォルダID: %s', formAndSsInfo.spreadsheetId, folder ? folder.getId() : 'なし');
+        console.error("[ERROR]", '❌ スプレッドシートファイルの移動に失敗:', ssMoveError.message);
+        console.error("[ERROR]", 'スプレッドシートID: %s, フォルダID: %s', formAndSsInfo.spreadsheetId, folder ? folder.getId() : 'なし');
       }
 
       // 移動結果のログ出力
@@ -2694,7 +2690,7 @@ function createQuickStartFiles(setupContext) {
       }
 
     } catch (generalError) {
-      errorLog('❌ ファイル移動処理で予期しないエラー:', generalError.message);
+      console.error("[ERROR]", '❌ ファイル移動処理で予期しないエラー:', generalError.message);
       // ファイル移動失敗は致命的ではないため、処理は継続
       debugLog('ファイルはマイドライブに残りますが、システムは正常に動作します');
     }
@@ -2761,11 +2757,11 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
   // 型安全性確保: publishedSheetNameの明示的文字列変換
   var safeSheetName = formAndSsInfo.sheetName;
   if (typeof safeSheetName !== 'string') {
-    errorLog('❌ quickStartSetup: formAndSsInfo.sheetNameが文字列ではありません:', typeof safeSheetName, safeSheetName);
+    console.error("[ERROR]", '❌ quickStartSetup: formAndSsInfo.sheetNameが文字列ではありません:', typeof safeSheetName, safeSheetName);
     safeSheetName = String(safeSheetName); // 強制的に文字列化
   }
   if (safeSheetName === 'true' || safeSheetName === 'false') {
-    errorLog('❌ quickStartSetup: 無効なシート名が検出されました:', safeSheetName);
+    console.error("[ERROR]", '❌ quickStartSetup: 無効なシート名が検出されました:', safeSheetName);
     throw new Error('無効なシート名: ' + safeSheetName);
   }
 
@@ -2908,7 +2904,7 @@ function performAutoPublish(requestUserId, sheetName) {
     }
     
   } catch (error) {
-    errorLog('❌ QuickStart自動公開エラー', {
+    console.error("[ERROR]", '❌ QuickStart自動公開エラー', {
       requestUserId,
       sheetName,
       error: error.message,
@@ -3121,7 +3117,7 @@ function quickStartSetup(requestUserId) {
     return finalResponse;
 
   } catch (e) {
-    errorLog('❌ quickStartSetup エラー: ' + e.message);
+    console.error("[ERROR]", '❌ quickStartSetup エラー: ' + e.message);
 
     // エラー時はセットアップ状態をリセット
     try {
@@ -3136,7 +3132,7 @@ function quickStartSetup(requestUserId) {
       invalidateUserCache(requestUserId, userEmail, null, false);
       clearExecutionUserInfoCache();
     } catch (updateError) {
-      errorLog('エラー状態の更新に失敗: ' + updateError.message);
+      console.error("[ERROR]", 'エラー状態の更新に失敗: ' + updateError.message);
     }
 
     return {
@@ -3176,7 +3172,7 @@ function createUserFolder(userEmail) {
     }
 
   } catch (e) {
-    errorLog('createUserFolder エラー: ' + e.message);
+    console.error("[ERROR]", 'createUserFolder エラー: ' + e.message);
     return null; // フォルダ作成に失敗してもnullを返して処理を継続
   }
 }
@@ -3224,7 +3220,7 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
       message: isHighlighted ? 'ハイライトを解除しました' : 'ハイライトしました'
     };
   } catch (e) {
-    errorLog('ハイライト処理エラー: ' + e.message);
+    console.error("[ERROR]", 'ハイライト処理エラー: ' + e.message);
     return { status: 'error', message: e.message };
   }
 }
@@ -3288,8 +3284,8 @@ function getSheetColumns(userId, sheetId) {
     return columns;
 
   } catch (e) {
-    errorLog('getSheetColumns エラー: ' + e.message);
-    errorLog('Error details:', e.stack);
+    console.error("[ERROR]", 'getSheetColumns エラー: ' + e.message);
+    console.error("[ERROR]", 'Error details:', e.stack);
     throw new Error('列の取得に失敗しました: ' + e.message);
   }
 }
@@ -3461,7 +3457,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
     });
 
   } catch (e) {
-    errorLog('リアクション処理エラー: ' + e.message);
+    console.error("[ERROR]", 'リアクション処理エラー: ' + e.message);
     return {
       status: 'error',
       message: 'リアクションの処理に失敗しました: ' + e.message
@@ -3549,7 +3545,7 @@ function createFormFactory(options) {
     };
 
   } catch (error) {
-    errorLog('createFormFactory エラー:', error.message);
+    console.error("[ERROR]", 'createFormFactory エラー:', error.message);
     throw new Error('フォーム作成ファクトリでエラーが発生しました: ' + error.message);
   }
 }
@@ -3666,7 +3662,7 @@ function addUnifiedQuestions(form, questionType, customConfig) {
     debugLog('フォームに統一質問を追加しました: ' + questionType);
 
   } catch (error) {
-    errorLog('addUnifiedQuestions エラー:', error.message);
+    console.error("[ERROR]", 'addUnifiedQuestions エラー:', error.message);
     throw error;
   }
 }
@@ -3731,7 +3727,7 @@ function doGetQuestionConfig() {
 
     return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    errorLog('doGetQuestionConfig error:', error);
+    console.error("[ERROR]", 'doGetQuestionConfig error:', error);
     return ContentService.createTextOutput(JSON.stringify({
       error: 'Failed to get question config',
       details: error.toString()
@@ -3761,7 +3757,7 @@ function saveClassChoices(userId, classChoices) {
     debugLog('クラス選択肢が保存されました:', classChoices);
     return { status: 'success', message: 'クラス選択肢が保存されました' };
   } catch (error) {
-    errorLog('クラス選択肢保存エラー:', error.message);
+    console.error("[ERROR]", 'クラス選択肢保存エラー:', error.message);
     return { status: 'error', message: 'クラス選択肢の保存に失敗しました: ' + error.message };
   }
 }
@@ -3786,7 +3782,7 @@ function getSavedClassChoices(userId) {
       lastUpdate: configJson.lastClassChoicesUpdate
     };
   } catch (error) {
-    errorLog('クラス選択肢取得エラー:', error.message);
+    console.error("[ERROR]", 'クラス選択肢取得エラー:', error.message);
     return { status: 'error', message: 'クラス選択肢の取得に失敗しました: ' + error.message };
   }
 }
@@ -3857,7 +3853,7 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
 
     return createFormFactory(factoryOptions);
   } catch (error) {
-    errorLog(`createUnifiedForm Error (${presetType}):`, error.message);
+    console.error("[ERROR]", `createUnifiedForm Error (${presetType}):`, error.message);
     throw new Error(`フォーム作成に失敗しました (${presetType}): ` + error.message);
   }
 }
@@ -3938,7 +3934,7 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
       infoLog('✅ フォーム連携後の正確なシート名を取得:', sheetName);
       
     } catch (sheetNameError) {
-      errorLog('❌ フォーム連携後のシート名取得エラー:', sheetNameError.message);
+      console.error("[ERROR]", '❌ フォーム連携後のシート名取得エラー:', sheetNameError.message);
       // フォールバック: 標準的なシート名を使用
       var sheetName = 'フォームの回答 1';
       warnLog('⚠️ シート名取得エラーのため、標準名を使用:', sheetName);
@@ -3994,7 +3990,7 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     };
 
   } catch (error) {
-    errorLog('createLinkedSpreadsheet エラー:', error.message);
+    console.error("[ERROR]", 'createLinkedSpreadsheet エラー:', error.message);
     throw new Error('スプレッドシート作成に失敗しました: ' + error.message);
   }
 }
@@ -4021,14 +4017,14 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
       }
       file.addEditor(serviceAccountEmail);
     } catch (driveError) {
-      errorLog('DriveApp error:', driveError.message);
+      console.error("[ERROR]", 'DriveApp error:', driveError.message);
       throw new Error('Drive API操作に失敗しました: ' + driveError.message);
     }
 
     debugLog('サービスアカウント共有成功:', serviceAccountEmail);
 
   } catch (error) {
-    errorLog('shareSpreadsheetWithServiceAccount エラー:', error.message);
+    console.error("[ERROR]", 'shareSpreadsheetWithServiceAccount エラー:', error.message);
     throw new Error('サービスアカウントとの共有に失敗しました: ' + error.message);
   }
 }
@@ -4068,7 +4064,7 @@ function shareAllSpreadsheetsWithServiceAccount() {
             error: shareError.message
           });
           errorCount++;
-          errorLog('共有失敗:', user.adminEmail, shareError.message);
+          console.error("[ERROR]", '共有失敗:', user.adminEmail, shareError.message);
         }
       }
     }
@@ -4084,7 +4080,7 @@ function shareAllSpreadsheetsWithServiceAccount() {
     };
 
   } catch (error) {
-    errorLog('shareAllSpreadsheetsWithServiceAccount エラー:', error.message);
+    console.error("[ERROR]", 'shareAllSpreadsheetsWithServiceAccount エラー:', error.message);
     throw new Error('全スプレッドシート共有処理でエラーが発生しました: ' + error.message);
   }
 }
@@ -4128,7 +4124,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
     debugLog('同一ドメインユーザーは共有設定により閲覧可能です');
 
   } catch (e) {
-    errorLog('サービスアカウントの追加に失敗: ' + e.message);
+    console.error("[ERROR]", 'サービスアカウントの追加に失敗: ' + e.message);
     // エラーでも処理は継続
   }
 }
@@ -4151,7 +4147,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
         throw new Error('スプレッドシートが見つかりません: ' + spreadsheetId);
       }
     } catch (driveError) {
-      errorLog('DriveApp.getFileById error:', driveError.message);
+      console.error("[ERROR]", 'DriveApp.getFileById error:', driveError.message);
       throw new Error('スプレッドシートへのアクセスに失敗しました: ' + driveError.message);
     }
 
@@ -4167,7 +4163,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
         file.addEditor(userEmail);
         debugLog('ユーザーを個別に編集者として追加しました: ' + userEmail);
       } catch (individualError) {
-        errorLog('個別ユーザー追加も失敗: ' + individualError.message);
+        console.error("[ERROR]", '個別ユーザー追加も失敗: ' + individualError.message);
       }
     }
 
@@ -4200,7 +4196,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     };
 
   } catch (e) {
-    errorLog('スプレッドシートアクセス権限の修復に失敗: ' + e.message);
+    console.error("[ERROR]", 'スプレッドシートアクセス権限の修復に失敗: ' + e.message);
     return {
       success: false,
       error: e.message
@@ -4247,7 +4243,7 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
     debugLog('リアクション列を追加しました: ' + sheetName);
   }
   catch (e) {
-    errorLog('リアクション列追加エラー: ' + e.message);
+    console.error("[ERROR]", 'リアクション列追加エラー: ' + e.message);
     // エラーでも処理は継続
   }
 }
@@ -4404,8 +4400,8 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     };
 
   } catch (e) {
-    errorLog('シートデータ取得エラー: ' + e.message);
-    errorLog('Error stack: ' + e.stack);
+    console.error("[ERROR]", 'シートデータ取得エラー: ' + e.message);
+    console.error("[ERROR]", 'Error stack: ' + e.stack);
 
     // データ取得失敗時のフォールバック処理
     try {
@@ -4433,7 +4429,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
         _fallbackUsed: true
       };
     } catch (fallbackError) {
-      errorLog('フォールバック処理も失敗: ' + fallbackError.message);
+      console.error("[ERROR]", 'フォールバック処理も失敗: ' + fallbackError.message);
 
       return {
         status: 'error',
@@ -4475,7 +4471,7 @@ function getSheetsList(userId) {
 
     var service = getSheetsServiceCached();
     if (!service) {
-      errorLog('❌ getSheetsList: Sheets service not initialized');
+      console.error("[ERROR]", '❌ getSheetsList: Sheets service not initialized');
       return [];
     }
 
@@ -4503,7 +4499,7 @@ function getSheetsList(userId) {
           spreadsheet = getSpreadsheetsData(service, userInfo.spreadsheetId);
 
         } catch (repairError) {
-          errorLog('getSheetsList: 権限修復に失敗:', repairError.message);
+          console.error("[ERROR]", 'getSheetsList: 権限修復に失敗:', repairError.message);
 
           // 最終手段：ユーザー権限での修復も試行
           try {
@@ -4513,7 +4509,7 @@ function getSheetsList(userId) {
               debugLog('getSheetsList: ユーザー権限での修復を実行しました。');
             }
           } catch (finalRepairError) {
-            errorLog('getSheetsList: 最終修復も失敗:', finalRepairError.message);
+            console.error("[ERROR]", 'getSheetsList: 最終修復も失敗:', finalRepairError.message);
           }
 
           return [];
@@ -4538,17 +4534,17 @@ function getSheetsList(userId) {
 
     debugLog('getSheetsList: Raw spreadsheet data:', spreadsheet);
     if (!spreadsheet) {
-      errorLog('getSheetsList: No spreadsheet data returned');
+      console.error("[ERROR]", 'getSheetsList: No spreadsheet data returned');
       return [];
     }
 
     if (!spreadsheet.sheets) {
-      errorLog('getSheetsList: Spreadsheet data missing sheets property. Available properties:', Object.keys(spreadsheet));
+      console.error("[ERROR]", 'getSheetsList: Spreadsheet data missing sheets property. Available properties:', Object.keys(spreadsheet));
       return [];
     }
 
     if (!Array.isArray(spreadsheet.sheets)) {
-      errorLog('getSheetsList: sheets property is not an array:', typeof spreadsheet.sheets);
+      console.error("[ERROR]", 'getSheetsList: sheets property is not an array:', typeof spreadsheet.sheets);
       return [];
     }
 
@@ -4566,9 +4562,9 @@ function getSheetsList(userId) {
     debugLog('getSheetsList: Successfully returning', sheets.length, 'sheets:', sheets);
     return sheets;
   } catch (e) {
-    errorLog('getSheetsList: シート一覧取得エラー:', e.message);
-    errorLog('getSheetsList: Error details:', e.stack);
-    errorLog('getSheetsList: Error for userId:', userId);
+    console.error("[ERROR]", 'getSheetsList: シート一覧取得エラー:', e.message);
+    console.error("[ERROR]", 'getSheetsList: Error details:', e.stack);
+    console.error("[ERROR]", 'getSheetsList: Error for userId:', userId);
     return [];
   }
 }
@@ -4934,7 +4930,7 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
 
     return reactionData;
   } catch (e) {
-    errorLog('getRowReactions エラー: ' + e.message);
+    console.error("[ERROR]", 'getRowReactions エラー: ' + e.message);
     return {
       UNDERSTAND: { count: 0, reacted: false },
       LIKE: { count: 0, reacted: false },
@@ -5021,7 +5017,7 @@ function updateIsActiveStatus(requestUserId, isActive) {
       };
     }
   } catch (e) {
-    errorLog('updateIsActiveStatus エラー: ' + e.message);
+    console.error("[ERROR]", 'updateIsActiveStatus エラー: ' + e.message);
     return {
       status: 'error',
       message: 'isActive状態の更新に失敗しました: ' + e.message
@@ -5044,7 +5040,7 @@ function hasSetupPageAccess() {
     var userInfo = findUserByEmail(activeUserEmail);
     return userInfo && isTrue(userInfo.isActive);
   } catch (e) {
-    errorLog('hasSetupPageAccess エラー: ' + e.message);
+    console.error("[ERROR]", 'hasSetupPageAccess エラー: ' + e.message);
     return false;
   }
 }
@@ -5110,7 +5106,7 @@ function isSystemAdmin() {
     var currentUserEmail = getCurrentUserEmail();
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
-    errorLog('isSystemAdmin エラー: ' + e.message);
+    console.error("[ERROR]", 'isSystemAdmin エラー: ' + e.message);
     return false;
   }
 }
@@ -5130,7 +5126,7 @@ function isDeployUser() {
     
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
-    errorLog('isDeployUser エラー: ' + e.message);
+    console.error("[ERROR]", 'isDeployUser エラー: ' + e.message);
     return false;
   }
 }
@@ -5165,7 +5161,7 @@ async function deleteUserAccountByAdminForUI(targetUserId, reason) {
       deletedUser: result.deletedUser
     };
   } catch (error) {
-    errorLog('deleteUserAccountByAdmin wrapper error:', error.message);
+    console.error("[ERROR]", 'deleteUserAccountByAdmin wrapper error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -5184,7 +5180,7 @@ function getDeletionLogsForUI() {
       logs: logs
     };
   } catch (error) {
-    errorLog('getDeletionLogs wrapper error:', error.message);
+    console.error("[ERROR]", 'getDeletionLogs wrapper error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -5204,7 +5200,7 @@ function getDiagnosticLogsForUI(limit) {
       logs: logs
     };
   } catch (error) {
-    errorLog('getDiagnosticLogs wrapper error:', error.message);
+    console.error("[ERROR]", 'getDiagnosticLogs wrapper error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -5220,7 +5216,7 @@ function getAllUsersForAdminForUI(requestUserId) {
       users: result
     };
   } catch (error) {
-    errorLog('getAllUsersForAdminForUI wrapper error:', error.message);
+    console.error("[ERROR]", 'getAllUsersForAdminForUI wrapper error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -5264,7 +5260,7 @@ function updateUserActiveStatusForUI(targetUserId, isActive) {
       return { status: 'error', message: 'データベースの更新に失敗しました' };
     }
   } catch (error) {
-    errorLog('updateUserActiveStatusForUI エラー:', error);
+    console.error("[ERROR]", 'updateUserActiveStatusForUI エラー:', error);
     return {
       status: 'error',
       message: error.message || String(error)
@@ -5365,7 +5361,7 @@ function customSetup(requestUserId, config) {
     };
 
   } catch (e) {
-    errorLog('❌ customSetup エラー: ' + e.message);
+    console.error("[ERROR]", '❌ customSetup エラー: ' + e.message);
 
     // エラー時はセットアップ状態をリセット
     try {
@@ -5381,7 +5377,7 @@ function customSetup(requestUserId, config) {
         clearExecutionUserInfoCache();
       }
     } catch (updateError) {
-      errorLog('エラー状態の更新に失敗: ' + updateError.message);
+      console.error("[ERROR]", 'エラー状態の更新に失敗: ' + updateError.message);
     }
 
     return {
@@ -5472,7 +5468,7 @@ function performAutoAIDetection(requestUserId, spreadsheetId, sheetName) {
     };
 
   } catch (error) {
-    errorLog('❌ AI列判定自動実行エラー', { error: error.message });
+    console.error("[ERROR]", '❌ AI列判定自動実行エラー', { error: error.message });
     return {
       success: false,
       aiDetected: false,
@@ -5526,7 +5522,7 @@ function createCustomFormUI(requestUserId, config) {
       } catch (sheetError) {
         warnLog('⚠️ シートアクティベーション失敗（処理継続）:', sheetError.message);
         // シートアクティベーション失敗時のログ詳細化
-        errorLog('シートアクティベーション失敗詳細:', {
+        console.error("[ERROR]", 'シートアクティベーション失敗詳細:', {
           requestUserId: requestUserId,
           sheetName: result.sheetName,
           error: sheetError.message
@@ -5619,7 +5615,7 @@ function createCustomFormUI(requestUserId, config) {
         updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
         infoLog('✅ publishedSpreadsheetId設定完了:', result.spreadsheetId);
       } else {
-        errorLog('❌ 無効なspreadsheetId:', result.spreadsheetId);
+        console.error("[ERROR]", '❌ 無効なspreadsheetId:', result.spreadsheetId);
         throw new Error('フォーム作成は成功しましたが、スプレッドシートIDが無効です');
       }
 
@@ -5627,7 +5623,7 @@ function createCustomFormUI(requestUserId, config) {
         updatedConfigJson.publishedSheetName = result.sheetName;
         infoLog('✅ publishedSheetName設定完了:', result.sheetName);
       } else {
-        errorLog('❌ 無効なsheetName:', result.sheetName);
+        console.error("[ERROR]", '❌ 無効なsheetName:', result.sheetName);
         throw new Error('フォーム作成は成功しましたが、シート名が無効です: ' + result.sheetName);
       }
       updatedConfigJson.folderId = folder ? folder.getId() : '';
@@ -5690,7 +5686,7 @@ function createCustomFormUI(requestUserId, config) {
       filesMovedToFolder: moveResults
     };
   } catch (error) {
-    errorLog('createCustomFormUI error:', error.message);
+    console.error("[ERROR]", 'createCustomFormUI error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -5738,14 +5734,14 @@ function createQuickStartFormUI(requestUserId) {
         updatedConfigJson.publishedSpreadsheetId = result.spreadsheetId;
         infoLog('✅ QuickStart publishedSpreadsheetId設定完了:', result.spreadsheetId);
       } else {
-        errorLog('❌ QuickStart 無効なspreadsheetId:', result.spreadsheetId);
+        console.error("[ERROR]", '❌ QuickStart 無効なspreadsheetId:', result.spreadsheetId);
       }
 
       if (result.sheetName && typeof result.sheetName === 'string' && result.sheetName.trim() !== '' && result.sheetName !== 'true') {
         updatedConfigJson.publishedSheetName = result.sheetName;
         infoLog('✅ QuickStart publishedSheetName設定完了:', result.sheetName);
       } else {
-        errorLog('❌ QuickStart 無効なsheetName:', result.sheetName);
+        console.error("[ERROR]", '❌ QuickStart 無効なsheetName:', result.sheetName);
       }
 
       const updateData = {
@@ -5766,7 +5762,7 @@ function createQuickStartFormUI(requestUserId) {
       formTitle: result.formTitle
     };
   } catch (error) {
-    errorLog('createQuickStartFormUI error:', error.message);
+    console.error("[ERROR]", 'createQuickStartFormUI error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -5788,7 +5784,7 @@ async function deleteCurrentUserAccount(requestUserId) {
       result: result
     };
   } catch (error) {
-    errorLog('deleteCurrentUserAccount error:', error.message);
+    console.error("[ERROR]", 'deleteCurrentUserAccount error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -5811,7 +5807,7 @@ function activateSheetSimple(requestUserId, sheetName) {
 
     return activateSheet(requestUserId, userInfo.spreadsheetId, sheetName);
   } catch (error) {
-    errorLog('activateSheetSimple error:', error.message);
+    console.error("[ERROR]", 'activateSheetSimple error:', error.message);
     return {
       status: 'error',
       message: error.message
@@ -6001,7 +5997,7 @@ function getLoginStatus() {
     return result;
 
   } catch (error) {
-    errorLog('❌ getLoginStatus 重大エラー:', {
+    console.error("[ERROR]", '❌ getLoginStatus 重大エラー:', {
       error: error.message,
       email: activeUserEmail || 'unknown',
       elapsed: (Date.now() - startTime) + 'ms'
@@ -6163,7 +6159,7 @@ function confirmUserRegistration() {
       
     } catch (registrationError) {
       const totalElapsed = Date.now() - startTime;
-      errorLog('❌ confirmUserRegistration: 登録処理エラー', {
+      console.error("[ERROR]", '❌ confirmUserRegistration: 登録処理エラー', {
         email: activeUserEmail,
         error: registrationError.message,
         elapsed: totalElapsed + 'ms'
@@ -6178,7 +6174,7 @@ function confirmUserRegistration() {
     
   } catch (error) {
     const totalElapsed = Date.now() - startTime;
-    errorLog('❌ confirmUserRegistration: 重大エラー', {
+    console.error("[ERROR]", '❌ confirmUserRegistration: 重大エラー', {
       email: activeUserEmail || 'unknown',
       error: error.message,
       elapsed: totalElapsed + 'ms'
@@ -6436,7 +6432,7 @@ function getInitialData(requestUserId, targetSheetName) {
     return response;
 
   } catch (error) {
-    errorLog('❌ getInitialData error:', error);
+    console.error("[ERROR]", '❌ getInitialData error:', error);
     
     // エラーレスポンスにも最低限のuserInfo構造を含める
     let fallbackUserInfo = null;
@@ -6454,7 +6450,7 @@ function getInitialData(requestUserId, targetSheetName) {
         };
       }
     } catch (userError) {
-      errorLog('❌ Fallback userInfo creation failed:', userError);
+      console.error("[ERROR]", '❌ Fallback userInfo creation failed:', userError);
     }
     
     return {
@@ -6508,7 +6504,7 @@ function fixDataConsistencyManual(requestUserId) {
     }
 
   } catch (error) {
-    errorLog('❌ 手動データ整合性修正エラー:', error);
+    console.error("[ERROR]", '❌ 手動データ整合性修正エラー:', error);
     return {
       status: 'error',
       message: '修正処理中にエラーが発生しました: ' + error.message
@@ -6543,7 +6539,7 @@ function getApplicationStatusForUI() {
       message: accessCheck.accessReason
     };
   } catch (error) {
-    errorLog('getApplicationStatusForUI エラー:', error);
+    console.error("[ERROR]", 'getApplicationStatusForUI エラー:', error);
     return {
       status: 'error',
       message: error.message
@@ -6567,7 +6563,7 @@ function setApplicationStatusForUI(enabled) {
       adminEmail: result.adminEmail
     };
   } catch (error) {
-    errorLog('setApplicationStatusForUI エラー:', error);
+    console.error("[ERROR]", 'setApplicationStatusForUI エラー:', error);
     return {
       status: 'error',
       message: error.message
@@ -6590,7 +6586,7 @@ function testForceLogoutRedirect() {
       function: 'testForceLogoutRedirect'
     };
   } catch (error) {
-    errorLog('testForceLogoutRedirect エラー:', error);
+    console.error("[ERROR]", 'testForceLogoutRedirect エラー:', error);
     return {
       status: 'error',
       message: error.message,
@@ -6690,7 +6686,7 @@ function getSpreadsheetCreatedDateAPI(requestUserId) {
     };
     
   } catch (error) {
-    errorLog('❌ getSpreadsheetCreatedDateAPI エラー:', error);
+    console.error("[ERROR]", '❌ getSpreadsheetCreatedDateAPI エラー:', error);
     return {
       status: 'error',
       message: '作成日取得中にエラーが発生しました: ' + error.message
@@ -6757,7 +6753,7 @@ function updateUserAPI(requestUserId, updateData) {
     };
     
   } catch (error) {
-    errorLog('❌ updateUserAPI エラー:', error);
+    console.error("[ERROR]", '❌ updateUserAPI エラー:', error);
     return {
       status: 'error',
       message: 'ユーザー情報更新中にエラーが発生しました: ' + error.message

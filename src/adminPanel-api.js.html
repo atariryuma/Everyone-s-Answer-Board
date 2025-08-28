@@ -1726,7 +1726,10 @@ function repairSetupStateInconsistencies() {
 // SAVE AND PUBLISH OPERATIONS
 // =============================================================================
 
-// Save configuration and publish board - 最適化版（進捗表示付き）
+/**
+ * @deprecated この関数は重複しています。バックエンドのconfig.gsのsaveAndPublish()を使用してください。
+ * Save configuration and publish board - 最適化版（進捗表示付き）
+ */
 function saveAndPublish() {
   if (!validateConfig()) {
     showMessage('必須項目（回答データ列）が選択されていません。', 'error');

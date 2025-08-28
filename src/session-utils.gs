@@ -142,7 +142,7 @@ function cleanupSessionOnAccountSwitch(currentEmail) {
     debugLog('セッションクリーンアップ完了: ' + currentEmail);
 
   } catch (error) {
-    errorLog('セッションクリーンアップでエラー: ' + error.message);
+    console.error('[ERROR]','セッションクリーンアップでエラー: ' + error.message);
     // エラーが発生してもアプリケーションを停止させない
   }
 }
@@ -240,7 +240,7 @@ function resetUserAuthentication() {
       }
     } catch (propsError) {
       authResetResult.errors.push(`プロパティクリアエラー: ${propsError.message}`);
-      errorLog('❌ プロパティクリアでエラーが発生しました:', propsError.message);
+      console.error('[ERROR]','❌ プロパティクリアでエラーが発生しました:', propsError.message);
       
       // プロパティクリアに失敗してもログアウト処理は続行
       warnLog('⚠️ プロパティクリアに失敗しましたが、ログアウト処理を続行します');
@@ -267,7 +267,7 @@ function resetUserAuthentication() {
     
   } catch (error) {
     const executionTime = Date.now() - (authResetResult.startTime || Date.now());
-    errorLog('❌ ユーザー認証リセット中に致命的エラー:', {
+    console.error('[ERROR]','❌ ユーザー認証リセット中に致命的エラー:', {
       error: error.message,
       executionTime: executionTime + 'ms',
       partialResults: authResetResult
@@ -410,7 +410,7 @@ function forceLogoutAndRedirectToLogin() {
       try {
         loginUrl = sanitizeRedirectUrl(fallbackUrl);
       } catch (sanitizeError) {
-        errorLog('❌ Fallback URL sanitization failed:', sanitizeError.message);
+        console.error('[ERROR]','❌ Fallback URL sanitization failed:', sanitizeError.message);
         loginUrl = fallbackUrl; // 最終フォールバック
       }
     }
@@ -447,7 +447,7 @@ function forceLogoutAndRedirectToLogin() {
             // フォールバック：現在のウィンドウでリダイレクト
             window.location.href = '${safeLoginUrl}';
           } catch (currentError) {
-            errorLog('リダイレクト完全失敗:', currentError);
+            console.error('[ERROR]','リダイレクト完全失敗:', currentError);
             // 最終手段：ページリロード
             window.location.reload();
           }
@@ -498,10 +498,10 @@ function forceLogoutAndRedirectToLogin() {
     return htmlOutput;
 
   } catch (error) {
-    errorLog('❌ サーバーサイドログアウト処理でエラー:', error.message);
-    errorLog('❌ エラースタック:', error.stack);
-    errorLog('❌ エラーの型:', typeof error);
-    errorLog('❌ エラーオブジェクト:', error);
+    console.error('[ERROR]','❌ サーバーサイドログアウト処理でエラー:', error.message);
+    console.error('[ERROR]','❌ エラースタック:', error.stack);
+    console.error('[ERROR]','❌ エラーの型:', typeof error);
+    console.error('[ERROR]','❌ エラーオブジェクト:', error);
 
     // Step 5: エラー時のフォールバックHTML（安全なエスケープ）
     const safeErrorMessage = String(error.message || 'Unknown error')
@@ -511,7 +511,7 @@ function forceLogoutAndRedirectToLogin() {
 
     const fallbackScript = `
       <script>
-        errorLog('サーバーサイドログアウトエラー: ${safeErrorMessage}');
+        console.error('[ERROR]','サーバーサイドログアウトエラー: ${safeErrorMessage}');
         alert('ログアウト処理中にエラーが発生しました。\\n\\n詳細: ${safeErrorMessage}\\n\\nページを再読み込みします。');
         window.location.reload();
       </script>
@@ -526,7 +526,7 @@ function forceLogoutAndRedirectToLogin() {
       debugLog('✅ Fallback HtmlOutput created successfully');
       return fallbackOutput;
     } catch (fallbackError) {
-      errorLog('❌ Fallback HTML creation failed:', fallbackError.message);
+      console.error('[ERROR]','❌ Fallback HTML creation failed:', fallbackError.message);
       // 最終手段として最小限のHTML
       return HtmlService.createHtmlOutput('<script>window.location.reload();</script>');
     }
@@ -562,7 +562,7 @@ function detectAccountSwitch(currentEmail) {
       currentEmail: currentEmail
     };
   } catch (error) {
-    errorLog('アカウント切り替え検出中にエラー:', error.message);
+    console.error('[ERROR]','アカウント切り替え検出中にエラー:', error.message);
     return {
       isAccountSwitch: false,
       previousEmail: null,

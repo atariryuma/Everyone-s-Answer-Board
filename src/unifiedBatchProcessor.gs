@@ -241,7 +241,7 @@ class UnifiedBatchProcessor {
             throw new Error('Failed to get service account token');
           }
         } catch (tokenError) {
-          errorLog('❌ Authentication failed in batchUpdateSpreadsheet:', tokenError.message);
+          console.error('[ERROR]','❌ Authentication failed in batchUpdateSpreadsheet:', tokenError.message);
           throw new Error('Authentication failed: ' + tokenError.message);
         }
 
@@ -268,7 +268,7 @@ class UnifiedBatchProcessor {
               payload: JSON.stringify(requestBody)
             });
           } catch (fetchError) {
-            errorLog('❌ Failed to make API request to Sheets:', {
+            console.error('[ERROR]','❌ Failed to make API request to Sheets:', {
               error: fetchError.message,
               url: url,
               requestType: chunk[0]?.deleteDimension ? 'DELETE_ROWS' : 'OTHER'
@@ -278,7 +278,7 @@ class UnifiedBatchProcessor {
 
           // レスポンスオブジェクトの検証
           if (!response || typeof response.getResponseCode !== 'function') {
-            errorLog('❌ Invalid response object from resilientUrlFetch');
+            console.error('[ERROR]','❌ Invalid response object from resilientUrlFetch');
             throw new Error('BatchUpdateSpreadsheet: 無効なレスポンスオブジェクトが返されました');
           }
           
@@ -286,7 +286,7 @@ class UnifiedBatchProcessor {
           
           if (responseCode !== 200) {
             const errorContent = response.getContentText();
-            errorLog('❌ BatchUpdateSpreadsheet API failed:', { responseCode, errorContent });
+            console.error('[ERROR]','❌ BatchUpdateSpreadsheet API failed:', { responseCode, errorContent });
             throw new Error(`BatchUpdateSpreadsheet failed: ${responseCode} - ${errorContent}`);
           }
 
@@ -474,7 +474,7 @@ class UnifiedBatchProcessor {
         valueRanges: valueRanges
       };
     } catch (error) {
-      errorLog('フォールバック処理エラー:', error.message);
+      console.error('[ERROR]','フォールバック処理エラー:', error.message);
       return null;
     }
   }

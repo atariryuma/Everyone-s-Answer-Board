@@ -175,7 +175,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
     });
 
   } catch (error) {
-    errorLog('🚨 削除ログ記録エラー:', error.message);
+    console.error("[ERROR]", '🚨 削除ログ記録エラー:', error.message);
     
     return {
       success: false,
@@ -291,7 +291,7 @@ function logDiagnosticResult(functionName, result, summary) {
     });
 
   } catch (error) {
-    errorLog('診断ログ記録エラー:', error.message);
+    console.error("[ERROR]", '診断ログ記録エラー:', error.message);
     debugLog('診断ログトランザクション詳細:', transactionLog);
     
     return {
@@ -358,7 +358,7 @@ function getDiagnosticLogs(limit = 50) {
     return logs;
 
   } catch (error) {
-    errorLog('getDiagnosticLogs error:', error.message);
+    console.error("[ERROR]", 'getDiagnosticLogs error:', error.message);
     throw new Error('診断ログの取得に失敗しました: ' + error.message);
   }
 }
@@ -435,7 +435,7 @@ function cleanupOldDiagnosticLogs() {
     };
 
   } catch (error) {
-    errorLog('cleanupOldDiagnosticLogs error:', error.message);
+    console.error("[ERROR]", 'cleanupOldDiagnosticLogs error:', error.message);
     return {
       success: false,
       error: error.message
@@ -501,7 +501,7 @@ function getAllUsersForAdmin() {
     return users;
 
   } catch (error) {
-    errorLog('getAllUsersForAdmin error:', error.message);
+    console.error("[ERROR]", 'getAllUsersForAdmin error:', error.message);
     throw new Error('ユーザー一覧の取得に失敗しました: ' + error.message);
   }
 }
@@ -664,7 +664,7 @@ async function deleteUserAccountByAdmin(targetUserId, reason) {
     });
 
   } catch (error) {
-    errorLog('deleteUserAccountByAdmin error:', error.message);
+    console.error("[ERROR]", 'deleteUserAccountByAdmin error:', error.message);
     throw new Error('管理者によるアカウント削除に失敗しました: ' + error.message);
   }
 }
@@ -685,7 +685,7 @@ function canDeleteUser(targetUserId) {
     // 本人削除 OR 管理者削除
     return (currentUserEmail === targetUser.adminEmail) || isDeployUser();
   } catch (error) {
-    errorLog('canDeleteUser error:', error.message);
+    console.error("[ERROR]", 'canDeleteUser error:', error.message);
     return false;
   }
 }
@@ -754,7 +754,7 @@ function getDeletionLogs() {
     }
 
   } catch (error) {
-    errorLog('getDeletionLogs error:', error.message);
+    console.error("[ERROR]", 'getDeletionLogs error:', error.message);
     throw new Error('削除ログの取得に失敗しました: ' + error.message);
   }
 }
@@ -782,7 +782,7 @@ function getSheetsServiceCached(forceRefresh) {
 
     const service = createSheetsService(accessToken);
     if (!service || !service.baseUrl || !service.accessToken) {
-      errorLog('❌ サービスオブジェクト検証失敗:', {
+      console.error("[ERROR]", '❌ サービスオブジェクト検証失敗:', {
         hasService: !!service,
         hasBaseUrl: !!(service && service.baseUrl),
         hasAccessToken: !!(service && service.accessToken)
@@ -801,7 +801,7 @@ function getSheetsServiceCached(forceRefresh) {
 
     // 簡略化された関数存在確認
     if (!service.spreadsheets || typeof service.spreadsheets.get !== 'function') {
-      errorLog('❌ 重要な関数が失われています: SheetsServiceの基本機能が利用できません');
+      console.error("[ERROR]", '❌ 重要な関数が失われています: SheetsServiceの基本機能が利用できません');
       throw new Error('SheetsServiceオブジェクトの関数が正しく設定されていません');
     }
 
@@ -809,7 +809,7 @@ function getSheetsServiceCached(forceRefresh) {
     return service;
 
   } catch (error) {
-    errorLog('❌ getSheetsServiceCached error:', error.message);
+    console.error("[ERROR]", '❌ getSheetsServiceCached error:', error.message);
     throw error;
   }
 }
@@ -826,12 +826,12 @@ function getSheetsService() {
     try {
       accessToken = getServiceAccountTokenCached();
     } catch (tokenError) {
-      errorLog('❌ Failed to get service account token:', tokenError.message);
+      console.error("[ERROR]", '❌ Failed to get service account token:', tokenError.message);
       throw new Error('サービスアカウントトークンの取得に失敗しました: ' + tokenError.message);
     }
 
     if (!accessToken) {
-      errorLog('❌ Access token is null or undefined after generation.');
+      console.error("[ERROR]", '❌ Access token is null or undefined after generation.');
       throw new Error('サービスアカウントトークンが取得できませんでした。');
     }
 
@@ -839,7 +839,7 @@ function getSheetsService() {
 
     const service = createSheetsService(accessToken);
     if (!service || !service.baseUrl) {
-      errorLog('❌ Failed to create sheets service or service object is invalid');
+      console.error("[ERROR]", '❌ Failed to create sheets service or service object is invalid');
       throw new Error('Sheets APIサービスの初期化に失敗しました。');
     }
 
@@ -848,8 +848,8 @@ function getSheetsService() {
     return service;
 
   } catch (error) {
-    errorLog('❌ getSheetsService error:', error.message);
-    errorLog('❌ Error stack:', error.stack);
+    console.error("[ERROR]", '❌ getSheetsService error:', error.message);
+    console.error("[ERROR]", '❌ Error stack:', error.stack);
     throw error; // エラーを再スロー
   }
 }
@@ -993,7 +993,7 @@ function fixUserDataConsistency(userId) {
     }
 
   } catch (error) {
-    errorLog('❌ データ整合性修正エラー:', error);
+    console.error("[ERROR]", '❌ データ整合性修正エラー:', error);
     return { status: 'error', message: 'データ整合性修正に失敗: ' + error.message };
   }
 }
@@ -1302,7 +1302,7 @@ function fetchUserFromDatabase(field, value, options = {}) {
     return null;
 
   } catch (error) {
-    errorLog('❌ fetchUserFromDatabase エラー:', error.message);
+    console.error("[ERROR]", '❌ fetchUserFromDatabase エラー:', error.message);
     
     // 1回だけリトライオプションが有効で、まだリトライしていない場合
     if (opts.retryOnce && !opts._hasRetried) {
@@ -1496,12 +1496,12 @@ function updateUser(userId, updateData) {
               debugLog('🔄 認証トークンをリフレッシュしてリトライします...');
               continue; // リトライループを続行
             } else {
-              errorLog('❌ 最大リトライ回数に達しました');
+              console.error("[ERROR]", '❌ 最大リトライ回数に達しました');
               throw new Error('認証エラーにより更新に失敗しました（最大リトライ回数超過）');
             }
           } else {
             // 認証エラー以外のエラーはすぐに終了
-            errorLog('❌ データベース更新中にエラーが発生:', updateError);
+            console.error("[ERROR]", '❌ データベース更新中にエラーが発生:', updateError);
             throw new Error('データベース更新に失敗しました: ' + updateError.message);
           }
         }
@@ -1519,8 +1519,8 @@ function updateUser(userId, updateData) {
         shareSpreadsheetWithServiceAccount(updateData.spreadsheetId);
         debugLog('ユーザー更新時のサービスアカウント共有完了:', updateData.spreadsheetId);
       } catch (shareError) {
-        errorLog('ユーザー更新時のサービスアカウント共有エラー:', shareError.message);
-        errorLog('スプレッドシートの更新は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
+        console.error("[ERROR]", 'ユーザー更新時のサービスアカウント共有エラー:', shareError.message);
+        console.error("[ERROR]", 'スプレッドシートの更新は完了しましたが、サービスアカウントとの共有に失敗しました。手動で共有してください。');
       }
     }
 
@@ -1545,7 +1545,7 @@ function updateUser(userId, updateData) {
 
     return { status: 'success', message: 'ユーザープロフィールが正常に更新されました' };
   } catch (error) {
-    errorLog('ユーザー更新エラー:', error);
+    console.error("[ERROR]", 'ユーザー更新エラー:', error);
     throw error;
   }
 }
@@ -1667,7 +1667,7 @@ function initializeDatabaseSheet(spreadsheetId) {
 
     debugLog('データベースシート「' + sheetName + '」の初期化が完了しました。');
   } catch (e) {
-    errorLog('データベースシートの初期化に失敗: ' + e.message);
+    console.error("[ERROR]", 'データベースシートの初期化に失敗: ' + e.message);
     throw new Error('データベースシートの初期化に失敗しました。サービスアカウントに編集者権限があるか確認してください。詳細: ' + e.message);
   }
 }
@@ -1708,7 +1708,7 @@ function handleMissingUser(userId) {
 
     debugLog('[Cache] Handled missing user: ' + userId);
   } catch (error) {
-    errorLog('handleMissingUser error:', error.message);
+    console.error("[ERROR]", 'handleMissingUser error:', error.message);
     // エラーが発生した場合のみ全キャッシュクリア
     clearDatabaseCache();
   }
@@ -2004,7 +2004,7 @@ function appendSheetsData(service, spreadsheetId, range, values) {
     return parsed;
 
   } catch (error) {
-    errorLog('❌ appendSheetsData エラー:', {
+    console.error("[ERROR]", '❌ appendSheetsData エラー:', {
       error: error.message,
       spreadsheetId: spreadsheetId.substring(0, 20) + '...',
       range,
@@ -2041,7 +2041,7 @@ function appendSheetsData(service, spreadsheetId, range, values) {
           return retryParsed;
         }
       } catch (retryError) {
-        errorLog('❌ appendSheetsData: リトライも失敗:', retryError.message);
+        console.error("[ERROR]", '❌ appendSheetsData: リトライも失敗:', retryError.message);
       }
     }
 
@@ -2102,7 +2102,7 @@ function getSpreadsheetsData(service, spreadsheetId) {
     var responseText = response.getContentText();
 
     if (responseCode !== 200) {
-      errorLog('Sheets API エラー詳細:', {
+      console.error("[ERROR]", 'Sheets API エラー詳細:', {
         code: responseCode,
         response: responseText,
         url: url.substring(0, 100) + '...',
@@ -2128,8 +2128,8 @@ function getSpreadsheetsData(service, spreadsheetId) {
     try {
       result = JSON.parse(responseText);
     } catch (parseError) {
-      errorLog('❌ JSON解析エラー:', parseError.message);
-      errorLog('❌ Response text:', responseText.substring(0, 200));
+      console.error("[ERROR]", '❌ JSON解析エラー:', parseError.message);
+      console.error("[ERROR]", '❌ Response text:', responseText.substring(0, 200));
       throw new Error('APIレスポンスのJSON解析に失敗: ' + parseError.message);
     }
 
@@ -2155,8 +2155,8 @@ function getSpreadsheetsData(service, spreadsheetId) {
     return result;
 
   } catch (error) {
-    errorLog('❌ getSpreadsheetsData error:', error.message);
-    errorLog('❌ Error stack:', error.stack);
+    console.error("[ERROR]", '❌ getSpreadsheetsData error:', error.message);
+    console.error("[ERROR]", '❌ Error stack:', error.stack);
     throw new Error('スプレッドシート情報取得に失敗しました: ' + error.message);
   }
 }
@@ -2196,7 +2196,7 @@ function getAllUsers() {
     return users;
 
   } catch (error) {
-    errorLog('getAllUsers エラー:', error.message);
+    console.error("[ERROR]", 'getAllUsers エラー:', error.message);
     throw new Error('全ユーザー情報の取得に失敗しました: ' + error.message);
   }
 }
@@ -2243,7 +2243,7 @@ function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
     
     return result;
   } catch (wrapperError) {
-    errorLog('❌ batchUpdateSpreadsheet wrapper error:', wrapperError.message);
+    console.error("[ERROR]", '❌ batchUpdateSpreadsheet wrapper error:', wrapperError.message);
     throw wrapperError;
   }
 }
@@ -2415,7 +2415,7 @@ function diagnoseDatabase(targetUserId) {
     return diagnosticResult;
 
   } catch (error) {
-    errorLog('❌ データベース診断でエラー:', error);
+    console.error("[ERROR]", '❌ データベース診断でエラー:', error);
     return {
       timestamp: new Date().toISOString(),
       error: error.message,
@@ -2470,7 +2470,7 @@ function checkCacheStatus(userId) {
     return cacheStatus;
 
   } catch (error) {
-    errorLog('キャッシュ状態チェックエラー:', error);
+    console.error("[ERROR]", 'キャッシュ状態チェックエラー:', error);
     return {
       status: 'error',
       error: error.message
@@ -2619,7 +2619,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
     return result;
 
   } catch (error) {
-    errorLog('❌ サービスアカウント権限確認でエラー:', error);
+    console.error("[ERROR]", '❌ サービスアカウント権限確認でエラー:', error);
     return {
       timestamp: new Date().toISOString(),
       error: error.message,
@@ -2736,7 +2736,7 @@ function performDataIntegrityCheck(options = {}) {
         result.summary.fixed = fixResult.fixed;
         debugLog('🔧 自動修復完了: ' + fixResult.fixed.length + '件修復');
       } catch (fixError) {
-        errorLog('❌ 自動修復エラー:', fixError.message);
+        console.error("[ERROR]", '❌ 自動修復エラー:', fixError.message);
         result.summary.issues.push('自動修復に失敗: ' + fixError.message);
       }
     }
@@ -2768,7 +2768,7 @@ function performDataIntegrityCheck(options = {}) {
     return result;
 
   } catch (error) {
-    errorLog('❌ データ整合性チェックでエラー:', error);
+    console.error("[ERROR]", '❌ データ整合性チェックでエラー:', error);
     return {
       timestamp: new Date().toISOString(),
       error: error.message,
@@ -2986,7 +2986,7 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
         batchUpdateSheetsData(service, dbId, updatesNeeded);
         fixed.push(updatesNeeded.length + '件のisActiveフィールドを修正');
       } catch (updateError) {
-        errorLog('❌ isActiveフィールド修正エラー:', updateError.message);
+        console.error("[ERROR]", '❌ isActiveフィールド修正エラー:', updateError.message);
       }
     }
   }
@@ -3014,7 +3014,7 @@ function getDbSheet() {
 
     return sheet;
   } catch (e) {
-    errorLog('getDbSheet error:', e.message);
+    console.error("[ERROR]", 'getDbSheet error:', e.message);
     throw new Error('データベースシートの取得に失敗しました: ' + e.message);
   }
 }
@@ -3166,7 +3166,7 @@ function performPerformanceCheck() {
     perfResult.benchmarks.cacheCheck = Date.now() - cacheTestStart;
 
   } catch (perfError) {
-    errorLog('パフォーマンステスト実行エラー:', perfError.message);
+    console.error("[ERROR]", 'パフォーマンステスト実行エラー:', perfError.message);
     perfResult.error = perfError.message;
   }
 
@@ -3238,7 +3238,7 @@ function performSecurityCheck() {
     }
 
   } catch (securityError) {
-    errorLog('セキュリティチェック実行エラー:', securityError.message);
+    console.error("[ERROR]", 'セキュリティチェック実行エラー:', securityError.message);
     securityResult.error = securityError.message;
   }
 
@@ -3292,7 +3292,7 @@ function sendSystemAlert(monitoringResult) {
 
       // 緊急レベルの場合は追加のログ記録
       if (monitoringResult.summary.alerts.length > 0) {
-        errorLog('🚨 緊急システムアラート: ' + monitoringResult.summary.alerts.join(', '));
+        console.error("[ERROR]", '🚨 緊急システムアラート: ' + monitoringResult.summary.alerts.join(', '));
       }
     }
 
@@ -3307,7 +3307,7 @@ function sendSystemAlert(monitoringResult) {
     infoLog('✅ システムアラート送信完了');
 
   } catch (alertError) {
-    errorLog('❌ アラート送信エラー:', alertError.message);
+    console.error("[ERROR]", '❌ アラート送信エラー:', alertError.message);
   }
 }
 
@@ -3330,7 +3330,7 @@ function logSystemEvent(eventType, eventData) {
     // 将来的にはログシートやログファイルに保存する機能を追加可能
 
   } catch (logError) {
-    errorLog('システムイベントログエラー:', logError.message);
+    console.error("[ERROR]", 'システムイベントログエラー:', logError.message);
   }
 }
 
@@ -3461,12 +3461,12 @@ async function deleteUserAccount(userId) {
             infoLog('✅ User deleted:', { userId, row: rowToDelete });
             
           } catch (deletionError) {
-            errorLog('❌ User deletion failed:', deletionError.message);
+            console.error("[ERROR]", '❌ User deletion failed:', deletionError.message);
             throw deletionError;
           }
           
         } catch (batchError) {
-          errorLog('❌ Deletion operation failed:', batchError.message);
+          console.error("[ERROR]", '❌ Deletion operation failed:', batchError.message);
           throw batchError;
         }
 
@@ -3479,21 +3479,21 @@ async function deleteUserAccount(userId) {
           // ユーザーがまだ存在するかチェック
           for (let i = 1; i < verifyValues.length; i++) {
             if (verifyValues[i][userIdFieldIndex] === userId) {
-              errorLog('❌ Deletion verification failed: User still exists');
+              console.error("[ERROR]", '❌ Deletion verification failed: User still exists');
               throw new Error('削除処理は成功しましたが、ユーザーがまだデータベースに存在しています');
             }
           }
           
           
         } catch (verifyError) {
-          errorLog('⚠️ Deletion verification failed:', verifyError.message);
+          console.error("[ERROR]", '⚠️ Deletion verification failed:', verifyError.message);
           throw verifyError;
         }
         
       } else {
         // 削除対象の行が見つからない場合はエラーとして扱う
         const errorMessage = `削除対象のユーザー行が見つかりません。userId: ${userId}`;
-        errorLog(errorMessage);
+        console.error("[ERROR]", errorMessage);
         throw new Error(errorMessage);
       }
 
@@ -3520,8 +3520,8 @@ async function deleteUserAccount(userId) {
     });
 
   } catch (error) {
-    errorLog('アカウント削除エラー:', error.message);
-    errorLog('アカウント削除エラー詳細:', error.stack);
+    console.error("[ERROR]", 'アカウント削除エラー:', error.message);
+    console.error("[ERROR]", 'アカウント削除エラー詳細:', error.stack);
 
     // より詳細なエラー情報を提供
     var errorMessage = 'アカウントの削除に失敗しました: ' + error.message;

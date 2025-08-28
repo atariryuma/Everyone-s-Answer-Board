@@ -64,7 +64,7 @@ class CacheManager {
     try {
       newValue = valueFn();
     } catch (e) {
-      errorLog(`[Cache] Value generation failed for key: ${key}`, e.message);
+      console.error("[ERROR]", `[Cache] Value generation failed for key: ${key}`, e.message);
       this.stats.errors++;
       throw e;
     }
@@ -77,7 +77,7 @@ class CacheManager {
         this.memoCache.set(key, { value: newValue, createdAt: Date.now(), ttl });
       }
     } catch (e) {
-      errorLog(`[Cache] Failed to cache value for key: ${key}`, e.message);
+      console.error("[ERROR]", `[Cache] Failed to cache value for key: ${key}`, e.message);
       this.stats.errors++;
       // キャッシュ保存に失敗しても値は返す
     }
@@ -102,7 +102,7 @@ class CacheManager {
    */
   validateKey(key) {
     if (!key || typeof key !== 'string') {
-      errorLog(`[Cache] Invalid key: ${key}`);
+      console.error("[ERROR]", `[Cache] Invalid key: ${key}`);
       return false;
     }
     if (key.length > 100) {
@@ -551,7 +551,7 @@ class CacheManager {
     } catch (error) {
       invalidationLog.errors.push(`Fatal: ${error.message}`);
       invalidationLog.duration = Date.now() - invalidationLog.startTime;
-      errorLog(`❌ 関連キャッシュ無効化致命的エラー: ${entityType}/${entityId}`, error);
+      console.error("[ERROR]", `❌ 関連キャッシュ無効化致命的エラー: ${entityType}/${entityId}`, error);
       this.stats.errors++;
       return invalidationLog;
     }
@@ -944,7 +944,7 @@ CacheManager.prototype.clearAllFrontendCaches = function(options = {}) {
       });
 
     } catch (error) {
-      errorLog('❌ Unified cache clear failed:', error);
+      console.error("[ERROR]", '❌ Unified cache clear failed:', error);
       this.rejectPendingClears(error);
       reject(error);
     } finally {
@@ -1583,7 +1583,7 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
 
     } catch (error) {
       lastError = error;
-      errorLog(`[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} failed:`, error.toString());
+      console.error("[ERROR]", `[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} failed:`, error.toString());
 
       // 最後の試行でない場合は待機してリトライ
       if (attempt < maxRetries) {
@@ -1595,9 +1595,9 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
   }
 
   // 全てのリトライが失敗した場合
-  errorLog(`[getHeadersWithRetry] All ${maxRetries} attempts failed. Last error:`, lastError.toString());
+  console.error("[ERROR]", `[getHeadersWithRetry] All ${maxRetries} attempts failed. Last error:`, lastError.toString());
   if (lastError.stack) {
-    errorLog('Error stack:', lastError.stack);
+    console.error("[ERROR]", 'Error stack:', lastError.stack);
   }
 
   return {};
@@ -1779,7 +1779,7 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
     Utilities.sleep(100);
 
   } catch (error) {
-    errorLog('❌ キャッシュ同期エラー:', error);
+    console.error("[ERROR]", '❌ キャッシュ同期エラー:', error);
     throw new Error('キャッシュ同期に失敗しました: ' + error.message);
   }
 }
@@ -1801,7 +1801,7 @@ function clearDatabaseCache() {
 
     debugLog('[Cache] Database cache cleared successfully');
   } catch (error) {
-    errorLog('clearDatabaseCache error:', error.message);
+    console.error("[ERROR]", 'clearDatabaseCache error:', error.message);
     // エラーが発生しても処理を継続
   }
 }
@@ -1898,7 +1898,7 @@ function preWarmCache(activeUserEmail) {
     results.duration = Date.now() - startTime;
     results.success = false;
     results.errors.push('fatal_error: ' + error.message);
-    errorLog('❌ キャッシュプリウォーミングエラー:', error);
+    console.error("[ERROR]", '❌ キャッシュプリウォーミングエラー:', error);
     return results;
   }
 }
@@ -1971,7 +1971,7 @@ function analyzeCacheEfficiency() {
     return analysis;
 
   } catch (error) {
-    errorLog('analyzeCacheEfficiency error:', error);
+    console.error("[ERROR]", 'analyzeCacheEfficiency error:', error);
     return {
       timestamp: new Date().toISOString(),
       error: error.message,

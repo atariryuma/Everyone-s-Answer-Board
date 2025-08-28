@@ -322,7 +322,7 @@ function resilientUrlFetch(url, options = {}) {
         warnLog(`resilientUrlFetch: エラー、${delay}ms後にリトライ - ${url}: ${error.message}`);
         Utilities.sleep(delay);
       } else {
-        errorLog(`resilientUrlFetch: 最終的に失敗 - ${url}: ${error.message}`);
+        console.error("[ERROR]", `resilientUrlFetch: 最終的に失敗 - ${url}: ${error.message}`);
         throw error;
       }
     }

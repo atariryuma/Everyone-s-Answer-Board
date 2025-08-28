@@ -7,11 +7,7 @@
 // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
 // debugLog は debugConfig.gs で統一制御されるため、重複定義を削除
 
-if (typeof errorLog === 'undefined') {
-  function errorLog(message, ...args) {
-    console.error('[ERROR]', message, ...args);
-  }
-}
+// errorLog統合: Core.gsのlogErrorに統一
 
 if (typeof warnLog === 'undefined') {
   function warnLog(message, ...args) {
@@ -137,7 +133,7 @@ function getFallbackWebAppUrl() {
     }
     warnLog('getWebAppUrl fallback failed: service URL unavailable');
   } catch (e) {
-    errorLog('getWebAppUrl fallback error:', e.message);
+    console.error('[ERROR]','getWebAppUrl fallback error:', e.message);
   }
 
   return '';
@@ -151,7 +147,7 @@ function getFallbackWebAppUrl() {
  */
 function generateUserUrls(userId) {
   if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-    errorLog('generateUserUrls: invalid userId:', userId);
+    console.error('[ERROR]','generateUserUrls: invalid userId:', userId);
     return {
       webAppUrl: '',
       adminUrl: '',
@@ -219,7 +215,7 @@ function addCacheBustingParams(baseUrl, options = {}) {
 
     return url.toString();
   } catch (error) {
-    errorLog('addCacheBustingParams error:', error.message);
+    console.error('[ERROR]','addCacheBustingParams error:', error.message);
     return baseUrl;
   }
 }
@@ -234,7 +230,7 @@ function generateUnpublishedStateUrl(userId) {
   try {
     const baseUrl = getWebAppUrl();
     if (!baseUrl) {
-      errorLog('generateUnpublishedStateUrl: ベースURLの取得に失敗');
+      console.error('[ERROR]','generateUnpublishedStateUrl: ベースURLの取得に失敗');
       return '';
     }
 
@@ -253,7 +249,7 @@ function generateUnpublishedStateUrl(userId) {
     }
     return url.toString();
   } catch (error) {
-    errorLog('generateUnpublishedStateUrl error:', error.message);
+    console.error('[ERROR]','generateUnpublishedStateUrl error:', error.message);
     const baseUrl = getWebAppUrl();
     return baseUrl + (userId ? `?userId=${userId}&_cb=${Date.now()}` : `?_cb=${Date.now()}`);
   }
@@ -289,7 +285,7 @@ function generateUserUrlsWithCacheBusting(userId, options = {}) {
       cacheBustOptions: cacheBustOptions
     };
   } catch (error) {
-    errorLog('generateUserUrlsWithCacheBusting error:', error.message);
+    console.error('[ERROR]','generateUserUrlsWithCacheBusting error:', error.message);
     return generateUserUrls(userId);
   }
 }

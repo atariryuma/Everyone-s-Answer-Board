@@ -29,7 +29,7 @@ function acquireStandardizedLock(operationType, operationName = 'unknown') {
     lock.waitLock(timeout);
     return lock;
   } catch (error) {
-    errorLog(`❌ ロック取得失敗: ${operationName} - ${error.message}`);
+    console.error("[ERROR]", `❌ ロック取得失敗: ${operationName} - ${error.message}`);
     throw new Error(`ロック取得がタイムアウトしました: ${operationName} (${timeout}ms)`);
   }
 }
@@ -43,7 +43,7 @@ function releaseStandardizedLock(lock, operationName = 'unknown') {
   try {
     lock.releaseLock();
   } catch (error) {
-    errorLog(`⚠️ ロック解放エラー: ${operationName} - ${error.message}`, { timestamp: new Date().toISOString() });
+    console.error("[ERROR]", `⚠️ ロック解放エラー: ${operationName} - ${error.message}`, { timestamp: new Date().toISOString() });
   }
 }
 

@@ -53,7 +53,7 @@ function autoInitializeSystem() {
     }
 
   } catch (error) {
-    errorLog('❌ 自動システム初期化エラー:', error);
+    console.error("[ERROR]", '❌ 自動システム初期化エラー:', error);
     return {
       success: false,
       message: 'システム初期化に失敗しました',
@@ -72,7 +72,7 @@ function performPostInitializationTasks() {
     if (typeof performComprehensiveSecurityHealthCheck !== 'undefined') {
       const securityCheck = performComprehensiveSecurityHealthCheck();
       if (securityCheck.overallStatus === 'CRITICAL') {
-        errorLog('🚨 初期セキュリティチェックで重要な問題を検出', securityCheck);
+        console.error("[ERROR]", '🚨 初期セキュリティチェックで重要な問題を検出', securityCheck);
       }
     }
 
@@ -150,7 +150,7 @@ function performPeriodicMaintenance() {
     });
 
   } catch (error) {
-    errorLog('定期メンテナンスエラー:', error);
+    console.error("[ERROR]", '定期メンテナンスエラー:', error);
   }
 }
 
