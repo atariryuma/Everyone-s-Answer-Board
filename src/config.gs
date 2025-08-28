@@ -2901,10 +2901,14 @@ function getSheetDetailsFromContext(context, spreadsheetId, sheetName) {
     throw new Error('getSheetDetailsFromContext: spreadsheetId parameter must be a valid string');
   }
   if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
-    console.error('[ERROR]', '❌ CRITICAL: Invalid sheetName parameter:', {
+    console.error('[ERROR]', '❌ CRITICAL: Invalid sheetName parameter (type mismatch detected):', {
       sheetName: sheetName,
       sheetNameType: typeof sheetName,
       sheetNameTrimmed: typeof sheetName === 'string' ? sheetName.trim() : 'not string',
+      isBoolean: typeof sheetName === 'boolean',
+      booleanValue: typeof sheetName === 'boolean' ? sheetName : 'not boolean',
+      expectedType: 'string',
+      receivedFrom: 'likely getInitialData parameter processing',
       contextUserInfo:
         context && context.userInfo
           ? {

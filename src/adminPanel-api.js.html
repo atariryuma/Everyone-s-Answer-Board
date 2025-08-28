@@ -974,7 +974,9 @@
         console.log('🌐 Calling getInitialData with userId:', userId, 'bypassCache:', bypassCache);
 
         // runGasWithUserId を使用して getInitialData を呼び出す
-        return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', bypassCache)
+        // 第3引数: targetSheetName（bypassCacheの場合はtrueではなく適切なシート名またはnullを渡す）
+        const targetSheetName = bypassCache ? null : null; // bypassCacheはboolean、targetSheetNameは文字列またはnull
+        return runGasWithUserId('getInitialData', 'システム情報を読み込み中...', targetSheetName)
           .then((response) => {
             console.log('🚀 getInitialData response received:', {
               response: response,
@@ -985,10 +987,29 @@
             });
             logDebug('✅ Integrated data loaded:', response);
 
-            // エラーレスポンスの検証
+            // エラーレスポンスの検証（詳細なデバッグ情報付き）
             if (!response || response.status === 'error') {
-              const errorMsg = response ? response.message : 'サーバーから無効な応答を受信しました';
-              logError('getInitialData returned error:', errorMsg);
+              const errorDetails = {
+                response: response,
+                hasResponse: !!response,
+                responseType: typeof response,
+                hasStatus: response && 'status' in response,
+                status: response ? response.status : 'undefined',
+                hasMessage: response && 'message' in response,
+                message: response ? response.message : 'undefined',
+                hasError: response && 'error' in response,
+                error: response ? response.error : 'undefined',
+                hasMeta: response && '_meta' in response,
+                meta: response && response._meta ? response._meta : 'undefined',
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                url: window.location.href
+              };
+              
+              console.error('🚨 Detailed getInitialData error analysis:', errorDetails);
+              logError('getInitialData detailed error:', errorDetails);
+              
+              const errorMsg = response && response.message ? response.message : 'サーバーから無効な応答を受信しました';
               throw new Error(errorMsg);
             }
 

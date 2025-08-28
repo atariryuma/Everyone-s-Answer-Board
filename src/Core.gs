@@ -6624,12 +6624,23 @@ function getInitialData(requestUserId, targetSheetName) {
     };
 
     // === ステップ6: シート詳細の取得（オプション）- 最適化版 ===
-    var includeSheetDetails = targetSheetName || configJson.publishedSheetName;
+    // 型安全性確保: targetSheetNameの適切な処理
+    var sheetNameForDetails = null;
+    if (typeof targetSheetName === 'string' && targetSheetName.trim() !== '') {
+      sheetNameForDetails = targetSheetName;
+    } else if (targetSheetName === true || !targetSheetName) {
+      // boolean true または未指定の場合はpublishedSheetNameを使用
+      sheetNameForDetails = configJson.publishedSheetName;
+    }
+    
+    var includeSheetDetails = sheetNameForDetails;
 
     // デバッグ: シート詳細取得パラメータの確認
     ULog.debug('🔍 getInitialData: シート詳細取得パラメータ確認:', {
       targetSheetName: targetSheetName,
+      targetSheetNameType: typeof targetSheetName,
       publishedSheetName: configJson.publishedSheetName,
+      sheetNameForDetails: sheetNameForDetails,
       includeSheetDetails: includeSheetDetails,
       hasSpreadsheetId: !!userInfo.spreadsheetId,
       willIncludeSheetDetails: !!(includeSheetDetails && userInfo.spreadsheetId),
