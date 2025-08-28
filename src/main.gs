@@ -12,7 +12,7 @@ function include(path) {
   try {
     return HtmlService.createHtmlOutputFromFile(path).getContent();
   } catch (error) {
-    logError(error, 'includeFile', MAIN_MAIN_MAIN_ERROR_SEVERITY.HIGH, MAIN_MAIN_MAIN_ERROR_CATEGORIES.SYSTEM, { filePath: path });
+    logError(error, 'includeFile', ERROR_SEVERITY.HIGH, ERROR_CATEGORIES.SYSTEM, { filePath: path });
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
 }
@@ -55,24 +55,7 @@ const SCRIPT_PROPS_KEYS = {
   ADMIN_EMAIL: 'ADMIN_EMAIL'
 };
 
-// エラーハンドリング定数（main.gs独自）
-const MAIN_MAIN_MAIN_ERROR_SEVERITY = {
-  LOW: 'low',
-  MEDIUM: 'medium',
-  HIGH: 'high',
-  CRITICAL: 'critical',
-};
-
-const MAIN_MAIN_MAIN_ERROR_CATEGORIES = {
-  AUTHENTICATION: 'authentication',
-  AUTHORIZATION: 'authorization',
-  DATABASE: 'database',
-  CACHE: 'cache',
-  NETWORK: 'network',
-  VALIDATION: 'validation',
-  SYSTEM: 'system',
-  USER_INPUT: 'user_input',
-};
+// constants.gsで定義済みのERROR_SEVERITY, ERROR_CATEGORIESを使用
 
 // DB_SHEET_CONFIG is defined in constants.gs
 
