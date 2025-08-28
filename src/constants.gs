@@ -1127,7 +1127,61 @@ const batchCache = (data) => console.log(`[BATCH] Caching ${data.length} items`)
 // セキュリティ・ユーザー管理関連ダミー
 const setupStatus = () => ({ configured: true });
 const sendSecurityAlert = (message) => console.log(`[SECURITY] Alert: ${message}`);
-const checkLoginStatus = (userId) => ({ loggedIn: true, userId });
+const checkLoginStatus = (userId) => {
+  try {
+    // ユーザーIDが提供されていない場合は現在のユーザーを使用
+    const targetUserId = userId || getCurrentUserEmail();
+    if (!targetUserId) {
+      return { isValid: false, message: 'ユーザーIDが取得できません', userId: null };
+    }
+
+    // PropertiesServiceでセッション状態を確認
+    const sessionKey = `session_${targetUserId}`;
+    const props = PropertiesService.getUserProperties();
+    const sessionData = props.getProperty(sessionKey);
+    
+    if (!sessionData) {
+      // セッション情報がない場合は新規セッションを作成
+      const newSession = {
+        userId: targetUserId,
+        loginTime: new Date().getTime(),
+        lastAccess: new Date().getTime()
+      };
+      props.setProperty(sessionKey, JSON.stringify(newSession));
+      return { isValid: true, message: '新規セッション作成', userId: targetUserId };
+    }
+
+    const session = JSON.parse(sessionData);
+    const now = new Date().getTime();
+    const sessionAge = now - session.loginTime;
+    const lastAccessAge = now - session.lastAccess;
+
+    // セッション有効期限チェック（24時間）
+    const MAX_SESSION_AGE = 24 * 60 * 60 * 1000; // 24時間
+    const MAX_IDLE_TIME = 4 * 60 * 60 * 1000; // 4時間
+
+    if (sessionAge > MAX_SESSION_AGE) {
+      // セッション期限切れ
+      props.deleteProperty(sessionKey);
+      return { isValid: false, message: 'セッション期限切れ', userId: targetUserId };
+    }
+
+    if (lastAccessAge > MAX_IDLE_TIME) {
+      // アイドル時間超過
+      props.deleteProperty(sessionKey);
+      return { isValid: false, message: 'セッションアイドル時間超過', userId: targetUserId };
+    }
+
+    // セッション有効 - 最終アクセス時刻を更新
+    session.lastAccess = now;
+    props.setProperty(sessionKey, JSON.stringify(session));
+    
+    return { isValid: true, message: 'セッション有効', userId: targetUserId };
+    
+  } catch (error) {
+    return { isValid: false, message: `セッション検証エラー: ${error.message}`, userId: userId };
+  }
+};
 const updateLoginStatus = (userId, status) => console.log(`[LOGIN] Status ${status} for ${userId}`);
 
 // UI・ユーティリティ関連ダミー

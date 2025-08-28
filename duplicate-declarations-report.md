@@ -92,8 +92,14 @@
   - const in unifiedSheetDataManager.gs:147
   - const in unifiedSheetDataManager.gs:191
 
+## props
+  - const in constants.gs:1140
+  - const in secretManager.gs:345
+  - const in secretManager.gs:390
+  - const in secretManager.gs:620
+
 ## response
-  - const in constants.gs:1216
+  - const in constants.gs:1270
   - const in secretManager.gs:224
   - const in unifiedBatchProcessor.gs:81
   - const in unifiedSheetDataManager.gs:405

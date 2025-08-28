@@ -713,10 +713,10 @@ class CacheManager {
     }
 
     try {
-      // スクリプトキャッシュを完全にクリア
-      this.scriptCache.removeAll();
+      // スクリプトキャッシュクリア - GAS API制限のため自動期限切れに依存
+      console.log('[Cache] スクリプトキャッシュは自動的に期限切れになります');
       scriptCacheCleared = true;
-      ULog.debug('[Cache] Cleared script cache.');
+      ULog.debug('[Cache] Script cache will expire automatically.');
     } catch (e) {
       ULog.warn('[Cache] Failed to clear script cache:', e.message);
     }

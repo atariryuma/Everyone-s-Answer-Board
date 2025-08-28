@@ -1,9 +1,9 @@
 # Runtime Errors Report
 
-Total: 943 undefined identifiers
+Total: 944 undefined identifiers
 
 ## debug
-- Occurrences: 616
+- Occurrences: 620
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, session-utils.gs, ulog.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUtilities.gs, url.gs
 - Samples:
   - Core.gs:248: ULog.debug('🔍 getSetupStep: UI状態ベースのステップ判定開始', {
@@ -19,7 +19,7 @@ Total: 943 undefined identifiers
   - Core.gs:35: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
 
 ## ID
-- Occurrences: 377
+- Occurrences: 380
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, session-utils.gs, setup.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs, url.gs
 - Samples:
   - Core.gs:352: * @param {string} requestUserId - リクエスト元のユーザーID（オプション）
@@ -27,7 +27,7 @@ Total: 943 undefined identifiers
   - Core.gs:583: * @param {string} userId - ユーザーID
 
 ## warn
-- Occurrences: 272
+- Occurrences: 274
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, session-utils.gs, ulog.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUtilities.gs, url.gs
 - Samples:
   - Core.gs:59: ULog.warn(`⚠️ MEDIUM SEVERITY [${context}]:`, errorInfo.message, errorInfo.metadata);
@@ -35,7 +35,7 @@ Total: 943 undefined identifiers
   - Core.gs:543: ULog.warn('configJson解析エラー:', parseError.message);
 
 ## CATEGORIES
-- Occurrences: 249
+- Occurrences: 261
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, resilientExecutor.gs, session-utils.gs, setup.gs, ulog.gs, workflowValidation.gs
 - Samples:
   - Core.gs:35: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
@@ -75,7 +75,7 @@ Total: 943 undefined identifiers
   - Core.gs:42: severity = UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
 
 ## API
-- Occurrences: 121
+- Occurrences: 122
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, resilientExecutor.gs, secretManager.gs, session-utils.gs, ulog.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, url.gs, validationMigration.gs, workflowValidation.gs
 - Samples:
   - Core.gs:3: * 主要な業務ロジックとAPI エンドポイント
@@ -83,16 +83,16 @@ Total: 943 undefined identifiers
   - Core.gs:1224: // processReactionの戻り値から直接リアクション状態を取得（API呼び出し削減）
 
 ## stringify
-- Occurrences: 101
-- Files: Core.gs, config.gs, database.gs, main.gs, secretManager.gs, ulog.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedUtilities.gs, url.gs, workflowValidation.gs
+- Occurrences: 105
+- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, ulog.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedUtilities.gs, url.gs, workflowValidation.gs
 - Samples:
   - Core.gs:53: ULog.error(`🚨 CRITICAL ERROR [${context}]:`, JSON.stringify(errorInfo, null, 2));
   - Core.gs:56: ULog.error(`❌ HIGH SEVERITY [${context}]:`, JSON.stringify(errorInfo, null, 2));
   - Core.gs:387: configJson: JSON.stringify(configJson),
 
 ## parse
-- Occurrences: 100
-- Files: Core.gs, config.gs, database.gs, main.gs, secretManager.gs, setup.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs
+- Occurrences: 101
+- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, setup.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs
 - Samples:
   - Core.gs:371: const configJson = JSON.parse(userInfo.configJson || '{}');
   - Core.gs:540: config = JSON.parse(configJsonString);
@@ -162,6 +162,14 @@ Total: 943 undefined identifiers
   - Core.gs:5342: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
   - Core.gs:5361: var props = PropertiesService.getScriptProperties();
 
+## AUTH
+- Occurrences: 44
+- Files: debugConfig.gs, main.gs, session-utils.gs, ulog.gs, unifiedValidationSystem.gs
+- Samples:
+  - debugConfig.gs:25: AUTH: true, // 認証関連
+  - debugConfig.gs:55: * @param {string} category - カテゴリ (CACHE, AUTH, DATABASE, UI, PERFORMANCE)
+  - debugConfig.gs:121: category = 'AUTH';
+
 ## CRITICAL
 - Occurrences: 43
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, main.gs, systemIntegrationManager.gs, ulog.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs, validationMigration.gs
@@ -179,20 +187,12 @@ Total: 943 undefined identifiers
   - unifiedValidationSystem.gs:96: results.tests.userAccess = this._checkUserAccess(options.userId);
 
 ## getProperty
-- Occurrences: 39
+- Occurrences: 40
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, secretManager.gs, session-utils.gs, setup.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, workflowValidation.gs
 - Samples:
   - Core.gs:4360: props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
   - Core.gs:5342: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
   - Core.gs:5362: var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-
-## AUTH
-- Occurrences: 38
-- Files: debugConfig.gs, main.gs, session-utils.gs, ulog.gs, unifiedValidationSystem.gs
-- Samples:
-  - debugConfig.gs:25: AUTH: true, // 認証関連
-  - debugConfig.gs:55: * @param {string} category - カテゴリ (CACHE, AUTH, DATABASE, UI, PERFORMANCE)
-  - debugConfig.gs:121: category = 'AUTH';
 
 ## toLowerCase
 - Occurrences: 37
@@ -282,6 +282,14 @@ Total: 943 undefined identifiers
   - unifiedValidationSystem.gs:89: if (level === this.validationLevels.BASIC || level === this.validationLevels.STANDARD || level === t
   - unifiedValidationSystem.gs:89: if (level === this.validationLevels.BASIC || level === this.validationLevels.STANDARD || level === t
 
+## getTime
+- Occurrences: 30
+- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, ulog.gs, unifiedValidationSystem.gs
+- Samples:
+  - Core.gs:327: const stopTime = new Date(publishTime.getTime() + minutes * 60 * 1000);
+  - Core.gs:336: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
+  - Core.gs:336: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
+
 ## join
 - Occurrences: 30
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, session-utils.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs
@@ -306,6 +314,14 @@ Total: 943 undefined identifiers
   - database.gs:1322: 'Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText()
   - database.gs:1326: return JSON.parse(response.getContentText());
 
+## GAS
+- Occurrences: 30
+- Files: Core.gs, config.gs, constants.gs, database.gs, secretManager.gs, session-utils.gs, ulog.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs, url.gs, workflowValidation.gs
+- Samples:
+  - Core.gs:5355: * 1. GASスクリプトの編集権限を確認
+  - config.gs:3485: // GAS環境ではcommitAllChanges実行をtry-catch強化で最適化
+  - constants.gs:1014: // JavaScript標準関数のGAS互換ポリフィル
+
 ## clearByPattern
 - Occurrences: 30
 - Files: config.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs
@@ -321,14 +337,6 @@ Total: 943 undefined identifiers
   - database.gs:1320: if (response.getResponseCode() !== 200) {
   - database.gs:1322: 'Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText()
   - database.gs:1347: if (response.getResponseCode() !== 200) {
-
-## GAS
-- Occurrences: 29
-- Files: Core.gs, config.gs, constants.gs, database.gs, secretManager.gs, session-utils.gs, ulog.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs, url.gs, workflowValidation.gs
-- Samples:
-  - Core.gs:5355: * 1. GASスクリプトの編集権限を確認
-  - config.gs:3485: // GAS環境ではcommitAllChanges実行をtry-catch強化で最適化
-  - constants.gs:1014: // JavaScript標準関数のGAS互換ポリフィル
 
 ## CACHE
 - Occurrences: 29
@@ -350,9 +358,9 @@ Total: 943 undefined identifiers
 - Occurrences: 28
 - Files: main.gs
 - Samples:
-  - main.gs:1875: background: rgba(31, 41, 55, 0.95);
-  - main.gs:1881: box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-  - main.gs:1882: border: 1px solid rgba(75, 85, 99, 0.3);
+  - main.gs:1943: background: rgba(31, 41, 55, 0.95);
+  - main.gs:1949: box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+  - main.gs:1950: border: 1px solid rgba(75, 85, 99, 0.3);
 
 ## filter
 - Occurrences: 27
@@ -426,14 +434,6 @@ Total: 943 undefined identifiers
   - constants.gs:131: HEADERS: [
   - constants.gs:144: HEADERS: [
 
-## getTime
-- Occurrences: 23
-- Files: Core.gs, config.gs, database.gs, ulog.gs, unifiedValidationSystem.gs
-- Samples:
-  - Core.gs:327: const stopTime = new Date(publishTime.getTime() + minutes * 60 * 1000);
-  - Core.gs:336: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
-  - Core.gs:336: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
-
 ## setTitle
 - Occurrences: 23
 - Files: Core.gs, config.gs, main.gs
@@ -466,14 +466,6 @@ Total: 943 undefined identifiers
   - Core.gs:3793: customConfig.classQuestion &&
   - Core.gs:3794: customConfig.classQuestion.choices &&
 
-## removeAll
-- Occurrences: 22
-- Files: config.gs, session-utils.gs, unifiedCacheManager.gs
-- Samples:
-  - config.gs:422: // removeAll() はキー配列が必要なため、自動期限切れを利用
-  - config.gs:1849: CacheService.getScriptCache().removeAll([
-  - session-utils.gs:30: * - removeAll() がサポートされる環境では全面削除
-
 ## startsWith
 - Occurrences: 21
 - Files: config.gs, constants.gs, main.gs, secretManager.gs, session-utils.gs, unifiedCacheManager.gs, unifiedSheetDataManager.gs, unifiedUtilities.gs
@@ -481,6 +473,14 @@ Total: 943 undefined identifiers
   - config.gs:399: key.startsWith('CURRENT_USER_ID_') &&
   - config.gs:1788: const sheetConfigKeys = Object.keys(configJson).filter((key) => key.startsWith('sheet_'));
   - config.gs:3341: 利用可能な設定: Object.keys(configJson).filter((k) => k.startsWith('sheet_')),
+
+## removeAll
+- Occurrences: 21
+- Files: config.gs, session-utils.gs, unifiedCacheManager.gs
+- Samples:
+  - config.gs:422: // removeAll() はキー配列が必要なため、自動期限切れを利用
+  - config.gs:1849: CacheService.getScriptCache().removeAll([
+  - session-utils.gs:30: * - removeAll() がサポートされる環境では全面削除
 
 ## OK
 - Occurrences: 21
@@ -494,9 +494,9 @@ Total: 943 undefined identifiers
 - Occurrences: 21
 - Files: main.gs, session-utils.gs
 - Samples:
-  - main.gs:1431: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
-  - main.gs:1432: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  - main.gs:1451: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+  - main.gs:1499: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
+  - main.gs:1500: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  - main.gs:1519: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
 
 ## getName
 - Occurrences: 20
@@ -602,13 +602,29 @@ Total: 943 undefined identifiers
   - config.gs:1991: const activeUserEmail = Session.getActiveUser().getEmail();
   - config.gs:2045: const activeUserEmail = Session.getActiveUser().getEmail();
 
+## deleteProperty
+- Occurrences: 17
+- Files: config.gs, constants.gs, database.gs, main.gs, session-utils.gs, unifiedCacheManager.gs
+- Samples:
+  - config.gs:390: props.deleteProperty('CURRENT_USER_ID');
+  - config.gs:411: props.deleteProperty(key);
+  - constants.gs:1165: props.deleteProperty(sessionKey);
+
+## setProperty
+- Occurrences: 17
+- Files: config.gs, constants.gs, main.gs, secretManager.gs, session-utils.gs, setup.gs, unifiedCacheManager.gs, unifiedUserManager.gs, workflowValidation.gs
+- Samples:
+  - config.gs:3849: props.setProperty('APPLICATION_ENABLED', enabledValue);
+  - constants.gs:1150: props.setProperty(sessionKey, JSON.stringify(newSession));
+  - constants.gs:1177: props.setProperty(sessionKey, JSON.stringify(session));
+
 ## ALLOWALL
 - Occurrences: 17
 - Files: main.gs, session-utils.gs
 - Samples:
-  - main.gs:1431: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
-  - main.gs:1432: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  - main.gs:2006: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
+  - main.gs:1499: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
+  - main.gs:1500: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  - main.gs:2074: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
 
 ## memoCache
 - Occurrences: 17
@@ -658,6 +674,14 @@ Total: 943 undefined identifiers
   - Core.gs:4486: // AI判定結果またはguessedConfigがある場合、それを優先使用
   - Core.gs:4562: // AI判定結果またはシート設定からメイン質問を特定
 
+## getUserProperties
+- Occurrences: 16
+- Files: config.gs, constants.gs, database.gs, main.gs, session-utils.gs
+- Samples:
+  - config.gs:387: const props = PropertiesService.getUserProperties();
+  - constants.gs:1140: const props = PropertiesService.getUserProperties();
+  - database.gs:34: return PropertiesService.getUserProperties();
+
 ## TTL
 - Occurrences: 16
 - Files: constants.gs, database.gs, unifiedCacheManager.gs
@@ -698,21 +722,13 @@ Total: 943 undefined identifiers
   - Core.gs:4735: if (!Array.isArray(spreadsheet.sheets)) {
   - config.gs:3664: isArray: Array.isArray(newConfig),
 
-## deleteProperty
-- Occurrences: 15
-- Files: config.gs, database.gs, main.gs, session-utils.gs, unifiedCacheManager.gs
-- Samples:
-  - config.gs:390: props.deleteProperty('CURRENT_USER_ID');
-  - config.gs:411: props.deleteProperty(key);
-  - database.gs:1262: userProps.deleteProperty('CURRENT_USER_ID');
-
 ## gradient
 - Occurrences: 15
 - Files: main.gs
 - Samples:
-  - main.gs:1866: background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
-  - main.gs:1898: background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
-  - main.gs:2409: background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  - main.gs:1934: background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+  - main.gs:1966: background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+  - main.gs:2477: background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 
 ## constructor
 - Occurrences: 14
@@ -818,14 +834,6 @@ Total: 943 undefined identifiers
   - database.gs:2670: SCRIPT_PROPS_KEYS.ADMIN_EMAIL,
   - database.gs:2790: var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
 
-## getUserProperties
-- Occurrences: 13
-- Files: config.gs, database.gs, main.gs, session-utils.gs
-- Samples:
-  - config.gs:387: const props = PropertiesService.getUserProperties();
-  - database.gs:34: return PropertiesService.getUserProperties();
-  - database.gs:39: return PropertiesService.getUserProperties();
-
 ## headerInfo
 - Occurrences: 13
 - Files: config.gs
@@ -841,14 +849,6 @@ Total: 943 undefined identifiers
   - config.gs:2563: const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
   - constants.gs:226: DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
   - constants.gs:226: DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
-
-## setProperty
-- Occurrences: 13
-- Files: config.gs, main.gs, secretManager.gs, session-utils.gs, setup.gs, unifiedCacheManager.gs, unifiedUserManager.gs, workflowValidation.gs
-- Samples:
-  - config.gs:3849: props.setProperty('APPLICATION_ENABLED', enabledValue);
-  - main.gs:1283: userProperties.setProperty('lastAdminUserId', params.userId);
-  - main.gs:1284: userProperties.setProperty('lastSuccessfulAdminAccess', Date.now().toString());
 
 ## Core
 - Occurrences: 13
@@ -870,16 +870,16 @@ Total: 943 undefined identifiers
 - Occurrences: 13
 - Files: main.gs
 - Samples:
-  - main.gs:2267: htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  - main.gs:2269: ULog.warn('⚠️ addMetaTag(viewport) failed:', e.message);
-  - main.gs:2273: htmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
+  - main.gs:2335: htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  - main.gs:2337: ULog.warn('⚠️ addMetaTag(viewport) failed:', e.message);
+  - main.gs:2341: htmlOutput.addMetaTag('cache-control', 'no-cache, no-store, must-revalidate');
 
 ## validate
 - Occurrences: 12
 - Files: Core.gs, main.gs, unifiedValidationSystem.gs, validationMigration.gs
 - Samples:
   - Core.gs:470: const result = UnifiedValidation.validate('configuration', 'basic', { config });
-  - main.gs:1014: const result = UnifiedValidation.validate('authentication', 'basic', {
+  - main.gs:1048: const result = UnifiedValidation.validate('authentication', 'basic', {
   - unifiedValidationSystem.gs:35: validate(category, level = this.validationLevels.STANDARD, options = {}) {
 
 ## REASON
@@ -1134,9 +1134,9 @@ Total: 943 undefined identifiers
 - Occurrences: 10
 - Files: main.gs, session-utils.gs
 - Samples:
-  - main.gs:1432: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  - main.gs:1452: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-  - main.gs:1498: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  - main.gs:1500: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  - main.gs:1520: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  - main.gs:1566: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 
 ## GET
 - Occurrences: 10
@@ -1246,9 +1246,9 @@ Total: 943 undefined identifiers
 - Occurrences: 9
 - Files: main.gs, unifiedUtilities.gs
 - Samples:
-  - main.gs:1426: const template = HtmlService.createTemplateFromFile('LoginPage');
-  - main.gs:1446: const template = HtmlService.createTemplateFromFile('SetupPage');
-  - main.gs:1491: const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
+  - main.gs:1494: const template = HtmlService.createTemplateFromFile('LoginPage');
+  - main.gs:1514: const template = HtmlService.createTemplateFromFile('SetupPage');
+  - main.gs:1559: const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
 
 ## OPEN
 - Occurrences: 9
@@ -1422,17 +1422,17 @@ Total: 943 undefined identifiers
 - Occurrences: 8
 - Files: main.gs, url.gs
 - Samples:
-  - main.gs:1818: url.searchParams.set('mode', mode);
-  - main.gs:1822: url.searchParams.set(key, params[key]);
+  - main.gs:1886: url.searchParams.set('mode', mode);
+  - main.gs:1890: url.searchParams.set(key, params[key]);
   - url.gs:193: url.searchParams.set('_cb', Date.now().toString());
 
 ## createHtmlOutput
 - Occurrences: 8
 - Files: main.gs, session-utils.gs, unifiedUtilities.gs
 - Samples:
-  - main.gs:1838: return HtmlService.createHtmlOutput().setContent(
-  - main.gs:2002: const htmlOutput = HtmlService.createHtmlOutput(userActionRedirectHtml);
-  - main.gs:2359: const htmlOutput = HtmlService.createHtmlOutput(htmlContent).setTitle('StudyQuest - 準備中');
+  - main.gs:1906: return HtmlService.createHtmlOutput().setContent(
+  - main.gs:2070: const htmlOutput = HtmlService.createHtmlOutput(userActionRedirectHtml);
+  - main.gs:2427: const htmlOutput = HtmlService.createHtmlOutput(htmlContent).setTitle('StudyQuest - 準備中');
 
 ## INITIALIZED
 - Occurrences: 8
@@ -1598,9 +1598,9 @@ Total: 943 undefined identifiers
 - Occurrences: 7
 - Files: main.gs
 - Samples:
-  - main.gs:1427: const htmlOutput = template.evaluate().setTitle('StudyQuest - ログイン');
-  - main.gs:1447: const htmlOutput = template.evaluate().setTitle('StudyQuest - 初回セットアップ');
-  - main.gs:1493: const htmlOutput = appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest');
+  - main.gs:1495: const htmlOutput = template.evaluate().setTitle('StudyQuest - ログイン');
+  - main.gs:1515: const htmlOutput = template.evaluate().setTitle('StudyQuest - 初回セットアップ');
+  - main.gs:1561: const htmlOutput = appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest');
 
 ## resolve
 - Occurrences: 7
@@ -1710,8 +1710,8 @@ Total: 943 undefined identifiers
 - Occurrences: 6
 - Files: constants.gs, systemIntegrationManager.gs, unifiedSecurityManager.gs
 - Samples:
-  - constants.gs:1158: generateUserUrls: () => 'http://example.com',
-  - constants.gs:1159: generateUnpublishedUrl: () => 'http://example.com/unpublished'
+  - constants.gs:1212: generateUserUrls: () => 'http://example.com',
+  - constants.gs:1213: generateUnpublishedUrl: () => 'http://example.com/unpublished'
   - systemIntegrationManager.gs:151: 'test@example.com',
 
 ## propsError
@@ -1719,7 +1719,7 @@ Total: 943 undefined identifiers
 - Files: database.gs, main.gs, session-utils.gs, unifiedCacheManager.gs
 - Samples:
   - database.gs:1266: ULog.warn('Failed to clear user properties:', propsError.message);
-  - main.gs:926: errors.push(`PropertiesService エラー: ${propsError.message}`);
+  - main.gs:960: errors.push(`PropertiesService エラー: ${propsError.message}`);
   - session-utils.gs:254: authResetResult.errors.push(`プロパティクリアエラー: ${propsError.message}`);
 
 ## details
@@ -1742,15 +1742,15 @@ Total: 943 undefined identifiers
 - Occurrences: 6
 - Files: main.gs
 - Samples:
-  - main.gs:1451: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
-  - main.gs:1452: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-  - main.gs:1497: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+  - main.gs:1519: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
+  - main.gs:1520: htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  - main.gs:1565: if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
 
 ## getService
 - Occurrences: 6
 - Files: main.gs, session-utils.gs, url.gs
 - Samples:
-  - main.gs:1555: const baseUrl = ScriptApp.getService().getUrl();
+  - main.gs:1623: const baseUrl = ScriptApp.getService().getUrl();
   - session-utils.gs:263: const loginPageUrl = ScriptApp.getService().getUrl();
   - session-utils.gs:426: const fallbackUrl = ScriptApp.getService().getUrl() + '?mode=login';
 
@@ -1984,7 +1984,7 @@ Total: 943 undefined identifiers
 - Samples:
   - config.gs:1006: * 既存の設定で回答ボードを再公開 (Unpublished.htmlから呼び出される)
   - config.gs:1309: * Unpublished.htmlから呼び出される
-  - main.gs:2208: * ErrorBoundaryを回避して確実にUnpublished.htmlを表示
+  - main.gs:2276: * ErrorBoundaryを回避して確実にUnpublished.htmlを表示
 
 ## newConfig
 - Occurrences: 5
@@ -2015,16 +2015,16 @@ Total: 943 undefined identifiers
 - Files: constants.gs, main.gs
 - Samples:
   - constants.gs:518: ACCESS: 'access',
-  - constants.gs:1245: ACCESS: 'access',
-  - main.gs:1602: errorType = ERROR_TYPES.ACCESS;
+  - constants.gs:1299: ACCESS: 'access',
+  - main.gs:1670: errorType = ERROR_TYPES.ACCESS;
 
 ## USER
 - Occurrences: 5
 - Files: constants.gs, main.gs
 - Samples:
   - constants.gs:521: USER: 'user',
-  - constants.gs:1248: USER: 'user',
-  - main.gs:1594: let errorType = ERROR_TYPES.USER;
+  - constants.gs:1302: USER: 'user',
+  - main.gs:1662: let errorType = ERROR_TYPES.USER;
 
 ## BATCH
 - Occurrences: 5
@@ -2078,9 +2078,9 @@ Total: 943 undefined identifiers
 - Occurrences: 5
 - Files: main.gs
 - Samples:
-  - main.gs:1934: 0% { transform: scale(1); }
-  - main.gs:1935: 50% { transform: scale(1.05); }
-  - main.gs:1936: 100% { transform: scale(1); }
+  - main.gs:2002: 0% { transform: scale(1); }
+  - main.gs:2003: 50% { transform: scale(1.05); }
+  - main.gs:2004: 100% { transform: scale(1); }
 
 ## CLOSED
 - Occurrences: 5
@@ -2208,7 +2208,7 @@ Total: 943 undefined identifiers
 - Samples:
   - Core.gs:332: publishTimeFormatted: publishTime.toLocaleString('ja-JP'),
   - Core.gs:333: stopTimeFormatted: stopTime.toLocaleString('ja-JP'),
-  - main.gs:1256: `時刻: ${new Date().toLocaleString('ja-JP')}`,
+  - main.gs:1324: `時刻: ${new Date().toLocaleString('ja-JP')}`,
 
 ## SERVICE_ACCOUNT
 - Occurrences: 4
@@ -2430,7 +2430,7 @@ Total: 943 undefined identifiers
 - Occurrences: 4
 - Files: constants.gs, unifiedUtilities.gs
 - Samples:
-  - constants.gs:1142: try { return fn(); }
+  - constants.gs:1196: try { return fn(); }
   - unifiedUtilities.gs:249: const result = fn();
   - unifiedUtilities.gs:262: const result = await fn();
 
@@ -2486,24 +2486,24 @@ Total: 943 undefined identifiers
 - Occurrences: 4
 - Files: main.gs, session-utils.gs
 - Samples:
-  - main.gs:1839: `<script>window.top.location.href = '${sanitizedUrl}';</script>`
-  - main.gs:1970: window.top.location.href = url;
+  - main.gs:1907: `<script>window.top.location.href = '${sanitizedUrl}';</script>`
+  - main.gs:2038: window.top.location.href = url;
   - session-utils.gs:461: // 最も確実な方法：window.top.location.href
 
 ## translateY
 - Occurrences: 4
 - Files: main.gs
 - Samples:
-  - main.gs:1910: transform: translateY(-2px);
-  - main.gs:2539: transform: translateY(-2px);
-  - main.gs:2548: transform: translateY(-2px);
+  - main.gs:1978: transform: translateY(-2px);
+  - main.gs:2607: transform: translateY(-2px);
+  - main.gs:2616: transform: translateY(-2px);
 
 ## endsWith
 - Occurrences: 4
 - Files: main.gs, unifiedUtilities.gs
 - Samples:
-  - main.gs:2046: (cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
-  - main.gs:2047: (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))
+  - main.gs:2114: (cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
+  - main.gs:2115: (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))
   - unifiedUtilities.gs:179: (sanitized.startsWith('"') && sanitized.endsWith('"')) ||
 
 ## failed
@@ -2696,7 +2696,7 @@ Total: 943 undefined identifiers
 - Samples:
   - Core.gs:332: publishTimeFormatted: publishTime.toLocaleString('ja-JP'),
   - Core.gs:333: stopTimeFormatted: stopTime.toLocaleString('ja-JP'),
-  - main.gs:1256: `時刻: ${new Date().toLocaleString('ja-JP')}`,
+  - main.gs:1324: `時刻: ${new Date().toLocaleString('ja-JP')}`,
 
 ## action
 - Occurrences: 3
@@ -2712,7 +2712,7 @@ Total: 943 undefined identifiers
 - Samples:
   - Core.gs:2374: // include 関数は main.gs で定義されています
   - config.gs:10: // メモリ管理用の実行レベル変数 (main.gsと統一)
-  - main.gs:2722: ULog.warn('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
+  - main.gs:2790: ULog.warn('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
 
 ## formMoveError
 - Occurrences: 3
@@ -2744,7 +2744,7 @@ Total: 943 undefined identifiers
 - Samples:
   - Core.gs:3742: editFormUrl: typeof form.getEditUrl === 'function' ? form.getEditUrl() : '',
   - config.gs:1652: ULog.debug('📝 フォーム作成成功:', form.getEditUrl());
-  - constants.gs:1238: getEditUrl: (form) => form ? form.getEditUrl() : ''
+  - constants.gs:1292: getEditUrl: (form) => form ? form.getEditUrl() : ''
 
 ## choices
 - Occurrences: 3
@@ -2966,9 +2966,9 @@ Total: 943 undefined identifiers
 - Occurrences: 3
 - Files: constants.gs
 - Samples:
-  - constants.gs:1203: console.log('[ALERT]', message);
-  - constants.gs:1204: Logger.log('[ALERT] ' + message);
-  - constants.gs:1208: console.log('[ALERT]', message);
+  - constants.gs:1257: console.log('[ALERT]', message);
+  - constants.gs:1258: Logger.log('[ALERT] ' + message);
+  - constants.gs:1262: console.log('[ALERT]', message);
 
 ## steps
 - Occurrences: 3
@@ -3022,33 +3022,33 @@ Total: 943 undefined identifiers
 - Occurrences: 3
 - Files: main.gs
 - Samples:
-  - main.gs:1196: systemDiagnostics.performanceMetrics.authDuration = authDuration + 'ms';
-  - main.gs:1200: systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
-  - main.gs:1272: systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
+  - main.gs:1264: systemDiagnostics.performanceMetrics.authDuration = authDuration + 'ms';
+  - main.gs:1268: systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
+  - main.gs:1340: systemDiagnostics.performanceMetrics.totalRequestTime = totalRequestTime + 'ms';
 
 ## line
 - Occurrences: 3
 - Files: main.gs
 - Samples:
-  - main.gs:1650: const trimmed = line.trim();
-  - main.gs:1656: const jsonStart = line.indexOf('{');
-  - main.gs:1659: const jsonStr = line.substring(jsonStart);
+  - main.gs:1718: const trimmed = line.trim();
+  - main.gs:1724: const jsonStart = line.indexOf('{');
+  - main.gs:1727: const jsonStr = line.substring(jsonStart);
 
 ## DOCTYPE
 - Occurrences: 3
 - Files: main.gs
 - Samples:
-  - main.gs:1857: <!DOCTYPE html>
-  - main.gs:2333: <!DOCTYPE html>
-  - main.gs:2399: <!DOCTYPE html>
+  - main.gs:1925: <!DOCTYPE html>
+  - main.gs:2401: <!DOCTYPE html>
+  - main.gs:2467: <!DOCTYPE html>
 
 ## googleusercontent
 - Occurrences: 3
 - Files: main.gs
 - Samples:
-  - main.gs:2069: // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
-  - main.gs:2075: // 最終的な URL 妥当性チェック（googleusercontent.comも有効URLとして認識）
-  - main.gs:2078: cleanUrl.includes('googleusercontent.com') ||
+  - main.gs:2137: // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
+  - main.gs:2143: // 最終的な URL 妥当性チェック（googleusercontent.comも有効URLとして認識）
+  - main.gs:2146: cleanUrl.includes('googleusercontent.com') ||
 
 ## DATABASE_CREDS
 - Occurrences: 3
@@ -3334,7 +3334,7 @@ Total: 943 undefined identifiers
 - Files: Core.gs, main.gs
 - Samples:
   - Core.gs:2868: ULog.error('[ERROR]', '❌ ファイル移動処理で予期しないエラー:', generalError.message);
-  - main.gs:958: errors.push(`システムチェック中の一般エラー: ${generalError.message}`);
+  - main.gs:992: errors.push(`システムチェック中の一般エラー: ${generalError.message}`);
 
 ## getFoldersByName
 - Occurrences: 2
@@ -3551,7 +3551,7 @@ Total: 943 undefined identifiers
 - Files: Core.gs, main.gs
 - Samples:
   - Core.gs:6531: ULog.warn('Answer count retrieval failed:', err.message);
-  - main.gs:2755: ULog.warn('アクセス権設定警告:', err.message);
+  - main.gs:2823: ULog.warn('アクセス権設定警告:', err.message);
 
 ## sheetErr
 - Occurrences: 2
@@ -3754,42 +3754,42 @@ Total: 943 undefined identifiers
 - Files: constants.gs
 - Samples:
   - constants.gs:1030: * ES2019のObject.fromEntriesポリフィル
-  - constants.gs:1260: console.log('   - Object.fromEntries: ES2019ポリフィル');
+  - constants.gs:1314: console.log('   - Object.fromEntries: ES2019ポリフィル');
 
 ## unifiedValidationSystem
 - Occurrences: 2
 - Files: constants.gs, unifiedUtilities.gs
 - Samples:
-  - constants.gs:1190: // UnifiedValidationSystem は unifiedValidationSystem.gs で定義済み
+  - constants.gs:1244: // UnifiedValidationSystem は unifiedValidationSystem.gs で定義済み
   - unifiedUtilities.gs:288: // これらの機能は既に unifiedValidationSystem.gs 等で実装されています
 
 ## msgBox
 - Occurrences: 2
 - Files: constants.gs
 - Samples:
-  - constants.gs:1201: return Browser.msgBox(message);
-  - constants.gs:1216: const response = Browser.msgBox(message, Browser.Buttons.YES_NO);
+  - constants.gs:1255: return Browser.msgBox(message);
+  - constants.gs:1270: const response = Browser.msgBox(message, Browser.Buttons.YES_NO);
 
 ## Buttons
 - Occurrences: 2
 - Files: constants.gs
 - Samples:
-  - constants.gs:1216: const response = Browser.msgBox(message, Browser.Buttons.YES_NO);
-  - constants.gs:1217: return response === Browser.Buttons.YES;
+  - constants.gs:1270: const response = Browser.msgBox(message, Browser.Buttons.YES_NO);
+  - constants.gs:1271: return response === Browser.Buttons.YES;
 
 ## CONFIRM
 - Occurrences: 2
 - Files: constants.gs
 - Samples:
-  - constants.gs:1219: console.log('[CONFIRM]', message, '(auto-confirmed)');
-  - constants.gs:1223: console.log('[CONFIRM]', message, '(auto-confirmed)');
+  - constants.gs:1273: console.log('[CONFIRM]', message, '(auto-confirmed)');
+  - constants.gs:1277: console.log('[CONFIRM]', message, '(auto-confirmed)');
 
 ## DOM
 - Occurrences: 2
 - Files: constants.gs
 - Samples:
-  - constants.gs:1228: // DOM/Browser操作のダミー実装（GASでは不要）
-  - constants.gs:1263: console.log('   - DOM操作関数: ダミー実装');
+  - constants.gs:1282: // DOM/Browser操作のダミー実装（GASでは不要）
+  - constants.gs:1317: console.log('   - DOM操作関数: ダミー実装');
 
 ## I1
 - Occurrences: 2
@@ -3910,54 +3910,61 @@ Total: 943 undefined identifiers
   - main.gs:13: return HtmlService.createHtmlOutputFromFile(path).getContent();
   - session-utils.gs:509: const outputContent = htmlOutput.getContent();
 
+## sessionError
+- Occurrences: 2
+- Files: main.gs, unifiedCacheManager.gs
+- Samples:
+  - main.gs:1215: error: sessionError.message
+  - unifiedCacheManager.gs:1367: ULog.debug('セッションキャッシュ保存エラー:', sessionError.message);
+
 ## title
 - Occurrences: 2
 - Files: main.gs, unifiedSheetDataManager.gs
 - Samples:
-  - main.gs:1590: const titleLower = title.toLowerCase();
+  - main.gs:1658: const titleLower = title.toLowerCase();
   - unifiedSheetDataManager.gs:645: !sheet.title.startsWith('名簿') // 名簿シート除外
 
 ## technical
 - Occurrences: 2
 - Files: main.gs
 - Samples:
-  - main.gs:1662: structured.technical.push(line);
-  - main.gs:1677: structured.technical.push(trimmed);
+  - main.gs:1730: structured.technical.push(line);
+  - main.gs:1745: structured.technical.push(trimmed);
 
 ## event
 - Occurrences: 2
 - Files: main.gs
 - Samples:
-  - main.gs:1968: event.preventDefault();
-  - main.gs:2653: const button = event.target;
+  - main.gs:2036: event.preventDefault();
+  - main.gs:2721: const button = event.target;
 
 ## style
 - Occurrences: 2
 - Files: main.gs
 - Samples:
-  - main.gs:1991: mainButton.style.animation = 'pulse 1s infinite';
-  - main.gs:1992: mainButton.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
+  - main.gs:2059: mainButton.style.animation = 'pulse 1s infinite';
+  - main.gs:2060: mainButton.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
 
 ## script
 - Occurrences: 2
 - Files: main.gs
 - Samples:
-  - main.gs:2077: cleanUrl.includes('script.google.com') ||
-  - main.gs:2658: google.script.run
+  - main.gs:2145: cleanUrl.includes('script.google.com') ||
+  - main.gs:2726: google.script.run
 
 ## UTF
 - Occurrences: 2
 - Files: main.gs
 - Samples:
-  - main.gs:2336: <meta charset="UTF-8">
-  - main.gs:2402: <meta charset="UTF-8">
+  - main.gs:2404: <meta charset="UTF-8">
+  - main.gs:2470: <meta charset="UTF-8">
 
 ## DEBUG_MODE_LAST_MODIFIED
 - Occurrences: 2
 - Files: main.gs
 - Samples:
-  - main.gs:2928: PropertiesService.getScriptProperties().getProperty('DEBUG_MODE_LAST_MODIFIED') ||
-  - main.gs:2969: DEBUG_MODE_LAST_MODIFIED: new Date().toISOString(),
+  - main.gs:2996: PropertiesService.getScriptProperties().getProperty('DEBUG_MODE_LAST_MODIFIED') ||
+  - main.gs:3037: DEBUG_MODE_LAST_MODIFIED: new Date().toISOString(),
 
 ## handleSuccess
 - Occurrences: 2
@@ -5684,61 +5691,61 @@ Total: 943 undefined identifiers
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1131: const updateLoginStatus = (userId, status) => console.log(`[LOGIN] Status ${status} for ${userId}`);
+  - constants.gs:1185: const updateLoginStatus = (userId, status) => console.log(`[LOGIN] Status ${status} for ${userId}`);
 
 ## UNIFIED
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1136: const unified = () => console.log('[UNIFIED] Operation');
+  - constants.gs:1190: const unified = () => console.log('[UNIFIED] Operation');
 
 ## SAFE_EXECUTE
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1143: catch(e) { console.error('[SAFE_EXECUTE]', e.message); return null; }
+  - constants.gs:1197: catch(e) { console.error('[SAFE_EXECUTE]', e.message); return null; }
 
 ## unifiedSheetDataManager
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1187: // UnifiedSheetDataManager は unifiedSheetDataManager.gs で定義済み
+  - constants.gs:1241: // UnifiedSheetDataManager は unifiedSheetDataManager.gs で定義済み
 
 ## secretManager
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1195: // UnifiedSecretManager は secretManager.gs で定義済み
+  - constants.gs:1249: // UnifiedSecretManager は secretManager.gs で定義済み
 
 ## YES_NO
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1216: const response = Browser.msgBox(message, Browser.Buttons.YES_NO);
+  - constants.gs:1270: const response = Browser.msgBox(message, Browser.Buttons.YES_NO);
 
 ## YES
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1217: return response === Browser.Buttons.YES;
+  - constants.gs:1271: return response === Browser.Buttons.YES;
 
 ## RELOAD
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1229: const reload = () => console.log('[RELOAD] Page reload not applicable in GAS');
+  - constants.gs:1283: const reload = () => console.log('[RELOAD] Page reload not applicable in GAS');
 
 ## PREVENT_DEFAULT
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1230: const preventDefault = () => console.log('[PREVENT_DEFAULT] Event handling not applicable in GAS');
+  - constants.gs:1284: const preventDefault = () => console.log('[PREVENT_DEFAULT] Event handling not applicable in GAS');
 
 ## FORM
 - Occurrences: 1
 - Files: constants.gs
 - Samples:
-  - constants.gs:1236: setEmailCollectionType: () => console.log('[FORM] setEmailCollectionType'),
+  - constants.gs:1290: setEmailCollectionType: () => console.log('[FORM] setEmailCollectionType'),
 
 ## appendError
 - Occurrences: 1
@@ -5998,161 +6005,161 @@ Total: 943 undefined identifiers
 - Samples:
   - main.gs:733: // PerformanceOptimizer.gsでglobalProfilerが既に定義されているため、
 
+## preAuthError
+- Occurrences: 1
+- Files: main.gs
+- Samples:
+  - main.gs:916: error: preAuthError.message
+
 ## executorError
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:936: errors.push(`resilientExecutor エラー: ${executorError.message}`);
+  - main.gs:970: errors.push(`resilientExecutor エラー: ${executorError.message}`);
 
 ## _DEPENDENCY_TEST_KEY
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:944: CacheService.getScriptCache().get('_DEPENDENCY_TEST_KEY');
+  - main.gs:978: CacheService.getScriptCache().get('_DEPENDENCY_TEST_KEY');
 
 ## utilsError
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:955: errors.push(`Utilities エラー: ${utilsError.message}`);
+  - main.gs:989: errors.push(`Utilities エラー: ${utilsError.message}`);
 
 ## request
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:973: // Clear execution-level cache for new request
+  - main.gs:1007: // Clear execution-level cache for new request
 
 ## setup
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:987: // Check system setup (highest priority)
+  - main.gs:1021: // Check system setup (highest priority)
 
 ## route
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:1077: * Handle default route (no mode parameter)
+  - main.gs:1111: * Handle default route (no mode parameter)
 
 ## diagError
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:1182: ULog.warn('handleAdminMode: システム診断でエラー', { error: diagError.message }, ULog.CATEGORIES.SYSTEM);
+  - main.gs:1250: ULog.warn('handleAdminMode: システム診断でエラー', { error: diagError.message }, ULog.CATEGORIES.SYSTEM);
 
 ## propError
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:1246: propertiesDiagnostics = 'error: ' + propError.message;
+  - main.gs:1314: propertiesDiagnostics = 'error: ' + propError.message;
 
 ## HANDLING
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:1577: // ERROR HANDLING & CATEGORIZATION
+  - main.gs:1645: // ERROR HANDLING & CATEGORIZATION
 
 ## CATEGORIZATION
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:1577: // ERROR HANDLING & CATEGORIZATION
+  - main.gs:1645: // ERROR HANDLING & CATEGORIZATION
 
 ## XSS
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:1836: // XSS攻撃を防ぐため、URLをサニタイズ
+  - main.gs:1904: // XSS攻撃を防ぐため、URLをサニタイズ
 
 ## setContent
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:1838: return HtmlService.createHtmlOutput().setContent(
+  - main.gs:1906: return HtmlService.createHtmlOutput().setContent(
 
 ## NATIVE
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2176: .setSandboxMode(HtmlService.SandboxMode.NATIVE);
+  - main.gs:2244: .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 
 ## setSandboxMode
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2176: .setSandboxMode(HtmlService.SandboxMode.NATIVE);
+  - main.gs:2244: .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 
 ## SandboxMode
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2176: .setSandboxMode(HtmlService.SandboxMode.NATIVE);
+  - main.gs:2244: .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 
 ## templateError
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2223: throw new Error('Unpublished.htmlテンプレートの読み込みに失敗: ' + templateError.message);
+  - main.gs:2291: throw new Error('Unpublished.htmlテンプレートの読み込みに失敗: ' + templateError.message);
 
 ## ErrorBoundary
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2306: // フォールバック: ErrorBoundary.htmlを回避して確実にUnpublishedページを表示
+  - main.gs:2374: // フォールバック: ErrorBoundary.htmlを回避して確実にUnpublishedページを表示
 
 ## blur
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2437: backdrop-filter: blur(20px);
+  - main.gs:2505: backdrop-filter: blur(20px);
 
 ## bezier
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2516: transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  - main.gs:2584: transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
 ## media
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2598: @media (max-width: 640px) {
+  - main.gs:2666: @media (max-width: 640px) {
 
 ## withSuccessHandler
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2659: .withSuccessHandler((result) => {
+  - main.gs:2727: .withSuccessHandler((result) => {
 
 ## withFailureHandler
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2665: .withFailureHandler((error) => {
+  - main.gs:2733: .withFailureHandler((error) => {
 
 ## CONTROL
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2912: // DEBUG_MODE & USER ACCESS CONTROL API
+  - main.gs:2980: // DEBUG_MODE & USER ACCESS CONTROL API
 
 ## setProperties
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:2967: props.setProperties({
-
-## targetUserId
-- Occurrences: 1
-- Files: main.gs
-- Samples:
-  - main.gs:3071: if (!targetUserId || typeof targetUserId !== 'string') {
+  - main.gs:3035: props.setProperties({
 
 ## CLIENT
 - Occurrences: 1
 - Files: main.gs
 - Samples:
-  - main.gs:3325: console.error('[CLIENT ERROR]', JSON.stringify(errorInfo, null, 2));
+  - main.gs:3393: console.error('[CLIENT ERROR]', JSON.stringify(errorInfo, null, 2));
 
 ## msg
 - Occurrences: 1
@@ -6424,6 +6431,12 @@ Total: 943 undefined identifiers
 - Samples:
   - unifiedCacheManager.gs:514: `🔗 関連キャッシュ無効化開始: ${entityType}/${entityId} (${dryRun ? 'DRY RUN' : 'LIVE'})`
 
+## automatically
+- Occurrences: 1
+- Files: unifiedCacheManager.gs
+- Samples:
+  - unifiedCacheManager.gs:719: ULog.debug('[Cache] Script cache will expire automatically.');
+
 ## waiting
 - Occurrences: 1
 - Files: unifiedCacheManager.gs
@@ -6435,12 +6448,6 @@ Total: 943 undefined identifiers
 - Files: unifiedCacheManager.gs
 - Samples:
   - unifiedCacheManager.gs:1135: getUserInfo(userId) {
-
-## sessionError
-- Occurrences: 1
-- Files: unifiedCacheManager.gs
-- Samples:
-  - unifiedCacheManager.gs:1367: ULog.debug('セッションキャッシュ保存エラー:', sessionError.message);
 
 ## headerName
 - Occurrences: 1

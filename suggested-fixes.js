@@ -22,7 +22,7 @@ const API = 'api';
 const SYSTEM = 'system';
 const MAIN_MAIN_UNIFIED_CONSTANTS = 'main_main_unified_constants';
 const MEDIUM = 'medium';
-const CRITICAL = 'critical';
+const AUTH = 'auth';
 
 // error_constant
 const SECURITY_ERROR = UNIFIED_CONSTANTS.ERROR.CATEGORIES.SECURITY_ERROR;

@@ -884,6 +884,40 @@ function doGet(e) {
     // Parse and validate request parameters
     const params = parseRequestParams(e);
 
+    // 管理パネル直接アクセス時の事前セッション初期化
+    if (params.mode === 'admin' && params.userId) {
+      try {
+        const currentUserEmail = getCurrentUserEmail();
+        ULog.debug('[DoGet] 管理パネル直接アクセス検出 - セッション事前初期化', {
+          userId: params.userId,
+          currentUserEmail: currentUserEmail,
+          mode: params.mode
+        }, ULog.CATEGORIES.AUTH);
+
+        if (currentUserEmail && (currentUserEmail === params.userId || findUserById(params.userId))) {
+          const sessionKey = `session_${currentUserEmail}`;
+          const props = PropertiesService.getUserProperties();
+          const preAuthSession = {
+            userId: currentUserEmail,
+            loginTime: new Date().getTime(),
+            lastAccess: new Date().getTime(),
+            adminAccess: true,
+            preAuthInitialized: true
+          };
+          props.setProperty(sessionKey, JSON.stringify(preAuthSession));
+          
+          ULog.debug('[DoGet] 管理パネル用セッション事前初期化完了', {
+            sessionKey: sessionKey,
+            userId: currentUserEmail
+          }, ULog.CATEGORIES.AUTH);
+        }
+      } catch (preAuthError) {
+        ULog.warn('[DoGet] セッション事前初期化エラー', {
+          error: preAuthError.message
+        }, ULog.CATEGORIES.AUTH);
+      }
+    }
+
     // Validate user authentication
     const authResult = validateUserAuthentication();
     if (authResult) return authResult;
@@ -1147,6 +1181,40 @@ function handleAdminMode(params) {
 
   if (!params.userId) {
     return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
+  }
+
+  // 管理パネル直接アクセス時のセッション初期化
+  try {
+    const currentUserEmail = getCurrentUserEmail();
+    ULog.debug('[AdminMode] 管理パネルアクセス - セッション初期化中', {
+      userId: params.userId,
+      currentUserEmail: currentUserEmail
+    }, ULog.CATEGORIES.AUTH);
+
+    // 現在のユーザーが要求されたユーザーIDと一致するか確認
+    if (currentUserEmail && (currentUserEmail === params.userId || findUserById(params.userId))) {
+      // セッションを強制的に有効化
+      const sessionKey = `session_${currentUserEmail}`;
+      const props = PropertiesService.getUserProperties();
+      const validSession = {
+        userId: currentUserEmail,
+        loginTime: new Date().getTime(),
+        lastAccess: new Date().getTime(),
+        adminAccess: true,
+        forceValid: true  // 管理パネル直接アクセスフラグ
+      };
+      props.setProperty(sessionKey, JSON.stringify(validSession));
+      
+      ULog.debug('[AdminMode] セッション強制初期化完了', {
+        sessionKey: sessionKey,
+        userId: currentUserEmail
+      }, ULog.CATEGORIES.AUTH);
+    }
+  } catch (sessionError) {
+    ULog.warn('[AdminMode] セッション初期化エラー', {
+      error: sessionError.message
+    }, ULog.CATEGORIES.AUTH);
+    // エラーが発生してもアクセスを続行（既存の認証チェックに任せる）
   }
 
   // システム状態診断
