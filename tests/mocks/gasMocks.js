@@ -105,23 +105,23 @@ global.ULog = {
 // 統一レスポンス関数 モック
 global.createSuccessResponse = jest.fn((data = null, message = null) => ({
   success: true,
-  data: data,
-  message: message,
+  data,
+  message,
   error: null
 }));
 
 global.createErrorResponse = jest.fn((error, message = null, data = null) => ({
   success: false,
-  data: data,
-  message: message,
-  error: error
+  data,
+  message,
+  error
 }));
 
 global.createUnifiedResponse = jest.fn((success, data = null, message = null, error = null) => ({
-  success: success,
-  data: data,
-  message: message,
-  error: error
+  success,
+  data,
+  message,
+  error
 }));
 
 // 統一キャッシュマネージャー モック

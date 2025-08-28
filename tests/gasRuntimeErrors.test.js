@@ -8,8 +8,8 @@ const path = require('path');
 
 describe('GAS Runtime Error Detection', () => {
   let allGasFiles = [];
-  let allDefinitions = new Set(); // すべての定義済み識別子
-  let allReferences = new Map(); // すべての参照 key: 識別子, value: [{file, line, context}]
+  const allDefinitions = new Set(); // すべての定義済み識別子
+  const allReferences = new Map(); // すべての参照 key: 識別子, value: [{file, line, context}]
   
   // GASビルトイン関数・オブジェクト
   const GAS_BUILTINS = new Set([
@@ -200,8 +200,8 @@ describe('GAS Runtime Error Detection', () => {
         `## ${error.identifier}\n` +
         `- Occurrences: ${error.occurrences}\n` +
         `- Files: ${error.files.join(', ')}\n` +
-        `- Samples:\n` +
-        error.samples.map(s => `  - ${s.file}:${s.line}: ${s.context}`).join('\n')
+        `- Samples:\n${ 
+        error.samples.map(s => `  - ${s.file}:${s.line}: ${s.context}`).join('\n')}`
       ).join('\n\n');
       
       fs.writeFileSync(

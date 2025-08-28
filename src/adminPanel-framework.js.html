@@ -207,14 +207,31 @@
   // マルチテナント対応: ユーザーIDの安全な初期化
   var userId = '';
 
+  // 重複初期化防止フラグ
+  let isInitializingUserId = false;
+  let userIdInitialized = false;
+
   // マルチテナント対応: バックエンドから安全にユーザーIDを取得
   function initializeUserId() {
+    // 重複初期化防止
+    if (isInitializingUserId) {
+      console.warn('⚠️ UserId initialization already in progress, skipping duplicate call');
+      return Promise.reject(new Error('初期化が既に進行中です'));
+    }
+    
+    if (userIdInitialized && userId) {
+      console.log('✅ UserId already initialized:', userId);
+      return Promise.resolve(userId);
+    }
+
+    isInitializingUserId = true;
     console.group('🔐 Initializing UserId');
     logDebug('📞 About to call getCurrentUserStatus');
 
     return new Promise((resolve, reject) => {
       google.script.run
         .withSuccessHandler((response) => {
+          isInitializingUserId = false;
           logDebug('📥 getCurrentUserStatus response:', response);
 
           if (
@@ -224,6 +241,7 @@
             response.userInfo.userId
           ) {
             userId = response.userInfo.userId;
+            userIdInitialized = true;
             logDebug('✅ AdminPanel: User authenticated, userId:', userId);
             console.groupEnd();
             resolve(userId);
@@ -235,6 +253,7 @@
           }
         })
         .withFailureHandler((error) => {
+          isInitializingUserId = false;
           console.error('❌ Backend error getting userId:', error);
           console.error('❌ Error type:', typeof error);
           console.error('❌ Error details:', error);
@@ -245,30 +264,110 @@
     });
   }
 
-  // リトライ付きユーザーID取得
-  async function initializeUserIdWithRetry(maxRetries = 3, delay = 1000) {
+  // リトライ付きユーザーID取得（改善版）
+  async function initializeUserIdWithRetry(maxRetries = 3, baseDelay = 1000) {
+    let lastError = null;
+    
     for (let i = 0; i < maxRetries; i++) {
       try {
+        // 既に初期化済みの場合は即座に返す
+        if (userIdInitialized && userId) {
+          console.log('✅ UserId already available, skipping retry logic');
+          return userId;
+        }
+
         return await initializeUserId();
       } catch (error) {
+        lastError = error;
+        
+        // 重複初期化エラーの場合は短時間待機して再試行
+        if (error.message.includes('初期化が既に進行中です')) {
+          console.log(`⏱️ Waiting for ongoing initialization (attempt ${i + 1}/${maxRetries})`);
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+
         console.warn(
           `⚠️ UserId initialization failed (attempt ${i + 1}/${maxRetries}):`,
           error.message
         );
+        
         if (i < maxRetries - 1) {
-          console.log(`🔄 Retrying in ${delay}ms...`);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          delay = Math.min(delay * 1.5, 5000); // 指数バックオフ（最大5秒）
-        } else {
-          console.error('❌ All userId initialization attempts failed');
-          throw error;
+          const delay = baseDelay * Math.pow(2, i); // 指数バックオフ
+          const maxDelay = 8000; // 最大8秒
+          const actualDelay = Math.min(delay, maxDelay);
+          
+          console.log(`🔄 Retrying in ${actualDelay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, actualDelay));
         }
       }
     }
+    
+    console.error('❌ All userId initialization attempts failed');
+    throw new Error(`ユーザーIDの取得に失敗しました: ${lastError?.message || '不明なエラー'}`);
   }
 
   // ユーザーID取得の完了を待つPromise（リトライ機構付き）
-  const userIdPromise = initializeUserIdWithRetry();
+  const userIdPromise = initializeUserIdWithRetry().catch((error) => {
+    console.error('🚨 Critical: UserID initialization completely failed:', error);
+    // ユーザーへのメッセージを表示
+    const errorMessage = '認証に失敗しました。ブラウザを更新してもう一度お試しください。';
+    showMessage && showMessage(errorMessage, 'error');
+    
+    // デバッグ情報を提供
+    console.group('🔧 Debug Information');
+    console.log('Browser:', navigator.userAgent);
+    console.log('Current URL:', window.location.href);
+    console.log('Google Script Host:', 'script.google.com');
+    console.groupEnd();
+    
+    throw error;
+  });
+
+  // =============================================================================
+  // GLOBAL ERROR HANDLING - Enhanced
+  // =============================================================================
+  
+  // グローバル未処理エラーハンドリングを強化
+  window.addEventListener('error', (event) => {
+    console.error('🚨 Global Error:', {
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      error: event.error
+    });
+    
+    // UI更新エラーを除き、ユーザーに通知
+    if (!event.message?.includes('UI') && !event.message?.includes('DOM')) {
+      showMessage && showMessage('予期しないエラーが発生しました', 'error');
+    }
+  });
+
+  // 未処理のPromise拒否の強化ハンドリング
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('🚨 Unhandled promise rejection:', event.reason);
+    
+    // 認証関連のエラーの場合は詳細な情報を提供
+    if (event.reason?.message?.includes('ユーザーID') || 
+        event.reason?.message?.includes('認証') ||
+        event.reason?.message?.includes('初期化')) {
+      console.group('🔍 Authentication Error Analysis');
+      console.log('Error details:', event.reason);
+      console.log('Is online:', navigator.onLine);
+      console.log('Current timestamp:', new Date().toISOString());
+      console.groupEnd();
+      
+      // フィードバックUI用の情報
+      logError('Unhandled authentication error', {
+        reason: event.reason?.message || 'Unknown error',
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      });
+    }
+    
+    event.preventDefault(); // デフォルトの動作を防ぐ
+  });
 
   // =============================================================================
   // CORE INITIALIZATION FUNCTIONS

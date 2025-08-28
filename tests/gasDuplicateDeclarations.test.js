@@ -8,7 +8,7 @@ const path = require('path');
 
 describe('GAS Duplicate Declarations Test', () => {
   let allGasFiles = [];
-  let globalDeclarations = new Map(); // key: 識別子名, value: [{file, line, type}]
+  const globalDeclarations = new Map(); // key: 識別子名, value: [{file, line, type}]
 
   beforeAll(() => {
     // 全.gsファイルを読み込み
@@ -108,7 +108,7 @@ describe('GAS Duplicate Declarations Test', () => {
         if (uniqueFiles.size > 1) {
           duplicates.push({
             name,
-            declarations: declarations
+            declarations
           });
         }
       }
@@ -126,7 +126,7 @@ describe('GAS Duplicate Declarations Test', () => {
         });
       });
       
-      console.log('\n' + '=' .repeat(60));
+      console.log(`\n${  '=' .repeat(60)}`);
       console.log(`合計: ${duplicates.length}個の重複宣言\n`);
       
       // 詳細レポートを生成

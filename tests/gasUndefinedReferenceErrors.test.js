@@ -8,8 +8,8 @@ const path = require('path');
 
 describe('GAS Undefined Reference Error Tests', () => {
   let allGasFiles = [];
-  let definedFunctions = new Set();
-  let referencedFunctions = new Set();
+  const definedFunctions = new Set();
+  const referencedFunctions = new Set();
 
   beforeAll(() => {
     // 全.gsファイルを読み込み

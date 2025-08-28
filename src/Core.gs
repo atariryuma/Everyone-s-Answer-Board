@@ -2432,17 +2432,23 @@ function getCurrentUserStatus(requestUserId) {
     }
 
     if (!userInfo) {
-      return createErrorResponse('USER_NOT_FOUND', 'ユーザー情報が見つかりません。', null);
+      return {
+        status: 'error',
+        error: 'USER_NOT_FOUND',
+        message: 'ユーザー情報が見つかりません。'
+      };
     }
 
-    return createSuccessResponse({
+    // フロントエンドが期待する形式に統一
+    return {
+      status: 'success',
       userInfo: {
         userId: userInfo.userId,
         adminEmail: userInfo.adminEmail,
         isActive: userInfo.isActive,
         lastAccessedAt: userInfo.lastAccessedAt,
-      },
-    });
+      }
+    };
   } catch (e) {
     logError(
       e,
@@ -2451,7 +2457,11 @@ function getCurrentUserStatus(requestUserId) {
       UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM,
       { userId }
     );
-    return createErrorResponse(e.message, 'ステータス取得に失敗しました: ' + e.message, null);
+    return {
+      status: 'error',
+      error: e.message,
+      message: 'ステータス取得に失敗しました: ' + e.message
+    };
   }
 }
 
