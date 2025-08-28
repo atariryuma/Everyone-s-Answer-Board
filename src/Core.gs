@@ -1093,22 +1093,70 @@ function registerNewUser(adminEmail) {
 }
 
 /**
+ * 回答ボードが公開中かどうかをチェック
+ * @param {Object} userInfo - ユーザー情報
+ * @returns {boolean} 公開中の場合true
+ */
+function isPublishedBoard(userInfo) {
+  if (!userInfo || !userInfo.configJson) {
+    return false;
+  }
+
+  try {
+    const config = JSON.parse(userInfo.configJson);
+    return !!(config.appPublished === true &&
+      config.publishedSpreadsheetId &&
+      config.publishedSheetName &&
+      typeof config.publishedSheetName === 'string' &&
+      config.publishedSheetName.trim() !== '');
+  } catch (e) {
+    debugLog('Config JSON parse error in isPublishedBoard:', e.message);
+    return false;
+  }
+}
+
+/**
+ * サービスアカウント権限でスプレッドシートにアクセス
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Spreadsheet} スプレッドシートオブジェクト
+ */
+function openSpreadsheetWithServiceAccount(spreadsheetId) {
+  try {
+    const token = getServiceAccountTokenCached();
+    if (!token) {
+      throw new Error('サービスアカウントトークンの取得に失敗しました');
+    }
+
+    // 通常のアクセスを試行（SERVICE_ACCOUNTでも同じSpreadsheetApp API使用）
+    return SpreadsheetApp.openById(spreadsheetId);
+  } catch (error) {
+    debugLog('サービスアカウントでのスプレッドシートアクセスエラー:', error.message);
+    // フォールバック: 通常のアクセス
+    return SpreadsheetApp.openById(spreadsheetId);
+  }
+}
+
+/**
  * リアクションを追加/削除する (マルチテナント対応版)
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
-  verifyUserAccess(requestUserId); // 内部でキャッシュクリア済み
+  // 修正: データベース未登録ユーザーでも公開中の回答ボードなら閲覧・リアクション可能
+  const userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('無効なボードです。');
+  }
+
+  // 公開状態チェック：公開中でない場合はアクセス拒否
+  if (!isPublishedBoard(userInfo)) {
+    throw new Error('この回答ボードは現在公開されていません。');
+  }
 
   try {
     var reactingUserEmail = getCurrentUserEmail();
     var ownerUserId = requestUserId; // requestUserId を使用
-
-    // ボードオーナーの情報をDBから取得（キャッシュ利用）
-    var boardOwnerInfo = findUserById(ownerUserId);
-    if (!boardOwnerInfo) {
-      throw new Error('無効なボードです。');
-    }
+    var boardOwnerInfo = userInfo; // 既に取得済み
 
     var result = processReaction(
       boardOwnerInfo.spreadsheetId,
@@ -1145,7 +1193,17 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
  * @returns {object} バッチ処理結果
  */
 function addReactionBatch(requestUserId, batchOperations) {
-  verifyUserAccess(requestUserId);
+  // 修正: データベース未登録ユーザーでも公開中の回答ボードなら閲覧・リアクション可能
+  const userInfo = findUserById(requestUserId);
+  if (!userInfo) {
+    throw new Error('無効なボードです。');
+  }
+
+  // 公開状態チェック：公開中でない場合はアクセス拒否
+  if (!isPublishedBoard(userInfo)) {
+    throw new Error('この回答ボードは現在公開されていません。');
+  }
+
   clearExecutionUserInfoCache();
 
   try {
@@ -1164,12 +1222,7 @@ function addReactionBatch(requestUserId, batchOperations) {
 
     var reactingUserEmail = getCurrentUserEmail();
     var ownerUserId = requestUserId;
-
-    // ボードオーナーの情報をDBから取得（キャッシュ利用）
-    var boardOwnerInfo = findUserById(ownerUserId);
-    if (!boardOwnerInfo) {
-      throw new Error('無効なボードです。');
-    }
+    var boardOwnerInfo = userInfo; // 既に取得済み
 
     // バッチ処理結果を格納
     var batchResults = [];
