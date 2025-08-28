@@ -1,126 +1,126 @@
 # Runtime Errors Report
 
-Total: 944 undefined identifiers
+Total: 950 undefined identifiers
 
 ## debug
-- Occurrences: 620
+- Occurrences: 631
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, session-utils.gs, ulog.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUtilities.gs, url.gs
 - Samples:
-  - Core.gs:248: ULog.debug('🔍 getSetupStep: UI状態ベースのステップ判定開始', {
-  - Core.gs:262: ULog.debug('🔧 ステップ1判定: 手動停止による完全リセット', {
-  - Core.gs:271: ULog.debug('🔧 ステップ1判定: データソース未設定', {
+  - Core.gs:11: ULog.debug('📍 testConnection called - simple ping test');
+  - Core.gs:38: ULog.debug('🩺 diagnosticPing response:', JSON.stringify(response));
+  - Core.gs:46: ULog.debug('🎯 diagnosticMasterController: Master Controller integration test');
 
 ## ERROR
 - Occurrences: 590
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, database.gs, debugConfig.gs, lockManager.gs, main.gs, secretManager.gs, setup.gs, systemIntegrationManager.gs, ulog.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedUtilities.gs, unifiedValidationSystem.gs, url.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:34: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
-  - Core.gs:34: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
-  - Core.gs:35: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
+  - Core.gs:187: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
+  - Core.gs:187: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
+  - Core.gs:188: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
 
 ## ID
 - Occurrences: 380
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, session-utils.gs, setup.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs, url.gs
 - Samples:
-  - Core.gs:352: * @param {string} requestUserId - リクエスト元のユーザーID（オプション）
-  - Core.gs:382: configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
-  - Core.gs:583: * @param {string} userId - ユーザーID
+  - Core.gs:505: * @param {string} requestUserId - リクエスト元のユーザーID（オプション）
+  - Core.gs:535: configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
+  - Core.gs:736: * @param {string} userId - ユーザーID
 
 ## warn
 - Occurrences: 274
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, session-utils.gs, ulog.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUtilities.gs, url.gs
 - Samples:
-  - Core.gs:59: ULog.warn(`⚠️ MEDIUM SEVERITY [${context}]:`, errorInfo.message, errorInfo.metadata);
-  - Core.gs:224: ULog.warn('[WARN]', message, ...args);
-  - Core.gs:543: ULog.warn('configJson解析エラー:', parseError.message);
+  - Core.gs:212: ULog.warn(`⚠️ MEDIUM SEVERITY [${context}]:`, errorInfo.message, errorInfo.metadata);
+  - Core.gs:377: ULog.warn('[WARN]', message, ...args);
+  - Core.gs:696: ULog.warn('configJson解析エラー:', parseError.message);
 
 ## CATEGORIES
 - Occurrences: 261
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, resilientExecutor.gs, session-utils.gs, setup.gs, ulog.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:35: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
-  - Core.gs:35: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
-  - Core.gs:43: category = UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM,
+  - Core.gs:188: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
+  - Core.gs:188: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
+  - Core.gs:196: category = UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM,
 
 ## push
 - Occurrences: 219
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, session-utils.gs, systemIntegrationManager.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, validationMigration.gs
 - Samples:
-  - Core.gs:495: errors.push(`必須フィールド '${field}' が未定義です`);
-  - Core.gs:497: errors.push(
-  - Core.gs:505: errors.push("publishedSheetNameが不正な値 'true' になっています");
+  - Core.gs:648: errors.push(`必須フィールド '${field}' が未定義です`);
+  - Core.gs:650: errors.push(
+  - Core.gs:658: errors.push("publishedSheetNameが不正な値 'true' になっています");
 
 ## URL
 - Occurrences: 175
 - Files: Core.gs, config.gs, database.gs, main.gs, resilientExecutor.gs, session-utils.gs, unifiedCacheManager.gs, unifiedUtilities.gs, url.gs
 - Samples:
-  - Core.gs:431: !hasFormUrl; // フォームURL未設定
-  - Core.gs:2188: // アクティブシートのフォームURLを優先（未設定時のみグローバルにフォールバック）
-  - Core.gs:2200: // フォームURLの解決失敗は致命的ではない
+  - Core.gs:584: !hasFormUrl; // フォームURL未設定
+  - Core.gs:2341: // アクティブシートのフォームURLを優先（未設定時のみグローバルにフォールバック）
+  - Core.gs:2353: // フォームURLの解決失敗は致命的ではない
 
 ## toISOString
-- Occurrences: 154
+- Occurrences: 159
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, secretManager.gs, session-utils.gs, systemIntegrationManager.gs, ulog.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs, validationMigration.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:81: timestamp: new Date().toISOString(),
-  - Core.gs:97: timestamp: new Date().toISOString(),
-  - Core.gs:107: timestamp: new Date().toISOString(),
+  - Core.gs:15: timestamp: new Date().toISOString(),
+  - Core.gs:27: timestamp: new Date().toISOString(),
+  - Core.gs:87: dateHandling: new Date().toISOString(),
 
 ## SEVERITY
 - Occurrences: 149
 - Files: Core.gs, config.gs, constants.gs, main.gs, setup.gs, unifiedCacheManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:34: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
-  - Core.gs:34: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
-  - Core.gs:42: severity = UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
+  - Core.gs:187: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
+  - Core.gs:187: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
+  - Core.gs:195: severity = UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
 
 ## API
 - Occurrences: 122
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, resilientExecutor.gs, secretManager.gs, session-utils.gs, ulog.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, url.gs, validationMigration.gs, workflowValidation.gs
 - Samples:
   - Core.gs:3: * 主要な業務ロジックとAPI エンドポイント
-  - Core.gs:1185: // 通常のアクセスを試行（SERVICE_ACCOUNTでも同じSpreadsheetApp API使用）
-  - Core.gs:1224: // processReactionの戻り値から直接リアクション状態を取得（API呼び出し削減）
+  - Core.gs:1338: // 通常のアクセスを試行（SERVICE_ACCOUNTでも同じSpreadsheetApp API使用）
+  - Core.gs:1377: // processReactionの戻り値から直接リアクション状態を取得（API呼び出し削減）
 
 ## stringify
-- Occurrences: 105
+- Occurrences: 112
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, ulog.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedUtilities.gs, url.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:53: ULog.error(`🚨 CRITICAL ERROR [${context}]:`, JSON.stringify(errorInfo, null, 2));
-  - Core.gs:56: ULog.error(`❌ HIGH SEVERITY [${context}]:`, JSON.stringify(errorInfo, null, 2));
-  - Core.gs:387: configJson: JSON.stringify(configJson),
+  - Core.gs:38: ULog.debug('🩺 diagnosticPing response:', JSON.stringify(response));
+  - Core.gs:71: ULog.debug('🎯 diagnosticMasterController: Integration test result:', JSON.stringify(diagnosticData)
+  - Core.gs:108: ULog.debug('🔍 diagnosticFullTest: Sanitized result:', JSON.stringify(result));
 
 ## parse
 - Occurrences: 101
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, setup.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs
 - Samples:
-  - Core.gs:371: const configJson = JSON.parse(userInfo.configJson || '{}');
-  - Core.gs:540: config = JSON.parse(configJsonString);
-  - Core.gs:888: const config = JSON.parse(userInfo.configJson || '{}');
+  - Core.gs:524: const configJson = JSON.parse(userInfo.configJson || '{}');
+  - Core.gs:693: config = JSON.parse(configJsonString);
+  - Core.gs:1041: const config = JSON.parse(userInfo.configJson || '{}');
 
 ## includes
 - Occurrences: 95
 - Files: Core.gs, config.gs, database.gs, debugConfig.gs, main.gs, resilientExecutor.gs, secretManager.gs, systemIntegrationManager.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedUtilities.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:510: if (config.setupStatus && !validSetupStatuses.includes(config.setupStatus)) {
-  - Core.gs:5021: normalizedActualHeader.includes(normalizedConfigName) ||
-  - Core.gs:5022: normalizedConfigName.includes(normalizedActualHeader)
+  - Core.gs:663: if (config.setupStatus && !validSetupStatuses.includes(config.setupStatus)) {
+  - Core.gs:5191: normalizedActualHeader.includes(normalizedConfigName) ||
+  - Core.gs:5192: normalizedConfigName.includes(normalizedActualHeader)
 
 ## trim
-- Occurrences: 80
+- Occurrences: 81
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedUtilities.gs, url.gs
 - Samples:
-  - Core.gs:270: if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
-  - Core.gs:293: configJson.opinionHeader.trim() !== '' && // 意見列が設定済み
-  - Core.gs:295: configJson.activeSheetName.trim() !== ''; // アクティブシートが選択済み
+  - Core.gs:423: if (!userInfo || !userInfo.spreadsheetId || userInfo.spreadsheetId.trim() === '') {
+  - Core.gs:446: configJson.opinionHeader.trim() !== '' && // 意見列が設定済み
+  - Core.gs:448: configJson.activeSheetName.trim() !== ''; // アクティブシートが選択済み
 
 ## SYSTEM
 - Occurrences: 68
 - Files: Core.gs, config.gs, constants.gs, debugConfig.gs, main.gs, setup.gs, ulog.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:35: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
-  - Core.gs:43: category = UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM,
-  - Core.gs:344: UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM
+  - Core.gs:188: * @param {string} [category=UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM] エラーカテゴリ
+  - Core.gs:196: category = UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM,
+  - Core.gs:497: UNIFIED_CONSTANTS.ERROR.CATEGORIES.SYSTEM
 
 ## MAIN_MAIN_UNIFIED_CONSTANTS
 - Occurrences: 68
@@ -134,33 +134,33 @@ Total: 944 undefined identifiers
 - Occurrences: 52
 - Files: Core.gs, config.gs, constants.gs, main.gs, setup.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:34: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
-  - Core.gs:42: severity = UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
-  - Core.gs:58: case UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM:
+  - Core.gs:187: * @param {string} [severity=UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM] エラーの重要度
+  - Core.gs:195: severity = UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM,
+  - Core.gs:211: case UNIFIED_CONSTANTS.ERROR.SEVERITY.MEDIUM:
 
 ## forEach
 - Occurrences: 49
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, session-utils.gs, systemIntegrationManager.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedUtilities.gs
 - Samples:
-  - Core.gs:1360: processedRows.forEach(function (rowIndex) {
-  - Core.gs:3540: REACTION_KEYS.forEach(function (key) {
-  - Core.gs:3568: REACTION_KEYS.forEach(function (key) {
+  - Core.gs:1513: processedRows.forEach(function (rowIndex) {
+  - Core.gs:3710: REACTION_KEYS.forEach(function (key) {
+  - Core.gs:3738: REACTION_KEYS.forEach(function (key) {
 
 ## remove
 - Occurrences: 45
 - Files: Core.gs, config.gs, database.gs, session-utils.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs
 - Samples:
-  - Core.gs:1013: CacheService.getScriptCache().remove('user_' + userId);
-  - Core.gs:1014: CacheService.getScriptCache().remove('email_' + adminEmail);
-  - Core.gs:3444: cacheManager.remove(cacheKey);
+  - Core.gs:1166: CacheService.getScriptCache().remove('user_' + userId);
+  - Core.gs:1167: CacheService.getScriptCache().remove('email_' + adminEmail);
+  - Core.gs:3614: cacheManager.remove(cacheKey);
 
 ## getScriptProperties
 - Occurrences: 44
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, secretManager.gs, setup.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:4368: var props = PropertiesService.getScriptProperties();
-  - Core.gs:5352: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
-  - Core.gs:5371: var props = PropertiesService.getScriptProperties();
+  - Core.gs:4538: var props = PropertiesService.getScriptProperties();
+  - Core.gs:5522: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+  - Core.gs:5541: var props = PropertiesService.getScriptProperties();
 
 ## AUTH
 - Occurrences: 44
@@ -174,8 +174,8 @@ Total: 944 undefined identifiers
 - Occurrences: 43
 - Files: Core.gs, autoInit.gs, config.gs, constants.gs, main.gs, systemIntegrationManager.gs, ulog.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs, validationMigration.gs
 - Samples:
-  - Core.gs:52: case UNIFIED_CONSTANTS.ERROR.SEVERITY.CRITICAL:
-  - Core.gs:53: ULog.error(`🚨 CRITICAL ERROR [${context}]:`, JSON.stringify(errorInfo, null, 2));
+  - Core.gs:205: case UNIFIED_CONSTANTS.ERROR.SEVERITY.CRITICAL:
+  - Core.gs:206: ULog.error(`🚨 CRITICAL ERROR [${context}]:`, JSON.stringify(errorInfo, null, 2));
   - autoInit.gs:72: if (securityCheck.overallStatus === 'CRITICAL') {
 
 ## tests
@@ -190,17 +190,17 @@ Total: 944 undefined identifiers
 - Occurrences: 40
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, secretManager.gs, session-utils.gs, setup.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:4370: props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
-  - Core.gs:5352: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
-  - Core.gs:5372: var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+  - Core.gs:4540: props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
+  - Core.gs:5522: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+  - Core.gs:5542: var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
 
 ## toLowerCase
 - Occurrences: 37
 - Files: Core.gs, config.gs, database.gs, main.gs, resilientExecutor.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:1107: messageText.toLowerCase().indexOf('duplicate') !== -1
-  - Core.gs:4830: processedRow.isHighlighted = row[highlightIndex].toString().toLowerCase() === 'true';
-  - Core.gs:5000: var normalizedConfigName = configHeaderName.toLowerCase().trim();
+  - Core.gs:1260: messageText.toLowerCase().indexOf('duplicate') !== -1
+  - Core.gs:5000: processedRow.isHighlighted = row[highlightIndex].toString().toLowerCase() === 'true';
+  - Core.gs:5170: var normalizedConfigName = configHeaderName.toLowerCase().trim();
 
 ## manager
 - Occurrences: 37
@@ -210,45 +210,45 @@ Total: 944 undefined identifiers
   - unifiedCacheManager.gs:2005: this.manager.remove(`userinfo_${identifier}`);
   - unifiedCacheManager.gs:2006: this.manager.remove(`unified_user_info_${identifier}`);
 
+## map
+- Occurrences: 36
+- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, session-utils.gs, systemIntegrationManager.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, validationMigration.gs
+- Samples:
+  - Core.gs:134: return data.map(item => sanitizeResponse(item));
+  - Core.gs:2021: var processedData = rawNewData.map(function (row, idx) {
+  - Core.gs:2091: return sheets.map(function (sheet) {
+
+## substring
+- Occurrences: 36
+- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, session-utils.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs
+- Samples:
+  - Core.gs:276: value: typeof value === 'string' ? value.substring(0, 100) : String(value).substring(0, 100),
+  - Core.gs:276: value: typeof value === 'string' ? value.substring(0, 100) : String(value).substring(0, 100),
+  - Core.gs:2274: opinionValue.substring(0, 50),
+
 ## toString
 - Occurrences: 35
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, resilientExecutor.gs, session-utils.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, url.gs
 - Samples:
-  - Core.gs:1104: var messageText = (e && (e.message || e.toString())) || '';
-  - Core.gs:2074: var reactionString = row.originalData[columnIndex].toString();
-  - Core.gs:3968: details: error.toString(),
-
-## map
-- Occurrences: 35
-- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, session-utils.gs, systemIntegrationManager.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, validationMigration.gs
-- Samples:
-  - Core.gs:1868: var processedData = rawNewData.map(function (row, idx) {
-  - Core.gs:1938: return sheets.map(function (sheet) {
-  - Core.gs:2016: return rawData.map(function (row, index) {
-
-## substring
-- Occurrences: 34
-- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs, session-utils.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs
-- Samples:
-  - Core.gs:123: value: typeof value === 'string' ? value.substring(0, 100) : String(value).substring(0, 100),
-  - Core.gs:123: value: typeof value === 'string' ? value.substring(0, 100) : String(value).substring(0, 100),
-  - Core.gs:2121: opinionValue.substring(0, 50),
+  - Core.gs:1257: var messageText = (e && (e.message || e.toString())) || '';
+  - Core.gs:2227: var reactionString = row.originalData[columnIndex].toString();
+  - Core.gs:4138: details: error.toString(),
 
 ## sleep
 - Occurrences: 34
 - Files: Core.gs, config.gs, constants.gs, database.gs, resilientExecutor.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:1036: Utilities.sleep(stage.delay);
-  - Core.gs:3015: Utilities.sleep(500);
-  - Core.gs:4161: Utilities.sleep(1000); // フォーム連携完了を待つ
+  - Core.gs:1189: Utilities.sleep(stage.delay);
+  - Core.gs:3185: Utilities.sleep(500);
+  - Core.gs:4331: Utilities.sleep(1000); // フォーム連携完了を待つ
 
 ## DATABASE
 - Occurrences: 33
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, main.gs, unifiedCacheManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:88: UNIFIED_CONSTANTS.ERROR.CATEGORIES.DATABASE,
-  - Core.gs:105: category: UNIFIED_CONSTANTS.ERROR.CATEGORIES.DATABASE,
-  - Core.gs:634: UNIFIED_CONSTANTS.ERROR.CATEGORIES.DATABASE
+  - Core.gs:241: UNIFIED_CONSTANTS.ERROR.CATEGORIES.DATABASE,
+  - Core.gs:258: category: UNIFIED_CONSTANTS.ERROR.CATEGORIES.DATABASE,
+  - Core.gs:787: UNIFIED_CONSTANTS.ERROR.CATEGORIES.DATABASE
 
 ## replace
 - Occurrences: 33
@@ -262,9 +262,9 @@ Total: 944 undefined identifiers
 - Occurrences: 31
 - Files: Core.gs, config.gs, constants.gs, main.gs, setup.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:55: case UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH:
-  - Core.gs:56: ULog.error(`❌ HIGH SEVERITY [${context}]:`, JSON.stringify(errorInfo, null, 2));
-  - Core.gs:633: UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH,
+  - Core.gs:208: case UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH:
+  - Core.gs:209: ULog.error(`❌ HIGH SEVERITY [${context}]:`, JSON.stringify(errorInfo, null, 2));
+  - Core.gs:786: UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH,
 
 ## components
 - Occurrences: 31
@@ -286,23 +286,23 @@ Total: 944 undefined identifiers
 - Occurrences: 30
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, ulog.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:327: const stopTime = new Date(publishTime.getTime() + minutes * 60 * 1000);
-  - Core.gs:336: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
-  - Core.gs:336: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
+  - Core.gs:480: const stopTime = new Date(publishTime.getTime() + minutes * 60 * 1000);
+  - Core.gs:489: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
+  - Core.gs:489: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
 
 ## join
 - Occurrences: 30
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, session-utils.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:648: ULog.debug('📋 Auto-healing実行:', changes.join(', '));
-  - Core.gs:758: validation.errors.join(', '),
-  - Core.gs:765: ULog.info('✅ 状態遷移実行:', Object.keys(newValues).join(', '));
+  - Core.gs:801: ULog.debug('📋 Auto-healing実行:', changes.join(', '));
+  - Core.gs:911: validation.errors.join(', '),
+  - Core.gs:918: ULog.info('✅ 状態遷移実行:', Object.keys(newValues).join(', '));
 
 ## DB
 - Occurrences: 30
 - Files: Core.gs, config.gs, constants.gs, database.gs, debugConfig.gs, ulog.gs
 - Samples:
-  - Core.gs:651: // DB更新失敗時は元の設定を返す
+  - Core.gs:804: // DB更新失敗時は元の設定を返す
   - config.gs:1220: // 変更をDBに反映
   - config.gs:2410: // 変更をpendingUpdatesに蓄積（DB書き込みはしない）
 
@@ -310,7 +310,7 @@ Total: 944 undefined identifiers
 - Occurrences: 30
 - Files: Core.gs, database.gs, secretManager.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:5339: return JSON.parse(response.getContentText());
+  - Core.gs:5509: return JSON.parse(response.getContentText());
   - database.gs:1322: 'Sheets API error: ' + response.getResponseCode() + ' - ' + response.getContentText()
   - database.gs:1326: return JSON.parse(response.getContentText());
 
@@ -318,8 +318,8 @@ Total: 944 undefined identifiers
 - Occurrences: 30
 - Files: Core.gs, config.gs, constants.gs, database.gs, secretManager.gs, session-utils.gs, ulog.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs, url.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:5365: * 1. GASスクリプトの編集権限を確認
-  - config.gs:3485: // GAS環境ではcommitAllChanges実行をtry-catch強化で最適化
+  - Core.gs:5535: * 1. GASスクリプトの編集権限を確認
+  - config.gs:3489: // GAS環境ではcommitAllChanges実行をtry-catch強化で最適化
   - constants.gs:1014: // JavaScript標準関数のGAS互換ポリフィル
 
 ## clearByPattern
@@ -366,31 +366,31 @@ Total: 944 undefined identifiers
 - Occurrences: 27
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, unifiedCacheManager.gs, unifiedSheetDataManager.gs, unifiedValidationSystem.gs, url.gs, validationMigration.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:1380: success: batchResults.filter((r) => r.success === true).length,
-  - Core.gs:1386: successCount: batchResults.filter((r) => r.success === true).length,
-  - Core.gs:4559: filteredData = processedData.filter(function (row) {
+  - Core.gs:1533: success: batchResults.filter((r) => r.success === true).length,
+  - Core.gs:1539: successCount: batchResults.filter((r) => r.success === true).length,
+  - Core.gs:4729: filteredData = processedData.filter(function (row) {
 
 ## DEBUG_MODE
 - Occurrences: 26
 - Files: Core.gs, constants.gs, debugConfig.gs, main.gs
 - Samples:
-  - Core.gs:5351: // PropertiesServiceでDEBUG_MODEが有効に設定されているかをチェック
-  - Core.gs:5352: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
+  - Core.gs:5521: // PropertiesServiceでDEBUG_MODEが有効に設定されているかをチェック
+  - Core.gs:5522: const debugMode = PropertiesService.getScriptProperties().getProperty('DEBUG_MODE') === 'true';
   - constants.gs:228: DEBUG_MODE: 'DEBUG_MODE',
 
 ## getScriptCache
 - Occurrences: 25
 - Files: Core.gs, config.gs, database.gs, main.gs, session-utils.gs, unifiedCacheManager.gs, unifiedUserManager.gs, url.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:1013: CacheService.getScriptCache().remove('user_' + userId);
-  - Core.gs:1014: CacheService.getScriptCache().remove('email_' + adminEmail);
-  - Core.gs:1095: CacheService.getScriptCache().put('user_' + userId, JSON.stringify(createdUser), 600); // 10分キャッシュ
+  - Core.gs:1166: CacheService.getScriptCache().remove('user_' + userId);
+  - Core.gs:1167: CacheService.getScriptCache().remove('email_' + adminEmail);
+  - Core.gs:1248: CacheService.getScriptCache().put('user_' + userId, JSON.stringify(createdUser), 600); // 10分キャッシュ
 
 ## HTML
 - Occurrences: 25
 - Files: Core.gs, constants.gs, main.gs, session-utils.gs, unifiedUtilities.gs
 - Samples:
-  - Core.gs:2413: // HTML依存関数（UI連携）
+  - Core.gs:2566: // HTML依存関数（UI連携）
   - constants.gs:510: * HTMLからアクセス可能な定数のサブセットを返す
   - main.gs:7: * HTML ファイルを読み込む include ヘルパー
 
@@ -406,25 +406,25 @@ Total: 944 undefined identifiers
 - Occurrences: 24
 - Files: Core.gs, config.gs, constants.gs, debugConfig.gs, main.gs, ulog.gs
 - Samples:
-  - Core.gs:248: ULog.debug('🔍 getSetupStep: UI状態ベースのステップ判定開始', {
-  - Core.gs:290: // Step 2 vs Step 3: UI設定状態に基づく判定
-  - Core.gs:2413: // HTML依存関数（UI連携）
+  - Core.gs:401: ULog.debug('🔍 getSetupStep: UI状態ベースのステップ判定開始', {
+  - Core.gs:443: // Step 2 vs Step 3: UI設定状態に基づく判定
+  - Core.gs:2566: // HTML依存関数（UI連携）
 
 ## indexOf
 - Occurrences: 24
 - Files: Core.gs, config.gs, database.gs, main.gs
 - Samples:
-  - Core.gs:1106: messageText.indexOf('既に登録されています') !== -1 ||
-  - Core.gs:1107: messageText.toLowerCase().indexOf('duplicate') !== -1
-  - Core.gs:2078: reacted = reactions.indexOf(currentUserEmail) !== -1;
+  - Core.gs:1259: messageText.indexOf('既に登録されています') !== -1 ||
+  - Core.gs:1260: messageText.toLowerCase().indexOf('duplicate') !== -1
+  - Core.gs:2231: reacted = reactions.indexOf(currentUserEmail) !== -1;
 
 ## getId
 - Occurrences: 24
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:2792: if (formParents.next().getId() === folder.getId()) {
-  - Core.gs:2792: if (formParents.next().getId() === folder.getId()) {
-  - Core.gs:2799: ULog.debug('📝 フォームファイルを移動中: %s → %s', formFile.getId(), folder.getName());
+  - Core.gs:2962: if (formParents.next().getId() === folder.getId()) {
+  - Core.gs:2962: if (formParents.next().getId() === folder.getId()) {
+  - Core.gs:2969: ULog.debug('📝 フォームファイルを移動中: %s → %s', formFile.getId(), folder.getName());
 
 ## HEADERS
 - Occurrences: 24
@@ -438,9 +438,9 @@ Total: 944 undefined identifiers
 - Occurrences: 23
 - Files: Core.gs, config.gs, main.gs
 - Samples:
-  - Core.gs:2653: form.setTitle(title);
-  - Core.gs:3777: classItem.setTitle(config.classQuestion.title);
-  - Core.gs:3782: nameItem.setTitle(config.nameQuestion.title);
+  - Core.gs:2823: form.setTitle(title);
+  - Core.gs:3947: classItem.setTitle(config.classQuestion.title);
+  - Core.gs:3952: nameItem.setTitle(config.nameQuestion.title);
 
 ## SHEET_NAME
 - Occurrences: 23
@@ -450,11 +450,19 @@ Total: 944 undefined identifiers
   - constants.gs:334: SHEET_NAME: 'DeleteLogs',
   - constants.gs:340: SHEET_NAME: 'DiagnosticLogs',
 
+## OK
+- Occurrences: 22
+- Files: Core.gs, constants.gs, secretManager.gs, systemIntegrationManager.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs
+- Samples:
+  - Core.gs:86: basicResponse: 'OK',
+  - constants.gs:1117: const performBasicHealthCheck = () => ({ status: 'ok', message: 'Basic health OK' });
+  - secretManager.gs:609: results.secretManagerStatus = 'OK';
+
 ## INFO
 - Occurrences: 22
 - Files: Core.gs, autoInit.gs, constants.gs, debugConfig.gs, ulog.gs, unifiedUtilities.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:232: ULog.info('[INFO]', message, ...args);
+  - Core.gs:385: ULog.info('[INFO]', message, ...args);
   - autoInit.gs:27: logLevel: 'INFO',
   - constants.gs:234: LOG_LEVEL: 'INFO',
 
@@ -462,9 +470,17 @@ Total: 944 undefined identifiers
 - Occurrences: 22
 - Files: Core.gs
 - Samples:
-  - Core.gs:3802: customConfig.enableClass &&
-  - Core.gs:3803: customConfig.classQuestion &&
-  - Core.gs:3804: customConfig.classQuestion.choices &&
+  - Core.gs:3972: customConfig.enableClass &&
+  - Core.gs:3973: customConfig.classQuestion &&
+  - Core.gs:3974: customConfig.classQuestion.choices &&
+
+## AdminPanel
+- Occurrences: 21
+- Files: Core.gs, config.gs, main.gs
+- Samples:
+  - Core.gs:60: coreLite: 'AdminPanel.core namespace active',
+  - Core.gs:100: variableConflict: 'RESOLVED - AdminPanel.core namespace implemented',
+  - Core.gs:2118: * AdminPanel.htmlから呼び出される
 
 ## startsWith
 - Occurrences: 21
@@ -472,7 +488,7 @@ Total: 944 undefined identifiers
 - Samples:
   - config.gs:399: key.startsWith('CURRENT_USER_ID_') &&
   - config.gs:1788: const sheetConfigKeys = Object.keys(configJson).filter((key) => key.startsWith('sheet_'));
-  - config.gs:3341: 利用可能な設定: Object.keys(configJson).filter((k) => k.startsWith('sheet_')),
+  - config.gs:3345: 利用可能な設定: Object.keys(configJson).filter((k) => k.startsWith('sheet_')),
 
 ## removeAll
 - Occurrences: 21
@@ -481,14 +497,6 @@ Total: 944 undefined identifiers
   - config.gs:422: // removeAll() はキー配列が必要なため、自動期限切れを利用
   - config.gs:1849: CacheService.getScriptCache().removeAll([
   - session-utils.gs:30: * - removeAll() がサポートされる環境では全面削除
-
-## OK
-- Occurrences: 21
-- Files: constants.gs, secretManager.gs, systemIntegrationManager.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs
-- Samples:
-  - constants.gs:1117: const performBasicHealthCheck = () => ({ status: 'ok', message: 'Basic health OK' });
-  - secretManager.gs:609: results.secretManagerStatus = 'OK';
-  - secretManager.gs:622: results.propertiesServiceStatus = 'OK';
 
 ## XFrameOptionsMode
 - Occurrences: 21
@@ -502,17 +510,17 @@ Total: 944 undefined identifiers
 - Occurrences: 20
 - Files: Core.gs, config.gs, database.gs
 - Samples:
-  - Core.gs:1422: return sheets[0].getName();
-  - Core.gs:1793: ULog.debug('DEBUG: Spreadsheet object obtained: %s', ss ? ss.getName() : 'null');
-  - Core.gs:1796: ULog.debug('DEBUG: Sheet object obtained: %s', sheet ? sheet.getName() : 'null');
+  - Core.gs:1575: return sheets[0].getName();
+  - Core.gs:1946: ULog.debug('DEBUG: Spreadsheet object obtained: %s', ss ? ss.getName() : 'null');
+  - Core.gs:1949: ULog.debug('DEBUG: Sheet object obtained: %s', sheet ? sheet.getName() : 'null');
 
 ## slice
 - Occurrences: 20
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, session-utils.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedUtilities.gs
 - Samples:
-  - Core.gs:2033: row.originalData ? JSON.stringify(row.originalData.slice(0, 5)) : 'undefined'
-  - Core.gs:2397: data: values.slice(1),
-  - Core.gs:4481: var dataRows = sheetData.slice(1);
+  - Core.gs:2186: row.originalData ? JSON.stringify(row.originalData.slice(0, 5)) : 'undefined'
+  - Core.gs:2550: data: values.slice(1),
+  - Core.gs:4651: var dataRows = sheetData.slice(1);
 
 ## criticalIssues
 - Occurrences: 20
@@ -522,13 +530,13 @@ Total: 944 undefined identifiers
   - database.gs:1852: diagnosticResult.summary.criticalIssues.push(
   - database.gs:1877: diagnosticResult.summary.criticalIssues.push(
 
-## AdminPanel
+## getEmail
 - Occurrences: 19
-- Files: Core.gs, config.gs, main.gs
+- Files: Core.gs, config.gs, secretManager.gs, setup.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:1965: * AdminPanel.htmlから呼び出される
-  - Core.gs:2211: appPublished: configJson.appPublished || false, // AdminPanel.htmlで使用される
-  - Core.gs:2213: allSheets: sheets, // AdminPanel.htmlで使用される
+  - Core.gs:29: activeUser: Session.getActiveUser().getEmail(),
+  - Core.gs:30: effectiveUser: Session.getEffectiveUser().getEmail()
+  - Core.gs:1591: * リクエストを投げたユーザー (Session.getActiveUser().getEmail()) が、
 
 ## unifiedResult
 - Occurrences: 19
@@ -542,15 +550,15 @@ Total: 944 undefined identifiers
 - Occurrences: 18
 - Files: Core.gs, config.gs, database.gs, main.gs
 - Samples:
-  - Core.gs:13: // ERROR_SEVERITY is defined in constants.gs
-  - Core.gs:18: // ERROR_CATEGORIES is defined in constants.gs
+  - Core.gs:166: // ERROR_SEVERITY is defined in constants.gs
+  - Core.gs:171: // ERROR_CATEGORIES is defined in constants.gs
   - config.gs:13: // EXECUTION_MAX_LIFETIME is defined in constants.gs
 
 ## test
 - Occurrences: 18
 - Files: Core.gs, config.gs, constants.gs, database.gs, secretManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
+  - Core.gs:339: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
   - config.gs:307: if (!spreadsheetIdPattern.test(userInfo.spreadsheetId)) {
   - config.gs:605: hasJapanese: /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(cleaned),
 
@@ -558,7 +566,7 @@ Total: 944 undefined identifiers
 - Occurrences: 18
 - Files: Core.gs, constants.gs, debugConfig.gs, ulog.gs, unifiedUtilities.gs, validationMigration.gs
 - Samples:
-  - Core.gs:224: ULog.warn('[WARN]', message, ...args);
+  - Core.gs:377: ULog.warn('[WARN]', message, ...args);
   - constants.gs:599: console.warn(`[WARN] ${functionName}: ${error.message}`, errorInfo);
   - constants.gs:824: logUnified('WARN', functionName, `試行${attempt}失敗、${waitTime}ms後に再試行`, {
 
@@ -566,9 +574,9 @@ Total: 944 undefined identifiers
 - Occurrences: 18
 - Files: Core.gs, config.gs, database.gs, main.gs, session-utils.gs, url.gs
 - Samples:
-  - Core.gs:1099: ULog.warn('registerNewUser: キャッシュ設定でエラー:', cacheError.message);
-  - Core.gs:3414: ULog.warn('ハイライト後のキャッシュ無効化エラー:', cacheError.message);
-  - Core.gs:3646: ULog.warn('リアクション後のキャッシュ無効化エラー:', cacheError.message);
+  - Core.gs:1252: ULog.warn('registerNewUser: キャッシュ設定でエラー:', cacheError.message);
+  - Core.gs:3584: ULog.warn('ハイライト後のキャッシュ無効化エラー:', cacheError.message);
+  - Core.gs:3816: ULog.warn('リアクション後のキャッシュ無効化エラー:', cacheError.message);
 
 ## SHEETS
 - Occurrences: 18
@@ -594,14 +602,6 @@ Total: 944 undefined identifiers
   - resilientExecutor.gs:56: const timeSinceLastFailure = Date.now() - this.circuitBreaker.lastFailureTime;
   - resilientExecutor.gs:57: if (timeSinceLastFailure < this.circuitBreaker.openTimeout) {
 
-## getEmail
-- Occurrences: 17
-- Files: Core.gs, config.gs, secretManager.gs, setup.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs
-- Samples:
-  - Core.gs:1438: * リクエストを投げたユーザー (Session.getActiveUser().getEmail()) が、
-  - config.gs:1991: const activeUserEmail = Session.getActiveUser().getEmail();
-  - config.gs:2045: const activeUserEmail = Session.getActiveUser().getEmail();
-
 ## deleteProperty
 - Occurrences: 17
 - Files: config.gs, constants.gs, database.gs, main.gs, session-utils.gs, unifiedCacheManager.gs
@@ -614,7 +614,7 @@ Total: 944 undefined identifiers
 - Occurrences: 17
 - Files: config.gs, constants.gs, main.gs, secretManager.gs, session-utils.gs, setup.gs, unifiedCacheManager.gs, unifiedUserManager.gs, workflowValidation.gs
 - Samples:
-  - config.gs:3849: props.setProperty('APPLICATION_ENABLED', enabledValue);
+  - config.gs:3853: props.setProperty('APPLICATION_ENABLED', enabledValue);
   - constants.gs:1150: props.setProperty(sessionKey, JSON.stringify(newSession));
   - constants.gs:1177: props.setProperty(sessionKey, JSON.stringify(session));
 
@@ -634,45 +634,53 @@ Total: 944 undefined identifiers
   - unifiedCacheManager.gs:132: if (enableMemoization && this.memoCache.has(key)) {
   - unifiedCacheManager.gs:134: const memoEntry = this.memoCache.get(key);
 
+## isArray
+- Occurrences: 16
+- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs
+- Samples:
+  - Core.gs:133: if (Array.isArray(data)) {
+  - Core.gs:1422: if (!Array.isArray(batchOperations) || batchOperations.length === 0) {
+  - Core.gs:4915: if (!Array.isArray(spreadsheet.sheets)) {
+
 ## VALIDATION
 - Occurrences: 16
 - Files: Core.gs, config.gs, constants.gs, main.gs, ulog.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:132: UNIFIED_CONSTANTS.ERROR.CATEGORIES.VALIDATION,
-  - config.gs:3678: UNIFIED_CONSTANTS.ERROR.CATEGORIES.VALIDATION
-  - config.gs:3697: UNIFIED_CONSTANTS.ERROR.CATEGORIES.VALIDATION
+  - Core.gs:285: UNIFIED_CONSTANTS.ERROR.CATEGORIES.VALIDATION,
+  - config.gs:3682: UNIFIED_CONSTANTS.ERROR.CATEGORIES.VALIDATION
+  - config.gs:3701: UNIFIED_CONSTANTS.ERROR.CATEGORIES.VALIDATION
 
 ## some
 - Occurrences: 16
 - Files: Core.gs, config.gs, database.gs, resilientExecutor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
-  - Core.gs:6656: if (spreadsheetInfo.sheets.some((sheet) => sheet.properties.title === commonName)) {
+  - Core.gs:339: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
+  - Core.gs:6837: if (spreadsheetInfo.sheets.some((sheet) => sheet.properties.title === commonName)) {
   - config.gs:786: return metadataPatterns.some((pattern) => headerLower.includes(pattern.toLowerCase()));
 
 ## openById
 - Occurrences: 16
 - Files: Core.gs, config.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:1186: return SpreadsheetApp.openById(spreadsheetId);
-  - Core.gs:1190: return SpreadsheetApp.openById(spreadsheetId);
-  - Core.gs:2650: var form = FormApp.openById(formId);
+  - Core.gs:1339: return SpreadsheetApp.openById(spreadsheetId);
+  - Core.gs:1343: return SpreadsheetApp.openById(spreadsheetId);
+  - Core.gs:2820: var form = FormApp.openById(formId);
 
 ## getRange
 - Occurrences: 16
 - Files: Core.gs, config.gs, unifiedSheetDataManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:1833: // getRange(row, column, numRows, numColumns)
-  - Core.gs:1836: var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
-  - Core.gs:1866: var headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
+  - Core.gs:1986: // getRange(row, column, numRows, numColumns)
+  - Core.gs:1989: var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
+  - Core.gs:2019: var headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
 
 ## AI
 - Occurrences: 16
 - Files: Core.gs
 - Samples:
-  - Core.gs:4492: // シート固有の設定を取得（最新のAI判定結果を反映）
-  - Core.gs:4496: // AI判定結果またはguessedConfigがある場合、それを優先使用
-  - Core.gs:4572: // AI判定結果またはシート設定からメイン質問を特定
+  - Core.gs:4662: // シート固有の設定を取得（最新のAI判定結果を反映）
+  - Core.gs:4666: // AI判定結果またはguessedConfigがある場合、それを優先使用
+  - Core.gs:4742: // AI判定結果またはシート設定からメイン質問を特定
 
 ## getUserProperties
 - Occurrences: 16
@@ -706,21 +714,21 @@ Total: 944 undefined identifiers
   - unifiedValidationSystem.gs:89: if (level === this.validationLevels.BASIC || level === this.validationLevels.STANDARD || level === t
   - unifiedValidationSystem.gs:95: if (level === this.validationLevels.STANDARD || level === this.validationLevels.COMPREHENSIVE) {
 
+## getActiveUser
+- Occurrences: 15
+- Files: Core.gs, config.gs, secretManager.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs
+- Samples:
+  - Core.gs:29: activeUser: Session.getActiveUser().getEmail(),
+  - Core.gs:1591: * リクエストを投げたユーザー (Session.getActiveUser().getEmail()) が、
+  - config.gs:1991: const activeUserEmail = Session.getActiveUser().getEmail();
+
 ## max
 - Occurrences: 15
 - Files: Core.gs, config.gs, database.gs, main.gs, unifiedCacheManager.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:334: remainingMinutes: Math.max(
-  - Core.gs:2567: return Math.max(0, lastRow - 1);
-  - Core.gs:2573: return Math.max(0, lastRow - 1);
-
-## isArray
-- Occurrences: 15
-- Files: Core.gs, config.gs, constants.gs, database.gs, main.gs
-- Samples:
-  - Core.gs:1269: if (!Array.isArray(batchOperations) || batchOperations.length === 0) {
-  - Core.gs:4745: if (!Array.isArray(spreadsheet.sheets)) {
-  - config.gs:3664: isArray: Array.isArray(newConfig),
+  - Core.gs:487: remainingMinutes: Math.max(
+  - Core.gs:2737: return Math.max(0, lastRow - 1);
+  - Core.gs:2743: return Math.max(0, lastRow - 1);
 
 ## gradient
 - Occurrences: 15
@@ -734,39 +742,31 @@ Total: 944 undefined identifiers
 - Occurrences: 14
 - Files: Core.gs, config.gs, constants.gs, resilientExecutor.gs, secretManager.gs, systemIntegrationManager.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedSheetDataManager.gs, unifiedValidationSystem.gs
 - Samples:
-  - Core.gs:24: constructor() {
+  - Core.gs:177: constructor() {
   - config.gs:22: constructor(requestUserId, userInfo) {
   - config.gs:2636: contextConstructor: context && context.constructor && context.constructor.name,
-
-## getActiveUser
-- Occurrences: 14
-- Files: Core.gs, config.gs, secretManager.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, unifiedValidationSystem.gs
-- Samples:
-  - Core.gs:1438: * リクエストを投げたユーザー (Session.getActiveUser().getEmail()) が、
-  - config.gs:1991: const activeUserEmail = Session.getActiveUser().getEmail();
-  - config.gs:2045: const activeUserEmail = Session.getActiveUser().getEmail();
 
 ## Z0
 - Occurrences: 14
 - Files: Core.gs, config.gs, constants.gs, database.gs, main.gs, secretManager.gs
 - Samples:
-  - Core.gs:3502: var formIdMatch = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-  - Core.gs:3508: var eFormIdMatch = url.match(/\/forms\/d\/e\/([a-zA-Z0-9-_]+)/);
+  - Core.gs:3672: var formIdMatch = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+  - Core.gs:3678: var eFormIdMatch = url.match(/\/forms\/d\/e\/([a-zA-Z0-9-_]+)/);
   - config.gs:306: const spreadsheetIdPattern = /^[a-zA-Z0-9-_]{44}$/;
 
 ## mainQuestion
 - Occurrences: 14
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3786: mainItem.setTitle(config.mainQuestion.title);
-  - Core.gs:3820: ? customConfig.mainQuestion.title
-  - Core.gs:3823: var questionType = customConfig.mainQuestion ? customConfig.mainQuestion.type : 'text';
+  - Core.gs:3956: mainItem.setTitle(config.mainQuestion.title);
+  - Core.gs:3990: ? customConfig.mainQuestion.title
+  - Core.gs:3993: var questionType = customConfig.mainQuestion ? customConfig.mainQuestion.type : 'text';
 
 ## entries
 - Occurrences: 13
 - Files: Core.gs, config.gs, constants.gs, systemIntegrationManager.gs, unifiedValidationSystem.gs, validationMigration.gs
 - Samples:
-  - Core.gs:493: for (const [field, expectedType] of Object.entries(requiredFields)) {
+  - Core.gs:646: for (const [field, expectedType] of Object.entries(requiredFields)) {
   - config.gs:396: for (const [key, value] of Object.entries(allProperties)) {
   - constants.gs:717: for (const [field, validators] of Object.entries(rules.fields)) {
 
@@ -774,47 +774,47 @@ Total: 944 undefined identifiers
 - Occurrences: 13
 - Files: Core.gs, config.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs, unifiedUserManager.gs, url.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:1095: CacheService.getScriptCache().put('user_' + userId, JSON.stringify(createdUser), 600); // 10分キャッシュ
-  - Core.gs:1096: CacheService.getScriptCache().put('email_' + adminEmail, JSON.stringify(createdUser), 600);
-  - Core.gs:6236: CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), cacheTtl);
+  - Core.gs:1248: CacheService.getScriptCache().put('user_' + userId, JSON.stringify(createdUser), 600); // 10分キャッシュ
+  - Core.gs:1249: CacheService.getScriptCache().put('email_' + adminEmail, JSON.stringify(createdUser), 600);
+  - Core.gs:6406: CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), cacheTtl);
 
 ## getSheetByName
 - Occurrences: 13
 - Files: Core.gs, config.gs, database.gs, main.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:1606: var sheet = spreadsheet.getSheetByName(publishedSheetName);
-  - Core.gs:1795: var sheet = ss.getSheetByName(publishedSheetName);
-  - Core.gs:2562: const sheet = openSpreadsheetOptimized(spreadsheetId).getSheetByName(sheetName);
+  - Core.gs:1759: var sheet = spreadsheet.getSheetByName(publishedSheetName);
+  - Core.gs:1948: var sheet = ss.getSheetByName(publishedSheetName);
+  - Core.gs:2732: const sheet = openSpreadsheetOptimized(spreadsheetId).getSheetByName(sheetName);
 
 ## fromCharCode
 - Occurrences: 13
 - Files: Core.gs, config.gs, database.gs, secretManager.gs
 - Samples:
-  - Core.gs:1614: 範囲: `A1:${String.fromCharCode(64 + lastColumn)}${lastRow}`,
-  - Core.gs:3386: var range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
-  - Core.gs:3544: var range = "'" + sheetName + "'!" + String.fromCharCode(65 + columnIndex) + rowIndex;
+  - Core.gs:1767: 範囲: `A1:${String.fromCharCode(64 + lastColumn)}${lastRow}`,
+  - Core.gs:3556: var range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
+  - Core.gs:3714: var range = "'" + sheetName + "'!" + String.fromCharCode(65 + columnIndex) + rowIndex;
 
 ## getValues
 - Occurrences: 13
 - Files: Core.gs, config.gs, unifiedSheetDataManager.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:1836: var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
-  - Core.gs:1866: var headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
-  - Core.gs:2576: const values = sheet.getRange(2, classIndex + 1, lastRow - 1, 1).getValues();
+  - Core.gs:1989: var rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
+  - Core.gs:2019: var headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
+  - Core.gs:2746: const values = sheet.getRange(2, classIndex + 1, lastRow - 1, 1).getValues();
 
 ## setRequired
 - Occurrences: 13
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3779: classItem.setRequired(true);
-  - Core.gs:3783: nameItem.setRequired(true);
-  - Core.gs:3787: mainItem.setRequired(true);
+  - Core.gs:3949: classItem.setRequired(true);
+  - Core.gs:3953: nameItem.setRequired(true);
+  - Core.gs:3957: mainItem.setRequired(true);
 
 ## SERVICE_ACCOUNT_CREDS
 - Occurrences: 13
 - Files: Core.gs, constants.gs, database.gs, main.gs, secretManager.gs, setup.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:4370: props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
+  - Core.gs:4540: props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
   - constants.gs:225: SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
   - constants.gs:225: SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
 
@@ -822,7 +822,7 @@ Total: 944 undefined identifiers
 - Occurrences: 13
 - Files: Core.gs, database.gs, secretManager.gs, unifiedCacheManager.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:5331: baseUrl: 'https://www.googleapis.com/drive/v3',
+  - Core.gs:5501: baseUrl: 'https://www.googleapis.com/drive/v3',
   - database.gs:1298: baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
   - database.gs:1303: 'https://sheets.googleapis.com/v4/spreadsheets/' +
 
@@ -830,7 +830,7 @@ Total: 944 undefined identifiers
 - Occurrences: 13
 - Files: Core.gs, database.gs, main.gs, setup.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:5372: var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+  - Core.gs:5542: var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
   - database.gs:2670: SCRIPT_PROPS_KEYS.ADMIN_EMAIL,
   - database.gs:2790: var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
 
@@ -878,7 +878,7 @@ Total: 944 undefined identifiers
 - Occurrences: 12
 - Files: Core.gs, main.gs, unifiedValidationSystem.gs, validationMigration.gs
 - Samples:
-  - Core.gs:470: const result = UnifiedValidation.validate('configuration', 'basic', { config });
+  - Core.gs:623: const result = UnifiedValidation.validate('configuration', 'basic', { config });
   - main.gs:1048: const result = UnifiedValidation.validate('authentication', 'basic', {
   - unifiedValidationSystem.gs:35: validate(category, level = this.validationLevels.STANDARD, options = {}) {
 
@@ -886,17 +886,17 @@ Total: 944 undefined identifiers
 - Occurrences: 12
 - Files: Core.gs, constants.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:823: reasonColumnIndex: indices[COLUMN_HEADERS.REASON],
-  - Core.gs:825: hasReasonColumn: indices[COLUMN_HEADERS.REASON] !== undefined,
-  - Core.gs:833: if (indices[COLUMN_HEADERS.REASON] === undefined) {
+  - Core.gs:976: reasonColumnIndex: indices[COLUMN_HEADERS.REASON],
+  - Core.gs:978: hasReasonColumn: indices[COLUMN_HEADERS.REASON] !== undefined,
+  - Core.gs:986: if (indices[COLUMN_HEADERS.REASON] === undefined) {
 
 ## EMAIL
 - Occurrences: 12
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:2046: var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
-  - Core.gs:2129: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]]
-  - Core.gs:2130: ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]]
+  - Core.gs:2199: var emailIndex = headerIndices[COLUMN_HEADERS.EMAIL];
+  - Core.gs:2282: row.originalData && row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]]
+  - Core.gs:2283: ? row.originalData[headerIndices[COLUMN_HEADERS.EMAIL]]
 
 ## rules
 - Occurrences: 12
@@ -926,15 +926,15 @@ Total: 944 undefined identifiers
 - Occurrences: 11
 - Files: Core.gs, config.gs, constants.gs, database.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:789: * @deprecated この関数は削除されました。unifiedCacheManager.gs の getSheetsServiceCached() を使用してください。
-  - Core.gs:792: // → unifiedCacheManager.gsの実装を使用してください
-  - Core.gs:868: // clearAllExecutionCache() は unifiedCacheManager.gs に統合済み
+  - Core.gs:942: * @deprecated この関数は削除されました。unifiedCacheManager.gs の getSheetsServiceCached() を使用してください。
+  - Core.gs:945: // → unifiedCacheManager.gsの実装を使用してください
+  - Core.gs:1021: // clearAllExecutionCache() は unifiedCacheManager.gs に統合済み
 
 ## A1
 - Occurrences: 11
 - Files: Core.gs, config.gs, database.gs
 - Samples:
-  - Core.gs:1614: 範囲: `A1:${String.fromCharCode(64 + lastColumn)}${lastRow}`,
+  - Core.gs:1767: 範囲: `A1:${String.fromCharCode(64 + lastColumn)}${lastRow}`,
   - config.gs:1543: const range = sheet.getRange('A1:Z10');
   - database.gs:137: appendSheetsData(service, dbId, `'${logSheetName}'!A1`, [
 
@@ -942,47 +942,47 @@ Total: 944 undefined identifiers
 - Occurrences: 11
 - Files: Core.gs, config.gs, constants.gs, main.gs, ulog.gs
 - Samples:
-  - Core.gs:2048: nameValue = row.originalData[emailIndex].split('@')[0];
-  - Core.gs:4937: .split(',')
-  - Core.gs:5320: return email.split('@')[1] || '';
+  - Core.gs:2201: nameValue = row.originalData[emailIndex].split('@')[0];
+  - Core.gs:5107: .split(',')
+  - Core.gs:5490: return email.split('@')[1] || '';
 
 ## UNDERSTAND
 - Occurrences: 11
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:2084: if (reactionKey === 'UNDERSTAND') count = row.understandCount || 0;
-  - Core.gs:2139: UNDERSTAND: checkReactionState('UNDERSTAND'),
-  - Core.gs:2139: UNDERSTAND: checkReactionState('UNDERSTAND'),
+  - Core.gs:2237: if (reactionKey === 'UNDERSTAND') count = row.understandCount || 0;
+  - Core.gs:2292: UNDERSTAND: checkReactionState('UNDERSTAND'),
+  - Core.gs:2292: UNDERSTAND: checkReactionState('UNDERSTAND'),
 
 ## LIKE
 - Occurrences: 11
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:2085: else if (reactionKey === 'LIKE') count = row.likeCount || 0;
-  - Core.gs:2140: LIKE: checkReactionState('LIKE'),
-  - Core.gs:2140: LIKE: checkReactionState('LIKE'),
+  - Core.gs:2238: else if (reactionKey === 'LIKE') count = row.likeCount || 0;
+  - Core.gs:2293: LIKE: checkReactionState('LIKE'),
+  - Core.gs:2293: LIKE: checkReactionState('LIKE'),
 
 ## CURIOUS
 - Occurrences: 11
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:2086: else if (reactionKey === 'CURIOUS') count = row.curiousCount || 0;
-  - Core.gs:2141: CURIOUS: checkReactionState('CURIOUS'),
-  - Core.gs:2141: CURIOUS: checkReactionState('CURIOUS'),
+  - Core.gs:2239: else if (reactionKey === 'CURIOUS') count = row.curiousCount || 0;
+  - Core.gs:2294: CURIOUS: checkReactionState('CURIOUS'),
+  - Core.gs:2294: CURIOUS: checkReactionState('CURIOUS'),
 
 ## getUrl
 - Occurrences: 11
 - Files: Core.gs, config.gs, main.gs, session-utils.gs, unifiedCacheManager.gs, url.gs
 - Samples:
-  - Core.gs:2973: folderUrl: folder ? folder.getUrl() : '',
-  - Core.gs:4207: spreadsheetUrl = spreadsheetObj.getUrl();
-  - Core.gs:4220: spreadsheetUrl = spreadsheetObj.getUrl();
+  - Core.gs:3143: folderUrl: folder ? folder.getUrl() : '',
+  - Core.gs:4377: spreadsheetUrl = spreadsheetObj.getUrl();
+  - Core.gs:4390: spreadsheetUrl = spreadsheetObj.getUrl();
 
 ## fetch
 - Occurrences: 11
 - Files: Core.gs, database.gs, resilientExecutor.gs, unifiedCacheManager.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:5336: var response = UrlFetchApp.fetch(url, {
+  - Core.gs:5506: var response = UrlFetchApp.fetch(url, {
   - database.gs:1407: const response = UrlFetchApp.fetch(url, {
   - database.gs:1466: const response = UrlFetchApp.fetch(url, {
 
@@ -1062,7 +1062,7 @@ Total: 944 undefined identifiers
 - Occurrences: 10
 - Files: Core.gs, config.gs, database.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:186: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
+  - Core.gs:339: return retryablePatterns.some((pattern) => pattern.test(coreErrorMessage));
   - config.gs:692: if (header === pattern.toLowerCase()) {
   - config.gs:695: if (header.includes(pattern.toLowerCase())) {
 
@@ -1070,25 +1070,25 @@ Total: 944 undefined identifiers
 - Occurrences: 10
 - Files: Core.gs, constants.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:824: opinionColumnIndex: indices[COLUMN_HEADERS.OPINION],
-  - Core.gs:826: hasOpinionColumn: indices[COLUMN_HEADERS.OPINION] !== undefined,
-  - Core.gs:838: if (indices[COLUMN_HEADERS.OPINION] === undefined) {
+  - Core.gs:977: opinionColumnIndex: indices[COLUMN_HEADERS.OPINION],
+  - Core.gs:979: hasOpinionColumn: indices[COLUMN_HEADERS.OPINION] !== undefined,
+  - Core.gs:991: if (indices[COLUMN_HEADERS.OPINION] === undefined) {
 
 ## Page
 - Occurrences: 10
 - Files: Core.gs
 - Samples:
-  - Core.gs:1196: * Page.htmlから呼び出される - フロントエンド期待形式に対応
-  - Core.gs:1508: * Page.htmlから呼び出される - フロントエンド期待形式に対応
-  - Core.gs:1632: // Page.html期待形式に変換
+  - Core.gs:1349: * Page.htmlから呼び出される - フロントエンド期待形式に対応
+  - Core.gs:1661: * Page.htmlから呼び出される - フロントエンド期待形式に対応
+  - Core.gs:1785: // Page.html期待形式に変換
 
 ## moveTo
 - Occurrences: 10
 - Files: Core.gs
 - Samples:
-  - Core.gs:2801: // 推奨メソッドmoveTo()を使用してファイル移動
-  - Core.gs:2802: formFile.moveTo(folder);
-  - Core.gs:2840: // 推奨メソッドmoveTo()を使用してファイル移動
+  - Core.gs:2971: // 推奨メソッドmoveTo()を使用してファイル移動
+  - Core.gs:2972: formFile.moveTo(folder);
+  - Core.gs:3010: // 推奨メソッドmoveTo()を使用してファイル移動
 
 ## resources
 - Occurrences: 10
@@ -1166,15 +1166,15 @@ Total: 944 undefined identifiers
 - Occurrences: 9
 - Files: Core.gs, config.gs, constants.gs, unifiedBatchProcessor.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:86: `database.${operation}`,
-  - Core.gs:93: ULog.error(`⚠️ LOGGING ERROR [database.${operation}]:`, {
-  - Core.gs:103: context: `database.${operation}`,
+  - Core.gs:239: `database.${operation}`,
+  - Core.gs:246: ULog.error(`⚠️ LOGGING ERROR [database.${operation}]:`, {
+  - Core.gs:256: context: `database.${operation}`,
 
 ## parseError
 - Occurrences: 9
 - Files: Core.gs, config.gs, database.gs, main.gs
 - Samples:
-  - Core.gs:543: ULog.warn('configJson解析エラー:', parseError.message);
+  - Core.gs:696: ULog.warn('configJson解析エラー:', parseError.message);
   - config.gs:2661: console.error('[ERROR]', '❌ Failed to recover context from JSON:', parseError.message);
   - database.gs:1540: throw new Error(`レスポンス解析失敗: ${parseError.message}`);
 
@@ -1182,31 +1182,31 @@ Total: 944 undefined identifiers
 - Occurrences: 9
 - Files: Core.gs, config.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:1609: var lastColumn = sheet.getLastColumn();
-  - Core.gs:1835: var lastColumn = sheet.getLastColumn();
-  - Core.gs:3470: var lastColumn = sheet.getLastColumn();
+  - Core.gs:1762: var lastColumn = sheet.getLastColumn();
+  - Core.gs:1988: var lastColumn = sheet.getLastColumn();
+  - Core.gs:3640: var lastColumn = sheet.getLastColumn();
 
 ## NAME
 - Occurrences: 9
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:1652: sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
-  - Core.gs:1850: sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
-  - Core.gs:4837: var nameIndex = headerIndices[COLUMN_HEADERS.NAME];
+  - Core.gs:1805: sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+  - Core.gs:2003: sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+  - Core.gs:5007: var nameIndex = headerIndices[COLUMN_HEADERS.NAME];
 
 ## getFileById
 - Occurrences: 9
 - Files: Core.gs
 - Samples:
-  - Core.gs:2782: var formFile = DriveApp.getFileById(formAndSsInfo.formId);
-  - Core.gs:2783: var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
-  - Core.gs:3720: const formFile = DriveApp.getFileById(form.getId());
+  - Core.gs:2952: var formFile = DriveApp.getFileById(formAndSsInfo.formId);
+  - Core.gs:2953: var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
+  - Core.gs:3890: const formFile = DriveApp.getFileById(form.getId());
 
 ## array
 - Occurrences: 9
 - Files: Core.gs, constants.gs, unifiedBatchProcessor.gs
 - Samples:
-  - Core.gs:4921: for (var i = array.length - 1; i > 0; i--) {
+  - Core.gs:5091: for (var i = array.length - 1; i > 0; i--) {
   - constants.gs:862: for (let i = 0; i < array.length; i += size) {
   - constants.gs:863: chunks.push(array.slice(i, i + size));
 
@@ -1214,7 +1214,7 @@ Total: 944 undefined identifiers
 - Occurrences: 9
 - Files: Core.gs, secretManager.gs, systemIntegrationManager.gs, unifiedSecurityManager.gs, validationMigration.gs
 - Samples:
-  - Core.gs:5161: 'mapConfigToActualHeaders: WARNING - No match found for %s = "%s"',
+  - Core.gs:5331: 'mapConfigToActualHeaders: WARNING - No match found for %s = "%s"',
   - secretManager.gs:669: results.criticalSecretsStatus = 'WARNING';
   - systemIntegrationManager.gs:251: healthResult.overallStatus = 'WARNING';
 
@@ -1278,57 +1278,57 @@ Total: 944 undefined identifiers
 - Occurrences: 8
 - Files: Core.gs, constants.gs, main.gs
 - Samples:
-  - Core.gs:61: case UNIFIED_CONSTANTS.ERROR.SEVERITY.LOW:
-  - Core.gs:62: ULog.info(`ℹ️ LOW SEVERITY [${context}]:`, errorInfo.message);
-  - Core.gs:131: UNIFIED_CONSTANTS.ERROR.SEVERITY.LOW,
+  - Core.gs:214: case UNIFIED_CONSTANTS.ERROR.SEVERITY.LOW:
+  - Core.gs:215: ULog.info(`ℹ️ LOW SEVERITY [${context}]:`, errorInfo.message);
+  - Core.gs:284: UNIFIED_CONSTANTS.ERROR.SEVERITY.LOW,
 
 ## floor
 - Occurrences: 8
 - Files: Core.gs, config.gs, database.gs, main.gs, resilientExecutor.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:336: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
-  - Core.gs:4922: var j = Math.floor(Math.random() * (i + 1));
+  - Core.gs:489: Math.floor((stopTime.getTime() - new Date().getTime()) / (1000 * 60))
+  - Core.gs:5092: var j = Math.floor(Math.random() * (i + 1));
   - config.gs:2617: num = Math.floor(num / 26);
 
 ## classQuestion
 - Occurrences: 8
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3777: classItem.setTitle(config.classQuestion.title);
-  - Core.gs:3778: classItem.setChoiceValues(config.classQuestion.choices);
-  - Core.gs:3804: customConfig.classQuestion.choices &&
+  - Core.gs:3947: classItem.setTitle(config.classQuestion.title);
+  - Core.gs:3948: classItem.setChoiceValues(config.classQuestion.choices);
+  - Core.gs:3974: customConfig.classQuestion.choices &&
 
 ## retryError
 - Occurrences: 8
 - Files: Core.gs, config.gs, database.gs
 - Samples:
-  - Core.gs:4229: ULog.warn(`❌ リトライ${retry + 1}回目失敗:`, retryError.message);
-  - config.gs:3071: console.error('[ERROR]', '❌ 強制リフレッシュリトライも失敗:', retryError.message);
-  - config.gs:3073: `Sheets APIサービスの復旧に完全に失敗しました。初期エラー: ${serviceError.message}, リトライエラー: ${retryError.message}`
+  - Core.gs:4399: ULog.warn(`❌ リトライ${retry + 1}回目失敗:`, retryError.message);
+  - config.gs:3075: console.error('[ERROR]', '❌ 強制リフレッシュリトライも失敗:', retryError.message);
+  - config.gs:3077: `Sheets APIサービスの復旧に完全に失敗しました。初期エラー: ${serviceError.message}, リトライエラー: ${retryError.message}`
 
 ## unifiedSecurityManager
 - Occurrences: 8
 - Files: Core.gs, constants.gs, secretManager.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:4256: // → unifiedSecurityManager.gsの実装を使用してください
-  - Core.gs:4318: // → unifiedSecurityManager.gsの実装を使用してください
-  - Core.gs:5381: // isDeployUser() は unifiedSecurityManager.gs に統合済み
+  - Core.gs:4426: // → unifiedSecurityManager.gsの実装を使用してください
+  - Core.gs:4488: // → unifiedSecurityManager.gsの実装を使用してください
+  - Core.gs:5551: // isDeployUser() は unifiedSecurityManager.gs に統合済み
 
 ## fallbackError
 - Occurrences: 8
 - Files: Core.gs, config.gs, main.gs, resilientExecutor.gs, session-utils.gs
 - Samples:
-  - Core.gs:4625: ULog.error('[ERROR]', 'フォールバック処理も失敗: ' + fallbackError.message);
-  - Core.gs:6670: ULog.warn('⚠️ フォールバックシート名検索に失敗:', fallbackError.message);
+  - Core.gs:4795: ULog.error('[ERROR]', 'フォールバック処理も失敗: ' + fallbackError.message);
+  - Core.gs:6851: ULog.warn('⚠️ フォールバックシート名検索に失敗:', fallbackError.message);
   - config.gs:2199: console.error('[ERROR]', '❌ フォールバック処理に失敗:', fallbackError.message);
 
 ## sheetError
 - Occurrences: 8
 - Files: Core.gs, config.gs, database.gs
 - Samples:
-  - Core.gs:5738: ULog.warn('⚠️ シートアクティベーション失敗（処理継続）:', sheetError.message);
-  - Core.gs:5743: error: sheetError.message,
-  - Core.gs:5949: ULog.warn('⚠️ QuickStartシートアクティベーション失敗（処理継続）:', sheetError.message);
+  - Core.gs:5908: ULog.warn('⚠️ シートアクティベーション失敗（処理継続）:', sheetError.message);
+  - Core.gs:5913: error: sheetError.message,
+  - Core.gs:6119: ULog.warn('⚠️ QuickStartシートアクティベーション失敗（処理継続）:', sheetError.message);
 
 ## setTimeout
 - Occurrences: 8
@@ -1336,7 +1336,7 @@ Total: 944 undefined identifiers
 - Samples:
   - config.gs:85: this.memoryMonitorTimer = setTimeout(() => {
   - config.gs:97: this.cleanupTimer = setTimeout(() => {
-  - config.gs:3914: setTimeout(() => {
+  - config.gs:3918: setTimeout(() => {
 
 ## clear
 - Occurrences: 8
@@ -1462,73 +1462,73 @@ Total: 944 undefined identifiers
 - Occurrences: 7
 - Files: Core.gs, database.gs, lockManager.gs
 - Samples:
-  - Core.gs:363: return executeWithStandardizedLock('WRITE_OPERATION', 'clearActiveSheet', () => {
-  - Core.gs:3530: return executeWithStandardizedLock('WRITE_OPERATION', 'processReaction', () => {
+  - Core.gs:516: return executeWithStandardizedLock('WRITE_OPERATION', 'clearActiveSheet', () => {
+  - Core.gs:3700: return executeWithStandardizedLock('WRITE_OPERATION', 'processReaction', () => {
   - database.gs:107: return executeWithStandardizedLock('WRITE_OPERATION', 'logAccountDeletion', () => {
 
 ## stage
 - Occurrences: 7
 - Files: Core.gs
 - Samples:
-  - Core.gs:1036: Utilities.sleep(stage.delay);
-  - Core.gs:1052: stage: stage.method,
-  - Core.gs:1067: stage: stage.method,
+  - Core.gs:1189: Utilities.sleep(stage.delay);
+  - Core.gs:1205: stage: stage.method,
+  - Core.gs:1220: stage: stage.method,
 
 ## CLASS
 - Occurrences: 7
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:1650: sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
-  - Core.gs:1848: sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
-  - Core.gs:2571: const classIndex = headerIndices[COLUMN_HEADERS.CLASS];
+  - Core.gs:1803: sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+  - Core.gs:2001: sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+  - Core.gs:2741: const classIndex = headerIndices[COLUMN_HEADERS.CLASS];
 
 ## ANONYMOUS
 - Occurrences: 7
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:1703: adminMode === true ? DISPLAY_MODES.NAMED : configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
-  - Core.gs:1820: displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
-  - Core.gs:1863: var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+  - Core.gs:1856: adminMode === true ? DISPLAY_MODES.NAMED : configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+  - Core.gs:1973: displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
+  - Core.gs:2016: var displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
 
 ## hasNext
 - Occurrences: 7
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:2791: while (formParents.hasNext()) {
-  - Core.gs:2826: while (ssParents.hasNext()) {
-  - Core.gs:3353: if (folders.hasNext()) {
+  - Core.gs:2961: while (formParents.hasNext()) {
+  - Core.gs:2996: while (ssParents.hasNext()) {
+  - Core.gs:3523: if (folders.hasNext()) {
 
 ## next
 - Occurrences: 7
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:2792: if (formParents.next().getId() === folder.getId()) {
-  - Core.gs:2827: if (ssParents.next().getId() === folder.getId()) {
-  - Core.gs:3354: rootFolder = folders.next();
+  - Core.gs:2962: if (formParents.next().getId() === folder.getId()) {
+  - Core.gs:2997: if (ssParents.next().getId() === folder.getId()) {
+  - Core.gs:3524: rootFolder = folders.next();
 
 ## create
 - Occurrences: 7
 - Files: Core.gs, config.gs, systemIntegrationManager.gs, unifiedSecurityManager.gs, unifiedUtilities.gs
 - Samples:
-  - Core.gs:3713: var form = FormApp.create(formTitle);
-  - Core.gs:4116: var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
+  - Core.gs:3883: var form = FormApp.create(formTitle);
+  - Core.gs:4286: var spreadsheetObj = SpreadsheetApp.create(spreadsheetName);
   - config.gs:1650: const form = FormApp.create(formTitle);
 
 ## addTextItem
 - Occurrences: 7
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3781: var nameItem = form.addTextItem();
-  - Core.gs:3785: var mainItem = form.addTextItem();
-  - Core.gs:3814: var nameItem = form.addTextItem();
+  - Core.gs:3951: var nameItem = form.addTextItem();
+  - Core.gs:3955: var mainItem = form.addTextItem();
+  - Core.gs:3984: var nameItem = form.addTextItem();
 
 ## serviceError
 - Occurrences: 7
 - Files: Core.gs, config.gs, database.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:4379: ULog.warn('サービスアカウント追加で警告: ' + serviceError.message);
-  - config.gs:3037: console.error('[ERROR]', '❌ SheetsService復旧エラー:', serviceError.message);
-  - config.gs:3038: console.error('[ERROR]', '❌ Error stack:', serviceError.stack);
+  - Core.gs:4549: ULog.warn('サービスアカウント追加で警告: ' + serviceError.message);
+  - config.gs:3041: console.error('[ERROR]', '❌ SheetsService復旧エラー:', serviceError.message);
+  - config.gs:3042: console.error('[ERROR]', '❌ Error stack:', serviceError.stack);
 
 ## MD5
 - Occurrences: 7
@@ -1552,15 +1552,15 @@ Total: 944 undefined identifiers
 - Samples:
   - config.gs:2244: console.error('[ERROR]', '❌ Sheets API取得エラー:', apiError.message);
   - config.gs:2268: `ヘッダー取得に失敗しました。Sheets API: ${apiError.message}, SpreadsheetApp: ${spreadsheetError.message}`
-  - config.gs:3104: console.error('[ERROR]', '❌ getSpreadsheetsData failed:', apiError.message);
+  - config.gs:3108: console.error('[ERROR]', '❌ getSpreadsheetsData failed:', apiError.message);
 
 ## dbError
 - Occurrences: 7
 - Files: config.gs, database.gs, main.gs, setup.gs
 - Samples:
-  - config.gs:3498: console.error('[ERROR]', `❌ DB書き込み失敗 (試行${dbWriteAttempts}):`, dbError.message);
-  - config.gs:3502: throw new Error('DB書き込み処理に失敗しました: ' + dbError.message);
-  - config.gs:3506: if (dbError.message.includes('503') || dbError.message.includes('429')) {
+  - config.gs:3502: console.error('[ERROR]', `❌ DB書き込み失敗 (試行${dbWriteAttempts}):`, dbError.message);
+  - config.gs:3506: throw new Error('DB書き込み処理に失敗しました: ' + dbError.message);
+  - config.gs:3510: if (dbError.message.includes('503') || dbError.message.includes('429')) {
 
 ## NETWORK
 - Occurrences: 7
@@ -1634,59 +1634,75 @@ Total: 944 undefined identifiers
   - unifiedCacheManager.gs:1826: results.preWarmedItems.push('user_by_email');
   - unifiedCacheManager.gs:1831: results.preWarmedItems.push('user_by_id');
 
+## random
+- Occurrences: 6
+- Files: Core.gs, resilientExecutor.gs, unifiedUserManager.gs, url.gs
+- Samples:
+  - Core.gs:16: random: Math.random()
+  - Core.gs:5058: var randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
+  - Core.gs:5092: var j = Math.floor(Math.random() * (i + 1));
+
+## hasOwnProperty
+- Occurrences: 6
+- Files: Core.gs, secretManager.gs, ulog.gs, unifiedCacheManager.gs
+- Samples:
+  - Core.gs:140: if (data.hasOwnProperty(key)) {
+  - Core.gs:5160: if (configHeaderName && actualHeaderIndices.hasOwnProperty(configHeaderName)) {
+  - Core.gs:7197: if (updateData.hasOwnProperty(field)) {
+
 ## batchOperations
 - Occurrences: 6
 - Files: Core.gs
 - Samples:
-  - Core.gs:1269: if (!Array.isArray(batchOperations) || batchOperations.length === 0) {
-  - Core.gs:1275: if (batchOperations.length > MAX_BATCH_SIZE) {
-  - Core.gs:1279: ULog.debug('🔄 バッチリアクション処理開始:', batchOperations.length + '件');
+  - Core.gs:1422: if (!Array.isArray(batchOperations) || batchOperations.length === 0) {
+  - Core.gs:1428: if (batchOperations.length > MAX_BATCH_SIZE) {
+  - Core.gs:1432: ULog.debug('🔄 バッチリアクション処理開始:', batchOperations.length + '件');
 
 ## getLastRow
 - Occurrences: 6
 - Files: Core.gs, config.gs, main.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:1608: var lastRow = sheet.getLastRow();
-  - Core.gs:1802: var lastRow = sheet.getLastRow(); // スプレッドシートの最終行
-  - Core.gs:2565: const lastRow = sheet.getLastRow();
+  - Core.gs:1761: var lastRow = sheet.getLastRow();
+  - Core.gs:1955: var lastRow = sheet.getLastRow(); // スプレッドシートの最終行
+  - Core.gs:2735: const lastRow = sheet.getLastRow();
 
 ## NAMED
 - Occurrences: 6
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:1703: adminMode === true ? DISPLAY_MODES.NAMED : configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
-  - Core.gs:2037: var shouldShowName = adminMode === true || displayMode === DISPLAY_MODES.NAMED || isOwner;
-  - Core.gs:4841: (displayMode === DISPLAY_MODES.NAMED || isOwner)
+  - Core.gs:1856: adminMode === true ? DISPLAY_MODES.NAMED : configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+  - Core.gs:2190: var shouldShowName = adminMode === true || displayMode === DISPLAY_MODES.NAMED || isOwner;
+  - Core.gs:5011: (displayMode === DISPLAY_MODES.NAMED || isOwner)
 
 ## reduce
 - Occurrences: 6
 - Files: Core.gs, config.gs, unifiedBatchProcessor.gs
 - Samples:
-  - Core.gs:2577: return values.reduce((cnt, row) => (row[0] === classFilter ? cnt + 1 : cnt), 0);
-  - Core.gs:5072: var longestHeader = questionHeaders.reduce(function (prev, current) {
+  - Core.gs:2747: return values.reduce((cnt, row) => (row[0] === classFilter ? cnt + 1 : cnt), 0);
+  - Core.gs:5242: var longestHeader = questionHeaders.reduce(function (prev, current) {
   - config.gs:648: const fallbackHeader = candidateHeaders.reduce((best, current) => {
 
 ## addParagraphTextItem
 - Occurrences: 6
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3789: var reasonItem = form.addParagraphTextItem();
-  - Core.gs:3864: mainItem = form.addParagraphTextItem();
-  - Core.gs:3870: var reasonItem = form.addParagraphTextItem();
+  - Core.gs:3959: var reasonItem = form.addParagraphTextItem();
+  - Core.gs:4034: mainItem = form.addParagraphTextItem();
+  - Core.gs:4040: var reasonItem = form.addParagraphTextItem();
 
 ## accessError
 - Occurrences: 6
 - Files: Core.gs, database.gs
 - Samples:
-  - Core.gs:4677: var statusMatch = ((accessError && accessError.message) || '').match(
-  - Core.gs:4685: accessError.message
+  - Core.gs:4847: var statusMatch = ((accessError && accessError.message) || '').match(
+  - Core.gs:4855: accessError.message
   - database.gs:1875: error: accessError.message,
 
 ## pow
 - Occurrences: 6
 - Files: Core.gs, constants.gs, resilientExecutor.gs, unifiedSheetDataManager.gs
 - Samples:
-  - Core.gs:4715: Utilities.sleep(Math.pow(2, attempt) * 1000);
+  - Core.gs:4885: Utilities.sleep(Math.pow(2, attempt) * 1000);
   - constants.gs:823: const waitTime = exponentialBackoff ? delay * Math.pow(2, attempt - 1) : delay;
   - resilientExecutor.gs:159: let delay = this.config.baseDelay * Math.pow(this.config.backoffFactor, attempt);
 
@@ -1830,7 +1846,7 @@ Total: 944 undefined identifiers
 - Occurrences: 5
 - Files: Core.gs, config.gs, database.gs
 - Samples:
-  - Core.gs:1327: processedRows.add(operation.rowIndex);
+  - Core.gs:1480: processedRows.add(operation.rowIndex);
   - config.gs:633: usedHeaders.add(bestHeader.index);
   - config.gs:655: usedHeaders.add(fallbackHeader.index);
 
@@ -1838,55 +1854,55 @@ Total: 944 undefined identifiers
 - Occurrences: 5
 - Files: Core.gs, database.gs
 - Samples:
-  - Core.gs:3330: ULog.error('[ERROR]', 'エラー状態の更新に失敗: ' + updateError.message);
-  - Core.gs:5596: ULog.error('[ERROR]', 'エラー状態の更新に失敗: ' + updateError.message);
+  - Core.gs:3500: ULog.error('[ERROR]', 'エラー状態の更新に失敗: ' + updateError.message);
+  - Core.gs:5766: ULog.error('[ERROR]', 'エラー状態の更新に失敗: ' + updateError.message);
   - database.gs:1025: var errorMessage = updateError.toString();
 
 ## HIGHLIGHT
 - Occurrences: 5
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:3379: var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
-  - Core.gs:4405: COLUMN_HEADERS.HIGHLIGHT,
-  - Core.gs:4828: var highlightIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+  - Core.gs:3549: var highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+  - Core.gs:4575: COLUMN_HEADERS.HIGHLIGHT,
+  - Core.gs:4998: var highlightIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
 
 ## splice
 - Occurrences: 5
 - Files: Core.gs, main.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:3590: currentReactions.splice(userIndex, 1);
-  - Core.gs:3601: currentReactions.splice(userIndex, 1);
+  - Core.gs:3760: currentReactions.splice(userIndex, 1);
+  - Core.gs:3771: currentReactions.splice(userIndex, 1);
   - main.gs:392: configJson.historyArray.splice(SERVER_MAX_HISTORY);
 
 ## getPublishedUrl
 - Occurrences: 5
 - Files: Core.gs, config.gs, constants.gs
 - Samples:
-  - Core.gs:3750: formUrl: form.getPublishedUrl(),
-  - Core.gs:3751: viewFormUrl: form.getPublishedUrl(),
+  - Core.gs:3920: formUrl: form.getPublishedUrl(),
+  - Core.gs:3921: viewFormUrl: form.getPublishedUrl(),
   - config.gs:1605: const formUrl = form.getPublishedUrl();
 
 ## reasonQuestion
 - Occurrences: 5
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3790: reasonItem.setTitle(config.reasonQuestion.title);
-  - Core.gs:3791: reasonItem.setHelpText(config.reasonQuestion.helpText);
-  - Core.gs:3885: reasonItem.setTitle(config.reasonQuestion.title);
+  - Core.gs:3960: reasonItem.setTitle(config.reasonQuestion.title);
+  - Core.gs:3961: reasonItem.setHelpText(config.reasonQuestion.helpText);
+  - Core.gs:4055: reasonItem.setTitle(config.reasonQuestion.title);
 
 ## setHelpText
 - Occurrences: 5
 - Files: Core.gs
 - Samples:
-  - Core.gs:3791: reasonItem.setHelpText(config.reasonQuestion.helpText);
-  - Core.gs:3876: classItem.setHelpText(config.classQuestion.helpText);
-  - Core.gs:3881: mainItem.setHelpText(config.mainQuestion.helpText);
+  - Core.gs:3961: reasonItem.setHelpText(config.reasonQuestion.helpText);
+  - Core.gs:4046: classItem.setHelpText(config.classQuestion.helpText);
+  - Core.gs:4051: mainItem.setHelpText(config.mainQuestion.helpText);
 
 ## urlError
 - Occurrences: 5
 - Files: Core.gs, session-utils.gs
 - Samples:
-  - Core.gs:4213: ULog.warn('⚠️ 初回URL取得失敗、リトライします:', urlError.message);
+  - Core.gs:4383: ULog.warn('⚠️ 初回URL取得失敗、リトライします:', urlError.message);
   - session-utils.gs:276: authResetResult.errors.push(`URL取得エラー: ${urlError.message}`);
   - session-utils.gs:277: throw new Error(`ログインページURL取得に失敗: ${urlError.message}`);
 
@@ -1894,41 +1910,25 @@ Total: 944 undefined identifiers
 - Occurrences: 5
 - Files: Core.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:4351: file.addEditor(userEmail);
-  - Core.gs:4361: spreadsheet.addEditor(userEmail);
-  - Core.gs:4376: file.addEditor(serviceAccountEmail);
-
-## random
-- Occurrences: 5
-- Files: Core.gs, resilientExecutor.gs, unifiedUserManager.gs, url.gs
-- Samples:
-  - Core.gs:4888: var randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
-  - Core.gs:4922: var j = Math.floor(Math.random() * (i + 1));
-  - resilientExecutor.gs:164: delay = delay * (0.5 + Math.random() * 0.5);
-
-## hasOwnProperty
-- Occurrences: 5
-- Files: Core.gs, secretManager.gs, ulog.gs, unifiedCacheManager.gs
-- Samples:
-  - Core.gs:4990: if (configHeaderName && actualHeaderIndices.hasOwnProperty(configHeaderName)) {
-  - Core.gs:7002: if (updateData.hasOwnProperty(field)) {
-  - secretManager.gs:467: return this.criticalSecrets.hasOwnProperty(secretName);
+  - Core.gs:4521: file.addEditor(userEmail);
+  - Core.gs:4531: spreadsheet.addEditor(userEmail);
+  - Core.gs:4546: file.addEditor(serviceAccountEmail);
 
 ## AppSetupPage
 - Occurrences: 5
 - Files: Core.gs
 - Samples:
-  - Core.gs:5250: * 現在のユーザーのステータス情報を取得（AppSetupPage.htmlから呼び出される）
-  - Core.gs:5255: * isActive状態を更新（AppSetupPage.htmlから呼び出される）
-  - Core.gs:5400: * 管理者によるユーザー削除（AppSetupPage.html用ラッパー）
+  - Core.gs:5420: * 現在のユーザーのステータス情報を取得（AppSetupPage.htmlから呼び出される）
+  - Core.gs:5425: * isActive状態を更新（AppSetupPage.htmlから呼び出される）
+  - Core.gs:5570: * 管理者によるユーザー削除（AppSetupPage.html用ラッパー）
 
 ## _meta
 - Occurrences: 5
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:6690: response._meta.includedApis.push('getSheetDetails');
-  - Core.gs:6702: response._meta.executionTime = endTime - startTime;
-  - Core.gs:6705: executionTime: response._meta.executionTime + 'ms',
+  - Core.gs:6871: response._meta.includedApis.push('getSheetDetails');
+  - Core.gs:6883: response._meta.executionTime = endTime - startTime;
+  - Core.gs:6886: executionTime: response._meta.executionTime + 'ms',
 
 ## _trackMemoryUsage
 - Occurrences: 5
@@ -1990,9 +1990,9 @@ Total: 944 undefined identifiers
 - Occurrences: 5
 - Files: config.gs
 - Samples:
-  - config.gs:3663: newConfigType: typeof newConfig,
-  - config.gs:3688: if (newConfig.length > 0 && typeof newConfig[0] === 'object') {
-  - config.gs:3688: if (newConfig.length > 0 && typeof newConfig[0] === 'object') {
+  - config.gs:3667: newConfigType: typeof newConfig,
+  - config.gs:3692: if (newConfig.length > 0 && typeof newConfig[0] === 'object') {
+  - config.gs:3692: if (newConfig.length > 0 && typeof newConfig[0] === 'object') {
 
 ## CONFIG
 - Occurrences: 5
@@ -2190,31 +2190,31 @@ Total: 944 undefined identifiers
 - Occurrences: 4
 - Files: Core.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:25: this.sessionId = Utilities.getUuid();
-  - Core.gs:145: errorId: Utilities.getUuid(),
-  - Core.gs:969: userId = Utilities.getUuid();
+  - Core.gs:178: this.sessionId = Utilities.getUuid();
+  - Core.gs:298: errorId: Utilities.getUuid(),
+  - Core.gs:1122: userId = Utilities.getUuid();
 
 ## debugConfig
 - Occurrences: 4
 - Files: Core.gs, url.gs
 - Samples:
-  - Core.gs:219: // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
-  - Core.gs:220: // debugLog は debugConfig.gs で統一制御されるため、重複定義を削除
+  - Core.gs:372: // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
+  - Core.gs:373: // debugLog は debugConfig.gs で統一制御されるため、重複定義を削除
   - url.gs:7: // debugLog関数はdebugConfig.gsで統一定義されていますが、テスト環境でのfallback定義
 
 ## JP
 - Occurrences: 4
 - Files: Core.gs, main.gs
 - Samples:
-  - Core.gs:332: publishTimeFormatted: publishTime.toLocaleString('ja-JP'),
-  - Core.gs:333: stopTimeFormatted: stopTime.toLocaleString('ja-JP'),
+  - Core.gs:485: publishTimeFormatted: publishTime.toLocaleString('ja-JP'),
+  - Core.gs:486: stopTimeFormatted: stopTime.toLocaleString('ja-JP'),
   - main.gs:1324: `時刻: ${new Date().toLocaleString('ja-JP')}`,
 
 ## SERVICE_ACCOUNT
 - Occurrences: 4
 - Files: Core.gs, secretManager.gs
 - Samples:
-  - Core.gs:1185: // 通常のアクセスを試行（SERVICE_ACCOUNTでも同じSpreadsheetApp API使用）
+  - Core.gs:1338: // 通常のアクセスを試行（SERVICE_ACCOUNTでも同じSpreadsheetApp API使用）
   - secretManager.gs:29: SERVICE_ACCOUNT: 'service_account',
   - secretManager.gs:38: SERVICE_ACCOUNT_CREDS: this.secretTypes.SERVICE_ACCOUNT,
 
@@ -2222,119 +2222,119 @@ Total: 944 undefined identifiers
 - Occurrences: 4
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:1418: var sheets = spreadsheet.getSheets();
-  - Core.gs:4166: var sheets = spreadsheetObj.getSheets();
-  - Core.gs:4399: var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+  - Core.gs:1571: var sheets = spreadsheet.getSheets();
+  - Core.gs:4336: var sheets = spreadsheetObj.getSheets();
+  - Core.gs:4569: var sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
 
 ## USER_NOT_FOUND
 - Occurrences: 4
 - Files: Core.gs
 - Samples:
-  - Core.gs:2381: return createErrorResponse('USER_NOT_FOUND', 'ユーザー情報が見つかりません', null);
-  - Core.gs:2437: error: 'USER_NOT_FOUND',
-  - Core.gs:4009: return createErrorResponse('USER_NOT_FOUND', 'ユーザー情報が見つかりません', null);
+  - Core.gs:2534: return createErrorResponse('USER_NOT_FOUND', 'ユーザー情報が見つかりません', null);
+  - Core.gs:2590: error: 'USER_NOT_FOUND',
+  - Core.gs:4179: return createErrorResponse('USER_NOT_FOUND', 'ユーザー情報が見つかりません', null);
 
 ## formError
 - Occurrences: 4
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:2661: ULog.error('[ERROR]', 'フォーム更新エラー: ' + formError.message);
-  - Core.gs:2662: return createErrorResponse(formError.message, 'フォームの更新に失敗しました: ' + formError.message, null);
-  - Core.gs:2662: return createErrorResponse(formError.message, 'フォームの更新に失敗しました: ' + formError.message, null);
+  - Core.gs:2831: ULog.error('[ERROR]', 'フォーム更新エラー: ' + formError.message);
+  - Core.gs:2832: return createErrorResponse(formError.message, 'フォームの更新に失敗しました: ' + formError.message, null);
+  - Core.gs:2832: return createErrorResponse(formError.message, 'フォームの更新に失敗しました: ' + formError.message, null);
 
 ## getParents
 - Occurrences: 4
 - Files: Core.gs
 - Samples:
-  - Core.gs:2788: var formParents = formFile.getParents();
-  - Core.gs:2823: var ssParents = ssFile.getParents();
-  - Core.gs:5763: const formParents = formFile.getParents();
+  - Core.gs:2958: var formParents = formFile.getParents();
+  - Core.gs:2993: var ssParents = ssFile.getParents();
+  - Core.gs:5933: const formParents = formFile.getParents();
 
 ## invalidateSheetData
 - Occurrences: 4
 - Files: Core.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:3410: cacheManager.invalidateSheetData(spreadsheetId, sheetName);
-  - Core.gs:3642: cacheManager.invalidateSheetData(spreadsheetId, sheetName);
+  - Core.gs:3580: cacheManager.invalidateSheetData(spreadsheetId, sheetName);
+  - Core.gs:3812: cacheManager.invalidateSheetData(spreadsheetId, sheetName);
   - unifiedCacheManager.gs:348: invalidateSheetData(spreadsheetId, sheetName = null) {
 
 ## MM
 - Occurrences: 4
 - Files: Core.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:3707: var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
-  - Core.gs:3953: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
-  - Core.gs:4079: const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
+  - Core.gs:3877: var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
+  - Core.gs:4123: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+  - Core.gs:4249: const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
 
 ## formatDate
 - Occurrences: 4
 - Files: Core.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:3707: var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
-  - Core.gs:3953: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
-  - Core.gs:4079: const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
+  - Core.gs:3877: var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
+  - Core.gs:4123: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+  - Core.gs:4249: const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
 
 ## GoogleAppsScript
 - Occurrences: 4
 - Files: Core.gs, unifiedCacheManager.gs
 - Samples:
-  - Core.gs:3765: * @param {GoogleAppsScript.Forms.Form} form - フォームオブジェクト
-  - Core.gs:4106: * @param {GoogleAppsScript.Forms.Form} form - フォーム
+  - Core.gs:3935: * @param {GoogleAppsScript.Forms.Form} form - フォームオブジェクト
+  - Core.gs:4276: * @param {GoogleAppsScript.Forms.Form} form - フォーム
   - unifiedCacheManager.gs:1283: * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} Spreadsheetオブジェクト
 
 ## setChoiceValues
 - Occurrences: 4
 - Files: Core.gs
 - Samples:
-  - Core.gs:3778: classItem.setChoiceValues(config.classQuestion.choices);
-  - Core.gs:3809: classItem.setChoiceValues(customConfig.classQuestion.choices);
-  - Core.gs:3836: mainItem.setChoiceValues(customConfig.mainQuestion.choices);
+  - Core.gs:3948: classItem.setChoiceValues(config.classQuestion.choices);
+  - Core.gs:3979: classItem.setChoiceValues(customConfig.classQuestion.choices);
+  - Core.gs:4006: mainItem.setChoiceValues(customConfig.mainQuestion.choices);
 
 ## nameQuestion
 - Occurrences: 4
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3782: nameItem.setTitle(config.nameQuestion.title);
-  - Core.gs:3890: nameItem.setTitle(config.nameQuestion.title);
-  - Core.gs:3891: nameItem.setHelpText(config.nameQuestion.helpText);
+  - Core.gs:3952: nameItem.setTitle(config.nameQuestion.title);
+  - Core.gs:4060: nameItem.setTitle(config.nameQuestion.title);
+  - Core.gs:4061: nameItem.setHelpText(config.nameQuestion.helpText);
 
 ## shareError
 - Occurrences: 4
 - Files: Core.gs, database.gs
 - Samples:
-  - Core.gs:4197: ULog.warn('サービスアカウント共有エラー（処理継続）:', shareError.message);
-  - Core.gs:4290: error: shareError.message,
-  - Core.gs:4293: ULog.error('[ERROR]', '共有失敗:', user.adminEmail, shareError.message);
+  - Core.gs:4367: ULog.warn('サービスアカウント共有エラー（処理継続）:', shareError.message);
+  - Core.gs:4460: error: shareError.message,
+  - Core.gs:4463: ULog.error('[ERROR]', '共有失敗:', user.adminEmail, shareError.message);
 
 ## rowData
 - Occurrences: 4
 - Files: Core.gs
 - Samples:
-  - Core.gs:4879: var likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
-  - Core.gs:4882: var reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
-  - Core.gs:4882: var reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
+  - Core.gs:5049: var likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
+  - Core.gs:5052: var reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
+  - Core.gs:5052: var reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
 
 ## sort
 - Occurrences: 4
 - Files: Core.gs, unifiedCacheManager.gs, url.gs
 - Samples:
-  - Core.gs:4899: return data.sort(function (a, b) {
-  - Core.gs:4909: return data.sort(function (a, b) {
+  - Core.gs:5069: return data.sort(function (a, b) {
+  - Core.gs:5079: return data.sort(function (a, b) {
   - unifiedCacheManager.gs:1400: .sort((a, b) => b.timestamp - a.timestamp);
 
 ## valueRange
 - Occurrences: 4
 - Files: Core.gs
 - Samples:
-  - Core.gs:5209: if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
-  - Core.gs:5209: if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
-  - Core.gs:5209: if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
+  - Core.gs:5379: if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
+  - Core.gs:5379: if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
+  - Core.gs:5379: if (valueRange && valueRange.values && valueRange.values[0] && valueRange.values[0][0]) {
 
 ## www
 - Occurrences: 4
 - Files: Core.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:5331: baseUrl: 'https://www.googleapis.com/drive/v3',
+  - Core.gs:5501: baseUrl: 'https://www.googleapis.com/drive/v3',
   - unifiedSecurityManager.gs:36: const tokenUrl = 'https://www.googleapis.com/oauth2/v4/token';
   - unifiedSecurityManager.gs:45: scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
 
@@ -2383,7 +2383,7 @@ Total: 944 undefined identifiers
 - Files: config.gs, lockManager.gs
 - Samples:
   - config.gs:1018: return executeWithStandardizedLock('BATCH_OPERATION', 'republishBoard', () => {
-  - config.gs:3449: return executeWithStandardizedLock('BATCH_OPERATION', 'saveAndPublish', () => {
+  - config.gs:3453: return executeWithStandardizedLock('BATCH_OPERATION', 'saveAndPublish', () => {
   - lockManager.gs:11: BATCH_OPERATION: 30000, // バッチ処理: 30秒 (saveAndPublish等)
 
 ## clearUserInfo
@@ -2398,7 +2398,7 @@ Total: 944 undefined identifiers
 - Occurrences: 4
 - Files: config.gs, unifiedCacheManager.gs
 - Samples:
-  - config.gs:3530: execCache.syncWithUnifiedCache('dataUpdate');
+  - config.gs:3534: execCache.syncWithUnifiedCache('dataUpdate');
   - unifiedCacheManager.gs:1239: syncWithUnifiedCache(operation) {
   - unifiedCacheManager.gs:2000: this.executionCache.syncWithUnifiedCache('userDataChange');
 
@@ -2690,19 +2690,35 @@ Total: 944 undefined identifiers
   - unifiedSheetDataManager.gs:532: const userInfo = this._getUserInfo(userId, { useExecutionCache: true, ttl: 300 });
   - unifiedSheetDataManager.gs:627: const userInfo = this._getUserInfo(userId, { useExecutionCache: true, ttl: 300 });
 
+## script
+- Occurrences: 3
+- Files: Core.gs, main.gs
+- Samples:
+  - Core.gs:8: * google.script.run通信問題のデバッグ用
+  - main.gs:2145: cleanUrl.includes('script.google.com') ||
+  - main.gs:2726: google.script.run
+
+## getScriptTimeZone
+- Occurrences: 3
+- Files: Core.gs, workflowValidation.gs
+- Samples:
+  - Core.gs:33: timezone: Session.getScriptTimeZone(),
+  - Core.gs:4123: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+  - workflowValidation.gs:147: const formatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
 ## toLocaleString
 - Occurrences: 3
 - Files: Core.gs, main.gs
 - Samples:
-  - Core.gs:332: publishTimeFormatted: publishTime.toLocaleString('ja-JP'),
-  - Core.gs:333: stopTimeFormatted: stopTime.toLocaleString('ja-JP'),
+  - Core.gs:485: publishTimeFormatted: publishTime.toLocaleString('ja-JP'),
+  - Core.gs:486: stopTimeFormatted: stopTime.toLocaleString('ja-JP'),
   - main.gs:1324: `時刻: ${new Date().toLocaleString('ja-JP')}`,
 
 ## action
 - Occurrences: 3
 - Files: Core.gs, secretManager.gs
 - Samples:
-  - Core.gs:915: * @param {string} adminEmail - Email address of the user performing the action.
+  - Core.gs:1068: * @param {string} adminEmail - Email address of the user performing the action.
   - secretManager.gs:569: if (action.includes('ERROR') || action.includes('FAILED')) {
   - secretManager.gs:569: if (action.includes('ERROR') || action.includes('FAILED')) {
 
@@ -2710,7 +2726,7 @@ Total: 944 undefined identifiers
 - Occurrences: 3
 - Files: Core.gs, config.gs, main.gs
 - Samples:
-  - Core.gs:2374: // include 関数は main.gs で定義されています
+  - Core.gs:2527: // include 関数は main.gs で定義されています
   - config.gs:10: // メモリ管理用の実行レベル変数 (main.gsと統一)
   - main.gs:2790: ULog.warn('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
 
@@ -2718,31 +2734,31 @@ Total: 944 undefined identifiers
 - Occurrences: 3
 - Files: Core.gs
 - Samples:
-  - Core.gs:2810: moveErrors.push('フォームファイル移動エラー: ' + formMoveError.message);
-  - Core.gs:2811: ULog.error('[ERROR]', '❌ フォームファイルの移動に失敗:', formMoveError.message);
-  - Core.gs:5785: ULog.warn('カスタムフォームファイル移動エラー:', formMoveError.message);
+  - Core.gs:2980: moveErrors.push('フォームファイル移動エラー: ' + formMoveError.message);
+  - Core.gs:2981: ULog.error('[ERROR]', '❌ フォームファイルの移動に失敗:', formMoveError.message);
+  - Core.gs:5955: ULog.warn('カスタムフォームファイル移動エラー:', formMoveError.message);
 
 ## ssMoveError
 - Occurrences: 3
 - Files: Core.gs
 - Samples:
-  - Core.gs:2853: moveErrors.push('スプレッドシートファイル移動エラー: ' + ssMoveError.message);
-  - Core.gs:2854: ULog.error('[ERROR]', '❌ スプレッドシートファイルの移動に失敗:', ssMoveError.message);
-  - Core.gs:5815: ULog.warn('カスタムスプレッドシートファイル移動エラー:', ssMoveError.message);
+  - Core.gs:3023: moveErrors.push('スプレッドシートファイル移動エラー: ' + ssMoveError.message);
+  - Core.gs:3024: ULog.error('[ERROR]', '❌ スプレッドシートファイルの移動に失敗:', ssMoveError.message);
+  - Core.gs:5985: ULog.warn('カスタムスプレッドシートファイル移動エラー:', ssMoveError.message);
 
 ## HH
 - Occurrences: 3
 - Files: Core.gs
 - Samples:
-  - Core.gs:3707: var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
-  - Core.gs:3953: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
-  - Core.gs:4079: const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
+  - Core.gs:3877: var dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
+  - Core.gs:4123: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+  - Core.gs:4249: const dateTimeString = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy年MM月dd日 HH:mm');
 
 ## getEditUrl
 - Occurrences: 3
 - Files: Core.gs, config.gs, constants.gs
 - Samples:
-  - Core.gs:3752: editFormUrl: typeof form.getEditUrl === 'function' ? form.getEditUrl() : '',
+  - Core.gs:3922: editFormUrl: typeof form.getEditUrl === 'function' ? form.getEditUrl() : '',
   - config.gs:1652: ULog.debug('📝 フォーム作成成功:', form.getEditUrl());
   - constants.gs:1292: getEditUrl: (form) => form ? form.getEditUrl() : ''
 
@@ -2750,23 +2766,23 @@ Total: 944 undefined identifiers
 - Occurrences: 3
 - Files: Core.gs
 - Samples:
-  - Core.gs:3805: customConfig.classQuestion.choices.length > 0
-  - Core.gs:3834: customConfig.mainQuestion.choices.length > 0
-  - Core.gs:3851: customConfig.mainQuestion.choices.length > 0
+  - Core.gs:3975: customConfig.classQuestion.choices.length > 0
+  - Core.gs:4004: customConfig.mainQuestion.choices.length > 0
+  - Core.gs:4021: customConfig.mainQuestion.choices.length > 0
 
 ## assign
 - Occurrences: 3
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:3937: Object.assign(config[key], customConfig[key]);
+  - Core.gs:4107: Object.assign(config[key], customConfig[key]);
   - config.gs:2368: userInfo: Object.assign({}, userInfo), // 浅いコピー（userInfoは単純オブジェクト）
-  - config.gs:3248: Object.assign(configJson, topLevelUpdates);
+  - config.gs:3252: Object.assign(configJson, topLevelUpdates);
 
 ## SPREADSHEET
 - Occurrences: 3
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:4155: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
+  - Core.gs:4325: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
   - config.gs:1601: if (destinationType === FormApp.DestinationType.SPREADSHEET) {
   - config.gs:1703: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
 
@@ -2774,7 +2790,7 @@ Total: 944 undefined identifiers
 - Occurrences: 3
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:4155: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
+  - Core.gs:4325: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
   - config.gs:1601: if (destinationType === FormApp.DestinationType.SPREADSHEET) {
   - config.gs:1703: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
 
@@ -2782,9 +2798,17 @@ Total: 944 undefined identifiers
 - Occurrences: 3
 - Files: Core.gs, constants.gs
 - Samples:
-  - Core.gs:4864: var timestampIndex = headerIndices[COLUMN_HEADERS.TIMESTAMP];
+  - Core.gs:5034: var timestampIndex = headerIndices[COLUMN_HEADERS.TIMESTAMP];
   - constants.gs:90: TIMESTAMP: 'タイムスタンプ',
   - constants.gs:279: TIMESTAMP: 'タイムスタンプ',
+
+## targetSheetName
+- Occurrences: 3
+- Files: Core.gs
+- Samples:
+  - Core.gs:6799: if (typeof targetSheetName === 'string' && targetSheetName.trim() !== '') {
+  - Core.gs:6799: if (typeof targetSheetName === 'string' && targetSheetName.trim() !== '') {
+  - Core.gs:6811: targetSheetNameType: typeof targetSheetName,
 
 ## componentsInitialized
 - Occurrences: 3
@@ -2832,7 +2856,7 @@ Total: 944 undefined identifiers
 - Samples:
   - config.gs:1503: const form = sheet.getFormUrl();
   - config.gs:1509: // getFormUrl()がエラーになる場合があるのでcatchする
-  - config.gs:3315: const url = targetSheet.getFormUrl();
+  - config.gs:3319: const url = targetSheet.getFormUrl();
 
 ## Login
 - Occurrences: 3
@@ -2846,8 +2870,8 @@ Total: 944 undefined identifiers
 - Occurrences: 3
 - Files: config.gs, database.gs
 - Samples:
-  - config.gs:3131: console.error('[ERROR]', '❌ batchGetSheetsData failed:', batchError.message);
-  - config.gs:3132: throw new Error('ヘッダー行の取得に失敗: ' + batchError.message);
+  - config.gs:3135: console.error('[ERROR]', '❌ batchGetSheetsData failed:', batchError.message);
+  - config.gs:3136: throw new Error('ヘッダー行の取得に失敗: ' + batchError.message);
   - database.gs:3055: console.error('[ERROR]', '❌ Deletion operation failed:', batchError.message);
 
 ## AUTHENTICATION
@@ -3266,299 +3290,306 @@ Total: 944 undefined identifiers
   - url.gs:77: .filter((d) => d.deploymentConfig && d.deploymentConfig.webApp)
   - url.gs:81: finalUrl = webAppDeployments[0].deploymentConfig.webApp.url;
 
+## getEffectiveUser
+- Occurrences: 2
+- Files: Core.gs, setup.gs
+- Samples:
+  - Core.gs:30: effectiveUser: Session.getEffectiveUser().getEmail()
+  - setup.gs:22: var adminEmail = Session.getEffectiveUser().getEmail();
+
+## RESOLVED
+- Occurrences: 2
+- Files: Core.gs
+- Samples:
+  - Core.gs:56: conflictResolution: 'RESOLVED'
+  - Core.gs:100: variableConflict: 'RESOLVED - AdminPanel.core namespace implemented',
+
 ## _buildErrorInfo
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:48: const errorInfo = this._buildErrorInfo(error, context, severity, category, metadata);
-  - Core.gs:141: _buildErrorInfo(error, context, severity, category, metadata) {
+  - Core.gs:201: const errorInfo = this._buildErrorInfo(error, context, severity, category, metadata);
+  - Core.gs:294: _buildErrorInfo(error, context, severity, category, metadata) {
 
 ## _isRetryableError
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:80: retryable: this._isRetryableError(error),
-  - Core.gs:174: _isRetryableError(error) {
+  - Core.gs:233: retryable: this._isRetryableError(error),
+  - Core.gs:327: _isRetryableError(error) {
 
 ## ISO
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:320: * @param {string} publishedAt - 公開開始時間のISO文字列
-  - Core.gs:6921: * @returns {string|null} 作成日のISO文字列、取得失敗時はnull
+  - Core.gs:473: * @param {string} publishedAt - 公開開始時間のISO文字列
+  - Core.gs:7116: * @returns {string|null} 作成日のISO文字列、取得失敗時はnull
 
 ## configJsonString
 - Occurrences: 2
 - Files: Core.gs, unifiedSecurityManager.gs
 - Samples:
-  - Core.gs:539: if (configJsonString && configJsonString.trim() !== '' && configJsonString !== '{}') {
+  - Core.gs:692: if (configJsonString && configJsonString.trim() !== '' && configJsonString !== '{}') {
   - unifiedSecurityManager.gs:245: if (!configJsonString || configJsonString.trim() === '' || configJsonString === '{}') {
 
 ## column
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:834: headerValidationData.issues.push('Reason column (理由) not found in headers');
-  - Core.gs:839: headerValidationData.issues.push('Opinion column (回答) not found in headers');
+  - Core.gs:987: headerValidationData.issues.push('Reason column (理由) not found in headers');
+  - Core.gs:992: headerValidationData.issues.push('Opinion column (回答) not found in headers');
 
 ## method
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:1048: createdUser = method();
-  - Core.gs:6313: existingUser = stage.method();
+  - Core.gs:1201: createdUser = method();
+  - Core.gs:6483: existingUser = stage.method();
 
 ## stageError
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:1068: error: stageError.message,
-  - Core.gs:6326: error: stageError.message,
+  - Core.gs:1221: error: stageError.message,
+  - Core.gs:6496: error: stageError.message,
 
 ## countError
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:2185: ULog.warn('回答数の取得に失敗: ' + countError.message);
-  - Core.gs:2505: ULog.warn('回答数の取得に失敗: ' + countError.message);
+  - Core.gs:2338: ULog.warn('回答数の取得に失敗: ' + countError.message);
+  - Core.gs:2675: ULog.warn('回答数の取得に失敗: ' + countError.message);
 
 ## setDescription
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:2656: form.setDescription(description);
-  - Core.gs:3714: form.setDescription(formDescription);
+  - Core.gs:2826: form.setDescription(description);
+  - Core.gs:3884: form.setDescription(formDescription);
 
 ## generalError
 - Occurrences: 2
 - Files: Core.gs, main.gs
 - Samples:
-  - Core.gs:2878: ULog.error('[ERROR]', '❌ ファイル移動処理で予期しないエラー:', generalError.message);
+  - Core.gs:3048: ULog.error('[ERROR]', '❌ ファイル移動処理で予期しないエラー:', generalError.message);
   - main.gs:992: errors.push(`システムチェック中の一般エラー: ${generalError.message}`);
 
 ## getFoldersByName
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3352: var folders = DriveApp.getFoldersByName(rootFolderName);
-  - Core.gs:3360: var userFolders = rootFolder.getFoldersByName(userFolderName);
+  - Core.gs:3522: var folders = DriveApp.getFoldersByName(rootFolderName);
+  - Core.gs:3530: var userFolders = rootFolder.getFoldersByName(userFolderName);
 
 ## createFolder
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3356: rootFolder = DriveApp.createFolder(rootFolderName);
-  - Core.gs:3364: return rootFolder.createFolder(userFolderName);
+  - Core.gs:3526: rootFolder = DriveApp.createFolder(rootFolderName);
+  - Core.gs:3534: return rootFolder.createFolder(userFolderName);
 
 ## rootFolder
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3360: var userFolders = rootFolder.getFoldersByName(userFolderName);
-  - Core.gs:3364: return rootFolder.createFolder(userFolderName);
+  - Core.gs:3530: var userFolders = rootFolder.getFoldersByName(userFolderName);
+  - Core.gs:3534: return rootFolder.createFolder(userFolderName);
 
 ## folderMoveError
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3725: ULog.warn('⚠️ フォーム作成直後の移動に失敗（後で再移動されます）:', folderMoveError.message);
-  - Core.gs:4133: folderMoveError.message
+  - Core.gs:3895: ULog.warn('⚠️ フォーム作成直後の移動に失敗（後で再移動されます）:', folderMoveError.message);
+  - Core.gs:4303: folderMoveError.message
 
 ## setCollectEmail
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3736: form.setCollectEmail(true);
-  - Core.gs:3773: form.setCollectEmail(false);
+  - Core.gs:3906: form.setCollectEmail(true);
+  - Core.gs:3943: form.setCollectEmail(false);
 
 ## Forms
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3765: * @param {GoogleAppsScript.Forms.Form} form - フォームオブジェクト
-  - Core.gs:4106: * @param {GoogleAppsScript.Forms.Form} form - フォーム
+  - Core.gs:3935: * @param {GoogleAppsScript.Forms.Form} form - フォームオブジェクト
+  - Core.gs:4276: * @param {GoogleAppsScript.Forms.Form} form - フォーム
 
 ## addListItem
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3776: var classItem = form.addListItem();
-  - Core.gs:3807: var classItem = form.addListItem();
+  - Core.gs:3946: var classItem = form.addListItem();
+  - Core.gs:3977: var classItem = form.addListItem();
 
 ## showOtherOption
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3843: mainItem.showOtherOption(true);
-  - Core.gs:3860: mainItem.showOtherOption(true);
-
-## getScriptTimeZone
-- Occurrences: 2
-- Files: Core.gs, workflowValidation.gs
-- Samples:
-  - Core.gs:3953: const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
-  - workflowValidation.gs:147: const formatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  - Core.gs:4013: mainItem.showOtherOption(true);
+  - Core.gs:4030: mainItem.showOtherOption(true);
 
 ## createTextOutput
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3960: return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(
-  - Core.gs:3965: return ContentService.createTextOutput(
+  - Core.gs:4130: return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(
+  - Core.gs:4135: return ContentService.createTextOutput(
 
 ## setMimeType
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3960: return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(
-  - Core.gs:3970: ).setMimeType(ContentService.MimeType.JSON);
+  - Core.gs:4130: return ContentService.createTextOutput(JSON.stringify(cfg)).setMimeType(
+  - Core.gs:4140: ).setMimeType(ContentService.MimeType.JSON);
 
 ## MimeType
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:3961: ContentService.MimeType.JSON
-  - Core.gs:3970: ).setMimeType(ContentService.MimeType.JSON);
+  - Core.gs:4131: ContentService.MimeType.JSON
+  - Core.gs:4140: ).setMimeType(ContentService.MimeType.JSON);
 
 ## setSharing
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:4145: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-  - Core.gs:4344: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+  - Core.gs:4315: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+  - Core.gs:4514: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
 
 ## Access
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:4145: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-  - Core.gs:4344: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+  - Core.gs:4315: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+  - Core.gs:4514: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
 
 ## Permission
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:4145: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-  - Core.gs:4344: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+  - Core.gs:4315: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+  - Core.gs:4514: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
 
 ## setDestination
 - Occurrences: 2
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:4155: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
+  - Core.gs:4325: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
   - config.gs:1703: form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
 
 ## docs
 - Occurrences: 2
 - Files: Core.gs, config.gs
 - Samples:
-  - Core.gs:4235: spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+  - Core.gs:4405: spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
   - config.gs:1549: if (typeof cellValue === 'string' && cellValue.includes('docs.google.com/forms/')) {
 
 ## driveError
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:4338: ULog.error('[ERROR]', 'DriveApp.getFileById error:', driveError.message);
-  - Core.gs:4339: throw new Error('スプレッドシートへのアクセスに失敗しました: ' + driveError.message);
+  - Core.gs:4508: ULog.error('[ERROR]', 'DriveApp.getFileById error:', driveError.message);
+  - Core.gs:4509: throw new Error('スプレッドシートへのアクセスに失敗しました: ' + driveError.message);
 
 ## setValues
 - Occurrences: 2
 - Files: Core.gs, workflowValidation.gs
 - Samples:
-  - Core.gs:4413: sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
+  - Core.gs:4583: sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
   - workflowValidation.gs:74: testRange.setValues(testData);
 
 ## status
 - Occurrences: 2
 - Files: Core.gs, main.gs
 - Samples:
-  - Core.gs:4436: * @returns {object} status ('success' or 'error') と message
+  - Core.gs:4606: * @returns {object} status ('success' or 'error') と message
   - main.gs:844: * Retrieves the administrator domain for the login page with domain match status.
 
 ## repairError
 - Occurrences: 2
 - Files: Core.gs, database.gs
 - Samples:
-  - Core.gs:4697: ULog.error('[ERROR]', 'getSheetsList: 権限修復に失敗:', repairError.message);
+  - Core.gs:4867: ULog.error('[ERROR]', 'getSheetsList: 権限修復に失敗:', repairError.message);
   - database.gs:2168: result.summary.actions.push('権限修復失敗: ' + repairError.message);
 
 ## LIKE_MULTIPLIER_FACTOR
 - Occurrences: 2
 - Files: Core.gs, main.gs
 - Samples:
-  - Core.gs:4879: var likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
+  - Core.gs:5049: var likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
   - main.gs:85: LIKE_MULTIPLIER_FACTOR: 0.1,
 
 ## RANDOM_SCORE_FACTOR
 - Occurrences: 2
 - Files: Core.gs, main.gs
 - Samples:
-  - Core.gs:4888: var randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
+  - Core.gs:5058: var randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
   - main.gs:86: RANDOM_SCORE_FACTOR: 0.01,
 
 ## actualHeader
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:5003: var normalizedActualHeader = actualHeader.toLowerCase().trim();
-  - Core.gs:5019: var normalizedActualHeader = actualHeader.toLowerCase().trim();
+  - Core.gs:5173: var normalizedActualHeader = actualHeader.toLowerCase().trim();
+  - Core.gs:5189: var normalizedActualHeader = actualHeader.toLowerCase().trim();
 
 ## DATABASE_UPDATE_FAILED
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:5286: return createErrorResponse('DATABASE_UPDATE_FAILED', result.message);
-  - Core.gs:5476: return createErrorResponse(result.message, result.error || 'DATABASE_UPDATE_FAILED');
+  - Core.gs:5456: return createErrorResponse('DATABASE_UPDATE_FAILED', result.message);
+  - Core.gs:5646: return createErrorResponse(result.message, result.error || 'DATABASE_UPDATE_FAILED');
 
 ## folderError
 - Occurrences: 2
 - Files: Core.gs, database.gs
 - Samples:
-  - Core.gs:5821: ULog.warn('カスタムセットアップフォルダ処理エラー:', folderError.message);
+  - Core.gs:5991: ULog.warn('カスタムセットアップフォルダ処理エラー:', folderError.message);
   - database.gs:1160: folderError.message
 
 ## stage2Error
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:6120: searchAttempts.push({ method: 'findUserByEmail', error: stage2Error.message });
-  - Core.gs:6121: ULog.warn('getLoginStatus: Stage 2失敗:', stage2Error.message);
+  - Core.gs:6290: searchAttempts.push({ method: 'findUserByEmail', error: stage2Error.message });
+  - Core.gs:6291: ULog.warn('getLoginStatus: Stage 2失敗:', stage2Error.message);
 
 ## stage3Error
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:6140: error: stage3Error.message,
-  - Core.gs:6142: ULog.warn('getLoginStatus: Stage 3失敗:', stage3Error.message);
+  - Core.gs:6310: error: stage3Error.message,
+  - Core.gs:6312: ULog.warn('getLoginStatus: Stage 3失敗:', stage3Error.message);
 
 ## verifyError
 - Occurrences: 2
 - Files: Core.gs, database.gs
 - Samples:
-  - Core.gs:6395: ULog.warn('confirmUserRegistration: 登録後検証でエラー:', verifyError.message);
+  - Core.gs:6565: ULog.warn('confirmUserRegistration: 登録後検証でエラー:', verifyError.message);
   - database.gs:3074: console.error('[ERROR]', '⚠️ Deletion verification failed:', verifyError.message);
 
 ## registrationError
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:6432: error: registrationError.message,
-  - Core.gs:6438: message: registrationError.message,
+  - Core.gs:6602: error: registrationError.message,
+  - Core.gs:6608: message: registrationError.message,
 
 ## err
 - Occurrences: 2
 - Files: Core.gs, main.gs
 - Samples:
-  - Core.gs:6541: ULog.warn('Answer count retrieval failed:', err.message);
+  - Core.gs:6711: ULog.warn('Answer count retrieval failed:', err.message);
   - main.gs:2823: ULog.warn('アクセス権設定警告:', err.message);
 
 ## sheetErr
 - Occurrences: 2
 - Files: Core.gs
 - Samples:
-  - Core.gs:6695: ULog.warn('Sheet details retrieval failed:', sheetErr.message);
-  - Core.gs:6696: response.sheetDetailsError = sheetErr.message;
+  - Core.gs:6876: ULog.warn('Sheet details retrieval failed:', sheetErr.message);
+  - Core.gs:6877: response.sheetDetailsError = sheetErr.message;
 
 ## _scheduleAutoCleanup
 - Occurrences: 2
@@ -3621,28 +3652,28 @@ Total: 944 undefined identifiers
 - Files: config.gs
 - Samples:
   - config.gs:2892: 'Parameter order mismatch: context must be an object, not a string. Check function call parameters.'
-  - config.gs:2932: 'getSheetDetailsFromContext: sheetName parameter must be a valid non-empty string. Received: ' +
+  - config.gs:2936: 'getSheetDetailsFromContext: sheetName parameter must be a valid non-empty string. Received: ' +
 
 ## spreadsheets
 - Occurrences: 2
 - Files: config.gs, database.gs
 - Samples:
-  - config.gs:3091: typeof context.sheetsService.spreadsheets.get === 'function'
+  - config.gs:3095: typeof context.sheetsService.spreadsheets.get === 'function'
   - database.gs:1390: // includeGridData は values:batchGet では無効（spreadsheets.get 系のみ）
 
 ## setUserInfo
 - Occurrences: 2
 - Files: config.gs, unifiedCacheManager.gs
 - Samples:
-  - config.gs:3524: execCache.setUserInfo(context.requestUserId, freshUserInfo);
+  - config.gs:3528: execCache.setUserInfo(context.requestUserId, freshUserInfo);
   - unifiedCacheManager.gs:1154: setUserInfo(userId, userInfo) {
 
 ## APPLICATION_ENABLED
 - Occurrences: 2
 - Files: config.gs
 - Samples:
-  - config.gs:3818: const value = props.getProperty('APPLICATION_ENABLED');
-  - config.gs:3849: props.setProperty('APPLICATION_ENABLED', enabledValue);
+  - config.gs:3822: const value = props.getProperty('APPLICATION_ENABLED');
+  - config.gs:3853: props.setProperty('APPLICATION_ENABLED', enabledValue);
 
 ## POLLING
 - Occurrences: 2
@@ -3944,13 +3975,6 @@ Total: 944 undefined identifiers
 - Samples:
   - main.gs:2059: mainButton.style.animation = 'pulse 1s infinite';
   - main.gs:2060: mainButton.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
-
-## script
-- Occurrences: 2
-- Files: main.gs
-- Samples:
-  - main.gs:2145: cleanUrl.includes('script.google.com') ||
-  - main.gs:2726: google.script.run
 
 ## UTF
 - Occurrences: 2
@@ -4883,371 +4907,389 @@ Total: 944 undefined identifiers
   - url.gs:217: * Generate URL for unpublished state with aggressive cache busting.
   - url.gs:253: * Generate URLs with optional cache busting.
 
+## getActiveUserLocale
+- Occurrences: 1
+- Files: Core.gs
+- Samples:
+  - Core.gs:34: locale: Session.getActiveUserLocale()
+
+## IMPLEMENTED
+- Occurrences: 1
+- Files: Core.gs
+- Samples:
+  - Core.gs:53: masterControllerPattern: 'IMPLEMENTED',
+
+## ACTIVE
+- Occurrences: 1
+- Files: Core.gs
+- Samples:
+  - Core.gs:54: stageManagement: 'ACTIVE',
+
 ## LOGGING
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:93: ULog.error(`⚠️ LOGGING ERROR [database.${operation}]:`, {
+  - Core.gs:246: ULog.error(`⚠️ LOGGING ERROR [database.${operation}]:`, {
 
 ## loggingError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:95: loggingError: loggingError.message,
+  - Core.gs:248: loggingError: loggingError.message,
 
 ## activeSheetName
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:295: configJson.activeSheetName.trim() !== ''; // アクティブシートが選択済み
+  - Core.gs:448: configJson.activeSheetName.trim() !== ''; // アクティブシートが選択済み
 
 ## completed
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:602: changes.push(`setupStatus: ${configJson.setupStatus} → completed (form作成済み)`);
+  - Core.gs:755: changes.push(`setupStatus: ${configJson.setupStatus} → completed (form作成済み)`);
 
 ## EABDB
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:813: const sheetName = userInfo.sheetName || 'EABDB';
+  - Core.gs:966: const sheetName = userInfo.sheetName || 'EABDB';
 
 ## one
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:913: * Register a new user or update an existing one.
+  - Core.gs:1066: * Register a new user or update an existing one.
 
 ## flags
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:916: * @returns {Object} Registration result including URLs and flags.
+  - Core.gs:1069: * @returns {Object} Registration result including URLs and flags.
 
 ## methodError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:1060: ULog.debug('registerNewUser: 検証方法でエラー:', methodError.message);
+  - Core.gs:1213: ULog.debug('registerNewUser: 検証方法でエラー:', methodError.message);
 
 ## lookupError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:1124: ULog.warn('registerNewUser: 既存ユーザー検索でエラー:', lookupError.message);
+  - Core.gs:1277: ULog.warn('registerNewUser: 既存ユーザー検索でエラー:', lookupError.message);
 
 ## operationError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:1348: operationError.message,
+  - Core.gs:1501: operationError.message,
 
 ## operations
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:1396: { batchSize: operations.length }
+  - Core.gs:1549: { batchSize: operations.length }
 
 ## diagnosisError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:1625: ULog.warn('診断処理でエラー:', diagnosisError.message);
+  - Core.gs:1778: ULog.warn('診断処理でエラー:', diagnosisError.message);
 
 ## FORM_NOT_FOUND
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:2665: return createErrorResponse('FORM_NOT_FOUND', 'フォームが見つかりません', null);
+  - Core.gs:2835: return createErrorResponse('FORM_NOT_FOUND', 'フォームが見つかりません', null);
 
 ## core
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3433: 'getHeaderIndices received in core.gs: spreadsheetId=%s, sheetName=%s',
+  - Core.gs:3603: 'getHeaderIndices received in core.gs: spreadsheetId=%s, sheetName=%s',
 
 ## getSheetById
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3464: var sheet = spreadsheet.getSheetById(sheetId);
+  - Core.gs:3634: var sheet = spreadsheet.getSheetById(sheetId);
 
 ## NOTE
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3688: // NOTE: unpublishBoard関数はconfig.gsに実装済み
+  - Core.gs:3858: // NOTE: unpublishBoard関数はconfig.gsに実装済み
 
 ## VERIFIED
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3734: form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+  - Core.gs:3904: form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
 
 ## setEmailCollectionType
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3734: form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+  - Core.gs:3904: form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
 
 ## EmailCollectionType
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3734: form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
+  - Core.gs:3904: form.setEmailCollectionType(FormApp.EmailCollectionType.VERIFIED);
 
 ## emailError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3739: ULog.warn('Email collection setting failed:', emailError.message);
+  - Core.gs:3909: ULog.warn('Email collection setting failed:', emailError.message);
 
 ## createParagraphTextValidation
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3792: var validation = FormApp.createParagraphTextValidation()
+  - Core.gs:3962: var validation = FormApp.createParagraphTextValidation()
 
 ## requireTextLengthLessThanOrEqualTo
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3793: .requireTextLengthLessThanOrEqualTo(140)
+  - Core.gs:3963: .requireTextLengthLessThanOrEqualTo(140)
 
 ## build
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3794: .build();
+  - Core.gs:3964: .build();
 
 ## setValidation
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3795: reasonItem.setValidation(validation);
+  - Core.gs:3965: reasonItem.setValidation(validation);
 
 ## addCheckboxItem
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3830: mainItem = form.addCheckboxItem();
+  - Core.gs:4000: mainItem = form.addCheckboxItem();
 
 ## addMultipleChoiceItem
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:3847: mainItem = form.addMultipleChoiceItem();
+  - Core.gs:4017: mainItem = form.addMultipleChoiceItem();
 
 ## DOMAIN
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4145: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+  - Core.gs:4315: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
 
 ## VIEW
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4145: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
+  - Core.gs:4315: file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
 
 ## sharingError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4151: ULog.warn('共有設定の変更に失敗しましたが、処理を続行します: ' + sharingError.message);
+  - Core.gs:4321: ULog.warn('共有設定の変更に失敗しましたが、処理を続行します: ' + sharingError.message);
 
 ## rename
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4158: spreadsheetObj.rename(spreadsheetName);
+  - Core.gs:4328: spreadsheetObj.rename(spreadsheetName);
 
 ## sheetNameError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4186: ULog.error('[ERROR]', '❌ フォーム連携後のシート名取得エラー:', sheetNameError.message);
+  - Core.gs:4356: ULog.error('[ERROR]', '❌ フォーム連携後のシート名取得エラー:', sheetNameError.message);
 
 ## DOMAIN_WITH_LINK
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4344: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+  - Core.gs:4514: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
 
 ## EDIT
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4344: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+  - Core.gs:4514: file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
 
 ## domainSharingError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4347: ULog.warn('ドメイン共有設定に失敗: ' + domainSharingError.message);
+  - Core.gs:4517: ULog.warn('ドメイン共有設定に失敗: ' + domainSharingError.message);
 
 ## individualError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4354: ULog.error('[ERROR]', '個別ユーザー追加も失敗: ' + individualError.message);
+  - Core.gs:4524: ULog.error('[ERROR]', '個別ユーザー追加も失敗: ' + individualError.message);
 
 ## spreadsheetAddError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4364: ULog.warn('SpreadsheetApp経由の追加で警告: ' + spreadsheetAddError.message);
+  - Core.gs:4534: ULog.warn('SpreadsheetApp経由の追加で警告: ' + spreadsheetAddError.message);
 
 ## E3F2FD
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4417: allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+  - Core.gs:4587: allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
 
 ## setFontWeight
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4417: allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+  - Core.gs:4587: allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
 
 ## setBackground
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4417: allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
+  - Core.gs:4587: allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
 
 ## autoResizeColumns
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4421: sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+  - Core.gs:4591: sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
 
 ## getNumColumns
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4421: sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
+  - Core.gs:4591: sheet.autoResizeColumns(1, allHeadersRange.getNumColumns());
 
 ## resizeError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4423: ULog.warn('Auto-resize failed:', resizeError.message);
+  - Core.gs:4593: ULog.warn('Auto-resize failed:', resizeError.message);
 
 ## finalRepairError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4707: ULog.error('[ERROR]', 'getSheetsList: 最終修復も失敗:', finalRepairError.message);
+  - Core.gs:4877: ULog.error('[ERROR]', 'getSheetsList: 最終修復も失敗:', finalRepairError.message);
 
 ## property
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4739: 'getSheetsList: Spreadsheet data missing sheets property. Available properties:',
+  - Core.gs:4909: 'getSheetsList: Spreadsheet data missing sheets property. Available properties:',
 
 ## reverse
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4903: return data.reverse();
+  - Core.gs:5073: return data.reverse();
 
 ## actualHeaderIndices
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:4990: if (configHeaderName && actualHeaderIndices.hasOwnProperty(configHeaderName)) {
+  - Core.gs:5160: if (configHeaderName && actualHeaderIndices.hasOwnProperty(configHeaderName)) {
 
 ## prev
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:5073: return prev.header.length > current.header.length ? prev : current;
+  - Core.gs:5243: return prev.header.length > current.header.length ? prev : current;
 
 ## current
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:5073: return prev.header.length > current.header.length ? prev : current;
+  - Core.gs:5243: return prev.header.length > current.header.length ? prev : current;
 
 ## Code
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:5234: // 追加のコアファンクション（Code.gsから移行）
+  - Core.gs:5404: // 追加のコアファンクション（Code.gsから移行）
 
 ## USER_NOT_AUTHENTICATED
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:5264: return createErrorResponse('USER_NOT_AUTHENTICATED', 'ユーザーが認証されていません');
+  - Core.gs:5434: return createErrorResponse('USER_NOT_AUTHENTICATED', 'ユーザーが認証されていません');
 
 ## USER_ID_REQUIRED
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:5462: return createErrorResponse('ユーザーIDが指定されていません', 'USER_ID_REQUIRED');
+  - Core.gs:5632: return createErrorResponse('ユーザーIDが指定されていません', 'USER_ID_REQUIRED');
 
 ## setName
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:5644: sheet.setName(config.sheetName);
+  - Core.gs:5814: sheet.setName(config.sheetName);
 
 ## LOGIN_USER_NOT_FOUND
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6080: error: 'LOGIN_USER_NOT_FOUND',
+  - Core.gs:6250: error: 'LOGIN_USER_NOT_FOUND',
 
 ## finalError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6169: searchAttempts.push({ method: `final_method_${i + 1}`, error: finalError.message });
+  - Core.gs:6339: searchAttempts.push({ method: `final_method_${i + 1}`, error: finalError.message });
 
 ## USER_INFO_FETCH_FAILED
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6271: error: 'USER_INFO_FETCH_FAILED',
+  - Core.gs:6441: error: 'USER_INFO_FETCH_FAILED',
 
 ## OPTIMIZED
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6463: * 統合初期データ取得API - OPTIMIZED
+  - Core.gs:6633: * 統合初期データ取得API - OPTIMIZED
 
 ## consistencyError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6511: ULog.warn('⚠️ データ整合性チェック中にエラー:', consistencyError.message);
+  - Core.gs:6681: ULog.warn('⚠️ データ整合性チェック中にエラー:', consistencyError.message);
 
 ## stepError
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6550: ULog.warn('setupStep決定でエラー、デフォルト値(1)を使用:', stepError.message);
+  - Core.gs:6720: ULog.warn('setupStep決定でエラー、デフォルト値(1)を使用:', stepError.message);
 
 ## includedApis
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6690: response._meta.includedApis.push('getSheetDetails');
+  - Core.gs:6871: response._meta.includedApis.push('getSheetDetails');
 
 ## getDateCreated
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6931: const createdDate = file.getDateCreated();
+  - Core.gs:7126: const createdDate = file.getDateCreated();
 
 ## update
 - Occurrences: 1
 - Files: Core.gs
 - Samples:
-  - Core.gs:6981: * @param {Object} updateData - Data to update (e.g., {spreadsheetId: "..."})
+  - Core.gs:7176: * @param {Object} updateData - Data to update (e.g., {spreadsheetId: "..."})
 
 ## ALREADY_INITIALIZED
 - Occurrences: 1
@@ -5435,41 +5477,47 @@ Total: 944 undefined identifiers
 - Samples:
   - config.gs:2892: 'Parameter order mismatch: context must be an object, not a string. Check function call parameters.'
 
+## parameter
+- Occurrences: 1
+- Files: config.gs
+- Samples:
+  - config.gs:2904: console.error('[ERROR]', '❌ CRITICAL: Invalid sheetName parameter (type mismatch detected):', {
+
 ## syncErr
 - Occurrences: 1
 - Files: config.gs
 - Samples:
-  - config.gs:3252: ULog.warn('saveSheetConfigInContext: トップレベル同期で警告（処理継続）:', syncErr.message);
+  - config.gs:3256: ULog.warn('saveSheetConfigInContext: トップレベル同期で警告（処理継続）:', syncErr.message);
 
 ## getFormErr
 - Occurrences: 1
 - Files: config.gs
 - Samples:
-  - config.gs:3321: ULog.debug('getFormUrl 未取得（例外）:', getFormErr.message);
+  - config.gs:3325: ULog.debug('getFormUrl 未取得（例外）:', getFormErr.message);
 
 ## sheetOpenErr
 - Occurrences: 1
 - Files: config.gs
 - Samples:
-  - config.gs:3325: ULog.debug('シートアクセス失敗（フォームURL検出スキップ）:', sheetOpenErr.message);
+  - config.gs:3329: ULog.debug('シートアクセス失敗（フォームURL検出スキップ）:', sheetOpenErr.message);
 
 ## formSyncErr
 - Occurrences: 1
 - Files: config.gs
 - Samples:
-  - config.gs:3352: ULog.warn('switchToSheetInContext: フォームURL同期で警告:', formSyncErr.message);
+  - config.gs:3356: ULog.warn('switchToSheetInContext: フォームURL同期で警告:', formSyncErr.message);
 
 ## warmingError
 - Occurrences: 1
 - Files: config.gs
 - Samples:
-  - config.gs:3537: warmingError.message
+  - config.gs:3541: warmingError.message
 
 ## conversionError
 - Occurrences: 1
 - Files: config.gs
 - Samples:
-  - config.gs:3702: const error = '配列形式の設定データ変換に失敗しました: ' + conversionError.message;
+  - config.gs:3706: const error = '配列形式の設定データ変換に失敗しました: ' + conversionError.message;
 
 ## SMALL
 - Occurrences: 1
@@ -6280,12 +6328,6 @@ Total: 944 undefined identifiers
 - Files: session-utils.gs
 - Samples:
   - session-utils.gs:519: ULog.warn('⚠️ Cannot access HtmlOutput content:', contentError.message);
-
-## getEffectiveUser
-- Occurrences: 1
-- Files: setup.gs
-- Samples:
-  - setup.gs:22: var adminEmail = Session.getEffectiveUser().getEmail();
 
 ## DATABASE_ID_NOT_SET
 - Occurrences: 1

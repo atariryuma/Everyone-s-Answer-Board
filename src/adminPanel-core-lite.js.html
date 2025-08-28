@@ -1,0 +1,439 @@
+<script>
+// =============================================================================
+// ADMIN PANEL CORE LITE - 軽量版コア機能
+// =============================================================================
+// Direct Embedding アプローチ用の軽量化されたコア機能
+// include() 制限を回避するため、最小限の機能のみ実装
+
+console.log('📦 CORE LITE: Loading lightweight admin panel core...');
+
+// 基本的な名前空間の設定 + Master Initialization Controller
+window.AdminPanel = window.AdminPanel || {
+  state: {
+    current: null,
+    isLoading: false,
+    userId: null
+  },
+  core: {
+    userId: null,
+    userIdPromise: null
+  },
+  initialization: {
+    isCompleted: false,
+    isInProgress: false,
+    masterControllerActive: false,
+    stage: 'IDLE', // IDLE → DIRECT → CORE → FRAMEWORK → COMPLETED
+    stages: {
+      DIRECT_EMBEDDED: { completed: false, error: null },
+      CORE_LITE: { completed: false, error: null },
+      FRAMEWORK: { completed: false, error: null }
+    }
+  }
+};
+
+// ユーザーID初期化
+function initializeUserId() {
+  console.log('🔐 CORE LITE: Initializing UserId');
+  
+  if (window.AdminPanel.core.userIdPromise) {
+    console.log('🔐 CORE LITE: Reusing existing userIdPromise');
+    return window.AdminPanel.core.userIdPromise;
+  }
+
+  window.AdminPanel.core.userIdPromise = new Promise((resolve, reject) => {
+    console.log('🔐 CORE LITE: Creating new userIdPromise');
+    
+    // Direct communication using safeGoogleScriptRun
+    if (typeof window.safeGoogleScriptRun === 'function') {
+      window.safeGoogleScriptRun('getCurrentUserStatus')
+        .then((result) => {
+          if (result && result.status === 'success' && result.userInfo && result.userInfo.userId) {
+            window.AdminPanel.core.userId = result.userInfo.userId;
+            window.AdminPanel.state.userId = window.AdminPanel.core.userId;
+            console.log('✅ CORE LITE: UserID initialized:', window.AdminPanel.core.userId);
+            resolve(window.AdminPanel.core.userId);
+          } else {
+            console.error('❌ CORE LITE: Invalid user status response:', result);
+            reject(new Error('Failed to get valid user status'));
+          }
+        })
+        .catch((error) => {
+          console.error('❌ CORE LITE: Failed to initialize userId:', error);
+          reject(error);
+        });
+    } else {
+      console.error('❌ CORE LITE: safeGoogleScriptRun not available');
+      reject(new Error('safeGoogleScriptRun not available'));
+    }
+  });
+
+  return window.AdminPanel.core.userIdPromise;
+}
+
+// 基本的なロード機能
+function loadInitialData() {
+  console.log('📊 CORE LITE: Loading initial data...');
+  
+  return initializeUserId()
+    .then(() => {
+      if (!window.AdminPanel.core.userId) {
+        throw new Error('UserId not available');
+      }
+      
+      return window.safeGoogleScriptRun('getInitialData', window.AdminPanel.core.userId, null);
+    })
+    .then((response) => {
+      console.log('✅ CORE LITE: Initial data loaded:', response);
+      if (response && response.userInfo) {
+        window.AdminPanel.state.current = response;
+      }
+      return response;
+    })
+    .catch((error) => {
+      console.error('❌ CORE LITE: Failed to load initial data:', error);
+      throw error;
+    });
+}
+
+// グローバル関数として公開
+window.initializeUserId = initializeUserId;
+window.loadInitialData = loadInitialData;
+window.AdminPanel.loadInitialData = loadInitialData;
+
+// 基本的なメッセージ表示機能
+function showMessage(message, type = 'info') {
+  console.log(`📢 CORE LITE: ${type.toUpperCase()}: ${message}`);
+  
+  // 簡易的なメッセージ表示（必要に応じて拡張）
+  const messageDiv = document.createElement('div');
+  messageDiv.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      ${type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️'} 
+      <span>${message}</span>
+    </div>
+  `;
+  messageDiv.style.cssText = `
+    position: fixed; 
+    top: 20px; 
+    right: 20px; 
+    padding: 12px 16px; 
+    background: ${type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#2563eb'}; 
+    color: white; 
+    border-radius: 6px; 
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    max-width: 400px;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+  `;
+  
+  document.body.appendChild(messageDiv);
+  
+  // アニメーション
+  setTimeout(() => {
+    messageDiv.style.opacity = '1';
+    messageDiv.style.transform = 'translateX(0)';
+  }, 10);
+  
+  setTimeout(() => {
+    messageDiv.style.opacity = '0';
+    messageDiv.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      if (messageDiv.parentNode) {
+        messageDiv.parentNode.removeChild(messageDiv);
+      }
+    }, 300);
+  }, type === 'error' ? 8000 : 5000);
+}
+
+window.showMessage = showMessage;
+
+// 変数衝突修正後のテスト機能
+function testVariableFixCommunication() {
+  console.log('🧪 CORE LITE: Testing variable fix communication...');
+  
+  return window.safeGoogleScriptRun('diagnosticFullTest')
+    .then((result) => {
+      console.log('✅ CORE LITE: Variable fix test successful!', result);
+      showMessage('変数衝突修正テスト成功: ' + result.message, 'success');
+      return result;
+    })
+    .catch((error) => {
+      console.error('❌ CORE LITE: Variable fix test failed:', error);
+      showMessage('変数衝突修正テスト失敗: ' + error.message, 'error');
+      throw error;
+    });
+}
+
+window.testVariableFixCommunication = testVariableFixCommunication;
+
+// Master Controller統合テスト機能
+function testMasterControllerIntegration() {
+  console.log('🎯 MASTER TEST: Testing Master Controller integration...');
+  
+  return window.safeGoogleScriptRun('diagnosticMasterController')
+    .then((result) => {
+      console.log('✅ MASTER TEST: Integration test successful!', result);
+      showMessage('Master Controller統合テスト成功: ' + result.message, 'success');
+      
+      // 初期化状態の詳細ログ
+      console.log('📊 MASTER TEST: Initialization state:', {
+        isCompleted: window.AdminPanel.initialization.isCompleted,
+        isInProgress: window.AdminPanel.initialization.isInProgress,
+        stage: window.AdminPanel.initialization.stage,
+        stages: window.AdminPanel.initialization.stages
+      });
+      
+      return result;
+    })
+    .catch((error) => {
+      console.error('❌ MASTER TEST: Integration test failed:', error);
+      showMessage('Master Controller統合テスト失敗: ' + error.message, 'error');
+      throw error;
+    });
+}
+
+window.testMasterControllerIntegration = testMasterControllerIntegration;
+
+// =============================================================================
+// MASTER INITIALIZATION CONTROLLER
+// =============================================================================
+
+function initializeMasterController() {
+  console.log('🎯 MASTER: Starting Master Initialization Controller');
+  console.log('📊 MASTER: Current system state:', {
+    isInProgress: window.AdminPanel.initialization.isInProgress,
+    isCompleted: window.AdminPanel.initialization.isCompleted,
+    masterControllerActive: window.AdminPanel.initialization.masterControllerActive,
+    stage: window.AdminPanel.initialization.stage
+  });
+  
+  // 重複初期化防止
+  if (window.AdminPanel.initialization.isInProgress) {
+    console.log('⚠️ MASTER: Initialization already in progress, skipping');
+    return Promise.resolve('already_in_progress');
+  }
+  
+  if (window.AdminPanel.initialization.isCompleted) {
+    console.log('✅ MASTER: Initialization already completed');
+    return Promise.resolve('already_completed');
+  }
+  
+  // 制御権を明確に宣言
+  window.AdminPanel.initialization.isInProgress = true;
+  window.AdminPanel.initialization.masterControllerActive = true;
+  window.AdminPanel.initialization.stage = 'DIRECT';
+  
+  console.log('🚀 MASTER: Stage 1/3 - Direct Embedded Communication Test');
+  console.log('📋 MASTER: Master Controller has taken control of initialization');
+  
+  // Stage 1: Direct Embedded Test
+  return testDirectEmbeddedCommunication()
+    .then((result) => {
+      console.log('✅ MASTER: Stage 1/3 completed - Direct Embedded');
+      console.log('📊 MASTER: Direct Embedded result:', result);
+      window.AdminPanel.initialization.stages.DIRECT_EMBEDDED.completed = true;
+      window.AdminPanel.initialization.stage = 'CORE';
+      
+      console.log('🚀 MASTER: Stage 2/3 - Core Lite User Initialization');
+      console.log('🔄 MASTER: Progress: Direct Embedded ✅ | Core Lite ⏳ | Framework ⏸️');
+      return initializeCoreSystem();
+    })
+    .then((result) => {
+      console.log('✅ MASTER: Stage 2/3 completed - Core Lite');
+      console.log('📊 MASTER: Core Lite result:', result ? 'Success with data' : 'Success');
+      window.AdminPanel.initialization.stages.CORE_LITE.completed = true;
+      window.AdminPanel.initialization.stage = 'FRAMEWORK';
+      
+      console.log('🚀 MASTER: Stage 3/3 - Framework System');
+      console.log('🔄 MASTER: Progress: Direct Embedded ✅ | Core Lite ✅ | Framework ⏳');
+      return initializeFrameworkSystem();
+    })
+    .then(() => {
+      console.log('✅ MASTER: All 3 stages completed successfully');
+      console.log('🔄 MASTER: Final Progress: Direct Embedded ✅ | Core Lite ✅ | Framework ✅');
+      window.AdminPanel.initialization.stage = 'COMPLETED';
+      window.AdminPanel.initialization.isCompleted = true;
+      window.AdminPanel.initialization.isInProgress = false;
+      
+      // 最終統合テスト実行
+      console.log('🧪 MASTER: Running final integration validation test');
+      return testMasterControllerIntegration();
+    })
+    .then(() => {
+      console.log('🎉 MASTER: Complete system initialization with integration test successful');
+      console.log('📋 MASTER: Final system state:', {
+        isCompleted: true,
+        masterControllerActive: true,
+        allStagesCompleted: Object.values(window.AdminPanel.initialization.stages).every(s => s.completed)
+      });
+      showMessage('管理パネル初期化完了 (統合システム)', 'success');
+      return 'completed';
+    })
+    .catch((error) => {
+      console.error('💥 MASTER: Initialization failed:', error);
+      window.AdminPanel.initialization.isInProgress = false;
+      
+      // エラーステージ記録
+      const currentStage = window.AdminPanel.initialization.stage;
+      if (currentStage === 'DIRECT') {
+        window.AdminPanel.initialization.stages.DIRECT_EMBEDDED.error = error;
+      } else if (currentStage === 'CORE') {
+        window.AdminPanel.initialization.stages.CORE_LITE.error = error;
+      } else if (currentStage === 'FRAMEWORK') {
+        window.AdminPanel.initialization.stages.FRAMEWORK.error = error;
+      }
+      
+      showMessage('初期化エラー: ' + error.message, 'error');
+      throw error;
+    });
+}
+
+// Stage 1: Direct Embedded Communication Test
+function testDirectEmbeddedCommunication() {
+  console.log('🔬 MASTER: Testing direct embedded communication');
+  
+  if (typeof window.safeGoogleScriptRun !== 'function') {
+    throw new Error('safeGoogleScriptRun not available');
+  }
+  
+  return window.safeGoogleScriptRun('diagnosticPing')
+    .then((result) => {
+      console.log('✅ MASTER: Direct communication test successful', result);
+      return result;
+    });
+}
+
+// Stage 2: Core System Initialization
+function initializeCoreSystem() {
+  console.log('🔧 MASTER: Initializing core system');
+  
+  return initializeUserId()
+    .then((userId) => {
+      console.log('✅ MASTER: Core system initialized with userId:', userId);
+      return loadInitialData();
+    })
+    .then((initialData) => {
+      console.log('✅ MASTER: Initial data loaded:', initialData);
+      return initialData;
+    });
+}
+
+// Stage 3: Framework System Initialization (Safe)
+function initializeFrameworkSystem() {
+  console.log('🖼️ MASTER: Initializing framework system');
+  
+  // フレームワークシステムが存在し、安全に初期化できるかチェック
+  if (typeof window.initializeAdminPanelMaster === 'function') {
+    console.log('🖼️ MASTER: Framework system available, delegating initialization');
+    
+    // Framework system will check AdminPanel.initialization.isCompleted 
+    // which is now properly initialized
+    try {
+      window.initializeAdminPanelMaster();
+      console.log('✅ MASTER: Framework system initialized');
+      return Promise.resolve('framework_initialized');
+    } catch (error) {
+      console.warn('⚠️ MASTER: Framework initialization failed, continuing without:', error);
+      return Promise.resolve('framework_skipped');
+    }
+  } else {
+    console.log('ℹ️ MASTER: Framework system not available, skipping');
+    return Promise.resolve('framework_not_available');
+  }
+}
+
+window.initializeMasterController = initializeMasterController;
+
+// =============================================================================
+// IMMEDIATE MASTER CONTROLLER EXECUTION  
+// =============================================================================
+console.log('🚀 MASTER: IMMEDIATE EXECUTION - Starting Master Controller instantly');
+console.log('📊 MASTER: Current environment state:', {
+  hasAdminPanel: !!window.AdminPanel,
+  hasGoogleScript: typeof window.google !== 'undefined',
+  hasSafeGoogleScriptRun: typeof window.safeGoogleScriptRun === 'function',
+  documentReadyState: document.readyState,
+  timestamp: new Date().toISOString()
+});
+
+// 最優先でMaster Controller制御を宣言
+if (window.AdminPanel && window.AdminPanel.initialization) {
+  window.AdminPanel.initialization.masterControllerActive = true;
+  console.log('📋 MASTER: IMMEDIATE CONTROL TAKEN - Other systems blocked');
+  console.log('🔒 MASTER: Control flag set - masterControllerActive = true');
+  
+  // 制御状態の詳細ログ
+  console.log('📊 MASTER: Initialization state after control taken:', {
+    masterControllerActive: window.AdminPanel.initialization.masterControllerActive,
+    isInProgress: window.AdminPanel.initialization.isInProgress,
+    isCompleted: window.AdminPanel.initialization.isCompleted,
+    stage: window.AdminPanel.initialization.stage
+  });
+} else {
+  console.error('💥 MASTER: AdminPanel namespace not available!');
+  console.error('💥 MASTER: Critical error - cannot take control');
+}
+
+// Direct Embedded システムが利用可能かチェック
+if (typeof window.safeGoogleScriptRun === 'function') {
+  console.log('✅ MASTER: Direct Embedded system available, proceeding with immediate initialization');
+  console.log('⚡ MASTER: BYPASSING DOM wait - starting immediately');
+  
+  // 即座に初期化開始（DOMContentLoaded待機なし）
+  initializeMasterController()
+    .then((result) => {
+      console.log('🎉 MASTER: IMMEDIATE initialization completed successfully:', result);
+      console.log('✅ MASTER: System ready - Master Controller in full control');
+      
+      // 最終制御状況の確認
+      console.log('📊 MASTER: Final control verification:', {
+        masterControllerActive: window.AdminPanel.initialization.masterControllerActive,
+        isCompleted: window.AdminPanel.initialization.isCompleted,
+        coreUserIdAvailable: !!window.AdminPanel.core.userId,
+        frameworkShouldBeBlocked: true
+      });
+    })
+    .catch((error) => {
+      console.error('💥 MASTER: IMMEDIATE initialization failed:', error);
+      
+      // DOM完了後に再試行
+      console.log('🔄 MASTER: Falling back to DOM ready initialization');
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('🔄 MASTER: DOM ready fallback attempt');
+        initializeMasterController()
+          .then((result) => {
+            console.log('🎉 MASTER: DOM fallback initialization successful:', result);
+          })
+          .catch((fallbackError) => {
+            console.error('💀 MASTER: Even DOM fallback failed:', fallbackError);
+            showMessage('初期化に完全に失敗しました。ページを再読み込みしてください。', 'error');
+          });
+      });
+    });
+} else {
+  // Direct Embedded未準備の場合はDOM完了まで待機
+  console.log('⏳ MASTER: Direct Embedded not ready, waiting for DOM...');
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 MASTER: DOM ready, executing Master Controller');
+    
+    // DOM完了時にも制御を再宣言
+    if (window.AdminPanel && window.AdminPanel.initialization) {
+      window.AdminPanel.initialization.masterControllerActive = true;
+      console.log('📋 MASTER: DOM - Control reaffirmed');
+    }
+    
+    initializeMasterController()
+      .then((result) => {
+        console.log('🎉 MASTER: DOM initialization completed:', result);
+      })
+      .catch((error) => {
+        console.error('💥 MASTER: DOM initialization failed:', error);
+        showMessage('初期化に失敗しました。ページを再読み込みしてください。', 'error');
+      });
+  });
+}
+</script>

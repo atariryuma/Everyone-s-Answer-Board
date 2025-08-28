@@ -212,10 +212,30 @@
   let userIdInitialized = false;
 
   // マルチテナント対応: バックエンドから安全にユーザーIDを取得
-  function initializeUserId() {
-    // 重複初期化防止
+  function initializeUserIdFramework() {
+    console.log('🖼️ FRAMEWORK: initializeUserIdFramework called');
+    
+    // Master Controller制御チェック
+    if (window.AdminPanel && window.AdminPanel.initialization && window.AdminPanel.initialization.masterControllerActive) {
+      console.log('🎯 FRAMEWORK: Master Controller is active, delegating to Core Lite system');
+      
+      // Master Controller経由でCore Liteの初期化を使用
+      if (window.AdminPanel.core && window.AdminPanel.core.userId) {
+        console.log('✅ FRAMEWORK: Using userId from Core Lite system:', window.AdminPanel.core.userId);
+        userId = window.AdminPanel.core.userId;
+        userIdInitialized = true;
+        return Promise.resolve(userId);
+      } else {
+        console.log('⏳ FRAMEWORK: Waiting for Master Controller to complete Core Lite initialization');
+        return Promise.reject(new Error('Master Controller initialization in progress'));
+      }
+    }
+    
+    console.log('⚠️ FRAMEWORK: Master Controller not active, using fallback initialization');
+    
+    // フォールバック: Master Controller未起動の場合のみ従来ロジック
     if (isInitializingUserId) {
-      console.warn('⚠️ UserId initialization already in progress, skipping duplicate call');
+      console.warn('⚠️ FRAMEWORK: UserId initialization already in progress, skipping duplicate call');
       return Promise.reject(new Error('初期化が既に進行中です'));
     }
     
@@ -224,9 +244,15 @@
       return Promise.resolve(userId);
     }
 
+    // 最終Master Controller制御チェック
+    if (window.AdminPanel && window.AdminPanel.initialization && window.AdminPanel.initialization.masterControllerActive) {
+      console.log('🚫 FRAMEWORK: Aborting fallback initialization - Master Controller is active');
+      return Promise.reject(new Error('Master Controller taking control'));
+    }
+    
     isInitializingUserId = true;
-    console.group('🔐 Initializing UserId');
-    logDebug('📞 About to call getCurrentUserStatus');
+    console.group('🔐 FRAMEWORK FALLBACK: Initializing UserId (Master Controller not active)');
+    logDebug('📞 About to call getCurrentUserStatus (fallback mode)');
 
     return new Promise((resolve, reject) => {
       google.script.run
@@ -266,6 +292,24 @@
 
   // リトライ付きユーザーID取得（改善版）
   async function initializeUserIdWithRetry(maxRetries = 3, baseDelay = 1000) {
+    console.log('🖼️ FRAMEWORK: initializeUserIdWithRetry called');
+    
+    // 最優先Master Controller制御チェック
+    if (window.AdminPanel && window.AdminPanel.initialization && window.AdminPanel.initialization.masterControllerActive) {
+      console.log('🚫 FRAMEWORK: BLOCKED by Master Controller - delegating to Core Lite');
+      
+      if (window.AdminPanel.core && window.AdminPanel.core.userId) {
+        console.log('✅ FRAMEWORK: Using Master Controller managed userId:', window.AdminPanel.core.userId);
+        userId = window.AdminPanel.core.userId;
+        userIdInitialized = true;
+        return userId;
+      } else {
+        console.log('⏳ FRAMEWORK: Master Controller initialization in progress, aborting retry logic');
+        throw new Error('Master Controller managing initialization');
+      }
+    }
+    
+    console.log('⚠️ FRAMEWORK: Master Controller not active, proceeding with retry logic');
     let lastError = null;
     
     for (let i = 0; i < maxRetries; i++) {
@@ -276,7 +320,7 @@
           return userId;
         }
 
-        return await initializeUserId();
+        return await initializeUserIdFramework();
       } catch (error) {
         lastError = error;
         
@@ -308,21 +352,36 @@
   }
 
   // ユーザーID取得の完了を待つPromise（リトライ機構付き）
-  const userIdPromise = initializeUserIdWithRetry().catch((error) => {
-    console.error('🚨 Critical: UserID initialization completely failed:', error);
-    // ユーザーへのメッセージを表示
-    const errorMessage = '認証に失敗しました。ブラウザを更新してもう一度お試しください。';
-    showMessage && showMessage(errorMessage, 'error');
+  // Master Controller制御チェック - userIdPromise作成前の最終確認
+  console.log('🖼️ FRAMEWORK: About to create userIdPromise');
+  
+  let userIdPromise;
+  
+  if (window.AdminPanel && window.AdminPanel.initialization && window.AdminPanel.initialization.masterControllerActive) {
+    console.log('🚫 FRAMEWORK: Master Controller active - ABORTING userIdPromise creation');
+    console.log('📋 FRAMEWORK: Deferring all initialization to Master Controller');
     
-    // デバッグ情報を提供
-    console.group('🔧 Debug Information');
-    console.log('Browser:', navigator.userAgent);
-    console.log('Current URL:', window.location.href);
-    console.log('Google Script Host:', 'script.google.com');
-    console.groupEnd();
+    // Master Controller管理下では管理されたPromiseを作成
+    userIdPromise = Promise.resolve('master_controller_managed');
+  } else {
+    console.log('⚠️ FRAMEWORK: No Master Controller detected - creating standard userIdPromise');
     
-    throw error;
-  });
+    userIdPromise = initializeUserIdWithRetry().catch((error) => {
+      console.error('🚨 Critical: UserID initialization completely failed:', error);
+      // ユーザーへのメッセージを表示
+      const errorMessage = '認証に失敗しました。ブラウザを更新してもう一度お試しください。';
+      showMessage && showMessage(errorMessage, 'error');
+      
+      // デバッグ情報を提供
+      console.group('🔧 Debug Information');
+      console.log('Browser:', navigator.userAgent);
+      console.log('Current URL:', window.location.href);
+      console.log('Google Script Host:', 'script.google.com');
+      console.groupEnd();
+      
+      throw error;
+    });
+  }
 
   // =============================================================================
   // GLOBAL ERROR HANDLING - Enhanced
@@ -1388,14 +1447,18 @@
   // =============================================================================
 
   function initializeAdminPanelMaster() {
-    // シンプル化: 重複初期化チェックを簡素化
+    console.log('🖼️ FRAMEWORK: initializeAdminPanelMaster called by Master Controller');
+    
+    // Master Controller統合: 初期化済みチェック
     if (window.AdminPanel.initialization.isCompleted) {
-      logDebug('✅ AdminPanel already initialized');
-      return;
+      console.log('✅ FRAMEWORK: AdminPanel already initialized by Master Controller');
+      return Promise.resolve('already_completed');
     }
 
-    window.AdminPanel.initialization.isInProgress = true;
-    logInfo('🚀 AdminPanel Master Initialization Started');
+    console.log('🖼️ FRAMEWORK: Starting Framework-specific initialization');
+    
+    // Master Controllerが既に基本初期化を完了していることを前提として
+    // Framework固有のUI初期化のみ実行
 
     // Phase 1: Core初期化
     try {
@@ -1543,12 +1606,12 @@
     }, 500);
   }
 
-  // 単一DOMContentLoadedハンドラー
-  if (document.readyState !== 'loading') {
-    initializeAdminPanelMaster();
-  } else {
-    document.addEventListener('DOMContentLoaded', initializeAdminPanelMaster);
-  }
+  // Master Controller統合: 自動初期化を無効化
+  // initializeAdminPanelMasterはMaster Controllerから呼び出される
+  console.log('🖼️ FRAMEWORK: Auto-initialization disabled - Master Controller will handle initialization');
+  
+  // 手動初期化用のグローバル関数として公開
+  window.initializeAdminPanelMaster = initializeAdminPanelMaster;
 
   // Update layout on resize
   window.addEventListener('resize', function () {

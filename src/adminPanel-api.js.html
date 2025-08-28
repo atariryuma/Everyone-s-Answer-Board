@@ -925,7 +925,14 @@
     }
 
     console.group('🔄 loadStatus - 一元管理版');
+    console.log('TEST1'); // 最もシンプルなテスト
     console.log('🚀 Loading system status, bypassCache:', bypassCache);
+    console.log('TEST2'); // 2番目のテスト
+    
+    // 🚨 EMERGENCY DEBUG: 直接的なコード実行確認
+    console.log('🚨 EMERGENCY DEBUG: Updated code is now executing!');
+    console.log('🚨 Current timestamp:', new Date().toISOString());
+    console.log('🚨 This confirms updated JS is loaded');
 
     // 新しい実行を開始（フォールバック機構付き）
     loadStatusInProgress = userIdPromise
