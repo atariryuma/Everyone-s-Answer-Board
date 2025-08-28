@@ -140,23 +140,9 @@ function debugLog(message, ...args) {
 
 // errorLog統合: Core.gsのlogErrorに統一。この関数は削除し、Core.gsを使用
 
-/**
- * 警告ログ出力
- * @param {string} message - 警告メッセージ
- * @param {...any} args - 追加引数
- */
-function warnLog(message, ...args) {
-  controlledLog('WARN', null, message, ...args);
-}
+// warnLog - 重複削除済み（Core.gsの実装を使用）
 
-/**
- * 情報ログ出力
- * @param {string} message - 情報メッセージ
- * @param {...any} args - 追加引数
- */
-function infoLog(message, ...args) {
-  controlledLog('INFO', null, message, ...args);
-}
+// infoLog - 重複削除済み（Core.gsの実装を使用）
 
 /**
  * パフォーマンス計測用のタイマー

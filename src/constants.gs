@@ -1278,7 +1278,7 @@ class URLSearchParams {
 
 // 本当に必要な未定義関数の最小実装
 const setupStep = (step) => console.log(`[SETUP] ${step}`);
-const checkReactionState = () => true; // 常にtrueを返すダミー
+// checkReactionState は Core.gs 内で定義済み（関数内ローカル）
 const cleanupExpired = () => console.log('[CLEANUP] Expired items cleaned');
 const dms = () => console.log('[DMS] Document management operation');
 const resolveValue = (value) => value; // パススルー関数

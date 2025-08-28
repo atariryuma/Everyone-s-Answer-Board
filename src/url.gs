@@ -9,17 +9,7 @@
 
 // errorLog統合: Core.gsのlogErrorに統一
 
-if (typeof warnLog === 'undefined') {
-  function warnLog(message, ...args) {
-    console.warn('[WARN]', message, ...args);
-  }
-}
-
-if (typeof infoLog === 'undefined') {
-  function infoLog(message, ...args) {
-    console.log('[INFO]', message, ...args);
-  }
-}
+// warnLog と infoLog は Core.gs で定義済み
 
 /**
  * Retrieve the deployed Web App URL via Apps Script API.
