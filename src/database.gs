@@ -181,68 +181,6 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
   }
 }
 
-/**
- * 全ユーザー一覧を取得（管理者用）
- */
-function getAllUsersForAdmin() {
-  try {
-    // 管理者権限チェック
-    if (!isDeployUser()) {
-      throw new Error('この機能にアクセスする権限がありません。');
-    }
-    
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    
-    if (!dbId) {
-      throw new Error('データベースIDが設定されていません');
-    }
-    
-    const service = getSheetsServiceCached();
-    const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-    
-    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
-    const values = data.valueRanges[0].values || [];
-    
-    if (values.length <= 1) {
-      return []; // ヘッダーのみの場合
-    }
-    
-    const headers = values[0];
-    const users = [];
-    
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i];
-      const user = {};
-      
-      headers.forEach((header, index) => {
-        user[header] = row[index] || '';
-      });
-      
-      // createdAt を registrationDate にマッピング
-      if (user.createdAt) {
-        user.registrationDate = user.createdAt;
-      }
-
-      // 設定情報をパース
-      try {
-        user.configJson = JSON.parse(user.configJson || '{}');
-      } catch (e) {
-        user.configJson = {};
-      }
-      
-      users.push(user);
-      console.log(`DEBUG: getAllUsersForAdmin - User object: ${JSON.stringify(user)}`);
-    }
-    
-    console.log(`✅ 管理者用ユーザー一覧を取得: ${users.length}件`);
-    return users;
-    
-  } catch (error) {
-    console.error('getAllUsersForAdmin error:', error.message);
-    throw new Error('ユーザー一覧の取得に失敗しました: ' + error.message);
-  }
-}
 
 /**
  * 管理者による他ユーザーアカウント削除
@@ -484,62 +422,6 @@ function getDeletionLogs() {
   }
 }
 
-/**
- * 長期キャッシュ対応Sheetsサービスを取得
- * @returns {object} Sheets APIサービス
- */
-function getSheetsServiceCached(forceRefresh) {
-  try {
-    console.log('🔧 getSheetsServiceCached: 新規サービス作成開始（キャッシュなし版）');
-    
-    var accessToken;
-    if (forceRefresh) {
-      console.log('🔐 認証トークンも強制リフレッシュ');
-      cacheManager.remove('service_account_token');
-      accessToken = generateNewServiceAccountToken();
-    } else {
-      accessToken = getServiceAccountTokenCached();
-    }
-    
-    if (!accessToken) {
-      throw new Error('サービスアカウントトークンが取得できませんでした');
-    }
-    
-    var service = createSheetsService(accessToken);
-    if (!service || !service.baseUrl || !service.accessToken) {
-      console.error('❌ サービスオブジェクト検証失敗:', {
-        hasService: !!service,
-        hasBaseUrl: !!(service && service.baseUrl),
-        hasAccessToken: !!(service && service.accessToken)
-      });
-      throw new Error('Sheets APIサービスの初期化に失敗しました: 有効なサービスオブジェクトを作成できません');
-    }
-    
-    console.log('✅ サービスオブジェクト検証成功:', {
-      hasBaseUrl: true,
-      hasAccessToken: true,
-      hasSpreadsheets: !!service.spreadsheets,
-      hasGet: !!(service.spreadsheets && typeof service.spreadsheets.get === 'function'),
-      baseUrl: service.baseUrl
-    });
-    
-    // 関数の存在確認（重要: Google Apps Scriptで関数が失われていないか確認）
-    if (!service.spreadsheets || typeof service.spreadsheets.get !== 'function') {
-      console.error('❌ 重要な関数が失われています:', {
-        hasSpreadsheets: !!service.spreadsheets,
-        getType: service.spreadsheets ? typeof service.spreadsheets.get : 'no spreadsheets'
-      });
-      throw new Error('SheetsServiceオブジェクトの関数が正しく設定されていません');
-    }
-    
-    console.log('✅ キャッシュ用新規Sheetsサービス作成完了（関数検証済み）');
-    return service;
-    
-  } catch (error) {
-    console.error('❌ getSheetsServiceCached error:', error.message);
-    throw error;
-  }
-}
 
 /**
  * 最適化されたSheetsサービスを取得
@@ -659,227 +541,6 @@ function fixUserDataConsistency(userId) {
  * @returns {object|null} ユーザー情報
  */
 
-/**
- * データベースからユーザーを取得（エラーハンドリング強化版）
- * @param {string} field - 検索フィールド
- * @param {string} value - 検索値
- * @param {object} options - オプション設定
- * @returns {object|null} ユーザー情報
- */
-function fetchUserFromDatabase(field, value, options = {}) {
-  // オプションのデフォルト値
-  var opts = {
-    retryCount: options.retryCount || 2,
-    enableDiagnostics: options.enableDiagnostics !== false,
-    autoRepair: options.autoRepair !== false,
-    ...options
-  };
-  
-  var retryAttempt = 0;
-  var lastError = null;
-  
-  while (retryAttempt <= opts.retryCount) {
-    try {
-      console.log('fetchUserFromDatabase - 試行 ' + (retryAttempt + 1) + '/' + (opts.retryCount + 1) + 
-        ': ' + field + '=' + value);
-      
-      var props = PropertiesService.getScriptProperties();
-      var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-      
-      if (!dbId) {
-        var configError = new Error('データベースIDが設定されていません');
-        configError.type = 'CONFIG_ERROR';
-        throw configError;
-      }
-      
-      // サービス取得（リトライ時は強制リフレッシュ）
-      var service;
-      try {
-        service = retryAttempt > 0 ? getSheetsServiceCached(true) : getCachedSheetsService();
-      } catch (serviceError) {
-        serviceError.type = 'SERVICE_ERROR';
-        throw serviceError;
-      }
-      
-      var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-      
-      console.log('fetchUserFromDatabase - 検索開始: ' + field + '=' + value);
-      console.log('fetchUserFromDatabase - データベースID: ' + dbId);
-      console.log('fetchUserFromDatabase - シート名: ' + sheetName);
-      
-      // キャッシュクリア（リトライ時は必須）
-      if (retryAttempt > 0 || opts.clearCache) {
-        const batchGetCacheKey = `batchGet_${dbId}_["'${sheetName}'!A:H"]`;
-        try {
-          cacheManager.remove(batchGetCacheKey);
-        } catch (cacheError) {
-          console.warn('fetchUserFromDatabase - キャッシュクリア警告:', cacheError.message);
-        }
-      }
-      
-      // データ取得
-      var data;
-      try {
-        data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
-      } catch (dataError) {
-        dataError.type = 'DATA_ACCESS_ERROR';
-        throw dataError;
-      }
-      
-      var values = data.valueRanges[0].values || [];
-      
-      console.log('fetchUserFromDatabase - データ取得完了: rows=' + values.length);
-      
-      if (values.length === 0) {
-        var noDataError = new Error('データベースが空です');
-        noDataError.type = 'NO_DATA_ERROR';
-        throw noDataError;
-      }
-      
-      var headers = values[0];
-      var fieldIndex = headers.indexOf(field);
-      
-      if (fieldIndex === -1) {
-        console.error('fetchUserFromDatabase: 指定されたフィールドが見つかりません:', {
-          field: field,
-          availableHeaders: headers
-        });
-        var fieldError = new Error('検索フィールド "' + field + '" が見つかりません');
-        fieldError.type = 'FIELD_ERROR';
-        throw fieldError;
-      }
-      
-      console.log('fetchUserFromDatabase - フィールド検索開始: index=' + fieldIndex);
-      console.log('fetchUserFromDatabase - デバッグ: 検索対象データ行数=' + (values.length > 1 ? values.length - 1 : 0));
-      
-      // ユーザー検索
-      for (var i = 1; i < values.length; i++) { // i=0はヘッダー行のためスキップ
-        var currentRow = values[i];
-        var currentValue = currentRow[fieldIndex];
-        
-        // 値の比較を厳密に行う（文字列の trim と型変換）
-        var normalizedCurrentValue = currentValue ? String(currentValue).trim() : '';
-        var normalizedSearchValue = value ? String(value).trim() : '';
-        
-        // 詳細ログ（最初の試行時のみ）
-        if (retryAttempt === 0) {
-          console.log('fetchUserFromDatabase - 行' + i + '値比較:', {
-            original: currentValue,
-            normalized: normalizedCurrentValue,
-            searchValue: normalizedSearchValue,
-            isMatch: normalizedCurrentValue === normalizedSearchValue
-          });
-        }
-        
-        if (normalizedCurrentValue === normalizedSearchValue) {
-          console.log('fetchUserFromDatabase - ユーザー発見 at rowIndex:', i);
-          var user = {};
-          headers.forEach(function(header, index) {
-            var rawValue = currentRow[index];
-            user[header] = rawValue !== undefined && rawValue !== null ? rawValue : '';
-          });
-          
-          // isActive フィールドの型変換
-          if (user.hasOwnProperty('isActive')) {
-            if (user.isActive === true || user.isActive === 'true' || user.isActive === 'TRUE') {
-              user.isActive = true;
-            } else if (user.isActive === false || user.isActive === 'false' || user.isActive === 'FALSE') {
-              user.isActive = false;
-            } else {
-              user.isActive = true; // デフォルト
-            }
-          }
-          
-          console.log('✅ fetchUserFromDatabase - ユーザー取得成功:', field + '=' + value, 
-            'userId=' + user.userId, 'isActive=' + user.isActive);
-          
-          return user;
-        }
-      }
-      
-      // ユーザーが見つからない場合
-      console.warn('⚠️ fetchUserFromDatabase - ユーザーが見つかりません:', {
-        field: field,
-        value: value,
-        totalSearchedRows: values.length - 1,
-        attempt: retryAttempt + 1,
-        availableUserIds: values.slice(1).map(row => row[headers.indexOf('userId')] || 'undefined').slice(0, 5)
-      });
-      
-      var notFoundError = new Error('ユーザー情報が見つかりません');
-      notFoundError.type = 'USER_NOT_FOUND';
-      notFoundError.searchCriteria = { field: field, value: value };
-      throw notFoundError;
-      
-    } catch (error) {
-      lastError = error;
-      retryAttempt++;
-      
-      console.error('❌ fetchUserFromDatabase - エラー発生 (試行 ' + retryAttempt + '/' + (opts.retryCount + 1) + 
-        ') (' + field + ':' + value + '):', error.message);
-      
-      // エラータイプ別の処理
-      if (error.type === 'CONFIG_ERROR' || error.type === 'FIELD_ERROR') {
-        // 設定エラーやフィールドエラーはリトライしても無駄
-        console.error('❌ 致命的エラーのためリトライを中止:', error.type);
-        break;
-      }
-      
-      // 最後の試行で失敗した場合の診断・修復
-      if (retryAttempt > opts.retryCount) {
-        console.error('❌ 全ての試行が失敗しました');
-        
-        // 診断実行（オプションが有効な場合）
-        if (opts.enableDiagnostics) {
-          try {
-            console.log('🔍 エラー診断を実行中...');
-            var diagnosis = diagnoseDatabase(field === 'userId' ? value : null);
-            console.log('📊 診断結果:', diagnosis.summary);
-            
-            // 自動修復試行（オプションが有効で、診断で問題が見つかった場合）
-            if (opts.autoRepair && diagnosis.summary.criticalIssues.length > 0) {
-              console.log('🔧 自動修復を試行中...');
-              var repairResult = performAutoRepair(field === 'userId' ? value : null);
-              console.log('🔧 修復結果:', repairResult.summary);
-              
-              if (repairResult.success) {
-                console.log('♻️ 修復後に再試行します...');
-                // 修復成功時は1回だけ追加試行
-                return fetchUserFromDatabase(field, value, { 
-                  retryCount: 0, 
-                  enableDiagnostics: false, 
-                  autoRepair: false,
-                  clearCache: true
-                });
-              }
-            }
-          } catch (diagError) {
-            console.error('❌ 診断・修復処理でエラー:', diagError.message);
-          }
-        }
-        
-        break;
-      }
-      
-      // リトライ前の待機
-      if (retryAttempt <= opts.retryCount) {
-        var waitTime = Math.min(1000 * retryAttempt, 3000); // 最大3秒
-        console.log('⏳ ' + waitTime + 'ms 待機後にリトライ...');
-        Utilities.sleep(waitTime);
-      }
-    }
-  }
-  
-  // すべてのリトライが失敗した場合
-  console.error('❌ fetchUserFromDatabase - 全てのリトライが失敗:', lastError ? lastError.message : 'unknown error');
-  
-  // エラーの詳細情報を付加
-  var finalError = lastError || new Error('ユーザー情報の取得に失敗しました');
-  finalError.searchCriteria = { field: field, value: value };
-  finalError.retryCount = retryAttempt - 1;
-  
-  return null;
-}
 
 
 /**
@@ -1409,20 +1070,20 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
         throw new Error('無効なAPIレスポンス: オブジェクトが期待されましたが ' + typeof result + ' を受信');
       }
       
-      if (!result.valueRanges || !Array.isArray(result.valueRanges)) {
-        console.warn('⚠️ valueRanges配列が見つからないか、配列でありません:', typeof result.valueRanges);
-        result.valueRanges = []; // 空配列を設定
+      if (!dbCheckResult.valueRanges || !Array.isArray(dbCheckResult.valueRanges)) {
+        console.warn('⚠️ valueRanges配列が見つからないか、配列でありません:', typeof dbCheckResult.valueRanges);
+        dbCheckResult.valueRanges = []; // 空配列を設定
       }
       
       // リクエストした範囲数と一致するか確認
-      if (result.valueRanges.length !== ranges.length) {
-        console.warn(`⚠️ リクエスト範囲数(${ranges.length})とレスポンス数(${result.valueRanges.length})が一致しません`);
+      if (dbCheckResult.valueRanges.length !== ranges.length) {
+        console.warn(`⚠️ リクエスト範囲数(${ranges.length})とレスポンス数(${dbCheckResult.valueRanges.length})が一致しません`);
       }
       
-      console.log('✅ batchGetSheetsData 成功: 取得した範囲数:', result.valueRanges.length);
+      console.log('✅ batchGetSheetsData 成功: 取得した範囲数:', dbCheckResult.valueRanges.length);
       
       // 各範囲のデータ存在確認
-      result.valueRanges.forEach((valueRange, index) => {
+      dbCheckResult.valueRanges.forEach((valueRange, index) => {
         const hasValues = valueRange.values && valueRange.values.length > 0;
         console.log(`📊 範囲[${index}] ${ranges[index]}: ${hasValues ? valueRange.values.length + '行' : 'データなし'}`);
       if (hasValues) {
@@ -1430,7 +1091,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
       }
       });
       
-      return result;
+      return dbCheckResult;
       
     } catch (error) {
       console.error('❌ batchGetSheetsData error:', error.message);
@@ -1581,21 +1242,21 @@ function getSpreadsheetsData(service, spreadsheetId) {
       throw new Error('無効なAPIレスポンス: オブジェクトが期待されましたが ' + typeof result + ' を受信');
     }
     
-    if (!result.sheets || !Array.isArray(result.sheets)) {
-      console.warn('⚠️ sheets配列が見つからないか、配列でありません:', typeof result.sheets);
-      result.sheets = []; // 空配列を設定してエラーを避ける
+    if (!dbCheckResult.sheets || !Array.isArray(dbCheckResult.sheets)) {
+      console.warn('⚠️ sheets配列が見つからないか、配列でありません:', typeof dbCheckResult.sheets);
+      dbCheckResult.sheets = []; // 空配列を設定してエラーを避ける
     }
     
-    var sheetCount = result.sheets.length;
+    var sheetCount = dbCheckResult.sheets.length;
     console.log('✅ getSpreadsheetsData 成功: 発見シート数:', sheetCount);
     
     if (sheetCount === 0) {
       console.warn('⚠️ スプレッドシートにシートが見つかりませんでした');
     } else {
-      console.log('📋 利用可能なシート:', result.sheets.map(s => s.properties?.title || 'Unknown').join(', '));
+      console.log('📋 利用可能なシート:', dbCheckResult.sheets.map(s => s.properties?.title || 'Unknown').join(', '));
     }
     
-    return result;
+    return dbCheckResult;
     
   } catch (error) {
     console.error('❌ getSpreadsheetsData error:', error.message);
@@ -1604,45 +1265,6 @@ function getSpreadsheetsData(service, spreadsheetId) {
   }
 }
 
-/**
- * すべてのユーザー情報を取得
- * @returns {Array} ユーザー情報配列
- */
-function getAllUsers() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var service = getSheetsServiceCached();
-    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
-    
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
-    var values = data.valueRanges[0].values || [];
-    
-    if (values.length <= 1) {
-      return []; // ヘッダーのみの場合は空配列を返す
-    }
-    
-    var headers = values[0];
-    var users = [];
-    
-    for (var i = 1; i < values.length; i++) {
-      var row = values[i];
-      var user = {};
-      
-      for (var j = 0; j < headers.length; j++) {
-        user[headers[j]] = row[j] || '';
-      }
-      
-      users.push(user);
-    }
-    
-    return users;
-    
-  } catch (error) {
-    console.error('getAllUsers エラー:', error.message);
-    throw new Error('全ユーザー情報の取得に失敗しました: ' + error.message);
-  }
-}
 
 /**
  * データ更新
@@ -1890,7 +1512,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
   try {
     console.log('🔐 サービスアカウント権限確認開始:', spreadsheetId || 'DATABASE');
     
-    var result = {
+    var dbCheckResult = {
       timestamp: new Date().toISOString(),
       spreadsheetId: spreadsheetId,
       checks: {},
@@ -1906,28 +1528,28 @@ function verifyServiceAccountPermissions(spreadsheetId) {
     var dbId = spreadsheetId || props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     
     if (!dbId) {
-      result.summary.issues.push('データベースIDが設定されていません');
-      result.summary.status = 'error';
-      return result;
+      dbCheckResult.summary.issues.push('データベースIDが設定されていません');
+      dbCheckResult.summary.status = 'error';
+      return dbCheckResult;
     }
     
     // 2. サービスアカウント情報確認
     try {
       var serviceAccountEmail = getServiceAccountEmail();
-      result.checks.serviceAccount = {
+      dbCheckResult.checks.serviceAccount = {
         email: serviceAccountEmail,
         configured: !!serviceAccountEmail
       };
       
       if (!serviceAccountEmail) {
-        result.summary.issues.push('サービスアカウント設定が見つかりません');
+        dbCheckResult.summary.issues.push('サービスアカウント設定が見つかりません');
       }
     } catch (saError) {
-      result.checks.serviceAccount = {
+      dbCheckResult.checks.serviceAccount = {
         configured: false,
         error: saError.message
       };
-      result.summary.issues.push('サービスアカウント設定エラー: ' + saError.message);
+      dbCheckResult.summary.issues.push('サービスアカウント設定エラー: ' + saError.message);
     }
     
     // 3. スプレッドシートアクセステスト
@@ -1935,7 +1557,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
       var service = getSheetsServiceCached();
       var spreadsheetInfo = getSpreadsheetsData(service, dbId);
       
-      result.checks.spreadsheetAccess = {
+      dbCheckResult.checks.spreadsheetAccess = {
         status: 'success',
         sheetCount: spreadsheetInfo.sheets ? spreadsheetInfo.sheets.length : 0,
         canRead: true
@@ -1949,33 +1571,33 @@ function verifyServiceAccountPermissions(spreadsheetId) {
         };
         // 空のリクエストでテスト
         batchUpdateSpreadsheet(service, dbId, testRequest);
-        result.checks.spreadsheetAccess.canWrite = true;
+        dbCheckResult.checks.spreadsheetAccess.canWrite = true;
         
       } catch (writeError) {
-        result.checks.spreadsheetAccess.canWrite = false;
-        result.checks.spreadsheetAccess.writeError = writeError.message;
-        result.summary.issues.push('スプレッドシート書き込み権限不足: ' + writeError.message);
+        dbCheckResult.checks.spreadsheetAccess.canWrite = false;
+        dbCheckResult.checks.spreadsheetAccess.writeError = writeError.message;
+        dbCheckResult.summary.issues.push('スプレッドシート書き込み権限不足: ' + writeError.message);
       }
       
     } catch (accessError) {
-      result.checks.spreadsheetAccess = {
+      dbCheckResult.checks.spreadsheetAccess = {
         status: 'failed',
         error: accessError.message,
         canRead: false,
         canWrite: false
       };
-      result.summary.issues.push('スプレッドシートアクセス失敗: ' + accessError.message);
+      dbCheckResult.summary.issues.push('スプレッドシートアクセス失敗: ' + accessError.message);
     }
     
     // 4. 権限修復の試行
-    if (result.summary.issues.length > 0) {
+    if (dbCheckResult.summary.issues.length > 0) {
       try {
         console.log('🔧 権限修復を試行中...');
         
         // サービスアカウントの再共有を試行
-        if (result.checks.serviceAccount && result.checks.serviceAccount.email) {
+        if (dbCheckResult.checks.serviceAccount && dbCheckResult.checks.serviceAccount.email) {
           shareSpreadsheetWithServiceAccount(dbId);
-          result.summary.actions.push('サービスアカウントの再共有実行');
+          dbCheckResult.summary.actions.push('サービスアカウントの再共有実行');
           
           // 修復後の再テスト
           Utilities.sleep(3000); // 共有反映待ち
@@ -1984,42 +1606,42 @@ function verifyServiceAccountPermissions(spreadsheetId) {
             var retestService = getSheetsServiceCached(true); // 強制リフレッシュ
             var retestInfo = getSpreadsheetsData(retestService, dbId);
             
-            result.checks.postRepairAccess = {
+            dbCheckResult.checks.postRepairAccess = {
               status: 'success',
               canRead: true,
               repairSuccessful: true
             };
             
             // 修復成功後はissuesをクリア
-            result.summary.issues = [];
-            result.summary.actions.push('アクセス権限修復成功');
+            dbCheckResult.summary.issues = [];
+            dbCheckResult.summary.actions.push('アクセス権限修復成功');
             
           } catch (retestError) {
-            result.checks.postRepairAccess = {
+            dbCheckResult.checks.postRepairAccess = {
               status: 'failed',
               error: retestError.message,
               repairSuccessful: false
             };
-            result.summary.actions.push('修復後テスト失敗: ' + retestError.message);
+            dbCheckResult.summary.actions.push('修復後テスト失敗: ' + retestError.message);
           }
         }
         
       } catch (repairError) {
-        result.summary.actions.push('権限修復失敗: ' + repairError.message);
+        dbCheckResult.summary.actions.push('権限修復失敗: ' + repairError.message);
       }
     }
     
     // 5. 最終判定
-    if (result.summary.issues.length === 0) {
-      result.summary.status = 'healthy';
-    } else if (result.summary.actions.length > 0) {
-      result.summary.status = 'repaired';
+    if (dbCheckResult.summary.issues.length === 0) {
+      dbCheckResult.summary.status = 'healthy';
+    } else if (dbCheckResult.summary.actions.length > 0) {
+      dbCheckResult.summary.status = 'repaired';
     } else {
-      result.summary.status = 'critical';
+      dbCheckResult.summary.status = 'critical';
     }
     
-    console.log('✅ サービスアカウント権限確認完了:', result.summary.status);
-    return result;
+    console.log('✅ サービスアカウント権限確認完了:', dbCheckResult.summary.status);
+    return dbCheckResult;
     
   } catch (error) {
     console.error('❌ サービスアカウント権限確認でエラー:', error);
@@ -2138,7 +1760,7 @@ function performDataIntegrityCheck(options = {}) {
       ...options
     };
     
-    var result = {
+    var dbCheckResult = {
       timestamp: new Date().toISOString(),
       summary: {
         status: 'unknown',
@@ -2159,9 +1781,9 @@ function performDataIntegrityCheck(options = {}) {
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     if (!dbId) {
-      result.summary.issues.push('データベースIDが設定されていません');
-      result.summary.status = 'critical';
-      return result;
+      dbCheckResult.summary.issues.push('データベースIDが設定されていません');
+      dbCheckResult.summary.status = 'critical';
+      return dbCheckResult;
     }
     
     var service = getSheetsServiceCached();
@@ -2169,71 +1791,71 @@ function performDataIntegrityCheck(options = {}) {
     var values = data.valueRanges[0].values || [];
     
     if (values.length <= 1) {
-      result.summary.status = 'empty';
-      return result;
+      dbCheckResult.summary.status = 'empty';
+      return dbCheckResult;
     }
     
     var headers = values[0];
     var userRows = values.slice(1);
-    result.summary.totalUsers = userRows.length;
+    dbCheckResult.summary.totalUsers = userRows.length;
     
     console.log('📊 データ整合性チェック: ' + userRows.length + 'ユーザーを確認中');
     
     // 1. 重複チェック
     if (opts.checkDuplicates) {
       var duplicateResult = checkForDuplicates(headers, userRows);
-      result.details.duplicates = duplicateResult.duplicates;
+      dbCheckResult.details.duplicates = duplicateResult.duplicates;
       if (duplicateResult.duplicates.length > 0) {
-        result.summary.issues.push(duplicateResult.duplicates.length + '件の重複データが見つかりました');
+        dbCheckResult.summary.issues.push(duplicateResult.duplicates.length + '件の重複データが見つかりました');
       }
     }
     
     // 2. 必須フィールドチェック
     if (opts.checkMissingFields) {
       var missingFieldsResult = checkMissingRequiredFields(headers, userRows);
-      result.details.missingFields = missingFieldsResult.missing;
+      dbCheckResult.details.missingFields = missingFieldsResult.missing;
       if (missingFieldsResult.missing.length > 0) {
-        result.summary.warnings.push(missingFieldsResult.missing.length + '件の必須フィールド不足が見つかりました');
+        dbCheckResult.summary.warnings.push(missingFieldsResult.missing.length + '件の必須フィールド不足が見つかりました');
       }
     }
     
     // 3. データ形式チェック
     if (opts.checkInvalidData) {
       var invalidDataResult = checkInvalidDataFormats(headers, userRows);
-      result.details.invalidData = invalidDataResult.invalid;
+      dbCheckResult.details.invalidData = invalidDataResult.invalid;
       if (invalidDataResult.invalid.length > 0) {
-        result.summary.warnings.push(invalidDataResult.invalid.length + '件の不正なデータ形式が見つかりました');
+        dbCheckResult.summary.warnings.push(invalidDataResult.invalid.length + '件の不正なデータ形式が見つかりました');
       }
     }
     
     // 4. 孤立データチェック
     var orphanResult = checkOrphanedData(headers, userRows);
-    result.details.orphanedData = orphanResult.orphaned;
+    dbCheckResult.details.orphanedData = orphanResult.orphaned;
     if (orphanResult.orphaned.length > 0) {
-      result.summary.warnings.push(orphanResult.orphaned.length + '件の孤立データが見つかりました');
+      dbCheckResult.summary.warnings.push(orphanResult.orphaned.length + '件の孤立データが見つかりました');
     }
     
     // 5. 自動修復
-    if (opts.autoFix && (result.summary.issues.length > 0 || result.summary.warnings.length > 0)) {
+    if (opts.autoFix && (dbCheckResult.summary.issues.length > 0 || dbCheckResult.summary.warnings.length > 0)) {
       try {
-        var fixResult = performDataIntegrityFix(result.details, headers, userRows, dbId, service);
-        result.summary.fixed = fixResult.fixed;
+        var fixResult = performDataIntegrityFix(dbCheckResult.details, headers, userRows, dbId, service);
+        dbCheckResult.summary.fixed = fixResult.fixed;
         console.log('🔧 自動修復完了: ' + fixResult.fixed.length + '件修復');
       } catch (fixError) {
         console.error('❌ 自動修復エラー:', fixError.message);
-        result.summary.issues.push('自動修復に失敗: ' + fixError.message);
+        dbCheckResult.summary.issues.push('自動修復に失敗: ' + fixError.message);
       }
     }
     
     // 6. 最終判定
-    if (result.summary.issues.length === 0) {
-      result.summary.status = result.summary.warnings.length > 0 ? 'warning' : 'healthy';
+    if (dbCheckResult.summary.issues.length === 0) {
+      dbCheckResult.summary.status = dbCheckResult.summary.warnings.length > 0 ? 'warning' : 'healthy';
     } else {
-      result.summary.status = 'critical';
+      dbCheckResult.summary.status = 'critical';
     }
     
-    console.log('✅ データ整合性チェック完了:', result.summary.status);
-    return result;
+    console.log('✅ データ整合性チェック完了:', dbCheckResult.summary.status);
+    return dbCheckResult;
     
   } catch (error) {
     console.error('❌ データ整合性チェックでエラー:', error);

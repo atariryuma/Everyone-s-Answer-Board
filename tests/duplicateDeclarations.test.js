@@ -72,29 +72,48 @@ describe('重複宣言エラー検出', () => {
   }
 
   function isInsideFunction(lines, currentIndex) {
-    let braceCount = 0;
-    let insideFunction = false;
+    // より単純なアプローチ：現在の行より前に関数宣言があり、
+    // その関数がまだ閉じていない場合は関数内部と判定
+    
+    let depth = 0;
+    let lastFunctionStartLine = -1;
     
     for (let i = 0; i <= currentIndex; i++) {
       const line = lines[i].trim();
       
-      // 関数宣言を検出
-      if (line.match(/^\s*(async\s+)?function\s+\w+|^\s*\w+\s*[:=]\s*(async\s+)?\(.*\)\s*=>|^\s*\w+\s*[:=]\s*(async\s+)?function/)) {
-        insideFunction = true;
+      // コメント行はスキップ
+      if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
+        continue;
       }
       
-      // ブレースのカウント
-      const openBraces = (line.match(/\{/g) || []).length;
-      const closeBraces = (line.match(/\}/g) || []).length;
-      braceCount += openBraces - closeBraces;
+      // 関数宣言を検出（function キーワードで始まる、またはアロー関数）
+      if (line.match(/^(async\s+)?function\s+\w+/) || 
+          line.match(/^\w+\s*[:=]\s*(async\s+)?function/) ||
+          line.match(/^\w+\s*[:=]\s*\(.*\)\s*=>/)) {
+        lastFunctionStartLine = i;
+      }
       
-      // 関数が終了した場合
-      if (insideFunction && braceCount === 0 && i > 0) {
-        insideFunction = false;
+      // クラスメソッドの検出（クラス内のメソッド定義）
+      if (line.match(/^\w+\s*\(.*\)\s*\{/) && depth > 0) {
+        lastFunctionStartLine = i;
+      }
+      
+      // 波括弧のカウント
+      for (let j = 0; j < line.length; j++) {
+        if (line[j] === '{') {
+          depth++;
+        } else if (line[j] === '}') {
+          depth--;
+          // 関数が終了した可能性
+          if (lastFunctionStartLine >= 0 && depth === 0) {
+            lastFunctionStartLine = -1;
+          }
+        }
       }
     }
     
-    return insideFunction && braceCount > 0;
+    // 関数宣言があり、まだ閉じていない場合は関数内部
+    return lastFunctionStartLine >= 0 && depth > 0;
   }
 
   function addDeclaration(name, fileName, lineNumber, type) {

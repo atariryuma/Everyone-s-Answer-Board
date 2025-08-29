@@ -105,7 +105,7 @@ class StructuredLogger {
 }
 
 // グローバルロガーインスタンス
-const logger = new StructuredLogger();
+const monitoringLogger = new StructuredLogger();
 
 /**
  * システム健全性チェック機能
@@ -133,7 +133,7 @@ class SystemHealthChecker {
    * 全てのヘルスチェックを実行
    */
   async runAllChecks() {
-    logger.info('システムヘルスチェック開始');
+    monitoringLogger.info('システムヘルスチェック開始');
     const results = new Map();
     let overallStatus = 'healthy';
     
@@ -152,7 +152,7 @@ class SystemHealthChecker {
         }
         
       } catch (error) {
-        logger.error(`ヘルスチェック実行エラー: ${name}`, { error: error.message });
+        monitoringLogger.error(`ヘルスチェック実行エラー: ${name}`, { error: error.message });
         results.set(name, {
           status: 'error',
           message: error.message,
@@ -175,7 +175,7 @@ class SystemHealthChecker {
       summary: this._generateSummary(results)
     };
     
-    logger.info('システムヘルスチェック完了', { status: overallStatus });
+    monitoringLogger.info('システムヘルスチェック完了', { status: overallStatus });
     return healthReport;
   }
   
@@ -243,7 +243,7 @@ const healthChecker = new SystemHealthChecker();
  * システム診断機能
  */
 function performSystemDiagnostics() {
-  logger.info('システム診断開始');
+  monitoringLogger.info('システム診断開始');
   const diagnostics = {
     timestamp: new Date().toISOString(),
     environment: {},
@@ -283,11 +283,11 @@ function performSystemDiagnostics() {
       monitoring: typeof logger !== 'undefined'
     };
     
-    logger.info('システム診断完了');
+    monitoringLogger.info('システム診断完了');
     return diagnostics;
     
   } catch (error) {
-    logger.error('システム診断エラー', { error: error.message });
+    monitoringLogger.error('システム診断エラー', { error: error.message });
     diagnostics.error = error.message;
     return diagnostics;
   }
@@ -349,7 +349,7 @@ function initializeHealthChecks() {
     }
   }, { critical: false, description: 'メモリ使用量確認' });
   
-  logger.info('ヘルスチェック項目初期化完了');
+  monitoringLogger.info('ヘルスチェック項目初期化完了');
 }
 
 /**
@@ -380,7 +380,7 @@ function getMonitoringDashboard() {
     return dashboard;
     
   } catch (error) {
-    logger.error('監視ダッシュボードデータ取得エラー', { error: error.message });
+    monitoringLogger.error('監視ダッシュボードデータ取得エラー', { error: error.message });
     return {
       timestamp: new Date().toISOString(),
       error: error.message
@@ -397,7 +397,7 @@ function getRecentErrors() {
     const errorLogs = JSON.parse(props.getProperty('ERROR_LOGS') || '[]');
     return errorLogs.slice(-10); // 最新10件
   } catch (error) {
-    logger.warn('エラーログ取得失敗', { error: error.message });
+    monitoringLogger.warn('エラーログ取得失敗', { error: error.message });
     return [];
   }
 }
@@ -408,11 +408,11 @@ function getRecentErrors() {
 function runScheduledHealthCheck() {
   return healthChecker.runAllChecks()
     .then(result => {
-      logger.info('定期ヘルスチェック完了', { status: result.overall });
+      monitoringLogger.info('定期ヘルスチェック完了', { status: result.overall });
       return result;
     })
     .catch(error => {
-      logger.error('定期ヘルスチェックエラー', { error: error.message });
+      monitoringLogger.error('定期ヘルスチェックエラー', { error: error.message });
       return {
         overall: 'error',
         timestamp: new Date().toISOString(),
@@ -424,7 +424,7 @@ function runScheduledHealthCheck() {
 // 初期化
 try {
   initializeHealthChecks();
-  logger.info('監視システム初期化完了');
+  monitoringLogger.info('監視システム初期化完了');
 } catch (error) {
   console.error('監視システム初期化エラー:', error.message);
 }

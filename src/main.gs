@@ -1052,21 +1052,6 @@ function sanitizeRedirectUrl(url) {
   }
 }
 
-/**
- * 正しいWeb App URLを取得 (url.gsのgetWebAppUrlCachedを使用)
- * @return {string}
- */
-function getWebAppUrl() {
-  try {
-    // url.gsの統一されたURL取得関数を使用
-    return getWebAppUrlCached();
-  } catch (error) {
-    console.error('getWebAppUrl error:', error);
-    // 緊急時のフォールバックURL
-    const fallbackUrl = 'https://script.google.com/a/macros/naha-okinawa.ed.jp/s/AKfycby5oABLEuyg46OvwVqt2flUKz15zocFhH-kLD0IuNWm8akKMXiKrOS5kqGCQ7V4DQ-2/exec';
-    return fallbackUrl;
-  }
-}
 
 
 /**
