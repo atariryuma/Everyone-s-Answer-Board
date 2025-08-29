@@ -79,18 +79,6 @@ function clearExecutionUserInfoCache() {
   _executionUserInfoCache = null;
 }
 
-const COLUMN_HEADERS = {
-  TIMESTAMP: 'タイムスタンプ',
-  EMAIL: 'メールアドレス',
-  CLASS: 'クラス',
-  OPINION: '回答',
-  REASON: '理由',
-  NAME: '名前',
-  UNDERSTAND: 'なるほど！',
-  LIKE: 'いいね！',
-  CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト'
-};
 
 // 表示モード定数
 const DISPLAY_MODES = {
@@ -98,14 +86,6 @@ const DISPLAY_MODES = {
   NAMED: 'named'
 };
 
-// リアクション関連定数
-const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
-
-// スコア計算設定
-const SCORING_CONFIG = {
-  LIKE_MULTIPLIER_FACTOR: 0.1,
-  RANDOM_SCORE_FACTOR: 0.01
-};
 
 const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
 const DEBUG = PropertiesService.getScriptProperties()

@@ -22,27 +22,11 @@ const USER_DB_CONFIG = {
     'isActive'
   ]
 };
-const COLUMN_HEADERS = {
-  TIMESTAMP: 'タイムスタンプ',
-  EMAIL: 'メールアドレス',
-  CLASS: 'クラス',
-  OPINION: '回答',
-  REASON: '理由',
-  NAME: '名前',
-  UNDERSTAND: 'なるほど！',
-  LIKE: 'いいね！',
-  CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト'
-};
-const SCORING_CONFIG = {
-  LIKE_MULTIPLIER_FACTOR: 0.05 // 1いいね！ごとにスコアが5%増加
-};
 
 const TIME_CONSTANTS = {
   LOCK_WAIT_MS: 10000
 };
 
-const REACTION_KEYS = ["UNDERSTAND","LIKE","CURIOUS"];
 var getConfig;
 var handleError;
 
