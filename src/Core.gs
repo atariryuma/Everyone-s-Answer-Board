@@ -67,26 +67,7 @@ function determineSetupStep(userInfo, configJson) {
 var _executionSheetsServiceCache = null;
 
 
-/**
- * 関数実行中のSheetsServiceキャッシュをクリア
- */
-function clearExecutionSheetsServiceCache() {
-  _executionSheetsServiceCache = null;
-}
 
-/**
- * 関数実行中のSheetsServiceを取得（キャッシュを使用）
- * @returns {Object} SheetsServiceオブジェクト
- */
-function getCachedSheetsService() {
-  if (_executionSheetsServiceCache === null) {
-    console.log('🔧 ExecutionLevel SheetsService: 初回作成');
-    _executionSheetsServiceCache = getSheetsService();
-  } else {
-    console.log('♻️ ExecutionLevel SheetsService: キャッシュから取得');
-  }
-  return _executionSheetsServiceCache;
-}
 
 /**
  * ヘッダー整合性検証（リアルタイム検証用）
@@ -156,13 +137,6 @@ function validateHeaderIntegrity(userId) {
   }
 }
 
-/**
- * 実行開始時のキャッシュクリア（新しいリクエスト開始時に呼び出し）
- */
-function clearAllExecutionCache() {
-  clearExecutionUserInfoCache();
-  clearExecutionSheetsServiceCache();
-}
 
 
 // =================================================================

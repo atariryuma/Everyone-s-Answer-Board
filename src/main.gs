@@ -56,18 +56,6 @@ const SCRIPT_PROPS_KEYS = {
   ADMIN_EMAIL: 'ADMIN_EMAIL'
 };
 
-const DB_SHEET_CONFIG = {
-  SHEET_NAME: 'Users',
-  HEADERS: [
-    'userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl',
-    'createdAt', 'configJson', 'lastAccessedAt', 'isActive'
-  ]
-};
-
-const LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'Logs',
-  HEADERS: ['timestamp', 'userId', 'action', 'details']
-};
 
 // 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
 var _executionUserInfoCache = null;

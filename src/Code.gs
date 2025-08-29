@@ -1863,31 +1863,6 @@ function findUserByEmailAndSpreadsheet(email, spreadsheetId) {
 /**
  * Find existing user by email only (used for single board per user).
  */
-function findUserByEmail(email) {
-  const userDb = getDatabase().getSheetByName(USER_DB_CONFIG.SHEET_NAME);
-  const data = userDb.getDataRange().getValues();
-  const headers = data[0];
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf('adminEmail')] === email) {
-      const userInfo = {};
-      headers.forEach((header, index) => {
-        userInfo[header] = data[i][index];
-      });
-      // Parse configJson if needed
-      if (userInfo.configJson && typeof userInfo.configJson === 'string') {
-        try {
-          userInfo.configJson = JSON.parse(userInfo.configJson);
-        } catch (e) {
-          userInfo.configJson = {};
-        }
-      }
-      return userInfo;
-    }
-  }
-
-  return null;
-}
 
 /**
  * 管理者メールアドレスを更新

@@ -12,13 +12,6 @@ var userIndexCache = {
   TTL: 300000 // 5分間のキャッシュ
 };
 
-/**
- * 削除ログ用シート設定
- */
-const DELETE_LOG_SHEET_CONFIG = {
-  SHEET_NAME: 'DeleteLogs',
-  HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
-};
 
 /**
  * 削除ログを安全にトランザクション的に記録
@@ -699,14 +692,6 @@ function fixUserDataConsistency(userId) {
  * @param {string} email - メールアドレス
  * @returns {object|null} ユーザー情報
  */
-function findUserByEmail(email) {
-  var cacheKey = 'email_' + email;
-  return cacheManager.get(
-    cacheKey,
-    function() { return fetchUserFromDatabase('adminEmail', email); },
-    { ttl: 300, enableMemoization: true }
-  );
-}
 
 /**
  * データベースからユーザーを取得（エラーハンドリング強化版）
