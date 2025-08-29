@@ -27,67 +27,6 @@ function getAutoStopTime(publishedAt, minutes) {
   }
 }
 
-/**
- * アクティブなシートの公開を終了する（公開終了ボタン用）
- * @param {string} requestUserId - リクエスト元のユーザーID（オプション）
- * @returns {object} 公開終了結果
- */
-function clearActiveSheet(requestUserId) {
-  if (!requestUserId) {
-    requestUserId = getUserId();
-  }
-  
-  verifyUserAccess(requestUserId);
-  const lock = LockService.getScriptLock();
-  
-  try {
-    if (!lock.tryLock(10000)) {
-      throw new Error('システムが混雑しています。しばらく待ってから再度お試しください。');
-    }
-    
-    console.log('clearActiveSheet開始: userId=%s', requestUserId);
-    
-    const userInfo = getConfigUserInfo(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません。');
-    }
-    
-    const configJson = JSON.parse(userInfo.configJson || '{}');
-    
-    console.log('🔍 公開停止前の設定:', {
-      publishedSheetName: configJson.publishedSheetName,
-      publishedSpreadsheetId: configJson.publishedSpreadsheetId,
-      appPublished: configJson.appPublished
-    });
-    
-    // 公開状態のクリア（データソースとシート選択は保持）
-    configJson.publishedSheet = ''; // 後方互換性のため残す
-    configJson.publishedSheetName = ''; // 正しいプロパティ名
-    configJson.publishedSpreadsheetId = ''; // スプレッドシートIDもクリア
-    configJson.appPublished = false; // 公開停止
-    
-    // データベースに保存
-    updateUser(requestUserId, {
-      configJson: JSON.stringify(configJson)
-    });
-    
-    console.log('clearActiveSheet完了: 公開を停止しました');
-    
-    return {
-      success: true,
-      message: '回答ボードの公開を終了しました',
-      status: 'unpublished'
-    };
-    
-  } catch (error) {
-    console.error('clearActiveSheetでエラー:', error.message, error.stack);
-    throw new Error('公開終了処理中にエラーが発生しました: ' + error.message);
-  } finally {
-    if (lock) {
-      lock.releaseLock();
-    }
-  }
-}
 
 /**
  * セットアップステップを統一的に判定する関数
@@ -634,33 +573,6 @@ function verifyUserAccess(requestUserId) {
   debugLog(`✅ ユーザーアクセス検証成功: ${activeUserEmail} は ${requestUserId} のデータにアクセスできます。`);
 }
 
-/**
- * 公開されたシートのデータを取得 (マルチテナント対応版)
- * Page.htmlから呼び出される - フロントエンド期待形式に対応
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
-function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode, bypassCache) {
-  verifyUserAccess(requestUserId);
-  clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
-
-  try {
-    // キャッシュキー生成（パフォーマンス向上）
-    var requestKey = `publishedData_${requestUserId}_${classFilter}_${sortOrder}_${adminMode}`;
-
-    // キャッシュバイパス時は直接実行
-    if (bypassCache === true) {
-      debugLog('🔄 キャッシュバイパス：最新データを直接取得');
-      return executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode);
-    }
-
-    return cacheManager.get(requestKey, () => {
-      return executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode);
-    }, { ttl: 600 }); // 10分間キャッシュ
-  } finally {
-    // 実行終了時にユーザー情報キャッシュをクリア
-    clearExecutionUserInfoCache();
-  }
-}
 
 /**
  * 実際のデータ取得処理（キャッシュ制御から分離） (マルチテナント対応版)
@@ -942,41 +854,6 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
   }
 }
 
-/**
- * 利用可能なシート一覧を取得 (マルチテナント対応版)
- * Page.htmlから呼び出される - フロントエンド期待形式に対応
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
-function getAvailableSheets(requestUserId) {
-  verifyUserAccess(requestUserId);
-  try {
-    var currentUserId = requestUserId; // requestUserId を使用
-
-    if (!currentUserId) {
-      console.warn('getAvailableSheets: No current user ID set');
-      return [];
-    }
-
-    var sheets = getSheetsList(currentUserId);
-
-    if (!sheets || sheets.length === 0) {
-      console.warn('getAvailableSheets: No sheets found for user:', currentUserId);
-      return [];
-    }
-
-    // Page.html期待形式に変換: [{name: string, id: number}]
-    return sheets.map(function(sheet) {
-      return {
-        name: sheet.name,
-        id: sheet.id
-      };
-    });
-  } catch (e) {
-    console.error('getAvailableSheets エラー: ' + e.message);
-    console.error('Error details:', e.stack);
-    return [];
-  }
-}
 
 /**
  * 指定されたユーザーのスプレッドシートからシートのリストを取得します。
@@ -1555,26 +1432,6 @@ function getActiveFormInfo(requestUserId) {
   }
 }
 
-/**
- * ユーザーが管理者かどうかをチェックする (マルチテナント対応版)
- * @param {string} requestUserId - リクエスト元のユーザーID
- * @returns {boolean} 管理者の場合はtrue、そうでない場合はfalse
- */
-function checkAdmin(requestUserId) {
-  verifyUserAccess(requestUserId);
-  try {
-    const userInfo = findUserById(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
-    // Session.getActiveUser().getEmail() が requestUserId の adminEmail と一致するかどうかを verifyUserAccess で既にチェック済み
-    // ここでは単に userInfo.adminEmail と Session.getActiveUser().getEmail() が一致するかを返す
-    return Session.getActiveUser().getEmail() === userInfo.adminEmail;
-  } catch (e) {
-    console.error('checkAdmin エラー: ' + e.message);
-    return false;
-  }
-}
 
 /**
  * 指定シートのデータ行数を取得します。
@@ -3669,13 +3526,6 @@ function shuffleArray(array) {
   return array;
 }
 
-/**
- * リアクション文字列をパース
- */
-function parseReactionString(val) {
-  if (!val) return [];
-  return val.toString().split(',').map(function(s) { return s.trim(); }).filter(Boolean);
-}
 
 /**
  * ヘルパー関数：ヘッダー配列から指定した名前のインデックスを取得
@@ -3989,14 +3839,6 @@ function hasSetupPageAccess() {
   }
 }
 
-/**
- * メールアドレスからドメインを抽出
- * @param {string} email - メールアドレス
- * @returns {string} ドメイン部分
- */
-function getEmailDomain(email) {
-  return email.split('@')[1] || '';
-}
 
 /**
  * Drive APIサービスを取得
