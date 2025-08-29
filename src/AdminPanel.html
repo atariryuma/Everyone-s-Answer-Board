@@ -6,6 +6,9 @@
   <title>StudyQuest 管理パネル</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Shared Utilities Include -->
+  <?!= include('SharedUtilities') ?>
   <style>
     /* ベストプラクティス準拠のスタイル */
     body { 
@@ -762,16 +765,24 @@
       }
     }
 
-    // エラー表示
+    // エラー表示 (SharedUtilitiesの通知システムを使用)
     function showError(message) {
-      // 簡単なエラー表示（後でトーストに置き換え可能）
-      alert('エラー: ' + message);
+      if (window.notifications && window.notifications.error) {
+        window.notifications.error(message);
+      } else {
+        // フォールバック
+        alert('エラー: ' + message);
+      }
     }
 
-    // 成功表示
+    // 成功表示 (SharedUtilitiesの通知システムを使用)
     function showSuccess(message) {
-      // 簡単な成功表示（後でトーストに置き換え可能）
-      alert('成功: ' + message);
+      if (window.notifications && window.notifications.success) {
+        window.notifications.success(message);
+      } else {
+        // フォールバック
+        alert('成功: ' + message);
+      }
     }
 
     // システム状態更新

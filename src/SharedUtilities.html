@@ -1120,9 +1120,221 @@ window.setLoading = function(isLoading, message, step, percentage) {
   }
 })();
 
+// =============================================================================
+// NOTIFICATION TOAST SYSTEM
+// =============================================================================
+
+class NotificationSystem {
+  constructor() {
+    this.container = null;
+    this.initialized = false;
+  }
+
+  // Initialize notification container
+  init() {
+    if (this.initialized) return;
+    
+    // Check if container already exists
+    this.container = document.getElementById('notification-container');
+    
+    if (!this.container) {
+      // Create notification container
+      this.container = document.createElement('div');
+      this.container.id = 'notification-container';
+      this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2';
+      this.container.style.cssText = 'position: fixed; top: 1rem; right: 1rem; z-index: 10000;';
+      
+      // Append to body when DOM is ready
+      if (document.body) {
+        document.body.appendChild(this.container);
+      } else {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.body.appendChild(this.container);
+        });
+      }
+    }
+    
+    this.initialized = true;
+  }
+
+  // Show notification message
+  showMessage(message, type = 'info', duration = 5000) {
+    // Ensure container is initialized
+    this.init();
+    
+    if (!this.container) {
+      console.error('Notification container could not be initialized');
+      // Fallback to alert for critical messages
+      if (type === 'error') {
+        alert('エラー: ' + message);
+      }
+      return;
+    }
+
+    // Color schemes for different types
+    const colors = {
+      success: 'border-green-400 bg-green-900/50 text-green-100',
+      error: 'border-red-400 bg-red-900/50 text-red-100',
+      warning: 'border-yellow-400 bg-yellow-900/50 text-yellow-100',
+      info: 'border-blue-400 bg-blue-900/50 text-blue-100'
+    };
+
+    // Icons for different types
+    const icons = {
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
+    };
+
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${colors[type]}`;
+    
+    // Add inline styles for better compatibility
+    notification.style.cssText = `
+      transform: translateX(100%);
+      opacity: 0;
+      transition: all 0.3s ease-out;
+      display: flex;
+      align-items: center;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 0.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid;
+    `;
+    
+    notification.innerHTML = `
+      <div class="mr-3 text-2xl">${icons[type]}</div>
+      <div class="flex-1 text-sm">${this.escapeHtml(message)}</div>
+      <button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" style="background: none; border: none; cursor: pointer;">✕</button>
+    `;
+
+    // Add close button handler
+    const closeBtn = notification.querySelector('button');
+    closeBtn.addEventListener('click', () => this.removeNotification(notification));
+
+    // Append to container
+    this.container.appendChild(notification);
+
+    // Trigger animation to show
+    setTimeout(() => {
+      notification.style.transform = 'translateX(0)';
+      notification.style.opacity = '1';
+    }, 10);
+
+    // Auto-remove after duration
+    if (duration > 0) {
+      setTimeout(() => {
+        this.removeNotification(notification);
+      }, duration);
+    }
+  }
+
+  // Remove notification with animation
+  removeNotification(notification) {
+    if (!notification) return;
+    
+    notification.style.transform = 'translateX(100%)';
+    notification.style.opacity = '0';
+    
+    notification.addEventListener('transitionend', () => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, { once: true });
+  }
+
+  // Convenience methods
+  success(message, duration = 5000) {
+    this.showMessage(message, 'success', duration);
+  }
+
+  error(message, duration = 7000) {
+    this.showMessage(message, 'error', duration);
+  }
+
+  warning(message, duration = 6000) {
+    this.showMessage(message, 'warning', duration);
+  }
+
+  info(message, duration = 5000) {
+    this.showMessage(message, 'info', duration);
+  }
+
+  // Escape HTML to prevent XSS
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+  }
+
+  // Clear all notifications
+  clearAll() {
+    if (!this.container) return;
+    
+    const notifications = this.container.querySelectorAll('.notification');
+    notifications.forEach(notification => this.removeNotification(notification));
+  }
+}
+
+// Create global notification instance
+window.notifications = new NotificationSystem();
+
+// Add to shared utilities
+if (window.sharedUtilities) {
+  window.sharedUtilities.notifications = window.notifications;
+}
+
+// Global convenience functions for backward compatibility
+window.showSuccess = function(message, duration) {
+  window.notifications.success(message, duration);
+};
+
+window.showError = function(message, duration) {
+  window.notifications.error(message, duration);
+};
+
+window.showWarning = function(message, duration) {
+  window.notifications.warning(message, duration);
+};
+
+window.showInfo = function(message, duration) {
+  window.notifications.info(message, duration);
+};
+
+// Alias for generic show message
+window.showMessage = function(message, type, duration) {
+  window.notifications.showMessage(message, type, duration);
+};
+
+// Add styles for notification system if not using Tailwind
+if (!document.querySelector('script[src*="tailwindcss"]')) {
+  const style = document.createElement('style');
+  style.textContent = `
+    #notification-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 10000;
+      pointer-events: none;
+    }
+    #notification-container .notification {
+      pointer-events: auto;
+      min-width: 300px;
+      max-width: 500px;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 // Prevent duplicate loading messages
 if (!window.sharedUtilitiesLoaded) {
   window.sharedUtilitiesLoaded = true;
-  console.log('✅ SharedUtilities loaded successfully - Version 1.2.0 (with GAS warnings suppression)');
+  console.log('✅ SharedUtilities loaded successfully - Version 1.3.0 (with Notification System)');
 }
 </script>
