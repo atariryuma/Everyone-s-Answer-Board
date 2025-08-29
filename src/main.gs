@@ -20,6 +20,25 @@ function include(path) {
 }
 
 /**
+ * アプリケーションアクセスチェック (簡易版)
+ * @return {Object} アクセス情報
+ */
+function checkApplicationAccess() {
+  try {
+    // システム管理者は常にアクセス許可
+    if (isDeployUser()) {
+      return { hasAccess: true, message: 'システム管理者アクセス許可' };
+    }
+    
+    // 基本的には全ユーザーアクセス許可（必要に応じて制限を追加）
+    return { hasAccess: true, message: 'アクセス許可' };
+  } catch (error) {
+    console.error('checkApplicationAccess エラー:', error);
+    return { hasAccess: true, message: 'アクセス許可（エラー回避）' };
+  }
+}
+
+/**
  * JavaScript文字列エスケープ関数 (URL対応版)
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列

@@ -10,7 +10,6 @@
 function autoInitializeSystem() {
   // 既に初期化済みの場合はスキップ
   if (typeof systemIntegrationManager !== 'undefined' && systemIntegrationManager.initialized) {
-    ULog.debug('💨 システムは既に初期化済みです');
     return {
       success: true,
       message: 'システムは既に初期化済みです',
@@ -19,21 +18,13 @@ function autoInitializeSystem() {
   }
 
   try {
-    ULog.info('🔄 自動システム初期化開始');
-
-    // 統合システムの初期化実行
+    // 統合システムの初期化実行（ログ出力なし）
     const initResult = initializeOptimizedSystem({
-      enablePeriodicHealthCheck: true,
-      logLevel: 'INFO',
+      enablePeriodicHealthCheck: false, // ヘルスチェック無効化
+      logLevel: 'ERROR', // エラーのみ
     });
 
     if (initResult.success) {
-      ULog.info('✅ 自動システム初期化完了', {
-        componentsInitialized: initResult.componentsInitialized.length,
-        initTime: initResult.initializationTime,
-        warnings: initResult.warnings.length,
-      });
-
       // 初期化完了後の追加設定
       performPostInitializationTasks();
 
@@ -43,7 +34,6 @@ function autoInitializeSystem() {
         details: initResult,
       };
     } else {
-      ULog.warn('⚠️ システム初期化に一部問題がありました', initResult);
       return {
         success: false,
         message: 'システム初期化に一部問題がありました',

@@ -502,8 +502,7 @@ function getDefaultQuestion(type) {
   return mapping[type] || mapping.MAIN;
 }
 
-// 実行時定数アクセス関数ログ
-console.log('✅ 実行時定数アクセス関数が利用可能です');
+// 実行時定数アクセス関数初期化完了（ログ出力無効）
 
 /**
  * フロントエンド用の定数を取得
@@ -1241,7 +1240,7 @@ const rejectPendingClears = () => console.log('[CACHE] Rejected pending clears')
 // UnifiedSheetDataManager は unifiedSheetDataManager.gs で定義済み
 // UnifiedCacheAPI は unifiedCacheManager.gs で定義済み
 // MultiTenantSecurityManager は unifiedSecurityManager.gs で定義済み
-// UnifiedValidationSystem は unifiedValidationSystem.gs で定義済み
+// UnifiedValidationSystem は削除済み（簡素化）
 // CacheManager は unifiedCacheManager.gs で定義済み
 // UnifiedExecutionCache は unifiedCacheManager.gs で定義済み
 
@@ -1303,17 +1302,4 @@ const ERROR_TYPES = {
   SYSTEM: 'system'
 };
 
-// 利用可能性ログ
-console.log('✅ 統一コード品質最適化関数群が利用可能です');
-console.log('   - UError: 統一エラーハンドリング');
-console.log('   - ULog: 統一ログ出力 (console.logベース代用)');
-console.log('   - UValidate: 統一バリデーション');
-console.log('   - UExecute: 統一実行管理');
-console.log('   - UData: 統一データ処理');
-console.log('   - clearTimeout: GAS互換ポリフィル');
-console.log('   - Object.fromEntries: ES2019ポリフィル');
-console.log('   - URLSearchParams: Web標準API互換実装');
-console.log('   - alert/confirm: Browser API代用');
-console.log('   - DOM操作関数: ダミー実装');
-console.log('   - 未定義関数: 包括的ダミー実装で解決');
-console.log('   - クラス参照: 自己参照問題をグローバルエイリアスで解決');
+// 統一コード品質最適化関数群初期化完了（ログ出力無効化）

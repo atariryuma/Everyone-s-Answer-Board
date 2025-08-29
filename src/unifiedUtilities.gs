@@ -285,7 +285,7 @@ class UUtilities {
 }
 
 // 重複クラス削除完了 - UnifiedAPIClient, UnifiedValidation は他のファイルで定義済み
-// これらの機能は既に unifiedValidationSystem.gs 等で実装されています
+// 検証機能は簡素化済み
 
 // 後方互換性ラッパー関数は削除済み
 // 統合されたクラスを直接使用してください

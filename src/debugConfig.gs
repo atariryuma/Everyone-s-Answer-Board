@@ -6,7 +6,7 @@
 // デバッグ設定 - 本番環境では false に設定
 const DEBUG_CONFIG = {
   // 本番環境判定: PropertiesService で制御可能
-  isProduction: false, // デプロイ時に true に変更
+  isProduction: true, // 本番モードに設定
 
   // ロギングレベル設定
   logLevels: {
@@ -17,15 +17,15 @@ const DEBUG_CONFIG = {
   },
 
   // 現在のログレベル（本番では ERROR のみ）
-  currentLogLevel: 2, // 開発時は INFO、本番では 0
+  currentLogLevel: 0, // ERROR のみ出力
 
-  // カテゴリ別デバッグ制御
+  // カテゴリ別デバッグ制御（全て無効化）
   categories: {
-    CACHE: true, // キャッシュ関連
-    AUTH: true, // 認証関連
-    DATABASE: true, // データベース操作
+    CACHE: false, // キャッシュ関連
+    AUTH: false, // 認証関連
+    DATABASE: false, // データベース操作
     UI: false, // UI更新関連（頻繁なため通常は無効）
-    PERFORMANCE: true, // パフォーマンス計測
+    PERFORMANCE: false, // パフォーマンス計測
   },
 };
 
