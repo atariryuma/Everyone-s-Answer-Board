@@ -153,10 +153,13 @@ function validateHeaderIntegrity(userId) {
  */
 function getOpinionHeaderSafely(userId, sheetName) {
   try {
-    const userInfo = getOrFetchUserInfo(userId, 'userId', {
-      useExecutionCache: true,
-      ttl: 300
-    });
+    // unifiedUserManager.gsの関数を使用
+    const userInfo = typeof getOrFetchUserInfo !== 'undefined' 
+      ? getOrFetchUserInfo(userId, 'userId', {
+          useExecutionCache: true,
+          ttl: 300
+        })
+      : null;
     if (!userInfo) {
       return 'お題';
     }

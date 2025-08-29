@@ -83,18 +83,20 @@ describe('Core.gs utilities', () => {
   describe('getOpinionHeaderSafely', () => {
     beforeEach(() => {
       context.findUserById = jest.fn();
+      context.getOrFetchUserInfo = jest.fn();
       // Clear cache before each test
       context.cacheManager.store = {};
     });
 
     test('returns default when user not found', () => {
       context.findUserById.mockReturnValue(null);
+      context.getOrFetchUserInfo.mockReturnValue(null);
       const header = context.getOpinionHeaderSafely('uid', 'Sheet1');
       expect(header).toBe('お題');
     });
 
     test('returns configured header', () => {
-      context.findUserById.mockReturnValue({
+      context.getOrFetchUserInfo.mockReturnValue({
         configJson: JSON.stringify({
           publishedSheetName: 'Sheet1',
           sheet_Sheet1: { opinionHeader: 'テーマ' }
