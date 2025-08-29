@@ -4,8 +4,8 @@
   // TailwindCSS configuration with production mode detection
   (function() {
     const isProduction = window.location.hostname !== 'localhost' && 
-                        window.location.hostname !== '127.0.0.1' && 
-                        !window.location.hostname.includes('script.google.com');
+                        window.location.hostname !== '127.0.0.1';
+                        // Google Apps Script環境は常に本番として扱う
     
     window.tailwind = {
       config: {
