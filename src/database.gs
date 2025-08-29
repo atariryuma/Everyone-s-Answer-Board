@@ -581,41 +581,7 @@ function getSheetsService() {
   }
 }
 
-/**
- * ユーザー情報を効率的に検索（キャッシュ優先）
- * @param {string} userId - ユーザーID
- * @returns {object|null} ユーザー情報
- */
-function findUserById(userId) {
-  var cacheKey = 'user_' + userId;
-  return cacheManager.get(
-    cacheKey,
-    function() { return fetchUserFromDatabase('userId', userId); },
-    { ttl: 300, enableMemoization: true }
-  );
-}
 
-/**
- * キャッシュをバイパスして最新のユーザー情報を強制取得
- * クリティカルな更新操作直後に使用
- * @param {string} userId - ユーザーID
- * @returns {object|null} 最新のユーザー情報
- */
-function findUserByIdFresh(userId) {
-  // 既存キャッシュを強制削除
-  var cacheKey = 'user_' + userId;
-  cacheManager.remove(cacheKey);
-
-  // データベースから直接取得（範囲キャッシュも無効化）
-  var freshUserInfo = fetchUserFromDatabase('userId', userId, {
-    clearCache: true
-  });
-
-  // 次回の通常アクセス時にキャッシュされるため、ここでは手動設定不要
-  console.log('✅ Fresh user data retrieved for:', userId);
-
-  return freshUserInfo;
-}
 
 /**
  * ユーザーデータの整合性を修正する
@@ -915,25 +881,6 @@ function fetchUserFromDatabase(field, value, options = {}) {
   return null;
 }
 
-/**
- * ユーザー情報をキャッシュ優先で取得し、見つからなければDBから直接取得
- * @param {string} userId - ユーザーID
- * @returns {object|null} ユーザー情報
- */
-function getUserWithFallback(userId) {
-  // 入力検証
-  if (!userId || typeof userId !== 'string') {
-    console.warn('getUserWithFallback: Invalid userId:', userId);
-    return null;
-  }
-
-  // 可能な限りキャッシュを利用
-  var user = findUserById(userId);
-  if (!user) {
-    handleMissingUser(userId);
-  }
-  return user;
-}
 
 /**
  * ユーザー情報を一括更新
@@ -1719,23 +1666,6 @@ function updateSheetsData(service, spreadsheetId, range, values) {
   return JSON.parse(response.getContentText());
 }
 
-/**
- * スプレッドシート構造更新
- * @param {object} service - Sheetsサービス
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {object} requestBody - リクエストボディ
- * @returns {object} レスポンス
- */
-function batchUpdateSpreadsheet(service, spreadsheetId, requestBody) {
-  var url = service.baseUrl + '/' + spreadsheetId + ':batchUpdate';
-  var response = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'Authorization': 'Bearer ' + service.accessToken },
-    payload: JSON.stringify(requestBody)
-  });
-  return JSON.parse(response.getContentText());
-}
 
 /**
  * データベース状態を詳細確認する診断機能
