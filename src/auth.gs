@@ -4,16 +4,6 @@
  */
 
 
-/**
- * キャッシュされたサービスアカウントトークンを取得
- * @returns {string} アクセストークン
- */
-function getServiceAccountTokenCached() {
-  return cacheManager.get(AUTH_CACHE_KEY, generateNewServiceAccountToken, { 
-    ttl: 3500, 
-    enableMemoization: true 
-  }); // メモ化対応でトークン取得を高速化
-}
   
 /**
  * 新しいJWTトークンを生成
@@ -89,33 +79,7 @@ function generateNewServiceAccountToken() {
   return responseData.access_token;
 }
 
-/**
- * トークンキャッシュをクリア
- */
-function clearServiceAccountTokenCache() {
-  cacheManager.remove(AUTH_CACHE_KEY);
-  debugLog('トークンキャッシュをクリアしました');
-}
 
-/**
- * 設定されているサービスアカウントのメールアドレスを取得
- * @returns {string} サービスアカウントのメールアドレス
- */
-function getServiceAccountEmail() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var serviceAccountCredsString = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
-    
-    if (!serviceAccountCredsString) {
-      return 'サービスアカウント未設定';
-    }
-    
-    var serviceAccountCreds = JSON.parse(serviceAccountCredsString);
-    return serviceAccountCreds.client_email || 'メールアドレス不明';
-  } catch (e) {
-    return 'サービスアカウント設定エラー';
-  }
-}
 
 /**
  * 指定されたuserIdと現在ログイン中のユーザーのメールアドレスが一致し、
@@ -315,55 +279,4 @@ function processLoginFlow(userEmail) {
   }
 }
 
-/**
- * ユーザーの最終アクセス時刻のみを更新（設定は保護）
- * @param {string} userId - 更新対象のユーザーID
- */
-function updateUserLastAccess(userId) {
-  try {
-    if (!userId) {
-      console.warn('updateUserLastAccess: userIdが指定されていません');
-      return;
-    }
-    
-    const now = new Date().toISOString();
-    console.log('最終アクセス時刻を更新:', userId, now);
-    
-    // lastAccessedAtフィールドのみを更新（他の設定は保護）
-    updateUserField(userId, 'lastAccessedAt', now);
-    
-  } catch (error) {
-    console.error('updateUserLastAccess エラー:', error.message);
-  }
-}
 
-/**
- * configJsonからsetupStatusを安全に取得
- * @param {string} configJsonString - JSONエンコードされた設定文字列
- * @returns {string} setupStatus ('pending', 'completed', 'error')
- */
-function getSetupStatusFromConfig(configJsonString) {
-  try {
-    if (!configJsonString || configJsonString.trim() === '' || configJsonString === '{}') {
-      return 'pending'; // 空の場合はセットアップ未完了とみなす
-    }
-    
-    const config = JSON.parse(configJsonString);
-    
-    // setupStatusが明示的に設定されている場合はそれを使用
-    if (config.setupStatus) {
-      return config.setupStatus;
-    }
-    
-    // setupStatusがない場合、他のフィールドから推測
-    if (config.appPublished === true && config.formCreated === true) {
-      return 'completed';
-    }
-    
-    return 'pending';
-    
-  } catch (error) {
-    console.warn('getSetupStatusFromConfig JSON解析エラー:', error.message);
-    return 'pending'; // エラー時はセットアップ未完了とみなす
-  }
-}
