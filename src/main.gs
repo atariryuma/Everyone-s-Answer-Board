@@ -1455,17 +1455,6 @@ function getSheetList(spreadsheetId) {
   }
 }
 
-/**
- * システムメトリクスを取得（ダミー実装）
- * @returns {Object} メトリクス情報
- */
-function getSystemMetrics() {
-  return {
-    activeUsers: 1,
-    activeBoards: 1,
-    timestamp: new Date().toISOString()
-  };
-}
 
 /**
  * 現在の設定を取得（ダミー実装）

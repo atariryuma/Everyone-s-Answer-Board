@@ -9,6 +9,9 @@
   
   <!-- Shared Utilities Include -->
   <?!= include('SharedUtilities') ?>
+  <script>
+    const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+  </script>
   <style>
     /* ベストプラクティス準拠のスタイル */
     body { 
@@ -614,20 +617,27 @@
         </div>
       </section>
 
-      <!-- システム監視 -->
-      <section class="info-card">
-        <h3>🔍 システム状態</h3>
-        <div class="metrics">
-          <div class="metric">
-            <span class="value" id="active-users">--</span>
-            <span class="unit">アクティブユーザー</span>
+      <!-- ユーザー情報 -->
+      <div class="glass-panel rounded-xl p-6 mb-6">
+        <h2 class="text-xl font-semibold text-white mb-4">👤 ユーザー情報</h2>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+            <span class="text-gray-300">メールアドレス:</span>
+            <span id="current-user-email" class="text-cyan-400">読み込み中...</span>
           </div>
-          <div class="metric">
-            <span class="value" id="active-boards">--</span>
-            <span class="unit">公開中ボード</span>
+          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+            <span class="text-gray-300">ユーザーID:</span>
+            <span id="current-user-id" class="text-gray-400">読み込み中...</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+            <span class="text-gray-300">アクション:</span>
+            <button onclick="window.sharedUtilities.auth.switchToAnotherAccount()" 
+                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">
+              ログアウト
+            </button>
           </div>
         </div>
-      </section>
+      </div>
 
       <!-- データベース詳細 -->
       <section class="info-card">
@@ -657,9 +667,6 @@
       <section class="info-card">
         <h3>⚡ クイックアクション</h3>
         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-          <button class="link-btn" style="width: 100%; text-align: center;" onclick="refreshSystemStatus()">
-            システム状態更新
-          </button>
           <button class="link-btn" style="width: 100%; text-align: center;" onclick="exportConfig()">
             設定をエクスポート
           </button>
@@ -697,7 +704,7 @@
       try {
         setLoading(true);
         loadSpreadsheetList();
-        loadSystemMetrics();
+        loadUserInfo();
         updateLastUpdateTime();
         setLoading(false);
       } catch (error) {
@@ -730,17 +737,25 @@
         .getSpreadsheetList();
     }
 
-    // システムメトリクス読み込み
-    function loadSystemMetrics() {
+    // ユーザー情報読み込み
+    function loadUserInfo() {
+      // メールアドレス取得
       google.script.run
-        .withSuccessHandler(function(metrics) {
-          document.getElementById('active-users').textContent = metrics.activeUsers || '--';
-          document.getElementById('active-boards').textContent = metrics.activeBoards || '--';
+        .withSuccessHandler(function(email) {
+          document.getElementById('current-user-email').textContent = email || '--';
         })
         .withFailureHandler(function(error) {
-          console.error('メトリクス読み込みエラー:', error);
+          console.error('メールアドレス取得エラー:', error);
+          document.getElementById('current-user-email').textContent = 'エラー';
         })
-        .getSystemMetrics();
+        .getCurrentUserEmail();
+        
+      // ユーザーIDを表示（__USER_ID__があれば使用）
+      if (typeof __USER_ID__ !== 'undefined' && __USER_ID__) {
+        document.getElementById('current-user-id').textContent = __USER_ID__;
+      } else {
+        document.getElementById('current-user-id').textContent = 'N/A';
+      }
     }
 
     // 最終更新時刻更新
@@ -784,21 +799,6 @@
       }
     }
 
-    // システム状態更新
-    function updateSystemStatus() {
-      updateLastUpdateTime();
-      loadSystemMetrics();
-    }
-
-    // システム状態更新（ボタン用）
-    function refreshSystemStatus() {
-      setLoading(true);
-      updateSystemStatus();
-      setTimeout(() => {
-        setLoading(false);
-        showSuccess('システム状態を更新しました');
-      }, 1000);
-    }
 
     // 設定エクスポート
     function exportConfig() {
