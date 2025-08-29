@@ -25,7 +25,7 @@ describe('getDataCount reflects new rows', () => {
       debugLog: () => {},
       cacheManager: {
         store: {},
-        get(key, fn) { return this.store.hasOwnProperty(key) ? this.store[key] : (this.store[key] = fn()); },
+        get(key, fn) { return Object.prototype.hasOwnProperty.call(this.store, key) ? this.store[key] : (this.store[key] = fn()); },
         remove(key) { delete this.store[key]; },
       },
       PropertiesService: {

@@ -1,4 +1,3 @@
-const fs = require('fs');
 const vm = require('vm');
 
 describe('StudyQuest System Flow Integration Tests', () => {
@@ -88,13 +87,13 @@ describe('StudyQuest System Flow Integration Tests', () => {
     test('saveAndPublish and addReaction should not interfere', async () => {
       // saveAndPublish と addReaction の同時実行テスト
 
-      const saveAndPublishMock = jest.fn().mockImplementation(async (userId, sheetName, config) => {
+      const saveAndPublishMock = jest.fn().mockImplementation(async (_userId, _sheetName, _config) => {
         // LockService の呼び出しをシミュレート
         const lock = context.LockService.getScriptLock();
         lock.waitLock(30000);
 
         // 処理時間をシミュレート
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await new Promise((resolve) => global.setTimeout(resolve, 50));
 
         lock.releaseLock();
         return { status: 'success' };
@@ -102,13 +101,13 @@ describe('StudyQuest System Flow Integration Tests', () => {
 
       const addReactionMock = jest
         .fn()
-        .mockImplementation(async (userId, rowIndex, reaction, sheetName) => {
+        .mockImplementation(async (_userId, _rowIndex, _reaction, _sheetName) => {
           // LockService の呼び出しをシミュレート
           const lock = context.LockService.getScriptLock();
           lock.waitLock(10000);
 
           // 処理時間をシミュレート
-          await new Promise((resolve) => setTimeout(resolve, 30));
+          await new Promise((resolve) => global.setTimeout(resolve, 30));
 
           lock.releaseLock();
           return { status: 'ok' };
@@ -139,9 +138,8 @@ describe('StudyQuest System Flow Integration Tests', () => {
     test('Cache invalidation should not cause race conditions', () => {
       // キャッシュ無効化の競合テスト
 
-      let cacheCleared = 0;
       context.clearExecutionUserInfoCache = jest.fn(() => {
-        cacheCleared++;
+        // キャッシュクリア処理をモック
       });
 
       // 複数のキャッシュクリア呼び出しを並行実行

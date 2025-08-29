@@ -259,7 +259,7 @@ describe('統一キャッシュシステム統合テスト', () => {
       });
 
       // テスト実行
-      const result = global.cacheManager.get('test_key', () => 'new_value', {
+      global.cacheManager.get('test_key', () => 'new_value', {
         enableMemoization: true,
         usePropertiesFallback: true
       });
