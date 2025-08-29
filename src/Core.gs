@@ -1237,48 +1237,6 @@ function setupApplication(credsJson, dbId) {
   }
 }
 
-/**
- * セットアップ状態をテストする (マルチテナント対応版)
- */
-function testSetup() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    var creds = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
-    
-    if (!dbId) {
-      return { status: 'error', message: 'データベーススプレッドシートIDが設定されていません。' };
-    }
-    
-    if (!creds) {
-      return { status: 'error', message: 'サービスアカウント認証情報が設定されていません。' };
-    }
-    
-    // データベースへの接続テスト
-    try {
-      var userInfo = findUserByEmail(Session.getActiveUser().getEmail());
-      return { 
-        status: 'success', 
-        message: 'セットアップは正常に完了しています。システムは使用準備が整いました。',
-        details: {
-          databaseConnected: true,
-          userCount: userInfo ? 'ユーザー登録済み' : '未登録',
-          serviceAccountConfigured: true
-        }
-      };
-    } catch (dbError) {
-      return { 
-        status: 'warning', 
-        message: '設定は保存されていますが、データベースアクセスに問題があります。',
-        details: { error: dbError.message }
-      };
-    }
-    
-  } catch (e) {
-    console.error('セットアップテストエラー:', e);
-    return { status: 'error', message: 'セットアップテストに失敗しました: ' + e.message };
-  }
-}
 
 // =================================================================
 // ヘルパー関数
@@ -3861,9 +3819,6 @@ function isSystemAdmin() {
   }
 }
 
-function isDeployUser() {
-  return isSystemAdmin();
-}
 
 // =================================================================
 // マルチテナント対応関数（同時アクセス対応）
@@ -4215,18 +4170,6 @@ function activateSheetSimple(requestUserId, sheetName) {
   }
 }
 
-/**
- * 現在ログイン中のユーザーのメールアドレスを取得する簡易関数
- * @returns {string} ユーザーのメールアドレス
- */
-function getCurrentUserEmail() {
-  try {
-    return Session.getActiveUser().getEmail() || '';
-  } catch (error) {
-    console.error('getCurrentUserEmail error:', error);
-    return '';
-  }
-}
 
 /**
  * ログインフロー修正の検証テスト
