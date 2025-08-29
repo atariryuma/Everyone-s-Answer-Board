@@ -3,8 +3,6 @@
  * GAS互換の関数ベースの実装
  */
 
-// データベース管理のための定数
-var DB_BATCH_SIZE = 100;
 
 // 簡易インデックス機能：ユーザー検索の高速化
 var userIndexCache = {

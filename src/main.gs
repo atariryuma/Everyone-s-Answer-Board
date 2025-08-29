@@ -72,12 +72,6 @@ const LOG_SHEET_CONFIG = {
 // 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
 var _executionUserInfoCache = null;
 
-/**
- * 実行中のユーザー情報キャッシュをクリア
- */
-function clearExecutionUserInfoCache() {
-  _executionUserInfoCache = null;
-}
 
 
 
@@ -177,14 +171,6 @@ function log(level, message, details) {
   }
 }
 
-function debugLog() {
-  if (!DEBUG) return;
-  try {
-    console.log.apply(console, arguments);
-  } catch (e) {
-    // ignore logging errors
-  }
-}
 
 /**
  * デプロイされたWebアプリのドメイン情報と現在のユーザーのドメイン情報を取得
@@ -582,102 +568,6 @@ function handleAdminRoute(userInfo, params, userEmail) {
 }
 
 
-/**
- * 統合されたユーザー情報取得関数 (Phase 2: 統合完了)
- * キャッシュ戦略とセキュリティチェックを統合
- * @param {string|Object} identifier - メールアドレス、ユーザーID、または設定オブジェクト
- * @param {string} [type] - 'email' | 'userId' | null (auto-detect)
- * @param {Object} [options] - キャッシュオプション
- * @returns {Object|null} ユーザー情報オブジェクト、見つからない場合はnull
- */
-function getOrFetchUserInfo(identifier, type = null, options = {}) {
-  // オプションのデフォルト値
-  const opts = {
-    ttl: options.ttl || 300, // 5分キャッシュ
-    enableSecurityCheck: options.enableSecurityCheck !== false, // デフォルトで有効
-    currentUserEmail: options.currentUserEmail || null,
-    useExecutionCache: options.useExecutionCache || false,
-    ...options
-  };
-
-  // 引数の正規化
-  let email = null;
-  let userId = null;
-  
-  if (typeof identifier === 'object' && identifier !== null) {
-    // オブジェクト形式の場合（後方互換性）
-    email = identifier.email;
-    userId = identifier.userId;
-  } else if (typeof identifier === 'string') {
-    // 文字列の場合、typeに基づいて判定
-    if (type === 'email' || (!type && identifier.includes('@'))) {
-      email = identifier;
-    } else {
-      userId = identifier;
-    }
-  }
-
-  // キャッシュキーの生成
-  const cacheKey = `unified_user_info_${userId || email}`;
-  
-  // 実行レベルキャッシュの確認（オプション）
-  if (opts.useExecutionCache && _executionUserInfoCache && 
-      _executionUserInfoCache.userId === userId) {
-    return _executionUserInfoCache.userInfo;
-  }
-
-  // 統合キャッシュマネージャーを使用（キャッシュ miss 時は自動でデータベースから取得）
-  let userInfo = null;
-  
-  try {
-    userInfo = cacheManager.get(cacheKey, () => {
-      // キャッシュに存在しない場合はデータベースから取得する
-      // 通常フローのためエラーレベルでは記録しない
-      console.log('cache miss - fetching from database');
-
-      const props = PropertiesService.getScriptProperties();
-      if (!props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID)) {
-        console.error('DATABASE_SPREADSHEET_ID not set');
-        return null;
-      }
-      
-      let dbUserInfo = null;
-      if (userId) {
-        dbUserInfo = findUserById(userId);
-        // セキュリティチェック: 取得した情報のemailが現在のユーザーと一致するか確認
-        if (opts.enableSecurityCheck && dbUserInfo && opts.currentUserEmail && 
-            dbUserInfo.adminEmail !== opts.currentUserEmail) {
-          console.warn('セキュリティチェック失敗: 他人の情報へのアクセス試行');
-          return null;
-        }
-      } else if (email) {
-        dbUserInfo = findUserByEmail(email);
-      }
-      
-      return dbUserInfo;
-    }, { 
-      ttl: opts.ttl || 300,
-      enableMemoization: opts.enableMemoization || false 
-    });
-    
-    // 実行レベルキャッシュにも保存（オプション）
-    if (userInfo && opts.useExecutionCache && (userId || userInfo.userId)) {
-      _executionUserInfoCache = { userId: userId || userInfo.userId, userInfo };
-      console.log('✅ 実行レベルキャッシュに保存:', userId || userInfo.userId);
-    }
-    
-  } catch (cacheError) {
-    console.error('統合キャッシュアクセスでエラー:', cacheError.message);
-    // フォールバック: 直接データベースから取得
-    if (userId) {
-      userInfo = findUserById(userId);
-    } else if (email) {
-      userInfo = findUserByEmail(email);
-    }
-  }
-
-  return userInfo;
-}
 
 
 /**

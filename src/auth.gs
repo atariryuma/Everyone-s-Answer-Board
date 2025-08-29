@@ -3,9 +3,6 @@
  * GAS互換の関数ベースの実装
  */
 
-// 認証管理のための定数
-var AUTH_CACHE_KEY = 'SA_TOKEN_CACHE';
-var TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
 
 /**
  * キャッシュされたサービスアカウントトークンを取得
