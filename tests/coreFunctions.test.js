@@ -10,7 +10,20 @@ describe('Core.gs utilities', () => {
     const store = {};
     context = { 
       debugLog: () => {}, 
-      console, 
+      console,
+      DEBUG: false,
+      COLUMN_HEADERS: {
+        TIMESTAMP: 'タイムスタンプ',
+        EMAIL: 'メールアドレス',
+        CLASS: 'クラス',
+        OPINION: '回答',
+        REASON: '理由',
+        NAME: '名前',
+        UNDERSTAND: 'なるほど！',
+        LIKE: 'いいね！',
+        CURIOUS: 'もっと知りたい！',
+        HIGHLIGHT: 'ハイライト'
+      }, 
       PropertiesService: {
         getScriptProperties: () => ({
           getProperty: (key) => {

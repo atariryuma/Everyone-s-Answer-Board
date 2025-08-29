@@ -80,16 +80,6 @@ function clearExecutionUserInfoCache() {
 }
 
 
-// 表示モード定数
-const DISPLAY_MODES = {
-  ANONYMOUS: 'anonymous',
-  NAMED: 'named'
-};
-
-
-const EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
-const DEBUG = PropertiesService.getScriptProperties()
-  .getProperty('DEBUG_MODE') === 'true';
 
 /**
  * Determine if a value represents boolean true.

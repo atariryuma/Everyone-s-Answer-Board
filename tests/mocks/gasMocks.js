@@ -478,6 +478,29 @@ if (!global.console) {
   };
 }
 
+// Constants and globals
+global.DEBUG = false;
+global.COLUMN_HEADERS = {
+  TIMESTAMP: 'タイムスタンプ',
+  EMAIL: 'メールアドレス',
+  CLASS: 'クラス',
+  OPINION: '回答',
+  REASON: '理由',
+  NAME: '名前',
+  UNDERSTAND: 'なるほど！',
+  LIKE: 'いいね！',
+  CURIOUS: 'もっと知りたい！',
+  HIGHLIGHT: 'ハイライト'
+};
+global.DISPLAY_MODES = {
+  ANONYMOUS: 'anonymous',
+  NAMED: 'named',
+  EMAIL: 'email'
+};
+global.REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+global.USER_CACHE_TTL = 300;
+global.EMAIL_REGEX = /^[^\n@]+@[^\n@]+\.[^\n@]+$/;
+
 module.exports = {
   SpreadsheetApp: global.SpreadsheetApp,
   PropertiesService: global.PropertiesService,
