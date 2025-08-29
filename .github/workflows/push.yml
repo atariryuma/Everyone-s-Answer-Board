@@ -53,8 +53,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests and linting
+        run: npm run check
 
       # 4. Google Apps Scriptへの認証を設定（mainブランチへのpush時のみ）
       - name: Create clasprc.json for authentication
