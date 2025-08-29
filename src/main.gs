@@ -1351,3 +1351,146 @@ function checkCurrentPublicationStatus(userId) {
 /**
  * Base64エンコード/デコードのテスト
  */
+
+/**
+ * システム管理者かどうかをチェック
+ * @returns {boolean} システム管理者の場合はtrue
+ */
+function checkIsSystemAdmin() {
+  try {
+    console.log('checkIsSystemAdmin: システム管理者チェック開始');
+    
+    // 既存のisDeployUser関数を利用
+    const isAdmin = isDeployUser();
+    
+    console.log('checkIsSystemAdmin: 結果', isAdmin);
+    return isAdmin;
+    
+  } catch (error) {
+    console.error('checkIsSystemAdmin エラー:', error);
+    return false;
+  }
+}
+
+// =============================================================================
+// AdminPanel.html用のダミー関数（最小限の実装）
+// =============================================================================
+
+/**
+ * スプレッドシート一覧を取得（ダミー実装）
+ * @returns {Array} スプレッドシート情報の配列
+ */
+function getSpreadsheetList() {
+  try {
+    // 現在のユーザーのスプレッドシート情報を返す
+    const userInfo = getCurrentUserInfo();
+    if (userInfo && userInfo.spreadsheetId) {
+      return [{
+        id: userInfo.spreadsheetId,
+        name: 'メインスプレッドシート',
+        lastModified: new Date().toISOString()
+      }];
+    }
+    return [];
+  } catch (error) {
+    console.error('getSpreadsheetList エラー:', error);
+    return [];
+  }
+}
+
+/**
+ * シート一覧を取得（ダミー実装）
+ * @param {string} spreadsheetId スプレッドシートID
+ * @returns {Array} シート情報の配列
+ */
+function getSheetList(spreadsheetId) {
+  try {
+    if (!spreadsheetId) return [];
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = ss.getSheets();
+    return sheets.map(sheet => ({
+      name: sheet.getName(),
+      id: sheet.getSheetId()
+    }));
+  } catch (error) {
+    console.error('getSheetList エラー:', error);
+    return [];
+  }
+}
+
+/**
+ * システムメトリクスを取得（ダミー実装）
+ * @returns {Object} メトリクス情報
+ */
+function getSystemMetrics() {
+  return {
+    activeUsers: 1,
+    activeBoards: 1,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * 現在の設定を取得（ダミー実装）
+ * @returns {Object} 設定情報
+ */
+function getCurrentConfig() {
+  try {
+    const userInfo = getCurrentUserInfo();
+    return {
+      userId: userInfo?.userId || 'unknown',
+      spreadsheetId: userInfo?.spreadsheetId || null,
+      adminEmail: userInfo?.adminEmail || null,
+      setupComplete: !!userInfo?.spreadsheetId
+    };
+  } catch (error) {
+    console.error('getCurrentConfig エラー:', error);
+    return {};
+  }
+}
+
+/**
+ * データソースに接続（ダミー実装）
+ * @param {string} spreadsheetId スプレッドシートID
+ * @param {string} sheetName シート名
+ * @returns {Object} 接続結果
+ */
+function connectToDataSource(spreadsheetId, sheetName) {
+  return {
+    success: true,
+    message: '接続しました',
+    columnMapping: {
+      question: 'A',
+      answer: 'B',
+      reason: 'C'
+    }
+  };
+}
+
+/**
+ * 下書き設定を保存（ダミー実装）
+ * @param {Object} config 設定オブジェクト
+ * @returns {Object} 保存結果
+ */
+function saveDraftConfiguration(config) {
+  console.log('設定を保存:', config);
+  return {
+    success: true,
+    message: '保存しました',
+    config: config
+  };
+}
+
+/**
+ * アプリケーションを公開（ダミー実装）
+ * @param {Object} config 設定オブジェクト
+ * @returns {Object} 公開結果
+ */
+function publishApplication(config) {
+  console.log('アプリを公開:', config);
+  return {
+    success: true,
+    message: '公開しました',
+    config: config
+  };
+}
