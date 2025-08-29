@@ -3945,11 +3945,8 @@ function getLoginStatus() {
       console.warn('getLoginStatus: キャッシュ読み込みエラー -', e.message);
     }
 
-    var userInfo = cacheManager.get(
-      'email_' + activeUserEmail,
-      function() { return findUserByEmail(activeUserEmail); },
-      { ttl: 300, enableMemoization: true }
-    );
+    // 簡素化された認証：データベースから直接ユーザー情報を取得
+    var userInfo = findUserByEmail(activeUserEmail);
 
     var result;
     if (userInfo && (userInfo.isActive === true || String(userInfo.isActive).toLowerCase() === 'true')) {

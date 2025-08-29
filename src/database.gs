@@ -1070,20 +1070,20 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
         throw new Error('無効なAPIレスポンス: オブジェクトが期待されましたが ' + typeof result + ' を受信');
       }
       
-      if (!dbCheckResult.valueRanges || !Array.isArray(dbCheckResult.valueRanges)) {
-        console.warn('⚠️ valueRanges配列が見つからないか、配列でありません:', typeof dbCheckResult.valueRanges);
-        dbCheckResult.valueRanges = []; // 空配列を設定
+      if (!result.valueRanges || !Array.isArray(result.valueRanges)) {
+        console.warn('⚠️ valueRanges配列が見つからないか、配列でありません:', typeof result.valueRanges);
+        result.valueRanges = []; // 空配列を設定
       }
       
       // リクエストした範囲数と一致するか確認
-      if (dbCheckResult.valueRanges.length !== ranges.length) {
-        console.warn(`⚠️ リクエスト範囲数(${ranges.length})とレスポンス数(${dbCheckResult.valueRanges.length})が一致しません`);
+      if (result.valueRanges.length !== ranges.length) {
+        console.warn(`⚠️ リクエスト範囲数(${ranges.length})とレスポンス数(${result.valueRanges.length})が一致しません`);
       }
       
-      console.log('✅ batchGetSheetsData 成功: 取得した範囲数:', dbCheckResult.valueRanges.length);
+      console.log('✅ batchGetSheetsData 成功: 取得した範囲数:', result.valueRanges.length);
       
       // 各範囲のデータ存在確認
-      dbCheckResult.valueRanges.forEach((valueRange, index) => {
+      result.valueRanges.forEach((valueRange, index) => {
         const hasValues = valueRange.values && valueRange.values.length > 0;
         console.log(`📊 範囲[${index}] ${ranges[index]}: ${hasValues ? valueRange.values.length + '行' : 'データなし'}`);
       if (hasValues) {
@@ -1091,7 +1091,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
       }
       });
       
-      return dbCheckResult;
+      return result;
       
     } catch (error) {
       console.error('❌ batchGetSheetsData error:', error.message);
@@ -2670,5 +2670,199 @@ function deleteUserAccount(userId) {
     }
     
     throw new Error(errorMessage);
+  }
+}
+
+/**
+ * 簡素化されたユーザー検索関数 - メールアドレスでユーザーを検索
+ * @param {string} email - 検索対象のメールアドレス
+ * @returns {Object|null} ユーザー情報またはnull
+ */
+function findUserByEmail(email) {
+  if (!email || typeof email !== 'string') {
+    console.warn('findUserByEmail: 無効なメールアドレス', email);
+    return null;
+  }
+
+  // キャッシュキーを生成
+  const cacheKey = 'user_email_' + email;
+  
+  try {
+    // キャッシュから取得を試行
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) {
+      if (cached === 'null') {
+        console.log('findUserByEmail: キャッシュヒット（null）:', email);
+        return null;
+      }
+      console.log('findUserByEmail: キャッシュヒット:', email);
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.warn('findUserByEmail: キャッシュ読み込みエラー', error.message);
+  }
+
+  try {
+    // データベースから検索
+    const service = getSheetsService();
+    const dbId = getSecureDatabaseId();
+    const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    console.log('findUserByEmail: データベース検索開始:', email);
+    
+    // シート全体のデータを取得
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    
+    if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
+      console.warn('findUserByEmail: データベースからデータを取得できませんでした');
+      return null;
+    }
+    
+    const rows = data.valueRanges[0].values;
+    const headers = rows[0];
+    
+    // メールアドレス列のインデックスを取得
+    const emailIndex = headers.indexOf('adminEmail');
+    if (emailIndex === -1) {
+      console.error('findUserByEmail: adminEmail列が見つかりません');
+      return null;
+    }
+    
+    // メールアドレスでユーザーを検索
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row[emailIndex] && row[emailIndex].toLowerCase() === email.toLowerCase()) {
+        // ユーザーオブジェクトを構築
+        const user = {};
+        headers.forEach((header, index) => {
+          if (row[index] !== undefined) {
+            user[header] = row[index];
+          }
+        });
+        
+        console.log('findUserByEmail: ユーザー発見:', user.userId || 'ID不明');
+        
+        // キャッシュに保存（300秒 = 5分）
+        try {
+          CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), 300);
+        } catch (error) {
+          console.warn('findUserByEmail: キャッシュ保存エラー', error.message);
+        }
+        
+        return user;
+      }
+    }
+    
+    console.log('findUserByEmail: ユーザーが見つかりません:', email);
+    
+    // 見つからなかった場合もキャッシュしておく（短時間）
+    try {
+      CacheService.getScriptCache().put(cacheKey, 'null', 60);
+    } catch (error) {
+      console.warn('findUserByEmail: nullキャッシュ保存エラー', error.message);
+    }
+    
+    return null;
+    
+  } catch (error) {
+    console.error('findUserByEmail エラー:', error.message);
+    return null;
+  }
+}
+
+/**
+ * 簡素化されたユーザー検索関数 - ユーザーIDでユーザーを検索
+ * @param {string} userId - 検索対象のユーザーID
+ * @returns {Object|null} ユーザー情報またはnull
+ */
+function findUserById(userId) {
+  if (!userId || typeof userId !== 'string') {
+    console.warn('findUserById: 無効なユーザーID', userId);
+    return null;
+  }
+
+  // キャッシュキーを生成
+  const cacheKey = 'user_id_' + userId;
+  
+  try {
+    // キャッシュから取得を試行
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) {
+      if (cached === 'null') {
+        console.log('findUserById: キャッシュヒット（null）:', userId);
+        return null;
+      }
+      console.log('findUserById: キャッシュヒット:', userId);
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.warn('findUserById: キャッシュ読み込みエラー', error.message);
+  }
+
+  try {
+    // データベースから検索
+    const service = getSheetsService();
+    const dbId = getSecureDatabaseId();
+    const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    console.log('findUserById: データベース検索開始:', userId);
+    
+    // シート全体のデータを取得
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    
+    if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
+      console.warn('findUserById: データベースからデータを取得できませんでした');
+      return null;
+    }
+    
+    const rows = data.valueRanges[0].values;
+    const headers = rows[0];
+    
+    // ユーザーID列のインデックスを取得
+    const userIdIndex = headers.indexOf('userId');
+    if (userIdIndex === -1) {
+      console.error('findUserById: userId列が見つかりません');
+      return null;
+    }
+    
+    // ユーザーIDでユーザーを検索
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row[userIdIndex] && row[userIdIndex] === userId) {
+        // ユーザーオブジェクトを構築
+        const user = {};
+        headers.forEach((header, index) => {
+          if (row[index] !== undefined) {
+            user[header] = row[index];
+          }
+        });
+        
+        console.log('findUserById: ユーザー発見:', userId);
+        
+        // キャッシュに保存（300秒 = 5分）
+        try {
+          CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), 300);
+        } catch (error) {
+          console.warn('findUserById: キャッシュ保存エラー', error.message);
+        }
+        
+        return user;
+      }
+    }
+    
+    console.log('findUserById: ユーザーが見つかりません:', userId);
+    
+    // 見つからなかった場合もキャッシュしておく（短時間）
+    try {
+      CacheService.getScriptCache().put(cacheKey, 'null', 60);
+    } catch (error) {
+      console.warn('findUserById: nullキャッシュ保存エラー', error.message);
+    }
+    
+    return null;
+    
+  } catch (error) {
+    console.error('findUserById エラー:', error.message);
+    return null;
   }
 }
