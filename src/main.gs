@@ -39,6 +39,24 @@ function checkApplicationAccess() {
 }
 
 /**
+ * 現在のユーザーメールアドレス取得
+ * @return {string} ユーザーのメールアドレス
+ */
+function getCurrentUserEmail() {
+  try {
+    const userEmail = Session.getActiveUser().getEmail();
+    if (!userEmail) {
+      console.warn('getCurrentUserEmail: ユーザーメールアドレスが取得できませんでした');
+      return '';
+    }
+    return userEmail;
+  } catch (error) {
+    console.error('getCurrentUserEmail エラー:', error.message);
+    return '';
+  }
+}
+
+/**
  * JavaScript文字列エスケープ関数 (URL対応版)
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列
