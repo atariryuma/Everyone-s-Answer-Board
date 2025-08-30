@@ -32,14 +32,14 @@ const User = {
    */
   email() {
     try {
-      const userEmail = User.email();
+      const userEmail = Session.getActiveUser().getEmail();
       if (!userEmail) {
         console.warn('ユーザーメールアドレス取得失敗');
         return '';
       }
       return userEmail;
     } catch (error) {
-      console.error('getCurrentUserEmail エラー', { error: error.message });
+      console.error('User.email エラー', { error: error.message });
       return '';
     }
   },

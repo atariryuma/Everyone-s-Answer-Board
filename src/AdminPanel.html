@@ -814,9 +814,22 @@
     // ユーザー情報読み込み
     function loadUserInfo() {
       // メールアドレス取得
+      console.log('loadUserInfo: メールアドレス取得開始');
       google.script.run
         .withSuccessHandler(function(email) {
-          document.getElementById('current-user-email').textContent = email || '--';
+          console.log('getUserEmail成功:', email);
+          if (email && email.trim()) {
+            document.getElementById('current-user-email').textContent = email;
+            console.log('メールアドレス表示完了:', email);
+          } else {
+            console.warn('User email not found in response:', email);
+            document.getElementById('current-user-email').textContent = '取得中...';
+            // 再試行メカニズム
+            setTimeout(() => {
+              console.log('メールアドレス取得再試行');
+              loadUserInfo();
+            }, 2000);
+          }
         })
         .withFailureHandler(function(error) {
           console.error('メールアドレス取得エラー:', error);
