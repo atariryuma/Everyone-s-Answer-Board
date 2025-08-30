@@ -1549,6 +1549,7 @@ function resetUnifiedExecutionCache() {
  * ヘッダーインデックスをキャッシュ付きで安定取得（リトライ機能付き）
  */
 function getHeadersCached(spreadsheetId, sheetName) {
+  console.log(`📋 [HEADER_CACHE] Requested headers for ${sheetName} in ${spreadsheetId?.substring(0, 10)}...`);
   const key = `hdr_${spreadsheetId}_${sheetName}`;
   const validationKey = `hdr_validation_${spreadsheetId}_${sheetName}`;
 
@@ -1610,10 +1611,13 @@ function getHeadersCached(spreadsheetId, sheetName) {
  * @private
  */
 function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
+  // 詳細ログ追加
+  console.log(`🔍 [HEADER_DETECTION] Starting header detection for ${sheetName} in ${spreadsheetId?.substring(0, 10)}...`);
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      console.log(`[HEADER_DETECTION] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId?.substring(0, 10)}, sheetName: ${sheetName}`);
       ULog.debug(
         `[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`
       );
@@ -1681,6 +1685,8 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
       }
 
       ULog.debug(`[getHeadersWithRetry] Final indices (attempt ${attempt}):`, indices);
+      console.log(`✅ [HEADER_DETECTION] Success! Found ${Object.keys(indices).length} headers:`, Object.keys(indices));
+      console.log(`🎯 [HEADER_DETECTION] Column mapping:`, JSON.stringify(indices, null, 2));
       return indices;
     } catch (error) {
       lastError = error;
