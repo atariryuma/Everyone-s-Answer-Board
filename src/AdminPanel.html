@@ -822,7 +822,7 @@
           console.error('メールアドレス取得エラー:', error);
           document.getElementById('current-user-email').textContent = 'エラー';
         })
-        .User.email();
+        .getUserEmail();
         
       // ユーザーIDを表示（__USER_ID__があれば使用）
       if (typeof __USER_ID__ !== 'undefined' && __USER_ID__) {

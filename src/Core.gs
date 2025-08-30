@@ -284,7 +284,7 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
   clearExecutionUserInfoCache();
 
   try {
-    var reactingUserEmail = Session.getActiveUser().getEmail();
+    var reactingUserEmail = User.email();
     var ownerUserId = requestUserId; // requestUserId を使用
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
@@ -350,7 +350,7 @@ function addReactionBatch(requestUserId, batchOperations) {
 
     console.log('🔄 バッチリアクション処理開始:', batchOperations.length + '件');
 
-    var reactingUserEmail = Session.getActiveUser().getEmail();
+    var reactingUserEmail = User.email();
     var ownerUserId = requestUserId;
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
@@ -503,7 +503,7 @@ function getCurrentSheetName(spreadsheetId) {
 
 /**
  * マルチテナント環境でのユーザーアクセス権限を検証します。
- * リクエストを投げたユーザー (Session.getActiveUser().getEmail()) が、
+ * リクエストを投げたユーザー (User.email()) が、
  * requestUserId のデータにアクセスする権限を持っているかを確認します。
  * 権限がない場合はエラーをスローします。
  * @param {string} requestUserId - アクセスを要求しているユーザーのID
@@ -526,7 +526,7 @@ function verifyUserAccess(requestUserId) {
   
   clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
 
-  const activeUserEmail = Session.getActiveUser().getEmail();
+  const activeUserEmail = User.email();
   console.log(`verifyUserAccess start: userId=${requestUserId}, email=${activeUserEmail}`);
   if (!activeUserEmail) {
     throw new Error('認証エラー: アクティブユーザーの情報を取得できませんでした');
@@ -901,7 +901,7 @@ function refreshBoardData(requestUserId) {
  */
 function formatSheetDataForFrontend(rawData, mappedIndices, headerIndices, adminMode, isOwner, displayMode) {
   // 現在のユーザーメールを取得（リアクション状態判定用）
-  var currentUserEmail = Session.getActiveUser().getEmail();
+  var currentUserEmail = User.email();
   
   return rawData.map(function(row, index) {
     var classIndex = mappedIndices.classHeader;
@@ -1194,7 +1194,7 @@ function getResponsesData(userId, sheetName) {
  */
 function getCurrentUserStatus(requestUserId) {
   try {
-    const activeUserEmail = Session.getActiveUser().getEmail();
+    const activeUserEmail = User.email();
     
     // requestUserIdが無効な場合は、メールアドレスでユーザーを検索
     let userInfo;
@@ -1446,7 +1446,7 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
     }
 
     // 管理者権限チェック - 現在のユーザーがボードの所有者かどうかを確認
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = User.email();
     if (activeUserEmail !== userInfo.adminEmail) {
       throw new Error('ハイライト機能は管理者のみ使用できます');
     }
@@ -3029,7 +3029,7 @@ function getSheetsList(userId) {
         
         // 最終手段：ユーザー権限での修復も試行
         try {
-          var currentUserEmail = Session.getActiveUser().getEmail();
+          var currentUserEmail = User.email();
           if (currentUserEmail === userInfo.adminEmail) {
             repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
             console.log('getSheetsList: ユーザー権限での修復を実行しました。');
@@ -3438,7 +3438,7 @@ function updateIsActiveStatus(requestUserId, isActive) {
     verifyUserAccess(requestUserId);
   }
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = User.email();
     if (!activeUserEmail) {
       return {
         status: 'error',
@@ -3501,7 +3501,7 @@ function updateIsActiveStatus(requestUserId, isActive) {
  */
 function hasSetupPageAccess() {
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = User.email();
     if (!activeUserEmail) {
       return false;
     }
@@ -3555,7 +3555,7 @@ function isSystemAdmin() {
   try {
     var props = PropertiesService.getScriptProperties();
     var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-    var currentUserEmail = Session.getActiveUser().getEmail();
+    var currentUserEmail = User.email();
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
     console.error('isSystemAdmin エラー: ' + e.message);
@@ -3647,7 +3647,7 @@ function getAllUsersForAdminForUI(requestUserId) {
 function createCustomFormUI(requestUserId, config) {
   try {
     verifyUserAccess(requestUserId);
-    const activeUserEmail = Session.getActiveUser().getEmail();
+    const activeUserEmail = User.email();
     
     // AdminPanelのconfig構造を内部形式に変換（createCustomForm の処理を統合）
     const convertedConfig = {
@@ -3825,7 +3825,7 @@ function createCustomFormUI(requestUserId, config) {
 function createQuickStartFormUI(requestUserId) {
   try {
     verifyUserAccess(requestUserId);
-    const activeUserEmail = Session.getActiveUser().getEmail();
+    const activeUserEmail = User.email();
     
     // createQuickStartForm の処理を統合（直接 createUnifiedForm を呼び出し）
     const result = createUnifiedForm('quickstart', activeUserEmail, requestUserId);
@@ -3932,7 +3932,7 @@ function activateSheetSimple(requestUserId, sheetName) {
  */
 function getLoginStatus() {
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = User.email();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }
@@ -3990,7 +3990,7 @@ function getLoginStatus() {
  */
 function confirmUserRegistration() {
   try {
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = User.email();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
     }
@@ -4019,7 +4019,7 @@ function getInitialData(requestUserId, targetSheetName) {
     var startTime = new Date().getTime();
     
     // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
-    var activeUserEmail = Session.getActiveUser().getEmail();
+    var activeUserEmail = User.email();
     var currentUserId = requestUserId;
     
     // UserID の解決
@@ -4313,7 +4313,7 @@ function getApplicationStatusForUI() {
   try {
     const accessCheck = Access.check();
     const isEnabled = getApplicationEnabled();
-    const adminEmail = Session.getActiveUser().getEmail();
+    const adminEmail = User.email();
     
     return {
       status: 'success',

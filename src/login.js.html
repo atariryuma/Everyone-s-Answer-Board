@@ -95,7 +95,7 @@
     const displayCurrentUserEmail = () => {
       google.script.run
         .withSuccessHandler(response => {
-          // Session.getActiveUser().getEmail() の結果を直接表示
+          // User.email() の結果を直接表示
           if (response) {
             userEmailDisplay.textContent = response;
           } else {
@@ -107,7 +107,7 @@
           console.warn('User email display failed:', error);
           userEmailDisplay.textContent = 'ユーザー情報取得エラー';
         })
-        .User.email();
+        .getUserEmail();
     };
 
     // GAS内蔵認証を使用した簡易ログイン処理

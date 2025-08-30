@@ -237,7 +237,7 @@ class CacheManager {
     try {
       // 統一バッチ処理システムでの処理を試行
       if (typeof unifiedBatchProcessor !== 'undefined') {
-        const currentUserId = Session.getActiveUser().getEmail();
+        const currentUserId = User.email();
         const cacheOperations = keys.map((key) => ({ key: key }));
 
         const cachedResults = unifiedBatchProcessor.batchCacheOperation(

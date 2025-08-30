@@ -416,7 +416,7 @@ class MultiTenantSecurityManager {
       type: 'SECURITY_VIOLATION',
       violation: violationType,
       details: details,
-      userAgent: Session.getActiveUser().getEmail(),
+      userAgent: User.email(),
     };
 
     console.error('[ERROR]', `🚨 セキュリティ違反: ${violationType}`, JSON.stringify(logEntry));
@@ -488,7 +488,7 @@ const multiTenantSecurity = new MultiTenantSecurityManager();
  */
 function secureMultiTenantCacheOperation(operation, baseKey, userId, value = null, options = {}) {
   // テナント境界検証
-  const currentUserId = Session.getActiveUser().getEmail(); // 簡易実装
+  const currentUserId = User.email(); // 簡易実装
   if (!multiTenantSecurity.validateTenantBoundary(currentUserId, userId, `cache_${operation}`)) {
     throw new Error(`SECURITY_ERROR: テナント境界違反 - ${operation} operation denied`);
   }

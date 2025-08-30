@@ -32,7 +32,7 @@ const User = {
    */
   email() {
     try {
-      const userEmail = Session.getActiveUser().getEmail();
+      const userEmail = User.email();
       if (!userEmail) {
         console.warn('ユーザーメールアドレス取得失敗');
         return '';
@@ -71,6 +71,15 @@ const User = {
   }
 };
 
+/**
+ * フロントエンド用のユーザーメールアドレス取得関数
+ * User.email()へのエイリアス（GASフロントエンドから直接呼び出し可能）
+ * @return {string} ユーザーのメールアドレス
+ */
+function getUserEmail() {
+  return User.email();
+}
+
 // アクセス制御関連の機能
 const Access = {
   /**
@@ -101,7 +110,7 @@ const Deploy = {
    */
   domain() {
     try {
-      var activeUserEmail = Session.getActiveUser().getEmail();
+      var activeUserEmail = User.email();
       var currentDomain = getEmailDomain(activeUserEmail);
       
       // 統一されたURL取得システムを使用（開発URL除去機能付き）
@@ -441,7 +450,7 @@ function doGet(e) {
     const params = parseRequestParams(e);
 
     // 4. ログイン状態の確認
-  const userEmail = Session.getActiveUser().getEmail();
+  const userEmail = User.email();
   if (!userEmail) {
     return showLoginPage();
   }
@@ -456,7 +465,7 @@ function doGet(e) {
       // パラメータなしの場合、前回の管理パネル状態を確認
       console.log('No mode parameter, checking previous admin session');
       
-      var activeUserEmail = Session.getActiveUser().getEmail();
+      var activeUserEmail = User.email();
       if (activeUserEmail) {
         var userProperties = PropertiesService.getUserProperties();
         var lastAdminUserId = userProperties.getProperty('lastAdminUserId');
@@ -676,7 +685,7 @@ function showAppSetupPage(userId) {
     // システム管理者権限チェック
     try {
       console.log('showAppSetupPage: Checking deploy user permissions...');
-      const currentUserEmail = Session.getActiveUser().getEmail();
+      const currentUserEmail = User.email();
       console.log('showAppSetupPage: Current user email:', currentUserEmail);
       const deployUserCheckResult = Deploy.isUser();
       console.log('showAppSetupPage: Deploy.isUser() result:', deployUserCheckResult);
@@ -739,7 +748,7 @@ function getAppSetupUrl() {
   try {
     // システム管理者権限チェック
     console.log('getAppSetupUrl: Checking deploy user permissions...');
-    const currentUserEmail = Session.getActiveUser().getEmail();
+    const currentUserEmail = User.email();
     console.log('getAppSetupUrl: Current user email:', currentUserEmail);
     const deployUserCheckResult = Deploy.isUser();
     console.log('getAppSetupUrl: Deploy.isUser() result:', deployUserCheckResult);
@@ -1175,7 +1184,7 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.showAdminFeatures = true;
   const deployUserResult = Deploy.isUser();
   console.log('renderAdminPanel - Deploy.isUser() result:', deployUserResult);
-  console.log('renderAdminPanel - current user email:', Session.getActiveUser().getEmail());
+  console.log('renderAdminPanel - current user email:', User.email());
   adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
   
@@ -1273,7 +1282,7 @@ function renderAnswerBoard(userInfo, params) {
       template.displayMode = config.displayMode || 'anonymous';
       template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
       template.showScoreSort = template.showCounts;
-      const currentUserEmail = Session.getActiveUser().getEmail();
+      const currentUserEmail = User.email();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;
@@ -1287,7 +1296,7 @@ function renderAnswerBoard(userInfo, params) {
       template.displayMode = 'anonymous';
       template.showCounts = false;
       template.showScoreSort = false;
-      const currentUserEmail = Session.getActiveUser().getEmail();
+      const currentUserEmail = User.email();
       const isOwner = currentUserEmail === userInfo.adminEmail;
       template.showAdminFeatures = isOwner;
       template.isAdminUser = isOwner;

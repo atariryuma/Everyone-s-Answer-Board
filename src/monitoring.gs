@@ -158,7 +158,7 @@ function performSystemDiagnostics() {
       gasVersion: 'V8 Runtime',
       timeZone: Session.getScriptTimeZone(),
       locale: Session.getActiveLocale(),
-      userEmail: Session.getActiveUser().getEmail()
+      userEmail: User.email()
     };
     
     // パフォーマンス情報
@@ -232,7 +232,7 @@ function initializeHealthChecks() {
   // 認証システムチェック
   healthChecker.registerCheck('authentication', () => {
     try {
-      const email = Session.getActiveUser().getEmail();
+      const email = User.email();
       return !!email;
     } catch (error) {
       return false;

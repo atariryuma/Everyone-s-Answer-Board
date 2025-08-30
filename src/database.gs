@@ -456,7 +456,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       throw new Error('削除理由に適切な内容を入力してください。テスト用の削除は許可されていません。');
     }
     
-    const executorEmail = Session.getActiveUser().getEmail();
+    const executorEmail = User.email();
     
     // セキュリティチェック: 管理者メールの検証
     if (!executorEmail || !executorEmail.includes('@')) {
@@ -586,7 +586,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
  */
 function canDeleteUser(targetUserId) {
   try {
-    const currentUserEmail = Session.getActiveUser().getEmail();
+    const currentUserEmail = User.email();
     const targetUser = DB.findUserById(targetUserId);
     
     if (!targetUser) {

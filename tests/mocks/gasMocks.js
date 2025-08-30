@@ -246,6 +246,42 @@ global.getUnifiedExecutionCache = jest.fn(() => ({
   clearAll: jest.fn()
 }));
 
+// User名前空間 モック
+global.User = {
+  email: jest.fn(() => 'test@example.com'),
+  info: jest.fn(() => ({ 
+    userId: 'testUserId',
+    adminEmail: 'test@example.com',
+    spreadsheetId: 'testSpreadsheetId'
+  }))
+};
+
+// Access名前空間 モック  
+global.Access = {
+  check: jest.fn(() => ({ hasAccess: true, message: 'テストアクセス許可' }))
+};
+
+// Deploy名前空間 モック
+global.Deploy = {
+  isUser: jest.fn(() => true),
+  domain: jest.fn(() => ({ domain: 'test.example.com', isDomainMatch: true }))
+};
+
+// DB名前空間 モック
+global.DB = {
+  findUserById: jest.fn((userId) => ({
+    userId: userId,
+    adminEmail: 'test@example.com',
+    spreadsheetId: 'testSpreadsheetId'
+  })),
+  findUserByEmail: jest.fn((email) => ({
+    userId: 'testUserId',
+    adminEmail: email,
+    spreadsheetId: 'testSpreadsheetId'
+  })),
+  createUser: jest.fn((userData) => ({ ...userData, created: true }))
+};
+
 // セキュリティ・権限関数 モック
 global.isDeployUser = jest.fn(() => true);
 global.executeWithStandardizedLock = jest.fn((callback) => callback());
