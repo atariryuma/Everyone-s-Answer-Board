@@ -3,7 +3,7 @@ const vm = require('vm');
 
 describe('verifyUserAccess security checks', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
-  const configManagerCode = fs.readFileSync('src/ConfigurationManager.gs', 'utf8');
+  // ConfigurationManagerとAccessControllerは同じファイルに統合
   const accessControllerCode = fs.readFileSync('src/AccessController.gs', 'utf8');
   let context;
 
@@ -61,7 +61,6 @@ describe('verifyUserAccess security checks', () => {
       })),
     };
     vm.createContext(context);
-    vm.runInContext(configManagerCode, context);
     vm.runInContext(accessControllerCode, context);
     vm.runInContext(coreCode, context);
   });
@@ -131,7 +130,6 @@ describe('verifyUserAccess security checks', () => {
     };
     
     vm.createContext(publicContext);
-    vm.runInContext(configManagerCode, publicContext);
     vm.runInContext(accessControllerCode, publicContext);
     vm.runInContext(coreCode, publicContext);
     

@@ -1,11 +1,210 @@
 /**
- * アクセス制御システム
- * データベース非依存でゲストアクセスにも対応した柔軟なアクセス制御
+ * 設定管理・アクセス制御統合システム
+ * ConfigurationManagerとAccessControllerを統合して依存関係を解決
  */
+
+// ===============================
+// ConfigurationManagerクラス
+// ===============================
+
+class ConfigurationManager {
+  constructor() {
+    this.properties = PropertiesService.getScriptProperties();
+    this.cache = CacheService.getScriptCache();
+  }
+
+  getUserConfig(userId) {
+    if (!userId) return null;
+
+    const cacheKey = `config_${userId}`;
+    let config = this.cache.get(cacheKey);
+    
+    if (config) {
+      return JSON.parse(config);
+    }
+
+    const propKey = `user_config_${userId}`;
+    const configData = this.properties.getProperty(propKey);
+    
+    if (!configData) return null;
+
+    config = JSON.parse(configData);
+    this.cache.put(cacheKey, configData, 1800);
+    return config;
+  }
+
+  setUserConfig(userId, config) {
+    if (!userId || !config) return false;
+
+    try {
+      const configData = JSON.stringify(config);
+      const propKey = `user_config_${userId}`;
+      
+      this.properties.setProperty(propKey, configData);
+      
+      const cacheKey = `config_${userId}`;
+      this.cache.put(cacheKey, configData, 1800);
+      
+      return true;
+    } catch (error) {
+      console.error(`設定保存エラー (${userId}):`, error);
+      return false;
+    }
+  }
+
+  removeUserConfig(userId) {
+    if (!userId) return false;
+
+    try {
+      const propKey = `user_config_${userId}`;
+      this.properties.deleteProperty(propKey);
+      
+      const cacheKey = `config_${userId}`;
+      this.cache.remove(cacheKey);
+      
+      return true;
+    } catch (error) {
+      console.error(`設定削除エラー (${userId}):`, error);
+      return false;
+    }
+  }
+
+  getPublicConfig(userId) {
+    const config = this.getUserConfig(userId);
+    if (!config || !config.isPublic) return null;
+
+    return {
+      tenantId: userId,
+      title: config.title || 'Answer Board',
+      description: config.description || '',
+      allowAnonymous: config.allowAnonymous || false,
+      columns: config.columns || this.getDefaultColumns(),
+      theme: config.theme || 'default'
+    };
+  }
+
+  getDefaultColumns() {
+    return [
+      { name: 'question', label: '質問', type: 'text', required: true },
+      { name: 'answer', label: '回答', type: 'textarea', required: false },
+      { name: 'category', label: 'カテゴリ', type: 'select', required: false },
+      { name: 'timestamp', label: '作成日時', type: 'datetime', required: false }
+    ];
+  }
+
+  initializeUserConfig(userId, email) {
+    const defaultConfig = {
+      userId: userId,
+      email: email,
+      title: `${email}の回答ボード`,
+      description: '',
+      isPublic: false,
+      allowAnonymous: false,
+      columns: this.getDefaultColumns(),
+      theme: 'default',
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString()
+    };
+
+    this.setUserConfig(userId, defaultConfig);
+    return defaultConfig;
+  }
+
+  updateUserConfig(userId, updates) {
+    const currentConfig = this.getUserConfig(userId);
+    if (!currentConfig) return false;
+
+    const updatedConfig = {
+      ...currentConfig,
+      ...updates,
+      lastModified: new Date().toISOString()
+    };
+
+    return this.setUserConfig(userId, updatedConfig);
+  }
+
+  getAllUserConfigs() {
+    const allProperties = this.properties.getProperties();
+    const configs = [];
+
+    Object.keys(allProperties).forEach(key => {
+      if (key.startsWith('user_config_')) {
+        try {
+          const config = JSON.parse(allProperties[key]);
+          configs.push(config);
+        } catch (error) {
+          console.error(`設定解析エラー (${key}):`, error);
+        }
+      }
+    });
+
+    return configs;
+  }
+
+  getUsageStats() {
+    const allProperties = this.properties.getProperties();
+    let totalSize = 0;
+    let userConfigCount = 0;
+
+    Object.entries(allProperties).forEach(([key, value]) => {
+      totalSize += key.length + value.length;
+      if (key.startsWith('user_config_')) {
+        userConfigCount++;
+      }
+    });
+
+    const maxSize = 524288;
+    const usagePercentage = (totalSize / maxSize * 100).toFixed(2);
+
+    return {
+      totalSize,
+      maxSize,
+      usagePercentage,
+      userConfigCount,
+      remainingCapacity: maxSize - totalSize
+    };
+  }
+
+  hasUserConfig(userId) {
+    if (!userId) return false;
+    const propKey = `user_config_${userId}`;
+    return this.properties.getProperty(propKey) !== null;
+  }
+
+  createBackup() {
+    const allConfigs = this.getAllUserConfigs();
+    return {
+      timestamp: new Date().toISOString(),
+      version: '1.0',
+      configs: allConfigs,
+      stats: this.getUsageStats()
+    };
+  }
+
+  restoreFromBackup(backupData) {
+    if (!backupData || !backupData.configs) return false;
+
+    try {
+      backupData.configs.forEach(config => {
+        if (config.userId) {
+          this.setUserConfig(config.userId, config);
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('バックアップ復元エラー:', error);
+      return false;
+    }
+  }
+}
+
+// ===============================
+// AccessControllerクラス
+// ===============================
 
 class AccessController {
   constructor() {
-    this.configManager = configManager;
+    // ConfigurationManagerはグローバルインスタンスとして利用
   }
 
   /**
@@ -23,7 +222,7 @@ class AccessController {
       }
 
       // 設定を取得（データベース非依存）
-      const config = this.configManager.getUserConfig(targetUserId);
+      const config = configManager.getUserConfig(targetUserId);
       
       // 設定が存在しない場合の処理
       if (!config) {
@@ -73,7 +272,7 @@ class AccessController {
 
     // ゲストアクセス
     if (config.allowAnonymous) {
-      const publicConfig = this.configManager.getPublicConfig(config.tenantId);
+      const publicConfig = configManager.getPublicConfig(config.tenantId);
       return this.createAccessResult(true, 'guest', publicConfig);
     }
 
@@ -140,7 +339,7 @@ class AccessController {
    * @return {boolean} 公開ボード存在可否
    */
   isPublicBoardAvailable(userId) {
-    const config = this.configManager.getUserConfig(userId);
+    const config = configManager.getUserConfig(userId);
     return config && config.isPublic;
   }
 
@@ -246,8 +445,7 @@ class AccessController {
   }
 }
 
-// グローバルインスタンス
-if (typeof accessController === 'undefined') {
-  var accessController = new AccessController();
-}
+// グローバルインスタンスを作成
+var configManager = new ConfigurationManager();
+var accessController = new AccessController();
 

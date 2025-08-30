@@ -2,7 +2,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('ゲストアクセステスト', () => {
-  const configManagerCode = fs.readFileSync('src/ConfigurationManager.gs', 'utf8');
+  // ConfigurationManagerとAccessControllerは同じファイルに統合
   const accessControllerCode = fs.readFileSync('src/AccessController.gs', 'utf8');
   let context;
 
@@ -47,7 +47,6 @@ describe('ゲストアクセステスト', () => {
       }
     };
     vm.createContext(context);
-    vm.runInContext(configManagerCode, context);
     vm.runInContext(accessControllerCode, context);
   });
 
