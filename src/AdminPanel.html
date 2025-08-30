@@ -5,189 +5,85 @@
   <base target="_top">
   <title>StudyQuest 管理パネル</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Shared Utilities Include -->
-  <?!= include('SharedUtilities') ?>
+  <!-- Shared Security Headers -->
+  <?!= include('SharedSecurityHeaders'); ?>
+  <!-- Shared TailwindCSS Configuration -->
+  <?!= include('SharedTailwindConfig'); ?>
+  <?!= include('UnifiedStyles'); ?>
+  <?!= include('SharedUtilities'); ?>
   <script>
     const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
   </script>
   <style>
-    /* ベストプラクティス準拠のスタイル */
+    /* AdminPanel専用スタイル - AppSetupPageと統一 */
     body { 
       margin: 0; 
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
     }
 
+    /* 簡素化されたAdminPanelスタイル */
     .admin-container {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 1rem;
-      min-height: 100vh;
-      padding: 1rem;
-    }
-
-    .main-editor {
-      background: #f8fafc;
-      border-radius: 12px;
+      max-width: 4xl;
+      margin: 0 auto;
       padding: 1.5rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
 
-    .info-panel {
-      background: #f1f5f9;
-      border-radius: 12px;
-      padding: 1rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      overflow-y: auto;
-    }
+    /* このセクションのスタイルは削除 */
 
-    .card {
-      background: white;
-      border-radius: 8px;
-      padding: 1.5rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      border: 1px solid #e2e8f0;
-    }
-
-    .card h2 {
-      margin: 0 0 1rem 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #1e293b;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .info-card {
-      background: white;
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 0.75rem;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      border: 1px solid #e2e8f0;
-    }
-
-    .info-card h3 {
-      margin: 0 0 0.75rem 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #1e293b;
-    }
-
-    /* ステータスヘッダー */
-    .status-header {
-      background: white;
-      border-radius: 8px;
-      padding: 1rem 1.5rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      border: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .status-header h1 {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #1e293b;
-    }
-
-    .system-monitor {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      font-size: 0.875rem;
-      color: #64748b;
-    }
-
-    .status-indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 4px;
-    }
-
-    .status-indicator.active {
-      background-color: #10b981;
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-    }
-
-    .status-indicator.warning {
-      background-color: #f59e0b;
-    }
-
-    .status-indicator.error {
-      background-color: #ef4444;
-    }
-
-    /* セットアップ進捗 */
+    /* 進捗スタイルを簡素化 */
     .setup-progress {
       display: flex;
-      gap: 1rem;
-      margin-bottom: 1rem;
-      padding: 1rem;
-      background: #e0e7ff;
-      border-radius: 8px;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
     }
 
     .step {
       flex: 1;
       text-align: center;
-      padding: 0.5rem;
-      border-radius: 4px;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
       font-size: 0.875rem;
       font-weight: 500;
-      color: #64748b;
-      background: #f1f5f9;
+      background: rgba(107, 114, 128, 0.1);
+      color: rgba(156, 163, 175, 1);
+      transition: all 0.2s;
     }
 
     .step.completed {
-      background: #dcfce7;
-      color: #166534;
+      background: rgba(34, 197, 94, 0.2);
+      color: rgba(34, 197, 94, 1);
     }
 
     .step.current {
-      background: #dbeafe;
-      color: #1d4ed8;
-      border: 2px solid #3b82f6;
+      background: rgba(59, 130, 246, 0.2);
+      color: rgba(59, 130, 246, 1);
+      border: 2px solid rgba(59, 130, 246, 0.5);
     }
 
-    /* フォーム要素 */
+    /* フォーム要素 - Tailwindスタイルで置き換え */
     .form-group {
       margin-bottom: 1rem;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 500;
-      color: #374151;
     }
 
     .modern-select, input[type="text"] {
       width: 100%;
       padding: 0.75rem;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
+      background: rgba(55, 65, 81, 0.8);
+      border: 1px solid rgba(75, 85, 99, 0.5);
+      border-radius: 0.5rem;
+      color: white;
       font-size: 0.875rem;
       transition: all 0.2s;
     }
 
     .modern-select:focus, input[type="text"]:focus {
       outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      border-color: rgba(59, 130, 246, 0.8);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
     }
 
-    /* トグルスイッチ */
+    /* トグルスイッチ - ダークテーマ対応 */
     .toggle-group {
       display: flex;
       flex-direction: column;
@@ -199,6 +95,7 @@
       align-items: center;
       gap: 0.75rem;
       cursor: pointer;
+      color: rgba(209, 213, 219, 1);
     }
 
     .toggle-switch input {
@@ -208,7 +105,7 @@
     .slider {
       width: 44px;
       height: 24px;
-      background: #cbd5e0;
+      background: rgba(107, 114, 128, 0.5);
       border-radius: 12px;
       position: relative;
       transition: all 0.3s;
@@ -228,17 +125,17 @@
     }
 
     .toggle-switch input:checked + .slider {
-      background: #3b82f6;
+      background: rgba(59, 130, 246, 0.8);
     }
 
     .toggle-switch input:checked + .slider:before {
       transform: translateX(20px);
     }
 
-    /* ボタン */
+    /* ボタン - ダークテーマ対応 */
     .btn-primary, .btn-secondary {
       padding: 0.75rem 1.5rem;
-      border-radius: 6px;
+      border-radius: 0.5rem;
       font-weight: 500;
       transition: all 0.2s;
       cursor: pointer;
@@ -247,23 +144,23 @@
     }
 
     .btn-primary {
-      background: #3b82f6;
+      background: linear-gradient(to right, rgba(59, 130, 246, 1), rgba(147, 51, 234, 1));
       color: white;
     }
 
     .btn-primary:hover {
-      background: #2563eb;
+      background: linear-gradient(to right, rgba(37, 99, 235, 1), rgba(126, 34, 206, 1));
       transform: translateY(-1px);
     }
 
     .btn-secondary {
-      background: #f1f5f9;
-      color: #64748b;
-      border: 1px solid #d1d5db;
+      background: rgba(75, 85, 99, 0.5);
+      color: rgba(209, 213, 219, 1);
+      border: 1px solid rgba(107, 114, 128, 0.5);
     }
 
     .btn-secondary:hover {
-      background: #e2e8f0;
+      background: rgba(75, 85, 99, 0.7);
     }
 
     .action-buttons {
@@ -272,7 +169,7 @@
       margin-top: 1rem;
     }
 
-    /* 右パネルの情報表示 */
+    /* 右パネルの情報表示 - ダークテーマ対応 */
     .config-summary {
       display: flex;
       flex-direction: column;
@@ -283,110 +180,110 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    .config-item:last-child {
-      border-bottom: none;
+      padding: 0.75rem;
+      background: rgba(55, 65, 81, 0.8);
+      border-radius: 0.5rem;
+      color: rgba(209, 213, 219, 1);
     }
 
     .label {
       font-weight: 500;
-      color: #374151;
+      color: rgba(156, 163, 175, 1);
       font-size: 0.875rem;
     }
 
     .link-btn {
-      background: #eff6ff;
-      color: #2563eb;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
+      background: rgba(59, 130, 246, 0.2);
+      color: rgba(96, 165, 250, 1);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
       text-decoration: none;
-      font-size: 0.75rem;
+      font-size: 0.875rem;
       font-weight: 500;
       transition: all 0.2s;
     }
 
     .link-btn:hover {
-      background: #dbeafe;
+      background: rgba(59, 130, 246, 0.3);
     }
 
     .status-badge {
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
       font-size: 0.75rem;
       font-weight: 500;
     }
 
     .status-badge.unpublished {
-      background: #fef3c7;
-      color: #92400e;
+      background: rgba(245, 158, 11, 0.2);
+      color: rgba(245, 158, 11, 1);
     }
 
     .status-badge.published {
-      background: #dcfce7;
-      color: #166534;
+      background: rgba(34, 197, 94, 0.2);
+      color: rgba(34, 197, 94, 1);
     }
 
     .status-badge.error {
-      background: #fee2e2;
-      color: #dc2626;
+      background: rgba(239, 68, 68, 0.2);
+      color: rgba(239, 68, 68, 1);
     }
 
-    /* システム監視メトリクス */
+    /* 簡素化されたメトリクス表示 */
     .metrics {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-wrap: wrap;
       gap: 0.75rem;
     }
 
     .metric {
       text-align: center;
-      padding: 0.75rem;
-      background: #f8fafc;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+      padding: 1rem;
+      background: rgba(55, 65, 81, 0.8);
+      border-radius: 0.75rem;
+      border: 1px solid rgba(75, 85, 99, 0.5);
+      flex: 1;
+      min-width: 200px;
     }
 
     .metric .value {
       display: block;
-      font-size: 1.25rem;
+      font-size: 1.5rem;
       font-weight: 700;
-      color: #1e293b;
+      color: rgba(96, 165, 250, 1);
     }
 
     .metric .unit {
-      font-size: 0.75rem;
-      color: #64748b;
+      font-size: 0.875rem;
+      color: rgba(156, 163, 175, 1);
     }
 
-    /* JSON表示 */
+    /* JSON表示 - ダークテーマ */
     .json-viewer {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 4px;
-      padding: 0.75rem;
-      font-family: 'Monaco', 'Menlo', monospace;
-      font-size: 0.75rem;
-      color: #374151;
+      background: rgba(17, 24, 39, 0.8);
+      border: 1px solid rgba(75, 85, 99, 0.5);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
+      font-size: 0.8rem;
+      color: rgba(209, 213, 219, 1);
       white-space: pre-wrap;
-      max-height: 200px;
+      max-height: 300px;
       overflow-y: auto;
     }
 
     .expandable-section {
-      margin-top: 0.5rem;
+      margin-top: 0.75rem;
     }
 
     .expandable-section summary {
       cursor: pointer;
       font-weight: 500;
-      color: #3b82f6;
-      padding: 0.5rem 0;
+      color: rgba(96, 165, 250, 1);
+      padding: 0.75rem 0;
     }
 
-    /* 列マッピング表示 */
+    /* 列マッピング表示 - ダークテーマ */
     .auto-detected-columns {
       display: flex;
       flex-direction: column;
@@ -397,225 +294,179 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.75rem;
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 6px;
+      padding: 1rem;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 0.5rem;
     }
 
     .column-type {
-      font-weight: 500;
-      color: #166534;
+      font-weight: 600;
+      color: rgba(34, 197, 94, 1);
     }
 
     .detected-column {
-      background: #dcfce7;
-      color: #166534;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
+      background: rgba(34, 197, 94, 0.2);
+      color: rgba(34, 197, 94, 1);
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      font-size: 0.8rem;
       font-weight: 500;
     }
 
     .confidence {
-      font-size: 0.75rem;
-      color: #16a34a;
+      font-size: 0.8rem;
+      color: rgba(34, 197, 94, 0.8);
     }
 
-    /* レスポンシブデザイン */
+    /* レスポンシブデザイン - 簡素化 */
     @media (max-width: 768px) {
       .admin-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto;
-      }
-      
-      .status-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
+        padding: 1rem;
       }
       
       .setup-progress {
         flex-direction: column;
+        gap: 0.5rem;
       }
       
       .metrics {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+      
+      .metric {
+        min-width: unset;
       }
     }
 
-    /* ローディング状態 */
-    .loading {
-      opacity: 0.6;
-      pointer-events: none;
-      position: relative;
-    }
-
-    .loading::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 20px;
-      height: 20px;
-      border: 2px solid #e2e8f0;
-      border-top: 2px solid #3b82f6;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      transform: translate(-50%, -50%);
-    }
-
-    @keyframes spin {
-      0% { transform: translate(-50%, -50%) rotate(0deg); }
-      100% { transform: translate(-50%, -50%) rotate(360deg); }
-    }
-
-    /* 成功・エラー状態のアニメーション */
-    .success-pulse {
-      animation: successPulse 0.6s ease-out;
-    }
-
-    .error-shake {
-      animation: errorShake 0.5s ease-out;
-    }
-
-    @keyframes successPulse {
-      0% { background-color: #dcfce7; }
-      50% { background-color: #bbf7d0; }
-      100% { background-color: #dcfce7; }
-    }
-
-    @keyframes errorShake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-5px); }
-      75% { transform: translateX(5px); }
-    }
+    /* SharedUtilitiesのローディングシステムを使用 */
   </style>
 </head>
 <body>
-  <div class="admin-container">
-    <!-- 左パネル: メインエディタ -->
-    <div class="main-editor">
-      <!-- ステータスヘッダー -->
-      <header class="status-header">
-        <h1>StudyQuest 管理パネル</h1>
-        <div class="system-monitor">
-          <span><span class="status-indicator active"></span>接続正常</span>
-          <span id="last-update">最終同期: --:--</span>
-          <span id="health-check">DB正常</span>
-        </div>
-      </header>
-
-      <!-- セットアップ進捗 -->
-      <div class="setup-progress">
-        <div class="step completed">1. データソース</div>
-        <div class="step current">2. 列設定</div>
-        <div class="step">3. 公開</div>
-      </div>
-
-      <!-- データソース選択カード -->
-      <section class="card">
-        <h2>📊 データソース選択</h2>
-        <div class="form-group">
-          <label for="spreadsheet-select">スプレッドシート:</label>
-          <select id="spreadsheet-select" class="modern-select">
-            <option value="">読み込み中...</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="sheet-select">シート:</label>
-          <select id="sheet-select" class="modern-select">
-            <option value="">スプレッドシートを選択してください</option>
-          </select>
-        </div>
-        <div class="action-buttons">
-          <button id="refresh-data" class="btn-secondary">🔄 更新</button>
-          <button id="connect-source" class="btn-primary">接続</button>
-        </div>
-      </section>
-
-      <!-- 列マッピングカード -->
-      <section class="card">
-        <h2>📋 列設定</h2>
-        <div class="auto-detected-columns">
-          <div class="column-match">
-            <span class="column-type">質問</span>
-            <span class="detected-column">A列</span>
-            <span class="confidence">95%確信度</span>
-          </div>
-          <div class="column-match">
-            <span class="column-type">回答者</span>
-            <span class="detected-column">B列</span>
-            <span class="confidence">88%確信度</span>
-          </div>
-          <div class="column-match">
-            <span class="column-type">理由</span>
-            <span class="detected-column">C列</span>
-            <span class="confidence">92%確信度</span>
-          </div>
-        </div>
-        <div class="action-buttons">
-          <button id="verify-mapping" class="btn-primary">設定を確認</button>
-        </div>
-      </section>
-
-      <!-- 表示設定カード -->
-      <section class="card">
-        <h2>⚙️ 表示設定</h2>
-        <div class="toggle-group">
-          <label class="toggle-switch">
-            <input type="checkbox" id="show-names" checked>
-            <span class="slider"></span>
-            回答者名を表示
-          </label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="show-reactions" checked>
-            <span class="slider"></span>
-            リアクション数を表示
-          </label>
-        </div>
-      </section>
-
-      <!-- 公開カード -->
-      <section class="card">
-        <h2>🚀 公開設定</h2>
-        <div class="form-group">
-          <div class="config-item">
-            <span class="label">現在のステータス:</span>
-            <span class="status-badge unpublished">未公開</span>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="app-name">アプリケーション名:</label>
-          <input type="text" id="app-name" placeholder="例: クラス質問ボード">
-        </div>
-        <div class="action-buttons">
-          <button id="save-draft" class="btn-secondary">下書き保存</button>
-          <button id="publish-now" class="btn-primary">今すぐ公開</button>
-        </div>
-      </section>
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden">
+        <div class="loading-spinner w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
     </div>
 
-    <!-- 右パネル: 情報表示 -->
-    <div class="info-panel">
-      <!-- 現在の設定サマリー -->
-      <section class="info-card">
-        <h3>📋 現在の設定</h3>
-        <div class="config-summary">
-          <div class="config-item">
-            <span class="label">データソース:</span>
-            <a href="#" class="link-btn" id="open-sheet">シートを開く</a>
-          </div>
-          <div class="config-item">
-            <span class="label">セットアップ:</span>
-            <span class="status-badge unpublished">設定中</span>
-          </div>
-          <div class="config-item">
-            <span class="label">最終更新:</span>
-            <span style="font-size: 0.75rem; color: #64748b;">--:--</span>
-          </div>
+    <!-- Notification Container -->
+    <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
+    
+    <div class="admin-container max-w-4xl mx-auto p-6">
+        <!-- ヘッダー -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-cyan-400 mb-2">🛠️ StudyQuest 管理パネル</h1>
+            <p class="text-xl text-gray-300">アプリケーションの設定と管理を行います</p>
+            <p class="text-sm text-gray-400 mt-2">データソースの接続、表示設定、公開設定を管理できます</p>
         </div>
-      </section>
+
+        <!-- セットアップ進捗 -->
+        <div class="setup-progress mb-6">
+            <div class="step completed">1. データソース</div>
+            <div class="step current">2. 列設定</div>
+            <div class="step">3. 公開</div>
+        </div>
+
+        <!-- データソース選択パネル -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
+            <div class="space-y-4">
+                <div class="form-group">
+                    <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2">スプレッドシート:</label>
+                    <select id="spreadsheet-select" class="modern-select">
+                        <option value="">読み込み中...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2">シート:</label>
+                    <select id="sheet-select" class="modern-select">
+                        <option value="">スプレッドシートを選択してください</option>
+                    </select>
+                </div>
+                <div class="action-buttons">
+                    <button id="refresh-data" class="btn-secondary">🔄 更新</button>
+                    <button id="connect-source" class="btn-primary">接続</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 列マッピングパネル -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
+            <div class="auto-detected-columns mb-4">
+                <div class="column-match">
+                    <span class="column-type">質問</span>
+                    <span class="detected-column">A列</span>
+                    <span class="confidence">95%確信度</span>
+                </div>
+                <div class="column-match">
+                    <span class="column-type">回答者</span>
+                    <span class="detected-column">B列</span>
+                    <span class="confidence">88%確信度</span>
+                </div>
+                <div class="column-match">
+                    <span class="column-type">理由</span>
+                    <span class="detected-column">C列</span>
+                    <span class="confidence">92%確信度</span>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button id="verify-mapping" class="btn-primary">設定を確認</button>
+            </div>
+        </div>
+
+        <!-- 表示設定パネル -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
+            <div class="toggle-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="show-names" checked>
+                    <span class="slider"></span>
+                    回答者名を表示
+                </label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="show-reactions" checked>
+                    <span class="slider"></span>
+                    リアクション数を表示
+                </label>
+            </div>
+        </div>
+
+        <!-- 公開設定パネル -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">🚀 公開設定</h2>
+            <div class="space-y-4">
+                <div class="config-item">
+                    <span class="label">現在のステータス:</span>
+                    <span class="status-badge unpublished">未公開</span>
+                </div>
+                <div class="form-group">
+                    <label for="app-name" class="block text-sm font-medium text-gray-300 mb-2">アプリケーション名:</label>
+                    <input type="text" id="app-name" placeholder="例: クラス質問ボード" class="w-full">
+                </div>
+                <div class="action-buttons">
+                    <button id="save-draft" class="btn-secondary">下書き保存</button>
+                    <button id="publish-now" class="btn-primary">今すぐ公開</button>
+                </div>
+            </div>
+        </div>
+        <!-- 情報表示エリア -->
+        <!-- 現在の設定サマリー -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">📋 現在の設定</h2>
+            <div class="config-summary">
+                <div class="config-item">
+                    <span class="label">データソース:</span>
+                    <a href="#" class="link-btn" id="open-sheet">シートを開く</a>
+                </div>
+                <div class="config-item">
+                    <span class="label">セットアップ:</span>
+                    <span class="status-badge unpublished">設定中</span>
+                </div>
+                <div class="config-item">
+                    <span class="label">最終更新:</span>
+                    <span class="text-sm text-gray-400">--:--</span>
+                </div>
+            </div>
+        </div>
 
       <!-- ユーザー情報 -->
       <div class="glass-panel rounded-xl p-6 mb-6">
@@ -639,17 +490,17 @@
         </div>
       </div>
 
-      <!-- データベース詳細 -->
-      <section class="info-card">
-        <h3>🗄️ データベース詳細</h3>
-        <div class="db-details">
-          <div class="config-item">
-            <span class="label">DB接続:</span>
-            <span class="status-badge published">正常</span>
-          </div>
-          <details class="expandable-section">
-            <summary>設定詳細 (JSON)</summary>
-            <div class="json-viewer" id="config-json">
+        <!-- データベース詳細 -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">🗄️ データベース詳細</h2>
+            <div class="space-y-4">
+                <div class="config-item">
+                    <span class="label">DB接続:</span>
+                    <span class="status-badge published">正常</span>
+                </div>
+                <details class="expandable-section">
+                    <summary class="text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">設定詳細 (JSON)</summary>
+                    <div class="json-viewer mt-3" id="config-json">
 {
   "setupStatus": "pending",
   "spreadsheetId": null,
@@ -658,35 +509,32 @@
   "appPublished": false,
   "lastUpdated": null
 }
+                    </div>
+                </details>
             </div>
-          </details>
         </div>
-      </section>
 
-      <!-- クイックアクション -->
-      <section class="info-card">
-        <h3>⚡ クイックアクション</h3>
-        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-          <button class="link-btn" style="width: 100%; text-align: center;" onclick="exportConfig()">
-            設定をエクスポート
-          </button>
-          <button id="app-setup-btn" class="link-btn" style="width: 100%; text-align: center; display: none;" onclick="goToAppSetup()">
-            ⚙️ アプリ設定画面
-          </button>
+        <!-- クイックアクション -->
+        <div class="glass-panel rounded-xl p-6 mb-6">
+            <h2 class="text-xl font-semibold text-white mb-4">⚡ クイックアクション</h2>
+            <div class="space-y-3">
+                <button class="link-btn w-full text-center" onclick="exportConfig()">
+                    設定をエクスポート
+                </button>
+                <button id="app-setup-btn" class="link-btn w-full text-center hidden" onclick="goToAppSetup()">
+                    ⚙️ アプリ設定画面
+                </button>
+            </div>
         </div>
-      </section>
     </div>
-  </div>
 
   <!-- SharedUtilities.html は上部で既にインクルード済み -->
 
   <script>
-    // グローバル状態管理
+    // 簡素化された状態管理
     let systemState = {
-      connected: false,
-      lastUpdate: null,
-      config: null,
-      loading: false
+      loading: false,
+      config: null
     };
 
     // 初期化
@@ -694,18 +542,14 @@
       console.log('AdminPanel初期化開始');
       initializePanel();
       checkSystemAdminAccess();
-      
-      // 定期的なステータス更新
-      setInterval(updateSystemStatus, 30000); // 30秒間隔
     });
 
-    // パネル初期化
+    // パネル初期化 - 簡素化
     function initializePanel() {
       try {
         setLoading(true);
         loadSpreadsheetList();
         loadUserInfo();
-        updateLastUpdateTime();
         setLoading(false);
       } catch (error) {
         console.error('初期化エラー:', error);
@@ -758,43 +602,36 @@
       }
     }
 
-    // 最終更新時刻更新
-    function updateLastUpdateTime() {
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('ja-JP', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-      document.getElementById('last-update').textContent = `最終同期: ${timeString}`;
-    }
+    // 不要なシステム監視機能を削除
 
-    // ローディング状態設定
+    // ローディング状態設定 - SharedUtilitiesシステムを使用
     function setLoading(loading) {
       systemState.loading = loading;
-      const container = document.querySelector('.admin-container');
-      if (loading) {
-        container.classList.add('loading');
-      } else {
-        container.classList.remove('loading');
+      if (window.sharedUtilities && window.sharedUtilities.ui) {
+        if (loading) {
+          window.sharedUtilities.ui.showLoading();
+        } else {
+          window.sharedUtilities.ui.hideLoading();
+        }
       }
     }
 
     // エラー表示 (SharedUtilitiesの通知システムを使用)
     function showError(message) {
-      if (window.notifications && window.notifications.error) {
-        window.notifications.error(message);
+      if (window.sharedUtilities && window.sharedUtilities.notifications) {
+        window.sharedUtilities.notifications.error(message);
       } else {
-        // フォールバック
+        console.error('Error:', message);
         alert('エラー: ' + message);
       }
     }
 
     // 成功表示 (SharedUtilitiesの通知システムを使用)
     function showSuccess(message) {
-      if (window.notifications && window.notifications.success) {
-        window.notifications.success(message);
+      if (window.sharedUtilities && window.sharedUtilities.notifications) {
+        window.sharedUtilities.notifications.success(message);
       } else {
-        // フォールバック
+        console.log('Success:', message);
         alert('成功: ' + message);
       }
     }
