@@ -337,6 +337,52 @@
         overflow-y: auto;
       }
 
+      /* 信頼度バッジスタイル */
+      .confidence-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        gap: 0.25rem;
+      }
+
+      .confidence-badge.high {
+        background: rgba(34, 197, 94, 0.2);
+        color: rgba(34, 197, 94, 1);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+      }
+
+      .confidence-badge.medium {
+        background: rgba(245, 158, 11, 0.2);
+        color: rgba(245, 158, 11, 1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+
+      .confidence-badge.low {
+        background: rgba(239, 68, 68, 0.2);
+        color: rgba(239, 68, 68, 1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+
+      .confidence-badge.manual {
+        background: rgba(168, 85, 247, 0.2);
+        color: rgba(168, 85, 247, 1);
+        border: 1px solid rgba(168, 85, 247, 0.3);
+      }
+
+      /* ドロップダウン選択時の視覚的フィードバック */
+      .modern-select.has-ai-selection {
+        border-color: rgba(59, 130, 246, 0.6);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
+
+      .modern-select.has-manual-selection {
+        border-color: rgba(168, 85, 247, 0.6);
+        box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+      }
+
       .expandable-section {
         margin-top: 0.75rem;
       }
@@ -597,25 +643,90 @@
         <!-- 列マッピングカード -->
         <section class="card glass-panel rounded-xl p-6">
           <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
-          <div class="auto-detected-columns mb-4">
-            <div class="column-match">
-              <span class="column-type">質問</span>
-              <span class="detected-column">A列</span>
-              <span class="confidence">95%確信度</span>
+          
+          <div class="column-dropdowns space-y-4 mb-4">
+            <!-- 回答列選択 -->
+            <div class="form-group">
+              <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+                💬 回答列:
+                <span class="text-xs text-gray-400 ml-2">(個別の回答内容が入っている列)</span>
+              </label>
+              <select id="answer-column-select" class="modern-select" data-column-type="answer">
+                <option value="">選択してください...</option>
+              </select>
+              <div id="answer-confidence" class="text-xs mt-1 hidden">
+                <span class="confidence-badge"></span>
+              </div>
             </div>
-            <div class="column-match">
-              <span class="column-type">回答者</span>
-              <span class="detected-column">B列</span>
-              <span class="confidence">88%確信度</span>
+
+            <!-- 理由列選択 -->
+            <div class="form-group">
+              <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+                📋 理由列:
+                <span class="text-xs text-gray-400 ml-2">(回答の理由・根拠が入っている列)</span>
+              </label>
+              <select id="reason-column-select" class="modern-select" data-column-type="reason">
+                <option value="">選択してください...</option>
+              </select>
+              <div id="reason-confidence" class="text-xs mt-1 hidden">
+                <span class="confidence-badge"></span>
+              </div>
             </div>
-            <div class="column-match">
-              <span class="column-type">理由</span>
-              <span class="detected-column">C列</span>
-              <span class="confidence">92%確信度</span>
+
+            <!-- クラス列選択 -->
+            <div class="form-group">
+              <label for="class-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+                🏫 クラス列:
+                <span class="text-xs text-gray-400 ml-2">(所属クラス情報が入っている列)</span>
+              </label>
+              <select id="class-column-select" class="modern-select" data-column-type="class">
+                <option value="">選択してください...</option>
+              </select>
+              <div id="class-confidence" class="text-xs mt-1 hidden">
+                <span class="confidence-badge"></span>
+              </div>
+            </div>
+
+            <!-- 名前列選択 -->
+            <div class="form-group">
+              <label for="name-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+                👤 名前列:
+                <span class="text-xs text-gray-400 ml-2">(回答者の名前が入っている列)</span>
+              </label>
+              <select id="name-column-select" class="modern-select" data-column-type="name">
+                <option value="">選択してください...</option>
+              </select>
+              <div id="name-confidence" class="text-xs mt-1 hidden">
+                <span class="confidence-badge"></span>
+              </div>
+            </div>
+
+            <!-- AI検出情報表示エリア -->
+            <div id="ai-detection-info" class="bg-blue-900 bg-opacity-30 border border-blue-500 border-opacity-30 rounded-lg p-3 hidden">
+              <div class="flex items-center space-x-2 mb-2">
+                <span class="text-blue-400">🤖</span>
+                <span class="text-sm font-medium text-blue-300">AI自動検出結果</span>
+              </div>
+              <div id="ai-detection-details" class="text-xs text-blue-200 space-y-1">
+                <!-- AI検出の詳細がここに表示される -->
+              </div>
+            </div>
+
+            <!-- 手動設定情報 -->
+            <div id="manual-override-info" class="bg-yellow-900 bg-opacity-30 border border-yellow-500 border-opacity-30 rounded-lg p-3 hidden">
+              <div class="flex items-center space-x-2 mb-2">
+                <span class="text-yellow-400">✋</span>
+                <span class="text-sm font-medium text-yellow-300">手動設定</span>
+              </div>
+              <div class="text-xs text-yellow-200">
+                ドロップダウンで手動選択された設定が優先されます
+              </div>
             </div>
           </div>
+          
           <div class="action-buttons">
             <button id="verify-mapping" class="btn-primary" type="button">設定を確認</button>
+            <button id="reset-to-ai" class="btn-secondary" type="button" style="display: none;">AI検出に戻す</button>
           </div>
         </section>
 
@@ -1140,6 +1251,16 @@
         }
       }
 
+      // 情報表示 (SharedUtilitiesの通知システムを使用)
+      function showInfo(message) {
+        if (window.sharedUtilities && window.sharedUtilities.notifications) {
+          window.sharedUtilities.notifications.info(message);
+        } else {
+          console.log('Info:', message);
+          alert('情報: ' + message);
+        }
+      }
+
       // 設定エクスポート
       function exportConfig() {
         google.script.run
@@ -1382,14 +1503,15 @@
 
         // 既存のconnectToSource関数と同様の処理を実行
         google.script.run
-          .withSuccessHandler(function (mapping) {
-            console.log('URL入力接続成功:', mapping);
-            if (mapping && mapping.success) {
-              updateColumnMapping(mapping.columnMapping);
+          .withSuccessHandler(function (result) {
+            console.log('URL入力接続成功:', result);
+            if (result && result.success) {
+              // 新しいドロップダウン式列マッピングを更新
+              updateColumnMapping(result);
               updateProgress(2);
               showSuccess('URL入力方式でスプレッドシートに接続しました');
             } else {
-              showError(mapping.error || 'スプレッドシートへの接続に失敗しました');
+              showError(result.error || 'スプレッドシートへの接続に失敗しました');
             }
             setLoading(false);
           })
@@ -1508,26 +1630,19 @@
               // 進捗更新
               updateProgress(2);
 
-              // 列マッピングの処理
-              if (result.columnMapping && Object.keys(result.columnMapping).length > 0) {
-                updateColumnMapping(result.columnMapping);
+              // 新しいドロップダウン式列マッピングを更新
+              updateColumnMapping(result);
 
-                // 自動検出の信頼度をチェック
-                const confidence = result.columnMapping.confidence || {};
+              // 自動検出の信頼度をチェック
+              if (result.columnMapping && result.columnMapping.confidence) {
+                const confidence = result.columnMapping.confidence;
                 const avgConfidence =
                   Object.values(confidence).reduce((sum, val) => sum + (val || 0), 0) /
                   Math.max(Object.keys(confidence).length, 1);
 
                 if (avgConfidence < 70) {
-                  showManualConfigOption(
-                    '列の自動検出の信頼度が低めです。手動で調整することをお勧めします。'
-                  );
+                  showInfo('💡 AI検出の信頼度が低めです。ドロップダウンで手動調整してください。');
                 }
-              } else {
-                // 自動検出に完全に失敗した場合
-                console.warn('自動列検出に失敗しました');
-                updateColumnMapping(null);
-                showManualConfigOption('列の自動検出に失敗しました。手動で設定してください。');
               }
             } else {
               handleConnectionError(result.error, { spreadsheetId, sheetName });
@@ -1568,82 +1683,12 @@
           userMessage + '\n\n推奨対処法:\n' + suggestions.map((s) => '• ' + s).join('\n');
         showError(fullMessage);
 
-        // 手動設定オプションを表示
-        showManualConfigOption('自動接続に失敗した場合は、手動で列を設定できます。');
+        // ドロップダウン式では手動設定は自動的に利用可能
+        showInfo('💡 ドロップダウンを使用して手動で列を設定できます。');
       }
 
-      // 手動設定オプションの表示
-      function showManualConfigOption(message) {
-        const columnsContainer = document.querySelector('.auto-detected-columns');
-        if (!columnsContainer) return;
-
-        // 既存の手動設定オプションがあれば削除
-        const existingManual = document.getElementById('manual-config-option');
-        if (existingManual) {
-          existingManual.remove();
-        }
-
-        const manualOption = document.createElement('div');
-        manualOption.id = 'manual-config-option';
-        manualOption.className = 'column-match';
-        manualOption.style.background = 'rgba(59, 130, 246, 0.1)';
-        manualOption.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-        manualOption.innerHTML = `
-        <div style="flex: 1;">
-          <div class="column-type">手動設定</div>
-          <div style="font-size: 0.875rem; color: rgba(156, 163, 175, 1); margin-top: 0.25rem;">
-            ${message}
-          </div>
-        </div>
-        <button class="btn-secondary" onclick="openManualColumnConfig()" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
-          手動設定
-        </button>
-      `;
-
-        columnsContainer.appendChild(manualOption);
-      }
-
-      // 手動列設定ダイアログ
-      function openManualColumnConfig() {
-        const spreadsheetId = document.getElementById('spreadsheet-select').value;
-        const sheetName = document.getElementById('sheet-select').value;
-
-        if (!spreadsheetId || !sheetName) {
-          showError('まず、スプレッドシートとシートを選択してください');
-          return;
-        }
-
-        // 簡易的な手動設定ダイアログ（実装可能範囲内）
-        const questionColumn = prompt('質問が入っている列を指定してください（例：A、B、C）:');
-        const answererColumn = prompt('回答者名が入っている列を指定してください（例：A、B、C）:');
-        const reasonColumn = prompt(
-          '理由・コメントが入っている列を指定してください（例：A、B、C）:'
-        );
-
-        if (questionColumn || answererColumn || reasonColumn) {
-          const manualMapping = {
-            question: questionColumn ? questionColumn.toUpperCase().charCodeAt(0) - 65 : null,
-            answerer: answererColumn ? answererColumn.toUpperCase().charCodeAt(0) - 65 : null,
-            reason: reasonColumn ? reasonColumn.toUpperCase().charCodeAt(0) - 65 : null,
-            confidence: {
-              question: questionColumn ? 100 : 0,
-              answerer: answererColumn ? 100 : 0,
-              reason: reasonColumn ? 100 : 0,
-            },
-          };
-
-          console.log('手動列マッピング:', manualMapping);
-          updateColumnMapping(manualMapping);
-          showSuccess('手動で列設定を行いました');
-          updateProgress(2);
-
-          // 手動設定オプションを非表示
-          const manualOption = document.getElementById('manual-config-option');
-          if (manualOption) {
-            manualOption.style.display = 'none';
-          }
-        }
-      }
+      // 手動設定オプションの表示（ドロップダウン式では不要 - 削除済み）
+      // 手動列設定ダイアログ（ドロップダウン式では不要 - 削除済み）
 
       // 進捗更新
       function updateProgress(step) {
@@ -1658,145 +1703,283 @@
         });
       }
 
-      // 列マッピング更新（改善版）
-      function updateColumnMapping(mapping) {
-        console.log('Column mapping received:', mapping);
+      // 列マッピング更新（ドロップダウン式）
+      function updateColumnMapping(result) {
+        console.log('Column mapping received:', result);
 
-        if (!mapping) {
-          console.warn('列マッピング情報がありません');
+        if (!result || !result.success) {
+          console.warn('列マッピング結果が不正です');
           showError('列マッピング情報の取得に失敗しました');
           return;
         }
 
-        const columnsContainer = document.querySelector('.auto-detected-columns');
-        if (!columnsContainer) {
-          console.error('列表示コンテナが見つかりません');
-          return;
-        }
+        const mapping = result.columnMapping;
+        const headers = result.headers || [];
 
-        // 既存の列表示をクリア
-        columnsContainer.innerHTML = '';
+        console.log('Headers:', headers, 'Mapping:', mapping);
 
-        // 列タイプの表示名マッピング（改善版）
-        const typeDisplayNames = {
-          question: '📝 質問',
-          answer: '💬 回答', 
-          answerer: '👤 回答者',
-          reason: '📋 理由',
-          timestamp: '⏰ タイムスタンプ',
-          class: '🏫 クラス',
-          name: '👤 名前',
-          // リアクション列
-          understand: '💡 なるほど！',
-          like: '👍 いいね！', 
-          curious: '🤔 もっと知りたい！',
-          highlight: '⭐ ハイライト'
+        // ドロップダウンにヘッダーオプションを設定
+        populateColumnDropdowns(headers, mapping);
+
+        // AI検出情報を表示
+        displayAIDetectionInfo(mapping);
+
+        showSuccess('✅ 列設定を更新しました');
+      }
+
+      // ドロップダウンにヘッダーオプションを設定
+      function populateColumnDropdowns(headers, mapping) {
+        console.log('populateColumnDropdowns:', { headers, mapping });
+
+        // 4つのドロップダウンを取得
+        const dropdowns = {
+          answer: document.getElementById('answer-column-select'),
+          reason: document.getElementById('reason-column-select'),
+          class: document.getElementById('class-column-select'),
+          name: document.getElementById('name-column-select')
         };
 
-        // 列の表示優先順位
-        const displayOrder = [
-          'question', 'answer', 'reason', 'answerer', 'name', 'class', 'timestamp',
-          'understand', 'like', 'curious', 'highlight'
-        ];
+        // 各ドロップダウンをクリアしてヘッダーオプションを追加
+        Object.keys(dropdowns).forEach(columnType => {
+          const dropdown = dropdowns[columnType];
+          if (!dropdown) return;
 
-        // 検出された列を優先順位に従って表示
-        let hasValidMapping = false;
-        const usedColumns = new Set(); // 重複する列の割り当てを追跡
+          // 既存のオプションをクリア
+          dropdown.innerHTML = '<option value="">選択してください...</option>';
 
-        displayOrder.forEach((type) => {
-          const columnIndex = mapping[type];
-          const confidence = mapping.confidence && mapping.confidence[type] ? mapping.confidence[type] : 0;
+          // ヘッダーをオプションとして追加
+          headers.forEach((header, index) => {
+            if (header && header.trim()) {
+              const option = document.createElement('option');
+              option.value = index;
+              option.textContent = `${String.fromCharCode(65 + index)}列: ${header}`;
+              dropdown.appendChild(option);
+            }
+          });
+        });
 
-          if (columnIndex !== null && columnIndex !== undefined) {
-            hasValidMapping = true;
-            const columnLabel = String.fromCharCode(65 + columnIndex) + '列';
+        // AI検出結果をドロップダウンの初期選択として設定
+        setAIDetectionSelections(mapping, dropdowns);
+
+        // ドロップダウン変更イベントリスナーを設定
+        setupDropdownEventListeners(dropdowns);
+      }
+
+      // AI検出結果をドロップダウンの初期選択として設定
+      function setAIDetectionSelections(mapping, dropdowns) {
+        console.log('setAIDetectionSelections:', mapping);
+
+        // グローバル変数として現在のAI検出結果を保存
+        window.currentAIMapping = mapping;
+
+        // マッピングの対応関係
+        const mappingKeys = {
+          answer: ['answerer', 'answer'], // 旧システムでは answerer が回答を意味する場合がある
+          reason: ['reason'],
+          class: ['class'], 
+          name: ['name', 'answerer'] // 名前の場合
+        };
+
+        Object.keys(dropdowns).forEach(columnType => {
+          const dropdown = dropdowns[columnType];
+          if (!dropdown) return;
+
+          // 対応するマッピングキーを探す
+          let selectedIndex = null;
+          let confidence = 0;
+
+          mappingKeys[columnType].forEach(key => {
+            if (mapping[key] !== null && mapping[key] !== undefined) {
+              selectedIndex = mapping[key];
+              confidence = mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
+            }
+          });
+
+          if (selectedIndex !== null) {
+            // ドロップダウンの選択を設定
+            dropdown.value = selectedIndex;
+            dropdown.classList.add('has-ai-selection');
             
-            // 重複する列の警告
-            const isDuplicate = usedColumns.has(columnIndex);
-            if (isDuplicate) {
-              console.warn(`Column ${columnLabel} is mapped to multiple purposes`);
-            }
-            usedColumns.add(columnIndex);
+            // 信頼度バッジを表示
+            showConfidenceBadge(columnType, confidence, 'ai');
 
-            const columnMatch = document.createElement('div');
-            columnMatch.className = 'column-match';
-
-            // 信頼度に基づく色分け（改善版）
-            let bgColor, borderColor, confidenceColor, textColor = '#374151';
-            
-            if (confidence >= 90) {
-              bgColor = 'rgba(34, 197, 94, 0.15)'; // 濃い緑（非常に高信頼度）
-              borderColor = 'rgba(34, 197, 94, 0.4)';
-              confidenceColor = 'rgba(34, 197, 94, 0.9)';
-            } else if (confidence >= 70) {
-              bgColor = 'rgba(34, 197, 94, 0.1)'; // 緑（高信頼度）
-              borderColor = 'rgba(34, 197, 94, 0.3)';
-              confidenceColor = 'rgba(34, 197, 94, 0.8)';
-            } else if (confidence >= 50) {
-              bgColor = 'rgba(245, 158, 11, 0.1)'; // 黄（中信頼度）
-              borderColor = 'rgba(245, 158, 11, 0.3)';
-              confidenceColor = 'rgba(245, 158, 11, 0.8)';
-            } else {
-              bgColor = 'rgba(239, 68, 68, 0.1)'; // 赤（低信頼度）
-              borderColor = 'rgba(239, 68, 68, 0.3)';
-              confidenceColor = 'rgba(239, 68, 68, 0.8)';
-            }
-
-            // 重複の場合は警告色を追加
-            if (isDuplicate) {
-              bgColor = 'rgba(245, 101, 101, 0.15)'; // オレンジ系警告色
-              borderColor = 'rgba(245, 101, 101, 0.4)';
-              textColor = '#B91C1C';
-            }
-
-            columnMatch.style.background = bgColor;
-            columnMatch.style.borderColor = borderColor;
-            columnMatch.style.color = textColor;
-
-            const displayName = typeDisplayNames[type] || type;
-            const duplicateWarning = isDuplicate ? ' ⚠️' : '';
-
-            columnMatch.innerHTML = `
-              <div class="flex items-center justify-between w-full">
-                <span class="column-type font-medium">${displayName}${duplicateWarning}</span>
-                <div class="flex items-center space-x-2">
-                  <span class="detected-column px-2 py-1 bg-gray-100 rounded text-sm font-mono">${columnLabel}</span>
-                  <span class="confidence text-xs" style="color: ${confidenceColor}">${Math.round(confidence)}%</span>
-                </div>
-              </div>
-              ${isDuplicate ? `<div class="text-xs text-orange-600 mt-1">⚠️ 同じ列が複数の目的に割り当てられています</div>` : ''}
-            `;
-
-            columnsContainer.appendChild(columnMatch);
+            console.log(`AI検出: ${columnType} → ${selectedIndex}列 (信頼度: ${confidence}%)`);
           }
         });
 
-        // 有効なマッピングがない場合の表示
-        if (!hasValidMapping) {
-          const noMapping = document.createElement('div');
-          noMapping.className = 'column-match';
-          noMapping.style.background = 'rgba(107, 114, 128, 0.1)';
-          noMapping.style.borderColor = 'rgba(107, 114, 128, 0.3)';
-          noMapping.innerHTML = `
-            <div class="flex items-center justify-between w-full">
-              <span class="column-type">❌ 自動検出失敗</span>
-              <div class="flex items-center space-x-2">
-                <span class="detected-column px-2 py-1 bg-gray-100 rounded text-sm">手動設定が必要</span>
-                <span class="confidence text-xs" style="color: rgba(239, 68, 68, 0.8)">0%</span>
-              </div>
-            </div>
-          `;
-          columnsContainer.appendChild(noMapping);
+        // AI検出情報パネルを表示
+        const aiInfo = document.getElementById('ai-detection-info');
+        if (aiInfo) {
+          aiInfo.classList.remove('hidden');
+        }
+      }
 
-          showError('列の自動検出に失敗しました。手動で設定してください');
+      // ドロップダウンの変更イベントリスナーを設定
+      function setupDropdownEventListeners(dropdowns) {
+        Object.keys(dropdowns).forEach(columnType => {
+          const dropdown = dropdowns[columnType];
+          if (!dropdown) return;
+
+          dropdown.addEventListener('change', function() {
+            handleDropdownChange(columnType, this);
+          });
+        });
+
+        // AI検出に戻すボタンのイベントリスナー
+        const resetButton = document.getElementById('reset-to-ai');
+        if (resetButton) {
+          resetButton.addEventListener('click', function() {
+            resetToAIDetection();
+          });
+        }
+      }
+
+      // ドロップダウン変更の処理
+      function handleDropdownChange(columnType, dropdown) {
+        const selectedValue = dropdown.value;
+        console.log(`ドロップダウン変更: ${columnType} → ${selectedValue}`);
+
+        // 既存のCSSクラスを削除
+        dropdown.classList.remove('has-ai-selection', 'has-manual-selection');
+
+        if (selectedValue === '') {
+          // 選択解除
+          hideConfidenceBadge(columnType);
         } else {
-          // 重複警告がある場合の追加メッセージ
-          if (usedColumns.size < Object.keys(mapping).length - 1) { // -1 for confidence object
-            showError('⚠️ 一部の列が重複して割り当てられています。確認してください。');
-          } else {
-            showSuccess('✅ 列マッピングを更新しました');
+          // 手動選択
+          dropdown.classList.add('has-manual-selection');
+          showConfidenceBadge(columnType, 100, 'manual');
+
+          // AI検出に戻すボタンを表示
+          const resetButton = document.getElementById('reset-to-ai');
+          if (resetButton) {
+            resetButton.style.display = 'inline-block';
+          }
+
+          // 手動設定情報を表示
+          const manualInfo = document.getElementById('manual-override-info');
+          if (manualInfo) {
+            manualInfo.classList.remove('hidden');
           }
         }
+
+        // 選択状況を更新
+        updateSelectionStatus();
+      }
+
+      // 信頼度バッジを表示
+      function showConfidenceBadge(columnType, confidence, type) {
+        const confidenceDiv = document.getElementById(`${columnType}-confidence`);
+        const badge = confidenceDiv.querySelector('.confidence-badge');
+        
+        if (!confidenceDiv || !badge) return;
+
+        let badgeClass = '';
+        let badgeText = '';
+
+        if (type === 'manual') {
+          badgeClass = 'manual';
+          badgeText = '✋ 手動設定';
+        } else {
+          // AI検出の場合の信頼度による色分け
+          if (confidence >= 80) {
+            badgeClass = 'high';
+            badgeText = `🤖 AI検出 ${Math.round(confidence)}%`;
+          } else if (confidence >= 50) {
+            badgeClass = 'medium';
+            badgeText = `🤖 AI検出 ${Math.round(confidence)}%`;
+          } else {
+            badgeClass = 'low';
+            badgeText = `🤖 AI検出 ${Math.round(confidence)}%`;
+          }
+        }
+
+        badge.className = `confidence-badge ${badgeClass}`;
+        badge.textContent = badgeText;
+        confidenceDiv.classList.remove('hidden');
+      }
+
+      // 信頼度バッジを非表示
+      function hideConfidenceBadge(columnType) {
+        const confidenceDiv = document.getElementById(`${columnType}-confidence`);
+        if (confidenceDiv) {
+          confidenceDiv.classList.add('hidden');
+        }
+      }
+
+      // AI検出情報を表示
+      function displayAIDetectionInfo(mapping) {
+        const detailsDiv = document.getElementById('ai-detection-details');
+        if (!detailsDiv) return;
+
+        const details = [];
+        const columnNames = {
+          answerer: '回答列',
+          reason: '理由列', 
+          class: 'クラス列',
+          name: '名前列'
+        };
+
+        Object.keys(columnNames).forEach(key => {
+          if (mapping[key] !== null && mapping[key] !== undefined) {
+            const columnLabel = String.fromCharCode(65 + mapping[key]) + '列';
+            const confidence = mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
+            details.push(`${columnNames[key]}: ${columnLabel} (信頼度: ${Math.round(confidence)}%)`);
+          }
+        });
+
+        detailsDiv.innerHTML = details.map(detail => 
+          `<div>• ${detail}</div>`
+        ).join('');
+      }
+
+      // 選択状況を更新
+      function updateSelectionStatus() {
+        const hasManualSelection = document.querySelectorAll('.modern-select.has-manual-selection').length > 0;
+        const hasAISelection = document.querySelectorAll('.modern-select.has-ai-selection').length > 0;
+
+        console.log('選択状況:', { hasManualSelection, hasAISelection });
+        
+        // AI検出情報とリセットボタンの表示制御
+        const resetButton = document.getElementById('reset-to-ai');
+        if (resetButton) {
+          resetButton.style.display = hasManualSelection ? 'inline-block' : 'none';
+        }
+      }
+
+      // AI検出結果に戻す
+      function resetToAIDetection() {
+        console.log('AI検出結果にリセット');
+        
+        if (!window.currentAIMapping) {
+          showError('AI検出データがありません');
+          return;
+        }
+
+        // 全てのドロップダウンをリセット
+        const dropdowns = {
+          answer: document.getElementById('answer-column-select'),
+          reason: document.getElementById('reason-column-select'),
+          class: document.getElementById('class-column-select'),
+          name: document.getElementById('name-column-select')
+        };
+
+        // AI検出結果を再設定
+        setAIDetectionSelections(window.currentAIMapping, dropdowns);
+
+        // 手動設定情報を非表示
+        const manualInfo = document.getElementById('manual-override-info');
+        if (manualInfo) {
+          manualInfo.classList.add('hidden');
+        }
+
+        // リセットボタンを非表示
+        const resetButton = document.getElementById('reset-to-ai');
+        if (resetButton) {
+          resetButton.style.display = 'none';
+        }
+
+        showSuccess('✅ AI検出結果にリセットしました');
       }
 
       // 列マッピング確認
@@ -1950,7 +2133,7 @@
           .publishApplication(config);
       }
 
-      // 設定収集
+      // 設定収集（ドロップダウン式対応）
       function gatherConfiguration() {
         const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
         
@@ -1972,15 +2155,76 @@
           spreadsheetId = document.getElementById('spreadsheet-select').value;
           sheetName = document.getElementById('sheet-select').value;
         }
+
+        // ドロップダウンから列選択を収集
+        const columnSelections = gatherColumnSelections();
         
         return {
           spreadsheetId: spreadsheetId,
           sheetName: sheetName,
           sourceMethod: sourceMethod,
+          columnSelections: columnSelections, // ドロップダウンの選択結果
           showNames: document.getElementById('show-names').checked,
           showReactions: document.getElementById('show-reactions').checked,
           timestamp: new Date().toISOString(),
         };
+      }
+
+      // ドロップダウンから列選択情報を収集
+      function gatherColumnSelections() {
+        const dropdowns = {
+          answer: document.getElementById('answer-column-select'),
+          reason: document.getElementById('reason-column-select'),
+          class: document.getElementById('class-column-select'),
+          name: document.getElementById('name-column-select')
+        };
+
+        const selections = {};
+        let hasAnySelection = false;
+
+        Object.keys(dropdowns).forEach(columnType => {
+          const dropdown = dropdowns[columnType];
+          if (!dropdown) return;
+
+          const selectedValue = dropdown.value;
+          const isAI = dropdown.classList.contains('has-ai-selection');
+          const isManual = dropdown.classList.contains('has-manual-selection');
+
+          if (selectedValue !== '') {
+            selections[columnType] = {
+              columnIndex: parseInt(selectedValue),
+              columnLabel: String.fromCharCode(65 + parseInt(selectedValue)) + '列',
+              selectionType: isManual ? 'manual' : 'ai',
+              confidence: getColumnConfidence(columnType)
+            };
+            hasAnySelection = true;
+          }
+        });
+
+        // AI検出の元データも含める
+        if (window.currentAIMapping) {
+          selections._aiMapping = window.currentAIMapping;
+        }
+
+        selections._hasSelections = hasAnySelection;
+        
+        console.log('gatherColumnSelections:', selections);
+        return selections;
+      }
+
+      // 列の信頼度を取得
+      function getColumnConfidence(columnType) {
+        const confidenceDiv = document.getElementById(`${columnType}-confidence`);
+        if (!confidenceDiv || confidenceDiv.classList.contains('hidden')) {
+          return 0;
+        }
+
+        const badge = confidenceDiv.querySelector('.confidence-badge');
+        if (!badge) return 0;
+
+        const text = badge.textContent;
+        const match = text.match(/(\d+)%/);
+        return match ? parseInt(match[1]) : (badge.classList.contains('manual') ? 100 : 0);
       }
 
       // 旧updateConfigDisplay関数は削除済み - updateResourceButtons()を使用
