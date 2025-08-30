@@ -30,6 +30,12 @@ describe('createFormFactory returns URLs', () => {
     context = {
       console,
       debugLog: () => {},
+      Log: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn()
+      },
       FormApp: {
         create: jest.fn(() => mockForm),
         EmailCollectionType: { VERIFIED: 'VERIFIED' }

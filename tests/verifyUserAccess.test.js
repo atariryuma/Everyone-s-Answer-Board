@@ -9,6 +9,18 @@ describe('verifyUserAccess security checks', () => {
     context = {
       console,
       debugLog: () => {},
+      Log: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn()
+      },
+      DB: {
+        findUserById: jest.fn(() => ({
+          adminEmail: 'admin@example.com',
+          configJson: JSON.stringify({ appPublished: false }),
+        }))
+      },
       clearExecutionUserInfoCache: jest.fn(),
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
       findUserById: jest.fn(() => ({
@@ -31,6 +43,10 @@ describe('verifyUserAccess security checks', () => {
 
   test('allows read-only access for published board', () => {
     context.Session.getActiveUser = () => ({ getEmail: () => 'viewer@example.com' });
+    context.DB.findUserById.mockReturnValue({
+      adminEmail: 'admin@example.com',
+      configJson: JSON.stringify({ appPublished: true }),
+    });
     context.findUserById.mockReturnValue({
       adminEmail: 'admin@example.com',
       configJson: JSON.stringify({ appPublished: true }),

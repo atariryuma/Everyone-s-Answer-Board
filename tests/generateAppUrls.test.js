@@ -19,6 +19,12 @@ describe('generateAppUrls admin url', () => {
         getScriptId: () => 'ID'
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
+      Log: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn()
+      },
       PropertiesService: {
         getScriptProperties: () => ({
           getProperty: (key) => {

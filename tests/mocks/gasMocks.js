@@ -41,7 +41,15 @@ global.SpreadsheetApp = {
   })),
 };
 
-// 統一ログシステム モック
+// 新しい統一ログシステム モック
+global.Log = {
+  debug: jest.fn((msg, data = '') => console.log(`[DEBUG] ${msg}`, data)),
+  info: jest.fn((msg, data = '') => console.info(`[INFO] ${msg}`, data)),
+  warn: jest.fn((msg, data = '') => console.warn(`[WARN] ${msg}`, data)),
+  error: jest.fn((msg, data = '') => console.error(`[ERROR] ${msg}`, data))
+};
+
+// 後方互換性のため旧ULogも残す
 global.ULog = {
   // ログレベル定義（実際のULogと同じ）
   LEVELS: {
@@ -68,6 +76,7 @@ global.ULog = {
     AUTH: 'AUTH',
     API: 'API',
     DATABASE: 'DATABASE',
+    DB: 'DATABASE',
     UI: 'UI',
     CACHE: 'CACHE',
     SECURITY: 'SECURITY',
@@ -133,7 +142,45 @@ global.cacheManager = {
   getStats: jest.fn(() => ({ hits: 0, misses: 0 })),
 };
 
-// その他の統一システム関数 モック
+// 名前空間オブジェクト モック
+global.User = {
+  email: jest.fn(() => 'test@example.com'),
+  info: jest.fn(() => ({ 
+    userId: 'test-user-id',
+    adminEmail: 'test@example.com',
+    isActive: true 
+  }))
+};
+
+global.Access = {
+  check: jest.fn(() => ({ hasAccess: true, message: 'アクセス許可' }))
+};
+
+global.Deploy = {
+  domain: jest.fn(() => ({
+    currentDomain: 'example.com',
+    deployDomain: 'example.com', 
+    isDomainMatch: true,
+    webAppUrl: 'https://script.google.com/test'
+  })),
+  isUser: jest.fn(() => true)
+};
+
+global.DB = {
+  createUser: jest.fn((userData) => userData),
+  findUserByEmail: jest.fn((email) => ({ 
+    userId: 'test-user-id',
+    adminEmail: email,
+    isActive: true 
+  })),
+  findUserById: jest.fn((userId) => ({ 
+    userId: userId,
+    adminEmail: 'test@example.com',
+    isActive: true 
+  }))
+};
+
+// その他の統一システム関数 モック（後方互換性）
 global.findUserById = jest.fn();
 global.findUserByEmail = jest.fn();
 global.getOrFetchUserInfo = jest.fn();
@@ -206,11 +253,22 @@ global.getSecureDatabaseId = jest.fn(() => 'mock-database-id');
 global.getServiceAccountTokenCached = jest.fn(() => 'mock-token');
 global.generateNewServiceAccountToken = jest.fn(() => 'new-mock-token');
 global.getServiceAccountEmail = jest.fn(() => 'service@example.com');
+global.getEmailDomain = jest.fn((email) => (email || '').split('@').pop().toLowerCase());
+global.getWebAppUrlCached = jest.fn(() => 'https://script.google.com/macros/test');
+global.getSheetsService = jest.fn(() => ({ spreadsheets: { values: { batchGet: jest.fn() } } }));
+global.batchGetSheetsData = jest.fn(() => ({ valueRanges: [{ values: [['header1', 'header2'], ['data1', 'data2']] }] }));
+global.appendSheetsData = jest.fn();
+global.waitForUserRecord = jest.fn(() => true);
+global.updateUserLastAccess = jest.fn();
+global.buildUserAdminUrl = jest.fn(() => 'https://example.com/admin/test-user');
+global.createSecureRedirect = jest.fn((url, message) => ({ getContent: () => `Redirect to ${url}: ${message}` }));
+global.showErrorPage = jest.fn((title, message) => ({ getContent: () => `Error: ${title} - ${message}` }));
+global.getSetupStatusFromConfig = jest.fn(() => 'completed');
 
 // データベース操作関数 モック
 global.DB_SHEET_CONFIG = {
-  sheetName: 'UserDatabase',
-  headers: ['userId', 'adminEmail', 'createdAt']
+  SHEET_NAME: 'UserDatabase',
+  HEADERS: ['userId', 'adminEmail', 'createdAt', 'isActive', 'configJson', 'spreadsheetId', 'spreadsheetUrl', 'lastAccessedAt']
 };
 global.DELETE_LOG_SHEET_CONFIG = {
   sheetName: 'DeleteLog',
@@ -223,7 +281,7 @@ global.DIAGNOSTIC_LOG_SHEET_CONFIG = {
 
 // スクリプトプロパティキー モック
 global.SCRIPT_PROPS_KEYS = {
-  DATABASE_ID: 'DATABASE_ID',
+  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
   ADMIN_EMAIL: 'ADMIN_EMAIL'
 };

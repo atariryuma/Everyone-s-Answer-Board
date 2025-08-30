@@ -10,7 +10,7 @@ describe('getDataCount reflects new rows', () => {
   beforeEach(() => {
     sheetData = [
       ['Timestamp', 'クラス'],
-      ['2024-01-01', 'A'],
+      // 初期状態はヘッダー行のみでデータ行なし
     ];
     const sheet = {
       getLastRow: () => sheetData.length,
@@ -23,6 +23,12 @@ describe('getDataCount reflects new rows', () => {
     context = {
       console,
       debugLog: () => {},
+      Log: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn()
+      },
       cacheManager: {
         store: {},
         get(key, fn) { return Object.prototype.hasOwnProperty.call(this.store, key) ? this.store[key] : (this.store[key] = fn()); },
@@ -38,6 +44,15 @@ describe('getDataCount reflects new rows', () => {
         openById: () => ({ getSheetByName: () => sheet }),
       },
       verifyUserAccess: jest.fn(),
+      DB: {
+        findUserById: jest.fn(() => ({
+          userId: 'U1',
+          configJson: JSON.stringify({
+            publishedSpreadsheetId: 'SID',
+            publishedSheetName: 'Sheet1',
+          }),
+        }))
+      },
       findUserById: jest.fn(() => ({
         userId: 'U1',
         configJson: JSON.stringify({
@@ -55,12 +70,15 @@ describe('getDataCount reflects new rows', () => {
   });
 
   test('returns updated count after adding row', () => {
+    // 初期状態：ヘッダー行のみ（データ行数は0）
     const first = context.getDataCount('U1', 'すべて', 'newest', false);
-    expect(first.count).toBe(1);
+    expect(first.count).toBe(0); // ヘッダー行を除くと0行
+    
+    // データ行を追加してカウント確認
     sheetData.push(['2024-01-02', 'A']);
     context.cacheManager.remove('rowCount_SID_Sheet1_すべて');
     const second = context.getDataCount('U1', 'すべて', 'newest', false);
-    expect(second.count).toBe(2);
+    expect(second.count).toBe(1); // ヘッダー行を除くと1行
   });
 });
 
