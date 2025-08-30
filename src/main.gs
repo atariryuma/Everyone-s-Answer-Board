@@ -57,6 +57,32 @@ function getCurrentUserEmail() {
 }
 
 /**
+ * 現在のユーザーの詳細情報を取得
+ * @return {Object|null} ユーザー情報オブジェクト、エラーの場合null
+ */
+function getCurrentUserInfo() {
+  try {
+    const userEmail = getCurrentUserEmail();
+    if (!userEmail) {
+      console.warn('getCurrentUserInfo: ユーザーメールアドレスが取得できませんでした');
+      return null;
+    }
+    
+    // メールアドレスでユーザー情報を検索
+    const userInfo = findUserByEmail(userEmail);
+    if (!userInfo) {
+      console.warn('getCurrentUserInfo: ユーザー情報が見つかりませんでした:', userEmail);
+      return null;
+    }
+    
+    return userInfo;
+  } catch (error) {
+    console.error('getCurrentUserInfo エラー:', error.message);
+    return null;
+  }
+}
+
+/**
  * JavaScript文字列エスケープ関数 (URL対応版)
  * @param {string} str エスケープする文字列
  * @return {string} エスケープされた文字列
@@ -1419,19 +1445,30 @@ function checkIsSystemAdmin() {
  */
 function getSpreadsheetList() {
   try {
+    console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
+    
     // 現在のユーザーのスプレッドシート情報を返す
     const userInfo = getCurrentUserInfo();
-    if (userInfo && userInfo.spreadsheetId) {
+    if (!userInfo) {
+      console.warn('getSpreadsheetList: ユーザー情報が取得できませんでした');
+      return [];
+    }
+    
+    if (userInfo.spreadsheetId) {
+      console.log('getSpreadsheetList: ユーザーのメインスプレッドシートを返します');
       return [{
         id: userInfo.spreadsheetId,
-        name: 'メインスプレッドシート',
-        lastModified: new Date().toISOString()
+        name: userInfo.spreadsheetUrl ? 'メインスプレッドシート' : 'ユーザースプレッドシート',
+        lastModified: new Date().toISOString(),
+        url: userInfo.spreadsheetUrl || null
       }];
     }
+    
+    console.warn('getSpreadsheetList: ユーザーにスプレッドシートが設定されていません');
     return [];
   } catch (error) {
-    console.error('getSpreadsheetList エラー:', error);
-    return [];
+    console.error('getSpreadsheetList エラー:', error.message || error);
+    throw new Error(`スプレッドシート一覧の取得に失敗しました: ${error.message || error}`);
   }
 }
 

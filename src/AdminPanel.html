@@ -856,8 +856,14 @@
       const spreadsheetId = document.getElementById('spreadsheet-select').value;
       const sheetName = document.getElementById('sheet-select').value;
       
-      if (!spreadsheetId || !sheetName) {
-        showError('スプレッドシートとシートを選択してください');
+      // 入力検証を詳細化
+      if (!spreadsheetId) {
+        showError('スプレッドシートを選択してください。先に「更新」ボタンを押して一覧を読み込んでください。');
+        return;
+      }
+      
+      if (!sheetName) {
+        showError('シートを選択してください。スプレッドシートを選択すると、シート一覧が表示されます。');
         return;
       }
 
@@ -877,7 +883,7 @@
         })
         .withFailureHandler(function(error) {
           console.error('接続エラー:', error);
-          showError('データソースへの接続に失敗しました');
+          showError('データソースへの接続に失敗しました。スプレッドシートのアクセス権限を確認してください。');
           setLoading(false);
         })
         .connectToDataSource(spreadsheetId, sheetName);
@@ -935,7 +941,15 @@
     function publishApp() {
       const appName = document.getElementById('app-name').value;
       if (!appName.trim()) {
-        showError('アプリケーション名を入力してください');
+        showError('アプリケーション名を入力してください。例：「クラス質問ボード」「理科実験アンケート」');
+        document.getElementById('app-name').focus();
+        return;
+      }
+      
+      // 長すぎる名前をチェック
+      if (appName.trim().length > 50) {
+        showError('アプリケーション名は50文字以内で入力してください。');
+        document.getElementById('app-name').focus();
         return;
       }
 
@@ -956,7 +970,7 @@
         })
         .withFailureHandler(function(error) {
           console.error('公開エラー:', error);
-          showError('アプリの公開に失敗しました');
+          showError('アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。');
           setLoading(false);
         })
         .publishApplication(config);
