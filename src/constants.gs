@@ -338,47 +338,23 @@ const DISPLAY_MODES = {
   EMAIL: 'email',
 };
 
-/** @deprecated Use UNIFIED_CONSTANTS.SCORING.REACTION_KEYS instead */
-const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
-/** @deprecated Use UNIFIED_CONSTANTS.CACHE.TTL.SHORT instead */
-const USER_CACHE_TTL = 300;
-
-/** @deprecated Use UNIFIED_CONSTANTS.TIMEOUTS.EXECUTION_MAX instead */
-const EXECUTION_MAX_LIFETIME = 300000;
-
-/** @deprecated Use UNIFIED_CONSTANTS.CACHE.BATCH_SIZE.LARGE instead */
-const DB_BATCH_SIZE = 100;
-
-/** @deprecated Use UNIFIED_CONSTANTS.LIMITS.HISTORY_ITEMS instead */
-const MAX_HISTORY_ITEMS = 50;
-
-/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_MAIN_QUESTION instead (defined in Core.gs) */
-
-/** @deprecated Use UNIFIED_CONSTANTS.FORMS.DEFAULT_REASON_QUESTION instead (defined in Core.gs) */
-
-/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DATABASE instead */
 const DB_SHEET_CONFIG = {
   SHEET_NAME: 'Users',
   HEADERS: [
-    'userId',
-    'adminEmail',
-    'spreadsheetId',
-    'spreadsheetUrl',
-    'createdAt',
-    'configJson',
-    'lastAccessedAt',
-    'isActive',
+    'tenantId',      // 汎用的なテナントID
+    'ownerEmail',    // 明確な所有者メール
+    'createdAt',     // 作成日時
+    'lastAccessedAt', // 最終アクセス日時
+    'status',        // ステータス: active/inactive/suspended
   ],
 };
 
-/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DELETE_LOG instead */
 const DELETE_LOG_SHEET_CONFIG = {
   SHEET_NAME: 'DeleteLogs',
-  HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'],
+  HEADERS: ['timestamp', 'executorEmail', 'targetTenantId', 'targetEmail', 'reason', 'deleteType'],
 };
 
-/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.DIAGNOSTIC_LOG instead */
 const DIAGNOSTIC_LOG_SHEET_CONFIG = {
   SHEET_NAME: 'DiagnosticLogs',
   HEADERS: [
@@ -394,10 +370,9 @@ const DIAGNOSTIC_LOG_SHEET_CONFIG = {
   ],
 };
 
-/** @deprecated Use UNIFIED_CONSTANTS.SHEETS.LOG instead */
 const LOG_SHEET_CONFIG = {
   SHEET_NAME: 'Logs',
-  HEADERS: ['timestamp', 'severity', 'category', 'message', 'userId', 'context'],
+  HEADERS: ['timestamp', 'severity', 'category', 'message', 'tenantId', 'context'],
 };
 
 /** @deprecated Use UNIFIED_CONSTANTS.REGEX.EMAIL instead */

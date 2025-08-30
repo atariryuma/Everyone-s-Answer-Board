@@ -28,7 +28,7 @@ const DB = {
 
     try {
       // メールアドレスの重複チェック
-      var existingUser = DB.findUserByEmail(userData.adminEmail);
+      var existingUser = DB.findUserByEmail(userData.ownerEmail);
       if (existingUser) {
         throw new Error('このメールアドレスは既に登録されています。');
       }
@@ -48,12 +48,12 @@ const DB = {
 
       appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
 
-      console.log('createUser - データベース書き込み完了: userId=' + userData.userId);
+      console.log('createUser - データベース書き込み完了: tenantId=' + userData.tenantId);
 
       // 新規ユーザー用の専用フォルダを作成
       try {
-        console.log('createUser - 専用フォルダ作成開始: ' + userData.adminEmail);
-        var folder = createUserFolder(userData.adminEmail);
+        console.log('createUser - 専用フォルダ作成開始: ' + userData.ownerEmail);
+        var folder = createUserFolder(userData.ownerEmail);
         if (folder) {
           console.log('✅ createUser - 専用フォルダ作成成功: ' + folder.getName());
         } else {
@@ -67,7 +67,7 @@ const DB = {
       }
 
       // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
-      invalidateUserCache(userData.userId, userData.adminEmail, userData.spreadsheetId, false);
+      invalidateUserCache(userData.tenantId, userData.ownerEmail, null, false);
 
       return userData;
     } finally {
@@ -124,9 +124,9 @@ const DB = {
       const headers = rows[0];
 
       // メールアドレス列のインデックスを取得
-      const emailIndex = headers.indexOf('adminEmail');
+      const emailIndex = headers.indexOf('ownerEmail');
       if (emailIndex === -1) {
-        console.error('findUserByEmail: adminEmail列が見つかりません');
+        console.error('findUserByEmail: ownerEmail列が見つかりません');
         return null;
       }
 
@@ -216,9 +216,9 @@ const DB = {
       const headers = rows[0];
 
       // ユーザーID列のインデックスを取得
-      const userIdIndex = headers.indexOf('userId');
+      const userIdIndex = headers.indexOf('tenantId');
       if (userIdIndex === -1) {
-        console.error('findUserById: userId列が見つかりません');
+        console.error('findUserById: tenantId列が見つかりません');
         return null;
       }
 
@@ -467,12 +467,12 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
     }
 
     // 追加セキュリティチェック
-    if (!targetUserInfo.adminEmail || !targetUserInfo.userId) {
+    if (!targetUserInfo.ownerEmail || !targetUserInfo.tenantId) {
       throw new Error('削除対象ユーザーの情報が不完全です。');
     }
 
     // 自分自身の削除を防ぐ
-    if (targetUserInfo.adminEmail === executorEmail) {
+    if (targetUserInfo.ownerEmail === executorEmail) {
       throw new Error(
         '自分自身のアカウントは管理者削除機能では削除できません。個人用削除機能をご利用ください。'
       );
@@ -552,7 +552,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       logAccountDeletion(
         executorEmail,
         targetUserId,
-        targetUserInfo.adminEmail,
+        targetUserInfo.ownerEmail,
         reason.trim(),
         'admin'
       );
@@ -560,7 +560,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       // 関連キャッシュを削除
       invalidateUserCache(
         targetUserId,
-        targetUserInfo.adminEmail,
+        targetUserInfo.ownerEmail,
         targetUserInfo.spreadsheetId,
         false
       );
@@ -568,14 +568,14 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       lock.releaseLock();
     }
 
-    const successMessage = `管理者によりアカウント「${targetUserInfo.adminEmail}」が削除されました。\n削除理由: ${reason.trim()}`;
+    const successMessage = `管理者によりアカウント「${targetUserInfo.ownerEmail}」が削除されました。\n削除理由: ${reason.trim()}`;
     console.log(successMessage);
     return {
       success: true,
       message: successMessage,
       deletedUser: {
         userId: targetUserId,
-        email: targetUserInfo.adminEmail,
+        email: targetUserInfo.ownerEmail,
       },
     };
   } catch (error) {
@@ -598,7 +598,7 @@ function canDeleteUser(targetUserId) {
     }
 
     // 本人削除 OR 管理者削除
-    return currentUserEmail === targetUser.adminEmail || Deploy.isUser();
+    return currentUserEmail === targetUser.ownerEmail || Deploy.isUser();
   } catch (error) {
     console.error('canDeleteUser error:', error.message);
     return false;
@@ -819,14 +819,14 @@ function updateUser(userId, updateData) {
 
   // 許可されたフィールドのホワイトリスト検証
   const allowedFields = [
-    'adminEmail',
+    'ownerEmail',
     'spreadsheetId',
     'spreadsheetUrl',
     'configJson',
     'lastAccessedAt',
     'createdAt',
     'formUrl',
-    'isActive',
+    'status',
   ];
   const updateFields = Object.keys(updateData);
   const invalidFields = updateFields.filter((field) => !allowedFields.includes(field));
@@ -996,7 +996,7 @@ function updateUser(userId, updateData) {
 
     // 重要: 更新完了後に包括的キャッシュ同期を実行
     var userInfo = DB.findUserById(userId);
-    var email = updateData.adminEmail || (userInfo ? userInfo.adminEmail : null);
+    var email = updateData.ownerEmail || (userInfo ? userInfo.ownerEmail : null);
     var oldSpreadsheetId = userInfo ? userInfo.spreadsheetId : null;
     var newSpreadsheetId = updateData.spreadsheetId || oldSpreadsheetId;
 
@@ -2198,8 +2198,8 @@ function performDataIntegrityCheck(options = {}) {
  */
 function checkForDuplicates(headers, userRows) {
   var duplicates = [];
-  var userIdIndex = headers.indexOf('userId');
-  var emailIndex = headers.indexOf('adminEmail');
+  var userIdIndex = headers.indexOf('tenantId');
+  var emailIndex = headers.indexOf('ownerEmail');
 
   if (userIdIndex === -1 || emailIndex === -1) {
     return { duplicates: [] };
@@ -2249,7 +2249,7 @@ function checkForDuplicates(headers, userRows) {
  */
 function checkMissingRequiredFields(headers, userRows) {
   var missing = [];
-  var requiredFields = ['userId', 'adminEmail']; // 最低限必要なフィールド
+  var requiredFields = ['tenantId', 'ownerEmail']; // 最低限必要なフィールド
 
   for (var i = 0; i < userRows.length; i++) {
     var row = userRows[i];
@@ -2284,8 +2284,8 @@ function checkMissingRequiredFields(headers, userRows) {
  */
 function checkInvalidDataFormats(headers, userRows) {
   var invalid = [];
-  var emailIndex = headers.indexOf('adminEmail');
-  var userIdIndex = headers.indexOf('userId');
+  var emailIndex = headers.indexOf('ownerEmail');
+  var userIdIndex = headers.indexOf('tenantId');
 
   for (var i = 0; i < userRows.length; i++) {
     var row = userRows[i];
@@ -2328,14 +2328,14 @@ function checkInvalidDataFormats(headers, userRows) {
  */
 function checkOrphanedData(headers, userRows) {
   var orphaned = [];
-  var isActiveIndex = headers.indexOf('isActive');
+  var statusIndex = headers.indexOf('status');
 
   for (var i = 0; i < userRows.length; i++) {
     var row = userRows[i];
     var issues = [];
 
     // 非アクティブだが他のデータが残っている
-    if (isActiveIndex !== -1 && row[isActiveIndex] === 'false') {
+    if (statusIndex !== -1 && (row[statusIndex] === 'inactive' || row[statusIndex] === 'suspended')) {
       // 非アクティブユーザーでスプレッドシートIDが残っている場合
       var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
       if (spreadsheetIdIndex !== -1 && row[spreadsheetIdIndex]) {
@@ -2376,31 +2376,30 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
     fixed.push('重複データの確認完了（手動対応が必要）');
   }
 
-  // 無効なisActiveフィールドの修正
-  var isActiveIndex = headers.indexOf('isActive');
-  if (isActiveIndex !== -1) {
+  // 無効なstatusフィールドの修正
+  var statusIndex = headers.indexOf('status');
+  if (statusIndex !== -1) {
     var updatesNeeded = [];
 
     for (var i = 0; i < userRows.length; i++) {
       var row = userRows[i];
-      var currentValue = row[isActiveIndex];
+      var currentValue = row[statusIndex];
 
-      // isActiveフィールドが空または無効な値の場合、trueに設定
+      // statusフィールドが空または無効な値の場合、activeに設定
       if (
         !currentValue ||
-        (currentValue !== 'true' &&
-          currentValue !== 'false' &&
-          currentValue !== true &&
-          currentValue !== false)
+        (currentValue !== 'active' &&
+          currentValue !== 'inactive' &&
+          currentValue !== 'suspended')
       ) {
         updatesNeeded.push({
           range:
             "'" +
             DB_SHEET_CONFIG.SHEET_NAME +
             "'!" +
-            String.fromCharCode(65 + isActiveIndex) +
+            String.fromCharCode(65 + statusIndex) +
             (i + 2),
-          values: [['true']],
+          values: [['active']],
         });
       }
     }
@@ -2408,9 +2407,9 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
     if (updatesNeeded.length > 0) {
       try {
         batchUpdateSheetsData(service, dbId, updatesNeeded);
-        fixed.push(updatesNeeded.length + '件のisActiveフィールドを修正');
+        fixed.push(updatesNeeded.length + '件のstatusフィールドを修正');
       } catch (updateError) {
-        console.error('❌ isActiveフィールド修正エラー:', updateError.message);
+        console.error('❌ statusフィールド修正エラー:', updateError.message);
       }
     }
   }
@@ -2972,10 +2971,10 @@ function deleteUserAccount(userId) {
       }
 
       // 削除ログを記録
-      logAccountDeletion(userInfo.adminEmail, userId, userInfo.adminEmail, '自己削除', 'self');
+      logAccountDeletion(userInfo.ownerEmail, userId, userInfo.ownerEmail, '自己削除', 'self');
 
       // 関連するすべてのキャッシュを削除
-      invalidateUserCache(userId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+      invalidateUserCache(userId, userInfo.ownerEmail, null, false);
 
       // Google Drive のデータは保持するため何も操作しない
 
@@ -2986,7 +2985,7 @@ function deleteUserAccount(userId) {
       lock.releaseLock();
     }
 
-    const successMessage = 'アカウント「' + userInfo.adminEmail + '」が正常に削除されました。';
+    const successMessage = 'アカウント「' + userInfo.ownerEmail + '」が正常に削除されました。';
     console.log(successMessage);
     return successMessage;
   } catch (error) {
@@ -3049,9 +3048,9 @@ function findUserByIdFresh(userId) {
     const headers = rows[0];
 
     // ユーザーID列のインデックスを取得
-    const userIdIndex = headers.indexOf('userId');
+    const userIdIndex = headers.indexOf('tenantId');
     if (userIdIndex === -1) {
-      console.error('findUserByIdFresh: userId列が見つかりません');
+      console.error('findUserByIdFresh: tenantId列が見つかりません');
       return null;
     }
 
@@ -3082,16 +3081,16 @@ function findUserByIdFresh(userId) {
 
 /**
  * 汎用ユーザーデータベース検索関数
- * @param {string} searchField - 検索フィールド ('userId' | 'adminEmail')
+ * @param {string} searchField - 検索フィールド ('tenantId' | 'ownerEmail')
  * @param {string} searchValue - 検索値
  * @param {object} options - オプション設定
  * @returns {object|null} ユーザー情報またはnull
  */
 function fetchUserFromDatabase(searchField, searchValue, options = {}) {
   try {
-    if (searchField === 'userId') {
+    if (searchField === 'tenantId') {
       return options.forceFresh ? findUserByIdFresh(searchValue) : DB.findUserById(searchValue);
-    } else if (searchField === 'adminEmail') {
+    } else if (searchField === 'ownerEmail') {
       return DB.findUserByEmail(searchValue);
     } else {
       console.warn('fetchUserFromDatabase: サポートされていない検索フィールド:', searchField);

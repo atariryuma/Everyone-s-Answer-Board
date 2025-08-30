@@ -13,34 +13,8 @@
  * 28個の生成関数と258箇所のログパターンを統合
  */
 class UUtilities {
-  // 後方互換性のためのurlFactoryエイリアス（generatorFactory.urlに統合済み）
-  static get urlFactory() {
-    return {
-      generateUserUrls: (userId, options = {}) =>
-        UUtilities.generatorFactory.url.user(userId, options),
-      generateUnpublishedUrl: (userId) => UUtilities.generatorFactory.url.unpublished(userId),
-      buildAdminUrl: (userId) => UUtilities.generatorFactory.url.admin(userId),
-    };
-  }
 
-  // 後方互換性のためのformFactoryエイリアス（generatorFactory.formに統合済み）
-  static get formFactory() {
-    return {
-      create: (type, options) => UUtilities.generatorFactory.form.create(type, options),
-      createCustomUI: (requestUserId, config) =>
-        UUtilities.generatorFactory.form.customUI(requestUserId, config),
-      createQuickStartUI: (requestUserId) =>
-        UUtilities.generatorFactory.form.quickStartUI(requestUserId),
-    };
-  }
 
-  // 後方互換性のためのuserFactoryエイリアス（generatorFactory.userに統合済み）
-  static get userFactory() {
-    return {
-      create: (userData) => UUtilities.generatorFactory.user.create(userData),
-      createFolder: (userEmail) => UUtilities.generatorFactory.user.folder(userEmail),
-    };
-  }
 
   /**
    * 【Phase 6最適化】統合生成ファクトリ - 28個の生成関数を一元管理
@@ -160,17 +134,6 @@ class UUtilities {
     };
   }
 
-  // 後方互換性のためのresponseFactoryエイリアス（generatorFactory.responseに統合済み）
-  static get responseFactory() {
-    return {
-      success: (data = null, message = null) =>
-        UUtilities.generatorFactory.response.success(data, message),
-      error: (error, message = null, data = null) =>
-        UUtilities.generatorFactory.response.error(error, message, data),
-      unified: (success, data = null, message = null, error = null) =>
-        UUtilities.generatorFactory.response.unified(success, data, message, error),
-    };
-  }
 
   /**
    * URL検証・サニタイズ
@@ -296,5 +259,4 @@ class UUtilities {
 // 重複クラス削除完了 - UnifiedAPIClient, UnifiedValidation は他のファイルで定義済み
 // 検証機能は簡素化済み
 
-// 後方互換性ラッパー関数は削除済み
 // 統合されたクラスを直接使用してください

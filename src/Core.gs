@@ -518,48 +518,16 @@ function getCurrentSheetName(spreadsheetId) {
  * @throws {Error} 認証エラーまたは権限エラー
  */
 function verifyUserAccess(requestUserId) {
-  // 型安全性強化: パラメータ検証
-  if (!requestUserId) {
-    throw new Error('認証エラー: ユーザーIDが指定されていません');
+  // 新しいAccessControllerシステムを使用（後方互換性のためのラッパー関数）
+  const currentUserEmail = Session.getActiveUser().getEmail();
+  const result = accessController.verifyAccess(requestUserId, 'view', currentUserEmail);
+  
+  if (!result.allowed) {
+    throw new Error(`認証エラー: ${result.message}`);
   }
-  if (typeof requestUserId !== 'string') {
-    throw new Error('認証エラー: ユーザーIDは文字列である必要があります');
-  }
-  if (requestUserId.trim().length === 0) {
-    throw new Error('認証エラー: ユーザーIDが空文字列です');
-  }
-  if (requestUserId.length > 255) {
-    throw new Error('認証エラー: ユーザーIDが長すぎます（最大255文字）');
-  }
-
-  clearExecutionUserInfoCache(); // キャッシュをクリアして最新のユーザー情報を取得
-
-  const activeUserEmail = User.email();
-  console.log(`verifyUserAccess start: userId=${requestUserId}, email=${activeUserEmail}`);
-  if (!activeUserEmail) {
-    throw new Error('認証エラー: アクティブユーザーの情報を取得できませんでした');
-  }
-
-  const requestedUserInfo = DB.findUserById(requestUserId);
-
-  if (!requestedUserInfo) {
-    throw new Error(`認証エラー: 指定されたユーザーID (${requestUserId}) が見つかりません。`);
-  }
-
-  // 管理者かどうかを確認
-  if (activeUserEmail !== requestedUserInfo.adminEmail) {
-    const config = JSON.parse(requestedUserInfo.configJson || '{}');
-    if (config.appPublished === true) {
-      console.log(`✅ 公開ボード閲覧許可: ${activeUserEmail} -> ${requestUserId}`);
-      return;
-    }
-    throw new Error(
-      `権限エラー: ${activeUserEmail} はユーザーID ${requestUserId} のデータにアクセスする権限がありません。`
-    );
-  }
-  console.log(
-    `✅ ユーザーアクセス検証成功: ${activeUserEmail} は ${requestUserId} のデータにアクセスできます。`
-  );
+  
+  console.log(`✅ ユーザーアクセス検証成功: ${currentUserEmail} は ${requestUserId} のデータにアクセスできます。`);
+  return result;
 }
 
 /**

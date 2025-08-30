@@ -3,6 +3,8 @@ const vm = require('vm');
 
 describe('verifyUserAccess security checks', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
+  const configManagerCode = fs.readFileSync('src/ConfigurationManager.gs', 'utf8');
+  const accessControllerCode = fs.readFileSync('src/AccessController.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -15,28 +17,52 @@ describe('verifyUserAccess security checks', () => {
         warn: jest.fn(),
         error: jest.fn(),
       },
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: jest.fn((key) => {
+            if (key === 'user_config_U1') {
+              return JSON.stringify({
+                tenantId: 'U1',
+                ownerEmail: 'admin@example.com',
+                isPublic: false,
+                allowAnonymous: false
+              });
+            }
+            return null;
+          })
+        })
+      },
+      CacheService: {
+        getScriptCache: () => ({
+          get: jest.fn(() => null),
+          put: jest.fn(),
+          remove: jest.fn()
+        })
+      },
       DB: {
         findUserById: jest.fn(() => ({
-          adminEmail: 'admin@example.com',
+          ownerEmail: 'admin@example.com',
           configJson: JSON.stringify({ appPublished: false }),
         })),
       },
       User: {
         email: jest.fn(() => 'admin@example.com'),
         info: jest.fn(() => ({
-          userId: 'U1',
-          adminEmail: 'admin@example.com',
+          tenantId: 'U1',
+          ownerEmail: 'admin@example.com',
           spreadsheetId: 'testSpreadsheetId',
         })),
       },
       clearExecutionUserInfoCache: jest.fn(),
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
       findUserById: jest.fn(() => ({
-        adminEmail: 'admin@example.com',
+        ownerEmail: 'admin@example.com',
         configJson: JSON.stringify({ appPublished: false }),
       })),
     };
     vm.createContext(context);
+    vm.runInContext(configManagerCode, context);
+    vm.runInContext(accessControllerCode, context);
     vm.runInContext(coreCode, context);
   });
 
@@ -46,21 +72,69 @@ describe('verifyUserAccess security checks', () => {
 
   test('denies access when emails differ and board not published', () => {
     context.Session.getActiveUser = () => ({ getEmail: () => 'other@example.com' });
-    context.User.email = jest.fn(() => 'other@example.com');
-    expect(() => context.verifyUserAccess('U1')).toThrow('権限エラー');
+    expect(() => context.verifyUserAccess('U1')).toThrow('認証エラー');
   });
 
   test('allows read-only access for published board', () => {
-    context.Session.getActiveUser = () => ({ getEmail: () => 'viewer@example.com' });
-    context.User.email = jest.fn(() => 'viewer@example.com');
-    context.DB.findUserById.mockReturnValue({
-      adminEmail: 'admin@example.com',
-      configJson: JSON.stringify({ appPublished: true }),
-    });
-    context.findUserById.mockReturnValue({
-      adminEmail: 'admin@example.com',
-      configJson: JSON.stringify({ appPublished: true }),
-    });
-    expect(() => context.verifyUserAccess('U1')).not.toThrow();
+    // 新しいコンテキストで公開設定をテスト
+    const publicContext = {
+      console,
+      debugLog: () => {},
+      Log: {
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      },
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: jest.fn((key) => {
+            if (key === 'user_config_U1') {
+              return JSON.stringify({
+                tenantId: 'U1',
+                ownerEmail: 'admin@example.com',
+                isPublic: true,
+                allowAnonymous: true
+              });
+            }
+            return null;
+          })
+        })
+      },
+      CacheService: {
+        getScriptCache: () => ({
+          get: jest.fn(() => null),
+          put: jest.fn(),
+          remove: jest.fn()
+        })
+      },
+      DB: {
+        findUserById: jest.fn(() => ({
+          ownerEmail: 'admin@example.com',
+          configJson: JSON.stringify({ appPublished: false }),
+        })),
+      },
+      User: {
+        email: jest.fn(() => 'admin@example.com'),
+        info: jest.fn(() => ({
+          tenantId: 'U1',
+          ownerEmail: 'admin@example.com',
+          spreadsheetId: 'testSpreadsheetId',
+        })),
+      },
+      clearExecutionUserInfoCache: jest.fn(),
+      Session: { getActiveUser: () => ({ getEmail: () => 'viewer@example.com' }) },
+      findUserById: jest.fn(() => ({
+        ownerEmail: 'admin@example.com',
+        configJson: JSON.stringify({ appPublished: false }),
+      })),
+    };
+    
+    vm.createContext(publicContext);
+    vm.runInContext(configManagerCode, publicContext);
+    vm.runInContext(accessControllerCode, publicContext);
+    vm.runInContext(coreCode, publicContext);
+    
+    expect(() => publicContext.verifyUserAccess('U1')).not.toThrow();
   });
 });

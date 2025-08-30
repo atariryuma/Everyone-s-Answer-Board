@@ -228,7 +228,7 @@
         showScoreSort: window.showScoreSort,
         displayMode: window.displayMode,
         sheetName: SHEET_NAME,
-        userId: this.validateUserId(USER_ID), // Validate and add userId to state
+        tenantId: this.validateUserId(USER_ID), // Validate and add userId to state
         hasNewContent: false,
         newContentCount: 0,
         lastSeenCount: this.loadLastSeenCount(), // ローカルストレージから復元
@@ -278,7 +278,7 @@
         getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
           this.runGas(
             'getPublishedSheetData',
-            this.state.userId,
+            this.state.tenantId,
             classFilter,
             sort,
             adminMode,
@@ -287,24 +287,24 @@
         getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) =>
           this.runGas(
             'getIncrementalSheetData',
-            this.state.userId,
+            this.state.tenantId,
             classFilter,
             sort,
             adminMode,
             sinceRowCount
           ),
-        getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
+        getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.tenantId),
         addReactionBatch: (batchOperations) =>
-          this.runGas('addReactionBatch', this.state.userId, batchOperations), // 新しいバッチAPI
+          this.runGas('addReactionBatch', this.state.tenantId, batchOperations), // 新しいバッチAPI
         addReaction: (rowIndex, reaction, sheetName) =>
-          this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
+          this.runGas('addReaction', this.state.tenantId, rowIndex, reaction, sheetName),
         toggleHighlight: (rowIndex, sheetName) =>
-          this.runGas('toggleHighlight', this.state.userId, rowIndex, sheetName),
-        checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
-        clearCache: () => this.runGas('refreshBoardData', this.state.userId),
+          this.runGas('toggleHighlight', this.state.tenantId, rowIndex, sheetName),
+        checkAdmin: () => this.runGas('checkAdmin', this.state.tenantId),
+        clearCache: () => this.runGas('refreshBoardData', this.state.tenantId),
         validateData: () => this.validateBoardDataIntegrity(),
         getDataCount: (classFilter, sortOrder, adminMode) =>
-          this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode),
+          this.runGas('getDataCount', this.state.tenantId, classFilter, sortOrder, adminMode),
       };
 
       // Polling settings
@@ -627,7 +627,7 @@
               clearTimeout(timeout);
               reject(error);
             })
-            .checkCurrentPublicationStatus(this.state.userId);
+            .checkCurrentPublicationStatus(this.state.tenantId);
         });
 
         console.log('📊 パブリケーション状態チェック結果:', result);
@@ -1194,7 +1194,7 @@
               console.error('GAS APIエラー受信:', { funcName, args, error, success: false });
               reject(error);
             })
-            .withUserObject({ userId: userId })
+            .withUserObject({ tenantId: userId })
             [funcName](...args);
         } else {
           console.warn('Google Apps Script environment not detected.');
@@ -1350,7 +1350,7 @@
       }
 
       // 初期化状態の確認
-      if (!this.state.userId) {
+      if (!this.state.tenantId) {
         console.warn('User ID not available for content check');
         return false;
       }
@@ -2441,7 +2441,7 @@
      */
     validatePrerequisites() {
       const checks = [
-        { name: 'userId', value: this.state.userId, required: true },
+        { name: 'userId', value: this.state.tenantId, required: true },
         { name: 'answersContainer', value: this.elements.answersContainer, required: true },
         { name: 'sheetName', value: this.state.sheetName, required: false },
         {
@@ -3104,7 +3104,7 @@
                 reject(error);
               })
               .getPublishedSheetData(
-                fetchParams.userId,
+                fetchParams.tenantId,
                 fetchParams.classFilter,
                 fetchParams.sortOrder,
                 fetchParams.showAdminFeatures,
@@ -3155,7 +3155,7 @@
                   google.script.run
                     .withSuccessHandler(resolve)
                     .withFailureHandler(reject)
-                    .performAutoRepair(fetchParams.userId);
+                    .performAutoRepair(fetchParams.tenantId);
                 });
                 console.log('✅ サーバー側修復完了、次の試行に進みます');
               } catch (repairError) {
@@ -3515,7 +3515,7 @@
 
         // データ取得パラメータの詳細ログ
         const fetchParams = {
-          userId: this.state.userId,
+          tenantId: this.state.tenantId,
           classFilter,
           sortOrder,
           showAdminFeatures: this.state.showAdminFeatures,
@@ -3548,8 +3548,8 @@
                   // ユーザー情報エラーの特別な処理
                   if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
                     console.error(
-                      '❌ StudyQuestApp: User not found. Current userId:',
-                      this.state.userId
+                      '❌ StudyQuestApp: User not found. Current tenantId:',
+                      this.state.tenantId
                     );
                     console.error('❌ StudyQuestApp: URL parameters:', window.location.href);
                     console.error('❌ StudyQuestApp: This may indicate:');
@@ -3629,7 +3629,7 @@
                             .withSuccessHandler(resolve)
                             .withFailureHandler(reject)
                             .getPublishedSheetData(
-                              this.state.userId,
+                              this.state.tenantId,
                               classFilter,
                               this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
                               this.state.showAdminFeatures,
@@ -3942,7 +3942,7 @@
       console.log('🔄 Starting sheet switch:', {
         from: this.state.currentActiveSheet,
         to: selectedSheet,
-        userId: this.state.userId,
+        tenantId: this.state.tenantId,
       });
 
       try {
@@ -3971,7 +3971,7 @@
 
     async prepareForSheetSwitch(targetSheet) {
       // 必要な前提条件をチェック
-      if (!this.state.userId) {
+      if (!this.state.tenantId) {
         throw new Error('User ID is missing - cannot switch sheet');
       }
 
@@ -4047,7 +4047,7 @@
         error: error.message,
         targetSheet,
         currentSheet: this.state.currentActiveSheet,
-        userId: this.state.userId,
+        tenantId: this.state.tenantId,
       });
 
       // 元のシートの選択に戻す
@@ -8257,7 +8257,7 @@
 
         // ヘッダー情報の検証
         try {
-          const headerValidation = await this.runGas('validateHeaderIntegrity', this.state.userId);
+          const headerValidation = await this.runGas('validateHeaderIntegrity', this.state.tenantId);
           if (!headerValidation.success) {
             validationResults.headerIssues++;
             validationResults.errors.push(`Header validation failed: ${headerValidation.error}`);
@@ -8982,7 +8982,7 @@
       const diagnosis = {
         timestamp: new Date().toISOString(),
         userState: {
-          userId: app.state.userId,
+          tenantId: app.state.userId,
           currentAnswersCount: app.state.currentAnswers?.length || 0,
           lastSeenCount: app.state.lastSeenCount,
           initialDataLoaded: app.initialDataLoaded,
@@ -9220,7 +9220,7 @@
           currentAnswersCount: app.state.currentAnswers?.length || 0,
           lastSeenCount: app.state.lastSeenCount,
           visibleCardsCount: document.querySelectorAll('.answer-card').length,
-          userId: app.state.userId?.substring(0, 8) + '...',
+          tenantId: app.state.userId?.substring(0, 8) + '...',
         },
         ui: {
           classFilter: app.elements.classFilter?.value,

@@ -2023,8 +2023,8 @@
 
           const options = sheetsData.sheets
             .map((sheet) => {
-              const selected = sheet.isActive ? 'selected' : '';
-              const activeLabel = sheet.isActive ? ' (現在のアクティブシート)' : '';
+              const selected = sheet.status === 'active' ? 'selected' : '';
+              const activeLabel = sheet.status === 'active' ? ' (現在のアクティブシート)' : '';
               return `<option value="${this.escapeHtml(sheet.name)}" ${selected}>${this.escapeHtml(sheet.name)}${activeLabel}</option>`;
             })
             .join('');

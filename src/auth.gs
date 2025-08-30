@@ -79,13 +79,16 @@ function processLoginFlow(userEmail) {
 
       // 3b. データベースに作成
       DB.createUser(newUser);
-      if (!waitForUserRecord(newUser.userId, 3000, 500)) {
-        console.warn('processLoginFlow: user not found after create:', newUser.userId);
+      // ConfigurationManagerで初期設定を作成
+      configManager.initializeUserConfig(newUser.tenantId, userEmail);
+      
+      if (!waitForUserRecord(newUser.tenantId, 3000, 500)) {
+        console.warn('processLoginFlow: user not found after create:', newUser.tenantId);
       }
-      console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
+      console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.tenantId);
 
       // 3c. 新規ユーザーの管理パネルへリダイレクト
-      const adminUrl = buildUserAdminUrl(newUser.userId);
+      const adminUrl = buildUserAdminUrl(newUser.tenantId);
       return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
     }
   } catch (error) {

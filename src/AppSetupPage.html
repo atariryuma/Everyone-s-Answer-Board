@@ -497,7 +497,7 @@
           ? '<span class="bg-green-600 text-green-100 px-3 py-1 rounded-full">🟢 アクティブ</span>'
           : '<span class="bg-red-600 text-red-100 px-3 py-1 rounded-full">🔴 非アクティブ</span>';
 
-        adminElement.textContent = appInfo.adminEmail || '不明';
+        adminElement.textContent = appInfo.ownerEmail || '不明';
         lastUpdatedElement.textContent = appInfo.lastUpdated
           ? new Date(appInfo.lastUpdated).toLocaleString('ja-JP')
           : '不明';
@@ -579,7 +579,7 @@
       function goBackToAdminPanel() {
         google.script.run
           .withSuccessHandler((webAppUrl) => {
-            const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;
+            const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__; // URLパラメータはuserIdのまま（後方互換性）
             // サンドボックス環境では window.top への直接アクセスが制限されるため
             // 確実に遷移させるために window.open を利用する
             window.open(targetUrl, '_top');
@@ -587,7 +587,7 @@
           .withFailureHandler((error) => {
             console.error('WebApp URL取得エラー:', error);
             const currentUrl = window.location.href.split('?')[0];
-            const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
+            const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__; // URLパラメータはuserIdのまま（後方互換性）
             window.open(targetUrl, '_top');
           })
           .getWebAppUrlCached();
@@ -661,8 +661,7 @@
         } else {
           tableBody.innerHTML = users
             .map((user) => {
-              const isActive =
-                user.isActive === true || String(user.isActive).toLowerCase() === 'true';
+              const isActive = user.status === 'active';
               const statusBadge = isActive
                 ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
                 : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';
@@ -677,14 +676,14 @@
 
               return `
                         <tr class="hover:bg-gray-700/50">
-                            <td class="px-4 py-3 text-sm text-white">${user.adminEmail}</td>
+                            <td class="px-4 py-3 text-sm text-white">${user.ownerEmail}</td>
                             <td class="px-4 py-3 text-sm text-gray-300">${registrationDate}</td>
                             <td class="px-4 py-3">${statusBadge}</td>
                             <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
                             <td class="px-4 py-3 text-center">
                                 <button 
-                                    data-user-id="${user.userId}"
-                                    data-user-email="${user.adminEmail}"
+                                    data-user-id="${user.tenantId}"
+                                    data-user-email="${user.ownerEmail}"
                                     onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
                                     class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
                                     削除
@@ -746,7 +745,7 @@
             confirmBtn.disabled = false;
             confirmBtn.textContent = '削除実行';
           })
-          .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
+          .deleteUserAccountByAdminForUI(userToDelete.tenantId, reason);
       }
 
       // 削除ログを表示

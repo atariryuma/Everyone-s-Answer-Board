@@ -897,35 +897,21 @@ function publishApplication(config) {
  */
 function updateUserSpreadsheetConfig(userId, config) {
   try {
-    const props = PropertiesService.getScriptProperties();
-    const configKey = `user_config_${userId}`;
+    console.log('updateUserSpreadsheetConfig: 設定更新開始', { userId, config });
 
-    // 既存の設定を取得
-    let existingConfig = {};
-    try {
-      const existingConfigStr = props.getProperty(configKey);
-      if (existingConfigStr) {
-        existingConfig = JSON.parse(existingConfigStr);
-      }
-    } catch (parseError) {
-      console.warn('既存設定の解析エラー:', parseError);
+    // 新しいconfigManagerを使用して設定を更新
+    const updateResult = configManager.updateUserConfig(userId, config);
+    
+    if (updateResult) {
+      const updatedConfig = configManager.getUserConfig(userId);
+      console.log('updateUserSpreadsheetConfig: 設定更新完了', { userId, config: updatedConfig });
+      return {
+        success: true,
+        config: updatedConfig,
+      };
+    } else {
+      throw new Error('設定の更新に失敗しました');
     }
-
-    // 設定をマージ
-    const mergedConfig = {
-      ...existingConfig,
-      ...config,
-      lastUpdated: new Date().toISOString(),
-    };
-
-    // 設定を保存
-    props.setProperty(configKey, JSON.stringify(mergedConfig));
-
-    console.log('updateUserSpreadsheetConfig: 設定更新完了', { userId, config: mergedConfig });
-    return {
-      success: true,
-      config: mergedConfig,
-    };
   } catch (error) {
     console.error('updateUserSpreadsheetConfig エラー:', error);
     return {
@@ -942,15 +928,13 @@ function updateUserSpreadsheetConfig(userId, config) {
  */
 function getUserConfigJson(userId) {
   try {
-    const props = PropertiesService.getScriptProperties();
-    const configKey = `user_config_${userId}`;
-    const configStr = props.getProperty(configKey);
-
-    if (!configStr) {
-      return null;
-    }
-
-    return JSON.parse(configStr);
+    console.log('getUserConfigJson: 設定取得開始', userId);
+    
+    // 新しいconfigManagerを使用して設定を取得
+    const config = configManager.getUserConfig(userId);
+    
+    console.log('getUserConfigJson: 設定取得完了', { userId, hasConfig: !!config });
+    return config;
   } catch (error) {
     console.error('getUserConfigJson エラー:', error);
     return null;

@@ -1151,11 +1151,9 @@
           // リソースボタンを更新
           updateResourceButtons(config);
 
-          if (config && config.spreadsheetId) {
-            console.log('既存設定を検出、自動反映を開始');
-
-            // 1. スプレッドシート自動選択
-            await autoSelectSpreadsheet(config.spreadsheetId);
+          // スプレッドシートIDはConfigurationManagerで管理され、直接参照は不可
+          // 必要に応じてバックエンドAPI経由で取得
+          console.log('設定初期化完了');
 
             // 2. シート自動選択
             if (config.sheetName) {
@@ -1263,7 +1261,7 @@
         console.log('autoInitializeColumnSettings: 列設定自動初期化開始', config);
 
         try {
-          const spreadsheetId = config.spreadsheetId;
+          // スプレッドシートIDはConfigurationManagerで管理されるため、API経由で取得が必要
           let sheetName = config.sheetName;
 
           if (!spreadsheetId) {
@@ -1355,8 +1353,9 @@
             throw new Error('復元に必要なシート名が不足しています');
           }
 
-          // まず列構造を分析してヘッダーを取得
-          const result = await analyzeColumnsAsync(config.spreadsheetId, targetSheetName);
+          // 列構造分析はスプレッドシート情報が必要な場合はAPI経由で実行
+          console.log('列構造分析はスキップされました（ConfigurationManager統合中）');
+          const result = { success: false, message: 'ConfigurationManager統合中' };
 
           if (result && result.success && result.headers) {
             console.log('列構造分析完了、ドロップダウンを設定');
@@ -1432,7 +1431,7 @@
         try {
           let currentStep = 1;
 
-          if (config.spreadsheetId && config.sheetName) {
+          if (config.sheetName) {
             currentStep = 2; // データソース接続完了
           }
 
@@ -1551,16 +1550,9 @@
           return;
         }
 
-        // スプレッドシートボタン
-        if (config.spreadsheetId) {
-          spreadsheetBtn.disabled = false;
-          spreadsheetBtn.dataset.spreadsheetId = config.spreadsheetId;
-          statusDiv.textContent = '✅ スプレッドシート接続済み';
-        } else {
-          spreadsheetBtn.disabled = true;
-          spreadsheetBtn.dataset.spreadsheetId = '';
-          statusDiv.textContent = '⚠️ スプレッドシート未設定';
-        }
+        // スプレッドシート情報はConfigurationManagerで管理されるため、API経由で取得
+        spreadsheetBtn.disabled = true;
+        statusDiv.textContent = 'スプレッドシート機能はConfigurationManager統合中';
 
         // フォームボタン（フォーム作成済みの場合のみ表示）
         if (config.formCreated && config.formUrl) {
@@ -1582,14 +1574,14 @@
           boardBtn.disabled = false;
           // ユーザーIDからボードURLを生成
           const baseUrl = window.location.origin + window.location.pathname;
-          boardBtn.dataset.boardUrl = `${baseUrl}?userId=${config.userId}`;
+          boardBtn.dataset.boardUrl = `${baseUrl}?userId=${config.tenantId}`;
         } else {
           boardBtn.classList.add('hidden');
         }
 
         // ステータス更新
         let statusParts = [];
-        if (config.spreadsheetId) statusParts.push('📊 スプレッドシート');
+        // スプレッドシートステータスはConfigurationManager経由で取得
         if (config.formCreated) statusParts.push('📝 フォーム');
         if (config.appPublished) statusParts.push('🎯 ボード');
 
@@ -2670,7 +2662,7 @@
         // 問題文設定
         questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
 
-        if (boardInfo.isActive && boardInfo.urls) {
+        if (boardInfo.status === 'active' && boardInfo.urls) {
           // ボタン表示・機能設定
           openBtn.style.display = 'block';
           copyBtn.style.display = 'block';

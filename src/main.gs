@@ -66,7 +66,7 @@ const User = {
       // ユーザー設定を PropertiesService から取得してマージ
       try {
         const props = PropertiesService.getScriptProperties();
-        const configKey = `user_config_${userInfo.userId}`;
+        const configKey = `user_config_${userInfo.tenantId}`;
         const configStr = props.getProperty(configKey);
 
         if (configStr) {
@@ -117,10 +117,9 @@ function getCurrentUserInfo() {
     }
 
     return {
-      userId: userInfo.userId,
-      adminEmail: userInfo.adminEmail,
-      spreadsheetId: userInfo.spreadsheetId,
-      configJson: userInfo.configJson,
+      tenantId: userInfo.tenantId,
+      ownerEmail: userInfo.ownerEmail,
+      // spreadsheetId, configJsonは削除され、ConfigurationManagerで管理
     };
   } catch (error) {
     console.error('getCurrentUserInfo エラー', { error: error.message });
@@ -523,7 +522,8 @@ function doGet(e) {
         if (lastAdminUserId) {
           console.log('Found previous admin session, redirecting to admin panel:', lastAdminUserId);
           // 前回の管理パネルセッションが存在する場合、そこにリダイレクト
-          if (verifyAdminAccess(lastAdminUserId)) {
+          const accessResult = accessController.verifyAccess(lastAdminUserId, 'admin', currentUserEmail);
+          if (accessResult.allowed) {
             const userInfo = DB.findUserById(lastAdminUserId);
             return renderAdminPanel(userInfo, 'admin');
           } else {
@@ -558,7 +558,8 @@ function doGet(e) {
       }
 
       // 管理者権限の確認
-      if (!verifyAdminAccess(lastAdminUserId)) {
+      const accessResult = accessController.verifyAccess(lastAdminUserId, 'admin', currentUserEmail);
+      if (!accessResult.allowed) {
         console.log('Admin access denied for userId:', lastAdminUserId);
         return showErrorPage('アクセス拒否', 'アプリ設定にアクセスする権限がありません。');
       }
@@ -567,66 +568,88 @@ function doGet(e) {
       return showAppSetupPage(lastAdminUserId);
     }
 
-    // mode=admin の場合
+    // mode=admin の場合（新しいアクセス制御システム使用）
     if (params.mode === 'admin') {
       if (!params.userId) {
         return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
       }
-      // 本人確認
-      if (!verifyAdminAccess(params.userId)) {
-        return showErrorPage('アクセス拒否', 'この管理パネルにアクセスする権限がありません。');
+      
+      // 現在のユーザーメールを取得
+      const currentUserEmail = Session.getActiveUser().getEmail();
+      
+      // アドミンアクセスを実行
+      const accessResult = accessController.verifyAccess(params.userId, 'admin', currentUserEmail);
+      
+      if (!accessResult.allowed) {
+        return showErrorPage('アクセス拒否', accessResult.message || 'この管理パネルにアクセスする権限がありません。');
       }
 
       // 管理パネルアクセス時に状態を保存
-      var userProperties = PropertiesService.getUserProperties();
+      const userProperties = PropertiesService.getUserProperties();
       userProperties.setProperty('lastAdminUserId', params.userId);
-      console.log('Saved admin session state:', params.userId);
+      console.log('Saved admin session state:', params.userId); // URLパラメータはuserIdのまま保持
 
-      const userInfo = DB.findUserById(params.userId);
-      return renderAdminPanel(userInfo, 'admin');
+      // アクセスログを記録
+      accessController.logAccess(params.userId, 'admin', accessResult.userType, true);
+
+      // データベース依存を排除してrenderAdminPanel用のuserInfo互換オブジェクトを作成
+      const compatUserInfo = {
+        tenantId: params.userId,
+        adminEmail: accessResult.config?.email || currentUserEmail,
+        configJson: JSON.stringify(accessResult.config || {})
+      };
+      
+      return renderAdminPanel(compatUserInfo, 'admin');
     }
 
-    // mode=view の場合（キャッシュバスティング対応強化）
+    // mode=view の場合（新しいアクセス制御システム使用）
     if (params.mode === 'view') {
       if (!params.userId) {
         return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
       }
 
-      // ユーザー情報を強制的に最新状態で取得（キャッシュバイパス）
-      const userInfo = DB.findUserById(params.userId, {
-        useExecutionCache: false,
-        forceRefresh: true,
-      });
-
-      if (!userInfo) {
-        return showErrorPage('エラー', '指定されたユーザーが見つかりません。');
-      }
-
-      // パブリケーション状態の事前検証
-      let config = {};
+      // 現在のユーザーメールを取得（ゲストの場合はnull）
+      let currentUserEmail = null;
       try {
-        config = JSON.parse(userInfo.configJson || '{}');
+        currentUserEmail = Session.getActiveUser().getEmail();
       } catch (e) {
-        console.warn('Config JSON parse error during publication check:', e.message);
+        // ゲストアクセスの場合、認証エラーを無視
+        console.log('ゲストアクセス検出:', e.message);
       }
 
-      // 非公開の場合は確実にUnpublishedページに誘導
-      const isCurrentlyPublished = !!(
-        config.appPublished === true &&
-        config.publishedSpreadsheetId &&
-        config.publishedSheetName &&
-        typeof config.publishedSheetName === 'string' &&
-        config.publishedSheetName.trim() !== ''
-      );
+      // アクセス制御を実行
+      const accessResult = accessController.verifyAccess(params.userId, 'view', currentUserEmail);
+      
+      if (!accessResult.allowed) {
+        if (accessResult.userType === 'not_found') {
+          return showErrorPage('エラー', '指定されたユーザーが見つかりません。');
+        } else if (accessResult.userType === 'private') {
+          return showErrorPage('非公開', 'このボードは非公開に設定されています。');
+        } else if (accessResult.userType === 'guest_not_allowed') {
+          return showErrorPage('認証が必要', 'このボードの閲覧には認証が必要です。');
+        } else {
+          return showErrorPage('アクセス拒否', accessResult.message);
+        }
+      }
 
-      console.log('🔍 Publication status check:', {
-        appPublished: config.appPublished,
-        hasSpreadsheetId: !!config.publishedSpreadsheetId,
-        hasSheetName: !!config.publishedSheetName,
-        isCurrentlyPublished: isCurrentlyPublished,
+      // アクセスログを記録
+      accessController.logAccess(params.userId, 'view', accessResult.userType, true);
+
+      console.log('🔍 Access granted:', {
+        userId: params.userId,
+        userType: accessResult.userType,
+        isPublic: accessResult.config?.isPublic,
+        allowAnonymous: accessResult.config?.allowAnonymous
       });
 
-      return renderAnswerBoard(userInfo, params);
+      // データベース依存を排除してrenderAnswerBoard用のuserInfo互換オブジェクトを作成
+      const compatUserInfo = {
+        tenantId: params.userId,
+        adminEmail: accessResult.config?.email || '',
+        configJson: JSON.stringify(accessResult.config || {})
+      };
+
+      return renderAnswerBoard(compatUserInfo, params);
     }
 
     // 不明なモードの場合の処理
@@ -634,7 +657,8 @@ function doGet(e) {
     console.log('Available modes: login, appSetup, admin, view');
 
     // 不明なモードでもuserId付きの場合は適切にリダイレクト
-    if (params.userId && verifyAdminAccess(params.userId)) {
+    const accessResult = accessController.verifyAccess(params.userId, 'admin', currentUserEmail);
+    if (params.userId && accessResult.allowed) {
       console.log('Redirecting unknown mode to admin panel for valid user:', params.userId);
       const userInfo = DB.findUserById(params.userId);
       return renderAdminPanel(userInfo, 'admin');
@@ -674,7 +698,8 @@ function handleAdminRoute(userInfo, params, userEmail) {
 
   // 強化されたセキュリティ検証: 指定されたIDの登録メールアドレスと現在ログイン中のGoogleアカウントが一致するかを検証
   if (params.userId) {
-    const isVerified = verifyAdminAccess(params.userId);
+    const accessResult = accessController.verifyAccess(params.userId, 'admin', currentUserEmail);
+    const isVerified = accessResult.allowed;
     if (!isVerified) {
       console.warn(
         `セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`
@@ -782,7 +807,8 @@ function getLastAdminUserId() {
     const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
 
     // ユーザーIDが存在し、かつ有効な管理者権限を持つかチェック
-    if (lastAdminUserId && verifyAdminAccess(lastAdminUserId)) {
+    const accessResult = accessController.verifyAccess(lastAdminUserId, 'admin', currentUserEmail);
+    if (lastAdminUserId && accessResult.allowed) {
       console.log('Found valid admin user ID:', lastAdminUserId);
       return lastAdminUserId;
     } else {
