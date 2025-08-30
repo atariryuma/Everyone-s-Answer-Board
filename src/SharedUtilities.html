@@ -37,7 +37,7 @@
     );
     
     if (shouldSuppress) {
-      Log.debug('Suppressed GAS internal error:', errorMessage);
+      console.debug('Suppressed GAS internal error:', errorMessage);
       return true; // Prevent default error handling
     }
     
@@ -56,12 +56,12 @@
     );
     
     if (shouldSuppress) {
-      Log.debug('Suppressed internal promise rejection:', reason);
+      console.debug('Suppressed internal promise rejection:', reason);
       event.preventDefault();
       return;
     }
     
-    Log.warn('Unhandled promise rejection:', event.reason);
+    console.warn('Unhandled promise rejection:', event.reason);
   });
 })();
 
@@ -166,7 +166,7 @@ class DOMUtilities {
     if (element) {
       this.elementCache.set(id, element);
     } else {
-      Log.warn('Element not found:', id);
+      console.warn('Element not found:', id);
     }
     return element;
   }
@@ -362,15 +362,15 @@ class ErrorHandler {
 
       // Better error logging with more details
       console.group('🚨 Error Logged');
-      Log.info('Message:', errorInfo.message);
-      Log.info('Type:', errorInfo.errorType);
-      Log.info('Context:', errorInfo.context);
-      Log.info('Stack:', errorInfo.stack);
-      Log.info('Full Error Object:', error);
+      console.log('Message:', errorInfo.message);
+      console.log('Type:', errorInfo.errorType);
+      console.log('Context:', errorInfo.context);
+      console.log('Stack:', errorInfo.stack);
+      console.log('Full Error Object:', error);
       console.groupEnd();
     } catch (loggingError) {
-      Log.error('Error in error logging:', loggingError);
-      Log.error('Original error:', error);
+      console.error('Error in error logging:', loggingError);
+      console.error('Original error:', error);
     }
   }
 
@@ -482,7 +482,7 @@ class GASUtilities {
     // 重複リクエスト防止: 同じ関数が実行中の場合は既存のPromiseを返す
     const requestKey = `${functionName}_${JSON.stringify(args)}`;
     if (this.pendingRequests && this.pendingRequests.has(requestKey)) {
-      Log.info(`🚫 Duplicate request prevented: ${functionName}`);
+      console.log(`🚫 Duplicate request prevented: ${functionName}`);
       return this.pendingRequests.get(requestKey);
     }
     
@@ -626,7 +626,7 @@ window.clearAllSharedUtilities = function() {
   window.sharedUtilities.dom.clearElementCache();
   window.sharedUtilities.errors.clearErrors();
   window.sharedUtilities.loading.clearAllLoading();
-  Log.info('🧹 All SharedUtilities cleared');
+  console.log('🧹 All SharedUtilities cleared');
 };
 
 // Integration test function
@@ -640,22 +640,22 @@ window.testSharedUtilities = function() {
   window.sharedUtilities.debounce.debounce(testDebounce, 'test', 100);
 
   setTimeout(() => {
-    Log.info('Debounce test:', debounceCount === 1 ? '✅ PASS' : '❌ FAIL');
+    console.log('Debounce test:', debounceCount === 1 ? '✅ PASS' : '❌ FAIL');
   }, 150);
 
   // Test cache
   window.sharedUtilities.cache.set('test', 'value', 1000);
   const cached = window.sharedUtilities.cache.get('test');
-  Log.info('Cache test:', cached === 'value' ? '✅ PASS' : '❌ FAIL');
+  console.log('Cache test:', cached === 'value' ? '✅ PASS' : '❌ FAIL');
 
   // Test DOM utilities
   const testEl = window.sharedUtilities.dom.createSafeElement('div', 'test-class', 'test');
-  Log.info('DOM creation test:', testEl.className === 'test-class' ? '✅ PASS' : '❌ FAIL');
+  console.log('DOM creation test:', testEl.className === 'test-class' ? '✅ PASS' : '❌ FAIL');
 
   // Test error handling
   window.sharedUtilities.errors.logError(new Error('Test error'), 'Integration test');
   const errors = window.sharedUtilities.errors.getRecentErrors(1);
-  Log.info('Error handling test:', errors.length > 0 ? '✅ PASS' : '❌ FAIL');
+  console.log('Error handling test:', errors.length > 0 ? '✅ PASS' : '❌ FAIL');
 
   console.groupEnd();
   return window.getSharedUtilitiesStats();
@@ -682,12 +682,12 @@ window.sharedUtilities.auth = {
             }
           })
           .withFailureHandler(function(error) {
-            Log.warn('認証リセットエラー:', error);
+            console.warn('認証リセットエラー:', error);
             window.sharedUtilities.auth.showAccountSwitchFallback();
           })
           .resetUserAuthentication();
       } catch (error) {
-        Log.warn('アカウント切り替えエラー:', error);
+        console.warn('アカウント切り替えエラー:', error);
         window.sharedUtilities.auth.showAccountSwitchFallback();
       }
     }
@@ -824,14 +824,14 @@ window.setLoading = function(isLoading, message) {
   // Initialize the loading manager with enhanced error handling and DOM monitoring.
   init(retries = 5, delay = 100, onSuccess = null) {
     if (this.initialized) {
-      Log.info('UnifiedLoadingManager: Already initialized.');
+      console.log('UnifiedLoadingManager: Already initialized.');
       if (onSuccess) onSuccess();
       return true;
     }
 
     // Enhanced DOM readiness check
     if (document.readyState === 'loading') {
-      Log.info('UnifiedLoadingManager: DOM still loading, waiting for DOMContentLoaded...');
+      console.log('UnifiedLoadingManager: DOM still loading, waiting for DOMContentLoaded...');
       document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => this.init(retries, delay, onSuccess), 50);
       }, { once: true });
@@ -842,7 +842,7 @@ window.setLoading = function(isLoading, message) {
     if (this.overlay) {
       if (!window.unifiedLoadingInitialized) {
         window.unifiedLoadingInitialized = true;
-        Log.info('✅ UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
+        console.log('✅ UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
       }
       this.initialized = true;
       if (onSuccess) onSuccess();
@@ -851,7 +851,7 @@ window.setLoading = function(isLoading, message) {
 
     // Enhanced retry logic with DOM mutation observation
     if (retries > 0) {
-      Log.warn(`⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`);
+      console.warn(`⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`);
       
       // Try to observe DOM changes for the loading-overlay element
       if (retries === 5) { // Only set up observer on first try
@@ -860,11 +860,11 @@ window.setLoading = function(isLoading, message) {
       
       setTimeout(() => this.init(retries - 1, delay * 1.5, onSuccess), delay); // Exponential backoff
     } else {
-      Log.error('❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
-      Log.error('❌ UnifiedLoadingManager: Current DOM structure check:');
-      Log.error('  - Document ready state:', document.readyState);
-      Log.error('  - Body exists:', !!document.body);
-      Log.error('  - Available IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id).join(', '));
+      console.error('❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
+      console.error('❌ UnifiedLoadingManager: Current DOM structure check:');
+      console.error('  - Document ready state:', document.readyState);
+      console.error('  - Body exists:', !!document.body);
+      console.error('  - Available IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id).join(', '));
       
       // Create fallback overlay as last resort
       this.createFallbackOverlay();
@@ -881,7 +881,7 @@ window.setLoading = function(isLoading, message) {
         if (mutation.type === 'childList') {
           for (const node of mutation.addedNodes) {
             if (node.nodeType === 1 && (node.id === 'loading-overlay' || node.querySelector('#loading-overlay'))) {
-              Log.info('✅ UnifiedLoadingManager: loading-overlay detected via DOM observer');
+              console.log('✅ UnifiedLoadingManager: loading-overlay detected via DOM observer');
               observer.disconnect();
               setTimeout(() => this.init(1, 50, onSuccess), 10); // Quick retry
               return;
@@ -904,7 +904,7 @@ window.setLoading = function(isLoading, message) {
   createFallbackOverlay() {
     if (document.getElementById('loading-overlay')) return;
     
-    Log.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
+    console.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
     const fallbackOverlay = document.createElement('div');
     fallbackOverlay.id = 'loading-overlay';
     fallbackOverlay.className = 'loading-overlay page-specific hidden';
@@ -914,7 +914,7 @@ window.setLoading = function(isLoading, message) {
       document.body.insertBefore(fallbackOverlay, document.body.firstChild);
       this.overlay = fallbackOverlay;
       this.initialized = true;
-      Log.info('✅ UnifiedLoadingManager: Fallback overlay created and initialized');
+      console.log('✅ UnifiedLoadingManager: Fallback overlay created and initialized');
       return true;
     }
     
@@ -924,23 +924,23 @@ window.setLoading = function(isLoading, message) {
   // Main loading function with a unified API and enhanced error handling.
    setLoading(isLoading, options = {}) {
      if (!this.initialized) {
-      Log.warn('UnifiedLoadingManager: Not initialized, attempting initialization...');
+      console.warn('UnifiedLoadingManager: Not initialized, attempting initialization...');
       if (!this.init()) {
-        Log.error('UnifiedLoadingManager: Cannot manage loading state - initialization failed.');
+        console.error('UnifiedLoadingManager: Cannot manage loading state - initialization failed.');
         return;
       }
      }
 
     try {
       if (isLoading) {
-        Log.info('UnifiedLoadingManager: Showing loading overlay with options:', options);
+        console.log('UnifiedLoadingManager: Showing loading overlay with options:', options);
         this.show(options);
       } else {
-        Log.info('UnifiedLoadingManager: Hiding loading overlay.');
+        console.log('UnifiedLoadingManager: Hiding loading overlay.');
         this.hide();
       }
     } catch (error) {
-      Log.error('UnifiedLoadingManager: Error during loading state change:', error);
+      console.error('UnifiedLoadingManager: Error during loading state change:', error);
     }
    }
 
@@ -1211,7 +1211,7 @@ class NotificationSystem {
     this.init();
     
     if (!this.container) {
-      Log.error('Notification container could not be initialized');
+      console.error('Notification container could not be initialized');
       // Fallback to alert for critical messages
       if (type === 'error') {
         alert('エラー: ' + message);
@@ -1383,6 +1383,6 @@ if (!document.querySelector('script[src*="tailwindcss"]')) {
 // Prevent duplicate loading messages
 if (!window.sharedUtilitiesLoaded) {
   window.sharedUtilitiesLoaded = true;
-  Log.info('✅ SharedUtilities loaded successfully - Version 1.3.0 (with Notification System)');
+  console.log('✅ SharedUtilities loaded successfully - Version 1.3.0 (with Notification System)');
 }
 </script>

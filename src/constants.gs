@@ -618,11 +618,20 @@ function handleUnifiedError(
  * @deprecated console.log(), console.warn(), console.error(), console.log() を使用してください
  */
 function logUnified(level, functionName, message, data = {}) {
-  // ULogクラスはulog.gsで定義されている
-  if (typeof ULog !== 'undefined' && ULog.log) {
-    ULog.log(level, functionName, message, data);
-  } else {
-    console.log(`[${level}] ${functionName}: ${message}`, data);
+  // console ベースに移行済み
+  const formattedMessage = `[${level}] ${functionName}: ${message}`;
+  
+  switch (level) {
+    case 'ERROR':
+    case 'CRITICAL':
+      console.error(formattedMessage, data);
+      break;
+    case 'WARN':
+      console.warn(formattedMessage, data);
+      break;
+    default:
+      console.log(formattedMessage, data);
+      break;
   }
 }
 
@@ -1254,7 +1263,7 @@ const alert = (message) => {
       return Browser.msgBox(message);
     } else {
       console.log('[ALERT]', message);
-      Logger.log('[ALERT] ' + message);
+      // Logger.log('[ALERT] ' + message); // 重複削除 - console.logで十分
       return message;
     }
   } catch (e) {

@@ -214,7 +214,7 @@
                             resolve(result);
                         })
                         .withFailureHandler((error) => {
-                            Log.error('Setup error:', error);
+                            console.error('Setup error:', error);
                             let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
                             if (error.message && error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
                                 displayMessage = `

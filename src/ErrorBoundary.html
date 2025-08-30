@@ -77,10 +77,10 @@
     
     // Detailed logging
     console.group('🚨 Error Boundary Triggered');
-    Log.error('Error:', error);
-    Log.info('Category:', errorInfo.category);
-    Log.info('Context:', errorInfo.context);
-    Log.info('Recovery Options:', recoveryOptions);
+    console.error('Error:', error);
+    console.log('Category:', errorInfo.category);
+    console.log('Context:', errorInfo.context);
+    console.log('Recovery Options:', recoveryOptions);
     console.groupEnd();
     
     // Attempt recovery based on error category
@@ -116,17 +116,17 @@
   
   // Network error recovery
   const handleNetworkError = (errorInfo, recoveryOptions) => {
-    Log.info('🔄 Attempting network error recovery...');
+    console.log('🔄 Attempting network error recovery...');
     
     if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
       errorBoundaryState.retryCount++;
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
-          Log.info('🔄 Retrying network operation...');
+          console.log('🔄 Retrying network operation...');
           recoveryOptions.retryCallback();
         } else {
-          Log.info('🔄 Reloading page for network recovery...');
+          console.log('🔄 Reloading page for network recovery...');
           window.location.reload();
         }
       }, ERROR_BOUNDARY_CONFIG.retryDelay * errorBoundaryState.retryCount);
@@ -140,10 +140,10 @@
   
   // Authentication error recovery
   const handleAuthError = (errorInfo, recoveryOptions) => {
-    Log.info('🔄 Attempting authentication error recovery...');
+    console.log('🔄 Attempting authentication error recovery...');
     
     if (recoveryOptions.reauthenticate) {
-      Log.info('🔄 Triggering re-authentication...');
+      console.log('🔄 Triggering re-authentication...');
       recoveryOptions.reauthenticate();
       return true;
     }
@@ -154,11 +154,11 @@
   
   // Google Apps Script error recovery
   const handleGoogleScriptError = (errorInfo, recoveryOptions) => {
-    Log.info('🔄 Attempting Google Apps Script error recovery...');
+    console.log('🔄 Attempting Google Apps Script error recovery...');
     
     // Try to reload Google Apps Script context
     if (typeof google !== 'undefined' && google.script) {
-      Log.info('🔄 Google Apps Script context available, retrying...');
+      console.log('🔄 Google Apps Script context available, retrying...');
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
@@ -175,14 +175,14 @@
   
   // Timeout error recovery
   const handleTimeoutError = (errorInfo, recoveryOptions) => {
-    Log.info('🔄 Attempting timeout error recovery...');
+    console.log('🔄 Attempting timeout error recovery...');
     
     if (errorBoundaryState.retryCount < ERROR_BOUNDARY_CONFIG.maxRetries) {
       errorBoundaryState.retryCount++;
       
       setTimeout(() => {
         if (recoveryOptions.retryCallback) {
-          Log.info('🔄 Retrying after timeout...');
+          console.log('🔄 Retrying after timeout...');
           recoveryOptions.retryCallback();
         }
       }, ERROR_BOUNDARY_CONFIG.retryDelay * 2); // Longer delay for timeouts
@@ -196,11 +196,11 @@
   
   // JavaScript error recovery
   const handleJavaScriptError = (errorInfo, recoveryOptions) => {
-    Log.info('🔄 Attempting JavaScript error recovery...');
+    console.log('🔄 Attempting JavaScript error recovery...');
     
     // Try to recover from common JavaScript errors
     if (errorInfo.message.includes('undefined') || errorInfo.message.includes('null')) {
-      Log.info('🔄 Attempting to recover from null/undefined error...');
+      console.log('🔄 Attempting to recover from null/undefined error...');
       
       if (recoveryOptions.fallbackCallback) {
         recoveryOptions.fallbackCallback();
@@ -214,7 +214,7 @@
   
   // Generic error recovery
   const handleGenericError = (errorInfo, recoveryOptions) => {
-    Log.info('🔄 Attempting generic error recovery...');
+    console.log('🔄 Attempting generic error recovery...');
     
     if (recoveryOptions.fallbackCallback) {
       recoveryOptions.fallbackCallback();
@@ -298,12 +298,12 @@
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withFailureHandler((error) => {
-            Log.warn('Failed to report error to server:', error);
+            console.warn('Failed to report error to server:', error);
           })
           .reportClientError && google.script.run.reportClientError(errorInfo);
       }
     } catch (e) {
-      Log.warn('Error reporting failed:', e);
+      console.warn('Error reporting failed:', e);
     }
   };
   
@@ -347,14 +347,14 @@
     // Global unhandled error handler
     window.addEventListener('error', (event) => {
       handleError(event.error || new Error(event.message), 'global', {
-        retryCallback: () => Log.info('Global error retry not implemented')
+        retryCallback: () => console.log('Global error retry not implemented')
       });
     });
     
     // Global unhandled promise rejection handler
     window.addEventListener('unhandledrejection', (event) => {
       handleError(event.reason || new Error('Unhandled promise rejection'), 'promise', {
-        retryCallback: () => Log.info('Promise rejection retry not implemented')
+        retryCallback: () => console.log('Promise rejection retry not implemented')
       });
     });
     
@@ -365,7 +365,7 @@
         get: function(target, prop) {
           if (typeof target[prop] === 'function') {
             return wrapFunctionWithErrorBoundary(target[prop], 'google-script', {
-              retryCallback: () => Log.info('Google Script retry triggered')
+              retryCallback: () => console.log('Google Script retry triggered')
             });
           }
           return target[prop];
@@ -376,7 +376,7 @@
   
   // Initialize error boundary system
   const initErrorBoundary = () => {
-    Log.info('🛡️ Error Boundary System initialized');
+    console.log('🛡️ Error Boundary System initialized');
     setupGlobalErrorHandlers();
   };
   
@@ -508,12 +508,12 @@
     <script>
         // 強制ログアウトしてログイン画面にリダイレクトする関数（簡素化版）
         function forceLogoutAndRedirect() {
-            Log.info('🔄 サーバーサイド強制ログアウト開始...');
-            Log.info('📍 現在のURL:', window.location.href);
+            console.log('🔄 サーバーサイド強制ログアウト開始...');
+            console.log('📍 現在のURL:', window.location.href);
             
             // リダイレクトループ防止：既にログインページにいる場合は単純にリロード
             if (window.location.href.includes('mode=login')) {
-                Log.info('⚠️ 既にログインモードです。ページをリロードします。');
+                console.log('⚠️ 既にログインモードです。ページをリロードします。');
                 window.location.reload();
                 return;
             }
@@ -529,40 +529,40 @@
                 // サーバーサイドリダイレクト関数を呼び出し（全ての制約を回避）
                 google.script.run
                     .withSuccessHandler(function(htmlOutput) {
-                        Log.info('✅ サーバーサイドリダイレクト取得成功');
-                        Log.info('🔍 Response type:', typeof htmlOutput);
-                        Log.info('🔍 Response value:', htmlOutput);
-                        Log.info('🔍 Response length:', htmlOutput ? htmlOutput.length : 'N/A');
-                        Log.info('🔍 Response preview:', htmlOutput ? htmlOutput.substring(0, 200) : 'NO CONTENT');
+                        console.log('✅ サーバーサイドリダイレクト取得成功');
+                        console.log('🔍 Response type:', typeof htmlOutput);
+                        console.log('🔍 Response value:', htmlOutput);
+                        console.log('🔍 Response length:', htmlOutput ? htmlOutput.length : 'N/A');
+                        console.log('🔍 Response preview:', htmlOutput ? htmlOutput.substring(0, 200) : 'NO CONTENT');
                         
                         // サーバーから返されたHTMLを現在のページに設定（自動リダイレクト実行）
                         if (htmlOutput && htmlOutput.trim()) {
-                            Log.info('✅ Valid HTML received, applying...');
+                            console.log('✅ Valid HTML received, applying...');
                             document.open();
                             document.write(htmlOutput);
                             document.close();
                         } else {
-                            Log.warn('⚠️ 空のHTMLOutput、フォールバック実行');
-                            Log.warn('  - htmlOutput:', htmlOutput);
-                            Log.warn('  - Trimmed:', htmlOutput ? htmlOutput.trim() : 'N/A');
+                            console.warn('⚠️ 空のHTMLOutput、フォールバック実行');
+                            console.warn('  - htmlOutput:', htmlOutput);
+                            console.warn('  - Trimmed:', htmlOutput ? htmlOutput.trim() : 'N/A');
                             fallbackReload();
                         }
                     })
                     .withFailureHandler(function(error) {
-                        Log.error('❌ サーバーサイドリダイレクト失敗:', error);
+                        console.error('❌ サーバーサイドリダイレクト失敗:', error);
                         fallbackReload();
                     })
                     .forceLogoutAndRedirectToLogin();
                     
             } catch (error) {
-                Log.error('❌ 強制ログアウト処理でエラー:', error);
+                console.error('❌ 強制ログアウト処理でエラー:', error);
                 fallbackReload();
             }
         }
         
         // シンプルなフォールバック関数
         function fallbackReload() {
-            Log.info('🔄 フォールバック：ページリロード実行');
+            console.log('🔄 フォールバック：ページリロード実行');
             const confirmMessage = 'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
             if (confirm(confirmMessage)) {
                 window.location.reload();
@@ -571,17 +571,17 @@
         
         // テスト用関数
         function testServerFunction() {
-            Log.info('🧪 Testing server function...');
+            console.log('🧪 Testing server function...');
             
             google.script.run
                 .withSuccessHandler(function(result) {
-                    Log.info('🧪 Test Success:', result);
-                    Log.info('🧪 Test Result Type:', typeof result);
-                    Log.info('🧪 Test Result Length:', result ? result.length : 'N/A');
+                    console.log('🧪 Test Success:', result);
+                    console.log('🧪 Test Result Type:', typeof result);
+                    console.log('🧪 Test Result Length:', result ? result.length : 'N/A');
                     alert('テスト成功: ' + (result ? '内容あり (' + result.length + ' chars)' : '空の結果'));
                 })
                 .withFailureHandler(function(error) {
-                    Log.error('🧪 Test Error:', error);
+                    console.error('🧪 Test Error:', error);
                     alert('テスト失敗: ' + error.message);
                 })
                 .testForceLogoutRedirect();

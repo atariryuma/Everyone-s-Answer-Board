@@ -113,7 +113,7 @@
       ERROR_SEVERITY = constants.ERROR_SEVERITY;
       ERROR_TYPES = constants.ERROR_TYPES;
     } catch (error) {
-      Log.warn('Failed to load backend constants, using fallback:', error);
+      console.warn('Failed to load backend constants, using fallback:', error);
       // Fallback constants if backend call fails
       ERROR_SEVERITY = {
         CRITICAL: 'critical',
@@ -239,16 +239,16 @@
 
       switch (errorInfo.severity) {
         case ERROR_SEVERITY.CRITICAL:
-          Log.error('🚨 CRITICAL:', logMessage, errorInfo);
+          console.error('🚨 CRITICAL:', logMessage, errorInfo);
           break;
         case ERROR_SEVERITY.HIGH:
-          Log.error('❌ HIGH:', logMessage, errorInfo.specificMessage);
+          console.error('❌ HIGH:', logMessage, errorInfo.specificMessage);
           break;
         case ERROR_SEVERITY.MEDIUM:
-          Log.warn('⚠️ MEDIUM:', logMessage, errorInfo.specificMessage);
+          console.warn('⚠️ MEDIUM:', logMessage, errorInfo.specificMessage);
           break;
         case ERROR_SEVERITY.LOW:
-          Log.info('ℹ️ LOW:', logMessage);
+          console.log('ℹ️ LOW:', logMessage);
           break;
       }
     }
@@ -339,5 +339,5 @@
   window.ERROR_SEVERITY = ERROR_SEVERITY;
   window.ERROR_TYPES = ERROR_TYPES;
 
-  Log.info('✅ Unified Error Handler initialized');
+  console.log('✅ Unified Error Handler initialized');
 </script>

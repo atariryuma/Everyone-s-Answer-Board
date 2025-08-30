@@ -353,7 +353,7 @@
         function showMessage(message, type = 'info', duration = 5000) {
             const notificationContainer = document.getElementById('notification-container');
             if (!notificationContainer) {
-                Log.error('Notification container not found!');
+                console.error('Notification container not found!');
                 return;
             }
 
@@ -489,7 +489,7 @@
                         }
                     })
                     .withFailureHandler((error) => {
-                        Log.error('Update error:', error);
+                        console.error('Update error:', error);
                         showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
                     })
                     .setApplicationStatusForUI(isActive);
@@ -517,7 +517,7 @@
                     window.open(targetUrl, '_top');
                 })
                 .withFailureHandler((error) => {
-                    Log.error('WebApp URL取得エラー:', error);
+                    console.error('WebApp URL取得エラー:', error);
                     const currentUrl = window.location.href.split('?')[0];
                     const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;
                     window.open(targetUrl, '_top');

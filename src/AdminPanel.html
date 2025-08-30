@@ -726,7 +726,7 @@
 
     // 初期化
     document.addEventListener('DOMContentLoaded', function() {
-      Log.info('AdminPanel初期化開始');
+      console.log('AdminPanel初期化開始');
       initializePanel();
       checkSystemAdminAccess();
       
@@ -739,7 +739,7 @@
 
     // フッター初期化
     function initializeFooter() {
-      Log.info('フッター初期化開始');
+      console.log('フッター初期化開始');
       
       // 初回ボード情報ロード
       loadBoardInfo();
@@ -753,7 +753,7 @@
       // body padding調整（フッター分の余白を追加）
       document.body.classList.add('has-footer');
       
-      Log.info('フッター初期化完了');
+      console.log('フッター初期化完了');
     }
 
     // システムステータス更新
@@ -782,7 +782,7 @@
         loadUserInfo();
         setLoading(false);
       } catch (error) {
-        Log.error('初期化エラー:', error);
+        console.error('初期化エラー:', error);
         showError('初期化に失敗しました: ' + error.message);
         setLoading(false);
       }
@@ -804,7 +804,7 @@
           });
         })
         .withFailureHandler(function(error) {
-          Log.error('スプレッドシート読み込みエラー:', error);
+          console.error('スプレッドシート読み込みエラー:', error);
           select.innerHTML = '<option value="">読み込みエラー</option>';
           showError('スプレッドシートの読み込みに失敗しました');
         })
@@ -819,7 +819,7 @@
           document.getElementById('current-user-email').textContent = email || '--';
         })
         .withFailureHandler(function(error) {
-          Log.error('メールアドレス取得エラー:', error);
+          console.error('メールアドレス取得エラー:', error);
           document.getElementById('current-user-email').textContent = 'エラー';
         })
         .User.email();
@@ -851,7 +851,7 @@
       if (window.sharedUtilities && window.sharedUtilities.notifications) {
         window.sharedUtilities.notifications.error(message);
       } else {
-        Log.error('Error:', message);
+        console.error('Error:', message);
         alert('エラー: ' + message);
       }
     }
@@ -861,7 +861,7 @@
       if (window.sharedUtilities && window.sharedUtilities.notifications) {
         window.sharedUtilities.notifications.success(message);
       } else {
-        Log.info('Success:', message);
+        console.log('Success:', message);
         alert('成功: ' + message);
       }
     }
@@ -883,7 +883,7 @@
           showSuccess('設定をエクスポートしました');
         })
         .withFailureHandler(function(error) {
-          Log.error('エクスポートエラー:', error);
+          console.error('エクスポートエラー:', error);
           showError('設定のエクスポートに失敗しました');
         })
         .getCurrentConfig();
@@ -894,15 +894,15 @@
       google.script.run
         .withSuccessHandler(function(isAdmin) {
           if (isAdmin) {
-            Log.info('システム管理者として認識されました');
+            console.log('システム管理者として認識されました');
             document.getElementById('app-setup-btn').style.display = 'block';
           } else {
-            Log.info('一般ユーザーとして認識されました');
+            console.log('一般ユーザーとして認識されました');
             document.getElementById('app-setup-btn').style.display = 'none';
           }
         })
         .withFailureHandler(function(error) {
-          Log.warn('システム管理者確認エラー:', error);
+          console.warn('システム管理者確認エラー:', error);
           document.getElementById('app-setup-btn').style.display = 'none';
         })
         .checkIsSystemAdmin();
@@ -917,7 +917,7 @@
           window.open(setupUrl, '_top');
         })
         .withFailureHandler(function(error) {
-          Log.error('アプリ設定画面への遷移エラー:', error);
+          console.error('アプリ設定画面への遷移エラー:', error);
           showError('アプリ設定画面への移動に失敗しました');
           setLoading(false);
         })
@@ -976,7 +976,7 @@
           });
         })
         .withFailureHandler(function(error) {
-          Log.error('シート読み込みエラー:', error);
+          console.error('シート読み込みエラー:', error);
           select.innerHTML = '<option value="">読み込みエラー</option>';
         })
         .getSheetList(spreadsheetId);
@@ -1013,7 +1013,7 @@
           setLoading(false);
         })
         .withFailureHandler(function(error) {
-          Log.error('接続エラー:', error);
+          console.error('接続エラー:', error);
           showError('データソースへの接続に失敗しました。スプレッドシートのアクセス権限を確認してください。');
           setLoading(false);
         })
@@ -1036,7 +1036,7 @@
     // 列マッピング更新
     function updateColumnMapping(mapping) {
       // 実装予定: バックエンドから受け取った列マッピング情報で画面を更新
-      Log.info('Column mapping:', mapping);
+      console.log('Column mapping:', mapping);
     }
 
     // 列マッピング確認
@@ -1061,7 +1061,7 @@
           setLoading(false);
         })
         .withFailureHandler(function(error) {
-          Log.error('保存エラー:', error);
+          console.error('保存エラー:', error);
           showError('下書きの保存に失敗しました');
           setLoading(false);
         })
@@ -1100,7 +1100,7 @@
           setLoading(false);
         })
         .withFailureHandler(function(error) {
-          Log.error('公開エラー:', error);
+          console.error('公開エラー:', error);
           showError('アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。');
           setLoading(false);
         })
@@ -1148,7 +1148,7 @@
           updateFooterDisplay(boardInfo);
         })
         .withFailureHandler(function(error) {
-          Log.error('ボード情報取得エラー:', error);
+          console.error('ボード情報取得エラー:', error);
           updateFooterDisplay({
             isActive: false,
             questionText: '情報取得エラー',
@@ -1234,7 +1234,7 @@
       document.body.removeChild(textarea);
     }
 
-    Log.info('AdminPanel スクリプト読み込み完了');
+    console.log('AdminPanel スクリプト読み込み完了');
   </script>
 </body>
 </html>
