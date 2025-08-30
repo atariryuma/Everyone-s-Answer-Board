@@ -14,7 +14,7 @@ function include(path) {
     tmpl.include = include;
     return tmpl.evaluate().getContent();
   } catch (error) {
-    console.error(`ファイル読み込み失敗: ${path}`, { error: error.message }, ULog.CATEGORIES.SYSTEM);
+    console.error(`ファイル読み込み失敗: ${path}`, { error: error.message });
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
 }
@@ -250,7 +250,7 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
   } catch (e) {
-    console.warn('XFrameOptionsMode設定失敗', { error: e.message }, ULog.CATEGORIES.SECURITY);
+    console.warn('XFrameOptionsMode設定失敗', { error: e.message });
   }
   return htmlOutput;
 }
@@ -345,7 +345,7 @@ function getGoogleClientId() {
     console.log('GOOGLE_CLIENT_ID結果', { found: !!clientId });
     
     if (!clientId) {
-      console.warn('GOOGLE_CLIENT_IDが見つかりません', {}, ULog.CATEGORIES.SYSTEM);
+      console.warn('GOOGLE_CLIENT_IDが見つかりません');
       
       // Try to get all properties to see what's available
       var allProperties = properties.getProperties();
@@ -360,7 +360,7 @@ function getGoogleClientId() {
     
     return { status: 'success', message: 'Google Client IDを取得しました', data: { clientId: clientId } };
   } catch (error) {
-    console.error('GOOGLE_CLIENT_ID取得エラー', { error: error.message }, ULog.CATEGORIES.SYSTEM);
+    console.error('GOOGLE_CLIENT_ID取得エラー', { error: error.message });
     return { status: 'error', message: 'Google Client IDの取得に失敗しました: ' + error.toString(), data: { clientId: '' } };
   }
 }

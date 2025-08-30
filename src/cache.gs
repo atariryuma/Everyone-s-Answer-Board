@@ -2436,7 +2436,7 @@ function resilientUrlFetch(url, options = {}) {
         console.warn(`resilientUrlFetch: エラー、${delay}ms後にリトライ - ${url}: ${error.message}`);
         Utilities.sleep(delay);
       } else {
-        console.error(`resilientUrlFetch: 最終的に失敗 - ${url}`, { error: error.message, url }, ULog.CATEGORIES.API);
+        console.error(`resilientUrlFetch: 最終的に失敗 - ${url}`, { error: error.message, url });
         throw error;
       }
     }
