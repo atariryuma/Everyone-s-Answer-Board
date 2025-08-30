@@ -107,9 +107,20 @@ function connectDataSource(spreadsheetId, sheetName) {
     // 既存の堅牢なヘッダー取得関数を活用（30分キャッシュ + リトライ機能）
     const headerIndices = getHeadersCached(spreadsheetId, sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
+
     // Core.gsの高精度AI列マッピングを直接活用
-    const columnMapping = headerIndices ? convertIndicesToMapping(headerIndices, headerRow) : mapColumns(headerRow);
+    const columnMapping = headerIndices
+      ? convertIndicesToMapping(headerIndices, headerRow)
+      : mapColumns(headerRow);
+
+    // 列名マッピングの整合性チェック
+    const validationResult = validateAdminPanelMapping(columnMapping);
+    if (!validationResult.isValid) {
+      console.warn('列名マッピング検証エラー', validationResult.errors);
+    }
+    if (validationResult.warnings.length > 0) {
+      console.warn('列名マッピング警告', validationResult.warnings);
+    }
 
     // 不足列の検出・追加
     const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping);
@@ -118,11 +129,13 @@ function connectDataSource(spreadsheetId, sheetName) {
     // 列が追加された場合は、ヘッダー行を再取得して列マッピングを更新
     if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
       const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
+
       // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
       cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
       const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
-      columnMapping = updatedHeaderIndices ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow) : mapColumns(updatedHeaderRow);
+      columnMapping = updatedHeaderIndices
+        ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow)
+        : mapColumns(updatedHeaderRow);
     }
 
     // 設定を保存（既存のユーザー管理システムを活用）
@@ -141,32 +154,35 @@ function connectDataSource(spreadsheetId, sheetName) {
         compatibleMapping: compatibleMapping, // Core.gs互換形式
         lastConnected: new Date().toISOString(),
         connectionMethod: 'dropdown_select',
-        missingColumnsHandled: missingColumnsResult
+        missingColumnsHandled: missingColumnsResult,
       });
 
       console.log('connectToDataSource: 互換形式も保存', { columnMapping, compatibleMapping });
     }
 
     console.log('connectToDataSource: 接続成功', columnMapping);
-    
+
     // メッセージを統合
     let message = 'データソースに正常に接続されました';
     if (missingColumnsResult.success) {
       if (missingColumnsResult.addedColumns.length > 0) {
         message += `。${missingColumnsResult.addedColumns.length}個の必須列を自動追加しました`;
       }
-      if (missingColumnsResult.recommendedColumns && missingColumnsResult.recommendedColumns.length > 0) {
+      if (
+        missingColumnsResult.recommendedColumns &&
+        missingColumnsResult.recommendedColumns.length > 0
+      ) {
         message += `。${missingColumnsResult.recommendedColumns.length}個の推奨列を手動で追加することをお勧めします`;
       }
     }
-    
+
     return {
       success: true,
       columnMapping: columnMapping,
-      headers: headerRow,              // 🔥 追加: 実際のヘッダー情報
+      headers: headerRow, // 🔥 追加: 実際のヘッダー情報
       rowCount: sheet.getLastRow(),
       message: message,
-      missingColumnsResult: missingColumnsResult
+      missingColumnsResult: missingColumnsResult,
     };
   } catch (error) {
     console.error('connectToDataSource エラー:', error);
@@ -178,40 +194,54 @@ function connectDataSource(spreadsheetId, sheetName) {
 }
 
 /**
- * ヘッダー行から列マッピングを自動検出
+ * ヘッダー行から列マッピングを自動検出（COLUMN_MAPPING使用）
  * @param {Array<string>} headers - ヘッダー行の配列
  * @returns {Object} 検出された列マッピング
  */
 function mapColumns(headers) {
-  const mapping = {
-    question: null,
-    answerer: null,
-    reason: null,
-    confidence: {},
-  };
+  // COLUMN_MAPPINGベースの初期化
+  const mapping = {};
+  const confidence = {};
 
-  // キーワードパターン
-  const patterns = {
-    question: ['質問', 'question', 'query', 'ask', 'Q'],
-    answerer: ['回答者', '名前', 'name', 'answerer', 'user', 'ユーザー'],
-    reason: ['理由', 'reason', 'comment', 'コメント', '備考', 'note'],
-  };
+  // COLUMN_MAPPINGの各列定義を初期化
+  Object.values(COLUMN_MAPPING).forEach((column) => {
+    mapping[column.key] = null;
+  });
+  mapping.confidence = {};
 
+  // ヘッダー検出処理
   headers.forEach((header, index) => {
     const headerLower = header.toString().toLowerCase();
 
-    Object.keys(patterns).forEach((type) => {
-      const pattern = patterns[type];
-      const matchCount = pattern.filter((p) => headerLower.includes(p.toLowerCase())).length;
+    // COLUMN_MAPPINGの各列を検査
+    Object.values(COLUMN_MAPPING).forEach((column) => {
+      const headerName = column.header.toLowerCase();
+      const fieldKey = column.key;
 
-      if (matchCount > 0) {
-        const confidence = Math.min(95, 60 + matchCount * 15);
-        if (!mapping[type] || confidence > (mapping.confidence[type] || 0)) {
-          mapping[type] = index;
-          mapping.confidence[type] = confidence;
+      // 基本マッチング（完全一致優先）
+      let matchScore = 0;
+      if (headerLower === headerName) {
+        matchScore = 95; // 完全一致
+      } else if (headerLower.includes(headerName)) {
+        matchScore = 80; // 部分一致
+      } else if (headerName.includes(headerLower) && headerLower.length > 2) {
+        matchScore = 70; // 逆部分一致
+      }
+
+      // より高い信頼度で置き換え
+      if (matchScore > 0) {
+        if (!mapping[fieldKey] || matchScore > (mapping.confidence[fieldKey] || 0)) {
+          mapping[fieldKey] = index;
+          mapping.confidence[fieldKey] = matchScore;
         }
       }
     });
+  });
+
+  console.log('mapColumns: COLUMN_MAPPING使用でマッピング完了', {
+    headers,
+    mapping,
+    usedConstant: 'COLUMN_MAPPING',
   });
 
   return mapping;
@@ -226,7 +256,11 @@ function mapColumns(headers) {
  */
 function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
   try {
-    console.log('detectAndAddMissingColumns: 不足列の検出開始', { spreadsheetId, sheetName, columnMapping });
+    console.log('detectAndAddMissingColumns: 不足列の検出開始', {
+      spreadsheetId,
+      sheetName,
+      columnMapping,
+    });
 
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
@@ -241,44 +275,53 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
 
     // 必要な列を定義（StudyQuestシステムで使用される標準列）
     const requiredColumns = {
-      'メールアドレス': 'EMAIL',
-      '理由': 'REASON',
-      '名前': 'NAME', 
+      メールアドレス: 'EMAIL',
+      理由: 'REASON',
+      名前: 'NAME',
       'なるほど！': 'UNDERSTAND',
       'いいね！': 'LIKE',
       'もっと知りたい！': 'CURIOUS',
-      'ハイライト': 'HIGHLIGHT',
-      'タイムスタンプ': 'TIMESTAMP'
+      ハイライト: 'HIGHLIGHT',
+      タイムスタンプ: 'TIMESTAMP',
     };
 
     // 不足している列を検出
     const missingColumns = [];
-    const existingColumns = headerRow.map(h => String(h || '').trim());
+    const existingColumns = headerRow.map((h) => String(h || '').trim());
 
-    Object.keys(requiredColumns).forEach(requiredCol => {
-      const found = existingColumns.some(existing => {
+    Object.keys(requiredColumns).forEach((requiredCol) => {
+      const found = existingColumns.some((existing) => {
         const existingLower = existing.toLowerCase();
         const requiredLower = requiredCol.toLowerCase();
-        
+
         // 基本的な検出ロジック（リアクション・ハイライトは完全一致）
-        if (requiredCol === 'なるほど！' || requiredCol === 'いいね！' || requiredCol === 'もっと知りたい！' || requiredCol === 'ハイライト') {
+        if (
+          requiredCol === 'なるほど！' ||
+          requiredCol === 'いいね！' ||
+          requiredCol === 'もっと知りたい！' ||
+          requiredCol === 'ハイライト'
+        ) {
           // システム列は完全一致のみ
           return existing === requiredCol;
         }
-        
+
         // その他の列は柔軟な検出
-        return existingLower.includes(requiredLower) || 
-               (requiredCol === 'メールアドレス' && existingLower.includes('email')) ||
-               (requiredCol === '理由' && (existingLower.includes('理由') || existingLower.includes('詳細'))) ||
-               (requiredCol === '名前' && (existingLower.includes('名前') || existingLower.includes('氏名'))) ||
-               (requiredCol === 'タイムスタンプ' && existingLower.includes('timestamp'));
+        return (
+          existingLower.includes(requiredLower) ||
+          (requiredCol === 'メールアドレス' && existingLower.includes('email')) ||
+          (requiredCol === '理由' &&
+            (existingLower.includes('理由') || existingLower.includes('詳細'))) ||
+          (requiredCol === '名前' &&
+            (existingLower.includes('名前') || existingLower.includes('氏名'))) ||
+          (requiredCol === 'タイムスタンプ' && existingLower.includes('timestamp'))
+        );
       });
 
       if (!found) {
         missingColumns.push({
           columnName: requiredCol,
           systemName: requiredColumns[requiredCol],
-          priority: getPriority(requiredCol)
+          priority: getPriority(requiredCol),
         });
       }
     });
@@ -291,7 +334,7 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
         success: true,
         missingColumns: [],
         addedColumns: [],
-        message: '必要な列がすべて揃っています'
+        message: '必要な列がすべて揃っています',
       };
     }
 
@@ -300,33 +343,33 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
 
     // 列を自動追加（高優先度のみ）
     const addedColumns = [];
-    const highPriorityColumns = missingColumns.filter(col => col.priority <= 2);
+    const highPriorityColumns = missingColumns.filter((col) => col.priority <= 2);
 
     if (highPriorityColumns.length > 0) {
       const lastColumn = sheet.getLastColumn();
-      
+
       highPriorityColumns.forEach((colInfo, index) => {
         const newColumnIndex = lastColumn + index + 1;
-        
+
         // 新しい列を追加
         sheet.insertColumnAfter(lastColumn + index);
         sheet.getRange(1, newColumnIndex).setValue(colInfo.columnName);
-        
+
         addedColumns.push({
           columnName: colInfo.columnName,
           position: newColumnIndex,
-          systemName: colInfo.systemName
+          systemName: colInfo.systemName,
         });
-        
+
         console.log('detectAndAddMissingColumns: 列追加', {
           columnName: colInfo.columnName,
-          position: newColumnIndex
+          position: newColumnIndex,
         });
       });
     }
 
     // 残りの不足列（低優先度）は推奨として返す
-    const recommendedColumns = missingColumns.filter(col => col.priority > 2);
+    const recommendedColumns = missingColumns.filter((col) => col.priority > 2);
 
     return {
       success: true,
@@ -337,17 +380,16 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
       details: {
         added: addedColumns.length,
         recommended: recommendedColumns.length,
-        total: missingColumns.length
-      }
+        total: missingColumns.length,
+      },
     };
-
   } catch (error) {
     console.error('detectAndAddMissingColumns エラー:', error);
     return {
       success: false,
       error: error.message,
       missingColumns: [],
-      addedColumns: []
+      addedColumns: [],
     };
   }
 }
@@ -359,16 +401,16 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
  */
 function getPriority(columnName) {
   const priorities = {
-    'メールアドレス': 1,    // 最高優先度
-    '理由': 1,            // 最高優先度  
-    '名前': 2,            // 高優先度
-    'タイムスタンプ': 3,    // 中優先度
-    'なるほど！': 4,       // 低優先度
+    メールアドレス: 1, // 最高優先度
+    理由: 1, // 最高優先度
+    名前: 2, // 高優先度
+    タイムスタンプ: 3, // 中優先度
+    'なるほど！': 4, // 低優先度
     'いいね！': 4,
     'もっと知りたい！': 4,
-    'ハイライト': 4
+    ハイライト: 4,
   };
-  
+
   return priorities[columnName] || 5;
 }
 
@@ -388,7 +430,7 @@ function validateAccess(spreadsheetId) {
     // スプレッドシートのアクセス権限を確認
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const spreadsheetName = spreadsheet.getName();
-    
+
     // シート一覧も取得
     const sheets = spreadsheet.getSheets();
     const sheetList = sheets.map((sheet) => ({
@@ -402,7 +444,7 @@ function validateAccess(spreadsheetId) {
     console.log('validateSpreadsheetAccess: アクセス権限確認成功', {
       id: spreadsheetId,
       name: spreadsheetName,
-      sheets: sheetList.length
+      sheets: sheetList.length,
     });
 
     return {
@@ -410,14 +452,14 @@ function validateAccess(spreadsheetId) {
       spreadsheetId: spreadsheetId,
       spreadsheetName: spreadsheetName,
       sheets: sheetList,
-      message: 'スプレッドシートへのアクセスが確認できました'
+      message: 'スプレッドシートへのアクセスが確認できました',
     };
   } catch (error) {
     console.error('validateSpreadsheetAccess エラー:', error);
     return {
       success: false,
       error: error.message,
-      details: 'スプレッドシートが存在しないか、アクセス権限がありません'
+      details: 'スプレッドシートが存在しないか、アクセス権限がありません',
     };
   }
 }
@@ -446,9 +488,20 @@ function analyzeColumns(spreadsheetId, sheetName) {
     // 既存の堅牢なヘッダー取得関数を活用（30分キャッシュ + リトライ機能）
     const headerIndices = getHeadersCached(spreadsheetId, sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
+
     // Core.gsの高精度AI列マッピングを直接活用
-    const columnMapping = headerIndices ? convertIndicesToMapping(headerIndices, headerRow) : mapColumns(headerRow);
+    const columnMapping = headerIndices
+      ? convertIndicesToMapping(headerIndices, headerRow)
+      : mapColumns(headerRow);
+
+    // 列名マッピングの整合性チェック
+    const validationResult = validateAdminPanelMapping(columnMapping);
+    if (!validationResult.isValid) {
+      console.warn('列名マッピング検証エラー', validationResult.errors);
+    }
+    if (validationResult.warnings.length > 0) {
+      console.warn('列名マッピング警告', validationResult.warnings);
+    }
     console.log('analyzeSpreadsheetColumns: 列マッピング完了', columnMapping);
 
     // 不足列の検出・追加
@@ -458,12 +511,14 @@ function analyzeColumns(spreadsheetId, sheetName) {
     // 列が追加された場合は、ヘッダー行を再取得して列マッピングを更新
     if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
       const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
+
       // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
       cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
       const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
-      columnMapping = updatedHeaderIndices ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow) : mapColumns(updatedHeaderRow);
-      
+      columnMapping = updatedHeaderIndices
+        ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow)
+        : mapColumns(updatedHeaderRow);
+
       console.log('analyzeSpreadsheetColumns: 列追加後の更新されたマッピング', columnMapping);
     }
 
@@ -478,23 +533,26 @@ function analyzeColumns(spreadsheetId, sheetName) {
         columnMapping: columnMapping,
         lastConnected: new Date().toISOString(),
         connectionMethod: 'url_input',
-        missingColumnsHandled: missingColumnsResult
+        missingColumnsHandled: missingColumnsResult,
       });
     }
 
     console.log('analyzeSpreadsheetColumns: 分析完了', columnMapping);
-    
+
     // メッセージを統合
     let message = 'スプレッドシートの列構造を分析しました';
     if (missingColumnsResult.success) {
       if (missingColumnsResult.addedColumns.length > 0) {
         message += `。${missingColumnsResult.addedColumns.length}個の必須列を自動追加しました`;
       }
-      if (missingColumnsResult.recommendedColumns && missingColumnsResult.recommendedColumns.length > 0) {
+      if (
+        missingColumnsResult.recommendedColumns &&
+        missingColumnsResult.recommendedColumns.length > 0
+      ) {
         message += `。${missingColumnsResult.recommendedColumns.length}個の推奨列を手動で追加することをお勧めします`;
       }
     }
-    
+
     return {
       success: true,
       columnMapping: columnMapping,
@@ -502,13 +560,13 @@ function analyzeColumns(spreadsheetId, sheetName) {
       rowCount: sheet.getLastRow(),
       columnCount: sheet.getLastColumn(),
       message: message,
-      missingColumnsResult: missingColumnsResult
+      missingColumnsResult: missingColumnsResult,
     };
   } catch (error) {
     console.error('analyzeSpreadsheetColumns エラー:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -520,115 +578,68 @@ function analyzeColumns(spreadsheetId, sheetName) {
  * @returns {Object} AdminPanel用マッピング
  */
 function convertIndicesToMapping(headerIndices, headerRow) {
-  const mapping = {
-    question: headerIndices[COLUMN_HEADERS.OPINION] || null,  // '回答' -> question として使用
-    answer: headerIndices[COLUMN_HEADERS.REASON] || null,     // '理由' -> answer として使用
-    nickname: headerIndices[COLUMN_HEADERS.NAME] || null,    // '名前' -> nickname として使用
-    timestamp: headerIndices[COLUMN_HEADERS.TIMESTAMP] || null, // 'タイムスタンプ'
-    reason: headerIndices[COLUMN_HEADERS.REASON] || null,    // '理由'
-    category: headerIndices[COLUMN_HEADERS.CLASS] || null,   // 'クラス' -> category として使用
-  };
+  // シンプル・単一定数COLUMN_MAPPINGを使用
+  const mapping = {};
 
-  console.log('convertIndicesToMapping: 変換結果', { headerIndices, mapping });
+  // 各列定義を直接使用（変換層なし）
+  Object.values(COLUMN_MAPPING).forEach((column) => {
+    const headerName = column.header; // '回答', '理由' など
+    const uiFieldName = column.key; // 'answer', 'reason' など
+
+    mapping[uiFieldName] =
+      headerIndices[headerName] !== undefined ? headerIndices[headerName] : null;
+  });
+
+  console.log('convertIndicesToMapping: 単一定数使用で変換完了', {
+    headerIndices,
+    mapping,
+    usedMapping: 'COLUMN_MAPPING (統一定数)',
+  });
   return mapping;
 }
 
 /**
- * guessHeadersFromArray結果をAdminPanel用マッピングに変換（廃止予定）
- * @deprecated convertIndicesToMappingを使用してください
- * @param {Object} guessedHeaders - guessHeadersFromArrayの結果
- * @param {Array} headerRow - ヘッダー行
- * @returns {Object} AdminPanel用マッピング
+ * AdminPanel列名マッピングの整合性チェック関数
+ * @param {Object} mapping - 変換されたマッピング
+ * @returns {Object} チェック結果
  */
-function convertGuessedToMapping(guessedHeaders, headerRow) {
-  const mapping = {
-    question: null,
-    answerer: null,
-    reason: null,
-    name: null,
-    class: null,
-    understand: null,
-    like: null,
-    curious: null,
-    highlight: null,
-    confidence: {}
+function validateAdminPanelMapping(mapping) {
+  const results = {
+    isValid: true,
+    errors: [],
+    warnings: [],
+    summary: {},
   };
 
-  // guessedHeadersからマッピングを作成
-  if (guessedHeaders.questionHeader) {
-    const questionIndex = headerRow.findIndex(h => h === guessedHeaders.questionHeader);
-    if (questionIndex !== -1) {
-      mapping.question = questionIndex;
-      mapping.confidence.question = 95; // 高精度AI判定の信頼度
-    }
-  }
+  // COLUMN_MAPPINGに基づく動的チェック
+  Object.values(COLUMN_MAPPING).forEach((column) => {
+    const fieldKey = column.key;
+    const isRequired = column.required;
 
-  if (guessedHeaders.answerHeader) {
-    const answerIndex = headerRow.findIndex(h => h === guessedHeaders.answerHeader);
-    if (answerIndex !== -1) {
-      mapping.answerer = answerIndex;
-      mapping.confidence.answerer = 95;
+    if (isRequired && !mapping[fieldKey] && mapping[fieldKey] !== 0) {
+      results.isValid = false;
+      results.errors.push(`必須フィールド '${fieldKey}' (${column.header}) が設定されていません`);
+    } else if (!isRequired && !mapping[fieldKey] && mapping[fieldKey] !== 0) {
+      results.warnings.push(`推奨フィールド '${fieldKey}' (${column.header}) が設定されていません`);
     }
-  }
+  });
 
-  if (guessedHeaders.reasonHeader) {
-    const reasonIndex = headerRow.findIndex(h => h === guessedHeaders.reasonHeader);
-    if (reasonIndex !== -1) {
-      mapping.reason = reasonIndex;
-      mapping.confidence.reason = 95;
+  // 許可されたフィールドかチェック
+  const allowedFields = Object.values(COLUMN_MAPPING).map((col) => col.key);
+  Object.keys(mapping).forEach((uiField) => {
+    if (!allowedFields.includes(uiField)) {
+      results.warnings.push(`未知のUIフィールド '${uiField}' が含まれています`);
     }
-  }
+  });
 
-  if (guessedHeaders.nameHeader) {
-    const nameIndex = headerRow.findIndex(h => h === guessedHeaders.nameHeader);
-    if (nameIndex !== -1) {
-      mapping.name = nameIndex;
-      mapping.confidence.name = 95;
-    }
-  }
+  results.summary = {
+    totalFields: Object.keys(mapping).length,
+    validFields: Object.keys(mapping).filter((k) => mapping[k] !== null).length,
+    nullFields: Object.keys(mapping).filter((k) => mapping[k] === null).length,
+  };
 
-  if (guessedHeaders.classHeader) {
-    const classIndex = headerRow.findIndex(h => h === guessedHeaders.classHeader);
-    if (classIndex !== -1) {
-      mapping.class = classIndex;
-      mapping.confidence.class = 95;
-    }
-  }
-
-  // リアクション列のマッピング
-  if (guessedHeaders.understandHeader) {
-    const understandIndex = headerRow.findIndex(h => h === guessedHeaders.understandHeader);
-    if (understandIndex !== -1) {
-      mapping.understand = understandIndex;
-      mapping.confidence.understand = 95;
-    }
-  }
-
-  if (guessedHeaders.likeHeader) {
-    const likeIndex = headerRow.findIndex(h => h === guessedHeaders.likeHeader);
-    if (likeIndex !== -1) {
-      mapping.like = likeIndex;
-      mapping.confidence.like = 95;
-    }
-  }
-
-  if (guessedHeaders.curiousHeader) {
-    const curiousIndex = headerRow.findIndex(h => h === guessedHeaders.curiousHeader);
-    if (curiousIndex !== -1) {
-      mapping.curious = curiousIndex;
-      mapping.confidence.curious = 95;
-    }
-  }
-
-  if (guessedHeaders.highlightHeader) {
-    const highlightIndex = headerRow.findIndex(h => h === guessedHeaders.highlightHeader);
-    if (highlightIndex !== -1) {
-      mapping.highlight = highlightIndex;
-      mapping.confidence.highlight = 95;
-    }
-  }
-
-  return mapping;
+  console.log('validateAdminPanelMapping:', results);
+  return results;
 }
 
 // =============================================================================
@@ -672,7 +683,7 @@ function getCurrentConfig() {
       // configJsonから推奨シート名を取得
       sheetName = configJson.publishedSheetName || configJson.activeSheetName || null;
     }
-    
+
     // まだsheetNameが不足している場合、スプレッドシートから自動検出
     if (!sheetName && userInfo.spreadsheetId) {
       try {
@@ -687,18 +698,19 @@ function getCurrentConfig() {
     const config = {
       setupStatus: getSetupStatusFromStep(setupStep),
       spreadsheetId: userInfo.spreadsheetId,
-      sheetName: sheetName,              // 🔥 強化されたシート名情報
+      sheetName: sheetName, // 🔥 強化されたシート名情報
       formCreated: configJson ? configJson.formCreated : false,
       appPublished: configJson ? configJson.appPublished : false,
       lastUpdated: userInfo.lastUpdated,
       setupStep: setupStep,
-      setupComplete: setupStep >= 3,     // 🔥 追加: セットアップ完了状態
+      setupComplete: setupStep >= 3, // 🔥 追加: セットアップ完了状態
       user: currentUser,
       userId: userInfo.userId,
-      displaySettings: {                 // 🔥 追加: 表示設定
+      displaySettings: {
+        // 🔥 追加: 表示設定
         showNames: configJson ? configJson.showNames !== false : true,
-        showReactions: configJson ? configJson.showReactions !== false : true
-      }
+        showReactions: configJson ? configJson.showReactions !== false : true,
+      },
     };
 
     console.log('getCurrentConfig: 設定情報取得完了', config);
@@ -722,35 +734,35 @@ function detectActiveSheetName(spreadsheetId) {
   try {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
-    
+
     // 優先順位: フォームの回答 > データがあるシート > 最初のシート
     const priorityNames = ['フォームの回答 1', 'フォームの回答', 'Sheet1', 'シート1'];
-    
+
     // 優先名から検索
     for (const priorityName of priorityNames) {
-      const sheet = sheets.find(s => s.getName() === priorityName);
-      if (sheet && sheet.getLastRow() > 1) { // データがあるかチェック
+      const sheet = sheets.find((s) => s.getName() === priorityName);
+      if (sheet && sheet.getLastRow() > 1) {
+        // データがあるかチェック
         console.log('detectActiveSheetName: 優先シート検出', priorityName);
         return priorityName;
       }
     }
-    
+
     // データが最も多いシートを選択
     const sheetsWithData = sheets
-      .filter(s => s.getLastRow() > 1)
+      .filter((s) => s.getLastRow() > 1)
       .sort((a, b) => b.getLastRow() - a.getLastRow());
-    
+
     if (sheetsWithData.length > 0) {
       const selectedSheet = sheetsWithData[0].getName();
       console.log('detectActiveSheetName: データ最大シート選択', selectedSheet);
       return selectedSheet;
     }
-    
+
     // フォールバック: 最初のシート
     const fallbackSheet = sheets[0].getName();
     console.log('detectActiveSheetName: フォールバック選択', fallbackSheet);
     return fallbackSheet;
-    
   } catch (error) {
     console.error('detectActiveSheetName エラー:', error);
     throw error;
@@ -1013,6 +1025,43 @@ function getOrCreateWebAppUrl(userId, appName) {
 }
 
 /**
+ * Page.html用：ユーザーの列マッピング設定を取得
+ * @param {string} userId - ユーザーID（オプション）
+ * @returns {Object} 列マッピング設定
+ */
+function getUserColumnMapping(userId = null) {
+  try {
+    console.log('getUserColumnMapping: 列マッピング取得開始', userId);
+
+    // ユーザー情報の取得
+    const targetUserId = userId || getCurrentUserInfo()?.userId;
+    if (!targetUserId) {
+      console.warn('getUserColumnMapping: ユーザーIDが見つかりません');
+      return {};
+    }
+
+    // 保存されている設定を取得
+    const userConfig = getUserConfigJson(targetUserId);
+    if (userConfig && userConfig.columnMapping) {
+      console.log('getUserColumnMapping: 保存済み設定を使用', userConfig.columnMapping);
+      return userConfig.columnMapping;
+    }
+
+    // 設定が見つからない場合はデフォルト（空）を返す
+    console.log('getUserColumnMapping: デフォルト設定を使用');
+    const defaultMapping = {};
+    Object.values(COLUMN_MAPPING).forEach((column) => {
+      defaultMapping[column.key] = null;
+    });
+
+    return defaultMapping;
+  } catch (error) {
+    console.error('getUserColumnMapping エラー:', error);
+    return {};
+  }
+}
+
+/**
  * 管理パネルのHTMLを返す
  * @returns {HtmlOutput} HTML出力
  */
@@ -1158,28 +1207,19 @@ function convertToCompatibleMapping(columnMapping, headerRow) {
   try {
     const compatibleMapping = {};
 
-    // AdminPanel形式から既存システムのCOLUMN_HEADERS形式に変換
-    const mappingConversions = {
-      question: 'OPINION', // 質問 → 回答（既存システムでは意見/回答として扱う）
-      answerer: 'NAME', // 回答者 → 名前
-      reason: 'REASON', // 理由 → 理由
-      timestamp: 'TIMESTAMP', // タイムスタンプ → タイムスタンプ
-      class: 'CLASS', // クラス → クラス
-    };
+    // COLUMN_MAPPING から動的変換マップ生成（汎用化）
+    const mappingConversions = {};
+    Object.values(COLUMN_MAPPING).forEach((column) => {
+      // 各列のシステム内部キー（大文字）を動的生成
+      mappingConversions[column.key] = column.key.toUpperCase();
+    });
 
-    // 既存のCOLUMN_HEADERSと対応する実際の列名
-    const columnHeaders = {
-      TIMESTAMP: 'タイムスタンプ',
-      EMAIL: 'メールアドレス',
-      CLASS: 'クラス',
-      OPINION: '回答',
-      REASON: '理由',
-      NAME: '名前',
-      UNDERSTAND: 'なるほど！',
-      LIKE: 'いいね！',
-      CURIOUS: 'もっと知りたい！',
-      HIGHLIGHT: 'ハイライト',
-    };
+    // COLUMN_MAPPINGから動的な列ヘッダーマップ生成（汎用化）
+    const columnHeaders = {};
+    Object.values(COLUMN_MAPPING).forEach((column) => {
+      const systemKey = column.key.toUpperCase();
+      columnHeaders[systemKey] = column.header; // 例: 'ANSWER' => '回答'
+    });
 
     // AdminPanel形式を既存システム形式に変換
     Object.keys(columnMapping).forEach((key) => {

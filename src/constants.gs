@@ -288,6 +288,49 @@ const COLUMN_HEADERS = {
   HIGHLIGHT: 'ハイライト',
 };
 
+/**
+ * 汎用列マッピング定数（システム全体統一）
+ * 管理パネル・回答ボード・バックエンドで共通使用
+ */
+const COLUMN_MAPPING = {
+  ANSWER: {
+    key: 'answer', // UI フィールド名
+    header: '回答', // スプレッドシート列名
+    element: 'answer-column-select', // HTML要素ID
+    required: true,
+  },
+  REASON: {
+    key: 'reason',
+    header: '理由',
+    element: 'reason-column-select',
+    required: true,
+  },
+  NAME: {
+    key: 'name',
+    header: '名前',
+    element: 'name-column-select',
+    required: false,
+  },
+  CLASS: {
+    key: 'class',
+    header: 'クラス',
+    element: 'class-column-select',
+    required: false,
+  },
+  TIMESTAMP: {
+    key: 'timestamp',
+    header: 'タイムスタンプ',
+    element: null,
+    required: false,
+  },
+  EMAIL: {
+    key: 'email',
+    header: 'メールアドレス',
+    element: null,
+    required: false,
+  },
+};
+
 /** @deprecated Use UNIFIED_CONSTANTS.DISPLAY.MODES instead */
 const DISPLAY_MODES = {
   ANONYMOUS: 'anonymous',
