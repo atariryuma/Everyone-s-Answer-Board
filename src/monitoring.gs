@@ -40,17 +40,17 @@ class StructuredLogger {
     // レベルに応じた出力先を選択
     switch (level) {
       case 'DEBUG':
-        Log.info(`[DEBUG] ${JSON.stringify(logEntry)}`);
+        console.log(`[DEBUG] ${JSON.stringify(logEntry)}`);
         break;
       case 'INFO':
-        Log.info(`[INFO] ${message}`, metadata);
+        console.log(`[INFO] ${message}`, metadata);
         break;
       case 'WARN':
-        Log.warn(`[WARN] ${message}`, metadata);
+        console.warn(`[WARN] ${message}`, metadata);
         break;
       case 'ERROR':
       case 'FATAL':
-        Log.error(`[${level}] ${message}`, metadata);
+        console.error(`[${level}] ${message}`, metadata);
         break;
     }
     
@@ -77,7 +77,7 @@ class StructuredLogger {
       
       props.setProperty('ERROR_LOGS', JSON.stringify(errorLogs));
     } catch (error) {
-      Log.error('ログ永続化エラー:', error.message);
+      console.error('ログ永続化エラー:', error.message);
     }
   }
   
@@ -426,5 +426,5 @@ try {
   initializeHealthChecks();
   monitoringLogger.info('監視システム初期化完了');
 } catch (error) {
-  Log.error('監視システム初期化エラー:', error.message);
+  console.error('監視システム初期化エラー:', error.message);
 }

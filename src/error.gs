@@ -54,16 +54,16 @@ class ErrorHandler {
     // ULogを使用した統一ログ出力
     switch (severity) {
       case ERROR_SEVERITY.CRITICAL:
-        Log.critical(errorInfo.message, errorInfo.metadata, category);
+        console.error(errorInfo.message, errorInfo.metadata, category);
         break;
       case ERROR_SEVERITY.HIGH:
-        Log.error(errorInfo.message, errorInfo.metadata, category);
+        console.error(errorInfo.message, errorInfo.metadata, category);
         break;
       case ERROR_SEVERITY.MEDIUM:
-        Log.warn(errorInfo.message, errorInfo.metadata, category);
+        console.warn(errorInfo.message, errorInfo.metadata, category);
         break;
       case ERROR_SEVERITY.LOW:
-        Log.info(errorInfo.message, errorInfo.metadata, category);
+        console.log(errorInfo.message, errorInfo.metadata, category);
         break;
     }
     

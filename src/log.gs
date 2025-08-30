@@ -34,17 +34,17 @@ class ULog {
     // レベル別出力（最適化済み）
     switch (level) {
       case 'DEBUG':
-        Log.info(finalMessage);
+        console.log(finalMessage);
         break;
       case 'INFO':
-        Log.info(finalMessage);
+        console.log(finalMessage);
         break;
       case 'WARN':
-        Log.warn(finalMessage);
+        console.warn(finalMessage);
         break;
       case 'ERROR':
       case 'CRITICAL':
-        Log.error(finalMessage);
+        console.error(finalMessage);
         // 重要なエラーのみLogger記録（パフォーマンス考慮）
         if (level === 'CRITICAL') {
           Logger.log(finalMessage);
@@ -139,9 +139,9 @@ class ULog {
   static setLevel(level) {
     if (ULog.LEVELS.hasOwnProperty(level)) {
       ULog.currentLevel = ULog.LEVELS[level];
-      Log.info(`${ULog.prefix} ログレベルを ${level} に設定しました`);
+      console.log(`${ULog.prefix} ログレベルを ${level} に設定しました`);
     } else {
-      Log.warn(`${ULog.prefix} 無効なログレベル: ${level}`);
+      console.warn(`${ULog.prefix} 無効なログレベル: ${level}`);
     }
   }
   
@@ -165,7 +165,7 @@ class ULog {
       startTime: startTime,
       end: () => {
         const duration = Date.now() - startTime;
-        Log.debug(`Performance: ${label}`, { duration: `${duration}ms` }, ULog.CATEGORIES.PERFORMANCE);
+        console.log(`Performance: ${label}`, { duration: `${duration}ms` });
         return duration;
       }
     };
@@ -177,7 +177,7 @@ class ULog {
   static setProductionMode() {
     ULog.setLevel('ERROR');
     ULog.setPrefix('[App]');
-    Log.info('ULog: 本番モード設定完了（ERROR以上のみ出力）');
+    console.log('ULog: 本番モード設定完了（ERROR以上のみ出力）');
   }
   
   /**
@@ -186,7 +186,7 @@ class ULog {
   static setDevelopmentMode() {
     ULog.setLevel('DEBUG');
     ULog.setPrefix('[Dev]');
-    Log.info('ULog: 開発モード設定完了（全レベル出力）');
+    console.log('ULog: 開発モード設定完了（全レベル出力）');
   }
 }
 

@@ -29,7 +29,7 @@ function processLoginFlow(userEmail) {
     if (userInfo) {
       // 2a. アクティブユーザーの場合
       if (isTrue(userInfo.isActive)) {
-        Log.info('processLoginFlow: 既存アクティブユーザー:', userEmail);
+        console.log('processLoginFlow: 既存アクティブユーザー:', userEmail);
         
         // 最終アクセス時刻を更新（設定は保護）
         updateUserLastAccess(userInfo.userId);
@@ -49,7 +49,7 @@ function processLoginFlow(userEmail) {
       } 
       // 2b. 非アクティブユーザーの場合
       else {
-        Log.warn('processLoginFlow: 既存だが非アクティブなユーザー:', userEmail);
+        console.warn('processLoginFlow: 既存だが非アクティブなユーザー:', userEmail);
         return showErrorPage(
           'アカウントが無効です', 
           'あなたのアカウントは現在無効化されています。管理者にお問い合わせください。'
@@ -58,7 +58,7 @@ function processLoginFlow(userEmail) {
     } 
     // 3. 新規ユーザーの処理
     else {
-      Log.info('processLoginFlow: 新規ユーザー登録開始:', userEmail);
+      console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
       
       // 3a. 新規ユーザーデータを準備（初期設定でpending状態）
       const initialConfig = {
@@ -82,9 +82,9 @@ function processLoginFlow(userEmail) {
       // 3b. データベースに作成
       DB.createUser(newUser);
       if (!waitForUserRecord(newUser.userId, 3000, 500)) {
-        Log.warn('processLoginFlow: user not found after create:', newUser.userId);
+        console.warn('processLoginFlow: user not found after create:', newUser.userId);
       }
-      Log.info('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
+      console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
       
       // 3c. 新規ユーザーの管理パネルへリダイレクト
       const adminUrl = buildUserAdminUrl(newUser.userId);
@@ -101,7 +101,7 @@ function processLoginFlow(userEmail) {
       stack: error.stack,
       severity: 'high' // ログインエラーは高重要度
     };
-    Log.error('🚨 processLoginFlow 重大エラー:', JSON.stringify(errorInfo, null, 2));
+    console.error('🚨 processLoginFlow 重大エラー:', JSON.stringify(errorInfo, null, 2));
     
     // ユーザーフレンドリーなエラーメッセージ
     const userMessage = error.message.includes('ユーザー') 

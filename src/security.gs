@@ -74,8 +74,8 @@ function generateNewServiceAccountToken() {
   const responseCode = response.getResponseCode();
   if (responseCode !== 200) {
     const responseText = response.getContentText();
-    Log.error('[ERROR]', 'Token request failed. Status:', responseCode);
-    Log.error('[ERROR]', 'Response:', responseText);
+    console.error('[ERROR]', 'Token request failed. Status:', responseCode);
+    console.error('[ERROR]', 'Response:', responseText);
 
     // より詳細なエラーメッセージ
     let errorMessage = 'サービスアカウントトークンの取得に失敗しました。';
@@ -94,13 +94,13 @@ function generateNewServiceAccountToken() {
 
   var responseData = JSON.parse(response.getContentText());
   if (!responseData.access_token) {
-    Log.error('[ERROR]', 'No access token in response:', responseData);
+    console.error('[ERROR]', 'No access token in response:', responseData);
     throw new Error(
       'アクセストークンが返されませんでした。サービスアカウント設定を確認してください。'
     );
   }
 
-  Log.info('Service account token generated successfully for:', clientEmail);
+  console.log('Service account token generated successfully for:', clientEmail);
   return responseData.access_token;
 }
 
@@ -109,7 +109,7 @@ function generateNewServiceAccountToken() {
  */
 function clearServiceAccountTokenCache() {
   cacheManager.remove(AUTH_CACHE_KEY);
-  Log.debug('トークンキャッシュをクリアしました');
+  console.log('トークンキャッシュをクリアしました');
 }
 
 /**
@@ -121,7 +121,7 @@ function getServiceAccountEmail() {
     const serviceAccountCreds = getSecureServiceAccountCreds();
     return serviceAccountCreds.client_email || 'メールアドレス不明';
   } catch (error) {
-    Log.warn('サービスアカウントメール取得エラー:', error.message);
+    console.warn('サービスアカウントメール取得エラー:', error.message);
     return 'メールアドレス取得エラー';
   }
 }
@@ -136,18 +136,18 @@ function verifyAdminAccess(userId) {
   try {
     // 基本的な引数チェック
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      Log.warn('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
+      console.warn('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
       return false;
     }
 
     // 現在のログインユーザーのメールアドレスを取得
     const activeUserEmail = User.email();
     if (!activeUserEmail) {
-      Log.warn('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
+      console.warn('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
       return false;
     }
 
-    Log.debug('verifyAdminAccess: 認証開始', { userId, activeUserEmail });
+    console.log('verifyAdminAccess: 認証開始', { userId, activeUserEmail });
 
     // データベースからユーザー情報を取得（統一検索関数使用）
     let userFromDb = null;
@@ -157,13 +157,13 @@ function verifyAdminAccess(userId) {
 
     // 見つからない場合は強制フレッシュで再試行
     if (!userFromDb) {
-      Log.debug('verifyAdminAccess: 強制フレッシュで再検索中...');
+      console.log('verifyAdminAccess: 強制フレッシュで再検索中...');
       userFromDb = fetchUserFromDatabase('userId', userId, { forceFresh: true });
     }
 
     // ユーザーが見つからない場合は認証失敗
     if (!userFromDb) {
-      Log.warn('verifyAdminAccess: ユーザーが見つかりません:', {
+      console.warn('verifyAdminAccess: ユーザーが見つかりません:', {
         userId,
         activeUserEmail,
       });
@@ -184,7 +184,7 @@ function verifyAdminAccess(userId) {
     // 3. アクティブ状態確認
     const isActive = Boolean(userFromDb.isActive);
 
-    Log.debug('verifyAdminAccess: 3重チェック結果:', {
+    console.log('verifyAdminAccess: 3重チェック結果:', {
       isEmailMatched,
       isUserIdMatched,
       isActive,
@@ -194,10 +194,10 @@ function verifyAdminAccess(userId) {
 
     // 3つの条件すべてが満たされた場合のみ認証成功
     if (isEmailMatched && isUserIdMatched && isActive) {
-      Log.info('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
+      console.log('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
       return true;
     } else {
-      Log.warn('❌ verifyAdminAccess: 認証失敗', {
+      console.warn('❌ verifyAdminAccess: 認証失敗', {
         userId,
         activeUserEmail,
         failures: {
@@ -209,7 +209,7 @@ function verifyAdminAccess(userId) {
       return false;
     }
   } catch (error) {
-    Log.error('[ERROR]', '❌ verifyAdminAccess: 認証処理エラー:', error.message);
+    console.error('[ERROR]', '❌ verifyAdminAccess: 認証処理エラー:', error.message);
     return false;
   }
 }
@@ -221,17 +221,17 @@ function verifyAdminAccess(userId) {
 function updateUserLastAccess(userId) {
   try {
     if (!userId) {
-      Log.warn('updateUserLastAccess: userIdが指定されていません');
+      console.warn('updateUserLastAccess: userIdが指定されていません');
       return;
     }
 
     const now = new Date().toISOString();
-    Log.debug('最終アクセス時刻を更新:', userId, now);
+    console.log('最終アクセス時刻を更新:', userId, now);
 
     // lastAccessedAtフィールドのみを更新（他の設定は保護）
     updateUser(userId, { lastAccessedAt: now });
   } catch (error) {
-    Log.error('[ERROR]', 'updateUserLastAccess エラー:', error.message);
+    console.error('[ERROR]', 'updateUserLastAccess エラー:', error.message);
   }
 }
 
@@ -261,7 +261,7 @@ function getSetupStatusFromConfig(configJsonString) {
 
     return 'pending';
   } catch (error) {
-    Log.warn('getSetupStatusFromConfig JSON解析エラー:', error.message);
+    console.warn('getSetupStatusFromConfig JSON解析エラー:', error.message);
     return 'pending'; // エラー時はセットアップ未完了とみなす
   }
 }
@@ -419,7 +419,7 @@ class MultiTenantSecurityManager {
       userAgent: Session.getActiveUser().getEmail(),
     };
 
-    Log.error('[ERROR]', `🚨 セキュリティ違反: ${violationType}`, JSON.stringify(logEntry));
+    console.error('[ERROR]', `🚨 セキュリティ違反: ${violationType}`, JSON.stringify(logEntry));
 
     // 重大な違反の場合は追加の通知を送信する可能性
     if (violationType === 'TENANT_BOUNDARY_VIOLATION') {
@@ -442,7 +442,7 @@ class MultiTenantSecurityManager {
       details: details,
     };
 
-    Log.debug(`🔒 データアクセス: ${accessType}`, JSON.stringify(logEntry));
+    console.log(`🔒 データアクセス: ${accessType}`, JSON.stringify(logEntry));
   }
 
   /**
@@ -452,7 +452,7 @@ class MultiTenantSecurityManager {
   handleCriticalSecurityViolation(logEntry) {
     // 重大な違反の場合の追加処理
     // 例：管理者への通知、一時的なアクセス制限など
-    Log.warn('🚨 重大なセキュリティ違反が発生しました', logEntry);
+    console.warn('🚨 重大なセキュリティ違反が発生しました', logEntry);
 
     // フューチャー実装: 通知システムとの連携
     // this.sendSecurityAlert(logEntry);
@@ -637,7 +637,7 @@ function performComprehensiveSecurityHealthCheck() {
   };
 
   try {
-    Log.info('🔒 統合セキュリティヘルスチェック開始');
+    console.log('🔒 統合セキュリティヘルスチェック開始');
 
     // 1. 統一秘密情報管理システム
     try {
@@ -771,15 +771,15 @@ function performComprehensiveSecurityHealthCheck() {
 
     // 結果をログ出力
     if (healthCheckResult.overallStatus === 'CRITICAL') {
-      Log.error(
+      console.error(
         '[ERROR]',
         '🚨 統合セキュリティヘルスチェック: 重要な問題が検出されました',
         healthCheckResult
       );
     } else if (healthCheckResult.overallStatus === 'WARNING') {
-      Log.warn('⚠️ 統合セキュリティヘルスチェック: 警告があります', healthCheckResult);
+      console.warn('⚠️ 統合セキュリティヘルスチェック: 警告があります', healthCheckResult);
     } else {
-      Log.info('✅ 統合セキュリティヘルスチェック: 正常', healthCheckResult);
+      console.log('✅ 統合セキュリティヘルスチェック: 正常', healthCheckResult);
     }
 
     return healthCheckResult;
@@ -788,7 +788,7 @@ function performComprehensiveSecurityHealthCheck() {
     healthCheckResult.criticalIssues.push(`ヘルスチェック実行エラー: ${error.message}`);
     healthCheckResult.executionTime = Date.now() - startTime;
 
-    Log.error('[ERROR]', '❌ 統合セキュリティヘルスチェック実行エラー:', error);
+    console.error('[ERROR]', '❌ 統合セキュリティヘルスチェック実行エラー:', error);
     return healthCheckResult;
   }
 }
@@ -946,7 +946,7 @@ function getSecurityMetrics() {
       };
     }
   } catch (error) {
-    Log.warn('セキュリティメトリクス取得エラー:', error.message);
+    console.warn('セキュリティメトリクス取得エラー:', error.message);
   }
 
   return metrics;
@@ -974,9 +974,9 @@ function scheduleSecurityHealthCheck(intervalMinutes = 60) {
       .everyMinutes(intervalMinutes)
       .create();
 
-    Log.info(`📅 定期セキュリティヘルスチェックを${intervalMinutes}分間隔で設定しました`);
+    console.log(`📅 定期セキュリティヘルスチェックを${intervalMinutes}分間隔で設定しました`);
   } catch (error) {
-    Log.error('[ERROR]', '定期セキュリティヘルスチェック設定エラー:', error.message);
+    console.error('[ERROR]', '定期セキュリティヘルスチェック設定エラー:', error.message);
   }
 }
 
@@ -990,7 +990,7 @@ function runScheduledSecurityHealthCheck() {
     // 重要な問題がある場合は管理者に通知
     if (healthResult.overallStatus === 'CRITICAL') {
       // フューチャー実装: 管理者への緊急通知
-      Log.error(
+      console.error(
         '[ERROR]',
         '🚨 緊急: セキュリティヘルスチェックで重要な問題を検出',
         healthResult
@@ -998,14 +998,14 @@ function runScheduledSecurityHealthCheck() {
     }
 
     // 結果をログに記録
-    Log.info('🔒 定期セキュリティヘルスチェック完了', {
+    console.log('🔒 定期セキュリティヘルスチェック完了', {
       status: healthResult.overallStatus,
       criticalIssues: healthResult.criticalIssues.length,
       warnings: healthResult.warnings.length,
       executionTime: healthResult.executionTime,
     });
   } catch (error) {
-    Log.error('[ERROR]', '定期セキュリティヘルスチェック実行エラー:', error.message);
+    console.error('[ERROR]', '定期セキュリティヘルスチェック実行エラー:', error.message);
   }
 }
 
@@ -1017,7 +1017,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
   try {
     const serviceAccountEmail = getServiceAccountEmail();
     if (serviceAccountEmail === 'メールアドレス取得エラー') {
-      Log.warn(
+      console.warn(
         'サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。'
       );
       return;
@@ -1029,16 +1029,16 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
 
     if (!isAlreadyEditor) {
       spreadsheet.addEditor(serviceAccountEmail);
-      Log.info(
+      console.log(
         `✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`
       );
     } else {
-      Log.debug(
+      console.log(
         `サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`
       );
     }
   } catch (error) {
-    Log.error(
+    console.error(
       '[ERROR]',
       `サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`
     );
@@ -1056,7 +1056,7 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
   try {
     const serviceAccountEmail = getServiceAccountEmail();
     if (serviceAccountEmail === 'メールアドレス取得エラー') {
-      Log.warn(
+      console.warn(
         'サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。'
       );
       return;
@@ -1068,16 +1068,16 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
 
     if (!isAlreadyEditor) {
       spreadsheet.addEditor(serviceAccountEmail);
-      Log.info(
+      console.log(
         `✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`
       );
     } else {
-      Log.debug(
+      console.log(
         `サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`
       );
     }
   } catch (error) {
-    Log.error(
+    console.error(
       '[ERROR]',
       `サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`
     );
@@ -1142,7 +1142,7 @@ function getSecureServiceAccountCreds() {
     }
     return JSON.parse(credsJson);
   } catch (e) {
-    Log.error('[ERROR]', 'getSecureServiceAccountCreds エラー: ' + e.message);
+    console.error('[ERROR]', 'getSecureServiceAccountCreds エラー: ' + e.message);
     throw new Error('サービスアカウント認証情報の取得に失敗しました。');
   }
 }
@@ -1161,7 +1161,7 @@ function getSecureDatabaseId() {
     }
     return dbId;
   } catch (e) {
-    Log.error('[ERROR]', 'getSecureDatabaseId エラー: ' + e.message);
+    console.error('[ERROR]', 'getSecureDatabaseId エラー: ' + e.message);
     throw new Error('データベーススプレッドシートIDの取得に失敗しました。');
   }
 }

@@ -18,7 +18,7 @@
  */
 function getSpreadsheetList() {
   try {
-    Log.info('getSpreadsheetList: スプレッドシート一覧取得開始');
+    console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
     
     // Google Driveからスプレッドシートを検索
     const files = DriveApp.searchFiles(
@@ -43,11 +43,11 @@ function getSpreadsheetList() {
     // 最終更新順でソート
     spreadsheets.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
     
-    Log.info(`getSpreadsheetList: ${spreadsheets.length}個のスプレッドシートを取得`);
+    console.log(`getSpreadsheetList: ${spreadsheets.length}個のスプレッドシートを取得`);
     return spreadsheets;
     
   } catch (error) {
-    Log.error('getSpreadsheetList エラー:', error);
+    console.error('getSpreadsheetList エラー:', error);
     throw new Error('スプレッドシート一覧の取得に失敗しました: ' + error.message);
   }
 }
@@ -59,7 +59,7 @@ function getSpreadsheetList() {
  */
 function getSheetList(spreadsheetId) {
   try {
-    Log.info('getSheetList: シート一覧取得開始', spreadsheetId);
+    console.log('getSheetList: シート一覧取得開始', spreadsheetId);
     
     if (!spreadsheetId) {
       throw new Error('スプレッドシートIDが指定されていません');
@@ -76,11 +76,11 @@ function getSheetList(spreadsheetId) {
       hidden: sheet.isSheetHidden()
     }));
     
-    Log.info(`getSheetList: ${sheetList.length}個のシートを取得`);
+    console.log(`getSheetList: ${sheetList.length}個のシートを取得`);
     return sheetList;
     
   } catch (error) {
-    Log.error('getSheetList エラー:', error);
+    console.error('getSheetList エラー:', error);
     throw new Error('シート一覧の取得に失敗しました: ' + error.message);
   }
 }
@@ -93,7 +93,7 @@ function getSheetList(spreadsheetId) {
  */
 function connectToDataSource(spreadsheetId, sheetName) {
   try {
-    Log.info('connectToDataSource: データソース接続開始', { spreadsheetId, sheetName });
+    console.log('connectToDataSource: データソース接続開始', { spreadsheetId, sheetName });
     
     if (!spreadsheetId || !sheetName) {
       throw new Error('スプレッドシートIDとシート名が必要です');
@@ -126,7 +126,7 @@ function connectToDataSource(spreadsheetId, sheetName) {
       });
     }
     
-    Log.info('connectToDataSource: 接続成功', columnMapping);
+    console.log('connectToDataSource: 接続成功', columnMapping);
     return {
       success: true,
       columnMapping: columnMapping,
@@ -135,7 +135,7 @@ function connectToDataSource(spreadsheetId, sheetName) {
     };
     
   } catch (error) {
-    Log.error('connectToDataSource エラー:', error);
+    console.error('connectToDataSource エラー:', error);
     return {
       success: false,
       error: error.message
@@ -200,7 +200,7 @@ function detectColumnMapping(headers) {
  */
 function getCurrentConfig() {
   try {
-    Log.info('getCurrentConfig: 設定情報取得開始');
+    console.log('getCurrentConfig: 設定情報取得開始');
     
     const currentUser = coreGetCurrentUserEmail();
     const userInfo = DB.findUserByEmail(currentUser);
@@ -233,11 +233,11 @@ function getCurrentConfig() {
       userId: userInfo.userId
     };
     
-    Log.info('getCurrentConfig: 設定情報取得完了', config);
+    console.log('getCurrentConfig: 設定情報取得完了', config);
     return config;
     
   } catch (error) {
-    Log.error('getCurrentConfig エラー:', error);
+    console.error('getCurrentConfig エラー:', error);
     return {
       setupStatus: 'error',
       error: error.message,
@@ -267,7 +267,7 @@ function getSetupStatusFromStep(step) {
  */
 function saveDraftConfiguration(config) {
   try {
-    Log.info('saveDraftConfiguration: 下書き保存開始', config);
+    console.log('saveDraftConfiguration: 下書き保存開始', config);
     
     const currentUser = coreGetCurrentUserEmail();
     let userInfo = DB.findUserByEmail(currentUser);
@@ -300,7 +300,7 @@ function saveDraftConfiguration(config) {
     }
     
   } catch (error) {
-    Log.error('saveDraftConfiguration エラー:', error);
+    console.error('saveDraftConfiguration エラー:', error);
     return {
       success: false,
       error: error.message
@@ -315,7 +315,7 @@ function saveDraftConfiguration(config) {
  */
 function publishApplication(config) {
   try {
-    Log.info('publishApplication: アプリ公開開始', config);
+    console.log('publishApplication: アプリ公開開始', config);
     
     const currentUser = coreGetCurrentUserEmail();
     const userInfo = DB.findUserByEmail(currentUser);
@@ -352,7 +352,7 @@ function publishApplication(config) {
     }
     
   } catch (error) {
-    Log.error('publishApplication エラー:', error);
+    console.error('publishApplication エラー:', error);
     return {
       success: false,
       error: error.message
@@ -383,7 +383,7 @@ function updateUserSpreadsheetConfig(userId, config) {
         existingConfig = JSON.parse(existingConfigStr);
       }
     } catch (parseError) {
-      Log.warn('既存設定の解析エラー:', parseError);
+      console.warn('既存設定の解析エラー:', parseError);
     }
     
     // 設定をマージ
@@ -396,14 +396,14 @@ function updateUserSpreadsheetConfig(userId, config) {
     // 設定を保存
     props.setProperty(configKey, JSON.stringify(mergedConfig));
     
-    Log.info('updateUserSpreadsheetConfig: 設定更新完了', { userId, config: mergedConfig });
+    console.log('updateUserSpreadsheetConfig: 設定更新完了', { userId, config: mergedConfig });
     return {
       success: true,
       config: mergedConfig
     };
     
   } catch (error) {
-    Log.error('updateUserSpreadsheetConfig エラー:', error);
+    console.error('updateUserSpreadsheetConfig エラー:', error);
     return {
       success: false,
       error: error.message
@@ -429,7 +429,7 @@ function getUserConfigJson(userId) {
     return JSON.parse(configStr);
     
   } catch (error) {
-    Log.error('getUserConfigJson エラー:', error);
+    console.error('getUserConfigJson エラー:', error);
     return null;
   }
 }
@@ -466,7 +466,7 @@ function executeAppPublish(userId, publishConfig) {
     };
     
   } catch (error) {
-    Log.error('executeAppPublish エラー:', error);
+    console.error('executeAppPublish エラー:', error);
     return {
       success: false,
       error: error.message
@@ -497,7 +497,7 @@ function getOrCreateWebAppUrl(userId, appName) {
     return webAppUrl;
     
   } catch (error) {
-    Log.error('getOrCreateWebAppUrl エラー:', error);
+    console.error('getOrCreateWebAppUrl エラー:', error);
     // フォールバック
     return `https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec?userId=${userId}`;
   }
@@ -514,7 +514,7 @@ function doGet() {
       .setTitle('StudyQuest 管理パネル')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (error) {
-    Log.error('doGet エラー:', error);
+    console.error('doGet エラー:', error);
     return HtmlService.createHtmlOutput(`
       <h1>エラー</h1>
       <p>管理パネルの読み込みに失敗しました: ${error.message}</p>
@@ -528,12 +528,12 @@ function doGet() {
  */
 function getCurrentBoardInfoAndUrls() {
   try {
-    Log.info('getCurrentBoardInfoAndUrls: ボード情報取得開始');
+    console.log('getCurrentBoardInfoAndUrls: ボード情報取得開始');
     
     // 現在ログイン中のユーザー情報を取得
     const userInfo = unifiedUserManager.getCurrentUser();
     if (!userInfo || !userInfo.userId) {
-      Log.warn('getCurrentBoardInfoAndUrls: ユーザー情報が見つかりません');
+      console.warn('getCurrentBoardInfoAndUrls: ユーザー情報が見つかりません');
       return {
         isActive: false,
         questionText: 'アクティブなボードがありません',
@@ -541,7 +541,7 @@ function getCurrentBoardInfoAndUrls() {
       };
     }
 
-    Log.info('getCurrentBoardInfoAndUrls: ユーザー情報取得成功', {
+    console.log('getCurrentBoardInfoAndUrls: ユーザー情報取得成功', {
       userId: userInfo.userId,
       hasSpreadsheetId: !!userInfo.spreadsheetId
     });
@@ -554,11 +554,11 @@ function getCurrentBoardInfoAndUrls() {
       try {
         boardData = getSheetData(userInfo.userId);
         questionText = boardData?.header || '問題文が設定されていません';
-        Log.info('getCurrentBoardInfoAndUrls: ボードデータ取得成功', {
+        console.log('getCurrentBoardInfoAndUrls: ボードデータ取得成功', {
           hasHeader: !!boardData?.header
         });
       } catch (error) {
-        Log.warn('getCurrentBoardInfoAndUrls: ボードデータ取得エラー:', error.message);
+        console.warn('getCurrentBoardInfoAndUrls: ボードデータ取得エラー:', error.message);
         questionText = '問題文の読み込みに失敗しました';
       }
     } else {
@@ -568,7 +568,7 @@ function getCurrentBoardInfoAndUrls() {
     // URL生成
     const baseUrl = getWebAppUrlCached();
     if (!baseUrl) {
-      Log.error('getCurrentBoardInfoAndUrls: WebAppURL取得失敗');
+      console.error('getCurrentBoardInfoAndUrls: WebAppURL取得失敗');
       return {
         isActive: false,
         questionText: questionText,
@@ -591,7 +591,7 @@ function getCurrentBoardInfoAndUrls() {
       ownerEmail: userInfo.adminEmail
     };
 
-    Log.info('getCurrentBoardInfoAndUrls: 成功', {
+    console.log('getCurrentBoardInfoAndUrls: 成功', {
       isActive: result.isActive,
       hasQuestionText: !!result.questionText,
       viewUrl: result.urls.view
@@ -600,7 +600,7 @@ function getCurrentBoardInfoAndUrls() {
     return result;
 
   } catch (error) {
-    Log.error('getCurrentBoardInfoAndUrls エラー:', error);
+    console.error('getCurrentBoardInfoAndUrls エラー:', error);
     return {
       isActive: false,
       questionText: 'エラーが発生しました',
@@ -615,18 +615,18 @@ function getCurrentBoardInfoAndUrls() {
  */
 function checkIsSystemAdmin() {
   try {
-    Log.info('checkIsSystemAdmin: システム管理者チェック開始');
+    console.log('checkIsSystemAdmin: システム管理者チェック開始');
     
     // 既存のisDeployUser関数を利用
     const isAdmin = Deploy.isUser();
     
-    Log.info('checkIsSystemAdmin: 結果', isAdmin);
+    console.log('checkIsSystemAdmin: 結果', isAdmin);
     return isAdmin;
     
   } catch (error) {
-    Log.error('checkIsSystemAdmin エラー:', error);
+    console.error('checkIsSystemAdmin エラー:', error);
     return false;
   }
 }
 
-Log.info('AdminPanel.gs 読み込み完了');
+console.log('AdminPanel.gs 読み込み完了');

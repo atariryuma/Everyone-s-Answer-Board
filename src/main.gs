@@ -14,7 +14,7 @@ function include(path) {
     tmpl.include = include;
     return tmpl.evaluate().getContent();
   } catch (error) {
-    Log.error(`ファイル読み込み失敗: ${path}`, { error: error.message }, ULog.CATEGORIES.SYSTEM);
+    console.error(`ファイル読み込み失敗: ${path}`, { error: error.message }, ULog.CATEGORIES.SYSTEM);
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
 }
@@ -34,12 +34,12 @@ const User = {
     try {
       const userEmail = Session.getActiveUser().getEmail();
       if (!userEmail) {
-        Log.warn('ユーザーメールアドレス取得失敗');
+        console.warn('ユーザーメールアドレス取得失敗');
         return '';
       }
       return userEmail;
     } catch (error) {
-      Log.error('getCurrentUserEmail エラー', { error: error.message });
+      console.error('getCurrentUserEmail エラー', { error: error.message });
       return '';
     }
   },
@@ -52,20 +52,20 @@ const User = {
     try {
       const userEmail = User.email();
       if (!userEmail) {
-        Log.warn('ユーザー情報取得: メールアドレス不明');
+        console.warn('ユーザー情報取得: メールアドレス不明');
         return null;
       }
       
       // メールアドレスでユーザー情報を検索
       const userInfo = DB.findUserByEmail(userEmail);
       if (!userInfo) {
-        Log.warn('ユーザー情報が見つかりません', { userEmail });
+        console.warn('ユーザー情報が見つかりません', { userEmail });
         return null;
       }
       
       return userInfo;
     } catch (error) {
-      Log.error('getCurrentUserInfo エラー', { error: error.message });
+      console.error('getCurrentUserInfo エラー', { error: error.message });
       return null;
     }
   }
@@ -87,7 +87,7 @@ const Access = {
       // 基本的には全ユーザーアクセス許可（必要に応じて制限を追加）
       return { hasAccess: true, message: 'アクセス許可' };
     } catch (error) {
-      Log.error('アプリケーションアクセスチェック失敗', { error: error.message });
+      console.error('アプリケーションアクセスチェック失敗', { error: error.message });
       return { hasAccess: true, message: 'アクセス許可（エラー回避）' };
     }
   }
@@ -123,7 +123,7 @@ const Deploy = {
       // deployDomainが空の場合、特定のドメインが強制されていないため、一致とみなす（グローバルアクセス）
       var isDomainMatch = (currentDomain === deployDomain) || (deployDomain === '');
 
-      Log.debug('Domain info:', {
+      console.log('Domain info:', {
         currentDomain: currentDomain,
         deployDomain: deployDomain,
         isDomainMatch: isDomainMatch,
@@ -137,7 +137,7 @@ const Deploy = {
         webAppUrl: webAppUrl
       };
     } catch (e) {
-      Log.error('デプロイユーザードメイン情報取得失敗', { error: e.message });
+      console.error('デプロイユーザードメイン情報取得失敗', { error: e.message });
       return {
         currentDomain: '不明',
         deployDomain: '不明',
@@ -159,7 +159,7 @@ const Deploy = {
 
       return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
     } catch (e) {
-      Log.error('Deploy.isUser エラー', { error: e.message });
+      console.error('Deploy.isUser エラー', { error: e.message });
       return false;
     }
   }
@@ -250,7 +250,7 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
   } catch (e) {
-    Log.warn('XFrameOptionsMode設定失敗', { error: e.message }, ULog.CATEGORIES.SECURITY);
+    console.warn('XFrameOptionsMode設定失敗', { error: e.message }, ULog.CATEGORIES.SECURITY);
   }
   return htmlOutput;
 }
@@ -289,13 +289,13 @@ function log(level, message, details) {
 
     switch (level) {
       case 'error':
-        Log.error(message, details || '');
+        console.error(message, details || '');
         break;
       case 'warn':
-        Log.warn(message, details || '');
+        console.warn(message, details || '');
         break;
       default:
-        Log.info(message, details || '');
+        console.log(message, details || '');
     }
     
     if (typeof globalProfiler !== 'undefined') {
@@ -338,18 +338,18 @@ function isSystemSetup() {
  */
 function getGoogleClientId() {
   try {
-    Log.debug('GOOGLE_CLIENT_ID取得開始');
+    console.log('GOOGLE_CLIENT_ID取得開始');
     var properties = PropertiesService.getScriptProperties();
     var clientId = properties.getProperty('GOOGLE_CLIENT_ID');
     
-    Log.debug('GOOGLE_CLIENT_ID結果', { found: !!clientId });
+    console.log('GOOGLE_CLIENT_ID結果', { found: !!clientId });
     
     if (!clientId) {
-      Log.warn('GOOGLE_CLIENT_IDが見つかりません', {}, ULog.CATEGORIES.SYSTEM);
+      console.warn('GOOGLE_CLIENT_IDが見つかりません', {}, ULog.CATEGORIES.SYSTEM);
       
       // Try to get all properties to see what's available
       var allProperties = properties.getProperties();
-      Log.info('Available properties:', Object.keys(allProperties));
+      console.log('Available properties:', Object.keys(allProperties));
       
       return { 
         clientId: '', 
@@ -360,7 +360,7 @@ function getGoogleClientId() {
     
     return { status: 'success', message: 'Google Client IDを取得しました', data: { clientId: clientId } };
   } catch (error) {
-    Log.error('GOOGLE_CLIENT_ID取得エラー', { error: error.message }, ULog.CATEGORIES.SYSTEM);
+    console.error('GOOGLE_CLIENT_ID取得エラー', { error: error.message }, ULog.CATEGORIES.SYSTEM);
     return { status: 'error', message: 'Google Client IDの取得に失敗しました: ' + error.toString(), data: { clientId: '' } };
   }
 }
@@ -405,7 +405,7 @@ function checkSystemConfiguration() {
       setupComplete: isSystemSetup()
     };
   } catch (error) {
-    Log.error('Error checking system configuration:', error);
+    console.error('Error checking system configuration:', error);
     return {
       isFullyConfigured: false,
       error: error.toString()
@@ -438,7 +438,7 @@ function getSystemDomainInfo() {
       deployDomain: domainInfo.deployDomain || adminDomain
     };
   } catch (e) {
-    Log.error('getSystemDomainInfo エラー:', e.message);
+    console.error('getSystemDomainInfo エラー:', e.message);
     return { error: e.message };
   }
 }
@@ -461,7 +461,7 @@ function doGet(e) {
     // 2. アプリケーション有効/無効チェック（システム管理者は除外）
     const accessCheck = Access.check();
     if (!accessCheck.hasAccess) {
-      Log.info('アプリケーションアクセス拒否:', accessCheck.accessReason);
+      console.log('アプリケーションアクセス拒否:', accessCheck.accessReason);
       return showAccessRestrictedPage(accessCheck);
     }
 
@@ -482,7 +482,7 @@ function doGet(e) {
   // 6. パラメータ検証とデフォルト処理
     if (!params || !params.mode) {
       // パラメータなしの場合、前回の管理パネル状態を確認
-      Log.info('No mode parameter, checking previous admin session');
+      console.log('No mode parameter, checking previous admin session');
       
       var activeUserEmail = Session.getActiveUser().getEmail();
       if (activeUserEmail) {
@@ -490,7 +490,7 @@ function doGet(e) {
         var lastAdminUserId = userProperties.getProperty('lastAdminUserId');
         
         if (lastAdminUserId) {
-          Log.info('Found previous admin session, redirecting to admin panel:', lastAdminUserId);
+          console.log('Found previous admin session, redirecting to admin panel:', lastAdminUserId);
           // 前回の管理パネルセッションが存在する場合、そこにリダイレクト
           if (verifyAdminAccess(lastAdminUserId)) {
             const userInfo = DB.findUserById(lastAdminUserId);
@@ -503,36 +503,36 @@ function doGet(e) {
       }
       
       // 前回のセッションがない場合はログインページを表示
-      Log.info('No previous admin session, showing login page');
+      console.log('No previous admin session, showing login page');
       return showLoginPage();
     }
 
     // mode=login の場合
     if (params.mode === 'login') {
-      Log.info('Login mode requested, showing login page');
+      console.log('Login mode requested, showing login page');
       return showLoginPage();
     }
 
     // mode=appSetup の場合
     if (params.mode === 'appSetup') {
-      Log.info('AppSetup mode requested');
+      console.log('AppSetup mode requested');
       
       // 管理パネルへのアクセス権限確認（前回のセッションから）
       var userProperties = PropertiesService.getUserProperties();
       var lastAdminUserId = userProperties.getProperty('lastAdminUserId');
       
       if (!lastAdminUserId) {
-        Log.info('No admin session found, redirecting to login');
+        console.log('No admin session found, redirecting to login');
         return showErrorPage('認証が必要です', 'アプリ設定にアクセスするにはログインが必要です。');
       }
       
       // 管理者権限の確認
       if (!verifyAdminAccess(lastAdminUserId)) {
-        Log.info('Admin access denied for userId:', lastAdminUserId);
+        console.log('Admin access denied for userId:', lastAdminUserId);
         return showErrorPage('アクセス拒否', 'アプリ設定にアクセスする権限がありません。');
       }
       
-      Log.info('Showing app setup page for userId:', lastAdminUserId);
+      console.log('Showing app setup page for userId:', lastAdminUserId);
       return showAppSetupPage(lastAdminUserId);
     }
 
@@ -549,7 +549,7 @@ function doGet(e) {
       // 管理パネルアクセス時に状態を保存
       var userProperties = PropertiesService.getUserProperties();
       userProperties.setProperty('lastAdminUserId', params.userId);
-      Log.info('Saved admin session state:', params.userId);
+      console.log('Saved admin session state:', params.userId);
       
       const userInfo = DB.findUserById(params.userId);
       return renderAdminPanel(userInfo, 'admin');
@@ -576,7 +576,7 @@ function doGet(e) {
       try {
         config = JSON.parse(userInfo.configJson || '{}');
       } catch (e) {
-        Log.warn('Config JSON parse error during publication check:', e.message);
+        console.warn('Config JSON parse error during publication check:', e.message);
       }
       
       // 非公開の場合は確実にUnpublishedページに誘導
@@ -588,7 +588,7 @@ function doGet(e) {
         config.publishedSheetName.trim() !== ''
       );
       
-      Log.info('🔍 Publication status check:', {
+      console.log('🔍 Publication status check:', {
         appPublished: config.appPublished,
         hasSpreadsheetId: !!config.publishedSpreadsheetId,
         hasSheetName: !!config.publishedSheetName,
@@ -599,22 +599,22 @@ function doGet(e) {
     }
     
     // 不明なモードの場合の処理
-    Log.info('Unknown mode received:', params.mode);
-    Log.info('Available modes: login, appSetup, admin, view');
+    console.log('Unknown mode received:', params.mode);
+    console.log('Available modes: login, appSetup, admin, view');
     
     // 不明なモードでもuserId付きの場合は適切にリダイレクト
     if (params.userId && verifyAdminAccess(params.userId)) {
-      Log.info('Redirecting unknown mode to admin panel for valid user:', params.userId);
+      console.log('Redirecting unknown mode to admin panel for valid user:', params.userId);
       const userInfo = DB.findUserById(params.userId);
       return renderAdminPanel(userInfo, 'admin');
     }
     
     // その他の場合はログインページへ
-    Log.info('Redirecting unknown mode to login page');
+    console.log('Redirecting unknown mode to login page');
     return showLoginPage();
 
   } catch (error) {
-    Log.error(`doGetで致命的なエラー: ${error.stack}`);
+    console.error(`doGetで致命的なエラー: ${error.stack}`);
     return showErrorPage('致命的なエラー', 'アプリケーションの処理中に予期せぬエラーが発生しました。', error);
   }
 }
@@ -632,7 +632,7 @@ function handleAdminRoute(userInfo, params, userEmail) {
 
   // セキュリティチェック: アクセスしようとしているuserIdが自分のものでなければ、自分の管理画面にリダイレクト
   if (params.userId && params.userId !== userInfo.userId) {
-    Log.warn(`不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`);
+    console.warn(`不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`);
     const correctUrl = buildUserAdminUrl(userInfo.userId);
     return redirectToUrl(correctUrl);
   }
@@ -641,11 +641,11 @@ function handleAdminRoute(userInfo, params, userEmail) {
   if (params.userId) {
     const isVerified = verifyAdminAccess(params.userId);
     if (!isVerified) {
-      Log.warn(`セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`);
+      console.warn(`セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`);
       const correctUrl = buildUserAdminUrl(userInfo.userId);
       return redirectToUrl(correctUrl);
     }
-    Log.info(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
+    console.log(`✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`);
   }
 
   return renderAdminPanel(userInfo, params.mode);
@@ -669,7 +669,7 @@ function showLoginPage() {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
   } catch (e) {
-    Log.warn('XFrameOptionsMode設定エラー:', e.message);
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
   
   return htmlOutput;
@@ -690,7 +690,7 @@ function showSetupPage() {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
   } catch (e) {
-    Log.warn('XFrameOptionsMode設定エラー:', e.message);
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
   
   return htmlOutput;
@@ -703,18 +703,18 @@ function showSetupPage() {
 function showAppSetupPage(userId) {
     // システム管理者権限チェック
     try {
-      Log.info('showAppSetupPage: Checking deploy user permissions...');
+      console.log('showAppSetupPage: Checking deploy user permissions...');
       const currentUserEmail = Session.getActiveUser().getEmail();
-      Log.info('showAppSetupPage: Current user email:', currentUserEmail);
+      console.log('showAppSetupPage: Current user email:', currentUserEmail);
       const deployUserCheckResult = Deploy.isUser();
-      Log.info('showAppSetupPage: Deploy.isUser() result:', deployUserCheckResult);
+      console.log('showAppSetupPage: Deploy.isUser() result:', deployUserCheckResult);
 
       if (!deployUserCheckResult) {
-        Log.warn('Unauthorized access attempt to app setup page:', currentUserEmail);
+        console.warn('Unauthorized access attempt to app setup page:', currentUserEmail);
         return showErrorPage('アクセス権限がありません', 'この機能にアクセスする権限がありません。システム管理者にお問い合わせください。');
       }
     } catch (error) {
-      Log.error('Error checking deploy user permissions:', error);
+      console.error('Error checking deploy user permissions:', error);
       return showErrorPage('認証エラー', '権限確認中にエラーが発生しました。');
     }
     
@@ -729,7 +729,7 @@ function showAppSetupPage(userId) {
         htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
       }
     } catch (e) {
-      Log.warn('XFrameOptionsMode設定エラー:', e.message);
+      console.warn('XFrameOptionsMode設定エラー:', e.message);
     }
     
     return htmlOutput;
@@ -747,14 +747,14 @@ function getLastAdminUserId() {
     
     // ユーザーIDが存在し、かつ有効な管理者権限を持つかチェック
     if (lastAdminUserId && verifyAdminAccess(lastAdminUserId)) {
-      Log.info('Found valid admin user ID:', lastAdminUserId);
+      console.log('Found valid admin user ID:', lastAdminUserId);
       return lastAdminUserId;
     } else {
-      Log.info('No valid admin user ID found');
+      console.log('No valid admin user ID found');
       return null;
     }
   } catch (error) {
-    Log.error('Error getting last admin user ID:', error.message);
+    console.error('Error getting last admin user ID:', error.message);
     return null;
   }
 }
@@ -766,14 +766,14 @@ function getLastAdminUserId() {
 function getAppSetupUrl() {
   try {
     // システム管理者権限チェック
-    Log.info('getAppSetupUrl: Checking deploy user permissions...');
+    console.log('getAppSetupUrl: Checking deploy user permissions...');
     const currentUserEmail = Session.getActiveUser().getEmail();
-    Log.info('getAppSetupUrl: Current user email:', currentUserEmail);
+    console.log('getAppSetupUrl: Current user email:', currentUserEmail);
     const deployUserCheckResult = Deploy.isUser();
-    Log.info('getAppSetupUrl: Deploy.isUser() result:', deployUserCheckResult);
+    console.log('getAppSetupUrl: Deploy.isUser() result:', deployUserCheckResult);
 
     if (!deployUserCheckResult) {
-      Log.warn('Unauthorized access attempt to get app setup URL:', currentUserEmail);
+      console.warn('Unauthorized access attempt to get app setup URL:', currentUserEmail);
       throw new Error('アクセス権限がありません');
     }
 
@@ -785,11 +785,11 @@ function getAppSetupUrl() {
 
     // アプリ設定ページのURLを生成
     const appSetupUrl = baseUrl + '?mode=appSetup';
-    Log.info('getAppSetupUrl: Generated URL:', appSetupUrl);
+    console.log('getAppSetupUrl: Generated URL:', appSetupUrl);
     
     return appSetupUrl;
   } catch (error) {
-    Log.error('Error getting app setup URL:', error);
+    console.error('Error getting app setup URL:', error);
     throw new Error('アプリ設定URLの取得に失敗しました: ' + error.message);
   }
 }
@@ -820,7 +820,7 @@ function showErrorPage(title, message, error) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
   } catch (e) {
-    Log.warn('XFrameOptionsMode設定エラー:', e.message);
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
   
   return htmlOutput;
@@ -849,12 +849,12 @@ function showAccessRestrictedPage(accessCheck) {
         htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
       }
     } catch (e) {
-      Log.warn('XFrameOptionsMode設定エラー:', e.message);
+      console.warn('XFrameOptionsMode設定エラー:', e.message);
     }
     
     return htmlOutput;
   } catch (error) {
-    Log.error('Error in showAccessRestrictedPage:', error);
+    console.error('Error in showAccessRestrictedPage:', error);
     // フォールバック: シンプルなHTMLを返す
     return HtmlService.createHtmlOutput(`
       <html>
@@ -964,8 +964,8 @@ function createSecureRedirect(targetUrl, message) {
   // URL検証とサニタイゼーション
   const sanitizedUrl = sanitizeRedirectUrl(targetUrl);
   
-  Log.info('createSecureRedirect - Original URL:', targetUrl);
-  Log.info('createSecureRedirect - Sanitized URL:', sanitizedUrl);
+  console.log('createSecureRedirect - Original URL:', targetUrl);
+  console.log('createSecureRedirect - Sanitized URL:', sanitizedUrl);
   
   // ユーザーアクティベーション必須のHTMLアンカー方式（サンドボックス制限準拠）
   const userActionRedirectHtml = `
@@ -1078,7 +1078,7 @@ function createSecureRedirect(targetUrl, message) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
   } catch (e) {
-    Log.warn('XFrameOptionsMode設定エラー:', e.message);
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
   
   return htmlOutput;
@@ -1114,20 +1114,20 @@ function sanitizeRedirectUrl(url) {
       // URL内に埋め込まれた別のURLを検出
       const embeddedUrlMatch = cleanUrl.match(/https?:\/\/[^\s<>"']+/);
       if (embeddedUrlMatch && embeddedUrlMatch[0] !== cleanUrl) {
-        Log.info('Extracting embedded URL:', embeddedUrlMatch[0]);
+        console.log('Extracting embedded URL:', embeddedUrlMatch[0]);
         cleanUrl = embeddedUrlMatch[0];
       }
     }
     
     // 基本的なURL形式チェック
     if (!cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
-      Log.warn('Invalid URL format after sanitization:', cleanUrl);
+      console.warn('Invalid URL format after sanitization:', cleanUrl);
       return getWebAppUrlCached();
     }
     
     // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
     if (cleanUrl.includes('userCodeAppPanel')) {
-      Log.warn('Development URL detected in redirect, using fallback:', cleanUrl);
+      console.warn('Development URL detected in redirect, using fallback:', cleanUrl);
       return getWebAppUrlCached();
     }
     
@@ -1137,13 +1137,13 @@ function sanitizeRedirectUrl(url) {
                      cleanUrl.includes('localhost');
     
     if (!isValidUrl) {
-      Log.warn('Suspicious URL detected:', cleanUrl);
+      console.warn('Suspicious URL detected:', cleanUrl);
       return getWebAppUrlCached();
     }
     
     return cleanUrl;
   } catch (e) {
-    Log.error('URL sanitization error:', e.message);
+    console.error('URL sanitization error:', e.message);
     return getWebAppUrlCached();
   }
 }
@@ -1158,7 +1158,7 @@ function sanitizeRedirectUrl(url) {
 function parseRequestParams(e) {
   // 引数の安全性チェック
   if (!e || typeof e !== 'object') {
-    Log.info('parseRequestParams: 無効なeventオブジェクト');
+    console.log('parseRequestParams: 無効なeventオブジェクト');
     return { mode: null, userId: null, setupParam: null, spreadsheetId: null, sheetName: null, isDirectPageAccess: false };
   }
 
@@ -1171,8 +1171,8 @@ function parseRequestParams(e) {
   const isDirectPageAccess = !!(userId && mode === 'view');
   
   // デバッグログを追加
-  Log.info('parseRequestParams - Received parameters:', JSON.stringify(p));
-  Log.info('parseRequestParams - Parsed mode:', mode, 'setupParam:', setupParam);
+  console.log('parseRequestParams - Received parameters:', JSON.stringify(p));
+  console.log('parseRequestParams - Parsed mode:', mode, 'setupParam:', setupParam);
   
   return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
@@ -1190,7 +1190,7 @@ function parseRequestParams(e) {
 function renderAdminPanel(userInfo, mode) {
   // ガード節: userInfoが存在しない場合はエラーページを表示して処理を中断
   if (!userInfo) {
-    Log.error('renderAdminPanelにuserInfoがnullで渡されました。これは予期せぬ状態です。');
+    console.error('renderAdminPanelにuserInfoがnullで渡されました。これは予期せぬ状態です。');
     return showErrorPage('エラー', 'ユーザー情報の読み込みに失敗したため、管理パネルを表示できません。');
   }
 
@@ -1202,8 +1202,8 @@ function renderAdminPanel(userInfo, mode) {
   adminTemplate.displayMode = 'named';
   adminTemplate.showAdminFeatures = true;
   const deployUserResult = Deploy.isUser();
-  Log.info('renderAdminPanel - Deploy.isUser() result:', deployUserResult);
-  Log.info('renderAdminPanel - current user email:', Session.getActiveUser().getEmail());
+  console.log('renderAdminPanel - Deploy.isUser() result:', deployUserResult);
+  console.log('renderAdminPanel - current user email:', Session.getActiveUser().getEmail());
   adminTemplate.isDeployUser = deployUserResult;
   adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
   
@@ -1218,7 +1218,7 @@ function renderAdminPanel(userInfo, mode) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
   } catch (e) {
-    Log.warn('XFrameOptionsMode設定エラー:', e.message);
+    console.warn('XFrameOptionsMode設定エラー:', e.message);
   }
   
   return htmlOutput;
@@ -1235,7 +1235,7 @@ function renderAnswerBoard(userInfo, params) {
   try {
     config = JSON.parse(userInfo.configJson || '{}');
   } catch (e) {
-    Log.warn('Invalid configJson:', e.message);
+    console.warn('Invalid configJson:', e.message);
   }
   // publishedSheetNameの型安全性確保（'true'問題の修正）
   let safePublishedSheetName = '';
@@ -1243,8 +1243,8 @@ function renderAnswerBoard(userInfo, params) {
     if (typeof config.publishedSheetName === 'string') {
       safePublishedSheetName = config.publishedSheetName;
     } else {
-      Log.error('❌ main.gs: publishedSheetNameが不正な型です:', typeof config.publishedSheetName, config.publishedSheetName);
-      Log.warn('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
+      console.error('❌ main.gs: publishedSheetNameが不正な型です:', typeof config.publishedSheetName, config.publishedSheetName);
+      console.warn('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
       safePublishedSheetName = '';
     }
   }
@@ -1265,7 +1265,7 @@ function renderAnswerBoard(userInfo, params) {
   // 非公開の場合は、ダイレクトアクセスでもUnpublishedページに誘導
   const showBoard = isCurrentlyPublished && (params.isDirectPageAccess || true);
   
-  Log.info('🔍 renderAnswerBoard decision:', {
+  console.log('🔍 renderAnswerBoard decision:', {
     isCurrentlyPublished: isCurrentlyPublished,
     isDirectPageAccess: params.isDirectPageAccess,
     showBoard: showBoard,
@@ -1280,7 +1280,7 @@ function renderAnswerBoard(userInfo, params) {
   if (showBoard) {
     try {
       if (userInfo.spreadsheetId) {
-        try { addServiceAccountToSpreadsheet(userInfo.spreadsheetId); } catch (err) { Log.warn('アクセス権設定警告:', err.message); }
+        try { addServiceAccountToSpreadsheet(userInfo.spreadsheetId); } catch (err) { console.warn('アクセス権設定警告:', err.message); }
       }
       template.userId = userInfo.userId;
       template.spreadsheetId = userInfo.spreadsheetId;
@@ -1336,7 +1336,7 @@ function renderAnswerBoard(userInfo, params) {
       template.adminPanelUrl = appUrls.adminUrl;
       template.boardUrl = appUrls.viewUrl;
     } catch (e) {
-      Log.error('Unpublished template setup error:', e);
+      console.error('Unpublished template setup error:', e);
       template.ownerName = 'システム管理者';
       template.isOwner = true;
       template.adminEmail = userInfo.adminEmail || 'admin@example.com';
@@ -1354,7 +1354,7 @@ function renderAnswerBoard(userInfo, params) {
     try {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     } catch (e) {
-      Log.warn('X-Frame-Options設定に失敗:', e.message);
+      console.warn('X-Frame-Options設定に失敗:', e.message);
     }
     
     return htmlOutput;
@@ -1369,10 +1369,10 @@ function renderAnswerBoard(userInfo, params) {
  */
 function checkCurrentPublicationStatus(userId) {
   try {
-    Log.info('🔍 checkCurrentPublicationStatus called for userId:', userId);
+    console.log('🔍 checkCurrentPublicationStatus called for userId:', userId);
     
     if (!userId) {
-      Log.warn('userId is required for publication status check');
+      console.warn('userId is required for publication status check');
       return { error: 'userId is required', isPublished: false };
     }
     
@@ -1383,7 +1383,7 @@ function checkCurrentPublicationStatus(userId) {
     });
     
     if (!userInfo) {
-      Log.warn('User not found for publication status check:', userId);
+      console.warn('User not found for publication status check:', userId);
       return { error: 'User not found', isPublished: false };
     }
     
@@ -1392,7 +1392,7 @@ function checkCurrentPublicationStatus(userId) {
     try {
       config = JSON.parse(userInfo.configJson || '{}');
     } catch (e) {
-      Log.warn('Config JSON parse error during publication status check:', e.message);
+      console.warn('Config JSON parse error during publication status check:', e.message);
       return { error: 'Config parse error', isPublished: false };
     }
     
@@ -1405,7 +1405,7 @@ function checkCurrentPublicationStatus(userId) {
       config.publishedSheetName.trim() !== ''
     );
     
-    Log.info('📊 Publication status check result:', {
+    console.log('📊 Publication status check result:', {
       userId: userId,
       appPublished: config.appPublished,
       hasSpreadsheetId: !!config.publishedSpreadsheetId,
@@ -1422,7 +1422,7 @@ function checkCurrentPublicationStatus(userId) {
     };
     
   } catch (error) {
-    Log.error('❌ Error in checkCurrentPublicationStatus:', error);
+    console.error('❌ Error in checkCurrentPublicationStatus:', error);
     return { 
       error: error.message, 
       isPublished: false,
@@ -1454,16 +1454,16 @@ function checkCurrentPublicationStatus(userId) {
  */
 function checkIsSystemAdmin() {
   try {
-    Log.info('checkIsSystemAdmin: システム管理者チェック開始');
+    console.log('checkIsSystemAdmin: システム管理者チェック開始');
     
     // 既存のisDeployUser関数を利用
     const isAdmin = Deploy.isUser();
     
-    Log.info('checkIsSystemAdmin: 結果', isAdmin);
+    console.log('checkIsSystemAdmin: 結果', isAdmin);
     return isAdmin;
     
   } catch (error) {
-    Log.error('checkIsSystemAdmin エラー:', error);
+    console.error('checkIsSystemAdmin エラー:', error);
     return false;
   }
 }
@@ -1478,17 +1478,17 @@ function checkIsSystemAdmin() {
  */
 function getSpreadsheetList() {
   try {
-    Log.info('getSpreadsheetList: スプレッドシート一覧取得開始');
+    console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
     
     // 現在のユーザーのスプレッドシート情報を返す
     const userInfo = User.info();
     if (!userInfo) {
-      Log.warn('getSpreadsheetList: ユーザー情報が取得できませんでした');
+      console.warn('getSpreadsheetList: ユーザー情報が取得できませんでした');
       return [];
     }
     
     if (userInfo.spreadsheetId) {
-      Log.info('getSpreadsheetList: ユーザーのメインスプレッドシートを返します');
+      console.log('getSpreadsheetList: ユーザーのメインスプレッドシートを返します');
       return [{
         id: userInfo.spreadsheetId,
         name: userInfo.spreadsheetUrl ? 'メインスプレッドシート' : 'ユーザースプレッドシート',
@@ -1497,10 +1497,10 @@ function getSpreadsheetList() {
       }];
     }
     
-    Log.warn('getSpreadsheetList: ユーザーにスプレッドシートが設定されていません');
+    console.warn('getSpreadsheetList: ユーザーにスプレッドシートが設定されていません');
     return [];
   } catch (error) {
-    Log.error('getSpreadsheetList エラー:', error.message || error);
+    console.error('getSpreadsheetList エラー:', error.message || error);
     throw new Error(`スプレッドシート一覧の取得に失敗しました: ${error.message || error}`);
   }
 }
@@ -1520,7 +1520,7 @@ function getSheetList(spreadsheetId) {
       id: sheet.getSheetId()
     }));
   } catch (error) {
-    Log.error('getSheetList エラー:', error);
+    console.error('getSheetList エラー:', error);
     return [];
   }
 }
@@ -1540,7 +1540,7 @@ function getCurrentConfig() {
       setupComplete: !!userInfo?.spreadsheetId
     };
   } catch (error) {
-    Log.error('getCurrentConfig エラー:', error);
+    console.error('getCurrentConfig エラー:', error);
     return {};
   }
 }
@@ -1569,7 +1569,7 @@ function connectToDataSource(spreadsheetId, sheetName) {
  * @returns {Object} 保存結果
  */
 function saveDraftConfiguration(config) {
-  Log.info('設定を保存:', config);
+  console.log('設定を保存:', config);
   return {
     success: true,
     message: '保存しました',
@@ -1583,7 +1583,7 @@ function saveDraftConfiguration(config) {
  * @returns {Object} 公開結果
  */
 function publishApplication(config) {
-  Log.info('アプリを公開:', config);
+  console.log('アプリを公開:', config);
   return {
     success: true,
     message: '公開しました',

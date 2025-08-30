@@ -203,33 +203,33 @@ class UUtilities {
     error: (context, message, details = null) => {
       const logMessage = `[ERROR] ${context}: ${message}`;
       if (details) {
-        Log.error(logMessage, details);
+        console.error(logMessage, details);
       } else {
-        Log.error(logMessage);
+        console.error(logMessage);
       }
     },
     warn: (context, message, details = null) => {
       const logMessage = `[WARN] ${context}: ${message}`;
       if (details) {
-        Log.warn(logMessage, details);
+        console.warn(logMessage, details);
       } else {
-        Log.warn(logMessage);
+        console.warn(logMessage);
       }
     },
     info: (context, message, details = null) => {
       const logMessage = `[INFO] ${context}: ${message}`;
       if (details) {
-        Log.info(logMessage, details);
+        console.log(logMessage, details);
       } else {
-        Log.info(logMessage);
+        console.log(logMessage);
       }
     },
     debug: (context, message, details = null) => {
       const logMessage = `[DEBUG] ${context}: ${message}`;
       if (details) {
-        Log.info(logMessage, details);
+        console.log(logMessage, details);
       } else {
-        Log.info(logMessage);
+        console.log(logMessage);
       }
     }
     };

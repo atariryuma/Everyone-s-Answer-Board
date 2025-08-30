@@ -4,7 +4,7 @@ function getConfig(sheetName) {
     
     // Configシートが存在しない場合は作成
     if (!sheet) {
-      Log.info('Config sheet not found, creating new one');
+      console.log('Config sheet not found, creating new one');
       sheet = getCurrentSpreadsheet().insertSheet('Config');
       const headers = ['表示シート名','問題文ヘッダー','回答ヘッダー','理由ヘッダー','名前列ヘッダー','クラス列ヘッダー'];
       sheet.appendRow(headers);
@@ -15,7 +15,7 @@ function getConfig(sheetName) {
     
     const values = sheet.getDataRange().getValues();
     if (values.length < 2) {
-      Log.info('Config sheet has no data, creating auto config');
+      console.log('Config sheet has no data, creating auto config');
       return createAutoConfig(sheetName);
     }
     
@@ -25,7 +25,7 @@ function getConfig(sheetName) {
     
     const target = values.find((row, rIdx) => rIdx>0 && row[idx['表示シート名']]===sheetName);
     if(!target) {
-      Log.info(`No config found for sheet ${sheetName}, creating auto config`);
+      console.log(`No config found for sheet ${sheetName}, creating auto config`);
       return createAutoConfig(sheetName);
     }
     
@@ -37,13 +37,13 @@ function getConfig(sheetName) {
       classHeader: idx['クラス列ヘッダー']!==undefined ? target[idx['クラス列ヘッダー']] || '' : ''
     };
   } catch (error) {
-    Log.error('getConfig error for sheet:', sheetName, error.message);
+    console.error('getConfig error for sheet:', sheetName, error.message);
     
     // エラーが発生した場合も自動設定を試行
     try {
       return createAutoConfig(sheetName);
     } catch (autoError) {
-      Log.error('Auto config creation failed:', autoError.message);
+      console.error('Auto config creation failed:', autoError.message);
       throw error; // 元のエラーを投げる
     }
   }
@@ -68,7 +68,7 @@ function createAutoConfig(sheetName) {
     const headerRow = targetSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
     const headers = headerRow.map(v => String(v || '').trim()).filter(h => h !== '');
     
-    Log.info('Creating auto config for headers:', headers);
+    console.log('Creating auto config for headers:', headers);
     
     // ヘッダーを推測（Code.gsの関数を使用）
     if (typeof guessHeadersFromArray === 'undefined') {
@@ -79,14 +79,14 @@ function createAutoConfig(sheetName) {
     // 設定を保存
     if (guessedConfig.answerHeader) {
       saveSheetConfig(sheetName, guessedConfig);
-      Log.info('Auto-created config saved:', guessedConfig);
+      console.log('Auto-created config saved:', guessedConfig);
       return guessedConfig;
     } else {
       throw new Error('適切なヘッダーを推測できませんでした。手動で設定してください。');
     }
     
   } catch (error) {
-    Log.error('createAutoConfig error:', error);
+    console.error('createAutoConfig error:', error);
     throw new Error(`自動設定の作成に失敗しました: ${error.message}`);
   }
 }
@@ -96,7 +96,7 @@ function saveSheetConfig(sheetName, cfg) {
     const ss = getCurrentSpreadsheet();
     let sheet = ss.getSheetByName('Config');
     if (!sheet) {
-      Log.info('Creating Config sheet for the first time');
+      console.log('Creating Config sheet for the first time');
       sheet = ss.insertSheet('Config');
     }
     
@@ -107,7 +107,7 @@ function saveSheetConfig(sheetName, cfg) {
     try {
       values = sheet.getDataRange().getValues();
     } catch (error) {
-      Log.info('Config sheet appears to be empty, creating header row');
+      console.log('Config sheet appears to be empty, creating header row');
       values = [];
     }
     
@@ -140,15 +140,15 @@ function saveSheetConfig(sheetName, cfg) {
     // Save data
     if (rowIndex === -1) {
       sheet.appendRow(row);
-      Log.info('Added new config row for sheet:', sheetName);
+      console.log('Added new config row for sheet:', sheetName);
     } else {
       sheet.getRange(rowIndex+1,1,1,row.length).setValues([row]);
-      Log.info('Updated existing config row for sheet:', sheetName);
+      console.log('Updated existing config row for sheet:', sheetName);
     }
     
     return `シート「${sheetName}」の設定を保存しました`;
   } catch (error) {
-    Log.error('Error saving sheet config:', error);
+    console.error('Error saving sheet config:', error);
     throw new Error(`設定の保存に失敗しました: ${error.message}`);
   }
 }
