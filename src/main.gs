@@ -14,7 +14,7 @@ function include(path) {
     tmpl.include = include;
     return tmpl.evaluate().getContent();
   } catch (error) {
-    console.error(`Error including file ${path}:`, error);
+    ULog.error(`ファイル読み込み失敗: ${path}`, { error: error.message }, ULog.CATEGORIES.SYSTEM);
     return `<!-- Error including ${path}: ${error.message} -->`;
   }
 }
@@ -33,7 +33,7 @@ function checkApplicationAccess() {
     // 基本的には全ユーザーアクセス許可（必要に応じて制限を追加）
     return { hasAccess: true, message: 'アクセス許可' };
   } catch (error) {
-    console.error('checkApplicationAccess エラー:', error);
+    ULog.error('アプリケーションアクセスチェック失敗', { error: error.message }, ULog.CATEGORIES.AUTH);
     return { hasAccess: true, message: 'アクセス許可（エラー回避）' };
   }
 }
@@ -46,12 +46,12 @@ function getCurrentUserEmail() {
   try {
     const userEmail = Session.getActiveUser().getEmail();
     if (!userEmail) {
-      console.warn('getCurrentUserEmail: ユーザーメールアドレスが取得できませんでした');
+      ULog.warn('ユーザーメールアドレス取得失敗', {}, ULog.CATEGORIES.AUTH);
       return '';
     }
     return userEmail;
   } catch (error) {
-    console.error('getCurrentUserEmail エラー:', error.message);
+    ULog.error('getCurrentUserEmail エラー', { error: error.message }, ULog.CATEGORIES.AUTH);
     return '';
   }
 }
@@ -64,20 +64,20 @@ function getCurrentUserInfo() {
   try {
     const userEmail = getCurrentUserEmail();
     if (!userEmail) {
-      console.warn('getCurrentUserInfo: ユーザーメールアドレスが取得できませんでした');
+      ULog.warn('ユーザー情報取得: メールアドレス不明', {}, ULog.CATEGORIES.AUTH);
       return null;
     }
     
     // メールアドレスでユーザー情報を検索
     const userInfo = findUserByEmail(userEmail);
     if (!userInfo) {
-      console.warn('getCurrentUserInfo: ユーザー情報が見つかりませんでした:', userEmail);
+      ULog.warn('ユーザー情報が見つかりません', { userEmail }, ULog.CATEGORIES.DB);
       return null;
     }
     
     return userInfo;
   } catch (error) {
-    console.error('getCurrentUserInfo エラー:', error.message);
+    ULog.error('getCurrentUserInfo エラー', { error: error.message }, ULog.CATEGORIES.AUTH);
     return null;
   }
 }
@@ -166,7 +166,7 @@ function safeSetXFrameOptionsDeny(htmlOutput) {
       htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
     }
   } catch (e) {
-    console.warn('Failed to set XFrameOptionsMode:', e.message);
+    ULog.warn('XFrameOptionsMode設定失敗', { error: e.message }, ULog.CATEGORIES.SECURITY);
   }
   return htmlOutput;
 }
@@ -205,13 +205,13 @@ function log(level, message, details) {
 
     switch (level) {
       case 'error':
-        console.error(message, details || '');
+        ULog.error(message, details || '');
         break;
       case 'warn':
-        console.warn(message, details || '');
+        ULog.warn(message, details || '');
         break;
       default:
-        console.log(message, details || '');
+        ULog.info(message, details || '');
     }
     
     if (typeof globalProfiler !== 'undefined') {
@@ -265,7 +265,7 @@ function getDeployUserDomainInfo() {
       webAppUrl: webAppUrl
     };
   } catch (e) {
-    console.error('getDeployUserDomainInfo エラー: ' + e.message);
+    ULog.error('デプロイユーザードメイン情報取得失敗', { error: e.message }, ULog.CATEGORIES.SYSTEM);
     return {
       currentDomain: '不明',
       deployDomain: '不明',
@@ -305,14 +305,14 @@ function isSystemSetup() {
  */
 function getGoogleClientId() {
   try {
-    console.log('Getting GOOGLE_CLIENT_ID from script properties...');
+    ULog.debug('GOOGLE_CLIENT_ID取得開始');
     var properties = PropertiesService.getScriptProperties();
     var clientId = properties.getProperty('GOOGLE_CLIENT_ID');
     
-    console.log('GOOGLE_CLIENT_ID retrieved:', clientId ? 'Found' : 'Not found');
+    ULog.debug('GOOGLE_CLIENT_ID結果', { found: !!clientId });
     
     if (!clientId) {
-      console.warn('GOOGLE_CLIENT_ID not found in script properties');
+      ULog.warn('GOOGLE_CLIENT_IDが見つかりません', {}, ULog.CATEGORIES.SYSTEM);
       
       // Try to get all properties to see what's available
       var allProperties = properties.getProperties();
@@ -327,7 +327,7 @@ function getGoogleClientId() {
     
     return { status: 'success', message: 'Google Client IDを取得しました', data: { clientId: clientId } };
   } catch (error) {
-    console.error('Error getting GOOGLE_CLIENT_ID:', error);
+    ULog.error('GOOGLE_CLIENT_ID取得エラー', { error: error.message }, ULog.CATEGORIES.SYSTEM);
     return { status: 'error', message: 'Google Client IDの取得に失敗しました: ' + error.toString(), data: { clientId: '' } };
   }
 }

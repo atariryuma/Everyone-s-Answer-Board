@@ -4,13 +4,8 @@
  * 既存の全ての関数をそのまま保持し、互換性を完全維持
  */
 
-// ULog の代替実装（最小限）
-const ULog = {
-  debug: (...args) => console.log('[DEBUG]', ...args),
-  info: (...args) => console.log('[INFO]', ...args),
-  warn: (...args) => console.warn('[WARN]', ...args),
-  error: (...args) => console.error('[ERROR]', ...args)
-};
+// ULog統合システムの利用
+// ulog.gsから統一ログシステムを使用
 
 // =============================================================================
 // SECTION 1: 統合キャッシュマネージャークラス（元cache.gs）
@@ -2383,4 +2378,67 @@ function clearDatabaseCache() {
 function clearExecutionSheetsServiceCache() {
   const cache = getUnifiedExecutionCache();
   cache.clearSheetsService();
+}
+
+/**
+ * リトライ機能付きの堅牢なURL取得関数
+ * @param {string} url - 取得するURL
+ * @param {object} options - UrlFetchApp.fetchのオプション
+ * @returns {GoogleAppsScript.URL_Fetch.HTTPResponse} レスポンス
+ */
+function resilientUrlFetch(url, options = {}) {
+  const maxRetries = 3;
+  const baseDelay = 1000;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      ULog.debug(`resilientUrlFetch: ${url} (試行 ${attempt + 1}/${maxRetries + 1})`);
+      
+      const response = UrlFetchApp.fetch(url, {
+        ...options,
+        muteHttpExceptions: true,
+      });
+      
+      if (!response || typeof response.getResponseCode !== 'function') {
+        throw new Error('無効なレスポンスオブジェクトが返されました');
+      }
+      
+      const responseCode = response.getResponseCode();
+      
+      // 成功時またはリトライ不要なエラー
+      if (responseCode >= 200 && responseCode < 300) {
+        if (attempt > 0) {
+          ULog.info(`resilientUrlFetch: リトライで成功 ${url}`);
+        }
+        return response;
+      }
+      
+      // 4xx エラーはリトライしない
+      if (responseCode >= 400 && responseCode < 500) {
+        ULog.warn(`resilientUrlFetch: クライアントエラー ${responseCode} - ${url}`);
+        return response;
+      }
+      
+      // 最後の試行でない場合は待機してリトライ
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        ULog.warn(`resilientUrlFetch: ${responseCode}エラー、${delay}ms後にリトライ - ${url}`);
+        Utilities.sleep(delay);
+      } else {
+        ULog.warn(`resilientUrlFetch: 最大リトライ回数に達しました - ${url}`);
+        return response;
+      }
+      
+    } catch (error) {
+      // 最後の試行でない場合はリトライ
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        ULog.warn(`resilientUrlFetch: エラー、${delay}ms後にリトライ - ${url}: ${error.message}`);
+        Utilities.sleep(delay);
+      } else {
+        ULog.error(`resilientUrlFetch: 最終的に失敗 - ${url}`, { error: error.message, url }, ULog.CATEGORIES.API);
+        throw error;
+      }
+    }
+  }
 }

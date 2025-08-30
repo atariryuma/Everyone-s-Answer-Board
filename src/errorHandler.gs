@@ -38,7 +38,7 @@ class UnifiedErrorHandler {
   }
 
   /**
-   * 構造化エラーログを生成・出力
+   * 構造化エラーログを生成・出力（ULog統合版）
    * @param {Error|string} error - エラーオブジェクトまたはメッセージ
    * @param {string} context - エラー発生箇所/関数名
    * @param {string} severity - エラーの重要度
@@ -51,19 +51,19 @@ class UnifiedErrorHandler {
     
     const errorInfo = this._buildErrorInfo(error, context, severity, category, metadata);
     
-    // 重要度に応じた出力方法
+    // ULogを使用した統一ログ出力
     switch (severity) {
       case ERROR_SEVERITY.CRITICAL:
-        console.error(`🚨 CRITICAL ERROR [${context}]:`, JSON.stringify(errorInfo, null, 2));
+        ULog.critical(errorInfo.message, errorInfo.metadata, category);
         break;
       case ERROR_SEVERITY.HIGH:
-        console.error(`❌ HIGH SEVERITY [${context}]:`, JSON.stringify(errorInfo, null, 2));
+        ULog.error(errorInfo.message, errorInfo.metadata, category);
         break;
       case ERROR_SEVERITY.MEDIUM:
-        console.warn(`⚠️ MEDIUM SEVERITY [${context}]:`, errorInfo.message, errorInfo.metadata);
+        ULog.warn(errorInfo.message, errorInfo.metadata, category);
         break;
       case ERROR_SEVERITY.LOW:
-        console.log(`ℹ️ LOW SEVERITY [${context}]:`, errorInfo.message);
+        ULog.info(errorInfo.message, errorInfo.metadata, category);
         break;
     }
     

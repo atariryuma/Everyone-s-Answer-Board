@@ -2866,3 +2866,98 @@ function findUserById(userId) {
     return null;
   }
 }
+
+/**
+ * メールアドレスからドメインを抽出する
+ * @param {string} email - メールアドレス
+ * @returns {string} ドメイン名（小文字）
+ */
+function getEmailDomain(email) {
+  return (email || '').toString().split('@').pop().toLowerCase();
+}
+
+/**
+ * キャッシュを使わずにユーザーIDでユーザーを検索（強制リフレッシュ用）
+ * @param {string} userId - 検索対象のユーザーID
+ * @returns {object|null} ユーザー情報またはnull
+ */
+function findUserByIdFresh(userId) {
+  if (!userId || typeof userId !== 'string') {
+    console.warn('findUserByIdFresh: 無効なユーザーID', userId);
+    return null;
+  }
+
+  try {
+    // データベースから検索（キャッシュを使わない）
+    const service = getSheetsService();
+    const dbId = getSecureDatabaseId();
+    const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    
+    console.log('findUserByIdFresh: データベース検索開始（強制リフレッシュ）:', userId);
+    
+    // シート全体のデータを取得
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    
+    if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
+      console.warn('findUserByIdFresh: データベースからデータを取得できませんでした');
+      return null;
+    }
+    
+    const rows = data.valueRanges[0].values;
+    const headers = rows[0];
+    
+    // ユーザーID列のインデックスを取得
+    const userIdIndex = headers.indexOf('userId');
+    if (userIdIndex === -1) {
+      console.error('findUserByIdFresh: userId列が見つかりません');
+      return null;
+    }
+    
+    // ユーザーIDでユーザーを検索
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row[userIdIndex] && row[userIdIndex] === userId) {
+        // ユーザーオブジェクトを構築
+        const user = {};
+        headers.forEach((header, index) => {
+          if (row[index] !== undefined) {
+            user[header] = row[index];
+          }
+        });
+        
+        console.log('findUserByIdFresh: ユーザー発見（強制リフレッシュ）:', userId);
+        return user;
+      }
+    }
+    
+    console.log('findUserByIdFresh: ユーザーが見つかりません:', userId);
+    return null;
+    
+  } catch (error) {
+    console.error('findUserByIdFresh エラー:', error.message);
+    return null;
+  }
+}
+
+/**
+ * 汎用ユーザーデータベース検索関数
+ * @param {string} searchField - 検索フィールド ('userId' | 'adminEmail')
+ * @param {string} searchValue - 検索値
+ * @param {object} options - オプション設定
+ * @returns {object|null} ユーザー情報またはnull
+ */
+function fetchUserFromDatabase(searchField, searchValue, options = {}) {
+  try {
+    if (searchField === 'userId') {
+      return options.forceFresh ? findUserByIdFresh(searchValue) : findUserById(searchValue);
+    } else if (searchField === 'adminEmail') {
+      return findUserByEmail(searchValue);
+    } else {
+      console.warn('fetchUserFromDatabase: サポートされていない検索フィールド:', searchField);
+      return null;
+    }
+  } catch (error) {
+    console.error('fetchUserFromDatabase エラー:', error.message);
+    return null;
+  }
+}
