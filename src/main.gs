@@ -68,7 +68,7 @@ const User = {
         const props = PropertiesService.getScriptProperties();
         const configKey = `user_config_${userInfo.userId}`;
         const configStr = props.getProperty(configKey);
-        
+
         if (configStr) {
           const config = JSON.parse(configStr);
           // ユーザー情報に設定をマージ
@@ -1355,11 +1355,11 @@ function renderAnswerBoard(userInfo, params) {
       }
       template.opinionHeader = escapeJavaScript(rawOpinionHeader);
       template.cacheTimestamp = Date.now();
-      
+
       // 現在の設定から表示設定を取得
       const currentConfig = getCurrentConfig();
       const displaySettings = currentConfig.displaySettings || {};
-      
+
       // 表示設定を適用
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
       template.showCounts = displaySettings.showReactions !== false;
@@ -1375,7 +1375,7 @@ function renderAnswerBoard(userInfo, params) {
       template.spreadsheetId = userInfo.spreadsheetId;
       template.ownerName = userInfo.adminEmail;
       template.sheetName = escapeJavaScript(params.sheetName);
-      
+
       // エラー時も表示設定を適用
       const currentConfig = getCurrentConfig();
       const displaySettings = currentConfig.displaySettings || {};

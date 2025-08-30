@@ -9,15 +9,15 @@
   // =============================================================================
 
   // Global error handling for Google Apps Script compatibility issues
-  (function() {
+  (function () {
     // Enhanced error suppression for GAS-specific issues
     const suppressedErrors = [
       'document.write',
-      'Failed to execute \'write\' on \'Document\'',
+      "Failed to execute 'write' on 'Document'",
       'await is only valid in async functions',
       'await is only valid in async functions and the top level bodies of modules',
       'Unexpected token',
-      'SyntaxError: Failed to execute \'write\'',
+      "SyntaxError: Failed to execute 'write'",
       'SyntaxError: await is only valid',
       'mae_html_user_bin_i18n_mae_html_user',
       'warden_bin_i18n_warden',
@@ -25,16 +25,14 @@
       'PostCSS plugin',
       'Tailwind CLI',
       'Promise constructor',
-      'TypeError: Cannot read properties of undefined'
+      'TypeError: Cannot read properties of undefined',
     ];
 
     // Override default error handling
     const originalErrorHandler = window.onerror;
-    window.onerror = function(message, source, lineno, colno, error) {
+    window.onerror = function (message, source, lineno, colno, error) {
       const errorMessage = message ? message.toString() : '';
-      const shouldSuppress = suppressedErrors.some(pattern =>
-        errorMessage.includes(pattern)
-      );
+      const shouldSuppress = suppressedErrors.some((pattern) => errorMessage.includes(pattern));
 
       if (shouldSuppress) {
         console.debug('Suppressed GAS internal error:', errorMessage);
@@ -49,11 +47,9 @@
     };
 
     // Enhanced promise rejection handling
-    window.addEventListener('unhandledrejection', function(event) {
+    window.addEventListener('unhandledrejection', function (event) {
       const reason = event.reason?.toString() || '';
-      const shouldSuppress = suppressedErrors.some(pattern =>
-        reason.includes(pattern)
-      );
+      const shouldSuppress = suppressedErrors.some((pattern) => reason.includes(pattern));
 
       if (shouldSuppress) {
         console.debug('Suppressed internal promise rejection:', reason);
@@ -94,7 +90,7 @@
     }
 
     clearAll() {
-      this.timers.forEach(timer => clearTimeout(timer));
+      this.timers.forEach((timer) => clearTimeout(timer));
       this.timers.clear();
     }
   }
@@ -114,11 +110,14 @@
         func();
         this.lastExecution.set(key, now);
       } else if (!this.timers.has(key)) {
-        const timeoutId = setTimeout(() => {
-          func();
-          this.lastExecution.set(key, Date.now());
-          this.timers.delete(key);
-        }, delay - (now - lastRun));
+        const timeoutId = setTimeout(
+          () => {
+            func();
+            this.lastExecution.set(key, Date.now());
+            this.timers.delete(key);
+          },
+          delay - (now - lastRun)
+        );
         this.timers.set(key, timeoutId);
       }
     }
@@ -132,7 +131,7 @@
     }
 
     clearAll() {
-      this.timers.forEach(timer => clearTimeout(timer));
+      this.timers.forEach((timer) => clearTimeout(timer));
       this.timers.clear();
       this.lastExecution.clear();
     }
@@ -174,7 +173,7 @@
     // Batch cache multiple elements
     cacheElements(elementIds) {
       const cached = {};
-      elementIds.forEach(id => {
+      elementIds.forEach((id) => {
         cached[id] = this.getCachedElement(id);
       });
       return cached;
@@ -231,7 +230,8 @@
 
   // Enhanced cache manager with TTL and size limits
   class EnhancedCache {
-    constructor(maxSize = 100, defaultTTL = 300000) { // 5 minutes default
+    constructor(maxSize = 100, defaultTTL = 300000) {
+      // 5 minutes default
       this.cache = new Map();
       this.timestamps = new Map();
       this.ttls = new Map();
@@ -313,7 +313,7 @@
         }
       }
 
-      expiredKeys.forEach(key => this.delete(key));
+      expiredKeys.forEach((key) => this.delete(key));
     }
 
     get size() {
@@ -326,7 +326,7 @@
       return {
         size: this.cache.size,
         maxSize: this.maxSize,
-        defaultTTL: this.defaultTTL
+        defaultTTL: this.defaultTTL,
       };
     }
   }
@@ -350,7 +350,7 @@
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent,
           errorType: typeof error,
-          isObject: typeof error === 'object'
+          isObject: typeof error === 'object',
         };
 
         this.errors.push(errorInfo);
@@ -407,7 +407,7 @@
 
       // Emit custom event for UI updates
       const event = new CustomEvent('loadingStateChange', {
-        detail: { key, isLoading, message }
+        detail: { key, isLoading, message },
       });
       document.dispatchEvent(event);
     }
@@ -429,7 +429,7 @@
 
     clearAllLoading() {
       const keys = Array.from(this.loadingStates.keys());
-      keys.forEach(key => this.clearLoading(key));
+      keys.forEach((key) => this.clearLoading(key));
     }
   }
 
@@ -451,7 +451,7 @@
 
       return new Promise((resolve, reject) => {
         google.script.run
-          .withSuccessHandler(result => {
+          .withSuccessHandler((result) => {
             this.callCache.set(cacheKey, result, ttl);
             resolve(result);
           })
@@ -500,12 +500,12 @@
         }
 
         google.script.run
-          .withSuccessHandler(result => {
+          .withSuccessHandler((result) => {
             window.unifiedLoading.hide(); // Hide loading overlay on success
             this.pendingRequests.delete(requestKey); // 完了後にキャッシュから削除
             resolve(result);
           })
-          .withFailureHandler(error => {
+          .withFailureHandler((error) => {
             window.unifiedLoading.hide(); // Hide loading overlay on failure
             this.pendingRequests.delete(requestKey); // エラー時にもキャッシュから削除
             // Log the error using the shared error handler
@@ -522,9 +522,7 @@
 
     // Check if running in GAS environment
     isGASEnvironment() {
-      return typeof google !== 'undefined' &&
-             google.script &&
-             google.script.run;
+      return typeof google !== 'undefined' && google.script && google.script.run;
     }
   }
 
@@ -550,7 +548,7 @@
 
       // Remove script tags and other dangerous elements
       const scripts = div.querySelectorAll('script, object, embed, iframe, form');
-      scripts.forEach(script => script.remove());
+      scripts.forEach((script) => script.remove());
 
       return div.innerHTML;
     }
@@ -575,7 +573,7 @@
     errors: new ErrorHandler(),
     loading: new LoadingManager(),
     gas: new GASUtilities(),
-    security: new SecurityUtilities()
+    security: new SecurityUtilities(),
   };
 
   // Setup global error handling
@@ -596,7 +594,7 @@
   }
 
   // DOM ready utility
-  window.onDOMReady = function(callback) {
+  window.onDOMReady = function (callback) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', callback);
     } else {
@@ -605,7 +603,7 @@
   };
 
   // Debug function for console access
-  window.getSharedUtilitiesStats = function() {
+  window.getSharedUtilitiesStats = function () {
     return {
       debounceTimers: window.sharedUtilities.debounce.timers.size,
       throttleTimers: window.sharedUtilities.throttle.timers.size,
@@ -614,12 +612,12 @@
       domCacheSize: window.sharedUtilities.dom.elementCache.size,
       recentErrors: window.sharedUtilities.errors.getRecentErrors(5),
       loadingStates: Object.fromEntries(window.sharedUtilities.loading.loadingStates),
-      gasEnvironment: window.sharedUtilities.gas.isGASEnvironment()
+      gasEnvironment: window.sharedUtilities.gas.isGASEnvironment(),
     };
   };
 
   // Performance monitoring
-  window.clearAllSharedUtilities = function() {
+  window.clearAllSharedUtilities = function () {
     window.sharedUtilities.debounce.clearAll();
     window.sharedUtilities.throttle.clearAll();
     window.sharedUtilities.cache.clear();
@@ -630,7 +628,7 @@
   };
 
   // Integration test function
-  window.testSharedUtilities = function() {
+  window.testSharedUtilities = function () {
     console.group('🧪 SharedUtilities Integration Test');
 
     // Test debounce
@@ -668,11 +666,15 @@
   // Shared authentication functions for consistent behavior across pages
   window.sharedUtilities.auth = {
     // Account switching functionality shared across pages
-    switchToAnotherAccount: function() {
-      if (confirm('別のGoogleアカウントでログインしますか？現在のセッションからログアウトされ、アカウント選択画面が表示されます。')) {
+    switchToAnotherAccount: function () {
+      if (
+        confirm(
+          '別のGoogleアカウントでログインしますか？現在のセッションからログアウトされ、アカウント選択画面が表示されます。'
+        )
+      ) {
         try {
           google.script.run
-            .withSuccessHandler(function(result) {
+            .withSuccessHandler(function (result) {
               if (result && result.success) {
                 const url = new URL(window.location.href);
                 url.searchParams.set('force_account_selection', 'true');
@@ -681,7 +683,7 @@
                 window.sharedUtilities.auth.showAccountSwitchFallback();
               }
             })
-            .withFailureHandler(function(error) {
+            .withFailureHandler(function (error) {
               console.warn('認証リセットエラー:', error);
               window.sharedUtilities.auth.showAccountSwitchFallback();
             })
@@ -694,7 +696,7 @@
     },
 
     // Fallback guidance when automatic switch fails
-    showAccountSwitchFallback: function() {
+    showAccountSwitchFallback: function () {
       const msg = `
           アカウントを切り替えるには以下の手順をお試しください：
 
@@ -709,14 +711,14 @@
     },
 
     // Authentication verification with promise
-    verifyAuthentication: function() {
+    verifyAuthentication: function () {
       return new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
           reject(new Error('認証確認がタイムアウトしました'));
         }, 10000);
 
         google.script.run
-          .withSuccessHandler(result => {
+          .withSuccessHandler((result) => {
             clearTimeout(timeoutId);
             if (result && result.authenticated && result.email) {
               resolve(result);
@@ -724,7 +726,7 @@
               reject(new Error('認証が必要です'));
             }
           })
-          .withFailureHandler(error => {
+          .withFailureHandler((error) => {
             clearTimeout(timeoutId);
             reject(error);
           })
@@ -733,41 +735,52 @@
     },
 
     // Display authentication info in standardized format
-    displayAuthInfo: function(containerId, email, showSwitchOption = true) {
+    displayAuthInfo: function (containerId, email, showSwitchOption = true) {
       const container = document.getElementById(containerId);
       if (!container) return;
 
       // Safely escape email with fallback
-      const safeEmail = window.sharedUtilities && window.sharedUtilities.security
-        ? window.sharedUtilities.security.escapeHtml(email)
-        : (email || '').replace(/[<>&"']/g, function(match) {
-            switch (match) {
-              case '<': return '&lt;';
-              case '>': return '&gt;';
-              case '&': return '&amp;';
-              case '"': return '&quot;';
-              case "'": return '&#39;';
-              default: return match;
-            }
-          });
+      const safeEmail =
+        window.sharedUtilities && window.sharedUtilities.security
+          ? window.sharedUtilities.security.escapeHtml(email)
+          : (email || '').replace(/[<>&"']/g, function (match) {
+              switch (match) {
+                case '<':
+                  return '&lt;';
+                case '>':
+                  return '&gt;';
+                case '&':
+                  return '&amp;';
+                case '"':
+                  return '&quot;';
+                case "'":
+                  return '&#39;';
+                default:
+                  return match;
+              }
+            });
 
       container.innerHTML = `
         <div class="bg-gray-800 rounded-lg p-4 mb-4">
           <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
           <p class="text-white font-semibold">${safeEmail}</p>
         </div>
-        ${showSwitchOption ? `
+        ${
+          showSwitchOption
+            ? `
         <div class="text-right">
           <button type="button" onclick="window.sharedUtilities.auth.switchToAnotherAccount()" class="text-cyan-400 hover:text-cyan-300 hover:underline text-sm">
             別のアカウントでログイン
           </button>
-        </div>` : ''}
+        </div>`
+            : ''
+        }
       `;
-    }
+    },
   };
 
   // Global function for backward compatibility
-  window.switchToAnotherAccount = function() {
+  window.switchToAnotherAccount = function () {
     window.sharedUtilities.auth.switchToAnotherAccount();
   };
 
@@ -779,7 +792,7 @@
   window.simpleLoading = {
     overlay: null,
 
-    init: function() {
+    init: function () {
       this.overlay = document.getElementById('loading-overlay');
       if (!this.overlay) {
         // Create simple overlay if it doesn't exist
@@ -795,15 +808,15 @@
       }
     },
 
-    show: function() {
+    show: function () {
       if (!this.overlay) this.init();
       if (this.overlay) this.overlay.style.display = 'flex';
     },
 
-    hide: function() {
+    hide: function () {
       if (!this.overlay) this.init();
       if (this.overlay) this.overlay.style.display = 'none';
-    }
+    },
   };
 
   // Initialize when DOM is ready and provide backward compatibility
@@ -813,7 +826,7 @@
 
   // Backward compatibility wrapper for existing code
   window.unifiedLoading = window.simpleLoading;
-  window.setLoading = function(isLoading, message) {
+  window.setLoading = function (isLoading, message) {
     if (isLoading) {
       window.simpleLoading.show();
     } else {
@@ -821,13 +834,8 @@
     }
   };
 
-
-
-
-
-
   // =============================================================================
-  // UNIFIED LOADING MANAGER (NEW ENHANCED VERSION)  
+  // UNIFIED LOADING MANAGER (NEW ENHANCED VERSION)
   // =============================================================================
 
   class UnifiedLoadingManager {
@@ -849,9 +857,13 @@
       // Enhanced DOM readiness check
       if (document.readyState === 'loading') {
         console.log('UnifiedLoadingManager: DOM still loading, waiting for DOMContentLoaded...');
-        document.addEventListener('DOMContentLoaded', () => {
-          setTimeout(() => this.init(retries, delay, onSuccess), 50);
-        }, { once: true });
+        document.addEventListener(
+          'DOMContentLoaded',
+          () => {
+            setTimeout(() => this.init(retries, delay, onSuccess), 50);
+          },
+          { once: true }
+        );
         return false;
       }
 
@@ -859,7 +871,10 @@
       if (this.overlay) {
         if (!window.unifiedLoadingInitialized) {
           window.unifiedLoadingInitialized = true;
-          console.log('✅ UnifiedLoadingManager: Initialized successfully with element:', this.overlay.className);
+          console.log(
+            '✅ UnifiedLoadingManager: Initialized successfully with element:',
+            this.overlay.className
+          );
         }
         this.initialized = true;
         if (onSuccess) onSuccess();
@@ -868,10 +883,14 @@
 
       // Enhanced retry logic
       if (retries > 0) {
-        console.warn(`⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`);
+        console.warn(
+          `⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`
+        );
         setTimeout(() => this.init(retries - 1, delay * 1.5, onSuccess), delay);
       } else {
-        console.error('❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.');
+        console.error(
+          '❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.'
+        );
         this.createFallbackOverlay();
       }
       return false;
@@ -901,7 +920,9 @@
       if (!this.initialized) {
         console.warn('UnifiedLoadingManager: Not initialized, attempting initialization...');
         if (!this.init()) {
-          console.error('UnifiedLoadingManager: Cannot manage loading state - initialization failed.');
+          console.error(
+            'UnifiedLoadingManager: Cannot manage loading state - initialization failed.'
+          );
           return;
         }
       }
@@ -927,13 +948,13 @@
         progress: options.progress || null,
         steps: options.steps || null,
         disableInteraction: options.disableInteraction !== false,
-        ...options
+        ...options,
       };
 
       this.currentState = config;
 
       // Clean up previous variant classes
-      this.variantClasses.forEach(vc => this.overlay.classList.remove(vc));
+      this.variantClasses.forEach((vc) => this.overlay.classList.remove(vc));
 
       // Add the new variant class if it's not the default overlay
       if (config.type !== 'overlay') {
@@ -952,7 +973,9 @@
         this.overlay.style.pointerEvents = 'auto';
       }
 
-      console.log(`UnifiedLoadingManager: Overlay shown with type '${config.type}' and message '${config.message}'`);
+      console.log(
+        `UnifiedLoadingManager: Overlay shown with type '${config.type}' and message '${config.message}'`
+      );
     }
 
     // Hide loading overlay with cleanup
@@ -963,7 +986,7 @@
       this.overlay.style.setProperty('display', 'none', 'important');
 
       // Clean up variant classes
-      this.variantClasses.forEach(vc => this.overlay.classList.remove(vc));
+      this.variantClasses.forEach((vc) => this.overlay.classList.remove(vc));
 
       // Re-enable user interaction
       document.body.style.overflow = '';
@@ -1012,7 +1035,7 @@
         }
 
         stepsElement.innerHTML = config.steps
-          .map(step => `<div class="loading-step ${step.status}">${step.text}</div>`)
+          .map((step) => `<div class="loading-step ${step.status}">${step.text}</div>`)
           .join('');
       }
     }
@@ -1035,16 +1058,28 @@
       const options = {
         message,
         type: 'overlay',
-        progress: percentage
+        progress: percentage,
       };
 
       // Define standard admin loading steps
       if (step && step > 0) {
         options.steps = [
-          { text: 'システム情報を読み込み中...', status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending' },
-          { text: 'ユーザー情報を取得中...', status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending' },
-          { text: 'シート情報と設定を適用中...', status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending' },
-          { text: 'UIを最終調整中...', status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending' }
+          {
+            text: 'システム情報を読み込み中...',
+            status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending',
+          },
+          {
+            text: 'ユーザー情報を取得中...',
+            status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending',
+          },
+          {
+            text: 'シート情報と設定を適用中...',
+            status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending',
+          },
+          {
+            text: 'UIを最終調整中...',
+            status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending',
+          },
         ];
       }
       this.setLoading(true, options);
@@ -1058,7 +1093,7 @@
   });
 
   // Backward compatibility wrapper for the global setLoading function.
-  window.setLoading = function(isLoading, message, step, percentage) {
+  window.setLoading = function (isLoading, message, step, percentage) {
     if (!isLoading) {
       window.unifiedLoading.setLoading(false);
       return;
@@ -1078,14 +1113,15 @@
   // =============================================================================
 
   // Suppress iframe and sandbox-related warnings specific to Google Apps Script
-  (function() {
-    const isGoogleAppsScript = window.location.hostname.includes('script.google.com') ||
-                             window.location.href.includes('script.googleusercontent.com') ||
-                             typeof google !== 'undefined' && google.script;
+  (function () {
+    const isGoogleAppsScript =
+      window.location.hostname.includes('script.google.com') ||
+      window.location.href.includes('script.googleusercontent.com') ||
+      (typeof google !== 'undefined' && google.script);
 
     if (isGoogleAppsScript) {
       const originalConsoleWarn = console.warn;
-      console.warn = function(...args) {
+      console.warn = function (...args) {
         const message = args.join(' ').toLowerCase();
 
         // Suppress common iframe/sandbox warnings in GAS environment
@@ -1121,12 +1157,10 @@
           'permissions policy',
           'feature policy',
           'escape its sandboxing',
-          'document.domain setter'
+          'document.domain setter',
         ];
 
-        const shouldSuppress = suppressPatterns.some(pattern =>
-          message.includes(pattern)
-        );
+        const shouldSuppress = suppressPatterns.some((pattern) => message.includes(pattern));
 
         if (!shouldSuppress) {
           originalConsoleWarn.apply(console, args);
@@ -1135,13 +1169,15 @@
 
       // Suppress common iframe-related errors
       const originalConsoleError = console.error;
-      console.error = function(...args) {
+      console.error = function (...args) {
         const message = args.join(' ').toLowerCase();
 
-        if (message.includes('iframe') &&
-            (message.includes('refused to frame') ||
-             message.includes('x-frame-options') ||
-             message.includes('frame-ancestors'))) {
+        if (
+          message.includes('iframe') &&
+          (message.includes('refused to frame') ||
+            message.includes('x-frame-options') ||
+            message.includes('frame-ancestors'))
+        ) {
           return;
         }
 
@@ -1149,16 +1185,22 @@
       };
 
       // Handle iframe-related window errors silently
-      window.addEventListener('error', function(event) {
-        if (event.message && typeof event.message === 'string') {
-          const message = event.message.toLowerCase();
-          if ((message.includes('iframe') || message.includes('frame')) &&
-              (message.includes('denied') || message.includes('blocked'))) {
-            event.preventDefault();
-            return false;
+      window.addEventListener(
+        'error',
+        function (event) {
+          if (event.message && typeof event.message === 'string') {
+            const message = event.message.toLowerCase();
+            if (
+              (message.includes('iframe') || message.includes('frame')) &&
+              (message.includes('denied') || message.includes('blocked'))
+            ) {
+              event.preventDefault();
+              return false;
+            }
           }
-        }
-      }, true);
+        },
+        true
+      );
     }
   })();
 
@@ -1218,7 +1260,7 @@
         success: 'border-green-400 bg-green-900/50 text-green-100',
         error: 'border-red-400 bg-red-900/50 text-red-100',
         warning: 'border-yellow-400 bg-yellow-900/50 text-yellow-100',
-        info: 'border-blue-400 bg-blue-900/50 text-blue-100'
+        info: 'border-blue-400 bg-blue-900/50 text-blue-100',
       };
 
       // Icons for different types
@@ -1226,7 +1268,7 @@
         success: '✅',
         error: '❌',
         warning: '⚠️',
-        info: 'ℹ️'
+        info: 'ℹ️',
       };
 
       // Create notification element
@@ -1284,11 +1326,15 @@
       notification.style.transform = 'translateX(100%)';
       notification.style.opacity = '0';
 
-      notification.addEventListener('transitionend', () => {
-        if (notification.parentNode) {
-          notification.remove();
-        }
-      }, { once: true });
+      notification.addEventListener(
+        'transitionend',
+        () => {
+          if (notification.parentNode) {
+            notification.remove();
+          }
+        },
+        { once: true }
+      );
     }
 
     // Convenience methods
@@ -1320,7 +1366,7 @@
       if (!this.container) return;
 
       const notifications = this.container.querySelectorAll('.notification');
-      notifications.forEach(notification => this.removeNotification(notification));
+      notifications.forEach((notification) => this.removeNotification(notification));
     }
   }
 
@@ -1333,24 +1379,24 @@
   }
 
   // Global convenience functions for backward compatibility
-  window.showSuccess = function(message, duration) {
+  window.showSuccess = function (message, duration) {
     window.notifications.success(message, duration);
   };
 
-  window.showError = function(message, duration) {
+  window.showError = function (message, duration) {
     window.notifications.error(message, duration);
   };
 
-  window.showWarning = function(message, duration) {
+  window.showWarning = function (message, duration) {
     window.notifications.warning(message, duration);
   };
 
-  window.showInfo = function(message, duration) {
+  window.showInfo = function (message, duration) {
     window.notifications.info(message, duration);
   };
 
   // Alias for generic show message
-  window.showMessage = function(message, type, duration) {
+  window.showMessage = function (message, type, duration) {
     window.notifications.showMessage(message, type, duration);
   };
 
@@ -1377,6 +1423,8 @@
   // Prevent duplicate loading messages
   if (!window.sharedUtilitiesLoaded) {
     window.sharedUtilitiesLoaded = true;
-    console.log('✅ SharedUtilities loaded successfully - Version 1.3.0 (with Notification System)');
+    console.log(
+      '✅ SharedUtilities loaded successfully - Version 1.3.0 (with Notification System)'
+    );
   }
 </script>

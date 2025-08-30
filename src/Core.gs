@@ -4211,45 +4211,55 @@ function setApplicationStatusForUI(enabled) {
  */
 function identifyHeaders(headers) {
   const find = (keys) => {
-    const header = headers.find(h => {
+    const header = headers.find((h) => {
       const hStr = String(h || '').toLowerCase();
-      return keys.some(k => hStr.includes(k.toLowerCase()));
+      return keys.some((k) => hStr.includes(k.toLowerCase()));
     });
     return header ? String(header) : '';
   };
-  
+
   console.log('guessHeadersFromArray: Available headers:', headers);
-  
+
   // Googleフォーム特有のヘッダー構造に対応
-  const isGoogleForm = headers.some(h => String(h || '').includes('タイムスタンプ') || String(h || '').includes('メールアドレス'));
-  
+  const isGoogleForm = headers.some(
+    (h) => String(h || '').includes('タイムスタンプ') || String(h || '').includes('メールアドレス')
+  );
+
   let question = '';
   let answer = '';
   let reason = '';
   let name = '';
   let classHeader = '';
-  
+
   if (isGoogleForm) {
     console.log('guessHeadersFromArray: Detected Google Form response sheet');
-    
+
     // Googleフォームの一般的な構造: タイムスタンプ, メールアドレス, [質問1], [質問2], ...
-    const nonMetaHeaders = headers.filter(h => {
+    const nonMetaHeaders = headers.filter((h) => {
       const hStr = String(h || '').toLowerCase();
-      return !hStr.includes('タイムスタンプ') && 
-             !hStr.includes('timestamp') && 
-             !hStr.includes('メールアドレス') && 
-             !hStr.includes('email');
+      return (
+        !hStr.includes('タイムスタンプ') &&
+        !hStr.includes('timestamp') &&
+        !hStr.includes('メールアドレス') &&
+        !hStr.includes('email')
+      );
     });
-    
+
     console.log('guessHeadersFromArray: Non-meta headers:', nonMetaHeaders);
-    
+
     // より柔軟な推測ロジック
     for (let i = 0; i < nonMetaHeaders.length; i++) {
       const header = nonMetaHeaders[i];
       const hStr = String(header || '').toLowerCase();
-      
+
       // 質問を含む長いテキストを質問ヘッダーとして推測
-      if (!question && (hStr.includes('だろうか') || hStr.includes('ですか') || hStr.includes('でしょうか') || hStr.length > 20)) {
+      if (
+        !question &&
+        (hStr.includes('だろうか') ||
+          hStr.includes('ですか') ||
+          hStr.includes('でしょうか') ||
+          hStr.length > 20)
+      ) {
         question = header;
         // 同じ内容が複数列にある場合、回答用として2番目を使用
         if (i + 1 < nonMetaHeaders.length && nonMetaHeaders[i + 1] === header) {
@@ -4257,34 +4267,42 @@ function identifyHeaders(headers) {
           continue;
         }
       }
-      
+
       // 回答・意見に関するヘッダー
-      if (!answer && (hStr.includes('回答') || hStr.includes('答え') || hStr.includes('意見') || hStr.includes('考え'))) {
+      if (
+        !answer &&
+        (hStr.includes('回答') ||
+          hStr.includes('答え') ||
+          hStr.includes('意見') ||
+          hStr.includes('考え'))
+      ) {
         answer = header;
       }
-      
+
       // 理由に関するヘッダー
       if (!reason && (hStr.includes('理由') || hStr.includes('詳細') || hStr.includes('説明'))) {
         reason = header;
       }
-      
+
       // 名前に関するヘッダー
       if (!name && (hStr.includes('名前') || hStr.includes('氏名') || hStr.includes('学生'))) {
         name = header;
       }
-      
+
       // クラスに関するヘッダー
-      if (!classHeader && (hStr.includes('クラス') || hStr.includes('組') || hStr.includes('学級'))) {
+      if (
+        !classHeader &&
+        (hStr.includes('クラス') || hStr.includes('組') || hStr.includes('学級'))
+      ) {
         classHeader = header;
       }
     }
-    
+
     // フォールバック: まだ回答が見つからない場合
     if (!answer && nonMetaHeaders.length > 0) {
       // 最初の非メタヘッダーを回答として使用
       answer = nonMetaHeaders[0];
     }
-    
   } else {
     // 通常のシート用の推測ロジック
     question = find(['質問', '問題', 'question', 'Q']);
@@ -4293,12 +4311,12 @@ function identifyHeaders(headers) {
     name = find(['名前', '氏名', 'name', '学生', 'student']);
     classHeader = find(['クラス', 'class', '組', '学級']);
   }
-  
+
   // リアクション列も検出（システム列は完全一致のみ）
-  const understand = headers.find(h => String(h || '').trim() === 'なるほど！') || '';
-  const like = headers.find(h => String(h || '').trim() === 'いいね！') || '';
-  const curious = headers.find(h => String(h || '').trim() === 'もっと知りたい！') || '';
-  const highlight = headers.find(h => String(h || '').trim() === 'ハイライト') || '';
+  const understand = headers.find((h) => String(h || '').trim() === 'なるほど！') || '';
+  const like = headers.find((h) => String(h || '').trim() === 'いいね！') || '';
+  const curious = headers.find((h) => String(h || '').trim() === 'もっと知りたい！') || '';
+  const highlight = headers.find((h) => String(h || '').trim() === 'ハイライト') || '';
 
   const guessed = {
     questionHeader: question,
@@ -4309,25 +4327,27 @@ function identifyHeaders(headers) {
     understandHeader: understand,
     likeHeader: like,
     curiousHeader: curious,
-    highlightHeader: highlight
+    highlightHeader: highlight,
   };
-  
+
   console.log('guessHeadersFromArray: Guessed headers:', guessed);
-  
+
   // 最終フォールバック: 何も推測できない場合
   if (!question && !answer && headers.length > 0) {
     console.log('guessHeadersFromArray: No specific headers found, using positional mapping');
-    
+
     // タイムスタンプとメールを除外して最初の列を回答として使用
-    const usableHeaders = headers.filter(h => {
+    const usableHeaders = headers.filter((h) => {
       const hStr = String(h || '').toLowerCase();
-      return !hStr.includes('タイムスタンプ') && 
-             !hStr.includes('timestamp') && 
-             !hStr.includes('メールアドレス') && 
-             !hStr.includes('email') &&
-             String(h || '').trim() !== '';
+      return (
+        !hStr.includes('タイムスタンプ') &&
+        !hStr.includes('timestamp') &&
+        !hStr.includes('メールアドレス') &&
+        !hStr.includes('email') &&
+        String(h || '').trim() !== ''
+      );
     });
-    
+
     if (usableHeaders.length > 0) {
       guessed.answerHeader = usableHeaders[0];
       if (usableHeaders.length > 1) guessed.reasonHeader = usableHeaders[1];
@@ -4335,7 +4355,7 @@ function identifyHeaders(headers) {
       if (usableHeaders.length > 3) guessed.classHeader = usableHeaders[3];
     }
   }
-  
+
   console.log('guessHeadersFromArray: Final result:', guessed);
   return guessed;
 }

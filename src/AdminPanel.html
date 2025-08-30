@@ -567,21 +567,28 @@
         <!-- データソース選択カード -->
         <section class="card glass-panel rounded-xl p-6">
           <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
-          
+
           <!-- データソース選択方式 -->
           <div class="mb-6">
             <div class="flex gap-4 mb-4">
               <label class="flex items-center cursor-pointer">
-                <input type="radio" name="source-method" value="dropdown" checked class="mr-2" id="method-dropdown">
+                <input
+                  type="radio"
+                  name="source-method"
+                  value="dropdown"
+                  checked
+                  class="mr-2"
+                  id="method-dropdown"
+                />
                 <span class="text-gray-300">📋 一覧から選択</span>
               </label>
               <label class="flex items-center cursor-pointer">
-                <input type="radio" name="source-method" value="url" class="mr-2" id="method-url">
+                <input type="radio" name="source-method" value="url" class="mr-2" id="method-url" />
                 <span class="text-gray-300">🔗 URL直接入力</span>
               </label>
             </div>
           </div>
-          
+
           <!-- 一覧選択方式 -->
           <div id="dropdown-method" class="space-y-4">
             <div class="form-group">
@@ -605,19 +612,19 @@
               <button id="connect-source" class="btn-primary" type="button">接続</button>
             </div>
           </div>
-          
+
           <!-- URL直接入力方式 -->
           <div id="url-method" class="space-y-4 hidden">
             <div class="form-group">
               <label for="spreadsheet-url" class="block text-sm font-medium text-gray-300 mb-2"
                 >スプレッドシートURL:</label
               >
-              <input 
-                type="text" 
-                id="spreadsheet-url" 
-                class="modern-select" 
+              <input
+                type="text"
+                id="spreadsheet-url"
+                class="modern-select"
                 placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit#gid=0"
-              >
+              />
               <div class="text-xs text-gray-400 mt-1">
                 💡 GoogleスプレッドシートのURLを貼り付けてください
               </div>
@@ -626,12 +633,12 @@
               <label for="sheet-name-input" class="block text-sm font-medium text-gray-300 mb-2"
                 >シート名:</label
               >
-              <input 
-                type="text" 
-                id="sheet-name-input" 
-                class="modern-select" 
+              <input
+                type="text"
+                id="sheet-name-input"
+                class="modern-select"
                 placeholder="シート名を入力（例：フォームの回答 1）"
-              >
+              />
             </div>
             <div class="action-buttons">
               <button id="url-validate" class="btn-secondary" type="button">✅ URL検証</button>
@@ -643,11 +650,14 @@
         <!-- 列マッピングカード -->
         <section class="card glass-panel rounded-xl p-6">
           <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
-          
+
           <div class="column-dropdowns space-y-4 mb-4">
             <!-- 回答列選択 -->
             <div class="form-group">
-              <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                for="answer-column-select"
+                class="block text-sm font-medium text-gray-300 mb-2"
+              >
                 💬 回答列:
                 <span class="text-xs text-gray-400 ml-2">(個別の回答内容が入っている列)</span>
               </label>
@@ -661,7 +671,10 @@
 
             <!-- 理由列選択 -->
             <div class="form-group">
-              <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+              <label
+                for="reason-column-select"
+                class="block text-sm font-medium text-gray-300 mb-2"
+              >
                 📋 理由列:
                 <span class="text-xs text-gray-400 ml-2">(回答の理由・根拠が入っている列)</span>
               </label>
@@ -702,7 +715,10 @@
             </div>
 
             <!-- AI検出情報表示エリア -->
-            <div id="ai-detection-info" class="bg-blue-900 bg-opacity-30 border border-blue-500 border-opacity-30 rounded-lg p-3 hidden">
+            <div
+              id="ai-detection-info"
+              class="bg-blue-900 bg-opacity-30 border border-blue-500 border-opacity-30 rounded-lg p-3 hidden"
+            >
               <div class="flex items-center space-x-2 mb-2">
                 <span class="text-blue-400">🤖</span>
                 <span class="text-sm font-medium text-blue-300">AI自動検出結果</span>
@@ -713,7 +729,10 @@
             </div>
 
             <!-- 手動設定情報 -->
-            <div id="manual-override-info" class="bg-yellow-900 bg-opacity-30 border border-yellow-500 border-opacity-30 rounded-lg p-3 hidden">
+            <div
+              id="manual-override-info"
+              class="bg-yellow-900 bg-opacity-30 border border-yellow-500 border-opacity-30 rounded-lg p-3 hidden"
+            >
               <div class="flex items-center space-x-2 mb-2">
                 <span class="text-yellow-400">✋</span>
                 <span class="text-sm font-medium text-yellow-300">手動設定</span>
@@ -723,10 +742,12 @@
               </div>
             </div>
           </div>
-          
+
           <div class="action-buttons">
             <button id="verify-mapping" class="btn-primary" type="button">設定を確認</button>
-            <button id="reset-to-ai" class="btn-secondary" type="button" style="display: none;">AI検出に戻す</button>
+            <button id="reset-to-ai" class="btn-secondary" type="button" style="display: none">
+              AI検出に戻す
+            </button>
           </div>
         </section>
 
@@ -835,7 +856,7 @@
                   <span>📊</span>
                   <span>スプレッドシートを開く</span>
                 </button>
-                
+
                 <button
                   id="open-form-btn"
                   class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
@@ -845,7 +866,7 @@
                   <span>📝</span>
                   <span>フォームを開く</span>
                 </button>
-                
+
                 <button
                   id="open-board-btn"
                   class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
@@ -855,7 +876,7 @@
                   <span>🎯</span>
                   <span>公開ボードを開く</span>
                 </button>
-                
+
                 <div id="resource-status" class="text-xs text-gray-400 mt-2 text-center">
                   設定を読み込み中...
                 </div>
@@ -956,17 +977,17 @@
       // 初期化
       document.addEventListener('DOMContentLoaded', async function () {
         console.log('AdminPanel初期化開始');
-        
+
         try {
           // メイン初期化を非同期実行
           await initializePanel();
-          
+
           // システム管理者チェック（並行実行）
           checkSystemAdminAccess();
 
           // フッターの初期化
           initializeFooter();
-          
+
           console.log('AdminPanel全体初期化完了');
         } catch (error) {
           console.error('AdminPanel初期化の致命的エラー:', error);
@@ -1019,16 +1040,13 @@
         try {
           console.log('AdminPanel非同期初期化開始');
           setLoading(true);
-          
+
           // 並行処理で基本データを読み込み
-          await Promise.all([
-            loadSpreadsheetListAsync(),
-            loadUserInfoAsync()
-          ]);
-          
+          await Promise.all([loadSpreadsheetListAsync(), loadUserInfoAsync()]);
+
           // 設定データを読み込んで完全に自動反映
           await loadAndApplyCurrentConfig();
-          
+
           console.log('AdminPanel非同期初期化完了');
           showSuccess('✅ 管理パネルの初期化が完了しました');
         } catch (error) {
@@ -1068,7 +1086,7 @@
 
       // 旧版との互換性維持
       function loadSpreadsheetList() {
-        loadSpreadsheetListAsync().catch(error => {
+        loadSpreadsheetListAsync().catch((error) => {
           showError(error.message);
         });
       }
@@ -1077,21 +1095,21 @@
       function loadUserInfoAsync() {
         return new Promise((resolve, reject) => {
           console.log('loadUserInfoAsync: メールアドレス取得開始');
-          
+
           google.script.run
             .withSuccessHandler(function (email) {
               console.log('getUserEmail成功:', email);
               if (email && email.trim()) {
                 document.getElementById('current-user-email').textContent = email;
                 console.log('メールアドレス表示完了:', email);
-                
+
                 // ユーザーIDを表示（__USER_ID__があれば使用）
                 if (typeof __USER_ID__ !== 'undefined' && __USER_ID__) {
                   document.getElementById('current-user-id').textContent = __USER_ID__;
                 } else {
                   document.getElementById('current-user-id').textContent = 'N/A';
                 }
-                
+
                 resolve({ email, userId: __USER_ID__ || null });
               } else {
                 console.warn('User email not found in response:', email);
@@ -1110,11 +1128,11 @@
 
       // 旧版との互換性維持（再試行機能付き）
       function loadUserInfo() {
-        loadUserInfoAsync().catch(error => {
+        loadUserInfoAsync().catch((error) => {
           console.warn('初回取得失敗、再試行します:', error.message);
           setTimeout(() => {
             console.log('メールアドレス取得再試行');
-            loadUserInfoAsync().catch(retryError => {
+            loadUserInfoAsync().catch((retryError) => {
               showError('ユーザー情報の取得に失敗しました: ' + retryError.message);
             });
           }, 2000);
@@ -1124,38 +1142,37 @@
       // 設定データの読み込みと完全自動反映（新実装）
       async function loadAndApplyCurrentConfig() {
         console.log('loadAndApplyCurrentConfig: 完全自動反映開始');
-        
+
         try {
           // 設定データを非同期で取得
           const config = await getCurrentConfigAsync();
           console.log('設定データ取得成功:', config);
-          
+
           // リソースボタンを更新
           updateResourceButtons(config);
-          
+
           if (config && config.spreadsheetId) {
             console.log('既存設定を検出、自動反映を開始');
-            
+
             // 1. スプレッドシート自動選択
             await autoSelectSpreadsheet(config.spreadsheetId);
-            
+
             // 2. シート自動選択
             if (config.sheetName) {
               await autoSelectSheet(config.sheetName);
             }
-            
+
             // 3. 列設定の自動初期化
             await autoInitializeColumnSettings(config);
-            
+
             // 4. 進捗ステップの更新
             updateProgressFromConfig(config);
-            
+
             showSuccess('✅ 既存の設定を完全に反映しました');
           } else {
             console.log('新規ユーザー: 初期セットアップが必要');
             showInfo('💡 新規セットアップを開始してください');
           }
-          
         } catch (error) {
           console.error('設定自動反映エラー:', error);
           showError('設定の自動反映に失敗しました: ' + error.message);
@@ -1176,7 +1193,7 @@
 
       // 旧版との互換性維持
       function loadCurrentConfig() {
-        loadAndApplyCurrentConfig().catch(error => {
+        loadAndApplyCurrentConfig().catch((error) => {
           console.error('loadCurrentConfig互換版エラー:', error);
         });
       }
@@ -1186,7 +1203,7 @@
       // スプレッドシート自動選択
       async function autoSelectSpreadsheet(spreadsheetId) {
         console.log('autoSelectSpreadsheet: 自動選択開始', spreadsheetId);
-        
+
         try {
           const select = document.getElementById('spreadsheet-select');
           if (!select) {
@@ -1194,11 +1211,11 @@
           }
 
           // オプションから該当するIDを探す
-          const option = Array.from(select.options).find(opt => opt.value === spreadsheetId);
+          const option = Array.from(select.options).find((opt) => opt.value === spreadsheetId);
           if (option) {
             select.value = spreadsheetId;
             console.log('スプレッドシート自動選択完了:', option.textContent);
-            
+
             // シート一覧も自動読み込み
             await loadSheetListAsync(spreadsheetId);
             return true;
@@ -1217,7 +1234,7 @@
       // シート自動選択
       async function autoSelectSheet(sheetName) {
         console.log('autoSelectSheet: 自動選択開始', sheetName);
-        
+
         try {
           const select = document.getElementById('sheet-select');
           if (!select) {
@@ -1225,7 +1242,7 @@
           }
 
           // オプションから該当する名前を探す
-          const option = Array.from(select.options).find(opt => opt.textContent === sheetName);
+          const option = Array.from(select.options).find((opt) => opt.textContent === sheetName);
           if (option) {
             select.value = option.value;
             console.log('シート自動選択完了:', sheetName);
@@ -1244,11 +1261,11 @@
       // 列設定の自動初期化（フォールバック処理強化版）
       async function autoInitializeColumnSettings(config) {
         console.log('autoInitializeColumnSettings: 列設定自動初期化開始', config);
-        
+
         try {
           const spreadsheetId = config.spreadsheetId;
           let sheetName = config.sheetName;
-          
+
           if (!spreadsheetId) {
             console.log('スプレッドシートIDが不足、列設定スキップ');
             return;
@@ -1263,7 +1280,7 @@
                 // 優先順位でシートを選択
                 sheetName = detectBestSheetName(sheets);
                 console.log('自動検出によるシート選択:', sheetName);
-                
+
                 // UI更新: 自動選択されたシートを反映
                 await autoSelectSheet(sheetName);
               } else {
@@ -1287,7 +1304,6 @@
             // 新規にAI分析実行
             await analyzeAndSetupColumns(spreadsheetId, sheetName);
           }
-
         } catch (error) {
           console.error('列設定自動初期化エラー:', error);
           showError('列設定の初期化に失敗しました: ' + error.message);
@@ -1297,30 +1313,31 @@
       // 最適なシート名を検出
       function detectBestSheetName(sheets) {
         console.log('detectBestSheetName: 最適シート検出開始', sheets);
-        
+
         // 優先順位リスト
         const priorities = ['フォームの回答 1', 'フォームの回答', 'Sheet1', 'シート1'];
-        
+
         // 優先名から検索
         for (const priority of priorities) {
-          const sheet = sheets.find(s => s.name === priority);
-          if (sheet && sheet.rowCount > 1) { // データがあるかチェック
+          const sheet = sheets.find((s) => s.name === priority);
+          if (sheet && sheet.rowCount > 1) {
+            // データがあるかチェック
             console.log('優先シート選択:', priority);
             return priority;
           }
         }
-        
+
         // データが最も多いシートを選択
         const sheetsWithData = sheets
-          .filter(s => s.rowCount > 1)
+          .filter((s) => s.rowCount > 1)
           .sort((a, b) => b.rowCount - a.rowCount);
-        
+
         if (sheetsWithData.length > 0) {
           const selected = sheetsWithData[0].name;
           console.log('データ最大シート選択:', selected);
           return selected;
         }
-        
+
         // フォールバック: 最初のシート
         const fallback = sheets[0].name;
         console.log('フォールバック選択:', fallback);
@@ -1330,28 +1347,28 @@
       // 既存の列設定データから復元（引数更新版）
       async function restoreColumnSettingsFromConfig(config, sheetName) {
         console.log('restoreColumnSettingsFromConfig: 既存設定復元開始', { config, sheetName });
-        
+
         try {
           // 有効なシート名を決定
           const targetSheetName = sheetName || config.sheetName;
           if (!targetSheetName) {
             throw new Error('復元に必要なシート名が不足しています');
           }
-          
+
           // まず列構造を分析してヘッダーを取得
           const result = await analyzeColumnsAsync(config.spreadsheetId, targetSheetName);
-          
+
           if (result && result.success && result.headers) {
             console.log('列構造分析完了、ドロップダウンを設定');
-            
+
             // ドロップダウンを初期化
             populateColumnDropdowns(result.headers, result.columnMapping || {});
-            
+
             // 既存の選択状況があれば反映
             if (config.columnSelections) {
               applyPreviousColumnSelections(config.columnSelections);
             }
-            
+
             console.log('既存設定からの列設定復元完了');
           } else {
             throw new Error('列構造の分析に失敗しました');
@@ -1365,10 +1382,10 @@
       // 新規AI分析と列設定
       async function analyzeAndSetupColumns(spreadsheetId, sheetName) {
         console.log('analyzeAndSetupColumns: 新規AI分析開始');
-        
+
         try {
           const result = await analyzeColumnsAsync(spreadsheetId, sheetName);
-          
+
           if (result && result.success) {
             console.log('AI分析完了、列設定UIを更新');
             updateColumnMapping(result);
@@ -1384,16 +1401,16 @@
       // 以前の列選択を復元
       function applyPreviousColumnSelections(columnSelections) {
         console.log('applyPreviousColumnSelections: 以前の選択を復元', columnSelections);
-        
-        Object.keys(columnSelections).forEach(columnType => {
+
+        Object.keys(columnSelections).forEach((columnType) => {
           if (columnType.startsWith('_')) return; // メタデータはスキップ
-          
+
           const selection = columnSelections[columnType];
           const dropdown = document.getElementById(`${columnType}-column-select`);
-          
+
           if (dropdown && selection && typeof selection.columnIndex === 'number') {
             dropdown.value = selection.columnIndex;
-            
+
             // 選択タイプに応じたクラス設定
             if (selection.selectionType === 'manual') {
               dropdown.classList.add('has-manual-selection');
@@ -1402,7 +1419,7 @@
               dropdown.classList.add('has-ai-selection');
               showConfidenceBadge(columnType, selection.confidence || 0, 'ai');
             }
-            
+
             console.log(`列選択復元: ${columnType} → ${selection.columnLabel}`);
           }
         });
@@ -1411,25 +1428,24 @@
       // 進捗ステップを設定から更新
       function updateProgressFromConfig(config) {
         console.log('updateProgressFromConfig: 進捗更新開始', config);
-        
+
         try {
           let currentStep = 1;
-          
+
           if (config.spreadsheetId && config.sheetName) {
             currentStep = 2; // データソース接続完了
           }
-          
+
           if (config.columnMapping || config.columnSelections) {
             currentStep = 2; // 列設定完了
           }
-          
+
           if (config.setupComplete) {
             currentStep = 3; // セットアップ完了
           }
-          
+
           console.log('進捗ステップ更新:', currentStep);
           updateProgress(currentStep);
-          
         } catch (error) {
           console.error('進捗更新エラー:', error);
         }
@@ -1472,59 +1488,59 @@
       }
 
       // ========== リソースボタン関連関数 ==========
-      
+
       // スプレッドシートを新タブで開く
       function openSpreadsheet() {
         const btn = document.getElementById('open-spreadsheet-btn');
         const spreadsheetId = btn.dataset.spreadsheetId;
-        
+
         if (!spreadsheetId) {
           showError('スプレッドシートが設定されていません');
           return;
         }
-        
+
         const spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit';
         window.open(spreadsheetUrl, '_blank');
         showSuccess('📊 スプレッドシートを開きました');
       }
-      
+
       // フォームを新タブで開く
       function openForm() {
         const btn = document.getElementById('open-form-btn');
         const formUrl = btn.dataset.formUrl;
-        
+
         if (!formUrl) {
           showError('フォームURLが設定されていません');
           return;
         }
-        
+
         window.open(formUrl, '_blank');
         showSuccess('📝 フォームを開きました');
       }
-      
+
       // 公開ボードを新タブで開く
       function openBoard() {
         const btn = document.getElementById('open-board-btn');
         const boardUrl = btn.dataset.boardUrl;
-        
+
         if (!boardUrl) {
           showError('ボードURLが設定されていません');
           return;
         }
-        
+
         window.open(boardUrl, '_blank');
         showSuccess('🎯 公開ボードを開きました');
       }
-      
+
       // リソースボタンの表示状態を更新
       function updateResourceButtons(config) {
         console.log('updateResourceButtons: リソースボタン更新', config);
-        
+
         const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
         const formBtn = document.getElementById('open-form-btn');
         const boardBtn = document.getElementById('open-board-btn');
         const statusDiv = document.getElementById('resource-status');
-        
+
         // 設定が無い場合の初期状態
         if (!config) {
           spreadsheetBtn.disabled = true;
@@ -1534,7 +1550,7 @@
           statusDiv.textContent = '設定が見つかりません';
           return;
         }
-        
+
         // スプレッドシートボタン
         if (config.spreadsheetId) {
           spreadsheetBtn.disabled = false;
@@ -1545,7 +1561,7 @@
           spreadsheetBtn.dataset.spreadsheetId = '';
           statusDiv.textContent = '⚠️ スプレッドシート未設定';
         }
-        
+
         // フォームボタン（フォーム作成済みの場合のみ表示）
         if (config.formCreated && config.formUrl) {
           formBtn.classList.remove('hidden');
@@ -1554,7 +1570,7 @@
         } else {
           formBtn.classList.add('hidden');
         }
-        
+
         // 公開ボードボタン（アプリ公開済みの場合のみ表示）
         if (config.appPublished && config.boardUrl) {
           boardBtn.classList.remove('hidden');
@@ -1570,13 +1586,13 @@
         } else {
           boardBtn.classList.add('hidden');
         }
-        
+
         // ステータス更新
         let statusParts = [];
         if (config.spreadsheetId) statusParts.push('📊 スプレッドシート');
         if (config.formCreated) statusParts.push('📝 フォーム');
         if (config.appPublished) statusParts.push('🎯 ボード');
-        
+
         if (statusParts.length > 0) {
           statusDiv.textContent = `✅ 利用可能: ${statusParts.join(', ')}`;
           statusDiv.className = 'text-xs text-green-400 mt-2 text-center';
@@ -1757,7 +1773,7 @@
       function toggleSourceMethod(method) {
         const dropdownMethod = document.getElementById('dropdown-method');
         const urlMethod = document.getElementById('url-method');
-        
+
         if (method === 'url') {
           dropdownMethod.classList.add('hidden');
           urlMethod.classList.remove('hidden');
@@ -1771,7 +1787,7 @@
       function validateSpreadsheetUrl() {
         const urlInput = document.getElementById('spreadsheet-url');
         const url = urlInput.value.trim();
-        
+
         if (!url) {
           showError('スプレッドシートURLを入力してください');
           return;
@@ -1780,7 +1796,7 @@
         // GoogleスプレッドシートURLの基本的な検証
         const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
         const match = url.match(spreadsheetRegex);
-        
+
         if (!match) {
           showError('有効なGoogleスプレッドシートのURLを入力してください');
           return;
@@ -1791,7 +1807,7 @@
 
         // バックエンドでアクセス権限を確認
         google.script.run
-          .withSuccessHandler(function(result) {
+          .withSuccessHandler(function (result) {
             setLoading(false);
             if (result.success) {
               showSuccess('✅ スプレッドシートへのアクセスが確認できました');
@@ -1802,10 +1818,12 @@
                 updateSheetNameSuggestions(result.sheets);
               }
             } else {
-              showError('スプレッドシートにアクセスできません: ' + (result.error || 'Unknown error'));
+              showError(
+                'スプレッドシートにアクセスできません: ' + (result.error || 'Unknown error')
+              );
             }
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             setLoading(false);
             console.error('URL検証エラー:', error);
             showError('URL検証に失敗しました: ' + error.message);
@@ -1819,7 +1837,7 @@
         if (sheets && sheets.length > 0) {
           // デフォルトで最初のシートを設定
           sheetNameInput.value = sheets[0].name;
-          
+
           // datalistで候補を表示（より良いUX）
           let datalist = document.getElementById('sheet-suggestions');
           if (!datalist) {
@@ -1828,9 +1846,9 @@
             sheetNameInput.setAttribute('list', 'sheet-suggestions');
             sheetNameInput.parentNode.appendChild(datalist);
           }
-          
+
           datalist.innerHTML = '';
-          sheets.forEach(sheet => {
+          sheets.forEach((sheet) => {
             const option = document.createElement('option');
             option.value = sheet.name;
             datalist.appendChild(option);
@@ -1842,15 +1860,15 @@
       function connectToUrlSource() {
         const urlInput = document.getElementById('spreadsheet-url');
         const sheetNameInput = document.getElementById('sheet-name-input');
-        
+
         const url = urlInput.value.trim();
         const sheetName = sheetNameInput.value.trim();
-        
+
         if (!url) {
           showError('スプレッドシートURLを入力してください');
           return;
         }
-        
+
         if (!sheetName) {
           showError('シート名を入力してください');
           return;
@@ -1859,14 +1877,14 @@
         // URLからスプレッドシートIDを抽出
         const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
         const match = url.match(spreadsheetRegex);
-        
+
         if (!match) {
           showError('有効なGoogleスプレッドシートのURLを入力してください');
           return;
         }
 
         const spreadsheetId = match[1];
-        
+
         console.log('URL入力方式で接続開始:', { spreadsheetId, sheetName });
         setLoading(true);
 
@@ -1895,8 +1913,8 @@
       // イベントリスナー設定
       document.addEventListener('DOMContentLoaded', function () {
         // データソース選択方式の切り替え
-        document.querySelectorAll('input[name="source-method"]').forEach(radio => {
-          radio.addEventListener('change', function() {
+        document.querySelectorAll('input[name="source-method"]').forEach((radio) => {
+          radio.addEventListener('change', function () {
             toggleSourceMethod(this.value);
           });
         });
@@ -2105,11 +2123,11 @@
           answer: document.getElementById('answer-column-select'),
           reason: document.getElementById('reason-column-select'),
           class: document.getElementById('class-column-select'),
-          name: document.getElementById('name-column-select')
+          name: document.getElementById('name-column-select'),
         };
 
         // 各ドロップダウンをクリアしてヘッダーオプションを追加
-        Object.keys(dropdowns).forEach(columnType => {
+        Object.keys(dropdowns).forEach((columnType) => {
           const dropdown = dropdowns[columnType];
           if (!dropdown) return;
 
@@ -2141,15 +2159,15 @@
         // グローバル変数として現在のAI検出結果を保存
         window.currentAIMapping = mapping;
 
-        // マッピングの対応関係
+        // マッピングの対応関係（バックエンドのconvertIndicesToMappingと統一）
         const mappingKeys = {
-          answer: ['answerer', 'answer'], // 旧システムでは answerer が回答を意味する場合がある
-          reason: ['reason'],
-          class: ['class'], 
-          name: ['name', 'answerer'] // 名前の場合
+          answer: ['answer'], // バックエンドのCOLUMN_HEADERS.OPINION → answer
+          reason: ['reason'], // バックエンドのCOLUMN_HEADERS.REASON → reason
+          class: ['class'], // バックエンドのCOLUMN_HEADERS.CLASS → class
+          name: ['name'], // バックエンドのCOLUMN_HEADERS.NAME → name
         };
 
-        Object.keys(dropdowns).forEach(columnType => {
+        Object.keys(dropdowns).forEach((columnType) => {
           const dropdown = dropdowns[columnType];
           if (!dropdown) return;
 
@@ -2157,10 +2175,11 @@
           let selectedIndex = null;
           let confidence = 0;
 
-          mappingKeys[columnType].forEach(key => {
+          mappingKeys[columnType].forEach((key) => {
             if (mapping[key] !== null && mapping[key] !== undefined) {
               selectedIndex = mapping[key];
-              confidence = mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
+              confidence =
+                mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
             }
           });
 
@@ -2168,7 +2187,7 @@
             // ドロップダウンの選択を設定
             dropdown.value = selectedIndex;
             dropdown.classList.add('has-ai-selection');
-            
+
             // 信頼度バッジを表示
             showConfidenceBadge(columnType, confidence, 'ai');
 
@@ -2185,11 +2204,11 @@
 
       // ドロップダウンの変更イベントリスナーを設定
       function setupDropdownEventListeners(dropdowns) {
-        Object.keys(dropdowns).forEach(columnType => {
+        Object.keys(dropdowns).forEach((columnType) => {
           const dropdown = dropdowns[columnType];
           if (!dropdown) return;
 
-          dropdown.addEventListener('change', function() {
+          dropdown.addEventListener('change', function () {
             handleDropdownChange(columnType, this);
           });
         });
@@ -2197,7 +2216,7 @@
         // AI検出に戻すボタンのイベントリスナー
         const resetButton = document.getElementById('reset-to-ai');
         if (resetButton) {
-          resetButton.addEventListener('click', function() {
+          resetButton.addEventListener('click', function () {
             resetToAIDetection();
           });
         }
@@ -2240,7 +2259,7 @@
       function showConfidenceBadge(columnType, confidence, type) {
         const confidenceDiv = document.getElementById(`${columnType}-confidence`);
         const badge = confidenceDiv.querySelector('.confidence-badge');
-        
+
         if (!confidenceDiv || !badge) return;
 
         let badgeClass = '';
@@ -2284,31 +2303,34 @@
         const details = [];
         const columnNames = {
           answerer: '回答列',
-          reason: '理由列', 
+          reason: '理由列',
           class: 'クラス列',
-          name: '名前列'
+          name: '名前列',
         };
 
-        Object.keys(columnNames).forEach(key => {
+        Object.keys(columnNames).forEach((key) => {
           if (mapping[key] !== null && mapping[key] !== undefined) {
             const columnLabel = String.fromCharCode(65 + mapping[key]) + '列';
-            const confidence = mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
-            details.push(`${columnNames[key]}: ${columnLabel} (信頼度: ${Math.round(confidence)}%)`);
+            const confidence =
+              mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
+            details.push(
+              `${columnNames[key]}: ${columnLabel} (信頼度: ${Math.round(confidence)}%)`
+            );
           }
         });
 
-        detailsDiv.innerHTML = details.map(detail => 
-          `<div>• ${detail}</div>`
-        ).join('');
+        detailsDiv.innerHTML = details.map((detail) => `<div>• ${detail}</div>`).join('');
       }
 
       // 選択状況を更新
       function updateSelectionStatus() {
-        const hasManualSelection = document.querySelectorAll('.modern-select.has-manual-selection').length > 0;
-        const hasAISelection = document.querySelectorAll('.modern-select.has-ai-selection').length > 0;
+        const hasManualSelection =
+          document.querySelectorAll('.modern-select.has-manual-selection').length > 0;
+        const hasAISelection =
+          document.querySelectorAll('.modern-select.has-ai-selection').length > 0;
 
         console.log('選択状況:', { hasManualSelection, hasAISelection });
-        
+
         // AI検出情報とリセットボタンの表示制御
         const resetButton = document.getElementById('reset-to-ai');
         if (resetButton) {
@@ -2319,7 +2341,7 @@
       // AI検出結果に戻す
       function resetToAIDetection() {
         console.log('AI検出結果にリセット');
-        
+
         if (!window.currentAIMapping) {
           showError('AI検出データがありません');
           return;
@@ -2330,7 +2352,7 @@
           answer: document.getElementById('answer-column-select'),
           reason: document.getElementById('reason-column-select'),
           class: document.getElementById('class-column-select'),
-          name: document.getElementById('name-column-select')
+          name: document.getElementById('name-column-select'),
         };
 
         // AI検出結果を再設定
@@ -2505,16 +2527,16 @@
       // 設定収集（ドロップダウン式対応）
       function gatherConfiguration() {
         const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
-        
+
         let spreadsheetId, sheetName;
-        
+
         if (sourceMethod === 'url') {
           // URL入力方式
           const urlInput = document.getElementById('spreadsheet-url');
           const url = urlInput.value.trim();
           const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
           const match = url.match(spreadsheetRegex);
-          
+
           if (match) {
             spreadsheetId = match[1];
           }
@@ -2527,7 +2549,7 @@
 
         // ドロップダウンから列選択を収集
         const columnSelections = gatherColumnSelections();
-        
+
         return {
           spreadsheetId: spreadsheetId,
           sheetName: sheetName,
@@ -2545,13 +2567,13 @@
           answer: document.getElementById('answer-column-select'),
           reason: document.getElementById('reason-column-select'),
           class: document.getElementById('class-column-select'),
-          name: document.getElementById('name-column-select')
+          name: document.getElementById('name-column-select'),
         };
 
         const selections = {};
         let hasAnySelection = false;
 
-        Object.keys(dropdowns).forEach(columnType => {
+        Object.keys(dropdowns).forEach((columnType) => {
           const dropdown = dropdowns[columnType];
           if (!dropdown) return;
 
@@ -2564,7 +2586,7 @@
               columnIndex: parseInt(selectedValue),
               columnLabel: String.fromCharCode(65 + parseInt(selectedValue)) + '列',
               selectionType: isManual ? 'manual' : 'ai',
-              confidence: getColumnConfidence(columnType)
+              confidence: getColumnConfidence(columnType),
             };
             hasAnySelection = true;
           }
@@ -2576,7 +2598,7 @@
         }
 
         selections._hasSelections = hasAnySelection;
-        
+
         console.log('gatherColumnSelections:', selections);
         return selections;
       }
@@ -2593,7 +2615,7 @@
 
         const text = badge.textContent;
         const match = text.match(/(\d+)%/);
-        return match ? parseInt(match[1]) : (badge.classList.contains('manual') ? 100 : 0);
+        return match ? parseInt(match[1]) : badge.classList.contains('manual') ? 100 : 0;
       }
 
       // 旧updateConfigDisplay関数は削除済み - updateResourceButtons()を使用
