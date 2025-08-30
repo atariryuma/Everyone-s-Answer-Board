@@ -45,7 +45,7 @@ const User = {
   },
 
   /**
-   * 現在のユーザーの詳細情報を取得
+   * 現在のユーザーの詳細情報を取得（設定を含む）
    * @return {Object|null} ユーザー情報オブジェクト、エラーの場合null
    */
   info() {
@@ -61,6 +61,24 @@ const User = {
       if (!userInfo) {
         console.warn('ユーザー情報が見つかりません', { userEmail });
         return null;
+      }
+
+      // ユーザー設定を PropertiesService から取得してマージ
+      try {
+        const props = PropertiesService.getScriptProperties();
+        const configKey = `user_config_${userInfo.userId}`;
+        const configStr = props.getProperty(configKey);
+        
+        if (configStr) {
+          const config = JSON.parse(configStr);
+          // ユーザー情報に設定をマージ
+          return {
+            ...userInfo,
+            ...config,
+          };
+        }
+      } catch (configError) {
+        console.warn('ユーザー設定取得エラー:', configError);
       }
 
       return userInfo;
@@ -1337,8 +1355,14 @@ function renderAnswerBoard(userInfo, params) {
       }
       template.opinionHeader = escapeJavaScript(rawOpinionHeader);
       template.cacheTimestamp = Date.now();
-      template.displayMode = config.displayMode || 'anonymous';
-      template.showCounts = config.showCounts !== undefined ? config.showCounts : false;
+      
+      // 現在の設定から表示設定を取得
+      const currentConfig = getCurrentConfig();
+      const displaySettings = currentConfig.displaySettings || {};
+      
+      // 表示設定を適用
+      template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
+      template.showCounts = displaySettings.showReactions !== false;
       template.showScoreSort = template.showCounts;
       const currentUserEmail = User.email();
       const isOwner = currentUserEmail === userInfo.adminEmail;
@@ -1351,8 +1375,12 @@ function renderAnswerBoard(userInfo, params) {
       template.spreadsheetId = userInfo.spreadsheetId;
       template.ownerName = userInfo.adminEmail;
       template.sheetName = escapeJavaScript(params.sheetName);
-      template.displayMode = 'anonymous';
-      template.showCounts = false;
+      
+      // エラー時も表示設定を適用
+      const currentConfig = getCurrentConfig();
+      const displaySettings = currentConfig.displaySettings || {};
+      template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
+      template.showCounts = displaySettings.showReactions !== false;
       template.showScoreSort = false;
       const currentUserEmail = User.email();
       const isOwner = currentUserEmail === userInfo.adminEmail;
@@ -1577,6 +1605,10 @@ function getCurrentConfig() {
       spreadsheetId: userInfo?.spreadsheetId || null,
       adminEmail: userInfo?.adminEmail || null,
       setupComplete: !!userInfo?.spreadsheetId,
+      displaySettings: {
+        showNames: userInfo?.displaySettings?.showNames !== false, // デフォルトtrue
+        showReactions: userInfo?.displaySettings?.showReactions !== false, // デフォルトtrue
+      },
     };
   } catch (error) {
     console.error('getCurrentConfig エラー:', error);

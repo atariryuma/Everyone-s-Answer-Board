@@ -453,10 +453,10 @@ function analyzeColumns(spreadsheetId, sheetName) {
     // ヘッダー行を取得
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // 既存のguessHeadersFromArray関数を使用（高精度AI判定）
+    // 既存のidentifyHeaders関数を使用（高精度AI判定）
     let columnMapping;
-    if (typeof guessHeadersFromArray === 'function') {
-      const guessedHeaders = guessHeadersFromArray(headerRow);
+    if (typeof identifyHeaders === 'function') {
+      const guessedHeaders = identifyHeaders(headerRow);
       console.log('analyzeSpreadsheetColumns: 高精度AI判定結果', guessedHeaders);
       
       // AdminPanel用の形式に変換

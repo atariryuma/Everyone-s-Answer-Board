@@ -712,15 +712,44 @@
               <span class="label">DB接続:</span>
               <span class="status-badge published">正常</span>
             </div>
-            <details class="expandable-section">
-              <summary class="text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">
-                設定詳細 (JSON)
-              </summary>
-              <div class="json-viewer mt-3" id="config-json">
-                { "setupStatus": "pending", "spreadsheetId": null, "sheetName": null, "formCreated":
-                false, "appPublished": false, "lastUpdated": null }
+            <div class="resource-section">
+              <h4 class="text-cyan-400 font-medium mb-3">📚 リソース</h4>
+              <div class="resource-buttons space-y-2">
+                <button
+                  id="open-spreadsheet-btn"
+                  class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onclick="openSpreadsheet()"
+                  disabled
+                >
+                  <span>📊</span>
+                  <span>スプレッドシートを開く</span>
+                </button>
+                
+                <button
+                  id="open-form-btn"
+                  class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
+                  onclick="openForm()"
+                  disabled
+                >
+                  <span>📝</span>
+                  <span>フォームを開く</span>
+                </button>
+                
+                <button
+                  id="open-board-btn"
+                  class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
+                  onclick="openBoard()"
+                  disabled
+                >
+                  <span>🎯</span>
+                  <span>公開ボードを開く</span>
+                </button>
+                
+                <div id="resource-status" class="text-xs text-gray-400 mt-2 text-center">
+                  設定を読み込み中...
+                </div>
               </div>
-            </details>
+            </div>
           </div>
         </section>
 
@@ -863,12 +892,13 @@
         }
       }
 
-      // パネル初期化 - 簡素化
+      // パネル初期化 - 設定読み込み追加
       function initializePanel() {
         try {
           setLoading(true);
           loadSpreadsheetList();
           loadUserInfo();
+          loadCurrentConfig(); // 設定を自動読み込み
           setLoading(false);
         } catch (error) {
           console.error('初期化エラー:', error);
@@ -931,6 +961,148 @@
           document.getElementById('current-user-id').textContent = __USER_ID__;
         } else {
           document.getElementById('current-user-id').textContent = 'N/A';
+        }
+      }
+
+      // 現在の設定を読み込み（初期化時用）
+      function loadCurrentConfig() {
+        console.log('loadCurrentConfig: データベースから設定読み込み開始');
+        
+        google.script.run
+          .withSuccessHandler(function (config) {
+            console.log('loadCurrentConfig: 設定読み込み成功', config);
+            
+            // リソースボタンを更新
+            updateResourceButtons(config);
+            
+            // 設定が存在する場合は成功メッセージ
+            if (config && (config.spreadsheetId || config.setupStatus !== 'pending')) {
+              showSuccess('✅ 既存の設定を読み込みました');
+            } else {
+              showInfo('💡 新規セットアップが必要です');
+            }
+          })
+          .withFailureHandler(function (error) {
+            console.error('loadCurrentConfig: 設定読み込みエラー', error);
+            showError('設定の読み込みに失敗しました: ' + (error.message || 'Unknown error'));
+            // エラー時でもリソースボタンを初期状態で表示
+            updateResourceButtons(null);
+          })
+          .getCurrentConfig();
+      }
+
+      // ========== リソースボタン関連関数 ==========
+      
+      // スプレッドシートを新タブで開く
+      function openSpreadsheet() {
+        const btn = document.getElementById('open-spreadsheet-btn');
+        const spreadsheetId = btn.dataset.spreadsheetId;
+        
+        if (!spreadsheetId) {
+          showError('スプレッドシートが設定されていません');
+          return;
+        }
+        
+        const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+        window.open(spreadsheetUrl, '_blank');
+        showSuccess('📊 スプレッドシートを開きました');
+      }
+      
+      // フォームを新タブで開く
+      function openForm() {
+        const btn = document.getElementById('open-form-btn');
+        const formUrl = btn.dataset.formUrl;
+        
+        if (!formUrl) {
+          showError('フォームURLが設定されていません');
+          return;
+        }
+        
+        window.open(formUrl, '_blank');
+        showSuccess('📝 フォームを開きました');
+      }
+      
+      // 公開ボードを新タブで開く
+      function openBoard() {
+        const btn = document.getElementById('open-board-btn');
+        const boardUrl = btn.dataset.boardUrl;
+        
+        if (!boardUrl) {
+          showError('ボードURLが設定されていません');
+          return;
+        }
+        
+        window.open(boardUrl, '_blank');
+        showSuccess('🎯 公開ボードを開きました');
+      }
+      
+      // リソースボタンの表示状態を更新
+      function updateResourceButtons(config) {
+        console.log('updateResourceButtons: リソースボタン更新', config);
+        
+        const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
+        const formBtn = document.getElementById('open-form-btn');
+        const boardBtn = document.getElementById('open-board-btn');
+        const statusDiv = document.getElementById('resource-status');
+        
+        // 設定が無い場合の初期状態
+        if (!config) {
+          spreadsheetBtn.disabled = true;
+          spreadsheetBtn.dataset.spreadsheetId = '';
+          formBtn.classList.add('hidden');
+          boardBtn.classList.add('hidden');
+          statusDiv.textContent = '設定が見つかりません';
+          return;
+        }
+        
+        // スプレッドシートボタン
+        if (config.spreadsheetId) {
+          spreadsheetBtn.disabled = false;
+          spreadsheetBtn.dataset.spreadsheetId = config.spreadsheetId;
+          statusDiv.textContent = '✅ スプレッドシート接続済み';
+        } else {
+          spreadsheetBtn.disabled = true;
+          spreadsheetBtn.dataset.spreadsheetId = '';
+          statusDiv.textContent = '⚠️ スプレッドシート未設定';
+        }
+        
+        // フォームボタン（フォーム作成済みの場合のみ表示）
+        if (config.formCreated && config.formUrl) {
+          formBtn.classList.remove('hidden');
+          formBtn.disabled = false;
+          formBtn.dataset.formUrl = config.formUrl;
+        } else {
+          formBtn.classList.add('hidden');
+        }
+        
+        // 公開ボードボタン（アプリ公開済みの場合のみ表示）
+        if (config.appPublished && config.boardUrl) {
+          boardBtn.classList.remove('hidden');
+          boardBtn.disabled = false;
+          boardBtn.dataset.boardUrl = config.boardUrl;
+        } else if (config.appPublished) {
+          // 公開済みだがURLが無い場合は、動的に生成
+          boardBtn.classList.remove('hidden');
+          boardBtn.disabled = false;
+          // ユーザーIDからボードURLを生成
+          const baseUrl = window.location.origin + window.location.pathname;
+          boardBtn.dataset.boardUrl = `${baseUrl}?userId=${config.userId}`;
+        } else {
+          boardBtn.classList.add('hidden');
+        }
+        
+        // ステータス更新
+        let statusParts = [];
+        if (config.spreadsheetId) statusParts.push('📊 スプレッドシート');
+        if (config.formCreated) statusParts.push('📝 フォーム');
+        if (config.appPublished) statusParts.push('🎯 ボード');
+        
+        if (statusParts.length > 0) {
+          statusDiv.textContent = `✅ 利用可能: ${statusParts.join(', ')}`;
+          statusDiv.className = 'text-xs text-green-400 mt-2 text-center';
+        } else {
+          statusDiv.textContent = '💡 リソースの設定を開始してください';
+          statusDiv.className = 'text-xs text-yellow-400 mt-2 text-center';
         }
       }
 
@@ -1486,7 +1658,7 @@
         });
       }
 
-      // 列マッピング更新
+      // 列マッピング更新（改善版）
       function updateColumnMapping(mapping) {
         console.log('Column mapping received:', mapping);
 
@@ -1505,59 +1677,95 @@
         // 既存の列表示をクリア
         columnsContainer.innerHTML = '';
 
-        // 列タイプの表示名マッピング
+        // 列タイプの表示名マッピング（改善版）
         const typeDisplayNames = {
-          question: '質問',
-          answerer: '回答者',
-          reason: '理由',
-          timestamp: 'タイムスタンプ',
-          class: 'クラス',
+          question: '📝 質問',
+          answer: '💬 回答', 
+          answerer: '👤 回答者',
+          reason: '📋 理由',
+          timestamp: '⏰ タイムスタンプ',
+          class: '🏫 クラス',
+          name: '👤 名前',
+          // リアクション列
+          understand: '💡 なるほど！',
+          like: '👍 いいね！', 
+          curious: '🤔 もっと知りたい！',
+          highlight: '⭐ ハイライト'
         };
 
-        // 検出された列を表示
+        // 列の表示優先順位
+        const displayOrder = [
+          'question', 'answer', 'reason', 'answerer', 'name', 'class', 'timestamp',
+          'understand', 'like', 'curious', 'highlight'
+        ];
+
+        // 検出された列を優先順位に従って表示
         let hasValidMapping = false;
+        const usedColumns = new Set(); // 重複する列の割り当てを追跡
 
-        Object.keys(mapping).forEach((type) => {
-          if (type === 'confidence') return; // 信頼度オブジェクトはスキップ
-
+        displayOrder.forEach((type) => {
           const columnIndex = mapping[type];
-          const confidence =
-            mapping.confidence && mapping.confidence[type] ? mapping.confidence[type] : 0;
+          const confidence = mapping.confidence && mapping.confidence[type] ? mapping.confidence[type] : 0;
 
           if (columnIndex !== null && columnIndex !== undefined) {
             hasValidMapping = true;
+            const columnLabel = String.fromCharCode(65 + columnIndex) + '列';
+            
+            // 重複する列の警告
+            const isDuplicate = usedColumns.has(columnIndex);
+            if (isDuplicate) {
+              console.warn(`Column ${columnLabel} is mapped to multiple purposes`);
+            }
+            usedColumns.add(columnIndex);
 
             const columnMatch = document.createElement('div');
             columnMatch.className = 'column-match';
 
-            // 信頼度に基づく色分け
-            let bgColor = 'rgba(34, 197, 94, 0.1)'; // 緑（高信頼度）
-            let borderColor = 'rgba(34, 197, 94, 0.3)';
-            let confidenceColor = 'rgba(34, 197, 94, 0.8)';
-
-            if (confidence < 70) {
+            // 信頼度に基づく色分け（改善版）
+            let bgColor, borderColor, confidenceColor, textColor = '#374151';
+            
+            if (confidence >= 90) {
+              bgColor = 'rgba(34, 197, 94, 0.15)'; // 濃い緑（非常に高信頼度）
+              borderColor = 'rgba(34, 197, 94, 0.4)';
+              confidenceColor = 'rgba(34, 197, 94, 0.9)';
+            } else if (confidence >= 70) {
+              bgColor = 'rgba(34, 197, 94, 0.1)'; // 緑（高信頼度）
+              borderColor = 'rgba(34, 197, 94, 0.3)';
+              confidenceColor = 'rgba(34, 197, 94, 0.8)';
+            } else if (confidence >= 50) {
               bgColor = 'rgba(245, 158, 11, 0.1)'; // 黄（中信頼度）
               borderColor = 'rgba(245, 158, 11, 0.3)';
               confidenceColor = 'rgba(245, 158, 11, 0.8)';
-            }
-
-            if (confidence < 50) {
+            } else {
               bgColor = 'rgba(239, 68, 68, 0.1)'; // 赤（低信頼度）
               borderColor = 'rgba(239, 68, 68, 0.3)';
               confidenceColor = 'rgba(239, 68, 68, 0.8)';
             }
 
+            // 重複の場合は警告色を追加
+            if (isDuplicate) {
+              bgColor = 'rgba(245, 101, 101, 0.15)'; // オレンジ系警告色
+              borderColor = 'rgba(245, 101, 101, 0.4)';
+              textColor = '#B91C1C';
+            }
+
             columnMatch.style.background = bgColor;
             columnMatch.style.borderColor = borderColor;
+            columnMatch.style.color = textColor;
 
             const displayName = typeDisplayNames[type] || type;
-            const columnLabel = String.fromCharCode(65 + columnIndex) + '列'; // A列、B列など
+            const duplicateWarning = isDuplicate ? ' ⚠️' : '';
 
             columnMatch.innerHTML = `
-            <span class="column-type">${displayName}</span>
-            <span class="detected-column">${columnLabel}</span>
-            <span class="confidence" style="color: ${confidenceColor}">${Math.round(confidence)}%確信度</span>
-          `;
+              <div class="flex items-center justify-between w-full">
+                <span class="column-type font-medium">${displayName}${duplicateWarning}</span>
+                <div class="flex items-center space-x-2">
+                  <span class="detected-column px-2 py-1 bg-gray-100 rounded text-sm font-mono">${columnLabel}</span>
+                  <span class="confidence text-xs" style="color: ${confidenceColor}">${Math.round(confidence)}%</span>
+                </div>
+              </div>
+              ${isDuplicate ? '<div class="text-xs text-orange-600 mt-1">⚠️ 同じ列が複数の目的に割り当てられています</div>' : ''}
+            `;
 
             columnsContainer.appendChild(columnMatch);
           }
@@ -1570,15 +1778,24 @@
           noMapping.style.background = 'rgba(107, 114, 128, 0.1)';
           noMapping.style.borderColor = 'rgba(107, 114, 128, 0.3)';
           noMapping.innerHTML = `
-          <span class="column-type">自動検出失敗</span>
-          <span class="detected-column">手動設定が必要</span>
-          <span class="confidence" style="color: rgba(239, 68, 68, 0.8)">0%確信度</span>
-        `;
+            <div class="flex items-center justify-between w-full">
+              <span class="column-type">❌ 自動検出失敗</span>
+              <div class="flex items-center space-x-2">
+                <span class="detected-column px-2 py-1 bg-gray-100 rounded text-sm">手動設定が必要</span>
+                <span class="confidence text-xs" style="color: rgba(239, 68, 68, 0.8)">0%</span>
+              </div>
+            </div>
+          `;
           columnsContainer.appendChild(noMapping);
 
           showError('列の自動検出に失敗しました。手動で設定してください');
         } else {
-          showSuccess('列マッピングを更新しました');
+          // 重複警告がある場合の追加メッセージ
+          if (usedColumns.size < Object.keys(mapping).length - 1) { // -1 for confidence object
+            showError('⚠️ 一部の列が重複して割り当てられています。確認してください。');
+          } else {
+            showSuccess('✅ 列マッピングを更新しました');
+          }
         }
       }
 
@@ -1676,7 +1893,7 @@
           .withSuccessHandler(function (result) {
             if (result.success) {
               showSuccess('下書きを保存しました');
-              updateConfigDisplay(result.config);
+              updateResourceButtons(result.config);
             } else {
               showError(result.error);
             }
@@ -1717,7 +1934,7 @@
             if (result.success) {
               showSuccess('アプリを公開しました！');
               updatePublishStatus('published');
-              updateConfigDisplay(result.config);
+              updateResourceButtons(result.config);
             } else {
               showError(result.error);
             }
@@ -1766,10 +1983,7 @@
         };
       }
 
-      // 設定表示更新
-      function updateConfigDisplay(config) {
-        document.getElementById('config-json').textContent = JSON.stringify(config, null, 2);
-      }
+      // 旧updateConfigDisplay関数は削除済み - updateResourceButtons()を使用
 
       // 公開ステータス更新
       function updatePublishStatus(status) {
