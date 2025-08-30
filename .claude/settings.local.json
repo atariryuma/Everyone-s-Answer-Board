@@ -11,7 +11,9 @@
       "Bash(npm test)",
       "Bash(git commit:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)"
     ],
     "deny": [],
     "ask": [],

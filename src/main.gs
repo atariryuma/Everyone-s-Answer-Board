@@ -80,6 +80,36 @@ function getUserEmail() {
   return User.email();
 }
 
+/**
+ * 現在のユーザー情報を取得（unifiedUserManager.getCurrentUser()の代替）
+ * @return {Object|null} ユーザー情報オブジェクト
+ */
+function getCurrentUserInfo() {
+  try {
+    const userEmail = User.email();
+    if (!userEmail) {
+      console.warn('getCurrentUserInfo: メールアドレス取得失敗');
+      return null;
+    }
+    
+    const userInfo = DB.findUserByEmail(userEmail);
+    if (!userInfo) {
+      console.warn('getCurrentUserInfo: ユーザー情報が見つかりません', { userEmail });
+      return null;
+    }
+    
+    return {
+      userId: userInfo.userId,
+      adminEmail: userInfo.adminEmail,
+      spreadsheetId: userInfo.spreadsheetId,
+      configJson: userInfo.configJson
+    };
+  } catch (error) {
+    console.error('getCurrentUserInfo エラー', { error: error.message });
+    return null;
+  }
+}
+
 // アクセス制御関連の機能
 const Access = {
   /**

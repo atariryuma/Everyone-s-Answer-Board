@@ -531,7 +531,7 @@ function getCurrentBoardInfoAndUrls() {
     console.log('getCurrentBoardInfoAndUrls: ボード情報取得開始');
     
     // 現在ログイン中のユーザー情報を取得
-    const userInfo = unifiedUserManager.getCurrentUser();
+    const userInfo = getCurrentUserInfo();
     if (!userInfo || !userInfo.userId) {
       console.warn('getCurrentBoardInfoAndUrls: ユーザー情報が見つかりません');
       return {
