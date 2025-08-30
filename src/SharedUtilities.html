@@ -1114,10 +1114,20 @@ window.setLoading = function(isLoading, message, step, percentage) {
         'speaker',
         'vibrate',
         'vr',
+        'gyroscope',
+        'accelerometer',
+        'magnetometer',
+        'camera',
+        'microphone',
+        'geolocation',
         'allow-scripts',
         'allow-same-origin',
         'feature',
-        'permission'
+        'permission',
+        'permissions policy',
+        'feature policy',
+        'escape its sandboxing',
+        'document.domain setter'
       ];
       
       const shouldSuppress = suppressPatterns.some(pattern => 

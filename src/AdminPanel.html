@@ -15,21 +15,81 @@
     const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
   </script>
   <style>
-    /* AdminPanel専用スタイル - AppSetupPageと統一 */
+    /* AdminPanel専用スタイル - commit 421e817 レイアウト構造 + 現在のダークテーマ */
     body { 
       margin: 0; 
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
     }
 
-    /* 簡素化されたAdminPanelスタイル */
     .admin-container {
-      max-width: 4xl;
-      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1rem;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .main-editor {
       padding: 1.5rem;
     }
 
-    /* このセクションのスタイルは削除 */
+    .info-panel {
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    .card {
+      margin-bottom: 1rem;
+    }
+
+    .info-card {
+      margin-bottom: 0.75rem;
+    }
+
+    /* ステータスヘッダー */
+    .status-header {
+      padding: 1rem 1.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .system-monitor {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.875rem;
+      color: #64748b;
+    }
+
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    .status-indicator.active {
+      background-color: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    }
+
+    .status-indicator.warning {
+      background-color: #f59e0b;
+    }
+
+    .status-indicator.error {
+      background-color: #ef4444;
+    }
 
     /* 進捗スタイルを簡素化 */
     .setup-progress {
@@ -319,10 +379,18 @@
       color: rgba(34, 197, 94, 0.8);
     }
 
-    /* レスポンシブデザイン - 簡素化 */
+    /* レスポンシブデザイン */
     @media (max-width: 768px) {
       .admin-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
         padding: 1rem;
+      }
+      
+      .status-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
       }
       
       .setup-progress {
@@ -350,127 +418,135 @@
     <!-- Notification Container -->
     <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
     
-    <div class="admin-container max-w-4xl mx-auto p-6">
-        <!-- ヘッダー -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-cyan-400 mb-2">🛠️ StudyQuest 管理パネル</h1>
-            <p class="text-xl text-gray-300">アプリケーションの設定と管理を行います</p>
-            <p class="text-sm text-gray-400 mt-2">データソースの接続、表示設定、公開設定を管理できます</p>
+  <div class="admin-container">
+    <!-- 左パネル: メインエディタ -->
+    <div class="main-editor">
+      <!-- ステータスヘッダー -->
+      <header class="status-header glass-panel rounded-xl">
+        <h1 class="text-cyan-400 font-bold">StudyQuest 管理パネル</h1>
+        <div class="system-monitor">
+          <span><span class="status-indicator active"></span>接続正常</span>
+          <span id="last-update">最終同期: --:--</span>
+          <span id="health-check">DB正常</span>
         </div>
+      </header>
 
-        <!-- セットアップ進捗 -->
-        <div class="setup-progress mb-6">
-            <div class="step completed">1. データソース</div>
-            <div class="step current">2. 列設定</div>
-            <div class="step">3. 公開</div>
-        </div>
+      <!-- セットアップ進捗 -->
+      <div class="setup-progress">
+        <div class="step completed">1. データソース</div>
+        <div class="step current">2. 列設定</div>
+        <div class="step">3. 公開</div>
+      </div>
 
-        <!-- データソース選択パネル -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
-            <div class="space-y-4">
-                <div class="form-group">
-                    <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2">スプレッドシート:</label>
-                    <select id="spreadsheet-select" class="modern-select">
-                        <option value="">読み込み中...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2">シート:</label>
-                    <select id="sheet-select" class="modern-select">
-                        <option value="">スプレッドシートを選択してください</option>
-                    </select>
-                </div>
-                <div class="action-buttons">
-                    <button id="refresh-data" class="btn-secondary">🔄 更新</button>
-                    <button id="connect-source" class="btn-primary">接続</button>
-                </div>
-            </div>
+      <!-- データソース選択カード -->
+      <section class="card glass-panel rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
+        <div class="space-y-4">
+          <div class="form-group">
+            <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2">スプレッドシート:</label>
+            <select id="spreadsheet-select" class="modern-select">
+              <option value="">読み込み中...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2">シート:</label>
+            <select id="sheet-select" class="modern-select">
+              <option value="">スプレッドシートを選択してください</option>
+            </select>
+          </div>
+          <div class="action-buttons">
+            <button id="refresh-data" class="btn-secondary" type="button">🔄 更新</button>
+            <button id="connect-source" class="btn-primary" type="button">接続</button>
+          </div>
         </div>
+      </section>
 
-        <!-- 列マッピングパネル -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
-            <div class="auto-detected-columns mb-4">
-                <div class="column-match">
-                    <span class="column-type">質問</span>
-                    <span class="detected-column">A列</span>
-                    <span class="confidence">95%確信度</span>
-                </div>
-                <div class="column-match">
-                    <span class="column-type">回答者</span>
-                    <span class="detected-column">B列</span>
-                    <span class="confidence">88%確信度</span>
-                </div>
-                <div class="column-match">
-                    <span class="column-type">理由</span>
-                    <span class="detected-column">C列</span>
-                    <span class="confidence">92%確信度</span>
-                </div>
-            </div>
-            <div class="action-buttons">
-                <button id="verify-mapping" class="btn-primary">設定を確認</button>
-            </div>
+      <!-- 列マッピングカード -->
+      <section class="card glass-panel rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
+        <div class="auto-detected-columns mb-4">
+          <div class="column-match">
+            <span class="column-type">質問</span>
+            <span class="detected-column">A列</span>
+            <span class="confidence">95%確信度</span>
+          </div>
+          <div class="column-match">
+            <span class="column-type">回答者</span>
+            <span class="detected-column">B列</span>
+            <span class="confidence">88%確信度</span>
+          </div>
+          <div class="column-match">
+            <span class="column-type">理由</span>
+            <span class="detected-column">C列</span>
+            <span class="confidence">92%確信度</span>
+          </div>
         </div>
+        <div class="action-buttons">
+          <button id="verify-mapping" class="btn-primary" type="button">設定を確認</button>
+        </div>
+      </section>
 
-        <!-- 表示設定パネル -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
-            <div class="toggle-group">
-                <label class="toggle-switch">
-                    <input type="checkbox" id="show-names" checked>
-                    <span class="slider"></span>
-                    回答者名を表示
-                </label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="show-reactions" checked>
-                    <span class="slider"></span>
-                    リアクション数を表示
-                </label>
-            </div>
+      <!-- 表示設定カード -->
+      <section class="card glass-panel rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
+        <div class="toggle-group">
+          <label class="toggle-switch">
+            <input type="checkbox" id="show-names" checked>
+            <span class="slider"></span>
+            回答者名を表示
+          </label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="show-reactions" checked>
+            <span class="slider"></span>
+            リアクション数を表示
+          </label>
         </div>
+      </section>
 
-        <!-- 公開設定パネル -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">🚀 公開設定</h2>
-            <div class="space-y-4">
-                <div class="config-item">
-                    <span class="label">現在のステータス:</span>
-                    <span class="status-badge unpublished">未公開</span>
-                </div>
-                <div class="form-group">
-                    <label for="app-name" class="block text-sm font-medium text-gray-300 mb-2">アプリケーション名:</label>
-                    <input type="text" id="app-name" placeholder="例: クラス質問ボード" class="w-full">
-                </div>
-                <div class="action-buttons">
-                    <button id="save-draft" class="btn-secondary">下書き保存</button>
-                    <button id="publish-now" class="btn-primary">今すぐ公開</button>
-                </div>
-            </div>
+      <!-- 公開カード -->
+      <section class="card glass-panel rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">🚀 公開設定</h2>
+        <div class="space-y-4">
+          <div class="config-item">
+            <span class="label">現在のステータス:</span>
+            <span class="status-badge unpublished">未公開</span>
+          </div>
+          <div class="form-group">
+            <label for="app-name" class="block text-sm font-medium text-gray-300 mb-2">アプリケーション名:</label>
+            <input type="text" id="app-name" placeholder="例: クラス質問ボード" class="w-full">
+          </div>
+          <div class="action-buttons">
+            <button id="save-draft" class="btn-secondary" type="button">下書き保存</button>
+            <button id="publish-now" class="btn-primary" type="button">今すぐ公開</button>
+          </div>
         </div>
-        <!-- 情報表示エリア -->
-        <!-- 現在の設定サマリー -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">📋 現在の設定</h2>
-            <div class="config-summary">
-                <div class="config-item">
-                    <span class="label">データソース:</span>
-                    <a href="#" class="link-btn" id="open-sheet">シートを開く</a>
-                </div>
-                <div class="config-item">
-                    <span class="label">セットアップ:</span>
-                    <span class="status-badge unpublished">設定中</span>
-                </div>
-                <div class="config-item">
-                    <span class="label">最終更新:</span>
-                    <span class="text-sm text-gray-400">--:--</span>
-                </div>
-            </div>
+      </section>
+    </div>
+
+    <!-- 右パネル: 情報表示 -->
+    <div class="info-panel">
+      <!-- 現在の設定サマリー -->
+      <section class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">📋 現在の設定</h3>
+        <div class="config-summary">
+          <div class="config-item">
+            <span class="label">データソース:</span>
+            <a href="#" class="link-btn" id="open-sheet">シートを開く</a>
+          </div>
+          <div class="config-item">
+            <span class="label">セットアップ:</span>
+            <span class="status-badge unpublished">設定中</span>
+          </div>
+          <div class="config-item">
+            <span class="label">最終更新:</span>
+            <span class="text-sm text-gray-400">--:--</span>
+          </div>
         </div>
+      </section>
 
       <!-- ユーザー情報 -->
-      <div class="glass-panel rounded-xl p-6 mb-6">
-        <h2 class="text-xl font-semibold text-white mb-4">👤 ユーザー情報</h2>
+      <div class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">👤 ユーザー情報</h3>
         <div class="space-y-3">
           <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
             <span class="text-gray-300">メールアドレス:</span>
@@ -483,6 +559,7 @@
           <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
             <span class="text-gray-300">アクション:</span>
             <button onclick="window.sharedUtilities.auth.switchToAnotherAccount()" 
+                    type="button"
                     class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">
               ログアウト
             </button>
@@ -490,17 +567,17 @@
         </div>
       </div>
 
-        <!-- データベース詳細 -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">🗄️ データベース詳細</h2>
-            <div class="space-y-4">
-                <div class="config-item">
-                    <span class="label">DB接続:</span>
-                    <span class="status-badge published">正常</span>
-                </div>
-                <details class="expandable-section">
-                    <summary class="text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">設定詳細 (JSON)</summary>
-                    <div class="json-viewer mt-3" id="config-json">
+      <!-- データベース詳細 -->
+      <section class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">🗄️ データベース詳細</h3>
+        <div class="space-y-4">
+          <div class="config-item">
+            <span class="label">DB接続:</span>
+            <span class="status-badge published">正常</span>
+          </div>
+          <details class="expandable-section">
+            <summary class="text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">設定詳細 (JSON)</summary>
+            <div class="json-viewer mt-3" id="config-json">
 {
   "setupStatus": "pending",
   "spreadsheetId": null,
@@ -509,24 +586,25 @@
   "appPublished": false,
   "lastUpdated": null
 }
-                    </div>
-                </details>
             </div>
+          </details>
         </div>
+      </section>
 
-        <!-- クイックアクション -->
-        <div class="glass-panel rounded-xl p-6 mb-6">
-            <h2 class="text-xl font-semibold text-white mb-4">⚡ クイックアクション</h2>
-            <div class="space-y-3">
-                <button class="link-btn w-full text-center" onclick="exportConfig()">
-                    設定をエクスポート
-                </button>
-                <button id="app-setup-btn" class="link-btn w-full text-center hidden" onclick="goToAppSetup()">
-                    ⚙️ アプリ設定画面
-                </button>
-            </div>
+      <!-- クイックアクション -->
+      <section class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">⚡ クイックアクション</h3>
+        <div class="space-y-3">
+          <button class="link-btn w-full text-center" type="button" onclick="exportConfig()">
+            設定をエクスポート
+          </button>
+          <button id="app-setup-btn" class="link-btn w-full text-center hidden" type="button" onclick="goToAppSetup()">
+            ⚙️ アプリ設定画面
+          </button>
         </div>
+      </section>
     </div>
+  </div>
 
   <!-- SharedUtilities.html は上部で既にインクルード済み -->
 
@@ -542,7 +620,28 @@
       console.log('AdminPanel初期化開始');
       initializePanel();
       checkSystemAdminAccess();
+      
+      // 定期的なステータス更新
+      setInterval(updateSystemStatus, 30000); // 30秒間隔
     });
+
+    // システムステータス更新
+    function updateSystemStatus() {
+      updateLastUpdateTime();
+    }
+
+    // 最終更新時刻更新
+    function updateLastUpdateTime() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('ja-JP', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      const updateElement = document.getElementById('last-update');
+      if (updateElement) {
+        updateElement.textContent = `最終同期: ${timeString}`;
+      }
+    }
 
     // パネル初期化 - 簡素化
     function initializePanel() {
