@@ -103,6 +103,77 @@ function computeWebAppUrl() {
   }
 }
 
+/**
+ * WebアプリのURLを取得（完全版）
+ * バックアップからの完全実装版 - PropertiesService連携とキャッシュ機能付き
+ * @returns {string} WebアプリURL
+ */
+function getWebAppUrl() {
+  const props = PropertiesService.getScriptProperties();
+  // deployIdを最初に取得しており、見通しが良い
+  const deployId = props.getProperty('DEPLOY_ID'); 
+  let stored = (props.getProperty('WEB_APP_URL') || '').trim();
+
+  // ★★★ このブロックが重要 ★★★
+  // 保存済みのURLが/dev形式の場合、正規の/exec形式に変換して保存し直す自己修正機能。
+  // これにより、プロパティに保存されるURLの形式が一貫する。
+  if (stored) {
+    const converted = convertPreviewUrl(stored, deployId);
+    if (converted !== stored) {
+      props.setProperties({ WEB_APP_URL: converted.trim() });
+      stored = converted.trim();
+    }
+  }
+
+  let current = '';
+  try {
+    if (typeof ScriptApp !== 'undefined') {
+      current = ScriptApp.getService().getUrl();
+    }
+  } catch (e) {
+    current = '';
+  }
+
+  if (current) {
+    current = convertPreviewUrl(current, deployId);
+    const currOrigin = getUrlOrigin(current);
+    const storedOrigin = getUrlOrigin(stored);
+    // 現在のURLと保存されているURLのドメインが異なる場合に更新するロジック
+    if (!stored || (storedOrigin && currOrigin && currOrigin !== storedOrigin)) {
+      props.setProperties({ WEB_APP_URL: current.trim() });
+      stored = current.trim();
+    }
+  }
+  return stored || current || '';
+}
+
+/**
+ * URLのオリジンを取得するヘルパー関数
+ */
+function getUrlOrigin(url) {
+  if (!url) return null;
+  try {
+    const match = url.match(/^https?:\/\/[^\/]+/);
+    return match ? match[0] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * プレビューURLを本番URLに変換するヘルパー関数
+ */
+function convertPreviewUrl(url, deployId) {
+  if (!url) return url;
+  
+  // /dev 形式を /exec 形式に変換
+  if (url.includes('/dev') && deployId) {
+    return url.replace('/dev', '/exec');
+  }
+  
+  return url;
+}
+
 function getWebAppUrlCached() {
   try {
     // 統合キャッシュマネージャーを使用してURL取得・生成・キャッシュを一元化

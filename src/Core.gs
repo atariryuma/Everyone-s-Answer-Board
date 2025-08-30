@@ -78,7 +78,7 @@ function validateHeaderIntegrity(userId) {
   try {
     console.log('🔍 Starting header integrity validation for userId:', userId);
     
-    const userInfo = getOrFetchUserInfo(userId, 'userId');
+    const userInfo = getCurrentUserInfo();
     if (!userInfo || !userInfo.spreadsheetId) {
       return {
         success: false,
@@ -154,12 +154,7 @@ function validateHeaderIntegrity(userId) {
 function getOpinionHeaderSafely(userId, sheetName) {
   try {
     // unifiedUserManager.gsの関数を使用
-    const userInfo = typeof getOrFetchUserInfo !== 'undefined' 
-      ? getOrFetchUserInfo(userId, 'userId', {
-          useExecutionCache: true,
-          ttl: 300
-        })
-      : null;
+    const userInfo = getCurrentUserInfo();
     if (!userInfo) {
       return 'お題';
     }
@@ -559,10 +554,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       var currentUserId = requestUserId; // requestUserId を使用
       console.log('getPublishedSheetData: userId=%s, classFilter=%s, sortOrder=%s, adminMode=%s', currentUserId, classFilter, sortOrder, adminMode);
 
-      var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-        useExecutionCache: true,
-        ttl: 300
-      });
+      var userInfo = getCurrentUserInfo();
       if (!userInfo) {
         throw new Error('ユーザー情報が見つかりません');
       }
@@ -708,10 +700,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
 
     var currentUserId = requestUserId; // requestUserId を使用
 
-    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-      useExecutionCache: true,
-      ttl: 300
-    });
+    var userInfo = getCurrentUserInfo();
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1152,10 +1141,7 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
  * アプリケーションの初期セットアップ（管理者が手動で実行） (マルチテナント対応版)
  */
 function getResponsesData(userId, sheetName) {
-  var userInfo = getOrFetchUserInfo(userId, 'userId', {
-    useExecutionCache: true,
-    ttl: 300
-  });
+  var userInfo = getCurrentUserInfo();
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
@@ -2886,10 +2872,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
  */
 function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     try {
-      var userInfo = getOrFetchUserInfo(userId, 'userId', {
-    useExecutionCache: true,
-    ttl: 300
-  });
+      var userInfo = getCurrentUserInfo();
       if (!userInfo) {
         throw new Error('ユーザー情報が見つかりません');
       }
@@ -4032,10 +4015,7 @@ function getInitialData(requestUserId, targetSheetName) {
     
     // ユーザー認証
     verifyUserAccess(currentUserId);
-    var userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-      useExecutionCache: true,
-      ttl: 300
-    }); // Use cached version
+    var userInfo = getCurrentUserInfo(); // Use cached version
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -4048,10 +4028,7 @@ function getInitialData(requestUserId, targetSheetName) {
         console.log('✅ データ整合性が自動修正されました');
         // 修正後は最新データを再取得
         clearExecutionUserInfoCache();
-        userInfo = getOrFetchUserInfo(currentUserId, 'userId', {
-          useExecutionCache: true,
-          ttl: 300
-        });
+        userInfo = getCurrentUserInfo();
       }
     } catch (consistencyError) {
       console.warn('⚠️ データ整合性チェック中にエラー:', consistencyError.message);
