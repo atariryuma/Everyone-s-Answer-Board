@@ -13,7 +13,7 @@ function createTimer(label) {
       const duration = Date.now() - startTime;
       console.log(`Performance: ${label} - ${duration}ms`);
       return duration;
-    }
+    },
   };
 }
 

@@ -87,17 +87,19 @@ describe('StudyQuest System Flow Integration Tests', () => {
     test('saveAndPublish and addReaction should not interfere', async () => {
       // saveAndPublish と addReaction の同時実行テスト
 
-      const saveAndPublishMock = jest.fn().mockImplementation(async (_userId, _sheetName, _config) => {
-        // LockService の呼び出しをシミュレート
-        const lock = context.LockService.getScriptLock();
-        lock.waitLock(30000);
+      const saveAndPublishMock = jest
+        .fn()
+        .mockImplementation(async (_userId, _sheetName, _config) => {
+          // LockService の呼び出しをシミュレート
+          const lock = context.LockService.getScriptLock();
+          lock.waitLock(30000);
 
-        // 処理時間をシミュレート
-        await new Promise((resolve) => global.setTimeout(resolve, 50));
+          // 処理時間をシミュレート
+          await new Promise((resolve) => global.setTimeout(resolve, 50));
 
-        lock.releaseLock();
-        return { status: 'success' };
-      });
+          lock.releaseLock();
+          return { status: 'success' };
+        });
 
       const addReactionMock = jest
         .fn()

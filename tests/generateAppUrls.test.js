@@ -11,27 +11,29 @@ describe('generateAppUrls admin url', () => {
     context = {
       cacheManager: {
         store,
-        get(key, fn) { return fn(); },
-        remove() {}
+        get(key, fn) {
+          return fn();
+        },
+        remove() {},
       },
       ScriptApp: {
         getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/ID/exec' }),
-        getScriptId: () => 'ID'
+        getScriptId: () => 'ID',
       },
       console: { error: () => {}, log: () => {}, warn: () => {} },
       Log: {
         debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
-        error: jest.fn()
+        error: jest.fn(),
       },
       PropertiesService: {
         getScriptProperties: () => ({
           getProperty: (key) => {
             if (key === 'DEBUG_MODE') return 'false';
             return null;
-          }
-        })
+          },
+        }),
       },
 
       CacheService: (() => {
@@ -39,24 +41,28 @@ describe('generateAppUrls admin url', () => {
         return {
           getUserCache: () => ({
             get: () => null,
-            put: () => {}
+            put: () => {},
           }),
           getScriptCache: () => ({
             get: (k) => store[k] || null,
-            put: (k, v) => { store[k] = v; },
-            remove: (k) => { delete store[k]; }
-          })
+            put: (k, v) => {
+              store[k] = v;
+            },
+            remove: (k) => {
+              delete store[k];
+            },
+          }),
         };
       })(),
-        
+
       Session: {
-        getActiveUser: () => ({ getEmail: () => 'test@example.com' })
+        getActiveUser: () => ({ getEmail: () => 'test@example.com' }),
       },
       Utilities: {
         getUuid: () => 'mock-uuid',
         computeDigest: () => [],
-        Charset: { UTF_8: 'UTF-8' }
-      }
+        Charset: { UTF_8: 'UTF-8' },
+      },
     };
     vm.createContext(context);
     vm.runInContext(urlCode, context);

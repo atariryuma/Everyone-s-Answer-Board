@@ -13,31 +13,31 @@ describe('統一キャッシュシステム統合テスト', () => {
       clearAll: jest.fn(),
       getHealth: jest.fn(() => ({
         status: 'ok',
-        stats: { hitRate: '85%', totalOperations: 100, errors: 2 }
+        stats: { hitRate: '85%', totalOperations: 100, errors: 2 },
       })),
       invalidateRelated: jest.fn(),
-      invalidateSheetData: jest.fn()
+      invalidateSheetData: jest.fn(),
     };
-    
+
     global.getUnifiedExecutionCache = jest.fn(() => ({
       clearUserInfo: jest.fn(),
       clearSheetsService: jest.fn(),
       clearAll: jest.fn(),
-      syncWithUnifiedCache: jest.fn()
+      syncWithUnifiedCache: jest.fn(),
     }));
 
     global.getServiceAccountTokenCached = jest.fn(() => 'mock_token');
     global.CacheService = {
       getScriptCache: jest.fn(() => ({
         removeAll: jest.fn(),
-        remove: jest.fn()
+        remove: jest.fn(),
       })),
       getUserCache: jest.fn(() => ({
         removeAll: jest.fn(),
-        remove: jest.fn()
-      }))
+        remove: jest.fn(),
+      })),
     };
-    
+
     // 統一キャッシュAPIをモック
     global.unifiedCacheAPI = {
       clearUserInfoCache: jest.fn(),
@@ -47,7 +47,7 @@ describe('統一キャッシュシステム統合テスト', () => {
       synchronizeCacheAfterCriticalUpdate: jest.fn(),
       clearDatabaseCache: jest.fn(),
       invalidateSpreadsheetCache: jest.fn(),
-      getHealth: jest.fn(() => ({ status: 'ok' }))
+      getHealth: jest.fn(() => ({ status: 'ok' })),
     };
   });
 
@@ -55,10 +55,10 @@ describe('統一キャッシュシステム統合テスト', () => {
     test('clearUserInfoCacheが正常に動作する', () => {
       const mockClearUserInfo = jest.fn();
       const mockSyncWithUnifiedCache = jest.fn();
-      
+
       global.getUnifiedExecutionCache = jest.fn(() => ({
         clearUserInfo: mockClearUserInfo,
-        syncWithUnifiedCache: mockSyncWithUnifiedCache
+        syncWithUnifiedCache: mockSyncWithUnifiedCache,
       }));
 
       global.unifiedCacheAPI.clearUserInfoCache('test_user');
@@ -82,11 +82,13 @@ describe('統一キャッシュシステム統合テスト', () => {
       const userId = 'user123';
       const email = 'test@example.com';
       const spreadsheetId = 'sheet123';
-      
+
       global.unifiedCacheAPI.invalidateUserCache(userId, email, spreadsheetId);
 
       expect(global.unifiedCacheAPI.invalidateUserCache).toHaveBeenCalledWith(
-        userId, email, spreadsheetId
+        userId,
+        email,
+        spreadsheetId
       );
     });
 
@@ -95,20 +97,27 @@ describe('統一キャッシュシステム統合テスト', () => {
       const email = 'test@example.com';
       const oldSpreadsheetId = 'old_sheet';
       const newSpreadsheetId = 'new_sheet';
-      
+
       global.unifiedCacheAPI.synchronizeCacheAfterCriticalUpdate(
-        userId, email, oldSpreadsheetId, newSpreadsheetId
+        userId,
+        email,
+        oldSpreadsheetId,
+        newSpreadsheetId
       );
 
-      expect(global.unifiedCacheAPI.synchronizeCacheAfterCriticalUpdate)
-        .toHaveBeenCalledWith(userId, email, oldSpreadsheetId, newSpreadsheetId);
+      expect(global.unifiedCacheAPI.synchronizeCacheAfterCriticalUpdate).toHaveBeenCalledWith(
+        userId,
+        email,
+        oldSpreadsheetId,
+        newSpreadsheetId
+      );
     });
   });
 
   describe('後方互換性テスト', () => {
     test('clearExecutionUserInfoCacheが統一APIにリダイレクトされる', () => {
       // 後方互換性関数がモック化されていることを確認
-      global.clearExecutionUserInfoCache = jest.fn(() => 
+      global.clearExecutionUserInfoCache = jest.fn(() =>
         global.unifiedCacheAPI.clearUserInfoCache()
       );
 
@@ -153,7 +162,7 @@ describe('統一キャッシュシステム統合テスト', () => {
       global.preWarmCache = jest.fn(() => ({
         preWarmedItems: ['service_account_token', 'user_by_email'],
         errors: [],
-        success: true
+        success: true,
       }));
 
       const result = global.preWarmCache('test@example.com');
@@ -161,7 +170,7 @@ describe('統一キャッシュシステム統合テスト', () => {
       expect(result).toEqual({
         preWarmedItems: ['service_account_token', 'user_by_email'],
         errors: [],
-        success: true
+        success: true,
       });
     });
 
@@ -169,7 +178,7 @@ describe('統一キャッシュシステム統合テスト', () => {
       global.analyzeCacheEfficiency = jest.fn(() => ({
         efficiency: 'excellent',
         recommendations: [],
-        optimizationOpportunities: ['TTL延長によるさらなる高速化']
+        optimizationOpportunities: ['TTL延長によるさらなる高速化'],
       }));
 
       const result = global.analyzeCacheEfficiency();
@@ -198,7 +207,7 @@ describe('統一キャッシュシステム統合テスト', () => {
 
     test('キャッシュマネージャー未初期化時の安全な動作', () => {
       global.cacheManager = undefined;
-      
+
       global.unifiedCacheAPI.clearDatabaseCache = jest.fn().mockImplementation(() => {
         // cacheManagerが未定義でもエラーをスローしない
       });
@@ -223,9 +232,9 @@ describe('統一キャッシュシステム統合テスト', () => {
       });
 
       global.unifiedCacheAPI.invalidateUserCache('user123', 'test@example.com');
-      
+
       expect(global.cacheManager.clearByPattern).toHaveBeenCalledWith(
-        'user_*', 
+        'user_*',
         expect.objectContaining({ maxKeys: expect.any(Number) })
       );
     });
@@ -237,31 +246,31 @@ describe('統一キャッシュシステム統合テスト', () => {
         // Level 2: Apps Scriptキャッシュ
         scriptCache: { get: jest.fn(), put: jest.fn() },
         // Level 3: PropertiesServiceフォールバック
-        propertiesService: { getProperty: jest.fn(), setProperty: jest.fn() }
+        propertiesService: { getProperty: jest.fn(), setProperty: jest.fn() },
       };
 
       global.cacheManager.get = jest.fn().mockImplementation((key, valueFn, options) => {
         // 階層化アクセスの順序をテスト
         const { enableMemoization, usePropertiesFallback } = options || {};
-        
+
         if (enableMemoization && mockCache.memoCache.has(key)) {
           return mockCache.memoCache.get(key);
         }
-        
+
         const scriptResult = mockCache.scriptCache.get(key);
         if (scriptResult) return scriptResult;
-        
+
         if (usePropertiesFallback) {
           return mockCache.propertiesService.getProperty(key);
         }
-        
+
         return valueFn ? valueFn() : null;
       });
 
       // テスト実行
       global.cacheManager.get('test_key', () => 'new_value', {
         enableMemoization: true,
-        usePropertiesFallback: true
+        usePropertiesFallback: true,
       });
 
       expect(global.cacheManager.get).toHaveBeenCalledWith(
@@ -269,7 +278,7 @@ describe('統一キャッシュシステム統合テスト', () => {
         expect.any(Function),
         expect.objectContaining({
           enableMemoization: true,
-          usePropertiesFallback: true
+          usePropertiesFallback: true,
         })
       );
     });

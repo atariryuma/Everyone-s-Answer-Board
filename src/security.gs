@@ -565,7 +565,7 @@ function secureMultiTenantCacheOperation(operation, baseKey, userId, value = nul
  * @returns {object} 健全性チェック結果
  */
 // performMultiTenantHealthCheck - 削除済み（過度に複雑なため不要）
-function performMultiTenantHealthCheck_DELETED() {
+function performMultiTenantHealthCheck() {
   const results = {
     timestamp: new Date().toISOString(),
     securityManagerStatus: 'OK',
@@ -954,35 +954,6 @@ function getSecurityMetrics() {
 }
 
 /**
- * 定期的なセキュリティヘルスチェックの設定
- * @param {number} intervalMinutes - チェック間隔（分）
- */
-// scheduleSecurityHealthCheck - 削除済み（過度に複雑なため不要）
-function scheduleSecurityHealthCheck_DELETED(intervalMinutes = 60) {
-  try {
-    // GAS環境では時間ベースのトリガーを使用
-    const triggers = ScriptApp.getProjectTriggers();
-
-    // 既存のヘルスチェック トリガーを削除
-    triggers.forEach((trigger) => {
-      if (trigger.getHandlerFunction() === 'runScheduledSecurityHealthCheck') {
-        ScriptApp.deleteTrigger(trigger);
-      }
-    });
-
-    // 新しいトリガーを作成
-    ScriptApp.newTrigger('runScheduledSecurityHealthCheck')
-      .timeBased()
-      .everyMinutes(intervalMinutes)
-      .create();
-
-    console.log(`📅 定期セキュリティヘルスチェックを${intervalMinutes}分間隔で設定しました`);
-  } catch (error) {
-    console.error('[ERROR]', '定期セキュリティヘルスチェック設定エラー:', error.message);
-  }
-}
-
-/**
  * 定期実行される関数（トリガーから呼び出し）
  */
 function runScheduledSecurityHealthCheck() {
@@ -1126,7 +1097,6 @@ function buildUserScopedKey(baseKey, userId, sheetName = '') {
   }
   return key;
 }
-
 
 // この重複関数は削除されました。L117のgetServiceAccountEmail()を使用してください。
 

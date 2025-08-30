@@ -11,7 +11,7 @@ describe('createFormFactory returns URLs', () => {
       setRequired: jest.fn(),
       setChoiceValues: jest.fn(),
       showOtherOption: jest.fn(),
-      setHelpText: jest.fn()
+      setHelpText: jest.fn(),
     };
     const mockForm = {
       setDescription: jest.fn(),
@@ -24,7 +24,7 @@ describe('createFormFactory returns URLs', () => {
       addParagraphTextItem: jest.fn(() => mockItem),
       getId: jest.fn(() => 'FORM_ID'),
       getPublishedUrl: jest.fn(() => 'https://example.com/view'),
-      getEditUrl: jest.fn(() => 'https://example.com/edit')
+      getEditUrl: jest.fn(() => 'https://example.com/edit'),
     };
 
     context = {
@@ -34,20 +34,20 @@ describe('createFormFactory returns URLs', () => {
         debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
-        error: jest.fn()
+        error: jest.fn(),
       },
       FormApp: {
         create: jest.fn(() => mockForm),
-        EmailCollectionType: { VERIFIED: 'VERIFIED' }
+        EmailCollectionType: { VERIFIED: 'VERIFIED' },
       },
-      Utilities: { formatDate: jest.fn(() => '2025/01/01 00:00:00') }
+      Utilities: { formatDate: jest.fn(() => '2025/01/01 00:00:00') },
     };
     vm.createContext(context);
     vm.runInContext(code, context);
     context.createLinkedSpreadsheet = jest.fn(() => ({
       spreadsheetId: 'SS_ID',
       spreadsheetUrl: 'https://example.com/ss',
-      sheetName: 'Sheet1'
+      sheetName: 'Sheet1',
     }));
     context.addReactionColumnsToSpreadsheet = jest.fn();
   });
@@ -56,11 +56,10 @@ describe('createFormFactory returns URLs', () => {
     const result = context.createFormFactory({
       userEmail: 'u@example.com',
       userId: 'uid',
-      formTitle: 'Title'
+      formTitle: 'Title',
     });
     expect(result.editFormUrl).toBe('https://example.com/edit');
     expect(result.viewFormUrl).toBe('https://example.com/view');
     expect(result.formUrl).toBe('https://example.com/view');
   });
 });
-

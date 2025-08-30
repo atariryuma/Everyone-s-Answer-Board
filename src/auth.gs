@@ -3,8 +3,6 @@
  * GAS互換の関数ベースの実装
  */
 
-
-  
 /**
 
 
@@ -30,44 +28,44 @@ function processLoginFlow(userEmail) {
       // 2a. アクティブユーザーの場合
       if (isTrue(userInfo.isActive)) {
         console.log('processLoginFlow: 既存アクティブユーザー:', userEmail);
-        
+
         // 最終アクセス時刻を更新（設定は保護）
         updateUserLastAccess(userInfo.userId);
-        
+
         // セットアップ状況を確認してメッセージを調整
         const setupStatus = getSetupStatusFromConfig(userInfo.configJson);
         let welcomeMessage = '管理パネルへようこそ';
-        
+
         if (setupStatus === 'pending') {
           welcomeMessage = 'セットアップを続行してください';
         } else if (setupStatus === 'completed') {
           welcomeMessage = 'おかえりなさい！';
         }
-        
+
         const adminUrl = buildUserAdminUrl(userInfo.userId);
         return createSecureRedirect(adminUrl, welcomeMessage);
-      } 
+      }
       // 2b. 非アクティブユーザーの場合
       else {
         console.warn('processLoginFlow: 既存だが非アクティブなユーザー:', userEmail);
         return showErrorPage(
-          'アカウントが無効です', 
+          'アカウントが無効です',
           'あなたのアカウントは現在無効化されています。管理者にお問い合わせください。'
         );
       }
-    } 
+    }
     // 3. 新規ユーザーの処理
     else {
       console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
-      
+
       // 3a. 新規ユーザーデータを準備（初期設定でpending状態）
       const initialConfig = {
         setupStatus: 'pending',
         createdAt: new Date().toISOString(),
         formCreated: false,
-        appPublished: false
+        appPublished: false,
       };
-      
+
       const newUser = {
         userId: Utilities.getUuid(),
         adminEmail: userEmail,
@@ -76,16 +74,16 @@ function processLoginFlow(userEmail) {
         configJson: JSON.stringify(initialConfig),
         spreadsheetId: '',
         spreadsheetUrl: '',
-        lastAccessedAt: new Date().toISOString()
+        lastAccessedAt: new Date().toISOString(),
       };
-      
+
       // 3b. データベースに作成
       DB.createUser(newUser);
       if (!waitForUserRecord(newUser.userId, 3000, 500)) {
         console.warn('processLoginFlow: user not found after create:', newUser.userId);
       }
       console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
-      
+
       // 3c. 新規ユーザーの管理パネルへリダイレクト
       const adminUrl = buildUserAdminUrl(newUser.userId);
       return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
@@ -99,17 +97,15 @@ function processLoginFlow(userEmail) {
       errorType: error.name || 'UnknownError',
       message: error.message,
       stack: error.stack,
-      severity: 'high' // ログインエラーは高重要度
+      severity: 'high', // ログインエラーは高重要度
     };
     console.error('🚨 processLoginFlow 重大エラー:', JSON.stringify(errorInfo, null, 2));
-    
+
     // ユーザーフレンドリーなエラーメッセージ
-    const userMessage = error.message.includes('ユーザー') 
-      ? error.message 
+    const userMessage = error.message.includes('ユーザー')
+      ? error.message
       : 'ログイン処理中に予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
-      
+
     return showErrorPage('ログインエラー', userMessage, error);
   }
 }
-
-

@@ -518,7 +518,7 @@ function getFrontendConstants() {
       VALIDATION: 'validation',
       NETWORK: 'network',
       USER: 'user',
-      SYSTEM: 'system'
+      SYSTEM: 'system',
     }, // Legacy support
     DISPLAY_MODES: UNIFIED_CONSTANTS.DISPLAY.MODES,
     REACTION_KEYS: UNIFIED_CONSTANTS.SCORING.REACTION_KEYS,
@@ -612,7 +612,6 @@ function handleUnifiedError(
   );
 }
 
-
 /**
  * 旧logUnified関数（互換性のため保持）
  * @deprecated console.log(), console.warn(), console.error(), console.log() を使用してください
@@ -620,7 +619,7 @@ function handleUnifiedError(
 function logUnified(level, functionName, message, data = {}) {
   // console ベースに移行済み
   const formattedMessage = `[${level}] ${functionName}: ${message}`;
-  
+
   switch (level) {
     case 'ERROR':
     case 'CRITICAL':
@@ -1034,13 +1033,13 @@ function clearTimeout(timeoutId) {
 }
 
 /**
- * Object.fromEntries - GAS互換実装  
+ * Object.fromEntries - GAS互換実装
  * ES2019のObject.fromEntriesポリフィル
  * @param {Array} entries - [key, value]ペアの配列
  * @return {Object} オブジェクト
  */
 if (!Object.fromEntries) {
-  Object.fromEntries = function(entries) {
+  Object.fromEntries = function (entries) {
     const result = {};
     for (const [key, value] of entries) {
       result[key] = value;
@@ -1061,7 +1060,7 @@ class URLSearchParams {
       if (params.startsWith('?')) {
         params = params.substring(1);
       }
-      params.split('&').forEach(pair => {
+      params.split('&').forEach((pair) => {
         const [key, value] = pair.split('=');
         if (key) {
           this.params[decodeURIComponent(key)] = decodeURIComponent(value || '');
@@ -1074,27 +1073,27 @@ class URLSearchParams {
       }
     }
   }
-  
+
   append(key, value) {
     this.params[key] = String(value);
   }
-  
+
   set(key, value) {
     this.params[key] = String(value);
   }
-  
+
   get(key) {
     return this.params[key] || null;
   }
-  
+
   has(key) {
     return key in this.params;
   }
-  
+
   delete(key) {
     delete this.params[key];
   }
-  
+
   toString() {
     return Object.entries(this.params)
       .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
@@ -1114,7 +1113,8 @@ const resolveValue = (value) => value; // パススルー関数
 
 // キャッシュ・データベース関連ダミー
 const invalidateCacheForSpreadsheet = (id) => console.log(`[CACHE] Invalidated for ${id}`);
-const updateUserDatabaseField = (userId, field, value) => console.log(`[DB] Updated ${field} for ${userId}`);
+const updateUserDatabaseField = (userId, field, value) =>
+  console.log(`[DB] Updated ${field} for ${userId}`);
 const clearUserCache = (userId) => console.log(`[CACHE] Cleared cache for ${userId}`);
 const deleteAll = () => console.log('[DELETE] All items deleted');
 
@@ -1147,13 +1147,13 @@ const checkLoginStatus = (userId) => {
     const sessionKey = `session_${targetUserId}`;
     const props = PropertiesService.getUserProperties();
     const sessionData = props.getProperty(sessionKey);
-    
+
     if (!sessionData) {
       // セッション情報がない場合は新規セッションを作成
       const newSession = {
         userId: targetUserId,
         loginTime: new Date().getTime(),
-        lastAccess: new Date().getTime()
+        lastAccess: new Date().getTime(),
       };
       props.setProperty(sessionKey, JSON.stringify(newSession));
       return { isValid: true, message: '新規セッション作成', userId: targetUserId };
@@ -1183,9 +1183,8 @@ const checkLoginStatus = (userId) => {
     // セッション有効 - 最終アクセス時刻を更新
     session.lastAccess = now;
     props.setProperty(sessionKey, JSON.stringify(session));
-    
+
     return { isValid: true, message: 'セッション有効', userId: targetUserId };
-    
   } catch (error) {
     return { isValid: false, message: `セッション検証エラー: ${error.message}`, userId: userId };
   }
@@ -1196,13 +1195,17 @@ const updateLoginStatus = (userId, status) => console.log(`[LOGIN] Status ${stat
 const sheetDataCache = () => ({});
 const unpublished = () => console.log('[UI] Unpublished operation');
 const unified = () => console.log('[UNIFIED] Operation');
-const logger = { 
+const logger = {
   info: (msg) => console.log(`[LOG] ${msg}`),
-  error: (msg) => console.error(`[LOG] ${msg}`)
+  error: (msg) => console.error(`[LOG] ${msg}`),
 };
 const safeExecute = (fn) => {
-  try { return fn(); } 
-  catch(e) { console.error('[SAFE_EXECUTE]', e.message); return null; }
+  try {
+    return fn();
+  } catch (e) {
+    console.error('[SAFE_EXECUTE]', e.message);
+    return null;
+  }
 };
 
 // 検証・設定関連ダミー
@@ -1218,26 +1221,26 @@ const argumentMapper = (args) => args;
 // 残りのUI/Factory関数のダミー実装
 const urlFactory = {
   generateUserUrls: () => 'http://example.com',
-  generateUnpublishedUrl: () => 'http://example.com/unpublished'
+  generateUnpublishedUrl: () => 'http://example.com/unpublished',
 };
 const formFactory = {
   create: () => ({}),
   createCustomUI: () => ({}),
-  createQuickStartUI: () => ({})
+  createQuickStartUI: () => ({}),
 };
 const userFactory = {
   create: () => ({}),
-  createFolder: () => ({})
+  createFolder: () => ({}),
 };
 const generatorFactory = {
   url: urlFactory,
   form: formFactory,
-  user: userFactory
+  user: userFactory,
 };
 const responseFactory = {
   success: (data) => ({ success: true, data }),
   error: (error) => ({ success: false, error }),
-  unified: (success, data) => ({ success, data })
+  unified: (success, data) => ({ success, data }),
 };
 
 // キャッシュ操作関数のダミー
@@ -1282,7 +1285,7 @@ const confirm = (message) => {
       return true;
     }
   } catch (e) {
-    console.log('[CONFIRM]', message, '(auto-confirmed)'); 
+    console.log('[CONFIRM]', message, '(auto-confirmed)');
     return true;
   }
 };
@@ -1296,10 +1299,9 @@ const querySelector = () => null;
 const Functions = {
   // FormApp APIのダミー参照（実際には使用されない）
   setEmailCollectionType: () => console.log('[FORM] setEmailCollectionType'),
-  getPublishedUrl: (form) => form ? form.getPublishedUrl() : '',
-  getEditUrl: (form) => form ? form.getEditUrl() : ''
+  getPublishedUrl: (form) => (form ? form.getPublishedUrl() : ''),
+  getEditUrl: (form) => (form ? form.getEditUrl() : ''),
 };
-
 
 // エラータイプの互換性定義
 const ERROR_TYPES = {
@@ -1308,7 +1310,7 @@ const ERROR_TYPES = {
   VALIDATION: 'validation',
   NETWORK: 'network',
   USER: 'user',
-  SYSTEM: 'system'
+  SYSTEM: 'system',
 };
 
 // 統一コード品質最適化関数群初期化完了（ログ出力無効化）

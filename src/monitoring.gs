@@ -15,7 +15,7 @@ class SystemHealthChecker {
     this.lastCheckTime = null;
     this.healthStatus = 'unknown';
   }
-  
+
   /**
    * ヘルスチェック項目を登録
    */
@@ -24,10 +24,10 @@ class SystemHealthChecker {
       fn: checkFunction,
       timeout: options.timeout || 5000,
       critical: options.critical || false,
-      description: options.description || ''
+      description: options.description || '',
     });
   }
-  
+
   /**
    * 全てのヘルスチェックを実行
    */
@@ -35,50 +35,49 @@ class SystemHealthChecker {
     console.log('システムヘルスチェック開始');
     const results = new Map();
     let overallStatus = 'healthy';
-    
+
     for (const [name, check] of this.checks) {
       try {
         const startTime = Date.now();
         const result = await this._runSingleCheck(name, check);
         const duration = Date.now() - startTime;
         console.log(`HealthCheck: ${name} - ${duration}ms`);
-        
+
         results.set(name, result);
-        
+
         if (result.status === 'unhealthy' && check.critical) {
           overallStatus = 'critical';
         } else if (result.status === 'unhealthy' && overallStatus === 'healthy') {
           overallStatus = 'degraded';
         }
-        
       } catch (error) {
         console.error(`ヘルスチェック実行エラー: ${name}`, { error: error.message });
         results.set(name, {
           status: 'error',
           message: error.message,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
-        
+
         if (check.critical) {
           overallStatus = 'critical';
         }
       }
     }
-    
+
     this.healthStatus = overallStatus;
     this.lastCheckTime = new Date().toISOString();
-    
+
     const healthReport = {
       overall: overallStatus,
       timestamp: this.lastCheckTime,
       checks: Object.fromEntries(results),
-      summary: this._generateSummary(results)
+      summary: this._generateSummary(results),
     };
-    
+
     console.log('システムヘルスチェック完了', { status: overallStatus });
     return healthReport;
   }
-  
+
   /**
    * 単一のヘルスチェックを実行
    */
@@ -87,14 +86,14 @@ class SystemHealthChecker {
       const timeout = setTimeout(() => {
         reject(new Error(`ヘルスチェックタイムアウト: ${name}`));
       }, check.timeout);
-      
+
       try {
         const result = check.fn();
         clearTimeout(timeout);
         resolve({
           status: result ? 'healthy' : 'unhealthy',
-          message: result === true ? 'OK' : (result || 'Check failed'),
-          timestamp: new Date().toISOString()
+          message: result === true ? 'OK' : result || 'Check failed',
+          timestamp: new Date().toISOString(),
         });
       } catch (error) {
         clearTimeout(timeout);
@@ -102,7 +101,7 @@ class SystemHealthChecker {
       }
     });
   }
-  
+
   /**
    * ヘルスチェック結果のサマリーを生成
    */
@@ -111,7 +110,7 @@ class SystemHealthChecker {
     let healthy = 0;
     let unhealthy = 0;
     let errors = 0;
-    
+
     for (const [name, result] of results) {
       switch (result.status) {
         case 'healthy':
@@ -125,13 +124,13 @@ class SystemHealthChecker {
           break;
       }
     }
-    
+
     return {
       total,
       healthy,
       unhealthy,
       errors,
-      healthPercentage: Math.round((healthy / total) * 100)
+      healthPercentage: Math.round((healthy / total) * 100),
     };
   }
 }
@@ -147,16 +146,16 @@ function getSystemStatus() {
   if (!checkIsSystemAdmin()) {
     throw new Error('システム状況の確認には管理者権限が必要です');
   }
-  
+
   console.log('システム状況確認開始');
   const status = {
     timestamp: new Date().toISOString(),
     environment: {},
     performance: {},
     security: {},
-    dependencies: {}
+    dependencies: {},
   };
-  
+
   try {
     // 環境情報（機密情報をマスク）
     const userEmail = User.email();
@@ -164,43 +163,42 @@ function getSystemStatus() {
       gasVersion: 'V8 Runtime',
       timeZone: Session.getScriptTimeZone(),
       locale: Session.getActiveLocale(),
-      userDomain: userEmail ? userEmail.split('@')[1] : 'unknown' // メールアドレス本体はマスク
+      userDomain: userEmail ? userEmail.split('@')[1] : 'unknown', // メールアドレス本体はマスク
     };
-    
+
     // パフォーマンス情報
     status.performance = {
       cacheHealth: cacheManager?.getHealth() || 'unavailable',
       activeContexts: globalContextManager?.activeContexts?.size || 0,
-      lastExecutionTime: Date.now() - (executionStartTime || Date.now())
+      lastExecutionTime: Date.now() - (executionStartTime || Date.now()),
     };
-    
+
     // セキュリティ情報
     status.security = {
       authenticationEnabled: true,
       domainRestriction: Deploy.domain() || 'unknown',
-      userVerificationActive: typeof verifyUserAccess === 'function'
+      userVerificationActive: typeof verifyUserAccess === 'function',
     };
-    
+
     // 依存関係チェック
     status.dependencies = {
       sheetsApi: typeof getSheetsServiceCached === 'function',
       database: typeof DB !== 'undefined' && typeof DB.findUserById === 'function',
       cache: typeof cacheManager !== 'undefined',
-      logging: typeof console !== 'undefined'
+      logging: typeof console !== 'undefined',
     };
-    
+
     console.log('システム状況確認完了');
     return {
       success: true,
-      status: status
+      status: status,
     };
-    
   } catch (error) {
     console.error('システム状況確認エラー', { error: error.message });
     return {
       success: false,
       error: error.message,
-      status: status
+      status: status,
     };
   }
 }
@@ -210,57 +208,77 @@ function getSystemStatus() {
  */
 function initializeHealthChecks() {
   // データベース接続チェック
-  healthChecker.registerCheck('database', () => {
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
-      return !!dbId;
-    } catch (error) {
-      return false;
-    }
-  }, { critical: true, description: 'データベース接続確認' });
-  
+  healthChecker.registerCheck(
+    'database',
+    () => {
+      try {
+        const props = PropertiesService.getScriptProperties();
+        const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+        return !!dbId;
+      } catch (error) {
+        return false;
+      }
+    },
+    { critical: true, description: 'データベース接続確認' }
+  );
+
   // Sheets API サービスチェック
-  healthChecker.registerCheck('sheetsApi', () => {
-    try {
-      const service = getSheetsServiceCached();
-      return !!(service && service.baseUrl && service.accessToken);
-    } catch (error) {
-      return false;
-    }
-  }, { critical: true, description: 'Sheets API サービス状態' });
-  
+  healthChecker.registerCheck(
+    'sheetsApi',
+    () => {
+      try {
+        const service = getSheetsServiceCached();
+        return !!(service && service.baseUrl && service.accessToken);
+      } catch (error) {
+        return false;
+      }
+    },
+    { critical: true, description: 'Sheets API サービス状態' }
+  );
+
   // キャッシュシステムチェック
-  healthChecker.registerCheck('cache', () => {
-    try {
-      if (!cacheManager) return false;
-      const health = cacheManager.getHealth();
-      return health.status === 'ok';
-    } catch (error) {
-      return false;
-    }
-  }, { critical: false, description: 'キャッシュシステム健全性' });
-  
+  healthChecker.registerCheck(
+    'cache',
+    () => {
+      try {
+        if (!cacheManager) return false;
+        const health = cacheManager.getHealth();
+        return health.status === 'ok';
+      } catch (error) {
+        return false;
+      }
+    },
+    { critical: false, description: 'キャッシュシステム健全性' }
+  );
+
   // 認証システムチェック
-  healthChecker.registerCheck('authentication', () => {
-    try {
-      const email = User.email();
-      return !!email;
-    } catch (error) {
-      return false;
-    }
-  }, { critical: true, description: '認証システム動作確認' });
-  
+  healthChecker.registerCheck(
+    'authentication',
+    () => {
+      try {
+        const email = User.email();
+        return !!email;
+      } catch (error) {
+        return false;
+      }
+    },
+    { critical: true, description: '認証システム動作確認' }
+  );
+
   // メモリ使用量チェック
-  healthChecker.registerCheck('memory', () => {
-    try {
-      const contextCount = globalContextManager.activeContexts.size;
-      return contextCount < globalContextManager.maxConcurrentContexts;
-    } catch (error) {
-      return false;
-    }
-  }, { critical: false, description: 'メモリ使用量確認' });
-  
+  healthChecker.registerCheck(
+    'memory',
+    () => {
+      try {
+        const contextCount = globalContextManager.activeContexts.size;
+        return contextCount < globalContextManager.maxConcurrentContexts;
+      } catch (error) {
+        return false;
+      }
+    },
+    { critical: false, description: 'メモリ使用量確認' }
+  );
+
   console.log('ヘルスチェック項目初期化完了');
 }
 
@@ -270,33 +288,36 @@ function initializeHealthChecks() {
 function getMonitoringDashboard() {
   try {
     const startTime = Date.now();
-    
+
     // 各種統計情報を収集
     const dashboard = {
       timestamp: new Date().toISOString(),
       system: performSystemDiagnostics(),
-      health: healthChecker.lastCheckTime ? {
-        status: healthChecker.healthStatus,
-        lastCheck: healthChecker.lastCheckTime
-      } : null,
+      health: healthChecker.lastCheckTime
+        ? {
+            status: healthChecker.healthStatus,
+            lastCheck: healthChecker.lastCheckTime,
+          }
+        : null,
       cache: cacheManager?.getHealth() || null,
-      memory: globalContextManager ? {
-        activeContexts: globalContextManager.activeContexts.size,
-        maxContexts: globalContextManager.maxConcurrentContexts
-      } : null,
+      memory: globalContextManager
+        ? {
+            activeContexts: globalContextManager.activeContexts.size,
+            maxContexts: globalContextManager.maxConcurrentContexts,
+          }
+        : null,
       errors: getRecentErrors(),
-      uptime: Date.now() - executionStartTime
+      uptime: Date.now() - executionStartTime,
     };
-    
+
     const duration = Date.now() - startTime;
     console.log(`MonitoringDashboard - ${duration}ms`);
     return dashboard;
-    
   } catch (error) {
     console.error('監視ダッシュボードデータ取得エラー', { error: error.message });
     return {
       timestamp: new Date().toISOString(),
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -319,17 +340,18 @@ function getRecentErrors() {
  * システム健全性の定期チェックを実行
  */
 function runScheduledHealthCheck() {
-  return healthChecker.runAllChecks()
-    .then(result => {
+  return healthChecker
+    .runAllChecks()
+    .then((result) => {
       console.log('定期ヘルスチェック完了', { status: result.overall });
       return result;
     })
-    .catch(error => {
+    .catch((error) => {
       console.error('定期ヘルスチェックエラー', { error: error.message });
       return {
         overall: 'error',
         timestamp: new Date().toISOString(),
-        error: error.message
+        error: error.message,
       };
     });
 }

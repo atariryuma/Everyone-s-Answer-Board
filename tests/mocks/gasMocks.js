@@ -46,7 +46,7 @@ global.Log = {
   debug: jest.fn((msg, data = '') => console.log(`[DEBUG] ${msg}`, data)),
   info: jest.fn((msg, data = '') => console.info(`[INFO] ${msg}`, data)),
   warn: jest.fn((msg, data = '') => console.warn(`[WARN] ${msg}`, data)),
-  error: jest.fn((msg, data = '') => console.error(`[ERROR] ${msg}`, data))
+  error: jest.fn((msg, data = '') => console.error(`[ERROR] ${msg}`, data)),
 };
 
 // 後方互換性のため旧ULogも残す
@@ -54,9 +54,9 @@ global.ULog = {
   // ログレベル定義（実際のULogと同じ）
   LEVELS: {
     ERROR: 'ERROR',
-    WARN: 'WARN', 
+    WARN: 'WARN',
     INFO: 'INFO',
-    DEBUG: 'DEBUG'
+    DEBUG: 'DEBUG',
   },
 
   // ログレベル優先度
@@ -64,7 +64,7 @@ global.ULog = {
     DEBUG: 1,
     INFO: 2,
     WARN: 3,
-    ERROR: 4
+    ERROR: 4,
   },
 
   // 現在のログレベル設定
@@ -81,18 +81,18 @@ global.ULog = {
     CACHE: 'CACHE',
     SECURITY: 'SECURITY',
     BATCH: 'BATCH',
-    WORKFLOW: 'WORKFLOW'
+    WORKFLOW: 'WORKFLOW',
   },
 
   // ログレベル設定
-  setLogLevel: jest.fn(function(level) {
+  setLogLevel: jest.fn(function (level) {
     if (this.LEVELS[level]) {
       this.currentLogLevel = level;
     }
   }),
 
   // ログレベルチェック
-  shouldLog: jest.fn(function(level) {
+  shouldLog: jest.fn(function (level) {
     const currentPriority = this.LEVEL_PRIORITY[this.currentLogLevel] || 2;
     const checkPriority = this.LEVEL_PRIORITY[level] || 2;
     return checkPriority >= currentPriority;
@@ -108,7 +108,7 @@ global.ULog = {
   debug: jest.fn(),
   info: jest.fn(),
   warn: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
 };
 
 // 統一レスポンス関数 モック
@@ -116,21 +116,21 @@ global.createSuccessResponse = jest.fn((data = null, message = null) => ({
   success: true,
   data,
   message,
-  error: null
+  error: null,
 }));
 
 global.createErrorResponse = jest.fn((error, message = null, data = null) => ({
   success: false,
   data,
   message,
-  error
+  error,
 }));
 
 global.createUnifiedResponse = jest.fn((success, data = null, message = null, error = null) => ({
   success,
   data,
   message,
-  error
+  error,
 }));
 
 // 統一キャッシュマネージャー モック
@@ -145,39 +145,39 @@ global.cacheManager = {
 // 名前空間オブジェクト モック
 global.User = {
   email: jest.fn(() => 'test@example.com'),
-  info: jest.fn(() => ({ 
+  info: jest.fn(() => ({
     userId: 'test-user-id',
     adminEmail: 'test@example.com',
-    isActive: true 
-  }))
+    isActive: true,
+  })),
 };
 
 global.Access = {
-  check: jest.fn(() => ({ hasAccess: true, message: 'アクセス許可' }))
+  check: jest.fn(() => ({ hasAccess: true, message: 'アクセス許可' })),
 };
 
 global.Deploy = {
   domain: jest.fn(() => ({
     currentDomain: 'example.com',
-    deployDomain: 'example.com', 
+    deployDomain: 'example.com',
     isDomainMatch: true,
-    webAppUrl: 'https://script.google.com/test'
+    webAppUrl: 'https://script.google.com/test',
   })),
-  isUser: jest.fn(() => true)
+  isUser: jest.fn(() => true),
 };
 
 global.DB = {
   createUser: jest.fn((userData) => userData),
-  findUserByEmail: jest.fn((email) => ({ 
+  findUserByEmail: jest.fn((email) => ({
     userId: 'test-user-id',
     adminEmail: email,
-    isActive: true 
+    isActive: true,
   })),
-  findUserById: jest.fn((userId) => ({ 
-    userId: userId,
+  findUserById: jest.fn((userId) => ({
+    userId,
     adminEmail: 'test@example.com',
-    isActive: true 
-  }))
+    isActive: true,
+  })),
 };
 
 // その他の統一システム関数 モック（後方互換性）
@@ -192,9 +192,9 @@ global.UNIFIED_CONSTANTS = {
   ERROR: {
     SEVERITY: {
       LOW: 'low',
-      MEDIUM: 'medium', 
+      MEDIUM: 'medium',
       HIGH: 'high',
-      CRITICAL: 'critical'
+      CRITICAL: 'critical',
     },
     CATEGORIES: {
       AUTHENTICATION: 'authentication',
@@ -207,29 +207,29 @@ global.UNIFIED_CONSTANTS = {
       USER_INPUT: 'user_input',
       EXTERNAL: 'external',
       CONFIG: 'config',
-      SECURITY: 'security'
-    }
+      SECURITY: 'security',
+    },
   },
   CACHE: {
     TTL: {
       SHORT: 300,
       MEDIUM: 600,
       LONG: 3600,
-      EXTENDED: 21600
+      EXTENDED: 21600,
     },
     BATCH_SIZE: {
       SMALL: 20,
       MEDIUM: 50,
       LARGE: 100,
-      XLARGE: 200
-    }
+      XLARGE: 200,
+    },
   },
   TIMEOUTS: {
     SHORT: 5000,
     MEDIUM: 15000,
     LONG: 30000,
-    EXTENDED: 60000
-  }
+    EXTENDED: 60000,
+  },
 };
 
 global.getSheetsServiceCached = jest.fn();
@@ -243,43 +243,43 @@ global.invalidateUserCache = jest.fn();
 global.getUnifiedExecutionCache = jest.fn(() => ({
   clearUserInfo: jest.fn(),
   clearSheetsService: jest.fn(),
-  clearAll: jest.fn()
+  clearAll: jest.fn(),
 }));
 
 // User名前空間 モック
 global.User = {
   email: jest.fn(() => 'test@example.com'),
-  info: jest.fn(() => ({ 
+  info: jest.fn(() => ({
     userId: 'testUserId',
     adminEmail: 'test@example.com',
-    spreadsheetId: 'testSpreadsheetId'
-  }))
+    spreadsheetId: 'testSpreadsheetId',
+  })),
 };
 
-// Access名前空間 モック  
+// Access名前空間 モック
 global.Access = {
-  check: jest.fn(() => ({ hasAccess: true, message: 'テストアクセス許可' }))
+  check: jest.fn(() => ({ hasAccess: true, message: 'テストアクセス許可' })),
 };
 
 // Deploy名前空間 モック
 global.Deploy = {
   isUser: jest.fn(() => true),
-  domain: jest.fn(() => ({ domain: 'test.example.com', isDomainMatch: true }))
+  domain: jest.fn(() => ({ domain: 'test.example.com', isDomainMatch: true })),
 };
 
 // DB名前空間 モック
 global.DB = {
   findUserById: jest.fn((userId) => ({
-    userId: userId,
+    userId,
     adminEmail: 'test@example.com',
-    spreadsheetId: 'testSpreadsheetId'
+    spreadsheetId: 'testSpreadsheetId',
   })),
   findUserByEmail: jest.fn((email) => ({
     userId: 'testUserId',
     adminEmail: email,
-    spreadsheetId: 'testSpreadsheetId'
+    spreadsheetId: 'testSpreadsheetId',
   })),
-  createUser: jest.fn((userData) => ({ ...userData, created: true }))
+  createUser: jest.fn((userData) => ({ ...userData, created: true })),
 };
 
 // セキュリティ・権限関数 モック
@@ -292,40 +292,62 @@ global.getServiceAccountEmail = jest.fn(() => 'service@example.com');
 global.getEmailDomain = jest.fn((email) => (email || '').split('@').pop().toLowerCase());
 global.getWebAppUrlCached = jest.fn(() => 'https://script.google.com/macros/test');
 global.getSheetsService = jest.fn(() => ({ spreadsheets: { values: { batchGet: jest.fn() } } }));
-global.batchGetSheetsData = jest.fn(() => ({ valueRanges: [{ values: [['header1', 'header2'], ['data1', 'data2']] }] }));
+global.batchGetSheetsData = jest.fn(() => ({
+  valueRanges: [
+    {
+      values: [
+        ['header1', 'header2'],
+        ['data1', 'data2'],
+      ],
+    },
+  ],
+}));
 global.appendSheetsData = jest.fn();
 global.waitForUserRecord = jest.fn(() => true);
 global.updateUserLastAccess = jest.fn();
 global.buildUserAdminUrl = jest.fn(() => 'https://example.com/admin/test-user');
-global.createSecureRedirect = jest.fn((url, message) => ({ getContent: () => `Redirect to ${url}: ${message}` }));
-global.showErrorPage = jest.fn((title, message) => ({ getContent: () => `Error: ${title} - ${message}` }));
+global.createSecureRedirect = jest.fn((url, message) => ({
+  getContent: () => `Redirect to ${url}: ${message}`,
+}));
+global.showErrorPage = jest.fn((title, message) => ({
+  getContent: () => `Error: ${title} - ${message}`,
+}));
 global.getSetupStatusFromConfig = jest.fn(() => 'completed');
 
 // データベース操作関数 モック
 global.DB_SHEET_CONFIG = {
   SHEET_NAME: 'UserDatabase',
-  HEADERS: ['userId', 'adminEmail', 'createdAt', 'isActive', 'configJson', 'spreadsheetId', 'spreadsheetUrl', 'lastAccessedAt']
+  HEADERS: [
+    'userId',
+    'adminEmail',
+    'createdAt',
+    'isActive',
+    'configJson',
+    'spreadsheetId',
+    'spreadsheetUrl',
+    'lastAccessedAt',
+  ],
 };
 global.DELETE_LOG_SHEET_CONFIG = {
   sheetName: 'DeleteLog',
-  headers: ['userId', 'deletedAt', 'reason']
+  headers: ['userId', 'deletedAt', 'reason'],
 };
 global.DIAGNOSTIC_LOG_SHEET_CONFIG = {
   sheetName: 'DiagnosticLog',
-  headers: ['timestamp', 'level', 'message']
+  headers: ['timestamp', 'level', 'message'],
 };
 
 // スクリプトプロパティキー モック
 global.SCRIPT_PROPS_KEYS = {
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
-  ADMIN_EMAIL: 'ADMIN_EMAIL'
+  ADMIN_EMAIL: 'ADMIN_EMAIL',
 };
 
 // バッチプロセッサ モック
 global.unifiedBatchProcessor = {
   batchUpdateSheet: jest.fn(),
-  batchReadSheet: jest.fn()
+  batchReadSheet: jest.fn(),
 };
 
 // キャッシュ操作 モック
@@ -344,7 +366,7 @@ global.EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 global.unifiedCacheAPI = {
   invalidateUserCache: jest.fn(),
   clearDatabaseCache: jest.fn(),
-  synchronizeCacheAfterCriticalUpdate: jest.fn()
+  synchronizeCacheAfterCriticalUpdate: jest.fn(),
 };
 
 // 統一Sheet管理システム関数のモック
@@ -584,12 +606,12 @@ global.COLUMN_HEADERS = {
   UNDERSTAND: 'なるほど！',
   LIKE: 'いいね！',
   CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト'
+  HIGHLIGHT: 'ハイライト',
 };
 global.DISPLAY_MODES = {
   ANONYMOUS: 'anonymous',
   NAMED: 'named',
-  EMAIL: 'email'
+  EMAIL: 'email',
 };
 global.REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 global.USER_CACHE_TTL = 300;

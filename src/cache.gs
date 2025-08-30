@@ -509,7 +509,9 @@ class CacheManager {
 
       // 関連IDの数制限
       if (relatedIds.length > maxRelated) {
-        console.warn(`[Cache] Too many related IDs (${relatedIds.length}), limiting to ${maxRelated}`);
+        console.warn(
+          `[Cache] Too many related IDs (${relatedIds.length}), limiting to ${maxRelated}`
+        );
         relatedIds = relatedIds.slice(0, maxRelated);
       }
 
@@ -1309,7 +1311,10 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
   // Phase 1: メモリキャッシュをチェック
   const memoryEntry = spreadsheetMemoryCache[spreadsheetId];
   if (memoryEntry && now - memoryEntry.timestamp < SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
-    console.log('✅ SpreadsheetApp.openById メモリキャッシュヒット:', spreadsheetId.substring(0, 10));
+    console.log(
+      '✅ SpreadsheetApp.openById メモリキャッシュヒット:',
+      spreadsheetId.substring(0, 10)
+    );
     return memoryEntry.spreadsheet;
   }
 
@@ -1544,7 +1549,9 @@ function resetExecutionCache() {
  * ヘッダーインデックスをキャッシュ付きで安定取得（リトライ機能付き）
  */
 function getHeadersCached(spreadsheetId, sheetName) {
-  console.log(`📋 [HEADER_CACHE] Requested headers for ${sheetName} in ${spreadsheetId?.substring(0, 10)}...`);
+  console.log(
+    `📋 [HEADER_CACHE] Requested headers for ${sheetName} in ${spreadsheetId?.substring(0, 10)}...`
+  );
   const key = `hdr_${spreadsheetId}_${sheetName}`;
   const validationKey = `hdr_validation_${spreadsheetId}_${sheetName}`;
 
@@ -1607,12 +1614,16 @@ function getHeadersCached(spreadsheetId, sheetName) {
  */
 function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
   // 詳細ログ追加
-  console.log(`🔍 [HEADER_DETECTION] Starting header detection for ${sheetName} in ${spreadsheetId?.substring(0, 10)}...`);
+  console.log(
+    `🔍 [HEADER_DETECTION] Starting header detection for ${sheetName} in ${spreadsheetId?.substring(0, 10)}...`
+  );
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`[HEADER_DETECTION] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId?.substring(0, 10)}, sheetName: ${sheetName}`);
+      console.log(
+        `[HEADER_DETECTION] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId?.substring(0, 10)}, sheetName: ${sheetName}`
+      );
       console.log(
         `[getHeadersWithRetry] Attempt ${attempt}/${maxRetries} for spreadsheetId: ${spreadsheetId}, sheetName: ${sheetName}`
       );
@@ -1652,7 +1663,9 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
       }
 
       if (!responseData.values) {
-        console.warn(`[getHeadersWithRetry] No values in response for ${range} (attempt ${attempt})`);
+        console.warn(
+          `[getHeadersWithRetry] No values in response for ${range} (attempt ${attempt})`
+        );
         throw new Error('No values in response');
       }
 
@@ -1680,7 +1693,10 @@ function getHeadersWithRetry(spreadsheetId, sheetName, maxRetries = 3) {
       }
 
       console.log(`[getHeadersWithRetry] Final indices (attempt ${attempt}):`, indices);
-      console.log(`✅ [HEADER_DETECTION] Success! Found ${Object.keys(indices).length} headers:`, Object.keys(indices));
+      console.log(
+        `✅ [HEADER_DETECTION] Success! Found ${Object.keys(indices).length} headers:`,
+        Object.keys(indices)
+      );
       console.log(`🎯 [HEADER_DETECTION] Column mapping:`, JSON.stringify(indices, null, 2));
       return indices;
     } catch (error) {
@@ -1917,7 +1933,7 @@ function getCacheStats() {
       timestamp: new Date().toISOString(),
       health: health,
       efficiency: 'unknown',
-      recommendations: []
+      recommendations: [],
     };
 
     const hitRate = parseFloat(health.stats.hitRate);
@@ -1940,30 +1956,30 @@ function getCacheStats() {
       stats.recommendations.push({
         priority: 'high',
         action: 'キャッシュヒット率向上',
-        details: 'TTL設定の見直し、メモ化の活用を検討してください。'
+        details: 'TTL設定の見直し、メモ化の活用を検討してください。',
       });
     }
 
     if (errorRate > 10) {
       stats.recommendations.push({
-        priority: 'medium', 
+        priority: 'medium',
         action: 'エラー率削減',
-        details: 'キャッシュアクセスエラーの調査とハンドリング改善が必要です。'
+        details: 'キャッシュアクセスエラーの調査とハンドリング改善が必要です。',
       });
     }
 
     if (health.memoCacheSize > 1000) {
       stats.recommendations.push({
         priority: 'low',
-        action: 'メモリ使用量最適化', 
-        details: 'メモ化キャッシュサイズが大きくなっています。定期クリアを検討してください。'
+        action: 'メモリ使用量最適化',
+        details: 'メモ化キャッシュサイズが大きくなっています。定期クリアを検討してください。',
       });
     }
 
     console.log('[Cache] Statistics analysis completed:', stats.efficiency);
     return {
       success: true,
-      stats: stats
+      stats: stats,
     };
   } catch (error) {
     console.error('[ERROR]', 'getCacheStats error:', error);
@@ -2015,7 +2031,7 @@ class CacheAPI {
         this.manager.remove(`unified_user_info_${identifier}`);
         this.manager.remove(`email_${identifier}`);
         this.manager.remove(`login_status_${identifier}`);
-        
+
         // パターンベースクリア
         this.manager.clearByPattern(`publishedData_${identifier}_`, { maxKeys: 200 });
         this.manager.clearByPattern(`sheetData_${identifier}_`, { maxKeys: 200 });
@@ -2029,7 +2045,9 @@ class CacheAPI {
         this.manager.clearByPattern('login_status_', { maxKeys: 500 });
       }
 
-      console.log(`✅ 統一API: ユーザー情報キャッシュクリア完了 (identifier: ${identifier || 'all'})`);
+      console.log(
+        `✅ 統一API: ユーザー情報キャッシュクリア完了 (identifier: ${identifier || 'all'})`
+      );
     } catch (error) {
       console.error('[ERROR]', `統一API: ユーザー情報キャッシュクリア失敗:`, error.message);
       throw error;
@@ -2083,7 +2101,7 @@ class CacheAPI {
       const token = getServiceAccountTokenCached();
       service = {
         accessToken: token,
-        baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets'
+        baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
       };
 
       // キャッシュに保存
@@ -2101,7 +2119,7 @@ class CacheAPI {
   /**
    * ユーザーキャッシュ無効化の統合（複数の分散実装を統合）
    * @param {string} userId - ユーザーID
-   * @param {string} email - メールアドレス  
+   * @param {string} email - メールアドレス
    * @param {string} [spreadsheetId] - スプレッドシートID
    * @param {boolean|string} [clearPattern=false] - パターンクリア（true='all', string=パターン）
    * @param {string} [dbSpreadsheetId] - データベーススプレッドシートID
@@ -2109,7 +2127,11 @@ class CacheAPI {
   invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
     try {
       console.log(`🗑️ 統一API: ユーザーキャッシュ無効化開始`, {
-        userId, email, spreadsheetId, clearPattern, dbSpreadsheetId
+        userId,
+        email,
+        spreadsheetId,
+        clearPattern,
+        dbSpreadsheetId,
       });
 
       // 基本ユーザーキャッシュクリア
@@ -2117,19 +2139,19 @@ class CacheAPI {
         this.manager.remove(`user_${userId}`);
         this.manager.remove(`unified_user_info_${userId}`);
         this.manager.remove(`userinfo_${userId}`);
-        
+
         // ユーザー関連パターンクリア
         this.manager.clearByPattern(`publishedData_${userId}_`, { maxKeys: 200 });
         this.manager.clearByPattern(`sheetData_${userId}_`, { maxKeys: 200 });
         this.manager.clearByPattern(`config_v3_${userId}_`, { maxKeys: 200 });
       }
-      
+
       if (email) {
         this.manager.remove(`email_${email}`);
         this.manager.remove(`unified_user_info_${email}`);
         this.manager.remove(`login_status_${email}`);
       }
-      
+
       if (spreadsheetId) {
         this.manager.remove(`hdr_${spreadsheetId}`);
         this.manager.remove(`data_${spreadsheetId}`);
@@ -2171,15 +2193,18 @@ class CacheAPI {
   synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
     try {
       console.log('🔄 統一API: クリティカル更新後のキャッシュ同期開始', {
-        userId, email, oldSpreadsheetId, newSpreadsheetId
+        userId,
+        email,
+        oldSpreadsheetId,
+        newSpreadsheetId,
       });
 
       // 段階1: 基本ユーザーキャッシュクリア
       this.invalidateUserCache(userId, email, oldSpreadsheetId, false);
-      
+
       if (newSpreadsheetId && newSpreadsheetId !== oldSpreadsheetId) {
         this.invalidateUserCache(userId, email, newSpreadsheetId, false);
-        
+
         // 古いスプレッドシートオブジェクトキャッシュクリア
         if (oldSpreadsheetId) {
           this.invalidateSpreadsheetCache(oldSpreadsheetId);
@@ -2194,7 +2219,7 @@ class CacheAPI {
 
       // 段階4: 関連パターンクリア
       const patterns = ['user_*', 'email_*', 'login_status_*', 'sheets_*', 'data_*', 'config_v3_*'];
-      patterns.forEach(pattern => {
+      patterns.forEach((pattern) => {
         this.manager.clearByPattern(pattern, { maxKeys: 100 });
       });
 
@@ -2214,10 +2239,10 @@ class CacheAPI {
   clearDatabaseCache() {
     try {
       console.log('🗑️ 統一API: データベースキャッシュクリア開始');
-      
+
       // データベース関連パターンクリア
       const dbPatterns = ['user_', 'email_', 'hdr_', 'data_', 'sheets_', 'config_v3_'];
-      dbPatterns.forEach(pattern => {
+      dbPatterns.forEach((pattern) => {
         this.manager.clearByPattern(pattern, { maxKeys: 200 });
       });
 
@@ -2238,7 +2263,7 @@ class CacheAPI {
    */
   invalidateSpreadsheetCache(spreadsheetId) {
     if (!spreadsheetId) return;
-    
+
     try {
       // メモリキャッシュから削除（spreadsheetCache.gsの機能）
       if (typeof spreadsheetMemoryCache !== 'undefined' && spreadsheetMemoryCache[spreadsheetId]) {
@@ -2257,7 +2282,9 @@ class CacheAPI {
       this.manager.clearByPattern(spreadsheetId, { maxKeys: 50 });
       this.manager.invalidateSheetData(spreadsheetId);
 
-      console.log(`✅ 統一API: スプレッドシートキャッシュ無効化完了: ${spreadsheetId.substring(0, 10)}`);
+      console.log(
+        `✅ 統一API: スプレッドシートキャッシュ無効化完了: ${spreadsheetId.substring(0, 10)}`
+      );
     } catch (error) {
       console.error('[ERROR]', `統一API: スプレッドシートキャッシュ無効化失敗:`, error.message);
     }
@@ -2296,7 +2323,8 @@ class CacheAPI {
     return {
       manager: this.manager.getHealth(),
       execution: this.executionCache.getStats(),
-      spreadsheet: typeof getSpreadsheetCacheStats === 'function' ? getSpreadsheetCacheStats() : null
+      spreadsheet:
+        typeof getSpreadsheetCacheStats === 'function' ? getSpreadsheetCacheStats() : null,
     };
   }
 }
@@ -2361,7 +2389,12 @@ function getCachedSheetsService() {
  * unifiedSecurityManager.gsの実装を統一APIで置き換え
  */
 function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
-  return unifiedCacheAPI.synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId);
+  return unifiedCacheAPI.synchronizeCacheAfterCriticalUpdate(
+    userId,
+    email,
+    oldSpreadsheetId,
+    newSpreadsheetId
+  );
 }
 
 /**
@@ -2389,22 +2422,22 @@ function clearExecutionSheetsServiceCache() {
 function resilientUrlFetch(url, options = {}) {
   const maxRetries = 3;
   const baseDelay = 1000;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       console.log(`resilientUrlFetch: ${url} (試行 ${attempt + 1}/${maxRetries + 1})`);
-      
+
       const response = UrlFetchApp.fetch(url, {
         ...options,
         muteHttpExceptions: true,
       });
-      
+
       if (!response || typeof response.getResponseCode !== 'function') {
         throw new Error('無効なレスポンスオブジェクトが返されました');
       }
-      
+
       const responseCode = response.getResponseCode();
-      
+
       // 成功時またはリトライ不要なエラー
       if (responseCode >= 200 && responseCode < 300) {
         if (attempt > 0) {
@@ -2412,13 +2445,13 @@ function resilientUrlFetch(url, options = {}) {
         }
         return response;
       }
-      
+
       // 4xx エラーはリトライしない
       if (responseCode >= 400 && responseCode < 500) {
         console.warn(`resilientUrlFetch: クライアントエラー ${responseCode} - ${url}`);
         return response;
       }
-      
+
       // 最後の試行でない場合は待機してリトライ
       if (attempt < maxRetries) {
         const delay = baseDelay * Math.pow(2, attempt);
@@ -2428,12 +2461,13 @@ function resilientUrlFetch(url, options = {}) {
         console.warn(`resilientUrlFetch: 最大リトライ回数に達しました - ${url}`);
         return response;
       }
-      
     } catch (error) {
       // 最後の試行でない場合はリトライ
       if (attempt < maxRetries) {
         const delay = baseDelay * Math.pow(2, attempt);
-        console.warn(`resilientUrlFetch: エラー、${delay}ms後にリトライ - ${url}: ${error.message}`);
+        console.warn(
+          `resilientUrlFetch: エラー、${delay}ms後にリトライ - ${url}: ${error.message}`
+        );
         Utilities.sleep(delay);
       } else {
         console.error(`resilientUrlFetch: 最終的に失敗 - ${url}`, { error: error.message, url });

@@ -8,9 +8,9 @@
  */
 const ERROR_SEVERITY = {
   LOW: 'low',
-  MEDIUM: 'medium', 
+  MEDIUM: 'medium',
   HIGH: 'high',
-  CRITICAL: 'critical'
+  CRITICAL: 'critical',
 };
 
 /**
@@ -24,7 +24,7 @@ const ERROR_CATEGORIES = {
   NETWORK: 'network',
   VALIDATION: 'validation',
   SYSTEM: 'system',
-  USER_INPUT: 'user_input'
+  USER_INPUT: 'user_input',
 };
 
 /**
@@ -46,11 +46,17 @@ class ErrorHandler {
    * @param {object} metadata - 追加メタデータ
    * @returns {object} 構造化エラー情報
    */
-  logError(error, context, severity = ERROR_SEVERITY.MEDIUM, category = ERROR_CATEGORIES.SYSTEM, metadata = {}) {
+  logError(
+    error,
+    context,
+    severity = ERROR_SEVERITY.MEDIUM,
+    category = ERROR_CATEGORIES.SYSTEM,
+    metadata = {}
+  ) {
     this.errorCount++;
-    
+
     const errorInfo = this._buildErrorInfo(error, context, severity, category, metadata);
-    
+
     // ULogを使用した統一ログ出力
     switch (severity) {
       case ERROR_SEVERITY.CRITICAL:
@@ -66,7 +72,7 @@ class ErrorHandler {
         console.log(errorInfo.message, errorInfo.metadata, category);
         break;
     }
-    
+
     return errorInfo;
   }
 
@@ -82,14 +88,14 @@ class ErrorHandler {
       userAgent: typeof Session !== 'undefined' ? Session.getActiveUser()?.getEmail() : 'unknown',
       ipAddress: 'not_available_in_gas', // GASでは取得不可
       timestamp: new Date().toISOString(),
-      securityAlert: true
+      securityAlert: true,
     };
 
     return this.logError(
-      error, 
-      context, 
-      ERROR_SEVERITY.HIGH, 
-      ERROR_CATEGORIES.AUTHORIZATION, 
+      error,
+      context,
+      ERROR_SEVERITY.HIGH,
+      ERROR_CATEGORIES.AUTHORIZATION,
       securityMetadata
     );
   }
@@ -105,14 +111,14 @@ class ErrorHandler {
       operation: operation,
       ...operationDetails,
       retryable: this._isRetryableError(error),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     return this.logError(
-      error, 
-      `database.${operation}`, 
-      ERROR_SEVERITY.MEDIUM, 
-      ERROR_CATEGORIES.DATABASE, 
+      error,
+      `database.${operation}`,
+      ERROR_SEVERITY.MEDIUM,
+      ERROR_CATEGORIES.DATABASE,
       dbMetadata
     );
   }
@@ -129,14 +135,14 @@ class ErrorHandler {
       field: field,
       value: typeof value === 'string' ? value.substring(0, 100) : String(value).substring(0, 100), // 値は100文字まで
       rule: rule,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     return this.logError(
-      message, 
-      `validation.${field}`, 
-      ERROR_SEVERITY.LOW, 
-      ERROR_CATEGORIES.VALIDATION, 
+      message,
+      `validation.${field}`,
+      ERROR_SEVERITY.LOW,
+      ERROR_CATEGORIES.VALIDATION,
       validationMetadata
     );
   }
@@ -159,7 +165,7 @@ class ErrorHandler {
       threshold: threshold,
       overThresholdBy: duration - threshold,
       ...details,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     return this.logError(
@@ -181,7 +187,7 @@ class ErrorHandler {
       totalErrors: this.errorCount,
       uptime: Date.now() - this.startTime,
       errorRate: this.errorCount / ((Date.now() - this.startTime) / 1000 / 60), // エラー/分
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -198,7 +204,7 @@ class ErrorHandler {
       severity: severity,
       category: category,
       errorNumber: this.errorCount,
-      uptime: Date.now() - this.startTime
+      uptime: Date.now() - this.startTime,
     };
 
     // エラーオブジェクトの場合
@@ -208,7 +214,7 @@ class ErrorHandler {
         message: error.message,
         name: error.name,
         stack: error.stack,
-        metadata: metadata
+        metadata: metadata,
       };
     }
 
@@ -216,7 +222,7 @@ class ErrorHandler {
     return {
       ...baseInfo,
       message: String(error),
-      metadata: metadata
+      metadata: metadata,
     };
   }
 
@@ -226,17 +232,17 @@ class ErrorHandler {
    */
   _isRetryableError(error) {
     if (!error) return false;
-    
+
     const retryablePatterns = [
       /timeout/i,
       /rate limit/i,
       /service unavailable/i,
       /temporary/i,
-      /quota/i
+      /quota/i,
     ];
 
     const errorMessage = error.message || String(error);
-    return retryablePatterns.some(pattern => pattern.test(errorMessage));
+    return retryablePatterns.some((pattern) => pattern.test(errorMessage));
   }
 }
 

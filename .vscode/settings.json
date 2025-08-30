@@ -22,7 +22,7 @@
     // ESLint設定（GAS用）
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-        "source.fixAll.eslint": true
+        "source.fixAll.eslint": "explicit"
     },
     "eslint.validate": [
         "javascript",

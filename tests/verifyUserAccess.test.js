@@ -13,21 +13,21 @@ describe('verifyUserAccess security checks', () => {
         debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
-        error: jest.fn()
+        error: jest.fn(),
       },
       DB: {
         findUserById: jest.fn(() => ({
           adminEmail: 'admin@example.com',
           configJson: JSON.stringify({ appPublished: false }),
-        }))
+        })),
       },
       User: {
         email: jest.fn(() => 'admin@example.com'),
-        info: jest.fn(() => ({ 
+        info: jest.fn(() => ({
           userId: 'U1',
           adminEmail: 'admin@example.com',
-          spreadsheetId: 'testSpreadsheetId'
-        }))
+          spreadsheetId: 'testSpreadsheetId',
+        })),
       },
       clearExecutionUserInfoCache: jest.fn(),
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
@@ -64,4 +64,3 @@ describe('verifyUserAccess security checks', () => {
     expect(() => context.verifyUserAccess('U1')).not.toThrow();
   });
 });
-

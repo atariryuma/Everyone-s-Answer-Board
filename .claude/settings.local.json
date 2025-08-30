@@ -15,7 +15,9 @@
       "WebSearch",
       "WebFetch(domain:developers.google.com)",
       "Bash(sed:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(npm run format:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": [],

@@ -1,168 +1,215 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <base target="_top">
+  <head>
+    <meta charset="UTF-8" />
+    <base target="_top" />
     <title>StudyQuest - アクセス制限中</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <!-- Shared Security Headers -->
-    
+
     <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?>
-    <?= include('UnifiedStyles'); ?>
-    <?= include('SharedUtilities'); ?>
+    <?!= include('SharedTailwindConfig'); ?> <?= include('UnifiedStyles'); ?> <?=
+    include('SharedUtilities'); ?>
     <style>
-        .pulse-slow {
-            animation: pulse 2s infinite;
+      .pulse-slow {
+        animation: pulse 2s infinite;
+      }
+      .fade-in {
+        animation: fadeIn 0.8s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
         }
-        .fade-in {
-            animation: fadeIn 0.8s ease-in-out;
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .restriction-notice {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            backdrop-filter: blur(10px);
-        }
-        .scenario-message {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            backdrop-filter: blur(10px);
-        }
+      }
+      .restriction-notice {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        backdrop-filter: blur(10px);
+      }
+      .scenario-message {
+        background: linear-gradient(
+          135deg,
+          rgba(59, 130, 246, 0.1) 0%,
+          rgba(37, 99, 235, 0.1) 100%
+        );
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        backdrop-filter: blur(10px);
+      }
     </style>
-</head>
-<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen flex items-center justify-center">
+  </head>
+  <body
+    class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen flex items-center justify-center"
+  >
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <div class="text-center fade-in">
-            <!-- メインステータス -->
-            <div class="glass-panel rounded-2xl p-8 shadow-2xl mb-8">
-                <div class="mb-6">
-                    <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-r from-red-500/20 to-orange-500/20 flex items-center justify-center border-2 border-red-400/30 pulse-slow">
-                        <svg class="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
-                    </div>
-                    <h1 class="text-3xl font-bold mb-2 text-red-300">アクセスが制限されています</h1>
-                    <p class="text-gray-400 text-lg">このアプリケーションは現在利用できません</p>
-                </div>
-                
-                <? if (typeof userEmail !== 'undefined' && userEmail) { ?>
-                <div class="mb-6 p-3 bg-gray-700/50 rounded-lg">
-                    <p class="text-sm text-gray-300">ユーザー: <span class="text-cyan-400 font-medium"><?= userEmail ?></span></p>
-                </div>
-                <? } ?>
-                
-                <!-- ステータス情報 -->
-                <div class="grid md:grid-cols-2 gap-4 mb-8">
-                    <div class="bg-gray-700/30 rounded-lg p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                            <span class="text-sm font-medium">アクセス状態</span>
-                        </div>
-                        <p class="text-gray-400 text-sm">制限中（一般ユーザーはアクセスできません）</p>
-                    </div>
-                    <div class="bg-gray-700/30 rounded-lg p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="w-3 h-3 rounded-full bg-orange-500"></div>
-                            <span class="text-sm font-medium">システム状態</span>
-                        </div>
-                        <p class="text-gray-400 text-sm">アプリケーション無効化中</p>
-                    </div>
-                </div>
+      <div class="text-center fade-in">
+        <!-- メインステータス -->
+        <div class="glass-panel rounded-2xl p-8 shadow-2xl mb-8">
+          <div class="mb-6">
+            <div
+              class="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-r from-red-500/20 to-orange-500/20 flex items-center justify-center border-2 border-red-400/30 pulse-slow"
+            >
+              <svg
+                class="w-12 h-12 text-red-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                ></path>
+              </svg>
             </div>
+            <h1 class="text-3xl font-bold mb-2 text-red-300">アクセスが制限されています</h1>
+            <p class="text-gray-400 text-lg">このアプリケーションは現在利用できません</p>
+          </div>
 
-            <!-- シナリオ別メッセージ -->
-            <div class="scenario-message rounded-2xl p-6 mb-6">
-                <h2 class="text-xl font-bold mb-4 text-blue-300 flex items-center justify-center gap-2">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    ご案内
-                </h2>
-                
-                <div class="space-y-4 text-left">
-                    <!-- 一時的な停止・メンテナンス -->
-                    <div class="bg-gray-700/30 rounded-lg p-4">
-                        <h3 class="text-lg font-semibold text-yellow-300 mb-2">🔧 システムメンテナンス</h3>
-                        <p class="text-gray-300 text-sm">
-                            システムの改善とセキュリティ強化のため、一時的にサービスを停止している場合があります。
-                            通常は短時間で復旧いたします。
-                        </p>
-                    </div>
-                    
-                    <!-- システムアーカイブ -->
-                    <div class="bg-gray-700/30 rounded-lg p-4">
-                        <h3 class="text-lg font-semibold text-purple-300 mb-2">📦 システム終了</h3>
-                        <p class="text-gray-300 text-sm">
-                            このシステムは運用期間が終了し、アーカイブされました。
-                            新しいシステムの案内については管理者にお問い合わせください。
-                        </p>
-                    </div>
-                    
-                    <!-- 違反対応 -->
-                    <div class="bg-gray-700/30 rounded-lg p-4">
-                        <h3 class="text-lg font-semibold text-red-300 mb-2">⚠️ 利用規約違反</h3>
-                        <p class="text-gray-300 text-sm">
-                            利用規約に違反する行為が確認されたため、一時的にアクセスを制限しています。
-                            詳細については管理者にお問い合わせください。
-                        </p>
-                    </div>
-                    
-                    <!-- セットアップ管理 -->
-                    <div class="bg-gray-700/30 rounded-lg p-4">
-                        <h3 class="text-lg font-semibold text-cyan-300 mb-2">⚙️ システム設定中</h3>
-                        <p class="text-gray-300 text-sm">
-                            新しい機能の追加やシステム設定の変更作業中のため、一時的に利用を停止しています。
-                            設定完了後、自動的に利用可能になります。
-                        </p>
-                    </div>
-                </div>
-            </div>
+          <? if (typeof userEmail !== 'undefined' && userEmail) { ?>
+          <div class="mb-6 p-3 bg-gray-700/50 rounded-lg">
+            <p class="text-sm text-gray-300">
+              ユーザー: <span class="text-cyan-400 font-medium"><?= userEmail ?></span>
+            </p>
+          </div>
+          <? } ?>
 
-            <!-- 管理者向け情報 -->
-            <? if (typeof isSystemAdmin !== 'undefined' && isSystemAdmin) { ?>
-            <div class="restriction-notice rounded-2xl p-6">
-                <h3 class="text-lg font-semibold text-orange-300 mb-3 flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2m0 0V7a2 2 0 012-2m6 0V5a2 2 0 00-2-2H7a2 2 0 00-2 2v2m6 0a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2"></path>
-                    </svg>
-                    システム管理者情報
-                </h3>
-                <div class="bg-gray-700/50 rounded-lg p-4">
-                    <p class="text-sm text-gray-300 mb-3">
-                        あなたはシステム管理者としてログインしているため、アプリケーション管理ページにアクセスできます。
-                    </p>
-                    <div class="text-center">
-                        <a href="?mode=appSetup" 
-                           class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                            アプリ設定画面へ
-                        </a>
-                    </div>
-                </div>
+          <!-- ステータス情報 -->
+          <div class="grid md:grid-cols-2 gap-4 mb-8">
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <span class="text-sm font-medium">アクセス状態</span>
+              </div>
+              <p class="text-gray-400 text-sm">制限中（一般ユーザーはアクセスできません）</p>
             </div>
-            <? } ?>
-
-            <!-- フッター情報 -->
-            <div class="mt-8 text-center">
-                <p class="text-xs text-gray-500">
-                    StudyQuest みんなの回答ボード
-                    <? if (typeof timestamp !== 'undefined' && timestamp) { ?>
-                    <br>確認時刻: <?= timestamp ?>
-                    <? } ?>
-                </p>
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="w-3 h-3 rounded-full bg-orange-500"></div>
+                <span class="text-sm font-medium">システム状態</span>
+              </div>
+              <p class="text-gray-400 text-sm">アプリケーション無効化中</p>
             </div>
+          </div>
         </div>
+
+        <!-- シナリオ別メッセージ -->
+        <div class="scenario-message rounded-2xl p-6 mb-6">
+          <h2 class="text-xl font-bold mb-4 text-blue-300 flex items-center justify-center gap-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            ご案内
+          </h2>
+
+          <div class="space-y-4 text-left">
+            <!-- 一時的な停止・メンテナンス -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-yellow-300 mb-2">🔧 システムメンテナンス</h3>
+              <p class="text-gray-300 text-sm">
+                システムの改善とセキュリティ強化のため、一時的にサービスを停止している場合があります。
+                通常は短時間で復旧いたします。
+              </p>
+            </div>
+
+            <!-- システムアーカイブ -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-purple-300 mb-2">📦 システム終了</h3>
+              <p class="text-gray-300 text-sm">
+                このシステムは運用期間が終了し、アーカイブされました。
+                新しいシステムの案内については管理者にお問い合わせください。
+              </p>
+            </div>
+
+            <!-- 違反対応 -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-red-300 mb-2">⚠️ 利用規約違反</h3>
+              <p class="text-gray-300 text-sm">
+                利用規約に違反する行為が確認されたため、一時的にアクセスを制限しています。
+                詳細については管理者にお問い合わせください。
+              </p>
+            </div>
+
+            <!-- セットアップ管理 -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-cyan-300 mb-2">⚙️ システム設定中</h3>
+              <p class="text-gray-300 text-sm">
+                新しい機能の追加やシステム設定の変更作業中のため、一時的に利用を停止しています。
+                設定完了後、自動的に利用可能になります。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 管理者向け情報 -->
+        <? if (typeof isSystemAdmin !== 'undefined' && isSystemAdmin) { ?>
+        <div class="restriction-notice rounded-2xl p-6">
+          <h3
+            class="text-lg font-semibold text-orange-300 mb-3 flex items-center justify-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2m0 0V7a2 2 0 012-2m6 0V5a2 2 0 00-2-2H7a2 2 0 00-2 2v2m6 0a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2"
+              ></path>
+            </svg>
+            システム管理者情報
+          </h3>
+          <div class="bg-gray-700/50 rounded-lg p-4">
+            <p class="text-sm text-gray-300 mb-3">
+              あなたはシステム管理者としてログインしているため、アプリケーション管理ページにアクセスできます。
+            </p>
+            <div class="text-center">
+              <a
+                href="?mode=appSetup"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  ></path>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  ></path>
+                </svg>
+                アプリ設定画面へ
+              </a>
+            </div>
+          </div>
+        </div>
+        <? } ?>
+
+        <!-- フッター情報 -->
+        <div class="mt-8 text-center">
+          <p class="text-xs text-gray-500">
+            StudyQuest みんなの回答ボード <? if (typeof timestamp !== 'undefined' && timestamp) { ?>
+            <br />確認時刻: <?= timestamp ?> <? } ?>
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- メッセージエリア -->
     <div id="message-area" class="fixed top-20 right-4 z-50" aria-live="polite" role="status"></div>
-</body>
+  </body>
 </html>
