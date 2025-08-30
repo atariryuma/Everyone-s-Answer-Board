@@ -104,19 +104,12 @@ function connectDataSource(spreadsheetId, sheetName) {
       throw new Error(`シート "${sheetName}" が見つかりません`);
     }
 
-    // ヘッダー行を取得（最初の行を仮定）
+    // 既存の堅牢なヘッダー取得関数を活用（30分キャッシュ + リトライ機能）
+    const headerIndices = getHeadersCached(spreadsheetId, sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-
-    // 高精度AI列マッピングを自動検出
-    let columnMapping;
-    if (typeof identifyHeaders === 'function') {
-      const guessedHeaders = identifyHeaders(headerRow);
-      console.log('connectToDataSource: 高精度AI判定結果', guessedHeaders);
-      columnMapping = convertGuessedToMapping(guessedHeaders, headerRow);
-    } else {
-      // フォールバック: 基本的な検出ロジック
-      columnMapping = mapColumns(headerRow);
-    }
+    
+    // Core.gsの高精度AI列マッピングを直接活用
+    const columnMapping = headerIndices ? convertIndicesToMapping(headerIndices, headerRow) : mapColumns(headerRow);
 
     // 不足列の検出・追加
     const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping);
@@ -126,11 +119,10 @@ function connectDataSource(spreadsheetId, sheetName) {
     if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
       const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
-      // 高精度AI判定を再実行
-      if (typeof identifyHeaders === 'function') {
-        const updatedGuessedHeaders = identifyHeaders(updatedHeaderRow);
-        columnMapping = convertGuessedToMapping(updatedGuessedHeaders, updatedHeaderRow);
-      }
+      // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
+      cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
+      const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
+      columnMapping = updatedHeaderIndices ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow) : mapColumns(updatedHeaderRow);
     }
 
     // 設定を保存（既存のユーザー管理システムを活用）
@@ -171,6 +163,7 @@ function connectDataSource(spreadsheetId, sheetName) {
     return {
       success: true,
       columnMapping: columnMapping,
+      headers: headerRow,              // 🔥 追加: 実際のヘッダー情報
       rowCount: sheet.getLastRow(),
       message: message,
       missingColumnsResult: missingColumnsResult
@@ -450,22 +443,13 @@ function analyzeColumns(spreadsheetId, sheetName) {
       throw new Error(`シート "${sheetName}" が見つかりません`);
     }
 
-    // ヘッダー行を取得
+    // 既存の堅牢なヘッダー取得関数を活用（30分キャッシュ + リトライ機能）
+    const headerIndices = getHeadersCached(spreadsheetId, sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // 既存のidentifyHeaders関数を使用（高精度AI判定）
-    let columnMapping;
-    if (typeof identifyHeaders === 'function') {
-      const guessedHeaders = identifyHeaders(headerRow);
-      console.log('analyzeSpreadsheetColumns: 高精度AI判定結果', guessedHeaders);
-      
-      // AdminPanel用の形式に変換
-      columnMapping = convertGuessedToMapping(guessedHeaders, headerRow);
-    } else {
-      // フォールバック: 基本的な検出ロジック
-      console.log('analyzeSpreadsheetColumns: 基本検出ロジック使用');
-      columnMapping = mapColumns(headerRow);
-    }
+    // Core.gsの高精度AI列マッピングを直接活用
+    const columnMapping = headerIndices ? convertIndicesToMapping(headerIndices, headerRow) : mapColumns(headerRow);
+    console.log('analyzeSpreadsheetColumns: 列マッピング完了', columnMapping);
 
     // 不足列の検出・追加
     const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping);
@@ -475,11 +459,10 @@ function analyzeColumns(spreadsheetId, sheetName) {
     if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
       const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
-      // 高精度AI判定を再実行
-      if (typeof identifyHeaders === 'function') {
-        const updatedGuessedHeaders = identifyHeaders(updatedHeaderRow);
-        columnMapping = convertGuessedToMapping(updatedGuessedHeaders, updatedHeaderRow);
-      }
+      // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
+      cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
+      const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
+      columnMapping = updatedHeaderIndices ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow) : mapColumns(updatedHeaderRow);
       
       console.log('analyzeSpreadsheetColumns: 列追加後の更新されたマッピング', columnMapping);
     }
@@ -531,7 +514,28 @@ function analyzeColumns(spreadsheetId, sheetName) {
 }
 
 /**
- * guessHeadersFromArray結果をAdminPanel用マッピングに変換
+ * Core.gsのヘッダーインデックスをAdminPanel用マッピングに変換
+ * @param {Object} headerIndices - getHeadersCachedから返されるインデックス
+ * @param {Array} headerRow - ヘッダー行（表示用）
+ * @returns {Object} AdminPanel用マッピング
+ */
+function convertIndicesToMapping(headerIndices, headerRow) {
+  const mapping = {
+    question: headerIndices[COLUMN_HEADERS.OPINION] || null,  // '回答' -> question として使用
+    answer: headerIndices[COLUMN_HEADERS.REASON] || null,     // '理由' -> answer として使用
+    nickname: headerIndices[COLUMN_HEADERS.NAME] || null,    // '名前' -> nickname として使用
+    timestamp: headerIndices[COLUMN_HEADERS.TIMESTAMP] || null, // 'タイムスタンプ'
+    reason: headerIndices[COLUMN_HEADERS.REASON] || null,    // '理由'
+    category: headerIndices[COLUMN_HEADERS.CLASS] || null,   // 'クラス' -> category として使用
+  };
+
+  console.log('convertIndicesToMapping: 変換結果', { headerIndices, mapping });
+  return mapping;
+}
+
+/**
+ * guessHeadersFromArray結果をAdminPanel用マッピングに変換（廃止予定）
+ * @deprecated convertIndicesToMappingを使用してください
  * @param {Object} guessedHeaders - guessHeadersFromArrayの結果
  * @param {Array} headerRow - ヘッダー行
  * @returns {Object} AdminPanel用マッピング
@@ -636,7 +640,7 @@ function convertGuessedToMapping(guessedHeaders, headerRow) {
 // =============================================================================
 
 /**
- * 現在の設定情報を取得
+ * 現在の設定情報を取得（sheetName情報強化版）
  * @returns {Object} 現在の設定情報
  */
 function getCurrentConfig() {
@@ -662,16 +666,39 @@ function getCurrentConfig() {
     const configJson = getUserConfigJson(userInfo.userId);
     const setupStep = determineSetupStep(userInfo, configJson);
 
+    // sheetName情報の拡張取得
+    let sheetName = userInfo.sheetName;
+    if (!sheetName && configJson) {
+      // configJsonから推奨シート名を取得
+      sheetName = configJson.publishedSheetName || configJson.activeSheetName || null;
+    }
+    
+    // まだsheetNameが不足している場合、スプレッドシートから自動検出
+    if (!sheetName && userInfo.spreadsheetId) {
+      try {
+        console.log('getCurrentConfig: シート名自動検出を実行');
+        sheetName = detectActiveSheetName(userInfo.spreadsheetId);
+      } catch (detectionError) {
+        console.warn('getCurrentConfig: シート名自動検出失敗', detectionError.message);
+        sheetName = 'フォームの回答 1'; // フォールバック
+      }
+    }
+
     const config = {
       setupStatus: getSetupStatusFromStep(setupStep),
       spreadsheetId: userInfo.spreadsheetId,
-      sheetName: userInfo.sheetName,
+      sheetName: sheetName,              // 🔥 強化されたシート名情報
       formCreated: configJson ? configJson.formCreated : false,
       appPublished: configJson ? configJson.appPublished : false,
       lastUpdated: userInfo.lastUpdated,
       setupStep: setupStep,
+      setupComplete: setupStep >= 3,     // 🔥 追加: セットアップ完了状態
       user: currentUser,
       userId: userInfo.userId,
+      displaySettings: {                 // 🔥 追加: 表示設定
+        showNames: configJson ? configJson.showNames !== false : true,
+        showReactions: configJson ? configJson.showReactions !== false : true
+      }
     };
 
     console.log('getCurrentConfig: 設定情報取得完了', config);
@@ -683,6 +710,50 @@ function getCurrentConfig() {
       error: error.message,
       lastUpdated: new Date().toISOString(),
     };
+  }
+}
+
+/**
+ * スプレッドシートからアクティブなシート名を自動検出
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {string} 推奨シート名
+ */
+function detectActiveSheetName(spreadsheetId) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = spreadsheet.getSheets();
+    
+    // 優先順位: フォームの回答 > データがあるシート > 最初のシート
+    const priorityNames = ['フォームの回答 1', 'フォームの回答', 'Sheet1', 'シート1'];
+    
+    // 優先名から検索
+    for (const priorityName of priorityNames) {
+      const sheet = sheets.find(s => s.getName() === priorityName);
+      if (sheet && sheet.getLastRow() > 1) { // データがあるかチェック
+        console.log('detectActiveSheetName: 優先シート検出', priorityName);
+        return priorityName;
+      }
+    }
+    
+    // データが最も多いシートを選択
+    const sheetsWithData = sheets
+      .filter(s => s.getLastRow() > 1)
+      .sort((a, b) => b.getLastRow() - a.getLastRow());
+    
+    if (sheetsWithData.length > 0) {
+      const selectedSheet = sheetsWithData[0].getName();
+      console.log('detectActiveSheetName: データ最大シート選択', selectedSheet);
+      return selectedSheet;
+    }
+    
+    // フォールバック: 最初のシート
+    const fallbackSheet = sheets[0].getName();
+    console.log('detectActiveSheetName: フォールバック選択', fallbackSheet);
+    return fallbackSheet;
+    
+  } catch (error) {
+    console.error('detectActiveSheetName エラー:', error);
+    throw error;
   }
 }
 

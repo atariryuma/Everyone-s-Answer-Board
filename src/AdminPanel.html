@@ -1241,24 +1241,47 @@
         }
       }
 
-      // 列設定の自動初期化
+      // 列設定の自動初期化（フォールバック処理強化版）
       async function autoInitializeColumnSettings(config) {
         console.log('autoInitializeColumnSettings: 列設定自動初期化開始', config);
         
         try {
           const spreadsheetId = config.spreadsheetId;
-          const sheetName = config.sheetName;
+          let sheetName = config.sheetName;
           
-          if (!spreadsheetId || !sheetName) {
-            console.log('スプレッドシートIDまたはシート名が不足、列設定スキップ');
+          if (!spreadsheetId) {
+            console.log('スプレッドシートIDが不足、列設定スキップ');
             return;
+          }
+
+          // シート名が不足している場合の自動検出・選択
+          if (!sheetName) {
+            console.log('シート名が不足、自動検出を実行');
+            try {
+              const sheets = await loadSheetListAsync(spreadsheetId);
+              if (sheets && sheets.length > 0) {
+                // 優先順位でシートを選択
+                sheetName = detectBestSheetName(sheets);
+                console.log('自動検出によるシート選択:', sheetName);
+                
+                // UI更新: 自動選択されたシートを反映
+                await autoSelectSheet(sheetName);
+              } else {
+                throw new Error('利用可能なシートが見つかりません');
+              }
+            } catch (sheetError) {
+              console.warn('シート自動検出失敗:', sheetError.message);
+              sheetName = 'フォームの回答 1'; // フォールバック
+              showInfo('💡 シート情報の自動検出に失敗しました。手動でシートを選択してください。');
+              return;
+            }
           }
 
           // 既存の列設定データがあるかチェック
           if (config.columnMapping || config.columnSelections) {
             console.log('既存の列設定データを使用');
             // 既存データから列設定を復元
-            await restoreColumnSettingsFromConfig(config);
+            await restoreColumnSettingsFromConfig(config, sheetName);
           } else {
             console.log('列設定データなし、AI分析を実行');
             // 新規にAI分析実行
@@ -1271,13 +1294,52 @@
         }
       }
 
-      // 既存の列設定データから復元
-      async function restoreColumnSettingsFromConfig(config) {
-        console.log('restoreColumnSettingsFromConfig: 既存設定復元開始');
+      // 最適なシート名を検出
+      function detectBestSheetName(sheets) {
+        console.log('detectBestSheetName: 最適シート検出開始', sheets);
+        
+        // 優先順位リスト
+        const priorities = ['フォームの回答 1', 'フォームの回答', 'Sheet1', 'シート1'];
+        
+        // 優先名から検索
+        for (const priority of priorities) {
+          const sheet = sheets.find(s => s.name === priority);
+          if (sheet && sheet.rowCount > 1) { // データがあるかチェック
+            console.log('優先シート選択:', priority);
+            return priority;
+          }
+        }
+        
+        // データが最も多いシートを選択
+        const sheetsWithData = sheets
+          .filter(s => s.rowCount > 1)
+          .sort((a, b) => b.rowCount - a.rowCount);
+        
+        if (sheetsWithData.length > 0) {
+          const selected = sheetsWithData[0].name;
+          console.log('データ最大シート選択:', selected);
+          return selected;
+        }
+        
+        // フォールバック: 最初のシート
+        const fallback = sheets[0].name;
+        console.log('フォールバック選択:', fallback);
+        return fallback;
+      }
+
+      // 既存の列設定データから復元（引数更新版）
+      async function restoreColumnSettingsFromConfig(config, sheetName) {
+        console.log('restoreColumnSettingsFromConfig: 既存設定復元開始', { config, sheetName });
         
         try {
+          // 有効なシート名を決定
+          const targetSheetName = sheetName || config.sheetName;
+          if (!targetSheetName) {
+            throw new Error('復元に必要なシート名が不足しています');
+          }
+          
           // まず列構造を分析してヘッダーを取得
-          const result = await analyzeColumnsAsync(config.spreadsheetId, config.sheetName);
+          const result = await analyzeColumnsAsync(config.spreadsheetId, targetSheetName);
           
           if (result && result.success && result.headers) {
             console.log('列構造分析完了、ドロップダウンを設定');
