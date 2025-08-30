@@ -1764,7 +1764,7 @@
                   <span class="confidence text-xs" style="color: ${confidenceColor}">${Math.round(confidence)}%</span>
                 </div>
               </div>
-              ${isDuplicate ? '<div class="text-xs text-orange-600 mt-1">⚠️ 同じ列が複数の目的に割り当てられています</div>' : ''}
+              ${isDuplicate ? `<div class="text-xs text-orange-600 mt-1">⚠️ 同じ列が複数の目的に割り当てられています</div>` : ''}
             `;
 
             columnsContainer.appendChild(columnMatch);
