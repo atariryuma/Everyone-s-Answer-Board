@@ -19,33 +19,32 @@
 function getSpreadsheetList() {
   try {
     console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
-    
+
     // Google Driveからスプレッドシートを検索
     const files = DriveApp.searchFiles(
       'mimeType="application/vnd.google-apps.spreadsheet" and trashed=false'
     );
-    
+
     const spreadsheets = [];
     let count = 0;
     const maxResults = 50; // パフォーマンス制限
-    
+
     while (files.hasNext() && count < maxResults) {
       const file = files.next();
       spreadsheets.push({
         id: file.getId(),
         name: file.getName(),
         lastModified: file.getLastUpdated().toISOString(),
-        owner: file.getOwner().getEmail()
+        owner: file.getOwner().getEmail(),
       });
       count++;
     }
-    
+
     // 最終更新順でソート
     spreadsheets.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
-    
+
     console.log(`getSpreadsheetList: ${spreadsheets.length}個のスプレッドシートを取得`);
     return spreadsheets;
-    
   } catch (error) {
     console.error('getSpreadsheetList エラー:', error);
     throw new Error('スプレッドシート一覧の取得に失敗しました: ' + error.message);
@@ -60,25 +59,24 @@ function getSpreadsheetList() {
 function getSheetList(spreadsheetId) {
   try {
     console.log('getSheetList: シート一覧取得開始', spreadsheetId);
-    
+
     if (!spreadsheetId) {
       throw new Error('スプレッドシートIDが指定されていません');
     }
-    
+
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
-    
-    const sheetList = sheets.map(sheet => ({
+
+    const sheetList = sheets.map((sheet) => ({
       name: sheet.getName(),
       index: sheet.getIndex(),
       rowCount: sheet.getLastRow(),
       columnCount: sheet.getLastColumn(),
-      hidden: sheet.isSheetHidden()
+      hidden: sheet.isSheetHidden(),
     }));
-    
+
     console.log(`getSheetList: ${sheetList.length}個のシートを取得`);
     return sheetList;
-    
   } catch (error) {
     console.error('getSheetList エラー:', error);
     throw new Error('シート一覧の取得に失敗しました: ' + error.message);
@@ -91,60 +89,97 @@ function getSheetList(spreadsheetId) {
  * @param {string} sheetName - シート名
  * @returns {Object} 接続結果と列マッピング情報
  */
-function connectToDataSource(spreadsheetId, sheetName) {
+function connectDataSource(spreadsheetId, sheetName) {
   try {
     console.log('connectToDataSource: データソース接続開始', { spreadsheetId, sheetName });
-    
+
     if (!spreadsheetId || !sheetName) {
       throw new Error('スプレッドシートIDとシート名が必要です');
     }
-    
+
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       throw new Error(`シート "${sheetName}" が見つかりません`);
     }
-    
+
     // ヘッダー行を取得（最初の行を仮定）
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // 列マッピングを自動検出
-    const columnMapping = detectColumnMapping(headerRow);
-    
+
+    // 高精度AI列マッピングを自動検出
+    let columnMapping;
+    if (typeof identifyHeaders === 'function') {
+      const guessedHeaders = identifyHeaders(headerRow);
+      console.log('connectToDataSource: 高精度AI判定結果', guessedHeaders);
+      columnMapping = convertGuessedToMapping(guessedHeaders, headerRow);
+    } else {
+      // フォールバック: 基本的な検出ロジック
+      columnMapping = mapColumns(headerRow);
+    }
+
+    // 不足列の検出・追加
+    const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping);
+    console.log('connectToDataSource: 不足列検出結果', missingColumnsResult);
+
+    // 列が追加された場合は、ヘッダー行を再取得して列マッピングを更新
+    if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
+      const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      
+      // 高精度AI判定を再実行
+      if (typeof identifyHeaders === 'function') {
+        const updatedGuessedHeaders = identifyHeaders(updatedHeaderRow);
+        columnMapping = convertGuessedToMapping(updatedGuessedHeaders, updatedHeaderRow);
+      }
+    }
+
     // 設定を保存（既存のユーザー管理システムを活用）
     const currentUser = coreGetCurrentUserEmail();
     const userInfo = DB.findUserByEmail(currentUser);
-    
+
     if (userInfo) {
       // 既存システム互換の列マッピングを作成
       const compatibleMapping = convertToCompatibleMapping(columnMapping, headerRow);
-      
+
       // ユーザーのスプレッドシート設定を更新
       updateUserSpreadsheetConfig(userInfo.userId, {
         spreadsheetId: spreadsheetId,
         sheetName: sheetName,
-        columnMapping: columnMapping,        // AdminPanel用の形式
+        columnMapping: columnMapping, // AdminPanel用の形式
         compatibleMapping: compatibleMapping, // Core.gs互換形式
-        lastConnected: new Date().toISOString()
+        lastConnected: new Date().toISOString(),
+        connectionMethod: 'dropdown_select',
+        missingColumnsHandled: missingColumnsResult
       });
-      
+
       console.log('connectToDataSource: 互換形式も保存', { columnMapping, compatibleMapping });
     }
-    
+
     console.log('connectToDataSource: 接続成功', columnMapping);
+    
+    // メッセージを統合
+    let message = 'データソースに正常に接続されました';
+    if (missingColumnsResult.success) {
+      if (missingColumnsResult.addedColumns.length > 0) {
+        message += `。${missingColumnsResult.addedColumns.length}個の必須列を自動追加しました`;
+      }
+      if (missingColumnsResult.recommendedColumns && missingColumnsResult.recommendedColumns.length > 0) {
+        message += `。${missingColumnsResult.recommendedColumns.length}個の推奨列を手動で追加することをお勧めします`;
+      }
+    }
+    
     return {
       success: true,
       columnMapping: columnMapping,
       rowCount: sheet.getLastRow(),
-      message: 'データソースに正常に接続されました'
+      message: message,
+      missingColumnsResult: missingColumnsResult
     };
-    
   } catch (error) {
     console.error('connectToDataSource エラー:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -154,32 +189,30 @@ function connectToDataSource(spreadsheetId, sheetName) {
  * @param {Array<string>} headers - ヘッダー行の配列
  * @returns {Object} 検出された列マッピング
  */
-function detectColumnMapping(headers) {
+function mapColumns(headers) {
   const mapping = {
     question: null,
     answerer: null,
     reason: null,
-    confidence: {}
+    confidence: {},
   };
-  
+
   // キーワードパターン
   const patterns = {
     question: ['質問', 'question', 'query', 'ask', 'Q'],
     answerer: ['回答者', '名前', 'name', 'answerer', 'user', 'ユーザー'],
-    reason: ['理由', 'reason', 'comment', 'コメント', '備考', 'note']
+    reason: ['理由', 'reason', 'comment', 'コメント', '備考', 'note'],
   };
-  
+
   headers.forEach((header, index) => {
     const headerLower = header.toString().toLowerCase();
-    
-    Object.keys(patterns).forEach(type => {
+
+    Object.keys(patterns).forEach((type) => {
       const pattern = patterns[type];
-      const matchCount = pattern.filter(p => 
-        headerLower.includes(p.toLowerCase())
-      ).length;
-      
+      const matchCount = pattern.filter((p) => headerLower.includes(p.toLowerCase())).length;
+
       if (matchCount > 0) {
-        const confidence = Math.min(95, 60 + (matchCount * 15));
+        const confidence = Math.min(95, 60 + matchCount * 15);
         if (!mapping[type] || confidence > (mapping.confidence[type] || 0)) {
           mapping[type] = index;
           mapping.confidence[type] = confidence;
@@ -187,14 +220,416 @@ function detectColumnMapping(headers) {
       }
     });
   });
+
+  return mapping;
+}
+
+/**
+ * 必要な列が不足していないか検出し、必要に応じて自動追加
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {Object} columnMapping - 現在の列マッピング
+ * @returns {Object} 検出・追加結果
+ */
+function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
+  try {
+    console.log('detectAndAddMissingColumns: 不足列の検出開始', { spreadsheetId, sheetName, columnMapping });
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      throw new Error(`シート "${sheetName}" が見つかりません`);
+    }
+
+    // 現在のヘッダー行を取得
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    console.log('detectAndAddMissingColumns: 現在のヘッダー', headerRow);
+
+    // 必要な列を定義（StudyQuestシステムで使用される標準列）
+    const requiredColumns = {
+      'メールアドレス': 'EMAIL',
+      '理由': 'REASON',
+      '名前': 'NAME', 
+      'なるほど！': 'UNDERSTAND',
+      'いいね！': 'LIKE',
+      'もっと知りたい！': 'CURIOUS',
+      'ハイライト': 'HIGHLIGHT',
+      'タイムスタンプ': 'TIMESTAMP'
+    };
+
+    // 不足している列を検出
+    const missingColumns = [];
+    const existingColumns = headerRow.map(h => String(h || '').trim());
+
+    Object.keys(requiredColumns).forEach(requiredCol => {
+      const found = existingColumns.some(existing => {
+        const existingLower = existing.toLowerCase();
+        const requiredLower = requiredCol.toLowerCase();
+        
+        // 基本的な検出ロジック（リアクション・ハイライトは完全一致）
+        if (requiredCol === 'なるほど！' || requiredCol === 'いいね！' || requiredCol === 'もっと知りたい！' || requiredCol === 'ハイライト') {
+          // システム列は完全一致のみ
+          return existing === requiredCol;
+        }
+        
+        // その他の列は柔軟な検出
+        return existingLower.includes(requiredLower) || 
+               (requiredCol === 'メールアドレス' && existingLower.includes('email')) ||
+               (requiredCol === '理由' && (existingLower.includes('理由') || existingLower.includes('詳細'))) ||
+               (requiredCol === '名前' && (existingLower.includes('名前') || existingLower.includes('氏名'))) ||
+               (requiredCol === 'タイムスタンプ' && existingLower.includes('timestamp'));
+      });
+
+      if (!found) {
+        missingColumns.push({
+          columnName: requiredCol,
+          systemName: requiredColumns[requiredCol],
+          priority: getPriority(requiredCol)
+        });
+      }
+    });
+
+    console.log('detectAndAddMissingColumns: 不足列検出結果', missingColumns);
+
+    // 不足列がない場合
+    if (missingColumns.length === 0) {
+      return {
+        success: true,
+        missingColumns: [],
+        addedColumns: [],
+        message: '必要な列がすべて揃っています'
+      };
+    }
+
+    // 優先度順にソート
+    missingColumns.sort((a, b) => a.priority - b.priority);
+
+    // 列を自動追加（高優先度のみ）
+    const addedColumns = [];
+    const highPriorityColumns = missingColumns.filter(col => col.priority <= 2);
+
+    if (highPriorityColumns.length > 0) {
+      const lastColumn = sheet.getLastColumn();
+      
+      highPriorityColumns.forEach((colInfo, index) => {
+        const newColumnIndex = lastColumn + index + 1;
+        
+        // 新しい列を追加
+        sheet.insertColumnAfter(lastColumn + index);
+        sheet.getRange(1, newColumnIndex).setValue(colInfo.columnName);
+        
+        addedColumns.push({
+          columnName: colInfo.columnName,
+          position: newColumnIndex,
+          systemName: colInfo.systemName
+        });
+        
+        console.log('detectAndAddMissingColumns: 列追加', {
+          columnName: colInfo.columnName,
+          position: newColumnIndex
+        });
+      });
+    }
+
+    // 残りの不足列（低優先度）は推奨として返す
+    const recommendedColumns = missingColumns.filter(col => col.priority > 2);
+
+    return {
+      success: true,
+      missingColumns: missingColumns,
+      addedColumns: addedColumns,
+      recommendedColumns: recommendedColumns,
+      message: `${addedColumns.length}個の必須列を自動追加しました`,
+      details: {
+        added: addedColumns.length,
+        recommended: recommendedColumns.length,
+        total: missingColumns.length
+      }
+    };
+
+  } catch (error) {
+    console.error('detectAndAddMissingColumns エラー:', error);
+    return {
+      success: false,
+      error: error.message,
+      missingColumns: [],
+      addedColumns: []
+    };
+  }
+}
+
+/**
+ * 列の優先度を取得
+ * @param {string} columnName - 列名
+ * @returns {number} 優先度（低い値ほど高優先度）
+ */
+function getPriority(columnName) {
+  const priorities = {
+    'メールアドレス': 1,    // 最高優先度
+    '理由': 1,            // 最高優先度  
+    '名前': 2,            // 高優先度
+    'タイムスタンプ': 3,    // 中優先度
+    'なるほど！': 4,       // 低優先度
+    'いいね！': 4,
+    'もっと知りたい！': 4,
+    'ハイライト': 4
+  };
   
+  return priorities[columnName] || 5;
+}
+
+/**
+ * スプレッドシートへのアクセス権限を検証
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Object} 検証結果
+ */
+function validateAccess(spreadsheetId) {
+  try {
+    console.log('validateSpreadsheetAccess: アクセス権限検証開始', spreadsheetId);
+
+    if (!spreadsheetId) {
+      throw new Error('スプレッドシートIDが指定されていません');
+    }
+
+    // スプレッドシートのアクセス権限を確認
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheetName = spreadsheet.getName();
+    
+    // シート一覧も取得
+    const sheets = spreadsheet.getSheets();
+    const sheetList = sheets.map((sheet) => ({
+      name: sheet.getName(),
+      index: sheet.getIndex(),
+      rowCount: sheet.getLastRow(),
+      columnCount: sheet.getLastColumn(),
+      hidden: sheet.isSheetHidden(),
+    }));
+
+    console.log('validateSpreadsheetAccess: アクセス権限確認成功', {
+      id: spreadsheetId,
+      name: spreadsheetName,
+      sheets: sheetList.length
+    });
+
+    return {
+      success: true,
+      spreadsheetId: spreadsheetId,
+      spreadsheetName: spreadsheetName,
+      sheets: sheetList,
+      message: 'スプレッドシートへのアクセスが確認できました'
+    };
+  } catch (error) {
+    console.error('validateSpreadsheetAccess エラー:', error);
+    return {
+      success: false,
+      error: error.message,
+      details: 'スプレッドシートが存在しないか、アクセス権限がありません'
+    };
+  }
+}
+
+/**
+ * スプレッドシートの列構造を分析（URL入力方式用）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} 分析結果
+ */
+function analyzeColumns(spreadsheetId, sheetName) {
+  try {
+    console.log('analyzeSpreadsheetColumns: 列分析開始', { spreadsheetId, sheetName });
+
+    if (!spreadsheetId || !sheetName) {
+      throw new Error('スプレッドシートIDとシート名が必要です');
+    }
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      throw new Error(`シート "${sheetName}" が見つかりません`);
+    }
+
+    // ヘッダー行を取得
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // 既存のguessHeadersFromArray関数を使用（高精度AI判定）
+    let columnMapping;
+    if (typeof guessHeadersFromArray === 'function') {
+      const guessedHeaders = guessHeadersFromArray(headerRow);
+      console.log('analyzeSpreadsheetColumns: 高精度AI判定結果', guessedHeaders);
+      
+      // AdminPanel用の形式に変換
+      columnMapping = convertGuessedToMapping(guessedHeaders, headerRow);
+    } else {
+      // フォールバック: 基本的な検出ロジック
+      console.log('analyzeSpreadsheetColumns: 基本検出ロジック使用');
+      columnMapping = mapColumns(headerRow);
+    }
+
+    // 不足列の検出・追加
+    const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping);
+    console.log('analyzeSpreadsheetColumns: 不足列検出結果', missingColumnsResult);
+
+    // 列が追加された場合は、ヘッダー行を再取得して列マッピングを更新
+    if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
+      const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      
+      // 高精度AI判定を再実行
+      if (typeof identifyHeaders === 'function') {
+        const updatedGuessedHeaders = identifyHeaders(updatedHeaderRow);
+        columnMapping = convertGuessedToMapping(updatedGuessedHeaders, updatedHeaderRow);
+      }
+      
+      console.log('analyzeSpreadsheetColumns: 列追加後の更新されたマッピング', columnMapping);
+    }
+
+    // 設定を保存（既存システム互換）
+    const currentUser = coreGetCurrentUserEmail();
+    const userInfo = DB.findUserByEmail(currentUser);
+
+    if (userInfo) {
+      updateUserSpreadsheetConfig(userInfo.userId, {
+        spreadsheetId: spreadsheetId,
+        sheetName: sheetName,
+        columnMapping: columnMapping,
+        lastConnected: new Date().toISOString(),
+        connectionMethod: 'url_input',
+        missingColumnsHandled: missingColumnsResult
+      });
+    }
+
+    console.log('analyzeSpreadsheetColumns: 分析完了', columnMapping);
+    
+    // メッセージを統合
+    let message = 'スプレッドシートの列構造を分析しました';
+    if (missingColumnsResult.success) {
+      if (missingColumnsResult.addedColumns.length > 0) {
+        message += `。${missingColumnsResult.addedColumns.length}個の必須列を自動追加しました`;
+      }
+      if (missingColumnsResult.recommendedColumns && missingColumnsResult.recommendedColumns.length > 0) {
+        message += `。${missingColumnsResult.recommendedColumns.length}個の推奨列を手動で追加することをお勧めします`;
+      }
+    }
+    
+    return {
+      success: true,
+      columnMapping: columnMapping,
+      headers: headerRow,
+      rowCount: sheet.getLastRow(),
+      columnCount: sheet.getLastColumn(),
+      message: message,
+      missingColumnsResult: missingColumnsResult
+    };
+  } catch (error) {
+    console.error('analyzeSpreadsheetColumns エラー:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * guessHeadersFromArray結果をAdminPanel用マッピングに変換
+ * @param {Object} guessedHeaders - guessHeadersFromArrayの結果
+ * @param {Array} headerRow - ヘッダー行
+ * @returns {Object} AdminPanel用マッピング
+ */
+function convertGuessedToMapping(guessedHeaders, headerRow) {
+  const mapping = {
+    question: null,
+    answerer: null,
+    reason: null,
+    name: null,
+    class: null,
+    understand: null,
+    like: null,
+    curious: null,
+    highlight: null,
+    confidence: {}
+  };
+
+  // guessedHeadersからマッピングを作成
+  if (guessedHeaders.questionHeader) {
+    const questionIndex = headerRow.findIndex(h => h === guessedHeaders.questionHeader);
+    if (questionIndex !== -1) {
+      mapping.question = questionIndex;
+      mapping.confidence.question = 95; // 高精度AI判定の信頼度
+    }
+  }
+
+  if (guessedHeaders.answerHeader) {
+    const answerIndex = headerRow.findIndex(h => h === guessedHeaders.answerHeader);
+    if (answerIndex !== -1) {
+      mapping.answerer = answerIndex;
+      mapping.confidence.answerer = 95;
+    }
+  }
+
+  if (guessedHeaders.reasonHeader) {
+    const reasonIndex = headerRow.findIndex(h => h === guessedHeaders.reasonHeader);
+    if (reasonIndex !== -1) {
+      mapping.reason = reasonIndex;
+      mapping.confidence.reason = 95;
+    }
+  }
+
+  if (guessedHeaders.nameHeader) {
+    const nameIndex = headerRow.findIndex(h => h === guessedHeaders.nameHeader);
+    if (nameIndex !== -1) {
+      mapping.name = nameIndex;
+      mapping.confidence.name = 95;
+    }
+  }
+
+  if (guessedHeaders.classHeader) {
+    const classIndex = headerRow.findIndex(h => h === guessedHeaders.classHeader);
+    if (classIndex !== -1) {
+      mapping.class = classIndex;
+      mapping.confidence.class = 95;
+    }
+  }
+
+  // リアクション列のマッピング
+  if (guessedHeaders.understandHeader) {
+    const understandIndex = headerRow.findIndex(h => h === guessedHeaders.understandHeader);
+    if (understandIndex !== -1) {
+      mapping.understand = understandIndex;
+      mapping.confidence.understand = 95;
+    }
+  }
+
+  if (guessedHeaders.likeHeader) {
+    const likeIndex = headerRow.findIndex(h => h === guessedHeaders.likeHeader);
+    if (likeIndex !== -1) {
+      mapping.like = likeIndex;
+      mapping.confidence.like = 95;
+    }
+  }
+
+  if (guessedHeaders.curiousHeader) {
+    const curiousIndex = headerRow.findIndex(h => h === guessedHeaders.curiousHeader);
+    if (curiousIndex !== -1) {
+      mapping.curious = curiousIndex;
+      mapping.confidence.curious = 95;
+    }
+  }
+
+  if (guessedHeaders.highlightHeader) {
+    const highlightIndex = headerRow.findIndex(h => h === guessedHeaders.highlightHeader);
+    if (highlightIndex !== -1) {
+      mapping.highlight = highlightIndex;
+      mapping.confidence.highlight = 95;
+    }
+  }
+
   return mapping;
 }
 
 // =============================================================================
 // システム監視・メトリクス
 // =============================================================================
-
 
 // =============================================================================
 // 設定管理
@@ -207,10 +642,10 @@ function detectColumnMapping(headers) {
 function getCurrentConfig() {
   try {
     console.log('getCurrentConfig: 設定情報取得開始');
-    
+
     const currentUser = coreGetCurrentUserEmail();
     const userInfo = DB.findUserByEmail(currentUser);
-    
+
     if (!userInfo) {
       return {
         setupStatus: 'pending',
@@ -219,14 +654,14 @@ function getCurrentConfig() {
         formCreated: false,
         appPublished: false,
         lastUpdated: null,
-        user: currentUser
+        user: currentUser,
       };
     }
-    
+
     // 既存のdetermineSetupStep関数を活用
     const configJson = getUserConfigJson(userInfo.userId);
     const setupStep = determineSetupStep(userInfo, configJson);
-    
+
     const config = {
       setupStatus: getSetupStatusFromStep(setupStep),
       spreadsheetId: userInfo.spreadsheetId,
@@ -236,18 +671,17 @@ function getCurrentConfig() {
       lastUpdated: userInfo.lastUpdated,
       setupStep: setupStep,
       user: currentUser,
-      userId: userInfo.userId
+      userId: userInfo.userId,
     };
-    
+
     console.log('getCurrentConfig: 設定情報取得完了', config);
     return config;
-    
   } catch (error) {
     console.error('getCurrentConfig エラー:', error);
     return {
       setupStatus: 'error',
       error: error.message,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
   }
 }
@@ -259,10 +693,14 @@ function getCurrentConfig() {
  */
 function getSetupStatusFromStep(step) {
   switch (step) {
-    case 1: return 'pending';
-    case 2: return 'configuring';
-    case 3: return 'completed';
-    default: return 'unknown';
+    case 1:
+      return 'pending';
+    case 2:
+      return 'configuring';
+    case 3:
+      return 'completed';
+    default:
+      return 'unknown';
   }
 }
 
@@ -274,42 +712,41 @@ function getSetupStatusFromStep(step) {
 function saveDraftConfiguration(config) {
   try {
     console.log('saveDraftConfiguration: 下書き保存開始', config);
-    
+
     const currentUser = coreGetCurrentUserEmail();
     let userInfo = DB.findUserByEmail(currentUser);
-    
+
     if (!userInfo) {
       // 新規ユーザーの場合は作成（既存のシステムを活用）
       throw new Error('ユーザー情報が見つかりません。先にユーザー登録を行ってください。');
     }
-    
+
     // 設定を更新
     const updateResult = updateUserSpreadsheetConfig(userInfo.userId, {
       spreadsheetId: config.spreadsheetId,
       sheetName: config.sheetName,
       displaySettings: {
         showNames: config.showNames,
-        showReactions: config.showReactions
+        showReactions: config.showReactions,
       },
-      lastDraftSave: new Date().toISOString()
+      lastDraftSave: new Date().toISOString(),
     });
-    
+
     if (updateResult.success) {
       const updatedConfig = getCurrentConfig();
       return {
         success: true,
         config: updatedConfig,
-        message: '下書きが保存されました'
+        message: '下書きが保存されました',
       };
     } else {
       throw new Error(updateResult.error);
     }
-    
   } catch (error) {
     console.error('saveDraftConfiguration エラー:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -322,18 +759,18 @@ function saveDraftConfiguration(config) {
 function publishApplication(config) {
   try {
     console.log('publishApplication: アプリ公開開始', config);
-    
+
     const currentUser = coreGetCurrentUserEmail();
     const userInfo = DB.findUserByEmail(currentUser);
-    
+
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
-    
+
     if (!config.spreadsheetId || !config.sheetName) {
       throw new Error('データソースが設定されていません');
     }
-    
+
     // 既存の公開システムを活用（簡略化）
     const publishResult = executeAppPublish(userInfo.userId, {
       appName: config.appName,
@@ -341,27 +778,26 @@ function publishApplication(config) {
       sheetName: config.sheetName,
       displaySettings: {
         showNames: config.showNames,
-        showReactions: config.showReactions
-      }
+        showReactions: config.showReactions,
+      },
     });
-    
+
     if (publishResult.success) {
       const updatedConfig = getCurrentConfig();
       return {
         success: true,
         config: updatedConfig,
         appUrl: publishResult.appUrl,
-        message: 'アプリケーションが正常に公開されました'
+        message: 'アプリケーションが正常に公開されました',
       };
     } else {
       throw new Error(publishResult.error);
     }
-    
   } catch (error) {
     console.error('publishApplication エラー:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -380,7 +816,7 @@ function updateUserSpreadsheetConfig(userId, config) {
   try {
     const props = PropertiesService.getScriptProperties();
     const configKey = `user_config_${userId}`;
-    
+
     // 既存の設定を取得
     let existingConfig = {};
     try {
@@ -391,28 +827,27 @@ function updateUserSpreadsheetConfig(userId, config) {
     } catch (parseError) {
       console.warn('既存設定の解析エラー:', parseError);
     }
-    
+
     // 設定をマージ
     const mergedConfig = {
       ...existingConfig,
       ...config,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
-    
+
     // 設定を保存
     props.setProperty(configKey, JSON.stringify(mergedConfig));
-    
+
     console.log('updateUserSpreadsheetConfig: 設定更新完了', { userId, config: mergedConfig });
     return {
       success: true,
-      config: mergedConfig
+      config: mergedConfig,
     };
-    
   } catch (error) {
     console.error('updateUserSpreadsheetConfig エラー:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -427,13 +862,12 @@ function getUserConfigJson(userId) {
     const props = PropertiesService.getScriptProperties();
     const configKey = `user_config_${userId}`;
     const configStr = props.getProperty(configKey);
-    
+
     if (!configStr) {
       return null;
     }
-    
+
     return JSON.parse(configStr);
-    
   } catch (error) {
     console.error('getUserConfigJson エラー:', error);
     return null;
@@ -450,32 +884,31 @@ function executeAppPublish(userId, publishConfig) {
   try {
     // 既存のWebアプリURLを生成または取得
     const webAppUrl = getOrCreateWebAppUrl(userId, publishConfig.appName);
-    
+
     // 公開状態をPropertiesServiceに記録
     const props = PropertiesService.getScriptProperties();
     props.setProperty(`${userId}_published`, 'true');
     props.setProperty(`${userId}_app_url`, webAppUrl);
     props.setProperty(`${userId}_publish_date`, new Date().toISOString());
-    
+
     // ユーザー設定に公開情報を追加
     updateUserSpreadsheetConfig(userId, {
       appPublished: true,
       appName: publishConfig.appName,
       appUrl: webAppUrl,
-      publishedAt: new Date().toISOString()
+      publishedAt: new Date().toISOString(),
     });
-    
+
     return {
       success: true,
       appUrl: webAppUrl,
-      publishedAt: new Date().toISOString()
+      publishedAt: new Date().toISOString(),
     };
-    
   } catch (error) {
     console.error('executeAppPublish エラー:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -491,17 +924,16 @@ function getOrCreateWebAppUrl(userId, appName) {
     // 既存のWebアプリURLがあるかチェック
     const props = PropertiesService.getScriptProperties();
     const existingUrl = props.getProperty(`${userId}_app_url`);
-    
+
     if (existingUrl) {
       return existingUrl;
     }
-    
+
     // 新規WebアプリURLを生成（実際の実装ではScriptAppを使用）
     const scriptId = ScriptApp.getScriptId();
     const webAppUrl = `https://script.google.com/macros/s/${scriptId}/exec?userId=${userId}`;
-    
+
     return webAppUrl;
-    
   } catch (error) {
     console.error('getOrCreateWebAppUrl エラー:', error);
     // フォールバック
@@ -535,7 +967,7 @@ function doGet() {
 function getCurrentBoardInfoAndUrls() {
   try {
     console.log('getCurrentBoardInfoAndUrls: ボード情報取得開始');
-    
+
     // 現在ログイン中のユーザー情報を取得
     const userInfo = getCurrentUserInfo();
     if (!userInfo || !userInfo.userId) {
@@ -543,25 +975,37 @@ function getCurrentBoardInfoAndUrls() {
       return {
         isActive: false,
         questionText: 'アクティブなボードがありません',
-        error: 'ユーザー情報が見つかりません'
+        error: 'ユーザー情報が見つかりません',
       };
     }
 
     console.log('getCurrentBoardInfoAndUrls: ユーザー情報取得成功', {
       userId: userInfo.userId,
-      hasSpreadsheetId: !!userInfo.spreadsheetId
+      hasSpreadsheetId: !!userInfo.spreadsheetId,
     });
 
     // 現在のボードデータを取得
     let boardData = null;
     let questionText = '問題読み込み中...';
-    
+
     if (userInfo.spreadsheetId) {
       try {
-        boardData = getSheetData(userInfo.userId);
+        // ユーザーの設定からアクティブなシート名を取得
+        let config = {};
+        try {
+          config = JSON.parse(userInfo.configJson || '{}');
+        } catch (e) {
+          console.warn('getCurrentBoardInfoAndUrls: 設定JSON解析エラー:', e.message);
+        }
+
+        // アクティブなシート名を決定（優先順位: publishedSheetName > activeSheetName）
+        const sheetName = config.publishedSheetName || config.activeSheetName || 'フォームの回答 1';
+        console.log('getCurrentBoardInfoAndUrls: 使用するシート名:', sheetName);
+
+        boardData = getSheetData(userInfo.userId, sheetName);
         questionText = boardData?.header || '問題文が設定されていません';
         console.log('getCurrentBoardInfoAndUrls: ボードデータ取得成功', {
-          hasHeader: !!boardData?.header
+          hasHeader: !!boardData?.header,
         });
       } catch (error) {
         console.warn('getCurrentBoardInfoAndUrls: ボードデータ取得エラー:', error.message);
@@ -578,7 +1022,7 @@ function getCurrentBoardInfoAndUrls() {
       return {
         isActive: false,
         questionText: questionText,
-        error: 'URLの生成に失敗しました'
+        error: 'URLの生成に失敗しました',
       };
     }
 
@@ -590,27 +1034,26 @@ function getCurrentBoardInfoAndUrls() {
       questionText: questionText,
       sheetName: userInfo.sheetName || 'シート名未設定',
       urls: {
-        view: viewUrl,      // 閲覧者向け（共有用）
-        admin: adminUrl     // 管理者向け
+        view: viewUrl, // 閲覧者向け（共有用）
+        admin: adminUrl, // 管理者向け
       },
       lastUpdated: new Date().toLocaleString('ja-JP'),
-      ownerEmail: userInfo.adminEmail
+      ownerEmail: userInfo.adminEmail,
     };
 
     console.log('getCurrentBoardInfoAndUrls: 成功', {
       isActive: result.isActive,
       hasQuestionText: !!result.questionText,
-      viewUrl: result.urls.view
+      viewUrl: result.urls.view,
     });
 
     return result;
-
   } catch (error) {
     console.error('getCurrentBoardInfoAndUrls エラー:', error);
     return {
       isActive: false,
       questionText: 'エラーが発生しました',
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -622,13 +1065,12 @@ function getCurrentBoardInfoAndUrls() {
 function checkIsSystemAdmin() {
   try {
     console.log('checkIsSystemAdmin: システム管理者チェック開始');
-    
+
     // 既存のisDeployUser関数を利用
     const isAdmin = Deploy.isUser();
-    
+
     console.log('checkIsSystemAdmin: 結果', isAdmin);
     return isAdmin;
-    
   } catch (error) {
     console.error('checkIsSystemAdmin エラー:', error);
     return false;
@@ -644,34 +1086,34 @@ function checkIsSystemAdmin() {
 function convertToCompatibleMapping(columnMapping, headerRow) {
   try {
     const compatibleMapping = {};
-    
+
     // AdminPanel形式から既存システムのCOLUMN_HEADERS形式に変換
     const mappingConversions = {
-      'question': 'OPINION',      // 質問 → 回答（既存システムでは意見/回答として扱う）
-      'answerer': 'NAME',         // 回答者 → 名前
-      'reason': 'REASON',         // 理由 → 理由
-      'timestamp': 'TIMESTAMP',   // タイムスタンプ → タイムスタンプ
-      'class': 'CLASS'           // クラス → クラス
+      question: 'OPINION', // 質問 → 回答（既存システムでは意見/回答として扱う）
+      answerer: 'NAME', // 回答者 → 名前
+      reason: 'REASON', // 理由 → 理由
+      timestamp: 'TIMESTAMP', // タイムスタンプ → タイムスタンプ
+      class: 'CLASS', // クラス → クラス
     };
-    
+
     // 既存のCOLUMN_HEADERSと対応する実際の列名
     const columnHeaders = {
-      'TIMESTAMP': 'タイムスタンプ',
-      'EMAIL': 'メールアドレス', 
-      'CLASS': 'クラス',
-      'OPINION': '回答',
-      'REASON': '理由',
-      'NAME': '名前',
-      'UNDERSTAND': 'なるほど！',
-      'LIKE': 'いいね！',
-      'CURIOUS': 'もっと知りたい！',
-      'HIGHLIGHT': 'ハイライト'
+      TIMESTAMP: 'タイムスタンプ',
+      EMAIL: 'メールアドレス',
+      CLASS: 'クラス',
+      OPINION: '回答',
+      REASON: '理由',
+      NAME: '名前',
+      UNDERSTAND: 'なるほど！',
+      LIKE: 'いいね！',
+      CURIOUS: 'もっと知りたい！',
+      HIGHLIGHT: 'ハイライト',
     };
-    
+
     // AdminPanel形式を既存システム形式に変換
-    Object.keys(columnMapping).forEach(key => {
+    Object.keys(columnMapping).forEach((key) => {
       if (key === 'confidence') return; // 信頼度は変換対象外
-      
+
       const columnIndex = columnMapping[key];
       if (columnIndex !== null && columnIndex !== undefined) {
         const systemKey = mappingConversions[key];
@@ -680,29 +1122,32 @@ function convertToCompatibleMapping(columnMapping, headerRow) {
         }
       }
     });
-    
+
     // 必須列の自動検出を試行
     headerRow.forEach((header, index) => {
       const headerLower = header.toString().toLowerCase();
-      
+
       // メールアドレス列の検出
       if (headerLower.includes('mail') || headerLower.includes('メール')) {
         compatibleMapping[columnHeaders.EMAIL] = index;
       }
-      
+
       // タイムスタンプ列の検出
-      if (headerLower.includes('timestamp') || headerLower.includes('タイムスタンプ') || headerLower.includes('時刻')) {
+      if (
+        headerLower.includes('timestamp') ||
+        headerLower.includes('タイムスタンプ') ||
+        headerLower.includes('時刻')
+      ) {
         compatibleMapping[columnHeaders.TIMESTAMP] = index;
       }
     });
-    
+
     console.log('convertToCompatibleMapping: 変換結果', {
       original: columnMapping,
-      compatible: compatibleMapping
+      compatible: compatibleMapping,
     });
-    
+
     return compatibleMapping;
-    
   } catch (error) {
     console.error('convertToCompatibleMapping エラー:', error);
     return {};

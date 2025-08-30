@@ -1,1163 +1,1422 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <base target="_top">
-  <title>StudyQuest 管理パネル</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Shared Security Headers -->
-  <!-- Shared TailwindCSS Configuration -->
-  <?!= include('SharedTailwindConfig'); ?>
-  <?!= include('UnifiedStyles'); ?>
-  <?!= include('SharedUtilities'); ?>
-  <script>
-    const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-  </script>
-  <style>
-    /* AdminPanel専用スタイル - commit 421e817 レイアウト構造 + 現在のダークテーマ */
-    body { 
-      margin: 0; 
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <base target="_top" />
+    <title>StudyQuest 管理パネル</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Shared Security Headers -->
+    <!-- Shared TailwindCSS Configuration -->
+    <?!= include('SharedTailwindConfig'); ?> <?!= include('UnifiedStyles'); ?> <?!=
+    include('SharedUtilities'); ?>
+    <script>
+      const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+    </script>
+    <style>
+      /* AdminPanel専用スタイル - commit 421e817 レイアウト構造 + 現在のダークテーマ */
+      body {
+        margin: 0;
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        min-height: 100vh;
+      }
 
-    .admin-container {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 1rem;
-      min-height: 100vh;
-      padding: 1rem;
-    }
-
-    .main-editor {
-      padding: 1.5rem;
-    }
-
-    .info-panel {
-      padding: 1rem;
-      overflow-y: auto;
-    }
-
-    .card {
-      margin-bottom: 1rem;
-    }
-
-    .info-card {
-      margin-bottom: 0.75rem;
-    }
-
-    /* ステータスヘッダー */
-    .status-header {
-      padding: 1rem 1.5rem;
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .status-header h1 {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-
-    .system-monitor {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      font-size: 0.875rem;
-      color: #64748b;
-    }
-
-    .status-indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 4px;
-    }
-
-    .status-indicator.active {
-      background-color: #10b981;
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-    }
-
-    .status-indicator.warning {
-      background-color: #f59e0b;
-    }
-
-    .status-indicator.error {
-      background-color: #ef4444;
-    }
-
-    /* 進捗スタイルを簡素化 */
-    .setup-progress {
-      display: flex;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .step {
-      flex: 1;
-      text-align: center;
-      padding: 0.75rem;
-      border-radius: 0.5rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-      background: rgba(107, 114, 128, 0.1);
-      color: rgba(156, 163, 175, 1);
-      transition: all 0.2s;
-    }
-
-    .step.completed {
-      background: rgba(34, 197, 94, 0.2);
-      color: rgba(34, 197, 94, 1);
-    }
-
-    .step.current {
-      background: rgba(59, 130, 246, 0.2);
-      color: rgba(59, 130, 246, 1);
-      border: 2px solid rgba(59, 130, 246, 0.5);
-    }
-
-    /* フォーム要素 - Tailwindスタイルで置き換え */
-    .form-group {
-      margin-bottom: 1rem;
-    }
-
-    .modern-select, input[type="text"] {
-      width: 100%;
-      padding: 0.75rem;
-      background: rgba(55, 65, 81, 0.8);
-      border: 1px solid rgba(75, 85, 99, 0.5);
-      border-radius: 0.5rem;
-      color: white;
-      font-size: 0.875rem;
-      transition: all 0.2s;
-    }
-
-    .modern-select:focus, input[type="text"]:focus {
-      outline: none;
-      border-color: rgba(59, 130, 246, 0.8);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-    }
-
-    /* トグルスイッチ - ダークテーマ対応 */
-    .toggle-group {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .toggle-switch {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      cursor: pointer;
-      color: rgba(209, 213, 219, 1);
-    }
-
-    .toggle-switch input {
-      display: none;
-    }
-
-    .slider {
-      width: 44px;
-      height: 24px;
-      background: rgba(107, 114, 128, 0.5);
-      border-radius: 12px;
-      position: relative;
-      transition: all 0.3s;
-    }
-
-    .slider:before {
-      content: '';
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: white;
-      top: 2px;
-      left: 2px;
-      transition: all 0.3s;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    }
-
-    .toggle-switch input:checked + .slider {
-      background: rgba(59, 130, 246, 0.8);
-    }
-
-    .toggle-switch input:checked + .slider:before {
-      transform: translateX(20px);
-    }
-
-    /* ボタン - ダークテーマ対応 */
-    .btn-primary, .btn-secondary {
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
-      font-weight: 500;
-      transition: all 0.2s;
-      cursor: pointer;
-      border: none;
-      font-size: 0.875rem;
-    }
-
-    .btn-primary {
-      background: linear-gradient(to right, rgba(59, 130, 246, 1), rgba(147, 51, 234, 1));
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: linear-gradient(to right, rgba(37, 99, 235, 1), rgba(126, 34, 206, 1));
-      transform: translateY(-1px);
-    }
-
-    .btn-secondary {
-      background: rgba(75, 85, 99, 0.5);
-      color: rgba(209, 213, 219, 1);
-      border: 1px solid rgba(107, 114, 128, 0.5);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(75, 85, 99, 0.7);
-    }
-
-    .action-buttons {
-      display: flex;
-      gap: 0.75rem;
-      margin-top: 1rem;
-    }
-
-    /* 右パネルの情報表示 - ダークテーマ対応 */
-    .config-summary {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .config-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem;
-      background: rgba(55, 65, 81, 0.8);
-      border-radius: 0.5rem;
-      color: rgba(209, 213, 219, 1);
-    }
-
-    .label {
-      font-weight: 500;
-      color: rgba(156, 163, 175, 1);
-      font-size: 0.875rem;
-    }
-
-    .link-btn {
-      background: rgba(59, 130, 246, 0.2);
-      color: rgba(96, 165, 250, 1);
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      text-decoration: none;
-      font-size: 0.875rem;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .link-btn:hover {
-      background: rgba(59, 130, 246, 0.3);
-    }
-
-    .status-badge {
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-
-    .status-badge.unpublished {
-      background: rgba(245, 158, 11, 0.2);
-      color: rgba(245, 158, 11, 1);
-    }
-
-    .status-badge.published {
-      background: rgba(34, 197, 94, 0.2);
-      color: rgba(34, 197, 94, 1);
-    }
-
-    .status-badge.error {
-      background: rgba(239, 68, 68, 0.2);
-      color: rgba(239, 68, 68, 1);
-    }
-
-    /* 簡素化されたメトリクス表示 */
-    .metrics {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-    }
-
-    .metric {
-      text-align: center;
-      padding: 1rem;
-      background: rgba(55, 65, 81, 0.8);
-      border-radius: 0.75rem;
-      border: 1px solid rgba(75, 85, 99, 0.5);
-      flex: 1;
-      min-width: 200px;
-    }
-
-    .metric .value {
-      display: block;
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: rgba(96, 165, 250, 1);
-    }
-
-    .metric .unit {
-      font-size: 0.875rem;
-      color: rgba(156, 163, 175, 1);
-    }
-
-    /* JSON表示 - ダークテーマ */
-    .json-viewer {
-      background: rgba(17, 24, 39, 0.8);
-      border: 1px solid rgba(75, 85, 99, 0.5);
-      border-radius: 0.5rem;
-      padding: 1rem;
-      font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
-      font-size: 0.8rem;
-      color: rgba(209, 213, 219, 1);
-      white-space: pre-wrap;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .expandable-section {
-      margin-top: 0.75rem;
-    }
-
-    .expandable-section summary {
-      cursor: pointer;
-      font-weight: 500;
-      color: rgba(96, 165, 250, 1);
-      padding: 0.75rem 0;
-    }
-
-    /* 列マッピング表示 - ダークテーマ */
-    .auto-detected-columns {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .column-match {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem;
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.3);
-      border-radius: 0.5rem;
-    }
-
-    .column-type {
-      font-weight: 600;
-      color: rgba(34, 197, 94, 1);
-    }
-
-    .detected-column {
-      background: rgba(34, 197, 94, 0.2);
-      color: rgba(34, 197, 94, 1);
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.375rem;
-      font-size: 0.8rem;
-      font-weight: 500;
-    }
-
-    .confidence {
-      font-size: 0.8rem;
-      color: rgba(34, 197, 94, 0.8);
-    }
-
-    /* レスポンシブデザイン */
-    @media (max-width: 768px) {
       .admin-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto;
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1rem;
+        min-height: 100vh;
         padding: 1rem;
       }
-      
+
+      .main-editor {
+        padding: 1.5rem;
+      }
+
+      .info-panel {
+        padding: 1rem;
+        overflow-y: auto;
+      }
+
+      .card {
+        margin-bottom: 1rem;
+      }
+
+      .info-card {
+        margin-bottom: 0.75rem;
+      }
+
+      /* ステータスヘッダー */
       .status-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
-      
+
+      .status-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .system-monitor {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.875rem;
+        color: #64748b;
+      }
+
+      .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 4px;
+      }
+
+      .status-indicator.active {
+        background-color: #10b981;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+      }
+
+      .status-indicator.warning {
+        background-color: #f59e0b;
+      }
+
+      .status-indicator.error {
+        background-color: #ef4444;
+      }
+
+      /* 進捗スタイルを簡素化 */
       .setup-progress {
-        flex-direction: column;
-        gap: 0.5rem;
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
       }
-      
-      .metrics {
-        flex-direction: column;
+
+      .step {
+        flex: 1;
+        text-align: center;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        background: rgba(107, 114, 128, 0.1);
+        color: rgba(156, 163, 175, 1);
+        transition: all 0.2s;
       }
-      
-      .metric {
-        min-width: unset;
+
+      .step.completed {
+        background: rgba(34, 197, 94, 0.2);
+        color: rgba(34, 197, 94, 1);
       }
-    }
 
-    /* SharedUtilitiesのローディングシステムを使用 */
+      .step.current {
+        background: rgba(59, 130, 246, 0.2);
+        color: rgba(59, 130, 246, 1);
+        border: 2px solid rgba(59, 130, 246, 0.5);
+      }
 
-    /* =============================================================================
-     * フッター：現在のボード情報表示スタイル
-     * ============================================================================= */
-    #boardInfoFooter {
-      /* 既存のz-indexよりも低く設定（通知コンテナより下） */
-      z-index: 30;
-    }
+      /* フォーム要素 - Tailwindスタイルで置き換え */
+      .form-group {
+        margin-bottom: 1rem;
+      }
 
-    #boardInfoFooter .glass-panel {
-      /* フッター専用のガラス調スタイル */
-      background: rgba(55, 65, 81, 0.95);
-      border: 1px solid rgba(75, 85, 99, 0.6);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
+      .modern-select,
+      input[type='text'] {
+        width: 100%;
+        padding: 0.75rem;
+        background: rgba(55, 65, 81, 0.8);
+        border: 1px solid rgba(75, 85, 99, 0.5);
+        border-radius: 0.5rem;
+        color: white;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+      }
 
-    #boardInfoFooter .glass-panel:hover {
-      border-color: rgba(96, 165, 250, 0.4);
-      transition: border-color 0.2s ease;
-    }
+      .modern-select:focus,
+      input[type='text']:focus {
+        outline: none;
+        border-color: rgba(59, 130, 246, 0.8);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+      }
 
-    /* 問題文表示エリア */
-    #currentQuestionText {
-      max-width: 100%;
-      line-height: 1.4;
-    }
-
-    /* アクションボタンのレスポンシブ対応 */
-    @media (max-width: 768px) {
-      #boardInfoFooter .flex.items-center.justify-between {
+      /* トグルスイッチ - ダークテーマ対応 */
+      .toggle-group {
+        display: flex;
         flex-direction: column;
-        align-items: stretch;
         gap: 1rem;
       }
-      
-      #boardInfoFooter .flex-1.min-w-0 {
-        flex: none;
-        text-align: center;
+
+      .toggle-switch {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        cursor: pointer;
+        color: rgba(209, 213, 219, 1);
       }
-      
-      #boardInfoFooter .flex.items-center.gap-2.flex-shrink-0 {
-        justify-content: center;
+
+      .toggle-switch input {
+        display: none;
+      }
+
+      .slider {
+        width: 44px;
+        height: 24px;
+        background: rgba(107, 114, 128, 0.5);
+        border-radius: 12px;
+        position: relative;
+        transition: all 0.3s;
+      }
+
+      .slider:before {
+        content: '';
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: white;
+        top: 2px;
+        left: 2px;
+        transition: all 0.3s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+
+      .toggle-switch input:checked + .slider {
+        background: rgba(59, 130, 246, 0.8);
+      }
+
+      .toggle-switch input:checked + .slider:before {
+        transform: translateX(20px);
+      }
+
+      /* ボタン - ダークテーマ対応 */
+      .btn-primary,
+      .btn-secondary {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        cursor: pointer;
+        border: none;
+        font-size: 0.875rem;
+      }
+
+      .btn-primary {
+        background: linear-gradient(to right, rgba(59, 130, 246, 1), rgba(147, 51, 234, 1));
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: linear-gradient(to right, rgba(37, 99, 235, 1), rgba(126, 34, 206, 1));
+        transform: translateY(-1px);
+      }
+
+      .btn-secondary {
+        background: rgba(75, 85, 99, 0.5);
+        color: rgba(209, 213, 219, 1);
+        border: 1px solid rgba(107, 114, 128, 0.5);
+      }
+
+      .btn-secondary:hover {
+        background: rgba(75, 85, 99, 0.7);
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+
+      /* 右パネルの情報表示 - ダークテーマ対応 */
+      .config-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .config-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: rgba(55, 65, 81, 0.8);
+        border-radius: 0.5rem;
+        color: rgba(209, 213, 219, 1);
+      }
+
+      .label {
+        font-weight: 500;
+        color: rgba(156, 163, 175, 1);
+        font-size: 0.875rem;
+      }
+
+      .link-btn {
+        background: rgba(59, 130, 246, 0.2);
+        color: rgba(96, 165, 250, 1);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .link-btn:hover {
+        background: rgba(59, 130, 246, 0.3);
+      }
+
+      .status-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+
+      .status-badge.unpublished {
+        background: rgba(245, 158, 11, 0.2);
+        color: rgba(245, 158, 11, 1);
+      }
+
+      .status-badge.published {
+        background: rgba(34, 197, 94, 0.2);
+        color: rgba(34, 197, 94, 1);
+      }
+
+      .status-badge.error {
+        background: rgba(239, 68, 68, 0.2);
+        color: rgba(239, 68, 68, 1);
+      }
+
+      /* 簡素化されたメトリクス表示 */
+      .metrics {
+        display: flex;
         flex-wrap: wrap;
+        gap: 0.75rem;
       }
-      
+
+      .metric {
+        text-align: center;
+        padding: 1rem;
+        background: rgba(55, 65, 81, 0.8);
+        border-radius: 0.75rem;
+        border: 1px solid rgba(75, 85, 99, 0.5);
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .metric .value {
+        display: block;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: rgba(96, 165, 250, 1);
+      }
+
+      .metric .unit {
+        font-size: 0.875rem;
+        color: rgba(156, 163, 175, 1);
+      }
+
+      /* JSON表示 - ダークテーマ */
+      .json-viewer {
+        background: rgba(17, 24, 39, 0.8);
+        border: 1px solid rgba(75, 85, 99, 0.5);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
+        font-size: 0.8rem;
+        color: rgba(209, 213, 219, 1);
+        white-space: pre-wrap;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .expandable-section {
+        margin-top: 0.75rem;
+      }
+
+      .expandable-section summary {
+        cursor: pointer;
+        font-weight: 500;
+        color: rgba(96, 165, 250, 1);
+        padding: 0.75rem 0;
+      }
+
+      /* 列マッピング表示 - ダークテーマ */
+      .auto-detected-columns {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .column-match {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        background: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: 0.5rem;
+      }
+
+      .column-type {
+        font-weight: 600;
+        color: rgba(34, 197, 94, 1);
+      }
+
+      .detected-column {
+        background: rgba(34, 197, 94, 0.2);
+        color: rgba(34, 197, 94, 1);
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+
+      .confidence {
+        font-size: 0.8rem;
+        color: rgba(34, 197, 94, 0.8);
+      }
+
+      /* レスポンシブデザイン */
+      @media (max-width: 768px) {
+        .admin-container {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto;
+          padding: 1rem;
+        }
+
+        .status-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+        }
+
+        .setup-progress {
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .metrics {
+          flex-direction: column;
+        }
+
+        .metric {
+          min-width: unset;
+        }
+      }
+
+      /* SharedUtilitiesのローディングシステムを使用 */
+
+      /* =============================================================================
+     * フッター：現在のボード情報表示スタイル
+     * ============================================================================= */
+      #boardInfoFooter {
+        /* 既存のz-indexよりも低く設定（通知コンテナより下） */
+        z-index: 30;
+      }
+
+      #boardInfoFooter .glass-panel {
+        /* フッター専用のガラス調スタイル */
+        background: rgba(55, 65, 81, 0.95);
+        border: 1px solid rgba(75, 85, 99, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+
+      #boardInfoFooter .glass-panel:hover {
+        border-color: rgba(96, 165, 250, 0.4);
+        transition: border-color 0.2s ease;
+      }
+
+      /* 問題文表示エリア */
       #currentQuestionText {
-        white-space: normal;
-        overflow: visible;
-        text-overflow: unset;
+        max-width: 100%;
+        line-height: 1.4;
       }
-    }
 
-    /* ボタンスタイル微調整 */
-    #boardInfoFooter .btn-primary,
-    #boardInfoFooter .btn-secondary {
-      white-space: nowrap;
-      min-width: fit-content;
-    }
+      /* アクションボタンのレスポンシブ対応 */
+      @media (max-width: 768px) {
+        #boardInfoFooter .flex.items-center.justify-between {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 1rem;
+        }
 
-    /* コピー完了状態のスタイル */
-    #copyViewUrlBtn:disabled {
-      opacity: 0.8;
-      cursor: not-allowed;
-    }
+        #boardInfoFooter .flex-1.min-w-0 {
+          flex: none;
+          text-align: center;
+        }
 
-    /* フッター表示時のbody余白調整 */
-    body.has-footer {
-      padding-bottom: 100px;
-    }
-  </style>
-</head>
-<body>
-    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden">
-        <div class="loading-spinner w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+        #boardInfoFooter .flex.items-center.gap-2.flex-shrink-0 {
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        #currentQuestionText {
+          white-space: normal;
+          overflow: visible;
+          text-overflow: unset;
+        }
+      }
+
+      /* ボタンスタイル微調整 */
+      #boardInfoFooter .btn-primary,
+      #boardInfoFooter .btn-secondary {
+        white-space: nowrap;
+        min-width: fit-content;
+      }
+
+      /* コピー完了状態のスタイル */
+      #copyViewUrlBtn:disabled {
+        opacity: 0.8;
+        cursor: not-allowed;
+      }
+
+      /* フッター表示時のbody余白調整 */
+      body.has-footer {
+        padding-bottom: 100px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="loading-overlay"
+      class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
+    >
+      <div
+        class="loading-spinner w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"
+      ></div>
     </div>
 
     <!-- Notification Container -->
     <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
-    
-  <div class="admin-container">
-    <!-- 左パネル: メインエディタ -->
-    <div class="main-editor">
-      <!-- ステータスヘッダー -->
-      <header class="status-header glass-panel rounded-xl">
-        <h1 class="text-cyan-400 font-bold">StudyQuest 管理パネル</h1>
-        <div class="system-monitor">
-          <span><span class="status-indicator active"></span>接続正常</span>
-          <span id="last-update">最終同期: --:--</span>
-          <span id="health-check">DB正常</span>
-        </div>
-      </header>
 
-      <!-- セットアップ進捗 -->
-      <div class="setup-progress">
-        <div class="step completed">1. データソース</div>
-        <div class="step current">2. 列設定</div>
-        <div class="step">3. 公開</div>
+    <div class="admin-container">
+      <!-- 左パネル: メインエディタ -->
+      <div class="main-editor">
+        <!-- ステータスヘッダー -->
+        <header class="status-header glass-panel rounded-xl">
+          <h1 class="text-cyan-400 font-bold">StudyQuest 管理パネル</h1>
+          <div class="system-monitor">
+            <span><span class="status-indicator active"></span>接続正常</span>
+            <span id="last-update">最終同期: --:--</span>
+            <span id="health-check">DB正常</span>
+          </div>
+        </header>
+
+        <!-- セットアップ進捗 -->
+        <div class="setup-progress">
+          <div class="step completed">1. データソース</div>
+          <div class="step current">2. 列設定</div>
+          <div class="step">3. 公開</div>
+        </div>
+
+        <!-- データソース選択カード -->
+        <section class="card glass-panel rounded-xl p-6">
+          <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
+          
+          <!-- データソース選択方式 -->
+          <div class="mb-6">
+            <div class="flex gap-4 mb-4">
+              <label class="flex items-center cursor-pointer">
+                <input type="radio" name="source-method" value="dropdown" checked class="mr-2" id="method-dropdown">
+                <span class="text-gray-300">📋 一覧から選択</span>
+              </label>
+              <label class="flex items-center cursor-pointer">
+                <input type="radio" name="source-method" value="url" class="mr-2" id="method-url">
+                <span class="text-gray-300">🔗 URL直接入力</span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- 一覧選択方式 -->
+          <div id="dropdown-method" class="space-y-4">
+            <div class="form-group">
+              <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2"
+                >スプレッドシート:</label
+              >
+              <select id="spreadsheet-select" class="modern-select">
+                <option value="">読み込み中...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2"
+                >シート:</label
+              >
+              <select id="sheet-select" class="modern-select">
+                <option value="">スプレッドシートを選択してください</option>
+              </select>
+            </div>
+            <div class="action-buttons">
+              <button id="refresh-data" class="btn-secondary" type="button">🔄 更新</button>
+              <button id="connect-source" class="btn-primary" type="button">接続</button>
+            </div>
+          </div>
+          
+          <!-- URL直接入力方式 -->
+          <div id="url-method" class="space-y-4 hidden">
+            <div class="form-group">
+              <label for="spreadsheet-url" class="block text-sm font-medium text-gray-300 mb-2"
+                >スプレッドシートURL:</label
+              >
+              <input 
+                type="text" 
+                id="spreadsheet-url" 
+                class="modern-select" 
+                placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit#gid=0"
+              >
+              <div class="text-xs text-gray-400 mt-1">
+                💡 GoogleスプレッドシートのURLを貼り付けてください
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="sheet-name-input" class="block text-sm font-medium text-gray-300 mb-2"
+                >シート名:</label
+              >
+              <input 
+                type="text" 
+                id="sheet-name-input" 
+                class="modern-select" 
+                placeholder="シート名を入力（例：フォームの回答 1）"
+              >
+            </div>
+            <div class="action-buttons">
+              <button id="url-validate" class="btn-secondary" type="button">✅ URL検証</button>
+              <button id="connect-url-source" class="btn-primary" type="button">接続</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 列マッピングカード -->
+        <section class="card glass-panel rounded-xl p-6">
+          <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
+          <div class="auto-detected-columns mb-4">
+            <div class="column-match">
+              <span class="column-type">質問</span>
+              <span class="detected-column">A列</span>
+              <span class="confidence">95%確信度</span>
+            </div>
+            <div class="column-match">
+              <span class="column-type">回答者</span>
+              <span class="detected-column">B列</span>
+              <span class="confidence">88%確信度</span>
+            </div>
+            <div class="column-match">
+              <span class="column-type">理由</span>
+              <span class="detected-column">C列</span>
+              <span class="confidence">92%確信度</span>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button id="verify-mapping" class="btn-primary" type="button">設定を確認</button>
+          </div>
+        </section>
+
+        <!-- 表示設定カード -->
+        <section class="card glass-panel rounded-xl p-6">
+          <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
+          <div class="toggle-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="show-names" checked />
+              <span class="slider"></span>
+              回答者名を表示
+            </label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="show-reactions" checked />
+              <span class="slider"></span>
+              リアクション数を表示
+            </label>
+          </div>
+        </section>
+
+        <!-- 公開カード -->
+        <section class="card glass-panel rounded-xl p-6">
+          <h2 class="text-xl font-semibold text-white mb-4">🚀 公開設定</h2>
+          <div class="space-y-4">
+            <div class="config-item">
+              <span class="label">現在のステータス:</span>
+              <span class="status-badge unpublished">未公開</span>
+            </div>
+            <div class="form-group">
+              <label for="app-name" class="block text-sm font-medium text-gray-300 mb-2"
+                >アプリケーション名:</label
+              >
+              <input type="text" id="app-name" placeholder="例: クラス質問ボード" class="w-full" />
+            </div>
+            <div class="action-buttons">
+              <button id="save-draft" class="btn-secondary" type="button">下書き保存</button>
+              <button id="publish-now" class="btn-primary" type="button">今すぐ公開</button>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <!-- データソース選択カード -->
-      <section class="card glass-panel rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
-        <div class="space-y-4">
-          <div class="form-group">
-            <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2">スプレッドシート:</label>
-            <select id="spreadsheet-select" class="modern-select">
-              <option value="">読み込み中...</option>
-            </select>
+      <!-- 右パネル: 情報表示 -->
+      <div class="info-panel">
+        <!-- 現在の設定サマリー -->
+        <section class="info-card glass-panel rounded-xl p-4">
+          <h3 class="text-lg font-semibold text-white mb-3">📋 現在の設定</h3>
+          <div class="config-summary">
+            <div class="config-item">
+              <span class="label">データソース:</span>
+              <a href="#" class="link-btn" id="open-sheet">シートを開く</a>
+            </div>
+            <div class="config-item">
+              <span class="label">セットアップ:</span>
+              <span class="status-badge unpublished">設定中</span>
+            </div>
+            <div class="config-item">
+              <span class="label">最終更新:</span>
+              <span class="text-sm text-gray-400">--:--</span>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2">シート:</label>
-            <select id="sheet-select" class="modern-select">
-              <option value="">スプレッドシートを選択してください</option>
-            </select>
-          </div>
-          <div class="action-buttons">
-            <button id="refresh-data" class="btn-secondary" type="button">🔄 更新</button>
-            <button id="connect-source" class="btn-primary" type="button">接続</button>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- 列マッピングカード -->
-      <section class="card glass-panel rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
-        <div class="auto-detected-columns mb-4">
-          <div class="column-match">
-            <span class="column-type">質問</span>
-            <span class="detected-column">A列</span>
-            <span class="confidence">95%確信度</span>
-          </div>
-          <div class="column-match">
-            <span class="column-type">回答者</span>
-            <span class="detected-column">B列</span>
-            <span class="confidence">88%確信度</span>
-          </div>
-          <div class="column-match">
-            <span class="column-type">理由</span>
-            <span class="detected-column">C列</span>
-            <span class="confidence">92%確信度</span>
+        <!-- ユーザー情報 -->
+        <div class="info-card glass-panel rounded-xl p-4">
+          <h3 class="text-lg font-semibold text-white mb-3">👤 ユーザー情報</h3>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+              <span class="text-gray-300">メールアドレス:</span>
+              <span id="current-user-email" class="text-cyan-400">読み込み中...</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+              <span class="text-gray-300">ユーザーID:</span>
+              <span id="current-user-id" class="text-gray-400">読み込み中...</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+              <span class="text-gray-300">アクション:</span>
+              <button
+                onclick="window.sharedUtilities.auth.switchToAnotherAccount()"
+                type="button"
+                class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
+              >
+                ログアウト
+              </button>
+            </div>
           </div>
         </div>
-        <div class="action-buttons">
-          <button id="verify-mapping" class="btn-primary" type="button">設定を確認</button>
-        </div>
-      </section>
 
-      <!-- 表示設定カード -->
-      <section class="card glass-panel rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
-        <div class="toggle-group">
-          <label class="toggle-switch">
-            <input type="checkbox" id="show-names" checked>
-            <span class="slider"></span>
-            回答者名を表示
-          </label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="show-reactions" checked>
-            <span class="slider"></span>
-            リアクション数を表示
-          </label>
-        </div>
-      </section>
+        <!-- データベース詳細 -->
+        <section class="info-card glass-panel rounded-xl p-4">
+          <h3 class="text-lg font-semibold text-white mb-3">🗄️ データベース詳細</h3>
+          <div class="space-y-4">
+            <div class="config-item">
+              <span class="label">DB接続:</span>
+              <span class="status-badge published">正常</span>
+            </div>
+            <details class="expandable-section">
+              <summary class="text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">
+                設定詳細 (JSON)
+              </summary>
+              <div class="json-viewer mt-3" id="config-json">
+                { "setupStatus": "pending", "spreadsheetId": null, "sheetName": null, "formCreated":
+                false, "appPublished": false, "lastUpdated": null }
+              </div>
+            </details>
+          </div>
+        </section>
 
-      <!-- 公開カード -->
-      <section class="card glass-panel rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-white mb-4">🚀 公開設定</h2>
-        <div class="space-y-4">
-          <div class="config-item">
-            <span class="label">現在のステータス:</span>
-            <span class="status-badge unpublished">未公開</span>
+        <!-- クイックアクション -->
+        <section class="info-card glass-panel rounded-xl p-4">
+          <h3 class="text-lg font-semibold text-white mb-3">⚡ クイックアクション</h3>
+          <div class="space-y-3">
+            <button class="link-btn w-full text-center" type="button" onclick="exportConfig()">
+              設定をエクスポート
+            </button>
+            <button
+              id="create-form-btn"
+              class="link-btn w-full text-center"
+              type="button"
+              onclick="createFormInterface()"
+            >
+              📝 フォーム作成
+            </button>
+            <button
+              id="app-setup-btn"
+              class="link-btn w-full text-center hidden"
+              type="button"
+              onclick="goToAppSetup()"
+            >
+              ⚙️ アプリ設定画面
+            </button>
           </div>
-          <div class="form-group">
-            <label for="app-name" class="block text-sm font-medium text-gray-300 mb-2">アプリケーション名:</label>
-            <input type="text" id="app-name" placeholder="例: クラス質問ボード" class="w-full">
-          </div>
-          <div class="action-buttons">
-            <button id="save-draft" class="btn-secondary" type="button">下書き保存</button>
-            <button id="publish-now" class="btn-primary" type="button">今すぐ公開</button>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
 
-    <!-- 右パネル: 情報表示 -->
-    <div class="info-panel">
-      <!-- 現在の設定サマリー -->
-      <section class="info-card glass-panel rounded-xl p-4">
-        <h3 class="text-lg font-semibold text-white mb-3">📋 現在の設定</h3>
-        <div class="config-summary">
-          <div class="config-item">
-            <span class="label">データソース:</span>
-            <a href="#" class="link-btn" id="open-sheet">シートを開く</a>
+    <!-- 現在のボード情報フッター -->
+    <footer
+      id="boardInfoFooter"
+      class="fixed bottom-0 left-0 right-0 z-30 p-3"
+      style="display: none"
+    >
+      <div class="glass-panel rounded-xl p-4 max-w-5xl mx-auto">
+        <div class="flex items-center justify-between gap-4">
+          <!-- 左側：問題文表示 -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-yellow-400">📝</span>
+              <span class="text-xs text-gray-400">現在の回答ボード</span>
+            </div>
+            <div id="currentQuestionText" class="text-white font-medium truncate">
+              読み込み中...
+            </div>
           </div>
-          <div class="config-item">
-            <span class="label">セットアップ:</span>
-            <span class="status-badge unpublished">設定中</span>
-          </div>
-          <div class="config-item">
-            <span class="label">最終更新:</span>
-            <span class="text-sm text-gray-400">--:--</span>
-          </div>
-        </div>
-      </section>
 
-      <!-- ユーザー情報 -->
-      <div class="info-card glass-panel rounded-xl p-4">
-        <h3 class="text-lg font-semibold text-white mb-3">👤 ユーザー情報</h3>
-        <div class="space-y-3">
-          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-            <span class="text-gray-300">メールアドレス:</span>
-            <span id="current-user-email" class="text-cyan-400">読み込み中...</span>
-          </div>
-          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-            <span class="text-gray-300">ユーザーID:</span>
-            <span id="current-user-id" class="text-gray-400">読み込み中...</span>
-          </div>
-          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-            <span class="text-gray-300">アクション:</span>
-            <button onclick="window.sharedUtilities.auth.switchToAnotherAccount()" 
-                    type="button"
-                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">
-              ログアウト
+          <!-- 右側：アクションボタン -->
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button
+              id="copyViewUrlBtn"
+              class="btn-secondary text-sm px-3 py-2"
+              title="閲覧用URLをコピー（共有用）"
+              style="display: none"
+            >
+              📋 URLコピー
+            </button>
+            <button
+              id="openBoardBtn"
+              class="btn-primary text-sm px-3 py-2"
+              title="回答ボードを開く"
+              style="display: none"
+            >
+              📊 ボードを開く
+            </button>
+            <button
+              id="refreshBoardInfo"
+              class="btn-secondary text-sm px-2 py-2"
+              title="情報を更新"
+            >
+              🔄
             </button>
           </div>
         </div>
+
+        <!-- ステータス表示（最小限） -->
+        <div class="text-xs text-gray-500 mt-2" id="boardStatus">最終更新: --:--</div>
       </div>
+    </footer>
 
-      <!-- データベース詳細 -->
-      <section class="info-card glass-panel rounded-xl p-4">
-        <h3 class="text-lg font-semibold text-white mb-3">🗄️ データベース詳細</h3>
-        <div class="space-y-4">
-          <div class="config-item">
-            <span class="label">DB接続:</span>
-            <span class="status-badge published">正常</span>
-          </div>
-          <details class="expandable-section">
-            <summary class="text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">設定詳細 (JSON)</summary>
-            <div class="json-viewer mt-3" id="config-json">
-{
-  "setupStatus": "pending",
-  "spreadsheetId": null,
-  "sheetName": null,
-  "formCreated": false,
-  "appPublished": false,
-  "lastUpdated": null
-}
-            </div>
-          </details>
-        </div>
-      </section>
+    <!-- SharedUtilities.html は上部で既にインクルード済み -->
 
-      <!-- クイックアクション -->
-      <section class="info-card glass-panel rounded-xl p-4">
-        <h3 class="text-lg font-semibold text-white mb-3">⚡ クイックアクション</h3>
-        <div class="space-y-3">
-          <button class="link-btn w-full text-center" type="button" onclick="exportConfig()">
-            設定をエクスポート
-          </button>
-          <button id="create-form-btn" class="link-btn w-full text-center" type="button" onclick="createFormInterface()">
-            📝 フォーム作成
-          </button>
-          <button id="app-setup-btn" class="link-btn w-full text-center hidden" type="button" onclick="goToAppSetup()">
-            ⚙️ アプリ設定画面
-          </button>
-        </div>
-      </section>
-    </div>
-  </div>
-
-  <!-- 現在のボード情報フッター -->
-  <footer id="boardInfoFooter" class="fixed bottom-0 left-0 right-0 z-30 p-3" style="display: none;">
-    <div class="glass-panel rounded-xl p-4 max-w-5xl mx-auto">
-      <div class="flex items-center justify-between gap-4">
-        <!-- 左側：問題文表示 -->
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-yellow-400">📝</span>
-            <span class="text-xs text-gray-400">現在の回答ボード</span>
-          </div>
-          <div id="currentQuestionText" class="text-white font-medium truncate">
-            読み込み中...
-          </div>
-        </div>
-        
-        <!-- 右側：アクションボタン -->
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <button id="copyViewUrlBtn" class="btn-secondary text-sm px-3 py-2" 
-                  title="閲覧用URLをコピー（共有用）" style="display: none;">
-            📋 URLコピー
-          </button>
-          <button id="openBoardBtn" class="btn-primary text-sm px-3 py-2"
-                  title="回答ボードを開く" style="display: none;">
-            📊 ボードを開く
-          </button>
-          <button id="refreshBoardInfo" class="btn-secondary text-sm px-2 py-2" 
-                  title="情報を更新">
-            🔄
-          </button>
-        </div>
-      </div>
-      
-      <!-- ステータス表示（最小限） -->
-      <div class="text-xs text-gray-500 mt-2" id="boardStatus">
-        最終更新: --:--
-      </div>
-    </div>
-  </footer>
-
-  <!-- SharedUtilities.html は上部で既にインクルード済み -->
-
-  <script>
-    // 簡素化された状態管理
-    let systemState = {
-      loading: false,
-      config: null
-    };
-
-    // 初期化
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('AdminPanel初期化開始');
-      initializePanel();
-      checkSystemAdminAccess();
-      
-      // フッターの初期化
-      initializeFooter();
-      
-      // 定期的なステータス更新
-      setInterval(updateSystemStatus, 30000); // 30秒間隔
-    });
-
-    // フッター初期化
-    function initializeFooter() {
-      console.log('フッター初期化開始');
-      
-      // 初回ボード情報ロード
-      loadBoardInfo();
-      
-      // 更新ボタンのイベントハンドラ設定
-      const refreshBtn = document.getElementById('refreshBoardInfo');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', loadBoardInfo);
-      }
-      
-      // body padding調整（フッター分の余白を追加）
-      document.body.classList.add('has-footer');
-      
-      console.log('フッター初期化完了');
-    }
-
-    // システムステータス更新
-    function updateSystemStatus() {
-      updateLastUpdateTime();
-    }
-
-    // 最終更新時刻更新
-    function updateLastUpdateTime() {
-      const now = new Date();
-      const timeString = now.toLocaleTimeString('ja-JP', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-      const updateElement = document.getElementById('last-update');
-      if (updateElement) {
-        updateElement.textContent = `最終同期: ${timeString}`;
-      }
-    }
-
-    // パネル初期化 - 簡素化
-    function initializePanel() {
-      try {
-        setLoading(true);
-        loadSpreadsheetList();
-        loadUserInfo();
-        setLoading(false);
-      } catch (error) {
-        console.error('初期化エラー:', error);
-        showError('初期化に失敗しました: ' + error.message);
-        setLoading(false);
-      }
-    }
-
-    // スプレッドシート一覧読み込み
-    function loadSpreadsheetList() {
-      const select = document.getElementById('spreadsheet-select');
-      select.innerHTML = '<option value="">読み込み中...</option>';
-      
-      google.script.run
-        .withSuccessHandler(function(spreadsheets) {
-          select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
-          spreadsheets.forEach(sheet => {
-            const option = document.createElement('option');
-            option.value = sheet.id;
-            option.textContent = sheet.name;
-            select.appendChild(option);
-          });
-        })
-        .withFailureHandler(function(error) {
-          console.error('スプレッドシート読み込みエラー:', error);
-          select.innerHTML = '<option value="">読み込みエラー</option>';
-          showError('スプレッドシートの読み込みに失敗しました');
-        })
-        .getSpreadsheetList();
-    }
-
-    // ユーザー情報読み込み
-    function loadUserInfo() {
-      // メールアドレス取得
-      console.log('loadUserInfo: メールアドレス取得開始');
-      google.script.run
-        .withSuccessHandler(function(email) {
-          console.log('getUserEmail成功:', email);
-          if (email && email.trim()) {
-            document.getElementById('current-user-email').textContent = email;
-            console.log('メールアドレス表示完了:', email);
-          } else {
-            console.warn('User email not found in response:', email);
-            document.getElementById('current-user-email').textContent = '取得中...';
-            // 再試行メカニズム
-            setTimeout(() => {
-              console.log('メールアドレス取得再試行');
-              loadUserInfo();
-            }, 2000);
-          }
-        })
-        .withFailureHandler(function(error) {
-          console.error('メールアドレス取得エラー:', error);
-          document.getElementById('current-user-email').textContent = 'エラー';
-        })
-        .getUserEmail();
-        
-      // ユーザーIDを表示（__USER_ID__があれば使用）
-      if (typeof __USER_ID__ !== 'undefined' && __USER_ID__) {
-        document.getElementById('current-user-id').textContent = __USER_ID__;
-      } else {
-        document.getElementById('current-user-id').textContent = 'N/A';
-      }
-    }
-
-    // 不要なシステム監視機能を削除
-
-    // ローディング状態設定 - SharedUtilitiesシステムを使用
-    function setLoading(loading) {
-      systemState.loading = loading;
-      if (window.sharedUtilities && window.sharedUtilities.ui) {
-        if (loading) {
-          window.sharedUtilities.ui.showLoading();
-        } else {
-          window.sharedUtilities.ui.hideLoading();
-        }
-      }
-    }
-
-    // エラー表示 (SharedUtilitiesの通知システムを使用)
-    function showError(message) {
-      if (window.sharedUtilities && window.sharedUtilities.notifications) {
-        window.sharedUtilities.notifications.error(message);
-      } else {
-        console.error('Error:', message);
-        alert('エラー: ' + message);
-      }
-    }
-
-    // 成功表示 (SharedUtilitiesの通知システムを使用)
-    function showSuccess(message) {
-      if (window.sharedUtilities && window.sharedUtilities.notifications) {
-        window.sharedUtilities.notifications.success(message);
-      } else {
-        console.log('Success:', message);
-        alert('成功: ' + message);
-      }
-    }
-
-
-    // 設定エクスポート
-    function exportConfig() {
-      google.script.run
-        .withSuccessHandler(function(config) {
-          const dataStr = JSON.stringify(config, null, 2);
-          const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-          const exportFileDefaultName = 'studyquest-config.json';
-          
-          const linkElement = document.createElement('a');
-          linkElement.setAttribute('href', dataUri);
-          linkElement.setAttribute('download', exportFileDefaultName);
-          linkElement.click();
-          
-          showSuccess('設定をエクスポートしました');
-        })
-        .withFailureHandler(function(error) {
-          console.error('エクスポートエラー:', error);
-          showError('設定のエクスポートに失敗しました');
-        })
-        .getCurrentConfig();
-    }
-
-    // システム管理者アクセス確認
-    function checkSystemAdminAccess() {
-      google.script.run
-        .withSuccessHandler(function(isAdmin) {
-          if (isAdmin) {
-            console.log('システム管理者として認識されました');
-            document.getElementById('app-setup-btn').style.display = 'block';
-          } else {
-            console.log('一般ユーザーとして認識されました');
-            document.getElementById('app-setup-btn').style.display = 'none';
-          }
-        })
-        .withFailureHandler(function(error) {
-          console.warn('システム管理者確認エラー:', error);
-          document.getElementById('app-setup-btn').style.display = 'none';
-        })
-        .checkIsSystemAdmin();
-    }
-
-    // フォーム作成インターフェース
-    function createFormInterface() {
-      const formName = prompt('作成するフォーム名を入力してください：\n例：アンケートフォーム、質問フォーム');
-      
-      if (!formName || !formName.trim()) {
-        showError('フォーム名が入力されませんでした');
-        return;
-      }
-      
-      if (formName.trim().length > 50) {
-        showError('フォーム名は50文字以内で入力してください');
-        return;
-      }
-      
-      // 基本的なフォーム設定
-      const config = {
-        title: formName.trim(),
-        description: 'カスタムフォームが作成されました',
-        fields: [
-          {
-            type: 'text',
-            label: '名前',
-            required: true
-          },
-          {
-            type: 'text',
-            label: 'メッセージ',
-            required: true
-          }
-        ]
+    <script>
+      // 簡素化された状態管理
+      let systemState = {
+        loading: false,
+        config: null,
       };
-      
-      setLoading(true);
-      
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            showSuccess('フォーム「' + formName + '」を作成しました');
-            if (result.formUrl) {
-              const openForm = confirm('フォームが作成されました。今すぐ開きますか？');
-              if (openForm) {
-                window.open(result.formUrl, '_blank');
-              }
-            }
-          } else {
-            showError(result.error || 'フォーム作成に失敗しました');
-          }
-          setLoading(false);
-        })
-        .withFailureHandler(function(error) {
-          console.error('フォーム作成エラー:', error);
-          showError('フォーム作成に失敗しました: ' + (error.message || 'Unknown error'));
-          setLoading(false);
-        })
-        .createForm(config);
-    }
-    
-    // アプリ設定画面へのナビゲーション
-    function goToAppSetup() {
-      setLoading(true);
-      google.script.run
-        .withSuccessHandler(function(webAppUrl) {
-          const setupUrl = webAppUrl + '?mode=appSetup';
-          window.open(setupUrl, '_top');
-        })
-        .withFailureHandler(function(error) {
-          console.error('アプリ設定画面への遷移エラー:', error);
-          showError('アプリ設定画面への移動に失敗しました');
-          setLoading(false);
-        })
-        .getWebAppUrlCached();
-    }
 
-    // イベントリスナー設定
-    document.addEventListener('DOMContentLoaded', function() {
-      // スプレッドシート選択時
-      document.getElementById('spreadsheet-select').addEventListener('change', function() {
-        const spreadsheetId = this.value;
-        if (spreadsheetId) {
-          loadSheetList(spreadsheetId);
+      // 初期化
+      document.addEventListener('DOMContentLoaded', function () {
+        console.log('AdminPanel初期化開始');
+        initializePanel();
+        checkSystemAdminAccess();
+
+        // フッターの初期化
+        initializeFooter();
+
+        // 定期的なステータス更新
+        setInterval(updateSystemStatus, 30000); // 30秒間隔
+      });
+
+      // フッター初期化
+      function initializeFooter() {
+        console.log('フッター初期化開始');
+
+        // 初回ボード情報ロード
+        loadBoardInfo();
+
+        // 更新ボタンのイベントハンドラ設定
+        const refreshBtn = document.getElementById('refreshBoardInfo');
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', loadBoardInfo);
         }
-      });
 
-      // データ更新ボタン
-      document.getElementById('refresh-data').addEventListener('click', function() {
-        loadSpreadsheetList();
-      });
+        // body padding調整（フッター分の余白を追加）
+        document.body.classList.add('has-footer');
 
-      // 接続ボタン
-      document.getElementById('connect-source').addEventListener('click', function() {
-        connectToSource();
-      });
+        console.log('フッター初期化完了');
+      }
 
-      // 設定確認ボタン
-      document.getElementById('verify-mapping').addEventListener('click', function() {
-        verifyColumnMapping();
-      });
+      // システムステータス更新
+      function updateSystemStatus() {
+        updateLastUpdateTime();
+      }
 
-      // 下書き保存ボタン
-      document.getElementById('save-draft').addEventListener('click', function() {
-        saveDraft();
-      });
+      // 最終更新時刻更新
+      function updateLastUpdateTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('ja-JP', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const updateElement = document.getElementById('last-update');
+        if (updateElement) {
+          updateElement.textContent = `最終同期: ${timeString}`;
+        }
+      }
 
-      // 公開ボタン
-      document.getElementById('publish-now').addEventListener('click', function() {
-        publishApp();
-      });
-    });
+      // パネル初期化 - 簡素化
+      function initializePanel() {
+        try {
+          setLoading(true);
+          loadSpreadsheetList();
+          loadUserInfo();
+          setLoading(false);
+        } catch (error) {
+          console.error('初期化エラー:', error);
+          showError('初期化に失敗しました: ' + error.message);
+          setLoading(false);
+        }
+      }
 
-    // シート一覧読み込み
-    function loadSheetList(spreadsheetId) {
-      const select = document.getElementById('sheet-select');
-      select.innerHTML = '<option value="">読み込み中...</option>';
-      
-      google.script.run
-        .withSuccessHandler(function(sheets) {
-          select.innerHTML = '<option value="">シートを選択...</option>';
+      // スプレッドシート一覧読み込み
+      function loadSpreadsheetList() {
+        const select = document.getElementById('spreadsheet-select');
+        select.innerHTML = '<option value="">読み込み中...</option>';
+
+        google.script.run
+          .withSuccessHandler(function (spreadsheets) {
+            select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
+            spreadsheets.forEach((sheet) => {
+              const option = document.createElement('option');
+              option.value = sheet.id;
+              option.textContent = sheet.name;
+              select.appendChild(option);
+            });
+          })
+          .withFailureHandler(function (error) {
+            console.error('スプレッドシート読み込みエラー:', error);
+            select.innerHTML = '<option value="">読み込みエラー</option>';
+            showError('スプレッドシートの読み込みに失敗しました');
+          })
+          .getSpreadsheetList();
+      }
+
+      // ユーザー情報読み込み
+      function loadUserInfo() {
+        // メールアドレス取得
+        console.log('loadUserInfo: メールアドレス取得開始');
+        google.script.run
+          .withSuccessHandler(function (email) {
+            console.log('getUserEmail成功:', email);
+            if (email && email.trim()) {
+              document.getElementById('current-user-email').textContent = email;
+              console.log('メールアドレス表示完了:', email);
+            } else {
+              console.warn('User email not found in response:', email);
+              document.getElementById('current-user-email').textContent = '取得中...';
+              // 再試行メカニズム
+              setTimeout(() => {
+                console.log('メールアドレス取得再試行');
+                loadUserInfo();
+              }, 2000);
+            }
+          })
+          .withFailureHandler(function (error) {
+            console.error('メールアドレス取得エラー:', error);
+            document.getElementById('current-user-email').textContent = 'エラー';
+          })
+          .getUserEmail();
+
+        // ユーザーIDを表示（__USER_ID__があれば使用）
+        if (typeof __USER_ID__ !== 'undefined' && __USER_ID__) {
+          document.getElementById('current-user-id').textContent = __USER_ID__;
+        } else {
+          document.getElementById('current-user-id').textContent = 'N/A';
+        }
+      }
+
+      // 不要なシステム監視機能を削除
+
+      // ローディング状態設定 - SharedUtilitiesシステムを使用
+      function setLoading(loading) {
+        systemState.loading = loading;
+        if (window.sharedUtilities && window.sharedUtilities.ui) {
+          if (loading) {
+            window.sharedUtilities.ui.showLoading();
+          } else {
+            window.sharedUtilities.ui.hideLoading();
+          }
+        }
+      }
+
+      // エラー表示 (SharedUtilitiesの通知システムを使用)
+      function showError(message) {
+        if (window.sharedUtilities && window.sharedUtilities.notifications) {
+          window.sharedUtilities.notifications.error(message);
+        } else {
+          console.error('Error:', message);
+          alert('エラー: ' + message);
+        }
+      }
+
+      // 成功表示 (SharedUtilitiesの通知システムを使用)
+      function showSuccess(message) {
+        if (window.sharedUtilities && window.sharedUtilities.notifications) {
+          window.sharedUtilities.notifications.success(message);
+        } else {
+          console.log('Success:', message);
+          alert('成功: ' + message);
+        }
+      }
+
+      // 設定エクスポート
+      function exportConfig() {
+        google.script.run
+          .withSuccessHandler(function (config) {
+            const dataStr = JSON.stringify(config, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileDefaultName = 'studyquest-config.json';
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+
+            showSuccess('設定をエクスポートしました');
+          })
+          .withFailureHandler(function (error) {
+            console.error('エクスポートエラー:', error);
+            showError('設定のエクスポートに失敗しました');
+          })
+          .getCurrentConfig();
+      }
+
+      // システム管理者アクセス確認
+      function checkSystemAdminAccess() {
+        google.script.run
+          .withSuccessHandler(function (isAdmin) {
+            if (isAdmin) {
+              console.log('システム管理者として認識されました');
+              document.getElementById('app-setup-btn').style.display = 'block';
+            } else {
+              console.log('一般ユーザーとして認識されました');
+              document.getElementById('app-setup-btn').style.display = 'none';
+            }
+          })
+          .withFailureHandler(function (error) {
+            console.warn('システム管理者確認エラー:', error);
+            document.getElementById('app-setup-btn').style.display = 'none';
+          })
+          .checkIsSystemAdmin();
+      }
+
+      // フォーム作成インターフェース
+      function createFormInterface() {
+        // ユーザーIDの確認
+        if (!__USER_ID__ || __USER_ID__.trim() === '') {
+          showError('ユーザー情報が取得できませんでした。ページを再読み込みしてください。');
+          return;
+        }
+
+        const formName = prompt(
+          '作成するフォーム名を入力してください：\n例：アンケートフォーム、質問フォーム'
+        );
+
+        if (!formName || !formName.trim()) {
+          showError('フォーム名が入力されませんでした');
+          return;
+        }
+
+        if (formName.trim().length > 50) {
+          showError('フォーム名は50文字以内で入力してください');
+          return;
+        }
+
+        // 基本的なフォーム設定
+        const config = {
+          title: formName.trim(),
+          description: 'カスタムフォームが作成されました',
+          fields: [
+            {
+              type: 'text',
+              label: '名前',
+              required: true,
+            },
+            {
+              type: 'text',
+              label: 'メッセージ',
+              required: true,
+            },
+          ],
+        };
+
+        console.log('フォーム作成開始:', { userId: __USER_ID__, config });
+        setLoading(true);
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result.success) {
+              showSuccess('フォーム「' + formName + '」を作成しました');
+              if (result.formUrl) {
+                const openForm = confirm('フォームが作成されました。今すぐ開きますか？');
+                if (openForm) {
+                  window.open(result.formUrl, '_blank');
+                }
+              }
+            } else {
+              showError(result.error || 'フォーム作成に失敗しました');
+            }
+            setLoading(false);
+          })
+          .withFailureHandler(function (error) {
+            console.error('フォーム作成エラー:', error);
+            showError('フォーム作成に失敗しました: ' + (error.message || 'Unknown error'));
+            setLoading(false);
+          })
+          .createForm(__USER_ID__, config);
+      }
+
+      // アプリ設定画面へのナビゲーション
+      function goToAppSetup() {
+        setLoading(true);
+        google.script.run
+          .withSuccessHandler(function (webAppUrl) {
+            const setupUrl = webAppUrl + '?mode=appSetup';
+            window.open(setupUrl, '_top');
+          })
+          .withFailureHandler(function (error) {
+            console.error('アプリ設定画面への遷移エラー:', error);
+            showError('アプリ設定画面への移動に失敗しました');
+            setLoading(false);
+          })
+          .getWebAppUrlCached();
+      }
+
+      // データソース選択方式の切り替え
+      function toggleSourceMethod(method) {
+        const dropdownMethod = document.getElementById('dropdown-method');
+        const urlMethod = document.getElementById('url-method');
+        
+        if (method === 'url') {
+          dropdownMethod.classList.add('hidden');
+          urlMethod.classList.remove('hidden');
+        } else {
+          dropdownMethod.classList.remove('hidden');
+          urlMethod.classList.add('hidden');
+        }
+      }
+
+      // スプレッドシートURL検証
+      function validateSpreadsheetUrl() {
+        const urlInput = document.getElementById('spreadsheet-url');
+        const url = urlInput.value.trim();
+        
+        if (!url) {
+          showError('スプレッドシートURLを入力してください');
+          return;
+        }
+
+        // GoogleスプレッドシートURLの基本的な検証
+        const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+        const match = url.match(spreadsheetRegex);
+        
+        if (!match) {
+          showError('有効なGoogleスプレッドシートのURLを入力してください');
+          return;
+        }
+
+        const spreadsheetId = match[1];
+        setLoading(true);
+
+        // バックエンドでアクセス権限を確認
+        google.script.run
+          .withSuccessHandler(function(result) {
+            setLoading(false);
+            if (result.success) {
+              showSuccess('✅ スプレッドシートへのアクセスが確認できました');
+              // スプレッドシートIDを隠しフィールドに保存
+              urlInput.dataset.spreadsheetId = spreadsheetId;
+              // シート一覧を取得してプルダウンを更新
+              if (result.sheets && result.sheets.length > 0) {
+                updateSheetNameSuggestions(result.sheets);
+              }
+            } else {
+              showError('スプレッドシートにアクセスできません: ' + (result.error || 'Unknown error'));
+            }
+          })
+          .withFailureHandler(function(error) {
+            setLoading(false);
+            console.error('URL検証エラー:', error);
+            showError('URL検証に失敗しました: ' + error.message);
+          })
+          .validateAccess(spreadsheetId);
+      }
+
+      // シート名候補を更新
+      function updateSheetNameSuggestions(sheets) {
+        const sheetNameInput = document.getElementById('sheet-name-input');
+        if (sheets && sheets.length > 0) {
+          // デフォルトで最初のシートを設定
+          sheetNameInput.value = sheets[0].name;
+          
+          // datalistで候補を表示（より良いUX）
+          let datalist = document.getElementById('sheet-suggestions');
+          if (!datalist) {
+            datalist = document.createElement('datalist');
+            datalist.id = 'sheet-suggestions';
+            sheetNameInput.setAttribute('list', 'sheet-suggestions');
+            sheetNameInput.parentNode.appendChild(datalist);
+          }
+          
+          datalist.innerHTML = '';
           sheets.forEach(sheet => {
             const option = document.createElement('option');
             option.value = sheet.name;
-            option.textContent = sheet.name;
-            select.appendChild(option);
+            datalist.appendChild(option);
           });
-        })
-        .withFailureHandler(function(error) {
-          console.error('シート読み込みエラー:', error);
-          select.innerHTML = '<option value="">読み込みエラー</option>';
-        })
-        .getSheetList(spreadsheetId);
-    }
-
-    // データソース接続
-    function connectToSource() {
-      const spreadsheetId = document.getElementById('spreadsheet-select').value;
-      const sheetName = document.getElementById('sheet-select').value;
-      
-      // 入力検証を詳細化
-      if (!spreadsheetId) {
-        showError('スプレッドシートを選択してください。先に「更新」ボタンを押して一覧を読み込んでください。');
-        return;
-      }
-      
-      if (!sheetName) {
-        showError('シートを選択してください。スプレッドシートを選択すると、シート一覧が表示されます。');
-        return;
+        }
       }
 
-      setLoading(true);
-      console.log('connectToSource: 接続開始', { spreadsheetId, sheetName });
-      
-      google.script.run
-        .withSuccessHandler(function(result) {
-          console.log('connectToSource: 接続結果', result);
-          
-          if (result.success) {
-            showSuccess('データソースに接続しました');
-            // 進捗更新
-            updateProgress(2);
-            
-            // 列マッピングの処理
-            if (result.columnMapping && Object.keys(result.columnMapping).length > 0) {
-              updateColumnMapping(result.columnMapping);
-              
-              // 自動検出の信頼度をチェック
-              const confidence = result.columnMapping.confidence || {};
-              const avgConfidence = Object.values(confidence).reduce((sum, val) => sum + (val || 0), 0) / Math.max(Object.keys(confidence).length, 1);
-              
-              if (avgConfidence < 70) {
-                showManualConfigOption('列の自動検出の信頼度が低めです。手動で調整することをお勧めします。');
+      // URL入力方式でのデータソース接続
+      function connectToUrlSource() {
+        const urlInput = document.getElementById('spreadsheet-url');
+        const sheetNameInput = document.getElementById('sheet-name-input');
+        
+        const url = urlInput.value.trim();
+        const sheetName = sheetNameInput.value.trim();
+        
+        if (!url) {
+          showError('スプレッドシートURLを入力してください');
+          return;
+        }
+        
+        if (!sheetName) {
+          showError('シート名を入力してください');
+          return;
+        }
+
+        // URLからスプレッドシートIDを抽出
+        const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+        const match = url.match(spreadsheetRegex);
+        
+        if (!match) {
+          showError('有効なGoogleスプレッドシートのURLを入力してください');
+          return;
+        }
+
+        const spreadsheetId = match[1];
+        
+        console.log('URL入力方式で接続開始:', { spreadsheetId, sheetName });
+        setLoading(true);
+
+        // 既存のconnectToSource関数と同様の処理を実行
+        google.script.run
+          .withSuccessHandler(function (mapping) {
+            console.log('URL入力接続成功:', mapping);
+            if (mapping && mapping.success) {
+              updateColumnMapping(mapping.columnMapping);
+              updateProgress(2);
+              showSuccess('URL入力方式でスプレッドシートに接続しました');
+            } else {
+              showError(mapping.error || 'スプレッドシートへの接続に失敗しました');
+            }
+            setLoading(false);
+          })
+          .withFailureHandler(function (error) {
+            console.error('URL入力接続エラー:', error);
+            showError('スプレッドシートへの接続に失敗しました: ' + error.message);
+            setLoading(false);
+          })
+          .analyzeColumns(spreadsheetId, sheetName);
+      }
+
+      // イベントリスナー設定
+      document.addEventListener('DOMContentLoaded', function () {
+        // データソース選択方式の切り替え
+        document.querySelectorAll('input[name="source-method"]').forEach(radio => {
+          radio.addEventListener('change', function() {
+            toggleSourceMethod(this.value);
+          });
+        });
+
+        // スプレッドシート選択時
+        document.getElementById('spreadsheet-select').addEventListener('change', function () {
+          const spreadsheetId = this.value;
+          if (spreadsheetId) {
+            loadSheetList(spreadsheetId);
+          }
+        });
+
+        // データ更新ボタン
+        document.getElementById('refresh-data').addEventListener('click', function () {
+          loadSpreadsheetList();
+        });
+
+        // 接続ボタン（一覧選択）
+        document.getElementById('connect-source').addEventListener('click', function () {
+          connectToSource();
+        });
+
+        // URL検証ボタン
+        document.getElementById('url-validate').addEventListener('click', function () {
+          validateSpreadsheetUrl();
+        });
+
+        // 接続ボタン（URL入力）
+        document.getElementById('connect-url-source').addEventListener('click', function () {
+          connectToUrlSource();
+        });
+
+        // 設定確認ボタン
+        document.getElementById('verify-mapping').addEventListener('click', function () {
+          verifyColumnMapping();
+        });
+
+        // 下書き保存ボタン
+        document.getElementById('save-draft').addEventListener('click', function () {
+          saveDraft();
+        });
+
+        // 公開ボタン
+        document.getElementById('publish-now').addEventListener('click', function () {
+          publishApp();
+        });
+      });
+
+      // シート一覧読み込み
+      function loadSheetList(spreadsheetId) {
+        const select = document.getElementById('sheet-select');
+        select.innerHTML = '<option value="">読み込み中...</option>';
+
+        google.script.run
+          .withSuccessHandler(function (sheets) {
+            select.innerHTML = '<option value="">シートを選択...</option>';
+            sheets.forEach((sheet) => {
+              const option = document.createElement('option');
+              option.value = sheet.name;
+              option.textContent = sheet.name;
+              select.appendChild(option);
+            });
+          })
+          .withFailureHandler(function (error) {
+            console.error('シート読み込みエラー:', error);
+            select.innerHTML = '<option value="">読み込みエラー</option>';
+          })
+          .getSheetList(spreadsheetId);
+      }
+
+      // データソース接続
+      function connectToSource() {
+        const spreadsheetId = document.getElementById('spreadsheet-select').value;
+        const sheetName = document.getElementById('sheet-select').value;
+
+        // 入力検証を詳細化
+        if (!spreadsheetId) {
+          showError(
+            'スプレッドシートを選択してください。先に「更新」ボタンを押して一覧を読み込んでください。'
+          );
+          return;
+        }
+
+        if (!sheetName) {
+          showError(
+            'シートを選択してください。スプレッドシートを選択すると、シート一覧が表示されます。'
+          );
+          return;
+        }
+
+        setLoading(true);
+        console.log('connectToSource: 接続開始', { spreadsheetId, sheetName });
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            console.log('connectToSource: 接続結果', result);
+
+            if (result.success) {
+              showSuccess('データソースに接続しました');
+              // 進捗更新
+              updateProgress(2);
+
+              // 列マッピングの処理
+              if (result.columnMapping && Object.keys(result.columnMapping).length > 0) {
+                updateColumnMapping(result.columnMapping);
+
+                // 自動検出の信頼度をチェック
+                const confidence = result.columnMapping.confidence || {};
+                const avgConfidence =
+                  Object.values(confidence).reduce((sum, val) => sum + (val || 0), 0) /
+                  Math.max(Object.keys(confidence).length, 1);
+
+                if (avgConfidence < 70) {
+                  showManualConfigOption(
+                    '列の自動検出の信頼度が低めです。手動で調整することをお勧めします。'
+                  );
+                }
+              } else {
+                // 自動検出に完全に失敗した場合
+                console.warn('自動列検出に失敗しました');
+                updateColumnMapping(null);
+                showManualConfigOption('列の自動検出に失敗しました。手動で設定してください。');
               }
             } else {
-              // 自動検出に完全に失敗した場合
-              console.warn('自動列検出に失敗しました');
-              updateColumnMapping(null);
-              showManualConfigOption('列の自動検出に失敗しました。手動で設定してください。');
+              handleConnectionError(result.error, { spreadsheetId, sheetName });
             }
-          } else {
-            handleConnectionError(result.error, { spreadsheetId, sheetName });
-          }
-          setLoading(false);
-        })
-        .withFailureHandler(function(error) {
-          console.error('connectToSource 接続エラー:', error);
-          handleConnectionError(error.message || error, { spreadsheetId, sheetName });
-          setLoading(false);
-        })
-        .connectToDataSource(spreadsheetId, sheetName);
-    }
-    
-    // 接続エラーハンドリング
-    function handleConnectionError(errorMessage, context) {
-      console.error('Connection error details:', { errorMessage, context });
-      
-      let userMessage = 'データソースへの接続に失敗しました。';
-      let suggestions = [];
-      
-      // エラーメッセージに基づく詳細な診断
-      if (errorMessage.includes('Permission') || errorMessage.includes('権限')) {
-        suggestions.push('スプレッドシートへのアクセス権限を確認してください');
-        suggestions.push('スプレッドシートを開いて、編集権限があることを確認してください');
-      } else if (errorMessage.includes('not found') || errorMessage.includes('見つかりません')) {
-        suggestions.push('指定されたスプレッドシートまたはシートが存在するか確認してください');
-        suggestions.push('シート名が正確か確認してください');
-      } else if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
-        suggestions.push('ネットワーク接続を確認してください');
-        suggestions.push('しばらく時間をおいて再試行してください');
-      } else {
-        suggestions.push('スプレッドシートが開けることを確認してください');
-        suggestions.push('手動で列を設定することも可能です');
+            setLoading(false);
+          })
+          .withFailureHandler(function (error) {
+            console.error('connectToSource 接続エラー:', error);
+            handleConnectionError(error.message || error, { spreadsheetId, sheetName });
+            setLoading(false);
+          })
+          .connectDataSource(spreadsheetId, sheetName);
       }
-      
-      const fullMessage = userMessage + '\n\n推奨対処法:\n' + suggestions.map(s => '• ' + s).join('\n');
-      showError(fullMessage);
-      
-      // 手動設定オプションを表示
-      showManualConfigOption('自動接続に失敗した場合は、手動で列を設定できます。');
-    }
-    
-    // 手動設定オプションの表示
-    function showManualConfigOption(message) {
-      const columnsContainer = document.querySelector('.auto-detected-columns');
-      if (!columnsContainer) return;
-      
-      // 既存の手動設定オプションがあれば削除
-      const existingManual = document.getElementById('manual-config-option');
-      if (existingManual) {
-        existingManual.remove();
+
+      // 接続エラーハンドリング
+      function handleConnectionError(errorMessage, context) {
+        console.error('Connection error details:', { errorMessage, context });
+
+        let userMessage = 'データソースへの接続に失敗しました。';
+        let suggestions = [];
+
+        // エラーメッセージに基づく詳細な診断
+        if (errorMessage.includes('Permission') || errorMessage.includes('権限')) {
+          suggestions.push('スプレッドシートへのアクセス権限を確認してください');
+          suggestions.push('スプレッドシートを開いて、編集権限があることを確認してください');
+        } else if (errorMessage.includes('not found') || errorMessage.includes('見つかりません')) {
+          suggestions.push('指定されたスプレッドシートまたはシートが存在するか確認してください');
+          suggestions.push('シート名が正確か確認してください');
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
+          suggestions.push('ネットワーク接続を確認してください');
+          suggestions.push('しばらく時間をおいて再試行してください');
+        } else {
+          suggestions.push('スプレッドシートが開けることを確認してください');
+          suggestions.push('手動で列を設定することも可能です');
+        }
+
+        const fullMessage =
+          userMessage + '\n\n推奨対処法:\n' + suggestions.map((s) => '• ' + s).join('\n');
+        showError(fullMessage);
+
+        // 手動設定オプションを表示
+        showManualConfigOption('自動接続に失敗した場合は、手動で列を設定できます。');
       }
-      
-      const manualOption = document.createElement('div');
-      manualOption.id = 'manual-config-option';
-      manualOption.className = 'column-match';
-      manualOption.style.background = 'rgba(59, 130, 246, 0.1)';
-      manualOption.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-      manualOption.innerHTML = `
+
+      // 手動設定オプションの表示
+      function showManualConfigOption(message) {
+        const columnsContainer = document.querySelector('.auto-detected-columns');
+        if (!columnsContainer) return;
+
+        // 既存の手動設定オプションがあれば削除
+        const existingManual = document.getElementById('manual-config-option');
+        if (existingManual) {
+          existingManual.remove();
+        }
+
+        const manualOption = document.createElement('div');
+        manualOption.id = 'manual-config-option';
+        manualOption.className = 'column-match';
+        manualOption.style.background = 'rgba(59, 130, 246, 0.1)';
+        manualOption.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        manualOption.innerHTML = `
         <div style="flex: 1;">
           <div class="column-type">手動設定</div>
           <div style="font-size: 0.875rem; color: rgba(156, 163, 175, 1); margin-top: 0.25rem;">
@@ -1168,435 +1427,466 @@
           手動設定
         </button>
       `;
-      
-      columnsContainer.appendChild(manualOption);
-    }
-    
-    // 手動列設定ダイアログ
-    function openManualColumnConfig() {
-      const spreadsheetId = document.getElementById('spreadsheet-select').value;
-      const sheetName = document.getElementById('sheet-select').value;
-      
-      if (!spreadsheetId || !sheetName) {
-        showError('まず、スプレッドシートとシートを選択してください');
-        return;
+
+        columnsContainer.appendChild(manualOption);
       }
-      
-      // 簡易的な手動設定ダイアログ（実装可能範囲内）
-      const questionColumn = prompt('質問が入っている列を指定してください（例：A、B、C）:');
-      const answererColumn = prompt('回答者名が入っている列を指定してください（例：A、B、C）:');
-      const reasonColumn = prompt('理由・コメントが入っている列を指定してください（例：A、B、C）:');
-      
-      if (questionColumn || answererColumn || reasonColumn) {
-        const manualMapping = {
-          question: questionColumn ? (questionColumn.toUpperCase().charCodeAt(0) - 65) : null,
-          answerer: answererColumn ? (answererColumn.toUpperCase().charCodeAt(0) - 65) : null,
-          reason: reasonColumn ? (reasonColumn.toUpperCase().charCodeAt(0) - 65) : null,
-          confidence: {
-            question: questionColumn ? 100 : 0,
-            answerer: answererColumn ? 100 : 0,
-            reason: reasonColumn ? 100 : 0
+
+      // 手動列設定ダイアログ
+      function openManualColumnConfig() {
+        const spreadsheetId = document.getElementById('spreadsheet-select').value;
+        const sheetName = document.getElementById('sheet-select').value;
+
+        if (!spreadsheetId || !sheetName) {
+          showError('まず、スプレッドシートとシートを選択してください');
+          return;
+        }
+
+        // 簡易的な手動設定ダイアログ（実装可能範囲内）
+        const questionColumn = prompt('質問が入っている列を指定してください（例：A、B、C）:');
+        const answererColumn = prompt('回答者名が入っている列を指定してください（例：A、B、C）:');
+        const reasonColumn = prompt(
+          '理由・コメントが入っている列を指定してください（例：A、B、C）:'
+        );
+
+        if (questionColumn || answererColumn || reasonColumn) {
+          const manualMapping = {
+            question: questionColumn ? questionColumn.toUpperCase().charCodeAt(0) - 65 : null,
+            answerer: answererColumn ? answererColumn.toUpperCase().charCodeAt(0) - 65 : null,
+            reason: reasonColumn ? reasonColumn.toUpperCase().charCodeAt(0) - 65 : null,
+            confidence: {
+              question: questionColumn ? 100 : 0,
+              answerer: answererColumn ? 100 : 0,
+              reason: reasonColumn ? 100 : 0,
+            },
+          };
+
+          console.log('手動列マッピング:', manualMapping);
+          updateColumnMapping(manualMapping);
+          showSuccess('手動で列設定を行いました');
+          updateProgress(2);
+
+          // 手動設定オプションを非表示
+          const manualOption = document.getElementById('manual-config-option');
+          if (manualOption) {
+            manualOption.style.display = 'none';
           }
+        }
+      }
+
+      // 進捗更新
+      function updateProgress(step) {
+        const steps = document.querySelectorAll('.step');
+        steps.forEach((stepEl, index) => {
+          stepEl.classList.remove('completed', 'current');
+          if (index < step - 1) {
+            stepEl.classList.add('completed');
+          } else if (index === step - 1) {
+            stepEl.classList.add('current');
+          }
+        });
+      }
+
+      // 列マッピング更新
+      function updateColumnMapping(mapping) {
+        console.log('Column mapping received:', mapping);
+
+        if (!mapping) {
+          console.warn('列マッピング情報がありません');
+          showError('列マッピング情報の取得に失敗しました');
+          return;
+        }
+
+        const columnsContainer = document.querySelector('.auto-detected-columns');
+        if (!columnsContainer) {
+          console.error('列表示コンテナが見つかりません');
+          return;
+        }
+
+        // 既存の列表示をクリア
+        columnsContainer.innerHTML = '';
+
+        // 列タイプの表示名マッピング
+        const typeDisplayNames = {
+          question: '質問',
+          answerer: '回答者',
+          reason: '理由',
+          timestamp: 'タイムスタンプ',
+          class: 'クラス',
         };
-        
-        console.log('手動列マッピング:', manualMapping);
-        updateColumnMapping(manualMapping);
-        showSuccess('手動で列設定を行いました');
-        updateProgress(2);
-        
-        // 手動設定オプションを非表示
-        const manualOption = document.getElementById('manual-config-option');
-        if (manualOption) {
-          manualOption.style.display = 'none';
-        }
-      }
-    }
 
-    // 進捗更新
-    function updateProgress(step) {
-      const steps = document.querySelectorAll('.step');
-      steps.forEach((stepEl, index) => {
-        stepEl.classList.remove('completed', 'current');
-        if (index < step - 1) {
-          stepEl.classList.add('completed');
-        } else if (index === step - 1) {
-          stepEl.classList.add('current');
-        }
-      });
-    }
+        // 検出された列を表示
+        let hasValidMapping = false;
 
-    // 列マッピング更新
-    function updateColumnMapping(mapping) {
-      console.log('Column mapping received:', mapping);
-      
-      if (!mapping) {
-        console.warn('列マッピング情報がありません');
-        showError('列マッピング情報の取得に失敗しました');
-        return;
-      }
-      
-      const columnsContainer = document.querySelector('.auto-detected-columns');
-      if (!columnsContainer) {
-        console.error('列表示コンテナが見つかりません');
-        return;
-      }
-      
-      // 既存の列表示をクリア
-      columnsContainer.innerHTML = '';
-      
-      // 列タイプの表示名マッピング
-      const typeDisplayNames = {
-        question: '質問',
-        answerer: '回答者', 
-        reason: '理由',
-        timestamp: 'タイムスタンプ',
-        class: 'クラス'
-      };
-      
-      // 検出された列を表示
-      let hasValidMapping = false;
-      
-      Object.keys(mapping).forEach(type => {
-        if (type === 'confidence') return; // 信頼度オブジェクトはスキップ
-        
-        const columnIndex = mapping[type];
-        const confidence = mapping.confidence && mapping.confidence[type] 
-          ? mapping.confidence[type] 
-          : 0;
-          
-        if (columnIndex !== null && columnIndex !== undefined) {
-          hasValidMapping = true;
-          
-          const columnMatch = document.createElement('div');
-          columnMatch.className = 'column-match';
-          
-          // 信頼度に基づく色分け
-          let bgColor = 'rgba(34, 197, 94, 0.1)'; // 緑（高信頼度）
-          let borderColor = 'rgba(34, 197, 94, 0.3)';
-          let confidenceColor = 'rgba(34, 197, 94, 0.8)';
-          
-          if (confidence < 70) {
-            bgColor = 'rgba(245, 158, 11, 0.1)'; // 黄（中信頼度）
-            borderColor = 'rgba(245, 158, 11, 0.3)';
-            confidenceColor = 'rgba(245, 158, 11, 0.8)';
-          }
-          
-          if (confidence < 50) {
-            bgColor = 'rgba(239, 68, 68, 0.1)'; // 赤（低信頼度）
-            borderColor = 'rgba(239, 68, 68, 0.3)';
-            confidenceColor = 'rgba(239, 68, 68, 0.8)';
-          }
-          
-          columnMatch.style.background = bgColor;
-          columnMatch.style.borderColor = borderColor;
-          
-          const displayName = typeDisplayNames[type] || type;
-          const columnLabel = String.fromCharCode(65 + columnIndex) + '列'; // A列、B列など
-          
-          columnMatch.innerHTML = `
+        Object.keys(mapping).forEach((type) => {
+          if (type === 'confidence') return; // 信頼度オブジェクトはスキップ
+
+          const columnIndex = mapping[type];
+          const confidence =
+            mapping.confidence && mapping.confidence[type] ? mapping.confidence[type] : 0;
+
+          if (columnIndex !== null && columnIndex !== undefined) {
+            hasValidMapping = true;
+
+            const columnMatch = document.createElement('div');
+            columnMatch.className = 'column-match';
+
+            // 信頼度に基づく色分け
+            let bgColor = 'rgba(34, 197, 94, 0.1)'; // 緑（高信頼度）
+            let borderColor = 'rgba(34, 197, 94, 0.3)';
+            let confidenceColor = 'rgba(34, 197, 94, 0.8)';
+
+            if (confidence < 70) {
+              bgColor = 'rgba(245, 158, 11, 0.1)'; // 黄（中信頼度）
+              borderColor = 'rgba(245, 158, 11, 0.3)';
+              confidenceColor = 'rgba(245, 158, 11, 0.8)';
+            }
+
+            if (confidence < 50) {
+              bgColor = 'rgba(239, 68, 68, 0.1)'; // 赤（低信頼度）
+              borderColor = 'rgba(239, 68, 68, 0.3)';
+              confidenceColor = 'rgba(239, 68, 68, 0.8)';
+            }
+
+            columnMatch.style.background = bgColor;
+            columnMatch.style.borderColor = borderColor;
+
+            const displayName = typeDisplayNames[type] || type;
+            const columnLabel = String.fromCharCode(65 + columnIndex) + '列'; // A列、B列など
+
+            columnMatch.innerHTML = `
             <span class="column-type">${displayName}</span>
             <span class="detected-column">${columnLabel}</span>
             <span class="confidence" style="color: ${confidenceColor}">${Math.round(confidence)}%確信度</span>
           `;
-          
-          columnsContainer.appendChild(columnMatch);
-        }
-      });
-      
-      // 有効なマッピングがない場合の表示
-      if (!hasValidMapping) {
-        const noMapping = document.createElement('div');
-        noMapping.className = 'column-match';
-        noMapping.style.background = 'rgba(107, 114, 128, 0.1)';
-        noMapping.style.borderColor = 'rgba(107, 114, 128, 0.3)';
-        noMapping.innerHTML = `
+
+            columnsContainer.appendChild(columnMatch);
+          }
+        });
+
+        // 有効なマッピングがない場合の表示
+        if (!hasValidMapping) {
+          const noMapping = document.createElement('div');
+          noMapping.className = 'column-match';
+          noMapping.style.background = 'rgba(107, 114, 128, 0.1)';
+          noMapping.style.borderColor = 'rgba(107, 114, 128, 0.3)';
+          noMapping.innerHTML = `
           <span class="column-type">自動検出失敗</span>
           <span class="detected-column">手動設定が必要</span>
           <span class="confidence" style="color: rgba(239, 68, 68, 0.8)">0%確信度</span>
         `;
-        columnsContainer.appendChild(noMapping);
-        
-        showError('列の自動検出に失敗しました。手動で設定してください');
-      } else {
-        showSuccess('列マッピングを更新しました');
-      }
-    }
+          columnsContainer.appendChild(noMapping);
 
-    // 列マッピング確認
-    function verifyColumnMapping() {
-      const spreadsheetId = document.getElementById('spreadsheet-select').value;
-      const sheetName = document.getElementById('sheet-select').value;
-      
-      if (!spreadsheetId || !sheetName) {
-        showError('検証するにはまず、スプレッドシートとシートを接続してください');
-        return;
+          showError('列の自動検出に失敗しました。手動で設定してください');
+        } else {
+          showSuccess('列マッピングを更新しました');
+        }
       }
-      
-      setLoading(true);
-      
-      console.log('verifyColumnMapping: 列マッピング検証開始', { spreadsheetId, sheetName });
-      
-      // 既存のgetHeaderIndices関数を使用して検証
-      google.script.run
-        .withSuccessHandler(function(headerIndices) {
-          console.log('verifyColumnMapping: ヘッダー検証成功', headerIndices);
-          
-          if (!headerIndices || Object.keys(headerIndices).length === 0) {
-            showError('ヘッダー情報を取得できませんでした。シートの構造を確認してください');
+
+      // 列マッピング確認
+      function verifyColumnMapping() {
+        const spreadsheetId = document.getElementById('spreadsheet-select').value;
+        const sheetName = document.getElementById('sheet-select').value;
+
+        if (!spreadsheetId || !sheetName) {
+          showError('検証するにはまず、スプレッドシートとシートを接続してください');
+          return;
+        }
+
+        setLoading(true);
+
+        console.log('verifyColumnMapping: 列マッピング検証開始', { spreadsheetId, sheetName });
+
+        // 既存のgetHeaderIndices関数を使用して検証
+        google.script.run
+          .withSuccessHandler(function (headerIndices) {
+            console.log('verifyColumnMapping: ヘッダー検証成功', headerIndices);
+
+            if (!headerIndices || Object.keys(headerIndices).length === 0) {
+              showError('ヘッダー情報を取得できませんでした。シートの構造を確認してください');
+              setLoading(false);
+              return;
+            }
+
+            // 検証結果を表示
+            displayVerificationResults(headerIndices);
+
+            // 設定を保存
+            saveColumnConfiguration(spreadsheetId, sheetName, headerIndices);
+
+            showSuccess('列マッピングの検証が完了しました');
+            updateProgress(3);
             setLoading(false);
-            return;
-          }
-          
-          // 検証結果を表示
-          displayVerificationResults(headerIndices);
-          
-          // 設定を保存
-          saveColumnConfiguration(spreadsheetId, sheetName, headerIndices);
-          
-          showSuccess('列マッピングの検証が完了しました');
-          updateProgress(3);
-          setLoading(false);
-        })
-        .withFailureHandler(function(error) {
-          console.error('verifyColumnMapping エラー:', error);
-          showError('列マッピングの検証に失敗しました: ' + (error.message || 'Unknown error'));
-          setLoading(false);
-        })
-        .getHeaderIndices(spreadsheetId, sheetName);
-    }
-    
-    // 検証結果の表示
-    function displayVerificationResults(headerIndices) {
-      const columnsContainer = document.querySelector('.auto-detected-columns');
-      if (!columnsContainer) return;
-      
-      // 既存の列表示に検証済みマークを追加
-      const columnMatches = columnsContainer.querySelectorAll('.column-match');
-      columnMatches.forEach(match => {
-        const verifiedBadge = document.createElement('span');
-        verifiedBadge.className = 'status-badge published';
-        verifiedBadge.textContent = '✓ 検証済み';
-        verifiedBadge.style.fontSize = '0.75rem';
-        verifiedBadge.style.marginLeft = '0.5rem';
-        match.appendChild(verifiedBadge);
-      });
-      
-      console.log('検証結果を表示しました:', headerIndices);
-    }
-    
-    // 列設定の保存
-    function saveColumnConfiguration(spreadsheetId, sheetName, headerIndices) {
-      const config = {
-        spreadsheetId: spreadsheetId,
-        sheetName: sheetName,
-        headerIndices: headerIndices,
-        verifiedAt: new Date().toISOString()
-      };
-      
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            console.log('列設定を保存しました:', config);
-          } else {
-            console.warn('列設定の保存に失敗:', result.error);
-          }
-        })
-        .withFailureHandler(function(error) {
-          console.error('列設定保存エラー:', error);
-        })
-        .saveDraftConfiguration(config);
-    }
-
-    // 下書き保存
-    function saveDraft() {
-      const config = gatherConfiguration();
-      
-      setLoading(true);
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            showSuccess('下書きを保存しました');
-            updateConfigDisplay(result.config);
-          } else {
-            showError(result.error);
-          }
-          setLoading(false);
-        })
-        .withFailureHandler(function(error) {
-          console.error('保存エラー:', error);
-          showError('下書きの保存に失敗しました');
-          setLoading(false);
-        })
-        .saveDraftConfiguration(config);
-    }
-
-    // アプリ公開
-    function publishApp() {
-      const appName = document.getElementById('app-name').value;
-      if (!appName.trim()) {
-        showError('アプリケーション名を入力してください。例：「クラス質問ボード」「理科実験アンケート」');
-        document.getElementById('app-name').focus();
-        return;
-      }
-      
-      // 長すぎる名前をチェック
-      if (appName.trim().length > 50) {
-        showError('アプリケーション名は50文字以内で入力してください。');
-        document.getElementById('app-name').focus();
-        return;
+          })
+          .withFailureHandler(function (error) {
+            console.error('verifyColumnMapping エラー:', error);
+            showError('列マッピングの検証に失敗しました: ' + (error.message || 'Unknown error'));
+            setLoading(false);
+          })
+          .getHeaderIndices(spreadsheetId, sheetName);
       }
 
-      const config = gatherConfiguration();
-      config.appName = appName;
+      // 検証結果の表示
+      function displayVerificationResults(headerIndices) {
+        const columnsContainer = document.querySelector('.auto-detected-columns');
+        if (!columnsContainer) return;
 
-      setLoading(true);
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            showSuccess('アプリを公開しました！');
-            updatePublishStatus('published');
-            updateConfigDisplay(result.config);
-          } else {
-            showError(result.error);
-          }
-          setLoading(false);
-        })
-        .withFailureHandler(function(error) {
-          console.error('公開エラー:', error);
-          showError('アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。');
-          setLoading(false);
-        })
-        .publishApplication(config);
-    }
-
-    // 設定収集
-    function gatherConfiguration() {
-      return {
-        spreadsheetId: document.getElementById('spreadsheet-select').value,
-        sheetName: document.getElementById('sheet-select').value,
-        showNames: document.getElementById('show-names').checked,
-        showReactions: document.getElementById('show-reactions').checked,
-        timestamp: new Date().toISOString()
-      };
-    }
-
-    // 設定表示更新
-    function updateConfigDisplay(config) {
-      document.getElementById('config-json').textContent = JSON.stringify(config, null, 2);
-    }
-
-    // 公開ステータス更新
-    function updatePublishStatus(status) {
-      const badge = document.querySelector('.status-badge.unpublished') || 
-                   document.querySelector('.status-badge.published');
-      if (badge) {
-        badge.className = `status-badge ${status}`;
-        badge.textContent = status === 'published' ? '公開中' : '未公開';
-      }
-    }
-
-    // =============================================================================
-    // フッター：現在のボード情報表示機能
-    // =============================================================================
-
-    // グローバル変数
-    let currentBoardInfo = null;
-
-    // ボード情報ロード
-    function loadBoardInfo() {
-      google.script.run
-        .withSuccessHandler(function(boardInfo) {
-          currentBoardInfo = boardInfo;
-          updateFooterDisplay(boardInfo);
-        })
-        .withFailureHandler(function(error) {
-          console.error('ボード情報取得エラー:', error);
-          updateFooterDisplay({
-            isActive: false,
-            questionText: '情報取得エラー',
-            error: error.message
-          });
-        })
-        .getCurrentBoardInfoAndUrls();
-    }
-
-    // フッター表示更新
-    function updateFooterDisplay(boardInfo) {
-      const footer = document.getElementById('boardInfoFooter');
-      const questionText = document.getElementById('currentQuestionText');
-      const openBtn = document.getElementById('openBoardBtn');
-      const copyBtn = document.getElementById('copyViewUrlBtn');
-      const statusText = document.getElementById('boardStatus');
-      
-      // フッターを表示
-      footer.style.display = 'block';
-      
-      // 問題文設定
-      questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
-      
-      if (boardInfo.isActive && boardInfo.urls) {
-        // ボタン表示・機能設定
-        openBtn.style.display = 'block';
-        copyBtn.style.display = 'block';
-        
-        openBtn.onclick = () => window.open(boardInfo.urls.view, '_blank');
-        copyBtn.onclick = () => copyViewUrl(boardInfo.urls.view);
-        
-        // ステータス更新
-        statusText.textContent = `最終更新: ${boardInfo.lastUpdated || '不明'}`;
-      } else {
-        // 非アクティブ状態
-        openBtn.style.display = 'none';
-        copyBtn.style.display = 'none';
-        statusText.textContent = boardInfo.error || 'ボードが非アクティブです';
-      }
-    }
-
-    // URLコピー機能（実用重視）
-    function copyViewUrl(url) {
-      if (!url) {
-        showError('コピーするURLがありません');
-        return;
-      }
-      
-      // クリップボードにコピー
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(() => {
-          showSuccess('閲覧用URLをコピーしました！');
-          // ボタンを一時的に変更してフィードバック
-          const btn = document.getElementById('copyViewUrlBtn');
-          const originalText = btn.textContent;
-          btn.textContent = '✅ コピー完了';
-          btn.disabled = true;
-          setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
-          }, 2000);
-        }).catch(() => {
-          fallbackCopyUrl(url);
+        // 既存の列表示に検証済みマークを追加
+        const columnMatches = columnsContainer.querySelectorAll('.column-match');
+        columnMatches.forEach((match) => {
+          const verifiedBadge = document.createElement('span');
+          verifiedBadge.className = 'status-badge published';
+          verifiedBadge.textContent = '✓ 検証済み';
+          verifiedBadge.style.fontSize = '0.75rem';
+          verifiedBadge.style.marginLeft = '0.5rem';
+          match.appendChild(verifiedBadge);
         });
-      } else {
-        fallbackCopyUrl(url);
-      }
-    }
 
-    // フォールバック（古いブラウザ用）
-    function fallbackCopyUrl(url) {
-      const textarea = document.createElement('textarea');
-      textarea.value = url;
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        document.execCommand('copy');
-        showSuccess('閲覧用URLをコピーしました！');
-      } catch (err) {
-        // 最終手段：URLを表示して手動コピーを促す
-        prompt('以下のURLをコピーしてください:', url);
+        console.log('検証結果を表示しました:', headerIndices);
       }
-      document.body.removeChild(textarea);
-    }
 
-    console.log('AdminPanel スクリプト読み込み完了');
-  </script>
-</body>
+      // 列設定の保存
+      function saveColumnConfiguration(spreadsheetId, sheetName, headerIndices) {
+        const config = {
+          spreadsheetId: spreadsheetId,
+          sheetName: sheetName,
+          headerIndices: headerIndices,
+          verifiedAt: new Date().toISOString(),
+        };
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result.success) {
+              console.log('列設定を保存しました:', config);
+            } else {
+              console.warn('列設定の保存に失敗:', result.error);
+            }
+          })
+          .withFailureHandler(function (error) {
+            console.error('列設定保存エラー:', error);
+          })
+          .saveDraftConfiguration(config);
+      }
+
+      // 下書き保存
+      function saveDraft() {
+        const config = gatherConfiguration();
+
+        setLoading(true);
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result.success) {
+              showSuccess('下書きを保存しました');
+              updateConfigDisplay(result.config);
+            } else {
+              showError(result.error);
+            }
+            setLoading(false);
+          })
+          .withFailureHandler(function (error) {
+            console.error('保存エラー:', error);
+            showError('下書きの保存に失敗しました');
+            setLoading(false);
+          })
+          .saveDraftConfiguration(config);
+      }
+
+      // アプリ公開
+      function publishApp() {
+        const appName = document.getElementById('app-name').value;
+        if (!appName.trim()) {
+          showError(
+            'アプリケーション名を入力してください。例：「クラス質問ボード」「理科実験アンケート」'
+          );
+          document.getElementById('app-name').focus();
+          return;
+        }
+
+        // 長すぎる名前をチェック
+        if (appName.trim().length > 50) {
+          showError('アプリケーション名は50文字以内で入力してください。');
+          document.getElementById('app-name').focus();
+          return;
+        }
+
+        const config = gatherConfiguration();
+        config.appName = appName;
+
+        setLoading(true);
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result.success) {
+              showSuccess('アプリを公開しました！');
+              updatePublishStatus('published');
+              updateConfigDisplay(result.config);
+            } else {
+              showError(result.error);
+            }
+            setLoading(false);
+          })
+          .withFailureHandler(function (error) {
+            console.error('公開エラー:', error);
+            showError(
+              'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
+            );
+            setLoading(false);
+          })
+          .publishApplication(config);
+      }
+
+      // 設定収集
+      function gatherConfiguration() {
+        const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
+        
+        let spreadsheetId, sheetName;
+        
+        if (sourceMethod === 'url') {
+          // URL入力方式
+          const urlInput = document.getElementById('spreadsheet-url');
+          const url = urlInput.value.trim();
+          const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+          const match = url.match(spreadsheetRegex);
+          
+          if (match) {
+            spreadsheetId = match[1];
+          }
+          sheetName = document.getElementById('sheet-name-input').value.trim();
+        } else {
+          // 一覧選択方式
+          spreadsheetId = document.getElementById('spreadsheet-select').value;
+          sheetName = document.getElementById('sheet-select').value;
+        }
+        
+        return {
+          spreadsheetId: spreadsheetId,
+          sheetName: sheetName,
+          sourceMethod: sourceMethod,
+          showNames: document.getElementById('show-names').checked,
+          showReactions: document.getElementById('show-reactions').checked,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // 設定表示更新
+      function updateConfigDisplay(config) {
+        document.getElementById('config-json').textContent = JSON.stringify(config, null, 2);
+      }
+
+      // 公開ステータス更新
+      function updatePublishStatus(status) {
+        const badge =
+          document.querySelector('.status-badge.unpublished') ||
+          document.querySelector('.status-badge.published');
+        if (badge) {
+          badge.className = `status-badge ${status}`;
+          badge.textContent = status === 'published' ? '公開中' : '未公開';
+        }
+      }
+
+      // =============================================================================
+      // フッター：現在のボード情報表示機能
+      // =============================================================================
+
+      // グローバル変数
+      let currentBoardInfo = null;
+
+      // ボード情報ロード
+      function loadBoardInfo() {
+        google.script.run
+          .withSuccessHandler(function (boardInfo) {
+            currentBoardInfo = boardInfo;
+            updateFooterDisplay(boardInfo);
+          })
+          .withFailureHandler(function (error) {
+            console.error('ボード情報取得エラー:', error);
+            updateFooterDisplay({
+              isActive: false,
+              questionText: '情報取得エラー',
+              error: error.message,
+            });
+          })
+          .getCurrentBoardInfoAndUrls();
+      }
+
+      // フッター表示更新
+      function updateFooterDisplay(boardInfo) {
+        const footer = document.getElementById('boardInfoFooter');
+        const questionText = document.getElementById('currentQuestionText');
+        const openBtn = document.getElementById('openBoardBtn');
+        const copyBtn = document.getElementById('copyViewUrlBtn');
+        const statusText = document.getElementById('boardStatus');
+
+        // フッターを表示
+        footer.style.display = 'block';
+
+        // 問題文設定
+        questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
+
+        if (boardInfo.isActive && boardInfo.urls) {
+          // ボタン表示・機能設定
+          openBtn.style.display = 'block';
+          copyBtn.style.display = 'block';
+
+          openBtn.onclick = () => window.open(boardInfo.urls.view, '_blank');
+          copyBtn.onclick = () => copyViewUrl(boardInfo.urls.view);
+
+          // ステータス更新
+          statusText.textContent = `最終更新: ${boardInfo.lastUpdated || '不明'}`;
+        } else {
+          // 非アクティブ状態
+          openBtn.style.display = 'none';
+          copyBtn.style.display = 'none';
+          statusText.textContent = boardInfo.error || 'ボードが非アクティブです';
+        }
+      }
+
+      // URLコピー機能（実用重視）
+      function copyViewUrl(url) {
+        if (!url) {
+          showError('コピーするURLがありません');
+          return;
+        }
+
+        // クリップボードにコピー
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(url)
+            .then(() => {
+              showSuccess('閲覧用URLをコピーしました！');
+              // ボタンを一時的に変更してフィードバック
+              const btn = document.getElementById('copyViewUrlBtn');
+              const originalText = btn.textContent;
+              btn.textContent = '✅ コピー完了';
+              btn.disabled = true;
+              setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+              }, 2000);
+            })
+            .catch(() => {
+              fallbackCopyUrl(url);
+            });
+        } else {
+          fallbackCopyUrl(url);
+        }
+      }
+
+      // フォールバック（古いブラウザ用）
+      function fallbackCopyUrl(url) {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          showSuccess('閲覧用URLをコピーしました！');
+        } catch (err) {
+          // 最終手段：URLを表示して手動コピーを促す
+          prompt('以下のURLをコピーしてください:', url);
+        }
+        document.body.removeChild(textarea);
+      }
+
+      console.log('AdminPanel スクリプト読み込み完了');
+    </script>
+  </body>
 </html>
