@@ -6,107 +6,6 @@
 /**
  * 構造化ログマネージャー
  */
-class StructuredLogger {
-  constructor() {
-    this.logLevels = {
-      DEBUG: 0,
-      INFO: 1,
-      WARN: 2,
-      ERROR: 3,
-      FATAL: 4
-    };
-    this.currentLevel = this.logLevels.INFO;
-    this.sessionId = Utilities.getUuid();
-    this.startTime = Date.now();
-  }
-  
-  /**
-   * 構造化ログを出力
-   */
-  log(level, message, metadata = {}) {
-    if (this.logLevels[level] < this.currentLevel) {
-      return; // ログレベルが低い場合はスキップ
-    }
-    
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      level: level,
-      sessionId: this.sessionId,
-      message: message,
-      metadata: metadata,
-      uptime: Date.now() - this.startTime
-    };
-    
-    // レベルに応じた出力先を選択
-    switch (level) {
-      case 'DEBUG':
-        console.log(`[DEBUG] ${JSON.stringify(logEntry)}`);
-        break;
-      case 'INFO':
-        console.log(`[INFO] ${message}`, metadata);
-        break;
-      case 'WARN':
-        console.warn(`[WARN] ${message}`, metadata);
-        break;
-      case 'ERROR':
-      case 'FATAL':
-        console.error(`[${level}] ${message}`, metadata);
-        break;
-    }
-    
-    // 重要なログは永続化（オプション）
-    if (level === 'ERROR' || level === 'FATAL') {
-      this._persistLog(logEntry);
-    }
-  }
-  
-  /**
-   * 重要なログを永続化
-   */
-  _persistLog(logEntry) {
-    try {
-      // PropertiesServiceに最新のエラーログを保存
-      const props = PropertiesService.getScriptProperties();
-      const errorLogs = JSON.parse(props.getProperty('ERROR_LOGS') || '[]');
-      
-      // 最新20件のエラーログを保持
-      errorLogs.push(logEntry);
-      if (errorLogs.length > 20) {
-        errorLogs.shift();
-      }
-      
-      props.setProperty('ERROR_LOGS', JSON.stringify(errorLogs));
-    } catch (error) {
-      console.error('ログ永続化エラー:', error.message);
-    }
-  }
-  
-  /**
-   * パフォーマンス測定開始
-   */
-  startTimer(operationName) {
-    return {
-      name: operationName,
-      startTime: Date.now(),
-      end: () => {
-        const duration = Date.now() - this.startTime;
-        this.log('INFO', `Performance: ${operationName}`, { duration: `${duration}ms` });
-        return duration;
-      }
-    };
-  }
-  
-  // 便利メソッド
-  debug(message, metadata = {}) { this.log('DEBUG', message, metadata); }
-  info(message, metadata = {}) { this.log('INFO', message, metadata); }
-  warn(message, metadata = {}) { this.log('WARN', message, metadata); }
-  error(message, metadata = {}) { this.log('ERROR', message, metadata); }
-  fatal(message, metadata = {}) { this.log('FATAL', message, metadata); }
-}
-
-// グローバルロガーインスタンス
-const monitoringLogger = new StructuredLogger();
-
 /**
  * システム健全性チェック機能
  */
@@ -133,15 +32,16 @@ class SystemHealthChecker {
    * 全てのヘルスチェックを実行
    */
   async runAllChecks() {
-    monitoringLogger.info('システムヘルスチェック開始');
+    console.log('システムヘルスチェック開始');
     const results = new Map();
     let overallStatus = 'healthy';
     
     for (const [name, check] of this.checks) {
       try {
-        const timer = logger.startTimer(`HealthCheck: ${name}`);
+        const startTime = Date.now();
         const result = await this._runSingleCheck(name, check);
-        timer.end();
+        const duration = Date.now() - startTime;
+        console.log(`HealthCheck: ${name} - ${duration}ms`);
         
         results.set(name, result);
         
@@ -152,7 +52,7 @@ class SystemHealthChecker {
         }
         
       } catch (error) {
-        monitoringLogger.error(`ヘルスチェック実行エラー: ${name}`, { error: error.message });
+        console.error(`ヘルスチェック実行エラー: ${name}`, { error: error.message });
         results.set(name, {
           status: 'error',
           message: error.message,
@@ -175,7 +75,7 @@ class SystemHealthChecker {
       summary: this._generateSummary(results)
     };
     
-    monitoringLogger.info('システムヘルスチェック完了', { status: overallStatus });
+    console.log('システムヘルスチェック完了', { status: overallStatus });
     return healthReport;
   }
   
@@ -243,7 +143,7 @@ const healthChecker = new SystemHealthChecker();
  * システム診断機能
  */
 function performSystemDiagnostics() {
-  monitoringLogger.info('システム診断開始');
+  console.log('システム診断開始');
   const diagnostics = {
     timestamp: new Date().toISOString(),
     environment: {},
@@ -283,11 +183,11 @@ function performSystemDiagnostics() {
       monitoring: typeof logger !== 'undefined'
     };
     
-    monitoringLogger.info('システム診断完了');
+    console.log('システム診断完了');
     return diagnostics;
     
   } catch (error) {
-    monitoringLogger.error('システム診断エラー', { error: error.message });
+    console.error('システム診断エラー', { error: error.message });
     diagnostics.error = error.message;
     return diagnostics;
   }
@@ -349,7 +249,7 @@ function initializeHealthChecks() {
     }
   }, { critical: false, description: 'メモリ使用量確認' });
   
-  monitoringLogger.info('ヘルスチェック項目初期化完了');
+  console.log('ヘルスチェック項目初期化完了');
 }
 
 /**
@@ -357,7 +257,7 @@ function initializeHealthChecks() {
  */
 function getMonitoringDashboard() {
   try {
-    const timer = logger.startTimer('MonitoringDashboard');
+    const startTime = Date.now();
     
     // 各種統計情報を収集
     const dashboard = {
@@ -376,11 +276,12 @@ function getMonitoringDashboard() {
       uptime: Date.now() - executionStartTime
     };
     
-    timer.end();
+    const duration = Date.now() - startTime;
+    console.log(`MonitoringDashboard - ${duration}ms`);
     return dashboard;
     
   } catch (error) {
-    monitoringLogger.error('監視ダッシュボードデータ取得エラー', { error: error.message });
+    console.error('監視ダッシュボードデータ取得エラー', { error: error.message });
     return {
       timestamp: new Date().toISOString(),
       error: error.message
@@ -397,7 +298,7 @@ function getRecentErrors() {
     const errorLogs = JSON.parse(props.getProperty('ERROR_LOGS') || '[]');
     return errorLogs.slice(-10); // 最新10件
   } catch (error) {
-    monitoringLogger.warn('エラーログ取得失敗', { error: error.message });
+    console.warn('エラーログ取得失敗', { error: error.message });
     return [];
   }
 }
@@ -408,11 +309,11 @@ function getRecentErrors() {
 function runScheduledHealthCheck() {
   return healthChecker.runAllChecks()
     .then(result => {
-      monitoringLogger.info('定期ヘルスチェック完了', { status: result.overall });
+      console.log('定期ヘルスチェック完了', { status: result.overall });
       return result;
     })
     .catch(error => {
-      monitoringLogger.error('定期ヘルスチェックエラー', { error: error.message });
+      console.error('定期ヘルスチェックエラー', { error: error.message });
       return {
         overall: 'error',
         timestamp: new Date().toISOString(),
@@ -424,7 +325,7 @@ function runScheduledHealthCheck() {
 // 初期化
 try {
   initializeHealthChecks();
-  monitoringLogger.info('監視システム初期化完了');
+  console.log('監視システム初期化完了');
 } catch (error) {
   console.error('監視システム初期化エラー:', error.message);
 }

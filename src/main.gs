@@ -276,35 +276,7 @@ var ULTRA_CONFIG = {
  * 簡素化されたエラーハンドリング関数群
  */
 
-// ログ出力の最適化
-function log(level, message, details) {
-  try {
-    if (typeof globalProfiler !== 'undefined') {
-      globalProfiler.start('logging');
-    }
-
-    if (level === 'info' && !DEBUG) {
-      return;
-    }
-
-    switch (level) {
-      case 'error':
-        console.error(message, details || '');
-        break;
-      case 'warn':
-        console.warn(message, details || '');
-        break;
-      default:
-        console.log(message, details || '');
-    }
-    
-    if (typeof globalProfiler !== 'undefined') {
-      globalProfiler.end('logging');
-    }
-  } catch (e) {
-    // ログ出力自体が失敗した場合は無視
-  }
-}
+// ログ関数は削除 - GAS ネイティブ console を直接使用
 
 
 
