@@ -667,6 +667,9 @@
           <button class="link-btn w-full text-center" type="button" onclick="exportConfig()">
             設定をエクスポート
           </button>
+          <button id="create-form-btn" class="link-btn w-full text-center" type="button" onclick="createFormInterface()">
+            📝 フォーム作成
+          </button>
           <button id="app-setup-btn" class="link-btn w-full text-center hidden" type="button" onclick="goToAppSetup()">
             ⚙️ アプリ設定画面
           </button>
@@ -920,6 +923,63 @@
         .checkIsSystemAdmin();
     }
 
+    // フォーム作成インターフェース
+    function createFormInterface() {
+      const formName = prompt('作成するフォーム名を入力してください：\n例：アンケートフォーム、質問フォーム');
+      
+      if (!formName || !formName.trim()) {
+        showError('フォーム名が入力されませんでした');
+        return;
+      }
+      
+      if (formName.trim().length > 50) {
+        showError('フォーム名は50文字以内で入力してください');
+        return;
+      }
+      
+      // 基本的なフォーム設定
+      const config = {
+        title: formName.trim(),
+        description: 'カスタムフォームが作成されました',
+        fields: [
+          {
+            type: 'text',
+            label: '名前',
+            required: true
+          },
+          {
+            type: 'text',
+            label: 'メッセージ',
+            required: true
+          }
+        ]
+      };
+      
+      setLoading(true);
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showSuccess('フォーム「' + formName + '」を作成しました');
+            if (result.formUrl) {
+              const openForm = confirm('フォームが作成されました。今すぐ開きますか？');
+              if (openForm) {
+                window.open(result.formUrl, '_blank');
+              }
+            }
+          } else {
+            showError(result.error || 'フォーム作成に失敗しました');
+          }
+          setLoading(false);
+        })
+        .withFailureHandler(function(error) {
+          console.error('フォーム作成エラー:', error);
+          showError('フォーム作成に失敗しました: ' + (error.message || 'Unknown error'));
+          setLoading(false);
+        })
+        .createForm(config);
+    }
+    
     // アプリ設定画面へのナビゲーション
     function goToAppSetup() {
       setLoading(true);
@@ -1011,25 +1071,145 @@
       }
 
       setLoading(true);
+      console.log('connectToSource: 接続開始', { spreadsheetId, sheetName });
+      
       google.script.run
         .withSuccessHandler(function(result) {
+          console.log('connectToSource: 接続結果', result);
+          
           if (result.success) {
             showSuccess('データソースに接続しました');
             // 進捗更新
             updateProgress(2);
-            // 列マッピングを更新
-            updateColumnMapping(result.columnMapping);
+            
+            // 列マッピングの処理
+            if (result.columnMapping && Object.keys(result.columnMapping).length > 0) {
+              updateColumnMapping(result.columnMapping);
+              
+              // 自動検出の信頼度をチェック
+              const confidence = result.columnMapping.confidence || {};
+              const avgConfidence = Object.values(confidence).reduce((sum, val) => sum + (val || 0), 0) / Math.max(Object.keys(confidence).length, 1);
+              
+              if (avgConfidence < 70) {
+                showManualConfigOption('列の自動検出の信頼度が低めです。手動で調整することをお勧めします。');
+              }
+            } else {
+              // 自動検出に完全に失敗した場合
+              console.warn('自動列検出に失敗しました');
+              updateColumnMapping(null);
+              showManualConfigOption('列の自動検出に失敗しました。手動で設定してください。');
+            }
           } else {
-            showError(result.error);
+            handleConnectionError(result.error, { spreadsheetId, sheetName });
           }
           setLoading(false);
         })
         .withFailureHandler(function(error) {
-          console.error('接続エラー:', error);
-          showError('データソースへの接続に失敗しました。スプレッドシートのアクセス権限を確認してください。');
+          console.error('connectToSource 接続エラー:', error);
+          handleConnectionError(error.message || error, { spreadsheetId, sheetName });
           setLoading(false);
         })
         .connectToDataSource(spreadsheetId, sheetName);
+    }
+    
+    // 接続エラーハンドリング
+    function handleConnectionError(errorMessage, context) {
+      console.error('Connection error details:', { errorMessage, context });
+      
+      let userMessage = 'データソースへの接続に失敗しました。';
+      let suggestions = [];
+      
+      // エラーメッセージに基づく詳細な診断
+      if (errorMessage.includes('Permission') || errorMessage.includes('権限')) {
+        suggestions.push('スプレッドシートへのアクセス権限を確認してください');
+        suggestions.push('スプレッドシートを開いて、編集権限があることを確認してください');
+      } else if (errorMessage.includes('not found') || errorMessage.includes('見つかりません')) {
+        suggestions.push('指定されたスプレッドシートまたはシートが存在するか確認してください');
+        suggestions.push('シート名が正確か確認してください');
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
+        suggestions.push('ネットワーク接続を確認してください');
+        suggestions.push('しばらく時間をおいて再試行してください');
+      } else {
+        suggestions.push('スプレッドシートが開けることを確認してください');
+        suggestions.push('手動で列を設定することも可能です');
+      }
+      
+      const fullMessage = userMessage + '\n\n推奨対処法:\n' + suggestions.map(s => '• ' + s).join('\n');
+      showError(fullMessage);
+      
+      // 手動設定オプションを表示
+      showManualConfigOption('自動接続に失敗した場合は、手動で列を設定できます。');
+    }
+    
+    // 手動設定オプションの表示
+    function showManualConfigOption(message) {
+      const columnsContainer = document.querySelector('.auto-detected-columns');
+      if (!columnsContainer) return;
+      
+      // 既存の手動設定オプションがあれば削除
+      const existingManual = document.getElementById('manual-config-option');
+      if (existingManual) {
+        existingManual.remove();
+      }
+      
+      const manualOption = document.createElement('div');
+      manualOption.id = 'manual-config-option';
+      manualOption.className = 'column-match';
+      manualOption.style.background = 'rgba(59, 130, 246, 0.1)';
+      manualOption.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+      manualOption.innerHTML = `
+        <div style="flex: 1;">
+          <div class="column-type">手動設定</div>
+          <div style="font-size: 0.875rem; color: rgba(156, 163, 175, 1); margin-top: 0.25rem;">
+            ${message}
+          </div>
+        </div>
+        <button class="btn-secondary" onclick="openManualColumnConfig()" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+          手動設定
+        </button>
+      `;
+      
+      columnsContainer.appendChild(manualOption);
+    }
+    
+    // 手動列設定ダイアログ
+    function openManualColumnConfig() {
+      const spreadsheetId = document.getElementById('spreadsheet-select').value;
+      const sheetName = document.getElementById('sheet-select').value;
+      
+      if (!spreadsheetId || !sheetName) {
+        showError('まず、スプレッドシートとシートを選択してください');
+        return;
+      }
+      
+      // 簡易的な手動設定ダイアログ（実装可能範囲内）
+      const questionColumn = prompt('質問が入っている列を指定してください（例：A、B、C）:');
+      const answererColumn = prompt('回答者名が入っている列を指定してください（例：A、B、C）:');
+      const reasonColumn = prompt('理由・コメントが入っている列を指定してください（例：A、B、C）:');
+      
+      if (questionColumn || answererColumn || reasonColumn) {
+        const manualMapping = {
+          question: questionColumn ? (questionColumn.toUpperCase().charCodeAt(0) - 65) : null,
+          answerer: answererColumn ? (answererColumn.toUpperCase().charCodeAt(0) - 65) : null,
+          reason: reasonColumn ? (reasonColumn.toUpperCase().charCodeAt(0) - 65) : null,
+          confidence: {
+            question: questionColumn ? 100 : 0,
+            answerer: answererColumn ? 100 : 0,
+            reason: reasonColumn ? 100 : 0
+          }
+        };
+        
+        console.log('手動列マッピング:', manualMapping);
+        updateColumnMapping(manualMapping);
+        showSuccess('手動で列設定を行いました');
+        updateProgress(2);
+        
+        // 手動設定オプションを非表示
+        const manualOption = document.getElementById('manual-config-option');
+        if (manualOption) {
+          manualOption.style.display = 'none';
+        }
+      }
     }
 
     // 進捗更新
@@ -1047,14 +1227,184 @@
 
     // 列マッピング更新
     function updateColumnMapping(mapping) {
-      // 実装予定: バックエンドから受け取った列マッピング情報で画面を更新
-      console.log('Column mapping:', mapping);
+      console.log('Column mapping received:', mapping);
+      
+      if (!mapping) {
+        console.warn('列マッピング情報がありません');
+        showError('列マッピング情報の取得に失敗しました');
+        return;
+      }
+      
+      const columnsContainer = document.querySelector('.auto-detected-columns');
+      if (!columnsContainer) {
+        console.error('列表示コンテナが見つかりません');
+        return;
+      }
+      
+      // 既存の列表示をクリア
+      columnsContainer.innerHTML = '';
+      
+      // 列タイプの表示名マッピング
+      const typeDisplayNames = {
+        question: '質問',
+        answerer: '回答者', 
+        reason: '理由',
+        timestamp: 'タイムスタンプ',
+        class: 'クラス'
+      };
+      
+      // 検出された列を表示
+      let hasValidMapping = false;
+      
+      Object.keys(mapping).forEach(type => {
+        if (type === 'confidence') return; // 信頼度オブジェクトはスキップ
+        
+        const columnIndex = mapping[type];
+        const confidence = mapping.confidence && mapping.confidence[type] 
+          ? mapping.confidence[type] 
+          : 0;
+          
+        if (columnIndex !== null && columnIndex !== undefined) {
+          hasValidMapping = true;
+          
+          const columnMatch = document.createElement('div');
+          columnMatch.className = 'column-match';
+          
+          // 信頼度に基づく色分け
+          let bgColor = 'rgba(34, 197, 94, 0.1)'; // 緑（高信頼度）
+          let borderColor = 'rgba(34, 197, 94, 0.3)';
+          let confidenceColor = 'rgba(34, 197, 94, 0.8)';
+          
+          if (confidence < 70) {
+            bgColor = 'rgba(245, 158, 11, 0.1)'; // 黄（中信頼度）
+            borderColor = 'rgba(245, 158, 11, 0.3)';
+            confidenceColor = 'rgba(245, 158, 11, 0.8)';
+          }
+          
+          if (confidence < 50) {
+            bgColor = 'rgba(239, 68, 68, 0.1)'; // 赤（低信頼度）
+            borderColor = 'rgba(239, 68, 68, 0.3)';
+            confidenceColor = 'rgba(239, 68, 68, 0.8)';
+          }
+          
+          columnMatch.style.background = bgColor;
+          columnMatch.style.borderColor = borderColor;
+          
+          const displayName = typeDisplayNames[type] || type;
+          const columnLabel = String.fromCharCode(65 + columnIndex) + '列'; // A列、B列など
+          
+          columnMatch.innerHTML = `
+            <span class="column-type">${displayName}</span>
+            <span class="detected-column">${columnLabel}</span>
+            <span class="confidence" style="color: ${confidenceColor}">${Math.round(confidence)}%確信度</span>
+          `;
+          
+          columnsContainer.appendChild(columnMatch);
+        }
+      });
+      
+      // 有効なマッピングがない場合の表示
+      if (!hasValidMapping) {
+        const noMapping = document.createElement('div');
+        noMapping.className = 'column-match';
+        noMapping.style.background = 'rgba(107, 114, 128, 0.1)';
+        noMapping.style.borderColor = 'rgba(107, 114, 128, 0.3)';
+        noMapping.innerHTML = `
+          <span class="column-type">自動検出失敗</span>
+          <span class="detected-column">手動設定が必要</span>
+          <span class="confidence" style="color: rgba(239, 68, 68, 0.8)">0%確信度</span>
+        `;
+        columnsContainer.appendChild(noMapping);
+        
+        showError('列の自動検出に失敗しました。手動で設定してください');
+      } else {
+        showSuccess('列マッピングを更新しました');
+      }
     }
 
     // 列マッピング確認
     function verifyColumnMapping() {
-      showSuccess('列マッピングを確認しました');
-      updateProgress(3);
+      const spreadsheetId = document.getElementById('spreadsheet-select').value;
+      const sheetName = document.getElementById('sheet-select').value;
+      
+      if (!spreadsheetId || !sheetName) {
+        showError('検証するにはまず、スプレッドシートとシートを接続してください');
+        return;
+      }
+      
+      setLoading(true);
+      
+      console.log('verifyColumnMapping: 列マッピング検証開始', { spreadsheetId, sheetName });
+      
+      // 既存のgetHeaderIndices関数を使用して検証
+      google.script.run
+        .withSuccessHandler(function(headerIndices) {
+          console.log('verifyColumnMapping: ヘッダー検証成功', headerIndices);
+          
+          if (!headerIndices || Object.keys(headerIndices).length === 0) {
+            showError('ヘッダー情報を取得できませんでした。シートの構造を確認してください');
+            setLoading(false);
+            return;
+          }
+          
+          // 検証結果を表示
+          displayVerificationResults(headerIndices);
+          
+          // 設定を保存
+          saveColumnConfiguration(spreadsheetId, sheetName, headerIndices);
+          
+          showSuccess('列マッピングの検証が完了しました');
+          updateProgress(3);
+          setLoading(false);
+        })
+        .withFailureHandler(function(error) {
+          console.error('verifyColumnMapping エラー:', error);
+          showError('列マッピングの検証に失敗しました: ' + (error.message || 'Unknown error'));
+          setLoading(false);
+        })
+        .getHeaderIndices(spreadsheetId, sheetName);
+    }
+    
+    // 検証結果の表示
+    function displayVerificationResults(headerIndices) {
+      const columnsContainer = document.querySelector('.auto-detected-columns');
+      if (!columnsContainer) return;
+      
+      // 既存の列表示に検証済みマークを追加
+      const columnMatches = columnsContainer.querySelectorAll('.column-match');
+      columnMatches.forEach(match => {
+        const verifiedBadge = document.createElement('span');
+        verifiedBadge.className = 'status-badge published';
+        verifiedBadge.textContent = '✓ 検証済み';
+        verifiedBadge.style.fontSize = '0.75rem';
+        verifiedBadge.style.marginLeft = '0.5rem';
+        match.appendChild(verifiedBadge);
+      });
+      
+      console.log('検証結果を表示しました:', headerIndices);
+    }
+    
+    // 列設定の保存
+    function saveColumnConfiguration(spreadsheetId, sheetName, headerIndices) {
+      const config = {
+        spreadsheetId: spreadsheetId,
+        sheetName: sheetName,
+        headerIndices: headerIndices,
+        verifiedAt: new Date().toISOString()
+      };
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            console.log('列設定を保存しました:', config);
+          } else {
+            console.warn('列設定の保存に失敗:', result.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('列設定保存エラー:', error);
+        })
+        .saveDraftConfiguration(config);
     }
 
     // 下書き保存

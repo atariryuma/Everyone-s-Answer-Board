@@ -117,13 +117,19 @@ function connectToDataSource(spreadsheetId, sheetName) {
     const userInfo = DB.findUserByEmail(currentUser);
     
     if (userInfo) {
+      // 既存システム互換の列マッピングを作成
+      const compatibleMapping = convertToCompatibleMapping(columnMapping, headerRow);
+      
       // ユーザーのスプレッドシート設定を更新
       updateUserSpreadsheetConfig(userInfo.userId, {
         spreadsheetId: spreadsheetId,
         sheetName: sheetName,
-        columnMapping: columnMapping,
+        columnMapping: columnMapping,        // AdminPanel用の形式
+        compatibleMapping: compatibleMapping, // Core.gs互換形式
         lastConnected: new Date().toISOString()
       });
+      
+      console.log('connectToDataSource: 互換形式も保存', { columnMapping, compatibleMapping });
     }
     
     console.log('connectToDataSource: 接続成功', columnMapping);
@@ -626,6 +632,80 @@ function checkIsSystemAdmin() {
   } catch (error) {
     console.error('checkIsSystemAdmin エラー:', error);
     return false;
+  }
+}
+
+/**
+ * AdminPanel用の列マッピングを既存システム互換の形式に変換
+ * @param {Object} columnMapping - AdminPanel用の列マッピング
+ * @param {Array<string>} headerRow - ヘッダー行の配列
+ * @returns {Object} Core.gs互換の形式
+ */
+function convertToCompatibleMapping(columnMapping, headerRow) {
+  try {
+    const compatibleMapping = {};
+    
+    // AdminPanel形式から既存システムのCOLUMN_HEADERS形式に変換
+    const mappingConversions = {
+      'question': 'OPINION',      // 質問 → 回答（既存システムでは意見/回答として扱う）
+      'answerer': 'NAME',         // 回答者 → 名前
+      'reason': 'REASON',         // 理由 → 理由
+      'timestamp': 'TIMESTAMP',   // タイムスタンプ → タイムスタンプ
+      'class': 'CLASS'           // クラス → クラス
+    };
+    
+    // 既存のCOLUMN_HEADERSと対応する実際の列名
+    const columnHeaders = {
+      'TIMESTAMP': 'タイムスタンプ',
+      'EMAIL': 'メールアドレス', 
+      'CLASS': 'クラス',
+      'OPINION': '回答',
+      'REASON': '理由',
+      'NAME': '名前',
+      'UNDERSTAND': 'なるほど！',
+      'LIKE': 'いいね！',
+      'CURIOUS': 'もっと知りたい！',
+      'HIGHLIGHT': 'ハイライト'
+    };
+    
+    // AdminPanel形式を既存システム形式に変換
+    Object.keys(columnMapping).forEach(key => {
+      if (key === 'confidence') return; // 信頼度は変換対象外
+      
+      const columnIndex = columnMapping[key];
+      if (columnIndex !== null && columnIndex !== undefined) {
+        const systemKey = mappingConversions[key];
+        if (systemKey) {
+          compatibleMapping[columnHeaders[systemKey]] = columnIndex;
+        }
+      }
+    });
+    
+    // 必須列の自動検出を試行
+    headerRow.forEach((header, index) => {
+      const headerLower = header.toString().toLowerCase();
+      
+      // メールアドレス列の検出
+      if (headerLower.includes('mail') || headerLower.includes('メール')) {
+        compatibleMapping[columnHeaders.EMAIL] = index;
+      }
+      
+      // タイムスタンプ列の検出
+      if (headerLower.includes('timestamp') || headerLower.includes('タイムスタンプ') || headerLower.includes('時刻')) {
+        compatibleMapping[columnHeaders.TIMESTAMP] = index;
+      }
+    });
+    
+    console.log('convertToCompatibleMapping: 変換結果', {
+      original: columnMapping,
+      compatible: compatibleMapping
+    });
+    
+    return compatibleMapping;
+    
+  } catch (error) {
+    console.error('convertToCompatibleMapping エラー:', error);
+    return {};
   }
 }
 
