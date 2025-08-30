@@ -134,7 +134,7 @@ function connectDataSource(spreadsheetId, sheetName) {
     }
 
     // 設定を保存（既存のユーザー管理システムを活用）
-    const currentUser = coreGetCurrentUserEmail();
+    const currentUser = User.email();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (userInfo) {
@@ -485,7 +485,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
     }
 
     // 設定を保存（既存システム互換）
-    const currentUser = coreGetCurrentUserEmail();
+    const currentUser = User.email();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (userInfo) {
@@ -643,7 +643,7 @@ function getCurrentConfig() {
   try {
     console.log('getCurrentConfig: 設定情報取得開始');
 
-    const currentUser = coreGetCurrentUserEmail();
+    const currentUser = User.email();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
@@ -713,7 +713,7 @@ function saveDraftConfiguration(config) {
   try {
     console.log('saveDraftConfiguration: 下書き保存開始', config);
 
-    const currentUser = coreGetCurrentUserEmail();
+    const currentUser = User.email();
     let userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
@@ -760,7 +760,7 @@ function publishApplication(config) {
   try {
     console.log('publishApplication: アプリ公開開始', config);
 
-    const currentUser = coreGetCurrentUserEmail();
+    const currentUser = User.email();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
