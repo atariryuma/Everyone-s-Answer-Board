@@ -1,0 +1,261 @@
+<script>
+  /**
+   * バックエンド進捗同期システム
+   * フロントエンドのプログレス表示とバックエンド処理の実時間同期を実現
+   */
+
+  class BackendProgressSync {
+    constructor() {
+      this.progressCallbacks = new Map();
+      this.pollingIntervals = new Map();
+      this.activeFlows = new Set();
+      this.progressCache = new Map();
+      this.isEnabled = true;
+    }
+
+    /**
+     * 進捗同期を開始
+     * @param {string} flowId - フロー識別子
+     * @param {Function} callback - 進捗更新コールバック
+     */
+    startSync(flowId, callback) {
+      if (!this.isEnabled) {
+        console.log('🔕 BackendProgressSync is disabled');
+        return;
+      }
+
+      console.log(`🔄 Starting progress sync for flow: ${flowId}`);
+
+      this.progressCallbacks.set(flowId, callback);
+      this.activeFlows.add(flowId);
+      this.beginPolling(flowId);
+    }
+
+    /**
+     * バックエンドポーリングを開始
+     * @param {string} flowId - フロー識別子
+     */
+    beginPolling(flowId) {
+      // 既存のポーリングを停止
+      this.stopPolling(flowId);
+
+      const pollingInterval = setInterval(async () => {
+        try {
+          const progress = await this.fetchBackendProgress(flowId);
+          const callback = this.progressCallbacks.get(flowId);
+
+          if (callback && progress) {
+            // 進捗が変化した場合のみコールバック実行
+            const cachedProgress = this.progressCache.get(flowId);
+            if (!cachedProgress || this.hasProgressChanged(cachedProgress, progress)) {
+              callback(progress);
+              this.progressCache.set(flowId, { ...progress });
+            }
+          }
+
+          // フローが完了した場合はポーリング停止
+          if (progress && (progress.completed || progress.error)) {
+            this.stopSync(flowId);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Progress polling error for ${flowId}:`, error);
+
+          // 連続エラーが発生した場合はポーリング停止
+          if (this.shouldStopOnError(flowId, error)) {
+            this.stopSync(flowId);
+          }
+        }
+      }, SYSTEM_CONSTANTS.TIMEOUTS.POLLING_INTERVAL);
+
+      this.pollingIntervals.set(flowId, pollingInterval);
+    }
+
+    /**
+     * バックエンドから進捗を取得
+     * @param {string} flowId - フロー識別子
+     * @returns {Promise<Object>} 進捗情報
+     */
+    async fetchBackendProgress(flowId) {
+      try {
+        // Google Apps Scriptでのprogress取得実装
+        const response = await new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error('Progress fetch timeout'));
+          }, 10000); // 10秒タイムアウト
+
+          google.script.run
+            .withSuccessHandler((result) => {
+              clearTimeout(timeoutId);
+              resolve(result);
+            })
+            .withFailureHandler((error) => {
+              clearTimeout(timeoutId);
+              reject(error);
+            })
+            .getFlowProgress(flowId);
+        });
+
+        return this.parseProgressResponse(response);
+      } catch (error) {
+        // getFlowProgress関数が存在しない場合の特別なハンドリング
+        if (error.message && error.message.includes('getFlowProgress is not a function')) {
+          console.log(`ℹ️ Backend progress sync not available for ${flowId}, using fallback mode`);
+          this.isEnabled = false; // 将来のリクエストを無効化
+          return null;
+        }
+
+        console.warn(`⚠️ Failed to fetch progress for ${flowId}:`, error);
+        return null;
+      }
+    }
+
+    /**
+     * 進捗レスポンスをパース
+     * @param {Object} response - バックエンドからのレスポンス
+     * @returns {Object} パース済み進捗情報
+     */
+    parseProgressResponse(response) {
+      if (!response || typeof response !== 'object') {
+        return null;
+      }
+
+      return {
+        flowId: response.flowId,
+        currentStep: response.currentStep || 0,
+        totalSteps: response.totalSteps || 7,
+        stepName: response.stepName || '',
+        stepDetail: response.stepDetail || '',
+        progress: response.progress || 0,
+        estimatedTimeRemaining: response.estimatedTimeRemaining || 0,
+        completed: response.completed || false,
+        error: response.error || false,
+        errorMessage: response.errorMessage || '',
+        timestamp: response.timestamp || Date.now(),
+      };
+    }
+
+    /**
+     * 進捗が変化したかチェック
+     * @param {Object} oldProgress - 前回の進捗
+     * @param {Object} newProgress - 新しい進捗
+     * @returns {boolean} 変化があった場合true
+     */
+    hasProgressChanged(oldProgress, newProgress) {
+      if (!oldProgress || !newProgress) return true;
+
+      return (
+        oldProgress.currentStep !== newProgress.currentStep ||
+        oldProgress.progress !== newProgress.progress ||
+        oldProgress.stepName !== newProgress.stepName ||
+        oldProgress.completed !== newProgress.completed ||
+        oldProgress.error !== newProgress.error
+      );
+    }
+
+    /**
+     * エラー時にポーリングを停止すべきかチェック
+     * @param {string} flowId - フロー識別子
+     * @param {Error} error - エラーオブジェクト
+     * @returns {boolean} 停止すべき場合true
+     */
+    shouldStopOnError(flowId, error) {
+      // 特定のエラータイプではポーリング継続
+      const continuableErrors = ['Network error', 'Temporary unavailable', 'Rate limit exceeded'];
+
+      const errorMessage = error.message || '';
+      return !continuableErrors.some((continuableError) => errorMessage.includes(continuableError));
+    }
+
+    /**
+     * 進捗同期を停止
+     * @param {string} flowId - フロー識別子
+     */
+    stopSync(flowId) {
+      console.log(`🛑 Stopping progress sync for flow: ${flowId}`);
+
+      this.stopPolling(flowId);
+      this.progressCallbacks.delete(flowId);
+      this.activeFlows.delete(flowId);
+      this.progressCache.delete(flowId);
+    }
+
+    /**
+     * ポーリングを停止
+     * @param {string} flowId - フロー識別子
+     */
+    stopPolling(flowId) {
+      const intervalId = this.pollingIntervals.get(flowId);
+      if (intervalId) {
+        clearInterval(intervalId);
+        this.pollingIntervals.delete(flowId);
+      }
+    }
+
+    /**
+     * 全ての同期を停止
+     */
+    stopAllSync() {
+      console.log('🛑 Stopping all progress sync');
+
+      for (const flowId of this.activeFlows) {
+        this.stopSync(flowId);
+      }
+    }
+
+    /**
+     * システムを無効化
+     */
+    disable() {
+      this.isEnabled = false;
+      this.stopAllSync();
+    }
+
+    /**
+     * システムを有効化
+     */
+    enable() {
+      this.isEnabled = true;
+    }
+
+    /**
+     * アクティブなフロー数を取得
+     * @returns {number} アクティブフロー数
+     */
+    getActiveFlowCount() {
+      return this.activeFlows.size;
+    }
+
+    /**
+     * デバッグ情報を取得
+     * @returns {Object} デバッグ情報
+     */
+    getDebugInfo() {
+      return {
+        isEnabled: this.isEnabled,
+        activeFlows: Array.from(this.activeFlows),
+        activeCallbacks: this.progressCallbacks.size,
+        activePolling: this.pollingIntervals.size,
+        cachedProgress: Object.fromEntries(this.progressCache),
+      };
+    }
+  }
+
+  // グローバルインスタンスを作成
+  window.backendProgressSync = new BackendProgressSync();
+
+  // 便利な関数をエクスポート
+  window.startProgressSync = (flowId, callback) => {
+    return window.backendProgressSync.startSync(flowId, callback);
+  };
+
+  window.stopProgressSync = (flowId) => {
+    return window.backendProgressSync.stopSync(flowId);
+  };
+
+  // ページアンロード時のクリーンアップ
+  window.addEventListener('beforeunload', () => {
+    window.backendProgressSync.stopAllSync();
+  });
+
+  console.log('✅ BackendProgressSync initialized');
+</script>

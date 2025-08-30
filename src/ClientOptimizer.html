@@ -1,0 +1,309 @@
+<script>
+/**
+ * @fileoverview クライアントサイド最適化ユーティリティ
+ * GAS HTML Service用の最適化されたクライアント関数群
+ */
+
+class GASOptimizer {
+  constructor() {
+    this.cache = new Map();
+    this.loadingStates = new Map();
+    this.concurrentLimit = 10;
+    this.activeCalls = 0;
+    this.callQueue = [];
+  }
+
+  /**
+   * Promise化されたgoogle.script.run呼び出し
+   * @param {string} functionName - 呼び出す関数名
+   * @param {...any} args - 関数の引数
+   * @returns {Promise} 結果のPromise
+   */
+  async call(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      // 同時実行制限の確認
+      if (this.activeCalls >= this.concurrentLimit) {
+        this.callQueue.push(() => this.executeCall(functionName, args, resolve, reject));
+        return;
+      }
+
+      this.executeCall(functionName, args, resolve, reject);
+    });
+  }
+
+  /**
+   * 実際の関数呼び出し実行
+   */
+  executeCall(functionName, args, resolve, reject) {
+    this.activeCalls++;
+    
+    // ローディング状態の管理
+    this.setLoadingState(functionName, true);
+
+    // GAS function call validation
+    if (typeof google === 'undefined' || !google.script || !google.script.run || typeof google.script.run[functionName] !== 'function') {
+      throw new Error(`GAS function '${functionName}' is not available`);
+    }
+
+    google.script.run
+      .withSuccessHandler((result) => {
+        this.activeCalls--;
+        this.setLoadingState(functionName, false);
+        resolve(result);
+        this.processQueue();
+      })
+      .withFailureHandler((error) => {
+        this.activeCalls--;
+        this.setLoadingState(functionName, false);
+        console.error(`GAS Function Error [${functionName}]:`, error);
+        reject(this.enhanceError(error, functionName));
+        this.processQueue();
+      })[functionName](...args);
+  }
+
+  /**
+   * キューの処理
+   */
+  processQueue() {
+    if (this.callQueue.length > 0 && this.activeCalls < this.concurrentLimit) {
+      const nextCall = this.callQueue.shift();
+      nextCall();
+    }
+  }
+
+  /**
+   * エラー情報の拡張
+   */
+  enhanceError(error, functionName) {
+    return {
+      ...error,
+      function: functionName,
+      timestamp: new Date().toISOString(),
+      userMessage: this.getUserFriendlyErrorMessage(error.message)
+    };
+  }
+
+  /**
+   * ユーザーフレンドリーなエラーメッセージ
+   */
+  getUserFriendlyErrorMessage(originalMessage) {
+    const errorMap = {
+      'Exception: 認証エラー': 'ログインセッションが期限切れです。ページを更新してから再度お試しください。',
+      'Exception: 無効なユーザーID': 'アクセス権限に問題があります。管理者にお問い合わせください。',
+      'Exception: データベース': 'データの保存に失敗しました。しばらく待ってから再度お試しください。',
+      'ScriptError': 'システムエラーが発生しました。管理者にお問い合わせください。'
+    };
+
+    for (const [key, message] of Object.entries(errorMap)) {
+      if (originalMessage && originalMessage.includes(key)) {
+        return message;
+      }
+    }
+    
+    return '予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
+  }
+
+  /**
+   * ローディング状態の管理
+   */
+  setLoadingState(functionName, isLoading) {
+    this.loadingStates.set(functionName, isLoading);
+    this.updateGlobalLoadingIndicator();
+  }
+
+  /**
+   * グローバルローディングインジケーターの更新
+   */
+  updateGlobalLoadingIndicator() {
+    const hasActiveLoading = Array.from(this.loadingStates.values()).some(state => state);
+    document.body.classList.toggle('gas-loading', hasActiveLoading);
+  }
+
+  /**
+   * キャッシュ付きの関数呼び出し
+   */
+  async callWithCache(functionName, args, ttl = 5 * 60 * 1000) {
+    const cacheKey = `${functionName}_${JSON.stringify(args)}`;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp) < ttl) {
+      return cached.data;
+    }
+
+    const result = await this.call(functionName, ...args);
+    this.cache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+
+    return result;
+  }
+
+  /**
+   * バッチ処理対応の関数呼び出し
+   */
+  async batchCall(calls) {
+    const promises = calls.map(({ functionName, args }) => 
+      this.call(functionName, ...args).catch(error => ({ error, functionName }))
+    );
+
+    return Promise.all(promises);
+  }
+
+  /**
+   * キャッシュのクリア
+   */
+  clearCache() {
+    this.cache.clear();
+  }
+
+  /**
+   * 統計情報の取得
+   */
+  getStats() {
+    return {
+      activeCalls: this.activeCalls,
+      queueLength: this.callQueue.length,
+      cacheSize: this.cache.size,
+      loadingStates: Object.fromEntries(this.loadingStates)
+    };
+  }
+}
+
+// グローバルインスタンスの作成
+window.gasOptimizer = new GASOptimizer();
+
+/**
+ * 便利な関数のエイリアス
+ */
+window.gasCall = (functionName, ...args) => window.gasOptimizer.call(functionName, ...args);
+window.gasCacheCall = (functionName, args, ttl) => window.gasOptimizer.callWithCache(functionName, args, ttl);
+
+/**
+ * メッセージ表示の最適化
+ */
+class MessageManager {
+  constructor() {
+    this.messageContainer = null;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init());
+    } else {
+      this.init();
+    }
+  }
+
+  init() {
+    // メッセージコンテナの作成
+    if (!document.getElementById('gas-message-container')) {
+      const container = document.createElement('div');
+      container.id = 'gas-message-container';
+      container.className = 'fixed top-4 right-4 z-50 space-y-2';
+      document.body.appendChild(container);
+      this.messageContainer = container;
+    }
+  }
+
+  show(message, type = 'info', duration = 5000) {
+    const messageEl = document.createElement('div');
+    messageEl.className = `
+      p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full
+      ${this.getTypeClasses(type)}
+    `;
+    messageEl.innerHTML = `
+      <div class="flex items-center space-x-2">
+        <div class="flex-shrink-0">
+          ${this.getIcon(type)}
+        </div>
+        <div class="flex-1 text-sm font-medium">${message}</div>
+        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+          </svg>
+        </button>
+      </div>
+    `;
+
+    this.messageContainer.appendChild(messageEl);
+
+    // アニメーション
+    setTimeout(() => {
+      messageEl.classList.remove('translate-x-full');
+    }, 10);
+
+    // 自動削除
+    if (duration > 0) {
+      setTimeout(() => {
+        if (messageEl.parentElement) {
+          messageEl.classList.add('translate-x-full', 'opacity-0');
+          setTimeout(() => messageEl.remove(), 300);
+        }
+      }, duration);
+    }
+
+    return messageEl;
+  }
+
+  getTypeClasses(type) {
+    const classes = {
+      info: 'bg-blue-500 text-white',
+      success: 'bg-green-500 text-white',
+      warning: 'bg-yellow-500 text-black',
+      error: 'bg-red-500 text-white'
+    };
+    return classes[type] || classes.info;
+  }
+
+  getIcon(type) {
+    const icons = {
+      info: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"/></svg>',
+      success: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>',
+      warning: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/></svg>',
+      error: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM12 8a1 1 0 112 0v4a1 1 0 11-2 0V8z"/></svg>'
+    };
+    return icons[type] || icons.info;
+  }
+}
+
+// グローバルメッセージマネージャー
+window.messageManager = new MessageManager();
+window.showMessage = (message, type, duration) => window.messageManager.show(message, type, duration);
+
+/**
+ * ローディング状態のCSS
+ */
+const loadingCSS = `
+<style>
+.gas-loading {
+  cursor: wait;
+}
+
+.gas-loading * {
+  pointer-events: none;
+}
+
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(139, 233, 253, 0.3);
+  border-top: 2px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+/* Loading overlay styles moved to UnifiedStyles.html for consistency */
+</style>
+`;
+
+// CSSを注入
+document.head.insertAdjacentHTML('beforeend', loadingCSS);
+
+// デバッグ用（開発時のみ）
+if (window.location.hostname === 'localhost' || window.location.hostname.includes('script.google.com')) {
+  window.gasDebug = () => console.log('GAS Optimizer Stats:', window.gasOptimizer.getStats());
+}
+</script>

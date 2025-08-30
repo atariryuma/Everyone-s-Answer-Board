@@ -1,0 +1,1603 @@
+<!-- SharedModals.html - 共通モーダルコンポーネント -->
+<!-- GAS include用のモーダルコンポーネント集 -->
+
+<!-- 確認モーダル -->
+<div id="confirmation-modal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+    <h3 id="modal-title" class="text-xl font-bold text-cyan-400 mb-4"></h3>
+    <p id="modal-message" class="text-gray-300 mb-6"></p>
+    <div class="flex justify-end gap-3">
+      <button type="button" id="modal-cancel-btn" class="btn btn-secondary">キャンセル</button>
+      <button type="button" id="modal-confirm-btn" class="btn btn-primary">はい、実行します</button>
+    </div>
+  </div>
+</div>
+
+<!-- 公開モーダル -->
+<div id="publish-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
+      <h3 class="text-xl font-bold text-cyan-400 mb-4">
+        <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        公開準備完了
+      </h3>
+      <p class="text-gray-300 mb-4">
+        シートの設定が完了しました。<br>
+        学習者がアクセスできるよう公開しますか？
+      </p>
+      
+      <!-- 自動停止機能の説明 -->
+      <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-3 mb-4">
+        <h4 class="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          🔄 自動停止機能について
+        </h4>
+        <p class="text-xs text-blue-200 leading-relaxed">
+          公開後、設定した時間が経過すると自動的に公開が停止されます。<br>
+          学習者の回答期間を適切に管理し、授業時間に合わせた運用が可能です。
+        </p>
+        <div class="mt-2 text-xs text-blue-300">
+          <span class="font-medium">現在の設定:</span>
+          <span id="auto-stop-time-display" class="text-blue-100">確認中...</span>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3">
+        <button type="button" id="publish-modal-private-btn" class="btn btn-secondary">非公開のまま</button>
+        <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+          公開する
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 公開停止確認モーダル（クイックスタート用） -->
+<div id="quickstart-stop-confirmation-modal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-yellow-400">新しいフォームを作成しますか？</h3>
+      </div>
+      
+      <div class="space-y-4 mb-6">
+        <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-4">
+          <p class="text-gray-300 leading-relaxed">
+            現在公開中の回答ボードを<span class="text-yellow-400 font-semibold">一時停止</span>して、新しいフォームとボードを作成します。
+          </p>
+        </div>
+        
+        <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4">
+          <h4 class="text-sm font-semibold text-blue-400 mb-2">📋 実行内容</h4>
+          <ul class="text-sm text-blue-200 space-y-1">
+            <li>• 既存の回答データは保持されます</li>
+            <li>• 新しいフォームとスプレッドシートを作成</li>
+            <li>• 高精度AI列判定を実行</li>
+            <li>• 作成完了後に自動で再公開</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3">
+        <button type="button" id="quickstart-stop-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="quickstart-stop-confirm-btn" class="btn btn-warning">停止して新規作成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- カスタムセットアップ選択モーダル -->
+<div id="custom-setup-selection-modal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-cyan-400">カスタムフォームの作成方法を選択</h3>
+      </div>
+      
+      <div class="space-y-4 mb-6">
+        <div class="bg-green-500/10 border border-green-400/30 rounded-lg p-4 cursor-pointer hover:bg-green-500/20 transition-colors" id="custom-stop-option">
+          <div class="flex items-start gap-3">
+            <div class="w-5 h-5 rounded-full border-2 border-green-400 flex items-center justify-center mt-0.5">
+              <div class="w-3 h-3 rounded-full bg-green-400 hidden" id="custom-stop-radio"></div>
+            </div>
+            <div>
+              <h4 class="text-green-400 font-semibold mb-1">現在のボードを停止して作成 (推奨)</h4>
+              <p class="text-sm text-green-200">既存の公開を停止し、新しいフォーム作成後に再公開</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4 cursor-pointer hover:bg-blue-500/20 transition-colors" id="custom-continue-option">
+          <div class="flex items-start gap-3">
+            <div class="w-5 h-5 rounded-full border-2 border-blue-400 flex items-center justify-center mt-0.5">
+              <div class="w-3 h-3 rounded-full bg-blue-400 hidden" id="custom-continue-radio"></div>
+            </div>
+            <div>
+              <h4 class="text-blue-400 font-semibold mb-1">公開を継続しながら作成</h4>
+              <p class="text-sm text-blue-200">現在の公開状態を維持し、フォームのみ作成</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3">
+        <button type="button" id="custom-setup-cancel-btn" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="custom-setup-confirm-btn" class="btn btn-primary" disabled>選択して作成</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6時間自動停止確認モーダル -->
+<div id="auto-stop-confirmation-modal" class="fixed inset-0 bg-black/80 z-[10001] hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-green-400">📋 公開完了</h3>
+      </div>
+      
+      <div class="space-y-4 text-gray-300">
+        <p class="text-center text-gray-200">回答ボードが正常に公開されました。</p>
+        
+        <!-- 自動停止機能の詳細 -->  
+        <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4">
+          <h4 class="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            ⏰ 自動停止設定
+          </h4>
+          <div class="space-y-3 text-sm text-blue-200">
+            <div class="grid grid-cols-1 gap-2">
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span class="text-gray-400 text-xs">公開開始時間:</span>
+                <span id="publish-start-time" class="font-medium text-blue-100 text-sm">確認中...</span>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span class="text-gray-400 text-xs">自動停止予定:</span>
+                <span id="auto-stop-time" class="font-medium text-yellow-100 text-sm">確認中...</span>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span class="text-gray-400 text-xs">残り時間:</span>
+                <span id="remaining-time" class="font-medium text-green-100 text-sm">確認中...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- URL生成状態表示 -->
+        <div id="url-status-section" class="bg-green-500/10 border border-green-400/30 rounded-lg p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            <span id="url-status-text" class="text-sm font-medium text-green-200">✅ URL生成済み</span>
+          </div>
+          <p id="url-preview" class="text-xs text-green-100 font-mono break-all">確認中...</p>
+        </div>
+
+        <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
+          <p class="text-sm text-yellow-200 leading-relaxed">
+            <strong>⚠️ 重要:</strong> 6時間後に自動的に公開が停止されます。学習者の回答期間を考慮して適切に管理してください。
+          </p>
+        </div>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row justify-end gap-3 mt-6">
+        <button type="button" id="extend-time-btn" class="btn btn-secondary flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          時間延長
+        </button>
+        <button type="button" id="confirm-auto-stop-btn" class="btn btn-primary flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          確認
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- プライバシーモーダル -->
+<div id="privacy-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+        </svg>
+        <h3 class="text-xl font-bold text-yellow-400">プライバシーとデータ保護</h3>
+      </div>
+      <div class="space-y-4 text-gray-300">
+        <p>このシステムは教育目的でのみ使用されます。</p>
+        <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+          <h4 class="font-semibold text-yellow-400 mb-2">重要な注意事項</h4>
+          <ul class="text-sm space-y-1">
+            <li>• 個人情報は適切に保護されます</li>
+            <li>• 回答データは教育目的でのみ使用されます</li>
+            <li>• 管理者は適切なアクセス権限を持っています</li>
+            <li>• データは法的要件に従って管理されます</li>
+          </ul>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <button type="button" id="privacy-modal-cancel" class="btn btn-secondary">キャンセル</button>
+        <button type="button" id="privacy-modal-continue" class="btn btn-primary">理解しました、継続</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- デジタルシティズンシップモーダル -->
+<div id="digital-citizenship-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold text-cyan-400">デジタル・シティズンシップに基づく回答ボード指導</h3>
+        <button type="button" id="digital-citizenship-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="space-y-6 text-gray-300">
+        <div class="glass-panel bg-cyan-500/10 rounded-lg p-4 border border-cyan-400/30 mb-4">
+          <h4 class="font-semibold text-cyan-400 mb-2">🌐 デジタル・シティズンシップとは</h4>
+          <p class="text-sm">デジタル社会における責任ある市民として、技術を適切かつ効果的に使用する能力です。回答ボードを通じて、この重要な概念を実践的に指導しましょう。</p>
+        </div>
+        
+        <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+          <h4 class="font-semibold text-blue-400 mb-2">📝 デジタル・リテラシーの育成</h4>
+          <p class="text-sm">適切な質問設計を通じて、学習者がデジタル環境で建設的な議論ができるよう導きましょう。情報を批判的に評価し、根拠に基づいた意見を表現する力を育成します。</p>
+        </div>
+        
+        <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+          <h4 class="font-semibold text-green-400 mb-2">🤝 デジタル・コミュニケーション</h4>
+          <p class="text-sm">多様な意見を尊重し、相手の立場を理解する姿勢を重視しましょう。リアクション機能の適切な使い方を指導し、建設的なフィードバック文化を形成します。</p>
+        </div>
+        
+        <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+          <h4 class="font-semibold text-purple-400 mb-2">🛡️ デジタル・セキュリティと倫理</h4>
+          <p class="text-sm">個人情報保護の重要性を学習者に伝え、デジタル環境でのプライバシー意識を高めましょう。名前表示設定を通じて、適切な情報開示について考える機会を提供します。</p>
+        </div>
+        
+        <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
+          <h4 class="font-semibold text-red-400 mb-2">⚖️ デジタル・責任と法的理解</h4>
+          <p class="text-sm">デジタル空間での行動にも実世界と同様の責任が伴うことを指導しましょう。不適切な投稿への対応を通じて、デジタル環境でのルールとマナーを学ばせます。</p>
+        </div>
+        
+        <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+          <h4 class="font-semibold text-yellow-400 mb-2">📊 デジタル・フットプリントと振り返り</h4>
+          <p class="text-sm">デジタル活動の記録が残ることを意識させ、学習データを活用した振り返りの価値を伝えましょう。自らの学習過程を客観視する力を育成します。</p>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button type="button" id="digital-citizenship-modal-close-btn" class="btn btn-primary">理解しました</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 教師ガイドモーダル -->
+<div id="teacherGuideModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-cyan-400">教師向けガイド</h2>
+        <button type="button" id="teacherGuideModal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="space-y-6 text-gray-300">
+        <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+          <h3 class="font-semibold text-blue-400 mb-2">📚 学習目標の設定</h3>
+          <p class="text-sm">明確な学習目標を設定し、学習者がアクティブに参加できる環境を作りましょう。</p>
+        </div>
+        
+        <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+          <h3 class="font-semibold text-green-400 mb-2">🎯 効果的な質問設計</h3>
+          <p class="text-sm">学習者の思考を促進する質問を設計し、多様な回答を引き出しましょう。</p>
+        </div>
+        
+        <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+          <h3 class="font-semibold text-purple-400 mb-2">📊 データ活用</h3>
+          <p class="text-sm">収集したデータを分析し、学習指導の改善に活用しましょう。</p>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button type="button" id="teacherGuideModal-close-btn" class="btn btn-primary">理解しました</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 汎用アラートモーダル -->
+<div id="alert-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
+      <div class="flex items-center gap-3 mb-4">
+        <svg id="alert-modal-icon" class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 id="alert-modal-title" class="text-xl font-bold"></h3>
+      </div>
+      <p id="alert-modal-message" class="text-gray-300 mb-6"></p>
+      <div class="flex justify-end">
+        <button type="button" id="alert-modal-close-btn" class="btn btn-primary">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ローディングモーダル -->
+<div id="loading-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-md w-full text-center">
+      <div class="spinner mx-auto mb-4"></div>
+      <h3 id="loading-modal-title" class="text-xl font-bold text-cyan-400 mb-2">処理中...</h3>
+      <p id="loading-modal-message" class="text-gray-300">しばらくお待ちください</p>
+    </div>
+  </div>
+</div>
+        
+      </div>
+</div>
+
+<!-- セキュリティモーダル -->
+<div id="security-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-2xl font-bold text-cyan-400">セキュリティとデータ保護</h3>
+        <button type="button" id="security-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="space-y-6 text-gray-300">
+        <div class="glass-panel bg-blue-500/10 rounded-lg p-4 border border-blue-400/30">
+          <h4 class="font-semibold text-blue-400 mb-2">🔒 データの暗号化と保護</h4>
+          <p class="text-sm">すべてのデータ通信はHTTPS暗号化により保護されており、Google Workspace のセキュリティ基準に準拠しています。学習者の個人情報は適切に保護されます。</p>
+        </div>
+        
+        <div class="glass-panel bg-green-500/10 rounded-lg p-4 border border-green-400/30">
+          <h4 class="font-semibold text-green-400 mb-2">👥 アクセス制御</h4>
+          <p class="text-sm">管理者権限により、教師のみがシート設定や公開・非公開の切り替えを行えます。学習者は閲覧と回答のみ可能で、他の学習者のデータを変更することはできません。</p>
+        </div>
+        
+        <div class="glass-panel bg-purple-500/10 rounded-lg p-4 border border-purple-400/30">
+          <h4 class="font-semibold text-purple-400 mb-2">📊 データの管理と保存</h4>
+          <p class="text-sm">回答データはGoogle スプレッドシートに保存され、学校のGoogle Workspace 管理ポリシーに従って管理されます。データは教育目的でのみ使用されます。</p>
+        </div>
+        
+        <div class="glass-panel bg-yellow-500/10 rounded-lg p-4 border border-yellow-400/30">
+          <h4 class="font-semibold text-yellow-400 mb-2">🛡️ プライバシー設定</h4>
+          <p class="text-sm">名前の表示・非表示、リアクション数の表示設定により、学習環境に応じて適切なプライバシーレベルを設定できます。匿名での議論も可能です。</p>
+        </div>
+        
+        <div class="glass-panel bg-red-500/10 rounded-lg p-4 border border-red-400/30">
+          <h4 class="font-semibold text-red-400 mb-2">⚠️ 注意事項</h4>
+          <p class="text-sm">機密性の高い個人情報や学外秘の内容は投稿しないよう、学習者に事前に指導してください。適切な利用ガイドラインを設定することが重要です。</p>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-6">
+        <button type="button" id="security-modal-confirm" class="btn btn-primary">理解しました</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 管理者用モーダル (AdminPanel専用) -->
+
+<!-- フォーム設定モーダル -->
+<div id="form-config-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-8">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-cyan-400">新しいフォームを作成</h3>
+          <button type="button" id="form-config-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="space-y-6">
+          
+
+          <!-- ステップ1: 問題文の入力 -->
+          <div class="glass-panel bg-blue-500/5 border border-blue-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+              <h4 class="text-lg font-semibold text-blue-400">質問内容を入力</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">必須</span>
+            </div>
+            <textarea 
+              id="custom-main-question" 
+              rows="3" 
+              class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors" 
+              placeholder="例：今日の授業で学んだことの中で、最も印象に残ったことは何ですか？"
+              maxlength="500"
+            ></textarea>
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-xs text-gray-400">💡 学習者に表示される質問文を入力してください</p>
+              <span class="text-xs text-gray-500" id="question-counter">0/500</span>
+            </div>
+          </div>
+
+          <!-- ステップ2: 回答方法の選択 -->
+          <div class="glass-panel bg-green-500/5 border border-green-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+              <h4 class="text-lg font-semibold text-green-400">回答方法を選択</h4>
+            </div>
+            <select id="main-question-type" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-colors" title="回答方法を選択してください">
+              <option value="choice" selected>選択肢（単一選択）</option>
+              <option value="multiple">選択肢（複数選択可）</option>
+              <option value="text">短文テキスト（1行回答）</option>
+            </select>
+            <p class="text-xs text-gray-400 mt-2">💡 すべての回答方法で、回答の理由を入力する欄が自動的に追加されます</p>
+          </div>
+
+          <!-- 選択肢設定（選択肢タイプの場合） -->
+          <div id="main-question-choices-div" class="glass-panel bg-yellow-500/5 border border-yellow-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+              <h4 class="text-lg font-semibold text-yellow-400">選択肢を設定</h4>
+            </div>
+            <textarea id="main-question-choices" rows="4" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-colors" placeholder="例：&#10;気づいたことがある。&#10;疑問に思うことがある。&#10;もっと知りたいことがある。"></textarea>
+            <p class="text-xs text-gray-400 mt-2">💡 学習者が選択できる選択肢を1行に1つずつ入力してください。例のような評価軸や、具体的な選択肢を設定できます。</p>
+            
+            <div class="mt-4">
+              <label class="flex items-center">
+                <input type="checkbox" id="include-others-option" class="mr-2 rounded bg-gray-700 border-gray-600 text-yellow-500 focus:ring-yellow-400" checked>
+                <span class="text-sm text-gray-300">「その他...」選択肢を追加する</span>
+              </label>
+              <p class="text-xs text-gray-400 mt-1 ml-6">チェックすると、学習者が自由に回答を入力できる「その他...」オプションが自動的に追加されます</p>
+            </div>
+          </div>
+
+          <!-- ステップ4: クラス設定（オプション） -->
+          <div class="glass-panel bg-purple-500/5 border border-purple-400/20 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-bold">4</div>
+              <h4 class="text-lg font-semibold text-purple-400">クラス設定</h4>
+              <span class="text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded">オプション</span>
+            </div>
+            <div class="mb-3">
+              <label class="flex items-center">
+                <input type="checkbox" id="enable-class-selection" class="mr-2 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-400" checked>
+                <span class="text-sm text-gray-300">クラス選択を有効にする</span>
+              </label>
+            </div>
+            <div id="class-choices-container">
+              <textarea id="class-choices" rows="3" class="w-full p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white text-sm placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-colors" placeholder="例：&#10;クラス1&#10;クラス2&#10;クラス3&#10;クラス4"></textarea>
+              <p class="text-xs text-gray-400 mt-2">1行に1つずつクラス名を入力してください</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-8">
+          <button type="button" id="form-config-cancel" class="flex-1 px-6 py-3 bg-gray-600/80 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium">
+            キャンセル
+          </button>
+          <button type="button" id="form-config-create" class="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors font-medium shadow-lg">
+            フォーム作成
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- セキュリティ詳細モーダル -->
+<div id="security-details-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-white">🔒 セキュリティについて</h2>
+        <button type="button" id="security-details-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-6">
+        <!-- データベースアクセス制御 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            🔒 データベースアクセス制御
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>限定アクセス：</strong>データベースにアクセスできるのはウェブアプリをデプロイしたユーザーとサービスアカウントのみ
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>完全非公開設定：</strong>システム上、データベースは非公開設定が必須となっており、外部からのアクセスは一切不可能
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>個別データ分離：</strong>各ユーザーのデータは専用スプレッドシートで完全分離
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>自動権限管理：</strong>サービスアカウントへの編集権限付与を自動実行
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 多層セキュリティ対策 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            🛡️ 多層セキュリティ対策
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>暗号化認証：</strong>JWT ベースのサービスアカウント認証とトークン自動更新
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>ドメイン制限：</strong>組織展開時のドメインベースアクセス制御
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>入力検証：</strong>全入力データの包括的検証とサニタイゼーション
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>監査ログ：</strong>システム活動の完全追跡とログ記録
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- ユーザー保護 -->
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-cyan-400 mb-4 flex items-center gap-2">
+            👥 ユーザー保護
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>学習者データ保護：</strong>一般ユーザーは他の回答者データや基盤データベースにアクセス不可
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>管理者権限分離：</strong>階層的アクセスレベルによる適切な権限管理
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400">•</span>
+              <div>
+                <strong>セッションセキュリティ：</strong>自動クリーンアップ機能付きセキュアセッション管理
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 重要事項 -->
+        <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-blue-300 mb-3 flex items-center gap-2">
+            📋 重要
+          </h3>
+          <p class="text-sm text-blue-200">
+            回答ボード使用者の個人情報や回答データは厳重に保護され、教育目的以外での使用や第三者による不正アクセスを防ぐ設計となっています。
+          </p>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 text-center">
+        <button type="button" id="security-details-modal-confirm" class="btn btn-primary">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- プライバシー警告モーダル -->
+<div id="privacy-warning-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-yellow-400">⚠️ 個人情報表示に関する重要な注意</h2>
+        <button type="button" id="privacy-warning-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-6">
+        <!-- 警告メッセージ -->
+        <div class="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <div class="text-yellow-400 text-xl">⚠️</div>
+            <div>
+              <h3 class="text-lg font-semibold text-yellow-400 mb-2">教育現場での個人情報保護について</h3>
+              <p class="text-yellow-200 text-sm leading-relaxed">
+                「名前を表示する」や「リアクション数を表示する」の設定を有効にすると、学習者の個人情報や活動データが他の参加者に表示されます。教育現場でのプライバシー保護の観点から、以下の点にご注意ください。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- チェックポイント -->
+        <div class="space-y-4">
+          <h3 class="text-lg font-semibold text-cyan-400 flex items-center gap-2">
+            <span>📋</span> 公開前に確認してください
+          </h3>
+          
+          <div class="space-y-3">
+            <div class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+              <span class="text-cyan-400 text-lg">✓</span>
+              <div>
+                <p class="text-white font-medium">学習者・保護者の同意</p>
+                <p class="text-gray-300 text-sm">名前やリアクション情報の公開について、事前に学習者や保護者の理解と同意を得ていますか？</p>
+              </div>
+            </div>
+            
+            <div class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+              <span class="text-cyan-400 text-lg">✓</span>
+              <div>
+                <p class="text-white font-medium">教育目的の明確化</p>
+                <p class="text-gray-300 text-sm">個人情報を表示する教育的意義や学習効果を明確にし、必要最小限の情報のみ表示していますか？</p>
+              </div>
+            </div>
+            
+            <div class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+              <span class="text-cyan-400 text-lg">✓</span>
+              <div>
+                <p class="text-white font-medium">安全な学習環境</p>
+                <p class="text-gray-300 text-sm">学習者が安心して意見を表明できる環境が整っていますか？個人攻撃や差別につながる可能性はありませんか？</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- プライバシー保護の推奨設定 -->
+        <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-green-400 mb-3 flex items-center gap-2">
+            🛡️ 推奨設定
+          </h3>
+          <ul class="space-y-2 text-sm text-green-200">
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>匿名での議論：</strong>初期設定では名前表示をオフにして、安全な議論環境を提供
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>段階的な公開：</strong>学習者の成熟度に応じて、徐々に個人情報の表示を検討
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>定期的な見直し：</strong>設定を定期的に見直し、学習者の状況に応じて調整
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 flex gap-3 justify-end">
+        <button type="button" id="privacy-warning-cancel" class="btn bg-gray-600 hover:bg-gray-500 text-white px-4 py-2">設定を見直す</button>
+        <button type="button" id="privacy-warning-confirm" class="btn btn-primary px-4 py-2">理解して続行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Google連携の利点モーダル -->
+<div id="google-integration-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="flex items-center justify-center min-h-full p-4">
+    <div class="glass-panel rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center p-6 border-b border-gray-600/30">
+        <h2 class="text-xl font-semibold text-white">📊 Google連携の利点</h2>
+        <button type="button" id="google-integration-modal-close" class="p-2 text-gray-400 transition-colors rounded-full hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500" aria-label="閉じる">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-4">
+        <div class="bg-gray-800/30 border border-gray-600/30 rounded-lg p-4">
+          <ul class="space-y-3 text-sm text-gray-300">
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>自動フォーム作成：</strong>回答収集フォームの即座生成
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>リアルタイム同期：</strong>フォーム回答の即座反映
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>セキュアな共有：</strong>学校ドメイン内でのデータ管理
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>バックアップ機能：</strong>Google Drive による自動バックアップ
+              </div>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-green-400">•</span>
+              <div>
+                <strong>分析活用：</strong>Google Sheets での詳細データ分析
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-gray-600/30 text-center">
+        <button type="button" id="google-integration-modal-confirm" class="btn btn-primary">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 共通モーダル管理クラス
+class SharedModals {
+  constructor() {
+    this.loadedModals = new Set();
+    this.setupEventListeners();
+  }
+
+  // 選択的モーダル読み込み
+  loadModals(modalIds) {
+    modalIds.forEach(modalId => {
+      if (!this.loadedModals.has(modalId)) {
+        this.loadedModals.add(modalId);
+        console.log(`Modal ${modalId} loaded`);
+      }
+    });
+  }
+
+  // 管理者専用モーダルの読み込み
+  loadAdminModals() {
+    this.loadModals([
+      'form-config-modal',
+      'security-details-modal',
+      'google-integration-modal',
+      'auto-stop-confirmation-modal',
+      'quickstart-stop-confirmation-modal',
+      'custom-setup-selection-modal'
+    ]);
+  }
+
+  // 確認モーダルの表示
+  showConfirmation(title, message, onConfirm, onCancel) {
+    const modal = document.getElementById('confirmation-modal');
+    const titleEl = document.getElementById('modal-title');
+    const messageEl = document.getElementById('modal-message');
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    // null checks for modal elements
+    if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
+      console.error('モーダル要素が見つかりません');
+      return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // イベントリスナーを一度削除してから追加
+    confirmBtn.onclick = () => {
+      this.hideModal('confirmation-modal');
+      if (onConfirm) onConfirm();
+    };
+    
+    cancelBtn.onclick = () => {
+      this.hideModal('confirmation-modal');
+      if (onCancel) onCancel();
+    };
+  }
+
+  // アラートモーダルの表示
+  showAlert(title, message, type = 'info') {
+    const modal = document.getElementById('alert-modal');
+    const titleEl = document.getElementById('alert-modal-title');
+    const messageEl = document.getElementById('alert-modal-message');
+    const iconEl = document.getElementById('alert-modal-icon');
+    const closeBtn = document.getElementById('alert-modal-close-btn');
+
+    // null checks for modal elements
+    if (!modal || !titleEl || !messageEl || !iconEl || !closeBtn) {
+      console.error('アラートモーダル要素が見つかりません');
+      return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // アイコンとカラーを設定
+    const typeConfig = {
+      info: { color: 'text-blue-400', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+      success: { color: 'text-green-400', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+      warning: { color: 'text-yellow-400', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z' },
+      error: { color: 'text-red-400', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }
+    };
+    
+    const config = typeConfig[type] || typeConfig.info;
+    titleEl.className = `text-xl font-bold ${config.color}`;
+    iconEl.className = `w-8 h-8 ${config.color}`;
+    iconEl.querySelector('path').setAttribute('d', config.icon);
+    
+    modal.classList.remove('hidden');
+    
+    closeBtn.onclick = () => this.hideModal('alert-modal');
+  }
+
+  // ローディングモーダルの表示
+  showLoading(title = '処理中...', message = 'しばらくお待ちください') {
+    const modal = document.getElementById('loading-modal');
+    const titleEl = document.getElementById('loading-modal-title');
+    const messageEl = document.getElementById('loading-modal-message');
+    
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  // モーダルの非表示
+  hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  }
+
+  // イベントリスナーの設定
+  setupEventListeners() {
+    // ESCキーでモーダルを閉じる
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modals = [
+          'confirmation-modal',
+          'publish-modal',
+          'privacy-modal',
+          'digital-citizenship-modal',
+          'teacherGuideModal',
+          'alert-modal',
+          'loading-modal',
+          'security-modal',
+          'form-config-modal',
+          'security-details-modal',
+          'google-integration-modal'
+        ];
+        
+        modals.forEach(modalId => {
+          const modal = document.getElementById(modalId);
+          if (modal && !modal.classList.contains('hidden')) {
+            this.hideModal(modalId);
+          }
+        });
+      }
+    });
+
+    // クローズボタンの設定
+    const closeButtons = [
+      'digital-citizenship-modal-close',
+      'digital-citizenship-modal-close-btn',
+      'teacherGuideModal-close',
+      'teacherGuideModal-close-btn',
+      'security-modal-close',
+      'security-modal-confirm',
+      'form-config-close',
+      'form-config-cancel',
+      'security-details-modal-close',
+      'security-details-modal-confirm',
+      'google-integration-modal-close',
+      'google-integration-modal-confirm'
+    ];
+    
+    closeButtons.forEach(buttonId => {
+      const button = document.getElementById(buttonId);
+      if (button) {
+        button.onclick = () => {
+          if (buttonId.includes('digital-citizenship')) {
+            this.hideModal('digital-citizenship-modal');
+          } else if (buttonId.includes('teacherGuide')) {
+            this.hideModal('teacherGuideModal');
+          } else if (buttonId.includes('security-modal')) {
+            this.hideModal('security-modal');
+          } else if (buttonId.includes('form-config')) {
+            this.hideModal('form-config-modal');
+          } else if (buttonId.includes('security-details')) {
+            this.hideModal('security-details-modal');
+          } else if (buttonId.includes('google-integration')) {
+            this.hideModal('google-integration-modal');
+          }
+        };
+      }
+    });
+  }
+
+  // プライバシーモーダルの表示
+  showPrivacy(onContinue) {
+    const modal = document.getElementById('privacy-modal');
+    if (!modal) {
+      console.error('プライバシーモーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const continueBtn = document.getElementById('privacy-modal-continue');
+    const cancelBtn = document.getElementById('privacy-modal-cancel');
+    
+    if (continueBtn) {
+      continueBtn.onclick = () => {
+        this.hideModal('privacy-modal');
+        if (onContinue) onContinue();
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('privacy-modal');
+      };
+    }
+  }
+
+  // デジタル・シティズンシップモーダルの表示
+  showDigitalCitizenship() {
+    const modal = document.getElementById('digital-citizenship-modal');
+    if (!modal) {
+      console.error('デジタル・シティズンシップモーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+  }
+
+  // 6時間自動停止確認モーダルの表示（完全版エラーハンドリング）
+  showAutoStopConfirmation(publishResult) {
+    // ローディングオーバーレイを確実に非表示にする
+    if (window.unifiedLoadingManager) {
+      window.unifiedLoadingManager.setLoading(false);
+      console.log('🔄 自動停止モーダル表示前にローディングを非表示にしました');
+    }
+    
+    this.loadModals(['auto-stop-confirmation-modal']);
+
+    const modal = document.getElementById('auto-stop-confirmation-modal');
+    if (!modal) {
+      console.error('❌ 自動停止確認モーダルが見つかりません');
+      return;
+    }
+
+    // 公開結果データの完全性検証
+    const validationResult = this.validatePublishResult(publishResult);
+    console.log('🔍 公開結果データ検証:', validationResult);
+
+    // 公開時間と停止時間の設定（完全版）
+    if (validationResult.isValid && publishResult.publishedAt) {
+      const publishTime = new Date(publishResult.publishedAt);
+      const minutes = publishResult.autoStopMinutes || 360; // 6時間 = 360分（デフォルト）
+      const stopTime = new Date(publishTime.getTime() + (minutes * 60 * 1000));
+      
+      console.log('🕒 自動停止時間設定:', {
+        publishedAt: publishResult.publishedAt,
+        autoStopMinutes: minutes,
+        source: publishResult.autoStopMinutes ? 'server' : 'default',
+        publishTime: publishTime.toLocaleString('ja-JP'),
+        stopTime: stopTime.toLocaleString('ja-JP'),
+        hasValidUrl: validationResult.hasValidUrl,
+        url: publishResult.url || 'undefined'
+      });
+      
+      document.getElementById('publish-start-time').textContent = publishTime.toLocaleString('ja-JP');
+      document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
+      
+      // URL状態の表示
+      this.updateUrlStatusDisplay(publishResult, validationResult);
+      
+      // 残り時間のカウントダウンを開始
+      this.startCountdown(stopTime);
+    } else {
+      // Critical errors がある場合のみ警告表示、軽微な問題は情報レベル
+      if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
+        console.warn('⚠️ 公開結果データに重要な問題があります:', {
+          publishResult: publishResult,
+          criticalErrors: validationResult.criticalErrors,
+          fallbackAction: 'デフォルト設定を適用'
+        });
+      } else if (validationResult.warningErrors && validationResult.warningErrors.length > 0) {
+        console.log('ℹ️ 公開結果データに軽微な問題がありますが正常に処理します:', {
+          publishResult: publishResult,
+          warningErrors: validationResult.warningErrors,
+          fallbackAction: 'デフォルト設定を適用'
+        });
+      } else {
+        console.debug('🔧 フォールバック処理を実行中:', {
+          publishResult: publishResult,
+          reason: '検証結果がfalse（原因不明）'
+        });
+      }
+      
+      const now = new Date();
+      const minutes = 360; // デフォルト6時間
+      const stopTime = new Date(now.getTime() + (minutes * 60 * 1000));
+      
+      document.getElementById('publish-start-time').textContent = now.toLocaleString('ja-JP');
+      document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
+      
+      // エラー状態の詳細表示（Critical errors のみ表示）
+      const remainingTimeEl = document.getElementById('remaining-time');
+      if (remainingTimeEl) {
+        if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
+          const errorCount = validationResult.criticalErrors.length;
+          remainingTimeEl.textContent = `⚠️ ${errorCount}個の重要な問題を検出 - 設定を確認してください`;
+          remainingTimeEl.className = 'font-medium text-yellow-100';
+        } else {
+          // Critical errors がない場合は通常のカウントダウンを開始
+          this.startCountdown(stopTime);
+        }
+      }
+      
+      // URL状態の表示（エラーケース）
+      this.updateUrlStatusDisplay(publishResult, validationResult);
+      
+      console.log('🕒 フォールバック自動停止時間設定:', {
+        publishTime: now.toLocaleString('ja-JP'),
+        autoStopMinutes: minutes,
+        stopTime: stopTime.toLocaleString('ja-JP'),
+        fallbackReason: '公開結果データ不足',
+        validationErrors: validationResult.errors
+      });
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // イベントリスナーの設定
+    const confirmBtn = document.getElementById('confirm-auto-stop-btn');
+    const extendBtn = document.getElementById('extend-time-btn');
+
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('auto-stop-confirmation-modal');
+      };
+    }
+
+    if (extendBtn) {
+      extendBtn.onclick = () => {
+        // 時間延長機能（将来実装）
+        alert('時間延長機能は今後実装予定です。');
+      };
+    }
+  }
+
+  // 公開結果データの完全性検証
+  validatePublishResult(publishResult) {
+    const errors = [];
+    let isValid = true;
+    let hasValidUrl = false;
+
+    // 基本的な存在チェック
+    if (!publishResult) {
+      errors.push('公開結果データが存在しません');
+      isValid = false;
+    } else {
+      // 公開成功フラグのチェック（クイックスタート用の柔軟な判定）
+      const isPublishedSuccessfully = publishResult.success || 
+                                    (publishResult.status === 'success') ||
+                                    (publishResult.publicationData && publishResult.publicationData.isPublished);
+      
+      if (!isPublishedSuccessfully) {
+        errors.push('公開が成功していません');
+        // クイックスタートの場合は警告レベルに下げる
+        if (publishResult.status === 'success') {
+          console.warn('⚠️ success フラグは false だが status は success - クイックスタート結果として受け入れます');
+        } else {
+          isValid = false;
+        }
+      }
+
+      // URL検証（複数のURLフィールドをチェック）
+      const candidateUrls = [
+        publishResult.url,
+        publishResult.boardUrl,
+        publishResult.viewUrl,
+        publishResult.webAppUrl
+      ].filter(url => url && url.trim() !== '');
+      
+      if (candidateUrls.length === 0) {
+        errors.push('公開URLが空です');
+      } else {
+        // 有効なURLが1つでもあれば OK
+        const validUrl = candidateUrls.find(url => url.length > 10);
+        if (validUrl) {
+          hasValidUrl = true;
+          // メインURLフィールドが空の場合は代替URLで補完
+          if (!publishResult.url || publishResult.url.trim() === '') {
+            publishResult.url = validUrl;
+            console.log('🔄 公開URL を代替URL で補完:', validUrl);
+          }
+        } else {
+          errors.push('公開URLが不完全です（長さ不足）');
+        }
+      }
+
+      // 公開時刻チェック（最適化版）
+      if (!publishResult.publishedAt || publishResult.publishedAt.trim() === '') {
+        // 公開時刻が設定されていない場合のみ現在時刻を使用
+        publishResult.publishedAt = new Date().toISOString();
+        console.log('🕒 公開時刻を現在時刻で補完:', publishResult.publishedAt);
+        // 補完は情報レベル（警告ではない）
+        console.debug('ℹ️ 公開時刻が未設定のため現在時刻で補完しました');
+      } else {
+        // 公開時刻が既に存在する場合は検証のみ実行
+        try {
+          const publishTime = new Date(publishResult.publishedAt);
+          if (isNaN(publishTime.getTime())) {
+            errors.push('公開時刻の形式が無効です');
+          } else {
+            console.debug('✅ 公開時刻は正常です:', publishResult.publishedAt);
+          }
+        } catch (e) {
+          errors.push('公開時刻の解析に失敗しました');
+        }
+      }
+
+      // 自動停止時間チェック
+      if (publishResult.autoStopMinutes && (publishResult.autoStopMinutes < 1 || publishResult.autoStopMinutes > 1440)) {
+        errors.push('自動停止時間が範囲外です（1分-24時間）');
+      }
+    }
+
+    // Critical errors vs Warning errors の分類
+    const criticalErrors = errors.filter(error => 
+      error.includes('公開が成功していません') ||
+      error.includes('公開URLが空です') ||
+      error.includes('公開URLが不完全です') ||
+      error.includes('公開時刻の形式が無効です') ||
+      error.includes('公開時刻の解析に失敗しました') ||
+      error.includes('自動停止時間が範囲外です')
+    );
+    
+    const warningErrors = errors.filter(error => !criticalErrors.includes(error));
+    const hasCriticalErrors = criticalErrors.length > 0;
+    
+    console.debug('🔍 エラー分類:', {
+      criticalErrors: criticalErrors,
+      warningErrors: warningErrors,
+      totalErrors: errors.length
+    });
+
+    return {
+      isValid: isValid && !hasCriticalErrors, // Critical errors のみで判定
+      hasValidUrl: hasValidUrl,
+      errors: errors,
+      criticalErrors: criticalErrors,
+      warningErrors: warningErrors,
+      summary: hasCriticalErrors ? 
+        `❌ ${criticalErrors.length}個の重要な問題があります` : 
+        (warningErrors.length > 0 ? 
+          `⚠️ ${warningErrors.length}個の軽微な問題があります` : 
+          '✅ データは正常です')
+    };
+  }
+
+  // URL状態表示の更新（改善版）
+  updateUrlStatusDisplay(publishResult, validationResult) {
+    const urlStatusText = document.getElementById('url-status-text');
+    const urlPreview = document.getElementById('url-preview');
+    const urlStatusSection = document.getElementById('url-status-section');
+    
+    if (!urlStatusText || !urlPreview || !urlStatusSection) {
+      console.warn('URL状態表示要素が見つかりません');
+      return;
+    }
+
+    if (validationResult.hasValidUrl && publishResult.url) {
+      // 成功状態
+      urlStatusSection.className = 'bg-green-500/10 border border-green-400/30 rounded-lg p-3';
+      urlStatusText.innerHTML = '<span class="text-green-400">✅</span> URL生成済み';
+      urlStatusText.className = 'text-sm font-medium text-green-200';
+      
+      // URLを短縮表示
+      const shortUrl = publishResult.url.length > 60 ? 
+        publishResult.url.substring(0, 57) + '...' : 
+        publishResult.url;
+      urlPreview.textContent = shortUrl;
+      urlPreview.className = 'text-xs text-green-100 font-mono break-all';
+    } else {
+      // エラー状態
+      urlStatusSection.className = 'bg-red-500/10 border border-red-400/30 rounded-lg p-3';
+      urlStatusText.innerHTML = '<span class="text-red-400">❌</span> URL生成に問題があります';
+      urlStatusText.className = 'text-sm font-medium text-red-200';
+      urlPreview.textContent = '公開URLが正常に生成されていません';
+      urlPreview.className = 'text-xs text-red-100 break-all';
+    }
+  }
+
+  // 旧displayUrlStatus関数（互換性のため保持）
+  displayUrlStatus(publishResult, validationResult) {
+    this.updateUrlStatusDisplay(publishResult, validationResult);
+  }
+
+  // 残り時間カウントダウン
+  startCountdown(stopTime) {
+    const updateRemainingTime = () => {
+      const now = new Date();
+      const remaining = stopTime - now;
+      
+      if (remaining <= 0) {
+        document.getElementById('remaining-time').textContent = '自動停止済み';
+        return;
+      }
+      
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      document.getElementById('remaining-time').textContent = `${hours}時間${minutes}分`;
+    };
+
+    // 初回実行
+    updateRemainingTime();
+    
+    // 1分毎に更新
+    const interval = setInterval(updateRemainingTime, 60000);
+    
+    // モーダルが閉じられたときにインターバルをクリア
+    const modal = document.getElementById('auto-stop-confirmation-modal');
+    if (modal) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            if (modal.classList.contains('hidden')) {
+              clearInterval(interval);
+              observer.disconnect();
+            }
+          }
+        });
+      });
+      observer.observe(modal, { attributes: true });
+    }
+  }
+
+  // フォーム設定モーダルの表示
+  showFormConfig() {
+    this.loadAdminModals();
+    const modal = document.getElementById('form-config-modal');
+    if (!modal) {
+      console.error('フォーム設定モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // 回答方法の選択肢に応じて選択肢設定の表示を切り替えるロジック
+    const mainQuestionTypeSelect = document.getElementById('main-question-type');
+    const mainQuestionChoicesDiv = document.getElementById('main-question-choices-div');
+
+    const toggleChoicesVisibility = () => {
+      if (mainQuestionTypeSelect && mainQuestionChoicesDiv) {
+        if (mainQuestionTypeSelect.value === 'choice' || mainQuestionTypeSelect.value === 'multiple') {
+          mainQuestionChoicesDiv.classList.remove('hidden');
+        } else {
+          mainQuestionChoicesDiv.classList.add('hidden');
+        }
+      }
+    };
+
+    // 初期表示時の設定
+    toggleChoicesVisibility();
+
+    // 選択肢が変更されたときのイベントリスナー
+    if (mainQuestionTypeSelect) {
+      mainQuestionTypeSelect.removeEventListener('change', toggleChoicesVisibility); // 重複登録防止
+      mainQuestionTypeSelect.addEventListener('change', toggleChoicesVisibility);
+    }
+  }
+
+  // セキュリティ詳細モーダルの表示
+  showSecurityDetails() {
+    this.loadAdminModals();
+    const modal = document.getElementById('security-details-modal');
+    if (!modal) {
+      console.error('セキュリティ詳細モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  // Google連携モーダルの表示
+  showGoogleIntegration() {
+    this.loadAdminModals();
+    const modal = document.getElementById('google-integration-modal');
+    if (!modal) {
+      console.error('Google連携モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  // プライバシー警告モーダルの表示
+  showPrivacyWarning(onConfirm, onCancel) {
+    this.loadAdminModals();
+    const modal = document.getElementById('privacy-warning-modal');
+    if (!modal) {
+      console.error('プライバシー警告モーダルが見つかりません');
+      return;
+    }
+    
+    // ボタンのイベントリスナーを設定
+    const confirmBtn = document.getElementById('privacy-warning-confirm');
+    const cancelBtn = document.getElementById('privacy-warning-cancel');
+    const closeBtn = document.getElementById('privacy-warning-modal-close');
+    
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('privacy-warning-modal');
+        if (onConfirm) onConfirm();
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('privacy-warning-modal');
+        if (onCancel) onCancel();
+      };
+    }
+    
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        this.hideModal('privacy-warning-modal');
+        if (onCancel) onCancel();
+      };
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  // 公開モーダルの表示（自動停止時間表示付き）
+  showPublish(onPublish, onCancel, autoStopSettings = null) {
+    const modal = document.getElementById('publish-modal');
+    if (!modal) {
+      console.error('公開モーダルが見つかりません');
+      return;
+    }
+    
+    // 自動停止時間の表示を更新
+    const autoStopDisplay = document.getElementById('auto-stop-time-display');
+    if (autoStopDisplay) {
+      if (autoStopSettings && autoStopSettings.enabled) {
+        const minutes = autoStopSettings.minutes || 360; // 6時間 = 360分（config.gsと統一）
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        
+        if (hours > 0 && remainingMinutes > 0) {
+          autoStopDisplay.textContent = `${hours}時間${remainingMinutes}分後に自動停止`;
+        } else if (hours > 0) {
+          autoStopDisplay.textContent = `${hours}時間後に自動停止`;
+        } else {
+          autoStopDisplay.textContent = `${minutes}分後に自動停止`;
+        }
+        autoStopDisplay.className = 'text-blue-100';
+      } else {
+        autoStopDisplay.textContent = '自動停止は無効';
+        autoStopDisplay.className = 'text-gray-400';
+      }
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const publishBtn = document.getElementById('publish-modal-publish-btn');
+    const privateBtn = document.getElementById('publish-modal-private-btn');
+    
+    if (publishBtn) {
+      publishBtn.onclick = () => {
+        this.hideModal('publish-modal');
+        if (onPublish) onPublish();
+      };
+    }
+    
+    if (privateBtn) {
+      privateBtn.onclick = () => {
+        this.hideModal('publish-modal');
+        if (onCancel) onCancel();
+      };
+    }
+  }
+
+  // クイックスタート停止確認モーダルの表示
+  showQuickStartStopConfirmation(onConfirm, onCancel) {
+    this.loadAdminModals();
+    const modal = document.getElementById('quickstart-stop-confirmation-modal');
+    if (!modal) {
+      console.error('クイックスタート停止確認モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const confirmBtn = document.getElementById('quickstart-stop-confirm-btn');
+    const cancelBtn = document.getElementById('quickstart-stop-cancel-btn');
+    
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('quickstart-stop-confirmation-modal');
+        if (onConfirm) onConfirm();
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('quickstart-stop-confirmation-modal');
+        if (onCancel) onCancel();
+      };
+    }
+  }
+
+  // カスタムセットアップ選択モーダルの表示
+  showCustomSetupSelection(onConfirm, onCancel) {
+    this.loadAdminModals();
+    const modal = document.getElementById('custom-setup-selection-modal');
+    if (!modal) {
+      console.error('カスタムセットアップ選択モーダルが見つかりません');
+      return;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    // ラジオボタンの制御
+    const stopOption = document.getElementById('custom-stop-option');
+    const continueOption = document.getElementById('custom-continue-option');
+    const stopRadio = document.getElementById('custom-stop-radio');
+    const continueRadio = document.getElementById('custom-continue-radio');
+    const confirmBtn = document.getElementById('custom-setup-confirm-btn');
+    const cancelBtn = document.getElementById('custom-setup-cancel-btn');
+    
+    let selectedOption = null;
+    
+    if (stopOption && continueOption) {
+      stopOption.onclick = () => {
+        selectedOption = 'stop';
+        stopRadio.classList.remove('hidden');
+        continueRadio.classList.add('hidden');
+        if (confirmBtn) confirmBtn.disabled = false;
+      };
+      
+      continueOption.onclick = () => {
+        selectedOption = 'continue';
+        continueRadio.classList.remove('hidden');
+        stopRadio.classList.add('hidden');
+        if (confirmBtn) confirmBtn.disabled = false;
+      };
+    }
+    
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        this.hideModal('custom-setup-selection-modal');
+        if (onConfirm) onConfirm(selectedOption);
+      };
+    }
+    
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        this.hideModal('custom-setup-selection-modal');
+        if (onCancel) onCancel();
+      };
+    }
+  }
+}
+
+// グローバルインスタンスの作成
+window.sharedModals = new SharedModals();
+
+// グローバル関数（後方互換性のため）
+window.showPrivacyModal = function(onContinue) {
+  window.sharedModals.showPrivacy(onContinue);
+};
+
+window.showDigitalCitizenshipModal = function() {
+  window.sharedModals.showDigitalCitizenship();
+};
+
+window.showPublishModal = function(onPublish, onCancel, autoStopSettings) {
+  window.sharedModals.showPublish(onPublish, onCancel, autoStopSettings);
+};
+
+window.showAutoStopConfirmationModal = function(publishResult) {
+  window.sharedModals.showAutoStopConfirmation(publishResult);
+};
+
+// 管理者専用モーダル用グローバル関数（後方互換性のため）
+window.showModal = function(modalId) {
+  if (modalId === 'form-config-modal') {
+    window.sharedModals.showFormConfig();
+  } else if (modalId === 'security-details-modal') {
+    window.sharedModals.showSecurityDetails();
+  } else if (modalId === 'google-integration-modal') {
+    window.sharedModals.showGoogleIntegration();
+  } else if (modalId === 'privacy-warning-modal') {
+    window.sharedModals.showPrivacyWarning();
+  } else {
+    // 従来のshowModal実装
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  }
+};
+
+window.hideModal = function(modalId) {
+  window.sharedModals.hideModal(modalId);
+};
+</script>
