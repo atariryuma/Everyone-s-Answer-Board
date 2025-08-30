@@ -10,7 +10,7 @@
     <?!= include('SharedTailwindConfig'); ?> <?!= include('UnifiedStyles'); ?> <?!=
     include('SharedUtilities'); ?>
     <script>
-      const __USER_ID__ = '<?= typeof userId !== \'undefined\' ? userId : \'\' ?>';
+      const __USER_ID__ = '<?= userId ? userId : "" ?>';
     </script>
     <style>
       /* AdminPanel専用スタイル - commit 421e817 レイアウト構造 + 現在のダークテーマ */
