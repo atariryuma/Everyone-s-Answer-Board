@@ -13,7 +13,9 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "WebSearch",
-      "WebFetch(domain:developers.google.com)"
+      "WebFetch(domain:developers.google.com)",
+      "Bash(sed:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": [],

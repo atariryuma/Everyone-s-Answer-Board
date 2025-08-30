@@ -564,7 +564,8 @@ function secureMultiTenantCacheOperation(operation, baseKey, userId, value = nul
  * マルチテナントセキュリティの健全性チェック
  * @returns {object} 健全性チェック結果
  */
-function performMultiTenantHealthCheck() {
+// performMultiTenantHealthCheck - 削除済み（過度に複雑なため不要）
+function performMultiTenantHealthCheck_DELETED() {
   const results = {
     timestamp: new Date().toISOString(),
     securityManagerStatus: 'OK',
@@ -956,7 +957,8 @@ function getSecurityMetrics() {
  * 定期的なセキュリティヘルスチェックの設定
  * @param {number} intervalMinutes - チェック間隔（分）
  */
-function scheduleSecurityHealthCheck(intervalMinutes = 60) {
+// scheduleSecurityHealthCheck - 削除済み（過度に複雑なため不要）
+function scheduleSecurityHealthCheck_DELETED(intervalMinutes = 60) {
   try {
     // GAS環境では時間ベースのトリガーを使用
     const triggers = ScriptApp.getProjectTriggers();

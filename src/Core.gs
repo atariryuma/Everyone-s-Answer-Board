@@ -1473,114 +1473,7 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
  * フォルダ作成、フォーム作成、スプレッドシート作成、ボード公開まで一括実行
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-/**
- * クイックスタート用のファイル作成とフォルダ管理
- * @param {object} setupContext - セットアップコンテキスト
- * @returns {object} 作成されたファイル情報
- */
-function createQuickStartFiles(setupContext) {
-  var userEmail = setupContext.userEmail;
-  var requestUserId = setupContext.requestUserId;
-  
-  // ステップ1: ユーザー専用フォルダを作成
-  console.log('📁 ステップ1: フォルダ作成中...');
-  var folder = createUserFolder(userEmail);
-  
-  // ステップ2: Googleフォームとスプレッドシートを作成
-  console.log('📝 ステップ2: フォーム作成中...');
-  var formAndSsInfo = createUnifiedForm('study', userEmail, requestUserId);
-  
-  // 作成したファイルをフォルダに移動（改善版：冗長処理除去と安全な移動処理）
-  if (folder) {
-    var moveResults = { form: false, spreadsheet: false };
-    var moveErrors = [];
-    
-    try {
-      var formFile = DriveApp.getFileById(formAndSsInfo.formId);
-      var ssFile = DriveApp.getFileById(formAndSsInfo.spreadsheetId);
-      
-      // フォームファイルの移動処理
-      try {
-        // 既にフォルダに存在するかチェック（重複移動を防止）
-        var formParents = formFile.getParents();
-        var isFormAlreadyInFolder = false;
-        
-        while (formParents.hasNext()) {
-          if (formParents.next().getId() === folder.getId()) {
-            isFormAlreadyInFolder = true;
-            break;
-          }
-        }
-        
-        if (!isFormAlreadyInFolder) {
-          console.log('📝 フォームファイルを移動中: %s → %s', formFile.getId(), folder.getName());
-          folder.addFile(formFile);
-          // ルートフォルダから削除（適切なタイミングで実行）
-          DriveApp.getRootFolder().removeFile(formFile);
-          moveResults.form = true;
-          console.log('✅ フォームファイル移動完了');
-        } else {
-          console.log('ℹ️ フォームファイルは既にフォルダに存在します');
-          moveResults.form = true;
-        }
-      } catch (formMoveError) {
-        moveErrors.push('フォームファイル移動エラー: ' + formMoveError.message);
-        console.error('❌ フォームファイルの移動に失敗:', formMoveError.message);
-      }
-      
-      // スプレッドシートファイルの移動処理
-      try {
-        // 既にフォルダに存在するかチェック（重複移動を防止）
-        var ssParents = ssFile.getParents();
-        var isSsAlreadyInFolder = false;
-        
-        while (ssParents.hasNext()) {
-          if (ssParents.next().getId() === folder.getId()) {
-            isSsAlreadyInFolder = true;
-            break;
-          }
-        }
-        
-        if (!isSsAlreadyInFolder) {
-          console.log('📊 スプレッドシートファイルを移動中: %s → %s', ssFile.getId(), folder.getName());
-          folder.addFile(ssFile);
-          // ルートフォルダから削除（適切なタイミングで実行）
-          DriveApp.getRootFolder().removeFile(ssFile);
-          moveResults.spreadsheet = true;
-          console.log('✅ スプレッドシートファイル移動完了');
-        } else {
-          console.log('ℹ️ スプレッドシートファイルは既にフォルダに存在します');
-          moveResults.spreadsheet = true;
-        }
-      } catch (ssMoveError) {
-        moveErrors.push('スプレッドシートファイル移動エラー: ' + ssMoveError.message);
-        console.error('❌ スプレッドシートファイルの移動に失敗:', ssMoveError.message);
-      }
-      
-      // 移動結果のログ出力
-      if (moveResults.form && moveResults.spreadsheet) {
-        console.log('✅ 全ファイルのフォルダ移動が完了: ' + folder.getName());
-      } else {
-        console.warn('⚠️ 一部のファイル移動に失敗しましたが、処理を継続します');
-        console.log('移動結果: フォーム=%s, スプレッドシート=%s', moveResults.form, moveResults.spreadsheet);
-        if (moveErrors.length > 0) {
-          console.log('移動エラー詳細: %s', moveErrors.join('; '));
-        }
-      }
-      
-    } catch (generalError) {
-      console.error('❌ ファイル移動処理で予期しないエラー:', generalError.message);
-      // ファイル移動失敗は致命的ではないため、処理は継続
-      console.log('ファイルはマイドライブに残りますが、システムは正常に動作します');
-    }
-  }
-  
-  return {
-    folder: folder,
-    formAndSsInfo: formAndSsInfo,
-    moveResults: moveResults || { form: false, spreadsheet: false }
-  };
-}
+// createQuickStartFiles - クイックスタート機能は不要のため削除済み
 
 /**
  * クイックスタートのデータベース更新とキャッシュ管理
@@ -1588,7 +1481,8 @@ function createQuickStartFiles(setupContext) {
  * @param {object} createdFiles - 作成されたファイル情報
  * @returns {object} 更新された設定オブジェクト
  */
-function updateQuickStartDatabase(setupContext, createdFiles) {
+// updateQuickStartDatabase - 削除済み（クイックスタート機能不要）
+function updateQuickStartDatabase_DELETED(setupContext, createdFiles) {
   var requestUserId = setupContext.requestUserId;
   var configJson = setupContext.configJson;
   var userEmail = setupContext.userEmail;
@@ -1696,7 +1590,8 @@ function updateQuickStartDatabase(setupContext, createdFiles) {
  * @param {object} updatedConfig - 更新された設定
  * @returns {object} 成功レスポンス
  */
-function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
+// generateQuickStartResponse - 削除済み（クイックスタート機能不要）
+function generateQuickStartResponse_DELETED(setupContext, createdFiles, updatedConfig) {
   var requestUserId = setupContext.requestUserId;
   var formAndSsInfo = createdFiles.formAndSsInfo;
   
@@ -1733,7 +1628,8 @@ function generateQuickStartResponse(setupContext, createdFiles, updatedConfig) {
  * @param {string} requestUserId - ユーザーID
  * @returns {object} セットアップコンテキスト
  */
-function initializeQuickStartContext(requestUserId) {
+// initializeQuickStartContext - 削除済み（クイックスタート機能不要）
+function initializeQuickStartContext_DELETED(requestUserId) {
   console.log('🚀 クイックスタートセットアップ開始: ' + requestUserId);
   
   // ユーザー情報の取得
@@ -1790,7 +1686,8 @@ function initializeQuickStartContext(requestUserId) {
   };
 }
 
-function quickStartSetup(requestUserId) {
+// quickStartSetup - 削除済み（クイックスタート機能不要）
+function quickStartSetup_DELETED(requestUserId) {
   // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
   if (requestUserId) {
     verifyUserAccess(requestUserId);
@@ -3627,10 +3524,16 @@ function getAllUsersForAdminForUI(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @param {object} config - フォーム設定
  */
-function createCustomFormUI(requestUserId, config) {
+function createForm(requestUserId, config) {
   try {
+    // セキュリティチェック: ユーザー認証と入力検証
     verifyUserAccess(requestUserId);
     const activeUserEmail = User.email();
+    
+    // 入力検証
+    if (!config || typeof config !== 'object') {
+      throw new Error('フォーム設定が無効です');
+    }
     
     // AdminPanelのconfig構造を内部形式に変換（createCustomForm の処理を統合）
     const convertedConfig = {
@@ -3646,7 +3549,7 @@ function createCustomFormUI(requestUserId, config) {
       }
     };
     
-    console.log('createCustomFormUI - converted config:', JSON.stringify(convertedConfig));
+    console.log('createForm - converted config:', JSON.stringify(convertedConfig));
     
     const overrides = {
       titlePrefix: config.formTitle || 'カスタムフォーム',
@@ -3805,7 +3708,8 @@ function createCustomFormUI(requestUserId, config) {
  * クイックスタート用フォーム作成（UI用ラッパー）
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function createQuickStartFormUI(requestUserId) {
+// createQuickStartFormUI - 削除済み（クイックスタート機能不要）
+function createQuickStartFormUI_DELETED(requestUserId) {
   try {
     verifyUserAccess(requestUserId);
     const activeUserEmail = User.email();

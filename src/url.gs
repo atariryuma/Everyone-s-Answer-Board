@@ -498,7 +498,8 @@ function generateUnpublishedStateUrl(userId) {
  * @param {Object} options - URL生成オプション
  * @returns {Object} 拡張されたURL群
  */
-function generateUserUrlsWithCacheBusting(userId, options = {}) {
+// generateUserUrlsWithCacheBusting - 削除済み（過度に複雑なため不要）
+function generateUserUrlsWithCacheBusting_DELETED(userId, options = {}) {
   try {
     const standardUrls = generateUserUrls(userId);
     

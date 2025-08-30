@@ -142,9 +142,14 @@ const healthChecker = new SystemHealthChecker();
 /**
  * システム診断機能
  */
-function performSystemDiagnostics() {
-  console.log('システム診断開始');
-  const diagnostics = {
+function getSystemStatus() {
+  // セキュリティチェック: 管理者のみアクセス可能
+  if (!checkIsSystemAdmin()) {
+    throw new Error('システム状況の確認には管理者権限が必要です');
+  }
+  
+  console.log('システム状況確認開始');
+  const status = {
     timestamp: new Date().toISOString(),
     environment: {},
     performance: {},
@@ -153,43 +158,50 @@ function performSystemDiagnostics() {
   };
   
   try {
-    // 環境情報
-    diagnostics.environment = {
+    // 環境情報（機密情報をマスク）
+    const userEmail = User.email();
+    status.environment = {
       gasVersion: 'V8 Runtime',
       timeZone: Session.getScriptTimeZone(),
       locale: Session.getActiveLocale(),
-      userEmail: User.email()
+      userDomain: userEmail ? userEmail.split('@')[1] : 'unknown' // メールアドレス本体はマスク
     };
     
     // パフォーマンス情報
-    diagnostics.performance = {
+    status.performance = {
       cacheHealth: cacheManager?.getHealth() || 'unavailable',
-      memoryStats: globalContextManager?.activeContexts?.size || 0,
-      lastExecutionTime: Date.now() - executionStartTime
+      activeContexts: globalContextManager?.activeContexts?.size || 0,
+      lastExecutionTime: Date.now() - (executionStartTime || Date.now())
     };
     
     // セキュリティ情報
-    diagnostics.security = {
+    status.security = {
       authenticationEnabled: true,
-      domainRestriction: Deploy.domain(),
+      domainRestriction: Deploy.domain() || 'unknown',
       userVerificationActive: typeof verifyUserAccess === 'function'
     };
     
     // 依存関係チェック
-    diagnostics.dependencies = {
+    status.dependencies = {
       sheetsApi: typeof getSheetsServiceCached === 'function',
-      database: typeof findUserById === 'function',
+      database: typeof DB !== 'undefined' && typeof DB.findUserById === 'function',
       cache: typeof cacheManager !== 'undefined',
-      monitoring: typeof logger !== 'undefined'
+      logging: typeof console !== 'undefined'
     };
     
-    console.log('システム診断完了');
-    return diagnostics;
+    console.log('システム状況確認完了');
+    return {
+      success: true,
+      status: status
+    };
     
   } catch (error) {
-    console.error('システム診断エラー', { error: error.message });
-    diagnostics.error = error.message;
-    return diagnostics;
+    console.error('システム状況確認エラー', { error: error.message });
+    return {
+      success: false,
+      error: error.message,
+      status: status
+    };
   }
 }
 

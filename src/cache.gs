@@ -1905,15 +1905,19 @@ function preWarmCache(activeUserEmail) {
  * キャッシュ効率化のための統計情報とチューニング推奨事項を提供
  * @returns {object} キャッシュ分析結果
  */
-function analyzeCacheEfficiency() {
+function getCacheStats() {
+  // セキュリティチェック: システム管理者のみアクセス可能
+  if (!checkIsSystemAdmin()) {
+    throw new Error('キャッシュ統計の確認には管理者権限が必要です');
+  }
+
   try {
     const health = cacheManager.getHealth();
-    const analysis = {
+    const stats = {
       timestamp: new Date().toISOString(),
-      currentHealth: health,
+      health: health,
       efficiency: 'unknown',
-      recommendations: [],
-      optimizationOpportunities: [],
+      recommendations: []
     };
 
     const hitRate = parseFloat(health.stats.hitRate);
@@ -1922,54 +1926,50 @@ function analyzeCacheEfficiency() {
 
     // 効率レベルの判定
     if (hitRate >= 85 && errorRate < 5 && totalOps > 50) {
-      analysis.efficiency = 'excellent';
+      stats.efficiency = 'excellent';
     } else if (hitRate >= 70 && errorRate < 10) {
-      analysis.efficiency = 'good';
+      stats.efficiency = 'good';
     } else if (hitRate >= 50 && errorRate < 15) {
-      analysis.efficiency = 'acceptable';
+      stats.efficiency = 'acceptable';
     } else {
-      analysis.efficiency = 'poor';
+      stats.efficiency = 'poor';
     }
 
-    // 推奨事項の生成
+    // 推奨事項の生成（管理者向け）
     if (hitRate < 70) {
-      analysis.recommendations.push({
+      stats.recommendations.push({
         priority: 'high',
         action: 'キャッシュヒット率向上',
-        details: 'TTL設定の見直し、メモ化の活用、キャッシュキー設計の最適化を検討してください。',
+        details: 'TTL設定の見直し、メモ化の活用を検討してください。'
       });
     }
 
     if (errorRate > 10) {
-      analysis.recommendations.push({
-        priority: 'medium',
+      stats.recommendations.push({
+        priority: 'medium', 
         action: 'エラー率削減',
-        details: 'キャッシュアクセスエラーの原因調査とエラーハンドリングの改善が必要です。',
+        details: 'キャッシュアクセスエラーの調査とハンドリング改善が必要です。'
       });
     }
 
     if (health.memoCacheSize > 1000) {
-      analysis.recommendations.push({
+      stats.recommendations.push({
         priority: 'low',
-        action: 'メモリ使用量最適化',
-        details: 'メモ化キャッシュサイズが大きくなっています。定期的なクリアを検討してください。',
+        action: 'メモリ使用量最適化', 
+        details: 'メモ化キャッシュサイズが大きくなっています。定期クリアを検討してください。'
       });
     }
 
-    // 最適化機会の特定
-    if (totalOps > 100 && hitRate < 80) {
-      analysis.optimizationOpportunities.push('プリウォーミング戦略の導入');
-    }
-
-    if (errorRate < 5 && hitRate > 60) {
-      analysis.optimizationOpportunities.push('TTL延長によるさらなる高速化');
-    }
-
-    console.log('[Cache] Efficiency analysis completed:', analysis.efficiency);
-    return analysis;
-  } catch (error) {
-    console.error('[ERROR]', 'analyzeCacheEfficiency error:', error);
+    console.log('[Cache] Statistics analysis completed:', stats.efficiency);
     return {
+      success: true,
+      stats: stats
+    };
+  } catch (error) {
+    console.error('[ERROR]', 'getCacheStats error:', error);
+    return {
+      success: false,
+      error: error.message,
       timestamp: new Date().toISOString(),
       error: error.message,
       efficiency: 'error',
