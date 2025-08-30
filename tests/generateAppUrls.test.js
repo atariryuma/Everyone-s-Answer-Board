@@ -2,8 +2,8 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('generateAppUrls admin url', () => {
+  const constantsCode = fs.readFileSync('src/constants.gs', 'utf8');
   const mainCode = fs.readFileSync('src/main.gs', 'utf8');
-  const urlCode = fs.readFileSync('src/url.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -65,9 +65,8 @@ describe('generateAppUrls admin url', () => {
       },
     };
     vm.createContext(context);
-    vm.runInContext(urlCode, context);
+    vm.runInContext(constantsCode, context);
     vm.runInContext(mainCode, context);
-    vm.runInContext(urlCode, context);
   });
 
   test('returns adminUrl with userId and mode parameter', () => {

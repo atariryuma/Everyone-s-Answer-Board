@@ -21,7 +21,7 @@ function processLoginFlow(userEmail) {
     }
 
     // 1. ユーザー情報をデータベースから取得
-    var userInfo = DB.findUserByEmail(userEmail);
+    const userInfo = DB.findUserByEmail(userEmail);
 
     // 2. 既存ユーザーの処理
     if (userInfo) {
@@ -80,7 +80,7 @@ function processLoginFlow(userEmail) {
       // 3b. データベースに作成
       DB.createUser(newUser);
       // ConfigurationManagerで初期設定を作成
-      configManager.initializeUserConfig(newUser.tenantId, userEmail);
+      App.getConfig().initializeUserConfig(newUser.tenantId, userEmail);
       
       if (!waitForUserRecord(newUser.tenantId, 3000, 500)) {
         console.warn('processLoginFlow: user not found after create:', newUser.tenantId);

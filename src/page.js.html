@@ -8397,10 +8397,21 @@
       .getActiveFormInfo(USER_ID);
   }
 
-  try {
-    if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
-      window.studyQuestApp.destroy();
+  // システムフロー表示関数の定義
+  function showSystemFlow() {
+    console.log('🔄 システムフロー初期化開始');
+    try {
+      // 基本的なシステムフロー初期化処理
+      if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
+        window.studyQuestApp.destroy();
+      }
+      console.log('✅ システムフロー初期化完了');
+    } catch (error) {
+      console.warn('⚠️ システムフロー初期化中にエラー:', error);
     }
+  }
+
+  try {
     // システムフロー表示
     showSystemFlow();
 

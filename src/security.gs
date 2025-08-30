@@ -8,16 +8,20 @@
 // SECTION 1: 認証管理システム（元auth.gs）
 // =============================================================================
 
-// 認証管理のための定数
-const AUTH_CACHE_KEY = 'SA_TOKEN_CACHE';
-const TOKEN_EXPIRY_BUFFER = 300; // 5分のバッファ
+// Module-scoped constants (2024 GAS Best Practice)
+const SECURITY_CONFIG = Object.freeze({
+  SECURITY_CONFIG.AUTH_CACHE_KEY: 'SA_TOKEN_CACHE',
+  SECURITY_CONFIG.TOKEN_EXPIRY_BUFFER: CORE.TIMEOUTS.LONG / 6,  // 5秒
+  SESSION_TTL: CORE.TIMEOUTS.LONG,              // 30秒
+  MAX_LOGIN_ATTEMPTS: 3,
+});
 
 /**
  * キャッシュされたサービスアカウントトークンを取得
  * @returns {string} アクセストークン
  */
 function getServiceAccountTokenCached() {
-  return cacheManager.get(AUTH_CACHE_KEY, generateNewServiceAccountToken, {
+  return cacheManager.get(SECURITY_CONFIG.AUTH_CACHE_KEY, generateNewServiceAccountToken, {
     ttl: 3500,
     enableMemoization: true,
   }); // メモ化対応でトークン取得を高速化
@@ -92,7 +96,7 @@ function generateNewServiceAccountToken() {
     throw new Error(errorMessage);
   }
 
-  var responseData = JSON.parse(response.getContentText());
+  const responseData = JSON.parse(response.getContentText());
   if (!responseData.access_token) {
     console.error('[ERROR]', 'No access token in response:', responseData);
     throw new Error(
@@ -108,7 +112,7 @@ function generateNewServiceAccountToken() {
  * トークンキャッシュをクリア
  */
 function clearServiceAccountTokenCache() {
-  cacheManager.remove(AUTH_CACHE_KEY);
+  cacheManager.remove(SECURITY_CONFIG.AUTH_CACHE_KEY);
   console.log('トークンキャッシュをクリアしました');
 }
 

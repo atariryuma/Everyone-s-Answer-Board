@@ -2,6 +2,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('isSystemSetup requires ADMIN_EMAIL and SERVICE_ACCOUNT_CREDS', () => {
+  const constantsCode = fs.readFileSync('src/constants.gs', 'utf8');
   const code = fs.readFileSync('src/main.gs', 'utf8');
   let context;
 
@@ -13,6 +14,7 @@ describe('isSystemSetup requires ADMIN_EMAIL and SERVICE_ACCOUNT_CREDS', () => {
       PropertiesService: { getScriptProperties: () => scriptProps },
     };
     vm.createContext(context);
+    vm.runInContext(constantsCode, context);
     vm.runInContext(code, context);
   });
 

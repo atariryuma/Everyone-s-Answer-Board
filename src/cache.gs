@@ -1273,13 +1273,13 @@ class ExecutionCache {
 // メモリキャッシュ - 実行セッション内で有効
 let spreadsheetMemoryCache = {};
 
-// キャッシュ設定
-const SPREADSHEET_CACHE_CONFIG = {
-  MEMORY_CACHE_TTL: 300000, // 5分間（メモリキャッシュ）
-  SESSION_CACHE_TTL: 1800000, // 30分間（PropertiesServiceキャッシュ）
-  MAX_CACHE_SIZE: 50, // 最大キャッシュエントリ数
-  CACHE_KEY_PREFIX: 'ss_cache_',
-};
+// Module-scoped constants (2024 GAS Best Practice)
+const CACHE_CONFIG = Object.freeze({
+  MEMORY_TTL: CORE.TIMEOUTS.LONG,     // 30秒（メモリキャッシュ）
+  SESSION_TTL: CORE.TIMEOUTS.LONG * 60,  // 30分（Propertiesキャッシュ）
+  MAX_SIZE: 50,
+  KEY_PREFIX: 'ss_cache_',
+});
 
 /**
  * キャッシュされたSpreadsheetオブジェクトを取得
@@ -1292,7 +1292,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
     throw new Error('有効なスプレッドシートIDが必要です');
   }
 
-  const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
+  const cacheKey = `${CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
   const now = Date.now();
 
   // 強制リフレッシュの場合はキャッシュをクリア
@@ -1310,7 +1310,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
 
   // Phase 1: メモリキャッシュをチェック
   const memoryEntry = spreadsheetMemoryCache[spreadsheetId];
-  if (memoryEntry && now - memoryEntry.timestamp < SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+  if (memoryEntry && now - memoryEntry.timestamp < CACHE_CONFIG.MEMORY_CACHE_TTL) {
     console.log(
       '✅ SpreadsheetApp.openById メモリキャッシュヒット:',
       spreadsheetId.substring(0, 10)
@@ -1326,7 +1326,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
     );
     if (sessionCacheData) {
       const sessionEntry = JSON.parse(sessionCacheData);
-      if (now - sessionEntry.timestamp < SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL) {
+      if (now - sessionEntry.timestamp < CACHE_CONFIG.SESSION_CACHE_TTL) {
         // セッションキャッシュからSpreadsheetオブジェクトを再構築
         const spreadsheet = resilientSpreadsheetOperation(
           () => SpreadsheetApp.openById(spreadsheetId),
@@ -1399,7 +1399,7 @@ function cleanupOldCacheEntries() {
   const memoryKeys = Object.keys(spreadsheetMemoryCache);
 
   // メモリキャッシュのクリーンアップ
-  if (memoryKeys.length > SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE) {
+  if (memoryKeys.length > CACHE_CONFIG.MAX_CACHE_SIZE) {
     const sortedEntries = memoryKeys
       .map((key) => ({
         key: key,
@@ -1408,7 +1408,7 @@ function cleanupOldCacheEntries() {
       .sort((a, b) => b.timestamp - a.timestamp);
 
     // 古いエントリを削除
-    const entriesToDelete = sortedEntries.slice(SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE);
+    const entriesToDelete = sortedEntries.slice(CACHE_CONFIG.MAX_CACHE_SIZE);
     entriesToDelete.forEach((entry) => {
       delete spreadsheetMemoryCache[entry.key];
     });
@@ -1419,7 +1419,7 @@ function cleanupOldCacheEntries() {
   // 期限切れエントリの削除
   memoryKeys.forEach((key) => {
     const entry = spreadsheetMemoryCache[key];
-    if (now - entry.timestamp > SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL) {
+    if (now - entry.timestamp > CACHE_CONFIG.MEMORY_CACHE_TTL) {
       delete spreadsheetMemoryCache[key];
     }
   });
@@ -1436,7 +1436,7 @@ function invalidateSpreadsheetCache(spreadsheetId) {
   delete spreadsheetMemoryCache[spreadsheetId];
 
   // セッションキャッシュから削除
-  const cacheKey = `${SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
+  const cacheKey = `${CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
   try {
     PropertiesService.getScriptProperties().deleteProperty(cacheKey);
     console.log('🗑️ SpreadsheetCache無効化:', spreadsheetId.substring(0, 10));
@@ -1458,7 +1458,7 @@ function clearAllSpreadsheetCache() {
     const allProps = props.getProperties();
 
     Object.keys(allProps).forEach((key) => {
-      if (key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)) {
+      if (key.startsWith(CACHE_CONFIG.CACHE_KEY_PREFIX)) {
         props.deleteProperty(key);
       }
     });
@@ -1481,7 +1481,7 @@ function getSpreadsheetCacheStats() {
   try {
     const allProps = PropertiesService.getScriptProperties().getProperties();
     sessionEntries = Object.keys(allProps).filter((key) =>
-      key.startsWith(SPREADSHEET_CACHE_CONFIG.CACHE_KEY_PREFIX)
+      key.startsWith(CACHE_CONFIG.CACHE_KEY_PREFIX)
     ).length;
   } catch (error) {
     console.log('キャッシュ統計取得エラー:', error.message);
@@ -1490,9 +1490,9 @@ function getSpreadsheetCacheStats() {
   return {
     memoryEntries: memoryEntries,
     sessionEntries: sessionEntries,
-    maxCacheSize: SPREADSHEET_CACHE_CONFIG.MAX_CACHE_SIZE,
-    memoryTTL: SPREADSHEET_CACHE_CONFIG.MEMORY_CACHE_TTL,
-    sessionTTL: SPREADSHEET_CACHE_CONFIG.SESSION_CACHE_TTL,
+    maxCacheSize: CACHE_CONFIG.MAX_CACHE_SIZE,
+    memoryTTL: CACHE_CONFIG.MEMORY_CACHE_TTL,
+    sessionTTL: CACHE_CONFIG.SESSION_CACHE_TTL,
   };
 }
 

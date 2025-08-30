@@ -3,12 +3,21 @@
  * GAS互換の関数ベースの実装
  */
 
-// 簡易インデックス機能：ユーザー検索の高速化
-var userIndexCache = {
+// Module-scoped constants (2024 GAS Best Practice)
+const DB_CONFIG = Object.freeze({
+  CACHE_TTL: CORE.TIMEOUTS.LONG,  // 30秒
+  BATCH_SIZE: 100,
+  LOCK_TIMEOUT: 10000,  // 10秒
+  SHEET_NAME: 'Users',
+  HEADERS: Object.freeze(['tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status']),
+});
+
+// 簡易インデックス機能：ユーザー検索の高速化  
+let userIndexCache = {
   byUserId: new Map(),
   byEmail: new Map(),
   lastUpdate: 0,
-  TTL: 300000, // 5分間のキャッシュ
+  TTL: DB_CONFIG.CACHE_TTL,
 };
 
 /**

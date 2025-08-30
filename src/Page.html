@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>StudyQuest - みんなのかいとうボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
     <link
       rel="preload"
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
@@ -19,51 +20,77 @@
     <link rel="preconnect" href="https://script.google.com" crossorigin />
     <script src="https://cdn.tailwindcss.com" defer></script>
     <script>
-      const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : false ?>';
-      const __DISPLAY_MODE__ =
-        '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
-      const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
-      const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
-      const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-      const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
-      const __SHOW_ADMIN_FEATURES__ =
-        '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>';
-      const __SHOW_HIGHLIGHT_TOGGLE__ =
-        '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>';
-      const __SHOW_SCORE_SORT__ =
-        '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>';
-      const __IS_STUDENT_MODE__ =
-        '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>';
-      const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>';
-      window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
-      window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
-      window.showAdminFeatures = __SHOW_ADMIN_FEATURES__.startsWith('<')
-        ? false
-        : __SHOW_ADMIN_FEATURES__ === 'true';
-      window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<')
-        ? false
-        : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
-      window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<')
-        ? false
-        : __SHOW_SCORE_SORT__ === 'true';
-      window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<')
-        ? true
-        : __IS_STUDENT_MODE__ === 'true';
-      window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
-      const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
-      const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
-      const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
-      let MAPPING;
-      try {
-        if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<')) {
-          MAPPING = JSON.parse(__MAPPING__);
-        } else {
-          MAPPING = {};
-        }
-      } catch (e) {
-        console.warn('Failed to parse MAPPING:', e);
-        MAPPING = {};
-      }
+      // Template Layer - 2024 GAS Best Practice
+      // 統一されたテンプレート変数受け取りシステム
+      
+      /**
+       * GASテンプレート変数を型安全に解析
+       * @param {Object} templateVars - テンプレート変数定義
+       * @returns {Object} 解析済み設定オブジェクト
+       */
+      const parseTemplateVars = (templateVars) => {
+        const result = {};
+        const defaults = {
+          showCounts: false,
+          displayMode: 'anonymous',
+          sheetName: 'テストシート',
+          userId: '',
+          ownerName: '',
+          showAdminFeatures: false,
+          showHighlightToggle: false,
+          showScoreSort: false,
+          isStudentMode: true,
+          isAdminUser: false,
+          mapping: {}
+        };
+        
+        Object.entries(templateVars).forEach(([key, rawValue]) => {
+          try {
+            // GASテンプレート未展開チェック
+            if (typeof rawValue === 'string' && rawValue.startsWith('<')) {
+              result[key] = defaults[key];
+              return;
+            }
+            
+            // 型別処理
+            if (key === 'mapping') {
+              result[key] = typeof rawValue === 'string' ? JSON.parse(rawValue) : (rawValue || defaults[key]);
+            } else if (typeof defaults[key] === 'boolean') {
+              result[key] = rawValue === 'true' || rawValue === true;
+            } else {
+              result[key] = rawValue || defaults[key];
+            }
+          } catch (error) {
+            console.warn(`Template variable parsing failed for ${key}:`, error);
+            result[key] = defaults[key];
+          }
+        });
+        
+        return Object.freeze(result);
+      };
+
+      // Template variables definition
+      const TEMPLATE_VARS = {
+        showCounts: '<?= typeof showCounts !== "undefined" ? showCounts : false ?>',
+        displayMode: '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>',
+        sheetName: '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>',
+        mapping: '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>',
+        userId: '<?= typeof userId !== "undefined" ? userId : "" ?>',
+        ownerName: '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>',
+        showAdminFeatures: '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>',
+        showHighlightToggle: '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>',
+        showScoreSort: '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>',
+        isStudentMode: '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>',
+        isAdminUser: '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>'
+      };
+
+      // 統一設定オブジェクト生成
+      const CONFIG = parseTemplateVars(TEMPLATE_VARS);
+      
+      // グローバル互換性のためのエクスポート
+      Object.assign(window, CONFIG);
+      
+      // 直接CONFIG使用推奨 - レガシー変数は削除済み
     </script>
     <style>
       :root {

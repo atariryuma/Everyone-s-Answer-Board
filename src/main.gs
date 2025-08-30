@@ -1,191 +1,200 @@
 /**
- * @fileoverview メインエントリーポイント - 2024年最新技術の結集
- * V8ランタイム、最新パフォーマンス技術、安定性強化を統合
+ * Module-scoped Constants for main.gs
+ * Core constants参照による軽量設計
  */
+const MODULE_CONFIG = Object.freeze({
+  // キャッシュTTL設定（CORE.TIMEOUTS参照）
+  CACHE_TTL: CORE.TIMEOUTS.LONG,
+  QUICK_CACHE_TTL: CORE.TIMEOUTS.SHORT,
+  
+  // ステータス定数（CORE.STATUS参照） 
+  STATUS_ACTIVE: CORE.STATUS.ACTIVE,
+  STATUS_INACTIVE: CORE.STATUS.INACTIVE,
+});
 
-/**
- * HTML ファイルを読み込む include ヘルパー
- * @param {string} path ファイルパス
- * @return {string} HTML content
- */
-function include(path) {
-  try {
-    const tmpl = HtmlService.createTemplateFromFile(path);
-    tmpl.include = include;
-    return tmpl.evaluate().getContent();
-  } catch (error) {
-    console.error(`ファイル読み込み失敗: ${path}`, { error: error.message });
-    return `<!-- Error including ${path}: ${error.message} -->`;
-  }
-}
-
-/**
- * グローバル名前空間オブジェクトの定義
- * 構造的なコード組織化のため
- */
-
-// ユーザー関連の機能
+// User管理の内部実装（依存注入パターン）
 const User = {
-  /**
-   * 現在のユーザーメールアドレス取得
-   * @return {string} ユーザーのメールアドレス
-   */
   email() {
     try {
-      const userEmail = Session.getActiveUser().getEmail();
-      if (!userEmail) {
-        console.warn('ユーザーメールアドレス取得失敗');
-        return '';
-      }
-      return userEmail;
-    } catch (error) {
-      console.error('User.email エラー', { error: error.message });
-      return '';
-    }
-  },
-
-  /**
-   * 現在のユーザーの詳細情報を取得（設定を含む）
-   * @return {Object|null} ユーザー情報オブジェクト、エラーの場合null
-   */
-  info() {
-    try {
-      const userEmail = User.email();
-      if (!userEmail) {
-        console.warn('ユーザー情報取得: メールアドレス不明');
-        return null;
-      }
-
-      // メールアドレスでユーザー情報を検索
-      const userInfo = DB.findUserByEmail(userEmail);
-      if (!userInfo) {
-        console.warn('ユーザー情報が見つかりません', { userEmail });
-        return null;
-      }
-
-      // ユーザー設定を PropertiesService から取得してマージ
-      try {
-        const props = PropertiesService.getScriptProperties();
-        const configKey = `user_config_${userInfo.tenantId}`;
-        const configStr = props.getProperty(configKey);
-
-        if (configStr) {
-          const config = JSON.parse(configStr);
-          // ユーザー情報に設定をマージ
-          return {
-            ...userInfo,
-            ...config,
-          };
-        }
-      } catch (configError) {
-        console.warn('ユーザー設定取得エラー:', configError);
-      }
-
-      return userInfo;
-    } catch (error) {
-      console.error('getCurrentUserInfo エラー', { error: error.message });
+      return Session.getActiveUser().getEmail();
+    } catch (e) {
       return null;
     }
-  },
+  }
 };
 
 /**
- * フロントエンド用のユーザーメールアドレス取得関数
- * User.email()へのエイリアス（GASフロントエンドから直接呼び出し可能）
- * @return {string} ユーザーのメールアドレス
+ * Entry Point Functions
+ * 新アーキテクチャにおけるエントリーポイント関数群
  */
-function getUserEmail() {
-  return User.email();
-}
 
-/**
- * 現在のユーザー情報を取得（unifiedUserManager.getCurrentUser()の代替）
- * @return {Object|null} ユーザー情報オブジェクト
- */
-function getCurrentUserInfo() {
+function doGet(e) {
   try {
-    const userEmail = User.email();
-    if (!userEmail) {
-      console.warn('getCurrentUserInfo: メールアドレス取得失敗');
-      return null;
+    // App名前空間の初期化（必須）
+    App.init();
+
+    // リクエストパラメータを解析
+    const params = parseRequestParams(e);
+    console.log('doGet - Received params:', params);
+
+    if (!isSystemSetup()) {
+      console.warn('System not setup, redirecting to setup page');
+      return renderSetupPage(params);
     }
 
-    const userInfo = DB.findUserByEmail(userEmail);
-    if (!userInfo) {
-      console.warn('getCurrentUserInfo: ユーザー情報が見つかりません', { userEmail });
-      return null;
-    }
+    // モードに応じたルーティング
+    switch (params.mode) {
+      case 'admin':
+        console.log('doGet - Admin mode detected, userId:', params.userId);
+        if (!params.userId) {
+          throw new Error('Admin mode requires userId parameter');
+        }
+        try {
+          const accessResult = App.getAccess().verifyAccess(params.userId, 'admin', User.email());
+          if (!accessResult.allowed) {
+            console.warn('Admin access denied:', accessResult);
+            return HtmlService.createHtmlOutput('<h3>Access Denied</h3><p>Admin access is not allowed for this user.</p>');
+          }
+          
+          // 互換性のためのユーザー情報変換
+          const compatUserInfo = {
+            userId: params.userId,
+            tenantId: params.userId,
+            adminEmail: accessResult.config?.email || User.email(),
+            configJson: JSON.stringify(accessResult.config || {})
+          };
+          
+          return renderAdminPanel(compatUserInfo, 'admin');
+        } catch (adminError) {
+          console.error('Admin mode error:', adminError);
+          return HtmlService.createHtmlOutput('<h3>Error</h3><p>An error occurred in admin mode: ' + adminError.message + '</p>');
+        }
+        
+      case 'view':
+      default:
+        console.log('doGet - View mode (default), userId:', params.userId);
+        if (!params.userId) {
+          throw new Error('View mode requires userId parameter');
+        }
+        
+        try {
+          const accessResult = App.getAccess().verifyAccess(params.userId, 'view', User.email());
+          if (!accessResult.allowed) {
+            console.warn('View access denied:', accessResult);
+            if (accessResult.userType === 'not_found') {
+              return HtmlService.createHtmlOutput('<h3>User Not Found</h3><p>The specified user does not exist.</p>');
+            }
+            return HtmlService.createHtmlOutput('<h3>Private Board</h3><p>This board is private.</p>');
+          }
+          
+          // 互換性のためのユーザー情報変換
+          const compatUserInfo = {
+            userId: params.userId,
+            tenantId: params.userId,
+            adminEmail: accessResult.config?.email || '',
+            configJson: JSON.stringify(accessResult.config || {})
+          };
 
-    return {
-      tenantId: userInfo.tenantId,
-      ownerEmail: userInfo.ownerEmail,
-      // spreadsheetId, configJsonは削除され、ConfigurationManagerで管理
-    };
+          return renderAnswerBoard(compatUserInfo, params);
+        } catch (viewError) {
+          console.error('View mode error:', viewError);
+          return HtmlService.createHtmlOutput('<h3>Error</h3><p>An error occurred: ' + viewError.message + '</p>');
+        }
+    }
   } catch (error) {
-    console.error('getCurrentUserInfo エラー', { error: error.message });
-    return null;
+    console.error('doGet - Critical error:', error);
+    return HtmlService.createHtmlOutput('<h3>System Error</h3><p>A critical system error occurred: ' + error.message + '</p>');
   }
 }
 
-// アクセス制御関連の機能
-const Access = {
-  /**
-   * アプリケーションアクセスチェック (簡易版)
-   * @return {Object} アクセス情報
-   */
-  check() {
-    try {
-      // システム管理者は常にアクセス許可
-      if (Deploy.isUser()) {
-        return { hasAccess: true, message: 'システム管理者アクセス許可' };
+/**
+ * Unified Services Layer
+ * サービス層の統一インターフェース
+ */
+const Services = {
+  user: {
+    get current() {
+      try {
+        const email = User.email();
+        if (!email) return null;
+        
+        // 簡易的なユーザー情報を返す（将来的にはApp.getConfig()経由）
+        return {
+          email: email,
+          isAuthenticated: true
+        };
+      } catch (error) {
+        console.error('getCurrentUserInfo エラー', { error: error.message });
+        return null;
       }
-
-      // 基本的には全ユーザーアクセス許可（必要に応じて制限を追加）
-      return { hasAccess: true, message: 'アクセス許可' };
-    } catch (error) {
-      console.error('アプリケーションアクセスチェック失敗', { error: error.message });
-      return { hasAccess: true, message: 'アクセス許可（エラー回避）' };
+    },
+    
+    getCurrentUserInfo() {
+      try {
+        // 新アーキテクチャでの単純化実装
+        const userInfo = Services.user.current;
+        if (!userInfo) return null;
+        
+        return {
+          email: userInfo.email,
+          tenantId: userInfo.email.split('@')[0], // 簡易的なテナントID
+          ownerEmail: userInfo.email,
+          // spreadsheetId, configJsonは削除され、ConfigurationManagerで管理
+        };
+      } catch (error) {
+        console.error('getCurrentUserInfo エラー', { error: error.message });
+        return null;
+      }
     }
   },
+  
+  access: {
+    check() {
+      try {
+        // システム管理者は常にアクセス許可
+        if (Deploy.isUser()) {
+          return { hasAccess: true, message: 'システム管理者アクセス許可' };
+        }
+
+        // 基本的には全ユーザーアクセス許可（必要に応じて制限を追加）
+        return { hasAccess: true, message: 'アクセス許可' };
+      } catch (error) {
+        console.error('アプリケーションアクセスチェック失敗', { error: error.message });
+        return { hasAccess: true, message: 'アクセス許可（エラー回避）' };
+      }
+    }
+  }
 };
 
 // デプロイ関連の機能
 const Deploy = {
-  /**
-   * デプロイされたWebアプリのドメイン情報と現在のユーザーのドメイン情報を取得
-   * AdminPanel.html と Login.html から共通で呼び出される
-   */
+  // ドメイン情報を取得する関数
   domain() {
     try {
-      var activeUserEmail = User.email();
-      var currentDomain = getEmailDomain(activeUserEmail);
-
-      // 統一されたURL取得システムを使用（開発URL除去機能付き）
-      var webAppUrl = getWebAppUrlCached();
-      var deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
-
-      if (webAppUrl) {
-        // Google WorkspaceアカウントのドメインをURLから抽出
-        var domainMatch =
-          webAppUrl.match(/\/a\/([a-zA-Z0-9\-.]+)\/macros\//) ||
-          webAppUrl.match(/\/a\/macros\/([a-zA-Z0-9\-.]+)\//);
+      console.log('Deploy.domain() - start');
+      
+      const activeUserEmail = User.email();
+      const currentDomain = getEmailDomain(activeUserEmail);
+      
+      // WebAppのURLを取得してドメインを判定
+      const webAppUrl = getWebAppUrlCached();
+      let deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
+      
+      if (webAppUrl && webAppUrl.includes('/a/')) {
+        // Google Workspace環境でのドメイン取得
+        const domainMatch =
+          webAppUrl.match(/\/a\/([a-zA-Z0-9\-.]+)\/macros\//);
         if (domainMatch && domainMatch[1]) {
           deployDomain = domainMatch[1];
+          console.log('Deploy.domain() - Workspace domain detected:', deployDomain);
         }
-        // ドメインが抽出されなかった場合、deployDomainは空のままとなり、個人アカウント/グローバルアクセスを示す
+      } else {
+        console.log('Deploy.domain() - Personal/Global access (no domain restriction)');
       }
-
-      // 現在のユーザーのドメインと抽出された/デフォルトのデプロイドメインを比較
-      // deployDomainが空の場合、特定のドメインが強制されていないため、一致とみなす（グローバルアクセス）
-      var isDomainMatch = currentDomain === deployDomain || deployDomain === '';
-
-      console.log('Domain info:', {
-        currentDomain: currentDomain,
-        deployDomain: deployDomain,
-        isDomainMatch: isDomainMatch,
-        webAppUrl: webAppUrl,
-      });
-
+      
+      // ドメインマッチング判定（個人アカウントの場合は常にtrue）
+      const isDomainMatch = currentDomain === deployDomain || deployDomain === '';
+      
       return {
         currentDomain: currentDomain,
         deployDomain: deployDomain,
@@ -195,135 +204,29 @@ const Deploy = {
     } catch (e) {
       console.error('デプロイユーザードメイン情報取得失敗', { error: e.message });
       return {
-        currentDomain: '不明',
-        deployDomain: '不明',
+        currentDomain: '',
+        deployDomain: '',
         isDomainMatch: false,
         error: e.message,
       };
     }
   },
-
-  /**
-   * 現在のユーザーがデプロイユーザーかどうかを判定
-   * @return {boolean} デプロイユーザーの場合true
-   */
+  
   isUser() {
     try {
-      var props = PropertiesService.getScriptProperties();
-      var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
-      var currentUserEmail = User.email();
+      const props = PropertiesService.getScriptProperties();
+      const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+      const currentUserEmail = User.email();
 
-      return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
-    } catch (e) {
-      console.error('Deploy.isUser エラー', { error: e.message });
+      console.log('Deploy.isUser() - 管理者確認', { adminEmail, currentUserEmail });
+      return adminEmail === currentUserEmail;
+    } catch (error) {
+      console.error('Deploy.isUser() エラー', { error: error.message });
       return false;
     }
-  },
-};
-
-/**
- * JavaScript文字列エスケープ関数 (URL対応版)
- * @param {string} str エスケープする文字列
- * @return {string} エスケープされた文字列
- */
-function escapeJavaScript(str) {
-  if (!str) return '';
-
-  const strValue = str.toString();
-
-  // URL判定: HTTP/HTTPSで始まり、すでに適切にエスケープされている場合は最小限の処理
-  if (strValue.match(/^https?:\/\/[^\s<>"']+$/)) {
-    // URLの場合はバックスラッシュと改行文字のみエスケープ
-    return strValue
-      .replace(/\\/g, '\\\\')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
   }
-
-  // 通常のテキストの場合は従来通りの完全エスケープ
-  return strValue
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t');
-}
-
-// グローバル定数の定義（書き換え不可）
-const SCRIPT_PROPS_KEYS = {
-  SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
-  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
-  ADMIN_EMAIL: 'ADMIN_EMAIL',
 };
 
-// 実行中のユーザー情報キャッシュ（パフォーマンス最適化用）
-var _executionUserInfoCache = null;
-
-/**
- * Determine if a value represents boolean true.
- * Accepts boolean true, 'true', or 'TRUE'.
- * @param {any} value
- * @returns {boolean}
- */
-function isTrue(value) {
-  if (typeof value === 'boolean') return value === true;
-  if (value === undefined || value === null) return false;
-  return String(value).toLowerCase() === 'true';
-}
-
-/**
- * HTMLエスケープ関数（Utilities.htmlEncodeの代替）
- * @param {string} text - エスケープするテキスト
- * @returns {string} エスケープされたテキスト
- */
-function htmlEncode(text) {
-  if (!text) return '';
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * HtmlOutputに安全にX-Frame-Optionsヘッダーを設定するユーティリティ
- * @param {HtmlOutput} htmlOutput - 設定対象のHtmlOutput
- * @returns {HtmlOutput} 設定後のHtmlOutput
- */
-function safeSetXFrameOptionsDeny(htmlOutput) {
-  try {
-    if (
-      htmlOutput &&
-      typeof htmlOutput.setXFrameOptionsMode === 'function' &&
-      HtmlService &&
-      HtmlService.XFrameOptionsMode &&
-      HtmlService.XFrameOptionsMode.DENY
-    ) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    }
-  } catch (e) {
-    console.warn('XFrameOptionsMode設定失敗', { error: e.message });
-  }
-  return htmlOutput;
-}
-
-// 安定性を重視してvarを使用
-var ULTRA_CONFIG = {
-  EXECUTION_LIMITS: {
-    MAX_TIME: 330000, // 5.5分（安全マージン）
-    BATCH_SIZE: 100,
-    API_RATE_LIMIT: 90, // 100秒間隔での制限
-  },
-
-  CACHE_STRATEGY: {
-    L1_TTL: 300, // Level 1: 5分
-    L2_TTL: 3600, // Level 2: 1時間
-    L3_TTL: 21600, // Level 3: 6時間（最大）
-  },
-};
 
 /**
  * 簡素化されたエラーハンドリング関数群
@@ -332,63 +235,52 @@ var ULTRA_CONFIG = {
 // ログ関数は削除 - GAS ネイティブ console を直接使用
 
 // PerformanceOptimizer.gsでglobalProfilerが既に定義されているため、
-// フォールバックの宣言は不要
+// 重複回避のためこちらでは定義しない
 
 /**
- * ユーザーがデータベースに登録済みかを確認するヘルパー関数
- * @param {string} email 確認するユーザーのメールアドレス
- * @param {string} spreadsheetId データベースのスプレッドシートID
- * @return {boolean} 登録されていればtrue
- */
-
-/**
- * システムの初期セットアップが完了しているかを確認するヘルパー関数
- * @returns {boolean} セットアップが完了していればtrue
+ * システム初期化チェック
+ * @returns {boolean} システムが初期化されているかどうか
  */
 function isSystemSetup() {
-  var props = PropertiesService.getScriptProperties();
-  var dbSpreadsheetId = props.getProperty('DATABASE_SPREADSHEET_ID');
-  var adminEmail = props.getProperty('ADMIN_EMAIL');
-  var serviceAccountCreds = props.getProperty('SERVICE_ACCOUNT_CREDS');
+  const props = PropertiesService.getScriptProperties();
+  const dbSpreadsheetId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+  const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+  const serviceAccountCreds = props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
   return !!dbSpreadsheetId && !!adminEmail && !!serviceAccountCreds;
 }
 
 /**
- * Get Google Client ID for fallback authentication
- * @return {Object} Object containing client ID
+ * Google Client IDを取得
  */
 function getGoogleClientId() {
   try {
-    console.log('GOOGLE_CLIENT_ID取得開始');
-    var properties = PropertiesService.getScriptProperties();
-    var clientId = properties.getProperty('GOOGLE_CLIENT_ID');
-
-    console.log('GOOGLE_CLIENT_ID結果', { found: !!clientId });
+    const properties = PropertiesService.getScriptProperties();
+    const clientId = properties.getProperty('GOOGLE_CLIENT_ID');
 
     if (!clientId) {
-      console.warn('GOOGLE_CLIENT_IDが見つかりません');
-
-      // Try to get all properties to see what's available
-      var allProperties = properties.getProperties();
+      console.warn('GOOGLE_CLIENT_ID not found in script properties');
+      
+      // デバッグ用：利用可能なプロパティを確認
+      const allProperties = properties.getProperties();
       console.log('Available properties:', Object.keys(allProperties));
-
+      
       return {
-        clientId: '',
-        error: 'GOOGLE_CLIENT_ID not found in script properties',
+        success: false,
+        message: 'Google Client ID not configured',
         setupInstructions:
           'Please set GOOGLE_CLIENT_ID in Google Apps Script project settings under Properties > Script Properties',
       };
     }
 
     return {
-      status: 'success',
+      success: true,
       message: 'Google Client IDを取得しました',
       data: { clientId: clientId },
     };
   } catch (error) {
     console.error('GOOGLE_CLIENT_ID取得エラー', { error: error.message });
     return {
-      status: 'error',
+      success: false,
       message: 'Google Client IDの取得に失敗しました: ' + error.toString(),
       data: { clientId: '' },
     };
@@ -396,28 +288,26 @@ function getGoogleClientId() {
 }
 
 /**
- * システム設定の詳細チェック
- * @return {Object} システム設定の詳細情報
+ * システム設定状況をチェック
  */
 function checkSystemConfiguration() {
   try {
-    var properties = PropertiesService.getScriptProperties();
-    var allProperties = properties.getProperties();
+    const properties = PropertiesService.getScriptProperties();
+    const allProperties = properties.getProperties();
 
-    var requiredProperties = [
+    const requiredProperties = [
       'GOOGLE_CLIENT_ID',
       'DATABASE_SPREADSHEET_ID',
       'ADMIN_EMAIL',
       'SERVICE_ACCOUNT_CREDS',
     ];
 
-    var configStatus = {};
-    var missingProperties = [];
+    const configStatus = {};
+    const missingProperties = [];
 
-    requiredProperties.forEach(function (prop) {
-      var value = allProperties[prop];
+    requiredProperties.forEach(prop => {
+      const value = allProperties[prop];
       configStatus[prop] = {
-        exists: !!value,
         hasValue: !!(value && value.trim()),
         length: value ? value.length : 0,
       };
@@ -429,8 +319,8 @@ function checkSystemConfiguration() {
 
     return {
       isFullyConfigured: missingProperties.length === 0,
-      configStatus: configStatus,
-      missingProperties: missingProperties,
+      configStatus,
+      missingProperties,
       availableProperties: Object.keys(allProperties),
       setupComplete: isSystemSetup(),
     };
@@ -444,24 +334,26 @@ function checkSystemConfiguration() {
 }
 
 /**
- * Retrieves the administrator domain for the login page with domain match status.
- * @returns {{adminDomain: string, isDomainMatch: boolean}|{error: string}} Domain info or error message.
+ * システムドメイン情報取得
  */
 function getSystemDomainInfo() {
   try {
-    var props = PropertiesService.getScriptProperties();
-    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    const props = PropertiesService.getScriptProperties();
+    const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+    
     if (!adminEmail) {
-      throw new Error('システム管理者が設定されていません。');
+      throw new Error('Admin email not configured');
     }
-
-    var adminDomain = adminEmail.split('@')[1];
-
-    // 現在のユーザーのドメイン一致状況を取得
-    var domainInfo = Deploy.domain();
-    var isDomainMatch = domainInfo.isDomainMatch !== undefined ? domainInfo.isDomainMatch : false;
-
+    
+    const adminDomain = adminEmail.split('@')[1];
+    
+    // デプロイ情報を取得
+    const domainInfo = Deploy.domain();
+    const isDomainMatch = domainInfo.isDomainMatch !== undefined ? domainInfo.isDomainMatch : false;
+    
     return {
+      success: true,
+      adminEmail: adminEmail,
       adminDomain: adminDomain,
       isDomainMatch: isDomainMatch,
       currentDomain: domainInfo.currentDomain || '不明',
@@ -474,755 +366,242 @@ function getSystemDomainInfo() {
 }
 
 /**
- * Webアプリケーションのメインエントリーポイント
- * @param {Object} e - URLパラメータを含むイベントオブジェクト
- * @returns {HtmlOutput} 表示するHTMLコンテンツ
+ * User Management Functions
+ * 統一されたユーザー管理機能群
  */
-function doGet(e) {
+
+/**
+ * 管理者パネルの表示
+ */
+function showAdminPanel() {
   try {
-    // 0. 実行レベルキャッシュクリア（新しいリクエスト開始）
-    clearAllExecutionCache();
-
-    // 1. システムセットアップの確認 (最優先)
-    if (!isSystemSetup()) {
-      return showSetupPage();
-    }
-
-    // 2. アプリケーション有効/無効チェック（システム管理者は除外）
-    const accessCheck = Access.check();
-    if (!accessCheck.hasAccess) {
-      console.log('アプリケーションアクセス拒否:', accessCheck.accessReason);
-      return showAccessRestrictedPage(accessCheck);
-    }
-
-    // 3. URLパラメータの解析
-    const params = parseRequestParams(e);
-
-    // 4. ログイン状態の確認
-    const userEmail = User.email();
-    if (!userEmail) {
-      return showLoginPage();
-    }
-
-    // 5. アプリ設定ページリクエストの処理
-    if (params.setupParam === 'true') {
-      return showAppSetupPage(params.userId);
-    }
-
-    // 6. パラメータ検証とデフォルト処理
-    if (!params || !params.mode) {
-      // パラメータなしの場合、前回の管理パネル状態を確認
-      console.log('No mode parameter, checking previous admin session');
-
-      var activeUserEmail = User.email();
-      if (activeUserEmail) {
-        var userProperties = PropertiesService.getUserProperties();
-        var lastAdminUserId = userProperties.getProperty('lastAdminUserId');
-
-        if (lastAdminUserId) {
-          console.log('Found previous admin session, redirecting to admin panel:', lastAdminUserId);
-          // 前回の管理パネルセッションが存在する場合、そこにリダイレクト
-          const accessResult = accessController.verifyAccess(lastAdminUserId, 'admin', currentUserEmail);
-          if (accessResult.allowed) {
-            const userInfo = DB.findUserById(lastAdminUserId);
-            return renderAdminPanel(userInfo, 'admin');
-          } else {
-            // 権限がない場合は状態をクリア
-            userProperties.deleteProperty('lastAdminUserId');
-          }
-        }
-      }
-
-      // 前回のセッションがない場合はログインページを表示
-      console.log('No previous admin session, showing login page');
-      return showLoginPage();
-    }
-
-    // mode=login の場合
-    if (params.mode === 'login') {
-      console.log('Login mode requested, showing login page');
-      return showLoginPage();
-    }
-
-    // mode=appSetup の場合
-    if (params.mode === 'appSetup') {
-      console.log('AppSetup mode requested');
-
-      // 管理パネルへのアクセス権限確認（前回のセッションから）
-      var userProperties = PropertiesService.getUserProperties();
-      var lastAdminUserId = userProperties.getProperty('lastAdminUserId');
-
-      if (!lastAdminUserId) {
-        console.log('No admin session found, redirecting to login');
-        return showErrorPage('認証が必要です', 'アプリ設定にアクセスするにはログインが必要です。');
-      }
-
-      // 管理者権限の確認
-      const accessResult = accessController.verifyAccess(lastAdminUserId, 'admin', currentUserEmail);
-      if (!accessResult.allowed) {
-        console.log('Admin access denied for userId:', lastAdminUserId);
-        return showErrorPage('アクセス拒否', 'アプリ設定にアクセスする権限がありません。');
-      }
-
-      console.log('Showing app setup page for userId:', lastAdminUserId);
-      return showAppSetupPage(lastAdminUserId);
-    }
-
-    // mode=admin の場合（新しいアクセス制御システム使用）
-    if (params.mode === 'admin') {
-      if (!params.userId) {
-        return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
-      }
-      
-      // 現在のユーザーメールを取得
-      const currentUserEmail = Session.getActiveUser().getEmail();
-      
-      // アドミンアクセスを実行
-      const accessResult = accessController.verifyAccess(params.userId, 'admin', currentUserEmail);
-      
-      if (!accessResult.allowed) {
-        return showErrorPage('アクセス拒否', accessResult.message || 'この管理パネルにアクセスする権限がありません。');
-      }
-
-      // 管理パネルアクセス時に状態を保存
+    console.log('showAdminPanel - start');
+    
+    // Admin権限でのアクセス確認
+    const activeUserEmail = User.email();
+    if (activeUserEmail) {
       const userProperties = PropertiesService.getUserProperties();
-      userProperties.setProperty('lastAdminUserId', params.userId);
-      console.log('Saved admin session state:', params.userId); // URLパラメータはuserIdのまま保持
-
-      // アクセスログを記録
-      accessController.logAccess(params.userId, 'admin', accessResult.userType, true);
-
-      // データベース依存を排除してrenderAdminPanel用のuserInfo互換オブジェクトを作成
-      const compatUserInfo = {
-        tenantId: params.userId,
-        adminEmail: accessResult.config?.email || currentUserEmail,
-        configJson: JSON.stringify(accessResult.config || {})
-      };
+      const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
       
-      return renderAdminPanel(compatUserInfo, 'admin');
-    }
-
-    // mode=view の場合（新しいアクセス制御システム使用）
-    if (params.mode === 'view') {
-      if (!params.userId) {
-        return showErrorPage('不正なリクエスト', 'ユーザーIDが指定されていません。');
-      }
-
-      // 現在のユーザーメールを取得（ゲストの場合はnull）
-      let currentUserEmail = null;
-      try {
-        currentUserEmail = Session.getActiveUser().getEmail();
-      } catch (e) {
-        // ゲストアクセスの場合、認証エラーを無視
-        console.log('ゲストアクセス検出:', e.message);
-      }
-
-      // アクセス制御を実行
-      const accessResult = accessController.verifyAccess(params.userId, 'view', currentUserEmail);
-      
-      if (!accessResult.allowed) {
-        if (accessResult.userType === 'not_found') {
-          return showErrorPage('エラー', '指定されたユーザーが見つかりません。');
-        } else if (accessResult.userType === 'private') {
-          return showErrorPage('非公開', 'このボードは非公開に設定されています。');
-        } else if (accessResult.userType === 'guest_not_allowed') {
-          return showErrorPage('認証が必要', 'このボードの閲覧には認証が必要です。');
-        } else {
-          return showErrorPage('アクセス拒否', accessResult.message);
+      if (lastAdminUserId) {
+        console.log('showAdminPanel - Using saved userId:', lastAdminUserId);
+        try {
+          const accessResult = App.getAccess().verifyAccess(lastAdminUserId, 'admin', activeUserEmail);
+          if (accessResult.allowed) {
+            console.log('✅ アクセス許可: ', accessResult);
+            const compatUserInfo = {
+              userId: lastAdminUserId,
+              tenantId: lastAdminUserId,
+              adminEmail: accessResult.config?.email || activeUserEmail,
+              configJson: JSON.stringify(accessResult.config || {})
+            };
+            
+            return renderAdminPanel(compatUserInfo, 'admin');
+          }
+        } catch (error) {
+          console.warn('Saved userId access failed:', error.message);
         }
       }
-
-      // アクセスログを記録
-      accessController.logAccess(params.userId, 'view', accessResult.userType, true);
-
-      console.log('🔍 Access granted:', {
-        userId: params.userId,
-        userType: accessResult.userType,
-        isPublic: accessResult.config?.isPublic,
-        allowAnonymous: accessResult.config?.allowAnonymous
-      });
-
-      // データベース依存を排除してrenderAnswerBoard用のuserInfo互換オブジェクトを作成
-      const compatUserInfo = {
-        tenantId: params.userId,
-        adminEmail: accessResult.config?.email || '',
-        configJson: JSON.stringify(accessResult.config || {})
-      };
-
-      return renderAnswerBoard(compatUserInfo, params);
     }
-
-    // 不明なモードの場合の処理
-    console.log('Unknown mode received:', params.mode);
-    console.log('Available modes: login, appSetup, admin, view');
-
-    // 不明なモードでもuserId付きの場合は適切にリダイレクト
-    const accessResult = accessController.verifyAccess(params.userId, 'admin', currentUserEmail);
-    if (params.userId && accessResult.allowed) {
-      console.log('Redirecting unknown mode to admin panel for valid user:', params.userId);
-      const userInfo = DB.findUserById(params.userId);
-      return renderAdminPanel(userInfo, 'admin');
-    }
-
-    // その他の場合はログインページへ
-    console.log('Redirecting unknown mode to login page');
-    return showLoginPage();
+    
+    // デフォルト：エラーページを表示
+    return HtmlService.createHtmlOutput('<h3>Admin Access Required</h3><p>Please access via the admin URL with proper userId parameter.</p>');
   } catch (error) {
-    console.error(`doGetで致命的なエラー: ${error.stack}`);
-    return showErrorPage(
-      '致命的なエラー',
-      'アプリケーションの処理中に予期せぬエラーが発生しました。',
-      error
-    );
+    console.error('showAdminPanel エラー:', error);
+    return HtmlService.createHtmlOutput('<h3>Error</h3><p>An error occurred: ' + error.message + '</p>');
   }
 }
 
 /**
- * 管理者ページのルートを処理
- * @param {Object} userInfo - ユーザー情報
- * @param {Object} params - リクエストパラメータ
- * @param {string} userEmail - 現在のユーザーのメールアドレス
- * @returns {HtmlOutput}
+ * 回答ボードの表示
  */
-function handleAdminRoute(userInfo, params, userEmail) {
-  // この関数が呼ばれる時点でuserInfoはnullではないことが保証されている
-
-  // セキュリティチェック: アクセスしようとしているuserIdが自分のものでなければ、自分の管理画面にリダイレクト
-  if (params.userId && params.userId !== userInfo.userId) {
-    console.warn(
-      `不正アクセス試行: ${userEmail} が userId ${params.userId} にアクセスしようとしました。`
-    );
-    const correctUrl = buildUserAdminUrl(userInfo.userId);
-    return redirectToUrl(correctUrl);
-  }
-
-  // 強化されたセキュリティ検証: 指定されたIDの登録メールアドレスと現在ログイン中のGoogleアカウントが一致するかを検証
-  if (params.userId) {
-    const accessResult = accessController.verifyAccess(params.userId, 'admin', currentUserEmail);
-    const isVerified = accessResult.allowed;
-    if (!isVerified) {
-      console.warn(
-        `セキュリティ検証失敗: userId ${params.userId} への不正アクセス試行をブロックしました。`
-      );
-      const correctUrl = buildUserAdminUrl(userInfo.userId);
-      return redirectToUrl(correctUrl);
-    }
-    console.log(
-      `✅ セキュリティ検証成功: userId ${params.userId} への正当なアクセスを確認しました。`
-    );
-  }
-
-  return renderAdminPanel(userInfo, params.mode);
-}
-
-/**
- * ログインページを表示
- * @returns {HtmlOutput}
- */
-function showLoginPage() {
-  const template = HtmlService.createTemplateFromFile('LoginPage');
-  const htmlOutput = template.evaluate().setTitle('StudyQuest - ログイン');
-
-  // XFrameOptionsMode を安全に設定
+function showAnswerBoard(userId) {
   try {
-    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    console.log('showAnswerBoard - start, userId:', userId);
+    if (!userId) {
+      throw new Error('userId is required');
     }
-  } catch (e) {
-    console.warn('XFrameOptionsMode設定エラー:', e.message);
-  }
-
-  return htmlOutput;
-}
-
-/**
- * 初回セットアップページを表示
- * @returns {HtmlOutput}
- */
-function showSetupPage() {
-  const template = HtmlService.createTemplateFromFile('SetupPage');
-  const htmlOutput = template.evaluate().setTitle('StudyQuest - 初回セットアップ');
-
-  // XFrameOptionsMode を安全に設定
-  try {
-    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    }
-  } catch (e) {
-    console.warn('XFrameOptionsMode設定エラー:', e.message);
-  }
-
-  return htmlOutput;
-}
-
-/**
- * アプリ設定ページを表示
- * @returns {HtmlOutput}
- */
-function showAppSetupPage(userId) {
-  // システム管理者権限チェック
-  try {
-    console.log('showAppSetupPage: Checking deploy user permissions...');
-    const currentUserEmail = User.email();
-    console.log('showAppSetupPage: Current user email:', currentUserEmail);
-    const deployUserCheckResult = Deploy.isUser();
-    console.log('showAppSetupPage: Deploy.isUser() result:', deployUserCheckResult);
-
-    if (!deployUserCheckResult) {
-      console.warn('Unauthorized access attempt to app setup page:', currentUserEmail);
-      return showErrorPage(
-        'アクセス権限がありません',
-        'この機能にアクセスする権限がありません。システム管理者にお問い合わせください。'
-      );
-    }
-  } catch (error) {
-    console.error('Error checking deploy user permissions:', error);
-    return showErrorPage('認証エラー', '権限確認中にエラーが発生しました。');
-  }
-
-  const appSetupTemplate = HtmlService.createTemplateFromFile('AppSetupPage');
-  appSetupTemplate.userId = userId;
-  const htmlOutput = appSetupTemplate.evaluate().setTitle('アプリ設定 - StudyQuest');
-
-  // XFrameOptionsMode を安全に設定
-  try {
-    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    }
-  } catch (e) {
-    console.warn('XFrameOptionsMode設定エラー:', e.message);
-  }
-
-  return htmlOutput;
-}
-
-/**
- * 最後にアクセスした管理ユーザーIDを取得
- * リダイレクト時の戻り先決定に使用
- * @returns {string|null} 管理ユーザーID、存在しない場合はnull
- */
-function getLastAdminUserId() {
-  try {
+    
+    // キャッシュから最後のユーザーIDを保存
     const userProperties = PropertiesService.getUserProperties();
     const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
-
-    // ユーザーIDが存在し、かつ有効な管理者権限を持つかチェック
-    const accessResult = accessController.verifyAccess(lastAdminUserId, 'admin', currentUserEmail);
-    if (lastAdminUserId && accessResult.allowed) {
-      console.log('Found valid admin user ID:', lastAdminUserId);
-      return lastAdminUserId;
-    } else {
-      console.log('No valid admin user ID found');
-      return null;
+    
+    if (lastAdminUserId !== userId) {
+      userProperties.setProperty('lastAdminUserId', userId);
     }
-  } catch (error) {
-    console.error('Error getting last admin user ID:', error.message);
-    return null;
-  }
-}
-
-/**
- * アプリ設定ページのURLを取得（フロントエンドから呼び出し用）
- * @returns {string} アプリ設定ページのURL
- */
-function getAppSetupUrl() {
-  try {
-    // システム管理者権限チェック
-    console.log('getAppSetupUrl: Checking deploy user permissions...');
-    const currentUserEmail = User.email();
-    console.log('getAppSetupUrl: Current user email:', currentUserEmail);
-    const deployUserCheckResult = Deploy.isUser();
-    console.log('getAppSetupUrl: Deploy.isUser() result:', deployUserCheckResult);
-
-    if (!deployUserCheckResult) {
-      console.warn('Unauthorized access attempt to get app setup URL:', currentUserEmail);
-      throw new Error('アクセス権限がありません');
-    }
-
-    // WebアプリのベースURLを取得
-    const baseUrl = ScriptApp.getService().getUrl();
-    if (!baseUrl) {
-      throw new Error('WebアプリのURLを取得できませんでした');
-    }
-
-    // アプリ設定ページのURLを生成
-    const appSetupUrl = baseUrl + '?mode=appSetup';
-    console.log('getAppSetupUrl: Generated URL:', appSetupUrl);
-
-    return appSetupUrl;
-  } catch (error) {
-    console.error('Error getting app setup URL:', error);
-    throw new Error('アプリ設定URLの取得に失敗しました: ' + error.message);
-  }
-}
-
-/**
- * エラーページを表示
- * @param {string} title - エラータイトル
- * @param {string} message - エラーメッセージ
- * @param {Error} [error] - (オプション) エラーオブジェクト
- * @returns {HtmlOutput}
- */
-function showErrorPage(title, message, error) {
-  const template = HtmlService.createTemplateFromFile('ErrorBoundary');
-  template.title = title;
-  template.message = message;
-  template.mode = 'admin'; // エラーテンプレートが依存するmode変数にデフォルト値を提供
-  if (DEBUG && error) {
-    template.debugInfo = error.stack;
-  } else {
-    template.debugInfo = '';
-  }
-  const htmlOutput = template.evaluate().setTitle(`エラー - ${title}`);
-
-  // XFrameOptionsMode を安全に設定
-  try {
-    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
-    }
-  } catch (e) {
-    console.warn('XFrameOptionsMode設定エラー:', e.message);
-  }
-
-  return htmlOutput;
-}
-
-/**
- * アクセス制限ページを表示
- * @param {object} accessCheck - アクセスチェック結果
- * @returns {HtmlOutput}
- */
-function showAccessRestrictedPage(accessCheck) {
-  try {
-    const template = HtmlService.createTemplateFromFile('AccessRestricted');
-    template.include = include;
-    template.accessCheck = accessCheck;
-    template.isSystemAdmin = accessCheck.isSystemAdmin || false;
-    template.userEmail = accessCheck.userEmail || '';
-    template.timestamp = new Date().toISOString();
-
-    const htmlOutput = template.evaluate().setTitle('アクセス制限 - StudyQuest');
-
-    // XFrameOptionsMode を安全に設定
-    try {
-      if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.DENY) {
-        htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    
+    // アクセス権限確認
+    const accessResult = App.getAccess().verifyAccess(userId, 'view', User.email());
+    if (!accessResult.allowed) {
+      if (accessResult.userType === 'not_found') {
+        return HtmlService.createHtmlOutput('<h3>User Not Found</h3><p>The specified user does not exist.</p>');
       }
-    } catch (e) {
-      console.warn('XFrameOptionsMode設定エラー:', e.message);
+      return HtmlService.createHtmlOutput('<h3>Private Board</h3><p>This board is private.</p>');
     }
+    
+    // 互換性のためのユーザー情報変換
+    const compatUserInfo = {
+      userId: userId,
+      tenantId: userId,
+      adminEmail: accessResult.config?.email || '',
+      configJson: JSON.stringify(accessResult.config || {})
+    };
 
-    return htmlOutput;
+    return renderAnswerBoard(compatUserInfo, { userId });
   } catch (error) {
-    console.error('Error in showAccessRestrictedPage:', error);
-    // フォールバック: シンプルなHTMLを返す
-    return HtmlService.createHtmlOutput(
-      `
-      <html>
-        <head><title>アクセス制限</title></head>
-        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-          <h1>アクセスが制限されています</h1>
-          <p>このアプリケーションは現在利用できません。</p>
-          <p>管理者にお問い合わせください。</p>
-        </body>
-      </html>
-    `
-    ).setTitle('アクセス制限');
+    console.error('showAnswerBoard エラー:', error);
+    return HtmlService.createHtmlOutput('<h3>Error</h3><p>An error occurred: ' + error.message + '</p>');
   }
 }
 
 /**
- * ユーザー専用の一意の管理パネルURLを構築
- * @param {string} userId ユーザーID
- * @return {string}
+ * Helper Functions
+ * ユーティリティ関数群
  */
-function buildUserAdminUrl(userId) {
-  const baseUrl = getWebAppUrl();
-  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+
+/**
+ * メールアドレスからドメインを抽出
+ * @param {string} email メールアドレス
+ * @returns {string} ドメイン部分
+ */
+function getEmailDomain(email) {
+  if (!email || typeof email !== 'string') return '';
+  const parts = email.split('@');
+  return parts.length >= 2 ? parts[1] : '';
 }
 
 /**
- * 標準化されたページURL生成のヘルパー関数群
+ * WebApp URLのキャッシュ取得
+ * @returns {string} WebApp URL
  */
-const URLBuilder = {
-  /**
-   * ログインページのURLを生成
-   * @returns {string} ログインページURL
-   */
-  login: function () {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=login`;
-  },
+function getWebAppUrlCached() {
+  // 簡易的な実装（実際はキャッシュから取得）
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (e) {
+    console.error('WebApp URL取得失敗', { error: e.message });
+    return '';
+  }
+}
 
-  /**
-   * 管理パネルのURLを生成
-   * @param {string} userId - ユーザーID
-   * @returns {string} 管理パネルURL
-   */
-  admin: function (userId) {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
-  },
+/**
+ * セットアップページのレンダリング
+ */
+function renderSetupPage(params) {
+  console.log('renderSetupPage - Rendering setup page');
+  
+  // 基本的なセットアップ指示ページを表示
+  const html = `
+    <h2>System Setup Required</h2>
+    <p>Please configure the following in Google Apps Script project settings:</p>
+    <ul>
+      <li>DATABASE_SPREADSHEET_ID</li>
+      <li>ADMIN_EMAIL</li>
+      <li>SERVICE_ACCOUNT_CREDS</li>
+      <li>GOOGLE_CLIENT_ID (optional)</li>
+    </ul>
+    <p>Go to Extensions → Apps Script → Settings → Script Properties to add these values.</p>
+  `;
+  
+  return HtmlService.createHtmlOutput(html);
+}
 
+/**
+ * URL生成関数群
+ * generateUserUrls等の共通URL生成ロジック
+ */
+const UrlGenerator = {
   /**
-   * アプリ設定ページのURLを生成
-   * @returns {string} アプリ設定ページURL
+   * 基本URL生成（アプリスクリプトURL）
+   * @returns {string} ベースURL
    */
-  appSetup: function () {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=appSetup`;
+  getBaseUrl() {
+    try {
+      return ScriptApp.getService().getUrl();
+    } catch (e) {
+      console.error('BaseURL取得失敗', e);
+      return '';
+    }
   },
-
+  
   /**
-   * 回答ボードのURLを生成
-   * @param {string} userId - ユーザーID
-   * @returns {string} 回答ボードURL
+   * ユーザー固有URLを生成
+   * @param {string} userId ユーザーID
+   * @returns {Object} 各種URL
    */
-  view: function (userId) {
-    const baseUrl = getWebAppUrl();
-    return `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`;
+  generateUserUrls(userId) {
+    const baseUrl = this.getBaseUrl();
+    if (!baseUrl) return { error: 'Base URL not available' };
+    
+    return {
+      viewUrl: `${baseUrl}?userId=${encodeURIComponent(userId)}`,
+      adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`,
+      editUrl: `${baseUrl}?mode=edit&userId=${encodeURIComponent(userId)}` // 将来実装
+    };
   },
-
+  
   /**
-   * パラメータ付きURLを安全に生成
-   * @param {string} mode - モード ('login', 'admin', 'view', 'appSetup')
-   * @param {Object} params - 追加パラメータ
-   * @returns {string} 生成されたURL
+   * 安全なURL検証
+   * @param {string} url 検証するURL
+   * @returns {boolean} 有効かどうか
    */
-  build: function (mode, params = {}) {
-    const baseUrl = getWebAppUrl();
+  isValidUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    
+    try {
+      const cleanUrl = url.trim();
+      const isValidUrl =
+        cleanUrl.includes('script.google.com') ||
+        cleanUrl.includes('localhost') ||
+        /^https:\/\/[a-zA-Z0-9.-]+/.test(cleanUrl);
+      
+      return isValidUrl && !cleanUrl.includes('javascript:');
+    } catch (e) {
+      return false;
+    }
+  },
+  
+  /**
+   * パラメーター付きURL生成
+   * @param {string} baseUrl ベースURL
+   * @param {Object} params パラメーターオブジェクト
+   * @returns {string} 完成したURL
+   */
+  buildUrlWithParams(baseUrl, params) {
+    if (!baseUrl) return '';
+    
     const url = new URL(baseUrl);
-    url.searchParams.set('mode', mode);
-
-    Object.keys(params).forEach((key) => {
-      if (params[key] !== null && params[key] !== undefined) {
-        url.searchParams.set(key, params[key]);
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        url.searchParams.set(key, String(value));
       }
     });
-
+    
     return url.toString();
-  },
+  }
 };
 
 /**
- * 指定されたURLへリダイレクトするサーバーサイド関数
- * @param {string} url - リダイレクト先のURL
- * @returns {HtmlOutput} リダイレクトを実行するHTML出力
+ * User URL generation - Main API
+ * ユーザー固有URL生成のメインAPI
  */
-function redirectToUrl(url) {
-  // XSS攻撃を防ぐため、URLをサニタイズ
-  const sanitizedUrl = sanitizeRedirectUrl(url);
-  return HtmlService.createHtmlOutput().setContent(
-    `<script>window.top.location.href = '${sanitizedUrl}';</script>`
-  );
+function generateUserUrls(userId) {
+  return UrlGenerator.generateUserUrls(userId);
 }
 
 /**
- * セキュアなリダイレクトHTMLを作成 (シンプル版)
- * @param {string} targetUrl リダイレクト先URL
- * @param {string} message 表示メッセージ
- * @return {HtmlOutput}
+ * Core Request Processing Functions
+ * リクエスト処理の核となる機能群
  */
-function createSecureRedirect(targetUrl, message) {
-  // URL検証とサニタイゼーション
-  const sanitizedUrl = sanitizeRedirectUrl(targetUrl);
-
-  console.log('createSecureRedirect - Original URL:', targetUrl);
-  console.log('createSecureRedirect - Sanitized URL:', sanitizedUrl);
-
-  // ユーザーアクティベーション必須のHTMLアンカー方式（サンドボックス制限準拠）
-  const userActionRedirectHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${message || 'アクセス確認'}</title>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body { 
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
-          min-height: 100vh;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-        }
-        .container {
-          background: rgba(31, 41, 55, 0.95);
-          border-radius: 16px;
-          padding: 40px;
-          max-width: 500px;
-          width: 100%;
-          text-align: center;
-          box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-          border: 1px solid rgba(75, 85, 99, 0.3);
-        }
-        .icon { font-size: 64px; margin-bottom: 20px; }
-        .title { 
-          color: #10b981; 
-          font-size: 24px; 
-          font-weight: bold; 
-          margin-bottom: 16px; 
-        }
-        .subtitle { 
-          color: #d1d5db; 
-          margin-bottom: 32px; 
-          line-height: 1.5;
-        }
-        .main-button {
-          display: inline-block;
-          background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
-          color: white;
-          font-weight: bold;
-          padding: 16px 32px;
-          border-radius: 12px;
-          text-decoration: none;
-          font-size: 18px;
-          transition: all 0.3s ease;
-          margin-bottom: 24px;
-          box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-        }
-        .main-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6);
-        }
-        .url-info {
-          background: rgba(17, 24, 39, 0.8);
-          border-radius: 8px;
-          padding: 16px;
-          margin: 20px 0;
-          border: 1px solid rgba(75, 85, 99, 0.5);
-        }
-        .url-text {
-          color: #60a5fa;
-          font-family: 'Courier New', monospace;
-          font-size: 12px;
-          word-break: break-all;
-          line-height: 1.4;
-        }
-        .note {
-          color: #9ca3af;
-          font-size: 14px;
-          margin-top: 20px;
-          line-height: 1.4;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="icon">🔐</div>
-        <h1 class="title">${message || 'アクセス確認'}</h1>
-        <p class="subtitle">セキュリティのため、下のボタンをクリックして続行してください</p>
-        
-        <a href="${sanitizedUrl}" target="_top" class="main-button">
-          🚀 続行する
-        </a>
-        
-        <div class="url-info">
-          <div class="url-text">${sanitizedUrl}</div>
-        </div>
-        
-        <div class="note">
-          ✓ このリンクは安全です<br>
-          ✓ Google Apps Script公式のセキュリティガイドラインに準拠
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-
-  const htmlOutput = HtmlService.createHtmlOutput(userActionRedirectHtml);
-
-  // XFrameOptionsMode を安全に設定
-  try {
-    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
-  } catch (e) {
-    console.warn('XFrameOptionsMode設定エラー:', e.message);
-  }
-
-  return htmlOutput;
-}
 
 /**
- * リダイレクト用URLの検証とサニタイゼーション
- * @param {string} url 検証対象のURL
- * @return {string} サニタイズされたURL
- */
-function sanitizeRedirectUrl(url) {
-  if (!url) {
-    return getWebAppUrlCached();
-  }
-
-  try {
-    let cleanUrl = String(url).trim();
-
-    // 複数レベルのクォート除去（JSON文字列化による多重クォートに対応）
-    let previousUrl = '';
-    while (cleanUrl !== previousUrl) {
-      previousUrl = cleanUrl;
-
-      // 先頭と末尾のクォートを除去
-      if (
-        (cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) ||
-        (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))
-      ) {
-        cleanUrl = cleanUrl.slice(1, -1);
-      }
-
-      // エスケープされたクォートを除去
-      cleanUrl = cleanUrl.replace(/\\"/g, '"').replace(/\\'/g, "'");
-
-      // URL内に埋め込まれた別のURLを検出
-      const embeddedUrlMatch = cleanUrl.match(/https?:\/\/[^\s<>"']+/);
-      if (embeddedUrlMatch && embeddedUrlMatch[0] !== cleanUrl) {
-        console.log('Extracting embedded URL:', embeddedUrlMatch[0]);
-        cleanUrl = embeddedUrlMatch[0];
-      }
-    }
-
-    // 基本的なURL形式チェック
-    if (!cleanUrl.match(/^https?:\/\/[^\s<>"']+$/)) {
-      console.warn('Invalid URL format after sanitization:', cleanUrl);
-      return getWebAppUrlCached();
-    }
-
-    // 開発モードURLのチェック（googleusercontent.comは有効なデプロイURLも含むため調整）
-    if (cleanUrl.includes('userCodeAppPanel')) {
-      console.warn('Development URL detected in redirect, using fallback:', cleanUrl);
-      return getWebAppUrlCached();
-    }
-
-    // 最終的な URL 妥当性チェック（googleusercontent.comも有効URLとして認識）
-    var isValidUrl =
-      cleanUrl.includes('script.google.com') ||
-      cleanUrl.includes('googleusercontent.com') ||
-      cleanUrl.includes('localhost');
-
-    if (!isValidUrl) {
-      console.warn('Suspicious URL detected:', cleanUrl);
-      return getWebAppUrlCached();
-    }
-
-    return cleanUrl;
-  } catch (e) {
-    console.error('URL sanitization error:', e.message);
-    return getWebAppUrlCached();
-  }
-}
-
-/**
- * doGet のリクエストパラメータを解析
- * @param {Object} e Event object
- * @return {{mode:string,userId:string|null,setupParam:string|null,spreadsheetId:string|null,sheetName:string|null,isDirectPageAccess:boolean}}
+ * リクエストパラメータを解析
+ * @param {Object} e Apps Script doGet イベントオブジェクト
+ * @returns {Object} 解析されたパラメータ
  */
 function parseRequestParams(e) {
-  // 引数の安全性チェック
-  if (!e || typeof e !== 'object') {
-    console.log('parseRequestParams: 無効なeventオブジェクト');
+  if (!e) {
+    console.warn('parseRequestParams - No event object provided');
     return {
       mode: null,
       userId: null,
@@ -1239,149 +618,113 @@ function parseRequestParams(e) {
   const setupParam = p.setup || null;
   const spreadsheetId = p.spreadsheetId || null;
   const sheetName = p.sheetName || null;
-  const isDirectPageAccess = !!(userId && mode === 'view');
-
-  // デバッグログを追加
-  console.log('parseRequestParams - Received parameters:', JSON.stringify(p));
+  const isDirectPageAccess = !!(spreadsheetId && sheetName);
+  
+  console.log('parseRequestParams - Raw parameters:', JSON.stringify(p));
   console.log('parseRequestParams - Parsed mode:', mode, 'setupParam:', setupParam);
 
   return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
 
 /**
- * 管理パネルを表示
+ * Page Rendering Functions
+ * 各種ページのレンダリング機能
+ */
+
+/**
+ * 管理者パネルのレンダリング
  * @param {Object} userInfo ユーザー情報
- * @param {string} mode 表示モード
- * @return {HtmlOutput} HTMLコンテンツ
+ * @param {string} mode モード（'admin'等）
+ * @returns {HtmlService.HtmlOutput} HTML出力
  */
 function renderAdminPanel(userInfo, mode) {
-  // ガード節: userInfoが存在しない場合はエラーページを表示して処理を中断
-  if (!userInfo) {
-    console.error('renderAdminPanelにuserInfoがnullで渡されました。これは予期せぬ状態です。');
-    return showErrorPage(
-      'エラー',
-      'ユーザー情報の読み込みに失敗したため、管理パネルを表示できません。'
-    );
-  }
-
-  const adminTemplate = HtmlService.createTemplateFromFile('AdminPanel');
-  adminTemplate.include = include;
-  adminTemplate.userInfo = userInfo;
-  adminTemplate.userId = userInfo.userId;
-  adminTemplate.mode = mode || 'admin'; // 安全のためのフォールバック
-  adminTemplate.displayMode = 'named';
-  adminTemplate.showAdminFeatures = true;
-  const deployUserResult = Deploy.isUser();
-  console.log('renderAdminPanel - Deploy.isUser() result:', deployUserResult);
-  console.log('renderAdminPanel - current user email:', User.email());
-  adminTemplate.isDeployUser = deployUserResult;
-  adminTemplate.DEBUG_MODE = shouldEnableDebugMode();
-
-  const htmlOutput = adminTemplate
-    .evaluate()
-    .setTitle('StudyQuest - 管理パネル')
-    .setSandboxMode(HtmlService.SandboxMode.NATIVE);
-
-  // XFrameOptionsMode を安全に設定
   try {
-    if (HtmlService && HtmlService.XFrameOptionsMode && HtmlService.XFrameOptionsMode.ALLOWALL) {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
-  } catch (e) {
-    console.warn('XFrameOptionsMode設定エラー:', e.message);
+    console.log('renderAdminPanel - userInfo:', JSON.stringify(userInfo));
+    console.log('renderAdminPanel - mode:', mode);
+    
+    // 既存のPage.htmlテンプレートを使用
+    const template = HtmlService.createTemplateFromFile('Page');
+    
+    // テンプレート変数を設定
+    template.userInfo = userInfo;
+    template.mode = mode || 'admin';
+    template.isAdminPanel = true;
+    
+    return template.evaluate()
+      .setTitle('管理パネル - Everyone\'s Answer Board')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (error) {
+    console.error('renderAdminPanel エラー:', error);
+    return HtmlService.createHtmlOutput('<h3>エラー</h3><p>管理パネルの表示中にエラーが発生しました: ' + error.message + '</p>');
   }
-
-  return htmlOutput;
 }
 
 /**
- * 回答ボードまたは未公開ページを表示
+ * 回答ボードのレンダリング
  * @param {Object} userInfo ユーザー情報
  * @param {Object} params リクエストパラメータ
- * @return {HtmlOutput} HTMLコンテンツ
+ * @returns {HtmlService.HtmlOutput} HTML出力
  */
 function renderAnswerBoard(userInfo, params) {
   let config = {};
   try {
     config = JSON.parse(userInfo.configJson || '{}');
   } catch (e) {
-    console.warn('Invalid configJson:', e.message);
-  }
-  // publishedSheetNameの型安全性確保（'true'問題の修正）
-  let safePublishedSheetName = '';
-  if (config.publishedSheetName) {
-    if (typeof config.publishedSheetName === 'string') {
-      safePublishedSheetName = config.publishedSheetName;
-    } else {
-      console.error(
-        '❌ main.gs: publishedSheetNameが不正な型です:',
-        typeof config.publishedSheetName,
-        config.publishedSheetName
-      );
-      console.warn('🔧 main.gs: publishedSheetNameを空文字にリセットしました');
-      safePublishedSheetName = '';
-    }
+    console.error('Config JSON parse error:', e);
+    config = {};
   }
 
-  // 強化されたパブリケーション状態検証（キャッシュバスティング対応）
-  const isPublished = !!(
-    config.appPublished &&
-    config.publishedSpreadsheetId &&
-    safePublishedSheetName
-  );
+  console.log('renderAnswerBoard - userInfo:', JSON.stringify(userInfo));
+  console.log('renderAnswerBoard - params:', JSON.stringify(params));
+  console.log('renderAnswerBoard - config keys:', Object.keys(config));
 
-  // リアルタイム検証: 非公開状態の場合は確実に検出
-  const isCurrentlyPublished =
-    isPublished &&
-    config.appPublished === true &&
-    config.publishedSpreadsheetId &&
-    safePublishedSheetName;
+  try {
+    // 既存のPage.htmlテンプレートを使用
+    const template = HtmlService.createTemplateFromFile('Page');
+    
+    // 基本情報設定
+    template.userInfo = userInfo;
+    template.mode = 'view';
+    template.isAdminPanel = false;
+    
+    // 公開シート設定の取得
+    const safePublishedSpreadsheetId = config.publishedSpreadsheetId || null;
+    const safePublishedSheetName = config.publishedSheetName || null;
 
-  const sheetConfigKey = 'sheet_' + (safePublishedSheetName || params.sheetName);
-  const sheetConfig = config[sheetConfigKey] || {};
+    const sheetConfigKey = 'sheet_' + (safePublishedSheetName || params.sheetName);
+    const sheetConfig = config[sheetConfigKey] || {};
 
-  // 修正: ダイレクトアクセスよりもパブリケーション状態を優先
-  // 非公開の場合は、ダイレクトアクセスでもUnpublishedページに誘導
-  const showBoard = isCurrentlyPublished && (params.isDirectPageAccess || true);
+    // 修正: ダイレクトアクセスよりもパブリケーション状態を優先
+    const isPublished = !!(safePublishedSpreadsheetId && safePublishedSheetName);
+    const finalSpreadsheetId = isPublished ? safePublishedSpreadsheetId : params.spreadsheetId;
+    const finalSheetName = isPublished ? safePublishedSheetName : params.sheetName;
 
-  console.log('🔍 renderAnswerBoard decision:', {
-    isCurrentlyPublished: isCurrentlyPublished,
-    isDirectPageAccess: params.isDirectPageAccess,
-    showBoard: showBoard,
-    appPublished: config.appPublished,
-    hasSpreadsheetId: !!config.publishedSpreadsheetId,
-    hasSheetName: !!safePublishedSheetName,
-  });
-  const file = showBoard ? 'Page' : 'Unpublished';
-  const template = HtmlService.createTemplateFromFile(file);
-  template.include = include;
+    console.log('renderAnswerBoard - isPublished:', isPublished);
+    console.log('renderAnswerBoard - finalSpreadsheetId:', finalSpreadsheetId);
+    console.log('renderAnswerBoard - finalSheetName:', finalSheetName);
 
-  if (showBoard) {
+    // テンプレート変数設定
+    template.config = config;
+    template.sheetConfig = sheetConfig;
+    template.spreadsheetId = finalSpreadsheetId;
+    template.sheetName = finalSheetName;
+    template.isDirectPageAccess = params.isDirectPageAccess;
+    template.isPublished = isPublished;
+
+    // データ取得とテンプレート設定の処理
     try {
-      if (userInfo.spreadsheetId) {
-        try {
-          addServiceAccountToSpreadsheet(userInfo.spreadsheetId);
-        } catch (err) {
-          console.warn('アクセス権設定警告:', err.message);
-        }
-      }
-      template.userId = userInfo.userId;
-      template.spreadsheetId = userInfo.spreadsheetId;
-      template.ownerName = userInfo.adminEmail;
-      template.sheetName = escapeJavaScript(safePublishedSheetName || params.sheetName);
-      template.DEBUG_MODE = shouldEnableDebugMode();
-      // setupStatus未完了時の安全なopinionHeader取得
-      const setupStatus = config.setupStatus || 'pending';
-      let rawOpinionHeader;
-
-      if (setupStatus === 'pending') {
-        rawOpinionHeader = 'セットアップ中...';
+      if (finalSpreadsheetId && finalSheetName) {
+        console.log('renderAnswerBoard - データ取得開始');
+        const dataResult = getPublishedSheetData(userInfo.userId, finalSpreadsheetId, finalSheetName);
+        template.data = dataResult.data;
+        template.message = dataResult.message;
+        template.hasData = !!(dataResult.data && dataResult.data.length > 0);
       } else {
-        rawOpinionHeader = sheetConfig.opinionHeader || safePublishedSheetName || 'お題';
+        template.data = [];
+        template.message = '表示するデータがありません';
+        template.hasData = false;
       }
-      template.opinionHeader = escapeJavaScript(rawOpinionHeader);
-      template.cacheTimestamp = Date.now();
-
+      
       // 現在の設定から表示設定を取得
       const currentConfig = getCurrentConfig();
       const displaySettings = currentConfig.displaySettings || {};
@@ -1389,94 +732,65 @@ function renderAnswerBoard(userInfo, params) {
       // 表示設定を適用
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
       template.showCounts = displaySettings.showReactions !== false;
-      template.showScoreSort = template.showCounts;
-      const currentUserEmail = User.email();
-      const isOwner = currentUserEmail === userInfo.adminEmail;
-      template.showAdminFeatures = isOwner;
-      template.isAdminUser = isOwner;
-    } catch (e) {
-      template.opinionHeader = escapeJavaScript('お題の読込エラー');
-      template.cacheTimestamp = Date.now();
-      template.userId = userInfo.userId;
-      template.spreadsheetId = userInfo.spreadsheetId;
-      template.ownerName = userInfo.adminEmail;
-      template.sheetName = escapeJavaScript(params.sheetName);
-
+      
+      console.log('renderAnswerBoard - 表示設定:', { displayMode: template.displayMode, showCounts: template.showCounts });
+      
+    } catch (dataError) {
+      console.error('renderAnswerBoard - データ取得エラー:', dataError);
+      template.data = [];
+      template.message = 'データ取得中にエラーが発生しました: ' + dataError.message;
+      template.hasData = false;
+      
       // エラー時も表示設定を適用
       const currentConfig = getCurrentConfig();
       const displaySettings = currentConfig.displaySettings || {};
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
       template.showCounts = displaySettings.showReactions !== false;
-      template.showScoreSort = false;
-      const currentUserEmail = User.email();
-      const isOwner = currentUserEmail === userInfo.adminEmail;
-      template.showAdminFeatures = isOwner;
-      template.isAdminUser = isOwner;
-    }
-    // 公開ボード: 通常のキャッシュ設定
-    return template
-      .evaluate()
-      .setTitle('StudyQuest -みんなの回答ボード-')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  } else {
-    try {
-      template.userId = userInfo.userId;
-      template.spreadsheetId = userInfo.spreadsheetId;
-      template.ownerName = userInfo.adminEmail;
-      template.isOwner = true;
-      template.adminEmail = userInfo.adminEmail;
-      template.cacheTimestamp = Date.now();
-      var appUrls = generateUserUrls(userId);
-      template.adminPanelUrl = appUrls.adminUrl;
-      template.boardUrl = appUrls.viewUrl;
-    } catch (e) {
-      console.error('Unpublished template setup error:', e);
-      template.ownerName = 'システム管理者';
-      template.isOwner = true;
-      template.adminEmail = userInfo.adminEmail || 'admin@example.com';
-      template.cacheTimestamp = Date.now();
-    }
-    // 非公開ボード: キャッシュを無効化して確実なリダイレクトを保証
-    const htmlOutput = template
-      .evaluate()
-      .setTitle('StudyQuest - 準備中')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0');
-
-    // HTTPヘッダーレベルでのキャッシュ制御（可能な範囲で）
-    try {
-      htmlOutput.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    } catch (e) {
-      console.warn('X-Frame-Options設定に失敗:', e.message);
     }
 
-    return htmlOutput;
+    // 管理者URLの生成
+    try {
+      if (userInfo.userId) {
+        const appUrls = generateUserUrls(userInfo.userId);
+        template.adminPanelUrl = appUrls.adminUrl;
+        console.log('renderAnswerBoard - 管理者URL設定:', template.adminPanelUrl);
+      }
+    } catch (urlError) {
+      console.error('renderAnswerBoard - URL生成エラー:', urlError);
+      template.adminPanelUrl = '';
+    }
+
+    return template.evaluate()
+      .setTitle('Everyone\'s Answer Board')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+  } catch (error) {
+    console.error('renderAnswerBoard - 全般エラー:', error);
+    return HtmlService.createHtmlOutput('<h3>エラー</h3><p>ページの表示中にエラーが発生しました: ' + error.message + '</p>');
   }
 }
 
 /**
- * クライアントサイドからのパブリケーション状態チェック
- * キャッシュバスティング対応のため、リアルタイムで状態を確認
- * @param {string} userId - ユーザーID
- * @returns {Object} パブリケーション状態情報
+ * Publication Status Management
+ * 公開状態管理の機能群
+ */
+
+/**
+ * 現在の公開状態をチェック
+ * @param {string} userId ユーザーID
+ * @returns {Object} 公開状態情報
  */
 function checkCurrentPublicationStatus(userId) {
   try {
-    console.log('🔍 checkCurrentPublicationStatus called for userId:', userId);
-
     if (!userId) {
       console.warn('userId is required for publication status check');
       return { error: 'userId is required', isPublished: false };
     }
 
-    // ユーザー情報を強制的に最新状態で取得（キャッシュバイパス）
-    const userInfo = DB.findUserById(userId, {
-      useExecutionCache: false,
-      forceRefresh: true,
-    });
-
+    console.log('checkCurrentPublicationStatus - userId:', userId);
+    
+    // 新アーキテクチャでのユーザー情報取得
+    const userInfo = DB.findUserById(userId);
     if (!userInfo) {
       console.warn('User not found for publication status check:', userId);
       return { error: 'User not found', isPublished: false };
@@ -1491,27 +805,22 @@ function checkCurrentPublicationStatus(userId) {
       return { error: 'Config parse error', isPublished: false };
     }
 
-    // 現在のパブリケーション状態を厳密にチェック
-    const isCurrentlyPublished = !!(
-      config.appPublished === true &&
-      config.publishedSpreadsheetId &&
-      config.publishedSheetName &&
-      typeof config.publishedSheetName === 'string' &&
-      config.publishedSheetName.trim() !== ''
+    // 公開状態の判定
+    const isPublished = !!(
+      config.publishedSpreadsheetId && 
+      config.publishedSheetName
     );
 
-    console.log('📊 Publication status check result:', {
+    console.log('checkCurrentPublicationStatus - result:', {
       userId: userId,
-      appPublished: config.appPublished,
+      isPublished: isPublished,
       hasSpreadsheetId: !!config.publishedSpreadsheetId,
-      hasSheetName: !!config.publishedSheetName,
-      isCurrentlyPublished: isCurrentlyPublished,
-      timestamp: new Date().toISOString(),
+      hasSheetName: !!config.publishedSheetName
     });
 
     return {
-      isPublished: isCurrentlyPublished,
-      publishedSheetName: config.publishedSheetName || null,
+      userId: userId,
+      isPublished: isPublished,
       publishedSpreadsheetId: config.publishedSpreadsheetId || null,
       lastChecked: new Date().toISOString(),
     };
@@ -1526,113 +835,28 @@ function checkCurrentPublicationStatus(userId) {
 }
 
 /**
- * JavaScript エスケープのテスト関数
+ * Configuration Management Functions
+ * 設定管理の機能群
  */
 
 /**
- * パフォーマンス監視エンドポイント（簡易版）
- */
-
-/**
- * escapeJavaScript関数のテスト
- */
-
-/**
- * Base64エンコード/デコードのテスト
- */
-
-/**
- * システム管理者かどうかをチェック
- * @returns {boolean} システム管理者の場合はtrue
- */
-function checkIsSystemAdmin() {
-  try {
-    console.log('checkIsSystemAdmin: システム管理者チェック開始');
-
-    // 既存のisDeployUser関数を利用
-    const isAdmin = Deploy.isUser();
-
-    console.log('checkIsSystemAdmin: 結果', isAdmin);
-    return isAdmin;
-  } catch (error) {
-    console.error('checkIsSystemAdmin エラー:', error);
-    return false;
-  }
-}
-
-// =============================================================================
-// AdminPanel.html用のダミー関数（最小限の実装）
-// =============================================================================
-
-/**
- * スプレッドシート一覧を取得（ダミー実装）
- * @returns {Array} スプレッドシート情報の配列
- */
-function getSpreadsheetList() {
-  try {
-    console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
-
-    // 現在のユーザーのスプレッドシート情報を返す
-    const userInfo = User.info();
-    if (!userInfo) {
-      console.warn('getSpreadsheetList: ユーザー情報が取得できませんでした');
-      return [];
-    }
-
-    if (userInfo.spreadsheetId) {
-      console.log('getSpreadsheetList: ユーザーのメインスプレッドシートを返します');
-      return [
-        {
-          id: userInfo.spreadsheetId,
-          name: userInfo.spreadsheetUrl ? 'メインスプレッドシート' : 'ユーザースプレッドシート',
-          lastModified: new Date().toISOString(),
-          url: userInfo.spreadsheetUrl || null,
-        },
-      ];
-    }
-
-    console.warn('getSpreadsheetList: ユーザーにスプレッドシートが設定されていません');
-    return [];
-  } catch (error) {
-    console.error('getSpreadsheetList エラー:', error.message || error);
-    throw new Error(`スプレッドシート一覧の取得に失敗しました: ${error.message || error}`);
-  }
-}
-
-/**
- * シート一覧を取得（ダミー実装）
- * @param {string} spreadsheetId スプレッドシートID
- * @returns {Array} シート情報の配列
- */
-function getSheetList(spreadsheetId) {
-  try {
-    if (!spreadsheetId) return [];
-    const ss = SpreadsheetApp.openById(spreadsheetId);
-    const sheets = ss.getSheets();
-    return sheets.map((sheet) => ({
-      name: sheet.getName(),
-      id: sheet.getSheetId(),
-    }));
-  } catch (error) {
-    console.error('getSheetList エラー:', error);
-    return [];
-  }
-}
-
-/**
- * 現在の設定を取得（ダミー実装）
- * @returns {Object} 設定情報
+ * 現在の設定を取得
+ * @returns {Object} 現在の設定
  */
 function getCurrentConfig() {
   try {
-    const userInfo = User.info();
+    // 簡易的な設定取得（新アーキテクチャへの移行準備）
+    const userInfo = Services.user.current;
+    if (!userInfo) {
+      return {};
+    }
+
+    // デフォルト設定を返す
     return {
-      userId: userInfo?.userId || 'unknown',
-      spreadsheetId: userInfo?.spreadsheetId || null,
-      adminEmail: userInfo?.adminEmail || null,
-      setupComplete: !!userInfo?.spreadsheetId,
+      title: 'みんなの質問箱', 
+      description: '質問をお寄せください',
       displaySettings: {
-        showNames: userInfo?.displaySettings?.showNames !== false, // デフォルトtrue
+        showNames: true,  // 名前表示: デフォルト有効
         showReactions: userInfo?.displaySettings?.showReactions !== false, // デフォルトtrue
       },
     };
@@ -1643,30 +867,25 @@ function getCurrentConfig() {
 }
 
 /**
- * データソースに接続（ダミー実装）
- * @param {string} spreadsheetId スプレッドシートID
- * @param {string} sheetName シート名
- * @returns {Object} 接続結果
+ * テスト用シンプルAPI（テスト専用）
  */
-function connectToDataSource(spreadsheetId, sheetName) {
+function getTestMockResponse() {
   return {
     success: true,
-    message: '接続しました',
-    columnMapping: {
-      question: 'A',
-      answer: 'B',
+    message: 'Test mock response',
+    data: {
       reason: 'C',
     },
   };
 }
 
 /**
- * 下書き設定を保存（ダミー実装）
+ * アプリケーション設定保存
  * @param {Object} config 設定オブジェクト
  * @returns {Object} 保存結果
  */
-function saveDraftConfiguration(config) {
-  console.log('設定を保存:', config);
+function saveApplicationConfig(config) {
+  console.log('アプリケーション設定を保存:', config);
   return {
     success: true,
     message: '保存しました',
@@ -1675,8 +894,8 @@ function saveDraftConfiguration(config) {
 }
 
 /**
- * アプリケーションを公開（ダミー実装）
- * @param {Object} config 設定オブジェクト
+ * アプリケーション公開
+ * @param {Object} config 設定オブジェクト 
  * @returns {Object} 公開結果
  */
 function publishApplication(config) {

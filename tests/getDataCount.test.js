@@ -2,8 +2,8 @@ const fs = require('fs');
 const vm = require('vm');
 
 describe('getDataCount reflects new rows', () => {
+  const constantsCode = fs.readFileSync('src/constants.gs', 'utf8');
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
-  const mainCode = fs.readFileSync('src/main.gs', 'utf8');
   let context;
   let sheetData;
 
@@ -71,7 +71,7 @@ describe('getDataCount reflects new rows', () => {
       COLUMN_HEADERS: { CLASS: 'クラス' },
     };
     vm.createContext(context);
-    vm.runInContext(mainCode, context);
+    vm.runInContext(constantsCode, context);
     vm.runInContext(coreCode, context);
     context.verifyUserAccess = jest.fn();
   });

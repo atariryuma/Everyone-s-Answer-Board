@@ -1,6 +1,7 @@
 /**
- * 設定管理・アクセス制御統合システム
- * ConfigurationManagerとAccessControllerを統合して依存関係を解決
+ * 基盤クラス集
+ * ConfigurationManagerとAccessControllerの定義
+ * 2024年GASベストプラクティス準拠
  */
 
 // ===============================
@@ -13,6 +14,11 @@ class ConfigurationManager {
     this.cache = CacheService.getScriptCache();
   }
 
+  /**
+   * ユーザー設定を取得
+   * @param {string} userId ユーザーID
+   * @return {Object|null} ユーザー設定オブジェクト
+   */
   getUserConfig(userId) {
     if (!userId) return null;
 
@@ -33,6 +39,12 @@ class ConfigurationManager {
     return config;
   }
 
+  /**
+   * ユーザー設定を保存
+   * @param {string} userId ユーザーID
+   * @param {Object} config 設定オブジェクト
+   * @return {boolean} 保存成功可否
+   */
   setUserConfig(userId, config) {
     if (!userId || !config) return false;
 
@@ -52,6 +64,11 @@ class ConfigurationManager {
     }
   }
 
+  /**
+   * ユーザー設定を削除
+   * @param {string} userId ユーザーID
+   * @return {boolean} 削除成功可否
+   */
   removeUserConfig(userId) {
     if (!userId) return false;
 
@@ -69,6 +86,11 @@ class ConfigurationManager {
     }
   }
 
+  /**
+   * 公開設定を取得（ゲストアクセス用）
+   * @param {string} userId ユーザーID
+   * @return {Object|null} 公開設定オブジェクト
+   */
   getPublicConfig(userId) {
     const config = this.getUserConfig(userId);
     if (!config || !config.isPublic) return null;
@@ -83,6 +105,10 @@ class ConfigurationManager {
     };
   }
 
+  /**
+   * デフォルト列設定を取得
+   * @return {Array} デフォルト列配列
+   */
   getDefaultColumns() {
     return [
       { name: 'question', label: '質問', type: 'text', required: true },
@@ -92,10 +118,16 @@ class ConfigurationManager {
     ];
   }
 
+  /**
+   * 新規ユーザー設定を初期化
+   * @param {string} userId ユーザーID
+   * @param {string} email ユーザーメール
+   * @return {Object} 初期化された設定
+   */
   initializeUserConfig(userId, email) {
     const defaultConfig = {
-      userId: userId,
-      email: email,
+      tenantId: userId,
+      ownerEmail: email,
       title: `${email}の回答ボード`,
       description: '',
       isPublic: false,
@@ -110,6 +142,12 @@ class ConfigurationManager {
     return defaultConfig;
   }
 
+  /**
+   * 設定を更新
+   * @param {string} userId ユーザーID
+   * @param {Object} updates 更新内容
+   * @return {boolean} 更新成功可否
+   */
   updateUserConfig(userId, updates) {
     const currentConfig = this.getUserConfig(userId);
     if (!currentConfig) return false;
@@ -123,6 +161,10 @@ class ConfigurationManager {
     return this.setUserConfig(userId, updatedConfig);
   }
 
+  /**
+   * 全ユーザー設定を取得（管理用）
+   * @return {Array} 全ユーザー設定配列
+   */
   getAllUserConfigs() {
     const allProperties = this.properties.getProperties();
     const configs = [];
@@ -141,6 +183,10 @@ class ConfigurationManager {
     return configs;
   }
 
+  /**
+   * PropertiesService使用量を取得
+   * @return {Object} 使用量統計
+   */
   getUsageStats() {
     const allProperties = this.properties.getProperties();
     let totalSize = 0;
@@ -165,12 +211,21 @@ class ConfigurationManager {
     };
   }
 
+  /**
+   * 設定の存在確認
+   * @param {string} userId ユーザーID
+   * @return {boolean} 存在可否
+   */
   hasUserConfig(userId) {
     if (!userId) return false;
     const propKey = `user_config_${userId}`;
     return this.properties.getProperty(propKey) !== null;
   }
 
+  /**
+   * 設定をバックアップ
+   * @return {Object} バックアップデータ
+   */
   createBackup() {
     const allConfigs = this.getAllUserConfigs();
     return {
@@ -181,13 +236,18 @@ class ConfigurationManager {
     };
   }
 
+  /**
+   * バックアップから復元
+   * @param {Object} backupData バックアップデータ
+   * @return {boolean} 復元成功可否
+   */
   restoreFromBackup(backupData) {
     if (!backupData || !backupData.configs) return false;
 
     try {
       backupData.configs.forEach(config => {
-        if (config.userId) {
-          this.setUserConfig(config.userId, config);
+        if (config.tenantId) {
+          this.setUserConfig(config.tenantId, config);
         }
       });
       return true;
@@ -203,40 +263,34 @@ class ConfigurationManager {
 // ===============================
 
 class AccessController {
-  constructor() {
-    // ConfigurationManagerはグローバルインスタンスとして利用
+  constructor(configManager) {
+    this.configManager = configManager;
   }
 
   /**
    * ユーザーアクセスを検証
    * @param {string} targetUserId 対象ユーザーID
    * @param {string} mode アクセスモード (view, edit, admin)
-   * @param {string} currentUserEmail 現在のユーザーメール（認証済み）
-   * @return {Object} アクセス結果 {allowed: boolean, userType: string, config: Object}
+   * @param {string} currentUserEmail 現在のユーザーメール
+   * @return {Object} アクセス結果
    */
   verifyAccess(targetUserId, mode = 'view', currentUserEmail = null) {
     try {
-      // 基本的な入力検証
       if (!targetUserId) {
         return this.createAccessResult(false, 'invalid', null, '無効なユーザーIDです');
       }
 
-      // 設定を取得（データベース非依存）
-      const config = configManager.getUserConfig(targetUserId);
+      const config = this.configManager.getUserConfig(targetUserId);
       
-      // 設定が存在しない場合の処理
       if (!config) {
         return this.createAccessResult(false, 'not_found', null, '指定されたユーザーが見つかりません');
       }
 
-      // モード別アクセス制御
       switch (mode) {
         case 'admin':
           return this.verifyAdminAccess(config, currentUserEmail);
-        
         case 'edit':
           return this.verifyEditAccess(config, currentUserEmail);
-        
         case 'view':
         default:
           return this.verifyViewAccess(config, currentUserEmail);
@@ -255,24 +309,20 @@ class AccessController {
    * @return {Object} アクセス結果
    */
   verifyViewAccess(config, currentUserEmail) {
-    // 所有者の場合
     if (currentUserEmail && config.ownerEmail === currentUserEmail) {
       return this.createAccessResult(true, 'owner', config);
     }
 
-    // 公開設定でない場合
     if (!config.isPublic) {
       return this.createAccessResult(false, 'private', null, 'このボードは非公開です');
     }
 
-    // 認証ユーザー（公開ボードへのアクセス）
     if (currentUserEmail) {
       return this.createAccessResult(true, 'authenticated_user', config);
     }
 
-    // ゲストアクセス
     if (config.allowAnonymous) {
-      const publicConfig = configManager.getPublicConfig(config.tenantId);
+      const publicConfig = this.configManager.getPublicConfig(config.tenantId);
       return this.createAccessResult(true, 'guest', publicConfig);
     }
 
@@ -286,7 +336,6 @@ class AccessController {
    * @return {Object} アクセス結果
    */
   verifyEditAccess(config, currentUserEmail) {
-    // 編集は所有者のみ
     if (currentUserEmail && config.ownerEmail === currentUserEmail) {
       return this.createAccessResult(true, 'owner', config);
     }
@@ -301,12 +350,10 @@ class AccessController {
    * @return {Object} アクセス結果
    */
   verifyAdminAccess(config, currentUserEmail) {
-    // 管理は所有者のみ
     if (currentUserEmail && config.ownerEmail === currentUserEmail) {
       return this.createAccessResult(true, 'owner', config);
     }
 
-    // システム管理者チェック
     const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
     if (systemAdminEmail && currentUserEmail === systemAdminEmail) {
       return this.createAccessResult(true, 'system_admin', config);
@@ -334,12 +381,12 @@ class AccessController {
   }
 
   /**
-   * 公開ボードの存在確認（ゲストアクセス用）
+   * 公開ボードの存在確認
    * @param {string} userId ユーザーID
    * @return {boolean} 公開ボード存在可否
    */
   isPublicBoardAvailable(userId) {
-    const config = configManager.getUserConfig(userId);
+    const config = this.configManager.getUserConfig(userId);
     return config && config.isPublic;
   }
 
@@ -347,7 +394,7 @@ class AccessController {
    * ユーザーのアクセス権限レベルを取得
    * @param {string} targetUserId 対象ユーザーID
    * @param {string} currentUserEmail 現在のユーザーメール
-   * @return {string} 権限レベル (owner, system_admin, authenticated_user, guest, none)
+   * @return {string} 権限レベル
    */
   getUserPermissionLevel(targetUserId, currentUserEmail) {
     const accessResult = this.verifyAccess(targetUserId, 'view', currentUserEmail);
@@ -358,94 +405,4 @@ class AccessController {
 
     return accessResult.userType;
   }
-
-  /**
-   * アクセスログを記録
-   * @param {string} targetUserId 対象ユーザーID
-   * @param {string} mode アクセスモード
-   * @param {string} userType ユーザータイプ
-   * @param {boolean} allowed アクセス許可可否
-   */
-  logAccess(targetUserId, mode, userType, allowed) {
-    const logData = {
-      targetUserId,
-      mode,
-      userType,
-      allowed,
-      timestamp: new Date().toISOString(),
-      sessionId: Utilities.getUuid()
-    };
-
-    // 簡易ログ（本格的なログ管理が必要な場合は拡張）
-    console.log('Access Log:', JSON.stringify(logData));
-
-    // 必要に応じてPropertiesServiceやSpreadsheetにログ保存
-    // this.saveAccessLog(logData);
-  }
-
-  /**
-   * バルクアクセス検証（複数ユーザーの一括確認）
-   * @param {Array} userIds ユーザーID配列
-   * @param {string} mode アクセスモード
-   * @param {string} currentUserEmail 現在のユーザーメール
-   * @return {Array} アクセス結果配列
-   */
-  verifyBulkAccess(userIds, mode = 'view', currentUserEmail = null) {
-    return userIds.map(userId => {
-      const result = this.verifyAccess(userId, mode, currentUserEmail);
-      return {
-        userId,
-        ...result
-      };
-    });
-  }
-
-  /**
-   * セッション管理（簡易版）
-   * @param {string} sessionId セッションID
-   * @param {Object} sessionData セッションデータ
-   */
-  setSession(sessionId, sessionData) {
-    const cache = CacheService.getScriptCache();
-    cache.put(`session_${sessionId}`, JSON.stringify(sessionData), 3600); // 1時間
-  }
-
-  /**
-   * セッション取得
-   * @param {string} sessionId セッションID
-   * @return {Object|null} セッションデータ
-   */
-  getSession(sessionId) {
-    const cache = CacheService.getScriptCache();
-    const sessionData = cache.get(`session_${sessionId}`);
-    return sessionData ? JSON.parse(sessionData) : null;
-  }
-
-  /**
-   * IP制限チェック（将来の拡張用）
-   * @param {string} ipAddress IPアドレス
-   * @param {Object} config ユーザー設定
-   * @return {boolean} IP許可可否
-   */
-  checkIpRestriction(ipAddress, config) {
-    // @ignore 将来の拡張用パラメータ
-    return true;
-  }
-
-  /**
-   * レート制限チェック（将来の拡張用）
-   * @param {string} identifier 識別子（IP、ユーザーID等）
-   * @param {number} limit 制限数
-   * @param {number} windowSeconds 時間窓（秒）
-   * @return {boolean} レート制限内か
-   */
-  checkRateLimit(identifier, limit = 100, windowSeconds = 3600) {
-    // @ignore 将来の拡張用パラメータ
-    return true;
-  }
 }
-
-// グローバルインスタンスを作成
-var configManager = new ConfigurationManager();
-var accessController = new AccessController();
-

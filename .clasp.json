@@ -1,4 +1,17 @@
 {
   "scriptId": "1SAAWR_m9TNMPsxCiX9wSm3KBU7yWAe_mN8PafZ00Dqr1hUTgXZhB2g3Z",
-  "rootDir": "src"
+  "rootDir": "src",
+  "filePushOrder": [
+    "src/constants.gs",
+    "src/Base.gs",
+    "src/App.gs",
+    "src/cache.gs",
+    "src/monitoring.gs",
+    "src/security.gs",
+    "src/database.gs",
+    "src/auth.gs",
+    "src/Core.gs",
+    "src/AdminPanelBackend.gs",
+    "src/main.gs"
+  ]
 }

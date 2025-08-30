@@ -3,8 +3,9 @@ const vm = require('vm');
 
 describe('verifyUserAccess security checks', () => {
   const coreCode = fs.readFileSync('src/Core.gs', 'utf8');
-  // ConfigurationManagerとAccessControllerは同じファイルに統合
-  const accessControllerCode = fs.readFileSync('src/AccessController.gs', 'utf8');
+  // ConfigurationManagerとAccessControllerは新しいBase.gsに統合
+  const baseCode = fs.readFileSync('src/Base.gs', 'utf8');
+  const appCode = fs.readFileSync('src/App.gs', 'utf8');
   let context;
 
   beforeEach(() => {
@@ -61,7 +62,8 @@ describe('verifyUserAccess security checks', () => {
       })),
     };
     vm.createContext(context);
-    vm.runInContext(accessControllerCode, context);
+    vm.runInContext(baseCode, context);
+    vm.runInContext(appCode, context);
     vm.runInContext(coreCode, context);
   });
 
@@ -130,7 +132,8 @@ describe('verifyUserAccess security checks', () => {
     };
     
     vm.createContext(publicContext);
-    vm.runInContext(accessControllerCode, publicContext);
+    vm.runInContext(baseCode, publicContext);
+    vm.runInContext(appCode, publicContext);
     vm.runInContext(coreCode, publicContext);
     
     expect(() => publicContext.verifyUserAccess('U1')).not.toThrow();

@@ -900,10 +900,10 @@ function updateUserSpreadsheetConfig(userId, config) {
     console.log('updateUserSpreadsheetConfig: 設定更新開始', { userId, config });
 
     // 新しいconfigManagerを使用して設定を更新
-    const updateResult = configManager.updateUserConfig(userId, config);
+    const updateResult = App.getConfig().updateUserConfig(userId, config);
     
     if (updateResult) {
-      const updatedConfig = configManager.getUserConfig(userId);
+      const updatedConfig = App.getConfig().getUserConfig(userId);
       console.log('updateUserSpreadsheetConfig: 設定更新完了', { userId, config: updatedConfig });
       return {
         success: true,
@@ -931,7 +931,7 @@ function getUserConfigJson(userId) {
     console.log('getUserConfigJson: 設定取得開始', userId);
     
     // 新しいconfigManagerを使用して設定を取得
-    const config = configManager.getUserConfig(userId);
+    const config = App.getConfig().getUserConfig(userId);
     
     console.log('getUserConfigJson: 設定取得完了', { userId, hasConfig: !!config });
     return config;
