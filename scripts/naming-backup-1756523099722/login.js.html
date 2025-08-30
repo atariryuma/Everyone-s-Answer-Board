@@ -1,7 +1,7 @@
 <script>
   // グローバルエラーハンドラー
   window.addEventListener('error', (event) => {
-    Log.error('Global error:', event.error);
+    console.error('Global error:', event.error);
     const userEmailDisplay = document.getElementById('user-email-display');
     if (userEmailDisplay && event.error.message) {
       userEmailDisplay.textContent = 'システムエラーが発生しました';
@@ -10,7 +10,7 @@
 
   // Promise rejection ハンドラー
   window.addEventListener('unhandledrejection', (event) => {
-    Log.error('Unhandled promise rejection:', event.reason);
+    console.error('Unhandled promise rejection:', event.reason);
     const userEmailDisplay = document.getElementById('user-email-display');
     if (userEmailDisplay) {
       userEmailDisplay.textContent = '通信エラーが発生しました';
@@ -21,7 +21,7 @@
   window.setLoading = function(flag, text = '') {
     const loginBtn = document.getElementById('login-btn');
     if (!loginBtn) {
-      Log.warn('login-btn element not found, skipping loading state change');
+      console.warn('login-btn element not found, skipping loading state change');
       return;
     }
     loginBtn.disabled = flag;
@@ -100,14 +100,14 @@
             userEmailDisplay.textContent = response;
           } else {
             userEmailDisplay.textContent = 'ユーザー情報を取得中...';
-            Log.warn('User email not found in response:', response);
+            console.warn('User email not found in response:', response);
           }
         })
         .withFailureHandler(error => {
-          Log.warn('User email display failed:', error);
+          console.warn('User email display failed:', error);
           userEmailDisplay.textContent = 'ユーザー情報取得エラー';
         })
-        .User.email();
+        .getCurrentUserEmail();
     };
 
     // GAS内蔵認証を使用した簡易ログイン処理
@@ -118,20 +118,20 @@
         // URL システムのリセットを事前に実行
         google.script.run
           .withSuccessHandler(() => {
-            Log.info('URL system reset completed');
+            console.log('URL system reset completed');
             // 統合されたログインフローを実行
             processUnifiedLogin()
               .catch(handleLoginError);
           })
           .withFailureHandler((error) => {
-            Log.warn('URL system reset failed:', error);
+            console.warn('URL system reset failed:', error);
             // リセットに失敗してもログイン処理は続行
             processUnifiedLogin()
               .catch(handleLoginError);
           })
           .forceUrlSystemReset();
       } catch (err) {
-        Log.error('Login function error:', err);
+        console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';
         setLoading(false);
       }
@@ -168,7 +168,7 @@
           }
         })
         .withFailureHandler(error => {
-          Log.warn('Domain info failed:', error);
+          console.warn('Domain info failed:', error);
           // エラー時も初期表示のままにする
           updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
         })
@@ -231,12 +231,12 @@
       // バックエンドのセッションクリーンアップ関数を呼び出し
       google.script.run
         .withSuccessHandler(result => {
-          Log.info('Session cleanup result:', result);
+          console.log('Session cleanup result:', result);
           // Google認証のログアウトURLにリダイレクト
           window.location.href = 'https://accounts.google.com/logout';
         })
         .withFailureHandler(error => {
-          Log.error('Session cleanup failed:', error);
+          console.error('Session cleanup failed:', error);
           alert('セッションクリアに失敗しました。手動でGoogleアカウントからログアウトしてください。');
           // 失敗時もGoogleログアウトページへ
           window.location.href = 'https://accounts.google.com/logout';
@@ -291,12 +291,12 @@
     try {
       // 引数の妥当性チェック
       if (!adminUrl || typeof adminUrl !== 'string') {
-        Log.error('showAdminPanelRedirect: 無効なadminUrlが渡されました:', adminUrl);
+        console.error('showAdminPanelRedirect: 無効なadminUrlが渡されました:', adminUrl);
         alert('管理パネルのURLが無効です。ページを再読み込みしてください。');
         return;
       }
       
-      Log.info('管理パネルアクセス成功画面を表示:', adminUrl);
+      console.log('管理パネルアクセス成功画面を表示:', adminUrl);
       
       // ローディング状態を停止
       if (typeof setLoading === 'function') {
@@ -524,12 +524,12 @@
         event.preventDefault();
         
         if (window.isAdminPanelClicking) {
-          Log.info('管理パネルボタンクリック処理中、二重クリックをブロック');
+          console.log('管理パネルボタンクリック処理中、二重クリックをブロック');
           return false;
         }
         
         window.isAdminPanelClicking = true;
-        Log.info('管理パネルへ遷移中...');
+        console.log('管理パネルへ遷移中...');
         
         // ボタンを無効化してローディング状態にする
         buttonElement.style.pointerEvents = 'none';
@@ -554,10 +554,10 @@
         document.body.classList.add('success-transition');
       }, 300);
       
-      Log.info('✅ ユーザーアクション待ち画面を表示しました');
+      console.log('✅ ユーザーアクション待ち画面を表示しました');
       
     } catch (error) {
-      Log.error('成功画面表示エラー:', error);
+      console.error('成功画面表示エラー:', error);
       // フォールバック: シンプルなconfirm
       const userChoice = confirm(`${message || 'ログインが完了しました'}\\n\\n管理パネルにアクセスしますか？`);
       if (userChoice) {
@@ -591,7 +591,7 @@
             buttonElement.disabled = false;
           }, 2000);
         }).catch((error) => {
-          Log.error('Clipboard API failed:', error);
+          console.error('Clipboard API failed:', error);
           // ユーザーに手動コピーを促すメッセージをボタンの近くに表示
           const messageElement = document.createElement('span');
           messageElement.textContent = ' (手動でコピーしてください)';
@@ -601,7 +601,7 @@
         });
       } else {
         // Clipboard APIがサポートされていない場合のフォールバック
-        Log.warn('Clipboard API not supported. Manual copy required.');
+        console.warn('Clipboard API not supported. Manual copy required.');
         const messageElement = document.createElement('span');
         messageElement.textContent = ' (ブラウザがコピーをサポートしていません。手動でコピーしてください)';
         messageElement.style.color = 'orange';
@@ -609,7 +609,7 @@
         setTimeout(() => messageElement.remove(), 5000);
       }
     } catch (error) {
-      Log.error('copyUrlToClipboard error:', error);
+      console.error('copyUrlToClipboard error:', error);
       // 予期せぬエラーの場合
       const messageElement = document.createElement('span');
       messageElement.textContent = ' (コピー中にエラーが発生しました)';

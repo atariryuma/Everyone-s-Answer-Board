@@ -593,9 +593,9 @@ function handleUnifiedError(
     severity === UNIFIED_CONSTANTS.ERROR.SEVERITY.CRITICAL ||
     severity === UNIFIED_CONSTANTS.ERROR.SEVERITY.HIGH
   ) {
-    Log.error(`[ERROR] ${functionName}: ${error.message}`, errorInfo);
+    console.error(`[ERROR] ${functionName}: ${error.message}`, errorInfo);
   } else {
-    Log.warn(`[WARN] ${functionName}: ${error.message}`, errorInfo);
+    console.warn(`[WARN] ${functionName}: ${error.message}`, errorInfo);
   }
 
   // 構造化エラーレスポンス返却
@@ -615,14 +615,14 @@ function handleUnifiedError(
 
 /**
  * 旧logUnified関数（互換性のため保持）
- * @deprecated Log.info(), Log.warn(), Log.error(), Log.debug() を使用してください
+ * @deprecated ULog.info(), ULog.warn(), ULog.error(), ULog.debug() を使用してください
  */
 function logUnified(level, functionName, message, data = {}) {
   // ULogクラスはulog.gsで定義されている
   if (typeof ULog !== 'undefined' && ULog.log) {
     ULog.log(level, functionName, message, data);
   } else {
-    Log.info(`[${level}] ${functionName}: ${message}`, data);
+    console.log(`[${level}] ${functionName}: ${message}`, data);
   }
 }
 
@@ -1020,7 +1020,7 @@ function clearTimeout(timeoutId) {
   // GASにはclearTimeoutが存在しないため、ログを出力して終了
   // 実際のタイムアウト操作はUtilities.sleepで制御する
   if (timeoutId) {
-    Log.info('[GAS-Polyfill] clearTimeout called (no-op in GAS):', timeoutId);
+    console.log('[GAS-Polyfill] clearTimeout called (no-op in GAS):', timeoutId);
   }
 }
 
@@ -1094,42 +1094,42 @@ class URLSearchParams {
 }
 
 // 必要最小限の関数エイリアス（未定義エラー解決用）
-// ErrorHandler は Core.gs で定義済みのため削除
+// UnifiedErrorHandler は Core.gs で定義済みのため削除
 
 // 本当に必要な未定義関数の最小実装
-const setupStep = (step) => Log.info(`[SETUP] ${step}`);
+const setupStep = (step) => console.log(`[SETUP] ${step}`);
 // checkReactionState は Core.gs 内で定義済み（関数内ローカル）
-const cleanupExpired = () => Log.info('[CLEANUP] Expired items cleaned');
-const dms = () => Log.info('[DMS] Document management operation');
+const cleanupExpired = () => console.log('[CLEANUP] Expired items cleaned');
+const dms = () => console.log('[DMS] Document management operation');
 const resolveValue = (value) => value; // パススルー関数
 
 // キャッシュ・データベース関連ダミー
-const invalidateCacheForSpreadsheet = (id) => Log.info(`[CACHE] Invalidated for ${id}`);
-const updateUserDatabaseField = (userId, field, value) => Log.info(`[DB] Updated ${field} for ${userId}`);
-const clearUserCache = (userId) => Log.info(`[CACHE] Cleared cache for ${userId}`);
-const deleteAll = () => Log.info('[DELETE] All items deleted');
+const invalidateCacheForSpreadsheet = (id) => console.log(`[CACHE] Invalidated for ${id}`);
+const updateUserDatabaseField = (userId, field, value) => console.log(`[DB] Updated ${field} for ${userId}`);
+const clearUserCache = (userId) => console.log(`[CACHE] Cleared cache for ${userId}`);
+const deleteAll = () => console.log('[DELETE] All items deleted');
 
 // システム初期化・管理関連ダミー
-const initializeSystem = () => Log.info('[SYSTEM] Initialized');
-const initializeComponent = (component) => Log.info(`[COMPONENT] Initialized ${component}`);
+const initializeSystem = () => console.log('[SYSTEM] Initialized');
+const initializeComponent = (component) => console.log(`[COMPONENT] Initialized ${component}`);
 const performInitialHealthCheck = () => ({ status: 'ok', message: 'Healthy' });
 const performBasicHealthCheck = () => ({ status: 'ok', message: 'Basic health OK' });
-const shutdown = () => Log.info('[SYSTEM] Shutdown completed');
+const shutdown = () => console.log('[SYSTEM] Shutdown completed');
 
 // バッチ処理関連ダミー
-const batchGet = (keys) => Log.info(`[BATCH] Getting ${keys.length} items`);
-const fallbackBatchGet = (keys) => Log.info(`[BATCH] Fallback get for ${keys.length} items`);
-const batchUpdate = (updates) => Log.info(`[BATCH] Updating ${updates.length} items`);
-const batchCacheOperation = (op, data) => Log.info(`[BATCH] Cache operation ${op}`);
-const batchCache = (data) => Log.info(`[BATCH] Caching ${data.length} items`);
+const batchGet = (keys) => console.log(`[BATCH] Getting ${keys.length} items`);
+const fallbackBatchGet = (keys) => console.log(`[BATCH] Fallback get for ${keys.length} items`);
+const batchUpdate = (updates) => console.log(`[BATCH] Updating ${updates.length} items`);
+const batchCacheOperation = (op, data) => console.log(`[BATCH] Cache operation ${op}`);
+const batchCache = (data) => console.log(`[BATCH] Caching ${data.length} items`);
 
 // セキュリティ・ユーザー管理関連ダミー
 const setupStatus = () => ({ configured: true });
-const sendSecurityAlert = (message) => Log.info(`[SECURITY] Alert: ${message}`);
+const sendSecurityAlert = (message) => console.log(`[SECURITY] Alert: ${message}`);
 const checkLoginStatus = (userId) => {
   try {
     // ユーザーIDが提供されていない場合は現在のユーザーを使用
-    const targetUserId = userId || User.email();
+    const targetUserId = userId || getCurrentUserEmail();
     if (!targetUserId) {
       return { isValid: false, message: 'ユーザーIDが取得できません', userId: null };
     }
@@ -1181,19 +1181,19 @@ const checkLoginStatus = (userId) => {
     return { isValid: false, message: `セッション検証エラー: ${error.message}`, userId: userId };
   }
 };
-const updateLoginStatus = (userId, status) => Log.info(`[LOGIN] Status ${status} for ${userId}`);
+const updateLoginStatus = (userId, status) => console.log(`[LOGIN] Status ${status} for ${userId}`);
 
 // UI・ユーティリティ関連ダミー
 const sheetDataCache = () => ({});
-const unpublished = () => Log.info('[UI] Unpublished operation');
-const unified = () => Log.info('[UNIFIED] Operation');
+const unpublished = () => console.log('[UI] Unpublished operation');
+const unified = () => console.log('[UNIFIED] Operation');
 const logger = { 
-  info: (msg) => Log.info(`[LOG] ${msg}`),
-  error: (msg) => Log.error(`[LOG] ${msg}`)
+  info: (msg) => console.log(`[LOG] ${msg}`),
+  error: (msg) => console.error(`[LOG] ${msg}`)
 };
 const safeExecute = (fn) => {
   try { return fn(); } 
-  catch(e) { Log.error('[SAFE_EXECUTE]', e.message); return null; }
+  catch(e) { console.error('[SAFE_EXECUTE]', e.message); return null; }
 };
 
 // 検証・設定関連ダミー
@@ -1232,17 +1232,17 @@ const responseFactory = {
 };
 
 // キャッシュ操作関数のダミー
-const clearElementCache = (element) => Log.info(`[CACHE] Cleared ${element}`);
-const resolvePendingClears = () => Log.info('[CACHE] Resolved pending clears');
-const rejectPendingClears = () => Log.info('[CACHE] Rejected pending clears');
+const clearElementCache = (element) => console.log(`[CACHE] Cleared ${element}`);
+const resolvePendingClears = () => console.log('[CACHE] Resolved pending clears');
+const rejectPendingClears = () => console.log('[CACHE] Rejected pending clears');
 
 // SystemIntegrationManager は systemIntegrationManager.gs で定義済み
 // UnifiedSheetDataManager は unifiedSheetDataManager.gs で定義済み
-// CacheAPI は unifiedCacheManager.gs で定義済み
+// UnifiedCacheAPI は unifiedCacheManager.gs で定義済み
 // MultiTenantSecurityManager は unifiedSecurityManager.gs で定義済み
 // UnifiedValidationSystem は削除済み（簡素化）
 // CacheManager は unifiedCacheManager.gs で定義済み
-// ExecutionCache は unifiedCacheManager.gs で定義済み
+// UnifiedExecutionCache は unifiedCacheManager.gs で定義済み
 
 // UnifiedBatchProcessor は unifiedBatchProcessor.gs で定義済み
 // UnifiedSecretManager は secretManager.gs で定義済み
@@ -1253,12 +1253,12 @@ const alert = (message) => {
     if (typeof Browser !== 'undefined' && Browser.msgBox) {
       return Browser.msgBox(message);
     } else {
-      Log.info('[ALERT]', message);
+      console.log('[ALERT]', message);
       Logger.log('[ALERT] ' + message);
       return message;
     }
   } catch (e) {
-    Log.info('[ALERT]', message);
+    console.log('[ALERT]', message);
     return message;
   }
 };
@@ -1269,24 +1269,24 @@ const confirm = (message) => {
       const response = Browser.msgBox(message, Browser.Buttons.YES_NO);
       return response === Browser.Buttons.YES;
     } else {
-      Log.info('[CONFIRM]', message, '(auto-confirmed)');
+      console.log('[CONFIRM]', message, '(auto-confirmed)');
       return true;
     }
   } catch (e) {
-    Log.info('[CONFIRM]', message, '(auto-confirmed)'); 
+    console.log('[CONFIRM]', message, '(auto-confirmed)'); 
     return true;
   }
 };
 
 // DOM/Browser操作のダミー実装（GASでは不要）
-const reload = () => Log.info('[RELOAD] Page reload not applicable in GAS');
-const preventDefault = () => Log.info('[PREVENT_DEFAULT] Event handling not applicable in GAS');
+const reload = () => console.log('[RELOAD] Page reload not applicable in GAS');
+const preventDefault = () => console.log('[PREVENT_DEFAULT] Event handling not applicable in GAS');
 const querySelector = () => null;
 
 // 代用可能な関数群のエイリアス（ダミー実装）
 const Functions = {
   // FormApp APIのダミー参照（実際には使用されない）
-  setEmailCollectionType: () => Log.info('[FORM] setEmailCollectionType'),
+  setEmailCollectionType: () => console.log('[FORM] setEmailCollectionType'),
   getPublishedUrl: (form) => form ? form.getPublishedUrl() : '',
   getEditUrl: (form) => form ? form.getEditUrl() : ''
 };

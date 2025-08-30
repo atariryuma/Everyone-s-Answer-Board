@@ -20,11 +20,11 @@
      */
     startSync(flowId, callback) {
       if (!this.isEnabled) {
-        Log.info('🔕 BackendProgressSync is disabled');
+        console.log('🔕 BackendProgressSync is disabled');
         return;
       }
 
-      Log.info(`🔄 Starting progress sync for flow: ${flowId}`);
+      console.log(`🔄 Starting progress sync for flow: ${flowId}`);
 
       this.progressCallbacks.set(flowId, callback);
       this.activeFlows.add(flowId);
@@ -58,7 +58,7 @@
             this.stopSync(flowId);
           }
         } catch (error) {
-          Log.warn(`⚠️ Progress polling error for ${flowId}:`, error);
+          console.warn(`⚠️ Progress polling error for ${flowId}:`, error);
 
           // 連続エラーが発生した場合はポーリング停止
           if (this.shouldStopOnError(flowId, error)) {
@@ -99,12 +99,12 @@
       } catch (error) {
         // getFlowProgress関数が存在しない場合の特別なハンドリング
         if (error.message && error.message.includes('getFlowProgress is not a function')) {
-          Log.info(`ℹ️ Backend progress sync not available for ${flowId}, using fallback mode`);
+          console.log(`ℹ️ Backend progress sync not available for ${flowId}, using fallback mode`);
           this.isEnabled = false; // 将来のリクエストを無効化
           return null;
         }
 
-        Log.warn(`⚠️ Failed to fetch progress for ${flowId}:`, error);
+        console.warn(`⚠️ Failed to fetch progress for ${flowId}:`, error);
         return null;
       }
     }
@@ -171,7 +171,7 @@
      * @param {string} flowId - フロー識別子
      */
     stopSync(flowId) {
-      Log.info(`🛑 Stopping progress sync for flow: ${flowId}`);
+      console.log(`🛑 Stopping progress sync for flow: ${flowId}`);
 
       this.stopPolling(flowId);
       this.progressCallbacks.delete(flowId);
@@ -195,7 +195,7 @@
      * 全ての同期を停止
      */
     stopAllSync() {
-      Log.info('🛑 Stopping all progress sync');
+      console.log('🛑 Stopping all progress sync');
 
       for (const flowId of this.activeFlows) {
         this.stopSync(flowId);
@@ -257,5 +257,5 @@
     window.backendProgressSync.stopAllSync();
   });
 
-  Log.info('✅ BackendProgressSync initialized');
+  console.log('✅ BackendProgressSync initialized');
 </script>

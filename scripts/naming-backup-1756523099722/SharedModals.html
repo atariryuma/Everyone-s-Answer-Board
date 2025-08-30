@@ -809,7 +809,7 @@ class SharedModals {
     modalIds.forEach(modalId => {
       if (!this.loadedModals.has(modalId)) {
         this.loadedModals.add(modalId);
-        Log.info(`Modal ${modalId} loaded`);
+        console.log(`Modal ${modalId} loaded`);
       }
     });
   }
@@ -836,7 +836,7 @@ class SharedModals {
 
     // null checks for modal elements
     if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
-      Log.error('モーダル要素が見つかりません');
+      console.error('モーダル要素が見つかりません');
       return;
     }
 
@@ -868,7 +868,7 @@ class SharedModals {
 
     // null checks for modal elements
     if (!modal || !titleEl || !messageEl || !iconEl || !closeBtn) {
-      Log.error('アラートモーダル要素が見つかりません');
+      console.error('アラートモーダル要素が見つかりません');
       return;
     }
 
@@ -984,7 +984,7 @@ class SharedModals {
   showPrivacy(onContinue) {
     const modal = document.getElementById('privacy-modal');
     if (!modal) {
-      Log.error('プライバシーモーダルが見つかりません');
+      console.error('プライバシーモーダルが見つかりません');
       return;
     }
     
@@ -1011,7 +1011,7 @@ class SharedModals {
   showDigitalCitizenship() {
     const modal = document.getElementById('digital-citizenship-modal');
     if (!modal) {
-      Log.error('デジタル・シティズンシップモーダルが見つかりません');
+      console.error('デジタル・シティズンシップモーダルが見つかりません');
       return;
     }
     
@@ -1023,20 +1023,20 @@ class SharedModals {
     // ローディングオーバーレイを確実に非表示にする
     if (window.unifiedLoadingManager) {
       window.unifiedLoadingManager.setLoading(false);
-      Log.info('🔄 自動停止モーダル表示前にローディングを非表示にしました');
+      console.log('🔄 自動停止モーダル表示前にローディングを非表示にしました');
     }
     
     this.loadModals(['auto-stop-confirmation-modal']);
 
     const modal = document.getElementById('auto-stop-confirmation-modal');
     if (!modal) {
-      Log.error('❌ 自動停止確認モーダルが見つかりません');
+      console.error('❌ 自動停止確認モーダルが見つかりません');
       return;
     }
 
     // 公開結果データの完全性検証
     const validationResult = this.validatePublishResult(publishResult);
-    Log.info('🔍 公開結果データ検証:', validationResult);
+    console.log('🔍 公開結果データ検証:', validationResult);
 
     // 公開時間と停止時間の設定（完全版）
     if (validationResult.isValid && publishResult.publishedAt) {
@@ -1044,7 +1044,7 @@ class SharedModals {
       const minutes = publishResult.autoStopMinutes || 360; // 6時間 = 360分（デフォルト）
       const stopTime = new Date(publishTime.getTime() + (minutes * 60 * 1000));
       
-      Log.info('🕒 自動停止時間設定:', {
+      console.log('🕒 自動停止時間設定:', {
         publishedAt: publishResult.publishedAt,
         autoStopMinutes: minutes,
         source: publishResult.autoStopMinutes ? 'server' : 'default',
@@ -1065,19 +1065,19 @@ class SharedModals {
     } else {
       // Critical errors がある場合のみ警告表示、軽微な問題は情報レベル
       if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
-        Log.warn('⚠️ 公開結果データに重要な問題があります:', {
+        console.warn('⚠️ 公開結果データに重要な問題があります:', {
           publishResult: publishResult,
           criticalErrors: validationResult.criticalErrors,
           fallbackAction: 'デフォルト設定を適用'
         });
       } else if (validationResult.warningErrors && validationResult.warningErrors.length > 0) {
-        Log.info('ℹ️ 公開結果データに軽微な問題がありますが正常に処理します:', {
+        console.log('ℹ️ 公開結果データに軽微な問題がありますが正常に処理します:', {
           publishResult: publishResult,
           warningErrors: validationResult.warningErrors,
           fallbackAction: 'デフォルト設定を適用'
         });
       } else {
-        Log.debug('🔧 フォールバック処理を実行中:', {
+        console.debug('🔧 フォールバック処理を実行中:', {
           publishResult: publishResult,
           reason: '検証結果がfalse（原因不明）'
         });
@@ -1106,7 +1106,7 @@ class SharedModals {
       // URL状態の表示（エラーケース）
       this.updateUrlStatusDisplay(publishResult, validationResult);
       
-      Log.info('🕒 フォールバック自動停止時間設定:', {
+      console.log('🕒 フォールバック自動停止時間設定:', {
         publishTime: now.toLocaleString('ja-JP'),
         autoStopMinutes: minutes,
         stopTime: stopTime.toLocaleString('ja-JP'),
@@ -1156,7 +1156,7 @@ class SharedModals {
         errors.push('公開が成功していません');
         // クイックスタートの場合は警告レベルに下げる
         if (publishResult.status === 'success') {
-          Log.warn('⚠️ success フラグは false だが status は success - クイックスタート結果として受け入れます');
+          console.warn('⚠️ success フラグは false だが status は success - クイックスタート結果として受け入れます');
         } else {
           isValid = false;
         }
@@ -1180,7 +1180,7 @@ class SharedModals {
           // メインURLフィールドが空の場合は代替URLで補完
           if (!publishResult.url || publishResult.url.trim() === '') {
             publishResult.url = validUrl;
-            Log.info('🔄 公開URL を代替URL で補完:', validUrl);
+            console.log('🔄 公開URL を代替URL で補完:', validUrl);
           }
         } else {
           errors.push('公開URLが不完全です（長さ不足）');
@@ -1191,9 +1191,9 @@ class SharedModals {
       if (!publishResult.publishedAt || publishResult.publishedAt.trim() === '') {
         // 公開時刻が設定されていない場合のみ現在時刻を使用
         publishResult.publishedAt = new Date().toISOString();
-        Log.info('🕒 公開時刻を現在時刻で補完:', publishResult.publishedAt);
+        console.log('🕒 公開時刻を現在時刻で補完:', publishResult.publishedAt);
         // 補完は情報レベル（警告ではない）
-        Log.debug('ℹ️ 公開時刻が未設定のため現在時刻で補完しました');
+        console.debug('ℹ️ 公開時刻が未設定のため現在時刻で補完しました');
       } else {
         // 公開時刻が既に存在する場合は検証のみ実行
         try {
@@ -1201,7 +1201,7 @@ class SharedModals {
           if (isNaN(publishTime.getTime())) {
             errors.push('公開時刻の形式が無効です');
           } else {
-            Log.debug('✅ 公開時刻は正常です:', publishResult.publishedAt);
+            console.debug('✅ 公開時刻は正常です:', publishResult.publishedAt);
           }
         } catch (e) {
           errors.push('公開時刻の解析に失敗しました');
@@ -1227,7 +1227,7 @@ class SharedModals {
     const warningErrors = errors.filter(error => !criticalErrors.includes(error));
     const hasCriticalErrors = criticalErrors.length > 0;
     
-    Log.debug('🔍 エラー分類:', {
+    console.debug('🔍 エラー分類:', {
       criticalErrors: criticalErrors,
       warningErrors: warningErrors,
       totalErrors: errors.length
@@ -1254,7 +1254,7 @@ class SharedModals {
     const urlStatusSection = document.getElementById('url-status-section');
     
     if (!urlStatusText || !urlPreview || !urlStatusSection) {
-      Log.warn('URL状態表示要素が見つかりません');
+      console.warn('URL状態表示要素が見つかりません');
       return;
     }
 
@@ -1329,7 +1329,7 @@ class SharedModals {
     this.loadAdminModals();
     const modal = document.getElementById('form-config-modal');
     if (!modal) {
-      Log.error('フォーム設定モーダルが見つかりません');
+      console.error('フォーム設定モーダルが見つかりません');
       return;
     }
     
@@ -1365,7 +1365,7 @@ class SharedModals {
     this.loadAdminModals();
     const modal = document.getElementById('security-details-modal');
     if (!modal) {
-      Log.error('セキュリティ詳細モーダルが見つかりません');
+      console.error('セキュリティ詳細モーダルが見つかりません');
       return;
     }
     
@@ -1378,7 +1378,7 @@ class SharedModals {
     this.loadAdminModals();
     const modal = document.getElementById('google-integration-modal');
     if (!modal) {
-      Log.error('Google連携モーダルが見つかりません');
+      console.error('Google連携モーダルが見つかりません');
       return;
     }
     
@@ -1391,7 +1391,7 @@ class SharedModals {
     this.loadAdminModals();
     const modal = document.getElementById('privacy-warning-modal');
     if (!modal) {
-      Log.error('プライバシー警告モーダルが見つかりません');
+      console.error('プライバシー警告モーダルが見つかりません');
       return;
     }
     
@@ -1429,7 +1429,7 @@ class SharedModals {
   showPublish(onPublish, onCancel, autoStopSettings = null) {
     const modal = document.getElementById('publish-modal');
     if (!modal) {
-      Log.error('公開モーダルが見つかりません');
+      console.error('公開モーダルが見つかりません');
       return;
     }
     
@@ -1480,7 +1480,7 @@ class SharedModals {
     this.loadAdminModals();
     const modal = document.getElementById('quickstart-stop-confirmation-modal');
     if (!modal) {
-      Log.error('クイックスタート停止確認モーダルが見つかりません');
+      console.error('クイックスタート停止確認モーダルが見つかりません');
       return;
     }
     
@@ -1509,7 +1509,7 @@ class SharedModals {
     this.loadAdminModals();
     const modal = document.getElementById('custom-setup-selection-modal');
     if (!modal) {
-      Log.error('カスタムセットアップ選択モーダルが見つかりません');
+      console.error('カスタムセットアップ選択モーダルが見つかりません');
       return;
     }
     
