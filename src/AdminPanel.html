@@ -954,13 +954,24 @@
       };
 
       // 初期化
-      document.addEventListener('DOMContentLoaded', function () {
+      document.addEventListener('DOMContentLoaded', async function () {
         console.log('AdminPanel初期化開始');
-        initializePanel();
-        checkSystemAdminAccess();
+        
+        try {
+          // メイン初期化を非同期実行
+          await initializePanel();
+          
+          // システム管理者チェック（並行実行）
+          checkSystemAdminAccess();
 
-        // フッターの初期化
-        initializeFooter();
+          // フッターの初期化
+          initializeFooter();
+          
+          console.log('AdminPanel全体初期化完了');
+        } catch (error) {
+          console.error('AdminPanel初期化の致命的エラー:', error);
+          showError('管理パネルの初期化に失敗しました。ページを再読み込みしてください。');
+        }
 
         // 定期的なステータス更新
         setInterval(updateSystemStatus, 30000); // 30秒間隔
@@ -1003,103 +1014,399 @@
         }
       }
 
-      // パネル初期化 - 設定読み込み追加
-      function initializePanel() {
+      // パネル初期化 - 非同期対応版（完全な自動反映機能付き）
+      async function initializePanel() {
         try {
+          console.log('AdminPanel非同期初期化開始');
           setLoading(true);
-          loadSpreadsheetList();
-          loadUserInfo();
-          loadCurrentConfig(); // 設定を自動読み込み
-          setLoading(false);
+          
+          // 並行処理で基本データを読み込み
+          await Promise.all([
+            loadSpreadsheetListAsync(),
+            loadUserInfoAsync()
+          ]);
+          
+          // 設定データを読み込んで完全に自動反映
+          await loadAndApplyCurrentConfig();
+          
+          console.log('AdminPanel非同期初期化完了');
+          showSuccess('✅ 管理パネルの初期化が完了しました');
         } catch (error) {
           console.error('初期化エラー:', error);
           showError('初期化に失敗しました: ' + error.message);
+        } finally {
           setLoading(false);
         }
       }
 
-      // スプレッドシート一覧読み込み
-      function loadSpreadsheetList() {
-        const select = document.getElementById('spreadsheet-select');
-        select.innerHTML = '<option value="">読み込み中...</option>';
+      // スプレッドシート一覧読み込み（非同期版）
+      function loadSpreadsheetListAsync() {
+        return new Promise((resolve, reject) => {
+          const select = document.getElementById('spreadsheet-select');
+          select.innerHTML = '<option value="">読み込み中...</option>';
 
-        google.script.run
-          .withSuccessHandler(function (spreadsheets) {
-            select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
-            spreadsheets.forEach((sheet) => {
-              const option = document.createElement('option');
-              option.value = sheet.id;
-              option.textContent = sheet.name;
-              select.appendChild(option);
-            });
-          })
-          .withFailureHandler(function (error) {
-            console.error('スプレッドシート読み込みエラー:', error);
-            select.innerHTML = '<option value="">読み込みエラー</option>';
-            showError('スプレッドシートの読み込みに失敗しました');
-          })
-          .getSpreadsheetList();
+          google.script.run
+            .withSuccessHandler(function (spreadsheets) {
+              select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
+              spreadsheets.forEach((sheet) => {
+                const option = document.createElement('option');
+                option.value = sheet.id;
+                option.textContent = sheet.name;
+                select.appendChild(option);
+              });
+              console.log(`スプレッドシート一覧読み込み完了: ${spreadsheets.length}件`);
+              resolve(spreadsheets);
+            })
+            .withFailureHandler(function (error) {
+              console.error('スプレッドシート読み込みエラー:', error);
+              select.innerHTML = '<option value="">読み込みエラー</option>';
+              reject(new Error('スプレッドシートの読み込みに失敗しました: ' + error.message));
+            })
+            .getSpreadsheetList();
+        });
       }
 
-      // ユーザー情報読み込み
-      function loadUserInfo() {
-        // メールアドレス取得
-        console.log('loadUserInfo: メールアドレス取得開始');
-        google.script.run
-          .withSuccessHandler(function (email) {
-            console.log('getUserEmail成功:', email);
-            if (email && email.trim()) {
-              document.getElementById('current-user-email').textContent = email;
-              console.log('メールアドレス表示完了:', email);
-            } else {
-              console.warn('User email not found in response:', email);
-              document.getElementById('current-user-email').textContent = '取得中...';
-              // 再試行メカニズム
-              setTimeout(() => {
-                console.log('メールアドレス取得再試行');
-                loadUserInfo();
-              }, 2000);
-            }
-          })
-          .withFailureHandler(function (error) {
-            console.error('メールアドレス取得エラー:', error);
-            document.getElementById('current-user-email').textContent = 'エラー';
-          })
-          .getUserEmail();
+      // 旧版との互換性維持
+      function loadSpreadsheetList() {
+        loadSpreadsheetListAsync().catch(error => {
+          showError(error.message);
+        });
+      }
 
-        // ユーザーIDを表示（__USER_ID__があれば使用）
-        if (typeof __USER_ID__ !== 'undefined' && __USER_ID__) {
-          document.getElementById('current-user-id').textContent = __USER_ID__;
-        } else {
-          document.getElementById('current-user-id').textContent = 'N/A';
+      // ユーザー情報読み込み（非同期版）
+      function loadUserInfoAsync() {
+        return new Promise((resolve, reject) => {
+          console.log('loadUserInfoAsync: メールアドレス取得開始');
+          
+          google.script.run
+            .withSuccessHandler(function (email) {
+              console.log('getUserEmail成功:', email);
+              if (email && email.trim()) {
+                document.getElementById('current-user-email').textContent = email;
+                console.log('メールアドレス表示完了:', email);
+                
+                // ユーザーIDを表示（__USER_ID__があれば使用）
+                if (typeof __USER_ID__ !== 'undefined' && __USER_ID__) {
+                  document.getElementById('current-user-id').textContent = __USER_ID__;
+                } else {
+                  document.getElementById('current-user-id').textContent = 'N/A';
+                }
+                
+                resolve({ email, userId: __USER_ID__ || null });
+              } else {
+                console.warn('User email not found in response:', email);
+                document.getElementById('current-user-email').textContent = '取得中...';
+                reject(new Error('ユーザー情報の取得に失敗しました'));
+              }
+            })
+            .withFailureHandler(function (error) {
+              console.error('メールアドレス取得エラー:', error);
+              document.getElementById('current-user-email').textContent = 'エラー';
+              reject(new Error('メールアドレス取得に失敗しました: ' + error.message));
+            })
+            .getUserEmail();
+        });
+      }
+
+      // 旧版との互換性維持（再試行機能付き）
+      function loadUserInfo() {
+        loadUserInfoAsync().catch(error => {
+          console.warn('初回取得失敗、再試行します:', error.message);
+          setTimeout(() => {
+            console.log('メールアドレス取得再試行');
+            loadUserInfoAsync().catch(retryError => {
+              showError('ユーザー情報の取得に失敗しました: ' + retryError.message);
+            });
+          }, 2000);
+        });
+      }
+
+      // 設定データの読み込みと完全自動反映（新実装）
+      async function loadAndApplyCurrentConfig() {
+        console.log('loadAndApplyCurrentConfig: 完全自動反映開始');
+        
+        try {
+          // 設定データを非同期で取得
+          const config = await getCurrentConfigAsync();
+          console.log('設定データ取得成功:', config);
+          
+          // リソースボタンを更新
+          updateResourceButtons(config);
+          
+          if (config && config.spreadsheetId) {
+            console.log('既存設定を検出、自動反映を開始');
+            
+            // 1. スプレッドシート自動選択
+            await autoSelectSpreadsheet(config.spreadsheetId);
+            
+            // 2. シート自動選択
+            if (config.sheetName) {
+              await autoSelectSheet(config.sheetName);
+            }
+            
+            // 3. 列設定の自動初期化
+            await autoInitializeColumnSettings(config);
+            
+            // 4. 進捗ステップの更新
+            updateProgressFromConfig(config);
+            
+            showSuccess('✅ 既存の設定を完全に反映しました');
+          } else {
+            console.log('新規ユーザー: 初期セットアップが必要');
+            showInfo('💡 新規セットアップを開始してください');
+          }
+          
+        } catch (error) {
+          console.error('設定自動反映エラー:', error);
+          showError('設定の自動反映に失敗しました: ' + error.message);
+          // エラー時でもリソースボタンを初期状態で表示
+          updateResourceButtons(null);
         }
       }
 
-      // 現在の設定を読み込み（初期化時用）
+      // 設定データ取得（Promise版）
+      function getCurrentConfigAsync() {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .getCurrentConfig();
+        });
+      }
+
+      // 旧版との互換性維持
       function loadCurrentConfig() {
-        console.log('loadCurrentConfig: データベースから設定読み込み開始');
+        loadAndApplyCurrentConfig().catch(error => {
+          console.error('loadCurrentConfig互換版エラー:', error);
+        });
+      }
+
+      // ========== 自動反映機能群 ==========
+
+      // スプレッドシート自動選択
+      async function autoSelectSpreadsheet(spreadsheetId) {
+        console.log('autoSelectSpreadsheet: 自動選択開始', spreadsheetId);
         
-        google.script.run
-          .withSuccessHandler(function (config) {
-            console.log('loadCurrentConfig: 設定読み込み成功', config);
+        try {
+          const select = document.getElementById('spreadsheet-select');
+          if (!select) {
+            throw new Error('スプレッドシート選択要素が見つかりません');
+          }
+
+          // オプションから該当するIDを探す
+          const option = Array.from(select.options).find(opt => opt.value === spreadsheetId);
+          if (option) {
+            select.value = spreadsheetId;
+            console.log('スプレッドシート自動選択完了:', option.textContent);
             
-            // リソースボタンを更新
-            updateResourceButtons(config);
+            // シート一覧も自動読み込み
+            await loadSheetListAsync(spreadsheetId);
+            return true;
+          } else {
+            console.warn('指定のスプレッドシートが一覧に見つかりません:', spreadsheetId);
+            // 直接URLで接続を試行
+            showInfo('💡 設定済みスプレッドシートに直接接続を試行します');
+            return false;
+          }
+        } catch (error) {
+          console.error('スプレッドシート自動選択エラー:', error);
+          throw error;
+        }
+      }
+
+      // シート自動選択
+      async function autoSelectSheet(sheetName) {
+        console.log('autoSelectSheet: 自動選択開始', sheetName);
+        
+        try {
+          const select = document.getElementById('sheet-select');
+          if (!select) {
+            throw new Error('シート選択要素が見つかりません');
+          }
+
+          // オプションから該当する名前を探す
+          const option = Array.from(select.options).find(opt => opt.textContent === sheetName);
+          if (option) {
+            select.value = option.value;
+            console.log('シート自動選択完了:', sheetName);
+            return true;
+          } else {
+            console.warn('指定のシートが一覧に見つかりません:', sheetName);
+            showInfo(`💡 シート「${sheetName}」が見つかりません。手動で選択してください`);
+            return false;
+          }
+        } catch (error) {
+          console.error('シート自動選択エラー:', error);
+          throw error;
+        }
+      }
+
+      // 列設定の自動初期化
+      async function autoInitializeColumnSettings(config) {
+        console.log('autoInitializeColumnSettings: 列設定自動初期化開始', config);
+        
+        try {
+          const spreadsheetId = config.spreadsheetId;
+          const sheetName = config.sheetName;
+          
+          if (!spreadsheetId || !sheetName) {
+            console.log('スプレッドシートIDまたはシート名が不足、列設定スキップ');
+            return;
+          }
+
+          // 既存の列設定データがあるかチェック
+          if (config.columnMapping || config.columnSelections) {
+            console.log('既存の列設定データを使用');
+            // 既存データから列設定を復元
+            await restoreColumnSettingsFromConfig(config);
+          } else {
+            console.log('列設定データなし、AI分析を実行');
+            // 新規にAI分析実行
+            await analyzeAndSetupColumns(spreadsheetId, sheetName);
+          }
+
+        } catch (error) {
+          console.error('列設定自動初期化エラー:', error);
+          showError('列設定の初期化に失敗しました: ' + error.message);
+        }
+      }
+
+      // 既存の列設定データから復元
+      async function restoreColumnSettingsFromConfig(config) {
+        console.log('restoreColumnSettingsFromConfig: 既存設定復元開始');
+        
+        try {
+          // まず列構造を分析してヘッダーを取得
+          const result = await analyzeColumnsAsync(config.spreadsheetId, config.sheetName);
+          
+          if (result && result.success && result.headers) {
+            console.log('列構造分析完了、ドロップダウンを設定');
             
-            // 設定が存在する場合は成功メッセージ
-            if (config && (config.spreadsheetId || config.setupStatus !== 'pending')) {
-              showSuccess('✅ 既存の設定を読み込みました');
-            } else {
-              showInfo('💡 新規セットアップが必要です');
+            // ドロップダウンを初期化
+            populateColumnDropdowns(result.headers, result.columnMapping || {});
+            
+            // 既存の選択状況があれば反映
+            if (config.columnSelections) {
+              applyPreviousColumnSelections(config.columnSelections);
             }
-          })
-          .withFailureHandler(function (error) {
-            console.error('loadCurrentConfig: 設定読み込みエラー', error);
-            showError('設定の読み込みに失敗しました: ' + (error.message || 'Unknown error'));
-            // エラー時でもリソースボタンを初期状態で表示
-            updateResourceButtons(null);
-          })
-          .getCurrentConfig();
+            
+            console.log('既存設定からの列設定復元完了');
+          } else {
+            throw new Error('列構造の分析に失敗しました');
+          }
+        } catch (error) {
+          console.error('既存設定復元エラー:', error);
+          throw error;
+        }
+      }
+
+      // 新規AI分析と列設定
+      async function analyzeAndSetupColumns(spreadsheetId, sheetName) {
+        console.log('analyzeAndSetupColumns: 新規AI分析開始');
+        
+        try {
+          const result = await analyzeColumnsAsync(spreadsheetId, sheetName);
+          
+          if (result && result.success) {
+            console.log('AI分析完了、列設定UIを更新');
+            updateColumnMapping(result);
+          } else {
+            throw new Error(result.error || 'AI分析に失敗しました');
+          }
+        } catch (error) {
+          console.error('新規AI分析エラー:', error);
+          throw error;
+        }
+      }
+
+      // 以前の列選択を復元
+      function applyPreviousColumnSelections(columnSelections) {
+        console.log('applyPreviousColumnSelections: 以前の選択を復元', columnSelections);
+        
+        Object.keys(columnSelections).forEach(columnType => {
+          if (columnType.startsWith('_')) return; // メタデータはスキップ
+          
+          const selection = columnSelections[columnType];
+          const dropdown = document.getElementById(`${columnType}-column-select`);
+          
+          if (dropdown && selection && typeof selection.columnIndex === 'number') {
+            dropdown.value = selection.columnIndex;
+            
+            // 選択タイプに応じたクラス設定
+            if (selection.selectionType === 'manual') {
+              dropdown.classList.add('has-manual-selection');
+              showConfidenceBadge(columnType, 100, 'manual');
+            } else {
+              dropdown.classList.add('has-ai-selection');
+              showConfidenceBadge(columnType, selection.confidence || 0, 'ai');
+            }
+            
+            console.log(`列選択復元: ${columnType} → ${selection.columnLabel}`);
+          }
+        });
+      }
+
+      // 進捗ステップを設定から更新
+      function updateProgressFromConfig(config) {
+        console.log('updateProgressFromConfig: 進捗更新開始', config);
+        
+        try {
+          let currentStep = 1;
+          
+          if (config.spreadsheetId && config.sheetName) {
+            currentStep = 2; // データソース接続完了
+          }
+          
+          if (config.columnMapping || config.columnSelections) {
+            currentStep = 2; // 列設定完了
+          }
+          
+          if (config.setupComplete) {
+            currentStep = 3; // セットアップ完了
+          }
+          
+          console.log('進捗ステップ更新:', currentStep);
+          updateProgress(currentStep);
+          
+        } catch (error) {
+          console.error('進捗更新エラー:', error);
+        }
+      }
+
+      // 非同期版の補助関数群
+      function loadSheetListAsync(spreadsheetId) {
+        return new Promise((resolve, reject) => {
+          const select = document.getElementById('sheet-select');
+          select.innerHTML = '<option value="">読み込み中...</option>';
+
+          google.script.run
+            .withSuccessHandler(function (sheets) {
+              select.innerHTML = '<option value="">シートを選択...</option>';
+              sheets.forEach((sheet) => {
+                const option = document.createElement('option');
+                option.value = sheet.name;
+                option.textContent = sheet.name;
+                select.appendChild(option);
+              });
+              console.log(`シート一覧読み込み完了: ${sheets.length}件`);
+              resolve(sheets);
+            })
+            .withFailureHandler(function (error) {
+              console.error('シート読み込みエラー:', error);
+              select.innerHTML = '<option value="">読み込みエラー</option>';
+              reject(new Error('シートの読み込みに失敗しました: ' + error.message));
+            })
+            .getSheetList(spreadsheetId);
+        });
+      }
+
+      function analyzeColumnsAsync(spreadsheetId, sheetName) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .analyzeColumns(spreadsheetId, sheetName);
+        });
       }
 
       // ========== リソースボタン関連関数 ==========
