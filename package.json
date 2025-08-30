@@ -14,7 +14,11 @@
     "push": "clasp push",
     "pull": "clasp pull",
     "open": "clasp open",
-    "deploy": "npm run check && npm run push"
+    "deploy": "npm run check && npm run push",
+    "cleanup": "node scripts/cleanup-unused-code.js",
+    "cleanup:dry": "node scripts/cleanup-unused-code.js --dry-run",
+    "cleanup:report": "node scripts/cleanup-reporter.js",
+    "analyze": "node scripts/dependency-analyzer.js"
   },
   "repository": {
     "type": "git",

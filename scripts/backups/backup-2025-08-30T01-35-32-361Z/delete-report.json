@@ -1,0 +1,254 @@
+{
+  "summary": {
+    "totalFilesDeleted": 29,
+    "totalFunctionsDeleted": 4,
+    "totalBytesFreed": 897888,
+    "backupLocation": "/Users/ryuma/Everyone-s-Answer-Board/scripts/backups/backup-2025-08-30T01-35-32-361Z",
+    "timestamp": "2025-08-30T01:35:32.727Z"
+  },
+  "details": {
+    "deletedFiles": [
+      {
+        "type": "file",
+        "path": "auth.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/auth.gs",
+        "size": 4280,
+        "timestamp": "2025-08-30T01:35:32.704Z"
+      },
+      {
+        "type": "file",
+        "path": "backendProgressSync.js.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/backendProgressSync.js.html",
+        "size": 8152,
+        "timestamp": "2025-08-30T01:35:32.704Z"
+      },
+      {
+        "type": "file",
+        "path": "ClientOptimizer.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/ClientOptimizer.html",
+        "size": 9695,
+        "timestamp": "2025-08-30T01:35:32.704Z"
+      },
+      {
+        "type": "file",
+        "path": "Code.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/Code.gs",
+        "size": 62356,
+        "timestamp": "2025-08-30T01:35:32.704Z"
+      },
+      {
+        "type": "file",
+        "path": "config.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/config.gs",
+        "size": 6414,
+        "timestamp": "2025-08-30T01:35:32.705Z"
+      },
+      {
+        "type": "file",
+        "path": "constants.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/constants.gs",
+        "size": 39635,
+        "timestamp": "2025-08-30T01:35:32.705Z"
+      },
+      {
+        "type": "file",
+        "path": "constants.js.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/constants.js.html",
+        "size": 6347,
+        "timestamp": "2025-08-30T01:35:32.705Z"
+      },
+      {
+        "type": "file",
+        "path": "Core.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/Core.gs",
+        "size": 166084,
+        "timestamp": "2025-08-30T01:35:32.705Z"
+      },
+      {
+        "type": "file",
+        "path": "database.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/database.gs",
+        "size": 103568,
+        "timestamp": "2025-08-30T01:35:32.706Z"
+      },
+      {
+        "type": "file",
+        "path": "debugConfig.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/debugConfig.gs",
+        "size": 4803,
+        "timestamp": "2025-08-30T01:35:32.706Z"
+      },
+      {
+        "type": "file",
+        "path": "ErrorBoundary.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/ErrorBoundary.html",
+        "size": 22189,
+        "timestamp": "2025-08-30T01:35:32.706Z"
+      },
+      {
+        "type": "file",
+        "path": "errorHandler.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/errorHandler.gs",
+        "size": 8170,
+        "timestamp": "2025-08-30T01:35:32.707Z"
+      },
+      {
+        "type": "file",
+        "path": "errorMessages.js.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/errorMessages.js.html",
+        "size": 11455,
+        "timestamp": "2025-08-30T01:35:32.707Z"
+      },
+      {
+        "type": "file",
+        "path": "lockManager.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/lockManager.gs",
+        "size": 2935,
+        "timestamp": "2025-08-30T01:35:32.708Z"
+      },
+      {
+        "type": "file",
+        "path": "monitoring.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/monitoring.gs",
+        "size": 12039,
+        "timestamp": "2025-08-30T01:35:32.708Z"
+      },
+      {
+        "type": "file",
+        "path": "page.css.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/page.css.html",
+        "size": 15658,
+        "timestamp": "2025-08-30T01:35:32.708Z"
+      },
+      {
+        "type": "file",
+        "path": "Page.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/Page.html",
+        "size": 118610,
+        "timestamp": "2025-08-30T01:35:32.708Z"
+      },
+      {
+        "type": "file",
+        "path": "Registration.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/Registration.html",
+        "size": 41839,
+        "timestamp": "2025-08-30T01:35:32.709Z"
+      },
+      {
+        "type": "file",
+        "path": "resilientExecutor.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/resilientExecutor.gs",
+        "size": 11570,
+        "timestamp": "2025-08-30T01:35:32.709Z"
+      },
+      {
+        "type": "file",
+        "path": "secretManager.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/secretManager.gs",
+        "size": 22690,
+        "timestamp": "2025-08-30T01:35:32.709Z"
+      },
+      {
+        "type": "file",
+        "path": "session-utils.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/session-utils.gs",
+        "size": 13106,
+        "timestamp": "2025-08-30T01:35:32.710Z"
+      },
+      {
+        "type": "file",
+        "path": "setup.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/setup.gs",
+        "size": 3529,
+        "timestamp": "2025-08-30T01:35:32.710Z"
+      },
+      {
+        "type": "file",
+        "path": "SharedModals.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/SharedModals.html",
+        "size": 76666,
+        "timestamp": "2025-08-30T01:35:32.710Z"
+      },
+      {
+        "type": "file",
+        "path": "ulog.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/ulog.gs",
+        "size": 6864,
+        "timestamp": "2025-08-30T01:35:32.710Z"
+      },
+      {
+        "type": "file",
+        "path": "UnifiedCache.js.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/UnifiedCache.js.html",
+        "size": 942,
+        "timestamp": "2025-08-30T01:35:32.711Z"
+      },
+      {
+        "type": "file",
+        "path": "unifiedCacheManager.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/unifiedCacheManager.gs",
+        "size": 78966,
+        "timestamp": "2025-08-30T01:35:32.711Z"
+      },
+      {
+        "type": "file",
+        "path": "unifiedUtilities.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/unifiedUtilities.gs",
+        "size": 9993,
+        "timestamp": "2025-08-30T01:35:32.712Z"
+      },
+      {
+        "type": "file",
+        "path": "Unpublished.html",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/Unpublished.html",
+        "size": 11340,
+        "timestamp": "2025-08-30T01:35:32.712Z"
+      },
+      {
+        "type": "file",
+        "path": "url.gs",
+        "fullPath": "/Users/ryuma/Everyone-s-Answer-Board/src/url.gs",
+        "size": 15578,
+        "timestamp": "2025-08-30T01:35:32.712Z"
+      }
+    ],
+    "deletedFunctions": [
+      {
+        "type": "function",
+        "path": "login.js.html",
+        "functionName": "getClientId",
+        "originalSize": 24197,
+        "newSize": 23787,
+        "timestamp": "2025-08-30T01:35:32.715Z"
+      },
+      {
+        "type": "function",
+        "path": "login.js.html",
+        "functionName": "handleLoginError",
+        "originalSize": 23787,
+        "newSize": 22705,
+        "timestamp": "2025-08-30T01:35:32.716Z"
+      },
+      {
+        "type": "function",
+        "path": "page.js.html",
+        "functionName": "measurePerformance",
+        "originalSize": 301508,
+        "newSize": 300786,
+        "timestamp": "2025-08-30T01:35:32.721Z"
+      },
+      {
+        "type": "function",
+        "path": "page.js.html",
+        "functionName": "handleKeydown",
+        "originalSize": 300786,
+        "newSize": 300585,
+        "timestamp": "2025-08-30T01:35:32.725Z"
+      }
+    ]
+  },
+  "rollbackInstructions": {
+    "command": "node scripts/rollback.js \"/Users/ryuma/Everyone-s-Answer-Board/scripts/backups/backup-2025-08-30T01-35-32-361Z\"",
+    "description": "このコマンドで変更を完全にロールバックできます"
+  }
+}
