@@ -523,6 +523,93 @@ function doGet() {
 }
 
 /**
+ * 現在のアクティブボード情報とURL生成
+ * @returns {Object} ボード情報とURL
+ */
+function getCurrentBoardInfoAndUrls() {
+  try {
+    Log.info('getCurrentBoardInfoAndUrls: ボード情報取得開始');
+    
+    // 現在ログイン中のユーザー情報を取得
+    const userInfo = unifiedUserManager.getCurrentUser();
+    if (!userInfo || !userInfo.userId) {
+      Log.warn('getCurrentBoardInfoAndUrls: ユーザー情報が見つかりません');
+      return {
+        isActive: false,
+        questionText: 'アクティブなボードがありません',
+        error: 'ユーザー情報が見つかりません'
+      };
+    }
+
+    Log.info('getCurrentBoardInfoAndUrls: ユーザー情報取得成功', {
+      userId: userInfo.userId,
+      hasSpreadsheetId: !!userInfo.spreadsheetId
+    });
+
+    // 現在のボードデータを取得
+    let boardData = null;
+    let questionText = '問題読み込み中...';
+    
+    if (userInfo.spreadsheetId) {
+      try {
+        boardData = getSheetData(userInfo.userId);
+        questionText = boardData?.header || '問題文が設定されていません';
+        Log.info('getCurrentBoardInfoAndUrls: ボードデータ取得成功', {
+          hasHeader: !!boardData?.header
+        });
+      } catch (error) {
+        Log.warn('getCurrentBoardInfoAndUrls: ボードデータ取得エラー:', error.message);
+        questionText = '問題文の読み込みに失敗しました';
+      }
+    } else {
+      questionText = 'スプレッドシートが設定されていません';
+    }
+
+    // URL生成
+    const baseUrl = getWebAppUrlCached();
+    if (!baseUrl) {
+      Log.error('getCurrentBoardInfoAndUrls: WebAppURL取得失敗');
+      return {
+        isActive: false,
+        questionText: questionText,
+        error: 'URLの生成に失敗しました'
+      };
+    }
+
+    const viewUrl = `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`;
+    const adminUrl = `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`;
+
+    const result = {
+      isActive: !!userInfo.spreadsheetId,
+      questionText: questionText,
+      sheetName: userInfo.sheetName || 'シート名未設定',
+      urls: {
+        view: viewUrl,      // 閲覧者向け（共有用）
+        admin: adminUrl     // 管理者向け
+      },
+      lastUpdated: new Date().toLocaleString('ja-JP'),
+      ownerEmail: userInfo.adminEmail
+    };
+
+    Log.info('getCurrentBoardInfoAndUrls: 成功', {
+      isActive: result.isActive,
+      hasQuestionText: !!result.questionText,
+      viewUrl: result.urls.view
+    });
+
+    return result;
+
+  } catch (error) {
+    Log.error('getCurrentBoardInfoAndUrls エラー:', error);
+    return {
+      isActive: false,
+      questionText: 'エラーが発生しました',
+      error: error.message
+    };
+  }
+}
+
+/**
  * システム管理者かどうかをチェック
  * @returns {boolean} システム管理者の場合はtrue
  */

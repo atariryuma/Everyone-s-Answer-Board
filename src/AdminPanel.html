@@ -408,6 +408,76 @@
     }
 
     /* SharedUtilitiesのローディングシステムを使用 */
+
+    /* =============================================================================
+     * フッター：現在のボード情報表示スタイル
+     * ============================================================================= */
+    #boardInfoFooter {
+      /* 既存のz-indexよりも低く設定（通知コンテナより下） */
+      z-index: 30;
+    }
+
+    #boardInfoFooter .glass-panel {
+      /* フッター専用のガラス調スタイル */
+      background: rgba(55, 65, 81, 0.95);
+      border: 1px solid rgba(75, 85, 99, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    #boardInfoFooter .glass-panel:hover {
+      border-color: rgba(96, 165, 250, 0.4);
+      transition: border-color 0.2s ease;
+    }
+
+    /* 問題文表示エリア */
+    #currentQuestionText {
+      max-width: 100%;
+      line-height: 1.4;
+    }
+
+    /* アクションボタンのレスポンシブ対応 */
+    @media (max-width: 768px) {
+      #boardInfoFooter .flex.items-center.justify-between {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+      }
+      
+      #boardInfoFooter .flex-1.min-w-0 {
+        flex: none;
+        text-align: center;
+      }
+      
+      #boardInfoFooter .flex.items-center.gap-2.flex-shrink-0 {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      
+      #currentQuestionText {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+      }
+    }
+
+    /* ボタンスタイル微調整 */
+    #boardInfoFooter .btn-primary,
+    #boardInfoFooter .btn-secondary {
+      white-space: nowrap;
+      min-width: fit-content;
+    }
+
+    /* コピー完了状態のスタイル */
+    #copyViewUrlBtn:disabled {
+      opacity: 0.8;
+      cursor: not-allowed;
+    }
+
+    /* フッター表示時のbody余白調整 */
+    body.has-footer {
+      padding-bottom: 100px;
+    }
   </style>
 </head>
 <body>
@@ -606,6 +676,45 @@
     </div>
   </div>
 
+  <!-- 現在のボード情報フッター -->
+  <footer id="boardInfoFooter" class="fixed bottom-0 left-0 right-0 z-30 p-3" style="display: none;">
+    <div class="glass-panel rounded-xl p-4 max-w-5xl mx-auto">
+      <div class="flex items-center justify-between gap-4">
+        <!-- 左側：問題文表示 -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-yellow-400">📝</span>
+            <span class="text-xs text-gray-400">現在の回答ボード</span>
+          </div>
+          <div id="currentQuestionText" class="text-white font-medium truncate">
+            読み込み中...
+          </div>
+        </div>
+        
+        <!-- 右側：アクションボタン -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <button id="copyViewUrlBtn" class="btn-secondary text-sm px-3 py-2" 
+                  title="閲覧用URLをコピー（共有用）" style="display: none;">
+            📋 URLコピー
+          </button>
+          <button id="openBoardBtn" class="btn-primary text-sm px-3 py-2"
+                  title="回答ボードを開く" style="display: none;">
+            📊 ボードを開く
+          </button>
+          <button id="refreshBoardInfo" class="btn-secondary text-sm px-2 py-2" 
+                  title="情報を更新">
+            🔄
+          </button>
+        </div>
+      </div>
+      
+      <!-- ステータス表示（最小限） -->
+      <div class="text-xs text-gray-500 mt-2" id="boardStatus">
+        最終更新: --:--
+      </div>
+    </div>
+  </footer>
+
   <!-- SharedUtilities.html は上部で既にインクルード済み -->
 
   <script>
@@ -621,9 +730,31 @@
       initializePanel();
       checkSystemAdminAccess();
       
+      // フッターの初期化
+      initializeFooter();
+      
       // 定期的なステータス更新
       setInterval(updateSystemStatus, 30000); // 30秒間隔
     });
+
+    // フッター初期化
+    function initializeFooter() {
+      Log.info('フッター初期化開始');
+      
+      // 初回ボード情報ロード
+      loadBoardInfo();
+      
+      // 更新ボタンのイベントハンドラ設定
+      const refreshBtn = document.getElementById('refreshBoardInfo');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadBoardInfo);
+      }
+      
+      // body padding調整（フッター分の余白を追加）
+      document.body.classList.add('has-footer');
+      
+      Log.info('フッター初期化完了');
+    }
 
     // システムステータス更新
     function updateSystemStatus() {
@@ -1000,6 +1131,107 @@
         badge.className = `status-badge ${status}`;
         badge.textContent = status === 'published' ? '公開中' : '未公開';
       }
+    }
+
+    // =============================================================================
+    // フッター：現在のボード情報表示機能
+    // =============================================================================
+
+    // グローバル変数
+    let currentBoardInfo = null;
+
+    // ボード情報ロード
+    function loadBoardInfo() {
+      google.script.run
+        .withSuccessHandler(function(boardInfo) {
+          currentBoardInfo = boardInfo;
+          updateFooterDisplay(boardInfo);
+        })
+        .withFailureHandler(function(error) {
+          Log.error('ボード情報取得エラー:', error);
+          updateFooterDisplay({
+            isActive: false,
+            questionText: '情報取得エラー',
+            error: error.message
+          });
+        })
+        .getCurrentBoardInfoAndUrls();
+    }
+
+    // フッター表示更新
+    function updateFooterDisplay(boardInfo) {
+      const footer = document.getElementById('boardInfoFooter');
+      const questionText = document.getElementById('currentQuestionText');
+      const openBtn = document.getElementById('openBoardBtn');
+      const copyBtn = document.getElementById('copyViewUrlBtn');
+      const statusText = document.getElementById('boardStatus');
+      
+      // フッターを表示
+      footer.style.display = 'block';
+      
+      // 問題文設定
+      questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
+      
+      if (boardInfo.isActive && boardInfo.urls) {
+        // ボタン表示・機能設定
+        openBtn.style.display = 'block';
+        copyBtn.style.display = 'block';
+        
+        openBtn.onclick = () => window.open(boardInfo.urls.view, '_blank');
+        copyBtn.onclick = () => copyViewUrl(boardInfo.urls.view);
+        
+        // ステータス更新
+        statusText.textContent = `最終更新: ${boardInfo.lastUpdated || '不明'}`;
+      } else {
+        // 非アクティブ状態
+        openBtn.style.display = 'none';
+        copyBtn.style.display = 'none';
+        statusText.textContent = boardInfo.error || 'ボードが非アクティブです';
+      }
+    }
+
+    // URLコピー機能（実用重視）
+    function copyViewUrl(url) {
+      if (!url) {
+        showError('コピーするURLがありません');
+        return;
+      }
+      
+      // クリップボードにコピー
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          showSuccess('閲覧用URLをコピーしました！');
+          // ボタンを一時的に変更してフィードバック
+          const btn = document.getElementById('copyViewUrlBtn');
+          const originalText = btn.textContent;
+          btn.textContent = '✅ コピー完了';
+          btn.disabled = true;
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+          }, 2000);
+        }).catch(() => {
+          fallbackCopyUrl(url);
+        });
+      } else {
+        fallbackCopyUrl(url);
+      }
+    }
+
+    // フォールバック（古いブラウザ用）
+    function fallbackCopyUrl(url) {
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showSuccess('閲覧用URLをコピーしました！');
+      } catch (err) {
+        // 最終手段：URLを表示して手動コピーを促す
+        prompt('以下のURLをコピーしてください:', url);
+      }
+      document.body.removeChild(textarea);
     }
 
     Log.info('AdminPanel スクリプト読み込み完了');
