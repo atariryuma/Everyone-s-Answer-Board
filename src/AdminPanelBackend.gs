@@ -931,13 +931,13 @@ function getOrCreateWebAppUrl(userId, appName) {
 
     // 新規WebアプリURLを生成（実際の実装ではScriptAppを使用）
     const scriptId = ScriptApp.getScriptId();
-    const webAppUrl = `https://script.google.com/macros/s/${scriptId}/exec?userId=${userId}`;
+    const webAppUrl = 'https://script.google.com/macros/s/' + scriptId + '/exec?userId=' + userId;
 
     return webAppUrl;
   } catch (error) {
     console.error('getOrCreateWebAppUrl エラー:', error);
     // フォールバック
-    return `https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec?userId=${userId}`;
+    return 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec?userId=' + userId;
   }
 }
 

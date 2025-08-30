@@ -1003,7 +1003,7 @@
           return;
         }
         
-        const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+        const spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit';
         window.open(spreadsheetUrl, '_blank');
         showSuccess('📊 スプレッドシートを開きました');
       }
