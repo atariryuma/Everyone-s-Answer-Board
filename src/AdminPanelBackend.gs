@@ -1120,7 +1120,7 @@ function getCurrentBoardInfoAndUrls() {
     }
 
     // URL生成
-    const baseUrl = getWebAppUrlCached();
+    const baseUrl = getWebAppUrl();
     if (!baseUrl) {
       console.error('getCurrentBoardInfoAndUrls: WebAppURL取得失敗');
       return {

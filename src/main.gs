@@ -70,11 +70,16 @@ function doGet(e) {
           return HtmlService.createHtmlOutput('<h3>Error</h3><p>An error occurred in admin mode: ' + adminError.message + '</p>');
         }
         
+      case 'login':
+        console.log('doGet - Login mode detected');
+        return renderLoginPage(params);
+        
       case 'view':
       default:
         console.log('doGet - View mode (default), userId:', params.userId);
         if (!params.userId) {
-          throw new Error('View mode requires userId parameter');
+          console.log('doGet - No userId provided, redirecting to login');
+          return renderLoginPage(params);
         }
         
         try {
@@ -177,7 +182,7 @@ const Deploy = {
       const currentDomain = getEmailDomain(activeUserEmail);
       
       // WebAppのURLを取得してドメインを判定
-      const webAppUrl = getWebAppUrlCached();
+      const webAppUrl = getWebAppUrl();
       let deployDomain = ''; // 個人アカウント/グローバルアクセスの場合、デフォルトで空
       
       if (webAppUrl && webAppUrl.includes('/a/')) {
@@ -471,11 +476,10 @@ function getEmailDomain(email) {
 }
 
 /**
- * WebApp URLのキャッシュ取得
+ * WebApp URLの取得
  * @returns {string} WebApp URL
  */
-function getWebAppUrlCached() {
-  // 簡易的な実装（実際はキャッシュから取得）
+function getWebAppUrl() {
   try {
     return ScriptApp.getService().getUrl();
   } catch (e) {
@@ -662,6 +666,24 @@ function renderAdminPanel(userInfo, mode) {
   } catch (error) {
     console.error('renderAdminPanel エラー:', error);
     return HtmlService.createHtmlOutput('<h3>エラー</h3><p>管理パネルの表示中にエラーが発生しました: ' + error.message + '</p>');
+  }
+}
+
+/**
+ * ログインページのレンダリング
+ * @param {Object} params リクエストパラメータ
+ * @returns {HtmlService.HtmlOutput} HTML出力
+ */
+function renderLoginPage(params = {}) {
+  try {
+    const template = HtmlService.createTemplateFromFile('LoginPage');
+    template.params = params;
+    return template.evaluate()
+      .setTitle('StudyQuest - ログイン')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (error) {
+    console.error('renderLoginPage error:', error);
+    return HtmlService.createHtmlOutput('<h3>Error</h3><p>ログインページの読み込みに失敗しました: ' + error.message + '</p>');
   }
 }
 
