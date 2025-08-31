@@ -21,7 +21,16 @@
       "Bash(npm run check:*)",
       "Bash(npm test:*)",
       "Bash(npm run push:*)",
-      "Bash(npm run validate:functions:*)"
+      "Bash(npm run validate:functions:*)",
+      "Read(//**)",
+      "Bash(for func in addSpreadsheetUrl analyzeColumns checkCurrentPublicationStatus checkIsSystemAdmin confirmUserRegistration connectDataSource createForm deleteUserAccountByAdminForUI forceLogoutAndRedirectToLogin forceUrlSystemReset getActiveFormInfo getAllUsersForAdminForUI getApplicationStatusForUI getCurrentBoardInfoAndUrls getCurrentConfig getDeletionLogsForUI getHeaderIndices getLoginStatus getPublishedSheetData getSheetList getSpreadsheetList getSystemDomainInfo getSystemStatus getUser getWebAppUrl performAutoRepair publishApplication resetUserAuthentication saveDraftConfiguration setApplicationStatusForUI setupApplication testForceLogoutRedirect testSetup validateAccess verifyUserAuthentication)",
+      "Bash(do echo -n \"$func: \")",
+      "Bash(done)",
+      "Bash(for file in login.js page.js SharedTailwindConfig SharedUtilities UnifiedStyles)",
+      "Bash(do if [ -f \"/Users/ryuma/Everyone-s-Answer-Board/src/$file.html\" ])",
+      "Bash(then echo \"$file: EXISTS\")",
+      "Bash(else echo \"$file: MISSING\")",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": [],

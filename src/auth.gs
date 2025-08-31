@@ -4,11 +4,6 @@
  */
 
 /**
-
-
-
-
-/**
  * ログインフローを処理し、適切なページにリダイレクトする
  * 既存ユーザーの設定を保護しつつ、セットアップ状況に応じたメッセージを表示
  * @param {string} userEmail ログインユーザーのメールアドレス
@@ -74,14 +69,14 @@ function processLoginFlow(userEmail) {
         configJson: JSON.stringify(initialConfig),
         spreadsheetId: '',
         spreadsheetUrl: '',
-        lastAccessedAt: new Date().toISOString(),
+        lastAccessedAt: new Date().toISOString()
       };
 
       // 3b. データベースに作成
       DB.createUser(newUser);
       // ConfigurationManagerで初期設定を作成
       App.getConfig().initializeUserConfig(newUser.tenantId, userEmail);
-      
+
       if (!waitForUserRecord(newUser.tenantId, 3000, 500)) {
         console.warn('processLoginFlow: user not found after create:', newUser.tenantId);
       }
@@ -100,7 +95,7 @@ function processLoginFlow(userEmail) {
       errorType: error.name || 'UnknownError',
       message: error.message,
       stack: error.stack,
-      severity: 'high', // ログインエラーは高重要度
+      severity: 'high'
     };
     console.error('🚨 processLoginFlow 重大エラー:', JSON.stringify(errorInfo, null, 2));
 

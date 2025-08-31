@@ -15,7 +15,7 @@ const CORE = Object.freeze({
     LONG: 30000,      // 30秒 - バッチ処理
     FLOW: 300000,     // 5分 - GAS実行制限
   }),
-  
+
   // ステータス定数
   STATUS: Object.freeze({
     ACTIVE: 'active',
@@ -23,16 +23,7 @@ const CORE = Object.freeze({
     PENDING: 'pending',
     ERROR: 'error',
   }),
-  
-  // アクセスレベル
-  ACCESS_LEVELS: Object.freeze({
-    OWNER: 'owner',
-    ADMIN: 'admin', 
-    USER: 'user',
-    GUEST: 'guest',
-    NONE: 'none',
-  }),
-  
+
   // エラーレベル（数値で優先度表現）
   ERROR_LEVELS: Object.freeze({
     INFO: 0,
@@ -40,7 +31,7 @@ const CORE = Object.freeze({
     ERROR: 2,
     CRITICAL: 3,
   }),
-  
+
   // 基本的なHTTPステータス
   HTTP_STATUS: Object.freeze({
     OK: 200,
@@ -61,8 +52,6 @@ const PROPS_KEYS = Object.freeze({
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
   ADMIN_EMAIL: 'ADMIN_EMAIL',
 });
-
-
 
 /**
  * セキュリティ設定定数
@@ -133,22 +122,22 @@ const SecurityValidator = Object.freeze({
     if (!input || typeof input !== 'string') return '';
     
     let sanitized = input;
-    
+
     // Trim whitespace
     if (SECURITY.SANITIZATION.TRIM_WHITESPACE) {
       sanitized = sanitized.trim();
     }
-    
+
     // Remove HTML tags (basic protection)
     if (SECURITY.SANITIZATION.REMOVE_HTML) {
       sanitized = sanitized.replace(/<[^>]*>/g, '');
     }
-    
+
     // Length limit
     if (sanitized.length > maxLength) {
       sanitized = sanitized.substring(0, maxLength);
     }
-    
+
     return sanitized;
   },
 
@@ -211,73 +200,68 @@ const SecurityValidator = Object.freeze({
 });
 
 /**
- * リアクション機能用定数
- * システム復旧のため緊急追加
+ * 機能別統合定数オブジェクト
+ * GAS 2025 Best Practices準拠
  */
-const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
-
-const COLUMN_HEADERS = Object.freeze({
-  TIMESTAMP: 'タイムスタンプ',
-  EMAIL: 'メールアドレス',
-  CLASS: 'クラス',
-  OPINION: '回答',
-  REASON: '理由',
-  NAME: '名前',
-  UNDERSTAND: 'なるほど！',
-  LIKE: 'いいね！',
-  CURIOUS: 'もっと知りたい！',
-  HIGHLIGHT: 'ハイライト',
-});
-
-/**
- * 削除ログ用シート設定
- */
-const DELETE_LOG_SHEET_CONFIG = Object.freeze({
-  SHEET_NAME: 'DeletionLogs',
-  HEADERS: Object.freeze(['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'])
-});
-
-/**
- * 統一システム定数
- * 全システムで使用する定数の統一管理
- */
-const SYSTEM_CONSTANTS = Object.freeze({
-  // データベーススキーマ（database.gs DB_CONFIG基準）
+const APP_CONSTANTS = Object.freeze({
+  // データベース関連定数
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
-    HEADERS: Object.freeze(['tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status'])
-  }),
-  
-  // リアクション定義
-  REACTIONS: Object.freeze({
-    KEYS: REACTION_KEYS,
-    COLUMNS: Object.freeze({
-      UNDERSTAND: COLUMN_HEADERS.UNDERSTAND,
-      LIKE: COLUMN_HEADERS.LIKE,
-      CURIOUS: COLUMN_HEADERS.CURIOUS,
-      HIGHLIGHT: COLUMN_HEADERS.HIGHLIGHT
+    HEADERS: Object.freeze(['tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status']),
+    DELETE_LOG: Object.freeze({
+      SHEET_NAME: 'DeletionLogs',
+      HEADERS: Object.freeze(['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'])
     })
   }),
-  
-  // 列定義
-  COLUMNS: COLUMN_HEADERS,
-  
-  // アクセス制御レベル
-  ACCESS_LEVELS: Object.freeze({
-    OWNER: 'owner',
-    SYSTEM_ADMIN: 'system_admin', 
-    AUTHENTICATED_USER: 'authenticated_user',
-    GUEST: 'guest',
-    NONE: 'none'
+
+  // ユーザーインターフェース関連
+  UI: Object.freeze({
+    // リアクション機能
+    REACTIONS: Object.freeze({
+      KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
+      LABELS: Object.freeze({
+        UNDERSTAND: 'なるほど！',
+        LIKE: 'いいね！',
+        CURIOUS: 'もっと知りたい！',
+        HIGHLIGHT: 'ハイライト'
+      })
+    }),
+
+    // 列ヘッダー定義
+    COLUMNS: Object.freeze({
+      TIMESTAMP: 'タイムスタンプ',
+      EMAIL: 'メールアドレス',
+      CLASS: 'クラス',
+      OPINION: '回答',
+      REASON: '理由',
+      NAME: '名前'
+    }),
+
+    // 表示モード
+    DISPLAY_MODES: Object.freeze({
+      ANONYMOUS: 'anonymous',
+      NAMED: 'named',
+      EMAIL: 'email'
+    })
   }),
 
-  // 表示モード
-  DISPLAY_MODES: Object.freeze({
-    ANONYMOUS: 'anonymous',
-    NAMED: 'named',
-    EMAIL: 'email'
-  }),
-
-  // 削除ログ設定
-  DELETE_LOG: DELETE_LOG_SHEET_CONFIG
+  // アクセス制御関連
+  ACCESS: Object.freeze({
+    LEVELS: Object.freeze({
+      OWNER: 'owner',
+      SYSTEM_ADMIN: 'system_admin',
+      AUTHENTICATED_USER: 'authenticated_user', 
+      GUEST: 'guest',
+      NONE: 'none'
+    })
+  })
 });
+
+// 後方互換性のための旧定数エイリアス
+const REACTION_KEYS = APP_CONSTANTS.UI.REACTIONS.KEYS;
+const COLUMN_HEADERS = {
+  ...APP_CONSTANTS.UI.COLUMNS,
+  ...APP_CONSTANTS.UI.REACTIONS.LABELS
+};
+const DELETE_LOG_SHEET_CONFIG = APP_CONSTANTS.DATABASE.DELETE_LOG;
+const SYSTEM_CONSTANTS = APP_CONSTANTS; // 完全なエイリアス

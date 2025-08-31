@@ -1511,6 +1511,7 @@ function openSpreadsheetOptimized(spreadsheetId) {
 // =============================================================================
 
 // --- シングルトンインスタンスの作成 ---
+// 統合キャッシュマネージャー（内部専用）
 const cacheManager = new CacheManager();
 
 // Google Apps Script環境でグローバルにアクセス可能にする
@@ -2334,7 +2335,41 @@ class CacheAPI {
 // =============================================================================
 
 // 統一キャッシュAPIのシングルトンインスタンス
+// 統合キャッシュAPI（推奨公開インターフェース）
 const unifiedCacheAPI = new CacheAPI();
+
+// シンプルなキャッシュAPI（推奨）
+const CacheStore = {
+  /**
+   * 値を取得、なければ生成して保存
+   * @param {string} key キーワード
+   * @param {function} valueFn 値生成関数
+   * @param {number} ttl TTL（秒、デフォルト：3600）
+   */
+  get: (key, valueFn, ttl = 3600) => unifiedCacheAPI.get(key, valueFn, ttl),
+  
+  /**
+   * 値を保存
+   * @param {string} key キーワード 
+   * @param {*} value 値
+   * @param {number} ttl TTL（秒、デフォルト：3600）
+   */
+  set: (key, value, ttl = 3600) => unifiedCacheAPI.put(key, value, ttl),
+  
+  /**
+   * 値を削除
+   * @param {string} key キーワード
+   */
+  remove: (key) => unifiedCacheAPI.remove(key),
+  
+  /**
+   * キャッシュをクリア
+   */
+  clear: () => unifiedCacheAPI.removeAll()
+};
+
+// 外部アクセス用エクスポート（後方互換性）
+const Cache = CacheStore;
 
 // グローバルアクセス用
 if (typeof global !== 'undefined') {

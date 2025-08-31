@@ -1045,24 +1045,7 @@ function getUserColumnMapping(userId = null) {
   }
 }
 
-/**
- * 管理パネルのHTMLを返す
- * @returns {HtmlOutput} HTML出力
- */
-function doGet() {
-  try {
-    return HtmlService.createTemplateFromFile('AdminPanel')
-      .evaluate()
-      .setTitle('StudyQuest 管理パネル')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } catch (error) {
-    console.error('doGet エラー:', error);
-    return HtmlService.createHtmlOutput(`
-      <h1>エラー</h1>
-      <p>管理パネルの読み込みに失敗しました: ${error.message}</p>
-    `);
-  }
-}
+// doGet: main.gsのメインエントリーポイントに統合済み（重複削除）
 
 /**
  * 現在のアクティブボード情報とURL生成

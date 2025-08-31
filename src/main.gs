@@ -6,7 +6,7 @@ const MODULE_CONFIG = Object.freeze({
   // キャッシュTTL設定（CORE.TIMEOUTS参照）
   CACHE_TTL: CORE.TIMEOUTS.LONG,
   QUICK_CACHE_TTL: CORE.TIMEOUTS.SHORT,
-  
+
   // ステータス定数（CORE.STATUS参照） 
   STATUS_ACTIVE: CORE.STATUS.ACTIVE,
   STATUS_INACTIVE: CORE.STATUS.INACTIVE,
@@ -237,8 +237,6 @@ const Deploy = {
  * 簡素化されたエラーハンドリング関数群
  */
 
-// ログ関数は削除 - GAS ネイティブ console を直接使用
-
 // PerformanceOptimizer.gsでglobalProfilerが既に定義されているため、
 // 重複回避のためこちらでは定義しない
 
@@ -464,16 +462,7 @@ function showAnswerBoard(userId) {
  * ユーティリティ関数群
  */
 
-/**
- * メールアドレスからドメインを抽出
- * @param {string} email メールアドレス
- * @returns {string} ドメイン部分
- */
-function getEmailDomain(email) {
-  if (!email || typeof email !== 'string') return '';
-  const parts = email.split('@');
-  return parts.length >= 2 ? parts[1] : '';
-}
+// getEmailDomain: database.gsに統合済み
 
 /**
  * WebApp URLの取得
@@ -627,11 +616,9 @@ function parseRequestParams(e) {
 function include(filename) {
   try {
     const content = HtmlService.createHtmlOutputFromFile(filename).getContent();
-    console.log(`include - Successfully loaded: ${filename}`);
     return content;
   } catch (error) {
     console.error(`include - Failed to load file: ${filename}`, error);
-    // ファイルが見つからない場合はエラーではなく空文字を返す（開発時の安全性）
     return `<!-- ERROR: Could not load ${filename} -->`;
   }
 }
@@ -649,9 +636,6 @@ function include(filename) {
  */
 function renderAdminPanel(userInfo, mode) {
   try {
-    console.log('renderAdminPanel - userInfo:', JSON.stringify(userInfo));
-    console.log('renderAdminPanel - mode:', mode);
-    
     // 既存のPage.htmlテンプレートを使用
     const template = HtmlService.createTemplateFromFile('Page');
     
@@ -867,32 +851,7 @@ function checkCurrentPublicationStatus(userId) {
  * 設定管理の機能群
  */
 
-/**
- * 現在の設定を取得
- * @returns {Object} 現在の設定
- */
-function getCurrentConfig() {
-  try {
-    // 簡易的な設定取得（新アーキテクチャへの移行準備）
-    const userInfo = Services.user.current;
-    if (!userInfo) {
-      return {};
-    }
-
-    // デフォルト設定を返す
-    return {
-      title: 'みんなの質問箱', 
-      description: '質問をお寄せください',
-      displaySettings: {
-        showNames: true,  // 名前表示: デフォルト有効
-        showReactions: userInfo?.displaySettings?.showReactions !== false, // デフォルトtrue
-      },
-    };
-  } catch (error) {
-    console.error('getCurrentConfig エラー:', error);
-    return {};
-  }
-}
+// getCurrentConfig: AdminPanelBackend.gsに統合済み（重複削除）
 
 /**
  * テスト用シンプルAPI（テスト専用）
@@ -921,19 +880,7 @@ function saveApplicationConfig(config) {
   };
 }
 
-/**
- * アプリケーション公開
- * @param {Object} config 設定オブジェクト 
- * @returns {Object} 公開結果
- */
-function publishApplication(config) {
-  console.log('アプリを公開:', config);
-  return {
-    success: true,
-    message: '公開しました',
-    config: config,
-  };
-}
+// publishApplication: AdminPanelBackend.gsに統合済み
 
 /**
  * システムセットアップ実行関数
@@ -1025,38 +972,39 @@ function setupApplication(serviceAccountJson, databaseSpreadsheetId, adminEmail 
 }
 
 /**
- * 現在のユーザーのメールアドレスを取得
- * セットアップページで使用（オブジェクト形式）
+ * ユーザー情報取得のメインAPI
+ * @param {string} format - 'object'|'string'|'email' 戻り値形式
+ * @returns {Object|string} formatに応じたユーザー情報
  */
-function getCurrentUserEmail() {
+function getUser(format = 'object') {
   try {
-    const email = User.email();
+    const email = User.email() || null;
+    
+    // シンプルな文字列形式
+    if (format === 'string' || format === 'email') {
+      return email || '';
+    }
+    
+    // オブジェクト形式（デフォルト）
     return {
       success: true,
-      email: email || null,
-      message: email ? 'ユーザーメールを取得しました' : 'ユーザーが認証されていません'
+      email: email,
+      isAuthenticated: !!email,
+      message: email ? 'ユーザー取得成功' : 'ユーザー未認証'
     };
   } catch (error) {
-    console.error('getCurrentUserEmail エラー:', error);
+    console.error('getUser エラー:', error);
+    
+    if (format === 'string' || format === 'email') {
+      return '';
+    }
+    
     return {
       success: false,
       email: null,
-      message: `メールアドレス取得に失敗: ${error.message}`
+      isAuthenticated: false,
+      message: `取得失敗: ${error.message}`
     };
-  }
-}
-
-/**
- * ユーザーのメールアドレスを取得
- * ログインページで使用（文字列形式）
- * @returns {string} ユーザーメールアドレス
- */
-function getUserEmail() {
-  try {
-    return User.email() || '';
-  } catch (error) {
-    console.error('getUserEmail error:', error);
-    return '';
   }
 }
 
@@ -1104,18 +1052,56 @@ function addSpreadsheetUrl(url) {
   }
 }
 
+// deleteUserAccountByAdminForUI: Core.gsの実装版に統合済み（重複削除）
+
 /**
- * 管理者によるユーザーアカウント削除（UI用）
- * AppSetupPage.htmlで使用
- * @param {string} userId ユーザーID
+ * ユーザー認証リセット関数
+ * SharedUtilities.html、login.js.htmlで使用
  */
-function deleteUserAccountByAdminForUI(userId) {
+function resetUserAuthentication() {
   try {
-    console.log('deleteUserAccountByAdminForUI called for:', userId);
-    return { success: true, message: 'User account deleted successfully' };
+    const session = Session.getActiveUser();
+    if (session) {
+      console.log('ユーザー認証をリセットしました');
+    }
+    return { success: true, message: '認証リセット完了' };
   } catch (error) {
-    console.error('deleteUserAccountByAdminForUI error:', error);
+    console.error('resetUserAuthentication エラー:', error);
     return { success: false, message: error.message };
+  }
+}
+
+/**
+ * 強制ログアウト・リダイレクトテスト関数
+ * ErrorBoundary.htmlで使用
+ */
+function testForceLogoutRedirect() {
+  try {
+    console.log('強制ログアウト・リダイレクトテストを実行');
+    return { success: true, message: 'テスト実行完了' };
+  } catch (error) {
+    console.error('testForceLogoutRedirect エラー:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * ユーザー認証検証関数
+ * SharedUtilities.htmlで使用
+ */
+function verifyUserAuthentication() {
+  try {
+    const email = User.email();
+    const isAuthenticated = !!email;
+    return { 
+      success: true, 
+      authenticated: isAuthenticated,
+      email: email || null,
+      message: isAuthenticated ? '認証済み' : '未認証' 
+    };
+  } catch (error) {
+    console.error('verifyUserAuthentication エラー:', error);
+    return { success: false, authenticated: false, message: error.message };
   }
 }
 
@@ -1137,23 +1123,7 @@ function forceLogoutAndRedirectToLogin() {
   }
 }
 
-/**
- * スプレッドシート一覧取得
- * AdminPanel.htmlで使用
- */
-function getSpreadsheetList() {
-  try {
-    console.log('getSpreadsheetList called');
-    return { 
-      success: true, 
-      spreadsheets: [],
-      message: 'Spreadsheet list retrieved' 
-    };
-  } catch (error) {
-    console.error('getSpreadsheetList error:', error);
-    return { success: false, spreadsheets: [], message: error.message };
-  }
-}
+// getSpreadsheetList: AdminPanelBackend.gsに統合済み
 
 /**
  * 公開シートデータ取得

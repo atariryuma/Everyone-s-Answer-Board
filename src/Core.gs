@@ -980,40 +980,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
   }
 }
 
-/**
- * 指定されたユーザーのスプレッドシートからシートのリストを取得します。
- * @param {string} userId - ユーザーID
- * @returns {Array<Object>} シートのリスト（例: [{name: 'Sheet1', id: 'sheetId1'}, ...]）
- */
-function getSheetsList(userId) {
-  try {
-    const userInfo = DB.findUserById(userId);
-    if (!userInfo || !userInfo.spreadsheetId) {
-      console.warn('getSheetsList: User info or spreadsheetId not found for userId:', userId);
-      return [];
-    }
-
-    const spreadsheet = SpreadsheetApp.openById(userInfo.spreadsheetId);
-    const sheets = spreadsheet.getSheets();
-
-    const sheetList = sheets.map(function (sheet) {
-      return {
-        name: sheet.getName(),
-        id: sheet.getSheetId(), // シートIDも必要に応じて取得
-      };
-    });
-
-    console.log(
-      '✅ getSheetsList: Found sheets for userId %s: %s',
-      userId,
-      JSON.stringify(sheetList)
-    );
-    return sheetList;
-  } catch (e) {
-    console.error('getSheetsList エラー: ' + e.message);
-    return [];
-  }
-}
+// getSheetsList: Core.gs 2816行目の完全版に統合済み（重複削除）
 
 /**
  * ボードデータを再読み込み (マルチテナント対応版)

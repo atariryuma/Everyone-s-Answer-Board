@@ -1123,7 +1123,7 @@
               document.getElementById('current-user-email').textContent = 'エラー';
               reject(new Error('メールアドレス取得に失敗しました: ' + error.message));
             })
-            .getUserEmail();
+            .getUser('email');
         });
       }
 
