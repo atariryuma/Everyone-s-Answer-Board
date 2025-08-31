@@ -2938,7 +2938,7 @@
       // サーバーキャッシュをクリア
       try {
         await new Promise((resolve, reject) => {
-          google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).clearCache();
+          google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).refreshBoardData();
         });
         console.log('✅ サーバーキャッシュをクリア');
       } catch (error) {
