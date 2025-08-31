@@ -7,8 +7,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#1a1b26" />
     <meta name="description" content="StudyQuest 回答ボードシステム - ログイン" />
-    <!-- Optimized Permissions Policy - suppress all warnings -->
-    <meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), speaker=(), vibrate=(), vr=(), camera=(), microphone=(), geolocation=(), fullscreen=*" />
+    <!-- Optimized Permissions Policy - essential permissions only -->
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
     
     <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
     <script>
@@ -36,7 +36,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Unified Styles and Shared Components -->
-    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
+    <?!= include('UnifiedStyles'); ?>
+    <?!= include('SharedUtilities'); ?>
 
     <!-- Global Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay page-specific hidden">
