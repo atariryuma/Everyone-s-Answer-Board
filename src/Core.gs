@@ -326,11 +326,9 @@ function registerNewUser(adminEmail) {
       console.error('❌ registerNewUser: Database operation failed', {
         adminEmail: sanitizedEmail,
         error: dbError.message,
-        stack: dbError.stack,
         executionTime: Date.now() - startTime + 'ms'
       });
       
-      // Re-throw with structured error message
       throw new Error(`ユーザー登録に失敗しました。詳細: ${dbError.message}`);
     }
     

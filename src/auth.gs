@@ -76,11 +76,6 @@ function handleUserRegistration(userEmail) {
   const completeUserData = createCompleteUser(userEmail);
   DB.createUser(completeUserData);
   
-  // 作成確認
-  if (!waitForUserRecord(completeUserData.userId, 3000, 500)) {
-    throw new Error('ユーザー作成の確認がタイムアウトしました');
-  }
-  
   console.log('新規ユーザー作成完了:', completeUserData.userId);
   return completeUserData;
 }
@@ -172,22 +167,3 @@ function processLoginFlow(userEmail) {
   }
 }
 
-/**
- * ユーザー作成のロールバック処理
- * @param {string} userId ロールバック対象のユーザーID
- */
-function rollbackUserCreation(userId) {
-  try {
-    console.log(`ユーザー作成ロールバック開始: ${userId}`);
-    
-    const deleted = DB.deleteUser(userId);
-    
-    if (deleted) {
-      console.log(`ロールバック完了: ${userId}`);
-    } else {
-      console.warn(`ロールバック失敗 - ユーザーが見つからない: ${userId}`);
-    }
-  } catch (error) {
-    console.error(`ロールバック処理でエラー: ${error.message}`);
-  }
-}
