@@ -2342,51 +2342,47 @@ if (typeof global !== 'undefined') {
 }
 
 // =============================================================================
-// SECTION 8: 後方互換性のための関数群（統一APIへのラッパー）
+// SECTION 8: 統一API直接実装関数群（GAS 2025 Best Practices）
 // =============================================================================
 
 /**
- * 後方互換性: clearExecutionUserInfoCache()
- * 複数ファイルの分散実装を統一APIで置き換え
+ * ユーザー情報キャッシュのクリア（統一API直接実装）
  */
 function clearExecutionUserInfoCache() {
   return unifiedCacheAPI.clearUserInfoCache();
 }
 
 /**
- * 後方互換性: clearAllExecutionCache()
- * 複数ファイルの分散実装を統一APIで置き換え
+ * 実行キャッシュの完全クリア（統一API直接実装）
  */
 function clearAllExecutionCache() {
   return unifiedCacheAPI.clearAllExecutionCache();
 }
 
 /**
- * 後方互換性: getSheetsServiceCached()
- * database.gs等の分散実装を統一APIで置き換え
+ * Sheetsサービスの取得（統一API直接実装）
  */
 function getSheetsServiceCached(forceRefresh = false) {
   return unifiedCacheAPI.getSheetsServiceCached(forceRefresh);
 }
 
 /**
- * 後方互換性: getCachedSheetsService()
- * Core.gsの実装を統一APIで置き換え
+ * Sheetsサービスの取得（統一API直接実装）
  */
 function getCachedSheetsService() {
   return unifiedCacheAPI.getSheetsServiceCached();
 }
 
 /**
- * 後方互換性: invalidateUserCache()
- * 複数ファイルの分散実装を統一APIで置き換え
+ * ユーザーキャッシュの無効化（統一API直接実装）
+ * GAS 2025 Best Practices - 後方互換性を削除して直接実装
  */
-// invalidateUserCache - 重複削除済み
-// → unifiedUserManager.gsの実装を使用してください
+function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
+  return unifiedCacheAPI.invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId);
+}
 
 /**
- * 後方互換性: synchronizeCacheAfterCriticalUpdate()
- * unifiedSecurityManager.gsの実装を統一APIで置き換え
+ * 重要な更新後のキャッシュ同期（統一API直接実装）
  */
 function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
   return unifiedCacheAPI.synchronizeCacheAfterCriticalUpdate(
@@ -2398,15 +2394,14 @@ function synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, ne
 }
 
 /**
- * 後方互換性: clearDatabaseCache()
- * unifiedSecurityManager.gsの実装を統一APIで置き換え
+ * データベースキャッシュのクリア（統一API直接実装）
  */
 function clearDatabaseCache() {
   return unifiedCacheAPI.clearDatabaseCache();
 }
 
 /**
- * 後方互換性: clearExecutionSheetsServiceCache()
+ * Sheetsサービスキャッシュのクリア（統一API直接実装）
  */
 function clearExecutionSheetsServiceCache() {
   const cache = getExecutionCache();

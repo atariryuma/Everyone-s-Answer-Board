@@ -634,7 +634,7 @@ function getCurrentSheetName(spreadsheetId) {
  * @throws {Error} 認証エラーまたは権限エラー
  */
 function verifyUserAccess(requestUserId) {
-  // 新しいAccessControllerシステムを使用（後方互換性のためのラッパー関数）
+  // AccessControllerシステムを使用
   const currentUserEmail = Session.getActiveUser().getEmail();
   const result = App.getAccess().verifyAccess(requestUserId, 'view', currentUserEmail);
   
@@ -801,7 +801,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       showCounts: adminMode === true ? true : configJson.showCounts === true,
       displayMode: finalDisplayMode,
       data: formattedData,
-      rows: formattedData, // 後方互換性のため
     };
 
     console.log('🔍 最終結果:', {
@@ -819,7 +818,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       status: 'error',
       message: 'データの取得に失敗しました: ' + e.message,
       data: [],
-      rows: [],
     };
   }
 }
@@ -894,8 +892,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
         showCounts: configJson.showCounts === true,
         displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
         data: [],
-        rows: [],
-        totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
+          totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
         newCount: 0,
         isIncremental: true,
       };
@@ -970,7 +967,6 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       showCounts: false, // 必要に応じて設定
       displayMode: displayMode,
       data: formattedNewData,
-      rows: formattedNewData, // 後方互換性のため
       totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
       newCount: formattedNewData.length,
       isIncremental: true,
@@ -1761,7 +1757,7 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
 }
 
 // =================================================================
-// 互換性関数（後方互換性のため）
+// 統一化関数群
 // =================================================================
 
 // getWebAppUrl function removed - now using the unified version from url.gs
@@ -2441,42 +2437,6 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
   }
 }
 
-/**
- * カスタムフォーム作成（管理パネル用）
- * @deprecated createUnifiedForm('custom', ...) を使用してください
- * 互換性のため保持、内部でcreateUnifiedFormを使用
- */
-function createCustomForm(userEmail, userId, config) {
-  try {
-    console.warn('createCustomForm() is deprecated. Use createUnifiedForm("custom", ...) instead.');
-
-    // AdminPanelのconfig構造を内部形式に変換
-    const convertedConfig = {
-      mainQuestion: {
-        title: config.mainQuestion || '今日の学習について、あなたの考えや感想を聞かせてください',
-        type: config.responseType || config.questionType || 'text', // responseTypeを優先して使用
-        choices: config.questionChoices || config.choices || [], // questionChoicesを優先して使用
-        includeOthers: config.includeOthers || false,
-      },
-      enableClass: config.enableClass || false,
-      classQuestion: {
-        choices: config.classChoices || ['クラス1', 'クラス2', 'クラス3', 'クラス4'],
-      },
-    };
-
-    console.log('createCustomForm - converted config:', JSON.stringify(convertedConfig));
-
-    const overrides = {
-      titlePrefix: config.formTitle || 'カスタムフォーム',
-      customConfig: convertedConfig,
-    };
-
-    return createUnifiedForm('custom', userEmail, userId, overrides);
-  } catch (error) {
-    console.error('createCustomForm Error:', error.message);
-    throw new Error('カスタムフォームの作成に失敗しました: ' + error.message);
-  }
-}
 
 /**
  * リンクされたスプレッドシートを作成
@@ -2657,7 +2617,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     // サービスアカウントも確認
     const props = PropertiesService.getScriptProperties();
     const serviceAccountCreds = JSON.parse(
-      props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
+      props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
     );
     const serviceAccountEmail = serviceAccountCreds.client_email;
 
@@ -3509,7 +3469,7 @@ function shouldEnableDebugMode() {
 function isSystemAdmin() {
   try {
     const props = PropertiesService.getScriptProperties();
-    const adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
     const currentUserEmail = User.email();
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {

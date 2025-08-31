@@ -1560,42 +1560,12 @@ class SharedModals {
 // グローバルインスタンスの作成
 window.sharedModals = new SharedModals();
 
-// グローバル関数（後方互換性のため）
-window.showPrivacyModal = function(onContinue) {
-  window.sharedModals.showPrivacy(onContinue);
-};
-
-window.showDigitalCitizenshipModal = function() {
-  window.sharedModals.showDigitalCitizenship();
-};
-
-window.showPublishModal = function(onPublish, onCancel, autoStopSettings) {
-  window.sharedModals.showPublish(onPublish, onCancel, autoStopSettings);
-};
-
-window.showAutoStopConfirmationModal = function(publishResult) {
-  window.sharedModals.showAutoStopConfirmation(publishResult);
-};
-
-// 管理者専用モーダル用グローバル関数（後方互換性のため）
-window.showModal = function(modalId) {
-  if (modalId === 'form-config-modal') {
-    window.sharedModals.showFormConfig();
-  } else if (modalId === 'security-details-modal') {
-    window.sharedModals.showSecurityDetails();
-  } else if (modalId === 'google-integration-modal') {
-    window.sharedModals.showGoogleIntegration();
-  } else if (modalId === 'privacy-warning-modal') {
-    window.sharedModals.showPrivacyWarning();
-  } else {
-    // 従来のshowModal実装
-    const modal = document.getElementById(modalId);
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-  }
-};
+// Direct usage via window.sharedModals is recommended:
+// window.sharedModals.showPrivacy(onContinue)
+// window.sharedModals.showDigitalCitizenship()
+// window.sharedModals.showPublish(onPublish, onCancel, autoStopSettings)
+// window.sharedModals.showAutoStopConfirmation(publishResult)
+// window.sharedModals.showFormConfig(), etc.
 
 window.hideModal = function(modalId) {
   window.sharedModals.hideModal(modalId);

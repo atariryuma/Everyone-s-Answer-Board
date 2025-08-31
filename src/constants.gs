@@ -62,16 +62,6 @@ const PROPS_KEYS = Object.freeze({
   ADMIN_EMAIL: 'ADMIN_EMAIL',
 });
 
-/**
- * レガシー互換性のための別名定義
- * 段階的移行のため一時的に維持
- * @deprecated PROPS_KEYSを使用してください
- */
-const SCRIPT_PROPS_KEYS = Object.freeze({
-  SERVICE_ACCOUNT_CREDS: PROPS_KEYS.SERVICE_ACCOUNT_CREDS,
-  DATABASE_SPREADSHEET_ID: PROPS_KEYS.DATABASE_SPREADSHEET_ID,
-  ADMIN_EMAIL: PROPS_KEYS.ADMIN_EMAIL,
-});
 
 /**
  * データベースシート設定定数

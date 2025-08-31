@@ -548,21 +548,6 @@ function secureMultiTenantCacheOperation(operation, baseKey, userId, value = nul
  * @param {object} options - オプション
  * @returns {object|null} ユーザー情報
  */
-/**
- * @deprecated 統合実装：unifiedUserManager.getSecureUserInfo() を使用してください
- */
-// getSecureUserInfo - 重複削除済み
-// → unifiedUserManager.gsの実装を使用してください
-
-/**
- * セキュアなユーザー設定情報取得
- * @param {string} userId - ユーザーID
- * @param {string} configKey - 設定キー
- * @param {object} options - オプション
- * @returns {any} 設定値
- */
-// getSecureUserConfig - 重複削除済み
-// → unifiedUserManager.gsの実装を使用してください
 
 /**
  * マルチテナントセキュリティの健全性チェック
@@ -1080,9 +1065,6 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
  * @param {string} oldSpreadsheetId - 変更前のスプレッドシートID
  * @param {string} newSpreadsheetId - 変更後のスプレッドシートID
  */
-// synchronizeCacheAfterCriticalUpdate() は unifiedCacheManager.gs に統合済み
-
-// clearDatabaseCache() は unifiedCacheManager.gs に統合済み
 
 /**
  * ユーザー固有のキーを構築
@@ -1111,7 +1093,7 @@ function buildUserScopedKey(baseKey, userId, sheetName = '') {
 function getSecureServiceAccountCreds() {
   try {
     const credsJson = PropertiesService.getScriptProperties().getProperty(
-      SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS
+      PROPS_KEYS.SERVICE_ACCOUNT_CREDS
     );
     if (!credsJson) {
       throw new Error('サービスアカウント認証情報が設定されていません。');
@@ -1130,7 +1112,7 @@ function getSecureServiceAccountCreds() {
 function getSecureDatabaseId() {
   try {
     const dbId = PropertiesService.getScriptProperties().getProperty(
-      SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID
+      PROPS_KEYS.DATABASE_SPREADSHEET_ID
     );
     if (!dbId) {
       throw new Error('データベーススプレッドシートIDが設定されていません。');

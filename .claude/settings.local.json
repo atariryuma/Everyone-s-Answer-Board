@@ -20,7 +20,8 @@
       "Bash(npm run lint)",
       "Bash(npm run check:*)",
       "Bash(npm test:*)",
-      "Bash(npm run push:*)"
+      "Bash(npm run push:*)",
+      "Bash(npm run validate:functions:*)"
     ],
     "deny": [],
     "ask": [],

@@ -472,7 +472,7 @@
 
     // GAS function call with loading overlay - 重複リクエスト防止版
     callWithLoading(functionName, message = '処理中...', loadingType = 'overlay', ...args) {
-      // Support legacy calls where message is an object with config
+      // Support config object as message parameter
       if (typeof message === 'object' && message !== null) {
         const config = message;
         message = config.message || '処理中...';

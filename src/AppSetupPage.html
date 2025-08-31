@@ -580,16 +580,14 @@
       function goBackToAdminPanel() {
         google.script.run
           .withSuccessHandler((webAppUrl) => {
-            const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__; // URLパラメータはuserIdのまま（後方互換性）
-            // サンドボックス環境では window.top への直接アクセスが制限されるため
+            const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;             // サンドボックス環境では window.top への直接アクセスが制限されるため
             // 確実に遷移させるために window.open を利用する
             window.open(targetUrl, '_top');
           })
           .withFailureHandler((error) => {
             console.error('WebApp URL取得エラー:', error);
             const currentUrl = window.location.href.split('?')[0];
-            const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__; // URLパラメータはuserIdのまま（後方互換性）
-            window.open(targetUrl, '_top');
+            const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;             window.open(targetUrl, '_top');
           })
           .getWebAppUrl();
       }

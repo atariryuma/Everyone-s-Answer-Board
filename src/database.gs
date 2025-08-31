@@ -66,7 +66,7 @@ const DB = {
       }
 
       const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
       
       if (!dbId) {
         throw new Error('データベース設定が不完全です。システム管理者に連絡してください。');
@@ -363,7 +363,7 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
     }
 
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     if (!dbId) {
       console.warn('削除ログの記録をスキップします: データベースIDが設定されていません');
@@ -576,7 +576,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
     try {
       // データベースからユーザー行を削除
       const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
@@ -696,7 +696,7 @@ function getDeletionLogs() {
     }
 
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
@@ -930,7 +930,7 @@ function updateUser(userId, updateData) {
 
   try {
     var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     if (!dbId) {
       throw new Error('データ更新エラー: データベースIDが設定されていません');
@@ -1673,7 +1673,7 @@ function diagnoseDatabase(targetUserId) {
     console.log('🔍 データベース診断開始:', targetUserId || 'ALL_USERS');
 
     var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     var diagnosticResult = {
       timestamp: new Date().toISOString(),
@@ -1907,7 +1907,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
 
     // 1. データベーススプレッドシートの権限確認
     var props = PropertiesService.getScriptProperties();
-    var dbId = spreadsheetId || props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = spreadsheetId || props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     if (!dbId) {
       dbCheckResult.summary.issues.push('データベースIDが設定されていません');
@@ -2162,7 +2162,7 @@ function performDataIntegrityCheck(options = {}) {
 
     // データベース接続確認
     var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     if (!dbId) {
       dbCheckResult.summary.issues.push('データベースIDが設定されていません');
       dbCheckResult.summary.status = 'critical';
@@ -2504,7 +2504,7 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
 function getDbSheet() {
   try {
     var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
     }
@@ -2706,9 +2706,9 @@ function performHealthCheck() {
   try {
     var props = PropertiesService.getScriptProperties();
     var requiredProps = [
-      SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID,
-      SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS,
-      SCRIPT_PROPS_KEYS.ADMIN_EMAIL,
+      PROPS_KEYS.DATABASE_SPREADSHEET_ID,
+      PROPS_KEYS.SERVICE_ACCOUNT_CREDS,
+      PROPS_KEYS.ADMIN_EMAIL,
     ];
 
     var missingProps = [];
@@ -2769,7 +2769,7 @@ function performPerformanceCheck() {
     // データベースアクセス速度テスト
     var dbTestStart = Date.now();
     var props = PropertiesService.getScriptProperties();
-    var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     if (dbId) {
       var service = getSheetsServiceCached();
@@ -2818,7 +2818,7 @@ function performSecurityCheck() {
     var allProps = props.getProperties();
 
     // サービスアカウント認証情報の存在確認
-    var serviceAccountCreds = props.getProperty(SCRIPT_PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    var serviceAccountCreds = props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
     if (!serviceAccountCreds) {
       securityResult.vulnerabilities.push({
         type: 'missing_credentials',
@@ -2828,7 +2828,7 @@ function performSecurityCheck() {
     }
 
     // 管理者メールの設定確認
-    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    var adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
     if (!adminEmail) {
       securityResult.vulnerabilities.push({
         type: 'missing_admin',
@@ -2913,7 +2913,7 @@ function sendSystemAlert(monitoringResult) {
 
     // 管理者への通知（メール送信は実装に依存）
     var props = PropertiesService.getScriptProperties();
-    var adminEmail = props.getProperty(SCRIPT_PROPS_KEYS.ADMIN_EMAIL);
+    var adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
 
     if (adminEmail) {
       // ログに記録（実際のメール送信機能がある場合はここで実装）
@@ -2984,7 +2984,7 @@ function deleteUserAccount(userId) {
     try {
       // データベース（シート）からユーザー行を削除（サービスアカウント経由）
       var props = PropertiesService.getScriptProperties();
-      var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
       }
