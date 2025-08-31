@@ -559,9 +559,20 @@ function createSecureRedirect(url, message) {
         <p><a href="<?= url ?>" class="manual-link">こちらをクリックしても移動できます</a></p>
       </div>
       <script>
+        // X-Frame-Options対応: 即座に直接リダイレクト
+        (function() {
+          try {
+            window.location.replace('<?= url ?>');
+          } catch (e) {
+            // フォールバック: 通常のlocation.href
+            window.location.href = '<?= url ?>';
+          }
+        })();
+        
+        // 念のための遅延リダイレクト
         setTimeout(() => {
-          window.top.location.href = '<?= url ?>';
-        }, 1500);
+          window.location.href = '<?= url ?>';
+        }, 1000);
       </script>
     </body>
     </html>
@@ -572,7 +583,7 @@ function createSecureRedirect(url, message) {
   
   return template.evaluate()
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 }
 
 /**
@@ -667,7 +678,7 @@ function showErrorPage(title, message, error) {
   
   return template.evaluate()
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    .setSandboxMode(HtmlService.SandboxMode.NATIVE);
 }
 
 /**
