@@ -478,6 +478,202 @@ function getWebAppUrl() {
 }
 
 /**
+ * 管理パネルのURLを構築
+ * @param {string} userId - ユーザーID
+ * @returns {string} 管理パネルURL
+ */
+function buildUserAdminUrl(userId) {
+  const baseUrl = getWebAppUrl();
+  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+}
+
+/**
+ * セキュアなリダイレクトページを作成
+ * @param {string} url - リダイレクト先URL
+ * @param {string} message - 表示メッセージ
+ * @returns {HtmlOutput} リダイレクトHTML
+ */
+function createSecureRedirect(url, message) {
+  const template = HtmlService.createTemplate(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>リダイレクト中...</title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          margin: 0;
+          padding: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          color: #333;
+        }
+        .redirect-container {
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+          padding: 40px 30px;
+          text-align: center;
+          max-width: 400px;
+          width: 90%;
+        }
+        .spinner {
+          width: 40px;
+          height: 40px;
+          margin: 20px auto;
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #667eea;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        h1 {
+          color: #667eea;
+          margin-bottom: 20px;
+        }
+        .manual-link {
+          margin-top: 20px;
+          padding: 10px 20px;
+          background: #667eea;
+          color: white;
+          text-decoration: none;
+          border-radius: 6px;
+          display: inline-block;
+          transition: background 0.3s;
+        }
+        .manual-link:hover {
+          background: #5a6fd8;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="redirect-container">
+        <h1><?= message ?></h1>
+        <div class="spinner"></div>
+        <p>自動的にリダイレクトします...</p>
+        <p><a href="<?= url ?>" class="manual-link">こちらをクリックしても移動できます</a></p>
+      </div>
+      <script>
+        setTimeout(() => {
+          window.top.location.href = '<?= url ?>';
+        }, 1500);
+      </script>
+    </body>
+    </html>
+  `);
+  
+  template.url = url;
+  template.message = message;
+  
+  return template.evaluate()
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+}
+
+/**
+ * エラーページを表示
+ * @param {string} title - エラータイトル
+ * @param {string} message - エラーメッセージ
+ * @param {Error} error - エラーオブジェクト（オプション）
+ * @returns {HtmlOutput} エラーHTML
+ */
+function showErrorPage(title, message, error) {
+  const template = HtmlService.createTemplate(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title><?= title ?></title>
+      <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+          margin: 0;
+          padding: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          color: #333;
+        }
+        .error-container {
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+          padding: 40px 30px;
+          text-align: center;
+          max-width: 500px;
+          width: 90%;
+        }
+        .error-icon {
+          font-size: 60px;
+          color: #ff6b6b;
+          margin-bottom: 20px;
+        }
+        h1 {
+          color: #ff6b6b;
+          margin-bottom: 20px;
+        }
+        .error-message {
+          background: #fff5f5;
+          border: 1px solid #fed7d7;
+          border-radius: 6px;
+          padding: 15px;
+          margin: 20px 0;
+        }
+        .retry-btn {
+          margin-top: 20px;
+          padding: 12px 24px;
+          background: #ff6b6b;
+          color: white;
+          text-decoration: none;
+          border-radius: 6px;
+          display: inline-block;
+          transition: background 0.3s;
+        }
+        .retry-btn:hover {
+          background: #ff5252;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1><?= title ?></h1>
+        <div class="error-message">
+          <p><?= message ?></p>
+          <? if (typeof errorDetails !== 'undefined' && errorDetails) { ?>
+            <details>
+              <summary>詳細情報</summary>
+              <pre><?= errorDetails ?></pre>
+            </details>
+          <? } ?>
+        </div>
+        <a href="<?= getWebAppUrl() ?>?mode=login" class="retry-btn">ログインページに戻る</a>
+      </div>
+    </body>
+    </html>
+  `);
+  
+  template.title = title;
+  template.message = message;
+  template.errorDetails = error ? error.message : '';
+  
+  return template.evaluate()
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+}
+
+/**
  * セットアップページのレンダリング
  */
 function renderSetupPage(params) {
@@ -950,6 +1146,16 @@ function setupApplication(serviceAccountJson, databaseSpreadsheetId, adminEmail 
     }
     
     console.log('setupApplication - プロパティ設定完了');
+    
+    // データベースシートの初期化とヘッダー設定
+    try {
+      console.log('setupApplication - データベースシート初期化開始');
+      initializeDatabaseSheet(databaseSpreadsheetId);
+      console.log('setupApplication - データベースシート初期化完了');
+    } catch (dbError) {
+      console.error('データベースシート初期化エラー:', dbError);
+      throw new Error(`データベースシートの初期化に失敗しました: ${dbError.message}`);
+    }
     
     // セットアップ完了検証
     if (!isSystemSetup()) {
