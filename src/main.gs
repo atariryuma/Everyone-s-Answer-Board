@@ -615,6 +615,24 @@ function parseRequestParams(e) {
 }
 
 /**
+ * HTMLテンプレート用include関数
+ * GAS標準のファイル読み込み機能 - すべてのHTMLテンプレートで使用される
+ * @param {string} filename 読み込むHTMLファイル名（拡張子なし）
+ * @returns {string} HTMLファイルの内容
+ */
+function include(filename) {
+  try {
+    const content = HtmlService.createHtmlOutputFromFile(filename).getContent();
+    console.log(`include - Successfully loaded: ${filename}`);
+    return content;
+  } catch (error) {
+    console.error(`include - Failed to load file: ${filename}`, error);
+    // ファイルが見つからない場合はエラーではなく空文字を返す（開発時の安全性）
+    return `<!-- ERROR: Could not load ${filename} -->`;
+  }
+}
+
+/**
  * Page Rendering Functions
  * 各種ページのレンダリング機能
  */
