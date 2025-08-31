@@ -48,11 +48,11 @@ function createCompleteUser(userEmail) {
 }
 
 /**
- * シンプルなリダイレクト関数
+ * リダイレクト関数
  * @param {string} url リダイレクト先URL
  * @returns {HtmlOutput} リダイレクトHTML
  */
-function createSimpleRedirect(url) {
+function createRedirect(url) {
   return HtmlService.createHtmlOutput('')
     .addMetaTag('http-equiv', 'refresh')
     .addMetaTag('content', `0;url=${url}`);
@@ -120,7 +120,7 @@ function processLoginFlow(userEmail) {
         }
 
         const adminUrl = buildUserAdminUrl(userInfo.userId);
-        return createSimpleRedirect(adminUrl);
+        return createRedirect(adminUrl);
       }
       // 2b. 非アクティブユーザーの場合
       else {
@@ -143,7 +143,7 @@ function processLoginFlow(userEmail) {
         
         // 新規ユーザーの管理パネルへリダイレクト
         const adminUrl = buildUserAdminUrl(newUser.userId);
-        return createSimpleRedirect(adminUrl);
+        return createRedirect(adminUrl);
         
       } catch (error) {
         console.error('新規ユーザー作成失敗:', error);
