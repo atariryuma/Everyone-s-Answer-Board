@@ -19,7 +19,8 @@
       "Bash(npm run format:*)",
       "Bash(npm run lint)",
       "Bash(npm run check:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(npm run push:*)"
     ],
     "deny": [],
     "ask": [],
