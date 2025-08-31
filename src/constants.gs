@@ -151,10 +151,10 @@ const SecurityValidator = Object.freeze({
     const sanitizedData = {};
 
     // Email validation
-    if (!SecurityValidator.isValidEmail(userData.adminEmail)) {
+    if (!SecurityValidator.isValidEmail(userData.userEmail)) {
       errors.push('有効なメールアドレスを入力してください。');
     } else {
-      sanitizedData.adminEmail = SecurityValidator.sanitizeInput(userData.adminEmail, SECURITY.MAX_LENGTHS.EMAIL);
+      sanitizedData.userEmail = SecurityValidator.sanitizeInput(userData.userEmail, SECURITY.MAX_LENGTHS.EMAIL);
     }
 
     // UUID validation

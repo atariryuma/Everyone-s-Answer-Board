@@ -999,7 +999,7 @@ function refreshBoardData(requestUserId) {
     }
 
     // キャッシュをクリア
-    invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, false);
+    invalidateUserCache(currentUserId, userInfo.userEmail, userInfo.spreadsheetId, false);
 
     // 最新のステータスを取得
     return getAppConfig(requestUserId);
@@ -1201,7 +1201,7 @@ function getAppConfig(requestUserId) {
     return {
       status: 'success',
       userId: currentUserId,
-      adminEmail: userInfo.adminEmail,
+      adminEmail: userInfo.userEmail,
       publishedSpreadsheetId: configJson.publishedSpreadsheetId || '',
       publishedSheetName: configJson.publishedSheetName || '',
       displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
@@ -1223,7 +1223,7 @@ function getAppConfig(requestUserId) {
       // データベース詳細情報
       userInfo: {
         userId: currentUserId,
-        adminEmail: userInfo.adminEmail,
+        adminEmail: userInfo.userEmail,
         spreadsheetId: userInfo.spreadsheetId || '',
         spreadsheetUrl: userInfo.spreadsheetUrl || '',
         createdAt: userInfo.createdAt || '',
@@ -1361,7 +1361,7 @@ function getCurrentUserStatus(requestUserId) {
       status: 'success',
       userInfo: {
         userId: userInfo.userId,
-        adminEmail: userInfo.adminEmail,
+        adminEmail: userInfo.userEmail,
         isActive: userInfo.isActive,
         lastAccessedAt: userInfo.lastAccessedAt,
       },
@@ -1598,7 +1598,7 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
 
     // 管理者権限チェック - 現在のユーザーがボードの所有者かどうかを確認
     const activeUserEmail = User.email();
-    if (activeUserEmail !== userInfo.adminEmail) {
+    if (activeUserEmail !== userInfo.userEmail) {
       throw new Error('ハイライト機能は管理者のみ使用できます');
     }
 
@@ -1992,7 +1992,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
 //     configJson.setupStatus = 'completed'; // 公開停止後もセットアップは完了状態とする
 
 //     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
-//     invalidateUserCache(currentUserId, userInfo.adminEmail, userInfo.spreadsheetId, true);
+//     invalidateUserCache(currentUserId, userInfo.userEmail, userInfo.spreadsheetId, true);
 
 //     console.log('✅ 回答ボードの公開を停止しました: %s', currentUserId);
 //     return { status: 'success', message: '回答ボードの公開を停止しました。' };
@@ -2792,7 +2792,7 @@ function getSheetsList(userId) {
 
     console.log('getSheetsList: UserInfo found:', {
       userId: userInfo.userId,
-      adminEmail: userInfo.adminEmail,
+      adminEmail: userInfo.userEmail,
       spreadsheetId: userInfo.spreadsheetId,
       spreadsheetUrl: userInfo.spreadsheetUrl,
     });
@@ -2837,7 +2837,7 @@ function getSheetsList(userId) {
         // 最終手段：ユーザー権限での修復も試行
         try {
           const currentUserEmail = User.email();
-          if (currentUserEmail === userInfo.adminEmail) {
+          if (currentUserEmail === userInfo.userEmail) {
             repairUserSpreadsheetAccess(currentUserEmail, userInfo.spreadsheetId);
             console.log('getSheetsList: ユーザー権限での修復を実行しました。');
           }
@@ -3966,7 +3966,7 @@ function getInitialData(requestUserId, targetSheetName) {
       // ユーザー情報
       userInfo: {
         userId: userInfo.userId,
-        adminEmail: userInfo.adminEmail,
+        adminEmail: userInfo.userEmail,
         isActive: userInfo.isActive,
         lastAccessedAt: userInfo.lastAccessedAt,
         spreadsheetId: userInfo.spreadsheetId,

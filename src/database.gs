@@ -103,7 +103,7 @@ const DB = {
       // 新規ユーザー用の専用フォルダを作成
       try {
         console.info('📁 createUser: Creating user folder', {
-          userEmail: userData.adminEmail
+          userEmail: userData.userEmail
         });
         
         const folder = createUserFolder(userData.userEmail);
@@ -115,7 +115,7 @@ const DB = {
           });
         } else {
           console.warn('⚠️ createUser: User folder creation failed (continuing process)', {
-            userEmail: userData.adminEmail
+            userEmail: userData.userEmail
           });
         }
       } catch (folderError) {
@@ -140,7 +140,7 @@ const DB = {
     } catch (error) {
       // Enhanced error handling with structured logging
       console.error('❌ createUser: User creation failed', {
-        userEmail: userData.adminEmail || 'unknown',
+        userEmail: userData.userEmail || 'unknown',
         userId: userData.userId || 'unknown',
         error: error.message,
         stack: error.stack,
@@ -153,7 +153,7 @@ const DB = {
     } finally {
       lock.releaseLock();
       console.info('🔓 createUser: Lock released', {
-        userEmail: userData.adminEmail || 'unknown'
+        userEmail: userData.userEmail || 'unknown'
       });
     }
   },
@@ -3171,9 +3171,9 @@ function findUserByIdFresh(userId) {
  */
 function fetchUserFromDatabase(searchField, searchValue, options = {}) {
   try {
-    if (searchField === 'tenantId') {
+    if (searchField === 'userId') {
       return options.forceFresh ? findUserByIdFresh(searchValue) : DB.findUserById(searchValue);
-    } else if (searchField === 'ownerEmail') {
+    } else if (searchField === 'userEmail') {
       return DB.findUserByEmail(searchValue);
     } else {
       console.warn('fetchUserFromDatabase: サポートされていない検索フィールド:', searchField);

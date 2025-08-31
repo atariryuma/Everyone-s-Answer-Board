@@ -140,8 +140,8 @@ const Services = {
         
         return {
           email: userInfo.email,
-          tenantId: userInfo.email.split('@')[0], // 簡易的なテナントID
-          ownerEmail: userInfo.email,
+          userId: userInfo.email.split('@')[0], // 簡易的なユーザーID
+          userEmail: userInfo.email,
           // spreadsheetId, configJsonは削除され、ConfigurationManagerで管理
         };
       } catch (error) {
@@ -392,8 +392,8 @@ function showAdminPanel() {
             console.log('✅ アクセス許可: ', accessResult);
             const compatUserInfo = {
               userId: lastAdminUserId,
-              tenantId: lastAdminUserId,
-              adminEmail: accessResult.config?.email || activeUserEmail,
+              userId: lastAdminUserId,
+              userEmail: accessResult.config?.email || activeUserEmail,
               configJson: JSON.stringify(accessResult.config || {})
             };
             
