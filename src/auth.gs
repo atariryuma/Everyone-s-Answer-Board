@@ -48,14 +48,25 @@ function createCompleteUser(userEmail) {
 }
 
 /**
- * リダイレクト関数
+ * リダイレクト関数 - X-Frame-Options対応
  * @param {string} url リダイレクト先URL
  * @returns {HtmlOutput} リダイレクトHTML
  */
 function createRedirect(url) {
-  return HtmlService.createHtmlOutput('')
-    .addMetaTag('http-equiv', 'refresh')
-    .addMetaTag('content', `0;url=${url}`);
+  const script = `
+    <script>
+      try {
+        if (window.top && window.top.location) {
+          window.top.location.href = '${url}';
+        } else {
+          window.location.href = '${url}';
+        }
+      } catch (e) {
+        window.location.href = '${url}';
+      }
+    </script>
+  `;
+  return HtmlService.createHtmlOutput(script);
 }
 
 /**
@@ -136,8 +147,21 @@ function processLoginFlow(userEmail) {
         
         console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
         
+        // キャッシュ整合性確保: 新規作成後の検証リトライ
+        let verifiedUser = DB.findUserByEmail(userEmail);
+        if (!verifiedUser) {
+          console.warn('processLoginFlow: キャッシュ不整合検出、リトライ実行');
+          Utilities.sleep(100); // キャッシュ同期待機
+          verifiedUser = DB.findUserByEmail(userEmail);
+          if (!verifiedUser) {
+            console.error('processLoginFlow: ユーザー検証失敗 - キャッシュ問題の可能性');
+            // フォールバック: 作成したユーザー情報を直接使用
+            verifiedUser = newUser;
+          }
+        }
+        
         // 新規ユーザーの管理パネルへリダイレクト
-        const adminUrl = buildUserAdminUrl(newUser.userId);
+        const adminUrl = buildUserAdminUrl(verifiedUser.userId);
         return createRedirect(adminUrl);
         
       } catch (error) {

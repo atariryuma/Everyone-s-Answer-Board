@@ -132,6 +132,14 @@ const DB = {
 
       // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化 (修正: userIdを使用)
       invalidateUserCache(userData.userId, userData.userEmail, null, false);
+      
+      // キャッシュ整合性確保: 新規作成ユーザーを即座にキャッシュに登録
+      const cacheKey = `user_by_email_${userData.userEmail}`;
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(userData), 300);
+      console.info('🔄 createUser: New user cached for immediate access', {
+        userEmail: userData.userEmail,
+        cacheKey: cacheKey
+      });
 
       console.info('🎉 createUser: User creation process completed successfully', {
         userEmail: userData.userEmail,
