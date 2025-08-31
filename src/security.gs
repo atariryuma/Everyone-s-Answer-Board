@@ -131,6 +131,148 @@ function getServiceAccountEmail() {
 }
 
 /**
+ * サービスアカウント診断情報を取得
+ * @returns {Object} 診断結果
+ */
+function getServiceAccountDiagnostics() {
+  const diagnostics = {
+    timestamp: new Date().toISOString(),
+    status: 'unknown',
+    checks: {
+      credentialsConfigured: false,
+      tokenGeneration: false,
+      apiAccess: false,
+      spreadsheetPermissions: false
+    },
+    details: {
+      email: null,
+      projectId: null,
+      keyId: null,
+      scopes: [],
+      lastTokenTime: null,
+      errors: []
+    },
+    recommendations: []
+  };
+
+  try {
+    // 1. 認証情報の設定確認
+    const serviceAccountCreds = getSecureServiceAccountCreds();
+    diagnostics.checks.credentialsConfigured = true;
+    diagnostics.details.email = serviceAccountCreds.client_email;
+    diagnostics.details.projectId = serviceAccountCreds.project_id;
+    diagnostics.details.keyId = serviceAccountCreds.private_key_id;
+
+    // 2. トークン生成テスト
+    try {
+      const token = getServiceAccountAccessToken();
+      if (token) {
+        diagnostics.checks.tokenGeneration = true;
+        diagnostics.details.lastTokenTime = new Date().toISOString();
+        diagnostics.details.scopes = ['https://www.googleapis.com/auth/spreadsheets'];
+      }
+    } catch (tokenError) {
+      diagnostics.details.errors.push(`トークン生成エラー: ${tokenError.message}`);
+    }
+
+    // 3. データベースアクセステスト
+    try {
+      const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+      if (dbId) {
+        const service = {
+          baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
+          accessToken: getServiceAccountAccessToken()
+        };
+        getSpreadsheetsData(service, dbId);
+        diagnostics.checks.apiAccess = true;
+        diagnostics.checks.spreadsheetPermissions = true;
+      } else {
+        diagnostics.details.errors.push('データベースIDが設定されていません');
+      }
+    } catch (apiError) {
+      diagnostics.details.errors.push(`API アクセスエラー: ${apiError.message}`);
+      if (apiError.message.includes('403') || apiError.message.includes('権限')) {
+        diagnostics.recommendations.push('スプレッドシートにサービスアカウントの編集権限を追加してください');
+      }
+    }
+
+    // ステータス判定
+    if (diagnostics.checks.credentialsConfigured && 
+        diagnostics.checks.tokenGeneration && 
+        diagnostics.checks.apiAccess && 
+        diagnostics.checks.spreadsheetPermissions) {
+      diagnostics.status = 'healthy';
+    } else if (diagnostics.checks.credentialsConfigured && diagnostics.checks.tokenGeneration) {
+      diagnostics.status = 'partial';
+      diagnostics.recommendations.push('スプレッドシートへのアクセス権限を確認してください');
+    } else {
+      diagnostics.status = 'critical';
+      if (!diagnostics.checks.credentialsConfigured) {
+        diagnostics.recommendations.push('サービスアカウントのJSONキーを設定してください');
+      }
+    }
+
+  } catch (error) {
+    diagnostics.status = 'error';
+    diagnostics.details.errors.push(`診断処理エラー: ${error.message}`);
+  }
+
+  console.log('🔍 サービスアカウント診断完了:', diagnostics.status);
+  return diagnostics;
+}
+
+/**
+ * サービスアカウント診断結果をフォーマットして表示
+ * @returns {string} フォーマット済み診断レポート
+ */
+function formatServiceAccountDiagnostics() {
+  const diagnostics = getServiceAccountDiagnostics();
+  
+  let report = `🔍 サービスアカウント診断レポート\n`;
+  report += `📅 実行日時: ${diagnostics.timestamp}\n`;
+  report += `📊 総合ステータス: ${getStatusIcon(diagnostics.status)} ${diagnostics.status.toUpperCase()}\n\n`;
+  
+  report += `✅ チェック項目:\n`;
+  report += `   • 認証情報設定: ${diagnostics.checks.credentialsConfigured ? '✅' : '❌'}\n`;
+  report += `   • トークン生成: ${diagnostics.checks.tokenGeneration ? '✅' : '❌'}\n`;
+  report += `   • API アクセス: ${diagnostics.checks.apiAccess ? '✅' : '❌'}\n`;
+  report += `   • スプレッドシート権限: ${diagnostics.checks.spreadsheetPermissions ? '✅' : '❌'}\n\n`;
+  
+  if (diagnostics.details.email) {
+    report += `📧 サービスアカウント: ${diagnostics.details.email}\n`;
+  }
+  if (diagnostics.details.projectId) {
+    report += `🏗️ プロジェクトID: ${diagnostics.details.projectId}\n`;
+  }
+  
+  if (diagnostics.details.errors.length > 0) {
+    report += `\n❌ エラー詳細:\n`;
+    diagnostics.details.errors.forEach(error => {
+      report += `   • ${error}\n`;
+    });
+  }
+  
+  if (diagnostics.recommendations.length > 0) {
+    report += `\n💡 推奨アクション:\n`;
+    diagnostics.recommendations.forEach(rec => {
+      report += `   • ${rec}\n`;
+    });
+  }
+  
+  return report;
+}
+
+function getStatusIcon(status) {
+  switch (status) {
+    case 'healthy': return '🟢';
+    case 'partial': return '🟡';
+    case 'critical': return '🔴';
+    case 'error': return '⚠️';
+    default: return '⚪';
+  }
+}
+
+/**
  * シンプル・確実な管理者権限検証（3重チェック）
  * メールアドレス + ユーザーID + アクティブ状態の照合
  * @param {string} userId - 検証するユーザーのID

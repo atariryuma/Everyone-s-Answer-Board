@@ -1611,12 +1611,12 @@ function getSpreadsheetsData(service, spreadsheetId) {
       );
     }
 
-    if (!dbCheckResult.sheets || !Array.isArray(dbCheckResult.sheets)) {
-      console.warn('⚠️ sheets配列が見つからないか、配列でありません:', typeof dbCheckResult.sheets);
-      dbCheckResult.sheets = []; // 空配列を設定してエラーを避ける
+    if (!result.sheets || !Array.isArray(result.sheets)) {
+      console.warn('⚠️ sheets配列が見つからないか、配列でありません:', typeof result.sheets);
+      result.sheets = []; // 空配列を設定してエラーを避ける
     }
 
-    var sheetCount = dbCheckResult.sheets.length;
+    var sheetCount = result.sheets.length;
     console.log('✅ getSpreadsheetsData 成功: 発見シート数:', sheetCount);
 
     if (sheetCount === 0) {
@@ -1624,11 +1624,11 @@ function getSpreadsheetsData(service, spreadsheetId) {
     } else {
       console.log(
         '📋 利用可能なシート:',
-        dbCheckResult.sheets.map((s) => s.properties?.title || 'Unknown').join(', ')
+        result.sheets.map((s) => s.properties?.title || 'Unknown').join(', ')
       );
     }
 
-    return dbCheckResult;
+    return result;
   } catch (error) {
     console.error('❌ getSpreadsheetsData error:', error.message);
     console.error('❌ Error stack:', error.stack);
