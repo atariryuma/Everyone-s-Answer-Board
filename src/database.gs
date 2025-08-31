@@ -10,7 +10,7 @@ const DB_CONFIG = Object.freeze({
   LOCK_TIMEOUT: 10000,  // 10秒
   SHEET_NAME: 'Users',
   HEADERS: Object.freeze([
-    'tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status',
+    'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
     'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl'
   ]),
 });
