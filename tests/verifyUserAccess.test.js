@@ -23,11 +23,14 @@ describe('verifyUserAccess security checks', () => {
           getProperty: jest.fn((key) => {
             if (key === 'user_config_U1') {
               return JSON.stringify({
-                tenantId: 'U1',
-                ownerEmail: 'admin@example.com',
+                userId: 'U1',
+                userEmail: 'admin@example.com',
                 isPublic: false,
                 allowAnonymous: false
               });
+            }
+            if (key === 'ADMIN_EMAIL') {
+              return 'admin@example.com';
             }
             return null;
           })
@@ -42,23 +45,35 @@ describe('verifyUserAccess security checks', () => {
       },
       DB: {
         findUserById: jest.fn(() => ({
-          ownerEmail: 'admin@example.com',
-          configJson: JSON.stringify({ appPublished: false }),
+          userEmail: 'admin@example.com',
+          configJson: JSON.stringify({ 
+            userId: 'U1',
+            userEmail: 'admin@example.com',
+            appPublished: false,
+            isPublic: false,
+            allowAnonymous: false
+          }),
         })),
       },
       User: {
         email: jest.fn(() => 'admin@example.com'),
         info: jest.fn(() => ({
-          tenantId: 'U1',
-          ownerEmail: 'admin@example.com',
+          userId: 'U1',
+          userEmail: 'admin@example.com',
           spreadsheetId: 'testSpreadsheetId',
         })),
       },
       clearExecutionUserInfoCache: jest.fn(),
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
       findUserById: jest.fn(() => ({
-        ownerEmail: 'admin@example.com',
-        configJson: JSON.stringify({ appPublished: false }),
+        userEmail: 'admin@example.com',
+        configJson: JSON.stringify({ 
+          userId: 'U1',
+          userEmail: 'admin@example.com',
+          appPublished: false,
+          isPublic: false,
+          allowAnonymous: false
+        }),
       })),
     };
     vm.createContext(context);
@@ -78,64 +93,38 @@ describe('verifyUserAccess security checks', () => {
 
   test('allows read-only access for published board', () => {
     // 新しいコンテキストで公開設定をテスト
-    const publicContext = {
-      console,
-      debugLog: () => {},
-      Log: {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-      },
-      PropertiesService: {
-        getScriptProperties: () => ({
-          getProperty: jest.fn((key) => {
-            if (key === 'user_config_U1') {
-              return JSON.stringify({
-                tenantId: 'U1',
-                ownerEmail: 'admin@example.com',
-                isPublic: true,
-                allowAnonymous: true
-              });
-            }
-            return null;
-          })
-        })
-      },
-      CacheService: {
-        getScriptCache: () => ({
-          get: jest.fn(() => null),
-          put: jest.fn(),
-          remove: jest.fn()
-        })
-      },
-      DB: {
-        findUserById: jest.fn(() => ({
-          ownerEmail: 'admin@example.com',
-          configJson: JSON.stringify({ appPublished: false }),
-        })),
-      },
-      User: {
-        email: jest.fn(() => 'admin@example.com'),
-        info: jest.fn(() => ({
-          tenantId: 'U1',
-          ownerEmail: 'admin@example.com',
-          spreadsheetId: 'testSpreadsheetId',
-        })),
-      },
-      clearExecutionUserInfoCache: jest.fn(),
-      Session: { getActiveUser: () => ({ getEmail: () => 'viewer@example.com' }) },
-      findUserById: jest.fn(() => ({
-        ownerEmail: 'admin@example.com',
-        configJson: JSON.stringify({ appPublished: false }),
-      })),
-    };
+    context.DB.findUserById = jest.fn(() => ({
+      userEmail: 'admin@example.com',
+      configJson: JSON.stringify({ 
+        userId: 'U1',
+        userEmail: 'admin@example.com',
+        appPublished: true, 
+        isPublic: true,
+        allowAnonymous: true
+      }),
+    }));
     
-    vm.createContext(publicContext);
-    vm.runInContext(baseCode, publicContext);
-    vm.runInContext(appCode, publicContext);
-    vm.runInContext(coreCode, publicContext);
-    
-    expect(() => publicContext.verifyUserAccess('U1')).not.toThrow();
+    // PropertiesServiceも更新
+    context.PropertiesService.getScriptProperties = () => ({
+      getProperty: jest.fn((key) => {
+        if (key === 'user_config_U1') {
+          return JSON.stringify({
+            userId: 'U1',
+            userEmail: 'admin@example.com',
+            appPublished: true,
+            isPublic: true,
+            allowAnonymous: true
+          });
+        }
+        if (key === 'ADMIN_EMAIL') {
+          return 'admin@example.com';
+        }
+        return null;
+      })
+    });
+
+    // 他のユーザーからのアクセス
+    context.Session.getActiveUser = () => ({ getEmail: () => 'other@example.com' });
+    expect(() => context.verifyUserAccess('U1')).not.toThrow();
   });
 });

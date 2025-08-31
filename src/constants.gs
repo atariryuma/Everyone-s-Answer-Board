@@ -208,7 +208,7 @@ const APP_CONSTANTS = Object.freeze({
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
     HEADERS: Object.freeze([
-      'tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status',
+      'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
       'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl'
     ]),
     DELETE_LOG: Object.freeze({

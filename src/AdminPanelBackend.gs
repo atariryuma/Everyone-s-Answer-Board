@@ -1125,7 +1125,7 @@ function getCurrentBoardInfoAndUrls() {
         admin: adminUrl, // 管理者向け
       },
       lastUpdated: new Date().toLocaleString('ja-JP'),
-      ownerEmail: userInfo.adminEmail,
+      ownerEmail: userInfo.userEmail,
     };
 
     console.log('getCurrentBoardInfoAndUrls: 成功', {

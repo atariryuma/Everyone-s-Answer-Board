@@ -21,7 +21,7 @@ function processLoginFlow(userEmail) {
     // 2. 既存ユーザーの処理
     if (userInfo) {
       // 2a. アクティブユーザーの場合
-      if (isTrue(userInfo.isActive)) {
+      if (userInfo.isActive === true) {
         console.log('processLoginFlow: 既存アクティブユーザー:', userEmail);
 
         // 最終アクセス時刻を更新（設定は保護）
@@ -53,39 +53,63 @@ function processLoginFlow(userEmail) {
     else {
       console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
 
-      // 3a. 新規ユーザーデータを準備（初期設定でpending状態）
+      // 3a. 新規ユーザーデータを準備
+      const userId = Utilities.getUuid();
+
+      // 完全な初期設定をconfigJsonに含める
       const initialConfig = {
+        userId: userId,
+        userEmail: userEmail,
+        title: `${userEmail}の回答ボード`,
         setupStatus: 'pending',
-        createdAt: new Date().toISOString(),
         formCreated: false,
         appPublished: false,
+        isPublic: false,
+        allowAnonymous: false,
+        columns: [
+          { name: 'timestamp', label: 'タイムスタンプ', type: 'datetime', required: false },
+          { name: 'email', label: 'メールアドレス', type: 'email', required: false },
+          { name: 'class', label: 'クラス', type: 'text', required: false },
+          { name: 'opinion', label: '回答', type: 'textarea', required: true },
+          { name: 'reason', label: '理由', type: 'textarea', required: false },
+          { name: 'name', label: '名前', type: 'text', required: false }
+        ],
+        theme: 'default',
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString()
       };
 
       const newUser = {
-        tenantId: Utilities.getUuid(),
-        ownerEmail: userEmail,
+        userId: userId,
+        userEmail: userEmail,
         createdAt: new Date().toISOString(),
         lastAccessedAt: new Date().toISOString(),
-        status: 'active', // 即時有効化
+        isActive: true, // 純粋boolean値
         spreadsheetId: '',
         spreadsheetUrl: '',
         configJson: JSON.stringify(initialConfig),
         formUrl: ''
       };
 
-      // 3b. データベースに作成
-      DB.createUser(newUser);
-      // ConfigurationManagerで初期設定を作成
-      App.getConfig().initializeUserConfig(newUser.tenantId, userEmail);
-
-      if (!waitForUserRecord(newUser.tenantId, 3000, 500)) {
-        console.warn('processLoginFlow: user not found after create:', newUser.tenantId);
+      try {
+        // 3b. データベースに作成
+        DB.createUser(newUser);
+        
+        if (!waitForUserRecord(userId, 3000, 500)) {
+          throw new Error('ユーザー作成の確認がタイムアウトしました');
+        }
+        
+        console.log('processLoginFlow: 新規ユーザー作成完了:', userId);
+        
+        // 3c. 新規ユーザーの管理パネルへリダイレクト
+        const adminUrl = buildUserAdminUrl(userId);
+        return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
+        
+      } catch (error) {
+        console.error('新規ユーザー作成失敗:', error);
+        rollbackUserCreation(userId);
+        throw error;
       }
-      console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.tenantId);
-
-      // 3c. 新規ユーザーの管理パネルへリダイレクト
-      const adminUrl = buildUserAdminUrl(newUser.tenantId);
-      return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
     }
   } catch (error) {
     // 構造化エラーログの出力
@@ -106,5 +130,25 @@ function processLoginFlow(userEmail) {
       : 'ログイン処理中に予期しないエラーが発生しました。しばらく待ってから再度お試しください。';
 
     return showErrorPage('ログインエラー', userMessage, error);
+  }
+}
+
+/**
+ * ユーザー作成のロールバック処理
+ * @param {string} userId ロールバック対象のユーザーID
+ */
+function rollbackUserCreation(userId) {
+  try {
+    console.log(`ユーザー作成ロールバック開始: ${userId}`);
+    
+    const deleted = DB.deleteUser(userId);
+    
+    if (deleted) {
+      console.log(`ロールバック完了: ${userId}`);
+    } else {
+      console.warn(`ロールバック失敗 - ユーザーが見つからない: ${userId}`);
+    }
+  } catch (error) {
+    console.error(`ロールバック処理でエラー: ${error.message}`);
   }
 }

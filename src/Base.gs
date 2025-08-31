@@ -5,59 +5,52 @@
  */
 
 // ===============================
-// ConfigurationManagerクラス
+// ConfigurationManagerクラス（データベース専用版）
 // ===============================
 
 class ConfigurationManager {
-  constructor() {
-    this.properties = PropertiesService.getScriptProperties();
-    this.cache = CacheService.getScriptCache();
-  }
-
   /**
-   * ユーザー設定を取得
+   * ユーザー設定を取得（データベースから直接読み取り）
    * @param {string} userId ユーザーID
    * @return {Object|null} ユーザー設定オブジェクト
    */
   getUserConfig(userId) {
     if (!userId) return null;
-
-    const cacheKey = `config_${userId}`;
-    let config = this.cache.get(cacheKey);
     
-    if (config) {
-      return JSON.parse(config);
+    const user = DB.findUserById(userId);
+    if (!user || !user.configJson) return null;
+    
+    try {
+      return JSON.parse(user.configJson);
+    } catch (e) {
+      console.error(`設定JSON解析エラー (${userId}):`, e);
+      return null;
     }
-
-    const propKey = `user_config_${userId}`;
-    const configData = this.properties.getProperty(propKey);
-    
-    if (!configData) return null;
-
-    config = JSON.parse(configData);
-    this.cache.put(cacheKey, configData, 1800);
-    return config;
   }
 
   /**
-   * ユーザー設定を保存
+   * ユーザー設定を保存（データベースに直接書き込み）
    * @param {string} userId ユーザーID
    * @param {Object} config 設定オブジェクト
    * @return {boolean} 保存成功可否
    */
   setUserConfig(userId, config) {
     if (!userId || !config) return false;
-
+    
+    config.userId = userId;
+    config.lastModified = new Date().toISOString();
+    
     try {
-      const configData = JSON.stringify(config);
-      const propKey = `user_config_${userId}`;
+      const updated = DB.updateUser(userId, {
+        configJson: JSON.stringify(config),
+        lastAccessedAt: new Date().toISOString()
+      });
       
-      this.properties.setProperty(propKey, configData);
-      
-      const cacheKey = `config_${userId}`;
-      this.cache.put(cacheKey, configData, 1800);
-      
-      return true;
+      if (updated) {
+        console.log(`設定更新完了: ${userId}`);
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error(`設定保存エラー (${userId}):`, error);
       return false;
@@ -71,19 +64,7 @@ class ConfigurationManager {
    */
   removeUserConfig(userId) {
     if (!userId) return false;
-
-    try {
-      const propKey = `user_config_${userId}`;
-      this.properties.deleteProperty(propKey);
-      
-      const cacheKey = `config_${userId}`;
-      this.cache.remove(cacheKey);
-      
-      return true;
-    } catch (error) {
-      console.error(`設定削除エラー (${userId}):`, error);
-      return false;
-    }
+    return this.setUserConfig(userId, {});
   }
 
   /**
@@ -96,7 +77,7 @@ class ConfigurationManager {
     if (!config || !config.isPublic) return null;
 
     return {
-      tenantId: userId,
+      userId: userId,
       title: config.title || 'Answer Board',
       description: config.description || '',
       allowAnonymous: config.allowAnonymous || false,
@@ -111,10 +92,12 @@ class ConfigurationManager {
    */
   getDefaultColumns() {
     return [
-      { name: 'question', label: '質問', type: 'text', required: true },
-      { name: 'answer', label: '回答', type: 'textarea', required: false },
-      { name: 'category', label: 'カテゴリ', type: 'select', required: false },
-      { name: 'timestamp', label: '作成日時', type: 'datetime', required: false }
+      { name: 'timestamp', label: 'タイムスタンプ', type: 'datetime', required: false },
+      { name: 'email', label: 'メールアドレス', type: 'email', required: false },
+      { name: 'class', label: 'クラス', type: 'text', required: false },
+      { name: 'opinion', label: '回答', type: 'textarea', required: true },
+      { name: 'reason', label: '理由', type: 'textarea', required: false },
+      { name: 'name', label: '名前', type: 'text', required: false }
     ];
   }
 
@@ -126,20 +109,23 @@ class ConfigurationManager {
    */
   initializeUserConfig(userId, email) {
     const defaultConfig = {
-      tenantId: userId,
-      ownerEmail: email,
+      userId: userId,
+      userEmail: email,
       title: `${email}の回答ボード`,
       description: '',
       isPublic: false,
       allowAnonymous: false,
+      setupStatus: 'pending',
+      formCreated: false,
+      appPublished: false,
       columns: this.getDefaultColumns(),
       theme: 'default',
       createdAt: new Date().toISOString(),
       lastModified: new Date().toISOString()
     };
 
-    this.setUserConfig(userId, defaultConfig);
-    return defaultConfig;
+    const success = this.setUserConfig(userId, defaultConfig);
+    return success ? defaultConfig : null;
   }
 
   /**
@@ -162,99 +148,13 @@ class ConfigurationManager {
   }
 
   /**
-   * 全ユーザー設定を取得（管理用）
-   * @return {Array} 全ユーザー設定配列
-   */
-  getAllUserConfigs() {
-    const allProperties = this.properties.getProperties();
-    const configs = [];
-
-    Object.keys(allProperties).forEach(key => {
-      if (key.startsWith('user_config_')) {
-        try {
-          const config = JSON.parse(allProperties[key]);
-          configs.push(config);
-        } catch (error) {
-          console.error(`設定解析エラー (${key}):`, error);
-        }
-      }
-    });
-
-    return configs;
-  }
-
-  /**
-   * PropertiesService使用量を取得
-   * @return {Object} 使用量統計
-   */
-  getUsageStats() {
-    const allProperties = this.properties.getProperties();
-    let totalSize = 0;
-    let userConfigCount = 0;
-
-    Object.entries(allProperties).forEach(([key, value]) => {
-      totalSize += key.length + value.length;
-      if (key.startsWith('user_config_')) {
-        userConfigCount++;
-      }
-    });
-
-    const maxSize = 524288;
-    const usagePercentage = (totalSize / maxSize * 100).toFixed(2);
-
-    return {
-      totalSize,
-      maxSize,
-      usagePercentage,
-      userConfigCount,
-      remainingCapacity: maxSize - totalSize
-    };
-  }
-
-  /**
    * 設定の存在確認
    * @param {string} userId ユーザーID
    * @return {boolean} 存在可否
    */
   hasUserConfig(userId) {
-    if (!userId) return false;
-    const propKey = `user_config_${userId}`;
-    return this.properties.getProperty(propKey) !== null;
-  }
-
-  /**
-   * 設定をバックアップ
-   * @return {Object} バックアップデータ
-   */
-  createBackup() {
-    const allConfigs = this.getAllUserConfigs();
-    return {
-      timestamp: new Date().toISOString(),
-      version: '1.0',
-      configs: allConfigs,
-      stats: this.getUsageStats()
-    };
-  }
-
-  /**
-   * バックアップから復元
-   * @param {Object} backupData バックアップデータ
-   * @return {boolean} 復元成功可否
-   */
-  restoreFromBackup(backupData) {
-    if (!backupData || !backupData.configs) return false;
-
-    try {
-      backupData.configs.forEach(config => {
-        if (config.tenantId) {
-          this.setUserConfig(config.tenantId, config);
-        }
-      });
-      return true;
-    } catch (error) {
-      console.error('バックアップ復元エラー:', error);
-      return false;
-    }
+    const config = this.getUserConfig(userId);
+    return config !== null && Object.keys(config).length > 0;
   }
 }
 
@@ -298,79 +198,69 @@ class AccessController {
 
     } catch (error) {
       console.error('アクセス検証エラー:', error);
-      return this.createAccessResult(false, 'error', null, 'アクセス検証中にエラーが発生しました');
+      return this.createAccessResult(false, 'error', null, 'アクセス検証でエラーが発生しました');
     }
-  }
-
-  /**
-   * 閲覧アクセスを検証
-   * @param {Object} config ユーザー設定
-   * @param {string} currentUserEmail 現在のユーザーメール
-   * @return {Object} アクセス結果
-   */
-  verifyViewAccess(config, currentUserEmail) {
-    if (currentUserEmail && config.ownerEmail === currentUserEmail) {
-      return this.createAccessResult(true, 'owner', config);
-    }
-
-    if (!config.isPublic) {
-      return this.createAccessResult(false, 'private', null, 'このボードは非公開です');
-    }
-
-    if (currentUserEmail) {
-      return this.createAccessResult(true, 'authenticated_user', config);
-    }
-
-    if (config.allowAnonymous) {
-      const publicConfig = this.configManager.getPublicConfig(config.tenantId);
-      return this.createAccessResult(true, 'guest', publicConfig);
-    }
-
-    return this.createAccessResult(false, 'guest_not_allowed', null, 'ゲストアクセスは許可されていません');
-  }
-
-  /**
-   * 編集アクセスを検証
-   * @param {Object} config ユーザー設定
-   * @param {string} currentUserEmail 現在のユーザーメール
-   * @return {Object} アクセス結果
-   */
-  verifyEditAccess(config, currentUserEmail) {
-    if (currentUserEmail && config.ownerEmail === currentUserEmail) {
-      return this.createAccessResult(true, 'owner', config);
-    }
-
-    return this.createAccessResult(false, 'unauthorized', null, '編集権限がありません');
   }
 
   /**
    * 管理者アクセスを検証
-   * @param {Object} config ユーザー設定
-   * @param {string} currentUserEmail 現在のユーザーメール
-   * @return {Object} アクセス結果
    */
   verifyAdminAccess(config, currentUserEmail) {
-    if (currentUserEmail && config.ownerEmail === currentUserEmail) {
+    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+    
+    // システム管理者
+    if (currentUserEmail === systemAdminEmail) {
+      return this.createAccessResult(true, 'system_admin', config);
+    }
+    
+    // オーナー
+    if (currentUserEmail === config.userEmail) {
       return this.createAccessResult(true, 'owner', config);
     }
 
-    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
-    if (systemAdminEmail && currentUserEmail === systemAdminEmail) {
-      return this.createAccessResult(true, 'system_admin', config);
+    return this.createAccessResult(false, 'guest', null, '管理者権限がありません');
+  }
+
+  /**
+   * 編集アクセスを検証
+   */
+  verifyEditAccess(config, currentUserEmail) {
+    // オーナーか確認
+    if (currentUserEmail === config.userEmail) {
+      return this.createAccessResult(true, 'owner', config);
     }
 
-    return this.createAccessResult(false, 'unauthorized', null, '管理者権限がありません');
+    // 他のユーザーは編集不可
+    return this.createAccessResult(false, 'guest', null, '編集権限がありません');
+  }
+
+  /**
+   * 閲覧アクセスを検証
+   */
+  verifyViewAccess(config, currentUserEmail) {
+    // オーナーは常に閲覧可能
+    if (currentUserEmail === config.userEmail) {
+      return this.createAccessResult(true, 'owner', config);
+    }
+
+    // 公開設定を確認
+    if (config.isPublic) {
+      return this.createAccessResult(true, 'guest', config);
+    }
+
+    // 匿名アクセス許可を確認
+    if (config.allowAnonymous) {
+      return this.createAccessResult(true, 'anonymous', config);
+    }
+
+    // デフォルトは閲覧不可
+    return this.createAccessResult(false, 'guest', null, '閲覧権限がありません');
   }
 
   /**
    * アクセス結果オブジェクトを作成
-   * @param {boolean} allowed アクセス許可可否
-   * @param {string} userType ユーザータイプ
-   * @param {Object} config 設定オブジェクト
-   * @param {string} message メッセージ
-   * @return {Object} アクセス結果
    */
-  createAccessResult(allowed, userType, config, message = '') {
+  createAccessResult(allowed, userType, config = null, message = null) {
     return {
       allowed,
       userType,
@@ -381,28 +271,28 @@ class AccessController {
   }
 
   /**
-   * 公開ボードの存在確認
-   * @param {string} userId ユーザーID
-   * @return {boolean} 公開ボード存在可否
+   * ユーザーレベルを取得
    */
-  isPublicBoardAvailable(userId) {
-    const config = this.configManager.getUserConfig(userId);
-    return config && config.isPublic;
-  }
+  getUserLevel(targetUserId, currentUserEmail) {
+    if (!targetUserId || !currentUserEmail) return 'none';
 
-  /**
-   * ユーザーのアクセス権限レベルを取得
-   * @param {string} targetUserId 対象ユーザーID
-   * @param {string} currentUserEmail 現在のユーザーメール
-   * @return {string} 権限レベル
-   */
-  getUserPermissionLevel(targetUserId, currentUserEmail) {
-    const accessResult = this.verifyAccess(targetUserId, 'view', currentUserEmail);
+    const config = this.configManager.getUserConfig(targetUserId);
+    if (!config) return 'none';
+
+    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
     
-    if (!accessResult.allowed) {
-      return 'none';
+    if (currentUserEmail === systemAdminEmail) {
+      return 'system_admin';
+    }
+    
+    if (currentUserEmail === config.userEmail) {
+      return 'owner';
     }
 
-    return accessResult.userType;
+    if (Session.getActiveUser().getEmail() === currentUserEmail) {
+      return 'authenticated_user';
+    }
+
+    return 'guest';
   }
 }

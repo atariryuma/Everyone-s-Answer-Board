@@ -56,11 +56,10 @@ function doGet(e) {
             return HtmlService.createHtmlOutput('<h3>Access Denied</h3><p>Admin access is not allowed for this user.</p>');
           }
           
-          // 互換性のためのユーザー情報変換
+          // ユーザー情報変換
           const compatUserInfo = {
             userId: params.userId,
-            tenantId: params.userId,
-            adminEmail: accessResult.config?.email || User.email(),
+            userEmail: accessResult.config?.userEmail || User.email(),
             configJson: JSON.stringify(accessResult.config || {})
           };
           
@@ -92,11 +91,10 @@ function doGet(e) {
             return HtmlService.createHtmlOutput('<h3>Private Board</h3><p>This board is private.</p>');
           }
           
-          // 互換性のためのユーザー情報変換
+          // ユーザー情報変換
           const compatUserInfo = {
             userId: params.userId,
-            tenantId: params.userId,
-            adminEmail: accessResult.config?.email || '',
+            userEmail: accessResult.config?.userEmail || '',
             configJson: JSON.stringify(accessResult.config || {})
           };
 
@@ -442,11 +440,10 @@ function showAnswerBoard(userId) {
       return HtmlService.createHtmlOutput('<h3>Private Board</h3><p>This board is private.</p>');
     }
     
-    // 互換性のためのユーザー情報変換
+    // ユーザー情報変換
     const compatUserInfo = {
       userId: userId,
-      tenantId: userId,
-      adminEmail: accessResult.config?.email || '',
+      userEmail: accessResult.config?.userEmail || '',
       configJson: JSON.stringify(accessResult.config || {})
     };
 
