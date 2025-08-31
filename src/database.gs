@@ -9,7 +9,10 @@ const DB_CONFIG = Object.freeze({
   BATCH_SIZE: 100,
   LOCK_TIMEOUT: 10000,  // 10秒
   SHEET_NAME: 'Users',
-  HEADERS: Object.freeze(['tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status']),
+  HEADERS: Object.freeze([
+    'tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status',
+    'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl'
+  ]),
 });
 
 // 簡易インデックス機能：ユーザー検索の高速化  
@@ -193,7 +196,7 @@ const DB = {
       console.log('findUserByEmail: データベース検索開始:', email);
 
       // シート全体のデータを取得
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
         console.warn('findUserByEmail: データベースからデータを取得できませんでした');
@@ -285,7 +288,7 @@ const DB = {
       console.log('findUserById: データベース検索開始:', userId);
 
       // シート全体のデータを取得
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
         console.warn('findUserById: データベースからデータを取得できませんでした');
@@ -596,7 +599,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       }
 
       // データを取得してユーザー行を特定
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
       const values = data.valueRanges[0].values || [];
 
       let rowToDelete = -1;
@@ -939,7 +942,7 @@ function updateUser(userId, updateData) {
     var sheetName = DB_CONFIG.SHEET_NAME;
 
     // 現在のデータを取得
-    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+    var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
 
     if (values.length === 0) {
@@ -1133,7 +1136,7 @@ function initializeDatabaseSheet(spreadsheetId) {
               title: sheetName,
               gridProperties: {
                 rowCount: 1000,
-                columnCount: DB_CONFIG.HEADERS.length,
+                columnCount: DB_CONFIG.HEADERS.length, // 9カラム対応
               },
             },
           },
@@ -1149,7 +1152,7 @@ function initializeDatabaseSheet(spreadsheetId) {
         sheetName +
         "'!A1:" +
         String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) +
-        '1';
+        '1'; // A1:I1 (9カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
 
       console.log(
@@ -1162,7 +1165,7 @@ function initializeDatabaseSheet(spreadsheetId) {
         sheetName +
         "'!A1:" +
         String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) +
-        '1';
+        '1'; // A1:I1 (9カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
       console.log('✅ 既存シートのヘッダー更新完了');
     }
@@ -1742,7 +1745,7 @@ function diagnoseDatabase(targetUserId) {
 
     // 4. ユーザーデータ取得テスト
     try {
-      var data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:H"]);
+      var data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:I"]);
       var values = data.valueRanges[0].values || [];
 
       diagnosticResult.checks.userData = {
@@ -2170,7 +2173,7 @@ function performDataIntegrityCheck(options = {}) {
     }
 
     var service = getSheetsServiceCached();
-    var data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:H"]);
+    var data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:I"]);
     var values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
@@ -3014,7 +3017,7 @@ function deleteUserAccount(userId) {
       console.log('Found database sheet with sheetId:', targetSheetId);
 
       // データを取得
-      var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
+      var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
       var values = data.valueRanges[0].values || [];
 
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）
@@ -3117,7 +3120,7 @@ function findUserByIdFresh(userId) {
     console.log('findUserByIdFresh: データベース検索開始（強制リフレッシュ）:', userId);
 
     // シート全体のデータを取得
-    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:H`]);
+    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
 
     if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
       console.warn('findUserByIdFresh: データベースからデータを取得できませんでした');

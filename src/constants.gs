@@ -207,7 +207,10 @@ const APP_CONSTANTS = Object.freeze({
   // データベース関連定数
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
-    HEADERS: Object.freeze(['tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status']),
+    HEADERS: Object.freeze([
+      'tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status',
+      'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl'
+    ]),
     DELETE_LOG: Object.freeze({
       SHEET_NAME: 'DeletionLogs',
       HEADERS: Object.freeze(['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'])

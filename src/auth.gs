@@ -62,14 +62,15 @@ function processLoginFlow(userEmail) {
       };
 
       const newUser = {
-        userId: Utilities.getUuid(),
-        adminEmail: userEmail,
+        tenantId: Utilities.getUuid(),
+        ownerEmail: userEmail,
         createdAt: new Date().toISOString(),
-        isActive: true, // 即時有効化
-        configJson: JSON.stringify(initialConfig),
+        lastAccessedAt: new Date().toISOString(),
+        status: 'active', // 即時有効化
         spreadsheetId: '',
         spreadsheetUrl: '',
-        lastAccessedAt: new Date().toISOString()
+        configJson: JSON.stringify(initialConfig),
+        formUrl: ''
       };
 
       // 3b. データベースに作成
