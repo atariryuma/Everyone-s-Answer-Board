@@ -5,6 +5,58 @@
 
 ---
 
+# ⚠️ システム破壊防止ルール（これを破ると全システム停止）
+
+## 🚨 絶対遵守：データベーススキーマ
+- ✅ **唯一使用**: `database.gs` の `DB_CONFIG`
+- ✅ **正式フィールド**: `tenantId`, `ownerEmail`, `createdAt`, `lastAccessedAt`, `status`
+- ❌ **使用禁止**: `userId`, `adminEmail`（旧フィールド名）
+- ❌ **削除済み**: `constants.gs` の `DB_SHEET_CONFIG`（古い定義）
+
+## 🎯 必須定数（src/constants.gs）
+### リアクション定数
+```javascript
+const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+const COLUMN_HEADERS = {
+  OPINION: '回答', REASON: '理由', UNDERSTAND: 'なるほど！', 
+  LIKE: 'いいね！', CURIOUS: 'もっと知りたい！', HIGHLIGHT: 'ハイライト'
+};
+```
+
+### 統一システム定数
+```javascript
+const SYSTEM_CONSTANTS = {
+  DATABASE: { SHEET_NAME: 'Users', HEADERS: ['tenantId', 'ownerEmail', ...] },
+  REACTIONS: { KEYS: REACTION_KEYS, COLUMNS: {...} },
+  ACCESS_LEVELS: { OWNER: 'owner', SYSTEM_ADMIN: 'system_admin', ... }
+};
+```
+
+## 🔄 システムフロー
+### 管理パネル作成フロー
+```
+管理パネル → connectDataSource → ConfigurationManager → Database.configJson
+```
+
+### 閲覧フロー  
+```
+doGet → verifyAccess → getUserConfig → renderAnswerBoard → HTMLテンプレート
+```
+
+### リアクションフロー
+```
+addReaction → LockService → processReaction → バッチ更新 → リアルタイム反映
+```
+
+## 🏗️ アーキテクチャ階層
+1. **PropertiesService**: システム設定（SERVICE_ACCOUNT_CREDS, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL）
+2. **Database**: テナント管理（tenantId, ownerEmail, configJson）
+3. **ConfigurationManager**: 設定管理（PropertiesService + Cache）
+4. **AccessController**: アクセス制御（owner > system_admin > authenticated_user > guest）
+5. **ReactionManager**: リアルタイム処理（LockService + バッチ処理）
+
+---
+
 ## 0) ランタイム前提
 
 - GAS は **V8**（Chrome/Node と同系エンジン）で動作し、**モダンな ECMAScript 構文**を利用可能。  

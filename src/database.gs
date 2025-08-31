@@ -73,16 +73,16 @@ const DB = {
       }
 
       const service = getSheetsServiceCached();
-      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      const sheetName = DB_CONFIG.SHEET_NAME;
 
       // Batch operation preparation (GAS performance best practice)
-      const newRow = DB_SHEET_CONFIG.HEADERS.map(function (header) {
+      const newRow = DB_CONFIG.HEADERS.map(function (header) {
         return userData[header] || '';
       });
 
       // Enhanced logging with structured data
       console.info('📊 createUser: Database write preparation', {
-        headers: DB_SHEET_CONFIG.HEADERS,
+        headers: DB_CONFIG.HEADERS,
         rowData: newRow,
         userEmail: userData.adminEmail,
         sheetName: sheetName
@@ -188,7 +188,7 @@ const DB = {
       // データベースから検索
       const service = getSheetsService();
       const dbId = getSecureDatabaseId();
-      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      const sheetName = DB_CONFIG.SHEET_NAME;
 
       console.log('findUserByEmail: データベース検索開始:', email);
 
@@ -280,7 +280,7 @@ const DB = {
       // データベースから検索
       const service = getSheetsService();
       const dbId = getSecureDatabaseId();
-      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      const sheetName = DB_CONFIG.SHEET_NAME;
 
       console.log('findUserById: データベース検索開始:', userId);
 
@@ -583,7 +583,7 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
       }
 
       const service = getSheetsServiceCached();
-      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      const sheetName = DB_CONFIG.SHEET_NAME;
 
       // データベーススプレッドシートの情報を取得
       const spreadsheetInfo = getSpreadsheetsData(service, dbId);
@@ -936,7 +936,7 @@ function updateUser(userId, updateData) {
       throw new Error('データ更新エラー: データベースIDが設定されていません');
     }
     var service = getSheetsServiceCached();
-    var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    var sheetName = DB_CONFIG.SHEET_NAME;
 
     // 現在のデータを取得
     var data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:H"]);
@@ -1112,7 +1112,7 @@ function waitForUserRecord(userId, maxWaitMs, intervalMs) {
  */
 function initializeDatabaseSheet(spreadsheetId) {
   var service = getSheetsServiceCached();
-  var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+  var sheetName = DB_CONFIG.SHEET_NAME;
 
   try {
     // シートが存在するか確認
@@ -1133,7 +1133,7 @@ function initializeDatabaseSheet(spreadsheetId) {
               title: sheetName,
               gridProperties: {
                 rowCount: 1000,
-                columnCount: DB_SHEET_CONFIG.HEADERS.length,
+                columnCount: DB_CONFIG.HEADERS.length,
               },
             },
           },
@@ -1148,9 +1148,9 @@ function initializeDatabaseSheet(spreadsheetId) {
         "'" +
         sheetName +
         "'!A1:" +
-        String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) +
+        String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) +
         '1';
-      updateSheetsData(service, spreadsheetId, headerRange, [DB_SHEET_CONFIG.HEADERS]);
+      updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
 
       console.log(
         '✅ バッチ最適化完了: シート作成+ヘッダー追加（2回のAPI呼び出し→シーケンシャル実行）'
@@ -1161,9 +1161,9 @@ function initializeDatabaseSheet(spreadsheetId) {
         "'" +
         sheetName +
         "'!A1:" +
-        String.fromCharCode(65 + DB_SHEET_CONFIG.HEADERS.length - 1) +
+        String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) +
         '1';
-      updateSheetsData(service, spreadsheetId, headerRange, [DB_SHEET_CONFIG.HEADERS]);
+      updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
       console.log('✅ 既存シートのヘッダー更新完了');
     }
 
@@ -1727,7 +1727,7 @@ function diagnoseDatabase(targetUserId) {
         status: 'success',
         sheetCount: spreadsheetInfo.sheets ? spreadsheetInfo.sheets.length : 0,
         hasUserSheet: spreadsheetInfo.sheets.some(
-          (sheet) => sheet.properties.title === DB_SHEET_CONFIG.SHEET_NAME
+          (sheet) => sheet.properties.title === DB_CONFIG.SHEET_NAME
         ),
       };
     } catch (accessError) {
@@ -1742,7 +1742,7 @@ function diagnoseDatabase(targetUserId) {
 
     // 4. ユーザーデータ取得テスト
     try {
-      var data = batchGetSheetsData(service, dbId, ["'" + DB_SHEET_CONFIG.SHEET_NAME + "'!A:H"]);
+      var data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:H"]);
       var values = data.valueRanges[0].values || [];
 
       diagnosticResult.checks.userData = {
@@ -2170,7 +2170,7 @@ function performDataIntegrityCheck(options = {}) {
     }
 
     var service = getSheetsServiceCached();
-    var data = batchGetSheetsData(service, dbId, ["'" + DB_SHEET_CONFIG.SHEET_NAME + "'!A:H"]);
+    var data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:H"]);
     var values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
@@ -2475,7 +2475,7 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
         updatesNeeded.push({
           range:
             "'" +
-            DB_SHEET_CONFIG.SHEET_NAME +
+            DB_CONFIG.SHEET_NAME +
             "'!" +
             String.fromCharCode(65 + statusIndex) +
             (i + 2),
@@ -2510,9 +2510,9 @@ function getDbSheet() {
     }
 
     var ss = SpreadsheetApp.openById(dbId);
-    var sheet = ss.getSheetByName(DB_SHEET_CONFIG.SHEET_NAME);
+    var sheet = ss.getSheetByName(DB_CONFIG.SHEET_NAME);
     if (!sheet) {
-      throw new Error('データベースシートが見つかりません: ' + DB_SHEET_CONFIG.SHEET_NAME);
+      throw new Error('データベースシートが見つかりません: ' + DB_CONFIG.SHEET_NAME);
     }
 
     return sheet;
@@ -2774,7 +2774,7 @@ function performPerformanceCheck() {
     if (dbId) {
       var service = getSheetsServiceCached();
       var testData = batchGetSheetsData(service, dbId, [
-        "'" + DB_SHEET_CONFIG.SHEET_NAME + "'!A1:B1",
+        "'" + DB_CONFIG.SHEET_NAME + "'!A1:B1",
       ]);
       perfResult.benchmarks.databaseAccess = Date.now() - dbTestStart;
       perfResult.metrics.apiCallCount++;
@@ -2994,7 +2994,7 @@ function deleteUserAccount(userId) {
         throw new Error('Sheets APIサービスの初期化に失敗しました');
       }
 
-      var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      var sheetName = DB_CONFIG.SHEET_NAME;
 
       // データベーススプレッドシートの情報を取得してsheetIdを確認
       var spreadsheetInfo = getSpreadsheetsData(service, dbId);
@@ -3112,7 +3112,7 @@ function findUserByIdFresh(userId) {
     // データベースから検索（キャッシュを使わない）
     const service = getSheetsService();
     const dbId = getSecureDatabaseId();
-    const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+    const sheetName = DB_CONFIG.SHEET_NAME;
 
     console.log('findUserByIdFresh: データベース検索開始（強制リフレッシュ）:', userId);
 

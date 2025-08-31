@@ -63,33 +63,6 @@ const PROPS_KEYS = Object.freeze({
 });
 
 
-/**
- * データベースシート設定定数
- * 2024 GAS V8 Best Practices準拠
- */
-const DB_SHEET_CONFIG = Object.freeze({
-  SHEET_NAME: 'users',
-  HEADERS: Object.freeze([
-    'userId',
-    'adminEmail', 
-    'spreadsheetId',
-    'spreadsheetUrl',
-    'createdAt',
-    'configJson',
-    'lastAccessedAt',
-    'isActive'
-  ]),
-  COLUMN_INDICES: Object.freeze({
-    USER_ID: 0,
-    ADMIN_EMAIL: 1,
-    SPREADSHEET_ID: 2,
-    SPREADSHEET_URL: 3,
-    CREATED_AT: 4,
-    CONFIG_JSON: 5,
-    LAST_ACCESSED_AT: 6,
-    IS_ACTIVE: 7
-  })
-});
 
 /**
  * セキュリティ設定定数
@@ -235,4 +208,76 @@ const SecurityValidator = Object.freeze({
       sanitizedData
     };
   }
+});
+
+/**
+ * リアクション機能用定数
+ * システム復旧のため緊急追加
+ */
+const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+
+const COLUMN_HEADERS = Object.freeze({
+  TIMESTAMP: 'タイムスタンプ',
+  EMAIL: 'メールアドレス',
+  CLASS: 'クラス',
+  OPINION: '回答',
+  REASON: '理由',
+  NAME: '名前',
+  UNDERSTAND: 'なるほど！',
+  LIKE: 'いいね！',
+  CURIOUS: 'もっと知りたい！',
+  HIGHLIGHT: 'ハイライト',
+});
+
+/**
+ * 削除ログ用シート設定
+ */
+const DELETE_LOG_SHEET_CONFIG = Object.freeze({
+  SHEET_NAME: 'DeletionLogs',
+  HEADERS: Object.freeze(['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'])
+});
+
+/**
+ * 統一システム定数
+ * 全システムで使用する定数の統一管理
+ */
+const SYSTEM_CONSTANTS = Object.freeze({
+  // データベーススキーマ（database.gs DB_CONFIG基準）
+  DATABASE: Object.freeze({
+    SHEET_NAME: 'Users',
+    HEADERS: Object.freeze(['tenantId', 'ownerEmail', 'createdAt', 'lastAccessedAt', 'status'])
+  }),
+  
+  // リアクション定義
+  REACTIONS: Object.freeze({
+    KEYS: REACTION_KEYS,
+    COLUMNS: Object.freeze({
+      UNDERSTAND: COLUMN_HEADERS.UNDERSTAND,
+      LIKE: COLUMN_HEADERS.LIKE,
+      CURIOUS: COLUMN_HEADERS.CURIOUS,
+      HIGHLIGHT: COLUMN_HEADERS.HIGHLIGHT
+    })
+  }),
+  
+  // 列定義
+  COLUMNS: COLUMN_HEADERS,
+  
+  // アクセス制御レベル
+  ACCESS_LEVELS: Object.freeze({
+    OWNER: 'owner',
+    SYSTEM_ADMIN: 'system_admin', 
+    AUTHENTICATED_USER: 'authenticated_user',
+    GUEST: 'guest',
+    NONE: 'none'
+  }),
+
+  // 表示モード
+  DISPLAY_MODES: Object.freeze({
+    ANONYMOUS: 'anonymous',
+    NAMED: 'named',
+    EMAIL: 'email'
+  }),
+
+  // 削除ログ設定
+  DELETE_LOG: DELETE_LOG_SHEET_CONFIG
 });
