@@ -6,12 +6,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
     <title>StudyQuest - アプリ設定</title>
-    <!-- Shared Security Headers -->
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?> <?!= include('UnifiedStyles'); ?> <?!=
-    include('SharedUtilities'); ?>
+    <!-- TailwindCSS Direct Loading -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
     <script>
-      const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+      // Simple TailwindCSS configuration
+      window.tailwind = {
+        config: {
+          corePlugins: { preflight: false }
+        }
+      };
+    </script>
+    
+    <!-- Shared Styles and Utilities -->
+    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
+    <!-- Safe template variable injection using HTML data attributes -->
+    <div id="app-data" 
+         data-user-id="<?= typeof userId !== 'undefined' && userId ? userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" 
+         style="display: none;"></div>
+    
+    <script>
+      // Safe template variable extraction from data attributes
+      let __USER_ID__ = '';
+      try {
+        const appData = document.getElementById('app-data');
+        if (appData) {
+          __USER_ID__ = appData.getAttribute('data-user-id') || '';
+          if (__USER_ID__) {
+            console.log('✅ User ID loaded safely from data attribute:', __USER_ID__);
+          } else {
+            console.warn('⚠️ User ID is empty, using fallback');
+          }
+        } else {
+          console.warn('⚠️ App data element not found, using fallback');
+        }
+      } catch (error) {
+        console.error('🚨 Template variable extraction error:', error);
+        __USER_ID__ = '';
+      }
     </script>
   </head>
   <body>

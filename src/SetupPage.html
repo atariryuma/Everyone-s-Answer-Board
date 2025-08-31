@@ -7,11 +7,19 @@
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
     <title>StudyQuest - 初回セットアップ</title>
 
-    <!-- Shared Security Headers -->
-
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?> <?!= include('UnifiedStyles'); ?> <?!=
-    include('SharedUtilities'); ?>
+    <!-- TailwindCSS Direct Loading -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <script>
+      // Simple TailwindCSS configuration
+      window.tailwind = {
+        config: {
+          corePlugins: { preflight: false }
+        }
+      };
+    </script>
+    
+    <!-- Shared Styles and Utilities -->
+    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
   </head>
   <body>
     <div class="max-w-2xl mx-auto">

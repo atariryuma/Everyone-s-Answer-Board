@@ -5,10 +5,16 @@
     <title>StudyQuest - 回答ボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Shared Security Headers -->
-
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?>
+    <!-- TailwindCSS Direct Loading -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <script>
+      // Simple TailwindCSS configuration
+      window.tailwind = {
+        config: {
+          corePlugins: { preflight: false }
+        }
+      };
+    </script>
 
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>

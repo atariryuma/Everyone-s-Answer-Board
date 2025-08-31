@@ -6,11 +6,19 @@
     <title>StudyQuest - アクセス制限中</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Shared Security Headers -->
-
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?> <?= include('UnifiedStyles'); ?> <?=
-    include('SharedUtilities'); ?>
+    <!-- TailwindCSS Direct Loading -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <script>
+      // Simple TailwindCSS configuration
+      window.tailwind = {
+        config: {
+          corePlugins: { preflight: false }
+        }
+      };
+    </script>
+    
+    <!-- Shared Styles and Utilities -->
+    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
     <style>
       .pulse-slow {
         animation: pulse 2s infinite;

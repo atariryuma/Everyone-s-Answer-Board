@@ -8,10 +8,16 @@
     <meta name="theme-color" content="#1a1b26" />
     <meta name="description" content="StudyQuest 回答ボードシステム - ログイン" />
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
-    <!-- Shared Security Headers -->
-
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?>
+    <!-- TailwindCSS Direct Loading -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <script>
+      // Simple TailwindCSS configuration
+      window.tailwind = {
+        config: {
+          corePlugins: { preflight: false }
+        }
+      };
+    </script>
 
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
