@@ -688,19 +688,6 @@ function renderLoginPage(params = {}) {
 }
 
 /**
- * ユーザーのメールアドレスを取得
- * @returns {string} ユーザーメールアドレス
- */
-function getUserEmail() {
-  try {
-    return User.email();
-  } catch (error) {
-    console.error('getUserEmail error:', error);
-    return '';
-  }
-}
-
-/**
  * 回答ボードのレンダリング
  * @param {Object} userInfo ユーザー情報
  * @param {Object} params リクエストパラメータ
@@ -1039,7 +1026,7 @@ function setupApplication(serviceAccountJson, databaseSpreadsheetId, adminEmail 
 
 /**
  * 現在のユーザーのメールアドレスを取得
- * セットアップページで使用
+ * セットアップページで使用（オブジェクト形式）
  */
 function getCurrentUserEmail() {
   try {
@@ -1056,6 +1043,20 @@ function getCurrentUserEmail() {
       email: null,
       message: `メールアドレス取得に失敗: ${error.message}`
     };
+  }
+}
+
+/**
+ * ユーザーのメールアドレスを取得
+ * ログインページで使用（文字列形式）
+ * @returns {string} ユーザーメールアドレス
+ */
+function getUserEmail() {
+  try {
+    return User.email() || '';
+  } catch (error) {
+    console.error('getUserEmail error:', error);
+    return '';
   }
 }
 
