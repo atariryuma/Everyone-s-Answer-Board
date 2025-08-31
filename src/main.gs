@@ -490,20 +490,8 @@ function getWebAppUrlCached() {
 function renderSetupPage(params) {
   console.log('renderSetupPage - Rendering setup page');
   
-  // 基本的なセットアップ指示ページを表示
-  const html = `
-    <h2>System Setup Required</h2>
-    <p>Please configure the following in Google Apps Script project settings:</p>
-    <ul>
-      <li>DATABASE_SPREADSHEET_ID</li>
-      <li>ADMIN_EMAIL</li>
-      <li>SERVICE_ACCOUNT_CREDS</li>
-      <li>GOOGLE_CLIENT_ID (optional)</li>
-    </ul>
-    <p>Go to Extensions → Apps Script → Settings → Script Properties to add these values.</p>
-  `;
-  
-  return HtmlService.createHtmlOutput(html);
+  // SetupPage.htmlテンプレートを使用
+  return HtmlService.createTemplateFromFile('SetupPage').evaluate();
 }
 
 /**
