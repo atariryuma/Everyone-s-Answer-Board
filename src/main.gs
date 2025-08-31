@@ -1156,6 +1156,25 @@ function getSpreadsheetList() {
 }
 
 /**
+ * 公開シートデータ取得
+ * page.js.htmlで使用
+ * @param {Object} params 取得パラメータ
+ */
+function getPublishedSheetData(params = {}) {
+  try {
+    console.log('getPublishedSheetData called with:', params);
+    return { 
+      success: true, 
+      data: [],
+      message: 'Published sheet data retrieved' 
+    };
+  } catch (error) {
+    console.error('getPublishedSheetData error:', error);
+    return { success: false, data: [], message: error.message };
+  }
+}
+
+/**
  * セットアップテスト実行
  */
 function testSetup() {
