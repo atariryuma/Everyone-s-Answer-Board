@@ -80,7 +80,11 @@ const DB = {
 
       // Batch operation preparation (GAS performance best practice)
       const newRow = DB_CONFIG.HEADERS.map(function (header) {
-        return userData[header] || '';
+        const value = userData[header];
+        // boolean値を正しく処理
+        if (typeof value === 'boolean') return value;
+        if (value === undefined || value === null) return '';
+        return value;
       });
 
       // Enhanced logging with structured data

@@ -264,12 +264,8 @@ function registerNewUser(adminEmail) {
         hasExistingConfig: Object.keys(existingConfig).length > 0
       });
 
-      // 最終アクセス時刻とアクティブ状態のみ更新（設定は保護）
-      updateUser(userId, {
-        lastAccessedAt: new Date().toISOString(),
-        isActive: 'true',
-        // 注意: configJsonは更新しない（既存の設定を保護）
-      });
+      // 最終アクセス時刻のみ更新（設定は保護）
+      updateUserLastAccess(userId);
 
       // キャッシュを無効化して最新状態を反映
       invalidateUserCache(userId, sanitizedEmail, existingUser.spreadsheetId, false);
@@ -295,63 +291,40 @@ function registerNewUser(adminEmail) {
     // 新規ユーザーの場合
     console.info('👶 registerNewUser: Creating new user', { adminEmail: sanitizedEmail });
     
-    const userId = Utilities.getUuid();
-    const currentTimestamp = new Date().toISOString();
-
-    const initialConfig = {
-      setupStatus: CORE.STATUS.PENDING,
-      createdAt: currentTimestamp,
-      formCreated: false,
-      appPublished: false,
-    };
-
-    // Comprehensive validation and sanitization for user data
-    const userData = {
-      userId,
-      userEmail: sanitizedEmail,
-      spreadsheetId: '',
-      spreadsheetUrl: '',
-      createdAt: currentTimestamp,
-      configJson: JSON.stringify(initialConfig),
-      lastAccessedAt: currentTimestamp,
-      isActive: true,
-      formUrl: ''
-    };
-
-    // Validate user data using SecurityValidator
-    const validation = SecurityValidator.validateUserData(userData);
-    if (!validation.isValid) {
-      const error = new Error(`データ検証エラー: ${validation.errors.join(', ')}`);
-      console.error('❌ registerNewUser: Data validation failed', {
-        adminEmail: sanitizedEmail,
-        errors: validation.errors
-      });
-      throw error;
-    }
-
-    console.info('💾 registerNewUser: Preparing database write', {
-      adminEmail: sanitizedEmail,
-      userId,
-      dataStructure: Object.keys(validation.sanitizedData)
-    });
-
-    // Enhanced error handling for database operations with validated data
     try {
-      DB.createUser(validation.sanitizedData);
+      // 統一ユーザー作成関数を使用
+      const newUser = handleUserRegistration(sanitizedEmail);
       
       console.info('✅ registerNewUser: New user created successfully', {
         adminEmail: sanitizedEmail,
-        userId,
+        userId: newUser.userId,
         databaseWriteTime: Date.now() - startTime + 'ms'
       });
       
       // 生成されたユーザー情報のキャッシュをクリア
-      invalidateUserCache(userId, sanitizedEmail, null, false);
+      invalidateUserCache(newUser.userId, sanitizedEmail, null, false);
+      
+      // 成功レスポンスを返す
+      const appUrls = generateUserUrls(newUser.userId);
+    
+      console.info('🎉 registerNewUser: New user registration completed', {
+        adminEmail: sanitizedEmail,
+        userId: newUser.userId,
+        totalExecutionTime: Date.now() - startTime + 'ms'
+      });
+      
+      return {
+        userId: newUser.userId,
+        adminUrl: appUrls.adminUrl,
+        viewUrl: appUrls.viewUrl,
+        setupRequired: true,
+        message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
+        isExistingUser: false,
+      };
       
     } catch (dbError) {
       console.error('❌ registerNewUser: Database operation failed', {
         adminEmail: sanitizedEmail,
-        userId,
         error: dbError.message,
         stack: dbError.stack,
         executionTime: Date.now() - startTime + 'ms'
@@ -360,24 +333,6 @@ function registerNewUser(adminEmail) {
       // Re-throw with structured error message
       throw new Error(`ユーザー登録に失敗しました。詳細: ${dbError.message}`);
     }
-
-    // 成功レスポンスを返す
-    const appUrls = generateUserUrls(userId);
-    
-    console.info('🎉 registerNewUser: New user registration completed', {
-      adminEmail: sanitizedEmail,
-      userId,
-      totalExecutionTime: Date.now() - startTime + 'ms'
-    });
-    
-    return {
-      userId,
-      adminUrl: appUrls.adminUrl,
-      viewUrl: appUrls.viewUrl,
-      setupRequired: true,
-      message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
-      isExistingUser: false,
-    };
     
   } catch (error) {
     // Comprehensive error handling with structured logging

@@ -4,6 +4,77 @@
  */
 
 /**
+ * 完全なユーザーデータを作成する統一関数
+ * @param {string} userEmail ユーザーメールアドレス
+ * @returns {Object} 完全なユーザーデータオブジェクト
+ */
+function createCompleteUser(userEmail) {
+  const userId = Utilities.getUuid();
+  const timestamp = new Date().toISOString();
+  
+  const initialConfig = {
+    userId,
+    userEmail,
+    title: `${userEmail}の回答ボード`,
+    setupStatus: 'pending',
+    formCreated: false,
+    appPublished: false,
+    isPublic: false,
+    allowAnonymous: false,
+    columns: [
+      { name: 'timestamp', label: 'タイムスタンプ', type: 'datetime', required: false },
+      { name: 'email', label: 'メールアドレス', type: 'email', required: false },
+      { name: 'class', label: 'クラス', type: 'text', required: false },
+      { name: 'opinion', label: '回答', type: 'textarea', required: true },
+      { name: 'reason', label: '理由', type: 'textarea', required: false },
+      { name: 'name', label: '名前', type: 'text', required: false }
+    ],
+    theme: 'default',
+    createdAt: timestamp,
+    lastModified: timestamp
+  };
+
+  return {
+    userId,
+    userEmail,
+    createdAt: timestamp,
+    lastAccessedAt: timestamp,
+    isActive: true,
+    spreadsheetId: '',
+    spreadsheetUrl: '',
+    configJson: JSON.stringify(initialConfig),
+    formUrl: ''
+  };
+}
+
+/**
+ * 統一ユーザー登録処理
+ * @param {string} userEmail ユーザーメールアドレス
+ * @returns {Object} ユーザー情報
+ */
+function handleUserRegistration(userEmail) {
+  const existingUser = DB.findUserByEmail(userEmail);
+  
+  if (existingUser) {
+    // 既存ユーザー: 最終アクセス時刻のみ更新
+    updateUserLastAccess(existingUser.userId);
+    return existingUser;
+  } 
+  
+  // 新規ユーザー: 完全データ作成
+  const completeUserData = createCompleteUser(userEmail);
+  DB.createUser(completeUserData);
+  
+  // 作成確認
+  if (!waitForUserRecord(completeUserData.userId, 3000, 500)) {
+    throw new Error('ユーザー作成の確認がタイムアウトしました');
+  }
+  
+  console.log('新規ユーザー作成完了:', completeUserData.userId);
+  return completeUserData;
+}
+
+/**
  * ログインフローを処理し、適切なページにリダイレクトする
  * 既存ユーザーの設定を保護しつつ、セットアップ状況に応じたメッセージを表示
  * @param {string} userEmail ログインユーザーのメールアドレス
@@ -53,61 +124,18 @@ function processLoginFlow(userEmail) {
     else {
       console.log('processLoginFlow: 新規ユーザー登録開始:', userEmail);
 
-      // 3a. 新規ユーザーデータを準備
-      const userId = Utilities.getUuid();
-
-      // 完全な初期設定をconfigJsonに含める
-      const initialConfig = {
-        userId: userId,
-        userEmail: userEmail,
-        title: `${userEmail}の回答ボード`,
-        setupStatus: 'pending',
-        formCreated: false,
-        appPublished: false,
-        isPublic: false,
-        allowAnonymous: false,
-        columns: [
-          { name: 'timestamp', label: 'タイムスタンプ', type: 'datetime', required: false },
-          { name: 'email', label: 'メールアドレス', type: 'email', required: false },
-          { name: 'class', label: 'クラス', type: 'text', required: false },
-          { name: 'opinion', label: '回答', type: 'textarea', required: true },
-          { name: 'reason', label: '理由', type: 'textarea', required: false },
-          { name: 'name', label: '名前', type: 'text', required: false }
-        ],
-        theme: 'default',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString()
-      };
-
-      const newUser = {
-        userId: userId,
-        userEmail: userEmail,
-        createdAt: new Date().toISOString(),
-        lastAccessedAt: new Date().toISOString(),
-        isActive: true, // 純粋boolean値
-        spreadsheetId: '',
-        spreadsheetUrl: '',
-        configJson: JSON.stringify(initialConfig),
-        formUrl: ''
-      };
-
       try {
-        // 3b. データベースに作成
-        DB.createUser(newUser);
+        // 統一ユーザー作成関数を使用
+        const newUser = handleUserRegistration(userEmail);
         
-        if (!waitForUserRecord(userId, 3000, 500)) {
-          throw new Error('ユーザー作成の確認がタイムアウトしました');
-        }
+        console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
         
-        console.log('processLoginFlow: 新規ユーザー作成完了:', userId);
-        
-        // 3c. 新規ユーザーの管理パネルへリダイレクト
-        const adminUrl = buildUserAdminUrl(userId);
+        // 新規ユーザーの管理パネルへリダイレクト
+        const adminUrl = buildUserAdminUrl(newUser.userId);
         return createSecureRedirect(adminUrl, 'ようこそ！セットアップを開始してください');
         
       } catch (error) {
         console.error('新規ユーザー作成失敗:', error);
-        rollbackUserCreation(userId);
         throw error;
       }
     }
