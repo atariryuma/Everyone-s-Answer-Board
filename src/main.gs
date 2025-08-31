@@ -840,8 +840,8 @@ function include(filename) {
  */
 function renderAdminPanel(userInfo, mode) {
   try {
-    // 既存のPage.htmlテンプレートを使用
-    const template = HtmlService.createTemplateFromFile('Page');
+    // AdminPanel専用テンプレートを使用（Page.htmlのStudyQuestApp読み込み回避）
+    const template = HtmlService.createTemplateFromFile('AdminPanel');
     
     // テンプレート変数を設定
     template.userInfo = userInfo;
