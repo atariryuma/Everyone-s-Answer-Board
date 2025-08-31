@@ -1158,6 +1158,10 @@
           'feature policy',
           'escape its sandboxing',
           'document.domain setter',
+          'an iframe which has both allow-scripts and allow-same-origin',
+          'can escape its sandboxing',
+          'net state changed from idle to busy',
+          'net state changed from busy to idle',
         ];
 
         const shouldSuppress = suppressPatterns.some((pattern) => message.includes(pattern));

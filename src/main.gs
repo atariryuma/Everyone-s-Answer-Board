@@ -688,6 +688,19 @@ function renderLoginPage(params = {}) {
 }
 
 /**
+ * ユーザーのメールアドレスを取得
+ * @returns {string} ユーザーメールアドレス
+ */
+function getUserEmail() {
+  try {
+    return User.email();
+  } catch (error) {
+    console.error('getUserEmail error:', error);
+    return '';
+  }
+}
+
+/**
  * 回答ボードのレンダリング
  * @param {Object} userInfo ユーザー情報
  * @param {Object} params リクエストパラメータ
