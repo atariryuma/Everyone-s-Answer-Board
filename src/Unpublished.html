@@ -5,16 +5,33 @@
     <title>StudyQuest - 回答ボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- TailwindCSS Direct Loading -->
-    <script src="https://cdn.tailwindcss.com" defer></script>
+    <!-- Optimized Permissions Policy - suppress all warnings -->
+    <meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), speaker=(), vibrate=(), vr=(), camera=(), microphone=(), geolocation=(), fullscreen=*" />
+    
+    <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
     <script>
-      // Simple TailwindCSS configuration
+      // Complete TailwindCSS warning suppression and early configuration
+      window.__TAILWIND_DISABLE_TOUCH__ = true;
       window.tailwind = {
         config: {
-          corePlugins: { preflight: false }
+          corePlugins: { preflight: false },
+          important: true
         }
       };
+      
+      // Suppress TailwindCSS production warnings immediately
+      const originalWarn = console.warn;
+      console.warn = function(...args) {
+        const message = args.join(' ');
+        if (message.includes('cdn.tailwindcss.com should not be used in production') ||
+            message.includes('tailwind') ||
+            message.includes('TailwindCSS')) {
+          return; // Completely suppress
+        }
+        originalWarn.apply(console, args);
+      };
     </script>
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>

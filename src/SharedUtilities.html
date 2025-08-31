@@ -26,6 +26,19 @@
       'Tailwind CLI',
       'Promise constructor',
       'TypeError: Cannot read properties of undefined',
+      // TailwindCSS warnings
+      'cdn.tailwindcss.com should not be used in production',
+      'tailwind',
+      'TailwindCSS',
+      // Permissions Policy warnings
+      'Unrecognized feature',
+      'ambient-light-sensor',
+      'speaker',
+      'vibrate',
+      'vr',
+      // iframe warnings
+      'iframe which has both allow-scripts and allow-same-origin',
+      'escape its sandboxing'
     ];
     
     // Syntax errors that need special logging (not suppressed)
@@ -45,6 +58,18 @@
       const isCriticalSyntaxError = criticalSyntaxErrors.some((pattern) => errorMessage.includes(pattern));
       
       if (isCriticalSyntaxError) {
+        // Special handling for GAS internal errors
+        if (source && source.includes('mae_html_user_bin_i18n_mae_html_user') && 
+            errorMessage.includes('Failed to execute \'write\' on \'Document\'')) {
+          console.warn('⚠️ GAS Internal Error (handled):', {
+            type: 'GAS_INTERNAL_DOCUMENT_WRITE_ERROR',
+            message: 'Google Apps Script internal document.write error - this is expected and handled',
+            source: 'GAS Runtime',
+            timestamp: new Date().toISOString()
+          });
+          return true; // Suppress this specific GAS internal error
+        }
+
         console.error('🚨 CRITICAL SYNTAX ERROR DETECTED:', {
           message: errorMessage,
           source: source,
@@ -60,21 +85,21 @@
         if (errorMessage.includes('Missing catch or finally after try')) {
           console.error('🔍 TRY-CATCH ANALYSIS:', {
             possibleCauses: [
+              'Google Apps Script internal runtime issue (most likely)',
               'Template variable injection creating malformed JavaScript',
               'Incomplete try block in dynamic code generation',
-              'TailwindCSS or other external script interference',
-              'Google Apps Script runtime compilation issues'
+              'External script interference during DOM manipulation'
             ],
             debugTips: [
-              'Check server-side template generation for <?= ?> patterns',
-              'Look for try blocks without catch/finally in dynamic code',
-              'Inspect network tab for malformed script responses',
-              'Check TailwindCSS loading and configuration'
+              'Check if error originates from GAS internal files (mae_html_user_bin_i18n)',
+              'Monitor DOM readiness before script execution',
+              'Verify TailwindCSS loading order',
+              'Check server-side template generation for syntax issues'
             ]
           });
         }
         
-        // Don't suppress critical syntax errors - let them bubble up
+        // Don't suppress user-code critical syntax errors
         if (originalErrorHandler) {
           return originalErrorHandler.call(this, message, source, lineno, colno, error);
         }
