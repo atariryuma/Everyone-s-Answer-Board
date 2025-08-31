@@ -10,106 +10,35 @@
 
   // Global error handling for Google Apps Script compatibility issues
   (function () {
-    // Enhanced error suppression for GAS-specific issues
+    // Simplified error suppression - safe for GAS template processing
     const suppressedErrors = [
-      'document.write',
-      "Failed to execute 'write' on 'Document'",
-      'await is only valid in async functions',
-      'await is only valid in async functions and the top level bodies of modules',
-      'Unexpected token',
-      "SyntaxError: Failed to execute 'write'",
-      'SyntaxError: await is only valid',
-      'mae_html_user_bin_i18n_mae_html_user',
-      'warden_bin_i18n_warden',
-      'unrecognized feature',
-      'PostCSS plugin',
-      'Tailwind CLI',
-      'Promise constructor',
-      'TypeError: Cannot read properties of undefined',
-      // TailwindCSS warnings
       'cdn.tailwindcss.com should not be used in production',
       'tailwind',
       'TailwindCSS',
-      // Permissions Policy warnings (only for remaining valid features)
-      'Unrecognized feature',
-      // iframe warnings
-      'iframe which has both allow-scripts and allow-same-origin',
-      'escape its sandboxing'
+      'Unrecognized feature'
     ];
     
     // Syntax errors that need special logging (not suppressed)
     const criticalSyntaxErrors = [
-      'Missing catch or finally after try',
-      'SyntaxError: Missing catch or finally after try',
       'Unexpected end of input',
       'Unexpected token',
+      'SyntaxError: Unexpected',
+      'Invalid or unexpected token'
     ];
 
-    // Override default error handling
+    // Simplified and safe error handling for GAS template processing
     const originalErrorHandler = window.onerror;
     window.onerror = function (message, source, lineno, colno, error) {
       const errorMessage = message ? message.toString() : '';
       
-      // Check for critical syntax errors first
-      const isCriticalSyntaxError = criticalSyntaxErrors.some((pattern) => errorMessage.includes(pattern));
+      // Only suppress specific known warnings that interfere with GAS
+      const shouldSuppress = suppressedErrors.some(pattern => errorMessage.includes(pattern));
       
-      if (isCriticalSyntaxError) {
-        // Special handling for GAS internal errors
-        if (source && source.includes('mae_html_user_bin_i18n_mae_html_user') && 
-            errorMessage.includes('Failed to execute \'write\' on \'Document\'')) {
-          console.warn('⚠️ GAS Internal Error (handled):', {
-            type: 'GAS_INTERNAL_DOCUMENT_WRITE_ERROR',
-            message: 'Google Apps Script internal document.write error - this is expected and handled',
-            source: 'GAS Runtime',
-            timestamp: new Date().toISOString()
-          });
-          return true; // Suppress this specific GAS internal error
-        }
-
-        console.error('🚨 CRITICAL SYNTAX ERROR DETECTED:', {
-          message: errorMessage,
-          source: source,
-          line: lineno,
-          column: colno,
-          error: error,
-          stack: error?.stack,
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent
-        });
-        
-        // Try to identify the problematic code
-        if (errorMessage.includes('Missing catch or finally after try')) {
-          console.error('🔍 TRY-CATCH ANALYSIS:', {
-            possibleCauses: [
-              'Google Apps Script internal runtime issue (most likely)',
-              'Template variable injection creating malformed JavaScript',
-              'Incomplete try block in dynamic code generation',
-              'External script interference during DOM manipulation'
-            ],
-            debugTips: [
-              'Check if error originates from GAS internal files (mae_html_user_bin_i18n)',
-              'Monitor DOM readiness before script execution',
-              'Verify TailwindCSS loading order',
-              'Check server-side template generation for syntax issues'
-            ]
-          });
-        }
-        
-        // Don't suppress user-code critical syntax errors
-        if (originalErrorHandler) {
-          return originalErrorHandler.call(this, message, source, lineno, colno, error);
-        }
-        return false;
-      }
-      
-      const shouldSuppress = suppressedErrors.some((pattern) => errorMessage.includes(pattern));
-
       if (shouldSuppress) {
-        console.debug('Suppressed GAS internal error:', errorMessage);
-        return true; // Prevent default error handling
+        return true; // Suppress known warnings
       }
-
-      // Call original handler if not suppressed
+      
+      // Let all other errors (including syntax errors) pass through to original handler
       if (originalErrorHandler) {
         return originalErrorHandler.call(this, message, source, lineno, colno, error);
       }
