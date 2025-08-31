@@ -11,7 +11,28 @@
     <?!= include('SharedTailwindConfig'); ?> <?!= include('UnifiedStyles'); ?> <?!=
     include('SharedUtilities'); ?>
     <script>
-      const __USER_ID__ = '<?= userInfo && userInfo.userId ? userInfo.userId : "" ?>';
+      // Enhanced template variable injection with error handling
+      let __USER_ID__ = '';
+      try {
+        __USER_ID__ = '<?= userInfo && userInfo.userId ? userInfo.userId : "" ?>';
+        // Validate the USER_ID format
+        if (__USER_ID__ && typeof __USER_ID__ === 'string' && __USER_ID__.length > 0) {
+          console.log('✅ User ID loaded successfully:', __USER_ID__);
+        } else {
+          console.warn('⚠️ User ID is empty or invalid, using fallback');
+          __USER_ID__ = '';
+        }
+      } catch (error) {
+        console.error('🚨 Template variable injection error:', error);
+        __USER_ID__ = '';
+        // Report template injection error for debugging
+        console.error('🔍 TEMPLATE INJECTION DEBUG:', {
+          error: error,
+          userInfoStatus: 'SERVER_SIDE_ERROR',
+          templateErrors: 'Check server-side userInfo object availability',
+          timestamp: new Date().toISOString()
+        });
+      }
     </script>
     <style>
       /* AdminPanel専用スタイル - commit 421e817 レイアウト構造 + 現在のダークテーマ */

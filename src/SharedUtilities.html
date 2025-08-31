@@ -27,11 +27,60 @@
       'Promise constructor',
       'TypeError: Cannot read properties of undefined',
     ];
+    
+    // Syntax errors that need special logging (not suppressed)
+    const criticalSyntaxErrors = [
+      'Missing catch or finally after try',
+      'SyntaxError: Missing catch or finally after try',
+      'Unexpected end of input',
+      'Unexpected token',
+    ];
 
     // Override default error handling
     const originalErrorHandler = window.onerror;
     window.onerror = function (message, source, lineno, colno, error) {
       const errorMessage = message ? message.toString() : '';
+      
+      // Check for critical syntax errors first
+      const isCriticalSyntaxError = criticalSyntaxErrors.some((pattern) => errorMessage.includes(pattern));
+      
+      if (isCriticalSyntaxError) {
+        console.error('🚨 CRITICAL SYNTAX ERROR DETECTED:', {
+          message: errorMessage,
+          source: source,
+          line: lineno,
+          column: colno,
+          error: error,
+          stack: error?.stack,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        });
+        
+        // Try to identify the problematic code
+        if (errorMessage.includes('Missing catch or finally after try')) {
+          console.error('🔍 TRY-CATCH ANALYSIS:', {
+            possibleCauses: [
+              'Template variable injection creating malformed JavaScript',
+              'Incomplete try block in dynamic code generation',
+              'TailwindCSS or other external script interference',
+              'Google Apps Script runtime compilation issues'
+            ],
+            debugTips: [
+              'Check server-side template generation for <?= ?> patterns',
+              'Look for try blocks without catch/finally in dynamic code',
+              'Inspect network tab for malformed script responses',
+              'Check TailwindCSS loading and configuration'
+            ]
+          });
+        }
+        
+        // Don't suppress critical syntax errors - let them bubble up
+        if (originalErrorHandler) {
+          return originalErrorHandler.call(this, message, source, lineno, colno, error);
+        }
+        return false;
+      }
+      
       const shouldSuppress = suppressedErrors.some((pattern) => errorMessage.includes(pattern));
 
       if (shouldSuppress) {
@@ -59,6 +108,39 @@
 
       console.warn('Unhandled promise rejection:', event.reason);
     });
+    
+    // Script loading monitoring to detect problematic scripts
+    const originalCreateElement = document.createElement;
+    document.createElement = function(tagName) {
+      const element = originalCreateElement.call(this, tagName);
+      
+      if (tagName.toLowerCase() === 'script') {
+        const originalSrc = element.src;
+        Object.defineProperty(element, 'src', {
+          get() {
+            return originalSrc;
+          },
+          set(value) {
+            console.log('🔍 Script loading:', value);
+            
+            // Monitor specific scripts that might cause syntax errors
+            if (value.includes('tailwindcss') || value.includes('cdn.')) {
+              element.addEventListener('load', () => {
+                console.log('✅ External script loaded successfully:', value);
+              });
+              
+              element.addEventListener('error', (e) => {
+                console.error('❌ External script failed to load:', value, e);
+              });
+            }
+            
+            originalSrc = value;
+          }
+        });
+      }
+      
+      return element;
+    };
   })();
 
   // =============================================================================
