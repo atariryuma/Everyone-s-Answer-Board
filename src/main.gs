@@ -906,3 +906,152 @@ function publishApplication(config) {
     config: config,
   };
 }
+
+/**
+ * システムセットアップ実行関数
+ * セットアップページから呼び出される
+ * @param {string} serviceAccountJson サービスアカウントJSON文字列
+ * @param {string} databaseSpreadsheetId データベーススプレッドシートID
+ * @param {string} adminEmail 管理者メールアドレス（省略時は現在のユーザー）
+ * @param {string} googleClientId Google Client ID（オプション）
+ */
+function setupApplication(serviceAccountJson, databaseSpreadsheetId, adminEmail = null, googleClientId = null) {
+  try {
+    console.log('setupApplication - セットアップ開始');
+    
+    // 現在のユーザーのメールアドレスを取得
+    const currentUserEmail = User.email();
+    if (!currentUserEmail) {
+      throw new Error('認証されたユーザーが必要です');
+    }
+    
+    // 管理者メールアドレスが指定されていない場合は現在のユーザーを使用
+    const finalAdminEmail = adminEmail || currentUserEmail;
+    
+    console.log('setupApplication - 管理者メール:', finalAdminEmail);
+    
+    // 入力値検証
+    if (!serviceAccountJson || !databaseSpreadsheetId) {
+      throw new Error('必須パラメータが不足しています');
+    }
+    
+    // JSON検証
+    let serviceAccountData;
+    try {
+      serviceAccountData = JSON.parse(serviceAccountJson);
+    } catch (e) {
+      throw new Error('サービスアカウントJSONの形式が無効です');
+    }
+    
+    // サービスアカウント必須フィールド検証
+    const requiredFields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email'];
+    for (const field of requiredFields) {
+      if (!serviceAccountData[field]) {
+        throw new Error(`必須フィールド '${field}' が見つかりません`);
+      }
+    }
+    
+    if (serviceAccountData.type !== 'service_account') {
+      throw new Error('サービスアカウントタイプのJSONである必要があります');
+    }
+    
+    // スプレッドシートID検証
+    if (databaseSpreadsheetId.length !== 44 || !/^[a-zA-Z0-9_-]+$/.test(databaseSpreadsheetId)) {
+      throw new Error('スプレッドシートIDの形式が無効です（44文字の英数字、アンダースコア、ハイフンのみ）');
+    }
+    
+    // Script Propertiesに設定を保存
+    const properties = PropertiesService.getScriptProperties();
+    
+    properties.setProperties({
+      [PROPS_KEYS.SERVICE_ACCOUNT_CREDS]: serviceAccountJson,
+      [PROPS_KEYS.DATABASE_SPREADSHEET_ID]: databaseSpreadsheetId,
+      [PROPS_KEYS.ADMIN_EMAIL]: finalAdminEmail
+    });
+    
+    // Google Client IDが提供されている場合は設定
+    if (googleClientId && googleClientId.trim()) {
+      properties.setProperty('GOOGLE_CLIENT_ID', googleClientId.trim());
+    }
+    
+    console.log('setupApplication - プロパティ設定完了');
+    
+    // セットアップ完了検証
+    if (!isSystemSetup()) {
+      throw new Error('セットアップ後の検証に失敗しました');
+    }
+    
+    console.log('setupApplication - セットアップ完了');
+    
+    return {
+      success: true,
+      message: 'システムセットアップが正常に完了しました',
+      adminEmail: finalAdminEmail,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('setupApplication エラー:', error);
+    throw new Error(`セットアップに失敗しました: ${error.message}`);
+  }
+}
+
+/**
+ * 現在のユーザーのメールアドレスを取得
+ * セットアップページで使用
+ */
+function getCurrentUserEmail() {
+  try {
+    const email = User.email();
+    return {
+      success: true,
+      email: email || null,
+      message: email ? 'ユーザーメールを取得しました' : 'ユーザーが認証されていません'
+    };
+  } catch (error) {
+    console.error('getCurrentUserEmail エラー:', error);
+    return {
+      success: false,
+      email: null,
+      message: `メールアドレス取得に失敗: ${error.message}`
+    };
+  }
+}
+
+/**
+ * セットアップテスト実行
+ */
+function testSetup() {
+  try {
+    if (!isSystemSetup()) {
+      return {
+        status: 'error',
+        message: 'システムがセットアップされていません'
+      };
+    }
+    
+    // 基本的な動作確認
+    const properties = PropertiesService.getScriptProperties();
+    const adminEmail = properties.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+    const currentUserEmail = User.email();
+    
+    if (adminEmail !== currentUserEmail) {
+      return {
+        status: 'warning',
+        message: '⚠️ テスト完了：現在のユーザーは管理者ではありません'
+      };
+    }
+    
+    return {
+      status: 'success',
+      message: '✅ テスト完了：システムは正常に動作しています'
+    };
+    
+  } catch (error) {
+    console.error('testSetup エラー:', error);
+    return {
+      status: 'error',
+      message: `テストに失敗しました: ${error.message}`
+    };
+  }
+}

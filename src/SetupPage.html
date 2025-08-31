@@ -68,6 +68,41 @@
             </p>
           </div>
 
+          <!-- 管理者メールアドレス -->
+          <div>
+            <label for="admin-email" class="block text-sm font-medium text-gray-300 mb-2">
+              👤 管理者メールアドレス
+            </label>
+            <input
+              type="email"
+              id="admin-email"
+              name="adminEmail"
+              class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              placeholder="admin@example.com"
+              required
+            />
+            <p class="text-xs text-gray-400 mt-1">
+              システム管理者のメールアドレスを入力してください
+            </p>
+          </div>
+
+          <!-- Google Client ID（オプション） -->
+          <div>
+            <label for="google-client-id" class="block text-sm font-medium text-gray-300 mb-2">
+              🔐 Google Client ID <span class="text-gray-500">(オプション)</span>
+            </label>
+            <input
+              type="text"
+              id="google-client-id"
+              name="googleClientId"
+              class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              placeholder="123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com"
+            />
+            <p class="text-xs text-gray-400 mt-1">
+              Google認証を使用する場合は、OAuth 2.0クライアントIDを入力してください
+            </p>
+          </div>
+
           <!-- セットアップボタン -->
           <button
             type="submit"
@@ -217,10 +252,20 @@
           // 入力値取得
           const serviceAccountJson = document.getElementById('service-account-json').value.trim();
           const databaseId = document.getElementById('database-id').value.trim();
+          const adminEmail = document.getElementById('admin-email').value.trim();
+          const googleClientId = document.getElementById('google-client-id').value.trim();
 
           // バリデーション
           validateJSON(serviceAccountJson);
           validateSpreadsheetId(databaseId);
+          
+          // 管理者メールのバリデーション
+          if (!adminEmail) {
+            throw new Error('管理者メールアドレスが入力されていません');
+          }
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+            throw new Error('有効なメールアドレスを入力してください');
+          }
 
           showMessage('セットアップを実行中...', 'info');
 
@@ -228,7 +273,7 @@
           await new Promise((resolve, reject) => {
             google.script.run
               .withSuccessHandler((result) => {
-                showMessage('✅ セットアップが正常に完了しました！', 'success');
+                showMessage(`✅ セットアップが正常に完了しました！管理者: ${result.adminEmail}`, 'success');
                 document.getElementById('test-section').classList.remove('hidden');
                 resolve(result);
               })
@@ -248,7 +293,7 @@
                 showMessage(displayMessage, 'error');
                 reject(error);
               })
-              .setupApplication(serviceAccountJson, databaseId);
+              .setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
           });
         } catch (error) {
           showMessage(`❌ ${error.message}`, 'error');
@@ -304,6 +349,20 @@
         }
       });
 
+      document.getElementById('admin-email').addEventListener('blur', function () {
+        try {
+          if (this.value.trim()) {
+            const email = this.value.trim();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+              throw new Error('有効なメールアドレスを入力してください');
+            }
+            this.style.borderColor = '#10b981';
+          }
+        } catch (e) {
+          this.style.borderColor = '#ef4444';
+        }
+      });
+
       function startApp() {
         const btn = document.getElementById('start-studyquest-btn');
         if (btn) {
@@ -324,6 +383,28 @@
           })
           .getWebAppUrl();
       }
+
+      // ページ読み込み時に現在のユーザーのメールアドレスを自動取得
+      window.addEventListener('load', function() {
+        const adminEmailField = document.getElementById('admin-email');
+        if (adminEmailField && !adminEmailField.value) {
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (result.success && result.email) {
+                adminEmailField.value = result.email;
+                adminEmailField.style.borderColor = '#10b981'; // 緑色の境界線
+                showMessage(`📧 管理者メールアドレスを自動取得しました: ${result.email}`, 'info');
+              } else {
+                showMessage('⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。', 'warning');
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.warn('Failed to get current user email:', error);
+              showMessage('⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。', 'warning');
+            })
+            .getCurrentUserEmail();
+        }
+      });
     </script>
   </body>
 </html>
