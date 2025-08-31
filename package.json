@@ -18,7 +18,10 @@
     "cleanup": "node scripts/cleanup-unused-code.js",
     "cleanup:dry": "node scripts/cleanup-unused-code.js --dry-run",
     "cleanup:report": "node scripts/cleanup-reporter.js",
-    "analyze": "node scripts/dependency-analyzer.js"
+    "analyze": "node scripts/dependency-analyzer.js",
+    "validate:functions": "node scripts/validate-functions.js",
+    "validate:functions:watch": "nodemon scripts/validate-functions.js",
+    "test:functions": "jest tests/functionMappingValidation.test.js"
   },
   "repository": {
     "type": "git",

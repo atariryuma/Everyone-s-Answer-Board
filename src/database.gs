@@ -31,56 +31,127 @@ const DB = {
    * @returns {object} 作成されたユーザーデータ
    */
   createUser: function (userData) {
+    const startTime = Date.now();
+    
+    // Structured logging with comprehensive context
+    console.info('🚀 createUser: Starting user creation process', {
+      userEmail: userData.adminEmail,
+      userId: userData.userId,
+      timestamp: new Date().toISOString()
+    });
+
     // 同時登録による重複を防ぐためロックを取得
-    var lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    const lock = LockService.getScriptLock();
+    const lockAcquired = lock.tryLock(10000);
+    
+    if (!lockAcquired) {
+      const error = new Error('システムがビジー状態です。しばらく待ってから再試行してください。');
+      console.error('❌ createUser: Lock acquisition failed', {
+        userEmail: userData.adminEmail,
+        error: error.message
+      });
+      throw error;
+    }
 
     try {
-      // メールアドレスの重複チェック
-      var existingUser = DB.findUserByEmail(userData.ownerEmail);
+      // Input validation (GAS 2025 best practices)
+      if (!userData.adminEmail || !userData.userId) {
+        throw new Error('必須フィールドが不足しています: adminEmail, userId');
+      }
+
+      // メールアドレスの重複チェック (修正: adminEmailを使用)
+      const existingUser = DB.findUserByEmail(userData.adminEmail);
       if (existingUser) {
         throw new Error('このメールアドレスは既に登録されています。');
       }
 
-      var props = PropertiesService.getScriptProperties();
-      var dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-      var service = getSheetsServiceCached();
-      var sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+      const props = PropertiesService.getScriptProperties();
+      const dbId = props.getProperty(SCRIPT_PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      
+      if (!dbId) {
+        throw new Error('データベース設定が不完全です。システム管理者に連絡してください。');
+      }
 
-      var newRow = DB_SHEET_CONFIG.HEADERS.map(function (header) {
+      const service = getSheetsServiceCached();
+      const sheetName = DB_SHEET_CONFIG.SHEET_NAME;
+
+      // Batch operation preparation (GAS performance best practice)
+      const newRow = DB_SHEET_CONFIG.HEADERS.map(function (header) {
         return userData[header] || '';
       });
 
-      console.log('createUser - デバッグ: ヘッダー構成=' + JSON.stringify(DB_SHEET_CONFIG.HEADERS));
-      console.log('createUser - デバッグ: ユーザーデータ=' + JSON.stringify(userData));
-      console.log('createUser - デバッグ: 作成される行データ=' + JSON.stringify(newRow));
+      // Enhanced logging with structured data
+      console.info('📊 createUser: Database write preparation', {
+        headers: DB_SHEET_CONFIG.HEADERS,
+        rowData: newRow,
+        userEmail: userData.adminEmail,
+        sheetName: sheetName
+      });
 
+      // Single batch write operation
       appendSheetsData(service, dbId, "'" + sheetName + "'!A1", [newRow]);
 
-      console.log('createUser - データベース書き込み完了: tenantId=' + userData.tenantId);
+      console.info('✅ createUser: Database write completed', {
+        userEmail: userData.adminEmail,
+        userId: userData.userId,
+        executionTime: Date.now() - startTime + 'ms'
+      });
 
       // 新規ユーザー用の専用フォルダを作成
       try {
-        console.log('createUser - 専用フォルダ作成開始: ' + userData.ownerEmail);
-        var folder = createUserFolder(userData.ownerEmail);
+        console.info('📁 createUser: Creating user folder', {
+          userEmail: userData.adminEmail
+        });
+        
+        const folder = createUserFolder(userData.adminEmail);
         if (folder) {
-          console.log('✅ createUser - 専用フォルダ作成成功: ' + folder.getName());
+          console.info('✅ createUser: User folder created successfully', {
+            userEmail: userData.adminEmail,
+            folderName: folder.getName(),
+            folderId: folder.getId()
+          });
         } else {
-          console.log('⚠️ createUser - 専用フォルダ作成失敗（処理は続行）');
+          console.warn('⚠️ createUser: User folder creation failed (continuing process)', {
+            userEmail: userData.adminEmail
+          });
         }
       } catch (folderError) {
-        console.warn(
-          'createUser - フォルダ作成でエラーが発生しましたが、処理を続行します: ' +
-            folderError.message
-        );
+        console.warn('⚠️ createUser: Folder creation error (non-critical)', {
+          userEmail: userData.adminEmail,
+          error: folderError.message,
+          stack: folderError.stack
+        });
       }
 
-      // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化
-      invalidateUserCache(userData.tenantId, userData.ownerEmail, null, false);
+      // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化 (修正: userIdを使用)
+      invalidateUserCache(userData.userId, userData.adminEmail, null, false);
+
+      console.info('🎉 createUser: User creation process completed successfully', {
+        userEmail: userData.adminEmail,
+        userId: userData.userId,
+        totalExecutionTime: Date.now() - startTime + 'ms'
+      });
 
       return userData;
+      
+    } catch (error) {
+      // Enhanced error handling with structured logging
+      console.error('❌ createUser: User creation failed', {
+        userEmail: userData.adminEmail || 'unknown',
+        userId: userData.userId || 'unknown',
+        error: error.message,
+        stack: error.stack,
+        executionTime: Date.now() - startTime + 'ms'
+      });
+      
+      // Re-throw with user-friendly message
+      throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。: ' + error.message);
+      
     } finally {
       lock.releaseLock();
+      console.info('🔓 createUser: Lock released', {
+        userEmail: userData.adminEmail || 'unknown'
+      });
     }
   },
 

@@ -191,93 +191,209 @@ function getOpinionHeaderSafely(userId, sheetName) {
  * 新規ユーザーを登録する（データベース登録のみ）
  * フォーム作成はクイックスタートで実行される
  */
+/**
+ * 新規ユーザー登録・既存ユーザー更新統合関数
+ * GAS 2025 Best Practices準拠 - Modern JavaScript & Structured Error Handling
+ * @param {string} adminEmail - 管理者メールアドレス
+ * @returns {Object} ユーザー情報とURL情報
+ */
 function registerNewUser(adminEmail) {
-  const activeUser = Session.getActiveUser();
-  if (adminEmail !== activeUser.getEmail()) {
-    throw new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
-  }
-
-  // ドメイン制限チェック
-  const domainInfo = Deploy.domain();
-  if (domainInfo.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
-    throw new Error(
-      `ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}`
-    );
-  }
-
-  // 既存ユーザーチェック（1ユーザー1行の原則）
-  const existingUser = DB.findUserByEmail(adminEmail);
-  let userId, appUrls;
-
-  if (existingUser) {
-    // 既存ユーザーの場合は最小限の更新のみ（設定は保護）
-    userId = existingUser.userId;
-    const existingConfig = JSON.parse(existingUser.configJson || '{}');
-
-    // 最終アクセス時刻とアクティブ状態のみ更新（設定は保護）
-    updateUser(userId, {
-      lastAccessedAt: new Date().toISOString(),
-      isActive: 'true',
-      // 注意: configJsonは更新しない（既存の設定を保護）
+  const startTime = Date.now();
+  
+  // Enhanced security validation using SecurityValidator (GAS 2025 best practices)
+  if (!SecurityValidator.isValidEmail(adminEmail)) {
+    const error = new Error('有効なメールアドレスを入力してください。');
+    console.error('❌ registerNewUser: Invalid email format', {
+      providedEmail: adminEmail ? adminEmail.substring(0, 10) + '...' : 'null', // Partial logging for privacy
+      error: error.message
     });
-
-    // キャッシュを無効化して最新状態を反映
-    invalidateUserCache(userId, adminEmail, existingUser.spreadsheetId, false);
-
-    console.log('✅ 既存ユーザーの最終アクセス時刻を更新しました（設定は保護）: ' + adminEmail);
-    appUrls = generateUserUrls(userId);
-
-    return {
-      userId: userId,
-      adminUrl: appUrls.adminUrl,
-      viewUrl: appUrls.viewUrl,
-      setupRequired: false, // 既存ユーザーはセットアップ完了済みと仮定
-      message: 'おかえりなさい！管理パネルへリダイレクトします。',
-      isExistingUser: true,
-    };
+    throw error;
   }
 
-  // 新規ユーザーの場合
-  userId = Utilities.getUuid();
+  // Sanitize email input
+  const sanitizedEmail = SecurityValidator.sanitizeInput(adminEmail, SECURITY.MAX_LENGTHS.EMAIL);
 
-  const initialConfig = {
-    setupStatus: 'pending',
-    createdAt: new Date().toISOString(),
-    formCreated: false,
-    appPublished: false,
-  };
-
-  const userData = {
-    userId: userId,
-    adminEmail: adminEmail,
-    spreadsheetId: '',
-    spreadsheetUrl: '',
-    createdAt: new Date().toISOString(),
-    configJson: JSON.stringify(initialConfig),
-    lastAccessedAt: new Date().toISOString(),
-    isActive: 'true',
-  };
+  console.info('🚀 registerNewUser: Starting registration process', {
+    adminEmail: sanitizedEmail,
+    timestamp: new Date().toISOString()
+  });
 
   try {
-    DB.createUser(userData);
-    console.log('✅ データベースに新規ユーザーを登録しました: ' + adminEmail);
-    // 生成されたユーザー情報のキャッシュをクリア
-    invalidateUserCache(userId, adminEmail, null, false);
-  } catch (e) {
-    console.error('データベースへのユーザー登録に失敗: ' + e.message);
-    throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。');
-  }
+    // Authentication check with sanitized email
+    const activeUser = Session.getActiveUser();
+    const currentUserEmail = activeUser.getEmail();
+    
+    if (sanitizedEmail !== currentUserEmail) {
+      const error = new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
+      console.error('❌ registerNewUser: Authentication failed', {
+        requestedEmail: sanitizedEmail.substring(0, 10) + '...',
+        currentUserEmail: currentUserEmail.substring(0, 10) + '...',
+        error: error.message
+      });
+      throw error;
+    }
 
-  // 成功レスポンスを返す
-  appUrls = generateUserUrls(userId);
-  return {
-    userId: userId,
-    adminUrl: appUrls.adminUrl,
-    viewUrl: appUrls.viewUrl,
-    setupRequired: true,
-    message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
-    isExistingUser: false,
-  };
+    // ドメイン制限チェック
+    const domainInfo = Deploy.domain();
+    if (domainInfo?.deployDomain && 
+        domainInfo.deployDomain !== '' && 
+        !domainInfo.isDomainMatch) {
+      const error = new Error(
+        `ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}`
+      );
+      console.error('❌ registerNewUser: Domain access denied', {
+        allowedDomain: domainInfo.deployDomain,
+        currentDomain: domainInfo.currentDomain,
+        error: error.message
+      });
+      throw error;
+    }
+
+    // 既存ユーザーチェック（1ユーザー1行の原則）
+    console.info('🔍 registerNewUser: Checking existing user', { adminEmail: sanitizedEmail });
+    const existingUser = DB.findUserByEmail(sanitizedEmail);
+    
+    if (existingUser) {
+      // 既存ユーザーの場合は最小限の更新のみ（設定は保護）
+      const { userId } = existingUser;
+      const existingConfig = JSON.parse(existingUser.configJson || '{}');
+
+      console.info('👤 registerNewUser: Updating existing user', {
+        adminEmail: sanitizedEmail,
+        userId,
+        hasExistingConfig: Object.keys(existingConfig).length > 0
+      });
+
+      // 最終アクセス時刻とアクティブ状態のみ更新（設定は保護）
+      updateUser(userId, {
+        lastAccessedAt: new Date().toISOString(),
+        isActive: 'true',
+        // 注意: configJsonは更新しない（既存の設定を保護）
+      });
+
+      // キャッシュを無効化して最新状態を反映
+      invalidateUserCache(userId, sanitizedEmail, existingUser.spreadsheetId, false);
+
+      console.info('✅ registerNewUser: Existing user updated successfully', {
+        adminEmail: sanitizedEmail,
+        userId,
+        executionTime: Date.now() - startTime + 'ms'
+      });
+      
+      const appUrls = generateUserUrls(userId);
+
+      return {
+        userId,
+        adminUrl: appUrls.adminUrl,
+        viewUrl: appUrls.viewUrl,
+        setupRequired: false, // 既存ユーザーはセットアップ完了済みと仮定
+        message: 'おかえりなさい！管理パネルへリダイレクトします。',
+        isExistingUser: true,
+      };
+    }
+
+    // 新規ユーザーの場合
+    console.info('👶 registerNewUser: Creating new user', { adminEmail: sanitizedEmail });
+    
+    const userId = Utilities.getUuid();
+    const currentTimestamp = new Date().toISOString();
+
+    const initialConfig = {
+      setupStatus: CORE.STATUS.PENDING,
+      createdAt: currentTimestamp,
+      formCreated: false,
+      appPublished: false,
+    };
+
+    // Comprehensive validation and sanitization for user data
+    const userData = {
+      userId,
+      adminEmail: sanitizedEmail,
+      spreadsheetId: '',
+      spreadsheetUrl: '',
+      createdAt: currentTimestamp,
+      configJson: JSON.stringify(initialConfig),
+      lastAccessedAt: currentTimestamp,
+      isActive: 'true',
+    };
+
+    // Validate user data using SecurityValidator
+    const validation = SecurityValidator.validateUserData(userData);
+    if (!validation.isValid) {
+      const error = new Error(`データ検証エラー: ${validation.errors.join(', ')}`);
+      console.error('❌ registerNewUser: Data validation failed', {
+        adminEmail: sanitizedEmail,
+        errors: validation.errors
+      });
+      throw error;
+    }
+
+    console.info('💾 registerNewUser: Preparing database write', {
+      adminEmail: sanitizedEmail,
+      userId,
+      dataStructure: Object.keys(validation.sanitizedData)
+    });
+
+    // Enhanced error handling for database operations with validated data
+    try {
+      DB.createUser(validation.sanitizedData);
+      
+      console.info('✅ registerNewUser: New user created successfully', {
+        adminEmail: sanitizedEmail,
+        userId,
+        databaseWriteTime: Date.now() - startTime + 'ms'
+      });
+      
+      // 生成されたユーザー情報のキャッシュをクリア
+      invalidateUserCache(userId, sanitizedEmail, null, false);
+      
+    } catch (dbError) {
+      console.error('❌ registerNewUser: Database operation failed', {
+        adminEmail: sanitizedEmail,
+        userId,
+        error: dbError.message,
+        stack: dbError.stack,
+        executionTime: Date.now() - startTime + 'ms'
+      });
+      
+      // Re-throw with structured error message
+      throw new Error(`ユーザー登録に失敗しました。詳細: ${dbError.message}`);
+    }
+
+    // 成功レスポンスを返す
+    const appUrls = generateUserUrls(userId);
+    
+    console.info('🎉 registerNewUser: New user registration completed', {
+      adminEmail: sanitizedEmail,
+      userId,
+      totalExecutionTime: Date.now() - startTime + 'ms'
+    });
+    
+    return {
+      userId,
+      adminUrl: appUrls.adminUrl,
+      viewUrl: appUrls.viewUrl,
+      setupRequired: true,
+      message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
+      isExistingUser: false,
+    };
+    
+  } catch (error) {
+    // Comprehensive error handling with structured logging
+    console.error('❌ registerNewUser: Registration process failed', {
+      adminEmail: sanitizedEmail || adminEmail?.substring(0, 10) + '...',
+      error: error.message,
+      stack: error.stack,
+      totalExecutionTime: Date.now() - startTime + 'ms'
+    });
+    
+    // Re-throw with user-friendly message while preserving technical details
+    const userFriendlyMessage = error.message.includes('ユーザー登録に失敗') 
+      ? error.message 
+      : 'ユーザー登録処理でエラーが発生しました。システム管理者に連絡してください。';
+      
+    throw new Error(userFriendlyMessage);
+  }
 }
 
 /**
