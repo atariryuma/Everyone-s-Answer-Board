@@ -163,7 +163,7 @@ describe('StudyQuest System Flow Integration Tests', () => {
       concurrentUsers.forEach((userId) => {
         context.findUserById.mockReturnValueOnce({
           userId,
-          adminEmail: `${userId.toLowerCase()}@example.com`,
+          userEmail: `${userId.toLowerCase()}@example.com`,
           spreadsheetId: `spreadsheet-${userId}`,
           configJson: '{"appPublished": true}',
         });

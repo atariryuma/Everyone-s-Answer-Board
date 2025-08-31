@@ -318,7 +318,7 @@ function verifyAdminAccess(userId) {
 
     // 3重チェック実行
     // 1. メールアドレス照合
-    const dbEmail = String(userFromDb.adminEmail || '')
+    const dbEmail = String(userFromDb.userEmail || '')
       .toLowerCase()
       .trim();
     const currentEmail = String(activeUserEmail).toLowerCase().trim();

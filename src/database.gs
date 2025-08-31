@@ -2281,8 +2281,8 @@ function performDataIntegrityCheck(options = {}) {
  */
 function checkForDuplicates(headers, userRows) {
   var duplicates = [];
-  var userIdIndex = headers.indexOf('tenantId');
-  var emailIndex = headers.indexOf('ownerEmail');
+  var userIdIndex = headers.indexOf('userId');
+  var emailIndex = headers.indexOf('userEmail');
 
   if (userIdIndex === -1 || emailIndex === -1) {
     return { duplicates: [] };
@@ -2332,7 +2332,7 @@ function checkForDuplicates(headers, userRows) {
  */
 function checkMissingRequiredFields(headers, userRows) {
   var missing = [];
-  var requiredFields = ['tenantId', 'ownerEmail']; // 最低限必要なフィールド
+  var requiredFields = ['userId', 'userEmail']; // 最低限必要なフィールド
 
   for (var i = 0; i < userRows.length; i++) {
     var row = userRows[i];
@@ -2367,8 +2367,8 @@ function checkMissingRequiredFields(headers, userRows) {
  */
 function checkInvalidDataFormats(headers, userRows) {
   var invalid = [];
-  var emailIndex = headers.indexOf('ownerEmail');
-  var userIdIndex = headers.indexOf('tenantId');
+  var emailIndex = headers.indexOf('userEmail');
+  var userIdIndex = headers.indexOf('userId');
 
   for (var i = 0; i < userRows.length; i++) {
     var row = userRows[i];
@@ -3131,9 +3131,9 @@ function findUserByIdFresh(userId) {
     const headers = rows[0];
 
     // ユーザーID列のインデックスを取得
-    const userIdIndex = headers.indexOf('tenantId');
+    const userIdIndex = headers.indexOf('userId');
     if (userIdIndex === -1) {
-      console.error('findUserByIdFresh: tenantId列が見つかりません');
+      console.error('findUserByIdFresh: userId列が見つかりません');
       return null;
     }
 
@@ -3164,7 +3164,7 @@ function findUserByIdFresh(userId) {
 
 /**
  * 汎用ユーザーデータベース検索関数
- * @param {string} searchField - 検索フィールド ('tenantId' | 'ownerEmail')
+ * @param {string} searchField - 検索フィールド ('userId' | 'userEmail')
  * @param {string} searchValue - 検索値
  * @param {object} options - オプション設定
  * @returns {object|null} ユーザー情報またはnull

@@ -16,8 +16,8 @@ describe('ゲストアクセステスト', () => {
           getProperty: jest.fn((key) => {
             if (key === 'user_config_public_user') {
               return JSON.stringify({
-                tenantId: 'public_user',
-                ownerEmail: 'owner@example.com',
+                userId: 'public_user',
+                userEmail: 'owner@example.com',
                 title: 'Public Answer Board',
                 isPublic: true,
                 allowAnonymous: true,
@@ -29,8 +29,8 @@ describe('ゲストアクセステスト', () => {
             }
             if (key === 'user_config_private_user') {
               return JSON.stringify({
-                tenantId: 'private_user',
-                ownerEmail: 'owner@example.com',
+                userId: 'private_user',
+                userEmail: 'owner@example.com',
                 title: 'Private Answer Board',
                 isPublic: false,
                 allowAnonymous: false
