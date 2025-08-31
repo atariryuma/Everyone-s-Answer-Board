@@ -308,13 +308,14 @@ function registerNewUser(adminEmail) {
     // Comprehensive validation and sanitization for user data
     const userData = {
       userId,
-      adminEmail: sanitizedEmail,
+      userEmail: sanitizedEmail,
       spreadsheetId: '',
       spreadsheetUrl: '',
       createdAt: currentTimestamp,
       configJson: JSON.stringify(initialConfig),
       lastAccessedAt: currentTimestamp,
-      isActive: 'true',
+      isActive: true,
+      formUrl: ''
     };
 
     // Validate user data using SecurityValidator
