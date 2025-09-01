@@ -41,7 +41,7 @@ class ConfigurationManager {
     config.lastModified = new Date().toISOString();
     
     try {
-      const updated = DB.updateUser(userId, {
+      const updated = updateUser(userId, {
         configJson: JSON.stringify(config),
         lastAccessedAt: new Date().toISOString()
       });
