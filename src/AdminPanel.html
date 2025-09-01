@@ -8,18 +8,11 @@
     <!-- Optimized Permissions Policy - essential permissions only -->
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
     
-    <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // TailwindCSS 設定の早期初期化
-      if (window.tailwind) {
-        window.tailwind.config = {
-          corePlugins: { preflight: false },
-          important: true
-        };
-      }
-      window.__TAILWIND_DISABLE_TOUCH__ = true;
-    </script>
+    <!-- Shared TailwindCSS Configuration -->
+    <?!= include('SharedTailwindConfig'); ?>
+    
+    <!-- Unified Styles -->
+    <?!= include('UnifiedStyles'); ?>
     
     <!-- Shared Utilities -->
     <?!= include('SharedUtilities'); ?>
@@ -34,7 +27,7 @@
     <!-- AdminPanel JavaScript -->
     <?!= include('AdminPanel.js'); ?>
   </head>
-  <body class="bg-gray-900 text-white">
+  <body>
     <!-- Top Navigation -->
     <header class="glass-panel shadow-xl">
       <div class="status-header">
