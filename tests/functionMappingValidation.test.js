@@ -21,30 +21,32 @@ describe('HTML/GAS Function Mapping Validation', () => {
 
     // HTMLファイルからgoogle.script.run呼び出しを抽出
     functionCalls = extractFunctionCalls(htmlFiles);
-    
+
     // GASファイルから関数定義を抽出
     gasFunctions = extractGasFunctions(gasFiles);
 
     console.log(`📊 Found ${htmlFiles.length} HTML files, ${gasFiles.length} GAS files`);
-    console.log(`🔍 Extracted ${functionCalls.length} function calls, ${gasFunctions.length} GAS functions`);
+    console.log(
+      `🔍 Extracted ${functionCalls.length} function calls, ${gasFunctions.length} GAS functions`
+    );
   });
 
   test('All google.script.run calls should have corresponding GAS functions', () => {
     const missingFunctions = [];
     const warnings = [];
 
-    functionCalls.forEach(call => {
-      const gasFunction = gasFunctions.find(f => f.name === call.functionName);
-      
+    functionCalls.forEach((call) => {
+      const gasFunction = gasFunctions.find((f) => f.name === call.functionName);
+
       if (!gasFunction) {
         // 完全一致しない場合、類似関数をチェック
         const similarFunctions = findSimilarFunctions(call.functionName, gasFunctions);
-        
+
         missingFunctions.push({
           function: call.functionName,
           file: call.file,
           line: call.line,
-          similarFunctions
+          similarFunctions,
         });
       }
     });
@@ -52,7 +54,7 @@ describe('HTML/GAS Function Mapping Validation', () => {
     // レポート生成
     if (missingFunctions.length > 0) {
       console.log('\n🚨 Missing Function Report:');
-      missingFunctions.forEach(missing => {
+      missingFunctions.forEach((missing) => {
         console.log(`❌ ${missing.function} (${path.basename(missing.file)}:${missing.line})`);
         if (missing.similarFunctions.length > 0) {
           console.log(`   💡 Similar functions found: ${missing.similarFunctions.join(', ')}`);
@@ -66,21 +68,21 @@ describe('HTML/GAS Function Mapping Validation', () => {
   test('Should detect unused GAS functions (potential cleanup candidates)', () => {
     const unusedFunctions = [];
 
-    gasFunctions.forEach(gasFunc => {
-      const isUsed = functionCalls.some(call => call.functionName === gasFunc.name);
-      
+    gasFunctions.forEach((gasFunc) => {
+      const isUsed = functionCalls.some((call) => call.functionName === gasFunc.name);
+
       if (!isUsed && !isInternalFunction(gasFunc.name)) {
         unusedFunctions.push({
           function: gasFunc.name,
           file: gasFunc.file,
-          line: gasFunc.line
+          line: gasFunc.line,
         });
       }
     });
 
     if (unusedFunctions.length > 0) {
       console.log('\n📋 Potential Cleanup Candidates (Unused Functions):');
-      unusedFunctions.forEach(unused => {
+      unusedFunctions.forEach((unused) => {
         console.log(`ℹ️  ${unused.function} (${path.basename(unused.file)}:${unused.line})`);
       });
     }
@@ -92,7 +94,7 @@ describe('HTML/GAS Function Mapping Validation', () => {
   test('Should validate function call patterns', () => {
     const invalidPatterns = [];
 
-    functionCalls.forEach(call => {
+    functionCalls.forEach((call) => {
       // チェーンコールのパターン検証
       if (call.hasSuccessHandler && !call.hasFailureHandler) {
         invalidPatterns.push({
@@ -100,10 +102,10 @@ describe('HTML/GAS Function Mapping Validation', () => {
           function: call.functionName,
           file: call.file,
           line: call.line,
-          suggestion: 'Add .withFailureHandler() for proper error handling'
+          suggestion: 'Add .withFailureHandler() for proper error handling',
         });
       }
-      
+
       // 直接呼び出しの検出（非推奨パターン）
       if (!call.hasSuccessHandler && !call.hasFailureHandler) {
         invalidPatterns.push({
@@ -111,15 +113,17 @@ describe('HTML/GAS Function Mapping Validation', () => {
           function: call.functionName,
           file: call.file,
           line: call.line,
-          suggestion: 'Consider adding success/failure handlers'
+          suggestion: 'Consider adding success/failure handlers',
         });
       }
     });
 
     if (invalidPatterns.length > 0) {
       console.log('\n⚠️  Function Call Pattern Issues:');
-      invalidPatterns.forEach(issue => {
-        console.log(`⚠️  ${issue.issue}: ${issue.function} (${path.basename(issue.file)}:${issue.line})`);
+      invalidPatterns.forEach((issue) => {
+        console.log(
+          `⚠️  ${issue.issue}: ${issue.function} (${path.basename(issue.file)}:${issue.line})`
+        );
         console.log(`   💡 ${issue.suggestion}`);
       });
     }
@@ -134,19 +138,19 @@ describe('HTML/GAS Function Mapping Validation', () => {
  */
 function extractFunctionCalls(htmlFiles) {
   const calls = [];
-  
-  htmlFiles.forEach(file => {
+
+  htmlFiles.forEach((file) => {
     const content = fs.readFileSync(file, 'utf8');
-    
+
     // 多行パターンを含む全体的な検索
     const multilinePatterns = [
       /google\.script\.run\s*\.withSuccessHandler\([^)]*\)\s*\.withFailureHandler\([^)]*\)\s*\.(\w+)\s*\(/g,
       /google\.script\.run\s*\.withSuccessHandler\([^)]*\)\s*\.(\w+)\s*\(/g,
       /google\.script\.run\s*\.withFailureHandler\([^)]*\)\s*\.(\w+)\s*\(/g,
-      /google\.script\.run\s*\.(\w+)\s*\(/g
+      /google\.script\.run\s*\.(\w+)\s*\(/g,
     ];
-    
-    multilinePatterns.forEach(pattern => {
+
+    multilinePatterns.forEach((pattern) => {
       let match;
       while ((match = pattern.exec(content)) !== null) {
         // 関数名がGASの予約語でないことを確認
@@ -154,21 +158,22 @@ function extractFunctionCalls(htmlFiles) {
         if (!isGasReservedWord(funcName)) {
           const lines = content.substring(0, match.index).split('\n');
           const lineNumber = lines.length;
-          const lineContent = lines[lines.length - 1] + content.substring(match.index, match.index + match[0].length);
-          
+          const lineContent =
+            lines[lines.length - 1] + content.substring(match.index, match.index + match[0].length);
+
           calls.push({
             functionName: funcName,
             file,
             line: lineNumber,
             pattern: lineContent.trim(),
             hasSuccessHandler: match[0].includes('.withSuccessHandler'),
-            hasFailureHandler: match[0].includes('.withFailureHandler')
+            hasFailureHandler: match[0].includes('.withFailureHandler'),
           });
         }
       }
     });
   });
-  
+
   return calls;
 }
 
@@ -177,36 +182,36 @@ function extractFunctionCalls(htmlFiles) {
  */
 function extractGasFunctions(gasFiles) {
   const functions = [];
-  
-  gasFiles.forEach(file => {
+
+  gasFiles.forEach((file) => {
     const content = fs.readFileSync(file, 'utf8');
     const lines = content.split('\n');
-    
+
     lines.forEach((line, index) => {
       // 関数定義のパターンを検出
       const patterns = [
-        /^function\s+(\w+)\s*\(/,           // 通常の関数定義
-        /^\s*function\s+(\w+)\s*\(/,       // インデントされた関数定義
-        /const\s+(\w+)\s*=\s*function/,    // const宣言の関数
-        /let\s+(\w+)\s*=\s*function/,      // let宣言の関数
-        /var\s+(\w+)\s*=\s*function/,      // var宣言の関数（非推奨だが検出）
-        /(\w+)\s*:\s*function/,            // オブジェクトメソッド
+        /^function\s+(\w+)\s*\(/, // 通常の関数定義
+        /^\s*function\s+(\w+)\s*\(/, // インデントされた関数定義
+        /const\s+(\w+)\s*=\s*function/, // const宣言の関数
+        /let\s+(\w+)\s*=\s*function/, // let宣言の関数
+        /var\s+(\w+)\s*=\s*function/, // var宣言の関数（非推奨だが検出）
+        /(\w+)\s*:\s*function/, // オブジェクトメソッド
       ];
-      
-      patterns.forEach(pattern => {
+
+      patterns.forEach((pattern) => {
         const match = line.match(pattern);
         if (match) {
           functions.push({
             name: match[1],
             file,
             line: index + 1,
-            definition: line.trim()
+            definition: line.trim(),
           });
         }
       });
     });
   });
-  
+
   return functions;
 }
 
@@ -215,14 +220,14 @@ function extractGasFunctions(gasFiles) {
  */
 function findSimilarFunctions(targetName, gasFunctions, threshold = 3) {
   const similar = [];
-  
-  gasFunctions.forEach(func => {
+
+  gasFunctions.forEach((func) => {
     const distance = levenshteinDistance(targetName, func.name);
     if (distance <= threshold && distance > 0) {
       similar.push(func.name);
     }
   });
-  
+
   return similar.slice(0, 5); // 最大5個まで
 }
 
@@ -231,15 +236,15 @@ function findSimilarFunctions(targetName, gasFunctions, threshold = 3) {
  */
 function levenshteinDistance(str1, str2) {
   const matrix = [];
-  
+
   for (let i = 0; i <= str2.length; i++) {
     matrix[i] = [i];
   }
-  
+
   for (let j = 0; j <= str1.length; j++) {
     matrix[0][j] = j;
   }
-  
+
   for (let i = 1; i <= str2.length; i++) {
     for (let j = 1; j <= str1.length; j++) {
       if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
@@ -253,7 +258,7 @@ function levenshteinDistance(str1, str2) {
       }
     }
   }
-  
+
   return matrix[str2.length][str1.length];
 }
 
@@ -262,23 +267,30 @@ function levenshteinDistance(str1, str2) {
  */
 function isInternalFunction(funcName) {
   const internalFunctions = [
-    'doGet', 'doPost', 'onOpen', 'onEdit', 'onFormSubmit',
-    'onInstall', 'include', // GAS固有
-    'main', 'init', 'test' // 汎用的な内部関数
+    'doGet',
+    'doPost',
+    'onOpen',
+    'onEdit',
+    'onFormSubmit',
+    'onInstall',
+    'include', // GAS固有
+    'main',
+    'init',
+    'test', // 汎用的な内部関数
   ];
-  
-  return internalFunctions.includes(funcName) || 
-         funcName.startsWith('_') || // プライベート関数
-         funcName.startsWith('test') || // テスト関数
-         funcName.startsWith('debug'); // デバッグ関数
+
+  return (
+    internalFunctions.includes(funcName) ||
+    funcName.startsWith('_') || // プライベート関数
+    funcName.startsWith('test') || // テスト関数
+    funcName.startsWith('debug')
+  ); // デバッグ関数
 }
 
 /**
  * GAS予約語かどうかを判定
  */
 function isGasReservedWord(funcName) {
-  const reservedWords = [
-    'withSuccessHandler', 'withFailureHandler', 'withUserObject'
-  ];
+  const reservedWords = ['withSuccessHandler', 'withFailureHandler', 'withUserObject'];
   return reservedWords.includes(funcName);
 }

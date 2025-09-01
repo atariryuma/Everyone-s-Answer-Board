@@ -5,17 +5,24 @@
 
 // Module-scoped constants (2024 GAS Best Practice)
 const DB_CONFIG = Object.freeze({
-  CACHE_TTL: CORE.TIMEOUTS.LONG,  // 30秒
+  CACHE_TTL: CORE.TIMEOUTS.LONG, // 30秒
   BATCH_SIZE: 100,
-  LOCK_TIMEOUT: 10000,  // 10秒
+  LOCK_TIMEOUT: 10000, // 10秒
   SHEET_NAME: 'Users',
   HEADERS: Object.freeze([
-    'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
-    'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl'
+    'userId',
+    'userEmail',
+    'createdAt',
+    'lastAccessedAt',
+    'isActive',
+    'spreadsheetId',
+    'spreadsheetUrl',
+    'configJson',
+    'formUrl',
   ]),
 });
 
-// 簡易インデックス機能：ユーザー検索の高速化  
+// 簡易インデックス機能：ユーザー検索の高速化
 let userIndexCache = {
   byUserId: new Map(),
   byEmail: new Map(),
@@ -35,23 +42,23 @@ const DB = {
    */
   createUser: function (userData) {
     const startTime = Date.now();
-    
+
     // Structured logging with comprehensive context
     console.info('🚀 createUser: Starting user creation process', {
       userEmail: userData.userEmail,
       userId: userData.userId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // 同時登録による重複を防ぐためロックを取得
     const lock = LockService.getScriptLock();
     const lockAcquired = lock.tryLock(10000);
-    
+
     if (!lockAcquired) {
       const error = new Error('システムがビジー状態です。しばらく待ってから再試行してください。');
       console.error('❌ createUser: Lock acquisition failed', {
         userEmail: userData.userEmail,
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
@@ -70,7 +77,7 @@ const DB = {
 
       const props = PropertiesService.getScriptProperties();
       const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-      
+
       if (!dbId) {
         throw new Error('データベース設定が不完全です。システム管理者に連絡してください。');
       }
@@ -92,7 +99,7 @@ const DB = {
         headers: DB_CONFIG.HEADERS,
         rowData: newRow,
         userEmail: userData.userEmail,
-        sheetName: sheetName
+        sheetName: sheetName,
       });
 
       // Single batch write operation
@@ -101,54 +108,53 @@ const DB = {
       console.info('✅ createUser: Database write completed', {
         userEmail: userData.userEmail,
         userId: userData.userId,
-        executionTime: Date.now() - startTime + 'ms'
+        executionTime: Date.now() - startTime + 'ms',
       });
 
       // 新規ユーザー用の専用フォルダを作成
       try {
         console.info('📁 createUser: Creating user folder', {
-          userEmail: userData.userEmail
+          userEmail: userData.userEmail,
         });
-        
+
         const folder = createUserFolder(userData.userEmail);
         if (folder) {
           console.info('✅ createUser: User folder created successfully', {
             userEmail: userData.userEmail,
             folderName: folder.getName(),
-            folderId: folder.getId()
+            folderId: folder.getId(),
           });
         } else {
           console.warn('⚠️ createUser: User folder creation failed (continuing process)', {
-            userEmail: userData.userEmail
+            userEmail: userData.userEmail,
           });
         }
       } catch (folderError) {
         console.warn('⚠️ createUser: Folder creation error (non-critical)', {
           userEmail: userData.userEmail,
           error: folderError.message,
-          stack: folderError.stack
+          stack: folderError.stack,
         });
       }
 
       // 最適化: 新規ユーザー作成時は対象キャッシュのみ無効化 (修正: userIdを使用)
       invalidateUserCache(userData.userId, userData.userEmail, null, false);
-      
+
       // キャッシュ整合性確保: 新規作成ユーザーを即座にキャッシュに登録
       const cacheKey = `user_by_email_${userData.userEmail}`;
       CacheService.getScriptCache().put(cacheKey, JSON.stringify(userData), 300);
       console.info('🔄 createUser: New user cached for immediate access', {
         userEmail: userData.userEmail,
-        cacheKey: cacheKey
+        cacheKey: cacheKey,
       });
 
       console.info('🎉 createUser: User creation process completed successfully', {
         userEmail: userData.userEmail,
         userId: userData.userId,
-        totalExecutionTime: Date.now() - startTime + 'ms'
+        totalExecutionTime: Date.now() - startTime + 'ms',
       });
 
       return userData;
-      
     } catch (error) {
       // Enhanced error handling with structured logging
       console.error('❌ createUser: User creation failed', {
@@ -156,16 +162,17 @@ const DB = {
         userId: userData.userId || 'unknown',
         error: error.message,
         stack: error.stack,
-        executionTime: Date.now() - startTime + 'ms'
+        executionTime: Date.now() - startTime + 'ms',
       });
-      
+
       // Re-throw with user-friendly message
-      throw new Error('ユーザー登録に失敗しました。システム管理者に連絡してください。: ' + error.message);
-      
+      throw new Error(
+        'ユーザー登録に失敗しました。システム管理者に連絡してください。: ' + error.message
+      );
     } finally {
       lock.releaseLock();
       console.info('🔓 createUser: Lock released', {
-        userEmail: userData.userEmail || 'unknown'
+        userEmail: userData.userEmail || 'unknown',
       });
     }
   },
@@ -202,7 +209,6 @@ const DB = {
       const service = getSheetsService();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
-
 
       // シート全体のデータを取得
       const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
@@ -291,7 +297,6 @@ const DB = {
       const service = getSheetsService();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
-
 
       // シート全体のデータを取得
       const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
@@ -431,7 +436,6 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
             DELETE_LOG_SHEET_CONFIG.HEADERS,
           ]);
           transactionLog.steps.push('headers_added');
-
         }
       } catch (sheetError) {
         // シート作成失敗時のロールバック
@@ -466,7 +470,6 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
 
         transactionLog.steps.push('verification_complete');
         transactionLog.success = true;
-
 
         return {
           success: true,
@@ -623,7 +626,6 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
         batchUpdateSpreadsheet(service, dbId, {
           requests: [deleteRequest],
         });
-
       } else {
         throw new Error('削除対象のユーザー行が見つかりませんでした');
       }
@@ -757,7 +759,6 @@ function getDeletionLogs() {
  */
 function getSheetsService() {
   try {
-
     var accessToken;
     try {
       accessToken = getServiceAccountTokenCached();
@@ -795,7 +796,6 @@ function getSheetsService() {
  */
 function fixUserDataConsistency(userId) {
   try {
-
     // 最新のユーザー情報を取得
     var userInfo = findUserByIdFresh(userId);
     if (!userInfo) {
@@ -1078,7 +1078,6 @@ function updateUser(userId, updateData) {
   }
 }
 
-
 /**
  * データベースシートを初期化
  * @param {string} spreadsheetId - データベースのスプレッドシートID
@@ -1118,11 +1117,7 @@ function initializeDatabaseSheet(spreadsheetId) {
 
       // 2. 作成直後にヘッダーを追加（A1記法でレンジを指定）
       var headerRange =
-        "'" +
-        sheetName +
-        "'!A1:" +
-        String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) +
-        '1'; // A1:I1 (9カラム対応)
+        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:I1 (9カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
 
       console.log(
@@ -1131,14 +1126,9 @@ function initializeDatabaseSheet(spreadsheetId) {
     } else {
       // シートが既に存在する場合は、ヘッダーのみ更新（既存動作を維持）
       var headerRange =
-        "'" +
-        sheetName +
-        "'!A1:" +
-        String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) +
-        '1'; // A1:I1 (9カラム対応)
+        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:I1 (9カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
     }
-
   } catch (e) {
     console.error('データベースシートの初期化に失敗: ' + e.message);
     throw new Error(
@@ -1261,7 +1251,6 @@ function createSheetsService(accessToken) {
  * @returns {object} レスポンス
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
-
   // 型安全性とバリデーション強化: 入力パラメータ検証
   if (!service) {
     throw new Error('Sheetsサービスオブジェクトが提供されていません');
@@ -1326,7 +1315,6 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
           );
         }
 
-
         // 安全なURL構築
         var url =
           baseUrl +
@@ -1338,7 +1326,6 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
               return 'ranges=' + encodeURIComponent(range);
             })
             .join('&');
-
 
         var response = UrlFetchApp.fetch(url, {
           headers: { Authorization: 'Bearer ' + accessToken },
@@ -1390,7 +1377,6 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
             `⚠️ リクエスト範囲数(${ranges.length})とレスポンス数(${result.valueRanges.length})が一致しません`
           );
         }
-
 
         // 各範囲のデータ存在確認
         result.valueRanges.forEach((valueRange, index) => {
@@ -1515,10 +1501,8 @@ function getSpreadsheetsData(service, spreadsheetId) {
       );
     }
 
-
     // 安全なURL構築 - シート情報を含む基本的なメタデータを取得するために fields パラメータを追加
     var url = baseUrl + '/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties';
-
 
     var response = UrlFetchApp.fetch(url, {
       headers: { Authorization: 'Bearer ' + accessToken },
@@ -1635,7 +1619,6 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  */
 function diagnoseDatabase(targetUserId) {
   try {
-
     var props = PropertiesService.getScriptProperties();
     var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
@@ -1855,7 +1838,6 @@ function checkCacheStatus(userId) {
  */
 function verifyServiceAccountPermissions(spreadsheetId) {
   try {
-
     var dbCheckResult = {
       timestamp: new Date().toISOString(),
       spreadsheetId: spreadsheetId,
@@ -2003,7 +1985,6 @@ function verifyServiceAccountPermissions(spreadsheetId) {
  */
 function performAutoRepair(targetUserId) {
   try {
-
     var repairResult = {
       timestamp: new Date().toISOString(),
       targetUserId: targetUserId,
@@ -2092,7 +2073,6 @@ function performAutoRepair(targetUserId) {
  */
 function performDataIntegrityCheck(options = {}) {
   try {
-
     var opts = {
       checkDuplicates: options.checkDuplicates !== false,
       checkMissingFields: options.checkMissingFields !== false,
@@ -2371,7 +2351,12 @@ function checkOrphanedData(headers, userRows) {
     var issues = [];
 
     // 非アクティブだが他のデータが残っている
-    if (isActiveIndex !== -1 && (row[isActiveIndex] === false || row[isActiveIndex] === 'FALSE' || row[isActiveIndex] === 'false')) {
+    if (
+      isActiveIndex !== -1 &&
+      (row[isActiveIndex] === false ||
+        row[isActiveIndex] === 'FALSE' ||
+        row[isActiveIndex] === 'false')
+    ) {
       // 非アクティブユーザーでスプレッドシートIDが残っている場合
       var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
       if (spreadsheetIdIndex !== -1 && row[spreadsheetIdIndex]) {
@@ -2424,17 +2409,11 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
       // statusフィールドが空または無効な値の場合、activeに設定
       if (
         !currentValue ||
-        (currentValue !== 'active' &&
-          currentValue !== 'inactive' &&
-          currentValue !== 'suspended')
+        (currentValue !== 'active' && currentValue !== 'inactive' && currentValue !== 'suspended')
       ) {
         updatesNeeded.push({
           range:
-            "'" +
-            DB_CONFIG.SHEET_NAME +
-            "'!" +
-            String.fromCharCode(65 + isActiveIndex) +
-            (i + 2),
+            "'" + DB_CONFIG.SHEET_NAME + "'!" + String.fromCharCode(65 + isActiveIndex) + (i + 2),
           values: [['active']],
         });
       }
@@ -2485,7 +2464,6 @@ function getDbSheet() {
  */
 function performSystemMonitoring(options = {}) {
   try {
-
     var opts = {
       checkHealth: options.checkHealth !== false,
       checkPerformance: options.checkPerformance !== false,
@@ -2727,9 +2705,7 @@ function performPerformanceCheck() {
 
     if (dbId) {
       var service = getSheetsServiceCached();
-      var testData = batchGetSheetsData(service, dbId, [
-        "'" + DB_CONFIG.SHEET_NAME + "'!A1:B1",
-      ]);
+      var testData = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A1:B1"]);
       perfResult.benchmarks.databaseAccess = Date.now() - dbTestStart;
       perfResult.metrics.apiCallCount++;
     }
@@ -2830,7 +2806,6 @@ function performSecurityCheck() {
  */
 function sendSystemAlert(monitoringResult) {
   try {
-
     // アラート内容の構築
     var alertMessage = '【StudyQuest システムアラート】\n\n';
     alertMessage += '発生時刻: ' + monitoringResult.timestamp + '\n';
@@ -2885,7 +2860,6 @@ function sendSystemAlert(monitoringResult) {
       warnings: monitoringResult.summary.warnings,
       timestamp: monitoringResult.timestamp,
     });
-
   } catch (alertError) {
     console.error('❌ アラート送信エラー:', alertError.message);
   }
@@ -3065,7 +3039,6 @@ function findUserByIdFresh(userId) {
     const service = getSheetsService();
     const dbId = getSecureDatabaseId();
     const sheetName = DB_CONFIG.SHEET_NAME;
-
 
     // シート全体のデータを取得
     const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);

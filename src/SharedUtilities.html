@@ -15,29 +15,29 @@
       'cdn.tailwindcss.com should not be used in production',
       'tailwind',
       'TailwindCSS',
-      'Unrecognized feature'
+      'Unrecognized feature',
     ];
-    
+
     // Syntax errors that need special logging (not suppressed)
     const criticalSyntaxErrors = [
       'Unexpected end of input',
       'Unexpected token',
       'SyntaxError: Unexpected',
-      'Invalid or unexpected token'
+      'Invalid or unexpected token',
     ];
 
     // Simplified and safe error handling for GAS template processing
     const originalErrorHandler = window.onerror;
     window.onerror = function (message, source, lineno, colno, error) {
       const errorMessage = message ? message.toString() : '';
-      
+
       // Only suppress specific known warnings that interfere with GAS
-      const shouldSuppress = suppressedErrors.some(pattern => errorMessage.includes(pattern));
-      
+      const shouldSuppress = suppressedErrors.some((pattern) => errorMessage.includes(pattern));
+
       if (shouldSuppress) {
         return true; // Suppress known warnings
       }
-      
+
       // Let all other errors (including syntax errors) pass through to original handler
       if (originalErrorHandler) {
         return originalErrorHandler.call(this, message, source, lineno, colno, error);
@@ -58,12 +58,12 @@
 
       console.warn('Unhandled promise rejection:', event.reason);
     });
-    
+
     // Script loading monitoring to detect problematic scripts
     const originalCreateElement = document.createElement;
-    document.createElement = function(tagName) {
+    document.createElement = function (tagName) {
       const element = originalCreateElement.call(this, tagName);
-      
+
       if (tagName.toLowerCase() === 'script') {
         const originalSrc = element.src;
         Object.defineProperty(element, 'src', {
@@ -72,23 +72,23 @@
           },
           set(value) {
             console.log('🔍 Script loading:', value);
-            
+
             // Monitor specific scripts that might cause syntax errors
             if (value.includes('tailwindcss') || value.includes('cdn.')) {
               element.addEventListener('load', () => {
                 console.log('✅ External script loaded successfully:', value);
               });
-              
+
               element.addEventListener('error', (e) => {
                 console.error('❌ External script failed to load:', value, e);
               });
             }
-            
+
             originalSrc = value;
-          }
+          },
         });
       }
-      
+
       return element;
     };
   })();

@@ -334,7 +334,6 @@ class CacheManager {
     } catch (e) {
       console.warn(`[Cache] Failed to remove memoCache for key: ${key}`, e.message);
     }
-
   }
 
   /**
@@ -1235,8 +1234,7 @@ class ExecutionCache {
             // システム全体のキャッシュクリア
             break;
         }
-      } catch (error) {
-      }
+      } catch (error) {}
     }
   }
 }
@@ -1250,8 +1248,8 @@ let spreadsheetMemoryCache = {};
 
 // Module-scoped constants (2024 GAS Best Practice)
 const CACHE_CONFIG = Object.freeze({
-  MEMORY_TTL: CORE.TIMEOUTS.LONG,     // 30秒（メモリキャッシュ）
-  SESSION_TTL: CORE.TIMEOUTS.LONG * 60,  // 30分（Propertiesキャッシュ）
+  MEMORY_TTL: CORE.TIMEOUTS.LONG, // 30秒（メモリキャッシュ）
+  SESSION_TTL: CORE.TIMEOUTS.LONG * 60, // 30分（Propertiesキャッシュ）
   MAX_SIZE: 50,
   KEY_PREFIX: 'ss_cache_',
 });
@@ -1278,8 +1276,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
         () => PropertiesService.getScriptProperties().deleteProperty(cacheKey),
         'PropertiesService.deleteProperty'
       );
-    } catch (error) {
-    }
+    } catch (error) {}
   }
 
   // Phase 1: メモリキャッシュをチェック
@@ -1320,8 +1317,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
         return spreadsheet;
       }
     }
-  } catch (error) {
-  }
+  } catch (error) {}
 
   // Phase 3: 新規取得とキャッシュ保存
   console.log('🔄 SpreadsheetApp.openById 新規取得:', spreadsheetId.substring(0, 10));
@@ -1344,8 +1340,7 @@ function getCachedSpreadsheet(spreadsheetId, forceRefresh = false) {
       };
 
       PropertiesService.getScriptProperties().setProperty(cacheKey, JSON.stringify(sessionData));
-    } catch (sessionError) {
-    }
+    } catch (sessionError) {}
 
     // キャッシュサイズ管理
     cleanupOldCacheEntries();
@@ -1384,7 +1379,6 @@ function cleanupOldCacheEntries() {
     entriesToDelete.forEach((entry) => {
       delete spreadsheetMemoryCache[entry.key];
     });
-
   }
 
   // 期限切れエントリの削除
@@ -1410,8 +1404,7 @@ function invalidateSpreadsheetCache(spreadsheetId) {
   const cacheKey = `${CACHE_CONFIG.CACHE_KEY_PREFIX}${spreadsheetId}`;
   try {
     PropertiesService.getScriptProperties().deleteProperty(cacheKey);
-  } catch (error) {
-  }
+  } catch (error) {}
 }
 
 /**
@@ -1431,9 +1424,7 @@ function clearAllSpreadsheetCache() {
         props.deleteProperty(key);
       }
     });
-
-  } catch (error) {
-  }
+  } catch (error) {}
 }
 
 /**
@@ -1450,8 +1441,7 @@ function getSpreadsheetCacheStats() {
     sessionEntries = Object.keys(allProps).filter((key) =>
       key.startsWith(CACHE_CONFIG.CACHE_KEY_PREFIX)
     ).length;
-  } catch (error) {
-  }
+  } catch (error) {}
 
   return {
     memoryEntries: memoryEntries,
@@ -1546,10 +1536,14 @@ function getHeadersCached(spreadsheetId, sheetName) {
         );
         return indices;
       }
-      
+
       // 完全に必須列が不足している場合のみ復旧を試行
       // 片方でも存在する場合は設定によるものとして受け入れる
-      if (!hasRequiredColumns.hasReasonColumn && !hasRequiredColumns.hasOpinionColumn && !hasRequiredColumns.hasQuestionColumn) {
+      if (
+        !hasRequiredColumns.hasReasonColumn &&
+        !hasRequiredColumns.hasOpinionColumn &&
+        !hasRequiredColumns.hasQuestionColumn
+      ) {
         console.warn(
           `[getHeadersCached] Critical headers missing: ${hasRequiredColumns.missing.join(', ')}, attempting recovery`
         );
@@ -1560,7 +1554,11 @@ function getHeadersCached(spreadsheetId, sheetName) {
         const recoveredIndices = getHeadersWithRetry(spreadsheetId, sheetName, 1);
         if (recoveredIndices && Object.keys(recoveredIndices).length > 0) {
           const recoveredValidation = validateRequiredHeaders(recoveredIndices);
-          if (recoveredValidation.hasReasonColumn || recoveredValidation.hasOpinionColumn || recoveredValidation.hasQuestionColumn) {
+          if (
+            recoveredValidation.hasReasonColumn ||
+            recoveredValidation.hasOpinionColumn ||
+            recoveredValidation.hasQuestionColumn
+          ) {
             return recoveredIndices;
           }
         }
@@ -1710,7 +1708,7 @@ function validateRequiredHeaders(indices) {
   // 最低限必要なヘッダーパターンをチェック
   // 理由列・回答列は設定によって名前が変わる可能性があるため、
   // より柔軟な検証を実装
-  
+
   // AIが認識しやすいパターンを大幅に拡張
   const reasonPatterns = [
     COLUMN_HEADERS.REASON, // 理由
@@ -1721,7 +1719,7 @@ function validateRequiredHeaders(indices) {
     '根拠',
     '体験',
     '詳細',
-    '説明'
+    '説明',
   ];
 
   const opinionPatterns = [
@@ -1733,49 +1731,73 @@ function validateRequiredHeaders(indices) {
     'answer',
     '答え',
     '質問',
-    '問い'
+    '問い',
   ];
 
   const missing = [];
   let hasReasonColumn = false;
   let hasOpinionColumn = false;
-  let hasQuestionColumn = false;  // 質問文がヘッダーになっている場合
+  let hasQuestionColumn = false; // 質問文がヘッダーになっている場合
 
   // より柔軟な判定: キーにパターンが含まれているかチェック
   for (const key in indices) {
     const keyLower = key.toLowerCase();
-    
+
     // 理由列の存在チェック（部分一致も許可）
     for (const pattern of reasonPatterns) {
-      if (key === pattern || keyLower.includes(pattern.toLowerCase()) || 
-          keyLower.includes('理由') || keyLower.includes('体験') || keyLower.includes('根拠')) {
+      if (
+        key === pattern ||
+        keyLower.includes(pattern.toLowerCase()) ||
+        keyLower.includes('理由') ||
+        keyLower.includes('体験') ||
+        keyLower.includes('根拠')
+      ) {
         hasReasonColumn = true;
         break;
       }
     }
-    
+
     // 回答列の存在チェック（部分一致も許可）
     for (const pattern of opinionPatterns) {
-      if (key === pattern || keyLower.includes(pattern.toLowerCase()) || 
-          keyLower.includes('回答') || keyLower.includes('答') || keyLower.includes('意見')) {
+      if (
+        key === pattern ||
+        keyLower.includes(pattern.toLowerCase()) ||
+        keyLower.includes('回答') ||
+        keyLower.includes('答') ||
+        keyLower.includes('意見')
+      ) {
         hasOpinionColumn = true;
         break;
       }
     }
-    
+
     // 質問文と思われる長いヘッダーの検出（15文字以上で「？」を含む）
-    if (key.length > 15 && (key.includes('？') || key.includes('?') || key.includes('どうして') || 
-        key.includes('なぜ') || key.includes('思います') || key.includes('考え'))) {
+    if (
+      key.length > 15 &&
+      (key.includes('？') ||
+        key.includes('?') ||
+        key.includes('どうして') ||
+        key.includes('なぜ') ||
+        key.includes('思います') ||
+        key.includes('考え'))
+    ) {
       hasQuestionColumn = true;
       hasOpinionColumn = true; // 質問文も回答列として扱う
     }
   }
-  
+
   // フォームの回答シートによくあるヘッダーも回答列として認識
   const formResponseIndices = Object.keys(indices);
-  if (formResponseIndices.some(header => 
-    header.length > 20 && (header.includes('どうして') || header.includes('なぜ') || 
-    header.includes('思いますか') || header.includes('考えますか')))) {
+  if (
+    formResponseIndices.some(
+      (header) =>
+        header.length > 20 &&
+        (header.includes('どうして') ||
+          header.includes('なぜ') ||
+          header.includes('思いますか') ||
+          header.includes('考えますか'))
+    )
+  ) {
     hasOpinionColumn = true;
     hasQuestionColumn = true;
   }
@@ -1789,7 +1811,7 @@ function validateRequiredHeaders(indices) {
 
   // 基本的なヘッダーが1つも存在しない場合は無効
   const hasBasicHeaders = Object.keys(indices).length > 0;
-  
+
   // より緩い検証: 質問文がヘッダーにある場合も有効とする
   const isValid = hasBasicHeaders && (hasReasonColumn || hasOpinionColumn || hasQuestionColumn);
 
@@ -1798,7 +1820,7 @@ function validateRequiredHeaders(indices) {
     missing: missing,
     hasReasonColumn: hasReasonColumn,
     hasOpinionColumn: hasOpinionColumn,
-    hasQuestionColumn: hasQuestionColumn
+    hasQuestionColumn: hasQuestionColumn,
   };
 }
 
@@ -1843,7 +1865,6 @@ function preWarmCache(activeUserEmail) {
   };
 
   try {
-
     // 1. サービスアカウントトークンの事前取得
     try {
       getServiceAccountTokenCached();
@@ -2073,7 +2094,6 @@ class CacheAPI {
 
       // 統一キャッシュマネージャークリア
       this.manager.clearAll();
-
     } catch (error) {
       console.error('[ERROR]', `統一API: 全実行キャッシュクリア失敗:`, error.message);
       throw error;
@@ -2127,7 +2147,6 @@ class CacheAPI {
    */
   invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
     try {
-
       // 基本ユーザーキャッシュクリア
       if (userId) {
         this.manager.remove(`user_${userId}`);
@@ -2168,7 +2187,6 @@ class CacheAPI {
 
       // 実行キャッシュも同期クリア
       this.clearUserInfoCache(userId || email);
-
     } catch (error) {
       console.error('[ERROR]', `統一API: ユーザーキャッシュ無効化失敗:`, error.message);
       throw error;
@@ -2184,7 +2202,6 @@ class CacheAPI {
    */
   synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
     try {
-
       // 段階1: 基本ユーザーキャッシュクリア
       this.invalidateUserCache(userId, email, oldSpreadsheetId, false);
 
@@ -2211,7 +2228,6 @@ class CacheAPI {
 
       // 段階5: 少し待ってから検証
       Utilities.sleep(100);
-
     } catch (error) {
       console.error('[ERROR]', '統一API: キャッシュ同期失敗:', error.message);
       throw new Error(`キャッシュ同期に失敗しました: ${error.message}`);
@@ -2223,7 +2239,6 @@ class CacheAPI {
    */
   clearDatabaseCache() {
     try {
-
       // データベース関連パターンクリア
       const dbPatterns = ['user_', 'email_', 'hdr_', 'data_', 'sheets_', 'config_v3_'];
       dbPatterns.forEach((pattern) => {
@@ -2232,7 +2247,6 @@ class CacheAPI {
 
       // Apps Script キャッシュもクリア（データベース関連のみ）
       // CacheService.removeAll() はキー配列が必要なため、自動期限切れを利用
-
     } catch (error) {
       console.error('[ERROR]', '統一API: データベースキャッシュクリア失敗:', error.message);
       // エラーが発生しても処理を継続
@@ -2328,25 +2342,25 @@ const CacheStore = {
    * @param {number} ttl TTL（秒、デフォルト：3600）
    */
   get: (key, valueFn, ttl = 3600) => unifiedCacheAPI.get(key, valueFn, ttl),
-  
+
   /**
    * 値を保存
-   * @param {string} key キーワード 
+   * @param {string} key キーワード
    * @param {*} value 値
    * @param {number} ttl TTL（秒、デフォルト：3600）
    */
   set: (key, value, ttl = 3600) => unifiedCacheAPI.put(key, value, ttl),
-  
+
   /**
    * 値を削除
    * @param {string} key キーワード
    */
   remove: (key) => unifiedCacheAPI.remove(key),
-  
+
   /**
    * キャッシュをクリア
    */
-  clear: () => unifiedCacheAPI.removeAll()
+  clear: () => unifiedCacheAPI.removeAll(),
 };
 
 // 外部アクセス用エクスポート（後方互換性）
@@ -2394,7 +2408,13 @@ function getCachedSheetsService() {
  * GAS 2025 Best Practices - 後方互換性を削除して直接実装
  */
 function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
-  return unifiedCacheAPI.invalidateUserCache(userId, email, spreadsheetId, clearPattern, dbSpreadsheetId);
+  return unifiedCacheAPI.invalidateUserCache(
+    userId,
+    email,
+    spreadsheetId,
+    clearPattern,
+    dbSpreadsheetId
+  );
 }
 
 /**

@@ -34,7 +34,14 @@
       "Bash(npm install)",
       "Bash(npm run typecheck:*)",
       "WebFetch(domain:github.com)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(for file in Core.gs database.gs cache.gs AdminPanelBackend.gs security.gs)",
+      "Bash(do echo -n \"$file: \")",
+      "Bash(for file in Core.gs AdminPanelBackend.gs security.gs)",
+      "Bash(do cp \"/Users/ryuma/Everyone-s-Answer-Board/src/$file\" \"/tmp/$file%.gs.js\")",
+      "Bash(echo \"$file: OK\")",
+      "Bash(echo:*)",
+      "Bash(clasp push:*)"
     ],
     "deny": [],
     "ask": [],

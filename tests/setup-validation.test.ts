@@ -9,7 +9,7 @@ describe('TypeScript環境検証', () => {
     const message: string = 'TypeScript環境が正常に設定されました';
     const version: number = 2025;
     const features: string[] = ['TypeScript', 'Jest', 'GAS API Mocks'];
-    
+
     expect(message).toBe('TypeScript環境が正常に設定されました');
     expect(version).toBe(2025);
     expect(features).toHaveLength(3);
@@ -20,7 +20,7 @@ describe('TypeScript環境検証', () => {
     // モック環境の基本確認
     const mockLogger = {
       log: jest.fn(),
-      error: jest.fn()
+      error: jest.fn(),
     };
 
     mockLogger.log('テストメッセージ');
@@ -32,11 +32,14 @@ describe('TypeScript環境検証', () => {
     const testData = {
       success: true,
       environment: 'TypeScript + Jest',
-      capabilities: ['型安全性', 'モック', '統合テスト']
+      capabilities: ['型安全性', 'モック', '統合テスト'],
     };
 
     expect(testData.success).toBe(true);
-    expect(Array.isArray(testData.capabilities) && testData.capabilities.every(item => typeof item === 'string')).toBe(true);
+    expect(
+      Array.isArray(testData.capabilities) &&
+        testData.capabilities.every((item) => typeof item === 'string')
+    ).toBe(true);
     expect(testData).toHaveProperty('environment');
   });
 });
@@ -62,14 +65,14 @@ describe('設計品質検証', () => {
     const validData = {
       userId: 'user123',
       createdAt: '2025-09-01',
-      isValid: true
+      isValid: true,
     };
 
     // 異常なデータ（プロダクションで問題となるケース）
     const invalidData = {
       userId: null, // これまでテストで検出できなかった問題
       createdAt: undefined,
-      isValid: 'true' // string型だが期待はboolean
+      isValid: 'true', // string型だが期待はboolean
     };
 
     expect(validateProductionData(validData)).toBe(true);
@@ -81,7 +84,7 @@ describe('設計品質検証', () => {
       const errors = {
         network: { message: 'Network error', code: 500 },
         permission: { message: 'Permission denied', code: 403 },
-        quota: { message: 'Quota exceeded', code: 429 }
+        quota: { message: 'Quota exceeded', code: 429 },
       };
       return errors[errorType];
     };

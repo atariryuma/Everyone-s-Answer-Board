@@ -16,10 +16,10 @@ class ConfigurationManager {
    */
   getUserConfig(userId) {
     if (!userId) return null;
-    
+
     const user = DB.findUserById(userId);
     if (!user || !user.configJson) return null;
-    
+
     try {
       return JSON.parse(user.configJson);
     } catch (e) {
@@ -50,16 +50,16 @@ class ConfigurationManager {
    */
   setUserConfig(userId, config) {
     if (!userId || !config) return false;
-    
+
     config.userId = userId;
     config.lastModified = new Date().toISOString();
-    
+
     try {
       const updated = updateUser(userId, {
         configJson: JSON.stringify(config),
-        lastAccessedAt: new Date().toISOString()
+        lastAccessedAt: new Date().toISOString(),
       });
-      
+
       if (updated) {
         console.log(`設定更新完了: ${userId}`);
         return true;
@@ -96,7 +96,7 @@ class ConfigurationManager {
       description: config.description || '',
       allowAnonymous: config.allowAnonymous || false,
       columns: config.columns || this.getDefaultColumns(),
-      theme: config.theme || 'default'
+      theme: config.theme || 'default',
     };
   }
 
@@ -111,7 +111,7 @@ class ConfigurationManager {
       { name: 'class', label: 'クラス', type: 'text', required: false },
       { name: 'opinion', label: '回答', type: 'textarea', required: true },
       { name: 'reason', label: '理由', type: 'textarea', required: false },
-      { name: 'name', label: '名前', type: 'text', required: false }
+      { name: 'name', label: '名前', type: 'text', required: false },
     ];
   }
 
@@ -133,7 +133,7 @@ class ConfigurationManager {
       sheetName: null,
       columnMapping: {},
       theme: 'default',
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
     };
 
     // columnsは必要時のみ保持（デフォルト列設定）
@@ -143,7 +143,7 @@ class ConfigurationManager {
       userId,
       email,
       optimizedSize: JSON.stringify(optimizedConfig).length,
-      removedFields: ['userId', 'userEmail', 'createdAt', 'description'] // DB列に移行済み
+      removedFields: ['userId', 'userEmail', 'createdAt', 'description'], // DB列に移行済み
     });
 
     const success = this.setUserConfig(userId, optimizedConfig);
@@ -163,7 +163,7 @@ class ConfigurationManager {
     const updatedConfig = {
       ...currentConfig,
       ...updates,
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
     };
 
     return this.setUserConfig(userId, updatedConfig);
@@ -203,9 +203,14 @@ class AccessController {
       }
 
       const config = this.configManager.getUserConfig(targetUserId);
-      
+
       if (!config) {
-        return this.createAccessResult(false, 'not_found', null, '指定されたユーザーが見つかりません');
+        return this.createAccessResult(
+          false,
+          'not_found',
+          null,
+          '指定されたユーザーが見つかりません'
+        );
       }
 
       switch (mode) {
@@ -217,7 +222,6 @@ class AccessController {
         default:
           return this.verifyViewAccess(config, currentUserEmail);
       }
-
     } catch (error) {
       console.error('アクセス検証エラー:', error);
       return this.createAccessResult(false, 'error', null, 'アクセス検証でエラーが発生しました');
@@ -229,12 +233,12 @@ class AccessController {
    */
   verifyAdminAccess(config, currentUserEmail) {
     const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
-    
+
     // システム管理者
     if (currentUserEmail === systemAdminEmail) {
       return this.createAccessResult(true, 'system_admin', config);
     }
-    
+
     // オーナー
     if (currentUserEmail === config.userEmail) {
       return this.createAccessResult(true, 'owner', config);
@@ -288,7 +292,7 @@ class AccessController {
       userType,
       config,
       message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -302,11 +306,11 @@ class AccessController {
     if (!config) return 'none';
 
     const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
-    
+
     if (currentUserEmail === systemAdminEmail) {
       return 'system_admin';
     }
-    
+
     if (currentUserEmail === config.userEmail) {
       return 'owner';
     }

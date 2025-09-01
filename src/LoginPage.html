@@ -8,8 +8,11 @@
     <meta name="theme-color" content="#1a1b26" />
     <meta name="description" content="StudyQuest 回答ボードシステム - ログイン" />
     <!-- Optimized Permissions Policy - essential permissions only -->
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
-    
+    <meta
+      http-equiv="Permissions-Policy"
+      content="camera=(), microphone=(), geolocation=(), fullscreen=*"
+    />
+
     <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
     <script>
       // Complete TailwindCSS warning suppression and early configuration
@@ -17,17 +20,19 @@
       window.tailwind = {
         config: {
           corePlugins: { preflight: false },
-          important: true
-        }
+          important: true,
+        },
       };
-      
+
       // Suppress TailwindCSS production warnings immediately
       const originalWarn = console.warn;
-      console.warn = function(...args) {
+      console.warn = function (...args) {
         const message = args.join(' ');
-        if (message.includes('cdn.tailwindcss.com should not be used in production') ||
-            message.includes('tailwind') ||
-            message.includes('TailwindCSS')) {
+        if (
+          message.includes('cdn.tailwindcss.com should not be used in production') ||
+          message.includes('tailwind') ||
+          message.includes('TailwindCSS')
+        ) {
           return; // Completely suppress
         }
         originalWarn.apply(console, args);
@@ -36,8 +41,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Unified Styles and Shared Components -->
-    <?!= include('UnifiedStyles'); ?>
-    <?!= include('SharedUtilities'); ?>
+    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
 
     <!-- Global Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay page-specific hidden">

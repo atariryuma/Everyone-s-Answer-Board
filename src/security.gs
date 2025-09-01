@@ -11,8 +11,8 @@
 // Module-scoped constants (2024 GAS Best Practice)
 const SECURITY_CONFIG = Object.freeze({
   AUTH_CACHE_KEY: 'SA_TOKEN_CACHE',
-  TOKEN_EXPIRY_BUFFER: CORE.TIMEOUTS.LONG / 6,  // 5秒
-  SESSION_TTL: CORE.TIMEOUTS.LONG,              // 30秒
+  TOKEN_EXPIRY_BUFFER: CORE.TIMEOUTS.LONG / 6, // 5秒
+  SESSION_TTL: CORE.TIMEOUTS.LONG, // 30秒
   MAX_LOGIN_ATTEMPTS: 3,
 });
 
@@ -142,7 +142,7 @@ function getServiceAccountDiagnostics() {
       credentialsConfigured: false,
       tokenGeneration: false,
       apiAccess: false,
-      spreadsheetPermissions: false
+      spreadsheetPermissions: false,
     },
     details: {
       email: null,
@@ -150,9 +150,9 @@ function getServiceAccountDiagnostics() {
       keyId: null,
       scopes: [],
       lastTokenTime: null,
-      errors: []
+      errors: [],
     },
-    recommendations: []
+    recommendations: [],
   };
 
   try {
@@ -181,7 +181,7 @@ function getServiceAccountDiagnostics() {
       if (dbId) {
         const service = {
           baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
-          accessToken: getServiceAccountAccessToken()
+          accessToken: getServiceAccountAccessToken(),
         };
         getSpreadsheetsData(service, dbId);
         diagnostics.checks.apiAccess = true;
@@ -192,15 +192,19 @@ function getServiceAccountDiagnostics() {
     } catch (apiError) {
       diagnostics.details.errors.push(`API アクセスエラー: ${apiError.message}`);
       if (apiError.message.includes('403') || apiError.message.includes('権限')) {
-        diagnostics.recommendations.push('スプレッドシートにサービスアカウントの編集権限を追加してください');
+        diagnostics.recommendations.push(
+          'スプレッドシートにサービスアカウントの編集権限を追加してください'
+        );
       }
     }
 
     // ステータス判定
-    if (diagnostics.checks.credentialsConfigured && 
-        diagnostics.checks.tokenGeneration && 
-        diagnostics.checks.apiAccess && 
-        diagnostics.checks.spreadsheetPermissions) {
+    if (
+      diagnostics.checks.credentialsConfigured &&
+      diagnostics.checks.tokenGeneration &&
+      diagnostics.checks.apiAccess &&
+      diagnostics.checks.spreadsheetPermissions
+    ) {
       diagnostics.status = 'healthy';
     } else if (diagnostics.checks.credentialsConfigured && diagnostics.checks.tokenGeneration) {
       diagnostics.status = 'partial';
@@ -211,7 +215,6 @@ function getServiceAccountDiagnostics() {
         diagnostics.recommendations.push('サービスアカウントのJSONキーを設定してください');
       }
     }
-
   } catch (error) {
     diagnostics.status = 'error';
     diagnostics.details.errors.push(`診断処理エラー: ${error.message}`);
@@ -227,48 +230,53 @@ function getServiceAccountDiagnostics() {
  */
 function formatServiceAccountDiagnostics() {
   const diagnostics = getServiceAccountDiagnostics();
-  
+
   let report = `🔍 サービスアカウント診断レポート\n`;
   report += `📅 実行日時: ${diagnostics.timestamp}\n`;
   report += `📊 総合ステータス: ${getStatusIcon(diagnostics.status)} ${diagnostics.status.toUpperCase()}\n\n`;
-  
+
   report += `✅ チェック項目:\n`;
   report += `   • 認証情報設定: ${diagnostics.checks.credentialsConfigured ? '✅' : '❌'}\n`;
   report += `   • トークン生成: ${diagnostics.checks.tokenGeneration ? '✅' : '❌'}\n`;
   report += `   • API アクセス: ${diagnostics.checks.apiAccess ? '✅' : '❌'}\n`;
   report += `   • スプレッドシート権限: ${diagnostics.checks.spreadsheetPermissions ? '✅' : '❌'}\n\n`;
-  
+
   if (diagnostics.details.email) {
     report += `📧 サービスアカウント: ${diagnostics.details.email}\n`;
   }
   if (diagnostics.details.projectId) {
     report += `🏗️ プロジェクトID: ${diagnostics.details.projectId}\n`;
   }
-  
+
   if (diagnostics.details.errors.length > 0) {
     report += `\n❌ エラー詳細:\n`;
-    diagnostics.details.errors.forEach(error => {
+    diagnostics.details.errors.forEach((error) => {
       report += `   • ${error}\n`;
     });
   }
-  
+
   if (diagnostics.recommendations.length > 0) {
     report += `\n💡 推奨アクション:\n`;
-    diagnostics.recommendations.forEach(rec => {
+    diagnostics.recommendations.forEach((rec) => {
       report += `   • ${rec}\n`;
     });
   }
-  
+
   return report;
 }
 
 function getStatusIcon(status) {
   switch (status) {
-    case 'healthy': return '🟢';
-    case 'partial': return '🟡';
-    case 'critical': return '🔴';
-    case 'error': return '⚠️';
-    default: return '⚪';
+    case 'healthy':
+      return '🟢';
+    case 'partial':
+      return '🟡';
+    case 'critical':
+      return '🔴';
+    case 'error':
+      return '⚠️';
+    default:
+      return '⚪';
   }
 }
 

@@ -6,7 +6,7 @@
 const App = {
   // システム状態
   initialized: false,
-  
+
   // サービスインスタンス
   _config: null,
   _access: null,
@@ -17,14 +17,14 @@ const App = {
    */
   init() {
     if (this.initialized) return;
-    
+
     try {
       // ConfigurationManagerを最初に初期化
       this._config = new ConfigurationManager();
-      
+
       // AccessControllerを初期化（ConfigurationManagerを注入）
       this._access = new AccessController(this._config);
-      
+
       this.initialized = true;
       console.log('✅ App システム初期化完了');
     } catch (error) {
@@ -70,7 +70,7 @@ const App = {
       initialized: this.initialized,
       hasConfig: !!this._config,
       hasAccess: !!this._access,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-  }
+  },
 };

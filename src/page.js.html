@@ -2938,7 +2938,10 @@
       // サーバーキャッシュをクリア
       try {
         await new Promise((resolve, reject) => {
-          google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).refreshBoardData();
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .refreshBoardData();
         });
         console.log('✅ サーバーキャッシュをクリア');
       } catch (error) {
@@ -8257,7 +8260,10 @@
 
         // ヘッダー情報の検証
         try {
-          const headerValidation = await this.runGas('validateHeaderIntegrity', this.state.tenantId);
+          const headerValidation = await this.runGas(
+            'validateHeaderIntegrity',
+            this.state.tenantId
+          );
           if (!headerValidation.success) {
             validationResults.headerIssues++;
             validationResults.errors.push(`Header validation failed: ${headerValidation.error}`);

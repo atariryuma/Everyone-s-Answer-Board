@@ -26,32 +26,32 @@ describe('verifyUserAccess security checks', () => {
                 userId: 'U1',
                 userEmail: 'admin@example.com',
                 isPublic: false,
-                allowAnonymous: false
+                allowAnonymous: false,
               });
             }
             if (key === 'ADMIN_EMAIL') {
               return 'admin@example.com';
             }
             return null;
-          })
-        })
+          }),
+        }),
       },
       CacheService: {
         getScriptCache: () => ({
           get: jest.fn(() => null),
           put: jest.fn(),
-          remove: jest.fn()
-        })
+          remove: jest.fn(),
+        }),
       },
       DB: {
         findUserById: jest.fn(() => ({
           userEmail: 'admin@example.com',
-          configJson: JSON.stringify({ 
+          configJson: JSON.stringify({
             userId: 'U1',
             userEmail: 'admin@example.com',
             appPublished: false,
             isPublic: false,
-            allowAnonymous: false
+            allowAnonymous: false,
           }),
         })),
       },
@@ -67,12 +67,12 @@ describe('verifyUserAccess security checks', () => {
       Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
       findUserById: jest.fn(() => ({
         userEmail: 'admin@example.com',
-        configJson: JSON.stringify({ 
+        configJson: JSON.stringify({
           userId: 'U1',
           userEmail: 'admin@example.com',
           appPublished: false,
           isPublic: false,
-          allowAnonymous: false
+          allowAnonymous: false,
         }),
       })),
     };
@@ -95,15 +95,15 @@ describe('verifyUserAccess security checks', () => {
     // 新しいコンテキストで公開設定をテスト
     context.DB.findUserById = jest.fn(() => ({
       userEmail: 'admin@example.com',
-      configJson: JSON.stringify({ 
+      configJson: JSON.stringify({
         userId: 'U1',
         userEmail: 'admin@example.com',
-        appPublished: true, 
+        appPublished: true,
         isPublic: true,
-        allowAnonymous: true
+        allowAnonymous: true,
       }),
     }));
-    
+
     // PropertiesServiceも更新
     context.PropertiesService.getScriptProperties = () => ({
       getProperty: jest.fn((key) => {
@@ -113,14 +113,14 @@ describe('verifyUserAccess security checks', () => {
             userEmail: 'admin@example.com',
             appPublished: true,
             isPublic: true,
-            allowAnonymous: true
+            allowAnonymous: true,
           });
         }
         if (key === 'ADMIN_EMAIL') {
           return 'admin@example.com';
         }
         return null;
-      })
+      }),
     });
 
     // 他のユーザーからのアクセス

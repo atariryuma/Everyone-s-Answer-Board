@@ -197,13 +197,13 @@ function getOpinionHeaderSafely(userId, sheetName) {
  */
 function registerNewUser(adminEmail) {
   const startTime = Date.now();
-  
+
   // Enhanced security validation using SecurityValidator (GAS 2025 best practices)
   if (!SecurityValidator.isValidEmail(adminEmail)) {
     const error = new Error('有効なメールアドレスを入力してください。');
     console.error('❌ registerNewUser: Invalid email format', {
       providedEmail: adminEmail ? adminEmail.substring(0, 10) + '...' : 'null', // Partial logging for privacy
-      error: error.message
+      error: error.message,
     });
     throw error;
   }
@@ -213,36 +213,36 @@ function registerNewUser(adminEmail) {
 
   console.info('🚀 registerNewUser: Starting registration process', {
     adminEmail: sanitizedEmail,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   try {
     // Authentication check with sanitized email
     const activeUser = Session.getActiveUser();
     const currentUserEmail = activeUser.getEmail();
-    
+
     if (sanitizedEmail !== currentUserEmail) {
-      const error = new Error('認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。');
+      const error = new Error(
+        '認証エラー: 操作を実行しているユーザーとメールアドレスが一致しません。'
+      );
       console.error('❌ registerNewUser: Authentication failed', {
         requestedEmail: sanitizedEmail.substring(0, 10) + '...',
         currentUserEmail: currentUserEmail.substring(0, 10) + '...',
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
 
     // ドメイン制限チェック
     const domainInfo = Deploy.domain();
-    if (domainInfo?.deployDomain && 
-        domainInfo.deployDomain !== '' && 
-        !domainInfo.isDomainMatch) {
+    if (domainInfo?.deployDomain && domainInfo.deployDomain !== '' && !domainInfo.isDomainMatch) {
       const error = new Error(
         `ドメインアクセスが制限されています。許可されたドメイン: ${domainInfo.deployDomain}, 現在のドメイン: ${domainInfo.currentDomain}`
       );
       console.error('❌ registerNewUser: Domain access denied', {
         allowedDomain: domainInfo.deployDomain,
         currentDomain: domainInfo.currentDomain,
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
@@ -250,7 +250,7 @@ function registerNewUser(adminEmail) {
     // 既存ユーザーチェック（1ユーザー1行の原則）
     console.info('🔍 registerNewUser: Checking existing user', { adminEmail: sanitizedEmail });
     const existingUser = DB.findUserByEmail(sanitizedEmail);
-    
+
     if (existingUser) {
       // 既存ユーザーの場合は最小限の更新のみ（設定は保護）
       const { userId } = existingUser;
@@ -259,7 +259,7 @@ function registerNewUser(adminEmail) {
       console.info('👤 registerNewUser: Updating existing user', {
         adminEmail: sanitizedEmail,
         userId,
-        hasExistingConfig: Object.keys(existingConfig).length > 0
+        hasExistingConfig: Object.keys(existingConfig).length > 0,
       });
 
       // 最終アクセス時刻のみ更新（設定は保護）
@@ -271,9 +271,9 @@ function registerNewUser(adminEmail) {
       console.info('✅ registerNewUser: Existing user updated successfully', {
         adminEmail: sanitizedEmail,
         userId,
-        executionTime: Date.now() - startTime + 'ms'
+        executionTime: Date.now() - startTime + 'ms',
       });
-      
+
       const appUrls = generateUserUrls(userId);
 
       return {
@@ -288,29 +288,29 @@ function registerNewUser(adminEmail) {
 
     // 新規ユーザーの場合
     console.info('👶 registerNewUser: Creating new user', { adminEmail: sanitizedEmail });
-    
+
     try {
       // 統一ユーザー作成関数を使用
       const newUser = handleUserRegistration(sanitizedEmail);
-      
+
       console.info('✅ registerNewUser: New user created successfully', {
         adminEmail: sanitizedEmail,
         userId: newUser.userId,
-        databaseWriteTime: Date.now() - startTime + 'ms'
+        databaseWriteTime: Date.now() - startTime + 'ms',
       });
-      
+
       // 生成されたユーザー情報のキャッシュをクリア
       invalidateUserCache(newUser.userId, sanitizedEmail, null, false);
-      
+
       // 成功レスポンスを返す
       const appUrls = generateUserUrls(newUser.userId);
-    
+
       console.info('🎉 registerNewUser: New user registration completed', {
         adminEmail: sanitizedEmail,
         userId: newUser.userId,
-        totalExecutionTime: Date.now() - startTime + 'ms'
+        totalExecutionTime: Date.now() - startTime + 'ms',
       });
-      
+
       return {
         userId: newUser.userId,
         adminUrl: appUrls.adminUrl,
@@ -319,31 +319,29 @@ function registerNewUser(adminEmail) {
         message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
         isExistingUser: false,
       };
-      
     } catch (dbError) {
       console.error('❌ registerNewUser: Database operation failed', {
         adminEmail: sanitizedEmail,
         error: dbError.message,
-        executionTime: Date.now() - startTime + 'ms'
+        executionTime: Date.now() - startTime + 'ms',
       });
-      
+
       throw new Error(`ユーザー登録に失敗しました。詳細: ${dbError.message}`);
     }
-    
   } catch (error) {
     // Comprehensive error handling with structured logging
     console.error('❌ registerNewUser: Registration process failed', {
       adminEmail: sanitizedEmail || adminEmail?.substring(0, 10) + '...',
       error: error.message,
       stack: error.stack,
-      totalExecutionTime: Date.now() - startTime + 'ms'
+      totalExecutionTime: Date.now() - startTime + 'ms',
     });
-    
+
     // Re-throw with user-friendly message while preserving technical details
-    const userFriendlyMessage = error.message.includes('ユーザー登録に失敗') 
-      ? error.message 
+    const userFriendlyMessage = error.message.includes('ユーザー登録に失敗')
+      ? error.message
       : 'ユーザー登録処理でエラーが発生しました。システム管理者に連絡してください。';
-      
+
     throw new Error(userFriendlyMessage);
   }
 }
@@ -426,7 +424,6 @@ function addReactionBatch(requestUserId, batchOperations) {
     if (batchOperations.length > MAX_BATCH_SIZE) {
       throw new Error(`バッチサイズが制限を超えています (最大${MAX_BATCH_SIZE}件)`);
     }
-
 
     const reactingUserEmail = User.email();
     const ownerUserId = requestUserId;
@@ -588,12 +585,14 @@ function verifyUserAccess(requestUserId) {
   // AccessControllerシステムを使用
   const currentUserEmail = Session.getActiveUser().getEmail();
   const result = App.getAccess().verifyAccess(requestUserId, 'view', currentUserEmail);
-  
+
   if (!result.allowed) {
     throw new Error(`認証エラー: ${result.message}`);
   }
-  
-  console.log(`✅ ユーザーアクセス検証成功: ${currentUserEmail} は ${requestUserId} のデータにアクセスできます。`);
+
+  console.log(
+    `✅ ユーザーアクセス検証成功: ${currentUserEmail} は ${requestUserId} のデータにアクセスできます。`
+  );
   return result;
 }
 
@@ -785,7 +784,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
 function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount) {
   verifyUserAccess(requestUserId);
   try {
-
     const currentUserId = requestUserId; // requestUserId を使用
 
     const userInfo = getActiveUserInfo();
@@ -840,7 +838,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
         showCounts: configJson.showCounts === true,
         displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
         data: [],
-          totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
+        totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
         newCount: 0,
         isIncremental: true,
       };
@@ -854,7 +852,6 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     // ここでは全列を取得すると仮定 (A列から最終列まで)
     const lastColumn = sheet.getLastColumn();
     const rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
-
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     const headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
@@ -905,7 +902,6 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       isOwner,
       displayMode
     );
-
 
     return {
       header: '', // 必要に応じて設定
@@ -1627,7 +1623,8 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
     }
 
     // 現在の値を取得
-    const range = "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
+    const range =
+      "'" + sheetName + "'!" + String.fromCharCode(65 + highlightColumnIndex) + rowIndex;
     const response = batchGetSheetsData(service, spreadsheetId, [range]);
     let isHighlighted = false;
     if (
@@ -2348,7 +2345,6 @@ function createUnifiedForm(presetType, userEmail, userId, overrides = {}) {
   }
 }
 
-
 /**
  * リンクされたスプレッドシートを作成
  * @param {string} userEmail - ユーザーメール
@@ -2426,7 +2422,6 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
  */
 function shareAllSpreadsheetsWithServiceAccount() {
   try {
-
     const allUsers = getAllUsers();
     const results = [];
     let successCount = 0;
@@ -2483,7 +2478,6 @@ function shareAllSpreadsheetsWithServiceAccount() {
  */
 function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
   try {
-
     // DriveApp経由で共有設定を変更
     let file;
     try {
@@ -2523,9 +2517,7 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
 
     // サービスアカウントも確認
     const props = PropertiesService.getScriptProperties();
-    const serviceAccountCreds = JSON.parse(
-      props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
-    );
+    const serviceAccountCreds = JSON.parse(props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS));
     const serviceAccountEmail = serviceAccountCreds.client_email;
 
     if (serviceAccountEmail) {
@@ -2576,7 +2568,12 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
     sheet.getRange(1, startCol, 1, additionalHeaders.length).setValues([additionalHeaders]);
 
     // スタイリングを一括適用
-    const allHeadersRange = sheet.getRange(1, 1, 1, currentHeaders.length + additionalHeaders.length);
+    const allHeadersRange = sheet.getRange(
+      1,
+      1,
+      1,
+      currentHeaders.length + additionalHeaders.length
+    );
     allHeadersRange.setFontWeight('bold').setBackground('#E3F2FD');
 
     // 自動リサイズ（エラーが出ても続行）
@@ -4161,31 +4158,31 @@ function setApplicationStatusForUI(enabled) {
  */
 function identifyHeadersAdvanced(headers, options = {}) {
   const { useWebKnowledge = true, useContextAnalysis = true } = options;
-  
+
   // 1. 既存のidentifyHeaders()を基礎として活用
   const basicResult = identifyHeaders(headers);
-  
+
   // 2. インターネット知識ベースの強化判定
   if (useWebKnowledge) {
     const webEnhancedResult = enhanceWithWebKnowledge(headers, basicResult);
     Object.assign(basicResult, webEnhancedResult);
   }
-  
+
   // 3. 文脈・意味解析による精度向上
   if (useContextAnalysis) {
     const contextResult = analyzeContextualMeaning(headers, basicResult);
     Object.assign(basicResult, contextResult);
   }
-  
+
   // 4. 信頼度計算の高精度化
   basicResult.confidence = calculateAdvancedConfidence(headers, basicResult);
-  
+
   console.log('identifyHeadersAdvanced: 超高精度判定完了', {
     originalHeaders: headers,
     detectedMapping: basicResult,
-    confidence: basicResult.confidence
+    confidence: basicResult.confidence,
   });
-  
+
   return basicResult;
 }
 
@@ -4194,20 +4191,29 @@ function identifyHeadersAdvanced(headers, options = {}) {
  */
 function enhanceWithWebKnowledge(headers, basicResult) {
   const enhancements = {};
-  
+
   // 教育分野の一般的なパターン（Googleフォーム等で頻出）
   const educationPatterns = {
-    question: ['どうして', 'なぜ', '理由は', 'どのように', '何が', '思いますか', '考えますか', 'について'],
+    question: [
+      'どうして',
+      'なぜ',
+      '理由は',
+      'どのように',
+      '何が',
+      '思いますか',
+      '考えますか',
+      'について',
+    ],
     answer: ['回答', '答え', '意見', '考え', '思う', 'と思います', 'だと考えます'],
     reason: ['理由', '根拠', '体験', 'そう考える', 'なぜなら', 'から'],
     name: ['名前', '氏名', 'お名前', '学生名', '回答者'],
-    class: ['クラス', '組', '学級', '学年', 'グループ']
+    class: ['クラス', '組', '学級', '学年', 'グループ'],
   };
-  
+
   // インターネット知識による高精度マッチング
   headers.forEach((header, index) => {
     const headerLower = String(header).toLowerCase();
-    
+
     Object.entries(educationPatterns).forEach(([type, patterns]) => {
       const matchScore = patterns.reduce((score, pattern) => {
         if (headerLower.includes(pattern.toLowerCase())) {
@@ -4224,11 +4230,11 @@ function enhanceWithWebKnowledge(headers, basicResult) {
         }
         return score;
       }, 0);
-      
+
       // 既存結果より高精度の場合、更新
       if (matchScore > (basicResult.confidence?.[type] || 0)) {
         if (type === 'question') {
-          enhancements.answer = header;  // 質問文 = 回答対象
+          enhancements.answer = header; // 質問文 = 回答対象
           enhancements.question = header;
         } else {
           enhancements[type === 'class' ? 'classHeader' : type] = header;
@@ -4236,7 +4242,7 @@ function enhanceWithWebKnowledge(headers, basicResult) {
       }
     });
   });
-  
+
   return enhancements;
 }
 
@@ -4245,23 +4251,28 @@ function enhanceWithWebKnowledge(headers, basicResult) {
  */
 function analyzeContextualMeaning(headers, basicResult) {
   const contextEnhancements = {};
-  
+
   // 文脈分析：質問→回答の関係性を検出
-  const questionIndicators = headers.filter(h => {
+  const questionIndicators = headers.filter((h) => {
     const str = String(h).toLowerCase();
-    return str.includes('？') || str.includes('?') || 
-           str.includes('ですか') || str.includes('でしょうか') ||
-           str.length > 40;  // 長文は質問文の可能性大
+    return (
+      str.includes('？') ||
+      str.includes('?') ||
+      str.includes('ですか') ||
+      str.includes('でしょうか') ||
+      str.length > 40
+    ); // 長文は質問文の可能性大
   });
-  
+
   if (questionIndicators.length > 0 && !basicResult.answer) {
     // 最も長い質問文を回答対象として設定
-    const longestQuestion = questionIndicators.sort((a, b) => 
-      String(b).length - String(a).length)[0];
+    const longestQuestion = questionIndicators.sort(
+      (a, b) => String(b).length - String(a).length
+    )[0];
     contextEnhancements.answer = longestQuestion;
     contextEnhancements.question = longestQuestion;
   }
-  
+
   return contextEnhancements;
 }
 
@@ -4270,11 +4281,11 @@ function analyzeContextualMeaning(headers, basicResult) {
  */
 function calculateAdvancedConfidence(headers, result) {
   const confidence = {};
-  
+
   Object.entries(result).forEach(([key, value]) => {
     if (key !== 'confidence' && value) {
       const header = String(value).toLowerCase();
-      
+
       // 長さベースの信頼度（質問文の場合）
       if (key === 'answer' && header.length > 30) {
         confidence[key] = 95;
@@ -4289,7 +4300,7 @@ function calculateAdvancedConfidence(headers, result) {
       }
     }
   });
-  
+
   return confidence;
 }
 

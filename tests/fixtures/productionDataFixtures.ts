@@ -51,14 +51,14 @@ export const PRODUCTION_DATA_FIXTURES = {
   SCHOOL_SURVEY_2024: {
     headers: [
       'タイムスタンプ',
-      'メールアドレス', 
+      'メールアドレス',
       '将来の夢について教えてください',
       'なぜそう思うのか理由を教えてください',
       'あなたのクラス',
       'お名前（任意）',
       'なるほど！',
       'いいね！',
-      'もっと知りたい！'
+      'もっと知りたい！',
     ],
     responses: [
       [
@@ -68,7 +68,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         '最近のAI技術の進歩を見ていて、無限の可能性を感じるからです。',
         '3年A組',
         '田中',
-        '12', '8', '15'
+        '12',
+        '8',
+        '15',
       ],
       [
         '2024/01/15 9:45:12',
@@ -77,7 +79,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         '地球温暖化などの問題が深刻化しており、未来のために何かしたいからです。',
         '3年B組',
         '佐藤',
-        '25', '18', '22'
+        '25',
+        '18',
+        '22',
       ],
       [
         '2024/01/15 10:12:33',
@@ -86,7 +90,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         '子供の時に病気で入院した際、優しい先生に支えられた経験があるからです。',
         '3年A組',
         '鈴木',
-        '30', '25', '18'
+        '30',
+        '25',
+        '18',
       ],
       [
         '2024/01/15 10:34:21',
@@ -95,7 +101,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         '世界平和に貢献し、異なる文化を繋ぐ架け橋になりたいからです。',
         '2年C組',
         '山田',
-        '15', '20', '28'
+        '15',
+        '20',
+        '28',
       ],
       [
         '2024/01/15 11:01:45',
@@ -104,7 +112,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         'ゲームを通じて人と人を繋げ、新しい体験を提供できると思うからです。',
         '2年A組',
         '高橋',
-        '45', '38', '42'
+        '45',
+        '38',
+        '42',
       ],
       [
         '2024/01/15 11:23:18',
@@ -113,9 +123,11 @@ export const PRODUCTION_DATA_FIXTURES = {
         '美しく機能的な建物が人の心を豊かにする力があると信じているからです。',
         '1年B組',
         '伊藤',
-        '22', '16', '25'
-      ]
-    ]
+        '22',
+        '16',
+        '25',
+      ],
+    ],
   },
 
   // Corporate training feedback data
@@ -129,7 +141,7 @@ export const PRODUCTION_DATA_FIXTURES = {
       'お名前',
       '参考になった',
       '実践したい',
-      '他にも知りたい'
+      '他にも知りたい',
     ],
     responses: [
       [
@@ -139,7 +151,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         '実際のケーススタディを通じて、効果的な対話の方法を学べたからです。',
         '営業部',
         '山田太郎',
-        '8', '9', '6'
+        '8',
+        '9',
+        '6',
       ],
       [
         '2024/03/15 16:52:15',
@@ -148,9 +162,11 @@ export const PRODUCTION_DATA_FIXTURES = {
         '現在進行中のプロジェクトで即座に応用できそうな内容だったからです。',
         'IT部',
         '田中花子',
-        '10', '10', '8'
-      ]
-    ]
+        '10',
+        '10',
+        '8',
+      ],
+    ],
   },
 
   // Academic conference feedback
@@ -164,7 +180,7 @@ export const PRODUCTION_DATA_FIXTURES = {
       'Name (Optional)',
       'Informative',
       'Applicable',
-      'Want to learn more'
+      'Want to learn more',
     ],
     responses: [
       [
@@ -174,7 +190,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         'The session provided practical frameworks for implementing ethical guidelines in AI research projects.',
         'Tokyo University',
         'Dr. Smith',
-        '15', '12', '18'
+        '15',
+        '12',
+        '18',
       ],
       [
         '2024/05/20 14:45:33',
@@ -183,9 +201,11 @@ export const PRODUCTION_DATA_FIXTURES = {
         'The case studies demonstrated clear pathways from research to clinical implementation.',
         '医療AI研究所',
         '研究員A',
-        '20', '25', '22'
-      ]
-    ]
+        '20',
+        '25',
+        '22',
+      ],
+    ],
   },
 
   // Edge case problematic data
@@ -199,19 +219,11 @@ export const PRODUCTION_DATA_FIXTURES = {
       '名前',
       'なるほど',
       'いいね',
-      'もっと知りたい'
+      'もっと知りたい',
     ],
     responses: [
       // Empty/minimal data
-      [
-        '2024/01/15 12:00:00',
-        'empty@test.com',
-        '',
-        '',
-        '',
-        '',
-        '0', '0', '0'
-      ],
+      ['2024/01/15 12:00:00', 'empty@test.com', '', '', '', '', '0', '0', '0'],
       // Very long text
       [
         '2024/01/15 12:05:00',
@@ -220,7 +232,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         'これは非常に長い理由です。'.repeat(50),
         'クラス名が長い場合のテスト用クラス名'.repeat(10),
         '名前が非常に長い場合のテスト用名前'.repeat(5),
-        '999', '999', '999'
+        '999',
+        '999',
+        '999',
       ],
       // Special characters and injection attempts
       [
@@ -230,7 +244,9 @@ export const PRODUCTION_DATA_FIXTURES = {
         "'; DROP TABLE users; -- SQL injection attempt",
         '3年<script>alert("XSS")</script>組',
         'テスト\n改行\t\tタブ\\バックスラッシュ',
-        'NaN', 'Infinity', '-1'
+        'NaN',
+        'Infinity',
+        '-1',
       ],
       // Unicode and internationalization
       [
@@ -240,10 +256,12 @@ export const PRODUCTION_DATA_FIXTURES = {
         '这是中文测试文本 中國語テスト',
         '한국어 클래스',
         'Üñïçødé Ñâmé',
-        '∞', '∑', '∫'
-      ]
-    ]
-  }
+        '∞',
+        '∑',
+        '∫',
+      ],
+    ],
+  },
 };
 
 // Production-like database configurations
@@ -253,7 +271,8 @@ export const PRODUCTION_DATABASE_FIXTURES = {
       userId: 'usr_2024_001_tokyo_hs',
       adminEmail: 'teacher001@tokyo-edu.ac.jp',
       spreadsheetId: '1ABC123DEF456GHI789JKL012MNO345PQR678STU',
-      spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1ABC123DEF456GHI789JKL012MNO345PQR678STU/edit',
+      spreadsheetUrl:
+        'https://docs.google.com/spreadsheets/d/1ABC123DEF456GHI789JKL012MNO345PQR678STU/edit',
       createdAt: '2024-01-10T09:00:00.000Z',
       configJson: JSON.stringify({
         appPublished: true,
@@ -268,17 +287,18 @@ export const PRODUCTION_DATABASE_FIXTURES = {
         displaySettings: {
           showNames: true,
           showReactions: true,
-          anonymousMode: false
-        }
+          anonymousMode: false,
+        },
       }),
       lastAccessedAt: '2024-01-15T11:45:22.000Z',
-      isActive: 'true'
+      isActive: 'true',
     },
     {
       userId: 'usr_2024_002_corp_train',
       adminEmail: 'hr.admin@company.co.jp',
       spreadsheetId: '1XYZ789ABC012DEF345GHI678JKL901MNO234PQR',
-      spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1XYZ789ABC012DEF345GHI678JKL901MNO234PQR/edit',
+      spreadsheetUrl:
+        'https://docs.google.com/spreadsheets/d/1XYZ789ABC012DEF345GHI678JKL901MNO234PQR/edit',
       createdAt: '2024-03-01T08:30:00.000Z',
       configJson: JSON.stringify({
         appPublished: true,
@@ -294,17 +314,18 @@ export const PRODUCTION_DATABASE_FIXTURES = {
         displaySettings: {
           showNames: false,
           showReactions: true,
-          anonymousMode: true
-        }
+          anonymousMode: true,
+        },
       }),
       lastAccessedAt: '2024-03-15T17:30:15.000Z',
-      isActive: 'true'
+      isActive: 'true',
     },
     {
       userId: 'usr_2024_003_acad_conf',
       adminEmail: 'conference@university.edu',
       spreadsheetId: '1QWE456RTY789UIO123ASD456FGH789JKL012ZXC',
-      spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1QWE456RTY789UIO123ASD456FGH789JKL012ZXC/edit',
+      spreadsheetUrl:
+        'https://docs.google.com/spreadsheets/d/1QWE456RTY789UIO123ASD456FGH789JKL012ZXC/edit',
       createdAt: '2024-05-01T12:00:00.000Z',
       configJson: JSON.stringify({
         appPublished: true,
@@ -319,14 +340,14 @@ export const PRODUCTION_DATABASE_FIXTURES = {
         displaySettings: {
           showNames: true,
           showReactions: true,
-          anonymousMode: false
+          anonymousMode: false,
         },
-        language: 'en'
+        language: 'en',
       }),
       lastAccessedAt: '2024-05-20T15:22:33.000Z',
-      isActive: 'true'
-    }
-  ]
+      isActive: 'true',
+    },
+  ],
 };
 
 // Helper functions for test data setup
@@ -342,14 +363,16 @@ export class ProductionDataManager {
 
     MockTestUtils.clearAllMockData();
     MockTestUtils.createRealisticSpreadsheetData(dataset.headers, dataset.responses);
-    
+
     // Setup corresponding user data
-    const userData = PRODUCTION_DATABASE_FIXTURES.USERS.find(user => 
-      user.configJson.includes(dataSetName.toLowerCase()) || 
-      dataSetName.includes('SCHOOL') && user.adminEmail.includes('edu') ||
-      dataSetName.includes('CORPORATE') && user.adminEmail.includes('company') ||
-      dataSetName.includes('ACADEMIC') && user.adminEmail.includes('university')
-    ) || PRODUCTION_DATABASE_FIXTURES.USERS[0];
+    const userData =
+      PRODUCTION_DATABASE_FIXTURES.USERS.find(
+        (user) =>
+          user.configJson.includes(dataSetName.toLowerCase()) ||
+          (dataSetName.includes('SCHOOL') && user.adminEmail.includes('edu')) ||
+          (dataSetName.includes('CORPORATE') && user.adminEmail.includes('company')) ||
+          (dataSetName.includes('ACADEMIC') && user.adminEmail.includes('university'))
+      ) || PRODUCTION_DATABASE_FIXTURES.USERS[0];
 
     MockTestUtils.setMockData('currentUser', userData);
     MockTestUtils.setMockData(`user_${userData.userId}`, userData);
@@ -358,7 +381,10 @@ export class ProductionDataManager {
   /**
    * Generate large-scale test data for performance testing
    */
-  static generateLargeDataset(responseCount: number, baseDataSet: keyof typeof PRODUCTION_DATA_FIXTURES): ProductionSpreadsheetData {
+  static generateLargeDataset(
+    responseCount: number,
+    baseDataSet: keyof typeof PRODUCTION_DATA_FIXTURES
+  ): ProductionSpreadsheetData {
     const dataset = PRODUCTION_DATA_FIXTURES[baseDataSet];
     if (!dataset) {
       throw new Error(`Dataset ${baseDataSet} not found`);
@@ -370,7 +396,14 @@ export class ProductionDataManager {
     const classes = ['1年A組', '1年B組', '2年A組', '2年B組', '3年A組', '3年B組'];
 
     for (let i = 0; i < responseCount; i++) {
-      const timestamp = new Date(2024, 0, 15, 9 + Math.floor(i / 60), i % 60, Math.floor(Math.random() * 60));
+      const timestamp = new Date(
+        2024,
+        0,
+        15,
+        9 + Math.floor(i / 60),
+        i % 60,
+        Math.floor(Math.random() * 60)
+      );
       const response = [
         timestamp.toLocaleString('ja-JP'),
         `student${String(i).padStart(4, '0')}@test.edu`,
@@ -380,7 +413,7 @@ export class ProductionDataManager {
         `生徒${i}`,
         String(Math.floor(Math.random() * 50)),
         String(Math.floor(Math.random() * 50)),
-        String(Math.floor(Math.random() * 50))
+        String(Math.floor(Math.random() * 50)),
       ];
       generatedResponses.push(response);
     }
@@ -392,11 +425,11 @@ export class ProductionDataManager {
         totalResponses: responseCount,
         dateRange: {
           start: '2024-01-15T09:00:00Z',
-          end: new Date().toISOString()
+          end: new Date().toISOString(),
         },
         schools: schools,
-        classes: classes
-      }
+        classes: classes,
+      },
     };
   }
 
@@ -427,8 +460,8 @@ export class ProductionDataManager {
 
     // Consistency validation
     const headerCount = data.headers.length;
-    const inconsistentRows = data.rows.filter(row => 
-      !Array.isArray(row) || row.length !== headerCount
+    const inconsistentRows = data.rows.filter(
+      (row) => !Array.isArray(row) || row.length !== headerCount
     );
 
     if (inconsistentRows.length > 0) {
@@ -458,26 +491,46 @@ export class ProductionDataManager {
       reason: -1,
       class: -1,
       name: -1,
-      reactions: []
+      reactions: [],
     };
 
     headers.forEach((header, index) => {
       const lowerHeader = header.toLowerCase();
-      
+
       if (lowerHeader.includes('タイムスタンプ') || lowerHeader.includes('timestamp')) {
         mapping.timestamp = index;
       } else if (lowerHeader.includes('メール') || lowerHeader.includes('email')) {
         mapping.email = index;
-      } else if (lowerHeader.includes('意見') || lowerHeader.includes('夢') || lowerHeader.includes('session') || lowerHeader.includes('印象')) {
+      } else if (
+        lowerHeader.includes('意見') ||
+        lowerHeader.includes('夢') ||
+        lowerHeader.includes('session') ||
+        lowerHeader.includes('印象')
+      ) {
         mapping.answer = index;
-      } else if (lowerHeader.includes('理由') || lowerHeader.includes('why') || lowerHeader.includes('感じた')) {
+      } else if (
+        lowerHeader.includes('理由') ||
+        lowerHeader.includes('why') ||
+        lowerHeader.includes('感じた')
+      ) {
         mapping.reason = index;
-      } else if (lowerHeader.includes('クラス') || lowerHeader.includes('部署') || lowerHeader.includes('institution') || lowerHeader.includes('class')) {
+      } else if (
+        lowerHeader.includes('クラス') ||
+        lowerHeader.includes('部署') ||
+        lowerHeader.includes('institution') ||
+        lowerHeader.includes('class')
+      ) {
         mapping.class = index;
       } else if (lowerHeader.includes('名前') || lowerHeader.includes('name')) {
         mapping.name = index;
-      } else if (lowerHeader.includes('なるほど') || lowerHeader.includes('いいね') || lowerHeader.includes('知りたい') || 
-                 lowerHeader.includes('informative') || lowerHeader.includes('applicable') || lowerHeader.includes('learn')) {
+      } else if (
+        lowerHeader.includes('なるほど') ||
+        lowerHeader.includes('いいね') ||
+        lowerHeader.includes('知りたい') ||
+        lowerHeader.includes('informative') ||
+        lowerHeader.includes('applicable') ||
+        lowerHeader.includes('learn')
+      ) {
         (mapping.reactions as number[]).push(index);
       }
     });

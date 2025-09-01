@@ -55,16 +55,16 @@ const PRODUCTION_LIKE_DATA = {
   // Japanese Google Forms typical headers
   formResponseHeaders: [
     'タイムスタンプ',
-    'メールアドレス', 
+    'メールアドレス',
     'あなたの意見を教えてください',
     'その理由を教えてください',
     'あなたのクラスを教えてください',
     'お名前を教えてください（任意）',
     'なるほど！',
-    'いいね！', 
-    'もっと知りたい！'
+    'いいね！',
+    'もっと知りたい！',
   ],
-  
+
   // Typical form response data
   formResponseData: [
     [
@@ -74,25 +74,31 @@ const PRODUCTION_LIKE_DATA = {
       '単純作業はAIに任せて、人間は創造的な仕事に集中できるから',
       '3年A組',
       '田中太郎',
-      '5', '3', '2'
+      '5',
+      '3',
+      '2',
     ],
     [
       '2024/01/15 15:12:33',
-      'student2@school.ed.jp', 
+      'student2@school.ed.jp',
       '環境問題への取り組みは個人レベルでも重要だと考えます',
       '小さな行動でも積み重なると大きな変化になるため',
       '2年B組',
       '佐藤花子',
-      '8', '6', '4'
+      '8',
+      '6',
+      '4',
     ],
     [
       '2024/01/15 16:45:12',
       'student3@school.ed.jp',
       'デジタル化が進んでも、対面でのコミュニケーションは大切だと思う',
       '人と人の直接的なつながりが信頼関係を築くため',
-      '1年C組', 
-      '',  // Empty name (optional field)
-      '12', '8', '6'
+      '1年C組',
+      '', // Empty name (optional field)
+      '12',
+      '8',
+      '6',
     ],
     [
       '2024/01/15 17:30:21',
@@ -100,48 +106,56 @@ const PRODUCTION_LIKE_DATA = {
       '部活動を通じて学んだチームワークが将来に活かされると感じています',
       '協力することで個人では達成できない成果が得られるから',
       '3年A組',
-      '鈴木次郎', 
-      '7', '9', '3'
-    ]
+      '鈴木次郎',
+      '7',
+      '9',
+      '3',
+    ],
   ],
 
   // Edge case data - problematic formats that occur in production
   edgeCaseData: [
     [
       '2024/01/15 18:15:30',
-      'teacher@school.ed.jp',  // Teacher email (different domain pattern)
-      '改行を含む\n意見です。\nこのような\n場合もあります。',  // Multi-line text
+      'teacher@school.ed.jp', // Teacher email (different domain pattern)
+      '改行を含む\n意見です。\nこのような\n場合もあります。', // Multi-line text
       '理由も\n複数行に\nわたる場合があります。',
-      '教員',  // Non-standard class format
+      '教員', // Non-standard class format
       '先生',
-      '0', '0', '0'  // Zero reactions
+      '0',
+      '0',
+      '0', // Zero reactions
     ],
     [
       '2024/01/15 19:22:18',
       'student5@school.ed.jp',
-      'とても長い意見です。'.repeat(50),  // Very long text
+      'とても長い意見です。'.repeat(50), // Very long text
       'とても長い理由です。'.repeat(30),
       '3年A組',
       '非常に長い名前の生徒です'.repeat(5),
-      '999', '999', '999'  // Extremely high reaction counts
+      '999',
+      '999',
+      '999', // Extremely high reaction counts
     ],
     [
       '2024/01/15 20:10:45',
       'incomplete@school.ed.jp',
-      '不完全なデータ',  // Missing reason
-      '',  // Empty reason
-      '',  // Empty class
-      '',  // Empty name
-      '', '', ''  // Empty reaction counts
-    ]
-  ]
+      '不完全なデータ', // Missing reason
+      '', // Empty reason
+      '', // Empty class
+      '', // Empty name
+      '',
+      '',
+      '', // Empty reaction counts
+    ],
+  ],
 };
 
 describe('データフロー統合テスト', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     MockTestUtils.clearAllMockData();
-    
+
     // Set up realistic timing for tests
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2024-01-15T12:00:00Z'));
@@ -162,7 +176,7 @@ describe('データフロー統合テスト', () => {
       // 2. Simulate spreadsheet access
       const spreadsheetId = 'test-form-responses-spreadsheet';
       const sheetName = 'フォームの回答 1';
-      
+
       MockTestUtils.setMockData('activeSpreadsheetId', spreadsheetId);
       MockTestUtils.setMockData('activeSheetName', sheetName);
 
@@ -170,7 +184,7 @@ describe('データフロー統合テスト', () => {
       const spreadsheet = global.SpreadsheetApp.openById(spreadsheetId);
       const sheet = spreadsheet.getSheetByName(sheetName);
       const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
+
       expect(headerRow).toEqual(PRODUCTION_LIKE_DATA.formResponseHeaders);
 
       // 4. Test AI column mapping
@@ -180,7 +194,7 @@ describe('データフロー統合テスト', () => {
           reason: -1,
           class: -1,
           name: -1,
-          confidence: { answer: 0, reason: 0, class: 0, name: 0 }
+          confidence: { answer: 0, reason: 0, class: 0, name: 0 },
         };
 
         headers.forEach((header, index) => {
@@ -189,7 +203,7 @@ describe('データフロー統合テスト', () => {
             mapping.answer = index;
             mapping.confidence.answer = 95;
           }
-          // Reason column detection  
+          // Reason column detection
           if (header.includes('理由') || header.includes('根拠') || header.includes('なぜ')) {
             mapping.reason = index;
             mapping.confidence.reason = 90;
@@ -210,11 +224,11 @@ describe('データフロー統合テスト', () => {
       };
 
       const columnMapping = detectColumnMapping(headerRow);
-      
+
       expect(columnMapping.answer).toBe(2); // "あなたの意見を教えてください"
       expect(columnMapping.reason).toBe(3); // "その理由を教えてください"
-      expect(columnMapping.class).toBe(4);  // "あなたのクラスを教えてください"
-      expect(columnMapping.name).toBe(5);   // "お名前を教えてください（任意）"
+      expect(columnMapping.class).toBe(4); // "あなたのクラスを教えてください"
+      expect(columnMapping.name).toBe(5); // "お名前を教えてください（任意）"
       expect(columnMapping).toHaveValidColumnMapping();
 
       // 5. Test data processing
@@ -226,14 +240,14 @@ describe('データフロー統合テスト', () => {
         timestamp: row[0] as string,
         email: row[1] as string,
         answer: row[columnMapping.answer] as string,
-        reason: columnMapping.reason >= 0 ? row[columnMapping.reason] as string : undefined,
-        class: columnMapping.class >= 0 ? row[columnMapping.class] as string : undefined,
-        name: columnMapping.name >= 0 ? row[columnMapping.name] as string : undefined,
+        reason: columnMapping.reason >= 0 ? (row[columnMapping.reason] as string) : undefined,
+        class: columnMapping.class >= 0 ? (row[columnMapping.class] as string) : undefined,
+        name: columnMapping.name >= 0 ? (row[columnMapping.name] as string) : undefined,
         reactions: {
           UNDERSTAND: parseInt(row[6]) || 0,
           LIKE: parseInt(row[7]) || 0,
           CURIOUS: parseInt(row[8]) || 0,
-        }
+        },
       }));
 
       expect(processedData).toHaveLength(4);
@@ -242,7 +256,7 @@ describe('データフロー統合テスト', () => {
         reason: '単純作業はAIに任せて、人間は創造的な仕事に集中できるから',
         class: '3年A組',
         name: '田中太郎',
-        reactions: { UNDERSTAND: 5, LIKE: 3, CURIOUS: 2 }
+        reactions: { UNDERSTAND: 5, LIKE: 3, CURIOUS: 2 },
       });
 
       // 6. Test AdminPanel output formatting
@@ -251,11 +265,14 @@ describe('データフロー統合テスト', () => {
         data: processedData,
         stats: {
           totalResponses: processedData.length,
-          averageReactions: processedData.reduce((sum, item) => 
-            sum + item.reactions.UNDERSTAND + item.reactions.LIKE + item.reactions.CURIOUS, 0
-          ) / processedData.length,
-          uniqueClasses: [...new Set(processedData.map(item => item.class).filter(Boolean))]
-        }
+          averageReactions:
+            processedData.reduce(
+              (sum, item) =>
+                sum + item.reactions.UNDERSTAND + item.reactions.LIKE + item.reactions.CURIOUS,
+              0
+            ) / processedData.length,
+          uniqueClasses: [...new Set(processedData.map((item) => item.class).filter(Boolean))],
+        },
       };
 
       expect(adminPanelResult.success).toBe(true);
@@ -280,7 +297,7 @@ describe('データフロー統合テスト', () => {
       const processData = (rows: any[][]) => {
         return rows.map((row, index) => {
           // Handle empty/undefined values gracefully
-          const safeGet = (arr: any[], idx: number, fallback = '') => 
+          const safeGet = (arr: any[], idx: number, fallback = '') =>
             arr[idx] !== undefined && arr[idx] !== null ? String(arr[idx]).trim() : fallback;
 
           return {
@@ -295,7 +312,7 @@ describe('データフロー統合テスト', () => {
               UNDERSTAND: Math.max(0, parseInt(safeGet(row, 6, '0')) || 0),
               LIKE: Math.max(0, parseInt(safeGet(row, 7, '0')) || 0),
               CURIOUS: Math.max(0, parseInt(safeGet(row, 8, '0')) || 0),
-            }
+            },
           };
         });
       };
@@ -338,14 +355,11 @@ describe('データフロー統合テスト', () => {
 
     test('列マッピング失敗時のフォールバック処理', () => {
       // Setup data with unexpected headers
-      const unexpectedHeaders = [
-        'Date', 'User', 'Comment', 'Note', 'Group', 'DisplayName'
-      ];
-      
-      MockTestUtils.createRealisticSpreadsheetData(
-        unexpectedHeaders,
-        [['2024-01-15', 'user1@example.com', 'Some comment', 'Some note', 'Group1', 'User One']]
-      );
+      const unexpectedHeaders = ['Date', 'User', 'Comment', 'Note', 'Group', 'DisplayName'];
+
+      MockTestUtils.createRealisticSpreadsheetData(unexpectedHeaders, [
+        ['2024-01-15', 'user1@example.com', 'Some comment', 'Some note', 'Group1', 'User One'],
+      ]);
 
       const detectColumnMappingWithFallback = (headers: string[]): ColumnMapping => {
         const mapping: ColumnMapping = {
@@ -353,27 +367,43 @@ describe('データフロー統合テスト', () => {
           reason: -1,
           class: -1,
           name: -1,
-          confidence: { answer: 0, reason: 0, class: 0, name: 0 }
+          confidence: { answer: 0, reason: 0, class: 0, name: 0 },
         };
 
         // Try exact matches first
         headers.forEach((header, index) => {
           const lowerHeader = header.toLowerCase();
-          
+
           // Fallback to partial matches for international/different formats
-          if (lowerHeader.includes('comment') || lowerHeader.includes('opinion') || lowerHeader.includes('answer')) {
+          if (
+            lowerHeader.includes('comment') ||
+            lowerHeader.includes('opinion') ||
+            lowerHeader.includes('answer')
+          ) {
             mapping.answer = index;
             mapping.confidence.answer = 60; // Lower confidence for fallback
           }
-          if (lowerHeader.includes('note') || lowerHeader.includes('reason') || lowerHeader.includes('why')) {
+          if (
+            lowerHeader.includes('note') ||
+            lowerHeader.includes('reason') ||
+            lowerHeader.includes('why')
+          ) {
             mapping.reason = index;
             mapping.confidence.reason = 50;
           }
-          if (lowerHeader.includes('group') || lowerHeader.includes('class') || lowerHeader.includes('team')) {
+          if (
+            lowerHeader.includes('group') ||
+            lowerHeader.includes('class') ||
+            lowerHeader.includes('team')
+          ) {
             mapping.class = index;
             mapping.confidence.class = 55;
           }
-          if (lowerHeader.includes('name') || lowerHeader.includes('displayname') || lowerHeader.includes('user')) {
+          if (
+            lowerHeader.includes('name') ||
+            lowerHeader.includes('displayname') ||
+            lowerHeader.includes('user')
+          ) {
             mapping.name = index;
             mapping.confidence.name = 45;
           }
@@ -391,11 +421,11 @@ describe('データフロー統合テスト', () => {
       const spreadsheet = global.SpreadsheetApp.openById('test-unexpected-headers');
       const sheet = spreadsheet.getSheetByName('Sheet1');
       const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
+
       const mapping = detectColumnMappingWithFallback(headerRow);
-      
+
       expect(mapping.answer).toBe(2); // 'Comment' column
-      expect(mapping.reason).toBe(3); // 'Note' column  
+      expect(mapping.reason).toBe(3); // 'Note' column
       expect(mapping.class).toBe(4); // 'Group' column
       expect(mapping.confidence.answer).toBe(60); // Lower confidence
     });
@@ -413,22 +443,22 @@ describe('データフロー統合テスト', () => {
         `${Math.floor(i / 100) + 1}年${String.fromCharCode(65 + (i % 26))}組`,
         `生徒${i}`,
         String(Math.floor(Math.random() * 20)),
-        String(Math.floor(Math.random() * 20)), 
-        String(Math.floor(Math.random() * 20))
+        String(Math.floor(Math.random() * 20)),
+        String(Math.floor(Math.random() * 20)),
       ]);
 
       MockTestUtils.createRealisticSpreadsheetData(largeHeaders, largeDataSet);
-      
+
       const startTime = Date.now();
-      
+
       const spreadsheet = global.SpreadsheetApp.openById('test-large-dataset');
       const sheet = spreadsheet.getSheetByName('Sheet1');
-      
+
       // Simulate batch data retrieval (performance optimization)
       const batchSize = 100;
       const totalRows = sheet.getLastRow();
       const processedBatches: any[][] = [];
-      
+
       for (let i = 2; i <= totalRows; i += batchSize) {
         const endRow = Math.min(i + batchSize - 1, totalRows);
         const batchData = sheet.getRange(i, 1, endRow - i + 1, sheet.getLastColumn()).getValues();
@@ -440,7 +470,7 @@ describe('データフロー統合テスト', () => {
 
       expect(processedBatches.length).toBeGreaterThan(0);
       expect(processingTime).toBeLessThan(5000); // Should complete within 5 seconds
-      
+
       // Verify data integrity in batching
       const totalProcessedRows = processedBatches.reduce((sum, batch) => sum + batch.length, 0);
       expect(totalProcessedRows).toBe(1000);
@@ -453,13 +483,11 @@ describe('データフロー統合テスト', () => {
         }
       };
 
-      const testData = Array.from({ length: 200 }, (_, i) => [
-        `data${i}`, `value${i}`, `info${i}`
-      ]);
+      const testData = Array.from({ length: 200 }, (_, i) => [`data${i}`, `value${i}`, `info${i}`]);
 
       const chunks: any[][] = [];
       const processor = memoryEfficientProcessor(testData, 50);
-      
+
       for (const chunk of processor) {
         chunks.push(chunk);
         // Simulate processing each chunk
@@ -467,7 +495,7 @@ describe('データフロー統合テスト', () => {
       }
 
       expect(chunks.length).toBe(4); // 200 / 50 = 4 chunks
-      
+
       // Verify all data was processed
       const totalProcessed = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
       expect(totalProcessed).toBe(200);
@@ -477,10 +505,50 @@ describe('データフロー統合テスト', () => {
   describe('Real-world Scenario Testing', () => {
     test('複数クラス混在データの処理', () => {
       const multiClassData = [
-        ['2024/01/15 10:00:00', 'student1@school.ed.jp', '環境保護が重要', '地球温暖化対策のため', '1年A組', '山田太郎', '5', '3', '2'],
-        ['2024/01/15 10:05:00', 'student2@school.ed.jp', 'デジタル化推進', '効率性向上のため', '2年B組', '佐藤花子', '8', '6', '4'],
-        ['2024/01/15 10:10:00', 'student3@school.ed.jp', '国際理解教育', 'グローバル社会対応', '3年C組', '田中次郎', '7', '5', '6'],
-        ['2024/01/15 10:15:00', 'teacher1@school.ed.jp', '教育改革必要', '時代に合わせた変化', '教員', '鈴木先生', '10', '8', '5'],
+        [
+          '2024/01/15 10:00:00',
+          'student1@school.ed.jp',
+          '環境保護が重要',
+          '地球温暖化対策のため',
+          '1年A組',
+          '山田太郎',
+          '5',
+          '3',
+          '2',
+        ],
+        [
+          '2024/01/15 10:05:00',
+          'student2@school.ed.jp',
+          'デジタル化推進',
+          '効率性向上のため',
+          '2年B組',
+          '佐藤花子',
+          '8',
+          '6',
+          '4',
+        ],
+        [
+          '2024/01/15 10:10:00',
+          'student3@school.ed.jp',
+          '国際理解教育',
+          'グローバル社会対応',
+          '3年C組',
+          '田中次郎',
+          '7',
+          '5',
+          '6',
+        ],
+        [
+          '2024/01/15 10:15:00',
+          'teacher1@school.ed.jp',
+          '教育改革必要',
+          '時代に合わせた変化',
+          '教員',
+          '鈴木先生',
+          '10',
+          '8',
+          '5',
+        ],
       ];
 
       MockTestUtils.createRealisticSpreadsheetData(
@@ -511,15 +579,17 @@ describe('データフロー統合テスト', () => {
       const classStats = Object.entries(groupedByClass).map(([className, rows]) => ({
         className,
         count: rows.length,
-        avgReactions: rows.reduce((sum, row) => 
-          sum + (parseInt(row[6]) + parseInt(row[7]) + parseInt(row[8])), 0
-        ) / rows.length
+        avgReactions:
+          rows.reduce(
+            (sum, row) => sum + (parseInt(row[6]) + parseInt(row[7]) + parseInt(row[8])),
+            0
+          ) / rows.length,
       }));
 
       expect(classStats).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ className: '1年A組', count: 1, avgReactions: 10 }),
-          expect.objectContaining({ className: '教員', count: 1, avgReactions: 23 })
+          expect.objectContaining({ className: '教員', count: 1, avgReactions: 23 }),
         ])
       );
     });

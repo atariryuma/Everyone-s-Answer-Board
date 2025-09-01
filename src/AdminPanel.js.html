@@ -31,10 +31,10 @@
 
   // Enhanced initialization with debugging
   console.log('🔍 AdminPanel Script Loading - Pre-DOMContentLoaded');
-  
+
   // Error tracking for debugging
   let initializationStep = 'not started';
-  
+
   // Wrap initialization in safe handler
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', safeInitialize);
@@ -42,31 +42,31 @@
     // DOM already loaded, initialize immediately
     safeInitialize();
   }
-  
+
   async function safeInitialize() {
     console.log('🚀 AdminPanel Safe Initialization Started');
     initializationStep = 'started';
-    
+
     try {
       initializationStep = 'panel initialization';
       console.log('Step 1: Initialize Panel');
       await initializePanel();
-      
+
       initializationStep = 'admin check';
       console.log('Step 2: Check System Admin Access');
       checkSystemAdminAccess();
-      
+
       initializationStep = 'footer initialization';
       console.log('Step 3: Initialize Footer');
       initializeFooter();
-      
+
       initializationStep = 'completed';
       console.log('✅ AdminPanel Initialization Completed Successfully');
     } catch (error) {
       console.error('❌ AdminPanel Initialization Failed at step:', initializationStep);
       console.error('Error details:', error);
       console.error('Stack trace:', error.stack);
-      
+
       // Try to show error even if UI is not fully initialized
       try {
         showError('初期化エラー: ' + initializationStep + ' - ' + error.message);
@@ -75,7 +75,7 @@
         alert('管理パネルの初期化に失敗しました。ページを再読み込みしてください。');
       }
     }
-    
+
     // Setup periodic updates regardless of initialization result
     try {
       setInterval(updateSystemStatus, 30000);
@@ -125,7 +125,7 @@
   async function initializePanel() {
     console.log('🔧 initializePanel: Starting panel initialization');
     let step = 'starting';
-    
+
     try {
       console.log('AdminPanel非同期初期化開始');
       setLoading(true);
@@ -157,7 +157,7 @@
   // スプレッドシート一覧読み込み（非同期版）
   function loadSpreadsheetListAsync() {
     console.log('📂 loadSpreadsheetListAsync: Starting to load spreadsheet list');
-    
+
     return new Promise((resolve, reject) => {
       const select = document.getElementById('spreadsheet-select');
       if (!select) {
@@ -165,9 +165,9 @@
         reject(new Error('spreadsheet-select element not found'));
         return;
       }
-      
+
       select.innerHTML = '<option value="">読み込み中...</option>';
-      
+
       // ローディング表示を追加
       setLoading(true, 'スプレッドシート一覧を読み込み中...');
       console.log('🔄 Calling google.script.run.getSpreadsheetList()...');
@@ -176,26 +176,26 @@
         .withSuccessHandler(function (spreadsheets) {
           console.log(`✅ Received spreadsheets:`, spreadsheets);
           select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
-          
+
           if (spreadsheets && Array.isArray(spreadsheets)) {
             spreadsheets.forEach((sheet) => {
               const option = document.createElement('option');
               option.value = sheet.id;
               option.textContent = sheet.name;
-              
+
               // フォーム情報をdata属性として保存
               if (sheet.formUrl) {
                 option.dataset.formUrl = sheet.formUrl;
                 option.dataset.formTitle = sheet.formTitle || 'フォーム';
               }
-              
+
               select.appendChild(option);
             });
             console.log(`📊 スプレッドシート一覧読み込み完了: ${spreadsheets.length}件`);
           } else {
             console.warn('⚠️ Received invalid spreadsheets data:', spreadsheets);
           }
-          
+
           setLoading(false);
           resolve(spreadsheets);
         })
@@ -203,11 +203,11 @@
           console.error('❌ スプレッドシート読み込みエラー:', error);
           select.innerHTML = '<option value="">読み込みエラー</option>';
           setLoading(false);
-          
+
           // エラーの詳細な分析とユーザーフレンドリーなメッセージ
           let userMessage = 'スプレッドシートの読み込みに失敗しました。';
           let suggestions = [];
-          
+
           if (error.message && error.message.includes('getEmail')) {
             suggestions.push('Googleドライブへのアクセス権限を確認してください');
             suggestions.push('ブラウザを再読み込みして再試行してください');
@@ -217,11 +217,12 @@
             suggestions.push('インターネット接続を確認してください');
             suggestions.push('しばらく時間をおいて再試行してください');
           }
-          
-          const detailedMessage = suggestions.length > 0 
-            ? userMessage + '\n\n推奨対処法:\n' + suggestions.map(s => '• ' + s).join('\n')
-            : userMessage + '\n\n詳細: ' + error.message;
-            
+
+          const detailedMessage =
+            suggestions.length > 0
+              ? userMessage + '\n\n推奨対処法:\n' + suggestions.map((s) => '• ' + s).join('\n')
+              : userMessage + '\n\n詳細: ' + error.message;
+
           reject(new Error(detailedMessage));
         })
         .getSpreadsheetList();
@@ -325,10 +326,7 @@
   // 設定データ取得（Promise版）
   function getCurrentConfigAsync() {
     return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .getCurrentConfig();
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCurrentConfig();
     });
   }
 
@@ -605,7 +603,7 @@
           sheets.forEach((sheet) => {
             const option = document.createElement('option');
             option.value = sheet.name;
-            
+
             // フォーム連携シートかどうかで表示を変える
             if (sheet.isFormResponseSheet && sheet.formConnected) {
               option.textContent = `📋 ${sheet.name} (フォーム回答)`;
@@ -615,7 +613,7 @@
               option.textContent = sheet.name;
               option.dataset.isFormSheet = 'false';
             }
-            
+
             select.appendChild(option);
           });
           console.log(`シート一覧読み込み完了: ${sheets.length}件`);
@@ -752,7 +750,7 @@
   // ローディング状態設定 - UnifiedLoadingSystemを使用
   function setLoading(loading, message = '処理中...') {
     systemState.loading = loading;
-    
+
     // UnifiedLoadingSystemを使用
     if (window.unifiedLoading) {
       if (loading) {
@@ -790,12 +788,12 @@
     const formInfo = document.getElementById('form-info');
     const formTitle = document.getElementById('form-title');
     const formUrl = document.getElementById('form-url');
-    
+
     if (formInfo && formTitle && formUrl) {
       formTitle.textContent = formData.formTitle;
       formUrl.href = formData.formUrl;
       formUrl.textContent = formData.formUrl;
-      
+
       formInfo.classList.remove('hidden');
       console.log('フォーム情報表示:', formData);
     }
@@ -807,6 +805,32 @@
     if (formInfo) {
       formInfo.classList.add('hidden');
     }
+  }
+
+  // シート別フォーム連携情報をチェック・表示
+  function checkSheetFormConnection(spreadsheetId, sheetName) {
+    if (!spreadsheetId || !sheetName) {
+      hideFormInfo();
+      return;
+    }
+
+    setLoading(true, 'シート連携情報を確認中...');
+
+    google.script.run
+      .withSuccessHandler((result) => {
+        setLoading(false);
+        if (result && result.success && result.formData) {
+          showFormInfo(result.formData);
+        } else {
+          hideFormInfo();
+        }
+      })
+      .withFailureHandler((error) => {
+        setLoading(false);
+        console.error('シート連携チェックエラー:', error);
+        hideFormInfo();
+      })
+      .getSheetFormConnection(spreadsheetId, sheetName);
   }
 
   // 情報表示 (SharedUtilitiesの通知システムを使用)
@@ -991,9 +1015,7 @@
             updateSheetNameSuggestions(result.sheets);
           }
         } else {
-          showError(
-            'スプレッドシートにアクセスできません: ' + (result.error || 'Unknown error')
-          );
+          showError('スプレッドシートにアクセスできません: ' + (result.error || 'Unknown error'));
         }
       })
       .withFailureHandler(function (error) {
@@ -1097,17 +1119,19 @@
       const spreadsheetId = this.value;
       if (spreadsheetId) {
         loadSheetList(spreadsheetId);
-        
-        // フォーム情報を表示
-        const selectedOption = this.selectedOptions[0];
-        if (selectedOption && selectedOption.dataset.formUrl) {
-          showFormInfo({
-            formTitle: selectedOption.dataset.formTitle || '不明',
-            formUrl: selectedOption.dataset.formUrl
-          });
-        } else {
-          hideFormInfo();
-        }
+      }
+      // フォーム情報はシート選択時に表示するため、ここでは非表示
+      hideFormInfo();
+    });
+
+    // シート選択時（フォーム情報表示）
+    document.getElementById('sheet-select').addEventListener('change', function () {
+      const spreadsheetId = document.getElementById('spreadsheet-select').value;
+      const sheetName = this.value;
+
+      if (spreadsheetId && sheetName) {
+        // シート別フォーム連携情報を取得・表示
+        checkSheetFormConnection(spreadsheetId, sheetName);
       } else {
         hideFormInfo();
       }
@@ -1153,7 +1177,7 @@
   function loadSheetList(spreadsheetId) {
     const select = document.getElementById('sheet-select');
     select.innerHTML = '<option value="">読み込み中...</option>';
-    
+
     // ローディング表示
     setLoading(true, 'シート一覧を読み込み中...');
 
@@ -1163,7 +1187,7 @@
         sheets.forEach((sheet) => {
           const option = document.createElement('option');
           option.value = sheet.name;
-          
+
           // フォーム連携シートかどうかで表示を変える
           if (sheet.isFormResponseSheet && sheet.formConnected) {
             option.textContent = `📋 ${sheet.name} (フォーム回答)`;
@@ -1173,7 +1197,7 @@
             option.textContent = sheet.name;
             option.dataset.isFormSheet = 'false';
           }
-          
+
           select.appendChild(option);
         });
         setLoading(false);
@@ -1382,8 +1406,7 @@
       mappingKeys[columnType].forEach((key) => {
         if (mapping[key] !== null && mapping[key] !== undefined) {
           selectedIndex = mapping[key];
-          confidence =
-            mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
+          confidence = mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
         }
       });
 
@@ -1517,9 +1540,7 @@
         const columnLabel = String.fromCharCode(65 + mapping[key]) + '列';
         const confidence =
           mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
-        details.push(
-          `${columnNames[key]}: ${columnLabel} (信頼度: ${Math.round(confidence)}%)`
-        );
+        details.push(`${columnNames[key]}: ${columnLabel} (信頼度: ${Math.round(confidence)}%)`);
       }
     });
 
@@ -1530,8 +1551,7 @@
   function updateSelectionStatus() {
     const hasManualSelection =
       document.querySelectorAll('.modern-select.has-manual-selection').length > 0;
-    const hasAISelection =
-      document.querySelectorAll('.modern-select.has-ai-selection').length > 0;
+    const hasAISelection = document.querySelectorAll('.modern-select.has-ai-selection').length > 0;
 
     console.log('選択状況:', { hasManualSelection, hasAISelection });
 
@@ -1952,7 +1972,7 @@
   // アプリケーション名自動生成機能
   function generateAndSetAppName(spreadsheetId, sheetName) {
     const appNameInput = document.getElementById('app-name');
-    
+
     // 既に値が入力されている場合は上書きしない
     if (appNameInput.value.trim()) {
       return;
@@ -1965,7 +1985,7 @@
 
     // アプリケーション名生成
     let appName;
-    
+
     if (sheetName.includes('フォームの回答')) {
       // "○○フォームの回答 7" → "○○回答ボード"
       const baseName = spreadsheetName.replace(/フォーム$/, '').trim();

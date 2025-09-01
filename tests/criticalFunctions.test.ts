@@ -1,5 +1,5 @@
 /**
- * @fileoverview クリティカル機能のテスト (TypeScript版) 
+ * @fileoverview クリティカル機能のテスト (TypeScript版)
  * 新アーキテクチャでの重要機能の動作確認 + 型安全性強化
  */
 
@@ -81,7 +81,15 @@ interface MockServices {
   getUserId: jest.MockedFunction<() => string>;
   updateUser: jest.MockedFunction<(userId: string, data: Partial<UserInfo>) => boolean>;
   createUser: jest.MockedFunction<(data: Partial<UserInfo>) => UserInfo>;
-  getSheetData: jest.MockedFunction<(userId: string, sheetName?: string, classFilter?: string | null, sortOrder?: string, adminMode?: boolean) => any[]>;
+  getSheetData: jest.MockedFunction<
+    (
+      userId: string,
+      sheetName?: string,
+      classFilter?: string | null,
+      sortOrder?: string,
+      adminMode?: boolean
+    ) => any[]
+  >;
   getResponsesData: jest.MockedFunction<() => ApiResponse>;
   verifyUserAccess: jest.MockedFunction<(userId: string) => boolean>;
   createQuickStartForm: jest.MockedFunction<(email: string, userId: string) => any>;
@@ -114,7 +122,7 @@ class TypedMemoryCache {
   set<T = any>(key: string, value: T, ttlSeconds = 300): void {
     this.cache.set(key, {
       value,
-      expiry: Date.now() + ttlSeconds * 1000
+      expiry: Date.now() + ttlSeconds * 1000,
     });
   }
 
@@ -142,7 +150,7 @@ const typedMemoryCache = new TypedMemoryCache();
 const setupTypedTest = (): MockServices => {
   // Reset all mock data
   MockTestUtils.clearAllMockData();
-  
+
   // Setup realistic test data
   const testUserInfo: UserInfo = {
     userId: 'user123',
@@ -157,8 +165,28 @@ const setupTypedTest = (): MockServices => {
 
   MockTestUtils.setMockData('user_user123', testUserInfo);
   MockTestUtils.createRealisticSpreadsheetData(
-    ['userId', 'adminEmail', 'spreadsheetId', 'spreadsheetUrl', 'createdAt', 'configJson', 'lastAccessedAt', 'isActive'],
-    [[testUserInfo.userId, testUserInfo.adminEmail, testUserInfo.spreadsheetId, testUserInfo.spreadsheetUrl, testUserInfo.createdAt, testUserInfo.configJson, testUserInfo.lastAccessedAt, testUserInfo.isActive]]
+    [
+      'userId',
+      'adminEmail',
+      'spreadsheetId',
+      'spreadsheetUrl',
+      'createdAt',
+      'configJson',
+      'lastAccessedAt',
+      'isActive',
+    ],
+    [
+      [
+        testUserInfo.userId,
+        testUserInfo.adminEmail,
+        testUserInfo.spreadsheetId,
+        testUserInfo.spreadsheetUrl,
+        testUserInfo.createdAt,
+        testUserInfo.configJson,
+        testUserInfo.lastAccessedAt,
+        testUserInfo.isActive,
+      ],
+    ]
   );
 
   // Create typed mock services
@@ -191,22 +219,30 @@ const setupTypedTest = (): MockServices => {
         configJson: '{}',
         lastAccessedAt: new Date().toISOString(),
         isActive: 'true',
-        ...data
+        ...data,
       };
       MockTestUtils.setMockData(`user_${newUser.userId}`, newUser);
       return newUser;
     }),
 
-    getSheetData: jest.fn((_userId: string, _sheetName?: string, _classFilter?: string | null, _sortOrder?: string, _adminMode?: boolean): any[] => {
-      return [
-        { rowIndex: 1, name: 'Test User', opinion: 'Test Opinion' },
-      ];
-    }),
+    getSheetData: jest.fn(
+      (
+        _userId: string,
+        _sheetName?: string,
+        _classFilter?: string | null,
+        _sortOrder?: string,
+        _adminMode?: boolean
+      ): any[] => {
+        return [{ rowIndex: 1, name: 'Test User', opinion: 'Test Opinion' }];
+      }
+    ),
 
-    getResponsesData: jest.fn((): ApiResponse => ({
-      status: 'success' as any,
-      data: [{ id: 1 }, { id: 2 }],
-    })),
+    getResponsesData: jest.fn(
+      (): ApiResponse => ({
+        status: 'success' as any,
+        data: [{ id: 1 }, { id: 2 }],
+      })
+    ),
 
     verifyUserAccess: jest.fn((_userId: string): boolean => true),
 
@@ -239,8 +275,10 @@ const setupTypedTest = (): MockServices => {
 
   // Setup typed cache functions
   (global as any).getCacheValue = <T = any>(key: string): T | null => typedMemoryCache.get<T>(key);
-  (global as any).setCacheValue = <T = any>(key: string, value: T, ttl = 300): void => typedMemoryCache.set(key, value, ttl);
-  (global as any).clearUserCache = (userId: string): void => typedMemoryCache.clearUserCache(userId);
+  (global as any).setCacheValue = <T = any>(key: string, value: T, ttl = 300): void =>
+    typedMemoryCache.set(key, value, ttl);
+  (global as any).clearUserCache = (userId: string): void =>
+    typedMemoryCache.clearUserCache(userId);
 
   // Setup core business logic functions with proper typing
   (global as any).getSetupStep = (userInfo: UserInfo | null, configJson: ConfigJson): number => {
@@ -266,7 +304,11 @@ const setupTypedTest = (): MockServices => {
 
 // Core function implementations with proper typing
 const createGetInitialData = (mockServices: MockServices) => {
-  return (requestUserId: string, _targetSheetName?: string, _lightweightMode?: boolean): InitialDataResponse => {
+  return (
+    requestUserId: string,
+    _targetSheetName?: string,
+    _lightweightMode?: boolean
+  ): InitialDataResponse => {
     const userInfo = mockServices.getUserInfo(requestUserId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -296,7 +338,13 @@ const createGetInitialData = (mockServices: MockServices) => {
 };
 
 const createGetPublishedSheetData = (mockServices: MockServices) => {
-  return (requestUserId: string, classFilter?: string | null, sortOrder?: string, adminMode?: boolean, bypassCache?: boolean): SheetDataResponse => {
+  return (
+    requestUserId: string,
+    classFilter?: string | null,
+    sortOrder?: string,
+    adminMode?: boolean,
+    bypassCache?: boolean
+  ): SheetDataResponse => {
     const userInfo = mockServices.getUserInfo(requestUserId);
     if (!userInfo) {
       return { success: false, error: 'ユーザーが見つかりません' };
@@ -311,7 +359,13 @@ const createGetPublishedSheetData = (mockServices: MockServices) => {
       }
     }
 
-    const data = mockServices.getSheetData(requestUserId, 'Sheet1', classFilter, sortOrder, adminMode);
+    const data = mockServices.getSheetData(
+      requestUserId,
+      'Sheet1',
+      classFilter,
+      sortOrder,
+      adminMode
+    );
     return { success: true, data, fromCache: false };
   };
 };
@@ -340,7 +394,13 @@ const createQuickStartFormUI = (mockServices: MockServices) => {
 };
 
 const createSaveSheetConfig = (mockServices: MockServices) => {
-  return (userId: string, spreadsheetId: string, sheetName: string, config: SheetConfig, options: { setAsPublished?: boolean } = {}): boolean => {
+  return (
+    userId: string,
+    spreadsheetId: string,
+    sheetName: string,
+    config: SheetConfig,
+    options: { setAsPublished?: boolean } = {}
+  ): boolean => {
     const userInfo = mockServices.getUserInfo(userId);
     if (!userInfo) {
       return false;
@@ -424,7 +484,7 @@ describe('クリティカル機能テスト (TypeScript強化版)', () => {
         spreadsheetId: 'sheet123',
         spreadsheetUrl: 'https://sheets.google.com/123',
         createdAt: '2024-01-01',
-        configJson: 'invalid-json',  // Invalid JSON
+        configJson: 'invalid-json', // Invalid JSON
         lastAccessedAt: '2024-01-02',
         isActive: 'true',
       });
@@ -487,10 +547,7 @@ describe('クリティカル機能テスト (TypeScript強化版)', () => {
       expect(result.spreadsheetUrl).toBeDefined();
       expect(result.setupStep).toBe(3);
 
-      expect(mockServices.createQuickStartForm).toHaveBeenCalledWith(
-        'test@example.com',
-        'user123'
-      );
+      expect(mockServices.createQuickStartForm).toHaveBeenCalledWith('test@example.com', 'user123');
       expect(mockServices.updateUser).toHaveBeenCalledWith('user123', expect.any(Object));
     });
 
@@ -525,7 +582,7 @@ describe('クリティカル機能テスト (TypeScript強化版)', () => {
 
       expect(result).toBe(true);
       expect(mockServices.updateUser).toHaveBeenCalledWith('user123', {
-        configJson: expect.stringContaining('Sheet1')
+        configJson: expect.stringContaining('Sheet1'),
       });
     });
 
@@ -542,11 +599,11 @@ describe('クリティカル機能テスト (TypeScript強化版)', () => {
       const config: SheetConfig = { opinionHeader: '意見' };
 
       const result = saveSheetConfig('user123', 'sheet123', 'Sheet1', config, {
-        setAsPublished: true
+        setAsPublished: true,
       });
 
       expect(result).toBe(true);
-      
+
       // Check the updated config contains published settings
       const updateCall = mockServices.updateUser.mock.calls[0];
       const updatedConfigJson = JSON.parse(updateCall[1].configJson!);
@@ -618,7 +675,7 @@ describe('クリティカル機能テスト (TypeScript強化版)', () => {
       const largeDataSet = Array.from({ length: 1000 }, (_, i) => ({
         id: i,
         name: `User ${i}`,
-        data: `Data ${i}`
+        data: `Data ${i}`,
       }));
 
       mockServices.getSheetData.mockReturnValueOnce(largeDataSet);
@@ -634,7 +691,7 @@ describe('クリティカル機能テスト (TypeScript強化版)', () => {
 
     test('キャッシュのパフォーマンス効果確認', () => {
       const testData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
-      
+
       // First call (uncached)
       mockServices.getSheetData.mockReturnValueOnce(testData);
       const startTime1 = Date.now();
@@ -652,7 +709,7 @@ describe('クリティカル機能テスト (TypeScript強化版)', () => {
       expect(result1.success).toBe(true);
       expect(result2.success).toBe(true);
       expect(result2.fromCache).toBe(true);
-      
+
       // Cached call should be faster
       expect(endTime2 - startTime2).toBeLessThan(endTime1 - startTime1);
     });

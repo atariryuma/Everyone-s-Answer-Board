@@ -5,7 +5,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Optimized Permissions Policy - essential permissions only -->
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
+    <meta
+      http-equiv="Permissions-Policy"
+      content="camera=(), microphone=(), geolocation=(), fullscreen=*"
+    />
     <title>StudyQuest - 初回セットアップ</title>
 
     <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
@@ -15,27 +18,28 @@
       window.tailwind = {
         config: {
           corePlugins: { preflight: false },
-          important: true
-        }
+          important: true,
+        },
       };
-      
+
       // Suppress TailwindCSS production warnings immediately
       const originalWarn = console.warn;
-      console.warn = function(...args) {
+      console.warn = function (...args) {
         const message = args.join(' ');
-        if (message.includes('cdn.tailwindcss.com should not be used in production') ||
-            message.includes('tailwind') ||
-            message.includes('TailwindCSS')) {
+        if (
+          message.includes('cdn.tailwindcss.com should not be used in production') ||
+          message.includes('tailwind') ||
+          message.includes('TailwindCSS')
+        ) {
           return; // Completely suppress
         }
         originalWarn.apply(console, args);
       };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Shared Styles and Utilities -->
-    <?!= include('UnifiedStyles'); ?>
-    <?!= include('SharedUtilities'); ?>
+    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
   </head>
   <body>
     <div class="max-w-2xl mx-auto">
@@ -282,7 +286,7 @@
           // バリデーション
           validateJSON(serviceAccountJson);
           validateSpreadsheetId(databaseId);
-          
+
           // 管理者メールのバリデーション
           if (!adminEmail) {
             throw new Error('管理者メールアドレスが入力されていません');
@@ -297,7 +301,10 @@
           await new Promise((resolve, reject) => {
             google.script.run
               .withSuccessHandler((result) => {
-                showMessage(`✅ セットアップが正常に完了しました！管理者: ${result.adminEmail}`, 'success');
+                showMessage(
+                  `✅ セットアップが正常に完了しました！管理者: ${result.adminEmail}`,
+                  'success'
+                );
                 document.getElementById('test-section').classList.remove('hidden');
                 resolve(result);
               })
@@ -409,22 +416,28 @@
       }
 
       // ページ読み込み時に現在のユーザーのメールアドレスを自動取得
-      window.addEventListener('load', function() {
+      window.addEventListener('load', function () {
         const adminEmailField = document.getElementById('admin-email');
         if (adminEmailField && !adminEmailField.value) {
           google.script.run
-            .withSuccessHandler(function(result) {
+            .withSuccessHandler(function (result) {
               if (result.success && result.email) {
                 adminEmailField.value = result.email;
                 adminEmailField.style.borderColor = '#10b981'; // 緑色の境界線
                 showMessage(`📧 管理者メールアドレスを自動取得しました: ${result.email}`, 'info');
               } else {
-                showMessage('⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。', 'warning');
+                showMessage(
+                  '⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。',
+                  'warning'
+                );
               }
             })
-            .withFailureHandler(function(error) {
+            .withFailureHandler(function (error) {
               console.warn('Failed to get current user email:', error);
-              showMessage('⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。', 'warning');
+              showMessage(
+                '⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。',
+                'warning'
+              );
             })
             .getUser();
         }

@@ -21,7 +21,10 @@ function debugConstants() {
   console.log('SYSTEM_CONSTANTS:', typeof SYSTEM_CONSTANTS);
   if (typeof SYSTEM_CONSTANTS !== 'undefined') {
     console.log('COLUMN_MAPPING:', typeof SYSTEM_CONSTANTS.COLUMN_MAPPING);
-    console.log('COLUMN_MAPPING keys:', SYSTEM_CONSTANTS.COLUMN_MAPPING ? Object.keys(SYSTEM_CONSTANTS.COLUMN_MAPPING) : 'undefined');
+    console.log(
+      'COLUMN_MAPPING keys:',
+      SYSTEM_CONSTANTS.COLUMN_MAPPING ? Object.keys(SYSTEM_CONSTANTS.COLUMN_MAPPING) : 'undefined'
+    );
   }
 }
 
@@ -36,71 +39,127 @@ function debugConstants() {
 function getSpreadsheetList() {
   try {
     console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
-    
+
     const currentUserEmail = Session.getActiveUser().getEmail();
     console.log('現在のユーザー:', currentUserEmail);
 
-    // Google Driveからスプレッドシートを検索
-    const files = DriveApp.searchFiles(
-      'mimeType="application/vnd.google-apps.spreadsheet" and trashed=false'
-    );
+    // 🚀 最適化：キャッシュチェック（5分間有効）
+    try {
+      const cacheKey = `spreadsheet_list_${currentUserEmail}`;
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) {
+        const cacheData = JSON.parse(cached);
+        const cacheAge = Date.now() - cacheData.timestamp;
+        if (cacheAge < 300000) {
+          // 5分以内
+          console.info(
+            `getSpreadsheetList: キャッシュヒット (${Math.round(cacheAge / 1000)}秒前、元実行時間: ${cacheData.executionTime}ms)`
+          );
+          return cacheData.data;
+        }
+      }
+    } catch (cacheError) {
+      console.warn('getSpreadsheetList: キャッシュ読み込みエラー:', cacheError.message);
+    }
+
+    // 🚀 最適化：30日以内に開いたスプレッドシートのみ検索
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false and viewedByMeTime > "${thirtyDaysAgo.toISOString()}"`;
+
+    console.info('getSpreadsheetList: 30日以内のファイルを検索:', thirtyDaysAgo.toISOString());
+    const files = DriveApp.searchFiles(searchQuery);
 
     const spreadsheets = [];
     let count = 0;
-    const maxResults = 50; // パフォーマンス制限
+    const maxResults = 20; // 🚀 最適化：制限を減らして高速化
+    const maxProcessTime = 15000; // 🚀 最適化：15秒でタイムアウト
+    const startTime = Date.now();
 
-    while (files.hasNext() && count < maxResults) {
+    // 🚀 最適化：オーナーファイル先行収集（軽量処理）
+    const ownerFiles = [];
+    let fileCount = 0;
+
+    while (files.hasNext() && fileCount < 100) {
+      // 最大100件まで検索
+      if (Date.now() - startTime > maxProcessTime) {
+        console.warn('getSpreadsheetList: タイムアウト、部分結果を返します');
+        break;
+      }
+
       const file = files.next();
-      
-      // オーナー権限チェック
-      let ownerEmail = 'Unknown';
-      let isOwner = false;
+      fileCount++;
+
+      // オーナー権限チェック（軽量）
       try {
         const owner = file.getOwner();
-        if (owner) {
-          ownerEmail = owner.getEmail();
-          isOwner = ownerEmail === currentUserEmail;
+        if (owner && owner.getEmail() === currentUserEmail) {
+          ownerFiles.push({
+            id: file.getId(),
+            name: file.getName(),
+            lastModified: file.getLastUpdated().toISOString(),
+            fileObject: file,
+          });
         }
       } catch (ownerError) {
-        console.warn(`Owner取得エラー for file ${file.getName()}:`, ownerError.message);
-        continue; // オーナー確認できない場合はスキップ
-      }
-
-      // オーナーでない場合はスキップ
-      if (!isOwner) {
+        // スキップ
         continue;
       }
+    }
 
-      // フォーム連携チェック
-      let formInfo = null;
+    console.info(`getSpreadsheetList: オーナーファイル ${ownerFiles.length}件検出`);
+
+    // 🚀 最適化：フォーム連携チェック（必要最小限）
+    for (const ownerFile of ownerFiles) {
+      if (count >= maxResults) break;
+      if (Date.now() - startTime > maxProcessTime) {
+        console.warn('getSpreadsheetList: タイムアウト');
+        break;
+      }
+
       try {
-        formInfo = checkFormConnection(file.getId());
-      } catch (formError) {
-        console.warn(`フォーム連携チェックエラー for ${file.getName()}:`, formError.message);
-      }
+        const formInfo = checkFormConnection(ownerFile.id);
 
-      // フォーム連携がない場合はスキップ
-      if (!formInfo || !formInfo.hasForm) {
-        continue;
+        // フォーム連携がある場合のみ追加
+        if (formInfo && formInfo.hasForm) {
+          spreadsheets.push({
+            id: ownerFile.id,
+            name: ownerFile.name,
+            lastModified: ownerFile.lastModified,
+            owner: currentUserEmail,
+            isOwner: true,
+            formUrl: formInfo.formUrl,
+            formTitle: formInfo.formTitle,
+            hasFormConnection: true,
+          });
+          count++;
+        }
+      } catch (formError) {
+        console.warn(`フォーム連携チェックエラー for ${ownerFile.name}:`, formError.message);
       }
-      
-      spreadsheets.push({
-        id: file.getId(),
-        name: file.getName(),
-        lastModified: file.getLastUpdated().toISOString(),
-        owner: ownerEmail,
-        isOwner: true,
-        formUrl: formInfo.formUrl,
-        formTitle: formInfo.formTitle,
-        hasFormConnection: true
-      });
-      count++;
     }
 
     // 最終更新順でソート
     spreadsheets.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
 
-    console.log(`getSpreadsheetList: ${spreadsheets.length}個の条件適合スプレッドシートを取得`);
+    const executionTime = Date.now() - startTime;
+    console.info(
+      `getSpreadsheetList: ${spreadsheets.length}個の条件適合スプレッドシートを取得（実行時間: ${executionTime}ms）`
+    );
+
+    // 🚀 最適化：結果をキャッシュ（5分間）
+    try {
+      const cacheKey = `spreadsheet_list_${currentUserEmail}`;
+      const cacheData = {
+        timestamp: Date.now(),
+        data: spreadsheets,
+        executionTime: executionTime,
+      };
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(cacheData), 300); // 5分キャッシュ
+      console.info('getSpreadsheetList: 結果をキャッシュしました');
+    } catch (cacheError) {
+      console.warn('getSpreadsheetList: キャッシュ保存エラー:', cacheError.message);
+    }
+
     return spreadsheets;
   } catch (error) {
     console.error('getSpreadsheetList エラー:', error);
@@ -115,29 +174,120 @@ function getSpreadsheetList() {
  */
 function checkFormConnection(spreadsheetId) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    
-    // フォーム連携されたスプレッドシートには特定のプロパティがある
-    const form = FormApp.openByUrl(spreadsheet.getFormUrl());
-    
-    if (form) {
-      const formUrl = form.getPublishedUrl();
-      const formTitle = form.getTitle();
-      
+    // 🚀 最適化：軽量チェックを先に実行
+    let spreadsheet;
+    try {
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (accessError) {
+      // アクセス権限がない場合は即座にfalseを返す
+      return { hasForm: false };
+    }
+
+    // 🚀 最適化：getFormUrl()の例外処理を軽量化
+    let formUrl;
+    try {
+      formUrl = spreadsheet.getFormUrl();
+
+      // FormURLがnullや空文字の場合は即座にfalseを返す
+      if (!formUrl) {
+        return { hasForm: false };
+      }
+    } catch (error) {
+      // フォーム連携がない場合、getFormUrl()でエラーが発生する
+      return { hasForm: false };
+    }
+
+    // 🚀 最適化：FormApp.openByUrlは重いので必要最小限に
+    try {
+      const form = FormApp.openByUrl(formUrl);
+
       return {
         hasForm: true,
-        formUrl: formUrl,
-        formTitle: formTitle,
-        formId: form.getId()
+        formUrl: form.getPublishedUrl(),
+        formTitle: form.getTitle(),
+        formId: form.getId(),
       };
+    } catch (formError) {
+      // フォームが削除されている等の場合
+      return { hasForm: false };
     }
-    
-    return { hasForm: false };
-    
   } catch (error) {
-    // フォーム連携がない場合、getFormUrl()でエラーが発生する
-    console.log(`フォーム連携チェック: ${spreadsheetId} はフォーム非連携`);
+    // 予期しないエラー
+    console.warn(`フォーム連携チェック予期しないエラー: ${spreadsheetId}`, error.message);
     return { hasForm: false };
+  }
+}
+
+/**
+ * 特定シートのフォーム連携情報を取得
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} シート別フォーム連携情報
+ */
+function getSheetFormConnection(spreadsheetId, sheetName) {
+  try {
+    console.log(
+      `getSheetFormConnection: シート別フォーム連携チェック開始 ${spreadsheetId}/${sheetName}`
+    );
+
+    // まずスプレッドシート全体のフォーム連携をチェック
+    const overallFormInfo = checkFormConnection(spreadsheetId);
+    if (!overallFormInfo || !overallFormInfo.hasForm) {
+      return { hasForm: false, reason: 'スプレッドシートにフォーム連携なし' };
+    }
+
+    // フォーム詳細情報を取得してシート名と照合
+    try {
+      const form = FormApp.openByUrl(overallFormInfo.formUrl);
+      const formDestination = form.getDestinationId();
+
+      // フォームの送信先スプレッドシートが一致するか確認
+      if (formDestination !== spreadsheetId) {
+        return { hasForm: false, reason: '送信先スプレッドシートの不一致' };
+      }
+
+      // フォームの送信先シート名を取得（可能な場合）
+      let destinationSheetName = null;
+      try {
+        const destinationSpreadsheet = SpreadsheetApp.openById(formDestination);
+        const destinationType = form.getDestinationType();
+
+        if (destinationType === FormApp.DestinationType.SPREADSHEET) {
+          // フォーム回答の送信先シート名を推定
+          // 通常は "フォームの回答 1", "フォームの回答 2" などの形式
+          destinationSheetName = sheetName; // 選択されたシート名で判定
+        }
+      } catch (destError) {
+        console.warn('送信先シート名取得エラー:', destError.message);
+      }
+
+      // シート名がフォーム回答用パターンに一致するかチェック
+      const isFormResponsePattern =
+        sheetName.startsWith('フォームの回答') || sheetName.startsWith('Form Responses');
+
+      if (isFormResponsePattern) {
+        return {
+          hasForm: true,
+          formUrl: overallFormInfo.formUrl,
+          formTitle: overallFormInfo.formTitle,
+          formId: overallFormInfo.formId,
+          sheetName: sheetName,
+          isConnectedToThisSheet: true,
+        };
+      } else {
+        return {
+          hasForm: false,
+          reason: 'シート名がフォーム回答パターンに非適合',
+          availableForm: overallFormInfo, // 参考情報
+        };
+      }
+    } catch (formError) {
+      console.warn('フォーム詳細取得エラー:', formError.message);
+      return { hasForm: false, reason: 'フォーム詳細取得失敗' };
+    }
+  } catch (error) {
+    console.error(`getSheetFormConnection エラー: ${spreadsheetId}/${sheetName}`, error.message);
+    return { hasForm: false, reason: 'エラー発生', error: error.message };
   }
 }
 
@@ -150,36 +300,38 @@ function checkFormConnection(spreadsheetId) {
 function checkIfFormResponseSheet(sheet, formInfo) {
   try {
     const sheetName = sheet.getName();
-    
+
     // フォーム連携がない場合は false
     if (!formInfo || !formInfo.hasForm) {
       return false;
     }
-    
+
     // フォーム回答シートの特徴をチェック
     // 1. シート名が「フォームの回答」で始まる
     if (sheetName.startsWith('フォームの回答') || sheetName.startsWith('Form Responses')) {
       return true;
     }
-    
+
     // 2. ヘッダー行の特徴をチェック（タイムスタンプ列の存在）
     if (sheet.getLastRow() > 0 && sheet.getLastColumn() > 0) {
       const headerRow = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), 10)).getValues()[0];
-      
+
       // タイムスタンプ列があるかチェック
-      const hasTimestamp = headerRow.some(header => {
+      const hasTimestamp = headerRow.some((header) => {
         if (!header) return false;
         const headerStr = String(header).toLowerCase();
-        return headerStr.includes('timestamp') || 
-               headerStr.includes('タイムスタンプ') || 
-               headerStr.includes('回答時刻');
+        return (
+          headerStr.includes('timestamp') ||
+          headerStr.includes('タイムスタンプ') ||
+          headerStr.includes('回答時刻')
+        );
       });
-      
+
       if (hasTimestamp) {
         return true;
       }
     }
-    
+
     return false;
   } catch (error) {
     console.warn(`フォーム回答シートチェックエラー for ${sheet.getName()}:`, error.message);
@@ -213,10 +365,10 @@ function getSheetList(spreadsheetId) {
 
     const sheetList = sheets.map((sheet) => {
       const sheetName = sheet.getName();
-      
+
       // シートがフォーム回答用シートかチェック
       const isFormResponseSheet = checkIfFormResponseSheet(sheet, formInfo);
-      
+
       return {
         name: sheetName,
         index: sheet.getIndex(),
@@ -225,7 +377,7 @@ function getSheetList(spreadsheetId) {
         hidden: sheet.isSheetHidden(),
         isFormResponseSheet: isFormResponseSheet,
         formConnected: formInfo && formInfo.hasForm ? true : false,
-        formTitle: formInfo && formInfo.hasForm ? formInfo.formTitle : null
+        formTitle: formInfo && formInfo.hasForm ? formInfo.formTitle : null,
       };
     });
 
@@ -266,11 +418,9 @@ function connectDataSource(spreadsheetId, sheetName) {
     // 【プロダクションバグ修正】 空オブジェクト {} も truthy と評価される問題を解決
     // 問題: headerIndices が {} の場合、truthy判定でconvertIndicesToMappingが呼ばれ
     // "Cannot convert undefined or null to object" エラーが発生
-    const hasValidHeaderIndices = headerIndices && 
-                                  typeof headerIndices === 'object' && 
-                                  Object.keys(headerIndices).length > 0;
-    
-    
+    const hasValidHeaderIndices =
+      headerIndices && typeof headerIndices === 'object' && Object.keys(headerIndices).length > 0;
+
     let columnMapping = detectColumnMapping(headerRow);
 
     // 列名マッピングの整合性チェック
@@ -329,9 +479,9 @@ function connectDataSource(spreadsheetId, sheetName) {
         // データベースのformUrl列に保存
         const dbUpdateResult = updateUser(userInfo.userId, {
           formUrl: formInfo.formUrl,
-          lastAccessedAt: new Date().toISOString()
+          lastAccessedAt: new Date().toISOString(),
         });
-        
+
         if (dbUpdateResult) {
           console.log('フォームURL保存成功:', formInfo.formUrl);
           updateData.formTitle = formInfo.formTitle;
@@ -390,68 +540,68 @@ function connectDataSource(spreadsheetId, sheetName) {
 function detectColumnMapping(headers) {
   // デバッグ: SYSTEM_CONSTANTSの存在確認
   debugConstants();
-  
+
   // 1. SYSTEM_CONSTANTS チェック → 失敗時は基本AI活用
   if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
     console.log('SYSTEM_CONSTANTS.COLUMN_MAPPING not available, using basic AI detection');
-    
+
     // 2. 高性能AI判定システム（フォールバック版）- aiPatterns活用
     const mapping = {};
     const confidence = {};
-    
+
     // SYSTEM_CONSTANTSが利用不可時の静的パターン定義
     const fallbackPatterns = {
       answer: {
         aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか'],
         alternates: ['どうして', '質問', '問題', '意見', '答え', 'なぜ', '思います', '考え'],
-        minLength: 15
+        minLength: 15,
       },
       reason: {
         aiPatterns: ['理由', '体験', '根拠', '詳細'],
-        alternates: ['理由', '根拠', '体験', 'なぜ', '詳細', '説明']
+        alternates: ['理由', '根拠', '体験', 'なぜ', '詳細', '説明'],
       },
       class: {
-        alternates: ['クラス', '学年']
+        alternates: ['クラス', '学年'],
       },
       name: {
-        alternates: ['名前', '氏名', 'お名前']
-      }
+        alternates: ['名前', '氏名', 'お名前'],
+      },
     };
-    
+
     // 高精度パターンマッチング
     headers.forEach((header, index) => {
       const headerLower = header.toLowerCase();
-      
-      Object.keys(fallbackPatterns).forEach(key => {
+
+      Object.keys(fallbackPatterns).forEach((key) => {
         const pattern = fallbackPatterns[key];
         let matchScore = 0;
-        
+
         // aiPatterns による高精度検出
         if (pattern.aiPatterns) {
-          pattern.aiPatterns.forEach(aiPattern => {
+          pattern.aiPatterns.forEach((aiPattern) => {
             if (headerLower.includes(aiPattern.toLowerCase())) {
               matchScore = Math.max(matchScore, 90);
             }
           });
-          
+
           // 質問文の特別処理（長い文章 + 疑問符）
           if (key === 'answer' && pattern.minLength && header.length > pattern.minLength) {
-            const hasQuestionMark = pattern.aiPatterns.some(p => header.includes(p));
+            const hasQuestionMark = pattern.aiPatterns.some((p) => header.includes(p));
             if (hasQuestionMark) {
               matchScore = Math.max(matchScore, 95); // 最高精度
             }
           }
         }
-        
+
         // alternates による補完検出
         if (matchScore === 0 && pattern.alternates) {
-          pattern.alternates.forEach(alternate => {
+          pattern.alternates.forEach((alternate) => {
             if (headerLower.includes(alternate.toLowerCase())) {
               matchScore = Math.max(matchScore, 80);
             }
           });
         }
-        
+
         // より高いスコアで置き換え
         if (matchScore > 0) {
           if (!mapping[key] || matchScore > (confidence[key] || 0)) {
@@ -461,18 +611,18 @@ function detectColumnMapping(headers) {
         }
       });
     });
-    
+
     // デフォルト値の設定
-    ['answer', 'reason', 'class', 'name'].forEach(key => {
+    ['answer', 'reason', 'class', 'name'].forEach((key) => {
       if (mapping[key] === undefined) mapping[key] = null;
     });
-    
+
     mapping.confidence = confidence;
-    
+
     console.log('detectColumnMapping: Enhanced AI detection result', {
-      mapping, 
+      mapping,
       confidence,
-      usedPatterns: 'aiPatterns + alternates + minLength'
+      usedPatterns: 'aiPatterns + alternates + minLength',
     });
     return mapping;
   }
@@ -524,11 +674,11 @@ function detectColumnMapping(headers) {
             matchScore = Math.max(matchScore, 85); // aiPatterns 高精度マッチング
           }
         });
-        
+
         // 回答列の特別処理：長い質問文 + aiパターンの組み合わせ
         if (fieldKey === 'answer' && header.length > 15) {
-          const hasAIPattern = column.aiPatterns.some(p => 
-            header.includes(p) || headerLower.includes(p.toLowerCase())
+          const hasAIPattern = column.aiPatterns.some(
+            (p) => header.includes(p) || headerLower.includes(p.toLowerCase())
           );
           if (hasAIPattern) {
             matchScore = Math.max(matchScore, 92); // 質問文特別検出
@@ -552,17 +702,17 @@ function detectColumnMapping(headers) {
   // 4. SYSTEM_CONSTANTS処理 + AI補強
   const basicMapping = performBasicSYSTEM_CONSTANTSMapping(headers);
   const aiEnhancement = identifyHeadersAdvanced(headers);
-  
+
   // 5. AI結果で精度向上
   const enhancedMapping = mergeColumnConfidence(basicMapping, aiEnhancement, headers);
-  
+
   console.log('detectColumnMapping: AI統合・超高精度マッピング完了', {
     headers,
     basicMapping,
     enhancedMapping,
     basicConfidence: basicMapping.confidence,
     enhancedConfidence: enhancedMapping.confidence,
-    usedTechnology: 'SYSTEM_CONSTANTS + aiPatterns + Advanced AI + Internet Knowledge'
+    usedTechnology: 'SYSTEM_CONSTANTS + aiPatterns + Advanced AI + Internet Knowledge',
   });
 
   return enhancedMapping;
@@ -618,11 +768,11 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
             matchScore = Math.max(matchScore, 85); // aiPatterns 高精度マッチング
           }
         });
-        
+
         // 回答列の特別処理：長い質問文 + aiパターンの組み合わせ
         if (fieldKey === 'answer' && header.length > 15) {
-          const hasAIPattern = column.aiPatterns.some(p => 
-            header.includes(p) || headerLower.includes(p.toLowerCase())
+          const hasAIPattern = column.aiPatterns.some(
+            (p) => header.includes(p) || headerLower.includes(p.toLowerCase())
           );
           if (hasAIPattern) {
             matchScore = Math.max(matchScore, 92); // 質問文特別検出
@@ -648,42 +798,52 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
  */
 function mergeColumnConfidence(basicMapping, aiResult, headers) {
   const enhanced = { ...basicMapping };
-  
+
   // 既存のconfidence値を保持（重要：0%問題の修正）
   enhanced.confidence = { ...basicMapping.confidence };
-  
-  
+
   // AI結果で既存マッピングを強化（既存confidence値を保持）
-  if (aiResult.answer && (!enhanced.answer || (aiResult.confidence?.answer || 0) > (enhanced.confidence?.answer || 0))) {
+  if (
+    aiResult.answer &&
+    (!enhanced.answer || (aiResult.confidence?.answer || 0) > (enhanced.confidence?.answer || 0))
+  ) {
     enhanced.answer = headers.indexOf(aiResult.answer);
     if (aiResult.confidence?.answer) {
       enhanced.confidence.answer = aiResult.confidence.answer;
     }
     // aiResult.confidence?.answerが無い場合はbasicMapping.confidenceの値を保持
   }
-  
-  if (aiResult.reason && (!enhanced.reason || (aiResult.confidence?.reason || 0) > (enhanced.confidence?.reason || 0))) {
+
+  if (
+    aiResult.reason &&
+    (!enhanced.reason || (aiResult.confidence?.reason || 0) > (enhanced.confidence?.reason || 0))
+  ) {
     enhanced.reason = headers.indexOf(aiResult.reason);
     if (aiResult.confidence?.reason) {
       enhanced.confidence.reason = aiResult.confidence.reason;
     }
   }
-  
-  if (aiResult.classHeader && (!enhanced.class || (aiResult.confidence?.class || 0) > (enhanced.confidence?.class || 0))) {
+
+  if (
+    aiResult.classHeader &&
+    (!enhanced.class || (aiResult.confidence?.class || 0) > (enhanced.confidence?.class || 0))
+  ) {
     enhanced.class = headers.indexOf(aiResult.classHeader);
     if (aiResult.confidence?.class) {
       enhanced.confidence.class = aiResult.confidence.class;
     }
   }
-  
-  if (aiResult.name && (!enhanced.name || (aiResult.confidence?.name || 0) > (enhanced.confidence?.name || 0))) {
+
+  if (
+    aiResult.name &&
+    (!enhanced.name || (aiResult.confidence?.name || 0) > (enhanced.confidence?.name || 0))
+  ) {
     enhanced.name = headers.indexOf(aiResult.name);
     if (aiResult.confidence?.name) {
       enhanced.confidence.name = aiResult.confidence.name;
     }
   }
-  
-  
+
   return enhanced;
 }
 
@@ -696,7 +856,6 @@ function mergeColumnConfidence(basicMapping, aiResult, headers) {
  */
 function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
   try {
-
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
@@ -760,7 +919,6 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
       }
     });
 
-
     // 不足列がない場合
     if (missingColumns.length === 0) {
       return {
@@ -793,7 +951,6 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
           position: newColumnIndex,
           systemName: colInfo.systemName,
         });
-
       });
     }
 
@@ -901,7 +1058,6 @@ function validateAccess(spreadsheetId) {
  */
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
-
     if (!spreadsheetId || !sheetName) {
       throw new Error('スプレッドシートIDとシート名が必要です');
     }
@@ -919,10 +1075,9 @@ function analyzeColumns(spreadsheetId, sheetName) {
 
     // 超高精度AI列マッピングを活用（新システム）
     // 【プロダクションバグ修正】 空オブジェクト {} も truthy と評価される問題を解決
-    const hasValidHeaderIndices = headerIndices && 
-                                  typeof headerIndices === 'object' && 
-                                  Object.keys(headerIndices).length > 0;
-    
+    const hasValidHeaderIndices =
+      headerIndices && typeof headerIndices === 'object' && Object.keys(headerIndices).length > 0;
+
     let columnMapping = detectColumnMapping(headerRow);
 
     // 列名マッピングの整合性チェック
@@ -945,7 +1100,6 @@ function analyzeColumns(spreadsheetId, sheetName) {
       cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
       const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
       columnMapping = detectColumnMapping(updatedHeaderRow);
-
     }
 
     // 設定を保存（既存システム互換）
@@ -1008,10 +1162,12 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   if (!headerIndices || typeof headerIndices !== 'object') {
     console.error('convertIndicesToMapping: headerIndices is null or invalid', headerIndices);
     // エラーを投げる代わりにAI判定にフォールバック
-    console.log('convertIndicesToMapping: Falling back to AI detection due to invalid headerIndices');
+    console.log(
+      'convertIndicesToMapping: Falling back to AI detection due to invalid headerIndices'
+    );
     return detectColumnMapping(headerRow);
   }
-  
+
   if (!headerRow || !Array.isArray(headerRow)) {
     console.error('convertIndicesToMapping: headerRow is null or invalid', headerRow);
     throw new Error('Cannot convert undefined or null headerRow to mapping object');
@@ -1029,12 +1185,14 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   console.log('convertIndicesToMapping: 入力データ確認', {
     headerIndices,
     headerRow: headerRow.slice(0, 10), // 最初の10項目のみログ出力
-    headerRowLength: headerRow.length
+    headerRowLength: headerRow.length,
   });
 
   // SYSTEM_CONSTANTS の安全性チェック
   if (!SYSTEM_CONSTANTS || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
-    console.warn('convertIndicesToMapping: SYSTEM_CONSTANTS.COLUMN_MAPPING is not available, falling back to AI detection');
+    console.warn(
+      'convertIndicesToMapping: SYSTEM_CONSTANTS.COLUMN_MAPPING is not available, falling back to AI detection'
+    );
     return detectColumnMapping(headerRow);
   }
 
@@ -1055,36 +1213,51 @@ function convertIndicesToMapping(headerIndices, headerRow) {
           for (const [actualHeader, index] of Object.entries(headerIndices)) {
             if (actualHeader.toLowerCase().includes(alternate.toLowerCase())) {
               columnIndex = index;
-              console.log(`convertIndicesToMapping: alternateマッチ ${uiFieldName}: "${actualHeader}" -> ${alternate} (index: ${index})`);
+              console.log(
+                `convertIndicesToMapping: alternateマッチ ${uiFieldName}: "${actualHeader}" -> ${alternate} (index: ${index})`
+              );
               break;
             }
           }
           if (columnIndex !== null) break;
         }
       }
-      
+
       // 質問文がヘッダーになっている場合の特別処理（answer列）
       if (columnIndex === null && uiFieldName === 'answer') {
         for (const [actualHeader, index] of Object.entries(headerIndices)) {
           // 15文字以上で質問っぽいヘッダーを回答列として認識
-          if (actualHeader.length > 15 && 
-              (actualHeader.includes('？') || actualHeader.includes('?') || 
-               actualHeader.includes('どうして') || actualHeader.includes('なぜ') || 
-               actualHeader.includes('思います') || actualHeader.includes('考え'))) {
+          if (
+            actualHeader.length > 15 &&
+            (actualHeader.includes('？') ||
+              actualHeader.includes('?') ||
+              actualHeader.includes('どうして') ||
+              actualHeader.includes('なぜ') ||
+              actualHeader.includes('思います') ||
+              actualHeader.includes('考え'))
+          ) {
             columnIndex = index;
-            console.log(`convertIndicesToMapping: 質問文ヘッダーを回答列として認識 ${uiFieldName}: "${actualHeader.substring(0, 30)}..." (index: ${index})`);
+            console.log(
+              `convertIndicesToMapping: 質問文ヘッダーを回答列として認識 ${uiFieldName}: "${actualHeader.substring(0, 30)}..." (index: ${index})`
+            );
             break;
           }
         }
       }
-      
+
       // 理由っぽいヘッダーの特別処理（reason列）
       if (columnIndex === null && uiFieldName === 'reason') {
         for (const [actualHeader, index] of Object.entries(headerIndices)) {
-          if (actualHeader.includes('理由') || actualHeader.includes('体験') || 
-              actualHeader.includes('根拠') || actualHeader.includes('なぜ')) {
+          if (
+            actualHeader.includes('理由') ||
+            actualHeader.includes('体験') ||
+            actualHeader.includes('根拠') ||
+            actualHeader.includes('なぜ')
+          ) {
             columnIndex = index;
-            console.log(`convertIndicesToMapping: 理由系ヘッダーを理由列として認識 ${uiFieldName}: "${actualHeader}" (index: ${index})`);
+            console.log(
+              `convertIndicesToMapping: 理由系ヘッダーを理由列として認識 ${uiFieldName}: "${actualHeader}" (index: ${index})`
+            );
             break;
           }
         }
@@ -1400,7 +1573,7 @@ function updateUserSpreadsheetConfig(userId, config) {
 
     // 新しいconfigManagerを使用して設定を更新
     const updateResult = App.getConfig().updateUserConfig(userId, config);
-    
+
     if (updateResult) {
       const updatedConfig = App.getConfig().getUserConfig(userId);
       console.log('updateUserSpreadsheetConfig: 設定更新完了', { userId, config: updatedConfig });
@@ -1428,10 +1601,10 @@ function updateUserSpreadsheetConfig(userId, config) {
 function getUserConfigJson(userId) {
   try {
     console.log('getUserConfigJson: 設定取得開始', userId);
-    
+
     // 新しいconfigManagerを使用して設定を取得
     const config = App.getConfig().getUserConfig(userId);
-    
+
     console.log('getUserConfigJson: 設定取得完了', { userId, hasConfig: !!config });
     return config;
   } catch (error) {
@@ -1584,7 +1757,6 @@ function getCurrentBoardInfoAndUrls() {
 
     if (userInfo.spreadsheetId) {
       try {
-
         // アクティブなシート名を決定（優先順位: publishedSheetName > activeSheetName）
         const sheetName = config.publishedSheetName || config.activeSheetName || 'フォームの回答 1';
         console.log('getCurrentBoardInfoAndUrls: 使用するシート名:', sheetName);
@@ -1652,7 +1824,7 @@ function getCurrentBoardInfoAndUrls() {
 function executeDataOptimization() {
   try {
     const targetUserId = '882d95c7-1fef-4739-a4b5-4ca02feaa69b';
-    
+
     if (typeof optimizeSpecificUser === 'function') {
       const result = optimizeSpecificUser(targetUserId);
       console.info('最適化結果:', result);
@@ -1660,14 +1832,14 @@ function executeDataOptimization() {
     } else {
       return {
         success: false,
-        message: 'ConfigOptimizer.gs が読み込まれていません'
+        message: 'ConfigOptimizer.gs が読み込まれていません',
       };
     }
   } catch (error) {
     console.error('executeDataOptimization エラー:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }

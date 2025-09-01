@@ -11,7 +11,7 @@
 function createCompleteUser(userEmail) {
   const userId = Utilities.getUuid();
   const timestamp = new Date().toISOString();
-  
+
   // ConfigOptimizerの最適化形式を使用（重複データを除去）
   const optimizedConfig = {
     title: `${userEmail}の回答ボード`,
@@ -23,7 +23,7 @@ function createCompleteUser(userEmail) {
     sheetName: null,
     columnMapping: {},
     theme: 'default',
-    lastModified: timestamp
+    lastModified: timestamp,
   };
 
   // columnsは必要時のみ保持（デフォルト列設定）
@@ -33,13 +33,13 @@ function createCompleteUser(userEmail) {
     { name: 'class', label: 'クラス', type: 'text', required: false },
     { name: 'opinion', label: '回答', type: 'textarea', required: true },
     { name: 'reason', label: '理由', type: 'textarea', required: false },
-    { name: 'name', label: '名前', type: 'text', required: false }
+    { name: 'name', label: '名前', type: 'text', required: false },
   ];
 
   console.info('新規ユーザー作成: 最適化済みconfigJSON使用', {
     userEmail,
     optimizedSize: JSON.stringify(optimizedConfig).length,
-    removedFields: ['userId', 'userEmail', 'createdAt'] // DB列に移行済み
+    removedFields: ['userId', 'userEmail', 'createdAt'], // DB列に移行済み
   });
 
   return {
@@ -51,7 +51,7 @@ function createCompleteUser(userEmail) {
     spreadsheetId: '',
     spreadsheetUrl: '',
     configJson: JSON.stringify(optimizedConfig),
-    formUrl: ''
+    formUrl: '',
   };
 }
 
@@ -84,17 +84,17 @@ function createRedirect(url) {
  */
 function handleUserRegistration(userEmail) {
   const existingUser = DB.findUserByEmail(userEmail);
-  
+
   if (existingUser) {
     // 既存ユーザー: 最終アクセス時刻のみ更新
     updateUserLastAccess(existingUser.userId);
     return existingUser;
-  } 
-  
+  }
+
   // 新規ユーザー: 完全データ作成
   const completeUserData = createCompleteUser(userEmail);
   DB.createUser(completeUserData);
-  
+
   console.log('新規ユーザー作成完了:', completeUserData.userId);
   return completeUserData;
 }
@@ -152,9 +152,9 @@ function processLoginFlow(userEmail) {
       try {
         // 統一ユーザー作成関数を使用
         const newUser = handleUserRegistration(userEmail);
-        
+
         console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
-        
+
         // キャッシュ整合性確保: 新規作成後の検証リトライ
         let verifiedUser = DB.findUserByEmail(userEmail);
         if (!verifiedUser) {
@@ -167,11 +167,10 @@ function processLoginFlow(userEmail) {
             verifiedUser = newUser;
           }
         }
-        
+
         // 新規ユーザーの管理パネルへリダイレクト
         const adminUrl = buildUserAdminUrl(verifiedUser.userId);
         return createRedirect(adminUrl);
-        
       } catch (error) {
         console.error('新規ユーザー作成失敗:', error);
         throw error;
@@ -186,7 +185,7 @@ function processLoginFlow(userEmail) {
       errorType: error.name || 'UnknownError',
       message: error.message,
       stack: error.stack,
-      severity: 'high'
+      severity: 'high',
     };
     console.error('🚨 processLoginFlow 重大エラー:', JSON.stringify(errorInfo, null, 2));
 
@@ -198,4 +197,3 @@ function processLoginFlow(userEmail) {
     return showErrorPage('ログインエラー', userMessage, error);
   }
 }
-

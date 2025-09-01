@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <title>StudyQuest - みんなのかいとうボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
+    <meta
+      http-equiv="Permissions-Policy"
+      content="camera=(), microphone=(), geolocation=(), fullscreen=*"
+    />
     <link
       rel="preload"
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
@@ -22,7 +25,7 @@
     <script>
       // Template Layer - 2024 GAS Best Practice
       // 統一されたテンプレート変数受け取りシステム
-      
+
       /**
        * GASテンプレート変数を型安全に解析
        * @param {Object} templateVars - テンプレート変数定義
@@ -41,9 +44,9 @@
           showScoreSort: false,
           isStudentMode: true,
           isAdminUser: false,
-          mapping: {}
+          mapping: {},
         };
-        
+
         Object.entries(templateVars).forEach(([key, rawValue]) => {
           try {
             // GASテンプレート未展開チェック
@@ -51,10 +54,11 @@
               result[key] = defaults[key];
               return;
             }
-            
+
             // 型別処理
             if (key === 'mapping') {
-              result[key] = typeof rawValue === 'string' ? JSON.parse(rawValue) : (rawValue || defaults[key]);
+              result[key] =
+                typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue || defaults[key];
             } else if (typeof defaults[key] === 'boolean') {
               result[key] = rawValue === 'true' || rawValue === true;
             } else {
@@ -65,7 +69,7 @@
             result[key] = defaults[key];
           }
         });
-        
+
         return Object.freeze(result);
       };
 
@@ -77,19 +81,21 @@
         mapping: '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>',
         userId: '<?= typeof userId !== "undefined" ? userId : "" ?>',
         ownerName: '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>',
-        showAdminFeatures: '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>',
-        showHighlightToggle: '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>',
+        showAdminFeatures:
+          '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>',
+        showHighlightToggle:
+          '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>',
         showScoreSort: '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>',
         isStudentMode: '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>',
-        isAdminUser: '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>'
+        isAdminUser: '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>',
       };
 
       // 統一設定オブジェクト生成
       const CONFIG = parseTemplateVars(TEMPLATE_VARS);
-      
+
       // グローバル互換性のためのエクスポート
       Object.assign(window, CONFIG);
-      
+
       // 直接CONFIG使用推奨 - レガシー変数は削除済み
     </script>
     <style>

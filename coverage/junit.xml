@@ -1,13 +1,448 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="4" failures="0" errors="0" time="0.329">
-  <testsuite name="プロダクションバグ検証: Cannot convert undefined or null to object" errors="0" failures="0" skipped="0" timestamp="2025-09-01T10:04:49" time="0.144" tests="4">
-    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object getHeadersCached が空オブジェクトを返す場合のエラー再現" name="プロダクションバグ検証: Cannot convert undefined or null to object getHeadersCached が空オブジェクトを返す場合のエラー再現" time="0.018">
+<testsuites name="jest tests" tests="133" failures="1" errors="0" time="1.268">
+  <testsuite name="エラー修正統合検証 (TypeScript強化版)" errors="0" failures="0" skipped="17" timestamp="2025-09-01T10:32:05" time="0.439" tests="17">
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト 文字列のrequestUserIdで正常に動作" name="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト 文字列のrequestUserIdで正常に動作" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" name="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" time="0.005">
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト オブジェクトのrequestUserIdでエラーハンドリング" name="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト オブジェクトのrequestUserIdでエラーハンドリング" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object connectDataSource エラーハンドリング強化の検証" name="プロダクションバグ検証: Cannot convert undefined or null to object connectDataSource エラーハンドリング強化の検証" time="0.003">
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト null/undefinedのrequestUserIdでフォールバック処理" name="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト null/undefinedのrequestUserIdでフォールバック処理" time="0">
+      <skipped/>
     </testcase>
-    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" name="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" time="0.002">
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト 空文字列のrequestUserIdでフォールバック処理" name="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト 空文字列のrequestUserIdでフォールバック処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト mockFindUserByIdがエラーを投げる場合の処理" name="エラー修正統合検証 (TypeScript強化版) getCurrentUserStatus型安全性統合テスト mockFindUserByIdがエラーを投げる場合の処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) 文字列エラーの正常処理" name="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) 文字列エラーの正常処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) ErrorInfoオブジェクトの正常処理" name="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) ErrorInfoオブジェクトの正常処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) 不完全なErrorInfoオブジェクトの処理" name="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) 不完全なErrorInfoオブジェクトの処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) undefined/null エラーの安全な処理" name="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) undefined/null エラーの安全な処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) 複雑なオブジェクト（JSON.stringify使用）" name="エラー修正統合検証 (TypeScript強化版) logClientError統合テスト (型安全版) 複雑なオブジェクト（JSON.stringify使用）" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) フロントエンド-バックエンド連携テスト (型安全版) 正しいエラー情報の送信" name="エラー修正統合検証 (TypeScript強化版) フロントエンド-バックエンド連携テスト (型安全版) 正しいエラー情報の送信" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) フロントエンド-バックエンド連携テスト (型安全版) スタックトレース付きエラーの送信" name="エラー修正統合検証 (TypeScript強化版) フロントエンド-バックエンド連携テスト (型安全版) スタックトレース付きエラーの送信" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) プロダクション環境特有のエラー再現テスト GASスプレッドシート権限エラーの再現" name="エラー修正統合検証 (TypeScript強化版) プロダクション環境特有のエラー再現テスト GASスプレッドシート権限エラーの再現" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) プロダクション環境特有のエラー再現テスト 配列サイズ不一致エラーの再現" name="エラー修正統合検証 (TypeScript強化版) プロダクション環境特有のエラー再現テスト 配列サイズ不一致エラーの再現" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) プロダクション環境特有のエラー再現テスト レスポンス時間制限エラーの再現" name="エラー修正統合検証 (TypeScript強化版) プロダクション環境特有のエラー再現テスト レスポンス時間制限エラーの再現" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) 型安全性テスト UserInfoインターフェースの型チェック" name="エラー修正統合検証 (TypeScript強化版) 型安全性テスト UserInfoインターフェースの型チェック" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 (TypeScript強化版) 型安全性テスト エラーレスポンスの型安全性" name="エラー修正統合検証 (TypeScript強化版) 型安全性テスト エラーレスポンスの型安全性" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="データフロー統合テスト" errors="0" failures="0" skipped="7" timestamp="2025-09-01T10:32:05" time="0.446" tests="7">
+    <testcase classname="データフロー統合テスト Complete Data Flow: 読み込み → 列検出 → 処理 → 出力 典型的なフォーム回答データの完全処理フロー" name="データフロー統合テスト Complete Data Flow: 読み込み → 列検出 → 処理 → 出力 典型的なフォーム回答データの完全処理フロー" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="データフロー統合テスト Complete Data Flow: 読み込み → 列検出 → 処理 → 出力 エッジケースデータの処理フロー" name="データフロー統合テスト Complete Data Flow: 読み込み → 列検出 → 処理 → 出力 エッジケースデータの処理フロー" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="データフロー統合テスト Error Handling in Data Flow スプレッドシートアクセス権限エラーのハンドリング" name="データフロー統合テスト Error Handling in Data Flow スプレッドシートアクセス権限エラーのハンドリング" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="データフロー統合テスト Error Handling in Data Flow 列マッピング失敗時のフォールバック処理" name="データフロー統合テスト Error Handling in Data Flow 列マッピング失敗時のフォールバック処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="データフロー統合テスト Performance and Scalability 大量データ処理のパフォーマンステスト" name="データフロー統合テスト Performance and Scalability 大量データ処理のパフォーマンステスト" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="データフロー統合テスト Performance and Scalability メモリ効率的なデータ処理" name="データフロー統合テスト Performance and Scalability メモリ効率的なデータ処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="データフロー統合テスト Real-world Scenario Testing 複数クラス混在データの処理" name="データフロー統合テスト Real-world Scenario Testing 複数クラス混在データの処理" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="StudyQuest System Flow Integration Tests" errors="0" failures="0" skipped="9" timestamp="2025-09-01T10:32:05" time="0.463" tests="9">
+    <testcase classname="StudyQuest System Flow Integration Tests Concurrent Flow Interference Tests saveAndPublish and addReaction should not interfere" name="StudyQuest System Flow Integration Tests Concurrent Flow Interference Tests saveAndPublish and addReaction should not interfere" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Concurrent Flow Interference Tests Cache invalidation should not cause race conditions" name="StudyQuest System Flow Integration Tests Concurrent Flow Interference Tests Cache invalidation should not cause race conditions" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Concurrent Flow Interference Tests User authentication flow should handle concurrent requests" name="StudyQuest System Flow Integration Tests Concurrent Flow Interference Tests User authentication flow should handle concurrent requests" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Flow State Consistency Tests Session state should remain consistent across flows" name="StudyQuest System Flow Integration Tests Flow State Consistency Tests Session state should remain consistent across flows" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Flow State Consistency Tests Cache hierarchy should maintain data consistency" name="StudyQuest System Flow Integration Tests Flow State Consistency Tests Cache hierarchy should maintain data consistency" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Error Recovery Tests Flow should recover from database errors" name="StudyQuest System Flow Integration Tests Error Recovery Tests Flow should recover from database errors" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Error Recovery Tests Lock timeout should not cause system hang" name="StudyQuest System Flow Integration Tests Error Recovery Tests Lock timeout should not cause system hang" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Performance Impact Tests Cache operations should not significantly impact performance" name="StudyQuest System Flow Integration Tests Performance Impact Tests Cache operations should not significantly impact performance" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="StudyQuest System Flow Integration Tests Performance Impact Tests Multiple flow executions should not cause memory leaks" name="StudyQuest System Flow Integration Tests Performance Impact Tests Multiple flow executions should not cause memory leaks" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="プロダクションデータ統合テスト" errors="0" failures="0" skipped="9" timestamp="2025-09-01T10:32:05" time="0.463" tests="9">
+    <testcase classname="プロダクションデータ統合テスト 学校アンケートデータ処理 2024年度学校アンケートの完全処理フロー" name="プロダクションデータ統合テスト 学校アンケートデータ処理 2024年度学校アンケートの完全処理フロー" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト 学校アンケートデータ処理 大量学校データの処理パフォーマンス" name="プロダクションデータ統合テスト 学校アンケートデータ処理 大量学校データの処理パフォーマンス" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト 企業研修フィードバック処理 企業研修データの匿名化処理" name="プロダクションデータ統合テスト 企業研修フィードバック処理 企業研修データの匿名化処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト 国際学会フィードバック処理 多言語データの処理" name="プロダクションデータ統合テスト 国際学会フィードバック処理 多言語データの処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト Edge Case データ処理 問題のあるデータの堅牢な処理" name="プロダクションデータ統合テスト Edge Case データ処理 問題のあるデータの堅牢な処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト システム統合パフォーマンステスト 複数データセット同時処理" name="プロダクションデータ統合テスト システム統合パフォーマンステスト 複数データセット同時処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト システム統合パフォーマンステスト メモリ効率的な大量データ処理" name="プロダクションデータ統合テスト システム統合パフォーマンステスト メモリ効率的な大量データ処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト データ品質保証テスト データ整合性自動検証" name="プロダクションデータ統合テスト データ品質保証テスト データ整合性自動検証" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションデータ統合テスト データ品質保証テスト 異常データの自動検出" name="プロダクションデータ統合テスト データ品質保証テスト 異常データの自動検出" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="HTML/GAS Function Mapping Validation" errors="0" failures="0" skipped="3" timestamp="2025-09-01T10:32:05" time="0.484" tests="3">
+    <testcase classname="HTML/GAS Function Mapping Validation All google.script.run calls should have corresponding GAS functions" name="HTML/GAS Function Mapping Validation All google.script.run calls should have corresponding GAS functions" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="HTML/GAS Function Mapping Validation Should detect unused GAS functions (potential cleanup candidates)" name="HTML/GAS Function Mapping Validation Should detect unused GAS functions (potential cleanup candidates)" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="HTML/GAS Function Mapping Validation Should validate function call patterns" name="HTML/GAS Function Mapping Validation Should validate function call patterns" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="統一キャッシュシステム統合テスト" errors="0" failures="0" skipped="16" timestamp="2025-09-01T10:32:06" time="0.059" tests="16">
+    <testcase classname="統一キャッシュシステム統合テスト 統一キャッシュAPI clearUserInfoCacheが正常に動作する" name="統一キャッシュシステム統合テスト 統一キャッシュAPI clearUserInfoCacheが正常に動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 統一キャッシュAPI clearAllExecutionCacheが全キャッシュをクリアする" name="統一キャッシュシステム統合テスト 統一キャッシュAPI clearAllExecutionCacheが全キャッシュをクリアする" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 統一キャッシュAPI getSheetsServiceCachedがサービスを返す" name="統一キャッシュシステム統合テスト 統一キャッシュAPI getSheetsServiceCachedがサービスを返す" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 統一キャッシュAPI invalidateUserCacheが複数パラメータを処理する" name="統一キャッシュシステム統合テスト 統一キャッシュAPI invalidateUserCacheが複数パラメータを処理する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 統一キャッシュAPI synchronizeCacheAfterCriticalUpdateがクリティカル同期を実行" name="統一キャッシュシステム統合テスト 統一キャッシュAPI synchronizeCacheAfterCriticalUpdateがクリティカル同期を実行" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 後方互換性テスト clearExecutionUserInfoCacheが統一APIにリダイレクトされる" name="統一キャッシュシステム統合テスト 後方互換性テスト clearExecutionUserInfoCacheが統一APIにリダイレクトされる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 後方互換性テスト clearAllExecutionCacheが統一APIにリダイレクトされる" name="統一キャッシュシステム統合テスト 後方互換性テスト clearAllExecutionCacheが統一APIにリダイレクトされる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 後方互換性テスト getSheetsServiceCachedが統一APIにリダイレクトされる" name="統一キャッシュシステム統合テスト 後方互換性テスト getSheetsServiceCachedが統一APIにリダイレクトされる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト 後方互換性テスト getCachedSheetsServiceが統一APIにリダイレクトされる" name="統一キャッシュシステム統合テスト 後方互換性テスト getCachedSheetsServiceが統一APIにリダイレクトされる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト キャッシュ効率テスト preWarmCacheが事前読み込みを実行" name="統一キャッシュシステム統合テスト キャッシュ効率テスト preWarmCacheが事前読み込みを実行" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト キャッシュ効率テスト analyzeCacheEfficiencyが分析結果を返す" name="統一キャッシュシステム統合テスト キャッシュ効率テスト analyzeCacheEfficiencyが分析結果を返す" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト キャッシュ効率テスト getHealthがキャッシュヘルス情報を返す" name="統一キャッシュシステム統合テスト キャッシュ効率テスト getHealthがキャッシュヘルス情報を返す" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト エラーハンドリングテスト 無効なユーザーIDでキャッシュクリアが安全に失敗" name="統一キャッシュシステム統合テスト エラーハンドリングテスト 無効なユーザーIDでキャッシュクリアが安全に失敗" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト エラーハンドリングテスト キャッシュマネージャー未初期化時の安全な動作" name="統一キャッシュシステム統合テスト エラーハンドリングテスト キャッシュマネージャー未初期化時の安全な動作" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト パフォーマンステスト 大量キャッシュクリア時の制限確認" name="統一キャッシュシステム統合テスト パフォーマンステスト 大量キャッシュクリア時の制限確認" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="統一キャッシュシステム統合テスト パフォーマンステスト キャッシュ階層の正しい使用順序" name="統一キャッシュシステム統合テスト パフォーマンステスト キャッシュ階層の正しい使用順序" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="ゲストアクセステスト" errors="0" failures="0" skipped="9" timestamp="2025-09-01T10:32:06" time="0.064" tests="9">
+    <testcase classname="ゲストアクセステスト 公開ボードのゲストアクセス ゲストが公開ボードに閲覧アクセスできる" name="ゲストアクセステスト 公開ボードのゲストアクセス ゲストが公開ボードに閲覧アクセスできる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト 公開ボードのゲストアクセス ゲストが公開ボードの編集はできない" name="ゲストアクセステスト 公開ボードのゲストアクセス ゲストが公開ボードの編集はできない" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト 公開ボードのゲストアクセス 所有者は自分のボードに全アクセス権限がある" name="ゲストアクセステスト 公開ボードのゲストアクセス 所有者は自分のボードに全アクセス権限がある" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト プライベートボードのアクセス制御 ゲストがプライベートボードにアクセスできない" name="ゲストアクセステスト プライベートボードのアクセス制御 ゲストがプライベートボードにアクセスできない" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト プライベートボードのアクセス制御 認証ユーザーもプライベートボードにアクセスできない" name="ゲストアクセステスト プライベートボードのアクセス制御 認証ユーザーもプライベートボードにアクセスできない" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト プライベートボードのアクセス制御 所有者のみプライベートボードにアクセスできる" name="ゲストアクセステスト プライベートボードのアクセス制御 所有者のみプライベートボードにアクセスできる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト 存在しないユーザーのアクセス制御 存在しないユーザーIDでアクセス拒否" name="ゲストアクセステスト 存在しないユーザーのアクセス制御 存在しないユーザーIDでアクセス拒否" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト ConfigurationManager統合テスト 公開設定の取得が正しく動作する" name="ゲストアクセステスト ConfigurationManager統合テスト 公開設定の取得が正しく動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="ゲストアクセステスト ConfigurationManager統合テスト プライベートボードの公開設定がnullになる" name="ゲストアクセステスト ConfigurationManager統合テスト プライベートボードの公開設定がnullになる" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="エラー修正統合検証" errors="0" failures="0" skipped="6" timestamp="2025-09-01T10:32:06" time="0.067" tests="6">
+    <testcase classname="エラー修正統合検証 getCurrentUserStatus型安全性統合テスト 文字列のrequestUserIdで正常に動作" name="エラー修正統合検証 getCurrentUserStatus型安全性統合テスト 文字列のrequestUserIdで正常に動作" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 getCurrentUserStatus型安全性統合テスト オブジェクトのrequestUserIdでエラーハンドリング" name="エラー修正統合検証 getCurrentUserStatus型安全性統合テスト オブジェクトのrequestUserIdでエラーハンドリング" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 logClientError統合テスト 文字列エラーの正常処理" name="エラー修正統合検証 logClientError統合テスト 文字列エラーの正常処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 logClientError統合テスト オブジェクトエラーの正常処理" name="エラー修正統合検証 logClientError統合テスト オブジェクトエラーの正常処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 logClientError統合テスト undefined/null エラーの安全な処理" name="エラー修正統合検証 logClientError統合テスト undefined/null エラーの安全な処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="エラー修正統合検証 フロントエンド-バックエンド連携テスト 正しいエラー情報の送信" name="エラー修正統合検証 フロントエンド-バックエンド連携テスト 正しいエラー情報の送信" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="プロダクションバグ検証: Cannot convert undefined or null to object" errors="0" failures="0" skipped="4" timestamp="2025-09-01T10:32:06" time="0.071" tests="4">
+    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object getHeadersCached が空オブジェクトを返す場合のエラー再現" name="プロダクションバグ検証: Cannot convert undefined or null to object getHeadersCached が空オブジェクトを返す場合のエラー再現" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" name="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object connectDataSource エラーハンドリング強化の検証" name="プロダクションバグ検証: Cannot convert undefined or null to object connectDataSource エラーハンドリング強化の検証" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" name="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="confidence値0%問題修正テスト" errors="0" failures="1" skipped="0" timestamp="2025-09-01T10:32:05" time="0.55" tests="4">
+    <testcase classname="confidence値0%問題修正テスト 既存のconfidence値が保持される（修正後）" name="confidence値0%問題修正テスト 既存のconfidence値が保持される（修正後）" time="0.082">
+    </testcase>
+    <testcase classname="confidence値0%問題修正テスト AI結果のconfidenceが高い場合は置き換わる" name="confidence値0%問題修正テスト AI結果のconfidenceが高い場合は置き換わる" time="0.003">
+    </testcase>
+    <testcase classname="confidence値0%問題修正テスト 旧版（問題のあるバージョン）のシミュレーション" name="confidence値0%問題修正テスト 旧版（問題のあるバージョン）のシミュレーション" time="0.008">
+      <failure>Error: expect(received).toBeUndefined()
+
+Received: 85
+    at Object.&lt;anonymous&gt; (/Users/ryuma/Everyone-s-Answer-Board/tests/confidence-fix.test.ts:120:42)
+    at Promise.then.completed (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/utils.js:298:28)
+    at new Promise (&lt;anonymous&gt;)
+    at callAsyncCircusFn (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/utils.js:231:10)
+    at _callCircusTest (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/run.js:316:40)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at _runTest (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/run.js:252:3)
+    at _runTestsForDescribeBlock (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/run.js:126:9)
+    at _runTestsForDescribeBlock (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/run.js:121:9)
+    at run (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/run.js:71:3)
+    at runAndTransformResultsToJestFormat (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)
+    at jestAdapter (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)
+    at runTestInternal (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-runner/build/runTest.js:367:16)
+    at runTest (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-runner/build/runTest.js:444:34)
+    at Object.worker (/Users/ryuma/Everyone-s-Answer-Board/node_modules/jest-runner/build/testWorker.js:106:12)</failure>
+    </testcase>
+    <testcase classname="confidence値0%問題修正テスト プロダクション環境のシナリオ再現" name="confidence値0%問題修正テスト プロダクション環境のシナリオ再現" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="クリティカル機能テスト" errors="0" failures="0" skipped="7" timestamp="2025-09-01T10:32:06" time="0.052" tests="7">
+    <testcase classname="クリティカル機能テスト getInitialData 正常に初期データを取得できる" name="クリティカル機能テスト getInitialData 正常に初期データを取得できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト getInitialData ユーザーが見つからない場合エラーをスロー" name="クリティカル機能テスト getInitialData ユーザーが見つからない場合エラーをスロー" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト getPublishedSheetData 公開シートデータを取得できる" name="クリティカル機能テスト getPublishedSheetData 公開シートデータを取得できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト getPublishedSheetData キャッシュから取得できる" name="クリティカル機能テスト getPublishedSheetData キャッシュから取得できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト createQuickStartFormUI クイックスタートフォームを作成できる" name="クリティカル機能テスト createQuickStartFormUI クイックスタートフォームを作成できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト saveSheetConfig シート設定を保存できる" name="クリティカル機能テスト saveSheetConfig シート設定を保存できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト API統合 handleCoreApiRequestが正しくルーティングする" name="クリティカル機能テスト API統合 handleCoreApiRequestが正しくルーティングする" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="新アーキテクチャ統合テスト" errors="0" failures="0" skipped="14" timestamp="2025-09-01T10:32:06" time="0.063" tests="14">
+    <testcase classname="新アーキテクチャ統合テスト エラーハンドリング エラーログが正しく記録される" name="新アーキテクチャ統合テスト エラーハンドリング エラーログが正しく記録される" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト エラーハンドリング デバッグログが適切に制御される" name="新アーキテクチャ統合テスト エラーハンドリング デバッグログが適切に制御される" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト キャッシュ管理 キャッシュの取得と設定が正しく動作する" name="新アーキテクチャ統合テスト キャッシュ管理 キャッシュの取得と設定が正しく動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト キャッシュ管理 キャッシュの削除が正しく動作する" name="新アーキテクチャ統合テスト キャッシュ管理 キャッシュの削除が正しく動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト キャッシュ管理 パターンによるキャッシュクリアが動作する" name="新アーキテクチャ統合テスト キャッシュ管理 パターンによるキャッシュクリアが動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト データベース操作 ユーザー情報の取得が正しく動作する" name="新アーキテクチャ統合テスト データベース操作 ユーザー情報の取得が正しく動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト データベース操作 新規ユーザーの作成が正しく動作する" name="新アーキテクチャ統合テスト データベース操作 新規ユーザーの作成が正しく動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト データベース操作 ユーザー情報の更新が正しく動作する" name="新アーキテクチャ統合テスト データベース操作 ユーザー情報の更新が正しく動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト API処理 初期データ取得APIが正しく動作する" name="新アーキテクチャ統合テスト API処理 初期データ取得APIが正しく動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト API処理 未認証ユーザーのAPIアクセスが拒否される" name="新アーキテクチャ統合テスト API処理 未認証ユーザーのAPIアクセスが拒否される" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト マイグレーションブリッジ 既存関数が新サービスに正しくマップされる" name="新アーキテクチャ統合テスト マイグレーションブリッジ 既存関数が新サービスに正しくマップされる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト マイグレーションブリッジ キャッシュクリア関数が正しくマップされる" name="新アーキテクチャ統合テスト マイグレーションブリッジ キャッシュクリア関数が正しくマップされる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト エントリーポイント doGet関数が正しくルーティングする" name="新アーキテクチャ統合テスト エントリーポイント doGet関数が正しくルーティングする" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="新アーキテクチャ統合テスト エントリーポイント システム未初期化時にセットアップページが表示される" name="新アーキテクチャ統合テスト エントリーポイント システム未初期化時にセットアップページが表示される" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="Basic Utilities Tests" errors="0" failures="0" skipped="3" timestamp="2025-09-01T10:32:06" time="0.077" tests="3">
+    <testcase classname="Basic Utilities Tests isSystemSetup function returns false when admin email missing" name="Basic Utilities Tests isSystemSetup function returns false when admin email missing" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Basic Utilities Tests isSystemSetup function returns false when service account missing" name="Basic Utilities Tests isSystemSetup function returns false when service account missing" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Basic Utilities Tests generateAppUrls function returns adminUrl with userId and mode parameter" name="Basic Utilities Tests generateAppUrls function returns adminUrl with userId and mode parameter" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="TypeScript環境検証" errors="0" failures="0" skipped="5" timestamp="2025-09-01T10:32:06" time="0.054" tests="5">
+    <testcase classname="TypeScript環境検証 TypeScript設定が正常に動作する" name="TypeScript環境検証 TypeScript設定が正常に動作する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="TypeScript環境検証 基本的なGAS APIモック動作確認" name="TypeScript環境検証 基本的なGAS APIモック動作確認" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="TypeScript環境検証 テスト環境の依存関係確認" name="TypeScript環境検証 テスト環境の依存関係確認" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="設計品質検証 プロダクション問題検出能力の基礎確認" name="設計品質検証 プロダクション問題検出能力の基礎確認" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="設計品質検証 エラー条件シミュレーション" name="設計品質検証 エラー条件シミュレーション" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="クリティカル機能テスト (TypeScript強化版)" errors="0" failures="0" skipped="17" timestamp="2025-09-01T10:32:05" time="0.576" tests="17">
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) getInitialData (型安全版) 正常に初期データを取得できる" name="クリティカル機能テスト (TypeScript強化版) getInitialData (型安全版) 正常に初期データを取得できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) getInitialData (型安全版) ユーザーが見つからない場合エラーをスロー" name="クリティカル機能テスト (TypeScript強化版) getInitialData (型安全版) ユーザーが見つからない場合エラーをスロー" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) getInitialData (型安全版) configJsonのパースエラーハンドリング" name="クリティカル機能テスト (TypeScript強化版) getInitialData (型安全版) configJsonのパースエラーハンドリング" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) 公開シートデータを取得できる" name="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) 公開シートデータを取得できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) ユーザーが見つからない場合エラー返却" name="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) ユーザーが見つからない場合エラー返却" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) キャッシュから取得できる" name="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) キャッシュから取得できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) bypassCacheでキャッシュを回避" name="クリティカル機能テスト (TypeScript強化版) getPublishedSheetData (型安全版) bypassCacheでキャッシュを回避" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) createQuickStartFormUI (型安全版) クイックスタートフォームを作成できる" name="クリティカル機能テスト (TypeScript強化版) createQuickStartFormUI (型安全版) クイックスタートフォームを作成できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) createQuickStartFormUI (型安全版) ユーザーが見つからない場合エラーをスロー" name="クリティカル機能テスト (TypeScript強化版) createQuickStartFormUI (型安全版) ユーザーが見つからない場合エラーをスロー" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) createQuickStartFormUI (型安全版) createQuickStartFormのエラーを適切に処理" name="クリティカル機能テスト (TypeScript強化版) createQuickStartFormUI (型安全版) createQuickStartFormのエラーを適切に処理" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) saveSheetConfig (型安全版) シート設定を保存できる" name="クリティカル機能テスト (TypeScript強化版) saveSheetConfig (型安全版) シート設定を保存できる" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) saveSheetConfig (型安全版) ユーザーが見つからない場合false返却" name="クリティカル機能テスト (TypeScript強化版) saveSheetConfig (型安全版) ユーザーが見つからない場合false返却" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) saveSheetConfig (型安全版) setAsPublishedオプションが機能する" name="クリティカル機能テスト (TypeScript強化版) saveSheetConfig (型安全版) setAsPublishedオプションが機能する" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) API統合 (型安全版) handleCoreApiRequestが正しくルーティングする" name="クリティカル機能テスト (TypeScript強化版) API統合 (型安全版) handleCoreApiRequestが正しくルーティングする" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) API統合 (型安全版) APIエラーハンドリングが適切に動作" name="クリティカル機能テスト (TypeScript強化版) API統合 (型安全版) APIエラーハンドリングが適切に動作" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) パフォーマンステスト 大量データでのパフォーマンス確認" name="クリティカル機能テスト (TypeScript強化版) パフォーマンステスト 大量データでのパフォーマンス確認" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="クリティカル機能テスト (TypeScript強化版) パフォーマンステスト キャッシュのパフォーマンス効果確認" name="クリティカル機能テスト (TypeScript強化版) パフォーマンステスト キャッシュのパフォーマンス効果確認" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+  <testsuite name="verifyUserAccess security checks" errors="0" failures="0" skipped="3" timestamp="2025-09-01T10:32:06" time="0.117" tests="3">
+    <testcase classname="verifyUserAccess security checks allows access for matching admin email" name="verifyUserAccess security checks allows access for matching admin email" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="verifyUserAccess security checks denies access when emails differ and board not published" name="verifyUserAccess security checks denies access when emails differ and board not published" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="verifyUserAccess security checks allows read-only access for published board" name="verifyUserAccess security checks allows read-only access for published board" time="0">
+      <skipped/>
     </testcase>
   </testsuite>
 </testsuites>

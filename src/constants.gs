@@ -10,10 +10,10 @@
 const CORE = Object.freeze({
   // タイムアウト設定（ミリ秒）
   TIMEOUTS: Object.freeze({
-    SHORT: 1000,      // 1秒 - UI反応
-    MEDIUM: 5000,     // 5秒 - API呼び出し  
-    LONG: 30000,      // 30秒 - バッチ処理
-    FLOW: 300000,     // 5分 - GAS実行制限
+    SHORT: 1000, // 1秒 - UI反応
+    MEDIUM: 5000, // 5秒 - API呼び出し
+    LONG: 30000, // 30秒 - バッチ処理
+    FLOW: 300000, // 5分 - GAS実行制限
   }),
 
   // ステータス定数
@@ -64,7 +64,7 @@ const SECURITY = Object.freeze({
     UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     SAFE_STRING: /^[a-zA-Z0-9\s\-_.@]+$/,
     URL: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
-    SHEET_NAME: /^[a-zA-Z0-9\s\-_()]{1,100}$/
+    SHEET_NAME: /^[a-zA-Z0-9\s\-_()]{1,100}$/,
   }),
 
   // Maximum lengths for input validation
@@ -74,7 +74,7 @@ const SECURITY = Object.freeze({
     SHEET_NAME: 100,
     CONFIG_JSON: 10000, // 10KB
     URL: 2048,
-    GENERAL_TEXT: 1000
+    GENERAL_TEXT: 1000,
   }),
 
   // Sanitization settings
@@ -82,8 +82,8 @@ const SECURITY = Object.freeze({
     REMOVE_HTML: true,
     TRIM_WHITESPACE: true,
     NORMALIZE_UNICODE: true,
-    MAX_ATTEMPTS: 3
-  })
+    MAX_ATTEMPTS: 3,
+  }),
 });
 
 /**
@@ -120,7 +120,7 @@ const SecurityValidator = Object.freeze({
    */
   sanitizeInput: (input, maxLength = SECURITY.MAX_LENGTHS.GENERAL_TEXT) => {
     if (!input || typeof input !== 'string') return '';
-    
+
     let sanitized = input;
 
     // Trim whitespace
@@ -154,7 +154,10 @@ const SecurityValidator = Object.freeze({
     if (!SecurityValidator.isValidEmail(userData.userEmail)) {
       errors.push('有効なメールアドレスを入力してください。');
     } else {
-      sanitizedData.userEmail = SecurityValidator.sanitizeInput(userData.userEmail, SECURITY.MAX_LENGTHS.EMAIL);
+      sanitizedData.userEmail = SecurityValidator.sanitizeInput(
+        userData.userEmail,
+        SECURITY.MAX_LENGTHS.EMAIL
+      );
     }
 
     // UUID validation
@@ -166,7 +169,10 @@ const SecurityValidator = Object.freeze({
 
     // Spreadsheet ID/URL validation
     if (userData.spreadsheetId) {
-      sanitizedData.spreadsheetId = SecurityValidator.sanitizeInput(userData.spreadsheetId, SECURITY.MAX_LENGTHS.GENERAL_TEXT);
+      sanitizedData.spreadsheetId = SecurityValidator.sanitizeInput(
+        userData.spreadsheetId,
+        SECURITY.MAX_LENGTHS.GENERAL_TEXT
+      );
     }
 
     if (userData.spreadsheetUrl) {
@@ -194,9 +200,9 @@ const SecurityValidator = Object.freeze({
     return {
       isValid: errors.length === 0,
       errors,
-      sanitizedData
+      sanitizedData,
     };
-  }
+  },
 });
 
 /**
@@ -208,13 +214,27 @@ const SYSTEM_CONSTANTS = Object.freeze({
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
     HEADERS: Object.freeze([
-      'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
-      'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl'
+      'userId',
+      'userEmail',
+      'createdAt',
+      'lastAccessedAt',
+      'isActive',
+      'spreadsheetId',
+      'spreadsheetUrl',
+      'configJson',
+      'formUrl',
     ]),
     DELETE_LOG: Object.freeze({
       SHEET_NAME: 'DeletionLogs',
-      HEADERS: Object.freeze(['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'])
-    })
+      HEADERS: Object.freeze([
+        'timestamp',
+        'executorEmail',
+        'targetUserId',
+        'targetEmail',
+        'reason',
+        'deleteType',
+      ]),
+    }),
   }),
 
   // リアクション機能
@@ -224,8 +244,8 @@ const SYSTEM_CONSTANTS = Object.freeze({
       UNDERSTAND: 'なるほど！',
       LIKE: 'いいね！',
       CURIOUS: 'もっと知りたい！',
-      HIGHLIGHT: 'ハイライト'
-    })
+      HIGHLIGHT: 'ハイライト',
+    }),
   }),
 
   // 列ヘッダー定義
@@ -235,7 +255,7 @@ const SYSTEM_CONSTANTS = Object.freeze({
     CLASS: 'クラス',
     OPINION: '回答',
     REASON: '理由',
-    NAME: '名前'
+    NAME: '名前',
   }),
 
   // AdminPanel用列マッピング定義（高性能AI検索対応）
@@ -245,34 +265,34 @@ const SYSTEM_CONSTANTS = Object.freeze({
       header: '回答',
       alternates: ['どうして', '質問', '問題', '意見', '答え', 'なぜ', '思います', '考え'], // 高性能AI用拡張パターン
       required: true,
-      aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか'] // AI専用検出パターン
+      aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか'], // AI専用検出パターン
     }),
     reason: Object.freeze({
-      key: 'reason', 
+      key: 'reason',
       header: '理由',
       alternates: ['理由', '根拠', '体験', 'なぜ', '詳細', '説明'], // 高性能AI用拡張パターン
       required: false,
-      aiPatterns: ['理由', '体験', '根拠', '詳細'] // AI専用検出パターン
+      aiPatterns: ['理由', '体験', '根拠', '詳細'], // AI専用検出パターン
     }),
     class: Object.freeze({
       key: 'class',
-      header: 'クラス', 
+      header: 'クラス',
       alternates: ['クラス', '学年'],
-      required: false
+      required: false,
     }),
     name: Object.freeze({
       key: 'name',
       header: '名前',
       alternates: ['名前', '氏名', 'お名前'],
-      required: false
-    })
+      required: false,
+    }),
   }),
 
   // 表示モード
   DISPLAY_MODES: Object.freeze({
     ANONYMOUS: 'anonymous',
     NAMED: 'named',
-    EMAIL: 'email'
+    EMAIL: 'email',
   }),
 
   // アクセス制御関連
@@ -280,17 +300,17 @@ const SYSTEM_CONSTANTS = Object.freeze({
     LEVELS: Object.freeze({
       OWNER: 'owner',
       SYSTEM_ADMIN: 'system_admin',
-      AUTHENTICATED_USER: 'authenticated_user', 
+      AUTHENTICATED_USER: 'authenticated_user',
       GUEST: 'guest',
-      NONE: 'none'
-    })
-  })
+      NONE: 'none',
+    }),
+  }),
 });
 
 // 後方互換性のための旧定数エイリアス
 const REACTION_KEYS = SYSTEM_CONSTANTS.REACTIONS.KEYS;
 const COLUMN_HEADERS = {
   ...SYSTEM_CONSTANTS.COLUMNS,
-  ...SYSTEM_CONSTANTS.REACTIONS.LABELS
+  ...SYSTEM_CONSTANTS.REACTIONS.LABELS,
 };
 const DELETE_LOG_SHEET_CONFIG = SYSTEM_CONSTANTS.DATABASE.DELETE_LOG;

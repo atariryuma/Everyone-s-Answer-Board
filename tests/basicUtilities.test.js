@@ -9,31 +9,31 @@ describe('Basic Utilities Tests', () => {
       context = {
         PropertiesService: {
           getScriptProperties: jest.fn(() => ({
-            getProperty: jest.fn()
-          }))
+            getProperty: jest.fn(),
+          })),
         },
         console: {
           log: jest.fn(),
           warn: jest.fn(),
-          error: jest.fn()
-        }
+          error: jest.fn(),
+        },
       };
       vm.createContext(context);
-      
+
       // constants.gsを先に読み込み
       const constantsCode = fs.readFileSync('src/constants.gs', 'utf8');
       vm.runInContext(constantsCode, context);
-      
+
       // PROPS_KEYSが正しく読み込まれたことを確認
       if (!context.PROPS_KEYS) {
         console.error('PROPS_KEYS not loaded from constants.gs');
         context.PROPS_KEYS = {
           DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
           ADMIN_EMAIL: 'ADMIN_EMAIL',
-          SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS'
+          SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
         };
       }
-      
+
       // main.gsを読み込み
       const code = fs.readFileSync('src/main.gs', 'utf8');
       vm.runInContext(code, context);
@@ -84,7 +84,9 @@ describe('Basic Utilities Tests', () => {
 
     test('returns adminUrl with userId and mode parameter', () => {
       const urls = context.generateUserUrls('abc');
-      expect(urls.adminUrl).toBe('https://script.google.com/macros/s/ID/exec?mode=admin&userId=abc');
+      expect(urls.adminUrl).toBe(
+        'https://script.google.com/macros/s/ID/exec?mode=admin&userId=abc'
+      );
     });
   });
 });

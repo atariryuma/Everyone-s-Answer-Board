@@ -26,16 +26,16 @@ expect.extend({
   toBeValidEmail(received: string) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const pass = typeof received === 'string' && emailRegex.test(received);
-    
+
     if (pass) {
       return {
         message: () => `expected ${received} not to be a valid email address`,
-        pass: true
+        pass: true,
       };
     } else {
       return {
         message: () => `expected ${received} to be a valid email address`,
-        pass: false
+        pass: false,
       };
     }
   },
@@ -46,16 +46,16 @@ expect.extend({
   toBeValidSpreadsheetId(received: string) {
     const spreadsheetIdRegex = /^[a-zA-Z0-9-_]{44}$/;
     const pass = typeof received === 'string' && spreadsheetIdRegex.test(received);
-    
+
     if (pass) {
       return {
         message: () => `expected ${received} not to be a valid spreadsheet ID`,
-        pass: true
+        pass: true,
       };
     } else {
       return {
         message: () => `expected ${received} to be a valid spreadsheet ID`,
-        pass: false
+        pass: false,
       };
     }
   },
@@ -66,16 +66,16 @@ expect.extend({
   toBeValidUserId(received: string) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const pass = typeof received === 'string' && uuidRegex.test(received);
-    
+
     if (pass) {
       return {
         message: () => `expected ${received} not to be a valid UUID user ID`,
-        pass: true
+        pass: true,
       };
     } else {
       return {
         message: () => `expected ${received} to be a valid UUID user ID`,
-        pass: false
+        pass: false,
       };
     }
   },
@@ -85,21 +85,21 @@ expect.extend({
    */
   toHaveValidColumnMapping(received: any) {
     const isObject = typeof received === 'object' && received !== null;
-    const hasRequiredFields = isObject && 
-      'answer' in received && 
-      typeof received.answer === 'number';
-    
+    const hasRequiredFields =
+      isObject && 'answer' in received && typeof received.answer === 'number';
+
     const pass = hasRequiredFields;
-    
+
     if (pass) {
       return {
         message: () => `expected ${JSON.stringify(received)} not to have valid column mapping`,
-        pass: true
+        pass: true,
       };
     } else {
       return {
-        message: () => `expected ${JSON.stringify(received)} to have valid column mapping with at least answer field`,
-        pass: false
+        message: () =>
+          `expected ${JSON.stringify(received)} to have valid column mapping with at least answer field`,
+        pass: false,
       };
     }
   },
@@ -110,51 +110,53 @@ expect.extend({
   toThrowGASError(received: () => void, expectedError?: string | RegExp) {
     let thrown = false;
     let error: Error | null = null;
-    
+
     try {
       received();
     } catch (e) {
       thrown = true;
       error = e as Error;
     }
-    
+
     if (!thrown) {
       return {
         message: () => `expected function to throw a GAS error`,
-        pass: false
+        pass: false,
       };
     }
-    
+
     if (expectedError) {
-      const messageMatches = typeof expectedError === 'string' 
-        ? error!.message.includes(expectedError)
-        : expectedError.test(error!.message);
-        
+      const messageMatches =
+        typeof expectedError === 'string'
+          ? error!.message.includes(expectedError)
+          : expectedError.test(error!.message);
+
       if (messageMatches) {
         return {
           message: () => `expected function not to throw error "${error!.message}"`,
-          pass: true
+          pass: true,
         };
       } else {
         return {
-          message: () => `expected function to throw error matching "${expectedError}", but got "${error!.message}"`,
-          pass: false
+          message: () =>
+            `expected function to throw error matching "${expectedError}", but got "${error!.message}"`,
+          pass: false,
         };
       }
     }
-    
+
     return {
       message: () => `expected function not to throw any error, but it threw "${error!.message}"`,
-      pass: true
+      pass: true,
     };
-  }
+  },
 });
 
 // Global test environment configuration
 beforeEach(() => {
   // Reset console mocks
   jest.clearAllMocks();
-  
+
   // Reset global Date to avoid test instability
   jest.useFakeTimers().setSystemTime(new Date('2024-01-01T12:00:00Z'));
 });
@@ -162,7 +164,7 @@ beforeEach(() => {
 afterEach(() => {
   // Clean up timers
   jest.useRealTimers();
-  
+
   // Reset all mocks
   jest.resetAllMocks();
 });
@@ -171,10 +173,13 @@ afterEach(() => {
 const originalConsoleError = console.error;
 console.error = (...args: any[]) => {
   // Filter out expected test errors to reduce noise
-  if (args.some(arg => 
-    typeof arg === 'string' && 
-    (arg.includes('Warning: ') || arg.includes('[EXPECTED TEST ERROR]'))
-  )) {
+  if (
+    args.some(
+      (arg) =>
+        typeof arg === 'string' &&
+        (arg.includes('Warning: ') || arg.includes('[EXPECTED TEST ERROR]'))
+    )
+  ) {
     return;
   }
   originalConsoleError.apply(console, args);
@@ -189,7 +194,7 @@ beforeEach(() => {
 afterEach(() => {
   const testEndTime = Date.now();
   const duration = testEndTime - testStartTime;
-  
+
   // Warn about slow tests (> 5 seconds)
   if (duration > 5000) {
     console.warn(`⚠️  Slow test detected: ${expect.getState().currentTestName} took ${duration}ms`);

@@ -26,7 +26,7 @@ function optimizeConfigJson(currentConfig, userInfo) {
     sheetName: currentConfig.sheetName || null,
     columnMapping: currentConfig.columnMapping || {},
     theme: currentConfig.theme || 'default',
-    lastModified: new Date().toISOString()
+    lastModified: new Date().toISOString(),
   };
 
   // columnsは本当に必要な場合のみ保持
@@ -37,7 +37,9 @@ function optimizeConfigJson(currentConfig, userInfo) {
   console.info('Config optimized', {
     originalSize: JSON.stringify(currentConfig).length,
     optimizedSize: JSON.stringify(optimizedConfig).length,
-    reductionPercent: Math.round((1 - JSON.stringify(optimizedConfig).length / JSON.stringify(currentConfig).length) * 100)
+    reductionPercent: Math.round(
+      (1 - JSON.stringify(optimizedConfig).length / JSON.stringify(currentConfig).length) * 100
+    ),
   });
 
   return optimizedConfig;
@@ -71,24 +73,25 @@ function determineFormCreatedStatus(config) {
 function generateDynamicFields(userInfo, config) {
   const userId = userInfo.userId;
   const baseUrl = getWebAppUrl();
-  
+
   return {
     // 基本情報（データベース列から）
     userId: userInfo.userId,
     userEmail: userInfo.userEmail,
     createdAt: userInfo.createdAt,
     spreadsheetId: userInfo.spreadsheetId,
-    
+
     // 動的生成フィールド
     appName: generateAppName(config.title),
     appUrl: `${baseUrl}?userId=${userId}`,
     formUrl: userInfo.formUrl || null,
-    spreadsheetUrl: userInfo.spreadsheetId ? 
-      `https://docs.google.com/spreadsheets/d/${userInfo.spreadsheetId}/edit` : null,
-    
+    spreadsheetUrl: userInfo.spreadsheetId
+      ? `https://docs.google.com/spreadsheets/d/${userInfo.spreadsheetId}/edit`
+      : null,
+
     // 計算フィールド
     setupStep: determineSetupStep(userInfo, config),
-    setupComplete: config.setupStatus === 'completed'
+    setupComplete: config.setupStatus === 'completed',
   };
 }
 
@@ -125,16 +128,15 @@ function getOptimizedUserInfo(userId) {
 
     // configJSONを最適化
     const optimizedConfig = optimizeConfigJson(config, userInfo);
-    
+
     // 動的フィールドを生成
     const dynamicFields = generateDynamicFields(userInfo, optimizedConfig);
-    
+
     // 統合結果を返す
     return {
       ...dynamicFields,
-      ...optimizedConfig
+      ...optimizedConfig,
     };
-    
   } catch (error) {
     console.error('getOptimizedUserInfo エラー:', error);
     return null;
@@ -160,7 +162,7 @@ function optimizeUserDatabase(userId) {
 
     // データベース列に移行すべきデータ
     const dbUpdates = {};
-    
+
     // spreadsheetIdをDBへ移行
     if (config.spreadsheetId && !userInfo.spreadsheetId) {
       dbUpdates.spreadsheetId = config.spreadsheetId;
@@ -174,21 +176,20 @@ function optimizeUserDatabase(userId) {
     // configJSONを最適化
     const optimizedConfig = optimizeConfigJson(config, userInfo);
     dbUpdates.configJson = JSON.stringify(optimizedConfig);
-    
+
     // lastAccessedAtを更新
     dbUpdates.lastAccessedAt = new Date().toISOString();
 
     // データベースを更新
     const success = updateUser(userId, dbUpdates);
-    
+
     if (success) {
       // キャッシュクリア
       clearUserInfoCache(userId);
       console.info('データベース最適化完了:', userId);
     }
-    
-    return success;
 
+    return success;
   } catch (error) {
     console.error('optimizeUserDatabase エラー:', error);
     return false;
@@ -202,24 +203,24 @@ function optimizeUserDatabase(userId) {
  */
 function optimizeSpecificUser(targetUserId) {
   const userId = targetUserId || '882d95c7-1fef-4739-a4b5-4ca02feaa69b';
-  
+
   console.info('ユーザーデータベース最適化開始:', userId);
-  
+
   const success = optimizeUserDatabase(userId);
-  
+
   if (success) {
     const optimizedInfo = getOptimizedUserInfo(userId);
     return {
       success: true,
       userId: userId,
       optimizedData: optimizedInfo,
-      message: 'データベース最適化が完了しました'
+      message: 'データベース最適化が完了しました',
     };
   } else {
     return {
       success: false,
       userId: userId,
-      message: '最適化に失敗しました'
+      message: '最適化に失敗しました',
     };
   }
 }

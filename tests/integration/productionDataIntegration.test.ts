@@ -4,7 +4,9 @@
  */
 
 import { MockTestUtils } from '../mocks/gasMocks';
-import ProductionDataManager, { PRODUCTION_DATA_FIXTURES } from '../fixtures/productionDataFixtures';
+import ProductionDataManager, {
+  PRODUCTION_DATA_FIXTURES,
+} from '../fixtures/productionDataFixtures';
 
 // Test-specific types
 interface ProcessedResponseData {
@@ -38,7 +40,7 @@ describe('プロダクションデータ統合テスト', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     MockTestUtils.clearAllMockData();
-    
+
     // Set realistic test timing
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2024-01-15T12:00:00Z'));
@@ -52,37 +54,40 @@ describe('プロダクションデータ統合テスト', () => {
     test('2024年度学校アンケートの完全処理フロー', () => {
       // Setup production-like school survey data
       ProductionDataManager.setupProductionEnvironment('SCHOOL_SURVEY_2024');
-      
+
       const spreadsheet = global.SpreadsheetApp.openById('test-spreadsheet');
       const sheet = spreadsheet.getSheetByName('Sheet1');
-      
+
       // Verify data structure matches production
       const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       const expectedHeaders = PRODUCTION_DATA_FIXTURES.SCHOOL_SURVEY_2024.headers;
-      
+
       expect(headerRow).toEqual(expectedHeaders);
       expect(headerRow[0]).toBe('タイムスタンプ');
       expect(headerRow[2]).toContain('将来の夢');
-      
+
       // Process all responses
       const allData = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
       const dataRows = allData.slice(1); // Skip header
-      
+
       expect(dataRows).toHaveLength(6); // 6 students
-      
+
       // Generate column mapping using production logic
       const columnMapping = ProductionDataManager.generateColumnMapping(headerRow);
       expect(columnMapping.answer).toBe(2); // "将来の夢について"
       expect(columnMapping.reason).toBe(3); // "なぜそう思うのか"
-      expect(columnMapping.class).toBe(4);  // "あなたのクラス"
-      
+      expect(columnMapping.class).toBe(4); // "あなたのクラス"
+
       // Process data with production-like logic
       const processedData: ProcessedResponseData[] = dataRows.map((row, index) => {
-        const reactions = (columnMapping.reactions as number[]).reduce((acc, colIndex, i) => {
-          const reactionKeys = ['understand', 'like', 'curious'] as const;
-          acc[reactionKeys[i] || 'understand'] = parseInt(row[colIndex]) || 0;
-          return acc;
-        }, { understand: 0, like: 0, curious: 0 });
+        const reactions = (columnMapping.reactions as number[]).reduce(
+          (acc, colIndex, i) => {
+            const reactionKeys = ['understand', 'like', 'curious'] as const;
+            acc[reactionKeys[i] || 'understand'] = parseInt(row[colIndex]) || 0;
+            return acc;
+          },
+          { understand: 0, like: 0, curious: 0 }
+        );
 
         return {
           id: `school_response_${index + 1}`,
@@ -96,21 +101,26 @@ describe('プロダクションデータ統合テスト', () => {
           metadata: {
             wordCount: (row[columnMapping.answer] || '').length,
             hasEmptyFields: !row[columnMapping.reason] || !row[columnMapping.class],
-            isAnonymous: !row[columnMapping.name] || row[columnMapping.name].trim() === ''
-          }
+            isAnonymous: !row[columnMapping.name] || row[columnMapping.name].trim() === '',
+          },
         };
       });
 
       // Validate processed data quality
-      expect(processedData.every(item => item.answer.length > 0)).toBe(true);
-      expect(processedData.every(item => item.email.includes('@'))).toBe(true);
-      expect(processedData.every(item => typeof item.reactions.understand === 'number')).toBe(true);
+      expect(processedData.every((item) => item.answer.length > 0)).toBe(true);
+      expect(processedData.every((item) => item.email.includes('@'))).toBe(true);
+      expect(processedData.every((item) => typeof item.reactions.understand === 'number')).toBe(
+        true
+      );
 
       // Statistical analysis
-      const totalReactions = processedData.reduce((sum, item) => 
-        sum + item.reactions.understand + item.reactions.like + item.reactions.curious, 0);
+      const totalReactions = processedData.reduce(
+        (sum, item) =>
+          sum + item.reactions.understand + item.reactions.like + item.reactions.curious,
+        0
+      );
       const averageReactions = totalReactions / processedData.length;
-      
+
       expect(averageReactions).toBeGreaterThan(10); // School data shows engagement
       expect(averageReactions).toBeLessThan(200); // Reasonable upper limit
 
@@ -129,28 +139,28 @@ describe('プロダクションデータ統合テスト', () => {
     test('大量学校データの処理パフォーマンス', () => {
       // Generate large dataset (1000 responses)
       const largeDataset = ProductionDataManager.generateLargeDataset(1000, 'SCHOOL_SURVEY_2024');
-      
+
       expect(ProductionDataManager.validateDataIntegrity(largeDataset)).toBe(true);
-      
+
       MockTestUtils.createRealisticSpreadsheetData(largeDataset.headers, largeDataset.rows);
-      
+
       const startTime = Date.now();
-      
+
       // Simulate batch processing
       const batchSize = 100;
       const batches: any[][] = [];
-      
+
       for (let i = 0; i < largeDataset.rows.length; i += batchSize) {
         const batch = largeDataset.rows.slice(i, i + batchSize);
         batches.push(batch);
       }
-      
+
       const endTime = Date.now();
       const processingTime = endTime - startTime;
 
       expect(batches).toHaveLength(10); // 1000 / 100 = 10 batches
       expect(processingTime).toBeLessThan(2000); // Should complete within 2 seconds
-      
+
       // Memory efficiency check
       const totalProcessed = batches.reduce((sum, batch) => sum + batch.length, 0);
       expect(totalProcessed).toBe(1000);
@@ -160,7 +170,7 @@ describe('プロダクションデータ統合テスト', () => {
   describe('企業研修フィードバック処理', () => {
     test('企業研修データの匿名化処理', () => {
       ProductionDataManager.setupProductionEnvironment('CORPORATE_TRAINING_2024');
-      
+
       const spreadsheet = global.SpreadsheetApp.openById('test-spreadsheet');
       const sheet = spreadsheet.getSheetByName('Sheet1');
       const allData = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
@@ -170,44 +180,45 @@ describe('プロダクションデータ統合テスト', () => {
       // Corporate data often requires anonymization
       const anonymizeResponse = (row: any[], columnMapping: Record<string, number>) => {
         const anonymized = [...row];
-        
+
         // Remove or hash email for privacy
         if (columnMapping.email >= 0) {
           const email = row[columnMapping.email];
-          anonymized[columnMapping.email] = email.replace(/^([^@])([^@]*?)([^@])(@.+)$/, '$1***$3$4');
+          anonymized[columnMapping.email] = email.replace(
+            /^([^@])([^@]*?)([^@])(@.+)$/,
+            '$1***$3$4'
+          );
         }
-        
+
         // Remove or anonymize name
         if (columnMapping.name >= 0) {
           anonymized[columnMapping.name] = '匿名';
         }
-        
+
         return anonymized;
       };
 
       const columnMapping = ProductionDataManager.generateColumnMapping(headerRow);
-      const anonymizedData = dataRows.map(row => anonymizeResponse(row, columnMapping));
+      const anonymizedData = dataRows.map((row) => anonymizeResponse(row, columnMapping));
 
       // Verify anonymization
-      expect(anonymizedData.every(row => 
-        row[columnMapping.email].includes('***')
-      )).toBe(true);
-      
-      expect(anonymizedData.every(row => 
-        row[columnMapping.name] === '匿名'
-      )).toBe(true);
+      expect(anonymizedData.every((row) => row[columnMapping.email].includes('***'))).toBe(true);
+
+      expect(anonymizedData.every((row) => row[columnMapping.name] === '匿名')).toBe(true);
 
       // Verify data utility is preserved
-      expect(anonymizedData.every(row => 
-        row[columnMapping.answer] && row[columnMapping.answer].length > 0
-      )).toBe(true);
+      expect(
+        anonymizedData.every(
+          (row) => row[columnMapping.answer] && row[columnMapping.answer].length > 0
+        )
+      ).toBe(true);
     });
   });
 
   describe('国際学会フィードバック処理', () => {
     test('多言語データの処理', () => {
       ProductionDataManager.setupProductionEnvironment('ACADEMIC_CONFERENCE_2024');
-      
+
       const spreadsheet = global.SpreadsheetApp.openById('test-spreadsheet');
       const sheet = spreadsheet.getSheetByName('Sheet1');
       const allData = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
@@ -237,7 +248,7 @@ describe('プロダクションデータ統合テスト', () => {
   describe('Edge Case データ処理', () => {
     test('問題のあるデータの堅牢な処理', () => {
       ProductionDataManager.setupEdgeCaseData();
-      
+
       const spreadsheet = global.SpreadsheetApp.openById('test-spreadsheet');
       const sheet = spreadsheet.getSheetByName('Sheet1');
       const allData = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
@@ -267,28 +278,28 @@ describe('プロダクションデータ統合テスト', () => {
           reactions: {
             understand: safeGetNumber(row[6]),
             like: safeGetNumber(row[7]),
-            curious: safeGetNumber(row[8])
-          }
+            curious: safeGetNumber(row[8]),
+          },
         };
       };
 
-      const robustResults = dataRows.map(row => processRobustly(row));
+      const robustResults = dataRows.map((row) => processRobustly(row));
 
       // Verify robust processing handles edge cases
       expect(robustResults).toHaveLength(4); // All problematic rows processed
-      
+
       // Check empty data handling
       expect(robustResults[0].answer).toBe('');
       expect(robustResults[0].reactions.understand).toBe(0);
-      
+
       // Check very long text handling (preserved but manageable)
       expect(robustResults[1].answer.length).toBeGreaterThan(1000);
       expect(typeof robustResults[1].answer).toBe('string');
-      
+
       // Check security issue handling (input preserved but can be sanitized later)
       expect(robustResults[2].answer).toContain('<script>');
       expect(robustResults[2].reactions.understand).toBe(0); // NaN converted to 0
-      
+
       // Check unicode handling
       expect(robustResults[3].answer).toContain('مرحبا');
       expect(robustResults[3].reason).toContain('中文');
@@ -298,29 +309,33 @@ describe('プロダクションデータ統合テスト', () => {
 
   describe('システム統合パフォーマンステスト', () => {
     test('複数データセット同時処理', async () => {
-      const datasets = ['SCHOOL_SURVEY_2024', 'CORPORATE_TRAINING_2024', 'ACADEMIC_CONFERENCE_2024'] as const;
-      
-      const processDataset = async (datasetName: typeof datasets[number]) => {
+      const datasets = [
+        'SCHOOL_SURVEY_2024',
+        'CORPORATE_TRAINING_2024',
+        'ACADEMIC_CONFERENCE_2024',
+      ] as const;
+
+      const processDataset = async (datasetName: (typeof datasets)[number]) => {
         ProductionDataManager.setupProductionEnvironment(datasetName);
-        
+
         const spreadsheet = global.SpreadsheetApp.openById(`test-${datasetName.toLowerCase()}`);
         const sheet = spreadsheet.getSheetByName('Sheet1');
         const data = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
-        
+
         return {
           dataset: datasetName,
           rowCount: data.length - 1, // Exclude header
           columnCount: data[0].length,
-          processedAt: new Date().toISOString()
+          processedAt: new Date().toISOString(),
         };
       };
 
       const startTime = Date.now();
-      const results = await Promise.all(datasets.map(dataset => processDataset(dataset)));
+      const results = await Promise.all(datasets.map((dataset) => processDataset(dataset)));
       const endTime = Date.now();
 
       expect(results).toHaveLength(3);
-      expect(results.every(result => result.rowCount > 0)).toBe(true);
+      expect(results.every((result) => result.rowCount > 0)).toBe(true);
       expect(endTime - startTime).toBeLessThan(3000); // Parallel processing should be fast
     });
 
@@ -329,7 +344,7 @@ describe('プロダクションデータ統合テスト', () => {
       const dataSizes = [100, 500, 1000, 2000];
       const performanceMetrics: SystemPerformanceMetrics[] = [];
 
-      dataSizes.forEach(size => {
+      dataSizes.forEach((size) => {
         const startTime = Date.now();
         const startMemory = process.memoryUsage().heapUsed;
 
@@ -344,10 +359,10 @@ describe('プロダクションデータ統合テスト', () => {
 
           for (let i = 0; i < data.length; i += chunkSize) {
             const chunk = data.slice(i, i + chunkSize);
-            
+
             try {
               // Simulate processing
-              chunk.forEach(row => {
+              chunk.forEach((row) => {
                 if (row.length > 0) processedCount++;
               });
             } catch (error) {
@@ -359,7 +374,7 @@ describe('プロダクションデータ統合テスト', () => {
         };
 
         const result = processInChunks(largeDataset.rows);
-        
+
         const endTime = Date.now();
         const endMemory = process.memoryUsage().heapUsed;
 
@@ -367,7 +382,7 @@ describe('プロダクションデータ統合テスト', () => {
           dataProcessingTime: endTime - startTime,
           memoryUsage: endMemory - startMemory,
           errorRate: result.errorCount / result.processedCount,
-          throughput: result.processedCount / ((endTime - startTime) / 1000)
+          throughput: result.processedCount / ((endTime - startTime) / 1000),
         };
 
         performanceMetrics.push(metrics);
@@ -379,14 +394,19 @@ describe('プロダクションデータ統合テスト', () => {
       });
 
       // Verify scalability
-      const timeComplexities = performanceMetrics.map((metric, i) => 
-        metric.dataProcessingTime / dataSizes[i]
+      const timeComplexities = performanceMetrics.map(
+        (metric, i) => metric.dataProcessingTime / dataSizes[i]
       );
 
       // Time complexity should remain relatively constant (good scalability)
-      const avgComplexity = timeComplexities.reduce((sum, complexity) => sum + complexity, 0) / timeComplexities.length;
-      const complexityVariance = timeComplexities.reduce((sum, complexity) => sum + Math.pow(complexity - avgComplexity, 2), 0) / timeComplexities.length;
-      
+      const avgComplexity =
+        timeComplexities.reduce((sum, complexity) => sum + complexity, 0) / timeComplexities.length;
+      const complexityVariance =
+        timeComplexities.reduce(
+          (sum, complexity) => sum + Math.pow(complexity - avgComplexity, 2),
+          0
+        ) / timeComplexities.length;
+
       expect(complexityVariance).toBeLessThan(avgComplexity * 0.5); // Less than 50% variance
     });
   });
@@ -401,11 +421,11 @@ describe('プロダクションデータ統合テスト', () => {
             totalResponses: dataset.responses.length,
             dateRange: {
               start: '2024-01-01T00:00:00Z',
-              end: '2024-12-31T23:59:59Z'
+              end: '2024-12-31T23:59:59Z',
             },
             schools: ['Test School'],
-            classes: ['Test Class']
-          }
+            classes: ['Test Class'],
+          },
         };
 
         const isValid = ProductionDataManager.validateDataIntegrity(spreadsheetData);
@@ -420,48 +440,54 @@ describe('プロダクションデータ統合テスト', () => {
 
     test('異常データの自動検出', () => {
       const anomalyDetector = (data: any[][], headers: string[]) => {
-        const anomalies: Array<{row: number, column: number, issue: string}> = [];
-        
+        const anomalies: Array<{ row: number; column: number; issue: string }> = [];
+
         data.forEach((row, rowIndex) => {
           row.forEach((cell, colIndex) => {
             const header = headers[colIndex];
-            
+
             // Check for suspiciously long text
             if (typeof cell === 'string' && cell.length > 1000) {
               anomalies.push({
                 row: rowIndex,
                 column: colIndex,
-                issue: 'Suspiciously long text'
+                issue: 'Suspiciously long text',
               });
             }
-            
+
             // Check for potential injection attempts
-            if (typeof cell === 'string' && (
-              cell.includes('<script>') ||
-              cell.includes('DROP TABLE') ||
-              cell.includes('javascript:')
-            )) {
+            if (
+              typeof cell === 'string' &&
+              (cell.includes('<script>') ||
+                cell.includes('DROP TABLE') ||
+                cell.includes('javascript:'))
+            ) {
               anomalies.push({
                 row: rowIndex,
                 column: colIndex,
-                issue: 'Potential security threat'
+                issue: 'Potential security threat',
               });
             }
-            
+
             // Check for numeric anomalies in reaction columns
-            if (header && (header.includes('なるほど') || header.includes('いいね') || header.includes('知りたい'))) {
+            if (
+              header &&
+              (header.includes('なるほど') ||
+                header.includes('いいね') ||
+                header.includes('知りたい'))
+            ) {
               const num = Number(cell);
               if (num > 1000) {
                 anomalies.push({
                   row: rowIndex,
                   column: colIndex,
-                  issue: 'Unusually high reaction count'
+                  issue: 'Unusually high reaction count',
                 });
               }
             }
           });
         });
-        
+
         return anomalies;
       };
 
@@ -473,12 +499,18 @@ describe('プロダクションデータ統合テスト', () => {
       const dataRows = allData.slice(1);
 
       const detectedAnomalies = anomalyDetector(dataRows, headers);
-      
+
       // Should detect the problematic data we set up
       expect(detectedAnomalies.length).toBeGreaterThan(0);
-      expect(detectedAnomalies.some(anomaly => anomaly.issue === 'Suspiciously long text')).toBe(true);
-      expect(detectedAnomalies.some(anomaly => anomaly.issue === 'Potential security threat')).toBe(true);
-      expect(detectedAnomalies.some(anomaly => anomaly.issue === 'Unusually high reaction count')).toBe(true);
+      expect(detectedAnomalies.some((anomaly) => anomaly.issue === 'Suspiciously long text')).toBe(
+        true
+      );
+      expect(
+        detectedAnomalies.some((anomaly) => anomaly.issue === 'Potential security threat')
+      ).toBe(true);
+      expect(
+        detectedAnomalies.some((anomaly) => anomaly.issue === 'Unusually high reaction count')
+      ).toBe(true);
     });
   });
 });
