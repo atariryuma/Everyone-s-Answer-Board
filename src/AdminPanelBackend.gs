@@ -145,15 +145,8 @@ function connectDataSource(spreadsheetId, sheetName) {
                                   typeof headerIndices === 'object' && 
                                   Object.keys(headerIndices).length > 0;
     
-    console.log('connectToDataSource: ヘッダーチェック', { 
-      headerIndices, 
-      hasValidHeaderIndices, 
-      headerRowLength: headerRow?.length 
-    });
     
-    let columnMapping = hasValidHeaderIndices
-      ? convertIndicesToMapping(headerIndices, headerRow)
-      : detectColumnMapping(headerRow);
+    let columnMapping = detectColumnMapping(headerRow);
 
     // 列名マッピングの整合性チェック
     const validationResult = validateAdminPanelMapping(columnMapping);
@@ -175,9 +168,7 @@ function connectDataSource(spreadsheetId, sheetName) {
       // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
       cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
       const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
-      columnMapping = updatedHeaderIndices
-        ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow)
-        : detectColumnMapping(updatedHeaderRow);
+      columnMapping = detectColumnMapping(updatedHeaderRow);
     }
 
     // 設定を保存（既存のユーザー管理システムを活用）
@@ -368,7 +359,6 @@ function detectColumnMapping(headers) {
         column.alternates.forEach((alternate) => {
           const alternateLower = alternate.toLowerCase();
           if (headerLower.includes(alternateLower)) {
-            console.log(`✅ Alternates Match: ${fieldKey} - "${alternate}" found in "${header.substring(0, 30)}..." (score: 75)`);
             matchScore = Math.max(matchScore, 75); // alternates マッチング
           }
         });
@@ -389,7 +379,6 @@ function detectColumnMapping(headers) {
             header.includes(p) || headerLower.includes(p.toLowerCase())
           );
           if (hasAIPattern) {
-            console.log(`🚀 Question Pattern Special Detection: "${header.substring(0, 50)}..." (score: 92)`);
             matchScore = Math.max(matchScore, 92); // 質問文特別検出
           }
         }
@@ -464,7 +453,6 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
         column.alternates.forEach((alternate) => {
           const alternateLower = alternate.toLowerCase();
           if (headerLower.includes(alternateLower)) {
-            console.log(`✅ Alternates Match: ${fieldKey} - "${alternate}" found in "${header.substring(0, 30)}..." (score: 75)`);
             matchScore = Math.max(matchScore, 75); // alternates マッチング
           }
         });
@@ -485,7 +473,6 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
             header.includes(p) || headerLower.includes(p.toLowerCase())
           );
           if (hasAIPattern) {
-            console.log(`🚀 Question Pattern Special Detection: "${header.substring(0, 50)}..." (score: 92)`);
             matchScore = Math.max(matchScore, 92); // 質問文特別検出
           }
         }
@@ -513,10 +500,6 @@ function mergeColumnConfidence(basicMapping, aiResult, headers) {
   // 既存のconfidence値を保持（重要：0%問題の修正）
   enhanced.confidence = { ...basicMapping.confidence };
   
-  console.log('mergeColumnConfidence: 開始', {
-    basicConfidence: basicMapping.confidence,
-    aiResultConfidence: aiResult.confidence
-  });
   
   // AI結果で既存マッピングを強化（既存confidence値を保持）
   if (aiResult.answer && (!enhanced.answer || (aiResult.confidence?.answer || 0) > (enhanced.confidence?.answer || 0))) {
@@ -548,9 +531,6 @@ function mergeColumnConfidence(basicMapping, aiResult, headers) {
     }
   }
   
-  console.log('mergeColumnConfidence: 完了', {
-    finalConfidence: enhanced.confidence
-  });
   
   return enhanced;
 }
@@ -564,11 +544,6 @@ function mergeColumnConfidence(basicMapping, aiResult, headers) {
  */
 function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
   try {
-    console.log('detectAndAddMissingColumns: 不足列の検出開始', {
-      spreadsheetId,
-      sheetName,
-      columnMapping,
-    });
 
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
@@ -579,7 +554,6 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
 
     // 現在のヘッダー行を取得
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    console.log('detectAndAddMissingColumns: 現在のヘッダー', headerRow);
 
     // 必要な列を定義（StudyQuestシステムで使用される標準列）
     const requiredColumns = {
@@ -634,7 +608,6 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
       }
     });
 
-    console.log('detectAndAddMissingColumns: 不足列検出結果', missingColumns);
 
     // 不足列がない場合
     if (missingColumns.length === 0) {
@@ -669,10 +642,6 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
           systemName: colInfo.systemName,
         });
 
-        console.log('detectAndAddMissingColumns: 列追加', {
-          columnName: colInfo.columnName,
-          position: newColumnIndex,
-        });
       });
     }
 
@@ -780,7 +749,6 @@ function validateAccess(spreadsheetId) {
  */
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
-    console.log('analyzeSpreadsheetColumns: 列分析開始', { spreadsheetId, sheetName });
 
     if (!spreadsheetId || !sheetName) {
       throw new Error('スプレッドシートIDとシート名が必要です');
@@ -803,9 +771,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
                                   typeof headerIndices === 'object' && 
                                   Object.keys(headerIndices).length > 0;
     
-    let columnMapping = hasValidHeaderIndices
-      ? convertIndicesToMapping(headerIndices, headerRow)
-      : detectColumnMapping(headerRow);
+    let columnMapping = detectColumnMapping(headerRow);
 
     // 列名マッピングの整合性チェック
     const validationResult = validateAdminPanelMapping(columnMapping);
@@ -815,11 +781,9 @@ function analyzeColumns(spreadsheetId, sheetName) {
     if (validationResult.warnings.length > 0) {
       console.warn('列名マッピング警告', validationResult.warnings);
     }
-    console.log('analyzeSpreadsheetColumns: 列マッピング完了', columnMapping);
 
     // 不足列の検出・追加
     const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping);
-    console.log('analyzeSpreadsheetColumns: 不足列検出結果', missingColumnsResult);
 
     // 列が追加された場合は、ヘッダー行を再取得して列マッピングを更新
     if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
@@ -828,11 +792,8 @@ function analyzeColumns(spreadsheetId, sheetName) {
       // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
       cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
       const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
-      columnMapping = updatedHeaderIndices
-        ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow)
-        : detectColumnMapping(updatedHeaderRow);
+      columnMapping = detectColumnMapping(updatedHeaderRow);
 
-      console.log('analyzeSpreadsheetColumns: 列追加後の更新されたマッピング', columnMapping);
     }
 
     // 設定を保存（既存システム互換）
@@ -981,7 +942,6 @@ function convertIndicesToMapping(headerIndices, headerRow) {
     mapping[uiFieldName] = columnIndex;
   });
 
-  console.log('convertIndicesToMapping: 単一定数使用で変換完了', {
     headerIndices,
     mapping,
     usedMapping: 'SYSTEM_CONSTANTS.COLUMN_MAPPING (統一定数)',

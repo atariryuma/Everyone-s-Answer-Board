@@ -46,7 +46,6 @@ function determineSetupStep(userInfo, configJson) {
     userInfo.spreadsheetId.trim() === '' ||
     setupStatus === 'pending'
   ) {
-    console.log('determineSetupStep: Step 1 - データソース未設定またはセットアップ初期状態');
     return 1;
   }
 
@@ -65,7 +64,6 @@ function determineSetupStep(userInfo, configJson) {
 
   // Step 3: 全セットアップ完了 + 公開済み
   if (setupStatus === 'completed' && configJson.formCreated && configJson.appPublished) {
-    console.log('determineSetupStep: Step 3 - 全セットアップ完了・公開済み');
     return 3;
   }
 
@@ -429,7 +427,6 @@ function addReactionBatch(requestUserId, batchOperations) {
       throw new Error(`バッチサイズが制限を超えています (最大${MAX_BATCH_SIZE}件)`);
     }
 
-    console.log('🔄 バッチリアクション処理開始:', batchOperations.length + '件');
 
     const reactingUserEmail = User.email();
     const ownerUserId = requestUserId;
@@ -788,7 +785,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
 function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount) {
   verifyUserAccess(requestUserId);
   try {
-    console.log('🔄 増分データ取得開始: sinceRowCount=%s', sinceRowCount);
 
     const currentUserId = requestUserId; // requestUserId を使用
 
@@ -817,10 +813,8 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
 
     // スプレッドシートとシートを取得
     const ss = SpreadsheetApp.openById(publishedSpreadsheetId);
-    console.log('DEBUG: Spreadsheet object obtained: %s', ss ? ss.getName() : 'null');
 
     const sheet = ss.getSheetByName(publishedSheetName);
-    console.log('DEBUG: Sheet object obtained: %s', sheet ? sheet.getName() : 'null');
 
     if (!sheet) {
       throw new Error('指定されたシートが見つかりません: ' + publishedSheetName);
@@ -861,7 +855,6 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     const lastColumn = sheet.getLastColumn();
     const rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
 
-    console.log('📥 スプレッドシートから直接取得した新しいデータ:', rawNewData.length, '件');
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     const headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
@@ -913,7 +906,6 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       displayMode
     );
 
-    console.log('✅ 増分データ取得完了: %s件の新しいデータを返します', formattedNewData.length);
 
     return {
       header: '', // 必要に応じて設定
@@ -1660,7 +1652,6 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
         typeof cacheManager.invalidateSheetData === 'function'
       ) {
         cacheManager.invalidateSheetData(spreadsheetId, sheetName);
-        console.log('ハイライト更新後のキャッシュ無効化完了: ' + spreadsheetId);
       }
     } catch (cacheError) {
       console.warn('ハイライト後のキャッシュ無効化エラー:', cacheError.message);
@@ -1894,7 +1885,6 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
           typeof cacheManager.invalidateSheetData === 'function'
         ) {
           cacheManager.invalidateSheetData(spreadsheetId, sheetName);
-          console.log('リアクション更新後のキャッシュ無効化完了: ' + spreadsheetId);
         }
       } catch (cacheError) {
         console.warn('リアクション後のキャッシュ無効化エラー:', cacheError.message);
@@ -2384,7 +2374,6 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
 
       // 同一ドメインで閲覧可能に設定（教育機関対応）
       file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
-      console.log('スプレッドシートを同一ドメイン閲覧可能に設定しました: ' + spreadsheetId);
 
       // 作成者（現在のユーザー）は所有者として保持
       console.log('作成者は所有者として権限を保持: ' + userEmail);
@@ -2412,7 +2401,6 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
     // サービスアカウントとスプレッドシートを共有（失敗しても処理継続）
     try {
       shareSpreadsheetWithServiceAccount(spreadsheetId);
-      console.log('サービスアカウントとの共有完了: ' + spreadsheetId);
     } catch (shareError) {
       console.warn('サービスアカウント共有エラー（処理継続）:', shareError.message);
       // 権限エラーの場合でも、スプレッドシート作成自体は成功とみなす
@@ -2438,7 +2426,6 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
  */
 function shareAllSpreadsheetsWithServiceAccount() {
   try {
-    console.log('全スプレッドシートのサービスアカウント共有開始');
 
     const allUsers = getAllUsers();
     const results = [];
@@ -2496,7 +2483,6 @@ function shareAllSpreadsheetsWithServiceAccount() {
  */
 function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
   try {
-    console.log('スプレッドシートアクセス権限の修復を開始: ' + userEmail + ' -> ' + spreadsheetId);
 
     // DriveApp経由で共有設定を変更
     let file;
@@ -2648,9 +2634,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const ranges = [sheetName + '!A:Z'];
 
     const responses = batchGetSheetsData(service, spreadsheetId, ranges);
-    console.log('DEBUG: batchGetSheetsData responses: %s', JSON.stringify(responses));
     const sheetData = responses.valueRanges[0].values || [];
-    console.log('DEBUG: sheetData length: %s', sheetData.length);
 
     // 名簿機能は使用せず、空の配列を設定
     const rosterData = [];
