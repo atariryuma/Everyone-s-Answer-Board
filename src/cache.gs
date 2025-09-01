@@ -1575,19 +1575,28 @@ function getHeadersCached(spreadsheetId, sheetName) {
       { ttl: 1800, enableMemoization: true }
     );
     if (!hasRequiredColumns.isValid) {
+      // 質問文がヘッダーになっている場合は有効として扱う
+      if (hasRequiredColumns.hasQuestionColumn) {
+        console.log(
+          `[getHeadersCached] Question column detected as header - treating as valid configuration`
+        );
+        return indices;
+      }
+      
       // 完全に必須列が不足している場合のみ復旧を試行
       // 片方でも存在する場合は設定によるものとして受け入れる
-      if (!hasRequiredColumns.hasReasonColumn && !hasRequiredColumns.hasOpinionColumn) {
+      if (!hasRequiredColumns.hasReasonColumn && !hasRequiredColumns.hasOpinionColumn && !hasRequiredColumns.hasQuestionColumn) {
         console.warn(
           `[getHeadersCached] Critical headers missing: ${hasRequiredColumns.missing.join(', ')}, attempting recovery`
         );
         cacheManager.remove(key);
+        cacheManager.remove(validationKey);
 
         // 即座に再取得を試行（リトライ回数を削減）
         const recoveredIndices = getHeadersWithRetry(spreadsheetId, sheetName, 1);
         if (recoveredIndices && Object.keys(recoveredIndices).length > 0) {
           const recoveredValidation = validateRequiredHeaders(recoveredIndices);
-          if (recoveredValidation.hasReasonColumn || recoveredValidation.hasOpinionColumn) {
+          if (recoveredValidation.hasReasonColumn || recoveredValidation.hasOpinionColumn || recoveredValidation.hasQuestionColumn) {
             console.log(`[getHeadersCached] Successfully recovered headers with basic columns`);
             return recoveredIndices;
           }
@@ -1595,7 +1604,7 @@ function getHeadersCached(spreadsheetId, sheetName) {
       } else {
         // 一部の列が存在する場合は警告のみで継続
         console.log(
-          `[getHeadersCached] Partial header validation - continuing with available columns: reason=${hasRequiredColumns.hasReasonColumn}, opinion=${hasRequiredColumns.hasOpinionColumn}`
+          `[getHeadersCached] Partial header validation - continuing with available columns: reason=${hasRequiredColumns.hasReasonColumn}, opinion=${hasRequiredColumns.hasOpinionColumn}, question=${hasRequiredColumns.hasQuestionColumn}`
         );
       }
     }
@@ -1738,11 +1747,18 @@ function validateRequiredHeaders(indices) {
   // 最低限必要なヘッダーパターンをチェック
   // 理由列・回答列は設定によって名前が変わる可能性があるため、
   // より柔軟な検証を実装
+  
+  // AIが認識しやすいパターンを大幅に拡張
   const reasonPatterns = [
     COLUMN_HEADERS.REASON, // 理由
     '理由',
     'そう思う理由',
+    'そう考える理由',
     'reason',
+    '根拠',
+    '体験',
+    '詳細',
+    '説明'
   ];
 
   const opinionPatterns = [
@@ -1752,43 +1768,74 @@ function validateRequiredHeaders(indices) {
     '考え',
     'opinion',
     'answer',
+    '答え',
+    '質問',
+    '問い'
   ];
 
   const missing = [];
   let hasReasonColumn = false;
   let hasOpinionColumn = false;
+  let hasQuestionColumn = false;  // 質問文がヘッダーになっている場合
 
-  // 理由列の存在チェック（いずれかのパターンが存在すればOK）
-  for (const pattern of reasonPatterns) {
-    if (indices[pattern] !== undefined) {
-      hasReasonColumn = true;
-      break;
+  // より柔軟な判定: キーにパターンが含まれているかチェック
+  for (const key in indices) {
+    const keyLower = key.toLowerCase();
+    
+    // 理由列の存在チェック（部分一致も許可）
+    for (const pattern of reasonPatterns) {
+      if (key === pattern || keyLower.includes(pattern.toLowerCase()) || 
+          keyLower.includes('理由') || keyLower.includes('体験') || keyLower.includes('根拠')) {
+        hasReasonColumn = true;
+        break;
+      }
+    }
+    
+    // 回答列の存在チェック（部分一致も許可）
+    for (const pattern of opinionPatterns) {
+      if (key === pattern || keyLower.includes(pattern.toLowerCase()) || 
+          keyLower.includes('回答') || keyLower.includes('答') || keyLower.includes('意見')) {
+        hasOpinionColumn = true;
+        break;
+      }
+    }
+    
+    // 質問文と思われる長いヘッダーの検出（15文字以上で「？」を含む）
+    if (key.length > 15 && (key.includes('？') || key.includes('?') || key.includes('どうして') || 
+        key.includes('なぜ') || key.includes('思います') || key.includes('考え'))) {
+      hasQuestionColumn = true;
+      hasOpinionColumn = true; // 質問文も回答列として扱う
     }
   }
-
-  // 回答列の存在チェック（いずれかのパターンが存在すればOK）
-  for (const pattern of opinionPatterns) {
-    if (indices[pattern] !== undefined) {
-      hasOpinionColumn = true;
-      break;
-    }
+  
+  // フォームの回答シートによくあるヘッダーも回答列として認識
+  const formResponseIndices = Object.keys(indices);
+  if (formResponseIndices.some(header => 
+    header.length > 20 && (header.includes('どうして') || header.includes('なぜ') || 
+    header.includes('思いますか') || header.includes('考えますか')))) {
+    hasOpinionColumn = true;
+    hasQuestionColumn = true;
   }
 
   if (!hasReasonColumn) {
-    missing.push(COLUMN_HEADERS.REASON);
+    missing.push('理由または詳細説明の列');
   }
-  if (!hasOpinionColumn) {
-    missing.push(COLUMN_HEADERS.OPINION);
+  if (!hasOpinionColumn && !hasQuestionColumn) {
+    missing.push('回答または質問の列');
   }
 
   // 基本的なヘッダーが1つも存在しない場合は無効
   const hasBasicHeaders = Object.keys(indices).length > 0;
+  
+  // より緩い検証: 質問文がヘッダーにある場合も有効とする
+  const isValid = hasBasicHeaders && (hasReasonColumn || hasOpinionColumn || hasQuestionColumn);
 
   return {
-    isValid: hasBasicHeaders && (hasReasonColumn || hasOpinionColumn), // 最低1つは必要
+    isValid: isValid,
     missing: missing,
     hasReasonColumn: hasReasonColumn,
     hasOpinionColumn: hasOpinionColumn,
+    hasQuestionColumn: hasQuestionColumn
   };
 }
 

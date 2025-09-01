@@ -762,12 +762,20 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   // nullチェックを追加
   if (!headerIndices || typeof headerIndices !== 'object') {
     console.error('convertIndicesToMapping: headerIndices is null or invalid', headerIndices);
-    throw new Error('Cannot convert undefined or null headerIndices to mapping object');
+    // エラーを投げる代わりにAI判定にフォールバック
+    console.log('convertIndicesToMapping: Falling back to AI detection due to invalid headerIndices');
+    return detectColumnMapping(headerRow);
   }
   
   if (!headerRow || !Array.isArray(headerRow)) {
     console.error('convertIndicesToMapping: headerRow is null or invalid', headerRow);
     throw new Error('Cannot convert undefined or null headerRow to mapping object');
+  }
+
+  // 空のheaderIndicesの場合もAI判定にフォールバック
+  if (Object.keys(headerIndices).length === 0) {
+    console.log('convertIndicesToMapping: Empty headerIndices, falling back to AI detection');
+    return detectColumnMapping(headerRow);
   }
 
   // シンプル・単一定数SYSTEM_CONSTANTS.COLUMN_MAPPINGを使用
@@ -801,6 +809,33 @@ function convertIndicesToMapping(headerIndices, headerRow) {
             }
           }
           if (columnIndex !== null) break;
+        }
+      }
+      
+      // 質問文がヘッダーになっている場合の特別処理（answer列）
+      if (columnIndex === null && uiFieldName === 'answer') {
+        for (const [actualHeader, index] of Object.entries(headerIndices)) {
+          // 15文字以上で質問っぽいヘッダーを回答列として認識
+          if (actualHeader.length > 15 && 
+              (actualHeader.includes('？') || actualHeader.includes('?') || 
+               actualHeader.includes('どうして') || actualHeader.includes('なぜ') || 
+               actualHeader.includes('思います') || actualHeader.includes('考え'))) {
+            columnIndex = index;
+            console.log(`convertIndicesToMapping: 質問文ヘッダーを回答列として認識 ${uiFieldName}: "${actualHeader.substring(0, 30)}..." (index: ${index})`);
+            break;
+          }
+        }
+      }
+      
+      // 理由っぽいヘッダーの特別処理（reason列）
+      if (columnIndex === null && uiFieldName === 'reason') {
+        for (const [actualHeader, index] of Object.entries(headerIndices)) {
+          if (actualHeader.includes('理由') || actualHeader.includes('体験') || 
+              actualHeader.includes('根拠') || actualHeader.includes('なぜ')) {
+            columnIndex = index;
+            console.log(`convertIndicesToMapping: 理由系ヘッダーを理由列として認識 ${uiFieldName}: "${actualHeader}" (index: ${index})`);
+            break;
+          }
         }
       }
     }
