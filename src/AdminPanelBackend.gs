@@ -8,6 +8,15 @@
  * 既存のunifiedUserManager、database、Core関数を活用
  */
 
+// SYSTEM_CONSTANTS の存在確認とデバッグ
+function debugConstants() {
+  console.log('SYSTEM_CONSTANTS:', typeof SYSTEM_CONSTANTS);
+  if (typeof SYSTEM_CONSTANTS !== 'undefined') {
+    console.log('COLUMN_MAPPING:', typeof SYSTEM_CONSTANTS.COLUMN_MAPPING);
+    console.log('COLUMN_MAPPING keys:', SYSTEM_CONSTANTS.COLUMN_MAPPING ? Object.keys(SYSTEM_CONSTANTS.COLUMN_MAPPING) : 'undefined');
+  }
+}
+
 // =============================================================================
 // データソース管理
 // =============================================================================
@@ -211,6 +220,15 @@ function connectDataSource(spreadsheetId, sheetName) {
  * @returns {Object} 検出された列マッピング
  */
 function mapColumns(headers) {
+  // デバッグ: SYSTEM_CONSTANTSの存在確認
+  debugConstants();
+  
+  // 安全性チェック: SYSTEM_CONSTANTSが未定義の場合のフォールバック
+  if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
+    console.error('SYSTEM_CONSTANTS.COLUMN_MAPPING is not available, using fallback');
+    throw new Error('SYSTEM_CONSTANTS.COLUMN_MAPPING is not defined');
+  }
+
   // SYSTEM_CONSTANTS.COLUMN_MAPPINGベースの初期化
   const mapping = {};
   const confidence = {};
@@ -238,6 +256,16 @@ function mapColumns(headers) {
         matchScore = 80; // 部分一致
       } else if (headerName.includes(headerLower) && headerLower.length > 2) {
         matchScore = 70; // 逆部分一致
+      }
+
+      // alternatesを使った拡張マッチング
+      if (matchScore === 0 && column.alternates) {
+        column.alternates.forEach((alternate) => {
+          const alternateLower = alternate.toLowerCase();
+          if (headerLower.includes(alternateLower)) {
+            matchScore = Math.max(matchScore, 75); // alternates マッチング
+          }
+        });
       }
 
       // より高い信頼度で置き換え

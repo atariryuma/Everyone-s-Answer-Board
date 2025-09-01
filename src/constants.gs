@@ -245,21 +245,25 @@ const APP_CONSTANTS = Object.freeze({
       answer: Object.freeze({
         key: 'answer',
         header: '回答',
+        alternates: ['どうして', '質問', '問題', '意見', '答え'], // 部分マッチ用
         required: true
       }),
       reason: Object.freeze({
         key: 'reason', 
         header: '理由',
+        alternates: ['理由', '根拠', '体験', 'なぜ'], // 部分マッチ用
         required: false
       }),
       class: Object.freeze({
         key: 'class',
         header: 'クラス', 
+        alternates: ['クラス', '学年'],
         required: false
       }),
       name: Object.freeze({
         key: 'name',
         header: '名前',
+        alternates: ['名前', '氏名', 'お名前'],
         required: false
       })
     }),
