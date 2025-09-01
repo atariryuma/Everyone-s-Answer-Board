@@ -30,12 +30,15 @@ function debugConstants() {
 // =============================================================================
 
 /**
- * スプレッドシート一覧を取得
+ * スプレッドシート一覧を取得（オーナー権限＋フォーム連携チェック）
  * @returns {Array<Object>} スプレッドシート情報の配列
  */
 function getSpreadsheetList() {
   try {
     console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
+    
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    console.log('現在のユーザー:', currentUserEmail);
 
     // Google Driveからスプレッドシートを検索
     const files = DriveApp.searchFiles(
@@ -49,15 +52,36 @@ function getSpreadsheetList() {
     while (files.hasNext() && count < maxResults) {
       const file = files.next();
       
-      // オーナー情報の安全な取得
+      // オーナー権限チェック
       let ownerEmail = 'Unknown';
+      let isOwner = false;
       try {
         const owner = file.getOwner();
         if (owner) {
           ownerEmail = owner.getEmail();
+          isOwner = ownerEmail === currentUserEmail;
         }
       } catch (ownerError) {
         console.warn(`Owner取得エラー for file ${file.getName()}:`, ownerError.message);
+        continue; // オーナー確認できない場合はスキップ
+      }
+
+      // オーナーでない場合はスキップ
+      if (!isOwner) {
+        continue;
+      }
+
+      // フォーム連携チェック
+      let formInfo = null;
+      try {
+        formInfo = checkFormConnection(file.getId());
+      } catch (formError) {
+        console.warn(`フォーム連携チェックエラー for ${file.getName()}:`, formError.message);
+      }
+
+      // フォーム連携がない場合はスキップ
+      if (!formInfo || !formInfo.hasForm) {
+        continue;
       }
       
       spreadsheets.push({
@@ -65,6 +89,10 @@ function getSpreadsheetList() {
         name: file.getName(),
         lastModified: file.getLastUpdated().toISOString(),
         owner: ownerEmail,
+        isOwner: true,
+        formUrl: formInfo.formUrl,
+        formTitle: formInfo.formTitle,
+        hasFormConnection: true
       });
       count++;
     }
@@ -72,11 +100,44 @@ function getSpreadsheetList() {
     // 最終更新順でソート
     spreadsheets.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
 
-    console.log(`getSpreadsheetList: ${spreadsheets.length}個のスプレッドシートを取得`);
+    console.log(`getSpreadsheetList: ${spreadsheets.length}個の条件適合スプレッドシートを取得`);
     return spreadsheets;
   } catch (error) {
     console.error('getSpreadsheetList エラー:', error);
     throw new Error('スプレッドシート一覧の取得に失敗しました: ' + error.message);
+  }
+}
+
+/**
+ * スプレッドシートのフォーム連携をチェック
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Object} フォーム連携情報
+ */
+function checkFormConnection(spreadsheetId) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    
+    // フォーム連携されたスプレッドシートには特定のプロパティがある
+    const form = FormApp.openByUrl(spreadsheet.getFormUrl());
+    
+    if (form) {
+      const formUrl = form.getPublishedUrl();
+      const formTitle = form.getTitle();
+      
+      return {
+        hasForm: true,
+        formUrl: formUrl,
+        formTitle: formTitle,
+        formId: form.getId()
+      };
+    }
+    
+    return { hasForm: false };
+    
+  } catch (error) {
+    // フォーム連携がない場合、getFormUrl()でエラーが発生する
+    console.log(`フォーム連携チェック: ${spreadsheetId} はフォーム非連携`);
+    return { hasForm: false };
   }
 }
 
@@ -171,6 +232,15 @@ function connectDataSource(spreadsheetId, sheetName) {
       columnMapping = detectColumnMapping(updatedHeaderRow);
     }
 
+    // フォーム連携情報を取得してデータベースに保存
+    let formInfo = null;
+    try {
+      formInfo = checkFormConnection(spreadsheetId);
+      console.log('フォーム連携情報:', formInfo);
+    } catch (formError) {
+      console.warn('フォーム情報取得エラー:', formError.message);
+    }
+
     // 設定を保存（既存のユーザー管理システムを活用）
     const currentUser = User.email();
     const userInfo = DB.findUserByEmail(currentUser);
@@ -179,8 +249,8 @@ function connectDataSource(spreadsheetId, sheetName) {
       // 既存システム互換の列マッピングを作成
       const compatibleMapping = convertToCompatibleMapping(columnMapping, headerRow);
 
-      // ユーザーのスプレッドシート設定を更新
-      updateUserSpreadsheetConfig(userInfo.userId, {
+      // ユーザーのスプレッドシート設定を更新（フォームURL含む）
+      const updateData = {
         spreadsheetId: spreadsheetId,
         sheetName: sheetName,
         columnMapping: columnMapping, // AdminPanel用の形式
@@ -188,7 +258,25 @@ function connectDataSource(spreadsheetId, sheetName) {
         lastConnected: new Date().toISOString(),
         connectionMethod: 'dropdown_select',
         missingColumnsHandled: missingColumnsResult,
-      });
+      };
+
+      // フォーム情報がある場合、データベースに保存
+      if (formInfo && formInfo.hasForm) {
+        // データベースのformUrl列に保存
+        const dbUpdateResult = updateUser(userInfo.userId, {
+          formUrl: formInfo.formUrl,
+          lastAccessedAt: new Date().toISOString()
+        });
+        
+        if (dbUpdateResult) {
+          console.log('フォームURL保存成功:', formInfo.formUrl);
+          updateData.formTitle = formInfo.formTitle;
+        } else {
+          console.warn('フォームURL保存失敗');
+        }
+      }
+
+      updateUserSpreadsheetConfig(userInfo.userId, updateData);
 
       console.log('connectToDataSource: 互換形式も保存', { columnMapping, compatibleMapping });
     }
@@ -1490,6 +1578,32 @@ function getCurrentBoardInfoAndUrls() {
       isActive: false,
       questionText: 'エラーが発生しました',
       error: error.message,
+    };
+  }
+}
+
+/**
+ * データベース最適化を実行（管理者用）
+ */
+function executeDataOptimization() {
+  try {
+    const targetUserId = '882d95c7-1fef-4739-a4b5-4ca02feaa69b';
+    
+    if (typeof optimizeSpecificUser === 'function') {
+      const result = optimizeSpecificUser(targetUserId);
+      console.info('最適化結果:', result);
+      return result;
+    } else {
+      return {
+        success: false,
+        message: 'ConfigOptimizer.gs が読み込まれていません'
+      };
+    }
+  } catch (error) {
+    console.error('executeDataOptimization エラー:', error);
+    return {
+      success: false,
+      error: error.message
     };
   }
 }

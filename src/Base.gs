@@ -29,6 +29,20 @@ class ConfigurationManager {
   }
 
   /**
+   * 最適化されたユーザー情報を取得（動的フィールド付き）
+   * @param {string} userId ユーザーID
+   * @return {Object|null} 統合されたユーザー情報
+   */
+  getOptimizedUserInfo(userId) {
+    if (typeof getOptimizedUserInfo === 'function') {
+      return getOptimizedUserInfo(userId);
+    } else {
+      // フォールバック：従来の方法
+      return this.getUserConfig(userId);
+    }
+  }
+
+  /**
    * ユーザー設定を保存（データベースに直接書き込み）
    * @param {string} userId ユーザーID
    * @param {Object} config 設定オブジェクト

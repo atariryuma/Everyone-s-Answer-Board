@@ -179,6 +179,13 @@
               const option = document.createElement('option');
               option.value = sheet.id;
               option.textContent = sheet.name;
+              
+              // フォーム情報をdata属性として保存
+              if (sheet.formUrl) {
+                option.dataset.formUrl = sheet.formUrl;
+                option.dataset.formTitle = sheet.formTitle || 'フォーム';
+              }
+              
               select.appendChild(option);
             });
             console.log(`📊 スプレッドシート一覧読み込み完了: ${spreadsheets.length}件`);
@@ -759,6 +766,30 @@
     }
   }
 
+  // フォーム情報表示
+  function showFormInfo(formData) {
+    const formInfo = document.getElementById('form-info');
+    const formTitle = document.getElementById('form-title');
+    const formUrl = document.getElementById('form-url');
+    
+    if (formInfo && formTitle && formUrl) {
+      formTitle.textContent = formData.formTitle;
+      formUrl.href = formData.formUrl;
+      formUrl.textContent = formData.formUrl;
+      
+      formInfo.classList.remove('hidden');
+      console.log('フォーム情報表示:', formData);
+    }
+  }
+
+  // フォーム情報非表示
+  function hideFormInfo() {
+    const formInfo = document.getElementById('form-info');
+    if (formInfo) {
+      formInfo.classList.add('hidden');
+    }
+  }
+
   // 情報表示 (SharedUtilitiesの通知システムを使用)
   function showInfo(message) {
     if (window.sharedUtilities && window.sharedUtilities.notifications) {
@@ -1047,6 +1078,19 @@
       const spreadsheetId = this.value;
       if (spreadsheetId) {
         loadSheetList(spreadsheetId);
+        
+        // フォーム情報を表示
+        const selectedOption = this.selectedOptions[0];
+        if (selectedOption && selectedOption.dataset.formUrl) {
+          showFormInfo({
+            formTitle: selectedOption.dataset.formTitle || '不明',
+            formUrl: selectedOption.dataset.formUrl
+          });
+        } else {
+          hideFormInfo();
+        }
+      } else {
+        hideFormInfo();
       }
     });
 

@@ -615,6 +615,25 @@
                 <option value="">スプレッドシートを選択してください</option>
               </select>
             </div>
+            <!-- フォーム情報表示 -->
+            <div id="form-info" class="form-info hidden">
+              <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-blue-400">📋</span>
+                  <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
+                </div>
+                <div class="text-sm text-gray-300">
+                  <div class="mb-1">
+                    <span class="font-medium">タイトル:</span>
+                    <span id="form-title">-</span>
+                  </div>
+                  <div>
+                    <span class="font-medium">URL:</span>
+                    <a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="action-buttons">
               <button id="refresh-data" class="btn-secondary" type="button">🔄 更新</button>
               <button id="connect-source" class="btn-primary" type="button">接続</button>
