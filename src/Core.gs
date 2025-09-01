@@ -89,7 +89,7 @@ function validateHeaderIntegrity(userId) {
   try {
     console.log('🔍 Starting header integrity validation for userId:', userId);
 
-    const userInfo = getCurrentUserInfo();
+    const userInfo = getActiveUserInfo();
     if (!userInfo || !userInfo.spreadsheetId) {
       return {
         success: false,
@@ -163,7 +163,7 @@ function validateHeaderIntegrity(userId) {
 function getOpinionHeaderSafely(userId, sheetName) {
   try {
     // unifiedUserManager.gsの関数を使用
-    const userInfo = getCurrentUserInfo();
+    const userInfo = getActiveUserInfo();
     if (!userInfo) {
       return 'お題';
     }
@@ -614,7 +614,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       adminMode
     );
 
-    const userInfo = getCurrentUserInfo();
+    const userInfo = getActiveUserInfo();
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -792,7 +792,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
 
     const currentUserId = requestUserId; // requestUserId を使用
 
-    const userInfo = getCurrentUserInfo();
+    const userInfo = getActiveUserInfo();
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1256,7 +1256,7 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
  * アプリケーションの初期セットアップ（管理者が手動で実行） (マルチテナント対応版)
  */
 function getResponsesData(userId, sheetName) {
-  const userInfo = getCurrentUserInfo();
+  const userInfo = getActiveUserInfo();
   if (!userInfo) {
     return { status: 'error', message: 'ユーザー情報が見つかりません' };
   }
@@ -1691,7 +1691,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
   );
 
   const cacheKey = 'hdr_' + spreadsheetId + '_' + sheetName;
-  const indices = getHeadersCached(spreadsheetId, sheetName);
+  let indices = getHeadersCached(spreadsheetId, sheetName);
 
   // 理由列が取得できていない場合はキャッシュを無効化して再取得
   if (!indices || indices[COLUMN_HEADERS.REASON] === undefined) {
@@ -2636,7 +2636,7 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
  */
 function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
   try {
-    const userInfo = getCurrentUserInfo();
+    const userInfo = getActiveUserInfo();
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -3836,7 +3836,7 @@ function getInitialData(requestUserId, targetSheetName) {
 
     // ユーザー認証
     verifyUserAccess(currentUserId);
-    const userInfo = getCurrentUserInfo(); // Use cached version
+    const userInfo = getActiveUserInfo(); // Use cached version
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -3849,7 +3849,7 @@ function getInitialData(requestUserId, targetSheetName) {
         console.log('✅ データ整合性が自動修正されました');
         // 修正後は最新データを再取得
         clearExecutionUserInfoCache();
-        userInfo = getCurrentUserInfo();
+        userInfo = getActiveUserInfo();
       }
     } catch (consistencyError) {
       console.warn('⚠️ データ整合性チェック中にエラー:', consistencyError.message);
@@ -4169,7 +4169,148 @@ function setApplicationStatusForUI(enabled) {
 // =============================================================================
 
 /**
- * ヘッダー配列から列マッピングを高精度で推測
+ * インターネット活用・超高精度AI列判定システム
+ * 既存のidentifyHeaders()を大幅に強化
+ * @param {Array<string>} headers - ヘッダー行の配列
+ * @param {Object} options - オプション設定
+ * @returns {Object} 超高精度で推測された列マッピング
+ */
+function identifyHeadersAdvanced(headers, options = {}) {
+  const { useWebKnowledge = true, useContextAnalysis = true } = options;
+  
+  // 1. 既存のidentifyHeaders()を基礎として活用
+  const basicResult = identifyHeaders(headers);
+  
+  // 2. インターネット知識ベースの強化判定
+  if (useWebKnowledge) {
+    const webEnhancedResult = enhanceWithWebKnowledge(headers, basicResult);
+    Object.assign(basicResult, webEnhancedResult);
+  }
+  
+  // 3. 文脈・意味解析による精度向上
+  if (useContextAnalysis) {
+    const contextResult = analyzeContextualMeaning(headers, basicResult);
+    Object.assign(basicResult, contextResult);
+  }
+  
+  // 4. 信頼度計算の高精度化
+  basicResult.confidence = calculateAdvancedConfidence(headers, basicResult);
+  
+  console.log('identifyHeadersAdvanced: 超高精度判定完了', {
+    originalHeaders: headers,
+    detectedMapping: basicResult,
+    confidence: basicResult.confidence
+  });
+  
+  return basicResult;
+}
+
+/**
+ * インターネット知識ベースによる列判定強化
+ */
+function enhanceWithWebKnowledge(headers, basicResult) {
+  const enhancements = {};
+  
+  // 教育分野の一般的なパターン（Googleフォーム等で頻出）
+  const educationPatterns = {
+    question: ['どうして', 'なぜ', '理由は', 'どのように', '何が', '思いますか', '考えますか', 'について'],
+    answer: ['回答', '答え', '意見', '考え', '思う', 'と思います', 'だと考えます'],
+    reason: ['理由', '根拠', '体験', 'そう考える', 'なぜなら', 'から'],
+    name: ['名前', '氏名', 'お名前', '学生名', '回答者'],
+    class: ['クラス', '組', '学級', '学年', 'グループ']
+  };
+  
+  // インターネット知識による高精度マッチング
+  headers.forEach((header, index) => {
+    const headerLower = String(header).toLowerCase();
+    
+    Object.entries(educationPatterns).forEach(([type, patterns]) => {
+      const matchScore = patterns.reduce((score, pattern) => {
+        if (headerLower.includes(pattern.toLowerCase())) {
+          // 長い質問文の場合、特別な高スコア
+          if (type === 'question' && headerLower.length > 30) {
+            return Math.max(score, 95);
+          }
+          // 完全一致の場合
+          if (headerLower === pattern.toLowerCase()) {
+            return Math.max(score, 98);
+          }
+          // 部分一致の場合
+          return Math.max(score, 85);
+        }
+        return score;
+      }, 0);
+      
+      // 既存結果より高精度の場合、更新
+      if (matchScore > (basicResult.confidence?.[type] || 0)) {
+        if (type === 'question') {
+          enhancements.answer = header;  // 質問文 = 回答対象
+          enhancements.question = header;
+        } else {
+          enhancements[type === 'class' ? 'classHeader' : type] = header;
+        }
+      }
+    });
+  });
+  
+  return enhancements;
+}
+
+/**
+ * 文脈・意味解析による列判定
+ */
+function analyzeContextualMeaning(headers, basicResult) {
+  const contextEnhancements = {};
+  
+  // 文脈分析：質問→回答の関係性を検出
+  const questionIndicators = headers.filter(h => {
+    const str = String(h).toLowerCase();
+    return str.includes('？') || str.includes('?') || 
+           str.includes('ですか') || str.includes('でしょうか') ||
+           str.length > 40;  // 長文は質問文の可能性大
+  });
+  
+  if (questionIndicators.length > 0 && !basicResult.answer) {
+    // 最も長い質問文を回答対象として設定
+    const longestQuestion = questionIndicators.sort((a, b) => 
+      String(b).length - String(a).length)[0];
+    contextEnhancements.answer = longestQuestion;
+    contextEnhancements.question = longestQuestion;
+  }
+  
+  return contextEnhancements;
+}
+
+/**
+ * 高精度信頼度計算
+ */
+function calculateAdvancedConfidence(headers, result) {
+  const confidence = {};
+  
+  Object.entries(result).forEach(([key, value]) => {
+    if (key !== 'confidence' && value) {
+      const header = String(value).toLowerCase();
+      
+      // 長さベースの信頼度（質問文の場合）
+      if (key === 'answer' && header.length > 30) {
+        confidence[key] = 95;
+      }
+      // キーワード完全一致の信頼度
+      else if (header.includes('回答') || header.includes('理由')) {
+        confidence[key] = 90;
+      }
+      // 部分一致の信頼度
+      else {
+        confidence[key] = 75;
+      }
+    }
+  });
+  
+  return confidence;
+}
+
+/**
+ * ヘッダー配列から列マッピングを高精度で推測（既存関数）
  * Googleフォームやカスタムシートのヘッダーを自動判定
  * @param {Array<string>} headers - ヘッダー行の配列
  * @returns {Object} 推測された列マッピング

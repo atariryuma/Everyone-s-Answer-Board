@@ -127,12 +127,12 @@ const Services = {
           isAuthenticated: true
         };
       } catch (error) {
-        console.error('getCurrentUserInfo エラー', { error: error.message });
+        console.error('getActiveUserInfo エラー', { error: error.message });
         return null;
       }
     },
     
-    getCurrentUserInfo() {
+    getActiveUserInfo() {
       try {
         // 新アーキテクチャでの単純化実装
         const userInfo = Services.user.current;
@@ -145,7 +145,7 @@ const Services = {
           // spreadsheetId, configJsonは削除され、ConfigurationManagerで管理
         };
       } catch (error) {
-        console.error('getCurrentUserInfo エラー', { error: error.message });
+        console.error('getActiveUserInfo エラー', { error: error.message });
         return null;
       }
     }

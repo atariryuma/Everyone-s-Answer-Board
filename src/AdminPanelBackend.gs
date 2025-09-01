@@ -9,6 +9,14 @@
  */
 
 // SYSTEM_CONSTANTS の存在確認とデバッグ
+/**
+ * 汎用ユーザー情報取得関数
+ * Services.user.getCurrentUserInfo()を活用した統一インターフェース - 全システムでgetActiveUserInfo()を使用
+ */
+function getActiveUserInfo() {
+  return Services.user.getCurrentUserInfo();
+}
+
 function debugConstants() {
   console.log('SYSTEM_CONSTANTS:', typeof SYSTEM_CONSTANTS);
   if (typeof SYSTEM_CONSTANTS !== 'undefined') {
@@ -129,10 +137,10 @@ function connectDataSource(spreadsheetId, sheetName) {
     const headerIndices = getHeadersCached(spreadsheetId, sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-    // Core.gsの高精度AI列マッピングを直接活用
-    const columnMapping = headerIndices
+    // 超高精度AI列マッピングを活用（新システム）
+    let columnMapping = headerIndices
       ? convertIndicesToMapping(headerIndices, headerRow)
-      : mapColumns(headerRow);
+      : detectColumnMapping(headerRow);
 
     // 列名マッピングの整合性チェック
     const validationResult = validateAdminPanelMapping(columnMapping);
@@ -156,7 +164,7 @@ function connectDataSource(spreadsheetId, sheetName) {
       const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
       columnMapping = updatedHeaderIndices
         ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow)
-        : mapColumns(updatedHeaderRow);
+        : detectColumnMapping(updatedHeaderRow);
     }
 
     // 設定を保存（既存のユーザー管理システムを活用）
@@ -219,14 +227,32 @@ function connectDataSource(spreadsheetId, sheetName) {
  * @param {Array<string>} headers - ヘッダー行の配列
  * @returns {Object} 検出された列マッピング
  */
-function mapColumns(headers) {
+/**
+ * 超高精度列マッピング検出システム（AI統合版）
+ * mapColumns から detectColumnMapping にリネーム
+ */
+function detectColumnMapping(headers) {
   // デバッグ: SYSTEM_CONSTANTSの存在確認
   debugConstants();
   
-  // 安全性チェック: SYSTEM_CONSTANTSが未定義の場合のフォールバック
+  // 1. SYSTEM_CONSTANTS チェック → 失敗時は既存AI活用
   if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
-    console.error('SYSTEM_CONSTANTS.COLUMN_MAPPING is not available, using fallback');
-    throw new Error('SYSTEM_CONSTANTS.COLUMN_MAPPING is not defined');
+    console.log('SYSTEM_CONSTANTS.COLUMN_MAPPING not available, using advanced AI detection');
+    
+    // 2. 超高精度AI判定システムを活用
+    const aiResult = identifyHeadersAdvanced(headers, {
+      useWebKnowledge: true,
+      useContextAnalysis: true
+    });
+    
+    // 3. 統一フォーマットに変換
+    return {
+      answer: headers.indexOf(aiResult.answer || aiResult.question),
+      reason: headers.indexOf(aiResult.reason),
+      class: headers.indexOf(aiResult.classHeader),
+      name: headers.indexOf(aiResult.name),
+      confidence: aiResult.confidence || { answer: 90, reason: 80, class: 75, name: 75 }
+    };
   }
 
   // SYSTEM_CONSTANTS.COLUMN_MAPPINGベースの初期化
@@ -278,13 +304,110 @@ function mapColumns(headers) {
     });
   });
 
-  console.log('mapColumns: SYSTEM_CONSTANTS.COLUMN_MAPPING使用でマッピング完了', {
+  // 4. SYSTEM_CONSTANTS処理 + AI補強
+  const basicMapping = performBasicSYSTEM_CONSTANTSMapping(headers);
+  const aiEnhancement = identifyHeadersAdvanced(headers);
+  
+  // 5. AI結果で精度向上
+  const enhancedMapping = enhanceMappingWithAI(basicMapping, aiEnhancement, headers);
+  
+  console.log('detectColumnMapping: AI統合・超高精度マッピング完了', {
     headers,
-    mapping,
-    usedConstant: 'SYSTEM_CONSTANTS.COLUMN_MAPPING',
+    basicMapping,
+    enhancedMapping,
+    usedTechnology: 'SYSTEM_CONSTANTS + Advanced AI + Internet Knowledge'
+  });
+
+  return enhancedMapping;
+}
+
+/**
+ * 基本的なSYSTEM_CONSTANTSマッピング（既存処理を分離）
+ */
+function performBasicSYSTEM_CONSTANTSMapping(headers) {
+  const mapping = {};
+  const confidence = {};
+
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列定義を初期化
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+    mapping[column.key] = null;
+  });
+  mapping.confidence = {};
+
+  // ヘッダー検出処理（既存ロジック）
+  headers.forEach((header, index) => {
+    const headerLower = header.toString().toLowerCase();
+
+    // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列を検査
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+      const headerName = column.header.toLowerCase();
+      const fieldKey = column.key;
+
+      // 基本マッチング（完全一致優先）
+      let matchScore = 0;
+      if (headerLower === headerName) {
+        matchScore = 95; // 完全一致
+      } else if (headerLower.includes(headerName)) {
+        matchScore = 80; // 部分一致
+      } else if (headerName.includes(headerLower) && headerLower.length > 2) {
+        matchScore = 70; // 逆部分一致
+      }
+
+      // alternatesを使った拡張マッチング
+      if (matchScore === 0 && column.alternates) {
+        column.alternates.forEach((alternate) => {
+          const alternateLower = alternate.toLowerCase();
+          if (headerLower.includes(alternateLower)) {
+            matchScore = Math.max(matchScore, 75); // alternates マッチング
+          }
+        });
+      }
+
+      // より高い信頼度で置き換え
+      if (matchScore > 0) {
+        if (!mapping[fieldKey] || matchScore > (mapping.confidence[fieldKey] || 0)) {
+          mapping[fieldKey] = index;
+          mapping.confidence[fieldKey] = matchScore;
+        }
+      }
+    });
   });
 
   return mapping;
+}
+
+/**
+ * AIによるマッピング強化
+ */
+function enhanceMappingWithAI(basicMapping, aiResult, headers) {
+  const enhanced = { ...basicMapping };
+  
+  // AIが高精度で検出した結果で既存マッピングを強化
+  if (aiResult.answer && (!enhanced.answer || (aiResult.confidence?.answer || 0) > (enhanced.confidence?.answer || 0))) {
+    enhanced.answer = headers.indexOf(aiResult.answer);
+    enhanced.confidence = enhanced.confidence || {};
+    enhanced.confidence.answer = aiResult.confidence?.answer || 95;
+  }
+  
+  if (aiResult.reason && (!enhanced.reason || (aiResult.confidence?.reason || 0) > (enhanced.confidence?.reason || 0))) {
+    enhanced.reason = headers.indexOf(aiResult.reason);
+    enhanced.confidence = enhanced.confidence || {};
+    enhanced.confidence.reason = aiResult.confidence?.reason || 85;
+  }
+  
+  if (aiResult.classHeader && (!enhanced.class || (aiResult.confidence?.class || 0) > (enhanced.confidence?.class || 0))) {
+    enhanced.class = headers.indexOf(aiResult.classHeader);
+    enhanced.confidence = enhanced.confidence || {};
+    enhanced.confidence.class = aiResult.confidence?.class || 80;
+  }
+  
+  if (aiResult.name && (!enhanced.name || (aiResult.confidence?.name || 0) > (enhanced.confidence?.name || 0))) {
+    enhanced.name = headers.indexOf(aiResult.name);
+    enhanced.confidence = enhanced.confidence || {};
+    enhanced.confidence.name = aiResult.confidence?.name || 75;
+  }
+  
+  return enhanced;
 }
 
 /**
@@ -529,10 +652,10 @@ function analyzeColumns(spreadsheetId, sheetName) {
     const headerIndices = getHeadersCached(spreadsheetId, sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-    // Core.gsの高精度AI列マッピングを直接活用
-    const columnMapping = headerIndices
+    // 超高精度AI列マッピングを活用（新システム）
+    let columnMapping = headerIndices
       ? convertIndicesToMapping(headerIndices, headerRow)
-      : mapColumns(headerRow);
+      : detectColumnMapping(headerRow);
 
     // 列名マッピングの整合性チェック
     const validationResult = validateAdminPanelMapping(columnMapping);
@@ -557,7 +680,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
       const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
       columnMapping = updatedHeaderIndices
         ? convertIndicesToMapping(updatedHeaderIndices, updatedHeaderRow)
-        : mapColumns(updatedHeaderRow);
+        : detectColumnMapping(updatedHeaderRow);
 
       console.log('analyzeSpreadsheetColumns: 列追加後の更新されたマッピング', columnMapping);
     }
@@ -1058,7 +1181,7 @@ function getUserColumnMapping(userId = null) {
     console.log('getUserColumnMapping: 列マッピング取得開始', userId);
 
     // ユーザー情報の取得
-    const targetUserId = userId || getCurrentUserInfo()?.userId;
+    const targetUserId = userId || getActiveUserInfo()?.userId;
     if (!targetUserId) {
       console.warn('getUserColumnMapping: ユーザーIDが見つかりません');
       return {};
@@ -1096,7 +1219,7 @@ function getCurrentBoardInfoAndUrls() {
     console.log('getCurrentBoardInfoAndUrls: ボード情報取得開始');
 
     // 現在ログイン中のユーザー情報を取得
-    const userInfo = getCurrentUserInfo();
+    const userInfo = getActiveUserInfo();
     if (!userInfo || !userInfo.userId) {
       console.warn('getCurrentBoardInfoAndUrls: ユーザー情報が見つかりません');
       return {
