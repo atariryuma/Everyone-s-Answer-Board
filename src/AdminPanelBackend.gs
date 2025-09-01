@@ -206,17 +206,17 @@ function connectDataSource(spreadsheetId, sheetName) {
 }
 
 /**
- * ヘッダー行から列マッピングを自動検出（COLUMN_MAPPING使用）
+ * ヘッダー行から列マッピングを自動検出（SYSTEM_CONSTANTS.COLUMN_MAPPING使用）
  * @param {Array<string>} headers - ヘッダー行の配列
  * @returns {Object} 検出された列マッピング
  */
 function mapColumns(headers) {
-  // COLUMN_MAPPINGベースの初期化
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGベースの初期化
   const mapping = {};
   const confidence = {};
 
-  // COLUMN_MAPPINGの各列定義を初期化
-  Object.values(COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列定義を初期化
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     mapping[column.key] = null;
   });
   mapping.confidence = {};
@@ -225,8 +225,8 @@ function mapColumns(headers) {
   headers.forEach((header, index) => {
     const headerLower = header.toString().toLowerCase();
 
-    // COLUMN_MAPPINGの各列を検査
-    Object.values(COLUMN_MAPPING).forEach((column) => {
+    // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列を検査
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       const headerName = column.header.toLowerCase();
       const fieldKey = column.key;
 
@@ -250,10 +250,10 @@ function mapColumns(headers) {
     });
   });
 
-  console.log('mapColumns: COLUMN_MAPPING使用でマッピング完了', {
+  console.log('mapColumns: SYSTEM_CONSTANTS.COLUMN_MAPPING使用でマッピング完了', {
     headers,
     mapping,
-    usedConstant: 'COLUMN_MAPPING',
+    usedConstant: 'SYSTEM_CONSTANTS.COLUMN_MAPPING',
   });
 
   return mapping;
@@ -590,11 +590,11 @@ function analyzeColumns(spreadsheetId, sheetName) {
  * @returns {Object} AdminPanel用マッピング
  */
 function convertIndicesToMapping(headerIndices, headerRow) {
-  // シンプル・単一定数COLUMN_MAPPINGを使用
+  // シンプル・単一定数SYSTEM_CONSTANTS.COLUMN_MAPPINGを使用
   const mapping = {};
 
   // 各列定義を直接使用（変換層なし）
-  Object.values(COLUMN_MAPPING).forEach((column) => {
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     const headerName = column.header; // '回答', '理由' など
     const uiFieldName = column.key; // 'answer', 'reason' など
 
@@ -605,7 +605,7 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   console.log('convertIndicesToMapping: 単一定数使用で変換完了', {
     headerIndices,
     mapping,
-    usedMapping: 'COLUMN_MAPPING (統一定数)',
+    usedMapping: 'SYSTEM_CONSTANTS.COLUMN_MAPPING (統一定数)',
   });
   return mapping;
 }
@@ -623,8 +623,8 @@ function validateAdminPanelMapping(mapping) {
     summary: {},
   };
 
-  // COLUMN_MAPPINGに基づく動的チェック
-  Object.values(COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGに基づく動的チェック
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     const fieldKey = column.key;
     const isRequired = column.required;
 
@@ -637,7 +637,7 @@ function validateAdminPanelMapping(mapping) {
   });
 
   // 許可されたフィールドかチェック
-  const allowedFields = Object.values(COLUMN_MAPPING).map((col) => col.key);
+  const allowedFields = Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).map((col) => col.key);
   Object.keys(mapping).forEach((uiField) => {
     if (!allowedFields.includes(uiField)) {
       results.warnings.push(`未知のUIフィールド '${uiField}' が含まれています`);
@@ -1046,7 +1046,7 @@ function getUserColumnMapping(userId = null) {
     // 設定が見つからない場合はデフォルト（空）を返す
     console.log('getUserColumnMapping: デフォルト設定を使用');
     const defaultMapping = {};
-    Object.values(COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       defaultMapping[column.key] = null;
     });
 
@@ -1186,16 +1186,16 @@ function convertToCompatibleMapping(columnMapping, headerRow) {
   try {
     const compatibleMapping = {};
 
-    // COLUMN_MAPPING から動的変換マップ生成（汎用化）
+    // SYSTEM_CONSTANTS.COLUMN_MAPPING から動的変換マップ生成（汎用化）
     const mappingConversions = {};
-    Object.values(COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       // 各列のシステム内部キー（大文字）を動的生成
       mappingConversions[column.key] = column.key.toUpperCase();
     });
 
-    // COLUMN_MAPPINGから動的な列ヘッダーマップ生成（汎用化）
+    // SYSTEM_CONSTANTS.COLUMN_MAPPINGから動的な列ヘッダーマップ生成（汎用化）
     const columnHeaders = {};
-    Object.values(COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       const systemKey = column.key.toUpperCase();
       columnHeaders[systemKey] = column.header; // 例: 'ANSWER' => '回答'
     });

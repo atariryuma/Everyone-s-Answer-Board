@@ -240,6 +240,30 @@ const APP_CONSTANTS = Object.freeze({
       NAME: '名前'
     }),
 
+    // AdminPanel用列マッピング定義
+    COLUMN_MAPPING: Object.freeze({
+      answer: Object.freeze({
+        key: 'answer',
+        header: '回答',
+        required: true
+      }),
+      reason: Object.freeze({
+        key: 'reason', 
+        header: '理由',
+        required: false
+      }),
+      class: Object.freeze({
+        key: 'class',
+        header: 'クラス', 
+        required: false
+      }),
+      name: Object.freeze({
+        key: 'name',
+        header: '名前',
+        required: false
+      })
+    }),
+
     // 表示モード
     DISPLAY_MODES: Object.freeze({
       ANONYMOUS: 'anonymous',
