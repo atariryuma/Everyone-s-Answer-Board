@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="4" failures="0" errors="0" time="0.324">
-  <testsuite name="プロダクションバグ検証: Cannot convert undefined or null to object" errors="0" failures="0" skipped="0" timestamp="2025-09-01T08:24:21" time="0.156" tests="4">
+<testsuites name="jest tests" tests="4" failures="0" errors="0" time="0.311">
+  <testsuite name="プロダクションバグ検証: Cannot convert undefined or null to object" errors="0" failures="0" skipped="0" timestamp="2025-09-01T08:27:53" time="0.151" tests="4">
     <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object getHeadersCached が空オブジェクトを返す場合のエラー再現" name="プロダクションバグ検証: Cannot convert undefined or null to object getHeadersCached が空オブジェクトを返す場合のエラー再現" time="0.016">
     </testcase>
-    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" name="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" time="0.004">
+    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" name="プロダクションバグ検証: Cannot convert undefined or null to object 修正版: 安全なヘッダーインデックスチェック" time="0.005">
     </testcase>
     <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object connectDataSource エラーハンドリング強化の検証" name="プロダクションバグ検証: Cannot convert undefined or null to object connectDataSource エラーハンドリング強化の検証" time="0.003">
     </testcase>
-    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" name="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" time="0.007">
+    <testcase classname="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" name="プロダクションバグ検証: Cannot convert undefined or null to object プロダクション修正コードの動作検証" time="0.002">
     </testcase>
   </testsuite>
 </testsuites>

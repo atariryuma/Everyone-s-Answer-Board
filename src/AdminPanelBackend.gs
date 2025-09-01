@@ -20,8 +20,11 @@ function getActiveUserInfo() {
 function debugConstants() {
   console.log('SYSTEM_CONSTANTS:', typeof SYSTEM_CONSTANTS);
   if (typeof SYSTEM_CONSTANTS !== 'undefined') {
-    console.log('COLUMN_MAPPING:', typeof SYSTEM_CONSTANTS.COLUMN_MAPPING);
-    console.log('COLUMN_MAPPING keys:', SYSTEM_CONSTANTS.COLUMN_MAPPING ? Object.keys(SYSTEM_CONSTANTS.COLUMN_MAPPING) : 'undefined');
+    console.log('UI:', typeof SYSTEM_CONSTANTS.UI);
+    console.log('UI.COLUMN_MAPPING:', typeof SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING);
+    console.log('UI.COLUMN_MAPPING keys:', SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING ? Object.keys(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING) : 'undefined');
+    // 旧パス（間違い）もチェック
+    console.log('COLUMN_MAPPING (old path):', typeof SYSTEM_CONSTANTS.COLUMN_MAPPING);
   }
 }
 
@@ -249,7 +252,7 @@ function detectColumnMapping(headers) {
   debugConstants();
   
   // 1. SYSTEM_CONSTANTS チェック → 失敗時は基本AI活用
-  if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
+  if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING) {
     console.log('SYSTEM_CONSTANTS.COLUMN_MAPPING not available, using basic AI detection');
     
     // 2. 基本的なAI判定システム（フォールバック版）
@@ -295,12 +298,12 @@ function detectColumnMapping(headers) {
     return mapping;
   }
 
-  // SYSTEM_CONSTANTS.COLUMN_MAPPINGベースの初期化
+  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGベースの初期化
   const mapping = {};
   const confidence = {};
 
-  // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列定義を初期化
-  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列定義を初期化
+  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
     mapping[column.key] = null;
   });
   mapping.confidence = {};
@@ -309,8 +312,8 @@ function detectColumnMapping(headers) {
   headers.forEach((header, index) => {
     const headerLower = header.toString().toLowerCase();
 
-    // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列を検査
-    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列を検査
+    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
       const headerName = column.header.toLowerCase();
       const fieldKey = column.key;
 
@@ -368,8 +371,8 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
   const mapping = {};
   const confidence = {};
 
-  // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列定義を初期化
-  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列定義を初期化
+  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
     mapping[column.key] = null;
   });
   mapping.confidence = {};
@@ -378,8 +381,8 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
   headers.forEach((header, index) => {
     const headerLower = header.toString().toLowerCase();
 
-    // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列を検査
-    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列を検査
+    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
       const headerName = column.header.toLowerCase();
       const fieldKey = column.key;
 
@@ -815,13 +818,13 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   });
 
   // SYSTEM_CONSTANTS の安全性チェック
-  if (!SYSTEM_CONSTANTS || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
-    console.warn('convertIndicesToMapping: SYSTEM_CONSTANTS.COLUMN_MAPPING is not available, falling back to AI detection');
+  if (!SYSTEM_CONSTANTS || !SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING) {
+    console.warn('convertIndicesToMapping: SYSTEM_CONSTANTS.UI.COLUMN_MAPPING is not available, falling back to AI detection');
     return detectColumnMapping(headerRow);
   }
 
   // 各列定義を直接使用（変換層なし）
-  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
     const headerName = column.header; // '回答', '理由' など
     const uiFieldName = column.key; // 'answer', 'reason' など
 
@@ -879,7 +882,7 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   console.log('convertIndicesToMapping: 単一定数使用で変換完了', {
     headerIndices,
     mapping,
-    usedMapping: 'SYSTEM_CONSTANTS.COLUMN_MAPPING (統一定数)',
+    usedMapping: 'SYSTEM_CONSTANTS.UI.COLUMN_MAPPING (統一定数)',
   });
   return mapping;
 }
@@ -897,8 +900,8 @@ function validateAdminPanelMapping(mapping) {
     summary: {},
   };
 
-  // SYSTEM_CONSTANTS.COLUMN_MAPPINGに基づく動的チェック
-  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGに基づく動的チェック
+  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
     const fieldKey = column.key;
     const isRequired = column.required;
 
@@ -911,7 +914,7 @@ function validateAdminPanelMapping(mapping) {
   });
 
   // 許可されたフィールドかチェック
-  const allowedFields = Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).map((col) => col.key);
+  const allowedFields = Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).map((col) => col.key);
   Object.keys(mapping).forEach((uiField) => {
     if (!allowedFields.includes(uiField)) {
       results.warnings.push(`未知のUIフィールド '${uiField}' が含まれています`);
@@ -1320,7 +1323,7 @@ function getUserColumnMapping(userId = null) {
     // 設定が見つからない場合はデフォルト（空）を返す
     console.log('getUserColumnMapping: デフォルト設定を使用');
     const defaultMapping = {};
-    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
       defaultMapping[column.key] = null;
     });
 
@@ -1460,16 +1463,16 @@ function convertToCompatibleMapping(columnMapping, headerRow) {
   try {
     const compatibleMapping = {};
 
-    // SYSTEM_CONSTANTS.COLUMN_MAPPING から動的変換マップ生成（汎用化）
+    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPING から動的変換マップ生成（汎用化）
     const mappingConversions = {};
-    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
       // 各列のシステム内部キー（大文字）を動的生成
       mappingConversions[column.key] = column.key.toUpperCase();
     });
 
-    // SYSTEM_CONSTANTS.COLUMN_MAPPINGから動的な列ヘッダーマップ生成（汎用化）
+    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGから動的な列ヘッダーマップ生成（汎用化）
     const columnHeaders = {};
-    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
       const systemKey = column.key.toUpperCase();
       columnHeaders[systemKey] = column.header; // 例: 'ANSWER' => '回答'
     });
