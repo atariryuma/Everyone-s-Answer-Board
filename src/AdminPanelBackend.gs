@@ -248,24 +248,51 @@ function detectColumnMapping(headers) {
   // デバッグ: SYSTEM_CONSTANTSの存在確認
   debugConstants();
   
-  // 1. SYSTEM_CONSTANTS チェック → 失敗時は既存AI活用
+  // 1. SYSTEM_CONSTANTS チェック → 失敗時は基本AI活用
   if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
-    console.log('SYSTEM_CONSTANTS.COLUMN_MAPPING not available, using advanced AI detection');
+    console.log('SYSTEM_CONSTANTS.COLUMN_MAPPING not available, using basic AI detection');
     
-    // 2. 超高精度AI判定システムを活用
-    const aiResult = identifyHeadersAdvanced(headers, {
-      useWebKnowledge: true,
-      useContextAnalysis: true
+    // 2. 基本的なAI判定システム（フォールバック版）
+    const mapping = {};
+    
+    // 質問文パターンの検出
+    headers.forEach((header, index) => {
+      const headerLower = header.toLowerCase();
+      
+      // 回答列の検出（質問文パターン）
+      if (header.length > 15 && 
+          (header.includes('？') || header.includes('?') || 
+           headerLower.includes('どうして') || headerLower.includes('なぜ') || 
+           headerLower.includes('思います') || headerLower.includes('考え'))) {
+        mapping.answer = index;
+      }
+      
+      // 理由列の検出
+      if (headerLower.includes('理由') || headerLower.includes('体験') || 
+          headerLower.includes('根拠') || headerLower.includes('なぜ')) {
+        mapping.reason = index;
+      }
+      
+      // クラス列の検出
+      if (headerLower.includes('クラス') || headerLower.includes('学年')) {
+        mapping.class = index;
+      }
+      
+      // 名前列の検出
+      if (headerLower.includes('名前') || headerLower.includes('氏名')) {
+        mapping.name = index;
+      }
     });
     
-    // 3. 統一フォーマットに変換
-    return {
-      answer: headers.indexOf(aiResult.answer || aiResult.question),
-      reason: headers.indexOf(aiResult.reason),
-      class: headers.indexOf(aiResult.classHeader),
-      name: headers.indexOf(aiResult.name),
-      confidence: aiResult.confidence || { answer: 90, reason: 80, class: 75, name: 75 }
-    };
+    // デフォルト値の設定
+    ['answer', 'reason', 'class', 'name'].forEach(key => {
+      if (mapping[key] === undefined) mapping[key] = null;
+    });
+    
+    mapping.confidence = { answer: 90, reason: 80, class: 75, name: 75 };
+    
+    console.log('detectColumnMapping: Basic AI detection result', mapping);
+    return mapping;
   }
 
   // SYSTEM_CONSTANTS.COLUMN_MAPPINGベースの初期化
@@ -786,6 +813,12 @@ function convertIndicesToMapping(headerIndices, headerRow) {
     headerRow: headerRow.slice(0, 10), // 最初の10項目のみログ出力
     headerRowLength: headerRow.length
   });
+
+  // SYSTEM_CONSTANTS の安全性チェック
+  if (!SYSTEM_CONSTANTS || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
+    console.warn('convertIndicesToMapping: SYSTEM_CONSTANTS.COLUMN_MAPPING is not available, falling back to AI detection');
+    return detectColumnMapping(headerRow);
+  }
 
   // 各列定義を直接使用（変換層なし）
   Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
