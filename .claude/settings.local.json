@@ -32,7 +32,9 @@
       "Bash(else echo \"$file: MISSING\")",
       "Bash(fi)",
       "Bash(npm install)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx jest:*)"
     ],
     "deny": [],
     "ask": [],

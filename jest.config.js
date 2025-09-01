@@ -66,13 +66,7 @@ module.exports = {
     '^@mocks/(.*)$': '<rootDir>/tests/mocks/$1'
   },
   
-  // Global configuration
-  globals: {
-    'ts-jest': {
-      useESM: false,
-      isolatedModules: true
-    }
-  },
+  // Legacy globals removed - using modern transform configuration instead
   
   // Test timeout for longer integration tests
   testTimeout: 30000,
