@@ -138,7 +138,20 @@ function connectDataSource(spreadsheetId, sheetName) {
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
     // 超高精度AI列マッピングを活用（新システム）
-    let columnMapping = headerIndices
+    // 【プロダクションバグ修正】 空オブジェクト {} も truthy と評価される問題を解決
+    // 問題: headerIndices が {} の場合、truthy判定でconvertIndicesToMappingが呼ばれ
+    // "Cannot convert undefined or null to object" エラーが発生
+    const hasValidHeaderIndices = headerIndices && 
+                                  typeof headerIndices === 'object' && 
+                                  Object.keys(headerIndices).length > 0;
+    
+    console.log('connectToDataSource: ヘッダーチェック', { 
+      headerIndices, 
+      hasValidHeaderIndices, 
+      headerRowLength: headerRow?.length 
+    });
+    
+    let columnMapping = hasValidHeaderIndices
       ? convertIndicesToMapping(headerIndices, headerRow)
       : detectColumnMapping(headerRow);
 
@@ -653,7 +666,12 @@ function analyzeColumns(spreadsheetId, sheetName) {
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
     // 超高精度AI列マッピングを活用（新システム）
-    let columnMapping = headerIndices
+    // 【プロダクションバグ修正】 空オブジェクト {} も truthy と評価される問題を解決
+    const hasValidHeaderIndices = headerIndices && 
+                                  typeof headerIndices === 'object' && 
+                                  Object.keys(headerIndices).length > 0;
+    
+    let columnMapping = hasValidHeaderIndices
       ? convertIndicesToMapping(headerIndices, headerRow)
       : detectColumnMapping(headerRow);
 
