@@ -51,7 +51,6 @@ class ConfigurationManager {
   setUserConfig(userId, config) {
     if (!userId || !config) return false;
 
-    config.userId = userId;
     config.lastModified = new Date().toISOString();
 
     try {
@@ -96,7 +95,6 @@ class ConfigurationManager {
       description: config.description || '',
       allowAnonymous: config.allowAnonymous || false,
       columns: config.columns || this.getDefaultColumns(),
-      theme: config.theme || 'default',
     };
   }
 
@@ -132,7 +130,6 @@ class ConfigurationManager {
       allowAnonymous: false,
       sheetName: null,
       columnMapping: {},
-      theme: 'default',
       lastModified: new Date().toISOString(),
     };
 
@@ -202,9 +199,9 @@ class AccessController {
         return this.createAccessResult(false, 'invalid', null, '無効なユーザーIDです');
       }
 
-      const config = this.configManager.getUserConfig(targetUserId);
-
-      if (!config) {
+      // データベースからユーザー情報を取得
+      const userInfo = DB.findUserById(targetUserId);
+      if (!userInfo) {
         return this.createAccessResult(
           false,
           'not_found',
@@ -213,14 +210,25 @@ class AccessController {
         );
       }
 
+      // configも取得（設定確認用）
+      const config = this.configManager.getUserConfig(targetUserId);
+      if (!config) {
+        return this.createAccessResult(
+          false,
+          'not_found',
+          null,
+          'ユーザー設定が見つかりません'
+        );
+      }
+
       switch (mode) {
         case 'admin':
-          return this.verifyAdminAccess(config, currentUserEmail);
+          return this.verifyAdminAccess(userInfo, config, currentUserEmail);
         case 'edit':
-          return this.verifyEditAccess(config, currentUserEmail);
+          return this.verifyEditAccess(userInfo, config, currentUserEmail);
         case 'view':
         default:
-          return this.verifyViewAccess(config, currentUserEmail);
+          return this.verifyViewAccess(userInfo, config, currentUserEmail);
       }
     } catch (error) {
       console.error('アクセス検証エラー:', error);
@@ -231,7 +239,7 @@ class AccessController {
   /**
    * 管理者アクセスを検証
    */
-  verifyAdminAccess(config, currentUserEmail) {
+  verifyAdminAccess(userInfo, config, currentUserEmail) {
     const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
 
     // システム管理者
@@ -240,7 +248,7 @@ class AccessController {
     }
 
     // オーナー
-    if (currentUserEmail === config.userEmail) {
+    if (currentUserEmail === userInfo.userEmail) {
       return this.createAccessResult(true, 'owner', config);
     }
 
@@ -250,9 +258,9 @@ class AccessController {
   /**
    * 編集アクセスを検証
    */
-  verifyEditAccess(config, currentUserEmail) {
+  verifyEditAccess(userInfo, config, currentUserEmail) {
     // オーナーか確認
-    if (currentUserEmail === config.userEmail) {
+    if (currentUserEmail === userInfo.userEmail) {
       return this.createAccessResult(true, 'owner', config);
     }
 
@@ -263,9 +271,9 @@ class AccessController {
   /**
    * 閲覧アクセスを検証
    */
-  verifyViewAccess(config, currentUserEmail) {
+  verifyViewAccess(userInfo, config, currentUserEmail) {
     // オーナーは常に閲覧可能
-    if (currentUserEmail === config.userEmail) {
+    if (currentUserEmail === userInfo.userEmail) {
       return this.createAccessResult(true, 'owner', config);
     }
 
@@ -302,8 +310,9 @@ class AccessController {
   getUserLevel(targetUserId, currentUserEmail) {
     if (!targetUserId || !currentUserEmail) return 'none';
 
-    const config = this.configManager.getUserConfig(targetUserId);
-    if (!config) return 'none';
+    // データベースからユーザー情報を取得
+    const userInfo = DB.findUserById(targetUserId);
+    if (!userInfo) return 'none';
 
     const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
 
@@ -311,7 +320,7 @@ class AccessController {
       return 'system_admin';
     }
 
-    if (currentUserEmail === config.userEmail) {
+    if (currentUserEmail === userInfo.userEmail) {
       return 'owner';
     }
 

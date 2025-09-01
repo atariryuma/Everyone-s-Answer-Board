@@ -22,7 +22,6 @@ function createCompleteUser(userEmail) {
     allowAnonymous: false,
     sheetName: null,
     columnMapping: {},
-    theme: 'default',
     lastModified: timestamp,
   };
 

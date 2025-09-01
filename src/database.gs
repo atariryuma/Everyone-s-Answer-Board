@@ -891,16 +891,16 @@ function updateUser(userId, updateData) {
     throw new Error('データ更新エラー: 更新データが空です');
   }
 
-  // 許可されたフィールドのホワイトリスト検証
+  // 許可されたフィールドのホワイトリスト検証（DBヘッダーと一致）
   const allowedFields = [
-    'ownerEmail',
+    'userEmail',       // ownerEmail → userEmail に修正
     'spreadsheetId',
     'spreadsheetUrl',
     'configJson',
     'lastAccessedAt',
     'createdAt',
     'formUrl',
-    'status',
+    'isActive',        // status → isActive に修正
   ];
   const updateFields = Object.keys(updateData);
   const invalidFields = updateFields.filter((field) => !allowedFields.includes(field));
@@ -1064,7 +1064,7 @@ function updateUser(userId, updateData) {
 
     // 重要: 更新完了後に包括的キャッシュ同期を実行
     var userInfo = DB.findUserById(userId);
-    var email = updateData.ownerEmail || (userInfo ? userInfo.ownerEmail : null);
+    var email = updateData.userEmail || (userInfo ? userInfo.userEmail : null);
     var oldSpreadsheetId = userInfo ? userInfo.spreadsheetId : null;
     var newSpreadsheetId = updateData.spreadsheetId || oldSpreadsheetId;
 
@@ -2977,10 +2977,10 @@ function deleteUserAccount(userId) {
       }
 
       // 削除ログを記録
-      logAccountDeletion(userInfo.ownerEmail, userId, userInfo.ownerEmail, '自己削除', 'self');
+      logAccountDeletion(userInfo.userEmail, userId, userInfo.userEmail, '自己削除', 'self');
 
       // 関連するすべてのキャッシュを削除
-      invalidateUserCache(userId, userInfo.ownerEmail, null, false);
+      invalidateUserCache(userId, userInfo.userEmail, null, false);
 
       // Google Drive のデータは保持するため何も操作しない
 
@@ -2991,7 +2991,7 @@ function deleteUserAccount(userId) {
       lock.releaseLock();
     }
 
-    const successMessage = 'アカウント「' + userInfo.ownerEmail + '」が正常に削除されました。';
+    const successMessage = 'アカウント「' + userInfo.userEmail + '」が正常に削除されました。';
     console.log(successMessage);
     return successMessage;
   } catch (error) {

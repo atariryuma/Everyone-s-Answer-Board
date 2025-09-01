@@ -198,7 +198,7 @@ function getSheetFormConnection(spreadsheetId, sheetName) {
     // まずスプレッドシート全体のフォーム連携をチェック
     const overallFormInfo = checkFormConnection(spreadsheetId);
     if (!overallFormInfo || !overallFormInfo.hasForm) {
-      return { hasForm: false, reason: 'スプレッドシートにフォーム連携なし' };
+      return { success: false, reason: 'スプレッドシートにフォーム連携なし' };
     }
 
     // フォーム詳細情報を取得してシート名と照合
@@ -208,7 +208,7 @@ function getSheetFormConnection(spreadsheetId, sheetName) {
 
       // フォームの送信先スプレッドシートが一致するか確認
       if (formDestination !== spreadsheetId) {
-        return { hasForm: false, reason: '送信先スプレッドシートの不一致' };
+        return { success: false, reason: '送信先スプレッドシートの不一致' };
       }
 
       // フォームの送信先シート名を取得（可能な場合）
@@ -232,27 +232,29 @@ function getSheetFormConnection(spreadsheetId, sheetName) {
 
       if (isFormResponsePattern) {
         return {
-          hasForm: true,
-          formUrl: overallFormInfo.formUrl,
-          formTitle: overallFormInfo.formTitle,
-          formId: overallFormInfo.formId,
-          sheetName: sheetName,
-          isConnectedToThisSheet: true,
+          success: true,
+          formData: {
+            formUrl: overallFormInfo.formUrl,
+            formTitle: overallFormInfo.formTitle,
+            formId: overallFormInfo.formId,
+            sheetName: sheetName,
+            isConnectedToThisSheet: true,
+          }
         };
       } else {
         return {
-          hasForm: false,
+          success: false,
           reason: 'シート名がフォーム回答パターンに非適合',
           availableForm: overallFormInfo, // 参考情報
         };
       }
     } catch (formError) {
       console.warn('フォーム詳細取得エラー:', formError.message);
-      return { hasForm: false, reason: 'フォーム詳細取得失敗' };
+      return { success: false, reason: 'フォーム詳細取得失敗' };
     }
   } catch (error) {
     console.error(`getSheetFormConnection エラー: ${spreadsheetId}/${sheetName}`, error.message);
-    return { hasForm: false, reason: 'エラー発生', error: error.message };
+    return { success: false, reason: 'エラー発生', error: error.message };
   }
 }
 
@@ -567,11 +569,25 @@ function detectColumnMapping(headers) {
           });
         }
 
-        // より高いスコアで置き換え
+        // より高いスコアで置き換え（重複チェック付き）
         if (matchScore > 0) {
-          if (!mapping[key] || matchScore > (confidence[key] || 0)) {
-            mapping[key] = index;
-            confidence[key] = matchScore;
+          const currentScore = confidence[key] || 0;
+          
+          // 重複チェック：既に他のキーで使用されているインデックスは避ける
+          const isIndexAlreadyUsed = Object.keys(mapping).some(
+            existingKey => existingKey !== key && mapping[existingKey] === index
+          );
+          
+          if (matchScore > currentScore) {
+            if (!isIndexAlreadyUsed || matchScore > 90) {
+              // 未使用インデックス、または非常に高い信頼度の場合は割り当て
+              mapping[key] = index;
+              confidence[key] = matchScore;
+            } else if (!mapping[key] && matchScore > 75) {
+              // 現在未割り当てで高い信頼度がある場合も割り当て
+              mapping[key] = index;
+              confidence[key] = matchScore - 5; // 軽度の重複ペナルティ
+            }
           }
         }
       });
@@ -651,11 +667,26 @@ function detectColumnMapping(headers) {
         }
       }
 
-      // より高い信頼度で置き換え
+      // より高い信頼度で置き換え（重複チェック付き）
       if (matchScore > 0) {
-        if (!mapping[fieldKey] || matchScore > (confidence[fieldKey] || 0)) {
-          mapping[fieldKey] = index;
-          confidence[fieldKey] = matchScore;
+        const currentMappedIndex = mapping[fieldKey];
+        const currentScore = confidence[fieldKey] || 0;
+        
+        // 重複チェック：既に他のフィールドで使用されているインデックスは避ける
+        const isIndexAlreadyUsed = Object.keys(mapping).some(
+          key => key !== fieldKey && mapping[key] === index
+        );
+        
+        if (matchScore > currentScore) {
+          if (!isIndexAlreadyUsed || matchScore > 85) {
+            // より高いスコア、または未使用インデックス、または非常に高い信頼度の場合は割り当て
+            mapping[fieldKey] = index;
+            confidence[fieldKey] = matchScore;
+          } else if (!currentMappedIndex && matchScore > 70) {
+            // 現在未割り当てで中程度の信頼度がある場合も割り当て
+            mapping[fieldKey] = index;
+            confidence[fieldKey] = matchScore - 10; // 重複ペナルティ
+          }
         }
       }
     });
@@ -664,153 +695,18 @@ function detectColumnMapping(headers) {
   // confidenceを返り値に追加
   mapping.confidence = confidence;
 
-  // 4. SYSTEM_CONSTANTS処理 + AI補強
-  const basicMapping = performBasicSYSTEM_CONSTANTSMapping(headers);
-  const aiEnhancement = identifyHeadersAdvanced(headers);
+  // 既にSYSTEM_CONSTANTSベースの高精度検出が完了しているため、追加処理は不要
 
-  // 5. AI結果で精度向上
-  const enhancedMapping = mergeColumnConfidence(basicMapping, aiEnhancement, headers);
-
-  console.log('detectColumnMapping: AI統合・超高精度マッピング完了', {
+  console.log('detectColumnMapping: 高精度マッピング完了', {
     headers,
-    basicMapping,
-    enhancedMapping,
-    basicConfidence: basicMapping.confidence,
-    enhancedConfidence: enhancedMapping.confidence,
-    usedTechnology: 'SYSTEM_CONSTANTS + aiPatterns + Advanced AI + Internet Knowledge',
-  });
-
-  return enhancedMapping;
-}
-
-/**
- * 基本的なSYSTEM_CONSTANTSマッピング（既存処理を分離）
- */
-function performBasicSYSTEM_CONSTANTSMapping(headers) {
-  const mapping = {};
-  const confidence = {};
-
-  // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列定義を初期化
-  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
-    mapping[column.key] = null;
-  });
-  mapping.confidence = {};
-
-  // ヘッダー検出処理（既存ロジック）
-  headers.forEach((header, index) => {
-    const headerLower = header.toString().toLowerCase();
-
-    // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列を検査
-    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
-      const headerName = column.header.toLowerCase();
-      const fieldKey = column.key;
-
-      // 基本マッチング（完全一致優先）
-      let matchScore = 0;
-      if (headerLower === headerName) {
-        matchScore = 95; // 完全一致
-      } else if (headerLower.includes(headerName)) {
-        matchScore = 80; // 部分一致
-      } else if (headerName.includes(headerLower) && headerLower.length > 2) {
-        matchScore = 70; // 逆部分一致
-      }
-
-      // alternatesを使った拡張マッチング
-      if (matchScore === 0 && column.alternates) {
-        column.alternates.forEach((alternate) => {
-          const alternateLower = alternate.toLowerCase();
-          if (headerLower.includes(alternateLower)) {
-            matchScore = Math.max(matchScore, 75); // alternates マッチング
-          }
-        });
-      }
-
-      // aiPatternsを使った高性能AI検出
-      if (matchScore === 0 && column.aiPatterns) {
-        column.aiPatterns.forEach((aiPattern) => {
-          const aiPatternLower = aiPattern.toLowerCase();
-          if (headerLower.includes(aiPatternLower)) {
-            matchScore = Math.max(matchScore, 85); // aiPatterns 高精度マッチング
-          }
-        });
-
-        // 回答列の特別処理：長い質問文 + aiパターンの組み合わせ
-        if (fieldKey === 'answer' && header.length > 15) {
-          const hasAIPattern = column.aiPatterns.some(
-            (p) => header.includes(p) || headerLower.includes(p.toLowerCase())
-          );
-          if (hasAIPattern) {
-            matchScore = Math.max(matchScore, 92); // 質問文特別検出
-          }
-        }
-      }
-
-      // より高い信頼度で置き換え
-      if (matchScore > 0) {
-        if (!mapping[fieldKey] || matchScore > (mapping.confidence[fieldKey] || 0)) {
-          mapping[fieldKey] = index;
-          mapping.confidence[fieldKey] = matchScore;
-        }
-      }
-    });
+    mapping,
+    confidence,
+    usedTechnology: 'SYSTEM_CONSTANTS + aiPatterns + 重複防止',
   });
 
   return mapping;
 }
 
-/**
- * AIによるマッピング強化
- */
-function mergeColumnConfidence(basicMapping, aiResult, headers) {
-  const enhanced = { ...basicMapping };
-
-  // 既存のconfidence値を保持（重要：0%問題の修正）
-  enhanced.confidence = { ...basicMapping.confidence };
-
-  // AI結果で既存マッピングを強化（既存confidence値を保持）
-  if (
-    aiResult.answer &&
-    (!enhanced.answer || (aiResult.confidence?.answer || 0) > (enhanced.confidence?.answer || 0))
-  ) {
-    enhanced.answer = headers.indexOf(aiResult.answer);
-    if (aiResult.confidence?.answer) {
-      enhanced.confidence.answer = aiResult.confidence.answer;
-    }
-    // aiResult.confidence?.answerが無い場合はbasicMapping.confidenceの値を保持
-  }
-
-  if (
-    aiResult.reason &&
-    (!enhanced.reason || (aiResult.confidence?.reason || 0) > (enhanced.confidence?.reason || 0))
-  ) {
-    enhanced.reason = headers.indexOf(aiResult.reason);
-    if (aiResult.confidence?.reason) {
-      enhanced.confidence.reason = aiResult.confidence.reason;
-    }
-  }
-
-  if (
-    aiResult.classHeader &&
-    (!enhanced.class || (aiResult.confidence?.class || 0) > (enhanced.confidence?.class || 0))
-  ) {
-    enhanced.class = headers.indexOf(aiResult.classHeader);
-    if (aiResult.confidence?.class) {
-      enhanced.confidence.class = aiResult.confidence.class;
-    }
-  }
-
-  if (
-    aiResult.name &&
-    (!enhanced.name || (aiResult.confidence?.name || 0) > (enhanced.confidence?.name || 0))
-  ) {
-    enhanced.name = headers.indexOf(aiResult.name);
-    if (aiResult.confidence?.name) {
-      enhanced.confidence.name = aiResult.confidence.name;
-    }
-  }
-
-  return enhanced;
-}
 
 /**
  * 必要な列が不足していないか検出し、必要に応じて自動追加
@@ -1299,65 +1195,41 @@ function getCurrentConfig() {
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
+      // デフォルト設定（最小限）
       return {
         setupStatus: 'pending',
-        spreadsheetId: null,
-        sheetName: null,
-        formCreated: false,
         appPublished: false,
-        lastUpdated: null,
+        displaySettings: { showNames: true, showReactions: true },
         user: currentUser,
       };
     }
 
-    // 既存のdetermineSetupStep関数を活用
-    const configJson = getUserConfigJson(userInfo.userId);
-    const setupStep = determineSetupStep(userInfo, configJson);
-
-    // sheetName情報の拡張取得
-    let sheetName = userInfo.sheetName;
-    if (!sheetName && configJson) {
-      // configJsonから推奨シート名を取得
-      sheetName = configJson.publishedSheetName || configJson.activeSheetName || null;
+    let config = {};
+    try {
+      config = JSON.parse(userInfo.configJson || '{}');
+    } catch (e) {
+      console.error('getCurrentConfig: JSON parse error:', e);
+      config = {};
     }
 
-    // まだsheetNameが不足している場合、スプレッドシートから自動検出
-    if (!sheetName && userInfo.spreadsheetId) {
-      try {
-        console.log('getCurrentConfig: シート名自動検出を実行');
-        sheetName = detectActiveSheetName(userInfo.spreadsheetId);
-      } catch (detectionError) {
-        console.warn('getCurrentConfig: シート名自動検出失敗', detectionError.message);
-        sheetName = 'フォームの回答 1'; // フォールバック
-      }
-    }
-
-    const config = {
-      setupStatus: getSetupStatusFromStep(setupStep),
-      spreadsheetId: userInfo.spreadsheetId,
-      sheetName: sheetName, // 🔥 強化されたシート名情報
-      formCreated: configJson ? configJson.formCreated : false,
-      appPublished: configJson ? configJson.appPublished : false,
-      lastUpdated: userInfo.lastUpdated,
-      setupStep: setupStep,
-      setupComplete: setupStep >= 3, // 🔥 追加: セットアップ完了状態
-      user: currentUser,
+    // DB情報と統合（重複データなし）
+    return {
       userId: userInfo.userId,
-      displaySettings: {
-        // 🔥 追加: 表示設定
-        showNames: configJson ? configJson.showNames !== false : true,
-        showReactions: configJson ? configJson.showReactions !== false : true,
-      },
+      userEmail: userInfo.userEmail,
+      spreadsheetId: userInfo.spreadsheetId,
+      spreadsheetUrl: userInfo.spreadsheetUrl,
+      formUrl: userInfo.formUrl,
+      isActive: userInfo.isActive,
+      createdAt: userInfo.createdAt,
+      lastAccessedAt: userInfo.lastAccessedAt,
+      ...config
     };
-
-    console.log('getCurrentConfig: 設定情報取得完了', config);
-    return config;
   } catch (error) {
     console.error('getCurrentConfig エラー:', error);
     return {
-      setupStatus: 'error',
-      error: error.message,
-      lastUpdated: new Date().toISOString(),
+      setupStatus: 'pending',
+      appPublished: false,
+      displaySettings: { showNames: true, showReactions: true }
     };
   }
 }
@@ -1441,16 +1313,57 @@ function saveDraftConfiguration(config) {
       throw new Error('ユーザー情報が見つかりません。先にユーザー登録を行ってください。');
     }
 
-    // 設定を更新
-    const updateResult = updateUserSpreadsheetConfig(userInfo.userId, {
+    // 列マッピング重複を直接解消
+    if (config.columnMapping) {
+      const cleanedMapping = {};
+      const usedIndices = new Set();
+      const confidence = config.columnMapping.confidence || {};
+      
+      // 信頼度順でソート処理
+      const mappingEntries = Object.entries(config.columnMapping).filter(([key, value]) => 
+        key !== 'confidence' && typeof value === 'number'
+      );
+      
+      mappingEntries.sort(([keyA], [keyB]) => 
+        (confidence[keyB] || 0) - (confidence[keyA] || 0)
+      );
+      
+      // 重複を回避して割り当て
+      mappingEntries.forEach(([key, value]) => {
+        if (!usedIndices.has(value)) {
+          cleanedMapping[key] = value;
+          usedIndices.add(value);
+        } else {
+          console.warn(`saveDraftConfiguration: 重複検出 ${key}=${value}, スキップします`);
+        }
+      });
+      
+      config.columnMapping = cleanedMapping;
+    }
+
+    // DB更新データ準備
+    const updateData = {
       spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName,
-      displaySettings: {
-        showNames: config.showNames,
-        showReactions: config.showReactions,
-      },
-      lastDraftSave: new Date().toISOString(),
-    });
+      spreadsheetUrl: config.spreadsheetId ? 
+        `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit` : '',
+      formUrl: config.formUrl
+    };
+    
+    // JSON最適化：重複データ除去
+    const optimizedConfig = {
+      appName: config.appName,
+      setupStatus: config.setupStatus,
+      appPublished: config.appPublished,
+      displaySettings: config.displaySettings,
+      columnMapping: config.columnMapping,
+      appUrl: config.appUrl
+    };
+    
+    updateData.configJson = JSON.stringify(optimizedConfig);
+    updateData.columnMapping = config.columnMapping;
+
+    // 設定を更新
+    const updateResult = updateUserSpreadsheetConfig(userInfo.userId, updateData);
 
     if (updateResult.success) {
       const updatedConfig = getCurrentConfig();
@@ -1491,6 +1404,34 @@ function publishApplication(config) {
       throw new Error('データソースが設定されていません');
     }
 
+    // 公開状態設定
+    config.appPublished = true;
+    config.publishedAt = new Date().toISOString();
+    
+    // 列マッピング重複解消
+    if (config.columnMapping) {
+      const cleanedMapping = {};
+      const usedIndices = new Set();
+      const confidence = config.columnMapping.confidence || {};
+      
+      const mappingEntries = Object.entries(config.columnMapping).filter(([key, value]) => 
+        key !== 'confidence' && typeof value === 'number'
+      );
+      
+      mappingEntries.sort(([keyA], [keyB]) => 
+        (confidence[keyB] || 0) - (confidence[keyA] || 0)
+      );
+      
+      mappingEntries.forEach(([key, value]) => {
+        if (!usedIndices.has(value)) {
+          cleanedMapping[key] = value;
+          usedIndices.add(value);
+        }
+      });
+      
+      config.columnMapping = cleanedMapping;
+    }
+
     // 既存の公開システムを活用（簡略化）
     const publishResult = executeAppPublish(userInfo.userId, {
       appName: config.appName,
@@ -1503,10 +1444,41 @@ function publishApplication(config) {
     });
 
     if (publishResult.success) {
-      const updatedConfig = getCurrentConfig();
+      // DB情報更新
+      const updateData = {
+        spreadsheetId: config.spreadsheetId,
+        spreadsheetUrl: config.spreadsheetId ? 
+          `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit` : '',
+        formUrl: config.formUrl
+      };
+      
+      // JSON最適化
+      const optimizedConfig = {
+        appName: config.appName,
+        setupStatus: 'completed',
+        appPublished: true,
+        publishedAt: config.publishedAt,
+        displaySettings: config.displaySettings,
+        columnMapping: config.columnMapping,
+        appUrl: publishResult.appUrl
+      };
+      
+      updateData.configJson = JSON.stringify(optimizedConfig);
+      
+      // データベース更新
+      updateUser(userInfo.userId, updateData);
+      
+      // 公開後すぐにフッター情報を更新
+      try {
+        const boardInfo = getCurrentBoardInfoAndUrls();
+        console.log('publishApplication: フッター情報更新完了', boardInfo);
+      } catch (boardInfoError) {
+        console.warn('publishApplication: フッター情報更新に失敗:', boardInfoError);
+      }
+      
       return {
         success: true,
-        config: updatedConfig,
+        config: getCurrentConfig(),
         appUrl: publishResult.appUrl,
         message: 'アプリケーションが正常に公開されました',
       };
@@ -1755,7 +1727,7 @@ function getCurrentBoardInfoAndUrls() {
 
     const result = {
       isActive: !!userInfo.spreadsheetId,
-      isPublished: config?.appPublished || false,
+      appPublished: config?.appPublished || false,
       questionText: questionText,
       sheetName: userInfo.sheetName || 'シート名未設定',
       urls: {

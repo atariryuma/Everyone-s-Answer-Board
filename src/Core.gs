@@ -192,27 +192,27 @@ function getOpinionHeaderSafely(userId, sheetName) {
 /**
  * 新規ユーザー登録・既存ユーザー更新統合関数
  * GAS 2025 Best Practices準拠 - Modern JavaScript & Structured Error Handling
- * @param {string} adminEmail - 管理者メールアドレス
+ * @param {string} userEmail - ユーザーメールアドレス
  * @returns {Object} ユーザー情報とURL情報
  */
-function registerNewUser(adminEmail) {
+function registerNewUser(userEmail) {
   const startTime = Date.now();
 
   // Enhanced security validation using SecurityValidator (GAS 2025 best practices)
-  if (!SecurityValidator.isValidEmail(adminEmail)) {
+  if (!SecurityValidator.isValidEmail(userEmail)) {
     const error = new Error('有効なメールアドレスを入力してください。');
     console.error('❌ registerNewUser: Invalid email format', {
-      providedEmail: adminEmail ? adminEmail.substring(0, 10) + '...' : 'null', // Partial logging for privacy
+      providedEmail: userEmail ? userEmail.substring(0, 10) + '...' : 'null', // Partial logging for privacy
       error: error.message,
     });
     throw error;
   }
 
   // Sanitize email input
-  const sanitizedEmail = SecurityValidator.sanitizeInput(adminEmail, SECURITY.MAX_LENGTHS.EMAIL);
+  const sanitizedEmail = SecurityValidator.sanitizeInput(userEmail, SECURITY.MAX_LENGTHS.EMAIL);
 
   console.info('🚀 registerNewUser: Starting registration process', {
-    adminEmail: sanitizedEmail,
+    userEmail: sanitizedEmail,
     timestamp: new Date().toISOString(),
   });
 
@@ -257,7 +257,7 @@ function registerNewUser(adminEmail) {
       const existingConfig = JSON.parse(existingUser.configJson || '{}');
 
       console.info('👤 registerNewUser: Updating existing user', {
-        adminEmail: sanitizedEmail,
+        userEmail: sanitizedEmail,
         userId,
         hasExistingConfig: Object.keys(existingConfig).length > 0,
       });
@@ -269,7 +269,7 @@ function registerNewUser(adminEmail) {
       invalidateUserCache(userId, sanitizedEmail, existingUser.spreadsheetId, false);
 
       console.info('✅ registerNewUser: Existing user updated successfully', {
-        adminEmail: sanitizedEmail,
+        userEmail: sanitizedEmail,
         userId,
         executionTime: Date.now() - startTime + 'ms',
       });
@@ -294,7 +294,7 @@ function registerNewUser(adminEmail) {
       const newUser = handleUserRegistration(sanitizedEmail);
 
       console.info('✅ registerNewUser: New user created successfully', {
-        adminEmail: sanitizedEmail,
+        userEmail: sanitizedEmail,
         userId: newUser.userId,
         databaseWriteTime: Date.now() - startTime + 'ms',
       });
@@ -306,7 +306,7 @@ function registerNewUser(adminEmail) {
       const appUrls = generateUserUrls(newUser.userId);
 
       console.info('🎉 registerNewUser: New user registration completed', {
-        adminEmail: sanitizedEmail,
+        userEmail: sanitizedEmail,
         userId: newUser.userId,
         totalExecutionTime: Date.now() - startTime + 'ms',
       });
@@ -321,7 +321,7 @@ function registerNewUser(adminEmail) {
       };
     } catch (dbError) {
       console.error('❌ registerNewUser: Database operation failed', {
-        adminEmail: sanitizedEmail,
+        userEmail: sanitizedEmail,
         error: dbError.message,
         executionTime: Date.now() - startTime + 'ms',
       });
@@ -331,7 +331,7 @@ function registerNewUser(adminEmail) {
   } catch (error) {
     // Comprehensive error handling with structured logging
     console.error('❌ registerNewUser: Registration process failed', {
-      adminEmail: sanitizedEmail || adminEmail?.substring(0, 10) + '...',
+      userEmail: sanitizedEmail || userEmail?.substring(0, 10) + '...',
       error: error.message,
       stack: error.stack,
       totalExecutionTime: Date.now() - startTime + 'ms',
@@ -1142,7 +1142,7 @@ function getAppConfig(requestUserId) {
     return {
       status: 'success',
       userId: currentUserId,
-      adminEmail: userInfo.userEmail,
+      userEmail: userInfo.userEmail,
       publishedSpreadsheetId: configJson.publishedSpreadsheetId || '',
       publishedSheetName: configJson.publishedSheetName || '',
       displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
@@ -1164,7 +1164,7 @@ function getAppConfig(requestUserId) {
       // データベース詳細情報
       userInfo: {
         userId: currentUserId,
-        adminEmail: userInfo.userEmail,
+        userEmail: userInfo.userEmail,
         spreadsheetId: userInfo.spreadsheetId || '',
         spreadsheetUrl: userInfo.spreadsheetUrl || '',
         createdAt: userInfo.createdAt || '',
@@ -1302,7 +1302,7 @@ function getCurrentUserStatus(requestUserId) {
       status: 'success',
       userInfo: {
         userId: userInfo.userId,
-        adminEmail: userInfo.userEmail,
+        userEmail: userInfo.userEmail,
         isActive: userInfo.isActive,
         lastAccessedAt: userInfo.lastAccessedAt,
       },
@@ -2434,22 +2434,22 @@ function shareAllSpreadsheetsWithServiceAccount() {
           shareSpreadsheetWithServiceAccount(user.spreadsheetId);
           results.push({
             userId: user.userId,
-            adminEmail: user.adminEmail,
+            userEmail: user.userEmail,
             spreadsheetId: user.spreadsheetId,
             status: 'success',
           });
           successCount++;
-          console.log('共有成功:', user.adminEmail, user.spreadsheetId);
+          console.log('共有成功:', user.userEmail, user.spreadsheetId);
         } catch (shareError) {
           results.push({
             userId: user.userId,
-            adminEmail: user.adminEmail,
+            userEmail: user.userEmail,
             spreadsheetId: user.spreadsheetId,
             status: 'error',
             error: shareError.message,
           });
           errorCount++;
-          console.error('共有失敗:', user.adminEmail, shareError.message);
+          console.error('共有失敗:', user.userEmail, shareError.message);
         }
       }
     }
@@ -2726,7 +2726,7 @@ function getSheetsList(userId) {
 
     console.log('getSheetsList: UserInfo found:', {
       userId: userInfo.userId,
-      adminEmail: userInfo.userEmail,
+      userEmail: userInfo.userEmail,
       spreadsheetId: userInfo.spreadsheetId,
       spreadsheetUrl: userInfo.spreadsheetUrl,
     });
@@ -3900,7 +3900,7 @@ function getInitialData(requestUserId, targetSheetName) {
       // ユーザー情報
       userInfo: {
         userId: userInfo.userId,
-        adminEmail: userInfo.userEmail,
+        userEmail: userInfo.userEmail,
         isActive: userInfo.isActive,
         lastAccessedAt: userInfo.lastAccessedAt,
         spreadsheetId: userInfo.spreadsheetId,
@@ -4102,13 +4102,13 @@ function getApplicationStatusForUI() {
   try {
     const accessCheck = Access.check();
     const isEnabled = getApplicationEnabled();
-    const adminEmail = User.email();
+    const currentUserEmail = User.email();
 
     return {
       status: 'success',
       isEnabled: isEnabled,
       isSystemAdmin: accessCheck.isSystemAdmin,
-      adminEmail: adminEmail,
+      currentUserEmail: currentUserEmail,
       lastUpdated: new Date().toISOString(),
       message: accessCheck.accessReason,
     };
@@ -4134,7 +4134,7 @@ function setApplicationStatusForUI(enabled) {
       enabled: result.enabled,
       message: result.message,
       timestamp: result.timestamp,
-      adminEmail: result.adminEmail,
+      currentUserEmail: result.adminEmail,
     };
   } catch (error) {
     console.error('setApplicationStatusForUI エラー:', error);

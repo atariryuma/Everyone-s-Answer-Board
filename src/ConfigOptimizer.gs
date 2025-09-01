@@ -25,7 +25,6 @@ function optimizeConfigJson(currentConfig, userInfo) {
     allowAnonymous: currentConfig.allowAnonymous || false,
     sheetName: currentConfig.sheetName || null,
     columnMapping: currentConfig.columnMapping || {},
-    theme: currentConfig.theme || 'default',
     lastModified: new Date().toISOString(),
   };
 

@@ -708,7 +708,7 @@
         } else {
           tableBody.innerHTML = users
             .map((user) => {
-              const isActive = user.status === 'active';
+              const isActive = user.isActive === true;
               const statusBadge = isActive
                 ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
                 : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';

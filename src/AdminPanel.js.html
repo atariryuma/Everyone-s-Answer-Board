@@ -1889,7 +1889,7 @@
     const statusText = document.getElementById('boardStatus');
 
     // 公開状態チェック - 非公開の場合はフッターを非表示
-    if (!boardInfo.isPublished) {
+    if (!boardInfo.appPublished) {
       footer.classList.add('hidden');
       return;
     }

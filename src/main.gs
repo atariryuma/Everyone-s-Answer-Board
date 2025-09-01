@@ -853,6 +853,7 @@ function renderAnswerBoard(userInfo, params) {
     template.sheetName = finalSheetName;
     template.isDirectPageAccess = params.isDirectPageAccess;
     template.isPublished = isPublished;
+    template.appPublished = config.appPublished || false;
 
     // データ取得とテンプレート設定の処理
     try {
