@@ -12,27 +12,35 @@ function createCompleteUser(userEmail) {
   const userId = Utilities.getUuid();
   const timestamp = new Date().toISOString();
   
-  const initialConfig = {
-    userId,
-    userEmail,
+  // ConfigOptimizerの最適化形式を使用（重複データを除去）
+  const optimizedConfig = {
     title: `${userEmail}の回答ボード`,
     setupStatus: 'pending',
     formCreated: false,
     appPublished: false,
     isPublic: false,
     allowAnonymous: false,
-    columns: [
-      { name: 'timestamp', label: 'タイムスタンプ', type: 'datetime', required: false },
-      { name: 'email', label: 'メールアドレス', type: 'email', required: false },
-      { name: 'class', label: 'クラス', type: 'text', required: false },
-      { name: 'opinion', label: '回答', type: 'textarea', required: true },
-      { name: 'reason', label: '理由', type: 'textarea', required: false },
-      { name: 'name', label: '名前', type: 'text', required: false }
-    ],
+    sheetName: null,
+    columnMapping: {},
     theme: 'default',
-    createdAt: timestamp,
     lastModified: timestamp
   };
+
+  // columnsは必要時のみ保持（デフォルト列設定）
+  optimizedConfig.columns = [
+    { name: 'timestamp', label: 'タイムスタンプ', type: 'datetime', required: false },
+    { name: 'email', label: 'メールアドレス', type: 'email', required: false },
+    { name: 'class', label: 'クラス', type: 'text', required: false },
+    { name: 'opinion', label: '回答', type: 'textarea', required: true },
+    { name: 'reason', label: '理由', type: 'textarea', required: false },
+    { name: 'name', label: '名前', type: 'text', required: false }
+  ];
+
+  console.info('新規ユーザー作成: 最適化済みconfigJSON使用', {
+    userEmail,
+    optimizedSize: JSON.stringify(optimizedConfig).length,
+    removedFields: ['userId', 'userEmail', 'createdAt'] // DB列に移行済み
+  });
 
   return {
     userId,
@@ -42,7 +50,7 @@ function createCompleteUser(userEmail) {
     isActive: true,
     spreadsheetId: '',
     spreadsheetUrl: '',
-    configJson: JSON.stringify(initialConfig),
+    configJson: JSON.stringify(optimizedConfig),
     formUrl: ''
   };
 }

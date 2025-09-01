@@ -122,24 +122,32 @@ class ConfigurationManager {
    * @return {Object} 初期化された設定
    */
   initializeUserConfig(userId, email) {
-    const defaultConfig = {
-      userId: userId,
-      userEmail: email,
+    // ConfigOptimizerの最適化形式を使用（重複データを除去）
+    const optimizedConfig = {
       title: `${email}の回答ボード`,
-      description: '',
-      isPublic: false,
-      allowAnonymous: false,
       setupStatus: 'pending',
       formCreated: false,
       appPublished: false,
-      columns: this.getDefaultColumns(),
+      isPublic: false,
+      allowAnonymous: false,
+      sheetName: null,
+      columnMapping: {},
       theme: 'default',
-      createdAt: new Date().toISOString(),
       lastModified: new Date().toISOString()
     };
 
-    const success = this.setUserConfig(userId, defaultConfig);
-    return success ? defaultConfig : null;
+    // columnsは必要時のみ保持（デフォルト列設定）
+    optimizedConfig.columns = this.getDefaultColumns();
+
+    console.info('Base.gs 初期化: 最適化済みconfigJSON使用', {
+      userId,
+      email,
+      optimizedSize: JSON.stringify(optimizedConfig).length,
+      removedFields: ['userId', 'userEmail', 'createdAt', 'description'] // DB列に移行済み
+    });
+
+    const success = this.setUserConfig(userId, optimizedConfig);
+    return success ? optimizedConfig : null;
   }
 
   /**
