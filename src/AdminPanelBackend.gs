@@ -20,11 +20,8 @@ function getActiveUserInfo() {
 function debugConstants() {
   console.log('SYSTEM_CONSTANTS:', typeof SYSTEM_CONSTANTS);
   if (typeof SYSTEM_CONSTANTS !== 'undefined') {
-    console.log('UI:', typeof SYSTEM_CONSTANTS.UI);
-    console.log('UI.COLUMN_MAPPING:', typeof SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING);
-    console.log('UI.COLUMN_MAPPING keys:', SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING ? Object.keys(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING) : 'undefined');
-    // 旧パス（間違い）もチェック
-    console.log('COLUMN_MAPPING (old path):', typeof SYSTEM_CONSTANTS.COLUMN_MAPPING);
+    console.log('COLUMN_MAPPING:', typeof SYSTEM_CONSTANTS.COLUMN_MAPPING);
+    console.log('COLUMN_MAPPING keys:', SYSTEM_CONSTANTS.COLUMN_MAPPING ? Object.keys(SYSTEM_CONSTANTS.COLUMN_MAPPING) : 'undefined');
   }
 }
 
@@ -252,39 +249,74 @@ function detectColumnMapping(headers) {
   debugConstants();
   
   // 1. SYSTEM_CONSTANTS チェック → 失敗時は基本AI活用
-  if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING) {
+  if (typeof SYSTEM_CONSTANTS === 'undefined' || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
     console.log('SYSTEM_CONSTANTS.COLUMN_MAPPING not available, using basic AI detection');
     
-    // 2. 基本的なAI判定システム（フォールバック版）
+    // 2. 高性能AI判定システム（フォールバック版）- aiPatterns活用
     const mapping = {};
+    const confidence = {};
     
-    // 質問文パターンの検出
+    // SYSTEM_CONSTANTSが利用不可時の静的パターン定義
+    const fallbackPatterns = {
+      answer: {
+        aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか'],
+        alternates: ['どうして', '質問', '問題', '意見', '答え', 'なぜ', '思います', '考え'],
+        minLength: 15
+      },
+      reason: {
+        aiPatterns: ['理由', '体験', '根拠', '詳細'],
+        alternates: ['理由', '根拠', '体験', 'なぜ', '詳細', '説明']
+      },
+      class: {
+        alternates: ['クラス', '学年']
+      },
+      name: {
+        alternates: ['名前', '氏名', 'お名前']
+      }
+    };
+    
+    // 高精度パターンマッチング
     headers.forEach((header, index) => {
       const headerLower = header.toLowerCase();
       
-      // 回答列の検出（質問文パターン）
-      if (header.length > 15 && 
-          (header.includes('？') || header.includes('?') || 
-           headerLower.includes('どうして') || headerLower.includes('なぜ') || 
-           headerLower.includes('思います') || headerLower.includes('考え'))) {
-        mapping.answer = index;
-      }
-      
-      // 理由列の検出
-      if (headerLower.includes('理由') || headerLower.includes('体験') || 
-          headerLower.includes('根拠') || headerLower.includes('なぜ')) {
-        mapping.reason = index;
-      }
-      
-      // クラス列の検出
-      if (headerLower.includes('クラス') || headerLower.includes('学年')) {
-        mapping.class = index;
-      }
-      
-      // 名前列の検出
-      if (headerLower.includes('名前') || headerLower.includes('氏名')) {
-        mapping.name = index;
-      }
+      Object.keys(fallbackPatterns).forEach(key => {
+        const pattern = fallbackPatterns[key];
+        let matchScore = 0;
+        
+        // aiPatterns による高精度検出
+        if (pattern.aiPatterns) {
+          pattern.aiPatterns.forEach(aiPattern => {
+            if (headerLower.includes(aiPattern.toLowerCase())) {
+              matchScore = Math.max(matchScore, 90);
+            }
+          });
+          
+          // 質問文の特別処理（長い文章 + 疑問符）
+          if (key === 'answer' && pattern.minLength && header.length > pattern.minLength) {
+            const hasQuestionMark = pattern.aiPatterns.some(p => header.includes(p));
+            if (hasQuestionMark) {
+              matchScore = Math.max(matchScore, 95); // 最高精度
+            }
+          }
+        }
+        
+        // alternates による補完検出
+        if (matchScore === 0 && pattern.alternates) {
+          pattern.alternates.forEach(alternate => {
+            if (headerLower.includes(alternate.toLowerCase())) {
+              matchScore = Math.max(matchScore, 80);
+            }
+          });
+        }
+        
+        // より高いスコアで置き換え
+        if (matchScore > 0) {
+          if (!mapping[key] || matchScore > (confidence[key] || 0)) {
+            mapping[key] = index;
+            confidence[key] = matchScore;
+          }
+        }
+      });
     });
     
     // デフォルト値の設定
@@ -292,18 +324,22 @@ function detectColumnMapping(headers) {
       if (mapping[key] === undefined) mapping[key] = null;
     });
     
-    mapping.confidence = { answer: 90, reason: 80, class: 75, name: 75 };
+    mapping.confidence = confidence;
     
-    console.log('detectColumnMapping: Basic AI detection result', mapping);
+    console.log('detectColumnMapping: Enhanced AI detection result', {
+      mapping, 
+      confidence,
+      usedPatterns: 'aiPatterns + alternates + minLength'
+    });
     return mapping;
   }
 
-  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGベースの初期化
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGベースの初期化
   const mapping = {};
   const confidence = {};
 
-  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列定義を初期化
-  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列定義を初期化
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     mapping[column.key] = null;
   });
   mapping.confidence = {};
@@ -312,8 +348,8 @@ function detectColumnMapping(headers) {
   headers.forEach((header, index) => {
     const headerLower = header.toString().toLowerCase();
 
-    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列を検査
-    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+    // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列を検査
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       const headerName = column.header.toLowerCase();
       const fieldKey = column.key;
 
@@ -335,6 +371,26 @@ function detectColumnMapping(headers) {
             matchScore = Math.max(matchScore, 75); // alternates マッチング
           }
         });
+      }
+
+      // aiPatternsを使った高性能AI検出
+      if (matchScore === 0 && column.aiPatterns) {
+        column.aiPatterns.forEach((aiPattern) => {
+          const aiPatternLower = aiPattern.toLowerCase();
+          if (headerLower.includes(aiPatternLower)) {
+            matchScore = Math.max(matchScore, 85); // aiPatterns 高精度マッチング
+          }
+        });
+        
+        // 回答列の特別処理：長い質問文 + aiパターンの組み合わせ
+        if (fieldKey === 'answer' && header.length > 15) {
+          const hasAIPattern = column.aiPatterns.some(p => 
+            header.includes(p) || headerLower.includes(p.toLowerCase())
+          );
+          if (hasAIPattern) {
+            matchScore = Math.max(matchScore, 92); // 質問文特別検出
+          }
+        }
       }
 
       // より高い信頼度で置き換え
@@ -358,7 +414,7 @@ function detectColumnMapping(headers) {
     headers,
     basicMapping,
     enhancedMapping,
-    usedTechnology: 'SYSTEM_CONSTANTS + Advanced AI + Internet Knowledge'
+    usedTechnology: 'SYSTEM_CONSTANTS + aiPatterns + Advanced AI + Internet Knowledge'
   });
 
   return enhancedMapping;
@@ -371,8 +427,8 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
   const mapping = {};
   const confidence = {};
 
-  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列定義を初期化
-  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列定義を初期化
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     mapping[column.key] = null;
   });
   mapping.confidence = {};
@@ -381,8 +437,8 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
   headers.forEach((header, index) => {
     const headerLower = header.toString().toLowerCase();
 
-    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGの各列を検査
-    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+    // SYSTEM_CONSTANTS.COLUMN_MAPPINGの各列を検査
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       const headerName = column.header.toLowerCase();
       const fieldKey = column.key;
 
@@ -404,6 +460,26 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
             matchScore = Math.max(matchScore, 75); // alternates マッチング
           }
         });
+      }
+
+      // aiPatternsを使った高性能AI検出
+      if (matchScore === 0 && column.aiPatterns) {
+        column.aiPatterns.forEach((aiPattern) => {
+          const aiPatternLower = aiPattern.toLowerCase();
+          if (headerLower.includes(aiPatternLower)) {
+            matchScore = Math.max(matchScore, 85); // aiPatterns 高精度マッチング
+          }
+        });
+        
+        // 回答列の特別処理：長い質問文 + aiパターンの組み合わせ
+        if (fieldKey === 'answer' && header.length > 15) {
+          const hasAIPattern = column.aiPatterns.some(p => 
+            header.includes(p) || headerLower.includes(p.toLowerCase())
+          );
+          if (hasAIPattern) {
+            matchScore = Math.max(matchScore, 92); // 質問文特別検出
+          }
+        }
       }
 
       // より高い信頼度で置き換え
@@ -818,13 +894,13 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   });
 
   // SYSTEM_CONSTANTS の安全性チェック
-  if (!SYSTEM_CONSTANTS || !SYSTEM_CONSTANTS.UI?.COLUMN_MAPPING) {
-    console.warn('convertIndicesToMapping: SYSTEM_CONSTANTS.UI.COLUMN_MAPPING is not available, falling back to AI detection');
+  if (!SYSTEM_CONSTANTS || !SYSTEM_CONSTANTS.COLUMN_MAPPING) {
+    console.warn('convertIndicesToMapping: SYSTEM_CONSTANTS.COLUMN_MAPPING is not available, falling back to AI detection');
     return detectColumnMapping(headerRow);
   }
 
   // 各列定義を直接使用（変換層なし）
-  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     const headerName = column.header; // '回答', '理由' など
     const uiFieldName = column.key; // 'answer', 'reason' など
 
@@ -882,7 +958,7 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   console.log('convertIndicesToMapping: 単一定数使用で変換完了', {
     headerIndices,
     mapping,
-    usedMapping: 'SYSTEM_CONSTANTS.UI.COLUMN_MAPPING (統一定数)',
+    usedMapping: 'SYSTEM_CONSTANTS.COLUMN_MAPPING (統一定数)',
   });
   return mapping;
 }
@@ -900,8 +976,8 @@ function validateAdminPanelMapping(mapping) {
     summary: {},
   };
 
-  // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGに基づく動的チェック
-  Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+  // SYSTEM_CONSTANTS.COLUMN_MAPPINGに基づく動的チェック
+  Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     const fieldKey = column.key;
     const isRequired = column.required;
 
@@ -914,7 +990,7 @@ function validateAdminPanelMapping(mapping) {
   });
 
   // 許可されたフィールドかチェック
-  const allowedFields = Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).map((col) => col.key);
+  const allowedFields = Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).map((col) => col.key);
   Object.keys(mapping).forEach((uiField) => {
     if (!allowedFields.includes(uiField)) {
       results.warnings.push(`未知のUIフィールド '${uiField}' が含まれています`);
@@ -1323,7 +1399,7 @@ function getUserColumnMapping(userId = null) {
     // 設定が見つからない場合はデフォルト（空）を返す
     console.log('getUserColumnMapping: デフォルト設定を使用');
     const defaultMapping = {};
-    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       defaultMapping[column.key] = null;
     });
 
@@ -1463,16 +1539,16 @@ function convertToCompatibleMapping(columnMapping, headerRow) {
   try {
     const compatibleMapping = {};
 
-    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPING から動的変換マップ生成（汎用化）
+    // SYSTEM_CONSTANTS.COLUMN_MAPPING から動的変換マップ生成（汎用化）
     const mappingConversions = {};
-    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       // 各列のシステム内部キー（大文字）を動的生成
       mappingConversions[column.key] = column.key.toUpperCase();
     });
 
-    // SYSTEM_CONSTANTS.UI.COLUMN_MAPPINGから動的な列ヘッダーマップ生成（汎用化）
+    // SYSTEM_CONSTANTS.COLUMN_MAPPINGから動的な列ヘッダーマップ生成（汎用化）
     const columnHeaders = {};
-    Object.values(SYSTEM_CONSTANTS.UI.COLUMN_MAPPING).forEach((column) => {
+    Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
       const systemKey = column.key.toUpperCase();
       columnHeaders[systemKey] = column.header; // 例: 'ANSWER' => '回答'
     });

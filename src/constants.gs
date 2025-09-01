@@ -200,10 +200,10 @@ const SecurityValidator = Object.freeze({
 });
 
 /**
- * 機能別統合定数オブジェクト
+ * 統合定数オブジェクト（フラット構造）
  * GAS 2025 Best Practices準拠
  */
-const APP_CONSTANTS = Object.freeze({
+const SYSTEM_CONSTANTS = Object.freeze({
   // データベース関連定数
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
@@ -217,63 +217,62 @@ const APP_CONSTANTS = Object.freeze({
     })
   }),
 
-  // ユーザーインターフェース関連
-  UI: Object.freeze({
-    // リアクション機能
-    REACTIONS: Object.freeze({
-      KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
-      LABELS: Object.freeze({
-        UNDERSTAND: 'なるほど！',
-        LIKE: 'いいね！',
-        CURIOUS: 'もっと知りたい！',
-        HIGHLIGHT: 'ハイライト'
-      })
-    }),
-
-    // 列ヘッダー定義
-    COLUMNS: Object.freeze({
-      TIMESTAMP: 'タイムスタンプ',
-      EMAIL: 'メールアドレス',
-      CLASS: 'クラス',
-      OPINION: '回答',
-      REASON: '理由',
-      NAME: '名前'
-    }),
-
-    // AdminPanel用列マッピング定義
-    COLUMN_MAPPING: Object.freeze({
-      answer: Object.freeze({
-        key: 'answer',
-        header: '回答',
-        alternates: ['どうして', '質問', '問題', '意見', '答え'], // 部分マッチ用
-        required: true
-      }),
-      reason: Object.freeze({
-        key: 'reason', 
-        header: '理由',
-        alternates: ['理由', '根拠', '体験', 'なぜ'], // 部分マッチ用
-        required: false
-      }),
-      class: Object.freeze({
-        key: 'class',
-        header: 'クラス', 
-        alternates: ['クラス', '学年'],
-        required: false
-      }),
-      name: Object.freeze({
-        key: 'name',
-        header: '名前',
-        alternates: ['名前', '氏名', 'お名前'],
-        required: false
-      })
-    }),
-
-    // 表示モード
-    DISPLAY_MODES: Object.freeze({
-      ANONYMOUS: 'anonymous',
-      NAMED: 'named',
-      EMAIL: 'email'
+  // リアクション機能
+  REACTIONS: Object.freeze({
+    KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
+    LABELS: Object.freeze({
+      UNDERSTAND: 'なるほど！',
+      LIKE: 'いいね！',
+      CURIOUS: 'もっと知りたい！',
+      HIGHLIGHT: 'ハイライト'
     })
+  }),
+
+  // 列ヘッダー定義
+  COLUMNS: Object.freeze({
+    TIMESTAMP: 'タイムスタンプ',
+    EMAIL: 'メールアドレス',
+    CLASS: 'クラス',
+    OPINION: '回答',
+    REASON: '理由',
+    NAME: '名前'
+  }),
+
+  // AdminPanel用列マッピング定義（高性能AI検索対応）
+  COLUMN_MAPPING: Object.freeze({
+    answer: Object.freeze({
+      key: 'answer',
+      header: '回答',
+      alternates: ['どうして', '質問', '問題', '意見', '答え', 'なぜ', '思います', '考え'], // 高性能AI用拡張パターン
+      required: true,
+      aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか'] // AI専用検出パターン
+    }),
+    reason: Object.freeze({
+      key: 'reason', 
+      header: '理由',
+      alternates: ['理由', '根拠', '体験', 'なぜ', '詳細', '説明'], // 高性能AI用拡張パターン
+      required: false,
+      aiPatterns: ['理由', '体験', '根拠', '詳細'] // AI専用検出パターン
+    }),
+    class: Object.freeze({
+      key: 'class',
+      header: 'クラス', 
+      alternates: ['クラス', '学年'],
+      required: false
+    }),
+    name: Object.freeze({
+      key: 'name',
+      header: '名前',
+      alternates: ['名前', '氏名', 'お名前'],
+      required: false
+    })
+  }),
+
+  // 表示モード
+  DISPLAY_MODES: Object.freeze({
+    ANONYMOUS: 'anonymous',
+    NAMED: 'named',
+    EMAIL: 'email'
   }),
 
   // アクセス制御関連
@@ -289,10 +288,9 @@ const APP_CONSTANTS = Object.freeze({
 });
 
 // 後方互換性のための旧定数エイリアス
-const REACTION_KEYS = APP_CONSTANTS.UI.REACTIONS.KEYS;
+const REACTION_KEYS = SYSTEM_CONSTANTS.REACTIONS.KEYS;
 const COLUMN_HEADERS = {
-  ...APP_CONSTANTS.UI.COLUMNS,
-  ...APP_CONSTANTS.UI.REACTIONS.LABELS
+  ...SYSTEM_CONSTANTS.COLUMNS,
+  ...SYSTEM_CONSTANTS.REACTIONS.LABELS
 };
-const DELETE_LOG_SHEET_CONFIG = APP_CONSTANTS.DATABASE.DELETE_LOG;
-const SYSTEM_CONSTANTS = APP_CONSTANTS; // 完全なエイリアス
+const DELETE_LOG_SHEET_CONFIG = SYSTEM_CONSTANTS.DATABASE.DELETE_LOG;
