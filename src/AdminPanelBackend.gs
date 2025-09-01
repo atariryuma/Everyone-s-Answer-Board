@@ -14,7 +14,7 @@
  * Services.user.getCurrentUserInfo()を活用した統一インターフェース - 全システムでgetActiveUserInfo()を使用
  */
 function getActiveUserInfo() {
-  return Services.user.getCurrentUserInfo();
+  return Services.user.getActiveUserInfo();
 }
 
 function debugConstants() {
@@ -1448,16 +1448,17 @@ function getCurrentBoardInfoAndUrls() {
     // 現在のボードデータを取得
     let boardData = null;
     let questionText = '問題読み込み中...';
+    let config = {};
+
+    // ユーザーの設定JSON解析
+    try {
+      config = JSON.parse(userInfo.configJson || '{}');
+    } catch (e) {
+      console.warn('getCurrentBoardInfoAndUrls: 設定JSON解析エラー:', e.message);
+    }
 
     if (userInfo.spreadsheetId) {
       try {
-        // ユーザーの設定からアクティブなシート名を取得
-        let config = {};
-        try {
-          config = JSON.parse(userInfo.configJson || '{}');
-        } catch (e) {
-          console.warn('getCurrentBoardInfoAndUrls: 設定JSON解析エラー:', e.message);
-        }
 
         // アクティブなシート名を決定（優先順位: publishedSheetName > activeSheetName）
         const sheetName = config.publishedSheetName || config.activeSheetName || 'フォームの回答 1';
@@ -1492,6 +1493,7 @@ function getCurrentBoardInfoAndUrls() {
 
     const result = {
       isActive: !!userInfo.spreadsheetId,
+      isPublished: config?.appPublished || false,
       questionText: questionText,
       sheetName: userInfo.sheetName || 'シート名未設定',
       urls: {
