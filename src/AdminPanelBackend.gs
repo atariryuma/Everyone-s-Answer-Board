@@ -413,7 +413,7 @@ function detectColumnMapping(headers) {
   const aiEnhancement = identifyHeadersAdvanced(headers);
   
   // 5. AI結果で精度向上
-  const enhancedMapping = enhanceMappingWithAI(basicMapping, aiEnhancement, headers);
+  const enhancedMapping = mergeColumnConfidence(basicMapping, aiEnhancement, headers);
   
   console.log('detectColumnMapping: AI統合・超高精度マッピング完了', {
     headers,
@@ -507,33 +507,50 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
 /**
  * AIによるマッピング強化
  */
-function enhanceMappingWithAI(basicMapping, aiResult, headers) {
+function mergeColumnConfidence(basicMapping, aiResult, headers) {
   const enhanced = { ...basicMapping };
   
-  // AIが高精度で検出した結果で既存マッピングを強化
+  // 既存のconfidence値を保持（重要：0%問題の修正）
+  enhanced.confidence = { ...basicMapping.confidence };
+  
+  console.log('mergeColumnConfidence: 開始', {
+    basicConfidence: basicMapping.confidence,
+    aiResultConfidence: aiResult.confidence
+  });
+  
+  // AI結果で既存マッピングを強化（既存confidence値を保持）
   if (aiResult.answer && (!enhanced.answer || (aiResult.confidence?.answer || 0) > (enhanced.confidence?.answer || 0))) {
     enhanced.answer = headers.indexOf(aiResult.answer);
-    enhanced.confidence = enhanced.confidence || {};
-    enhanced.confidence.answer = aiResult.confidence?.answer || 95;
+    if (aiResult.confidence?.answer) {
+      enhanced.confidence.answer = aiResult.confidence.answer;
+    }
+    // aiResult.confidence?.answerが無い場合はbasicMapping.confidenceの値を保持
   }
   
   if (aiResult.reason && (!enhanced.reason || (aiResult.confidence?.reason || 0) > (enhanced.confidence?.reason || 0))) {
     enhanced.reason = headers.indexOf(aiResult.reason);
-    enhanced.confidence = enhanced.confidence || {};
-    enhanced.confidence.reason = aiResult.confidence?.reason || 85;
+    if (aiResult.confidence?.reason) {
+      enhanced.confidence.reason = aiResult.confidence.reason;
+    }
   }
   
   if (aiResult.classHeader && (!enhanced.class || (aiResult.confidence?.class || 0) > (enhanced.confidence?.class || 0))) {
     enhanced.class = headers.indexOf(aiResult.classHeader);
-    enhanced.confidence = enhanced.confidence || {};
-    enhanced.confidence.class = aiResult.confidence?.class || 80;
+    if (aiResult.confidence?.class) {
+      enhanced.confidence.class = aiResult.confidence.class;
+    }
   }
   
   if (aiResult.name && (!enhanced.name || (aiResult.confidence?.name || 0) > (enhanced.confidence?.name || 0))) {
     enhanced.name = headers.indexOf(aiResult.name);
-    enhanced.confidence = enhanced.confidence || {};
-    enhanced.confidence.name = aiResult.confidence?.name || 75;
+    if (aiResult.confidence?.name) {
+      enhanced.confidence.name = aiResult.confidence.name;
+    }
   }
+  
+  console.log('mergeColumnConfidence: 完了', {
+    finalConfidence: enhanced.confidence
+  });
   
   return enhanced;
 }
