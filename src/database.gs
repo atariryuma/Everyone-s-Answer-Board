@@ -467,11 +467,6 @@ function logAccountDeletion(executorEmail, targetUserId, targetEmail, reason, de
         transactionLog.steps.push('verification_complete');
         transactionLog.success = true;
 
-          executor: executorEmail,
-          target: targetUserId,
-          type: deleteType,
-          steps: transactionLog.steps.length,
-        });
 
         return {
           success: true,

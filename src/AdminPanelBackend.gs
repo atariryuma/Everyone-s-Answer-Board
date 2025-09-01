@@ -942,10 +942,6 @@ function convertIndicesToMapping(headerIndices, headerRow) {
     mapping[uiFieldName] = columnIndex;
   });
 
-    headerIndices,
-    mapping,
-    usedMapping: 'SYSTEM_CONSTANTS.COLUMN_MAPPING (統一定数)',
-  });
   return mapping;
 }
 

@@ -2127,12 +2127,6 @@ class CacheAPI {
    */
   invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
     try {
-        userId,
-        email,
-        spreadsheetId,
-        clearPattern,
-        dbSpreadsheetId,
-      });
 
       // 基本ユーザーキャッシュクリア
       if (userId) {
@@ -2190,11 +2184,6 @@ class CacheAPI {
    */
   synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId) {
     try {
-        userId,
-        email,
-        oldSpreadsheetId,
-        newSpreadsheetId,
-      });
 
       // 段階1: 基本ユーザーキャッシュクリア
       this.invalidateUserCache(userId, email, oldSpreadsheetId, false);
