@@ -33,8 +33,8 @@ function debugConstants() {
 // =============================================================================
 
 /**
- * スプレッドシート一覧を取得（オーナー権限＋フォーム連携チェック）
- * @returns {Array<Object>} スプレッドシート情報の配列
+ * スプレッドシート一覧を取得（管理パネル用）- シンプル版
+ * @returns {Array} スプレッドシート一覧
  */
 function getSpreadsheetList() {
   try {
@@ -43,144 +43,86 @@ function getSpreadsheetList() {
     const currentUserEmail = Session.getActiveUser().getEmail();
     console.log('現在のユーザー:', currentUserEmail);
 
-    // 🚀 最適化：キャッシュチェック（5分間有効）
-    try {
-      const cacheKey = `spreadsheet_list_${currentUserEmail}`;
-      const cached = CacheService.getScriptCache().get(cacheKey);
-      if (cached) {
+    // キャッシュチェック（5分間有効）
+    const cacheKey = `spreadsheet_list_${currentUserEmail}`;
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) {
+      try {
         const cacheData = JSON.parse(cached);
         const cacheAge = Date.now() - cacheData.timestamp;
         if (cacheAge < 300000) {
-          // 5分以内
-          console.info(
-            `getSpreadsheetList: キャッシュヒット (${Math.round(cacheAge / 1000)}秒前、元実行時間: ${cacheData.executionTime}ms)`
-          );
+          console.info(`getSpreadsheetList: キャッシュヒット (${Math.round(cacheAge / 1000)}秒前)`);
           return cacheData.data;
         }
+      } catch (e) {
+        // キャッシュ読み込みエラーは無視して続行
       }
-    } catch (cacheError) {
-      console.warn('getSpreadsheetList: キャッシュ読み込みエラー:', cacheError.message);
     }
 
-    // 🚀 最適化：30日以内のファイルのみ検索（フォールバック対応）
+    const startTime = Date.now();
+    const spreadsheets = [];
+    const maxResults = 30; // 十分な数を取得
+    
+    // シンプルな検索：スプレッドシートのみ、ゴミ箱以外
+    const searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false`;
+    console.info('getSpreadsheetList: 検索開始');
+    
+    const files = DriveApp.searchFiles(searchQuery);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const dateString = thirtyDaysAgo.toISOString();
-    
-    let files;
-    let searchQuery;
-    
-    try {
-      // 最初に viewedByMeTime を試行（推奨）
-      searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false and viewedByMeTime > '${dateString}'`;
-      console.info('getSpreadsheetList: viewedByMeTimeで検索:', searchQuery);
-      files = DriveApp.searchFiles(searchQuery);
-    } catch (viewedTimeError) {
-      console.warn('getSpreadsheetList: viewedByMeTime検索失敗、modifiedTimeにフォールバック:', viewedTimeError.message);
+
+    let count = 0;
+    let totalChecked = 0;
+
+    while (files.hasNext() && count < maxResults && totalChecked < 200) {
+      totalChecked++;
+      const file = files.next();
       
       try {
-        // フォールバック1: modifiedTime を使用
-        searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false and modifiedTime > '${dateString}'`;
-        console.info('getSpreadsheetList: modifiedTimeで検索:', searchQuery);
-        files = DriveApp.searchFiles(searchQuery);
-      } catch (modifiedTimeError) {
-        console.warn('getSpreadsheetList: modifiedTime検索も失敗、基本検索にフォールバック:', modifiedTimeError.message);
-        
-        // フォールバック2: 基本検索（日付制限なし）
-        searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false`;
-        console.info('getSpreadsheetList: 基本検索:', searchQuery);
-        files = DriveApp.searchFiles(searchQuery);
-      }
-    }
-
-    const spreadsheets = [];
-    let count = 0;
-    const maxResults = 20; // 🚀 最適化：制限を減らして高速化
-    const maxProcessTime = 15000; // 🚀 最適化：15秒でタイムアウト
-    const startTime = Date.now();
-
-    // 🚀 最適化：オーナーファイル先行収集（軽量処理）
-    const ownerFiles = [];
-    let fileCount = 0;
-
-    while (files.hasNext() && fileCount < 100) {
-      // 最大100件まで検索
-      if (Date.now() - startTime > maxProcessTime) {
-        console.warn('getSpreadsheetList: タイムアウト、部分結果を返します');
-        break;
-      }
-
-      const file = files.next();
-      fileCount++;
-
-      // オーナー権限チェック（軽量）
-      try {
+        // オーナーチェック
         const owner = file.getOwner();
-        if (owner && owner.getEmail() === currentUserEmail) {
-          ownerFiles.push({
-            id: file.getId(),
-            name: file.getName(),
-            lastModified: file.getLastUpdated().toISOString(),
-            fileObject: file,
-          });
+        if (!owner || owner.getEmail() !== currentUserEmail) {
+          continue;
         }
-      } catch (ownerError) {
-        // スキップ
+        
+        // 30日以内にアクセスしたかチェック
+        const lastUpdated = file.getLastUpdated();
+        if (lastUpdated < thirtyDaysAgo) {
+          continue;
+        }
+        
+        // 条件を満たすファイルを追加
+        spreadsheets.push({
+          id: file.getId(),
+          name: file.getName(),
+          lastModified: lastUpdated.toISOString(),
+          owner: currentUserEmail,
+          isOwner: true
+        });
+        count++;
+        
+      } catch (error) {
+        // 個別ファイルのエラーは無視して続行
         continue;
       }
     }
 
-    console.info(`getSpreadsheetList: オーナーファイル ${ownerFiles.length}件検出`);
-
-    // 🚀 最適化：フォーム連携チェック（必要最小限）
-    for (const ownerFile of ownerFiles) {
-      if (count >= maxResults) break;
-      if (Date.now() - startTime > maxProcessTime) {
-        console.warn('getSpreadsheetList: タイムアウト');
-        break;
-      }
-
-      try {
-        const formInfo = checkFormConnection(ownerFile.id);
-
-        // フォーム連携がある場合のみ追加
-        if (formInfo && formInfo.hasForm) {
-          spreadsheets.push({
-            id: ownerFile.id,
-            name: ownerFile.name,
-            lastModified: ownerFile.lastModified,
-            owner: currentUserEmail,
-            isOwner: true,
-            formUrl: formInfo.formUrl,
-            formTitle: formInfo.formTitle,
-            hasFormConnection: true,
-          });
-          count++;
-        }
-      } catch (formError) {
-        console.warn(`フォーム連携チェックエラー for ${ownerFile.name}:`, formError.message);
-      }
-    }
 
     // 最終更新順でソート
     spreadsheets.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
 
     const executionTime = Date.now() - startTime;
-    console.info(
-      `getSpreadsheetList: ${spreadsheets.length}個の条件適合スプレッドシートを取得（実行時間: ${executionTime}ms）`
-    );
+    console.info(`getSpreadsheetList: ${spreadsheets.length}件取得（実行時間: ${executionTime}ms、検査数: ${totalChecked}）`);
 
-    // 🚀 最適化：結果をキャッシュ（5分間）
+    // 結果をキャッシュ（5分間）
     try {
-      const cacheKey = `spreadsheet_list_${currentUserEmail}`;
       const cacheData = {
         timestamp: Date.now(),
-        data: spreadsheets,
-        executionTime: executionTime,
+        data: spreadsheets
       };
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(cacheData), 300); // 5分キャッシュ
-      console.info('getSpreadsheetList: 結果をキャッシュしました');
-    } catch (cacheError) {
-      console.warn('getSpreadsheetList: キャッシュ保存エラー:', cacheError.message);
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(cacheData), 300);
+      console.info('getSpreadsheetList: キャッシュ保存完了');
+    } catch (e) {
+      // キャッシュ保存エラーは無視
     }
 
     return spreadsheets;
