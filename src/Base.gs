@@ -240,18 +240,29 @@ class AccessController {
    * 管理者アクセスを検証
    */
   verifyAdminAccess(userInfo, config, currentUserEmail) {
-    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(PROPS_KEYS.ADMIN_EMAIL);
+
+    console.log('🔍 管理者アクセス検証:', {
+      currentUserEmail: currentUserEmail ? currentUserEmail.substring(0, 10) + '...' : 'null',
+      systemAdminEmail: systemAdminEmail ? systemAdminEmail.substring(0, 10) + '...' : 'null',
+      userEmail: userInfo.userEmail ? userInfo.userEmail.substring(0, 10) + '...' : 'null',
+      isSystemAdmin: currentUserEmail === systemAdminEmail,
+      isOwner: currentUserEmail === userInfo.userEmail
+    });
 
     // システム管理者
     if (currentUserEmail === systemAdminEmail) {
+      console.log('✅ システム管理者として認証成功');
       return this.createAccessResult(true, 'system_admin', config);
     }
 
     // オーナー
     if (currentUserEmail === userInfo.userEmail) {
+      console.log('✅ ボード所有者として認証成功');
       return this.createAccessResult(true, 'owner', config);
     }
 
+    console.warn('❌ 管理者権限なし');
     return this.createAccessResult(false, 'guest', null, '管理者権限がありません');
   }
 
@@ -314,7 +325,7 @@ class AccessController {
     const userInfo = DB.findUserById(targetUserId);
     if (!userInfo) return 'none';
 
-    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(PROPS_KEYS.ADMIN_EMAIL);
 
     if (currentUserEmail === systemAdminEmail) {
       return 'system_admin';

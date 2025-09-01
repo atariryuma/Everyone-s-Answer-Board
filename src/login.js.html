@@ -536,8 +536,8 @@
             <h1 class="title">${message || 'ログインが完了しました'}</h1>
             <p class="subtitle">管理パネルにアクセスしてください</p>
             
-            <a href="${adminUrl}" target="_top" class="main-button" id="admin-panel-btn" onclick="handleAdminPanelClick(event, '${adminUrl}', this)">
-              <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
+            <a href="${adminUrl}" target="_blank" rel="noopener noreferrer" class="main-button" id="admin-panel-btn" onclick="handleAdminPanelClick(event, '${adminUrl}', this)">
+              <span id="admin-panel-btn-text">🚀 管理パネルを開く（新しいタブ）</span>
               <div id="admin-panel-btn-spinner" style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
                 <div style="width: 20px; height: 20px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
               </div>
@@ -554,7 +554,9 @@
             <div class="note">
               <div style="margin-bottom: 4px;">✓ このリンクは安全です</div>
               <div style="margin-bottom: 4px;">✓ Google Apps Script公式のセキュリティガイドラインに準拠</div>
+              <div style="margin-bottom: 4px;">🆕 管理パネルは新しいタブで開きます</div>
               <div style="margin-bottom: 4px;">💡 このURLをブックマークすると、次回から直接アクセスできます</div>
+              <div style="margin-bottom: 4px;">⚠️ ポップアップがブロックされる場合は、ブラウザの設定をご確認ください</div>
               <div>🔒 セキュリティのため、URLは他人と共有しないでください</div>
             </div>
           </div>
@@ -577,7 +579,7 @@
         }
 
         window.isAdminPanelClicking = true;
-        console.log('管理パネルへ遷移中...');
+        console.log('管理パネルを新しいタブで開いています...');
 
         // ボタンを無効化してローディング状態にする
         buttonElement.style.pointerEvents = 'none';
@@ -589,9 +591,45 @@
         if (btnText) btnText.style.display = 'none';
         if (btnSpinner) btnSpinner.style.display = 'flex';
 
-        // 実際の遷移
+        // 新しいタブで開く
         setTimeout(() => {
-          window.location.href = adminUrl;
+          const newTab = window.open(adminUrl, '_blank', 'noopener,noreferrer');
+          
+          // ポップアップブロック検出
+          if (!newTab || newTab.closed || typeof newTab.closed == 'undefined') {
+            console.warn('ポップアップがブロックされました。フォールバック実行');
+            // フォールバック: ユーザーに手動でクリックしてもらう
+            buttonElement.style.pointerEvents = 'auto';
+            buttonElement.style.opacity = '1';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+            if (btnText) {
+              btnText.style.display = 'inline';
+              btnText.textContent = '⚠️ ポップアップがブロックされました。再クリックしてください';
+            }
+            window.isAdminPanelClicking = false;
+            
+            // 3秒後に元のテキストに戻す
+            setTimeout(() => {
+              if (btnText) btnText.textContent = '🚀 管理パネルを開く（新しいタブ）';
+            }, 3000);
+          } else {
+            // 成功時：ボタンを元に戻す
+            setTimeout(() => {
+              buttonElement.style.pointerEvents = 'auto';
+              buttonElement.style.opacity = '1';
+              if (btnSpinner) btnSpinner.style.display = 'none';
+              if (btnText) {
+                btnText.style.display = 'inline';
+                btnText.textContent = '✅ 新しいタブで開きました';
+              }
+              window.isAdminPanelClicking = false;
+              
+              // 3秒後に元のテキストに戻す
+              setTimeout(() => {
+                if (btnText) btnText.textContent = '🚀 管理パネルを開く（新しいタブ）';
+              }, 3000);
+            }, 500);
+          }
         }, 100);
 
         return false;
