@@ -31,11 +31,23 @@ function getSpreadsheetList() {
 
     while (files.hasNext() && count < maxResults) {
       const file = files.next();
+      
+      // オーナー情報の安全な取得
+      let ownerEmail = 'Unknown';
+      try {
+        const owner = file.getOwner();
+        if (owner) {
+          ownerEmail = owner.getEmail();
+        }
+      } catch (ownerError) {
+        console.warn(`Owner取得エラー for file ${file.getName()}:`, ownerError.message);
+      }
+      
       spreadsheets.push({
         id: file.getId(),
         name: file.getName(),
         lastModified: file.getLastUpdated().toISOString(),
-        owner: file.getOwner().getEmail(),
+        owner: ownerEmail,
       });
       count++;
     }

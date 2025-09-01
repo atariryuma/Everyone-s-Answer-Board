@@ -1,26 +1,4 @@
 <script>
-  // Complete TailwindCSS warning suppression and early configuration
-  window.__TAILWIND_DISABLE_TOUCH__ = true;
-  window.tailwind = {
-    config: {
-      corePlugins: { preflight: false },
-      important: true
-    }
-  };
-  
-  // Suppress TailwindCSS production warnings immediately
-  const originalWarn = console.warn;
-  console.warn = function(...args) {
-    const message = args.join(' ');
-    if (message.includes('cdn.tailwindcss.com should not be used in production') ||
-        message.includes('tailwind') ||
-        message.includes('TailwindCSS')) {
-      return; // Completely suppress
-    }
-    originalWarn.apply(console, args);
-  };
-
-  // === SECTION SEPARATOR ===
   // Safe template variable extraction from data attributes
   let __USER_ID__ = '';
   try {
@@ -211,7 +189,26 @@
         .withFailureHandler(function (error) {
           console.error('❌ スプレッドシート読み込みエラー:', error);
           select.innerHTML = '<option value="">読み込みエラー</option>';
-          reject(new Error('スプレッドシートの読み込みに失敗しました: ' + error.message));
+          
+          // エラーの詳細な分析とユーザーフレンドリーなメッセージ
+          let userMessage = 'スプレッドシートの読み込みに失敗しました。';
+          let suggestions = [];
+          
+          if (error.message && error.message.includes('getEmail')) {
+            suggestions.push('Googleドライブへのアクセス権限を確認してください');
+            suggestions.push('ブラウザを再読み込みして再試行してください');
+          } else if (error.message && error.message.includes('permission')) {
+            suggestions.push('Googleアカウントでログインし直してください');
+          } else {
+            suggestions.push('インターネット接続を確認してください');
+            suggestions.push('しばらく時間をおいて再試行してください');
+          }
+          
+          const detailedMessage = suggestions.length > 0 
+            ? userMessage + '\n\n推奨対処法:\n' + suggestions.map(s => '• ' + s).join('\n')
+            : userMessage + '\n\n詳細: ' + error.message;
+            
+          reject(new Error(detailedMessage));
         })
         .getSpreadsheetList();
     });
