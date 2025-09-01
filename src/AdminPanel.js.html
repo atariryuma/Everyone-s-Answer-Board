@@ -1,4 +1,3 @@
-<script>
   // Complete TailwindCSS warning suppression and early configuration
   window.__TAILWIND_DISABLE_TOUCH__ = true;
   window.tailwind = {
@@ -19,9 +18,8 @@
     }
     originalWarn.apply(console, args);
   };
-</script>
 
-<script>
+  // === SECTION SEPARATOR ===
   // Safe template variable extraction from data attributes
   let __USER_ID__ = '';
   try {
@@ -42,9 +40,8 @@
   }
 
   console.log('🔧 Template variables prepared:', { __USER_ID__ });
-</script>
 
-<script>
+  // === SECTION SEPARATOR ===
   // 簡素化された状態管理
   let systemState = {
     loading: false,
@@ -1862,4 +1859,3 @@
   }
 
   console.log('AdminPanel スクリプト読み込み完了');
-</script>
