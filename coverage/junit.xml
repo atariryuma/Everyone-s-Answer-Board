@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="5" failures="0" errors="0" time="0.318">
+  <testsuite name="TypeScript環境検証" errors="0" failures="0" skipped="0" timestamp="2025-09-01T07:25:39" time="0.145" tests="5">
+    <testcase classname="TypeScript環境検証 TypeScript設定が正常に動作する" name="TypeScript環境検証 TypeScript設定が正常に動作する" time="0.018">
+    </testcase>
+    <testcase classname="TypeScript環境検証 基本的なGAS APIモック動作確認" name="TypeScript環境検証 基本的なGAS APIモック動作確認" time="0.001">
+    </testcase>
+    <testcase classname="TypeScript環境検証 テスト環境の依存関係確認" name="TypeScript環境検証 テスト環境の依存関係確認" time="0.001">
+    </testcase>
+    <testcase classname="設計品質検証 プロダクション問題検出能力の基礎確認" name="設計品質検証 プロダクション問題検出能力の基礎確認" time="0">
+    </testcase>
+    <testcase classname="設計品質検証 エラー条件シミュレーション" name="設計品質検証 エラー条件シミュレーション" time="0.001">
+    </testcase>
+  </testsuite>
+</testsuites>

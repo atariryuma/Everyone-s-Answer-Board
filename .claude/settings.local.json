@@ -30,7 +30,9 @@
       "Bash(do if [ -f \"/Users/ryuma/Everyone-s-Answer-Board/src/$file.html\" ])",
       "Bash(then echo \"$file: EXISTS\")",
       "Bash(else echo \"$file: MISSING\")",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(npm install)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": [],
     "ask": [],

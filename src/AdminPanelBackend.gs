@@ -741,16 +741,53 @@ function analyzeColumns(spreadsheetId, sheetName) {
  * @returns {Object} AdminPanel用マッピング
  */
 function convertIndicesToMapping(headerIndices, headerRow) {
+  // nullチェックを追加
+  if (!headerIndices || typeof headerIndices !== 'object') {
+    console.error('convertIndicesToMapping: headerIndices is null or invalid', headerIndices);
+    throw new Error('Cannot convert undefined or null headerIndices to mapping object');
+  }
+  
+  if (!headerRow || !Array.isArray(headerRow)) {
+    console.error('convertIndicesToMapping: headerRow is null or invalid', headerRow);
+    throw new Error('Cannot convert undefined or null headerRow to mapping object');
+  }
+
   // シンプル・単一定数SYSTEM_CONSTANTS.COLUMN_MAPPINGを使用
   const mapping = {};
+
+  console.log('convertIndicesToMapping: 入力データ確認', {
+    headerIndices,
+    headerRow: headerRow.slice(0, 10), // 最初の10項目のみログ出力
+    headerRowLength: headerRow.length
+  });
 
   // 各列定義を直接使用（変換層なし）
   Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     const headerName = column.header; // '回答', '理由' など
     const uiFieldName = column.key; // 'answer', 'reason' など
 
-    mapping[uiFieldName] =
-      headerIndices[headerName] !== undefined ? headerIndices[headerName] : null;
+    // 直接マッチをチェック
+    let columnIndex = null;
+    if (headerIndices[headerName] !== undefined) {
+      columnIndex = headerIndices[headerName];
+    } else {
+      // alternatesでの部分マッチングを試行
+      if (column.alternates && Array.isArray(column.alternates)) {
+        for (const alternate of column.alternates) {
+          // headerIndicesの各キーに対してalternatesをチェック
+          for (const [actualHeader, index] of Object.entries(headerIndices)) {
+            if (actualHeader.toLowerCase().includes(alternate.toLowerCase())) {
+              columnIndex = index;
+              console.log(`convertIndicesToMapping: alternateマッチ ${uiFieldName}: "${actualHeader}" -> ${alternate} (index: ${index})`);
+              break;
+            }
+          }
+          if (columnIndex !== null) break;
+        }
+      }
+    }
+
+    mapping[uiFieldName] = columnIndex;
   });
 
   console.log('convertIndicesToMapping: 単一定数使用で変換完了', {
