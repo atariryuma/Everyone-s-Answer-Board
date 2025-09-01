@@ -142,6 +142,52 @@ function checkFormConnection(spreadsheetId) {
 }
 
 /**
+ * シートがフォーム回答用シートかチェック
+ * @param {Sheet} sheet - チェック対象のシート
+ * @param {Object} formInfo - フォーム連携情報
+ * @returns {boolean} フォーム回答用シートかどうか
+ */
+function checkIfFormResponseSheet(sheet, formInfo) {
+  try {
+    const sheetName = sheet.getName();
+    
+    // フォーム連携がない場合は false
+    if (!formInfo || !formInfo.hasForm) {
+      return false;
+    }
+    
+    // フォーム回答シートの特徴をチェック
+    // 1. シート名が「フォームの回答」で始まる
+    if (sheetName.startsWith('フォームの回答') || sheetName.startsWith('Form Responses')) {
+      return true;
+    }
+    
+    // 2. ヘッダー行の特徴をチェック（タイムスタンプ列の存在）
+    if (sheet.getLastRow() > 0 && sheet.getLastColumn() > 0) {
+      const headerRow = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), 10)).getValues()[0];
+      
+      // タイムスタンプ列があるかチェック
+      const hasTimestamp = headerRow.some(header => {
+        if (!header) return false;
+        const headerStr = String(header).toLowerCase();
+        return headerStr.includes('timestamp') || 
+               headerStr.includes('タイムスタンプ') || 
+               headerStr.includes('回答時刻');
+      });
+      
+      if (hasTimestamp) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.warn(`フォーム回答シートチェックエラー for ${sheet.getName()}:`, error.message);
+    return false;
+  }
+}
+
+/**
  * 指定されたスプレッドシートのシート一覧を取得
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {Array<Object>} シート情報の配列
@@ -157,15 +203,33 @@ function getSheetList(spreadsheetId) {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
 
-    const sheetList = sheets.map((sheet) => ({
-      name: sheet.getName(),
-      index: sheet.getIndex(),
-      rowCount: sheet.getLastRow(),
-      columnCount: sheet.getLastColumn(),
-      hidden: sheet.isSheetHidden(),
-    }));
+    // フォーム連携情報を取得
+    let formInfo = null;
+    try {
+      formInfo = checkFormConnection(spreadsheetId);
+    } catch (formError) {
+      console.warn('フォーム連携情報取得エラー:', formError.message);
+    }
 
-    console.log(`getSheetList: ${sheetList.length}個のシートを取得`);
+    const sheetList = sheets.map((sheet) => {
+      const sheetName = sheet.getName();
+      
+      // シートがフォーム回答用シートかチェック
+      const isFormResponseSheet = checkIfFormResponseSheet(sheet, formInfo);
+      
+      return {
+        name: sheetName,
+        index: sheet.getIndex(),
+        rowCount: sheet.getLastRow(),
+        columnCount: sheet.getLastColumn(),
+        hidden: sheet.isSheetHidden(),
+        isFormResponseSheet: isFormResponseSheet,
+        formConnected: formInfo && formInfo.hasForm ? true : false,
+        formTitle: formInfo && formInfo.hasForm ? formInfo.formTitle : null
+      };
+    });
+
+    console.log(`getSheetList: ${sheetList.length}個のシートを取得（フォーム連携情報付き）`);
     return sheetList;
   } catch (error) {
     console.error('getSheetList エラー:', error);

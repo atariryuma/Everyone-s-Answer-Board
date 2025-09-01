@@ -167,6 +167,9 @@
       }
       
       select.innerHTML = '<option value="">読み込み中...</option>';
+      
+      // ローディング表示を追加
+      setLoading(true, 'スプレッドシート一覧を読み込み中...');
       console.log('🔄 Calling google.script.run.getSpreadsheetList()...');
 
       google.script.run
@@ -193,11 +196,13 @@
             console.warn('⚠️ Received invalid spreadsheets data:', spreadsheets);
           }
           
+          setLoading(false);
           resolve(spreadsheets);
         })
         .withFailureHandler(function (error) {
           console.error('❌ スプレッドシート読み込みエラー:', error);
           select.innerHTML = '<option value="">読み込みエラー</option>';
+          setLoading(false);
           
           // エラーの詳細な分析とユーザーフレンドリーなメッセージ
           let userMessage = 'スプレッドシートの読み込みに失敗しました。';
@@ -600,7 +605,17 @@
           sheets.forEach((sheet) => {
             const option = document.createElement('option');
             option.value = sheet.name;
-            option.textContent = sheet.name;
+            
+            // フォーム連携シートかどうかで表示を変える
+            if (sheet.isFormResponseSheet && sheet.formConnected) {
+              option.textContent = `📋 ${sheet.name} (フォーム回答)`;
+              option.dataset.isFormSheet = 'true';
+              option.dataset.formTitle = sheet.formTitle || '';
+            } else {
+              option.textContent = sheet.name;
+              option.dataset.isFormSheet = 'false';
+            }
+            
             select.appendChild(option);
           });
           console.log(`シート一覧読み込み完了: ${sheets.length}件`);
@@ -734,15 +749,19 @@
 
   // 不要なシステム監視機能を削除
 
-  // ローディング状態設定 - SharedUtilitiesシステムを使用
-  function setLoading(loading) {
+  // ローディング状態設定 - UnifiedLoadingSystemを使用
+  function setLoading(loading, message = '処理中...') {
     systemState.loading = loading;
-    if (window.sharedUtilities && window.sharedUtilities.ui) {
+    
+    // UnifiedLoadingSystemを使用
+    if (window.unifiedLoading) {
       if (loading) {
-        window.sharedUtilities.ui.showLoading();
+        window.unifiedLoading.showSimple(message);
       } else {
-        window.sharedUtilities.ui.hideLoading();
+        window.unifiedLoading.hide();
       }
+    } else {
+      console.warn('UnifiedLoading not available, using fallback');
     }
   }
 
@@ -1134,6 +1153,9 @@
   function loadSheetList(spreadsheetId) {
     const select = document.getElementById('sheet-select');
     select.innerHTML = '<option value="">読み込み中...</option>';
+    
+    // ローディング表示
+    setLoading(true, 'シート一覧を読み込み中...');
 
     google.script.run
       .withSuccessHandler(function (sheets) {
@@ -1141,13 +1163,25 @@
         sheets.forEach((sheet) => {
           const option = document.createElement('option');
           option.value = sheet.name;
-          option.textContent = sheet.name;
+          
+          // フォーム連携シートかどうかで表示を変える
+          if (sheet.isFormResponseSheet && sheet.formConnected) {
+            option.textContent = `📋 ${sheet.name} (フォーム回答)`;
+            option.dataset.isFormSheet = 'true';
+            option.dataset.formTitle = sheet.formTitle || '';
+          } else {
+            option.textContent = sheet.name;
+            option.dataset.isFormSheet = 'false';
+          }
+          
           select.appendChild(option);
         });
+        setLoading(false);
       })
       .withFailureHandler(function (error) {
         console.error('シート読み込みエラー:', error);
         select.innerHTML = '<option value="">読み込みエラー</option>';
+        setLoading(false);
       })
       .getSheetList(spreadsheetId);
   }
