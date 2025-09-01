@@ -368,6 +368,7 @@ function detectColumnMapping(headers) {
         column.alternates.forEach((alternate) => {
           const alternateLower = alternate.toLowerCase();
           if (headerLower.includes(alternateLower)) {
+            console.log(`✅ Alternates Match: ${fieldKey} - "${alternate}" found in "${header.substring(0, 30)}..." (score: 75)`);
             matchScore = Math.max(matchScore, 75); // alternates マッチング
           }
         });
@@ -388,6 +389,7 @@ function detectColumnMapping(headers) {
             header.includes(p) || headerLower.includes(p.toLowerCase())
           );
           if (hasAIPattern) {
+            console.log(`🚀 Question Pattern Special Detection: "${header.substring(0, 50)}..." (score: 92)`);
             matchScore = Math.max(matchScore, 92); // 質問文特別検出
           }
         }
@@ -395,13 +397,16 @@ function detectColumnMapping(headers) {
 
       // より高い信頼度で置き換え
       if (matchScore > 0) {
-        if (!mapping[fieldKey] || matchScore > (mapping.confidence[fieldKey] || 0)) {
+        if (!mapping[fieldKey] || matchScore > (confidence[fieldKey] || 0)) {
           mapping[fieldKey] = index;
-          mapping.confidence[fieldKey] = matchScore;
+          confidence[fieldKey] = matchScore;
         }
       }
     });
   });
+
+  // confidenceを返り値に追加
+  mapping.confidence = confidence;
 
   // 4. SYSTEM_CONSTANTS処理 + AI補強
   const basicMapping = performBasicSYSTEM_CONSTANTSMapping(headers);
@@ -414,6 +419,8 @@ function detectColumnMapping(headers) {
     headers,
     basicMapping,
     enhancedMapping,
+    basicConfidence: basicMapping.confidence,
+    enhancedConfidence: enhancedMapping.confidence,
     usedTechnology: 'SYSTEM_CONSTANTS + aiPatterns + Advanced AI + Internet Knowledge'
   });
 
@@ -457,6 +464,7 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
         column.alternates.forEach((alternate) => {
           const alternateLower = alternate.toLowerCase();
           if (headerLower.includes(alternateLower)) {
+            console.log(`✅ Alternates Match: ${fieldKey} - "${alternate}" found in "${header.substring(0, 30)}..." (score: 75)`);
             matchScore = Math.max(matchScore, 75); // alternates マッチング
           }
         });
@@ -477,6 +485,7 @@ function performBasicSYSTEM_CONSTANTSMapping(headers) {
             header.includes(p) || headerLower.includes(p.toLowerCase())
           );
           if (hasAIPattern) {
+            console.log(`🚀 Question Pattern Special Detection: "${header.substring(0, 50)}..." (score: 92)`);
             matchScore = Math.max(matchScore, 92); // 質問文特別検出
           }
         }
