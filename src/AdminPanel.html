@@ -17,7 +17,7 @@
     <!-- Shared Utilities -->
     <?!= include('SharedUtilities'); ?>
     <script>
-      const __USER_ID__ = '<?= userId ? userId : "" ?>';
+      const __USER_ID__ = '<?= userInfo && userInfo.userId ? userInfo.userId : "" ?>';
     </script>
     <style>
       /* AdminPanel専用スタイル - commit 421e817 レイアウト構造 + 現在のダークテーマ */
@@ -974,5 +974,8 @@
         <div class="text-xs text-gray-500 mt-2" id="boardStatus">最終更新: --:--</div>
       </div>
     </footer>
+
+    <!-- AdminPanel JavaScript -->
+    <?!= include('AdminPanel.js'); ?>
   </body>
 </html>
