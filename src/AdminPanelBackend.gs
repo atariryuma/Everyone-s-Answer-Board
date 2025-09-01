@@ -62,12 +62,35 @@ function getSpreadsheetList() {
       console.warn('getSpreadsheetList: キャッシュ読み込みエラー:', cacheError.message);
     }
 
-    // 🚀 最適化：30日以内に開いたスプレッドシートのみ検索
+    // 🚀 最適化：30日以内のファイルのみ検索（フォールバック対応）
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false and viewedByMeTime > "${thirtyDaysAgo.toISOString()}"`;
-
-    console.info('getSpreadsheetList: 30日以内のファイルを検索:', thirtyDaysAgo.toISOString());
-    const files = DriveApp.searchFiles(searchQuery);
+    const dateString = thirtyDaysAgo.toISOString();
+    
+    let files;
+    let searchQuery;
+    
+    try {
+      // 最初に viewedByMeTime を試行（推奨）
+      searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false and viewedByMeTime > '${dateString}'`;
+      console.info('getSpreadsheetList: viewedByMeTimeで検索:', searchQuery);
+      files = DriveApp.searchFiles(searchQuery);
+    } catch (viewedTimeError) {
+      console.warn('getSpreadsheetList: viewedByMeTime検索失敗、modifiedTimeにフォールバック:', viewedTimeError.message);
+      
+      try {
+        // フォールバック1: modifiedTime を使用
+        searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false and modifiedTime > '${dateString}'`;
+        console.info('getSpreadsheetList: modifiedTimeで検索:', searchQuery);
+        files = DriveApp.searchFiles(searchQuery);
+      } catch (modifiedTimeError) {
+        console.warn('getSpreadsheetList: modifiedTime検索も失敗、基本検索にフォールバック:', modifiedTimeError.message);
+        
+        // フォールバック2: 基本検索（日付制限なし）
+        searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false`;
+        console.info('getSpreadsheetList: 基本検索:', searchQuery);
+        files = DriveApp.searchFiles(searchQuery);
+      }
+    }
 
     const spreadsheets = [];
     let count = 0;
