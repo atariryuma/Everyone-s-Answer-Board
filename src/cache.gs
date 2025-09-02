@@ -231,4 +231,106 @@ function getSheetsServiceCached() {
   }, { ttl: 3500, enableMemoization: true });
 }
 
+/**
+ * 汎用スプレッドシートヘッダー取得関数
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {object} [options] - オプション { useCache: boolean, validate: boolean, forceRefresh: boolean }
+ * @returns {object} ヘッダーインデックス情報
+ */
+function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
+  const { useCache = true, validate = false, forceRefresh = false } = options;
+  
+  if (!spreadsheetId || !sheetName) {
+    throw new Error('スプレッドシートIDとシート名は必須です');
+  }
+
+  const cacheKey = `headers_${spreadsheetId}_${sheetName}`;
+  
+  // キャッシュから取得を試行（forceRefreshでない場合）
+  if (useCache && !forceRefresh) {
+    const cached = cacheManager.get(cacheKey, null, { enableMemoization: true });
+    if (cached && (!validate || validateSpreadsheetHeaders(cached).success)) {
+      return cached;
+    }
+  }
+
+  try {
+    // スプレッドシートから直接取得
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      throw new Error(`シート「${sheetName}」が見つかりません`);
+    }
+
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (!headerRow || headerRow.length === 0) {
+      throw new Error('ヘッダー行が見つかりません');
+    }
+
+    // ヘッダーインデックスマップを作成
+    const headerIndices = {};
+    headerRow.forEach((header, index) => {
+      if (header && String(header).trim() !== '') {
+        headerIndices[String(header).trim()] = index;
+      }
+    });
+
+    // 検証実行（必要な場合）
+    if (validate) {
+      const validationResult = validateSpreadsheetHeaders(headerIndices);
+      if (!validationResult.success) {
+        console.warn('ヘッダー検証に失敗:', validationResult.missing);
+      }
+    }
+
+    // キャッシュに保存
+    if (useCache) {
+      cacheManager.set(cacheKey, headerIndices, { 
+        ttl: 1800, // 30分
+        enableMemoization: true 
+      });
+    }
+
+    console.log(`📊 スプレッドシートヘッダーを取得しました: ${spreadsheetId}/${sheetName}`);
+    return headerIndices;
+
+  } catch (error) {
+    console.error('[ERROR] getSpreadsheetHeaders:', error.message);
+    throw new Error(`ヘッダー取得エラー: ${error.message}`);
+  }
+}
+
+/**
+ * スプレッドシートヘッダーの検証
+ * @param {object} headerIndices - ヘッダーインデックス
+ * @returns {object} 検証結果 { success: boolean, missing: string[], hasReasonColumn: boolean, hasOpinionColumn: boolean }
+ */
+function validateSpreadsheetHeaders(headerIndices) {
+  if (!headerIndices || typeof headerIndices !== 'object') {
+    return { success: false, missing: ['すべて'], hasReasonColumn: false, hasOpinionColumn: false };
+  }
+  
+  // COLUMN_HEADERSが定義されていない場合のフォールバック
+  const HEADERS = typeof COLUMN_HEADERS !== 'undefined' ? COLUMN_HEADERS : {
+    REASON: '理由',
+    OPINION: '回答'
+  };
+  
+  const hasReason = headerIndices[HEADERS.REASON] !== undefined;
+  const hasOpinion = headerIndices[HEADERS.OPINION] !== undefined;
+  const missing = [];
+  
+  if (!hasReason) missing.push(HEADERS.REASON);
+  if (!hasOpinion) missing.push(HEADERS.OPINION);
+  
+  return {
+    success: hasReason && hasOpinion,
+    missing,
+    hasReasonColumn: hasReason,
+    hasOpinionColumn: hasOpinion
+  };
+}
+
 console.log('🗄️ 簡略化されたキャッシュシステムが初期化されました');

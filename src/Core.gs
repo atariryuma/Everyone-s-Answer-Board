@@ -100,7 +100,7 @@ function validateHeaderIntegrity(userId) {
     const sheetName = userInfo.sheetName || 'EABDB';
 
     // 理由列のヘッダー検証を重点的に実施
-    const indices = getHeaderIndices(spreadsheetId, sheetName);
+    const indices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
     const validationResults = {
       success: true,
@@ -702,7 +702,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     );
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
-    const headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
+    const headerIndices = getSpreadsheetColumnIndices(publishedSpreadsheetId, publishedSheetName);
     console.log('getPublishedSheetData: Available headerIndices=%s', JSON.stringify(headerIndices));
 
     // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
@@ -853,7 +853,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     const rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
-    const headerIndices = getHeaderIndices(publishedSpreadsheetId, publishedSheetName);
+    const headerIndices = getSpreadsheetColumnIndices(publishedSpreadsheetId, publishedSheetName);
 
     // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
     const sheetConfig = configJson['sheet_' + publishedSheetName] || {};
@@ -1378,7 +1378,7 @@ function countSheetRows(spreadsheetId, sheetName, classFilter) {
         return Math.max(0, lastRow - 1);
       }
 
-      const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+      const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
       const classIndex = headerIndices[COLUMN_HEADERS.CLASS];
       if (classIndex === undefined) {
         return Math.max(0, lastRow - 1);
@@ -1614,7 +1614,7 @@ function createUserFolder(userEmail) {
 function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
   try {
     const service = getSheetsServiceCached();
-    const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
     const highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
 
     if (highlightColumnIndex === undefined) {
@@ -1670,21 +1670,19 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
 
 // getWebAppUrl function removed - now using the unified version from url.gs
 
-function getHeaderIndices(spreadsheetId, sheetName) {
+function getSpreadsheetColumnIndices(spreadsheetId, sheetName) {
   console.log(
-    'getHeaderIndices received in core.gs: spreadsheetId=%s, sheetName=%s',
+    'getSpreadsheetColumnIndices received in core.gs: spreadsheetId=%s, sheetName=%s',
     spreadsheetId,
     sheetName
   );
 
-  const cacheKey = 'hdr_' + spreadsheetId + '_' + sheetName;
-  let indices = getHeadersCached(spreadsheetId, sheetName);
+  let indices = getSpreadsheetHeaders(spreadsheetId, sheetName, { validate: false });
 
-  // 理由列が取得できていない場合はキャッシュを無効化して再取得
+  // 理由列が取得できていない場合は強制リフレッシュで再取得
   if (!indices || indices[COLUMN_HEADERS.REASON] === undefined) {
-    console.log('getHeaderIndices: Reason header missing, refreshing cache for key=%s', cacheKey);
-    cacheManager.remove(cacheKey);
-    indices = getHeadersCached(spreadsheetId, sheetName);
+    console.log('getSpreadsheetColumnIndices: Reason header missing, force refreshing headers');
+    indices = getSpreadsheetHeaders(spreadsheetId, sheetName, { forceRefresh: true, validate: true });
   }
 
   return indices;
@@ -1770,7 +1768,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       lock.waitLock(10000);
 
       const service = getSheetsServiceCached();
-      const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+      const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
       // すべてのリアクション列を取得してユーザーの重複リアクションをチェック
       const allReactionRanges = [];
@@ -2648,7 +2646,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const dataRows = sheetData.slice(1);
 
     // ヘッダーインデックスを取得（キャッシュ利用）
-    const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
     // 名簿マップを作成（キャッシュ利用）
     const rosterMap = buildRosterMap(rosterData);
@@ -3170,7 +3168,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
   try {
     const service = getSheetsServiceCached();
-    const headerIndices = getHeaderIndices(spreadsheetId, sheetName);
+    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
     const reactionData = {
       UNDERSTAND: { count: 0, reacted: false },

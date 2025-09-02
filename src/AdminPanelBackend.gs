@@ -378,7 +378,7 @@ function connectDataSource(spreadsheetId, sheetName) {
     }
 
     // 既存の堅牢なヘッダー取得関数を活用（30分キャッシュ + リトライ機能）
-    const headerIndices = getHeadersCached(spreadsheetId, sheetName);
+    const headerIndices = getSpreadsheetHeaders(spreadsheetId, sheetName, { validate: true });
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
     // 超高精度AI列マッピングを活用（新システム）
@@ -408,8 +408,7 @@ function connectDataSource(spreadsheetId, sheetName) {
       const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
       // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
-      cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
-      const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
+      const updatedHeaderIndices = getSpreadsheetHeaders(spreadsheetId, sheetName, { forceRefresh: true, validate: true });
       columnMapping = detectColumnMapping(updatedHeaderRow);
     }
 
@@ -931,7 +930,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
     }
 
     // 既存の堅牢なヘッダー取得関数を活用（30分キャッシュ + リトライ機能）
-    const headerIndices = getHeadersCached(spreadsheetId, sheetName);
+    const headerIndices = getSpreadsheetHeaders(spreadsheetId, sheetName, { validate: true });
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
     // 超高精度AI列マッピングを活用（新システム）
@@ -958,8 +957,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
       const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
       // 更新後のヘッダーで再実行（キャッシュを削除して最新取得）
-      cacheManager.remove(`hdr_${spreadsheetId}_${sheetName}`);
-      const updatedHeaderIndices = getHeadersCached(spreadsheetId, sheetName);
+      const updatedHeaderIndices = getSpreadsheetHeaders(spreadsheetId, sheetName, { forceRefresh: true, validate: true });
       columnMapping = detectColumnMapping(updatedHeaderRow);
     }
 
@@ -1014,7 +1012,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
 
 /**
  * Core.gsのヘッダーインデックスをAdminPanel用マッピングに変換
- * @param {Object} headerIndices - getHeadersCachedから返されるインデックス
+ * @param {Object} headerIndices - getSpreadsheetHeadersから返されるインデックス
  * @param {Array} headerRow - ヘッダー行（表示用）
  * @returns {Object} AdminPanel用マッピング
  */
