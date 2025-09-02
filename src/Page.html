@@ -1227,7 +1227,6 @@
         init() {
           // Critical path only - non-blocking
           this.setupCriticalElements();
-          this.setupOwnerName();
           this.showMinimalSkeleton();
 
           // Apply default low performance tweaks
@@ -1261,11 +1260,6 @@
             },
             { timeout: 50 }
           );
-        }
-        setupOwnerName() {
-          if (OWNER_NAME && this.elements.ownerNameText) {
-            this.elements.ownerNameText.textContent = `管理者: ${OWNER_NAME}`;
-          }
         }
         setupCriticalElements() {
           // Only setup absolutely critical event listeners
@@ -1476,11 +1470,11 @@
             }
           }
 
-          console.log('GAS API呼び出し:', { funcName, args, userId: USER_ID, isStateChanging });
+          console.log('GAS API呼び出し:', { funcName, args, isStateChanging });
 
           return new Promise((resolve, reject) => {
             if (typeof google !== 'undefined' && google.script && google.script.run) {
-              const userId = USER_ID || '';
+              const userId = '';
               console.log('Google Apps Script環境検出済み、実際にAPI呼び出し実行中...');
               google.script.run
                 .withSuccessHandler((result) => {
@@ -2839,8 +2833,6 @@
               isAdminUser: this.state.isAdminUser,
               windowIsAdminUser: window.isAdminUser,
               showAdminFeatures: this.state.showAdminFeatures,
-              userId: USER_ID,
-              ownerName: OWNER_NAME,
             });
             const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
             console.log('ハイライトレスポンス:', res);
