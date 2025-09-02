@@ -7,7 +7,8 @@
     const appData = document.getElementById('app-data');
     if (appData) {
       __USER_ID__ = appData.getAttribute('data-user-id') || '';
-    } catch (error) {
+    }
+  } catch (error) {
     __USER_ID__ = '';
   }
 
