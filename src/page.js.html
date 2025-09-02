@@ -1,8 +1,88 @@
 <script>
+  // === TEMPLATE LAYER - 2024 GAS Best Practice ===
+  // 統一されたテンプレート変数受け取りシステム
+
+  /**
+   * GASテンプレート変数を型安全に解析
+   * @param {Object} templateVars - テンプレート変数定義
+   * @returns {Object} 解析済み設定オブジェクト
+   */
+  const parseTemplateVars = (templateVars) => {
+    const result = {};
+    const defaults = {
+      showCounts: false,
+      displayMode: 'anonymous',
+      sheetName: 'テストシート',
+      userId: '',
+      ownerName: '',
+      showAdminFeatures: false,
+      showHighlightToggle: false,
+      showScoreSort: false,
+      isStudentMode: true,
+      isAdminUser: false,
+      mapping: {},
+    };
+
+    Object.entries(templateVars).forEach(([key, rawValue]) => {
+      try {
+        // GASテンプレート未展開チェック
+        if (typeof rawValue === 'string' && rawValue.startsWith('<')) {
+          result[key] = defaults[key];
+          return;
+        }
+
+        // 型別処理
+        if (key === 'mapping') {
+          result[key] =
+            typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue || defaults[key];
+        } else if (typeof defaults[key] === 'boolean') {
+          result[key] = rawValue === 'true' || rawValue === true;
+        } else {
+          result[key] = rawValue || defaults[key];
+        }
+      } catch (error) {
+        console.warn(`Template variable parsing failed for ${key}:`, error);
+        result[key] = defaults[key];
+      }
+    });
+
+    return Object.freeze(result);
+  };
+
+  // Template variables definition
+  const TEMPLATE_VARS = {
+    showCounts: '<?= typeof showCounts !== "undefined" ? showCounts : false ?>',
+    displayMode: '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>',
+    sheetName: '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>',
+    mapping: '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>',
+    userId: '<?= typeof userId !== "undefined" ? userId : "" ?>',
+    ownerName: '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>',
+    showAdminFeatures:
+      '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>',
+    showHighlightToggle:
+      '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>',
+    showScoreSort: '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>',
+    isStudentMode: '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>',
+    isAdminUser: '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>',
+  };
+
+  // 統一設定オブジェクト生成
+  const CONFIG = parseTemplateVars(TEMPLATE_VARS);
+
+  // グローバル互換性のためのエクスポート
+  Object.assign(window, CONFIG);
+
+  // SHEET_NAME定数定義（StudyQuestApp互換性のため）
+  const SHEET_NAME = window.sheetName;
+  
+  // USER_ID定数定義（StudyQuestApp後方互換性のため）
+  const USER_ID = window.userId;
+
+  // === APPLICATION CONSTANTS ===
   // GAS optimized constants
   const RENDER_BATCH_SIZE = 10; // Fixed batch size for GAS environment
   const CHUNK_SIZE = 5; // DOM operations per chunk
-  const ICONS = {
+  const ICONS = Object.freeze({
     'lightbulb-outline':
       '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
     'lightbulb-solid':
@@ -24,7 +104,7 @@
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
     users:
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-  };
+  });
 
   // バックエンド定数との統一（SYSTEM_CONSTANTS.REACTIONS.LABELS参照）
   const REACTION_NAMES = Object.freeze({
@@ -48,14 +128,14 @@
 
   class StudyQuestApp {
     // アプリケーション定数
-    static CONSTANTS = {
+    static CONSTANTS = Object.freeze({
       REACTION_RATE_LIMIT_MS: 500,
       HIGHLIGHT_RATE_LIMIT_MS: 500,
       CACHE_TTL_MS: 1000,
       RETRY_DELAY_MS: 2000,
       POLLING_INTERVAL_MS: 5000,
       INIT_TIMEOUT_MS: 30000,
-    };
+    });
 
     /**
      * ユーザーIDを検証し、必要に応じてフォールバック値を提供
@@ -204,11 +284,11 @@
       this.eventDelegationSetup = false;
       this.nonCriticalListenersSetup = false;
       this.modalOperationPending = false;
-      this.reactionTypes = [
-        { key: 'LIKE', icon: 'hand-thumb-up' },
-        { key: 'UNDERSTAND', icon: 'lightbulb' },
-        { key: 'CURIOUS', icon: 'magnifying-glass-plus' },
-      ];
+      this.reactionTypes = Object.freeze([
+        Object.freeze({ key: 'LIKE', icon: 'hand-thumb-up' }),
+        Object.freeze({ key: 'UNDERSTAND', icon: 'lightbulb' }),
+        Object.freeze({ key: 'CURIOUS', icon: 'magnifying-glass-plus' }),
+      ]);
 
       // リアクション状態保存用のキー
       this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
@@ -2902,14 +2982,14 @@
         this.state.lastSeenCount = preservedLastSeenCount;
         console.log('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
           preservedCount: preservedLastSeenCount,
-          currentAnswersLength: this.state.currentAnswers.length,
+          currentAnswersLength: this.state.currentAnswers?.length || 0,
           stabilityMaintained: true,
         });
       } else {
         console.log('✅ 強制データリフレッシュ完了、新データによりlastSeenCount更新:', {
           oldCount: preservedLastSeenCount,
           newCount: this.state.lastSeenCount,
-          currentAnswersLength: this.state.currentAnswers.length,
+          currentAnswersLength: this.state.currentAnswers?.length || 0,
         });
       }
     }
@@ -3043,13 +3123,34 @@
               attempt === 0 ? 15000 : 10000
             ); // 初回は15秒、以降は10秒
 
+            // CLAUDE.md準拠: パラメータ詳細ログでデバッグ性向上
+            console.log(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
+              tenantId: fetchParams.tenantId,
+              tenantIdType: typeof fetchParams.tenantId,
+              classFilter: fetchParams.classFilter,
+              sortOrder: fetchParams.sortOrder,
+              showAdminFeatures: fetchParams.showAdminFeatures,
+              bypassCache: fetchParams.bypassCache || false,
+              allFetchParams: fetchParams
+            });
+
             google.script.run
               .withSuccessHandler((response) => {
                 clearTimeout(timeout);
+                console.log(`✅ GAS API成功レスポンス受信 (試行 ${attempt + 1}):`, {
+                  hasResponse: !!response,
+                  responseType: typeof response,
+                  responseKeys: response ? Object.keys(response) : []
+                });
                 resolve(response);
               })
               .withFailureHandler((error) => {
                 clearTimeout(timeout);
+                console.error(`❌ GAS API失敗レスポンス受信 (試行 ${attempt + 1}):`, {
+                  error: error,
+                  errorMessage: error ? error.message : 'Unknown error',
+                  errorType: typeof error
+                });
                 reject(error);
               })
               .getPublishedSheetData(
@@ -3669,7 +3770,7 @@
               // 理由列デバッグ: 取得されたデータの詳細を確認
               console.log(
                 '🔍 理由列デバッグ - 取得データ詳細:',
-                result.data.map((item, index) => ({
+                (result.data || []).map((item, index) => ({
                   index: index,
                   rowIndex: item.rowIndex,
                   opinion: item.opinion?.substring(0, 50) + '...',
@@ -3823,22 +3924,259 @@
           }
         }
       } catch (error) {
-        console.error('Error loading sheet data:', error);
-        const errorMessage = this.escapeHtml(error.message || 'Unknown error');
+        // CLAUDE.md準拠: 包括的エラーハンドリング実装
+        console.error('❌ Error loading sheet data:', error);
+        
+        // 構造化ログでデバッグ情報を詳細記録
+        console.error('📋 Error context:', {
+          tenantId: this.state.tenantId,
+          currentAnswers: this.state.currentAnswers?.length || 0,
+          isInitialLoad: config.isInitialLoad,
+          bypassCache: config.bypassCache,
+          userAgent: navigator.userAgent,
+          timestamp: new Date().toISOString(),
+          stack: error.stack
+        });
+
+        // エラータイプ分析とユーザーフレンドリーメッセージ生成
+        const errorAnalysis = this.analyzeErrorType(error);
+        const userMessage = this.generateUserFriendlyErrorMessage(errorAnalysis);
+        
+        // スケルトン削除
         this.elements.answersContainer.querySelectorAll('.skeleton').forEach((el) => el.remove());
-        this.elements.answersContainer.innerHTML =
-          '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' +
-          '<p class="font-bold">データの読み込みに失敗しました。</p>' +
-          '<p class="text-sm mt-2">' +
-          errorMessage +
-          '</p>' +
-          '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' +
-          '</div>';
+        
+        // エラー表示UI作成
+        this.elements.answersContainer.innerHTML = `
+          <div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg border border-red-800/30">
+            <div class="mb-4">
+              <svg class="w-16 h-16 mx-auto text-red-400 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+              </svg>
+              <p class="font-bold text-lg">${userMessage.title}</p>
+            </div>
+            <div class="text-sm space-y-2 mb-4">
+              <p>${userMessage.description}</p>
+              ${errorAnalysis.showTechnicalDetails ? `<details class="mt-2 text-left"><summary class="cursor-pointer text-yellow-400">技術詳細を表示</summary><pre class="mt-2 p-2 bg-gray-800 rounded text-xs overflow-x-auto">${this.escapeHtml(error.message || 'Unknown error')}</pre></details>` : ''}
+            </div>
+            <div class="flex gap-2 justify-center">
+              <button id="retryLoadBtn" class="game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">
+                再試行 (${errorAnalysis.retryAttempts + 1}/3)
+              </button>
+              ${errorAnalysis.showResetOption ? `<button id="resetAppBtn" class="game-btn bg-red-600 text-white px-4 py-2 rounded-lg font-bold border-red-800 hover:bg-red-500 text-sm">アプリリセット</button>` : ''}
+            </div>
+          </div>
+        `;
+        
+        // エラーリトライボタンのイベントリスナー設定
+        this.setupErrorRecoveryHandlers(errorAnalysis);
+        
+        // エラー統計更新
+        this.updateErrorStatistics(errorAnalysis.type);
+        
         // 同期エラーの場合にもローディング状態を解除
         this.state.isLoading = false;
         this.hideLoadingOverlay();
       }
     }
+
+    // CLAUDE.md準拠: エラータイプ分析メソッド
+    analyzeErrorType(error) {
+      const errorMessage = (error.message || '').toLowerCase();
+      const stack = (error.stack || '').toLowerCase();
+      
+      // エラーリトライ統計を取得
+      const retryAttempts = this.getErrorRetryCount() || 0;
+      
+      let errorType = 'unknown';
+      let severity = 'medium';
+      let recoverable = true;
+      let showTechnicalDetails = false;
+      let showResetOption = false;
+
+      // ネットワーク関連エラー
+      if (errorMessage.includes('network') || errorMessage.includes('fetch') || 
+          errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+        errorType = 'network';
+        severity = 'high';
+        recoverable = true;
+      }
+      // 認証・権限エラー
+      else if (errorMessage.includes('unauthorized') || errorMessage.includes('forbidden') ||
+               errorMessage.includes('ユーザー情報が見つかりません')) {
+        errorType = 'auth';
+        severity = 'critical';
+        recoverable = false;
+        showTechnicalDetails = true;
+        showResetOption = true;
+      }
+      // データベース・サーバーエラー
+      else if (errorMessage.includes('database') || errorMessage.includes('server error') ||
+               errorMessage.includes('internal') || stack.includes('gas')) {
+        errorType = 'server';
+        severity = 'high';
+        recoverable = true;
+        showTechnicalDetails = retryAttempts > 1;
+      }
+      // JavaScript実行エラー
+      else if (stack.includes('typeerror') || errorMessage.includes('undefined') ||
+               errorMessage.includes('null') || errorMessage.includes('cannot read')) {
+        errorType = 'runtime';
+        severity = 'medium';
+        recoverable = true;
+        showTechnicalDetails = true;
+      }
+      // リトライ回数に基づく調整
+      if (retryAttempts >= 2) {
+        severity = 'critical';
+        showTechnicalDetails = true;
+        showResetOption = true;
+      }
+
+      return {
+        type: errorType,
+        severity,
+        recoverable,
+        retryAttempts,
+        showTechnicalDetails,
+        showResetOption,
+        originalError: error
+      };
+    }
+
+    // CLAUDE.md準拠: ユーザーフレンドリーエラーメッセージ生成
+    generateUserFriendlyErrorMessage(errorAnalysis) {
+      const messages = {
+        network: {
+          title: 'ネットワーク接続エラー',
+          description: 'インターネット接続を確認して、再試行してください。'
+        },
+        auth: {
+          title: '認証エラー',
+          description: 'ユーザー認証に問題があります。ログイン状態を確認するか、ページを更新してください。'
+        },
+        server: {
+          title: 'サーバーエラー',
+          description: 'サーバー側で一時的な問題が発生しています。しばらく待ってから再試行してください。'
+        },
+        runtime: {
+          title: 'アプリケーションエラー',
+          description: 'アプリケーションの処理中にエラーが発生しました。ページの更新をお試しください。'
+        },
+        unknown: {
+          title: '予期しないエラー',
+          description: '不明なエラーが発生しました。ページを更新するか、管理者にお問い合わせください。'
+        }
+      };
+
+      const baseMessage = messages[errorAnalysis.type] || messages.unknown;
+      
+      // 重大度に応じてメッセージを調整
+      if (errorAnalysis.severity === 'critical') {
+        return {
+          ...baseMessage,
+          title: `${baseMessage.title} (深刻)`,
+          description: `${baseMessage.description} 問題が継続する場合は、管理者にお問い合わせください。`
+        };
+      }
+
+      return baseMessage;
+    }
+
+    // CLAUDE.md準拠: エラー回復ハンドラー設定
+    setupErrorRecoveryHandlers(errorAnalysis) {
+      // 再試行ボタンのハンドラー
+      const retryBtn = document.getElementById('retryLoadBtn');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', async () => {
+          try {
+            retryBtn.textContent = '再試行中...';
+            retryBtn.disabled = true;
+            
+            // エラーリトライ回数を増加
+            this.incrementErrorRetryCount();
+            
+            // 指数バックオフでリトライ
+            const backoffDelay = Math.min(1000 * Math.pow(2, errorAnalysis.retryAttempts), 10000);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+            
+            // データリロード実行
+            await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+            
+          } catch (retryError) {
+            console.error('❌ Retry failed:', retryError);
+            retryBtn.textContent = '再試行失敗';
+            retryBtn.disabled = true;
+          }
+        });
+      }
+
+      // アプリリセットボタンのハンドラー
+      const resetBtn = document.getElementById('resetAppBtn');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          if (confirm('アプリケーションをリセットします。すべてのローカルデータが削除されます。よろしいですか？')) {
+            this.performAppReset();
+          }
+        });
+      }
+    }
+
+    // CLAUDE.md準拠: エラー統計管理
+    getErrorRetryCount() {
+      const key = 'error_retry_count';
+      return parseInt(localStorage.getItem(key) || '0', 10);
+    }
+
+    incrementErrorRetryCount() {
+      const key = 'error_retry_count';
+      const current = this.getErrorRetryCount();
+      localStorage.setItem(key, String(current + 1));
+    }
+
+    resetErrorRetryCount() {
+      localStorage.removeItem('error_retry_count');
+    }
+
+    updateErrorStatistics(errorType) {
+      const statsKey = 'error_statistics';
+      const stats = JSON.parse(localStorage.getItem(statsKey) || '{}');
+      
+      stats[errorType] = (stats[errorType] || 0) + 1;
+      stats.lastErrorTime = Date.now();
+      
+      localStorage.setItem(statsKey, JSON.stringify(stats));
+    }
+
+    // CLAUDE.md準拠: アプリケーションリセット機能
+    performAppReset() {
+      try {
+        // ローカルストレージクリア
+        const preserveKeys = ['user_preferences']; // 保持すべきキー
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (!preserveKeys.includes(key)) {
+            localStorage.removeItem(key);
+          }
+        });
+
+        // キャッシュクリア
+        if (this.cache) {
+          this.cache.clear();
+        }
+
+        // エラー統計リセット
+        this.resetErrorRetryCount();
+
+        // ページリロード
+        window.location.reload();
+        
+      } catch (resetError) {
+        console.error('❌ App reset failed:', resetError);
+        // フォールバック: 強制リロード
+        window.location.href = window.location.href;
+      }
+    }
+
     async loadAvailableSheets() {
       try {
         const sheetsData = await this.gas.getAvailableSheets();
@@ -5069,7 +5407,7 @@
         );
         this.setReactionButtonsLoading(btns, true);
 
-        const item = this.state.currentAnswers.find((i) => i.rowIndex == rowIndex);
+        const item = this.state.currentAnswers?.find((i) => i.rowIndex == rowIndex);
         if (!item) {
           throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
@@ -5892,7 +6230,7 @@
     // ハイライト状態同期確認
     async verifyHighlightSync(rowIndex, expectedHighlight) {
       try {
-        const item = this.state.currentAnswers.find((i) => i.rowIndex == rowIndex);
+        const item = this.state.currentAnswers?.find((i) => i.rowIndex == rowIndex);
         if (!item) return;
 
         // UI状態とサーバー応答の一致確認
@@ -7117,11 +7455,11 @@
       // Data search context
 
       // 最新データを取得（filteredDataとcurrentAnswersの両方から）
-      let data = this.state.currentAnswers.find((r) => r.rowIndex == rowIndex);
+      let data = this.state.currentAnswers?.find((r) => r.rowIndex == rowIndex);
       // Data search in currentAnswers
 
       if (!data && this.state.filteredData) {
-        data = this.state.filteredData.find((r) => r.rowIndex == rowIndex);
+        data = this.state.filteredData?.find((r) => r.rowIndex == rowIndex);
         console.debug('Data search in filteredData:', {
           found: !!data,
           searchRowIndex: rowIndex,
@@ -9197,6 +9535,9 @@
     // ドメイン情報とフォームリンクを取得
     loadDomainInfo();
     loadFormLink();
+
+    // StudyQuestApp インスタンス初期化
+    window.studyQuestApp = new StudyQuestApp();
 
     window.addEventListener('beforeunload', () => {
       if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {

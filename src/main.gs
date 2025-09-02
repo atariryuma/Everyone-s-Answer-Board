@@ -1365,9 +1365,23 @@ function forceLogoutAndRedirectToLogin() {
  * page.js.htmlで使用
  * @param {Object} params 取得パラメータ
  */
-function getPublishedSheetData(params = {}) {
+function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypassCache) {
   try {
-    console.log('getPublishedSheetData: Core.gs実装呼び出し開始', params);
+    // CLAUDE.md準拠: 個別引数とオブジェクト引数の両方に対応
+    let params;
+    if (arguments.length === 1 && typeof userId === 'object' && userId !== null) {
+      // オブジェクト引数の場合
+      params = userId;
+    } else {
+      // 個別引数の場合
+      params = { userId, classFilter, sortOrder, adminMode, bypassCache };
+    }
+    
+    console.log('getPublishedSheetData: Core.gs実装呼び出し開始', {
+      argumentsLength: arguments.length,
+      firstArgType: typeof userId,
+      params: params
+    });
     
     // CLAUDE.md準拠: 統一データソース原則でCore.gs実装を呼び出し
     // 多段階認証フロー: ユーザーIDの確実な取得

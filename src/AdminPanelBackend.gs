@@ -2079,8 +2079,8 @@ function getCurrentBoardInfoAndUrls() {
 
         boardData = getSheetData(userInfo.userId, sheetName);
         
-        // 問題文はフォームタイトルまたはヘッダーから取得
-        questionText = config.formTitle || boardData?.header || '問題文が設定されていません';
+        // 問題文は回答列（質問文）を優先、フォームタイトルはフォールバック
+        questionText = boardData?.header || config.formTitle || '問題文が設定されていません';
         
         console.log('getCurrentBoardInfoAndUrls: ボードデータ取得成功', {
           hasHeader: !!boardData?.header,
@@ -2089,7 +2089,7 @@ function getCurrentBoardInfoAndUrls() {
         });
       } catch (error) {
         console.warn('getCurrentBoardInfoAndUrls: ボードデータ取得エラー:', error.message);
-        // エラー時でもフォームタイトルを使用
+        // エラー時も回答列優先の方針を維持、フォームタイトルはフォールバック
         questionText = config.formTitle || '問題文の読み込みに失敗しました';
       }
     } else {
@@ -2291,4 +2291,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
   }
 }
 
-console.log('AdminPanel.gs 読み込み完了');
+// CLAUDE.md準拠: 条件付きログでPage.htmlアクセス時のノイズを削減
+if (typeof console !== 'undefined' && (globalThis.ADMIN_PANEL_DEBUG || false)) {
+  console.log('AdminPanel.gs 読み込み完了');
+}
