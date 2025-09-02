@@ -70,7 +70,7 @@ describe('Sheet-Specific Form Connection Tests', () => {
           formUrl: form.getPublishedUrl(),
           formTitle: form.getTitle(),
           formId: form.getId(),
-          sheetName: sheetName,
+          sheetName,
           destinationCheck: form.getDestinationId() === spreadsheetId
         };
       }
@@ -171,7 +171,7 @@ describe('Sheet-Specific Form Connection Tests', () => {
           hasForm: true,
           formTitle: form.getTitle(),
           formId: form.getId(),
-          sheetName: sheetName
+          sheetName
         };
       }
 

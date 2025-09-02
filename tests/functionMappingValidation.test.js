@@ -33,7 +33,6 @@ describe('HTML/GAS Function Mapping Validation', () => {
 
   test('All google.script.run calls should have corresponding GAS functions', () => {
     const missingFunctions = [];
-    const warnings = [];
 
     functionCalls.forEach((call) => {
       const gasFunction = gasFunctions.find((f) => f.name === call.functionName);
@@ -154,7 +153,7 @@ function extractFunctionCalls(htmlFiles) {
       let match;
       while ((match = pattern.exec(content)) !== null) {
         // 関数名がGASの予約語でないことを確認
-        const funcName = match[1];
+        const [, funcName] = match;
         if (!isGasReservedWord(funcName)) {
           const lines = content.substring(0, match.index).split('\n');
           const lineNumber = lines.length;

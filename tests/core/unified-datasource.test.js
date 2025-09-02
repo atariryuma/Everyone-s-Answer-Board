@@ -22,7 +22,7 @@ describe('Unified Data Source Implementation', () => {
   describe('renderAnswerBoard', () => {
     test('userInfo.spreadsheetIdを統一データソースとして使用', () => {
       // renderAnswerBoardのモック実装
-      function renderAnswerBoard(userInfo, params) {
+      function renderAnswerBoard(userInfo, _params) {
         const targetSpreadsheetId = userInfo.spreadsheetId;
         const targetSheetName = userInfo.sheetName;
         
@@ -57,7 +57,7 @@ describe('Unified Data Source Implementation', () => {
 
   describe('getPublishedSheetData', () => {
     test('userInfo.spreadsheetIdから直接データを取得', () => {
-      function getPublishedSheetData(userId) {
+      function getPublishedSheetData(_userId) {
         // DBからユーザー情報取得のモック
         const userInfo = mockUserInfo;
         

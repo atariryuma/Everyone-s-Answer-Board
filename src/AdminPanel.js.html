@@ -1,7 +1,8 @@
 <script>
   // Safe template variable extraction from data attributes
-  if (typeof __USER_ID__ === 'undefined') {
-    var __USER_ID__ = '';
+  let __USER_ID__ = '';
+  if (typeof __USER_ID__ !== 'undefined') {
+    // __USER_ID__ is already defined
   }
   try {
     const appData = document.getElementById('app-data');
