@@ -13,11 +13,11 @@
 ```javascript
 const DB_CONFIG = Object.freeze({
   SHEET_NAME: 'Users',
-  HEADERS: [
+  HEADERS: Object.freeze([
     'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
     'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl', 
     'sheetName', 'columnMappingJson', 'publishedAt', 'appUrl', 'lastModified'
-  ]
+  ])
 });
 ```
 
@@ -26,51 +26,93 @@ const DB_CONFIG = Object.freeze({
 ```javascript
 const SYSTEM_CONSTANTS = Object.freeze({
   // データベース関連定数
-  DATABASE: {
+  DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
-    HEADERS: [...], // 14フィールド
-    DELETE_LOG: {
+    HEADERS: Object.freeze([
+      'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
+      'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl', 
+      'sheetName', 'columnMappingJson', 'publishedAt', 'appUrl', 'lastModified'
+    ]),
+    DELETE_LOG: Object.freeze({
       SHEET_NAME: 'DeletionLogs',
-      HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
-    }
-  },
+      HEADERS: Object.freeze(['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType'])
+    })
+  }),
 
   // リアクション機能
-  REACTIONS: {
-    KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
-    LABELS: {
+  REACTIONS: Object.freeze({
+    KEYS: Object.freeze(['UNDERSTAND', 'LIKE', 'CURIOUS']),
+    LABELS: Object.freeze({
       UNDERSTAND: 'なるほど！',
       LIKE: 'いいね！', 
       CURIOUS: 'もっと知りたい！',
       HIGHLIGHT: 'ハイライト'
-    }
-  },
+    })
+  }),
 
-  // AdminPanel用列マッピング（AI検索対応）
-  COLUMN_MAPPING: {
-    answer: {
+  // スプレッドシート列定義（AI検索対応）
+  COLUMNS: Object.freeze({
+    OPINION: '回答',
+    REASON: '理由', 
+    CLASS: 'クラス',
+    NAME: '名前',
+    EMAIL: 'メールアドレス'
+  }),
+
+  // 列マッピング（AI検索対応）
+  COLUMN_MAPPING: Object.freeze({
+    answer: Object.freeze({
       key: 'answer', header: '回答',
-      alternates: ['どうして', '質問', '問題', '意見', '答え', 'なぜ'],
-      aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか'],
-      required: true
-    },
-    reason: {
+      alternates: ['どうして', '質問', '問題', '意見', '答え', 'なぜ', '思います', '考え'],
+      required: true,
+      aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか']
+    }),
+    reason: Object.freeze({
       key: 'reason', header: '理由',
       alternates: ['理由', '根拠', '体験', 'なぜ', '詳細', '説明'],
+      required: false,
+      aiPatterns: ['理由', '体験', '根拠', '詳細']
+    }),
+    class: Object.freeze({
+      key: 'class', header: 'クラス',
+      alternates: ['クラス', '学年'],
       required: false
-    }
-  },
+    }),
+    name: Object.freeze({
+      key: 'name', header: '名前', 
+      alternates: ['名前', '氏名', 'お名前'],
+      required: false
+    })
+  }),
+
+  // 表示モード
+  DISPLAY_MODES: Object.freeze({
+    ANONYMOUS: 'anonymous',
+    NAMED: 'named', 
+    EMAIL: 'email'
+  }),
 
   // アクセス制御
-  ACCESS: {
-    LEVELS: {
+  ACCESS: Object.freeze({
+    LEVELS: Object.freeze({
       OWNER: 'owner',
       SYSTEM_ADMIN: 'system_admin', 
       AUTHENTICATED_USER: 'authenticated_user',
-      GUEST: 'guest'
-    }
-  }
+      GUEST: 'guest',
+      NONE: 'none'
+    })
+  })
 });
+```
+
+### 後方互換性エイリアス
+```javascript
+const REACTION_KEYS = SYSTEM_CONSTANTS.REACTIONS.KEYS;
+const COLUMN_HEADERS = {
+  ...SYSTEM_CONSTANTS.COLUMNS,
+  ...SYSTEM_CONSTANTS.REACTIONS.LABELS
+};
+const DELETE_LOG_SHEET_CONFIG = SYSTEM_CONSTANTS.DATABASE.DELETE_LOG;
 ```
 
 ### コアシステム定数
@@ -107,17 +149,25 @@ doGet(mode=admin) → App.getAccess().verifyAccess() → renderAdminPanel()
 ### 4. 回答ボード表示フロー
 ```
 doGet(mode=view) → App.getAccess().verifyAccess() → renderAnswerBoard()
+  → userInfo.spreadsheetId/sheetName を統一使用
 ```
 
 ### 5. データソース接続フロー
 ```
-connectDataSource() → ConfigurationManager → Database.configJson 更新
+connectDataSource() → DB.updateUser() → userInfo.spreadsheetId/sheetName 更新
+  → 重複フィールド削除（publishedSpreadsheetId等）
+```
+
+### 6. スプレッドシートアクセスフロー
+```
+getPublishedSheetData() → userInfo.spreadsheetId（統一データソース）
+Core.gs関数群 → targetSpreadsheetId = userInfo.spreadsheetId
 ```
 
 ## 🏗️ アーキテクチャ階層
 1. **PropertiesService**: システム設定（SERVICE_ACCOUNT_CREDS, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL）
-2. **Database**: テナント管理（userId, userEmail, configJson）
-3. **App名前空間**: 統一サービス層（App.init(), App.getAccess(), App.getConfig()）
+2. **Database**: テナント管理（userId, userEmail, configJson, **spreadsheetId**, **sheetName**）
+3. **統一データソース**: `userInfo.spreadsheetId`が全機能で唯一の真実の源
 4. **AccessController**: アクセス制御（owner > system_admin > authenticated_user > guest）
 5. **SecurityManager**: 認証・JWT管理（Service Account Token生成）
 
@@ -252,6 +302,19 @@ if (!validation.isValid) {
 
 ## 7) 現在のシステム特有の実装パターン
 
+### 統一データソースパターン（2025年最新）
+```javascript
+// ✅ 推奨：userInfo.spreadsheetIdを統一使用
+function renderAnswerBoard(userInfo, params) {
+  const targetSpreadsheetId = userInfo.spreadsheetId;  // 統一データソース
+  const targetSheetName = userInfo.sheetName;
+  // ...
+}
+
+// ❌ 非推奨：重複したconfig参照
+// const publishedSpreadsheetId = config.publishedSpreadsheetId;
+```
+
 ### App名前空間パターン
 ```javascript
 // App.gs - 統一サービス層
@@ -280,7 +343,9 @@ const App = {
 const DB = {
   createUser(userData) { /* */ },
   findUserByEmail(email) { /* */ },
-  updateUser(userId, updateData) { /* */ }
+  updateUser(userId, updateData) { /* */ },
+  // ✅ データベース統一フィールド
+  // userInfo.spreadsheetId, userInfo.sheetName を使用
 };
 ```
 
@@ -307,10 +372,11 @@ const MODULE_CONFIG = Object.freeze({
 1. **`const`優先、`let`のみ許可、`var`禁止**  
 2. **SYSTEM_CONSTANTS, DB_CONFIG使用必須**  
 3. **App名前空間、DB名前空間のパターン遵守**  
-4. **バッチI/O・最小呼び出し**を強制  
-5. **SecurityValidator使用**でセキュリティ確保  
-6. **console.error**でエラー情報を構造化ログ出力  
-7. **Object.freeze()**で設定の不変性保持
+4. **統一データソース原則**: `userInfo.spreadsheetId`のみ使用、`publishedSpreadsheetId`等重複フィールド禁止
+5. **バッチI/O・最小呼び出し**を強制  
+6. **SecurityValidator使用**でセキュリティ確保  
+7. **console.error**でエラー情報を構造化ログ出力  
+8. **Object.freeze()**で設定の不変性保持
 
 ---
 
@@ -380,9 +446,10 @@ function processFeature(userId) {
 ### 必須チェックリスト
 1. **定数使用**: `SYSTEM_CONSTANTS`, `DB_CONFIG`, `CORE` の使用確認
 2. **名前空間**: `App`, `DB`, `SecurityValidator` パターンの適用
-3. **セキュリティ**: 入力検証とエラーハンドリングの実装
-4. **パフォーマンス**: バッチ処理とキャッシュの活用
-5. **ログ**: 構造化ログによるデバッグ情報出力
+3. **統一データソース**: `userInfo.spreadsheetId`のみ使用、重複フィールド禁止
+4. **セキュリティ**: 入力検証とエラーハンドリングの実装
+5. **パフォーマンス**: バッチ処理とキャッシュの活用
+6. **ログ**: 構造化ログによるデバッグ情報出力
 
 ### 本番デプロイ前チェックリスト
 ```bash
@@ -401,6 +468,28 @@ npm run check
 # 5. GASデプロイ
 npm run deploy
 ```
+
+---
+
+# 📊 システム整合性チェック結果（2025年2月更新）
+
+## ✅ 実装状況
+- **Object.freeze()使用**: constants.gs(27), database.gs(2), main.gs(1), security.gs(1), Base.gs(1)
+- **const使用率**: 高い（全ファイルで const 優先使用）
+- **var残存**: database.gs(187件), Core.gs(7件) ← 要改善
+- **統一データソース**: ✅ 実装済み（userInfo.spreadsheetId使用）
+- **重複フィールド削除**: ✅ 実装済み（publishedSpreadsheetId削除）
+
+## 🚨 改善が必要な項目
+1. **var → const/let変換**: database.gs, Core.gsで残存var使用を修正
+2. **Object.freeze()適用拡充**: 全定数オブジェクトへの適用
+3. **エラーハンドリング統一**: ErrorManagerパターンの全面適用
+
+## ✅ 適合済み項目  
+1. **データベーススキーマ**: DB_CONFIGと実装が完全一致
+2. **SYSTEM_CONSTANTS**: 実装と文書が一致
+3. **統一データソース**: userInfo.spreadsheetIdを全機能で使用
+4. **アーキテクチャ階層**: PropertiesService → Database → App階層を実装
 
 ---
 
