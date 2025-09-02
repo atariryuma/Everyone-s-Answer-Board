@@ -898,14 +898,14 @@ function updateUser(userId, updateData) {
 
   // 許可されたフィールドのホワイトリスト検証（DBヘッダーと一致）
   const allowedFields = [
-    'userEmail',       // ownerEmail → userEmail に修正
+    'userEmail', // ownerEmail → userEmail に修正
     'spreadsheetId',
     'spreadsheetUrl',
     'configJson',
     'lastAccessedAt',
     'createdAt',
     'formUrl',
-    'isActive',        // status → isActive に修正
+    'isActive', // status → isActive に修正
     'sheetName',
     'columnMappingJson',
     'publishedAt',

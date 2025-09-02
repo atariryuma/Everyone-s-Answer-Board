@@ -74,7 +74,7 @@
 
   // SHEET_NAME定数定義（StudyQuestApp互換性のため）
   const SHEET_NAME = window.sheetName;
-  
+
   // USER_ID定数定義（StudyQuestApp後方互換性のため）
   const USER_ID = window.userId;
 
@@ -118,12 +118,24 @@
     constructor() {
       this.data = new Map();
     }
-    set(key, value) { this.data.set(key, value); }
-    get(key) { return this.data.get(key); }
-    has(key) { return this.data.has(key); }
-    delete(key) { this.data.delete(key); }
-    clear() { this.data.clear(); }
-    get size() { return this.data.size; }
+    set(key, value) {
+      this.data.set(key, value);
+    }
+    get(key) {
+      return this.data.get(key);
+    }
+    has(key) {
+      return this.data.has(key);
+    }
+    delete(key) {
+      this.data.delete(key);
+    }
+    clear() {
+      this.data.clear();
+    }
+    get size() {
+      return this.data.size;
+    }
   }
 
   class StudyQuestApp {
@@ -345,22 +357,25 @@
       // パブリケーション状態監視システムの初期化
       this.initPublicationStatusMonitoring();
     }
-    
+
     // CLAUDE.md準拠: 安全なデータアクセスメソッド
     getCurrentAnswers() {
       if (!Array.isArray(this.state.currentAnswers)) {
-        console.warn('getCurrentAnswers: currentAnswersが配列ではありません。空配列で初期化します。', this.state.currentAnswers);
+        console.warn(
+          'getCurrentAnswers: currentAnswersが配列ではありません。空配列で初期化します。',
+          this.state.currentAnswers
+        );
         this.state.currentAnswers = [];
       }
       return this.state.currentAnswers;
     }
-    
+
     setCurrentAnswers(answers) {
       const safeAnswers = Array.isArray(answers) ? answers : [];
       this.state.currentAnswers = safeAnswers;
       console.log('setCurrentAnswers: 設定完了', { length: safeAnswers.length });
     }
-    
+
     // currentAnswersの安全な長さ取得
     getCurrentAnswersLength() {
       return this.getCurrentAnswers().length;
@@ -487,7 +502,6 @@
         },
       };
 
-
       // Alert on significant inconsistencies
       if (!metrics.domMetrics.isConsistent) {
         console.warn('⚠️ DOM-Data inconsistency detected:', {
@@ -509,7 +523,6 @@
         details,
         context: this.state.currentActiveSheet || 'unknown',
       };
-
 
       // Store cache metrics
       if (!this.cacheMetrics) this.cacheMetrics = [];
@@ -1797,7 +1810,8 @@
         await this.loadSheetData({ bypassCache: true });
 
         // 手動リフレッシュ後の新着チェック基準更新戦略
-        const shouldUpdateLastSeen = (this.state.currentAnswers?.length || 0) > preservedLastSeenCount;
+        const shouldUpdateLastSeen =
+          (this.state.currentAnswers?.length || 0) > preservedLastSeenCount;
 
         if (shouldUpdateLastSeen) {
           // データが増加している場合のみ更新
@@ -2977,7 +2991,8 @@
       await this.loadSheetData({ bypassCache: true });
 
       // lastSeenCount復元（安定化のため）
-      const shouldPreserveLastSeen = (this.state.currentAnswers?.length || 0) <= preservedLastSeenCount;
+      const shouldPreserveLastSeen =
+        (this.state.currentAnswers?.length || 0) <= preservedLastSeenCount;
       if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
         this.state.lastSeenCount = preservedLastSeenCount;
         console.log('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
@@ -3131,7 +3146,7 @@
               sortOrder: fetchParams.sortOrder,
               showAdminFeatures: fetchParams.showAdminFeatures,
               bypassCache: fetchParams.bypassCache || false,
-              allFetchParams: fetchParams
+              allFetchParams: fetchParams,
             });
 
             google.script.run
@@ -3140,7 +3155,7 @@
                 console.log(`✅ GAS API成功レスポンス受信 (試行 ${attempt + 1}):`, {
                   hasResponse: !!response,
                   responseType: typeof response,
-                  responseKeys: response ? Object.keys(response) : []
+                  responseKeys: response ? Object.keys(response) : [],
                 });
                 resolve(response);
               })
@@ -3149,7 +3164,7 @@
                 console.error(`❌ GAS API失敗レスポンス受信 (試行 ${attempt + 1}):`, {
                   error: error,
                   errorMessage: error ? error.message : 'Unknown error',
-                  errorType: typeof error
+                  errorType: typeof error,
                 });
                 reject(error);
               })
@@ -3179,11 +3194,7 @@
 
           // 成功した場合は結果を返す - 改善された判定条件
           if (result && this.isValidDataResult(result)) {
-            console.log(
-              `✅ データ取得成功 (試行 ${attempt + 1}):`,
-              result.data?.length || 0,
-              '件'
-            );
+            console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data?.length || 0, '件');
             return result;
           }
 
@@ -3236,7 +3247,7 @@
             message: error.message,
             stack: error.stack,
             fetchParams: fetchParams,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
 
           // 最後の試行で失敗した場合：包括的なエラーレポートを作成
@@ -3602,7 +3613,11 @@
                 this.initTimeoutId = null;
               }
 
-              if (!result || !result.data || (Array.isArray(result.data) && result.data.length === 0)) {
+              if (
+                !result ||
+                !result.data ||
+                (Array.isArray(result.data) && result.data.length === 0)
+              ) {
                 // 詳細なエラーログ出力
                 if (result && result.status === 'error') {
                   console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
@@ -3717,7 +3732,11 @@
                 }
 
                 // 再チェック後もデータが空の場合のみ空状態を表示
-                if (!result || !result.data || (Array.isArray(result.data) && result.data.length === 0)) {
+                if (
+                  !result ||
+                  !result.data ||
+                  (Array.isArray(result.data) && result.data.length === 0)
+                ) {
                   // 空データ受信時は古いカードを強制的にクリア
                   await this.clearAllCardsForEmptyData();
 
@@ -3926,7 +3945,7 @@
       } catch (error) {
         // CLAUDE.md準拠: 包括的エラーハンドリング実装
         console.error('❌ Error loading sheet data:', error);
-        
+
         // 構造化ログでデバッグ情報を詳細記録
         console.error('📋 Error context:', {
           tenantId: this.state.tenantId,
@@ -3935,16 +3954,16 @@
           bypassCache: config.bypassCache,
           userAgent: navigator.userAgent,
           timestamp: new Date().toISOString(),
-          stack: error.stack
+          stack: error.stack,
         });
 
         // エラータイプ分析とユーザーフレンドリーメッセージ生成
         const errorAnalysis = this.analyzeErrorType(error);
         const userMessage = this.generateUserFriendlyErrorMessage(errorAnalysis);
-        
+
         // スケルトン削除
         this.elements.answersContainer.querySelectorAll('.skeleton').forEach((el) => el.remove());
-        
+
         // エラー表示UI作成
         this.elements.answersContainer.innerHTML = `
           <div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg border border-red-800/30">
@@ -3966,13 +3985,13 @@
             </div>
           </div>
         `;
-        
+
         // エラーリトライボタンのイベントリスナー設定
         this.setupErrorRecoveryHandlers(errorAnalysis);
-        
+
         // エラー統計更新
         this.updateErrorStatistics(errorAnalysis.type);
-        
+
         // 同期エラーの場合にもローディング状態を解除
         this.state.isLoading = false;
         this.hideLoadingOverlay();
@@ -3983,10 +4002,10 @@
     analyzeErrorType(error) {
       const errorMessage = (error.message || '').toLowerCase();
       const stack = (error.stack || '').toLowerCase();
-      
+
       // エラーリトライ統計を取得
       const retryAttempts = this.getErrorRetryCount() || 0;
-      
+
       let errorType = 'unknown';
       let severity = 'medium';
       let recoverable = true;
@@ -3994,15 +4013,22 @@
       let showResetOption = false;
 
       // ネットワーク関連エラー
-      if (errorMessage.includes('network') || errorMessage.includes('fetch') || 
-          errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+      if (
+        errorMessage.includes('network') ||
+        errorMessage.includes('fetch') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('connection')
+      ) {
         errorType = 'network';
         severity = 'high';
         recoverable = true;
       }
       // 認証・権限エラー
-      else if (errorMessage.includes('unauthorized') || errorMessage.includes('forbidden') ||
-               errorMessage.includes('ユーザー情報が見つかりません')) {
+      else if (
+        errorMessage.includes('unauthorized') ||
+        errorMessage.includes('forbidden') ||
+        errorMessage.includes('ユーザー情報が見つかりません')
+      ) {
         errorType = 'auth';
         severity = 'critical';
         recoverable = false;
@@ -4010,16 +4036,24 @@
         showResetOption = true;
       }
       // データベース・サーバーエラー
-      else if (errorMessage.includes('database') || errorMessage.includes('server error') ||
-               errorMessage.includes('internal') || stack.includes('gas')) {
+      else if (
+        errorMessage.includes('database') ||
+        errorMessage.includes('server error') ||
+        errorMessage.includes('internal') ||
+        stack.includes('gas')
+      ) {
         errorType = 'server';
         severity = 'high';
         recoverable = true;
         showTechnicalDetails = retryAttempts > 1;
       }
       // JavaScript実行エラー
-      else if (stack.includes('typeerror') || errorMessage.includes('undefined') ||
-               errorMessage.includes('null') || errorMessage.includes('cannot read')) {
+      else if (
+        stack.includes('typeerror') ||
+        errorMessage.includes('undefined') ||
+        errorMessage.includes('null') ||
+        errorMessage.includes('cannot read')
+      ) {
         errorType = 'runtime';
         severity = 'medium';
         recoverable = true;
@@ -4039,7 +4073,7 @@
         retryAttempts,
         showTechnicalDetails,
         showResetOption,
-        originalError: error
+        originalError: error,
       };
     }
 
@@ -4048,34 +4082,38 @@
       const messages = {
         network: {
           title: 'ネットワーク接続エラー',
-          description: 'インターネット接続を確認して、再試行してください。'
+          description: 'インターネット接続を確認して、再試行してください。',
         },
         auth: {
           title: '認証エラー',
-          description: 'ユーザー認証に問題があります。ログイン状態を確認するか、ページを更新してください。'
+          description:
+            'ユーザー認証に問題があります。ログイン状態を確認するか、ページを更新してください。',
         },
         server: {
           title: 'サーバーエラー',
-          description: 'サーバー側で一時的な問題が発生しています。しばらく待ってから再試行してください。'
+          description:
+            'サーバー側で一時的な問題が発生しています。しばらく待ってから再試行してください。',
         },
         runtime: {
           title: 'アプリケーションエラー',
-          description: 'アプリケーションの処理中にエラーが発生しました。ページの更新をお試しください。'
+          description:
+            'アプリケーションの処理中にエラーが発生しました。ページの更新をお試しください。',
         },
         unknown: {
           title: '予期しないエラー',
-          description: '不明なエラーが発生しました。ページを更新するか、管理者にお問い合わせください。'
-        }
+          description:
+            '不明なエラーが発生しました。ページを更新するか、管理者にお問い合わせください。',
+        },
       };
 
       const baseMessage = messages[errorAnalysis.type] || messages.unknown;
-      
+
       // 重大度に応じてメッセージを調整
       if (errorAnalysis.severity === 'critical') {
         return {
           ...baseMessage,
           title: `${baseMessage.title} (深刻)`,
-          description: `${baseMessage.description} 問題が継続する場合は、管理者にお問い合わせください。`
+          description: `${baseMessage.description} 問題が継続する場合は、管理者にお問い合わせください。`,
         };
       }
 
@@ -4091,17 +4129,16 @@
           try {
             retryBtn.textContent = '再試行中...';
             retryBtn.disabled = true;
-            
+
             // エラーリトライ回数を増加
             this.incrementErrorRetryCount();
-            
+
             // 指数バックオフでリトライ
             const backoffDelay = Math.min(1000 * Math.pow(2, errorAnalysis.retryAttempts), 10000);
-            await new Promise(resolve => setTimeout(resolve, backoffDelay));
-            
+            await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+
             // データリロード実行
             await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-            
           } catch (retryError) {
             console.error('❌ Retry failed:', retryError);
             retryBtn.textContent = '再試行失敗';
@@ -4114,7 +4151,11 @@
       const resetBtn = document.getElementById('resetAppBtn');
       if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-          if (confirm('アプリケーションをリセットします。すべてのローカルデータが削除されます。よろしいですか？')) {
+          if (
+            confirm(
+              'アプリケーションをリセットします。すべてのローカルデータが削除されます。よろしいですか？'
+            )
+          ) {
             this.performAppReset();
           }
         });
@@ -4140,10 +4181,10 @@
     updateErrorStatistics(errorType) {
       const statsKey = 'error_statistics';
       const stats = JSON.parse(localStorage.getItem(statsKey) || '{}');
-      
+
       stats[errorType] = (stats[errorType] || 0) + 1;
       stats.lastErrorTime = Date.now();
-      
+
       localStorage.setItem(statsKey, JSON.stringify(stats));
     }
 
@@ -4153,7 +4194,7 @@
         // ローカルストレージクリア
         const preserveKeys = ['user_preferences']; // 保持すべきキー
         const keys = Object.keys(localStorage);
-        keys.forEach(key => {
+        keys.forEach((key) => {
           if (!preserveKeys.includes(key)) {
             localStorage.removeItem(key);
           }
@@ -4169,7 +4210,6 @@
 
         // ページリロード
         window.location.reload();
-        
       } catch (resetError) {
         console.error('❌ App reset failed:', resetError);
         // フォールバック: 強制リロード
@@ -4429,35 +4469,34 @@
           console.warn('populateClassFilter: classFilter要素が見つかりません');
           return;
         }
-        
+
         // CLAUDE.md準拠: 包括的null安全性チェック
-        console.log('populateClassFilter: 引数チェック', { 
-          rows: rows, 
-          isArray: Array.isArray(rows), 
-          length: rows ? rows.length : 'N/A' 
+        console.log('populateClassFilter: 引数チェック', {
+          rows: rows,
+          isArray: Array.isArray(rows),
+          length: rows ? rows.length : 'N/A',
         });
-        
+
         // 安全な配列確保とクラス抽出
         const safeRows = Array.isArray(rows) ? rows : [];
-        const validRows = safeRows.filter(row => row && typeof row === 'object');
+        const validRows = safeRows.filter((row) => row && typeof row === 'object');
         const classValues = validRows
-          .map(row => row.class)
-          .filter(cls => cls && typeof cls === 'string' && cls.trim());
-        
-        const uniqueClasses = [
-          'すべて',
-          ...new Set(classValues),
-        ];
-        
+          .map((row) => row.class)
+          .filter((cls) => cls && typeof cls === 'string' && cls.trim());
+
+        const uniqueClasses = ['すべて', ...new Set(classValues)];
+
         console.log('populateClassFilter: 処理結果', {
           totalRows: safeRows.length,
           validRows: validRows.length,
           classValues: classValues.length,
-          uniqueClasses: uniqueClasses
+          uniqueClasses: uniqueClasses,
         });
-        
+
         classFilter.innerHTML = uniqueClasses
-          .map((c) => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>')
+          .map(
+            (c) => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>'
+          )
           .join('');
         classFilter.value = 'すべて';
         classFilter.classList.remove('hidden');

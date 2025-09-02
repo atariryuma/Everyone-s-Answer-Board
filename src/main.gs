@@ -494,7 +494,7 @@ function getWebAppUrl() {
     () => {
       const service = ScriptApp.newWebApp();
       return service ? service.getUrl() : null;
-    }
+    },
   ];
 
   for (let i = 0; i < urlMethods.length; i++) {
@@ -530,7 +530,7 @@ function getWebAppUrl() {
       // Google Workspace環境を考慮した動的URL構築
       const currentUser = Session.getActiveUser().getEmail();
       const domain = getEmailDomain(currentUser);
-      
+
       let baseUrl;
       if (domain && domain !== 'gmail.com' && domain !== 'googlemail.com') {
         // Google Workspace環境
@@ -541,7 +541,7 @@ function getWebAppUrl() {
         baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
         console.log('getWebAppUrl: 個人Google環境 URL構築', { scriptId });
       }
-      
+
       // URLをキャッシュ保存
       try {
         const props = PropertiesService.getScriptProperties();
@@ -550,7 +550,7 @@ function getWebAppUrl() {
       } catch (cacheError) {
         console.warn('getWebAppUrl: URL保存失敗:', cacheError.message);
       }
-      
+
       console.log('getWebAppUrl: フォールバックURL生成成功', baseUrl);
       return baseUrl;
     } else {
@@ -1195,7 +1195,7 @@ function getUser(format = 'object') {
   try {
     const email = User.email() || null;
     let userId = null;
-    
+
     // emailが取得できた場合、userIdも取得してセッション保存
     if (email) {
       try {
@@ -1206,9 +1206,12 @@ function getUser(format = 'object') {
           const sessionData = {
             userId: userId,
             email: email,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           };
-          PropertiesService.getScriptProperties().setProperty('LAST_USER_SESSION', JSON.stringify(sessionData));
+          PropertiesService.getScriptProperties().setProperty(
+            'LAST_USER_SESSION',
+            JSON.stringify(sessionData)
+          );
           console.log('getUser: セッション保存完了', { userId, email });
         }
       } catch (dbError) {
@@ -1376,18 +1379,18 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
       // 個別引数の場合
       params = { userId, classFilter, sortOrder, adminMode, bypassCache };
     }
-    
+
     console.log('getPublishedSheetData: Core.gs実装呼び出し開始', {
       argumentsLength: arguments.length,
       firstArgType: typeof userId,
-      params: params
+      params: params,
     });
-    
+
     // CLAUDE.md準拠: 統一データソース原則でCore.gs実装を呼び出し
     // 多段階認証フロー: ユーザーIDの確実な取得
     let targetUserId = params.userId;
     let currentUserEmail = null;
-    
+
     // Step 1: 直接指定されたuserIdを確認
     if (targetUserId && typeof targetUserId === 'string' && targetUserId.trim()) {
       console.log('getPublishedSheetData: 指定userIdを使用', targetUserId);
@@ -1399,25 +1402,30 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
       } catch (emailError) {
         console.warn('getPublishedSheetData: User.email()取得失敗', emailError.message);
       }
-      
+
       // Step 3: メールアドレスからユーザー検索
       if (currentUserEmail && typeof currentUserEmail === 'string' && currentUserEmail.trim()) {
         try {
           const user = DB.findUserByEmail(currentUserEmail);
           targetUserId = user ? user.userId : null;
-          console.log('getPublishedSheetData: DB検索結果', { email: currentUserEmail, userId: targetUserId });
+          console.log('getPublishedSheetData: DB検索結果', {
+            email: currentUserEmail,
+            userId: targetUserId,
+          });
         } catch (dbError) {
           console.warn('getPublishedSheetData: DB検索失敗', dbError.message);
         }
       }
-      
+
       // Step 4: セッション情報からの復元試行
       if (!targetUserId) {
         try {
-          const sessionData = PropertiesService.getScriptProperties().getProperty('LAST_USER_SESSION');
+          const sessionData =
+            PropertiesService.getScriptProperties().getProperty('LAST_USER_SESSION');
           if (sessionData) {
             const session = JSON.parse(sessionData);
-            if (session.userId && Date.now() - session.timestamp < 3600000) { // 1時間以内
+            if (session.userId && Date.now() - session.timestamp < 3600000) {
+              // 1時間以内
               targetUserId = session.userId;
               console.log('getPublishedSheetData: セッション復元成功', targetUserId);
             }
@@ -1427,18 +1435,18 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
         }
       }
     }
-    
+
     if (!targetUserId) {
       const errorDetails = {
         providedUserId: params.userId,
         currentUserEmail: currentUserEmail,
         hasValidEmail: !!currentUserEmail,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
       console.error('getPublishedSheetData: 全認証方法失敗', errorDetails);
       throw new Error(`ユーザー認証情報が取得できません。詳細: ${JSON.stringify(errorDetails)}`);
     }
-    
+
     return executeGetPublishedSheetData(
       targetUserId,
       params.classFilter,

@@ -1,12 +1,18 @@
 <!-- Shared Security Headers - CLAUDE.md準拠統一セキュリティ設定 -->
 <!-- Permission Policy: サポートされている機能のみを指定 -->
-<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), fullscreen=*" />
+<meta
+  http-equiv="Permissions-Policy"
+  content="camera=(), microphone=(), geolocation=(), fullscreen=*"
+/>
 
 <!-- Content Security Policy: 必要最小限のセキュリティ設定 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://fonts.googleapis.com https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; img-src 'self' data: https:;"
+/>
 
 <!-- Referrer Policy: プライバシー保護 -->
-<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="referrer" content="strict-origin-when-cross-origin" />
 
 <!-- X-Content-Type-Options: MIMEタイプスニッフィング防止 -->
-<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Content-Type-Options" content="nosniff" />

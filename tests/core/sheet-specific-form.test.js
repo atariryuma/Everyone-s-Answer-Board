@@ -11,13 +11,13 @@ describe('Sheet-Specific Form Connection Tests', () => {
     // SpreadsheetAppのモック
     mockSpreadsheetApp = {
       openById: jest.fn(),
-      getSheetByName: jest.fn()
+      getSheetByName: jest.fn(),
     };
     global.SpreadsheetApp = mockSpreadsheetApp;
 
     // FormAppのモック
     mockFormApp = {
-      openByUrl: jest.fn()
+      openByUrl: jest.fn(),
     };
     global.FormApp = mockFormApp;
 
@@ -25,7 +25,7 @@ describe('Sheet-Specific Form Connection Tests', () => {
     global.console = {
       log: jest.fn(),
       warn: jest.fn(),
-      error: jest.fn()
+      error: jest.fn(),
     };
   });
 
@@ -33,18 +33,26 @@ describe('Sheet-Specific Form Connection Tests', () => {
     test('フォームの回答 6に正しいフォーム情報を返す', () => {
       // モックの設定
       const mockSheet = {
-        getFormUrl: jest.fn().mockReturnValue('https://docs.google.com/forms/d/e/1FAIpQLSdbfLhJJbqneRsBr2cN7CHhG1yZN3Ik4p9r3TCWuPMQViGtuA/viewform')
+        getFormUrl: jest
+          .fn()
+          .mockReturnValue(
+            'https://docs.google.com/forms/d/e/1FAIpQLSdbfLhJJbqneRsBr2cN7CHhG1yZN3Ik4p9r3TCWuPMQViGtuA/viewform'
+          ),
       };
 
       const mockForm = {
-        getPublishedUrl: jest.fn().mockReturnValue('https://docs.google.com/forms/d/e/1FAIpQLSdbfLhJJbqneRsBr2cN7CHhG1yZN3Ik4p9r3TCWuPMQViGtuA/viewform'),
+        getPublishedUrl: jest
+          .fn()
+          .mockReturnValue(
+            'https://docs.google.com/forms/d/e/1FAIpQLSdbfLhJJbqneRsBr2cN7CHhG1yZN3Ik4p9r3TCWuPMQViGtuA/viewform'
+          ),
         getTitle: jest.fn().mockReturnValue('自然の中での動物の食べ物を調べよう。'),
         getId: jest.fn().mockReturnValue('12BK-SczqlVTaPOJGjTmuVJ2sEnvObxYYJSS7eecbPDI'),
-        getDestinationId: jest.fn().mockReturnValue('1z5DNDxNZJB6x8KYRNBKRM1qRlGKCH44rNSMF9vlu4bA')
+        getDestinationId: jest.fn().mockReturnValue('1z5DNDxNZJB6x8KYRNBKRM1qRlGKCH44rNSMF9vlu4bA'),
       };
 
       const mockSpreadsheet = {
-        getSheetByName: jest.fn().mockReturnValue(mockSheet)
+        getSheetByName: jest.fn().mockReturnValue(mockSheet),
       };
 
       mockSpreadsheetApp.openById.mockReturnValue(mockSpreadsheet);
@@ -54,7 +62,7 @@ describe('Sheet-Specific Form Connection Tests', () => {
       function getSheetSpecificFormInfo(spreadsheetId, sheetName) {
         const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
         const sheet = spreadsheet.getSheetByName(sheetName);
-        
+
         if (!sheet) {
           return { hasForm: false, reason: 'シートが見つかりません' };
         }
@@ -71,12 +79,15 @@ describe('Sheet-Specific Form Connection Tests', () => {
           formTitle: form.getTitle(),
           formId: form.getId(),
           sheetName,
-          destinationCheck: form.getDestinationId() === spreadsheetId
+          destinationCheck: form.getDestinationId() === spreadsheetId,
         };
       }
 
       // テスト実行
-      const result = getSheetSpecificFormInfo('1z5DNDxNZJB6x8KYRNBKRM1qRlGKCH44rNSMF9vlu4bA', 'フォームの回答 6');
+      const result = getSheetSpecificFormInfo(
+        '1z5DNDxNZJB6x8KYRNBKRM1qRlGKCH44rNSMF9vlu4bA',
+        'フォームの回答 6'
+      );
 
       // 検証
       expect(result.hasForm).toBe(true);
@@ -86,19 +97,23 @@ describe('Sheet-Specific Form Connection Tests', () => {
       expect(result.destinationCheck).toBe(true);
 
       // 正しいAPI呼び出しを確認
-      expect(mockSpreadsheetApp.openById).toHaveBeenCalledWith('1z5DNDxNZJB6x8KYRNBKRM1qRlGKCH44rNSMF9vlu4bA');
+      expect(mockSpreadsheetApp.openById).toHaveBeenCalledWith(
+        '1z5DNDxNZJB6x8KYRNBKRM1qRlGKCH44rNSMF9vlu4bA'
+      );
       expect(mockSpreadsheet.getSheetByName).toHaveBeenCalledWith('フォームの回答 6');
       expect(mockSheet.getFormUrl).toHaveBeenCalled();
-      expect(mockFormApp.openByUrl).toHaveBeenCalledWith('https://docs.google.com/forms/d/e/1FAIpQLSdbfLhJJbqneRsBr2cN7CHhG1yZN3Ik4p9r3TCWuPMQViGtuA/viewform');
+      expect(mockFormApp.openByUrl).toHaveBeenCalledWith(
+        'https://docs.google.com/forms/d/e/1FAIpQLSdbfLhJJbqneRsBr2cN7CHhG1yZN3Ik4p9r3TCWuPMQViGtuA/viewform'
+      );
     });
 
     test('フォーム連携のないシートでfalseを返す', () => {
       const mockSheet = {
-        getFormUrl: jest.fn().mockReturnValue(null)
+        getFormUrl: jest.fn().mockReturnValue(null),
       };
 
       const mockSpreadsheet = {
-        getSheetByName: jest.fn().mockReturnValue(mockSheet)
+        getSheetByName: jest.fn().mockReturnValue(mockSheet),
       };
 
       mockSpreadsheetApp.openById.mockReturnValue(mockSpreadsheet);
@@ -106,7 +121,7 @@ describe('Sheet-Specific Form Connection Tests', () => {
       function getSheetSpecificFormInfo(spreadsheetId, sheetName) {
         const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
         const sheet = spreadsheet.getSheetByName(sheetName);
-        
+
         if (!sheet) {
           return { hasForm: false, reason: 'シートが見つかりません' };
         }
@@ -128,22 +143,26 @@ describe('Sheet-Specific Form Connection Tests', () => {
     test('異なるシートが異なるフォームを返すことを確認', () => {
       // フォームの回答 2のモック
       const mockSheet2 = {
-        getFormUrl: jest.fn().mockReturnValue('https://docs.google.com/forms/d/e/form2-url/viewform')
+        getFormUrl: jest
+          .fn()
+          .mockReturnValue('https://docs.google.com/forms/d/e/form2-url/viewform'),
       };
 
-      // フォームの回答 6のモック  
+      // フォームの回答 6のモック
       const mockSheet6 = {
-        getFormUrl: jest.fn().mockReturnValue('https://docs.google.com/forms/d/e/form6-url/viewform')
+        getFormUrl: jest
+          .fn()
+          .mockReturnValue('https://docs.google.com/forms/d/e/form6-url/viewform'),
       };
 
       const mockForm2 = {
         getTitle: jest.fn().mockReturnValue('別のフォーム'),
-        getId: jest.fn().mockReturnValue('form2-id')
+        getId: jest.fn().mockReturnValue('form2-id'),
       };
 
       const mockForm6 = {
         getTitle: jest.fn().mockReturnValue('自然の中での動物の食べ物を調べよう。'),
-        getId: jest.fn().mockReturnValue('form6-id')
+        getId: jest.fn().mockReturnValue('form6-id'),
       };
 
       const mockSpreadsheet = {
@@ -151,7 +170,7 @@ describe('Sheet-Specific Form Connection Tests', () => {
           if (name === 'フォームの回答 2') return mockSheet2;
           if (name === 'フォームの回答 6') return mockSheet6;
           return null;
-        })
+        }),
       };
 
       mockSpreadsheetApp.openById.mockReturnValue(mockSpreadsheet);
@@ -166,12 +185,12 @@ describe('Sheet-Specific Form Connection Tests', () => {
         const sheet = spreadsheet.getSheetByName(sheetName);
         const formUrl = sheet.getFormUrl();
         const form = FormApp.openByUrl(formUrl);
-        
+
         return {
           hasForm: true,
           formTitle: form.getTitle(),
           formId: form.getId(),
-          sheetName
+          sheetName,
         };
       }
 

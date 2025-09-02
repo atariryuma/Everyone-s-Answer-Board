@@ -594,7 +594,7 @@
         // 新しいタブで開く
         setTimeout(() => {
           const newTab = window.open(adminUrl, '_blank', 'noopener,noreferrer');
-          
+
           // ポップアップブロック検出
           if (!newTab || newTab.closed || typeof newTab.closed == 'undefined') {
             console.warn('ポップアップがブロックされました。フォールバック実行');
@@ -607,7 +607,7 @@
               btnText.textContent = '⚠️ ポップアップがブロックされました。再クリックしてください';
             }
             window.isAdminPanelClicking = false;
-            
+
             // 3秒後に元のテキストに戻す
             setTimeout(() => {
               if (btnText) btnText.textContent = '🚀 管理パネルを開く（新しいタブ）';
@@ -623,7 +623,7 @@
                 btnText.textContent = '✅ 新しいタブで開きました';
               }
               window.isAdminPanelClicking = false;
-              
+
               // 3秒後に元のテキストに戻す
               setTimeout(() => {
                 if (btnText) btnText.textContent = '🚀 管理パネルを開く（新しいタブ）';

@@ -94,7 +94,9 @@ function generateNewServiceAccountToken() {
     throw new Error('アクセストークンが見つかりませんでした');
   }
 
-  console.log(`🔐 新しいサービスアカウントトークンを生成しました (有効期限: ${new Date(expiresAt * 1000).toISOString()})`);
+  console.log(
+    `🔐 新しいサービスアカウントトークンを生成しました (有効期限: ${new Date(expiresAt * 1000).toISOString()})`
+  );
   return responseData.access_token;
 }
 
@@ -104,7 +106,7 @@ function generateNewServiceAccountToken() {
 function getSecureServiceAccountCreds() {
   const props = PropertiesService.getScriptProperties();
   const credsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
-  
+
   if (!credsJson) {
     throw new Error('サービスアカウント認証情報が設定されていません');
   }
@@ -158,7 +160,9 @@ function verifyAdminAccess(userId) {
 
     // 3重チェック実行
     // 1. メールアドレス照合
-    const dbEmail = String(userFromDb.userEmail || '').toLowerCase().trim();
+    const dbEmail = String(userFromDb.userEmail || '')
+      .toLowerCase()
+      .trim();
     const currentEmail = String(activeUserEmail).toLowerCase().trim();
     const isEmailMatched = dbEmail && currentEmail && dbEmail === currentEmail;
 
@@ -238,14 +242,53 @@ function verifyUserAccess(userId) {
   if (!userId) {
     throw new Error('ユーザーIDが必要です');
   }
-  
+
   // Base.gsのAccessControllerを使用したアクセス制御
   const result = App.getAccess().verifyAccess(userId, 'view', User.email());
   if (!result.allowed) {
     throw new Error('アクセスが拒否されました: ' + result.reason);
   }
-  
+
   return true;
+}
+
+/**
+ * スプレッドシートをサービスアカウントと共有
+ * @param {string} spreadsheetId - 共有するスプレッドシートのID
+ */
+function shareSpreadsheetWithServiceAccount(spreadsheetId) {
+  try {
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      console.warn('shareSpreadsheetWithServiceAccount: 無効なspreadsheetId:', spreadsheetId);
+      return;
+    }
+
+    // サービスアカウント認証情報を取得
+    const serviceAccountCreds = getSecureServiceAccountCreds();
+    const serviceAccountEmail = serviceAccountCreds.client_email;
+
+    if (!serviceAccountEmail) {
+      console.error(
+        'shareSpreadsheetWithServiceAccount: サービスアカウントメールアドレスが見つかりません'
+      );
+      return;
+    }
+
+    // スプレッドシートをサービスアカウントと共有
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    spreadsheet.addEditor(serviceAccountEmail);
+
+    console.log(
+      `✅ スプレッドシートをサービスアカウントと共有完了: ${spreadsheetId} -> ${serviceAccountEmail}`
+    );
+  } catch (error) {
+    console.error('shareSpreadsheetWithServiceAccount エラー:', {
+      spreadsheetId: spreadsheetId,
+      error: error.message,
+      stack: error.stack,
+    });
+    // 共有失敗は非致命的エラーとして処理（システム全体を停止させない）
+  }
 }
 
 console.log('🔐 簡略化されたセキュリティシステムが初期化されました');

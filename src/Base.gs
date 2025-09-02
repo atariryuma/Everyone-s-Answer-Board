@@ -17,14 +17,14 @@ const ErrorManager = Object.freeze({
    * @param {Error} error - エラーオブジェクト
    * @param {string} context - エラー発生コンテキスト
    * @param {Object} options - オプション {shouldThrow: boolean, retryable: boolean}
-   * @returns {void|*} 
+   * @returns {void|*}
    */
   handle(error, context, options = {}) {
     const { shouldThrow = true, retryable = false } = options;
-    
+
     // GAS標準ログでエラー記録
     console.error(`[${context}] エラー:`, error.message);
-    
+
     // Google Apps Scriptの特定エラーハンドリング
     if (error.name === 'Exception' && error.message.includes('Quota exceeded')) {
       console.warn(`[${context}] クォータ制限に達しました`);
@@ -32,19 +32,19 @@ const ErrorManager = Object.freeze({
         return this.retryWithBackoff(error, context);
       }
     }
-    
+
     if (error.name === 'Exception' && error.message.includes('Rate limit')) {
       console.warn(`[${context}] レート制限に達しました`);
       if (retryable) {
         return this.retryWithBackoff(error, context);
       }
     }
-    
+
     // エラーの再投げ（デフォルト）
     if (shouldThrow) {
       throw new Error(`${context}で処理エラー: ${error.message}`);
     }
-    
+
     return null;
   },
 
@@ -63,7 +63,7 @@ const ErrorManager = Object.freeze({
 
   /**
    * 非クリティカルエラーの安全な処理
-   * @param {Error} error - エラーオブジェクト  
+   * @param {Error} error - エラーオブジェクト
    * @param {string} context - コンテキスト
    * @param {*} fallbackValue - フォールバック値
    * @returns {*}
@@ -71,7 +71,7 @@ const ErrorManager = Object.freeze({
   handleSafely(error, context, fallbackValue = null) {
     console.warn(`[${context}] 非クリティカルエラー:`, error.message);
     return fallbackValue;
-  }
+  },
 });
 
 // ===============================
@@ -247,13 +247,13 @@ class ConfigurationManager {
 
     // 既存の全データを取得（空の場合も安全に処理）
     const existingConfig = this.getUserConfig(userId) || {};
-    
+
     // 安全なマージ（上書きではなく統合）
     // 既存データを保持し、新しいデータを追加・更新
     const mergedConfig = {
-      ...existingConfig,  // 既存データを保持
-      ...newData,         // 新しいデータを追加/更新
-      lastModified: new Date().toISOString()
+      ...existingConfig, // 既存データを保持
+      ...newData, // 新しいデータを追加/更新
+      lastModified: new Date().toISOString(),
     };
 
     console.log('safeUpdateUserConfig: データ保護統合', {
@@ -261,7 +261,7 @@ class ConfigurationManager {
       existingKeys: Object.keys(existingConfig),
       newKeys: Object.keys(newData),
       mergedKeys: Object.keys(mergedConfig),
-      dataProtected: true
+      dataProtected: true,
     });
 
     return this.setUserConfig(userId, mergedConfig);
@@ -314,12 +314,7 @@ class AccessController {
       // configも取得（設定確認用）
       const config = this.configManager.getUserConfig(targetUserId);
       if (!config) {
-        return this.createAccessResult(
-          false,
-          'not_found',
-          null,
-          'ユーザー設定が見つかりません'
-        );
+        return this.createAccessResult(false, 'not_found', null, 'ユーザー設定が見つかりません');
       }
 
       switch (mode) {
@@ -341,14 +336,16 @@ class AccessController {
    * 管理者アクセスを検証
    */
   verifyAdminAccess(userInfo, config, currentUserEmail) {
-    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(PROPS_KEYS.ADMIN_EMAIL);
+    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(
+      PROPS_KEYS.ADMIN_EMAIL
+    );
 
     console.log('🔍 管理者アクセス検証:', {
       currentUserEmail: currentUserEmail ? currentUserEmail.substring(0, 10) + '...' : 'null',
       systemAdminEmail: systemAdminEmail ? systemAdminEmail.substring(0, 10) + '...' : 'null',
       userEmail: userInfo.userEmail ? userInfo.userEmail.substring(0, 10) + '...' : 'null',
       isSystemAdmin: currentUserEmail === systemAdminEmail,
-      isOwner: currentUserEmail === userInfo.userEmail
+      isOwner: currentUserEmail === userInfo.userEmail,
     });
 
     // システム管理者
@@ -426,7 +423,9 @@ class AccessController {
     const userInfo = DB.findUserById(targetUserId);
     if (!userInfo) return 'none';
 
-    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(PROPS_KEYS.ADMIN_EMAIL);
+    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(
+      PROPS_KEYS.ADMIN_EMAIL
+    );
 
     if (currentUserEmail === systemAdminEmail) {
       return 'system_admin';
@@ -465,9 +464,9 @@ class ErrorHandler {
       context,
       message: errorMessage,
       stack: error instanceof Error ? error.stack : null,
-      ...additionalData
+      ...additionalData,
     };
-    
+
     console.error(`[${context}] ${errorMessage}`, logData);
   }
 
@@ -483,7 +482,7 @@ class ErrorHandler {
       success,
       data,
       error: error ? (error instanceof Error ? error.message : String(error)) : null,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -498,7 +497,7 @@ class ErrorHandler {
       success: true,
       data,
       message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -516,7 +515,7 @@ class ErrorHandler {
       error: error instanceof Error ? error.message : String(error),
       context,
       data,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 

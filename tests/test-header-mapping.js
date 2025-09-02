@@ -13,19 +13,19 @@ function validateRequiredHeaders(indices) {
   if (!indices || typeof indices !== 'object') {
     return { success: false, missing: ['すべて'], hasReasonColumn: false, hasOpinionColumn: false };
   }
-  
+
   const hasReason = indices[COLUMN_HEADERS.REASON] !== undefined;
   const hasOpinion = indices[COLUMN_HEADERS.OPINION] !== undefined;
   const missing = [];
-  
+
   if (!hasReason) missing.push(COLUMN_HEADERS.REASON);
   if (!hasOpinion) missing.push(COLUMN_HEADERS.OPINION);
-  
+
   return {
     success: hasReason && hasOpinion,
     missing,
     hasReasonColumn: hasReason,
-    hasOpinionColumn: hasOpinion
+    hasOpinionColumn: hasOpinion,
   };
 }
 
@@ -33,19 +33,19 @@ function convertIndicesToMapping(headerIndices, headerRow) {
   if (!headerIndices || !headerRow) {
     return { answer: null, reason: null };
   }
-  
+
   const mapping = {};
-  
+
   // SYSTEM_CONSTANTS.COLUMN_MAPPINGを使用してマッピング作成
   Object.values(SYSTEM_CONSTANTS.COLUMN_MAPPING).forEach((column) => {
     const headerName = column.header;
-    const index = Object.keys(headerIndices).find(key => 
-      headerIndices[key] !== undefined && headerRow[headerIndices[key]] === headerName
+    const index = Object.keys(headerIndices).find(
+      (key) => headerIndices[key] !== undefined && headerRow[headerIndices[key]] === headerName
     );
-    
+
     mapping[column.key] = index !== undefined ? headerIndices[index] : null;
   });
-  
+
   return mapping;
 }
 

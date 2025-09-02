@@ -31,7 +31,7 @@ class CacheManager {
     const { ttl = this.defaultTTL, enableMemoization = false } = options;
 
     this.stats.totalOps++;
-    
+
     if (!key || typeof key !== 'string') {
       this.stats.errors++;
       throw new Error('キャッシュキーは文字列である必要があります');
@@ -49,12 +49,12 @@ class CacheManager {
       if (cachedValue !== null) {
         this.stats.hits++;
         const parsedValue = JSON.parse(cachedValue);
-        
+
         // メモ化キャッシュにも保存
         if (enableMemoization) {
           this.memoCache.set(key, parsedValue);
         }
-        
+
         return parsedValue;
       }
     } catch (error) {
@@ -96,7 +96,7 @@ class CacheManager {
     try {
       // スクリプトキャッシュに保存
       this.scriptCache.put(key, JSON.stringify(value), ttl);
-      
+
       // メモ化キャッシュにも保存
       if (enableMemoization) {
         this.memoCache.set(key, value);
@@ -139,7 +139,7 @@ class CacheManager {
           this.memoCache.delete(key);
         }
       }
-      
+
       // スクリプトキャッシュは一括削除がないため、よく使われるパターンのみ対応
       if (pattern.includes('user_')) {
         // ユーザー関連キャッシュの削除など
@@ -158,7 +158,10 @@ class CacheManager {
   getStats() {
     return {
       ...this.stats,
-      hitRate: this.stats.totalOps > 0 ? ((this.stats.hits / this.stats.totalOps) * 100).toFixed(2) + '%' : '0%',
+      hitRate:
+        this.stats.totalOps > 0
+          ? ((this.stats.hits / this.stats.totalOps) * 100).toFixed(2) + '%'
+          : '0%',
       memoSize: this.memoCache.size,
       uptime: Date.now() - this.stats.lastReset,
     };
@@ -176,8 +179,9 @@ class CacheManager {
     };
 
     // エラー率チェック
-    const errorRate = this.stats.totalOps > 0 ? (this.stats.errors / this.stats.totalOps) : 0;
-    if (errorRate > 0.1) { // 10%以上のエラー率
+    const errorRate = this.stats.totalOps > 0 ? this.stats.errors / this.stats.totalOps : 0;
+    if (errorRate > 0.1) {
+      // 10%以上のエラー率
       health.status = 'warning';
       health.issues.push(`高いエラー率: ${(errorRate * 100).toFixed(2)}%`);
     }
@@ -220,15 +224,19 @@ const cacheManager = new CacheManager();
  * @returns {object|null} キャッシュされたサービス情報
  */
 function getSheetsServiceCached() {
-  return cacheManager.get('sheets_service', () => {
-    const accessToken = getServiceAccountTokenCached();
-    if (!accessToken) return null;
-    
-    return {
-      baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
-      accessToken: accessToken,
-    };
-  }, { ttl: 3500, enableMemoization: true });
+  return cacheManager.get(
+    'sheets_service',
+    () => {
+      const accessToken = getServiceAccountTokenCached();
+      if (!accessToken) return null;
+
+      return {
+        baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
+        accessToken: accessToken,
+      };
+    },
+    { ttl: 3500, enableMemoization: true }
+  );
 }
 
 /**
@@ -240,13 +248,13 @@ function getSheetsServiceCached() {
  */
 function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
   const { useCache = true, validate = false, forceRefresh = false } = options;
-  
+
   if (!spreadsheetId || !sheetName) {
     throw new Error('スプレッドシートIDとシート名は必須です');
   }
 
   const cacheKey = `headers_${spreadsheetId}_${sheetName}`;
-  
+
   // キャッシュから取得を試行（forceRefreshでない場合）
   if (useCache && !forceRefresh) {
     const cached = cacheManager.get(cacheKey, null, { enableMemoization: true });
@@ -259,7 +267,7 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
     // スプレッドシートから直接取得
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       throw new Error(`シート「${sheetName}」が見つかりません`);
     }
@@ -287,15 +295,14 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
 
     // キャッシュに保存
     if (useCache) {
-      cacheManager.set(cacheKey, headerIndices, { 
+      cacheManager.set(cacheKey, headerIndices, {
         ttl: 1800, // 30分
-        enableMemoization: true 
+        enableMemoization: true,
       });
     }
 
     console.log(`📊 スプレッドシートヘッダーを取得しました: ${spreadsheetId}/${sheetName}`);
     return headerIndices;
-
   } catch (error) {
     console.error('[ERROR] getSpreadsheetHeaders:', error.message);
     throw new Error(`ヘッダー取得エラー: ${error.message}`);
@@ -311,54 +318,67 @@ function validateSpreadsheetHeaders(headerIndices) {
   if (!headerIndices || typeof headerIndices !== 'object') {
     return { success: false, missing: ['すべて'], hasReasonColumn: false, hasOpinionColumn: false };
   }
-  
+
   const headerNames = Object.keys(headerIndices);
-  
+
   // 動的な列名パターン検出
   const reasonPatterns = [
-    '理由', 'なぜ', 'どうして', '根拠', 'わけ', 'reason', 'why',
-    '考える理由', '体験', '経験'
+    '理由',
+    'なぜ',
+    'どうして',
+    '根拠',
+    'わけ',
+    'reason',
+    'why',
+    '考える理由',
+    '体験',
+    '経験',
   ];
-  
+
   const opinionPatterns = [
-    '回答', '答え', '意見', 'こたえ', '考え', '思考', 'answer', 'opinion',
-    'どう思いますか', '書きましょう', '教えてください'
+    '回答',
+    '答え',
+    '意見',
+    'こたえ',
+    '考え',
+    '思考',
+    'answer',
+    'opinion',
+    'どう思いますか',
+    '書きましょう',
+    '教えてください',
   ];
-  
+
   // パターンマッチングで列を検出
-  const hasReason = headerNames.some(header => 
-    reasonPatterns.some(pattern => 
-      header.toLowerCase().includes(pattern.toLowerCase())
-    )
+  const hasReason = headerNames.some((header) =>
+    reasonPatterns.some((pattern) => header.toLowerCase().includes(pattern.toLowerCase()))
   );
-  
-  const hasOpinion = headerNames.some(header => 
-    opinionPatterns.some(pattern => 
-      header.toLowerCase().includes(pattern.toLowerCase())
-    )
+
+  const hasOpinion = headerNames.some((header) =>
+    opinionPatterns.some((pattern) => header.toLowerCase().includes(pattern.toLowerCase()))
   );
-  
+
   const missing = [];
   if (!hasReason) missing.push('理由系列');
   if (!hasOpinion) missing.push('回答系列');
-  
+
   // 最低限必要なのは2列以上のテキストデータ
   const minimalValidation = headerNames.length >= 2;
-  
+
   return {
     success: minimalValidation && (hasReason || hasOpinion || headerNames.length >= 4),
     missing,
     hasReasonColumn: hasReason,
     hasOpinionColumn: hasOpinion,
     detectedColumns: {
-      reasonCandidates: headerNames.filter(h => 
-        reasonPatterns.some(p => h.toLowerCase().includes(p.toLowerCase()))
+      reasonCandidates: headerNames.filter((h) =>
+        reasonPatterns.some((p) => h.toLowerCase().includes(p.toLowerCase()))
       ),
-      opinionCandidates: headerNames.filter(h => 
-        opinionPatterns.some(p => h.toLowerCase().includes(p.toLowerCase()))
+      opinionCandidates: headerNames.filter((h) =>
+        opinionPatterns.some((p) => h.toLowerCase().includes(p.toLowerCase()))
       ),
-      totalColumns: headerNames.length
-    }
+      totalColumns: headerNames.length,
+    },
   };
 }
 
@@ -372,23 +392,23 @@ function validateSpreadsheetHeaders(headerIndices) {
  */
 function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
   try {
-    console.log('🗑️ ユーザーキャッシュ無効化開始:', { 
-      userId, 
-      email, 
-      spreadsheetId, 
-      clearPattern 
+    console.log('🗑️ ユーザーキャッシュ無効化開始:', {
+      userId,
+      email,
+      spreadsheetId,
+      clearPattern,
     });
-    
+
     // 基本ユーザーキャッシュクリア
     if (userId) {
       const userCacheKeys = [
         `user_${userId}`,
         `user_data_${userId}`,
         `userinfo_${userId}`,
-        `unified_user_info_${userId}`
+        `unified_user_info_${userId}`,
       ];
-      userCacheKeys.forEach(key => cacheManager.remove(key));
-      
+      userCacheKeys.forEach((key) => cacheManager.remove(key));
+
       // パターンクリア（簡略版）
       if (clearPattern) {
         cacheManager.removePattern(`publishedData_${userId}_`);
@@ -396,28 +416,24 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false,
         cacheManager.removePattern(`config_v3_${userId}_`);
       }
     }
-    
+
     // メールベースキャッシュクリア
     if (email) {
-      const emailCacheKeys = [
-        `email_${email}`,
-        `unified_user_info_${email}`
-      ];
-      emailCacheKeys.forEach(key => cacheManager.remove(key));
+      const emailCacheKeys = [`email_${email}`, `unified_user_info_${email}`];
+      emailCacheKeys.forEach((key) => cacheManager.remove(key));
     }
-    
+
     // スプレッドシート関連キャッシュクリア
     if (spreadsheetId) {
       const spreadsheetKeys = [
         `headers_${spreadsheetId}`,
         `spreadsheet_info_${spreadsheetId}`,
-        `published_data_${spreadsheetId}`
+        `published_data_${spreadsheetId}`,
       ];
-      spreadsheetKeys.forEach(key => cacheManager.remove(key));
+      spreadsheetKeys.forEach((key) => cacheManager.remove(key));
     }
-    
+
     console.log('✅ ユーザーキャッシュ無効化完了');
-    
   } catch (error) {
     console.error('[ERROR] invalidateUserCache:', error.message);
     // エラーが発生してもシステムを停止させない
@@ -427,40 +443,44 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false,
 /**
  * クリティカル更新後のキャッシュ同期（統合版）
  * @param {string} userId - ユーザーID
- * @param {string} userEmail - ユーザーメールアドレス  
+ * @param {string} userEmail - ユーザーメールアドレス
  * @param {string|null} oldSpreadsheetId - 古いスプレッドシートID
  * @param {string|null} newSpreadsheetId - 新しいスプレッドシートID
  */
-function synchronizeCacheAfterCriticalUpdate(userId, userEmail, oldSpreadsheetId, newSpreadsheetId) {
+function synchronizeCacheAfterCriticalUpdate(
+  userId,
+  userEmail,
+  oldSpreadsheetId,
+  newSpreadsheetId
+) {
   try {
-    console.log('🔄 クリティカル更新後のキャッシュ同期開始:', { 
-      userId, 
-      oldSpreadsheetId, 
-      newSpreadsheetId 
+    console.log('🔄 クリティカル更新後のキャッシュ同期開始:', {
+      userId,
+      oldSpreadsheetId,
+      newSpreadsheetId,
     });
-    
+
     // 古いスプレッドシート関連のキャッシュを削除
     if (oldSpreadsheetId) {
       const oldKeys = [
         `headers_${oldSpreadsheetId}`,
         `user_data_${userId}`,
-        `spreadsheet_info_${oldSpreadsheetId}`
+        `spreadsheet_info_${oldSpreadsheetId}`,
       ];
-      oldKeys.forEach(key => cacheManager.remove(key));
+      oldKeys.forEach((key) => cacheManager.remove(key));
     }
-    
+
     // 新しいスプレッドシート関連のキャッシュを初期化
     if (newSpreadsheetId) {
       const newKeys = [
-        `headers_${newSpreadsheetId}`,  
+        `headers_${newSpreadsheetId}`,
         `user_data_${userId}`,
-        `spreadsheet_info_${newSpreadsheetId}`
+        `spreadsheet_info_${newSpreadsheetId}`,
       ];
-      newKeys.forEach(key => cacheManager.remove(key)); // 古いキャッシュがあれば削除
+      newKeys.forEach((key) => cacheManager.remove(key)); // 古いキャッシュがあれば削除
     }
-    
+
     console.log('✅ クリティカル更新後のキャッシュ同期完了');
-    
   } catch (error) {
     console.error('[ERROR] synchronizeCacheAfterCriticalUpdate:', error.message);
     // エラーが発生してもシステムを停止させない

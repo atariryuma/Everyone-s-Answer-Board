@@ -1486,7 +1486,10 @@ function getSpreadsheetColumnIndices(spreadsheetId, sheetName) {
   // 理由列が取得できていない場合は強制リフレッシュで再取得
   if (!indices || indices[COLUMN_HEADERS.REASON] === undefined) {
     console.log('getSpreadsheetColumnIndices: Reason header missing, force refreshing headers');
-    indices = getSpreadsheetHeaders(spreadsheetId, sheetName, { forceRefresh: true, validate: true });
+    indices = getSpreadsheetHeaders(spreadsheetId, sheetName, {
+      forceRefresh: true,
+      validate: true,
+    });
   }
 
   return indices;
@@ -2426,6 +2429,17 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     }
 
     const spreadsheetId = userInfo.spreadsheetId;
+
+    // spreadsheetIDの型と存在をチェック
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      console.error('executeGetSheetData: 無効なspreadsheetID', {
+        spreadsheetId: spreadsheetId,
+        type: typeof spreadsheetId,
+        userId: userId,
+        userInfo: userInfo,
+      });
+      throw new Error(`無効なspreadsheetIDです: 文字列である必要があります`);
+    }
     const service = getSheetsServiceCached();
 
     // フォーム回答データのみを取得（名簿機能は使用しない）

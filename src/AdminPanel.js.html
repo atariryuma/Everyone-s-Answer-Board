@@ -45,7 +45,6 @@
 
       initializationStep = 'completed';
     } catch (error) {
-
       // Try to show error even if UI is not fully initialized
       try {
         showError('初期化エラー: ' + initializationStep + ' - ' + error.message);
@@ -53,7 +52,6 @@
         alert('管理パネルの初期化に失敗しました。ページを再読み込みしてください。');
       }
     }
-
   }
 
   // フッター初期化
@@ -71,7 +69,6 @@
     document.body.classList.add('has-footer');
   }
 
-
   // パネル初期化 - 非同期対応版（完全な自動反映機能付き）
   async function initializePanel() {
     let step = 'starting';
@@ -82,7 +79,7 @@
       // 並行処理で基本データを読み込み（ノンブロッキング）
       step = 'loading user info';
       await loadUserInfoAsync();
-      
+
       // スプレッドシート一覧読み込みを待機（設定適用に必要）
       step = 'loading spreadsheet list';
       await loadSpreadsheetListAsync();
@@ -201,7 +198,7 @@
 
       // リソースボタンを更新
       updateResourceButtons(config);
-      
+
       // 設定サマリーを更新
       updateConfigSummary(config);
 
@@ -235,8 +232,7 @@
 
   // 旧版との互換性維持
   function loadCurrentConfig() {
-    loadAndApplyCurrentConfig().catch((error) => {
-    });
+    loadAndApplyCurrentConfig().catch((error) => {});
   }
 
   // ========== 自動反映機能群 ==========
@@ -291,7 +287,6 @@
 
   // 列設定の自動初期化（フォールバック処理強化版）
   async function autoInitializeColumnSettings(config) {
-
     try {
       // スプレッドシートIDを取得: configから、または現在選択中のものから
       const spreadsheetSelect = document.getElementById('spreadsheet-select');
@@ -337,13 +332,12 @@
 
   // 最適なシート名を検出（柔軟パターンマッチング対応）
   function detectBestSheetName(sheets) {
-
     // フォームレスポンス系のパターン（正規表現）
     const formResponsePatterns = [
-      /^フォームの回答\s*\d*$/,        // フォームの回答、フォームの回答 1, フォームの回答 7 など
-      /^Form Responses?\s*\d*$/,       // Form Response, Form Responses 1 など
-      /^回答\s*\d*$/,                  // 回答、回答 1 など
-      /^Responses?\s*\d*$/            // Response, Responses 1 など
+      /^フォームの回答\s*\d*$/, // フォームの回答、フォームの回答 1, フォームの回答 7 など
+      /^Form Responses?\s*\d*$/, // Form Response, Form Responses 1 など
+      /^回答\s*\d*$/, // 回答、回答 1 など
+      /^Responses?\s*\d*$/, // Response, Responses 1 など
     ];
 
     // 優先順位リスト（厳密マッチ）
@@ -362,7 +356,7 @@
       const matchingSheets = sheets
         .filter((s) => pattern.test(s.name) && s.rowCount > 1)
         .sort((a, b) => b.rowCount - a.rowCount); // データが多い順
-      
+
       if (matchingSheets.length > 0) {
         const selected = matchingSheets[0].name;
         return selected;
@@ -386,7 +380,6 @@
 
   // 既存の列設定データから復元（引数更新版）
   async function restoreColumnSettingsFromConfig(config, sheetName) {
-
     try {
       // 有効なシート名を決定
       const targetSheetName = sheetName || config.sheetName;
@@ -396,7 +389,6 @@
 
       // 既存の列マッピングがあれば使用、なければ簡易フォールバック
       if (config.columnMapping) {
-        
         // 既存のマッピングから列設定を復元
         if (config.columnSelections) {
           applyPreviousColumnSelections(config.columnSelections);
@@ -424,7 +416,6 @@
 
   // 以前の列選択を復元
   function applyPreviousColumnSelections(columnSelections) {
-
     Object.keys(columnSelections).forEach((columnType) => {
       if (columnType.startsWith('_')) return; // メタデータはスキップ
 
@@ -442,14 +433,12 @@
           dropdown.classList.add('has-ai-selection');
           showConfidenceBadge(columnType, selection.confidence || 0, 'ai');
         }
-
       }
     });
   }
 
   // 進捗ステップを設定から更新
   function updateProgressFromConfig(config) {
-
     try {
       let currentStep = 1;
 
@@ -466,8 +455,7 @@
       }
 
       updateProgress(currentStep);
-    } catch (error) {
-    }
+    } catch (error) {}
   }
 
   // 非同期版の補助関数群
@@ -545,10 +533,8 @@
     showSuccess('📝 フォームを開きました');
   }
 
-
   // リソースボタンの表示状態を更新
   function updateResourceButtons(config) {
-
     const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
     const formBtn = document.getElementById('open-form-btn');
     const statusDiv = document.getElementById('resource-status');
@@ -576,7 +562,6 @@
       formBtn.classList.add('hidden');
     }
 
-
     // ステータス更新
     let statusParts = [];
     // スプレッドシートステータスはConfigurationManager経由で取得
@@ -590,11 +575,10 @@
       statusDiv.textContent = '💡 リソースの設定を開始してください';
       statusDiv.className = 'text-xs text-yellow-400 mt-2 text-center';
     }
-    
+
     // 設定サマリーも更新
     updateConfigSummary(config);
   }
-
 
   // ローディング状態設定 - UnifiedLoadingSystemを使用
   function setLoading(loading, message = '処理中...') {
@@ -642,7 +626,7 @@
       formTitleValue: formData.formTitle,
       formTitleType: typeof formData.formTitle,
       formTitleLength: formData.formTitle ? formData.formTitle.length : 0,
-      isEmpty: !formData.formTitle || formData.formTitle.trim() === ''
+      isEmpty: !formData.formTitle || formData.formTitle.trim() === '',
     });
 
     if (formInfo && formTitle && formUrl) {
@@ -651,9 +635,9 @@
       console.log('📝 フォームタイトル設定:', {
         originalTitle: formData.formTitle,
         settingTitle: titleToSet,
-        element: formTitle
+        element: formTitle,
       });
-      
+
       formTitle.textContent = titleToSet;
       formUrl.href = formData.formUrl;
       formUrl.textContent = formData.formUrl;
@@ -661,13 +645,13 @@
       formInfo.classList.remove('hidden');
       console.log('✅ フォーム情報表示完了:', {
         title: formTitle.textContent,
-        url: formData.formUrl
+        url: formData.formUrl,
       });
     } else {
       console.error('❌ DOM要素が見つかりません:', {
         formInfo: !!formInfo,
         formTitle: !!formTitle,
-        formUrl: !!formUrl
+        formUrl: !!formUrl,
       });
     }
   }
@@ -699,15 +683,15 @@
           hasFormData: result && result.formData,
           formData: result ? result.formData : null,
           spreadsheetId: spreadsheetId,
-          sheetName: sheetName
+          sheetName: sheetName,
         });
-        
+
         if (result && result.success && result.formData) {
           showFormInfo(result.formData);
         } else {
           console.warn('⚠️ フォーム連携情報が見つからない:', {
             reason: result ? result.reason : '不明',
-            suggestions: result ? result.suggestions : []
+            suggestions: result ? result.suggestions : [],
           });
           hideFormInfo();
         }
@@ -718,7 +702,7 @@
           error: error,
           errorMessage: error.message,
           spreadsheetId: spreadsheetId,
-          sheetName: sheetName
+          sheetName: sheetName,
         });
         hideFormInfo();
       })
@@ -1755,20 +1739,26 @@
       const badge = document.querySelector('.config-summary .status-badge');
       if (badge) {
         const statusText = {
-          'complete': '公開準備完了',
-          'setup_completed': '公開準備完了',
-          'published': '公開中',
-          'incomplete': '設定中',
-          'pending': '設定中'
+          complete: '公開準備完了',
+          setup_completed: '公開準備完了',
+          published: '公開中',
+          incomplete: '設定中',
+          pending: '設定中',
         };
-        
-        badge.className = 'status-badge ' + (setupStatus === 'complete' || setupStatus === 'setup_completed' ? 'published' : 'unpublished');
+
+        badge.className =
+          'status-badge ' +
+          (setupStatus === 'complete' || setupStatus === 'setup_completed'
+            ? 'published'
+            : 'unpublished');
         badge.textContent = statusText[setupStatus] || '設定中';
       }
 
       // 最終更新時刻更新
       const lastUpdated = config?.lastModified || config?.updatedAt;
-      const timeElement = document.querySelector('.config-summary .config-item:last-child span:last-child');
+      const timeElement = document.querySelector(
+        '.config-summary .config-item:last-child span:last-child'
+      );
       if (timeElement && lastUpdated) {
         try {
           const date = new Date(lastUpdated);
@@ -1776,7 +1766,7 @@
             month: '2-digit',
             day: '2-digit',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
           });
           timeElement.className = 'text-sm text-gray-300';
         } catch (e) {
@@ -1789,7 +1779,8 @@
       if (openSheetBtn && config?.spreadsheetId) {
         openSheetBtn.onclick = (e) => {
           e.preventDefault();
-          const spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit';
+          const spreadsheetUrl =
+            'https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit';
           window.open(spreadsheetUrl, '_blank');
           showSuccess('📊 スプレッドシートを開きました');
         };
@@ -1842,9 +1833,10 @@
     const statusText = document.getElementById('boardStatus');
 
     // データベース直接参照で確実な公開状態チェック
-    const isPublished = boardInfo.appPublished === true || 
-                       boardInfo.appPublished === 'true' ||
-                       boardInfo.appPublished === '1';
+    const isPublished =
+      boardInfo.appPublished === true ||
+      boardInfo.appPublished === 'true' ||
+      boardInfo.appPublished === '1';
 
     if (!isPublished) {
       footer.classList.add('hidden');
@@ -1856,7 +1848,6 @@
 
     // 問題文設定
     questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
-
 
     if (boardInfo.isActive && boardInfo.urls) {
       // ボタン表示・機能設定
@@ -1880,7 +1871,6 @@
     }
   }
 
-
   // 日時フォーマット関数
   function formatDate(dateString) {
     if (!dateString) return '--';
@@ -1891,7 +1881,7 @@
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       });
     } catch (e) {
       return '--';
@@ -1982,5 +1972,4 @@
     appNameInput.value = appName;
     console.log(`アプリケーション名自動生成: ${appName}`);
   }
-
 </script>

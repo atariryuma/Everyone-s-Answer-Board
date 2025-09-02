@@ -24,7 +24,7 @@ function checkAdmin(userId = null) {
     const currentUserEmail = User.email();
     console.log('checkAdmin: 管理者権限チェック開始', {
       userId: userId ? userId.substring(0, 8) + '...' : 'null',
-      currentUserEmail: currentUserEmail ? currentUserEmail.substring(0, 10) + '...' : 'null'
+      currentUserEmail: currentUserEmail ? currentUserEmail.substring(0, 10) + '...' : 'null',
     });
 
     // userIdが指定されていない場合は現在のユーザーのuserIdを取得
@@ -46,21 +46,20 @@ function checkAdmin(userId = null) {
 
     // App.getAccess().verifyAccess()でadmin権限をチェック
     const accessResult = App.getAccess().verifyAccess(targetUserId, 'admin', currentUserEmail);
-    
+
     const isAdmin = accessResult.allowed;
     console.log('checkAdmin: 権限チェック結果', {
       allowed: isAdmin,
       userType: accessResult.userType,
-      reason: accessResult.reason
+      reason: accessResult.reason,
     });
 
     return isAdmin;
-
   } catch (error) {
     console.error('checkAdmin エラー:', {
       error: error.message,
       stack: error.stack,
-      userId: userId
+      userId: userId,
     });
     return false;
   }
@@ -76,7 +75,7 @@ function getAvailableSheets(userId = null) {
   try {
     const currentUserEmail = User.email();
     console.log('getAvailableSheets: シート一覧取得開始', {
-      userId: userId ? userId.substring(0, 8) + '...' : 'null'
+      userId: userId ? userId.substring(0, 8) + '...' : 'null',
     });
 
     // userIdが指定されていない場合は現在のユーザーのuserIdを取得
@@ -108,19 +107,18 @@ function getAvailableSheets(userId = null) {
 
     // AdminPanelBackend.gsのgetSheetList()を利用
     const sheetList = getSheetList(userInfo.spreadsheetId);
-    
+
     console.log('getAvailableSheets: シート一覧取得完了', {
       spreadsheetId: userInfo.spreadsheetId.substring(0, 20) + '...',
-      sheetCount: sheetList.length
+      sheetCount: sheetList.length,
     });
 
     return sheetList;
-
   } catch (error) {
     console.error('getAvailableSheets エラー:', {
       error: error.message,
       stack: error.stack,
-      userId: userId
+      userId: userId,
     });
     throw error;
   }
@@ -136,7 +134,7 @@ function clearActiveSheet(userId = null) {
   try {
     const currentUserEmail = User.email();
     console.log('clearActiveSheet: アクティブシートクリア開始', {
-      userId: userId ? userId.substring(0, 8) + '...' : 'null'
+      userId: userId ? userId.substring(0, 8) + '...' : 'null',
     });
 
     // userIdが指定されていない場合は現在のユーザーのuserIdを取得
@@ -165,11 +163,11 @@ function clearActiveSheet(userId = null) {
       `sheet_data_${targetUserId}`,
       `active_sheet_${targetUserId}`,
       `sheet_headers_${targetUserId}`,
-      `reaction_data_${targetUserId}`
+      `reaction_data_${targetUserId}`,
     ];
 
     let clearedCount = 0;
-    cacheKeys.forEach(key => {
+    cacheKeys.forEach((key) => {
       try {
         CacheService.getScriptCache().remove(key);
         clearedCount++;
@@ -185,23 +183,22 @@ function clearActiveSheet(userId = null) {
       success: true,
       clearedCacheCount: clearedCount,
       userId: targetUserId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     console.log('clearActiveSheet: 完了', result);
     return result;
-
   } catch (error) {
     console.error('clearActiveSheet エラー:', {
       error: error.message,
       stack: error.stack,
-      userId: userId
+      userId: userId,
     });
-    
+
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -218,7 +215,7 @@ function addReactionBatch(requestUserId, batchOperations) {
     const currentUserEmail = User.email();
     console.log('addReactionBatch: バッチリアクション処理開始', {
       userId: requestUserId ? requestUserId.substring(0, 8) + '...' : 'null',
-      operationsCount: Array.isArray(batchOperations) ? batchOperations.length : 0
+      operationsCount: Array.isArray(batchOperations) ? batchOperations.length : 0,
     });
 
     // 入力検証
@@ -259,7 +256,7 @@ function addReactionBatch(requestUserId, batchOperations) {
 
     console.log('addReactionBatch: 処理対象シート', {
       spreadsheetId: boardOwnerInfo.spreadsheetId.substring(0, 20) + '...',
-      sheetName: sheetName
+      sheetName: sheetName,
     });
 
     // バッチ操作を順次処理
@@ -274,14 +271,19 @@ function addReactionBatch(requestUserId, batchOperations) {
         }
 
         // 個別のリアクション処理（Core.gsのaddReaction関数を呼び出し）
-        const result = addReaction(requestUserId, operation.rowIndex, operation.reaction, sheetName);
+        const result = addReaction(
+          requestUserId,
+          operation.rowIndex,
+          operation.reaction,
+          sheetName
+        );
 
         if (result && result.success) {
           batchResults.push({
             rowIndex: operation.rowIndex,
             reaction: operation.reaction,
             status: 'success',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
           processedRows.add(operation.rowIndex);
         } else {
@@ -304,11 +306,11 @@ function addReactionBatch(requestUserId, batchOperations) {
       }
     }
 
-    const successCount = batchResults.filter(r => r.status === 'success').length;
+    const successCount = batchResults.filter((r) => r.status === 'success').length;
     console.log('addReactionBatch: バッチリアクション処理完了', {
       total: batchOperations.length,
       processed: processedRows.size,
-      success: successCount
+      success: successCount,
     });
 
     return {
@@ -316,14 +318,13 @@ function addReactionBatch(requestUserId, batchOperations) {
       processedCount: batchOperations.length,
       successCount: successCount,
       timestamp: new Date().toISOString(),
-      details: batchResults
+      details: batchResults,
     };
-
   } catch (error) {
     console.error('addReactionBatch エラー:', {
       error: error.message,
       stack: error.stack,
-      requestUserId: requestUserId
+      requestUserId: requestUserId,
     });
 
     return {
@@ -345,7 +346,7 @@ function refreshBoardData(requestUserId) {
   try {
     const currentUserEmail = User.email();
     console.log('refreshBoardData: ボードデータ更新開始', {
-      userId: requestUserId ? requestUserId.substring(0, 8) + '...' : 'null'
+      userId: requestUserId ? requestUserId.substring(0, 8) + '...' : 'null',
     });
 
     // ユーザーID検証
@@ -371,11 +372,11 @@ function refreshBoardData(requestUserId) {
       `board_data_${requestUserId}`,
       `user_config_${requestUserId}`,
       `reaction_data_${requestUserId}`,
-      `sheet_headers_${requestUserId}`
+      `sheet_headers_${requestUserId}`,
     ];
 
     let clearedCount = 0;
-    cacheKeys.forEach(key => {
+    cacheKeys.forEach((key) => {
       try {
         CacheService.getScriptCache().remove(key);
         clearedCount++;
@@ -413,30 +414,29 @@ function refreshBoardData(requestUserId) {
       config: latestConfig,
       userId: requestUserId,
       timestamp: new Date().toISOString(),
-      message: 'ボードデータを更新しました'
+      message: 'ボードデータを更新しました',
     };
 
     console.log('refreshBoardData: 完了', {
       clearedCount: clearedCount,
       hasConfig: !!latestConfig,
-      userId: requestUserId
+      userId: requestUserId,
     });
 
     return result;
-
   } catch (error) {
     console.error('refreshBoardData エラー:', {
       error: error.message,
       stack: error.stack,
-      requestUserId: requestUserId
+      requestUserId: requestUserId,
     });
-    
+
     return {
       success: false,
       status: 'error',
       error: error.message,
       message: 'ボードデータの再読み込みに失敗しました: ' + error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -456,7 +456,7 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
     console.log('getDataCount: データ件数取得開始', {
       userId: requestUserId ? requestUserId.substring(0, 8) + '...' : 'null',
       classFilter: classFilter,
-      adminMode: adminMode
+      adminMode: adminMode,
     });
 
     // ユーザーID検証
@@ -523,24 +523,23 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
       spreadsheetId: spreadsheetId,
       sheetName: sheetName,
       classFilter: classFilter || null,
-      adminMode: adminMode || false
+      adminMode: adminMode || false,
     };
 
     console.log('getDataCount: 完了', {
       count: count,
       sheetName: sheetName,
-      classFilter: classFilter
+      classFilter: classFilter,
     });
 
     return result;
-
   } catch (error) {
     console.error('getDataCount エラー:', {
       error: error.message,
       stack: error.stack,
-      requestUserId: requestUserId
+      requestUserId: requestUserId,
     });
-    
+
     return {
       count: 0,
       lastUpdate: new Date().toISOString(),
