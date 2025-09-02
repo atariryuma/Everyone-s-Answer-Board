@@ -1227,15 +1227,40 @@ function getQuickPublishedInfo(userId = null) {
       };
     }
 
-    const config = JSON.parse(userInfo.configJson || '{}');
+    // configJsonを完全にパース
+    let config = {};
+    try {
+      config = JSON.parse(userInfo.configJson || '{}');
+    } catch (e) {
+      console.error('getQuickPublishedInfo: configJson parse error:', e);
+      config = {};
+    }
 
+    // すべての情報を含めて返す
     return {
+      // 基本的な公開情報
       appPublished: config.appPublished || false,
       appName: config.appName || 'アプリ名未設定',
-      appUrl: userInfo.appUrl || config.appUrl,
-      publishedAt: userInfo.publishedAt || config.publishedAt,
-      sheetName: userInfo.sheetName,
-      lastModified: userInfo.lastModified,
+      appUrl: config.appUrl,
+      publishedAt: config.publishedAt,
+      
+      // configJsonからの詳細情報
+      sheetName: config.sheetName,
+      columnMapping: config.columnMapping,
+      compatibleMapping: config.compatibleMapping,
+      formTitle: config.formTitle,
+      lastModified: config.lastModified,
+      lastConnected: config.lastConnected,
+      connectionMethod: config.connectionMethod,
+      missingColumnsHandled: config.missingColumnsHandled,
+      
+      // データベースからの情報
+      userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
+      spreadsheetId: userInfo.spreadsheetId,
+      spreadsheetUrl: userInfo.spreadsheetUrl,
+      formUrl: userInfo.formUrl,
+      
       isLoading: false
     };
   } catch (error) {
@@ -1269,27 +1294,58 @@ function getCurrentConfig() {
       };
     }
 
-    // まず高速基本情報を取得
-    const quickInfo = getQuickPublishedInfo();
-    
-    // 公開済みなら基本情報で十分（高速処理）
-    if (quickInfo.appPublished && !quickInfo.error) {
-      console.log('getCurrentConfig: 公開済み - 基本情報で処理');
-      return {
-        ...quickInfo,
-        userId: userInfo.userId,
-        userEmail: userInfo.userEmail,
-        spreadsheetId: userInfo.spreadsheetId,
-        spreadsheetUrl: userInfo.spreadsheetUrl,
-        formUrl: userInfo.formUrl,
-        setupStatus: 'completed',
-        displaySettings: { showNames: true, showReactions: true },
-      };
+    // configJsonをパース
+    let config = {};
+    try {
+      config = JSON.parse(userInfo.configJson || '{}');
+    } catch (e) {
+      console.error('getCurrentConfig: configJson parse error:', e);
+      config = {};
     }
 
-    // 詳細情報が必要（設定中の場合）
-    console.log('getCurrentConfig: 詳細情報で処理（重い処理）');
-    return getFullConfigWithSpreadsheetAccess(userInfo);
+    // データベースの全情報とconfigJsonを統合
+    const fullConfig = {
+      // データベースの基本情報
+      userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
+      spreadsheetId: userInfo.spreadsheetId,
+      spreadsheetUrl: userInfo.spreadsheetUrl,
+      formUrl: userInfo.formUrl,
+      isActive: userInfo.isActive,
+      createdAt: userInfo.createdAt,
+      lastAccessedAt: userInfo.lastAccessedAt,
+      
+      // configJson内の詳細設定を展開
+      ...config,
+      
+      // configJson内の特定フィールドを明示的に設定（確実性のため）
+      appName: config.appName || 'みんなの回答ボード',
+      setupStatus: config.setupStatus || 'pending',
+      appPublished: config.appPublished || false,
+      publishedAt: config.publishedAt,
+      appUrl: config.appUrl,
+      sheetName: config.sheetName,
+      columnMapping: config.columnMapping,
+      compatibleMapping: config.compatibleMapping,
+      lastConnected: config.lastConnected,
+      connectionMethod: config.connectionMethod,
+      missingColumnsHandled: config.missingColumnsHandled,
+      formTitle: config.formTitle,
+      lastModified: config.lastModified,
+      
+      // デフォルト表示設定
+      displaySettings: config.displaySettings || { showNames: true, showReactions: true },
+    };
+
+    console.log('getCurrentConfig: 完全な設定を返します', {
+      hasSheetName: !!fullConfig.sheetName,
+      hasColumnMapping: !!fullConfig.columnMapping,
+      hasFormTitle: !!fullConfig.formTitle,
+      appPublished: fullConfig.appPublished
+    });
+
+    return fullConfig;
+    
   } catch (error) {
     console.error('getCurrentConfig エラー:', error);
     return {
@@ -1680,18 +1736,38 @@ function getOrCreateWebAppUrl(userId, appName) {
     const existingUrl = props.getProperty(`${userId}_app_url`);
 
     if (existingUrl) {
+      console.log('getOrCreateWebAppUrl: 既存URL使用', existingUrl);
       return existingUrl;
     }
 
-    // 新規WebアプリURLを生成（実際の実装ではScriptAppを使用）
-    const scriptId = ScriptApp.getScriptId();
-    const webAppUrl = 'https://script.google.com/macros/s/' + scriptId + '/exec?userId=' + userId;
+    // WebアプリのベースURLを取得（正式な方法）
+    let baseUrl;
+    try {
+      baseUrl = ScriptApp.getService().getUrl();
+    } catch (e) {
+      // フォールバック: Script IDから構築
+      const scriptId = ScriptApp.getScriptId();
+      baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+    }
+
+    // ユーザー用の回答ボードURL（Page.htmlが表示される）
+    const webAppUrl = `${baseUrl}?userId=${userId}`;
+    
+    console.log('getOrCreateWebAppUrl: 新規URL生成', webAppUrl);
+    
+    // URLを保存（オプション）
+    try {
+      props.setProperty(`${userId}_app_url`, webAppUrl);
+    } catch (saveError) {
+      console.warn('URL保存失敗:', saveError.message);
+    }
 
     return webAppUrl;
   } catch (error) {
     console.error('getOrCreateWebAppUrl エラー:', error);
-    // フォールバック
-    return 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec?userId=' + userId;
+    // 最終フォールバック
+    const scriptId = ScriptApp.getScriptId();
+    return `https://script.google.com/macros/s/${scriptId}/exec?userId=${userId}`;
   }
 }
 
@@ -1743,7 +1819,9 @@ function getCurrentBoardInfoAndUrls() {
     console.log('getCurrentBoardInfoAndUrls: ボード情報取得開始');
 
     // 現在ログイン中のユーザー情報を取得
-    const userInfo = getActiveUserInfo();
+    const currentUser = User.email();
+    const userInfo = DB.findUserByEmail(currentUser);
+    
     if (!userInfo || !userInfo.userId) {
       console.warn('getCurrentBoardInfoAndUrls: ユーザー情報が見つかりません');
       return {
@@ -1755,38 +1833,51 @@ function getCurrentBoardInfoAndUrls() {
 
     console.log('getCurrentBoardInfoAndUrls: ユーザー情報取得成功', {
       userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
       hasSpreadsheetId: !!userInfo.spreadsheetId,
     });
 
-    // 現在のボードデータを取得
+    // configJsonを完全に解析
+    let config = {};
     let boardData = null;
     let questionText = '問題読み込み中...';
-    let config = {};
 
-    // ユーザーの設定JSON解析
     try {
       config = JSON.parse(userInfo.configJson || '{}');
+      console.log('getCurrentBoardInfoAndUrls: 設定解析成功', {
+        appPublished: config.appPublished,
+        hasSheetName: !!config.sheetName,
+        hasFormTitle: !!config.formTitle,
+        appName: config.appName
+      });
     } catch (e) {
       console.warn('getCurrentBoardInfoAndUrls: 設定JSON解析エラー:', e.message);
     }
 
+    // ボードデータの取得
     if (userInfo.spreadsheetId) {
       try {
-        // アクティブなシート名を決定（優先順位: publishedSheetName > activeSheetName）
-        const sheetName = config.publishedSheetName || config.activeSheetName || 'フォームの回答 1';
+        // configJsonから保存されているシート名を優先使用
+        const sheetName = config.sheetName || config.publishedSheetName || config.activeSheetName || 'フォームの回答 1';
         console.log('getCurrentBoardInfoAndUrls: 使用するシート名:', sheetName);
 
         boardData = getSheetData(userInfo.userId, sheetName);
-        questionText = boardData?.header || '問題文が設定されていません';
+        
+        // 問題文はフォームタイトルまたはヘッダーから取得
+        questionText = config.formTitle || boardData?.header || '問題文が設定されていません';
+        
         console.log('getCurrentBoardInfoAndUrls: ボードデータ取得成功', {
           hasHeader: !!boardData?.header,
+          formTitle: config.formTitle,
+          dataCount: boardData?.data?.length || 0
         });
       } catch (error) {
         console.warn('getCurrentBoardInfoAndUrls: ボードデータ取得エラー:', error.message);
-        questionText = '問題文の読み込みに失敗しました';
+        // エラー時でもフォームタイトルを使用
+        questionText = config.formTitle || '問題文の読み込みに失敗しました';
       }
     } else {
-      questionText = 'スプレッドシートが設定されていません';
+      questionText = config.formTitle || 'スプレッドシートが設定されていません';
     }
 
     // URL生成
@@ -1800,25 +1891,35 @@ function getCurrentBoardInfoAndUrls() {
       };
     }
 
-    const viewUrl = `${baseUrl}?mode=view&userId=${encodeURIComponent(userInfo.userId)}`;
+    // URLを構築（configJsonに保存されているappUrlも考慮）
+    const viewUrl = config.appUrl || `${baseUrl}?userId=${encodeURIComponent(userInfo.userId)}`;
     const adminUrl = `${baseUrl}?mode=admin&userId=${encodeURIComponent(userInfo.userId)}`;
 
     const result = {
-      isActive: !!userInfo.spreadsheetId,
-      appPublished: config?.appPublished || false,
+      isActive: !!userInfo.spreadsheetId && userInfo.isActive !== false && userInfo.isActive !== 'FALSE',
+      appPublished: config.appPublished === true,
       questionText: questionText,
-      sheetName: userInfo.sheetName || 'シート名未設定',
+      sheetName: config.sheetName || 'シート名未設定',
+      appName: config.appName || '未設定',
       urls: {
-        view: viewUrl, // 閲覧者向け（共有用）
+        view: viewUrl,  // 閲覧者向け（共有用）
         admin: adminUrl, // 管理者向け
       },
-      lastUpdated: new Date().toLocaleString('ja-JP'),
+      lastUpdated: config.lastModified || new Date().toLocaleString('ja-JP'),
       userEmail: userInfo.userEmail,
+      // 追加情報
+      formTitle: config.formTitle,
+      totalResponses: boardData?.data?.length || 0,
+      hasPublishedData: config.appPublished === true,
+      publicUrl: viewUrl,
+      adminUrl: adminUrl
     };
 
     console.log('getCurrentBoardInfoAndUrls: 成功', {
       isActive: result.isActive,
+      appPublished: result.appPublished,
       hasQuestionText: !!result.questionText,
+      appName: result.appName,
       viewUrl: result.urls.view,
     });
 
@@ -1943,6 +2044,34 @@ function convertToCompatibleMapping(columnMapping, headerRow) {
   } catch (error) {
     console.error('convertToCompatibleMapping エラー:', error);
     return {};
+  }
+}
+
+/**
+ * ヘッダーインデックスを取得（管理パネル用）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} ヘッダーインデックス情報
+ */
+function getHeaderIndices(spreadsheetId, sheetName) {
+  try {
+    console.log('getHeaderIndices: ヘッダー取得開始', { spreadsheetId, sheetName });
+    
+    // 既存の汎用関数を活用
+    const headerIndices = getSpreadsheetHeaders(spreadsheetId, sheetName, { 
+      validate: false,
+      useCache: true 
+    });
+    
+    console.log('getHeaderIndices: ヘッダー取得成功', {
+      columnCount: Object.keys(headerIndices).length
+    });
+    
+    return headerIndices;
+    
+  } catch (error) {
+    console.error('getHeaderIndices エラー:', error.message);
+    throw new Error(`ヘッダー取得エラー: ${error.message}`);
   }
 }
 
