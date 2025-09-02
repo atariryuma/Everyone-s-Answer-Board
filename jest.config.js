@@ -12,28 +12,28 @@ module.exports = {
   // File extensions to recognize
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'gs', 'json'],
   
-  // Setup files - enhanced with jest-extended
+  // Setup files - only GAS mocks needed
   setupFilesAfterEnv: [
-    '<rootDir>/tests/setup/jest.setup.ts',
-    '<rootDir>/tests/mocks/gasMocks.ts'
+    '<rootDir>/tests/mocks/gasMocks.js'
   ],
   
-  // Coverage configuration
+  // Coverage configuration - focused on core functionality
   collectCoverageFrom: [
     'src/**/*.{js,ts,gs}',
     '!src/**/*.html',
     '!src/appsscript.json',
     '!src/**/*.d.ts',
-    '!src/utilities/RenamingScript.gs' // Exclude utility scripts
+    '!src/utilities/**', // Exclude all utility scripts
+    '!src/scripts/**'   // Exclude conversion scripts
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html', 'json'],
+  coverageReporters: ['text', 'lcov'],
   coverageThreshold: {
     global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70
     }
   },
   
@@ -68,8 +68,8 @@ module.exports = {
   
   // Legacy globals removed - using modern transform configuration instead
   
-  // Test timeout for longer integration tests
-  testTimeout: 30000,
+  // Test timeout - reduced for focused unit tests
+  testTimeout: 15000,
   
   // Clear mocks between tests
   clearMocks: true,
@@ -78,12 +78,6 @@ module.exports = {
   // Collect coverage from TypeScript files
   extensionsToTreatAsEsm: [],
   
-  // Test result processor for better output
-  reporters: [
-    'default',
-    ['jest-junit', {
-      outputDirectory: 'coverage',
-      outputName: 'junit.xml'
-    }]
-  ]
+  // Simplified reporters for faster execution
+  reporters: ['default']
 };

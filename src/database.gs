@@ -967,7 +967,7 @@ function updateUser(userId, updateData) {
     }
 
     // バッチ更新リクエストを作成
-    const requests = Object.keys(updateData);
+    const requests = Object.keys(updateData)
       .map(function (key) {
         const colIndex = headers.indexOf(key);
         if (colIndex === -1) return null;
