@@ -762,7 +762,7 @@ function getDeletionLogs() {
  */
 function getSheetsService() {
   try {
-    let accessToken;
+    var accessToken;
     try {
       accessToken = getServiceAccountTokenCached();
     } catch (tokenError) {
@@ -810,8 +810,8 @@ function fixUserDataConsistency(userId) {
     const configJson = JSON.parse(userInfo.configJson || '{}');
     console.log('📝 configJson内のpublishedSpreadsheetId:', configJson.publishedSpreadsheetId);
 
-    let needsUpdate = false;;
-    let updateData = {};;
+    var needsUpdate = false;
+    var updateData = {};
 
     // 1. エラー情報をクリーンアップ
     if (configJson.lastError || configJson.errorAt) {
@@ -934,25 +934,25 @@ function updateUser(userId, updateData) {
 
   try {
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);;
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     if (!dbId) {
       throw new Error('データ更新エラー: データベースIDが設定されていません');
     }
     const service = getSheetsServiceCached();
-    const sheetName = DB_CONFIG.SHEET_NAME;;
+    var sheetName = DB_CONFIG.SHEET_NAME;
 
     // 現在のデータを取得
     const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
-    const values = data.valueRanges[0].values || [];;
+    var values = data.valueRanges[0].values || [];
 
     if (values.length === 0) {
       throw new Error('データベースが空です');
     }
 
-    const headers = values[0];;
-    const userIdIndex = headers.indexOf('userId');;
-    let rowIndex = -1;;
+    var headers = values[0];
+    var userIdIndex = headers.indexOf('userId');
+    var rowIndex = -1;
 
     // ユーザーの行を特定
     for (let i = 1; i < values.length; i++) {
@@ -967,9 +967,9 @@ function updateUser(userId, updateData) {
     }
 
     // バッチ更新リクエストを作成
-    const requests = Object.keys(updateData);
+    var requests = Object.keys(updateData)
       .map(function (key) {
-        const colIndex = headers.indexOf(key);
+        var colIndex = headers.indexOf(key);
         if (colIndex === -1) return null;
 
         return {
@@ -988,9 +988,9 @@ function updateUser(userId, updateData) {
         );
       });
 
-      const maxRetries = 2;
-      let retryCount = 0;;
-      let updateSuccess = false;;
+      var maxRetries = 2;
+      var retryCount = 0;
+      var updateSuccess = false;
 
       while (retryCount <= maxRetries && !updateSuccess) {
         try {
@@ -1005,7 +1005,7 @@ function updateUser(userId, updateData) {
           updateSuccess = true;
 
           // 更新成功の確認
-          const verifyData = batchGetSheetsData(service, dbId, [;
+          var verifyData = batchGetSheetsData(service, dbId, [
             "'" +
               sheetName +
               "'!" +
@@ -1020,9 +1020,9 @@ function updateUser(userId, updateData) {
             verifyData.valueRanges[0] &&
             verifyData.valueRanges[0].values
           ) {
-            const updatedRow = verifyData.valueRanges[0].values[0];
+            var updatedRow = verifyData.valueRanges[0].values[0];
             if (updateData.spreadsheetId) {
-              const spreadsheetIdIndex = headers.indexOf('spreadsheetId');;
+              var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
               console.log(
                 '🎯 スプレッドシートID更新確認:',
                 updatedRow[spreadsheetIdIndex] === updateData.spreadsheetId ? '✅ 成功' : '❌ 失敗'
@@ -1031,7 +1031,8 @@ function updateUser(userId, updateData) {
           }
         } catch (updateError) {
           retryCount++;
-          const errorMessage = updateError.toString();
+          var errorMessage = updateError.toString();
+
           if (
             errorMessage.includes('401') ||
             errorMessage.includes('UNAUTHENTICATED') ||
@@ -1072,10 +1073,11 @@ function updateUser(userId, updateData) {
     }
 
     // 重要: 更新完了後に包括的キャッシュ同期を実行
-    const userInfo = DB.findUserById(userId);
-    const email = updateData.userEmail || (userInfo ? userInfo.userEmail : null);
-    const oldSpreadsheetId = userInfo ? userInfo.spreadsheetId : null;
-    const newSpreadsheetId = updateData.spreadsheetId || oldSpreadsheetId;
+    var userInfo = DB.findUserById(userId);
+    var email = updateData.userEmail || (userInfo ? userInfo.userEmail : null);
+    var oldSpreadsheetId = userInfo ? userInfo.spreadsheetId : null;
+    var newSpreadsheetId = updateData.spreadsheetId || oldSpreadsheetId;
+
     // クリティカル更新時の包括的キャッシュ同期
     synchronizeCacheAfterCriticalUpdate(userId, email, oldSpreadsheetId, newSpreadsheetId);
 
@@ -1092,12 +1094,12 @@ function updateUser(userId, updateData) {
  */
 function initializeDatabaseSheet(spreadsheetId) {
   const service = getSheetsServiceCached();
-  const sheetName = DB_CONFIG.SHEET_NAME;;
+  var sheetName = DB_CONFIG.SHEET_NAME;
 
   try {
     // シートが存在するか確認
     const spreadsheet = getSpreadsheetsData(service, spreadsheetId);
-    const sheetExists = spreadsheet.sheets.some(function (s) {;
+    var sheetExists = spreadsheet.sheets.some(function (s) {
       return s.properties.title === sheetName;
     });
 
@@ -1105,7 +1107,7 @@ function initializeDatabaseSheet(spreadsheetId) {
       // バッチ処理最適化: シート作成とヘッダー追加を1回のAPI呼び出しで実行
       console.log('📊 バッチ最適化: シート作成+ヘッダー追加を同時実行');
 
-      const requests = [;
+      var requests = [
         // 1. シートを作成
         {
           addSheet: {
@@ -1124,7 +1126,7 @@ function initializeDatabaseSheet(spreadsheetId) {
       batchUpdateSpreadsheet(service, spreadsheetId, { requests: requests });
 
       // 2. 作成直後にヘッダーを追加（A1記法でレンジを指定）
-      const headerRange =;
+      var headerRange =
         "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:I1 (9カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
 
@@ -1133,7 +1135,7 @@ function initializeDatabaseSheet(spreadsheetId) {
       );
     } else {
       // シートが既に存在する場合は、ヘッダーのみ更新（既存動作を維持）
-      const headerRange =;
+      var headerRange =
         "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:I1 (9カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
     }
@@ -1160,7 +1162,7 @@ function handleMissingUser(userId) {
       // 関連するメールキャッシュも削除（可能な場合）
       try {
         const userProps = PropertiesService.getUserProperties();
-        const currentUserId = userProps.getProperty('CURRENT_USER_ID');
+        var currentUserId = userProps.getProperty('CURRENT_USER_ID');
         if (currentUserId === userId) {
           // 現在のユーザーIDが無効な場合はクリア
           userProps.deleteProperty('CURRENT_USER_ID');
@@ -1173,7 +1175,7 @@ function handleMissingUser(userId) {
 
     // 全データベースキャッシュのクリアは最後の手段として実行
     // 頻繁な実行を避けるため、確実にデータ不整合がある場合のみ実行
-    let shouldClearAll = false;;
+    var shouldClearAll = false;
 
     // 判定条件: 複数のユーザーで問題が発生している場合のみ全クリア
     if (shouldClearAll) {
@@ -1204,13 +1206,13 @@ function createSheetsService(accessToken) {
     spreadsheets: {
       values: {
         get: function (options) {
-          const url =
+          var url =
             'https://sheets.googleapis.com/v4/spreadsheets/' +
             options.spreadsheetId +
             '/values/' +
             encodeURIComponent(options.range);
 
-          const response = UrlFetchApp.fetch(url, {;
+          var response = UrlFetchApp.fetch(url, {
             headers: { Authorization: 'Bearer ' + accessToken },
             muteHttpExceptions: true,
             followRedirects: true,
@@ -1227,12 +1229,12 @@ function createSheetsService(accessToken) {
         },
       },
       get: function (options) {
-        const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + options.spreadsheetId;
+        var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + options.spreadsheetId;
         if (options.fields) {
           url += '?fields=' + encodeURIComponent(options.fields);
         }
 
-        const response = UrlFetchApp.fetch(url, {;
+        var response = UrlFetchApp.fetch(url, {
           headers: { Authorization: 'Bearer ' + accessToken },
           muteHttpExceptions: true,
           followRedirects: true,
@@ -1299,14 +1301,15 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
   }
 
   // API効率化: 小さなバッチの統合とキャッシュ化
-  const cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
+  var cacheKey = `batchGet_${spreadsheetId}_${JSON.stringify(ranges)}`;
+
   return cacheManager.get(
     cacheKey,
     () => {
       try {
         // 防御的プログラミング: サービスオブジェクトのプロパティを安全に取得
-        const baseUrl = service.baseUrl;;
-        const accessToken = service.accessToken;;
+        var baseUrl = service.baseUrl;
+        var accessToken = service.accessToken;
 
         // baseUrlが失われている場合の防御処理
         if (!baseUrl || typeof baseUrl !== 'string') {
@@ -1323,7 +1326,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
         }
 
         // 安全なURL構築
-        const url =
+        var url =
           baseUrl +
           '/' +
           encodeURIComponent(spreadsheetId) +
@@ -1334,15 +1337,15 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
             })
             .join('&');
 
-        const response = UrlFetchApp.fetch(url, {;
+        var response = UrlFetchApp.fetch(url, {
           headers: { Authorization: 'Bearer ' + accessToken },
           muteHttpExceptions: true,
           followRedirects: true,
           validateHttpsCertificates: true,
         });
 
-        const responseCode = response.getResponseCode();;
-        const responseText = response.getContentText();;
+        var responseCode = response.getResponseCode();
+        var responseText = response.getContentText();
 
         if (responseCode !== 200) {
           console.error('Sheets API エラー詳細:', {
@@ -1354,7 +1357,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
           throw new Error('Sheets API error: ' + responseCode + ' - ' + responseText);
         }
 
-        let result;
+        var result;
         try {
           result = JSON.parse(responseText);
         } catch (parseError) {
@@ -1419,9 +1422,9 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
  */
 function batchUpdateSheetsData(service, spreadsheetId, requests) {
   try {
-    const url = service.baseUrl + '/' + spreadsheetId + '/values:batchUpdate';
+    var url = service.baseUrl + '/' + spreadsheetId + '/values:batchUpdate';
 
-    const response = UrlFetchApp.fetch(url, {;
+    var response = UrlFetchApp.fetch(url, {
       method: 'post',
       contentType: 'application/json',
       headers: { Authorization: 'Bearer ' + service.accessToken },
@@ -1456,7 +1459,7 @@ function batchUpdateSheetsData(service, spreadsheetId, requests) {
  * @returns {object} レスポンス
  */
 function appendSheetsData(service, spreadsheetId, range, values) {
-  const url =
+  var url =
     service.baseUrl +
     '/' +
     spreadsheetId +
@@ -1464,7 +1467,7 @@ function appendSheetsData(service, spreadsheetId, range, values) {
     encodeURIComponent(range) +
     ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
 
-  const response = UrlFetchApp.fetch(url, {;
+  var response = UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
     headers: { Authorization: 'Bearer ' + service.accessToken },
@@ -1491,8 +1494,8 @@ function getSpreadsheetsData(service, spreadsheetId) {
     }
 
     // 防御的プログラミング: サービスオブジェクトのプロパティを安全に取得
-    const baseUrl = service.baseUrl;;
-    const accessToken = service.accessToken;;
+    var baseUrl = service.baseUrl;
+    var accessToken = service.accessToken;
 
     // baseUrlが失われている場合の防御処理
     if (!baseUrl || typeof baseUrl !== 'string') {
@@ -1509,17 +1512,17 @@ function getSpreadsheetsData(service, spreadsheetId) {
     }
 
     // 安全なURL構築 - シート情報を含む基本的なメタデータを取得するために fields パラメータを追加
-    const url = baseUrl + '/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties';
+    var url = baseUrl + '/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties';
 
-    const response = UrlFetchApp.fetch(url, {;
+    var response = UrlFetchApp.fetch(url, {
       headers: { Authorization: 'Bearer ' + accessToken },
       muteHttpExceptions: true,
       followRedirects: true,
       validateHttpsCertificates: true,
     });
 
-    const responseCode = response.getResponseCode();;
-    const responseText = response.getContentText();;
+    var responseCode = response.getResponseCode();
+    var responseText = response.getContentText();
 
     if (responseCode !== 200) {
       console.error('Sheets API エラー詳細:', {
@@ -1551,7 +1554,7 @@ function getSpreadsheetsData(service, spreadsheetId) {
       throw new Error('Sheets API error: ' + responseCode + ' - ' + responseText);
     }
 
-    let result;
+    var result;
     try {
       result = JSON.parse(responseText);
     } catch (parseError) {
@@ -1572,7 +1575,7 @@ function getSpreadsheetsData(service, spreadsheetId) {
       result.sheets = []; // 空配列を設定してエラーを避ける
     }
 
-    const sheetCount = result.sheets.length;;
+    var sheetCount = result.sheets.length;
     console.log('✅ getSpreadsheetsData 成功: 発見シート数:', sheetCount);
 
     if (sheetCount === 0) {
@@ -1601,7 +1604,7 @@ function getSpreadsheetsData(service, spreadsheetId) {
  * @returns {object} レスポンス
  */
 function updateSheetsData(service, spreadsheetId, range, values) {
-  const url =
+  var url =
     service.baseUrl +
     '/' +
     spreadsheetId +
@@ -1609,7 +1612,7 @@ function updateSheetsData(service, spreadsheetId, range, values) {
     encodeURIComponent(range) +
     '?valueInputOption=RAW';
 
-  const response = UrlFetchApp.fetch(url, {;
+  var response = UrlFetchApp.fetch(url, {
     method: 'put',
     contentType: 'application/json',
     headers: { Authorization: 'Bearer ' + service.accessToken },
@@ -1627,9 +1630,9 @@ function updateSheetsData(service, spreadsheetId, range, values) {
 function diagnoseDatabase(targetUserId) {
   try {
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);;
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
-    const diagnosticResult = {;
+    var diagnosticResult = {
       timestamp: new Date().toISOString(),
       databaseId: dbId,
       targetUserId: targetUserId,
@@ -1655,7 +1658,7 @@ function diagnoseDatabase(targetUserId) {
     }
 
     // 2. サービス接続テスト
-    let service;
+    var service;
     try {
       service = getSheetsServiceCached();
       diagnosticResult.checks.serviceConnection = { status: 'success' };
@@ -1697,7 +1700,7 @@ function diagnoseDatabase(targetUserId) {
     // 4. ユーザーデータ取得テスト
     try {
       const data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:I"]);
-      const values = data.valueRanges[0].values || [];;
+      var values = data.valueRanges[0].values || [];
 
       diagnosticResult.checks.userData = {
         status: 'success',
@@ -1709,8 +1712,8 @@ function diagnoseDatabase(targetUserId) {
 
       // 特定ユーザーの検索テスト
       if (targetUserId && values.length > 1) {
-        let userFound = false;;
-        let userRowIndex = -1;;
+        var userFound = false;
+        var userRowIndex = -1;
 
         for (let i = 1; i < values.length; i++) {
           if (values[i][0] === targetUserId) {
@@ -1795,7 +1798,7 @@ function diagnoseDatabase(targetUserId) {
  */
 function checkCacheStatus(userId) {
   try {
-    const cacheStatus = {;
+    var cacheStatus = {
       userSpecific: null,
       general: {
         totalEntries: 0,
@@ -1806,8 +1809,9 @@ function checkCacheStatus(userId) {
 
     // ユーザー固有のキャッシュ確認
     if (userId) {
-      const userCacheKey = 'user_' + userId;
-      const cachedUser = cacheManager.get(userCacheKey, null, { skipFetch: true });
+      var userCacheKey = 'user_' + userId;
+      var cachedUser = cacheManager.get(userCacheKey, null, { skipFetch: true });
+
       cacheStatus.userSpecific = {
         userId: userId,
         cacheKey: userCacheKey,
@@ -1820,7 +1824,7 @@ function checkCacheStatus(userId) {
     // 注: 実際のキャッシュマネージャーの実装に依存
     try {
       if (typeof cacheManager.getStats === 'function') {
-        const stats = cacheManager.getStats();
+        var stats = cacheManager.getStats();
         cacheStatus.general = stats;
       }
     } catch (statsError) {
@@ -1844,7 +1848,7 @@ function checkCacheStatus(userId) {
  */
 function verifyServiceAccountPermissions(spreadsheetId) {
   try {
-    const dbCheckResult = {;
+    var dbCheckResult = {
       timestamp: new Date().toISOString(),
       spreadsheetId: spreadsheetId,
       checks: {},
@@ -1857,7 +1861,8 @@ function verifyServiceAccountPermissions(spreadsheetId) {
 
     // 1. データベーススプレッドシートの権限確認
     const props = PropertiesService.getScriptProperties();
-    const dbId = spreadsheetId || props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    var dbId = spreadsheetId || props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+
     if (!dbId) {
       dbCheckResult.summary.issues.push('データベースIDが設定されていません');
       dbCheckResult.summary.status = 'error';
@@ -1897,7 +1902,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
       // 書き込みテスト（安全な方法で）
       try {
         // テスト用のバッチ更新（実際には何も変更しない）
-        const testRequest = {;
+        var testRequest = {
           requests: [],
         };
         // 空のリクエストでテスト
@@ -1934,7 +1939,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
           Utilities.sleep(3000); // 共有反映待ち
 
           try {
-            const retestService = getSheetsServiceCached(true); // 強制リフレッシュ;
+            var retestService = getSheetsServiceCached(true); // 強制リフレッシュ
             const retestInfo = getSpreadsheetsData(retestService, dbId);
 
             dbCheckResult.checks.postRepairAccess = {
@@ -1990,7 +1995,7 @@ function verifyServiceAccountPermissions(spreadsheetId) {
  */
 function performAutoRepair(targetUserId) {
   try {
-    const repairResult = {;
+    var repairResult = {
       timestamp: new Date().toISOString(),
       targetUserId: targetUserId,
       actions: [],
@@ -2078,7 +2083,7 @@ function performAutoRepair(targetUserId) {
  */
 function performDataIntegrityCheck(options = {}) {
   try {
-    const opts = {;
+    var opts = {
       checkDuplicates: options.checkDuplicates !== false,
       checkMissingFields: options.checkMissingFields !== false,
       checkInvalidData: options.checkInvalidData !== false,
@@ -2086,7 +2091,7 @@ function performDataIntegrityCheck(options = {}) {
       ...options,
     };
 
-    const dbCheckResult = {;
+    var dbCheckResult = {
       timestamp: new Date().toISOString(),
       summary: {
         status: 'unknown',
@@ -2105,7 +2110,7 @@ function performDataIntegrityCheck(options = {}) {
 
     // データベース接続確認
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);;
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     if (!dbId) {
       dbCheckResult.summary.issues.push('データベースIDが設定されていません');
       dbCheckResult.summary.status = 'critical';
@@ -2114,15 +2119,15 @@ function performDataIntegrityCheck(options = {}) {
 
     const service = getSheetsServiceCached();
     const data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:I"]);
-    const values = data.valueRanges[0].values || [];;
+    var values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
       dbCheckResult.summary.status = 'empty';
       return dbCheckResult;
     }
 
-    const headers = values[0];;
-    const userRows = values.slice(1);;
+    var headers = values[0];
+    var userRows = values.slice(1);
     dbCheckResult.summary.totalUsers = userRows.length;
 
     console.log('📊 データ整合性チェック: ' + userRows.length + 'ユーザーを確認中');
@@ -2218,20 +2223,22 @@ function performDataIntegrityCheck(options = {}) {
  * @returns {object} 重複チェック結果
  */
 function checkForDuplicates(headers, userRows) {
-  const duplicates = [];
-  const userIdIndex = headers.indexOf('userId');;
-  const emailIndex = headers.indexOf('userEmail');;
+  var duplicates = [];
+  var userIdIndex = headers.indexOf('userId');
+  var emailIndex = headers.indexOf('userEmail');
 
   if (userIdIndex === -1 || emailIndex === -1) {
     return { duplicates: [] };
   }
 
-  const seenUserIds = new Set();
-  const seenEmails = new Set();
+  var seenUserIds = new Set();
+  var seenEmails = new Set();
+
   for (let i = 0; i < userRows.length; i++) {
-    const row = userRows[i];
-    const userId = row[userIdIndex];
-    const email = row[emailIndex];
+    var row = userRows[i];
+    var userId = row[userIdIndex];
+    var email = row[emailIndex];
+
     // userId重複チェック
     if (userId && seenUserIds.has(userId)) {
       duplicates.push({
@@ -2267,14 +2274,17 @@ function checkForDuplicates(headers, userRows) {
  * @returns {object} 必須フィールドチェック結果
  */
 function checkMissingRequiredFields(headers, userRows) {
-  const missing = [];
-  const requiredFields = ['userId', 'userEmail']; // 最低限必要なフィールド;
+  var missing = [];
+  var requiredFields = ['userId', 'userEmail']; // 最低限必要なフィールド
+
   for (let i = 0; i < userRows.length; i++) {
-    const row = userRows[i];
-    const missingInThisRow = [];
+    var row = userRows[i];
+    var missingInThisRow = [];
+
     for (let j = 0; j < requiredFields.length; j++) {
-      const fieldName = requiredFields[j];
-      const fieldIndex = headers.indexOf(fieldName);
+      var fieldName = requiredFields[j];
+      var fieldIndex = headers.indexOf(fieldName);
+
       if (fieldIndex === -1 || !row[fieldIndex] || row[fieldIndex].trim() === '') {
         missingInThisRow.push(fieldName);
       }
@@ -2299,16 +2309,17 @@ function checkMissingRequiredFields(headers, userRows) {
  * @returns {object} データ形式チェック結果
  */
 function checkInvalidDataFormats(headers, userRows) {
-  const invalid = [];
-  const emailIndex = headers.indexOf('userEmail');;
-  const userIdIndex = headers.indexOf('userId');;
+  var invalid = [];
+  var emailIndex = headers.indexOf('userEmail');
+  var userIdIndex = headers.indexOf('userId');
 
   for (let i = 0; i < userRows.length; i++) {
-    const row = userRows[i];
-    const rowIssues = [];
+    var row = userRows[i];
+    var rowIssues = [];
+
     // メールアドレス形式チェック
     if (emailIndex !== -1 && row[emailIndex]) {
-      const email = row[emailIndex];
+      var email = row[emailIndex];
       if (!EMAIL_REGEX.test(email)) {
         rowIssues.push('無効なメールアドレス形式: ' + email);
       }
@@ -2316,8 +2327,8 @@ function checkInvalidDataFormats(headers, userRows) {
 
     // ユーザーID形式チェック（UUIDかどうか）
     if (userIdIndex !== -1 && row[userIdIndex]) {
-      const userId = row[userIdIndex];
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      var userId = row[userIdIndex];
+      var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(userId)) {
         rowIssues.push('無効なユーザーID形式: ' + userId);
       }
@@ -2342,12 +2353,13 @@ function checkInvalidDataFormats(headers, userRows) {
  * @returns {object} 孤立データチェック結果
  */
 function checkOrphanedData(headers, userRows) {
-  const orphaned = [];
-  const isActiveIndex = headers.indexOf('isActive');;
+  var orphaned = [];
+  var isActiveIndex = headers.indexOf('isActive');
 
   for (let i = 0; i < userRows.length; i++) {
-    const row = userRows[i];
-    const issues = [];
+    var row = userRows[i];
+    var issues = [];
+
     // 非アクティブだが他のデータが残っている
     if (
       isActiveIndex !== -1 &&
@@ -2356,7 +2368,7 @@ function checkOrphanedData(headers, userRows) {
         row[isActiveIndex] === 'false')
     ) {
       // 非アクティブユーザーでスプレッドシートIDが残っている場合
-      const spreadsheetIdIndex = headers.indexOf('spreadsheetId');;
+      var spreadsheetIdIndex = headers.indexOf('spreadsheetId');
       if (spreadsheetIdIndex !== -1 && row[spreadsheetIdIndex]) {
         issues.push('非アクティブユーザーにスプレッドシートIDが残存');
       }
@@ -2384,7 +2396,8 @@ function checkOrphanedData(headers, userRows) {
  * @returns {object} 修復結果
  */
 function performDataIntegrityFix(details, headers, userRows, dbId, service) {
-  const fixed = [];
+  var fixed = [];
+
   // 注意: 重複データの自動削除は危険なため、ログのみ記録
   if (details.duplicates.length > 0) {
     console.warn(
@@ -2395,12 +2408,14 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
   }
 
   // 無効なstatusフィールドの修正
-  const isActiveIndex = headers.indexOf('isActive');;
+  var isActiveIndex = headers.indexOf('isActive');
   if (isActiveIndex !== -1) {
-    const updatesNeeded = [];
+    var updatesNeeded = [];
+
     for (let i = 0; i < userRows.length; i++) {
-      const row = userRows[i];
-      const currentValue = row[isActiveIndex];
+      var row = userRows[i];
+      var currentValue = row[isActiveIndex];
+
       // statusフィールドが空または無効な値の場合、activeに設定
       if (
         !currentValue ||
@@ -2434,13 +2449,13 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
 function getDbSheet() {
   try {
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);;
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     if (!dbId) {
       throw new Error('データベースIDが設定されていません');
     }
 
-    const ss = SpreadsheetApp.openById(dbId);
-    const sheet = ss.getSheetByName(DB_CONFIG.SHEET_NAME);
+    var ss = SpreadsheetApp.openById(dbId);
+    var sheet = ss.getSheetByName(DB_CONFIG.SHEET_NAME);
     if (!sheet) {
       throw new Error('データベースシートが見つかりません: ' + DB_CONFIG.SHEET_NAME);
     }
@@ -2459,7 +2474,7 @@ function getDbSheet() {
  */
 function performSystemMonitoring(options = {}) {
   try {
-    const opts = {;
+    var opts = {
       checkHealth: options.checkHealth !== false,
       checkPerformance: options.checkPerformance !== false,
       checkSecurity: options.checkSecurity !== false,
@@ -2467,7 +2482,7 @@ function performSystemMonitoring(options = {}) {
       ...options,
     };
 
-    const monitoringResult = {;
+    var monitoringResult = {
       timestamp: new Date().toISOString(),
       summary: {
         overallHealth: 'unknown',
@@ -2577,7 +2592,7 @@ function performSystemMonitoring(options = {}) {
  * @returns {object} ヘルスチェック結果
  */
 function performHealthCheck() {
-  const healthResult = {;
+  var healthResult = {
     timestamp: new Date().toISOString(),
     checks: {},
     summary: {
@@ -2632,13 +2647,13 @@ function performHealthCheck() {
   // システム設定チェック
   try {
     const props = PropertiesService.getScriptProperties();
-    const requiredProps = [;
+    var requiredProps = [
       PROPS_KEYS.DATABASE_SPREADSHEET_ID,
       PROPS_KEYS.SERVICE_ACCOUNT_CREDS,
       PROPS_KEYS.ADMIN_EMAIL,
     ];
 
-    const missingProps = [];
+    var missingProps = [];
     for (let i = 0; i < requiredProps.length; i++) {
       if (!props.getProperty(requiredProps[i])) {
         missingProps.push(requiredProps[i]);
@@ -2680,8 +2695,9 @@ function performHealthCheck() {
  * @returns {object} パフォーマンスチェック結果
  */
 function performPerformanceCheck() {
-  const startTime = Date.now();
-  const perfResult = {;
+  var startTime = Date.now();
+
+  var perfResult = {
     timestamp: new Date().toISOString(),
     metrics: {
       responseTime: 0,
@@ -2693,9 +2709,9 @@ function performPerformanceCheck() {
 
   try {
     // データベースアクセス速度テスト
-    const dbTestStart = Date.now();
+    var dbTestStart = Date.now();
     const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);;
+    var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
     if (dbId) {
       const service = getSheetsServiceCached();
@@ -2705,10 +2721,10 @@ function performPerformanceCheck() {
     }
 
     // キャッシュ効率テスト（簡易版）
-    const cacheTestStart = Date.now();
+    var cacheTestStart = Date.now();
     try {
       if (typeof cacheManager !== 'undefined' && cacheManager.getStats) {
-        const cacheStats = cacheManager.getStats();
+        var cacheStats = cacheManager.getStats();
         perfResult.metrics.cacheHitRate = cacheStats.hitRate || 0;
       }
     } catch (cacheError) {
@@ -2730,7 +2746,7 @@ function performPerformanceCheck() {
  * @returns {object} セキュリティチェック結果
  */
 function performSecurityCheck() {
-  const securityResult = {;
+  var securityResult = {
     timestamp: new Date().toISOString(),
     vulnerabilities: [],
     recommendations: [],
@@ -2739,9 +2755,10 @@ function performSecurityCheck() {
   try {
     // スクリプトプロパティのセキュリティチェック
     const props = PropertiesService.getScriptProperties();
-    const allProps = props.getProperties();
+    var allProps = props.getProperties();
+
     // サービスアカウント認証情報の存在確認
-    const serviceAccountCreds = props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    var serviceAccountCreds = props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
     if (!serviceAccountCreds) {
       securityResult.vulnerabilities.push({
         type: 'missing_credentials',
@@ -2751,7 +2768,7 @@ function performSecurityCheck() {
     }
 
     // 管理者メールの設定確認
-    const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+    var adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
     if (!adminEmail) {
       securityResult.vulnerabilities.push({
         type: 'missing_admin',
@@ -2800,7 +2817,7 @@ function performSecurityCheck() {
 function sendSystemAlert(monitoringResult) {
   try {
     // アラート内容の構築
-    const alertMessage = '【StudyQuest システムアラート】\n\n';
+    var alertMessage = '【StudyQuest システムアラート】\n\n';
     alertMessage += '発生時刻: ' + monitoringResult.timestamp + '\n';
     alertMessage += 'システム状態: ' + monitoringResult.summary.overallHealth + '\n\n';
 
@@ -2834,7 +2851,8 @@ function sendSystemAlert(monitoringResult) {
 
     // 管理者への通知（メール送信は実装に依存）
     const props = PropertiesService.getScriptProperties();
-    const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+    var adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+
     if (adminEmail) {
       // ログに記録（実際のメール送信機能がある場合はここで実装）
       console.log('📧 管理者アラート（' + adminEmail + '）:\n' + alertMessage);
@@ -2864,7 +2882,7 @@ function sendSystemAlert(monitoringResult) {
  */
 function logSystemEvent(eventType, eventData) {
   try {
-    const logEntry = {;
+    var logEntry = {
       timestamp: new Date().toISOString(),
       type: eventType,
       data: eventData,
@@ -2902,7 +2920,7 @@ function deleteUserAccount(userId) {
     try {
       // データベース（シート）からユーザー行を削除（サービスアカウント経由）
       const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);;
+      var dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
       if (!dbId) {
         throw new Error('データベースIDが設定されていません');
       }
@@ -2912,12 +2930,12 @@ function deleteUserAccount(userId) {
         throw new Error('Sheets APIサービスの初期化に失敗しました');
       }
 
-      const sheetName = DB_CONFIG.SHEET_NAME;;
+      var sheetName = DB_CONFIG.SHEET_NAME;
 
       // データベーススプレッドシートの情報を取得してsheetIdを確認
       const spreadsheetInfo = getSpreadsheetsData(service, dbId);
 
-      let targetSheetId;
+      var targetSheetId = null;
       for (let i = 0; i < spreadsheetInfo.sheets.length; i++) {
         if (spreadsheetInfo.sheets[i].properties.title === sheetName) {
           targetSheetId = spreadsheetInfo.sheets[i].properties.sheetId;
@@ -2933,10 +2951,10 @@ function deleteUserAccount(userId) {
 
       // データを取得
       const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
-      const values = data.valueRanges[0].values || [];;
+      var values = data.valueRanges[0].values || [];
 
       // ユーザーIDに基づいて行を探す（A列がIDと仮定）
-      const rowToDelete = -1;
+      var rowToDelete = -1;
       for (let i = values.length - 1; i >= 1; i--) {
         if (values[i][0] === userId) {
           rowToDelete = i + 1; // スプレッドシートは1ベース
@@ -2948,7 +2966,7 @@ function deleteUserAccount(userId) {
         console.log('Deleting row:', rowToDelete, 'from sheetId:', targetSheetId);
 
         // 行を削除（正しいsheetIdを使用）
-        const deleteRequest = {;
+        var deleteRequest = {
           deleteDimension: {
             range: {
               sheetId: targetSheetId,
@@ -2991,7 +3009,8 @@ function deleteUserAccount(userId) {
     console.error('アカウント削除エラー詳細:', error.stack);
 
     // より詳細なエラー情報を提供
-    const errorMessage = 'アカウントの削除に失敗しました: ' + error.message;
+    var errorMessage = 'アカウントの削除に失敗しました: ' + error.message;
+
     if (error.message.includes('No grid with id')) {
       errorMessage +=
         '\n詳細: データベースシートのIDが正しく取得できませんでした。データベース設定を確認してください。';

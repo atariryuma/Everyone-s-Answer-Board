@@ -3008,7 +3008,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
       // 部分一致で検索（大文字小文字を区別しない）
       const normalizedConfigName = configHeaderName.toLowerCase().trim();
 
-      for (let actualHeader in actualHeaderIndices) {
+      for (var actualHeader in actualHeaderIndices) {
         const normalizedActualHeader = actualHeader.toLowerCase().trim();
         if (normalizedActualHeader === normalizedConfigName) {
           mappedIndex = actualHeaderIndices[actualHeader];
@@ -3024,7 +3024,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 
       // 部分一致検索
       if (mappedIndex === undefined) {
-        for (let actualHeader in actualHeaderIndices) {
+        for (var actualHeader in actualHeaderIndices) {
           const normalizedActualHeader = actualHeader.toLowerCase().trim();
           if (
             normalizedActualHeader.includes(normalizedConfigName) ||
@@ -3058,9 +3058,9 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
       ];
       const questionHeaders = [];
 
-      for (let header in actualHeaderIndices) {
+      for (var header in actualHeaderIndices) {
         let isStandardHeader = false;
-        for (let i = 0; i < standardHeaders.length; i++) {
+        for (var i = 0; i < standardHeaders.length; i++) {
           if (
             header.toLowerCase().includes(standardHeaders[i].toLowerCase()) ||
             standardHeaders[i].toLowerCase().includes(header.toLowerCase())
@@ -3100,9 +3100,9 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
         JSON.stringify(reasonKeywords)
       );
 
-      for (let header in actualHeaderIndices) {
+      for (var header in actualHeaderIndices) {
         const normalizedHeader = header.toLowerCase().trim();
-        for (let k = 0; k < reasonKeywords.length; k++) {
+        for (var k = 0; k < reasonKeywords.length; k++) {
           if (
             normalizedHeader.includes(reasonKeywords[k]) ||
             reasonKeywords[k].includes(normalizedHeader)
@@ -3123,7 +3123,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 
       // より広範囲の検索（部分一致）
       if (mappedIndex === undefined) {
-        for (let header in actualHeaderIndices) {
+        for (var header in actualHeaderIndices) {
           const normalizedHeader = header.toLowerCase().trim();
           if (
             normalizedHeader.indexOf('理由') !== -1 ||
