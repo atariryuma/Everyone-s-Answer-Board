@@ -363,6 +363,68 @@ function validateSpreadsheetHeaders(headerIndices) {
 }
 
 /**
+ * ユーザーキャッシュ無効化（後方互換性）
+ * @param {string} userId - ユーザーID
+ * @param {string} email - ユーザーメールアドレス
+ * @param {string|null} spreadsheetId - スプレッドシートID
+ * @param {boolean|string} clearPattern - パターンクリア（true='all', false=基本のみ）
+ * @param {string} dbSpreadsheetId - データベーススプレッドシートID（未使用）
+ */
+function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false, dbSpreadsheetId) {
+  try {
+    console.log('🗑️ ユーザーキャッシュ無効化開始:', { 
+      userId, 
+      email, 
+      spreadsheetId, 
+      clearPattern 
+    });
+    
+    // 基本ユーザーキャッシュクリア
+    if (userId) {
+      const userCacheKeys = [
+        `user_${userId}`,
+        `user_data_${userId}`,
+        `userinfo_${userId}`,
+        `unified_user_info_${userId}`
+      ];
+      userCacheKeys.forEach(key => cacheManager.remove(key));
+      
+      // パターンクリア（簡略版）
+      if (clearPattern) {
+        cacheManager.removePattern(`publishedData_${userId}_`);
+        cacheManager.removePattern(`sheetData_${userId}_`);
+        cacheManager.removePattern(`config_v3_${userId}_`);
+      }
+    }
+    
+    // メールベースキャッシュクリア
+    if (email) {
+      const emailCacheKeys = [
+        `email_${email}`,
+        `unified_user_info_${email}`
+      ];
+      emailCacheKeys.forEach(key => cacheManager.remove(key));
+    }
+    
+    // スプレッドシート関連キャッシュクリア
+    if (spreadsheetId) {
+      const spreadsheetKeys = [
+        `headers_${spreadsheetId}`,
+        `spreadsheet_info_${spreadsheetId}`,
+        `published_data_${spreadsheetId}`
+      ];
+      spreadsheetKeys.forEach(key => cacheManager.remove(key));
+    }
+    
+    console.log('✅ ユーザーキャッシュ無効化完了');
+    
+  } catch (error) {
+    console.error('[ERROR] invalidateUserCache:', error.message);
+    // エラーが発生してもシステムを停止させない
+  }
+}
+
+/**
  * クリティカル更新後のキャッシュ同期（統合版）
  * @param {string} userId - ユーザーID
  * @param {string} userEmail - ユーザーメールアドレス  
