@@ -247,7 +247,7 @@ function registerNewUser(userEmail) {
     }
 
     // 既存ユーザーチェック（1ユーザー1行の原則）
-    console.info('🔍 registerNewUser: Checking existing user', { adminEmail: sanitizedEmail });
+    console.info('registerNewUser: 既存ユーザーチェック');
     const existingUser = DB.findUserByEmail(sanitizedEmail);
 
     if (existingUser) {
@@ -255,11 +255,7 @@ function registerNewUser(userEmail) {
       const { userId } = existingUser;
       const existingConfig = JSON.parse(existingUser.configJson || '{}');
 
-      console.info('👤 registerNewUser: Updating existing user', {
-        userEmail: sanitizedEmail,
-        userId,
-        hasExistingConfig: Object.keys(existingConfig).length > 0,
-      });
+      console.info('registerNewUser: 既存ユーザー更新:', sanitizedEmail);
 
       // 最終アクセス時刻のみ更新（設定は保護）
       updateUserLastAccess(userId);
@@ -267,11 +263,7 @@ function registerNewUser(userEmail) {
       // キャッシュを無効化して最新状態を反映
       invalidateUserCache(userId, sanitizedEmail, existingUser.spreadsheetId, false);
 
-      console.info('✅ registerNewUser: Existing user updated successfully', {
-        userEmail: sanitizedEmail,
-        userId,
-        executionTime: Date.now() - startTime + 'ms',
-      });
+      console.info('registerNewUser: 既存ユーザー更新完了');
 
       const appUrls = generateUserUrls(userId);
 
@@ -286,7 +278,7 @@ function registerNewUser(userEmail) {
     }
 
     // 新規ユーザーの場合
-    console.info('👶 registerNewUser: Creating new user', { adminEmail: sanitizedEmail });
+    console.info('registerNewUser: 新ユーザー作成');
 
     try {
       // 統一ユーザー作成関数を使用
@@ -732,7 +724,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
     let headerTitle = publishedSheetName || '今日のお題';
     if (mappedIndices.opinionHeader !== undefined) {
-      for (var actualHeader in headerIndices) {
+      for (const actualHeader in headerIndices) {
         if (headerIndices[actualHeader] === mappedIndices.opinionHeader) {
           headerTitle = actualHeader;
           console.log('getPublishedSheetData: Using actual header as title: "%s"', headerTitle);
@@ -2172,7 +2164,7 @@ function getQuestionConfig(questionType, customConfig) {
 
   // カスタム設定をマージ
   if (customConfig && typeof customConfig === 'object') {
-    for (var key in customConfig) {
+    for (const key in customConfig) {
       if (config[key]) {
         Object.assign(config[key], customConfig[key]);
       }
@@ -2424,7 +2416,7 @@ function shareAllSpreadsheetsWithServiceAccount() {
     let successCount = 0;
     let errorCount = 0;
 
-    for (var i = 0; i < allUsers.length; i++) {
+    for (let i = 0; i < allUsers.length; i++) {
       const user = allUsers[i];
       if (user.spreadsheetId && user.isActive === 'true') {
         try {
@@ -2946,7 +2938,7 @@ function applySortMode(data, sortMode) {
  * 配列をシャッフル（Fisher-Yates shuffle）
  */
 function shuffleArray(array) {
-  for (var i = array.length - 1; i > 0; i--) {
+  for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     const temp = array[i];
     array[i] = array[j];
@@ -2995,7 +2987,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
   );
 
   // 各設定ヘッダーでマッピングを試行
-  for (var configKey in configHeaders) {
+  for (const configKey in configHeaders) {
     const configHeaderName = configHeaders[configKey];
     let mappedIndex = undefined;
 
@@ -3795,7 +3787,7 @@ function confirmUserRegistration() {
  * @returns {Object} 統合された初期データ
  */
 function getInitialData(requestUserId, targetSheetName) {
-  console.log('🚀 getInitialData: 統合初期化開始', { requestUserId, targetSheetName });
+  console.log('getInitialData: 統合初期化開始');
 
   try {
     const startTime = new Date().getTime();

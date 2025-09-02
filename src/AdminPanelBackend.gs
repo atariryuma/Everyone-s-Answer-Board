@@ -43,14 +43,14 @@ function getSpreadsheetList() {
     const currentUserEmail = User.email();
     console.log('現在のユーザー:', currentUserEmail);
 
-    // キャッシュチェック（5分間有効）
+    // キャッシュチェック（10分間有効に延長）
     const cacheKey = `spreadsheet_list_${currentUserEmail}`;
     const cached = CacheService.getScriptCache().get(cacheKey);
     if (cached) {
       try {
         const cacheData = JSON.parse(cached);
         const cacheAge = Date.now() - cacheData.timestamp;
-        if (cacheAge < 300000) {
+        if (cacheAge < 600000) {
           console.info(`getSpreadsheetList: キャッシュヒット (${Math.round(cacheAge / 1000)}秒前)`);
           return cacheData.data;
         }
@@ -61,11 +61,13 @@ function getSpreadsheetList() {
 
     const startTime = Date.now();
     const spreadsheets = [];
-    const maxResults = 30; // 十分な数を取得
+    const maxResults = 20; // 制限を削減してパフォーマンス向上
+    const maxExecutionTime = 15000; // 15秒でタイムアウト
+    const maxFilesToCheck = 50; // 検査ファイル数を大幅削減
     
-    // シンプルな検索：スプレッドシートのみ、ゴミ箱以外
+    // 最近更新されたスプレッドシートのみを効率的に検索
     const searchQuery = `mimeType="application/vnd.google-apps.spreadsheet" and trashed=false`;
-    console.info('getSpreadsheetList: 検索開始');
+    console.log('getSpreadsheetList: 最適化検索開始');
     
     const files = DriveApp.searchFiles(searchQuery);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -73,7 +75,12 @@ function getSpreadsheetList() {
     let count = 0;
     let totalChecked = 0;
 
-    while (files.hasNext() && count < maxResults && totalChecked < 200) {
+    while (files.hasNext() && count < maxResults && totalChecked < maxFilesToCheck) {
+      // タイムアウトチェック
+      if (Date.now() - startTime > maxExecutionTime) {
+        console.warn('getSpreadsheetList: タイムアウトのため検索を終了');
+        break;
+      }
       totalChecked++;
       const file = files.next();
       
@@ -113,13 +120,13 @@ function getSpreadsheetList() {
     const executionTime = Date.now() - startTime;
     console.info(`getSpreadsheetList: ${spreadsheets.length}件取得（実行時間: ${executionTime}ms、検査数: ${totalChecked}）`);
 
-    // 結果をキャッシュ（5分間）
+    // 結果をキャッシュ（10分間に延長）
     try {
       const cacheData = {
         timestamp: Date.now(),
         data: spreadsheets
       };
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(cacheData), 300);
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(cacheData), 600);
       console.info('getSpreadsheetList: キャッシュ保存完了');
     } catch (e) {
       // キャッシュ保存エラーは無視
@@ -127,8 +134,7 @@ function getSpreadsheetList() {
 
     return spreadsheets;
   } catch (error) {
-    console.error('getSpreadsheetList エラー:', error);
-    throw new Error('スプレッドシート一覧の取得に失敗しました: ' + error.message);
+    return ErrorManager.handle(error, 'getSpreadsheetList');
   }
 }
 

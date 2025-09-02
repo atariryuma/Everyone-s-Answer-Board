@@ -510,26 +510,28 @@
 
   // 列設定の自動初期化（フォールバック処理強化版）
   async function autoInitializeColumnSettings(config) {
-    console.log('autoInitializeColumnSettings: 列設定自動初期化開始', config);
+    console.log('列設定自動初期化開始');
 
     try {
-      // スプレッドシートIDはConfigurationManagerで管理されるため、API経由で取得が必要
+      // スプレッドシートIDを取得: configから、または現在選択中のものから
+      const spreadsheetSelect = document.getElementById('spreadsheet-select');
+      const spreadsheetId = config.spreadsheetId || spreadsheetSelect?.value;
       let sheetName = config.sheetName;
 
       if (!spreadsheetId) {
-        console.log('スプレッドシートIDが不足、列設定スキップ');
+        console.warn('スプレッドシートIDが選択されていません');
         return;
       }
 
       // シート名が不足している場合の自動検出・選択
       if (!sheetName) {
-        console.log('シート名が不足、自動検出を実行');
+        console.log('シート名不足のため自動検出実行');
         try {
           const sheets = await loadSheetListAsync(spreadsheetId);
           if (sheets && sheets.length > 0) {
             // 優先順位でシートを選択
             sheetName = detectBestSheetName(sheets);
-            console.log('自動検出によるシート選択:', sheetName);
+            console.log('自動選択シート:', sheetName);
 
             // UI更新: 自動選択されたシートを反映
             await autoSelectSheet(sheetName);
@@ -546,34 +548,54 @@
 
       // 既存の列設定データがあるかチェック
       if (config.columnMapping || config.columnSelections) {
-        console.log('既存の列設定データを使用');
+        console.log('既存列設定データ使用');
         // 既存データから列設定を復元
         await restoreColumnSettingsFromConfig(config, sheetName);
       } else {
-        console.log('列設定データなし、AI分析を実行');
+        console.log('新規AI分析実行');
         // 新規にAI分析実行
         await analyzeAndSetupColumns(spreadsheetId, sheetName);
       }
     } catch (error) {
-      console.error('列設定自動初期化エラー:', error);
+      console.error('列設定初期化エラー:', error);
       showError('列設定の初期化に失敗しました: ' + error.message);
     }
   }
 
-  // 最適なシート名を検出
+  // 最適なシート名を検出（柔軟パターンマッチング対応）
   function detectBestSheetName(sheets) {
-    console.log('detectBestSheetName: 最適シート検出開始', sheets);
+    console.log('最適シート検出開始');
 
-    // 優先順位リスト
+    // フォームレスポンス系のパターン（正規表現）
+    const formResponsePatterns = [
+      /^フォームの回答\s*\d*$/,        // フォームの回答、フォームの回答 1, フォームの回答 7 など
+      /^Form Responses?\s*\d*$/,       // Form Response, Form Responses 1 など
+      /^回答\s*\d*$/,                  // 回答、回答 1 など
+      /^Responses?\s*\d*$/            // Response, Responses 1 など
+    ];
+
+    // 優先順位リスト（厳密マッチ）
     const priorities = ['フォームの回答 1', 'フォームの回答', 'Sheet1', 'シート1'];
 
-    // 優先名から検索
+    // 1. 優先名から厳密検索
     for (const priority of priorities) {
       const sheet = sheets.find((s) => s.name === priority);
       if (sheet && sheet.rowCount > 1) {
-        // データがあるかチェック
         console.log('優先シート選択:', priority);
         return priority;
+      }
+    }
+
+    // 2. フォームレスポンスパターンマッチング
+    for (const pattern of formResponsePatterns) {
+      const matchingSheets = sheets
+        .filter((s) => pattern.test(s.name) && s.rowCount > 1)
+        .sort((a, b) => b.rowCount - a.rowCount); // データが多い順
+      
+      if (matchingSheets.length > 0) {
+        const selected = matchingSheets[0].name;
+        console.log('パターンマッチシート選択:', selected);
+        return selected;
       }
     }
 

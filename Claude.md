@@ -9,51 +9,130 @@
 
 ## 🚨 絶対遵守：データベーススキーマ
 - ✅ **唯一使用**: `database.gs` の `DB_CONFIG`
-- ✅ **正式フィールド**: `tenantId`, `ownerEmail`, `createdAt`, `lastAccessedAt`, `status`
-- ❌ **使用禁止**: `userId`, `adminEmail`（旧フィールド名）
-- ❌ **削除済み**: `constants.gs` の `DB_SHEET_CONFIG`（古い定義）
-
-## 🎯 必須定数（src/constants.gs）
-### リアクション定数
+- ✅ **正式フィールド**: 
 ```javascript
-const REACTION_KEYS = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
-const COLUMN_HEADERS = {
-  OPINION: '回答', REASON: '理由', UNDERSTAND: 'なるほど！', 
-  LIKE: 'いいね！', CURIOUS: 'もっと知りたい！', HIGHLIGHT: 'ハイライト'
-};
+const DB_CONFIG = Object.freeze({
+  SHEET_NAME: 'Users',
+  HEADERS: [
+    'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
+    'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl', 
+    'sheetName', 'columnMappingJson', 'publishedAt', 'appUrl', 'lastModified'
+  ]
+});
 ```
 
-### 統一システム定数
+## 🎯 必須定数（src/constants.gs）
+### システム全体の統一定数
 ```javascript
-const SYSTEM_CONSTANTS = {
-  DATABASE: { SHEET_NAME: 'Users', HEADERS: ['tenantId', 'ownerEmail', ...] },
-  REACTIONS: { KEYS: REACTION_KEYS, COLUMNS: {...} },
-  ACCESS_LEVELS: { OWNER: 'owner', SYSTEM_ADMIN: 'system_admin', ... }
-};
+const SYSTEM_CONSTANTS = Object.freeze({
+  // データベース関連定数
+  DATABASE: {
+    SHEET_NAME: 'Users',
+    HEADERS: [...], // 14フィールド
+    DELETE_LOG: {
+      SHEET_NAME: 'DeletionLogs',
+      HEADERS: ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
+    }
+  },
+
+  // リアクション機能
+  REACTIONS: {
+    KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
+    LABELS: {
+      UNDERSTAND: 'なるほど！',
+      LIKE: 'いいね！', 
+      CURIOUS: 'もっと知りたい！',
+      HIGHLIGHT: 'ハイライト'
+    }
+  },
+
+  // AdminPanel用列マッピング（AI検索対応）
+  COLUMN_MAPPING: {
+    answer: {
+      key: 'answer', header: '回答',
+      alternates: ['どうして', '質問', '問題', '意見', '答え', 'なぜ'],
+      aiPatterns: ['？', '?', 'どうして', 'なぜ', '思いますか'],
+      required: true
+    },
+    reason: {
+      key: 'reason', header: '理由',
+      alternates: ['理由', '根拠', '体験', 'なぜ', '詳細', '説明'],
+      required: false
+    }
+  },
+
+  // アクセス制御
+  ACCESS: {
+    LEVELS: {
+      OWNER: 'owner',
+      SYSTEM_ADMIN: 'system_admin', 
+      AUTHENTICATED_USER: 'authenticated_user',
+      GUEST: 'guest'
+    }
+  }
+});
+```
+
+### コアシステム定数
+```javascript
+const CORE = Object.freeze({
+  TIMEOUTS: { SHORT: 1000, MEDIUM: 5000, LONG: 30000, FLOW: 300000 },
+  STATUS: { ACTIVE: 'active', INACTIVE: 'inactive', PENDING: 'pending', ERROR: 'error' },
+  HTTP_STATUS: { OK: 200, BAD_REQUEST: 400, UNAUTHORIZED: 401, FORBIDDEN: 403 }
+});
+
+const PROPS_KEYS = Object.freeze({
+  SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
+  DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
+  ADMIN_EMAIL: 'ADMIN_EMAIL'
+});
 ```
 
 ## 🔄 システムフロー
-### 管理パネル作成フロー
+### 1. 初期セットアップフロー
 ```
-管理パネル → connectDataSource → ConfigurationManager → Database.configJson
-```
-
-### 閲覧フロー  
-```
-doGet → verifyAccess → getUserConfig → renderAnswerBoard → HTMLテンプレート
+システム未設定 → doGet() → isSystemSetup() → renderSetupPage()
 ```
 
-### リアクションフロー
+### 2. ユーザー登録・認証フロー
 ```
-addReaction → LockService → processReaction → バッチ更新 → リアルタイム反映
+doGet(mode=login) → handleUserRegistration() → createCompleteUser() → DB.createUser()
+```
+
+### 3. 管理パネルフロー
+```
+doGet(mode=admin) → App.getAccess().verifyAccess() → renderAdminPanel()
+```
+
+### 4. 回答ボード表示フロー
+```
+doGet(mode=view) → App.getAccess().verifyAccess() → renderAnswerBoard()
+```
+
+### 5. データソース接続フロー
+```
+connectDataSource() → ConfigurationManager → Database.configJson 更新
 ```
 
 ## 🏗️ アーキテクチャ階層
 1. **PropertiesService**: システム設定（SERVICE_ACCOUNT_CREDS, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL）
-2. **Database**: テナント管理（tenantId, ownerEmail, configJson）
-3. **ConfigurationManager**: 設定管理（PropertiesService + Cache）
+2. **Database**: テナント管理（userId, userEmail, configJson）
+3. **App名前空間**: 統一サービス層（App.init(), App.getAccess(), App.getConfig()）
 4. **AccessController**: アクセス制御（owner > system_admin > authenticated_user > guest）
-5. **ReactionManager**: リアルタイム処理（LockService + バッチ処理）
+5. **SecurityManager**: 認証・JWT管理（Service Account Token生成）
+
+## 🔐 セキュリティ設計
+### 入力検証（SecurityValidator）
+```javascript
+const SECURITY = Object.freeze({
+  VALIDATION_PATTERNS: {
+    EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+    UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    SAFE_STRING: /^[a-zA-Z0-9\s\-_.@]+$/
+  },
+  MAX_LENGTHS: { EMAIL: 254, CONFIG_JSON: 10000, GENERAL_TEXT: 1000 }
+});
+```
 
 ---
 
@@ -88,51 +167,131 @@ addReaction → LockService → processReaction → バッチ更新 → リア�
 
 ## 3) ファイル構成とモジュール化
 
-- GAS は **ES Modules 非対応**。`import/export` はそのままでは使えない。  
-- 多ファイルに分け、**グローバル名前空間を汚さない命名**で整理。  
-- npm を利用する場合はローカルでバンドル（Webpack など）、`clasp` でアップロード。
-
+現在のファイル構成:
+```
+/src/
+├── constants.gs      # システム定数（SYSTEM_CONSTANTS, CORE, PROPS_KEYS）
+├── database.gs       # DB操作（DB名前空間、DB_CONFIG）
+├── main.gs          # エントリーポイント（doGet, Services名前空間）
+├── auth.gs          # 認証管理（ユーザー登録、JWT）
+├── security.gs      # セキュリティ（Service Account Token）
+├── Core.gs          # 業務ロジック（自動停止、ヘッダー検証）
+├── AdminPanelBackend.gs  # 管理パネル（列マッピング検出）
+├── App.gs           # 統一サービス層
+├── Base.gs          # 基盤機能
+└── cache.gs         # キャッシュ管理
 ```
 
-/src               # ES6/TS 源コード
-/dist/code.js      # バンドル出力（GAS 用）
-/appsscript.json   # マニフェスト
-
-````
+- GAS は **ES Modules 非対応**。`import/export` はそのままでは使えない。  
+- 多ファイルに分け、**グローバル名前空間を汚さない命名**で整理。
 
 ---
 
 ## 4) 主要 ES6+ 機能の使い分け
 
-- **クラス**：責務分離に利用。  
-- **`Map/Set`**：高速検索や非文字列キー管理に有効。  
-- **イテレータ/ジェネレータ**：大規模データの段階処理に。  
-- **Promise/`async`**：構文は使えるが GAS API は同期。基本は不要。
+- **Object.freeze()**：設定オブジェクトの不変化
+- **Map/Set**：高速検索や非文字列キー管理に有効
+- **アロー関数**：関数型プログラミングパターン
+- **テンプレートリテラル**：ログメッセージやHTML生成
+- **分割代入**：オブジェクト/配列の簡潔な操作
 
 ---
 
 ## 5) I/O とパフォーマンス
 
-- **Spreadsheet**：`getValues()`→配列処理→`setValues()` 一括。  
-- **Drive/UrlFetch**：必要最小限。レスポンスは即 `JSON.parse`。  
-- **キャッシュ**：`CacheService`/`PropertiesService` を積極利用。  
-- **Utilities.sleep** は最小限。
+### Sheets API最適化
+```javascript
+// ❌ 非効率：個別API呼び出し
+sheet.getRange('A1').setValue('data1');
+sheet.getRange('A2').setValue('data2');
+
+// ✅ 効率的：バッチ処理
+const values = [['data1'], ['data2']];  
+sheet.getRange('A1:A2').setValues(values);
+```
+
+### Service Account認証
+```javascript
+// キャッシュ活用でトークン取得を最適化
+function getServiceAccountTokenCached() {
+  return cacheManager.get(SECURITY_CONFIG.AUTH_CACHE_KEY, generateNewServiceAccountToken, {
+    ttl: 3500,
+    enableMemoization: true
+  });
+}
+```
 
 ---
 
 ## 6) 例外・リトライ・検証
 
-- **入力検証**：Public 関数は JSDoc で型・必須性を明記。  
-- **外部呼び出し**は指数バックオフを実装。  
-- **失敗時の痕跡**：`console.error`＋簡潔な要約を残す。
+### 統一エラーハンドリング
+```javascript
+try {
+  const result = DB.createUser(userData);
+  return result;
+} catch (error) {
+  console.error('ユーザー作成エラー:', {
+    userEmail: userData.userEmail,
+    error: error.message,
+    timestamp: new Date().toISOString()
+  });
+  throw error;
+}
+```
+
+### 入力検証
+```javascript
+const validation = SecurityValidator.validateUserData(userData);
+if (!validation.isValid) {
+  throw new Error(validation.errors.join(', '));
+}
+```
 
 ---
 
-## 7) ローカル開発・デプロイ
+## 7) 現在のシステム特有の実装パターン
 
-- **`clasp`** でローカル開発／デプロイ。  
-- **ライブラリ**は Script ID 指定でバージョン固定。  
-- **npm** は「バンドル → 単一ファイル」の原則。
+### App名前空間パターン
+```javascript
+// App.gs - 統一サービス層
+const App = {
+  init() {
+    // システム初期化
+  },
+  
+  getAccess() {
+    return {
+      verifyAccess(userId, mode, currentUserEmail) {
+        // アクセス制御ロジック
+      }
+    };
+  },
+  
+  getConfig() {
+    // 設定管理
+  }
+};
+```
+
+### DB名前空間パターン
+```javascript
+// database.gs - DB操作の構造化
+const DB = {
+  createUser(userData) { /* */ },
+  findUserByEmail(email) { /* */ },
+  updateUser(userId, updateData) { /* */ }
+};
+```
+
+### モジュール設定パターン
+```javascript
+// 各ファイルでのモジュール固有設定
+const MODULE_CONFIG = Object.freeze({
+  CACHE_TTL: CORE.TIMEOUTS.LONG,
+  STATUS_ACTIVE: CORE.STATUS.ACTIVE
+});
+```
 
 ---
 
@@ -143,60 +302,105 @@ addReaction → LockService → processReaction → バッチ更新 → リア�
 
 ---
 
-## 9) 生成AI向けプロンプト指示（サンプル）
+## 9) 生成AI向けプロンプト指示
 
-1. **`const`優先、`let`のみ許可、`var`禁止**。  
-2. **エントリーポイントはトップレベル関数**。  
-3. **バッチI/O・最小呼び出し**を強制。  
-4. **JSDoc**を必須。  
-5. **例外処理・ログ方針**を明記。  
-6. **`async/await`は不要**。  
-7. npm が必要な場合のみバンドル指示。  
-8. 依存がなければ **単一ファイルに収束**。
+1. **`const`優先、`let`のみ許可、`var`禁止**  
+2. **SYSTEM_CONSTANTS, DB_CONFIG使用必須**  
+3. **App名前空間、DB名前空間のパターン遵守**  
+4. **バッチI/O・最小呼び出し**を強制  
+5. **SecurityValidator使用**でセキュリティ確保  
+6. **console.error**でエラー情報を構造化ログ出力  
+7. **Object.freeze()**で設定の不変性保持
 
 ---
 
-## 10) 最小テンプレート（雛形）
+## 10) 最小テンプレート（現在のシステム準拠）
 
-```js
+```javascript
 /** @OnlyCurrentDoc */
 
 /**
- * シートのA列を集計してログ出力する
- * @return {void}
+ * 新機能の実装例
+ * SYSTEM_CONSTANTS使用、DB名前空間パターン適用
  */
-function main() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const values = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues();
-  const nonEmpty = values.flat().filter(v => String(v).trim() !== "");
-  const counts = countBy(nonEmpty);
-  console.log(summaryToLines(counts).join("\n"));
+
+// モジュール設定（CORE参照）
+const FEATURE_CONFIG = Object.freeze({
+  TIMEOUT: CORE.TIMEOUTS.MEDIUM,
+  STATUS: CORE.STATUS.ACTIVE
+});
+
+/**
+ * メイン機能関数
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 処理結果
+ */
+function processFeature(userId) {
+  try {
+    // 入力検証
+    if (!SecurityValidator.isValidUUID(userId)) {
+      throw new Error('無効なユーザーIDです');
+    }
+
+    // DB操作
+    const user = DB.findUserById(userId);
+    if (!user) {
+      throw new Error('ユーザーが見つかりません');
+    }
+
+    // 処理ロジック
+    const result = {
+      success: true,
+      userId: user.userId,
+      timestamp: new Date().toISOString()
+    };
+
+    console.info('機能処理完了', {
+      userId: userId,
+      result: result
+    });
+
+    return result;
+
+  } catch (error) {
+    console.error('機能処理エラー', {
+      userId: userId,
+      error: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
 }
-
-/** @param {string[]} arr @return {Map<string, number>} */
-const countBy = (arr) => {
-  const m = new Map();
-  for (const v of arr) m.set(v, (m.get(v) ?? 0) + 1);
-  return m;
-};
-
-/** @param {Map<string, number>} m @return {string[]} */
-const summaryToLines = (m) =>
-  Array.from(m.entries()).map(([k, n]) => `${k}: ${n}`);
-````
+```
 
 ---
 
-## AI にありがちな誤りと対策
+## AI開発での注意点・制約
 
-* **誤**「`import/export` を .gs に書く」
-  → **正**「バンドルして単一 JS にしてからデプロイ」。
-* **誤**「`await UrlFetchApp.fetch()`」
-  → **正**「同期API。`await` は意味がない」。
-* **誤**「セルを1件ずつ `setValue`」
-  → **正**「`getValues`/`setValues` で一括」。
-* **誤**「`var` 多用」
-  → **正**「`const`/`let`」。
+### 必須チェックリスト
+1. **定数使用**: `SYSTEM_CONSTANTS`, `DB_CONFIG`, `CORE` の使用確認
+2. **名前空間**: `App`, `DB`, `SecurityValidator` パターンの適用
+3. **セキュリティ**: 入力検証とエラーハンドリングの実装
+4. **パフォーマンス**: バッチ処理とキャッシュの活用
+5. **ログ**: 構造化ログによるデバッグ情報出力
+
+### 本番デプロイ前チェックリスト
+```bash
+# 1. 全テスト通過確認
+npm run test
+
+# 2. コード品質チェック  
+npm run lint
+
+# 3. フォーマット統一
+npm run format
+
+# 4. 統合チェック
+npm run check
+
+# 5. GASデプロイ
+npm run deploy
+```
 
 ---
 

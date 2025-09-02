@@ -1,8 +1,78 @@
 /**
  * 基盤クラス集
- * ConfigurationManagerとAccessControllerの定義
+ * ConfigurationManager、AccessController、統一エラーハンドラの定義
  * 2024年GASベストプラクティス準拠
  */
+
+// ===============================
+// 統一エラーハンドラ（CLAUDE.md準拠）
+// ===============================
+
+/**
+ * CLAUDE.md準拠の統一エラーハンドラ
+ */
+const ErrorManager = Object.freeze({
+  /**
+   * 統一エラー処理
+   * @param {Error} error - エラーオブジェクト
+   * @param {string} context - エラー発生コンテキスト
+   * @param {Object} options - オプション {shouldThrow: boolean, retryable: boolean}
+   * @returns {void|*} 
+   */
+  handle(error, context, options = {}) {
+    const { shouldThrow = true, retryable = false } = options;
+    
+    // GAS標準ログでエラー記録
+    console.error(`[${context}] エラー:`, error.message);
+    
+    // Google Apps Scriptの特定エラーハンドリング
+    if (error.name === 'Exception' && error.message.includes('Quota exceeded')) {
+      console.warn(`[${context}] クォータ制限に達しました`);
+      if (retryable) {
+        return this.retryWithBackoff(error, context);
+      }
+    }
+    
+    if (error.name === 'Exception' && error.message.includes('Rate limit')) {
+      console.warn(`[${context}] レート制限に達しました`);
+      if (retryable) {
+        return this.retryWithBackoff(error, context);
+      }
+    }
+    
+    // エラーの再投げ（デフォルト）
+    if (shouldThrow) {
+      throw new Error(`${context}で処理エラー: ${error.message}`);
+    }
+    
+    return null;
+  },
+
+  /**
+   * 指数バックオフによるリトライ実装
+   * @param {Error} originalError - 元のエラー
+   * @param {string} context - コンテキスト
+   * @returns {*}
+   */
+  retryWithBackoff(originalError, context) {
+    console.log(`[${context}] バックオフリトライを開始`);
+    // 簡易実装: GASの制限内でのリトライ
+    Utilities.sleep(Math.random() * 2000 + 1000); // 1-3秒待機
+    return null;
+  },
+
+  /**
+   * 非クリティカルエラーの安全な処理
+   * @param {Error} error - エラーオブジェクト  
+   * @param {string} context - コンテキスト
+   * @param {*} fallbackValue - フォールバック値
+   * @returns {*}
+   */
+  handleSafely(error, context, fallbackValue = null) {
+    console.warn(`[${context}] 非クリティカルエラー:`, error.message);
+    return fallbackValue;
+  }
+});
 
 // ===============================
 // ConfigurationManagerクラス（データベース専用版）

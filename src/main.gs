@@ -139,7 +139,7 @@ const Services = {
           isAuthenticated: true,
         };
       } catch (error) {
-        console.error('getActiveUserInfo エラー', { error: error.message });
+        console.error('getActiveUserInfo エラー:', error.message);
         return null;
       }
     },
@@ -157,7 +157,7 @@ const Services = {
           // spreadsheetId, configJsonは削除され、ConfigurationManagerで管理
         };
       } catch (error) {
-        console.error('getActiveUserInfo エラー', { error: error.message });
+        console.error('getActiveUserInfo エラー:', error.message);
         return null;
       }
     },
@@ -174,7 +174,7 @@ const Services = {
         // 基本的には全ユーザーアクセス許可（必要に応じて制限を追加）
         return { hasAccess: true, message: 'アクセス許可' };
       } catch (error) {
-        console.error('アプリケーションアクセスチェック失敗', { error: error.message });
+        console.error('アプリケーションアクセスチェック失敗:', error.message);
         return { hasAccess: true, message: 'アクセス許可（エラー回避）' };
       }
     },
@@ -216,7 +216,7 @@ const Deploy = {
         webAppUrl: webAppUrl,
       };
     } catch (e) {
-      console.error('デプロイユーザードメイン情報取得失敗', { error: e.message });
+      console.error('デプロイユーザードメイン情報取得失敗:', e.message);
       return {
         currentDomain: '',
         deployDomain: '',
@@ -232,10 +232,10 @@ const Deploy = {
       const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
       const currentUserEmail = User.email();
 
-      console.log('Deploy.isUser() - 管理者確認', { adminEmail, currentUserEmail });
+      console.log('Deploy.isUser() - 管理者確認:', adminEmail, currentUserEmail);
       return adminEmail === currentUserEmail;
     } catch (error) {
-      console.error('Deploy.isUser() エラー', { error: error.message });
+      console.error('Deploy.isUser() エラー:', error.message);
       return false;
     }
   },
@@ -287,7 +287,7 @@ function getGoogleClientId() {
       data: { clientId: clientId },
     };
   } catch (error) {
-    console.error('GOOGLE_CLIENT_ID取得エラー', { error: error.message });
+    console.error('GOOGLE_CLIENT_ID取得エラー:', error.message);
     return {
       success: false,
       message: 'Google Client IDの取得に失敗しました: ' + error.toString(),
@@ -489,7 +489,7 @@ function getWebAppUrl() {
   try {
     return ScriptApp.getService().getUrl();
   } catch (e) {
-    console.error('WebApp URL取得失敗', { error: e.message });
+    console.error('WebApp URL取得失敗:', e.message);
     return '';
   }
 }
@@ -724,8 +724,7 @@ function parseRequestParams(e) {
   const sheetName = p.sheetName || null;
   const isDirectPageAccess = !!(spreadsheetId && sheetName);
 
-  console.log('parseRequestParams - Raw parameters:', JSON.stringify(p));
-  console.log('parseRequestParams - Parsed mode:', mode, 'setupParam:', setupParam);
+  console.log('parseRequestParams - mode:', mode, 'setup:', setupParam);
 
   return { mode, userId, setupParam, spreadsheetId, sheetName, isDirectPageAccess };
 }
@@ -815,9 +814,8 @@ function renderAnswerBoard(userInfo, params) {
     config = {};
   }
 
-  console.log('renderAnswerBoard - userInfo:', JSON.stringify(userInfo));
-  console.log('renderAnswerBoard - params:', JSON.stringify(params));
-  console.log('renderAnswerBoard - config keys:', Object.keys(config));
+  console.log('renderAnswerBoard - userId:', userInfo.userId);
+  console.log('renderAnswerBoard - mode:', params.mode);
 
   try {
     // 既存のPage.htmlテンプレートを使用

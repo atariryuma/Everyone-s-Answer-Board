@@ -265,8 +265,7 @@ const DB = {
       console.log('findUserByEmail: ユーザーが見つかりませんでした:', email);
       return null;
     } catch (error) {
-      console.error('findUserByEmail: 検索エラー', { email, error: error.message });
-      return null;
+      return ErrorManager.handleSafely(error, 'findUserByEmail', null);
     }
   },
 
@@ -353,8 +352,7 @@ const DB = {
       console.log('findUserById: ユーザーが見つかりませんでした:', userId);
       return null;
     } catch (error) {
-      console.error('findUserById: 検索エラー', { userId, error: error.message });
-      return null;
+      return ErrorManager.handleSafely(error, 'findUserById', null);
     }
   },
 };
@@ -955,7 +953,7 @@ function updateUser(userId, updateData) {
     var rowIndex = -1;
 
     // ユーザーの行を特定
-    for (var i = 1; i < values.length; i++) {
+    for (let i = 1; i < values.length; i++) {
       if (values[i][userIdIndex] === userId) {
         rowIndex = i + 1; // 1-based index
         break;
@@ -1715,7 +1713,7 @@ function diagnoseDatabase(targetUserId) {
         var userFound = false;
         var userRowIndex = -1;
 
-        for (var i = 1; i < values.length; i++) {
+        for (let i = 1; i < values.length; i++) {
           if (values[i][0] === targetUserId) {
             userFound = true;
             userRowIndex = i;
@@ -2234,7 +2232,7 @@ function checkForDuplicates(headers, userRows) {
   var seenUserIds = new Set();
   var seenEmails = new Set();
 
-  for (var i = 0; i < userRows.length; i++) {
+  for (let i = 0; i < userRows.length; i++) {
     var row = userRows[i];
     var userId = row[userIdIndex];
     var email = row[emailIndex];
@@ -2277,11 +2275,11 @@ function checkMissingRequiredFields(headers, userRows) {
   var missing = [];
   var requiredFields = ['userId', 'userEmail']; // 最低限必要なフィールド
 
-  for (var i = 0; i < userRows.length; i++) {
+  for (let i = 0; i < userRows.length; i++) {
     var row = userRows[i];
     var missingInThisRow = [];
 
-    for (var j = 0; j < requiredFields.length; j++) {
+    for (let j = 0; j < requiredFields.length; j++) {
       var fieldName = requiredFields[j];
       var fieldIndex = headers.indexOf(fieldName);
 
@@ -2313,7 +2311,7 @@ function checkInvalidDataFormats(headers, userRows) {
   var emailIndex = headers.indexOf('userEmail');
   var userIdIndex = headers.indexOf('userId');
 
-  for (var i = 0; i < userRows.length; i++) {
+  for (let i = 0; i < userRows.length; i++) {
     var row = userRows[i];
     var rowIssues = [];
 
@@ -2356,7 +2354,7 @@ function checkOrphanedData(headers, userRows) {
   var orphaned = [];
   var isActiveIndex = headers.indexOf('isActive');
 
-  for (var i = 0; i < userRows.length; i++) {
+  for (let i = 0; i < userRows.length; i++) {
     var row = userRows[i];
     var issues = [];
 
@@ -2412,7 +2410,7 @@ function performDataIntegrityFix(details, headers, userRows, dbId, service) {
   if (isActiveIndex !== -1) {
     var updatesNeeded = [];
 
-    for (var i = 0; i < userRows.length; i++) {
+    for (let i = 0; i < userRows.length; i++) {
       var row = userRows[i];
       var currentValue = row[isActiveIndex];
 
