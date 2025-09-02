@@ -189,6 +189,70 @@ function checkFormConnection(spreadsheetId) {
   }
 }
 
+/**
+ * シート特定のフォーム連携情報を取得
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} フォーム連携情報
+ */
+function getSheetSpecificFormInfo(spreadsheetId, sheetName) {
+  try {
+    console.log(`getSheetSpecificFormInfo: ${sheetName} のフォーム連携チェック開始`);
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      return { hasForm: false, reason: 'シートが見つかりません' };
+    }
+
+    // シート別のフォームURL取得（重要: sheet.getFormUrl()を使用）
+    let formUrl;
+    try {
+      formUrl = sheet.getFormUrl();
+      
+      if (!formUrl) {
+        console.log(`getSheetSpecificFormInfo: シート「${sheetName}」にフォーム連携なし`);
+        return { hasForm: false, reason: 'このシートにフォーム連携なし' };
+      }
+    } catch (error) {
+      console.log(`getSheetSpecificFormInfo: シート「${sheetName}」フォームURL取得エラー:`, error.message);
+      return { hasForm: false, reason: 'フォームURL取得エラー' };
+    }
+
+    // フォーム情報を取得
+    try {
+      const form = FormApp.openByUrl(formUrl);
+      
+      const formInfo = {
+        hasForm: true,
+        formUrl: form.getPublishedUrl(),
+        formTitle: form.getTitle(),
+        formId: form.getId(),
+        sheetName: sheetName,
+        destinationCheck: form.getDestinationId() === spreadsheetId
+      };
+
+      console.log(`getSheetSpecificFormInfo: シート「${sheetName}」フォーム情報取得成功`, {
+        formTitle: formInfo.formTitle,
+        formId: formInfo.formId,
+        destinationMatch: formInfo.destinationCheck
+      });
+
+      return formInfo;
+    } catch (formError) {
+      console.warn(`getSheetSpecificFormInfo: シート「${sheetName}」フォーム詳細取得エラー:`, formError.message);
+      return { 
+        hasForm: false, 
+        reason: 'フォーム詳細取得失敗',
+        formUrl: formUrl 
+      };
+    }
+  } catch (error) {
+    console.error(`getSheetSpecificFormInfo エラー: ${spreadsheetId}/${sheetName}`, error.message);
+    return { hasForm: false, reason: 'エラー発生', error: error.message };
+  }
+}
 
 /**
  * フォーム情報を取得（シンプル&高速版）
@@ -200,92 +264,41 @@ function getFormInfo(spreadsheetId, sheetName) {
   try {
     console.log(`getFormInfo: シート別フォーム連携チェック開始 ${spreadsheetId}/${sheetName}`);
 
-    // まずスプレッドシート全体のフォーム連携をチェック
-    const overallFormInfo = checkFormConnection(spreadsheetId);
-    if (!overallFormInfo || !overallFormInfo.hasForm) {
-      return { success: false, reason: 'スプレッドシートにフォーム連携なし' };
-    }
-
-    // シート名がフォーム回答用パターンに一致するかチェック
-    const isFormResponsePattern =
-      sheetName.startsWith('フォームの回答') || 
-      sheetName.startsWith('Form Responses') ||
-      sheetName.includes('フォーム') ||
-      sheetName.includes('回答');
-
-    if (isFormResponsePattern) {
-      // パターンに一致する場合、基本的にフォーム連携とみなす
+    // 新しいシート特定のフォーム連携チェックを使用
+    const sheetFormInfo = getSheetSpecificFormInfo(spreadsheetId, sheetName);
+    
+    if (sheetFormInfo.hasForm) {
+      console.log(`getFormInfo: シート「${sheetName}」のフォーム連携確認成功`);
       return {
         success: true,
         formData: {
-          formUrl: overallFormInfo.formUrl,
-          formTitle: overallFormInfo.formTitle,
-          formId: overallFormInfo.formId,
+          formUrl: sheetFormInfo.formUrl,
+          formTitle: sheetFormInfo.formTitle,
+          formId: sheetFormInfo.formId,
           sheetName: sheetName,
           isConnectedToThisSheet: true,
-          source: 'pattern_match'
+          source: 'sheet_specific',
+          destinationVerified: sheetFormInfo.destinationCheck
         }
       };
     }
 
-    // より詳細なフォーム情報が必要な場合のみ FormApp を使用
-    try {
-      let form = null;
-      
-      // まずIDでの取得を試行
-      if (overallFormInfo.formId) {
-        try {
-          form = FormApp.openById(overallFormInfo.formId);
-        } catch (idError) {
-          console.warn('FormIDでの取得失敗:', idError.message);
-        }
-      }
-      
-      // IDで取得できない場合はURLで試行
-      if (!form && overallFormInfo.formUrl) {
-        try {
-          form = FormApp.openByUrl(overallFormInfo.formUrl);
-        } catch (urlError) {
-          console.warn('FormURLでの取得失敗:', urlError.message);
-        }
-      }
+    // シート特定のフォームが見つからない場合の詳細ログ
+    console.log(`getFormInfo: シート「${sheetName}」にフォーム連携なし`, {
+      reason: sheetFormInfo.reason,
+      sheetName: sheetName,
+      spreadsheetId: spreadsheetId
+    });
 
-      if (form) {
-        const formDestination = form.getDestinationId();
-        
-        // フォームの送信先スプレッドシートが一致するか確認
-        if (formDestination === spreadsheetId) {
-          return {
-            success: true,
-            formData: {
-              formUrl: overallFormInfo.formUrl,
-              formTitle: overallFormInfo.formTitle,
-              formId: overallFormInfo.formId,
-              sheetName: sheetName,
-              isConnectedToThisSheet: true,
-              source: 'form_validation'
-            }
-          };
-        }
-      }
-      
-      // フォームが取得できない場合でも、基本情報は返す
-      return {
-        success: false,
-        reason: 'フォーム詳細確認不可（基本連携あり）',
-        availableForm: overallFormInfo,
-      };
-      
-    } catch (formError) {
-      console.warn('フォーム詳細取得エラー:', formError.message);
-      
-      // エラーが発生してもフォーム連携の基本情報は提供
-      return {
-        success: false,
-        reason: 'フォーム詳細取得失敗',
-        availableForm: overallFormInfo,
-      };
-    }
+    return {
+      success: false,
+      reason: sheetFormInfo.reason || 'このシートにはフォーム連携がありません',
+      sheetName: sheetName,
+      suggestions: [
+        'このシートが正しいフォーム回答シートか確認してください',
+        '他のシートにフォーム連携があるかもしれません'
+      ]
+    };
 
   } catch (error) {
     console.error(`getFormInfo エラー: ${spreadsheetId}/${sheetName}`, error.message);
@@ -293,6 +306,91 @@ function getFormInfo(spreadsheetId, sheetName) {
       success: false, 
       reason: 'エラー発生', 
       error: error.message 
+    };
+  }
+}
+
+/**
+ * スプレッドシート内の全フォーム連携を取得（デバッグ・管理用）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Object} 全フォーム連携情報
+ */
+function getAllFormsInSpreadsheet(spreadsheetId) {
+  try {
+    console.log(`getAllFormsInSpreadsheet: ${spreadsheetId} の全フォーム連携調査開始`);
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = spreadsheet.getSheets();
+    const formConnections = [];
+
+    sheets.forEach((sheet, index) => {
+      const sheetName = sheet.getName();
+      console.log(`getAllFormsInSpreadsheet: シート ${index + 1}/${sheets.length}: ${sheetName} 確認中`);
+
+      try {
+        const formUrl = sheet.getFormUrl();
+        if (formUrl) {
+          try {
+            const form = FormApp.openByUrl(formUrl);
+            formConnections.push({
+              sheetName: sheetName,
+              sheetIndex: index,
+              formUrl: form.getPublishedUrl(),
+              formTitle: form.getTitle(),
+              formId: form.getId(),
+              destinationCheck: form.getDestinationId() === spreadsheetId,
+              hasConnection: true
+            });
+            console.log(`getAllFormsInSpreadsheet: シート「${sheetName}」にフォーム「${form.getTitle()}」が連携`);
+          } catch (formError) {
+            formConnections.push({
+              sheetName: sheetName,
+              sheetIndex: index,
+              formUrl: formUrl,
+              hasConnection: false,
+              error: formError.message
+            });
+          }
+        } else {
+          formConnections.push({
+            sheetName: sheetName,
+            sheetIndex: index,
+            hasConnection: false,
+            reason: 'フォーム連携なし'
+          });
+        }
+      } catch (sheetError) {
+        console.warn(`getAllFormsInSpreadsheet: シート「${sheetName}」チェックエラー:`, sheetError.message);
+        formConnections.push({
+          sheetName: sheetName,
+          sheetIndex: index,
+          hasConnection: false,
+          error: sheetError.message
+        });
+      }
+    });
+
+    const connectedForms = formConnections.filter(conn => conn.hasConnection);
+    console.log(`getAllFormsInSpreadsheet: 調査完了`, {
+      totalSheets: sheets.length,
+      connectedForms: connectedForms.length,
+      connections: connectedForms.map(conn => ({ sheet: conn.sheetName, form: conn.formTitle }))
+    });
+
+    return {
+      success: true,
+      totalSheets: sheets.length,
+      connectedFormsCount: connectedForms.length,
+      formConnections: formConnections,
+      connectedForms: connectedForms
+    };
+
+  } catch (error) {
+    console.error(`getAllFormsInSpreadsheet エラー: ${spreadsheetId}`, error.message);
+    return {
+      success: false,
+      error: error.message,
+      reason: 'スプレッドシートアクセスエラー'
     };
   }
 }

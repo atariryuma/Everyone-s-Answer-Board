@@ -400,143 +400,7 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
  * @param {Array} batchOperations - バッチ操作配列 [{rowIndex, reaction, timestamp}, ...]
  * @returns {object} バッチ処理結果
  */
-function addReactionBatch(requestUserId, batchOperations) {
-  verifyUserAccess(requestUserId);
-  clearExecutionUserInfoCache();
-
-  try {
-    // 入力検証
-    if (!Array.isArray(batchOperations) || batchOperations.length === 0) {
-      throw new Error('バッチ操作が無効です');
-    }
-
-    // バッチサイズ制限（安全性のため）
-    const MAX_BATCH_SIZE = 20;
-    if (batchOperations.length > MAX_BATCH_SIZE) {
-      throw new Error(`バッチサイズが制限を超えています (最大${MAX_BATCH_SIZE}件)`);
-    }
-
-    const reactingUserEmail = User.email();
-    const ownerUserId = requestUserId;
-
-    // ボードオーナーの情報をDBから取得（キャッシュ利用）
-    const boardOwnerInfo = DB.findUserById(ownerUserId);
-    if (!boardOwnerInfo) {
-      throw new Error('無効なボードです。');
-    }
-
-    // バッチ処理結果を格納
-    const batchResults = [];
-    const processedRows = new Set(); // 重複行の追跡
-
-    // 既存のsheetNameを取得（最初の操作から）
-    const sheetName = getCurrentSheetName(boardOwnerInfo.spreadsheetId);
-
-    // バッチ操作を順次処理（既存のprocessReaction関数を再利用）
-    for (let i = 0; i < batchOperations.length; i++) {
-      const operation = batchOperations[i];
-
-      try {
-        // 入力検証
-        if (!operation.rowIndex || !operation.reaction) {
-          console.warn('無効な操作をスキップ:', operation);
-          continue;
-        }
-
-        // 既存のprocessReaction関数を使用（100%互換性保証）
-        const result = processReaction(
-          boardOwnerInfo.spreadsheetId,
-          sheetName,
-          operation.rowIndex,
-          operation.reaction,
-          reactingUserEmail
-        );
-
-        if (result && result.status === 'success') {
-          // 更新後のリアクション情報を取得
-          const updatedReactions = getRowReactions(
-            boardOwnerInfo.spreadsheetId,
-            sheetName,
-            operation.rowIndex,
-            reactingUserEmail
-          );
-
-          batchResults.push({
-            rowIndex: operation.rowIndex,
-            reaction: operation.reaction,
-            reactions: updatedReactions,
-            status: 'success',
-          });
-
-          processedRows.add(operation.rowIndex);
-        } else {
-          console.warn('リアクション処理失敗:', operation, result.message);
-          batchResults.push({
-            rowIndex: operation.rowIndex,
-            reaction: operation.reaction,
-            status: 'error',
-            message: result.message || 'リアクション処理失敗',
-          });
-        }
-      } catch (operationError) {
-        console.error('個別操作エラー:', operation, operationError.message);
-        batchResults.push({
-          rowIndex: operation.rowIndex,
-          reaction: operation.reaction,
-          status: 'error',
-          message: operationError.message,
-        });
-      }
-    }
-
-    // 成功した行の最新状態を収集
-    const finalResults = [];
-    processedRows.forEach(function (rowIndex) {
-      try {
-        const latestReactions = getRowReactions(
-          boardOwnerInfo.spreadsheetId,
-          sheetName,
-          rowIndex,
-          reactingUserEmail
-        );
-        finalResults.push({
-          rowIndex: rowIndex,
-          reactions: latestReactions,
-        });
-      } catch (error) {
-        console.warn('最終状態取得エラー:', rowIndex, error.message);
-      }
-    });
-
-    console.log('✅ バッチリアクション処理完了:', {
-      total: batchOperations.length,
-      processed: processedRows.size,
-      success: batchResults.filter((r) => r.status === 'success').length,
-    });
-
-    return {
-      success: true,
-      data: finalResults,
-      processedCount: batchOperations.length,
-      successCount: batchResults.filter((r) => r.status === 'success').length,
-      timestamp: new Date().toISOString(),
-      details: batchResults, // デバッグ用詳細情報
-    };
-  } catch (error) {
-    console.error('addReactionBatch エラー:', error.message);
-
-    // バッチ処理失敗時は個別処理にフォールバック可能であることを示す
-    return {
-      success: false,
-      error: error.message,
-      fallbackToIndividual: true, // クライアント側が個別処理にフォールバック可能
-      timestamp: new Date().toISOString(),
-    };
-  } finally {
-    // 実行終了時にユーザー情報キャッシュをクリア
-    clearExecutionUserInfoCache();
-  }
-}
+// addReactionBatch関数はPageBackend.gsに移動済み
 
 /**
  * 現在のシート名を取得するヘルパー関数
@@ -920,26 +784,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
  * AdminPanel.htmlから呼び出される
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
-function refreshBoardData(requestUserId) {
-  verifyUserAccess(requestUserId);
-  try {
-    const currentUserId = requestUserId; // requestUserId を使用
-
-    const userInfo = DB.findUserById(currentUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
-
-    // キャッシュをクリア
-    invalidateUserCache(currentUserId, userInfo.userEmail, userInfo.spreadsheetId, false);
-
-    // 最新のステータスを取得
-    return getAppConfig(requestUserId);
-  } catch (e) {
-    console.error('refreshBoardData の再読み込みに失敗: ' + e.message);
-    return { status: 'error', message: 'ボードデータの再読み込みに失敗しました: ' + e.message };
-  }
-}
+// refreshBoardData関数はPageBackend.gsに移動済み
 
 /**
  * スプレッドシートの生データをフロントエンドが期待する形式にフォーマットするヘルパー関数
@@ -1391,44 +1236,7 @@ function countSheetRows(spreadsheetId, sheetName, classFilter) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  * @returns {number} データ数
  */
-function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
-  verifyUserAccess(requestUserId);
-  try {
-    const userInfo = DB.findUserById(requestUserId);
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
-    const configJson = JSON.parse(userInfo.configJson || '{}');
-
-    if (!configJson.targetSpreadsheetId || !configJson.targetSheetName) {
-      return {
-        count: 0,
-        lastUpdate: new Date().toISOString(),
-        status: 'error',
-        message: 'スプレッドシート設定なし',
-      };
-    }
-
-    const count = countSheetRows(
-      configJson.targetSpreadsheetId,
-      configJson.targetSheetName,
-      classFilter
-    );
-    return {
-      count,
-      lastUpdate: new Date().toISOString(),
-      status: 'success',
-    };
-  } catch (e) {
-    console.error('getDataCount エラー: ' + e.message);
-    return {
-      count: 0,
-      lastUpdate: new Date().toISOString(),
-      status: 'error',
-      message: e.message,
-    };
-  }
-}
+// getDataCount関数はPageBackend.gsに移動済み
 
 /**
  * フォーム設定を更新 (マルチテナント対応版)
