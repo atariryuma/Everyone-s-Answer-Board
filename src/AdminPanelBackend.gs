@@ -1749,7 +1749,7 @@ function getOrCreateWebAppUrl(userId, appName) {
     // WebアプリのベースURLを取得（正式な方法）
     let baseUrl;
     try {
-      baseUrl = ScriptApp.getService().getUrl();
+      baseUrl = getWebAppUrl();
     } catch (e) {
       // フォールバック: Script IDから構築
       const scriptId = ScriptApp.getScriptId();

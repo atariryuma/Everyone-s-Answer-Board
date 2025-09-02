@@ -500,8 +500,7 @@ function getWebAppUrl() {
  * @returns {string} 管理パネルURL
  */
 function buildUserAdminUrl(userId) {
-  const baseUrl = getWebAppUrl();
-  return `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`;
+  return generateUserUrls(userId).adminUrl;
 }
 
 /**
@@ -616,29 +615,16 @@ function renderSetupPage(params) {
  */
 const UrlGenerator = {
   /**
-   * 基本URL生成（アプリスクリプトURL）
-   * @returns {string} ベースURL
-   */
-  getBaseUrl() {
-    try {
-      return ScriptApp.getService().getUrl();
-    } catch (e) {
-      console.error('BaseURL取得失敗', e);
-      return '';
-    }
-  },
-
-  /**
-   * ユーザー固有URLを生成
+   * ユーザー固有URLを生成（統一版）
    * @param {string} userId ユーザーID
    * @returns {Object} 各種URL
    */
   generateUserUrls(userId) {
-    const baseUrl = this.getBaseUrl();
+    const baseUrl = getWebAppUrl();
     if (!baseUrl) return { error: 'Base URL not available' };
 
     return {
-      viewUrl: `${baseUrl}?userId=${encodeURIComponent(userId)}`,
+      viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`,
       adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`,
       editUrl: `${baseUrl}?mode=edit&userId=${encodeURIComponent(userId)}`, // 将来実装
     };
