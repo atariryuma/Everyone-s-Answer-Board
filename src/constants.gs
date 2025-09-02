@@ -223,6 +223,11 @@ const SYSTEM_CONSTANTS = Object.freeze({
       'spreadsheetUrl',
       'configJson',
       'formUrl',
+      'sheetName',
+      'columnMappingJson',
+      'publishedAt',
+      'appUrl',
+      'lastModified',
     ]),
     DELETE_LOG: Object.freeze({
       SHEET_NAME: 'DeletionLogs',

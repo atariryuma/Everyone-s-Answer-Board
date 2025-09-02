@@ -19,6 +19,11 @@ const DB_CONFIG = Object.freeze({
     'spreadsheetUrl',
     'configJson',
     'formUrl',
+    'sheetName',
+    'columnMappingJson',
+    'publishedAt',
+    'appUrl',
+    'lastModified',
   ]),
 });
 
@@ -901,6 +906,11 @@ function updateUser(userId, updateData) {
     'createdAt',
     'formUrl',
     'isActive',        // status → isActive に修正
+    'sheetName',
+    'columnMappingJson',
+    'publishedAt',
+    'appUrl',
+    'lastModified',
   ];
   const updateFields = Object.keys(updateData);
   const invalidFields = updateFields.filter((field) => !allowedFields.includes(field));

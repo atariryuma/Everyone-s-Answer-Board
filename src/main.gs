@@ -246,8 +246,6 @@ const Deploy = {
  */
 
 // PerformanceOptimizer.gsでglobalProfilerが既に定義されているため、
-// 重複回避のためこちらでは定義しない
-
 /**
  * システム初期化チェック
  * @returns {boolean} システムが初期化されているかどうか
@@ -988,8 +986,6 @@ function checkCurrentPublicationStatus(userId) {
  * 設定管理の機能群
  */
 
-// getCurrentConfig: AdminPanelBackend.gsに統合済み（重複削除）
-
 /**
  * テスト用シンプルAPI（テスト専用）
  */
@@ -1204,8 +1200,6 @@ function addSpreadsheetUrl(url) {
     return { success: false, message: error.message };
   }
 }
-
-// deleteUserAccountByAdminForUI: Core.gsの実装版に統合済み（重複削除）
 
 /**
  * ユーザー認証リセット関数

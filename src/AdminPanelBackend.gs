@@ -1184,6 +1184,46 @@ function validateAdminPanelMapping(mapping) {
 // =============================================================================
 
 /**
+ * 高速公開情報取得（データベースのみ、段階的ローディング用）
+ * @param {string} userId ユーザーID（オプション）
+ * @returns {Object} 基本公開情報
+ */
+function getQuickPublishedInfo(userId = null) {
+  try {
+    const currentUser = User.email();
+    const targetUserId = userId || currentUser;
+    const userInfo = userId ? DB.findUserById(userId) : DB.findUserByEmail(currentUser);
+
+    if (!userInfo) {
+      return {
+        appPublished: false,
+        isLoading: false,
+        error: 'ユーザー情報が見つかりません'
+      };
+    }
+
+    const config = JSON.parse(userInfo.configJson || '{}');
+
+    return {
+      appPublished: config.appPublished || false,
+      appName: config.appName || 'アプリ名未設定',
+      appUrl: userInfo.appUrl || config.appUrl,
+      publishedAt: userInfo.publishedAt || config.publishedAt,
+      sheetName: userInfo.sheetName,
+      lastModified: userInfo.lastModified,
+      isLoading: false
+    };
+  } catch (error) {
+    console.error('getQuickPublishedInfo エラー:', error);
+    return {
+      appPublished: false,
+      isLoading: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * 現在の設定情報を取得（sheetName情報強化版）
  * @returns {Object} 現在の設定情報
  */
@@ -1204,32 +1244,88 @@ function getCurrentConfig() {
       };
     }
 
+    // まず高速基本情報を取得
+    const quickInfo = getQuickPublishedInfo();
+    
+    // 公開済みなら基本情報で十分（高速処理）
+    if (quickInfo.appPublished && !quickInfo.error) {
+      console.log('getCurrentConfig: 公開済み - 基本情報で処理');
+      return {
+        ...quickInfo,
+        userId: userInfo.userId,
+        userEmail: userInfo.userEmail,
+        spreadsheetId: userInfo.spreadsheetId,
+        spreadsheetUrl: userInfo.spreadsheetUrl,
+        formUrl: userInfo.formUrl,
+        setupStatus: 'completed',
+        displaySettings: { showNames: true, showReactions: true },
+      };
+    }
+
+    // 詳細情報が必要（設定中の場合）
+    console.log('getCurrentConfig: 詳細情報で処理（重い処理）');
+    return getFullConfigWithSpreadsheetAccess(userInfo);
+  } catch (error) {
+    console.error('getCurrentConfig エラー:', error);
+    return {
+      setupStatus: 'error',
+      appPublished: false,
+      displaySettings: { showNames: true, showReactions: true },
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * 詳細設定取得（スプレッドシートアクセス含む、重い処理）
+ * @param {Object} userInfo ユーザー情報
+ * @returns {Object} 詳細設定情報
+ */
+function getFullConfigWithSpreadsheetAccess(userInfo) {
+  try {
     let config = {};
     try {
       config = JSON.parse(userInfo.configJson || '{}');
     } catch (e) {
-      console.error('getCurrentConfig: JSON parse error:', e);
+      console.error('getFullConfigWithSpreadsheetAccess: JSON parse error:', e);
       config = {};
     }
 
-    // DB情報と統合（重複データなし）
-    return {
+    // DB情報と統合（新フィールド対応）
+    const result = {
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
       spreadsheetId: userInfo.spreadsheetId,
       spreadsheetUrl: userInfo.spreadsheetUrl,
       formUrl: userInfo.formUrl,
+      sheetName: userInfo.sheetName,
+      publishedAt: userInfo.publishedAt,
+      appUrl: userInfo.appUrl,
+      lastModified: userInfo.lastModified,
       isActive: userInfo.isActive,
       createdAt: userInfo.createdAt,
       lastAccessedAt: userInfo.lastAccessedAt,
       ...config
     };
+
+    // 列マッピングの復元
+    if (userInfo.columnMappingJson) {
+      try {
+        result.columnMapping = JSON.parse(userInfo.columnMappingJson);
+      } catch (e) {
+        console.warn('columnMappingJson parse error:', e);
+        result.columnMapping = {};
+      }
+    }
+
+    return result;
   } catch (error) {
-    console.error('getCurrentConfig エラー:', error);
+    console.error('getFullConfigWithSpreadsheetAccess エラー:', error);
     return {
-      setupStatus: 'pending',
+      setupStatus: 'error',
       appPublished: false,
-      displaySettings: { showNames: true, showReactions: true }
+      displaySettings: { showNames: true, showReactions: true },
+      error: error.message
     };
   }
 }
@@ -1313,54 +1409,29 @@ function saveDraftConfiguration(config) {
       throw new Error('ユーザー情報が見つかりません。先にユーザー登録を行ってください。');
     }
 
-    // 列マッピング重複を直接解消
-    if (config.columnMapping) {
-      const cleanedMapping = {};
-      const usedIndices = new Set();
-      const confidence = config.columnMapping.confidence || {};
-      
-      // 信頼度順でソート処理
-      const mappingEntries = Object.entries(config.columnMapping).filter(([key, value]) => 
-        key !== 'confidence' && typeof value === 'number'
-      );
-      
-      mappingEntries.sort(([keyA], [keyB]) => 
-        (confidence[keyB] || 0) - (confidence[keyA] || 0)
-      );
-      
-      // 重複を回避して割り当て
-      mappingEntries.forEach(([key, value]) => {
-        if (!usedIndices.has(value)) {
-          cleanedMapping[key] = value;
-          usedIndices.add(value);
-        } else {
-          console.warn(`saveDraftConfiguration: 重複検出 ${key}=${value}, スキップします`);
-        }
-      });
-      
-      config.columnMapping = cleanedMapping;
-    }
+    // シンプルな列マッピング保存（重複検出ロジック削除）
 
-    // DB更新データ準備
+    // DB更新データ準備（新フィールド対応）
     const updateData = {
       spreadsheetId: config.spreadsheetId,
       spreadsheetUrl: config.spreadsheetId ? 
         `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit` : '',
-      formUrl: config.formUrl
+      formUrl: config.formUrl,
+      sheetName: config.sheetName,
+      columnMappingJson: JSON.stringify(config.columnMapping || {}),
+      lastModified: new Date().toISOString()
     };
     
     // JSON最適化：重複データ除去
     const optimizedConfig = {
       appName: config.appName,
       setupStatus: config.setupStatus,
-      appPublished: config.appPublished,
-      displaySettings: config.displaySettings,
-      columnMapping: config.columnMapping,
+      appPublished: config.appPublished || false,
+      displaySettings: config.displaySettings || { showNames: true, showReactions: true },
       appUrl: config.appUrl
     };
     
     updateData.configJson = JSON.stringify(optimizedConfig);
-    updateData.columnMapping = config.columnMapping;
 
     // 設定を更新
     const updateResult = updateUserSpreadsheetConfig(userInfo.userId, updateData);
@@ -1408,29 +1479,7 @@ function publishApplication(config) {
     config.appPublished = true;
     config.publishedAt = new Date().toISOString();
     
-    // 列マッピング重複解消
-    if (config.columnMapping) {
-      const cleanedMapping = {};
-      const usedIndices = new Set();
-      const confidence = config.columnMapping.confidence || {};
-      
-      const mappingEntries = Object.entries(config.columnMapping).filter(([key, value]) => 
-        key !== 'confidence' && typeof value === 'number'
-      );
-      
-      mappingEntries.sort(([keyA], [keyB]) => 
-        (confidence[keyB] || 0) - (confidence[keyA] || 0)
-      );
-      
-      mappingEntries.forEach(([key, value]) => {
-        if (!usedIndices.has(value)) {
-          cleanedMapping[key] = value;
-          usedIndices.add(value);
-        }
-      });
-      
-      config.columnMapping = cleanedMapping;
-    }
+    // シンプルな列マッピング保存（重複検出ロジック削除）
 
     // 既存の公開システムを活用（簡略化）
     const publishResult = executeAppPublish(userInfo.userId, {
@@ -1444,12 +1493,17 @@ function publishApplication(config) {
     });
 
     if (publishResult.success) {
-      // DB情報更新
+      // DB情報更新（新フィールド対応）
       const updateData = {
         spreadsheetId: config.spreadsheetId,
         spreadsheetUrl: config.spreadsheetId ? 
           `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit` : '',
-        formUrl: config.formUrl
+        formUrl: config.formUrl,
+        sheetName: config.sheetName,
+        columnMappingJson: JSON.stringify(config.columnMapping || {}),
+        publishedAt: config.publishedAt,
+        appUrl: publishResult.appUrl,
+        lastModified: new Date().toISOString()
       };
       
       // JSON最適化
@@ -1458,8 +1512,7 @@ function publishApplication(config) {
         setupStatus: 'completed',
         appPublished: true,
         publishedAt: config.publishedAt,
-        displaySettings: config.displaySettings,
-        columnMapping: config.columnMapping,
+        displaySettings: config.displaySettings || { showNames: true, showReactions: true },
         appUrl: publishResult.appUrl
       };
       

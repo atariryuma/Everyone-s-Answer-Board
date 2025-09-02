@@ -1888,8 +1888,12 @@
     const copyBtn = document.getElementById('copyViewUrlBtn');
     const statusText = document.getElementById('boardStatus');
 
-    // 公開状態チェック - 非公開の場合はフッターを非表示
-    if (!boardInfo.appPublished) {
+    // データベース直接参照で確実な公開状態チェック
+    const isPublished = boardInfo.appPublished === true || 
+                       boardInfo.appPublished === 'true' ||
+                       boardInfo.appPublished === '1';
+
+    if (!isPublished) {
       footer.classList.add('hidden');
       return;
     }
@@ -1899,6 +1903,9 @@
 
     // 問題文設定
     questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
+
+    // 公開情報の詳細表示
+    updatePublishedInfo(boardInfo);
 
     if (boardInfo.isActive && boardInfo.urls) {
       // ボタン表示・機能設定
@@ -1919,6 +1926,58 @@
       if (statusText) {
         statusText.textContent = boardInfo.error || 'ボードが非アクティブです';
       }
+    }
+  }
+
+  // 公開情報の詳細表示
+  function updatePublishedInfo(boardInfo) {
+    const publishedInfoSection = document.getElementById('publishedInfoSection');
+    const publishedDate = document.getElementById('publishedDate');
+    const publishedUrl = document.getElementById('publishedUrl');
+    const publishedSheet = document.getElementById('publishedSheet');
+
+    if (!publishedInfoSection) return;
+
+    // 公開情報があれば表示
+    if (boardInfo.appPublished) {
+      publishedInfoSection.classList.remove('hidden');
+
+      // 公開日時の表示
+      if (publishedDate && boardInfo.publishedAt) {
+        const formattedDate = formatDate(boardInfo.publishedAt);
+        publishedDate.innerHTML = `<span>📅</span><span>公開日: ${formattedDate}</span>`;
+      }
+
+      // アプリURLの表示
+      if (publishedUrl && boardInfo.appUrl) {
+        const shortUrl = boardInfo.appUrl.length > 40 ? 
+          boardInfo.appUrl.substring(0, 40) + '...' : boardInfo.appUrl;
+        publishedUrl.innerHTML = `<span>🔗</span><span class="text-cyan-400 truncate max-w-xs">${shortUrl}</span>`;
+      }
+
+      // シート名の表示
+      if (publishedSheet && boardInfo.sheetName) {
+        publishedSheet.innerHTML = `<span>📊</span><span>シート: ${boardInfo.sheetName}</span>`;
+      }
+    } else {
+      publishedInfoSection.classList.add('hidden');
+    }
+  }
+
+  // 日時フォーマット関数
+  function formatDate(dateString) {
+    if (!dateString) return '--';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return '--';
     }
   }
 

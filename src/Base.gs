@@ -167,6 +167,37 @@ class ConfigurationManager {
   }
 
   /**
+   * 安全な設定更新（JSON上書き防止機能付き）
+   * @param {string} userId ユーザーID
+   * @param {Object} newData 新しいデータ
+   * @return {boolean} 更新成功可否
+   */
+  safeUpdateUserConfig(userId, newData) {
+    if (!userId || !newData) return false;
+
+    // 既存の全データを取得（空の場合も安全に処理）
+    const existingConfig = this.getUserConfig(userId) || {};
+    
+    // 安全なマージ（上書きではなく統合）
+    // 既存データを保持し、新しいデータを追加・更新
+    const mergedConfig = {
+      ...existingConfig,  // 既存データを保持
+      ...newData,         // 新しいデータを追加/更新
+      lastModified: new Date().toISOString()
+    };
+
+    console.log('safeUpdateUserConfig: データ保護統合', {
+      userId,
+      existingKeys: Object.keys(existingConfig),
+      newKeys: Object.keys(newData),
+      mergedKeys: Object.keys(mergedConfig),
+      dataProtected: true
+    });
+
+    return this.setUserConfig(userId, mergedConfig);
+  }
+
+  /**
    * 設定の存在確認
    * @param {string} userId ユーザーID
    * @return {boolean} 存在可否
@@ -340,5 +371,113 @@ class AccessController {
     }
 
     return 'guest';
+  }
+}
+
+// ===============================
+// 統一エラーハンドリング
+// ===============================
+
+/**
+ * 統一エラーハンドリングクラス
+ */
+class ErrorHandler {
+  /**
+   * エラーログ記録
+   * @param {string} context エラーが発生したコンテキスト
+   * @param {Error|string} error エラーオブジェクトまたはメッセージ
+   * @param {Object} additionalData 追加データ（オプション）
+   */
+  static log(context, error, additionalData = null) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const logData = {
+      timestamp: new Date().toISOString(),
+      context,
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : null,
+      ...additionalData
+    };
+    
+    console.error(`[${context}] ${errorMessage}`, logData);
+  }
+
+  /**
+   * 標準応答オブジェクト作成
+   * @param {boolean} success 成功フラグ
+   * @param {any} data レスポンスデータ
+   * @param {Error|string} error エラー情報
+   * @return {Object} 標準応答オブジェクト
+   */
+  static createResponse(success, data = null, error = null) {
+    return {
+      success,
+      data,
+      error: error ? (error instanceof Error ? error.message : String(error)) : null,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 成功応答を作成
+   * @param {any} data レスポンスデータ
+   * @param {string} message 成功メッセージ（オプション）
+   * @return {Object} 成功応答オブジェクト
+   */
+  static success(data = null, message = null) {
+    return {
+      success: true,
+      data,
+      message,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * エラー応答を作成
+   * @param {Error|string} error エラー情報
+   * @param {string} context エラーコンテキスト
+   * @param {any} data 追加データ（オプション）
+   * @return {Object} エラー応答オブジェクト
+   */
+  static error(error, context = 'Unknown', data = null) {
+    this.log(context, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      context,
+      data,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 安全な関数実行ラッパー
+   * @param {Function} fn 実行する関数
+   * @param {string} context 実行コンテキスト
+   * @param {any} defaultValue エラー時のデフォルト値
+   * @return {any} 実行結果またはデフォルト値
+   */
+  static safeExecute(fn, context, defaultValue = null) {
+    try {
+      return fn();
+    } catch (error) {
+      this.log(context, error);
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Promise対応の安全実行
+   * @param {Function} fn 実行する非同期関数
+   * @param {string} context 実行コンテキスト
+   * @return {Promise} 実行結果のPromise
+   */
+  static async safeExecuteAsync(fn, context) {
+    try {
+      return await fn();
+    } catch (error) {
+      this.log(context, error);
+      throw error;
+    }
   }
 }

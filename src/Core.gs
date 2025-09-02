@@ -622,9 +622,9 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     // セットアップ状況を確認
     const setupStatus = configJson.setupStatus || 'pending';
 
-    // 公開対象のスプレッドシートIDとシート名を取得
-    const publishedSpreadsheetId = configJson.publishedSpreadsheetId;
-    const publishedSheetName = configJson.publishedSheetName;
+    // 公開対象のスプレッドシートIDとシート名を取得（データベース直接参照に変更）
+    const publishedSpreadsheetId = userInfo.spreadsheetId;
+    const publishedSheetName = userInfo.sheetName;
 
     if (!publishedSpreadsheetId || !publishedSheetName) {
       if (setupStatus === 'pending') {
