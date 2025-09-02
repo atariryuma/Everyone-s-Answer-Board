@@ -303,7 +303,7 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
 }
 
 /**
- * スプレッドシートヘッダーの検証
+ * スプレッドシートヘッダーの検証（柔軟な列名検出）
  * @param {object} headerIndices - ヘッダーインデックス
  * @returns {object} 検証結果 { success: boolean, missing: string[], hasReasonColumn: boolean, hasOpinionColumn: boolean }
  */
@@ -312,25 +312,97 @@ function validateSpreadsheetHeaders(headerIndices) {
     return { success: false, missing: ['すべて'], hasReasonColumn: false, hasOpinionColumn: false };
   }
   
-  // COLUMN_HEADERSが定義されていない場合のフォールバック
-  const HEADERS = typeof COLUMN_HEADERS !== 'undefined' ? COLUMN_HEADERS : {
-    REASON: '理由',
-    OPINION: '回答'
-  };
+  const headerNames = Object.keys(headerIndices);
   
-  const hasReason = headerIndices[HEADERS.REASON] !== undefined;
-  const hasOpinion = headerIndices[HEADERS.OPINION] !== undefined;
+  // 動的な列名パターン検出
+  const reasonPatterns = [
+    '理由', 'なぜ', 'どうして', '根拠', 'わけ', 'reason', 'why',
+    '考える理由', '体験', '経験'
+  ];
+  
+  const opinionPatterns = [
+    '回答', '答え', '意見', 'こたえ', '考え', '思考', 'answer', 'opinion',
+    'どう思いますか', '書きましょう', '教えてください'
+  ];
+  
+  // パターンマッチングで列を検出
+  const hasReason = headerNames.some(header => 
+    reasonPatterns.some(pattern => 
+      header.toLowerCase().includes(pattern.toLowerCase())
+    )
+  );
+  
+  const hasOpinion = headerNames.some(header => 
+    opinionPatterns.some(pattern => 
+      header.toLowerCase().includes(pattern.toLowerCase())
+    )
+  );
+  
   const missing = [];
+  if (!hasReason) missing.push('理由系列');
+  if (!hasOpinion) missing.push('回答系列');
   
-  if (!hasReason) missing.push(HEADERS.REASON);
-  if (!hasOpinion) missing.push(HEADERS.OPINION);
+  // 最低限必要なのは2列以上のテキストデータ
+  const minimalValidation = headerNames.length >= 2;
   
   return {
-    success: hasReason && hasOpinion,
+    success: minimalValidation && (hasReason || hasOpinion || headerNames.length >= 4),
     missing,
     hasReasonColumn: hasReason,
-    hasOpinionColumn: hasOpinion
+    hasOpinionColumn: hasOpinion,
+    detectedColumns: {
+      reasonCandidates: headerNames.filter(h => 
+        reasonPatterns.some(p => h.toLowerCase().includes(p.toLowerCase()))
+      ),
+      opinionCandidates: headerNames.filter(h => 
+        opinionPatterns.some(p => h.toLowerCase().includes(p.toLowerCase()))
+      ),
+      totalColumns: headerNames.length
+    }
   };
+}
+
+/**
+ * クリティカル更新後のキャッシュ同期（統合版）
+ * @param {string} userId - ユーザーID
+ * @param {string} userEmail - ユーザーメールアドレス  
+ * @param {string|null} oldSpreadsheetId - 古いスプレッドシートID
+ * @param {string|null} newSpreadsheetId - 新しいスプレッドシートID
+ */
+function synchronizeCacheAfterCriticalUpdate(userId, userEmail, oldSpreadsheetId, newSpreadsheetId) {
+  try {
+    console.log('🔄 クリティカル更新後のキャッシュ同期開始:', { 
+      userId, 
+      oldSpreadsheetId, 
+      newSpreadsheetId 
+    });
+    
+    // 古いスプレッドシート関連のキャッシュを削除
+    if (oldSpreadsheetId) {
+      const oldKeys = [
+        `headers_${oldSpreadsheetId}`,
+        `user_data_${userId}`,
+        `spreadsheet_info_${oldSpreadsheetId}`
+      ];
+      oldKeys.forEach(key => cacheManager.remove(key));
+    }
+    
+    // 新しいスプレッドシート関連のキャッシュを初期化
+    if (newSpreadsheetId) {
+      const newKeys = [
+        `headers_${newSpreadsheetId}`,  
+        `user_data_${userId}`,
+        `spreadsheet_info_${newSpreadsheetId}`
+      ];
+      newKeys.forEach(key => cacheManager.remove(key)); // 古いキャッシュがあれば削除
+    }
+    
+    console.log('✅ クリティカル更新後のキャッシュ同期完了');
+    
+  } catch (error) {
+    console.error('[ERROR] synchronizeCacheAfterCriticalUpdate:', error.message);
+    // エラーが発生してもシステムを停止させない
+  }
 }
 
 console.log('🗄️ 簡略化されたキャッシュシステムが初期化されました');

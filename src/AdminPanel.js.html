@@ -130,11 +130,17 @@
       console.log('AdminPanel非同期初期化開始');
       setLoading(true);
 
-      // 並行処理で基本データを読み込み
-      step = 'loading spreadsheet list and user info';
-      console.log('📊 Loading spreadsheet list and user info in parallel...');
-      await Promise.all([loadSpreadsheetListAsync(), loadUserInfoAsync()]);
-      console.log('✅ Spreadsheet list and user info loaded');
+      // 並行処理で基本データを読み込み（ノンブロッキング）
+      step = 'loading user info';
+      console.log('👤 Loading user info...');
+      await loadUserInfoAsync();
+      console.log('✅ User info loaded');
+      
+      // スプレッドシート一覧は非同期でバックグラウンド読み込み
+      step = 'starting spreadsheet list background load';
+      console.log('📊 Starting spreadsheet list background loading...');
+      loadSpreadsheetListInBackground();
+      console.log('✅ Spreadsheet list loading started in background');
 
       // 設定データを読み込んで完全に自動反映
       step = 'loading and applying config';
@@ -229,11 +235,116 @@
     });
   }
 
+  // バックグラウンドでスプレッドシート一覧を読み込み（ノンブロッキング）
+  function loadSpreadsheetListInBackground() {
+    const select = document.getElementById('spreadsheet-select');
+    if (!select) {
+      console.error('❌ spreadsheet-select element not found');
+      return;
+    }
+
+    // ローディング表示を設定（他の操作は可能）
+    select.innerHTML = '<option value="">📊 読み込み中... (他の操作は可能です)</option>';
+    select.disabled = true;
+
+    // プログレスインジケーター追加
+    showSpreadsheetLoadingProgress();
+
+    console.log('🔄 Background loading: Calling google.script.run.getSpreadsheetList()...');
+    
+    google.script.run
+      .withSuccessHandler(function (spreadsheets) {
+        console.log(`✅ Background load completed: ${spreadsheets?.length || 0} spreadsheets`);
+        
+        select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
+        select.disabled = false;
+        
+        if (spreadsheets && Array.isArray(spreadsheets)) {
+          spreadsheets.forEach((sheet) => {
+            const option = document.createElement('option');
+            option.value = sheet.id;
+            option.textContent = sheet.name;
+
+            // フォーム情報をdata属性として保存
+            if (sheet.formUrl) {
+              option.dataset.formUrl = sheet.formUrl;
+              option.dataset.formTitle = sheet.formTitle || 'フォーム';
+            }
+
+            select.appendChild(option);
+          });
+        }
+        
+        hideSpreadsheetLoadingProgress();
+        showSuccess(`✅ スプレッドシート一覧を読み込み完了: ${spreadsheets?.length || 0}件`);
+      })
+      .withFailureHandler(function (error) {
+        console.error('❌ Background load failed:', error);
+        
+        select.innerHTML = '<option value="">読み込みエラー - クリックで再試行</option>';
+        select.disabled = false;
+        
+        // 再試行ボタンを追加
+        const retryButton = document.createElement('button');
+        retryButton.textContent = '🔄 再読み込み';
+        retryButton.onclick = () => loadSpreadsheetListInBackground();
+        retryButton.className = 'btn btn-sm btn-outline-primary ms-2';
+        
+        const selectContainer = select.parentElement;
+        if (!selectContainer.querySelector('.retry-button')) {
+          retryButton.className += ' retry-button';
+          selectContainer.appendChild(retryButton);
+        }
+        
+        hideSpreadsheetLoadingProgress();
+        showError('スプレッドシート一覧の読み込みに失敗しました。再試行ボタンをクリックしてください。');
+      })
+      .getSpreadsheetList();
+  }
+
+  // プログレス表示/非表示
+  function showSpreadsheetLoadingProgress() {
+    const progressElement = document.getElementById('spreadsheet-loading-progress') || 
+                           createSpreadsheetProgressElement();
+    progressElement.style.display = 'block';
+  }
+
+  function hideSpreadsheetLoadingProgress() {
+    const progressElement = document.getElementById('spreadsheet-loading-progress');
+    if (progressElement) {
+      progressElement.style.display = 'none';
+    }
+    
+    // 再試行ボタンも削除
+    const retryButton = document.querySelector('.retry-button');
+    if (retryButton) {
+      retryButton.remove();
+    }
+  }
+
+  function createSpreadsheetProgressElement() {
+    const progress = document.createElement('div');
+    progress.id = 'spreadsheet-loading-progress';
+    progress.className = 'alert alert-info mt-2';
+    progress.innerHTML = `
+      <div class="d-flex align-items-center">
+        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+        <span>スプレッドシート一覧を読み込み中... (他の操作は可能です)</span>
+      </div>
+    `;
+    progress.style.display = 'none';
+    
+    const selectContainer = document.getElementById('spreadsheet-select')?.parentElement;
+    if (selectContainer) {
+      selectContainer.appendChild(progress);
+    }
+    
+    return progress;
+  }
+
   // 旧版との互換性維持
   function loadSpreadsheetList() {
-    loadSpreadsheetListAsync().catch((error) => {
-      showError(error.message);
-    });
+    loadSpreadsheetListInBackground();
   }
 
   // ユーザー情報読み込み（非同期版）
