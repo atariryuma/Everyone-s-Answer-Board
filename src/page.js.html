@@ -54,6 +54,13 @@
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   };
 
+  // バックエンド定数との統一（SYSTEM_CONSTANTS.REACTIONS.LABELS参照）
+  const REACTION_NAMES = Object.freeze({
+    LIKE: 'いいね！',
+    UNDERSTAND: 'なるほど！',
+    CURIOUS: 'もっと知りたい！',
+  });
+
   class UnifiedCache {
     constructor() {
       this.data = new Map();
@@ -4584,12 +4591,7 @@
                 btn.style.display = update.shouldDisplay ? 'flex' : 'none';
 
                 // aria-label更新
-                const reactionNames = {
-                  LIKE: 'いいね！',
-                  UNDERSTAND: 'なるほど！',
-                  CURIOUS: 'もっと知りたい！',
-                };
-                const reactionName = reactionNames[update.reaction] || update.reaction;
+                const reactionName = REACTION_NAMES[update.reaction] || update.reaction;
                 const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
                 btn.setAttribute('aria-label', ariaLabel);
 
@@ -4812,12 +4814,7 @@
                   (info.count || 0) +
                   '</span>'
                 : '';
-              const reactionNames = {
-                LIKE: 'いいね！',
-                UNDERSTAND: 'なるほど！',
-                CURIOUS: 'もっと知りたい！',
-              };
-              const reactionName = reactionNames[rt.key] || rt.key;
+              const reactionName = REACTION_NAMES[rt.key] || rt.key;
               const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
               return (
                 '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' +
@@ -7041,12 +7038,7 @@
           modalBtn.setAttribute('aria-pressed', info.reacted.toString());
 
           // aria-label更新
-          const reactionNames = {
-            LIKE: 'いいね！',
-            UNDERSTAND: 'なるほど！',
-            CURIOUS: 'もっと知りたい！',
-          };
-          const reactionName = reactionNames[rt.key] || rt.key;
+          const reactionName = REACTION_NAMES[rt.key] || rt.key;
           const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
           modalBtn.setAttribute('aria-label', ariaLabel);
         }
