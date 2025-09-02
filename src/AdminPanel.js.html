@@ -280,7 +280,7 @@
         select.value = option.value;
         return true;
       } else {
-        showInfo(`💡 シート「${sheetName}」が見つかりません。手動で選択してください`);
+        showInfo('💡 シート「' + sheetName + '」が見つかりません。手動で選択してください');
         return false;
       }
     } catch (error) {
@@ -583,7 +583,7 @@
     if (config.appPublished) statusParts.push('🎯 ボード');
 
     if (statusParts.length > 0) {
-      statusDiv.textContent = `✅ 利用可能: ${statusParts.join(', ')}`;
+      statusDiv.textContent = '✅ 利用可能: ' + statusParts.join(', ');
       statusDiv.className = 'text-xs text-green-400 mt-2 text-center';
     } else {
       statusDiv.textContent = '💡 リソースの設定を開始してください';
@@ -1715,7 +1715,7 @@
           'pending': '設定中'
         };
         
-        badge.className = `status-badge ${setupStatus === 'complete' || setupStatus === 'setup_completed' ? 'published' : 'unpublished'}`;
+        badge.className = 'status-badge ' + (setupStatus === 'complete' || setupStatus === 'setup_completed' ? 'published' : 'unpublished');
         badge.textContent = statusText[setupStatus] || '設定中';
       }
 
@@ -1742,7 +1742,7 @@
       if (openSheetBtn && config?.spreadsheetId) {
         openSheetBtn.onclick = (e) => {
           e.preventDefault();
-          const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
+          const spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit';
           window.open(spreadsheetUrl, '_blank');
           showSuccess('📊 スプレッドシートを開きました');
         };
@@ -1821,7 +1821,7 @@
 
       // ステータス更新
       if (statusText) {
-        statusText.textContent = `最終更新: ${boardInfo.lastUpdated || '不明'}`;
+        statusText.textContent = '最終更新: ' + (boardInfo.lastUpdated || '不明');
       }
     } else {
       // 非アクティブ状態
