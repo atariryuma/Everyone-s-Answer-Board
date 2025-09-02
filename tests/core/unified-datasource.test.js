@@ -122,8 +122,8 @@ describe('Unified Data Source Implementation', () => {
       
       function switchPublishedSheet(userId, spreadsheetId, sheetName) {
         const updateData = {
-          spreadsheetId: spreadsheetId,
-          sheetName: sheetName,
+          spreadsheetId,
+          sheetName,
           configJson: JSON.stringify({
             appPublished: true,
             lastModified: new Date().toISOString()
