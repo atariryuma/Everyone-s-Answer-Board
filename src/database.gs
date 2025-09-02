@@ -939,7 +939,7 @@ function updateUser(userId, updateData) {
     if (!dbId) {
       throw new Error('データ更新エラー: データベースIDが設定されていません');
     }
-    const service = getSheetsServiceCached();
+    let service = getSheetsServiceCached();
     const sheetName = DB_CONFIG.SHEET_NAME;
 
     // 現在のデータを取得
