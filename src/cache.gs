@@ -230,8 +230,9 @@ class CacheManager {
     const { ttl = this.defaultTTL } = options;
 
     try {
-      // 統一バッチ処理システムでの処理を試行
-      if (typeof unifiedBatchProcessor !== 'undefined') {
+      // 統一バッチ処理システムでの処理を試行（未定義の場合は個別処理にフォールバック）
+      if (typeof unifiedBatchProcessor !== 'undefined' && unifiedBatchProcessor && 
+          typeof unifiedBatchProcessor.batchCacheOperation === 'function') {
         const currentUserId = User.email();
         const cacheOperations = keys.map((key) => ({ key: key }));
 
@@ -272,7 +273,8 @@ class CacheManager {
             results[key] = newValues[key];
           }
 
-          if (setCacheOps.length > 0) {
+          if (setCacheOps.length > 0 && unifiedBatchProcessor && 
+              typeof unifiedBatchProcessor.batchCacheOperation === 'function') {
             unifiedBatchProcessor.batchCacheOperation('set', setCacheOps, currentUserId, {
               concurrency: 5,
             });

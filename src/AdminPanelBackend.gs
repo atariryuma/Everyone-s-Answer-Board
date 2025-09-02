@@ -14,7 +14,7 @@
  * Services.user.currentを活用した統一インターフェース - 全システムでgetActiveUserInfo()を使用
  */
 function getActiveUserInfo() {
-  return Services.user.getActiveUserInfo();
+  return Services.user.current;
 }
 
 function debugConstants() {
