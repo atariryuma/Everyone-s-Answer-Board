@@ -10,11 +10,46 @@
 
 // SYSTEM_CONSTANTS の存在確認とデバッグ
 /**
- * 汎用ユーザー情報取得関数
- * Services.user.currentを活用した統一インターフェース - 全システムでgetActiveUserInfo()を使用
+ * アクティブユーザー情報を取得
+ * データベースから完全なユーザー情報を取得（統一データソース準拠）
  */
 function getActiveUserInfo() {
-  return Services.user.current;
+  try {
+    // 基本認証情報を取得
+    const authUser = Services.user.current;
+    if (!authUser || !authUser.email) {
+      console.warn('getActiveUserInfo: 認証情報が取得できません');
+      return authUser; // 認証エラーの場合はそのまま返す
+    }
+
+    // データベースから完全なユーザー情報を取得
+    const fullUserInfo = DB.findUserByEmail(authUser.email);
+    if (!fullUserInfo) {
+      console.warn(
+        'getActiveUserInfo: データベースにユーザー情報が見つかりません:',
+        authUser.email
+      );
+      return authUser; // DBにない場合は基本情報を返す
+    }
+
+    // 統一データソース準拠の完全なユーザー情報を返す
+    const completeUserInfo = {
+      ...authUser, // 認証情報
+      ...fullUserInfo, // データベース情報（spreadsheetId, sheetName含む）
+    };
+
+    console.log('getActiveUserInfo: 完全なユーザー情報取得成功', {
+      email: completeUserInfo.email,
+      hasSpreadsheetId: !!completeUserInfo.spreadsheetId,
+      hasSheetName: !!completeUserInfo.sheetName,
+    });
+
+    return completeUserInfo;
+  } catch (error) {
+    console.error('getActiveUserInfo エラー:', error.message);
+    // エラー時は基本認証情報を返してシステムを継続
+    return Services.user.current;
+  }
 }
 
 function debugConstants() {
