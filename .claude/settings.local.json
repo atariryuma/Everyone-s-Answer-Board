@@ -41,7 +41,8 @@
       "Bash(do cp \"/Users/ryuma/Everyone-s-Answer-Board/src/$file\" \"/tmp/$file%.gs.js\")",
       "Bash(echo \"$file: OK\")",
       "Bash(echo:*)",
-      "Bash(clasp push:*)"
+      "Bash(clasp push:*)",
+      "WebFetch(domain:stackoverflow.com)"
     ],
     "deny": [],
     "ask": [],
