@@ -200,6 +200,9 @@
 
       // リソースボタンを更新
       updateResourceButtons(config);
+      
+      // 設定サマリーを更新
+      updateConfigSummary(config);
 
       if (config && config.sheetName) {
         // 2. シート自動選択
@@ -541,26 +544,12 @@
     showSuccess('📝 フォームを開きました');
   }
 
-  // 公開ボードを新タブで開く
-  function openBoard() {
-    const btn = document.getElementById('open-board-btn');
-    const boardUrl = btn.dataset.boardUrl;
-
-    if (!boardUrl) {
-      showError('ボードURLが設定されていません');
-      return;
-    }
-
-    window.open(boardUrl, '_blank');
-    showSuccess('🎯 公開ボードを開きました');
-  }
 
   // リソースボタンの表示状態を更新
   function updateResourceButtons(config) {
 
     const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
     const formBtn = document.getElementById('open-form-btn');
-    const boardBtn = document.getElementById('open-board-btn');
     const statusDiv = document.getElementById('resource-status');
 
     // 設定が無い場合の初期状態
@@ -586,21 +575,6 @@
       formBtn.classList.add('hidden');
     }
 
-    // 公開ボードボタン（アプリ公開済みの場合のみ表示）
-    if (config.appPublished && config.boardUrl) {
-      boardBtn.classList.remove('hidden');
-      boardBtn.disabled = false;
-      boardBtn.dataset.boardUrl = config.boardUrl;
-    } else if (config.appPublished) {
-      // 公開済みだがURLが無い場合は、動的に生成
-      boardBtn.classList.remove('hidden');
-      boardBtn.disabled = false;
-      // ユーザーIDからボードURLを生成
-      const baseUrl = window.location.origin + window.location.pathname;
-      boardBtn.dataset.boardUrl = `${baseUrl}?userId=${config.tenantId}`;
-    } else {
-      boardBtn.classList.add('hidden');
-    }
 
     // ステータス更新
     let statusParts = [];
@@ -615,6 +589,9 @@
       statusDiv.textContent = '💡 リソースの設定を開始してください';
       statusDiv.className = 'text-xs text-yellow-400 mt-2 text-center';
     }
+    
+    // 設定サマリーも更新
+    updateConfigSummary(config);
   }
 
 
@@ -1720,6 +1697,67 @@
     if (badge) {
       badge.className = `status-badge ${status}`;
       badge.textContent = status === 'published' ? '公開中' : '未公開';
+    }
+  }
+
+  // 設定サマリー更新
+  function updateConfigSummary(config) {
+    try {
+      // セットアップステータス更新
+      const setupStatus = config?.setupStatus || 'incomplete';
+      const badge = document.querySelector('.config-summary .status-badge');
+      if (badge) {
+        const statusText = {
+          'complete': '公開準備完了',
+          'setup_completed': '公開準備完了',
+          'published': '公開中',
+          'incomplete': '設定中',
+          'pending': '設定中'
+        };
+        
+        badge.className = `status-badge ${setupStatus === 'complete' || setupStatus === 'setup_completed' ? 'published' : 'unpublished'}`;
+        badge.textContent = statusText[setupStatus] || '設定中';
+      }
+
+      // 最終更新時刻更新
+      const lastUpdated = config?.lastModified || config?.updatedAt;
+      const timeElement = document.querySelector('.config-summary .config-item:last-child span:last-child');
+      if (timeElement && lastUpdated) {
+        try {
+          const date = new Date(lastUpdated);
+          timeElement.textContent = date.toLocaleString('ja-JP', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          timeElement.className = 'text-sm text-gray-300';
+        } catch (e) {
+          timeElement.textContent = '--:--';
+        }
+      }
+
+      // スプレッドシートリンク更新
+      const openSheetBtn = document.getElementById('open-sheet');
+      if (openSheetBtn && config?.spreadsheetId) {
+        openSheetBtn.onclick = (e) => {
+          e.preventDefault();
+          const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
+          window.open(spreadsheetUrl, '_blank');
+          showSuccess('📊 スプレッドシートを開きました');
+        };
+        openSheetBtn.style.opacity = '1';
+        openSheetBtn.style.pointerEvents = 'auto';
+      } else if (openSheetBtn) {
+        openSheetBtn.onclick = (e) => {
+          e.preventDefault();
+          showError('スプレッドシートが設定されていません');
+        };
+        openSheetBtn.style.opacity = '0.5';
+        openSheetBtn.style.pointerEvents = 'auto';
+      }
+    } catch (error) {
+      console.error('updateConfigSummary エラー:', error);
     }
   }
 

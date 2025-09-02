@@ -1746,14 +1746,16 @@ function getOrCreateWebAppUrl(userId, appName) {
       return existingUrl;
     }
 
-    // WebアプリのベースURLを取得（正式な方法）
-    let baseUrl;
-    try {
-      baseUrl = getWebAppUrl();
-    } catch (e) {
-      // フォールバック: Script IDから構築
+    // WebアプリのベースURLを取得（改良された動的取得）
+    const baseUrl = getWebAppUrl();
+    
+    if (!baseUrl) {
+      console.error('getOrCreateWebAppUrl: ベースURL取得失敗');
+      // 最終フォールバック
       const scriptId = ScriptApp.getScriptId();
-      baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+      const fallbackUrl = `https://script.google.com/macros/s/${scriptId}/exec?userId=${userId}`;
+      console.warn('getOrCreateWebAppUrl: 最終フォールバック使用', fallbackUrl);
+      return fallbackUrl;
     }
 
     // ユーザー用の回答ボードURL（Page.htmlが表示される）

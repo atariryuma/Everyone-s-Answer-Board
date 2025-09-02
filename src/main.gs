@@ -487,11 +487,52 @@ function showAnswerBoard(userId) {
  */
 function getWebAppUrl() {
   try {
-    return ScriptApp.getService().getUrl();
+    // 1. 公式のWebAppURLを取得
+    const officialUrl = ScriptApp.getService().getUrl();
+    if (officialUrl) {
+      console.log('getWebAppUrl: 公式URL取得成功', officialUrl);
+      return officialUrl;
+    }
   } catch (e) {
-    console.error('WebApp URL取得失敗:', e.message);
-    return '';
+    console.warn('getWebAppUrl: 公式URL取得失敗、フォールバック実行:', e.message);
   }
+
+  // 2. フォールバック: Script IDから構築
+  try {
+    const scriptId = ScriptApp.getScriptId();
+    if (scriptId) {
+      // Google Workspace環境を考慮した動的URL構築
+      const currentUser = Session.getActiveUser().getEmail();
+      const domain = getEmailDomain(currentUser);
+      
+      let baseUrl;
+      if (domain && domain !== 'gmail.com' && domain !== 'googlemail.com') {
+        // Google Workspace環境
+        baseUrl = `https://script.google.com/a/${domain}/macros/s/${scriptId}/exec`;
+      } else {
+        // 個人Google環境
+        baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+      }
+      
+      console.log('getWebAppUrl: フォールバックURL生成成功', baseUrl);
+      return baseUrl;
+    }
+  } catch (e) {
+    console.error('getWebAppUrl: フォールバック失敗:', e.message);
+  }
+
+  return '';
+}
+
+/**
+ * メールアドレスからドメイン部分を抽出
+ * @param {string} email - メールアドレス
+ * @returns {string} ドメイン部分
+ */
+function getEmailDomain(email) {
+  if (!email || typeof email !== 'string') return '';
+  const parts = email.split('@');
+  return parts.length >= 2 ? parts[1] : '';
 }
 
 /**
