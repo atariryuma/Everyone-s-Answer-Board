@@ -821,13 +821,15 @@ function fixUserDataConsistency(userId) {
       needsUpdate = true;
     }
 
-    // 2. spreadsheetIdとpublishedSpreadsheetIdの整合性チェック
-    if (userInfo.spreadsheetId && configJson.publishedSpreadsheetId !== userInfo.spreadsheetId) {
-      console.log('🔄 publishedSpreadsheetIdを実際のspreadsheetIdに合わせて修正');
-      console.log('  修正前:', configJson.publishedSpreadsheetId);
-      console.log('  修正後:', userInfo.spreadsheetId);
-
-      configJson.publishedSpreadsheetId = userInfo.spreadsheetId;
+    // 2. 重複フィールドの削除（published*フィールドは不要）
+    if (configJson.publishedSpreadsheetId) {
+      console.log('🔄 不要なpublishedSpreadsheetIdフィールドを削除');
+      delete configJson.publishedSpreadsheetId;
+      needsUpdate = true;
+    }
+    if (configJson.publishedSheetName) {
+      console.log('🔄 不要なpublishedSheetNameフィールドを削除');
+      delete configJson.publishedSheetName;
       needsUpdate = true;
     }
 

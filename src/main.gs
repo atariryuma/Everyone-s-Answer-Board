@@ -812,19 +812,19 @@ function renderAnswerBoard(userInfo, params) {
     template.mode = 'view';
     template.isAdminPanel = false;
 
-    // 公開シート設定の取得
-    const safePublishedSpreadsheetId = config.publishedSpreadsheetId || null;
-    const safePublishedSheetName = config.publishedSheetName || null;
+    // ユーザー選択スプレッドシート設定を統一使用
+    const userSpreadsheetId = userInfo.spreadsheetId || null;
+    const userSheetName = userInfo.sheetName || null;
 
-    const sheetConfigKey = 'sheet_' + (safePublishedSheetName || params.sheetName);
+    const sheetConfigKey = 'sheet_' + (userSheetName || params.sheetName);
     const sheetConfig = config[sheetConfigKey] || {};
 
-    // 修正: ダイレクトアクセスよりもパブリケーション状態を優先
-    const isPublished = !!(safePublishedSpreadsheetId && safePublishedSheetName);
-    const finalSpreadsheetId = isPublished ? safePublishedSpreadsheetId : params.spreadsheetId;
-    const finalSheetName = isPublished ? safePublishedSheetName : params.sheetName;
+    // シンプルな判定: ユーザーがスプレッドシートを設定済みかどうか
+    const hasUserConfig = !!(userSpreadsheetId && userSheetName);
+    const finalSpreadsheetId = hasUserConfig ? userSpreadsheetId : params.spreadsheetId;
+    const finalSheetName = hasUserConfig ? userSheetName : params.sheetName;
 
-    console.log('renderAnswerBoard - isPublished:', isPublished);
+    console.log('renderAnswerBoard - hasUserConfig:', hasUserConfig);
     console.log('renderAnswerBoard - finalSpreadsheetId:', finalSpreadsheetId);
     console.log('renderAnswerBoard - finalSheetName:', finalSheetName);
 
@@ -834,7 +834,7 @@ function renderAnswerBoard(userInfo, params) {
     template.spreadsheetId = finalSpreadsheetId;
     template.sheetName = finalSheetName;
     template.isDirectPageAccess = params.isDirectPageAccess;
-    template.isPublished = isPublished;
+    template.isPublished = hasUserConfig;
     template.appPublished = config.appPublished || false;
 
     // データ取得とテンプレート設定の処理
@@ -939,20 +939,21 @@ function checkCurrentPublicationStatus(userId) {
       return { error: 'Config parse error', isPublished: false };
     }
 
-    // 公開状態の判定
-    const isPublished = !!(config.publishedSpreadsheetId && config.publishedSheetName);
+    // ユーザー選択スプレッドシートでの公開状態判定
+    const isPublished = !!(userInfo.spreadsheetId && userInfo.sheetName);
 
     console.log('checkCurrentPublicationStatus - result:', {
       userId: userId,
       isPublished: isPublished,
-      hasSpreadsheetId: !!config.publishedSpreadsheetId,
-      hasSheetName: !!config.publishedSheetName,
+      hasSpreadsheetId: !!userInfo.spreadsheetId,
+      hasSheetName: !!userInfo.sheetName,
     });
 
     return {
       userId: userId,
       isPublished: isPublished,
-      publishedSpreadsheetId: config.publishedSpreadsheetId || null,
+      spreadsheetId: userInfo.spreadsheetId || null,
+      sheetName: userInfo.sheetName || null,
       lastChecked: new Date().toISOString(),
     };
   } catch (error) {
