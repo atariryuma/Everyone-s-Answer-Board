@@ -1413,51 +1413,73 @@ function getCurrentConfig() {
       config = {};
     }
 
-    // データベースの全情報とconfigJsonを統合
+    // CLAUDE.md準拠: 統一データソース原則に基づく設定構築
+    // userInfo.spreadsheetId, userInfo.sheetNameを唯一の真実の源とする
     const fullConfig = {
-      // データベースの基本情報
+      // DB_CONFIG.HEADERS準拠の基本情報（統一データソース）
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
-      spreadsheetId: userInfo.spreadsheetId,
+      spreadsheetId: userInfo.spreadsheetId,    // 統一データソース
       spreadsheetUrl: userInfo.spreadsheetUrl,
       formUrl: userInfo.formUrl,
       isActive: userInfo.isActive,
       createdAt: userInfo.createdAt,
       lastAccessedAt: userInfo.lastAccessedAt,
       
-      // configJson内の詳細設定を展開
-      ...config,
+      // DB専用フィールドから取得（統一データソース）
+      sheetName: userInfo.sheetName,            // 統一データソース
+      publishedAt: userInfo.publishedAt,
+      appUrl: userInfo.appUrl,
+      lastModified: userInfo.lastModified,
       
-      // configJson内の特定フィールドを明示的に設定（確実性のため）
+      // 列マッピング情報（JSON parse）
+      columnMapping: userInfo.columnMappingJson ? 
+        (() => {
+          try {
+            return JSON.parse(userInfo.columnMappingJson);
+          } catch (e) {
+            console.warn('getCurrentConfig: columnMappingJson parse error:', e);
+            return {};
+          }
+        })() : {},
+      
+      // configJson内の表示設定のみ使用
       appName: config.appName || 'みんなの回答ボード',
       setupStatus: config.setupStatus || 'pending',
       appPublished: config.appPublished || false,
-      publishedAt: config.publishedAt,
-      appUrl: config.appUrl,
-      sheetName: config.sheetName,
-      columnMapping: config.columnMapping,
+      displaySettings: config.displaySettings || { showNames: true, showReactions: true },
+      
+      // 後方互換性: configJson内の詳細情報（fallback用）
       compatibleMapping: config.compatibleMapping,
       lastConnected: config.lastConnected,
       connectionMethod: config.connectionMethod,
       missingColumnsHandled: config.missingColumnsHandled,
-      formTitle: config.formTitle,
-      lastModified: config.lastModified,
-      
-      // デフォルト表示設定
-      displaySettings: config.displaySettings || { showNames: true, showReactions: true },
+      formTitle: config.formTitle
     };
 
-    console.log('getCurrentConfig: 完全な設定を返します', {
-      hasSheetName: !!fullConfig.sheetName,
+    // CLAUDE.md準拠: 構造化ログによる設定情報出力
+    console.info('📋 getCurrentConfig: 統一データソースベース設定取得完了', {
+      userId: fullConfig.userId,
+      hasSpreadsheetId: !!fullConfig.spreadsheetId,  // 統一データソース
+      hasSheetName: !!fullConfig.sheetName,          // 統一データソース
       hasColumnMapping: !!fullConfig.columnMapping,
-      hasFormTitle: !!fullConfig.formTitle,
-      appPublished: fullConfig.appPublished
+      hasFormUrl: !!fullConfig.formUrl,
+      appPublished: fullConfig.appPublished,
+      setupStatus: fullConfig.setupStatus,
+      timestamp: new Date().toISOString()
     });
 
     return fullConfig;
     
   } catch (error) {
-    console.error('getCurrentConfig エラー:', error);
+    // CLAUDE.md準拠: 構造化ログによるエラー情報出力
+    console.error('❌ getCurrentConfig エラー:', {
+      error: error.message,
+      stack: error.stack,
+      currentUser: currentUser,
+      timestamp: new Date().toISOString()
+    });
+    
     return {
       setupStatus: 'error',
       appPublished: false,
@@ -1653,7 +1675,14 @@ function saveDraftConfiguration(config) {
  */
 function publishApplication(config) {
   try {
-    console.log('publishApplication: アプリ公開開始', config);
+    // CLAUDE.md準拠: 構造化ログによる詳細情報出力
+    console.info('🚀 publishApplication: アプリ公開開始', {
+      configKeys: Object.keys(config),
+      hasSpreadsheetId: !!config.spreadsheetId,
+      hasSheetName: !!config.sheetName,
+      hasColumnMapping: !!config.columnMapping,
+      timestamp: new Date().toISOString()
+    });
 
     const currentUser = User.email();
     const userInfo = DB.findUserByEmail(currentUser);
@@ -1662,8 +1691,9 @@ function publishApplication(config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
+    // CLAUDE.md準拠: 統一データソース原則による検証
     if (!config.spreadsheetId || !config.sheetName) {
-      throw new Error('データソースが設定されていません');
+      throw new Error('統一データソース必須: spreadsheetIdとsheetNameが設定されていません');
     }
 
     // 公開状態設定
@@ -1684,12 +1714,15 @@ function publishApplication(config) {
     });
 
     if (publishResult.success) {
-      // DB情報更新（新フィールド対応）
+      // CLAUDE.md準拠: DB_CONFIG.HEADERS準拠のデータベース更新
       const updateData = {
+        // 統一データソース: userInfo.spreadsheetIdが唯一の真実の源
         spreadsheetId: config.spreadsheetId,
         spreadsheetUrl: config.spreadsheetId ? 
           `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit` : '',
-        formUrl: config.formUrl,
+        
+        // DB_CONFIG.HEADERS準拠のフィールド更新
+        formUrl: config.formUrl || '',
         sheetName: config.sheetName,
         columnMappingJson: JSON.stringify(config.columnMapping || {}),
         publishedAt: config.publishedAt,
@@ -1697,27 +1730,57 @@ function publishApplication(config) {
         lastModified: new Date().toISOString()
       };
       
-      // JSON最適化
-      const optimizedConfig = {
+      console.info('📊 updateData構築完了', {
+        hasSpreadsheetId: !!updateData.spreadsheetId,
+        hasSheetName: !!updateData.sheetName,
+        hasColumnMapping: !!config.columnMapping,
+        hasFormUrl: !!updateData.formUrl
+      });
+      
+      // CLAUDE.md準拠: 統一データソース原則に基づく設定保存
+      // configJsonは表示設定のみ、重要データはDB専用フィールドで管理
+      const displayOnlyConfig = {
         appName: config.appName,
         setupStatus: 'completed',
         appPublished: true,
         publishedAt: config.publishedAt,
         displaySettings: config.displaySettings || { showNames: true, showReactions: true },
-        appUrl: publishResult.appUrl
+        appUrl: publishResult.appUrl,
+        
+        // 重要: 既存の設定情報を保持（データ損失防止）
+        sheetName: config.sheetName,
+        columnMapping: config.columnMapping,
+        compatibleMapping: config.compatibleMapping,
+        formTitle: config.formTitle,
+        lastConnected: config.lastConnected,
+        connectionMethod: config.connectionMethod,
+        missingColumnsHandled: config.missingColumnsHandled
       };
       
-      updateData.configJson = JSON.stringify(optimizedConfig);
+      updateData.configJson = JSON.stringify(displayOnlyConfig);
       
-      // データベース更新
+      // CLAUDE.md準拠: データベース更新実行
       updateUser(userInfo.userId, updateData);
+      
+      console.info('✅ publishApplication: データベース更新完了', {
+        userId: userInfo.userId,
+        spreadsheetId: updateData.spreadsheetId,
+        sheetName: updateData.sheetName,
+        appUrl: updateData.appUrl
+      });
       
       // 公開後すぐにフッター情報を更新
       try {
         const boardInfo = getCurrentBoardInfoAndUrls();
-        console.log('publishApplication: フッター情報更新完了', boardInfo);
+        console.info('📄 publishApplication: フッター情報更新完了', {
+          hasAppUrl: !!boardInfo.appUrl,
+          hasSpreadsheetUrl: !!boardInfo.spreadsheetUrl
+        });
       } catch (boardInfoError) {
-        console.warn('publishApplication: フッター情報更新に失敗:', boardInfoError);
+        console.warn('⚠️ publishApplication: フッター情報更新に失敗:', {
+          error: boardInfoError.message,
+          userId: userInfo.userId
+        });
       }
       
       return {
@@ -1727,10 +1790,18 @@ function publishApplication(config) {
         message: 'アプリケーションが正常に公開されました',
       };
     } else {
-      throw new Error(publishResult.error);
+      throw new Error(`公開処理失敗: ${publishResult.error}`);
     }
   } catch (error) {
-    console.error('publishApplication エラー:', error);
+    // CLAUDE.md準拠: 構造化ログによるエラー情報出力
+    console.error('❌ publishApplication エラー:', {
+      error: error.message,
+      stack: error.stack,
+      configHasSpreadsheetId: !!(config && config.spreadsheetId),
+      configHasSheetName: !!(config && config.sheetName),
+      timestamp: new Date().toISOString()
+    });
+    
     return {
       success: false,
       error: error.message,
