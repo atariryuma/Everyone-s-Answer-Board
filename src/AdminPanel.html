@@ -73,34 +73,6 @@
         font-weight: 700;
       }
 
-      .system-monitor {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        font-size: 0.875rem;
-        color: #64748b;
-      }
-
-      .status-indicator {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 4px;
-      }
-
-      .status-indicator.active {
-        background-color: #10b981;
-        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-      }
-
-      .status-indicator.warning {
-        background-color: #f59e0b;
-      }
-
-      .status-indicator.error {
-        background-color: #ef4444;
-      }
 
       /* 進捗スタイルを簡素化 */
       .setup-progress {
@@ -303,48 +275,7 @@
         color: rgba(239, 68, 68, 1);
       }
 
-      /* 簡素化されたメトリクス表示 */
-      .metrics {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-      }
 
-      .metric {
-        text-align: center;
-        padding: 1rem;
-        background: rgba(55, 65, 81, 0.8);
-        border-radius: 0.75rem;
-        border: 1px solid rgba(75, 85, 99, 0.5);
-        flex: 1;
-        min-width: 200px;
-      }
-
-      .metric .value {
-        display: block;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: rgba(96, 165, 250, 1);
-      }
-
-      .metric .unit {
-        font-size: 0.875rem;
-        color: rgba(156, 163, 175, 1);
-      }
-
-      /* JSON表示 - ダークテーマ */
-      .json-viewer {
-        background: rgba(17, 24, 39, 0.8);
-        border: 1px solid rgba(75, 85, 99, 0.5);
-        border-radius: 0.5rem;
-        padding: 1rem;
-        font-family: 'Monaco', 'Menlo', 'SF Mono', monospace;
-        font-size: 0.8rem;
-        color: rgba(209, 213, 219, 1);
-        white-space: pre-wrap;
-        max-height: 300px;
-        overflow-y: auto;
-      }
 
       /* 信頼度バッジスタイル */
       .confidence-badge {
@@ -458,13 +389,6 @@
           gap: 0.5rem;
         }
 
-        .metrics {
-          flex-direction: column;
-        }
-
-        .metric {
-          min-width: unset;
-        }
       }
 
       /* SharedUtilitiesのローディングシステムを使用 */
@@ -559,11 +483,6 @@
         <!-- ステータスヘッダー -->
         <header class="status-header glass-panel rounded-xl">
           <h1 class="text-cyan-400 font-bold">StudyQuest 管理パネル</h1>
-          <div class="system-monitor">
-            <span><span class="status-indicator active"></span>接続正常</span>
-            <span id="last-update">最終同期: --:--</span>
-            <span id="health-check">DB正常</span>
-          </div>
         </header>
 
         <!-- セットアップ進捗 -->
@@ -741,40 +660,10 @@
               </div>
             </div>
 
-            <!-- AI検出情報表示エリア -->
-            <div
-              id="ai-detection-info"
-              class="bg-blue-900 bg-opacity-30 border border-blue-500 border-opacity-30 rounded-lg p-3 hidden"
-            >
-              <div class="flex items-center space-x-2 mb-2">
-                <span class="text-blue-400">🤖</span>
-                <span class="text-sm font-medium text-blue-300">AI自動検出結果</span>
-              </div>
-              <div id="ai-detection-details" class="text-xs text-blue-200 space-y-1">
-                <!-- AI検出の詳細がここに表示される -->
-              </div>
-            </div>
-
-            <!-- 手動設定情報 -->
-            <div
-              id="manual-override-info"
-              class="bg-yellow-900 bg-opacity-30 border border-yellow-500 border-opacity-30 rounded-lg p-3 hidden"
-            >
-              <div class="flex items-center space-x-2 mb-2">
-                <span class="text-yellow-400">✋</span>
-                <span class="text-sm font-medium text-yellow-300">手動設定</span>
-              </div>
-              <div class="text-xs text-yellow-200">
-                ドロップダウンで手動選択された設定が優先されます
-              </div>
-            </div>
           </div>
 
           <div class="action-buttons">
             <button id="verify-mapping" class="btn-primary" type="button">設定を確認</button>
-            <button id="reset-to-ai" class="btn-secondary" type="button">
-              AI検出に戻す
-            </button>
           </div>
         </section>
 
@@ -863,54 +752,45 @@
           </div>
         </div>
 
-        <!-- データベース詳細 -->
+        <!-- リソース -->
         <section class="info-card glass-panel rounded-xl p-4">
-          <h3 class="text-lg font-semibold text-white mb-3">🗄️ データベース詳細</h3>
-          <div class="space-y-4">
-            <div class="config-item">
-              <span class="label">DB接続:</span>
-              <span class="status-badge published">正常</span>
-            </div>
-            <div class="resource-section">
-              <h4 class="text-cyan-400 font-medium mb-3">📚 リソース</h4>
-              <div class="resource-buttons space-y-2">
-                <button
-                  id="open-spreadsheet-btn"
-                  class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onclick="openSpreadsheet()"
-                  disabled
-                  type="button"
-                >
-                  <span>📊</span>
-                  <span>スプレッドシートを開く</span>
-                </button>
+          <h3 class="text-lg font-semibold text-white mb-3">📚 リソース</h3>
+          <div class="resource-buttons space-y-2">
+            <button
+              id="open-spreadsheet-btn"
+              class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onclick="openSpreadsheet()"
+              disabled
+              type="button"
+            >
+              <span>📊</span>
+              <span>スプレッドシートを開く</span>
+            </button>
 
-                <button
-                  id="open-form-btn"
-                  class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
-                  onclick="openForm()"
-                  disabled
-                  type="button"
-                >
-                  <span>📝</span>
-                  <span>フォームを開く</span>
-                </button>
+            <button
+              id="open-form-btn"
+              class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
+              onclick="openForm()"
+              disabled
+              type="button"
+            >
+              <span>📝</span>
+              <span>フォームを開く</span>
+            </button>
 
-                <button
-                  id="open-board-btn"
-                  class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
-                  onclick="openBoard()"
-                  disabled
-                  type="button"
-                >
-                  <span>🎯</span>
-                  <span>公開ボードを開く</span>
-                </button>
+            <button
+              id="open-board-btn"
+              class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
+              onclick="openBoard()"
+              disabled
+              type="button"
+            >
+              <span>🎯</span>
+              <span>公開ボードを開く</span>
+            </button>
 
-                <div id="resource-status" class="text-xs text-gray-400 mt-2 text-center">
-                  設定を読み込み中...
-                </div>
-              </div>
+            <div id="resource-status" class="text-xs text-gray-400 mt-2 text-center">
+              設定を読み込み中...
             </div>
           </div>
         </section>
@@ -991,23 +871,6 @@
           </div>
         </div>
 
-        <!-- 公開情報表示エリア -->
-        <div id="publishedInfoSection" class="text-xs text-gray-400 mt-2 space-y-1 hidden">
-          <div class="flex items-center gap-4 flex-wrap">
-            <div id="publishedDate" class="flex items-center gap-1">
-              <span>📅</span>
-              <span>公開日: --</span>
-            </div>
-            <div id="publishedUrl" class="flex items-center gap-1">
-              <span>🔗</span>
-              <span class="text-cyan-400 truncate max-w-xs">--</span>
-            </div>
-            <div id="publishedSheet" class="flex items-center gap-1">
-              <span>📊</span>
-              <span>シート: --</span>
-            </div>
-          </div>
-        </div>
 
         <!-- ステータス表示（最小限） -->
         <div class="text-xs text-gray-500 mt-2" id="boardStatus">最終更新: --:--</div>
