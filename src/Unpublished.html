@@ -5,11 +5,8 @@
     <title>StudyQuest - 回答ボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Optimized Permissions Policy - essential permissions only -->
-    <meta
-      http-equiv="Permissions-Policy"
-      content="camera=(), microphone=(), geolocation=(), fullscreen=*"
-    />
+    <!-- Shared Security Headers -->
+    <?!= include('SharedSecurityHeaders'); ?>
 
     <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
     <script>
@@ -36,7 +33,8 @@
         originalWarn.apply(console, args);
       };
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Shared TailwindCSS Configuration -->
+    <?!= include('SharedTailwindConfig'); ?>
 
     <!-- Unified Styles and Shared Components -->
     <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>

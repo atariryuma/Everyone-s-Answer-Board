@@ -155,7 +155,7 @@
         loadingOverlay: document.getElementById('loading-overlay'),
       };
       this.state = {
-        currentAnswers: [],
+        currentAnswers: [], // CLAUDE.md準拠: 常に配列として初期化
         isLoading: false,
         lastFocusedElement: null,
         isStudentMode: window.isStudentMode,
@@ -264,6 +264,26 @@
 
       // パブリケーション状態監視システムの初期化
       this.initPublicationStatusMonitoring();
+    }
+    
+    // CLAUDE.md準拠: 安全なデータアクセスメソッド
+    getCurrentAnswers() {
+      if (!Array.isArray(this.state.currentAnswers)) {
+        console.warn('getCurrentAnswers: currentAnswersが配列ではありません。空配列で初期化します。', this.state.currentAnswers);
+        this.state.currentAnswers = [];
+      }
+      return this.state.currentAnswers;
+    }
+    
+    setCurrentAnswers(answers) {
+      const safeAnswers = Array.isArray(answers) ? answers : [];
+      this.state.currentAnswers = safeAnswers;
+      console.log('setCurrentAnswers: 設定完了', { length: safeAnswers.length });
+    }
+    
+    // currentAnswersの安全な長さ取得
+    getCurrentAnswersLength() {
+      return this.getCurrentAnswers().length;
     }
 
     // Reset state for clean initialization (Phase 1.2)
@@ -3005,9 +3025,10 @@
      * @returns {Promise} データ取得結果
      */
     async performDataFetchWithRetry(fetchParams, isInitialLoad) {
-      // 初期データロード時は高速リトライ、通常時は従来通り
-      const MAX_ATTEMPTS = isInitialLoad ? 2 : 3;
-      const retryDelays = isInitialLoad ? [500, 1000] : [1000, 2000, 3000]; // 初期ロード時は高速化
+      // CLAUDE.md準拠: 強化されたリトライ戦略
+      const MAX_ATTEMPTS = isInitialLoad ? 3 : 4; // 試行回数増加
+      const retryDelays = isInitialLoad ? [300, 800, 1500] : [500, 1200, 2500, 5000]; // 指数バックオフ
+      let lastError = null;
 
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         try {
@@ -3109,11 +3130,23 @@
             return result || { status: 'error', message: 'データが見つかりませんでした', data: [] };
           }
         } catch (error) {
-          console.error(`❌ データ取得エラー (試行 ${attempt + 1}):`, error.message);
+          lastError = error; // エラー履歴を保存
+          console.error(`❌ データ取得エラー (試行 ${attempt + 1}):`, {
+            message: error.message,
+            stack: error.stack,
+            fetchParams: fetchParams,
+            timestamp: new Date().toISOString()
+          });
 
-          // 最後の試行で失敗した場合
+          // 最後の試行で失敗した場合：包括的なエラーレポートを作成
           if (attempt >= MAX_ATTEMPTS - 1) {
-            throw error;
+            const comprehensiveError = new Error(
+              `データ取得に${MAX_ATTEMPTS}回失敗しました。最後のエラー: ${error.message}`
+            );
+            comprehensiveError.originalError = error;
+            comprehensiveError.allAttempts = attempt + 1;
+            comprehensiveError.fetchParams = fetchParams;
+            throw comprehensiveError;
           }
 
           // 一時的なエラーの場合はリトライ
@@ -4052,19 +4085,57 @@
     }
 
     populateClassFilter(rows) {
-      const classFilter = this.elements.classFilter;
-      // Ensure rows is an array before mapping
-      const uniqueClasses = [
-        'すべて',
-        ...new Set(Array.isArray(rows) ? rows.map((r) => r.class).filter(Boolean) : []),
-      ];
-      classFilter.innerHTML = uniqueClasses
-        .map(
-          (c) => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>'
-        )
-        .join('');
-      classFilter.value = 'すべて';
-      classFilter.classList.remove('hidden');
+      try {
+        const classFilter = this.elements.classFilter;
+        if (!classFilter) {
+          console.warn('populateClassFilter: classFilter要素が見つかりません');
+          return;
+        }
+        
+        // CLAUDE.md準拠: 包括的null安全性チェック
+        console.log('populateClassFilter: 引数チェック', { 
+          rows: rows, 
+          isArray: Array.isArray(rows), 
+          length: rows ? rows.length : 'N/A' 
+        });
+        
+        // 安全な配列確保とクラス抽出
+        const safeRows = Array.isArray(rows) ? rows : [];
+        const validRows = safeRows.filter(row => row && typeof row === 'object');
+        const classValues = validRows
+          .map(row => row.class)
+          .filter(cls => cls && typeof cls === 'string' && cls.trim());
+        
+        const uniqueClasses = [
+          'すべて',
+          ...new Set(classValues),
+        ];
+        
+        console.log('populateClassFilter: 処理結果', {
+          totalRows: safeRows.length,
+          validRows: validRows.length,
+          classValues: classValues.length,
+          uniqueClasses: uniqueClasses
+        });
+        
+        classFilter.innerHTML = uniqueClasses
+          .map((c) => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>')
+          .join('');
+        classFilter.value = 'すべて';
+        classFilter.classList.remove('hidden');
+      } catch (error) {
+        console.error('populateClassFilter エラー:', error);
+        // フォールバック: 最小限のオプションで復旧
+        try {
+          const classFilter = this.elements.classFilter;
+          if (classFilter) {
+            classFilter.innerHTML = '<option value="すべて">すべて</option>';
+            classFilter.value = 'すべて';
+          }
+        } catch (fallbackError) {
+          console.error('populateClassFilter フォールバック失敗:', fallbackError);
+        }
+      }
     }
 
     applyReactionStyles(element, data) {

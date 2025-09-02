@@ -1194,6 +1194,27 @@ function setupApplication(
 function getUser(format = 'object') {
   try {
     const email = User.email() || null;
+    let userId = null;
+    
+    // emailが取得できた場合、userIdも取得してセッション保存
+    if (email) {
+      try {
+        const user = DB.findUserByEmail(email);
+        if (user && user.userId) {
+          userId = user.userId;
+          // セッション情報を保存（1時間有効）
+          const sessionData = {
+            userId: userId,
+            email: email,
+            timestamp: Date.now()
+          };
+          PropertiesService.getScriptProperties().setProperty('LAST_USER_SESSION', JSON.stringify(sessionData));
+          console.log('getUser: セッション保存完了', { userId, email });
+        }
+      } catch (dbError) {
+        console.warn('getUser: DB検索失敗（セッション保存スキップ）', dbError.message);
+      }
+    }
 
     // シンプルな文字列形式
     if (format === 'string' || format === 'email') {
@@ -1204,6 +1225,7 @@ function getUser(format = 'object') {
     return {
       success: true,
       email: email,
+      userId: userId,
       isAuthenticated: !!email,
       message: email ? 'ユーザー取得成功' : 'ユーザー未認証',
     };
@@ -1348,18 +1370,59 @@ function getPublishedSheetData(params = {}) {
     console.log('getPublishedSheetData: Core.gs実装呼び出し開始', params);
     
     // CLAUDE.md準拠: 統一データソース原則でCore.gs実装を呼び出し
-    // セキュリティチェック: ユーザーIDの確実な取得
-    const currentUserEmail = User.email();
+    // 多段階認証フロー: ユーザーIDの確実な取得
     let targetUserId = params.userId;
+    let currentUserEmail = null;
     
-    if (!targetUserId && currentUserEmail) {
-      // userIdが指定されていない場合、メールアドレスからユーザー検索
-      const user = DB.findUserByEmail(currentUserEmail);
-      targetUserId = user ? user.userId : null;
+    // Step 1: 直接指定されたuserIdを確認
+    if (targetUserId && typeof targetUserId === 'string' && targetUserId.trim()) {
+      console.log('getPublishedSheetData: 指定userIdを使用', targetUserId);
+    } else {
+      // Step 2: User.email()からの取得を試行
+      try {
+        currentUserEmail = User.email();
+        console.log('getPublishedSheetData: User.email()結果', currentUserEmail);
+      } catch (emailError) {
+        console.warn('getPublishedSheetData: User.email()取得失敗', emailError.message);
+      }
+      
+      // Step 3: メールアドレスからユーザー検索
+      if (currentUserEmail && typeof currentUserEmail === 'string' && currentUserEmail.trim()) {
+        try {
+          const user = DB.findUserByEmail(currentUserEmail);
+          targetUserId = user ? user.userId : null;
+          console.log('getPublishedSheetData: DB検索結果', { email: currentUserEmail, userId: targetUserId });
+        } catch (dbError) {
+          console.warn('getPublishedSheetData: DB検索失敗', dbError.message);
+        }
+      }
+      
+      // Step 4: セッション情報からの復元試行
+      if (!targetUserId) {
+        try {
+          const sessionData = PropertiesService.getScriptProperties().getProperty('LAST_USER_SESSION');
+          if (sessionData) {
+            const session = JSON.parse(sessionData);
+            if (session.userId && Date.now() - session.timestamp < 3600000) { // 1時間以内
+              targetUserId = session.userId;
+              console.log('getPublishedSheetData: セッション復元成功', targetUserId);
+            }
+          }
+        } catch (sessionError) {
+          console.warn('getPublishedSheetData: セッション復元失敗', sessionError.message);
+        }
+      }
     }
     
     if (!targetUserId) {
-      throw new Error('ユーザー認証情報が取得できません');
+      const errorDetails = {
+        providedUserId: params.userId,
+        currentUserEmail: currentUserEmail,
+        hasValidEmail: !!currentUserEmail,
+        timestamp: new Date().toISOString()
+      };
+      console.error('getPublishedSheetData: 全認証方法失敗', errorDetails);
+      throw new Error(`ユーザー認証情報が取得できません。詳細: ${JSON.stringify(errorDetails)}`);
     }
     
     return executeGetPublishedSheetData(
