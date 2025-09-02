@@ -9211,47 +9211,7 @@
       return monitor;
     };
 
-    // 現在のシステム状態の包括的なレポート
-    window.getSystemStatusReport = () => {
-      const app = window.studyQuestApp;
-      if (!app) return null;
-
-      const report = {
-        timestamp: new Date().toISOString(),
-        application: {
-          version: '2.0',
-          initialDataLoaded: app.initialDataLoaded,
-          hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
-          pollingActive: app.pollingSettings?.enabled,
-          batchProcessingEnabled: app.enableBatchProcessing,
-        },
-        data: {
-          currentAnswersCount: app.state.currentAnswers?.length || 0,
-          lastSeenCount: app.state.lastSeenCount,
-          visibleCardsCount: document.querySelectorAll('.answer-card').length,
-          tenantId: app.state.userId?.substring(0, 8) + '...',
-        },
-        ui: {
-          classFilter: app.elements.classFilter?.value,
-          sortOrder: app.elements.sortOrder?.value,
-          showAdminFeatures: app.state.showAdminFeatures,
-          notificationBannerVisible:
-            app.elements.newContentBanner &&
-            !app.elements.newContentBanner.classList.contains('hidden'),
-        },
-        performance: {
-          memoryUsage: performance.memory
-            ? {
-                used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
-                total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB',
-              }
-            : 'unavailable',
-        },
-      };
-
-      console.log('📋 システム状態レポート:', report);
-      return report;
-    };
+    // System status reporting removed - simplified system
 
     // ドメイン情報とフォームリンクを取得
     loadDomainInfo();

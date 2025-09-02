@@ -238,22 +238,7 @@
               </button>
             </div>
 
-            <div class="p-4 bg-gray-800 rounded-lg">
-              <h3 class="text-lg font-medium text-white mb-3">📊 システム状況</h3>
-              <p class="text-sm text-gray-400 mb-4">システムの現在の状況を確認します</p>
-              <button
-                id="get-system-status-btn"
-                onclick="getSystemStatus()"
-                class="btn bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg w-full mb-4"
-              >
-                状況確認
-              </button>
-              <div id="system-status-result" class="hidden">
-                <div class="bg-gray-900 rounded p-3 text-sm">
-                  <div id="status-content" class="text-gray-300"></div>
-                </div>
-              </div>
-            </div>
+            <!-- System status monitoring removed - simplified system -->
           </div>
 
           <div class="grid md:grid-cols-1 gap-4">
@@ -962,60 +947,7 @@
           [functionName]();
       }
 
-      // システム状況確認機能
-      function getSystemStatus() {
-        const button = document.getElementById('get-system-status-btn');
-        const resultDiv = document.getElementById('system-status-result');
-        const contentDiv = document.getElementById('status-content');
-
-        if (!button || !resultDiv || !contentDiv) return;
-
-        // ボタンを無効化して読み込み状態に
-        button.disabled = true;
-        button.innerHTML =
-          '<div class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto"></div>';
-
-        google.script.run
-          .withSuccessHandler((response) => {
-            if (response && response.success) {
-              const status = response.status;
-              contentDiv.innerHTML = `
-                            <div class="space-y-2">
-                                <div><strong>📅 確認時刻:</strong> ${status.timestamp}</div>
-                                <div><strong>🏢 ドメイン:</strong> ${status.environment.userDomain}</div>
-                                <div><strong>⚙️ GAS版:</strong> ${status.environment.gasVersion}</div>
-                                <div><strong>📊 キャッシュ状況:</strong> ${status.performance.cacheHealth || 'N/A'}</div>
-                                <div><strong>🔒 認証状態:</strong> ${status.security.authenticationEnabled ? '有効' : '無効'}</div>
-                                <div><strong>✅ 依存関係:</strong></div>
-                                <ul class="ml-4 space-y-1">
-                                    <li>• API: ${status.dependencies.sheetsApi ? '✅' : '❌'}</li>
-                                    <li>• DB: ${status.dependencies.database ? '✅' : '❌'}</li>
-                                    <li>• Cache: ${status.dependencies.cache ? '✅' : '❌'}</li>
-                                </ul>
-                            </div>
-                        `;
-              resultDiv.classList.remove('hidden');
-              showMessage('✅ システム状況を確認しました', 'success');
-            } else {
-              contentDiv.innerHTML = `<div class="text-red-400">❌ ${response.error || '状況確認に失敗しました'}</div>`;
-              resultDiv.classList.remove('hidden');
-              showMessage('❌ システム状況の確認に失敗しました', 'error');
-            }
-          })
-          .withFailureHandler((error) => {
-            contentDiv.innerHTML = `<div class="text-red-400">❌ エラー: ${error.message || error}</div>`;
-            resultDiv.classList.remove('hidden');
-            showMessage(`❌ エラーが発生しました: ${error.message || error}`, 'error');
-          })
-          .withUserObject({ userId: 'system-admin' })
-          .getSystemStatus();
-
-        // ボタンを復元
-        setTimeout(() => {
-          button.disabled = false;
-          button.textContent = '状況確認';
-        }, 1000);
-      }
+      // System status monitoring function removed - simplified system
 
       // 診断結果を整形する関数
       function formatDiagnosticResult(result, functionName) {
