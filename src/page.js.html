@@ -310,7 +310,7 @@
       this.state.currentActiveSheet = SHEET_NAME;
 
       console.log('✅ State reset completed', {
-        currentAnswers: this.state.currentAnswers.length,
+        currentAnswers: this.state.currentAnswers?.length || 0,
         initialDataLoaded: this.initialDataLoaded,
         currentActiveSheet: this.state.currentActiveSheet,
       });
@@ -321,7 +321,7 @@
       console.log(`🔄 Synchronizing state after data update (${context})...`);
 
       const dataLength = newData ? newData.length : 0;
-      const previousLength = this.state.currentAnswers.length;
+      const previousLength = this.state.currentAnswers?.length || 0;
 
       // Step 1: Update data
       this.state.currentAnswers = newData || [];
@@ -941,7 +941,7 @@
         this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
         try {
           await this.loadSheetData({ bypassCache: true });
-          this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
+          this.updateLastSeenCount(this.state.currentAnswers?.length || 0); // 新しいベースラインを設定
         } catch (error) {
           console.error('クラスフィルター変更時のデータ読み込みエラー:', error);
         }
@@ -950,7 +950,7 @@
         this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
         try {
           await this.loadSheetData({ bypassCache: true });
-          this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
+          this.updateLastSeenCount(this.state.currentAnswers?.length || 0); // 新しいベースラインを設定
         } catch (error) {
           console.error('ソート順変更時のデータ読み込みエラー:', error);
         }
@@ -1606,7 +1606,7 @@
         const criticalInconsistency = {
           zeroStateWithServerData:
             preUpdateAnalysis.totalCount > 0 &&
-            this.state.currentAnswers.length === 0 &&
+            (this.state.currentAnswers?.length || 0) === 0 &&
             this.state.lastSeenCount > 0,
           significantCountMismatch:
             Math.abs(preUpdateAnalysis.totalCount - this.state.lastSeenCount) > 10,
@@ -1620,7 +1620,7 @@
           console.warn('🚨 重大なサーバー・クライアント不整合検出 - フルリフレッシュ実行:', {
             preUpdateAnalysis,
             criticalInconsistency,
-            currentAnswersLength: this.state.currentAnswers.length,
+            currentAnswersLength: this.state.currentAnswers?.length || 0,
           });
 
           // 重大な不整合の場合のみ全体リフレッシュを実行
@@ -1658,7 +1658,7 @@
 
         console.log('✅ 増分リフレッシュ完了:', {
           addedCards: incrementalData.newCount,
-          totalCards: this.state.currentAnswers.length,
+          totalCards: this.state.currentAnswers?.length || 0,
           newBaseline: this.state.lastSeenCount,
         });
 
@@ -1697,22 +1697,22 @@
         await this.loadSheetData({ bypassCache: true });
 
         // 手動リフレッシュ後の新着チェック基準更新戦略
-        const shouldUpdateLastSeen = this.state.currentAnswers.length > preservedLastSeenCount;
+        const shouldUpdateLastSeen = (this.state.currentAnswers?.length || 0) > preservedLastSeenCount;
 
         if (shouldUpdateLastSeen) {
           // データが増加している場合のみ更新
-          this.updateLastSeenCount(this.state.currentAnswers.length);
+          this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
           console.log('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
             newLastSeenCount: this.state.lastSeenCount,
             preservedCount: preservedLastSeenCount,
-            currentAnswersLength: this.state.currentAnswers.length,
+            currentAnswersLength: this.state.currentAnswers?.length || 0,
           });
         } else {
           // データが減少または同じ場合は保持
           this.state.lastSeenCount = preservedLastSeenCount;
           console.log('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
             preservedLastSeenCount: preservedLastSeenCount,
-            currentAnswersLength: this.state.currentAnswers.length,
+            currentAnswersLength: this.state.currentAnswers?.length || 0,
             maintainedStability: true,
           });
         }
@@ -2539,7 +2539,7 @@
       if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
         console.log(
           'safeDisplayEmptyState: currentAnswersに',
-          this.state.currentAnswers.length,
+          this.state.currentAnswers?.length || 0,
           '個のアイテムがあるため空状態を表示しません'
         );
         return; // データがある場合も空状態を表示しない
@@ -2877,7 +2877,7 @@
       await this.loadSheetData({ bypassCache: true });
 
       // lastSeenCount復元（安定化のため）
-      const shouldPreserveLastSeen = this.state.currentAnswers.length <= preservedLastSeenCount;
+      const shouldPreserveLastSeen = (this.state.currentAnswers?.length || 0) <= preservedLastSeenCount;
       if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
         this.state.lastSeenCount = preservedLastSeenCount;
         console.log('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
@@ -4304,7 +4304,7 @@
         ')'
       );
 
-      if (isInitialLoad || this.state.currentAnswers.length === 0) {
+      if (isInitialLoad || (this.state.currentAnswers?.length || 0) === 0) {
         this.clearVirtualScrollingState();
       }
 
@@ -6081,7 +6081,7 @@
       try {
         // テスト用の模擬リアクション操作データ
         const testOperations = [];
-        const testRowCount = Math.min(this.state.currentAnswers.length, 5); // 最大5行でテスト
+        const testRowCount = Math.min(this.state.currentAnswers?.length || 0, 5); // 最大5行でテスト
 
         for (let i = 0; i < testRowCount; i++) {
           const item = this.state.currentAnswers[i];
@@ -6625,7 +6625,7 @@
         // 管理モード切り替え時は設定変更のため再描画が必要
         this.loadSheetData({ bypassCache: true }).then(() => {
           // 管理モード切り替え後に新着チェックの基準を更新
-          this.updateLastSeenCount(this.state.currentAnswers.length);
+          this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
           console.log('🔄 管理モード切り替え完了、新着チェック基準更新:', {
             newBaselineCount: this.state.lastSeenCount,
             adminMode: this.state.showAdminFeatures,
@@ -7713,7 +7713,7 @@
       }
 
       const currentCards = this.elements.answersContainer.querySelectorAll('.answer-card');
-      const totalAvailable = this.state.currentAnswers.length;
+      const totalAvailable = this.state.currentAnswers?.length || 0;
       const currentRendered = currentCards.length;
 
       console.debug('handleVirtualScroll triggered:', {
@@ -7778,7 +7778,7 @@
         'Total rendered:',
         this.virtualScrollState.renderedRowIndexes.size,
         'Total available:',
-        this.state.currentAnswers.length
+        this.state.currentAnswers?.length || 0
       );
 
       // Use deferred rendering for performance
@@ -7892,7 +7892,7 @@
 
       const trackedCount = this.virtualScrollState.renderedRowIndexes.size;
       const domCount = domRowIndexes.size;
-      const totalAvailable = this.state.currentAnswers.length;
+      const totalAvailable = this.state.currentAnswers?.length || 0;
 
       // Check for inconsistencies
       const missingInDOM = [...this.virtualScrollState.renderedRowIndexes].filter(
@@ -8022,7 +8022,7 @@
       // Clear state
       this.virtualScrollState = {
         renderedItems: 0,
-        totalItems: this.state.currentAnswers.length,
+        totalItems: this.state.currentAnswers?.length || 0,
         isLoading: false,
         renderedRowIndexes: new Set(),
         hiddenCards: new Set(),

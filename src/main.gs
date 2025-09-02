@@ -1345,14 +1345,17 @@ function forceLogoutAndRedirectToLogin() {
  */
 function getPublishedSheetData(params = {}) {
   try {
-    console.log('getPublishedSheetData called with:', params);
-    return {
-      success: true,
-      data: [],
-      message: 'Published sheet data retrieved',
-    };
+    console.log('getPublishedSheetData: Core.gs実装呼び出し開始', params);
+    
+    // CLAUDE.md準拠: 統一データソース原則でCore.gs実装を呼び出し
+    return executeGetPublishedSheetData(
+      params.userId || User.email(),
+      params.classFilter,
+      params.sortOrder,
+      params.adminMode
+    );
   } catch (error) {
-    console.error('getPublishedSheetData error:', error);
+    console.error('getPublishedSheetData エラー:', error);
     return { success: false, data: [], message: error.message };
   }
 }

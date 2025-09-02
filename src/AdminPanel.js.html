@@ -634,13 +634,40 @@
     const formTitle = document.getElementById('form-title');
     const formUrl = document.getElementById('form-url');
 
+    // 詳細デバッグ情報
+    console.log('🔍 showFormInfo: 受信データ詳細', {
+      formData: formData,
+      hasFormTitle: formData.hasOwnProperty('formTitle'),
+      formTitleValue: formData.formTitle,
+      formTitleType: typeof formData.formTitle,
+      formTitleLength: formData.formTitle ? formData.formTitle.length : 0,
+      isEmpty: !formData.formTitle || formData.formTitle.trim() === ''
+    });
+
     if (formInfo && formTitle && formUrl) {
-      formTitle.textContent = formData.formTitle;
+      // フォームタイトル設定の詳細ログ
+      const titleToSet = formData.formTitle || '（タイトルなし）';
+      console.log('📝 フォームタイトル設定:', {
+        originalTitle: formData.formTitle,
+        settingTitle: titleToSet,
+        element: formTitle
+      });
+      
+      formTitle.textContent = titleToSet;
       formUrl.href = formData.formUrl;
       formUrl.textContent = formData.formUrl;
 
       formInfo.classList.remove('hidden');
-      console.log('フォーム情報表示:', formData);
+      console.log('✅ フォーム情報表示完了:', {
+        title: formTitle.textContent,
+        url: formData.formUrl
+      });
+    } else {
+      console.error('❌ DOM要素が見つかりません:', {
+        formInfo: !!formInfo,
+        formTitle: !!formTitle,
+        formUrl: !!formUrl
+      });
     }
   }
 
@@ -664,15 +691,34 @@
     google.script.run
       .withSuccessHandler((result) => {
         setLoading(false);
+        console.log('🔍 getFormInfo APIレスポンス詳細:', {
+          result: result,
+          hasResult: !!result,
+          isSuccess: result && result.success,
+          hasFormData: result && result.formData,
+          formData: result ? result.formData : null,
+          spreadsheetId: spreadsheetId,
+          sheetName: sheetName
+        });
+        
         if (result && result.success && result.formData) {
           showFormInfo(result.formData);
         } else {
+          console.warn('⚠️ フォーム連携情報が見つからない:', {
+            reason: result ? result.reason : '不明',
+            suggestions: result ? result.suggestions : []
+          });
           hideFormInfo();
         }
       })
       .withFailureHandler((error) => {
         setLoading(false);
-        console.error('シート連携チェックエラー:', error);
+        console.error('❌ シート連携チェックエラー:', {
+          error: error,
+          errorMessage: error.message,
+          spreadsheetId: spreadsheetId,
+          sheetName: sheetName
+        });
         hideFormInfo();
       })
       .getFormInfo(spreadsheetId, sheetName);

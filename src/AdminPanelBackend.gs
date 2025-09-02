@@ -222,12 +222,44 @@ function getSheetSpecificFormInfo(spreadsheetId, sheetName) {
 
     // フォーム情報を取得
     try {
+      console.log(`getSheetSpecificFormInfo: フォームURL開く前: ${formUrl}`);
       const form = FormApp.openByUrl(formUrl);
+      console.log(`getSheetSpecificFormInfo: フォーム取得成功`);
+      
+      // フォームタイトル取得の詳細デバッグ
+      let formTitle;
+      try {
+        formTitle = form.getTitle();
+        console.log(`getSheetSpecificFormInfo: フォームタイトル取得結果:`, {
+          title: formTitle,
+          titleType: typeof formTitle,
+          titleLength: formTitle ? formTitle.length : 0,
+          isEmpty: !formTitle || formTitle.trim() === ''
+        });
+      } catch (titleError) {
+        console.warn(`getSheetSpecificFormInfo: フォームタイトル取得エラー:`, titleError.message);
+        formTitle = null;
+      }
+      
+      // フォームタイトルが空の場合の対処（複数のフォールバック）
+      let finalFormTitle;
+      if (formTitle && formTitle.trim() !== '') {
+        finalFormTitle = formTitle;
+      } else {
+        // フォールバック1: フォームIDを使用
+        try {
+          const formId = form.getId();
+          finalFormTitle = `フォーム（ID: ${formId.substring(0, 8)}...）`;
+        } catch (idError) {
+          // フォールバック2: URLから推測
+          finalFormTitle = `フォーム（${formUrl.includes('forms') ? 'Google Form' : '不明'}）`;
+        }
+      }
       
       const formInfo = {
         hasForm: true,
         formUrl: form.getPublishedUrl(),
-        formTitle: form.getTitle(),
+        formTitle: finalFormTitle,
         formId: form.getId(),
         sheetName: sheetName,
         destinationCheck: form.getDestinationId() === spreadsheetId
@@ -236,7 +268,8 @@ function getSheetSpecificFormInfo(spreadsheetId, sheetName) {
       console.log(`getSheetSpecificFormInfo: シート「${sheetName}」フォーム情報取得成功`, {
         formTitle: formInfo.formTitle,
         formId: formInfo.formId,
-        destinationMatch: formInfo.destinationCheck
+        destinationMatch: formInfo.destinationCheck,
+        finalFormTitleType: typeof formInfo.formTitle
       });
 
       return formInfo;
