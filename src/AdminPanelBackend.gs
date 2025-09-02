@@ -11,7 +11,7 @@
 // SYSTEM_CONSTANTS の存在確認とデバッグ
 /**
  * 汎用ユーザー情報取得関数
- * Services.user.getCurrentUserInfo()を活用した統一インターフェース - 全システムでgetActiveUserInfo()を使用
+ * Services.user.currentを活用した統一インターフェース - 全システムでgetActiveUserInfo()を使用
  */
 function getActiveUserInfo() {
   return Services.user.getActiveUserInfo();
@@ -40,7 +40,7 @@ function getSpreadsheetList() {
   try {
     console.log('getSpreadsheetList: スプレッドシート一覧取得開始');
 
-    const currentUserEmail = Session.getActiveUser().getEmail();
+    const currentUserEmail = User.email();
     console.log('現在のユーザー:', currentUserEmail);
 
     // キャッシュチェック（5分間有効）

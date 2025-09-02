@@ -218,8 +218,7 @@ function registerNewUser(userEmail) {
 
   try {
     // Authentication check with sanitized email
-    const activeUser = Session.getActiveUser();
-    const currentUserEmail = activeUser.getEmail();
+    const currentUserEmail = User.email();
 
     if (sanitizedEmail !== currentUserEmail) {
       const error = new Error(
@@ -583,7 +582,7 @@ function getCurrentSheetName(spreadsheetId) {
  */
 function verifyUserAccess(requestUserId) {
   // AccessControllerシステムを使用
-  const currentUserEmail = Session.getActiveUser().getEmail();
+  const currentUserEmail = User.email();
   const result = App.getAccess().verifyAccess(requestUserId, 'view', currentUserEmail);
 
   if (!result.allowed) {

@@ -366,7 +366,7 @@ class AccessController {
       return 'owner';
     }
 
-    if (Session.getActiveUser().getEmail() === currentUserEmail) {
+    if (User.email() === currentUserEmail) {
       return 'authenticated_user';
     }
 
