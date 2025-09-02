@@ -486,21 +486,47 @@ function showAnswerBoard(userId) {
  * @returns {string} WebApp URL
  */
 function getWebAppUrl() {
-  try {
-    // 1. 公式のWebAppURLを取得
-    const officialUrl = ScriptApp.getService().getUrl();
-    if (officialUrl) {
-      console.log('getWebAppUrl: 公式URL取得成功', officialUrl);
-      return officialUrl;
+  console.log('getWebAppUrl: WebApp URL取得開始');
+
+  // 1. 複数の方法でWebApp URLを取得試行
+  const urlMethods = [
+    () => ScriptApp.getService().getUrl(),
+    () => {
+      const service = ScriptApp.newWebApp();
+      return service ? service.getUrl() : null;
     }
-  } catch (e) {
-    console.warn('getWebAppUrl: 公式URL取得失敗、フォールバック実行:', e.message);
+  ];
+
+  for (let i = 0; i < urlMethods.length; i++) {
+    try {
+      const url = urlMethods[i]();
+      if (url && url.includes('script.google.com') && url.includes('exec')) {
+        console.log(`getWebAppUrl: 方法${i + 1}で公式URL取得成功`, url);
+        return url;
+      }
+    } catch (e) {
+      console.warn(`getWebAppUrl: 方法${i + 1}失敗:`, e.message);
+    }
   }
 
-  // 2. フォールバック: Script IDから構築
+  // 2. フォールバック: PropertiesServiceから保存済みURLを確認
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const savedUrl = props.getProperty('CACHED_WEBAPP_URL');
+    if (savedUrl && savedUrl.includes('script.google.com')) {
+      console.log('getWebAppUrl: キャッシュされたURL使用', savedUrl);
+      return savedUrl;
+    }
+  } catch (e) {
+    console.warn('getWebAppUrl: キャッシュURL確認失敗:', e.message);
+  }
+
+  // 3. 最終フォールバック: Script IDから構築（改良版）
   try {
     const scriptId = ScriptApp.getScriptId();
     if (scriptId) {
+      console.log('getWebAppUrl: Script ID確認', scriptId);
+
       // Google Workspace環境を考慮した動的URL構築
       const currentUser = Session.getActiveUser().getEmail();
       const domain = getEmailDomain(currentUser);
@@ -509,18 +535,32 @@ function getWebAppUrl() {
       if (domain && domain !== 'gmail.com' && domain !== 'googlemail.com') {
         // Google Workspace環境
         baseUrl = `https://script.google.com/a/${domain}/macros/s/${scriptId}/exec`;
+        console.log('getWebAppUrl: Google Workspace URL構築', { domain, scriptId });
       } else {
         // 個人Google環境
         baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+        console.log('getWebAppUrl: 個人Google環境 URL構築', { scriptId });
+      }
+      
+      // URLをキャッシュ保存
+      try {
+        const props = PropertiesService.getScriptProperties();
+        props.setProperty('CACHED_WEBAPP_URL', baseUrl);
+        console.log('getWebAppUrl: URL保存成功');
+      } catch (cacheError) {
+        console.warn('getWebAppUrl: URL保存失敗:', cacheError.message);
       }
       
       console.log('getWebAppUrl: フォールバックURL生成成功', baseUrl);
       return baseUrl;
+    } else {
+      console.error('getWebAppUrl: Script ID取得失敗');
     }
   } catch (e) {
     console.error('getWebAppUrl: フォールバック失敗:', e.message);
   }
 
+  console.error('getWebAppUrl: 全ての方法が失敗');
   return '';
 }
 

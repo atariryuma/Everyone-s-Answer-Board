@@ -1912,10 +1912,14 @@
     const selectedOption = spreadsheetSelect.querySelector(`option[value="${spreadsheetId}"]`);
     const spreadsheetName = selectedOption ? selectedOption.textContent : 'フォーム';
 
-    // アプリケーション名生成
+    // アプリケーション名生成（重複防止）
     let appName;
 
-    if (sheetName.includes('フォームの回答')) {
+    // スプレッドシート名が既に「回答ボード」で終わっているかチェック
+    if (spreadsheetName.endsWith('回答ボード')) {
+      // 既に「回答ボード」で終わっている場合は、そのまま使用
+      appName = spreadsheetName;
+    } else if (sheetName.includes('フォームの回答')) {
       // "○○フォームの回答 7" → "○○回答ボード"
       const baseName = spreadsheetName.replace(/フォーム$/, '').trim();
       appName = `${baseName}回答ボード`;
