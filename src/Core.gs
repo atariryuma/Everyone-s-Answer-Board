@@ -465,9 +465,10 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       adminMode
     );
 
-    const userInfo = getActiveUserInfo();
+    // CLAUDE.md準拠: requestUserIdを使用してユーザー情報取得
+    const userInfo = DB.findUserById(currentUserId);
     if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
+      throw new Error(`ユーザー情報が見つかりません (userId: ${currentUserId})`);
     }
     console.log('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
 

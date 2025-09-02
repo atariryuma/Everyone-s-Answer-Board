@@ -2951,7 +2951,7 @@
 
         console.log('✅ データ判定: 有効なデータ構造 -', {
           status: result.status || '(no status field)',
-          dataLength: result.data.length,
+          dataLength: result.data?.length || 0,
           hasHeader: !!result.header,
           sheetName: result.sheetName,
         });
@@ -3059,7 +3059,7 @@
           if (result && this.isValidDataResult(result)) {
             console.log(
               `✅ データ取得成功 (試行 ${attempt + 1}):`,
-              result.data ? result.data.length : 0,
+              result.data?.length || 0,
               '件'
             );
             return result;
@@ -3274,7 +3274,7 @@
         }
 
         console.log('🔍 loadSheetData started:', config);
-        const oldAnswers = [...this.state.currentAnswers];
+        const oldAnswers = [...(this.state.currentAnswers || [])];
 
         // Clear caches if needed
         if (config.bypassCache || this.shouldClearCache(config)) {
@@ -3468,7 +3468,7 @@
                 this.initTimeoutId = null;
               }
 
-              if (!result || !result.data || result.data.length === 0) {
+              if (!result || !result.data || (Array.isArray(result.data) && result.data.length === 0)) {
                 // 詳細なエラーログ出力
                 if (result && result.status === 'error') {
                   console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
@@ -3583,7 +3583,7 @@
                 }
 
                 // 再チェック後もデータが空の場合のみ空状態を表示
-                if (!result || !result.data || result.data.length === 0) {
+                if (!result || !result.data || (Array.isArray(result.data) && result.data.length === 0)) {
                   // 空データ受信時は古いカードを強制的にクリア
                   await this.clearAllCardsForEmptyData();
 
@@ -3669,7 +3669,7 @@
               this.applyReactionState(result.data);
 
               // Populate class filter with available classes and make it visible
-              this.populateClassFilter(result.data);
+              this.populateClassFilter(result.data || []);
 
               // アクティブシート情報を記録（ポーリングで使用）
               this.state.activeSheetInfo = {

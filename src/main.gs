@@ -1348,8 +1348,22 @@ function getPublishedSheetData(params = {}) {
     console.log('getPublishedSheetData: Core.gs実装呼び出し開始', params);
     
     // CLAUDE.md準拠: 統一データソース原則でCore.gs実装を呼び出し
+    // セキュリティチェック: ユーザーIDの確実な取得
+    const currentUserEmail = User.email();
+    let targetUserId = params.userId;
+    
+    if (!targetUserId && currentUserEmail) {
+      // userIdが指定されていない場合、メールアドレスからユーザー検索
+      const user = DB.findUserByEmail(currentUserEmail);
+      targetUserId = user ? user.userId : null;
+    }
+    
+    if (!targetUserId) {
+      throw new Error('ユーザー認証情報が取得できません');
+    }
+    
     return executeGetPublishedSheetData(
-      params.userId || User.email(),
+      targetUserId,
       params.classFilter,
       params.sortOrder,
       params.adminMode
