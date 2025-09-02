@@ -1,35 +1,7 @@
 <script>
-  // Dynamic performance-based batch sizing
-  const BASE_RENDER_BATCH_SIZE = 10; // Base batch size for normal performance
-  const LOW_PERF_BATCH_SIZE = 5; // Reduced batch size for low performance devices
-  const HIGH_PERF_BATCH_SIZE = 15; // Increased batch size for high performance devices
-  const VIEWPORT_BUFFER = 200; // Viewport buffer for virtual scrolling
-  const PERFORMANCE_BUDGET = 16; // Maximum ms per frame (60fps)
+  // GAS optimized constants
+  const RENDER_BATCH_SIZE = 10; // Fixed batch size for GAS environment
   const CHUNK_SIZE = 5; // DOM operations per chunk
-  const IDLE_TIMEOUT = 5000; // Idle timeout for cleanup
-
-  // Dynamic batch size calculation based on device performance
-  function getDynamicBatchSize(performanceMetrics = {}) {
-    const memory = navigator.deviceMemory || 4;
-    const cores = navigator.hardwareConcurrency || 4;
-    const frameTime = performanceMetrics.frameTime || 16;
-
-    // High performance: plenty of memory, many cores, fast frame time
-    if (memory >= 8 && cores >= 8 && frameTime < 12) {
-      return HIGH_PERF_BATCH_SIZE;
-    }
-
-    // Low performance: limited memory, few cores, slow frame time
-    if (memory <= 2 || cores <= 2 || frameTime > 20) {
-      return LOW_PERF_BATCH_SIZE;
-    }
-
-    // Normal performance
-    return BASE_RENDER_BATCH_SIZE;
-  }
-
-  // Get optimal batch size for current device
-  const RENDER_BATCH_SIZE = getDynamicBatchSize();
   const ICONS = {
     'lightbulb-outline':
       '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
@@ -61,56 +33,17 @@
     CURIOUS: 'もっと知りたい！',
   });
 
-  class UnifiedCache {
+  // Generic cache for data storage
+  class Cache {
     constructor() {
       this.data = new Map();
-      this.timestamps = new Map();
     }
-
-    set(key, value, ttl = 300000) {
-      // 5分のデフォルトTTL
-      this.data.set(key, value);
-      this.timestamps.set(key, Date.now() + ttl);
-    }
-
-    get(key) {
-      if (!this.data.has(key)) return undefined;
-
-      const expiry = this.timestamps.get(key);
-      if (expiry && Date.now() > expiry) {
-        this.delete(key);
-        return undefined;
-      }
-
-      return this.data.get(key);
-    }
-
-    has(key) {
-      return this.get(key) !== undefined;
-    }
-
-    delete(key) {
-      this.data.delete(key);
-      this.timestamps.delete(key);
-    }
-
-    clear() {
-      this.data.clear();
-      this.timestamps.clear();
-    }
-
-    cleanup() {
-      const now = Date.now();
-      for (const [key, expiry] of this.timestamps.entries()) {
-        if (now > expiry) {
-          this.delete(key);
-        }
-      }
-    }
-
-    get size() {
-      return this.data.size;
-    }
+    set(key, value) { this.data.set(key, value); }
+    get(key) { return this.data.get(key); }
+    has(key) { return this.data.has(key); }
+    delete(key) { this.data.delete(key); }
+    clear() { this.data.clear(); }
+    get size() { return this.data.size; }
   }
 
   class StudyQuestApp {
@@ -176,9 +109,7 @@
     }
 
     constructor() {
-      this.cache = new UnifiedCache();
-      this.weakCache = new WeakMap(); // For DOM element caching
-      this.performanceMetrics = { frameTime: 0, domOperations: 0 };
+      this.cache = new Cache();
       this.visibilityObserver = null;
       this.resizeObserver = null;
       this.deferredUpdates = new Set();
@@ -454,20 +385,8 @@
           pollingFailureCount: this.state.pollingFailureCount,
           initialDataLoaded: this.initialDataLoaded,
         },
-        performanceMetrics: {
-          timeSinceInit: Date.now() - this.state.startTime,
-          isLoadingActive: this.state.isLoading,
-        },
       };
 
-      console.log('📊 Data Consistency Metrics (Phase 4.1):', metrics);
-
-      // Store metrics for debugging (keep last 10 entries)
-      if (!this.debugMetrics) this.debugMetrics = [];
-      this.debugMetrics.push(metrics);
-      if (this.debugMetrics.length > 10) {
-        this.debugMetrics.shift();
-      }
 
       // Alert on significant inconsistencies
       if (!metrics.domMetrics.isConsistent) {
@@ -491,7 +410,6 @@
         context: this.state.currentActiveSheet || 'unknown',
       };
 
-      console.log(`🗄️ Cache ${hit ? 'HIT' : 'MISS'}:`, cacheLog);
 
       // Store cache metrics
       if (!this.cacheMetrics) this.cacheMetrics = [];
@@ -7408,18 +7326,10 @@
       }
     }
     debounce(func, delay) {
-      // Use SharedUtilities with instance-specific keys
-      const key = `studyquest-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
+      let timeout;
       return (...args) => {
-        window.sharedUtilities.debounce.debounce(() => func.apply(this, args), key, delay);
-      };
-    }
-
-    throttle(func, delay) {
-      // Use SharedUtilities with instance-specific keys
-      const key = `studyquest-throttle-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
-      return (...args) => {
-        window.sharedUtilities.throttle.throttle(() => func.apply(this, args), key, delay);
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
       };
     }
     updateSortOptions() {
