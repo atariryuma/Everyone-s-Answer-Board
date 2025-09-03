@@ -105,7 +105,7 @@ function doGet(e) {
           }
 
           // ユーザー情報変換（DBからの完全なユーザー情報を取得）
-          const dbUserInfo = DB.findUserById(params.userId);
+          const dbUserInfo = DB.findUserByIdNoCache(params.userId);
           console.log('doGet - dbUserInfo:', {
             userId: dbUserInfo?.userId,
             hasSpreadsheetId: !!dbUserInfo?.spreadsheetId,
@@ -1117,7 +1117,7 @@ function checkCurrentPublicationStatus(userId) {
     console.log('checkCurrentPublicationStatus - userId:', userId);
 
     // 新アーキテクチャでのユーザー情報取得
-    const userInfo = DB.findUserById(userId);
+    const userInfo = DB.findUserByIdNoCache(userId);
     if (!userInfo) {
       console.warn('User not found for publication status check:', userId);
       return { error: 'User not found', isPublished: false };
@@ -1311,7 +1311,7 @@ function getUser(format = 'object') {
     // emailが取得できた場合、userIdも取得してセッション保存
     if (email) {
       try {
-        const user = DB.findUserByEmail(email);
+        const user = DB.findUserByEmailNoCache(email);
         if (user && user.userId) {
           userId = user.userId;
           // セッション情報を保存（1時間有効）
@@ -1518,7 +1518,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
       // Step 3: メールアドレスからユーザー検索
       if (currentUserEmail && typeof currentUserEmail === 'string' && currentUserEmail.trim()) {
         try {
-          const user = DB.findUserByEmail(currentUserEmail);
+          const user = DB.findUserByEmailNoCache(currentUserEmail);
           targetUserId = user ? user.userId : null;
           console.log('getPublishedSheetData: DB検索結果', {
             email: currentUserEmail,
