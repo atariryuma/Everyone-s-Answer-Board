@@ -361,6 +361,54 @@ const DB = {
       return ErrorManager.handleSafely(error, 'findUserById', null);
     }
   },
+
+  /**
+   * 全ユーザーデータを取得する
+   * @returns {Array} 全ユーザーの配列
+   */
+  getAllUsers: function() {
+    try {
+      console.info('getAllUsers: 全ユーザーデータ取得開始');
+      
+      const service = getSheetsService();
+      const dbId = getSecureDatabaseId();
+      const sheetName = DB_CONFIG.SHEET_NAME;
+      
+      // 全データを取得
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:N`]);
+      
+      if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
+        console.info('getAllUsers: ユーザーデータが見つかりません');
+        return [];
+      }
+
+      const rows = data.valueRanges[0].values;
+      
+      if (rows.length < 2) {
+        console.info('getAllUsers: ユーザーデータが見つかりません');
+        return [];
+      }
+
+      const headers = rows[0];
+      const userRows = rows.slice(1);
+      
+      // 各行をオブジェクトに変換
+      const users = userRows.map(row => {
+        const user = {};
+        headers.forEach((header, index) => {
+          user[header] = row[index] || '';
+        });
+        return user;
+      });
+      
+      console.info(`getAllUsers: ${users.length}件のユーザーデータを取得`);
+      return users;
+      
+    } catch (error) {
+      console.error('getAllUsers エラー:', error.message);
+      return ErrorManager.handleSafely(error, 'getAllUsers', []);
+    }
+  },
 };
 
 /**
