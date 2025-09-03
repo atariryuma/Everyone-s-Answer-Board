@@ -1208,9 +1208,7 @@ function getActiveFormInfo(requestUserId) {
       editFormUrl: configJson.editFormUrl || '',
       editUrl: configJson.editFormUrl || '', // AdminPanel.htmlが期待するフィールド名
       formId: extractFormIdFromUrl(configJson.formUrl || configJson.editFormUrl || ''),
-      // 🚀 CLAUDE.md準拠：統一データソース原則
-      const config = JSON.parse(userInfo.configJson || '{}');
-      spreadsheetUrl: config.spreadsheetUrl || '',
+      spreadsheetUrl: configJson.spreadsheetUrl || '',
       answerCount: answerCount,
       isFormActive: !!(configJson.formUrl && configJson.formCreated),
     };
