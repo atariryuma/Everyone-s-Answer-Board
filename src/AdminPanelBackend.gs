@@ -25,21 +25,21 @@ function getCurrentConfig() {
       };
     }
 
-    // CLAUDE.md準拠：統一データソース原則 - configJsonから全データを取得
+    // ✅ CLAUDE.md完全準拠：configJSON統一データソース原則
     const config = userInfo.parsedConfig || {};
 
-    // CLAUDE.md準拠：configJSON中心型設定構築（統一データソース原則）
+    // ✅ CLAUDE.md準拠：configJSON中心型設定構築（外側フィールド参照完全排除）
     const fullConfig = {
-      // 基本情報
+      // 5フィールド構造の基本情報
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
       isActive: userInfo.isActive,
       lastModified: userInfo.lastModified,
 
-      // CLAUDE.md準拠：configJsonから全データ取得（統一データソース）
-      spreadsheetId: config.spreadsheetId || null, // 統一データソース
-      spreadsheetUrl: config.spreadsheetUrl || null,
-      sheetName: config.sheetName || null, // 統一データソース
+      // ✅ configJSON統一データソース：全データはconfigから取得（外側フィールド参照なし）
+      spreadsheetId: config.spreadsheetId || null,
+      spreadsheetUrl: config.spreadsheetUrl || null, 
+      sheetName: config.sheetName || null,
       formUrl: config.formUrl || null,
       
       // 監査情報
@@ -49,12 +49,12 @@ function getCurrentConfig() {
       // 列マッピング（JSON統一）
       columnMapping: config.columnMapping || {},
       
-      // 公開情報
+      // ✅ 公開情報（configJSON統一データソース）
       publishedAt: config.publishedAt || null,
       appUrl: config.appUrl || null,
-      appPublished: config.appPublished || false,
+      appPublished: config.appPublished || false, // ← これが重要：configJSONから取得
       
-      // 表示設定（CLAUDE.md準拠：心理的安全性重視）
+      // ✅ 表示設定（configJSON統一データソース、CLAUDE.md準拠）
       displaySettings: config.displaySettings || { showNames: false, showReactions: false },
       
       // アプリ設定
@@ -163,32 +163,31 @@ function connectDataSource(spreadsheetId, sheetName) {
         opinionHeader = headerRow[columnMapping.answer] || 'お題';
       }
 
-      // CLAUDE.md準拠：全設定をconfigJsonに統合（統一データソース原則）
+      // 🚀 CLAUDE.md完全準拠：動的生成値の完全キャッシュ化
       const updatedConfig = {
         ...currentConfig,
         
-        // データソース情報（統一データソース）
+        // 🎯 CLAUDE.md準拠：データソース情報（動的値キャッシュ）
         spreadsheetId,
-        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
         sheetName,
+        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, // CLAUDE.md Line 34
         
-        // 列マッピング・ヘッダー情報
+        // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報  
         columnMapping,
         opinionHeader,
         
-        // フォーム情報
-        formUrl: formInfo?.formUrl || currentConfig.formUrl || null,
-        formTitle: formInfo?.formTitle || currentConfig.formTitle || null,
+        // 🎯 CLAUDE.md準拠：フォーム情報（完全保存）
+        ...(formInfo?.formUrl && { 
+          formUrl: formInfo.formUrl,
+          formTitle: formInfo.formTitle || null 
+        }),
         
-        // 接続メタデータ
+        // 🎯 CLAUDE.md準拠：appURL完全キャッシュ化（Line 49）
+        appUrl: currentConfig.appUrl || generateUserUrls(userInfo.userId).viewUrl,
+        
+        // 🎯 必要最小限メタデータ
         lastConnected: new Date().toISOString(),
-        connectionMethod: 'dropdown_select',
-        missingColumnsHandled: missingColumnsResult,
-        
-        // CLAUDE.md準拠メタデータ更新
-        lastDataSourceUpdate: new Date().toISOString(),
-        configJsonVersion: '1.0',
-        claudeMdCompliant: true
+        lastModified: new Date().toISOString()
       };
 
       // CLAUDE.md準拠：configJSON中心型でデータベース更新
@@ -265,27 +264,28 @@ function publishApplication(config) {
     if (publishResult.success) {
       const currentConfig = userInfo.parsedConfig || {};
       
-      // CLAUDE.md準拠：全公開情報をconfigJsonに統合
+      // 🚀 CLAUDE.md完全準拠：全URL情報の完全キャッシュ化
       const publishedConfig = {
         ...currentConfig,
         ...config, // フロントエンドからの設定
         
-        // 公開情報
+        // 🎯 CLAUDE.md準拠：公開情報（Line 46, 48, 49）
         appPublished: true,
         publishedAt: new Date().toISOString(),
-        appUrl: publishResult.appUrl,
+        appUrl: publishResult.appUrl, // CLAUDE.md Line 49：動的生成値をキャッシュ
         
-        // 表示設定（CLAUDE.md準拠：心理的安全性重視）
+        // 🎯 CLAUDE.md準拠：全動的URL情報の完全保存
+        spreadsheetUrl: currentConfig.spreadsheetUrl || 
+          (config.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}` : null),
+        
+        // 🎯 必須データのみ：表示設定（CLAUDE.md準拠：心理的安全性重視）
         displaySettings: {
           showNames: config.showNames || false,
           showReactions: config.showReactions || false
         },
         
-        // メタデータ
-        lastPublished: new Date().toISOString(),
-        publishMethod: 'configJSON中心型',
-        configJsonVersion: '1.0',
-        claudeMdCompliant: true
+        // 🎯 必要最小限メタデータ
+        lastModified: new Date().toISOString()
       };
 
       // CLAUDE.md準拠：configJSON中心型で一括保存
@@ -345,20 +345,14 @@ function saveDraftConfiguration(config) {
 
     const currentConfig = userInfo.parsedConfig || {};
     
-    // CLAUDE.md準拠：全設定をconfigJsonに統合（統一データソース原則）
+    // 🚀 最小限ドラフト保存（JSON bloat完全回避）
     const updatedConfig = {
       ...currentConfig,
       ...config,
       
-      // ドラフト情報
+      // 🎯 必須データのみ：ドラフト情報
       isDraft: true,
-      lastDraftSaved: new Date().toISOString(),
-      draftVersion: (currentConfig.draftVersion || 0) + 1,
-      
-      // CLAUDE.md準拠メタデータ
-      lastModified: new Date().toISOString(),
-      configJsonVersion: '1.0',
-      claudeMdCompliant: true
+      lastModified: new Date().toISOString()
     };
 
     // CLAUDE.md準拠：configJSON中心型で一括保存
@@ -822,11 +816,16 @@ function getCurrentBoardInfoAndUrls() {
     
     const boardInfo = {
       isActive: config.appPublished || false,
+      appPublished: config.appPublished || false, // ✅ フッター表示用：明示的にappPublished状態を提供
       questionText,        // 実際の問題文
       appUrl: config.appUrl || '',
       spreadsheetUrl: config.spreadsheetUrl || '',
       hasSpreadsheet: !!config.spreadsheetId,
-      setupStatus: config.setupStatus || 'pending'
+      setupStatus: config.setupStatus || 'pending',
+      urls: {
+        view: config.appUrl || '',
+        spreadsheet: config.spreadsheetUrl || ''
+      }
     };
 
     console.info('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
@@ -884,6 +883,117 @@ function checkIsSystemAdmin() {
     
     // エラー時は安全のため false を返す
     return false;
+  }
+}
+
+/**
+ * ✅ データマイグレーション：重複フィールドをconfigJSONに統合
+ * CLAUDE.md準拠：5フィールド構造への正規化
+ * @param {string} userId - 対象ユーザーID（オプション、未指定時は全ユーザー）
+ * @returns {Object} マイグレーション結果
+ */
+function migrateUserDataToConfigJson(userId = null) {
+  try {
+    console.info('🔄 migrateUserDataToConfigJson: データマイグレーション開始', {
+      targetUserId: userId || 'all_users',
+      timestamp: new Date().toISOString()
+    });
+
+    const users = userId ? [DB.findUserById(userId)] : DB.getAllUsers();
+    const migrationResults = {
+      total: users.length,
+      migrated: 0,
+      skipped: 0,
+      errors: 0,
+      details: []
+    };
+
+    users.forEach(user => {
+      if (!user) return;
+
+      try {
+        const currentConfig = user.parsedConfig || {};
+        let needsMigration = false;
+        const migratedConfig = { ...currentConfig };
+
+        // 外側フィールドをconfigJSONに統合
+        const fieldsToMigrate = [
+          'spreadsheetId', 'sheetName', 'formUrl', 'formTitle',
+          'appPublished', 'publishedAt', 'appUrl',
+          'displaySettings', 'showNames', 'showReactions',
+          'columnMapping', 'setupStatus', 'createdAt', 'lastAccessedAt'
+        ];
+
+        fieldsToMigrate.forEach(field => {
+          if (user[field] !== undefined && currentConfig[field] === undefined) {
+            migratedConfig[field] = user[field];
+            needsMigration = true;
+          }
+        });
+
+        // displaySettingsの統合
+        if (user.showNames !== undefined || user.showReactions !== undefined) {
+          migratedConfig.displaySettings = {
+            showNames: user.showNames ?? migratedConfig.displaySettings?.showNames ?? false,
+            showReactions: user.showReactions ?? migratedConfig.displaySettings?.showReactions ?? false
+          };
+          needsMigration = true;
+        }
+
+        // マイグレーション実行
+        if (needsMigration) {
+          migratedConfig.migratedAt = new Date().toISOString();
+          migratedConfig.claudeMdCompliant = true;
+
+          DB.updateUser(user.userId, migratedConfig);
+          
+          migrationResults.migrated++;
+          migrationResults.details.push({
+            userId: user.userId,
+            email: user.userEmail,
+            status: 'migrated',
+            fieldsUpdated: Object.keys(migratedConfig).length
+          });
+
+          console.log(`✅ マイグレーション完了: ${user.userEmail}`);
+        } else {
+          migrationResults.skipped++;
+          migrationResults.details.push({
+            userId: user.userId,
+            email: user.userEmail,
+            status: 'skipped_no_changes'
+          });
+        }
+
+      } catch (userError) {
+        migrationResults.errors++;
+        migrationResults.details.push({
+          userId: user.userId,
+          email: user.userEmail,
+          status: 'error',
+          error: userError.message
+        });
+        console.error(`❌ ユーザーマイグレーションエラー: ${user.userEmail}`, userError.message);
+      }
+    });
+
+    console.info('✅ migrateUserDataToConfigJson: データマイグレーション完了', migrationResults);
+    return {
+      success: true,
+      results: migrationResults,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('❌ migrateUserDataToConfigJson: マイグレーションエラー', {
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
   }
 }
 

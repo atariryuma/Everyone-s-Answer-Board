@@ -1100,9 +1100,33 @@
     // スプレッドシート選択時
     document.getElementById('spreadsheet-select').addEventListener('change', function () {
       const spreadsheetId = this.value;
+      const selectedText = this.options[this.selectedIndex]?.text || '';
+      
+      console.log('📋 スプレッドシート選択イベント', {
+        spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
+        selectedText: selectedText.substring(0, 50),
+        hasValue: !!spreadsheetId,
+        timestamp: new Date().toISOString()
+      });
+      
       if (spreadsheetId) {
+        // 即座にユーザーフィードバックを表示
+        const sheetSelect = document.getElementById('sheet-select');
+        if (sheetSelect) {
+          sheetSelect.innerHTML = '<option value="">📄 シート読み込み中...</option>';
+          sheetSelect.classList.add('partial-loading-target');
+        }
+        
         loadSheetList(spreadsheetId);
+      } else {
+        console.log('⚠️ スプレッドシートが未選択のため、シート読み込みをスキップ');
+        const sheetSelect = document.getElementById('sheet-select');
+        if (sheetSelect) {
+          sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
+          sheetSelect.classList.remove('partial-loading-target');
+        }
       }
+      
       // フォーム情報はシート選択時に表示するため、ここでは非表示
       hideFormInfo();
     });
@@ -1158,7 +1182,18 @@
 
   // シート一覧読み込み
   function loadSheetList(spreadsheetId) {
+    console.log('🔄 loadSheetList: シート一覧読み込み開始', { 
+      spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
+      timestamp: new Date().toISOString()
+    });
+    
     const select = document.getElementById('sheet-select');
+    if (!select) {
+      console.error('❌ loadSheetList: sheet-select要素が見つかりません');
+      showError('シート選択要素が見つかりません');
+      return;
+    }
+    
     select.innerHTML = '<option value="">読み込み中...</option>';
 
     // シート読み込みは部分ローディング
@@ -1166,29 +1201,58 @@
 
     google.script.run
       .withSuccessHandler(function (sheets) {
-        select.innerHTML = '<option value="">シートを選択...</option>';
-        sheets.forEach((sheet) => {
-          const option = document.createElement('option');
-          option.value = sheet.name;
-
-          // フォーム連携シートかどうかで表示を変える
-          if (sheet.isFormResponseSheet && sheet.formConnected) {
-            option.textContent = `📋 ${sheet.name} (フォーム回答)`;
-            option.dataset.isFormSheet = 'true';
-            option.dataset.formTitle = sheet.formTitle || '';
-          } else {
-            option.textContent = sheet.name;
-            option.dataset.isFormSheet = 'false';
-          }
-
-          select.appendChild(option);
+        console.log('✅ loadSheetList: シート一覧取得成功', {
+          sheetCount: sheets?.length || 0,
+          sheets: sheets?.map(s => s.name) || [],
+          timestamp: new Date().toISOString()
         });
+        
+        select.innerHTML = '<option value="">シートを選択...</option>';
+        
+        if (!sheets || sheets.length === 0) {
+          const noSheetOption = document.createElement('option');
+          noSheetOption.value = '';
+          noSheetOption.textContent = '利用可能なシートがありません';
+          noSheetOption.disabled = true;
+          select.appendChild(noSheetOption);
+          console.warn('⚠️ loadSheetList: シートが0件です');
+        } else {
+          sheets.forEach((sheet) => {
+            const option = document.createElement('option');
+            option.value = sheet.name;
+
+            // フォーム連携シートかどうかで表示を変える
+            if (sheet.isFormResponseSheet && sheet.formConnected) {
+              option.textContent = `📋 ${sheet.name} (フォーム回答)`;
+              option.dataset.isFormSheet = 'true';
+              option.dataset.formTitle = sheet.formTitle || '';
+            } else {
+              option.textContent = sheet.name;
+              option.dataset.isFormSheet = 'false';
+            }
+
+            select.appendChild(option);
+          });
+        }
+        
+        // partial-loading-targetクラスを削除
+        select.classList.remove('partial-loading-target');
+        
         setPartialLoading(false);
+        showSuccess(`✅ ${sheets?.length || 0}個のシートを読み込みました`);
       })
       .withFailureHandler(function (error) {
-        console.error('シート読み込みエラー:', error);
-        select.innerHTML = '<option value="">読み込みエラー</option>';
+        console.error('❌ loadSheetList: シート読み込みエラー', {
+          error: error.message || error,
+          spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
+          timestamp: new Date().toISOString()
+        });
+        
+        select.innerHTML = '<option value="">読み込みエラー - 再試行してください</option>';
+        select.classList.remove('partial-loading-target');
+        
         setPartialLoading(false);
+        showError(`シート一覧の読み込みに失敗しました: ${error.message || error}`);
       })
       .getSheetList(spreadsheetId);
   }
@@ -1731,15 +1795,16 @@
           return;
         }
 
-        // UI設定を現在の設定に統合（appName削除）
+        // 🚀 最小限公開設定（送信データ最適化）
         const publishConfig = {
-          ...currentConfig, // formUrl, columnMapping, spreadsheetId, sheetNameなど全て含む
+          // 🎯 必須データのみ：既存設定から最小限抽出
+          spreadsheetId: currentConfig.spreadsheetId,
+          sheetName: currentConfig.sheetName,
+          columnMapping: currentConfig.columnMapping,
+          
+          // 🎯 必須データのみ：UI設定
           showNames: document.getElementById('show-names').checked,
-          showReactions: document.getElementById('show-reactions').checked,
-          displaySettings: {
-            showNames: document.getElementById('show-names').checked,
-            showReactions: document.getElementById('show-reactions').checked,
-          },
+          showReactions: document.getElementById('show-reactions').checked
         };
 
         console.log('📋 publishApp: 完全な設定でpublishApplication呼び出し', {
@@ -1756,6 +1821,11 @@
               showSuccess('アプリを公開しました！');
               updatePublishStatus('published');
               updateResourceButtons(result.config);
+              
+              // ✅ 公開成功後：即座にフッターを更新（UX向上）
+              setTimeout(() => {
+                loadBoardInfo(); // フッター情報を再読み込み
+              }, 500);
             } else {
               showError(result.error);
             }
@@ -1800,17 +1870,12 @@
       sheetName = document.getElementById('sheet-select').value;
     }
 
-    // ドロップダウンから列選択を収集
-    const columnSelections = gatherColumnSelections();
-
+    // 🎯 必須データのみ送信（送信データ大幅削減）
     return {
-      spreadsheetId: spreadsheetId,
-      sheetName: sheetName,
-      sourceMethod: sourceMethod,
-      columnSelections: columnSelections, // ドロップダウンの選択結果
+      spreadsheetId,
+      sheetName,
       showNames: document.getElementById('show-names').checked,
-      showReactions: document.getElementById('show-reactions').checked,
-      timestamp: new Date().toISOString(),
+      showReactions: document.getElementById('show-reactions').checked
     };
   }
 
@@ -1985,11 +2050,20 @@
     const copyBtn = document.getElementById('copyViewUrlBtn');
     const statusText = document.getElementById('boardStatus');
 
-    // データベース直接参照で確実な公開状態チェック
-    const isPublished =
+    // ✅ configJSON中心型：統一データソースからの公開状態チェック
+    const isPublished = Boolean(
       boardInfo.appPublished === true ||
       boardInfo.appPublished === 'true' ||
-      boardInfo.appPublished === '1';
+      boardInfo.appPublished === '1' ||
+      boardInfo.isActive === true
+    );
+    
+    console.log('🔍 フッター表示判定:', {
+      appPublished: boardInfo.appPublished,
+      isActive: boardInfo.isActive,
+      isPublished: isPublished,
+      timestamp: new Date().toISOString()
+    });
 
     if (!isPublished) {
       footer.classList.add('hidden');

@@ -12,45 +12,32 @@ function createCompleteUser(userEmail) {
   const userId = Utilities.getUuid();
   const timestamp = new Date().toISOString();
 
-  // ConfigOptimizerの最適化形式を使用（重複データを除去）
-  const optimizedConfig = {
-    title: `${userEmail}の回答ボード`,
+  // ✅ CLAUDE.md完全準拠：最小限configJSONで開始（マイグレーション不要）
+  const minimalConfig = {
+    // 🎯 必要最小限のみ：重複データ完全排除
     setupStatus: 'pending',
-    formCreated: false,
     appPublished: false,
-    isPublic: false,
-    allowAnonymous: false,
-    sheetName: null,
-    columnMapping: {},
-    lastModified: timestamp,
+    displaySettings: {
+      showNames: false,    // CLAUDE.md準拠：心理的安全性重視
+      showReactions: false
+    },
+    createdAt: timestamp,
+    lastModified: timestamp
   };
-
-  // columnsは必要時のみ保持（デフォルト列設定）
-  optimizedConfig.columns = [
-    { name: 'timestamp', label: 'タイムスタンプ', type: 'datetime', required: false },
-    { name: 'email', label: 'メールアドレス', type: 'email', required: false },
-    { name: 'class', label: 'クラス', type: 'text', required: false },
-    { name: 'opinion', label: '回答', type: 'textarea', required: true },
-    { name: 'reason', label: '理由', type: 'textarea', required: false },
-    { name: 'name', label: '名前', type: 'text', required: false },
-  ];
 
   console.info('新規ユーザー作成: 最適化済みconfigJSON使用', {
     userEmail,
-    optimizedSize: JSON.stringify(optimizedConfig).length,
+    configSize: JSON.stringify(minimalConfig).length,
     removedFields: ['userId', 'userEmail', 'createdAt'], // DB列に移行済み
   });
 
+  // ✅ CLAUDE.md完全準拠：5フィールドDB構造のみ返却
   return {
     userId,
     userEmail,
-    createdAt: timestamp,
-    lastAccessedAt: timestamp,
     isActive: true,
-    spreadsheetId: '',
-    spreadsheetUrl: '',
-    configJson: JSON.stringify(optimizedConfig),
-    formUrl: '',
+    configJson: JSON.stringify(minimalConfig),
+    lastModified: timestamp
   };
 }
 

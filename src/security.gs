@@ -206,6 +206,10 @@ function verifyAdminAccess(userId) {
  * ユーザーの最終アクセス時刻のみを更新（設定は保護）
  * @param {string} userId - 更新対象のユーザーID
  */
+/**
+ * 🚀 CLAUDE.md完全準拠：lastAccessedAt更新ロジック
+ * configJSONのlastAccessedAtを更新（Line 38準拠）
+ */
 function updateUserLastAccess(userId) {
   try {
     if (!userId) {
@@ -214,12 +218,30 @@ function updateUserLastAccess(userId) {
     }
 
     const now = new Date().toISOString();
-    console.log('最終アクセス時刻を更新:', userId, now);
+    console.log('🕒 CLAUDE.md準拠：lastAccessedAt更新開始', { userId, timestamp: now });
 
-    // lastAccessedAtフィールドのみを更新（他の設定は保護）
-    updateUser(userId, { lastAccessedAt: now });
+    // CLAUDE.md準拠：configJSON内のlastAccessedAtを更新（Line 38）
+    const userInfo = DB.findUserById(userId);
+    if (!userInfo) {
+      console.warn('updateUserLastAccess: ユーザー情報が見つかりません:', userId);
+      return;
+    }
+
+    const currentConfig = userInfo.parsedConfig || {};
+    const updatedConfig = {
+      ...currentConfig,
+      lastAccessedAt: now, // CLAUDE.md Line 38準拠
+      lastModified: now
+    };
+
+    DB.updateUser(userId, updatedConfig);
+    console.log('✅ CLAUDE.md準拠：lastAccessedAt更新完了', { userId, lastAccessedAt: now });
   } catch (error) {
-    console.error('[ERROR]', 'updateUserLastAccess エラー:', error.message);
+    console.error('❌ updateUserLastAccess CLAUDE.md準拠エラー:', {
+      userId,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 

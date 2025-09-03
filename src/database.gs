@@ -145,37 +145,32 @@ const DB = {
    * CLAUDE.md準拠：configJSON構築
    * 全データをconfigJsonに統合（統一データソース原則）
    */
+  /**
+   * 🚀 最小限configJSON構築（root cause fix）
+   * 新規ユーザー作成時は最小限のみ、設定時に追加
+   */
   buildConfigJson(userData) {
     const now = new Date().toISOString();
     
+    // ✅ userDataがconfigJson文字列を既に持っている場合はそれを使用
+    if (userData.configJson && typeof userData.configJson === 'string') {
+      try {
+        return JSON.parse(userData.configJson);
+      } catch (error) {
+        console.warn('buildConfigJson: configJson解析エラー、最小構成で再構築', error.message);
+      }
+    }
+    
+    // 🎯 最小限configJSON構築（JSON bloat完全回避）
     return {
-      // 監査情報（旧DB列から移行）
-      createdAt: userData.createdAt || now,
-      lastAccessedAt: userData.lastAccessedAt || now,
-      
-      // データソース情報（旧DB列から移行）
-      spreadsheetId: userData.spreadsheetId || null,
-      spreadsheetUrl: userData.spreadsheetUrl || null,
-      sheetName: userData.sheetName || null,
-      
-      // フォーム・マッピング情報
-      formUrl: userData.formUrl || null,
-      columnMapping: userData.columnMapping || {},
-      
-      // アプリ設定
       setupStatus: userData.setupStatus || 'pending',
       appPublished: userData.appPublished || false,
       displaySettings: userData.displaySettings || {
-        showNames: false, // CLAUDE.md準拠：心理的安全性重視
+        showNames: false,    // CLAUDE.md準拠：心理的安全性重視
         showReactions: false
       },
-      publishedAt: userData.publishedAt || null,
-      appUrl: userData.appUrl || null,
-      
-      // メタデータ
-      configJsonVersion: '1.0',
-      claudeMdCompliant: true,
-      createdWith: 'configJSON中心型システム'
+      createdAt: userData.createdAt || now,
+      lastModified: userData.lastModified || now
     };
   },
 
@@ -394,18 +389,9 @@ const DB = {
       userObj.parsedConfig = {};
     }
 
-    // CLAUDE.md準拠：統一データソースからデータ展開
-    const config = userObj.parsedConfig;
-    userObj.spreadsheetId = config.spreadsheetId || null;
-    userObj.sheetName = config.sheetName || null;
-    userObj.columnMapping = config.columnMapping || {};
-    userObj.displaySettings = config.displaySettings || { showNames: false, showReactions: false };
-    userObj.appPublished = config.appPublished || false;
-    userObj.formUrl = config.formUrl || null;
-    userObj.createdAt = config.createdAt || null;
-    userObj.lastAccessedAt = config.lastAccessedAt || null;
-    userObj.publishedAt = config.publishedAt || null;
-    userObj.appUrl = config.appUrl || null;
+    // ✅ CLAUDE.md完全準拠：5フィールド構造を厳格実装
+    // configJSON中心型 - 外側フィールド展開を完全削除
+    // parsedConfigは参照専用、userObjへの展開は行わない（データ重複排除）
 
     return userObj;
   },
@@ -434,13 +420,13 @@ const DB = {
       const currentConfig = currentUser.parsedConfig || {};
       const updatedConfig = { ...currentConfig };
 
-      // 更新データをconfigJsonに統合（統一データソース原則）
+      // ✅ CLAUDE.md準拠：5フィールド構造に厳格準拠
       Object.keys(updateData).forEach(key => {
-        if (key === 'userEmail' || key === 'isActive') {
-          // 基本フィールドはそのまま
+        if (key === 'userEmail' || key === 'isActive' || key === 'lastModified') {
+          // 5フィールド構造の基本フィールドはそのまま
           return;
         }
-        // その他はすべてconfigJsonに統合
+        // その他はすべてconfigJsonに統合（統一データソース原則）
         updatedConfig[key] = updateData[key];
       });
 
