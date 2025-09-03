@@ -633,6 +633,170 @@ const DB = {
       console.error('findUserByEmailNoCache エラー:', error.message);
       return null;
     }
+  },
+
+  /**
+   * 🗑️ ユーザー削除（管理者専用）
+   * @param {string} targetUserId 削除対象ユーザーID
+   * @param {string} reason 削除理由
+   * @returns {Object} 削除結果
+   */
+  deleteUserAccountByAdmin(targetUserId, reason) {
+    try {
+      // 1. 基本検証
+      if (!targetUserId || !reason || reason.length < 10) {
+        throw new Error('削除対象ユーザーIDと削除理由（10文字以上）が必要です');
+      }
+
+      // 2. 管理者権限確認
+      const currentUserEmail = User.email();
+      const props = PropertiesService.getScriptProperties();
+      const adminEmail = props.getProperty('ADMIN_EMAIL');
+      
+      if (currentUserEmail !== adminEmail) {
+        throw new Error('管理者権限が必要です');
+      }
+
+      // 3. 削除対象ユーザー情報取得（キャッシュバイパス）
+      const targetUser = this.findUserByIdNoCache(targetUserId);
+      if (!targetUser) {
+        throw new Error('削除対象ユーザーが見つかりません');
+      }
+
+      // 4. 自己削除防止
+      if (targetUser.userEmail === currentUserEmail) {
+        throw new Error('自分のアカウントは削除できません');
+      }
+
+      console.log('🗑️ ユーザー削除開始', { 
+        targetUserId, 
+        targetEmail: targetUser.userEmail,
+        reason,
+        executor: currentUserEmail 
+      });
+
+      // 5. データベースから削除
+      const service = getSheetsService();
+      const dbId = getSecureDatabaseId();
+      const sheetName = DB_CONFIG.SHEET_NAME;
+
+      // 全ユーザーデータを取得
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
+      const rows = data.valueRanges[0].values;
+      
+      if (!rows || rows.length < 2) {
+        throw new Error('データベースにユーザーデータがありません');
+      }
+
+      // ターゲットユーザーの行を特定
+      let targetRowIndex = -1;
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][0] === targetUserId) { // userId列（0番目）で判定
+          targetRowIndex = i + 1; // Sheets APIは1ベース
+          break;
+        }
+      }
+
+      if (targetRowIndex === -1) {
+        throw new Error('削除対象ユーザーがデータベースに見つかりません');
+      }
+
+      // 6. スプレッドシートから行削除
+      const spreadsheet = SpreadsheetApp.openById(dbId);
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      sheet.deleteRow(targetRowIndex);
+
+      // 7. 🔥 重要：キャッシュ完全クリア
+      this.invalidateUserCache(targetUserId, targetUser.userEmail);
+
+      // 8. 削除ログ記録
+      this.logAccountDeletion(targetUserId, targetUser.userEmail, reason, currentUserEmail);
+
+      console.log('✅ ユーザー削除完了', { 
+        targetUserId, 
+        targetEmail: targetUser.userEmail,
+        rowIndex: targetRowIndex 
+      });
+
+      return {
+        success: true,
+        message: `ユーザー ${targetUser.userEmail} を正常に削除しました`,
+        deletedUser: {
+          userId: targetUserId,
+          email: targetUser.userEmail
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ ユーザー削除エラー:', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 🚨 キャッシュ完全無効化
+   * @param {string} userId ユーザーID  
+   * @param {string} userEmail ユーザーメール
+   */
+  invalidateUserCache(userId, userEmail) {
+    try {
+      const cache = CacheService.getScriptCache();
+      
+      // ユーザー関連の全キャッシュキーをクリア
+      const cacheKeys = [
+        `user_${userId}`,
+        `userinfo_${userId}`,
+        `user_email_${userEmail}`,
+        `config_${userId}`,
+        'all_users', // 全ユーザーリストキャッシュ
+        'user_count'  // ユーザー数キャッシュ
+      ];
+
+      cacheKeys.forEach(key => {
+        cache.remove(key);
+      });
+
+      console.log('🔥 キャッシュ完全クリア完了', { userId, userEmail, clearedKeys: cacheKeys.length });
+
+    } catch (error) {
+      console.warn('キャッシュクリアエラー:', error.message);
+    }
+  },
+
+  /**
+   * 📝 削除ログ記録
+   */
+  logAccountDeletion(targetUserId, targetEmail, reason, executorEmail) {
+    try {
+      const dbId = getSecureDatabaseId();
+      const logSheetName = 'DeletionLogs';
+      
+      const spreadsheet = SpreadsheetApp.openById(dbId);
+      let logSheet = spreadsheet.getSheetByName(logSheetName);
+      
+      // ログシートが存在しない場合は作成
+      if (!logSheet) {
+        logSheet = spreadsheet.insertSheet(logSheetName);
+        logSheet.getRange(1, 1, 1, 6).setValues([
+          ['timestamp', 'executorEmail', 'targetUserId', 'targetEmail', 'reason', 'deleteType']
+        ]);
+      }
+
+      // ログエントリを追加
+      logSheet.appendRow([
+        new Date().toISOString(),
+        executorEmail,
+        targetUserId,
+        targetEmail,
+        reason,
+        'admin_deletion'
+      ]);
+
+      console.log('📝 削除ログ記録完了', { targetUserId, targetEmail });
+
+    } catch (error) {
+      console.warn('削除ログ記録エラー:', error.message);
+    }
   }
 };
 
@@ -641,4 +805,8 @@ const DB = {
  */
 function updateUser(userId, updateData) {
   return DB.updateUser(userId, updateData);
+}
+
+function deleteUserAccountByAdmin(targetUserId, reason) {
+  return DB.deleteUserAccountByAdmin(targetUserId, reason);
 }
