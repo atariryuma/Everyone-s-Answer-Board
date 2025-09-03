@@ -81,8 +81,14 @@ const DB = {
           throw new Error('データベース設定が不完全です。システム管理者に連絡してください。');
         }
 
-        const service = getSheetsServiceCached();
-        const sheetName = DB_CONFIG.SHEET_NAME;
+          const sheetName = DB_CONFIG.SHEET_NAME;
+
+        // SpreadsheetAppを使用
+        const spreadsheet = SpreadsheetApp.openById(dbId);
+        const sheet = spreadsheet.getSheetByName(sheetName);
+        if (!sheet) {
+          throw new Error(`シート '${sheetName}' が見つかりません`);
+        }
 
         // CLAUDE.md準拠：configJSON構築（全データを統合）
         const configJson = this.buildConfigJson(userData);
@@ -103,13 +109,8 @@ const DB = {
           timestamp: new Date().toISOString()
         });
 
-        // データベースに挿入（5列のみ）
-        const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
-        const currentRows = data.valueRanges[0].values || [DB_CONFIG.HEADERS];
-        const nextRow = currentRows.length + 1;
-        
-        const range = `'${sheetName}'!A${nextRow}:E${nextRow}`;
-        updateSheetsData(service, dbId, range, [newRow]);
+        // 新しい行を追加
+        sheet.appendRow(newRow);
 
         console.info('✅ createUser: configJSON中心型ユーザー作成完了', {
           userId: userData.userId,
@@ -208,19 +209,18 @@ const DB = {
     try {
       console.log('🔍 findUserByEmail: configJSON中心型検索開始', { email });
 
-      const service = getSheetsService();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
-      // CLAUDE.md準拠：5列のみ取得（A:E）
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
-
-      if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
-        console.warn('findUserByEmail: データベースからデータを取得できませんでした');
+      // SpreadsheetAppを使用してデータ取得
+      const spreadsheet = SpreadsheetApp.openById(dbId);
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      if (!sheet) {
+        console.warn('findUserByEmail: シートが見つかりません');
         return null;
       }
 
-      const rows = data.valueRanges[0].values;
+      const rows = sheet.getDataRange().getValues();
       if (rows.length < 2) {
         console.info('findUserByEmail: ユーザーデータが存在しません');
         return null;
@@ -304,19 +304,18 @@ const DB = {
     try {
       console.log('🔍 findUserById: configJSON中心型検索開始', { userId });
 
-      const service = getSheetsService();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
-      // CLAUDE.md準拠：5列のみ取得（A:E）
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
-
-      if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
-        console.warn('findUserById: データベースからデータを取得できませんでした');
+      // SpreadsheetAppを使用してデータ取得
+      const spreadsheet = SpreadsheetApp.openById(dbId);
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      if (!sheet) {
+        console.warn('findUserById: シートが見つかりません');
         return null;
       }
 
-      const rows = data.valueRanges[0].values;
+      const rows = sheet.getDataRange().getValues();
       if (rows.length < 2) {
         console.info('findUserById: ユーザーデータが存在しません');
         return null;

@@ -292,6 +292,28 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
 }
 
 /**
+ * Sheets APIサービスを取得（キャッシュなし版）
+ * @returns {Object|null} Sheetsサービスオブジェクト
+ */
+function getSheetsService() {
+  try {
+    const accessToken = generateNewServiceAccountToken();
+    if (!accessToken) {
+      console.error('getSheetsService: アクセストークンの取得に失敗');
+      return null;
+    }
+
+    return {
+      baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
+      accessToken: accessToken,
+    };
+  } catch (error) {
+    console.error('getSheetsService エラー:', error.message);
+    return null;
+  }
+}
+
+/**
  * Sheets APIを使用してデータを更新
  * @param {Object} service - Sheets APIサービスオブジェクト
  * @param {string} spreadsheetId - スプレッドシートID
