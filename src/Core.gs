@@ -318,8 +318,9 @@ function registerNewUser(userEmail) {
         adminUrl: appUrls.adminUrl,
         viewUrl: appUrls.viewUrl,
         setupRequired: true,
-        message: 'ユーザー登録が完了しました！次にクイックスタートでフォームを作成してください。',
+        message: 'ユーザー登録が完了しました！管理パネルで設定を開始してください。',
         isExistingUser: false,
+        status: 'success'
       };
     } catch (dbError) {
       console.error('❌ registerNewUser: Database operation failed', {
@@ -3594,14 +3595,14 @@ function getLoginStatus() {
       // 新規ユーザーの場合は自動登録を実行
       console.log('getLoginStatus: 新規ユーザーを検出、自動登録を実行');
       const registrationResult = registerNewUser(activeUserEmail);
-      if (registrationResult.status === 'success') {
-        const urls = generateUserUrls(registrationResult.userId);
+      if (registrationResult && registrationResult.userId) {
+        // 登録成功
         result = {
           status: 'new_user_registered',
           userId: registrationResult.userId,
-          adminUrl: urls.adminUrl,
-          viewUrl: urls.viewUrl,
-          message: '新規ユーザー登録が完了しました',
+          adminUrl: registrationResult.adminUrl,
+          viewUrl: registrationResult.viewUrl,
+          message: registrationResult.message || '新規ユーザー登録が完了しました',
         };
       } else {
         result = { 
