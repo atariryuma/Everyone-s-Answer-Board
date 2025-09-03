@@ -951,6 +951,15 @@
         </div>
       </div>
     </footer>
+    <script>
+      // テンプレート変数をJavaScriptグローバル変数として設定
+      const USER_ID = '<?= userInfo?.userId || "" ?>';
+      const SHEET_NAME = '<?= sheetName || "" ?>';
+      const __OPINION_HEADER__ = '<?= __OPINION_HEADER__ || "お題" ?>';
+      
+      // デバッグログ
+      console.log('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__ });
+    </script>
     <?!= include('page.js'); ?>
   </body>
 </html>
