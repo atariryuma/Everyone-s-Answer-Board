@@ -3562,16 +3562,17 @@ function getLoginStatus() {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }
 
-    const cacheKey = `login_status_${  activeUserEmail}`;
-    try {
-      const cached = CacheService.getScriptCache().get(cacheKey);
-      if (cached) return JSON.parse(cached);
-    } catch (e) {
-      console.warn('getLoginStatus: キャッシュ読み込みエラー -', e.message);
-    }
+    // 🔧 修正：ログイン時はキャッシュを使用しない（削除ユーザー問題対応）
+    // const cacheKey = `login_status_${  activeUserEmail}`;
+    // try {
+    //   const cached = CacheService.getScriptCache().get(cacheKey);
+    //   if (cached) return JSON.parse(cached);
+    // } catch (e) {
+    //   console.warn('getLoginStatus: キャッシュ読み込みエラー -', e.message);
+    // }
 
-    // 簡素化された認証：データベースから直接ユーザー情報を取得
-    const userInfo = DB.findUserByEmail(activeUserEmail);
+    // 🔧 修正：ログイン時は常にキャッシュバイパスで最新情報を取得
+    const userInfo = DB.findUserByEmailNoCache(activeUserEmail);
 
     let result;
     if (
@@ -3617,11 +3618,12 @@ function getLoginStatus() {
       }
     }
 
-    try {
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
-    } catch (e) {
-      console.warn('getLoginStatus: キャッシュ保存エラー -', e.message);
-    }
+    // 🔧 修正：ログイン結果のキャッシュも無効化（削除ユーザー問題対応）
+    // try {
+    //   CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 30);
+    // } catch (e) {
+    //   console.warn('getLoginStatus: キャッシュ保存エラー -', e.message);
+    // }
 
     return result;
   } catch (error) {
