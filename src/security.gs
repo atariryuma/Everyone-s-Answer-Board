@@ -291,4 +291,59 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
   }
 }
 
+/**
+ * Sheets APIを使用してバッチでデータを取得
+ * @param {Object} service - Sheets APIサービスオブジェクト
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {Array<string>} ranges - 取得する範囲の配列
+ * @returns {Object} APIレスポンス
+ */
+function batchGetSheetsData(service, spreadsheetId, ranges) {
+  try {
+    // Sheets API v4のbatchGetメソッドを使用
+    const response = Sheets.Spreadsheets.Values.batchGet(spreadsheetId, {
+      ranges: ranges,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING'
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('batchGetSheetsData エラー:', {
+      spreadsheetId: spreadsheetId,
+      ranges: ranges,
+      error: error.message
+    });
+    
+    // フォールバック: 通常のSpreadsheetAppを使用
+    try {
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const valueRanges = ranges.map(range => {
+        // シート名と範囲を分離
+        const match = range.match(/^'?([^'!]+)'?!(.+)$/);
+        if (match) {
+          const sheetName = match[1];
+          const rangeSpec = match[2];
+          const sheet = spreadsheet.getSheetByName(sheetName);
+          if (sheet) {
+            const values = sheet.getRange(rangeSpec).getValues();
+            return {
+              range: range,
+              values: values
+            };
+          }
+        }
+        return null;
+      }).filter(Boolean);
+      
+      return {
+        valueRanges: valueRanges
+      };
+    } catch (fallbackError) {
+      console.error('batchGetSheetsData フォールバックエラー:', fallbackError.message);
+      throw error;
+    }
+  }
+}
+
 console.log('🔐 簡略化されたセキュリティシステムが初期化されました');
