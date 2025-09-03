@@ -1102,6 +1102,12 @@
       const spreadsheetId = this.value;
       const selectedText = this.options[this.selectedIndex]?.text || '';
       
+      console.log('📋 スプレッドシート選択イベント:', { 
+        spreadsheetId, 
+        hasValue: !!spreadsheetId,
+        selectedText,
+        timestamp: Date.now() 
+      });
       
       if (spreadsheetId) {
         // 即座にユーザーフィードバックを表示
@@ -1113,6 +1119,7 @@
         
         loadSheetList(spreadsheetId);
       } else {
+        console.log('⚠️ スプレッドシート未選択のためシート選択をリセット');
         const sheetSelect = document.getElementById('sheet-select');
         if (sheetSelect) {
           sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
@@ -1175,6 +1182,13 @@
 
   // シート一覧読み込み
   function loadSheetList(spreadsheetId) {
+    const spreadsheetSelect = document.getElementById('spreadsheet-select');
+    console.log('🔍 loadSheetList開始時状態:', {
+      spreadsheetId,
+      currentSpreadsheetValue: spreadsheetSelect?.value,
+      match: spreadsheetSelect?.value === spreadsheetId,
+      timestamp: Date.now()
+    });
     
     const select = document.getElementById('sheet-select');
     if (!select) {
@@ -1212,6 +1226,14 @@
         
         setPartialLoading(false);
         showSuccess(`✅ ${sheets?.length || 0}個のシートを読み込みました`);
+        
+        // 完了時の状態確認
+        const spreadsheetSelect = document.getElementById('spreadsheet-select');
+        console.log('🔍 loadSheetList完了時状態:', {
+          sheetOptionsCount: select.options.length,
+          spreadsheetValue: spreadsheetSelect?.value,
+          timestamp: Date.now()
+        });
       })
       .withFailureHandler(function (error) {
         console.error('❌ loadSheetList: シート読み込みエラー', {
