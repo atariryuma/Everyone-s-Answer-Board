@@ -23,8 +23,8 @@ function checkAdmin(userId = null) {
   try {
     const currentUserEmail = User.email();
     console.log('checkAdmin: 管理者権限チェック開始', {
-      userId: userId ? userId.substring(0, 8) + '...' : 'null',
-      currentUserEmail: currentUserEmail ? currentUserEmail.substring(0, 10) + '...' : 'null',
+      userId: userId ? `${userId.substring(0, 8)}...` : 'null',
+      currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null',
     });
 
     // userIdが指定されていない場合は現在のユーザーのuserIdを取得
@@ -75,7 +75,7 @@ function getAvailableSheets(userId = null) {
   try {
     const currentUserEmail = User.email();
     console.log('getAvailableSheets: シート一覧取得開始', {
-      userId: userId ? userId.substring(0, 8) + '...' : 'null',
+      userId: userId ? `${userId.substring(0, 8)}...` : 'null',
     });
 
     // userIdが指定されていない場合は現在のユーザーのuserIdを取得
@@ -109,7 +109,7 @@ function getAvailableSheets(userId = null) {
     const sheetList = getSheetList(userInfo.spreadsheetId);
 
     console.log('getAvailableSheets: シート一覧取得完了', {
-      spreadsheetId: userInfo.spreadsheetId.substring(0, 20) + '...',
+      spreadsheetId: `${userInfo.spreadsheetId.substring(0, 20)}...`,
       sheetCount: sheetList.length,
     });
 
@@ -134,7 +134,7 @@ function clearActiveSheet(userId = null) {
   try {
     const currentUserEmail = User.email();
     console.log('clearActiveSheet: アクティブシートクリア開始', {
-      userId: userId ? userId.substring(0, 8) + '...' : 'null',
+      userId: userId ? `${userId.substring(0, 8)}...` : 'null',
     });
 
     // userIdが指定されていない場合は現在のユーザーのuserIdを取得

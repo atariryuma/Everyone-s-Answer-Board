@@ -162,7 +162,8 @@ const SystemManager = {
       const sheetName = DB_CONFIG.SHEET_NAME;
 
       // 全データを取得
-      const currentData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:N`]);
+      // 🚀 CLAUDE.md準拠：5列構造A:E範囲使用
+      const currentData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:E`]);
       const values = currentData.valueRanges[0].values || [];
 
       if (values.length <= 1) {
@@ -300,7 +301,8 @@ const SystemManager = {
       const service = getSheetsServiceCached();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
-      const currentData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:N`]);
+      // 🚀 CLAUDE.md準拠：5列構造A:E範囲使用
+      const currentData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:E`]);
       const values = currentData.valueRanges[0].values || [];
 
       if (values.length <= 1) {

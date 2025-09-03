@@ -69,7 +69,7 @@ function doGet(e) {
         } catch (adminError) {
           console.error('Admin mode error:', adminError);
           return HtmlService.createHtmlOutput(
-            '<h3>Error</h3><p>An error occurred in admin mode: ' + adminError.message + '</p>'
+            `<h3>Error</h3><p>An error occurred in admin mode: ${adminError.message}</p>`
           );
         }
 
@@ -106,7 +106,7 @@ function doGet(e) {
             hasSpreadsheetId: !!dbUserInfo?.spreadsheetId,
             hasSheetName: !!dbUserInfo?.sheetName,
             spreadsheetId: dbUserInfo?.spreadsheetId
-              ? dbUserInfo.spreadsheetId.substring(0, 20) + '...'
+              ? `${dbUserInfo.spreadsheetId.substring(0, 20)}...`
               : 'null',
             sheetName: dbUserInfo?.sheetName,
           });
@@ -123,14 +123,14 @@ function doGet(e) {
         } catch (viewError) {
           console.error('View mode error:', viewError);
           return HtmlService.createHtmlOutput(
-            '<h3>Error</h3><p>An error occurred: ' + viewError.message + '</p>'
+            `<h3>Error</h3><p>An error occurred: ${viewError.message}</p>`
           );
         }
     }
   } catch (error) {
     console.error('doGet - Critical error:', error);
     return HtmlService.createHtmlOutput(
-      '<h3>System Error</h3><p>A critical system error occurred: ' + error.message + '</p>'
+      `<h3>System Error</h3><p>A critical system error occurred: ${error.message}</p>`
     );
   }
 }
@@ -437,7 +437,7 @@ function showAdminPanel() {
   } catch (error) {
     console.error('showAdminPanel エラー:', error);
     return HtmlService.createHtmlOutput(
-      '<h3>Error</h3><p>An error occurred: ' + error.message + '</p>'
+      `<h3>Error</h3><p>An error occurred: ${error.message}</p>`
     );
   }
 }
@@ -482,7 +482,7 @@ function showAnswerBoard(userId) {
   } catch (error) {
     console.error('showAnswerBoard エラー:', error);
     return HtmlService.createHtmlOutput(
-      '<h3>Error</h3><p>An error occurred: ' + error.message + '</p>'
+      `<h3>Error</h3><p>An error occurred: ${error.message}</p>`
     );
   }
 }
@@ -853,7 +853,7 @@ function renderAdminPanel(userInfo, mode) {
   } catch (error) {
     console.error('renderAdminPanel エラー:', error);
     return HtmlService.createHtmlOutput(
-      '<h3>エラー</h3><p>管理パネルの表示中にエラーが発生しました: ' + error.message + '</p>'
+      `<h3>エラー</h3><p>管理パネルの表示中にエラーが発生しました: ${error.message}</p>`
     );
   }
 }
@@ -874,7 +874,7 @@ function renderLoginPage(params = {}) {
   } catch (error) {
     console.error('renderLoginPage error:', error);
     return HtmlService.createHtmlOutput(
-      '<h3>Error</h3><p>ログインページの読み込みに失敗しました: ' + error.message + '</p>'
+      `<h3>Error</h3><p>ログインページの読み込みに失敗しました: ${error.message}</p>`
     );
   }
 }
@@ -901,7 +901,7 @@ function renderAnswerBoard(userInfo, params) {
     hasSpreadsheetId: !!userInfo.spreadsheetId,
     hasSheetName: !!userInfo.sheetName,
     spreadsheetIdStart: userInfo.spreadsheetId
-      ? userInfo.spreadsheetId.substring(0, 20) + '...'
+      ? `${userInfo.spreadsheetId.substring(0, 20)}...`
       : 'null',
     sheetName: userInfo.sheetName,
   });
@@ -1039,7 +1039,7 @@ function renderAnswerBoard(userInfo, params) {
   } catch (error) {
     console.error('renderAnswerBoard - 全般エラー:', error);
     return HtmlService.createHtmlOutput(
-      '<h3>エラー</h3><p>ページの表示中にエラーが発生しました: ' + error.message + '</p>'
+      `<h3>エラー</h3><p>ページの表示中にエラーが発生しました: ${error.message}</p>`
     );
   }
 }
@@ -1411,7 +1411,7 @@ function forceLogoutAndRedirectToLogin() {
     console.log('forceLogoutAndRedirectToLogin called');
     return {
       success: true,
-      redirectUrl: getWebAppUrl() + '?mode=login',
+      redirectUrl: `${getWebAppUrl()}?mode=login`,
       message: 'Logout successful',
     };
   } catch (error) {

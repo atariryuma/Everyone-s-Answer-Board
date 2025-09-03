@@ -160,7 +160,7 @@ class CacheManager {
       ...this.stats,
       hitRate:
         this.stats.totalOps > 0
-          ? ((this.stats.hits / this.stats.totalOps) * 100).toFixed(2) + '%'
+          ? `${((this.stats.hits / this.stats.totalOps) * 100).toFixed(2)}%`
           : '0%',
       memoSize: this.memoCache.size,
       uptime: Date.now() - this.stats.lastReset,
