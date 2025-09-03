@@ -44,7 +44,7 @@ function testDatabaseMigration() {
     console.error('🔧 データベース最適化テストエラー:', error.message);
     return {
       status: 'error',
-      message: '❌ データベース最適化エラー: ' + error.message,
+      message: `❌ データベース最適化エラー: ${  error.message}`,
     };
   }
 }
@@ -80,7 +80,7 @@ function testSchemaOptimization() {
     console.error('🔄 データベース構造最適化テストエラー:', error.message);
     return {
       status: 'error',
-      message: '❌ データベース構造最適化テストエラー: ' + error.message,
+      message: `❌ データベース構造最適化テストエラー: ${  error.message}`,
       error: error.stack
     };
   }
@@ -105,13 +105,13 @@ function testSystemDiagnosis() {
     return {
       status: 'success',
       message: '✅ システム診断完了',
-      results: results,
+      results,
     };
   } catch (error) {
     console.error('🏥 システム診断エラー:', error.message);
     return {
       status: 'error',
-      message: '❌ システム診断エラー: ' + error.message,
+      message: `❌ システム診断エラー: ${  error.message}`,
     };
   }
 }
@@ -135,7 +135,7 @@ function testSetup() {
     console.error('⚙️ セットアップテストエラー:', error.message);
     return {
       status: 'error',
-      message: '❌ セットアップテストエラー: ' + error.message,
+      message: `❌ セットアップテストエラー: ${  error.message}`,
     };
   }
 }
@@ -202,7 +202,7 @@ const SystemManager = {
         }
 
         try {
-          let config = JSON.parse(configJsonStr);
+          const config = JSON.parse(configJsonStr);
           let isModified = false;
 
           // 1. appNameフィールドを削除
@@ -345,9 +345,9 @@ const SystemManager = {
 
       return {
         totalRows: dataRows.length,
-        hasAppName: hasAppName,
-        needsOpinionHeader: needsOpinionHeader,
-        needsDisplayUpdate: needsDisplayUpdate,
+        hasAppName,
+        needsOpinionHeader,
+        needsDisplayUpdate,
       };
     } catch (error) {
       console.error('📊 データベース分析エラー:', error.message);
@@ -374,8 +374,8 @@ const SystemManager = {
 
       return {
         success: true,
-        databaseId: dbId ? dbId.substring(0, 10) + '...' : 'なし',
-        sheetName: sheetName,
+        databaseId: dbId ? `${dbId.substring(0, 10)  }...` : 'なし',
+        sheetName,
         hasData: testData.valueRanges[0].values && testData.valueRanges[0].values.length > 0,
       };
     } catch (error) {
@@ -419,14 +419,14 @@ const SystemManager = {
     try {
       const analysisResult = this.analyzeDatabaseState();
 
-      const totalRows = analysisResult.totalRows;
+      const {totalRows} = analysisResult;
       const issues =
         analysisResult.hasAppName +
         analysisResult.needsOpinionHeader +
         analysisResult.needsDisplayUpdate;
 
       return {
-        totalRows: totalRows,
+        totalRows,
         issuesFound: issues,
         isHealthy: issues === 0,
         details: analysisResult,
@@ -452,9 +452,9 @@ const SystemManager = {
       const hasAdminEmail = !!props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
 
       return {
-        hasServiceAccount: hasServiceAccount,
-        hasDatabaseId: hasDatabaseId,
-        hasAdminEmail: hasAdminEmail,
+        hasServiceAccount,
+        hasDatabaseId,
+        hasAdminEmail,
         isComplete: hasServiceAccount && hasDatabaseId && hasAdminEmail,
       };
     } catch (error) {
@@ -477,8 +477,8 @@ const SystemManager = {
 
       return {
         isComplete: security.isComplete && database.success,
-        security: security,
-        database: database,
+        security,
+        database,
         userCount: userStats.total,
         timestamp: new Date().toISOString(),
       };
@@ -508,7 +508,7 @@ const SystemManager = {
         return { success: false, reason: 'ユーザーまたはconfigJsonが存在しません' };
       }
 
-      let config = JSON.parse(userInfo.configJson);
+      const config = JSON.parse(userInfo.configJson);
       let isModified = false;
 
       // 最適化処理
@@ -541,13 +541,13 @@ const SystemManager = {
       if (isModified) {
         DB.updateUser(userId, { configJson: JSON.stringify(config) });
         console.info(`👤 ユーザー ${userId} のconfigJson最適化完了`);
-        return { success: true, userId: userId, updated: true };
+        return { success: true, userId, updated: true };
       }
 
-      return { success: true, userId: userId, updated: false, reason: '変更不要' };
+      return { success: true, userId, updated: false, reason: '変更不要' };
     } catch (error) {
       console.error(`👤 ユーザー ${userId} の最適化エラー:`, error.message);
-      return { success: false, userId: userId, error: error.message };
+      return { success: false, userId, error: error.message };
     }
   },
 
@@ -643,7 +643,7 @@ const SystemManager = {
       console.error('🔄 データベース構造最適化エラー:', error.message);
       return {
         status: 'error', 
-        message: '❌ データベース構造最適化エラー: ' + error.message,
+        message: `❌ データベース構造最適化エラー: ${  error.message}`,
         error: error.stack
       };
     }
@@ -672,7 +672,7 @@ const SystemManager = {
         }
         results.cacheCleared = true;
       } catch (error) {
-        results.errors.push('キャッシュクリアエラー: ' + error.message);
+        results.errors.push(`キャッシュクリアエラー: ${  error.message}`);
       }
 
       // config最適化
@@ -681,14 +681,14 @@ const SystemManager = {
         results.configOptimized = optimizeResult.success;
         results.optimizedRows = optimizeResult.optimizedRows;
       } catch (error) {
-        results.errors.push('config最適化エラー: ' + error.message);
+        results.errors.push(`config最適化エラー: ${  error.message}`);
       }
 
       console.info('🧹 システムクリーンアップ完了:', results);
 
       return {
         success: results.errors.length === 0,
-        results: results,
+        results,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
@@ -794,7 +794,7 @@ function generateSystemReport() {
     console.log('===============================');
 
     return {
-      diagnosis: diagnosis,
+      diagnosis,
       setup: setupTest,
       timestamp: new Date().toISOString(),
     };

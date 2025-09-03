@@ -232,7 +232,7 @@ function getSheetsServiceCached() {
 
       return {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
-        accessToken: accessToken,
+        accessToken,
       };
     },
     { ttl: 3500, enableMemoization: true }

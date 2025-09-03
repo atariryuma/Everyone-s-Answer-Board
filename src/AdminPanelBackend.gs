@@ -168,13 +168,13 @@ function connectDataSource(spreadsheetId, sheetName) {
         ...currentConfig,
         
         // データソース情報（統一データソース）
-        spreadsheetId: spreadsheetId,
+        spreadsheetId,
         spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
-        sheetName: sheetName,
+        sheetName,
         
         // 列マッピング・ヘッダー情報
-        columnMapping: columnMapping,
-        opinionHeader: opinionHeader,
+        columnMapping,
+        opinionHeader,
         
         // フォーム情報
         formUrl: formInfo?.formUrl || currentConfig.formUrl || null,
@@ -208,11 +208,11 @@ function connectDataSource(spreadsheetId, sheetName) {
 
     return {
       success: true,
-      columnMapping: columnMapping,
+      columnMapping,
       headers: headerRow,
       rowCount: sheet.getLastRow(),
-      message: message,
-      missingColumnsResult: missingColumnsResult,
+      message,
+      missingColumnsResult,
       claudeMdCompliant: true
     };
 
@@ -433,7 +433,7 @@ function getFormInfo() {
     return {
       success: true,
       hasFormData: formData,
-      formData: formData,
+      formData,
       result: formData,
       claudeMdCompliant: true,
       timestamp: new Date().toISOString()
@@ -513,10 +513,10 @@ function getSpreadsheetList() {
 
       return {
         success: true,
-        spreadsheets: spreadsheets,
+        spreadsheets,
         count: spreadsheets.length,
-        maxResults: maxResults,
-        executionTime: executionTime,
+        maxResults,
+        executionTime,
         cached: false,
         timestamp: new Date().toISOString()
       };
@@ -553,7 +553,7 @@ function executeAppPublish(userId, publishConfig) {
     
     return {
       success: true,
-      appUrl: appUrl,
+      appUrl,
       publishedAt: new Date().toISOString()
     };
     
@@ -710,8 +710,8 @@ function validateAdminPanelMapping(columnMapping) {
   
   return {
     isValid: errors.length === 0,
-    errors: errors,
-    warnings: warnings
+    errors,
+    warnings
   };
 }
 
@@ -745,8 +745,8 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
 
     return {
       success: true,
-      addedColumns: addedColumns,
-      recommendedColumns: recommendedColumns,
+      addedColumns,
+      recommendedColumns,
       message: addedColumns.length > 0 ? `${addedColumns.length}個の列を追加しました` : '追加は不要でした'
     };
 
@@ -782,8 +782,8 @@ function checkFormConnection(spreadsheetId) {
       
       return {
         hasForm: true,
-        formUrl: formUrl,
-        formTitle: formTitle
+        formUrl,
+        formTitle
       };
     } else {
       return {
@@ -822,7 +822,7 @@ function getCurrentBoardInfoAndUrls() {
     
     const boardInfo = {
       isActive: config.appPublished || false,
-      questionText: questionText,        // 実際の問題文
+      questionText,        // 実際の問題文
       appUrl: config.appUrl || '',
       spreadsheetUrl: config.spreadsheetUrl || '',
       hasSpreadsheet: !!config.spreadsheetId,
@@ -870,7 +870,7 @@ function checkIsSystemAdmin() {
     
     console.info('✅ checkIsSystemAdmin: 権限確認完了', {
       userEmail: currentUserEmail,
-      isSystemAdmin: isSystemAdmin,
+      isSystemAdmin,
       timestamp: new Date().toISOString()
     });
 
@@ -897,7 +897,7 @@ function checkIsSystemAdmin() {
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
     console.log('analyzeColumns: CLAUDE.md準拠列分析開始', {
-      spreadsheetId: spreadsheetId?.substring(0, 10) + '...',
+      spreadsheetId: `${spreadsheetId?.substring(0, 10)  }...`,
       sheetName,
       timestamp: new Date().toISOString()
     });
@@ -929,7 +929,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
       headers: headerRow,
       columnMapping: columnMapping.mapping || columnMapping,  // 統一形式
       confidence: columnMapping.confidence,                   // 信頼度を分離
-      sheetName: sheetName,
+      sheetName,
       rowCount: sheet.getLastRow(),
       timestamp: new Date().toISOString(),
       claudeMdCompliant: true

@@ -199,7 +199,7 @@ class ConfigurationManager {
     if (!config || !config.isPublic) return null;
 
     return {
-      userId: userId,
+      userId,
       title: config.title || 'Answer Board',
       description: config.description || '',
       allowAnonymous: config.allowAnonymous || false,

@@ -28,20 +28,20 @@ function analyzeColumnType(headerName, sampleData = []) {
 
     console.info('🚀 超高精度列タイプ分析完了:', {
       headerName: headerName.substring(0, 30),
-      bestType: bestType,
-      confidence: confidence,
+      bestType,
+      confidence,
       allScores: ensembleScores,
       sampleCount: sampleData.length
     });
 
     return {
       type: bestType,
-      confidence: confidence
+      confidence
     };
     
   } catch (error) {
     console.error('超高精度列タイプ分析エラー:', {
-      headerName: headerName,
+      headerName,
       error: error.message,
       stack: error.stack
     });
@@ -236,8 +236,8 @@ function calculateFinalConfidence(headerScore, contentScore) {
   console.info('列タイプ分析完了:', {
     headerScores: headerScore,
     contentScores: contentScore,
-    finalScores: finalScores,
-    bestType: bestType,
+    finalScores,
+    bestType,
     confidence: adjustedConfidence
   });
 
@@ -356,14 +356,14 @@ function calculateShannonEntropy(text) {
   if (!text || text.length === 0) return 0;
   
   const charCounts = {};
-  for (let char of text) {
+  for (const char of text) {
     charCounts[char] = (charCounts[char] || 0) + 1;
   }
   
   const totalChars = text.length;
   let entropy = 0;
   
-  for (let count of Object.values(charCounts)) {
+  for (const count of Object.values(charCounts)) {
     const probability = count / totalChars;
     if (probability > 0) {
       entropy -= probability * Math.log2(probability);
@@ -395,7 +395,7 @@ function calculateConditionalEntropy(textArray) {
   let conditionalEntropy = 0;
   const totalBigrams = Object.values(bigramCounts).reduce((sum, count) => sum + count, 0);
   
-  for (let [bigram, bigramCount] of Object.entries(bigramCounts)) {
+  for (const [bigram, bigramCount] of Object.entries(bigramCounts)) {
     const firstChar = bigram.charAt(0);
     const unigramCount = unigramCounts[firstChar] || 1;
     
@@ -602,7 +602,7 @@ function calculateBayesianConfidence(scores, features) {
   const calibratedScores = {};
   
   Object.keys(scores).forEach(type => {
-    let baseScore = scores[type];
+    const baseScore = scores[type];
     let confidenceFactor = 1.0;
 
     // 特徴量に基づく信頼度調整
@@ -712,7 +712,7 @@ function resolveColumnConflicts(headerRow, allData) {
   return {
     mapping: finalMapping,
     confidence: finalConfidence,
-    assignmentLog: assignmentLog,
+    assignmentLog,
     conflictsResolved: true
   };
 }
@@ -737,7 +737,7 @@ function hungarianAlgorithmSimplified(costMatrix, columnTypes) {
     for (let type = 0; type < numTypes; type++) {
       candidateList.push({
         column: col,
-        type: type,
+        type,
         cost: costMatrix[col][type],
         confidence: 100 - costMatrix[col][type]
       });
@@ -748,7 +748,7 @@ function hungarianAlgorithmSimplified(costMatrix, columnTypes) {
   candidateList.sort((a, b) => a.cost - b.cost);
 
   // 貪欲割り当て（各タイプに最大1つの列のみ）
-  for (let candidate of candidateList) {
+  for (const candidate of candidateList) {
     const { column, type, confidence } = candidate;
     
     // 高信頼度のみ採用（閾値75%以上）

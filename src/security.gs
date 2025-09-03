@@ -53,10 +53,10 @@ function generateNewServiceAccountToken() {
 
   const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
   const encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
-  const signatureInput = encodedHeader + '.' + encodedClaimSet;
+  const signatureInput = `${encodedHeader  }.${  encodedClaimSet}`;
   const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
   const encodedSignature = Utilities.base64EncodeWebSafe(signature);
-  const jwt = signatureInput + '.' + encodedSignature;
+  const jwt = `${signatureInput  }.${  encodedSignature}`;
 
   // トークンリクエスト
   const response = UrlFetchApp.fetch(tokenUrl, {
@@ -246,7 +246,7 @@ function verifyUserAccess(userId) {
   // Base.gsのAccessControllerを使用したアクセス制御
   const result = App.getAccess().verifyAccess(userId, 'view', User.email());
   if (!result.allowed) {
-    throw new Error('アクセスが拒否されました: ' + result.reason);
+    throw new Error(`アクセスが拒否されました: ${  result.reason}`);
   }
 
   return true;
@@ -283,7 +283,7 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
     );
   } catch (error) {
     console.error('shareSpreadsheetWithServiceAccount エラー:', {
-      spreadsheetId: spreadsheetId,
+      spreadsheetId,
       error: error.message,
       stack: error.stack,
     });
@@ -305,7 +305,7 @@ function getSheetsService() {
 
     return {
       baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
-      accessToken: accessToken,
+      accessToken,
     };
   } catch (error) {
     console.error('getSheetsService エラー:', error.message);
@@ -326,7 +326,7 @@ function updateSheetsData(service, spreadsheetId, range, values) {
     // Sheets API v4のupdateメソッドを使用
     const response = Sheets.Spreadsheets.Values.update(
       {
-        values: values
+        values
       },
       spreadsheetId,
       range,
@@ -338,8 +338,8 @@ function updateSheetsData(service, spreadsheetId, range, values) {
     return response;
   } catch (error) {
     console.error('updateSheetsData エラー:', {
-      spreadsheetId: spreadsheetId,
-      range: range,
+      spreadsheetId,
+      range,
       error: error.message
     });
     
@@ -359,12 +359,12 @@ function updateSheetsData(service, spreadsheetId, range, values) {
             updatedCells: values.length * (values[0] ? values[0].length : 0),
             updatedRows: values.length,
             updatedColumns: values[0] ? values[0].length : 0,
-            spreadsheetId: spreadsheetId,
+            spreadsheetId,
             updatedRange: range
           };
         }
       }
-      throw new Error('範囲の解析に失敗しました: ' + range);
+      throw new Error(`範囲の解析に失敗しました: ${  range}`);
     } catch (fallbackError) {
       console.error('updateSheetsData フォールバックエラー:', fallbackError.message);
       throw error;
@@ -383,7 +383,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
   try {
     // Sheets API v4のbatchGetメソッドを使用
     const response = Sheets.Spreadsheets.Values.batchGet(spreadsheetId, {
-      ranges: ranges,
+      ranges,
       valueRenderOption: 'UNFORMATTED_VALUE',
       dateTimeRenderOption: 'FORMATTED_STRING'
     });
@@ -391,8 +391,8 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
     return response;
   } catch (error) {
     console.error('batchGetSheetsData エラー:', {
-      spreadsheetId: spreadsheetId,
-      ranges: ranges,
+      spreadsheetId,
+      ranges,
       error: error.message
     });
     
@@ -409,8 +409,8 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
           if (sheet) {
             const values = sheet.getRange(rangeSpec).getValues();
             return {
-              range: range,
-              values: values
+              range,
+              values
             };
           }
         }
@@ -418,7 +418,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
       }).filter(Boolean);
       
       return {
-        valueRanges: valueRanges
+        valueRanges
       };
     } catch (fallbackError) {
       console.error('batchGetSheetsData フォールバックエラー:', fallbackError.message);

@@ -41,7 +41,7 @@ const DB = {
    * @param {Object} userData - ユーザーデータ
    * @returns {Object} 作成結果
    */
-  createUser: function(userData) {
+  createUser(userData) {
     try {
       console.info('📊 createUser: configJSON中心型ユーザー作成開始', {
         userId: userData.userId,
@@ -123,7 +123,7 @@ const DB = {
           success: true,
           userId: userData.userId,
           userEmail: userData.userEmail,
-          configJson: configJson,
+          configJson,
           timestamp: new Date().toISOString()
         };
 
@@ -145,7 +145,7 @@ const DB = {
    * CLAUDE.md準拠：configJSON構築
    * 全データをconfigJsonに統合（統一データソース原則）
    */
-  buildConfigJson: function(userData) {
+  buildConfigJson(userData) {
     const now = new Date().toISOString();
     
     return {
@@ -184,14 +184,14 @@ const DB = {
    * @param {string} email - メールアドレス
    * @returns {Object|null} ユーザー情報またはnull
    */
-  findUserByEmail: function(email) {
+  findUserByEmail(email) {
     if (!email || typeof email !== 'string') {
       console.warn('findUserByEmail: 無効なメールアドレス', email);
       return null;
     }
 
     // キャッシュキーを生成
-    const cacheKey = 'user_email_' + email;
+    const cacheKey = `user_email_${  email}`;
 
     try {
       // キャッシュから取得を試行
@@ -279,14 +279,14 @@ const DB = {
    * @param {string} userId - ユーザーID
    * @returns {Object|null} ユーザー情報またはnull
    */
-  findUserById: function(userId) {
+  findUserById(userId) {
     if (!userId || typeof userId !== 'string') {
       console.warn('findUserById: 無効なユーザーID', userId);
       return null;
     }
 
     // キャッシュキーを生成
-    const cacheKey = 'user_id_' + userId;
+    const cacheKey = `user_id_${  userId}`;
 
     try {
       // キャッシュから取得を試行
@@ -373,7 +373,7 @@ const DB = {
    * CLAUDE.md準拠：行データをユーザーオブジェクトに変換
    * 統一データソース原則：configJsonから全データを展開
    */
-  parseUserRow: function(headers, row) {
+  parseUserRow(headers, row) {
     // CLAUDE.md準拠：5フィールド構造
     const userObj = {
       userId: row[0] || '',
@@ -416,7 +416,7 @@ const DB = {
    * @param {Object} updateData - 更新データ
    * @returns {Object} 更新結果
    */
-  updateUser: function(userId, updateData) {
+  updateUser(userId, updateData) {
     try {
       console.info('📝 updateUser: configJSON中心型更新開始', {
         userId,
@@ -470,7 +470,7 @@ const DB = {
       return {
         success: true,
         userId,
-        updatedConfig: updatedConfig,
+        updatedConfig,
         timestamp: updatedConfig.lastModified
       };
 
@@ -487,7 +487,7 @@ const DB = {
   /**
    * CLAUDE.md準拠：データベース物理更新（5フィールドのみ）
    */
-  updateUserInDatabase: function(userId, dbUpdateData) {
+  updateUserInDatabase(userId, dbUpdateData) {
     const dbId = getSecureDatabaseId();
     const service = getSheetsServiceCached();
     const sheetName = DB_CONFIG.SHEET_NAME;
@@ -528,7 +528,7 @@ const DB = {
     console.log('💾 CLAUDE.md準拠：5フィールド物理更新完了', {
       userId,
       row: rowIndex,
-      range: range,
+      range,
       configJsonSize: dbUpdateData.configJson.length
     });
   },
@@ -536,12 +536,12 @@ const DB = {
   /**
    * ユーザーキャッシュクリア
    */
-  clearUserCache: function(userId, userEmail) {
+  clearUserCache(userId, userEmail) {
     try {
       const cache = CacheService.getScriptCache();
-      cache.remove('user_id_' + userId);
+      cache.remove(`user_id_${  userId}`);
       if (userEmail) {
-        cache.remove('user_email_' + userEmail);
+        cache.remove(`user_email_${  userEmail}`);
       }
     } catch (error) {
       console.warn('キャッシュクリアエラー:', error.message);
@@ -551,7 +551,7 @@ const DB = {
   /**
    * 全ユーザー取得（CLAUDE.md準拠版）
    */
-  getAllUsers: function() {
+  getAllUsers() {
     try {
       console.info('📋 getAllUsers: configJSON中心型全ユーザー取得開始');
 
@@ -593,7 +593,7 @@ const DB = {
   /**
    * キャッシュなしでメールアドレスでユーザーを検索（ログイン専用）
    */
-  findUserByEmailNoCache: function(email) {
+  findUserByEmailNoCache(email) {
     if (!email || typeof email !== 'string') {
       console.warn('findUserByEmailNoCache: 無効なメールアドレス', email);
       return null;

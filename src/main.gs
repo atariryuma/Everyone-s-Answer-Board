@@ -153,7 +153,7 @@ const Services = {
 
         // 簡易的なユーザー情報を返す（将来的にはApp.getConfig()経由）
         return {
-          email: email,
+          email,
           isAuthenticated: true,
         };
       } catch (error) {
@@ -228,10 +228,10 @@ const Deploy = {
       const isDomainMatch = currentDomain === deployDomain || deployDomain === '';
 
       return {
-        currentDomain: currentDomain,
-        deployDomain: deployDomain,
-        isDomainMatch: isDomainMatch,
-        webAppUrl: webAppUrl,
+        currentDomain,
+        deployDomain,
+        isDomainMatch,
+        webAppUrl,
       };
     } catch (e) {
       console.error('デプロイユーザードメイン情報取得失敗:', e.message);
@@ -302,13 +302,13 @@ function getGoogleClientId() {
     return {
       success: true,
       message: 'Google Client IDを取得しました',
-      data: { clientId: clientId },
+      data: { clientId },
     };
   } catch (error) {
     console.error('GOOGLE_CLIENT_ID取得エラー:', error.message);
     return {
       success: false,
-      message: 'Google Client IDの取得に失敗しました: ' + error.toString(),
+      message: `Google Client IDの取得に失敗しました: ${  error.toString()}`,
       data: { clientId: '' },
     };
   }
@@ -380,9 +380,9 @@ function getSystemDomainInfo() {
 
     return {
       success: true,
-      adminEmail: adminEmail,
-      adminDomain: adminDomain,
-      isDomainMatch: isDomainMatch,
+      adminEmail,
+      adminDomain,
+      isDomainMatch,
       currentDomain: domainInfo.currentDomain || '不明',
       deployDomain: domainInfo.deployDomain || adminDomain,
     };
@@ -478,7 +478,7 @@ function showAnswerBoard(userId) {
 
     // ユーザー情報変換
     const compatUserInfo = {
-      userId: userId,
+      userId,
       userEmail: accessResult.config?.userEmail || '',
       configJson: JSON.stringify(accessResult.config || {}),
     };
@@ -924,7 +924,7 @@ function renderAnswerBoard(userInfo, params) {
     const userSpreadsheetId = userInfo.spreadsheetId || null;
     const userSheetName = userInfo.sheetName || null;
 
-    const sheetConfigKey = 'sheet_' + (userSheetName || params.sheetName);
+    const sheetConfigKey = `sheet_${  userSheetName || params.sheetName}`;
     const sheetConfig = config[sheetConfigKey] || {};
 
     // シンプルな判定: ユーザーがスプレッドシートを設定済みかどうか
@@ -1015,7 +1015,7 @@ function renderAnswerBoard(userInfo, params) {
     } catch (dataError) {
       console.error('renderAnswerBoard - データ取得エラー:', dataError);
       template.data = [];
-      template.message = 'データ取得中にエラーが発生しました: ' + dataError.message;
+      template.message = `データ取得中にエラーが発生しました: ${  dataError.message}`;
       template.hasData = false;
 
       // エラー時も表示設定を適用
@@ -1088,15 +1088,15 @@ function checkCurrentPublicationStatus(userId) {
     const isPublished = !!(userInfo.spreadsheetId && userInfo.sheetName);
 
     console.log('checkCurrentPublicationStatus - result:', {
-      userId: userId,
-      isPublished: isPublished,
+      userId,
+      isPublished,
       hasSpreadsheetId: !!userInfo.spreadsheetId,
       hasSheetName: !!userInfo.sheetName,
     });
 
     return {
-      userId: userId,
-      isPublished: isPublished,
+      userId,
+      isPublished,
       spreadsheetId: userInfo.spreadsheetId || null,
       sheetName: userInfo.sheetName || null,
       lastChecked: new Date().toISOString(),
@@ -1139,7 +1139,7 @@ function saveApplicationConfig(config) {
   return {
     success: true,
     message: '保存しました',
-    config: config,
+    config,
   };
 }
 
@@ -1268,8 +1268,8 @@ function getUser(format = 'object') {
           userId = user.userId;
           // セッション情報を保存（1時間有効）
           const sessionData = {
-            userId: userId,
-            email: email,
+            userId,
+            email,
             timestamp: Date.now(),
           };
           PropertiesService.getScriptProperties().setProperty(
@@ -1291,8 +1291,8 @@ function getUser(format = 'object') {
     // オブジェクト形式（デフォルト）
     return {
       success: true,
-      email: email,
-      userId: userId,
+      email,
+      userId,
       isAuthenticated: !!email,
       message: email ? 'ユーザー取得成功' : 'ユーザー未認証',
     };
@@ -1447,7 +1447,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
     console.log('getPublishedSheetData: Core.gs実装呼び出し開始', {
       argumentsLength: arguments.length,
       firstArgType: typeof userId,
-      params: params,
+      params,
     });
 
     // CLAUDE.md準拠: 統一データソース原則でCore.gs実装を呼び出し
@@ -1503,7 +1503,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
     if (!targetUserId) {
       const errorDetails = {
         providedUserId: params.userId,
-        currentUserEmail: currentUserEmail,
+        currentUserEmail,
         hasValidEmail: !!currentUserEmail,
         timestamp: new Date().toISOString(),
       };

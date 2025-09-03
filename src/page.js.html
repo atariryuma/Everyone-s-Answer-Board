@@ -3,80 +3,56 @@
   // 統一されたテンプレート変数受け取りシステム
 
   /**
-   * GASテンプレート変数を型安全に解析
-   * @param {Object} templateVars - テンプレート変数定義
-   * @returns {Object} 解析済み設定オブジェクト
+   * ✅ CLAUDE.md準拠: configJSONベース設定取得（App名前空間使用）
+   * @returns {Promise<Object>} 設定オブジェクト
    */
-  const parseTemplateVars = (templateVars) => {
-    const result = {};
-    const defaults = {
-      showCounts: false,
-      displayMode: 'anonymous',
-      sheetName: 'テストシート',
-      userId: '',
-      ownerName: '',
-      showAdminFeatures: false,
-      showHighlightToggle: false,
-      showScoreSort: false,
-      isStudentMode: true,
-      isAdminUser: false,
-      mapping: {},
-    };
-
-    Object.entries(templateVars).forEach(([key, rawValue]) => {
-      try {
-        // GASテンプレート未展開チェック
-        if (typeof rawValue === 'string' && rawValue.startsWith('<')) {
-          result[key] = defaults[key];
-          return;
-        }
-
-        // 型別処理
-        if (key === 'mapping') {
-          result[key] =
-            typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue || defaults[key];
-        } else if (typeof defaults[key] === 'boolean') {
-          result[key] = rawValue === 'true' || rawValue === true;
-        } else {
-          result[key] = rawValue || defaults[key];
-        }
-      } catch (error) {
-        console.warn(`Template variable parsing failed for ${key}:`, error);
-        result[key] = defaults[key];
+  const getConfigFromBackend = async () => {
+    try {
+      const userId = new URLSearchParams(window.location.search).get('userId');
+      if (!userId) throw new Error('userId parameter missing');
+      
+      // SecurityValidator使用でセキュリティ強化
+      if (!SecurityValidator.isValidUUID(userId)) {
+        throw new Error('Invalid userId format');
       }
-    });
 
-    return Object.freeze(result);
+      // App名前空間パターン使用
+      return await App.getConfig().getUserConfig(userId);
+    } catch (error) {
+      console.error('❌ getConfigFromBackend エラー:', error);
+      throw error;
+    }
   };
 
-  // Template variables definition
-  const TEMPLATE_VARS = {
-    showCounts: '<?= typeof showCounts !== "undefined" ? showCounts : false ?>',
-    displayMode: '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>',
-    sheetName: '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>',
-    mapping: '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>',
-    userId: '<?= typeof userId !== "undefined" ? userId : "" ?>',
-    ownerName: '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>',
-    showAdminFeatures:
-      '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : false ?>',
-    showHighlightToggle:
-      '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : false ?>',
-    showScoreSort: '<?= typeof showScoreSort !== "undefined" ? showScoreSort : false ?>',
-    isStudentMode: '<?= typeof isStudentMode !== "undefined" ? isStudentMode : true ?>',
-    isAdminUser: '<?= typeof isAdminUser !== "undefined" ? isAdminUser : false ?>',
+  // configJSON中心設定（CLAUDE.md準拠）
+  let CONFIG = {};
+  
+  // 設定初期化
+  const initializeConfig = async () => {
+    try {
+      CONFIG = await getConfigFromBackend();
+      Object.assign(window, CONFIG);
+      console.info('✅ Config初期化完了:', CONFIG.userId);
+    } catch (error) {
+      console.error('❌ Config初期化エラー:', error);
+      // フォールバック設定
+      CONFIG = Object.freeze({
+        showCounts: false,
+        displayMode: 'anonymous',
+        sheetName: 'テストシート',
+        userId: new URLSearchParams(window.location.search).get('userId') || '',
+        ownerName: '',
+        showAdminFeatures: false,
+        showHighlightToggle: false,
+        showScoreSort: false,
+        isStudentMode: true,
+        isAdminUser: false,
+        mapping: {}
+      });
+      Object.assign(window, CONFIG);
+    }
   };
 
-  // 統一設定オブジェクト生成
-  const CONFIG = parseTemplateVars(TEMPLATE_VARS);
-
-  // グローバル互換性のためのエクスポート
-  Object.assign(window, CONFIG);
-
-  // SHEET_NAME定数定義（StudyQuestApp互換性のため）
-  const SHEET_NAME = window.sheetName;
-
-  // USER_ID定数定義（StudyQuestApp後方互換性のため）
-  const USER_ID = window.userId;
 
   // === APPLICATION CONSTANTS ===
   // GAS optimized constants
@@ -106,12 +82,219 @@
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   });
 
-  // バックエンド定数との統一（SYSTEM_CONSTANTS.REACTIONS.LABELS参照）
-  const REACTION_NAMES = Object.freeze({
-    LIKE: 'いいね！',
-    UNDERSTAND: 'なるほど！',
-    CURIOUS: 'もっと知りたい！',
+  // ✅ CLAUDE.md準拠: SYSTEM_CONSTANTS統合
+  const SYSTEM_CONSTANTS = Object.freeze({
+    REACTIONS: Object.freeze({
+      KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
+      LABELS: Object.freeze({
+        UNDERSTAND: 'なるほど！',
+        LIKE: 'いいね！',
+        CURIOUS: 'もっと知りたい！',
+        HIGHLIGHT: 'ハイライト'
+      })
+    }),
+    TIMEOUTS: Object.freeze({
+      SHORT: 1000,
+      MEDIUM: 5000,
+      LONG: 30000,
+      FLOW: 300000
+    }),
+    DISPLAY_MODES: Object.freeze({
+      ANONYMOUS: 'anonymous',
+      NAMED: 'named',
+      EMAIL: 'email'
+    })
   });
+
+  // ✅ CLAUDE.md準拠: App名前空間パターン
+  const App = {
+    getConfig() {
+      return {
+        async getUserConfig(userId) {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getCurrentConfig(userId);
+            });
+          } catch (error) {
+            console.error('❌ App.getConfig.getUserConfig エラー:', error);
+            throw error;
+          }
+        }
+      };
+    },
+
+    getAccess() {
+      return {
+        async verifyAccess(userId, mode, currentUserEmail) {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .verifyUserAccess(userId, mode, currentUserEmail);
+            });
+          } catch (error) {
+            console.error('❌ App.getAccess.verifyAccess エラー:', error);
+            throw error;
+          }
+        }
+      };
+    },
+
+    getData() {
+      return {
+        async getPublishedSheetData(userId, classFilter, sort, adminMode, bypassCache) {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getPublishedSheetData(userId, classFilter, sort, adminMode, bypassCache);
+            });
+          } catch (error) {
+            console.error('❌ App.getData.getPublishedSheetData エラー:', error);
+            throw error;
+          }
+        },
+
+        async addReaction(userId, rowIndex, reactionType) {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .addReaction(userId, rowIndex, reactionType);
+            });
+          } catch (error) {
+            console.error('❌ App.getData.addReaction エラー:', error);
+            throw error;
+          }
+        },
+
+        async removeReaction(userId, rowIndex, reactionType) {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .removeReaction(userId, rowIndex, reactionType);
+            });
+          } catch (error) {
+            console.error('❌ App.getData.removeReaction エラー:', error);
+            throw error;
+          }
+        },
+
+        async batchAddReaction(userId, reactions) {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .batchAddReaction(userId, reactions);
+            });
+          } catch (error) {
+            console.error('❌ App.getData.batchAddReaction エラー:', error);
+            throw error;
+          }
+        }
+      };
+    },
+
+    getForm() {
+      return {
+        async getActiveFormInfo(userId) {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getActiveFormInfo(userId);
+            });
+          } catch (error) {
+            console.error('❌ App.getForm.getActiveFormInfo エラー:', error);
+            throw error;
+          }
+        }
+      };
+    },
+
+    getDomain() {
+      return {
+        async getSystemDomainInfo() {
+          try {
+            return new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getSystemDomainInfo();
+            });
+          } catch (error) {
+            console.error('❌ App.getDomain.getSystemDomainInfo エラー:', error);
+            throw error;
+          }
+        }
+      };
+    },
+
+    getStatus() {
+      return {
+        async checkPublicationStatus(userId) {
+          try {
+            return new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error('Publication status check timeout'));
+              }, SYSTEM_CONSTANTS.TIMEOUTS.SHORT * 8);
+
+              google.script.run
+                .withSuccessHandler((response) => {
+                  clearTimeout(timeout);
+                  resolve(response);
+                })
+                .withFailureHandler((error) => {
+                  clearTimeout(timeout);
+                  reject(error);
+                })
+                .checkCurrentPublicationStatus(userId);
+            });
+          } catch (error) {
+            console.error('❌ App.getStatus.checkPublicationStatus エラー:', error);
+            throw error;
+          }
+        }
+      };
+    }
+  };
+
+  // ✅ CLAUDE.md準拠: SecurityValidator統合
+  const SecurityValidator = {
+    isValidUUID(uuid) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return typeof uuid === 'string' && uuidRegex.test(uuid);
+    },
+
+    isValidEmail(email) {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      return typeof email === 'string' && emailRegex.test(email);
+    },
+
+    sanitizeInput(input) {
+      if (typeof input !== 'string') return '';
+      return input.replace(/[<>&"']/g, (match) => {
+        const entities = {
+          '<': '&lt;',
+          '>': '&gt;',
+          '&': '&amp;',
+          '"': '&quot;',
+          "'": '&#x27;'
+        };
+        return entities[match];
+      });
+    }
+  };
 
   // Generic cache for data storage
   class Cache {
@@ -147,7 +330,7 @@
     }
   }
 
-  class StudyQuestApp {
+  class AnswerBoardApp {
     // アプリケーション定数
     static CONSTANTS = Object.freeze({
       REACTION_RATE_LIMIT_MS: 500,
@@ -166,7 +349,7 @@
     validateUserId(userId) {
       // 基本的な検証
       if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-        console.warn('⚠️ StudyQuestApp: Invalid or empty userId provided:', userId);
+        console.warn('⚠️ Invalid or empty userId provided:', userId);
 
         // URLパラメータからuserIdを取得するフォールバック
         try {
@@ -175,27 +358,27 @@
 
           if (fallbackUserId) {
             console.log(
-              '✅ StudyQuestApp: Using fallback userId from URL parameters:',
+              '✅ Using fallback userId from URL parameters:',
               fallbackUserId
             );
             return fallbackUserId;
           }
         } catch (error) {
           console.warn(
-            '⚠️ StudyQuestApp: Failed to get userId from URL parameters:',
+            '⚠️ Failed to get userId from URL parameters:',
             error.message
           );
         }
 
         // 最後のフォールバック
-        console.error('❌ StudyQuestApp: No valid userId available. Data loading may fail.');
+        console.error('❌ No valid userId available. Data loading may fail.');
         return '';
       }
 
       // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
       if (userId.length === 36 && userId.includes('-')) {
         console.log(
-          '✅ StudyQuestApp: Valid userId format detected:',
+          '✅ Valid userId format detected:',
           userId.substring(0, 8) + '...'
         );
         return userId;
@@ -203,7 +386,7 @@
 
       // その他の形式も許可するが警告を出す
       console.warn(
-        '⚠️ StudyQuestApp: Unusual userId format, but proceeding:',
+        '⚠️ Unusual userId format, but proceeding:',
         userId.substring(0, 8) + '...'
       );
       return userId;
@@ -266,8 +449,8 @@
         showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
         showScoreSort: window.showScoreSort,
         displayMode: window.displayMode,
-        sheetName: SHEET_NAME,
-        tenantId: this.validateUserId(USER_ID), // Validate and add userId to state
+        sheetName: CONFIG.sheetName || 'テストシート',
+        tenantId: this.validateUserId(CONFIG.userId), // Validate and add userId to state
         hasNewContent: false,
         newContentCount: 0,
         lastSeenCount: this.loadLastSeenCount(), // ローカルストレージから復元
@@ -312,7 +495,7 @@
       ]);
 
       // リアクション状態保存用のキー
-      this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
+      this.reactionStorageKey = `reactions_${CONFIG.userId}_${CONFIG.sheetName}`;
       this.gas = {
         getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
           this.runGas(
@@ -359,7 +542,7 @@
         this.elements.sliderValue.textContent = savedCols;
       }
       this.init().catch((error) => {
-        console.error('❌ StudyQuestApp: Fatal initialization error:', error);
+        console.error('❌ AnswerBoardApp: Fatal initialization error:', error);
         this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
       });
 
@@ -431,7 +614,7 @@
       this.contentCheckInProgress = false;
 
       // Reset current active sheet state
-      this.state.currentActiveSheet = SHEET_NAME;
+      this.state.currentActiveSheet = CONFIG.sheetName;
 
       console.log('✅ State reset completed', {
         currentAnswers: this.state.currentAnswers?.length || 0,
@@ -659,23 +842,8 @@
       try {
         console.log('🔍 パブリケーション状態をチェック中...');
 
-        // サーバーサイドでのリアルタイム状態確認
-        const result = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Publication status check timeout'));
-          }, 8000); // 8秒タイムアウト
-
-          google.script.run
-            .withSuccessHandler((response) => {
-              clearTimeout(timeout);
-              resolve(response);
-            })
-            .withFailureHandler((error) => {
-              clearTimeout(timeout);
-              reject(error);
-            })
-            .checkCurrentPublicationStatus(this.state.tenantId);
-        });
+        // ✅ CLAUDE.md準拠: App名前空間パターン使用
+        const result = await App.getStatus().checkPublicationStatus(this.state.tenantId);
 
         console.log('📊 パブリケーション状態チェック結果:', result);
 
@@ -823,7 +991,7 @@
         // Kick off data loading without blocking UI
         this.loadDataImmediate()
           .catch((error) => {
-            console.error('❌ StudyQuestApp: Critical error in loadDataImmediate:', error);
+            console.error('❌ AnswerBoardApp: Critical error in loadDataImmediate:', error);
             this.displayInitializationError(
               'アプリケーションの初期化中にエラーが発生しました: ' + error.message
             );
@@ -835,7 +1003,7 @@
             }
           });
       } catch (error) {
-        console.error('❌ StudyQuestApp: Critical error in init():', error);
+        console.error('❌ AnswerBoardApp: Critical error in init():', error);
         this.displayInitializationError(
           'アプリケーションの初期化中にエラーが発生しました: ' + error.message
         );
@@ -1211,12 +1379,10 @@
       const footerHeight = this.elements.footer.offsetHeight;
       this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
     }
-    runGas(funcName, ...args) {
-      // Simple request deduplication for identical calls (except for state-changing operations)
+    // ✅ CLAUDE.md準拠: App名前空間パターン使用
+    async runGas(funcName, ...args) {
       const cacheKey = funcName + JSON.stringify(args);
-      const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(
-        funcName
-      );
+      const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
 
       if (!isStateChanging) {
         const cached = this.cache.get(cacheKey);
@@ -1225,36 +1391,55 @@
         }
       }
 
-      // GAS API call processing
+      try {
+        const userId = CONFIG.userId || '';
+        let result;
 
-      return new Promise((resolve, reject) => {
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-          const userId = USER_ID || '';
-          google.script.run
-            .withSuccessHandler((result) => {
-              if (!isStateChanging) {
-                this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
+        // ✅ App名前空間パターンでの統一データアクセス
+        switch (funcName) {
+          case 'getPublishedSheetData':
+            result = await App.getData().getPublishedSheetData(userId, ...args);
+            break;
+          case 'addReaction':
+            result = await App.getData().addReaction(userId, ...args);
+            break;
+          case 'removeReaction':
+            result = await App.getData().removeReaction(userId, ...args);
+            break;
+          case 'batchAddReaction':
+            result = await App.getData().batchAddReaction(userId, ...args);
+            break;
+          case 'getActiveFormInfo':
+            result = await App.getForm().getActiveFormInfo(userId);
+            break;
+          case 'getSystemDomainInfo':
+            result = await App.getDomain().getSystemDomainInfo();
+            break;
+          default:
+            // フォールバック: 直接呼び出し（段階的移行用）
+            result = await new Promise((resolve, reject) => {
+              if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                  .withSuccessHandler(resolve)
+                  .withFailureHandler(reject)
+                  .withUserObject({ tenantId: userId })
+                  [funcName](...args);
+              } else {
+                const mockResult = await this.getMockData(funcName, ...args);
+                resolve(mockResult);
               }
-              resolve(result);
-            })
-            .withFailureHandler((error) => {
-              console.error('GAS APIエラー受信:', { funcName, args, error, success: false });
-              reject(error);
-            })
-            .withUserObject({ tenantId: userId })
-            [funcName](...args);
-        } else {
-          console.warn('Google Apps Script environment not detected.');
-          this.getMockData(funcName, ...args)
-            .then((result) => {
-              if (!isStateChanging) {
-                this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
-              }
-              resolve(result);
-            })
-            .catch(reject);
+            });
         }
-      });
+
+        if (!isStateChanging) {
+          this.cache.set(cacheKey, result, SYSTEM_CONSTANTS.TIMEOUTS.LONG);
+        }
+
+        return result;
+      } catch (error) {
+        console.error('❌ runGas エラー:', { funcName, args, error });
+        throw error;
+      }
     }
     async verifyAdminAsync() {
       // Use server-provided flag first (fast)
@@ -2426,12 +2611,12 @@
     }
     async loadDataImmediate() {
       try {
-        console.log('🚀 StudyQuestApp: Starting immediate data loading...');
+        console.log('🚀 AnswerBoardApp: Starting immediate data loading...');
 
         // 1. Validate essential prerequisites
         if (!this.validatePrerequisites()) {
           console.error(
-            '❌ StudyQuestApp: Prerequisites validation failed, aborting initialization'
+            '❌ AnswerBoardApp: Prerequisites validation failed, aborting initialization'
           );
           this.displayInitializationError(
             'アプリケーションの初期化に必要な条件が満たされていません'
@@ -2440,43 +2625,43 @@
         }
 
         // 2. Verify admin status to ensure proper initialization
-        console.log('🔍 StudyQuestApp: Verifying admin status...');
+        console.log('🔍 AnswerBoardApp: Verifying admin status...');
         await this.verifyAdminAsync().catch((error) => {
           console.warn(
-            '⚠️ StudyQuestApp: Admin verification failed, continuing with default permissions:',
+            '⚠️ AnswerBoardApp: Admin verification failed, continuing with default permissions:',
             error.message
           );
         });
 
         // 3. Start loading immediately without waiting
-        console.log('📊 StudyQuestApp: Starting sheet data loading...');
+        console.log('📊 AnswerBoardApp: Starting sheet data loading...');
         try {
           await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: true });
-          console.log('✅ StudyQuestApp: Sheet data loaded, restoring differential cards...');
+          console.log('✅ AnswerBoardApp: Sheet data loaded, restoring differential cards...');
 
           // 差分カードの復元
           this.restoreDifferentialCards();
 
-          console.log('✅ StudyQuestApp: Starting polling...');
+          console.log('✅ AnswerBoardApp: Starting polling...');
           this.startPolling();
         } catch (error) {
-          console.error('❌ StudyQuestApp: Sheet data loading failed:', error);
+          console.error('❌ AnswerBoardApp: Sheet data loading failed:', error);
           this.displayDataLoadError(error.message || 'データの読み込みに失敗しました');
         }
 
         // 4. Load sheets in background only for administrators
         if (this.state.isAdminUser) {
-          console.log('👑 StudyQuestApp: Loading available sheets for admin user...');
+          console.log('👑 AnswerBoardApp: Loading available sheets for admin user...');
           try {
             await this.loadAvailableSheets();
           } catch (error) {
-            console.warn('⚠️ StudyQuestApp: Available sheets loading failed:', error.message);
+            console.warn('⚠️ AnswerBoardApp: Available sheets loading failed:', error.message);
           }
         }
 
-        console.log('🎯 StudyQuestApp: Immediate loading initialization completed');
+        console.log('🎯 AnswerBoardApp: Immediate loading initialization completed');
       } catch (error) {
-        console.error('❌ StudyQuestApp: Critical error in loadDataImmediate:', error);
+        console.error('❌ AnswerBoardApp: Critical error in loadDataImmediate:', error);
         this.displayInitializationError(
           'アプリケーションの初期化中にエラーが発生しました: ' + error.message
         );
@@ -2500,7 +2685,7 @@
       ];
 
       let allValid = true;
-      console.log('🔍 StudyQuestApp: Validating prerequisites:');
+      console.log('🔍 AnswerBoardApp: Validating prerequisites:');
 
       checks.forEach((check) => {
         const isValid = check.required ? !!check.value : true;
@@ -2567,7 +2752,7 @@
             ページを再読み込み
           </button>
           <button 
-            onclick="window.studyQuestApp && window.studyQuestApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
+            onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
             class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
           >
             再試行
@@ -2903,8 +3088,8 @@
     }
 
     hasRelevantLocalStorage() {
-      const userId = this.state?.userId || USER_ID;
-      const sheetName = SHEET_NAME;
+      const userId = this.state?.userId || CONFIG.userId;
+      const sheetName = CONFIG.sheetName;
 
       return {
         hasLastSeen: localStorage.getItem(`lastSeenCount_${userId}_${sheetName}`) !== null,
@@ -3629,21 +3814,21 @@
               ) {
                 // 詳細なエラーログ出力
                 if (result && result.status === 'error') {
-                  console.error('❌ StudyQuestApp: Data fetch failed with error:', result.message);
+                  console.error('❌ AnswerBoardApp: Data fetch failed with error:', result.message);
 
                   // ユーザー情報エラーの特別な処理
                   if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
                     console.error(
-                      '❌ StudyQuestApp: User not found. Current tenantId:',
+                      '❌ AnswerBoardApp: User not found. Current tenantId:',
                       this.state.tenantId
                     );
-                    console.error('❌ StudyQuestApp: URL parameters:', window.location.href);
-                    console.error('❌ StudyQuestApp: This may indicate:');
+                    console.error('❌ AnswerBoardApp: URL parameters:', window.location.href);
+                    console.error('❌ AnswerBoardApp: This may indicate:');
                     console.error('  1. Invalid userId parameter in URL');
                     console.error('  2. User not registered in the system');
                     console.error('  3. Database connectivity issues');
                     console.error('  4. Session expired or corrupted');
-                    console.error('❌ StudyQuestApp: Possible solutions:');
+                    console.error('❌ AnswerBoardApp: Possible solutions:');
                     console.error('  - Check if the URL parameters are correct');
                     console.error('  - Try refreshing the page');
                     console.error('  - Contact administrator if the issue persists');
@@ -3654,7 +3839,7 @@
                   }
                 } else {
                   // データ不整合チェック: 軽量チェックでデータが存在するかを確認
-                  console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
+                  console.warn('⚠️ AnswerBoardApp: Received empty or invalid data:', result);
 
                   try {
                     // 初期データロード時は高速復旧戦略を採用
@@ -3892,7 +4077,7 @@
                 this.initTimeoutId = null;
               }
 
-              console.error('❌ StudyQuestApp: All retry attempts failed:', error);
+              console.error('❌ AnswerBoardApp: All retry attempts failed:', error);
 
               // Check if the error indicates the board has been unpublished
               const errorStr = error.message || error.toString();
@@ -4966,7 +5151,7 @@
                 btn.style.display = update.shouldDisplay ? 'flex' : 'none';
 
                 // aria-label更新
-                const reactionName = REACTION_NAMES[update.reaction] || update.reaction;
+                const reactionName = SYSTEM_CONSTANTS.REACTIONS.LABELS[update.reaction] || update.reaction;
                 const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
                 btn.setAttribute('aria-label', ariaLabel);
 
@@ -5189,7 +5374,7 @@
                   (info.count || 0) +
                   '</span>'
                 : '';
-              const reactionName = REACTION_NAMES[rt.key] || rt.key;
+              const reactionName = SYSTEM_CONSTANTS.REACTIONS.LABELS[rt.key] || rt.key;
               const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
               return (
                 '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' +
@@ -6004,8 +6189,8 @@
 
     // ユーザーIDとシート名に基づくローカルストレージキー生成
     getScopedKey(base) {
-      const userId = this.state?.userId || USER_ID;
-      return `${base}_${userId}_${SHEET_NAME}`;
+      const userId = this.state?.userId || CONFIG.userId;
+      return `${base}_${userId}_${CONFIG.sheetName}`;
     }
 
     // lastSeenCount永続化機能
@@ -6200,7 +6385,7 @@
       // Rate limiting for highlights
       const now = Date.now();
       const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
-      if (now - lastHighlightTime < StudyQuestApp.CONSTANTS.HIGHLIGHT_RATE_LIMIT_MS) {
+      if (now - lastHighlightTime < 500) {
         return;
       }
 
@@ -7413,7 +7598,7 @@
           modalBtn.setAttribute('aria-pressed', info.reacted.toString());
 
           // aria-label更新
-          const reactionName = REACTION_NAMES[rt.key] || rt.key;
+          const reactionName = SYSTEM_CONSTANTS.REACTIONS.LABELS[rt.key] || rt.key;
           const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
           modalBtn.setAttribute('aria-label', ariaLabel);
         }
@@ -8759,7 +8944,7 @@
       .withFailureHandler((error) => {
         console.warn('フォーム情報の取得に失敗しました:', error);
       })
-      .getActiveFormInfo(USER_ID);
+      .getActiveFormInfo(CONFIG.userId);
   }
 
   // システムフロー表示関数の定義
@@ -8767,8 +8952,8 @@
     console.log('🔄 システムフロー初期化開始');
     try {
       // 基本的なシステムフロー初期化処理
-      if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
-        window.studyQuestApp.destroy();
+      if (window.answerBoardApp && typeof window.answerBoardApp.destroy === 'function') {
+        window.answerBoardApp.destroy();
       }
       console.log('✅ システムフロー初期化完了');
     } catch (error) {
@@ -8780,26 +8965,23 @@
     // システムフロー表示
     showSystemFlow();
 
-    document.addEventListener('DOMContentLoaded', () => {
-      const app = new StudyQuestApp();
-    });
 
     // Expose debug functions globally for console access
     window.debugAnswerCards = () => {
-      if (window.studyQuestApp && window.studyQuestApp.debugAnswerCards) {
-        window.studyQuestApp.debugAnswerCards();
+      if (window.answerBoardApp && window.answerBoardApp.debugAnswerCards) {
+        window.answerBoardApp.debugAnswerCards();
       } else {
-        console.log('StudyQuestApp not available or debug function not found');
+        console.log('AnswerBoardApp not available or debug function not found');
       }
     };
 
     // Enhanced global debug function with additional utility methods
     window.debugClickAnswerCard = (cardIndex = 0, options = {}) => {
-      if (window.studyQuestApp && window.studyQuestApp.debugClickAnswerCard) {
-        return window.studyQuestApp.debugClickAnswerCard(cardIndex, options);
+      if (window.answerBoardApp && window.answerBoardApp.debugClickAnswerCard) {
+        return window.answerBoardApp.debugClickAnswerCard(cardIndex, options);
       } else {
-        console.log('StudyQuestApp not available or debug function not found');
-        return { success: false, error: 'StudyQuestApp not available' };
+        console.log('AnswerBoardApp not available or debug function not found');
+        return { success: false, error: 'AnswerBoardApp not available' };
       }
     };
 
@@ -8808,26 +8990,26 @@
 
     // デバッグ用：データ構造確認機能
     window.debugCurrentData = () => {
-      if (window.studyQuestApp && window.studyQuestApp.state) {
+      if (window.answerBoardApp && window.answerBoardApp.state) {
         console.log('現在のデータ構造:', {
-          currentAnswers: window.studyQuestApp.state.currentAnswers,
-          currentAnswersLength: window.studyQuestApp.state.currentAnswers?.length,
-          firstItem: window.studyQuestApp.state.currentAnswers?.[0],
-          header: window.studyQuestApp.elements?.headingLabel?.textContent,
+          currentAnswers: window.answerBoardApp.state.currentAnswers,
+          currentAnswersLength: window.answerBoardApp.state.currentAnswers?.length,
+          firstItem: window.answerBoardApp.state.currentAnswers?.[0],
+          header: window.answerBoardApp.elements?.headingLabel?.textContent,
         });
       } else {
-        console.log('StudyQuestApp not available');
+        console.log('AnswerBoardApp not available');
       }
     };
 
     // Additional global debug utilities
     window.debugClickAllAnswerCards = async (options = {}) => {
-      if (!window.studyQuestApp) {
-        console.log('StudyQuestApp not available');
-        return { success: false, error: 'StudyQuestApp not available' };
+      if (!window.answerBoardApp) {
+        console.log('AnswerBoardApp not available');
+        return { success: false, error: 'AnswerBoardApp not available' };
       }
 
-      const container = window.studyQuestApp.elements?.answersContainer;
+      const container = window.answerBoardApp.elements?.answersContainer;
       if (!container) {
         console.log('No answers container found');
         return { success: false, error: 'No answers container found' };
@@ -8840,7 +9022,7 @@
 
       for (let i = 0; i < answerCards.length; i++) {
         try {
-          const result = await window.studyQuestApp.debugClickAnswerCard(i, {
+          const result = await window.answerBoardApp.debugClickAnswerCard(i, {
             ...options,
             logDetails: false, // Reduce noise when clicking all cards
           });
@@ -8865,9 +9047,9 @@
 
     // バッチ処理制御関数（デバッグ/運用制御用）
     window.toggleBatchProcessing = (enable = null) => {
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) {
-        console.error('StudyQuestApp not found');
+        console.error('AnswerBoardApp not found');
         return;
       }
 
@@ -8884,7 +9066,7 @@
     };
 
     window.getBatchProcessingStatus = () => {
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) return null;
 
       return {
@@ -8900,9 +9082,9 @@
     };
 
     window.debugGetAnswerCardInfo = (cardIndex = 0) => {
-      if (!window.studyQuestApp) {
-        console.log('StudyQuestApp not available');
-        return { success: false, error: 'StudyQuestApp not available' };
+      if (!window.answerBoardApp) {
+        console.log('AnswerBoardApp not available');
+        return { success: false, error: 'AnswerBoardApp not available' };
       }
 
       // Validate cardIndex
@@ -8911,7 +9093,7 @@
         return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
       }
 
-      const container = window.studyQuestApp.elements?.answersContainer;
+      const container = window.answerBoardApp.elements?.answersContainer;
       if (!container) {
         console.log('No answers container found');
         return { success: false, error: 'No answers container found' };
@@ -8962,9 +9144,9 @@
     window.testReactionSystem = async (options = {}) => {
       console.log('🧪 リアクションシステムテスト開始');
 
-      if (!window.studyQuestApp) {
-        console.error('❌ StudyQuestApp not available');
-        return { success: false, error: 'StudyQuestApp not available' };
+      if (!window.answerBoardApp) {
+        console.error('❌ AnswerBoardApp not available');
+        return { success: false, error: 'AnswerBoardApp not available' };
       }
 
       const { cardIndex = 0, reaction = 'LIKE', verbose = true } = options;
@@ -8991,7 +9173,7 @@
         });
 
         // Test 2: リアクションボタン存在確認
-        const container = window.studyQuestApp.elements.answersContainer;
+        const container = window.answerBoardApp.elements.answersContainer;
         const card = container.querySelectorAll('.answer-card')[cardIndex];
         const reactionBtn = card.querySelector(`[data-reaction="${reaction}"]`);
 
@@ -9030,15 +9212,15 @@
         const reactionKey = `${rowIndex}-${reaction}`;
         let reactionCompletePromise = null;
 
-        if (window.studyQuestApp && window.studyQuestApp.waitForReactionComplete) {
-          reactionCompletePromise = window.studyQuestApp.waitForReactionComplete(reactionKey, 3000);
+        if (window.answerBoardApp && window.answerBoardApp.waitForReactionComplete) {
+          reactionCompletePromise = window.answerBoardApp.waitForReactionComplete(reactionKey, 3000);
         }
 
         reactionBtn.dispatchEvent(clickEvent);
 
         // 処理完了を待機（高度な動的システム）
         try {
-          const updateResult = await window.studyQuestApp.waitForReactionUpdate(
+          const updateResult = await window.answerBoardApp.waitForReactionUpdate(
             rowIndex,
             reaction,
             null,
@@ -9090,15 +9272,15 @@
 
         // 2回目のリアクション完了を待機
         let secondReactionPromise = null;
-        if (window.studyQuestApp && window.studyQuestApp.waitForReactionComplete) {
-          secondReactionPromise = window.studyQuestApp.waitForReactionComplete(reactionKey, 3000);
+        if (window.answerBoardApp && window.answerBoardApp.waitForReactionComplete) {
+          secondReactionPromise = window.answerBoardApp.waitForReactionComplete(reactionKey, 3000);
         }
 
         reactionBtn.dispatchEvent(clickEvent);
 
         // 2回目の処理完了を待機（高度な動的システム）
         try {
-          const secondUpdateResult = await window.studyQuestApp.waitForReactionUpdate(
+          const secondUpdateResult = await window.answerBoardApp.waitForReactionUpdate(
             rowIndex,
             reaction,
             null,
@@ -9202,10 +9384,10 @@
     window.testNotificationSystem = async () => {
       console.log('🧪 通知システム全体テスト開始');
 
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) {
-        console.error('StudyQuestApp not found');
-        return { success: false, error: 'StudyQuestApp not found' };
+        console.error('AnswerBoardApp not found');
+        return { success: false, error: 'AnswerBoardApp not found' };
       }
 
       try {
@@ -9222,10 +9404,10 @@
     window.validateNotificationSystem = () => {
       console.log('🔍 通知システム健全性チェック開始');
 
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) {
-        console.error('StudyQuestApp not found');
-        return { success: false, error: 'StudyQuestApp not found' };
+        console.error('AnswerBoardApp not found');
+        return { success: false, error: 'AnswerBoardApp not found' };
       }
 
       try {
@@ -9242,10 +9424,10 @@
     window.simulateInitialLoadFailure = async () => {
       console.log('🧪 初期データロード失敗シナリオのシミュレーション開始');
 
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) {
-        console.error('StudyQuestApp not found');
-        return { success: false, error: 'StudyQuestApp not found' };
+        console.error('AnswerBoardApp not found');
+        return { success: false, error: 'AnswerBoardApp not found' };
       }
 
       try {
@@ -9303,7 +9485,7 @@
 
     // 現在の通知システム状態を取得
     window.getNotificationSystemStatus = () => {
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) return null;
 
       return {
@@ -9329,10 +9511,10 @@
     window.testNotificationDebounce = async () => {
       console.log('🧪 通知デバウンステスト開始');
 
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) {
-        console.error('StudyQuestApp not found');
-        return { success: false, error: 'StudyQuestApp not found' };
+        console.error('AnswerBoardApp not found');
+        return { success: false, error: 'AnswerBoardApp not found' };
       }
 
       try {
@@ -9349,10 +9531,10 @@
     window.diagnoseDataFetch = async () => {
       console.log('🔬 データ取得診断開始');
 
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) {
-        console.error('StudyQuestApp not found');
-        return { success: false, error: 'StudyQuestApp not found' };
+        console.error('AnswerBoardApp not found');
+        return { success: false, error: 'AnswerBoardApp not found' };
       }
 
       const diagnosis = {
@@ -9505,10 +9687,10 @@
     window.monitorDataFetchPerformance = async (duration = 60000) => {
       console.log(`📈 データ取得パフォーマンス監視開始 (${duration / 1000}秒間)`);
 
-      const app = window.studyQuestApp;
+      const app = window.answerBoardApp;
       if (!app) {
-        console.error('StudyQuestApp not found');
-        return { success: false, error: 'StudyQuestApp not found' };
+        console.error('AnswerBoardApp not found');
+        return { success: false, error: 'AnswerBoardApp not found' };
       }
 
       const monitor = {
@@ -9580,23 +9762,31 @@
 
     // System status reporting removed - simplified system
 
-    // ドメイン情報とフォームリンクを取得
-    loadDomainInfo();
-    loadFormLink();
-
-    // StudyQuestApp インスタンス初期化
-    window.studyQuestApp = new StudyQuestApp();
+    // ✅ CLAUDE.md準拠: configJSON中心設定の初期化
+    (async () => {
+      try {
+        await initializeConfig();
+        console.info('✅ Config初期化完了');
+        
+        // AnswerBoardApp インスタンス初期化
+        window.answerBoardApp = new AnswerBoardApp();
+        console.info('✅ AnswerBoardApp初期化完了');
+      } catch (error) {
+        console.error('❌ 初期化エラー:', error);
+        throw error;
+      }
+    })();
 
     window.addEventListener('beforeunload', () => {
-      if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {
-        window.studyQuestApp.destroy();
+      if (window.answerBoardApp && typeof window.answerBoardApp.destroy === 'function') {
+        window.answerBoardApp.destroy();
       }
     });
   } catch (error) {
-    console.error('Error creating StudyQuestApp instance:', error);
+    console.error('Error creating AnswerBoardApp instance:', error);
     const container = document.getElementById('answers');
     if (container) {
-      const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
+      const msg = AnswerBoardApp.prototype.escapeHtml(error.message || '');
       container.innerHTML =
         '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
     }
