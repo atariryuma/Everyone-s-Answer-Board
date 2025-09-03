@@ -803,3 +803,131 @@ function generateSystemReport() {
     return { error: error.message };
   }
 }
+
+// =============================================================================
+// configJSON完全クリーンアップ機能（2025年9月追加）
+// =============================================================================
+
+/**
+ * 🧹 configJSON完全クリーンアップ：不要フィールドの自動削除
+ * 重複・不要データを完全排除してCLAUDE.md準拠の最小configJSONに最適化
+ */
+function cleanupConfigJsonData(userId = null) {
+  try {
+    console.info('🧹 configJSON完全クリーンアップ開始', { userId: userId || 'ALL' });
+
+    const users = userId ? [DB.findUserById(userId)] : DB.getAllUsers();
+    if (!users || users.length === 0) {
+      throw new Error('対象ユーザーが見つかりません');
+    }
+
+    const cleanupResults = {
+      total: users.length,
+      cleaned: 0,
+      errors: [],
+      removedFields: [],
+      sizeReduction: 0,
+      timestamp: new Date().toISOString()
+    };
+
+    // 🚨 削除対象：不要・重複フィールドの定義
+    const FIELDS_TO_REMOVE = [
+      // 処理過程メタデータ（不要）
+      'connectionMethod', 'missingColumnsHandled', 'lastDataSourceUpdate', 
+      'configJsonVersion', 'claudeMdCompliant', 'publishMethod', 'verifiedAt',
+      'lastPublished', 'draftVersion', 'lastDraftSaved',
+      
+      // 重複フィールド（displaySettingsに統合）
+      'showNames', 'showReactions', 
+      
+      // 入れ子構造（外側のconfigJsonフィールド）
+      'configJson', 'columnMappingJson',
+      
+      // 旧形式データ
+      'columns', 'headerIndices', 'title', 'formCreated', 'isPublic', 'allowAnonymous'
+    ];
+
+    users.forEach(user => {
+      if (!user || !user.userId) return;
+
+      try {
+        const currentConfig = user.parsedConfig || {};
+        const originalSize = JSON.stringify(currentConfig).length;
+        
+        // 🚀 置き換えベース：CLAUDE.md準拠の必要フィールドのみ残す
+        const cleanedConfig = {
+          // 🎯 CLAUDE.md準拠：監査情報（Line 37-38）
+          createdAt: currentConfig.createdAt || new Date().toISOString(),
+          lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
+          
+          // 🎯 CLAUDE.md準拠：データソース情報（Line 32-34）
+          ...(currentConfig.spreadsheetId && { spreadsheetId: currentConfig.spreadsheetId }),
+          ...(currentConfig.sheetName && { sheetName: currentConfig.sheetName }),
+          ...(currentConfig.spreadsheetUrl && { spreadsheetUrl: currentConfig.spreadsheetUrl }),
+          
+          // 🎯 CLAUDE.md準拠：フォーム・マッピング情報（Line 41-42）
+          ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
+          ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
+          ...(currentConfig.columnMapping && Object.keys(currentConfig.columnMapping).length > 0 && { 
+            columnMapping: currentConfig.columnMapping 
+          }),
+          ...(currentConfig.opinionHeader && { opinionHeader: currentConfig.opinionHeader }),
+          
+          // 🎯 CLAUDE.md準拠：アプリ設定（Line 45-49）
+          setupStatus: currentConfig.setupStatus || 'pending',
+          appPublished: currentConfig.appPublished || false,
+          ...(currentConfig.appUrl && { appUrl: currentConfig.appUrl }),
+          ...(currentConfig.publishedAt && { publishedAt: currentConfig.publishedAt }),
+          
+          // 🎯 CLAUDE.md準拠：表示設定（重複排除）
+          displaySettings: {
+            showNames: currentConfig.displaySettings?.showNames || 
+                       currentConfig.showNames || false,
+            showReactions: currentConfig.displaySettings?.showReactions || 
+                           currentConfig.showReactions || false
+          },
+          
+          // 🎯 必要最小限メタデータ
+          lastModified: new Date().toISOString()
+        };
+
+        const cleanedSize = JSON.stringify(cleanedConfig).length;
+        const reduction = originalSize - cleanedSize;
+
+        // データベース更新
+        DB.updateUser(user.userId, cleanedConfig);
+        
+        cleanupResults.cleaned++;
+        cleanupResults.sizeReduction += reduction;
+
+        console.log(`✅ ユーザークリーンアップ完了: ${user.userEmail}`, {
+          originalSize,
+          cleanedSize,
+          reduction: `${((reduction / originalSize) * 100).toFixed(1)}%削減`
+        });
+
+      } catch (userError) {
+        const errorMsg = `${user.userEmail || user.userId}: ${userError.message}`;
+        cleanupResults.errors.push(errorMsg);
+        console.error('❌ ユーザークリーンアップエラー:', errorMsg);
+      }
+    });
+
+    cleanupResults.removedFields = FIELDS_TO_REMOVE;
+    
+    console.info('✅ configJSON完全クリーンアップ完了', {
+      処理対象: cleanupResults.total,
+      クリーンアップ成功: cleanupResults.cleaned,
+      エラー数: cleanupResults.errors.length,
+      総削減サイズ: `${cleanupResults.sizeReduction}文字`,
+      平均削減率: cleanupResults.total > 0 ? 
+        `${((cleanupResults.sizeReduction / (cleanupResults.total * 1000)) * 100).toFixed(1)}%` : '0%'
+    });
+
+    return cleanupResults;
+
+  } catch (error) {
+    console.error('❌ configJSON完全クリーンアップエラー:', error.message);
+    throw error;
+  }
+}
