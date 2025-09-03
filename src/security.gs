@@ -345,52 +345,32 @@ function getSheetsService() {
  */
 function updateSheetsData(service, spreadsheetId, range, values) {
   try {
-    // Sheets API v4のupdateメソッドを使用
-    const response = Sheets.Spreadsheets.Values.update(
-      {
-        values
-      },
-      spreadsheetId,
-      range,
-      {
-        valueInputOption: 'USER_ENTERED'
-      }
-    );
+    // 🔧 修正：Sheets API未有効化対応 - 直接SpreadsheetAppを使用
+    console.log('updateSheetsData: SpreadsheetApp直接使用（API未有効化対応）');
     
-    return response;
-  } catch (error) {
-    console.error('updateSheetsData エラー:', {
-      spreadsheetId,
-      range,
-      error: error.message
-    });
-    
-    // フォールバック: 通常のSpreadsheetAppを使用
-    try {
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      // シート名と範囲を分離
-      const match = range.match(/^'?([^'!]+)'?!(.+)$/);
-      if (match) {
-        const sheetName = match[1];
-        const rangeSpec = match[2];
-        const sheet = spreadsheet.getSheetByName(sheetName);
-        if (sheet) {
-          const targetRange = sheet.getRange(rangeSpec);
-          targetRange.setValues(values);
-          return {
-            updatedCells: values.length * (values[0] ? values[0].length : 0),
-            updatedRows: values.length,
-            updatedColumns: values[0] ? values[0].length : 0,
-            spreadsheetId,
-            updatedRange: range
-          };
-        }
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    // シート名と範囲を分離
+    const match = range.match(/^'?([^'!]+)'?!(.+)$/);
+    if (match) {
+      const sheetName = match[1];
+      const rangeSpec = match[2];
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      if (sheet) {
+        const targetRange = sheet.getRange(rangeSpec);
+        targetRange.setValues(values);
+        return {
+          updatedCells: values.length * (values[0] ? values[0].length : 0),
+          updatedRows: values.length,
+          updatedColumns: values[0] ? values[0].length : 0,
+          spreadsheetId,
+          updatedRange: range
+        };
       }
-      throw new Error(`範囲の解析に失敗しました: ${  range}`);
-    } catch (fallbackError) {
-      console.error('updateSheetsData フォールバックエラー:', fallbackError.message);
-      throw error;
     }
+    throw new Error(`範囲の解析に失敗しました: ${  range}`);
+  } catch (error) {
+    console.error('updateSheetsData SpreadsheetAppエラー:', error.message);
+    throw error;
   }
 }
 
@@ -403,23 +383,10 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
   try {
-    // Sheets API v4のbatchGetメソッドを使用
-    const response = Sheets.Spreadsheets.Values.batchGet(spreadsheetId, {
-      ranges,
-      valueRenderOption: 'UNFORMATTED_VALUE',
-      dateTimeRenderOption: 'FORMATTED_STRING'
-    });
+    // 🔧 修正：Sheets API未有効化対応 - 直接フォールバックを使用
+    console.log('batchGetSheetsData: SpreadsheetApp直接使用（API未有効化対応）');
     
-    return response;
-  } catch (error) {
-    console.error('batchGetSheetsData エラー:', {
-      spreadsheetId,
-      ranges,
-      error: error.message
-    });
-    
-    // フォールバック: 通常のSpreadsheetAppを使用
-    try {
+    // フォールバック: 通常のSpreadsheetAppを使用（最優先）
       const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       const valueRanges = ranges.map(range => {
         // シート名と範囲を分離
@@ -443,9 +410,12 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
         valueRanges
       };
     } catch (fallbackError) {
-      console.error('batchGetSheetsData フォールバックエラー:', fallbackError.message);
-      throw error;
+      console.error('batchGetSheetsData SpreadsheetAppエラー:', fallbackError.message);
+      throw fallbackError;
     }
+  } catch (error) {
+    console.error('batchGetSheetsData 全般エラー:', error.message);
+    throw error;
   }
 }
 
