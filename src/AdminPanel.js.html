@@ -1190,15 +1190,6 @@
 
     google.script.run
       .withSuccessHandler(function (sheets) {
-        // デバッグログ追加
-        console.log('✅ シート一覧受信:', { 
-          sheetsType: typeof sheets, 
-          sheetsLength: sheets?.length,
-          isArray: Array.isArray(sheets),
-          firstSheet: sheets?.[0],
-          allSheets: sheets
-        });
-        
         select.innerHTML = '<option value="">シートを選択...</option>';
         
         if (!sheets || sheets.length === 0) {
@@ -1207,49 +1198,13 @@
           noSheetOption.textContent = '利用可能なシートがありません';
           noSheetOption.disabled = true;
           select.appendChild(noSheetOption);
-          console.warn('⚠️ シートが0件または未定義です');
         } else {
-          try {
-            console.log('🔄 forEach処理開始', { sheetCount: sheets.length });
-            sheets.forEach((sheet, index) => {
-              try {
-                const option = document.createElement('option');
-                option.value = sheet.name;
-
-                // フォーム連携シートかどうかで表示を変える
-                if (sheet.isFormResponseSheet && sheet.formConnected) {
-                  option.textContent = `📋 ${sheet.name} (フォーム回答)`;
-                  option.dataset.isFormSheet = 'true';
-                  option.dataset.formTitle = sheet.formTitle || '';
-                } else {
-                  option.textContent = sheet.name;
-                  option.dataset.isFormSheet = 'false';
-                }
-
-                select.appendChild(option);
-                console.log(`✅ シート${index + 1}処理完了:`, sheet.name);
-              } catch (sheetError) {
-                console.error(`❌ シート${index + 1}処理エラー:`, sheetError, sheet);
-              }
-            });
-            console.log('✅ forEach処理完了');
-          } catch (forEachError) {
-            console.error('❌ forEach処理全体エラー:', forEachError);
-            // フォールバック: シンプルなfor文による代替処理
-            console.log('🔄 フォールバック処理開始');
-            for (let i = 0; i < sheets.length; i++) {
-              try {
-                const sheet = sheets[i];
-                const option = document.createElement('option');
-                option.value = sheet.name;
-                option.textContent = sheet.name;
-                select.appendChild(option);
-                console.log(`✅ フォールバック処理: ${sheet.name}`);
-              } catch (fallbackError) {
-                console.error('❌ フォールバック処理エラー:', fallbackError);
-              }
-            }
-          }
+          sheets.forEach((sheet) => {
+            const option = document.createElement('option');
+            option.value = sheet.name;
+            option.textContent = sheet.name;
+            select.appendChild(option);
+          });
         }
         
         // partial-loading-targetクラスを削除
