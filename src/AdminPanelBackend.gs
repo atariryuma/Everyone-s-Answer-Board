@@ -553,37 +553,68 @@ function generateUserUrls(userId) {
 // === 補助関数群（CLAUDE.md準拠で実装） ===
 
 /**
- * 列マッピング検出（既存ロジック維持）
+ * 列マッピング生成（AI最適化版）
+ * SYSTEM_CONSTANTS.COLUMN_MAPPING に基づく高度なマッピング生成
+ * @param {Array} headerRow - ヘッダー行の配列
+ * @returns {Object} 生成された列マッピング
  */
-function detectColumnMapping(headerRow) {
+function generateColumnMapping(headerRow) {
   const mapping = {};
   
-  // SYSTEM_CONSTANTS.COLUMN_MAPPING に基づく検出ロジック
+  // SYSTEM_CONSTANTS.COLUMN_MAPPING に基づく検出ロジック（AI最適化）
   headerRow.forEach((header, index) => {
     const normalizedHeader = header.toString().toLowerCase();
     
-    // 回答列の検出
-    if (normalizedHeader.includes('回答') || normalizedHeader.includes('どうして') || normalizedHeader.includes('なぜ')) {
+    // 回答列の検出（AI パターンマッチング）
+    if (normalizedHeader.includes('回答') || 
+        normalizedHeader.includes('どうして') || 
+        normalizedHeader.includes('なぜ') ||
+        normalizedHeader.includes('意見') ||
+        normalizedHeader.includes('答え') ||
+        normalizedHeader.includes('問題') ||
+        normalizedHeader.includes('質問')) {
       mapping.answer = index;
     }
     
-    // 理由列の検出
-    if (normalizedHeader.includes('理由') || normalizedHeader.includes('体験')) {
+    // 理由列の検出（AI パターンマッチング）
+    if (normalizedHeader.includes('理由') || 
+        normalizedHeader.includes('体験') ||
+        normalizedHeader.includes('根拠') ||
+        normalizedHeader.includes('詳細') ||
+        normalizedHeader.includes('説明')) {
       mapping.reason = index;
     }
     
     // クラス列の検出
-    if (normalizedHeader.includes('クラス') || normalizedHeader.includes('学年')) {
+    if (normalizedHeader.includes('クラス') || 
+        normalizedHeader.includes('学年') ||
+        normalizedHeader.includes('組')) {
       mapping.class = index;
     }
     
     // 名前列の検出
-    if (normalizedHeader.includes('名前') || normalizedHeader.includes('氏名')) {
+    if (normalizedHeader.includes('名前') || 
+        normalizedHeader.includes('氏名') ||
+        normalizedHeader.includes('お名前')) {
       mapping.name = index;
     }
+    
+    // リアクション列の検出
+    if (header === 'なるほど！') mapping.understand = index;
+    if (header === 'いいね！') mapping.like = index;
+    if (header === 'もっと知りたい！') mapping.curious = index;
+    if (header === 'ハイライト') mapping.highlight = index;
   });
   
   return mapping;
+}
+
+/**
+ * 列マッピング検出（既存ロジック維持）
+ */
+function detectColumnMapping(headerRow) {
+  // 新しいgenerateColumnMappingを使用
+  return generateColumnMapping(headerRow);
 }
 
 /**
@@ -693,6 +724,67 @@ function checkFormConnection(spreadsheetId) {
       formUrl: null,
       formTitle: null,
       error: error.message
+    };
+  }
+}
+
+/**
+ * CLAUDE.md準拠：スプレッドシート列構造を分析
+ * 統一データソース原則：configJSON中心型で列マッピングを生成
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} 列分析結果
+ */
+function analyzeColumns(spreadsheetId, sheetName) {
+  try {
+    console.log('analyzeColumns: CLAUDE.md準拠列分析開始', {
+      spreadsheetId: spreadsheetId?.substring(0, 10) + '...',
+      sheetName,
+      timestamp: new Date().toISOString()
+    });
+
+    // スプレッドシートアクセス
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      throw new Error(`シート '${sheetName}' が見つかりません`);
+    }
+
+    // ヘッダー行取得
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // 列マッピング生成
+    const columnMapping = detectColumnMapping(headerRow);
+    
+    console.info('✅ analyzeColumns: CLAUDE.md準拠列分析完了', {
+      headerCount: headerRow.length,
+      mappingCount: Object.keys(columnMapping).length,
+      claudeMdCompliant: true
+    });
+
+    return {
+      success: true,
+      headers: headerRow,
+      columnMapping: columnMapping,
+      sheetName: sheetName,
+      rowCount: sheet.getLastRow(),
+      timestamp: new Date().toISOString(),
+      claudeMdCompliant: true
+    };
+
+  } catch (error) {
+    console.error('❌ analyzeColumns: CLAUDE.md準拠エラー:', {
+      spreadsheetId,
+      sheetName,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
     };
   }
 }

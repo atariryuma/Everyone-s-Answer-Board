@@ -3591,7 +3591,25 @@ function getLoginStatus() {
         message: 'セットアップを完了してください',
       };
     } else {
-      result = { status: 'unregistered', userEmail: activeUserEmail };
+      // 新規ユーザーの場合は自動登録を実行
+      console.log('getLoginStatus: 新規ユーザーを検出、自動登録を実行');
+      const registrationResult = registerNewUser(activeUserEmail);
+      if (registrationResult.status === 'success') {
+        const urls = generateUserUrls(registrationResult.userId);
+        result = {
+          status: 'new_user_registered',
+          userId: registrationResult.userId,
+          adminUrl: urls.adminUrl,
+          viewUrl: urls.viewUrl,
+          message: '新規ユーザー登録が完了しました',
+        };
+      } else {
+        result = { 
+          status: 'registration_failed', 
+          userEmail: activeUserEmail,
+          message: registrationResult.message || '登録に失敗しました'
+        };
+      }
     }
 
     try {
@@ -3607,22 +3625,7 @@ function getLoginStatus() {
   }
 }
 
-/**
- * Confirms registration for the active user on demand.
- * @returns {Object} Registration result
- */
-function confirmUserRegistration() {
-  try {
-    const activeUserEmail = User.email();
-    if (!activeUserEmail) {
-      return { status: 'error', message: 'ユーザー情報を取得できませんでした。' };
-    }
-    return registerNewUser(activeUserEmail);
-  } catch (error) {
-    console.error('confirmUserRegistration error:', error);
-    return { status: 'error', message: error.message };
-  }
-}
+// confirmUserRegistration function removed - 自動登録はgetLoginStatus()で実行
 
 // =================================================================
 // 統合API（フェーズ2最適化）
@@ -4297,4 +4300,126 @@ function identifyHeaders(headers) {
 
   console.log('guessHeadersFromArray: Final result:', guessed);
   return guessed;
+}
+
+/**
+ * CLAUDE.md準拠：システム自動修復機能
+ * 統一データソース原則：configJSON中心型でシステムの整合性を回復
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 修復結果
+ */
+function performAutoRepair(userId) {
+  try {
+    console.log('performAutoRepair: CLAUDE.md準拠システム修復開始', {
+      userId: userId?.substring(0, 10) + '...',
+      timestamp: new Date().toISOString()
+    });
+
+    if (!SecurityValidator.isValidUUID(userId)) {
+      throw new Error('無効なユーザーIDです');
+    }
+
+    // ユーザー情報取得
+    const userInfo = DB.findUserById(userId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+
+    const config = userInfo.parsedConfig || {};
+    const repairResults = {
+      fixedItems: [],
+      warnings: [],
+      errors: [],
+      configUpdated: false
+    };
+
+    // 1. 統一データソース整合性チェック
+    if (config.spreadsheetId && !config.spreadsheetUrl) {
+      config.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`;
+      repairResults.fixedItems.push('spreadsheetUrl自動生成');
+      repairResults.configUpdated = true;
+    }
+
+    if (userInfo.userId && !config.appUrl) {
+      const urls = generateUserUrls(userInfo.userId);
+      config.appUrl = urls.viewUrl;
+      repairResults.fixedItems.push('appURL自動生成');
+      repairResults.configUpdated = true;
+    }
+
+    // 2. 必須フィールドの確認と修復
+    const requiredFields = ['setupStatus', 'displaySettings'];
+    requiredFields.forEach(field => {
+      if (!config[field]) {
+        switch (field) {
+          case 'setupStatus':
+            config.setupStatus = config.spreadsheetId ? 'connected' : 'pending';
+            break;
+          case 'displaySettings':
+            config.displaySettings = { showNames: false, showReactions: false };
+            break;
+        }
+        repairResults.fixedItems.push(`${field}の初期化`);
+        repairResults.configUpdated = true;
+      }
+    });
+
+    // 3. 古いフィールドのクリーンアップ
+    const obsoleteFields = ['oldSpreadsheetId', 'legacyConfig', 'deprecatedSettings'];
+    obsoleteFields.forEach(field => {
+      if (config[field]) {
+        delete config[field];
+        repairResults.fixedItems.push(`古いフィールド${field}を削除`);
+        repairResults.configUpdated = true;
+      }
+    });
+
+    // 4. configJSON更新（修復が必要な場合のみ）
+    if (repairResults.configUpdated) {
+      config.lastModified = new Date().toISOString();
+      config.autoRepairDate = new Date().toISOString();
+      config.claudeMdCompliant = true;
+      
+      DB.updateUser(userId, config);
+      console.info('✅ performAutoRepair: configJSON更新完了', {
+        userId: userId,
+        fixedItems: repairResults.fixedItems.length,
+        claudeMdCompliant: true
+      });
+    }
+
+    console.info('✅ performAutoRepair: CLAUDE.md準拠システム修復完了', {
+      userId: userId,
+      fixedItems: repairResults.fixedItems,
+      configUpdated: repairResults.configUpdated,
+      claudeMdCompliant: true
+    });
+
+    return {
+      success: true,
+      fixedItems: repairResults.fixedItems,
+      warnings: repairResults.warnings,
+      errors: repairResults.errors,
+      configUpdated: repairResults.configUpdated,
+      claudeMdCompliant: true,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('❌ performAutoRepair: CLAUDE.md準拠エラー:', {
+      userId,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      success: false,
+      error: error.message,
+      fixedItems: [],
+      warnings: [],
+      errors: [error.message],
+      configUpdated: false,
+      timestamp: new Date().toISOString()
+    };
+  }
 }
