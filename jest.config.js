@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/src', '<rootDir>/tests'],
+  roots: ['<rootDir>/src'],
   
   // Test file patterns - support both JS and TS
   testMatch: [
@@ -12,10 +12,8 @@ module.exports = {
   // File extensions to recognize
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'gs', 'json'],
   
-  // Setup files - only GAS mocks needed
-  setupFilesAfterEnv: [
-    '<rootDir>/tests/mocks/gasMocks.js'
-  ],
+  // Setup files - no setup files needed currently
+  // setupFilesAfterEnv: [],
   
   // Coverage configuration - focused on core functionality
   collectCoverageFrom: [

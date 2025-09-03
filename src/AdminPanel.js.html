@@ -193,8 +193,8 @@
 
       select.innerHTML = '<option value="">読み込み中...</option>';
 
-      // ローディング表示を追加
-      setLoading(true, 'スプレッドシート一覧を読み込み中...');
+      // オンデマンド読み込みは部分ローディング
+      setPartialLoading(true, 'スプレッドシート一覧を読み込み中...');
 
       google.script.run
         .withSuccessHandler(function (result) {
@@ -263,12 +263,12 @@
             select.appendChild(errorOption);
           }
 
-          setLoading(false);
+          setPartialLoading(false);
           resolve(spreadsheets);
         })
         .withFailureHandler(function (error) {
           select.innerHTML = '<option value="">読み込みエラー</option>';
-          setLoading(false);
+          setPartialLoading(false);
 
           const detailedMessage = 'スプレッドシートの読み込みに失敗しました: ' + error.message;
 
@@ -728,23 +728,6 @@
     }
   }
 
-  // エラー表示 (SharedUtilitiesの通知システムを使用)
-  function showError(message) {
-    if (window.sharedUtilities && window.sharedUtilities.notifications) {
-      window.sharedUtilities.notifications.error(message);
-    } else {
-      alert('エラー: ' + message);
-    }
-  }
-
-  // 成功表示 (SharedUtilitiesの通知システムを使用)
-  function showSuccess(message) {
-    if (window.sharedUtilities && window.sharedUtilities.notifications) {
-      window.sharedUtilities.notifications.success(message);
-    } else {
-      alert('成功: ' + message);
-    }
-  }
 
   // フォーム情報表示
   function showFormInfo(formData) {
@@ -804,11 +787,11 @@
       return;
     }
 
-    setLoading(true, 'シート連携情報を確認中...');
+    setPartialLoading(true, 'シート連携情報を確認中...');
 
     google.script.run
       .withSuccessHandler((result) => {
-        setLoading(false);
+        setPartialLoading(false);
         console.log('🔍 getFormInfo APIレスポンス詳細:', {
           result: result,
           hasResult: !!result,
@@ -830,7 +813,7 @@
         }
       })
       .withFailureHandler((error) => {
-        setLoading(false);
+        setPartialLoading(false);
         console.error('❌ シート連携チェックエラー:', {
           error: error,
           errorMessage: error.message,
@@ -842,15 +825,6 @@
       .getFormInfo(spreadsheetId, sheetName);
   }
 
-  // 情報表示 (SharedUtilitiesの通知システムを使用)
-  function showInfo(message) {
-    if (window.sharedUtilities && window.sharedUtilities.notifications) {
-      window.sharedUtilities.notifications.info(message);
-    } else {
-      console.log('Info:', message);
-      alert('情報: ' + message);
-    }
-  }
 
   // 設定エクスポート
   function exportConfig() {
@@ -934,7 +908,7 @@
     };
 
     console.log('フォーム作成開始:', { userId: __USER_ID__, config });
-    setLoading(true);
+    setPartialLoading(true, 'フォーム作成中...');
 
     google.script.run
       .withSuccessHandler(function (result) {
@@ -949,19 +923,19 @@
         } else {
           showError(result.error || 'フォーム作成に失敗しました');
         }
-        setLoading(false);
+        setPartialLoading(false);
       })
       .withFailureHandler(function (error) {
         console.error('フォーム作成エラー:', error);
         showError('フォーム作成に失敗しました: ' + (error.message || 'Unknown error'));
-        setLoading(false);
+        setPartialLoading(false);
       })
       .createForm(__USER_ID__, config);
   }
 
   // アプリ設定画面へのナビゲーション
   function goToAppSetup() {
-    setLoading(true);
+    setPartialLoading(true, '画面遷移中...');
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
         const setupUrl = webAppUrl + '?mode=appSetup';
@@ -970,7 +944,7 @@
       .withFailureHandler(function (error) {
         console.error('アプリ設定画面への遷移エラー:', error);
         showError('アプリ設定画面への移動に失敗しました');
-        setLoading(false);
+        setPartialLoading(false);
       })
       .getWebAppUrl();
   }
@@ -1009,12 +983,12 @@
     }
 
     const spreadsheetId = match[1];
-    setLoading(true);
+    setPartialLoading(true, 'URL検証中...');
 
     // バックエンドでアクセス権限を確認
     google.script.run
       .withSuccessHandler(function (result) {
-        setLoading(false);
+        setPartialLoading(false);
         if (result.success) {
           showSuccess('✅ スプレッドシートへのアクセスが確認できました');
           // スプレッドシートIDを隠しフィールドに保存
@@ -1028,7 +1002,7 @@
         }
       })
       .withFailureHandler(function (error) {
-        setLoading(false);
+        setPartialLoading(false);
         console.error('URL検証エラー:', error);
         showError('URL検証に失敗しました: ' + error.message);
       })
@@ -1090,7 +1064,7 @@
     const spreadsheetId = match[1];
 
     console.log('URL入力方式で接続開始:', { spreadsheetId, sheetName });
-    setLoading(true);
+    setPartialLoading(true, 'URL接続中...');
 
     // 既存のconnectToSource関数と同様の処理を実行
     google.script.run
@@ -1104,12 +1078,12 @@
         } else {
           showError(result.error || 'スプレッドシートへの接続に失敗しました');
         }
-        setLoading(false);
+        setPartialLoading(false);
       })
       .withFailureHandler(function (error) {
         console.error('URL入力接続エラー:', error);
         showError('スプレッドシートへの接続に失敗しました: ' + error.message);
-        setLoading(false);
+        setPartialLoading(false);
       })
       .analyzeColumns(spreadsheetId, sheetName);
   }
@@ -1187,8 +1161,8 @@
     const select = document.getElementById('sheet-select');
     select.innerHTML = '<option value="">読み込み中...</option>';
 
-    // ローディング表示
-    setLoading(true, 'シート一覧を読み込み中...');
+    // シート読み込みは部分ローディング
+    setPartialLoading(true, 'シート一覧を読み込み中...');
 
     google.script.run
       .withSuccessHandler(function (sheets) {
@@ -1209,12 +1183,12 @@
 
           select.appendChild(option);
         });
-        setLoading(false);
+        setPartialLoading(false);
       })
       .withFailureHandler(function (error) {
         console.error('シート読み込みエラー:', error);
         select.innerHTML = '<option value="">読み込みエラー</option>';
-        setLoading(false);
+        setPartialLoading(false);
       })
       .getSheetList(spreadsheetId);
   }
@@ -1327,7 +1301,7 @@
     });
   }
 
-  // 列マッピング更新（ドロップダウン式）
+  // 列マッピング更新（ドロップダウン式）- シンプル版
   function updateColumnMapping(result) {
     console.log('Column mapping received:', result);
 
@@ -1339,7 +1313,12 @@
 
     const mapping = result.columnMapping;
     const headers = result.headers || [];
-
+    
+    // confidenceをmappingに追加（バックエンド統一形式対応）
+    if (result.confidence) {
+      mapping.confidence = result.confidence;
+    }
+    
     console.log('Headers:', headers, 'Mapping:', mapping);
 
     // ドロップダウンにヘッダーオプションを設定
@@ -1351,43 +1330,68 @@
     showSuccess('✅ 列設定を更新しました');
   }
 
-  // ドロップダウンにヘッダーオプションを設定
+  // ドロップダウンにヘッダーオプションを設定 - エラーハンドリング強化版
   function populateColumnDropdowns(headers, mapping) {
     console.log('populateColumnDropdowns:', { headers, mapping });
 
-    // 4つのドロップダウンを取得
-    const dropdowns = {
-      answer: document.getElementById('answer-column-select'),
-      reason: document.getElementById('reason-column-select'),
-      class: document.getElementById('class-column-select'),
-      name: document.getElementById('name-column-select'),
-    };
+    try {
+      // 入力データの検証
+      if (!Array.isArray(headers) || headers.length === 0) {
+        throw new Error('ヘッダー情報が不正です');
+      }
 
-    // 各ドロップダウンをクリアしてヘッダーオプションを追加
-    Object.keys(dropdowns).forEach((columnType) => {
-      const dropdown = dropdowns[columnType];
-      if (!dropdown) return;
+      // 4つのドロップダウンを取得
+      const dropdowns = {
+        answer: document.getElementById('answer-column-select'),
+        reason: document.getElementById('reason-column-select'),
+        class: document.getElementById('class-column-select'),
+        name: document.getElementById('name-column-select'),
+      };
 
-      // 既存のオプションをクリア
-      dropdown.innerHTML = '<option value="">選択してください...</option>';
+      // ドロップダウンの存在確認
+      const missingDropdowns = Object.keys(dropdowns).filter(key => !dropdowns[key]);
+      if (missingDropdowns.length > 0) {
+        console.warn('一部のドロップダウンが見つかりません:', missingDropdowns);
+      }
 
-      // ヘッダーをオプションとして追加
-      headers.forEach((header, index) => {
-        if (header && header.trim()) {
-          const option = document.createElement('option');
-          option.value = index;
-          option.textContent = `${String.fromCharCode(65 + index)}列: ${header}`;
-          dropdown.appendChild(option);
+      // 各ドロップダウンをクリアしてヘッダーオプションを追加
+      Object.keys(dropdowns).forEach((columnType) => {
+        const dropdown = dropdowns[columnType];
+        if (!dropdown) {
+          console.warn(`${columnType}ドロップダウンが見つかりません`);
+          return;
+        }
+
+        try {
+          // 既存のオプションをクリア
+          dropdown.innerHTML = '<option value="">選択してください...</option>';
+
+          // ヘッダーをオプションとして追加
+          headers.forEach((header, index) => {
+            if (header && header.trim()) {
+              const option = document.createElement('option');
+              option.value = index;
+              option.textContent = `${String.fromCharCode(65 + index)}列: ${header}`;
+              dropdown.appendChild(option);
+            }
+          });
+        } catch (error) {
+          console.error(`${columnType}ドロップダウンの設定エラー:`, error);
         }
       });
-    });
 
-    // AI検出結果をドロップダウンの初期選択として設定
-    setAIDetectionSelections(mapping, dropdowns);
+      // AI検出結果をドロップダウンの初期選択として設定
+      setAIDetectionSelections(mapping, dropdowns);
 
-    // ドロップダウン変更イベントリスナーを設定
-    setupDropdownEventListeners(dropdowns);
+      // ドロップダウン変更イベントリスナーを設定
+      setupDropdownEventListeners(dropdowns);
+
+    } catch (error) {
+      console.error('populateColumnDropdowns エラー:', error);
+      showError('ドロップダウンの設定に失敗しました: ' + error.message);
+    }
   }
+
 
   // AI検出結果をドロップダウンの初期選択として設定
   function setAIDetectionSelections(mapping, dropdowns) {

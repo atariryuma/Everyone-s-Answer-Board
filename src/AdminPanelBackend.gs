@@ -927,7 +927,8 @@ function analyzeColumns(spreadsheetId, sheetName) {
     return {
       success: true,
       headers: headerRow,
-      columnMapping: columnMapping,
+      columnMapping: columnMapping.mapping || columnMapping,  // 統一形式
+      confidence: columnMapping.confidence,                   // 信頼度を分離
       sheetName: sheetName,
       rowCount: sheet.getLastRow(),
       timestamp: new Date().toISOString(),
@@ -977,6 +978,45 @@ function getHeaderIndices(spreadsheetId, sheetName) {
     console.error('❌ getHeaderIndices: エラー:', {
       spreadsheetId,
       sheetName,
+      error: error.message
+    });
+    throw error;
+  }
+}
+
+/**
+ * getSheetList - Frontend compatibility function
+ * スプレッドシート内のシート一覧を取得（フロントエンド互換関数）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Array} シート名の配列
+ */
+function getSheetList(spreadsheetId) {
+  try {
+    console.log('getSheetList: フロントエンド互換関数開始', {
+      spreadsheetId
+    });
+
+    if (!spreadsheetId) {
+      throw new Error('スプレッドシートIDが必要です');
+    }
+
+    // スプレッドシートを開く
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = spreadsheet.getSheets();
+    
+    // シート名の配列を作成
+    const sheetList = sheets.map(sheet => sheet.getName());
+    
+    console.log('✅ getSheetList: シート一覧取得完了', {
+      spreadsheetId,
+      sheetCount: sheetList.length,
+      sheetNames: sheetList
+    });
+
+    return sheetList;
+  } catch (error) {
+    console.error('❌ getSheetList: エラー:', {
+      spreadsheetId,
       error: error.message
     });
     throw error;
