@@ -408,12 +408,15 @@ class AccessController {
       PROPS_KEYS.ADMIN_EMAIL
     );
 
-    console.log('🔍 管理者アクセス検証:', {
-      currentUserEmail: currentUserEmail ? currentUserEmail.substring(0, 10) + '...' : 'null',
-      systemAdminEmail: systemAdminEmail ? systemAdminEmail.substring(0, 10) + '...' : 'null',
-      userEmail: userInfo.userEmail ? userInfo.userEmail.substring(0, 10) + '...' : 'null',
+    // 詳細なデバッグログ
+    console.log('🔍 管理者アクセス検証（詳細）:', {
+      currentUserEmail: currentUserEmail,
+      userInfoEmail: userInfo.userEmail,
+      systemAdminEmail: systemAdminEmail,
+      userId: userInfo.userId,
+      isActive: userInfo.isActive,
+      emailsMatch: currentUserEmail === userInfo.userEmail,
       isSystemAdmin: currentUserEmail === systemAdminEmail,
-      isOwner: currentUserEmail === userInfo.userEmail,
     });
 
     // システム管理者

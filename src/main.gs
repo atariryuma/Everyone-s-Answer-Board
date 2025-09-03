@@ -16,8 +16,11 @@ const MODULE_CONFIG = Object.freeze({
 const User = {
   email() {
     try {
-      return Session.getActiveUser().getEmail();
+      const email = Session.getActiveUser().getEmail();
+      console.log('User.email() called, returning:', email);
+      return email;
     } catch (e) {
+      console.error('User.email() error:', e);
       return null;
     }
   },
@@ -50,7 +53,9 @@ function doGet(e) {
           throw new Error('Admin mode requires userId parameter');
         }
         try {
-          const accessResult = App.getAccess().verifyAccess(params.userId, 'admin', User.email());
+          const currentUserEmail = User.email();
+          console.log('doGet - Current user email:', currentUserEmail);
+          const accessResult = App.getAccess().verifyAccess(params.userId, 'admin', currentUserEmail);
           if (!accessResult.allowed) {
             console.warn('Admin access denied:', accessResult);
             return HtmlService.createHtmlOutput(
