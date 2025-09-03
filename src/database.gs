@@ -606,20 +606,8 @@ const DB = {
         return null;
       }
 
-      // 🔍 デバッグ: 取得したデータの詳細をログ出力
-      console.log('📊 findUserByEmailNoCache: データベース内容', {
-        totalRows: rows.length,
-        headerRow: rows[0],
-        userCount: rows.length - 1,
-        targetEmail: email
-      });
-
       const headers = rows[0];
       const userRows = rows.slice(1);
-      
-      // 🔍 デバッグ: 全ユーザーのメールアドレスをログ出力
-      const allEmails = userRows.map(row => row[1]); // emailIndex = 1
-      console.log('📧 findUserByEmailNoCache: 全ユーザーメール', allEmails);
 
       // メールアドレス列のインデックスを取得（CLAUDE.md準拠：2列目）
       const emailIndex = 1;
@@ -821,6 +809,52 @@ function updateUser(userId, updateData) {
 
 function deleteUserAccountByAdmin(targetUserId, reason) {
   return DB.deleteUserAccountByAdmin(targetUserId, reason);
+}
+
+/**
+ * 🧹 データベースクリーンアップ - 空のユーザーエントリを削除
+ * @returns {Object} クリーンアップ結果
+ */
+function cleanupEmptyUsers() {
+  try {
+    console.log('🧹 データベースクリーンアップ開始...');
+    
+    const dbId = getSecureDatabaseId();
+    const spreadsheet = SpreadsheetApp.openById(dbId);
+    const sheet = spreadsheet.getSheetByName('Users');
+    
+    if (!sheet) {
+      throw new Error('Usersシートが見つかりません');
+    }
+    
+    const allData = sheet.getDataRange().getValues();
+    const headers = allData[0];
+    let deletedCount = 0;
+    
+    // 後ろから削除（インデックスのズレを防ぐ）
+    for (let i = allData.length - 1; i > 0; i--) {
+      const row = allData[i];
+      const userEmail = row[1]; // emailIndex = 1
+      
+      // メールアドレスが空の行を削除
+      if (!userEmail || userEmail === '') {
+        sheet.deleteRow(i + 1); // シートの行番号は1ベース
+        deletedCount++;
+      }
+    }
+    
+    console.log(`✅ クリーンアップ完了: ${deletedCount}件の空ユーザーを削除`);
+    
+    return {
+      success: true,
+      deletedCount,
+      remainingUsers: sheet.getLastRow() - 1
+    };
+    
+  } catch (error) {
+    console.error('❌ クリーンアップエラー:', error.message);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
