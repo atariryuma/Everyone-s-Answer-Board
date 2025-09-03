@@ -606,8 +606,20 @@ const DB = {
         return null;
       }
 
+      // 🔍 デバッグ: 取得したデータの詳細をログ出力
+      console.log('📊 findUserByEmailNoCache: データベース内容', {
+        totalRows: rows.length,
+        headerRow: rows[0],
+        userCount: rows.length - 1,
+        targetEmail: email
+      });
+
       const headers = rows[0];
       const userRows = rows.slice(1);
+      
+      // 🔍 デバッグ: 全ユーザーのメールアドレスをログ出力
+      const allEmails = userRows.map(row => row[1]); // emailIndex = 1
+      console.log('📧 findUserByEmailNoCache: 全ユーザーメール', allEmails);
 
       // メールアドレス列のインデックスを取得（CLAUDE.md準拠：2列目）
       const emailIndex = 1;
@@ -809,4 +821,82 @@ function updateUser(userId, updateData) {
 
 function deleteUserAccountByAdmin(targetUserId, reason) {
   return DB.deleteUserAccountByAdmin(targetUserId, reason);
+}
+
+/**
+ * 🔍 データベース診断関数 - 全ユーザーデータを表示
+ * @returns {Object} データベースの全内容
+ */
+function debugShowAllUsers() {
+  try {
+    console.log('🔍 データベース診断開始...');
+    
+    const service = getSheetsService();
+    const dbId = getSecureDatabaseId();
+    const sheetName = 'Users';
+    
+    // スプレッドシートから直接データを取得
+    const spreadsheet = SpreadsheetApp.openById(dbId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      console.error('❌ Usersシートが見つかりません');
+      return { error: 'Usersシートが見つかりません' };
+    }
+    
+    const allData = sheet.getDataRange().getValues();
+    
+    console.log('📊 データベース診断結果:', {
+      spreadsheetId: dbId,
+      sheetName: sheetName,
+      totalRows: allData.length,
+      headers: allData[0]
+    });
+    
+    // 各ユーザーの詳細を表示
+    for (let i = 1; i < allData.length; i++) {
+      const row = allData[i];
+      console.log(`ユーザー ${i}:`, {
+        userId: row[0],
+        userEmail: row[1],
+        isActive: row[2],
+        configJson: row[3] ? `${row[3].substring(0, 50)}...` : 'null',
+        lastModified: row[4]
+      });
+    }
+    
+    // 削除ログも確認
+    const deletionLogSheet = spreadsheet.getSheetByName('DeletionLogs');
+    if (deletionLogSheet) {
+      const deletionLogs = deletionLogSheet.getDataRange().getValues();
+      console.log('🗑️ 削除ログ:', {
+        totalDeletions: deletionLogs.length - 1,
+        headers: deletionLogs[0]
+      });
+      
+      for (let i = 1; i < Math.min(deletionLogs.length, 6); i++) { // 最新5件まで
+        const log = deletionLogs[i];
+        console.log(`削除ログ ${i}:`, {
+          timestamp: log[0],
+          executor: log[1],
+          targetUserId: log[2],
+          targetEmail: log[3],
+          reason: log[4]
+        });
+      }
+    }
+    
+    return {
+      userCount: allData.length - 1,
+      users: allData.slice(1).map(row => ({
+        userId: row[0],
+        email: row[1],
+        isActive: row[2]
+      }))
+    };
+    
+  } catch (error) {
+    console.error('❌ データベース診断エラー:', error.message);
+    return { error: error.message };
+  }
 }
