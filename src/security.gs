@@ -292,6 +292,65 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
 }
 
 /**
+ * Sheets APIを使用してデータを更新
+ * @param {Object} service - Sheets APIサービスオブジェクト
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} range - 更新する範囲
+ * @param {Array<Array>} values - 更新する値の2次元配列
+ * @returns {Object} APIレスポンス
+ */
+function updateSheetsData(service, spreadsheetId, range, values) {
+  try {
+    // Sheets API v4のupdateメソッドを使用
+    const response = Sheets.Spreadsheets.Values.update(
+      {
+        values: values
+      },
+      spreadsheetId,
+      range,
+      {
+        valueInputOption: 'USER_ENTERED'
+      }
+    );
+    
+    return response;
+  } catch (error) {
+    console.error('updateSheetsData エラー:', {
+      spreadsheetId: spreadsheetId,
+      range: range,
+      error: error.message
+    });
+    
+    // フォールバック: 通常のSpreadsheetAppを使用
+    try {
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      // シート名と範囲を分離
+      const match = range.match(/^'?([^'!]+)'?!(.+)$/);
+      if (match) {
+        const sheetName = match[1];
+        const rangeSpec = match[2];
+        const sheet = spreadsheet.getSheetByName(sheetName);
+        if (sheet) {
+          const targetRange = sheet.getRange(rangeSpec);
+          targetRange.setValues(values);
+          return {
+            updatedCells: values.length * (values[0] ? values[0].length : 0),
+            updatedRows: values.length,
+            updatedColumns: values[0] ? values[0].length : 0,
+            spreadsheetId: spreadsheetId,
+            updatedRange: range
+          };
+        }
+      }
+      throw new Error('範囲の解析に失敗しました: ' + range);
+    } catch (fallbackError) {
+      console.error('updateSheetsData フォールバックエラー:', fallbackError.message);
+      throw error;
+    }
+  }
+}
+
+/**
  * Sheets APIを使用してバッチでデータを取得
  * @param {Object} service - Sheets APIサービスオブジェクト
  * @param {string} spreadsheetId - スプレッドシートID
