@@ -65,6 +65,7 @@ function getCurrentConfig() {
       // その他
       formTitle: config.formTitle || null,
       missingColumnsHandled: config.missingColumnsHandled || null,
+      opinionHeader: config.opinionHeader || null, // 問題文ヘッダー
       
       // CLAUDE.md準拠メタデータ
       configJsonVersion: config.configJsonVersion || '1.0',
@@ -750,6 +751,58 @@ function checkFormConnection(spreadsheetId) {
       formUrl: null,
       formTitle: null,
       error: error.message
+    };
+  }
+}
+
+/**
+ * 現在のボード情報とURLを取得（CLAUDE.md準拠版）
+ * フロントエンドフッター表示用
+ * @returns {Object} ボード情報オブジェクト
+ */
+function getCurrentBoardInfoAndUrls() {
+  try {
+    console.log('📊 getCurrentBoardInfoAndUrls: ボード情報取得開始');
+
+    const config = getCurrentConfig(); // 既存関数活用
+    
+    // opinionHeader取得（問題文として表示）
+    const questionText = config.opinionHeader || 
+                        config.formTitle || 
+                        'システム準備中';
+    
+    const boardInfo = {
+      isActive: config.appPublished || false,
+      questionText: questionText,        // 実際の問題文
+      appUrl: config.appUrl || '',
+      spreadsheetUrl: config.spreadsheetUrl || '',
+      hasSpreadsheet: !!config.spreadsheetId,
+      setupStatus: config.setupStatus || 'pending'
+    };
+
+    console.info('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
+      isActive: boardInfo.isActive,
+      hasQuestionText: !!boardInfo.questionText,
+      questionText: boardInfo.questionText,
+      timestamp: new Date().toISOString()
+    });
+
+    return boardInfo;
+
+  } catch (error) {
+    console.error('❌ getCurrentBoardInfoAndUrls: エラー', {
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+    
+    // エラー時でもフッター初期化を継続
+    return { 
+      isActive: false, 
+      questionText: 'システム準備中', 
+      appUrl: '',
+      spreadsheetUrl: '',
+      hasSpreadsheet: false,
+      error: error.message 
     };
   }
 }
