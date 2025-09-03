@@ -503,6 +503,23 @@ class AccessController {
 
     return 'guest';
   }
+
+  /**
+   * システム管理者権限を確認
+   * @param {string} currentUserEmail 現在のユーザーメール（省略可）
+   * @return {boolean} システム管理者の場合true
+   */
+  isSystemAdmin(currentUserEmail = null) {
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+      const userEmail = currentUserEmail || User.email();
+      return adminEmail && userEmail && adminEmail === userEmail;
+    } catch (e) {
+      console.error(`isSystemAdmin エラー: ${e.message}`);
+      return false;
+    }
+  }
 }
 
 // ===============================
