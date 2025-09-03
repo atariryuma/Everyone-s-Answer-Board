@@ -17,8 +17,8 @@
       }
       
       // フォールバック2: テンプレート変数から取得（GAS側で展開される可能性）
-      if (!userId && window.templateUserId) {
-        userId = window.templateUserId;
+      if (!userId && window.USER_ID) {
+        userId = window.USER_ID;
       }
       
       if (!userId) throw new Error('userId parameter missing from all sources');
@@ -49,7 +49,7 @@
       console.error('❌ Config初期化エラー:', error);
       // フォールバック設定（SHEET_NAME空文字対策）
       const fallbackUserId = new URLSearchParams(window.location.search).get('userId') || '';
-      const fallbackSheetName = window.templateSheetName || 'テストシート'; // テンプレート変数フォールバック
+      const fallbackSheetName = window.SHEET_NAME || 'テストシート'; // テンプレート変数フォールバック
       
       CONFIG = Object.freeze({
         showCounts: false,
@@ -97,7 +97,9 @@
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   });
 
-  // ✅ CLAUDE.md準拠: SYSTEM_CONSTANTS統合
+  // ✅ CLAUDE.md準拠: SYSTEM_CONSTANTS統合 + 必須UI定数
+  const VIEWPORT_BUFFER = 100; // setupObservers用の必須定数
+  
   const SYSTEM_CONSTANTS = Object.freeze({
     REACTIONS: Object.freeze({
       KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
