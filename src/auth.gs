@@ -150,14 +150,14 @@ function processLoginFlow(userEmail) {
 
         console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
 
-        // キャッシュ整合性確保: 新規作成後の検証リトライ
-        let verifiedUser = DB.findUserByEmail(userEmail);
+        // 🔧 修正：ログイン時は常にキャッシュバイパスで検証
+        let verifiedUser = DB.findUserByEmailNoCache(userEmail);
         if (!verifiedUser) {
-          console.warn('processLoginFlow: キャッシュ不整合検出、リトライ実行');
-          Utilities.sleep(100); // キャッシュ同期待機
-          verifiedUser = DB.findUserByEmail(userEmail);
+          console.warn('processLoginFlow: DB直接検索でもユーザー未発見、再試行');
+          Utilities.sleep(200); // DB同期待機
+          verifiedUser = DB.findUserByEmailNoCache(userEmail);
           if (!verifiedUser) {
-            console.error('processLoginFlow: ユーザー検証失敗 - キャッシュ問題の可能性');
+            console.error('processLoginFlow: ユーザー検証失敗 - DB同期問題の可能性');
             // フォールバック: 作成したユーザー情報を直接使用
             verifiedUser = newUser;
           }
