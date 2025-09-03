@@ -1781,40 +1781,14 @@ function publishApplication(config) {
       throw new Error('統一データソース必須: spreadsheetIdとsheetNameが設定されていません');
     }
 
-    // 🔧 根本的修正: 不足データを自動的にデータベースから取得・補完
-    // フロントエンドからformUrlやcolumnMappingが送信されていない場合の対策
-    if (!config.formUrl || !config.columnMapping || Object.keys(config.columnMapping || {}).length === 0) {
-      console.info('📋 publishApplication: 不足データを検出、データベースから自動取得中', {
-        missingFormUrl: !config.formUrl,
-        missingColumnMapping: !config.columnMapping || Object.keys(config.columnMapping || {}).length === 0,
-        userInfoHasFormUrl: !!userInfo.formUrl,
-        userInfoHasColumnMapping: !!userInfo.columnMappingJson
-      });
-
-      // データベースから最新の保存済みデータを取得
-      if (!config.formUrl && userInfo.formUrl) {
-        config.formUrl = userInfo.formUrl;
-        console.info('✅ formUrlをデータベースから復元:', config.formUrl);
-      }
-
-      if ((!config.columnMapping || Object.keys(config.columnMapping).length === 0) && userInfo.columnMappingJson) {
-        try {
-          const parsedMapping = JSON.parse(userInfo.columnMappingJson);
-          if (parsedMapping && Object.keys(parsedMapping).length > 0) {
-            config.columnMapping = parsedMapping;
-            console.info('✅ columnMappingをデータベースから復元:', config.columnMapping);
-          }
-        } catch (parseError) {
-          console.warn('columnMappingJson解析エラー:', parseError.message);
-        }
-      }
-
-      console.info('📋 publishApplication: データ補完完了', {
-        finalFormUrl: config.formUrl || '(still empty)',
-        finalColumnMapping: config.columnMapping || '(still empty)',
-        columnMappingKeys: config.columnMapping ? Object.keys(config.columnMapping) : []
-      });
-    }
+    // 📋 フロントエンドから送信された完全なconfig確認
+    console.info('📋 publishApplication: 受信したconfig', {
+      hasFormUrl: !!config.formUrl,
+      hasColumnMapping: !!config.columnMapping,
+      columnMappingKeys: config.columnMapping ? Object.keys(config.columnMapping) : [],
+      formUrl: config.formUrl ? config.formUrl.substring(0, 50) + '...' : '(empty)',
+      timestamp: new Date().toISOString()
+    });
 
     // 公開状態設定
     config.appPublished = true;

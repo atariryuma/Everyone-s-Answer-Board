@@ -1599,29 +1599,62 @@
       return;
     }
 
-    const config = gatherConfiguration();
-    config.appName = appName;
-
     setLoading(true);
+    
+    // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し
     google.script.run
-      .withSuccessHandler(function (result) {
-        if (result.success) {
-          showSuccess('アプリを公開しました！');
-          updatePublishStatus('published');
-          updateResourceButtons(result.config);
-        } else {
-          showError(result.error);
+      .withSuccessHandler(function (currentConfig) {
+        if (!currentConfig || !currentConfig.spreadsheetId) {
+          showError('まずデータソースを設定してください。');
+          setLoading(false);
+          return;
         }
-        setLoading(false);
+
+        // UI設定を現在の設定に統合
+        const publishConfig = {
+          ...currentConfig, // formUrl, columnMapping, spreadsheetId, sheetNameなど全て含む
+          appName: appName,
+          showNames: document.getElementById('show-names').checked,
+          showReactions: document.getElementById('show-reactions').checked,
+          displaySettings: {
+            showNames: document.getElementById('show-names').checked,
+            showReactions: document.getElementById('show-reactions').checked
+          }
+        };
+
+        console.log('📋 publishApp: 完全な設定でpublishApplication呼び出し', {
+          hasFormUrl: !!publishConfig.formUrl,
+          hasColumnMapping: !!publishConfig.columnMapping,
+          hasSpreadsheetId: !!publishConfig.spreadsheetId,
+          hasSheetName: !!publishConfig.sheetName
+        });
+
+        // 完全な設定でpublishApplicationを呼び出し
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result.success) {
+              showSuccess('アプリを公開しました！');
+              updatePublishStatus('published');
+              updateResourceButtons(result.config);
+            } else {
+              showError(result.error);
+            }
+            setLoading(false);
+          })
+          .withFailureHandler(function (error) {
+            console.error('公開エラー:', error);
+            showError(
+              'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
+            );
+            setLoading(false);
+          })
+          .publishApplication(publishConfig);
       })
       .withFailureHandler(function (error) {
-        console.error('公開エラー:', error);
-        showError(
-          'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
-        );
+        showError('現在の設定の取得に失敗しました: ' + error.message);
         setLoading(false);
       })
-      .publishApplication(config);
+      .getCurrentConfig(); // 現在の完全な設定を先に取得
   }
 
   // 設定収集（ドロップダウン式対応）
