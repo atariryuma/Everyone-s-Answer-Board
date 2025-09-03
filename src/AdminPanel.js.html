@@ -81,9 +81,9 @@
       await loadUserInfoAsync();
 
       // ⚡ 最適化：スプレッドシート一覧の自動読み込みを停止
-      // データベース情報があれば事前入力、ドロップダウンクリック時のみ読み込み
-      step = 'initializing dropdown with database info';
-      await initializeDropdownsWithDatabaseInfo();
+      // ドロップダウンの初期化
+      step = 'initializing dropdowns';
+      await initializeDropdowns();
 
       // 設定データを読み込んで完全に自動反映
       step = 'loading and applying config';
@@ -97,54 +97,33 @@
     }
   }
 
-  // 🚀 データベース情報を使用したドロップダウン初期化（オンデマンド対応）
-  async function initializeDropdownsWithDatabaseInfo() {
+  // シンプルなドロップダウン初期化（初期化時にデータ一括読み込み）
+  async function initializeDropdowns() {
     const spreadsheetSelect = document.getElementById('spreadsheet-select');
     const sheetSelect = document.getElementById('sheet-select');
     
     if (!spreadsheetSelect) return;
 
     try {
-      // 現在の設定から既存データを取得
-      const config = await getCurrentConfigAsync();
+      // スプレッドシート一覧を初期化時に読み込み
+      await loadSpreadsheetListAsync();
       
-      if (config && config.spreadsheetId && config.sheetName) {
-        // 🎯 データベースに情報がある場合：事前入力
-        console.log('📋 データベース情報で事前入力:', {
-          spreadsheetId: config.spreadsheetId,
-          sheetName: config.sheetName
-        });
-
-        // スプレッドシート選択を設定済み状態に
-        spreadsheetSelect.innerHTML = `
-          <option value="">-- クリックして読み込み --</option>
-          <option value="${config.spreadsheetId}" selected>設定済み: ${config.sheetName || 'スプレッドシート'}</option>
-        `;
-
-        // シート選択を設定済み状態に
-        if (sheetSelect) {
-          sheetSelect.innerHTML = `
-            <option value="">シートを選択</option>
-            <option value="${config.sheetName}" selected>${config.sheetName}</option>
-          `;
-        }
-
-        // データソース接続ボタンを有効化
-        const connectBtn = document.getElementById('connect-source');
-        if (connectBtn) {
-          connectBtn.disabled = false;
-          connectBtn.textContent = '再接続';
-        }
-      } else {
-        // 🔄 データベースに情報がない場合：オンデマンド読み込み設定
-        spreadsheetSelect.innerHTML = '<option value="">-- クリックして読み込み --</option>';
-        if (sheetSelect) {
-          sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
+      // 現在の設定から既存データを取得・反映
+      const config = await getCurrentConfigAsync();
+      if (config && config.spreadsheetId) {
+        spreadsheetSelect.value = config.spreadsheetId;
+        
+        // 設定されているスプレッドシートのシート一覧を読み込み
+        if (config.spreadsheetId) {
+          await loadSheetList(config.spreadsheetId);
+          if (config.sheetName && sheetSelect) {
+            sheetSelect.value = config.sheetName;
+          }
         }
       }
 
-      // 📱 オンデマンド読み込みイベント設定
-      setupOnDemandLoading();
+      // シンプルなchangeイベントを設定
+      setupSimpleChangeEvents();
 
     } catch (error) {
       console.error('ドロップダウン初期化エラー:', error);
@@ -152,33 +131,24 @@
     }
   }
 
-  // 🎯 オンデマンド読み込みイベント設定
-  function setupOnDemandLoading() {
-    const spreadsheetSelect = document.getElementById('spreadsheet-select');
-    
-    if (spreadsheetSelect) {
-      // クリック・フォーカス時にスプレッドシート一覧を読み込み
-      ['click', 'focus'].forEach(eventType => {
-        spreadsheetSelect.addEventListener(eventType, async function(e) {
-          // 既に読み込み済みかチェック
-          if (spreadsheetSelect.children.length > 2 || 
-              spreadsheetSelect.dataset.loaded === 'true') {
-            return; // すでに読み込み済み
-          }
-
-          console.log('📋 オンデマンドでスプレッドシート一覧を読み込み開始');
-          
-          try {
-            spreadsheetSelect.innerHTML = '<option value="">読み込み中...</option>';
-            await loadSpreadsheetListAsync();
-            spreadsheetSelect.dataset.loaded = 'true';
-          } catch (error) {
-            console.error('オンデマンド読み込みエラー:', error);
-            spreadsheetSelect.innerHTML = '<option value="">読み込みエラー - 再クリックして再試行</option>';
-            spreadsheetSelect.dataset.loaded = 'false';
-          }
-        });
-      });
+  // 🎯 シンプルなchangeイベント設定
+  function setupSimpleChangeEvents() {
+    // スプレッドシート選択時 → シート読み込み
+    document.getElementById('spreadsheet-select').addEventListener('change', function() {
+      const spreadsheetId = this.value;
+      if (spreadsheetId) {
+        loadSheetList(spreadsheetId);
+      } else {
+        resetSheetSelect();
+      }
+    });
+  }
+  
+  // シート選択をリセット
+  function resetSheetSelect() {
+    const sheetSelect = document.getElementById('sheet-select');
+    if (sheetSelect) {
+      sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
     }
   }
 
@@ -1097,47 +1067,6 @@
       });
     });
 
-    // 🔧 実行状態管理変数
-    let isProcessingSpreadsheetSelection = false;
-    
-    // スプレッドシート選択時
-    document.getElementById('spreadsheet-select').addEventListener('change', function () {
-      // 重複実行防止
-      if (isProcessingSpreadsheetSelection) {
-        return;
-      }
-      
-      const spreadsheetId = this.value;
-      
-      if (spreadsheetId) {
-        isProcessingSpreadsheetSelection = true;
-        
-        try {
-          // 即座にユーザーフィードバックを表示
-          const sheetSelect = document.getElementById('sheet-select');
-          if (sheetSelect) {
-            sheetSelect.innerHTML = '<option value="">📄 シート読み込み中...</option>';
-            sheetSelect.classList.add('partial-loading-target');
-          }
-          
-          loadSheetList(spreadsheetId);
-        } finally {
-          // 少し遅延させて次の処理を許可
-          setTimeout(() => {
-            isProcessingSpreadsheetSelection = false;
-          }, 100);
-        }
-      } else {
-        const sheetSelect = document.getElementById('sheet-select');
-        if (sheetSelect) {
-          sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
-          sheetSelect.classList.remove('partial-loading-target');
-        }
-      }
-      
-      // フォーム情報はシート選択時に表示するため、ここでは非表示
-      hideFormInfo();
-    });
 
     // シート選択時（フォーム情報表示）
     document.getElementById('sheet-select').addEventListener('change', function () {
