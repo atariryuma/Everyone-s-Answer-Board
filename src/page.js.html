@@ -1425,8 +1425,9 @@
                   .withUserObject({ tenantId: userId })
                   [funcName](...args);
               } else {
-                const mockResult = await this.getMockData(funcName, ...args);
-                resolve(mockResult);
+                this.getMockData(funcName, ...args)
+                  .then(mockResult => resolve(mockResult))
+                  .catch(reject);
               }
             });
         }
