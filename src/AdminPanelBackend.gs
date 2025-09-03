@@ -1816,6 +1816,34 @@ function publishApplication(config) {
     });
 
     if (publishResult.success) {
+      // 🔒 データ保護: 既存のデータベース情報を取得して保持
+      const currentUserData = DB.findUserById(userInfo.userId);
+      
+      // 🔒 重要データの保護ロジック: 既存データを優先、新規データで補完
+      const protectedFormUrl = currentUserData?.formUrl || config.formUrl || '';
+      let protectedColumnMapping = config.columnMapping || {};
+      
+      // connectDataSourceで保存した列マッピング情報を復元
+      if (currentUserData?.columnMappingJson && currentUserData.columnMappingJson !== '{}') {
+        try {
+          protectedColumnMapping = JSON.parse(currentUserData.columnMappingJson);
+        } catch (e) {
+          console.warn('🔒 columnMappingJson解析エラー:', e.message);
+        }
+      }
+      
+      // configJsonからも列マッピング情報を復元（connectDataSourceで保存）
+      if (existingConfig.columnMapping && Object.keys(protectedColumnMapping).length === 0) {
+        protectedColumnMapping = existingConfig.columnMapping;
+      }
+      
+      console.info('🔒 データ保護完了', {
+        existingFormUrl: !!currentUserData?.formUrl,
+        existingColumnMapping: !!(currentUserData?.columnMappingJson && currentUserData.columnMappingJson !== '{}'),
+        protectedFormUrl: !!protectedFormUrl,
+        protectedColumnMappingKeys: Object.keys(protectedColumnMapping)
+      });
+
       // CLAUDE.md準拠: DB_CONFIG.HEADERS準拠のデータベース更新
       const updateData = {
         // 統一データソース: userInfo.spreadsheetIdが唯一の真実の源
@@ -1824,10 +1852,10 @@ function publishApplication(config) {
           ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`
           : '',
 
-        // DB_CONFIG.HEADERS準拠のフィールド更新
-        formUrl: config.formUrl || '',
+        // 🔒 DB_CONFIG.HEADERS準拠のフィールド更新（データ保護適用）
+        formUrl: protectedFormUrl,
         sheetName: config.sheetName,
-        columnMappingJson: JSON.stringify(config.columnMapping || {}),
+        columnMappingJson: JSON.stringify(protectedColumnMapping),
         publishedAt: config.publishedAt,
         appUrl: publishResult.appUrl,
         lastModified: new Date().toISOString(),
@@ -1841,7 +1869,7 @@ function publishApplication(config) {
       });
 
       // CLAUDE.md準拠: 統一データソース原則に基づく設定保存
-      // configJsonは表示設定のみ、重要データはDB専用フィールドで管理
+      // 🔒 保護されたデータをconfigJsonにも反映（完全同期）
       const displayOnlyConfig = {
         appName: config.appName,
         setupStatus: 'completed',
@@ -1850,26 +1878,38 @@ function publishApplication(config) {
         displaySettings: config.displaySettings || { showNames: true, showReactions: true },
         appUrl: publishResult.appUrl,
 
-        // 重要: 既存の設定情報を保持（データ損失防止）
+        // 🔒 重要: 保護されたデータを含める（データ損失防止）
         sheetName: config.sheetName,
-        columnMapping: config.columnMapping,
-        compatibleMapping: config.compatibleMapping,
-        formTitle: config.formTitle,
-        lastConnected: config.lastConnected,
-        connectionMethod: config.connectionMethod,
-        missingColumnsHandled: config.missingColumnsHandled,
+        formUrl: protectedFormUrl,
+        columnMapping: protectedColumnMapping,
+        compatibleMapping: config.compatibleMapping || existingConfig.compatibleMapping,
+        formTitle: config.formTitle || existingConfig.formTitle,
+        lastConnected: config.lastConnected || existingConfig.lastConnected,
+        connectionMethod: config.connectionMethod || existingConfig.connectionMethod,
+        missingColumnsHandled: config.missingColumnsHandled || existingConfig.missingColumnsHandled,
       };
 
       updateData.configJson = JSON.stringify(displayOnlyConfig);
 
       // CLAUDE.md準拠: データベース更新実行
-      updateUser(userInfo.userId, updateData);
+      const updateResult = updateUser(userInfo.userId, updateData);
+
+      // 🔍 保存後検証: データが正しく保存されたかを確認
+      const verificationData = DB.findUserById(userInfo.userId);
+      const verificationSuccess = {
+        formUrlSaved: !!(verificationData?.formUrl && verificationData.formUrl !== ''),
+        columnMappingSaved: !!(verificationData?.columnMappingJson && verificationData.columnMappingJson !== '{}'),
+        sheetNameSaved: !!(verificationData?.sheetName && verificationData.sheetName === config.sheetName),
+        appUrlSaved: !!(verificationData?.appUrl && verificationData.appUrl !== ''),
+      };
 
       console.info('✅ publishApplication: データベース更新完了', {
         userId: userInfo.userId,
         spreadsheetId: updateData.spreadsheetId,
         sheetName: updateData.sheetName,
         appUrl: updateData.appUrl,
+        verification: verificationSuccess,
+        allDataSaved: Object.values(verificationSuccess).every(Boolean),
       });
 
       // 公開後すぐにフッター情報を更新
