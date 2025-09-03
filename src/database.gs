@@ -812,6 +812,38 @@ function deleteUserAccountByAdmin(targetUserId, reason) {
 }
 
 /**
+ * 📊 データベースシートの初期化
+ * @param {string} spreadsheetId - データベーススプレッドシートID
+ */
+function initializeDatabaseSheet(spreadsheetId) {
+  try {
+    console.log('データベースシート初期化開始:', spreadsheetId);
+    
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    let sheet = spreadsheet.getSheetByName(DB_CONFIG.SHEET_NAME);
+    
+    // シートが存在しない場合は作成
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(DB_CONFIG.SHEET_NAME);
+      console.log('Usersシートを新規作成');
+    }
+    
+    // ヘッダー行が存在しない場合は設定
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, DB_CONFIG.HEADERS.length).setValues([DB_CONFIG.HEADERS]);
+      console.log('ヘッダー行を設定:', DB_CONFIG.HEADERS);
+    }
+    
+    console.log('✅ データベースシート初期化完了');
+    return true;
+    
+  } catch (error) {
+    console.error('データベースシート初期化エラー:', error.message);
+    throw error;
+  }
+}
+
+/**
  * 🧹 データベースクリーンアップ - 空のユーザーエントリを削除
  * @returns {Object} クリーンアップ結果
  */
