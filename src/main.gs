@@ -918,6 +918,23 @@ function renderAnswerBoard(userInfo, params) {
     template.isPublished = hasUserConfig;
     template.appPublished = config.appPublished || false;
 
+    // __OPINION_HEADER__テンプレート変数を設定（エラー対策）
+    let opinionHeader = 'お題'; // デフォルト値
+    try {
+      if (finalSpreadsheetId && finalSheetName) {
+        const headerIndices = getHeaderIndices(finalSpreadsheetId, finalSheetName);
+        opinionHeader = headerIndices?.opinionHeader || 'お題';
+      }
+    } catch (headerError) {
+      console.warn('renderAnswerBoard: ヘッダー情報取得エラー:', headerError.message);
+      opinionHeader = 'お題'; // フォールバック
+    }
+    template.__OPINION_HEADER__ = opinionHeader;
+    
+    // StudyQuestApp用のユーザーID設定（エラー対策）
+    template.USER_ID = userInfo.userId || '';
+    template.SHEET_NAME = finalSheetName || '';
+
     // データ取得とテンプレート設定の処理
     try {
       if (finalSpreadsheetId && finalSheetName) {
@@ -1492,6 +1509,33 @@ function testSetup() {
     return {
       status: 'error',
       message: `テストに失敗しました: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * データベース移行処理のテスト実行関数
+ * GASエディタから直接実行可能
+ */
+function testDatabaseMigration() {
+  try {
+    console.info('📊 データベース移行テスト開始');
+    
+    const result = DB.migrateDatabaseTo14Columns();
+    
+    console.info('📊 移行結果:', result);
+    
+    return {
+      status: 'success',
+      message: '✅ データベース移行完了',
+      details: result
+    };
+    
+  } catch (error) {
+    console.error('📊 データベース移行テストエラー:', error.message);
+    return {
+      status: 'error', 
+      message: '❌ データベース移行エラー: ' + error.message
     };
   }
 }

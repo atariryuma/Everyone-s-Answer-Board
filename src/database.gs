@@ -41,6 +41,102 @@ let userIndexCache = {
  */
 const DB = {
   /**
+   * データベース構造を9列から14列に移行する
+   * @returns {Object} 移行結果
+   */
+  migrateDatabaseTo14Columns: function() {
+    try {
+      console.info('📊 データベース移行開始: 9列→14列');
+      
+      const dbId = getSecureDatabaseId();
+      const service = getSheetsServiceCached();
+      const sheetName = DB_CONFIG.SHEET_NAME;
+      
+      // 現在のデータを取得 (A:I = 9列)
+      const currentData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
+      const values = currentData.valueRanges[0].values || [];
+      
+      if (values.length === 0) {
+        console.warn('📊 移行対象データが存在しません');
+        return { success: false, reason: '移行対象データが存在しません' };
+      }
+      
+      // ヘッダー行の確認と更新
+      const currentHeaders = values[0] || [];
+      const targetHeaders = DB_CONFIG.HEADERS;
+      
+      console.info('📊 現在のヘッダー:', currentHeaders);
+      console.info('📊 目標ヘッダー:', targetHeaders);
+      
+      // ヘッダー行を14列に拡張
+      const headerRange = `'${sheetName}'!A1:${String.fromCharCode(65 + targetHeaders.length - 1)}1`;
+      updateSheetsData(service, dbId, headerRange, [targetHeaders]);
+      
+      // データ行の移行処理
+      if (values.length > 1) {
+        const dataRows = values.slice(1);
+        const migratedRows = [];
+        
+        for (const row of dataRows) {
+          const migratedRow = new Array(14);
+          
+          // 既存の9列をコピー
+          for (let i = 0; i < Math.min(row.length, 9); i++) {
+            migratedRow[i] = row[i] || '';
+          }
+          
+          // 不足している列を補完
+          const configJson = migratedRow[7]; // configJsonは8番目の列 (index 7)
+          let parsedConfig = {};
+          
+          if (configJson) {
+            try {
+              parsedConfig = JSON.parse(configJson);
+            } catch (e) {
+              console.warn('📊 configJson解析エラー:', e.message);
+            }
+          }
+          
+          // 9列目以降を補完
+          migratedRow[8] = migratedRow[8] || parsedConfig.formUrl || ''; // formUrl
+          migratedRow[9] = migratedRow[9] || parsedConfig.sheetName || migratedRow[1] || ''; // sheetName
+          migratedRow[10] = migratedRow[10] || JSON.stringify(parsedConfig.columnMapping || {}); // columnMappingJson
+          migratedRow[11] = migratedRow[11] || parsedConfig.publishedAt || ''; // publishedAt
+          migratedRow[12] = migratedRow[12] || parsedConfig.appUrl || ''; // appUrl
+          migratedRow[13] = migratedRow[13] || new Date().toISOString(); // lastModified
+          
+          migratedRows.push(migratedRow);
+        }
+        
+        // 拡張されたデータを書き込み
+        const dataRange = `'${sheetName}'!A2:${String.fromCharCode(65 + targetHeaders.length - 1)}${migratedRows.length + 1}`;
+        updateSheetsData(service, dbId, dataRange, migratedRows);
+        
+        console.info('📊 データベース移行完了:', {
+          処理行数: migratedRows.length,
+          移行前列数: currentHeaders.length,
+          移行後列数: targetHeaders.length
+        });
+      }
+      
+      // 移行完了後にキャッシュをクリア
+      userIndexCache.byUserId.clear();
+      userIndexCache.byEmail.clear();
+      userIndexCache.lastUpdate = 0;
+      
+      return {
+        success: true,
+        migratedRows: values.length - 1,
+        fromColumns: currentHeaders.length,
+        toColumns: targetHeaders.length
+      };
+      
+    } catch (error) {
+      console.error('📊 データベース移行エラー:', error.message);
+      throw new Error(`データベース移行に失敗しました: ${error.message}`);
+    }
+  },
+  /**
    * ユーザーを作成する
    * @param {object} userData - 作成するユーザーデータ
    * @returns {object} 作成されたユーザーデータ
@@ -215,8 +311,8 @@ const DB = {
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
-      // シート全体のデータを取得
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
+      // シート全体のデータを取得 (14列対応)
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:N`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
         console.warn('findUserByEmail: データベースからデータを取得できませんでした');
@@ -302,8 +398,8 @@ const DB = {
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
-      // シート全体のデータを取得
-      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
+      // シート全体のデータを取得 (14列対応)
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:N`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
         console.warn('findUserById: データベースからデータを取得できませんでした');
@@ -942,8 +1038,8 @@ function updateUser(userId, updateData) {
     let service = getSheetsServiceCached();
     const sheetName = DB_CONFIG.SHEET_NAME;
 
-    // 現在のデータを取得
-    const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:I"]);
+    // 現在のデータを取得 (14列対応)
+    const data = batchGetSheetsData(service, dbId, ["'" + sheetName + "'!A:N"]);
     const values = data.valueRanges[0].values || [];
 
     if (values.length === 0) {
@@ -1113,7 +1209,7 @@ function initializeDatabaseSheet(spreadsheetId) {
               title: sheetName,
               gridProperties: {
                 rowCount: 1000,
-                columnCount: DB_CONFIG.HEADERS.length, // 9カラム対応
+                columnCount: DB_CONFIG.HEADERS.length, // 14カラム対応
               },
             },
           },
@@ -1125,7 +1221,7 @@ function initializeDatabaseSheet(spreadsheetId) {
 
       // 2. 作成直後にヘッダーを追加（A1記法でレンジを指定）
       const headerRange =
-        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:I1 (9カラム対応)
+        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:N1 (14カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
 
       console.log(
@@ -1134,7 +1230,7 @@ function initializeDatabaseSheet(spreadsheetId) {
     } else {
       // シートが既に存在する場合は、ヘッダーのみ更新（既存動作を維持）
       const headerRange =
-        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:I1 (9カラム対応)
+        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:N1 (14カラム対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
     }
   } catch (e) {
@@ -1696,7 +1792,7 @@ function diagnoseDatabase(targetUserId) {
 
     // 4. ユーザーデータ取得テスト
     try {
-      const data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:I"]);
+      const data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:N"]);
       const values = data.valueRanges[0].values || [];
 
       diagnosticResult.checks.userData = {
@@ -2113,7 +2209,7 @@ function performDataIntegrityCheck(options = {}) {
     }
 
     const service = getSheetsServiceCached();
-    const data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:I"]);
+    const data = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A:N"]);
     const values = data.valueRanges[0].values || [];
 
     if (values.length <= 1) {
@@ -2699,7 +2795,7 @@ function performPerformanceCheck() {
 
     if (dbId) {
       const service = getSheetsServiceCached();
-      const testData = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A1:B1"]);
+      const testData = batchGetSheetsData(service, dbId, ["'" + DB_CONFIG.SHEET_NAME + "'!A1:N1"]);
       perfResult.benchmarks.databaseAccess = Date.now() - dbTestStart;
       perfResult.metrics.apiCallCount++;
     }
