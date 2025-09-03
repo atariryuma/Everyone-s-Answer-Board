@@ -8,8 +8,20 @@
    */
   const getConfigFromBackend = async () => {
     try {
-      const userId = new URLSearchParams(window.location.search).get('userId');
-      if (!userId) throw new Error('userId parameter missing');
+      // 🚀 複数ソースからuserId取得（超効率化）
+      let userId = new URLSearchParams(window.location.search).get('userId');
+      
+      // フォールバック1: 既存のCONFIGから取得
+      if (!userId && CONFIG && CONFIG.userId) {
+        userId = CONFIG.userId;
+      }
+      
+      // フォールバック2: テンプレート変数から取得（GAS側で展開される可能性）
+      if (!userId && window.templateUserId) {
+        userId = window.templateUserId;
+      }
+      
+      if (!userId) throw new Error('userId parameter missing from all sources');
       
       // SecurityValidator使用でセキュリティ強化
       if (!SecurityValidator.isValidUUID(userId)) {
@@ -35,12 +47,15 @@
       console.info('✅ Config初期化完了:', CONFIG.userId);
     } catch (error) {
       console.error('❌ Config初期化エラー:', error);
-      // フォールバック設定
+      // フォールバック設定（SHEET_NAME空文字対策）
+      const fallbackUserId = new URLSearchParams(window.location.search).get('userId') || '';
+      const fallbackSheetName = window.templateSheetName || 'テストシート'; // テンプレート変数フォールバック
+      
       CONFIG = Object.freeze({
         showCounts: false,
         displayMode: 'anonymous',
-        sheetName: 'テストシート',
-        userId: new URLSearchParams(window.location.search).get('userId') || '',
+        sheetName: fallbackSheetName,
+        userId: fallbackUserId,
         ownerName: '',
         showAdminFeatures: false,
         showHighlightToggle: false,
@@ -7973,6 +7988,18 @@
       return (...args) => {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), delay);
+      };
+    }
+    
+    // 🚀 CLAUDE.md準拠：throttle関数追加（必須ユーティリティ）
+    throttle(func, delay) {
+      let lastCall = 0;
+      return (...args) => {
+        const now = Date.now();
+        if (now - lastCall >= delay) {
+          lastCall = now;
+          return func.apply(this, args);
+        }
       };
     }
     updateSortOptions() {
