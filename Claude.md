@@ -7,9 +7,9 @@
 
 # ⚠️ システム破壊防止ルール（これを破ると全システム停止）
 
-## 🚨 絶対遵守：configJSON中心型データベーススキーマ（最新版：5項目に最適化）
+## 🚨 絶対遵守：configJSON中心型データベーススキーマ（5フィールド構造）
 - ✅ **唯一使用**: `database.gs` の `DB_CONFIG`
-- ✅ **超効率化構造**（14項目→5項目に64%削減、パフォーマンス50%向上）: 
+- ✅ **最適化構造**（5フィールドでconfigJSON中心設計、パフォーマンス大幅向上）: 
 ```javascript
 const DB_CONFIG = Object.freeze({
   SHEET_NAME: 'Users',
@@ -51,10 +51,10 @@ const DB_CONFIG = Object.freeze({
 ```
 
 ### 🚀 パフォーマンス最適化効果
-- **取得速度**: 60%向上（JSON一括読み込み）
-- **更新効率**: 70%向上（単一列更新）
-- **メモリ使用**: 40%削減（列数大幅減少）
-- **コード量**: 50%削減（複雑な列操作削除）
+- **取得速度**: 大幅向上（JSON一括読み込み）
+- **更新効率**: 大幅向上（configJSON単一更新）
+- **メモリ使用**: 削減（シンプル構造）
+- **コード量**: 削減（統一データソース化）
 
 ## 🎯 必須定数（src/constants.gs）
 ### システム全体の統一定数
@@ -261,7 +261,7 @@ const SECURITY = Object.freeze({
 ```
 /src/
 ├── constants.gs         # システム定数（SYSTEM_CONSTANTS, CORE, PROPS_KEYS）
-├── database.gs          # DB操作（DB名前空間、最新9項目スキーマ）
+├── database.gs          # DB操作（DB名前空間、5フィールド構造）
 ├── main.gs             # エントリーポイント（doGet, Services名前空間）
 ├── auth.gs             # 認証管理（ユーザー登録、JWT）
 ├── security.gs         # セキュリティ（Service Account Token）
@@ -450,7 +450,7 @@ const DB = {
 
 ### 🎯 必須遵守項目（configJSON中心型）
 1. **`const`優先、`let`のみ許可、`var`禁止**  
-2. **🚀 5項目超効率データベーススキーマ使用必須**（`DB_CONFIG`準拠）
+2. **🚀 5フィールドデータベーススキーマ使用必須**（`DB_CONFIG`準拠）
 3. **⚡ configJSON統合型設計**: 全データをconfigJsonに統合、DB列アクセス禁止
 4. **🔥 統一データソース原則**: `config.spreadsheetId/sheetName`のみ使用（userInfo.列アクセス廃止）
 5. **📊 JSON一括処理**: 個別列更新禁止、configJson更新のみ許可
@@ -461,7 +461,7 @@ const DB = {
 
 ### 🆕 最新最適化機能
 - **testSchemaOptimization()**: データベース構造最適化テスト
-- **SystemManager.migrateToSimpleSchema()**: 14項目→9項目自動変換
+- **SystemManager.migrateToSimpleSchema()**: レガシー構造→5フィールド自動変換
 - **動的URL生成**: spreadsheetUrl/appUrlの効率化
 - **プライバシー重視**: displaySettings デフォルトfalse
 
@@ -474,7 +474,7 @@ const DB = {
 
 /**
  * ⚡ 新機能の実装例（超効率化版）
- * 5項目スキーマ、configJSON中心型、60%高速化実現
+ * 5フィールドスキーマ、configJSON中心型、高速化実現
  */
 
 // モジュール設定（CORE参照）
@@ -611,7 +611,7 @@ npm run deploy
 # 📊 システム整合性チェック結果（2025年3月最新版）
 
 ## 🚀 最新の最適化達成状況
-- **データベース構造最適化**: ✅ **14項目→9項目（36%削減）完了**
+- **データベース構造最適化**: ✅ **5フィールド構造完了**
 - **SystemManager.gs統合**: ✅ **分散機能の完全統合達成**
 - **ConfigOptimizer.gs削除**: ✅ **重複排除完了**
 - **管理画面簡素化**: ✅ **3段階→2段階、appName削除完了**
@@ -622,17 +622,17 @@ npm run deploy
 - **const使用率**: **100%** - 全ファイルでconst/letのみ使用
 - **var残存**: **0件** ✅ **完全削除維持**（194件→0件）
 - **統一データソース**: ✅ **完全実装**（userInfo.spreadsheetId/sheetName）
-- **データベース最適化**: ✅ **36%削減達成**（14項目→9項目）
+- **データベース最適化**: ✅ **5フィールド構造達成**（configJSON中心設計）
 
 ## 🎯 CLAUDE.md規範 100%達成 + 最適化拡張
-1. **データベースシンプル化**: ✅ **36%削減** - 最適化済み9項目構造
+1. **データベースシンプル化**: ✅ **5フィールド構造** - configJSON中心設計
 2. **機能統合管理**: ✅ **SystemManager.gs** - テスト・最適化・診断の統合
 3. **設定統合**: ✅ **configJson中心** - 重複項目の完全統合
 4. **UI簡素化**: ✅ **2段階管理画面** - UX向上とappName削除
 5. **プライバシー重視**: ✅ **デフォルトOFF** - 心理的安全性向上
 
 ## ✅ 完全適合 + 最適化済み項目  
-1. **データベーススキーマ**: ✅ **最新9項目**構造で完全一致
+1. **データベーススキーマ**: ✅ **5フィールド**構造で完全一致
 2. **SystemManager統合**: ✅ **分散機能の一元管理**達成
 3. **configJson統合**: ✅ **全設定の中央管理**実装
 4. **動的生成**: ✅ **URL項目の効率化**実装

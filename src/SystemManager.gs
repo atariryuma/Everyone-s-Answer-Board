@@ -50,7 +50,7 @@ function testDatabaseMigration() {
 }
 
 /**
- * データベース構造最適化テスト（14項目→9項目）
+ * データベース構造最適化テスト（現在：5フィールド構造）
  * GASエディタから直接実行可能
  * @returns {Object} 最適化結果
  */
@@ -551,12 +551,12 @@ const SystemManager = {
 
   /**
    * データベース構造を最適化（重複項目削除）
-   * 14項目 → 9項目に簡素化
+   * レガシー構造 → 5フィールド構造に簡素化
    * @returns {Object} 最適化結果
    */
   migrateToSimpleSchema() {
     try {
-      console.info('🔄 データベース構造最適化開始（14項目→9項目）');
+      console.info('🔄 データベース構造最適化開始（5フィールド構造確認）');
       
       const allUsers = DB.getAllUsers();
       const results = {

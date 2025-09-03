@@ -1248,7 +1248,7 @@ function initializeDatabaseSheet(spreadsheetId) {
               title: sheetName,
               gridProperties: {
                 rowCount: 1000,
-                columnCount: DB_CONFIG.HEADERS.length, // 14カラム対応
+                columnCount: DB_CONFIG.HEADERS.length, // 5フィールド対応
               },
             },
           },
@@ -1260,7 +1260,7 @@ function initializeDatabaseSheet(spreadsheetId) {
 
       // 2. 作成直後にヘッダーを追加（A1記法でレンジを指定）
       const headerRange =
-        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:N1 (14カラム対応)
+        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:E1 (5フィールド対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
 
       console.log(
@@ -1269,7 +1269,7 @@ function initializeDatabaseSheet(spreadsheetId) {
     } else {
       // シートが既に存在する場合は、ヘッダーのみ更新（既存動作を維持）
       const headerRange =
-        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:N1 (14カラム対応)
+        "'" + sheetName + "'!A1:" + String.fromCharCode(65 + DB_CONFIG.HEADERS.length - 1) + '1'; // A1:E1 (5フィールド対応)
       updateSheetsData(service, spreadsheetId, headerRange, [DB_CONFIG.HEADERS]);
     }
   } catch (e) {
