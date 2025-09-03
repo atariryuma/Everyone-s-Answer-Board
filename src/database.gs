@@ -42,99 +42,14 @@ let userIndexCache = {
 const DB = {
   /**
    * データベース構造を9列から14列に移行する
+   * ⚠️ この関数は SystemManager.gs に移行されました ⚠️
    * @returns {Object} 移行結果
+   * @deprecated SystemManager.optimizeDatabaseConfigJson() を使用してください
    */
-  migrateDatabaseTo14Columns: function() {
-    try {
-      console.info('📊 データベース移行開始: 9列→14列');
-      
-      const dbId = getSecureDatabaseId();
-      const service = getSheetsServiceCached();
-      const sheetName = DB_CONFIG.SHEET_NAME;
-      
-      // 現在のデータを取得 (A:I = 9列)
-      const currentData = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:I`]);
-      const values = currentData.valueRanges[0].values || [];
-      
-      if (values.length === 0) {
-        console.warn('📊 移行対象データが存在しません');
-        return { success: false, reason: '移行対象データが存在しません' };
-      }
-      
-      // ヘッダー行の確認と更新
-      const currentHeaders = values[0] || [];
-      const targetHeaders = DB_CONFIG.HEADERS;
-      
-      console.info('📊 現在のヘッダー:', currentHeaders);
-      console.info('📊 目標ヘッダー:', targetHeaders);
-      
-      // ヘッダー行を14列に拡張
-      const headerRange = `'${sheetName}'!A1:${String.fromCharCode(65 + targetHeaders.length - 1)}1`;
-      updateSheetsData(service, dbId, headerRange, [targetHeaders]);
-      
-      // データ行の移行処理
-      if (values.length > 1) {
-        const dataRows = values.slice(1);
-        const migratedRows = [];
-        
-        for (const row of dataRows) {
-          const migratedRow = new Array(14);
-          
-          // 既存の9列をコピー
-          for (let i = 0; i < Math.min(row.length, 9); i++) {
-            migratedRow[i] = row[i] || '';
-          }
-          
-          // 不足している列を補完
-          const configJson = migratedRow[7]; // configJsonは8番目の列 (index 7)
-          let parsedConfig = {};
-          
-          if (configJson) {
-            try {
-              parsedConfig = JSON.parse(configJson);
-            } catch (e) {
-              console.warn('📊 configJson解析エラー:', e.message);
-            }
-          }
-          
-          // 9列目以降を補完
-          migratedRow[8] = migratedRow[8] || parsedConfig.formUrl || ''; // formUrl
-          migratedRow[9] = migratedRow[9] || parsedConfig.sheetName || migratedRow[1] || ''; // sheetName
-          migratedRow[10] = migratedRow[10] || JSON.stringify(parsedConfig.columnMapping || {}); // columnMappingJson
-          migratedRow[11] = migratedRow[11] || parsedConfig.publishedAt || ''; // publishedAt
-          migratedRow[12] = migratedRow[12] || parsedConfig.appUrl || ''; // appUrl
-          migratedRow[13] = migratedRow[13] || new Date().toISOString(); // lastModified
-          
-          migratedRows.push(migratedRow);
-        }
-        
-        // 拡張されたデータを書き込み
-        const dataRange = `'${sheetName}'!A2:${String.fromCharCode(65 + targetHeaders.length - 1)}${migratedRows.length + 1}`;
-        updateSheetsData(service, dbId, dataRange, migratedRows);
-        
-        console.info('📊 データベース移行完了:', {
-          処理行数: migratedRows.length,
-          移行前列数: currentHeaders.length,
-          移行後列数: targetHeaders.length
-        });
-      }
-      
-      // 移行完了後にキャッシュをクリア
-      userIndexCache.byUserId.clear();
-      userIndexCache.byEmail.clear();
-      userIndexCache.lastUpdate = 0;
-      
-      return {
-        success: true,
-        migratedRows: values.length - 1,
-        fromColumns: currentHeaders.length,
-        toColumns: targetHeaders.length
-      };
-      
-    } catch (error) {
-      console.error('📊 データベース移行エラー:', error.message);
-      throw new Error(`データベース移行に失敗しました: ${error.message}`);
-    }
+  migrateDatabaseTo14Columns: function () {
+    console.error('⚠️ migrateDatabaseTo14Columns は SystemManager.gs に移動しました。');
+    console.error('   新しい関数: testDatabaseMigration() を使用してください');
+    throw new Error('この関数は SystemManager.gs に移動しました');
   },
   /**
    * ユーザーを作成する
@@ -1717,10 +1632,17 @@ function updateSheetsData(service, spreadsheetId, range, values) {
 
 /**
  * データベース状態を詳細確認する診断機能
+ * ⚠️ この関数は SystemManager.gs に移行されました ⚠️
  * @param {string} targetUserId - 確認対象のユーザーID（オプション）
  * @returns {object} データベース診断結果
+ * @deprecated SystemManager.checkSetupStatus() または testSystemDiagnosis() を使用してください
  */
 function diagnoseDatabase(targetUserId) {
+  console.error('⚠️ diagnoseDatabase は SystemManager.gs に移動しました。');
+  console.error('   新しい関数: testSystemDiagnosis() を使用してください');
+  throw new Error('この関数は SystemManager.gs に移動しました');
+
+  // 以下は旧実装（参考用）
   try {
     const props = PropertiesService.getScriptProperties();
     const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
@@ -2138,12 +2060,9 @@ function performAutoRepair(targetUserId) {
     // 4. 修復後の検証
     try {
       Utilities.sleep(2000); // 少し待機
-      const postRepairDiagnosis = diagnoseDatabase(targetUserId);
+      const postRepairDiagnosis = SystemManager.checkSetupStatus();
 
-      if (
-        postRepairDiagnosis.summary.overallStatus === 'healthy' ||
-        postRepairDiagnosis.summary.overallStatus === 'warning'
-      ) {
+      if (postRepairDiagnosis.isComplete) {
         repairResult.success = true;
         repairResult.summary = '修復成功: システム状態が改善されました';
       } else {
@@ -2685,13 +2604,13 @@ function performHealthCheck() {
 
   // データベース接続チェック
   try {
-    const diagnosis = diagnoseDatabase();
+    const diagnosis = SystemManager.checkSetupStatus();
     healthResult.checks.database = {
-      status: diagnosis.summary.overallStatus === 'healthy' ? 'pass' : 'fail',
-      details: diagnosis.summary,
+      status: diagnosis.isComplete ? 'pass' : 'fail',
+      details: diagnosis,
     };
 
-    if (diagnosis.summary.overallStatus === 'healthy') {
+    if (diagnosis.isComplete) {
       healthResult.summary.passedChecks++;
     } else {
       healthResult.summary.failedChecks++;

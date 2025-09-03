@@ -487,9 +487,8 @@
 
         <!-- セットアップ進捗 -->
         <div class="setup-progress">
-          <div class="step current">1. データソース</div>
-          <div class="step">2. 列設定</div>
-          <div class="step">3. 公開設定</div>
+          <div class="step current">1. データソース設定</div>
+          <div class="step">2. 公開設定</div>
         </div>
         <!-- データソース選択カード -->
         <section class="card glass-panel rounded-xl p-6">
@@ -667,24 +666,7 @@
           </div>
         </section>
 
-        <!-- 表示設定カード -->
-        <section class="card glass-panel rounded-xl p-6">
-          <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
-          <div class="toggle-group">
-            <label class="toggle-switch">
-              <input type="checkbox" id="show-names" checked />
-              <span class="slider"></span>
-              回答者名を表示
-            </label>
-            <label class="toggle-switch">
-              <input type="checkbox" id="show-reactions" checked />
-              <span class="slider"></span>
-              リアクション数を表示
-            </label>
-          </div>
-        </section>
-
-        <!-- 公開カード -->
+        <!-- 公開設定カード（表示設定統合） -->
         <section class="card glass-panel rounded-xl p-6">
           <h2 class="text-xl font-semibold text-white mb-4">🚀 公開設定</h2>
           <div class="space-y-4">
@@ -692,12 +674,31 @@
               <span class="label">現在のステータス:</span>
               <span class="status-badge unpublished">未公開</span>
             </div>
-            <div class="form-group">
-              <label for="app-name" class="block text-sm font-medium text-gray-300 mb-2"
-                >アプリケーション名:</label
-              >
-              <input type="text" id="app-name" placeholder="例: クラス質問ボード" class="w-full" />
+            
+            <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
+            <div class="mb-4">
+              <h3 class="text-lg font-medium text-gray-300 mb-3">⚙️ 表示設定</h3>
+              <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-yellow-400">🔒</span>
+                  <span class="text-sm font-medium text-yellow-300">心理的安全性への配慮</span>
+                </div>
+                <p class="text-xs text-yellow-200">初期設定では回答者のプライバシーを保護しています。必要に応じて表示設定を調整してください。</p>
+              </div>
+              <div class="toggle-group">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="show-names" />
+                  <span class="slider"></span>
+                  回答者名を表示
+                </label>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="show-reactions" />
+                  <span class="slider"></span>
+                  リアクション数を表示
+                </label>
+              </div>
             </div>
+            
             <div class="action-buttons">
               <button id="save-draft" class="btn-secondary" type="button">下書き保存</button>
               <button id="publish-now" class="btn-primary" type="button">今すぐ公開</button>

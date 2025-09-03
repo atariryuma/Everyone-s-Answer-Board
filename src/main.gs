@@ -105,10 +105,12 @@ function doGet(e) {
             userId: dbUserInfo?.userId,
             hasSpreadsheetId: !!dbUserInfo?.spreadsheetId,
             hasSheetName: !!dbUserInfo?.sheetName,
-            spreadsheetId: dbUserInfo?.spreadsheetId ? dbUserInfo.spreadsheetId.substring(0, 20) + '...' : 'null',
-            sheetName: dbUserInfo?.sheetName
+            spreadsheetId: dbUserInfo?.spreadsheetId
+              ? dbUserInfo.spreadsheetId.substring(0, 20) + '...'
+              : 'null',
+            sheetName: dbUserInfo?.sheetName,
           });
-          
+
           const compatUserInfo = {
             userId: params.userId,
             userEmail: accessResult.config?.userEmail || '',
@@ -898,8 +900,10 @@ function renderAnswerBoard(userInfo, params) {
     userId: userInfo.userId,
     hasSpreadsheetId: !!userInfo.spreadsheetId,
     hasSheetName: !!userInfo.sheetName,
-    spreadsheetIdStart: userInfo.spreadsheetId ? userInfo.spreadsheetId.substring(0, 20) + '...' : 'null',
-    sheetName: userInfo.sheetName
+    spreadsheetIdStart: userInfo.spreadsheetId
+      ? userInfo.spreadsheetId.substring(0, 20) + '...'
+      : 'null',
+    sheetName: userInfo.sheetName,
   });
 
   try {
@@ -936,19 +940,39 @@ function renderAnswerBoard(userInfo, params) {
     template.isPublished = hasUserConfig;
     template.appPublished = config.appPublished || false;
 
-    // __OPINION_HEADER__テンプレート変数を設定（エラー対策）
+    // __OPINION_HEADER__テンプレート変数を設定（configJson優先）
     let opinionHeader = 'お題'; // デフォルト値
     try {
-      if (finalSpreadsheetId && finalSheetName) {
+      // 1. configJsonからopinionHeaderを優先取得
+      if (config?.opinionHeader) {
+        opinionHeader = config.opinionHeader;
+        console.log('renderAnswerBoard: configJsonからopinionHeaderを取得:', opinionHeader);
+      } else if (finalSpreadsheetId && finalSheetName) {
+        // 2. 既存のgetHeaderIndices方式（フォールバック）
         const headerIndices = getHeaderIndices(finalSpreadsheetId, finalSheetName);
         opinionHeader = headerIndices?.opinionHeader || 'お題';
+        console.log('renderAnswerBoard: getHeaderIndicesからopinionHeaderを取得:', opinionHeader);
+
+        // 3. 取得したopinionHeaderをconfigJsonに保存（次回用の最適化）
+        if (headerIndices?.opinionHeader && userInfo?.userId) {
+          try {
+            const updatedConfig = { ...config, opinionHeader: headerIndices.opinionHeader };
+            DB.updateUser(userInfo.userId, {
+              configJson: JSON.stringify(updatedConfig),
+              lastModified: new Date().toISOString(),
+            });
+            console.log('renderAnswerBoard: opinionHeaderをconfigJsonに保存');
+          } catch (saveError) {
+            console.warn('renderAnswerBoard: configJson保存エラー:', saveError.message);
+          }
+        }
       }
     } catch (headerError) {
       console.warn('renderAnswerBoard: ヘッダー情報取得エラー:', headerError.message);
       opinionHeader = 'お題'; // フォールバック
     }
     template.__OPINION_HEADER__ = opinionHeader;
-    
+
     // StudyQuestApp用のユーザーID設定（エラー対策）
     template.USER_ID = userInfo.userId || '';
     template.SHEET_NAME = finalSheetName || '';
@@ -1497,63 +1521,6 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
 /**
  * セットアップテスト実行
  */
-function testSetup() {
-  try {
-    if (!isSystemSetup()) {
-      return {
-        status: 'error',
-        message: 'システムがセットアップされていません',
-      };
-    }
+// testSetup関数はSystemManager.gsに完全移行しました
 
-    // 基本的な動作確認
-    const properties = PropertiesService.getScriptProperties();
-    const adminEmail = properties.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-    const currentUserEmail = User.email();
-
-    if (adminEmail !== currentUserEmail) {
-      return {
-        status: 'warning',
-        message: '⚠️ テスト完了：現在のユーザーは管理者ではありません',
-      };
-    }
-
-    return {
-      status: 'success',
-      message: '✅ テスト完了：システムは正常に動作しています',
-    };
-  } catch (error) {
-    console.error('testSetup エラー:', error);
-    return {
-      status: 'error',
-      message: `テストに失敗しました: ${error.message}`,
-    };
-  }
-}
-
-/**
- * データベース移行処理のテスト実行関数
- * GASエディタから直接実行可能
- */
-function testDatabaseMigration() {
-  try {
-    console.info('📊 データベース移行テスト開始');
-    
-    const result = DB.migrateDatabaseTo14Columns();
-    
-    console.info('📊 移行結果:', result);
-    
-    return {
-      status: 'success',
-      message: '✅ データベース移行完了',
-      details: result
-    };
-    
-  } catch (error) {
-    console.error('📊 データベース移行テストエラー:', error.message);
-    return {
-      status: 'error', 
-      message: '❌ データベース移行エラー: ' + error.message
-    };
-  }
-}
+// testDatabaseMigration関数はSystemManager.gsに完全移行しました

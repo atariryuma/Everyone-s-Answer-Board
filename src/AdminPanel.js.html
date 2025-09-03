@@ -1600,7 +1600,7 @@
     }
 
     setLoading(true);
-    
+
     // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し
     google.script.run
       .withSuccessHandler(function (currentConfig) {
@@ -1618,15 +1618,15 @@
           showReactions: document.getElementById('show-reactions').checked,
           displaySettings: {
             showNames: document.getElementById('show-names').checked,
-            showReactions: document.getElementById('show-reactions').checked
-          }
+            showReactions: document.getElementById('show-reactions').checked,
+          },
         };
 
         console.log('📋 publishApp: 完全な設定でpublishApplication呼び出し', {
           hasFormUrl: !!publishConfig.formUrl,
           hasColumnMapping: !!publishConfig.columnMapping,
           hasSpreadsheetId: !!publishConfig.spreadsheetId,
-          hasSheetName: !!publishConfig.sheetName
+          hasSheetName: !!publishConfig.sheetName,
         });
 
         // 完全な設定でpublishApplicationを呼び出し

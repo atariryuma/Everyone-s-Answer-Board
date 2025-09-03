@@ -648,31 +648,48 @@ function connectDataSource(spreadsheetId, sheetName) {
       // 既存システム互換の列マッピングを作成
       const compatibleMapping = convertToCompatibleMapping(columnMapping, headerRow);
 
+      // 🎯 opinionHeaderを取得してconfigJsonに保存
+      const currentConfig = JSON.parse(userInfo.configJson || '{}');
+
+      // opinionHeader（問題文）を決定: 回答列のヘッダー名を使用
+      let opinionHeader = 'お題'; // デフォルト
+      if (columnMapping.answer && typeof columnMapping.answer === 'string') {
+        opinionHeader = columnMapping.answer; // 「質問への回答」など実際のヘッダー名
+      } else if (columnMapping.answer && typeof columnMapping.answer === 'number') {
+        // インデックスの場合は実際のヘッダー名を取得
+        opinionHeader = headerRow[columnMapping.answer] || 'お題';
+      }
+
+      // configJsonを更新（opinionHeader追加）
+      const updatedConfig = {
+        ...currentConfig,
+        sheetName: sheetName,
+        opinionHeader: opinionHeader, // 🎯 NEW: 問題文をconfigJsonに保存
+        columnMapping: columnMapping,
+        compatibleMapping: compatibleMapping,
+        lastConnected: new Date().toISOString(),
+        connectionMethod: 'dropdown_select',
+      };
+
       // ユーザーのスプレッドシート設定を更新（フォームURL含む）
       const updateData = {
         spreadsheetId: spreadsheetId,
-        sheetName: sheetName,
-        columnMapping: columnMapping, // AdminPanel用の形式
-        compatibleMapping: compatibleMapping, // Core.gs互換形式
-        lastConnected: new Date().toISOString(),
-        connectionMethod: 'dropdown_select',
+        configJson: JSON.stringify(updatedConfig), // 🎯 更新されたconfigJsonを保存
+        lastModified: new Date().toISOString(),
         missingColumnsHandled: missingColumnsResult,
       };
 
-      // フォーム情報がある場合、データベースに保存
+      // フォーム情報がある場合、configJsonに統合
       if (formInfo && formInfo.hasForm) {
-        // データベースのformUrl列に保存
-        const dbUpdateResult = updateUser(userInfo.userId, {
+        updatedConfig.formUrl = formInfo.formUrl;
+        updatedConfig.formTitle = formInfo.formTitle;
+        console.log('フォーム情報をconfigJsonに統合:', {
           formUrl: formInfo.formUrl,
-          lastAccessedAt: new Date().toISOString(),
+          formTitle: formInfo.formTitle,
         });
 
-        if (dbUpdateResult) {
-          console.log('フォームURL保存成功:', formInfo.formUrl);
-          updateData.formTitle = formInfo.formTitle;
-        } else {
-          console.warn('フォームURL保存失敗');
-        }
+        // configJsonを更新
+        updateData.configJson = JSON.stringify(updatedConfig);
       }
 
       updateUserSpreadsheetConfig(userInfo.userId, updateData);
@@ -1787,7 +1804,7 @@ function publishApplication(config) {
       hasColumnMapping: !!config.columnMapping,
       columnMappingKeys: config.columnMapping ? Object.keys(config.columnMapping) : [],
       formUrl: config.formUrl ? config.formUrl.substring(0, 50) + '...' : '(empty)',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // 公開状態設定
@@ -1798,7 +1815,6 @@ function publishApplication(config) {
 
     // 既存の公開システムを活用（簡略化）
     const publishResult = executeAppPublish(userInfo.userId, {
-      appName: config.appName,
       spreadsheetId: config.spreadsheetId,
       sheetName: config.sheetName,
       displaySettings: {
@@ -1816,7 +1832,9 @@ function publishApplication(config) {
         formUrl: config.formUrl || '(empty)',
         columnMapping: config.columnMapping || '(empty)',
         sheetName: config.sheetName,
-        spreadsheetId: config.spreadsheetId ? config.spreadsheetId.substring(0, 20) + '...' : '(empty)'
+        spreadsheetId: config.spreadsheetId
+          ? config.spreadsheetId.substring(0, 20) + '...'
+          : '(empty)',
       });
 
       // シンプルな保存処理: configをそのまま使用
@@ -1840,15 +1858,15 @@ function publishApplication(config) {
         hasFormUrl: !!updateData.formUrl,
       });
 
-      // シンプルなconfigJson構築: configをそのまま使用
+      // シンプルなconfigJson構築: configをそのまま使用（appName削除）
       const displayOnlyConfig = {
-        appName: config.appName,
         setupStatus: 'completed',
         appPublished: true,
         publishedAt: config.publishedAt,
-        displaySettings: config.displaySettings || { showNames: true, showReactions: true },
+        displaySettings: config.displaySettings || { showNames: false, showReactions: false }, // デフォルトを心理的安全性重視でfalseに変更
         appUrl: publishResult.appUrl,
         sheetName: config.sheetName,
+        opinionHeader: config.opinionHeader, // opinionHeaderを追加
         formUrl: config.formUrl || '',
         columnMapping: config.columnMapping || {},
         compatibleMapping: config.compatibleMapping,
@@ -1867,7 +1885,7 @@ function publishApplication(config) {
         columnMappingJson: updateData.columnMappingJson || '(empty)',
         sheetName: updateData.sheetName || '(empty)',
         appUrl: updateData.appUrl || '(empty)',
-        completeUpdateData: updateData
+        completeUpdateData: updateData,
       });
 
       // シンプルなデータベース更新実行
@@ -1879,7 +1897,7 @@ function publishApplication(config) {
         formUrlInDb: savedData?.formUrl || '(empty)',
         columnMappingJsonInDb: savedData?.columnMappingJson || '(empty)',
         sheetNameInDb: savedData?.sheetName || '(empty)',
-        appUrlInDb: savedData?.appUrl || '(empty)'
+        appUrlInDb: savedData?.appUrl || '(empty)',
       });
 
       // 公開後すぐにフッター情報を更新
@@ -2242,14 +2260,14 @@ function executeDataOptimization() {
   try {
     const targetUserId = '882d95c7-1fef-4739-a4b5-4ca02feaa69b';
 
-    if (typeof optimizeSpecificUser === 'function') {
-      const result = optimizeSpecificUser(targetUserId);
+    if (typeof SystemManager !== 'undefined' && SystemManager.optimizeUserConfigJson) {
+      const result = SystemManager.optimizeUserConfigJson(targetUserId);
       console.info('最適化結果:', result);
       return result;
     } else {
       return {
         success: false,
-        message: 'ConfigOptimizer.gs が読み込まれていません',
+        message: 'SystemManager.gs が読み込まれていません',
       };
     }
   } catch (error) {
