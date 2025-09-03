@@ -383,38 +383,33 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
   try {
-    // 🔧 修正：Sheets API未有効化対応 - 直接フォールバックを使用
+    // 🔧 修正：Sheets API未有効化対応 - 直接SpreadsheetAppを使用
     console.log('batchGetSheetsData: SpreadsheetApp直接使用（API未有効化対応）');
     
-    // フォールバック: 通常のSpreadsheetAppを使用（最優先）
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      const valueRanges = ranges.map(range => {
-        // シート名と範囲を分離
-        const match = range.match(/^'?([^'!]+)'?!(.+)$/);
-        if (match) {
-          const sheetName = match[1];
-          const rangeSpec = match[2];
-          const sheet = spreadsheet.getSheetByName(sheetName);
-          if (sheet) {
-            const values = sheet.getRange(rangeSpec).getValues();
-            return {
-              range,
-              values
-            };
-          }
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const valueRanges = ranges.map(range => {
+      // シート名と範囲を分離
+      const match = range.match(/^'?([^'!]+)'?!(.+)$/);
+      if (match) {
+        const sheetName = match[1];
+        const rangeSpec = match[2];
+        const sheet = spreadsheet.getSheetByName(sheetName);
+        if (sheet) {
+          const values = sheet.getRange(rangeSpec).getValues();
+          return {
+            range,
+            values
+          };
         }
-        return null;
-      }).filter(Boolean);
-      
-      return {
-        valueRanges
-      };
-    } catch (fallbackError) {
-      console.error('batchGetSheetsData SpreadsheetAppエラー:', fallbackError.message);
-      throw fallbackError;
-    }
+      }
+      return null;
+    }).filter(Boolean);
+    
+    return {
+      valueRanges
+    };
   } catch (error) {
-    console.error('batchGetSheetsData 全般エラー:', error.message);
+    console.error('batchGetSheetsData エラー:', error.message);
     throw error;
   }
 }
