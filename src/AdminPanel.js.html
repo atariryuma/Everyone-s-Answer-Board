@@ -1097,29 +1097,37 @@
       });
     });
 
+    // 🔧 実行状態管理変数
+    let isProcessingSpreadsheetSelection = false;
+    
     // スプレッドシート選択時
     document.getElementById('spreadsheet-select').addEventListener('change', function () {
-      const spreadsheetId = this.value;
-      const selectedText = this.options[this.selectedIndex]?.text || '';
+      // 重複実行防止
+      if (isProcessingSpreadsheetSelection) {
+        return;
+      }
       
-      console.log('📋 スプレッドシート選択イベント:', { 
-        spreadsheetId, 
-        hasValue: !!spreadsheetId,
-        selectedText,
-        timestamp: Date.now() 
-      });
+      const spreadsheetId = this.value;
       
       if (spreadsheetId) {
-        // 即座にユーザーフィードバックを表示
-        const sheetSelect = document.getElementById('sheet-select');
-        if (sheetSelect) {
-          sheetSelect.innerHTML = '<option value="">📄 シート読み込み中...</option>';
-          sheetSelect.classList.add('partial-loading-target');
-        }
+        isProcessingSpreadsheetSelection = true;
         
-        loadSheetList(spreadsheetId);
+        try {
+          // 即座にユーザーフィードバックを表示
+          const sheetSelect = document.getElementById('sheet-select');
+          if (sheetSelect) {
+            sheetSelect.innerHTML = '<option value="">📄 シート読み込み中...</option>';
+            sheetSelect.classList.add('partial-loading-target');
+          }
+          
+          loadSheetList(spreadsheetId);
+        } finally {
+          // 少し遅延させて次の処理を許可
+          setTimeout(() => {
+            isProcessingSpreadsheetSelection = false;
+          }, 100);
+        }
       } else {
-        console.log('⚠️ スプレッドシート未選択のためシート選択をリセット');
         const sheetSelect = document.getElementById('sheet-select');
         if (sheetSelect) {
           sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
@@ -1182,13 +1190,6 @@
 
   // シート一覧読み込み
   function loadSheetList(spreadsheetId) {
-    const spreadsheetSelect = document.getElementById('spreadsheet-select');
-    console.log('🔍 loadSheetList開始時状態:', {
-      spreadsheetId,
-      currentSpreadsheetValue: spreadsheetSelect?.value,
-      match: spreadsheetSelect?.value === spreadsheetId,
-      timestamp: Date.now()
-    });
     
     const select = document.getElementById('sheet-select');
     if (!select) {
@@ -1226,14 +1227,6 @@
         
         setPartialLoading(false);
         showSuccess(`✅ ${sheets?.length || 0}個のシートを読み込みました`);
-        
-        // 完了時の状態確認
-        const spreadsheetSelect = document.getElementById('spreadsheet-select');
-        console.log('🔍 loadSheetList完了時状態:', {
-          sheetOptionsCount: select.options.length,
-          spreadsheetValue: spreadsheetSelect?.value,
-          timestamp: Date.now()
-        });
       })
       .withFailureHandler(function (error) {
         console.error('❌ loadSheetList: シート読み込みエラー', {
