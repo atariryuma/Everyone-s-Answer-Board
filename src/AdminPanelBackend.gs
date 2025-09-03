@@ -1785,24 +1785,7 @@ function publishApplication(config) {
     config.appPublished = true;
     config.publishedAt = new Date().toISOString();
 
-    // 列マッピング情報を保護 - 既存データベースから取得して保持
-    let existingConfig = {};
-    try {
-      if (userInfo.configJson) {
-        existingConfig = JSON.parse(userInfo.configJson);
-      }
-    } catch (e) {
-      console.warn('publishApplication: 既存configJson解析エラー:', e.message);
-    }
-
-    // 列マッピングが設定に含まれていない場合、既存のものを保持
-    if (!config.columnMapping && existingConfig.columnMapping) {
-      console.log('publishApplication: 既存の列マッピングを保持');
-      config.columnMapping = existingConfig.columnMapping;
-      config.compatibleMapping = existingConfig.compatibleMapping;
-    }
-
-    // シンプルな列マッピング保存（重複検出ロジック削除）
+    // シンプルな処理: configをそのまま使用（保護ロジック削除）
 
     // 既存の公開システムを活用（簡略化）
     const publishResult = executeAppPublish(userInfo.userId, {
@@ -1816,46 +1799,26 @@ function publishApplication(config) {
     });
 
     if (publishResult.success) {
-      // 🔒 データ保護: 既存のデータベース情報を取得して保持
-      const currentUserData = DB.findUserById(userInfo.userId);
-      
-      // 🔒 重要データの保護ロジック: 既存データを優先、新規データで補完
-      const protectedFormUrl = currentUserData?.formUrl || config.formUrl || '';
-      let protectedColumnMapping = config.columnMapping || {};
-      
-      // connectDataSourceで保存した列マッピング情報を復元
-      if (currentUserData?.columnMappingJson && currentUserData.columnMappingJson !== '{}') {
-        try {
-          protectedColumnMapping = JSON.parse(currentUserData.columnMappingJson);
-        } catch (e) {
-          console.warn('🔒 columnMappingJson解析エラー:', e.message);
-        }
-      }
-      
-      // configJsonからも列マッピング情報を復元（connectDataSourceで保存）
-      if (existingConfig.columnMapping && Object.keys(protectedColumnMapping).length === 0) {
-        protectedColumnMapping = existingConfig.columnMapping;
-      }
-      
-      console.info('🔒 データ保護完了', {
-        existingFormUrl: !!currentUserData?.formUrl,
-        existingColumnMapping: !!(currentUserData?.columnMappingJson && currentUserData.columnMappingJson !== '{}'),
-        protectedFormUrl: !!protectedFormUrl,
-        protectedColumnMappingKeys: Object.keys(protectedColumnMapping)
+      // 📋 受け取ったconfigパラメータを完全ログ出力（問題特定用）
+      console.info('📋 publishApplication: 受け取ったconfig', {
+        configKeys: Object.keys(config),
+        hasFormUrl: !!config.formUrl,
+        hasColumnMapping: !!config.columnMapping,
+        formUrl: config.formUrl || '(empty)',
+        columnMapping: config.columnMapping || '(empty)',
+        sheetName: config.sheetName,
+        spreadsheetId: config.spreadsheetId ? config.spreadsheetId.substring(0, 20) + '...' : '(empty)'
       });
 
-      // CLAUDE.md準拠: DB_CONFIG.HEADERS準拠のデータベース更新
+      // シンプルな保存処理: configをそのまま使用
       const updateData = {
-        // 統一データソース: userInfo.spreadsheetIdが唯一の真実の源
         spreadsheetId: config.spreadsheetId,
         spreadsheetUrl: config.spreadsheetId
           ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`
           : '',
-
-        // 🔒 DB_CONFIG.HEADERS準拠のフィールド更新（データ保護適用）
-        formUrl: protectedFormUrl,
+        formUrl: config.formUrl || '',
         sheetName: config.sheetName,
-        columnMappingJson: JSON.stringify(protectedColumnMapping),
+        columnMappingJson: JSON.stringify(config.columnMapping || {}),
         publishedAt: config.publishedAt,
         appUrl: publishResult.appUrl,
         lastModified: new Date().toISOString(),
@@ -1868,8 +1831,7 @@ function publishApplication(config) {
         hasFormUrl: !!updateData.formUrl,
       });
 
-      // CLAUDE.md準拠: 統一データソース原則に基づく設定保存
-      // 🔒 保護されたデータをconfigJsonにも反映（完全同期）
+      // シンプルなconfigJson構築: configをそのまま使用
       const displayOnlyConfig = {
         appName: config.appName,
         setupStatus: 'completed',
@@ -1877,39 +1839,38 @@ function publishApplication(config) {
         publishedAt: config.publishedAt,
         displaySettings: config.displaySettings || { showNames: true, showReactions: true },
         appUrl: publishResult.appUrl,
-
-        // 🔒 重要: 保護されたデータを含める（データ損失防止）
         sheetName: config.sheetName,
-        formUrl: protectedFormUrl,
-        columnMapping: protectedColumnMapping,
-        compatibleMapping: config.compatibleMapping || existingConfig.compatibleMapping,
-        formTitle: config.formTitle || existingConfig.formTitle,
-        lastConnected: config.lastConnected || existingConfig.lastConnected,
-        connectionMethod: config.connectionMethod || existingConfig.connectionMethod,
-        missingColumnsHandled: config.missingColumnsHandled || existingConfig.missingColumnsHandled,
+        formUrl: config.formUrl || '',
+        columnMapping: config.columnMapping || {},
+        compatibleMapping: config.compatibleMapping,
+        formTitle: config.formTitle,
+        lastConnected: config.lastConnected,
+        connectionMethod: config.connectionMethod,
+        missingColumnsHandled: config.missingColumnsHandled,
       };
 
       updateData.configJson = JSON.stringify(displayOnlyConfig);
 
-      // CLAUDE.md準拠: データベース更新実行
+      // 📊 updateDataの完全ログ出力（問題特定用）
+      console.info('📊 publishApplication: 保存するupdateData', {
+        updateDataKeys: Object.keys(updateData),
+        formUrl: updateData.formUrl || '(empty)',
+        columnMappingJson: updateData.columnMappingJson || '(empty)',
+        sheetName: updateData.sheetName || '(empty)',
+        appUrl: updateData.appUrl || '(empty)',
+        completeUpdateData: updateData
+      });
+
+      // シンプルなデータベース更新実行
       const updateResult = updateUser(userInfo.userId, updateData);
 
-      // 🔍 保存後検証: データが正しく保存されたかを確認
-      const verificationData = DB.findUserById(userInfo.userId);
-      const verificationSuccess = {
-        formUrlSaved: !!(verificationData?.formUrl && verificationData.formUrl !== ''),
-        columnMappingSaved: !!(verificationData?.columnMappingJson && verificationData.columnMappingJson !== '{}'),
-        sheetNameSaved: !!(verificationData?.sheetName && verificationData.sheetName === config.sheetName),
-        appUrlSaved: !!(verificationData?.appUrl && verificationData.appUrl !== ''),
-      };
-
-      console.info('✅ publishApplication: データベース更新完了', {
-        userId: userInfo.userId,
-        spreadsheetId: updateData.spreadsheetId,
-        sheetName: updateData.sheetName,
-        appUrl: updateData.appUrl,
-        verification: verificationSuccess,
-        allDataSaved: Object.values(verificationSuccess).every(Boolean),
+      // 保存後の実際のデータベース状態をログ出力
+      const savedData = DB.findUserById(userInfo.userId);
+      console.info('📋 publishApplication: 保存後のデータベース状態', {
+        formUrlInDb: savedData?.formUrl || '(empty)',
+        columnMappingJsonInDb: savedData?.columnMappingJson || '(empty)',
+        sheetNameInDb: savedData?.sheetName || '(empty)',
+        appUrlInDb: savedData?.appUrl || '(empty)'
       });
 
       // 公開後すぐにフッター情報を更新
