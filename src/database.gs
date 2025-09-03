@@ -186,7 +186,7 @@ const DB = {
     }
 
     // キャッシュキーを生成
-    const cacheKey = `user_email_${  email}`;
+    const cacheKey = 'user_email_' + email;
 
     try {
       // キャッシュから取得を試行
@@ -281,7 +281,7 @@ const DB = {
     }
 
     // キャッシュキーを生成
-    const cacheKey = `user_id_${  userId}`;
+    const cacheKey = 'user_id_' + userId;
 
     try {
       // キャッシュから取得を試行
@@ -527,7 +527,7 @@ const DB = {
       const cache = CacheService.getScriptCache();
       cache.remove(`user_id_${  userId}`);
       if (userEmail) {
-        cache.remove(`user_email_${  userEmail}`);
+        cache.remove('user_email_' + userEmail);
       }
     } catch (error) {
       console.warn('キャッシュクリアエラー:', error.message);
@@ -746,7 +746,7 @@ const DB = {
       const cacheKeys = [
         `user_${userId}`,
         `userinfo_${userId}`,
-        `user_email_${userEmail}`,
+        'user_email_' + userEmail,
         `config_${userId}`,
         'all_users', // 全ユーザーリストキャッシュ
         'user_count'  // ユーザー数キャッシュ
