@@ -218,7 +218,7 @@ class ConfigurationManager {
   }
 
   /**
-   * 設定を更新
+   * 設定を更新（データベースフィールドとconfigJsonの両方を処理）
    * @param {string} userId ユーザーID
    * @param {Object} updates 更新内容
    * @return {boolean} 更新成功可否
@@ -227,13 +227,49 @@ class ConfigurationManager {
     const currentConfig = this.getUserConfig(userId);
     if (!currentConfig) return false;
 
+    // データベースフィールド（DB_CONFIG.HEADERS準拠）とconfigJson内フィールドを分離
+    const dbFields = ['spreadsheetId', 'spreadsheetUrl', 'formUrl', 'sheetName', 'columnMappingJson', 'publishedAt', 'appUrl', 'isActive'];
+    const dbUpdates = {};
+    const configUpdates = {};
+
+    // 更新データを分類
+    Object.entries(updates).forEach(([key, value]) => {
+      if (dbFields.includes(key)) {
+        dbUpdates[key] = value;
+      } else {
+        configUpdates[key] = value;
+      }
+    });
+
+    // configJsonの更新
     const updatedConfig = {
       ...currentConfig,
-      ...updates,
+      ...configUpdates,
       lastModified: new Date().toISOString(),
     };
 
-    return this.setUserConfig(userId, updatedConfig);
+    // データベース更新データを準備
+    const dbUpdateData = {
+      configJson: JSON.stringify(updatedConfig),
+      lastAccessedAt: new Date().toISOString(),
+      ...dbUpdates, // spreadsheetId等のDBフィールドを追加
+    };
+
+    try {
+      const updated = updateUser(userId, dbUpdateData);
+      if (updated) {
+        console.log('📋 updateUserConfig: データベースとconfigJson更新完了', {
+          userId,
+          dbFields: Object.keys(dbUpdates),
+          configFields: Object.keys(configUpdates),
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error(`updateUserConfig エラー (${userId}):`, error);
+      return false;
+    }
   }
 
   /**
