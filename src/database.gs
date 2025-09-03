@@ -116,7 +116,7 @@ const DB = {
           userId: userData.userId,
           userEmail: userData.userEmail,
           configJsonFields: Object.keys(configJson).length,
-          row: nextRow
+          row: newRow
         });
 
         return {
