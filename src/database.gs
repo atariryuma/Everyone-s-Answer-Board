@@ -409,6 +409,77 @@ const DB = {
       return ErrorManager.handleSafely(error, 'getAllUsers', []);
     }
   },
+
+  /**
+   * キャッシュを使わずにメールアドレスでユーザーを検索（ログイン専用）
+   * ログイン時の「はじめる」ボタンでは最新データを確実に取得するため
+   * @param {string} email - 検索対象のメールアドレス
+   * @returns {Object|null} ユーザー情報またはnull
+   */
+  findUserByEmailNoCache: function (email) {
+    if (!email || typeof email !== 'string') {
+      console.warn('findUserByEmailNoCache: 無効なメールアドレス', email);
+      return null;
+    }
+
+    console.info('🔄 findUserByEmailNoCache: キャッシュをバイパスしてDB直接検索', { email });
+
+    try {
+      // データベースから直接検索（キャッシュなし）
+      const service = getSheetsService();
+      const dbId = getSecureDatabaseId();
+      const sheetName = DB_CONFIG.SHEET_NAME;
+
+      // シート全体のデータを取得
+      const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!A:N`]);
+
+      if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
+        console.warn('findUserByEmailNoCache: データベースからデータを取得できませんでした');
+        return null;
+      }
+
+      const rows = data.valueRanges[0].values;
+      if (rows.length < 2) {
+        console.info('findUserByEmailNoCache: ユーザーデータがありません');
+        return null;
+      }
+
+      const headers = rows[0];
+      const userRows = rows.slice(1);
+
+      // メールアドレスでユーザーを検索
+      const emailIndex = headers.indexOf('userEmail');
+      if (emailIndex === -1) {
+        console.error('findUserByEmailNoCache: userEmailカラムが見つかりません');
+        return null;
+      }
+
+      for (const row of userRows) {
+        if (row[emailIndex] === email) {
+          // ユーザーオブジェクトを構築
+          const user = {};
+          headers.forEach((header, index) => {
+            user[header] = row[index] || '';
+          });
+
+          console.info('✅ findUserByEmailNoCache: ユーザー発見（キャッシュバイパス）', {
+            email,
+            userId: user.userId,
+            timestamp: new Date().toISOString()
+          });
+
+          return user;
+        }
+      }
+
+      console.info('findUserByEmailNoCache: ユーザーが見つかりませんでした', { email });
+      return null;
+
+    } catch (error) {
+      console.error('findUserByEmailNoCache エラー:', error.message);
+      return ErrorManager.handleSafely(error, 'findUserByEmailNoCache', null);
+    }
+  },
 };
 
 /**

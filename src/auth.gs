@@ -79,10 +79,18 @@ function createRedirect(url) {
 /**
  * 統一ユーザー登録処理
  * @param {string} userEmail ユーザーメールアドレス
+ * @param {boolean} bypassCache キャッシュをバイパスするか（ログイン時true推奨）
  * @returns {Object} ユーザー情報
  */
-function handleUserRegistration(userEmail) {
-  const existingUser = DB.findUserByEmail(userEmail);
+function handleUserRegistration(userEmail, bypassCache = false) {
+  // ログイン時（はじめるボタン）はキャッシュをバイパスして最新データを取得
+  const existingUser = bypassCache ? 
+    DB.findUserByEmailNoCache(userEmail) : 
+    DB.findUserByEmail(userEmail);
+  
+  if (bypassCache) {
+    console.info('🔄 handleUserRegistration: キャッシュバイパスモード', { userEmail });
+  }
 
   if (existingUser) {
     // 既存ユーザー: 最終アクセス時刻のみ更新
@@ -110,8 +118,9 @@ function processLoginFlow(userEmail) {
       throw new Error('ユーザーメールアドレスが指定されていません');
     }
 
-    // 1. ユーザー情報をデータベースから取得
-    const userInfo = DB.findUserByEmail(userEmail);
+    // 1. ユーザー情報をデータベースから直接取得（ログイン時はキャッシュバイパス）
+    const userInfo = DB.findUserByEmailNoCache(userEmail);
+    console.info('🔄 processLoginFlow: キャッシュバイパスでユーザー検索', { userEmail });
 
     // 2. 既存ユーザーの処理
     if (userInfo) {
@@ -150,7 +159,7 @@ function processLoginFlow(userEmail) {
 
       try {
         // 統一ユーザー作成関数を使用
-        const newUser = handleUserRegistration(userEmail);
+        const newUser = handleUserRegistration(userEmail, true); // ログイン時はキャッシュバイパス
 
         console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
 

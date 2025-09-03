@@ -281,8 +281,8 @@ function registerNewUser(userEmail) {
     console.info('registerNewUser: 新ユーザー作成');
 
     try {
-      // 統一ユーザー作成関数を使用
-      const newUser = handleUserRegistration(sanitizedEmail);
+      // 統一ユーザー作成関数を使用（ログイン時はキャッシュバイパス）
+      const newUser = handleUserRegistration(sanitizedEmail, true);
 
       console.info('✅ registerNewUser: New user created successfully', {
         userEmail: sanitizedEmail,
