@@ -101,6 +101,14 @@ function doGet(e) {
 
           // ユーザー情報変換（DBからの完全なユーザー情報を取得）
           const dbUserInfo = DB.findUserById(params.userId);
+          console.log('doGet - dbUserInfo:', {
+            userId: dbUserInfo?.userId,
+            hasSpreadsheetId: !!dbUserInfo?.spreadsheetId,
+            hasSheetName: !!dbUserInfo?.sheetName,
+            spreadsheetId: dbUserInfo?.spreadsheetId ? dbUserInfo.spreadsheetId.substring(0, 20) + '...' : 'null',
+            sheetName: dbUserInfo?.sheetName
+          });
+          
           const compatUserInfo = {
             userId: params.userId,
             userEmail: accessResult.config?.userEmail || '',
@@ -886,6 +894,13 @@ function renderAnswerBoard(userInfo, params) {
 
   console.log('renderAnswerBoard - userId:', userInfo.userId);
   console.log('renderAnswerBoard - mode:', params.mode);
+  console.log('renderAnswerBoard - userInfo:', {
+    userId: userInfo.userId,
+    hasSpreadsheetId: !!userInfo.spreadsheetId,
+    hasSheetName: !!userInfo.sheetName,
+    spreadsheetIdStart: userInfo.spreadsheetId ? userInfo.spreadsheetId.substring(0, 20) + '...' : 'null',
+    sheetName: userInfo.sheetName
+  });
 
   try {
     // 既存のPage.htmlテンプレートを使用
