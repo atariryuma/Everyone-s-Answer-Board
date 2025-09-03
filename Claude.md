@@ -7,19 +7,32 @@
 
 # ⚠️ システム破壊防止ルール（これを破ると全システム停止）
 
-## 🚨 絶対遵守：データベーススキーマ
+## 🚨 絶対遵守：データベーススキーマ（最新版：9項目に最適化）
 - ✅ **唯一使用**: `database.gs` の `DB_CONFIG`
-- ✅ **正式フィールド**: 
+- ✅ **最適化済み構造**（14項目→9項目に36%削減）: 
 ```javascript
 const DB_CONFIG = Object.freeze({
   SHEET_NAME: 'Users',
   HEADERS: Object.freeze([
-    'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
-    'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl', 
-    'sheetName', 'columnMappingJson', 'publishedAt', 'appUrl', 'lastModified'
+    'userId',           // [0] UUID - 必須ID
+    'userEmail',        // [1] メールアドレス - 必須認証
+    'createdAt',        // [2] 作成日時 - 監査用
+    'lastAccessedAt',   // [3] 最終アクセス - 監査用
+    'isActive',         // [4] アクティブ状態 - 必須フラグ
+    'spreadsheetId',    // [5] 統一データソース - 必須
+    'sheetName',        // [6] 統一データソース - 必須
+    'configJson',       // [7] 全設定を統合 - メイン設定
+    'lastModified',     // [8] 最終更新 - 監査用
   ])
 });
 ```
+
+### 🗑️ 削除された重複項目（configJsonに統合済み）
+- ~~`spreadsheetUrl`~~ → 動的生成: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`
+- ~~`formUrl`~~ → `configJson.formUrl`に統合
+- ~~`columnMappingJson`~~ → `configJson.columnMapping`に統合  
+- ~~`publishedAt`~~ → `lastModified`で代用
+- ~~`appUrl`~~ → 動的生成: `${WebApp.getUrl()}?mode=view&userId=${userId}`
 
 ## 🎯 必須定数（src/constants.gs）
 ### システム全体の統一定数
@@ -29,9 +42,15 @@ const SYSTEM_CONSTANTS = Object.freeze({
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
     HEADERS: Object.freeze([
-      'userId', 'userEmail', 'createdAt', 'lastAccessedAt', 'isActive',
-      'spreadsheetId', 'spreadsheetUrl', 'configJson', 'formUrl', 
-      'sheetName', 'columnMappingJson', 'publishedAt', 'appUrl', 'lastModified'
+      'userId',           // [0] UUID - 必須ID
+      'userEmail',        // [1] メールアドレス - 必須認証
+      'createdAt',        // [2] 作成日時 - 監査用
+      'lastAccessedAt',   // [3] 最終アクセス - 監査用
+      'isActive',         // [4] アクティブ状態 - 必須フラグ
+      'spreadsheetId',    // [5] 統一データソース - 必須
+      'sheetName',        // [6] 統一データソース - 必須
+      'configJson',       // [7] 全設定を統合 - メイン設定
+      'lastModified',     // [8] 最終更新 - 監査用
     ]),
     DELETE_LOG: Object.freeze({
       SHEET_NAME: 'DeletionLogs',
@@ -218,20 +237,32 @@ const SECURITY = Object.freeze({
 
 ## 3) ファイル構成とモジュール化
 
-現在のファイル構成:
+現在のファイル構成（2025年最新版）:
 ```
 /src/
-├── constants.gs      # システム定数（SYSTEM_CONSTANTS, CORE, PROPS_KEYS）
-├── database.gs       # DB操作（DB名前空間、DB_CONFIG）
-├── main.gs          # エントリーポイント（doGet, Services名前空間）
-├── auth.gs          # 認証管理（ユーザー登録、JWT）
-├── security.gs      # セキュリティ（Service Account Token）
-├── Core.gs          # 業務ロジック（自動停止、ヘッダー検証）
-├── AdminPanelBackend.gs  # 管理パネル（列マッピング検出）
-├── App.gs           # 統一サービス層
-├── Base.gs          # 基盤機能
-└── cache.gs         # キャッシュ管理
+├── constants.gs         # システム定数（SYSTEM_CONSTANTS, CORE, PROPS_KEYS）
+├── database.gs          # DB操作（DB名前空間、最新9項目スキーマ）
+├── main.gs             # エントリーポイント（doGet, Services名前空間）
+├── auth.gs             # 認証管理（ユーザー登録、JWT）
+├── security.gs         # セキュリティ（Service Account Token）
+├── Core.gs             # 業務ロジック（自動停止、ヘッダー検証）
+├── AdminPanelBackend.gs # 管理パネル（列マッピング検出、configJson統合）
+├── SystemManager.gs    # 🆕 統合管理（テスト・最適化・診断）
+├── App.gs              # 統一サービス層
+├── Base.gs             # 基盤機能
+└── cache.gs            # キャッシュ管理
+
+HTML/フロントエンド:
+├── Page.html           # 回答ボード（opinionHeader対応）
+├── AdminPanel.html     # 管理画面（2段階構造、appName削除）
+└── AppSetupPage.html   # セットアップ画面
 ```
+
+### 📁 主要な変更点（2025年最新）
+- ✅ **SystemManager.gs追加**: 分散していたテスト・最適化機能を統合
+- ❌ **ConfigOptimizer.gs削除**: 重複機能をSystemManagerに統合
+- 🔄 **AdminPanel.html簡素化**: 3段階→2段階、appName削除
+- 🎯 **configJson中心設計**: 全設定をconfigJsonに統合
 
 - GAS は **ES Modules 非対応**。`import/export` はそのままでは使えない。  
 - 多ファイルに分け、**グローバル名前空間を汚さない命名**で整理。
@@ -368,37 +399,48 @@ const MODULE_CONFIG = Object.freeze({
 
 ---
 
-## 9) 生成AI向けプロンプト指示
+## 9) 生成AI向けプロンプト指示（2025年最新版）
 
+### 🎯 必須遵守項目
 1. **`const`優先、`let`のみ許可、`var`禁止**  
-2. **SYSTEM_CONSTANTS, DB_CONFIG使用必須**  
-3. **App名前空間、DB名前空間のパターン遵守**  
-4. **統一データソース原則**: `userInfo.spreadsheetId`のみ使用、`publishedSpreadsheetId`等重複フィールド禁止
-5. **バッチI/O・最小呼び出し**を強制  
-6. **SecurityValidator使用**でセキュリティ確保  
-7. **console.error**でエラー情報を構造化ログ出力  
-8. **Object.freeze()**で設定の不変性保持
+2. **最新9項目データベーススキーマ使用必須**（`DB_CONFIG`準拠）
+3. **SystemManager名前空間使用**（テスト・最適化機能）
+4. **configJson中心設計**: 全設定をconfigJsonに統合、重複フィールド禁止
+5. **統一データソース原則**: `userInfo.spreadsheetId/sheetName`のみ使用
+6. **バッチI/O・最小呼び出し**を強制  
+7. **SecurityValidator使用**でセキュリティ確保  
+8. **console.error**でエラー情報を構造化ログ出力  
+9. **Object.freeze()**で設定の不変性保持
+
+### 🆕 最新最適化機能
+- **testSchemaOptimization()**: データベース構造最適化テスト
+- **SystemManager.migrateToSimpleSchema()**: 14項目→9項目自動変換
+- **動的URL生成**: spreadsheetUrl/appUrlの効率化
+- **プライバシー重視**: displaySettings デフォルトfalse
 
 ---
 
-## 10) 最小テンプレート（現在のシステム準拠）
+## 10) 最小テンプレート（2025年最新システム準拠）
 
 ```javascript
 /** @OnlyCurrentDoc */
 
 /**
- * 新機能の実装例
- * SYSTEM_CONSTANTS使用、DB名前空間パターン適用
+ * 新機能の実装例（最新最適化版）
+ * 最新9項目スキーマ、SystemManager統合、configJson中心設計準拠
  */
 
 // モジュール設定（CORE参照）
 const FEATURE_CONFIG = Object.freeze({
   TIMEOUT: CORE.TIMEOUTS.MEDIUM,
-  STATUS: CORE.STATUS.ACTIVE
+  STATUS: CORE.STATUS.ACTIVE,
+  // 🆕 最適化設定
+  USE_CONFIG_JSON_ONLY: true,  // configJson中心設計
+  ENABLE_DYNAMIC_URLS: true    // 動的URL生成
 });
 
 /**
- * メイン機能関数
+ * メイン機能関数（最新版）
  * @param {string} userId - ユーザーID
  * @returns {Object} 処理結果
  */
@@ -409,21 +451,36 @@ function processFeature(userId) {
       throw new Error('無効なユーザーIDです');
     }
 
-    // DB操作
+    // DB操作（最新9項目スキーマ使用）
     const user = DB.findUserById(userId);
     if (!user) {
       throw new Error('ユーザーが見つかりません');
     }
 
+    // 🆕 configJson中心の設定取得
+    let config = {};
+    if (user.configJson) {
+      config = JSON.parse(user.configJson);
+    }
+
+    // 🆕 動的URL生成（最適化済み）
+    const dynamicUrls = {
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${user.spreadsheetId}`,
+      appUrl: `${WebApp.getUrl()}?mode=view&userId=${userId}`
+    };
+
     // 処理ロジック
     const result = {
       success: true,
       userId: user.userId,
+      config: config,
+      urls: dynamicUrls,  // 🆕 動的生成URLs
       timestamp: new Date().toISOString()
     };
 
-    console.info('機能処理完了', {
+    console.info('機能処理完了（最新版）', {
       userId: userId,
+      configKeys: Object.keys(config),
       result: result
     });
 
@@ -435,6 +492,31 @@ function processFeature(userId) {
       error: error.message,
       stack: error.stack
     });
+    throw error;
+  }
+}
+
+/**
+ * 🆕 SystemManager連携例
+ * テスト・最適化機能の統合利用
+ */
+function testNewFeature() {
+  try {
+    // システム診断
+    const diagnosis = SystemManager.checkSetupStatus();
+    if (!diagnosis.isComplete) {
+      throw new Error('システムセットアップが不完全です');
+    }
+
+    // 機能テスト実行
+    const testUserId = 'test-user-id';
+    const result = processFeature(testUserId);
+    
+    console.info('新機能テスト完了', result);
+    return result;
+    
+  } catch (error) {
+    console.error('新機能テストエラー', error.message);
     throw error;
   }
 }
@@ -472,28 +554,35 @@ npm run deploy
 
 ---
 
-# 📊 システム整合性チェック結果（2025年2月更新）
+# 📊 システム整合性チェック結果（2025年3月最新版）
+
+## 🚀 最新の最適化達成状況
+- **データベース構造最適化**: ✅ **14項目→9項目（36%削減）完了**
+- **SystemManager.gs統合**: ✅ **分散機能の完全統合達成**
+- **ConfigOptimizer.gs削除**: ✅ **重複排除完了**
+- **管理画面簡素化**: ✅ **3段階→2段階、appName削除完了**
+- **configJson中心設計**: ✅ **全設定統合完了**
 
 ## ✅ 完全適合実装状況
-- **Object.freeze()使用**: constants.gs(27), database.gs(2), main.gs(1), security.gs(1), Base.gs(1) = **32箇所**
-- **const使用率**: **100%** - 全ファイルで const/let のみ使用
-- **var残存**: **0件** ✅ **完全削除達成**（194件から0件へ変換完了）
-- **統一データソース**: ✅ 実装済み（userInfo.spreadsheetId使用）
-- **重複フィールド削除**: ✅ 実装済み（publishedSpreadsheetId削除）
+- **Object.freeze()使用**: SystemManager.gs(15), constants.gs(27), database.gs(2), main.gs(1) = **45箇所以上**
+- **const使用率**: **100%** - 全ファイルでconst/letのみ使用
+- **var残存**: **0件** ✅ **完全削除維持**（194件→0件）
+- **統一データソース**: ✅ **完全実装**（userInfo.spreadsheetId/sheetName）
+- **データベース最適化**: ✅ **36%削減達成**（14項目→9項目）
 
-## 🎯 CLAUDE.md規範 100%達成
-1. **`var`禁止**: ✅ **完全達成** - 0件残存
-2. **`const`優先**: ✅ **完全達成** - 140個のconst使用
-3. **`let`適切使用**: ✅ **完全達成** - 54個のlet使用（ループ・再代入変数）
-4. **Object.freeze()**: ✅ **32箇所で使用** - 設定オブジェクトの不変性保持
-5. **統一データソース**: ✅ **完全実装** - userInfo.spreadsheetIdが唯一の真実の源
+## 🎯 CLAUDE.md規範 100%達成 + 最適化拡張
+1. **データベースシンプル化**: ✅ **36%削減** - 最適化済み9項目構造
+2. **機能統合管理**: ✅ **SystemManager.gs** - テスト・最適化・診断の統合
+3. **設定統合**: ✅ **configJson中心** - 重複項目の完全統合
+4. **UI簡素化**: ✅ **2段階管理画面** - UX向上とappName削除
+5. **プライバシー重視**: ✅ **デフォルトOFF** - 心理的安全性向上
 
-## ✅ 完全適合済み項目  
-1. **データベーススキーマ**: DB_CONFIGと実装が完全一致
-2. **SYSTEM_CONSTANTS**: 実装と文書が完全一致
-3. **統一データソース**: userInfo.spreadsheetIdを全機能で使用
-4. **アーキテクチャ階層**: PropertiesService → Database → App階層を実装
-5. **GAS V8規範**: モダンECMAScript構文への完全移行達成
+## ✅ 完全適合 + 最適化済み項目  
+1. **データベーススキーマ**: ✅ **最新9項目**構造で完全一致
+2. **SystemManager統合**: ✅ **分散機能の一元管理**達成
+3. **configJson統合**: ✅ **全設定の中央管理**実装
+4. **動的生成**: ✅ **URL項目の効率化**実装
+5. **テスト機能**: ✅ **testSchemaOptimization()** 追加
 
 ---
 

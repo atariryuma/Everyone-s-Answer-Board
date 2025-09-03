@@ -1122,7 +1122,7 @@
           updateColumnMapping(result);
 
           // アプリケーション名自動生成
-          generateAndSetAppName(spreadsheetId, sheetName);
+          // アプリケーション名自動生成は削除（CLAUDE.md準拠）
 
           // 自動検出の信頼度をチェック
           if (result.columnMapping && result.columnMapping.confidence) {
@@ -1581,24 +1581,8 @@
       .saveDraftConfiguration(config);
   }
 
-  // アプリ公開
+  // アプリ公開（appName削除版）
   function publishApp() {
-    const appName = document.getElementById('app-name').value;
-    if (!appName.trim()) {
-      showError(
-        'アプリケーション名を入力してください。例：「クラス質問ボード」「理科実験アンケート」'
-      );
-      document.getElementById('app-name').focus();
-      return;
-    }
-
-    // 長すぎる名前をチェック
-    if (appName.trim().length > 50) {
-      showError('アプリケーション名は50文字以内で入力してください。');
-      document.getElementById('app-name').focus();
-      return;
-    }
-
     setLoading(true);
 
     // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し
@@ -1610,10 +1594,9 @@
           return;
         }
 
-        // UI設定を現在の設定に統合
+        // UI設定を現在の設定に統合（appName削除）
         const publishConfig = {
           ...currentConfig, // formUrl, columnMapping, spreadsheetId, sheetNameなど全て含む
-          appName: appName,
           showNames: document.getElementById('show-names').checked,
           showReactions: document.getElementById('show-reactions').checked,
           displaySettings: {
@@ -1968,41 +1951,5 @@
     document.body.removeChild(textarea);
   }
 
-  // アプリケーション名自動生成機能
-  function generateAndSetAppName(spreadsheetId, sheetName) {
-    const appNameInput = document.getElementById('app-name');
-
-    // 既に値が入力されている場合は上書きしない
-    if (appNameInput.value.trim()) {
-      return;
-    }
-
-    // スプレッドシート名を取得
-    const spreadsheetSelect = document.getElementById('spreadsheet-select');
-    const selectedOption = spreadsheetSelect.querySelector(`option[value="${spreadsheetId}"]`);
-    const spreadsheetName = selectedOption ? selectedOption.textContent : 'フォーム';
-
-    // アプリケーション名生成（重複防止）
-    let appName;
-
-    // スプレッドシート名が既に「回答ボード」で終わっているかチェック
-    if (spreadsheetName.endsWith('回答ボード')) {
-      // 既に「回答ボード」で終わっている場合は、そのまま使用
-      appName = spreadsheetName;
-    } else if (sheetName.includes('フォームの回答')) {
-      // "○○フォームの回答 7" → "○○回答ボード"
-      const baseName = spreadsheetName.replace(/フォーム$/, '').trim();
-      appName = `${baseName}回答ボード`;
-    } else if (sheetName.includes('回答')) {
-      // "回答" が含まれる場合
-      appName = `${spreadsheetName}回答ボード`;
-    } else {
-      // 汎用的な名前生成
-      appName = `${spreadsheetName} - ${sheetName}`;
-    }
-
-    // 生成したアプリケーション名を設定
-    appNameInput.value = appName;
-    console.log(`アプリケーション名自動生成: ${appName}`);
-  }
+  // アプリケーション名自動生成機能は削除（CLAUDE.md準拠）
 </script>

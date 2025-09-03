@@ -214,20 +214,15 @@ const SYSTEM_CONSTANTS = Object.freeze({
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
     HEADERS: Object.freeze([
-      'userId',
-      'userEmail',
-      'createdAt',
-      'lastAccessedAt',
-      'isActive',
-      'spreadsheetId',
-      'spreadsheetUrl',
-      'configJson',
-      'formUrl',
-      'sheetName',
-      'columnMappingJson',
-      'publishedAt',
-      'appUrl',
-      'lastModified',
+      'userId',           // [0] UUID - 必須ID
+      'userEmail',        // [1] メールアドレス - 必須認証
+      'createdAt',        // [2] 作成日時 - 監査用
+      'lastAccessedAt',   // [3] 最終アクセス - 監査用
+      'isActive',         // [4] アクティブ状態 - 必須フラグ
+      'spreadsheetId',    // [5] 統一データソース - 必須
+      'sheetName',        // [6] 統一データソース - 必須
+      'configJson',       // [7] 全設定を統合 - メイン設定
+      'lastModified',     // [8] 最終更新 - 監査用
     ]),
     DELETE_LOG: Object.freeze({
       SHEET_NAME: 'DeletionLogs',

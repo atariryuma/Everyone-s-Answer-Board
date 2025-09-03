@@ -50,6 +50,43 @@ function testDatabaseMigration() {
 }
 
 /**
+ * データベース構造最適化テスト（14項目→9項目）
+ * GASエディタから直接実行可能
+ * @returns {Object} 最適化結果
+ */
+function testSchemaOptimization() {
+  try {
+    console.info('🔄 データベース構造最適化テスト開始');
+    
+    // 構造最適化を実行
+    const result = SystemManager.migrateToSimpleSchema();
+    
+    console.info('🔄 最適化結果:', result);
+    
+    return {
+      status: result.status,
+      message: result.message,
+      details: result.details,
+      summary: {
+        削除項目: ['spreadsheetUrl', 'formUrl', 'columnMappingJson', 'publishedAt', 'appUrl'],
+        統合先: 'configJson',
+        新項目数: 9,
+        旧項目数: 14
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('🔄 データベース構造最適化テストエラー:', error.message);
+    return {
+      status: 'error',
+      message: '❌ データベース構造最適化テストエラー: ' + error.message,
+      error: error.stack
+    };
+  }
+}
+
+/**
  * システム全体の診断テスト
  * @returns {Object} 診断結果
  */
@@ -509,6 +546,104 @@ const SystemManager = {
     } catch (error) {
       console.error(`👤 ユーザー ${userId} の最適化エラー:`, error.message);
       return { success: false, userId: userId, error: error.message };
+    }
+  },
+
+  /**
+   * データベース構造を最適化（重複項目削除）
+   * 14項目 → 9項目に簡素化
+   * @returns {Object} 最適化結果
+   */
+  migrateToSimpleSchema() {
+    try {
+      console.info('🔄 データベース構造最適化開始（14項目→9項目）');
+      
+      const allUsers = DB.getAllUsers();
+      const results = {
+        totalUsers: allUsers.length,
+        migratedUsers: 0,
+        errors: [],
+        removedColumns: ['spreadsheetUrl', 'formUrl', 'columnMappingJson', 'publishedAt', 'appUrl'],
+        timestamp: new Date().toISOString()
+      };
+      
+      // 各ユーザーのconfigJsonを統合・移行
+      allUsers.forEach((user) => {
+        try {
+          let config = {};
+          
+          // 既存のconfigJsonをベースに
+          if (user.configJson) {
+            config = JSON.parse(user.configJson);
+          }
+          
+          // 重複項目をconfigJsonに統合
+          if (user.formUrl && !config.formUrl) {
+            config.formUrl = user.formUrl;
+          }
+          
+          if (user.columnMappingJson && !config.columnMapping) {
+            try {
+              config.columnMapping = JSON.parse(user.columnMappingJson);
+            } catch (e) {
+              console.warn(`columnMappingJson解析エラー (userId: ${user.userId}):`, e.message);
+            }
+          }
+          
+          // opinionHeaderの追加（未設定の場合）
+          if (!config.opinionHeader && config.columnMapping?.answer) {
+            config.opinionHeader = config.columnMapping.answer;
+          }
+          
+          // プライバシー設定のデフォルト化
+          if (!config.displaySettings) {
+            config.displaySettings = {
+              showNames: false,
+              showReactions: false
+            };
+          }
+          
+          // appNameの削除（不要）
+          delete config.appName;
+          
+          // 更新対象データ（新スキーマ項目のみ）
+          const updateData = {
+            configJson: JSON.stringify(config),
+            lastModified: new Date().toISOString()
+          };
+          
+          DB.updateUser(user.userId, updateData);
+          results.migratedUsers++;
+          
+        } catch (error) {
+          results.errors.push({
+            userId: user.userId,
+            userEmail: user.userEmail,
+            error: error.message
+          });
+        }
+      });
+      
+      console.info('🔄 データベース構造最適化完了:', {
+        総ユーザー数: results.totalUsers,
+        移行成功: results.migratedUsers,
+        エラー数: results.errors.length,
+        削除項目: results.removedColumns
+      });
+      
+      return {
+        status: 'success',
+        message: `✅ データベース構造最適化完了（${results.migratedUsers}/${results.totalUsers}ユーザー）`,
+        details: results
+      };
+      
+    } catch (error) {
+      console.error('🔄 データベース構造最適化エラー:', error.message);
+      return {
+        status: 'error', 
+        message: '❌ データベース構造最適化エラー: ' + error.message,
+        error: error.stack
+      };
     }
   },
 
