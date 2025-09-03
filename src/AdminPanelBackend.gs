@@ -104,6 +104,66 @@ function getCurrentConfig() {
 }
 
 /**
+ * 🎆 緊急回復用RPC関数 - メールアドレスベースで設定取得
+ * テンプレート変数展開失敗時のフォールバックとして使用
+ */
+function getCurrentConfigByEmail() {
+  try {
+    console.info('🎆 緊急回復: メールアドレスベースで設定取得開始');
+    
+    const currentUserEmail = User.email();
+    if (!currentUserEmail) {
+      throw new Error('アクティブユーザーのメールアドレスが取得できません');
+    }
+    
+    const userInfo = DB.findUserByEmail(currentUserEmail);
+    if (!userInfo) {
+      console.warn('緊急回復: ユーザー情報が見つかりません:', currentUserEmail);
+      return {
+        error: 'user_not_found',
+        userEmail: currentUserEmail,
+        suggestion: 'ユーザー登録が必要です'
+      };
+    }
+    
+    const config = userInfo.parsedConfig || {};
+    const recoveryConfig = {
+      userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      formUrl: config.formUrl,
+      setupStatus: config.setupStatus || 'incomplete',
+      appPublished: config.appPublished || false,
+      displaySettings: config.displaySettings || { showNames: false, showReactions: false },
+      recoveryMode: true,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.info('✅ 緊急回復: 設定取得成功', {
+      userId: userInfo.userId,
+      hasSpreadsheetId: !!config.spreadsheetId,
+      hasSheetName: !!config.sheetName,
+      setupStatus: config.setupStatus
+    });
+    
+    return recoveryConfig;
+  } catch (error) {
+    console.error('❌ 緊急回復エラー:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      error: 'recovery_failed',
+      message: error.message,
+      suggestion: 'ページをリロードしてください'
+    };
+  }
+}
+
+/**
  * データソース接続（CLAUDE.md準拠版）
  * 統一データソース原則：全データをconfigJsonに統合
  */
@@ -163,27 +223,37 @@ function connectDataSource(spreadsheetId, sheetName) {
         opinionHeader = headerRow[columnMapping.answer] || 'お題';
       }
 
-      // 🚀 CLAUDE.md完全準拠：動的生成値の完全キャッシュ化
+      // 🚀 置き換えベース設計：必要データのみを明示的に選択（スプレッド演算子完全排除）
       const updatedConfig = {
-        ...currentConfig,
+        // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
+        createdAt: currentConfig.createdAt || new Date().toISOString(),
+        lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
         
         // 🎯 CLAUDE.md準拠：データソース情報（動的値キャッシュ）
         spreadsheetId,
         sheetName,
-        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, // CLAUDE.md Line 34
+        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
         
         // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報  
         columnMapping,
         opinionHeader,
         
-        // 🎯 CLAUDE.md準拠：フォーム情報（完全保存）
+        // 🎯 CLAUDE.md準拠：フォーム情報（存在する場合のみ）
         ...(formInfo?.formUrl && { 
           formUrl: formInfo.formUrl,
           formTitle: formInfo.formTitle || null 
         }),
         
-        // 🎯 CLAUDE.md準拠：appURL完全キャッシュ化（Line 49）
+        // 🎯 CLAUDE.md準拠：アプリ設定（必要なもののみ継承）
+        setupStatus: currentConfig.setupStatus || 'pending',
+        appPublished: currentConfig.appPublished || false,
         appUrl: currentConfig.appUrl || generateUserUrls(userInfo.userId).viewUrl,
+        
+        // 🎯 表示設定（統一・重複排除）
+        displaySettings: {
+          showNames: currentConfig.displaySettings?.showNames || false,
+          showReactions: currentConfig.displaySettings?.showReactions || false
+        },
         
         // 🎯 必要最小限メタデータ
         lastConnected: new Date().toISOString(),
@@ -264,21 +334,35 @@ function publishApplication(config) {
     if (publishResult.success) {
       const currentConfig = userInfo.parsedConfig || {};
       
-      // 🚀 CLAUDE.md完全準拠：全URL情報の完全キャッシュ化
+      // 🚀 置き換えベース設計：公開時の完全クリーンアップ（スプレッド演算子完全排除）
       const publishedConfig = {
-        ...currentConfig,
-        ...config, // フロントエンドからの設定
+        // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
+        createdAt: currentConfig.createdAt || new Date().toISOString(),
+        lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
         
-        // 🎯 CLAUDE.md準拠：公開情報（Line 46, 48, 49）
-        appPublished: true,
-        publishedAt: new Date().toISOString(),
-        appUrl: publishResult.appUrl, // CLAUDE.md Line 49：動的生成値をキャッシュ
-        
-        // 🎯 CLAUDE.md準拠：全動的URL情報の完全保存
+        // 🎯 CLAUDE.md準拠：データソース情報（既存から継承）
+        spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
+        sheetName: config.sheetName || currentConfig.sheetName,
         spreadsheetUrl: currentConfig.spreadsheetUrl || 
           (config.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}` : null),
         
-        // 🎯 必須データのみ：表示設定（CLAUDE.md準拠：心理的安全性重視）
+        // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報（継承）
+        columnMapping: currentConfig.columnMapping || {},
+        opinionHeader: currentConfig.opinionHeader || 'お題',
+        
+        // 🎯 CLAUDE.md準拠：フォーム情報（継承）
+        ...(currentConfig.formUrl && { 
+          formUrl: currentConfig.formUrl,
+          formTitle: currentConfig.formTitle 
+        }),
+        
+        // 🎯 CLAUDE.md準拠：アプリ設定
+        setupStatus: 'completed', // 公開時は完了
+        appPublished: true,
+        publishedAt: new Date().toISOString(),
+        appUrl: publishResult.appUrl,
+        
+        // 🎯 表示設定（重複排除：フロントエンド設定を反映）
         displaySettings: {
           showNames: config.showNames || false,
           showReactions: config.showReactions || false
@@ -345,12 +429,41 @@ function saveDraftConfiguration(config) {
 
     const currentConfig = userInfo.parsedConfig || {};
     
-    // 🚀 最小限ドラフト保存（JSON bloat完全回避）
+    // 🚀 置き換えベース設計：ドラフト保存時も完全クリーンアップ（スプレッド演算子完全排除）
     const updatedConfig = {
-      ...currentConfig,
-      ...config,
+      // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
+      createdAt: currentConfig.createdAt || new Date().toISOString(),
+      lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
       
-      // 🎯 必須データのみ：ドラフト情報
+      // 🎯 CLAUDE.md準拠：データソース情報（継承または新規設定）
+      spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
+      sheetName: config.sheetName || currentConfig.sheetName,
+      spreadsheetUrl: currentConfig.spreadsheetUrl || 
+        (config.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}` : null),
+      
+      // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報（継承）
+      columnMapping: currentConfig.columnMapping || {},
+      opinionHeader: currentConfig.opinionHeader || 'お題',
+      
+      // 🎯 CLAUDE.md準拠：フォーム情報（継承）
+      ...(currentConfig.formUrl && { 
+        formUrl: currentConfig.formUrl,
+        formTitle: currentConfig.formTitle 
+      }),
+      
+      // 🎯 CLAUDE.md準拠：アプリ設定（継承または新規設定）
+      setupStatus: currentConfig.setupStatus || 'pending',
+      appPublished: currentConfig.appPublished || false,
+      ...(currentConfig.appUrl && { appUrl: currentConfig.appUrl }),
+      ...(currentConfig.publishedAt && { publishedAt: currentConfig.publishedAt }),
+      
+      // 🎯 表示設定（重複排除：フロントエンド設定を反映）
+      displaySettings: {
+        showNames: config.showNames !== undefined ? config.showNames : (currentConfig.displaySettings?.showNames || false),
+        showReactions: config.showReactions !== undefined ? config.showReactions : (currentConfig.displaySettings?.showReactions || false)
+      },
+      
+      // 🎯 ドラフト情報
       isDraft: true,
       lastModified: new Date().toISOString()
     };
@@ -565,6 +678,49 @@ function executeAppPublish(userId, publishConfig) {
 function generateUserUrls(userId) {
   // main.gsの動的・安全版generateUserUrlsを使用
   return Services.generateUserUrls(userId);
+}
+
+/**
+ * 🧹 configJSONクリーンアップ実行（管理パネルから呼び出し）
+ * 現在のユーザーのconfigJSONを完全クリーンアップ
+ */
+function executeConfigCleanup() {
+  try {
+    console.info('🧹 configJSONクリーンアップ実行開始');
+
+    const currentUser = User.email();
+    const userInfo = DB.findUserByEmail(currentUser);
+
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+
+    // SystemManagerのクリーンアップ機能を使用
+    const result = cleanupConfigJsonData(userInfo.userId);
+
+    console.info('✅ configJSONクリーンアップ実行完了', result);
+
+    return {
+      success: true,
+      message: 'configJSONのクリーンアップが完了しました',
+      details: {
+        削減サイズ: `${result.sizeReduction}文字`,
+        削減率: result.total > 0 && result.sizeReduction > 0 ? 
+          `${((result.sizeReduction / (JSON.stringify(userInfo.parsedConfig || {}).length)) * 100).toFixed(1)}%` : '0%',
+        削除フィールド数: result.removedFields.length,
+        処理時刻: result.timestamp
+      },
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('❌ configJSONクリーンアップ実行エラー:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 // === 補助関数群（CLAUDE.md準拠で実装） ===

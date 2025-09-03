@@ -3,10 +3,147 @@
   // 統一されたテンプレート変数受け取りシステム
 
   /**
-   * ✅ CLAUDE.md準拠: configJSONベース設定取得（App名前空間使用）
+   * 🦾 スマート診断システム - 問題を自動特定してユーザーに適切なガイダンスを提供
+   */
+  const smartDiagnosis = () => {
+    const issues = [];
+    const solutions = [];
+    
+    // 診断1: テンプレート展開状況
+    if (!window.USER_ID || typeof window.USER_ID === 'object') {
+      issues.push('テンプレート変数が正しく展開されていません');
+      solutions.push('🔄 ページをリロードしてください');
+    }
+    
+    // 診断2: URLパラメータ状況  
+    const urlUserId = new URLSearchParams(window.location.search).get('userId');
+    if (!urlUserId) {
+      issues.push('URLにユーザーIDが含まれていません');
+      solutions.push('🔗 正しいリンクからアクセスしてください');
+    }
+    
+    // 診断3: システム設定状況
+    if (window.DIAGNOSTIC_INFO) {
+      if (!window.DIAGNOSTIC_INFO.hasSpreadsheetId) {
+        issues.push('データソース（スプレッドシート）が設定されていません');
+        solutions.push('🛠️ 管理パネルでデータソースを接続してください');
+      }
+      if (!window.DIAGNOSTIC_INFO.hasSheetName) {
+        issues.push('シート名が設定されていません');
+        solutions.push('📊 管理パネルでシートを選択してください');
+      }
+    }
+    
+    return { issues, solutions, severity: issues.length > 0 ? 'needs_setup' : 'healthy' };
+  };
+  
+  /**
+   * 🎆 自動回復システム - 可能な範囲で自動修復を試行
+   */
+  const autoRecovery = async (diagnosis) => {
+    if (diagnosis.severity === 'healthy') return true;
+    
+    // 回復1: RPC経由で設定取得を試行
+    if (!window.USER_ID && window.google && window.google.script) {
+      try {
+        console.info('🚑 緊急回復: RPC経由で設定取得を試行中...');
+        const config = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .getCurrentConfigByEmail(); // メールアドレスベースで設定取得
+        });
+        
+        if (config && config.userId) {
+          window.USER_ID = config.userId;
+          console.info('✅ 緊急回復成功: RPC経由で設定を取得しました');
+          return true;
+        }
+      } catch (error) {
+        console.warn('⚠️ 緊急回復失敗:', error.message);
+      }
+    }
+    
+    return false;
+  };
+  
+  /**
+   * 📱 ユーザーフレンドリーエラー表示
+   */
+  const showUserFriendlyError = (diagnosis) => {
+    const container = document.getElementById('answersContainer');
+    if (!container) return;
+    
+    const errorHtml = `
+      <div class="setup-guide-container" style="max-width: 600px; margin: 2rem auto; padding: 2rem; background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <div class="setup-header" style="text-align: center; margin-bottom: 2rem;">
+          <div style="font-size: 4rem; margin-bottom: 1rem;">🛠️</div>
+          <h2 style="color: #2563eb; margin-bottom: 0.5rem;">初期設定が必要です</h2>
+          <p style="color: #6b7280;">回答ボードを使用するために、いくつかの設定が必要です。</p>
+        </div>
+        
+        <div class="issues-list" style="margin-bottom: 2rem;">
+          <h3 style="color: #dc2626; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>❌</span> 解決が必要な問題
+          </h3>
+          <ul style="list-style: none; padding: 0; margin-bottom: 2rem;">
+            ${diagnosis.issues.map(issue => `
+              <li style="padding: 0.75rem; margin-bottom: 0.5rem; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
+                ${issue}
+              </li>
+            `).join('')}
+          </ul>
+          
+          <h3 style="color: #059669; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span>✅</span> 推奨される解決策
+          </h3>
+          <ul style="list-style: none; padding: 0;">
+            ${diagnosis.solutions.map(solution => `
+              <li style="padding: 0.75rem; margin-bottom: 0.5rem; background: #ecfdf5; border-left: 4px solid #059669; border-radius: 4px;">
+                ${solution}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+        
+        <div class="action-buttons" style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+          <button onclick="window.location.reload()" 
+                  style="padding: 0.75rem 1.5rem; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
+            🔄 ページをリロード
+          </button>
+          <button onclick="window.location.href = window.location.href.split('?')[0] + '?mode=admin&userId=' + (window.USER_ID || '')" 
+                  style="padding: 0.75rem 1.5rem; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
+            🛠️ 管理パネルへ
+          </button>
+        </div>
+        
+        <div class="help-text" style="margin-top: 2rem; padding: 1rem; background: #f8fafc; border-radius: 6px; text-align: center; color: #64748b; font-size: 0.875rem;">
+          📞 お困りの場合は管理者にお問い合わせください
+        </div>
+      </div>
+    `;
+    
+    container.innerHTML = errorHtml;
+  };
+  
+  /**
+   * ✅ CLAUDE.md準拠: configJSONベース設定取得（スマート診断統合）
    * @returns {Promise<Object>} 設定オブジェクト
    */
   const getConfigFromBackend = async () => {
+    // 🦾 スマート診断実行
+    const diagnosis = smartDiagnosis();
+    console.info('🦾 システム診断結果:', diagnosis);
+    
+    // 🎆 自動回復試行
+    if (diagnosis.severity !== 'healthy') {
+      const recovered = await autoRecovery(diagnosis);
+      if (recovered) {
+        console.info('✅ 自動回復成功 - 再診断を実行');
+        return getConfigFromBackend(); // 再帰的再試行
+      }
+    }
+    
     try {
       // 🚀 複数ソースからuserId取得（超効率化）
       let userId = new URLSearchParams(window.location.search).get('userId');
@@ -21,17 +158,27 @@
         userId = window.USER_ID;
       }
       
-      if (!userId) throw new Error('userId parameter missing from all sources');
+      if (!userId) {
+        // 📱 ユーザーフレンドリーエラー表示
+        showUserFriendlyError(diagnosis);
+        throw new Error('ユーザーIDを取得できません。初期設定が必要です。');
+      }
       
       // SecurityValidator使用でセキュリティ強化
       if (!SecurityValidator.isValidUUID(userId)) {
-        throw new Error('Invalid userId format');
+        throw new Error('無効なuserID形式です');
       }
 
       // App名前空間パターン使用
       return await App.getConfig().getUserConfig(userId);
     } catch (error) {
       console.error('❌ getConfigFromBackend エラー:', error);
+      
+      // エラーが診断関連でない場合、ユーザーフレンドリーエラーを表示
+      if (diagnosis.severity !== 'healthy') {
+        showUserFriendlyError(diagnosis);
+      }
+      
       throw error;
     }
   };
@@ -47,6 +194,14 @@
       console.info('✅ Config初期化完了:', CONFIG.userId);
     } catch (error) {
       console.error('❌ Config初期化エラー:', error);
+      
+      // 📱 ユーザーフレンドリーエラーハンドリング
+      const diagnosis = smartDiagnosis();
+      if (diagnosis.severity !== 'healthy') {
+        console.info('📱 ユーザーフレンドリーエラー表示をスキップ（既に表示済み）');
+        return; // 既にshowUserFriendlyErrorが呼ばれているため、フォールバック設定は不要
+      }
+      
       // フォールバック設定（SHEET_NAME空文字対策）
       const fallbackUserId = new URLSearchParams(window.location.search).get('userId') || '';
       const fallbackSheetName = window.SHEET_NAME || 'テストシート'; // テンプレート変数フォールバック

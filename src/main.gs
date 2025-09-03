@@ -493,6 +493,35 @@ function showAnswerBoard(userId) {
 }
 
 /**
+ * 🦾 スマート診断システムサポート関数
+ * ユーザーに適切なアクションを推奨する
+ */
+function getSuggestedAction(diagnostics) {
+  try {
+    if (!diagnostics.hasSpreadsheetId) {
+      return '管理パネルでデータソース（スプレッドシート）を接続してください';
+    }
+    
+    if (!diagnostics.hasSheetName) {
+      return '管理パネルでシートを選択してください';
+    }
+    
+    if (!diagnostics.appPublished) {
+      return '管理パネルでアプリを公開してください';
+    }
+    
+    if (diagnostics.setupStatus !== 'completed') {
+      return '初期設定を完了してください';
+    }
+    
+    return 'システムは正常に動作しています';
+  } catch (error) {
+    console.error('getSuggestedAction エラー:', error.message);
+    return '管理パネルで設定を確認してください';
+  }
+}
+
+/**
  * Helper Functions
  * ユーティリティ関数群
  */
@@ -923,6 +952,10 @@ function renderAnswerBoard(userInfo, params) {
     // ユーザー選択スプレッドシート設定を統一使用
     const userSpreadsheetId = userInfo.spreadsheetId || null;
     const userSheetName = userInfo.sheetName || null;
+    
+    // 📊 ユーザーIDをテンプレートに適切に設定
+    template.USER_ID = userInfo.userId || null;
+    template.SHEET_NAME = userSheetName || '';
 
     const sheetConfigKey = `sheet_${  userSheetName || params.sheetName}`;
     const sheetConfig = config[sheetConfigKey] || {};
@@ -944,6 +977,21 @@ function renderAnswerBoard(userInfo, params) {
     template.isDirectPageAccess = params.isDirectPageAccess;
     template.isPublished = hasUserConfig;
     template.appPublished = config.appPublished || false;
+    
+    // 🦾 スマート診断情報をテンプレートに提供
+    template.DIAGNOSTIC_INFO = {
+      hasSpreadsheetId: !!(finalSpreadsheetId && finalSpreadsheetId !== 'null'),
+      hasSheetName: !!(finalSheetName && finalSheetName !== 'null'),
+      setupStatus: config.setupStatus || 'incomplete',
+      appPublished: config.appPublished || false,
+      suggestedAction: getSuggestedAction({
+        hasSpreadsheetId: !!(finalSpreadsheetId && finalSpreadsheetId !== 'null'),
+        hasSheetName: !!(finalSheetName && finalSheetName !== 'null'),
+        setupStatus: config.setupStatus || 'incomplete',
+        appPublished: config.appPublished || false
+      }),
+      systemHealthy: hasUserConfig && config.appPublished
+    };
 
     // __OPINION_HEADER__テンプレート変数を設定（configJson優先）
     let opinionHeader = 'お題'; // デフォルト値
