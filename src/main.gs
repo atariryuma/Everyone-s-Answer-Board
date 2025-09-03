@@ -99,11 +99,14 @@ function doGet(e) {
             );
           }
 
-          // ユーザー情報変換
+          // ユーザー情報変換（DBからの完全なユーザー情報を取得）
+          const dbUserInfo = DB.findUserById(params.userId);
           const compatUserInfo = {
             userId: params.userId,
             userEmail: accessResult.config?.userEmail || '',
             configJson: JSON.stringify(accessResult.config || {}),
+            spreadsheetId: dbUserInfo?.spreadsheetId || null,
+            sheetName: dbUserInfo?.sheetName || null,
           };
 
           return renderAnswerBoard(compatUserInfo, params);

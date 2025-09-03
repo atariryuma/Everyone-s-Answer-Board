@@ -136,6 +136,15 @@
     get size() {
       return this.data.size;
     }
+    cleanup() {
+      // 古いエントリをクリーンアップ（最大100個まで保持）
+      if (this.data.size > 100) {
+        const entries = Array.from(this.data.entries());
+        const keepEntries = entries.slice(-50); // 最新50個を保持
+        this.data.clear();
+        keepEntries.forEach(([key, value]) => this.data.set(key, value));
+      }
+    }
   }
 
   class StudyQuestApp {
