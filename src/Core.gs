@@ -449,16 +449,20 @@ function getCurrentSheetName(spreadsheetId) {
  * @throws {Error} 認証エラーまたは権限エラー
  */
 function verifyUserAccess(requestUserId) {
-  // AccessControllerシステムを使用
-  const currentUserEmail = User.email();
-  const result = App.getAccess().verifyAccess(requestUserId, 'view', currentUserEmail);
+  // security.gsの統一版に委譲（重複関数修正）
+  // ここではsecurity.gsの関数を直接呼び出すのではなく、
+  // 同じロジックを使用してlocal実装を保持
+  if (!requestUserId) {
+    throw new Error('ユーザーIDが必要です');
+  }
 
+  const result = App.getAccess().verifyAccess(requestUserId, 'view', User.email());
   if (!result.allowed) {
-    throw new Error(`認証エラー: ${result.message}`);
+    throw new Error('アクセスが拒否されました: ' + result.reason);
   }
 
   console.log(
-    `✅ ユーザーアクセス検証成功: ${currentUserEmail} は ${requestUserId} のデータにアクセスできます。`
+    `✅ ユーザーアクセス検証成功: ${User.email()} は ${requestUserId} のデータにアクセスできます。`
   );
   return result;
 }

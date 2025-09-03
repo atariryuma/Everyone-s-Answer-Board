@@ -953,10 +953,10 @@ function renderAnswerBoard(userInfo, params) {
         opinionHeader = config.opinionHeader;
         console.log('renderAnswerBoard: configJsonからopinionHeaderを取得:', opinionHeader);
       } else if (finalSpreadsheetId && finalSheetName) {
-        // 2. 既存のgetHeaderIndices方式（フォールバック）
-        const headerIndices = getHeaderIndices(finalSpreadsheetId, finalSheetName);
+        // 2. 既存のgetSpreadsheetColumnIndices方式（フォールバック）
+        const headerIndices = getSpreadsheetColumnIndices(finalSpreadsheetId, finalSheetName);
         opinionHeader = headerIndices?.opinionHeader || 'お題';
-        console.log('renderAnswerBoard: getHeaderIndicesからopinionHeaderを取得:', opinionHeader);
+        console.log('renderAnswerBoard: getSpreadsheetColumnIndicesからopinionHeaderを取得:', opinionHeader);
 
         // 3. 取得したopinionHeaderをconfigJsonに保存（次回用の最適化）
         if (headerIndices?.opinionHeader && userInfo?.userId) {

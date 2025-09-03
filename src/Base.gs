@@ -401,34 +401,25 @@ class AccessController {
   }
 
   /**
-   * 管理者アクセスを検証
+   * 管理者アクセスを検証 - security.gsの強化版に委譲
    */
   verifyAdminAccess(userInfo, config, currentUserEmail) {
-    const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(
-      PROPS_KEYS.ADMIN_EMAIL
-    );
-
-    // 詳細なデバッグログ
-    console.log('🔍 管理者アクセス検証（詳細）:', {
-      currentUserEmail: currentUserEmail,
-      userInfoEmail: userInfo.userEmail,
-      systemAdminEmail: systemAdminEmail,
-      userId: userInfo.userId,
-      isActive: userInfo.isActive,
-      emailsMatch: currentUserEmail === userInfo.userEmail,
-      isSystemAdmin: currentUserEmail === systemAdminEmail,
-    });
-
-    // システム管理者
-    if (currentUserEmail === systemAdminEmail) {
-      console.log('✅ システム管理者として認証成功');
-      return this.createAccessResult(true, 'system_admin', config);
-    }
-
-    // オーナー
-    if (currentUserEmail === userInfo.userEmail) {
-      console.log('✅ ボード所有者として認証成功');
-      return this.createAccessResult(true, 'owner', config);
+    // security.gsの強化版verifyAdminAccessを使用
+    const isVerified = verifyAdminAccess(userInfo.userId);
+    
+    if (isVerified) {
+      const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(
+        PROPS_KEYS.ADMIN_EMAIL
+      );
+      
+      // システム管理者かオーナーかを判定
+      if (currentUserEmail === systemAdminEmail) {
+        console.log('✅ システム管理者として認証成功');
+        return this.createAccessResult(true, 'system_admin', config);
+      } else {
+        console.log('✅ ボード所有者として認証成功');
+        return this.createAccessResult(true, 'owner', config);
+      }
     }
 
     console.warn('❌ 管理者権限なし');

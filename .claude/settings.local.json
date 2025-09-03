@@ -42,7 +42,10 @@
       "Bash(echo \"$file: OK\")",
       "Bash(echo:*)",
       "Bash(clasp push:*)",
-      "WebFetch(domain:stackoverflow.com)"
+      "WebFetch(domain:stackoverflow.com)",
+      "Bash(npm run deploy:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx clasp:*)"
     ],
     "deny": [],
     "ask": [],

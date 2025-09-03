@@ -1,0 +1,110 @@
+{
+  "timestamp": "2025-09-03T11:08:57.629Z",
+  "config": {
+    "sourceDir": "/Users/ryuma/Everyone-s-Answer-Board/src",
+    "extensions": [
+      ".gs"
+    ],
+    "ignorePatterns": [
+      {},
+      {},
+      {}
+    ],
+    "minFunctionBodyLines": 3
+  },
+  "results": {
+    "exactDuplicates": [],
+    "similarFunctions": [],
+    "nameConflicts": [
+      {
+        "name": "generateUserUrls",
+        "functions": [
+          {
+            "name": "generateUserUrls",
+            "signature": "function generateUserUrls(userId)",
+            "body": "const baseUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbxcR5qQuyM_eMh5AT7abVVNjj-4I3xVppxl2Ah1_cUlBHWboJ0x_qTw3w865fUPoTsV/exec';\n  \n  return {\n    viewUrl: `${baseUrl}?mode=view&userId=${userId}`,\n    adminUrl: `${baseUrl}?mode=admin&userId=${userId}`\n  };\n}",
+            "file": "AdminPanelBackend.gs",
+            "lineNumber": 571,
+            "endLineNumber": 578,
+            "hash": "-1438527610",
+            "normalizedBody": "const baseUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbxcR5qQuyM_eMh5AT7abVVNjj-4I3xVppxl2Ah1_cUlBHWboJ0x_qTw3w865fUPoTsV/exec';return{viewUrl: `${baseUrl}?mode=view&userId=${userId}`,adminUrl: `${baseUrl}?mode=admin&userId=${userId}`};}"
+          },
+          {
+            "name": "generateUserUrls",
+            "signature": "function generateUserUrls(userId)",
+            "body": "const baseUrl = getWebAppUrl();\n    if (!baseUrl) return { error: 'Base URL not available' };\n\n    return {\n      viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`,\n      adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`,\n      editUrl: `${baseUrl}?mode=edit&userId=${encodeURIComponent(userId)}`, // 将来実装\n    };\n  },",
+            "file": "main.gs",
+            "lineNumber": 721,
+            "endLineNumber": 730,
+            "hash": "-761308506",
+            "normalizedBody": "const baseUrl = getWebAppUrl();if (!baseUrl) return{error: 'Base URL not available'};return{viewUrl: `${baseUrl}?mode=view&userId=${encodeURIComponent(userId)}`,adminUrl: `${baseUrl}?mode=admin&userId=${encodeURIComponent(userId)}`,editUrl: `${baseUrl}?mode=edit&userId=${encodeURIComponent(userId)}`,// 将来実装};},"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "verifyAdminAccess",
+        "functions": [
+          {
+            "name": "verifyAdminAccess",
+            "signature": "function verifyAdminAccess(userInfo, config, currentUserEmail)",
+            "body": "const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(\n      PROPS_KEYS.ADMIN_EMAIL\n    );\n\n    // 詳細なデバッグログ\n    console.log('🔍 管理者アクセス検証（詳細）:', {\n      currentUserEmail: currentUserEmail,\n      userInfoEmail: userInfo.userEmail,\n      systemAdminEmail: systemAdminEmail,\n      userId: userInfo.userId,\n      isActive: userInfo.isActive,\n      emailsMatch: currentUserEmail === userInfo.userEmail,\n      isSystemAdmin: currentUserEmail === systemAdminEmail,\n    });\n\n    // システム管理者\n    if (currentUserEmail === systemAdminEmail) {\n      console.log('✅ システム管理者として認証成功');\n      return this.createAccessResult(true, 'system_admin', config);\n    }\n\n    // オーナー\n    if (currentUserEmail === userInfo.userEmail) {\n      console.log('✅ ボード所有者として認証成功');\n      return this.createAccessResult(true, 'owner', config);\n    }\n\n    console.warn('❌ 管理者権限なし');\n    return this.createAccessResult(false, 'guest', null, '管理者権限がありません');\n  }",
+            "file": "Base.gs",
+            "lineNumber": 406,
+            "endLineNumber": 436,
+            "hash": "617649017",
+            "normalizedBody": "const systemAdminEmail = PropertiesService.getScriptProperties().getProperty( PROPS_KEYS.ADMIN_EMAIL );// 詳細なデバッグログ console.log('🔍 管理者アクセス検証（詳細）:',{currentUserEmail: currentUserEmail,userInfoEmail: userInfo.userEmail,systemAdminEmail: systemAdminEmail,userId: userInfo.userId,isActive: userInfo.isActive,emailsMatch: currentUserEmail === userInfo.userEmail,isSystemAdmin: currentUserEmail === systemAdminEmail,});// システム管理者 if (currentUserEmail === systemAdminEmail){console.log('✅ システム管理者として認証成功');return this.createAccessResult(true,'system_admin',config);}// オーナー if (currentUserEmail === userInfo.userEmail){console.log('✅ ボード所有者として認証成功');return this.createAccessResult(true,'owner',config);}console.warn('❌ 管理者権限なし');return this.createAccessResult(false,'guest',null,'管理者権限がありません');}"
+          },
+          {
+            "name": "verifyAdminAccess",
+            "signature": "function verifyAdminAccess(userId)",
+            "body": "try {\n    // 基本的な引数チェック\n    if (!userId || typeof userId !== 'string' || userId.trim() === '') {\n      console.warn('verifyAdminAccess: 無効なuserIdが渡されました:', userId);\n      return false;\n    }\n\n    // 現在のログインユーザーのメールアドレスを取得\n    const activeUserEmail = User.email();\n    if (!activeUserEmail) {\n      console.warn('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');\n      return false;\n    }\n\n    console.log('verifyAdminAccess: 認証開始', { userId, activeUserEmail });\n\n    // データベースからユーザー情報を取得\n    let userFromDb = DB.findUserById(userId);\n\n    // 見つからない場合は強制フレッシュで再試行\n    if (!userFromDb) {\n      console.log('verifyAdminAccess: 強制フレッシュで再検索中...');\n      userFromDb = fetchUserFromDatabase('userId', userId, { forceFresh: true });\n    }\n\n    // ユーザーが見つからない場合は認証失敗\n    if (!userFromDb) {\n      console.warn('verifyAdminAccess: ユーザーが見つかりません:', {\n        userId,\n        activeUserEmail,\n      });\n      return false;\n    }\n\n    // 3重チェック実行\n    // 1. メールアドレス照合\n    const dbEmail = String(userFromDb.userEmail || '')\n      .toLowerCase()\n      .trim();\n    const currentEmail = String(activeUserEmail).toLowerCase().trim();\n    const isEmailMatched = dbEmail && currentEmail && dbEmail === currentEmail;\n\n    // 2. ユーザーID照合（念のため）\n    const isUserIdMatched = String(userFromDb.userId) === String(userId);\n\n    // 3. アクティブ状態確認\n    const isActive = Boolean(userFromDb.isActive);\n\n    console.log('verifyAdminAccess: 3重チェック結果:', {\n      isEmailMatched,\n      isUserIdMatched,\n      isActive,\n      dbEmail,\n      currentEmail,\n    });\n\n    // 3つの条件すべてが満たされた場合のみ認証成功\n    if (isEmailMatched && isUserIdMatched && isActive) {\n      console.log('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });\n      return true;\n    } else {\n      console.warn('❌ verifyAdminAccess: 認証失敗', {\n        userId,\n        activeUserEmail,\n        failures: {\n          email: !isEmailMatched,\n          userId: !isUserIdMatched,\n          active: !isActive,\n        },\n      });\n      return false;\n    }\n  } catch (error) {\n    console.error('[ERROR]', '❌ verifyAdminAccess: 認証処理エラー:', error.message);\n    return false;\n  }\n}",
+            "file": "security.gs",
+            "lineNumber": 126,
+            "endLineNumber": 203,
+            "hash": "-230927365",
+            "normalizedBody": "try{// 基本的な引数チェック if (!userId || typeof userId !== 'string' || userId.trim() === ''){console.warn('verifyAdminAccess: 無効なuserIdが渡されました:',userId);return false;}// 現在のログインユーザーのメールアドレスを取得 const activeUserEmail = User.email();if (!activeUserEmail){console.warn('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');return false;}console.log('verifyAdminAccess: 認証開始',{userId,activeUserEmail});// データベースからユーザー情報を取得 let userFromDb = DB.findUserById(userId);// 見つからない場合は強制フレッシュで再試行 if (!userFromDb){console.log('verifyAdminAccess: 強制フレッシュで再検索中...');userFromDb = fetchUserFromDatabase('userId',userId,{forceFresh: true});}// ユーザーが見つからない場合は認証失敗 if (!userFromDb){console.warn('verifyAdminAccess: ユーザーが見つかりません:',{userId,activeUserEmail,});return false;}// 3重チェック実行 // 1. メールアドレス照合 const dbEmail = String(userFromDb.userEmail || '') .toLowerCase() .trim();const currentEmail = String(activeUserEmail).toLowerCase().trim();const isEmailMatched = dbEmail && currentEmail && dbEmail === currentEmail;// 2. ユーザーID照合（念のため） const isUserIdMatched = String(userFromDb.userId) === String(userId);// 3. アクティブ状態確認 const isActive = Boolean(userFromDb.isActive);console.log('verifyAdminAccess: 3重チェック結果:',{isEmailMatched,isUserIdMatched,isActive,dbEmail,currentEmail,});// 3つの条件すべてが満たされた場合のみ認証成功 if (isEmailMatched && isUserIdMatched && isActive){console.log('✅ verifyAdminAccess: 認証成功',{userId,email: activeUserEmail});return true;}else{console.warn('❌ verifyAdminAccess: 認証失敗',{userId,activeUserEmail,failures:{email: !isEmailMatched,userId: !isUserIdMatched,active: !isActive,},});return false;}}catch (error){console.error('[ERROR]','❌ verifyAdminAccess: 認証処理エラー:',error.message);return false;}}"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "verifyUserAccess",
+        "functions": [
+          {
+            "name": "verifyUserAccess",
+            "signature": "function verifyUserAccess(requestUserId)",
+            "body": "// AccessControllerシステムを使用\n  const currentUserEmail = User.email();\n  const result = App.getAccess().verifyAccess(requestUserId, 'view', currentUserEmail);\n\n  if (!result.allowed) {\n    throw new Error(`認証エラー: ${result.message}`);\n  }\n\n  console.log(\n    `✅ ユーザーアクセス検証成功: ${currentUserEmail} は ${requestUserId} のデータにアクセスできます。`\n  );\n  return result;\n}",
+            "file": "Core.gs",
+            "lineNumber": 451,
+            "endLineNumber": 464,
+            "hash": "-1612060190",
+            "normalizedBody": "// AccessControllerシステムを使用 const currentUserEmail = User.email();const result = App.getAccess().verifyAccess(requestUserId,'view',currentUserEmail);if (!result.allowed){throw new Error(`認証エラー: ${result.message}`);}console.log( `✅ ユーザーアクセス検証成功: ${currentUserEmail}は ${requestUserId}のデータにアクセスできます。` );return result;}"
+          },
+          {
+            "name": "verifyUserAccess",
+            "signature": "function verifyUserAccess(userId)",
+            "body": "if (!userId) {\n    throw new Error('ユーザーIDが必要です');\n  }\n\n  // Base.gsのAccessControllerを使用したアクセス制御\n  const result = App.getAccess().verifyAccess(userId, 'view', User.email());\n  if (!result.allowed) {\n    throw new Error('アクセスが拒否されました: ' + result.reason);\n  }\n\n  return true;\n}",
+            "file": "security.gs",
+            "lineNumber": 241,
+            "endLineNumber": 253,
+            "hash": "-294077955",
+            "normalizedBody": "if (!userId){throw new Error('ユーザーIDが必要です');}// Base.gsのAccessControllerを使用したアクセス制御 const result = App.getAccess().verifyAccess(userId,'view',User.email());if (!result.allowed){throw new Error('アクセスが拒否されました: ' + result.reason);}return true;}"
+          }
+        ],
+        "type": "name_conflict"
+      }
+    ],
+    "stats": {
+      "totalFunctions": 217,
+      "uniqueNames": 214,
+      "duplicateGroups": 0
+    }
+  },
+  "summary": {
+    "totalFunctions": 217,
+    "exactDuplicates": 0,
+    "nameConflicts": 3,
+    "similarFunctions": 0
+  }
+}

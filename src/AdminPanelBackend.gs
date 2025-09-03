@@ -566,74 +566,123 @@ function executeAppPublish(userId, publishConfig) {
 }
 
 /**
- * URL生成（既存互換）
+ * URL生成（既存互換） - main.gsの動的版に委譲
  */
 function generateUserUrls(userId) {
-  const baseUrl = 'https://script.google.com/a/naha-okinawa.ed.jp/macros/s/AKfycbxcR5qQuyM_eMh5AT7abVVNjj-4I3xVppxl2Ah1_cUlBHWboJ0x_qTw3w865fUPoTsV/exec';
-  
-  return {
-    viewUrl: `${baseUrl}?mode=view&userId=${userId}`,
-    adminUrl: `${baseUrl}?mode=admin&userId=${userId}`
-  };
+  // main.gsの動的・安全版generateUserUrlsを使用
+  return Services.generateUserUrls(userId);
 }
 
 // === 補助関数群（CLAUDE.md準拠で実装） ===
 
 /**
- * 列マッピング生成（AI最適化版）
- * SYSTEM_CONSTANTS.COLUMN_MAPPING に基づく高度なマッピング生成
+ * 列マッピング生成（超高精度・重複回避版）
+ * 最適割り当てアルゴリズムによる重複のない高精度マッピング
  * @param {Array} headerRow - ヘッダー行の配列
+ * @param {Array} data - スプレッドシート全データ（分析用）
  * @returns {Object} 生成された列マッピング
  */
-function generateColumnMapping(headerRow) {
+function generateColumnMapping(headerRow, data = []) {
+  try {
+    console.log('🎯 超高精度列マッピング生成開始:', {
+      columnCount: headerRow.length,
+      dataRows: data.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // 重複回避・最適割り当てアルゴリズム実行
+    const result = resolveColumnConflicts(headerRow, data);
+    
+    console.info('✅ 超高精度列マッピング生成完了:', {
+      mappedColumns: Object.keys(result.mapping).length,
+      averageConfidence: result.averageConfidence || 'N/A',
+      conflictsResolved: result.conflictsResolved,
+      assignments: result.assignmentLog
+    });
+
+    // 従来形式でのレスポンス構築
+    const response = {
+      mapping: result.mapping,
+      confidence: result.confidence
+    };
+
+    return response;
+
+  } catch (error) {
+    console.error('❌ 超高精度列マッピング生成エラー:', {
+      headerCount: headerRow.length,
+      error: error.message,
+      stack: error.stack
+    });
+
+    // エラー時はレガシーシステムにフォールバック
+    return generateLegacyColumnMapping(headerRow);
+  }
+}
+
+/**
+ * レガシー列マッピング（フォールバック用）
+ */
+function generateLegacyColumnMapping(headerRow) {
   const mapping = {};
+  const confidence = {};
   
-  // SYSTEM_CONSTANTS.COLUMN_MAPPING に基づく検出ロジック（AI最適化）
   headerRow.forEach((header, index) => {
     const normalizedHeader = header.toString().toLowerCase();
     
-    // 回答列の検出（AI パターンマッチング）
+    // レガシーパターンマッチング
     if (normalizedHeader.includes('回答') || 
         normalizedHeader.includes('どうして') || 
-        normalizedHeader.includes('なぜ') ||
-        normalizedHeader.includes('意見') ||
-        normalizedHeader.includes('答え') ||
-        normalizedHeader.includes('問題') ||
-        normalizedHeader.includes('質問')) {
-      mapping.answer = index;
+        normalizedHeader.includes('なぜ')) {
+      if (!mapping.answer) {
+        mapping.answer = index;
+        confidence.answer = 75;
+      }
     }
     
-    // 理由列の検出（AI パターンマッチング）
     if (normalizedHeader.includes('理由') || 
-        normalizedHeader.includes('体験') ||
-        normalizedHeader.includes('根拠') ||
-        normalizedHeader.includes('詳細') ||
-        normalizedHeader.includes('説明')) {
-      mapping.reason = index;
+        normalizedHeader.includes('体験')) {
+      if (!mapping.reason) {
+        mapping.reason = index;
+        confidence.reason = 75;
+      }
     }
     
-    // クラス列の検出
     if (normalizedHeader.includes('クラス') || 
         normalizedHeader.includes('学年') ||
         normalizedHeader.includes('組')) {
-      mapping.class = index;
+      if (!mapping.class) {
+        mapping.class = index;
+        confidence.class = 85;
+      }
     }
     
-    // 名前列の検出
     if (normalizedHeader.includes('名前') || 
         normalizedHeader.includes('氏名') ||
         normalizedHeader.includes('お名前')) {
-      mapping.name = index;
+      if (!mapping.name) {
+        mapping.name = index;
+        confidence.name = 90;
+      }
     }
     
     // リアクション列の検出
-    if (header === 'なるほど！') mapping.understand = index;
-    if (header === 'いいね！') mapping.like = index;
-    if (header === 'もっと知りたい！') mapping.curious = index;
-    if (header === 'ハイライト') mapping.highlight = index;
+    if (header === 'なるほど！') {
+      mapping.understand = index;
+      confidence.understand = 100;
+    } else if (header === 'いいね！') {
+      mapping.like = index;
+      confidence.like = 100;
+    } else if (header === 'もっと知りたい！') {
+      mapping.curious = index;
+      confidence.curious = 100;
+    } else if (header === 'ハイライト') {
+      mapping.highlight = index;
+      confidence.highlight = 100;
+    }
   });
   
-  return mapping;
+  return { mapping, confidence };
 }
 
 /**
@@ -861,11 +910,13 @@ function analyzeColumns(spreadsheetId, sheetName) {
       throw new Error(`シート '${sheetName}' が見つかりません`);
     }
 
-    // ヘッダー行取得
+    // ヘッダー行とサンプルデータ取得
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const dataRange = sheet.getRange(1, 1, Math.min(11, sheet.getLastRow()), sheet.getLastColumn());
+    const allData = dataRange.getValues();
     
-    // 列マッピング生成
-    const columnMapping = detectColumnMapping(headerRow);
+    // 高精度列マッピング生成（データ分析付き）
+    const columnMapping = generateColumnMapping(headerRow, allData);
     
     console.info('✅ analyzeColumns: CLAUDE.md準拠列分析完了', {
       headerCount: headerRow.length,
@@ -896,5 +947,38 @@ function analyzeColumns(spreadsheetId, sheetName) {
       error: error.message,
       timestamp: new Date().toISOString()
     };
+  }
+}
+
+/**
+ * getHeaderIndices - Frontend compatibility function
+ * Wraps getSpreadsheetColumnIndices to provide expected interface
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} ヘッダー情報とカラムインデックス
+ */
+function getHeaderIndices(spreadsheetId, sheetName) {
+  try {
+    console.log('getHeaderIndices: フロントエンド互換関数開始', {
+      spreadsheetId,
+      sheetName
+    });
+
+    // 既存のgetSpreadsheetColumnIndices関数を使用
+    const result = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
+    
+    console.log('✅ getHeaderIndices: フロントエンド互換関数完了', {
+      hasResult: !!result,
+      opinionHeader: result?.opinionHeader
+    });
+
+    return result;
+  } catch (error) {
+    console.error('❌ getHeaderIndices: エラー:', {
+      spreadsheetId,
+      sheetName,
+      error: error.message
+    });
+    throw error;
   }
 }
