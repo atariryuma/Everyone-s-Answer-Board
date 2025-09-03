@@ -1102,12 +1102,6 @@
       const spreadsheetId = this.value;
       const selectedText = this.options[this.selectedIndex]?.text || '';
       
-      console.log('📋 スプレッドシート選択イベント', {
-        spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
-        selectedText: selectedText.substring(0, 50),
-        hasValue: !!spreadsheetId,
-        timestamp: new Date().toISOString()
-      });
       
       if (spreadsheetId) {
         // 即座にユーザーフィードバックを表示
@@ -1119,7 +1113,6 @@
         
         loadSheetList(spreadsheetId);
       } else {
-        console.log('⚠️ スプレッドシートが未選択のため、シート読み込みをスキップ');
         const sheetSelect = document.getElementById('sheet-select');
         if (sheetSelect) {
           sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
@@ -1182,10 +1175,6 @@
 
   // シート一覧読み込み
   function loadSheetList(spreadsheetId) {
-    console.log('🔄 loadSheetList: シート一覧読み込み開始', { 
-      spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
-      timestamp: new Date().toISOString()
-    });
     
     const select = document.getElementById('sheet-select');
     if (!select) {
@@ -1201,11 +1190,6 @@
 
     google.script.run
       .withSuccessHandler(function (sheets) {
-        console.log('✅ loadSheetList: シート一覧取得成功', {
-          sheetCount: sheets?.length || 0,
-          sheets: sheets?.map(s => s.name) || [],
-          timestamp: new Date().toISOString()
-        });
         
         select.innerHTML = '<option value="">シートを選択...</option>';
         
@@ -1215,7 +1199,6 @@
           noSheetOption.textContent = '利用可能なシートがありません';
           noSheetOption.disabled = true;
           select.appendChild(noSheetOption);
-          console.warn('⚠️ loadSheetList: シートが0件です');
         } else {
           sheets.forEach((sheet) => {
             const option = document.createElement('option');

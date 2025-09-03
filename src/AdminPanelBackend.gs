@@ -1258,25 +1258,25 @@ function getHeaderIndices(spreadsheetId, sheetName) {
  */
 function getSheetList(spreadsheetId) {
   try {
-    console.log('getSheetList: フロントエンド互換関数開始', {
-      spreadsheetId
-    });
-
     if (!spreadsheetId) {
       throw new Error('スプレッドシートIDが必要です');
     }
 
-    // スプレッドシートを開く
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
     
-    // シート名の配列を作成
-    const sheetList = sheets.map(sheet => sheet.getName());
+    // フロントエンドが期待するオブジェクト形式で返す
+    const sheetList = sheets.map(sheet => ({
+      name: sheet.getName(),
+      isFormResponseSheet: false,
+      formConnected: false,
+      formTitle: ''
+    }));
     
     console.log('✅ getSheetList: シート一覧取得完了', {
       spreadsheetId,
       sheetCount: sheetList.length,
-      sheetNames: sheetList
+      sheetNames: sheetList.map(s => s.name)
     });
 
     return sheetList;
