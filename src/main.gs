@@ -17,7 +17,6 @@ const User = {
   email() {
     try {
       const email = Session.getActiveUser().getEmail();
-      console.log('User.email() called, returning:', email);
       return email;
     } catch (e) {
       console.error('User.email() error:', e);
@@ -38,10 +37,8 @@ function doGet(e) {
 
     // リクエストパラメータを解析
     const params = parseRequestParams(e);
-    console.log('doGet - Received params:', params);
 
     if (!isSystemSetup()) {
-      console.warn('System not setup, redirecting to setup page');
       return renderSetupPage(params);
     }
 
@@ -110,13 +107,11 @@ function doGet(e) {
         }
         
       case 'admin':
-        console.log('doGet - Admin mode detected, userId:', params.userId);
         if (!params.userId) {
           throw new Error('Admin mode requires userId parameter');
         }
         try {
           const currentUserEmail = User.email();
-          console.log('doGet - Current user email:', currentUserEmail);
           
           // 🔍 デバッグ情報取得
           const debugInfo = {
@@ -166,14 +161,11 @@ function doGet(e) {
         }
 
       case 'login':
-        console.log('doGet - Login mode detected');
         return renderLoginPage(params);
 
       case 'view':
       default:
-        console.log('doGet - View mode (default), userId:', params.userId);
         if (!params.userId) {
-          console.log('doGet - No userId provided, redirecting to login');
           return renderLoginPage(params);
         }
 
@@ -193,15 +185,6 @@ function doGet(e) {
 
           // ユーザー情報変換（DBからの完全なユーザー情報を取得）
           const dbUserInfo = DB.findUserById(params.userId);
-          console.log('doGet - dbUserInfo:', {
-            userId: dbUserInfo?.userId,
-            hasSpreadsheetId: !!dbUserInfo?.spreadsheetId,
-            hasSheetName: !!dbUserInfo?.sheetName,
-            spreadsheetId: dbUserInfo?.spreadsheetId
-              ? `${dbUserInfo.spreadsheetId.substring(0, 20)}...`
-              : 'null',
-            sheetName: dbUserInfo?.sheetName,
-          });
 
           const compatUserInfo = {
             userId: params.userId,
@@ -620,7 +603,6 @@ function getSuggestedAction(diagnostics) {
  * @returns {string} WebApp URL
  */
 function getWebAppUrl() {
-  console.log('getWebAppUrl: WebApp URL取得開始');
 
   // 1. 複数の方法でWebApp URLを取得試行
   const urlMethods = [

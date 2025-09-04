@@ -91,9 +91,8 @@ class ConfigurationManager {
     if (!user) return null;
 
     try {
-      // 🚀 5項目最適化構造からconfigJsonを読み込み
-      const configJson = user.configJson || '{}';
-      const config = JSON.parse(configJson);
+      // 🚀 5項目最適化構造からparsedConfigを使用
+      const config = user.parsedConfig || {};
 
       // ⚡ 動的URL生成（キャッシュ付き）
       const dynamicUrls = this.generateDynamicUrls(config, userId);

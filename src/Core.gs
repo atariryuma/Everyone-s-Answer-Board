@@ -68,7 +68,6 @@ function determineSetupStep(userInfo, configJson) {
   }
 
   // フォールバック: Step 2
-  console.log('determineSetupStep: フォールバック - Step 2');
   return 2;
 }
 
@@ -85,7 +84,6 @@ const _executionSheetsServiceCache = null;
  */
 function validateHeaderIntegrity(userId) {
   try {
-    console.log('🔍 Starting header integrity validation for userId:', userId);
 
     const userInfo = getActiveUserInfo();
     if (!userInfo || !userInfo.parsedConfig) {
@@ -140,7 +138,6 @@ function validateHeaderIntegrity(userId) {
 
     // ログ出力
     if (validationResults.success) {
-      console.log('✅ Header integrity validation passed');
     } else {
       console.warn('⚠️ Header integrity validation failed:', validationResults.issues);
     }
@@ -263,7 +260,7 @@ function registerNewUser(userEmail) {
     if (existingUser) {
       // 既存ユーザーの場合は最小限の更新のみ（設定は保護）
       const { userId } = existingUser;
-      const existingConfig = JSON.parse(existingUser.configJson || '{}');
+      const existingConfig = existingUser.parsedConfig || {};
 
       console.info('registerNewUser: 既存ユーザー更新:', sanitizedEmail);
 
@@ -485,10 +482,8 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     if (!userInfo) {
       throw new Error(`ユーザー情報が見つかりません (userId: ${currentUserId})`);
     }
-    console.log('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
 
     const configJson = userInfo.parsedConfig || {};
-    console.log('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
 
     // セットアップ状況を確認
     const setupStatus = configJson.setupStatus || 'pending';
@@ -515,7 +510,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     // シート固有の設定を取得 (sheetKey is based only on sheet name)
     const sheetKey = `sheet_${targetSheetName}`;
     const sheetConfig = configJson[sheetKey] || {};
-    console.log('getPublishedSheetData: sheetConfig=%s', JSON.stringify(sheetConfig));
 
     // Check if current user is the board owner
     const isOwner = configJson.ownerId === currentUserId;
@@ -576,7 +570,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     const headerIndices = getSpreadsheetColumnIndices(targetSpreadsheetId, targetSheetName);
-    console.log('getPublishedSheetData: Available headerIndices=%s', JSON.stringify(headerIndices));
 
     // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
     const mappedIndices = mapConfigToActualHeaders(
@@ -588,7 +581,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       },
       headerIndices
     );
-    console.log('getPublishedSheetData: Mapped indices=%s', JSON.stringify(mappedIndices));
 
     const formattedData = formatSheetDataForFrontend(
       sheetData.data,
@@ -1112,7 +1104,7 @@ function getResponsesData(userId, sheetName) {
   try {
     const service = getSheetsServiceCached();
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo.parsedConfig || JSON.parse(userInfo.configJson || '{}');
+    const config = userInfo.parsedConfig || {};
     const {spreadsheetId} = config;
     // 🚀 CLAUDE.md準拠：A:E範囲使用でパフォーマンス最適化
     const range = `'${  sheetName || 'フォームの回答 1'  }'!A:E`;
@@ -1370,7 +1362,7 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
     }
 
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo.parsedConfig || JSON.parse(userInfo.configJson || '{}');
+    const config = userInfo.parsedConfig || {};
     const result = processHighlightToggle(
       config.spreadsheetId,
       sheetName || 'フォームの回答 1',
@@ -1526,7 +1518,7 @@ function getSheetColumns(userId, sheetId) {
     const userInfo = DB.findUserById(userId);
     
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo ? (userInfo.parsedConfig || JSON.parse(userInfo.configJson || '{}')) : {};
+    const config = userInfo ? (userInfo.parsedConfig || {}) : {};
     if (!userInfo || !config.spreadsheetId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
@@ -2457,7 +2449,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     }
 
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo.parsedConfig || JSON.parse(userInfo.configJson || '{}');
+    const config = userInfo.parsedConfig || {};
     const {spreadsheetId} = config;
 
     // spreadsheetIDの型と存在をチェック
@@ -3405,7 +3397,7 @@ function createForm(requestUserId, config) {
     if (existingUser) {
       console.log('createCustomFormUI - updating user data for:', requestUserId);
 
-      const updatedConfigJson = JSON.parse(existingUser.configJson || '{}');
+      const updatedConfigJson = existingUser.parsedConfig || {};
       updatedConfigJson.formUrl = result.formUrl;
       updatedConfigJson.editFormUrl = result.editFormUrl || result.formUrl;
       updatedConfigJson.formCreated = true;
@@ -3524,7 +3516,7 @@ function activateSheetSimple(requestUserId, sheetName) {
     verifyUserAccess(requestUserId);
     const userInfo = DB.findUserById(requestUserId);
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo ? (userInfo.parsedConfig || JSON.parse(userInfo.configJson || '{}')) : {};
+    const config = userInfo ? (userInfo.parsedConfig || {}) : {};
     if (!userInfo || !config.spreadsheetId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
