@@ -1433,8 +1433,13 @@
     let autoAppliedCount = 0;
     let highConfidenceCount = 0;
 
-    // 高信頼度(80%以上)の検出結果を自動適用
+    // 高信頼度(80%以上)の検出結果を自動適用（UI列のみ）
     Object.keys(mapping).forEach(columnType => {
+      // リアクション列はスキップ（UIドロップダウンが存在しない）
+      if (['highlight', 'curious', 'like', 'understand'].includes(columnType)) {
+        return;
+      }
+      
       const columnIndex = mapping[columnType];
       const confidenceValue = confidence?.[columnType] || 0;
       

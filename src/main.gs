@@ -105,7 +105,7 @@ function doGet(e) {
           }
 
           // ユーザー情報変換（DBからの完全なユーザー情報を取得）
-          const dbUserInfo = DB.findUserByIdNoCache(params.userId);
+          const dbUserInfo = DB.findUserById(params.userId);
           console.log('doGet - dbUserInfo:', {
             userId: dbUserInfo?.userId,
             hasSpreadsheetId: !!dbUserInfo?.spreadsheetId,
@@ -1117,7 +1117,7 @@ function checkCurrentPublicationStatus(userId) {
     console.log('checkCurrentPublicationStatus - userId:', userId);
 
     // 新アーキテクチャでのユーザー情報取得
-    const userInfo = DB.findUserByIdNoCache(userId);
+    const userInfo = DB.findUserById(userId);
     if (!userInfo) {
       console.warn('User not found for publication status check:', userId);
       return { error: 'User not found', isPublished: false };

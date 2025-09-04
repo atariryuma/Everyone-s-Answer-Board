@@ -661,7 +661,7 @@ const DB = {
       }
 
       // 3. 削除対象ユーザー情報取得（キャッシュバイパス）
-      const targetUser = this.findUserByIdNoCache(targetUserId);
+      const targetUser = this.findUserById(targetUserId);
       if (!targetUser) {
         throw new Error('削除対象ユーザーが見つかりません');
       }
