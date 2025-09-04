@@ -503,60 +503,91 @@ function saveDraftConfiguration(config) {
  * フォーム情報取得（CLAUDE.md準拠版）
  * 統一データソース原則：configJsonからフォーム情報を取得
  */
-function getFormInfo() {
+function getFormInfo(spreadsheetId, sheetName) {
   try {
-    console.log('📋 getFormInfo: CLAUDE.md準拠configJSON中心型フォーム情報取得開始');
+    console.log('📋 getFormInfo: シート固有フォーム情報取得開始', { spreadsheetId, sheetName });
 
-    const currentUser = User.email();
-    const userInfo = DB.findUserByEmail(currentUser);
-
-    if (!userInfo) {
+    if (!spreadsheetId || !sheetName) {
       return {
         success: false,
-        hasFormData: false,
-        error: 'ユーザー情報が見つかりません'
+        error: 'スプレッドシートIDまたはシート名が指定されていません',
+        formData: {
+          hasForm: false,
+          formUrl: null,
+          formTitle: null
+        }
       };
     }
 
-    // CLAUDE.md準拠：統一データソース - configJsonからフォーム情報を取得
-    const config = userInfo.parsedConfig || {};
+    // シート固有のフォーム連携確認
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
     
+    if (!sheet) {
+      return {
+        success: false,
+        error: '指定されたシートが見つかりません',
+        formData: {
+          hasForm: false,
+          formUrl: null,
+          formTitle: null
+        }
+      };
+    }
+
+    // シート固有のフォームURL取得
+    let formUrl = null;
+    let formTitle = null;
+    let hasForm = false;
+
+    try {
+      formUrl = sheet.getFormUrl();
+      if (formUrl) {
+        hasForm = true;
+        // フォームタイトル取得
+        try {
+          const form = FormApp.openByUrl(formUrl);
+          formTitle = form.getTitle();
+        } catch (formError) {
+          console.warn('フォームタイトル取得エラー:', formError.message);
+          formTitle = `フォーム（ID: ${formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1]?.substring(0, 8)}...）`;
+        }
+      }
+    } catch (error) {
+      console.info('フォーム連携なし:', sheetName);
+    }
+
     const formData = {
-      hasForm: !!config.formUrl,
-      formUrl: config.formUrl || null,
-      formTitle: config.formTitle || null,
-      lastConnected: config.lastConnected || null,
-      spreadsheetId: config.spreadsheetId || null, // 統一データソース
-      sheetName: config.sheetName || null, // 統一データソース
-      claudeMdCompliant: config.claudeMdCompliant || false
+      hasForm: hasForm,
+      formUrl: formUrl,
+      formTitle: formTitle,
+      spreadsheetId: spreadsheetId,
+      sheetName: sheetName
     };
 
-    console.log('✅ getFormInfo: CLAUDE.md準拠configJSON中心型取得完了', {
+    console.log('✅ getFormInfo: シート固有フォーム情報取得完了', {
+      sheetName: sheetName,
       hasForm: formData.hasForm,
-      hasSpreadsheet: !!formData.spreadsheetId,
-      claudeMdCompliant: formData.claudeMdCompliant
+      formTitle: formData.formTitle,
+      formUrl: !!formData.formUrl
     });
 
     return {
       success: true,
-      hasFormData: formData,
-      formData,
-      result: formData,
-      claudeMdCompliant: true,
-      timestamp: new Date().toISOString()
+      formData: formData,
+      hasFormData: formData
     };
 
   } catch (error) {
-    console.error('❌ getFormInfo: CLAUDE.md準拠エラー:', {
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-    
+    console.error('❌ getFormInfo: エラー:', error.message);
     return {
       success: false,
-      hasFormData: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      formData: {
+        hasForm: false,
+        formUrl: null,
+        formTitle: null
+      }
     };
   }
 }

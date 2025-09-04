@@ -1208,20 +1208,11 @@
           // 新しいドロップダウン式列マッピングを更新
           updateColumnMapping(result);
 
-          // アプリケーション名自動生成
-          // アプリケーション名自動生成は削除（CLAUDE.md準拠）
+          // 🚀 UX向上：AI判定の自動適用
+          autoApplyAIDetection(result);
 
-          // 自動検出の信頼度をチェック
-          if (result.columnMapping && result.columnMapping.confidence) {
-            const confidence = result.columnMapping.confidence;
-            const avgConfidence =
-              Object.values(confidence).reduce((sum, val) => sum + (val || 0), 0) /
-              Math.max(Object.keys(confidence).length, 1);
-
-            if (avgConfidence < 70) {
-              showInfo('💡 AI検出の信頼度が低めです。ドロップダウンで手動調整してください。');
-            }
-          }
+          // 🎯 UX向上：次ステップの案内
+          showNextStepGuidance(result);
         } else {
           handleConnectionError(result.error, { spreadsheetId, sheetName });
         }
@@ -1420,6 +1411,75 @@
     if (aiInfo) {
       aiInfo.classList.remove('hidden');
     }
+  }
+
+  // 🚀 UX向上：AI判定の自動適用機能
+  function autoApplyAIDetection(result) {
+    if (!result || !result.success || !result.columnMapping) {
+      return;
+    }
+
+    const mapping = result.columnMapping;
+    let autoAppliedCount = 0;
+    let highConfidenceCount = 0;
+
+    // 高信頼度(80%以上)の検出結果を自動適用
+    Object.keys(mapping).forEach(columnType => {
+      const detection = mapping[columnType];
+      
+      // confidenceがオブジェクトの場合は該当カラムの信頼度を取得
+      let confidence = 0;
+      if (detection && typeof detection === 'object') {
+        if (typeof detection.confidence === 'number') {
+          confidence = detection.confidence;
+        } else if (typeof detection === 'number') {
+          confidence = detection;
+        }
+      }
+
+      if (confidence >= 80) {
+        highConfidenceCount++;
+        const dropdown = document.getElementById(`${columnType}-column-select`);
+        if (dropdown && detection.columnIndex !== undefined) {
+          dropdown.value = detection.columnIndex;
+          dropdown.classList.add('has-auto-applied');
+          dropdown.classList.remove('has-manual-selection');
+          
+          // 信頼度バッジを更新
+          showConfidenceBadge(columnType, confidence, 'auto-applied');
+          autoAppliedCount++;
+          
+          console.log(`🤖 AI自動適用: ${columnType} → ${detection.columnIndex}列 (信頼度: ${confidence}%)`);
+        }
+      }
+    });
+
+    // ユーザーフィードバック
+    if (autoAppliedCount > 0) {
+      showSuccess(`🤖 高精度AI判定を${autoAppliedCount}項目自動適用しました！`);
+      updateProgress(3); // 列設定完了まで進める
+    } else if (highConfidenceCount === 0) {
+      showInfo('💡 AI判定の信頼度が低めです。ドロップダウンで手動設定してください。');
+    }
+  }
+
+  // 🎯 UX向上：次ステップ案内機能  
+  function showNextStepGuidance(result) {
+    if (!result || !result.success) return;
+
+    const mapping = result.columnMapping || {};
+    const hasAutoApplied = Object.values(mapping).some(detection => {
+      const confidence = typeof detection?.confidence === 'number' ? detection.confidence : 0;
+      return confidence >= 80;
+    });
+
+    setTimeout(() => {
+      if (hasAutoApplied) {
+        showSuccess('✨ AI判定を自動適用済み。「設定を確認」で完了できます！');
+      } else {
+        showInfo('💡 ドロップダウンで列を手動設定してから「設定を確認」してください');
+      }
+    }, 1500); // 他のメッセージの後に表示
   }
 
   // ドロップダウンの変更イベントリスナーを設定
