@@ -1007,13 +1007,8 @@ function renderLoginPage(params = {}) {
  * @returns {HtmlService.HtmlOutput} HTML出力
  */
 function renderAnswerBoard(userInfo, params) {
-  let config = {};
-  try {
-    config = JSON.parse(userInfo.configJson || '{}');
-  } catch (e) {
-    console.error('Config JSON parse error:', e);
-    config = {};
-  }
+  // 🔥 parsedConfig優先アクセス（パフォーマンス向上）
+  const config = userInfo.parsedConfig || {};
 
   console.log('renderAnswerBoard - userId:', userInfo.userId);
   console.log('renderAnswerBoard - mode:', params.mode);
@@ -1210,14 +1205,8 @@ function checkCurrentPublicationStatus(userId) {
       return { error: 'User not found', isPublished: false };
     }
 
-    // 設定情報を解析
-    let config = {};
-    try {
-      config = JSON.parse(userInfo.configJson || '{}');
-    } catch (e) {
-      console.warn('Config JSON parse error during publication status check:', e.message);
-      return { error: 'Config parse error', isPublished: false };
-    }
+    // 🔥 設定情報を効率的に取得（parsedConfig優先）
+    const config = userInfo.parsedConfig || {};
 
     // configJSON中心型：公開状態判定
     const isPublished = config.appPublished === true;
@@ -1666,6 +1655,29 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
 // testDatabaseMigration関数はSystemManager.gsに完全移行しました
 
 /**
+ * 🔧 統一エラーハンドリング関数
+ */
+function handleSystemError(context, error, userId = null, additionalData = {}) {
+  const errorInfo = {
+    context,
+    message: error.message,
+    stack: error.stack,
+    userId,
+    timestamp: new Date().toISOString(),
+    ...additionalData
+  };
+  
+  console.error(`❌ [${context}] システムエラー:`, errorInfo);
+  
+  return {
+    success: false,
+    error: error.message,
+    context,
+    timestamp: errorInfo.timestamp
+  };
+}
+
+/**
  * 🔧 グローバル関数: getActiveUserInfo（Core.gs互換性用）
  * Core.gsから呼び出される際の互換性を保つためのグローバル関数
  */
@@ -1689,4 +1701,47 @@ function getActiveUserInfo() {
     console.error('getActiveUserInfo グローバル関数エラー:', error.message);
     return null;
   }
+}
+
+/**
+ * 🔧 データ状態一元検証関数
+ */
+function validateUserDataState(userInfo) {
+  const issues = [];
+  const fixes = [];
+
+  // 基本フィールド検証
+  if (!userInfo.userId) {
+    issues.push('userIdが設定されていません');
+    fixes.push('ユーザーIDを設定');
+  }
+  
+  if (!userInfo.userEmail) {
+    issues.push('userEmailが設定されていません');
+    fixes.push('メールアドレスを設定');
+  }
+  
+  if (userInfo.isActive !== true && userInfo.isActive !== false) {
+    issues.push('isActiveフラグが不正です');
+    fixes.push('isActiveをbooleanに設定');
+  }
+
+  // 設定データ検証
+  const config = userInfo.parsedConfig || {};
+  if (config.appPublished && !config.spreadsheetId) {
+    issues.push('公開状態だがスプレッドシートIDがありません');
+    fixes.push('スプレッドシート接続を確認');
+  }
+  
+  if (config.isDraft === true && config.appPublished === true) {
+    issues.push('ドラフト状態と公開状態が同時にtrueです');
+    fixes.push('状態フラグを整理');
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues,
+    fixes,
+    summary: issues.length > 0 ? `${issues.length}個の問題を検出` : '状態正常'
+  };
 }

@@ -485,14 +485,8 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // 設定情報を取得
-    let config = {};
-    try {
-      config = JSON.parse(userInfo.configJson || '{}');
-    } catch (e) {
-      console.warn('getDataCount: configJson解析エラー:', e.message);
-      config = {};
-    }
+    // 🔥 設定情報を効率的に取得（parsedConfig優先）
+    const config = userInfo.parsedConfig || {};
 
     // スプレッドシート設定確認（configJSON中心型）
     const spreadsheetId = config.spreadsheetId;

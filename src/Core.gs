@@ -176,7 +176,7 @@ function getOpinionHeaderSafely(userId, sheetName) {
       return 'お題';
     }
 
-    const config = JSON.parse(userInfo.configJson || '{}');
+    const config = userInfo.parsedConfig || {};
     const sheetConfigKey = `sheet_${config.targetSheetName || sheetName}`;
     const sheetConfig = config[sheetConfigKey] || {};
 
@@ -487,7 +487,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     }
     console.log('getPublishedSheetData: userInfo=%s', JSON.stringify(userInfo));
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
     console.log('getPublishedSheetData: configJson=%s', JSON.stringify(configJson));
 
     // セットアップ状況を確認
@@ -663,7 +663,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
     const setupStatus = configJson.setupStatus || 'pending';
     
     // 🚀 CLAUDE.md準拠：統一データソース原則 - configJSONからのみデータ取得
@@ -952,7 +952,7 @@ function getAppConfig(requestUserId) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
 
     // --- Auto-healing for inconsistent setup states ---
     let needsUpdate = false;
@@ -1077,7 +1077,7 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
 
     configJson.appPublished = true; // シートを切り替えたら公開状態にする
     configJson.lastModified = new Date().toISOString();
@@ -1191,7 +1191,7 @@ function getActiveFormInfo(requestUserId) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
 
     // フォーム回答数を取得
     let answerCount = 0;
@@ -1279,7 +1279,7 @@ function updateFormSettings(requestUserId, title, description) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
 
     if (configJson.editFormUrl) {
       try {
@@ -1324,7 +1324,7 @@ function saveSystemConfig(requestUserId, config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
 
     // システム設定を更新
     configJson.systemConfig = {
@@ -1756,7 +1756,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
 //       throw new Error('ユーザー情報が見つかりません');
 //     }
 
-//     const configJson = JSON.parse(userInfo.configJson || '{}');
+//     const configJson = userInfo.parsedConfig || {};
 
 //     configJson.targetSpreadsheetId = '';
 //     configJson.targetSheetName = '';
@@ -2057,7 +2057,7 @@ function saveClassChoices(userId, classChoices) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
     configJson.savedClassChoices = classChoices;
     configJson.lastClassChoicesUpdate = new Date().toISOString();
 
@@ -2084,7 +2084,7 @@ function getSavedClassChoices(userId) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
     const savedClassChoices = configJson.savedClassChoices || [
       'クラス1',
       'クラス2',
@@ -2501,7 +2501,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const rosterMap = buildRosterMap(rosterData);
 
     // 表示モードを取得
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
     const displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
 
     // Check if current user is the board owner
@@ -3685,7 +3685,7 @@ function getInitialData(requestUserId, targetSheetName) {
     }
 
     // === ステップ2: 設定データの取得と自動修復 ===
-    const configJson = JSON.parse(userInfo.configJson || '{}');
+    const configJson = userInfo.parsedConfig || {};
 
     // Auto-healing for inconsistent setup states
     let needsUpdate = false;

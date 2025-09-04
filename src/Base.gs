@@ -176,7 +176,8 @@ class ConfigurationManager {
       }
       return false;
     } catch (error) {
-      console.error(`設定保存エラー (${userId}):`, error);
+      // 🔥 統一エラーハンドリング使用
+      handleSystemError('setUserConfig', error, userId);
       return false;
     }
   }

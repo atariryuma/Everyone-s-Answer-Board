@@ -504,11 +504,12 @@ const SystemManager = {
       console.info(`👤 ユーザー ${userId} のconfigJson最適化開始`);
 
       const userInfo = DB.findUserById(userId);
-      if (!userInfo || !userInfo.configJson) {
-        return { success: false, reason: 'ユーザーまたはconfigJsonが存在しません' };
+      if (!userInfo || !userInfo.parsedConfig) {
+        return { success: false, reason: 'ユーザーまたは設定が存在しません' };
       }
 
-      const config = JSON.parse(userInfo.configJson);
+      // 🔥 parsedConfig優先アクセス（パフォーマンス向上）
+      const config = { ...userInfo.parsedConfig }; // コピーして変更可能にする
       let isModified = false;
 
       // 最適化処理
