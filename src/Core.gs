@@ -591,24 +591,9 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       sheetData.displayMode
     );
 
-    console.log('getPublishedSheetData: formattedData length=%s', formattedData.length);
-    console.log('getPublishedSheetData: formattedData content=%s', JSON.stringify(formattedData));
-    
-    // 🔍 緊急データソース診断：空データ原因調査
-    console.log('🚨 空データ調査開始 - データソース詳細確認');
-    console.log('📊 基盤データ情報:', {
-      sheetDataStatus: sheetData.status,
-      sheetDataLength: sheetData.data?.length || 0,
-      sheetDataSample: sheetData.data?.slice(0, 3).map(row => ({
-        originalDataLength: row.originalData?.length || 0,
-        originalDataSample: row.originalData?.slice(0, 5) || 'No originalData'
-      })) || 'No sheetData'
-    });
-    console.log('🗂️ ヘッダーマッピング情報:', {
-      mappedIndices,
-      headerIndices,
-      targetSpreadsheetId,
-      targetSheetName
+    console.log('getPublishedSheetData: 正常完了', {
+      dataCount: formattedData.length,
+      status: sheetData.status
     });
 
     // ボードのタイトルを実際のスプレッドシートのヘッダーから取得
@@ -2487,20 +2472,6 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
 
     const responses = batchGetSheetsData(service, spreadsheetId, ranges);
     const sheetData = responses.valueRanges[0].values || [];
-    
-    // 🔍 緊急診断：スプレッドシート生データ確認
-    console.log('🚨 executeGetSheetData - スプレッドシート生データ診断:', {
-      spreadsheetId,
-      sheetName,
-      requestedRange: ranges[0],
-      responseStatus: responses ? 'OK' : 'ERROR',
-      rawDataLength: sheetData.length,
-      rawDataSample: sheetData.slice(0, 3).map((row, idx) => ({
-        rowIndex: idx,
-        columnCount: row?.length || 0,
-        values: row || 'No data'
-      }))
-    });
 
     // 名簿機能は使用せず、空の配列を設定
     const rosterData = [];
@@ -2516,17 +2487,6 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
 
     const headers = sheetData[0];
     const dataRows = sheetData.slice(1);
-    
-    // 🔍 緊急診断：ヘッダーとデータ行の詳細確認
-    console.log('🚨 executeGetSheetData - ヘッダー・データ詳細:', {
-      headers: headers || 'No headers',
-      headerCount: headers?.length || 0,
-      dataRowCount: dataRows.length,
-      dataRowSample: dataRows.slice(0, 3).map((row, idx) => ({
-        rowIndex: idx + 2,
-        data: row || 'Empty row'
-      }))
-    });
 
     // ヘッダーインデックスを取得（キャッシュ利用）
     const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
