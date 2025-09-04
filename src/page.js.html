@@ -256,167 +256,60 @@
     })
   });
 
-  // ✅ CLAUDE.md準拠: App名前空間パターン
+  // ✅ CLAUDE.md準拠: App名前空間パターン（効率化版）
+  const createGasMethod = (methodName, funcName, errorContext) => {
+    return async (...args) => {
+      try {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            [funcName](...args);
+        });
+      } catch (error) {
+        console.error(`❌ ${errorContext} エラー:`, error);
+        throw error;
+      }
+    };
+  };
+
   const App = {
-    getConfig() {
-      return {
-        async getUserConfig(userId) {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getCurrentConfig(userId);
-            });
-          } catch (error) {
-            console.error('❌ App.getConfig.getUserConfig エラー:', error);
-            throw error;
-          }
-        }
-      };
-    },
+    getConfig: () => ({
+      getUserConfig: createGasMethod('getUserConfig', 'getCurrentConfig', 'App.getConfig.getUserConfig')
+    }),
 
-    getAccess() {
-      return {
-        async verifyAccess(userId, mode, currentUserEmail) {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .verifyUserAccess(userId, mode, currentUserEmail);
-            });
-          } catch (error) {
-            console.error('❌ App.getAccess.verifyAccess エラー:', error);
-            throw error;
-          }
-        }
-      };
-    },
+    getAccess: () => ({
+      verifyAccess: createGasMethod('verifyAccess', 'verifyUserAccess', 'App.getAccess.verifyAccess')
+    }),
 
-    getData() {
-      return {
-        async getPublishedSheetData(userId, classFilter, sort, adminMode, bypassCache) {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getPublishedSheetData(userId, classFilter, sort, adminMode, bypassCache);
-            });
-          } catch (error) {
-            console.error('❌ App.getData.getPublishedSheetData エラー:', error);
-            throw error;
-          }
-        },
+    getData: () => ({
+      getPublishedSheetData: createGasMethod('getPublishedSheetData', 'getPublishedSheetData', 'App.getData.getPublishedSheetData'),
+      addReaction: createGasMethod('addReaction', 'addReaction', 'App.getData.addReaction'),
+      removeReaction: createGasMethod('removeReaction', 'removeReaction', 'App.getData.removeReaction'),
+      batchAddReaction: createGasMethod('batchAddReaction', 'batchAddReaction', 'App.getData.batchAddReaction')
+    }),
 
-        async addReaction(userId, rowIndex, reactionType) {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .addReaction(userId, rowIndex, reactionType);
-            });
-          } catch (error) {
-            console.error('❌ App.getData.addReaction エラー:', error);
-            throw error;
-          }
-        },
+    getForm: () => ({
+      getActiveFormInfo: createGasMethod('getActiveFormInfo', 'getActiveFormInfo', 'App.getForm.getActiveFormInfo')
+    }),
 
-        async removeReaction(userId, rowIndex, reactionType) {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .removeReaction(userId, rowIndex, reactionType);
-            });
-          } catch (error) {
-            console.error('❌ App.getData.removeReaction エラー:', error);
-            throw error;
-          }
-        },
+    getDomain: () => ({
+      getSystemDomainInfo: createGasMethod('getSystemDomainInfo', 'getSystemDomainInfo', 'App.getDomain.getSystemDomainInfo')
+    }),
 
-        async batchAddReaction(userId, reactions) {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .batchAddReaction(userId, reactions);
-            });
-          } catch (error) {
-            console.error('❌ App.getData.batchAddReaction エラー:', error);
-            throw error;
-          }
-        }
-      };
-    },
-
-    getForm() {
-      return {
-        async getActiveFormInfo(userId) {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getActiveFormInfo(userId);
-            });
-          } catch (error) {
-            console.error('❌ App.getForm.getActiveFormInfo エラー:', error);
-            throw error;
-          }
-        }
-      };
-    },
-
-    getDomain() {
-      return {
-        async getSystemDomainInfo() {
-          try {
-            return new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getSystemDomainInfo();
-            });
-          } catch (error) {
-            console.error('❌ App.getDomain.getSystemDomainInfo エラー:', error);
-            throw error;
-          }
-        }
-      };
-    },
-
-    getStatus() {
-      return {
-        async checkPublicationStatus(userId) {
-          try {
-            return new Promise((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                reject(new Error('Publication status check timeout'));
-              }, SYSTEM_CONSTANTS.TIMEOUTS.SHORT * 8);
-
-              google.script.run
-                .withSuccessHandler((response) => {
-                  clearTimeout(timeout);
-                  resolve(response);
-                })
-                .withFailureHandler((error) => {
-                  clearTimeout(timeout);
-                  reject(error);
-                })
-                .checkCurrentPublicationStatus(userId);
-            });
-          } catch (error) {
-            console.error('❌ App.getStatus.checkPublicationStatus エラー:', error);
-            throw error;
-          }
-        }
-      };
-    }
+    getStatus: () => ({
+      async checkPublicationStatus(userId) {
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Publication status check timeout')), SYSTEM_CONSTANTS.TIMEOUTS.SHORT * 8);
+          const cleanup = (fn) => (...args) => { clearTimeout(timeout); fn(...args); };
+          
+          google.script.run
+            .withSuccessHandler(cleanup(resolve))
+            .withFailureHandler(cleanup(reject))
+            .checkCurrentPublicationStatus(userId);
+        }).catch(error => { console.error('❌ App.getStatus.checkPublicationStatus エラー:', error); throw error; });
+      }
+    })
   };
 
   // ✅ CLAUDE.md準拠: SecurityValidator統合
@@ -698,6 +591,30 @@
 
       // パブリケーション状態監視システムの初期化
       this.initPublicationStatusMonitoring();
+    }
+
+    // 効率化ヘルパーメソッド
+    withElement(elementName, callback) {
+      const element = this.elements[elementName];
+      if (element) callback(element);
+      return this;
+    }
+
+    withElements(elementNames, callback) {
+      const elements = elementNames.map(name => this.elements[name]).filter(Boolean);
+      if (elements.length > 0) callback(elements);
+      return this;
+    }
+    // Helper for card reaction updates
+    updateCardIfExists(rowIndex, item, warningMsg = null) {
+      const card = document.querySelector(`[data-row-index="${rowIndex}"]`);
+      if (card && card.nodeType) {
+        this.updateCardReactions(card, item);
+        this.applyReactionStyles(card, item);
+      } else if (warningMsg) {
+        console.warn(warningMsg, rowIndex);
+      }
+      return card;
     }
 
     // CLAUDE.md準拠: 安全なデータアクセスメソッド
@@ -1087,13 +1004,8 @@
 
     determineRecoveryStrategy(error, context) {
       // Determine best recovery strategy based on error characteristics
-      if (this.state.pollingFailureCount <= 2) {
-        return 'retry';
-      } else if (this.state.pollingFailureCount <= 5) {
-        return 'clearAndReload';
-      } else {
-        return 'fallbackMode';
-      }
+      const failCount = this.state.pollingFailureCount;
+      return failCount <= 2 ? 'retry' : failCount <= 5 ? 'clearAndReload' : 'fallbackMode';
     }
 
     async executeRecoveryRetry(context) {
@@ -2908,65 +2820,37 @@
       return allValid;
     }
 
-    /**
-     * Display initialization error to user
-     * @param {string} message - Error message to display
-     */
-    displayInitializationError(message) {
+    // Unified error display system
+    displayError(message, type = 'init') {
       const container = this.elements.answersContainer;
       if (!container) return;
-
+      
+      const config = {
+        init: { color: 'red', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', title: '初期化エラー', buttons: 'reload' },
+        data: { color: 'yellow', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z', title: 'データ読み込みエラー', buttons: 'both' }
+      }[type];
+      
+      const retryBtn = config.buttons === 'both' ? `
+          <button onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
+            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600">再試行</button>` : '';
+      
       container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-        <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg class="mx-auto h-12 w-12 text-${config.color}-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${config.icon}" />
         </svg>
-        <h3 class="mt-2 text-lg font-medium text-red-400">初期化エラー</h3>
-        <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
-        <div class="mt-6">
-          <button 
-            onclick="window.location.reload()" 
-            class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-          >
-            ページを再読み込み
-          </button>
-        </div>
-      </div>
-    `;
-    }
-
-    /**
-     * Display data loading error to user
-     * @param {string} message - Error message to display
-     */
-    displayDataLoadError(message) {
-      const container = this.elements.answersContainer;
-      if (!container) return;
-
-      container.innerHTML = `
-      <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-        <svg class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
-        <h3 class="mt-2 text-lg font-medium text-yellow-400">データ読み込みエラー</h3>
+        <h3 class="mt-2 text-lg font-medium text-${config.color}-400">${config.title}</h3>
         <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
-          <button 
-            onclick="window.location.reload()" 
-            class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600"
-          >
+          <button onclick="window.location.reload()" 
+            class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
             ページを再読み込み
-          </button>
-          <button 
-            onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
-            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
-          >
-            再試行
-          </button>
+          </button>${retryBtn}
         </div>
-      </div>
-    `;
+      </div>`;
     }
+    displayInitializationError(message) { this.displayError(message, 'init'); }
+    displayDataLoadError(message) { this.displayError(message, 'data'); }
 
     showErrorMessage(message, isTemporary = true) {
       // 一時的なエラーメッセージを表示（トースト風）
@@ -4923,7 +4807,7 @@
     }
 
     applyReactionStyles(element, data) {
-      if (!element || !data || !(element instanceof HTMLElement)) return;
+      if (!element || !data || !element.nodeType) return;
 
       // 既存のリアクション関連クラスをクリア
       const reactionClasses = [
@@ -4961,16 +4845,11 @@
       // 背景色クラスを適用
       if (active.length === 1) {
         if (active[0] === 'LIKE') element.classList.add('reaction-bg-like');
-        else if (active[0] === 'UNDERSTAND') element.classList.add('reaction-bg-understand');
-        else if (active[0] === 'CURIOUS') element.classList.add('reaction-bg-curious');
+        else element.classList.add(`reaction-bg-${active[0].toLowerCase()}`);
       } else if (active.length === 2) {
-        const sorted = active.sort();
-        if (sorted[0] === 'CURIOUS' && sorted[1] === 'LIKE')
-          element.classList.add('reaction-bg-like-curious');
-        else if (sorted[0] === 'LIKE' && sorted[1] === 'UNDERSTAND')
-          element.classList.add('reaction-bg-like-understand');
-        else if (sorted[0] === 'CURIOUS' && sorted[1] === 'UNDERSTAND')
-          element.classList.add('reaction-bg-understand-curious');
+        const [a, b] = active.sort();
+        const combos = { 'CURIOUS,LIKE': 'like-curious', 'LIKE,UNDERSTAND': 'like-understand', 'CURIOUS,UNDERSTAND': 'understand-curious' };
+        element.classList.add(`reaction-bg-${combos[`${a},${b}`] || 'mixed'}`);
       } else if (active.length === 3) {
         element.classList.add('reaction-bg-like-understand-curious');
       }
@@ -4980,12 +4859,9 @@
         (sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0),
         0
       );
-      if (totalReactions >= 10) {
-        element.classList.add('reaction-border-3');
-      } else if (totalReactions >= 5) {
-        element.classList.add('reaction-border-2');
-      } else if (totalReactions > 0) {
-        element.classList.add('reaction-border-1');
+      if (totalReactions > 0) {
+        const borderClass = totalReactions >= 10 ? 'reaction-border-3' : totalReactions >= 5 ? 'reaction-border-2' : 'reaction-border-1';
+        element.classList.add(borderClass);
       }
     }
     async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
@@ -5203,23 +5079,12 @@
 
     shouldUpdateCard(newData, oldData) {
       if (!oldData) return true;
-
-      const newReactionCount = this.reactionTypes.reduce(
-        (sum, rt) => sum + (newData.reactions?.[rt.key]?.count || 0),
-        0
-      );
-      const oldReactionCount = this.reactionTypes.reduce(
-        (sum, rt) => sum + (oldData.reactions?.[rt.key]?.count || 0),
-        0
-      );
-
-      return (
-        newReactionCount !== oldReactionCount ||
-        newData.isHighlighted !== oldData.isHighlighted ||
-        newData.opinion !== oldData.opinion ||
-        this.validateReasonText(newData.reason) !== this.validateReasonText(oldData.reason) ||
-        newData.name !== oldData.name
-      );
+      
+      const getTotalReactions = data => this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
+      
+      return getTotalReactions(newData) !== getTotalReactions(oldData) ||
+        ['isHighlighted', 'opinion', 'name'].some(key => newData[key] !== oldData[key]) ||
+        this.validateReasonText(newData.reason) !== this.validateReasonText(oldData.reason);
     }
 
     finalizeRenderingState() {
@@ -5555,16 +5420,7 @@
 
         if (showName) {
           // 名前が利用可能な場合はそれを使用、なければemailから生成
-          if (safeData.name) {
-            displayName = safeData.name;
-          } else if (safeData.email) {
-            try {
-              displayName = safeData.email.split('@')[0];
-            } catch (emailError) {
-              console.warn('createAnswerCard: Email parsing error:', emailError);
-              displayName = 'ユーザー';
-            }
-          }
+          displayName = safeData.name || (safeData.email ? safeData.email.split('@')[0] : 'ユーザー');
         }
 
         const nameHtml =
@@ -6304,11 +6160,7 @@
 
       try {
         // カードのUI更新（同期実行）
-        const card = document.querySelector(`[data-row-index="${rowIndex}"]`);
-        if (card && card instanceof HTMLElement) {
-          this.updateCardReactions(card, item);
-          this.applyReactionStyles(card, item);
-        }
+        this.updateCardIfExists(rowIndex, item);
 
         // モーダルが開いている場合はそちらも更新
         if (!this.elements.answerModalContainer.classList.contains('hidden')) {
@@ -6344,13 +6196,7 @@
       if (immediate) {
         // 即座実行（requestAnimationFrameを使わない）
         try {
-          const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
-          if (card && card instanceof HTMLElement) {
-            this.updateCardReactions(card, item);
-            this.applyReactionStyles(card, item);
-          } else {
-            console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
-          }
+          this.updateCardIfExists(item.rowIndex, item, '⚠️ カード要素が見つかりません:');
 
           // モーダルが開いている場合はそちらも更新
           if (!this.elements.answerModalContainer.classList.contains('hidden')) {
@@ -6378,11 +6224,7 @@
         requestAnimationFrame(() => {
           try {
             // カードのリアクション表示を更新
-            const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
-            if (card && card instanceof HTMLElement) {
-              this.updateCardReactions(card, item);
-              this.applyReactionStyles(card, item);
-            } else {
+            if (!this.updateCardIfExists(item.rowIndex, item)) {
               console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
             }
 
@@ -6925,12 +6767,7 @@
 
     // アイテム状態のハッシュを計算（変更検出用）
     calculateStateHash(item) {
-      const state = {
-        reactions: item.reactions,
-        highlight: item.highlight,
-        rowIndex: item.rowIndex,
-      };
-      return JSON.stringify(state);
+      return JSON.stringify({ reactions: item.reactions, highlight: item.highlight, rowIndex: item.rowIndex });
     }
 
     // バッチ処理パフォーマンステスト（開発・デバッグ用）
@@ -7960,11 +7797,7 @@
 
       if (showName) {
         // 名前が利用可能な場合はそれを使用、なければemailから生成
-        if (data.name) {
-          modalDisplayName = data.name;
-        } else if (data.email) {
-          modalDisplayName = data.email.split('@')[0];
-        }
+        modalDisplayName = data.name || (data.email ? data.email.split('@')[0] : 'ユーザー');
       }
 
       this.elements.modalStudentName.textContent = modalDisplayName;
@@ -9298,703 +9131,6 @@
       debugLog('💡 個別処理システムは常に動作します（フォールバック保証）');
       return app.enableBatchProcessing;
     };
-
-    window.getBatchProcessingStatus = () => {
-      const app = window.answerBoardApp;
-      if (!app) return null;
-
-      return {
-        enabled: app.enableBatchProcessing,
-        active: app.batchProcessingActive,
-        queueSize: app.reactionQueue.size,
-        batchQueueSize: app.reactionBatchQueue.size,
-        settings: {
-          timeout: app.BATCH_TIMEOUT,
-          sizeLimit: app.BATCH_SIZE_LIMIT,
-        },
-      };
-    };
-
-    window.debugGetAnswerCardInfo = (cardIndex = 0) => {
-      if (!window.answerBoardApp) {
-        debugLog('AnswerBoardApp not available');
-        return { success: false, error: 'AnswerBoardApp not available' };
-      }
-
-      // Validate cardIndex
-      if (typeof cardIndex !== 'number' || cardIndex < 0 || !Number.isInteger(cardIndex)) {
-        debugLog('Invalid card index:', cardIndex);
-        return { success: false, error: 'Invalid card index. Must be a non-negative integer.' };
-      }
-
-      const container = window.answerBoardApp.elements?.answersContainer;
-      if (!container) {
-        debugLog('No answers container found');
-        return { success: false, error: 'No answers container found' };
-      }
-
-      const answerCards = container.querySelectorAll('.answer-card');
-      if (answerCards.length === 0) {
-        debugLog('No answer cards found');
-        return { success: false, error: 'No answer cards found' };
-      }
-
-      if (cardIndex >= answerCards.length) {
-        debugLog('Card index out of bounds');
-        return {
-          success: false,
-          error: 'Card index out of bounds',
-          totalCards: answerCards.length,
-        };
-      }
-
-      const card = answerCards[cardIndex];
-
-      try {
-        const cardInfo = {
-          index: cardIndex,
-          className: card.className,
-          dataset: { ...card.dataset },
-          rowIndex: card.dataset.rowIndex,
-          boundingRect: card.getBoundingClientRect(),
-          computedStyle: {
-            display: getComputedStyle(card).display,
-            visibility: getComputedStyle(card).visibility,
-            opacity: getComputedStyle(card).opacity,
-          },
-          textContent: card.textContent?.trim() || '',
-          innerHTML: card.innerHTML,
-        };
-
-        debugLog('Answer card info:', cardInfo);
-        return { success: true, cardInfo };
-      } catch (error) {
-        console.error('Error getting card info:', error);
-        return { success: false, error: `Error getting card info: ${error.message}` };
-      }
-    };
-
-    // リアクションシステムの専用テスト関数
-    window.testReactionSystem = async (options = {}) => {
-      debugLog('🧪 リアクションシステムテスト開始');
-
-      if (!window.answerBoardApp) {
-        console.error('❌ AnswerBoardApp not available');
-        return { success: false, error: 'AnswerBoardApp not available' };
-      }
-
-      const { cardIndex = 0, reaction = 'LIKE', verbose = true } = options;
-
-      const testResults = {
-        success: false,
-        tests: [],
-        errors: [],
-      };
-
-      try {
-        // Test 1: カード存在確認
-        const cardInfo = window.debugGetAnswerCardInfo(cardIndex);
-        if (!cardInfo.success) {
-          testResults.errors.push('カードが見つかりません: ' + cardInfo.error);
-          return testResults;
-        }
-
-        const rowIndex = cardInfo.cardInfo.rowIndex;
-        testResults.tests.push({
-          name: 'カード存在確認',
-          status: 'passed',
-          data: { cardIndex, rowIndex },
-        });
-
-        // Test 2: リアクションボタン存在確認
-        const container = window.answerBoardApp.elements.answersContainer;
-        const card = container.querySelectorAll('.answer-card')[cardIndex];
-        const reactionBtn = card.querySelector(`[data-reaction="${reaction}"]`);
-
-        if (!reactionBtn) {
-          testResults.errors.push(`リアクションボタンが見つかりません: ${reaction}`);
-          return testResults;
-        }
-
-        testResults.tests.push({
-          name: 'リアクションボタン存在確認',
-          status: 'passed',
-          data: { reaction, button: reactionBtn.outerHTML },
-        });
-
-        // Test 3: 初期状態記録
-        const initialState = {
-          reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
-          count: parseInt(reactionBtn.querySelector('.count')?.textContent || '0'),
-          classes: reactionBtn.className,
-        };
-
-        testResults.tests.push({
-          name: '初期状態記録',
-          status: 'passed',
-          data: initialState,
-        });
-
-        if (verbose) debugLog('📊 初期状態:', initialState);
-
-        // Test 4: リアクション送信テスト
-        debugLog('🔄 リアクション送信テスト開始...');
-
-        const clickEvent = new MouseEvent('click', { bubbles: true });
-
-        // リアクション完了を待機する準備
-        const reactionKey = `${rowIndex}-${reaction}`;
-        let reactionCompletePromise = null;
-
-        if (window.answerBoardApp && window.answerBoardApp.waitForReactionComplete) {
-          reactionCompletePromise = window.answerBoardApp.waitForReactionComplete(reactionKey, 3000);
-        }
-
-        reactionBtn.dispatchEvent(clickEvent);
-
-        // 処理完了を待機（高度な動的システム）
-        try {
-          const updateResult = await window.answerBoardApp.waitForReactionUpdate(
-            rowIndex,
-            reaction,
-            null,
-            3000
-          );
-          if (updateResult.stateChanged || updateResult.changeDetectedAt) {
-            debugLog('✅ 状態変化検出:', updateResult);
-          } else if (updateResult.timeout) {
-            console.warn('⚠️ 動的待機タイムアウト - フォールバック待機実行');
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        } catch (error) {
-          console.warn('⚠️ 動的待機エラー:', error.message);
-          // フォールバック: 従来の時間待機
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-
-        const afterClickState = {
-          reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
-          count: parseInt(reactionBtn.querySelector('.count')?.textContent || '0'),
-          classes: reactionBtn.className,
-        };
-
-        testResults.tests.push({
-          name: 'クリック後状態',
-          status: 'passed',
-          data: afterClickState,
-        });
-
-        if (verbose) debugLog('📊 クリック後状態:', afterClickState);
-
-        // Test 5: 状態変化検証
-        const stateChanged =
-          initialState.reacted !== afterClickState.reacted ||
-          initialState.count !== afterClickState.count;
-
-        testResults.tests.push({
-          name: '状態変化検証',
-          status: stateChanged ? 'passed' : 'failed',
-          data: {
-            changed: stateChanged,
-            reactedChanged: initialState.reacted !== afterClickState.reacted,
-            countChanged: initialState.count !== afterClickState.count,
-          },
-        });
-
-        // Test 6: 再度クリックして戻るかテスト
-        debugLog('🔄 リアクション取消テスト開始...');
-
-        // 2回目のリアクション完了を待機
-        let secondReactionPromise = null;
-        if (window.answerBoardApp && window.answerBoardApp.waitForReactionComplete) {
-          secondReactionPromise = window.answerBoardApp.waitForReactionComplete(reactionKey, 3000);
-        }
-
-        reactionBtn.dispatchEvent(clickEvent);
-
-        // 2回目の処理完了を待機（高度な動的システム）
-        try {
-          const secondUpdateResult = await window.answerBoardApp.waitForReactionUpdate(
-            rowIndex,
-            reaction,
-            null,
-            3000
-          );
-          if (secondUpdateResult.stateChanged || secondUpdateResult.changeDetectedAt) {
-            debugLog('✅ 2回目状態変化検出:', secondUpdateResult);
-          } else if (secondUpdateResult.timeout) {
-            console.warn('⚠️ 2回目動的待機タイムアウト - フォールバック待機実行');
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        } catch (error) {
-          console.warn('⚠️ 2回目動的待機エラー:', error.message);
-          // フォールバック: 従来の時間待機
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-
-        const finalState = {
-          reacted: reactionBtn.getAttribute('aria-pressed') === 'true',
-          count: parseInt(reactionBtn.querySelector('.count')?.textContent || '0'),
-          classes: reactionBtn.className,
-        };
-
-        testResults.tests.push({
-          name: 'リアクション取消後状態',
-          status: 'passed',
-          data: finalState,
-        });
-
-        if (verbose) debugLog('📊 取消後状態:', finalState);
-
-        // Test 7: 完全サイクル検証
-        const backToInitial =
-          initialState.reacted === finalState.reacted && initialState.count === finalState.count;
-
-        testResults.tests.push({
-          name: '完全サイクル検証',
-          status: backToInitial ? 'passed' : 'failed',
-          data: {
-            backToInitial,
-            initialState,
-            finalState,
-          },
-        });
-
-        testResults.success = testResults.tests.every((test) => test.status === 'passed');
-
-        debugLog('✅ リアクションシステムテスト完了');
-        console.table(
-          testResults.tests.map((t) => ({
-            テスト名: t.name,
-            結果: t.status,
-            詳細: JSON.stringify(t.data),
-          }))
-        );
-
-        return testResults;
-      } catch (error) {
-        console.error('❌ テスト実行エラー:', error);
-        testResults.errors.push(error.message);
-        return testResults;
-      }
-    };
-
-    // 複数リアクションタイプのテスト
-    window.testAllReactions = async (cardIndex = 0) => {
-      debugLog('🧪 全リアクションタイプテスト開始');
-
-      const reactions = ['LIKE', 'UNDERSTAND', 'CURIOUS'];
-      const results = [];
-
-      for (const reaction of reactions) {
-        debugLog(`\n--- ${reaction} テスト ---`);
-        const result = await window.testReactionSystem({
-          cardIndex,
-          reaction,
-          verbose: false,
-        });
-        results.push({ reaction, ...result });
-
-        // テスト間の待機
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-
-      debugLog('\n📊 全リアクションテスト結果:');
-      console.table(
-        results.map((r) => ({
-          リアクション: r.reaction,
-          成功: r.success ? '✅' : '❌',
-          テスト数: r.tests.length,
-          エラー数: r.errors.length,
-        }))
-      );
-
-      return results;
-    };
-
-    // === 通知システムテスト用グローバル関数 ===
-
-    // 通知システム全体のテスト実行
-    window.testNotificationSystem = async () => {
-      debugLog('🧪 通知システム全体テスト開始');
-
-      const app = window.answerBoardApp;
-      if (!app) {
-        console.error('AnswerBoardApp not found');
-        return { success: false, error: 'AnswerBoardApp not found' };
-      }
-
-      try {
-        const results = await app.testNotificationEdgeCases();
-        debugLog('📊 通知システムテスト結果:', results);
-        return results;
-      } catch (error) {
-        console.error('❌ 通知システムテストエラー:', error);
-        return { success: false, error: error.message };
-      }
-    };
-
-    // 通知システムの健全性チェック
-    window.validateNotificationSystem = () => {
-      debugLog('🔍 通知システム健全性チェック開始');
-
-      const app = window.answerBoardApp;
-      if (!app) {
-        console.error('AnswerBoardApp not found');
-        return { success: false, error: 'AnswerBoardApp not found' };
-      }
-
-      try {
-        const results = app.validateNotificationSystem();
-        debugLog('📊 通知システム健全性:', results);
-        return results;
-      } catch (error) {
-        console.error('❌ 通知システム健全性チェックエラー:', error);
-        return { success: false, error: error.message };
-      }
-    };
-
-    // 初期データロード失敗シナリオの手動テスト
-    window.simulateInitialLoadFailure = async () => {
-      debugLog('🧪 初期データロード失敗シナリオのシミュレーション開始');
-
-      const app = window.answerBoardApp;
-      if (!app) {
-        console.error('AnswerBoardApp not found');
-        return { success: false, error: 'AnswerBoardApp not found' };
-      }
-
-      try {
-        // 現在の状態を保存
-        const originalInitialDataLoaded = app.initialDataLoaded;
-        const originalHadInitialDataLoadFailure = app.hadInitialDataLoadFailure;
-        const originalLastSeenCount = app.state.lastSeenCount;
-
-        // 失敗状態をシミュレート
-        app.initialDataLoaded = false;
-        app.hadInitialDataLoadFailure = true;
-        app.state.lastSeenCount = 0;
-
-        debugLog('🔧 失敗状態設定:', {
-          initialDataLoaded: app.initialDataLoaded,
-          hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
-          lastSeenCount: app.state.lastSeenCount,
-        });
-
-        // 通知カウンターを設定
-        let notificationShown = false;
-        const originalShowNewContentBanner = app.showNewContentBanner;
-        app.showNewContentBanner = (newItems) => {
-          notificationShown = true;
-          debugLog('🎯 シミュレーション中：通知が表示されました -', newItems, '件');
-          return originalShowNewContentBanner.call(app, newItems);
-        };
-
-        // ポーリング成功をシミュレート
-        await app.handleInitialContentLoad('すべて-newest', 1);
-
-        const result = {
-          success: true,
-          notificationShown,
-          finalState: {
-            initialDataLoaded: app.initialDataLoaded,
-            hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
-            lastSeenCount: app.state.lastSeenCount,
-          },
-        };
-
-        // 状態を復元
-        app.initialDataLoaded = originalInitialDataLoaded;
-        app.hadInitialDataLoadFailure = originalHadInitialDataLoadFailure;
-        app.state.lastSeenCount = originalLastSeenCount;
-        app.showNewContentBanner = originalShowNewContentBanner;
-
-        debugLog('✅ シミュレーション完了:', result);
-        return result;
-      } catch (error) {
-        console.error('❌ シミュレーションエラー:', error);
-        return { success: false, error: error.message };
-      }
-    };
-
-    // 現在の通知システム状態を取得
-    window.getNotificationSystemStatus = () => {
-      const app = window.answerBoardApp;
-      if (!app) return null;
-
-      return {
-        initialDataLoaded: app.initialDataLoaded,
-        hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
-        lastSeenCount: app.state.lastSeenCount,
-        pollingEnabled: app.pollingSettings?.enabled,
-        notificationElements: {
-          banner: !!app.elements.newContentBanner,
-          text: !!app.elements.newContentText,
-          refreshBtn: !!app.elements.refreshContentBtn,
-          dismissBtn: !!app.elements.dismissBannerBtn,
-        },
-        bannerVisible:
-          app.elements.newContentBanner &&
-          !app.elements.newContentBanner.classList.contains('hidden'),
-        lastNotificationTime: app.lastNotificationTime,
-        currentAnswersCount: app.state.currentAnswers?.length || 0,
-      };
-    };
-
-    // 通知デバウンスのテスト
-    window.testNotificationDebounce = async () => {
-      debugLog('🧪 通知デバウンステスト開始');
-
-      const app = window.answerBoardApp;
-      if (!app) {
-        console.error('AnswerBoardApp not found');
-        return { success: false, error: 'AnswerBoardApp not found' };
-      }
-
-      try {
-        return await app.testNotificationDebounce();
-      } catch (error) {
-        console.error('❌ デバウンステストエラー:', error);
-        return { success: false, error: error.message };
-      }
-    };
-
-    // === データ取得診断機能 ===
-
-    // データ取得状況の詳細診断
-    window.diagnoseDataFetch = async () => {
-      debugLog('🔬 データ取得診断開始');
-
-      const app = window.answerBoardApp;
-      if (!app) {
-        console.error('AnswerBoardApp not found');
-        return { success: false, error: 'AnswerBoardApp not found' };
-      }
-
-      const diagnosis = {
-        timestamp: new Date().toISOString(),
-        userState: {
-          tenantId: app.state.userId,
-          currentAnswersCount: app.state.currentAnswers?.length || 0,
-          lastSeenCount: app.state.lastSeenCount,
-          initialDataLoaded: app.initialDataLoaded,
-          hadInitialDataLoadFailure: app.hadInitialDataLoadFailure,
-        },
-        uiState: {
-          classFilter: app.elements.classFilter?.value || 'unknown',
-          sortOrder: app.elements.sortOrder?.value || 'unknown',
-          showAdminFeatures: app.state.showAdminFeatures,
-        },
-        tests: [],
-        recommendations: [],
-      };
-
-      try {
-        // テスト1: 軽量データカウント
-        debugLog('📊 テスト1: データカウント');
-        const startTime = performance.now();
-        const countData = await app.gas.getDataCount(
-          diagnosis.uiState.classFilter,
-          diagnosis.uiState.sortOrder,
-          diagnosis.uiState.showAdminFeatures
-        );
-        const countTime = performance.now() - startTime;
-
-        diagnosis.tests.push({
-          name: 'データカウント',
-          duration: Math.round(countTime),
-          result: countData,
-          success: !!countData && countData.count !== undefined,
-        });
-
-        // テスト2: フルデータ取得
-        debugLog('📊 テスト2: フルデータ取得');
-        const fullStartTime = performance.now();
-        const fullData = await app.gas.getPublishedSheetData(
-          app.state.userId,
-          diagnosis.uiState.classFilter,
-          diagnosis.uiState.sortOrder,
-          diagnosis.uiState.showAdminFeatures,
-          false
-        );
-        const fullTime = performance.now() - fullStartTime;
-
-        diagnosis.tests.push({
-          name: 'フルデータ取得',
-          duration: Math.round(fullTime),
-          result: {
-            status: fullData?.status,
-            dataCount: fullData?.data?.length || 0,
-            sheetName: fullData?.sheetName,
-          },
-          success: !!fullData && !!fullData.data,
-        });
-
-        // テスト3: 増分データ取得
-        if (diagnosis.userState.lastSeenCount > 0) {
-          debugLog('📊 テスト3: 増分データ取得');
-          const incrementalStartTime = performance.now();
-          const incrementalData = await app.gas.getIncrementalSheetData(
-            diagnosis.uiState.classFilter,
-            diagnosis.uiState.sortOrder,
-            diagnosis.uiState.showAdminFeatures,
-            diagnosis.userState.lastSeenCount
-          );
-          const incrementalTime = performance.now() - incrementalStartTime;
-
-          diagnosis.tests.push({
-            name: '増分データ取得',
-            duration: Math.round(incrementalTime),
-            result: {
-              newCount: incrementalData?.newCount || 0,
-              totalCount: incrementalData?.totalCount || 0,
-              status: incrementalData?.status,
-            },
-            success: !!incrementalData && incrementalData.status !== 'error',
-          });
-        }
-
-        // 診断結果の評価と推奨事項
-        const countResult = diagnosis.tests.find((t) => t.name === 'データカウント');
-        const fullResult = diagnosis.tests.find((t) => t.name === 'フルデータ取得');
-
-        if (countResult && fullResult) {
-          if (countResult.success && fullResult.success) {
-            const expectedCount = countResult.result.count || 0;
-            const actualCount = fullResult.result.dataCount || 0;
-
-            if (expectedCount !== actualCount) {
-              diagnosis.recommendations.push({
-                level: 'warning',
-                message: `データ不整合検出: カウント=${expectedCount}, 実際=${actualCount}`,
-                action: 'サーバー側のデータ取得ロジックを確認してください',
-              });
-            } else if (expectedCount === 0) {
-              diagnosis.recommendations.push({
-                level: 'info',
-                message: 'データが存在しません',
-                action: 'フォームに新しい回答を投稿してください',
-              });
-            } else {
-              diagnosis.recommendations.push({
-                level: 'success',
-                message: 'データ取得は正常に動作しています',
-                action: '問題が発生した場合はページを再読み込みしてください',
-              });
-            }
-          } else {
-            diagnosis.recommendations.push({
-              level: 'error',
-              message: 'データ取得に失敗しました',
-              action: 'ネットワーク接続とユーザー権限を確認してください',
-            });
-          }
-        }
-
-        // パフォーマンス評価
-        const avgTime =
-          diagnosis.tests.reduce((sum, test) => sum + test.duration, 0) / diagnosis.tests.length;
-        if (avgTime > 3000) {
-          diagnosis.recommendations.push({
-            level: 'warning',
-            message: `応答時間が遅い (平均${Math.round(avgTime)}ms)`,
-            action: 'サーバーのパフォーマンスを確認してください',
-          });
-        }
-
-        debugLog('📊 データ取得診断完了:', diagnosis);
-        return diagnosis;
-      } catch (error) {
-        console.error('❌ 診断エラー:', error);
-        diagnosis.tests.push({
-          name: '診断実行',
-          duration: 0,
-          result: null,
-          success: false,
-          error: error.message,
-        });
-        return diagnosis;
-      }
-    };
-
-    // データ取得パフォーマンス監視
-    window.monitorDataFetchPerformance = async (duration = 60000) => {
-      debugLog(`📈 データ取得パフォーマンス監視開始 (${duration / 1000}秒間)`);
-
-      const app = window.answerBoardApp;
-      if (!app) {
-        console.error('AnswerBoardApp not found');
-        return { success: false, error: 'AnswerBoardApp not found' };
-      }
-
-      const monitor = {
-        startTime: Date.now(),
-        duration: duration,
-        samples: [],
-        summary: {},
-      };
-
-      const interval = setInterval(async () => {
-        try {
-          const startTime = performance.now();
-          const countData = await app.gas.getDataCount('すべて', 'newest', false);
-          const endTime = performance.now();
-
-          monitor.samples.push({
-            timestamp: Date.now(),
-            duration: Math.round(endTime - startTime),
-            success: !!countData,
-            count: countData?.count || 0,
-          });
-
-          debugLog(`📊 サンプル${monitor.samples.length}: ${Math.round(endTime - startTime)}ms`);
-        } catch (error) {
-          monitor.samples.push({
-            timestamp: Date.now(),
-            duration: 0,
-            success: false,
-            error: error.message,
-          });
-        }
-      }, 5000); // 5秒間隔
-
-      // 指定時間後に監視終了
-      setTimeout(() => {
-        clearInterval(interval);
-
-        // 統計計算
-        const successful = monitor.samples.filter((s) => s.success);
-        const failed = monitor.samples.filter((s) => !s.success);
-
-        if (successful.length > 0) {
-          const durations = successful.map((s) => s.duration);
-          monitor.summary = {
-            totalSamples: monitor.samples.length,
-            successfulSamples: successful.length,
-            failedSamples: failed.length,
-            successRate: ((successful.length / monitor.samples.length) * 100).toFixed(1) + '%',
-            avgDuration: Math.round(durations.reduce((a, b) => a + b, 0) / durations.length),
-            minDuration: Math.min(...durations),
-            maxDuration: Math.max(...durations),
-            medianDuration: durations.sort((a, b) => a - b)[Math.floor(durations.length / 2)],
-          };
-        } else {
-          monitor.summary = {
-            totalSamples: monitor.samples.length,
-            successfulSamples: 0,
-            failedSamples: failed.length,
-            successRate: '0%',
-            error: '全てのサンプルが失敗しました',
-          };
-        }
-
-        debugLog('📈 パフォーマンス監視完了:', monitor.summary);
-      }, duration);
-
-      return monitor;
-    };
-
-    // System status reporting removed - simplified system
 
     // ✅ CLAUDE.md準拠: configJSON中心設定の初期化
     initializeConfig()
