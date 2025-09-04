@@ -969,8 +969,23 @@
       // PERFORMANCE_BUDGET定数をフロントエンドで利用可能にする
       window.PERFORMANCE_BUDGET = 16; // 60FPS = 16.67ms/frame の閾値
 
-      // デバッグログ
-      console.log('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__, DISPLAY_MODES, PERFORMANCE_BUDGET });
+      // DEBUG_MODE定数をフロントエンドで利用可能にする
+      window.DEBUG_MODE = false; // 本番環境ではfalse、開発時はtrueに設定
+      
+      // デバッグログ制御関数
+      window.debugLog = (...args) => {
+        if (window.DEBUG_MODE) {
+          console.log(...args);
+        }
+      };
+      window.debugInfo = (...args) => {
+        if (window.DEBUG_MODE) {
+          console.info(...args);
+        }
+      };
+
+      // デバッグログ（DEBUG_MODE時のみ）
+      debugLog('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__, DISPLAY_MODES, PERFORMANCE_BUDGET, DEBUG_MODE });
     </script>
     <?!= include('page.js.html'); ?>
   </body>
