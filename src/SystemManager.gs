@@ -11,22 +11,62 @@
 // =============================================================================
 
 /**
- * 🔥 configJSON重複修正テスト（root cause fix）
- * ネストしたconfigJsonフィールドのクリーンアップ
+ * 🔥 configJSON重複修正テスト（root cause fix + 詳細診断）
+ * ネストしたconfigJsonフィールドのクリーンアップ + サービスアカウント確認
  * @returns {Object} 実行結果
  */
 function testConfigJsonCleanup() {
   try {
     console.info('🔥 configJSON重複修正テスト開始');
 
+    // 1. サービスアカウント状態確認
+    const securityCheck = SystemManager.testSecurity();
+    console.info('🔐 サービスアカウント状態:', securityCheck);
+
+    // 2. データベース接続確認
+    const dbCheck = SystemManager.testDatabaseConnection();
+    console.info('📊 データベース接続:', dbCheck);
+
+    // 3. 現在のユーザーデータ状態確認
+    const currentUser = User.email();
+    const userInfo = DB.findUserByEmail(currentUser);
+    if (userInfo) {
+      console.info('👤 現在のユーザー情報:', {
+        userId: userInfo.userId,
+        configJsonLength: userInfo.configJson?.length || 0,
+        configJsonPreview: userInfo.configJson?.substring(0, 200) || 'no data'
+      });
+    }
+
+    // 4. クリーンアップ実行（権限確認付き）
+    if (!securityCheck.isComplete) {
+      throw new Error('サービスアカウント設定が不完全です。管理者に設定を確認してください。');
+    }
+
+    if (!dbCheck.success) {
+      throw new Error('データベース接続に失敗しました。');
+    }
+
     // 新しいクリーンアップ関数を実行
     const result = DB.cleanupNestedConfigJson();
 
     console.info('🔥 修正結果:', result);
 
+    // 5. 修正後の状態確認
+    if (userInfo) {
+      const updatedUser = DB.findUserById(userInfo.userId);
+      console.info('🔄 修正後のユーザー情報:', {
+        userId: updatedUser.userId,
+        configJsonLength: updatedUser.configJson?.length || 0,
+        configJsonPreview: updatedUser.configJson?.substring(0, 200) || 'no data'
+      });
+    }
+
     return {
       status: 'success',
       message: '✅ configJSON重複修正完了',
+      security: securityCheck,
+      database: dbCheck,
       details: {
         total: result.results.total,
         cleaned: result.results.cleaned,
@@ -45,7 +85,9 @@ function testConfigJsonCleanup() {
     console.error('🔥 configJSON重複修正テストエラー:', error.message);
     return {
       status: 'error',
-      message: `❌ configJSON重複修正エラー: ${error.message}`
+      message: `❌ configJSON重複修正エラー: ${error.message}`,
+      security: SystemManager.testSecurity(),
+      database: SystemManager.testDatabaseConnection()
     };
   }
 }

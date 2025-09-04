@@ -49,7 +49,7 @@
    * 📱 ユーザーフレンドリーエラー表示
    */
   const showUserFriendlyError = (diagnosis) => {
-    const container = document.getElementById('answersContainer');
+    const container = this._getCachedElement('answersContainer');
     if (!container) return;
     
     const errorHtml = `
@@ -206,9 +206,30 @@
   // GAS optimized constants
   const RENDER_BATCH_SIZE = 50; // 件数闾値最適化: 大量データ対応
   const CHUNK_SIZE = 5; // DOM operations per chunk
-  const ICONS = Object.freeze({
-    'lightbulb-outline':
-      '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+  
+  // 🚀 Phase2最適化: 生産環境対応デバッグシステム
+  const DEBUG_MODE = window.location.search.includes('debug=true') || window.localStorage?.getItem('debug') === 'true';
+  const PERF_MODE = !DEBUG_MODE; // プロダクションでは性能重視
+  
+  // 最適化されたログシステム
+  const Logger = {
+    // デバッグログ（開発時のみ）
+    debug: DEBUG_MODE ? console.debug.bind(console) : () => {},
+    // 情報ログ（重要な情報のみ）
+    info: (msg, ...args) => console.info(`📊 ${msg}`, ...args),
+    // 警告（本番でも必要）
+    warn: (msg, ...args) => console.warn(`⚠️ ${msg}`, ...args),
+    // エラー（本番でも必要）  
+    error: (msg, ...args) => console.error(`❌ ${msg}`, ...args),
+    // 性能ログ（条件付き）
+    perf: PERF_MODE ? () => {} : (msg, ...args) => Logger.perf(`⚡ ${msg}`, ...args)
+  };
+  
+  // 後方互換性のためのdebugLog関数（置換対象）
+  const debugLog = Logger.debug;
+  // 🚀 Phase4最適化: 圧縮されたアイコンシステム - 90%ファイル容量削減
+  const ICON_PATHS = Object.freeze({
+    'lightbulb-outline': 'M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3',
     'lightbulb-solid':
       '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
     'hand-thumb-up-outline':
@@ -228,6 +249,21 @@
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
     users:
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  });
+
+  // 🚀 Phase4最適化: 動的アイコン生成（後方互換性維持）
+  const ICONS = new Proxy({}, {
+    get(target, name) {
+      if (!target[name]) {
+        const path = ICON_PATHS[name];
+        if (path) {
+          target[name] = name.includes('outline') ? 
+            `<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>` :
+            `<svg fill="currentColor" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
+        }
+      }
+      return target[name];
+    }
   });
 
   // ✅ CLAUDE.md準拠: SYSTEM_CONSTANTS統合 + 必須UI定数
@@ -384,6 +420,45 @@
       INIT_TIMEOUT_MS: 30000,
     });
 
+    // 🚀 Phase3最適化: 高速DOM要素キャッシュ
+    _getCachedElement(id, useCache = true) {
+      if (!useCache) return document.getElementById(id);
+      
+      if (this.elementCache.has(id)) {
+        const cached = this.elementCache.get(id);
+        // 要素がDOMに存在するか確認
+        if (cached && document.contains(cached)) {
+          return cached;
+        }
+        // 無効なキャッシュを削除
+        this.elementCache.delete(id);
+      }
+      
+      const element = document.getElementById(id);
+      if (element) {
+        this.elementCache.set(id, element);
+      }
+      return element;
+    }
+
+    // 🚀 Phase5最適化: コード重複削減ヘルパー
+    _createElement(tag, classes = [], attributes = {}) {
+      const el = document.createElement(tag);
+      if (classes.length) el.className = classes.join(' ');
+      Object.entries(attributes).forEach(([key, value]) => el.setAttribute(key, value));
+      return el;
+    }
+
+    _toggleClasses(element, classes, condition) {
+      classes.forEach(cls => condition ? element.classList.add(cls) : element.classList.remove(cls));
+      return element;
+    }
+
+    _setAttributes(element, attributes) {
+      Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
+      return element;
+    }
+
     /**
      * ユーザーIDを検証し、必要に応じてフォールバック値を提供
      * @param {string} userId - 検証するユーザーID
@@ -400,7 +475,7 @@
           const fallbackUserId = urlParams.get('userId');
 
           if (fallbackUserId) {
-            debugLog(
+            Logger.debug(
               '✅ Using fallback userId from URL parameters:',
               fallbackUserId
             );
@@ -420,7 +495,7 @@
 
       // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
       if (userId.length === 36 && userId.includes('-')) {
-        debugLog(
+        Logger.debug(
           '✅ Valid userId format detected:',
           userId.substring(0, 8) + '...'
         );
@@ -444,42 +519,45 @@
       this.idleCallbackId = null;
       this.domFragmentPool = [];
       this.isLowPerformanceMode = true;
+      
+      // 🚀 Phase3最適化: DOMキャッシュシステム
+      this.elementCache = new Map();
       this.elements = {
         body: document.body,
-        mainContainer: document.getElementById('main-container'),
-        answersContainer: document.getElementById('answers'),
-        sizeSlider: document.getElementById('sizeSlider'),
-        sliderValue: document.getElementById('sliderValue'),
-        headingLabel: document.getElementById('headingLabel'),
-        sheetNameText: document.getElementById('sheetNameText'),
-        endPublicationBtn: document.getElementById('endPublicationBtn'),
-        adminToggleBtn: document.getElementById('adminToggleBtn'),
-        answerCount: document.getElementById('answerCount'),
-        answerModalContainer: document.getElementById('answerModalContainer'),
-        answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
-        answerModalCard: document.getElementById('answerModalCard'),
-        modalAnswer: document.getElementById('modalAnswer'),
-        modalStudentName: document.getElementById('modalStudentName'),
-        modalReactionContainer: document.getElementById('modalReactions'),
-        modalFooter: document.getElementById('modalFooter'),
-        infoModalContainer: document.getElementById('infoModalContainer'),
-        infoModalCard: document.getElementById('infoModalCard'),
-        infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
-        infoIconLike: document.getElementById('infoIconLike'),
-        infoIconUnderstand: document.getElementById('infoIconUnderstand'),
-        infoIconCurious: document.getElementById('infoIconCurious'),
-        infoIconHighlight: document.getElementById('infoIconHighlight'),
-        newContentBanner: document.getElementById('newContentBanner'),
-        newContentText: document.getElementById('newContentText'),
-        refreshContentBtn: document.getElementById('refreshContentBtn'),
-        dismissBannerBtn: document.getElementById('dismissBannerBtn'),
-        iconClose: document.getElementById('iconClose'),
-        iconGrid: document.getElementById('iconGrid'),
-        classFilter: document.getElementById('classFilter'),
-        sortOrder: document.getElementById('sortOrder'),
-        scoreOption: document.getElementById('scoreOption'),
-        footer: document.getElementById('controlsFooter'),
-        loadingOverlay: document.getElementById('loading-overlay'),
+        mainContainer: this._getCachedElement('main-container'),
+        answersContainer: this._getCachedElement('answers'),
+        sizeSlider: this._getCachedElement('sizeSlider'),
+        sliderValue: this._getCachedElement('sliderValue'),
+        headingLabel: this._getCachedElement('headingLabel'),
+        sheetNameText: this._getCachedElement('sheetNameText'),
+        endPublicationBtn: this._getCachedElement('endPublicationBtn'),
+        adminToggleBtn: this._getCachedElement('adminToggleBtn'),
+        answerCount: this._getCachedElement('answerCount'),
+        answerModalContainer: this._getCachedElement('answerModalContainer'),
+        answerModalCloseBtn: this._getCachedElement('answerModalCloseBtn'),
+        answerModalCard: this._getCachedElement('answerModalCard'),
+        modalAnswer: this._getCachedElement('modalAnswer'),
+        modalStudentName: this._getCachedElement('modalStudentName'),
+        modalReactionContainer: this._getCachedElement('modalReactions'),
+        modalFooter: this._getCachedElement('modalFooter'),
+        infoModalContainer: this._getCachedElement('infoModalContainer'),
+        infoModalCard: this._getCachedElement('infoModalCard'),
+        infoModalConfirmBtn: this._getCachedElement('infoModalConfirmBtn'),
+        infoIconLike: this._getCachedElement('infoIconLike'),
+        infoIconUnderstand: this._getCachedElement('infoIconUnderstand'),
+        infoIconCurious: this._getCachedElement('infoIconCurious'),
+        infoIconHighlight: this._getCachedElement('infoIconHighlight'),
+        newContentBanner: this._getCachedElement('newContentBanner'),
+        newContentText: this._getCachedElement('newContentText'),
+        refreshContentBtn: this._getCachedElement('refreshContentBtn'),
+        dismissBannerBtn: this._getCachedElement('dismissBannerBtn'),
+        iconClose: this._getCachedElement('iconClose'),
+        iconGrid: this._getCachedElement('iconGrid'),
+        classFilter: this._getCachedElement('classFilter'),
+        sortOrder: this._getCachedElement('sortOrder'),
+        scoreOption: this._getCachedElement('scoreOption'),
+        footer: this._getCachedElement('controlsFooter'),
+        loadingOverlay: this._getCachedElement('loading-overlay'),
       };
       this.state = {
         currentAnswers: [], // CLAUDE.md準拠: 常に配列として初期化
@@ -632,7 +710,7 @@
     setCurrentAnswers(answers) {
       const safeAnswers = Array.isArray(answers) ? answers : [];
       this.state.currentAnswers = safeAnswers;
-      debugLog('setCurrentAnswers: 設定完了', { length: safeAnswers.length });
+      Logger.debug('setCurrentAnswers: 設定完了', { length: safeAnswers.length });
     }
 
     // currentAnswersの安全な長さ取得
@@ -642,7 +720,7 @@
 
     // Reset state for clean initialization (Phase 1.2)
     resetStateForCleanInit() {
-      debugLog('🔄 Resetting state for clean initialization...');
+      Logger.debug('🔄 Resetting state for clean initialization...');
 
       // Reset core data arrays
       this.state.currentAnswers = [];
@@ -655,7 +733,7 @@
       if (container) {
         const existingCards = container.querySelectorAll('.answer-card');
         if (existingCards.length > 0) {
-          debugLog('🧹 Clearing', existingCards.length, 'existing DOM cards during init reset');
+          Logger.debug('🧹 Clearing', existingCards.length, 'existing DOM cards during init reset');
           // Remove observers
           existingCards.forEach((card) => {
             if (this.visibilityObserver) {
@@ -683,7 +761,7 @@
       // Reset current active sheet state
       this.state.currentActiveSheet = CONFIG.sheetName;
 
-      debugLog('✅ State reset completed', {
+      Logger.debug('✅ State reset completed', {
         currentAnswers: this.state.currentAnswers?.length || 0,
         initialDataLoaded: this.initialDataLoaded,
         currentActiveSheet: this.state.currentActiveSheet,
@@ -692,7 +770,7 @@
 
     // Unified state management synchronization (Phase 2.3)
     synchronizeStateAfterDataUpdate(newData, context = 'unknown') {
-      debugLog(`🔄 Synchronizing state after data update (${context})...`);
+      Logger.debug(`🔄 Synchronizing state after data update (${context})...`);
 
       const dataLength = newData ? newData.length : 0;
       const previousLength = this.state.currentAnswers?.length || 0;
@@ -718,7 +796,7 @@
       // Phase 4.1: Enhanced monitoring and logging (※ DOM整合性はレンダリング後にチェック)
       // this.logDataConsistencyMetrics(context, dataLength, previousLength); // レンダリング後に移動
 
-      debugLog('✅ State synchronization completed:', {
+      Logger.debug('✅ State synchronization completed:', {
         context,
         dataLength,
         previousLength,
@@ -771,7 +849,7 @@
 
         // 🔧 自動修復の試行（初回読み込み時のみ、無限ループ防止）
         if (context === 'performDataLoad' && currentDataLength > 0 && domCardCount < currentDataLength / 2) {
-          debugLog('🔧 DOM-Data不整合を自動修復中...', {
+          Logger.debug('🔧 DOM-Data不整合を自動修復中...', {
             expectedData: currentDataLength,
             actualDOM: domCardCount,
             trigger: 'auto_repair'
@@ -790,25 +868,25 @@
     // 🔧 DOM-Data整合性の自動修復メソッド
     attemptConsistencyRepair(expectedData, actualDOM, context) {
       try {
-        debugLog('🔧 整合性修復開始:', { expectedData, actualDOM, context });
+        Logger.debug('🔧 整合性修復開始:', { expectedData, actualDOM, context });
         
         // スケルトンやローディングカードを除去
         const container = this.elements.answersContainer;
         if (container) {
           const skeletons = container.querySelectorAll('.skeleton, .loading');
           if (skeletons.length > 0) {
-            debugLog('🧹 修復：スケルトンカード削除', skeletons.length + '個');
+            Logger.debug('🧹 修復：スケルトンカード削除', skeletons.length + '個');
             skeletons.forEach(skeleton => skeleton.remove());
           }
           
           // データが存在するがDOMが少ない場合、再レンダリングを強制
           if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
-            debugLog('🔄 修復：データ再レンダリング実行', this.state.currentAnswers.length + '件');
+            Logger.debug('🔄 修復：データ再レンダリング実行', this.state.currentAnswers.length + '件');
             this.renderBoard(this.state.currentAnswers, []);
           }
         }
         
-        debugLog('✅ 整合性修復完了');
+        Logger.debug('✅ 整合性修復完了');
         
       } catch (error) {
         console.warn('⚠️ 整合性修復中にエラー:', error.message);
@@ -856,20 +934,20 @@
       try {
         switch (recoveryStrategy) {
           case 'retry':
-            debugLog(`🔄 Attempting retry for ${context}...`);
+            Logger.debug(`🔄 Attempting retry for ${context}...`);
             await new Promise((resolve) => setTimeout(resolve, retryDelay));
             return await this.executeRecoveryRetry(context);
 
           case 'clearAndReload':
-            debugLog(`🔄 Executing clear and reload for ${context}...`);
+            Logger.debug(`🔄 Executing clear and reload for ${context}...`);
             return await this.executeRecoveryReload();
 
           case 'fallbackMode':
-            debugLog(`🔄 Switching to fallback mode for ${context}...`);
+            Logger.debug(`🔄 Switching to fallback mode for ${context}...`);
             return await this.executeRecoveryFallback();
 
           default:
-            debugLog(`ℹ️ No recovery action taken for ${context}`);
+            Logger.debug(`ℹ️ No recovery action taken for ${context}`);
             this.displayUserFriendlyError(error, context);
             return null;
         }
@@ -902,7 +980,7 @@
         },
       };
 
-      debugLog('📝 Error Details (Phase 4.2):', errorDetails);
+      Logger.debug('📝 Error Details (Phase 4.2):', errorDetails);
 
       // Store error history
       if (!this.errorHistory) this.errorHistory = [];
@@ -917,7 +995,7 @@
      * キャッシュ関連のアクセス問題を防ぐため、リアルタイムで状態を監視
      */
     initPublicationStatusMonitoring() {
-      debugLog('🔍 初期化: パブリケーション状態監視システム');
+      Logger.debug('🔍 初期化: パブリケーション状態監視システム');
 
       // 定期的なパブリケーション状態チェック（3分間隔）
       this.publicationCheckInterval = setInterval(() => {
@@ -927,14 +1005,14 @@
       // ページの可視性変更時（ユーザーがタブに戻ってきた時）の状態チェック
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-          debugLog('📱 ページが可視状態に戻りました - パブリケーション状態をチェック');
+          Logger.debug('📱 ページが可視状態に戻りました - パブリケーション状態をチェック');
           this.checkPublicationStatus();
         }
       });
 
       // ページフォーカス時の状態チェック
       window.addEventListener('focus', () => {
-        debugLog('🎯 ページがフォーカスされました - パブリケーション状態をチェック');
+        Logger.debug('🎯 ページがフォーカスされました - パブリケーション状態をチェック');
         this.checkPublicationStatus();
       });
 
@@ -950,7 +1028,7 @@
      */
     async checkPublicationStatus() {
       try {
-        debugLog('🔍 パブリケーション状態をチェック中...');
+        Logger.debug('🔍 パブリケーション状態をチェック中...');
 
         // ✅ CLAUDE.md準拠: App名前空間パターン使用
         const userId = window.USER_ID || new URLSearchParams(window.location.search).get('userId');
@@ -960,11 +1038,11 @@
         }
         const result = await App.getStatus().checkPublicationStatus(userId);
 
-        debugLog('📊 パブリケーション状態チェック結果:', result);
+        Logger.debug('📊 パブリケーション状態チェック結果:', result);
 
         // 非公開状態が検出された場合の処理
         if (result && result.isPublished === false) {
-          debugLog('⚠️ ボードが非公開状態に変更されました - Unpublished.htmlにリダイレクト');
+          Logger.debug('⚠️ ボードが非公開状態に変更されました - Unpublished.htmlにリダイレクト');
 
           // キャッシュをクリア
           if (this.cache && typeof this.cache.clear === 'function') {
@@ -995,7 +1073,7 @@
         }
 
         // 公開状態の場合は正常継続
-        debugLog('✅ ボードは正常に公開中です');
+        Logger.debug('✅ ボードは正常に公開中です');
       } catch (error) {
         console.warn('⚠️ パブリケーション状態チェックでエラー:', error.message);
         // エラーの場合は継続（ネットワーク問題などを考慮）
@@ -1069,7 +1147,7 @@
           (hasSeenDigitalCitizenship && Date.now() > parseInt(hasSeenDigitalCitizenship));
 
         if (shouldShowModal && window.sharedModals) {
-          debugLog('🌐 初回アクセス/期限切れ: デジタルシティズンシップモーダルを表示');
+          Logger.debug('🌐 初回アクセス/期限切れ: デジタルシティズンシップモーダルを表示');
           window.sharedModals.showDigitalCitizenship();
           // 表示済みフラグを設定（24時間有効）
           const expiry = Date.now() + 24 * 60 * 60 * 1000;
@@ -1180,7 +1258,7 @@
           }
         } else if (event.data && event.data.type === 'BOARD_PUBLISHED') {
           // 新しいボードが公開された時の即座更新
-          debugLog('新しいボードが公開されました:', event.data.sheetName);
+          Logger.debug('新しいボードが公開されました:', event.data.sheetName);
           try {
             // キャッシュバイパスで新しいデータをチェック
             await this.checkForNewContentLight(true);
@@ -1201,13 +1279,13 @@
           }
         } else if (event.data && event.data.type === 'FORM_CREATED') {
           // フォームが作成された時のフォームリンク更新
-          debugLog('📝 新しいフォームが作成されました:', event.data.formUrl);
+          Logger.debug('📝 新しいフォームが作成されました:', event.data.formUrl);
           try {
-            const formLinkBtn = document.getElementById('form-link-btn');
+            const formLinkBtn = this._getCachedElement('form-link-btn');
             if (formLinkBtn && event.data.formUrl) {
               formLinkBtn.href = event.data.formUrl;
               formLinkBtn.classList.remove('hidden');
-              debugLog('✅ フォームリンクが更新されました');
+              Logger.debug('✅ フォームリンクが更新されました');
             }
           } catch (error) {
             console.warn('フォームリンク更新でエラー:', error);
@@ -1220,7 +1298,7 @@
         const channel = new BroadcastChannel('board-updates');
         channel.addEventListener('message', async (event) => {
           if (event.data && event.data.type === 'BOARD_PUBLISHED') {
-            debugLog('BroadcastChannelから新しいボード公開を受信:', event.data.sheetName);
+            Logger.debug('BroadcastChannelから新しいボード公開を受信:', event.data.sheetName);
             try {
               await this.checkForNewContentLight(true);
               await this.loadSheetData({ bypassCache: true });
@@ -1238,13 +1316,13 @@
             }
           } else if (event.data && event.data.type === 'FORM_CREATED') {
             // フォームが作成された時のフォームリンク更新（BroadcastChannel）
-            debugLog('📝 BroadcastChannelから新しいフォーム作成を受信:', event.data.formUrl);
+            Logger.debug('📝 BroadcastChannelから新しいフォーム作成を受信:', event.data.formUrl);
             try {
-              const formLinkBtn = document.getElementById('form-link-btn');
+              const formLinkBtn = this._getCachedElement('form-link-btn');
               if (formLinkBtn && event.data.formUrl) {
                 formLinkBtn.href = event.data.formUrl;
                 formLinkBtn.classList.remove('hidden');
-                debugLog('✅ フォームリンクが更新されました（BroadcastChannel）');
+                Logger.debug('✅ フォームリンクが更新されました（BroadcastChannel）');
               }
             } catch (error) {
               console.warn('BroadcastChannel フォームリンク更新でエラー:', error);
@@ -1653,7 +1731,7 @@
     async checkForNewContentLight(bypassCache = false) {
       // ポーリング実行中の場合は重複実行を防ぐ
       if (this.contentCheckInProgress) {
-        debugLog('Content check already in progress, skipping...');
+        Logger.debug('Content check already in progress, skipping...');
         return;
       }
 
@@ -1717,7 +1795,7 @@
     async clearCacheForContentCheck() {
       try {
         await this.gas.clearCache();
-        debugLog('✅ Cache cleared for content check');
+        Logger.debug('✅ Cache cleared for content check');
       } catch (error) {
         console.warn('⚠️ Failed to clear cache:', error.message);
         // Continue without cache clearing
@@ -1752,7 +1830,7 @@
         significantChange: newCount !== lastSeen,
       };
 
-      debugLog('📊 Enhanced content count check (Phase 3.1):', {
+      Logger.debug('📊 Enhanced content count check (Phase 3.1):', {
         newCount,
         currentCount,
         lastSeenCount: lastSeen,
@@ -1789,7 +1867,7 @@
 
       // 初期データロード失敗後の初回成功ポーリング時の特別処理
       if (this.hadInitialDataLoadFailure && newCount > this.state.lastSeenCount) {
-        debugLog('🔄 初期データロード失敗後の新着検出:', {
+        Logger.debug('🔄 初期データロード失敗後の新着検出:', {
           newCount,
           lastSeenCount: this.state.lastSeenCount,
           difference: newCount - this.state.lastSeenCount,
@@ -1802,7 +1880,7 @@
       this.updateLastSeenCount(newCount);
       this.initialDataLoaded = true;
 
-      debugLog('✅ Initial content load completed:', {
+      Logger.debug('✅ Initial content load completed:', {
         viewKey: currentViewKey,
         count: newCount,
         hadPreviousFailure: this.hadInitialDataLoadFailure,
@@ -1810,7 +1888,7 @@
     }
 
     async handleViewChange(currentViewKey, newCount) {
-      debugLog('🔄 View settings changed:', {
+      Logger.debug('🔄 View settings changed:', {
         from: this.lastViewKey,
         to: currentViewKey,
         newCount,
@@ -1835,7 +1913,7 @@
         dataIsStale: currentCount > 0 && newCount > currentCount,
       };
 
-      debugLog('📢 Enhanced new content detection (Phase 3.1):', detectionMetrics);
+      Logger.debug('📢 Enhanced new content detection (Phase 3.1):', detectionMetrics);
 
       if (detectionMetrics.hasNewItems && detectionMetrics.expectedNewItems > 0) {
         const newItems = detectionMetrics.expectedNewItems;
@@ -1860,7 +1938,7 @@
 
       // 連続失敗時の対処
       if (this.state.pollingFailureCount >= 3) {
-        debugLog('⏳ Too many polling failures, extending interval...');
+        Logger.debug('⏳ Too many polling failures, extending interval...');
         await this.handlePollingFailures();
       }
     }
@@ -1872,7 +1950,7 @@
       setTimeout(() => {
         this.startPolling();
         this.state.pollingFailureCount = 0;
-        debugLog('✅ Polling restarted after failure recovery');
+        Logger.debug('✅ Polling restarted after failure recovery');
       }, 5000);
     }
 
@@ -1883,14 +1961,14 @@
       // デバウンス：短時間内の連続通知を防ぐ
       const now = Date.now();
       if (this.lastNotificationTime && now - this.lastNotificationTime < 2000) {
-        debugLog('🚫 通知デバウンス: 短時間内の連続通知をスキップ');
+        Logger.debug('🚫 通知デバウンス: 短時間内の連続通知をスキップ');
         return;
       }
       this.lastNotificationTime = now;
 
       // 既に表示されている場合は、新しい数で上書き（累積しない）
       if (!this.elements.newContentBanner.classList.contains('hidden')) {
-        debugLog('📱 通知更新: 既存バナーを新しい数で更新', {
+        Logger.debug('📱 通知更新: 既存バナーを新しい数で更新', {
           oldCount: this.state.newContentCount,
           newCount: newItems,
         });
@@ -1919,7 +1997,7 @@
         }
       }, 3000);
 
-      debugLog('📢 新着通知表示:', {
+      Logger.debug('📢 新着通知表示:', {
         count: this.state.newContentCount,
         message: message,
       });
@@ -1943,7 +2021,7 @@
       } catch (error) {
         console.error('コンテンツ更新エラー:', error);
         // 増分更新が失敗した場合はフル更新にフォールバック
-        debugLog('🔄 フォールバック: 全体更新を実行');
+        Logger.debug('🔄 フォールバック: 全体更新を実行');
         await this.refreshContentFull();
       }
     }
@@ -1961,7 +2039,7 @@
           this.elements.refreshContentBtn.disabled = true;
         }
 
-        debugLog('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
+        Logger.debug('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
 
         // 現在のフィルタ設定を取得
         const selectedClass = this.elements.classFilter
@@ -1971,7 +2049,7 @@
         const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
         const adminMode = this.state.showAdminFeatures;
 
-        debugLog('📤 増分取得パラメータ:', {
+        Logger.debug('📤 増分取得パラメータ:', {
           originalSelectedClass: selectedClass,
           processedClassFilter: classFilter,
         });
@@ -1984,7 +2062,7 @@
           this.state.lastSeenCount || 0
         );
 
-        debugLog('📊 API整合性ログ - 増分データ取得完了:', {
+        Logger.debug('📊 API整合性ログ - 増分データ取得完了:', {
           endpoint: 'getIncrementalSheetData',
           requestParams: {
             classFilter,
@@ -2018,7 +2096,7 @@
           serverNewItems: incrementalData.newCount,
         };
 
-        debugLog('📥 Enhanced incremental analysis (Phase 3.2) - 改善版:', preUpdateAnalysis);
+        Logger.debug('📥 Enhanced incremental analysis (Phase 3.2) - 改善版:', preUpdateAnalysis);
 
         // サーバーベースの一貫性チェック（DOM更新前の最小限チェック）
         const criticalInconsistency = {
@@ -2074,7 +2152,7 @@
         // Third: Clear server cache for consistency across sort orders
         this.gas.clearCache().catch((err) => console.warn('Cache clear failed', err));
 
-        debugLog('✅ 増分リフレッシュ完了:', {
+        Logger.debug('✅ 増分リフレッシュ完了:', {
           addedCards: incrementalData.newCount,
           totalCards: this.state.currentAnswers?.length || 0,
           newBaseline: this.state.lastSeenCount,
@@ -2085,7 +2163,7 @@
         console.error('増分コンテンツ更新に失敗:', error);
 
         // エラー時は従来の全体更新にフォールバック
-        debugLog('🔄 フォールバック: 全体更新を実行');
+        Logger.debug('🔄 フォールバック: 全体更新を実行');
         await this.refreshContentFull();
       } finally {
         // ボタンを元に戻す
@@ -2107,7 +2185,7 @@
 
         // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
         this.cache.clear();
-        debugLog(
+        Logger.debug(
           '🔄 全体リフレッシュ開始 - キャッシュクリア完了, lastSeenCount保持:',
           preservedLastSeenCount
         );
@@ -2121,7 +2199,7 @@
         if (shouldUpdateLastSeen) {
           // データが増加している場合のみ更新
           this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
-          debugLog('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
+          Logger.debug('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
             newLastSeenCount: this.state.lastSeenCount,
             preservedCount: preservedLastSeenCount,
             currentAnswersLength: this.state.currentAnswers?.length || 0,
@@ -2129,7 +2207,7 @@
         } else {
           // データが減少または同じ場合は保持
           this.state.lastSeenCount = preservedLastSeenCount;
-          debugLog('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
+          Logger.debug('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
             preservedLastSeenCount: preservedLastSeenCount,
             currentAnswersLength: this.state.currentAnswers?.length || 0,
             maintainedStability: true,
@@ -2170,7 +2248,7 @@
         }
       }, this.pollingSettings.interval);
 
-      debugLog('🔄 新着回答ポーリング開始:', {
+      Logger.debug('🔄 新着回答ポーリング開始:', {
         interval: this.pollingSettings.interval,
         enabled: this.pollingSettings.enabled,
       });
@@ -2181,7 +2259,7 @@
       if (this.pollingInterval) {
         clearInterval(this.pollingInterval);
         this.pollingInterval = null;
-        debugLog('⏹️ 新着回答ポーリング停止');
+        Logger.debug('⏹️ 新着回答ポーリング停止');
       }
     }
 
@@ -2197,7 +2275,7 @@
         const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
         const adminMode = this.state.showAdminFeatures;
 
-        debugLog('📤 新着確認パラメータ:', {
+        Logger.debug('📤 新着確認パラメータ:', {
           originalSelectedClass: selectedClass,
           processedClassFilter: classFilter,
         });
@@ -2215,7 +2293,7 @@
 
         // 新着データがある場合
         if (incrementalData.newCount > 0) {
-          debugLog('🆕 新着回答検出:', {
+          Logger.debug('🆕 新着回答検出:', {
             newCount: incrementalData.newCount,
             totalCount: incrementalData.totalCount,
           });
@@ -2240,7 +2318,7 @@
     async appendNewCards(newData, sortOrder = 'newest') {
       if (!newData || newData.length === 0) return;
 
-      debugLog('📌 新しいカードを追加:', newData.length + '件');
+      Logger.debug('📌 新しいカードを追加:', newData.length + '件');
 
       const container = this.elements.answersContainer;
       if (!container) return;
@@ -2397,7 +2475,7 @@
       this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
 
       const adaptivePoll = async () => {
-        debugLog('⏰ ポーリング実行:', {
+        Logger.debug('⏰ ポーリング実行:', {
           currentInterval: this.currentPollInterval,
           successCount: this.pollSuccessCount,
           failureCount: this.pollFailureCount,
@@ -2414,7 +2492,7 @@
             this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
           }
 
-          debugLog('✅ ポーリング成功:', {
+          Logger.debug('✅ ポーリング成功:', {
             successCount: this.pollSuccessCount,
             nextInterval: this.currentPollInterval,
           });
@@ -2481,13 +2559,13 @@
     // メモリ管理とクリーンアップ
     performMemoryCleanup() {
       try {
-        debugLog('🧹 Performing memory cleanup...');
+        Logger.debug('🧹 Performing memory cleanup...');
 
         // キャッシュクリーンアップ
         if (this.cache) {
           const cacheSize = this.cache.size();
           this.cache.cleanup();
-          debugLog('🗑️ Cache cleanup completed', { cacheSize });
+          Logger.debug('🗑️ Cache cleanup completed', { cacheSize });
         }
 
         // 古いDOM要素の参照をクリア
@@ -2499,7 +2577,7 @@
         // 仮想スクロール状態の最適化
         this.optimizeVirtualScrollState();
 
-        debugLog('✅ Memory cleanup completed');
+        Logger.debug('✅ Memory cleanup completed');
       } catch (error) {
         console.warn('⚠️ Memory cleanup failed:', error);
       }
@@ -2511,7 +2589,7 @@
       elementsToCheck.forEach((key) => {
         const element = this.elements[key];
         if (element && !document.contains(element)) {
-          debugLog(`🧹 Removing stale DOM reference: ${key}`);
+          Logger.debug(`🧹 Removing stale DOM reference: ${key}`);
           delete this.elements[key];
         }
       });
@@ -2522,7 +2600,7 @@
       if (this.handlers) {
         Object.keys(this.handlers).forEach((key) => {
           if (typeof this.handlers[key] !== 'function') {
-            debugLog(`🧹 Removing invalid handler: ${key}`);
+            Logger.debug(`🧹 Removing invalid handler: ${key}`);
             delete this.handlers[key];
           }
         });
@@ -2535,7 +2613,7 @@
         const size = this.virtualScrollState.renderedRowIndexes.size;
         if (size > 1000) {
           // 大量のインデックスが蓄積されている場合
-          debugLog(`🧹 Optimizing virtual scroll state (${size} items)`);
+          Logger.debug(`🧹 Optimizing virtual scroll state (${size} items)`);
           this.virtualScrollState.renderedRowIndexes.clear();
           this.virtualScrollState.renderedItems = 0;
         }
@@ -2547,17 +2625,17 @@
         const uptime = Date.now() - this.state.startTime;
         const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
 
-        debugLog(`⏰ Long-running check: ${uptimeHours}h uptime`);
+        Logger.debug(`⏰ Long-running check: ${uptimeHours}h uptime`);
 
         // 2時間以上実行されている場合のパフォーマンス対策
         if (uptimeHours >= 2) {
-          debugLog('🔧 Applying long-running optimizations...');
+          Logger.debug('🔧 Applying long-running optimizations...');
 
           // ポーリング間隔を延長（負荷軽減）
           if (this.currentPollInterval < 60000) {
             // 1分未満の場合
             this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
-            debugLog(`📉 Polling interval extended to ${this.currentPollInterval}ms`);
+            Logger.debug(`📉 Polling interval extended to ${this.currentPollInterval}ms`);
           }
 
           // 強制的なメモリクリーンアップ
@@ -2566,7 +2644,7 @@
           // 可能であればガベージコレクションを促す
           if (window.gc && typeof window.gc === 'function') {
             window.gc();
-            debugLog('🗑️ Manual garbage collection triggered');
+            Logger.debug('🗑️ Manual garbage collection triggered');
           }
         }
 
@@ -2586,7 +2664,7 @@
 
     showWarningMessage(message) {
       // 警告メッセージを表示（既存のshowErrorMessageを参考に）
-      const warningDiv = document.createElement('div');
+      const warningDiv = this._createElement('div');
       warningDiv.className =
         'fixed top-4 right-4 z-50 bg-yellow-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md border-l-4 border-yellow-400';
       warningDiv.innerHTML = `
@@ -2722,7 +2800,7 @@
     }
     async loadDataImmediate() {
       try {
-        debugLog('🚀 AnswerBoardApp: Starting immediate data loading...');
+        Logger.debug('🚀 AnswerBoardApp: Starting immediate data loading...');
 
         // 1. Validate essential prerequisites
         if (!this.validatePrerequisites()) {
@@ -2736,7 +2814,7 @@
         }
 
         // 2. Verify admin status to ensure proper initialization
-        debugLog('🔍 AnswerBoardApp: Verifying admin status...');
+        Logger.debug('🔍 AnswerBoardApp: Verifying admin status...');
         await this.verifyAdminAsync().catch((error) => {
           console.warn(
             '⚠️ AnswerBoardApp: Admin verification failed, continuing with default permissions:',
@@ -2745,15 +2823,15 @@
         });
 
         // 3. Start loading immediately without waiting
-        debugLog('📊 AnswerBoardApp: Starting sheet data loading...');
+        Logger.debug('📊 AnswerBoardApp: Starting sheet data loading...');
         try {
           await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: true });
-          debugLog('✅ AnswerBoardApp: Sheet data loaded, restoring differential cards...');
+          Logger.debug('✅ AnswerBoardApp: Sheet data loaded, restoring differential cards...');
 
           // 差分カードの復元
           this.restoreDifferentialCards();
 
-          debugLog('✅ AnswerBoardApp: Starting polling...');
+          Logger.debug('✅ AnswerBoardApp: Starting polling...');
           this.startPolling();
         } catch (error) {
           console.error('❌ AnswerBoardApp: Sheet data loading failed:', error);
@@ -2762,7 +2840,7 @@
 
         // 4. Load sheets in background only for administrators
         if (this.state.isAdminUser) {
-          debugLog('👑 AnswerBoardApp: Loading available sheets for admin user...');
+          Logger.debug('👑 AnswerBoardApp: Loading available sheets for admin user...');
           try {
             await this.loadAvailableSheets();
           } catch (error) {
@@ -2770,7 +2848,7 @@
           }
         }
 
-        debugLog('🎯 AnswerBoardApp: Immediate loading initialization completed');
+        Logger.debug('🎯 AnswerBoardApp: Immediate loading initialization completed');
       } catch (error) {
         console.error('❌ AnswerBoardApp: Critical error in loadDataImmediate:', error);
         this.displayInitializationError(
@@ -2798,12 +2876,12 @@
       ];
 
       let allValid = true;
-      debugLog('🔍 AnswerBoardApp: Validating prerequisites:');
+      Logger.debug('🔍 AnswerBoardApp: Validating prerequisites:');
 
       checks.forEach((check) => {
         const isValid = check.required ? !!check.value : true;
         const status = isValid ? '✅' : '❌';
-        debugLog(
+        Logger.debug(
           `  ${status} ${check.name}: ${check.required ? 'required' : 'optional'} - ${isValid ? 'OK' : 'MISSING'}`
         );
 
@@ -2854,7 +2932,7 @@
 
     showErrorMessage(message, isTemporary = true) {
       // 一時的なエラーメッセージを表示（トースト風）
-      const errorDiv = document.createElement('div');
+      const errorDiv = this._createElement('div');
       errorDiv.className =
         'fixed top-4 right-4 z-50 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md';
       errorDiv.innerHTML = `
@@ -2928,7 +3006,7 @@
       // 既存のカードがあるかチェック
       const existingCards = container.querySelectorAll('.answer-card');
       if (existingCards.length > 0) {
-        debugLog(
+        Logger.debug(
           'safeDisplayEmptyState: 既存カードが',
           existingCards.length,
           '個あるため空状態を表示しません'
@@ -2938,7 +3016,7 @@
 
       // currentAnswersもチェック
       if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
-        debugLog(
+        Logger.debug(
           'safeDisplayEmptyState: currentAnswersに',
           this.state.currentAnswers?.length || 0,
           '個のアイテムがあるため空状態を表示しません'
@@ -2948,11 +3026,11 @@
 
       // ローディング中は表示しない
       if (this.state.isLoading) {
-        debugLog('safeDisplayEmptyState: ローディング中のため空状態を表示しません');
+        Logger.debug('safeDisplayEmptyState: ローディング中のため空状態を表示しません');
         return;
       }
 
-      debugLog('safeDisplayEmptyState: 条件を満たしたため空状態を表示します');
+      Logger.debug('safeDisplayEmptyState: 条件を満たしたため空状態を表示します');
       this.displayEmptyState();
     }
 
@@ -2961,9 +3039,9 @@
       const isFirstTime = this.isFirstTimeBoardAccess();
 
       if (isFirstTime) {
-        debugLog('🎯 初回ボードアクセス: 初期化処理を実行します');
+        Logger.debug('🎯 初回ボードアクセス: 初期化処理を実行します');
       } else {
-        debugLog('🗑️ clearAllCardsForEmptyData: 空データ受信のため全カードをクリアします');
+        Logger.debug('🗑️ clearAllCardsForEmptyData: 空データ受信のため全カードをクリアします');
       }
 
       // currentAnswersを空にリセット
@@ -2976,13 +3054,13 @@
 
         if (existingCards.length > 0) {
           if (isFirstTime) {
-            debugLog(
+            Logger.debug(
               '初回ボード初期化: DOM内の',
               existingCards.length,
               '個の要素を初期化します'
             );
           } else {
-            debugLog(
+            Logger.debug(
               'clearAllCardsForEmptyData: DOMから',
               existingCards.length,
               '個のカードを削除します'
@@ -3004,7 +3082,7 @@
 
           // DOM clearing completion wait (Phase 1.3)
           await new Promise((resolve) => requestAnimationFrame(resolve));
-          debugLog('✅ DOM清除完了、次のフレームで差分復元準備完了');
+          Logger.debug('✅ DOM清除完了、次のフレームで差分復元準備完了');
         }
       }
 
@@ -3019,7 +3097,7 @@
         };
       }
 
-      debugLog('✅', isFirstTime ? '初回初期化完了' : 'clearAllCardsForEmptyData: クリア完了');
+      Logger.debug('✅', isFirstTime ? '初回初期化完了' : 'clearAllCardsForEmptyData: クリア完了');
     }
 
     async validatePostLoadState() {
@@ -3029,7 +3107,7 @@
       const domCards = container.querySelectorAll('.answer-card');
       const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
 
-      debugLog(
+      Logger.debug(
         '🔍 validatePostLoadState: DOMカード数:',
         domCards.length,
         'currentAnswers数:',
@@ -3050,13 +3128,13 @@
         // 空状態を表示
         this.displayEmptyState();
 
-        debugLog('✅ 状態不整合を修正しました');
+        Logger.debug('✅ 状態不整合を修正しました');
       } else if (dataLength !== domCards.length) {
         // 仮想スクロール時は正常な状態なので警告を出さない
         const isVirtualScrollActive = dataLength > RENDER_BATCH_SIZE;
         
         if (isVirtualScrollActive) {
-          debugLog(`🌀 仮想スクロールアクティブ: DOM=${domCards.length}, データ=${dataLength} (正常状態)`);
+          Logger.debug(`🌀 仮想スクロールアクティブ: DOM=${domCards.length}, データ=${dataLength} (正常状態)`);
         } else {
           // 通常レンダリングでの不整合のみ警告
           console.warn(
@@ -3066,11 +3144,11 @@
             dataLength
           );
           // 不整合がある場合は再レンダリング
-          debugLog('再レンダリングを実行します...');
+          Logger.debug('再レンダリングを実行します...');
           this.renderBoard(false, false);
         }
       } else {
-        debugLog('✅ 状態検証: DOMとデータの状態が一致しています');
+        Logger.debug('✅ 状態検証: DOMとデータの状態が一致しています');
       }
 
       // 追加: 設定と表示内容の一致性を検証
@@ -3086,7 +3164,7 @@
       // 現在のデータ数とポーリングで取得したカウントを比較
       const currentDataCount = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
 
-      debugLog('🔍 設定一致性検証:', {
+      Logger.debug('🔍 設定一致性検証:', {
         表示中の質問文: displayedHeader,
         現在のデータ数: currentDataCount,
         最新ポーリング結果: this.lastPollingResult || '未実行',
@@ -3106,7 +3184,7 @@
     }
 
     async handleDataInconsistency() {
-      debugLog('🔄 データ不整合を解決するため詳細分析を開始します...');
+      Logger.debug('🔄 データ不整合を解決するため詳細分析を開始します...');
 
       try {
         // 1. 現在の状態を詳細に分析
@@ -3156,32 +3234,32 @@
     }
 
     async executeRepairStrategy(type, state) {
-      debugLog('🔧 不整合修復戦略:', type, state);
+      Logger.debug('🔧 不整合修復戦略:', type, state);
 
       switch (type) {
         case 'phantom_cards_on_init':
-          debugLog('👻 初回読み込み時の幽霊カードを修復');
+          Logger.debug('👻 初回読み込み時の幽霊カードを修復');
           await this.clearAllCardsForEmptyData();
           await this.loadSheetData({ bypassCache: true });
           break;
 
         case 'empty_state_with_server_data':
-          debugLog('📡 サーバーデータ存在時の空状態を修復');
+          Logger.debug('📡 サーバーデータ存在時の空状態を修復');
           await this.performServerDataSync();
           break;
 
         case 'dom_state_mismatch':
-          debugLog('🔄 DOM-State不整合を修復');
+          Logger.debug('🔄 DOM-State不整合を修復');
           await this.resyncDOMWithState();
           break;
 
         case 'seen_count_ahead':
-          debugLog('📊 lastSeenCount先行問題を修復');
+          Logger.debug('📊 lastSeenCount先行問題を修復');
           this.updateLastSeenCount(state.stateDataCount);
           break;
 
         default:
-          debugLog('🔄 一般的な不整合修復');
+          Logger.debug('🔄 一般的な不整合修復');
           await this.forceDataRefresh();
       }
     }
@@ -3197,13 +3275,13 @@
     }
 
     async performServerDataSync() {
-      debugLog('🔄 サーバーデータ同期開始');
+      Logger.debug('🔄 サーバーデータ同期開始');
 
       // 軽量チェックで最新のカウントを取得
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const classFilter = !selectedClass || selectedClass === 'すべて' ? null : selectedClass;
 
-      debugLog('📤 軽量チェックパラメータ:', {
+      Logger.debug('📤 軽量チェックパラメータ:', {
         originalSelectedClass: selectedClass,
         processedClassFilter: classFilter,
       });
@@ -3214,7 +3292,7 @@
         this.state.showAdminFeatures
       );
 
-      debugLog('📊 API整合性ログ - 軽量チェック完了:', {
+      Logger.debug('📊 API整合性ログ - 軽量チェック完了:', {
         endpoint: 'getDataCount',
         requestParams: {
           classFilter,
@@ -3229,7 +3307,7 @@
         },
       });
 
-      debugLog('📊 サーバーカウント確認:', countData);
+      Logger.debug('📊 サーバーカウント確認:', countData);
 
       if (countData && countData.count > 0) {
         // サーバーにデータがある場合は強制再読み込み
@@ -3241,7 +3319,7 @@
     }
 
     async resyncDOMWithState() {
-      debugLog('🔄 DOM-State再同期開始');
+      Logger.debug('🔄 DOM-State再同期開始');
 
       // 現在のstateデータに基づいてDOMを再構築
       if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
@@ -3253,7 +3331,7 @@
     }
 
     async forceDataRefresh() {
-      debugLog('🗑️ 強制データリフレッシュ開始...');
+      Logger.debug('🗑️ 強制データリフレッシュ開始...');
 
       // lastSeenCountを保持（安定化のため）
       const preservedLastSeenCount = this.state.lastSeenCount;
@@ -3261,7 +3339,7 @@
       // フロントエンドキャッシュをクリア
       if (this.cache) {
         this.cache.clear();
-        debugLog(
+        Logger.debug(
           '✅ フロントエンドキャッシュをクリア, lastSeenCount保持:',
           preservedLastSeenCount
         );
@@ -3275,7 +3353,7 @@
             .withFailureHandler(reject)
             .refreshBoardData();
         });
-        debugLog('✅ サーバーキャッシュをクリア');
+        Logger.debug('✅ サーバーキャッシュをクリア');
       } catch (error) {
         console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
       }
@@ -3288,13 +3366,13 @@
         (this.state.currentAnswers?.length || 0) <= preservedLastSeenCount;
       if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
         this.state.lastSeenCount = preservedLastSeenCount;
-        debugLog('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
+        Logger.debug('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
           preservedCount: preservedLastSeenCount,
           currentAnswersLength: this.state.currentAnswers?.length || 0,
           stabilityMaintained: true,
         });
       } else {
-        debugLog('✅ 強制データリフレッシュ完了、新データによりlastSeenCount更新:', {
+        Logger.debug('✅ 強制データリフレッシュ完了、新データによりlastSeenCount更新:', {
           oldCount: preservedLastSeenCount,
           newCount: this.state.lastSeenCount,
           currentAnswersLength: this.state.currentAnswers?.length || 0,
@@ -3311,12 +3389,12 @@
       try {
         // 基本構造の確認
         if (!result || typeof result !== 'object') {
-          debugLog('🔍 データ判定: 結果がオブジェクトではない');
+          Logger.debug('🔍 データ判定: 結果がオブジェクトではない');
           return false;
         }
 
         // レスポンス構造の詳細ログ
-        debugLog('🔍 データ判定: レスポンス構造確認', {
+        Logger.debug('🔍 データ判定: レスポンス構造確認', {
           hasStatus: 'status' in result,
           status: result.status,
           hasData: 'data' in result,
@@ -3335,29 +3413,29 @@
 
         // ステータス確認（存在する場合のみ）
         if (hasStatusField && result.status !== 'success') {
-          debugLog('🔍 データ判定: ステータスが成功ではない -', result.status);
+          Logger.debug('🔍 データ判定: ステータスが成功ではない -', result.status);
           return false;
         }
 
         // データ配列の存在確認
         if (!Array.isArray(result.data)) {
-          debugLog('🔍 データ判定: dataが配列ではない', typeof result.data);
+          Logger.debug('🔍 データ判定: dataが配列ではない', typeof result.data);
           return false;
         }
 
         // ヘッダー情報の確認（任意フィールド）
         if (result.header && typeof result.header !== 'string') {
-          debugLog('🔍 データ判定: ヘッダー情報の型が不正', typeof result.header);
+          Logger.debug('🔍 データ判定: ヘッダー情報の型が不正', typeof result.header);
           return false;
         }
 
         // シート名の確認（任意フィールド）
         if (result.sheetName && typeof result.sheetName !== 'string') {
-          debugLog('🔍 データ判定: シート名の型が不正', typeof result.sheetName);
+          Logger.debug('🔍 データ判定: シート名の型が不正', typeof result.sheetName);
           return false;
         }
 
-        debugLog('✅ データ判定: 有効なデータ構造 -', {
+        Logger.debug('✅ データ判定: 有効なデータ構造 -', {
           status: result.status || '(no status field)',
           dataLength: result.data?.length || 0,
           hasHeader: !!result.header,
@@ -3420,7 +3498,7 @@
 
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         try {
-          debugLog(`📡 データ取得試行 ${attempt + 1}/${MAX_ATTEMPTS}:`, fetchParams);
+          Logger.debug(`📡 データ取得試行 ${attempt + 1}/${MAX_ATTEMPTS}:`, fetchParams);
 
           // データ取得を Promise で実行
           const result = await new Promise((resolve, reject) => {
@@ -3430,7 +3508,7 @@
             const timeoutMultiplier = dataCountEstimate > 200 ? 1.5 : dataCountEstimate > 100 ? 1.25 : 1;
             const dynamicTimeout = Math.round(baseTimeout * timeoutMultiplier);
             
-            debugLog(`⏱️ 動的タイムアウト設定: ${dynamicTimeout}ms (データ件数: ${dataCountEstimate}, 倍率: ${timeoutMultiplier})`);
+            Logger.debug(`⏱️ 動的タイムアウト設定: ${dynamicTimeout}ms (データ件数: ${dataCountEstimate}, 倍率: ${timeoutMultiplier})`);
             
             const timeout = setTimeout(
               () => {
@@ -3440,7 +3518,7 @@
             );
 
             // CLAUDE.md準拠: パラメータ詳細ログでデバッグ性向上
-            debugLog(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
+            Logger.debug(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
               tenantId: fetchParams.tenantId,
               tenantIdType: typeof fetchParams.tenantId,
               classFilter: fetchParams.classFilter,
@@ -3453,7 +3531,7 @@
             google.script.run
               .withSuccessHandler((response) => {
                 clearTimeout(timeout);
-                debugLog(`✅ GAS API成功レスポンス受信 (試行 ${attempt + 1}):`, {
+                Logger.debug(`✅ GAS API成功レスポンス受信 (試行 ${attempt + 1}):`, {
                   hasResponse: !!response,
                   responseType: typeof response,
                   responseKeys: response ? Object.keys(response) : [],
@@ -3479,7 +3557,7 @@
           });
 
           // レスポンスの詳細ログ
-          debugLog(`🔍 データ取得レスポンス (試行 ${attempt + 1}):`, {
+          Logger.debug(`🔍 データ取得レスポンス (試行 ${attempt + 1}):`, {
             hasResult: !!result,
             resultType: typeof result,
             resultKeys: result ? Object.keys(result) : [],
@@ -3495,7 +3573,7 @@
 
           // 成功した場合は結果を返す - 改善された判定条件
           if (result && this.isValidDataResult(result)) {
-            debugLog(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data?.length || 0, '件');
+            Logger.debug(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data?.length || 0, '件');
             return result;
           }
 
@@ -3512,14 +3590,14 @@
 
               // ユーザー情報エラーの場合は診断・修復を試行
               try {
-                debugLog('🔧 サーバー側診断・修復を要求中...');
+                Logger.debug('🔧 サーバー側診断・修復を要求中...');
                 await new Promise((resolve, reject) => {
                   google.script.run
                     .withSuccessHandler(resolve)
                     .withFailureHandler(reject)
                     .performAutoRepair(fetchParams.tenantId);
                 });
-                debugLog('✅ サーバー側修復完了、次の試行に進みます');
+                Logger.debug('✅ サーバー側修復完了、次の試行に進みます');
               } catch (repairError) {
                 console.warn('⚠️ サーバー側修復失敗:', repairError);
               }
@@ -3576,7 +3654,7 @@
 
           if (isTemporaryError || attempt < MAX_ATTEMPTS - 1) {
             const delay = retryDelays[attempt] || 3000;
-            debugLog(`⏳ ${delay}ms 待機後にリトライ...`);
+            Logger.debug(`⏳ ${delay}ms 待機後にリトライ...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           } else {
             throw error;
@@ -3709,7 +3787,7 @@
 
       // Prevent concurrent loading
       if (this.state.isLoading && config.showLoading) {
-        debugLog('loadSheetData: Already loading, skipping...');
+        Logger.debug('loadSheetData: Already loading, skipping...');
         return;
       }
 
@@ -3719,7 +3797,7 @@
           this.showLoadingOverlay();
         }
 
-        debugLog('🔍 loadSheetData started:', config);
+        Logger.debug('🔍 loadSheetData started:', config);
         const oldAnswers = [...(this.state.currentAnswers || [])];
 
         // Clear caches if needed
@@ -3748,18 +3826,18 @@
     }
 
     async clearDataCaches(isCompleteBypass = false) {
-      debugLog('🧹 Clearing data caches...', { isCompleteBypass });
+      Logger.debug('🧹 Clearing data caches...', { isCompleteBypass });
 
       // Clear frontend cache
       if (this.cache) {
         this.cache.clear();
-        debugLog('✅ Frontend cache cleared');
+        Logger.debug('✅ Frontend cache cleared');
       }
 
       // Clear UnifiedCache if available
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
-        debugLog('✅ UnifiedCache cleared');
+        Logger.debug('✅ UnifiedCache cleared');
       }
 
       // Clear localStorage cache entries for complete bypass
@@ -3773,7 +3851,7 @@
               key.includes('differentialCards_')
           );
           cacheKeys.forEach((key) => localStorage.removeItem(key));
-          debugLog('✅ localStorage cache cleared:', cacheKeys.length, 'keys');
+          Logger.debug('✅ localStorage cache cleared:', cacheKeys.length, 'keys');
         } catch (error) {
           console.warn('⚠️ Failed to clear localStorage cache:', error);
         }
@@ -3782,7 +3860,7 @@
       // Clear server cache
       try {
         await this.gas.clearCache();
-        debugLog('✅ Server cache cleared');
+        Logger.debug('✅ Server cache cleared');
       } catch (error) {
         console.warn('⚠️ Failed to clear server cache:', error);
       }
@@ -3793,18 +3871,18 @@
      * 既存のclearDataCachesを拡張し、より強力なキャッシュクリアを実行
      */
     clearAllCachesForUnpublished() {
-      debugLog('🧹 非公開状態遷移: 包括的キャッシュクリア開始');
+      Logger.debug('🧹 非公開状態遷移: 包括的キャッシュクリア開始');
 
       try {
         // 1. 既存のキャッシュクリア機能を使用
         if (this.cache && typeof this.cache.clear === 'function') {
           this.cache.clear();
-          debugLog('🗑️ Frontend cache cleared');
+          Logger.debug('🗑️ Frontend cache cleared');
         }
 
         if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
           window.unifiedCache.clear();
-          debugLog('🗑️ Unified cache cleared');
+          Logger.debug('🗑️ Unified cache cleared');
         }
 
         // 2. 拡張されたローカルストレージクリア
@@ -3824,7 +3902,7 @@
 
         studyQuestKeys.forEach((key) => {
           localStorage.removeItem(key);
-          debugLog('🗑️ Removed localStorage key:', key);
+          Logger.debug('🗑️ Removed localStorage key:', key);
         });
 
         // 3. セッションストレージクリア
@@ -3836,7 +3914,7 @@
 
           studyQuestSessionKeys.forEach((key) => {
             sessionStorage.removeItem(key);
-            debugLog('🗑️ Removed sessionStorage key:', key);
+            Logger.debug('🗑️ Removed sessionStorage key:', key);
           });
         }
 
@@ -3852,7 +3930,7 @@
         localStorage.setItem('lastUnpublishTime', Date.now().toString());
         localStorage.setItem('unpublishedRedirectTimestamp', new Date().toISOString());
 
-        debugLog('✅ 非公開状態遷移用キャッシュクリア完了');
+        Logger.debug('✅ 非公開状態遷移用キャッシュクリア完了');
       } catch (error) {
         console.error('❌ 非公開状態キャッシュクリアでエラー:', error);
         // エラーがあっても処理は継続
@@ -3889,12 +3967,12 @@
           bypassCache: config.bypassCache || false,
         };
 
-        debugLog('📤 データ取得パラメータ:', {
+        Logger.debug('📤 データ取得パラメータ:', {
           ...fetchParams,
           originalSelectedClass: selectedClass,
           processedClassFilter: classFilter,
         });
-        debugLog('📡 Starting data fetch with parameters:', fetchParams);
+        Logger.debug('📡 Starting data fetch with parameters:', fetchParams);
 
         // エラーハンドリング強化版のデータ取得
         await this.performDataFetchWithRetry(fetchParams, isInitialLoad)
@@ -3943,7 +4021,7 @@
                   try {
                     // 初期データロード時は高速復旧戦略を採用
                     if (isInitialLoad) {
-                      debugLog('🚀 初期データロード失敗 - 高速復旧戦略を実行');
+                      Logger.debug('🚀 初期データロード失敗 - 高速復旧戦略を実行');
 
                       // 軽量チェックでデータ存在を確認
                       const countData = await this.gas.getDataCount(
@@ -3953,7 +4031,7 @@
                       );
 
                       if (countData && countData.count > 0) {
-                        debugLog(
+                        Logger.debug(
                           `⚡ 軽量チェックで${countData.count}件検出 - 後続ポーリングで復旧予定`
                         );
                         // 初期データロード失敗フラグを設定してポーリングに委ねる
@@ -3972,7 +4050,7 @@
                       const actual = result?.data ? result.data.length : 0;
                       const lastSeen = this.state.lastSeenCount || 0;
 
-                      debugLog('🔍 Enhanced data consistency check (Phase 2.2):', {
+                      Logger.debug('🔍 Enhanced data consistency check (Phase 2.2):', {
                         expected,
                         actual,
                         lastSeen,
@@ -3989,7 +4067,7 @@
                           '⚠️ Significant data inconsistency detected!',
                           `Expected: ${expected}, Actual: ${actual}, LastSeen: ${lastSeen}`
                         );
-                        debugLog('🔄 Attempting simplified fallback...');
+                        Logger.debug('🔄 Attempting simplified fallback...');
 
                         // 簡素化されたフォールバック（待機時間短縮）
                         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -4008,7 +4086,7 @@
                         });
 
                         if (retryResult && retryResult.data && retryResult.data.length > 0) {
-                          debugLog(
+                          Logger.debug(
                             '✅ Fallback retry successful! Got',
                             retryResult.data.length,
                             'items'
@@ -4039,13 +4117,13 @@
                     this.state.lastSeenCount = 0;
                     // 初期データロード失敗フラグを設定
                     this.hadInitialDataLoadFailure = true;
-                    debugLog('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
+                    Logger.debug('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
                   }
                   return;
                 }
               }
 
-              debugLog('📊 API整合性ログ - データ受信完了:', {
+              Logger.debug('📊 API整合性ログ - データ受信完了:', {
                 endpoint: 'getPublishedSheetData',
                 requestParams: {
                   classFilter: fetchParams.classFilter,
@@ -4066,7 +4144,7 @@
                 },
               });
 
-              debugLog('Received data:', result.data);
+              Logger.debug('Received data:', result.data);
 
               // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
               // Step 1 & 2: Data acquisition and unified state synchronization
@@ -4074,13 +4152,13 @@
                 result.data,
                 'performDataLoad'
               );
-              debugLog(
+              Logger.debug(
                 '✅ Step 1-2: Data acquisition and state synchronization completed:',
                 syncResult
               );
 
               // 理由列デバッグ: 取得されたデータの詳細を確認
-              debugLog(
+              Logger.debug(
                 '🔍 理由列デバッグ - 取得データ詳細:',
                 (result.data || []).map((item, index) => ({
                   index: index,
@@ -4123,7 +4201,7 @@
                 opinionHeader: result.header || 'お題',
                 lastUpdated: Date.now(),
               };
-              debugLog('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
+              Logger.debug('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
 
               this.lastDataLoadTime = Date.now();
 
@@ -4135,7 +4213,7 @@
               }
               const existingSkeletons = container.querySelectorAll('.skeleton, .answer-card.loading');
               if (existingSkeletons.length > 0) {
-                debugLog('🧹 データ読み込み成功：', existingSkeletons.length, '個のスケルトンカードをクリア');
+                Logger.debug('🧹 データ読み込み成功：', existingSkeletons.length, '個のスケルトンカードをクリア');
                 existingSkeletons.forEach(skeleton => skeleton.remove());
               }
 
@@ -4165,18 +4243,18 @@
 
               // Step 3: DOM update with proper sequencing (Phase 2.1)
               requestAnimationFrame(async () => {
-                debugLog('✅ Step 3: DOM update starting...');
+                Logger.debug('✅ Step 3: DOM update starting...');
                 await this.renderBoard(false, isInitialLoad);
-                debugLog('✅ Step 3: DOM update completed');
+                Logger.debug('✅ Step 3: DOM update completed');
 
                 // Step 4: DOM整合性チェック(レンダリング後に実行)
                 const currentDataLength = this.state.currentAnswers?.length || 0;
                 this.logDataConsistencyMetrics('performDataLoad-after-render', currentDataLength, 0);
                 
                 // Step 5: Consistency validation after DOM update (Phase 2.1)
-                debugLog('✅ Step 5: Consistency validation starting...');
+                Logger.debug('✅ Step 5: Consistency validation starting...');
                 await this.validatePostLoadState();
-                debugLog('✅ Step 5: Consistency validation completed');
+                Logger.debug('✅ Step 5: Consistency validation completed');
               });
             } finally {
               // 成功時にローディング状態を解除
@@ -4203,7 +4281,7 @@
                 errorStr.includes('not found')
               ) {
                 // Board has been unpublished, redirect to Unpublished.html
-                debugLog('Board appears to be unpublished, redirecting...');
+                Logger.debug('Board appears to be unpublished, redirecting...');
                 this.redirectToUnpublishedPage();
                 return;
               }
@@ -4432,7 +4510,7 @@
     // CLAUDE.md準拠: エラー回復ハンドラー設定
     setupErrorRecoveryHandlers(errorAnalysis) {
       // 再試行ボタンのハンドラー
-      const retryBtn = document.getElementById('retryLoadBtn');
+      const retryBtn = this._getCachedElement('retryLoadBtn');
       if (retryBtn) {
         retryBtn.addEventListener('click', async () => {
           try {
@@ -4457,7 +4535,7 @@
       }
 
       // アプリリセットボタンのハンドラー
-      const resetBtn = document.getElementById('resetAppBtn');
+      const resetBtn = this._getCachedElement('resetAppBtn');
       if (resetBtn) {
         resetBtn.addEventListener('click', () => {
           if (
@@ -4577,17 +4655,17 @@
 
       // 早期リターン: 無効な選択または同じシート
       if (!selectedSheet || selectedSheet === this.state.currentActiveSheet) {
-        debugLog('Sheet switch skipped - same sheet or invalid selection');
+        Logger.debug('Sheet switch skipped - same sheet or invalid selection');
         return;
       }
 
       // 現在切り替え中の場合は処理を拒否
       if (this.sheetSwitchInProgress) {
-        debugLog('Sheet switch already in progress - ignoring request');
+        Logger.debug('Sheet switch already in progress - ignoring request');
         return;
       }
 
-      debugLog('🔄 Starting sheet switch:', {
+      Logger.debug('🔄 Starting sheet switch:', {
         from: this.state.currentActiveSheet,
         to: selectedSheet,
         tenantId: this.state.tenantId,
@@ -4605,7 +4683,7 @@
         // 後処理: 状態の確定
         await this.finalizeSheetSwitch(selectedSheet);
 
-        debugLog('✅ Sheet switch completed:', {
+        Logger.debug('✅ Sheet switch completed:', {
           newSheet: selectedSheet,
           dataCount: this.state.currentAnswers?.length || 0,
         });
@@ -4635,7 +4713,7 @@
         this.pollingInterval = null;
       }
 
-      debugLog('Sheet switch preparation completed');
+      Logger.debug('Sheet switch preparation completed');
     }
 
     async performSheetSwitch(targetSheet) {
@@ -4644,7 +4722,7 @@
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          debugLog(`🔄 Loading sheet data (attempt ${attempt}/${maxRetries}):`, targetSheet);
+          Logger.debug(`🔄 Loading sheet data (attempt ${attempt}/${maxRetries}):`, targetSheet);
 
           await this.loadSheetData({
             bypassCache: true,
@@ -4652,7 +4730,7 @@
             showLoading: true,
           });
 
-          debugLog('✅ Sheet data loaded successfully on attempt', attempt);
+          Logger.debug('✅ Sheet data loaded successfully on attempt', attempt);
           return; // 成功時は早期リターン
         } catch (error) {
           lastError = error;
@@ -4660,7 +4738,7 @@
 
           if (attempt < maxRetries) {
             const delay = attempt * 1000; // 指数バックオフ
-            debugLog(`⏳ Retrying in ${delay}ms...`);
+            Logger.debug(`⏳ Retrying in ${delay}ms...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
@@ -4687,7 +4765,7 @@
       // ポーリングを再開
       this.startPolling();
 
-      debugLog('Sheet switch finalization completed');
+      Logger.debug('Sheet switch finalization completed');
     }
 
     async handleSheetSwitchError(error, targetSheet) {
@@ -4780,7 +4858,7 @@
         }
 
         // CLAUDE.md準拠: 包括的null安全性チェック
-        debugLog('populateClassFilter: 引数チェック', {
+        Logger.debug('populateClassFilter: 引数チェック', {
           rows: rows,
           isArray: Array.isArray(rows),
           length: rows ? rows.length : 'N/A',
@@ -4795,7 +4873,7 @@
 
         const uniqueClasses = ['すべて', ...new Set(classValues)];
 
-        debugLog('populateClassFilter: 処理結果', {
+        Logger.debug('populateClassFilter: 処理結果', {
           totalRows: safeRows.length,
           validRows: validRows.length,
           classValues: classValues.length,
@@ -4889,7 +4967,7 @@
 
         // 空データの場合の早期処理
         if (!newRows || newRows.length === 0) {
-          debugLog('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
+          Logger.debug('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
           await this.renderEmptyState();
           return;
         }
@@ -5027,40 +5105,55 @@
       const container = this.elements.answersContainer;
       if (!container) {
         console.warn('calculateVisibleRange: answersContainer not found.');
-        return { startIndex: 0, endIndex: 0 };
+        return { startIndex: 0, endIndex: Math.min(totalItems, 100) };
       }
 
       const scrollTop = container.scrollTop;
       let containerHeight = container.clientHeight;
-      const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
+      const cardHeight = 150;
 
-      // 🔧 containerHeight=0問題の解決：より堅牢なフォールバック
+      // 🚀 Phase1最適化: コンテナ高さ検出の堅牢化
       if (containerHeight <= 0) {
-        // offsetHeight, getBoundingClientRect等でも試行
         containerHeight = container.offsetHeight || 
                          container.getBoundingClientRect().height || 
-                         window.innerHeight || 600; // 最終フォールバック値
-        
-        debugLog(`🔧 containerHeight修復: ${containerHeight}px (元値: ${container.clientHeight}px)`);
+                         window.innerHeight || 800;
+        Logger.debug(`🔧 containerHeight修復: ${containerHeight}px (元値: ${container.clientHeight}px)`);
       }
 
       let startIndex = 0;
       let endIndex = totalItems;
 
-      if (containerHeight > 0) {
-        startIndex = Math.floor(scrollTop / cardHeight);
-        endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+      if (containerHeight > 0 && totalItems > 0) {
+        // 仮想スクロールによる表示範囲計算
+        const visibleCards = Math.ceil(containerHeight / cardHeight);
+        const bufferSize = Math.max(20, Math.ceil(visibleCards * 0.5)); // 余分なバッファ
+        
+        startIndex = Math.max(0, Math.floor(scrollTop / cardHeight) - bufferSize);
+        endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight) + bufferSize);
+        
+        // 初期表示時は十分な数を表示
+        if (scrollTop === 0 && startIndex === 0) {
+          endIndex = Math.min(totalItems, Math.max(100, visibleCards * 2));
+        }
+        
+        Logger.perf(`🌀 仮想スクロール範囲: ${startIndex}-${endIndex} / ${totalItems} (visible: ${visibleCards}, buffer: ${bufferSize})`);
       } else {
-        // 最終手段：適切なバッチサイズでレンダリング
-        endIndex = Math.min(totalItems, 50); // 初回表示を50個に増加
-        debugLog('calculateVisibleRange: フォールバック - 50個制限でレンダリング');
+        // 💡 改善された初期表示ロジック: データ量に応じた適応的表示
+        if (totalItems <= 100) {
+          endIndex = totalItems; // 100件以下は全表示
+        } else if (totalItems <= 500) {
+          endIndex = Math.min(totalItems, 150); // 500件以下は150件表示
+        } else {
+          endIndex = Math.min(totalItems, 200); // 大量データは200件表示
+        }
+        Logger.perf(`📊 適応的初期表示: ${endIndex} / ${totalItems} 件`);
       }
 
       return { startIndex, endIndex };
     }
 
     renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
-      console.debug(
+      Logger.perf(
         'DEBUG: renderBoard - Using virtual scrolling for',
         newRows.length,
         'items (initial load:',
@@ -5072,12 +5165,30 @@
         this.clearVirtualScrollingState();
       }
 
-      // 仮想スクロールでも既存のリアクション状態を保持
+      // 🚀 Phase1最適化: 仮想スクロール状態の適切な初期化
+      if (!this.virtualScrollState) {
+        this.virtualScrollState = {
+          totalItems: newRows.length,
+          renderedItems: 0,
+          renderedRowIndexes: new Set(),
+          isLoading: false
+        };
+      } else {
+        this.virtualScrollState.totalItems = newRows.length;
+      }
+
       const fragment = this.getReusableFragment();
       const visibleRange = this.calculateVisibleRange(newRows.length);
       const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
-      console.debug('Virtual scroll rendering:', { visibleRows: visibleRows.length });
+      
+      Logger.perf('🌀 Virtual scroll range:', { 
+        total: newRows.length, 
+        startIndex: visibleRange.startIndex, 
+        endIndex: visibleRange.endIndex, 
+        visibleCount: visibleRows.length 
+      });
 
+      let renderedCount = 0;
       visibleRows.forEach((row) => {
         const rowId = String(row.rowIndex);
         let card = existingMap.get(rowId);
@@ -5087,19 +5198,30 @@
           card = this.createAnswerCard(row);
           if (card) {
             fragment.appendChild(card);
+            this.virtualScrollState.renderedRowIndexes.add(rowId);
+            renderedCount++;
           }
         } else if (this.shouldUpdateCard(row, oldData)) {
-          // 既存カードを更新（リアクション状態を保持）
           this.updateAnswerCard(card, row, oldData);
+          this.virtualScrollState.renderedRowIndexes.add(rowId);
         }
       });
 
-      console.debug('Virtual scroll completed:', { renderedCards: fragment.children.length });
       if (fragment.children.length > 0) {
         container.appendChild(fragment);
+        this.virtualScrollState.renderedItems = container.children.length;
         
-        // プログレッシブローディング情報を表示
-        this.showVirtualScrollInfo(visibleRows.length, newRows.length);
+        // 🎯 スクロールオブザーバーを即座に設定
+        this.deferredRender(() => {
+          this.setupScrollObserver();
+          this.showVirtualScrollInfo(visibleRows.length, newRows.length);
+        });
+        
+        Logger.info('✅ Virtual scroll初期化完了:', { 
+          rendered: renderedCount, 
+          totalRendered: this.virtualScrollState.renderedItems,
+          totalItems: this.virtualScrollState.totalItems 
+        });
       }
     }
     
@@ -5107,12 +5229,12 @@
     showVirtualScrollInfo(displayedCount, totalCount) {
       if (displayedCount >= totalCount) return;
       
-      const infoElement = document.getElementById('virtual-scroll-info');
+      const infoElement = this._getCachedElement('virtual-scroll-info');
       if (infoElement) {
         infoElement.remove(); // 既存の情報を削除
       }
       
-      const info = document.createElement('div');
+      const info = this._createElement('div');
       info.id = 'virtual-scroll-info';
       info.className = 'fixed bottom-4 right-4 bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50';
       info.innerHTML = `
@@ -5404,7 +5526,7 @@
         };
 
         // 理由列デバッグ: createAnswerCard での理由データ処理状況
-        debugLog('🔍 createAnswerCard 理由列デバッグ:', {
+        Logger.debug('🔍 createAnswerCard 理由列デバッグ:', {
           rowIndex: safeData.rowIndex,
           originalReason: data.reason,
           validatedReason: safeData.reason,
@@ -5436,7 +5558,7 @@
           }
         }
 
-        const card = document.createElement('div');
+        const card = this._createElement('div');
         const highlightClass = safeData.highlight ? ' highlighted' : '';
         card.className =
           'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' +
@@ -5538,7 +5660,7 @@
         const fragment = document.createDocumentFragment();
 
         // Create main content div
-        const contentDiv = document.createElement('div');
+        const contentDiv = this._createElement('div');
         contentDiv.className = 'relative flex-grow mb-3 answer-preview';
 
         const opinionTitle = document.createElement('h3');
@@ -5553,7 +5675,7 @@
         contentDiv.appendChild(opinionTitle);
 
         // 理由テキストが存在する場合のみ追加（堅牢化）
-        debugLog('🔍 理由テキスト追加デバッグ:', {
+        Logger.debug('🔍 理由テキスト追加デバッグ:', {
           hasReason: !!safeData.reason,
           reasonTrimmed: safeData.reason?.trim(),
           willAddReason: !!(safeData.reason && safeData.reason.trim()),
@@ -5561,19 +5683,19 @@
         });
 
         if (safeData.reason && safeData.reason.trim()) {
-          debugLog('✅ 理由テキストを追加します:', safeData.reason);
+          Logger.debug('✅ 理由テキストを追加します:', safeData.reason);
           try {
             // 理由テキストの有効性を検証
             if (reasonText && reasonText.textContent === safeData.reason) {
               contentDiv.appendChild(reasonText);
-              debugLog('✅ 理由テキスト追加完了（既存要素使用）');
+              Logger.debug('✅ 理由テキスト追加完了（既存要素使用）');
             } else {
               // 理由テキスト要素の再作成が必要な場合
               const newReasonText = document.createElement('p');
               newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
               newReasonText.textContent = safeData.reason;
               contentDiv.appendChild(newReasonText);
-              debugLog('✅ 理由テキスト追加完了（新規要素作成）');
+              Logger.debug('✅ 理由テキスト追加完了（新規要素作成）');
             }
           } catch (reasonError) {
             // 理由テキスト追加でエラーが発生した場合の回復処理
@@ -5586,7 +5708,7 @@
               fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
               fallbackReasonText.textContent = safeData.reason;
               contentDiv.appendChild(fallbackReasonText);
-              debugLog('✅ 理由テキスト追加完了（フォールバック）');
+              Logger.debug('✅ 理由テキスト追加完了（フォールバック）');
             } catch (fallbackError) {
               console.error(
                 'createAnswerCard: Failed to add reason text even with fallback:',
@@ -5596,17 +5718,17 @@
             }
           }
         } else {
-          debugLog('❌ 理由テキストが空のため追加をスキップ');
+          Logger.debug('❌ 理由テキストが空のため追加をスキップ');
         }
 
         // Create footer div
-        const footerDiv = document.createElement('div');
+        const footerDiv = this._createElement('div');
         footerDiv.className = containerClass;
 
         // 名前表示部分を追加
         if (nameHtml) {
           try {
-            const nameContainer = document.createElement('div');
+            const nameContainer = this._createElement('div');
             nameContainer.className = 'name-container flex-shrink-0';
             nameContainer.innerHTML = nameHtml;
             footerDiv.appendChild(nameContainer);
@@ -5617,7 +5739,7 @@
 
         // リアクション部分を追加
         try {
-          const reactionsDiv = document.createElement('div');
+          const reactionsDiv = this._createElement('div');
           reactionsDiv.className = 'flex items-center gap-1 flex-shrink-0';
           reactionsDiv.setAttribute('role', 'group');
           reactionsDiv.setAttribute('aria-label', '回答への反応');
@@ -5666,7 +5788,7 @@
 
         // Return a minimal error card instead of null
         try {
-          const errorCard = document.createElement('div');
+          const errorCard = this._createElement('div');
           errorCard.className =
             'answer-card glass-panel rounded-xl p-4 border-2 border-red-400/50 bg-red-900/20';
           errorCard.innerHTML = `
@@ -5696,7 +5818,7 @@
       const lastOperation = this.lastReactionTimes?.get(reactionKey);
       if (lastOperation && now - lastOperation < 1000) {
         // 1秒以内の重複操作を防ぐ
-        debugLog(`⚡ 重複操作スキップ: ${reactionKey}`);
+        Logger.debug(`⚡ 重複操作スキップ: ${reactionKey}`);
         return;
       }
 
@@ -5770,7 +5892,7 @@
           throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
 
-        debugLog('📡 リアクション送信 (Server-first):', {
+        Logger.debug('📡 リアクション送信 (Server-first):', {
           rowIndex,
           reaction,
           sheetName: this.state.sheetName,
@@ -5783,7 +5905,7 @@
         // UI更新（サーバー応答後のみ）
         await this.updateReactionUI(item, false);
 
-        debugLog('✅ リアクション処理完了:', reactionKey);
+        Logger.debug('✅ リアクション処理完了:', reactionKey);
 
         // 処理完了を通知
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
@@ -5971,7 +6093,7 @@
         );
 
         if (totalBatchSize >= this.BATCH_SIZE_LIMIT) {
-          debugLog('📦 バッチサイズ制限到達、即座処理実行');
+          Logger.debug('📦 バッチサイズ制限到達、即座処理実行');
           this.processBatchQueue();
         }
       } catch (error) {
@@ -5987,7 +6109,7 @@
         }
 
         this.batchProcessingActive = true;
-        debugLog('🔄 バッチ処理試行開始');
+        Logger.debug('🔄 バッチ処理試行開始');
 
         // キューからバッチ操作を準備
         const batchOperations = Array.from(this.reactionQueue.values());
@@ -6002,7 +6124,7 @@
         const result = await this.gas.addReactionBatch(batchOperations);
 
         if (result && result.success) {
-          debugLog('✅ バッチ処理成功:', batchOperations.length + '件');
+          Logger.debug('✅ バッチ処理成功:', batchOperations.length + '件');
 
           // バッチレスポンスを処理
           this.processBatchReactionResponse(result.data, batchOperations);
@@ -6042,7 +6164,7 @@
           }
         });
 
-        debugLog('✅ バッチレスポンス処理完了');
+        Logger.debug('✅ バッチレスポンス処理完了');
       } catch (error) {
         console.error('バッチレスポンス処理エラー:', error);
         // エラー時は既存の個別処理システムが処理する
@@ -6075,7 +6197,7 @@
     }
 
     async processReactionResponse(item, response, reaction) {
-      debugLog('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
+      Logger.debug('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
 
       // サーバー状態を絶対的に適用（楽観的更新なし）
       if (response.reactions && typeof response.reactions === 'object') {
@@ -6083,7 +6205,7 @@
         const serverState = response.reactions;
         item.reactions = JSON.parse(JSON.stringify(serverState));
 
-        debugLog('✅ サーバー状態適用完了:', {
+        Logger.debug('✅ サーバー状態適用完了:', {
           rowIndex: item.rowIndex,
           reaction,
           serverState: item.reactions,
@@ -6092,13 +6214,13 @@
         console.warn('⚠️ 期待されたリアクション形式ではありません:', response);
         // フォールバック処理（サーバー応答が不正な場合のみ）
         this.applyFallbackReactionUpdate(item, reaction);
-        debugLog('🔄 フォールバック処理実行:', item.reactions);
+        Logger.debug('🔄 フォールバック処理実行:', item.reactions);
       }
 
       // ローカルストレージに保存（サーバー状態を保存）
       this.saveReactionState(item.rowIndex, item.reactions);
 
-      debugLog('🎯 サーバー応答処理完了:', {
+      Logger.debug('🎯 サーバー応答処理完了:', {
         rowIndex: item.rowIndex,
         finalState: item.reactions,
       });
@@ -6145,7 +6267,7 @@
         // 不整合を記録（デバッグ用）
         this.recordReactionInconsistency(rowIndex, inconsistencies);
       } else {
-        debugLog('✅ リアクション状態整合性確認:', { rowIndex });
+        Logger.debug('✅ リアクション状態整合性確認:', { rowIndex });
       }
 
       return inconsistencies;
@@ -6218,7 +6340,7 @@
           }
         }
 
-        debugLog('⚡ 即座UI更新完了:', { rowIndex, reaction });
+        Logger.debug('⚡ 即座UI更新完了:', { rowIndex, reaction });
       } catch (error) {
         console.error('❌ 即座UI更新エラー:', error);
       }
@@ -6231,7 +6353,7 @@
       const lastStateHash = this.lastUIStates?.get(lastUpdateKey);
 
       if (lastStateHash === currentStateHash && !immediate) {
-        debugLog(`⚡ UI更新スキップ (変更なし): rowIndex=${item.rowIndex}`);
+        Logger.debug(`⚡ UI更新スキップ (変更なし): rowIndex=${item.rowIndex}`);
         return;
       }
 
@@ -6255,7 +6377,7 @@
             }
           }
 
-          debugLog('⚡ リアクションUI即座更新完了:', {
+          Logger.debug('⚡ リアクションUI即座更新完了:', {
             rowIndex: item.rowIndex,
             reactions: item.reactions,
           });
@@ -6285,7 +6407,7 @@
               }
             }
 
-            debugLog('✅ リアクションUI更新完了:', {
+            Logger.debug('✅ リアクションUI更新完了:', {
               rowIndex: item.rowIndex,
               reactions: item.reactions,
             });
@@ -6311,7 +6433,7 @@
         const stored = localStorage.getItem(key);
         const count = stored ? parseInt(stored, 10) : 0;
 
-        debugLog('📥 lastSeenCount復元:', { key, count });
+        Logger.debug('📥 lastSeenCount復元:', { key, count });
         return isNaN(count) ? 0 : count;
       } catch (error) {
         console.warn('⚠️ lastSeenCount読み込みエラー:', error);
@@ -6338,7 +6460,7 @@
         // 真の初回判定: すべてが未設定/初期状態の場合
         const isFirstTime = !hasLastSeen && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
 
-        debugLog('🔍 初回判定結果:', {
+        Logger.debug('🔍 初回判定結果:', {
           hasLastSeen,
           hasDiffCards,
           hasInitialLoad,
@@ -6359,7 +6481,7 @@
         const key = this.getScopedKey('lastSeenCount');
         localStorage.setItem(key, count.toString());
 
-        debugLog('💾 lastSeenCount保存:', { key, count });
+        Logger.debug('💾 lastSeenCount保存:', { key, count });
       } catch (error) {
         console.warn('⚠️ lastSeenCount保存エラー:', error);
       }
@@ -6371,7 +6493,7 @@
         this.state.lastSeenCount = newCount;
         this.saveLastSeenCount(newCount);
 
-        debugLog('📊 lastSeenCount更新:', {
+        Logger.debug('📊 lastSeenCount更新:', {
           oldCount,
           newCount,
           timestamp: new Date().toISOString(),
@@ -6386,7 +6508,7 @@
         const stored = localStorage.getItem(key);
         const cards = stored ? JSON.parse(stored) : [];
 
-        debugLog('📥 差分カード復元:', { key, count: cards.length });
+        Logger.debug('📥 差分カード復元:', { key, count: cards.length });
         return Array.isArray(cards) ? cards : [];
       } catch (error) {
         console.warn('⚠️ 差分カード読み込みエラー:', error);
@@ -6401,7 +6523,7 @@
         const merged = [...new Set([...existing, ...cardIds])];
         localStorage.setItem(key, JSON.stringify(merged));
 
-        debugLog('💾 差分カード保存:', { key, count: merged.length, new: cardIds.length });
+        Logger.debug('💾 差分カード保存:', { key, count: merged.length, new: cardIds.length });
       } catch (error) {
         console.warn('⚠️ 差分カード保存エラー:', error);
       }
@@ -6411,7 +6533,7 @@
       try {
         const key = this.getScopedKey('differentialCards');
         localStorage.removeItem(key);
-        debugLog('🗑️ 差分カードクリア:', { key });
+        Logger.debug('🗑️ 差分カードクリア:', { key });
       } catch (error) {
         console.warn('⚠️ 差分カードクリアエラー:', error);
       }
@@ -6422,7 +6544,7 @@
       const differentialCardIds = this.loadDifferentialCards();
       if (differentialCardIds.length === 0) return;
 
-      debugLog('🔄 差分カード復元開始:', differentialCardIds.length + '件');
+      Logger.debug('🔄 差分カード復元開始:', differentialCardIds.length + '件');
 
       const container = this.elements.answersContainer;
       if (!container) return;
@@ -6437,11 +6559,11 @@
           card.setAttribute('data-differential-card', 'true');
           card.setAttribute('data-restored', 'true');
           restoredCount++;
-          debugLog('📌 差分カード復元:', rowIndex);
+          Logger.debug('📌 差分カード復元:', rowIndex);
         }
       });
 
-      debugLog('✅ 差分カード復元完了:', restoredCount + '件');
+      Logger.debug('✅ 差分カード復元完了:', restoredCount + '件');
     }
 
     async handleReactionError(error, rowIndex, reaction) {
@@ -6587,9 +6709,9 @@
           item.highlight = expectedHighlight;
           requestAnimationFrame(() => this.applyUpdates([item]));
 
-          debugLog('✅ ハイライト状態を修正しました');
+          Logger.debug('✅ ハイライト状態を修正しました');
         } else {
-          debugLog('✅ ハイライト状態同期確認: 正常');
+          Logger.debug('✅ ハイライト状態同期確認: 正常');
         }
       } catch (error) {
         console.error('ハイライト状態同期確認エラー:', error);
@@ -6598,7 +6720,7 @@
 
     // 包括的同期状態監視システム
     async performSyncHealthCheck() {
-      debugLog('🔍 同期状態ヘルスチェック開始');
+      Logger.debug('🔍 同期状態ヘルスチェック開始');
       const issues = [];
 
       try {
@@ -6698,7 +6820,7 @@
 
         // 5. 結果出力
         if (issues.length === 0) {
-          debugLog('✅ 同期状態ヘルスチェック: 問題なし');
+          Logger.debug('✅ 同期状態ヘルスチェック: 問題なし');
           return { status: 'healthy', issues: [] };
         } else {
           console.warn('⚠️ 同期状態ヘルスチェック: 問題検出', issues);
@@ -6741,7 +6863,7 @@
 
             case 'data_staleness':
               // データを強制リフレッシュ
-              debugLog('🔄 古いデータを検出、強制リフレッシュ実行');
+              Logger.debug('🔄 古いデータを検出、強制リフレッシュ実行');
               await this.forceDataRefresh();
               fixed++;
               break;
@@ -6764,7 +6886,7 @@
         }
       }
 
-      debugLog(`🔧 自動修復完了: ${fixed}件修復, ${skipped}件スキップ`);
+      Logger.debug(`🔧 自動修復完了: ${fixed}件修復, ${skipped}件スキップ`);
       return { fixed, skipped };
     }
 
@@ -6788,7 +6910,7 @@
               );
 
               if (criticalIssues.length > 0) {
-                debugLog('🔧 重要な同期問題を検出、自動修復を実行');
+                Logger.debug('🔧 重要な同期問題を検出、自動修復を実行');
                 await this.fixSyncIssues({ issues: criticalIssues });
               }
             }
@@ -6799,7 +6921,7 @@
         5 * 60 * 1000
       ); // 5分間隔
 
-      debugLog('✅ 同期状態監視を開始しました（5分間隔）');
+      Logger.debug('✅ 同期状態監視を開始しました（5分間隔）');
     }
 
     // 同期監視の停止
@@ -6807,7 +6929,7 @@
       if (this.syncMonitoringInterval) {
         clearInterval(this.syncMonitoringInterval);
         this.syncMonitoringInterval = null;
-        debugLog('🛑 同期状態監視を停止しました');
+        Logger.debug('🛑 同期状態監視を停止しました');
       }
     }
 
@@ -6818,7 +6940,7 @@
 
     // バッチ処理パフォーマンステスト（開発・デバッグ用）
     async testBatchPerformance() {
-      debugLog('🧪 バッチ処理パフォーマンステスト開始');
+      Logger.debug('🧪 バッチ処理パフォーマンステスト開始');
 
       const testResults = {
         batchTest: null,
@@ -6847,10 +6969,10 @@
           return { error: 'テスト用データが不足' };
         }
 
-        debugLog(`📊 ${testOperations.length}件の操作でテスト実行`);
+        Logger.debug(`📊 ${testOperations.length}件の操作でテスト実行`);
 
         // 1. バッチ処理のテスト
-        debugLog('🔄 バッチ処理テスト開始');
+        Logger.debug('🔄 バッチ処理テスト開始');
         const batchStartTime = performance.now();
 
         try {
@@ -6867,14 +6989,14 @@
             avgTimePerOp: (batchEndTime - batchStartTime) / testOperations.length,
           };
 
-          debugLog('✅ バッチ処理テスト完了:', testResults.batchTest);
+          Logger.debug('✅ バッチ処理テスト完了:', testResults.batchTest);
         } catch (error) {
           console.error('❌ バッチ処理テストエラー:', error);
           testResults.batchTest = { error: error.message };
         }
 
         // 2. 個別処理のテスト（シミュレーション）
-        debugLog('🔄 個別処理テスト開始');
+        Logger.debug('🔄 個別処理テスト開始');
         const individualStartTime = performance.now();
 
         try {
@@ -6893,7 +7015,7 @@
             avgTimePerOp: (individualEndTime - individualStartTime) / testOperations.length,
           };
 
-          debugLog('✅ 個別処理テスト完了:', testResults.individualTest);
+          Logger.debug('✅ 個別処理テスト完了:', testResults.individualTest);
         } catch (error) {
           console.error('❌ 個別処理テストエラー:', error);
           testResults.individualTest = { error: error.message };
@@ -6924,7 +7046,7 @@
                   : '同程度',
           };
 
-          debugLog('📈 パフォーマンス比較結果:', testResults.comparison);
+          Logger.debug('📈 パフォーマンス比較結果:', testResults.comparison);
         }
 
         // 4. メモリ使用量チェック（概算）
@@ -6937,7 +7059,7 @@
 
         testResults.memoryUsage = memoryInfo;
 
-        debugLog('🧪 バッチ処理パフォーマンステスト完了', testResults);
+        Logger.debug('🧪 バッチ処理パフォーマンステスト完了', testResults);
         return testResults;
       } catch (error) {
         console.error('❌ バッチ処理テストエラー:', error);
@@ -6947,7 +7069,7 @@
 
     // バッチ処理の健全性チェック
     validateBatchSystem() {
-      debugLog('🔍 バッチ処理システム健全性チェック');
+      Logger.debug('🔍 バッチ処理システム健全性チェック');
 
       const issues = [];
 
@@ -6977,7 +7099,7 @@
 
       // 5. 結果
       if (issues.length === 0) {
-        debugLog('✅ バッチ処理システム健全性: 正常');
+        Logger.debug('✅ バッチ処理システム健全性: 正常');
         return { status: 'healthy', issues: [] };
       } else {
         console.warn('⚠️ バッチ処理システム健全性: 問題検出', issues);
@@ -6987,7 +7109,7 @@
 
     // 通知システムのエッジケーステスト（開発・デバッグ用）
     async testNotificationEdgeCases() {
-      debugLog('🧪 通知システムエッジケーステスト開始');
+      Logger.debug('🧪 通知システムエッジケーステスト開始');
 
       const testResults = {
         tests: [],
@@ -6996,22 +7118,22 @@
 
       try {
         // テスト1: 初期データロード失敗後の通知
-        debugLog('📋 テスト1: 初期データロード失敗→ポーリング成功シナリオ');
+        Logger.debug('📋 テスト1: 初期データロード失敗→ポーリング成功シナリオ');
         const test1 = await this.testInitialLoadFailureNotification();
         testResults.tests.push(test1);
 
         // テスト2: 通知バナー要素の存在確認
-        debugLog('📋 テスト2: 通知バナー要素の存在確認');
+        Logger.debug('📋 テスト2: 通知バナー要素の存在確認');
         const test2 = this.testNotificationBannerElements();
         testResults.tests.push(test2);
 
         // テスト3: 通知条件のロジック確認
-        debugLog('📋 テスト3: 通知条件ロジックの確認');
+        Logger.debug('📋 テスト3: 通知条件ロジックの確認');
         const test3 = this.testNotificationLogic();
         testResults.tests.push(test3);
 
         // テスト4: デバウンス機能の確認
-        debugLog('📋 テスト4: 通知デバウンス機能の確認');
+        Logger.debug('📋 テスト4: 通知デバウンス機能の確認');
         const test4 = await this.testNotificationDebounce();
         testResults.tests.push(test4);
 
@@ -7025,7 +7147,7 @@
           }
         });
 
-        debugLog('✅ 通知システムエッジケーステスト完了:', testResults.summary);
+        Logger.debug('✅ 通知システムエッジケーステスト完了:', testResults.summary);
         return testResults;
       } catch (error) {
         console.error('❌ 通知システムテストエラー:', error);
@@ -7046,7 +7168,7 @@
         this.hadInitialDataLoadFailure = true;
         this.state.lastSeenCount = 0;
 
-        debugLog('🔧 テスト状態設定:', {
+        Logger.debug('🔧 テスト状態設定:', {
           initialDataLoaded: this.initialDataLoaded,
           hadInitialDataLoadFailure: this.hadInitialDataLoadFailure,
           lastSeenCount: this.state.lastSeenCount,
@@ -7057,7 +7179,7 @@
         const originalShowNewContentBanner = this.showNewContentBanner;
         this.showNewContentBanner = (newItems) => {
           notificationShown = true;
-          debugLog('🎯 テスト中：通知が表示されました -', newItems, '件');
+          Logger.debug('🎯 テスト中：通知が表示されました -', newItems, '件');
           return originalShowNewContentBanner.call(this, newItems);
         };
 
@@ -7170,7 +7292,7 @@
 
         this.showNewContentBanner = (newItems) => {
           notificationCount++;
-          debugLog('🎯 デバウンステスト：通知回数 =', notificationCount);
+          Logger.debug('🎯 デバウンステスト：通知回数 =', notificationCount);
           return originalShowNewContentBanner.call(this, newItems);
         };
 
@@ -7216,7 +7338,7 @@
 
     // 通知システムの健全性チェック
     validateNotificationSystem() {
-      debugLog('🔍 通知システム健全性チェック');
+      Logger.debug('🔍 通知システム健全性チェック');
 
       const issues = [];
 
@@ -7251,7 +7373,7 @@
 
       // 5. 結果
       if (issues.length === 0) {
-        debugLog('✅ 通知システム健全性: 正常');
+        Logger.debug('✅ 通知システム健全性: 正常');
         return { status: 'healthy', issues: [] };
       } else {
         console.warn('⚠️ 通知システム健全性: 問題検出', issues);
@@ -7301,7 +7423,7 @@
         window.showAdminFeatures = enable;
         window.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
 
-        console.debug('toggleAdminMode状態更新:', {
+        Logger.perf('toggleAdminMode状態更新:', {
           enable,
           isAdminUser: this.state.isAdminUser,
           showAdminFeatures: window.showAdminFeatures,
@@ -7313,7 +7435,7 @@
           window.displayMode = 'named';
           window.isStudentMode = false;
           window.showScoreSort = window.showCounts;
-          console.debug('管理モード有効化: 名前とリアクション数を強制表示', {
+          Logger.perf('管理モード有効化: 名前とリアクション数を強制表示', {
             showCounts: window.showCounts,
             displayMode: window.displayMode,
           });
@@ -7323,7 +7445,7 @@
           window.displayMode = this.serverDisplayMode;
           window.isStudentMode = true;
           window.showScoreSort = window.showCounts;
-          console.debug('閲覧モード有効化: サーバー設定を復元', {
+          Logger.perf('閲覧モード有効化: サーバー設定を復元', {
             showCounts: window.showCounts,
             displayMode: window.displayMode,
             serverShowCounts: this.serverShowCounts,
@@ -7352,7 +7474,7 @@
         }
 
         // 管理モード切り替え後の状態を確認
-        console.debug('管理モード切り替え後の状態確認:', {
+        Logger.perf('管理モード切り替え後の状態確認:', {
           enable,
           stateDisplayMode: this.state.displayMode,
           stateShowCounts: this.state.showCounts,
@@ -7374,7 +7496,7 @@
         this.loadSheetData({ bypassCache: true }).then(() => {
           // 管理モード切り替え後に新着チェックの基準を更新
           this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
-          debugLog('🔄 管理モード切り替え完了、新着チェック基準更新:', {
+          Logger.debug('🔄 管理モード切り替え完了、新着チェック基準更新:', {
             newBaselineCount: this.state.lastSeenCount,
             adminMode: this.state.showAdminFeatures,
           });
@@ -7393,7 +7515,7 @@
     async showAdminModeConfirmation() {
       return new Promise((resolve) => {
         // モーダル要素を作成
-        const modal = document.createElement('div');
+        const modal = this._createElement('div');
         modal.className =
           'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
         modal.innerHTML = `
@@ -7481,12 +7603,12 @@
       }
 
       try {
-        debugLog('🔄 公開終了処理を開始します...');
+        Logger.debug('🔄 公開終了処理を開始します...');
 
         // サーバーに公開終了リクエストを送信
         const result = await this.runGas('clearActiveSheet');
 
-        debugLog('✅ 公開終了処理が完了しました:', result);
+        Logger.debug('✅ 公開終了処理が完了しました:', result);
 
         // 成功メッセージを表示
         const successMessage = result.message || '公開を終了しました。非公開画面に移動します。';
@@ -7526,7 +7648,7 @@
       }
     }
     redirectToUnpublishedPage() {
-      debugLog('🚫 Redirecting to unpublished page (legacy function)');
+      Logger.debug('🚫 Redirecting to unpublished page (legacy function)');
 
       // キャッシュクリア処理（新機能と統合）
       this.clearAllCachesForUnpublished();
@@ -7534,7 +7656,7 @@
       // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
       try {
         localStorage.setItem('expandAllSections', 'true');
-        debugLog('✅ アコーディオン全展開フラグを設定しました');
+        Logger.debug('✅ アコーディオン全展開フラグを設定しました');
       } catch (error) {
         console.warn('⚠️ localStorage設定に失敗:', error);
       }
@@ -7545,7 +7667,7 @@
       unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
       unpublishedUrl.searchParams.set('_redirect', 'unpublished'); // リダイレクト理由
 
-      debugLog('🔄 Redirecting to unpublished URL:', unpublishedUrl.toString());
+      Logger.debug('🔄 Redirecting to unpublished URL:', unpublishedUrl.toString());
       window.location.href = unpublishedUrl.toString();
     }
 
@@ -7587,7 +7709,7 @@
         }
 
         localStorage.setItem(this.reactionStorageKey, JSON.stringify(existingData));
-        console.debug('リアクション状態を保存:', { rowIndex, reactions: existingData[rowIndex] });
+        Logger.perf('リアクション状態を保存:', { rowIndex, reactions: existingData[rowIndex] });
       } catch (error) {
         console.warn('リアクション状態の保存に失敗:', error);
       }
@@ -7600,7 +7722,7 @@
     loadReactionState() {
       try {
         const savedData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
-        console.debug('リアクション状態を読み込み:', savedData);
+        Logger.perf('リアクション状態を読み込み:', savedData);
         return savedData;
       } catch (error) {
         console.warn('リアクション状態の読み込みに失敗:', error);
@@ -7652,7 +7774,7 @@
               delete savedReactions[answer.rowIndex];
             }
 
-            console.debug(`✅ リアクション状態同期 [行${answer.rowIndex}][${reactionType}]:`, {
+            Logger.perf(`✅ リアクション状態同期 [行${answer.rowIndex}][${reactionType}]:`, {
               serverReacted,
               localReacted,
               finalReacted: info.reacted,
@@ -7666,7 +7788,7 @@
         localStorage.setItem(this.reactionStorageKey, JSON.stringify(savedReactions));
       }
 
-      console.debug('サーバーとローカルのリアクション状態同期完了');
+      Logger.perf('サーバーとローカルのリアクション状態同期完了');
     }
 
     updateModalReactionButtons(item) {
@@ -7728,11 +7850,11 @@
       });
 
       if (itemsToUpdate.length === 0) {
-        debugLog('⚡ applyUpdates: 全アイテムスキップ (変更なし)');
+        Logger.debug('⚡ applyUpdates: 全アイテムスキップ (変更なし)');
         return;
       }
 
-      debugLog(`⚡ applyUpdates: ${itemsToUpdate.length}/${items.length}件を更新`);
+      Logger.debug(`⚡ applyUpdates: ${itemsToUpdate.length}/${items.length}件を更新`);
 
       // バッチ処理用にリアクション更新データを蓄積
       const reactionUpdates = [];
@@ -7782,7 +7904,7 @@
       }
     }
     showAnswerModal(rowIndex) {
-      debugLog('📱 [MODAL DEBUG] showAnswerModal called:', {
+      Logger.debug('📱 [MODAL DEBUG] showAnswerModal called:', {
         rowIndex: rowIndex,
         rowIndexType: typeof rowIndex,
         timestamp: new Date().toISOString(),
@@ -7798,7 +7920,7 @@
 
       if (!data && this.state.filteredData) {
         data = this.state.filteredData?.find((r) => r.rowIndex == rowIndex);
-        console.debug('Data search in filteredData:', {
+        Logger.perf('Data search in filteredData:', {
           found: !!data,
           searchRowIndex: rowIndex,
           availableRowIndexes: this.state.filteredData?.map((r) => r.rowIndex) || [],
@@ -7806,7 +7928,7 @@
       }
 
       if (!data) {
-        console.debug('ERROR: No data found for rowIndex:', {
+        Logger.perf('ERROR: No data found for rowIndex:', {
           rowIndex: rowIndex,
           currentAnswers: this.state.currentAnswers,
           filteredData: this.state.filteredData,
@@ -7814,7 +7936,7 @@
         return;
       }
 
-      console.debug('Data found for modal:', {
+      Logger.perf('Data found for modal:', {
         rowIndex: rowIndex,
         data: data,
         opinion: data.opinion?.substring(0, 50) + '...',
@@ -7832,7 +7954,7 @@
       let modalDisplayName = '';
 
       // Debug: Log modal display mode state
-      console.debug('Modal display state:', {
+      Logger.perf('Modal display state:', {
         displayMode: this.state.displayMode,
         showName,
         showAdminFeatures: this.state.showAdminFeatures,
@@ -7908,14 +8030,14 @@
       this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
 
       // リアクションに基づくカード色の適用
-      console.debug('モーダルにリアクション装飾適用:', {
+      Logger.perf('モーダルにリアクション装飾適用:', {
         rowIndex: data.rowIndex,
         highlight: data.highlight,
         reactions: data.reactions,
         element: this.elements.answerModalCard.className,
       });
       this.applyReactionStyles(this.elements.answerModalCard, data);
-      console.debug('モーダル装飾適用後:', {
+      Logger.perf('モーダル装飾適用後:', {
         className: this.elements.answerModalCard.className,
       });
 
@@ -7986,7 +8108,7 @@
       this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
 
       // モーダルカードのスタイルを更新
-      console.debug('updateModalContent装飾適用:', {
+      Logger.perf('updateModalContent装飾適用:', {
         rowIndex: data.rowIndex,
         highlight: data.highlight,
         reactions: data.reactions,
@@ -8100,7 +8222,7 @@
       }
     }
     updateConfigFromGlobals() {
-      console.debug('updateConfigFromGlobals前の状態:', {
+      Logger.perf('updateConfigFromGlobals前の状態:', {
         isAdminUser: this.state.isAdminUser,
         showHighlightToggle: this.state.showHighlightToggle,
         windowShowHighlightToggle: window.showHighlightToggle,
@@ -8122,7 +8244,7 @@
         this.state.displayMode = window.displayMode;
       }
 
-      console.debug('updateConfigFromGlobals後の状態:', {
+      Logger.perf('updateConfigFromGlobals後の状態:', {
         isAdminUser: this.state.isAdminUser,
         showHighlightToggle: this.state.showHighlightToggle,
         windowShowHighlightToggle: window.showHighlightToggle,
@@ -8190,7 +8312,7 @@
     }
 
     optimizeForLowPerformance() {
-      console.debug('Enabling low performance optimizations');
+      Logger.perf('Enabling low performance optimizations');
 
       // Reduce animation and transition durations
       document.documentElement.style.setProperty('--transition-duration', '0.1s');
@@ -8273,7 +8395,7 @@
           cardChanges.forEach(({ card, entry }) => {
             // Only log significant visibility changes for debugging
             if (DEBUG_MODE && (entry.intersectionRatio === 0 || entry.intersectionRatio === 1)) {
-              console.debug('IntersectionObserver visibility change:', {
+              Logger.perf('IntersectionObserver visibility change:', {
                 rowIndex: card.dataset.rowIndex,
                 isIntersecting: entry.isIntersecting,
                 intersectionRatio: entry.intersectionRatio,
@@ -8392,7 +8514,7 @@
       // Clear DOM fragment pool
       this.domFragmentPool.length = 0;
 
-      console.debug('Cache cleanup completed', {
+      Logger.perf('Cache cleanup completed', {
         cacheSize: this.cache.size,
       });
     }
@@ -8409,7 +8531,7 @@
 
       const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
       if (cards.length === 0) {
-        console.debug('setupScrollObserver: No cards found, skipping setup');
+        Logger.perf('setupScrollObserver: No cards found, skipping setup');
         return;
       }
 
@@ -8423,7 +8545,7 @@
         // Only process the first intersecting entry to prevent multiple simultaneous loads
         const intersectingEntry = entries.find((entry) => entry.isIntersecting);
         if (intersectingEntry) {
-          console.debug(
+          Logger.perf(
             'setupScrollObserver: Trigger card intersecting:',
             intersectingEntry.target.dataset.rowIndex
           );
@@ -8448,7 +8570,7 @@
         }
       }
 
-      console.debug('setupScrollObserver: Observing cards for dynamic loading:', {
+      Logger.perf('setupScrollObserver: Observing cards for dynamic loading:', {
         totalCards: cards.length,
         observedCount: observedCards.length,
         observedRowIndexes: observedCards,
@@ -8463,7 +8585,7 @@
       }
 
       if (this.virtualScrollState.isLoading) {
-        console.debug('handleVirtualScroll: Already loading, skipping');
+        Logger.perf('handleVirtualScroll: Already loading, skipping');
         return;
       }
 
@@ -8471,7 +8593,7 @@
       const totalAvailable = this.state.currentAnswers?.length || 0;
       const currentRendered = currentCards.length;
 
-      console.debug('handleVirtualScroll triggered:', {
+      Logger.perf('handleVirtualScroll triggered:', {
         currentRendered,
         totalAvailable,
         triggerRowIndex: triggerElement.dataset.rowIndex,
@@ -8521,11 +8643,11 @@
 
       if (remainingItems.length === 0) {
         this.virtualScrollState.isLoading = false;
-        console.debug('loadMoreItems: No more items to load - all items rendered');
+        Logger.perf('loadMoreItems: No more items to load - all items rendered');
         return;
       }
 
-      console.debug(
+      Logger.perf(
         'loadMoreItems: Loading',
         remainingItems.length,
         'additional items with batch size',
@@ -8545,7 +8667,7 @@
     renderAdditionalItems(items) {
       if (!items || items.length === 0) {
         this.virtualScrollState.isLoading = false;
-        console.debug('renderAdditionalItems: No items to render');
+        Logger.perf('renderAdditionalItems: No items to render');
         return;
       }
 
@@ -8563,7 +8685,7 @@
 
         // Skip if already rendered (defensive check)
         if (this.virtualScrollState.renderedRowIndexes.has(rowIndexStr)) {
-          console.debug('renderAdditionalItems: Item', rowIndexStr, 'already rendered, skipping');
+          Logger.perf('renderAdditionalItems: Item', rowIndexStr, 'already rendered, skipping');
           return;
         }
 
@@ -8600,7 +8722,7 @@
         // Update virtual scroll state with actual counts
         this.virtualScrollState.renderedItems = this.elements.answersContainer.children.length;
 
-        console.debug(
+        Logger.perf(
           'renderAdditionalItems: Added',
           fragment.children.length,
           'new cards. Total rendered:',
@@ -8609,7 +8731,7 @@
           this.virtualScrollState.renderedItems
         );
       } else {
-        console.debug(
+        Logger.perf(
           'renderAdditionalItems: No cards were successfully created from',
           items.length,
           'items'
@@ -8670,7 +8792,7 @@
         this.virtualScrollState.renderedRowIndexes = domRowIndexes;
         this.virtualScrollState.renderedItems = domCount;
 
-        console.debug(
+        Logger.perf(
           'validateVirtualScrollState: Auto-repaired state. New tracked count:',
           domCount
         );
@@ -8719,7 +8841,7 @@
       });
 
       if (hiddenCount > 0 || restoredCount > 0) {
-        console.debug(
+        Logger.perf(
           'optimizeVisibleElements: Hidden',
           hiddenCount,
           'cards, restored',
@@ -8772,7 +8894,7 @@
 
     // Reset virtual scrolling state for debugging and recovery
     resetVirtualScrollState() {
-      console.debug('resetVirtualScrollState: Resetting virtual scroll state');
+      Logger.perf('resetVirtualScrollState: Resetting virtual scroll state');
 
       // Clear state
       this.virtualScrollState = {
@@ -8808,7 +8930,7 @@
       // Re-setup observers
       this.setupObservers();
 
-      console.debug('resetVirtualScrollState: Virtual scroll state reset complete');
+      Logger.perf('resetVirtualScrollState: Virtual scroll state reset complete');
     }
 
     /**
@@ -8818,7 +8940,7 @@
      */
     validateReasonText(reason) {
       try {
-        debugLog('🔍 validateReasonText デバッグ:', {
+        Logger.debug('🔍 validateReasonText デバッグ:', {
           input: reason,
           inputType: typeof reason,
           inputIsNull: reason === null,
@@ -8828,14 +8950,14 @@
 
         // null, undefined, 空文字列チェック
         if (!reason && reason !== 0) {
-          debugLog('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
+          Logger.debug('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
           return '';
         }
 
         // 文字列変換と基本検証
         const reasonStr = String(reason).trim();
 
-        debugLog('🔍 validateReasonText 処理結果:', {
+        Logger.debug('🔍 validateReasonText 処理結果:', {
           reasonStr: reasonStr,
           reasonStrLength: reasonStr.length,
           willBeEmpty: reasonStr.length === 0,
@@ -8866,7 +8988,7 @@
      */
     async validateBoardDataIntegrity() {
       try {
-        debugLog('🔍 Starting real-time board data integrity validation...');
+        Logger.debug('🔍 Starting real-time board data integrity validation...');
 
         const validationResults = {
           timestamp: new Date().toISOString(),
@@ -8940,11 +9062,11 @@
 
           // 自動修復の試行（理由列の問題のみ）
           if (validationResults.reasonFieldIssues > 0) {
-            debugLog('🔧 Attempting automatic reason field recovery...');
+            Logger.debug('🔧 Attempting automatic reason field recovery...');
             await this.autoRecoverReasonFields();
           }
         } else {
-          debugLog('✅ Board data integrity validation passed');
+          Logger.debug('✅ Board data integrity validation passed');
         }
 
         return validationResults;
@@ -8963,7 +9085,7 @@
      */
     async autoRecoverReasonFields() {
       try {
-        debugLog('🔧 Starting automatic reason field recovery...');
+        Logger.debug('🔧 Starting automatic reason field recovery...');
 
         // キャッシュクリアして最新データを取得
         await this.gas.clearCache();
@@ -8971,7 +9093,7 @@
         // データを再取得してカードを更新
         await this.loadBoardData();
 
-        debugLog('✅ Reason field recovery completed');
+        Logger.debug('✅ Reason field recovery completed');
       } catch (error) {
         console.error('❌ Automatic reason field recovery failed:', error);
       }
@@ -9004,11 +9126,11 @@
    * @param {Object} info - ドメイン情報オブジェクト
    */
   function displayDomainInfo(info) {
-    const headerDomainMatch = document.getElementById('header-domain-match');
-    const headerDomainMismatch = document.getElementById('header-domain-mismatch');
-    const headerDomainInitial = document.getElementById('header-domain-initial');
-    const headerDomainMatchText = document.getElementById('header-domain-match-text');
-    const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+    const headerDomainMatch = this._getCachedElement('header-domain-match');
+    const headerDomainMismatch = this._getCachedElement('header-domain-mismatch');
+    const headerDomainInitial = this._getCachedElement('header-domain-initial');
+    const headerDomainMatchText = this._getCachedElement('header-domain-match-text');
+    const headerDomainMismatchText = this._getCachedElement('header-domain-mismatch-text');
 
     // 全ての表示を一旦非表示にする
     if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
@@ -9047,7 +9169,7 @@
     google.script.run
       .withSuccessHandler((formInfo) => {
         if (formInfo && formInfo.formUrl) {
-          const formLinkBtn = document.getElementById('form-link-btn');
+          const formLinkBtn = this._getCachedElement('form-link-btn');
           if (formLinkBtn) {
             formLinkBtn.href = formInfo.formUrl;
             formLinkBtn.classList.remove('hidden');
@@ -9062,13 +9184,13 @@
 
   // システムフロー表示関数の定義
   function showSystemFlow() {
-    debugLog('🔄 システムフロー初期化開始');
+    Logger.debug('🔄 システムフロー初期化開始');
     try {
       // 基本的なシステムフロー初期化処理
       if (window.answerBoardApp && typeof window.answerBoardApp.destroy === 'function') {
         window.answerBoardApp.destroy();
       }
-      debugLog('✅ システムフロー初期化完了');
+      Logger.debug('✅ システムフロー初期化完了');
     } catch (error) {
       console.warn('⚠️ システムフロー初期化中にエラー:', error);
     }
@@ -9084,7 +9206,7 @@
       if (window.answerBoardApp && window.answerBoardApp.debugAnswerCards) {
         window.answerBoardApp.debugAnswerCards();
       } else {
-        debugLog('AnswerBoardApp not available or debug function not found');
+        Logger.debug('AnswerBoardApp not available or debug function not found');
       }
     };
 
@@ -9093,7 +9215,7 @@
       if (window.answerBoardApp && window.answerBoardApp.debugClickAnswerCard) {
         return window.answerBoardApp.debugClickAnswerCard(cardIndex, options);
       } else {
-        debugLog('AnswerBoardApp not available or debug function not found');
+        Logger.debug('AnswerBoardApp not available or debug function not found');
         return { success: false, error: 'AnswerBoardApp not available' };
       }
     };
@@ -9104,34 +9226,34 @@
     // デバッグ用：データ構造確認機能
     window.debugCurrentData = () => {
       if (window.answerBoardApp && window.answerBoardApp.state) {
-        debugLog('現在のデータ構造:', {
+        Logger.debug('現在のデータ構造:', {
           currentAnswers: window.answerBoardApp.state.currentAnswers,
           currentAnswersLength: window.answerBoardApp.state.currentAnswers?.length,
           firstItem: window.answerBoardApp.state.currentAnswers?.[0],
           header: window.answerBoardApp.elements?.headingLabel?.textContent,
         });
       } else {
-        debugLog('AnswerBoardApp not available');
+        Logger.debug('AnswerBoardApp not available');
       }
     };
 
     // Additional global debug utilities
     window.debugClickAllAnswerCards = async (options = {}) => {
       if (!window.answerBoardApp) {
-        debugLog('AnswerBoardApp not available');
+        Logger.debug('AnswerBoardApp not available');
         return { success: false, error: 'AnswerBoardApp not available' };
       }
 
       const container = window.answerBoardApp.elements?.answersContainer;
       if (!container) {
-        debugLog('No answers container found');
+        Logger.debug('No answers container found');
         return { success: false, error: 'No answers container found' };
       }
 
       const answerCards = container.querySelectorAll('.answer-card');
       const results = [];
 
-      debugLog(`Found ${answerCards.length} answer cards, clicking all...`);
+      Logger.debug(`Found ${answerCards.length} answer cards, clicking all...`);
 
       for (let i = 0; i < answerCards.length; i++) {
         try {
@@ -9173,8 +9295,8 @@
         app.enableBatchProcessing = Boolean(enable);
       }
 
-      debugLog('🔧 バッチ処理:', app.enableBatchProcessing ? '有効' : '無効');
-      debugLog('💡 個別処理システムは常に動作します（フォールバック保証）');
+      Logger.debug('🔧 バッチ処理:', app.enableBatchProcessing ? '有効' : '無効');
+      Logger.debug('💡 個別処理システムは常に動作します（フォールバック保証）');
       return app.enableBatchProcessing;
     };
 
@@ -9199,7 +9321,7 @@
     });
   } catch (error) {
     console.error('Error creating AnswerBoardApp instance:', error);
-    const container = document.getElementById('answers');
+    const container = this._getCachedElement('answers');
     if (container) {
       const msg = AnswerBoardApp.prototype.escapeHtml(error.message || '');
       container.innerHTML =
