@@ -509,11 +509,12 @@ const DB = {
       throw new Error('更新対象のユーザーが見つかりません');
     }
 
-    // CLAUDE.md準拠：5列更新
+    // 🔥 CLAUDE.md準拠：5列更新（既存値保護版）
+    const currentRow = values[rowIndex - 1]; // 0-based index for values array
     const updateRow = [
       userId, // 変更しない
-      dbUpdateData.userEmail,
-      dbUpdateData.isActive,
+      dbUpdateData.userEmail !== undefined ? dbUpdateData.userEmail : currentRow[1], // 既存userEmail保護
+      dbUpdateData.isActive !== undefined ? dbUpdateData.isActive : currentRow[2],   // 既存isActive保護
       dbUpdateData.configJson,
       dbUpdateData.lastModified
     ];
