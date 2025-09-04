@@ -965,9 +965,12 @@
         NAMED: 'named',
         EMAIL: 'email'
       });
+      
+      // PERFORMANCE_BUDGET定数をフロントエンドで利用可能にする
+      window.PERFORMANCE_BUDGET = 16; // 60FPS = 16.67ms/frame の閾値
 
       // デバッグログ
-      console.log('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__, DISPLAY_MODES });
+      console.log('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__, DISPLAY_MODES, PERFORMANCE_BUDGET });
     </script>
     <?!= include('page.js.html'); ?>
   </body>
