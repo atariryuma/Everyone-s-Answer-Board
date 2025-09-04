@@ -715,8 +715,8 @@
       // Step 4: Reset polling failure count on successful data update
       this.state.pollingFailureCount = 0;
 
-      // Phase 4.1: Enhanced monitoring and logging
-      this.logDataConsistencyMetrics(context, dataLength, previousLength);
+      // Phase 4.1: Enhanced monitoring and logging (※ DOM整合性はレンダリング後にチェック)
+      // this.logDataConsistencyMetrics(context, dataLength, previousLength); // レンダリング後に移動
 
       debugLog('✅ State synchronization completed:', {
         context,
@@ -4150,10 +4150,14 @@
                 await this.renderBoard(false, isInitialLoad);
                 debugLog('✅ Step 3: DOM update completed');
 
-                // Step 4: Consistency validation after DOM update (Phase 2.1)
-                debugLog('✅ Step 4: Consistency validation starting...');
+                // Step 4: DOM整合性チェック(レンダリング後に実行)
+                const currentDataLength = this.state.currentAnswers?.length || 0;
+                this.logDataConsistencyMetrics('performDataLoad-after-render', currentDataLength, 0);
+                
+                // Step 5: Consistency validation after DOM update (Phase 2.1)
+                debugLog('✅ Step 5: Consistency validation starting...');
                 await this.validatePostLoadState();
-                debugLog('✅ Step 4: Consistency validation completed');
+                debugLog('✅ Step 5: Consistency validation completed');
               });
             } finally {
               // 成功時にローディング状態を解除
