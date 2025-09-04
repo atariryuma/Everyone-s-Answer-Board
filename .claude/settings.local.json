@@ -46,7 +46,8 @@
       "Bash(npm run deploy:*)",
       "Bash(npm run lint:*)",
       "Bash(npx clasp:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(clasp status:*)"
     ],
     "deny": [],
     "ask": [],
