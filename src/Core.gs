@@ -607,7 +607,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     }
 
     const finalDisplayMode =
-      adminMode === true ? DISPLAY_MODES.NAMED : configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+      adminMode === true ? SYSTEM_CONSTANTS.DISPLAY_MODES.NAMED : configJson.displayMode || SYSTEM_CONSTANTS.DISPLAY_MODES.ANONYMOUS;
 
     const result = {
       header: headerTitle,
@@ -703,7 +703,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
         header: '', // 必要に応じて設定
         sheetName: targetSheetName,
         showCounts: configJson.showCounts === true,
-        displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
+        displayMode: configJson.displayMode || SYSTEM_CONSTANTS.DISPLAY_MODES.ANONYMOUS,
         data: [],
         totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
         newCount: 0,
@@ -743,7 +743,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
 
     // ユーザー情報と管理者モードの取得
     const isOwner = configJson.ownerId === currentUserId;
-    const displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+    const displayMode = configJson.displayMode || SYSTEM_CONSTANTS.DISPLAY_MODES.ANONYMOUS;
 
     // 新しいデータを既存の処理パイプラインと同様に加工
     const headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
@@ -840,7 +840,7 @@ function formatSheetDataForFrontend(
     );
 
     let nameValue = '';
-    const shouldShowName = adminMode === true || displayMode === DISPLAY_MODES.NAMED || isOwner;
+    const shouldShowName = adminMode === true || displayMode === SYSTEM_CONSTANTS.DISPLAY_MODES.NAMED || isOwner;
     const hasNameIndex = nameIndex !== undefined;
     const hasOriginalData = row.originalData && row.originalData.length > 0;
 
@@ -993,7 +993,7 @@ function getAppConfig(requestUserId) {
       userEmail: userInfo.userEmail,
       targetSpreadsheetId: configJson.targetSpreadsheetId || '',
       targetSheetName: configJson.targetSheetName || '',
-      displayMode: configJson.displayMode || DISPLAY_MODES.ANONYMOUS,
+      displayMode: configJson.displayMode || SYSTEM_CONSTANTS.DISPLAY_MODES.ANONYMOUS,
       isPublished: configJson.appPublished || false,
       appPublished: configJson.appPublished || false, // AdminPanel.htmlで使用される
       availableSheets: sheets,
@@ -2494,7 +2494,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
 
     // 表示モードを取得
     const configJson = userInfo.parsedConfig || {};
-    const displayMode = configJson.displayMode || DISPLAY_MODES.ANONYMOUS;
+    const displayMode = configJson.displayMode || SYSTEM_CONSTANTS.DISPLAY_MODES.ANONYMOUS;
 
     // Check if current user is the board owner
     const isOwner = configJson.ownerId === userId;
@@ -2723,10 +2723,10 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
   if (
     nameIndex !== undefined &&
     row[nameIndex] &&
-    (displayMode === DISPLAY_MODES.NAMED || isOwner)
+    (displayMode === SYSTEM_CONSTANTS.DISPLAY_MODES.NAMED || isOwner)
   ) {
     processedRow.displayName = row[nameIndex];
-  } else if (displayMode === DISPLAY_MODES.NAMED || isOwner) {
+  } else if (displayMode === SYSTEM_CONSTANTS.DISPLAY_MODES.NAMED || isOwner) {
     // 名前入力がない場合のフォールバック
     processedRow.displayName = '匿名';
   }
