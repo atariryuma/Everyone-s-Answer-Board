@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Permissions-Policy"
-      content="camera=(), microphone=(), geolocation=(), fullscreen=*"
+      content="camera=(), microphone=(), geolocation=()"
     />
     <link
       rel="preload"
@@ -958,9 +958,16 @@
       const SHEET_NAME = '<?= typeof sheetName !== "undefined" && sheetName ? sheetName : "" ?>';
       const __OPINION_HEADER__ =
         '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>';
+      
+      // DISPLAY_MODES定数をフロントエンドで利用可能にする
+      window.DISPLAY_MODES = Object.freeze({
+        ANONYMOUS: 'anonymous',
+        NAMED: 'named',
+        EMAIL: 'email'
+      });
 
       // デバッグログ
-      console.log('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__ });
+      console.log('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__, DISPLAY_MODES });
     </script>
     <?!= include('page.js.html'); ?>
   </body>

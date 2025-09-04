@@ -8,12 +8,18 @@
  * 統一データソース原則：configJsonからすべてのデータを取得
  * @returns {Object} 現在の設定情報
  */
-function getCurrentConfig() {
+function getCurrentConfig(userId = null) {
   try {
     console.log('getCurrentConfig: CLAUDE.md準拠configJSON中心型設定取得開始');
 
-    const currentUser = User.email();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userIdが指定されている場合はそのユーザーの設定を取得、なければ現在のユーザー
+    let userInfo;
+    if (userId) {
+      userInfo = DB.findUserById(userId);
+    } else {
+      const currentUser = User.email();
+      userInfo = DB.findUserByEmail(currentUser);
+    }
 
     if (!userInfo) {
       // デフォルト設定（CLAUDE.md準拠：心理的安全性重視）
@@ -21,7 +27,7 @@ function getCurrentConfig() {
         setupStatus: 'pending',
         appPublished: false,
         displaySettings: { showNames: false, showReactions: false }, // CLAUDE.md準拠
-        user: currentUser,
+        user: userId || User.email(),
       };
     }
 
