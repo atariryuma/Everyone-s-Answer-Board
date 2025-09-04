@@ -4114,6 +4114,11 @@
               this.lastDataLoadTime = Date.now();
 
               // 🧹 データ読み込み成功時：スケルトンカードの確実なクリア
+              const container = this.elements.answersContainer;
+              if (!container) {
+                console.warn('⚠️ answersContainer要素が見つかりません');
+                return;
+              }
               const existingSkeletons = container.querySelectorAll('.skeleton, .answer-card.loading');
               if (existingSkeletons.length > 0) {
                 debugLog('🧹 データ読み込み成功：', existingSkeletons.length, '個のスケルトンカードをクリア');
