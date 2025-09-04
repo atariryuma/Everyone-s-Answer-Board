@@ -97,7 +97,7 @@ const DB = {
         const newRow = [
           userData.userId,
           userData.userEmail,
-          userData.isActive || 'TRUE',
+          userData.isActive !== undefined ? userData.isActive : true,  // Boolean値で設定
           JSON.stringify(configJson),
           new Date().toISOString()
         ];
@@ -973,5 +973,75 @@ function debugShowAllUsers() {
   } catch (error) {
     console.error('❌ データベース診断エラー:', error.message);
     return { error: error.message };
+  }
+}
+
+/**
+ * 🚨 緊急修正用：ユーザーの基本フィールドを直接更新
+ * @param {string} userId - ユーザーID
+ * @param {Object} fields - 更新するフィールド {userEmail, isActive}
+ */
+function updateUserFields(userId, fields) {
+  try {
+    console.log('🚨 updateUserFields: 緊急修正開始', { userId, fields });
+
+    if (!userId) {
+      throw new Error('userIdが必要です');
+    }
+
+    const dbId = getSecureDatabaseId();
+    const sheetName = DB_CONFIG.SHEET_NAME;
+    const spreadsheet = SpreadsheetApp.openById(dbId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      throw new Error('データベースシートが見つかりません');
+    }
+
+    const rows = sheet.getDataRange().getValues();
+    const headers = rows[0];
+
+    // ユーザー行を検索
+    let targetRowIndex = -1;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === userId) {  // userId列で検索
+        targetRowIndex = i + 1; // Sheetのインデックスは1ベース
+        break;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      throw new Error('ユーザーが見つかりません');
+    }
+
+    // フィールドを更新
+    if (fields.userEmail !== undefined) {
+      const emailColIndex = headers.indexOf('userEmail');
+      if (emailColIndex >= 0) {
+        sheet.getRange(targetRowIndex, emailColIndex + 1).setValue(fields.userEmail);
+        console.log('✅ userEmail更新完了:', fields.userEmail);
+      }
+    }
+
+    if (fields.isActive !== undefined) {
+      const activeColIndex = headers.indexOf('isActive');
+      if (activeColIndex >= 0) {
+        sheet.getRange(targetRowIndex, activeColIndex + 1).setValue(fields.isActive);
+        console.log('✅ isActive更新完了:', fields.isActive);
+      }
+    }
+
+    // lastModified更新
+    const lastModifiedColIndex = headers.indexOf('lastModified');
+    if (lastModifiedColIndex >= 0) {
+      sheet.getRange(targetRowIndex, lastModifiedColIndex + 1).setValue(new Date().toISOString());
+    }
+
+    console.log('✅ updateUserFields: 緊急修正完了', { userId });
+    return { success: true };
+
+  } catch (error) {
+    console.error('❌ updateUserFields: 緊急修正エラー:', error.message);
+    throw error;
   }
 }

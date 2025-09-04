@@ -68,9 +68,45 @@ function doGet(e) {
             <h2>Debug Info</h2>
             <pre>${JSON.stringify(debugData, null, 2)}</pre>
             ${userByEmail ? `<p><a href="?mode=admin&userId=${userByEmail.userId}">管理パネルにアクセス</a></p>` : ''}
+            ${userByEmail && (!userByEmail.userEmail || !userByEmail.isActive) ? 
+              `<p><strong>⚠️ データ不整合検出</strong></p>
+               <p><a href="?mode=fix_user&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔧 ユーザーデータを修正</a></p>` : ''}
           `);
         } catch (error) {
           return HtmlService.createHtmlOutput(`<h2>Debug Error</h2><pre>${error.message}</pre>`);
+        }
+        
+      case 'fix_user':
+        // 🔧 緊急修正：ユーザーデータの修正
+        try {
+          if (!params.userId) {
+            return HtmlService.createHtmlOutput('<h2>Error</h2><p>userIdが必要です</p>');
+          }
+          
+          const currentUserEmail = User.email();
+          const userInfo = DB.findUserById(params.userId);
+          
+          if (!userInfo) {
+            return HtmlService.createHtmlOutput('<h2>Error</h2><p>ユーザーが見つかりません</p>');
+          }
+          
+          // 🚨 緊急修正：userEmailとisActiveを設定
+          const updatedData = {
+            userEmail: currentUserEmail,
+            isActive: true
+          };
+          
+          // データベース更新（直接フィールド更新）
+          DB.updateUserFields(params.userId, updatedData);
+          
+          return HtmlService.createHtmlOutput(`
+            <h2>✅ ユーザーデータ修正完了</h2>
+            <p>userEmail: ${currentUserEmail}</p>
+            <p>isActive: true</p>
+            <p><a href="?mode=admin&userId=${params.userId}">管理パネルにアクセス</a></p>
+          `);
+        } catch (error) {
+          return HtmlService.createHtmlOutput(`<h2>修正エラー</h2><pre>${error.message}</pre>`);
         }
         
       case 'admin':
