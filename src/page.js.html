@@ -2645,16 +2645,17 @@
       const warningDiv = this._createElement('div');
       warningDiv.className =
         'fixed top-4 right-4 z-50 bg-yellow-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md border-l-4 border-yellow-400';
+      
+      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決  
+      const warningIcon = this.getIcon('x', 'w-5 h-5 mr-2');
+      const closeIcon = this.getIcon('x', 'w-4 h-4');
+      
       warningDiv.innerHTML = `
       <div class="flex items-center">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13 4c-.77-.833-1.964-.833-2.732 0L3 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-        </svg>
+        ${warningIcon}
         <span class="text-sm">${this.escapeHtml(message)}</span>
         <button onclick="this.parentElement.parentElement.remove()" class="ml-4 hover:bg-yellow-700 rounded p-1">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
+          ${closeIcon}
         </button>
       </div>
     `;
@@ -2882,19 +2883,20 @@
       if (!container) return;
       
       const config = {
-        init: { color: 'red', icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', title: '初期化エラー', buttons: 'reload' },
-        data: { color: 'yellow', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z', title: 'データ読み込みエラー', buttons: 'both' }
+        init: { color: 'red', iconName: 'x', title: '初期化エラー', buttons: 'reload' },
+        data: { color: 'yellow', iconName: 'x', title: 'データ読み込みエラー', buttons: 'both' }
       }[type];
       
       const retryBtn = config.buttons === 'both' ? `
           <button onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
             class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600">再試行</button>` : '';
       
+      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
+      const iconSvg = this.getIcon(config.iconName, `mx-auto h-12 w-12 text-${config.color}-500`);
+      
       container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-        <svg class="mx-auto h-12 w-12 text-${config.color}-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${config.icon}" />
-        </svg>
+        ${iconSvg}
         <h3 class="mt-2 text-lg font-medium text-${config.color}-400">${config.title}</h3>
         <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
@@ -2913,11 +2915,13 @@
       const errorDiv = this._createElement('div');
       errorDiv.className =
         'fixed top-4 right-4 z-50 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md';
+      
+      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
+      const errorIcon = this.getIcon('x', 'w-5 h-5 mr-2');
+      
       errorDiv.innerHTML = `
       <div class="flex items-center">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
+        ${errorIcon}
         <span class="text-sm">${this.escapeHtml(message)}</span>
       </div>
     `;
@@ -2953,11 +2957,12 @@
       const container = this.elements.answersContainer;
       if (!container) return;
 
+      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
+      const emptyIcon = this.getIcon('x', 'mx-auto h-12 w-12 text-gray-500');
+
       container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-        <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
+        ${emptyIcon}
         <h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>
         <p class="mt-1 text-sm text-gray-400">最初の回答者になりましょう！</p>
       </div>
@@ -3657,11 +3662,12 @@
         (errorMessage.includes('ユーザー情報が見つかりません') ||
           errorMessage.includes('が見つかりません'));
 
+      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
+      const errorIcon = this.getIcon('x', 'mx-auto h-12 w-12 text-red-500');
+
       container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full">
-        <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
+        ${errorIcon}
         <h3 class="mt-2 text-lg font-medium text-red-400">${isUserNotFoundError ? 'ユーザー情報が見つかりません' : 'アクセスエラー'}</h3>
         <p class="mt-1 text-sm text-gray-400">${
           isUserNotFoundError
@@ -3703,9 +3709,7 @@
             onclick="window.location.reload()" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
           >
-            <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            ${this.getIcon('x', '-ml-1 mr-2 h-4 w-4')}
             ページを再読み込み
           </button>
         </div>
@@ -7496,13 +7500,14 @@
         const modal = this._createElement('div');
         modal.className =
           'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
+        const warningIcon = this.getIcon('x', 'w-6 h-6 text-orange-600');
+        
         modal.innerHTML = `
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
           <div class="flex items-center mb-4">
             <div class="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-              <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-              </svg>
+              ${warningIcon}
             </div>
             <div class="ml-4">
               <h3 class="text-lg font-medium text-gray-900">管理モードに切り替えますか？</h3>
@@ -7572,10 +7577,12 @@
       if (endPublicationBtn) {
         originalButtonContent = endPublicationBtn.innerHTML;
         endPublicationBtn.disabled = true;
+        
+        // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
+        const loadingIcon = this.getIcon('x', 'w-3 h-3 animate-spin inline-block mr-1');
+        
         endPublicationBtn.innerHTML = `
-        <svg class="w-3 h-3 animate-spin inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-        </svg>
+        ${loadingIcon}
         公開終了中...
       `;
       }
