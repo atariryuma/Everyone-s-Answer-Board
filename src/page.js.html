@@ -2881,13 +2881,16 @@
     }
 
     showMinimalSkeleton() {
-      // Show only 3 skeletons for immediate visual feedback
-      const count = 3;
-      const frag = document.createDocumentFragment();
-      for (let i = 0; i < count; i++) {
-        frag.appendChild(this.createSkeletonCard());
-      }
-      this.elements.answersContainer.appendChild(frag);
+      // シンプルなローディング表示
+      const container = this.elements.answersContainer;
+      if (!container) return;
+      
+      container.innerHTML = `
+        <div class="text-center py-16 col-span-full">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+          <p class="mt-4 text-gray-400">データを読み込み中...</p>
+        </div>
+      `;
     }
 
     displayEmptyState() {
@@ -3855,16 +3858,8 @@
 
       // Show skeleton cards during loading
       if (config.showLoading && !config.isInitialLoad) {
-        const count = Math.min(parseInt(this.elements.sizeSlider.value, 10) * 2, 8); // Cap at 8
-        const frag = document.createDocumentFragment();
-        for (let i = 0; i < count; i++) {
-          frag.appendChild(this.createSkeletonCard());
-        }
-        const container = this.elements.answersContainer;
-        container.className =
-          'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
-        container.innerHTML = '';
-        container.appendChild(frag);
+        // シンプルローディングで置き換え
+        this.showMinimalSkeleton();
       }
       try {
         // classFilter「すべて」または空の場合はサーバーに送信しない（全データ取得のため）
@@ -4090,15 +4085,15 @@
                 const currentDisplayed = this.elements.headingLabel
                   ? this.elements.headingLabel.textContent
                   : '';
-                if (currentDisplayed && currentDisplayed !== result.header) {
-                  console.warn('⚠️ 質問文不一致検出:', {
-                    現在表示: currentDisplayed,
-                    サーバー設定: result.header,
-                    シート名: result.sheetName,
-                  });
-
-                  // 質問文を新しいものに更新
-                  debugLog('🔄 質問文をサーバー設定に合わせます');
+                // ⚡ サーバー設定の質問文を強制適用
+                if (result.header && this.elements.headingLabel) {
+                  if (currentDisplayed !== result.header) {
+                    console.info('🔄 質問文をサーバー設定に更新:', {
+                      旧: currentDisplayed || '未設定',
+                      新: result.header
+                    });
+                    this.elements.headingLabel.textContent = result.header;
+                  }
                 }
               }
 
@@ -4909,8 +4904,13 @@
 
     prepareRenderingState(newRows) {
       const container = this.elements.answersContainer;
-      container.querySelectorAll('.skeleton').forEach((el) => el.remove());
-
+      if (!container) {
+        console.error('⚠️ prepareRenderingState: answersContainerが見つかりません');
+        return;
+      }
+      
+      // すべてのローディング要素を削除 (シンプルローディング含む)
+      container.querySelectorAll('.skeleton, .loading, [data-loading="true"], .animate-spin').forEach((el) => el.remove());
       this.updateLayoutControls(newRows);
     }
 
@@ -5628,15 +5628,6 @@
       }
     }
 
-    createSkeletonCard() {
-      const card = document.createElement('div');
-      card.className =
-        'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
-      // Simplified skeleton for faster rendering
-      card.innerHTML =
-        '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
-      return card;
-    }
 
     /**
      * リアクション処理（既存キューイングシステム＋オプショナルバッチ処理）
