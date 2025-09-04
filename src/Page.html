@@ -953,7 +953,7 @@
     </footer>
     <script>
       // テンプレート変数をJavaScriptグローバル変数として設定
-      const USER_ID =
+      window.USER_ID =
         '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>';
       const SHEET_NAME = '<?= typeof sheetName !== "undefined" && sheetName ? sheetName : "" ?>';
       const __OPINION_HEADER__ =

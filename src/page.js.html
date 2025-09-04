@@ -10,7 +10,7 @@
     const solutions = [];
     
     // 診断1: テンプレート展開状況
-    if (!window.USER_ID || typeof window.USER_ID === 'object') {
+    if (!window.USER_ID || typeof window.USER_ID === 'object' || window.USER_ID.trim() === '') {
       issues.push('テンプレート変数が正しく展開されていません');
       solutions.push('🔄 ページをリロードしてください');
     }
@@ -993,7 +993,12 @@
         console.log('🔍 パブリケーション状態をチェック中...');
 
         // ✅ CLAUDE.md準拠: App名前空間パターン使用
-        const result = await App.getStatus().checkPublicationStatus(this.state.tenantId);
+        const userId = window.USER_ID || new URLSearchParams(window.location.search).get('userId');
+        if (!userId) {
+          console.error('❌ パブリケーション状態チェック: userIdが取得できません');
+          return { error: 'userId is required', isPublished: false };
+        }
+        const result = await App.getStatus().checkPublicationStatus(userId);
 
         console.log('📊 パブリケーション状態チェック結果:', result);
 
@@ -2824,8 +2829,10 @@
      * @returns {boolean} true if all prerequisites are met
      */
     validatePrerequisites() {
+      // 🔥 userIdの正しい取得方法
+      const userId = window.USER_ID || new URLSearchParams(window.location.search).get('userId');
       const checks = [
-        { name: 'userId', value: this.state.tenantId, required: true },
+        { name: 'userId', value: userId, required: true },
         { name: 'answersContainer', value: this.elements.answersContainer, required: true },
         { name: 'sheetName', value: this.state.sheetName, required: false },
         {
@@ -2849,6 +2856,11 @@
           allValid = false;
         }
       });
+
+      // 🔥 検証済みのuserIdをstateに保存
+      if (userId && allValid) {
+        this.state.tenantId = userId;
+      }
 
       return allValid;
     }

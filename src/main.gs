@@ -1664,3 +1664,29 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
 // testSetup関数はSystemManager.gsに完全移行しました
 
 // testDatabaseMigration関数はSystemManager.gsに完全移行しました
+
+/**
+ * 🔧 グローバル関数: getActiveUserInfo（Core.gs互換性用）
+ * Core.gsから呼び出される際の互換性を保つためのグローバル関数
+ */
+function getActiveUserInfo() {
+  try {
+    const currentUserEmail = User.email();
+    if (!currentUserEmail) return null;
+
+    const userInfo = DB.findUserByEmail(currentUserEmail);
+    if (!userInfo) return null;
+
+    return {
+      email: userInfo.userEmail,
+      userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
+      spreadsheetId: userInfo.parsedConfig?.spreadsheetId,
+      configJson: userInfo.configJson,
+      parsedConfig: userInfo.parsedConfig
+    };
+  } catch (error) {
+    console.error('getActiveUserInfo グローバル関数エラー:', error.message);
+    return null;
+  }
+}

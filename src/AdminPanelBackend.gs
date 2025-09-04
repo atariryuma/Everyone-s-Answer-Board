@@ -315,6 +315,7 @@ function publishApplication(config) {
         appPublished: true,
         publishedAt: new Date().toISOString(),
         appUrl: publishResult.appUrl,
+        isDraft: false, // 🔥 公開時はドラフト状態を解除
         
         // 🎯 表示設定（重複排除：フロントエンド設定を反映）
         displaySettings: {
@@ -417,8 +418,8 @@ function saveDraftConfiguration(config) {
         showReactions: config.showReactions !== undefined ? config.showReactions : (currentConfig.displaySettings?.showReactions || false)
       },
       
-      // 🎯 ドラフト情報
-      isDraft: true,
+      // 🎯 ドラフト情報（公開済みの場合はドラフト状態を保持）
+      isDraft: !currentConfig.appPublished, // 公開済みでなければドラフト
       lastModified: new Date().toISOString()
     };
 
