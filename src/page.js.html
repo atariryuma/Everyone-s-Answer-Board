@@ -38,33 +38,11 @@
   };
   
   /**
-   * 🎆 自動回復システム - 可能な範囲で自動修復を試行
+   * ✅ configJSON中心型アーキテクチャ - 自動回復不要
    */
   const autoRecovery = async (diagnosis) => {
-    if (diagnosis.severity === 'healthy') return true;
-    
-    // 回復1: RPC経由で設定取得を試行
-    if (!window.USER_ID && window.google && window.google.script) {
-      try {
-        console.info('🚑 緊急回復: RPC経由で設定取得を試行中...');
-        const config = await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .getCurrentConfigByEmail(); // メールアドレスベースで設定取得
-        });
-        
-        if (config && config.userId) {
-          window.USER_ID = config.userId;
-          console.info('✅ 緊急回復成功: RPC経由で設定を取得しました');
-          return true;
-        }
-      } catch (error) {
-        console.warn('⚠️ 緊急回復失敗:', error.message);
-      }
-    }
-    
-    return false;
+    // configJSON完全移行により、データ不整合が発生しないため緊急回復は不要
+    return diagnosis.severity === 'healthy';
   };
   
   /**

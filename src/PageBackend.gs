@@ -99,17 +99,21 @@ function getAvailableSheets(userId = null) {
       throw new Error(`アクセス権限がありません: ${accessResult.reason}`);
     }
 
-    // ユーザー情報からスプレッドシートIDを取得（統一データソース）
+    // ユーザー情報からスプレッドシートIDを取得（configJSON中心型）
     const userInfo = DB.findUserById(targetUserId);
-    if (!userInfo || !userInfo.spreadsheetId) {
+    if (!userInfo || !userInfo.parsedConfig) {
+      throw new Error('ユーザー設定が見つかりません');
+    }
+    const config = userInfo.parsedConfig;
+    if (!config.spreadsheetId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません');
     }
 
     // AdminPanelBackend.gsのgetSheetList()を利用
-    const sheetList = getSheetList(userInfo.spreadsheetId);
+    const sheetList = getSheetList(config.spreadsheetId);
 
     console.log('getAvailableSheets: シート一覧取得完了', {
-      spreadsheetId: `${userInfo.spreadsheetId.substring(0, 20)}...`,
+      spreadsheetId: `${config.spreadsheetId.substring(0, 20)}...`,
       sheetCount: sheetList.length,
     });
 
@@ -242,8 +246,12 @@ function addReactionBatch(requestUserId, batchOperations) {
 
     // ボードオーナーの情報をDBから取得
     const boardOwnerInfo = DB.findUserById(requestUserId);
-    if (!boardOwnerInfo || !boardOwnerInfo.spreadsheetId) {
+    if (!boardOwnerInfo || !boardOwnerInfo.parsedConfig) {
       throw new Error('無効なボードです');
+    }
+    const ownerConfig = boardOwnerInfo.parsedConfig;
+    if (!ownerConfig.spreadsheetId) {
+      throw new Error('スプレッドシートが設定されていません');
     }
 
     // バッチ処理結果を格納
@@ -255,7 +263,7 @@ function addReactionBatch(requestUserId, batchOperations) {
     const sheetName = userConfig?.sheetName || 'フォームの回答 1';
 
     console.log('addReactionBatch: 処理対象シート', {
-      spreadsheetId: `${boardOwnerInfo.spreadsheetId.substring(0, 20)  }...`,
+      spreadsheetId: `${ownerConfig.spreadsheetId.substring(0, 20)  }...`,
       sheetName,
     });
 
@@ -388,7 +396,8 @@ function refreshBoardData(requestUserId) {
     // ユーザーキャッシュの無効化（Core.gsの関数を利用）
     try {
       if (typeof invalidateUserCache === 'function') {
-        invalidateUserCache(requestUserId, userInfo.userEmail, userInfo.spreadsheetId, false);
+        const spreadsheetId = boardOwnerInfo.parsedConfig?.spreadsheetId || boardOwnerInfo.spreadsheetId;
+        invalidateUserCache(requestUserId, userInfo.userEmail, spreadsheetId, false);
       }
     } catch (invalidateError) {
       console.warn('refreshBoardData: ユーザーキャッシュ無効化エラー:', invalidateError.message);
@@ -485,9 +494,9 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
       config = {};
     }
 
-    // スプレッドシート設定確認（統一データソース使用）
-    const {spreadsheetId} = userInfo;
-    const sheetName = config.sheetName || userInfo.sheetName || 'フォームの回答 1';
+    // スプレッドシート設定確認（configJSON中心型）
+    const spreadsheetId = config.spreadsheetId;
+    const sheetName = config.sheetName || 'フォームの回答 1';
 
     if (!spreadsheetId || !sheetName) {
       return {

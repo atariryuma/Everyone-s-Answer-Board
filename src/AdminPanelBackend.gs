@@ -103,65 +103,6 @@ function getCurrentConfig() {
   }
 }
 
-/**
- * 🎆 緊急回復用RPC関数 - メールアドレスベースで設定取得
- * テンプレート変数展開失敗時のフォールバックとして使用
- */
-function getCurrentConfigByEmail() {
-  try {
-    console.info('🎆 緊急回復: メールアドレスベースで設定取得開始');
-    
-    const currentUserEmail = User.email();
-    if (!currentUserEmail) {
-      throw new Error('アクティブユーザーのメールアドレスが取得できません');
-    }
-    
-    const userInfo = DB.findUserByEmail(currentUserEmail);
-    if (!userInfo) {
-      console.warn('緊急回復: ユーザー情報が見つかりません:', currentUserEmail);
-      return {
-        error: 'user_not_found',
-        userEmail: currentUserEmail,
-        suggestion: 'ユーザー登録が必要です'
-      };
-    }
-    
-    const config = userInfo.parsedConfig || {};
-    const recoveryConfig = {
-      userId: userInfo.userId,
-      userEmail: userInfo.userEmail,
-      spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName,
-      formUrl: config.formUrl,
-      setupStatus: config.setupStatus || 'incomplete',
-      appPublished: config.appPublished || false,
-      displaySettings: config.displaySettings || { showNames: false, showReactions: false },
-      recoveryMode: true,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.info('✅ 緊急回復: 設定取得成功', {
-      userId: userInfo.userId,
-      hasSpreadsheetId: !!config.spreadsheetId,
-      hasSheetName: !!config.sheetName,
-      setupStatus: config.setupStatus
-    });
-    
-    return recoveryConfig;
-  } catch (error) {
-    console.error('❌ 緊急回復エラー:', {
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    });
-    
-    return {
-      error: 'recovery_failed',
-      message: error.message,
-      suggestion: 'ページをリロードしてください'
-    };
-  }
-}
 
 /**
  * データソース接続（CLAUDE.md準拠版）

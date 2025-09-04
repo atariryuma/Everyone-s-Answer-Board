@@ -932,12 +932,12 @@ function renderAnswerBoard(userInfo, params) {
   console.log('renderAnswerBoard - mode:', params.mode);
   console.log('renderAnswerBoard - userInfo:', {
     userId: userInfo.userId,
-    hasSpreadsheetId: !!userInfo.spreadsheetId,
-    hasSheetName: !!userInfo.sheetName,
-    spreadsheetIdStart: userInfo.spreadsheetId
-      ? `${userInfo.spreadsheetId.substring(0, 20)}...`
+    hasSpreadsheetId: !!config.spreadsheetId,
+    hasSheetName: !!config.sheetName,
+    spreadsheetIdStart: config.spreadsheetId
+      ? `${config.spreadsheetId.substring(0, 20)}...`
       : 'null',
-    sheetName: userInfo.sheetName,
+    sheetName: config.sheetName,
   });
 
   try {
@@ -949,9 +949,9 @@ function renderAnswerBoard(userInfo, params) {
     template.mode = 'view';
     template.isAdminPanel = false;
 
-    // ユーザー選択スプレッドシート設定を統一使用
-    const userSpreadsheetId = userInfo.spreadsheetId || null;
-    const userSheetName = userInfo.sheetName || null;
+    // configJSON中心型：スプレッドシート設定を統一使用
+    const userSpreadsheetId = config.spreadsheetId || null;
+    const userSheetName = config.sheetName || null;
     
     // 📊 ユーザーIDをテンプレートに適切に設定
     template.USER_ID = userInfo.userId || null;
@@ -1132,21 +1132,21 @@ function checkCurrentPublicationStatus(userId) {
       return { error: 'Config parse error', isPublished: false };
     }
 
-    // ユーザー選択スプレッドシートでの公開状態判定
-    const isPublished = !!(userInfo.spreadsheetId && userInfo.sheetName);
+    // configJSON中心型：公開状態判定
+    const isPublished = config.appPublished === true;
 
     console.log('checkCurrentPublicationStatus - result:', {
       userId,
       isPublished,
-      hasSpreadsheetId: !!userInfo.spreadsheetId,
-      hasSheetName: !!userInfo.sheetName,
+      hasSpreadsheetId: !!config.spreadsheetId,
+      hasSheetName: !!config.sheetName,
     });
 
     return {
       userId,
       isPublished,
-      spreadsheetId: userInfo.spreadsheetId || null,
-      sheetName: userInfo.sheetName || null,
+      spreadsheetId: config.spreadsheetId || null,
+      sheetName: config.sheetName || null,
       lastChecked: new Date().toISOString(),
     };
   } catch (error) {
