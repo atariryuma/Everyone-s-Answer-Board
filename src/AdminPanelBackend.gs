@@ -1265,18 +1265,29 @@ function getSheetList(spreadsheetId) {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
     
-    // フロントエンドが期待するオブジェクト形式で返す
-    const sheetList = sheets.map(sheet => ({
-      name: sheet.getName(),
-      isFormResponseSheet: false,
-      formConnected: false,
-      formTitle: ''
-    }));
+    // 最小限のフォーム連携チェック（軽量版）
+    const sheetList = sheets.map(sheet => {
+      const sheetName = sheet.getName();
+      
+      // フォームレスポンスシートの簡易判定（FormApp呼び出しなし）
+      let isFormSheet = false;
+      if (sheetName.match(/^(フォームの回答|Form Responses?|回答)/)) {
+        // パターンマッチで高速判定
+        isFormSheet = true;
+      }
+      
+      return {
+        name: sheetName,
+        isFormResponseSheet: isFormSheet,
+        formConnected: isFormSheet,  
+        formTitle: ''  // 詳細はシート選択時に取得
+      };
+    });
     
     console.log('✅ getSheetList: シート一覧取得完了', {
       spreadsheetId,
       sheetCount: sheetList.length,
-      sheetNames: sheetList.map(s => s.name)
+      formSheets: sheetList.filter(s => s.isFormResponseSheet).length
     });
 
     return sheetList;
