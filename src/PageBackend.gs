@@ -396,7 +396,9 @@ function refreshBoardData(requestUserId) {
     // ユーザーキャッシュの無効化（Core.gsの関数を利用）
     try {
       if (typeof invalidateUserCache === 'function') {
-        const spreadsheetId = boardOwnerInfo.parsedConfig?.spreadsheetId || boardOwnerInfo.spreadsheetId;
+        // 🚀 CLAUDE.md準拠：userInfo使用（boardOwnerInfoはuserInfoと同じ）
+        const config = userInfo.parsedConfig || {};
+        const spreadsheetId = config.spreadsheetId;
         invalidateUserCache(requestUserId, userInfo.userEmail, spreadsheetId, false);
       }
     } catch (invalidateError) {
