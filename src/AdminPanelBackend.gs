@@ -214,8 +214,8 @@ function connectDataSource(spreadsheetId, sheetName) {
         lastModified: new Date().toISOString()
       };
 
-      // CLAUDE.md準拠：configJSON中心型でデータベース更新
-      DB.updateUser(userInfo.userId, updatedConfig);
+      // CLAUDE.md準拠：configJSON中心型でデータベース更新（root cause fix）
+      DB.updateUserConfig(userInfo.userId, updatedConfig);
 
       console.log('✅ connectDataSource: CLAUDE.md準拠configJSON統合保存完了', {
         userId: userInfo.userId,
@@ -333,8 +333,8 @@ function publishApplication(config) {
         lastModified: new Date().toISOString()
       };
 
-      // CLAUDE.md準拠：configJSON中心型で一括保存
-      DB.updateUser(userInfo.userId, publishedConfig);
+      // CLAUDE.md準拠：configJSON中心型で一括保存（root cause fix）
+      DB.updateUserConfig(userInfo.userId, publishedConfig);
       
       console.info('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {
         userId: userInfo.userId,
@@ -429,8 +429,8 @@ function saveDraftConfiguration(config) {
       lastModified: new Date().toISOString()
     };
 
-    // CLAUDE.md準拠：configJSON中心型で一括保存
-    DB.updateUser(userInfo.userId, updatedConfig);
+    // CLAUDE.md準拠：configJSON中心型で一括保存（root cause fix）
+    DB.updateUserConfig(userInfo.userId, updatedConfig);
 
     console.info('✅ saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存完了', {
       userId: userInfo.userId,
@@ -1097,7 +1097,7 @@ function migrateUserDataToConfigJson(userId = null) {
           migratedConfig.migratedAt = new Date().toISOString();
           migratedConfig.claudeMdCompliant = true;
 
-          DB.updateUser(user.userId, migratedConfig);
+          DB.updateUserConfig(user.userId, migratedConfig);
           
           migrationResults.migrated++;
           migrationResults.details.push({

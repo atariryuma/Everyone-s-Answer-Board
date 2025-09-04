@@ -397,6 +397,62 @@ const DB = {
   },
 
   /**
+   * 🔥 configJSON専用更新（root cause fix）
+   * configJsonフィールドのネスト重複を完全回避
+   * @param {string} userId - ユーザーID
+   * @param {Object} configData - configJsonに直接保存するデータ
+   * @returns {Object} 更新結果
+   */
+  updateUserConfig(userId, configData) {
+    try {
+      console.info('🔥 updateUserConfig: configJSON重複回避更新開始', {
+        userId,
+        configFields: Object.keys(configData),
+        timestamp: new Date().toISOString()
+      });
+
+      // 現在のユーザーデータを取得
+      const currentUser = this.findUserById(userId);
+      if (!currentUser) {
+        throw new Error('更新対象のユーザーが見つかりません');
+      }
+
+      // 🔥 重要：configDataをそのままJSONとして保存（マージなし）
+      const dbUpdateData = {
+        configJson: JSON.stringify(configData),
+        lastModified: configData.lastModified || new Date().toISOString()
+      };
+
+      // データベース更新実行
+      this.updateUserInDatabase(userId, dbUpdateData);
+
+      // キャッシュクリア
+      this.clearUserCache(userId, currentUser.userEmail);
+
+      console.info('✅ updateUserConfig: configJSON重複回避更新完了', {
+        userId,
+        configFields: Object.keys(configData),
+        configSize: dbUpdateData.configJson.length
+      });
+
+      return {
+        success: true,
+        userId,
+        updatedConfig: configData,
+        timestamp: dbUpdateData.lastModified
+      };
+
+    } catch (error) {
+      console.error('❌ updateUserConfig: configJSON重複回避更新エラー:', {
+        userId,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  },
+
+  /**
    * ユーザー更新（CLAUDE.md準拠版）
    * @param {string} userId - ユーザーID
    * @param {Object} updateData - 更新データ
@@ -806,6 +862,124 @@ const DB = {
 
     } catch (error) {
       console.warn('削除ログ記録エラー:', error.message);
+    }
+  },
+
+  /**
+   * 🧹 configJSON重複クリーンアップ（root cause fix）
+   * ネストしたconfigJsonフィールドを正規化
+   * @param {string} userId - 対象ユーザーID（省略時は全ユーザー）
+   * @returns {Object} クリーンアップ結果
+   */
+  cleanupNestedConfigJson(userId = null) {
+    try {
+      console.info('🧹 cleanupNestedConfigJson: 重複configJSON修正開始', {
+        targetUserId: userId || 'all_users',
+        timestamp: new Date().toISOString()
+      });
+
+      const users = userId ? [this.findUserById(userId)] : this.getAllUsers();
+      const cleanupResults = {
+        total: users.length,
+        cleaned: 0,
+        skipped: 0,
+        errors: 0,
+        details: []
+      };
+
+      users.forEach(user => {
+        if (!user) return;
+
+        try {
+          const originalConfig = user.parsedConfig || {};
+          let cleanedConfig = { ...originalConfig };
+          let needsCleaning = false;
+
+          // 🔥 重要：ネストしたconfigJsonフィールドを検出・修正
+          if (cleanedConfig.configJson) {
+            // configJsonフィールドが存在する場合、それを最上位に展開
+            try {
+              let nestedConfig;
+              if (typeof cleanedConfig.configJson === 'string') {
+                nestedConfig = JSON.parse(cleanedConfig.configJson);
+              } else {
+                nestedConfig = cleanedConfig.configJson;
+              }
+
+              // ネストされたconfigJsonを最上位にマージ
+              cleanedConfig = { ...nestedConfig, ...cleanedConfig };
+              
+              // configJsonフィールド自体を削除
+              delete cleanedConfig.configJson;
+              needsCleaning = true;
+
+              console.log(`🧹 ネストしたconfigJsonを修正: ${user.userEmail}`);
+            } catch (parseError) {
+              console.warn('configJson解析エラー:', parseError.message);
+            }
+          }
+
+          // 🔥 その他の重複フィールドもクリーンアップ
+          const duplicateFields = ['userId', 'userEmail', 'isActive', 'lastModified'];
+          duplicateFields.forEach(field => {
+            if (cleanedConfig[field] !== undefined) {
+              delete cleanedConfig[field];
+              needsCleaning = true;
+            }
+          });
+
+          if (needsCleaning) {
+            // lastModifiedを更新
+            cleanedConfig.lastModified = new Date().toISOString();
+            
+            // updateUserConfigを使用してクリーンなデータを保存
+            this.updateUserConfig(user.userId, cleanedConfig);
+            
+            cleanupResults.cleaned++;
+            cleanupResults.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              status: 'cleaned',
+              removedFields: duplicateFields.filter(f => originalConfig[f] !== undefined)
+            });
+          } else {
+            cleanupResults.skipped++;
+            cleanupResults.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              status: 'skipped_no_issues'
+            });
+          }
+
+        } catch (userError) {
+          cleanupResults.errors++;
+          cleanupResults.details.push({
+            userId: user.userId,
+            email: user.userEmail,
+            status: 'error',
+            error: userError.message
+          });
+          console.error(`❌ ユーザークリーンアップエラー: ${user.userEmail}`, userError.message);
+        }
+      });
+
+      console.info('✅ cleanupNestedConfigJson: 重複configJSON修正完了', cleanupResults);
+      return {
+        success: true,
+        results: cleanupResults,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('❌ cleanupNestedConfigJson: クリーンアップエラー', {
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
     }
   }
 };

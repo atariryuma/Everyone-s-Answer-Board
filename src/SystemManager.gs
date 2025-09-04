@@ -11,6 +11,46 @@
 // =============================================================================
 
 /**
+ * 🔥 configJSON重複修正テスト（root cause fix）
+ * ネストしたconfigJsonフィールドのクリーンアップ
+ * @returns {Object} 実行結果
+ */
+function testConfigJsonCleanup() {
+  try {
+    console.info('🔥 configJSON重複修正テスト開始');
+
+    // 新しいクリーンアップ関数を実行
+    const result = DB.cleanupNestedConfigJson();
+
+    console.info('🔥 修正結果:', result);
+
+    return {
+      status: 'success',
+      message: '✅ configJSON重複修正完了',
+      details: {
+        total: result.results.total,
+        cleaned: result.results.cleaned,
+        skipped: result.results.skipped,
+        errors: result.results.errors,
+        timestamp: result.timestamp,
+        changes: [
+          'ネストしたconfigJsonフィールドを正規化',
+          '重複したconfigJsonフィールドを削除',
+          'データベース基本フィールドの重複を除去',
+          'JSON構造を単純化してパフォーマンス向上'
+        ]
+      }
+    };
+  } catch (error) {
+    console.error('🔥 configJSON重複修正テストエラー:', error.message);
+    return {
+      status: 'error',
+      message: `❌ configJSON重複修正エラー: ${error.message}`
+    };
+  }
+}
+
+/**
  * メインのデータベース最適化テスト関数
  * GASエディタから直接実行可能
  * @returns {Object} 実行結果
@@ -180,7 +220,6 @@ const SystemManager = {
       // ヘッダー行を確認
       const headers = values[0];
       const configJsonIndex = headers.indexOf('configJson');
-      const columnMappingJsonIndex = headers.indexOf('columnMappingJson');
 
       if (configJsonIndex === -1) {
         throw new Error('configJson列が見つかりません');
@@ -447,7 +486,7 @@ const SystemManager = {
     try {
       const props = PropertiesService.getScriptProperties();
 
-      const hasServiceAccount = !!props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+      const hasServiceAccount = !!props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS); // cspell:ignore CREDS
       const hasDatabaseId = !!props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
       const hasAdminEmail = !!props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
 
@@ -806,7 +845,7 @@ const SystemManager = {
  * レガシー最適化関数の統合版
  * ConfigOptimizer.gsの機能を統合
  */
-function optimizeConfigJson(currentConfig, userInfo) {
+function optimizeConfigJson(_currentConfig, userInfo) {
   return SystemManager.optimizeUserConfigJson(userInfo.userId);
 }
 
