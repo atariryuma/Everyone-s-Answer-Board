@@ -204,7 +204,7 @@
 
   // === APPLICATION CONSTANTS ===
   // GAS optimized constants
-  const RENDER_BATCH_SIZE = 10; // Fixed batch size for GAS environment
+  const RENDER_BATCH_SIZE = 50; // 件数闾値最適化: 大量データ対応
   const CHUNK_SIZE = 5; // DOM operations per chunk
   const ICONS = Object.freeze({
     'lightbulb-outline':
@@ -3052,17 +3052,23 @@
 
         debugLog('✅ 状態不整合を修正しました');
       } else if (dataLength !== domCards.length) {
-        // 数の不一致も不整合とみなす
-        console.warn(
-          '⚠️ 状態不整合検出: DOMカード数とデータ数が一致しません。DOM:',
-          domCards.length,
-          'データ:',
-          dataLength
-        );
-
-        // 不整合がある場合は再レンダリング
-        debugLog('再レンダリングを実行します...');
-        this.renderBoard(false, false);
+        // 仮想スクロール時は正常な状態なので警告を出さない
+        const isVirtualScrollActive = dataLength > RENDER_BATCH_SIZE;
+        
+        if (isVirtualScrollActive) {
+          debugLog(`🌀 仮想スクロールアクティブ: DOM=${domCards.length}, データ=${dataLength} (正常状態)`);
+        } else {
+          // 通常レンダリングでの不整合のみ警告
+          console.warn(
+            '⚠️ 状態不整合検出: DOMカード数とデータ数が一致しません。DOM:',
+            domCards.length,
+            'データ:',
+            dataLength
+          );
+          // 不整合がある場合は再レンダリング
+          debugLog('再レンダリングを実行します...');
+          this.renderBoard(false, false);
+        }
       } else {
         debugLog('✅ 状態検証: DOMとデータの状態が一致しています');
       }
@@ -3418,12 +3424,20 @@
 
           // データ取得を Promise で実行
           const result = await new Promise((resolve, reject) => {
+            // データ件数に応じた動的タイムアウト設定
+            const baseTimeout = attempt === 0 ? 30000 : 20000; // ベース: 30秒/20秒
+            const dataCountEstimate = this.state.currentAnswers?.length || 0;
+            const timeoutMultiplier = dataCountEstimate > 200 ? 1.5 : dataCountEstimate > 100 ? 1.25 : 1;
+            const dynamicTimeout = Math.round(baseTimeout * timeoutMultiplier);
+            
+            debugLog(`⏱️ 動的タイムアウト設定: ${dynamicTimeout}ms (データ件数: ${dataCountEstimate}, 倍率: ${timeoutMultiplier})`);
+            
             const timeout = setTimeout(
               () => {
-                reject(new Error('データ取得がタイムアウトしました'));
+                reject(new Error(`データ取得がタイムアウトしました (タイムアウト: ${dynamicTimeout}ms)`));
               },
-              attempt === 0 ? 15000 : 10000
-            ); // 初回は15秒、以降は10秒
+              dynamicTimeout
+            );
 
             // CLAUDE.md準拠: パラメータ詳細ログでデバッグ性向上
             debugLog(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
@@ -5037,9 +5051,9 @@
         startIndex = Math.floor(scrollTop / cardHeight);
         endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
       } else {
-        // 最終手段：小さなバッチサイズでレンダリング
-        endIndex = Math.min(totalItems, 20); // 初回表示は20個まで
-        debugLog('calculateVisibleRange: フォールバック - 20個制限でレンダリング');
+        // 最終手段：適切なバッチサイズでレンダリング
+        endIndex = Math.min(totalItems, 50); // 初回表示を50個に増加
+        debugLog('calculateVisibleRange: フォールバック - 50個制限でレンダリング');
       }
 
       return { startIndex, endIndex };
@@ -5083,7 +5097,39 @@
       console.debug('Virtual scroll completed:', { renderedCards: fragment.children.length });
       if (fragment.children.length > 0) {
         container.appendChild(fragment);
+        
+        // プログレッシブローディング情報を表示
+        this.showVirtualScrollInfo(visibleRows.length, newRows.length);
       }
+    }
+    
+    // 仮想スクロール情報表示(プログレッシブローディング)
+    showVirtualScrollInfo(displayedCount, totalCount) {
+      if (displayedCount >= totalCount) return;
+      
+      const infoElement = document.getElementById('virtual-scroll-info');
+      if (infoElement) {
+        infoElement.remove(); // 既存の情報を削除
+      }
+      
+      const info = document.createElement('div');
+      info.id = 'virtual-scroll-info';
+      info.className = 'fixed bottom-4 right-4 bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50';
+      info.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+          <span>${displayedCount}件表示、残り${totalCount - displayedCount}件読み込み中...</span>
+        </div>
+      `;
+      
+      document.body.appendChild(info);
+      
+      // 3秒後に自動消去
+      setTimeout(() => {
+        if (info.parentNode) {
+          info.remove();
+        }
+      }, 3000);
     }
 
     shouldUpdateCard(newData, oldData) {
