@@ -98,19 +98,21 @@ class ConfigurationManager {
       // ⚡ 動的URL生成（キャッシュ付き）
       const dynamicUrls = this.generateDynamicUrls(config, userId);
 
-      // 🔥 統合設定オブジェクト（configJSON中心型）
+      // 🔥 完全configJSON中心型（重複フィールド削除）
       return {
-        // DB検索フィールド
-        userId: user.userId,
-        userEmail: user.userEmail,
-        isActive: user.isActive,
-        lastModified: user.lastModified,
-
-        // configJSON統合データ
+        // configJSON統合データ（唯一のデータソース）
         ...config,
 
         // 動的生成URLs（キャッシュされた値または新規生成）
         ...dynamicUrls,
+        
+        // DB検索用メタデータ（別途アクセス可能）
+        _meta: {
+          userId: user.userId,
+          userEmail: user.userEmail,
+          isActive: user.isActive,
+          lastModified: user.lastModified
+        }
       };
     } catch (e) {
       console.error(`⚡ configJSON解析エラー (${userId}):`, e);

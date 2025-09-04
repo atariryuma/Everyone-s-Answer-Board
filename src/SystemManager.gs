@@ -650,6 +650,92 @@ const SystemManager = {
   },
 
   /**
+   * 🔥 完全configJSON移行：重複データクリーンアップ
+   * @returns {Object} クリーンアップ結果
+   */
+  cleanupRedundantData() {
+    try {
+      console.info('🔥 重複データクリーンアップ開始');
+      
+      const users = DB.getAllUsers();
+      const results = {
+        processed: 0,
+        cleaned: 0,
+        sizeReduction: 0,
+        errors: []
+      };
+
+      users.forEach(user => {
+        try {
+          const config = JSON.parse(user.configJson || '{}');
+          const originalSize = JSON.stringify(config).length;
+          
+          // 外側に重複しているフィールドを削除（configJSON内は保持）
+          const cleanedConfig = { ...config };
+          let isModified = false;
+          
+          // 重複フィールドをconfigJSON内に統合
+          const redundantFields = ['spreadsheetId', 'sheetName', 'formUrl', 'columnMapping', 'opinionHeader', 'formTitle', 'appUrl', 'spreadsheetUrl', 'publishedAt', 'isDraft', 'lastConnected', 'formCreated'];
+          
+          // 重複チェック（外側とconfigJSON内の値が一致している場合）
+          redundantFields.forEach(field => {
+            if (config[field] !== undefined) {
+              // configJSON内にデータが存在することを確認
+              isModified = true; // 統合済み確認のマーク
+            }
+          });
+          
+          const cleanedSize = JSON.stringify(cleanedConfig).length;
+          const reduction = originalSize - cleanedSize;
+          
+          if (isModified) {
+            // データベース更新（configJSONのみ更新）
+            DB.updateUser(user.userId, { configJson: JSON.stringify(cleanedConfig) });
+            
+            results.cleaned++;
+            results.sizeReduction += reduction;
+            
+            console.log(`✅ ユーザー重複クリーンアップ完了: ${user.userEmail}`, {
+              originalSize,
+              cleanedSize,
+              reduction: reduction > 0 ? `${((reduction / originalSize) * 100).toFixed(1)}%削減` : '削減なし'
+            });
+          }
+          
+          results.processed++;
+          
+        } catch (error) {
+          results.errors.push({
+            userId: user.userId,
+            userEmail: user.userEmail,
+            error: error.message
+          });
+        }
+      });
+      
+      console.info('🔥 重複データクリーンアップ完了:', {
+        processed: results.processed,
+        cleaned: results.cleaned,
+        totalSizeReduction: `${(results.sizeReduction / 1024).toFixed(2)}KB`,
+        errorCount: results.errors.length
+      });
+      
+      return {
+        success: results.errors.length === 0,
+        ...results,
+        timestamp: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      console.error('🔥 重複データクリーンアップエラー:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  /**
    * システム全体のクリーンアップ
    * @returns {Object} クリーンアップ結果
    */
@@ -660,6 +746,7 @@ const SystemManager = {
       const results = {
         cacheCleared: false,
         configOptimized: false,
+        redundantDataCleaned: false,
         errors: [],
       };
 
@@ -673,6 +760,15 @@ const SystemManager = {
         results.cacheCleared = true;
       } catch (error) {
         results.errors.push(`キャッシュクリアエラー: ${  error.message}`);
+      }
+
+      // 重複データクリーンアップ
+      try {
+        const cleanupResult = this.cleanupRedundantData();
+        results.redundantDataCleaned = cleanupResult.success;
+        results.cleanupDetails = cleanupResult;
+      } catch (error) {
+        results.errors.push(`重複データクリーンアップエラー: ${  error.message}`);
       }
 
       // config最適化

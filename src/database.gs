@@ -433,13 +433,19 @@ const DB = {
       // lastModifiedを更新
       updatedConfig.lastModified = new Date().toISOString();
 
-      // CLAUDE.md準拠：5フィールドで更新データを構築
+      // 🔥 CLAUDE.md準拠：完全configJSON中心型（重複フィールド削除）
       const dbUpdateData = {
-        userEmail: updateData.userEmail || currentUser.userEmail,
-        isActive: updateData.isActive || currentUser.isActive,
         configJson: JSON.stringify(updatedConfig),
         lastModified: updatedConfig.lastModified
       };
+      
+      // ⚡ DB基本フィールドの直接更新が必要な場合のみ追加
+      if (updateData.userEmail !== undefined) {
+        dbUpdateData.userEmail = updateData.userEmail;
+      }
+      if (updateData.isActive !== undefined) {
+        dbUpdateData.isActive = updateData.isActive;
+      }
 
       // データベース更新実行
       this.updateUserInDatabase(userId, dbUpdateData);
