@@ -472,16 +472,20 @@ const DB = {
 
   /**
    * CLAUDE.md準拠：データベース物理更新（5フィールドのみ）
+   * SpreadsheetApp統一版
    */
   updateUserInDatabase(userId, dbUpdateData) {
     const dbId = getSecureDatabaseId();
-    const service = getSheetsServiceCached();
     const sheetName = DB_CONFIG.SHEET_NAME;
 
-    // CLAUDE.md準拠：5列のみ取得
-    const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
-    const values = data.valueRanges[0].values || [];
+    // SpreadsheetAppを使用してデータ取得
+    const spreadsheet = SpreadsheetApp.openById(dbId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      throw new Error('データベースシートが見つかりません');
+    }
 
+    const values = sheet.getDataRange().getValues();
     if (values.length === 0) {
       throw new Error('データベースが空です');
     }
@@ -508,13 +512,12 @@ const DB = {
       dbUpdateData.lastModified
     ];
 
-    const range = `'${sheetName}'!A${rowIndex}:E${rowIndex}`;
-    updateSheetsData(service, dbId, range, [updateRow]);
+    // SpreadsheetAppを使用してデータ更新
+    sheet.getRange(rowIndex, 1, 1, 5).setValues([updateRow]);
 
-    console.log('💾 CLAUDE.md準拠：5フィールド物理更新完了', {
+    console.log('💾 CLAUDE.md準拠：5フィールド物理更新完了（SpreadsheetApp統一版）', {
       userId,
       row: rowIndex,
-      range,
       configJsonSize: dbUpdateData.configJson.length
     });
   },
