@@ -4421,3 +4421,14 @@ function performAutoRepair(userId) {
     };
   }
 }
+
+/**
+ * 実行時ユーザー情報キャッシュクリア関数
+ * 既存のinvalidateUserCache関数のエイリアスとして実装
+ * リアクション機能で使用される
+ */
+function clearExecutionUserInfoCache() {
+  // 既存のinvalidateUserCache関数を活用
+  // 引数なしで呼び出すと基本的なキャッシュクリアを実行
+  return invalidateUserCache();
+}

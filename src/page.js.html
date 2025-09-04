@@ -844,16 +844,59 @@
         },
       };
 
-      // Alert on significant inconsistencies
+      // Alert on significant inconsistencies + 自動修復試行
       if (!metrics.domMetrics.isConsistent) {
         console.warn('⚠️ DOM-Data inconsistency detected:', {
           data: currentDataLength,
           dom: domCardCount,
           context,
         });
+
+        // 🔧 自動修復の試行（初回読み込み時のみ、無限ループ防止）
+        if (context === 'performDataLoad' && currentDataLength > 0 && domCardCount < currentDataLength / 2) {
+          debugLog('🔧 DOM-Data不整合を自動修復中...', {
+            expectedData: currentDataLength,
+            actualDOM: domCardCount,
+            trigger: 'auto_repair'
+          });
+          
+          // 次のフレームで修復実行（非同期で実行）
+          requestAnimationFrame(() => {
+            this.attemptConsistencyRepair(currentDataLength, domCardCount, context);
+          });
+        }
       }
 
       return metrics;
+    }
+
+    // 🔧 DOM-Data整合性の自動修復メソッド
+    attemptConsistencyRepair(expectedData, actualDOM, context) {
+      try {
+        debugLog('🔧 整合性修復開始:', { expectedData, actualDOM, context });
+        
+        // スケルトンやローディングカードを除去
+        const container = this.elements.answersContainer;
+        if (container) {
+          const skeletons = container.querySelectorAll('.skeleton, .loading');
+          if (skeletons.length > 0) {
+            debugLog('🧹 修復：スケルトンカード削除', skeletons.length + '個');
+            skeletons.forEach(skeleton => skeleton.remove());
+          }
+          
+          // データが存在するがDOMが少ない場合、再レンダリングを強制
+          if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
+            debugLog('🔄 修復：データ再レンダリング実行', this.state.currentAnswers.length + '件');
+            this.renderBoard(this.state.currentAnswers, []);
+          }
+        }
+        
+        debugLog('✅ 整合性修復完了');
+        
+      } catch (error) {
+        console.warn('⚠️ 整合性修復中にエラー:', error.message);
+        // エラーが発生してもシステムを停止させない
+      }
     }
 
     // Cache hit/miss tracking (Phase 4.1)
@@ -4191,6 +4234,13 @@
 
               this.lastDataLoadTime = Date.now();
 
+              // 🧹 データ読み込み成功時：スケルトンカードの確実なクリア
+              const existingSkeletons = container.querySelectorAll('.skeleton, .answer-card.loading');
+              if (existingSkeletons.length > 0) {
+                debugLog('🧹 データ読み込み成功：', existingSkeletons.length, '個のスケルトンカードをクリア');
+                existingSkeletons.forEach(skeleton => skeleton.remove());
+              }
+
               if (isInitialLoad) {
                 // 初期データロード完了フラグを設定
                 this.initialDataLoaded = true;
@@ -5082,8 +5132,18 @@
       }
 
       const scrollTop = container.scrollTop;
-      const containerHeight = container.clientHeight;
+      let containerHeight = container.clientHeight;
       const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
+
+      // 🔧 containerHeight=0問題の解決：より堅牢なフォールバック
+      if (containerHeight <= 0) {
+        // offsetHeight, getBoundingClientRect等でも試行
+        containerHeight = container.offsetHeight || 
+                         container.getBoundingClientRect().height || 
+                         window.innerHeight || 600; // 最終フォールバック値
+        
+        debugLog(`🔧 containerHeight修復: ${containerHeight}px (元値: ${container.clientHeight}px)`);
+      }
 
       let startIndex = 0;
       let endIndex = totalItems;
@@ -5092,9 +5152,9 @@
         startIndex = Math.floor(scrollTop / cardHeight);
         endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
       } else {
-        console.warn(
-          'calculateVisibleRange: containerHeight is 0, rendering all items as fallback.'
-        );
+        // 最終手段：小さなバッチサイズでレンダリング
+        endIndex = Math.min(totalItems, 20); // 初回表示は20個まで
+        debugLog('calculateVisibleRange: フォールバック - 20個制限でレンダリング');
       }
 
       return { startIndex, endIndex };
