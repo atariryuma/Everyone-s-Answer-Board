@@ -51,9 +51,8 @@ function determineSetupStep(userInfo, configJson) {
     return 1;
   }
 
-  // Step 2: データソース設定済み + (再設定中 OR セットアップ未完了)
+  // Step 2: データソース設定済み + セットアップ未完了
   if (
-    setupStatus === 'reconfiguring' ||
     setupStatus !== 'completed' ||
     !config.formCreated
   ) {

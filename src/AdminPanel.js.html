@@ -1944,20 +1944,18 @@
   function updateConfigSummary(config) {
     try {
       // セットアップステータス更新
-      const setupStatus = config?.setupStatus || 'incomplete';
+      const setupStatus = config?.setupStatus || 'pending';
       const badge = document.querySelector('.config-summary .status-badge');
       if (badge) {
         const statusText = {
-          complete: '公開準備完了',
-          setup_completed: '公開準備完了',
+          completed: '公開準備完了',
           published: '公開中',
-          incomplete: '設定中',
           pending: '設定中',
         };
 
         badge.className =
           'status-badge ' +
-          (setupStatus === 'complete' || setupStatus === 'setup_completed'
+          (setupStatus === 'completed'
             ? 'published'
             : 'unpublished');
         badge.textContent = statusText[setupStatus] || '設定中';

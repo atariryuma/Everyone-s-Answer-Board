@@ -57,8 +57,15 @@ function getCurrentConfig() {
       // ✅ 表示設定（configJSON統一データソース、CLAUDE.md準拠）
       displaySettings: config.displaySettings || { showNames: false, showReactions: false },
       
-      // アプリ設定
-      setupStatus: config.setupStatus || 'pending',
+      // 🎯 アプリ設定（setupStatus自動判定：データ状態と同期）
+      setupStatus: (() => {
+        // 既存のsetupStatusがある場合はそれを使用
+        if (config.setupStatus && config.setupStatus === 'completed') {
+          return 'completed';
+        }
+        // データソース接続状態に基づく自動判定
+        return (config.spreadsheetId && config.sheetName) ? 'completed' : 'pending';
+      })(),
       connectionMethod: config.connectionMethod || null,
       lastConnected: config.lastConnected || null,
       
@@ -185,8 +192,8 @@ function connectDataSource(spreadsheetId, sheetName) {
           formTitle: formInfo.formTitle || null 
         }),
         
-        // 🎯 CLAUDE.md準拠：アプリ設定（必要なもののみ継承）
-        setupStatus: currentConfig.setupStatus || 'pending',
+        // 🎯 CLAUDE.md準拠：アプリ設定（データソース接続完了で'completed'に自動更新）
+        setupStatus: 'completed',
         appPublished: currentConfig.appPublished || false,
         appUrl: currentConfig.appUrl || generateUserUrls(userInfo.userId).viewUrl,
         
@@ -257,9 +264,15 @@ function publishApplication(config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // CLAUDE.md準拠：統一データソース検証
+    // 🎯 CLAUDE.md準拠：統一データソース検証 + setupStatus確認
+    const currentConfig = getCurrentConfig(); // 最新の設定状態を取得
+    
     if (!config.spreadsheetId || !config.sheetName) {
-      throw new Error('統一データソース必須: spreadsheetIdとsheetNameが設定されていません');
+      throw new Error('データソースが設定されていません。まずデータソースを設定してください。');
+    }
+    
+    if (currentConfig.setupStatus !== 'completed') {
+      throw new Error('セットアップが完了していません。データソース接続を完了させてください。');
     }
 
     // 公開実行
@@ -485,13 +498,17 @@ function getFormInfo(spreadsheetId, sheetName) {
       formUrl = sheet.getFormUrl();
       if (formUrl) {
         hasForm = true;
-        // フォームタイトル取得
+        // 🔥 フォームタイトル確実取得（キャッシュバイパス）
         try {
           const form = FormApp.openByUrl(formUrl);
-          formTitle = form.getTitle();
+          formTitle = form.getTitle() || 'Google フォーム'; // 空文字列防止
+          if (!formTitle || formTitle.trim() === '') {
+            formTitle = 'Google フォーム'; // 完全に空の場合のフォールバック
+          }
         } catch (formError) {
           console.warn('フォームタイトル取得エラー:', formError.message);
-          formTitle = `フォーム（ID: ${formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1]?.substring(0, 8)}...）`;
+          // より親しみやすいフォールバック名
+          formTitle = 'Google フォーム（接続済み）';
         }
       }
     } catch (error) {

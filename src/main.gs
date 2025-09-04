@@ -982,12 +982,12 @@ function renderAnswerBoard(userInfo, params) {
     template.DIAGNOSTIC_INFO = {
       hasSpreadsheetId: !!(finalSpreadsheetId && finalSpreadsheetId !== 'null'),
       hasSheetName: !!(finalSheetName && finalSheetName !== 'null'),
-      setupStatus: config.setupStatus || 'incomplete',
+      setupStatus: config.setupStatus || 'pending',
       appPublished: config.appPublished || false,
       suggestedAction: getSuggestedAction({
         hasSpreadsheetId: !!(finalSpreadsheetId && finalSpreadsheetId !== 'null'),
         hasSheetName: !!(finalSheetName && finalSheetName !== 'null'),
-        setupStatus: config.setupStatus || 'incomplete',
+        setupStatus: config.setupStatus || 'pending',
         appPublished: config.appPublished || false
       }),
       systemHealthy: hasUserConfig && config.appPublished
