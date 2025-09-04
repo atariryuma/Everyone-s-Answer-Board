@@ -41,6 +41,12 @@ const CORE = Object.freeze({
     NOT_FOUND: 404,
     INTERNAL_ERROR: 500,
   }),
+  
+  // スコア計算設定
+  SCORING_CONFIG: Object.freeze({
+    LIKE_MULTIPLIER_FACTOR: 0.1,    // いいね！のスコア倍率
+    RANDOM_SCORE_FACTOR: 0.001,     // ランダム要素の範囲
+  }),
 });
 
 /**

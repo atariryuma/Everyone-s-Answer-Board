@@ -2741,7 +2741,7 @@ function calculateRowScore(rowData) {
   const baseScore = 1.0;
 
   // いいね！による加算
-  const likeBonus = rowData.likeCount * SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
+  const likeBonus = rowData.likeCount * CORE.SCORING_CONFIG.LIKE_MULTIPLIER_FACTOR;
 
   // その他のリアクションも軽微な加算
   const reactionBonus = (rowData.understandCount + rowData.curiousCount) * 0.01;
@@ -2750,7 +2750,7 @@ function calculateRowScore(rowData) {
   const highlightBonus = rowData.isHighlighted ? 0.5 : 0;
 
   // ランダム要素（同じスコアの項目をランダムに並べるため）
-  const randomFactor = Math.random() * SCORING_CONFIG.RANDOM_SCORE_FACTOR;
+  const randomFactor = Math.random() * CORE.SCORING_CONFIG.RANDOM_SCORE_FACTOR;
 
   return baseScore + likeBonus + reactionBonus + highlightBonus + randomFactor;
 }
