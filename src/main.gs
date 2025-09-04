@@ -47,6 +47,32 @@ function doGet(e) {
 
     // モードに応じたルーティング
     switch (params.mode) {
+      case 'debug':
+        // 🔍 デバッグモード：現在のユーザー情報を表示
+        try {
+          const currentUserEmail = User.email();
+          const userByEmail = DB.findUserByEmail(currentUserEmail);
+          const debugData = {
+            current_user_email: currentUserEmail,
+            user_exists_in_db: !!userByEmail,
+            user_data: userByEmail ? {
+              userId: userByEmail.userId,
+              userEmail: userByEmail.userEmail,
+              isActive: userByEmail.isActive,
+              hasConfig: !!userByEmail.parsedConfig
+            } : null,
+            suggestion: !userByEmail ? 'ユーザー登録が必要です。mode=loginでアクセスしてください。' : 'データは正常です'
+          };
+          
+          return HtmlService.createHtmlOutput(`
+            <h2>Debug Info</h2>
+            <pre>${JSON.stringify(debugData, null, 2)}</pre>
+            ${userByEmail ? `<p><a href="?mode=admin&userId=${userByEmail.userId}">管理パネルにアクセス</a></p>` : ''}
+          `);
+        } catch (error) {
+          return HtmlService.createHtmlOutput(`<h2>Debug Error</h2><pre>${error.message}</pre>`);
+        }
+        
       case 'admin':
         console.log('doGet - Admin mode detected, userId:', params.userId);
         if (!params.userId) {
@@ -55,12 +81,37 @@ function doGet(e) {
         try {
           const currentUserEmail = User.email();
           console.log('doGet - Current user email:', currentUserEmail);
+          
+          // 🔍 デバッグ情報取得
+          const debugInfo = {
+            params_userId: params.userId,
+            current_email: currentUserEmail,
+            user_from_db: null,
+            db_email: null
+          };
+          
+          try {
+            debugInfo.user_from_db = DB.findUserById(params.userId);
+            debugInfo.db_email = debugInfo.user_from_db?.userEmail;
+          } catch (dbError) {
+            console.error('DB查询错误:', dbError.message);
+          }
+          
           const accessResult = App.getAccess().verifyAccess(params.userId, 'admin', currentUserEmail);
           if (!accessResult.allowed) {
             console.warn('Admin access denied:', accessResult);
-            return HtmlService.createHtmlOutput(
-              '<h3>Access Denied</h3><p>Admin access is not allowed for this user.</p>'
-            );
+            console.warn('Debug info:', debugInfo);
+            
+            // 🔍 詳細なデバッグ情報を含むエラーページ
+            return HtmlService.createHtmlOutput(`
+              <h3>Access Denied</h3>
+              <p>Admin access is not allowed for this user.</p>
+              <details>
+                <summary>Debug Info (開発用)</summary>
+                <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
+                <pre>Access Result: ${JSON.stringify(accessResult, null, 2)}</pre>
+              </details>
+            `);
           }
 
           // ユーザー情報変換
