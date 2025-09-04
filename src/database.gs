@@ -1220,3 +1220,119 @@ function updateUserFields(userId, fields) {
     throw error;
   }
 }
+
+/**
+ * スプレッドシート情報取得（Sheets API使用）
+ * @param {Object} service - Sheetsサービスオブジェクト
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Object} スプレッドシート情報
+ */
+function getSpreadsheetsData(service, spreadsheetId) {
+  try {
+    // 入力パラメータ検証強化
+    if (!service) {
+      throw new Error('Sheetsサービスオブジェクトが提供されていません');
+    }
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      throw new Error('無効なspreadsheetIDです');
+    }
+
+    // 防御的プログラミング: サービスオブジェクトのプロパティを安全に取得
+    const baseUrl = service.baseUrl;
+    const accessToken = service.accessToken;
+
+    // baseUrlが失われている場合の防御処理
+    if (!baseUrl || typeof baseUrl !== 'string') {
+      console.warn(
+        '⚠️ baseUrlが見つかりません。デフォルトのGoogleSheetsAPIエンドポイントを使用します'
+      );
+      service.baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+    }
+
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new Error(
+        'アクセストークンが見つかりません。サービスオブジェクトが破損している可能性があります'
+      );
+    }
+
+    // 安全なURL構築 - シート情報を含む基本的なメタデータを取得するために fields パラメータを追加
+    const url = `${service.baseUrl}/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties`;
+
+    const response = UrlFetchApp.fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      muteHttpExceptions: true,
+      followRedirects: true,
+      validateHttpsCertificates: true,
+    });
+
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+
+    if (responseCode !== 200) {
+      console.error('Sheets API エラー詳細:', {
+        code: responseCode,
+        response: responseText,
+        url: url.substring(0, 100) + '...',
+        spreadsheetId: spreadsheetId,
+      });
+
+      if (responseCode === 403) {
+        try {
+          const errorResponse = JSON.parse(responseText);
+          if (
+            errorResponse.error &&
+            errorResponse.error.message === 'The caller does not have permission'
+          ) {
+            const serviceAccountEmail = getServiceAccountEmail();
+            throw new Error(
+              `スプレッドシートへのアクセス権限がありません。サービスアカウント（${serviceAccountEmail}）をスプレッドシートの編集者として共有してください。`
+            );
+          }
+        } catch (parseError) {
+          console.warn('エラーレスポンスのJSON解析に失敗:', parseError.message);
+        }
+      }
+
+      throw new Error(`Sheets API error: ${responseCode} - ${responseText}`);
+    }
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON解析エラー:', parseError.message);
+      console.error('❌ Response text:', responseText.substring(0, 200));
+      throw new Error(`APIレスポンスのJSON解析に失敗: ${parseError.message}`);
+    }
+
+    // レスポンス構造の検証
+    if (!result || typeof result !== 'object') {
+      throw new Error(
+        `無効なAPIレスポンス: オブジェクトが期待されましたが ${typeof result} を受信`
+      );
+    }
+
+    if (!result.sheets || !Array.isArray(result.sheets)) {
+      console.warn('⚠️ sheets配列が見つからないか、配列でありません:', typeof result.sheets);
+      result.sheets = []; // 空配列を設定してエラーを避ける
+    }
+
+    const sheetCount = result.sheets.length;
+    console.log('✅ getSpreadsheetsData 成功: 発見シート数:', sheetCount);
+
+    if (sheetCount === 0) {
+      console.warn('⚠️ スプレッドシートにシートが見つかりませんでした');
+    } else {
+      console.log(
+        '📋 利用可能なシート:',
+        result.sheets.map((s) => s.properties?.title || 'Unknown').join(', ')
+      );
+    }
+
+    return result;
+  } catch (error) {
+    console.error('❌ getSpreadsheetsData error:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    throw new Error(`スプレッドシート情報取得に失敗しました: ${error.message}`);
+  }
+}

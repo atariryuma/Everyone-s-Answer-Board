@@ -414,4 +414,56 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
   }
 }
 
+/**
+ * サービスアカウントのメールアドレス取得
+ * @returns {string} サービスアカウントのメールアドレス
+ */
+function getServiceAccountEmail() {
+  try {
+    const serviceAccountCreds = getSecureServiceAccountCreds();
+    return serviceAccountCreds.client_email || 'メールアドレス不明';
+  } catch (error) {
+    console.warn('サービスアカウントメール取得エラー:', error.message);
+    return 'メールアドレス取得エラー';
+  }
+}
+
+/**
+ * サービスアカウントをスプレッドシートに編集者として追加
+ * @param {string} spreadsheetId - スプレッドシートID
+ */
+function addServiceAccountToSpreadsheet(spreadsheetId) {
+  try {
+    const serviceAccountEmail = getServiceAccountEmail();
+    if (serviceAccountEmail === 'メールアドレス取得エラー') {
+      console.warn(
+        'サービスアカウントのメールアドレスが取得できないため、スプレッドシートの共有をスキップします。'
+      );
+      return;
+    }
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const permissions = spreadsheet.getEditors();
+    const isAlreadyEditor = permissions.some((editor) => editor.getEmail() === serviceAccountEmail);
+
+    if (!isAlreadyEditor) {
+      spreadsheet.addEditor(serviceAccountEmail);
+      console.log(
+        `✅ サービスアカウント (${serviceAccountEmail}) をスプレッドシート (${spreadsheetId}) に編集者として追加しました。`
+      );
+    } else {
+      console.log(
+        `サービスアカウント (${serviceAccountEmail}) は既にスプレッドシート (${spreadsheetId}) の編集者です。`
+      );
+    }
+  } catch (error) {
+    console.error(
+      `サービスアカウントをスプレッドシート (${spreadsheetId}) に共有中にエラーが発生しました: ${error.message}`
+    );
+    throw new Error(
+      `サービスアカウントをスプレッドシートに共有できませんでした。手動で ${getServiceAccountEmail()} を編集者として追加してください。`
+    );
+  }
+}
+
 console.log('🔐 簡略化されたセキュリティシステムが初期化されました');
