@@ -5031,9 +5031,8 @@
 
     performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
       const container = this.elements.answersContainer;
-      container.innerHTML = ''; // ここでコンテナをクリア
-
-      // 既存カードのマップを作成（リアクション状態を保持）
+      
+      // 🔥 緊急修正: DOM クリア前に既存カードのマップを作成
       const existingMap = new Map();
       container.querySelectorAll('.answer-card').forEach((card) => {
         existingMap.set(card.dataset.rowIndex, card);
@@ -5046,6 +5045,9 @@
           existingMap.delete(id);
         }
       });
+      
+      // 🔥 緊急修正: 既存カードマップ取得後にコンテナをクリア
+      container.innerHTML = '';
 
       // メインレンダリング処理
       if (newRows.length > RENDER_BATCH_SIZE) {
