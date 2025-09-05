@@ -886,6 +886,81 @@ const SystemManager = {
       };
     }
   },
+
+  /**
+   * 🚨 重複configJsonネスト修正（緊急修正）
+   * configJSON内に不正にネストされたconfigJsonフィールドを除去
+   * @returns {Object} 修正結果
+   */
+  fixConfigJsonNesting() {
+    console.log('🔧 SystemManager.fixConfigJsonNesting: 重複ネスト修正開始');
+    
+    try {
+      const users = DB.getAllUsers();
+      const results = {
+        total: users.length,
+        fixed: 0,
+        errors: [],
+        details: []
+      };
+
+      for (const user of users) {
+        try {
+          const config = JSON.parse(user.configJson || '{}');
+          
+          // configJsonフィールドが存在する場合は除去
+          if ('configJson' in config) {
+            console.log(`🚨 重複ネスト発見: ${user.userId}`);
+            delete config.configJson;
+            
+            // ConfigManager経由で修正保存
+            const success = ConfigManager.saveConfig(user.userId, config);
+            
+            if (success) {
+              results.fixed++;
+              results.details.push({
+                userId: user.userId,
+                userEmail: user.userEmail,
+                status: 'fixed'
+              });
+              console.log(`✅ 修正完了: ${user.userEmail}`);
+            } else {
+              results.errors.push({
+                userId: user.userId,
+                userEmail: user.userEmail,
+                error: '保存失敗'
+              });
+            }
+          }
+        } catch (error) {
+          results.errors.push({
+            userId: user.userId,
+            userEmail: user.userEmail,
+            error: error.message
+          });
+        }
+      }
+
+      console.log('✅ SystemManager.fixConfigJsonNesting: 修正完了', {
+        total: results.total,
+        fixed: results.fixed,
+        errors: results.errors.length
+      });
+
+      return {
+        success: results.errors.length === 0,
+        ...results,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('❌ SystemManager.fixConfigJsonNesting: エラー:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 };
 
 // =============================================================================
@@ -1116,81 +1191,5 @@ function cleanupConfigJsonData(userId = null) {
   } catch (error) {
     console.error('❌ configJSON完全クリーンアップエラー:', error.message);
     throw error;
-  }
-},
-
-  /**
-   * 🚨 重複configJsonネスト修正（緊急修正）
-   * configJSON内に不正にネストされたconfigJsonフィールドを除去
-   * @returns {Object} 修正結果
-   */
-  fixConfigJsonNesting() {
-    console.log('🔧 SystemManager.fixConfigJsonNesting: 重複ネスト修正開始');
-    
-    try {
-      const users = DB.getAllUsers();
-      const results = {
-        total: users.length,
-        fixed: 0,
-        errors: [],
-        details: []
-      };
-
-      for (const user of users) {
-        try {
-          const config = JSON.parse(user.configJson || '{}');
-          
-          // configJsonフィールドが存在する場合は除去
-          if ('configJson' in config) {
-            console.log(`🚨 重複ネスト発見: ${user.userId}`);
-            delete config.configJson;
-            
-            // ConfigManager経由で修正保存
-            const success = ConfigManager.saveConfig(user.userId, config);
-            
-            if (success) {
-              results.fixed++;
-              results.details.push({
-                userId: user.userId,
-                userEmail: user.userEmail,
-                status: 'fixed'
-              });
-              console.log(`✅ 修正完了: ${user.userEmail}`);
-            } else {
-              results.errors.push({
-                userId: user.userId,
-                userEmail: user.userEmail,
-                error: '保存失敗'
-              });
-            }
-          }
-        } catch (error) {
-          results.errors.push({
-            userId: user.userId,
-            userEmail: user.userEmail,
-            error: error.message
-          });
-        }
-      }
-
-      console.log('✅ SystemManager.fixConfigJsonNesting: 修正完了', {
-        total: results.total,
-        fixed: results.fixed,
-        errors: results.errors.length
-      });
-
-      return {
-        success: results.errors.length === 0,
-        ...results,
-        timestamp: new Date().toISOString()
-      };
-
-    } catch (error) {
-      console.error('❌ SystemManager.fixConfigJsonNesting: エラー:', error.message);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
   }
 }
