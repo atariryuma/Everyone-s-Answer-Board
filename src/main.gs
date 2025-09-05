@@ -94,123 +94,20 @@ function doGet(e) {
               `<p><strong>⚠️ データ不整合検出</strong></p>
                <p><a href="?mode=fix_user&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔧 ユーザーデータを修正</a></p>` : ''}
             <hr>
-            <h3>🔧 システム修正ツール</h3>
-            <p><a href="?mode=fix_config" style="background:orange;color:white;padding:10px;text-decoration:none;">🔧 configJSON重複ネスト問題を修正</a></p>
-            ${userByEmail ? `
-              <p><a href="?mode=reset_config&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔄 ユーザー設定をデフォルトにリセット</a></p>
-              <p><small>対象ユーザーID: ${userByEmail.userId}</small></p>
-            ` : '<p><em>ユーザーが見つからないため、リセット機能は利用できません</em></p>'}
-            <p><a href="?mode=system_check" style="background:blue;color:white;padding:10px;text-decoration:none;">🔍 システム診断実行</a></p>
+            <h3>🔧 GAS実行用関数</h3>
+            <p><strong>GASエディタから直接実行してください：</strong></p>
+            <ul>
+              <li><code>testSystemStatus()</code> - システム診断</li>
+              <li><code>fixConfigJsonNesting()</code> - configJSON重複修正</li>
+              <li><code>resetCurrentUserToDefault()</code> - 現在のユーザーをリセット</li>
+              <li><code>resetUserToDefault(userId)</code> - 指定ユーザーをリセット</li>
+            </ul>
+            ${userByEmail ? `<p><small>現在のユーザーID: ${userByEmail.userId}</small></p>` : ''}
           `);
         } catch (error) {
           return HtmlService.createHtmlOutput(`<h2>Debug Error</h2><pre>${error.message}</pre>`);
         }
 
-      case 'fix_config':
-        // 🔧 緊急修正：configJson重複ネスト問題の修正
-        try {
-          console.log('🔧 configJson重複ネスト修正開始');
-          const results = SystemManager.fixConfigJsonNesting();
-          
-          return HtmlService.createHtmlOutput(`
-            <h2>✅ configJson重複ネスト修正完了</h2>
-            <h3>修正結果:</h3>
-            <pre>${JSON.stringify(results, null, 2)}</pre>
-            <p><strong>総ユーザー数:</strong> ${results.total}</p>
-            <p><strong>修正済み:</strong> ${results.fixed}</p>
-            <p><strong>エラー:</strong> ${results.errors.length}</p>
-            ${results.errors.length > 0 ? `
-              <h4>エラー詳細:</h4>
-              <pre>${JSON.stringify(results.errors, null, 2)}</pre>
-            ` : ''}
-            <p><a href="?mode=debug">デバッグページに戻る</a></p>
-          `);
-        } catch (error) {
-          console.error('configJson修正エラー:', error);
-          return HtmlService.createHtmlOutput(`
-            <h2>❌ configJson修正エラー</h2>
-            <pre>${error.message}</pre>
-            <p><a href="?mode=debug">デバッグページに戻る</a></p>
-          `);
-        }
-        
-      case 'reset_config':
-        // 🔄 ユーザー設定デフォルトリセット
-        try {
-          console.log('🔄 reset_config パラメータ確認:', {
-            userId: params.userId,
-            allParams: params,
-            originalEvent: e ? e.parameter : 'no event'
-          });
-          
-          if (!params.userId) {
-            return HtmlService.createHtmlOutput(`
-              <h2>Error</h2>
-              <p>userIdが必要です</p>
-              <h3>デバッグ情報:</h3>
-              <pre>params: ${JSON.stringify(params, null, 2)}</pre>
-              <pre>event: ${JSON.stringify(e ? e.parameter : 'no event', null, 2)}</pre>
-              <p><a href="?mode=debug">デバッグページに戻る</a></p>
-            `);
-          }
-          
-          console.log('🔄 ユーザー設定デフォルトリセット開始');
-          const results = SystemManager.resetUserConfigToDefault(params.userId);
-          
-          return HtmlService.createHtmlOutput(`
-            <h2>${results.success ? '✅' : '❌'} ユーザー設定リセット${results.success ? '完了' : 'エラー'}</h2>
-            <h3>リセット結果:</h3>
-            <pre>${JSON.stringify(results, null, 2)}</pre>
-            ${results.success ? `
-              <p><strong>ユーザーEmail:</strong> ${results.userEmail}</p>
-              <p><strong>リセット内容:</strong> 全設定をデフォルト値に初期化</p>
-              <p><strong>効果:</strong> configJSON重複問題も完全解決</p>
-            ` : `
-              <p><strong>エラー:</strong> ${results.error}</p>
-            `}
-            <p><a href="?mode=debug">デバッグページに戻る</a></p>
-          `);
-        } catch (error) {
-          console.error('設定リセットエラー:', error);
-          return HtmlService.createHtmlOutput(`
-            <h2>❌ 設定リセットエラー</h2>
-            <pre>${error.message}</pre>
-            <p><a href="?mode=debug">デバッグページに戻る</a></p>
-          `);
-        }
-        
-      case 'system_check':
-        // 🔍 システム診断実行
-        try {
-          console.log('🔍 システム診断実行');
-          const diagnostics = runSystemDiagnostics();
-          
-          return HtmlService.createHtmlOutput(`
-            <h2>🔍 システム診断結果</h2>
-            <h3>セキュリティチェック:</h3>
-            <pre>${JSON.stringify(diagnostics.security, null, 2)}</pre>
-            
-            <h3>データベースチェック:</h3>
-            <pre>${JSON.stringify(diagnostics.database, null, 2)}</pre>
-            
-            <h3>ユーザー統計:</h3>
-            <pre>${JSON.stringify(diagnostics.userStats, null, 2)}</pre>
-            
-            <h3>設定整合性:</h3>
-            <pre>${JSON.stringify(diagnostics.configIntegrity, null, 2)}</pre>
-            
-            <p><strong>システム状態:</strong> ${(diagnostics.security.isComplete && diagnostics.database.success) ? '✅ 正常' : '⚠️ 要注意'}</p>
-            <p><a href="?mode=debug">デバッグページに戻る</a></p>
-          `);
-        } catch (error) {
-          console.error('システム診断エラー:', error);
-          return HtmlService.createHtmlOutput(`
-            <h2>❌ システム診断エラー</h2>
-            <pre>${error.message}</pre>
-            <p><a href="?mode=debug">デバッグページに戻る</a></p>
-          `);
-        }
-        
       case 'fix_user':
         // 🔧 緊急修正：ユーザーデータの修正
         try {

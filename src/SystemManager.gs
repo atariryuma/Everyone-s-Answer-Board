@@ -359,27 +359,14 @@ const SystemManager = {
 };
 
 // =============================================================================
-// グローバルアクセス関数（Web UI用）
+// GAS直接実行用のシンプル関数
 // =============================================================================
 
 /**
- * Web UI用のconfigJSON修正関数
+ * 🔍 システム診断（GAS直接実行用）
+ * GASエディタから直接実行してください
  */
-function fixConfigJsonNesting() {
-  return SystemManager.fixConfigJsonNesting();
-}
-
-/**
- * Web UI用のデフォルトリセット関数
- */
-function resetUserConfigToDefault(userId) {
-  return SystemManager.resetUserConfigToDefault(userId);
-}
-
-/**
- * システム診断関数（管理用）
- */
-function runSystemDiagnostics() {
+function testSystemStatus() {
   console.log('🔍 システム診断実行開始');
   
   const diagnostics = {
@@ -391,5 +378,95 @@ function runSystemDiagnostics() {
   };
   
   console.log('🔍 システム診断完了:', diagnostics);
+  console.log('✅ セキュリティ:', diagnostics.security.isComplete ? '正常' : '要修正');
+  console.log('✅ データベース:', diagnostics.database.success ? '正常' : '要修正');
+  console.log('👥 ユーザー数:', `合計${diagnostics.userStats.total}名（アクティブ${diagnostics.userStats.active}名）`);
+  
   return diagnostics;
+}
+
+/**
+ * 🔧 configJSON重複ネスト修正（GAS直接実行用）
+ * GASエディタから直接実行してください
+ */
+function fixConfigJsonNesting() {
+  console.log('🔧 configJSON重複ネスト修正開始');
+  const result = SystemManager.fixConfigJsonNesting();
+  
+  console.log('修正結果:', {
+    総ユーザー数: result.total,
+    修正済み: result.fixed,
+    エラー: result.errors.length
+  });
+  
+  if (result.fixed > 0) {
+    console.log(`✅ ${result.fixed}名のユーザーの重複ネストを修正しました`);
+  }
+  if (result.errors.length > 0) {
+    console.warn('❌ エラーが発生したユーザー:', result.errors);
+  }
+  
+  return result;
+}
+
+/**
+ * 🔄 現在のユーザー設定をデフォルトにリセット（GAS直接実行用）
+ * GASエディタから直接実行してください
+ */
+function resetCurrentUserToDefault() {
+  try {
+    // 現在のユーザーを取得
+    const currentEmail = UserManager.getCurrentEmail();
+    if (!currentEmail) {
+      console.error('❌ 認証されたユーザーが見つかりません');
+      return { success: false, error: '認証されたユーザーが見つかりません' };
+    }
+    
+    const user = DB.findUserByEmail(currentEmail);
+    if (!user) {
+      console.error('❌ データベースにユーザーが見つかりません:', currentEmail);
+      return { success: false, error: 'データベースにユーザーが見つかりません' };
+    }
+    
+    console.log('🔄 現在のユーザーをデフォルトリセット:', currentEmail);
+    const result = SystemManager.resetUserConfigToDefault(user.userId);
+    
+    if (result.success) {
+      console.log('✅ デフォルトリセット完了');
+      console.log('📄 設定内容:', result.defaultConfig);
+    } else {
+      console.error('❌ リセット失敗:', result.error);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error('❌ resetCurrentUserToDefault エラー:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🔄 指定ユーザーIDの設定をデフォルトにリセット（GAS直接実行用）
+ * 使用方法: resetUserToDefault('f3dad965-d8d2-411c-a8b0-b8728b231821')
+ */
+function resetUserToDefault(userId) {
+  if (!userId) {
+    console.error('❌ userIdを指定してください');
+    console.log('使用方法: resetUserToDefault("f3dad965-d8d2-411c-a8b0-b8728b231821")');
+    return { success: false, error: 'userIdが必要です' };
+  }
+  
+  console.log('🔄 指定ユーザーをデフォルトリセット:', userId);
+  const result = SystemManager.resetUserConfigToDefault(userId);
+  
+  if (result.success) {
+    console.log('✅ デフォルトリセット完了');
+    console.log('📧 対象ユーザー:', result.userEmail);
+    console.log('📄 設定内容:', result.defaultConfig);
+  } else {
+    console.error('❌ リセット失敗:', result.error);
+  }
+  
+  return result;
 }
