@@ -93,9 +93,40 @@ function doGet(e) {
             ${userByEmail && (!userByEmail.userEmail || !userByEmail.isActive) ? 
               `<p><strong>⚠️ データ不整合検出</strong></p>
                <p><a href="?mode=fix_user&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔧 ユーザーデータを修正</a></p>` : ''}
+            <hr>
+            <h3>🔧 システム修正ツール</h3>
+            <p><a href="?mode=fix_config" style="background:orange;color:white;padding:10px;text-decoration:none;">🔧 configJSON重複ネスト問題を修正</a></p>
           `);
         } catch (error) {
           return HtmlService.createHtmlOutput(`<h2>Debug Error</h2><pre>${error.message}</pre>`);
+        }
+
+      case 'fix_config':
+        // 🔧 緊急修正：configJson重複ネスト問題の修正
+        try {
+          console.log('🔧 configJson重複ネスト修正開始');
+          const results = SystemManager.fixConfigJsonNesting();
+          
+          return HtmlService.createHtmlOutput(`
+            <h2>✅ configJson重複ネスト修正完了</h2>
+            <h3>修正結果:</h3>
+            <pre>${JSON.stringify(results, null, 2)}</pre>
+            <p><strong>総ユーザー数:</strong> ${results.total}</p>
+            <p><strong>修正済み:</strong> ${results.fixed}</p>
+            <p><strong>エラー:</strong> ${results.errors.length}</p>
+            ${results.errors.length > 0 ? `
+              <h4>エラー詳細:</h4>
+              <pre>${JSON.stringify(results.errors, null, 2)}</pre>
+            ` : ''}
+            <p><a href="?mode=debug">デバッグページに戻る</a></p>
+          `);
+        } catch (error) {
+          console.error('configJson修正エラー:', error);
+          return HtmlService.createHtmlOutput(`
+            <h2>❌ configJson修正エラー</h2>
+            <pre>${error.message}</pre>
+            <p><a href="?mode=debug">デバッグページに戻る</a></p>
+          `);
         }
         
       case 'fix_user':

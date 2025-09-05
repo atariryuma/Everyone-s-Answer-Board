@@ -361,6 +361,12 @@ const ConfigManager = Object.freeze({
       // 基本検証
       const sanitized = { ...config };
       
+      // 🚨 重複ネスト防止: configJsonフィールドの除去
+      if ('configJson' in sanitized) {
+        console.warn('ConfigManager.validateAndSanitizeConfig: configJsonフィールドを除去（重複ネスト防止）');
+        delete sanitized.configJson;
+      }
+      
       // 必須タイムスタンプの確保
       if (!sanitized.createdAt) {
         sanitized.createdAt = new Date().toISOString();
