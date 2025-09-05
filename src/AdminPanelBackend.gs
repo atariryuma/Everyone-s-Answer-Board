@@ -412,10 +412,11 @@ function publishApplication(config) {
         lastModified: new Date().toISOString()
       };
 
-      // ConfigManager統一管理による公開状態更新
+      // ConfigManager統一管理による公開状態更新（データソース情報保護）
       ConfigManager.updateAppStatus(userInfo.userId, {
         appPublished: true,
-        setupStatus: 'completed'
+        setupStatus: 'completed',
+        preserveDataSource: true  // 🔒 connectDataSourceで保存されたデータソース情報を保護
       });
       
       console.log('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {

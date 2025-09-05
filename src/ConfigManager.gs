@@ -225,12 +225,12 @@ const ConfigManager = Object.freeze({
   },
 
   /**
-   * アプリステータス更新
+   * アプリステータス更新（データソース情報保護対応）
    * @param {string} userId - ユーザーID
-   * @param {Object} status - {appPublished, setupStatus, formUrl, formTitle}
+   * @param {Object} status - {appPublished, setupStatus, formUrl, formTitle, preserveDataSource}
    * @returns {boolean} 更新成功可否
    */
-  updateAppStatus(userId, { appPublished, setupStatus, formUrl, formTitle }) {
+  updateAppStatus(userId, { appPublished, setupStatus, formUrl, formTitle, preserveDataSource = true }) {
     const currentConfig = this.getUserConfig(userId);
     if (!currentConfig) return false;
 
@@ -238,11 +238,26 @@ const ConfigManager = Object.freeze({
       ...currentConfig,
       ...(appPublished !== undefined && { appPublished }),
       ...(setupStatus && { setupStatus }),
-      ...(formUrl && { formUrl }),
-      ...(formTitle && { formTitle }),
+      ...(formUrl !== undefined && { formUrl }),
+      ...(formTitle !== undefined && { formTitle }),
       ...(appPublished && { publishedAt: new Date().toISOString() }),
       lastModified: new Date().toISOString()
     };
+
+    // 🔒 データソース情報の明示的な保護（connectDataSource設定の保持）
+    if (preserveDataSource && currentConfig) {
+      const dataSourceFields = ['spreadsheetId', 'sheetName', 'spreadsheetUrl', 'columnMapping', 'opinionHeader'];
+      dataSourceFields.forEach(field => {
+        if (currentConfig[field] !== undefined && updatedConfig[field] === undefined) {
+          updatedConfig[field] = currentConfig[field];
+          console.log(`🔒 ConfigManager.updateAppStatus: ${field}を保護`, { 
+            userId, 
+            field, 
+            value: currentConfig[field] 
+          });
+        }
+      });
+    }
 
     return this.saveConfig(userId, updatedConfig);
   },
