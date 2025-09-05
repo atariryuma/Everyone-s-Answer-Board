@@ -626,7 +626,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       dataCount: formattedData.length,
       showCounts: result.showCounts,
     });
-    console.log('getPublishedSheetData: Returning result=%s', JSON.stringify(result));
     return result;
   } catch (e) {
     console.error(`公開シートデータ取得エラー: ${e.message}`);
