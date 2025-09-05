@@ -121,15 +121,16 @@ const ConfigManager = Object.freeze({
       
       // 🔧 修正: DB.updateUserInDatabaseを直接使用（updateUserではなく）
       // updateUserは個別フィールドマージ用、完全なconfigJson置き換えはupdateUserInDatabase
+      let success = false;
       try {
         DB.updateUserInDatabase(userId, {
           configJson: JSON.stringify(validatedConfig),
           lastModified: validatedConfig.lastModified
         });
-        const success = true;
+        success = true;
       } catch (dbError) {
         console.error('❌ ConfigManager.saveConfig: DB更新エラー:', dbError.message);
-        const success = false;
+        success = false;
       }
 
       if (success) {
