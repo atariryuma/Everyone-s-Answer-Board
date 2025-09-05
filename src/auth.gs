@@ -144,12 +144,11 @@ function getSetupStatusFromConfig(configJson) {
 }
 
 /**
- * ログインフローを処理し、適切なページにリダイレクトする
- * 既存ユーザーの設定を保護しつつ、セットアップ状況に応じたメッセージを表示
- * @param {string} userEmail ログインユーザーのメールアドレス
+ * 専用の管理パネルアクセス処理（クエリパラメータ mode=admin 必須）
+ * @param {string} userEmail ログインユーザーのメールアドレス  
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
-function processLoginFlow(userEmail) {
+function processAdminAccess(userEmail) {
   try {
     if (!userEmail) {
       throw new Error('ユーザーメールアドレスが指定されていません');

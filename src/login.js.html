@@ -48,35 +48,41 @@
       return new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler((response) => {
-            if (!response || !response.status) {
-              reject(
-                new Error(
-                  response && response.message ? response.message : 'ログイン処理に失敗しました'
-                )
-              );
+            if (!response || !response.success) {
+              // エラーメッセージを表示
+              const errorMsg = response?.message || 'ログイン処理に失敗しました';
+              userEmailDisplay.textContent = errorMsg;
+              userEmailDisplay.classList.add('text-red-400');
+              reject(new Error(errorMsg));
               return;
             }
 
-            if (response.status === 'existing_user' || response.status === 'setup_required') {
-              const msg =
-                response.status === 'setup_required'
-                  ? 'セットアップを完了してください'
-                  : 'ログインが完了しました';
-              showAdminPanelRedirect(response.adminUrl, msg);
-              resolve();
-            } else if (response.status === 'new_user_registered') {
-              // 新規ユーザーが自動登録された場合
-              showAdminPanelRedirect(response.adminUrl, response.message || '新規ユーザー登録が完了しました');
-              resolve();
-            } else if (response.status === 'registration_failed') {
-              // 登録に失敗した場合
-              reject(new Error(response.message || 'ユーザー登録に失敗しました'));
-            } else {
-              reject(new Error(response.message || 'ログイン処理に失敗しました'));
+            // ログイン成功: 管理パネルURLを表示
+            const successContainer = document.createElement('div');
+            successContainer.className = 'glass-panel rounded-xl p-6 mt-4 bg-green-500/10 border-green-400/30';
+            successContainer.innerHTML = `
+              <h3 class="text-green-400 font-semibold mb-2">✅ ${response.message}</h3>
+              <p class="text-cyan-300 mb-4">管理パネルにアクセスできます:</p>
+              <a href="${response.adminUrl}" 
+                 class="inline-block btn btn-primary font-bold py-2 px-4 rounded-lg">
+                管理パネルを開く
+              </a>
+            `;
+            
+            // ログインボタンを成功メッセージに置き換え
+            const loginBtn = document.getElementById('login-btn');
+            if (loginBtn && loginBtn.parentElement) {
+              loginBtn.parentElement.replaceChild(successContainer, loginBtn);
             }
+            
+            resolve();
           })
-          .withFailureHandler(reject)
-          .getLoginStatus();
+          .withFailureHandler((error) => {
+            userEmailDisplay.textContent = `エラー: ${error.message}`;
+            userEmailDisplay.classList.add('text-red-400');
+            reject(error);
+          })
+          .processLoginAction();
       });
     };
 

@@ -142,66 +142,70 @@ function doGet(e) {
         }
         
       case 'admin':
+        // 管理パネルモード: userIdが必須
         if (!params.userId) {
-          throw new Error('Admin mode requires userId parameter');
+          // userIdが無い場合はログイン画面へ
+          return renderLoginPage(params);
         }
+        
         try {
           const currentUserEmail = UserManager.getCurrentEmail();
-          
-          // 🔍 デバッグ情報取得
-          const debugInfo = {
-            params_userId: params.userId,
-            current_email: currentUserEmail,
-            user_from_db: null,
-            db_email: null
-          };
-          
-          try {
-            debugInfo.user_from_db = DB.findUserById(params.userId);
-            debugInfo.db_email = debugInfo.user_from_db?.userEmail;
-          } catch (dbError) {
-            console.error('DB查询错误:', dbError.message);
+          if (!currentUserEmail) {
+            // 未認証の場合はログイン画面へ
+            return renderLoginPage(params);
           }
           
+          // ユーザー検証（キャッシュバイパス）
+          const userInfo = DB.findUserByEmailNoCache(currentUserEmail);
+          if (!userInfo || userInfo.userId !== params.userId) {
+            // ユーザーが存在しないか、userIdが一致しない場合
+            return showErrorPage(
+              'アクセス拒否',
+              '管理パネルへのアクセス権限がありません'
+            );
+          }
+          
+          if (userInfo.isActive !== true) {
+            return showErrorPage(
+              'アカウントが無効です',
+              'あなたのアカウントは現在無効化されています。'
+            );
+          }
+
+          // アクセス検証
           const accessResult = App.getAccess().verifyAccess(params.userId, 'admin', currentUserEmail);
           if (!accessResult.allowed) {
-            console.warn('Admin access denied:', accessResult);
-            console.warn('Debug info:', debugInfo);
-            
-            // 🔍 詳細なデバッグ情報を含むエラーページ
-            return HtmlService.createHtmlOutput(`
-              <h3>Access Denied</h3>
-              <p>Admin access is not allowed for this user.</p>
-              <details>
-                <summary>Debug Info (開発用)</summary>
-                <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
-                <pre>Access Result: ${JSON.stringify(accessResult, null, 2)}</pre>
-              </details>
-            `);
+            return showErrorPage(
+              'アクセス拒否',
+              '管理パネルへのアクセス権限がありません'
+            );
           }
 
           // ユーザー情報変換
           const compatUserInfo = {
             userId: params.userId,
-            userEmail: accessResult.config?.userEmail || UserManager.getCurrentEmail(),
-            configJson: JSON.stringify(accessResult.config || {}),
+            userEmail: userInfo.userEmail,
+            configJson: userInfo.configJson,
           };
 
           return renderAdminPanel(compatUserInfo, 'admin');
         } catch (adminError) {
           console.error('Admin mode error:', adminError);
-          return HtmlService.createHtmlOutput(
-            `<h3>Error</h3><p>An error occurred in admin mode: ${adminError.message}</p>`
+          return showErrorPage(
+            '管理パネルエラー',
+            `管理パネルの表示中にエラーが発生しました: ${adminError.message}`
           );
         }
 
       case 'login':
-        return handleLoginFlow(params);
+        // ログインモード: 明示的にログイン画面を表示
+        return renderLoginPage(params);
 
       case 'view':
-      default:
+        // ビューモード: userIdが必要
         if (!params.userId) {
-          return handleLoginFlow(params);
+          // userIdがない場合はログイン画面へ
+          return renderLoginPage(params);
         }
 
         try {
@@ -236,6 +240,10 @@ function doGet(e) {
             `<h3>Error</h3><p>An error occurred: ${viewError.message}</p>`
           );
         }
+        
+      default:
+        // デフォルト: ログイン画面を表示
+        return renderLoginPage(params);
     }
   } catch (error) {
     console.error('doGet - Critical error:', error);
@@ -993,50 +1001,68 @@ function renderAdminPanel(userInfo, mode) {
 }
 
 /**
- * 🔄 シンプルログインフロー（常にDB直接検索）
- * ログイン時は常にキャッシュをバイパスしてデータベースから最新情報を取得
- * @param {Object} params リクエストパラメータ  
- * @returns {HtmlService.HtmlOutput} HTML出力
+ * 🎯 ログイン状態の確認とユーザー登録
+ * ログインボタンから呼び出される処理
+ * @returns {Object} ログイン状態とメッセージ
  */
-function handleLoginFlow(params = {}) {
+function processLoginAction() {
   try {
-    // ログイン時は常にキャッシュクリア
+    // キャッシュをクリアして最新情報取得
     UserManager.clearCache();
     const currentUserEmail = UserManager.getCurrentEmail();
     
     if (!currentUserEmail) {
-      return renderLoginPage(params);
+      return {
+        success: false,
+        message: '認証されていません。Googleアカウントでログインしてください。'
+      };
     }
 
-    console.log('🔄 ログイン処理: DB直接検索', { currentUserEmail });
+    console.log('🔄 ログインアクション: DB確認', { currentUserEmail });
 
-    // 🎯 シンプル: 常にDB直接検索（キャッシュ使用禁止）
-    const userInfo = DB.findUserByEmailNoCache(currentUserEmail);
+    // DB直接検索（キャッシュバイパス）
+    let userInfo = DB.findUserByEmailNoCache(currentUserEmail);
     
     if (!userInfo) {
-      // データベースにない場合は新規ユーザー作成
-      return processLoginFlow(currentUserEmail);
+      // 新規ユーザー作成
+      console.log('🆕 新規ユーザー作成開始');
+      const newUserData = createCompleteUser(currentUserEmail);
+      DB.createUser(newUserData);
+      
+      // 作成後に再度確認
+      userInfo = DB.findUserByEmailNoCache(currentUserEmail);
+      if (!userInfo) {
+        throw new Error('ユーザー作成後の確認に失敗しました');
+      }
     }
 
-    // 既存ユーザーの場合
+    // アクティブチェック
     if (userInfo.isActive !== true) {
-      return showErrorPage(
-        'アカウントが無効です',
-        'あなたのアカウントは現在無効化されています。管理者にお問い合わせください。'
-      );
+      return {
+        success: false,
+        message: 'アカウントが無効化されています。管理者にお問い合わせください。'
+      };
     }
 
-    // アクティブユーザー: アクセス時刻更新してリダイレクト
+    // 最終アクセス時刻更新
     updateUserLastAccess(userInfo.userId);
+
+    // 管理パネルURLを生成
     const adminUrl = buildUserAdminUrl(userInfo.userId);
-    return createRedirect(adminUrl);
+
+    return {
+      success: true,
+      message: 'ログインが完了しました',
+      adminUrl: adminUrl,
+      userId: userInfo.userId
+    };
 
   } catch (error) {
-    console.error('ログインエラー:', error);
-    return showErrorPage(
-      'ログインエラー', 
-      `ログイン処理中にエラーが発生しました: ${error.message}`
-    );
+    console.error('ログインアクションエラー:', error);
+    return {
+      success: false,
+      message: `ログイン処理中にエラーが発生しました: ${error.message}`
+    };
   }
 }
 
