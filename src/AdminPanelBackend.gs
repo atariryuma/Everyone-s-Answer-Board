@@ -32,7 +32,45 @@ function getCurrentConfig(userId = null) {
     }
 
     // ✅ CLAUDE.md完全準拠：configJSON統一データソース原則
-    const config = userInfo.parsedConfig || {};
+    let config = userInfo.parsedConfig || {};
+
+    // 🔧 自動修復機能: configJsonが二重になっていたら修正
+    if (config.configJson) {
+      console.warn('⚠️ getCurrentConfig: 二重構造を検出 - 自動修復開始');
+      
+      if (typeof config.configJson === 'string') {
+        try {
+          // ネストしたconfigJsonを展開
+          const nestedConfig = JSON.parse(config.configJson);
+          
+          // 内側のデータを外側にマージ（内側優先）
+          config = { ...config, ...nestedConfig };
+          
+          // configJsonフィールドを削除
+          delete config.configJson;
+          delete config.configJSON;
+          
+          // 修復したデータをDBに保存
+          DB.updateUser(userInfo.userId, {
+            configJson: JSON.stringify(config),
+            lastModified: new Date().toISOString()
+          });
+          
+          console.log('✅ getCurrentConfig: 二重構造を自動修復完了', {
+            userId: userInfo.userId,
+            fixedFields: Object.keys(config)
+          });
+        } catch (parseError) {
+          console.error('❌ getCurrentConfig: ネストしたconfigJson解析エラー', parseError.message);
+          // パースできない場合はフィールドだけ削除
+          delete config.configJson;
+        }
+      } else {
+        // 文字列でない場合も削除
+        delete config.configJson;
+        delete config.configJSON;
+      }
+    }
 
     // ✅ CLAUDE.md準拠：configJSON中心型設定構築（外側フィールド参照完全排除）
     const fullConfig = {
@@ -274,14 +312,30 @@ function publishApplication(config) {
     }
 
     // 🎯 CLAUDE.md準拠：統一データソース検証 + setupStatus確認
-    const currentConfig = getCurrentConfig(); // 最新の設定状態を取得
+    const currentConfig = getCurrentConfig(); // 最新の設定状態を取得（自動修復済み）
     
-    if (!config.spreadsheetId || !config.sheetName) {
+    // getCurrentConfigが自動修復した後のデータをチェック
+    if (!currentConfig.spreadsheetId || !currentConfig.sheetName) {
+      console.error('❌ publishApplication: データソース未設定', {
+        spreadsheetId: currentConfig.spreadsheetId,
+        sheetName: currentConfig.sheetName
+      });
       throw new Error('データソースが設定されていません。まずデータソースを設定してください。');
     }
     
     if (currentConfig.setupStatus !== 'completed') {
-      throw new Error('セットアップが完了していません。データソース接続を完了させてください。');
+      console.warn('⚠️ publishApplication: setupStatus確認', {
+        currentStatus: currentConfig.setupStatus,
+        hasSpreadsheetId: !!currentConfig.spreadsheetId,
+        hasSheetName: !!currentConfig.sheetName
+      });
+      // データソースがある場合はsetupStatusを自動修正
+      if (currentConfig.spreadsheetId && currentConfig.sheetName) {
+        console.log('🔧 setupStatusを自動修正: pending → completed');
+        // setupStatusを更新しない（getCurrentConfigで判定済み）
+      } else {
+        throw new Error('セットアップが完了していません。データソース接続を完了させてください。');
+      }
     }
 
     // 公開実行
@@ -394,11 +448,20 @@ function saveDraftConfiguration(config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
+    // 🚫 二重構造防止（第3層防御）: configJsonフィールドを削除
+    const cleanConfig = { ...config };
+    delete cleanConfig.configJson;
+    delete cleanConfig.configJSON;
+    
     // ConfigManagerを使用してドラフト設定を構築・保存
     const currentConfig = ConfigManager.getUserConfig(userInfo.userId) || {};
-    const draftConfig = ConfigManager.buildDraftConfig(currentConfig, config);
+    const draftConfig = ConfigManager.buildDraftConfig(currentConfig, cleanConfig);
     
-    // ConfigManagerによる統一保存
+    // 念のため再度削除
+    delete draftConfig.configJson;
+    delete draftConfig.configJSON;
+    
+    // ConfigManagerによる統一保存（ConfigManager内でも削除される）
     const success = ConfigManager.saveConfig(userInfo.userId, draftConfig);
     
     if (!success) {

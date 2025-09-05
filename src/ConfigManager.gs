@@ -96,8 +96,21 @@ const ConfigManager = Object.freeze({
     }
 
     try {
+      // 🚫 二重構造防止（第2層防御）: configJsonフィールドを強制削除
+      const cleanConfig = { ...config };
+      delete cleanConfig.configJson;
+      delete cleanConfig.configJSON;
+      
+      // 大文字小文字のバリエーションも削除
+      Object.keys(cleanConfig).forEach(key => {
+        if (key.toLowerCase() === 'configjson') {
+          console.warn(`⚠️ ConfigManager.saveConfig: 危険なフィールド "${key}" を削除`);
+          delete cleanConfig[key];
+        }
+      });
+
       // 設定の検証とサニタイズ
-      const validatedConfig = this.validateAndSanitizeConfig(config);
+      const validatedConfig = this.validateAndSanitizeConfig(cleanConfig);
       if (!validatedConfig) {
         console.error('ConfigManager.saveConfig: 設定検証失敗', { userId, config });
         return false;

@@ -348,6 +348,110 @@ function testConfigIntegrity() {
 // SystemManager メインオブジェクト
 // =============================================================================
 
+/**
+ * 🧹 全ユーザーのconfigJsonをクリーンアップ
+ * 二重構造を完全に修復する一括処理
+ */
+function cleanAllConfigJson() {
+  console.log('🧹 全ユーザーconfigJsonクリーンアップ開始');
+  
+  const results = {
+    total: 0,
+    cleaned: 0,
+    errors: [],
+    details: []
+  };
+  
+  try {
+    const users = DB.getAllUsers();
+    results.total = users.length;
+    
+    users.forEach(user => {
+      try {
+        const config = JSON.parse(user.configJson || '{}');
+        let needsUpdate = false;
+        
+        // configJsonフィールドが存在する場合
+        if (config.configJson) {
+          console.log(`🔧 ユーザー ${user.userId} の二重構造を修復中`);
+          
+          if (typeof config.configJson === 'string') {
+            try {
+              // ネストしたconfigJsonを展開
+              const nestedConfig = JSON.parse(config.configJson);
+              
+              // 内側のデータで外側を更新（内側が新しいデータ）
+              Object.keys(nestedConfig).forEach(key => {
+                if (key !== 'configJson' && key !== 'configJSON') {
+                  config[key] = nestedConfig[key];
+                }
+              });
+              
+              needsUpdate = true;
+            } catch (parseError) {
+              console.error(`パースエラー: ${user.userId}`, parseError.message);
+              results.errors.push({
+                userId: user.userId,
+                error: 'ネストしたJSON解析エラー'
+              });
+            }
+          }
+          
+          // configJsonフィールドを削除
+          delete config.configJson;
+          delete config.configJSON;
+          needsUpdate = true;
+        }
+        
+        // 大文字小文字のバリエーションもチェック
+        Object.keys(config).forEach(key => {
+          if (key.toLowerCase() === 'configjson' && key !== 'configJson') {
+            delete config[key];
+            needsUpdate = true;
+          }
+        });
+        
+        // 更新が必要な場合のみDB更新
+        if (needsUpdate) {
+          DB.updateUser(user.userId, {
+            configJson: JSON.stringify(config),
+            lastModified: new Date().toISOString()
+          });
+          
+          results.cleaned++;
+          results.details.push({
+            userId: user.userId,
+            status: 'cleaned'
+          });
+          
+          console.log(`✅ ユーザー ${user.userId} をクリーンアップ完了`);
+        }
+        
+      } catch (error) {
+        console.error(`❌ ユーザー ${user.userId} の処理エラー:`, error.message);
+        results.errors.push({
+          userId: user.userId,
+          error: error.message
+        });
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ クリーンアップ全体エラー:', error.message);
+    results.errors.push({
+      error: error.message
+    });
+  }
+  
+  console.log('🧹 クリーンアップ完了:', {
+    総数: results.total,
+    修復: results.cleaned,
+    エラー: results.errors.length
+  });
+  
+  return results;
+}
+
 const SystemManager = {
   testSecurity,
   testDatabaseConnection, 
@@ -355,7 +459,8 @@ const SystemManager = {
   fixConfigJsonNesting: fixConfigJsonNestingImpl,
   resetUserConfigToDefault: resetUserConfigToDefaultImpl,
   getUserCount,
-  testConfigIntegrity
+  testConfigIntegrity,
+  cleanAllConfigJson
 };
 
 // =============================================================================

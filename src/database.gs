@@ -400,6 +400,18 @@ const DB = {
         updatedConfig[key] = updateData[key];
       });
 
+      // 🚫 二重構造防止（第1層防御）: configJsonフィールドを絶対に含めない
+      delete updatedConfig.configJson;
+      delete updatedConfig.configJSON;
+      
+      // ネストした文字列形式のconfigJsonも検出して削除
+      Object.keys(updatedConfig).forEach(key => {
+        if (key.toLowerCase() === 'configjson' || key === 'configJson') {
+          console.warn(`⚠️ DB.updateUser: 危険なフィールド "${key}" を検出・削除`);
+          delete updatedConfig[key];
+        }
+      });
+
       // lastModifiedを更新
       updatedConfig.lastModified = new Date().toISOString();
 
