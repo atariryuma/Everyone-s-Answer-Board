@@ -374,9 +374,9 @@ const DB = {
       lastModified: row[4] || ''
     };
 
-    // configJsonをパース（統一データソース原則）
+    // configJsonをパース（無限再帰回避）
     try {
-      userObj.parsedConfig = ConfigManager.getUserConfig(userObj.userId);
+      userObj.parsedConfig = JSON.parse(userObj.configJson || '{}');
     } catch (e) {
       console.warn('configJson解析エラー:', {
         userId: userObj.userId,

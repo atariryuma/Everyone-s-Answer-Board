@@ -38,8 +38,15 @@ const ConfigManager = Object.freeze({
         return null;
       }
 
-      // parsedConfigを基盤とし、動的URLを追加
-      const baseConfig = user.parsedConfig || {};
+      // 無限再帰回避: 直接JSONパース（user.parsedConfigではなく生configJsonから）
+      let baseConfig;
+      try {
+        baseConfig = JSON.parse(user.configJson || '{}');
+      } catch (parseError) {
+        console.warn('ConfigManager.getUserConfig: JSON解析エラー:', parseError.message);
+        baseConfig = {};
+      }
+      
       const enhancedConfig = this.enhanceConfigWithDynamicUrls(baseConfig, userId);
 
       console.log('✅ ConfigManager.getUserConfig: 設定取得完了', {
