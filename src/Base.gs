@@ -78,126 +78,55 @@ const ErrorManager = Object.freeze({
 // ConfigurationManagerクラス（データベース専用版）
 // ===============================
 
+/**
+ * ConfigurationManager - ConfigManagerへの委譲クラス
+ * 既存システムとの互換性を保ちながらConfigManagerに処理を委譲
+ */
 class ConfigurationManager {
   /**
-   * ⚡ 超効率化：ユーザー設定取得（configJSON中心型）
+   * ユーザー設定取得（ConfigManager委譲版）
    * @param {string} userId ユーザーID
    * @return {Object|null} 統合ユーザー設定オブジェクト
    */
   getUserConfig(userId) {
-    if (!userId) return null;
-
-    const user = DB.findUserById(userId);
-    if (!user) return null;
-
-    try {
-      // 🚀 5項目最適化構造からparsedConfigを使用
-      const config = user.parsedConfig || {};
-
-      // ⚡ 動的URL生成（キャッシュ付き）
-      const dynamicUrls = this.generateDynamicUrls(config, userId);
-
-      // 🔥 完全configJSON中心型（重複フィールド削除）
-      return {
-        // configJSON統合データ（唯一のデータソース）
-        ...config,
-
-        // 動的生成URLs（キャッシュされた値または新規生成）
-        ...dynamicUrls,
-        
-        // DB検索用メタデータ（別途アクセス可能）
-        _meta: {
-          userId: user.userId,
-          userEmail: user.userEmail,
-          isActive: user.isActive,
-          lastModified: user.lastModified
-        }
-      };
-    } catch (e) {
-      console.error(`⚡ configJSON解析エラー (${userId}):`, e);
-      return null;
-    }
+    return ConfigManager.getUserConfig(userId);
   }
 
   /**
-   * 🚀 動的URL生成（キャッシュ最適化）
-   */
-  generateDynamicUrls(config, userId) {
-    const urls = {};
-
-    // spreadsheetUrl生成（キャッシュされた値または新規生成）
-    if (config.spreadsheetId) {
-      urls.spreadsheetUrl = config.spreadsheetUrl ||
-        `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`;
-    }
-
-    // appUrl生成（キャッシュされた値または新規生成）
-    urls.appUrl = config.appUrl ||
-      `${ScriptApp.getService().getUrl()}?mode=view&userId=${userId}`;
-
-    return urls;
-  }
-
-  /**
-   * 最適化されたユーザー情報を取得（動的フィールド付き）
+   * 最適化されたユーザー情報取得（ConfigManager委譲版）
    * @param {string} userId ユーザーID
    * @return {Object|null} 統合されたユーザー情報
    */
   getOptimizedUserInfo(userId) {
-    if (typeof getOptimizedUserInfo === 'function') {
-      return getOptimizedUserInfo(userId);
-    } else {
-      // フォールバック：従来の方法
-      return this.getUserConfig(userId);
-    }
+    return ConfigManager.getUserConfig(userId);
   }
 
   /**
-   * ユーザー設定を保存（データベースに直接書き込み）
+   * ユーザー設定保存（ConfigManager委譲版）
    * @param {string} userId ユーザーID
    * @param {Object} config 設定オブジェクト
    * @return {boolean} 保存成功可否
    */
   setUserConfig(userId, config) {
-    if (!userId || !config) return false;
-
-    config.lastModified = new Date().toISOString();
-
-    try {
-      const updated = updateUser(userId, {
-        configJson: JSON.stringify(config),
-        lastAccessedAt: new Date().toISOString(),
-      });
-
-      if (updated) {
-        console.log(`設定更新完了: ${userId}`);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      // 🔥 統一エラーハンドリング使用
-      handleSystemError('setUserConfig', error, userId);
-      return false;
-    }
+    return ConfigManager.saveConfig(userId, config);
   }
 
   /**
-   * ユーザー設定を削除
+   * ユーザー設定削除（ConfigManager委譲版）
    * @param {string} userId ユーザーID
    * @return {boolean} 削除成功可否
    */
   removeUserConfig(userId) {
-    if (!userId) return false;
-    return this.setUserConfig(userId, {});
+    return ConfigManager.saveConfig(userId, ConfigManager.buildInitialConfig());
   }
 
   /**
-   * 公開設定を取得（ゲストアクセス用）
+   * 公開設定取得（ConfigManager委譲版）
    * @param {string} userId ユーザーID
    * @return {Object|null} 公開設定オブジェクト
    */
   getPublicConfig(userId) {
-    const config = this.getUserConfig(userId);
+    const config = ConfigManager.getUserConfig(userId);
     if (!config || !config.isPublic) return null;
 
     return {
@@ -259,12 +188,19 @@ class ConfigurationManager {
   }
 
   /**
-   * 🚀 超効率化：設定更新（configJSON中心型、70%効率化）
+   * 設定の部分更新（ConfigManager委譲版）
    * @param {string} userId ユーザーID
    * @param {Object} updates 更新内容
    * @return {boolean} 更新成功可否
    */
   updateUserConfig(userId, updates) {
+    return ConfigManager.updateConfig(userId, updates);
+  }
+
+  /**
+   * 旧updateUserConfig実装（削除予定）
+   */
+  _oldUpdateUserConfig(userId, updates) {
     const currentConfig = this.getUserConfig(userId);
     if (!currentConfig) return false;
 
@@ -313,37 +249,16 @@ class ConfigurationManager {
    * @return {boolean} 更新成功可否
    */
   safeUpdateUserConfig(userId, newData) {
-    if (!userId || !newData) return false;
-
-    // 既存の全データを取得（空の場合も安全に処理）
-    const existingConfig = this.getUserConfig(userId) || {};
-
-    // 安全なマージ（上書きではなく統合）
-    // 既存データを保持し、新しいデータを追加・更新
-    const mergedConfig = {
-      ...existingConfig, // 既存データを保持
-      ...newData, // 新しいデータを追加/更新
-      lastModified: new Date().toISOString(),
-    };
-
-    console.log('safeUpdateUserConfig: データ保護統合', {
-      userId,
-      existingKeys: Object.keys(existingConfig),
-      newKeys: Object.keys(newData),
-      mergedKeys: Object.keys(mergedConfig),
-      dataProtected: true,
-    });
-
-    return this.setUserConfig(userId, mergedConfig);
+    return ConfigManager.updateConfig(userId, newData);
   }
 
   /**
-   * 設定の存在確認
+   * 設定の存在確認（ConfigManager委譲版）
    * @param {string} userId ユーザーID
    * @return {boolean} 存在可否
    */
   hasUserConfig(userId) {
-    const config = this.getUserConfig(userId);
+    const config = ConfigManager.getUserConfig(userId);
     return config !== null && Object.keys(config).length > 0;
   }
 }

@@ -90,8 +90,8 @@ const DB = {
           throw new Error(`シート '${sheetName}' が見つかりません`);
         }
 
-        // CLAUDE.md準拠：configJSON構築（全データを統合）
-        const configJson = this.buildConfigJson(userData);
+        // ConfigManagerによる初期設定構築
+        const configJson = ConfigManager.buildInitialConfig(userData);
 
         // CLAUDE.md準拠：5フィールドのみでデータ構築
         const newRow = [
@@ -142,14 +142,10 @@ const DB = {
   },
 
   /**
-   * CLAUDE.md準拠：configJSON構築
-   * 全データをconfigJsonに統合（統一データソース原則）
+   * 🚨 廃止予定：buildConfigJson（ConfigManagerに移行済み）
+   * @deprecated ConfigManager.buildInitialConfigを使用
    */
-  /**
-   * 🚀 最小限configJSON構築（root cause fix）
-   * 新規ユーザー作成時は最小限のみ、設定時に追加
-   */
-  buildConfigJson(userData) {
+  buildConfigJson_DEPRECATED(userData) {
     const now = new Date().toISOString();
     
     // ✅ userDataがconfigJson文字列を既に持っている場合はそれを使用
@@ -397,13 +393,10 @@ const DB = {
   },
 
   /**
-   * 🔥 configJSON専用更新（root cause fix）
-   * configJsonフィールドのネスト重複を完全回避
-   * @param {string} userId - ユーザーID
-   * @param {Object} configData - configJsonに直接保存するデータ
-   * @returns {Object} 更新結果
+   * 🚨 廃止予定：updateUserConfig（ConfigManagerに移行済み）
+   * @deprecated ConfigManager.saveConfigまたはConfigManager.updateConfigを使用
    */
-  updateUserConfig(userId, configData) {
+  updateUserConfig_DEPRECATED(userId, configData) {
     try {
       console.info('🔥 updateUserConfig: configJSON重複回避更新開始', {
         userId,

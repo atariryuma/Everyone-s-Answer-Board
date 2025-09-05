@@ -1,0 +1,463 @@
+/**
+ * ConfigManager.gs - 統一configJSON管理システム
+ * 
+ * 🎯 目的: 全configJson操作の単一責任者として論理整合性を確保
+ * 🚀 CLAUDE.md完全準拠: configJSON中心型アーキテクチャの統一実装
+ * 
+ * 責任範囲:
+ * - configJsonの読み込み・保存・更新・削除
+ * - 設定構築・検証・サニタイズ
+ * - 既存システムとの互換性維持
+ */
+
+/**
+ * ConfigManager - 統一configJSON管理システム
+ * 全configJson操作の唯一の責任者
+ */
+const ConfigManager = Object.freeze({
+
+  // ========================================
+  // 📖 読み込み系メソッド
+  // ========================================
+
+  /**
+   * ユーザー設定取得（統合版）
+   * @param {string} userId - ユーザーID
+   * @returns {Object|null} 統合設定オブジェクト
+   */
+  getUserConfig(userId) {
+    if (!userId || !this.validateUserId(userId)) {
+      console.warn('ConfigManager.getUserConfig: 無効なuserID:', userId);
+      return null;
+    }
+
+    try {
+      const user = DB.findUserById(userId);
+      if (!user) {
+        console.warn('ConfigManager.getUserConfig: ユーザーが見つかりません:', userId);
+        return null;
+      }
+
+      // parsedConfigを基盤とし、動的URLを追加
+      const baseConfig = user.parsedConfig || {};
+      const enhancedConfig = this.enhanceConfigWithDynamicUrls(baseConfig, userId);
+
+      console.log('✅ ConfigManager.getUserConfig: 設定取得完了', {
+        userId,
+        configFields: Object.keys(enhancedConfig).length,
+        hasSpreadsheetId: !!enhancedConfig.spreadsheetId
+      });
+
+      return enhancedConfig;
+
+    } catch (error) {
+      console.error('❌ ConfigManager.getUserConfig: エラー', {
+        userId,
+        error: error.message,
+        stack: error.stack
+      });
+      return null;
+    }
+  },
+
+  /**
+   * 生configJson取得（デバッグ・移行用）
+   * @param {string} userId - ユーザーID
+   * @returns {string|null} JSON文字列
+   */
+  getRawConfig(userId) {
+    if (!userId) return null;
+
+    const user = DB.findUserById(userId);
+    return user?.configJson || null;
+  },
+
+  // ========================================
+  // 💾 保存系メソッド（統一）
+  // ========================================
+
+  /**
+   * 設定保存（唯一の保存メソッド）
+   * @param {string} userId - ユーザーID  
+   * @param {Object} config - 保存する設定オブジェクト
+   * @returns {boolean} 保存成功可否
+   */
+  saveConfig(userId, config) {
+    if (!userId || !config) {
+      console.error('ConfigManager.saveConfig: 無効な引数', { userId: !!userId, config: !!config });
+      return false;
+    }
+
+    try {
+      // 設定の検証とサニタイズ
+      const validatedConfig = this.validateAndSanitizeConfig(config);
+      if (!validatedConfig) {
+        console.error('ConfigManager.saveConfig: 設定検証失敗', { userId, config });
+        return false;
+      }
+
+      // タイムスタンプ更新
+      validatedConfig.lastModified = new Date().toISOString();
+      
+      // データベース更新（database.gsのupdateUserを直接使用）
+      const success = updateUser(userId, {
+        configJson: JSON.stringify(validatedConfig),
+        lastModified: validatedConfig.lastModified
+      });
+
+      if (success) {
+        console.info('✅ ConfigManager.saveConfig: 設定保存完了', {
+          userId,
+          configSize: JSON.stringify(validatedConfig).length,
+          configFields: Object.keys(validatedConfig),
+          timestamp: validatedConfig.lastModified
+        });
+      } else {
+        console.error('❌ ConfigManager.saveConfig: データベース更新失敗', { userId });
+      }
+
+      return success;
+
+    } catch (error) {
+      console.error('❌ ConfigManager.saveConfig: 保存エラー', {
+        userId,
+        error: error.message,
+        stack: error.stack
+      });
+      return false;
+    }
+  },
+
+  // ========================================
+  // ✏️ 編集系メソッド
+  // ========================================
+
+  /**
+   * データソース更新
+   * @param {string} userId - ユーザーID
+   * @param {Object} dataSource - {spreadsheetId, sheetName}
+   * @returns {boolean} 更新成功可否
+   */
+  updateDataSource(userId, { spreadsheetId, sheetName }) {
+    const currentConfig = this.getUserConfig(userId);
+    if (!currentConfig) return false;
+
+    const updatedConfig = {
+      ...currentConfig,
+      spreadsheetId: spreadsheetId || currentConfig.spreadsheetId,
+      sheetName: sheetName || currentConfig.sheetName,
+      spreadsheetUrl: spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}` : currentConfig.spreadsheetUrl,
+      setupStatus: (spreadsheetId && sheetName) ? 'data_connected' : currentConfig.setupStatus,
+      lastModified: new Date().toISOString()
+    };
+
+    return this.saveConfig(userId, updatedConfig);
+  },
+
+  /**
+   * 表示設定更新
+   * @param {string} userId - ユーザーID
+   * @param {Object} displaySettings - {showNames, showReactions, displayMode}
+   * @returns {boolean} 更新成功可否
+   */
+  updateDisplaySettings(userId, { showNames, showReactions, displayMode }) {
+    const currentConfig = this.getUserConfig(userId);
+    if (!currentConfig) return false;
+
+    const updatedConfig = {
+      ...currentConfig,
+      displaySettings: {
+        ...(currentConfig.displaySettings || {}),
+        ...(showNames !== undefined && { showNames }),
+        ...(showReactions !== undefined && { showReactions })
+      },
+      ...(displayMode && { displayMode }),
+      lastModified: new Date().toISOString()
+    };
+
+    return this.saveConfig(userId, updatedConfig);
+  },
+
+  /**
+   * アプリステータス更新
+   * @param {string} userId - ユーザーID
+   * @param {Object} status - {appPublished, setupStatus, formUrl, formTitle}
+   * @returns {boolean} 更新成功可否
+   */
+  updateAppStatus(userId, { appPublished, setupStatus, formUrl, formTitle }) {
+    const currentConfig = this.getUserConfig(userId);
+    if (!currentConfig) return false;
+
+    const updatedConfig = {
+      ...currentConfig,
+      ...(appPublished !== undefined && { appPublished }),
+      ...(setupStatus && { setupStatus }),
+      ...(formUrl && { formUrl }),
+      ...(formTitle && { formTitle }),
+      ...(appPublished && { publishedAt: new Date().toISOString() }),
+      lastModified: new Date().toISOString()
+    };
+
+    return this.saveConfig(userId, updatedConfig);
+  },
+
+  /**
+   * 設定の部分更新（汎用）
+   * @param {string} userId - ユーザーID
+   * @param {Object} updates - 更新データ
+   * @returns {boolean} 更新成功可否
+   */
+  updateConfig(userId, updates) {
+    const currentConfig = this.getUserConfig(userId);
+    if (!currentConfig) return false;
+
+    const updatedConfig = {
+      ...currentConfig,
+      ...updates,
+      lastModified: new Date().toISOString()
+    };
+
+    return this.saveConfig(userId, updatedConfig);
+  },
+
+  // ========================================
+  // 🏗️ 構築系メソッド
+  // ========================================
+
+  /**
+   * 初期設定構築（新規ユーザー用）
+   * @param {Object} userData - ユーザーデータ
+   * @returns {Object} 初期設定オブジェクト
+   */
+  buildInitialConfig(userData = {}) {
+    const now = new Date().toISOString();
+    
+    return {
+      // 監査情報
+      createdAt: now,
+      lastModified: now,
+      lastAccessedAt: now,
+      
+      // セットアップ情報
+      setupStatus: 'pending',
+      appPublished: false,
+      
+      // 表示設定（プライバシー重視：デフォルトOFF）
+      displaySettings: {
+        showNames: false,
+        showReactions: false
+      },
+      displayMode: 'anonymous',
+      
+      // データソース情報（空で開始）
+      spreadsheetId: userData.spreadsheetId || null,
+      sheetName: userData.sheetName || null,
+      spreadsheetUrl: null,
+      
+      // フォーム情報
+      formUrl: null,
+      formTitle: null,
+      
+      // メタ情報
+      configVersion: '2.0',
+      claudeMdCompliant: true
+    };
+  },
+
+  /**
+   * ドラフト設定構築
+   * @param {Object} currentConfig - 現在の設定
+   * @param {Object} updates - 更新データ
+   * @returns {Object} ドラフト設定オブジェクト
+   */
+  buildDraftConfig(currentConfig, updates) {
+    const baseConfig = currentConfig || this.buildInitialConfig();
+    
+    return {
+      // 既存の重要データを継承
+      createdAt: baseConfig.createdAt || new Date().toISOString(),
+      lastAccessedAt: baseConfig.lastAccessedAt || new Date().toISOString(),
+      
+      // データソース情報（更新または継承）
+      spreadsheetId: updates.spreadsheetId || baseConfig.spreadsheetId,
+      sheetName: updates.sheetName || baseConfig.sheetName,
+      spreadsheetUrl: updates.spreadsheetId 
+        ? `https://docs.google.com/spreadsheets/d/${updates.spreadsheetId}` 
+        : baseConfig.spreadsheetUrl,
+      
+      // 表示設定
+      displaySettings: {
+        showNames: updates.showNames !== undefined ? updates.showNames : (baseConfig.displaySettings?.showNames || false),
+        showReactions: updates.showReactions !== undefined ? updates.showReactions : (baseConfig.displaySettings?.showReactions || false)
+      },
+      
+      // アプリ設定
+      setupStatus: baseConfig.setupStatus || 'pending',
+      appPublished: baseConfig.appPublished || false,
+      
+      // フォーム情報（継承）
+      ...(baseConfig.formUrl && { 
+        formUrl: baseConfig.formUrl,
+        formTitle: baseConfig.formTitle 
+      }),
+      
+      // 列マッピング情報（継承）
+      ...(baseConfig.columnMapping && { columnMapping: baseConfig.columnMapping }),
+      ...(baseConfig.opinionHeader && { opinionHeader: baseConfig.opinionHeader }),
+      
+      // ドラフト状態
+      isDraft: !baseConfig.appPublished,
+      
+      // メタ情報
+      configVersion: '2.0',
+      claudeMdCompliant: true,
+      lastModified: new Date().toISOString()
+    };
+  },
+
+  /**
+   * 公開設定構築
+   * @param {Object} currentConfig - 現在の設定
+   * @returns {Object} 公開設定オブジェクト
+   */
+  buildPublishConfig(currentConfig) {
+    if (!currentConfig || !currentConfig.spreadsheetId || !currentConfig.sheetName) {
+      throw new Error('公開に必要な設定が不足しています');
+    }
+
+    return {
+      ...currentConfig,
+      appPublished: true,
+      setupStatus: 'completed',
+      publishedAt: new Date().toISOString(),
+      isDraft: false,
+      lastModified: new Date().toISOString()
+    };
+  },
+
+  // ========================================
+  // 🔍 検証・サニタイズ系メソッド
+  // ========================================
+
+  /**
+   * 設定検証とサニタイズ
+   * @param {Object} config - 検証する設定
+   * @returns {Object|null} サニタイズ済み設定またはnull
+   */
+  validateAndSanitizeConfig(config) {
+    if (!config || typeof config !== 'object') {
+      console.warn('ConfigManager.validateAndSanitizeConfig: 無効な設定オブジェクト');
+      return null;
+    }
+
+    try {
+      // 基本検証
+      const sanitized = { ...config };
+      
+      // 必須タイムスタンプの確保
+      if (!sanitized.createdAt) {
+        sanitized.createdAt = new Date().toISOString();
+      }
+      if (!sanitized.lastModified) {
+        sanitized.lastModified = new Date().toISOString();
+      }
+      
+      // displaySettingsの正規化
+      if (sanitized.displaySettings && typeof sanitized.displaySettings === 'object') {
+        sanitized.displaySettings = {
+          showNames: Boolean(sanitized.displaySettings.showNames),
+          showReactions: Boolean(sanitized.displaySettings.showReactions)
+        };
+      }
+      
+      // spreadsheetUrlの動的生成
+      if (sanitized.spreadsheetId && !sanitized.spreadsheetUrl) {
+        sanitized.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${sanitized.spreadsheetId}`;
+      }
+      
+      return sanitized;
+      
+    } catch (error) {
+      console.error('ConfigManager.validateAndSanitizeConfig: サニタイズエラー', error);
+      return null;
+    }
+  },
+
+  /**
+   * ユーザーID検証
+   * @param {string} userId - ユーザーID
+   * @returns {boolean} 有効性
+   */
+  validateUserId(userId) {
+    return userId && typeof userId === 'string' && userId.trim().length > 0;
+  },
+
+  // ========================================
+  // 🔧 内部ユーティリティメソッド
+  // ========================================
+
+  /**
+   * 動的URL生成して設定を拡張
+   * @param {Object} config - 基本設定
+   * @param {string} userId - ユーザーID
+   * @returns {Object} URL追加済み設定
+   */
+  enhanceConfigWithDynamicUrls(config, userId) {
+    try {
+      const enhanced = { ...config };
+      
+      // WebAppURL生成
+      if (!enhanced.appUrl) {
+        enhanced.appUrl = `${ScriptApp.getService().getUrl()}?mode=view&userId=${userId}`;
+      }
+      
+      // SpreadsheetURL生成
+      if (enhanced.spreadsheetId && !enhanced.spreadsheetUrl) {
+        enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${enhanced.spreadsheetId}`;
+      }
+      
+      return enhanced;
+      
+    } catch (error) {
+      console.warn('ConfigManager.enhanceConfigWithDynamicUrls: URL生成エラー', error);
+      return config;
+    }
+  }
+});
+
+// ========================================
+// 🌐 グローバル関数（既存互換性用）
+// ========================================
+
+/**
+ * 既存システムとの互換性を保つためのラッパー関数
+ */
+
+/**
+ * ユーザー設定取得（互換性ラッパー）
+ * @param {string} userId - ユーザーID
+ * @returns {Object|null} ユーザー設定
+ */
+function getUserConfig(userId) {
+  return ConfigManager.getUserConfig(userId);
+}
+
+/**
+ * ユーザー設定保存（互換性ラッパー）
+ * @param {string} userId - ユーザーID
+ * @param {Object} config - 設定オブジェクト
+ * @returns {boolean} 保存成功可否
+ */
+function setUserConfig(userId, config) {
+  return ConfigManager.saveConfig(userId, config);
+}
+
+/**
+ * ユーザー設定更新（互換性ラッパー）
+ * @param {string} userId - ユーザーID
+ * @param {Object} updates - 更新データ
+ * @returns {boolean} 更新成功可否
+ */
+function updateUserConfig(userId, updates) {
+  return ConfigManager.updateConfig(userId, updates);
+}

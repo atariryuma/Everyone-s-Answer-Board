@@ -214,8 +214,11 @@ function connectDataSource(spreadsheetId, sheetName) {
         lastModified: new Date().toISOString()
       };
 
-      // CLAUDE.md準拠：configJSON中心型でデータベース更新（root cause fix）
-      DB.updateUserConfig(userInfo.userId, updatedConfig);
+      // ConfigManager統一管理による更新
+      ConfigManager.updateDataSource(userInfo.userId, {
+        spreadsheetId: spreadsheetId,
+        sheetName: sheetName
+      });
 
       console.log('✅ connectDataSource: CLAUDE.md準拠configJSON統合保存完了', {
         userId: userInfo.userId,
@@ -333,8 +336,11 @@ function publishApplication(config) {
         lastModified: new Date().toISOString()
       };
 
-      // CLAUDE.md準拠：configJSON中心型で一括保存（root cause fix）
-      DB.updateUserConfig(userInfo.userId, publishedConfig);
+      // ConfigManager統一管理による公開状態更新
+      ConfigManager.updateAppStatus(userInfo.userId, {
+        appPublished: true,
+        setupStatus: 'completed'
+      });
       
       console.info('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {
         userId: userInfo.userId,
@@ -388,49 +394,18 @@ function saveDraftConfiguration(config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const currentConfig = userInfo.parsedConfig || {};
+    // ConfigManagerを使用してドラフト設定を構築・保存
+    const currentConfig = ConfigManager.getUserConfig(userInfo.userId) || {};
+    const draftConfig = ConfigManager.buildDraftConfig(currentConfig, config);
     
-    // 🚀 置き換えベース設計：ドラフト保存時も完全クリーンアップ（スプレッド演算子完全排除）
-    const updatedConfig = {
-      // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
-      createdAt: currentConfig.createdAt || new Date().toISOString(),
-      lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
-      
-      // 🎯 CLAUDE.md準拠：データソース情報（継承または新規設定）
-      spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
-      sheetName: config.sheetName || currentConfig.sheetName,
-      spreadsheetUrl: currentConfig.spreadsheetUrl || 
-        (config.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}` : null),
-      
-      // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報（継承）
-      columnMapping: currentConfig.columnMapping || {},
-      opinionHeader: currentConfig.opinionHeader || 'お題',
-      
-      // 🎯 CLAUDE.md準拠：フォーム情報（継承）
-      ...(currentConfig.formUrl && { 
-        formUrl: currentConfig.formUrl,
-        formTitle: currentConfig.formTitle 
-      }),
-      
-      // 🎯 CLAUDE.md準拠：アプリ設定（継承または新規設定）
-      setupStatus: currentConfig.setupStatus || 'pending',
-      appPublished: currentConfig.appPublished || false,
-      ...(currentConfig.appUrl && { appUrl: currentConfig.appUrl }),
-      ...(currentConfig.publishedAt && { publishedAt: currentConfig.publishedAt }),
-      
-      // 🎯 表示設定（重複排除：フロントエンド設定を反映）
-      displaySettings: {
-        showNames: config.showNames !== undefined ? config.showNames : (currentConfig.displaySettings?.showNames || false),
-        showReactions: config.showReactions !== undefined ? config.showReactions : (currentConfig.displaySettings?.showReactions || false)
-      },
-      
-      // 🎯 ドラフト情報（公開済みの場合はドラフト状態を保持）
-      isDraft: !currentConfig.appPublished, // 公開済みでなければドラフト
-      lastModified: new Date().toISOString()
-    };
-
-    // CLAUDE.md準拠：configJSON中心型で一括保存（root cause fix）
-    DB.updateUserConfig(userInfo.userId, updatedConfig);
+    // ConfigManagerによる統一保存
+    const success = ConfigManager.saveConfig(userInfo.userId, draftConfig);
+    
+    if (!success) {
+      throw new Error('設定の保存に失敗しました');
+    }
+    
+    const updatedConfig = draftConfig;
 
     console.info('✅ saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存完了', {
       userId: userInfo.userId,
