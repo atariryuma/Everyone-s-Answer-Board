@@ -227,10 +227,10 @@ const ConfigManager = Object.freeze({
   /**
    * アプリステータス更新（データソース情報保護対応）
    * @param {string} userId - ユーザーID
-   * @param {Object} status - {appPublished, setupStatus, formUrl, formTitle, preserveDataSource}
+   * @param {Object} status - {appPublished, setupStatus, formUrl, formTitle, preserveDataSource, spreadsheetId, sheetName, appUrl}
    * @returns {boolean} 更新成功可否
    */
-  updateAppStatus(userId, { appPublished, setupStatus, formUrl, formTitle, preserveDataSource = true }) {
+  updateAppStatus(userId, { appPublished, setupStatus, formUrl, formTitle, preserveDataSource = true, spreadsheetId, sheetName, appUrl }) {
     const currentConfig = this.getUserConfig(userId);
     if (!currentConfig) return false;
 
@@ -241,6 +241,10 @@ const ConfigManager = Object.freeze({
       ...(formUrl !== undefined && { formUrl }),
       ...(formTitle !== undefined && { formTitle }),
       ...(appPublished && { publishedAt: new Date().toISOString() }),
+      // 🔒 明示的なデータソース情報の設定（フォールバック対応）
+      ...(spreadsheetId && { spreadsheetId }),
+      ...(sheetName && { sheetName }),
+      ...(appUrl && { appUrl }),
       lastModified: new Date().toISOString()
     };
 

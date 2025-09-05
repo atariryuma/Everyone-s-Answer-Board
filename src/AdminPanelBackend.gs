@@ -333,14 +333,29 @@ function publishApplication(config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // 🎯 CLAUDE.md準拠：統一データソース検証 + setupStatus確認
-    const currentConfig = getCurrentConfig(); // 最新の設定状態を取得（自動修復済み）
+    // 🔧 修正：ConfigManager経由で確実に最新設定を取得
+    const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
     
-    // getCurrentConfigが自動修復した後のデータをチェック
-    if (!currentConfig.spreadsheetId || !currentConfig.sheetName) {
+    console.log('🔍 publishApplication: 最新設定確認', {
+      userId: userInfo.userId,
+      hasSpreadsheetId: !!currentConfig?.spreadsheetId,
+      hasSheetName: !!currentConfig?.sheetName,
+      configFromFrontend: {
+        hasSpreadsheetId: !!config.spreadsheetId,
+        hasSheetName: !!config.sheetName
+      }
+    });
+    
+    // データソース情報のフォールバック戦略
+    const effectiveSpreadsheetId = currentConfig?.spreadsheetId || config.spreadsheetId;
+    const effectiveSheetName = currentConfig?.sheetName || config.sheetName;
+    
+    if (!effectiveSpreadsheetId || !effectiveSheetName) {
       console.error('❌ publishApplication: データソース未設定', {
-        spreadsheetId: currentConfig.spreadsheetId,
-        sheetName: currentConfig.sheetName
+        dbSpreadsheetId: currentConfig?.spreadsheetId,
+        dbSheetName: currentConfig?.sheetName,
+        frontendSpreadsheetId: config.spreadsheetId,
+        frontendSheetName: config.sheetName
       });
       throw new Error('データソースが設定されていません。まずデータソースを設定してください。');
     }
@@ -412,11 +427,15 @@ function publishApplication(config) {
         lastModified: new Date().toISOString()
       };
 
-      // ConfigManager統一管理による公開状態更新（データソース情報保護）
+      // 🔒 データソース情報を明示的に保持してConfigManager更新
       ConfigManager.updateAppStatus(userInfo.userId, {
         appPublished: true,
         setupStatus: 'completed',
-        preserveDataSource: true  // 🔒 connectDataSourceで保存されたデータソース情報を保護
+        preserveDataSource: true,  // 🔒 connectDataSourceで保存されたデータソース情報を保護
+        // フォールバックデータソース情報（保護機能が失敗した場合の備え）
+        spreadsheetId: effectiveSpreadsheetId,
+        sheetName: effectiveSheetName,
+        appUrl: publishResult.appUrl
       });
       
       console.log('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {
