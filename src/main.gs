@@ -196,12 +196,12 @@ function doGet(e) {
         }
 
       case 'login':
-        return renderLoginPage(params);
+        return handleLoginFlow(params);
 
       case 'view':
       default:
         if (!params.userId) {
-          return renderLoginPage(params);
+          return handleLoginFlow(params);
         }
 
         try {
@@ -993,7 +993,75 @@ function renderAdminPanel(userInfo, mode) {
 }
 
 /**
- * ログインページのレンダリング
+ * 🔄 統一ログインフロー処理（新規アカウント自動作成対応）
+ * データベースにユーザーが存在しない場合、自動的に新規アカウント作成フローに進む
+ * @param {Object} params リクエストパラメータ  
+ * @returns {HtmlService.HtmlOutput} HTML出力
+ */
+function handleLoginFlow(params = {}) {
+  try {
+    // 現在のユーザーメール取得（キャッシュ関係なく）
+    UserManager.clearCache(); // キャッシュを強制クリア
+    const currentUserEmail = UserManager.getCurrentEmail();
+    
+    console.log('🔄 handleLoginFlow: ユーザー認証開始', { 
+      currentUserEmail,
+      mode: params.mode 
+    });
+
+    if (!currentUserEmail) {
+      // 認証されていない場合は通常のログインページ表示
+      return renderLoginPage(params);
+    }
+
+    // データベース検索（キャッシュ完全バイパス）
+    const existingUser = DB.findUserByEmailNoCache(currentUserEmail);
+    
+    if (existingUser) {
+      console.log('🔍 handleLoginFlow: 既存ユーザー検出', {
+        userId: existingUser.userId,
+        isActive: existingUser.isActive,
+        email: existingUser.userEmail
+      });
+
+      // 既存ユーザーの場合、アクセス時刻更新してリダイレクト
+      if (existingUser.isActive === true) {
+        updateUserLastAccess(existingUser.userId);
+        const adminUrl = buildUserAdminUrl(existingUser.userId);
+        return createRedirect(adminUrl);
+      } else {
+        // 非アクティブユーザーの場合
+        return showErrorPage(
+          'アカウントが無効です',
+          'あなたのアカウントは現在無効化されています。管理者にお問い合わせください。'
+        );
+      }
+    } else {
+      // ✅ 新規ユーザー自動作成フロー
+      console.log('🆕 handleLoginFlow: 新規ユーザー自動作成開始', { currentUserEmail });
+      
+      try {
+        // processLoginFlowを呼び出して新規ユーザー作成処理を実行
+        return processLoginFlow(currentUserEmail);
+      } catch (newUserError) {
+        console.error('新規ユーザー作成エラー:', newUserError);
+        return showErrorPage(
+          '新規アカウント作成エラー',
+          `新規アカウントの作成中にエラーが発生しました: ${newUserError.message}`
+        );
+      }
+    }
+  } catch (error) {
+    console.error('handleLoginFlow エラー:', error);
+    return showErrorPage(
+      'ログインエラー', 
+      `ログイン処理中にエラーが発生しました: ${error.message}`
+    );
+  }
+}
+
+/**
+ * ログインページのレンダリング（内部用）
  * @param {Object} params リクエストパラメータ
  * @returns {HtmlService.HtmlOutput} HTML出力
  */

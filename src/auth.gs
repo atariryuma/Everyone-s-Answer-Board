@@ -94,6 +94,56 @@ function handleUserRegistration(userEmail, bypassCache = false) {
 }
 
 /**
+ * 🔄 ユーザーの最終アクセス時刻を更新（設定は保護）
+ * @param {string} userId ユーザーID
+ */
+function updateUserLastAccess(userId) {
+  try {
+    if (!userId) {
+      console.warn('updateUserLastAccess: userIdが指定されていません');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const currentUser = DB.findUserById(userId);
+    
+    if (!currentUser) {
+      console.warn('updateUserLastAccess: ユーザーが見つかりません:', userId);
+      return;
+    }
+
+    // 既存のconfigJsonを保護しつつ、lastAccessedAtのみ更新
+    const existingConfig = JSON.parse(currentUser.configJson || '{}');
+    const updatedConfig = { ...existingConfig, lastAccessedAt: now };
+
+    // configJsonと lastModified のみ更新
+    DB.updateUser(userId, {
+      configJson: JSON.stringify(updatedConfig),
+      lastModified: now
+    });
+
+    console.log('updateUserLastAccess: 最終アクセス時刻更新完了', { userId, lastAccessedAt: now });
+  } catch (error) {
+    console.error('updateUserLastAccess エラー:', error.message);
+  }
+}
+
+/**
+ * 🔍 設定JSONからセットアップ状況を取得
+ * @param {string} configJson 設定JSON文字列
+ * @returns {string} セットアップ状況
+ */
+function getSetupStatusFromConfig(configJson) {
+  try {
+    const config = JSON.parse(configJson || '{}');
+    return config.setupStatus || 'pending';
+  } catch (error) {
+    console.warn('getSetupStatusFromConfig: JSON解析エラー:', error.message);
+    return 'pending';
+  }
+}
+
+/**
  * ログインフローを処理し、適切なページにリダイレクトする
  * 既存ユーザーの設定を保護しつつ、セットアップ状況に応じたメッセージを表示
  * @param {string} userEmail ログインユーザーのメールアドレス
