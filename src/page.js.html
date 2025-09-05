@@ -41,7 +41,6 @@
    * ✅ configJSON中心型アーキテクチャ - 自動回復不要
    */
   const autoRecovery = async (diagnosis) => {
-    // configJSON完全移行により、データ不整合が発生しないため緊急回復は不要
     return diagnosis.severity === 'healthy';
   };
   
@@ -182,7 +181,7 @@
       
       // フォールバック設定（SHEET_NAME空文字対策）
       const fallbackUserId = new URLSearchParams(window.location.search).get('userId') || '';
-      const fallbackSheetName = window.SHEET_NAME || 'テストシート'; // テンプレート変数フォールバック
+      const fallbackSheetName = window.SHEET_NAME || 'Sheet1'; // テンプレート変数フォールバック
       
       CONFIG = Object.freeze({
         showCounts: false,
@@ -206,15 +205,14 @@
   // GAS optimized constants
   const RENDER_BATCH_SIZE = 50; // 件数闾值最適化: 大量データ対応
   const CHUNK_SIZE = 5; // DOM operations per chunk
-  const IDLE_TIMEOUT = 5000; // requestIdleCallback timeout (緊急修正)
+  const IDLE_TIMEOUT = 5000; // requestIdleCallback timeout
   
-  // 🚀 Phase2最適化: 生産環境対応デバッグシステム
+  // 生産環境対応デバッグシステム
   const DEBUG_MODE = window.location.search.includes('debug=true') || window.localStorage?.getItem('debug') === 'true';
   const PERF_MODE = !DEBUG_MODE; // プロダクションでは性能重視
   
   // 最適化されたログシステム
   const Logger = {
-    // デバッグログ（開発時のみ）
     debug: DEBUG_MODE ? console.debug.bind(console) : () => {},
     // 情報ログ（重要な情報のみ）
     info: (msg, ...args) => console.info(`📊 ${msg}`, ...args),
@@ -226,10 +224,9 @@
     perf: PERF_MODE ? () => {} : (msg, ...args) => Logger.perf(`⚡ ${msg}`, ...args)
   };
   
-  // 後方互換性のためのdebugLog関数（置換対象）
   const debugLog = Logger.debug;
 
-  // 🚀 Phase4最適化: 後方互換アイコンシステム（緊急修正）
+  // アイコンシステム
   const ICONS = Object.freeze({
     'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
     'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
@@ -548,7 +545,7 @@
         showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
         showScoreSort: window.showScoreSort,
         displayMode: window.displayMode,
-        sheetName: CONFIG.sheetName || 'テストシート',
+        sheetName: CONFIG.sheetName || 'Sheet1',
         tenantId: this.validateUserId(CONFIG.userId), // Validate and add userId to state
         hasNewContent: false,
         newContentCount: 0,
@@ -1537,7 +1534,6 @@
       }
     }
 
-    // Debug helper functions removed for production
     adjustLayout() {
       if (this.baseBodyPadding === undefined) {
         this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
@@ -1591,9 +1587,8 @@
                   .withUserObject({ tenantId: userId })
                   [funcName](...args);
               } else {
-                this.getMockData(funcName, ...args)
-                  .then(mockResult => resolve(mockResult))
-                  .catch(reject);
+                // GAS実行環境が利用できない場合
+                reject(new Error('Google Apps Script実行環境が利用できません'));
               }
             });
         }
@@ -2382,66 +2377,6 @@
       }, 2000);
     }
 
-    getMockData(funcName, ...args) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          if (funcName === 'getPublishedSheetData') {
-            const currentDisplayMode = window.displayMode || this.state.displayMode;
-            const studentName1 = currentDisplayMode === 'named' ? '田中太郎' : '';
-            const studentName2 = currentDisplayMode === 'named' ? '佐藤花子' : '';
-            resolve({
-              header: 'テスト問題',
-              sheetName: 'テストシート',
-              data: [
-                {
-                  rowIndex: 1,
-                  name: studentName1,
-                  class: '3年A組',
-                  opinion: 'これは素晴らしいアイデアだと思います。',
-                  reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
-                  reactions: {
-                    UNDERSTAND: { count: 5, reacted: false },
-                    LIKE: { count: 2, reacted: false },
-                    CURIOUS: { count: 1, reacted: false },
-                  },
-                  highlight: false,
-                },
-                {
-                  rowIndex: 2,
-                  name: studentName2,
-                  class: '3年B組',
-                  opinion: '少し改善の余地があると考えます。',
-                  reason: 'より多くの人の意見を聞く必要があると思います。',
-                  reactions: {
-                    UNDERSTAND: { count: 3, reacted: true },
-                    LIKE: { count: 0, reacted: false },
-                    CURIOUS: { count: 0, reacted: false },
-                  },
-                  highlight: true,
-                },
-              ],
-            });
-          } else if (funcName === 'addReaction') {
-            resolve({
-              status: 'ok',
-              reactions: {
-                UNDERSTAND: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
-                LIKE: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
-                CURIOUS: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
-              },
-            });
-          } else if (funcName === 'toggleHighlight') {
-            const currentHighlight = args[2] === undefined ? false : !args[2];
-            resolve({
-              status: 'ok',
-              highlight: currentHighlight,
-            });
-          } else if (funcName === 'checkAdmin') {
-            resolve(true);
-          }
-        }, 300);
-      });
-    }
     startPolling() {
       if (this.pollingInterval) {
         clearInterval(this.pollingInterval);
@@ -2646,7 +2581,6 @@
       warningDiv.className =
         'fixed top-4 right-4 z-50 bg-yellow-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md border-l-4 border-yellow-400';
       
-      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決  
       const warningIcon = this.getIcon('x', 'w-5 h-5 mr-2');
       const closeIcon = this.getIcon('x', 'w-4 h-4');
       
@@ -2841,7 +2775,6 @@
      * @returns {boolean} true if all prerequisites are met
      */
     validatePrerequisites() {
-      // 🔥 userIdの正しい取得方法
       const userId = window.USER_ID || new URLSearchParams(window.location.search).get('userId');
       const checks = [
         { name: 'userId', value: userId, required: true },
@@ -2869,7 +2802,7 @@
         }
       });
 
-      // 🔥 検証済みのuserIdをstateに保存
+      // 検証済みのuserIdをstateに保存
       if (userId && allValid) {
         this.state.tenantId = userId;
       }
@@ -2891,7 +2824,6 @@
           <button onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
             class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600">再試行</button>` : '';
       
-      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
       const iconSvg = this.getIcon(config.iconName, `mx-auto h-12 w-12 text-${config.color}-500`);
       
       container.innerHTML = `
@@ -2916,7 +2848,6 @@
       errorDiv.className =
         'fixed top-4 right-4 z-50 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md';
       
-      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
       const errorIcon = this.getIcon('x', 'w-5 h-5 mr-2');
       
       errorDiv.innerHTML = `
@@ -2957,7 +2888,6 @@
       const container = this.elements.answersContainer;
       if (!container) return;
 
-      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
       const emptyIcon = this.getIcon('x', 'mx-auto h-12 w-12 text-gray-500');
 
       container.innerHTML = `
@@ -3134,7 +3064,7 @@
         Logger.debug('✅ 状態検証: DOMとデータの状態が一致しています');
       }
 
-      // 追加: 設定と表示内容の一致性を検証
+      // 設定と表示内容の一致性を検証
       this.validateConfigConsistency();
     }
 
@@ -3500,7 +3430,7 @@
               dynamicTimeout
             );
 
-            // CLAUDE.md準拠: パラメータ詳細ログでデバッグ性向上
+            // パラメータ詳細ログ
             Logger.debug(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
               tenantId: fetchParams.tenantId,
               tenantIdType: typeof fetchParams.tenantId,
@@ -3662,7 +3592,6 @@
         (errorMessage.includes('ユーザー情報が見つかりません') ||
           errorMessage.includes('が見つかりません'));
 
-      // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
       const errorIcon = this.getIcon('x', 'mx-auto h-12 w-12 text-red-500');
 
       container.innerHTML = `
@@ -4139,9 +4068,9 @@
                 syncResult
               );
 
-              // 理由列デバッグ: 取得されたデータの詳細を確認
+              // 取得されたデータの詳細を確認
               Logger.debug(
-                '🔍 理由列デバッグ - 取得データ詳細:',
+                '取得データ詳細:',
                 (result.data || []).map((item, index) => ({
                   index: index,
                   rowIndex: item.rowIndex,
@@ -4159,7 +4088,7 @@
                 const currentDisplayed = this.elements.headingLabel
                   ? this.elements.headingLabel.textContent
                   : '';
-                // ⚡ サーバー設定の質問文を強制適用
+                // サーバー設定の質問文を強制適用
                 if (result.header && this.elements.headingLabel) {
                   if (currentDisplayed !== result.header) {
                     console.info('🔄 質問文をサーバー設定に更新:', {
@@ -5032,7 +4961,7 @@
     performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
       const container = this.elements.answersContainer;
       
-      // 🔥 緊急修正: DOM クリア前に既存カードのマップを作成
+      // DOMクリア前に既存カードのマップを作成
       const existingMap = new Map();
       container.querySelectorAll('.answer-card').forEach((card) => {
         existingMap.set(card.dataset.rowIndex, card);
@@ -5046,7 +4975,7 @@
         }
       });
       
-      // 🔥 緊急修正: 既存カードマップ取得後にコンテナをクリア
+      // 既存カードマップ取得後にコンテナをクリア
       container.innerHTML = '';
 
       // メインレンダリング処理
@@ -5498,17 +5427,6 @@
           return null;
         }
 
-        // 🔥 緊急デバッグ: 入力データの詳細確認
-        console.log('🔍 createAnswerCard 入力データ詳細:', {
-          data: data,
-          dataKeys: Object.keys(data),
-          opinion: data.opinion,
-          opinionType: typeof data.opinion,
-          opinionLength: data.opinion?.length,
-          reason: data.reason,
-          reasonType: typeof data.reason,
-          reasonLength: data.reason?.length
-        });
 
         // Ensure required properties exist with safe defaults（理由列の堅牢化）
         const safeData = {
@@ -5521,21 +5439,7 @@
           highlight: Boolean(data.highlight),
         };
 
-        // 🔥 緊急デバッグ: 処理後データの確認
-        console.log('🔍 createAnswerCard 処理後データ:', {
-          safeData: safeData,
-          opinionFinal: safeData.opinion,
-          reasonFinal: safeData.reason
-        });
 
-        // 理由列デバッグ: createAnswerCard での理由データ処理状況
-        Logger.debug('🔍 createAnswerCard 理由列デバッグ:', {
-          rowIndex: safeData.rowIndex,
-          originalReason: data.reason,
-          validatedReason: safeData.reason,
-          reasonLength: safeData.reason?.length || 0,
-          willShowReason: !!(safeData.reason && safeData.reason.trim()),
-        });
 
         // Optimized cache key generation (faster than JSON.stringify)
         const cacheKey = `${safeData.rowIndex}-${safeData.opinion.slice(0, 50)}-${safeData.reason.slice(0, 30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
@@ -5670,13 +5574,9 @@
         opinionTitle.className =
           'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
         
-        // 🔥 緊急修正: テキスト設定の強化
+        // テキスト設定の強化
         try {
           opinionTitle.textContent = safeData.opinion || '(回答データが見つかりません)';
-          console.log('🔍 opinionTitle設定完了:', {
-            textContent: opinionTitle.textContent,
-            element: opinionTitle
-          });
         } catch (opinionError) {
           console.error('opinionTitle設定エラー:', opinionError);
           opinionTitle.textContent = '(表示エラー)';
@@ -5687,29 +5587,14 @@
         
         try {
           reasonText.textContent = safeData.reason || '';
-          console.log('🔍 reasonText設定完了:', {
-            textContent: reasonText.textContent,
-            element: reasonText
-          });
         } catch (reasonError) {
           console.error('reasonText設定エラー:', reasonError);
           reasonText.textContent = '';
         }
 
         contentDiv.appendChild(opinionTitle);
-        console.log('🔍 opinionTitle DOM追加完了:', {
-          parent: contentDiv,
-          child: opinionTitle,
-          childTextContent: opinionTitle.textContent
-        });
 
         // 理由テキストが存在する場合のみ追加（堅牢化）
-        Logger.debug('🔍 理由テキスト追加デバッグ:', {
-          hasReason: !!safeData.reason,
-          reasonTrimmed: safeData.reason?.trim(),
-          willAddReason: !!(safeData.reason && safeData.reason.trim()),
-          reasonTextElement: !!reasonText,
-        });
 
         if (safeData.reason && safeData.reason.trim()) {
           Logger.debug('✅ 理由テキストを追加します:', safeData.reason);
@@ -7547,8 +7432,7 @@
         const modal = this._createElement('div');
         modal.className =
           'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
-        const warningIcon = this.getIcon('x', 'w-6 h-6 text-orange-600');
+          const warningIcon = this.getIcon('x', 'w-6 h-6 text-orange-600');
         
         modal.innerHTML = `
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
@@ -7625,8 +7509,7 @@
         originalButtonContent = endPublicationBtn.innerHTML;
         endPublicationBtn.disabled = true;
         
-        // 🔥 緊急修正: アイコンシステム統一化 - SVGパスエラーの根本解決
-        const loadingIcon = this.getIcon('x', 'w-3 h-3 animate-spin inline-block mr-1');
+          const loadingIcon = this.getIcon('x', 'w-3 h-3 animate-spin inline-block mr-1');
         
         endPublicationBtn.innerHTML = `
         ${loadingIcon}
