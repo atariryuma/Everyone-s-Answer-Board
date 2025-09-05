@@ -230,9 +230,56 @@ function getSheetsServiceCached() {
       const accessToken = getServiceAccountTokenCached();
       if (!accessToken) return null;
 
+      // Google Sheets APIサービスオブジェクトを返す
       return {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
         accessToken,
+        spreadsheets: {
+          values: {
+            batchGet: function(params) {
+              // Sheets API v4 batchGet実装
+              const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values:batchGet`;
+              const queryParams = params.ranges ? `?ranges=${params.ranges.join('&ranges=')}` : '';
+              
+              const response = UrlFetchApp.fetch(url + queryParams, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                muteHttpExceptions: true
+              });
+              
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API Error: ${response.getContentText()}`);
+              }
+              
+              return JSON.parse(response.getContentText());
+            },
+            update: function(params) {
+              // Sheets API v4 update実装  
+              const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values/${params.range}?valueInputOption=RAW`;
+              
+              const response = UrlFetchApp.fetch(url, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                payload: JSON.stringify({
+                  values: params.values
+                }),
+                muteHttpExceptions: true
+              });
+              
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API Error: ${response.getContentText()}`);
+              }
+              
+              return JSON.parse(response.getContentText());
+            }
+          }
+        }
       };
     },
     { ttl: 3500, enableMemoization: true }
