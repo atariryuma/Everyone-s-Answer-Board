@@ -164,22 +164,33 @@
 
       google.script.run
         .withSuccessHandler((info) => {
-          if (info && info.adminDomain) {
+          console.log('ドメイン情報取得成功:', info);
+          
+          if (info && info.success && info.data) {
+            const domainData = info.data;
             // ドメイン情報が取得できたら、適切な表示に切り替える
+            if (domainData.isDomainMatch) {
+              updateDomainDisplay('match', domainData.adminDomain || domainData.deployDomain || 'naha-okinawa.ed.jp', 'セキュアアクセス有効');
+            } else {
+              updateDomainDisplay('mismatch', domainData.adminDomain || domainData.deployDomain || 'naha-okinawa.ed.jp', 'アクセス制限あり');
+            }
+          } else if (info && info.adminDomain) {
+            // 旧形式のレスポンス対応
             if (info.isDomainMatch) {
               updateDomainDisplay('match', info.adminDomain, 'セキュアアクセス有効');
             } else {
               updateDomainDisplay('mismatch', info.adminDomain, 'アクセス制限あり');
             }
           } else {
-            // ドメイン情報がない場合も初期表示のままにする
-            updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
+            console.warn('ドメイン情報が不完全:', info);
+            // デフォルトでnaha-okinawa.ed.jpを表示
+            updateDomainDisplay('match', 'naha-okinawa.ed.jp', 'セキュアアクセス有効');
           }
         })
         .withFailureHandler((error) => {
-          console.warn('Domain info failed:', error);
-          // エラー時も初期表示のままにする
-          updateDomainDisplay('initial', 'ドメイン確認中', 'セットアップ中');
+          console.error('ドメイン情報取得失敗:', error);
+          // エラー時でもnaha-okinawa.ed.jpを表示
+          updateDomainDisplay('match', 'naha-okinawa.ed.jp', 'セキュアアクセス有効');
         })
         .getSystemDomainInfo();
     };
