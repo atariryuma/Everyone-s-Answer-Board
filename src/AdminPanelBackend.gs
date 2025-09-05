@@ -252,16 +252,20 @@ function connectDataSource(spreadsheetId, sheetName) {
         lastModified: new Date().toISOString()
       };
 
-      // ConfigManager統一管理による更新
-      ConfigManager.updateDataSource(userInfo.userId, {
-        spreadsheetId: spreadsheetId,
-        sheetName: sheetName
-      });
+      // 🔧 修正: 構築したupdatedConfigを確実に保存
+      const saveSuccess = ConfigManager.saveConfig(userInfo.userId, updatedConfig);
+      
+      if (!saveSuccess) {
+        throw new Error('設定の保存に失敗しました');
+      }
 
       console.log('✅ connectDataSource: CLAUDE.md準拠configJSON統合保存完了', {
         userId: userInfo.userId,
         configFields: Object.keys(updatedConfig).length,
-        configJsonSize: JSON.stringify(updatedConfig).length
+        configJsonSize: JSON.stringify(updatedConfig).length,
+        spreadsheetId: updatedConfig.spreadsheetId,
+        sheetName: updatedConfig.sheetName,
+        setupStatus: updatedConfig.setupStatus
       });
     }
 
