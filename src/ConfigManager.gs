@@ -119,11 +119,18 @@ const ConfigManager = Object.freeze({
       // タイムスタンプ更新
       validatedConfig.lastModified = new Date().toISOString();
       
-      // データベース更新（database.gsのupdateUserを直接使用）
-      const success = updateUser(userId, {
-        configJson: JSON.stringify(validatedConfig),
-        lastModified: validatedConfig.lastModified
-      });
+      // 🔧 修正: DB.updateUserInDatabaseを直接使用（updateUserではなく）
+      // updateUserは個別フィールドマージ用、完全なconfigJson置き換えはupdateUserInDatabase
+      try {
+        DB.updateUserInDatabase(userId, {
+          configJson: JSON.stringify(validatedConfig),
+          lastModified: validatedConfig.lastModified
+        });
+        const success = true;
+      } catch (dbError) {
+        console.error('❌ ConfigManager.saveConfig: DB更新エラー:', dbError.message);
+        const success = false;
+      }
 
       if (success) {
         console.log('✅ ConfigManager.saveConfig: 設定保存完了', {
