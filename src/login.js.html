@@ -57,24 +57,8 @@
               return;
             }
 
-            // ログイン成功: 管理パネルURLを表示
-            const successContainer = document.createElement('div');
-            successContainer.className = 'glass-panel rounded-xl p-6 mt-4 bg-green-500/10 border-green-400/30';
-            successContainer.innerHTML = `
-              <h3 class="text-green-400 font-semibold mb-2">✅ ${response.message}</h3>
-              <p class="text-cyan-300 mb-4">管理パネルにアクセスできます:</p>
-              <a href="${response.adminUrl}" 
-                 class="inline-block btn btn-primary font-bold py-2 px-4 rounded-lg">
-                管理パネルを開く
-              </a>
-            `;
-            
-            // ログインボタンを成功メッセージに置き換え
-            const loginBtn = document.getElementById('login-btn');
-            if (loginBtn && loginBtn.parentElement) {
-              loginBtn.parentElement.replaceChild(successContainer, loginBtn);
-            }
-            
+            // ログイン成功: 管理パネルURLを表示して自動リダイレクト
+            showAdminPanelRedirect(response.adminUrl, response.message);
             resolve();
           })
           .withFailureHandler((error) => {
@@ -550,6 +534,15 @@
 
       // JavaScript関数を再定義（HTMLに埋め込まれたスクリプトが実行されるため）
       window.isAdminPanelClicking = false;
+
+      // 🚀 2秒後に自動的に管理パネルを開く（以前の動作を再現）
+      setTimeout(() => {
+        console.log('⏰ 2秒後の自動リダイレクト実行');
+        const adminBtn = document.getElementById('admin-panel-btn');
+        if (adminBtn) {
+          adminBtn.click();
+        }
+      }, 2000);
 
       window.handleAdminPanelClick = function (event, adminUrl, buttonElement) {
         event.preventDefault();
