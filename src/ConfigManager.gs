@@ -109,12 +109,30 @@ const ConfigManager = Object.freeze({
         }
       });
 
+      // 🔍 デバッグ: cleanConfig詳細ログ
+      console.log('🔍 ConfigManager.saveConfig: cleanConfig詳細', {
+        userId,
+        cleanConfigKeys: Object.keys(cleanConfig),
+        spreadsheetId: cleanConfig.spreadsheetId,
+        sheetName: cleanConfig.sheetName,
+        formUrl: cleanConfig.formUrl
+      });
+
       // 設定の検証とサニタイズ
       const validatedConfig = this.validateAndSanitizeConfig(cleanConfig);
       if (!validatedConfig) {
         console.error('ConfigManager.saveConfig: 設定検証失敗', { userId, config });
         return false;
       }
+
+      // 🔍 デバッグ: validatedConfig詳細ログ
+      console.log('🔍 ConfigManager.saveConfig: validatedConfig詳細', {
+        userId,
+        validatedConfigKeys: Object.keys(validatedConfig),
+        spreadsheetId: validatedConfig.spreadsheetId,
+        sheetName: validatedConfig.sheetName,
+        formUrl: validatedConfig.formUrl
+      });
 
       // タイムスタンプ更新
       validatedConfig.lastModified = new Date().toISOString();

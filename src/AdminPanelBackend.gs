@@ -252,8 +252,26 @@ function connectDataSource(spreadsheetId, sheetName) {
         lastModified: new Date().toISOString()
       };
 
+      // 🔧 デバッグ: updatedConfigの内容を詳細ログ出力
+      console.log('🔍 connectDataSource: 保存前のupdatedConfig詳細', {
+        userId: userInfo.userId,
+        updatedConfigKeys: Object.keys(updatedConfig),
+        spreadsheetId: updatedConfig.spreadsheetId,
+        sheetName: updatedConfig.sheetName,
+        formUrl: updatedConfig.formUrl,
+        formTitle: updatedConfig.formTitle,
+        setupStatus: updatedConfig.setupStatus,
+        configSize: JSON.stringify(updatedConfig).length
+      });
+
       // 🔧 修正: 構築したupdatedConfigを確実に保存
       const saveSuccess = ConfigManager.saveConfig(userInfo.userId, updatedConfig);
+      
+      console.log('🔍 connectDataSource: 保存結果', {
+        userId: userInfo.userId,
+        saveSuccess: saveSuccess,
+        timestamp: new Date().toISOString()
+      });
       
       if (!saveSuccess) {
         throw new Error('設定の保存に失敗しました');
