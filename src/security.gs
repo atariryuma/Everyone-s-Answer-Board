@@ -325,9 +325,56 @@ function getSheetsService() {
       return null;
     }
 
+    // Google Sheets APIサービスオブジェクトをシミュレート
     return {
       baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
       accessToken,
+      spreadsheets: {
+        values: {
+          batchGet: function(params) {
+            // Sheets API v4 batchGet実装
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values:batchGet`;
+            const queryParams = params.ranges ? `?ranges=${params.ranges.join('&ranges=')}` : '';
+            
+            const response = UrlFetchApp.fetch(url + queryParams, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              muteHttpExceptions: true
+            });
+            
+            if (response.getResponseCode() !== 200) {
+              throw new Error(`Sheets API Error: ${response.getContentText()}`);
+            }
+            
+            return JSON.parse(response.getContentText());
+          },
+          update: function(params) {
+            // Sheets API v4 update実装  
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values/${params.range}?valueInputOption=RAW`;
+            
+            const response = UrlFetchApp.fetch(url, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              payload: JSON.stringify({
+                values: params.values
+              }),
+              muteHttpExceptions: true
+            });
+            
+            if (response.getResponseCode() !== 200) {
+              throw new Error(`Sheets API Error: ${response.getContentText()}`);
+            }
+            
+            return JSON.parse(response.getContentText());
+          }
+        }
+      }
     };
   } catch (error) {
     console.error('getSheetsService エラー:', error.message);
@@ -383,8 +430,22 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
   try {
-    // 🔧 修正：Sheets API未有効化対応 - 直接SpreadsheetAppを使用
-    console.log('batchGetSheetsData: SpreadsheetApp直接使用（API未有効化対応）');
+    // Service Accountを使用してSheets APIでアクセスを試みる
+    if (service && service.spreadsheets) {
+      try {
+        console.log('batchGetSheetsData: Service Account経由でSheets API使用');
+        const response = service.spreadsheets.values.batchGet({
+          spreadsheetId: spreadsheetId,
+          ranges: ranges
+        });
+        return response;
+      } catch (apiError) {
+        console.warn('Sheets API呼び出し失敗、SpreadsheetAppにフォールバック:', apiError.message);
+      }
+    }
+    
+    // フォールバック：Sheets APIが使えない場合はSpreadsheetAppを使用
+    console.log('batchGetSheetsData: SpreadsheetApp直接使用（フォールバック）');
     
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const valueRanges = ranges.map(range => {
