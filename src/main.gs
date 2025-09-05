@@ -217,63 +217,6 @@ function doGet(e) {
         }
 
       case 'login':
-        // 🔄 ログイン時の新規ユーザー自動作成
-        try {
-          const currentUserEmail = UserManager.getCurrentEmail();
-          if (currentUserEmail) {
-            let user = DB.findUserByEmail(currentUserEmail);
-            
-            // ユーザーが見つからない場合は新規作成
-            if (!user) {
-              console.log('🆕 新規ユーザー作成:', currentUserEmail);
-              const newUserData = {
-                userId: generateUserId(),
-                userEmail: currentUserEmail,
-                isActive: true,
-                configJson: JSON.stringify({
-                  createdAt: new Date().toISOString(),
-                  lastAccessedAt: new Date().toISOString(),
-                  setupStatus: 'pending',
-                  appPublished: false,
-                  displaySettings: {
-                    showNames: false,
-                    showReactions: false
-                  }
-                }),
-                lastModified: new Date().toISOString()
-              };
-              
-              const createResult = DB.createUser(newUserData);
-              if (createResult.success) {
-                console.log('✅ 新規ユーザー作成完了:', createResult.userId);
-                // 新規作成ユーザーを取得
-                user = DB.findUserById(createResult.userId);
-                if (user) {
-                  // 管理パネルにリダイレクト
-                  const adminUrl = `${getWebAppUrl()}?mode=admin&userId=${user.userId}`;
-                  return HtmlService.createHtmlOutput(`
-                    <script>
-                      window.location.href = "${adminUrl}";
-                    </script>
-                    <p>新規ユーザーとして登録しました。管理パネルにリダイレクトします...</p>
-                  `);
-                }
-              }
-            } else {
-              // 既存ユーザーの場合、管理パネルにリダイレクト
-              const adminUrl = `${getWebAppUrl()}?mode=admin&userId=${user.userId}`;
-              return HtmlService.createHtmlOutput(`
-                <script>
-                  window.location.href = "${adminUrl}";
-                </script>
-                <p>既存ユーザーです。管理パネルにリダイレクトします...</p>
-              `);
-            }
-          }
-        } catch (error) {
-          console.error('ログイン処理エラー:', error);
-        }
-        
         return renderLoginPage(params);
 
       case 'view':
