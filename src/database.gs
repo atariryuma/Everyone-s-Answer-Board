@@ -175,94 +175,15 @@ const DB = {
    * @param {string} email - メールアドレス
    * @returns {Object|null} ユーザー情報またはnull
    */
+  /**
+   * 🎯 シンプル版：メールアドレスでユーザー検索（常にDB直接検索）
+   * ログイン時の信頼性を向上させるため、常にキャッシュをバイパス
+   * @param {string} email メールアドレス
+   * @returns {Object|null} ユーザー情報またはnull
+   */
   findUserByEmail(email) {
-    if (!email || typeof email !== 'string') {
-      console.warn('findUserByEmail: 無効なメールアドレス', email);
-      return null;
-    }
-
-    // キャッシュキーを生成
-    const cacheKey = 'user_email_' + email;
-
-    try {
-      // キャッシュから取得を試行
-      const cached = CacheService.getScriptCache().get(cacheKey);
-      if (cached) {
-        if (cached === 'null') {
-          return null;
-        }
-        return JSON.parse(cached);
-      }
-    } catch (error) {
-      console.warn('findUserByEmail: キャッシュ読み込みエラー', error.message);
-    }
-
-    try {
-      console.log('🔍 findUserByEmail: configJSON中心型検索開始', { email });
-
-      const dbId = getSecureDatabaseId();
-      const sheetName = DB_CONFIG.SHEET_NAME;
-
-      // SpreadsheetAppを使用してデータ取得
-      const spreadsheet = SpreadsheetApp.openById(dbId);
-      const sheet = spreadsheet.getSheetByName(sheetName);
-      if (!sheet) {
-        console.warn('findUserByEmail: シートが見つかりません');
-        return null;
-      }
-
-      const rows = sheet.getDataRange().getValues();
-      if (rows.length < 2) {
-        console.log('findUserByEmail: ユーザーデータが存在しません');
-        return null;
-      }
-
-      const headers = rows[0];
-      
-      // CLAUDE.md準拠：userEmailは2列目（インデックス1）
-      const emailIndex = 1;
-
-      // メールアドレスでマッチする行を検索
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (row[emailIndex] === email) {
-          // CLAUDE.md準拠：5フィールド構造でユーザーオブジェクト構築
-          const userObj = this.parseUserRow(headers, row);
-
-          // キャッシュに保存
-          try {
-            CacheService.getScriptCache().put(cacheKey, JSON.stringify(userObj), DB_CONFIG.CACHE_TTL);
-          } catch (cacheError) {
-            console.warn('findUserByEmail: キャッシュ保存エラー', cacheError.message);
-          }
-
-          console.log('✅ findUserByEmail: configJSON中心型ユーザー発見', {
-            email,
-            userId: userObj.userId,
-            configFields: Object.keys(userObj.parsedConfig).length
-          });
-
-          return userObj;
-        }
-      }
-
-      // 見つからなかった場合
-      try {
-        CacheService.getScriptCache().put(cacheKey, 'null', 60);
-      } catch (cacheError) {
-        console.warn('findUserByEmail: nullキャッシュ保存エラー', cacheError.message);
-      }
-
-      console.log('findUserByEmail: ユーザーが見つかりませんでした:', email);
-      return null;
-
-    } catch (error) {
-      console.error('❌ findUserByEmail: configJSON中心型検索エラー:', {
-        email,
-        error: error.message
-      });
-      return null;
-    }
+    console.log('🔄 findUserByEmail: 常にDB直接検索（ログイン最適化）');
+    return this.findUserByEmailNoCache(email);
   },
 
   /**
