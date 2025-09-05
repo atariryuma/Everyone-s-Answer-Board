@@ -12,17 +12,42 @@ const MODULE_CONFIG = Object.freeze({
   STATUS_INACTIVE: CORE.STATUS.INACTIVE,
 });
 
-// User管理の内部実装（依存注入パターン）
-const User = {
-  email() {
+// UserManager - 統一ユーザー情報管理（キャッシュ付き）
+const UserManager = {
+  _cachedEmail: null,
+  _cacheTime: 0,
+  _CACHE_TTL: 300000, // 5分キャッシュ
+
+  getCurrentEmail() {
+    const now = Date.now();
+    if (this._cachedEmail && (now - this._cacheTime) < this._CACHE_TTL) {
+      return this._cachedEmail;
+    }
+
     try {
-      const email = Session.getActiveUser().getEmail();
-      return email;
-    } catch (e) {
-      console.error('User.email() error:', e);
+      this._cachedEmail = Session.getActiveUser().getEmail();
+      this._cacheTime = now;
+      console.log('UserManager: ユーザー情報更新');
+      return this._cachedEmail;
+    } catch (error) {
+      console.error('UserManager.getCurrentEmail:', error.message);
       return null;
     }
   },
+
+  clearCache() {
+    this._cachedEmail = null;
+    this._cacheTime = 0;
+    console.log('UserManager: キャッシュクリア');
+  }
+};
+
+// 後方互換性のためのUserオブジェクト（廃止予定）
+const User = {
+  email() {
+    console.warn('User.email() は廃止予定です。UserManager.getCurrentEmail()を使用してください');
+    return UserManager.getCurrentEmail();
+  }
 };
 
 /**
@@ -47,7 +72,7 @@ function doGet(e) {
       case 'debug':
         // 🔍 デバッグモード：現在のユーザー情報を表示
         try {
-          const currentUserEmail = User.email();
+          const currentUserEmail = UserManager.getCurrentEmail();
           const userByEmail = DB.findUserByEmail(currentUserEmail);
           const debugData = {
             current_user_email: currentUserEmail,
@@ -80,7 +105,7 @@ function doGet(e) {
             return HtmlService.createHtmlOutput('<h2>Error</h2><p>userIdが必要です</p>');
           }
           
-          const currentUserEmail = User.email();
+          const currentUserEmail = UserManager.getCurrentEmail();
           const userInfo = DB.findUserById(params.userId);
           
           if (!userInfo) {
@@ -111,7 +136,7 @@ function doGet(e) {
           throw new Error('Admin mode requires userId parameter');
         }
         try {
-          const currentUserEmail = User.email();
+          const currentUserEmail = UserManager.getCurrentEmail();
           
           // 🔍 デバッグ情報取得
           const debugInfo = {
@@ -148,7 +173,7 @@ function doGet(e) {
           // ユーザー情報変換
           const compatUserInfo = {
             userId: params.userId,
-            userEmail: accessResult.config?.userEmail || User.email(),
+            userEmail: accessResult.config?.userEmail || UserManager.getCurrentEmail(),
             configJson: JSON.stringify(accessResult.config || {}),
           };
 
@@ -170,7 +195,7 @@ function doGet(e) {
         }
 
         try {
-          const accessResult = App.getAccess().verifyAccess(params.userId, 'view', User.email());
+          const accessResult = App.getAccess().verifyAccess(params.userId, 'view', UserManager.getCurrentEmail());
           if (!accessResult.allowed) {
             console.warn('View access denied:', accessResult);
             if (accessResult.userType === 'not_found') {
@@ -218,7 +243,7 @@ const Services = {
   user: {
     get current() {
       try {
-        const email = User.email();
+        const email = UserManager.getCurrentEmail();
         if (!email) return null;
 
         // 簡易的なユーザー情報を返す（将来的にはApp.getConfig()経由）
@@ -276,7 +301,7 @@ const Deploy = {
     try {
       console.log('Deploy.domain() - start');
 
-      const activeUserEmail = User.email();
+      const activeUserEmail = UserManager.getCurrentEmail();
       const currentDomain = getEmailDomain(activeUserEmail);
 
       // WebAppのURLを取得してドメインを判定
@@ -318,7 +343,7 @@ const Deploy = {
     try {
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-      const currentUserEmail = User.email();
+      const currentUserEmail = UserManager.getCurrentEmail();
 
       console.log('Deploy.isUser() - 管理者確認:', adminEmail, currentUserEmail);
       return adminEmail === currentUserEmail;
@@ -361,26 +386,15 @@ function getGoogleClientId() {
       const allProperties = properties.getProperties();
       console.log('Available properties:', Object.keys(allProperties));
 
-      return {
-        success: false,
-        message: 'Google Client ID not configured',
-        setupInstructions:
-          'Please set GOOGLE_CLIENT_ID in Google Apps Script project settings under Properties > Script Properties',
-      };
+      return createResponse(false, 'Google Client ID not configured', {
+        setupInstructions: 'Please set GOOGLE_CLIENT_ID in Google Apps Script project settings under Properties > Script Properties'
+      });
     }
 
-    return {
-      success: true,
-      message: 'Google Client IDを取得しました',
-      data: { clientId },
-    };
+    return createResponse(true, 'Google Client IDを取得しました', { clientId });
   } catch (error) {
     console.error('GOOGLE_CLIENT_ID取得エラー:', error.message);
-    return {
-      success: false,
-      message: `Google Client IDの取得に失敗しました: ${  error.toString()}`,
-      data: { clientId: '' },
-    };
+    return createResponse(false, `Google Client IDの取得に失敗しました: ${error.toString()}`, { clientId: '' }, error);
   }
 }
 
@@ -448,17 +462,16 @@ function getSystemDomainInfo() {
     const domainInfo = Deploy.domain();
     const isDomainMatch = domainInfo.isDomainMatch !== undefined ? domainInfo.isDomainMatch : false;
 
-    return {
-      success: true,
+    return createResponse(true, 'System domain info retrieved', {
       adminEmail,
       adminDomain,
       isDomainMatch,
       currentDomain: domainInfo.currentDomain || '不明',
-      deployDomain: domainInfo.deployDomain || adminDomain,
-    };
+      deployDomain: domainInfo.deployDomain || adminDomain
+    });
   } catch (e) {
     console.error('getSystemDomainInfo エラー:', e.message);
-    return { error: e.message };
+    return createResponse(false, 'System domain info取得エラー', null, e);
   }
 }
 
@@ -475,7 +488,7 @@ function showAdminPanel() {
     console.log('showAdminPanel - start');
 
     // Admin権限でのアクセス確認
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
     if (activeUserEmail) {
       const userProperties = PropertiesService.getUserProperties();
       const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
@@ -536,7 +549,7 @@ function showAnswerBoard(userId) {
     }
 
     // アクセス権限確認
-    const accessResult = App.getAccess().verifyAccess(userId, 'view', User.email());
+    const accessResult = App.getAccess().verifyAccess(userId, 'view', UserManager.getCurrentEmail());
     if (!accessResult.allowed) {
       if (accessResult.userType === 'not_found') {
         return HtmlService.createHtmlOutput(
@@ -644,7 +657,7 @@ function getWebAppUrl() {
       console.log('getWebAppUrl: Script ID確認', scriptId);
 
       // Google Workspace環境を考慮した動的URL構築
-      const currentUser = Session.getActiveUser().getEmail();
+      const currentUser = UserManager.getCurrentEmail();
       const domain = getEmailDomain(currentUser);
 
       let baseUrl;
@@ -1226,13 +1239,7 @@ function checkCurrentPublicationStatus(userId) {
  * テスト用シンプルAPI（テスト専用）
  */
 function getTestMockResponse() {
-  return {
-    success: true,
-    message: 'Test mock response',
-    data: {
-      reason: 'C',
-    },
-  };
+  return createResponse(true, 'Test mock response', { reason: 'C' });
 }
 
 /**
@@ -1242,11 +1249,7 @@ function getTestMockResponse() {
  */
 function saveApplicationConfig(config) {
   console.log('アプリケーション設定を保存:', config);
-  return {
-    success: true,
-    message: '保存しました',
-    config,
-  };
+  return createResponse(true, '保存しました', { config });
 }
 
 // publishApplication: AdminPanelBackend.gsに統合済み
@@ -1269,7 +1272,7 @@ function setupApplication(
     console.log('setupApplication - セットアップ開始');
 
     // 現在のユーザーのメールアドレスを取得
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     if (!currentUserEmail) {
       throw new Error('認証されたユーザーが必要です');
     }
@@ -1344,12 +1347,9 @@ function setupApplication(
 
     console.log('setupApplication - セットアップ完了');
 
-    return {
-      success: true,
-      message: 'システムセットアップが正常に完了しました',
-      adminEmail: finalAdminEmail,
-      timestamp: new Date().toISOString(),
-    };
+    return createResponse(true, 'システムセットアップが正常に完了しました', { 
+      adminEmail: finalAdminEmail 
+    });
   } catch (error) {
     console.error('setupApplication エラー:', error);
     throw new Error(`セットアップに失敗しました: ${error.message}`);
@@ -1363,7 +1363,7 @@ function setupApplication(
  */
 function getUser(format = 'object') {
   try {
-    const email = User.email() || null;
+    const email = UserManager.getCurrentEmail() || null;
     let userId = null;
 
     // emailが取得できた場合、userIdも取得してセッション保存
@@ -1395,13 +1395,11 @@ function getUser(format = 'object') {
     }
 
     // オブジェクト形式（デフォルト）
-    return {
-      success: true,
+    return createResponse(true, email ? 'ユーザー取得成功' : 'ユーザー未認証', {
       email,
       userId,
-      isAuthenticated: !!email,
-      message: email ? 'ユーザー取得成功' : 'ユーザー未認証',
-    };
+      isAuthenticated: !!email
+    });
   } catch (error) {
     console.error('getUser エラー:', error);
 
@@ -1425,10 +1423,10 @@ function getUser(format = 'object') {
 function forceUrlSystemReset() {
   try {
     console.log('URL system reset requested');
-    return { success: true, message: 'URL system reset completed' };
+    return createResponse(true, 'URL system reset completed');
   } catch (error) {
     console.error('forceUrlSystemReset error:', error);
-    return { success: false, message: error.message };
+    return createResponse(false, error.message, null, error);
   }
 }
 
@@ -1440,11 +1438,34 @@ function forceUrlSystemReset() {
 function reportClientError(errorInfo) {
   try {
     console.error('🚨 CLIENT ERROR:', errorInfo);
-    return { success: true, message: 'Error reported successfully' };
+    return createResponse(true, 'Error reported successfully');
   } catch (error) {
     console.error('reportClientError failed:', error);
-    return { success: false, message: error.message };
+    return createResponse(false, error.message, null, error);
   }
+}
+
+/**
+ * API統一レスポンス生成
+ * 全API関数で一貫したレスポンス形式を提供
+ * @param {boolean} success - 成功/失敗フラグ  
+ * @param {string|null} message - メッセージ
+ * @param {Object|null} data - データ
+ * @param {Error|null} error - エラーオブジェクト
+ * @returns {Object} 統一レスポンス形式
+ */
+function createResponse(success, message = null, data = null, error = null) {
+  const response = { success };
+  
+  if (message) response.message = message;
+  if (data) response.data = data;
+  if (error) {
+    response.error = error.message;
+    response.stack = error.stack;
+  }
+  response.timestamp = new Date().toISOString();
+  
+  return response;
 }
 
 /**
@@ -1455,10 +1476,10 @@ function reportClientError(errorInfo) {
 function addSpreadsheetUrl(url) {
   try {
     console.log('addSpreadsheetUrl called with:', url);
-    return { success: true, message: 'URL added successfully' };
+    return createResponse(true, 'URL added successfully');
   } catch (error) {
     console.error('addSpreadsheetUrl error:', error);
-    return { success: false, message: error.message };
+    return createResponse(false, 'URL追加に失敗しました', null, error);
   }
 }
 
@@ -1468,14 +1489,14 @@ function addSpreadsheetUrl(url) {
  */
 function resetUserAuthentication() {
   try {
-    const session = Session.getActiveUser();
-    if (session) {
+    const userEmail = UserManager.getCurrentEmail();
+    if (userEmail) {
       console.log('ユーザー認証をリセットしました');
     }
-    return { success: true, message: '認証リセット完了' };
+    return createResponse(true, '認証リセット完了');
   } catch (error) {
     console.error('resetUserAuthentication エラー:', error);
-    return { success: false, message: error.message };
+    return createResponse(false, error.message, null, error);
   }
 }
 
@@ -1486,10 +1507,10 @@ function resetUserAuthentication() {
 function testForceLogoutRedirect() {
   try {
     console.log('強制ログアウト・リダイレクトテストを実行');
-    return { success: true, message: 'テスト実行完了' };
+    return createResponse(true, 'テスト実行完了');
   } catch (error) {
     console.error('testForceLogoutRedirect エラー:', error);
-    return { success: false, message: error.message };
+    return createResponse(false, error.message, null, error);
   }
 }
 
@@ -1499,17 +1520,15 @@ function testForceLogoutRedirect() {
  */
 function verifyUserAuthentication() {
   try {
-    const email = User.email();
+    const email = UserManager.getCurrentEmail();
     const isAuthenticated = !!email;
-    return {
-      success: true,
+    return createResponse(true, isAuthenticated ? '認証済み' : '未認証', {
       authenticated: isAuthenticated,
-      email: email || null,
-      message: isAuthenticated ? '認証済み' : '未認証',
-    };
+      email: email || null
+    });
   } catch (error) {
     console.error('verifyUserAuthentication エラー:', error);
-    return { success: false, authenticated: false, message: error.message };
+    return createResponse(false, error.message, { authenticated: false }, error);
   }
 }
 
@@ -1520,14 +1539,12 @@ function verifyUserAuthentication() {
 function forceLogoutAndRedirectToLogin() {
   try {
     console.log('forceLogoutAndRedirectToLogin called');
-    return {
-      success: true,
-      redirectUrl: `${getWebAppUrl()}?mode=login`,
-      message: 'Logout successful',
-    };
+    return createResponse(true, 'Logout successful', {
+      redirectUrl: `${getWebAppUrl()}?mode=login`
+    });
   } catch (error) {
     console.error('forceLogoutAndRedirectToLogin error:', error);
-    return { success: false, message: error.message };
+    return createResponse(false, error.message, null, error);
   }
 }
 
@@ -1567,10 +1584,10 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
     } else {
       // Step 2: User.email()からの取得を試行
       try {
-        currentUserEmail = User.email();
-        console.log('getPublishedSheetData: User.email()結果', currentUserEmail);
+        currentUserEmail = UserManager.getCurrentEmail();
+        console.log('getPublishedSheetData: UserManager.getCurrentEmail()結果', currentUserEmail);
       } catch (emailError) {
-        console.warn('getPublishedSheetData: User.email()取得失敗', emailError.message);
+        console.warn('getPublishedSheetData: UserManager.getCurrentEmail()取得失敗', emailError.message);
       }
 
       // Step 3: メールアドレスからユーザー検索
@@ -1625,7 +1642,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
     );
   } catch (error) {
     console.error('getPublishedSheetData エラー:', error);
-    return { success: false, data: [], message: error.message };
+    return createResponse(false, error.message, { data: [] }, error);
   }
 }
 
@@ -1665,7 +1682,7 @@ function handleSystemError(context, error, userId = null, additionalData = {}) {
  */
 function getActiveUserInfo() {
   try {
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     if (!currentUserEmail) return null;
 
     const userInfo = DB.findUserByEmail(currentUserEmail);

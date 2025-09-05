@@ -21,7 +21,7 @@ const PAGE_CONFIG = Object.freeze({
  */
 function checkAdmin(userId = null) {
   try {
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     console.log('checkAdmin: 管理者権限チェック開始', {
       userId: userId ? `${userId.substring(0, 8)}...` : 'null',
       currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null',
@@ -73,7 +73,7 @@ function checkAdmin(userId = null) {
  */
 function getAvailableSheets(userId = null) {
   try {
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     console.log('getAvailableSheets: シート一覧取得開始', {
       userId: userId ? `${userId.substring(0, 8)}...` : 'null',
     });
@@ -136,7 +136,7 @@ function getAvailableSheets(userId = null) {
  */
 function clearActiveSheet(userId = null) {
   try {
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     console.log('clearActiveSheet: アクティブシートクリア開始', {
       userId: userId ? `${userId.substring(0, 8)}...` : 'null',
     });
@@ -183,12 +183,10 @@ function clearActiveSheet(userId = null) {
     // ユーザーのアクティブシート情報をリセット（必要に応じて）
     // 現在のシステムではsheetNameは保持するため、特別な処理は不要
 
-    const result = {
-      success: true,
+    const result = createResponse(true, 'キャッシュクリア完了', {
       clearedCacheCount: clearedCount,
-      userId: targetUserId,
-      timestamp: new Date().toISOString(),
-    };
+      userId: targetUserId
+    });
 
     console.log('clearActiveSheet: 完了', result);
     return result;
@@ -199,11 +197,7 @@ function clearActiveSheet(userId = null) {
       userId,
     });
 
-    return {
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    };
+    return createResponse(false, 'キャッシュクリアエラー', null, error);
   }
 }
 
@@ -216,7 +210,7 @@ function clearActiveSheet(userId = null) {
  */
 function addReactionBatch(requestUserId, batchOperations) {
   try {
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     console.log('addReactionBatch: バッチリアクション処理開始', {
       userId: requestUserId ? `${requestUserId.substring(0, 8)  }...` : 'null',
       operationsCount: Array.isArray(batchOperations) ? batchOperations.length : 0,
@@ -321,13 +315,11 @@ function addReactionBatch(requestUserId, batchOperations) {
       success: successCount,
     });
 
-    return {
-      success: true,
+    return createResponse(true, 'バッチリアクション処理完了', {
       processedCount: batchOperations.length,
       successCount,
-      timestamp: new Date().toISOString(),
-      details: batchResults,
-    };
+      details: batchResults
+    });
   } catch (error) {
     console.error('addReactionBatch エラー:', {
       error: error.message,
@@ -335,12 +327,9 @@ function addReactionBatch(requestUserId, batchOperations) {
       requestUserId,
     });
 
-    return {
-      success: false,
-      error: error.message,
-      fallbackToIndividual: true, // クライアント側が個別処理にフォールバック可能
-      timestamp: new Date().toISOString(),
-    };
+    return createResponse(false, 'バッチリアクション処理エラー', {
+      fallbackToIndividual: true // クライアント側が個別処理にフォールバック可能
+    }, error);
   }
 }
 
@@ -352,7 +341,7 @@ function addReactionBatch(requestUserId, batchOperations) {
  */
 function refreshBoardData(requestUserId) {
   try {
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     console.log('refreshBoardData: ボードデータ更新開始', {
       userId: requestUserId ? `${requestUserId.substring(0, 8)  }...` : 'null',
     });
@@ -419,14 +408,11 @@ function refreshBoardData(requestUserId) {
       latestConfig = { status: 'error', message: '設定の取得に失敗しました' };
     }
 
-    const result = {
-      success: true,
+    const result = createResponse(true, 'ボードデータを更新しました', {
       clearedCacheCount: clearedCount,
       config: latestConfig,
-      userId: requestUserId,
-      timestamp: new Date().toISOString(),
-      message: 'ボードデータを更新しました',
-    };
+      userId: requestUserId
+    });
 
     console.log('refreshBoardData: 完了', {
       clearedCount,
@@ -442,13 +428,9 @@ function refreshBoardData(requestUserId) {
       requestUserId,
     });
 
-    return {
-      success: false,
-      status: 'error',
-      error: error.message,
-      message: `ボードデータの再読み込みに失敗しました: ${  error.message}`,
-      timestamp: new Date().toISOString(),
-    };
+    return createResponse(false, `ボードデータの再読み込みに失敗しました: ${error.message}`, {
+      status: 'error'
+    }, error);
   }
 }
 
@@ -463,7 +445,7 @@ function refreshBoardData(requestUserId) {
  */
 function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
   try {
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     console.log('getDataCount: データ件数取得開始', {
       userId: requestUserId ? `${requestUserId.substring(0, 8)  }...` : 'null',
       classFilter,

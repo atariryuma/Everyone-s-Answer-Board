@@ -316,7 +316,11 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
  */
 function validateSpreadsheetHeaders(headerIndices) {
   if (!headerIndices || typeof headerIndices !== 'object') {
-    return { success: false, missing: ['すべて'], hasReasonColumn: false, hasOpinionColumn: false };
+    return createResponse(false, 'ヘッダー検証失敗', { 
+      missing: ['すべて'], 
+      hasReasonColumn: false, 
+      hasOpinionColumn: false 
+    });
   }
 
   const headerNames = Object.keys(headerIndices);

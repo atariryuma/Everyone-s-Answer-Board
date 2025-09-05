@@ -39,7 +39,7 @@ function checkServiceAccountStatus() {
     }
 
     // 3. 現在の実行ユーザー確認
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     console.log('👤 実行ユーザー:', currentUser);
     console.log('🔐 管理者権限:', currentUser === adminEmail ? '✅あり' : '❌なし');
 
@@ -79,21 +79,17 @@ function checkServiceAccountStatus() {
     console.log('✅ サービスアカウント動作確認完了');
     console.log('='.repeat(50));
 
-    return {
-      success: true,
+    return createResponse(true, 'サービスアカウント確認完了', {
       hasServiceAccount: !!serviceAccountCreds,
       hasDatabaseId: !!databaseId,
       hasAdminEmail: !!adminEmail,
       currentUser,
       isAdmin: currentUser === adminEmail
-    };
+    });
 
   } catch (error) {
     console.error('❌ サービスアカウント確認エラー:', error.message);
-    return {
-      success: false,
-      error: error.message
-    };
+    return createResponse(false, 'エラーが発生しました', null, error);
   }
 }
 
@@ -113,7 +109,7 @@ function forceCleanupConfigJson() {
     }
 
     // 現在のユーザー情報取得
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
     
     if (!userInfo) {
@@ -175,8 +171,8 @@ function forceCleanupConfigJson() {
 
     console.log('🔧 クリーンアップ後の構造:', Object.keys(cleanedConfig));
 
-    // 直接データベース更新
-    const updateResult = DB.updateUserConfig(userInfo.userId, cleanedConfig);
+    // ConfigManager経由でデータベース更新
+    const updateResult = ConfigManager.saveConfig(userInfo.userId, cleanedConfig);
     
     console.log('💾 更新結果:', updateResult.success ? '✅成功' : '❌失敗');
 
@@ -189,19 +185,15 @@ function forceCleanupConfigJson() {
     console.log('✅ 強制configJSONクリーンアップ完了');
     console.log('='.repeat(50));
 
-    return {
-      success: true,
+    return createResponse(true, '強制configJSONクリーンアップ完了', {
       originalLength: userInfo.configJson?.length || 0,
       cleanedLength: updatedUser.configJson?.length || 0,
       cleanedFields: Object.keys(cleanedConfig)
-    };
+    });
 
   } catch (error) {
     console.error('❌ 強制クリーンアップエラー:', error.message);
-    return {
-      success: false,
-      error: error.message
-    };
+    return createResponse(false, 'エラーが発生しました', null, error);
   }
 }
 
@@ -252,17 +244,13 @@ function diagnoseDatabase() {
     console.log('✅ データベース診断完了');
     console.log('='.repeat(50));
 
-    return {
-      success: true,
+    return createResponse(true, 'データベース診断完了', {
       headers,
       userCount: Math.max(0, values.length - 1)
-    };
+    });
 
   } catch (error) {
     console.error('❌ データベース診断エラー:', error.message);
-    return {
-      success: false,
-      error: error.message
-    };
+    return createResponse(false, 'エラーが発生しました', null, error);
   }
 }

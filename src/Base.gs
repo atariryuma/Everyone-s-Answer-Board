@@ -176,7 +176,7 @@ class ConfigurationManager {
     // columnsは必要時のみ保持（デフォルト列設定）
     optimizedConfig.columns = this.getDefaultColumns();
 
-    console.info('Base.gs 初期化: 最適化済みconfigJSON使用', {
+    console.log('Base.gs 初期化: 最適化済みconfigJSON使用', {
       userId,
       email,
       optimizedSize: JSON.stringify(optimizedConfig).length,
@@ -414,7 +414,7 @@ class AccessController {
       return 'owner';
     }
 
-    if (User.email() === currentUserEmail) {
+    if (UserManager.getCurrentEmail() === currentUserEmail) {
       return 'authenticated_user';
     }
 
@@ -430,7 +430,7 @@ class AccessController {
     try {
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-      const userEmail = currentUserEmail || User.email();
+      const userEmail = currentUserEmail || UserManager.getCurrentEmail();
       return adminEmail && userEmail && adminEmail === userEmail;
     } catch (e) {
       console.error(`isSystemAdmin エラー: ${e.message}`);
@@ -489,12 +489,7 @@ class ErrorHandler {
    * @return {Object} 成功応答オブジェクト
    */
   static success(data = null, message = null) {
-    return {
-      success: true,
-      data,
-      message,
-      timestamp: new Date().toISOString(),
-    };
+    return createResponse(true, message, data);
   }
 
   /**
@@ -506,13 +501,8 @@ class ErrorHandler {
    */
   static error(error, context = 'Unknown', data = null) {
     this.log(context, error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-      context,
-      data,
-      timestamp: new Date().toISOString(),
-    };
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    return createResponse(false, `${context}: ${errorObj.message}`, data, errorObj);
   }
 
   /**

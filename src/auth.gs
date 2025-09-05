@@ -25,7 +25,7 @@ function createCompleteUser(userEmail) {
     lastModified: timestamp
   };
 
-  console.info('新規ユーザー作成: 最適化済みconfigJSON使用', {
+  console.log('新規ユーザー作成: 最適化済みconfigJSON使用', {
     userEmail,
     configSize: JSON.stringify(minimalConfig).length,
     removedFields: ['userId', 'userEmail', 'createdAt'], // DB列に移行済み
@@ -76,7 +76,7 @@ function handleUserRegistration(userEmail, bypassCache = false) {
     DB.findUserByEmail(userEmail);
   
   if (bypassCache) {
-    console.info('🔄 handleUserRegistration: キャッシュバイパスモード', { userEmail });
+    console.log('🔄 handleUserRegistration: キャッシュバイパスモード', { userEmail });
   }
 
   if (existingUser) {
@@ -107,7 +107,7 @@ function processLoginFlow(userEmail) {
 
     // 1. ユーザー情報をデータベースから直接取得（ログイン時はキャッシュバイパス）
     const userInfo = DB.findUserByEmailNoCache(userEmail);
-    console.info('🔄 processLoginFlow: キャッシュバイパスでユーザー検索', { userEmail });
+    console.log('🔄 processLoginFlow: キャッシュバイパスでユーザー検索', { userEmail });
 
     // 2. 既存ユーザーの処理
     if (userInfo) {

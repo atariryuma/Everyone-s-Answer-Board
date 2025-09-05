@@ -218,14 +218,14 @@ function registerNewUser(userEmail) {
   // Sanitize email input
   const sanitizedEmail = SecurityValidator.sanitizeInput(userEmail, SECURITY.MAX_LENGTHS.EMAIL);
 
-  console.info('🚀 registerNewUser: Starting registration process', {
+  console.log('🚀 registerNewUser: Starting registration process', {
     userEmail: sanitizedEmail,
     timestamp: new Date().toISOString(),
   });
 
   try {
     // Authentication check with sanitized email
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
 
     if (sanitizedEmail !== currentUserEmail) {
       const error = new Error(
@@ -254,7 +254,7 @@ function registerNewUser(userEmail) {
     }
 
     // 既存ユーザーチェック（1ユーザー1行の原則）
-    console.info('registerNewUser: 既存ユーザーチェック');
+    console.log('registerNewUser: 既存ユーザーチェック');
     const existingUser = DB.findUserByEmail(sanitizedEmail);
 
     if (existingUser) {
@@ -262,7 +262,7 @@ function registerNewUser(userEmail) {
       const { userId } = existingUser;
       const existingConfig = existingUser.parsedConfig || {};
 
-      console.info('registerNewUser: 既存ユーザー更新:', sanitizedEmail);
+      console.log('registerNewUser: 既存ユーザー更新:', sanitizedEmail);
 
       // 最終アクセス時刻のみ更新（設定は保護）
       updateUserLastAccess(userId);
@@ -270,7 +270,7 @@ function registerNewUser(userEmail) {
       // キャッシュを無効化して最新状態を反映
       invalidateUserCache(userId, sanitizedEmail, existingUser.spreadsheetId, false);
 
-      console.info('registerNewUser: 既存ユーザー更新完了');
+      console.log('registerNewUser: 既存ユーザー更新完了');
 
       const appUrls = generateUserUrls(userId);
 
@@ -285,13 +285,13 @@ function registerNewUser(userEmail) {
     }
 
     // 新規ユーザーの場合
-    console.info('registerNewUser: 新ユーザー作成');
+    console.log('registerNewUser: 新ユーザー作成');
 
     try {
       // 統一ユーザー作成関数を使用（ログイン時はキャッシュバイパス）
       const newUser = handleUserRegistration(sanitizedEmail, true);
 
-      console.info('✅ registerNewUser: New user created successfully', {
+      console.log('✅ registerNewUser: New user created successfully', {
         userEmail: sanitizedEmail,
         userId: newUser.userId,
         databaseWriteTime: `${Date.now() - startTime  }ms`,
@@ -303,7 +303,7 @@ function registerNewUser(userEmail) {
       // 成功レスポンスを返す
       const appUrls = generateUserUrls(newUser.userId);
 
-      console.info('🎉 registerNewUser: New user registration completed', {
+      console.log('🎉 registerNewUser: New user registration completed', {
         userEmail: sanitizedEmail,
         userId: newUser.userId,
         totalExecutionTime: `${Date.now() - startTime  }ms`,
@@ -355,7 +355,7 @@ function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
   clearExecutionUserInfoCache();
 
   try {
-    const reactingUserEmail = User.email();
+    const reactingUserEmail = UserManager.getCurrentEmail();
     const ownerUserId = requestUserId; // requestUserId を使用
 
     // ボードオーナーの情報をDBから取得（キャッシュ利用）
@@ -438,7 +438,7 @@ function getCurrentSheetName(spreadsheetId) {
 
 /**
  * マルチテナント環境でのユーザーアクセス権限を検証します。
- * リクエストを投げたユーザー (User.email()) が、
+ * リクエストを投げたユーザー (UserManager.getCurrentEmail()) が、
  * requestUserId のデータにアクセスする権限を持っているかを確認します。
  * 権限がない場合はエラーをスローします。
  * @param {string} requestUserId - アクセスを要求しているユーザーのID
@@ -452,13 +452,13 @@ function verifyUserAccess(requestUserId) {
     throw new Error('ユーザーIDが必要です');
   }
 
-  const result = App.getAccess().verifyAccess(requestUserId, 'view', User.email());
+  const result = App.getAccess().verifyAccess(requestUserId, 'view', UserManager.getCurrentEmail());
   if (!result.allowed) {
     throw new Error(`アクセスが拒否されました: ${  result.reason}`);
   }
 
   console.log(
-    `✅ ユーザーアクセス検証成功: ${User.email()} は ${requestUserId} のデータにアクセスできます。`
+    `✅ ユーザーアクセス検証成功: ${UserManager.getCurrentEmail()} は ${requestUserId} のデータにアクセスできます。`
   );
   return result;
 }
@@ -818,7 +818,7 @@ function formatSheetDataForFrontend(
   displayMode
 ) {
   // 現在のユーザーメールを取得（リアクション状態判定用）
-  const currentUserEmail = User.email();
+  const currentUserEmail = UserManager.getCurrentEmail();
 
   return rawData.map((row, index) => {
     const classIndex = mappedIndices.classHeader;
@@ -1113,7 +1113,7 @@ function getResponsesData(userId, sheetName) {
  */
 function getCurrentUserStatus(requestUserId) {
   try {
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
 
     // requestUserIdが無効な場合は、メールアドレスでユーザーを検索
     let userInfo;
@@ -1331,7 +1331,7 @@ function toggleHighlight(requestUserId, rowIndex, sheetName) {
     }
 
     // 管理者権限チェック - 現在のユーザーがボードの所有者かどうかを確認
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
     if (activeUserEmail !== userInfo.userEmail) {
       throw new Error('ハイライト機能は管理者のみ使用できます');
     }
@@ -2584,7 +2584,7 @@ function getSheetsList(userId) {
 
         // 最終手段：ユーザー権限での修復も試行
         try {
-          const currentUserEmail = User.email();
+          const currentUserEmail = UserManager.getCurrentEmail();
           if (currentUserEmail === userInfo.userEmail) {
             repairUserSpreadsheetAccess(currentUserEmail, config.spreadsheetId);
             console.log('getSheetsList: ユーザー権限での修復を実行しました。');
@@ -3067,7 +3067,7 @@ function updateIsActiveStatus(requestUserId, isActive) {
     verifyUserAccess(requestUserId);
   }
   try {
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
     if (!activeUserEmail) {
       return {
         status: 'error',
@@ -3130,7 +3130,7 @@ function updateIsActiveStatus(requestUserId, isActive) {
  */
 function hasSetupPageAccess() {
   try {
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
     if (!activeUserEmail) {
       return false;
     }
@@ -3184,7 +3184,7 @@ function isSystemAdmin() {
   try {
     const props = PropertiesService.getScriptProperties();
     const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     return adminEmail && currentUserEmail && adminEmail === currentUserEmail;
   } catch (e) {
     console.error(`isSystemAdmin エラー: ${  e.message}`);
@@ -3274,7 +3274,7 @@ function createForm(requestUserId, config) {
   try {
     // セキュリティチェック: ユーザー認証と入力検証
     verifyUserAccess(requestUserId);
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
 
     // 入力検証
     if (!config || typeof config !== 'object') {
@@ -3526,7 +3526,7 @@ function activateSheetSimple(requestUserId, sheetName) {
  */
 function getLoginStatus() {
   try {
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
     if (!activeUserEmail) {
       return { status: 'error', message: 'ログインユーザーの情報を取得できませんでした。' };
     }
@@ -3621,7 +3621,7 @@ function getInitialData(requestUserId, targetSheetName) {
     const startTime = new Date().getTime();
 
     // === ステップ1: ユーザー認証とユーザー情報取得（キャッシュ活用） ===
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
     const currentUserId = requestUserId;
 
     // UserID の解決
@@ -3919,7 +3919,7 @@ function getApplicationStatusForUI() {
   try {
     const accessCheck = Access.check();
     const isEnabled = getApplicationEnabled();
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
 
     return {
       status: 'success',
@@ -4357,14 +4357,14 @@ function performAutoRepair(userId) {
       config.claudeMdCompliant = true;
       
       DB.updateUser(userId, config);
-      console.info('✅ performAutoRepair: configJSON更新完了', {
+      console.log('✅ performAutoRepair: configJSON更新完了', {
         userId,
         fixedItems: repairResults.fixedItems.length,
         claudeMdCompliant: true
       });
     }
 
-    console.info('✅ performAutoRepair: CLAUDE.md準拠システム修復完了', {
+    console.log('✅ performAutoRepair: CLAUDE.md準拠システム修復完了', {
       userId,
       fixedItems: repairResults.fixedItems,
       configUpdated: repairResults.configUpdated,

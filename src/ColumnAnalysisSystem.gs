@@ -26,7 +26,7 @@ function analyzeColumnType(headerName, sampleData = []) {
 
     const confidence = Math.max(75, ensembleScores[bestType] || 0);
 
-    console.info('🚀 超高精度列タイプ分析完了:', {
+    console.log('🚀 超高精度列タイプ分析完了:', {
       headerName: headerName.substring(0, 30),
       bestType,
       confidence,
@@ -233,7 +233,7 @@ function calculateFinalConfidence(headerScore, contentScore) {
   // 最低信頼度の保証
   const adjustedConfidence = Math.max(confidence, 50);
 
-  console.info('列タイプ分析完了:', {
+  console.log('列タイプ分析完了:', {
     headerScores: headerScore,
     contentScores: contentScore,
     finalScores,
@@ -698,7 +698,7 @@ function resolveColumnConflicts(headerRow, allData) {
     }
   });
 
-  console.info('🎯 重複回避・最適割り当て完了:', {
+  console.log('🎯 重複回避・最適割り当て完了:', {
     totalColumns: columnCount,
     assignedColumns: assignmentLog.length,
     assignments: assignmentLog,

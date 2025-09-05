@@ -17,7 +17,7 @@ function getCurrentConfig(userId = null) {
     if (userId) {
       userInfo = DB.findUserById(userId);
     } else {
-      const currentUser = User.email();
+      const currentUser = UserManager.getCurrentEmail();
       userInfo = DB.findUserByEmail(currentUser);
     }
 
@@ -27,7 +27,7 @@ function getCurrentConfig(userId = null) {
         setupStatus: 'pending',
         appPublished: false,
         displaySettings: { showNames: false, showReactions: false }, // CLAUDE.md準拠
-        user: userId || User.email(),
+        user: userId || UserManager.getCurrentEmail(),
       };
     }
 
@@ -86,7 +86,7 @@ function getCurrentConfig(userId = null) {
     };
 
     // CLAUDE.md準拠：構造化ログによる設定情報出力
-    console.info('📋 getCurrentConfig: configJSON中心型設定取得完了', {
+    console.log('📋 getCurrentConfig: configJSON中心型設定取得完了', {
       userId: fullConfig.userId,
       hasSpreadsheetId: !!fullConfig.spreadsheetId, // 統一データソース
       hasSheetName: !!fullConfig.sheetName, // 統一データソース
@@ -163,7 +163,7 @@ function connectDataSource(spreadsheetId, sheetName) {
     }
 
     // CLAUDE.md準拠：現在のユーザー取得とconfigJSON統合
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (userInfo) {
@@ -259,14 +259,14 @@ function connectDataSource(spreadsheetId, sheetName) {
  */
 function publishApplication(config) {
   try {
-    console.info('🚀 publishApplication: CLAUDE.md準拠configJSON中心型公開開始', {
+    console.log('🚀 publishApplication: CLAUDE.md準拠configJSON中心型公開開始', {
       hasSpreadsheetId: !!config.spreadsheetId,
       hasSheetName: !!config.sheetName,
       hasColumnMapping: !!config.columnMapping,
       timestamp: new Date().toISOString()
     });
 
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
@@ -342,7 +342,7 @@ function publishApplication(config) {
         setupStatus: 'completed'
       });
       
-      console.info('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {
+      console.log('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {
         userId: userInfo.userId,
         appUrl: publishResult.appUrl,
         configFields: Object.keys(publishedConfig).length,
@@ -382,12 +382,12 @@ function publishApplication(config) {
  */
 function saveDraftConfiguration(config) {
   try {
-    console.info('💾 saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存開始', {
+    console.log('💾 saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存開始', {
       configKeys: Object.keys(config),
       timestamp: new Date().toISOString()
     });
 
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
@@ -407,7 +407,7 @@ function saveDraftConfiguration(config) {
     
     const updatedConfig = draftConfig;
 
-    console.info('✅ saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存完了', {
+    console.log('✅ saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存完了', {
       userId: userInfo.userId,
       draftVersion: updatedConfig.draftVersion,
       configFields: Object.keys(updatedConfig).length,
@@ -494,7 +494,7 @@ function getFormInfo(spreadsheetId, sheetName) {
         }
       }
     } catch (error) {
-      console.info('フォーム連携なし:', sheetName);
+      console.log('フォーム連携なし:', sheetName);
     }
 
     const formData = {
@@ -541,7 +541,7 @@ function getSpreadsheetList() {
     console.log('📊 getSpreadsheetList: スプレッドシート一覧取得開始');
 
     // キャッシュキー生成（ユーザー固有）
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     const cacheKey = `spreadsheet_list_${Utilities.base64Encode(currentUser).replace(/[^a-zA-Z0-9]/g, '')}`;
     
     // キャッシュから取得を試行（1時間キャッシュ）
@@ -554,7 +554,7 @@ function getSpreadsheetList() {
       let count = 0;
 
       // 現在のユーザーを取得（オーナーフィルタリング用）
-      const currentUserEmail = User.email();
+      const currentUserEmail = UserManager.getCurrentEmail();
       
       // Drive APIでオーナーが自分のスプレッドシートのみを検索
       const files = DriveApp.searchFiles(
@@ -657,9 +657,9 @@ function generateUserUrls(userId) {
  */
 function executeConfigCleanup() {
   try {
-    console.info('🧹 configJSONクリーンアップ実行開始');
+    console.log('🧹 configJSONクリーンアップ実行開始');
 
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
@@ -669,7 +669,7 @@ function executeConfigCleanup() {
     // SystemManagerのクリーンアップ機能を使用
     const result = cleanupConfigJsonData(userInfo.userId);
 
-    console.info('✅ configJSONクリーンアップ実行完了', result);
+    console.log('✅ configJSONクリーンアップ実行完了', result);
 
     return {
       success: true,
@@ -714,7 +714,7 @@ function generateColumnMapping(headerRow, data = []) {
     // 重複回避・最適割り当てアルゴリズム実行
     const result = resolveColumnConflicts(headerRow, data);
     
-    console.info('✅ 超高精度列マッピング生成完了:', {
+    console.log('✅ 超高精度列マッピング生成完了:', {
       mappedColumns: Object.keys(result.mapping).length,
       averageConfidence: result.averageConfidence || 'N/A',
       conflictsResolved: result.conflictsResolved,
@@ -955,7 +955,7 @@ function getCurrentBoardInfoAndUrls() {
       }
     };
 
-    console.info('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
+    console.log('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
       isActive: boardInfo.isActive,
       hasQuestionText: !!boardInfo.questionText,
       questionText: boardInfo.questionText,
@@ -991,10 +991,10 @@ function checkIsSystemAdmin() {
   try {
     console.log('🔐 checkIsSystemAdmin: システム管理者権限確認開始');
 
-    const currentUserEmail = User.email();
+    const currentUserEmail = UserManager.getCurrentEmail();
     const isSystemAdmin = App.getAccess().isSystemAdmin(currentUserEmail);
     
-    console.info('✅ checkIsSystemAdmin: 権限確認完了', {
+    console.log('✅ checkIsSystemAdmin: 権限確認完了', {
       userEmail: currentUserEmail,
       isSystemAdmin,
       timestamp: new Date().toISOString()
@@ -1021,7 +1021,7 @@ function checkIsSystemAdmin() {
  */
 function migrateUserDataToConfigJson(userId = null) {
   try {
-    console.info('🔄 migrateUserDataToConfigJson: データマイグレーション開始', {
+    console.log('🔄 migrateUserDataToConfigJson: データマイグレーション開始', {
       targetUserId: userId || 'all_users',
       timestamp: new Date().toISOString()
     });
@@ -1072,7 +1072,7 @@ function migrateUserDataToConfigJson(userId = null) {
           migratedConfig.migratedAt = new Date().toISOString();
           migratedConfig.claudeMdCompliant = true;
 
-          DB.updateUserConfig(user.userId, migratedConfig);
+          ConfigManager.saveConfig(user.userId, migratedConfig);
           
           migrationResults.migrated++;
           migrationResults.details.push({
@@ -1104,7 +1104,7 @@ function migrateUserDataToConfigJson(userId = null) {
       }
     });
 
-    console.info('✅ migrateUserDataToConfigJson: データマイグレーション完了', migrationResults);
+    console.log('✅ migrateUserDataToConfigJson: データマイグレーション完了', migrationResults);
     return {
       success: true,
       results: migrationResults,
@@ -1155,7 +1155,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
     // 高精度列マッピング生成（データ分析付き）
     const columnMapping = generateColumnMapping(headerRow, allData);
     
-    console.info('✅ analyzeColumns: CLAUDE.md準拠列分析完了', {
+    console.log('✅ analyzeColumns: CLAUDE.md準拠列分析完了', {
       headerCount: headerRow.length,
       mappingCount: Object.keys(columnMapping).length,
       claudeMdCompliant: true

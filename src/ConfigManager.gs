@@ -106,7 +106,7 @@ const ConfigManager = Object.freeze({
       });
 
       if (success) {
-        console.info('✅ ConfigManager.saveConfig: 設定保存完了', {
+        console.log('✅ ConfigManager.saveConfig: 設定保存完了', {
           userId,
           configSize: JSON.stringify(validatedConfig).length,
           configFields: Object.keys(validatedConfig),
@@ -421,6 +421,66 @@ const ConfigManager = Object.freeze({
     } catch (error) {
       console.warn('ConfigManager.enhanceConfigWithDynamicUrls: URL生成エラー', error);
       return config;
+    }
+  },
+
+  // ========================================
+  // 🗄️ 統一DB操作メソッド（キャッシュ付き）
+  // ========================================
+
+  /**
+   * 統一ユーザー情報取得（キャッシュ付き）
+   * @param {string} email - ユーザーメールアドレス
+   * @returns {Object|null} ユーザー情報
+   */
+  getUserInfo(email) {
+    if (!email) return null;
+
+    try {
+      // 5分キャッシュでユーザー情報取得
+      const cacheKey = `userInfo-${email}`;
+      
+      // CacheManagerが利用可能な場合
+      if (typeof cacheManager !== 'undefined' && cacheManager) {
+        return cacheManager.get(cacheKey, () => {
+          console.log(`ConfigManager: ユーザー情報取得 - ${email}`);
+          return DB.findUserByEmail(email);
+        }, { ttl: 300 });
+      }
+      
+      // フォールバック: 直接取得
+      console.log(`ConfigManager: ユーザー情報取得（キャッシュなし） - ${email}`);
+      return DB.findUserByEmail(email);
+      
+    } catch (error) {
+      console.error('ConfigManager.getUserInfo エラー:', error.message);
+      return null;
+    }
+  },
+
+  /**
+   * 統一ユーザー情報+設定取得
+   * @param {string} email - ユーザーメールアドレス
+   * @returns {Object|null} ユーザー情報+設定
+   */
+  getUserWithConfig(email) {
+    try {
+      const userInfo = this.getUserInfo(email);
+      if (!userInfo) {
+        console.log(`ConfigManager: ユーザーが見つかりません - ${email}`);
+        return null;
+      }
+
+      const config = this.getUserConfig(userInfo.userId);
+      
+      return {
+        ...userInfo,
+        config: config || this.buildInitialConfig()
+      };
+      
+    } catch (error) {
+      console.error('ConfigManager.getUserWithConfig エラー:', error.message);
+      return null;
     }
   }
 });

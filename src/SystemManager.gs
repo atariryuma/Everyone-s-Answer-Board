@@ -17,21 +17,21 @@
  */
 function testConfigJsonCleanup() {
   try {
-    console.info('🔥 configJSON重複修正テスト開始');
+    console.log('🔥 configJSON重複修正テスト開始');
 
     // 1. サービスアカウント状態確認
     const securityCheck = SystemManager.testSecurity();
-    console.info('🔐 サービスアカウント状態:', securityCheck);
+    console.log('🔐 サービスアカウント状態:', securityCheck);
 
     // 2. データベース接続確認
     const dbCheck = SystemManager.testDatabaseConnection();
-    console.info('📊 データベース接続:', dbCheck);
+    console.log('📊 データベース接続:', dbCheck);
 
     // 3. 現在のユーザーデータ状態確認
-    const currentUser = User.email();
+    const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
     if (userInfo) {
-      console.info('👤 現在のユーザー情報:', {
+      console.log('👤 現在のユーザー情報:', {
         userId: userInfo.userId,
         configJsonLength: userInfo.configJson?.length || 0,
         configJsonPreview: userInfo.configJson?.substring(0, 200) || 'no data'
@@ -50,12 +50,12 @@ function testConfigJsonCleanup() {
     // 新しいクリーンアップ関数を実行
     const result = DB.cleanupNestedConfigJson();
 
-    console.info('🔥 修正結果:', result);
+    console.log('🔥 修正結果:', result);
 
     // 5. 修正後の状態確認
     if (userInfo) {
       const updatedUser = DB.findUserById(userInfo.userId);
-      console.info('🔄 修正後のユーザー情報:', {
+      console.log('🔄 修正後のユーザー情報:', {
         userId: updatedUser.userId,
         configJsonLength: updatedUser.configJson?.length || 0,
         configJsonPreview: updatedUser.configJson?.substring(0, 200) || 'no data'
@@ -99,12 +99,12 @@ function testConfigJsonCleanup() {
  */
 function testDatabaseMigration() {
   try {
-    console.info('🔧 データベース最適化テスト開始（2025年2月版）');
+    console.log('🔧 データベース最適化テスト開始（2025年2月版）');
 
     // 新しい最適化関数を実行
     const result = SystemManager.optimizeDatabaseConfigJson();
 
-    console.info('🔧 最適化結果:', result);
+    console.log('🔧 最適化結果:', result);
 
     return {
       status: 'success',
@@ -138,12 +138,12 @@ function testDatabaseMigration() {
  */
 function testSchemaOptimization() {
   try {
-    console.info('🔄 データベース構造最適化テスト開始');
+    console.log('🔄 データベース構造最適化テスト開始');
     
     // 構造最適化を実行
     const result = SystemManager.migrateToSimpleSchema();
     
-    console.info('🔄 最適化結果:', result);
+    console.log('🔄 最適化結果:', result);
     
     return {
       status: result.status,
@@ -174,7 +174,7 @@ function testSchemaOptimization() {
  */
 function testSystemDiagnosis() {
   try {
-    console.info('🏥 システム診断開始');
+    console.log('🏥 システム診断開始');
 
     const results = {
       database: SystemManager.testDatabaseConnection(),
@@ -204,7 +204,7 @@ function testSystemDiagnosis() {
  */
 function testSetup() {
   try {
-    console.info('⚙️ セットアップテスト開始');
+    console.log('⚙️ セットアップテスト開始');
 
     const setupStatus = SystemManager.checkSetupStatus();
 
@@ -237,7 +237,7 @@ const SystemManager = {
    */
   optimizeDatabaseConfigJson() {
     try {
-      console.info('🔧 データベース最適化開始: configJson構造の更新');
+      console.log('🔧 データベース最適化開始: configJson構造の更新');
 
       const dbId = getSecureDatabaseId();
       const service = getSheetsServiceCached();
@@ -351,7 +351,7 @@ const SystemManager = {
         }
       }
 
-      console.info('🔧 データベース最適化完了:', {
+      console.log('🔧 データベース最適化完了:', {
         処理行数: dataRows.length,
         最適化行数: optimizedCount,
         エラー行数: errorCount,
@@ -376,7 +376,7 @@ const SystemManager = {
    */
   analyzeDatabaseState() {
     try {
-      console.info('📊 データベース分析開始');
+      console.log('📊 データベース分析開始');
 
       const dbId = getSecureDatabaseId();
       const service = getSheetsServiceCached();
@@ -582,7 +582,7 @@ const SystemManager = {
    */
   optimizeUserConfigJson(userId) {
     try {
-      console.info(`👤 ユーザー ${userId} のconfigJson最適化開始`);
+      console.log(`👤 ユーザー ${userId} のconfigJson最適化開始`);
 
       const userInfo = DB.findUserById(userId);
       if (!userInfo || !userInfo.parsedConfig) {
@@ -622,7 +622,7 @@ const SystemManager = {
 
       if (isModified) {
         DB.updateUser(userId, { configJson: JSON.stringify(config) });
-        console.info(`👤 ユーザー ${userId} のconfigJson最適化完了`);
+        console.log(`👤 ユーザー ${userId} のconfigJson最適化完了`);
         return { success: true, userId, updated: true };
       }
 
@@ -640,7 +640,7 @@ const SystemManager = {
    */
   migrateToSimpleSchema() {
     try {
-      console.info('🔄 データベース構造最適化開始（5フィールド構造確認）');
+      console.log('🔄 データベース構造最適化開始（5フィールド構造確認）');
       
       const allUsers = DB.getAllUsers();
       const results = {
@@ -708,7 +708,7 @@ const SystemManager = {
         }
       });
       
-      console.info('🔄 データベース構造最適化完了:', {
+      console.log('🔄 データベース構造最適化完了:', {
         総ユーザー数: results.totalUsers,
         移行成功: results.migratedUsers,
         エラー数: results.errors.length,
@@ -737,7 +737,7 @@ const SystemManager = {
    */
   cleanupRedundantData() {
     try {
-      console.info('🔥 重複データクリーンアップ開始');
+      console.log('🔥 重複データクリーンアップ開始');
       
       const users = DB.getAllUsers();
       const results = {
@@ -795,7 +795,7 @@ const SystemManager = {
         }
       });
       
-      console.info('🔥 重複データクリーンアップ完了:', {
+      console.log('🔥 重複データクリーンアップ完了:', {
         processed: results.processed,
         cleaned: results.cleaned,
         totalSizeReduction: `${(results.sizeReduction / 1024).toFixed(2)}KB`,
@@ -823,7 +823,7 @@ const SystemManager = {
    */
   performSystemCleanup() {
     try {
-      console.info('🧹 システムクリーンアップ開始');
+      console.log('🧹 システムクリーンアップ開始');
 
       const results = {
         cacheCleared: false,
@@ -862,7 +862,7 @@ const SystemManager = {
         results.errors.push(`config最適化エラー: ${  error.message}`);
       }
 
-      console.info('🧹 システムクリーンアップ完了:', results);
+      console.log('🧹 システムクリーンアップ完了:', results);
 
       return {
         success: results.errors.length === 0,
@@ -992,7 +992,7 @@ function generateSystemReport() {
  */
 function cleanupConfigJsonData(userId = null) {
   try {
-    console.info('🧹 configJSON完全クリーンアップ開始', { userId: userId || 'ALL' });
+    console.log('🧹 configJSON完全クリーンアップ開始', { userId: userId || 'ALL' });
 
     const users = userId ? [DB.findUserById(userId)] : DB.getAllUsers();
     if (!users || users.length === 0) {
@@ -1093,7 +1093,7 @@ function cleanupConfigJsonData(userId = null) {
 
     cleanupResults.removedFields = FIELDS_TO_REMOVE;
     
-    console.info('✅ configJSON完全クリーンアップ完了', {
+    console.log('✅ configJSON完全クリーンアップ完了', {
       処理対象: cleanupResults.total,
       クリーンアップ成功: cleanupResults.cleaned,
       エラー数: cleanupResults.errors.length,

@@ -132,7 +132,7 @@ function verifyAdminAccess(userId) {
     }
 
     // 現在のログインユーザーのメールアドレスを取得
-    const activeUserEmail = User.email();
+    const activeUserEmail = UserManager.getCurrentEmail();
     if (!activeUserEmail) {
       console.warn('verifyAdminAccess: アクティブユーザーのメールアドレスが取得できませんでした');
       return false;
@@ -266,7 +266,7 @@ function verifyUserAccess(userId) {
   }
 
   // Base.gsのAccessControllerを使用したアクセス制御
-  const result = App.getAccess().verifyAccess(userId, 'view', User.email());
+  const result = App.getAccess().verifyAccess(userId, 'view', UserManager.getCurrentEmail());
   if (!result.allowed) {
     throw new Error(`アクセスが拒否されました: ${  result.reason}`);
   }

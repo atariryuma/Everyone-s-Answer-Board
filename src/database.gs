@@ -43,7 +43,7 @@ const DB = {
    */
   createUser(userData) {
     try {
-      console.info('📊 createUser: configJSON中心型ユーザー作成開始', {
+      console.log('📊 createUser: configJSON中心型ユーザー作成開始', {
         userId: userData.userId,
         userEmail: userData.userEmail,
         timestamp: new Date().toISOString()
@@ -102,7 +102,7 @@ const DB = {
           new Date().toISOString()
         ];
 
-        console.info('📊 createUser: CLAUDE.md準拠5フィールド構築完了', {
+        console.log('📊 createUser: CLAUDE.md準拠5フィールド構築完了', {
           userId: userData.userId,
           configJsonSize: JSON.stringify(configJson).length,
           headers: DB_CONFIG.HEADERS,
@@ -112,7 +112,7 @@ const DB = {
         // 新しい行を追加
         sheet.appendRow(newRow);
 
-        console.info('✅ createUser: configJSON中心型ユーザー作成完了', {
+        console.log('✅ createUser: configJSON中心型ユーザー作成完了', {
           userId: userData.userId,
           userEmail: userData.userEmail,
           configJsonFields: Object.keys(configJson).length,
@@ -213,7 +213,7 @@ const DB = {
 
       const rows = sheet.getDataRange().getValues();
       if (rows.length < 2) {
-        console.info('findUserByEmail: ユーザーデータが存在しません');
+        console.log('findUserByEmail: ユーザーデータが存在しません');
         return null;
       }
 
@@ -308,7 +308,7 @@ const DB = {
 
       const rows = sheet.getDataRange().getValues();
       if (rows.length < 2) {
-        console.info('findUserById: ユーザーデータが存在しません');
+        console.log('findUserById: ユーザーデータが存在しません');
         return null;
       }
 
@@ -348,7 +348,7 @@ const DB = {
         console.warn('findUserById: nullキャッシュ保存エラー', cacheError.message);
       }
 
-      console.info('findUserById: ユーザーが見つかりませんでした', { userId });
+      console.log('findUserById: ユーザーが見つかりませんでした', { userId });
       return null;
 
     } catch (error) {
@@ -376,7 +376,7 @@ const DB = {
 
     // configJsonをパース（統一データソース原則）
     try {
-      userObj.parsedConfig = JSON.parse(userObj.configJson);
+      userObj.parsedConfig = ConfigManager.getUserConfig(userObj.userId);
     } catch (e) {
       console.warn('configJson解析エラー:', {
         userId: userObj.userId,
@@ -398,7 +398,7 @@ const DB = {
    */
   updateUserConfig_DEPRECATED(userId, configData) {
     try {
-      console.info('🔥 updateUserConfig: configJSON重複回避更新開始', {
+      console.log('🔥 updateUserConfig: configJSON重複回避更新開始', {
         userId,
         configFields: Object.keys(configData),
         timestamp: new Date().toISOString()
@@ -422,7 +422,7 @@ const DB = {
       // キャッシュクリア
       this.clearUserCache(userId, currentUser.userEmail);
 
-      console.info('✅ updateUserConfig: configJSON重複回避更新完了', {
+      console.log('✅ updateUserConfig: configJSON重複回避更新完了', {
         userId,
         configFields: Object.keys(configData),
         configSize: dbUpdateData.configJson.length
@@ -453,7 +453,7 @@ const DB = {
    */
   updateUser(userId, updateData) {
     try {
-      console.info('📝 updateUser: configJSON中心型更新開始', {
+      console.log('📝 updateUser: configJSON中心型更新開始', {
         userId,
         updateFields: Object.keys(updateData),
         timestamp: new Date().toISOString()
@@ -502,7 +502,7 @@ const DB = {
       // キャッシュクリア
       this.clearUserCache(userId, currentUser.userEmail);
 
-      console.info('✅ updateUser: configJSON中心型更新完了', {
+      console.log('✅ updateUser: configJSON中心型更新完了', {
         userId,
         updatedFields: Object.keys(updateData),
         configSize: dbUpdateData.configJson.length
@@ -598,7 +598,7 @@ const DB = {
    */
   getAllUsers() {
     try {
-      console.info('📋 getAllUsers: configJSON中心型全ユーザー取得開始');
+      console.log('📋 getAllUsers: configJSON中心型全ユーザー取得開始');
 
       const service = getSheetsService();
       const dbId = getSecureDatabaseId();
@@ -608,13 +608,13 @@ const DB = {
       const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
-        console.info('getAllUsers: ユーザーデータが見つかりません');
+        console.log('getAllUsers: ユーザーデータが見つかりません');
         return [];
       }
 
       const rows = data.valueRanges[0].values;
       if (rows.length < 2) {
-        console.info('getAllUsers: データ行が存在しません');
+        console.log('getAllUsers: データ行が存在しません');
         return [];
       }
 
@@ -626,7 +626,7 @@ const DB = {
         return this.parseUserRow(headers, row);
       });
 
-      console.info(`✅ getAllUsers: configJSON中心型で${users.length}件のユーザーデータを取得`);
+      console.log(`✅ getAllUsers: configJSON中心型で${users.length}件のユーザーデータを取得`);
       return users;
 
     } catch (error) {
@@ -644,7 +644,7 @@ const DB = {
       return null;
     }
 
-    console.info('🔄 findUserByEmailNoCache: キャッシュをバイパスしてDB直接検索', { email });
+    console.log('🔄 findUserByEmailNoCache: キャッシュをバイパスしてDB直接検索', { email });
 
     try {
       const service = getSheetsService();
@@ -661,7 +661,7 @@ const DB = {
 
       const rows = data.valueRanges[0].values;
       if (rows.length < 2) {
-        console.info('findUserByEmailNoCache: ユーザーデータがありません');
+        console.log('findUserByEmailNoCache: ユーザーデータがありません');
         return null;
       }
 
@@ -675,7 +675,7 @@ const DB = {
         if (row[emailIndex] === email) {
           const user = this.parseUserRow(headers, row);
 
-          console.info('✅ findUserByEmailNoCache: ユーザー発見（キャッシュバイパス）', {
+          console.log('✅ findUserByEmailNoCache: ユーザー発見（キャッシュバイパス）', {
             email,
             userId: user.userId,
             timestamp: new Date().toISOString()
@@ -685,7 +685,7 @@ const DB = {
         }
       }
 
-      console.info('findUserByEmailNoCache: ユーザーが見つかりませんでした', { email });
+      console.log('findUserByEmailNoCache: ユーザーが見つかりませんでした', { email });
       return null;
 
     } catch (error) {
@@ -708,7 +708,7 @@ const DB = {
       }
 
       // 2. 管理者権限確認
-      const currentUserEmail = User.email();
+      const currentUserEmail = UserManager.getCurrentEmail();
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty('ADMIN_EMAIL');
       
@@ -866,7 +866,7 @@ const DB = {
    */
   cleanupNestedConfigJson(userId = null) {
     try {
-      console.info('🧹 cleanupNestedConfigJson: 重複configJSON修正開始', {
+      console.log('🧹 cleanupNestedConfigJson: 重複configJSON修正開始', {
         targetUserId: userId || 'all_users',
         timestamp: new Date().toISOString()
       });
@@ -925,8 +925,8 @@ const DB = {
             // lastModifiedを更新
             cleanedConfig.lastModified = new Date().toISOString();
             
-            // updateUserConfigを使用してクリーンなデータを保存
-            this.updateUserConfig(user.userId, cleanedConfig);
+            // ConfigManager経由でクリーンなデータを保存
+            ConfigManager.saveConfig(user.userId, cleanedConfig);
             
             cleanupResults.cleaned++;
             cleanupResults.details.push({
@@ -956,7 +956,7 @@ const DB = {
         }
       });
 
-      console.info('✅ cleanupNestedConfigJson: 重複configJSON修正完了', cleanupResults);
+      console.log('✅ cleanupNestedConfigJson: 重複configJSON修正完了', cleanupResults);
       return {
         success: true,
         results: cleanupResults,
