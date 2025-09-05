@@ -96,7 +96,10 @@ function doGet(e) {
             <hr>
             <h3>🔧 システム修正ツール</h3>
             <p><a href="?mode=fix_config" style="background:orange;color:white;padding:10px;text-decoration:none;">🔧 configJSON重複ネスト問題を修正</a></p>
-            ${userByEmail ? `<p><a href="?mode=reset_config&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔄 ユーザー設定をデフォルトにリセット</a></p>` : ''}
+            ${userByEmail ? `
+              <p><a href="?mode=reset_config&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔄 ユーザー設定をデフォルトにリセット</a></p>
+              <p><small>対象ユーザーID: ${userByEmail.userId}</small></p>
+            ` : '<p><em>ユーザーが見つからないため、リセット機能は利用できません</em></p>'}
             <p><a href="?mode=system_check" style="background:blue;color:white;padding:10px;text-decoration:none;">🔍 システム診断実行</a></p>
           `);
         } catch (error) {
@@ -134,8 +137,21 @@ function doGet(e) {
       case 'reset_config':
         // 🔄 ユーザー設定デフォルトリセット
         try {
+          console.log('🔄 reset_config パラメータ確認:', {
+            userId: params.userId,
+            allParams: params,
+            originalEvent: e ? e.parameter : 'no event'
+          });
+          
           if (!params.userId) {
-            return HtmlService.createHtmlOutput('<h2>Error</h2><p>userIdが必要です</p>');
+            return HtmlService.createHtmlOutput(`
+              <h2>Error</h2>
+              <p>userIdが必要です</p>
+              <h3>デバッグ情報:</h3>
+              <pre>params: ${JSON.stringify(params, null, 2)}</pre>
+              <pre>event: ${JSON.stringify(e ? e.parameter : 'no event', null, 2)}</pre>
+              <p><a href="?mode=debug">デバッグページに戻る</a></p>
+            `);
           }
           
           console.log('🔄 ユーザー設定デフォルトリセット開始');
