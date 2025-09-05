@@ -127,7 +127,7 @@ function checkSetupStatus() {
  * JSONの重複・ネスト問題を解決
  * @returns {Object} 修正結果
  */
-function fixConfigJsonNesting() {
+function fixConfigJsonNestingImpl() {
   console.log('🔧 SystemManager.fixConfigJsonNesting: 重複ネスト修正開始');
   
   try {
@@ -204,7 +204,7 @@ function fixConfigJsonNesting() {
  * @param {string} userId - 対象ユーザーID
  * @returns {Object} リセット結果
  */
-function resetUserConfigToDefault(userId) {
+function resetUserConfigToDefaultImpl(userId) {
   console.log('🔄 resetUserConfigToDefault: デフォルトリセット開始', userId);
   
   try {
@@ -352,8 +352,8 @@ const SystemManager = {
   testSecurity,
   testDatabaseConnection, 
   checkSetupStatus,
-  fixConfigJsonNesting,
-  resetUserConfigToDefault,
+  fixConfigJsonNesting: fixConfigJsonNestingImpl,
+  resetUserConfigToDefault: resetUserConfigToDefaultImpl,
   getUserCount,
   testConfigIntegrity
 };
