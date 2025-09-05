@@ -827,19 +827,6 @@ function formatSheetDataForFrontend(
     const reasonIndex = mappedIndices.reasonHeader;
     const nameIndex = mappedIndices.nameHeader;
 
-    console.log(
-      'formatSheetDataForFrontend: Row %s - classIndex=%s, opinionIndex=%s, reasonIndex=%s, nameIndex=%s',
-      index,
-      classIndex,
-      opinionIndex,
-      reasonIndex,
-      nameIndex
-    );
-    console.log(
-      'formatSheetDataForFrontend: Row data length=%s, first few values=%s',
-      row.originalData ? row.originalData.length : 'undefined',
-      row.originalData ? JSON.stringify(row.originalData.slice(0, 5)) : 'undefined'
-    );
 
     let nameValue = '';
     const shouldShowName = adminMode === true || displayMode === SYSTEM_CONSTANTS.DISPLAY_MODES.NAMED || isOwner;
@@ -857,19 +844,6 @@ function formatSheetDataForFrontend(
       }
     }
 
-    console.log('🔍 サーバー側名前データ詳細:', {
-      rowIndex: row.rowNumber || index + 2,
-      shouldShowName,
-      adminMode,
-      displayMode,
-      isOwner,
-      nameIndex,
-      hasNameIndex,
-      hasOriginalData,
-      originalDataLength: row.originalData ? row.originalData.length : 'undefined',
-      nameValue,
-      rawNameData: hasOriginalData && nameIndex !== undefined ? row.originalData[nameIndex] : 'N/A',
-    });
 
     // リアクション状態を判定するヘルパー関数
     function checkReactionState(reactionKey) {
@@ -1000,7 +974,7 @@ function getAppConfig(requestUserId) {
       appPublished: configJson.appPublished || false, // AdminPanel.htmlで使用される
       availableSheets: sheets,
       allSheets: sheets, // AdminPanel.htmlで使用される
-      spreadsheetUrl: config.spreadsheetUrl,
+      spreadsheetUrl: configJson.spreadsheetUrl,
       formUrl: configJson.formUrl || '',
       editFormUrl: configJson.editFormUrl || '',
       webAppUrl: appUrls.webAppUrl,
@@ -1015,11 +989,11 @@ function getAppConfig(requestUserId) {
       userInfo: {
         userId: currentUserId,
         userEmail: userInfo.userEmail,
-        spreadsheetId: config.spreadsheetId || '',
+        spreadsheetId: configJson.spreadsheetId || '',
         // 🚀 CLAUDE.md準拠：統一データソース原則 - configJSONからのみアクセス
-        spreadsheetUrl: config.spreadsheetUrl || '',
-        createdAt: config.createdAt || '',
-        lastAccessedAt: config.lastAccessedAt || '',
+        spreadsheetUrl: configJson.spreadsheetUrl || '',
+        createdAt: configJson.createdAt || '',
+        lastAccessedAt: configJson.lastAccessedAt || '',
         isActive: userInfo.isActive || 'false',
         configJson: userInfo.configJson || '{}',
       },
