@@ -75,6 +75,82 @@ const ErrorManager = Object.freeze({
 });
 
 // ===============================
+// ユーザーID解決ユーティリティ（CLAUDE.md準拠）
+// ===============================
+
+/**
+ * 🎯 ユーザーID解決ユーティリティ - 重複コード削減
+ * 現在のユーザーまたは指定されたメールアドレスからユーザーIDを解決
+ */
+const UserIdResolver = Object.freeze({
+  /**
+   * 現在のユーザーのユーザーIDを取得
+   * @returns {string|null} ユーザーID、または見つからない場合はnull
+   */
+  getCurrentUserId() {
+    try {
+      const currentEmail = UserManager.getCurrentEmail();
+      if (!currentEmail) {
+        console.warn('UserIdResolver.getCurrentUserId: 現在のユーザーメールが取得できません');
+        return null;
+      }
+      return this.resolveByEmail(currentEmail);
+    } catch (error) {
+      console.error('UserIdResolver.getCurrentUserId エラー:', error.message);
+      return null;
+    }
+  },
+
+  /**
+   * メールアドレスからユーザーIDを解決
+   * @param {string} email - メールアドレス
+   * @returns {string|null} ユーザーID、または見つからない場合はnull
+   */
+  resolveByEmail(email) {
+    try {
+      if (!email || typeof email !== 'string') {
+        console.warn('UserIdResolver.resolveByEmail: 無効なメールアドレス', email);
+        return null;
+      }
+
+      const user = DB.findUserByEmail(email);
+      if (!user) {
+        console.warn('UserIdResolver.resolveByEmail: ユーザーが見つかりません', email);
+        return null;
+      }
+
+      return user.userId || null;
+    } catch (error) {
+      console.error('UserIdResolver.resolveByEmail エラー:', {
+        email,
+        error: error.message
+      });
+      return null;
+    }
+  },
+
+  /**
+   * 現在のユーザーまたは指定されたユーザーIDを解決（フォールバック付き）
+   * @param {string|null} providedUserId - 指定されたユーザーID（あれば）
+   * @returns {string|null} 解決されたユーザーID
+   */
+  resolveUserId(providedUserId = null) {
+    // 既にユーザーIDが指定されている場合はそれを使用
+    if (providedUserId) {
+      if (SecurityValidator.isValidUUID(providedUserId)) {
+        return providedUserId;
+      } else {
+        console.warn('UserIdResolver.resolveUserId: 無効なユーザーID形式', providedUserId);
+        return null;
+      }
+    }
+
+    // ユーザーIDが指定されていない場合は現在のユーザーから解決
+    return this.getCurrentUserId();
+  }
+});
+
+// ===============================
 // ConfigurationManagerクラス（データベース専用版）
 // ===============================
 
@@ -92,24 +168,9 @@ class ConfigurationManager {
     return ConfigManager.getUserConfig(userId);
   }
 
-  /**
-   * 最適化されたユーザー情報取得（ConfigManager委譲版）
-   * @param {string} userId ユーザーID
-   * @return {Object|null} 統合されたユーザー情報
-   */
-  getOptimizedUserInfo(userId) {
-    return ConfigManager.getUserConfig(userId);
-  }
+  // getOptimizedUserInfo removed - use getUserConfig() directly
 
-  /**
-   * ユーザー設定保存（ConfigManager委譲版）
-   * @param {string} userId ユーザーID
-   * @param {Object} config 設定オブジェクト
-   * @return {boolean} 保存成功可否
-   */
-  setUserConfig(userId, config) {
-    return ConfigManager.saveConfig(userId, config);
-  }
+  // setUserConfig removed - use ConfigManager.saveConfig() directly
 
   /**
    * ユーザー設定削除（ConfigManager委譲版）
@@ -183,19 +244,12 @@ class ConfigurationManager {
       removedFields: ['userId', 'userEmail', 'createdAt', 'description'], // DB列に移行済み
     });
 
-    const success = this.setUserConfig(userId, optimizedConfig);
+    // ✅ ConfigManager直接使用（wrapper削除）
+    const success = ConfigManager.saveConfig(userId, optimizedConfig);
     return success ? optimizedConfig : null;
   }
 
-  /**
-   * 設定の部分更新（ConfigManager委譲版）
-   * @param {string} userId ユーザーID
-   * @param {Object} updates 更新内容
-   * @return {boolean} 更新成功可否
-   */
-  updateUserConfig(userId, updates) {
-    return ConfigManager.updateConfig(userId, updates);
-  }
+  // updateUserConfig removed - use ConfigManager.updateConfig() directly
 
   /**
    * 旧updateUserConfig実装（削除予定）
@@ -225,7 +279,7 @@ class ConfigurationManager {
     }
 
     try {
-      const updated = updateUser(userId, dbUpdates);
+      const updated = DB.updateUser(userId, dbUpdates);
       if (updated) {
         console.log('⚡ updateUserConfig: configJSON中心型更新完了', {
           userId,

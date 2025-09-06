@@ -351,7 +351,7 @@ function registerNewUser(userEmail) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
-  verifyUserAccess(requestUserId);
+  const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   clearExecutionUserInfoCache();
 
   try {
@@ -444,24 +444,7 @@ function getCurrentSheetName(spreadsheetId) {
  * @param {string} requestUserId - アクセスを要求しているユーザーのID
  * @throws {Error} 認証エラーまたは権限エラー
  */
-function verifyUserAccess(requestUserId) {
-  // security.gsの統一版に委譲（重複関数修正）
-  // ここではsecurity.gsの関数を直接呼び出すのではなく、
-  // 同じロジックを使用してlocal実装を保持
-  if (!requestUserId) {
-    throw new Error('ユーザーIDが必要です');
-  }
-
-  const result = App.getAccess().verifyAccess(requestUserId, 'view', UserManager.getCurrentEmail());
-  if (!result.allowed) {
-    throw new Error(`アクセスが拒否されました: ${  result.reason}`);
-  }
-
-  console.log(
-    `✅ ユーザーアクセス検証成功: ${UserManager.getCurrentEmail()} は ${requestUserId} のデータにアクセスできます。`
-  );
-  return result;
-}
+// verifyUserAccess function removed - all calls now use App.getAccess().verifyAccess() directly
 
 /**
  * 実際のデータ取得処理（キャッシュ制御から分離） (マルチテナント対応版)
@@ -647,7 +630,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
  * @returns {object} 新しいデータのみを含む結果
  */
 function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount) {
-  verifyUserAccess(requestUserId);
+  const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   try {
     const currentUserId = requestUserId; // requestUserId を使用
 
@@ -911,7 +894,7 @@ function formatSheetDataForFrontend(
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getAppConfig(requestUserId) {
-  verifyUserAccess(requestUserId);
+  const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   try {
     const currentUserId = requestUserId;
     const userInfo = DB.findUserById(currentUserId);
@@ -919,27 +902,29 @@ function getAppConfig(requestUserId) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    // ✅ CLAUDE.md準拠：ConfigManager統一データソース原則
+    const configJson = ConfigManager.getUserConfig(currentUserId) || {};
 
     // --- Auto-healing for inconsistent setup states ---
-    let needsUpdate = false;
+    const healingUpdates = {};
     if (configJson.formUrl && !configJson.formCreated) {
-      configJson.formCreated = true;
-      needsUpdate = true;
+      healingUpdates.formCreated = true;
     }
     if (configJson.formCreated && configJson.setupStatus !== 'completed') {
-      configJson.setupStatus = 'completed';
-      needsUpdate = true;
+      healingUpdates.setupStatus = 'completed';
     }
     if (configJson.targetSheetName && !configJson.appPublished) {
-      configJson.appPublished = true;
-      needsUpdate = true;
+      healingUpdates.appPublished = true;
     }
-    if (needsUpdate) {
+    
+    if (Object.keys(healingUpdates).length > 0) {
       try {
-        updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
+        // ✅ ConfigManager統一更新メソッド使用
+        ConfigManager.updateConfig(currentUserId, healingUpdates);
+        // 更新後のconfigを取得
+        Object.assign(configJson, healingUpdates);
       } catch (updateErr) {
-        console.warn(`Config auto-heal failed: ${  updateErr.message}`);
+        console.warn(`Config auto-heal failed: ${updateErr.message}`);
       }
     }
 
@@ -1050,7 +1035,7 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
     configJson.lastModified = new Date().toISOString();
 
     // データベースのspreadsheetIdとsheetNameフィールドを更新
-    updateUser(currentUserId, { 
+    DB.updateUser(currentUserId, { 
       spreadsheetId: spreadsheetId,
       sheetName: sheetName,
       configJson: JSON.stringify(configJson) 
@@ -1118,7 +1103,7 @@ function getCurrentUserStatus(requestUserId) {
     // requestUserIdが無効な場合は、メールアドレスでユーザーを検索
     let userInfo;
     if (requestUserId && requestUserId.trim() !== '') {
-      verifyUserAccess(requestUserId);
+      const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
       userInfo = DB.findUserById(requestUserId);
     } else {
       userInfo = DB.findUserByEmail(activeUserEmail);
@@ -1149,7 +1134,7 @@ function getCurrentUserStatus(requestUserId) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function getActiveFormInfo(requestUserId) {
-  verifyUserAccess(requestUserId);
+  const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   try {
     const currentUserId = requestUserId; // requestUserId を使用
 
@@ -1237,7 +1222,7 @@ function countSheetRows(spreadsheetId, sheetName, classFilter) {
  * @param {string} description - 新しい説明
  */
 function updateFormSettings(requestUserId, title, description) {
-  verifyUserAccess(requestUserId);
+  const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   try {
     const currentUserId = requestUserId; // requestUserId を使用
 
@@ -1282,7 +1267,7 @@ function updateFormSettings(requestUserId, title, description) {
  * AdminPanel.htmlから呼び出される
  */
 function saveSystemConfig(requestUserId, config) {
-  verifyUserAccess(requestUserId);
+  const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   try {
     const currentUserId = requestUserId; // requestUserId を使用
 
@@ -1301,7 +1286,7 @@ function saveSystemConfig(requestUserId, config) {
       updatedAt: new Date().toISOString(),
     };
 
-    updateUser(currentUserId, {
+    DB.updateUser(currentUserId, {
       configJson: JSON.stringify(configJson),
     });
 
@@ -1321,7 +1306,7 @@ function saveSystemConfig(requestUserId, config) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function toggleHighlight(requestUserId, rowIndex, sheetName) {
-  verifyUserAccess(requestUserId);
+  const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   try {
     const currentUserId = requestUserId; // requestUserId を使用
 
@@ -1488,7 +1473,10 @@ function getSpreadsheetColumnIndices(spreadsheetId, sheetName) {
 }
 
 function getSheetColumns(userId, sheetId) {
-  verifyUserAccess(userId);
+  const accessResult = App.getAccess().verifyAccess(userId, "view", UserManager.getCurrentEmail()); 
+  if (!accessResult.allowed) { 
+    throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); 
+  }
   try {
     const userInfo = DB.findUserById(userId);
     
@@ -1715,7 +1703,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
  */
 // NOTE: unpublishBoard関数の重複を回避するため、config.gsの実装を使用
 // function unpublishBoard(requestUserId) {
-//   verifyUserAccess(requestUserId);
+//   const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
 //   try {
 //     const currentUserId = requestUserId;
 //     const userInfo = DB.findUserById(currentUserId);
@@ -1730,7 +1718,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
 //     configJson.appPublished = false; // 公開状態をfalseにする
 //     configJson.setupStatus = 'completed'; // 公開停止後もセットアップは完了状態とする
 
-//     updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
+//     DB.updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
 //     invalidateUserCache(currentUserId, userInfo.userEmail, userInfo.spreadsheetId, true);
 
 //     console.log('✅ 回答ボードの公開を停止しました: %s', currentUserId);
@@ -2028,7 +2016,7 @@ function saveClassChoices(userId, classChoices) {
     configJson.savedClassChoices = classChoices;
     configJson.lastClassChoicesUpdate = new Date().toISOString();
 
-    updateUser(currentUserId, {
+    DB.updateUser(currentUserId, {
       configJson: JSON.stringify(configJson),
     });
 
@@ -3064,7 +3052,7 @@ function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
 function updateIsActiveStatus(requestUserId, isActive) {
   // 新規ユーザー（requestUserIdがundefinedまたはnull）の場合はverifyUserAccessをスキップ
   if (requestUserId) {
-    verifyUserAccess(requestUserId);
+    const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
   }
   try {
     const activeUserEmail = UserManager.getCurrentEmail();
@@ -3094,7 +3082,7 @@ function updateIsActiveStatus(requestUserId, isActive) {
 
     // isActive状態を更新
     const newIsActiveValue = isActive ? 'true' : 'false';
-    const updateResult = updateUser(userInfo.userId, {
+    const updateResult = DB.updateUser(userInfo.userId, {
       isActive: newIsActiveValue,
       lastAccessedAt: new Date().toISOString(),
     });
@@ -3215,7 +3203,7 @@ function isSystemAdmin() {
  */
 function deleteUserAccountByAdminForUI(targetUserId, reason) {
   try {
-    const result = deleteUserAccountByAdmin(targetUserId, reason);
+    const result = DB.deleteUserAccountByAdmin(targetUserId, reason);
     return {
       status: 'success',
       message: result.message,
@@ -3273,7 +3261,7 @@ function getAllUsersForAdminForUI(requestUserId) {
 function createForm(requestUserId, config) {
   try {
     // セキュリティチェック: ユーザー認証と入力検証
-    verifyUserAccess(requestUserId);
+    const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
     const activeUserEmail = UserManager.getCurrentEmail();
 
     // 入力検証
@@ -3419,7 +3407,7 @@ function createForm(requestUserId, config) {
 
       console.log('createCustomFormUI - update data:', JSON.stringify(updateData));
 
-      updateUser(requestUserId, updateData);
+      DB.updateUser(requestUserId, updateData);
 
       // カスタムフォーム作成後の包括的キャッシュ同期（Quick Startと同様）
       console.log('🗑️ カスタムフォーム作成後の包括的キャッシュ同期中...');
@@ -3467,7 +3455,7 @@ function deleteCurrentUserAccount(requestUserId) {
     if (!requestUserId) {
       throw new Error('認証エラー: ユーザーIDが指定されていません');
     }
-    verifyUserAccess(requestUserId);
+    const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
     const result = deleteUserAccount(requestUserId);
 
     return {
@@ -3491,7 +3479,7 @@ function deleteCurrentUserAccount(requestUserId) {
  */
 function activateSheetSimple(requestUserId, sheetName) {
   try {
-    verifyUserAccess(requestUserId);
+    const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
     const userInfo = DB.findUserById(requestUserId);
     // 🚀 CLAUDE.md準拠：統一データソース原則
     const config = userInfo ? (userInfo.parsedConfig || {}) : {};
@@ -3541,7 +3529,7 @@ function getLoginStatus() {
     // }
 
     // 🔧 修正：ログイン時は常にキャッシュバイパスで最新情報を取得
-    const userInfo = DB.findUserByEmailNoCache(activeUserEmail);
+    const userInfo = DB.findUserByEmail(activeUserEmail);
 
     let result;
     if (
@@ -3633,7 +3621,10 @@ function getInitialData(requestUserId, targetSheetName) {
     clearExecutionUserInfoCache(); // Clear any stale cache
 
     // ユーザー認証
-    verifyUserAccess(currentUserId);
+    const accessResult = App.getAccess().verifyAccess(currentUserId, "view", UserManager.getCurrentEmail()); 
+    if (!accessResult.allowed) { 
+      throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); 
+    }
     const userInfo = getActiveUserInfo(); // Use cached version
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -3673,7 +3664,7 @@ function getInitialData(requestUserId, targetSheetName) {
     }
     if (needsUpdate) {
       try {
-        updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
+        DB.updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
         userInfo.configJson = JSON.stringify(configJson);
       } catch (updateErr) {
         console.warn(`Config auto-heal failed: ${  updateErr.message}`);
@@ -3869,7 +3860,7 @@ function getInitialData(requestUserId, targetSheetName) {
  */
 function fixDataConsistencyManual(requestUserId) {
   try {
-    verifyUserAccess(requestUserId);
+    const accessResult = App.getAccess().verifyAccess(requestUserId, "view", UserManager.getCurrentEmail()); if (!accessResult.allowed) { throw new Error(`アクセスが拒否されました: ${accessResult.reason}`); }
     console.log('🔧 手動データ整合性修正実行:', requestUserId);
 
     const result = fixUserDataConsistency(requestUserId);
@@ -4356,7 +4347,7 @@ function performAutoRepair(userId) {
       config.autoRepairDate = new Date().toISOString();
       config.claudeMdCompliant = true;
       
-      DB.updateUser(userId, config);
+      DB.DB.updateUser(userId, config);
       console.log('✅ performAutoRepair: configJSON更新完了', {
         userId,
         fixedItems: repairResults.fixedItems.length,

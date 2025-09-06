@@ -156,7 +156,7 @@ function doGet(e) {
           }
           
           // ユーザー検証（キャッシュバイパス）
-          const userInfo = DB.findUserByEmailNoCache(currentUserEmail);
+          const userInfo = DB.findUserByEmail(currentUserEmail);
           if (!userInfo || userInfo.userId !== params.userId) {
             // ユーザーが存在しないか、userIdが一致しない場合
             return showErrorPage(
@@ -1021,7 +1021,7 @@ function processLoginAction() {
     console.log('🔄 ログインアクション: DB確認', { currentUserEmail });
 
     // DB直接検索（キャッシュバイパス）
-    let userInfo = DB.findUserByEmailNoCache(currentUserEmail);
+    let userInfo = DB.findUserByEmail(currentUserEmail);
     
     if (!userInfo) {
       // 新規ユーザー作成
@@ -1030,7 +1030,7 @@ function processLoginAction() {
       DB.createUser(newUserData);
       
       // 作成後に再度確認
-      userInfo = DB.findUserByEmailNoCache(currentUserEmail);
+      userInfo = DB.findUserByEmail(currentUserEmail);
       if (!userInfo) {
         throw new Error('ユーザー作成後の確認に失敗しました');
       }
@@ -1218,8 +1218,8 @@ function renderAnswerBoard(userInfo, params) {
       }
 
       // 現在の設定から表示設定を取得
-      const currentConfig = getCurrentConfig();
-      const displaySettings = currentConfig.displaySettings || {};
+      const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
+      const displaySettings = currentConfig?.displaySettings || {};
 
       // 表示設定を適用
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
@@ -1236,8 +1236,8 @@ function renderAnswerBoard(userInfo, params) {
       template.hasData = false;
 
       // エラー時も表示設定を適用
-      const currentConfig = getCurrentConfig();
-      const displaySettings = currentConfig.displaySettings || {};
+      const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
+      const displaySettings = currentConfig?.displaySettings || {};
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
       template.showCounts = displaySettings.showReactions !== false;
     }
@@ -1461,7 +1461,7 @@ function getUser(format = 'object') {
     // emailが取得できた場合、userIdも取得してセッション保存
     if (email) {
       try {
-        const user = DB.findUserByEmailNoCache(email);
+        const user = DB.findUserByEmail(email);
         if (user && user.userId) {
           userId = user.userId;
           // セッション情報を保存（1時間有効）
@@ -1685,7 +1685,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
       // Step 3: メールアドレスからユーザー検索
       if (currentUserEmail && typeof currentUserEmail === 'string' && currentUserEmail.trim()) {
         try {
-          const user = DB.findUserByEmailNoCache(currentUserEmail);
+          const user = DB.findUserByEmail(currentUserEmail);
           targetUserId = user ? user.userId : null;
           console.log('getPublishedSheetData: DB検索結果', {
             email: currentUserEmail,

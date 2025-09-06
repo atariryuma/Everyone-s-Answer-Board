@@ -35,7 +35,13 @@ const ConfigManager = Object.freeze({
       const user = DB.findUserById(userId);
       if (!user) {
         console.warn('ConfigManager.getUserConfig: ユーザーが見つかりません:', userId);
-        return null;
+        // デフォルト設定を返す（CLAUDE.md準拠：心理的安全性重視）
+        return {
+          setupStatus: 'pending',
+          appPublished: false,
+          displaySettings: { showNames: false, showReactions: false },
+          userId: userId
+        };
       }
 
       // 無限再帰回避: 直接JSONパース（user.parsedConfigではなく生configJsonから）
@@ -45,6 +51,40 @@ const ConfigManager = Object.freeze({
       } catch (parseError) {
         console.warn('ConfigManager.getUserConfig: JSON解析エラー:', parseError.message);
         baseConfig = {};
+      }
+
+      // 🔧 自動修復機能: configJsonが二重になっていたら修正
+      if (baseConfig.configJson) {
+        console.warn('⚠️ ConfigManager.getUserConfig: 二重構造を検出 - 自動修復開始');
+        
+        if (typeof baseConfig.configJson === 'string') {
+          try {
+            // ネストしたconfigJsonを展開
+            const nestedConfig = JSON.parse(baseConfig.configJson);
+            
+            // 内側のデータを外側にマージ（内側優先）
+            baseConfig = { ...baseConfig, ...nestedConfig };
+            
+            // configJsonフィールドを削除
+            delete baseConfig.configJson;
+            delete baseConfig.configJSON;
+            
+            // 修復したデータをDBに保存
+            this.saveConfig(userId, baseConfig);
+            
+            console.log('✅ ConfigManager.getUserConfig: 二重構造を自動修復完了', {
+              userId: userId,
+              fixedFields: Object.keys(baseConfig)
+            });
+          } catch (parseError) {
+            console.error('❌ ConfigManager.getUserConfig: ネストしたconfigJson解析エラー', parseError.message);
+            // パースできない場合はフィールドだけ削除
+            delete baseConfig.configJson;
+          }
+        } else {
+          // 文字列でない場合も削除
+          delete baseConfig.configJson;
+        }
       }
       
       const enhancedConfig = this.enhanceConfigWithDynamicUrls(baseConfig, userId);
@@ -557,38 +597,5 @@ const ConfigManager = Object.freeze({
 });
 
 // ========================================
-// 🌐 グローバル関数（既存互換性用）
+// 🌐 グローバル関数は削除済み（ConfigManager名前空間に統一）
 // ========================================
-
-/**
- * 既存システムとの互換性を保つためのラッパー関数
- */
-
-/**
- * ユーザー設定取得（互換性ラッパー）
- * @param {string} userId - ユーザーID
- * @returns {Object|null} ユーザー設定
- */
-function getUserConfig(userId) {
-  return ConfigManager.getUserConfig(userId);
-}
-
-/**
- * ユーザー設定保存（互換性ラッパー）
- * @param {string} userId - ユーザーID
- * @param {Object} config - 設定オブジェクト
- * @returns {boolean} 保存成功可否
- */
-function setUserConfig(userId, config) {
-  return ConfigManager.saveConfig(userId, config);
-}
-
-/**
- * ユーザー設定更新（互換性ラッパー）
- * @param {string} userId - ユーザーID
- * @param {Object} updates - 更新データ
- * @returns {boolean} 更新成功可否
- */
-function updateUserConfig(userId, updates) {
-  return ConfigManager.updateConfig(userId, updates);
-}

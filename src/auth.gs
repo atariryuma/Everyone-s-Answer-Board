@@ -72,7 +72,7 @@ function createRedirect(url) {
 function handleUserRegistration(userEmail, bypassCache = false) {
   // ログイン時（はじめるボタン）はキャッシュをバイパスして最新データを取得
   const existingUser = bypassCache ? 
-    DB.findUserByEmailNoCache(userEmail) : 
+    DB.findUserByEmail(userEmail) : 
     DB.findUserByEmail(userEmail);
   
   if (bypassCache) {
@@ -155,7 +155,7 @@ function processAdminAccess(userEmail) {
     }
 
     // 1. ユーザー情報をデータベースから直接取得（ログイン時はキャッシュバイパス）
-    const userInfo = DB.findUserByEmailNoCache(userEmail);
+    const userInfo = DB.findUserByEmail(userEmail);
     console.log('🔄 processLoginFlow: キャッシュバイパスでユーザー検索', { userEmail });
 
     // 2. 既存ユーザーの処理
@@ -200,11 +200,11 @@ function processAdminAccess(userEmail) {
         console.log('processLoginFlow: 新規ユーザー作成完了:', newUser.userId);
 
         // 🔧 修正：ログイン時は常にキャッシュバイパスで検証
-        let verifiedUser = DB.findUserByEmailNoCache(userEmail);
+        let verifiedUser = DB.findUserByEmail(userEmail);
         if (!verifiedUser) {
           console.warn('processLoginFlow: DB直接検索でもユーザー未発見、再試行');
           Utilities.sleep(200); // DB同期待機
-          verifiedUser = DB.findUserByEmailNoCache(userEmail);
+          verifiedUser = DB.findUserByEmail(userEmail);
           if (!verifiedUser) {
             console.error('processLoginFlow: ユーザー検証失敗 - DB同期問題の可能性');
             // フォールバック: 作成したユーザー情報を直接使用

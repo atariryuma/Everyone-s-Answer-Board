@@ -3,157 +3,6 @@
  * configJSON中心型アーキテクチャの完全実装
  */
 
-/**
- * CLAUDE.md準拠：現在の設定情報を取得（configJSON中心型）
- * 統一データソース原則：configJsonからすべてのデータを取得
- * @returns {Object} 現在の設定情報
- */
-function getCurrentConfig(userId = null) {
-  try {
-    console.log('getCurrentConfig: CLAUDE.md準拠configJSON中心型設定取得開始');
-
-    // userIdが指定されている場合はそのユーザーの設定を取得、なければ現在のユーザー
-    let userInfo;
-    if (userId) {
-      userInfo = DB.findUserById(userId);
-    } else {
-      const currentUser = UserManager.getCurrentEmail();
-      userInfo = DB.findUserByEmail(currentUser);
-    }
-
-    if (!userInfo) {
-      // デフォルト設定（CLAUDE.md準拠：心理的安全性重視）
-      return {
-        setupStatus: 'pending',
-        appPublished: false,
-        displaySettings: { showNames: false, showReactions: false }, // CLAUDE.md準拠
-        user: userId || UserManager.getCurrentEmail(),
-      };
-    }
-
-    // ✅ CLAUDE.md完全準拠：configJSON統一データソース原則
-    let config = userInfo.parsedConfig || {};
-
-    // 🔧 自動修復機能: configJsonが二重になっていたら修正
-    if (config.configJson) {
-      console.warn('⚠️ getCurrentConfig: 二重構造を検出 - 自動修復開始');
-      
-      if (typeof config.configJson === 'string') {
-        try {
-          // ネストしたconfigJsonを展開
-          const nestedConfig = JSON.parse(config.configJson);
-          
-          // 内側のデータを外側にマージ（内側優先）
-          config = { ...config, ...nestedConfig };
-          
-          // configJsonフィールドを削除
-          delete config.configJson;
-          delete config.configJSON;
-          
-          // 修復したデータをDBに保存
-          DB.updateUser(userInfo.userId, {
-            configJson: JSON.stringify(config),
-            lastModified: new Date().toISOString()
-          });
-          
-          console.log('✅ getCurrentConfig: 二重構造を自動修復完了', {
-            userId: userInfo.userId,
-            fixedFields: Object.keys(config)
-          });
-        } catch (parseError) {
-          console.error('❌ getCurrentConfig: ネストしたconfigJson解析エラー', parseError.message);
-          // パースできない場合はフィールドだけ削除
-          delete config.configJson;
-        }
-      } else {
-        // 文字列でない場合も削除
-        delete config.configJson;
-        delete config.configJSON;
-      }
-    }
-
-    // ✅ CLAUDE.md準拠：configJSON中心型設定構築（外側フィールド参照完全排除）
-    const fullConfig = {
-      // 5フィールド構造の基本情報
-      userId: userInfo.userId,
-      userEmail: userInfo.userEmail,
-      isActive: userInfo.isActive,
-      lastModified: userInfo.lastModified,
-
-      // ✅ configJSON統一データソース：全データはconfigから取得（外側フィールド参照なし）
-      spreadsheetId: config.spreadsheetId || null,
-      spreadsheetUrl: config.spreadsheetUrl || null, 
-      sheetName: config.sheetName || null,
-      formUrl: config.formUrl || null,
-      
-      // 監査情報
-      createdAt: config.createdAt || null,
-      lastAccessedAt: config.lastAccessedAt || null,
-      
-      // 列マッピング（JSON統一）
-      columnMapping: config.columnMapping || {},
-      
-      // ✅ 公開情報（configJSON統一データソース）
-      publishedAt: config.publishedAt || null,
-      appUrl: config.appUrl || null,
-      appPublished: config.appPublished || false, // ← これが重要：configJSONから取得
-      
-      // ✅ 表示設定（configJSON統一データソース、CLAUDE.md準拠）
-      displaySettings: config.displaySettings || { showNames: false, showReactions: false },
-      
-      // 🎯 アプリ設定（setupStatus自動判定：データ状態と同期）
-      setupStatus: (() => {
-        // 既存のsetupStatusがある場合はそれを使用
-        if (config.setupStatus && config.setupStatus === 'completed') {
-          return 'completed';
-        }
-        // データソース接続状態に基づく自動判定
-        return (config.spreadsheetId && config.sheetName) ? 'completed' : 'pending';
-      })(),
-      connectionMethod: config.connectionMethod || null,
-      lastConnected: config.lastConnected || null,
-      
-      // その他
-      formTitle: config.formTitle || null,
-      missingColumnsHandled: config.missingColumnsHandled || null,
-      opinionHeader: config.opinionHeader || null, // 問題文ヘッダー
-      
-      // CLAUDE.md準拠メタデータ
-      configJsonVersion: config.configJsonVersion || '1.0',
-      claudeMdCompliant: config.claudeMdCompliant || false
-    };
-
-    // CLAUDE.md準拠：構造化ログによる設定情報出力
-    console.log('📋 getCurrentConfig: configJSON中心型設定取得完了', {
-      userId: fullConfig.userId,
-      hasSpreadsheetId: !!fullConfig.spreadsheetId, // 統一データソース
-      hasSheetName: !!fullConfig.sheetName, // 統一データソース
-      hasColumnMapping: !!fullConfig.columnMapping && Object.keys(fullConfig.columnMapping).length > 0,
-      hasFormUrl: !!fullConfig.formUrl,
-      appPublished: fullConfig.appPublished,
-      setupStatus: fullConfig.setupStatus,
-      claudeMdCompliant: fullConfig.claudeMdCompliant,
-      timestamp: new Date().toISOString(),
-    });
-
-    return fullConfig;
-  } catch (error) {
-    // CLAUDE.md準拠：構造化ログによるエラー情報出力
-    console.error('❌ getCurrentConfig エラー:', {
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString(),
-    });
-
-    return {
-      setupStatus: 'error',
-      appPublished: false,
-      displaySettings: { showNames: false, showReactions: false }, // CLAUDE.md準拠
-      error: error.message,
-    };
-  }
-}
-
 
 /**
  * データソース接続（CLAUDE.md準拠版）
@@ -473,12 +322,12 @@ function publishApplication(config) {
 }
 
 /**
- * 設定保存（CLAUDE.md準拠版）
- * 統一データソース原則：全設定をconfigJsonに統合
+ * 設定保存（CLAUDE.md準拠版・ConfigManager統一）
+ * ✅ ConfigManager.updateConfig()に統一簡素化
  */
 function saveDraftConfiguration(config) {
   try {
-    console.log('💾 saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存開始', {
+    console.log('💾 saveDraftConfiguration: ConfigManager統一版保存開始', {
       configKeys: Object.keys(config),
       timestamp: new Date().toISOString()
     });
@@ -490,45 +339,33 @@ function saveDraftConfiguration(config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // 🚫 二重構造防止（第3層防御）: configJsonフィールドを削除
+    // 🚫 二重構造防止: configJsonフィールドを削除
     const cleanConfig = { ...config };
     delete cleanConfig.configJson;
     delete cleanConfig.configJSON;
     
-    // ConfigManagerを使用してドラフト設定を構築・保存
-    const currentConfig = ConfigManager.getUserConfig(userInfo.userId) || {};
-    const draftConfig = ConfigManager.buildDraftConfig(currentConfig, cleanConfig);
-    
-    // 念のため再度削除
-    delete draftConfig.configJson;
-    delete draftConfig.configJSON;
-    
-    // ConfigManagerによる統一保存（ConfigManager内でも削除される）
-    const success = ConfigManager.saveConfig(userInfo.userId, draftConfig);
+    // ✅ ConfigManager.updateConfig()による統一更新（簡素化）
+    const success = ConfigManager.updateConfig(userInfo.userId, cleanConfig);
     
     if (!success) {
       throw new Error('設定の保存に失敗しました');
     }
-    
-    const updatedConfig = draftConfig;
 
-    console.log('✅ saveDraftConfiguration: CLAUDE.md準拠configJSON中心型保存完了', {
+    console.log('✅ saveDraftConfiguration: ConfigManager統一版保存完了', {
       userId: userInfo.userId,
-      draftVersion: updatedConfig.draftVersion,
-      configFields: Object.keys(updatedConfig).length,
+      configFields: Object.keys(cleanConfig).length,
       claudeMdCompliant: true
     });
 
     return {
       success: true,
       message: 'ドラフトが保存されました',
-      draftVersion: updatedConfig.draftVersion,
       claudeMdCompliant: true,
       timestamp: new Date().toISOString()
     };
 
   } catch (error) {
-    console.error('❌ saveDraftConfiguration: CLAUDE.md準拠エラー:', {
+    console.error('❌ saveDraftConfiguration: ConfigManager統一版エラー:', {
       error: error.message,
       timestamp: new Date().toISOString()
     });
@@ -772,7 +609,7 @@ function executeConfigCleanup() {
     }
 
     // SystemManagerのクリーンアップ機能を使用
-    const result = cleanupConfigJsonData(userInfo.userId);
+    const result = SystemManager.cleanAllConfigJson();
 
     console.log('✅ configJSONクリーンアップ実行完了', result);
 
@@ -1039,7 +876,10 @@ function getCurrentBoardInfoAndUrls() {
   try {
     console.log('📊 getCurrentBoardInfoAndUrls: ボード情報取得開始');
 
-    const config = getCurrentConfig(); // 既存関数活用
+    // 現在のユーザーの設定を取得
+    const currentUser = UserManager.getCurrentEmail();
+    const userInfo = DB.findUserByEmail(currentUser);
+    const config = userInfo ? ConfigManager.getUserConfig(userInfo.userId) : null;
     
     // opinionHeader取得（問題文として表示）
     const questionText = config.opinionHeader || 

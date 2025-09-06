@@ -146,7 +146,7 @@ function verifyAdminAccess(userId) {
     // 見つからない場合は強制フレッシュで再試行
     if (!userFromDb) {
       console.log('verifyAdminAccess: 強制フレッシュで再検索中...');
-      userFromDb = fetchUserFromDatabase('userId', userId, { forceFresh: true });
+      userFromDb = DB.findUserById(userId);
     }
 
     // ユーザーが見つからない場合は認証失敗
@@ -206,44 +206,7 @@ function verifyAdminAccess(userId) {
  * ユーザーの最終アクセス時刻のみを更新（設定は保護）
  * @param {string} userId - 更新対象のユーザーID
  */
-/**
- * 🚀 CLAUDE.md完全準拠：lastAccessedAt更新ロジック
- * configJSONのlastAccessedAtを更新（Line 38準拠）
- */
-function updateUserLastAccess(userId) {
-  try {
-    if (!userId) {
-      console.warn('updateUserLastAccess: userIdが指定されていません');
-      return;
-    }
-
-    const now = new Date().toISOString();
-    console.log('🕒 CLAUDE.md準拠：lastAccessedAt更新開始', { userId, timestamp: now });
-
-    // CLAUDE.md準拠：configJSON内のlastAccessedAtを更新（Line 38）
-    const userInfo = DB.findUserById(userId);
-    if (!userInfo) {
-      console.warn('updateUserLastAccess: ユーザー情報が見つかりません:', userId);
-      return;
-    }
-
-    const currentConfig = userInfo.parsedConfig || {};
-    const updatedConfig = {
-      ...currentConfig,
-      lastAccessedAt: now, // CLAUDE.md Line 38準拠
-      lastModified: now
-    };
-
-    DB.updateUser(userId, updatedConfig);
-    console.log('✅ CLAUDE.md準拠：lastAccessedAt更新完了', { userId, lastAccessedAt: now });
-  } catch (error) {
-    console.error('❌ updateUserLastAccess CLAUDE.md準拠エラー:', {
-      userId,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-}
+// updateUserLastAccess removed from security.gs - use auth.js version (proper configJson handling)
 
 // =============================================================================
 // SECTION 3: 最小限のユーティリティ関数
@@ -257,22 +220,7 @@ function getSecureDatabaseId() {
   return props.getProperty('DATABASE_SPREADSHEET_ID');
 }
 
-/**
- * 基本的なユーザー検証（Core.gsで使用）
- */
-function verifyUserAccess(userId) {
-  if (!userId) {
-    throw new Error('ユーザーIDが必要です');
-  }
-
-  // Base.gsのAccessControllerを使用したアクセス制御
-  const result = App.getAccess().verifyAccess(userId, 'view', UserManager.getCurrentEmail());
-  if (!result.allowed) {
-    throw new Error(`アクセスが拒否されました: ${  result.reason}`);
-  }
-
-  return true;
-}
+// verifyUserAccess function removed - standardized to use App.getAccess().verifyAccess() directly
 
 /**
  * スプレッドシートをサービスアカウントと共有

@@ -175,16 +175,7 @@ const DB = {
    * @param {string} email - メールアドレス
    * @returns {Object|null} ユーザー情報またはnull
    */
-  /**
-   * 🎯 シンプル版：メールアドレスでユーザー検索（常にDB直接検索）
-   * ログイン時の信頼性を向上させるため、常にキャッシュをバイパス
-   * @param {string} email メールアドレス
-   * @returns {Object|null} ユーザー情報またはnull
-   */
-  findUserByEmail(email) {
-    console.log('🔄 findUserByEmail: 常にDB直接検索（ログイン最適化）');
-    return this.findUserByEmailNoCache(email);
-  },
+  // findUserByEmail - see implementation below (line 574)
 
   /**
    * ユーザーIDでユーザー検索（CLAUDE.md準拠版）
@@ -571,13 +562,13 @@ const DB = {
   /**
    * キャッシュなしでメールアドレスでユーザーを検索（ログイン専用）
    */
-  findUserByEmailNoCache(email) {
+  findUserByEmail(email) {
     if (!email || typeof email !== 'string') {
-      console.warn('findUserByEmailNoCache: 無効なメールアドレス', email);
+      console.warn('findUserByEmail: 無効なメールアドレス', email);
       return null;
     }
 
-    console.log('🔄 findUserByEmailNoCache: キャッシュをバイパスしてDB直接検索', { email });
+    console.log('🔄 findUserByEmail: キャッシュをバイパスしてDB直接検索', { email });
 
     try {
       const service = getSheetsService();
@@ -588,13 +579,13 @@ const DB = {
       const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
-        console.warn('findUserByEmailNoCache: データベースからデータを取得できませんでした');
+        console.warn('findUserByEmail: データベースからデータを取得できませんでした');
         return null;
       }
 
       const rows = data.valueRanges[0].values;
       if (rows.length < 2) {
-        console.log('findUserByEmailNoCache: ユーザーデータがありません');
+        console.log('findUserByEmail: ユーザーデータがありません');
         return null;
       }
 
@@ -608,7 +599,7 @@ const DB = {
         if (row[emailIndex] === email) {
           const user = this.parseUserRow(headers, row);
 
-          console.log('✅ findUserByEmailNoCache: ユーザー発見（キャッシュバイパス）', {
+          console.log('✅ findUserByEmail: ユーザー発見（キャッシュバイパス）', {
             email,
             userId: user.userId,
             timestamp: new Date().toISOString()
@@ -618,7 +609,7 @@ const DB = {
         }
       }
 
-      console.log('findUserByEmailNoCache: ユーザーが見つかりませんでした', { email });
+      console.log('findUserByEmail: ユーザーが見つかりませんでした', { email });
       return null;
 
     } catch (error) {
@@ -913,13 +904,9 @@ const DB = {
 /**
  * CLAUDE.md準拠：グローバル関数（後方互換性）
  */
-function updateUser(userId, updateData) {
-  return DB.updateUser(userId, updateData);
-}
+// updateUser global wrapper removed - use DB.updateUser() directly
 
-function deleteUserAccountByAdmin(targetUserId, reason) {
-  return DB.deleteUserAccountByAdmin(targetUserId, reason);
-}
+// deleteUserAccountByAdmin global wrapper removed - use DB.deleteUserAccountByAdmin() directly
 
 /**
  * 📊 データベースシートの初期化
