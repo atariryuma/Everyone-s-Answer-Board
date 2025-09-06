@@ -191,7 +191,7 @@ const DB = {
     }
 
     // キャッシュキーを生成
-    const cacheKey = 'user_id_' + userId;
+    const cacheKey = `user_id_${  userId}`;
 
     try {
       // キャッシュから取得を試行
@@ -526,7 +526,7 @@ const DB = {
       const cache = CacheService.getScriptCache();
       cache.remove(`user_id_${userId}`);
       if (userEmail) {
-        cache.remove('user_email_' + userEmail);
+        cache.remove(`user_email_${  userEmail}`);
       }
     } catch (error) {
       console.warn('キャッシュクリアエラー:', error.message);
@@ -753,7 +753,7 @@ const DB = {
       const cacheKeys = [
         `user_${userId}`,
         `userinfo_${userId}`,
-        'user_email_' + userEmail,
+        `user_email_${  userEmail}`,
         `config_${userId}`,
         'all_users', // 全ユーザーリストキャッシュ
         'user_count', // ユーザー数キャッシュ
@@ -969,7 +969,7 @@ function initializeDatabaseSheet(spreadsheetId) {
     // シートの存在確認とヘッダー設定
     try {
       const batchGetResult = service.spreadsheets.values.batchGet({
-        spreadsheetId: spreadsheetId,
+        spreadsheetId,
         ranges: [`${DB_CONFIG.SHEET_NAME}!A1:E1`]
       });
       
@@ -977,7 +977,7 @@ function initializeDatabaseSheet(spreadsheetId) {
       if (!batchGetResult.valueRanges[0].values || batchGetResult.valueRanges[0].values.length === 0) {
         console.log('Usersシートにヘッダーを設定');
         service.spreadsheets.values.update({
-          spreadsheetId: spreadsheetId,
+          spreadsheetId,
           range: `${DB_CONFIG.SHEET_NAME}!A1:E1`,
           values: [DB_CONFIG.HEADERS],
           valueInputOption: 'RAW'
@@ -1096,7 +1096,7 @@ function debugShowAllUsers() {
 
     console.log('📊 データベース診断結果:', {
       spreadsheetId: dbId,
-      sheetName: sheetName,
+      sheetName,
       totalRows: allData.length,
       headers: allData[0],
     });
@@ -1236,8 +1236,8 @@ function getSpreadsheetsData(service, spreadsheetId) {
     }
 
     // 防御的プログラミング: サービスオブジェクトのプロパティを安全に取得
-    const baseUrl = service.baseUrl;
-    const accessToken = service.accessToken;
+    const {baseUrl} = service;
+    const {accessToken} = service;
 
     // baseUrlが失われている場合の防御処理
     if (!baseUrl || typeof baseUrl !== 'string') {
@@ -1270,8 +1270,8 @@ function getSpreadsheetsData(service, spreadsheetId) {
       console.error('Sheets API エラー詳細:', {
         code: responseCode,
         response: responseText,
-        url: url.substring(0, 100) + '...',
-        spreadsheetId: spreadsheetId,
+        url: `${url.substring(0, 100)  }...`,
+        spreadsheetId,
       });
 
       if (responseCode === 403) {

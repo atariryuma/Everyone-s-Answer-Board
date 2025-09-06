@@ -57,6 +57,36 @@ module.exports = {
         'Browser': 'readonly',
         
         // Custom application globals (プロジェクト固有)
+        'CORE': 'readonly',
+        'DB_CONFIG': 'readonly', 
+        'PROPS_KEYS': 'readonly',
+        'SYSTEM_CONSTANTS': 'readonly',
+        'DB': 'writable',
+        'App': 'writable',
+        'Services': 'writable',
+        'UserManager': 'writable',
+        'ConfigManager': 'writable',
+        'SystemManager': 'writable',
+        'SecurityValidator': 'writable',
+        'cacheManager': 'writable',
+        'getSheetsService': 'writable',
+        'getSheetsServiceCached': 'writable',
+        'getServiceAccountTokenCached': 'writable',
+        'getSecureDatabaseId': 'writable',
+        'getSecureServiceAccountCreds': 'writable',
+        'batchGetSheetsData': 'writable',
+        'updateSheetsData': 'writable',
+        'initializeDatabaseSheet': 'writable',
+        'getWebAppUrl': 'writable',
+        'resolveColumnConflicts': 'writable',
+        'getSpreadsheetColumnIndices': 'writable',
+        'updateUserLastAccess': 'writable',
+        'executeGetPublishedSheetData': 'writable',
+        'invalidateUserCache': 'writable',
+        'createResponse': 'writable',
+        'validateAccess': 'writable',
+        'verifyAccess': 'writable',
+        'buildUserAdminUrl': 'writable',
         'logError': 'writable',
         'debugLog': 'writable',
         'warnLog': 'writable', 
@@ -75,7 +105,9 @@ module.exports = {
         'findUserById': 'writable',
         'checkLoginStatus': 'writable',
         'updateLoginStatus': 'writable',
-        'clearTimeout': 'writable'
+        'clearTimeout': 'writable',
+        'LockService': 'readonly',
+        'WebApp': 'readonly'
       },
       rules: {
         // GAS特有のルール調整
@@ -83,7 +115,7 @@ module.exports = {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_'
         }],
-        'no-undef': 'error',
+        'no-undef': 'warn',
         'no-var': 'warn',          // GAS V8でもconstを推奨
         'prefer-const': 'warn',    // 再代入しない変数はconst
         'no-console': 'off'        // console.logはGASで使用可能

@@ -39,7 +39,7 @@ const ConfigManager = Object.freeze({
           setupStatus: 'pending',
           appPublished: false,
           displaySettings: { showNames: false, showReactions: false },
-          userId: userId,
+          userId,
         };
       }
 
@@ -72,7 +72,7 @@ const ConfigManager = Object.freeze({
             this.saveConfig(userId, baseConfig);
 
             console.log('✅ ConfigManager.getUserConfig: 二重構造を自動修復完了', {
-              userId: userId,
+              userId,
               fixedFields: Object.keys(baseConfig),
             });
           } catch (parseError) {

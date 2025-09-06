@@ -392,7 +392,7 @@ function refreshBoardData(requestUserId) {
       if (typeof invalidateUserCache === 'function') {
         // 🚀 CLAUDE.md準拠：userInfo使用（boardOwnerInfoはuserInfoと同じ）
         const config = userInfo.parsedConfig || {};
-        const spreadsheetId = config.spreadsheetId;
+        const {spreadsheetId} = config;
         invalidateUserCache(requestUserId, userInfo.userEmail, spreadsheetId, false);
       }
     } catch (invalidateError) {
@@ -483,7 +483,7 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
     const config = userInfo.parsedConfig || {};
 
     // スプレッドシート設定確認（configJSON中心型）
-    const spreadsheetId = config.spreadsheetId;
+    const {spreadsheetId} = config;
     const sheetName = config.sheetName || 'フォームの回答 1';
 
     if (!spreadsheetId || !sheetName) {

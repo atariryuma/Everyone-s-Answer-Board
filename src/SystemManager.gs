@@ -87,10 +87,10 @@ function testDatabaseConnection() {
     return {
       success: true,
       databaseId: dbId,
-      sheetName: sheetName,
+      sheetName,
       hasCorrectHeaders,
       headerCount: headers.length,
-      headers: headers,
+      headers,
     };
   } catch (error) {
     return {
@@ -229,7 +229,7 @@ function resetUserConfigToDefaultImpl(userId) {
 
     // 5フィールド構造でのクリーンな更新データ
     const cleanUserData = {
-      userId: userId,
+      userId,
       userEmail: user.userEmail,
       isActive: true,
       configJson: JSON.stringify(defaultConfig),
@@ -243,10 +243,10 @@ function resetUserConfigToDefaultImpl(userId) {
       console.log('✅ ユーザー設定デフォルトリセット完了:', userId);
       return {
         success: true,
-        userId: userId,
+        userId,
         userEmail: user.userEmail,
         resetTo: 'default',
-        defaultConfig: defaultConfig,
+        defaultConfig,
         timestamp: new Date().toISOString(),
       };
     } else {
@@ -256,7 +256,7 @@ function resetUserConfigToDefaultImpl(userId) {
     console.error('❌ resetUserConfigToDefault エラー:', error.message);
     return {
       success: false,
-      userId: userId,
+      userId,
       error: error.message,
       timestamp: new Date().toISOString(),
     };
@@ -332,7 +332,7 @@ function testConfigIntegrity() {
       total: users.length,
       valid: validConfigs,
       invalid: invalidConfigs,
-      errors: errors,
+      errors,
     };
   } catch (error) {
     return {

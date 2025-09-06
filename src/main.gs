@@ -1067,7 +1067,7 @@ function processLoginAction() {
     return {
       success: true,
       message: 'ログインが完了しました',
-      adminUrl: adminUrl,
+      adminUrl,
       userId: userInfo.userId,
     };
   } catch (error) {

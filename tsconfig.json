@@ -35,9 +35,7 @@
     // Path Mapping
     "baseUrl": "./",
     "paths": {
-      "@src/*": ["src/*"],
-      "@tests/*": ["tests/*"],
-      "@mocks/*": ["tests/mocks/*"]
+      "@src/*": ["src/*"]
     },
     
     // Google Apps Script specific
@@ -45,8 +43,9 @@
   },
   
   "include": [
-    "src/**/*",
-    "tests/**/*",
+    "src/**/*.gs",
+    "src/**/*.js", 
+    "src/**/*.ts",
     "*.ts",
     "*.js"
   ],

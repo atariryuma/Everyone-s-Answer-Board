@@ -284,15 +284,15 @@ function updateSheetsData(service, spreadsheetId, range, values) {
     // Service Account経由でSheets API使用
     if (service && service.spreadsheets && service.spreadsheets.values && service.spreadsheets.values.update) {
       console.log('updateSheetsData: Service Account経由でSheets API使用', {
-        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
-        range: range
+        spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`,
+        range
       });
       
       const response = service.spreadsheets.values.update({
-        spreadsheetId: spreadsheetId,
-        range: range,
+        spreadsheetId,
+        range,
         valueInputOption: 'RAW',
-        values: values
+        values
       });
       
       console.log('✅ updateSheetsData: Service Account成功');
@@ -318,14 +318,14 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
     // Service Accountを使用してSheets APIでアクセス
     if (service && service.spreadsheets && service.spreadsheets.values && service.spreadsheets.values.batchGet) {
       console.log('batchGetSheetsData: Service Account経由でSheets API使用', {
-        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
+        spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`,
         rangeCount: ranges.length
       });
       
       // 正しいメソッド呼び出し: 関数として実行
       const response = service.spreadsheets.values.batchGet({
-        spreadsheetId: spreadsheetId,
-        ranges: ranges,
+        spreadsheetId,
+        ranges,
       });
       
       console.log('✅ batchGetSheetsData: Service Account成功');
