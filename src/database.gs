@@ -82,6 +82,19 @@ const DB = {
 
         // Service Account使用
         console.log('🔧 createUser: getSheetsServiceCached呼び出し前');
+        
+        // 🚨 キャッシュ状態を強制確認 - getUser成功後にcreateUserが失敗する原因調査
+        try {
+          // Service Accountトークンの状態確認
+          const currentToken = getServiceAccountTokenCached();
+          console.log('🔧 createUser: 現在のService Accountトークン状態', {
+            hasToken: !!currentToken,
+            tokenLength: currentToken ? currentToken.length : 0
+          });
+        } catch (tokenError) {
+          console.error('🔧 createUser: Service Accountトークン取得失敗', tokenError.message);
+        }
+        
         const service = getSheetsServiceCached();
         console.log('🔧 createUser: getSheetsServiceCached呼び出し後', { 
           hasService: !!service,

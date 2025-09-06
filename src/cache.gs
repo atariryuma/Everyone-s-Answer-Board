@@ -224,10 +224,12 @@ const cacheManager = new CacheManager();
  * @returns {object|null} キャッシュされたサービス情報
  */
 function getSheetsServiceCached() {
-  return cacheManager.get(
+  console.log('🔧 getSheetsServiceCached: キャッシュ確認開始');
+  
+  const result = cacheManager.get(
     'sheets_service',
     () => {
-      console.log('getSheetsServiceCached: 新しいサービスオブジェクト作成');
+      console.log('🔧 getSheetsServiceCached: 新しいサービスオブジェクト作成（キャッシュミス）');
       
       // Service Account認証確認
       let testToken;
@@ -241,13 +243,25 @@ function getSheetsServiceCached() {
       } catch (tokenError) {
         console.error('🔧 getSheetsServiceCached: Service Accountトークン取得エラー詳細', {
           error: tokenError.message,
-          stack: tokenError.stack
+          stack: tokenError.stack,
+          context: 'service_object_creation'
         });
+        
+        // 🚨 重要：トークン取得失敗時は不完全なサービスオブジェクトを返さない
+        console.error('🚨 Service Accountトークン取得失敗により、service object構築を中止します');
         throw new Error('Service Account Sheets APIが利用できません');
       }
 
       // Google Sheets APIサービスオブジェクトを返す
       console.log('🔧 getSheetsServiceCached: service object構築開始');
+      
+      // 🚨 実行コンテキスト情報を記録 - getUser成功/createUser失敗の原因調査
+      const executionContext = {
+        timestamp: new Date().toISOString(),
+        stackTrace: new Error().stack.split('\n').slice(1, 4).join(' -> '),
+        memoryUsage: typeof Utilities !== 'undefined' ? 'available' : 'unavailable'
+      };
+      console.log('🔧 getSheetsServiceCached: 実行コンテキスト', executionContext);
       
       const serviceObject = {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
@@ -433,6 +447,19 @@ function getSheetsServiceCached() {
     },
     { ttl: 3500, enableMemoization: true }
   );
+  
+  // 🚨 キャッシュから取得されたservice objectの検証
+  console.log('🔧 getSheetsServiceCached: キャッシュ取得結果検証', {
+    hasResult: !!result,
+    resultType: typeof result,
+    hasSpreadsheets: !!result?.spreadsheets,
+    hasValues: !!result?.spreadsheets?.values,
+    hasAppend: !!result?.spreadsheets?.values?.append,
+    appendType: typeof result?.spreadsheets?.values?.append,
+    valuesKeys: result?.spreadsheets?.values ? Object.keys(result.spreadsheets.values) : []
+  });
+  
+  return result;
 }
 
 /**
