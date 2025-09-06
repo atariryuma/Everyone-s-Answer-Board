@@ -57,7 +57,8 @@
       "Bash(for func in getCurrentConfig getCurrentBoardInfoAndUrls checkAdmin getAvailableSheets addReactionBatch getDataCount addReaction getIncrementalSheetData toggleHighlight refreshBoardData)",
       "Bash(./scripts/validate-system-spec.js)",
       "Bash(./scripts/extract-all-functions.js)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(clasp run:*)"
     ],
     "deny": [],
     "ask": [],

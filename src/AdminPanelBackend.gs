@@ -588,13 +588,7 @@ function executeAppPublish(userId, publishConfig) {
   }
 }
 
-/**
- * URL生成（既存互換） - main.gsの動的版に委譲
- */
-function generateUserUrls(userId) {
-  // main.gsの動的・安全版generateUserUrlsを使用
-  return Services.generateUserUrls(userId);
-}
+// URL生成関数はmain.gsのgenerateUserUrls()を使用（重複削除）
 
 /**
  * 🧹 configJSONクリーンアップ実行（管理パネルから呼び出し）

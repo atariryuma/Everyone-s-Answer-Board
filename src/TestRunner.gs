@@ -77,7 +77,7 @@ function checkServiceAccountStatus() {
       const token = getServiceAccountTokenCached();
       console.log('🔑 サービスアカウントトークン:', token ? '✅生成成功' : '❌生成失敗');
     } catch (tokenError) {
-      console.log('❌ トークン生成エラー:', tokenError.message);
+      console.log('❌ トークン生成エラー: [詳細は非表示]');
     }
 
     console.log('='.repeat(50));

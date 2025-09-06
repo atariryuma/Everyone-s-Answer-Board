@@ -411,7 +411,7 @@ function getGoogleClientId() {
 
       // デバッグ用：利用可能なプロパティを確認
       const allProperties = properties.getProperties();
-      console.log('Available properties:', Object.keys(allProperties));
+      console.log('Available properties count:', Object.keys(allProperties).length);
 
       return createResponse(false, 'Google Client ID not configured', {
         setupInstructions:

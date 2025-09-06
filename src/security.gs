@@ -72,7 +72,7 @@ function generateNewServiceAccountToken() {
   const responseCode = response.getResponseCode();
   if (responseCode !== 200) {
     const responseText = response.getContentText();
-    console.error('[ERROR]', 'Token request failed. Status:', responseCode);
+    console.error('[ERROR]', 'Token request failed. Status: [非表示]');
     console.error('[ERROR]', 'Response:', responseText);
 
     // セキュリティ: エラー詳細を隠蔽、内部ログのみ
