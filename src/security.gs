@@ -322,7 +322,13 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
     // Service Accountを使用してSheets APIでアクセスを試みる
     if (service && service.spreadsheets) {
       try {
-        console.log('batchGetSheetsData: Service Account経由でSheets API使用');
+        console.log('batchGetSheetsData: Service Account経由でSheets API使用', {
+          hasService: !!service,
+          hasSpreadsheets: !!service.spreadsheets,
+          hasValues: !!service.spreadsheets.values,
+          hasBatchGet: !!service.spreadsheets.values.batchGet,
+          batchGetType: typeof service.spreadsheets.values.batchGet
+        });
         const response = service.spreadsheets.values.batchGet({
           spreadsheetId: spreadsheetId,
           ranges: ranges
@@ -331,6 +337,11 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
       } catch (apiError) {
         console.warn('Sheets API呼び出し失敗、SpreadsheetAppにフォールバック:', apiError.message);
       }
+    } else {
+      console.log('batchGetSheetsData: Service利用不可', {
+        hasService: !!service,
+        hasSpreadsheets: service ? !!service.spreadsheets : 'service is null'
+      });
     }
     
     // フォールバック：Sheets APIが使えない場合はSpreadsheetAppを使用

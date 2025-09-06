@@ -92,7 +92,9 @@ const ConfigManager = Object.freeze({
       console.log('✅ ConfigManager.getUserConfig: 設定取得完了', {
         userId,
         configFields: Object.keys(enhancedConfig).length,
-        hasSpreadsheetId: !!enhancedConfig.spreadsheetId
+        hasSpreadsheetId: !!enhancedConfig.spreadsheetId,
+        spreadsheetId: enhancedConfig.spreadsheetId ? `${enhancedConfig.spreadsheetId.substring(0, 8)}...` : 'null',
+        configKeys: Object.keys(enhancedConfig)
       });
 
       return enhancedConfig;

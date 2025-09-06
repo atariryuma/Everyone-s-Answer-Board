@@ -912,9 +912,22 @@ function getCurrentBoardInfoAndUrls() {
     const config = userInfo ? ConfigManager.getUserConfig(userInfo.userId) : null;
     
     // フッター表示用の詳細情報を構築
-    const questionText = config?.opinionHeader || 
-                        config?.formTitle || 
-                        'システム準備中';
+    // headerIndicesから回答列のヘッダーを抽出（管理パネルと一致）
+    let questionText = config?.opinionHeader || config?.formTitle;
+    
+    if (!questionText && config?.headerIndices) {
+      // headerIndicesから回答列のヘッダーを取得
+      const headers = Object.keys(config.headerIndices);
+      questionText = headers.find(header => 
+        config.headerIndices[header] === 4 || // 通常回答列は4列目
+        (typeof config.columnMapping?.answer === 'number' && 
+         config.headerIndices[header] === config.columnMapping.answer)
+      ) || config?.formTitle || 'システム準備中';
+    }
+    
+    if (!questionText) {
+      questionText = 'システム準備中';
+    }
     
     // 日時情報の取得と整形
     const createdAt = config?.createdAt || null;
