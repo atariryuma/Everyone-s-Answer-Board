@@ -230,16 +230,26 @@ function getSheetsServiceCached() {
       console.log('getSheetsServiceCached: 新しいサービスオブジェクト作成');
       
       // Service Account認証確認
+      let testToken;
       try {
-        const testToken = getServiceAccountTokenCached();
-        console.log('getSheetsServiceCached: Service Accountトークン確認', { hasToken: !!testToken });
+        console.log('🔧 getSheetsServiceCached: Service Accountトークン取得開始');
+        testToken = getServiceAccountTokenCached();
+        console.log('🔧 getSheetsServiceCached: Service Accountトークン確認', { 
+          hasToken: !!testToken,
+          tokenLength: testToken ? testToken.length : 0 
+        });
       } catch (tokenError) {
-        console.error('getSheetsServiceCached: Service Accountトークン取得エラー', tokenError.message);
+        console.error('🔧 getSheetsServiceCached: Service Accountトークン取得エラー詳細', {
+          error: tokenError.message,
+          stack: tokenError.stack
+        });
         throw new Error('Service Account Sheets APIが利用できません');
       }
 
       // Google Sheets APIサービスオブジェクトを返す
-      return {
+      console.log('🔧 getSheetsServiceCached: service object構築開始');
+      
+      const serviceObject = {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
         spreadsheets: {
           batchUpdate: function (params) {
@@ -408,6 +418,18 @@ function getSheetsServiceCached() {
           },
         },
       };
+      
+      // 🔧 service object構築完了確認
+      console.log('🔧 getSheetsServiceCached: service object構築完了確認', {
+        hasSpreadsheets: !!serviceObject.spreadsheets,
+        hasValues: !!serviceObject.spreadsheets.values,
+        hasBatchGet: typeof serviceObject.spreadsheets.values.batchGet === 'function',
+        hasUpdate: typeof serviceObject.spreadsheets.values.update === 'function', 
+        hasAppend: typeof serviceObject.spreadsheets.values.append === 'function',
+        valuesKeys: Object.keys(serviceObject.spreadsheets.values)
+      });
+      
+      return serviceObject;
     },
     { ttl: 3500, enableMemoization: true }
   );

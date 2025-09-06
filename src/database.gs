@@ -81,7 +81,13 @@ const DB = {
         const sheetName = DB_CONFIG.SHEET_NAME;
 
         // Service Account使用
+        console.log('🔧 createUser: getSheetsServiceCached呼び出し前');
         const service = getSheetsServiceCached();
+        console.log('🔧 createUser: getSheetsServiceCached呼び出し後', { 
+          hasService: !!service,
+          serviceType: typeof service 
+        });
+        
         if (!service) {
           throw new Error('Service Accountサービスが利用できません');
         }

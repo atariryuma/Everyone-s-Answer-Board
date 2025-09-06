@@ -20,10 +20,26 @@ const SECURITY_CONFIG = Object.freeze({
  * @returns {string} アクセストークン
  */
 function getServiceAccountTokenCached() {
-  return cacheManager.get(SECURITY_CONFIG.AUTH_CACHE_KEY, generateNewServiceAccountToken, {
-    ttl: 3500,
-    enableMemoization: true,
-  }); // メモ化対応でトークン取得を高速化
+  try {
+    console.log('🔧 getServiceAccountTokenCached: トークンキャッシュ取得開始');
+    const token = cacheManager.get(SECURITY_CONFIG.AUTH_CACHE_KEY, generateNewServiceAccountToken, {
+      ttl: 3500,
+      enableMemoization: true,
+    }); // メモ化対応でトークン取得を高速化
+    
+    console.log('🔧 getServiceAccountTokenCached: トークンキャッシュ取得結果', {
+      hasToken: !!token,
+      tokenLength: token ? token.length : 0
+    });
+    
+    return token;
+  } catch (error) {
+    console.error('🔧 getServiceAccountTokenCached: キャッシュ取得エラー', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
 }
 
 /**
