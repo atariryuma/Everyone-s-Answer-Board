@@ -234,7 +234,7 @@ function getSheetsServiceCached() {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
         spreadsheets: {
           values: {
-            batchGet (params) {
+            batchGet: function (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
@@ -271,7 +271,7 @@ function getSheetsServiceCached() {
 
               return JSON.parse(response.getContentText());
             },
-            update (params) {
+            update: function (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
@@ -310,7 +310,7 @@ function getSheetsServiceCached() {
 
               return JSON.parse(response.getContentText());
             },
-            batchUpdate (params) {
+            batchUpdate: function (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
@@ -349,7 +349,7 @@ function getSheetsServiceCached() {
 
               return JSON.parse(response.getContentText());
             },
-            append (params) {
+            append: function (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
