@@ -1,0 +1,876 @@
+{
+  "timestamp": "2025-09-06T08:17:03.634Z",
+  "summary": {
+    "totalImplemented": 309,
+    "totalSpecAPI": 19,
+    "matchedAPI": 18,
+    "mismatchedAPI": 1,
+    "undocumentedMain": 117
+  },
+  "apiMismatches": [
+    {
+      "spec": "testSecurity",
+      "similar": null
+    }
+  ],
+  "undocumentedFunctions": [
+    {
+      "func": "checkFormConnection",
+      "file": "AdminPanelBackend.gs"
+    },
+    {
+      "func": "getFormInfo",
+      "file": "AdminPanelBackend.gs"
+    },
+    {
+      "func": "validateAdminPanelMapping",
+      "file": "AdminPanelBackend.gs"
+    },
+    {
+      "func": "getAccess",
+      "file": "App.gs"
+    },
+    {
+      "func": "getConfig",
+      "file": "App.gs"
+    },
+    {
+      "func": "getStatus",
+      "file": "App.gs"
+    },
+    {
+      "func": "createAccessResult",
+      "file": "Base.gs"
+    },
+    {
+      "func": "getCurrentUserId",
+      "file": "Base.gs"
+    },
+    {
+      "func": "getDefaultColumns",
+      "file": "Base.gs"
+    },
+    {
+      "func": "getPublicConfig",
+      "file": "Base.gs"
+    },
+    {
+      "func": "getUserConfig",
+      "file": "Base.gs"
+    },
+    {
+      "func": "getUserLevel",
+      "file": "Base.gs"
+    },
+    {
+      "func": "handle",
+      "file": "Base.gs"
+    },
+    {
+      "func": "handleSafely",
+      "file": "Base.gs"
+    },
+    {
+      "func": "getEmptyFeatureVector",
+      "file": "ColumnAnalysisSystem.gs"
+    },
+    {
+      "func": "getRawConfig",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "getUserConfig",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "getUserInfo",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "getUserWithConfig",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "saveConfig",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "updateAppStatus",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "updateConfig",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "updateDataSource",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "updateDisplaySettings",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "validateAndSanitizeConfig",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "validateUserId",
+      "file": "ConfigManager.gs"
+    },
+    {
+      "func": "checkReactionState",
+      "file": "Core.gs"
+    },
+    {
+      "func": "createForm",
+      "file": "Core.gs"
+    },
+    {
+      "func": "createFormFactory",
+      "file": "Core.gs"
+    },
+    {
+      "func": "createLinkedSpreadsheet",
+      "file": "Core.gs"
+    },
+    {
+      "func": "createUnifiedForm",
+      "file": "Core.gs"
+    },
+    {
+      "func": "createUserFolder",
+      "file": "Core.gs"
+    },
+    {
+      "func": "deleteCurrentUserAccount",
+      "file": "Core.gs"
+    },
+    {
+      "func": "deleteUserAccountByAdminForUI",
+      "file": "Core.gs"
+    },
+    {
+      "func": "doGetQuestionConfig",
+      "file": "Core.gs"
+    },
+    {
+      "func": "get",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getActiveFormInfo",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getAllUsersForAdminForUI",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getAppConfig",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getApplicationStatusForUI",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getAutoStopTime",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getColumnHeaderName",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getCurrentSheetName",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getCurrentUserStatus",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getDeletionLogsForUI",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getDriveService",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getHeaderIndex",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getInitialData",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getLoginStatus",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getOpinionHeaderSafely",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getQuestionConfig",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getResponsesData",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getRowReactions",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getSavedClassChoices",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getSheetColumns",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getSheetData",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getSheetsList",
+      "file": "Core.gs"
+    },
+    {
+      "func": "getSpreadsheetColumnIndices",
+      "file": "Core.gs"
+    },
+    {
+      "func": "saveClassChoices",
+      "file": "Core.gs"
+    },
+    {
+      "func": "saveSystemConfig",
+      "file": "Core.gs"
+    },
+    {
+      "func": "updateFormSettings",
+      "file": "Core.gs"
+    },
+    {
+      "func": "updateIsActiveStatus",
+      "file": "Core.gs"
+    },
+    {
+      "func": "validateHeaderIntegrity",
+      "file": "Core.gs"
+    },
+    {
+      "func": "checkAdmin",
+      "file": "PageBackend.gs"
+    },
+    {
+      "func": "getAvailableSheets",
+      "file": "PageBackend.gs"
+    },
+    {
+      "func": "getDataCount",
+      "file": "PageBackend.gs"
+    },
+    {
+      "func": "getUserCount",
+      "file": "SystemManager.gs"
+    },
+    {
+      "func": "checkServiceAccountStatus",
+      "file": "TestRunner.gs"
+    },
+    {
+      "func": "createCompleteUser",
+      "file": "auth.gs"
+    },
+    {
+      "func": "createRedirect",
+      "file": "auth.gs"
+    },
+    {
+      "func": "getSetupStatusFromConfig",
+      "file": "auth.gs"
+    },
+    {
+      "func": "handleUserRegistration",
+      "file": "auth.gs"
+    },
+    {
+      "func": "updateUserLastAccess",
+      "file": "auth.gs"
+    },
+    {
+      "func": "get",
+      "file": "cache.gs"
+    },
+    {
+      "func": "getHealth",
+      "file": "cache.gs"
+    },
+    {
+      "func": "getSpreadsheetHeaders",
+      "file": "cache.gs"
+    },
+    {
+      "func": "getStats",
+      "file": "cache.gs"
+    },
+    {
+      "func": "set",
+      "file": "cache.gs"
+    },
+    {
+      "func": "update",
+      "file": "cache.gs"
+    },
+    {
+      "func": "validateSpreadsheetHeaders",
+      "file": "cache.gs"
+    },
+    {
+      "func": "validateUserData",
+      "file": "constants.gs"
+    },
+    {
+      "func": "createUser",
+      "file": "database.gs"
+    },
+    {
+      "func": "deleteUserAccountByAdmin",
+      "file": "database.gs"
+    },
+    {
+      "func": "getAllUsers",
+      "file": "database.gs"
+    },
+    {
+      "func": "getSpreadsheetsData",
+      "file": "database.gs"
+    },
+    {
+      "func": "updateUser",
+      "file": "database.gs"
+    },
+    {
+      "func": "updateUserConfig_DEPRECATED",
+      "file": "database.gs"
+    },
+    {
+      "func": "updateUserFields",
+      "file": "database.gs"
+    },
+    {
+      "func": "updateUserInDatabase",
+      "file": "database.gs"
+    },
+    {
+      "func": "check",
+      "file": "main.gs"
+    },
+    {
+      "func": "checkCurrentPublicationStatus",
+      "file": "main.gs"
+    },
+    {
+      "func": "checkSystemConfiguration",
+      "file": "main.gs"
+    },
+    {
+      "func": "createResponse",
+      "file": "main.gs"
+    },
+    {
+      "func": "doGet",
+      "file": "main.gs"
+    },
+    {
+      "func": "domain",
+      "file": "main.gs"
+    },
+    {
+      "func": "getActiveUserInfo",
+      "file": "main.gs"
+    },
+    {
+      "func": "getCurrentEmail",
+      "file": "main.gs"
+    },
+    {
+      "func": "getEmailDomain",
+      "file": "main.gs"
+    },
+    {
+      "func": "getGoogleClientId",
+      "file": "main.gs"
+    },
+    {
+      "func": "getSuggestedAction",
+      "file": "main.gs"
+    },
+    {
+      "func": "getSystemDomainInfo",
+      "file": "main.gs"
+    },
+    {
+      "func": "getTestMockResponse",
+      "file": "main.gs"
+    },
+    {
+      "func": "getUser",
+      "file": "main.gs"
+    },
+    {
+      "func": "getWebAppUrl",
+      "file": "main.gs"
+    },
+    {
+      "func": "handleSystemError",
+      "file": "main.gs"
+    },
+    {
+      "func": "renderAdminPanel",
+      "file": "main.gs"
+    },
+    {
+      "func": "renderAnswerBoard",
+      "file": "main.gs"
+    },
+    {
+      "func": "renderLoginPage",
+      "file": "main.gs"
+    },
+    {
+      "func": "renderSetupPage",
+      "file": "main.gs"
+    },
+    {
+      "func": "saveApplicationConfig",
+      "file": "main.gs"
+    },
+    {
+      "func": "setupApplication",
+      "file": "main.gs"
+    },
+    {
+      "func": "validateUserDataState",
+      "file": "main.gs"
+    },
+    {
+      "func": "getSecureDatabaseId",
+      "file": "security.gs"
+    },
+    {
+      "func": "getSecureServiceAccountCreds",
+      "file": "security.gs"
+    },
+    {
+      "func": "getServiceAccountEmail",
+      "file": "security.gs"
+    },
+    {
+      "func": "getSheetsService",
+      "file": "security.gs"
+    },
+    {
+      "func": "updateSheetsData",
+      "file": "security.gs"
+    }
+  ],
+  "implementedFunctions": {
+    "AdminPanelBackend.gs": [
+      "addMissingColumns",
+      "analyzeColumns",
+      "checkFormConnection",
+      "checkIsSystemAdmin",
+      "connectDataSource",
+      "detectColumnMapping",
+      "executeAppPublish",
+      "executeConfigCleanup",
+      "generateColumnMapping",
+      "generateLegacyColumnMapping",
+      "generateUserUrls",
+      "getCurrentBoardInfoAndUrls",
+      "getCurrentConfig",
+      "getFormInfo",
+      "getHeaderIndices",
+      "getSheetList",
+      "getSpreadsheetList",
+      "if",
+      "migrateUserDataToConfigJson",
+      "publishApplication",
+      "saveDraftConfiguration",
+      "validateAdminPanelMapping"
+    ],
+    "App.gs": [
+      "getAccess",
+      "getConfig",
+      "getStatus",
+      "init",
+      "reset",
+      "App.initialized",
+      "App._config",
+      "App._access",
+      "App.init",
+      "App.if",
+      "App.ConfigurationManager",
+      "App.AccessController",
+      "App.log"
+    ],
+    "Base.gs": [
+      "constructor",
+      "createAccessResult",
+      "getCurrentUserId",
+      "getDefaultColumns",
+      "getPublicConfig",
+      "getUserConfig",
+      "getUserLevel",
+      "handle",
+      "handleSafely",
+      "hasUserConfig",
+      "if",
+      "initializeUserConfig",
+      "isSystemAdmin",
+      "removeUserConfig",
+      "resolveByEmail",
+      "resolveUserId",
+      "retryWithBackoff",
+      "safeUpdateUserConfig",
+      "switch",
+      "verifyAccess",
+      "verifyAdminAccess",
+      "verifyEditAccess",
+      "verifyViewAccess"
+    ],
+    "ColumnAnalysisSystem.gs": [
+      "analyzeColumnContent",
+      "analyzeColumnType",
+      "analyzeHeaderName",
+      "calculateAdvancedFeatures",
+      "calculateBayesianConfidence",
+      "calculateClassPatternScore",
+      "calculateConditionalEntropy",
+      "calculateDynamicWeights",
+      "calculateFinalConfidence",
+      "calculateKurtosis",
+      "calculateMutualInformation",
+      "calculateNamePatternScore",
+      "calculatePatternDensity",
+      "calculateShannonEntropy",
+      "calculateSkewness",
+      "classifyByAdvancedFeatures",
+      "ensembleClassification",
+      "for",
+      "getEmptyFeatureVector",
+      "hungarianAlgorithmSimplified",
+      "if",
+      "resolveColumnConflicts"
+    ],
+    "ConfigManager.gs": [
+      "buildDraftConfig",
+      "buildInitialConfig",
+      "buildPublishConfig",
+      "enhanceConfigWithDynamicUrls",
+      "getRawConfig",
+      "getUserConfig",
+      "getUserInfo",
+      "getUserWithConfig",
+      "if",
+      "saveConfig",
+      "updateAppStatus",
+      "updateConfig",
+      "updateDataSource",
+      "updateDisplaySettings",
+      "validateAndSanitizeConfig",
+      "validateUserId"
+    ],
+    "Core.gs": [
+      "activateSheetSimple",
+      "addReaction",
+      "addReactionColumnsToSpreadsheet",
+      "addUnifiedQuestions",
+      "analyzeContextualMeaning",
+      "applySortMode",
+      "buildRosterMap",
+      "calculateAdvancedConfidence",
+      "calculateRowScore",
+      "checkReactionState",
+      "clearExecutionUserInfoCache",
+      "countSheetRows",
+      "createForm",
+      "createFormFactory",
+      "createLinkedSpreadsheet",
+      "createUnifiedForm",
+      "createUserFolder",
+      "deleteCurrentUserAccount",
+      "deleteUserAccountByAdminForUI",
+      "determineSetupStep",
+      "doGetQuestionConfig",
+      "enhanceWithWebKnowledge",
+      "executeGetPublishedSheetData",
+      "executeGetSheetData",
+      "extractFormIdFromUrl",
+      "find",
+      "fixDataConsistencyManual",
+      "for",
+      "formatSheetDataForFrontend",
+      "get",
+      "getActiveFormInfo",
+      "getAllUsersForAdminForUI",
+      "getAppConfig",
+      "getApplicationStatusForUI",
+      "getAutoStopTime",
+      "getColumnHeaderName",
+      "getCurrentSheetName",
+      "getCurrentUserStatus",
+      "getDeletionLogsForUI",
+      "getDriveService",
+      "getHeaderIndex",
+      "getIncrementalSheetData",
+      "getInitialData",
+      "getLoginStatus",
+      "getOpinionHeaderSafely",
+      "getQuestionConfig",
+      "getResponsesData",
+      "getRowReactions",
+      "getSavedClassChoices",
+      "getSheetColumns",
+      "getSheetData",
+      "getSheetsList",
+      "getSpreadsheetColumnIndices",
+      "hasSetupPageAccess",
+      "identifyHeaders",
+      "identifyHeadersAdvanced",
+      "if",
+      "isSystemAdmin",
+      "mapConfigToActualHeaders",
+      "performAutoRepair",
+      "processHighlightToggle",
+      "processReaction",
+      "processRowData",
+      "registerNewUser",
+      "repairUserSpreadsheetAccess",
+      "saveClassChoices",
+      "saveSystemConfig",
+      "setApplicationStatusForUI",
+      "shareAllSpreadsheetsWithServiceAccount",
+      "shouldEnableDebugMode",
+      "shuffleArray",
+      "switch",
+      "switchToSheet",
+      "toggleHighlight",
+      "updateFormSettings",
+      "updateIsActiveStatus",
+      "validateHeaderIntegrity"
+    ],
+    "PageBackend.gs": [
+      "addReactionBatch",
+      "checkAdmin",
+      "clearActiveSheet",
+      "for",
+      "getAvailableSheets",
+      "getDataCount",
+      "if",
+      "refreshBoardData"
+    ],
+    "SystemManager.gs": [
+      "checkSetupStatus",
+      "cleanAllConfigJson",
+      "fixConfigJsonNesting",
+      "fixConfigJsonNestingImpl",
+      "for",
+      "getUserCount",
+      "if",
+      "resetCurrentUserToDefault",
+      "resetUserConfigToDefaultImpl",
+      "resetUserToDefault",
+      "SystemManager.fixConfigJsonNesting",
+      "SystemManager.resetUserConfigToDefault"
+    ],
+    "TestRunner.gs": [
+      "checkServiceAccountStatus",
+      "diagnoseDatabase",
+      "for",
+      "forceCleanupConfigJson",
+      "if",
+      "while"
+    ],
+    "auth.gs": [
+      "createCompleteUser",
+      "createRedirect",
+      "getSetupStatusFromConfig",
+      "handleUserRegistration",
+      "if",
+      "processAdminAccess",
+      "updateUserLastAccess"
+    ],
+    "cache.gs": [
+      "batchGet",
+      "clearMemoCache",
+      "constructor",
+      "get",
+      "getHealth",
+      "getSheetsServiceCached",
+      "getSpreadsheetHeaders",
+      "getStats",
+      "if",
+      "invalidateUserCache",
+      "remove",
+      "removePattern",
+      "resetStats",
+      "set",
+      "synchronizeCacheAfterCriticalUpdate",
+      "update",
+      "validateSpreadsheetHeaders"
+    ],
+    "constants.gs": [
+      "if",
+      "isValidEmail",
+      "isValidUUID",
+      "sanitizeInput",
+      "validateUserData"
+    ],
+    "database.gs": [
+      "buildConfigJson_DEPRECATED",
+      "cleanupEmptyUsers",
+      "cleanupNestedConfigJson",
+      "clearUserCache",
+      "createUser",
+      "debugShowAllUsers",
+      "deleteUserAccountByAdmin",
+      "findUserByEmail",
+      "findUserById",
+      "for",
+      "getAllUsers",
+      "getSpreadsheetsData",
+      "if",
+      "initializeDatabaseSheet",
+      "invalidateUserCache",
+      "logAccountDeletion",
+      "parseUserRow",
+      "updateUser",
+      "updateUserConfig_DEPRECATED",
+      "updateUserFields",
+      "updateUserInDatabase"
+    ],
+    "main.gs": [
+      "addSpreadsheetUrl",
+      "buildUrlWithParams",
+      "buildUserAdminUrl",
+      "check",
+      "checkCurrentPublicationStatus",
+      "checkSystemConfiguration",
+      "clearCache",
+      "createResponse",
+      "doGet",
+      "domain",
+      "email",
+      "for",
+      "forceLogoutAndRedirectToLogin",
+      "forceUrlSystemReset",
+      "generateUserId",
+      "generateUserUrls",
+      "getActiveUserInfo",
+      "getCurrentEmail",
+      "getEmailDomain",
+      "getGoogleClientId",
+      "getPublishedSheetData",
+      "getSuggestedAction",
+      "getSystemDomainInfo",
+      "getTestMockResponse",
+      "getUser",
+      "getWebAppUrl",
+      "handleSystemError",
+      "if",
+      "include",
+      "isSystemSetup",
+      "isUser",
+      "isValidUrl",
+      "parseRequestParams",
+      "processLoginAction",
+      "renderAdminPanel",
+      "renderAnswerBoard",
+      "renderLoginPage",
+      "renderSetupPage",
+      "reportClientError",
+      "resetUserAuthentication",
+      "saveApplicationConfig",
+      "setupApplication",
+      "showAdminPanel",
+      "showAnswerBoard",
+      "showErrorPage",
+      "switch",
+      "validateUserDataState",
+      "verifyUserAuthentication"
+    ],
+    "security.gs": [
+      "addServiceAccountToSpreadsheet",
+      "batchGetSheetsData",
+      "generateNewServiceAccountToken",
+      "getSecureDatabaseId",
+      "getSecureServiceAccountCreds",
+      "getServiceAccountEmail",
+      "getServiceAccountTokenCached",
+      "getSheetsService",
+      "if",
+      "shareSpreadsheetWithServiceAccount",
+      "updateSheetsData",
+      "verifyAdminAccess"
+    ]
+  },
+  "specFunctions": {
+    "api": [
+      "connectDataSource",
+      "getCurrentConfig",
+      "saveDraftConfiguration",
+      "publishApplication",
+      "setApplicationStatusForUI",
+      "getCurrentBoardInfoAndUrls",
+      "checkIsSystemAdmin",
+      "getSpreadsheetList",
+      "getSheetList",
+      "getHeaderIndices",
+      "getPublishedSheetData",
+      "addReaction",
+      "getIncrementalSheetData",
+      "toggleHighlight",
+      "checkSetupStatus",
+      "testSecurity",
+      "cleanAllConfigJson",
+      "getServiceAccountTokenCached",
+      "getSheetsServiceCached"
+    ],
+    "internal": [
+      "getServiceAccountTokenCached",
+      "connectDataSource",
+      "getCurrentConfig",
+      "saveDraftConfiguration",
+      "publishApplication",
+      "setApplicationStatusForUI",
+      "getCurrentBoardInfoAndUrls",
+      "checkIsSystemAdmin",
+      "getSpreadsheetList",
+      "getSheetList",
+      "getHeaderIndices",
+      "getPublishedSheetData",
+      "addReaction",
+      "getIncrementalSheetData",
+      "toggleHighlight",
+      "checkSetupStatus",
+      "performSystemDiagnosis",
+      "testSchemaOptimization",
+      "testSecurity",
+      "cleanAllConfigJson",
+      "getSheetsServiceCached",
+      "loadIncrementalData",
+      "logDeletion"
+    ],
+    "mentioned": []
+  }
+}
