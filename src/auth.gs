@@ -35,7 +35,7 @@ function createCompleteUser(userEmail) {
   return {
     userId,
     userEmail,
-    isActive: true,
+    isActive: 'true',  // 文字列として統一（Sheetsとの一貫性）
     configJson: JSON.stringify(minimalConfig),
     lastModified: timestamp,
   };
