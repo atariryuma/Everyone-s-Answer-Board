@@ -123,7 +123,7 @@ const UserIdResolver = Object.freeze({
     } catch (error) {
       console.error('UserIdResolver.resolveByEmail エラー:', {
         email,
-        error: error.message
+        error: error.message,
       });
       return null;
     }
@@ -147,7 +147,7 @@ const UserIdResolver = Object.freeze({
 
     // ユーザーIDが指定されていない場合は現在のユーザーから解決
     return this.getCurrentUserId();
-  }
+  },
 });
 
 // ===============================
@@ -285,7 +285,7 @@ class ConfigurationManager {
           userId,
           configSize: JSON.stringify(updatedConfig).length,
           updateKeys: Object.keys(updates),
-          performance: '70%効率化'
+          performance: '70%効率化',
         });
         return true;
       }
@@ -377,12 +377,12 @@ class AccessController {
   verifyAdminAccess(userInfo, config, currentUserEmail) {
     // security.gsの強化版verifyAdminAccessを使用
     const isVerified = verifyAdminAccess(userInfo.userId);
-    
+
     if (isVerified) {
       const systemAdminEmail = PropertiesService.getScriptProperties().getProperty(
         PROPS_KEYS.ADMIN_EMAIL
       );
-      
+
       // システム管理者かオーナーかを判定
       if (currentUserEmail === systemAdminEmail) {
         console.log('✅ システム管理者として認証成功');

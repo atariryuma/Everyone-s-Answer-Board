@@ -1,9 +1,9 @@
 /**
  * ConfigManager.gs - 統一configJSON管理システム
- * 
+ *
  * 🎯 目的: 全configJson操作の単一責任者として論理整合性を確保
  * 🚀 CLAUDE.md完全準拠: configJSON中心型アーキテクチャの統一実装
- * 
+ *
  * 責任範囲:
  * - configJsonの読み込み・保存・更新・削除
  * - 設定構築・検証・サニタイズ
@@ -15,7 +15,6 @@
  * 全configJson操作の唯一の責任者
  */
 const ConfigManager = Object.freeze({
-
   // ========================================
   // 📖 読み込み系メソッド
   // ========================================
@@ -40,7 +39,7 @@ const ConfigManager = Object.freeze({
           setupStatus: 'pending',
           appPublished: false,
           displaySettings: { showNames: false, showReactions: false },
-          userId: userId
+          userId: userId,
         };
       }
 
@@ -56,28 +55,31 @@ const ConfigManager = Object.freeze({
       // 🔧 自動修復機能: configJsonが二重になっていたら修正
       if (baseConfig.configJson) {
         console.warn('⚠️ ConfigManager.getUserConfig: 二重構造を検出 - 自動修復開始');
-        
+
         if (typeof baseConfig.configJson === 'string') {
           try {
             // ネストしたconfigJsonを展開
             const nestedConfig = JSON.parse(baseConfig.configJson);
-            
+
             // 内側のデータを外側にマージ（内側優先）
             baseConfig = { ...baseConfig, ...nestedConfig };
-            
+
             // configJsonフィールドを削除
             delete baseConfig.configJson;
             delete baseConfig.configJSON;
-            
+
             // 修復したデータをDBに保存
             this.saveConfig(userId, baseConfig);
-            
+
             console.log('✅ ConfigManager.getUserConfig: 二重構造を自動修復完了', {
               userId: userId,
-              fixedFields: Object.keys(baseConfig)
+              fixedFields: Object.keys(baseConfig),
             });
           } catch (parseError) {
-            console.error('❌ ConfigManager.getUserConfig: ネストしたconfigJson解析エラー', parseError.message);
+            console.error(
+              '❌ ConfigManager.getUserConfig: ネストしたconfigJson解析エラー',
+              parseError.message
+            );
             // パースできない場合はフィールドだけ削除
             delete baseConfig.configJson;
           }
@@ -86,24 +88,25 @@ const ConfigManager = Object.freeze({
           delete baseConfig.configJson;
         }
       }
-      
+
       const enhancedConfig = this.enhanceConfigWithDynamicUrls(baseConfig, userId);
 
       console.log('✅ ConfigManager.getUserConfig: 設定取得完了', {
         userId,
         configFields: Object.keys(enhancedConfig).length,
         hasSpreadsheetId: !!enhancedConfig.spreadsheetId,
-        spreadsheetId: enhancedConfig.spreadsheetId ? `${enhancedConfig.spreadsheetId.substring(0, 8)}...` : 'null',
-        configKeys: Object.keys(enhancedConfig)
+        spreadsheetId: enhancedConfig.spreadsheetId
+          ? `${enhancedConfig.spreadsheetId.substring(0, 8)}...`
+          : 'null',
+        configKeys: Object.keys(enhancedConfig),
       });
 
       return enhancedConfig;
-
     } catch (error) {
       console.error('❌ ConfigManager.getUserConfig: エラー', {
         userId,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
       return null;
     }
@@ -127,7 +130,7 @@ const ConfigManager = Object.freeze({
 
   /**
    * 設定保存（唯一の保存メソッド）
-   * @param {string} userId - ユーザーID  
+   * @param {string} userId - ユーザーID
    * @param {Object} config - 保存する設定オブジェクト
    * @returns {boolean} 保存成功可否
    */
@@ -142,9 +145,9 @@ const ConfigManager = Object.freeze({
       const cleanConfig = { ...config };
       delete cleanConfig.configJson;
       delete cleanConfig.configJSON;
-      
+
       // 大文字小文字のバリエーションも削除
-      Object.keys(cleanConfig).forEach(key => {
+      Object.keys(cleanConfig).forEach((key) => {
         if (key.toLowerCase() === 'configjson') {
           console.warn(`⚠️ ConfigManager.saveConfig: 危険なフィールド "${key}" を削除`);
           delete cleanConfig[key];
@@ -157,7 +160,7 @@ const ConfigManager = Object.freeze({
         cleanConfigKeys: Object.keys(cleanConfig),
         spreadsheetId: cleanConfig.spreadsheetId,
         sheetName: cleanConfig.sheetName,
-        formUrl: cleanConfig.formUrl
+        formUrl: cleanConfig.formUrl,
       });
 
       // 設定の検証とサニタイズ
@@ -173,19 +176,19 @@ const ConfigManager = Object.freeze({
         validatedConfigKeys: Object.keys(validatedConfig),
         spreadsheetId: validatedConfig.spreadsheetId,
         sheetName: validatedConfig.sheetName,
-        formUrl: validatedConfig.formUrl
+        formUrl: validatedConfig.formUrl,
       });
 
       // タイムスタンプ更新
       validatedConfig.lastModified = new Date().toISOString();
-      
+
       // 🔧 修正: DB.updateUserInDatabaseを直接使用（updateUserではなく）
       // updateUserは個別フィールドマージ用、完全なconfigJson置き換えはupdateUserInDatabase
       let success = false;
       try {
         DB.updateUserInDatabase(userId, {
           configJson: JSON.stringify(validatedConfig),
-          lastModified: validatedConfig.lastModified
+          lastModified: validatedConfig.lastModified,
         });
         success = true;
       } catch (dbError) {
@@ -198,19 +201,18 @@ const ConfigManager = Object.freeze({
           userId,
           configSize: JSON.stringify(validatedConfig).length,
           configFields: Object.keys(validatedConfig),
-          timestamp: validatedConfig.lastModified
+          timestamp: validatedConfig.lastModified,
         });
       } else {
         console.error('❌ ConfigManager.saveConfig: データベース更新失敗', { userId });
       }
 
       return success;
-
     } catch (error) {
       console.error('❌ ConfigManager.saveConfig: 保存エラー', {
         userId,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
       return false;
     }
@@ -234,9 +236,11 @@ const ConfigManager = Object.freeze({
       ...currentConfig,
       spreadsheetId: spreadsheetId || currentConfig.spreadsheetId,
       sheetName: sheetName || currentConfig.sheetName,
-      spreadsheetUrl: spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}` : currentConfig.spreadsheetUrl,
-      setupStatus: (spreadsheetId && sheetName) ? 'data_connected' : currentConfig.setupStatus,
-      lastModified: new Date().toISOString()
+      spreadsheetUrl: spreadsheetId
+        ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}`
+        : currentConfig.spreadsheetUrl,
+      setupStatus: spreadsheetId && sheetName ? 'data_connected' : currentConfig.setupStatus,
+      lastModified: new Date().toISOString(),
     };
 
     return this.saveConfig(userId, updatedConfig);
@@ -257,10 +261,10 @@ const ConfigManager = Object.freeze({
       displaySettings: {
         ...(currentConfig.displaySettings || {}),
         ...(showNames !== undefined && { showNames }),
-        ...(showReactions !== undefined && { showReactions })
+        ...(showReactions !== undefined && { showReactions }),
       },
       ...(displayMode && { displayMode }),
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
     };
 
     return this.saveConfig(userId, updatedConfig);
@@ -272,7 +276,19 @@ const ConfigManager = Object.freeze({
    * @param {Object} status - {appPublished, setupStatus, formUrl, formTitle, preserveDataSource, spreadsheetId, sheetName, appUrl}
    * @returns {boolean} 更新成功可否
    */
-  updateAppStatus(userId, { appPublished, setupStatus, formUrl, formTitle, preserveDataSource = true, spreadsheetId, sheetName, appUrl }) {
+  updateAppStatus(
+    userId,
+    {
+      appPublished,
+      setupStatus,
+      formUrl,
+      formTitle,
+      preserveDataSource = true,
+      spreadsheetId,
+      sheetName,
+      appUrl,
+    }
+  ) {
     const currentConfig = this.getUserConfig(userId);
     if (!currentConfig) return false;
 
@@ -287,19 +303,25 @@ const ConfigManager = Object.freeze({
       ...(spreadsheetId && { spreadsheetId }),
       ...(sheetName && { sheetName }),
       ...(appUrl && { appUrl }),
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
     };
 
     // 🔒 データソース情報の明示的な保護（connectDataSource設定の保持）
     if (preserveDataSource && currentConfig) {
-      const dataSourceFields = ['spreadsheetId', 'sheetName', 'spreadsheetUrl', 'columnMapping', 'opinionHeader'];
-      dataSourceFields.forEach(field => {
+      const dataSourceFields = [
+        'spreadsheetId',
+        'sheetName',
+        'spreadsheetUrl',
+        'columnMapping',
+        'opinionHeader',
+      ];
+      dataSourceFields.forEach((field) => {
         if (currentConfig[field] !== undefined && updatedConfig[field] === undefined) {
           updatedConfig[field] = currentConfig[field];
-          console.log(`🔒 ConfigManager.updateAppStatus: ${field}を保護`, { 
-            userId, 
-            field, 
-            value: currentConfig[field] 
+          console.log(`🔒 ConfigManager.updateAppStatus: ${field}を保護`, {
+            userId,
+            field,
+            value: currentConfig[field],
           });
         }
       });
@@ -321,7 +343,7 @@ const ConfigManager = Object.freeze({
     const updatedConfig = {
       ...currentConfig,
       ...updates,
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
     };
 
     return this.saveConfig(userId, updatedConfig);
@@ -338,36 +360,36 @@ const ConfigManager = Object.freeze({
    */
   buildInitialConfig(userData = {}) {
     const now = new Date().toISOString();
-    
+
     return {
       // 監査情報
       createdAt: now,
       lastModified: now,
       lastAccessedAt: now,
-      
+
       // セットアップ情報
       setupStatus: 'pending',
       appPublished: false,
-      
+
       // 表示設定（プライバシー重視：デフォルトOFF）
       displaySettings: {
         showNames: false,
-        showReactions: false
+        showReactions: false,
       },
       displayMode: 'anonymous',
-      
+
       // データソース情報（空で開始）
       spreadsheetId: userData.spreadsheetId || null,
       sheetName: userData.sheetName || null,
       spreadsheetUrl: null,
-      
+
       // フォーム情報
       formUrl: null,
       formTitle: null,
-      
+
       // メタ情報
       configVersion: '2.0',
-      claudeMdCompliant: true
+      claudeMdCompliant: true,
     };
   },
 
@@ -379,46 +401,52 @@ const ConfigManager = Object.freeze({
    */
   buildDraftConfig(currentConfig, updates) {
     const baseConfig = currentConfig || this.buildInitialConfig();
-    
+
     return {
       // 既存の重要データを継承
       createdAt: baseConfig.createdAt || new Date().toISOString(),
       lastAccessedAt: baseConfig.lastAccessedAt || new Date().toISOString(),
-      
+
       // データソース情報（更新または継承）
       spreadsheetId: updates.spreadsheetId || baseConfig.spreadsheetId,
       sheetName: updates.sheetName || baseConfig.sheetName,
-      spreadsheetUrl: updates.spreadsheetId 
-        ? `https://docs.google.com/spreadsheets/d/${updates.spreadsheetId}` 
+      spreadsheetUrl: updates.spreadsheetId
+        ? `https://docs.google.com/spreadsheets/d/${updates.spreadsheetId}`
         : baseConfig.spreadsheetUrl,
-      
+
       // 表示設定
       displaySettings: {
-        showNames: updates.showNames !== undefined ? updates.showNames : (baseConfig.displaySettings?.showNames || false),
-        showReactions: updates.showReactions !== undefined ? updates.showReactions : (baseConfig.displaySettings?.showReactions || false)
+        showNames:
+          updates.showNames !== undefined
+            ? updates.showNames
+            : baseConfig.displaySettings?.showNames || false,
+        showReactions:
+          updates.showReactions !== undefined
+            ? updates.showReactions
+            : baseConfig.displaySettings?.showReactions || false,
       },
-      
+
       // アプリ設定
       setupStatus: baseConfig.setupStatus || 'pending',
       appPublished: baseConfig.appPublished || false,
-      
+
       // フォーム情報（継承）
-      ...(baseConfig.formUrl && { 
+      ...(baseConfig.formUrl && {
         formUrl: baseConfig.formUrl,
-        formTitle: baseConfig.formTitle 
+        formTitle: baseConfig.formTitle,
       }),
-      
+
       // 列マッピング情報（継承）
       ...(baseConfig.columnMapping && { columnMapping: baseConfig.columnMapping }),
       ...(baseConfig.opinionHeader && { opinionHeader: baseConfig.opinionHeader }),
-      
+
       // ドラフト状態
       isDraft: !baseConfig.appPublished,
-      
+
       // メタ情報
       configVersion: '2.0',
       claudeMdCompliant: true,
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
     };
   },
 
@@ -438,7 +466,7 @@ const ConfigManager = Object.freeze({
       setupStatus: 'completed',
       publishedAt: new Date().toISOString(),
       isDraft: false,
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
     };
   },
 
@@ -460,13 +488,15 @@ const ConfigManager = Object.freeze({
     try {
       // 基本検証
       const sanitized = { ...config };
-      
+
       // 🚨 重複ネスト防止: configJsonフィールドの除去
       if ('configJson' in sanitized) {
-        console.warn('ConfigManager.validateAndSanitizeConfig: configJsonフィールドを除去（重複ネスト防止）');
+        console.warn(
+          'ConfigManager.validateAndSanitizeConfig: configJsonフィールドを除去（重複ネスト防止）'
+        );
         delete sanitized.configJson;
       }
-      
+
       // 必須タイムスタンプの確保
       if (!sanitized.createdAt) {
         sanitized.createdAt = new Date().toISOString();
@@ -474,22 +504,21 @@ const ConfigManager = Object.freeze({
       if (!sanitized.lastModified) {
         sanitized.lastModified = new Date().toISOString();
       }
-      
+
       // displaySettingsの正規化
       if (sanitized.displaySettings && typeof sanitized.displaySettings === 'object') {
         sanitized.displaySettings = {
           showNames: Boolean(sanitized.displaySettings.showNames),
-          showReactions: Boolean(sanitized.displaySettings.showReactions)
+          showReactions: Boolean(sanitized.displaySettings.showReactions),
         };
       }
-      
+
       // spreadsheetUrlの動的生成
       if (sanitized.spreadsheetId && !sanitized.spreadsheetUrl) {
         sanitized.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${sanitized.spreadsheetId}`;
       }
-      
+
       return sanitized;
-      
     } catch (error) {
       console.error('ConfigManager.validateAndSanitizeConfig: サニタイズエラー', error);
       return null;
@@ -518,7 +547,7 @@ const ConfigManager = Object.freeze({
   enhanceConfigWithDynamicUrls(config, userId) {
     try {
       const enhanced = { ...config };
-      
+
       // WebAppURL生成（main.gsの安定したgetWebAppUrl関数を使用）
       if (!enhanced.appUrl) {
         try {
@@ -527,21 +556,25 @@ const ConfigManager = Object.freeze({
           if (baseUrl) {
             enhanced.appUrl = `${baseUrl}?mode=view&userId=${userId}`;
           } else {
-            console.warn('ConfigManager.enhanceConfigWithDynamicUrls: getWebAppUrl()がnullを返しました');
+            console.warn(
+              'ConfigManager.enhanceConfigWithDynamicUrls: getWebAppUrl()がnullを返しました'
+            );
           }
         } catch (urlError) {
-          console.warn('ConfigManager.enhanceConfigWithDynamicUrls: getWebAppUrl()使用エラー:', urlError.message);
+          console.warn(
+            'ConfigManager.enhanceConfigWithDynamicUrls: getWebAppUrl()使用エラー:',
+            urlError.message
+          );
           // URL生成失敗時はappUrlを設定しない（undefined のまま）
         }
       }
-      
+
       // SpreadsheetURL生成
       if (enhanced.spreadsheetId && !enhanced.spreadsheetUrl) {
         enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${enhanced.spreadsheetId}`;
       }
-      
+
       return enhanced;
-      
     } catch (error) {
       console.warn('ConfigManager.enhanceConfigWithDynamicUrls: URL生成エラー', error.message);
       return config; // エラー時は元のconfigをそのまま返す
@@ -563,19 +596,22 @@ const ConfigManager = Object.freeze({
     try {
       // 5分キャッシュでユーザー情報取得
       const cacheKey = `userInfo-${email}`;
-      
+
       // CacheManagerが利用可能な場合
       if (typeof cacheManager !== 'undefined' && cacheManager) {
-        return cacheManager.get(cacheKey, () => {
-          console.log(`ConfigManager: ユーザー情報取得 - ${email}`);
-          return DB.findUserByEmail(email);
-        }, { ttl: 300 });
+        return cacheManager.get(
+          cacheKey,
+          () => {
+            console.log(`ConfigManager: ユーザー情報取得 - ${email}`);
+            return DB.findUserByEmail(email);
+          },
+          { ttl: 300 }
+        );
       }
-      
+
       // フォールバック: 直接取得
       console.log(`ConfigManager: ユーザー情報取得（キャッシュなし） - ${email}`);
       return DB.findUserByEmail(email);
-      
     } catch (error) {
       console.error('ConfigManager.getUserInfo エラー:', error.message);
       return null;
@@ -596,17 +632,16 @@ const ConfigManager = Object.freeze({
       }
 
       const config = this.getUserConfig(userInfo.userId);
-      
+
       return {
         ...userInfo,
-        config: config || this.buildInitialConfig()
+        config: config || this.buildInitialConfig(),
       };
-      
     } catch (error) {
       console.error('ConfigManager.getUserWithConfig エラー:', error.message);
       return null;
     }
-  }
+  },
 });
 
 // ========================================

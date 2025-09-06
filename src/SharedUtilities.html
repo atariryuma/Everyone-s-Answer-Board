@@ -1145,10 +1145,10 @@
     if (loading) {
       // 部分ローディング: 通知 + インラインスピナー、画面操作可能
       window.showInfo(`🔄 ${message || '処理中...'}`);
-      
+
       // インライン要素にスピナークラスを追加（あれば）
       const activeElements = document.querySelectorAll('.partial-loading-target');
-      activeElements.forEach(el => {
+      activeElements.forEach((el) => {
         el.classList.add('partial-loading');
         if (!el.dataset.originalText) {
           el.dataset.originalText = el.textContent;
@@ -1159,7 +1159,7 @@
     } else {
       // 終了時: スピナー除去、元の状態に復元
       const activeElements = document.querySelectorAll('.partial-loading');
-      activeElements.forEach(el => {
+      activeElements.forEach((el) => {
         el.classList.remove('partial-loading');
         if (el.dataset.originalText) {
           el.textContent = el.dataset.originalText;

@@ -101,18 +101,18 @@
   async function initializeDropdowns() {
     const spreadsheetSelect = document.getElementById('spreadsheet-select');
     const sheetSelect = document.getElementById('sheet-select');
-    
+
     if (!spreadsheetSelect) return;
 
     try {
       // スプレッドシート一覧を初期化時に読み込み
       await loadSpreadsheetListAsync();
-      
+
       // 現在の設定から既存データを取得・反映
       const config = await getCurrentConfigAsync();
       if (config && config.spreadsheetId) {
         spreadsheetSelect.value = config.spreadsheetId;
-        
+
         // 設定されているスプレッドシートのシート一覧を読み込み
         if (config.spreadsheetId) {
           await loadSheetList(config.spreadsheetId);
@@ -124,7 +124,6 @@
 
       // シンプルなchangeイベントを設定
       setupSimpleChangeEvents();
-
     } catch (error) {
       console.error('ドロップダウン初期化エラー:', error);
       spreadsheetSelect.innerHTML = '<option value="">初期化エラー</option>';
@@ -134,7 +133,7 @@
   // 🎯 シンプルなchangeイベント設定
   function setupSimpleChangeEvents() {
     // スプレッドシート選択時 → シート読み込み
-    document.getElementById('spreadsheet-select').addEventListener('change', function() {
+    document.getElementById('spreadsheet-select').addEventListener('change', function () {
       const spreadsheetId = this.value;
       if (spreadsheetId) {
         loadSheetList(spreadsheetId);
@@ -143,7 +142,7 @@
       }
     });
   }
-  
+
   // シート選択をリセット
   function resetSheetSelect() {
     const sheetSelect = document.getElementById('sheet-select');
@@ -169,12 +168,16 @@
       google.script.run
         .withSuccessHandler(function (result) {
           // レスポンス構造の確認（オブジェクトか配列か）
-          const spreadsheets = Array.isArray(result) ? result : (result && result.spreadsheets ? result.spreadsheets : []);
-          
+          const spreadsheets = Array.isArray(result)
+            ? result
+            : result && result.spreadsheets
+              ? result.spreadsheets
+              : [];
+
           // 🎯 既存の選択値を保持
           const currentValue = select.value;
           const wasPrePopulated = select.querySelector('[selected]');
-          
+
           select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
 
           // デバッグログ追加
@@ -183,7 +186,7 @@
             count: spreadsheets.length,
             cached: result.cached || false,
             executionTime: result.executionTime || 'N/A',
-            ownerFiltered: true
+            ownerFiltered: true,
           });
 
           if (spreadsheets && Array.isArray(spreadsheets) && spreadsheets.length > 0) {
@@ -205,7 +208,7 @@
 
               select.appendChild(option);
             });
-            
+
             // 📋 事前入力された設定がリストにない場合は追加
             if (wasPrePopulated && !select.querySelector(`option[value="${currentValue}"]`)) {
               const prePopulatedText = wasPrePopulated.textContent;
@@ -698,7 +701,6 @@
     }
   }
 
-
   // フォーム情報表示
   function showFormInfo(formData) {
     const formInfo = document.getElementById('form-info');
@@ -794,7 +796,6 @@
       })
       .getFormInfo(spreadsheetId, sheetName);
   }
-
 
   // 設定エクスポート
   function exportConfig() {
@@ -1067,7 +1068,6 @@
       });
     });
 
-
     // シート選択時（フォーム情報表示）
     document.getElementById('sheet-select').addEventListener('change', function () {
       const spreadsheetId = document.getElementById('spreadsheet-select').value;
@@ -1119,14 +1119,13 @@
 
   // シート一覧読み込み
   function loadSheetList(spreadsheetId) {
-    
     const select = document.getElementById('sheet-select');
     if (!select) {
       console.error('❌ loadSheetList: sheet-select要素が見つかりません');
       showError('シート選択要素が見つかりません');
       return;
     }
-    
+
     select.innerHTML = '<option value="">読み込み中...</option>';
 
     // シート読み込みは部分ローディング
@@ -1135,7 +1134,7 @@
     google.script.run
       .withSuccessHandler(function (sheets) {
         select.innerHTML = '<option value="">シートを選択...</option>';
-        
+
         if (!sheets || sheets.length === 0) {
           const noSheetOption = document.createElement('option');
           noSheetOption.value = '';
@@ -1150,10 +1149,10 @@
             select.appendChild(option);
           });
         }
-        
+
         // partial-loading-targetクラスを削除
         select.classList.remove('partial-loading-target');
-        
+
         setPartialLoading(false);
         showSuccess(`✅ ${sheets?.length || 0}個のシートを読み込みました`);
       })
@@ -1161,12 +1160,12 @@
         console.error('❌ loadSheetList: シート読み込みエラー', {
           error: error.message || error,
           spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
-        
+
         select.innerHTML = '<option value="">読み込みエラー - 再試行してください</option>';
         select.classList.remove('partial-loading-target');
-        
+
         setPartialLoading(false);
         showError(`シート一覧の読み込みに失敗しました: ${error.message || error}`);
       })
@@ -1284,12 +1283,12 @@
 
     const mapping = result.columnMapping;
     const headers = result.headers || [];
-    
+
     // confidenceをmappingに追加（バックエンド統一形式対応）
     if (result.confidence) {
       mapping.confidence = result.confidence;
     }
-    
+
     console.log('Headers:', headers, 'Mapping:', mapping);
 
     // ドロップダウンにヘッダーオプションを設定
@@ -1320,7 +1319,7 @@
       };
 
       // ドロップダウンの存在確認
-      const missingDropdowns = Object.keys(dropdowns).filter(key => !dropdowns[key]);
+      const missingDropdowns = Object.keys(dropdowns).filter((key) => !dropdowns[key]);
       if (missingDropdowns.length > 0) {
         console.warn('一部のドロップダウンが見つかりません:', missingDropdowns);
       }
@@ -1356,13 +1355,11 @@
 
       // ドロップダウン変更イベントリスナーを設定
       setupDropdownEventListeners(dropdowns);
-
     } catch (error) {
       console.error('populateColumnDropdowns エラー:', error);
       showError('ドロップダウンの設定に失敗しました: ' + error.message);
     }
   }
-
 
   // AI検出結果をドロップダウンの初期選択として設定
   function setAIDetectionSelections(mapping, dropdowns) {
@@ -1421,46 +1418,48 @@
     }
 
     // 正しいデータ構造へのアクセス
-    const mapping = result.columnMapping.mapping;      // ✅ 正しいパス
+    const mapping = result.columnMapping.mapping; // ✅ 正しいパス
     const confidence = result.columnMapping.confidence; // ✅ 正しいパス
-    
+
     console.log('🔍 autoApplyAIDetection: データ構造確認', {
       columnMapping: result.columnMapping,
       mapping: mapping,
-      confidence: confidence
+      confidence: confidence,
     });
 
     let autoAppliedCount = 0;
     let highConfidenceCount = 0;
 
     // 高信頼度(80%以上)の検出結果を自動適用（UI列のみ）
-    Object.keys(mapping).forEach(columnType => {
+    Object.keys(mapping).forEach((columnType) => {
       // リアクション列はスキップ（UIドロップダウンが存在しない）
       if (['highlight', 'curious', 'like', 'understand'].includes(columnType)) {
         return;
       }
-      
+
       const columnIndex = mapping[columnType];
       const confidenceValue = confidence?.[columnType] || 0;
-      
+
       console.log(`🔍 ${columnType}: columnIndex=${columnIndex}, confidence=${confidenceValue}`);
 
       if (confidenceValue >= 80 && columnIndex !== undefined && columnIndex !== null) {
         highConfidenceCount++;
         const dropdown = document.getElementById(`${columnType}-column-select`);
-        
+
         if (dropdown) {
           dropdown.value = columnIndex;
           dropdown.classList.add('has-auto-applied');
           dropdown.classList.remove('has-manual-selection');
-          
+
           // 信頼度バッジを更新（関数が存在する場合のみ）
           if (typeof showConfidenceBadge === 'function') {
             showConfidenceBadge(columnType, confidenceValue, 'auto-applied');
           }
-          
+
           autoAppliedCount++;
-          console.log(`🤖 AI自動適用成功: ${columnType} → ${columnIndex}列 (信頼度: ${confidenceValue}%)`);
+          console.log(
+            `🤖 AI自動適用成功: ${columnType} → ${columnIndex}列 (信頼度: ${confidenceValue}%)`
+          );
         } else {
           console.warn(`❌ ドロップダウンが見つかりません: ${columnType}-column-select`);
         }
@@ -1478,12 +1477,12 @@
     }
   }
 
-  // 🎯 UX向上：次ステップ案内機能  
+  // 🎯 UX向上：次ステップ案内機能
   function showNextStepGuidance(result) {
     if (!result || !result.success) return;
 
     const mapping = result.columnMapping || {};
-    const hasAutoApplied = Object.values(mapping).some(detection => {
+    const hasAutoApplied = Object.values(mapping).some((detection) => {
       const confidence = typeof detection?.confidence === 'number' ? detection.confidence : 0;
       return confidence >= 80;
     });
@@ -1792,10 +1791,10 @@
           spreadsheetId: currentConfig.spreadsheetId,
           sheetName: currentConfig.sheetName,
           columnMapping: currentConfig.columnMapping,
-          
+
           // 🎯 必須データのみ：UI設定
           showNames: document.getElementById('show-names').checked,
-          showReactions: document.getElementById('show-reactions').checked
+          showReactions: document.getElementById('show-reactions').checked,
         };
 
         console.log('📋 publishApp: 完全な設定でpublishApplication呼び出し', {
@@ -1812,7 +1811,7 @@
               showSuccess('アプリを公開しました！');
               updatePublishStatus('published');
               updateResourceButtons(result.config);
-              
+
               // ✅ 公開成功後：即座にフッターを更新（UX向上）
               setTimeout(() => {
                 loadBoardInfo(); // フッター情報を再読み込み
@@ -1866,7 +1865,7 @@
       spreadsheetId,
       sheetName,
       showNames: document.getElementById('show-names').checked,
-      showReactions: document.getElementById('show-reactions').checked
+      showReactions: document.getElementById('show-reactions').checked,
     };
   }
 
@@ -1954,10 +1953,7 @@
         };
 
         badge.className =
-          'status-badge ' +
-          (setupStatus === 'completed'
-            ? 'published'
-            : 'unpublished');
+          'status-badge ' + (setupStatus === 'completed' ? 'published' : 'unpublished');
         badge.textContent = statusText[setupStatus] || '設定中';
       }
 
@@ -2042,16 +2038,16 @@
     // ✅ configJSON中心型：統一データソースからの公開状態チェック
     const isPublished = Boolean(
       boardInfo.appPublished === true ||
-      boardInfo.appPublished === 'true' ||
-      boardInfo.appPublished === '1' ||
-      boardInfo.isActive === true
+        boardInfo.appPublished === 'true' ||
+        boardInfo.appPublished === '1' ||
+        boardInfo.isActive === true
     );
-    
+
     console.log('🔍 フッター表示判定:', {
       appPublished: boardInfo.appPublished,
       isActive: boardInfo.isActive,
       isPublished: isPublished,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     if (!isPublished) {

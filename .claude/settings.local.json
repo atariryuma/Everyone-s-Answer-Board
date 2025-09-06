@@ -54,7 +54,10 @@
       "Bash(for file in src/Core.gs src/database.gs src/Base.gs src/security.gs src/PageBackend.gs)",
       "Bash(do echo -n \"構文チェック $file: \")",
       "Bash(for file in src/AdminPanelBackend.gs src/Page.html src/SharedSecurityHeaders.html)",
-      "Bash(for func in getCurrentConfig getCurrentBoardInfoAndUrls checkAdmin getAvailableSheets addReactionBatch getDataCount addReaction getIncrementalSheetData toggleHighlight refreshBoardData)"
+      "Bash(for func in getCurrentConfig getCurrentBoardInfoAndUrls checkAdmin getAvailableSheets addReactionBatch getDataCount addReaction getIncrementalSheetData toggleHighlight refreshBoardData)",
+      "Bash(./scripts/validate-system-spec.js)",
+      "Bash(./scripts/extract-all-functions.js)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": [],

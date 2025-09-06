@@ -958,20 +958,20 @@
       const SHEET_NAME = '<?= typeof sheetName !== "undefined" && sheetName ? sheetName : "" ?>';
       const __OPINION_HEADER__ =
         '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>';
-      
+
       // DISPLAY_MODES定数をフロントエンドで利用可能にする
       window.DISPLAY_MODES = Object.freeze({
         ANONYMOUS: 'anonymous',
         NAMED: 'named',
-        EMAIL: 'email'
+        EMAIL: 'email',
       });
-      
+
       // PERFORMANCE_BUDGET定数をフロントエンドで利用可能にする
       window.PERFORMANCE_BUDGET = 16; // 60FPS = 16.67ms/frame の閾値
 
       // DEBUG_MODE定数をフロントエンドで利用可能にする
       window.DEBUG_MODE = false; // 本番環境ではfalse、開発時はtrueに設定
-      
+
       // デバッグログ制御関数
       window.debugLog = (...args) => {
         if (window.DEBUG_MODE) {
@@ -985,7 +985,14 @@
       };
 
       // デバッグログ（DEBUG_MODE時のみ）
-      debugLog('Template variables:', { USER_ID, SHEET_NAME, __OPINION_HEADER__, DISPLAY_MODES, PERFORMANCE_BUDGET, DEBUG_MODE });
+      debugLog('Template variables:', {
+        USER_ID,
+        SHEET_NAME,
+        __OPINION_HEADER__,
+        DISPLAY_MODES,
+        PERFORMANCE_BUDGET,
+        DEBUG_MODE,
+      });
     </script>
     <?!= include('page.js.html'); ?>
   </body>

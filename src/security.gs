@@ -53,10 +53,10 @@ function generateNewServiceAccountToken() {
 
   const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
   const encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
-  const signatureInput = `${encodedHeader  }.${  encodedClaimSet}`;
+  const signatureInput = `${encodedHeader}.${encodedClaimSet}`;
   const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
   const encodedSignature = Utilities.base64EncodeWebSafe(signature);
-  const jwt = `${signatureInput  }.${  encodedSignature}`;
+  const jwt = `${signatureInput}.${encodedSignature}`;
 
   // トークンリクエスト
   const response = UrlFetchApp.fetch(tokenUrl, {
@@ -281,31 +281,27 @@ function getSheetsService() {
  */
 function updateSheetsData(service, spreadsheetId, range, values) {
   try {
-    // 🔧 修正：Sheets API未有効化対応 - 直接SpreadsheetAppを使用
-    console.log('updateSheetsData: SpreadsheetApp直接使用（API未有効化対応）');
-    
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    // シート名と範囲を分離
-    const match = range.match(/^'?([^'!]+)'?!(.+)$/);
-    if (match) {
-      const sheetName = match[1];
-      const rangeSpec = match[2];
-      const sheet = spreadsheet.getSheetByName(sheetName);
-      if (sheet) {
-        const targetRange = sheet.getRange(rangeSpec);
-        targetRange.setValues(values);
-        return {
-          updatedCells: values.length * (values[0] ? values[0].length : 0),
-          updatedRows: values.length,
-          updatedColumns: values[0] ? values[0].length : 0,
-          spreadsheetId,
-          updatedRange: range
-        };
-      }
+    // Service Account経由でSheets API使用
+    if (service && service.spreadsheets && service.spreadsheets.values && service.spreadsheets.values.update) {
+      console.log('updateSheetsData: Service Account経由でSheets API使用', {
+        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
+        range: range
+      });
+      
+      const response = service.spreadsheets.values.update({
+        spreadsheetId: spreadsheetId,
+        range: range,
+        valueInputOption: 'RAW',
+        values: values
+      });
+      
+      console.log('✅ updateSheetsData: Service Account成功');
+      return response;
+    } else {
+      throw new Error('Service Account Sheets APIが利用できません');
     }
-    throw new Error(`範囲の解析に失敗しました: ${  range}`);
   } catch (error) {
-    console.error('updateSheetsData SpreadsheetAppエラー:', error.message);
+    console.error('❌ updateSheetsData Service Account呼び出しエラー:', error.message);
     throw error;
   }
 }
@@ -319,58 +315,26 @@ function updateSheetsData(service, spreadsheetId, range, values) {
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
   try {
-    // Service Accountを使用してSheets APIでアクセスを試みる
-    if (service && service.spreadsheets) {
-      try {
-        console.log('batchGetSheetsData: Service Account経由でSheets API使用', {
-          hasService: !!service,
-          hasSpreadsheets: !!service.spreadsheets,
-          hasValues: !!service.spreadsheets.values,
-          hasBatchGet: !!service.spreadsheets.values.batchGet,
-          batchGetType: typeof service.spreadsheets.values.batchGet
-        });
-        const response = service.spreadsheets.values.batchGet({
-          spreadsheetId: spreadsheetId,
-          ranges: ranges
-        });
-        return response;
-      } catch (apiError) {
-        console.warn('Sheets API呼び出し失敗、SpreadsheetAppにフォールバック:', apiError.message);
-      }
-    } else {
-      console.log('batchGetSheetsData: Service利用不可', {
-        hasService: !!service,
-        hasSpreadsheets: service ? !!service.spreadsheets : 'service is null'
+    // Service Accountを使用してSheets APIでアクセス
+    if (service && service.spreadsheets && service.spreadsheets.values && service.spreadsheets.values.batchGet) {
+      console.log('batchGetSheetsData: Service Account経由でSheets API使用', {
+        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
+        rangeCount: ranges.length
       });
+      
+      // 正しいメソッド呼び出し: 関数として実行
+      const response = service.spreadsheets.values.batchGet({
+        spreadsheetId: spreadsheetId,
+        ranges: ranges,
+      });
+      
+      console.log('✅ batchGetSheetsData: Service Account成功');
+      return response;
+    } else {
+      throw new Error('Service Account Sheets APIが利用できません');
     }
-    
-    // フォールバック：Sheets APIが使えない場合はSpreadsheetAppを使用
-    console.log('batchGetSheetsData: SpreadsheetApp直接使用（フォールバック）');
-    
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    const valueRanges = ranges.map(range => {
-      // シート名と範囲を分離
-      const match = range.match(/^'?([^'!]+)'?!(.+)$/);
-      if (match) {
-        const sheetName = match[1];
-        const rangeSpec = match[2];
-        const sheet = spreadsheet.getSheetByName(sheetName);
-        if (sheet) {
-          const values = sheet.getRange(rangeSpec).getValues();
-          return {
-            range,
-            values
-          };
-        }
-      }
-      return null;
-    }).filter(Boolean);
-    
-    return {
-      valueRanges
-    };
   } catch (error) {
-    console.error('batchGetSheetsData エラー:', error.message);
+    console.error('❌ batchGetSheetsData Service Account呼び出しエラー:', error.message);
     throw error;
   }
 }

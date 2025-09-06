@@ -20,7 +20,7 @@ const UserManager = {
 
   getCurrentEmail() {
     const now = Date.now();
-    if (this._cachedEmail && (now - this._cacheTime) < this._CACHE_TTL) {
+    if (this._cachedEmail && now - this._cacheTime < this._CACHE_TTL) {
       return this._cachedEmail;
     }
 
@@ -39,7 +39,7 @@ const UserManager = {
     this._cachedEmail = null;
     this._cacheTime = 0;
     console.log('UserManager: キャッシュクリア');
-  }
+  },
 };
 
 // 後方互換性のためのUserオブジェクト（廃止予定）
@@ -47,7 +47,7 @@ const User = {
   email() {
     console.warn('User.email() は廃止予定です。UserManager.getCurrentEmail()を使用してください');
     return UserManager.getCurrentEmail();
-  }
+  },
 };
 
 /**
@@ -77,22 +77,29 @@ function doGet(e) {
           const debugData = {
             current_user_email: currentUserEmail,
             user_exists_in_db: !!userByEmail,
-            user_data: userByEmail ? {
-              userId: userByEmail.userId,
-              userEmail: userByEmail.userEmail,
-              isActive: userByEmail.isActive,
-              hasConfig: !!userByEmail.parsedConfig
-            } : null,
-            suggestion: !userByEmail ? 'ユーザー登録が必要です。mode=loginでアクセスしてください。' : 'データは正常です'
+            user_data: userByEmail
+              ? {
+                  userId: userByEmail.userId,
+                  userEmail: userByEmail.userEmail,
+                  isActive: userByEmail.isActive,
+                  hasConfig: !!userByEmail.parsedConfig,
+                }
+              : null,
+            suggestion: !userByEmail
+              ? 'ユーザー登録が必要です。mode=loginでアクセスしてください。'
+              : 'データは正常です',
           };
-          
+
           return HtmlService.createHtmlOutput(`
             <h2>Debug Info</h2>
             <pre>${JSON.stringify(debugData, null, 2)}</pre>
             ${userByEmail ? `<p><a href="?mode=admin&userId=${userByEmail.userId}">管理パネルにアクセス</a></p>` : ''}
-            ${userByEmail && (!userByEmail.userEmail || !userByEmail.isActive) ? 
-              `<p><strong>⚠️ データ不整合検出</strong></p>
-               <p><a href="?mode=fix_user&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔧 ユーザーデータを修正</a></p>` : ''}
+            ${
+              userByEmail && (!userByEmail.userEmail || !userByEmail.isActive)
+                ? `<p><strong>⚠️ データ不整合検出</strong></p>
+               <p><a href="?mode=fix_user&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔧 ユーザーデータを修正</a></p>`
+                : ''
+            }
             <hr>
             <h3>🔧 GAS実行用関数</h3>
             <p><strong>GASエディタから直接実行してください：</strong></p>
@@ -114,23 +121,23 @@ function doGet(e) {
           if (!params.userId) {
             return HtmlService.createHtmlOutput('<h2>Error</h2><p>userIdが必要です</p>');
           }
-          
+
           const currentUserEmail = UserManager.getCurrentEmail();
           const userInfo = DB.findUserById(params.userId);
-          
+
           if (!userInfo) {
             return HtmlService.createHtmlOutput('<h2>Error</h2><p>ユーザーが見つかりません</p>');
           }
-          
+
           // 🚨 緊急修正：userEmailとisActiveを設定
           const updatedData = {
             userEmail: currentUserEmail,
-            isActive: true
+            isActive: true,
           };
-          
+
           // データベース更新（直接フィールド更新）
           DB.updateUserFields(params.userId, updatedData);
-          
+
           return HtmlService.createHtmlOutput(`
             <h2>✅ ユーザーデータ修正完了</h2>
             <p>userEmail: ${currentUserEmail}</p>
@@ -140,31 +147,28 @@ function doGet(e) {
         } catch (error) {
           return HtmlService.createHtmlOutput(`<h2>修正エラー</h2><pre>${error.message}</pre>`);
         }
-        
+
       case 'admin':
         // 管理パネルモード: userIdが必須
         if (!params.userId) {
           // userIdが無い場合はログイン画面へ
           return renderLoginPage(params);
         }
-        
+
         try {
           const currentUserEmail = UserManager.getCurrentEmail();
           if (!currentUserEmail) {
             // 未認証の場合はログイン画面へ
             return renderLoginPage(params);
           }
-          
+
           // ユーザー検証（キャッシュバイパス）
           const userInfo = DB.findUserByEmail(currentUserEmail);
           if (!userInfo || userInfo.userId !== params.userId) {
             // ユーザーが存在しないか、userIdが一致しない場合
-            return showErrorPage(
-              'アクセス拒否',
-              '管理パネルへのアクセス権限がありません'
-            );
+            return showErrorPage('アクセス拒否', '管理パネルへのアクセス権限がありません');
           }
-          
+
           if (userInfo.isActive !== true) {
             return showErrorPage(
               'アカウントが無効です',
@@ -173,12 +177,13 @@ function doGet(e) {
           }
 
           // アクセス検証
-          const accessResult = App.getAccess().verifyAccess(params.userId, 'admin', currentUserEmail);
+          const accessResult = App.getAccess().verifyAccess(
+            params.userId,
+            'admin',
+            currentUserEmail
+          );
           if (!accessResult.allowed) {
-            return showErrorPage(
-              'アクセス拒否',
-              '管理パネルへのアクセス権限がありません'
-            );
+            return showErrorPage('アクセス拒否', '管理パネルへのアクセス権限がありません');
           }
 
           // ユーザー情報変換
@@ -209,7 +214,11 @@ function doGet(e) {
         }
 
         try {
-          const accessResult = App.getAccess().verifyAccess(params.userId, 'view', UserManager.getCurrentEmail());
+          const accessResult = App.getAccess().verifyAccess(
+            params.userId,
+            'view',
+            UserManager.getCurrentEmail()
+          );
           if (!accessResult.allowed) {
             console.warn('View access denied:', accessResult);
             if (accessResult.userType === 'not_found') {
@@ -240,7 +249,7 @@ function doGet(e) {
             `<h3>Error</h3><p>An error occurred: ${viewError.message}</p>`
           );
         }
-        
+
       default:
         // デフォルト: ログイン画面を表示
         return renderLoginPage(params);
@@ -405,14 +414,20 @@ function getGoogleClientId() {
       console.log('Available properties:', Object.keys(allProperties));
 
       return createResponse(false, 'Google Client ID not configured', {
-        setupInstructions: 'Please set GOOGLE_CLIENT_ID in Google Apps Script project settings under Properties > Script Properties'
+        setupInstructions:
+          'Please set GOOGLE_CLIENT_ID in Google Apps Script project settings under Properties > Script Properties',
       });
     }
 
     return createResponse(true, 'Google Client IDを取得しました', { clientId });
   } catch (error) {
     console.error('GOOGLE_CLIENT_ID取得エラー:', error.message);
-    return createResponse(false, `Google Client IDの取得に失敗しました: ${error.toString()}`, { clientId: '' }, error);
+    return createResponse(
+      false,
+      `Google Client IDの取得に失敗しました: ${error.toString()}`,
+      { clientId: '' },
+      error
+    );
   }
 }
 
@@ -485,7 +500,7 @@ function getSystemDomainInfo() {
       adminDomain,
       isDomainMatch,
       currentDomain: domainInfo.currentDomain || '不明',
-      deployDomain: domainInfo.deployDomain || adminDomain
+      deployDomain: domainInfo.deployDomain || adminDomain,
     });
   } catch (e) {
     console.error('getSystemDomainInfo エラー:', e.message);
@@ -542,9 +557,7 @@ function showAdminPanel() {
     );
   } catch (error) {
     console.error('showAdminPanel エラー:', error);
-    return HtmlService.createHtmlOutput(
-      `<h3>Error</h3><p>An error occurred: ${error.message}</p>`
-    );
+    return HtmlService.createHtmlOutput(`<h3>Error</h3><p>An error occurred: ${error.message}</p>`);
   }
 }
 
@@ -567,7 +580,11 @@ function showAnswerBoard(userId) {
     }
 
     // アクセス権限確認
-    const accessResult = App.getAccess().verifyAccess(userId, 'view', UserManager.getCurrentEmail());
+    const accessResult = App.getAccess().verifyAccess(
+      userId,
+      'view',
+      UserManager.getCurrentEmail()
+    );
     if (!accessResult.allowed) {
       if (accessResult.userType === 'not_found') {
         return HtmlService.createHtmlOutput(
@@ -587,9 +604,7 @@ function showAnswerBoard(userId) {
     return renderAnswerBoard(compatUserInfo, { userId });
   } catch (error) {
     console.error('showAnswerBoard エラー:', error);
-    return HtmlService.createHtmlOutput(
-      `<h3>Error</h3><p>An error occurred: ${error.message}</p>`
-    );
+    return HtmlService.createHtmlOutput(`<h3>Error</h3><p>An error occurred: ${error.message}</p>`);
   }
 }
 
@@ -602,19 +617,19 @@ function getSuggestedAction(diagnostics) {
     if (!diagnostics.hasSpreadsheetId) {
       return '管理パネルでデータソース（スプレッドシート）を接続してください';
     }
-    
+
     if (!diagnostics.hasSheetName) {
       return '管理パネルでシートを選択してください';
     }
-    
+
     if (!diagnostics.appPublished) {
       return '管理パネルでアプリを公開してください';
     }
-    
+
     if (diagnostics.setupStatus !== 'completed') {
       return '初期設定を完了してください';
     }
-    
+
     return 'システムは正常に動作しています';
   } catch (error) {
     console.error('getSuggestedAction エラー:', error.message);
@@ -642,7 +657,6 @@ function generateUserId() {
  * @returns {string} WebApp URL
  */
 function getWebAppUrl() {
-
   // 1. 複数の方法でWebApp URLを取得試行
   const urlMethods = [
     () => ScriptApp.getService().getUrl(),
@@ -1010,11 +1024,11 @@ function processLoginAction() {
     // キャッシュをクリアして最新情報取得
     UserManager.clearCache();
     const currentUserEmail = UserManager.getCurrentEmail();
-    
+
     if (!currentUserEmail) {
       return {
         success: false,
-        message: '認証されていません。Googleアカウントでログインしてください。'
+        message: '認証されていません。Googleアカウントでログインしてください。',
       };
     }
 
@@ -1022,13 +1036,13 @@ function processLoginAction() {
 
     // DB直接検索（キャッシュバイパス）
     let userInfo = DB.findUserByEmail(currentUserEmail);
-    
+
     if (!userInfo) {
       // 新規ユーザー作成
       console.log('🆕 新規ユーザー作成開始');
       const newUserData = createCompleteUser(currentUserEmail);
       DB.createUser(newUserData);
-      
+
       // 作成後に再度確認
       userInfo = DB.findUserByEmail(currentUserEmail);
       if (!userInfo) {
@@ -1040,7 +1054,7 @@ function processLoginAction() {
     if (userInfo.isActive !== true) {
       return {
         success: false,
-        message: 'アカウントが無効化されています。管理者にお問い合わせください。'
+        message: 'アカウントが無効化されています。管理者にお問い合わせください。',
       };
     }
 
@@ -1054,14 +1068,13 @@ function processLoginAction() {
       success: true,
       message: 'ログインが完了しました',
       adminUrl: adminUrl,
-      userId: userInfo.userId
+      userId: userInfo.userId,
     };
-
   } catch (error) {
     console.error('ログインアクションエラー:', error);
     return {
       success: false,
-      message: `ログイン処理中にエラーが発生しました: ${error.message}`
+      message: `ログイン処理中にエラーが発生しました: ${error.message}`,
     };
   }
 }
@@ -1121,12 +1134,12 @@ function renderAnswerBoard(userInfo, params) {
     // configJSON中心型：スプレッドシート設定を統一使用
     const userSpreadsheetId = config.spreadsheetId || null;
     const userSheetName = config.sheetName || null;
-    
+
     // 📊 ユーザーIDをテンプレートに適切に設定
     template.USER_ID = userInfo.userId || null;
     template.SHEET_NAME = userSheetName || '';
 
-    const sheetConfigKey = `sheet_${  userSheetName || params.sheetName}`;
+    const sheetConfigKey = `sheet_${userSheetName || params.sheetName}`;
     const sheetConfig = config[sheetConfigKey] || {};
 
     // シンプルな判定: ユーザーがスプレッドシートを設定済みかどうか
@@ -1146,7 +1159,7 @@ function renderAnswerBoard(userInfo, params) {
     template.isDirectPageAccess = params.isDirectPageAccess;
     template.isPublished = hasUserConfig;
     template.appPublished = config.appPublished || false;
-    
+
     // 🦾 スマート診断情報をテンプレートに提供
     template.DIAGNOSTIC_INFO = {
       hasSpreadsheetId: !!(finalSpreadsheetId && finalSpreadsheetId !== 'null'),
@@ -1157,9 +1170,9 @@ function renderAnswerBoard(userInfo, params) {
         hasSpreadsheetId: !!(finalSpreadsheetId && finalSpreadsheetId !== 'null'),
         hasSheetName: !!(finalSheetName && finalSheetName !== 'null'),
         setupStatus: config.setupStatus || 'pending',
-        appPublished: config.appPublished || false
+        appPublished: config.appPublished || false,
       }),
-      systemHealthy: hasUserConfig && config.appPublished
+      systemHealthy: hasUserConfig && config.appPublished,
     };
 
     // __OPINION_HEADER__テンプレート変数を設定（configJson優先）
@@ -1173,7 +1186,10 @@ function renderAnswerBoard(userInfo, params) {
         // 2. 既存のgetSpreadsheetColumnIndices方式（フォールバック）
         const headerIndices = getSpreadsheetColumnIndices(finalSpreadsheetId, finalSheetName);
         opinionHeader = headerIndices?.opinionHeader || 'お題';
-        console.log('renderAnswerBoard: getSpreadsheetColumnIndicesからopinionHeaderを取得:', opinionHeader);
+        console.log(
+          'renderAnswerBoard: getSpreadsheetColumnIndicesからopinionHeaderを取得:',
+          opinionHeader
+        );
 
         // 3. 取得したopinionHeaderをconfigJsonに保存（次回用の最適化）
         if (headerIndices?.opinionHeader && userInfo?.userId) {
@@ -1232,7 +1248,7 @@ function renderAnswerBoard(userInfo, params) {
     } catch (dataError) {
       console.error('renderAnswerBoard - データ取得エラー:', dataError);
       template.data = [];
-      template.message = `データ取得中にエラーが発生しました: ${  dataError.message}`;
+      template.message = `データ取得中にエラーが発生しました: ${dataError.message}`;
       template.hasData = false;
 
       // エラー時も表示設定を適用
@@ -1439,8 +1455,8 @@ function setupApplication(
 
     console.log('setupApplication - セットアップ完了');
 
-    return createResponse(true, 'システムセットアップが正常に完了しました', { 
-      adminEmail: finalAdminEmail 
+    return createResponse(true, 'システムセットアップが正常に完了しました', {
+      adminEmail: finalAdminEmail,
     });
   } catch (error) {
     console.error('setupApplication エラー:', error);
@@ -1490,7 +1506,7 @@ function getUser(format = 'object') {
     return createResponse(true, email ? 'ユーザー取得成功' : 'ユーザー未認証', {
       email,
       userId,
-      isAuthenticated: !!email
+      isAuthenticated: !!email,
     });
   } catch (error) {
     console.error('getUser エラー:', error);
@@ -1540,7 +1556,7 @@ function reportClientError(errorInfo) {
 /**
  * API統一レスポンス生成
  * 全API関数で一貫したレスポンス形式を提供
- * @param {boolean} success - 成功/失敗フラグ  
+ * @param {boolean} success - 成功/失敗フラグ
  * @param {string|null} message - メッセージ
  * @param {Object|null} data - データ
  * @param {Error|null} error - エラーオブジェクト
@@ -1548,7 +1564,7 @@ function reportClientError(errorInfo) {
  */
 function createResponse(success, message = null, data = null, error = null) {
   const response = { success };
-  
+
   if (message) response.message = message;
   if (data) response.data = data;
   if (error) {
@@ -1556,7 +1572,7 @@ function createResponse(success, message = null, data = null, error = null) {
     response.stack = error.stack;
   }
   response.timestamp = new Date().toISOString();
-  
+
   return response;
 }
 
@@ -1616,7 +1632,7 @@ function verifyUserAuthentication() {
     const isAuthenticated = !!email;
     return createResponse(true, isAuthenticated ? '認証済み' : '未認証', {
       authenticated: isAuthenticated,
-      email: email || null
+      email: email || null,
     });
   } catch (error) {
     console.error('verifyUserAuthentication エラー:', error);
@@ -1632,7 +1648,7 @@ function forceLogoutAndRedirectToLogin() {
   try {
     console.log('forceLogoutAndRedirectToLogin called');
     return createResponse(true, 'Logout successful', {
-      redirectUrl: `${getWebAppUrl()}?mode=login`
+      redirectUrl: `${getWebAppUrl()}?mode=login`,
     });
   } catch (error) {
     console.error('forceLogoutAndRedirectToLogin error:', error);
@@ -1679,7 +1695,10 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
         currentUserEmail = UserManager.getCurrentEmail();
         console.log('getPublishedSheetData: UserManager.getCurrentEmail()結果', currentUserEmail);
       } catch (emailError) {
-        console.warn('getPublishedSheetData: UserManager.getCurrentEmail()取得失敗', emailError.message);
+        console.warn(
+          'getPublishedSheetData: UserManager.getCurrentEmail()取得失敗',
+          emailError.message
+        );
       }
 
       // Step 3: メールアドレスからユーザー検索
@@ -1755,16 +1774,16 @@ function handleSystemError(context, error, userId = null, additionalData = {}) {
     stack: error.stack,
     userId,
     timestamp: new Date().toISOString(),
-    ...additionalData
+    ...additionalData,
   };
-  
+
   console.error(`❌ [${context}] システムエラー:`, errorInfo);
-  
+
   return {
     success: false,
     error: error.message,
     context,
-    timestamp: errorInfo.timestamp
+    timestamp: errorInfo.timestamp,
   };
 }
 
@@ -1786,7 +1805,7 @@ function getActiveUserInfo() {
       userEmail: userInfo.userEmail,
       spreadsheetId: userInfo.parsedConfig?.spreadsheetId,
       configJson: userInfo.configJson,
-      parsedConfig: userInfo.parsedConfig
+      parsedConfig: userInfo.parsedConfig,
     };
   } catch (error) {
     console.error('getActiveUserInfo グローバル関数エラー:', error.message);
@@ -1806,12 +1825,12 @@ function validateUserDataState(userInfo) {
     issues.push('userIdが設定されていません');
     fixes.push('ユーザーIDを設定');
   }
-  
+
   if (!userInfo.userEmail) {
     issues.push('userEmailが設定されていません');
     fixes.push('メールアドレスを設定');
   }
-  
+
   if (userInfo.isActive !== true && userInfo.isActive !== false) {
     issues.push('isActiveフラグが不正です');
     fixes.push('isActiveをbooleanに設定');
@@ -1823,7 +1842,7 @@ function validateUserDataState(userInfo) {
     issues.push('公開状態だがスプレッドシートIDがありません');
     fixes.push('スプレッドシート接続を確認');
   }
-  
+
   if (config.isDraft === true && config.appPublished === true) {
     issues.push('ドラフト状態と公開状態が同時にtrueです');
     fixes.push('状態フラグを整理');
@@ -1833,6 +1852,6 @@ function validateUserDataState(userInfo) {
     isValid: issues.length === 0,
     issues,
     fixes,
-    summary: issues.length > 0 ? `${issues.length}個の問題を検出` : '状態正常'
+    summary: issues.length > 0 ? `${issues.length}個の問題を検出` : '状態正常',
   };
 }

@@ -8,20 +8,20 @@
   const smartDiagnosis = () => {
     const issues = [];
     const solutions = [];
-    
+
     // 診断1: テンプレート展開状況
     if (!window.USER_ID || typeof window.USER_ID === 'object' || window.USER_ID.trim() === '') {
       issues.push('テンプレート変数が正しく展開されていません');
       solutions.push('🔄 ページをリロードしてください');
     }
-    
-    // 診断2: URLパラメータ状況  
+
+    // 診断2: URLパラメータ状況
     const urlUserId = new URLSearchParams(window.location.search).get('userId');
     if (!urlUserId) {
       issues.push('URLにユーザーIDが含まれていません');
       solutions.push('🔗 正しいリンクからアクセスしてください');
     }
-    
+
     // 診断3: システム設定状況
     if (window.DIAGNOSTIC_INFO) {
       if (!window.DIAGNOSTIC_INFO.hasSpreadsheetId) {
@@ -33,24 +33,24 @@
         solutions.push('📊 管理パネルでシートを選択してください');
       }
     }
-    
+
     return { issues, solutions, severity: issues.length > 0 ? 'needs_setup' : 'healthy' };
   };
-  
+
   /**
    * ✅ configJSON中心型アーキテクチャ - 自動回復不要
    */
   const autoRecovery = async (diagnosis) => {
     return diagnosis.severity === 'healthy';
   };
-  
+
   /**
    * 📱 ユーザーフレンドリーエラー表示
    */
   const showUserFriendlyError = (diagnosis) => {
     const container = this._getCachedElement('answersContainer');
     if (!container) return;
-    
+
     const errorHtml = `
       <div class="setup-guide-container" style="max-width: 600px; margin: 2rem auto; padding: 2rem; background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
         <div class="setup-header" style="text-align: center; margin-bottom: 2rem;">
@@ -64,22 +64,30 @@
             <span>❌</span> 解決が必要な問題
           </h3>
           <ul style="list-style: none; padding: 0; margin-bottom: 2rem;">
-            ${diagnosis.issues.map(issue => `
+            ${diagnosis.issues
+              .map(
+                (issue) => `
               <li style="padding: 0.75rem; margin-bottom: 0.5rem; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
                 ${issue}
               </li>
-            `).join('')}
+            `
+              )
+              .join('')}
           </ul>
           
           <h3 style="color: #059669; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
             <span>✅</span> 推奨される解決策
           </h3>
           <ul style="list-style: none; padding: 0;">
-            ${diagnosis.solutions.map(solution => `
+            ${diagnosis.solutions
+              .map(
+                (solution) => `
               <li style="padding: 0.75rem; margin-bottom: 0.5rem; background: #ecfdf5; border-left: 4px solid #059669; border-radius: 4px;">
                 ${solution}
               </li>
-            `).join('')}
+            `
+              )
+              .join('')}
           </ul>
         </div>
         
@@ -99,10 +107,10 @@
         </div>
       </div>
     `;
-    
+
     container.innerHTML = errorHtml;
   };
-  
+
   /**
    * ✅ CLAUDE.md準拠: configJSONベース設定取得（スマート診断統合）
    * @returns {Promise<Object>} 設定オブジェクト
@@ -111,7 +119,7 @@
     // 🦾 スマート診断実行
     const diagnosis = smartDiagnosis();
     debugInfo('🦾 システム診断結果:', diagnosis);
-    
+
     // 🎆 自動回復試行
     if (diagnosis.severity !== 'healthy') {
       const recovered = await autoRecovery(diagnosis);
@@ -120,27 +128,27 @@
         return getConfigFromBackend(); // 再帰的再試行
       }
     }
-    
+
     try {
       // 🚀 複数ソースからuserId取得（超効率化）
       let userId = new URLSearchParams(window.location.search).get('userId');
-      
+
       // フォールバック1: 既存のCONFIGから取得
       if (!userId && CONFIG && CONFIG.userId) {
         userId = CONFIG.userId;
       }
-      
+
       // フォールバック2: テンプレート変数から取得（GAS側で展開される可能性）
       if (!userId && window.USER_ID) {
         userId = window.USER_ID;
       }
-      
+
       if (!userId) {
         // 📱 ユーザーフレンドリーエラー表示
         showUserFriendlyError(diagnosis);
         throw new Error('ユーザーIDを取得できません。初期設定が必要です。');
       }
-      
+
       // SecurityValidator使用でセキュリティ強化
       if (!SecurityValidator.isValidUUID(userId)) {
         throw new Error('無効なuserID形式です');
@@ -150,19 +158,19 @@
       return await App.getConfig().getUserConfig(userId);
     } catch (error) {
       console.error('❌ getConfigFromBackend エラー:', error);
-      
+
       // エラーが診断関連でない場合、ユーザーフレンドリーエラーを表示
       if (diagnosis.severity !== 'healthy') {
         showUserFriendlyError(diagnosis);
       }
-      
+
       throw error;
     }
   };
 
   // configJSON中心設定（CLAUDE.md準拠）
   let CONFIG = {};
-  
+
   // 設定初期化
   const initializeConfig = async () => {
     try {
@@ -171,18 +179,18 @@
       debugInfo('✅ Config初期化完了:', CONFIG.userId);
     } catch (error) {
       console.error('❌ Config初期化エラー:', error);
-      
+
       // 📱 ユーザーフレンドリーエラーハンドリング
       const diagnosis = smartDiagnosis();
       if (diagnosis.severity !== 'healthy') {
         debugInfo('📱 ユーザーフレンドリーエラー表示をスキップ（既に表示済み）');
         return; // 既にshowUserFriendlyErrorが呼ばれているため、フォールバック設定は不要
       }
-      
+
       // フォールバック設定（SHEET_NAME空文字対策）
       const fallbackUserId = new URLSearchParams(window.location.search).get('userId') || '';
       const fallbackSheetName = window.SHEET_NAME || 'Sheet1'; // テンプレート変数フォールバック
-      
+
       CONFIG = Object.freeze({
         showCounts: false,
         displayMode: 'anonymous',
@@ -194,23 +202,24 @@
         showScoreSort: false,
         isStudentMode: true,
         isAdminUser: false,
-        mapping: {}
+        mapping: {},
       });
       Object.assign(window, CONFIG);
     }
   };
-
 
   // === APPLICATION CONSTANTS ===
   // GAS optimized constants
   const RENDER_BATCH_SIZE = 50; // 件数闾值最適化: 大量データ対応
   const CHUNK_SIZE = 5; // DOM operations per chunk
   const IDLE_TIMEOUT = 5000; // requestIdleCallback timeout
-  
+
   // 生産環境対応デバッグシステム
-  const DEBUG_MODE = window.location.search.includes('debug=true') || window.localStorage?.getItem('debug') === 'true';
+  const DEBUG_MODE =
+    window.location.search.includes('debug=true') ||
+    window.localStorage?.getItem('debug') === 'true';
   const PERF_MODE = !DEBUG_MODE; // プロダクションでは性能重視
-  
+
   // 最適化されたログシステム
   const Logger = {
     debug: DEBUG_MODE ? console.debug.bind(console) : () => {},
@@ -218,32 +227,42 @@
     info: (msg, ...args) => console.info(`📊 ${msg}`, ...args),
     // 警告（本番でも必要）
     warn: (msg, ...args) => console.warn(`⚠️ ${msg}`, ...args),
-    // エラー（本番でも必要）  
+    // エラー（本番でも必要）
     error: (msg, ...args) => console.error(`❌ ${msg}`, ...args),
     // 性能ログ（条件付き）
-    perf: PERF_MODE ? () => {} : (msg, ...args) => Logger.perf(`⚡ ${msg}`, ...args)
+    perf: PERF_MODE ? () => {} : (msg, ...args) => Logger.perf(`⚡ ${msg}`, ...args),
   };
-  
+
   const debugLog = Logger.debug;
 
   // アイコンシステム
   const ICONS = Object.freeze({
-    'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
-    'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
-    'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
-    'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
-    'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
-    'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    'lightbulb-outline':
+      '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+    'lightbulb-solid':
+      '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+    'hand-thumb-up-outline':
+      '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+    'hand-thumb-up-solid':
+      '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
+    'magnifying-glass-plus-outline':
+      '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+    'magnifying-glass-plus-solid':
+      '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     x: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-    'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
-    'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
-    'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
-    users: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+    'star-outline':
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+    'star-solid':
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+    'grid-2x2':
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
+    users:
+      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   });
 
   // ✅ CLAUDE.md準拠: SYSTEM_CONSTANTS統合 + 必須UI定数
   const VIEWPORT_BUFFER = 100; // setupObservers用の必須定数
-  
+
   const SYSTEM_CONSTANTS = Object.freeze({
     REACTIONS: Object.freeze({
       KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
@@ -251,20 +270,20 @@
         UNDERSTAND: 'なるほど！',
         LIKE: 'いいね！',
         CURIOUS: 'もっと知りたい！',
-        HIGHLIGHT: 'ハイライト'
-      })
+        HIGHLIGHT: 'ハイライト',
+      }),
     }),
     TIMEOUTS: Object.freeze({
       SHORT: 1000,
       MEDIUM: 5000,
       LONG: 30000,
-      FLOW: 300000
+      FLOW: 300000,
     }),
     DISPLAY_MODES: Object.freeze({
       ANONYMOUS: 'anonymous',
       NAMED: 'named',
-      EMAIL: 'email'
-    })
+      EMAIL: 'email',
+    }),
   });
 
   // ✅ CLAUDE.md準拠: App名前空間パターン（効率化版）
@@ -286,47 +305,87 @@
 
   const App = {
     getConfig: () => ({
-      getUserConfig: createGasMethod('getUserConfig', 'getCurrentConfig', 'App.getConfig.getUserConfig')
+      getUserConfig: createGasMethod(
+        'getUserConfig',
+        'getCurrentConfig',
+        'App.getConfig.getUserConfig'
+      ),
     }),
 
     getAccess: () => ({
-      verifyAccess: createGasMethod('verifyAccess', 'verifyUserAccess', 'App.getAccess.verifyAccess')
+      verifyAccess: createGasMethod(
+        'verifyAccess',
+        'verifyUserAccess',
+        'App.getAccess.verifyAccess'
+      ),
     }),
 
     getData: () => ({
-      getPublishedSheetData: createGasMethod('getPublishedSheetData', 'getPublishedSheetData', 'App.getData.getPublishedSheetData'),
+      getPublishedSheetData: createGasMethod(
+        'getPublishedSheetData',
+        'getPublishedSheetData',
+        'App.getData.getPublishedSheetData'
+      ),
       addReaction: createGasMethod('addReaction', 'addReaction', 'App.getData.addReaction'),
-      removeReaction: createGasMethod('removeReaction', 'removeReaction', 'App.getData.removeReaction'),
-      batchAddReaction: createGasMethod('batchAddReaction', 'batchAddReaction', 'App.getData.batchAddReaction')
+      removeReaction: createGasMethod(
+        'removeReaction',
+        'removeReaction',
+        'App.getData.removeReaction'
+      ),
+      batchAddReaction: createGasMethod(
+        'batchAddReaction',
+        'batchAddReaction',
+        'App.getData.batchAddReaction'
+      ),
     }),
 
     getForm: () => ({
-      getActiveFormInfo: createGasMethod('getActiveFormInfo', 'getActiveFormInfo', 'App.getForm.getActiveFormInfo')
+      getActiveFormInfo: createGasMethod(
+        'getActiveFormInfo',
+        'getActiveFormInfo',
+        'App.getForm.getActiveFormInfo'
+      ),
     }),
 
     getDomain: () => ({
-      getSystemDomainInfo: createGasMethod('getSystemDomainInfo', 'getSystemDomainInfo', 'App.getDomain.getSystemDomainInfo')
+      getSystemDomainInfo: createGasMethod(
+        'getSystemDomainInfo',
+        'getSystemDomainInfo',
+        'App.getDomain.getSystemDomainInfo'
+      ),
     }),
 
     getStatus: () => ({
       async checkPublicationStatus(userId) {
         return new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Publication status check timeout')), SYSTEM_CONSTANTS.TIMEOUTS.SHORT * 8);
-          const cleanup = (fn) => (...args) => { clearTimeout(timeout); fn(...args); };
-          
+          const timeout = setTimeout(
+            () => reject(new Error('Publication status check timeout')),
+            SYSTEM_CONSTANTS.TIMEOUTS.SHORT * 8
+          );
+          const cleanup =
+            (fn) =>
+            (...args) => {
+              clearTimeout(timeout);
+              fn(...args);
+            };
+
           google.script.run
             .withSuccessHandler(cleanup(resolve))
             .withFailureHandler(cleanup(reject))
             .checkCurrentPublicationStatus(userId);
-        }).catch(error => { console.error('❌ App.getStatus.checkPublicationStatus エラー:', error); throw error; });
-      }
-    })
+        }).catch((error) => {
+          console.error('❌ App.getStatus.checkPublicationStatus エラー:', error);
+          throw error;
+        });
+      },
+    }),
   };
 
   // ✅ CLAUDE.md準拠: SecurityValidator統合
   const SecurityValidator = {
     isValidUUID(uuid) {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       return typeof uuid === 'string' && uuidRegex.test(uuid);
     },
 
@@ -343,11 +402,11 @@
           '>': '&gt;',
           '&': '&amp;',
           '"': '&quot;',
-          "'": '&#x27;'
+          "'": '&#x27;',
         };
         return entities[match];
       });
-    }
+    },
   };
 
   // Generic cache for data storage
@@ -398,7 +457,7 @@
     // 🚀 Phase3最適化: 高速DOM要素キャッシュ
     _getCachedElement(id, useCache = true) {
       if (!useCache) return document.getElementById(id);
-      
+
       if (this.elementCache.has(id)) {
         const cached = this.elementCache.get(id);
         // 要素がDOMに存在するか確認
@@ -408,7 +467,7 @@
         // 無効なキャッシュを削除
         this.elementCache.delete(id);
       }
-      
+
       const element = document.getElementById(id);
       if (element) {
         this.elementCache.set(id, element);
@@ -425,7 +484,9 @@
     }
 
     _toggleClasses(element, classes, condition) {
-      classes.forEach(cls => condition ? element.classList.add(cls) : element.classList.remove(cls));
+      classes.forEach((cls) =>
+        condition ? element.classList.add(cls) : element.classList.remove(cls)
+      );
       return element;
     }
 
@@ -450,17 +511,11 @@
           const fallbackUserId = urlParams.get('userId');
 
           if (fallbackUserId) {
-            Logger.debug(
-              '✅ Using fallback userId from URL parameters:',
-              fallbackUserId
-            );
+            Logger.debug('✅ Using fallback userId from URL parameters:', fallbackUserId);
             return fallbackUserId;
           }
         } catch (error) {
-          console.warn(
-            '⚠️ Failed to get userId from URL parameters:',
-            error.message
-          );
+          console.warn('⚠️ Failed to get userId from URL parameters:', error.message);
         }
 
         // 最後のフォールバック
@@ -470,18 +525,12 @@
 
       // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
       if (userId.length === 36 && userId.includes('-')) {
-        Logger.debug(
-          '✅ Valid userId format detected:',
-          userId.substring(0, 8) + '...'
-        );
+        Logger.debug('✅ Valid userId format detected:', userId.substring(0, 8) + '...');
         return userId;
       }
 
       // その他の形式も許可するが警告を出す
-      console.warn(
-        '⚠️ Unusual userId format, but proceeding:',
-        userId.substring(0, 8) + '...'
-      );
+      console.warn('⚠️ Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
       return userId;
     }
 
@@ -494,7 +543,7 @@
       this.idleCallbackId = null;
       this.domFragmentPool = [];
       this.isLowPerformanceMode = true;
-      
+
       // 🚀 Phase3最適化: DOMキャッシュシステム
       this.elementCache = new Map();
       this.elements = {
@@ -654,7 +703,7 @@
     }
 
     withElements(elementNames, callback) {
-      const elements = elementNames.map(name => this.elements[name]).filter(Boolean);
+      const elements = elementNames.map((name) => this.elements[name]).filter(Boolean);
       if (elements.length > 0) callback(elements);
       return this;
     }
@@ -823,13 +872,17 @@
         });
 
         // 🔧 自動修復の試行（初回読み込み時のみ、無限ループ防止）
-        if (context === 'performDataLoad' && currentDataLength > 0 && domCardCount < currentDataLength / 2) {
+        if (
+          context === 'performDataLoad' &&
+          currentDataLength > 0 &&
+          domCardCount < currentDataLength / 2
+        ) {
           Logger.debug('🔧 DOM-Data不整合を自動修復中...', {
             expectedData: currentDataLength,
             actualDOM: domCardCount,
-            trigger: 'auto_repair'
+            trigger: 'auto_repair',
           });
-          
+
           // 次のフレームで修復実行（非同期で実行）
           requestAnimationFrame(() => {
             this.attemptConsistencyRepair(currentDataLength, domCardCount, context);
@@ -844,25 +897,27 @@
     attemptConsistencyRepair(expectedData, actualDOM, context) {
       try {
         Logger.debug('🔧 整合性修復開始:', { expectedData, actualDOM, context });
-        
+
         // スケルトンやローディングカードを除去
         const container = this.elements.answersContainer;
         if (container) {
           const skeletons = container.querySelectorAll('.skeleton, .loading');
           if (skeletons.length > 0) {
             Logger.debug('🧹 修復：スケルトンカード削除', skeletons.length + '個');
-            skeletons.forEach(skeleton => skeleton.remove());
+            skeletons.forEach((skeleton) => skeleton.remove());
           }
-          
+
           // データが存在するがDOMが少ない場合、再レンダリングを強制
           if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
-            Logger.debug('🔄 修復：データ再レンダリング実行', this.state.currentAnswers.length + '件');
+            Logger.debug(
+              '🔄 修復：データ再レンダリング実行',
+              this.state.currentAnswers.length + '件'
+            );
             this.renderBoard(this.state.currentAnswers, []);
           }
         }
-        
+
         Logger.debug('✅ 整合性修復完了');
-        
       } catch (error) {
         console.warn('⚠️ 整合性修復中にエラー:', error.message);
         // エラーが発生してもシステムを停止させない
@@ -1544,7 +1599,9 @@
     // ✅ CLAUDE.md準拠: App名前空間パターン使用
     async runGas(funcName, ...args) {
       const cacheKey = funcName + JSON.stringify(args);
-      const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
+      const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(
+        funcName
+      );
 
       if (!isStateChanging) {
         const cached = this.cache.get(cacheKey);
@@ -2580,10 +2637,10 @@
       const warningDiv = this._createElement('div');
       warningDiv.className =
         'fixed top-4 right-4 z-50 bg-yellow-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md border-l-4 border-yellow-400';
-      
+
       const warningIcon = this.getIcon('x', 'w-5 h-5 mr-2');
       const closeIcon = this.getIcon('x', 'w-4 h-4');
-      
+
       warningDiv.innerHTML = `
       <div class="flex items-center">
         ${warningIcon}
@@ -2814,18 +2871,21 @@
     displayError(message, type = 'init') {
       const container = this.elements.answersContainer;
       if (!container) return;
-      
+
       const config = {
         init: { color: 'red', iconName: 'x', title: '初期化エラー', buttons: 'reload' },
-        data: { color: 'yellow', iconName: 'x', title: 'データ読み込みエラー', buttons: 'both' }
+        data: { color: 'yellow', iconName: 'x', title: 'データ読み込みエラー', buttons: 'both' },
       }[type];
-      
-      const retryBtn = config.buttons === 'both' ? `
+
+      const retryBtn =
+        config.buttons === 'both'
+          ? `
           <button onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
-            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600">再試行</button>` : '';
-      
+            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600">再試行</button>`
+          : '';
+
       const iconSvg = this.getIcon(config.iconName, `mx-auto h-12 w-12 text-${config.color}-500`);
-      
+
       container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
         ${iconSvg}
@@ -2839,17 +2899,21 @@
         </div>
       </div>`;
     }
-    displayInitializationError(message) { this.displayError(message, 'init'); }
-    displayDataLoadError(message) { this.displayError(message, 'data'); }
+    displayInitializationError(message) {
+      this.displayError(message, 'init');
+    }
+    displayDataLoadError(message) {
+      this.displayError(message, 'data');
+    }
 
     showErrorMessage(message, isTemporary = true) {
       // 一時的なエラーメッセージを表示（トースト風）
       const errorDiv = this._createElement('div');
       errorDiv.className =
         'fixed top-4 right-4 z-50 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg max-w-md';
-      
+
       const errorIcon = this.getIcon('x', 'w-5 h-5 mr-2');
-      
+
       errorDiv.innerHTML = `
       <div class="flex items-center">
         ${errorIcon}
@@ -2875,7 +2939,7 @@
       // シンプルなローディング表示
       const container = this.elements.answersContainer;
       if (!container) return;
-      
+
       container.innerHTML = `
         <div class="text-center py-16 col-span-full">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
@@ -3045,9 +3109,11 @@
       } else if (dataLength !== domCards.length) {
         // 仮想スクロール時は正常な状態なので警告を出さない
         const isVirtualScrollActive = dataLength > RENDER_BATCH_SIZE;
-        
+
         if (isVirtualScrollActive) {
-          Logger.debug(`🌀 仮想スクロールアクティブ: DOM=${domCards.length}, データ=${dataLength} (正常状態)`);
+          Logger.debug(
+            `🌀 仮想スクロールアクティブ: DOM=${domCards.length}, データ=${dataLength} (正常状態)`
+          );
         } else {
           // 通常レンダリングでの不整合のみ警告
           console.warn(
@@ -3418,17 +3484,19 @@
             // データ件数に応じた動的タイムアウト設定
             const baseTimeout = attempt === 0 ? 30000 : 20000; // ベース: 30秒/20秒
             const dataCountEstimate = this.state.currentAnswers?.length || 0;
-            const timeoutMultiplier = dataCountEstimate > 200 ? 1.5 : dataCountEstimate > 100 ? 1.25 : 1;
+            const timeoutMultiplier =
+              dataCountEstimate > 200 ? 1.5 : dataCountEstimate > 100 ? 1.25 : 1;
             const dynamicTimeout = Math.round(baseTimeout * timeoutMultiplier);
-            
-            Logger.debug(`⏱️ 動的タイムアウト設定: ${dynamicTimeout}ms (データ件数: ${dataCountEstimate}, 倍率: ${timeoutMultiplier})`);
-            
-            const timeout = setTimeout(
-              () => {
-                reject(new Error(`データ取得がタイムアウトしました (タイムアウト: ${dynamicTimeout}ms)`));
-              },
-              dynamicTimeout
+
+            Logger.debug(
+              `⏱️ 動的タイムアウト設定: ${dynamicTimeout}ms (データ件数: ${dataCountEstimate}, 倍率: ${timeoutMultiplier})`
             );
+
+            const timeout = setTimeout(() => {
+              reject(
+                new Error(`データ取得がタイムアウトしました (タイムアウト: ${dynamicTimeout}ms)`)
+              );
+            }, dynamicTimeout);
 
             // パラメータ詳細ログ
             Logger.debug(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
@@ -3486,7 +3554,11 @@
 
           // 成功した場合は結果を返す - 改善された判定条件
           if (result && this.isValidDataResult(result)) {
-            Logger.debug(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data?.length || 0, '件');
+            Logger.debug(
+              `✅ データ取得成功 (試行 ${attempt + 1}):`,
+              result.data?.length || 0,
+              '件'
+            );
             return result;
           }
 
@@ -4093,7 +4165,7 @@
                   if (currentDisplayed !== result.header) {
                     console.info('🔄 質問文をサーバー設定に更新:', {
                       旧: currentDisplayed || '未設定',
-                      新: result.header
+                      新: result.header,
                     });
                     this.elements.headingLabel.textContent = result.header;
                   }
@@ -4122,10 +4194,16 @@
                 console.warn('⚠️ answersContainer要素が見つかりません');
                 return;
               }
-              const existingSkeletons = container.querySelectorAll('.skeleton, .answer-card.loading');
+              const existingSkeletons = container.querySelectorAll(
+                '.skeleton, .answer-card.loading'
+              );
               if (existingSkeletons.length > 0) {
-                Logger.debug('🧹 データ読み込み成功：', existingSkeletons.length, '個のスケルトンカードをクリア');
-                existingSkeletons.forEach(skeleton => skeleton.remove());
+                Logger.debug(
+                  '🧹 データ読み込み成功：',
+                  existingSkeletons.length,
+                  '個のスケルトンカードをクリア'
+                );
+                existingSkeletons.forEach((skeleton) => skeleton.remove());
               }
 
               if (isInitialLoad) {
@@ -4160,8 +4238,12 @@
 
                 // Step 4: DOM整合性チェック(レンダリング後に実行)
                 const currentDataLength = this.state.currentAnswers?.length || 0;
-                this.logDataConsistencyMetrics('performDataLoad-after-render', currentDataLength, 0);
-                
+                this.logDataConsistencyMetrics(
+                  'performDataLoad-after-render',
+                  currentDataLength,
+                  0
+                );
+
                 // Step 5: Consistency validation after DOM update (Phase 2.1)
                 Logger.debug('✅ Step 5: Consistency validation starting...');
                 await this.validatePostLoadState();
@@ -4855,7 +4937,11 @@
         else element.classList.add(`reaction-bg-${active[0].toLowerCase()}`);
       } else if (active.length === 2) {
         const [a, b] = active.sort();
-        const combos = { 'CURIOUS,LIKE': 'like-curious', 'LIKE,UNDERSTAND': 'like-understand', 'CURIOUS,UNDERSTAND': 'understand-curious' };
+        const combos = {
+          'CURIOUS,LIKE': 'like-curious',
+          'LIKE,UNDERSTAND': 'like-understand',
+          'CURIOUS,UNDERSTAND': 'understand-curious',
+        };
         element.classList.add(`reaction-bg-${combos[`${a},${b}`] || 'mixed'}`);
       } else if (active.length === 3) {
         element.classList.add('reaction-bg-like-understand-curious');
@@ -4867,7 +4953,12 @@
         0
       );
       if (totalReactions > 0) {
-        const borderClass = totalReactions >= 10 ? 'reaction-border-3' : totalReactions >= 5 ? 'reaction-border-2' : 'reaction-border-1';
+        const borderClass =
+          totalReactions >= 10
+            ? 'reaction-border-3'
+            : totalReactions >= 5
+              ? 'reaction-border-2'
+              : 'reaction-border-1';
         element.classList.add(borderClass);
       }
     }
@@ -4920,9 +5011,11 @@
         console.error('⚠️ prepareRenderingState: answersContainerが見つかりません');
         return;
       }
-      
+
       // すべてのローディング要素を削除 (シンプルローディング含む)
-      container.querySelectorAll('.skeleton, .loading, [data-loading="true"], .animate-spin').forEach((el) => el.remove());
+      container
+        .querySelectorAll('.skeleton, .loading, [data-loading="true"], .animate-spin')
+        .forEach((el) => el.remove());
       this.updateLayoutControls(newRows);
     }
 
@@ -4960,7 +5053,7 @@
 
     performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
       const container = this.elements.answersContainer;
-      
+
       // DOMクリア前に既存カードのマップを作成
       const existingMap = new Map();
       container.querySelectorAll('.answer-card').forEach((card) => {
@@ -4974,7 +5067,7 @@
           existingMap.delete(id);
         }
       });
-      
+
       // 既存カードマップ取得後にコンテナをクリア
       container.innerHTML = '';
 
@@ -5027,10 +5120,14 @@
 
       // 🚀 Phase1最適化: コンテナ高さ検出の堅牢化
       if (containerHeight <= 0) {
-        containerHeight = container.offsetHeight || 
-                         container.getBoundingClientRect().height || 
-                         window.innerHeight || 800;
-        Logger.debug(`🔧 containerHeight修復: ${containerHeight}px (元値: ${container.clientHeight}px)`);
+        containerHeight =
+          container.offsetHeight ||
+          container.getBoundingClientRect().height ||
+          window.innerHeight ||
+          800;
+        Logger.debug(
+          `🔧 containerHeight修復: ${containerHeight}px (元値: ${container.clientHeight}px)`
+        );
       }
 
       let startIndex = 0;
@@ -5040,16 +5137,21 @@
         // 仮想スクロールによる表示範囲計算
         const visibleCards = Math.ceil(containerHeight / cardHeight);
         const bufferSize = Math.max(20, Math.ceil(visibleCards * 0.5)); // 余分なバッファ
-        
+
         startIndex = Math.max(0, Math.floor(scrollTop / cardHeight) - bufferSize);
-        endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight) + bufferSize);
-        
+        endIndex = Math.min(
+          totalItems,
+          Math.ceil((scrollTop + containerHeight) / cardHeight) + bufferSize
+        );
+
         // 初期表示時は十分な数を表示
         if (scrollTop === 0 && startIndex === 0) {
           endIndex = Math.min(totalItems, Math.max(100, visibleCards * 2));
         }
-        
-        Logger.perf(`🌀 仮想スクロール範囲: ${startIndex}-${endIndex} / ${totalItems} (visible: ${visibleCards}, buffer: ${bufferSize})`);
+
+        Logger.perf(
+          `🌀 仮想スクロール範囲: ${startIndex}-${endIndex} / ${totalItems} (visible: ${visibleCards}, buffer: ${bufferSize})`
+        );
       } else {
         // 💡 改善された初期表示ロジック: データ量に応じた適応的表示
         if (totalItems <= 100) {
@@ -5084,7 +5186,7 @@
           totalItems: newRows.length,
           renderedItems: 0,
           renderedRowIndexes: new Set(),
-          isLoading: false
+          isLoading: false,
         };
       } else {
         this.virtualScrollState.totalItems = newRows.length;
@@ -5093,12 +5195,12 @@
       const fragment = this.getReusableFragment();
       const visibleRange = this.calculateVisibleRange(newRows.length);
       const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
-      
-      Logger.perf('🌀 Virtual scroll range:', { 
-        total: newRows.length, 
-        startIndex: visibleRange.startIndex, 
-        endIndex: visibleRange.endIndex, 
-        visibleCount: visibleRows.length 
+
+      Logger.perf('🌀 Virtual scroll range:', {
+        total: newRows.length,
+        startIndex: visibleRange.startIndex,
+        endIndex: visibleRange.endIndex,
+        visibleCount: visibleRows.length,
       });
 
       let renderedCount = 0;
@@ -5123,42 +5225,43 @@
       if (fragment.children.length > 0) {
         container.appendChild(fragment);
         this.virtualScrollState.renderedItems = container.children.length;
-        
+
         // 🎯 スクロールオブザーバーを即座に設定
         this.deferredRender(() => {
           this.setupScrollObserver();
           this.showVirtualScrollInfo(visibleRows.length, newRows.length);
         });
-        
-        Logger.info('✅ Virtual scroll初期化完了:', { 
-          rendered: renderedCount, 
+
+        Logger.info('✅ Virtual scroll初期化完了:', {
+          rendered: renderedCount,
           totalRendered: this.virtualScrollState.renderedItems,
-          totalItems: this.virtualScrollState.totalItems 
+          totalItems: this.virtualScrollState.totalItems,
         });
       }
     }
-    
+
     // 仮想スクロール情報表示(プログレッシブローディング)
     showVirtualScrollInfo(displayedCount, totalCount) {
       if (displayedCount >= totalCount) return;
-      
+
       const infoElement = this._getCachedElement('virtual-scroll-info');
       if (infoElement) {
         infoElement.remove(); // 既存の情報を削除
       }
-      
+
       const info = this._createElement('div');
       info.id = 'virtual-scroll-info';
-      info.className = 'fixed bottom-4 right-4 bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50';
+      info.className =
+        'fixed bottom-4 right-4 bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50';
       info.innerHTML = `
         <div class="flex items-center space-x-2">
           <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           <span>${displayedCount}件表示、残り${totalCount - displayedCount}件読み込み中...</span>
         </div>
       `;
-      
+
       document.body.appendChild(info);
-      
+
       // 3秒後に自動消去
       setTimeout(() => {
         if (info.parentNode) {
@@ -5169,12 +5272,15 @@
 
     shouldUpdateCard(newData, oldData) {
       if (!oldData) return true;
-      
-      const getTotalReactions = data => this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
-      
-      return getTotalReactions(newData) !== getTotalReactions(oldData) ||
-        ['isHighlighted', 'opinion', 'name'].some(key => newData[key] !== oldData[key]) ||
-        this.validateReasonText(newData.reason) !== this.validateReasonText(oldData.reason);
+
+      const getTotalReactions = (data) =>
+        this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
+
+      return (
+        getTotalReactions(newData) !== getTotalReactions(oldData) ||
+        ['isHighlighted', 'opinion', 'name'].some((key) => newData[key] !== oldData[key]) ||
+        this.validateReasonText(newData.reason) !== this.validateReasonText(oldData.reason)
+      );
     }
 
     finalizeRenderingState() {
@@ -5329,7 +5435,8 @@
                 btn.style.display = update.shouldDisplay ? 'flex' : 'none';
 
                 // aria-label更新
-                const reactionName = SYSTEM_CONSTANTS.REACTIONS.LABELS[update.reaction] || update.reaction;
+                const reactionName =
+                  SYSTEM_CONSTANTS.REACTIONS.LABELS[update.reaction] || update.reaction;
                 const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
                 btn.setAttribute('aria-label', ariaLabel);
 
@@ -5427,7 +5534,6 @@
           return null;
         }
 
-
         // Ensure required properties exist with safe defaults（理由列の堅牢化）
         const safeData = {
           rowIndex: data.rowIndex || 0,
@@ -5438,8 +5544,6 @@
           reactions: data.reactions || {},
           highlight: Boolean(data.highlight),
         };
-
-
 
         // Optimized cache key generation (faster than JSON.stringify)
         const cacheKey = `${safeData.rowIndex}-${safeData.opinion.slice(0, 50)}-${safeData.reason.slice(0, 30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
@@ -5504,7 +5608,8 @@
 
         if (showName) {
           // 名前が利用可能な場合はそれを使用、なければemailから生成
-          displayName = safeData.name || (safeData.email ? safeData.email.split('@')[0] : 'ユーザー');
+          displayName =
+            safeData.name || (safeData.email ? safeData.email.split('@')[0] : 'ユーザー');
         }
 
         const nameHtml =
@@ -5573,7 +5678,7 @@
         const opinionTitle = document.createElement('h3');
         opinionTitle.className =
           'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
-        
+
         // テキスト設定の強化
         try {
           opinionTitle.textContent = safeData.opinion || '(回答データが見つかりません)';
@@ -5584,7 +5689,7 @@
 
         const reasonText = document.createElement('p');
         reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-        
+
         try {
           reasonText.textContent = safeData.reason || '';
         } catch (reasonError) {
@@ -5718,7 +5823,6 @@
         }
       }
     }
-
 
     /**
      * リアクション処理（既存キューイングシステム＋オプショナルバッチ処理）
@@ -6849,7 +6953,11 @@
 
     // アイテム状態のハッシュを計算（変更検出用）
     calculateStateHash(item) {
-      return JSON.stringify({ reactions: item.reactions, highlight: item.highlight, rowIndex: item.rowIndex });
+      return JSON.stringify({
+        reactions: item.reactions,
+        highlight: item.highlight,
+        rowIndex: item.rowIndex,
+      });
     }
 
     // バッチ処理パフォーマンステスト（開発・デバッグ用）
@@ -7432,8 +7540,8 @@
         const modal = this._createElement('div');
         modal.className =
           'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-          const warningIcon = this.getIcon('x', 'w-6 h-6 text-orange-600');
-        
+        const warningIcon = this.getIcon('x', 'w-6 h-6 text-orange-600');
+
         modal.innerHTML = `
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
           <div class="flex items-center mb-4">
@@ -7508,9 +7616,9 @@
       if (endPublicationBtn) {
         originalButtonContent = endPublicationBtn.innerHTML;
         endPublicationBtn.disabled = true;
-        
-          const loadingIcon = this.getIcon('x', 'w-3 h-3 animate-spin inline-block mr-1');
-        
+
+        const loadingIcon = this.getIcon('x', 'w-3 h-3 animate-spin inline-block mr-1');
+
         endPublicationBtn.innerHTML = `
         ${loadingIcon}
         公開終了中...
@@ -8112,7 +8220,7 @@
         timeout = setTimeout(() => func.apply(this, args), delay);
       };
     }
-    
+
     // 🚀 CLAUDE.md準拠：throttle関数追加（必須ユーティリティ）
     throttle(func, delay) {
       let lastCall = 0;
@@ -9115,7 +9223,6 @@
     // システムフロー表示
     showSystemFlow();
 
-
     // Expose debug functions globally for console access
     window.debugAnswerCards = () => {
       if (window.answerBoardApp && window.answerBoardApp.debugAnswerCards) {
@@ -9219,7 +9326,7 @@
     initializeConfig()
       .then(() => {
         debugInfo('✅ Config初期化完了');
-        
+
         // AnswerBoardApp インスタンス初期化
         window.answerBoardApp = new AnswerBoardApp();
         debugInfo('✅ AnswerBoardApp初期化完了');

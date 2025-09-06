@@ -18,9 +18,9 @@ function analyzeColumnType(headerName, sampleData = []) {
 
     // 超高精度アンサンブル判定を実行
     const ensembleScores = ensembleClassification(headerName, sampleData);
-    
+
     // 最高スコアの列タイプを決定
-    const bestType = Object.keys(ensembleScores).reduce((a, b) => 
+    const bestType = Object.keys(ensembleScores).reduce((a, b) =>
       ensembleScores[a] > ensembleScores[b] ? a : b
     );
 
@@ -31,19 +31,18 @@ function analyzeColumnType(headerName, sampleData = []) {
       bestType,
       confidence,
       allScores: ensembleScores,
-      sampleCount: sampleData.length
+      sampleCount: sampleData.length,
     });
 
     return {
       type: bestType,
-      confidence
+      confidence,
     };
-    
   } catch (error) {
     console.error('超高精度列タイプ分析エラー:', {
       headerName,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     return { type: null, confidence: 50 };
   }
@@ -61,7 +60,7 @@ function analyzeHeaderName(headerName) {
     answer: 0,
     reason: 0,
     class: 0,
-    name: 0
+    name: 0,
   };
 
   // 回答列パターン（高精度 → 低精度順）
@@ -75,7 +74,7 @@ function analyzeHeaderName(headerName) {
     { pattern: '質問', score: 75, exact: false },
     { pattern: 'について', score: 70, exact: false },
     { pattern: 'ますか', score: 85, exact: false },
-    { pattern: 'でしょうか', score: 85, exact: false }
+    { pattern: 'でしょうか', score: 85, exact: false },
   ];
 
   // 理由列パターン
@@ -86,7 +85,7 @@ function analyzeHeaderName(headerName) {
     { pattern: '詳細', score: 80, exact: false },
     { pattern: '説明', score: 80, exact: false },
     { pattern: 'なぜそう', score: 88, exact: false },
-    { pattern: 'そう考える', score: 85, exact: false }
+    { pattern: 'そう考える', score: 85, exact: false },
   ];
 
   // クラス列パターン
@@ -94,7 +93,7 @@ function analyzeHeaderName(headerName) {
     { pattern: 'クラス', score: 98, exact: false },
     { pattern: '学年', score: 95, exact: false },
     { pattern: '組', score: 90, exact: true },
-    { pattern: 'class', score: 95, exact: false }
+    { pattern: 'class', score: 95, exact: false },
   ];
 
   // 名前列パターン
@@ -102,7 +101,7 @@ function analyzeHeaderName(headerName) {
     { pattern: '名前', score: 98, exact: false },
     { pattern: '氏名', score: 98, exact: false },
     { pattern: 'お名前', score: 95, exact: false },
-    { pattern: 'name', score: 90, exact: false }
+    { pattern: 'name', score: 90, exact: false },
   ];
 
   // パターンマッチング実行
@@ -110,15 +109,13 @@ function analyzeHeaderName(headerName) {
     { patterns: answerPatterns, type: 'answer' },
     { patterns: reasonPatterns, type: 'reason' },
     { patterns: classPatterns, type: 'class' },
-    { patterns: namePatterns, type: 'name' }
+    { patterns: namePatterns, type: 'name' },
   ];
 
-  patternGroups.forEach(group => {
-    group.patterns.forEach(p => {
-      const match = p.exact ? 
-        normalized === p.pattern : 
-        normalized.includes(p.pattern);
-      
+  patternGroups.forEach((group) => {
+    group.patterns.forEach((p) => {
+      const match = p.exact ? normalized === p.pattern : normalized.includes(p.pattern);
+
       if (match) {
         scores[group.type] = Math.max(scores[group.type], p.score);
       }
@@ -139,7 +136,7 @@ function analyzeColumnContent(sampleData) {
     answer: 0,
     reason: 0,
     class: 0,
-    name: 0
+    name: 0,
   };
 
   if (!sampleData || sampleData.length === 0) {
@@ -148,8 +145,8 @@ function analyzeColumnContent(sampleData) {
 
   // 有効なテキストデータのみ抽出
   const validData = sampleData
-    .filter(item => item && typeof item === 'string' && item.trim().length > 0)
-    .map(item => item.trim());
+    .filter((item) => item && typeof item === 'string' && item.trim().length > 0)
+    .map((item) => item.trim());
 
   if (validData.length === 0) {
     return scores;
@@ -158,28 +155,28 @@ function analyzeColumnContent(sampleData) {
   // 統計データ計算
   const stats = {
     avgLength: validData.reduce((sum, item) => sum + item.length, 0) / validData.length,
-    maxLength: Math.max(...validData.map(item => item.length)),
-    minLength: Math.min(...validData.map(item => item.length)),
-    hasNumbers: validData.some(item => /\d/.test(item)),
-    hasAlphabet: validData.some(item => /[a-zA-Z]/.test(item)),
-    hasQuestionMarks: validData.some(item => /[？?]/.test(item)),
-    hasReasonWords: validData.some(item => /理由|なぜなら|だから|体験/.test(item))
+    maxLength: Math.max(...validData.map((item) => item.length)),
+    minLength: Math.min(...validData.map((item) => item.length)),
+    hasNumbers: validData.some((item) => /\d/.test(item)),
+    hasAlphabet: validData.some((item) => /[a-zA-Z]/.test(item)),
+    hasQuestionMarks: validData.some((item) => /[？?]/.test(item)),
+    hasReasonWords: validData.some((item) => /理由|なぜなら|だから|体験/.test(item)),
   };
 
   // 名前列の判定（2-4文字の日本語が多い）
-  const shortJapaneseCount = validData.filter(item => 
-    item.length >= 2 && item.length <= 4 && /^[ひらがなカタカナ漢字]+$/.test(item)
+  const shortJapaneseCount = validData.filter(
+    (item) => item.length >= 2 && item.length <= 4 && /^[ひらがなカタカナ漢字]+$/.test(item)
   ).length;
-  
+
   if (shortJapaneseCount >= Math.ceil(validData.length * 0.6)) {
     scores.name = 85;
   }
 
   // クラス列の判定（数字+アルファベットパターン）
-  const classPatternCount = validData.filter(item => 
+  const classPatternCount = validData.filter((item) =>
     /^\d+[A-Za-z]+$|^[A-Za-z]+\d+$|^\d+組$|^\d+年/.test(item)
   ).length;
-  
+
   if (classPatternCount >= Math.ceil(validData.length * 0.5)) {
     scores.class = 90;
   }
@@ -216,15 +213,14 @@ function calculateFinalConfidence(headerScore, contentScore) {
   const finalScores = {};
 
   // 重み付き統合スコア計算
-  columnTypes.forEach(type => {
+  columnTypes.forEach((type) => {
     finalScores[type] = Math.round(
-      (headerScore[type] * HEADER_WEIGHT) + 
-      (contentScore[type] * CONTENT_WEIGHT)
+      headerScore[type] * HEADER_WEIGHT + contentScore[type] * CONTENT_WEIGHT
     );
   });
 
   // 最高スコアの列タイプを決定
-  const bestType = Object.keys(finalScores).reduce((a, b) => 
+  const bestType = Object.keys(finalScores).reduce((a, b) =>
     finalScores[a] > finalScores[b] ? a : b
   );
 
@@ -238,12 +234,12 @@ function calculateFinalConfidence(headerScore, contentScore) {
     contentScores: contentScore,
     finalScores,
     bestType,
-    confidence: adjustedConfidence
+    confidence: adjustedConfidence,
   });
 
   return {
     type: bestType,
-    confidence: adjustedConfidence
+    confidence: adjustedConfidence,
   };
 }
 
@@ -262,8 +258,8 @@ function calculateAdvancedFeatures(sampleData) {
     return getEmptyFeatureVector();
   }
 
-  const validData = sampleData.filter(item => 
-    item && typeof item === 'string' && item.trim().length > 0
+  const validData = sampleData.filter(
+    (item) => item && typeof item === 'string' && item.trim().length > 0
   );
 
   if (validData.length === 0) {
@@ -273,10 +269,11 @@ function calculateAdvancedFeatures(sampleData) {
   const features = {};
 
   // === 1-4: 統計的特徴量 ===
-  const lengths = validData.map(text => text.length);
+  const lengths = validData.map((text) => text.length);
   const avgLength = lengths.reduce((sum, len) => sum + len, 0) / lengths.length;
-  const variance = lengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / lengths.length;
-  
+  const variance =
+    lengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / lengths.length;
+
   features.avgLength = avgLength;
   features.lengthVariance = Math.sqrt(variance);
   features.lengthSkewness = calculateSkewness(lengths, avgLength, Math.sqrt(variance));
@@ -284,9 +281,12 @@ function calculateAdvancedFeatures(sampleData) {
 
   // === 5-8: 文字種分布特徴量 ===
   let totalChars = 0;
-  let hiraganaCount = 0, katakanaCount = 0, kanjiCount = 0, alphanumCount = 0;
+  let hiraganaCount = 0,
+    katakanaCount = 0,
+    kanjiCount = 0,
+    alphanumCount = 0;
 
-  validData.forEach(text => {
+  validData.forEach((text) => {
     totalChars += text.length;
     hiraganaCount += (text.match(/[ひらがな]/g) || []).length;
     katakanaCount += (text.match(/[カタカナ]/g) || []).length;
@@ -307,7 +307,10 @@ function calculateAdvancedFeatures(sampleData) {
 
   // === 12-13: パターン分析特徴量 ===
   features.questionDensity = calculatePatternDensity(validData, /[？?]/g);
-  features.conjunctionDensity = calculatePatternDensity(validData, /理由|なぜなら|だから|そして|また/g);
+  features.conjunctionDensity = calculatePatternDensity(
+    validData,
+    /理由|なぜなら|だから|そして|また/g
+  );
 
   // === 14-15: 高度な言語学的特徴量 ===
   features.namePatternScore = calculateNamePatternScore(validData);
@@ -321,11 +324,21 @@ function calculateAdvancedFeatures(sampleData) {
  */
 function getEmptyFeatureVector() {
   return {
-    avgLength: 0, lengthVariance: 0, lengthSkewness: 0, lengthKurtosis: 0,
-    hiraganaRatio: 0, katakanaRatio: 0, kanjiRatio: 0, alphanumRatio: 0,
-    shannonEntropy: 0, conditionalEntropy: 0, mutualInformation: 0,
-    questionDensity: 0, conjunctionDensity: 0,
-    namePatternScore: 0, classPatternScore: 0
+    avgLength: 0,
+    lengthVariance: 0,
+    lengthSkewness: 0,
+    lengthKurtosis: 0,
+    hiraganaRatio: 0,
+    katakanaRatio: 0,
+    kanjiRatio: 0,
+    alphanumRatio: 0,
+    shannonEntropy: 0,
+    conditionalEntropy: 0,
+    mutualInformation: 0,
+    questionDensity: 0,
+    conjunctionDensity: 0,
+    namePatternScore: 0,
+    classPatternScore: 0,
   };
 }
 
@@ -334,8 +347,8 @@ function getEmptyFeatureVector() {
  */
 function calculateSkewness(values, mean, stdDev) {
   if (stdDev === 0) return 0;
-  const skewness = values.reduce((sum, val) => 
-    sum + Math.pow((val - mean) / stdDev, 3), 0) / values.length;
+  const skewness =
+    values.reduce((sum, val) => sum + Math.pow((val - mean) / stdDev, 3), 0) / values.length;
   return skewness;
 }
 
@@ -344,8 +357,8 @@ function calculateSkewness(values, mean, stdDev) {
  */
 function calculateKurtosis(values, mean, stdDev) {
   if (stdDev === 0) return 0;
-  const kurtosis = values.reduce((sum, val) => 
-    sum + Math.pow((val - mean) / stdDev, 4), 0) / values.length - 3;
+  const kurtosis =
+    values.reduce((sum, val) => sum + Math.pow((val - mean) / stdDev, 4), 0) / values.length - 3;
   return kurtosis;
 }
 
@@ -354,22 +367,22 @@ function calculateKurtosis(values, mean, stdDev) {
  */
 function calculateShannonEntropy(text) {
   if (!text || text.length === 0) return 0;
-  
+
   const charCounts = {};
   for (const char of text) {
     charCounts[char] = (charCounts[char] || 0) + 1;
   }
-  
+
   const totalChars = text.length;
   let entropy = 0;
-  
+
   for (const count of Object.values(charCounts)) {
     const probability = count / totalChars;
     if (probability > 0) {
       entropy -= probability * Math.log2(probability);
     }
   }
-  
+
   return entropy;
 }
 
@@ -378,35 +391,35 @@ function calculateShannonEntropy(text) {
  */
 function calculateConditionalEntropy(textArray) {
   if (!textArray || textArray.length <= 1) return 0;
-  
+
   const bigramCounts = {};
   const unigramCounts = {};
-  
-  textArray.forEach(text => {
+
+  textArray.forEach((text) => {
     for (let i = 0; i < text.length - 1; i++) {
       const bigram = text.substr(i, 2);
       const unigram = text.charAt(i);
-      
+
       bigramCounts[bigram] = (bigramCounts[bigram] || 0) + 1;
       unigramCounts[unigram] = (unigramCounts[unigram] || 0) + 1;
     }
   });
-  
+
   let conditionalEntropy = 0;
   const totalBigrams = Object.values(bigramCounts).reduce((sum, count) => sum + count, 0);
-  
+
   for (const [bigram, bigramCount] of Object.entries(bigramCounts)) {
     const firstChar = bigram.charAt(0);
     const unigramCount = unigramCounts[firstChar] || 1;
-    
+
     const conditionalProb = bigramCount / unigramCount;
     const jointProb = bigramCount / totalBigrams;
-    
+
     if (conditionalProb > 0 && jointProb > 0) {
       conditionalEntropy -= jointProb * Math.log2(conditionalProb);
     }
   }
-  
+
   return conditionalEntropy;
 }
 
@@ -415,22 +428,22 @@ function calculateConditionalEntropy(textArray) {
  */
 function calculateMutualInformation(textArray) {
   if (!textArray || textArray.length <= 1) return 0;
-  
+
   // 簡易版：文字長と文字種の相互情報量
-  const lengths = textArray.map(text => text.length);
+  const lengths = textArray.map((text) => text.length);
   const avgLength = lengths.reduce((sum, len) => sum + len, 0) / lengths.length;
-  
+
   let mutualInfo = 0;
-  textArray.forEach(text => {
+  textArray.forEach((text) => {
     const lengthDeviation = Math.abs(text.length - avgLength);
     const charDiversity = new Set(text).size;
-    
+
     // 長さの偏差と文字種多様性の関係を相互情報量として近似
     if (charDiversity > 0) {
       mutualInfo += Math.log2(charDiversity / (lengthDeviation + 1));
     }
   });
-  
+
   return mutualInfo / textArray.length;
 }
 
@@ -440,13 +453,13 @@ function calculateMutualInformation(textArray) {
 function calculatePatternDensity(textArray, pattern) {
   let totalMatches = 0;
   let totalChars = 0;
-  
-  textArray.forEach(text => {
+
+  textArray.forEach((text) => {
     const matches = text.match(pattern) || [];
     totalMatches += matches.length;
     totalChars += text.length;
   });
-  
+
   return totalChars > 0 ? totalMatches / totalChars : 0;
 }
 
@@ -455,8 +468,8 @@ function calculatePatternDensity(textArray, pattern) {
  */
 function calculateNamePatternScore(textArray) {
   let score = 0;
-  
-  textArray.forEach(text => {
+
+  textArray.forEach((text) => {
     // 2-4文字の日本語パターン
     if (/^[ひらがなカタカナ漢字]{2,4}$/.test(text)) {
       score += 1;
@@ -470,7 +483,7 @@ function calculateNamePatternScore(textArray) {
       score += 0.8;
     }
   });
-  
+
   return textArray.length > 0 ? score / textArray.length : 0;
 }
 
@@ -479,8 +492,8 @@ function calculateNamePatternScore(textArray) {
  */
 function calculateClassPatternScore(textArray) {
   let score = 0;
-  
-  textArray.forEach(text => {
+
+  textArray.forEach((text) => {
     // 数字+アルファベットパターン（例：1A, 2B）
     if (/^\d+[A-Za-z]+$/.test(text)) {
       score += 1;
@@ -498,7 +511,7 @@ function calculateClassPatternScore(textArray) {
       score += 0.6;
     }
   });
-  
+
   return textArray.length > 0 ? score / textArray.length : 0;
 }
 
@@ -523,11 +536,11 @@ function ensembleClassification(headerName, sampleData) {
   const columnTypes = ['answer', 'reason', 'class', 'name'];
   const ensembleScores = {};
 
-  columnTypes.forEach(type => {
+  columnTypes.forEach((type) => {
     ensembleScores[type] = Math.round(
-      (headerScore[type] * weights.header) +
-      (basicContentScore[type] * weights.basicContent) +
-      (advancedScore[type] * weights.advanced)
+      headerScore[type] * weights.header +
+        basicContentScore[type] * weights.basicContent +
+        advancedScore[type] * weights.advanced
     );
   });
 
@@ -544,30 +557,31 @@ function classifyByAdvancedFeatures(features) {
   const scores = { answer: 0, reason: 0, class: 0, name: 0 };
 
   // 名前列判定（高精度特徴量ベース）
-  if (features.namePatternScore > 0.6 && 
-      features.avgLength >= 2 && features.avgLength <= 8 &&
-      features.kanjiRatio + features.hiraganaRatio > 0.7) {
+  if (
+    features.namePatternScore > 0.6 &&
+    features.avgLength >= 2 &&
+    features.avgLength <= 8 &&
+    features.kanjiRatio + features.hiraganaRatio > 0.7
+  ) {
     scores.name = 95;
   }
 
   // クラス列判定
-  if (features.classPatternScore > 0.5 && 
-      features.avgLength <= 5 &&
-      features.alphanumRatio > 0.3) {
+  if (features.classPatternScore > 0.5 && features.avgLength <= 5 && features.alphanumRatio > 0.3) {
     scores.class = 92;
   }
 
   // 回答列判定（情報理論ベース）
-  if (features.avgLength > 20 && 
-      features.questionDensity > 0.01 &&
-      features.shannonEntropy > 3.0) {
+  if (features.avgLength > 20 && features.questionDensity > 0.01 && features.shannonEntropy > 3.0) {
     scores.answer = 88;
   }
 
   // 理由列判定
-  if (features.conjunctionDensity > 0.02 && 
-      features.avgLength > 10 &&
-      features.conditionalEntropy > 1.0) {
+  if (
+    features.conjunctionDensity > 0.02 &&
+    features.avgLength > 10 &&
+    features.conditionalEntropy > 1.0
+  ) {
     scores.reason = 85;
   }
 
@@ -583,7 +597,7 @@ function calculateDynamicWeights(headerScore, contentScore, advancedScore) {
   const advancedMax = Math.max(...Object.values(advancedScore));
 
   const total = headerMax + contentMax + advancedMax;
-  
+
   if (total === 0) {
     return { header: 0.5, basicContent: 0.3, advanced: 0.2 };
   }
@@ -591,7 +605,7 @@ function calculateDynamicWeights(headerScore, contentScore, advancedScore) {
   return {
     header: headerMax / total,
     basicContent: contentMax / total,
-    advanced: advancedMax / total
+    advanced: advancedMax / total,
   };
 }
 
@@ -600,8 +614,8 @@ function calculateDynamicWeights(headerScore, contentScore, advancedScore) {
  */
 function calculateBayesianConfidence(scores, features) {
   const calibratedScores = {};
-  
-  Object.keys(scores).forEach(type => {
+
+  Object.keys(scores).forEach((type) => {
     const baseScore = scores[type];
     let confidenceFactor = 1.0;
 
@@ -630,25 +644,27 @@ function calculateBayesianConfidence(scores, features) {
 function resolveColumnConflicts(headerRow, allData) {
   const columnTypes = ['answer', 'reason', 'class', 'name'];
   const columnCount = headerRow.length;
-  
+
   // コスト行列生成（列×タイプ）
   const costMatrix = [];
   const columnAnalyses = [];
 
   for (let colIndex = 0; colIndex < columnCount; colIndex++) {
     const header = headerRow[colIndex];
-    const sampleData = allData.length > 1 ? 
-      allData.slice(1, Math.min(11, allData.length))
-        .map(row => row[colIndex])
-        .filter(cell => cell && typeof cell === 'string' && cell.trim().length > 0) : 
-      [];
+    const sampleData =
+      allData.length > 1
+        ? allData
+            .slice(1, Math.min(11, allData.length))
+            .map((row) => row[colIndex])
+            .filter((cell) => cell && typeof cell === 'string' && cell.trim().length > 0)
+        : [];
 
     // アンサンブル判定実行
     const scores = ensembleClassification(header, sampleData);
     columnAnalyses.push({ header, scores, sampleData });
 
     // コスト行列の行を生成（高いスコア = 低いコスト）
-    const costs = columnTypes.map(type => Math.max(0, 100 - (scores[type] || 0)));
+    const costs = columnTypes.map((type) => Math.max(0, 100 - (scores[type] || 0)));
     costMatrix.push(costs);
   }
 
@@ -664,10 +680,10 @@ function resolveColumnConflicts(headerRow, allData) {
     if (typeIndex !== -1) {
       const columnType = columnTypes[typeIndex];
       const confidence = columnAnalyses[colIndex].scores[columnType] || 0;
-      
+
       // 最低信頼度保証
       const adjustedConfidence = Math.max(75, confidence);
-      
+
       finalMapping[columnType] = colIndex;
       finalConfidence[columnType] = adjustedConfidence;
 
@@ -676,7 +692,7 @@ function resolveColumnConflicts(headerRow, allData) {
         header: headerRow[colIndex],
         assignedType: columnType,
         confidence: adjustedConfidence,
-        originalScores: columnAnalyses[colIndex].scores
+        originalScores: columnAnalyses[colIndex].scores,
       });
     }
   });
@@ -704,16 +720,16 @@ function resolveColumnConflicts(headerRow, allData) {
     assignments: assignmentLog,
     conflictsResolved: true,
     averageConfidence: Math.round(
-      Object.values(finalConfidence).reduce((sum, conf) => sum + conf, 0) / 
-      Object.values(finalConfidence).length
-    )
+      Object.values(finalConfidence).reduce((sum, conf) => sum + conf, 0) /
+        Object.values(finalConfidence).length
+    ),
   });
 
   return {
     mapping: finalMapping,
     confidence: finalConfidence,
     assignmentLog,
-    conflictsResolved: true
+    conflictsResolved: true,
   };
 }
 
@@ -732,14 +748,14 @@ function hungarianAlgorithmSimplified(costMatrix, columnTypes) {
 
   // 段階1：貪欲法による初期割り当て
   const candidateList = [];
-  
+
   for (let col = 0; col < numColumns; col++) {
     for (let type = 0; type < numTypes; type++) {
       candidateList.push({
         column: col,
         type,
         cost: costMatrix[col][type],
-        confidence: 100 - costMatrix[col][type]
+        confidence: 100 - costMatrix[col][type],
       });
     }
   }
@@ -750,11 +766,9 @@ function hungarianAlgorithmSimplified(costMatrix, columnTypes) {
   // 貪欲割り当て（各タイプに最大1つの列のみ）
   for (const candidate of candidateList) {
     const { column, type, confidence } = candidate;
-    
+
     // 高信頼度のみ採用（閾値75%以上）
-    if (confidence >= 75 && 
-        assignment[column] === -1 && 
-        !assignedTypes.has(type)) {
+    if (confidence >= 75 && assignment[column] === -1 && !assignedTypes.has(type)) {
       assignment[column] = type;
       assignedTypes.add(type);
     }
@@ -773,12 +787,13 @@ function hungarianAlgorithmSimplified(costMatrix, columnTypes) {
 
           // 現在のコスト
           const currentCost = costMatrix[col1][type1] + costMatrix[col2][type2];
-          
+
           // スワップ後のコスト
           const swapCost = costMatrix[col1][type2] + costMatrix[col2][type1];
 
           // 改善があればスワップ
-          if (swapCost < currentCost - 5) { // 閾値5でノイズ除去
+          if (swapCost < currentCost - 5) {
+            // 閾値5でノイズ除去
             assignment[col1] = type2;
             assignment[col2] = type1;
             improved = true;
@@ -795,7 +810,7 @@ function hungarianAlgorithmSimplified(costMatrix, columnTypes) {
     if (assignment[col] !== -1) {
       const assignedType = assignment[col];
       const confidence = 100 - costMatrix[col][assignedType];
-      
+
       // 信頼度が低すぎる場合は割り当て解除
       if (confidence < 60) {
         assignedTypes.delete(assignedType);

@@ -228,90 +228,169 @@ function getSheetsServiceCached() {
     'sheets_service',
     () => {
       console.log('getSheetsServiceCached: 新しいサービスオブジェクト作成');
-      
+
       // Google Sheets APIサービスオブジェクトを返す
       return {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
         spreadsheets: {
           values: {
-            batchGet: function(params) {
+            batchGet: function (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
                 throw new Error('Service Account token is not available');
               }
-              
+
               console.log('getSheetsServiceCached.batchGet: API呼び出し開始', {
                 spreadsheetId: params.spreadsheetId,
                 rangesCount: params.ranges ? params.ranges.length : 0,
-                hasToken: !!accessToken
+                hasToken: !!accessToken,
               });
-              
+
               // Sheets API v4 batchGet実装
               const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values:batchGet`;
               const queryParams = params.ranges ? `?ranges=${params.ranges.join('&ranges=')}` : '';
-              
+
               const response = UrlFetchApp.fetch(url + queryParams, {
                 method: 'GET',
                 headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
                 },
-                muteHttpExceptions: true
+                muteHttpExceptions: true,
               });
-              
+
               console.log('getSheetsServiceCached.batchGet: API応答', {
                 responseCode: response.getResponseCode(),
-                contentLength: response.getContentText().length
+                contentLength: response.getContentText().length,
               });
-              
+
               if (response.getResponseCode() !== 200) {
                 throw new Error(`Sheets API Error: ${response.getContentText()}`);
               }
-              
+
               return JSON.parse(response.getContentText());
             },
-            update: function(params) {
+            update: function (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
                 throw new Error('Service Account token is not available');
               }
-              
+
               console.log('getSheetsServiceCached.update: API呼び出し開始', {
                 spreadsheetId: params.spreadsheetId,
                 range: params.range,
-                hasToken: !!accessToken
+                hasToken: !!accessToken,
               });
-              
-              // Sheets API v4 update実装  
+
+              // Sheets API v4 update実装
               const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values/${params.range}?valueInputOption=RAW`;
-              
+
               const response = UrlFetchApp.fetch(url, {
                 method: 'PUT',
                 headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
                 },
                 payload: JSON.stringify({
-                  values: params.values
+                  values: params.values,
                 }),
-                muteHttpExceptions: true
+                muteHttpExceptions: true,
               });
-              
+
               console.log('getSheetsServiceCached.update: API応答', {
                 responseCode: response.getResponseCode(),
-                contentLength: response.getContentText().length
+                contentLength: response.getContentText().length,
               });
-              
+
               if (response.getResponseCode() !== 200) {
                 throw new Error(`Sheets API Error: ${response.getContentText()}`);
               }
-              
+
               return JSON.parse(response.getContentText());
-            }
-          }
-        }
+            },
+            batchUpdate: function (params) {
+              // 最新のアクセストークンを取得（トークンの期限切れ対応）
+              const accessToken = getServiceAccountTokenCached();
+              if (!accessToken) {
+                throw new Error('Service Account token is not available');
+              }
+
+              console.log('getSheetsServiceCached.batchUpdate: API呼び出し開始', {
+                spreadsheetId: params.spreadsheetId,
+                requestsCount: params.requests ? params.requests.length : 0,
+                hasToken: !!accessToken,
+              });
+
+              // Sheets API v4 batchUpdate実装
+              const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}:batchUpdate`;
+
+              const response = UrlFetchApp.fetch(url, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                payload: JSON.stringify({
+                  requests: params.requests,
+                }),
+                muteHttpExceptions: true,
+              });
+
+              console.log('getSheetsServiceCached.batchUpdate: API応答', {
+                responseCode: response.getResponseCode(),
+                contentLength: response.getContentText().length,
+              });
+
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API Error: ${response.getContentText()}`);
+              }
+
+              return JSON.parse(response.getContentText());
+            },
+            append: function (params) {
+              // 最新のアクセストークンを取得（トークンの期限切れ対応）
+              const accessToken = getServiceAccountTokenCached();
+              if (!accessToken) {
+                throw new Error('Service Account token is not available');
+              }
+
+              console.log('getSheetsServiceCached.append: API呼び出し開始', {
+                spreadsheetId: params.spreadsheetId,
+                range: params.range,
+                valuesCount: params.values ? params.values.length : 0,
+                hasToken: !!accessToken,
+              });
+
+              // Sheets API v4 append実装
+              const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values/${params.range}:append?valueInputOption=${params.valueInputOption || 'RAW'}&insertDataOption=${params.insertDataOption || 'INSERT_ROWS'}`;
+
+              const response = UrlFetchApp.fetch(url, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                payload: JSON.stringify({
+                  values: params.values,
+                }),
+                muteHttpExceptions: true,
+              });
+
+              console.log('getSheetsServiceCached.append: API応答', {
+                responseCode: response.getResponseCode(),
+                contentLength: response.getContentText().length,
+              });
+
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API Error: ${response.getContentText()}`);
+              }
+
+              return JSON.parse(response.getContentText());
+            },
+          },
+        },
       };
     },
     { ttl: 3500, enableMemoization: true }
@@ -395,10 +474,10 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
  */
 function validateSpreadsheetHeaders(headerIndices) {
   if (!headerIndices || typeof headerIndices !== 'object') {
-    return createResponse(false, 'ヘッダー検証失敗', { 
-      missing: ['すべて'], 
-      hasReasonColumn: false, 
-      hasOpinionColumn: false 
+    return createResponse(false, 'ヘッダー検証失敗', {
+      missing: ['すべて'],
+      hasReasonColumn: false,
+      hasOpinionColumn: false,
     });
   }
 

@@ -18,11 +18,11 @@ function createCompleteUser(userEmail) {
     setupStatus: 'pending',
     appPublished: false,
     displaySettings: {
-      showNames: false,    // CLAUDE.md準拠：心理的安全性重視
-      showReactions: false
+      showNames: false, // CLAUDE.md準拠：心理的安全性重視
+      showReactions: false,
     },
     createdAt: timestamp,
-    lastModified: timestamp
+    lastModified: timestamp,
   };
 
   console.log('新規ユーザー作成: 最適化済みconfigJSON使用', {
@@ -37,7 +37,7 @@ function createCompleteUser(userEmail) {
     userEmail,
     isActive: true,
     configJson: JSON.stringify(minimalConfig),
-    lastModified: timestamp
+    lastModified: timestamp,
   };
 }
 
@@ -71,10 +71,8 @@ function createRedirect(url) {
  */
 function handleUserRegistration(userEmail, bypassCache = false) {
   // ログイン時（はじめるボタン）はキャッシュをバイパスして最新データを取得
-  const existingUser = bypassCache ? 
-    DB.findUserByEmail(userEmail) : 
-    DB.findUserByEmail(userEmail);
-  
+  const existingUser = bypassCache ? DB.findUserByEmail(userEmail) : DB.findUserByEmail(userEmail);
+
   if (bypassCache) {
     console.log('🔄 handleUserRegistration: キャッシュバイパスモード', { userEmail });
   }
@@ -106,7 +104,7 @@ function updateUserLastAccess(userId) {
 
     const now = new Date().toISOString();
     const currentUser = DB.findUserById(userId);
-    
+
     if (!currentUser) {
       console.warn('updateUserLastAccess: ユーザーが見つかりません:', userId);
       return;
@@ -119,7 +117,7 @@ function updateUserLastAccess(userId) {
     // configJsonと lastModified のみ更新
     DB.updateUser(userId, {
       configJson: JSON.stringify(updatedConfig),
-      lastModified: now
+      lastModified: now,
     });
 
     console.log('updateUserLastAccess: 最終アクセス時刻更新完了', { userId, lastAccessedAt: now });
@@ -145,7 +143,7 @@ function getSetupStatusFromConfig(configJson) {
 
 /**
  * 専用の管理パネルアクセス処理（クエリパラメータ mode=admin 必須）
- * @param {string} userEmail ログインユーザーのメールアドレス  
+ * @param {string} userEmail ログインユーザーのメールアドレス
  * @returns {HtmlOutput} 表示するHTMLコンテンツ
  */
 function processAdminAccess(userEmail) {

@@ -3,14 +3,16 @@
  * configJSON中心型アーキテクチャの完全実装
  */
 
-
 /**
  * データソース接続（CLAUDE.md準拠版）
  * 統一データソース原則：全データをconfigJsonに統合
  */
 function connectDataSource(spreadsheetId, sheetName) {
   try {
-    console.log('🔗 connectDataSource: CLAUDE.md準拠configJSON中心型接続開始', { spreadsheetId, sheetName });
+    console.log('🔗 connectDataSource: CLAUDE.md準拠configJSON中心型接続開始', {
+      spreadsheetId,
+      sheetName,
+    });
 
     if (!spreadsheetId || !sheetName) {
       throw new Error('スプレッドシートIDとシート名が必要です');
@@ -55,7 +57,7 @@ function connectDataSource(spreadsheetId, sheetName) {
 
     if (userInfo) {
       const currentConfig = userInfo.parsedConfig || {};
-      
+
       // opinionHeader決定
       let opinionHeader = 'お題';
       if (columnMapping.answer && typeof columnMapping.answer === 'string') {
@@ -69,36 +71,34 @@ function connectDataSource(spreadsheetId, sheetName) {
         // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
         createdAt: currentConfig.createdAt || new Date().toISOString(),
         lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
-        
+
         // 🎯 CLAUDE.md準拠：データソース情報（動的値キャッシュ）
         spreadsheetId,
         sheetName,
         spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
-        
-        // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報  
+
+        // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報
         columnMapping,
         opinionHeader,
-        
-        // 🎯 CLAUDE.md準拠：フォーム情報（存在する場合のみ）
-        ...(formInfo?.formUrl && { 
-          formUrl: formInfo.formUrl,
-          formTitle: formInfo.formTitle || null 
-        }),
-        
+
+        // 🎯 CLAUDE.md準拠：フォーム情報（確実な取得・設定）
+        formUrl: formInfo?.formUrl || null,
+        formTitle: formInfo?.formTitle || null,
+
         // 🎯 CLAUDE.md準拠：アプリ設定（データソース接続完了で'completed'に自動更新）
         setupStatus: 'completed',
         appPublished: currentConfig.appPublished || false,
         appUrl: currentConfig.appUrl || generateUserUrls(userInfo.userId).viewUrl,
-        
+
         // 🎯 表示設定（統一・重複排除）
         displaySettings: {
           showNames: currentConfig.displaySettings?.showNames || false,
-          showReactions: currentConfig.displaySettings?.showReactions || false
+          showReactions: currentConfig.displaySettings?.showReactions || false,
         },
-        
+
         // 🎯 必要最小限メタデータ
         lastConnected: new Date().toISOString(),
-        lastModified: new Date().toISOString()
+        lastModified: new Date().toISOString(),
       };
 
       // 🔧 デバッグ: updatedConfigの内容を詳細ログ出力
@@ -110,18 +110,18 @@ function connectDataSource(spreadsheetId, sheetName) {
         formUrl: updatedConfig.formUrl,
         formTitle: updatedConfig.formTitle,
         setupStatus: updatedConfig.setupStatus,
-        configSize: JSON.stringify(updatedConfig).length
+        configSize: JSON.stringify(updatedConfig).length,
       });
 
       // 🔧 修正: 構築したupdatedConfigを確実に保存
       const saveSuccess = ConfigManager.saveConfig(userInfo.userId, updatedConfig);
-      
+
       console.log('🔍 connectDataSource: 保存結果', {
         userId: userInfo.userId,
-        saveSuccess: saveSuccess,
-        timestamp: new Date().toISOString()
+        saveSuccess,
+        timestamp: new Date().toISOString(),
       });
-      
+
       if (!saveSuccess) {
         throw new Error('設定の保存に失敗しました');
       }
@@ -132,7 +132,7 @@ function connectDataSource(spreadsheetId, sheetName) {
         configJsonSize: JSON.stringify(updatedConfig).length,
         spreadsheetId: updatedConfig.spreadsheetId,
         sheetName: updatedConfig.sheetName,
-        setupStatus: updatedConfig.setupStatus
+        setupStatus: updatedConfig.setupStatus,
       });
     }
 
@@ -148,15 +148,14 @@ function connectDataSource(spreadsheetId, sheetName) {
       rowCount: sheet.getLastRow(),
       message,
       missingColumnsResult,
-      claudeMdCompliant: true
+      claudeMdCompliant: true,
     };
-
   } catch (error) {
     console.error('❌ connectDataSource: CLAUDE.md準拠エラー:', {
       spreadsheetId,
       sheetName,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     throw error;
   }
@@ -172,7 +171,7 @@ function publishApplication(config) {
       hasSpreadsheetId: !!config.spreadsheetId,
       hasSheetName: !!config.sheetName,
       hasColumnMapping: !!config.columnMapping,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     const currentUser = UserManager.getCurrentEmail();
@@ -184,36 +183,36 @@ function publishApplication(config) {
 
     // 🔧 修正：ConfigManager経由で確実に最新設定を取得
     const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
-    
+
     console.log('🔍 publishApplication: 最新設定確認', {
       userId: userInfo.userId,
       hasSpreadsheetId: !!currentConfig?.spreadsheetId,
       hasSheetName: !!currentConfig?.sheetName,
       configFromFrontend: {
         hasSpreadsheetId: !!config.spreadsheetId,
-        hasSheetName: !!config.sheetName
-      }
+        hasSheetName: !!config.sheetName,
+      },
     });
-    
+
     // データソース情報のフォールバック戦略
     const effectiveSpreadsheetId = currentConfig?.spreadsheetId || config.spreadsheetId;
     const effectiveSheetName = currentConfig?.sheetName || config.sheetName;
-    
+
     if (!effectiveSpreadsheetId || !effectiveSheetName) {
       console.error('❌ publishApplication: データソース未設定', {
         dbSpreadsheetId: currentConfig?.spreadsheetId,
         dbSheetName: currentConfig?.sheetName,
         frontendSpreadsheetId: config.spreadsheetId,
-        frontendSheetName: config.sheetName
+        frontendSheetName: config.sheetName,
       });
       throw new Error('データソースが設定されていません。まずデータソースを設定してください。');
     }
-    
+
     if (currentConfig.setupStatus !== 'completed') {
       console.warn('⚠️ publishApplication: setupStatus確認', {
         currentStatus: currentConfig.setupStatus,
         hasSpreadsheetId: !!currentConfig.spreadsheetId,
-        hasSheetName: !!currentConfig.sheetName
+        hasSheetName: !!currentConfig.sheetName,
       });
       // データソースがある場合はsetupStatusを自動修正
       if (currentConfig.spreadsheetId && currentConfig.sheetName) {
@@ -236,62 +235,65 @@ function publishApplication(config) {
 
     if (publishResult.success) {
       const currentConfig = userInfo.parsedConfig || {};
-      
+
       // 🚀 置き換えベース設計：公開時の完全クリーンアップ（スプレッド演算子完全排除）
       const publishedConfig = {
         // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
         createdAt: currentConfig.createdAt || new Date().toISOString(),
         lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
-        
+
         // 🎯 CLAUDE.md準拠：データソース情報（既存から継承）
         spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
         sheetName: config.sheetName || currentConfig.sheetName,
-        spreadsheetUrl: currentConfig.spreadsheetUrl || 
-          (config.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}` : null),
-        
+        spreadsheetUrl:
+          currentConfig.spreadsheetUrl ||
+          (config.spreadsheetId
+            ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`
+            : null),
+
         // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報（継承）
         columnMapping: currentConfig.columnMapping || {},
         opinionHeader: currentConfig.opinionHeader || 'お題',
-        
+
         // 🎯 CLAUDE.md準拠：フォーム情報（継承）
-        ...(currentConfig.formUrl && { 
+        ...(currentConfig.formUrl && {
           formUrl: currentConfig.formUrl,
-          formTitle: currentConfig.formTitle 
+          formTitle: currentConfig.formTitle,
         }),
-        
+
         // 🎯 CLAUDE.md準拠：アプリ設定
         setupStatus: 'completed', // 公開時は完了
         appPublished: true,
         publishedAt: new Date().toISOString(),
         appUrl: publishResult.appUrl,
         isDraft: false, // 🔥 公開時はドラフト状態を解除
-        
+
         // 🎯 表示設定（重複排除：フロントエンド設定を反映）
         displaySettings: {
           showNames: config.showNames || false,
-          showReactions: config.showReactions || false
+          showReactions: config.showReactions || false,
         },
-        
+
         // 🎯 必要最小限メタデータ
-        lastModified: new Date().toISOString()
+        lastModified: new Date().toISOString(),
       };
 
       // 🔒 データソース情報を明示的に保持してConfigManager更新
       ConfigManager.updateAppStatus(userInfo.userId, {
         appPublished: true,
         setupStatus: 'completed',
-        preserveDataSource: true,  // 🔒 connectDataSourceで保存されたデータソース情報を保護
+        preserveDataSource: true, // 🔒 connectDataSourceで保存されたデータソース情報を保護
         // フォールバックデータソース情報（保護機能が失敗した場合の備え）
         spreadsheetId: effectiveSpreadsheetId,
         sheetName: effectiveSheetName,
-        appUrl: publishResult.appUrl
+        appUrl: publishResult.appUrl,
       });
-      
+
       console.log('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {
         userId: userInfo.userId,
         appUrl: publishResult.appUrl,
         configFields: Object.keys(publishedConfig).length,
-        claudeMdCompliant: true
+        claudeMdCompliant: true,
       });
 
       return {
@@ -300,23 +302,22 @@ function publishApplication(config) {
         config: publishedConfig,
         message: 'アプリが正常に公開されました',
         claudeMdCompliant: true,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } else {
       throw new Error(publishResult.error || '公開処理に失敗しました');
     }
-
   } catch (error) {
     console.error('❌ publishApplication: CLAUDE.md準拠エラー:', {
       error: error.message,
       stack: error.stack,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -329,7 +330,7 @@ function saveDraftConfiguration(config) {
   try {
     console.log('💾 saveDraftConfiguration: ConfigManager統一版保存開始', {
       configKeys: Object.keys(config),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     const currentUser = UserManager.getCurrentEmail();
@@ -343,10 +344,10 @@ function saveDraftConfiguration(config) {
     const cleanConfig = { ...config };
     delete cleanConfig.configJson;
     delete cleanConfig.configJSON;
-    
+
     // ✅ ConfigManager.updateConfig()による統一更新（簡素化）
     const success = ConfigManager.updateConfig(userInfo.userId, cleanConfig);
-    
+
     if (!success) {
       throw new Error('設定の保存に失敗しました');
     }
@@ -354,25 +355,24 @@ function saveDraftConfiguration(config) {
     console.log('✅ saveDraftConfiguration: ConfigManager統一版保存完了', {
       userId: userInfo.userId,
       configFields: Object.keys(cleanConfig).length,
-      claudeMdCompliant: true
+      claudeMdCompliant: true,
     });
 
     return {
       success: true,
       message: 'ドラフトが保存されました',
       claudeMdCompliant: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-
   } catch (error) {
     console.error('❌ saveDraftConfiguration: ConfigManager統一版エラー:', {
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -392,15 +392,15 @@ function getFormInfo(spreadsheetId, sheetName) {
         formData: {
           hasForm: false,
           formUrl: null,
-          formTitle: null
-        }
+          formTitle: null,
+        },
       };
     }
 
     // シート固有のフォーム連携確認
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       return {
         success: false,
@@ -408,8 +408,8 @@ function getFormInfo(spreadsheetId, sheetName) {
         formData: {
           hasForm: false,
           formUrl: null,
-          formTitle: null
-        }
+          formTitle: null,
+        },
       };
     }
 
@@ -440,26 +440,25 @@ function getFormInfo(spreadsheetId, sheetName) {
     }
 
     const formData = {
-      hasForm: hasForm,
-      formUrl: formUrl,
-      formTitle: formTitle,
-      spreadsheetId: spreadsheetId,
-      sheetName: sheetName
+      hasForm,
+      formUrl,
+      formTitle,
+      spreadsheetId,
+      sheetName,
     };
 
     console.log('✅ getFormInfo: シート固有フォーム情報取得完了', {
-      sheetName: sheetName,
+      sheetName,
       hasForm: formData.hasForm,
       formTitle: formData.formTitle,
-      formUrl: !!formData.formUrl
+      formUrl: !!formData.formUrl,
     });
 
     return {
       success: true,
-      formData: formData,
-      hasFormData: formData
+      formData,
+      hasFormData: formData,
     };
-
   } catch (error) {
     console.error('❌ getFormInfo: エラー:', error.message);
     return {
@@ -468,8 +467,8 @@ function getFormInfo(spreadsheetId, sheetName) {
       formData: {
         hasForm: false,
         formUrl: null,
-        formTitle: null
-      }
+        formTitle: null,
+      },
     };
   }
 }
@@ -485,74 +484,79 @@ function getSpreadsheetList() {
     // キャッシュキー生成（ユーザー固有）
     const currentUser = UserManager.getCurrentEmail();
     const cacheKey = `spreadsheet_list_${Utilities.base64Encode(currentUser).replace(/[^a-zA-Z0-9]/g, '')}`;
-    
+
     // キャッシュから取得を試行（1時間キャッシュ）
-    return cacheManager.get(cacheKey, () => {
-      console.log('📊 getSpreadsheetList: キャッシュなし、新規取得開始');
-      
-      const startTime = new Date().getTime();
-      const spreadsheets = [];
-      const maxResults = 100; // 結果制限（パフォーマンス向上）
-      let count = 0;
+    return cacheManager.get(
+      cacheKey,
+      () => {
+        console.log('📊 getSpreadsheetList: キャッシュなし、新規取得開始');
 
-      // 現在のユーザーを取得（オーナーフィルタリング用）
-      const currentUserEmail = UserManager.getCurrentEmail();
-      
-      // Drive APIでオーナーが自分のスプレッドシートのみを検索
-      const files = DriveApp.searchFiles(
-        `mimeType='application/vnd.google-apps.spreadsheet' and trashed=false and '${currentUserEmail}' in owners`
-      );
-      
-      while (files.hasNext() && count < maxResults) {
-        const file = files.next();
-        try {
-          // オーナー確認（追加の安全確認）
-          const owner = file.getOwner();
-          if (owner && owner.getEmail() === currentUserEmail) {
-            spreadsheets.push({
-              id: file.getId(),
-              name: file.getName(),
-              url: file.getUrl(),
-              lastModified: file.getLastUpdated().toISOString(),
-              owner: currentUserEmail // オーナー情報も含める
-            });
-            count++;
+        const startTime = new Date().getTime();
+        const spreadsheets = [];
+        const maxResults = 100; // 結果制限（パフォーマンス向上）
+        let count = 0;
+
+        // 現在のユーザーを取得（オーナーフィルタリング用）
+        const currentUserEmail = UserManager.getCurrentEmail();
+
+        // Drive APIでオーナーが自分のスプレッドシートのみを検索
+        const files = DriveApp.searchFiles(
+          `mimeType='application/vnd.google-apps.spreadsheet' and trashed=false and '${currentUserEmail}' in owners`
+        );
+
+        while (files.hasNext() && count < maxResults) {
+          const file = files.next();
+          try {
+            // オーナー確認（追加の安全確認）
+            const owner = file.getOwner();
+            if (owner && owner.getEmail() === currentUserEmail) {
+              spreadsheets.push({
+                id: file.getId(),
+                name: file.getName(),
+                url: file.getUrl(),
+                lastModified: file.getLastUpdated().toISOString(),
+                owner: currentUserEmail, // オーナー情報も含める
+              });
+              count++;
+            }
+          } catch (fileError) {
+            console.warn('ファイル情報取得エラー:', fileError.message);
           }
-        } catch (fileError) {
-          console.warn('ファイル情報取得エラー:', fileError.message);
         }
-      }
 
-      // 最終更新日時でソート（新しい順）
-      spreadsheets.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+        // 最終更新日時でソート（新しい順）
+        spreadsheets.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
 
-      const endTime = new Date().getTime();
-      const executionTime = (endTime - startTime) / 1000;
+        const endTime = new Date().getTime();
+        const executionTime = (endTime - startTime) / 1000;
 
-      console.log(`✅ getSpreadsheetList: ${spreadsheets.length}件のスプレッドシートを取得（${executionTime}秒）`);
+        console.log(
+          `✅ getSpreadsheetList: ${spreadsheets.length}件のスプレッドシートを取得（${executionTime}秒）`
+        );
 
-      return {
-        success: true,
-        spreadsheets,
-        count: spreadsheets.length,
-        maxResults,
-        executionTime,
-        cached: false,
-        timestamp: new Date().toISOString()
-      };
-    }, { ttl: 3600 }); // 1時間キャッシュ
-
+        return {
+          success: true,
+          spreadsheets,
+          count: spreadsheets.length,
+          maxResults,
+          executionTime,
+          cached: false,
+          timestamp: new Date().toISOString(),
+        };
+      },
+      { ttl: 3600 }
+    ); // 1時間キャッシュ
   } catch (error) {
     console.error('❌ getSpreadsheetList エラー:', {
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return {
       success: false,
       error: error.message,
       spreadsheets: [],
-      count: 0
+      count: 0,
     };
   }
 }
@@ -570,17 +574,16 @@ function executeAppPublish(userId, publishConfig) {
   // この関数は既存のシステムと連携するため、そのまま維持
   try {
     const appUrl = generateUserUrls(userId).viewUrl;
-    
+
     return {
       success: true,
       appUrl,
-      publishedAt: new Date().toISOString()
+      publishedAt: new Date().toISOString(),
     };
-    
   } catch (error) {
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -618,20 +621,21 @@ function executeConfigCleanup() {
       message: 'configJSONのクリーンアップが完了しました',
       details: {
         削減サイズ: `${result.sizeReduction}文字`,
-        削減率: result.total > 0 && result.sizeReduction > 0 ? 
-          `${((result.sizeReduction / (JSON.stringify(userInfo.parsedConfig || {}).length)) * 100).toFixed(1)}%` : '0%',
+        削減率:
+          result.total > 0 && result.sizeReduction > 0
+            ? `${((result.sizeReduction / JSON.stringify(userInfo.parsedConfig || {}).length) * 100).toFixed(1)}%`
+            : '0%',
         削除フィールド数: result.removedFields.length,
-        処理時刻: result.timestamp
+        処理時刻: result.timestamp,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-
   } catch (error) {
     console.error('❌ configJSONクリーンアップ実行エラー:', error.message);
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -650,32 +654,31 @@ function generateColumnMapping(headerRow, data = []) {
     console.log('🎯 超高精度列マッピング生成開始:', {
       columnCount: headerRow.length,
       dataRows: data.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // 重複回避・最適割り当てアルゴリズム実行
     const result = resolveColumnConflicts(headerRow, data);
-    
+
     console.log('✅ 超高精度列マッピング生成完了:', {
       mappedColumns: Object.keys(result.mapping).length,
       averageConfidence: result.averageConfidence || 'N/A',
       conflictsResolved: result.conflictsResolved,
-      assignments: result.assignmentLog
+      assignments: result.assignmentLog,
     });
 
     // 従来形式でのレスポンス構築
     const response = {
       mapping: result.mapping,
-      confidence: result.confidence
+      confidence: result.confidence,
     };
 
     return response;
-
   } catch (error) {
     console.error('❌ 超高精度列マッピング生成エラー:', {
       headerCount: headerRow.length,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
 
     // エラー時はレガシーシステムにフォールバック
@@ -689,46 +692,51 @@ function generateColumnMapping(headerRow, data = []) {
 function generateLegacyColumnMapping(headerRow) {
   const mapping = {};
   const confidence = {};
-  
+
   headerRow.forEach((header, index) => {
     const normalizedHeader = header.toString().toLowerCase();
-    
+
     // レガシーパターンマッチング
-    if (normalizedHeader.includes('回答') || 
-        normalizedHeader.includes('どうして') || 
-        normalizedHeader.includes('なぜ')) {
+    if (
+      normalizedHeader.includes('回答') ||
+      normalizedHeader.includes('どうして') ||
+      normalizedHeader.includes('なぜ')
+    ) {
       if (!mapping.answer) {
         mapping.answer = index;
         confidence.answer = 75;
       }
     }
-    
-    if (normalizedHeader.includes('理由') || 
-        normalizedHeader.includes('体験')) {
+
+    if (normalizedHeader.includes('理由') || normalizedHeader.includes('体験')) {
       if (!mapping.reason) {
         mapping.reason = index;
         confidence.reason = 75;
       }
     }
-    
-    if (normalizedHeader.includes('クラス') || 
-        normalizedHeader.includes('学年') ||
-        normalizedHeader.includes('組')) {
+
+    if (
+      normalizedHeader.includes('クラス') ||
+      normalizedHeader.includes('学年') ||
+      normalizedHeader.includes('組')
+    ) {
       if (!mapping.class) {
         mapping.class = index;
         confidence.class = 85;
       }
     }
-    
-    if (normalizedHeader.includes('名前') || 
-        normalizedHeader.includes('氏名') ||
-        normalizedHeader.includes('お名前')) {
+
+    if (
+      normalizedHeader.includes('名前') ||
+      normalizedHeader.includes('氏名') ||
+      normalizedHeader.includes('お名前')
+    ) {
       if (!mapping.name) {
         mapping.name = index;
         confidence.name = 90;
       }
     }
-    
+
     // リアクション列の検出
     if (header === 'なるほど！') {
       mapping.understand = index;
@@ -744,7 +752,7 @@ function generateLegacyColumnMapping(headerRow) {
       confidence.highlight = 100;
     }
   });
-  
+
   return { mapping, confidence };
 }
 
@@ -762,19 +770,19 @@ function detectColumnMapping(headerRow) {
 function validateAdminPanelMapping(columnMapping) {
   const errors = [];
   const warnings = [];
-  
+
   if (!columnMapping.answer) {
     errors.push('回答列が見つかりません');
   }
-  
+
   if (!columnMapping.reason) {
     warnings.push('理由列が見つかりません');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
@@ -785,7 +793,7 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
   try {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       throw new Error(`シート "${sheetName}" が見つかりません`);
     }
@@ -798,7 +806,7 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
     const lastColumn = sheet.getLastColumn();
     const headerRow = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
 
-    reactionColumns.forEach(reactionCol => {
+    reactionColumns.forEach((reactionCol) => {
       if (!headerRow.includes(reactionCol)) {
         const newColumnIndex = sheet.getLastColumn() + 1;
         sheet.getRange(1, newColumnIndex).setValue(reactionCol);
@@ -810,16 +818,16 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
       success: true,
       addedColumns,
       recommendedColumns,
-      message: addedColumns.length > 0 ? `${addedColumns.length}個の列を追加しました` : '追加は不要でした'
+      message:
+        addedColumns.length > 0 ? `${addedColumns.length}個の列を追加しました` : '追加は不要でした',
     };
-
   } catch (error) {
     console.error('addMissingColumns エラー:', error.message);
     return {
       success: false,
       error: error.message,
       addedColumns: [],
-      recommendedColumns: []
+      recommendedColumns: [],
     };
   }
 }
@@ -831,7 +839,7 @@ function checkFormConnection(spreadsheetId) {
   try {
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const formUrl = spreadsheet.getFormUrl();
-    
+
     if (formUrl) {
       // フォームタイトルの取得を試行
       let formTitle = 'フォーム';
@@ -842,27 +850,26 @@ function checkFormConnection(spreadsheetId) {
         console.warn('フォームタイトル取得エラー:', formError.message);
         formTitle = `フォーム（ID: ${formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1]?.substring(0, 8)}...）`;
       }
-      
+
       return {
         hasForm: true,
         formUrl,
-        formTitle
+        formTitle,
       };
     } else {
       return {
         hasForm: false,
         formUrl: null,
-        formTitle: null
+        formTitle: null,
       };
     }
-
   } catch (error) {
     console.error('checkFormConnection エラー:', error.message);
     return {
       hasForm: false,
       formUrl: null,
       formTitle: null,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -883,7 +890,7 @@ function getCurrentConfig() {
     // 現在のユーザーの設定を取得
     const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
-    
+
     if (!userInfo) {
       console.warn('getCurrentConfig: ユーザー情報が見つかりません');
       return ConfigManager.buildInitialConfig();
@@ -892,7 +899,7 @@ function getCurrentConfig() {
     const config = ConfigManager.getUserConfig(userInfo.userId);
     console.log('✅ getCurrentConfig: 設定取得完了', {
       userId: userInfo.userId,
-      configFields: Object.keys(config || {}).length
+      configFields: Object.keys(config || {}).length,
     });
 
     return config;
@@ -910,26 +917,26 @@ function getCurrentBoardInfoAndUrls() {
     const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
     const config = userInfo ? ConfigManager.getUserConfig(userInfo.userId) : null;
-    
+
     // フッター表示用の問題文を管理パネルの回答列と一致させる（シンプル版）
     let questionText = config?.opinionHeader;
-    
+
     // opinionHeaderが設定されていない場合のみフォールバック
     if (!questionText) {
       questionText = config?.formTitle || 'システム準備中';
     }
-    
+
     console.log('getCurrentBoardInfoAndUrls: フッター問題文決定', {
       opinionHeader: config?.opinionHeader,
       formTitle: config?.formTitle,
-      finalQuestionText: questionText
+      finalQuestionText: questionText,
     });
-    
+
     // 日時情報の取得と整形
     const createdAt = config?.createdAt || null;
     const lastModified = config?.lastModified || userInfo?.lastModified || null;
     const publishedAt = config?.publishedAt || null;
-    
+
     // URLs の生成（main.gsの安定したgetWebAppUrl関数を使用）
     let appUrl = config?.appUrl || '';
     if (!appUrl && userInfo) {
@@ -937,23 +944,30 @@ function getCurrentBoardInfoAndUrls() {
         const baseUrl = getWebAppUrl();
         appUrl = baseUrl ? `${baseUrl}?mode=view&userId=${userInfo.userId}` : '';
       } catch (urlError) {
-        console.warn('AdminPanelBackend.getCurrentBoardInfoAndUrls: URL生成エラー:', urlError.message);
+        console.warn(
+          'AdminPanelBackend.getCurrentBoardInfoAndUrls: URL生成エラー:',
+          urlError.message
+        );
         appUrl = '';
       }
     }
-    const spreadsheetUrl = config?.spreadsheetUrl || (config?.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}` : '');
-    
+    const spreadsheetUrl =
+      config?.spreadsheetUrl ||
+      (config?.spreadsheetId
+        ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`
+        : '');
+
     const boardInfo = {
       isActive: config?.appPublished || false,
       appPublished: config?.appPublished || false,
       isPublished: config?.appPublished || false, // フッター互換性
-      questionText,        // 実際の問題文
+      questionText, // 実際の問題文
       opinionHeader: config?.opinionHeader || '', // 問題文（詳細版）
-      appUrl: appUrl,
-      spreadsheetUrl: spreadsheetUrl,
+      appUrl,
+      spreadsheetUrl,
       hasSpreadsheet: !!config?.spreadsheetId,
       setupStatus: config?.setupStatus || 'pending',
-      
+
       // 日時情報（フッター表示用）
       dates: {
         created: createdAt,
@@ -961,45 +975,44 @@ function getCurrentBoardInfoAndUrls() {
         published: publishedAt,
         createdFormatted: createdAt ? new Date(createdAt).toLocaleString('ja-JP') : null,
         modifiedFormatted: lastModified ? new Date(lastModified).toLocaleString('ja-JP') : null,
-        publishedFormatted: publishedAt ? new Date(publishedAt).toLocaleString('ja-JP') : null
+        publishedFormatted: publishedAt ? new Date(publishedAt).toLocaleString('ja-JP') : null,
       },
-      
+
       // URLs（従来互換性）
       urls: {
         view: appUrl,
-        spreadsheet: spreadsheetUrl
+        spreadsheet: spreadsheetUrl,
       },
-      
+
       // 追加のボード情報
       formUrl: config?.formUrl || '',
       hasForm: !!config?.formUrl,
       sheetName: config?.sheetName || '',
-      dataCount: 0 // 後で実際のデータ数を取得可能
+      dataCount: 0, // 後で実際のデータ数を取得可能
     };
 
     console.log('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
       isActive: boardInfo.isActive,
       hasQuestionText: !!boardInfo.questionText,
       questionText: boardInfo.questionText,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return boardInfo;
-
   } catch (error) {
     console.error('❌ getCurrentBoardInfoAndUrls: エラー', {
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     // エラー時でもフッター初期化を継続
-    return { 
-      isActive: false, 
-      questionText: 'システム準備中', 
+    return {
+      isActive: false,
+      questionText: 'システム準備中',
       appUrl: '',
       spreadsheetUrl: '',
       hasSpreadsheet: false,
-      error: error.message 
+      error: error.message,
     };
   }
 }
@@ -1015,21 +1028,20 @@ function checkIsSystemAdmin() {
 
     const currentUserEmail = UserManager.getCurrentEmail();
     const isSystemAdmin = App.getAccess().isSystemAdmin(currentUserEmail);
-    
+
     console.log('✅ checkIsSystemAdmin: 権限確認完了', {
       userEmail: currentUserEmail,
       isSystemAdmin,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return isSystemAdmin;
-
   } catch (error) {
     console.error('❌ checkIsSystemAdmin: エラー', {
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     // エラー時は安全のため false を返す
     return false;
   }
@@ -1045,7 +1057,7 @@ function migrateUserDataToConfigJson(userId = null) {
   try {
     console.log('🔄 migrateUserDataToConfigJson: データマイグレーション開始', {
       targetUserId: userId || 'all_users',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     const users = userId ? [DB.findUserById(userId)] : DB.getAllUsers();
@@ -1054,10 +1066,10 @@ function migrateUserDataToConfigJson(userId = null) {
       migrated: 0,
       skipped: 0,
       errors: 0,
-      details: []
+      details: [],
     };
 
-    users.forEach(user => {
+    users.forEach((user) => {
       if (!user) return;
 
       try {
@@ -1067,13 +1079,23 @@ function migrateUserDataToConfigJson(userId = null) {
 
         // 外側フィールドをconfigJSONに統合
         const fieldsToMigrate = [
-          'spreadsheetId', 'sheetName', 'formUrl', 'formTitle',
-          'appPublished', 'publishedAt', 'appUrl',
-          'displaySettings', 'showNames', 'showReactions',
-          'columnMapping', 'setupStatus', 'createdAt', 'lastAccessedAt'
+          'spreadsheetId',
+          'sheetName',
+          'formUrl',
+          'formTitle',
+          'appPublished',
+          'publishedAt',
+          'appUrl',
+          'displaySettings',
+          'showNames',
+          'showReactions',
+          'columnMapping',
+          'setupStatus',
+          'createdAt',
+          'lastAccessedAt',
         ];
 
-        fieldsToMigrate.forEach(field => {
+        fieldsToMigrate.forEach((field) => {
           if (user[field] !== undefined && currentConfig[field] === undefined) {
             migratedConfig[field] = user[field];
             needsMigration = true;
@@ -1084,7 +1106,8 @@ function migrateUserDataToConfigJson(userId = null) {
         if (user.showNames !== undefined || user.showReactions !== undefined) {
           migratedConfig.displaySettings = {
             showNames: user.showNames ?? migratedConfig.displaySettings?.showNames ?? false,
-            showReactions: user.showReactions ?? migratedConfig.displaySettings?.showReactions ?? false
+            showReactions:
+              user.showReactions ?? migratedConfig.displaySettings?.showReactions ?? false,
           };
           needsMigration = true;
         }
@@ -1095,13 +1118,13 @@ function migrateUserDataToConfigJson(userId = null) {
           migratedConfig.claudeMdCompliant = true;
 
           ConfigManager.saveConfig(user.userId, migratedConfig);
-          
+
           migrationResults.migrated++;
           migrationResults.details.push({
             userId: user.userId,
             email: user.userEmail,
             status: 'migrated',
-            fieldsUpdated: Object.keys(migratedConfig).length
+            fieldsUpdated: Object.keys(migratedConfig).length,
           });
 
           console.log(`✅ マイグレーション完了: ${user.userEmail}`);
@@ -1110,17 +1133,16 @@ function migrateUserDataToConfigJson(userId = null) {
           migrationResults.details.push({
             userId: user.userId,
             email: user.userEmail,
-            status: 'skipped_no_changes'
+            status: 'skipped_no_changes',
           });
         }
-
       } catch (userError) {
         migrationResults.errors++;
         migrationResults.details.push({
           userId: user.userId,
           email: user.userEmail,
           status: 'error',
-          error: userError.message
+          error: userError.message,
         });
         console.error(`❌ ユーザーマイグレーションエラー: ${user.userEmail}`, userError.message);
       }
@@ -1130,18 +1152,17 @@ function migrateUserDataToConfigJson(userId = null) {
     return {
       success: true,
       results: migrationResults,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-
   } catch (error) {
     console.error('❌ migrateUserDataToConfigJson: マイグレーションエラー', {
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -1156,15 +1177,15 @@ function migrateUserDataToConfigJson(userId = null) {
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
     console.log('analyzeColumns: CLAUDE.md準拠列分析開始', {
-      spreadsheetId: `${spreadsheetId?.substring(0, 10)  }...`,
+      spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
       sheetName,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // スプレッドシートアクセス
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       throw new Error(`シート '${sheetName}' が見つかりません`);
     }
@@ -1173,39 +1194,38 @@ function analyzeColumns(spreadsheetId, sheetName) {
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const dataRange = sheet.getRange(1, 1, Math.min(11, sheet.getLastRow()), sheet.getLastColumn());
     const allData = dataRange.getValues();
-    
+
     // 高精度列マッピング生成（データ分析付き）
     const columnMapping = generateColumnMapping(headerRow, allData);
-    
+
     console.log('✅ analyzeColumns: CLAUDE.md準拠列分析完了', {
       headerCount: headerRow.length,
       mappingCount: Object.keys(columnMapping).length,
-      claudeMdCompliant: true
+      claudeMdCompliant: true,
     });
 
     return {
       success: true,
       headers: headerRow,
-      columnMapping: columnMapping.mapping || columnMapping,  // 統一形式
-      confidence: columnMapping.confidence,                   // 信頼度を分離
+      columnMapping: columnMapping.mapping || columnMapping, // 統一形式
+      confidence: columnMapping.confidence, // 信頼度を分離
       sheetName,
       rowCount: sheet.getLastRow(),
       timestamp: new Date().toISOString(),
-      claudeMdCompliant: true
+      claudeMdCompliant: true,
     };
-
   } catch (error) {
     console.error('❌ analyzeColumns: CLAUDE.md準拠エラー:', {
       spreadsheetId,
       sheetName,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -1221,15 +1241,15 @@ function getHeaderIndices(spreadsheetId, sheetName) {
   try {
     console.log('getHeaderIndices: フロントエンド互換関数開始', {
       spreadsheetId,
-      sheetName
+      sheetName,
     });
 
     // 既存のgetSpreadsheetColumnIndices関数を使用
     const result = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
-    
+
     console.log('✅ getHeaderIndices: フロントエンド互換関数完了', {
       hasResult: !!result,
-      opinionHeader: result?.opinionHeader
+      opinionHeader: result?.opinionHeader,
     });
 
     return result;
@@ -1237,7 +1257,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
     console.error('❌ getHeaderIndices: エラー:', {
       spreadsheetId,
       sheetName,
-      error: error.message
+      error: error.message,
     });
     throw error;
   }
@@ -1257,38 +1277,127 @@ function getSheetList(spreadsheetId) {
 
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
-    
+
     // 最小限のフォーム連携チェック（軽量版）
-    const sheetList = sheets.map(sheet => {
+    const sheetList = sheets.map((sheet) => {
       const sheetName = sheet.getName();
-      
+
       // フォームレスポンスシートの簡易判定（FormApp呼び出しなし）
       let isFormSheet = false;
       if (sheetName.match(/^(フォームの回答|Form Responses?|回答)/)) {
         // パターンマッチで高速判定
         isFormSheet = true;
       }
-      
+
       return {
         name: sheetName,
         isFormResponseSheet: isFormSheet,
-        formConnected: isFormSheet,  
-        formTitle: ''  // 詳細はシート選択時に取得
+        formConnected: isFormSheet,
+        formTitle: '', // 詳細はシート選択時に取得
       };
     });
-    
+
     console.log('✅ getSheetList: シート一覧取得完了', {
       spreadsheetId,
       sheetCount: sheetList.length,
-      formSheets: sheetList.filter(s => s.isFormResponseSheet).length
+      formSheets: sheetList.filter((s) => s.isFormResponseSheet).length,
     });
 
     return sheetList;
   } catch (error) {
     console.error('❌ getSheetList: エラー:', {
       spreadsheetId,
-      error: error.message
+      error: error.message,
     });
     throw error;
+  }
+}
+
+/**
+ * 既存ユーザーのフォーム情報修復
+ * 不完全なconfigJSONのformUrl/formTitleを修正
+ * @param {string} userId - ユーザーID
+ * @returns {object} 修復結果
+ */
+function fixFormInfoForUser(userId) {
+  try {
+    console.log('🔧 fixFormInfoForUser: フォーム情報修復開始', { userId });
+
+    // 現在のユーザー設定を取得
+    const currentConfig = ConfigManager.getUserConfig(userId);
+    if (!currentConfig) {
+      throw new Error('ユーザー設定が見つかりません');
+    }
+
+    // スプレッドシート情報が必要
+    if (!currentConfig.spreadsheetId || !currentConfig.sheetName) {
+      console.warn('修復スキップ: データソース情報が不足', { userId });
+      return {
+        success: false,
+        reason: 'no_datasource',
+        message: 'データソース接続が必要です',
+      };
+    }
+
+    // フォーム情報を再取得
+    const formInfoResult = getFormInfo(currentConfig.spreadsheetId, currentConfig.sheetName);
+    if (!formInfoResult.success) {
+      console.warn('フォーム情報取得失敗', { userId, error: formInfoResult.error });
+      return {
+        success: false,
+        reason: 'form_info_failed',
+        message: 'フォーム情報の取得に失敗しました',
+      };
+    }
+
+    const formInfo = formInfoResult.formData;
+    const needsUpdate =
+      currentConfig.formUrl !== formInfo.formUrl || currentConfig.formTitle !== formInfo.formTitle;
+
+    if (!needsUpdate) {
+      console.log('修復不要: フォーム情報は正常', { userId });
+      return {
+        success: true,
+        reason: 'no_update_needed',
+        message: 'フォーム情報は既に正常です',
+      };
+    }
+
+    // フォーム情報を更新
+    const updatedConfig = {
+      ...currentConfig,
+      formUrl: formInfo.formUrl || null,
+      formTitle: formInfo.formTitle || null,
+      lastModified: new Date().toISOString(),
+    };
+
+    const saveSuccess = ConfigManager.saveConfig(userId, updatedConfig);
+    if (!saveSuccess) {
+      throw new Error('設定の保存に失敗しました');
+    }
+
+    console.log('✅ fixFormInfoForUser: フォーム情報修復完了', {
+      userId,
+      oldFormUrl: currentConfig.formUrl,
+      newFormUrl: formInfo.formUrl,
+      oldFormTitle: currentConfig.formTitle,
+      newFormTitle: formInfo.formTitle,
+    });
+
+    return {
+      success: true,
+      message: 'フォーム情報を修復しました',
+      updated: {
+        formUrl: { before: currentConfig.formUrl, after: formInfo.formUrl },
+        formTitle: { before: currentConfig.formTitle, after: formInfo.formTitle },
+      },
+    };
+  } catch (error) {
+    console.error('❌ fixFormInfoForUser: エラー:', error.message);
+    return {
+      success: false,
+      reason: 'error',
+      message: `フォーム情報の修復に失敗しました: ${error.message}`,
+    };
   }
 }

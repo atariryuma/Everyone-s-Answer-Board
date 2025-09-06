@@ -19,7 +19,10 @@ function checkServiceAccountStatus() {
     const adminEmail = props.getProperty('ADMIN_EMAIL');
 
     console.log('📋 PropertiesService確認:');
-    console.log('- SERVICE_ACCOUNT_CREDS:', serviceAccountCreds ? `設定済み (${serviceAccountCreds.length}文字)` : '❌未設定');
+    console.log(
+      '- SERVICE_ACCOUNT_CREDS:',
+      serviceAccountCreds ? `設定済み (${serviceAccountCreds.length}文字)` : '❌未設定'
+    );
     console.log('- DATABASE_SPREADSHEET_ID:', databaseId ? `設定済み (${databaseId})` : '❌未設定');
     console.log('- ADMIN_EMAIL:', adminEmail ? `設定済み (${adminEmail})` : '❌未設定');
 
@@ -51,7 +54,10 @@ function checkServiceAccountStatus() {
         console.log('📊 データベース接続成功:');
         console.log('- スプレッドシート名:', dbSpreadsheet.getName());
         console.log('- シート数:', dbSheets.length);
-        console.log('- シート名:', dbSheets.map(s => s.getName()));
+        console.log(
+          '- シート名:',
+          dbSheets.map((s) => s.getName())
+        );
 
         // Users シート確認
         const usersSheet = dbSpreadsheet.getSheetByName('Users');
@@ -61,7 +67,6 @@ function checkServiceAccountStatus() {
         } else {
           console.log('❌ Usersシートが見つかりません');
         }
-
       } catch (dbError) {
         console.log('❌ データベース接続エラー:', dbError.message);
       }
@@ -84,9 +89,8 @@ function checkServiceAccountStatus() {
       hasDatabaseId: !!databaseId,
       hasAdminEmail: !!adminEmail,
       currentUser,
-      isAdmin: currentUser === adminEmail
+      isAdmin: currentUser === adminEmail,
     });
-
   } catch (error) {
     console.error('❌ サービスアカウント確認エラー:', error.message);
     return createResponse(false, 'エラーが発生しました', null, error);
@@ -111,23 +115,26 @@ function forceCleanupConfigJson() {
     // 現在のユーザー情報取得
     const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
-    
+
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
     console.log('👤 対象ユーザー:', userInfo.userEmail);
     console.log('📏 現在のconfigJson長:', userInfo.configJson?.length || 0);
-    console.log('🔍 configJson先頭200文字:', userInfo.configJson?.substring(0, 200) || 'データなし');
+    console.log(
+      '🔍 configJson先頭200文字:',
+      userInfo.configJson?.substring(0, 200) || 'データなし'
+    );
 
     // 強制的にJSONを解析して再構築
     let cleanedConfig = {};
-    
+
     if (userInfo.configJson) {
       try {
         const parsedConfig = JSON.parse(userInfo.configJson);
         console.log('📋 解析されたconfig構造:', Object.keys(parsedConfig));
-        
+
         // 重複したconfigJsonフィールドを検出
         if (parsedConfig.configJson) {
           console.log('⚠️ ネストしたconfigJsonフィールドを発見');
@@ -141,28 +148,27 @@ function forceCleanupConfigJson() {
               break;
             }
           }
-          
+
           if (typeof nestedData === 'object') {
             cleanedConfig = { ...nestedData };
           }
         } else {
           cleanedConfig = { ...parsedConfig };
         }
-        
       } catch (parseError) {
         console.log('❌ JSON解析エラー:', parseError.message);
         // デフォルト設定で初期化
         cleanedConfig = {
           setupStatus: 'pending',
           createdAt: new Date().toISOString(),
-          lastModified: new Date().toISOString()
+          lastModified: new Date().toISOString(),
         };
       }
     }
 
     // 基本DBフィールドを除去
     const dbFields = ['userId', 'userEmail', 'isActive', 'lastModified', 'configJson'];
-    dbFields.forEach(field => {
+    dbFields.forEach((field) => {
       delete cleanedConfig[field];
     });
 
@@ -173,13 +179,16 @@ function forceCleanupConfigJson() {
 
     // ConfigManager経由でデータベース更新
     const updateResult = ConfigManager.saveConfig(userInfo.userId, cleanedConfig);
-    
+
     console.log('💾 更新結果:', updateResult.success ? '✅成功' : '❌失敗');
 
     // 更新後の確認
     const updatedUser = DB.findUserById(userInfo.userId);
     console.log('🔄 更新後のconfigJson長:', updatedUser.configJson?.length || 0);
-    console.log('🔍 更新後の先頭200文字:', updatedUser.configJson?.substring(0, 200) || 'データなし');
+    console.log(
+      '🔍 更新後の先頭200文字:',
+      updatedUser.configJson?.substring(0, 200) || 'データなし'
+    );
 
     console.log('='.repeat(50));
     console.log('✅ 強制configJSONクリーンアップ完了');
@@ -188,9 +197,8 @@ function forceCleanupConfigJson() {
     return createResponse(true, '強制configJSONクリーンアップ完了', {
       originalLength: userInfo.configJson?.length || 0,
       cleanedLength: updatedUser.configJson?.length || 0,
-      cleanedFields: Object.keys(cleanedConfig)
+      cleanedFields: Object.keys(cleanedConfig),
     });
-
   } catch (error) {
     console.error('❌ 強制クリーンアップエラー:', error.message);
     return createResponse(false, 'エラーが発生しました', null, error);
@@ -213,21 +221,22 @@ function diagnoseDatabase() {
 
     const dbSpreadsheet = SpreadsheetApp.openById(dbId);
     const usersSheet = dbSpreadsheet.getSheetByName('Users');
-    
+
     if (!usersSheet) {
       throw new Error('Usersシートが見つかりません');
     }
 
     const values = usersSheet.getDataRange().getValues();
     const headers = values[0];
-    
+
     console.log('📊 データベース構造:');
     console.log('- ヘッダー:', headers);
     console.log('- 総行数:', values.length);
     console.log('- データ行数:', Math.max(0, values.length - 1));
 
     // 各ユーザーのconfigJson状況確認
-    for (let i = 1; i < values.length && i <= 5; i++) { // 最初の5ユーザーのみ
+    for (let i = 1; i < values.length && i <= 5; i++) {
+      // 最初の5ユーザーのみ
       const row = values[i];
       const configJsonIndex = headers.indexOf('configJson');
       if (configJsonIndex >= 0) {
@@ -235,7 +244,7 @@ function diagnoseDatabase() {
         console.log(`👤 ユーザー${i}:`, {
           email: row[1],
           configJsonLength: configJson?.length || 0,
-          configJsonPreview: configJson?.substring(0, 100) || 'データなし'
+          configJsonPreview: configJson?.substring(0, 100) || 'データなし',
         });
       }
     }
@@ -246,9 +255,8 @@ function diagnoseDatabase() {
 
     return createResponse(true, 'データベース診断完了', {
       headers,
-      userCount: Math.max(0, values.length - 1)
+      userCount: Math.max(0, values.length - 1),
     });
-
   } catch (error) {
     console.error('❌ データベース診断エラー:', error.message);
     return createResponse(false, 'エラーが発生しました', null, error);

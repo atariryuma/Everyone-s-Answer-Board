@@ -155,14 +155,22 @@
       google.script.run
         .withSuccessHandler((info) => {
           console.log('ドメイン情報取得成功:', info);
-          
+
           if (info && info.success && info.data) {
             const domainData = info.data;
             // ドメイン情報が取得できたら、適切な表示に切り替える
             if (domainData.isDomainMatch) {
-              updateDomainDisplay('match', domainData.adminDomain || domainData.deployDomain || 'naha-okinawa.ed.jp', 'セキュアアクセス有効');
+              updateDomainDisplay(
+                'match',
+                domainData.adminDomain || domainData.deployDomain || 'naha-okinawa.ed.jp',
+                'セキュアアクセス有効'
+              );
             } else {
-              updateDomainDisplay('mismatch', domainData.adminDomain || domainData.deployDomain || 'naha-okinawa.ed.jp', 'アクセス制限あり');
+              updateDomainDisplay(
+                'mismatch',
+                domainData.adminDomain || domainData.deployDomain || 'naha-okinawa.ed.jp',
+                'アクセス制限あり'
+              );
             }
           } else if (info && info.adminDomain) {
             // 旧形式のレスポンス対応
