@@ -519,9 +519,20 @@ const ConfigManager = Object.freeze({
     try {
       const enhanced = { ...config };
       
-      // WebAppURL生成
+      // WebAppURL生成（main.gsの安定したgetWebAppUrl関数を使用）
       if (!enhanced.appUrl) {
-        enhanced.appUrl = `${ScriptApp.getService().getUrl()}?mode=view&userId=${userId}`;
+        try {
+          // main.gsのgetWebAppUrl関数を使用（複数手法でURL取得）
+          const baseUrl = getWebAppUrl();
+          if (baseUrl) {
+            enhanced.appUrl = `${baseUrl}?mode=view&userId=${userId}`;
+          } else {
+            console.warn('ConfigManager.enhanceConfigWithDynamicUrls: getWebAppUrl()がnullを返しました');
+          }
+        } catch (urlError) {
+          console.warn('ConfigManager.enhanceConfigWithDynamicUrls: getWebAppUrl()使用エラー:', urlError.message);
+          // URL生成失敗時はappUrlを設定しない（undefined のまま）
+        }
       }
       
       // SpreadsheetURL生成
@@ -532,8 +543,8 @@ const ConfigManager = Object.freeze({
       return enhanced;
       
     } catch (error) {
-      console.warn('ConfigManager.enhanceConfigWithDynamicUrls: URL生成エラー', error);
-      return config;
+      console.warn('ConfigManager.enhanceConfigWithDynamicUrls: URL生成エラー', error.message);
+      return config; // エラー時は元のconfigをそのまま返す
     }
   },
 

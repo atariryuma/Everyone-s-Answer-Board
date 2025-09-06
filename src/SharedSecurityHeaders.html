@@ -1,8 +1,14 @@
 <!-- Shared Security Headers - CLAUDE.md準拠統一セキュリティ設定 -->
-<!-- Permission Policy: GAS環境対応（基本機能のみ指定） -->
+
+<!-- Cache Control: Feature Policy警告のキャッシュ問題解決 -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+
+<!-- Permission Policy: Feature Policy警告対策（完全版） -->
 <meta
   http-equiv="Permissions-Policy"
-  content="camera=(), microphone=(), geolocation=(), ambient-light-sensor=(), speaker=(), vibrate=(), vr=()"
+  content="camera=(), microphone=(), geolocation=(), ambient-light-sensor=(), accelerometer=(), gyroscope=(), magnetometer=(), usb=(), serial=(), bluetooth=(), payment=(), speaker=(), vibrate=(), vr=(), xr-spatial-tracking=(), fullscreen=(), autoplay=(), encrypted-media=(), picture-in-picture=(), midi=(), display-capture=(), screen-wake-lock=(), document-domain=()"
 />
 
 <!-- Content Security Policy: GAS最適化セキュリティ設定 -->

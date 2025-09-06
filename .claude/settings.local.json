@@ -48,7 +48,13 @@
       "Bash(npx clasp:*)",
       "Bash(rg:*)",
       "Bash(clasp status:*)",
-      "Bash(clasp deploy:*)"
+      "Bash(clasp deploy:*)",
+      "Bash(for func in checkAdmin getAvailableSheets addReactionBatch getDataCount addReaction getIncrementalSheetData toggleHighlight refreshBoardData)",
+      "Bash(for file in Core.gs database.gs Base.gs AdminPanelBackend.gs security.gs)",
+      "Bash(for file in src/Core.gs src/database.gs src/Base.gs src/security.gs src/PageBackend.gs)",
+      "Bash(do echo -n \"構文チェック $file: \")",
+      "Bash(for file in src/AdminPanelBackend.gs src/Page.html src/SharedSecurityHeaders.html)",
+      "Bash(for func in getCurrentConfig getCurrentBoardInfoAndUrls checkAdmin getAvailableSheets addReactionBatch getDataCount addReaction getIncrementalSheetData toggleHighlight refreshBoardData)"
     ],
     "deny": [],
     "ask": [],

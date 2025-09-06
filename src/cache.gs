@@ -227,16 +227,26 @@ function getSheetsServiceCached() {
   return cacheManager.get(
     'sheets_service',
     () => {
-      const accessToken = getServiceAccountTokenCached();
-      if (!accessToken) return null;
-
+      console.log('getSheetsServiceCached: 新しいサービスオブジェクト作成');
+      
       // Google Sheets APIサービスオブジェクトを返す
       return {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
-        accessToken,
         spreadsheets: {
           values: {
             batchGet: function(params) {
+              // 最新のアクセストークンを取得（トークンの期限切れ対応）
+              const accessToken = getServiceAccountTokenCached();
+              if (!accessToken) {
+                throw new Error('Service Account token is not available');
+              }
+              
+              console.log('getSheetsServiceCached.batchGet: API呼び出し開始', {
+                spreadsheetId: params.spreadsheetId,
+                rangesCount: params.ranges ? params.ranges.length : 0,
+                hasToken: !!accessToken
+              });
+              
               // Sheets API v4 batchGet実装
               const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values:batchGet`;
               const queryParams = params.ranges ? `?ranges=${params.ranges.join('&ranges=')}` : '';
@@ -250,6 +260,11 @@ function getSheetsServiceCached() {
                 muteHttpExceptions: true
               });
               
+              console.log('getSheetsServiceCached.batchGet: API応答', {
+                responseCode: response.getResponseCode(),
+                contentLength: response.getContentText().length
+              });
+              
               if (response.getResponseCode() !== 200) {
                 throw new Error(`Sheets API Error: ${response.getContentText()}`);
               }
@@ -257,6 +272,18 @@ function getSheetsServiceCached() {
               return JSON.parse(response.getContentText());
             },
             update: function(params) {
+              // 最新のアクセストークンを取得（トークンの期限切れ対応）
+              const accessToken = getServiceAccountTokenCached();
+              if (!accessToken) {
+                throw new Error('Service Account token is not available');
+              }
+              
+              console.log('getSheetsServiceCached.update: API呼び出し開始', {
+                spreadsheetId: params.spreadsheetId,
+                range: params.range,
+                hasToken: !!accessToken
+              });
+              
               // Sheets API v4 update実装  
               const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values/${params.range}?valueInputOption=RAW`;
               
@@ -270,6 +297,11 @@ function getSheetsServiceCached() {
                   values: params.values
                 }),
                 muteHttpExceptions: true
+              });
+              
+              console.log('getSheetsServiceCached.update: API応答', {
+                responseCode: response.getResponseCode(),
+                contentLength: response.getContentText().length
               });
               
               if (response.getResponseCode() !== 200) {
