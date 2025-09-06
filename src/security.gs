@@ -75,18 +75,9 @@ function generateNewServiceAccountToken() {
     console.error('[ERROR]', 'Token request failed. Status:', responseCode);
     console.error('[ERROR]', 'Response:', responseText);
 
-    let errorMessage = 'サービスアカウントトークンの取得に失敗しました。';
-    if (responseCode === 400) {
-      errorMessage += ' 認証情報またはJWTの形式に問題があります。';
-    } else if (responseCode === 401) {
-      errorMessage += ' 認証情報が無効です。サービスアカウントキーを確認してください。';
-    } else if (responseCode === 403) {
-      errorMessage += ' 権限が不足しています。サービスアカウントの権限を確認してください。';
-    } else {
-      errorMessage += ` Status: ${responseCode}`;
-    }
-
-    throw new Error(errorMessage);
+    // セキュリティ: エラー詳細を隠蔽、内部ログのみ
+    console.error('Service Account認証エラー:', { responseCode, responseText });
+    throw new Error('認証システムでエラーが発生しました。システム管理者にお問い合わせください。');
   }
 
   const responseData = JSON.parse(response.getContentText());
@@ -94,9 +85,7 @@ function generateNewServiceAccountToken() {
     throw new Error('アクセストークンが見つかりませんでした');
   }
 
-  console.log(
-    `🔐 新しいサービスアカウントトークンを生成しました (有効期限: ${new Date(expiresAt * 1000).toISOString()})`
-  );
+  // Security: Never log access tokens - removed token logging
   return responseData.access_token;
 }
 
@@ -125,9 +114,9 @@ function getSecureServiceAccountCreds() {
  */
 function verifyAdminAccess(userId) {
   try {
-    // 基本的な引数チェック
-    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      console.warn('verifyAdminAccess: 無効なuserIdが渡されました:', userId);
+    // セキュリティ: 厳密な入力検証
+    if (!userId || typeof userId !== 'string' || userId.trim() === '' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+      console.warn('verifyAdminAccess: 無効なuserID形式');
       return false;
     }
 
@@ -138,7 +127,7 @@ function verifyAdminAccess(userId) {
       return false;
     }
 
-    console.log('verifyAdminAccess: 認証開始', { userId, activeUserEmail });
+    console.log('verifyAdminAccess: 認証開始');
 
     // データベースからユーザー情報を取得
     let userFromDb = DB.findUserById(userId);
@@ -175,19 +164,15 @@ function verifyAdminAccess(userId) {
     console.log('verifyAdminAccess: 3重チェック結果:', {
       isEmailMatched,
       isUserIdMatched,
-      isActive,
-      dbEmail,
-      currentEmail,
+      isActive
     });
 
     // 3つの条件すべてが満たされた場合のみ認証成功
     if (isEmailMatched && isUserIdMatched && isActive) {
-      console.log('✅ verifyAdminAccess: 認証成功', { userId, email: activeUserEmail });
+      console.log('✅ verifyAdminAccess: 認証成功');
       return true;
     } else {
       console.warn('❌ verifyAdminAccess: 認証失敗', {
-        userId,
-        activeUserEmail,
         failures: {
           email: !isEmailMatched,
           userId: !isUserIdMatched,

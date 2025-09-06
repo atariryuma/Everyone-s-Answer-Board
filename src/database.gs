@@ -53,23 +53,21 @@ const DB = {
         throw new Error('必須フィールドが不足しています: userEmail, userId');
       }
 
-      // 重複チェック
-      const existingUser = this.findUserByEmail(userData.userEmail);
-      if (existingUser) {
-        throw new Error('このメールアドレスは既に登録されています。');
-      }
-
-      // 同時登録による重複を防ぐためロックを取得
+      // セキュリティ: ロック取得後に重複チェックでrace condition回避
       const lock = LockService.getScriptLock();
       const lockAcquired = lock.tryLock(DB_CONFIG.LOCK_TIMEOUT);
 
       if (!lockAcquired) {
         const error = new Error('システムがビジー状態です。しばらく待ってから再試行してください。');
-        console.error('❌ createUser: Lock acquisition failed', {
-          userEmail: userData.userEmail,
-          error: error.message,
-        });
+        console.error('❌ createUser: ロック取得失敗');
         throw error;
+      }
+
+      // ロック内で重複チェック（アトミック操作）
+      const existingUser = this.findUserByEmail(userData.userEmail);
+      if (existingUser) {
+        lock.releaseLock();
+        throw new Error('このメールアドレスは既に登録されています。');
       }
 
       try {
@@ -207,7 +205,7 @@ const DB = {
     }
 
     try {
-      console.log('🔍 findUserById: configJSON中心型検索開始', { userId });
+      console.log('🔍 findUserById: configJSON中心型検索開始');
 
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
@@ -269,7 +267,7 @@ const DB = {
         console.warn('findUserById: nullキャッシュ保存エラー', cacheError.message);
       }
 
-      console.log('findUserById: ユーザーが見つかりませんでした', { userId });
+      console.log('findUserById: ユーザーが見つかりませんでした');
       return null;
     } catch (error) {
       console.error('❌ findUserById: configJSON中心型検索エラー:', {
