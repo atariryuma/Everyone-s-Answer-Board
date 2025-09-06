@@ -449,7 +449,7 @@ function getSheetsServiceCached() {
   );
   
   // 🚨 キャッシュから取得されたservice objectの検証
-  console.log('🔧 getSheetsServiceCached: キャッシュ取得結果検証', {
+  const validation = {
     hasResult: !!result,
     resultType: typeof result,
     hasSpreadsheets: !!result?.spreadsheets,
@@ -457,7 +457,180 @@ function getSheetsServiceCached() {
     hasAppend: !!result?.spreadsheets?.values?.append,
     appendType: typeof result?.spreadsheets?.values?.append,
     valuesKeys: result?.spreadsheets?.values ? Object.keys(result.spreadsheets.values) : []
-  });
+  };
+  
+  console.log('🔧 getSheetsServiceCached: キャッシュ取得結果検証', validation);
+  
+  // 🚨 破損したservice objectの自動修復
+  if (validation.hasResult && validation.hasValues && (!validation.hasAppend || validation.valuesKeys.length === 0)) {
+    console.error('🚨 破損したservice objectを検出 - キャッシュクリア後に再生成します', {
+      expectedKeys: ['batchGet', 'update', 'append'],
+      actualKeys: validation.valuesKeys,
+      missingAppend: !validation.hasAppend
+    });
+    
+    // キャッシュクリア
+    cacheManager.remove('sheets_service');
+    
+    // 新しいservice objectを強制再生成
+    console.log('🔧 破損したキャッシュクリア完了 - 新しいservice object生成開始');
+    return cacheManager.get(
+      'sheets_service',
+      () => {
+        console.log('🔧 getSheetsServiceCached: 修復のため新しいサービスオブジェクト再作成');
+        
+        // Service Account認証確認
+        let testToken;
+        try {
+          console.log('🔧 getSheetsServiceCached: Service Accountトークン取得開始');
+          testToken = getServiceAccountTokenCached();
+          console.log('🔧 getSheetsServiceCached: Service Accountトークン確認', { 
+            hasToken: !!testToken,
+            tokenLength: testToken ? testToken.length : 0 
+          });
+        } catch (tokenError) {
+          console.error('🔧 getSheetsServiceCached: Service Accountトークン取得エラー詳細', {
+            error: tokenError.message,
+            stack: tokenError.stack,
+            context: 'repair_service_object'
+          });
+          throw new Error('Service Account Sheets APIが利用できません');
+        }
+
+        // Google Sheets APIサービスオブジェクトを返す
+        console.log('🔧 getSheetsServiceCached: service object修復構築開始');
+        
+        const repairedServiceObject = {
+          baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
+          spreadsheets: {
+            batchUpdate: function (params) {
+              const accessToken = getServiceAccountTokenCached();
+              if (!accessToken) {
+                throw new Error('Service Account token is not available');
+              }
+              const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}:batchUpdate`;
+              const response = UrlFetchApp.fetch(url, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                payload: JSON.stringify({
+                  requests: params.requests,
+                }),
+                muteHttpExceptions: true,
+              });
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API Error: ${response.getContentText()}`);
+              }
+              return JSON.parse(response.getContentText());
+            },
+            values: {
+              batchGet: function (params) {
+                const accessToken = getServiceAccountTokenCached();
+                if (!accessToken) {
+                  throw new Error('Service Account token is not available');
+                }
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values:batchGet`;
+                const queryParams = params.ranges ? `?ranges=${params.ranges.join('&ranges=')}` : '';
+                const response = UrlFetchApp.fetch(url + queryParams, {
+                  method: 'GET',
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  muteHttpExceptions: true,
+                });
+                if (response.getResponseCode() !== 200) {
+                  throw new Error(`Sheets API Error: ${response.getContentText()}`);
+                }
+                return JSON.parse(response.getContentText());
+              },
+              update: function (params) {
+                const accessToken = getServiceAccountTokenCached();
+                if (!accessToken) {
+                  throw new Error('Service Account token is not available');
+                }
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values/${params.range}?valueInputOption=RAW`;
+                const response = UrlFetchApp.fetch(url, {
+                  method: 'PUT',
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  payload: JSON.stringify({
+                    values: params.values,
+                  }),
+                  muteHttpExceptions: true,
+                });
+                if (response.getResponseCode() !== 200) {
+                  throw new Error(`Sheets API Error: ${response.getContentText()}`);
+                }
+                return JSON.parse(response.getContentText());
+              },
+              append: function (params) {
+                console.log('🔧 cache.gs append function called (repaired)', { 
+                  hasParams: !!params,
+                  spreadsheetId: params?.spreadsheetId,
+                  range: params?.range
+                });
+                
+                const accessToken = getServiceAccountTokenCached();
+                if (!accessToken) {
+                  console.error('🔧 cache.gs append: Service Account token is not available');
+                  throw new Error('Service Account token is not available');
+                }
+                
+                console.log('getSheetsServiceCached.append: API呼び出し開始 (repaired)', {
+                  spreadsheetId: params.spreadsheetId,
+                  range: params.range,
+                  valuesCount: params.values ? params.values.length : 0,
+                  hasToken: !!accessToken,
+                });
+                
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${params.spreadsheetId}/values/${params.range}:append?valueInputOption=${params.valueInputOption || 'RAW'}&insertDataOption=${params.insertDataOption || 'INSERT_ROWS'}`;
+                
+                const response = UrlFetchApp.fetch(url, {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  payload: JSON.stringify({
+                    values: params.values,
+                  }),
+                  muteHttpExceptions: true,
+                });
+                
+                console.log('getSheetsServiceCached.append: API応答 (repaired)', {
+                  responseCode: response.getResponseCode(),
+                  contentLength: response.getContentText().length,
+                });
+                
+                if (response.getResponseCode() !== 200) {
+                  throw new Error(`Sheets API Error: ${response.getContentText()}`);
+                }
+                
+                return JSON.parse(response.getContentText());
+              },
+            },
+          },
+        };
+        
+        console.log('🔧 getSheetsServiceCached: service object修復構築完了確認', {
+          hasSpreadsheets: !!repairedServiceObject.spreadsheets,
+          hasValues: !!repairedServiceObject.spreadsheets.values,
+          hasBatchGet: typeof repairedServiceObject.spreadsheets.values.batchGet === 'function',
+          hasUpdate: typeof repairedServiceObject.spreadsheets.values.update === 'function', 
+          hasAppend: typeof repairedServiceObject.spreadsheets.values.append === 'function',
+          valuesKeys: Object.keys(repairedServiceObject.spreadsheets.values)
+        });
+        
+        return repairedServiceObject;
+      },
+      { ttl: 3500, enableMemoization: true }
+    );
+  }
   
   return result;
 }
