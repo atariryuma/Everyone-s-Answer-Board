@@ -228,6 +228,15 @@ function getSheetsServiceCached() {
     'sheets_service',
     () => {
       console.log('getSheetsServiceCached: 新しいサービスオブジェクト作成');
+      
+      // Service Account認証確認
+      try {
+        const testToken = getServiceAccountTokenCached();
+        console.log('getSheetsServiceCached: Service Accountトークン確認', { hasToken: !!testToken });
+      } catch (tokenError) {
+        console.error('getSheetsServiceCached: Service Accountトークン取得エラー', tokenError.message);
+        throw new Error('Service Account Sheets APIが利用できません');
+      }
 
       // Google Sheets APIサービスオブジェクトを返す
       return {
@@ -350,9 +359,16 @@ function getSheetsServiceCached() {
               return JSON.parse(response.getContentText());
             },
             append: function (params) {
+              console.log('🔧 cache.gs append function called', { 
+                hasParams: !!params,
+                spreadsheetId: params?.spreadsheetId,
+                range: params?.range
+              });
+              
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
+                console.error('🔧 cache.gs append: Service Account token is not available');
                 throw new Error('Service Account token is not available');
               }
 

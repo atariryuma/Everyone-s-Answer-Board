@@ -105,7 +105,7 @@ const DB = {
           timestamp: new Date().toISOString(),
         });
 
-        // Service Accountで新しい行を追加
+        // Service Account: cache.gsの統一されたAPI構造を使用
         const appendResult = service.spreadsheets.values.append({
           spreadsheetId: dbId,
           range: `${sheetName}!A:E`,
