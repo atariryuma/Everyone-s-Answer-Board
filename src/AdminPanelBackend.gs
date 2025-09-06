@@ -872,6 +872,36 @@ function checkFormConnection(spreadsheetId) {
  * フロントエンドフッター表示用
  * @returns {Object} ボード情報オブジェクト
  */
+/**
+ * 現在のユーザー設定を取得（フロントエンド統合用）
+ * App.getConfig().getUserConfig() の実装として使用される
+ */
+function getCurrentConfig() {
+  try {
+    console.log('🔧 getCurrentConfig: ユーザー設定取得開始');
+
+    // 現在のユーザーの設定を取得
+    const currentUser = UserManager.getCurrentEmail();
+    const userInfo = DB.findUserByEmail(currentUser);
+    
+    if (!userInfo) {
+      console.warn('getCurrentConfig: ユーザー情報が見つかりません');
+      return ConfigManager.buildInitialConfig();
+    }
+
+    const config = ConfigManager.getUserConfig(userInfo.userId);
+    console.log('✅ getCurrentConfig: 設定取得完了', {
+      userId: userInfo.userId,
+      configFields: Object.keys(config || {}).length
+    });
+
+    return config;
+  } catch (error) {
+    console.error('❌ getCurrentConfig エラー:', error.message);
+    return ConfigManager.buildInitialConfig();
+  }
+}
+
 function getCurrentBoardInfoAndUrls() {
   try {
     console.log('📊 getCurrentBoardInfoAndUrls: ボード情報取得開始');
@@ -881,23 +911,52 @@ function getCurrentBoardInfoAndUrls() {
     const userInfo = DB.findUserByEmail(currentUser);
     const config = userInfo ? ConfigManager.getUserConfig(userInfo.userId) : null;
     
-    // opinionHeader取得（問題文として表示）
-    const questionText = config.opinionHeader || 
-                        config.formTitle || 
+    // フッター表示用の詳細情報を構築
+    const questionText = config?.opinionHeader || 
+                        config?.formTitle || 
                         'システム準備中';
     
+    // 日時情報の取得と整形
+    const createdAt = config?.createdAt || null;
+    const lastModified = config?.lastModified || userInfo?.lastModified || null;
+    const publishedAt = config?.publishedAt || null;
+    
+    // URLs の生成
+    const appUrl = config?.appUrl || (userInfo ? `${ScriptApp.getService().getUrl()}?mode=view&userId=${userInfo.userId}` : '');
+    const spreadsheetUrl = config?.spreadsheetUrl || (config?.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}` : '');
+    
     const boardInfo = {
-      isActive: config.appPublished || false,
-      appPublished: config.appPublished || false, // ✅ フッター表示用：明示的にappPublished状態を提供
+      isActive: config?.appPublished || false,
+      appPublished: config?.appPublished || false,
+      isPublished: config?.appPublished || false, // フッター互換性
       questionText,        // 実際の問題文
-      appUrl: config.appUrl || '',
-      spreadsheetUrl: config.spreadsheetUrl || '',
-      hasSpreadsheet: !!config.spreadsheetId,
-      setupStatus: config.setupStatus || 'pending',
+      opinionHeader: config?.opinionHeader || '', // 問題文（詳細版）
+      appUrl: appUrl,
+      spreadsheetUrl: spreadsheetUrl,
+      hasSpreadsheet: !!config?.spreadsheetId,
+      setupStatus: config?.setupStatus || 'pending',
+      
+      // 日時情報（フッター表示用）
+      dates: {
+        created: createdAt,
+        modified: lastModified,
+        published: publishedAt,
+        createdFormatted: createdAt ? new Date(createdAt).toLocaleString('ja-JP') : null,
+        modifiedFormatted: lastModified ? new Date(lastModified).toLocaleString('ja-JP') : null,
+        publishedFormatted: publishedAt ? new Date(publishedAt).toLocaleString('ja-JP') : null
+      },
+      
+      // URLs（従来互換性）
       urls: {
-        view: config.appUrl || '',
-        spreadsheet: config.spreadsheetUrl || ''
-      }
+        view: appUrl,
+        spreadsheet: spreadsheetUrl
+      },
+      
+      // 追加のボード情報
+      formUrl: config?.formUrl || '',
+      hasForm: !!config?.formUrl,
+      sheetName: config?.sheetName || '',
+      dataCount: 0 // 後で実際のデータ数を取得可能
     };
 
     console.log('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
