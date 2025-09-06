@@ -547,7 +547,7 @@ const DB = {
         activeOnly 
       });
 
-      const service = getSheetsService();
+      const service = getSheetsServiceCached();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -622,7 +622,7 @@ const DB = {
     console.log('🔄 findUserByEmail: キャッシュをバイパスしてDB直接検索', { email });
 
     try {
-      const service = getSheetsService();
+      const service = getSheetsServiceCached();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -709,7 +709,7 @@ const DB = {
       });
 
       // 5. データベースから削除
-      const service = getSheetsService();
+      const service = getSheetsServiceCached();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 

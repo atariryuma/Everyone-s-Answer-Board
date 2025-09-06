@@ -31,12 +31,21 @@ function getServiceAccountTokenCached() {
  * @returns {string} アクセストークン
  */
 function generateNewServiceAccountToken() {
-  // 統一秘密情報管理システムで安全に取得
-  const serviceAccountCreds = getSecureServiceAccountCreds();
+  try {
+    console.log('🔑 Service Accountトークン生成開始');
+    
+    // 統一秘密情報管理システムで安全に取得
+    const serviceAccountCreds = getSecureServiceAccountCreds();
 
   const privateKey = serviceAccountCreds.private_key.replace(/\n/g, '\n'); // 改行文字を正規化
   const clientEmail = serviceAccountCreds.client_email;
   const tokenUrl = 'https://www.googleapis.com/oauth2/v4/token';
+
+  console.log('🔑 JWT生成準備完了', {
+    hasPrivateKey: !!privateKey,
+    clientEmail: clientEmail,
+    privateKeyLength: privateKey.length
+  });
 
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + 3600; // 1時間後
@@ -86,21 +95,39 @@ function generateNewServiceAccountToken() {
   }
 
   // Security: Never log access tokens - removed token logging
+  console.log('🔑 Service Accountトークン生成完了');
   return responseData.access_token;
+  } catch (error) {
+    console.error('🔑 Service Accountトークン生成失敗:', error.message);
+    throw error;
+  }
 }
 
 /**
  * 統一秘密情報取得（PropertiesService利用）
  */
 function getSecureServiceAccountCreds() {
-  const props = PropertiesService.getScriptProperties();
-  const credsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
+  try {
+    console.log('🔐 Service Account認証情報取得開始');
+    const props = PropertiesService.getScriptProperties();
+    const credsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
 
-  if (!credsJson) {
-    throw new Error('サービスアカウント認証情報が設定されていません');
+    if (!credsJson) {
+      console.error('🔐 SERVICE_ACCOUNT_CREDS が PropertiesService に設定されていません');
+      throw new Error('サービスアカウント認証情報が設定されていません');
+    }
+
+    console.log('🔐 Service Account認証情報取得成功', { 
+      credsLength: credsJson.length,
+      hasPrivateKey: credsJson.includes('private_key'),
+      hasClientEmail: credsJson.includes('client_email')
+    });
+
+    return JSON.parse(credsJson);
+  } catch (error) {
+    console.error('🔐 Service Account認証情報取得エラー:', error.message);
+    throw error;
   }
-
-  return JSON.parse(credsJson);
 }
 
 // =============================================================================
