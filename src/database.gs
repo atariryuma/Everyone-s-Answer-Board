@@ -106,13 +106,45 @@ const DB = {
         });
 
         // Service Account: cache.gsの統一されたAPI構造を使用
-        const appendResult = service.spreadsheets.values.append({
-          spreadsheetId: dbId,
-          range: `${sheetName}!A:E`,
-          values: [newRow],
-          valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS'
+        // 🔧 診断: service オブジェクトの構造を詳細確認
+        console.log('🔧 createUser: service object診断', {
+          hasService: !!service,
+          serviceType: typeof service,
+          hasSpreadsheets: !!service?.spreadsheets,
+          spreadsheetsType: typeof service?.spreadsheets,
+          hasValues: !!service?.spreadsheets?.values,
+          valuesType: typeof service?.spreadsheets?.values,
+          hasAppend: !!service?.spreadsheets?.values?.append,
+          appendType: typeof service?.spreadsheets?.values?.append,
+          serviceKeys: service ? Object.keys(service) : [],
+          spreadsheetsKeys: service?.spreadsheets ? Object.keys(service.spreadsheets) : [],
+          valuesKeys: service?.spreadsheets?.values ? Object.keys(service.spreadsheets.values) : []
         });
+
+        let appendResult;
+        try {
+          appendResult = service.spreadsheets.values.append({
+            spreadsheetId: dbId,
+            range: `${sheetName}!A:E`,
+            values: [newRow],
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS'
+          });
+          console.log('✅ createUser: append呼び出し成功', { hasResult: !!appendResult });
+        } catch (appendError) {
+          console.error('❌ createUser: append呼び出しエラー詳細', {
+            error: appendError.message,
+            stack: appendError.stack,
+            serviceStructure: {
+              hasService: !!service,
+              hasSpreadsheets: !!service?.spreadsheets,
+              hasValues: !!service?.spreadsheets?.values,
+              hasAppend: !!service?.spreadsheets?.values?.append,
+              appendIsFunction: typeof service?.spreadsheets?.values?.append === 'function'
+            }
+          });
+          throw appendError;
+        }
 
         console.log('✅ createUser: configJSON中心型ユーザー作成完了', {
           userId: userData.userId,
