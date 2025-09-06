@@ -74,7 +74,7 @@ function handleUserRegistration(userEmail, bypassCache = false) {
   const existingUser = bypassCache ? DB.findUserByEmail(userEmail) : DB.findUserByEmail(userEmail);
 
   if (bypassCache) {
-    console.log('🔄 handleUserRegistration: キャッシュバイパスモード', { userEmail });
+    console.log('🔄 handleUserRegistration: キャッシュバイパスモード');
   }
 
   if (existingUser) {
@@ -87,7 +87,7 @@ function handleUserRegistration(userEmail, bypassCache = false) {
   const completeUserData = createCompleteUser(userEmail);
   DB.createUser(completeUserData);
 
-  console.log('新規ユーザー作成完了:', completeUserData.userId);
+  console.log('新規ユーザー作成完了');
   return completeUserData;
 }
 
@@ -120,7 +120,7 @@ function updateUserLastAccess(userId) {
       lastModified: now,
     });
 
-    console.log('updateUserLastAccess: 最終アクセス時刻更新完了', { userId, lastAccessedAt: now });
+    console.log('updateUserLastAccess: 最終アクセス時刻更新完了');
   } catch (error) {
     console.error('updateUserLastAccess エラー:', error.message);
   }
@@ -154,13 +154,13 @@ function processAdminAccess(userEmail) {
 
     // 1. ユーザー情報をデータベースから直接取得（ログイン時はキャッシュバイパス）
     const userInfo = DB.findUserByEmail(userEmail);
-    console.log('🔄 processLoginFlow: キャッシュバイパスでユーザー検索', { userEmail });
+    console.log('🔄 processLoginFlow: キャッシュバイパスでユーザー検索');
 
     // 2. 既存ユーザーの処理
     if (userInfo) {
       // 2a. アクティブユーザーの場合
       if (userInfo.isActive === true) {
-        console.log('processLoginFlow: 既存アクティブユーザー:', userEmail);
+        console.log('processLoginFlow: 既存アクティブユーザー検出');
 
         // 最終アクセス時刻を更新（設定は保護）
         updateUserLastAccess(userInfo.userId);

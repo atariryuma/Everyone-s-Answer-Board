@@ -132,12 +132,9 @@ const DB = {
         lock.releaseLock();
       }
     } catch (error) {
-      console.error('❌ createUser: configJSON中心型作成エラー:', {
-        userId: userData.userId,
-        error: error.message,
-        stack: error.stack,
-      });
-      throw error;
+      // 統一エラーハンドリング適用
+      const safeResponse = ErrorHandler.createSafeResponse(error, 'createUser');
+      throw new Error(safeResponse.message);
     }
   },
 
@@ -532,44 +529,85 @@ const DB = {
   },
 
   /**
-   * 全ユーザー取得（CLAUDE.md準拠版）
+   * 全ユーザー取得（CLAUDE.md準拠版） - パフォーマンス最適化済み
+   * @param {Object} options - オプション {limit: number, offset: number, activeOnly: boolean}
    */
-  getAllUsers() {
+  getAllUsers(options = {}) {
     try {
-      console.log('📋 getAllUsers: configJSON中心型全ユーザー取得開始');
+      const { limit = 500, offset = 0, activeOnly = false } = options;
+      
+      // パフォーマンス保護：大量取得の警告
+      if (limit > 1000) {
+        console.warn('⚠️ getAllUsers: パフォーマンス警告 - 1000件超の取得は非推奨');
+      }
+      
+      console.log('📋 getAllUsers: configJSON中心型取得開始', { 
+        limit: Math.min(limit, 1000), 
+        offset, 
+        activeOnly 
+      });
 
       const service = getSheetsService();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
-      // CLAUDE.md準拠：5列のみ取得
+      // CLAUDE.md準拠：5列のみ取得（効率的な範囲指定）
       const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
         console.log('getAllUsers: ユーザーデータが見つかりません');
-        return [];
+        return { users: [], total: 0, hasMore: false };
       }
 
       const rows = data.valueRanges[0].values;
       if (rows.length < 2) {
         console.log('getAllUsers: データ行が存在しません');
-        return [];
+        return { users: [], total: 0, hasMore: false };
       }
 
       const headers = rows[0];
-      const userRows = rows.slice(1);
+      let userRows = rows.slice(1);
+
+      // アクティブユーザーのみフィルター（必要時）
+      if (activeOnly) {
+        userRows = userRows.filter(row => row[2] === true || row[2] === 'true');
+      }
+
+      // ページネーション適用
+      const total = userRows.length;
+      const startIndex = offset;
+      const endIndex = Math.min(startIndex + Math.min(limit, 1000), total);
+      const paginatedRows = userRows.slice(startIndex, endIndex);
 
       // 各行をユーザーオブジェクトに変換
-      const users = userRows.map((row) => {
+      const users = paginatedRows.map((row) => {
         return this.parseUserRow(headers, row);
       });
 
-      console.log(`✅ getAllUsers: configJSON中心型で${users.length}件のユーザーデータを取得`);
-      return users;
+      const result = {
+        users,
+        total,
+        returned: users.length,
+        hasMore: endIndex < total,
+        nextOffset: endIndex < total ? endIndex : null
+      };
+
+      console.log(`✅ getAllUsers: ${result.returned}/${result.total}件取得完了`);
+      return result;
     } catch (error) {
       console.error('❌ getAllUsers: configJSON中心型取得エラー:', error.message);
-      return [];
+      return { users: [], total: 0, hasMore: false, error: error.message };
     }
+  },
+
+  /**
+   * 後方互換性: レガシーgetAllUsers関数
+   * @deprecated 新しいgetAllUsers(options)を使用してください
+   */
+  getAllUsersLegacy() {
+    console.warn('⚠️ getAllUsersLegacy: 廃止予定 - getAllUsers({limit: 500})を使用');
+    const result = this.getAllUsers({ limit: 500 });
+    return result.users; // レガシー互換のため配列のみ返却
   },
 
   /**

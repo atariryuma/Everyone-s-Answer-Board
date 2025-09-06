@@ -324,6 +324,65 @@ const SYSTEM_CONSTANTS = Object.freeze({
   }),
 });
 
+// 統一エラーハンドリング - セキュリティ強化版
+const ErrorHandler = Object.freeze({
+  createSafeResponse(error, context = 'operation', includeDetails = false) {
+    // 内部ログ（詳細付き）
+    console.error(`❌ ${context}:`, {
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+
+    // 外部向けレスポンス（セキュア）
+    return {
+      success: false,
+      message: this.getSafeErrorMessage(error.message),
+      timestamp: new Date().toISOString(),
+      errorCode: this.getErrorCode(error.message)
+    };
+  },
+
+  getSafeErrorMessage(originalMessage) {
+    const patterns = ['Service Account', 'token', 'database', 'validation'];
+    for (const pattern of patterns) {
+      if (originalMessage.toLowerCase().includes(pattern.toLowerCase())) {
+        return 'システムエラーが発生しました。管理者にお問い合わせください。';
+      }
+    }
+    return '処理中にエラーが発生しました。';
+  },
+
+  getErrorCode(message) {
+    const hash = message.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return `E${Math.abs(hash).toString(16).substr(0, 6).toUpperCase()}`;
+  }
+});
+
+// パフォーマンス監視
+const PerformanceMonitor = Object.freeze({
+  measure(operationName, operation) {
+    const startTime = Date.now();
+    
+    try {
+      const result = operation();
+      const duration = Date.now() - startTime;
+      
+      if (duration > 5000) {
+        console.warn(`⚠️ 低速操作: ${operationName} - ${duration}ms`);
+      }
+      
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`❌ 操作失敗: ${operationName} (${duration}ms)`);
+      throw error;
+    }
+  }
+});
+
 // 後方互換性のための旧定数エイリアス
 const REACTION_KEYS = SYSTEM_CONSTANTS.REACTIONS.KEYS;
 const COLUMN_HEADERS = {
