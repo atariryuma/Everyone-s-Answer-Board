@@ -141,6 +141,22 @@ const ConfigManager = Object.freeze({
     }
 
     try {
+      // 🚨 第1層防御: 二重構造の厳格検出・警告
+      const duplicateFields = Object.keys(config).filter(key => 
+        key.toLowerCase() === 'configjson' || 
+        (typeof config[key] === 'string' && this.isJSONString(config[key]) && key.toLowerCase().includes('config'))
+      );
+      
+      if (duplicateFields.length > 0) {
+        console.error('🚨 ConfigManager.saveConfig: 二重構造検出 - 保存を拒否', {
+          userId: userId,
+          duplicateFields: duplicateFields,
+          source: new Error().stack.split('\n')[2]
+        });
+        // 厳格モード: 二重構造を検出したら保存を拒否
+        throw new Error(`二重構造検出: フィールド [${duplicateFields.join(', ')}] - 保存を拒否しました`);
+      }
+
       // 🚫 二重構造防止（第2層防御）: configJsonフィールドを強制削除
       const cleanConfig = { ...config };
       delete cleanConfig.configJson;
@@ -539,6 +555,30 @@ const ConfigManager = Object.freeze({
   // ========================================
 
   /**
+   * JSON文字列判定（安全版）
+   * @param {*} value - 判定する値
+   * @returns {boolean} JSON文字列かどうか
+   */
+  isJSONString(value) {
+    if (typeof value !== 'string') return false;
+    if (value.length < 2) return false; // 最小 "{}" or "[]"
+    
+    // 明らかにJSONでないパターンを除外
+    const trimmed = value.trim();
+    if (!((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+          (trimmed.startsWith('[') && trimmed.endsWith(']')))) {
+      return false;
+    }
+    
+    try {
+      JSON.parse(value);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
    * 動的URL生成して設定を拡張
    * @param {Object} config - 基本設定
    * @param {string} userId - ユーザーID
@@ -578,6 +618,284 @@ const ConfigManager = Object.freeze({
     } catch (error) {
       console.warn('ConfigManager.enhanceConfigWithDynamicUrls: URL生成エラー', error.message);
       return config; // エラー時は元のconfigをそのまま返す
+    }
+  },
+
+  /**
+   * setupStatus/appPublished整合性修正
+   * @param {string} userId - ユーザーID
+   * @returns {boolean} 修正成功可否
+   */
+  fixSetupConsistency(userId) {
+    try {
+      const config = this.getUserConfig(userId);
+      if (!config) {
+        console.error('ConfigManager.fixSetupConsistency: 設定が見つかりません', { userId });
+        return false;
+      }
+
+      console.log('🔧 ConfigManager.fixSetupConsistency: 整合性チェック開始', {
+        userId,
+        currentSetupStatus: config.setupStatus,
+        currentAppPublished: config.appPublished,
+        hasSpreadsheetId: !!config.spreadsheetId,
+        hasSheetName: !!config.sheetName
+      });
+
+      let needsFix = false;
+      const updates = {};
+
+      // Rule 1: spreadsheetIdとsheetNameが揃っていればdata_connected以上
+      if (config.spreadsheetId && config.sheetName) {
+        if (config.setupStatus === 'pending' || !config.setupStatus) {
+          updates.setupStatus = 'data_connected';
+          needsFix = true;
+        }
+      }
+
+      // Rule 2: appPublishedがtrueならsetupStatusはcompleted
+      if (config.appPublished === true) {
+        if (config.setupStatus !== 'completed') {
+          updates.setupStatus = 'completed';
+          needsFix = true;
+        }
+      }
+
+      // Rule 3: setupStatusがcompletedならappPublishedもtrue
+      if (config.setupStatus === 'completed') {
+        if (config.appPublished !== true) {
+          updates.appPublished = true;
+          if (!config.publishedAt) {
+            updates.publishedAt = new Date().toISOString();
+          }
+          needsFix = true;
+        }
+      }
+
+      // Rule 4: publishedAtがあってappPublishedがfalseなら整合性エラー
+      if (config.publishedAt && config.appPublished !== true) {
+        updates.appPublished = true;
+        updates.setupStatus = 'completed';
+        needsFix = true;
+      }
+
+      if (needsFix) {
+        console.log('🔧 ConfigManager.fixSetupConsistency: 整合性修正適用', {
+          userId,
+          updates,
+          before: {
+            setupStatus: config.setupStatus,
+            appPublished: config.appPublished
+          }
+        });
+
+        const success = this.updateConfig(userId, updates);
+        if (success) {
+          console.log('✅ ConfigManager.fixSetupConsistency: 整合性修正完了', {
+            userId,
+            after: {
+              setupStatus: updates.setupStatus || config.setupStatus,
+              appPublished: updates.appPublished !== undefined ? updates.appPublished : config.appPublished
+            }
+          });
+        }
+        return success;
+      } else {
+        console.log('✅ ConfigManager.fixSetupConsistency: 整合性問題なし', { userId });
+        return true;
+      }
+    } catch (error) {
+      console.error('❌ ConfigManager.fixSetupConsistency: エラー', {
+        userId,
+        error: error.message
+      });
+      return false;
+    }
+  },
+
+  /**
+   * フォーム情報復元（Google Sheetsから自動検出）
+   * @param {string} userId - ユーザーID
+   * @returns {boolean} 復元成功可否
+   */
+  restoreFormInfo(userId) {
+    try {
+      const config = this.getUserConfig(userId);
+      if (!config || !config.spreadsheetId) {
+        console.error('ConfigManager.restoreFormInfo: スプレッドシートIDが見つかりません', { userId });
+        return false;
+      }
+
+      console.log('🔧 ConfigManager.restoreFormInfo: フォーム情報復元開始', {
+        userId,
+        spreadsheetId: config.spreadsheetId,
+        currentFormUrl: config.formUrl,
+        currentFormTitle: config.formTitle
+      });
+
+      // フォーム情報が既に存在する場合はスキップ
+      if (config.formUrl && config.formTitle) {
+        console.log('✅ ConfigManager.restoreFormInfo: フォーム情報は既に存在', { userId });
+        return true;
+      }
+
+      try {
+        // スプレッドシートからフォーム情報を取得
+        const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+        const formUrl = spreadsheet.getFormUrl();
+        
+        if (formUrl) {
+          const updates = {
+            formUrl: formUrl
+          };
+
+          // フォームタイトルも取得を試みる
+          try {
+            const form = FormApp.openByUrl(formUrl);
+            if (form) {
+              updates.formTitle = form.getTitle();
+            }
+          } catch (formError) {
+            console.warn('ConfigManager.restoreFormInfo: フォームタイトル取得失敗', formError.message);
+            // タイトル取得失敗時はスプレッドシート名をフォールバック
+            updates.formTitle = spreadsheet.getName() + ' (フォーム)';
+          }
+
+          const success = this.updateConfig(userId, updates);
+          if (success) {
+            console.log('✅ ConfigManager.restoreFormInfo: フォーム情報復元完了', {
+              userId,
+              formUrl: updates.formUrl,
+              formTitle: updates.formTitle
+            });
+          }
+          return success;
+        } else {
+          console.warn('ConfigManager.restoreFormInfo: スプレッドシートにフォームが関連付けられていません', {
+            userId,
+            spreadsheetId: config.spreadsheetId
+          });
+          return false;
+        }
+      } catch (spreadsheetError) {
+        console.error('ConfigManager.restoreFormInfo: スプレッドシートアクセスエラー', {
+          userId,
+          spreadsheetId: config.spreadsheetId,
+          error: spreadsheetError.message
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ ConfigManager.restoreFormInfo: エラー', {
+        userId,
+        error: error.message
+      });
+      return false;
+    }
+  },
+
+  /**
+   * 既存ユーザーデータの一括修正（二重構造解消）
+   * @returns {Object} 修正結果
+   */
+  fixAllDoubleStructure() {
+    try {
+      const results = {
+        totalUsers: 0,
+        fixedUsers: 0,
+        errorUsers: 0,
+        skippedUsers: 0,
+        details: []
+      };
+
+      // 全ユーザーを取得
+      const allUsers = DB.getAllUsers();
+      results.totalUsers = allUsers.length;
+
+      console.log(`🔧 ConfigManager.fixAllDoubleStructure: ${allUsers.length}ユーザーの一括修正開始`);
+
+      allUsers.forEach(user => {
+        try {
+          if (!user.configJson) {
+            results.skippedUsers++;
+            results.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              status: 'skipped',
+              reason: 'configJsonが空'
+            });
+            return;
+          }
+
+          // configJsonをパース
+          let config;
+          try {
+            config = JSON.parse(user.configJson);
+          } catch (parseError) {
+            results.errorUsers++;
+            results.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              status: 'error',
+              reason: `JSON解析エラー: ${parseError.message}`
+            });
+            return;
+          }
+
+          // 二重構造を検出
+          const hasDoubleStructure = config.configJson || config.configJSON;
+          if (!hasDoubleStructure) {
+            results.skippedUsers++;
+            results.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              status: 'skipped',
+              reason: '二重構造なし'
+            });
+            return;
+          }
+
+          // 修正処理：getUserConfigを呼び出すことで自動修復させる
+          const fixedConfig = this.getUserConfig(user.userId);
+          if (fixedConfig) {
+            results.fixedUsers++;
+            results.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              status: 'fixed',
+              reason: '二重構造を自動修復'
+            });
+          } else {
+            results.errorUsers++;
+            results.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              status: 'error',
+              reason: '自動修復失敗'
+            });
+          }
+        } catch (userError) {
+          results.errorUsers++;
+          results.details.push({
+            userId: user.userId || 'unknown',
+            email: user.userEmail || 'unknown',
+            status: 'error',
+            reason: `処理エラー: ${userError.message}`
+          });
+        }
+      });
+
+      console.log('✅ ConfigManager.fixAllDoubleStructure: 一括修正完了', {
+        total: results.totalUsers,
+        fixed: results.fixedUsers,
+        error: results.errorUsers,
+        skipped: results.skippedUsers
+      });
+
+      return results;
+    } catch (error) {
+      console.error('❌ ConfigManager.fixAllDoubleStructure: エラー', error.message);
+      throw error;
     }
   },
 
@@ -640,6 +958,198 @@ const ConfigManager = Object.freeze({
     } catch (error) {
       console.error('ConfigManager.getUserWithConfig エラー:', error.message);
       return null;
+    }
+  },
+
+  // ========================================
+  // 🛡️ 予防システム・監視機能
+  // ========================================
+
+  /**
+   * 二重構造予防システム初期化
+   * @returns {boolean} 初期化成功可否
+   */
+  initPreventionSystem() {
+    try {
+      console.log('🛡️ ConfigManager.initPreventionSystem: 二重構造予防システム初期化');
+      
+      // 予防システムのフラグを立てる
+      this._preventionSystemActive = true;
+      
+      console.log('✅ ConfigManager.initPreventionSystem: 予防システム初期化完了');
+      return true;
+    } catch (error) {
+      console.error('❌ ConfigManager.initPreventionSystem: エラー', error.message);
+      return false;
+    }
+  },
+
+  /**
+   * システム健全性チェック
+   * @returns {Object} チェック結果
+   */
+  performHealthCheck() {
+    try {
+      console.log('🔍 ConfigManager.performHealthCheck: システム健全性チェック開始');
+      
+      const results = {
+        totalUsers: 0,
+        healthyUsers: 0,
+        doubleStructureUsers: 0,
+        errorUsers: 0,
+        details: [],
+        timestamp: new Date().toISOString()
+      };
+
+      // 全ユーザーをチェック
+      const allUsers = DB.getAllUsers();
+      results.totalUsers = allUsers.length;
+
+      allUsers.forEach(user => {
+        try {
+          if (!user.configJson) {
+            results.healthyUsers++;
+            return;
+          }
+
+          // configJsonを安全に解析
+          let config;
+          try {
+            config = JSON.parse(user.configJson);
+          } catch (parseError) {
+            results.errorUsers++;
+            results.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              issue: 'json_parse_error',
+              description: parseError.message
+            });
+            return;
+          }
+
+          // 二重構造チェック
+          const hasDoubleStructure = config.configJson || config.configJSON;
+          if (hasDoubleStructure) {
+            results.doubleStructureUsers++;
+            results.details.push({
+              userId: user.userId,
+              email: user.userEmail,
+              issue: 'double_structure',
+              description: '二重構造を検出'
+            });
+          } else {
+            results.healthyUsers++;
+          }
+        } catch (userError) {
+          results.errorUsers++;
+          results.details.push({
+            userId: user.userId || 'unknown',
+            email: user.userEmail || 'unknown',
+            issue: 'processing_error',
+            description: userError.message
+          });
+        }
+      });
+
+      const healthScore = Math.round((results.healthyUsers / results.totalUsers) * 100);
+      
+      console.log('✅ ConfigManager.performHealthCheck: システム健全性チェック完了', {
+        total: results.totalUsers,
+        healthy: results.healthyUsers,
+        doubleStructure: results.doubleStructureUsers,
+        errors: results.errorUsers,
+        healthScore: `${healthScore}%`
+      });
+
+      results.healthScore = healthScore;
+      return results;
+    } catch (error) {
+      console.error('❌ ConfigManager.performHealthCheck: エラー', error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 総合修復処理（全問題を一括解決）
+   * @returns {Object} 修復結果
+   */
+  performCompleteRepair() {
+    try {
+      console.log('🔧 ConfigManager.performCompleteRepair: 総合修復処理開始');
+      
+      const repairResults = {
+        doubleStructureRepair: null,
+        consistencyRepair: null,
+        formInfoRepair: null,
+        timestamp: new Date().toISOString()
+      };
+
+      // Phase 1: 二重構造修復
+      console.log('Phase 1: 二重構造一括修復');
+      repairResults.doubleStructureRepair = this.fixAllDoubleStructure();
+
+      // Phase 2: 整合性修復（各ユーザーごと）
+      console.log('Phase 2: 整合性修復');
+      const allUsers = DB.getAllUsers();
+      let consistencyFixed = 0;
+      let consistencyErrors = 0;
+
+      allUsers.forEach(user => {
+        try {
+          const success = this.fixSetupConsistency(user.userId);
+          if (success) {
+            consistencyFixed++;
+          } else {
+            consistencyErrors++;
+          }
+        } catch (error) {
+          consistencyErrors++;
+          console.warn('ConfigManager.performCompleteRepair: 整合性修復エラー', {
+            userId: user.userId,
+            error: error.message
+          });
+        }
+      });
+
+      repairResults.consistencyRepair = {
+        totalUsers: allUsers.length,
+        fixed: consistencyFixed,
+        errors: consistencyErrors
+      };
+
+      // Phase 3: フォーム情報復元（各ユーザーごと）
+      console.log('Phase 3: フォーム情報復元');
+      let formInfoFixed = 0;
+      let formInfoErrors = 0;
+
+      allUsers.forEach(user => {
+        try {
+          const success = this.restoreFormInfo(user.userId);
+          if (success) {
+            formInfoFixed++;
+          } else {
+            formInfoErrors++;
+          }
+        } catch (error) {
+          formInfoErrors++;
+          console.warn('ConfigManager.performCompleteRepair: フォーム情報復元エラー', {
+            userId: user.userId,
+            error: error.message
+          });
+        }
+      });
+
+      repairResults.formInfoRepair = {
+        totalUsers: allUsers.length,
+        fixed: formInfoFixed,
+        errors: formInfoErrors
+      };
+
+      console.log('✅ ConfigManager.performCompleteRepair: 総合修復処理完了', repairResults);
+      return repairResults;
+    } catch (error) {
+      console.error('❌ ConfigManager.performCompleteRepair: エラー', error.message);
+      throw error;
     }
   },
 });

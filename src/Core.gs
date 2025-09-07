@@ -1226,11 +1226,13 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
     configJson.lastModified = new Date().toISOString();
 
     // データベースのspreadsheetIdとsheetNameフィールドを更新
-    DB.updateUser(currentUserId, { 
-      spreadsheetId: spreadsheetId,
-      sheetName: sheetName,
-      configJson: JSON.stringify(configJson) 
+    // 🔧 修正: 直接フィールド更新 + ConfigManager経由での安全保存
+    DB.updateUserInDatabase(currentUserId, { 
+      // 基本フィールドのみ直接更新
+      lastModified: new Date().toISOString()
     });
+    // configJsonはConfigManager経由で安全保存
+    ConfigManager.saveConfig(currentUserId, configJson);
     console.log('✅ 表示シートを切り替えました: %s - %s', spreadsheetId, sheetName);
     return { status: 'success', message: '表示シートを切り替えました。' };
   } catch (e) {
@@ -1505,9 +1507,8 @@ function saveSystemConfig(requestUserId, config) {
       updatedAt: new Date().toISOString(),
     };
 
-    DB.updateUser(currentUserId, {
-      configJson: JSON.stringify(configJson),
-    });
+    // 🔧 修正: ConfigManager経由で安全な保存（二重構造防止）
+    ConfigManager.saveConfig(currentUserId, configJson);
 
     return {
       status: 'success',
@@ -2235,9 +2236,8 @@ function saveClassChoices(userId, classChoices) {
     configJson.savedClassChoices = classChoices;
     configJson.lastClassChoicesUpdate = new Date().toISOString();
 
-    DB.updateUser(currentUserId, {
-      configJson: JSON.stringify(configJson),
-    });
+    // 🔧 修正: ConfigManager経由で安全な保存（二重構造防止）
+    ConfigManager.saveConfig(currentUserId, configJson);
 
     console.log('クラス選択肢が保存されました:', classChoices);
     return { status: 'success', message: 'クラス選択肢が保存されました' };
@@ -3628,17 +3628,18 @@ function createForm(requestUserId, config) {
       delete updatedConfigJson.enableClass;
       delete updatedConfigJson.classChoices;
 
-      // 新しく作成されたスプレッドシート情報をメインのユーザー情報として更新
-      const updateData = {
-        spreadsheetId: result.spreadsheetId,
-        spreadsheetUrl: result.spreadsheetUrl,
-        configJson: JSON.stringify(updatedConfigJson),
+      // 🔧 修正: 直接フィールド更新 + ConfigManager経由での安全保存
+      const directUpdateData = {
         lastAccessedAt: new Date().toISOString(),
       };
 
-      console.log('createCustomFormUI - update data:', JSON.stringify(updateData));
+      console.log('createCustomFormUI - 直接更新フィールド:', JSON.stringify(directUpdateData));
+      console.log('createCustomFormUI - ConfigManager保存データ:', Object.keys(updatedConfigJson).length, 'fields');
 
-      DB.updateUser(requestUserId, updateData);
+      // 直接フィールドのみDB更新
+      DB.updateUserInDatabase(requestUserId, directUpdateData);
+      // configJsonは安全に保存
+      ConfigManager.saveConfig(requestUserId, updatedConfigJson);
 
       // カスタムフォーム作成後の包括的キャッシュ同期（Quick Startと同様）
       console.log('🗑️ カスタムフォーム作成後の包括的キャッシュ同期中...');
@@ -3913,8 +3914,9 @@ function getInitialData(requestUserId, sheetName) {
     }
     if (needsUpdate) {
       try {
-        DB.updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
-        userInfo.configJson = JSON.stringify(configJson);
+        // 🔧 修正: ConfigManager経由で安全な保存（二重構造防止）
+        ConfigManager.saveConfig(currentUserId, configJson);
+        // userInfo.configJsonの直接更新は削除（二重構造原因となるため）
       } catch (updateErr) {
         console.warn(`Config auto-heal failed: ${updateErr.message}`);
       }

@@ -1211,11 +1211,9 @@ function renderAnswerBoard(userInfo, params) {
         if (headerIndices?.opinionHeader && userInfo?.userId) {
           try {
             const updatedConfig = { ...config, opinionHeader: headerIndices.opinionHeader };
-            DB.updateUser(userInfo.userId, {
-              configJson: JSON.stringify(updatedConfig),
-              lastModified: new Date().toISOString(),
-            });
-            console.log('renderAnswerBoard: opinionHeaderをconfigJsonに保存');
+            // 🔧 修正: ConfigManager経由で安全な保存（二重構造防止）
+            ConfigManager.saveConfig(userInfo.userId, updatedConfig);
+            console.log('renderAnswerBoard: opinionHeaderをConfigManager経由で保存');
           } catch (saveError) {
             console.warn('renderAnswerBoard: configJson保存エラー:', saveError.message);
           }
