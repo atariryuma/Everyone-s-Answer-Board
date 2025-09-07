@@ -43,12 +43,27 @@ function connectDataSource(spreadsheetId, sheetName) {
       columnMapping = detectColumnMapping(updatedHeaderRow);
     }
 
-    // フォーム連携情報取得
+    // 🎯 フォーム連携情報取得（正規実装）
     let formInfo = null;
     try {
+      console.log('🔍 connectDataSource: フォーム情報取得開始', { spreadsheetId });
       formInfo = checkFormConnection(spreadsheetId);
+      
+      if (formInfo && formInfo.hasForm) {
+        console.log('✅ connectDataSource: フォーム情報取得成功', {
+          formUrl: formInfo.formUrl,
+          formTitle: formInfo.formTitle,
+          hasFormUrl: !!formInfo.formUrl,
+          hasFormTitle: !!formInfo.formTitle
+        });
+      } else {
+        console.log('ℹ️ connectDataSource: フォーム未連携', { spreadsheetId });
+      }
     } catch (formError) {
-      console.warn('フォーム情報取得エラー:', formError.message);
+      console.error('❌ connectDataSource: フォーム情報取得エラー', {
+        error: formError.message,
+        spreadsheetId
+      });
     }
 
     // 現在のユーザー取得と設定準備（最適化版）
@@ -76,37 +91,37 @@ function connectDataSource(spreadsheetId, sheetName) {
         opinionHeader = headerRow[columnMapping.answer] || 'お題';
       }
 
-      // 🚀 最適化：必要最小限の設定更新のみ
+      // 🎯 正規的な設定更新：明確で確実な状態管理
       const updatedConfig = {
         // 既存設定を継承
         ...currentConfig,
 
-        // データソース情報を確実に更新
-        spreadsheetId,
-        sheetName,
+        // 🔸 データソース情報（確実に設定）
+        spreadsheetId: spreadsheetId,
+        sheetName: sheetName,
         spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
 
-        // 列マッピング・ヘッダー情報
-        columnMapping,
-        opinionHeader,
+        // 🔸 列マッピング・ヘッダー情報
+        columnMapping: columnMapping,
+        opinionHeader: opinionHeader,
 
-        // フォーム情報（確実な更新）
-        formUrl: formInfo?.formUrl || currentConfig.formUrl || null,
-        formTitle: formInfo?.formTitle || currentConfig.formTitle || null,
+        // 🔸 フォーム情報（確実な設定）
+        formUrl: formInfo?.formUrl || null,
+        formTitle: formInfo?.formTitle || null,
 
-        // ステータス更新
+        // 🔸 ステータス更新（最重要）
         setupStatus: 'completed',
+        
+        // 🔸 タイムスタンプ
         lastConnected: new Date().toISOString(),
         lastModified: new Date().toISOString(),
+        createdAt: currentConfig.createdAt || new Date().toISOString(),
 
-        // 初回設定時のデフォルト値
-        ...((!currentConfig.createdAt) && { createdAt: new Date().toISOString() }),
-        ...((!currentConfig.displaySettings) && { 
-          displaySettings: { 
-            showNames: false, 
-            showReactions: false 
-          }
-        }),
+        // 🔸 表示設定（デフォルト値確保）
+        displaySettings: currentConfig.displaySettings || {
+          showNames: false,
+          showReactions: false
+        }
       };
 
       console.log('💾 connectDataSource: 保存前の設定詳細', {

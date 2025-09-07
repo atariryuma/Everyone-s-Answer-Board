@@ -61,6 +61,29 @@ const SimpleCacheManager = {
     } catch (error) {
       console.error('SimpleCacheManager.remove エラー:', error.message);
     }
+  },
+
+  /**
+   * 🚨 緊急時キャッシュクリア（システム復旧用）
+   * Service Accountトークンとサービスオブジェクトを強制リセット
+   */
+  clearAll() {
+    try {
+      console.log('🔥 緊急キャッシュクリア: システム復旧開始');
+      
+      // Service Accountトークンクリア
+      this.scriptCache.remove('SA_TOKEN_CACHE');
+      this.scriptCache.remove('sheets_service_optimized');
+      this.scriptCache.remove('sheets_service');
+      
+      // その他のキャッシュクリア
+      const commonCacheKeys = ['user_config', 'form_info', 'system_status'];
+      commonCacheKeys.forEach(key => this.scriptCache.remove(key));
+      
+      console.log('✅ 緊急キャッシュクリア: 完了');
+    } catch (error) {
+      console.error('❌ 緊急キャッシュクリア: エラー', error.message);
+    }
   }
 };
 

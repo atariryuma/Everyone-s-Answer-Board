@@ -156,7 +156,7 @@ const DB = {
         const newRow = [
           userData.userId,
           userData.userEmail,
-          userData.isActive !== undefined ? String(userData.isActive).toLowerCase() : 'true', // 文字列小文字で統一
+          userData.isActive === true ? 'TRUE' : 'FALSE', // 正規なBoolean→文字列変換
           JSON.stringify(configJson),
           new Date().toISOString(),
         ];
@@ -379,7 +379,7 @@ const DB = {
     const userObj = {
       userId: row[0] || '',
       userEmail: row[1] || '',
-      isActive: (row[2] || 'true').toLowerCase() === 'true',  // 文字列からBoolean変換
+      isActive: String(row[2] || 'TRUE').toUpperCase() === 'TRUE',  // 正規なBoolean変換
       configJson: row[3] || '{}',
       lastModified: row[4] || '',
     };

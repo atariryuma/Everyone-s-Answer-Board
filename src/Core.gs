@@ -3307,9 +3307,8 @@ function updateIsActiveStatus(requestUserId, isActive) {
     }
 
     // isActive状態を更新
-    const newIsActiveValue = isActive ? 'true' : 'false';
     const updateResult = DB.updateUser(userInfo.userId, {
-      isActive: newIsActiveValue,
+      isActive: Boolean(isActive),  // 正規Boolean型で統一
       lastAccessedAt: new Date().toISOString(),
     });
 

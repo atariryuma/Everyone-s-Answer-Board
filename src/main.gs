@@ -202,6 +202,22 @@ function doGet(e) {
           );
         }
 
+      case 'clear_cache':
+        // 🚨 緊急時キャッシュクリア（システム復旧用）
+        try {
+          SimpleCacheManager.clearAll();
+          return HtmlService.createHtmlOutput(`
+            <h2>✅ キャッシュクリア完了</h2>
+            <p>Service Accountトークンとキャッシュをクリアしました</p>
+            <p><a href="${WebApp.getUrl()}">ホームに戻る</a></p>
+          `);
+        } catch (clearError) {
+          return HtmlService.createHtmlOutput(`
+            <h2>❌ キャッシュクリアエラー</h2>
+            <pre>${clearError.message}</pre>
+          `);
+        }
+
       case 'login':
         // ログインモード: 明示的にログイン画面を表示
         return renderLoginPage(params);
@@ -1854,4 +1870,108 @@ function validateUserDataState(userInfo) {
     fixes,
     summary: issues.length > 0 ? `${issues.length}個の問題を検出` : '状態正常',
   };
+}
+
+/**
+ * 🛠️ GAS実行用診断・復旧関数群
+ * エラー時にGASエディタから直接実行可能
+ */
+
+/**
+ * システム診断関数（GAS実行用）
+ */
+function diagnoseSystem() {
+  try {
+    console.log('🔍 システム診断開始...');
+    
+    const currentUser = UserManager.getCurrentEmail();
+    const userInfo = currentUser ? DB.findUserByEmail(currentUser) : null;
+    
+    const diagnosis = {
+      timestamp: new Date().toISOString(),
+      currentUser: currentUser,
+      userExists: !!userInfo,
+      userData: userInfo ? {
+        userId: userInfo.userId,
+        isActive: userInfo.isActive,
+        hasConfig: !!userInfo.configJson,
+        setupStatus: JSON.parse(userInfo.configJson || '{}').setupStatus
+      } : null,
+      systemSetup: isSystemSetup(),
+      recommendations: []
+    };
+    
+    if (!currentUser) {
+      diagnosis.recommendations.push('ユーザーが認証されていません');
+    }
+    if (!userInfo) {
+      diagnosis.recommendations.push('ユーザーをDBに登録してください');
+    }
+    if (userInfo && !userInfo.isActive) {
+      diagnosis.recommendations.push('ユーザーを有効化してください');
+    }
+    
+    console.log('✅ システム診断結果:', diagnosis);
+    return diagnosis;
+    
+  } catch (error) {
+    console.error('❌ システム診断エラー:', error.message);
+    return { error: error.message };
+  }
+}
+
+/**
+ * 緊急キャッシュクリア関数（GAS実行用）
+ */
+function emergencyClearCache() {
+  try {
+    console.log('🚨 緊急キャッシュクリア実行...');
+    SimpleCacheManager.clearAll();
+    console.log('✅ 緊急キャッシュクリア完了');
+    return { success: true, message: 'キャッシュクリア完了' };
+  } catch (error) {
+    console.error('❌ 緊急キャッシュクリアエラー:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 現在のユーザー修復関数（GAS実行用）
+ */
+function repairCurrentUser() {
+  try {
+    console.log('🔧 現在のユーザー修復開始...');
+    
+    const currentUser = UserManager.getCurrentEmail();
+    if (!currentUser) {
+      throw new Error('認証されたユーザーが見つかりません');
+    }
+    
+    let userInfo = DB.findUserByEmail(currentUser);
+    if (!userInfo) {
+      // ユーザーが存在しない場合は新規作成
+      console.log('新規ユーザー作成中...');
+      const newUserData = createCompleteUser(currentUser);
+      DB.createUser(newUserData);
+      userInfo = DB.findUserByEmail(currentUser);
+    }
+    
+    // データ整合性チェック・修復
+    if (userInfo.isActive !== true) {
+      console.log('isActiveフラグ修復中...');
+      DB.updateUser(userInfo.userId, { isActive: true });
+    }
+    
+    console.log('✅ ユーザー修復完了:', {
+      userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
+      isActive: userInfo.isActive
+    });
+    
+    return { success: true, userInfo: userInfo };
+    
+  } catch (error) {
+    console.error('❌ ユーザー修復エラー:', error.message);
+    return { success: false, error: error.message };
+  }
 }
