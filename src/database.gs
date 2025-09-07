@@ -31,23 +31,19 @@ const DB_CONFIG = Object.freeze({
 });
 
 /**
- * 🚨 緊急修正: 安全なService Object取得（無限再帰防止）
- * 
- * getSheetsServiceCachedの無限ループ問題を回避し、
- * 直接getSheetsServiceを呼び出してService Objectを取得
+ * Service Object取得のリトライ機能付きヘルパー
+ * 安全にgetSheetsServiceCachedを呼び出し、失敗時はリトライする
  * 
  * @param {number} maxRetries - 最大リトライ回数
  * @returns {object} Sheets API Service Object
  */
 function getSheetsServiceWithRetry(maxRetries = 2) {
-  console.log('🔧 getSheetsServiceWithRetry: 直接Service Object生成開始');
+  console.log('🔧 getSheetsServiceWithRetry: Service Object取得開始');
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // ✅ 修正: getSheetsServiceCachedの代わりに直接生成
-      const token = getServiceAccountTokenCached();
-      const service = Sheets.newSheetsApi();
-      service.setRequestHeaders({ 'Authorization': 'Bearer ' + token });
+      // getSheetsServiceCachedを呼び出す
+      const service = getSheetsServiceCached();
       
       // Service Objectの完全性確認
       if (service?.spreadsheets?.values?.append && 
@@ -60,11 +56,17 @@ function getSheetsServiceWithRetry(maxRetries = 2) {
       
     } catch (error) {
       console.warn(`🔄 Service Object取得エラー (試行 ${attempt}/${maxRetries}):`, error.message);
+      
+      // Service object corruption detectedエラーの場合はキャッシュをクリア
+      if (error.message.includes('Service object corruption')) {
+        console.log('🔧 破損検出によりキャッシュクリア');
+        cacheManager.memoCache.delete('sheets_service');
+      }
     }
     
     // 最後の試行以外は待機
     if (attempt < maxRetries) {
-      Utilities.sleep(200 * attempt); // 待機時間を増加
+      Utilities.sleep(200 * attempt);
     }
   }
   
