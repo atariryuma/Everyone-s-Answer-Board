@@ -1123,12 +1123,28 @@ function renderLoginPage(params = {}) {
  * @returns {HtmlService.HtmlOutput} HTML出力
  */
 function renderAnswerBoard(userInfo, params) {
-  // 🔥 parsedConfig優先アクセス（パフォーマンス向上）
-  const config = userInfo.parsedConfig || {};
+  // 🔥 configJSON統一アクセス（parsedConfig優先、フォールバック強化）
+  let config = {};
+  
+  // parsedConfigがある場合は優先使用
+  if (userInfo.parsedConfig && Object.keys(userInfo.parsedConfig).length > 0) {
+    config = userInfo.parsedConfig;
+    console.log('renderAnswerBoard - parsedConfig使用:', Object.keys(config));
+  } else {
+    // フォールバック：ConfigManagerから直接取得
+    console.log('renderAnswerBoard - parsedConfigが空、ConfigManagerから取得');
+    try {
+      config = ConfigManager.getUserConfig(userInfo.userId) || {};
+      console.log('renderAnswerBoard - ConfigManagerから取得完了:', Object.keys(config));
+    } catch (configError) {
+      console.warn('renderAnswerBoard - Config取得エラー:', configError.message);
+      config = {};
+    }
+  }
 
   console.log('renderAnswerBoard - userId:', userInfo.userId);
   console.log('renderAnswerBoard - mode:', params.mode);
-  console.log('renderAnswerBoard - userInfo:', {
+  console.log('renderAnswerBoard - 最終config:', {
     userId: userInfo.userId,
     hasSpreadsheetId: !!config.spreadsheetId,
     hasSheetName: !!config.sheetName,
@@ -1136,6 +1152,7 @@ function renderAnswerBoard(userInfo, params) {
       ? `${config.spreadsheetId.substring(0, 20)}...`
       : 'null',
     sheetName: config.sheetName,
+    configKeys: Object.keys(config)
   });
 
   try {

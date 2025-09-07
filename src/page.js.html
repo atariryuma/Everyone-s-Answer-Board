@@ -501,9 +501,24 @@
      * @returns {string} 有効なユーザーID、またはフォールバック値
      */
     validateUserId(userId) {
+      // デバッグ情報を追加
+      Logger.debug('🔍 validateUserId: 検証開始', {
+        inputUserId: userId,
+        inputType: typeof userId,
+        configUserId: CONFIG.userId,
+        windowUserId: window.USER_ID,
+        urlSearch: window.location.search
+      });
+
       // 基本的な検証
       if (!userId || typeof userId !== 'string' || userId.trim() === '') {
         console.warn('⚠️ Invalid or empty userId provided:', userId);
+
+        // window.USER_IDからフォールバック（最優先）
+        if (window.USER_ID && window.USER_ID.trim()) {
+          Logger.debug('✅ Using fallback userId from window.USER_ID:', window.USER_ID);
+          return window.USER_ID;
+        }
 
         // URLパラメータからuserIdを取得するフォールバック
         try {
@@ -596,7 +611,7 @@
         showScoreSort: window.showScoreSort,
         displayMode: window.displayMode,
         sheetName: CONFIG.sheetName || 'Sheet1',
-        tenantId: this.validateUserId(CONFIG.userId), // Validate and add userId to state
+        tenantId: this.validateUserId(CONFIG.userId || window.USER_ID), // Validate and add userId to state with fallback
         hasNewContent: false,
         newContentCount: 0,
         lastSeenCount: this.loadLastSeenCount(), // ローカルストレージから復元

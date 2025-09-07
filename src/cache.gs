@@ -11,6 +11,7 @@
 const SimpleCacheManager = {
   scriptCache: CacheService.getScriptCache(),
   defaultTTL: 21600, // 6時間
+  memoryCache: {}, // Service Object専用メモリキャッシュ
   
   /**
    * CacheService永続キャッシュから取得、なければ生成して保存
@@ -23,6 +24,36 @@ const SimpleCacheManager = {
       // 🔧 関数オブジェクト保護：disableCacheService=true の場合はキャッシュをスキップ
       if (disableCacheService) {
         console.log('🔧 SimpleCacheManager.get: CacheService無効化モード（関数オブジェクト保護）', { key });
+        
+        // Service Object専用処理：メモリ内キャッシュを使用
+        if (key.includes('sheets_service')) {
+          const memoryKey = `memory_${key}`;
+          const cachedServiceObj = this.memoryCache[memoryKey];
+          
+          if (cachedServiceObj && this.isValidServiceObject(cachedServiceObj)) {
+            console.log('🔧 SimpleCacheManager.get: Service Objectメモリキャッシュヒット');
+            return cachedServiceObj;
+          }
+          
+          // メモリキャッシュにない場合は新規作成
+          if (typeof valueFn === 'function') {
+            console.log('🔧 SimpleCacheManager.get: Service Object新規作成');
+            const newServiceObj = valueFn();
+            if (newServiceObj && this.isValidServiceObject(newServiceObj)) {
+              // メモリキャッシュに保存（5分間）
+              this.memoryCache[memoryKey] = newServiceObj;
+              setTimeout(() => {
+                delete this.memoryCache[memoryKey];
+                console.log('🔧 Service Objectメモリキャッシュ期限切れ');
+              }, 300000); // 5分
+              
+              return newServiceObj;
+            }
+          }
+          return null;
+        }
+        
+        // 通常の関数実行
         if (typeof valueFn === 'function') {
           return valueFn();
         }
@@ -94,6 +125,42 @@ const SimpleCacheManager = {
     } catch (error) {
       console.error('❌ 緊急キャッシュクリア: エラー', error.message);
     }
+  },
+
+  /**
+   * Service Objectの有効性を検証
+   * @param {Object} serviceObj - 検証するサービスオブジェクト
+   * @returns {boolean} 有効かどうか
+   */
+  isValidServiceObject(serviceObj) {
+    if (!serviceObj || typeof serviceObj !== 'object') {
+      return false;
+    }
+    
+    // 必要なプロパティの存在確認
+    const requiredProps = ['baseUrl', 'spreadsheets'];
+    const hasRequiredProps = requiredProps.every(prop => serviceObj.hasOwnProperty(prop));
+    
+    if (!hasRequiredProps) {
+      console.log('🔧 isValidServiceObject: 必須プロパティが不足', {
+        hasBaseUrl: !!serviceObj.baseUrl,
+        hasSpreadsheets: !!serviceObj.spreadsheets
+      });
+      return false;
+    }
+    
+    // spreadsheetsオブジェクトの関数確認
+    if (!serviceObj.spreadsheets.batchGet || typeof serviceObj.spreadsheets.batchGet !== 'function') {
+      console.log('🔧 isValidServiceObject: batchGet関数が無効');
+      return false;
+    }
+    
+    if (!serviceObj.spreadsheets.update || typeof serviceObj.spreadsheets.update !== 'function') {
+      console.log('🔧 isValidServiceObject: update関数が無効');
+      return false;
+    }
+    
+    return true;
   }
 };
 
