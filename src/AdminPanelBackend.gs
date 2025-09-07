@@ -51,14 +51,24 @@ function connectDataSource(spreadsheetId, sheetName) {
       console.warn('フォーム情報取得エラー:', formError.message);
     }
 
-    // CLAUDE.md準拠：現在のユーザー取得とconfigJSON統合
+    // 現在のユーザー取得と設定準備（最適化版）
     const currentUser = UserManager.getCurrentEmail();
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (userInfo) {
-      const currentConfig = userInfo.parsedConfig || {};
+      // 現在のconfigJSONを直接取得（ConfigManager経由削除）
+      const currentConfig = JSON.parse(userInfo.configJson || '{}');
 
-      // opinionHeader決定
+      console.log('🔍 connectDataSource: 現在の設定状態', {
+        userId: userInfo.userId,
+        currentSpreadsheetId: currentConfig.spreadsheetId,
+        currentSheetName: currentConfig.sheetName,
+        currentSetupStatus: currentConfig.setupStatus,
+        newSpreadsheetId: spreadsheetId,
+        newSheetName: sheetName,
+      });
+
+      // opinionHeader決定（シンプル化）
       let opinionHeader = 'お題';
       if (columnMapping.answer && typeof columnMapping.answer === 'string') {
         opinionHeader = columnMapping.answer;
@@ -66,69 +76,76 @@ function connectDataSource(spreadsheetId, sheetName) {
         opinionHeader = headerRow[columnMapping.answer] || 'お題';
       }
 
-      // 🚀 置き換えベース設計：必要データのみを明示的に選択（スプレッド演算子完全排除）
+      // 🚀 最適化：必要最小限の設定更新のみ
       const updatedConfig = {
-        // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
-        createdAt: currentConfig.createdAt || new Date().toISOString(),
-        lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
+        // 既存設定を継承
+        ...currentConfig,
 
-        // 🎯 CLAUDE.md準拠：データソース情報（動的値キャッシュ）
+        // データソース情報を確実に更新
         spreadsheetId,
         sheetName,
         spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
 
-        // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報
+        // 列マッピング・ヘッダー情報
         columnMapping,
         opinionHeader,
 
-        // 🎯 CLAUDE.md準拠：フォーム情報（確実な取得・設定）
-        formUrl: formInfo?.formUrl || null,
-        formTitle: formInfo?.formTitle || null,
+        // フォーム情報（確実な更新）
+        formUrl: formInfo?.formUrl || currentConfig.formUrl || null,
+        formTitle: formInfo?.formTitle || currentConfig.formTitle || null,
 
-        // 🎯 CLAUDE.md準拠：アプリ設定（データソース接続完了で'completed'に自動更新）
+        // ステータス更新
         setupStatus: 'completed',
-        appPublished: currentConfig.appPublished || false,
-        appUrl: currentConfig.appUrl || generateUserUrls(userInfo.userId).viewUrl,
-
-        // 🎯 表示設定（統一・重複排除）
-        displaySettings: {
-          showNames: currentConfig.displaySettings?.showNames || false,
-          showReactions: currentConfig.displaySettings?.showReactions || false,
-        },
-
-        // 🎯 必要最小限メタデータ
         lastConnected: new Date().toISOString(),
         lastModified: new Date().toISOString(),
+
+        // 初回設定時のデフォルト値
+        ...((!currentConfig.createdAt) && { createdAt: new Date().toISOString() }),
+        ...((!currentConfig.displaySettings) && { 
+          displaySettings: { 
+            showNames: false, 
+            showReactions: false 
+          }
+        }),
       };
 
-      // 🔧 デバッグ: updatedConfigの内容を詳細ログ出力
-      console.log('🔍 connectDataSource: 保存前のupdatedConfig詳細', {
+      console.log('💾 connectDataSource: 保存前の設定詳細', {
         userId: userInfo.userId,
-        updatedConfigKeys: Object.keys(updatedConfig),
-        spreadsheetId: updatedConfig.spreadsheetId,
-        sheetName: updatedConfig.sheetName,
-        formUrl: updatedConfig.formUrl,
-        formTitle: updatedConfig.formTitle,
-        setupStatus: updatedConfig.setupStatus,
+        updatedFields: {
+          spreadsheetId: updatedConfig.spreadsheetId,
+          sheetName: updatedConfig.sheetName,
+          setupStatus: updatedConfig.setupStatus,
+          hasFormUrl: !!updatedConfig.formUrl,
+          hasColumnMapping: !!updatedConfig.columnMapping,
+        },
         configSize: JSON.stringify(updatedConfig).length,
       });
 
-      // 🔧 修正: 構築したupdatedConfigを確実に保存
-      const saveSuccess = ConfigManager.saveConfig(userInfo.userId, updatedConfig);
+      // 🚀 最適化：ConfigManager経由を削除し、直接DB更新（Service Account維持）
+      const updateResult = DB.updateUserInDatabase(userInfo.userId, {
+        configJson: JSON.stringify(updatedConfig),
+        lastModified: new Date().toISOString(),
+      });
 
-      console.log('🔍 connectDataSource: 保存結果', {
+      console.log('🔍 connectDataSource: DB更新結果', {
         userId: userInfo.userId,
-        saveSuccess,
+        updateSuccess: updateResult.success,
+        error: updateResult.error,
         timestamp: new Date().toISOString(),
       });
 
-      if (!saveSuccess) {
-        throw new Error('設定の保存に失敗しました');
+      if (!updateResult.success) {
+        console.error('❌ connectDataSource: DB更新失敗', {
+          userId: userInfo.userId,
+          error: updateResult.error,
+          detailedError: updateResult.detailedError,
+        });
+        throw new Error(`設定の保存に失敗しました: ${updateResult.error}`);
       }
 
-      console.log('✅ connectDataSource: CLAUDE.md準拠configJSON統合保存完了', {
+      console.log('✅ connectDataSource: 最適化版データソース接続完了', {
         userId: userInfo.userId,
-        configFields: Object.keys(updatedConfig).length,
+        updatedFields: Object.keys(updatedConfig).length,
         configJsonSize: JSON.stringify(updatedConfig).length,
         spreadsheetId: updatedConfig.spreadsheetId,
         sheetName: updatedConfig.sheetName,
@@ -162,12 +179,12 @@ function connectDataSource(spreadsheetId, sheetName) {
 }
 
 /**
- * アプリ公開（CLAUDE.md準拠版）
- * 統一データソース原則：configJsonから設定を取得し、結果もconfigJsonに保存
+ * アプリ公開（最適化版 - 直接DB更新でService Account維持）
+ * 複雑な階層を削除し、確実にデータを保存
  */
 function publishApplication(config) {
   try {
-    console.log('🚀 publishApplication: CLAUDE.md準拠configJSON中心型公開開始', {
+    console.log('🚀 publishApplication: 最適化版開始（直接DB更新）', {
       hasSpreadsheetId: !!config.spreadsheetId,
       hasSheetName: !!config.sheetName,
       hasColumnMapping: !!config.columnMapping,
@@ -178,25 +195,33 @@ function publishApplication(config) {
     const userInfo = DB.findUserByEmail(currentUser);
 
     if (!userInfo) {
+      console.error('❌ publishApplication: ユーザー情報が見つかりません', {
+        currentUser,
+        timestamp: new Date().toISOString(),
+      });
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // 🔧 修正：ConfigManager経由で確実に最新設定を取得
-    const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
+    // 現在のconfigJSONを直接取得（パフォーマンス向上）
+    const currentConfig = JSON.parse(userInfo.configJson || '{}');
 
-    console.log('🔍 publishApplication: 最新設定確認', {
+    console.log('🔍 publishApplication: 現在の設定状態', {
       userId: userInfo.userId,
-      hasSpreadsheetId: !!currentConfig?.spreadsheetId,
-      hasSheetName: !!currentConfig?.sheetName,
-      configFromFrontend: {
-        hasSpreadsheetId: !!config.spreadsheetId,
-        hasSheetName: !!config.sheetName,
+      currentConfig: {
+        spreadsheetId: currentConfig.spreadsheetId,
+        sheetName: currentConfig.sheetName,
+        setupStatus: currentConfig.setupStatus,
+        appPublished: currentConfig.appPublished,
+      },
+      frontendConfig: {
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName,
       },
     });
 
-    // データソース情報のフォールバック戦略
-    const effectiveSpreadsheetId = currentConfig?.spreadsheetId || config.spreadsheetId;
-    const effectiveSheetName = currentConfig?.sheetName || config.sheetName;
+    // データソース情報の確定（フォールバック戦略）
+    const effectiveSpreadsheetId = currentConfig.spreadsheetId || config.spreadsheetId;
+    const effectiveSheetName = currentConfig.sheetName || config.sheetName;
 
     if (!effectiveSpreadsheetId || !effectiveSheetName) {
       console.error('❌ publishApplication: データソース未設定', {
@@ -208,107 +233,115 @@ function publishApplication(config) {
       throw new Error('データソースが設定されていません。まずデータソースを設定してください。');
     }
 
-    if (currentConfig.setupStatus !== 'completed') {
-      console.warn('⚠️ publishApplication: setupStatus確認', {
-        currentStatus: currentConfig.setupStatus,
-        hasSpreadsheetId: !!currentConfig.spreadsheetId,
-        hasSheetName: !!currentConfig.sheetName,
+    // データソース設定の簡単な検証
+    if (currentConfig.setupStatus !== 'completed' && effectiveSpreadsheetId && effectiveSheetName) {
+      console.log('🔧 publishApplication: setupStatusを自動修正 (pending → completed)');
+      currentConfig.setupStatus = 'completed';
+    } else if (!effectiveSpreadsheetId || !effectiveSheetName) {
+      console.error('❌ publishApplication: 必須データソース情報不足', {
+        effectiveSpreadsheetId: !!effectiveSpreadsheetId,
+        effectiveSheetName: !!effectiveSheetName,
       });
-      // データソースがある場合はsetupStatusを自動修正
-      if (currentConfig.spreadsheetId && currentConfig.sheetName) {
-        console.log('🔧 setupStatusを自動修正: pending → completed');
-        // setupStatusを更新しない（getCurrentConfigで判定済み）
-      } else {
-        throw new Error('セットアップが完了していません。データソース接続を完了させてください。');
-      }
+      throw new Error('セットアップが完了していません。データソース接続を完了させてください。');
     }
 
-    // 公開実行
+    // 公開実行（executeAppPublish）
     const publishResult = executeAppPublish(userInfo.userId, {
-      spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName,
+      spreadsheetId: effectiveSpreadsheetId,
+      sheetName: effectiveSheetName,
       displaySettings: {
-        showNames: config.showNames || false, // CLAUDE.md準拠：心理的安全性
+        showNames: config.showNames || false,
         showReactions: config.showReactions || false,
       },
     });
 
+    console.log('📊 publishApplication: executeAppPublish実行結果', {
+      userId: userInfo.userId,
+      success: publishResult.success,
+      hasAppUrl: !!publishResult.appUrl,
+      error: publishResult.error,
+    });
+
     if (publishResult.success) {
-      const currentConfig = userInfo.parsedConfig || {};
-
-      // 🚀 置き換えベース設計：公開時の完全クリーンアップ（スプレッド演算子完全排除）
-      const publishedConfig = {
-        // 🎯 CLAUDE.md準拠：監査情報（必要なもののみ継承）
-        createdAt: currentConfig.createdAt || new Date().toISOString(),
-        lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
-
-        // 🎯 CLAUDE.md準拠：データソース情報（既存から継承）
-        spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
-        sheetName: config.sheetName || currentConfig.sheetName,
-        spreadsheetUrl:
-          currentConfig.spreadsheetUrl ||
-          (config.spreadsheetId
-            ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`
-            : null),
-
-        // 🎯 CLAUDE.md準拠：列マッピング・ヘッダー情報（継承）
-        columnMapping: currentConfig.columnMapping || {},
-        opinionHeader: currentConfig.opinionHeader || 'お題',
-
-        // 🎯 CLAUDE.md準拠：フォーム情報（継承）
-        ...(currentConfig.formUrl && {
-          formUrl: currentConfig.formUrl,
-          formTitle: currentConfig.formTitle,
-        }),
-
-        // 🎯 CLAUDE.md準拠：アプリ設定
-        setupStatus: 'completed', // 公開時は完了
+      // 🔥 最適化：ConfigManager経由を削除し、直接configJSONを更新
+      const updatedConfig = {
+        ...currentConfig,
+        // 公開設定
+        setupStatus: 'completed',
         appPublished: true,
         publishedAt: new Date().toISOString(),
         appUrl: publishResult.appUrl,
-        isDraft: false, // 🔥 公開時はドラフト状態を解除
-
-        // 🎯 表示設定（重複排除：フロントエンド設定を反映）
+        isDraft: false,
+        
+        // 表示設定を確実に更新
         displaySettings: {
           showNames: config.showNames || false,
           showReactions: config.showReactions || false,
         },
 
-        // 🎯 必要最小限メタデータ
+        // メタデータ
         lastModified: new Date().toISOString(),
       };
 
-      // 🔒 データソース情報を明示的に保持してConfigManager更新
-      ConfigManager.updateAppStatus(userInfo.userId, {
-        appPublished: true,
-        setupStatus: 'completed',
-        preserveDataSource: true, // 🔒 connectDataSourceで保存されたデータソース情報を保護
-        // フォールバックデータソース情報（保護機能が失敗した場合の備え）
-        spreadsheetId: effectiveSpreadsheetId,
-        sheetName: effectiveSheetName,
-        appUrl: publishResult.appUrl,
+      console.log('💾 publishApplication: 直接DB更新開始', {
+        userId: userInfo.userId,
+        updatedFields: {
+          appPublished: updatedConfig.appPublished,
+          setupStatus: updatedConfig.setupStatus,
+          hasAppUrl: !!updatedConfig.appUrl,
+          publishedAt: updatedConfig.publishedAt,
+        },
       });
 
-      console.log('✅ publishApplication: CLAUDE.md準拠configJSON中心型公開完了', {
+      // 🚀 最適化：ConfigManagerを経由せず直接DB更新（Service Account維持）
+      const updateResult = DB.updateUserInDatabase(userInfo.userId, {
+        configJson: JSON.stringify(updatedConfig),
+        lastModified: new Date().toISOString(),
+      });
+
+      console.log('🔍 publishApplication: DB更新結果', {
+        userId: userInfo.userId,
+        updateSuccess: updateResult.success,
+        error: updateResult.error,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!updateResult.success) {
+        console.error('❌ publishApplication: DB更新失敗', {
+          userId: userInfo.userId,
+          error: updateResult.error,
+          detailedError: updateResult.detailedError,
+        });
+        throw new Error(`アプリの公開設定保存に失敗しました: ${updateResult.error}`);
+      }
+
+      console.log('✅ publishApplication: 最適化版公開完了（直接DB更新）', {
         userId: userInfo.userId,
         appUrl: publishResult.appUrl,
-        configFields: Object.keys(publishedConfig).length,
-        claudeMdCompliant: true,
+        appPublished: updatedConfig.appPublished,
+        setupStatus: updatedConfig.setupStatus,
+        hasDisplaySettings: !!updatedConfig.displaySettings,
+        publishedAt: updatedConfig.publishedAt,
       });
 
       return {
         success: true,
         appUrl: publishResult.appUrl,
-        config: publishedConfig,
-        message: 'アプリが正常に公開されました',
-        claudeMdCompliant: true,
+        config: updatedConfig,
+        message: 'アプリが正常に公開されました（最適化版）',
+        optimized: true,
         timestamp: new Date().toISOString(),
       };
     } else {
+      console.error('❌ publishApplication: executeAppPublish失敗', {
+        userId: userInfo.userId,
+        error: publishResult.error,
+        detailedError: publishResult.detailedError,
+      });
       throw new Error(publishResult.error || '公開処理に失敗しました');
     }
   } catch (error) {
-    console.error('❌ publishApplication: CLAUDE.md準拠エラー:', {
+    console.error('❌ publishApplication: 最適化版エラー', {
       error: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString(),
@@ -317,6 +350,7 @@ function publishApplication(config) {
     return {
       success: false,
       error: error.message,
+      optimized: true,
       timestamp: new Date().toISOString(),
     };
   }

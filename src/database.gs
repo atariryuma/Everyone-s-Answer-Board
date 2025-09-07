@@ -550,62 +550,132 @@ const DB = {
    * Service Account版
    */
   updateUserInDatabase(userId, dbUpdateData) {
-    const dbId = getSecureDatabaseId();
-    const sheetName = DB_CONFIG.SHEET_NAME;
+    try {
+      console.log('📝 updateUserInDatabase: 更新開始（最適化版）', {
+        userId,
+        hasConfigJson: !!dbUpdateData.configJson,
+        configJsonSize: dbUpdateData.configJson?.length || 0,
+        timestamp: new Date().toISOString(),
+      });
 
-    // Service Accountでデータ取得
-    const service = getSheetsServiceWithRetry();
-    if (!service) {
-      throw new Error('Service Accountサービスが利用できません');
-    }
-
-    const batchGetResult = service.spreadsheets.values.batchGet({
-      spreadsheetId: dbId,
-      ranges: [`${sheetName}!A:E`]
-    });
-    
-    const values = batchGetResult.valueRanges[0].values || [];
-    if (values.length === 0) {
-      throw new Error('データベースが空です');
-    }
-
-    // ユーザーの行を特定
-    let rowIndex = -1;
-    for (let i = 1; i < values.length; i++) {
-      if (values[i][0] === userId) {
-        // userIdは1列目（インデックス0）
-        rowIndex = i + 1; // 1-based index
-        break;
+      const dbId = getSecureDatabaseId();
+      const sheetName = DB_CONFIG.SHEET_NAME;
+      
+      // Service Accountサービス取得（リトライ付き）
+      const service = getSheetsServiceWithRetry();
+      if (!service) {
+        const serviceError = 'Service Accountサービスが利用できません';
+        console.error('❌ updateUserInDatabase: Service Account取得失敗', {
+          userId,
+          error: serviceError,
+        });
+        return {
+          success: false,
+          error: serviceError,
+          detailedError: 'getSheetsServiceWithRetry returned null',
+        };
       }
+
+      // データ取得（Service Account）
+      const batchGetResult = service.spreadsheets.values.batchGet({
+        spreadsheetId: dbId,
+        ranges: [`${sheetName}!A:E`]
+      });
+      
+      const values = batchGetResult.valueRanges[0].values || [];
+      if (values.length === 0) {
+        const emptyDbError = 'データベースが空です';
+        console.error('❌ updateUserInDatabase: データベース空', {
+          userId,
+          error: emptyDbError,
+        });
+        return {
+          success: false,
+          error: emptyDbError,
+          detailedError: 'batchGetResult returned empty values',
+        };
+      }
+
+      // ユーザーの行を特定
+      let rowIndex = -1;
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][0] === userId) {
+          rowIndex = i + 1; // 1-based index
+          break;
+        }
+      }
+      
+      if (rowIndex === -1) {
+        const userNotFoundError = '更新対象のユーザーが見つかりません';
+        console.error('❌ updateUserInDatabase: ユーザー行未発見', {
+          userId,
+          totalRows: values.length,
+          searchedUserId: userId,
+        });
+        return {
+          success: false,
+          error: userNotFoundError,
+          detailedError: `User ${userId} not found in ${values.length} rows`,
+        };
+      }
+
+      console.log('🔍 updateUserInDatabase: ユーザー行発見', {
+        userId,
+        rowIndex,
+        currentConfigSize: values[rowIndex - 1][3]?.length || 0,
+      });
+
+      // 🔥 CLAUDE.md準拠：5列更新（既存値保護版）
+      const currentRow = values[rowIndex - 1]; // 0-based index
+      const updateRow = [
+        userId, // [0] 変更しない
+        dbUpdateData.userEmail !== undefined ? dbUpdateData.userEmail : currentRow[1], // [1] 既存値保護
+        dbUpdateData.isActive !== undefined ? dbUpdateData.isActive : currentRow[2], // [2] 既存値保護
+        dbUpdateData.configJson, // [3] 新しいconfigJSON
+        dbUpdateData.lastModified, // [4] 更新時刻
+      ];
+
+      // Service Accountでデータ更新
+      const updateResult = service.spreadsheets.values.update({
+        spreadsheetId: dbId,
+        range: `${sheetName}!A${rowIndex}:E${rowIndex}`,
+        values: [updateRow],
+        valueInputOption: 'RAW'
+      });
+
+      console.log('✅ updateUserInDatabase: 最適化版更新完了', {
+        userId,
+        row: rowIndex,
+        configJsonSize: dbUpdateData.configJson.length,
+        updatedCells: updateResult.updatedCells,
+        updatedRange: updateResult.updatedRange,
+      });
+
+      return {
+        success: true,
+        userId,
+        rowIndex,
+        updatedCells: updateResult.updatedCells,
+        configJsonSize: dbUpdateData.configJson.length,
+        timestamp: dbUpdateData.lastModified,
+      };
+
+    } catch (error) {
+      console.error('❌ updateUserInDatabase: 最適化版エラー', {
+        userId,
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        detailedError: error.stack,
+        userId,
+        timestamp: new Date().toISOString(),
+      };
     }
-
-    if (rowIndex === -1) {
-      throw new Error('更新対象のユーザーが見つかりません');
-    }
-
-    // 🔥 CLAUDE.md準拠：5列更新（既存値保護版）
-    const currentRow = values[rowIndex - 1]; // 0-based index for values array
-    const updateRow = [
-      userId, // 変更しない
-      dbUpdateData.userEmail !== undefined ? dbUpdateData.userEmail : currentRow[1], // 既存userEmail保護
-      dbUpdateData.isActive !== undefined ? dbUpdateData.isActive : currentRow[2], // 既存isActive保護
-      dbUpdateData.configJson,
-      dbUpdateData.lastModified,
-    ];
-
-    // Service Accountでデータ更新
-    const updateResult = service.spreadsheets.values.update({
-      spreadsheetId: dbId,
-      range: `${sheetName}!A${rowIndex}:E${rowIndex}`,
-      values: [updateRow],
-      valueInputOption: 'RAW'
-    });
-
-    console.log('💾 CLAUDE.md準拠：5フィールド物理更新完了（Service Account版）', {
-      userId,
-      row: rowIndex,
-      configJsonSize: dbUpdateData.configJson.length,
-    });
   },
 
   /**
