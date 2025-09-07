@@ -16,25 +16,33 @@ const SECURITY_CONFIG = Object.freeze({
 });
 
 /**
- * キャッシュされたサービスアカウントトークンを取得
+ * CacheService永続キャッシュでサービスアカウントトークンを取得
+ * GAS実行環境で真に永続化されるCacheServiceを活用
  * @returns {string} アクセストークン
  */
 function getServiceAccountTokenCached() {
   try {
-    console.log('🔧 getServiceAccountTokenCached: トークンキャッシュ取得開始');
-    const token = cacheManager.get(SECURITY_CONFIG.AUTH_CACHE_KEY, generateNewServiceAccountToken, {
-      ttl: 3500,
-      enableMemoization: true,
-    }); // メモ化対応でトークン取得を高速化
+    console.log('🔧 getServiceAccountTokenCached: CacheService永続キャッシュ確認開始');
     
-    console.log('🔧 getServiceAccountTokenCached: トークンキャッシュ取得結果', {
-      hasToken: !!token,
-      tokenLength: token ? token.length : 0
-    });
+    // CacheService直接使用（GAS環境で真に永続化）
+    const scriptCache = CacheService.getScriptCache();
+    const cachedToken = scriptCache.get(SECURITY_CONFIG.AUTH_CACHE_KEY);
     
-    return token;
+    if (cachedToken) {
+      console.log('✅ Service Accountトークン: CacheServiceヒット（永続キャッシュ）');
+      return cachedToken;
+    }
+    
+    console.log('🔧 Service Accountトークン: キャッシュミス - 新規生成開始');
+    const newToken = generateNewServiceAccountToken();
+    
+    // 1時間（3600秒）永続キャッシュ
+    scriptCache.put(SECURITY_CONFIG.AUTH_CACHE_KEY, newToken, 3600);
+    console.log('✅ Service Accountトークン: CacheServiceに永続保存完了（1時間TTL）');
+    
+    return newToken;
   } catch (error) {
-    console.error('🔧 getServiceAccountTokenCached: キャッシュ取得エラー', {
+    console.error('❌ getServiceAccountTokenCached: CacheService永続キャッシュエラー', {
       error: error.message,
       stack: error.stack
     });

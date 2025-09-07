@@ -1603,12 +1603,22 @@
         funcName
       );
 
-      if (!isStateChanging) {
-        const cached = this.cache.get(cacheKey);
-        if (cached) {
-          return Promise.resolve(cached);
-        }
+      // 🚀 順次実行メカニズム: 並行実行を防止してパフォーマンス最適化
+      if (!this._executionQueue) {
+        this._executionQueue = Promise.resolve();
       }
+      
+      return this._executionQueue = this._executionQueue.then(async () => {
+        console.log(`⚡ runGas順次実行: ${funcName} 開始`);
+        const startTime = performance.now();
+
+        if (!isStateChanging) {
+          const cached = this.cache.get(cacheKey);
+          if (cached) {
+            console.log(`📦 runGas順次実行: ${funcName} キャッシュヒット (${(performance.now() - startTime).toFixed(1)}ms)`);
+            return Promise.resolve(cached);
+          }
+        }
 
       try {
         const userId = CONFIG.userId || '';
@@ -1616,6 +1626,15 @@
 
         // ✅ App名前空間パターンでの統一データアクセス
         switch (funcName) {
+          case 'getBulkData':
+            // 🚀 バルクデータAPI: 複数データを一括取得で高速化
+            result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getBulkData(userId, ...args);
+            });
+            break;
           case 'getPublishedSheetData':
             result = await App.getData().getPublishedSheetData(userId, ...args);
             break;
@@ -1654,11 +1673,15 @@
           this.cache.set(cacheKey, result, SYSTEM_CONSTANTS.TIMEOUTS.LONG);
         }
 
+        const executionTime = (performance.now() - startTime).toFixed(1);
+        console.log(`✅ runGas順次実行: ${funcName} 完了 (${executionTime}ms)`);
         return result;
       } catch (error) {
-        console.error('❌ runGas エラー:', { funcName, args, error });
+        const executionTime = (performance.now() - startTime).toFixed(1);
+        console.error(`❌ runGas順次実行: ${funcName} エラー (${executionTime}ms):`, { args, error });
         throw error;
       }
+      });
     }
     async verifyAdminAsync() {
       // Use server-provided flag first (fast)
@@ -2792,11 +2815,39 @@
           );
         });
 
-        // 3. Start loading immediately without waiting
-        Logger.debug('📊 AnswerBoardApp: Starting sheet data loading...');
+        // 3. 🚀 バルクデータAPI使用で高速初期化
+        Logger.debug('📊 AnswerBoardApp: バルクデータAPI使用で高速データ読み込み開始...');
         try {
-          await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: true });
-          Logger.debug('✅ AnswerBoardApp: Sheet data loaded, restoring differential cards...');
+          // 初期化時にバルクデータAPIで一括取得
+          const bulkOptions = {
+            includeSheetData: true,
+            includeFormInfo: true,
+            includeSystemInfo: true
+          };
+          
+          const bulkResult = await this.runGas('getBulkData', bulkOptions);
+          
+          if (bulkResult.success && bulkResult.data) {
+            const { data } = bulkResult;
+            Logger.debug('✅ バルクデータAPI: 一括データ取得成功', {
+              hasSheetData: !!data.sheetData,
+              hasFormInfo: !!data.formInfo,
+              hasSystemInfo: !!data.systemInfo,
+              executionTime: bulkResult.executionTime
+            });
+            
+            // シートデータを状態に反映
+            if (data.sheetData) {
+              this.synchronizeStateAfterDataUpdate(data.sheetData, 'bulk_api_init');
+              this.renderAnswerCards(data.sheetData);
+            }
+          } else {
+            // フォールバック: 従来のloadSheetData
+            Logger.debug('⚠️ バルクデータAPI失敗、従来方式にフォールバック');
+            await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: true });
+          }
+          
+          Logger.debug('✅ AnswerBoardApp: データ読み込み完了、差分カード復元中...');
 
           // 差分カードの復元
           this.restoreDifferentialCards();

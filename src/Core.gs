@@ -1,7 +1,93 @@
 /**
- * @fileoverview StudyQuest - Core Functions (最適化版)
- * 主要な業務ロジックとAPI エンドポイント
+ * @fileoverview StudyQuest - Core Functions (高速化版)
+ * 主要な業務ロジック、APIエンドポイント、バルクデータAPI
  */
+
+/**
+ * 🚀 バルクデータAPI: 複数の情報を一括取得で高速化
+ * 個別API呼び出しを防止し、パフォーマンスを大幅改善
+ * @param {string} userId - ユーザーID
+ * @param {object} options - オプション { includeSheetData, includeFormInfo, includeSystemInfo }
+ * @returns {object} 一括データ
+ */
+function getBulkData(userId, options = {}) {
+  try {
+    console.log('🚀 getBulkData: バルクデータ取得開始', { userId, options });
+    const startTime = Date.now();
+    
+    // ユーザー情報取得（必須）
+    const userInfo = DB.findUserById(userId);
+    if (!userInfo) {
+      throw new Error('ユーザーが見つかりません');
+    }
+    
+    const config = JSON.parse(userInfo.configJson || '{}');
+    const bulkData = {
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      userInfo: {
+        userEmail: userInfo.userEmail,
+        isActive: userInfo.isActive,
+        config: config
+      }
+    };
+    
+    // シートデータを含む場合
+    if (options.includeSheetData && config.spreadsheetId && config.sheetName) {
+      try {
+        bulkData.sheetData = getPublishedSheetData(userId, null, 'asc', false, true);
+      } catch (sheetError) {
+        console.warn('getBulkData: シートデータ取得エラー', sheetError.message);
+        bulkData.sheetDataError = sheetError.message;
+      }
+    }
+    
+    // フォーム情報を含む場合
+    if (options.includeFormInfo && config.formUrl) {
+      try {
+        bulkData.formInfo = getActiveFormInfo(userId);
+      } catch (formError) {
+        console.warn('getBulkData: フォーム情報取得エラー', formError.message);
+        bulkData.formInfoError = formError.message;
+      }
+    }
+    
+    // システム情報を含む場合
+    if (options.includeSystemInfo) {
+      bulkData.systemInfo = {
+        setupStep: determineSetupStep(userInfo, config),
+        isSystemSetup: isSystemSetup(),
+        appPublished: config.appPublished || false
+      };
+    }
+    
+    const executionTime = Date.now() - startTime;
+    console.log(`✅ getBulkData: 一括データ取得完了 (${executionTime}ms)`, {
+      includedData: Object.keys(bulkData),
+      dataSize: JSON.stringify(bulkData).length
+    });
+    
+    return {
+      success: true,
+      data: bulkData,
+      executionTime: executionTime
+    };
+    
+  } catch (error) {
+    console.error('❌ getBulkData: バルクデータ取得エラー', {
+      userId,
+      options,
+      error: error.message,
+      stack: error.stack
+    });
+    
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
 
 /**
  * 自動停止時間を計算する

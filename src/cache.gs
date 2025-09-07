@@ -3,235 +3,70 @@
  * 基本的なキャッシュ機能のみを保持し、複雑なキャッシュクラスを除去
  */
 
-/**
- * 簡略化されたキャッシュマネージャークラス
- */
-class CacheManager {
-  constructor() {
-    this.scriptCache = CacheService.getScriptCache();
-    this.memoCache = new Map(); // メモ化用の高速キャッシュ
-    this.defaultTTL = 21600; // デフォルトTTL（6時間）
-    this.stats = {
-      hits: 0,
-      misses: 0,
-      errors: 0,
-      totalOps: 0,
-      lastReset: Date.now(),
-    };
-  }
 
+/**
+ * シンプルなCacheService永続キャッシュ管理
+ * GAS実行環境の特性に合わせてglobalThis依存を排除
+ */
+const SimpleCacheManager = {
+  scriptCache: CacheService.getScriptCache(),
+  defaultTTL: 21600, // 6時間
+  
   /**
-   * キャッシュから値を取得、なければ指定された関数で生成して保存
-   * @param {string} key - キャッシュキー
-   * @param {function} valueFn - 値を生成する関数
-   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean, disableCacheService: boolean }
-   * @returns {*} キャッシュされた値
+   * CacheService永続キャッシュから取得、なければ生成して保存
    */
   get(key, valueFn, options = {}) {
-    const { ttl = this.defaultTTL, enableMemoization = false, disableCacheService = false } = options;
-
-    this.stats.totalOps++;
-
-    if (!key || typeof key !== 'string') {
-      this.stats.errors++;
-      throw new Error('キャッシュキーは文字列である必要があります');
-    }
-
-    // メモ化キャッシュから取得を試行
-    if (enableMemoization && this.memoCache.has(key)) {
-      this.stats.hits++;
-      return this.memoCache.get(key);
-    }
-
-    // ✅ CacheService無効化オプション対応
-    if (!disableCacheService) {
-      try {
-        // スクリプトキャッシュから取得を試行
-        const cachedValue = this.scriptCache.get(key);
-        if (cachedValue !== null) {
-          this.stats.hits++;
-          const parsedValue = JSON.parse(cachedValue);
-
-          // メモ化キャッシュにも保存
-          if (enableMemoization) {
-            this.memoCache.set(key, parsedValue);
-          }
-
-          return parsedValue;
-        }
-      } catch (error) {
-        console.warn('キャッシュ取得エラー:', error.message);
-        this.stats.errors++;
+    const { ttl = this.defaultTTL } = options;
+    
+    try {
+      // CacheService永続キャッシュから取得
+      const cachedValue = this.scriptCache.get(key);
+      if (cachedValue !== null) {
+        return JSON.parse(cachedValue);
       }
-    }
-
-    // キャッシュにない場合は関数を実行
-    if (typeof valueFn === 'function') {
-      this.stats.misses++;
-      try {
+      
+      // キャッシュにない場合は関数実行
+      if (typeof valueFn === 'function') {
         const newValue = valueFn();
-        this.set(key, newValue, { ttl, enableMemoization, disableCacheService });
+        this.set(key, newValue, { ttl });
         return newValue;
-      } catch (error) {
-        this.stats.errors++;
-        console.error('値生成関数エラー:', error.message);
-        throw error;
       }
+      
+      return null;
+    } catch (error) {
+      console.error('SimpleCacheManager.get エラー:', error.message);
+      return null;
     }
-
-    this.stats.misses++;
-    return null;
-  }
-
+  },
+  
   /**
-   * キャッシュに値を設定
-   * @param {string} key - キャッシュキー
-   * @param {*} value - 保存する値
-   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean, disableCacheService: boolean }
+   * CacheService永続キャッシュに保存
    */
   set(key, value, options = {}) {
-    const { ttl = this.defaultTTL, enableMemoization = false, disableCacheService = false } = options;
-
-    if (!key || typeof key !== 'string') {
-      throw new Error('キャッシュキーは文字列である必要があります');
-    }
-
+    const { ttl = this.defaultTTL } = options;
+    
     try {
-      // ✅ CacheService無効化オプション対応
-      if (!disableCacheService) {
-        // スクリプトキャッシュに保存
-        this.scriptCache.put(key, JSON.stringify(value), ttl);
-      }
-
-      // メモ化キャッシュにも保存
-      if (enableMemoization) {
-        this.memoCache.set(key, value);
-      }
+      this.scriptCache.put(key, JSON.stringify(value), ttl);
     } catch (error) {
-      this.stats.errors++;
-      console.error('キャッシュ設定エラー:', error.message);
-      throw error;
+      console.error('SimpleCacheManager.set エラー:', error.message);
     }
-  }
-
+  },
+  
   /**
-   * キャッシュから値を削除
-   * @param {string} key - キャッシュキー
+   * CacheService永続キャッシュから削除
    */
   remove(key) {
-    if (!key || typeof key !== 'string') {
-      throw new Error('キャッシュキーは文字列である必要があります');
-    }
-
     try {
       this.scriptCache.remove(key);
-      this.memoCache.delete(key);
     } catch (error) {
-      this.stats.errors++;
-      console.error('キャッシュ削除エラー:', error.message);
+      console.error('SimpleCacheManager.remove エラー:', error.message);
     }
   }
+};
 
-  /**
-   * パターンにマッチするキーのキャッシュをすべて削除
-   * @param {string} pattern - パターン（正規表現文字列）
-   */
-  removePattern(pattern) {
-    try {
-      // メモ化キャッシュから削除
-      const regex = new RegExp(pattern);
-      for (const key of this.memoCache.keys()) {
-        if (regex.test(key)) {
-          this.memoCache.delete(key);
-        }
-      }
-
-      // スクリプトキャッシュは一括削除がないため、よく使われるパターンのみ対応
-      if (pattern.includes('user_')) {
-        // ユーザー関連キャッシュの削除など
-        console.log('ユーザー関連キャッシュのパターン削除実行:', pattern);
-      }
-    } catch (error) {
-      this.stats.errors++;
-      console.error('パターン削除エラー:', error.message);
-    }
-  }
-
-  /**
-   * キャッシュの統計情報を取得
-   * @returns {object} 統計情報
-   */
-  getStats() {
-    return {
-      ...this.stats,
-      hitRate:
-        this.stats.totalOps > 0
-          ? `${((this.stats.hits / this.stats.totalOps) * 100).toFixed(2)}%`
-          : '0%',
-      memoSize: this.memoCache.size,
-      uptime: Date.now() - this.stats.lastReset,
-    };
-  }
-
-  /**
-   * キャッシュの健全性チェック
-   * @returns {object} 健全性情報
-   */
-  getHealth() {
-    const health = {
-      status: 'ok',
-      issues: [],
-      stats: this.getStats(),
-    };
-
-    // エラー率チェック
-    const errorRate = this.stats.totalOps > 0 ? this.stats.errors / this.stats.totalOps : 0;
-    if (errorRate > 0.1) {
-      // 10%以上のエラー率
-      health.status = 'warning';
-      health.issues.push(`高いエラー率: ${(errorRate * 100).toFixed(2)}%`);
-    }
-
-    // メモリ使用量チェック
-    if (this.memoCache.size > 1000) {
-      health.status = 'warning';
-      health.issues.push(`メモリキャッシュサイズが大きい: ${this.memoCache.size}`);
-    }
-
-    return health;
-  }
-
-  /**
-   * 統計情報をリセット
-   */
-  resetStats() {
-    this.stats = {
-      hits: 0,
-      misses: 0,
-      errors: 0,
-      totalOps: 0,
-      lastReset: Date.now(),
-    };
-  }
-
-  /**
-   * メモリキャッシュをクリア
-   */
-  clearMemoCache() {
-    this.memoCache.clear();
-  }
-}
-
-// グローバルキャッシュマネージャーインスタンス（最適化版）
-// ✅ GAS実行環境での永続化対応
-let cacheManager;
-if (typeof globalThis._optimizedCacheManager === 'undefined') {
-  globalThis._optimizedCacheManager = new CacheManager();
-  console.log('🚀 最適化CacheManager: 新規作成');
-} else {
-  console.log('🎯 最適化CacheManager: 既存インスタンス再利用');
-}
-cacheManager = globalThis._optimizedCacheManager;
+// 後方互換性のためのエイリアス
+const cacheManager = SimpleCacheManager;
+console.log('🗄️ シンプルCacheService永続キャッシュが初期化されました（globalThis依存排除）');
 
 /**
  * Sheets APIサービス結果のキャッシュ（互換性維持）
@@ -550,7 +385,7 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
 
   // キャッシュから取得を試行（forceRefreshでない場合）
   if (useCache && !forceRefresh) {
-    const cached = cacheManager.get(cacheKey, null, { enableMemoization: true });
+    const cached = SimpleCacheManager.get(cacheKey, null);
     if (cached && (!validate || validateSpreadsheetHeaders(cached).success)) {
       return cached;
     }
@@ -588,10 +423,7 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
 
     // キャッシュに保存
     if (useCache) {
-      cacheManager.set(cacheKey, headerIndices, {
-        ttl: 1800, // 30分
-        enableMemoization: true,
-      });
+      SimpleCacheManager.set(cacheKey, headerIndices, { ttl: 1800 });
     }
 
     console.log(`📊 スプレッドシートヘッダーを取得しました: ${spreadsheetId}/${sheetName}`);
@@ -704,20 +536,18 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false,
         `userinfo_${userId}`,
         `unified_user_info_${userId}`,
       ];
-      userCacheKeys.forEach((key) => cacheManager.remove(key));
+      userCacheKeys.forEach((key) => SimpleCacheManager.remove(key));
 
-      // パターンクリア（簡略版）
+      // パターンクリア（CacheServiceでは個別削除のみ対応）
       if (clearPattern) {
-        cacheManager.removePattern(`publishedData_${userId}_`);
-        cacheManager.removePattern(`sheetData_${userId}_`);
-        cacheManager.removePattern(`config_v3_${userId}_`);
+        console.log('パターンクリア: CacheServiceでは個別キー削除のみ対応');
       }
     }
 
     // メールベースキャッシュクリア
     if (email) {
       const emailCacheKeys = [`email_${email}`, `unified_user_info_${email}`];
-      emailCacheKeys.forEach((key) => cacheManager.remove(key));
+      emailCacheKeys.forEach((key) => SimpleCacheManager.remove(key));
     }
 
     // スプレッドシート関連キャッシュクリア
@@ -727,7 +557,7 @@ function invalidateUserCache(userId, email, spreadsheetId, clearPattern = false,
         `spreadsheet_info_${spreadsheetId}`,
         `published_data_${spreadsheetId}`,
       ];
-      spreadsheetKeys.forEach((key) => cacheManager.remove(key));
+      spreadsheetKeys.forEach((key) => SimpleCacheManager.remove(key));
     }
 
     console.log('✅ ユーザーキャッシュ無効化完了');
@@ -764,7 +594,7 @@ function synchronizeCacheAfterCriticalUpdate(
         `user_data_${userId}`,
         `spreadsheet_info_${oldSpreadsheetId}`,
       ];
-      oldKeys.forEach((key) => cacheManager.remove(key));
+      oldKeys.forEach((key) => SimpleCacheManager.remove(key));
     }
 
     // 新しいスプレッドシート関連のキャッシュを初期化
@@ -774,7 +604,7 @@ function synchronizeCacheAfterCriticalUpdate(
         `user_data_${userId}`,
         `spreadsheet_info_${newSpreadsheetId}`,
       ];
-      newKeys.forEach((key) => cacheManager.remove(key)); // 古いキャッシュがあれば削除
+      newKeys.forEach((key) => SimpleCacheManager.remove(key)); // 古いキャッシュがあれば削除
     }
 
     console.log('✅ クリティカル更新後のキャッシュ同期完了');
@@ -784,4 +614,3 @@ function synchronizeCacheAfterCriticalUpdate(
   }
 }
 
-console.log('🗄️ 簡略化されたキャッシュシステムが初期化されました');
