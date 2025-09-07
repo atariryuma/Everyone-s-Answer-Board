@@ -130,18 +130,21 @@ function getSheetsServiceCached() {
         testToken = getServiceAccountTokenCached();
         console.log('🔧 getSheetsServiceCached: Service Accountトークン確認', { 
           hasToken: !!testToken,
-          tokenLength: testToken ? testToken.length : 0 
+          tokenLength: testToken ? testToken.length : 0,
+          tokenPrefix: testToken ? testToken.substring(0, 20) + '...' : 'null'
         });
       } catch (tokenError) {
         console.error('🔧 getSheetsServiceCached: Service Accountトークン取得エラー詳細', {
           error: tokenError.message,
           stack: tokenError.stack,
-          context: 'service_object_creation'
+          context: 'service_object_creation',
+          errorName: tokenError.name,
+          errorConstructor: tokenError.constructor.name
         });
         
         // 🚨 重要：トークン取得失敗時は不完全なサービスオブジェクトを返さない
         console.error('🚨 Service Accountトークン取得失敗により、service object構築を中止します');
-        throw new Error('Service Account Sheets APIが利用できません');
+        throw new Error('Service Account認証が利用できません。システム管理者に連絡してください。');
       }
 
       // Google Sheets APIサービスオブジェクトを返す
@@ -344,6 +347,19 @@ function getSheetsServiceCached() {
     }
   );
   
+  // 🔧 デバッグ：result の詳細情報を出力
+  console.log('🔧 getSheetsServiceCached: キャッシュからの戻り値詳細', {
+    resultType: typeof result,
+    isNull: result === null,
+    isUndefined: result === undefined,
+    hasSpreadsheets: !!result?.spreadsheets,
+    spreadsheetsType: typeof result?.spreadsheets,
+    hasValues: !!result?.spreadsheets?.values,
+    valuesType: typeof result?.spreadsheets?.values,
+    valuesKeys: result?.spreadsheets?.values ? Object.keys(result.spreadsheets.values) : [],
+    resultKeys: result ? Object.keys(result) : []
+  });
+
   // ✅ 安定化：実際の関数動作確認まで行う詳細検証
   const validation = {
     hasResult: !!result,
@@ -377,19 +393,48 @@ function getSheetsServiceCached() {
   
   // 🚨 破損したservice objectの自動修復
   // ✅ 安定化：必要な全メソッドの存在確認
+  // 🔄 無限ループ防止：修復試行回数を制限
+  const retryKey = `${cacheKey}_retry_count`;
+  const currentRetryCount = parseInt(cacheManager.get(retryKey) || '0');
+  const maxRetryAttempts = 3;
   if (!isComplete) {
     console.error('🚨 Service object破損検出：必要メソッド欠損', {
       hasAppend: validation.appendIsFunction,
       hasBatchGet: validation.hasBatchGet,
-      hasUpdate: validation.hasUpdate
+      hasUpdate: validation.hasUpdate,
+      currentRetryCount: currentRetryCount,
+      maxRetryAttempts: maxRetryAttempts
     });
+    
+    // 🔄 無限ループ防止：リトライ回数が上限を超えた場合はエラー
+    if (currentRetryCount >= maxRetryAttempts) {
+      console.error('🚨 Service object修復失敗：最大リトライ回数を超過', {
+        retryCount: currentRetryCount,
+        maxRetryAttempts: maxRetryAttempts
+      });
+      // リトライカウンターをリセットして次回は再試行できるようにする
+      cacheManager.remove(retryKey);
+      throw new Error('Service Account認証が利用できません。システム管理者に連絡してください。');
+    }
+    
+    // リトライ回数を増やす
+    cacheManager.set(retryKey, (currentRetryCount + 1).toString(), { ttl: 300 }); // 5分でリセット
     
     // ✅ メモリキャッシュのみクリア（CacheService無効のため）
     cacheManager.remove('sheets_service');
-    console.log('🔧 破損メモリキャッシュクリア完了');
+    cacheManager.remove('sheets_service_optimized');
+    console.log('🔧 破損メモリキャッシュクリア完了', {
+      nextRetryCount: currentRetryCount + 1
+    });
     
     // ✅ 次回呼び出しで正常なオブジェクトが生成される
     throw new Error('Service object corruption detected - please retry operation');
+  }
+  
+  // 🎉 成功時はリトライカウンターをクリア
+  if (currentRetryCount > 0) {
+    cacheManager.remove(retryKey);
+    console.log('✅ Service object正常生成：リトライカウンターをクリア');
   }
   
   return result;
