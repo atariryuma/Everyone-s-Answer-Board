@@ -1249,9 +1249,9 @@ function renderAnswerBoard(userInfo, params) {
         template.hasData = false;
       }
 
-      // 現在の設定から表示設定を取得
-      const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
-      const displaySettings = currentConfig?.displaySettings || {};
+      // 現在の設定から表示設定を取得（シンプル版）
+      const currentConfig = userInfo.parsedConfig || {};
+      const displaySettings = currentConfig.displaySettings || {};
 
       // 表示設定を適用
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
@@ -1267,9 +1267,9 @@ function renderAnswerBoard(userInfo, params) {
       template.message = `データ取得中にエラーが発生しました: ${dataError.message}`;
       template.hasData = false;
 
-      // エラー時も表示設定を適用
-      const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
-      const displaySettings = currentConfig?.displaySettings || {};
+      // エラー時も表示設定を適用（シンプル版）
+      const currentConfig = userInfo.parsedConfig || {};
+      const displaySettings = currentConfig.displaySettings || {};
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
       template.showCounts = displaySettings.showReactions !== false;
     }

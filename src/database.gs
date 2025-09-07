@@ -86,150 +86,78 @@ const DB = {
    */
   createUser(userData) {
     try {
-      console.log('📊 createUser: configJSON中心型ユーザー作成開始', {
-        userId: userData.userId,
-        userEmail: userData.userEmail,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Input validation (GAS 2025 best practices)
+      // 基本入力検証
       if (!userData.userEmail || !userData.userId) {
         throw new Error('必須フィールドが不足しています: userEmail, userId');
       }
 
-      // セキュリティ: ロック取得後に重複チェックでrace condition回避
-      const lock = LockService.getScriptLock();
-      const lockAcquired = lock.tryLock(DB_CONFIG.LOCK_TIMEOUT);
-
-      if (!lockAcquired) {
-        const error = new Error('システムがビジー状態です。しばらく待ってから再試行してください。');
-        console.error('❌ createUser: ロック取得失敗');
-        throw error;
-      }
-
-      // ロック内で重複チェック（アトミック操作）
+      // 重複チェック
       const existingUser = this.findUserByEmail(userData.userEmail);
       if (existingUser) {
-        lock.releaseLock();
         throw new Error('このメールアドレスは既に登録されています。');
       }
 
-      try {
-        const props = PropertiesService.getScriptProperties();
-        const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-
-        if (!dbId) {
-          throw new Error('データベース設定が不完全です。システム管理者に連絡してください。');
-        }
-
-        const sheetName = DB_CONFIG.SHEET_NAME;
-
-        // Service Account使用
-        console.log('🔧 createUser: getSheetsServiceCached呼び出し前');
-        
-        // 🚨 キャッシュ状態を強制確認 - getUser成功後にcreateUserが失敗する原因調査
-        try {
-          // Service Accountトークンの状態確認
-          const currentToken = getServiceAccountTokenCached();
-          console.log('🔧 createUser: 現在のService Accountトークン状態', {
-            hasToken: !!currentToken,
-            tokenLength: currentToken ? currentToken.length : 0
-          });
-        } catch (tokenError) {
-          console.error('🔧 createUser: Service Accountトークン取得失敗', tokenError.message);
-        }
-        
-        const service = getSheetsServiceWithRetry();
-        console.log('🔧 createUser: getSheetsServiceCached呼び出し後', { 
-          hasService: !!service,
-          serviceType: typeof service 
-        });
-        
-        if (!service) {
-          throw new Error('Service Accountサービスが利用できません');
-        }
-
-        // ConfigManagerによる初期設定構築
-        const configJson = ConfigManager.buildInitialConfig(userData);
-
-        // CLAUDE.md準拠：5フィールドのみでデータ構築
-        const newRow = [
-          userData.userId,
-          userData.userEmail,
-          userData.isActive === true ? 'TRUE' : 'FALSE', // 正規なBoolean→文字列変換
-          JSON.stringify(configJson),
-          new Date().toISOString(),
-        ];
-
-        console.log('📊 createUser: CLAUDE.md準拠5フィールド構築完了', {
-          userId: userData.userId,
-          configJsonSize: JSON.stringify(configJson).length,
-          headers: DB_CONFIG.HEADERS,
-          timestamp: new Date().toISOString(),
-        });
-
-        // Service Account: cache.gsの統一されたAPI構造を使用
-        // 🔧 診断: service オブジェクトの構造を詳細確認
-        console.log('🔧 createUser: service object診断', {
-          hasService: !!service,
-          serviceType: typeof service,
-          hasSpreadsheets: !!service?.spreadsheets,
-          spreadsheetsType: typeof service?.spreadsheets,
-          hasValues: !!service?.spreadsheets?.values,
-          valuesType: typeof service?.spreadsheets?.values,
-          hasAppend: !!service?.spreadsheets?.values?.append,
-          appendType: typeof service?.spreadsheets?.values?.append,
-          serviceKeys: service ? Object.keys(service) : [],
-          spreadsheetsKeys: service?.spreadsheets ? Object.keys(service.spreadsheets) : [],
-          valuesKeys: service?.spreadsheets?.values ? Object.keys(service.spreadsheets.values) : []
-        });
-
-        let appendResult;
-        try {
-          appendResult = service.spreadsheets.values.append({
-            spreadsheetId: dbId,
-            range: `${sheetName}!A:E`,
-            values: [newRow],
-            valueInputOption: 'RAW',
-            insertDataOption: 'INSERT_ROWS'
-          });
-          console.log('✅ createUser: append呼び出し成功', { hasResult: !!appendResult });
-        } catch (appendError) {
-          console.error('❌ createUser: append呼び出しエラー詳細', {
-            error: appendError.message,
-            stack: appendError.stack,
-            serviceStructure: {
-              hasService: !!service,
-              hasSpreadsheets: !!service?.spreadsheets,
-              hasValues: !!service?.spreadsheets?.values,
-              hasAppend: !!service?.spreadsheets?.values?.append,
-              appendIsFunction: typeof service?.spreadsheets?.values?.append === 'function'
-            }
-          });
-          throw appendError;
-        }
-
-        console.log('✅ createUser: configJSON中心型ユーザー作成完了', {
-          userId: userData.userId,
-          userEmail: userData.userEmail,
-          configJsonFields: Object.keys(configJson).length,
-          row: newRow,
-        });
-
-        return {
-          success: true,
-          userId: userData.userId,
-          userEmail: userData.userEmail,
-          configJson,
-          timestamp: new Date().toISOString(),
-        };
-      } finally {
-        lock.releaseLock();
+      // データベース取得
+      const props = PropertiesService.getScriptProperties();
+      const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      if (!dbId) {
+        throw new Error('データベース設定が不完全です。');
       }
+
+      // シンプルな初期configJson作成（setupStatus修正済み）
+      const configJson = {
+        spreadsheetId: userData.spreadsheetId || '',
+        sheetName: userData.sheetName || '',
+        formUrl: userData.formUrl || '',
+        setupStatus: 'pending',  // 明確にpendingに設定
+        appPublished: false,
+        displaySettings: {
+          showName: false,
+          showEmail: false
+        },
+        createdAt: new Date().toISOString(),
+        lastAccessedAt: new Date().toISOString()
+      };
+
+      // 5フィールド構造でデータ作成
+      const newRow = [
+        userData.userId,
+        userData.userEmail,
+        'TRUE',  // isActive
+        JSON.stringify(configJson),
+        new Date().toISOString()  // lastModified
+      ];
+
+      // データベースへ書き込み
+      const service = getSheetsServiceWithRetry();
+      if (!service) {
+        throw new Error('Service Accountサービスが利用できません');
+      }
+
+      service.spreadsheets.values.append({
+        spreadsheetId: dbId,
+        range: `${DB_CONFIG.SHEET_NAME}!A:E`,
+        values: [newRow],
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS'
+      });
+
+      console.log('✅ ユーザー作成完了（シンプル版）', {
+        userId: userData.userId,
+        setupStatus: configJson.setupStatus
+      });
+
+      return {
+        success: true,
+        userId: userData.userId,
+        userEmail: userData.userEmail,
+        configJson,
+        timestamp: new Date().toISOString()
+      };
+
     } catch (error) {
-      // 統一エラーハンドリング適用
-      const safeResponse = ErrorHandler.createSafeResponse(error, 'createUser');
-      throw new Error(safeResponse.message);
+      console.error('❌ createUser エラー:', error.message);
+      throw error;
     }
   },
 
@@ -462,54 +390,32 @@ const DB = {
    */
   updateUser(userId, updateData) {
     try {
-      console.log('📝 updateUser: configJSON中心型更新開始', {
-        userId,
-        updateFields: Object.keys(updateData),
-        timestamp: new Date().toISOString(),
-      });
-
       // 現在のユーザーデータを取得
       const currentUser = this.findUserById(userId);
       if (!currentUser) {
         throw new Error('更新対象のユーザーが見つかりません');
       }
 
-      // CLAUDE.md準拠：現在のconfigJsonと更新データをマージ
+      // シンプルなconfigJsonマージ（現在の設定を保持して更新データを追加）
       const currentConfig = currentUser.parsedConfig || {};
-      const updatedConfig = { ...currentConfig };
-
-      // ✅ CLAUDE.md準拠：5フィールド構造に厳格準拠
-      Object.keys(updateData).forEach((key) => {
-        if (key === 'userEmail' || key === 'isActive' || key === 'lastModified') {
-          // 5フィールド構造の基本フィールドはそのまま
-          return;
-        }
-        // その他はすべてconfigJsonに統合（統一データソース原則）
-        updatedConfig[key] = updateData[key];
-      });
-
-      // 🚫 二重構造防止（第1層防御）: configJsonフィールドを絶対に含めない
-      delete updatedConfig.configJson;
-      delete updatedConfig.configJSON;
-
-      // ネストした文字列形式のconfigJsonも検出して削除
-      Object.keys(updatedConfig).forEach((key) => {
-        if (key.toLowerCase() === 'configjson' || key === 'configJson') {
-          console.warn(`⚠️ DB.updateUser: 危険なフィールド "${key}" を検出・削除`);
-          delete updatedConfig[key];
-        }
-      });
-
-      // lastModifiedを更新
-      updatedConfig.lastModified = new Date().toISOString();
-
-      // 🔥 CLAUDE.md準拠：完全configJSON中心型（重複フィールド削除）
-      const dbUpdateData = {
-        configJson: JSON.stringify(updatedConfig),
-        lastModified: updatedConfig.lastModified,
+      const updatedConfig = {
+        ...currentConfig,
+        ...updateData,  // updateDataで直接上書き
+        lastModified: new Date().toISOString()
       };
 
-      // ⚡ DB基本フィールドの直接更新が必要な場合のみ追加
+      // 基本フィールドは別管理なのでconfigJsonから除外
+      delete updatedConfig.userEmail;
+      delete updatedConfig.isActive;
+      delete updatedConfig.userId;
+
+      // データベース更新データ作成
+      const dbUpdateData = {
+        configJson: JSON.stringify(updatedConfig),
+        lastModified: updatedConfig.lastModified
+      };
+
+      // 基本フィールドの直接更新がある場合
       if (updateData.userEmail !== undefined) {
         dbUpdateData.userEmail = updateData.userEmail;
       }
@@ -523,24 +429,21 @@ const DB = {
       // キャッシュクリア
       this.clearUserCache(userId, currentUser.userEmail);
 
-      console.log('✅ updateUser: configJSON中心型更新完了', {
+      console.log('✅ ユーザー更新完了（シンプル版）', {
         userId,
-        updatedFields: Object.keys(updateData),
-        configSize: dbUpdateData.configJson.length,
+        setupStatus: updatedConfig.setupStatus,
+        hasFormUrl: !!updatedConfig.formUrl
       });
 
       return {
         success: true,
         userId,
         updatedConfig,
-        timestamp: updatedConfig.lastModified,
+        timestamp: updatedConfig.lastModified
       };
+
     } catch (error) {
-      console.error('❌ updateUser: configJSON中心型更新エラー:', {
-        userId,
-        error: error.message,
-        stack: error.stack,
-      });
+      console.error('❌ updateUser エラー:', error.message);
       throw error;
     }
   },

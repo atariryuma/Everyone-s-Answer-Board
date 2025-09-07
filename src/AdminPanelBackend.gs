@@ -136,27 +136,14 @@ function connectDataSource(spreadsheetId, sheetName) {
         configSize: JSON.stringify(updatedConfig).length,
       });
 
-      // 🚀 最適化：ConfigManager経由を削除し、直接DB更新（Service Account維持）
-      const updateResult = DB.updateUserInDatabase(userInfo.userId, {
-        configJson: JSON.stringify(updatedConfig),
-        lastModified: new Date().toISOString(),
-      });
+      // 🚀 シンプル化：新しいupdateUserメソッドを使用
+      DB.updateUser(userInfo.userId, updatedConfig);
 
-      console.log('🔍 connectDataSource: DB更新結果', {
+      console.log('✅ connectDataSource: 設定更新完了', {
         userId: userInfo.userId,
-        updateSuccess: updateResult.success,
-        error: updateResult.error,
-        timestamp: new Date().toISOString(),
+        setupStatus: updatedConfig.setupStatus,
+        hasFormUrl: !!updatedConfig.formUrl
       });
-
-      if (!updateResult.success) {
-        console.error('❌ connectDataSource: DB更新失敗', {
-          userId: userInfo.userId,
-          error: updateResult.error,
-          detailedError: updateResult.detailedError,
-        });
-        throw new Error(`設定の保存に失敗しました: ${updateResult.error}`);
-      }
 
       console.log('✅ connectDataSource: 最適化版データソース接続完了', {
         userId: userInfo.userId,
@@ -308,27 +295,13 @@ function publishApplication(config) {
         },
       });
 
-      // 🚀 最適化：ConfigManagerを経由せず直接DB更新（Service Account維持）
-      const updateResult = DB.updateUserInDatabase(userInfo.userId, {
-        configJson: JSON.stringify(updatedConfig),
-        lastModified: new Date().toISOString(),
-      });
+      // 🚀 シンプル化：新しいupdateUserメソッドを使用
+      DB.updateUser(userInfo.userId, updatedConfig);
 
-      console.log('🔍 publishApplication: DB更新結果', {
+      console.log('✅ publishApplication: 公開設定更新完了', {
         userId: userInfo.userId,
-        updateSuccess: updateResult.success,
-        error: updateResult.error,
-        timestamp: new Date().toISOString(),
+        appPublished: updatedConfig.appPublished
       });
-
-      if (!updateResult.success) {
-        console.error('❌ publishApplication: DB更新失敗', {
-          userId: userInfo.userId,
-          error: updateResult.error,
-          detailedError: updateResult.detailedError,
-        });
-        throw new Error(`アプリの公開設定保存に失敗しました: ${updateResult.error}`);
-      }
 
       console.log('✅ publishApplication: 最適化版公開完了（直接DB更新）', {
         userId: userInfo.userId,
