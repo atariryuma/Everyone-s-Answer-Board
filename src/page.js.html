@@ -501,52 +501,8 @@
      * @returns {string} 有効なユーザーID、またはフォールバック値
      */
     validateUserId(userId) {
-      // デバッグ情報を追加
-      Logger.debug('🔍 validateUserId: 検証開始', {
-        inputUserId: userId,
-        inputType: typeof userId,
-        configUserId: CONFIG.userId,
-        windowUserId: window.USER_ID,
-        urlSearch: window.location.search
-      });
-
-      // 基本的な検証
-      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-        console.warn('⚠️ Invalid or empty userId provided:', userId);
-
-        // window.USER_IDからフォールバック（最優先）
-        if (window.USER_ID && window.USER_ID.trim()) {
-          Logger.debug('✅ Using fallback userId from window.USER_ID:', window.USER_ID);
-          return window.USER_ID;
-        }
-
-        // URLパラメータからuserIdを取得するフォールバック
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const fallbackUserId = urlParams.get('userId');
-
-          if (fallbackUserId) {
-            Logger.debug('✅ Using fallback userId from URL parameters:', fallbackUserId);
-            return fallbackUserId;
-          }
-        } catch (error) {
-          console.warn('⚠️ Failed to get userId from URL parameters:', error.message);
-        }
-
-        // 最後のフォールバック
-        console.error('❌ No valid userId available. Data loading may fail.');
-        return '';
-      }
-
-      // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
-      if (userId.length === 36 && userId.includes('-')) {
-        Logger.debug('✅ Valid userId format detected:', userId.substring(0, 8) + '...');
-        return userId;
-      }
-
-      // その他の形式も許可するが警告を出す
-      console.warn('⚠️ Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
-      return userId;
+      // シンプル版：基本的な値確認のみ
+      return userId || window.USER_ID || '';
     }
 
     constructor() {
