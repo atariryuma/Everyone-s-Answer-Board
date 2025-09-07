@@ -31,6 +31,40 @@ const DB_CONFIG = Object.freeze({
 });
 
 /**
+ * Service Object取得のリトライ機能付きヘルパー
+ * @param {number} maxRetries - 最大リトライ回数
+ * @returns {object} Sheets API Service Object
+ */
+function getSheetsServiceWithRetry(maxRetries = 2) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const service = getSheetsServiceWithRetry();
+      
+      // ✅ 安定化：Service Objectの完全性確認
+      if (service?.spreadsheets?.values?.append && 
+          typeof service.spreadsheets.values.append === 'function') {
+        return service;
+      }
+      
+      console.warn(`🔄 Service Object不完全 (試行 ${attempt}/${maxRetries})`);
+      
+    } catch (error) {
+      console.warn(`🔄 Service Object取得エラー (試行 ${attempt}/${maxRetries}):`, error.message);
+      
+      if (attempt === maxRetries) {
+        console.error('🚨 Service Object取得完全失敗 - 最大リトライ回数に到達');
+        throw new Error('Service Account Sheets APIが利用できません');
+      }
+      
+      // 短い待機後にリトライ
+      Utilities.sleep(100 * attempt);
+    }
+  }
+  
+  throw new Error('Service Object取得に失敗しました');
+}
+
+/**
  * CLAUDE.md準拠：統一データソース原則
  * データベース操作の名前空間オブジェクト
  */
@@ -95,7 +129,7 @@ const DB = {
           console.error('🔧 createUser: Service Accountトークン取得失敗', tokenError.message);
         }
         
-        const service = getSheetsServiceCached();
+        const service = getSheetsServiceWithRetry();
         console.log('🔧 createUser: getSheetsServiceCached呼び出し後', { 
           hasService: !!service,
           serviceType: typeof service 
@@ -259,7 +293,7 @@ const DB = {
       const sheetName = DB_CONFIG.SHEET_NAME;
 
       // Service Accountでデータ取得
-      const service = getSheetsServiceCached();
+      const service = getSheetsServiceWithRetry();
       if (!service) {
         throw new Error('Service Accountサービスが利用できません');
       }
@@ -510,7 +544,7 @@ const DB = {
     const sheetName = DB_CONFIG.SHEET_NAME;
 
     // Service Accountでデータ取得
-    const service = getSheetsServiceCached();
+    const service = getSheetsServiceWithRetry();
     if (!service) {
       throw new Error('Service Accountサービスが利用できません');
     }
@@ -598,7 +632,7 @@ const DB = {
         activeOnly 
       });
 
-      const service = getSheetsServiceCached();
+      const service = getSheetsServiceWithRetry();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -673,7 +707,7 @@ const DB = {
     console.log('🔄 findUserByEmail: キャッシュをバイパスしてDB直接検索', { email });
 
     try {
-      const service = getSheetsServiceCached();
+      const service = getSheetsServiceWithRetry();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -760,7 +794,7 @@ const DB = {
       });
 
       // 5. データベースから削除
-      const service = getSheetsServiceCached();
+      const service = getSheetsServiceWithRetry();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -869,7 +903,7 @@ const DB = {
       const logSheetName = 'DeletionLogs';
 
       // Service Accountでログ記録
-      const service = getSheetsServiceCached();
+      const service = getSheetsServiceWithRetry();
       if (!service) {
         console.warn('Service Accountサービスが利用できないためログ記録をスキップ');
         return;
@@ -1048,7 +1082,7 @@ function initializeDatabaseSheet(spreadsheetId) {
     console.log('データベースシート初期化開始:', spreadsheetId);
 
     // Service Accountでシート初期化
-    const service = getSheetsServiceCached();
+    const service = getSheetsServiceWithRetry();
     if (!service) {
       throw new Error('Service Accountサービスが利用できません');
     }
@@ -1094,7 +1128,7 @@ function cleanupEmptyUsers() {
     const dbId = getSecureDatabaseId();
     
     // Service Accountでデータ取得
-    const service = getSheetsServiceCached();
+    const service = getSheetsServiceWithRetry();
     if (!service) {
       throw new Error('Service Accountサービスが利用できません');
     }
@@ -1164,7 +1198,7 @@ function debugShowAllUsers() {
   try {
     console.log('🔍 データベース診断開始...');
 
-    const service = getSheetsServiceCached();
+    const service = getSheetsServiceWithRetry();
     const dbId = getSecureDatabaseId();
     const sheetName = 'Users';
 

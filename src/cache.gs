@@ -24,11 +24,11 @@ class CacheManager {
    * キャッシュから値を取得、なければ指定された関数で生成して保存
    * @param {string} key - キャッシュキー
    * @param {function} valueFn - 値を生成する関数
-   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean }
+   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean, disableCacheService: boolean }
    * @returns {*} キャッシュされた値
    */
   get(key, valueFn, options = {}) {
-    const { ttl = this.defaultTTL, enableMemoization = false } = options;
+    const { ttl = this.defaultTTL, enableMemoization = false, disableCacheService = false } = options;
 
     this.stats.totalOps++;
 
@@ -43,23 +43,26 @@ class CacheManager {
       return this.memoCache.get(key);
     }
 
-    try {
-      // スクリプトキャッシュから取得を試行
-      const cachedValue = this.scriptCache.get(key);
-      if (cachedValue !== null) {
-        this.stats.hits++;
-        const parsedValue = JSON.parse(cachedValue);
+    // ✅ CacheService無効化オプション対応
+    if (!disableCacheService) {
+      try {
+        // スクリプトキャッシュから取得を試行
+        const cachedValue = this.scriptCache.get(key);
+        if (cachedValue !== null) {
+          this.stats.hits++;
+          const parsedValue = JSON.parse(cachedValue);
 
-        // メモ化キャッシュにも保存
-        if (enableMemoization) {
-          this.memoCache.set(key, parsedValue);
+          // メモ化キャッシュにも保存
+          if (enableMemoization) {
+            this.memoCache.set(key, parsedValue);
+          }
+
+          return parsedValue;
         }
-
-        return parsedValue;
+      } catch (error) {
+        console.warn('キャッシュ取得エラー:', error.message);
+        this.stats.errors++;
       }
-    } catch (error) {
-      console.warn('キャッシュ取得エラー:', error.message);
-      this.stats.errors++;
     }
 
     // キャッシュにない場合は関数を実行
@@ -67,7 +70,7 @@ class CacheManager {
       this.stats.misses++;
       try {
         const newValue = valueFn();
-        this.set(key, newValue, { ttl, enableMemoization });
+        this.set(key, newValue, { ttl, enableMemoization, disableCacheService });
         return newValue;
       } catch (error) {
         this.stats.errors++;
@@ -84,18 +87,21 @@ class CacheManager {
    * キャッシュに値を設定
    * @param {string} key - キャッシュキー
    * @param {*} value - 保存する値
-   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean }
+   * @param {object} [options] - オプション { ttl: number, enableMemoization: boolean, disableCacheService: boolean }
    */
   set(key, value, options = {}) {
-    const { ttl = this.defaultTTL, enableMemoization = false } = options;
+    const { ttl = this.defaultTTL, enableMemoization = false, disableCacheService = false } = options;
 
     if (!key || typeof key !== 'string') {
       throw new Error('キャッシュキーは文字列である必要があります');
     }
 
     try {
-      // スクリプトキャッシュに保存
-      this.scriptCache.put(key, JSON.stringify(value), ttl);
+      // ✅ CacheService無効化オプション対応
+      if (!disableCacheService) {
+        // スクリプトキャッシュに保存
+        this.scriptCache.put(key, JSON.stringify(value), ttl);
+      }
 
       // メモ化キャッシュにも保存
       if (enableMemoization) {
@@ -224,8 +230,9 @@ const cacheManager = new CacheManager();
  * @returns {object|null} キャッシュされたサービス情報
  */
 function getSheetsServiceCached() {
-  console.log('🔧 getSheetsServiceCached: キャッシュ確認開始');
+  console.log('🔧 getSheetsServiceCached: 安定化版キャッシュ確認開始');
   
+  // ✅ 修正: CacheServiceは関数オブジェクトを正しく保存できないため、メモリキャッシュのみ使用
   const result = cacheManager.get(
     'sheets_service',
     () => {
@@ -445,30 +452,56 @@ function getSheetsServiceCached() {
       
       return serviceObject;
     },
-    { ttl: 3500, enableMemoization: true }
+    { 
+      ttl: 300, // 5分間に短縮（メモリリーク防止）
+      enableMemoization: true,
+      disableCacheService: true // ✅ CacheService無効化（関数オブジェクト保護）
+    }
   );
   
-  // ✅ 軽量化：必要最小限の検証のみ実行
+  // ✅ 安定化：実際の関数動作確認まで行う詳細検証
   const validation = {
     hasResult: !!result,
     hasSpreadsheets: !!result?.spreadsheets,
     hasValues: !!result?.spreadsheets?.values,
-    hasAppend: !!result?.spreadsheets?.values?.append
+    hasAppend: !!result?.spreadsheets?.values?.append,
+    appendIsFunction: typeof result?.spreadsheets?.values?.append === 'function',
+    hasBatchGet: !!result?.spreadsheets?.values?.batchGet,
+    hasUpdate: !!result?.spreadsheets?.values?.update
   };
   
+  // 🔍 完全性チェック：全必要メソッドの存在確認
+  const isComplete = validation.hasResult && 
+                    validation.hasSpreadsheets && 
+                    validation.hasValues && 
+                    validation.appendIsFunction && 
+                    validation.hasBatchGet && 
+                    validation.hasUpdate;
+  
   // パフォーマンス向上：正常時はログ出力を削減
-  if (!validation.hasResult || !validation.hasSpreadsheets || !validation.hasValues) {
-    console.log('🔧 getSheetsServiceCached: サービスオブジェクト検証', validation);
+  if (!isComplete) {
+    console.log('🔧 getSheetsServiceCached: サービスオブジェクト詳細検証', {
+      isComplete,
+      missingMethods: [
+        !validation.hasAppend && 'append',
+        !validation.hasBatchGet && 'batchGet', 
+        !validation.hasUpdate && 'update'
+      ].filter(Boolean)
+    });
   }
   
   // 🚨 破損したservice objectの自動修復
-  // ✅ 修正: Object.keys()では関数名取得不可のため、実際の破損（appendメソッド欠損）のみ検出
-  if (validation.hasResult && validation.hasValues && !validation.hasAppend) {
-    console.error('🚨 Service object破損検出：appendメソッド欠損');
+  // ✅ 安定化：必要な全メソッドの存在確認
+  if (!isComplete) {
+    console.error('🚨 Service object破損検出：必要メソッド欠損', {
+      hasAppend: validation.appendIsFunction,
+      hasBatchGet: validation.hasBatchGet,
+      hasUpdate: validation.hasUpdate
+    });
     
-    // キャッシュクリアして再試行を促す
-    cacheManager.remove('sheets_service');
-    console.log('🔧 破損キャッシュクリア完了');
+    // ✅ メモリキャッシュのみクリア（CacheService無効のため）
+    cacheManager.memoCache.delete('sheets_service');
+    console.log('🔧 破損メモリキャッシュクリア完了');
     
     // ✅ 次回呼び出しで正常なオブジェクトが生成される
     throw new Error('Service object corruption detected - please retry operation');
