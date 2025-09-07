@@ -31,37 +31,45 @@ const DB_CONFIG = Object.freeze({
 });
 
 /**
- * Service Object取得のリトライ機能付きヘルパー
+ * 🚨 緊急修正: 安全なService Object取得（無限再帰防止）
+ * 
+ * getSheetsServiceCachedの無限ループ問題を回避し、
+ * 直接getSheetsServiceを呼び出してService Objectを取得
+ * 
  * @param {number} maxRetries - 最大リトライ回数
  * @returns {object} Sheets API Service Object
  */
 function getSheetsServiceWithRetry(maxRetries = 2) {
+  console.log('🔧 getSheetsServiceWithRetry: 直接Service Object生成開始');
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const service = getSheetsServiceWithRetry();
+      // ✅ 修正: getSheetsServiceCachedの代わりに直接生成
+      const token = getServiceAccountTokenCached();
+      const service = Sheets.newSheetsApi();
+      service.setRequestHeaders({ 'Authorization': 'Bearer ' + token });
       
-      // ✅ 安定化：Service Objectの完全性確認
+      // Service Objectの完全性確認
       if (service?.spreadsheets?.values?.append && 
           typeof service.spreadsheets.values.append === 'function') {
+        console.log(`✅ Service Object取得成功 (試行 ${attempt})`);
         return service;
       }
       
-      console.warn(`🔄 Service Object不完全 (試行 ${attempt}/${maxRetries})`);
+      console.warn(`⚠️ Service Object不完全 (試行 ${attempt}/${maxRetries})`);
       
     } catch (error) {
       console.warn(`🔄 Service Object取得エラー (試行 ${attempt}/${maxRetries}):`, error.message);
-      
-      if (attempt === maxRetries) {
-        console.error('🚨 Service Object取得完全失敗 - 最大リトライ回数に到達');
-        throw new Error('Service Account Sheets APIが利用できません');
-      }
-      
-      // 短い待機後にリトライ
-      Utilities.sleep(100 * attempt);
+    }
+    
+    // 最後の試行以外は待機
+    if (attempt < maxRetries) {
+      Utilities.sleep(200 * attempt); // 待機時間を増加
     }
   }
   
-  throw new Error('Service Object取得に失敗しました');
+  console.error('🚨 全リトライ失敗：Service Object取得不可');
+  throw new Error('Service Account認証が利用できません。システム管理者に連絡してください。');
 }
 
 /**
