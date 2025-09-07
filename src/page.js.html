@@ -554,6 +554,7 @@
         sliderValue: this._getCachedElement('sliderValue'),
         headingLabel: this._getCachedElement('headingLabel'),
         sheetNameText: this._getCachedElement('sheetNameText'),
+        formAnswerBtn: this._getCachedElement('formAnswerBtn'),
         endPublicationBtn: this._getCachedElement('endPublicationBtn'),
         adminToggleBtn: this._getCachedElement('adminToggleBtn'),
         answerCount: this._getCachedElement('answerCount'),
@@ -1480,6 +1481,10 @@
         this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
         this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
       }
+      if (this.elements.formAnswerBtn) {
+        this.handlers.onFormAnswerClick = () => this.openFormAnswer();
+        this.elements.formAnswerBtn.addEventListener('click', this.handlers.onFormAnswerClick);
+      }
 
       // 新着通知バナーのイベントハンドラー
       if (this.elements.refreshContentBtn) {
@@ -1684,10 +1689,20 @@
       });
     }
     async verifyAdminAsync() {
+      // UserIDが正しく設定されているかチェック
+      Logger.debug('🔍 verifyAdminAsync: 管理者権限確認開始', {
+        windowUserId: window.USER_ID,
+        userIdLength: window.USER_ID?.length,
+        stateUserId: this.state.tenantId,
+        windowIsAdmin: window.isAdminUser,
+        hasAdminCapability: window.hasAdminCapability,
+      });
+
       // Use server-provided flag first (fast)
-      if (window.isAdminUser) {
+      if (window.isAdminUser && window.USER_ID && window.USER_ID.trim()) {
         this.state.isAdminUser = true;
         this.state.showHighlightToggle = true; // 管理者なら常に表示
+        Logger.debug('✅ サーバー提供フラグで管理者権限を確認しました');
         // Admin permissions verified
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
@@ -1697,11 +1712,17 @@
       // Fallback API call (slower)
       let prevState;
       try {
+        if (!window.USER_ID || !window.USER_ID.trim()) {
+          Logger.warn('❌ USER_IDが設定されていないため、管理者チェックをスキップします');
+          return;
+        }
+
         const isAdmin = await this.gas.checkAdmin();
         if (isAdmin) {
           window.isAdminUser = true;
           this.state.isAdminUser = true;
           this.state.showHighlightToggle = true; // 管理者なら常に表示
+          Logger.debug('✅ API経由で管理者権限を確認しました');
           // API admin permissions verified
           this.updateAdminButtonUI();
           this.updateEndPublicationButtonUI();
@@ -2840,6 +2861,15 @@
             if (data.sheetData) {
               this.synchronizeStateAfterDataUpdate(data.sheetData, 'bulk_api_init');
               this.renderAnswerCards(data.sheetData);
+            }
+            
+            // フォーム回答ボタンの表示制御
+            if (data.formUrl && this.elements.formAnswerBtn) {
+              this.elements.formAnswerBtn.style.display = 'flex';
+              Logger.debug('✅ フォーム回答ボタンを表示しました:', data.formUrl);
+            } else if (this.elements.formAnswerBtn) {
+              this.elements.formAnswerBtn.style.display = 'none';
+              Logger.debug('❌ formUrlが見つかりません - ボタンを非表示にします');
             }
           } else {
             // フォールバック: 従来のloadSheetData
@@ -5162,7 +5192,8 @@
       const container = this.elements.answersContainer;
       if (!container) {
         console.warn('calculateVisibleRange: answersContainer not found.');
-        return { startIndex: 0, endIndex: Math.min(totalItems, 100) };
+        // 106件のデータに対応するため制限を200に拡張
+        return { startIndex: 0, endIndex: Math.min(totalItems, 200) };
       }
 
       const scrollTop = container.scrollTop;
@@ -5195,9 +5226,9 @@
           Math.ceil((scrollTop + containerHeight) / cardHeight) + bufferSize
         );
 
-        // 初期表示時は十分な数を表示
+        // 初期表示時は十分な数を表示（106件対応のため200に拡張）
         if (scrollTop === 0 && startIndex === 0) {
-          endIndex = Math.min(totalItems, Math.max(100, visibleCards * 2));
+          endIndex = Math.min(totalItems, Math.max(200, visibleCards * 2));
         }
 
         Logger.perf(
@@ -5205,8 +5236,8 @@
         );
       } else {
         // 💡 改善された初期表示ロジック: データ量に応じた適応的表示
-        if (totalItems <= 100) {
-          endIndex = totalItems; // 100件以下は全表示
+        if (totalItems <= 200) {
+          endIndex = totalItems; // 200件以下は全表示
         } else if (totalItems <= 500) {
           endIndex = Math.min(totalItems, 150); // 500件以下は150件表示
         } else {
@@ -5586,6 +5617,14 @@
         }
 
         // Ensure required properties exist with safe defaults（理由列の堅牢化）
+        // 理由データのデバッグログ追加
+        Logger.debug('🔍 createAnswerCard: 理由データ検証', {
+          originalReason: data.reason,
+          reasonType: typeof data.reason,
+          reasonLength: data.reason?.length,
+          dataKeys: Object.keys(data),
+        });
+
         const safeData = {
           rowIndex: data.rowIndex || 0,
           opinion: data.opinion || '(回答なし)',
@@ -5750,7 +5789,13 @@
 
         contentDiv.appendChild(opinionTitle);
 
-        // 理由テキストが存在する場合のみ追加（堅牢化）
+        // 理由テキストの表示処理（デバッグ強化版）
+        Logger.debug('🔍 理由テキスト表示判定:', {
+          reasonExists: !!safeData.reason,
+          reasonTrimmed: safeData.reason?.trim(),
+          reasonLength: safeData.reason?.length,
+          willShow: !!(safeData.reason && safeData.reason.trim()),
+        });
 
         if (safeData.reason && safeData.reason.trim()) {
           Logger.debug('✅ 理由テキストを追加します:', safeData.reason);
@@ -7654,6 +7699,32 @@
         // フォーカスを確認ボタンに移動
         setTimeout(() => confirmBtn.focus(), 100);
       });
+    }
+
+    /**
+     * フォーム回答画面を新しいタブで開く
+     */
+    async openFormAnswer() {
+      try {
+        Logger.debug('🔗 フォーム回答画面を開きます...');
+
+        // formUrlを取得
+        const result = await this.runGas('getBulkData', { userId: this.state.tenantId });
+        
+        if (result && result.success && result.data && result.data.formUrl) {
+          const formUrl = result.data.formUrl;
+          Logger.debug('✅ フォームURLを取得しました:', formUrl);
+          
+          // 新しいタブでフォームを開く
+          window.open(formUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          console.warn('❌ フォームURLが見つかりません:', result);
+          alert('フォームURLが設定されていません。管理者にお問い合わせください。');
+        }
+      } catch (error) {
+        console.error('❌ フォーム回答画面の表示エラー:', error);
+        alert('フォーム回答画面を開く際にエラーが発生しました。再度お試しください。');
+      }
     }
 
     async endPublication() {
