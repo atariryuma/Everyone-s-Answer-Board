@@ -146,6 +146,147 @@ function testOptimizedManagementPanel() {
 }
 
 /**
+ * 🚀 パフォーマンス最適化検証テスト
+ * キャッシュ効率とService Object取得速度を検証
+ */
+function testPerformanceOptimizations() {
+  try {
+    console.log('='.repeat(60));
+    console.log('⚡ パフォーマンス最適化検証テスト開始');
+    console.log('='.repeat(60));
+
+    const results = {
+      serviceObjectCache: null,
+      userSearchCache: null,
+      overallPerformance: null,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Test 1: Service Object キャッシュ効率テスト
+    console.log('\n📝 Test 1: Service Object キャッシュ効率');
+    
+    console.log('🔧 1回目: Service Object取得（キャッシュミス想定）');
+    const start1 = Date.now();
+    const service1 = getSheetsServiceWithRetry();
+    const time1 = Date.now() - start1;
+    
+    console.log('🔧 2回目: Service Object取得（キャッシュヒット想定）');
+    const start2 = Date.now();
+    const service2 = getSheetsServiceWithRetry();
+    const time2 = Date.now() - start2;
+    
+    console.log('🔧 3回目: Service Object取得（キャッシュヒット想定）');
+    const start3 = Date.now();
+    const service3 = getSheetsServiceWithRetry();
+    const time3 = Date.now() - start3;
+
+    const avgCachedTime = (time2 + time3) / 2;
+    const speedImprovement = time1 / avgCachedTime;
+
+    results.serviceObjectCache = {
+      firstCall: `${time1}ms`,
+      secondCall: `${time2}ms`,
+      thirdCall: `${time3}ms`,
+      avgCachedTime: `${avgCachedTime}ms`,
+      speedImprovement: `${speedImprovement.toFixed(1)}x faster`,
+      cacheWorking: time2 < (time1 * 0.5) && time3 < (time1 * 0.5),
+    };
+
+    console.log('📊 Service Object キャッシュ結果:', results.serviceObjectCache);
+
+    // Test 2: User Search キャッシュテスト
+    console.log('\n📝 Test 2: User Search キャッシュ効率');
+    
+    const currentUser = UserManager.getCurrentEmail();
+    if (currentUser) {
+      // キャッシュクリア（強制更新テスト）
+      console.log('🔧 1回目: findUserByEmail（強制更新）');
+      const userStart1 = Date.now();
+      const user1 = DB.findUserByEmail(currentUser, true); // forceRefresh = true
+      const userTime1 = Date.now() - userStart1;
+      
+      console.log('🔧 2回目: findUserByEmail（キャッシュヒット想定）');
+      const userStart2 = Date.now();
+      const user2 = DB.findUserByEmail(currentUser, false); // forceRefresh = false
+      const userTime2 = Date.now() - userStart2;
+      
+      console.log('🔧 3回目: findUserByEmail（キャッシュヒット想定）');
+      const userStart3 = Date.now();
+      const user3 = DB.findUserByEmail(currentUser, false); // forceRefresh = false
+      const userTime3 = Date.now() - userStart3;
+
+      const userAvgCachedTime = (userTime2 + userTime3) / 2;
+      const userSpeedImprovement = userTime1 / userAvgCachedTime;
+
+      results.userSearchCache = {
+        firstCall: `${userTime1}ms`,
+        secondCall: `${userTime2}ms`, 
+        thirdCall: `${userTime3}ms`,
+        avgCachedTime: `${userAvgCachedTime}ms`,
+        speedImprovement: `${userSpeedImprovement.toFixed(1)}x faster`,
+        cacheWorking: userTime2 < (userTime1 * 0.3) && userTime3 < (userTime1 * 0.3),
+        userFound: !!user1 && !!user2 && !!user3,
+      };
+
+      console.log('📊 User Search キャッシュ結果:', results.userSearchCache);
+    }
+
+    // Test 3: 全体的なパフォーマンス評価
+    console.log('\n📝 Test 3: 総合パフォーマンス評価');
+    
+    const overallStart = Date.now();
+    
+    // 典型的な管理パネル読み込みシーケンス
+    const testUser = UserManager.getCurrentEmail();
+    const testUserInfo = DB.findUserByEmail(testUser);
+    const testService = getSheetsServiceWithRetry();
+    
+    const overallTime = Date.now() - overallStart;
+    
+    results.overallPerformance = {
+      totalTime: `${overallTime}ms`,
+      acceptable: overallTime < 1000, // 1秒以内が目標
+      excellent: overallTime < 500,   // 0.5秒以内が理想
+    };
+
+    console.log('📊 総合パフォーマンス:', results.overallPerformance);
+
+    // 最終評価
+    const serviceOK = results.serviceObjectCache?.cacheWorking || false;
+    const userOK = results.userSearchCache?.cacheWorking || false;
+    const performanceOK = results.overallPerformance?.acceptable || false;
+
+    const overallScore = [serviceOK, userOK, performanceOK].filter(Boolean).length;
+    const maxScore = 3;
+
+    console.log('\n='.repeat(60));
+    console.log('🎯 最適化検証結果サマリー');
+    console.log(`📈 総合スコア: ${overallScore}/${maxScore}`);
+    console.log(`🔧 Service Object キャッシュ: ${serviceOK ? '✅ 正常' : '❌ 要改善'}`);
+    console.log(`👤 User Search キャッシュ: ${userOK ? '✅ 正常' : '❌ 要改善'}`);  
+    console.log(`⚡ 総合パフォーマンス: ${performanceOK ? '✅ 良好' : '❌ 要改善'}`);
+    console.log('='.repeat(60));
+
+    results.overallScore = `${overallScore}/${maxScore}`;
+    results.optimizationSuccess = overallScore >= 2;
+    
+    return results;
+
+  } catch (error) {
+    console.error('❌ パフォーマンス最適化検証エラー:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+    });
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+/**
  * 🔍 サービスアカウント動作確認（詳細版）
  */
 function checkServiceAccountStatus() {

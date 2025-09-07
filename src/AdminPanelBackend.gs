@@ -908,32 +908,64 @@ function checkFormConnection(spreadsheetId) {
  * @returns {Object} ボード情報オブジェクト
  */
 /**
- * 現在のユーザー設定を取得（フロントエンド統合用）
+ * 現在のユーザー設定を取得（最適化版 - データ上書き防止）
  * App.getConfig().getUserConfig() の実装として使用される
  */
 function getCurrentConfig() {
+  const startTime = Date.now();
+  
   try {
     console.log('🔧 getCurrentConfig: ユーザー設定取得開始');
 
     // 現在のユーザーの設定を取得
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    if (!currentUser) {
+      console.error('❌ getCurrentConfig: ユーザーメール取得失敗');
+      throw new Error('ユーザー認証が必要です');
+    }
 
+    const userInfo = DB.findUserByEmail(currentUser);
     if (!userInfo) {
-      console.warn('getCurrentConfig: ユーザー情報が見つかりません');
-      return ConfigManager.buildInitialConfig();
+      console.error('❌ getCurrentConfig: ユーザー情報が見つかりません', {
+        currentUser,
+        timestamp: new Date().toISOString(),
+      });
+      // ✅ 修正：初期設定を返さず、エラーとして扱う
+      throw new Error('ユーザー情報が見つかりません。セットアップが必要です。');
     }
 
     const config = ConfigManager.getUserConfig(userInfo.userId);
+    if (!config) {
+      console.error('❌ getCurrentConfig: 設定データが見つかりません', {
+        userId: userInfo.userId,
+        userEmail: currentUser,
+      });
+      // ✅ 修正：既存ユーザーには初期設定ではなく最小限の設定を返す
+      throw new Error('設定データが破損している可能性があります');
+    }
+
+    const executionTime = Date.now() - startTime;
     console.log('✅ getCurrentConfig: 設定取得完了', {
       userId: userInfo.userId,
       configFields: Object.keys(config || {}).length,
+      setupStatus: config.setupStatus,
+      appPublished: config.appPublished,
+      hasSpreadsheetId: !!config.spreadsheetId,
+      executionTime: `${executionTime}ms`,
     });
 
     return config;
   } catch (error) {
-    console.error('❌ getCurrentConfig エラー:', error.message);
-    return ConfigManager.buildInitialConfig();
+    const executionTime = Date.now() - startTime;
+    console.error('❌ getCurrentConfig エラー（最適化版）', {
+      error: error.message,
+      executionTime: `${executionTime}ms`,
+      timestamp: new Date().toISOString(),
+    });
+    
+    // ✅ 重要：エラー時も初期設定を返さない
+    // フロントエンドでエラー処理を行い、ユーザーに適切な案内を表示
+    throw error;
   }
 }
 

@@ -222,8 +222,16 @@ class CacheManager {
   }
 }
 
-// グローバルキャッシュマネージャーインスタンス
-const cacheManager = new CacheManager();
+// グローバルキャッシュマネージャーインスタンス（最適化版）
+// ✅ GAS実行環境での永続化対応
+let cacheManager;
+if (typeof globalThis._optimizedCacheManager === 'undefined') {
+  globalThis._optimizedCacheManager = new CacheManager();
+  console.log('🚀 最適化CacheManager: 新規作成');
+} else {
+  console.log('🎯 最適化CacheManager: 既存インスタンス再利用');
+}
+cacheManager = globalThis._optimizedCacheManager;
 
 /**
  * Sheets APIサービス結果のキャッシュ（互換性維持）
@@ -233,8 +241,22 @@ function getSheetsServiceCached() {
   console.log('🔧 getSheetsServiceCached: 安定化版キャッシュ確認開始');
   
   // ✅ 修正: CacheServiceは関数オブジェクトを正しく保存できないため、メモリキャッシュのみ使用
+  // ✅ 最適化：先にキャッシュ存在確認とヒット率向上
+  const cacheKey = 'sheets_service_optimized';
+  console.log('🔧 getSheetsServiceCached: キャッシュ確認', { key: cacheKey });
+
+  // メモリキャッシュから直接確認
+  if (cacheManager.memoCache.has(cacheKey)) {
+    const cachedService = cacheManager.memoCache.get(cacheKey);
+    if (cachedService?.spreadsheets?.values?.append && 
+        typeof cachedService.spreadsheets.values.append === 'function') {
+      console.log('✅ getSheetsServiceCached: メモリキャッシュヒット（高速取得）');
+      return cachedService;
+    }
+  }
+
   const result = cacheManager.get(
-    'sheets_service',
+    cacheKey,
     () => {
       console.log('🔧 getSheetsServiceCached: 新しいサービスオブジェクト作成（キャッシュミス）');
       
@@ -453,7 +475,7 @@ function getSheetsServiceCached() {
       return serviceObject;
     },
     { 
-      ttl: 300, // 5分間に短縮（メモリリーク防止）
+      ttl: 900, // 15分間に延長（パフォーマンス重視）
       enableMemoization: true,
       disableCacheService: true // ✅ CacheService無効化（関数オブジェクト保護）
     }

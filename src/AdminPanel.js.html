@@ -329,10 +329,59 @@
     }
   }
 
-  // 設定データ取得（Promise版）
+  // ✅ 重複実行防止管理（パフォーマンス最適化）
+  const executionManager = {
+    pending: new Set(),
+    lastCalls: new Map(),
+    
+    debounce(funcName, delay = 500) {
+      const now = Date.now();
+      const lastCall = this.lastCalls.get(funcName) || 0;
+      
+      if (now - lastCall < delay) {
+        console.log(`🚫 ${funcName}: デバウンス実行（${delay}ms以内の連続呼び出しを防止）`);
+        return false;
+      }
+      
+      this.lastCalls.set(funcName, now);
+      return true;
+    },
+    
+    async execute(funcName, asyncFunction, debounceMs = 500) {
+      // デバウンスチェック
+      if (!this.debounce(funcName, debounceMs)) {
+        throw new Error(`${funcName}が短時間で重複実行されました`);
+      }
+      
+      // 重複実行チェック
+      if (this.pending.has(funcName)) {
+        console.log(`⏳ ${funcName}: 既に実行中のため待機`);
+        throw new Error(`${funcName}が既に実行中です`);
+      }
+      
+      try {
+        this.pending.add(funcName);
+        console.log(`🚀 ${funcName}: 実行開始（最適化版）`);
+        
+        const result = await asyncFunction();
+        
+        console.log(`✅ ${funcName}: 実行完了`);
+        return result;
+      } finally {
+        this.pending.delete(funcName);
+      }
+    }
+  };
+
+  // 設定データ取得（最適化版 - 重複実行防止）
   function getCurrentConfigAsync() {
-    return new Promise((resolve, reject) => {
-      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getCurrentConfig();
+    return executionManager.execute('getCurrentConfig', () => {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .getCurrentConfig();
+      });
     });
   }
 

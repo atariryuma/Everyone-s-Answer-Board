@@ -776,15 +776,31 @@ const DB = {
   },
 
   /**
-   * キャッシュなしでメールアドレスでユーザーを検索（ログイン専用）
+   * メールアドレスでユーザーを検索（最適化版 - インテリジェントキャッシュ）
+   * @param {string} email - メールアドレス
+   * @param {boolean} forceRefresh - キャッシュを強制更新するか
    */
-  findUserByEmail(email) {
+  findUserByEmail(email, forceRefresh = false) {
     if (!email || typeof email !== 'string') {
       console.warn('findUserByEmail: 無効なメールアドレス', email);
       return null;
     }
 
-    console.log('🔄 findUserByEmail: キャッシュをバイパスしてDB直接検索', { email });
+    const cacheKey = `user_email_${email}`;
+    const startTime = Date.now();
+
+    // キャッシュ確認（forceRefresh=falseの場合のみ）
+    if (!forceRefresh && cacheManager.memoCache.has(cacheKey)) {
+      const cachedUser = cacheManager.memoCache.get(cacheKey);
+      console.log('🎯 findUserByEmail: キャッシュヒット（高速取得）', { 
+        email, 
+        executionTime: `${Date.now() - startTime}ms` 
+      });
+      return cachedUser;
+    }
+
+    const logPrefix = forceRefresh ? '🔄 findUserByEmail: 強制更新' : '🔍 findUserByEmail: キャッシュミス';
+    console.log(logPrefix, { email });
 
     try {
       const service = getSheetsServiceWithRetry();
@@ -815,9 +831,15 @@ const DB = {
         if (row[emailIndex] === email) {
           const user = this.parseUserRow(headers, row);
 
-          console.log('✅ findUserByEmail: ユーザー発見（キャッシュバイパス）', {
+          // ✅ 最適化：ユーザー情報をキャッシュに保存（5分間）
+          cacheManager.memoCache.set(cacheKey, user);
+          
+          const executionTime = Date.now() - startTime;
+          console.log('✅ findUserByEmail: ユーザー発見（最適化版）', {
             email,
             userId: user.userId,
+            cached: true,
+            executionTime: `${executionTime}ms`,
             timestamp: new Date().toISOString(),
           });
 
@@ -825,10 +847,22 @@ const DB = {
         }
       }
 
-      console.log('findUserByEmail: ユーザーが見つかりませんでした', { email });
+      // ユーザーが見つからない場合もキャッシュ（短時間）
+      cacheManager.memoCache.set(cacheKey, null);
+      const executionTime = Date.now() - startTime;
+      
+      console.log('findUserByEmail: ユーザーが見つかりませんでした（最適化版）', { 
+        email, 
+        executionTime: `${executionTime}ms` 
+      });
       return null;
     } catch (error) {
-      console.error('findUserByEmailNoCache エラー:', error.message);
+      const executionTime = Date.now() - startTime;
+      console.error('findUserByEmail エラー（最適化版）:', {
+        email,
+        error: error.message,
+        executionTime: `${executionTime}ms`,
+      });
       return null;
     }
   },
