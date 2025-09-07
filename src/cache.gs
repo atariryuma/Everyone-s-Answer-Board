@@ -14,11 +14,21 @@ const SimpleCacheManager = {
   
   /**
    * CacheService永続キャッシュから取得、なければ生成して保存
+   * disableCacheService: true の場合は関数オブジェクト保護のためキャッシュをスキップ
    */
   get(key, valueFn, options = {}) {
-    const { ttl = this.defaultTTL } = options;
+    const { ttl = this.defaultTTL, disableCacheService = false } = options;
     
     try {
+      // 🔧 関数オブジェクト保護：disableCacheService=true の場合はキャッシュをスキップ
+      if (disableCacheService) {
+        console.log('🔧 SimpleCacheManager.get: CacheService無効化モード（関数オブジェクト保護）', { key });
+        if (typeof valueFn === 'function') {
+          return valueFn();
+        }
+        return null;
+      }
+      
       // CacheService永続キャッシュから取得
       const cachedValue = this.scriptCache.get(key);
       if (cachedValue !== null) {
@@ -103,15 +113,31 @@ function getSheetsServiceCached() {
   const cacheKey = 'sheets_service_optimized';
   console.log('🔧 getSheetsServiceCached: キャッシュ確認', { key: cacheKey });
 
-  // メモリキャッシュから直接確認
+  // 🔧 メモリキャッシュから直接確認（関数オブジェクト保護考慮）
   try {
-    const cachedService = cacheManager.get(cacheKey);
+    // disableCacheService=true の場合はキャッシュチェックをスキップ
+    const cachedService = cacheManager.get(cacheKey, null, { disableCacheService: false });
     if (cachedService !== null) {
-    if (cachedService?.spreadsheets?.values?.append && 
-        typeof cachedService.spreadsheets.values.append === 'function') {
-      console.log('✅ getSheetsServiceCached: メモリキャッシュヒット（高速取得）');
-      return cachedService;
-    }
+      // 🔍 厳密な関数検証：実際の関数型と構造をチェック
+      const isValidService = cachedService?.spreadsheets?.values?.append && 
+                            typeof cachedService.spreadsheets.values.append === 'function' &&
+                            cachedService?.spreadsheets?.values?.batchGet &&
+                            typeof cachedService.spreadsheets.values.batchGet === 'function' &&
+                            cachedService?.spreadsheets?.values?.update &&
+                            typeof cachedService.spreadsheets.values.update === 'function';
+      
+      if (isValidService) {
+        console.log('✅ getSheetsServiceCached: メモリキャッシュヒット（完全検証済み）');
+        return cachedService;
+      } else {
+        console.warn('⚠️ getSheetsServiceCached: キャッシュサービス不完全（関数欠損）- 再生成実行', {
+          hasAppend: typeof cachedService?.spreadsheets?.values?.append,
+          hasBatchGet: typeof cachedService?.spreadsheets?.values?.batchGet,
+          hasUpdate: typeof cachedService?.spreadsheets?.values?.update
+        });
+        // 不完全なキャッシュをクリア
+        cacheManager.remove(cacheKey);
+      }
     }
   } catch (error) {
     // キャッシュアクセスエラーは無視してサービスを再生成
@@ -328,15 +354,24 @@ function getSheetsServiceCached() {
         },
       };
       
-      // 🔧 service object構築完了確認
-      console.log('🔧 getSheetsServiceCached: service object構築完了確認', {
-        hasSpreadsheets: !!serviceObject.spreadsheets,
-        hasValues: !!serviceObject.spreadsheets.values,
-        hasBatchGet: typeof serviceObject.spreadsheets.values.batchGet === 'function',
-        hasUpdate: typeof serviceObject.spreadsheets.values.update === 'function', 
-        hasAppend: typeof serviceObject.spreadsheets.values.append === 'function',
-        valuesKeys: Object.keys(serviceObject.spreadsheets.values)
-      });
+      // 🔧 service object構築完了確認（構築成功時は簡潔ログ）
+      const isComplete = serviceObject.spreadsheets && serviceObject.spreadsheets.values &&
+                        typeof serviceObject.spreadsheets.values.batchGet === 'function' &&
+                        typeof serviceObject.spreadsheets.values.update === 'function' &&
+                        typeof serviceObject.spreadsheets.values.append === 'function';
+      
+      if (isComplete) {
+        console.log('✅ getSheetsServiceCached: service object構築完了（全メソッド確認済み）');
+      } else {
+        console.warn('🔧 getSheetsServiceCached: service object構築異常', {
+          hasSpreadsheets: !!serviceObject.spreadsheets,
+          hasValues: !!serviceObject.spreadsheets?.values,
+          hasBatchGet: typeof serviceObject.spreadsheets?.values?.batchGet === 'function',
+          hasUpdate: typeof serviceObject.spreadsheets?.values?.update === 'function', 
+          hasAppend: typeof serviceObject.spreadsheets?.values?.append === 'function',
+          valuesKeys: serviceObject.spreadsheets?.values ? Object.keys(serviceObject.spreadsheets.values) : []
+        });
+      }
       
       return serviceObject;
     },
@@ -347,18 +382,24 @@ function getSheetsServiceCached() {
     }
   );
   
-  // 🔧 デバッグ：result の詳細情報を出力
-  console.log('🔧 getSheetsServiceCached: キャッシュからの戻り値詳細', {
-    resultType: typeof result,
-    isNull: result === null,
-    isUndefined: result === undefined,
-    hasSpreadsheets: !!result?.spreadsheets,
-    spreadsheetsType: typeof result?.spreadsheets,
-    hasValues: !!result?.spreadsheets?.values,
-    valuesType: typeof result?.spreadsheets?.values,
-    valuesKeys: result?.spreadsheets?.values ? Object.keys(result.spreadsheets.values) : [],
-    resultKeys: result ? Object.keys(result) : []
-  });
+  // 🔧 デバッグ：result の詳細情報を出力（異常時のみ）
+  const hasAllMethods = result?.spreadsheets?.values?.append && 
+                       result?.spreadsheets?.values?.batchGet && 
+                       result?.spreadsheets?.values?.update;
+  
+  if (!hasAllMethods) {
+    console.log('🔧 getSheetsServiceCached: キャッシュからの戻り値詳細（異常検出）', {
+      resultType: typeof result,
+      isNull: result === null,
+      isUndefined: result === undefined,
+      hasSpreadsheets: !!result?.spreadsheets,
+      spreadsheetsType: typeof result?.spreadsheets,
+      hasValues: !!result?.spreadsheets?.values,
+      valuesType: typeof result?.spreadsheets?.values,
+      valuesKeys: result?.spreadsheets?.values ? Object.keys(result.spreadsheets.values) : [],
+      resultKeys: result ? Object.keys(result) : []
+    });
+  }
 
   // ✅ 安定化：実際の関数動作確認まで行う詳細検証
   const validation = {
@@ -381,13 +422,15 @@ function getSheetsServiceCached() {
   
   // パフォーマンス向上：正常時はログ出力を削減
   if (!isComplete) {
-    console.log('🔧 getSheetsServiceCached: サービスオブジェクト詳細検証', {
-      isComplete,
-      missingMethods: [
-        !validation.hasAppend && 'append',
-        !validation.hasBatchGet && 'batchGet', 
-        !validation.hasUpdate && 'update'
-      ].filter(Boolean)
+    const missingMethods = [
+      !validation.hasAppend && 'append',
+      !validation.hasBatchGet && 'batchGet', 
+      !validation.hasUpdate && 'update'
+    ].filter(Boolean);
+    
+    console.log('🔧 getSheetsServiceCached: サービス検証失敗', {
+      missingMethods: missingMethods,
+      methodCount: missingMethods.length
     });
   }
   
