@@ -104,13 +104,18 @@ function getSheetsServiceCached() {
   console.log('🔧 getSheetsServiceCached: キャッシュ確認', { key: cacheKey });
 
   // メモリキャッシュから直接確認
-  if (cacheManager.memoCache.has(cacheKey)) {
-    const cachedService = cacheManager.memoCache.get(cacheKey);
+  try {
+    const cachedService = cacheManager.get(cacheKey);
+    if (cachedService !== null) {
     if (cachedService?.spreadsheets?.values?.append && 
         typeof cachedService.spreadsheets.values.append === 'function') {
       console.log('✅ getSheetsServiceCached: メモリキャッシュヒット（高速取得）');
       return cachedService;
     }
+    }
+  } catch (error) {
+    // キャッシュアクセスエラーは無視してサービスを再生成
+    console.log('⚠️ キャッシュアクセスエラー（サービス再生成）:', error.message);
   }
 
   const result = cacheManager.get(
@@ -380,7 +385,7 @@ function getSheetsServiceCached() {
     });
     
     // ✅ メモリキャッシュのみクリア（CacheService無効のため）
-    cacheManager.memoCache.delete('sheets_service');
+    cacheManager.remove('sheets_service');
     console.log('🔧 破損メモリキャッシュクリア完了');
     
     // ✅ 次回呼び出しで正常なオブジェクトが生成される

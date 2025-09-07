@@ -60,7 +60,7 @@ function getSheetsServiceWithRetry(maxRetries = 2) {
       // Service object corruption detectedエラーの場合はキャッシュをクリア
       if (error.message.includes('Service object corruption')) {
         console.log('🔧 破損検出によりキャッシュクリア');
-        cacheManager.memoCache.delete('sheets_service');
+        cacheManager.remove('sheets_service');
       }
     }
     
@@ -693,13 +693,19 @@ const DB = {
     const startTime = Date.now();
 
     // キャッシュ確認（forceRefresh=falseの場合のみ）
-    if (!forceRefresh && cacheManager.memoCache.has(cacheKey)) {
-      const cachedUser = cacheManager.memoCache.get(cacheKey);
-      console.log('🎯 findUserByEmail: キャッシュヒット（高速取得）', { 
-        email, 
-        executionTime: `${Date.now() - startTime}ms` 
-      });
-      return cachedUser;
+    if (!forceRefresh) {
+      try {
+        const cachedUser = cacheManager.get(cacheKey);
+        if (cachedUser !== null) {
+          console.log('🎯 findUserByEmail: キャッシュヒット（高速取得）', { 
+            email, 
+            executionTime: `${Date.now() - startTime}ms` 
+          });
+          return cachedUser;
+        }
+      } catch (cacheError) {
+        console.warn('findUserByEmail: キャッシュ読み込みエラー', cacheError.message);
+      }
     }
 
     const logPrefix = forceRefresh ? '🔄 findUserByEmail: 強制更新' : '🔍 findUserByEmail: キャッシュミス';
@@ -735,7 +741,11 @@ const DB = {
           const user = this.parseUserRow(headers, row);
 
           // ✅ 最適化：ユーザー情報をキャッシュに保存（5分間）
-          cacheManager.memoCache.set(cacheKey, user);
+          try {
+            cacheManager.set(cacheKey, user, { ttl: 300 });
+          } catch (cacheError) {
+            console.warn('findUserByEmail: キャッシュ保存エラー', cacheError.message);
+          }
           
           const executionTime = Date.now() - startTime;
           console.log('✅ findUserByEmail: ユーザー発見（最適化版）', {
@@ -751,7 +761,11 @@ const DB = {
       }
 
       // ユーザーが見つからない場合もキャッシュ（短時間）
-      cacheManager.memoCache.set(cacheKey, null);
+      try {
+        cacheManager.set(cacheKey, null, { ttl: 60 });
+      } catch (cacheError) {
+        console.warn('findUserByEmail: nullキャッシュ保存エラー', cacheError.message);
+      }
       const executionTime = Date.now() - startTime;
       
       console.log('findUserByEmail: ユーザーが見つかりませんでした（最適化版）', { 

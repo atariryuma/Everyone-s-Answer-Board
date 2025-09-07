@@ -58,7 +58,9 @@
       "Bash(./scripts/validate-system-spec.js)",
       "Bash(./scripts/extract-all-functions.js)",
       "Bash(npx eslint:*)",
-      "Bash(clasp run:*)"
+      "Bash(clasp run:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": [],
