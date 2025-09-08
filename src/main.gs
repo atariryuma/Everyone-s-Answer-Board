@@ -1138,9 +1138,21 @@ function renderAnswerBoard(userInfo, params) {
     template.mode = 'view';
     template.isAdminPanel = false;
 
-    // configJSON中心型：スプレッドシート設定を統一使用
-    const userSpreadsheetId = config.spreadsheetId || null;
-    const userSheetName = config.sheetName || null;
+    // ✅ 設定取得統一化：より確実な設定参照方法
+    const userSpreadsheetId = config.spreadsheetId || userInfo.spreadsheetId || null;
+    const userSheetName = config.sheetName || userInfo.sheetName || null;
+    
+    // ✅ デバッグ：設定取得状況の詳細確認
+    console.log('🔍 renderAnswerBoard - 設定取得詳細:', {
+      'config.spreadsheetId': config.spreadsheetId,
+      'userInfo.spreadsheetId': userInfo.spreadsheetId,
+      'config.sheetName': config.sheetName,
+      'userInfo.sheetName': userInfo.sheetName,
+      finalSpreadsheetId: userSpreadsheetId,
+      finalSheetName: userSheetName,
+      configKeys: Object.keys(config),
+      userInfoKeys: Object.keys(userInfo)
+    });
 
     // 📊 ユーザーIDをテンプレートに適切に設定
     template.USER_ID = userInfo.userId || null;

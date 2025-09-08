@@ -2956,107 +2956,59 @@
       try {
         Logger.debug('🚀 AnswerBoardApp: Starting immediate data loading...');
 
-        // 1. Validate essential prerequisites
-        if (!this.validatePrerequisites()) {
-          console.error(
-            '❌ AnswerBoardApp: Prerequisites validation failed, aborting initialization'
-          );
-          this.displayInitializationError(
-            'アプリケーションの初期化に必要な条件が満たされていません'
-          );
+        // 1. ✅ シンプル化：基本的な前提条件のみチェック
+        if (!this.elements || !this.elements.answersContainer) {
+          console.error('❌ AnswerBoardApp: 基本要素が見つかりません');
           return;
         }
 
-        // 2. Verify admin status to ensure proper initialization
-        Logger.debug('🔍 AnswerBoardApp: Verifying admin status...');
-        await this.verifyAdminAsync().catch((error) => {
-          console.warn(
-            '⚠️ AnswerBoardApp: Admin verification failed, continuing with default permissions:',
-            error.message
-          );
-        });
+        // 2. ✅ シンプル化：管理者確認を非同期で並行実行（メインフローをブロックしない）
+        Logger.debug('🔍 AnswerBoardApp: 管理者確認開始（非同期）...');
+        this.verifyAdminAsync().catch((error) => {
+          console.warn('⚠️ AnswerBoardApp: 管理者確認失敗、デフォルト権限で継続:', error.message);
+        }); // awaitを削除して非ブロッキングに変更
 
-        // 3. 🚀 バルクデータAPI使用で高速初期化
-        Logger.debug('📊 AnswerBoardApp: バルクデータAPI使用で高速データ読み込み開始...');
+        // 3. ✅ シンプル化データ取得：確実に動作する従来方式を優先使用
+        Logger.debug('📊 AnswerBoardApp: シンプル化データ読み込み開始...');
         try {
-          // 初期化時にバルクデータAPIで一括取得
-          const bulkOptions = {
-            includeSheetData: true,
-            includeFormInfo: true,
-            includeSystemInfo: true
-          };
+          // ✅ 確実に動作する従来のloadSheetDataを使用（複雑なバルクAPIは廃止）
+          await this.loadSheetData({ 
+            showLoading: false, 
+            isInitialLoad: true, 
+            bypassCache: true 
+          });
           
-          const bulkResult = await this.runGas('getBulkData', bulkOptions);
-          
-          if (bulkResult.success && bulkResult.data) {
-            const { data } = bulkResult;
-            Logger.debug('✅ バルクデータAPI: 一括データ取得成功', {
-              hasSheetData: !!data.sheetData,
-              hasFormInfo: !!data.formInfo,
-              hasSystemInfo: !!data.systemInfo,
-              executionTime: bulkResult.executionTime
-            });
-            
-            // シートデータを状態に反映
-            if (data.sheetData) {
-              // ✅ sheetDataがオブジェクト形式の場合、dataプロパティを使用
-              const actualData = data.sheetData.data || data.sheetData;
-              
-              // デバッグログ追加
-              Logger.debug('🔍 sheetData構造確認:', {
-                isObject: typeof data.sheetData === 'object',
-                hasDataProperty: !!data.sheetData.data,
-                dataLength: Array.isArray(actualData) ? actualData.length : 0,
-                actualDataSample: actualData[0] || null
-              });
-              
-              this.synchronizeStateAfterDataUpdate(actualData, 'bulk_api_init');
-              // ✅ renderAnswerCardsをrenderBoardに置き換え（未定義メソッドエラー修正）
-              await this.renderBoard(false, true); // isInitialLoad = true
-            }
-            
-            // フォーム回答ボタンの表示制御
-            if (data.formUrl && this.elements.formAnswerBtn) {
-              this.elements.formAnswerBtn.style.display = 'flex';
-              Logger.debug('✅ フォーム回答ボタンを表示しました:', data.formUrl);
-            } else if (this.elements.formAnswerBtn) {
-              this.elements.formAnswerBtn.style.display = 'none';
-              Logger.debug('❌ formUrlが見つかりません - ボタンを非表示にします');
-            }
-          } else {
-            // フォールバック: 従来のloadSheetData
-            Logger.debug('⚠️ バルクデータAPI失敗、従来方式にフォールバック');
-            await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: true });
-          }
-          
-          Logger.debug('✅ AnswerBoardApp: データ読み込み完了、差分カード復元中...');
+          Logger.debug('✅ AnswerBoardApp: シンプル化データ読み込み完了');
 
-          // 差分カードの復元
+          // 差分カードの復元（シンプル化）
           this.restoreDifferentialCards();
 
-          Logger.debug('✅ AnswerBoardApp: Starting polling...');
+          // ポーリング開始（シンプル化）
+          Logger.debug('✅ AnswerBoardApp: ポーリング開始...');
           this.startPolling();
         } catch (error) {
-          console.error('❌ AnswerBoardApp: Sheet data loading failed:', error);
+          console.error('❌ AnswerBoardApp: シンプル化データ読み込み失敗:', error);
           this.displayDataLoadError(error.message || 'データの読み込みに失敗しました');
         }
 
-        // 4. Load sheets in background only for administrators
+        // 4. ✅ シンプル化：管理者用シート読み込みは非同期で後回し（メインフロー優先）
         if (this.state.isAdminUser) {
-          Logger.debug('👑 AnswerBoardApp: Loading available sheets for admin user...');
-          try {
-            await this.loadAvailableSheets();
-          } catch (error) {
-            console.warn('⚠️ AnswerBoardApp: Available sheets loading failed:', error.message);
-          }
+          // ✅ 非ブロッキング：メインデータ読み込み完了後に非同期実行
+          setTimeout(async () => {
+            Logger.debug('👑 AnswerBoardApp: 管理者用シート読み込み開始（非同期）...');
+            try {
+              await this.loadAvailableSheets();
+              Logger.debug('✅ 管理者用シート読み込み完了');
+            } catch (error) {
+              console.warn('⚠️ 管理者用シート読み込み失敗:', error.message);
+            }
+          }, 1000); // 1秒後に実行
         }
 
-        Logger.debug('🎯 AnswerBoardApp: Immediate loading initialization completed');
+        Logger.debug('✅ AnswerBoardApp: シンプル化初期化完了');
       } catch (error) {
-        console.error('❌ AnswerBoardApp: Critical error in loadDataImmediate:', error);
-        this.displayInitializationError(
-          'アプリケーションの初期化中にエラーが発生しました: ' + error.message
-        );
+        console.error('❌ AnswerBoardApp: 初期化エラー:', error);
+        this.displayInitializationError('初期化エラー: ' + error.message);
       }
     }
 
