@@ -593,6 +593,7 @@ function testDoubleStructurePrevention() {
     console.log("Test 1: システム健全性チェック");
     try {
       testResults.healthCheck = ConfigManager.performHealthCheck();
+      console.log("✅ 健全性チェック完了:", {
         total: testResults.healthCheck.totalUsers,
         healthy: testResults.healthCheck.healthyUsers,
         healthScore: testResults.healthCheck.healthScore + "%"
@@ -918,6 +919,7 @@ function diagnoseOpinionHeader(userId = null) {
     diagnosis.overallScore = Math.max(0, score);
     diagnosis.status = score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
 
+    console.log('🔍 opinionHeader診断結果', {
       userId: userInfo.userId,
       score: diagnosis.overallScore,
       status: diagnosis.status,
@@ -1305,6 +1307,7 @@ function validateClaudeMdCompliance() {
   const overallCompliance = Object.values(compliance).every(Boolean);
   const duration = Date.now() - startTime;
   
+  console.log('📊 CLAUDE.md準拠度結果:', JSON.stringify({
     overallCompliance,
     details: compliance
   }, null, 2));
@@ -1375,6 +1378,7 @@ function runComprehensiveSystemTest() {
   const overallSuccess = Object.values(testResults).every(Boolean);
   const duration = Date.now() - startTime;
   
+  console.log('🧪 システム完全性テスト結果:', JSON.stringify({
     overallSuccess,
     results: testResults
   }, null, 2));

@@ -73,6 +73,7 @@ function testOptimizedManagementPanel() {
       const updatedUserInfo = DB.findUserById(userInfo.userId);
       const updatedConfig = JSON.parse(updatedUserInfo.configJson || '{}');
       
+      console.log('🎯 configJSONテスト: 設定更新確認', {
         spreadsheetId: updatedConfig.spreadsheetId,
         sheetName: updatedConfig.sheetName,
         setupStatus: updatedConfig.setupStatus,
@@ -94,6 +95,7 @@ function testOptimizedManagementPanel() {
       // Test 3: Service Account 認証テスト
       const serviceTest = getSheetsServiceWithRetry();
       
+      console.log('🔐 Service Account 認証状態', {
         hasService: !!serviceTest,
         hasSpreadsheets: !!serviceTest?.spreadsheets,
         hasValues: !!serviceTest?.spreadsheets?.values,
@@ -500,6 +502,7 @@ function diagnoseDatabase() {
       const configJsonIndex = headers.indexOf('configJson');
       if (configJsonIndex >= 0) {
         const configJson = row[configJsonIndex];
+        console.log(`- ユーザー ${i}:`, {
           email: row[1],
           configJsonLength: configJson?.length || 0,
           configJsonPreview: configJson?.substring(0, 100) || 'データなし',

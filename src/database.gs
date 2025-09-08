@@ -334,6 +334,7 @@ const DB = {
    */
   updateUserConfig_DEPRECATED(userId, configData) {
     try {
+      console.log('updateUserConfig_DEPRECATED: 設定更新開始', {
         userId,
         configFields: Object.keys(configData),
         timestamp: new Date().toISOString(),
@@ -357,6 +358,7 @@ const DB = {
       // キャッシュクリア
       this.clearUserCache(userId, currentUser.userEmail);
 
+      console.log('updateUserConfig_DEPRECATED: 設定更新完了', {
         userId,
         configFields: Object.keys(configData),
         configSize: dbUpdateData.configJson.length,
@@ -425,6 +427,7 @@ const DB = {
       // キャッシュクリア
       this.clearUserCache(userId, currentUser.userEmail);
 
+      console.log('updateUserConfigJson: 設定更新完了', {
         userId,
         setupStatus: updatedConfig.setupStatus,
         hasFormUrl: !!updatedConfig.formUrl
@@ -449,6 +452,7 @@ const DB = {
    */
   updateUserInDatabase(userId, dbUpdateData) {
     try {
+      console.log('updateUserInDatabase: データベース更新開始', {
         userId,
         hasConfigJson: !!dbUpdateData.configJson,
         configJsonSize: dbUpdateData.configJson?.length || 0,
@@ -516,6 +520,7 @@ const DB = {
         };
       }
 
+      console.log('updateUserInDatabase: 行更新準備', {
         userId,
         rowIndex,
         currentConfigSize: values[rowIndex - 1][3]?.length || 0,
@@ -539,6 +544,7 @@ const DB = {
         valueInputOption: 'RAW'
       });
 
+      console.log('updateUserInDatabase: データベース更新完了', {
         userId,
         row: rowIndex,
         configJsonSize: dbUpdateData.configJson.length,
@@ -601,6 +607,7 @@ const DB = {
         console.warn('⚠️ getAllUsers: パフォーマンス警告 - 1000件超の取得は非推奨');
       }
       
+      console.log('getAllUsers: 取得開始', {
         limit: Math.min(limit, 1000), 
         offset, 
         activeOnly 
@@ -687,6 +694,7 @@ const DB = {
       try {
         const cachedUser = cacheManager.get(cacheKey);
         if (cachedUser !== null) {
+          console.log('findUserByEmail: キャッシュヒット', {
             email, 
             executionTime: `${Date.now() - startTime}ms` 
           });
@@ -736,6 +744,7 @@ const DB = {
           }
           
           const executionTime = Date.now() - startTime;
+          console.log('findUserByEmail: データベース検索完了・キャッシュ保存', {
             email,
             userId: user.userId,
             cached: true,
@@ -859,6 +868,7 @@ const DB = {
       // 8. 削除ログ記録
       this.logAccountDeletion(targetUserId, targetUser.userEmail, reason, currentUserEmail);
 
+      console.log('deleteUserById: ユーザー削除完了', {
         targetUserId,
         targetEmail: targetUser.userEmail,
         rowIndex: targetRowIndex,
@@ -901,6 +911,7 @@ const DB = {
         cache.remove(key);
       });
 
+      console.log('clearUserCacheEnhanced: キャッシュクリア完了', {
         userId,
         userEmail,
         clearedKeys: cacheKeys.length,
@@ -972,6 +983,7 @@ const DB = {
    */
   cleanupNestedConfigJson(userId = null) {
     try {
+      console.log('cleanupUserCache: キャッシュクリーンアップ開始', {
         targetUserId: userId || 'all_users',
         timestamp: new Date().toISOString(),
       });
@@ -1226,6 +1238,7 @@ function debugShowAllUsers() {
     
     const allData = batchGetResult.valueRanges[0].values || [];
 
+    console.log('🔍 debugShowAllUsers: データベース情報', {
       spreadsheetId: dbId,
       sheetName,
       totalRows: allData.length,
@@ -1235,6 +1248,7 @@ function debugShowAllUsers() {
     // 各ユーザーの詳細を表示
     for (let i = 1; i < allData.length; i++) {
       const row = allData[i];
+      console.log(`📋 ユーザー #${i}:`, {
         userId: row[0],
         userEmail: row[1],
         isActive: row[2],
@@ -1244,9 +1258,14 @@ function debugShowAllUsers() {
     }
 
     // 削除ログも確認
-    const deletionLogSheet = spreadsheet.getSheetByName('DeletionLogs');
-    if (deletionLogSheet) {
-      const deletionLogs = deletionLogSheet.getDataRange().getValues();
+    try {
+      const deletionLogResult = service.spreadsheets.values.batchGet({
+        spreadsheetId: dbId,
+        ranges: ['DeletionLogs!A:F']
+      });
+      
+      if (deletionLogResult.valueRanges && deletionLogResult.valueRanges[0] && deletionLogResult.valueRanges[0].values) {
+        const deletionLogs = deletionLogResult.valueRanges[0].values;
       console.log('🗑️ 削除ログ:', {
         totalDeletions: deletionLogs.length - 1,
         headers: deletionLogs[0],
@@ -1255,6 +1274,7 @@ function debugShowAllUsers() {
       for (let i = 1; i < Math.min(deletionLogs.length, 6); i++) {
         // 最新5件まで
         const log = deletionLogs[i];
+        console.log(`🗑️ 削除ログ #${i}:`, {
           timestamp: log[0],
           executor: log[1],
           targetUserId: log[2],
@@ -1262,6 +1282,11 @@ function debugShowAllUsers() {
           reason: log[4],
         });
       }
+      } else {
+        console.log('🗑️ 削除ログシートが見つからないかデータがありません');
+      }
+    } catch (deletionLogError) {
+      console.warn('🗑️ 削除ログ取得エラー:', deletionLogError.message);
     }
 
     return {

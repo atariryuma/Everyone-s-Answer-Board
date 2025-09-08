@@ -92,6 +92,7 @@ function connectDataSource(spreadsheetId, sheetName) {
           const actualHeaderName = headerRow[answerIndex];
           if (actualHeaderName && actualHeaderName.trim() !== '') {
             opinionHeader = actualHeaderName;
+            console.log('✅ connectDataSource: opinionHeader自動検出成功', {
               answerIndex,
               headerName: actualHeaderName.substring(0, 50) + (actualHeaderName.length > 50 ? '...' : ''),
               confidence: columnMapping.confidence?.answer || '不明'
@@ -127,6 +128,7 @@ function connectDataSource(spreadsheetId, sheetName) {
           suggestion: 'Core.gsの高精度検出システムが後で自動修正します'
         });
       } else {
+        console.log('✅ connectDataSource: opinionHeader最終確定', {
           finalValue: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
           length: opinionHeader.length,
           source: 'columnMapping連携'
@@ -192,11 +194,13 @@ function connectDataSource(spreadsheetId, sheetName) {
       // 🚀 シンプル化：新しいupdateUserメソッドを使用
       DB.updateUser(userInfo.userId, updatedConfig);
 
+      console.log('✅ connectDataSource: DB更新成功', {
         userId: userInfo.userId,
         setupStatus: updatedConfig.setupStatus,
         hasFormUrl: !!updatedConfig.formUrl
       });
 
+      console.log('✅ connectDataSource: 設定統合完了（CLAUDE.md準拠）', {
         userId: userInfo.userId,
         updatedFields: Object.keys(updatedConfig).length,
         configJsonSize: JSON.stringify(updatedConfig).length,
@@ -237,6 +241,7 @@ function connectDataSource(spreadsheetId, sheetName) {
  */
 function publishApplication(config) {
   try {
+    console.log('📱 publishApplication: アプリ公開開始（最適化版）', {
       hasSpreadsheetId: !!config.spreadsheetId,
       hasSheetName: !!config.sheetName,
       hasColumnMapping: !!config.columnMapping,
@@ -257,6 +262,7 @@ function publishApplication(config) {
     // 現在のconfigJSONを直接取得（パフォーマンス向上）
     const currentConfig = JSON.parse(userInfo.configJson || '{}');
 
+    console.log('🔍 publishApplication: 設定確認', {
       userId: userInfo.userId,
       currentConfig: {
         spreadsheetId: currentConfig.spreadsheetId,
@@ -306,6 +312,7 @@ function publishApplication(config) {
       },
     });
 
+    console.log('⚡ publishApplication: executeAppPublish実行結果', {
       userId: userInfo.userId,
       success: publishResult.success,
       hasAppUrl: !!publishResult.appUrl,
@@ -346,10 +353,12 @@ function publishApplication(config) {
       // 🚀 シンプル化：新しいupdateUserメソッドを使用
       DB.updateUser(userInfo.userId, updatedConfig);
 
+      console.log('✅ publishApplication: DB直接更新完了', {
         userId: userInfo.userId,
         appPublished: updatedConfig.appPublished
       });
 
+      console.log('🎉 publishApplication: アプリ公開完了（最適化版）', {
         userId: userInfo.userId,
         appUrl: publishResult.appUrl,
         appPublished: updatedConfig.appPublished,
@@ -420,6 +429,7 @@ function saveDraftConfiguration(config) {
       throw new Error('設定の保存に失敗しました');
     }
 
+    console.log('✅ saveDraftConfiguration: ConfigManager統一版保存完了', {
       userId: userInfo.userId,
       configFields: Object.keys(cleanConfig).length,
       claudeMdCompliant: true,
@@ -450,6 +460,11 @@ function saveDraftConfiguration(config) {
  */
 function getFormInfo(spreadsheetId, sheetName) {
   try {
+    console.log('📋 getFormInfo: フォーム情報取得開始（CLAUDE.md準拠）', {
+      spreadsheetId: spreadsheetId?.substring(0, 10) + '...',
+      sheetName,
+      timestamp: new Date().toISOString(),
+    });
 
     if (!spreadsheetId || !sheetName) {
       return {
@@ -513,6 +528,7 @@ function getFormInfo(spreadsheetId, sheetName) {
       sheetName,
     };
 
+    console.log('✅ getFormInfo: フォーム情報取得完了', {
       sheetName,
       hasForm: formData.hasForm,
       formTitle: formData.formTitle,
@@ -544,6 +560,9 @@ function getFormInfo(spreadsheetId, sheetName) {
  */
 function getSpreadsheetList() {
   try {
+    console.log('📊 getSpreadsheetList: スプレッドシート一覧取得開始（最適化版）', {
+      timestamp: new Date().toISOString(),
+    });
 
     // キャッシュキー生成（ユーザー固有）
     const currentUser = UserManager.getCurrentEmail();
@@ -553,7 +572,7 @@ function getSpreadsheetList() {
     return cacheManager.get(
       cacheKey,
       () => {
-
+        console.log('🔄 getSpreadsheetList: キャッシュミス、データ取得開始');
         const startTime = new Date().getTime();
         const spreadsheets = [];
         const maxResults = 100; // 結果制限（パフォーマンス向上）
@@ -708,6 +727,7 @@ function executeConfigCleanup() {
  */
 function generateColumnMapping(headerRow, data = []) {
   try {
+    console.log('🔧 generateColumnMapping: 超高精度列マッピング生成開始', {
       columnCount: headerRow.length,
       dataRows: data.length,
       timestamp: new Date().toISOString(),
@@ -716,6 +736,7 @@ function generateColumnMapping(headerRow, data = []) {
     // 重複回避・最適割り当てアルゴリズム実行
     const result = resolveColumnConflicts(headerRow, data);
 
+    console.log('✅ generateColumnMapping: 超高精度マッピング完了', {
       mappedColumns: Object.keys(result.mapping).length,
       averageConfidence: result.averageConfidence || 'N/A',
       conflictsResolved: result.conflictsResolved,
@@ -981,6 +1002,7 @@ function getCurrentConfig() {
     }
 
     const executionTime = Date.now() - startTime;
+    console.log('✅ getCurrentConfig: ユーザー設定取得完了（最適化版）', {
       userId: userInfo.userId,
       configFields: Object.keys(config || {}).length,
       setupStatus: config.setupStatus,
@@ -1085,6 +1107,7 @@ function getCurrentBoardInfoAndUrls() {
       dataCount: 0, // 後で実際のデータ数を取得可能
     };
 
+    console.log('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
       isActive: boardInfo.isActive,
       hasQuestionText: !!boardInfo.questionText,
       questionText: boardInfo.questionText,
@@ -1122,6 +1145,7 @@ function checkIsSystemAdmin() {
     const currentUserEmail = UserManager.getCurrentEmail();
     const isSystemAdmin = App.getAccess().isSystemAdmin(currentUserEmail);
 
+    console.log('✅ checkIsSystemAdmin: 権限確認完了', {
       userEmail: currentUserEmail,
       isSystemAdmin,
       timestamp: new Date().toISOString(),
@@ -1147,6 +1171,7 @@ function checkIsSystemAdmin() {
  */
 function migrateUserDataToConfigJson(userId = null) {
   try {
+    console.log('🔄 migrateUserDataToConfigJson: データマイグレーション開始', {
       targetUserId: userId || 'all_users',
       timestamp: new Date().toISOString(),
     });
@@ -1209,6 +1234,12 @@ function migrateUserDataToConfigJson(userId = null) {
           migratedConfig.claudeMdCompliant = true;
 
           ConfigManager.saveConfig(user.userId, migratedConfig);
+
+          console.log('✅ ユーザーマイグレーション完了', {
+            userId: user.userId,
+            email: user.userEmail,
+            fieldsUpdated: Object.keys(migratedConfig).length,
+          });
 
           migrationResults.migrated++;
           migrationResults.details.push({
@@ -1288,6 +1319,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
     // 高精度列マッピング生成（データ分析付き）
     const columnMapping = generateColumnMapping(headerRow, allData);
 
+    console.log('✅ analyzeColumns: 列分析完了', {
       headerCount: headerRow.length,
       mappingCount: Object.keys(columnMapping).length,
       claudeMdCompliant: true,
@@ -1336,6 +1368,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
     // 既存のgetSpreadsheetColumnIndices関数を使用
     const result = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
+    console.log('✅ getHeaderIndices: フロントエンド互換関数完了', {
       hasResult: !!result,
       opinionHeader: result?.opinionHeader,
     });
@@ -1385,6 +1418,7 @@ function getSheetList(spreadsheetId) {
       };
     });
 
+    console.log('✅ getSheetList: シート一覧取得完了', {
       spreadsheetId,
       sheetCount: sheetList.length,
       formSheets: sheetList.filter((s) => s.isFormResponseSheet).length,
@@ -1424,6 +1458,10 @@ function getActualHeaderName(headerRow, columnIndex) {
  */
 function fixFormInfoForUser(userId) {
   try {
+    console.log('🔧 fixFormInfoForUser: フォーム情報修復開始', {
+      userId,
+      timestamp: new Date().toISOString(),
+    });
 
     // 現在のユーザー設定を取得
     const currentConfig = ConfigManager.getUserConfig(userId);
@@ -1477,6 +1515,7 @@ function fixFormInfoForUser(userId) {
       throw new Error('設定の保存に失敗しました');
     }
 
+    console.log('✅ フォーム情報復元完了', {
       userId,
       oldFormUrl: currentConfig.formUrl,
       newFormUrl: formInfo.formUrl,

@@ -695,6 +695,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       data: formattedData,
     };
 
+    console.log('processSheetData: 処理完了', {
       adminMode,
       originalDisplayMode: sheetData.displayMode,
       finalDisplayMode,
@@ -900,7 +901,7 @@ function formatSheetDataForFrontend(
   displayMode
 ) {
   // 🔍 formatSheetDataForFrontend - マッピングデータ処理調査ログ
-  console.log('🎭 formatSheetDataForFrontend - データフォーマット調査');
+  console.log('🎭 formatSheetDataForFrontend - データフォーマット調査', {
     rawDataCount: rawData.length,
     mappedIndices: mappedIndices,
     headerIndicesKeys: Object.keys(headerIndices),
@@ -928,6 +929,7 @@ function formatSheetDataForFrontend(
     });
     
     if (row.originalData) {
+      console.log('🔍 実データ値:', {
         classValue: classIndex !== undefined ? row.originalData[classIndex] : 'INDEX_UNDEFINED',
         opinionValue: opinionIndex !== undefined ? row.originalData[opinionIndex] : 'INDEX_UNDEFINED',
         reasonValue: reasonIndex !== undefined ? row.originalData[reasonIndex] : 'INDEX_UNDEFINED',
@@ -981,7 +983,7 @@ function formatSheetDataForFrontend(
     // 🔍 理由列の値を取得（包括的null/undefined/空文字列処理）
     let reasonValue = '';
     
-    console.log('🎯 理由列データ抽出詳細:');
+    console.log('🎯 理由列データ抽出詳細:', {
       reasonIndex: reasonIndex,
       hasOriginalData: !!row.originalData,
       originalDataLength: row.originalData ? row.originalData.length : 'NO_DATA',
@@ -991,6 +993,7 @@ function formatSheetDataForFrontend(
 
     if (reasonIndex !== undefined && row.originalData && reasonIndex >= 0 && reasonIndex < row.originalData.length) {
       const rawReasonValue = row.originalData[reasonIndex];
+      console.log('📝 理由の生データ詳細:', {
         rawValue: rawReasonValue,
         rawType: typeof rawReasonValue,
         isNull: rawReasonValue === null,
@@ -1047,6 +1050,7 @@ function formatSheetDataForFrontend(
     };
     
     // 🔍 最終結果のログ出力
+    console.log('🎯 行データ最終結果:', {
       rowIndex: finalResult.rowIndex,
       hasName: !!finalResult.name,
       hasEmail: !!finalResult.email,
@@ -1171,6 +1175,7 @@ function getAppConfig(requestUserId) {
         }
         
         // 古いheaderIndicesを削除予約（段階的移行）
+        console.log('🔄 headerIndices最適化完了:', {
           columnMappingCount: Object.keys(columnMapping).length,
           reactionMappingCount: Object.keys(reactionMapping).length 
         });
@@ -2847,6 +2852,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const dataRows = sheetData.slice(1);
 
     // 🔍 スプレッドシート生データの詳細調査ログ（理由列問題対応）
+    console.log('📊 スプレッドシート生データ詳細:', {
       headers: headers,
       headerCount: headers.length,
       reasonRelatedHeaders: headers.map((h, i) => ({ index: i, header: h }))
@@ -2856,6 +2862,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     console.log('📄 データ行サンプル（最初の3行）:');
     for (let i = 0; i < Math.min(3, dataRows.length); i++) {
       const row = dataRows[i];
+      console.log(`  📋 行${i + 1}:`, {
         rowLength: row.length,
         hasReasonData: row[5] ? 'YES' : 'NO',  // index 5は理由列の予想位置
         reasonValue: row[5] || 'EMPTY',
@@ -3400,6 +3407,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices, configJson
 
       // ✅ opinionHeaderが見つからない場合の詳細デバッグ情報
       if (mappedIndex === undefined) {
+        console.warn('🚨 opinionHeader検出失敗:', {
           allHeaders: Object.keys(actualHeaderIndices),
           columnMapping: columnMapping || '未設定',
           suggestion: '手動で列マッピングを設定するか、列名に「どうして」「なぜ」「？」などを含めてください'
@@ -3475,6 +3483,7 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices, configJson
       );
       // ✅ 理由列が見つからない場合の詳細デバッグ情報
       if (configKey === 'reasonHeader') {
+        console.warn('🚨 reasonHeader検出失敗:', {
           availableHeaders: availableHeaders,
           searchedPatterns: reasonKeywords || ['基本パターンのみ'],
           configHeaderName: configHeaderName,
@@ -4297,6 +4306,7 @@ function getInitialData(requestUserId, sheetName) {
     const includeSheetDetails = sheetName || configJson.sheetName;
 
     // デバッグ: シート詳細取得パラメータの確認
+    console.log('📋 シート詳細取得パラメータ:', {
       sheetName,
       sheetName: configJson.sheetName,
       includeSheetDetails,
@@ -4370,6 +4380,7 @@ function getInitialData(requestUserId, sheetName) {
     const endTime = new Date().getTime();
     response._meta.executionTime = endTime - startTime;
 
+    console.log('⏱️ getInitialData実行完了:', {
       executionTime: `${response._meta.executionTime}ms`,
       userId: currentUserId,
       setupStep,
@@ -4892,12 +4903,14 @@ function performAutoRepair(userId) {
       config.claudeMdCompliant = true;
 
       DB.DB.updateUser(userId, config);
+      console.log('performAutoRepair: configJSON更新完了', {
         userId,
         fixedItems: repairResults.fixedItems.length,
         claudeMdCompliant: true,
       });
     }
 
+    console.log('performAutoRepair: 修復処理完了', {
       userId,
       fixedItems: repairResults.fixedItems,
       configUpdated: repairResults.configUpdated,
