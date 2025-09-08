@@ -1206,6 +1206,7 @@ function renderAnswerBoard(userInfo, params) {
       if (config?.opinionHeader && config.opinionHeader !== 'お題') {
         opinionHeader = config.opinionHeader;
         opinionHeaderSource = 'configJson';
+        console.log('✅ renderAnswerBoard: configJsonからopinionHeader取得:', {
           value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
           length: opinionHeader.length,
           source: 'configJson'
@@ -1220,6 +1221,7 @@ function renderAnswerBoard(userInfo, params) {
         if (headerIndices?.opinionHeader && headerIndices.opinionHeader !== 'お題') {
           opinionHeader = headerIndices.opinionHeader;
           opinionHeaderSource = 'getSpreadsheetColumnIndices';
+          console.log('✅ renderAnswerBoard: 高精度検出システムによるopinionHeader取得:', {
             value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
             length: opinionHeader.length,
             source: 'Core.gs高精度検出システム'
@@ -1259,6 +1261,7 @@ function renderAnswerBoard(userInfo, params) {
     }
     
     // 最終確認ログ
+    console.log('📋 renderAnswerBoard: opinionHeader最終設定完了:', {
       finalValue: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
       source: opinionHeaderSource,
       isDefault: opinionHeader === 'お題',
@@ -1996,6 +1999,7 @@ function repairCurrentUser() {
       DB.updateUser(userInfo.userId, { isActive: true });
     }
     
+    console.log('✅ ユーザー修復完了:', {
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
       isActive: userInfo.isActive
