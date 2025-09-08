@@ -1123,8 +1123,27 @@ function renderLoginPage(params = {}) {
  * @returns {HtmlService.HtmlOutput} HTML出力
  */
 function renderAnswerBoard(userInfo, params) {
-  // シンプル版：parsedConfigをそのまま使用
-  const config = userInfo.parsedConfig || {};
+  // ConfigManagerから直接最新の設定を取得
+  let config;
+  try {
+    config = ConfigManager.getUserConfig(userInfo.userId);
+    if (!config || !config.spreadsheetId) {
+      console.warn('⚠️ ConfigManagerからの取得失敗、parsedConfigを使用');
+      config = userInfo.parsedConfig || {};
+    }
+  } catch (error) {
+    console.error('❌ Config取得エラー:', error);
+    config = userInfo.parsedConfig || {};
+  }
+  
+  // デバッグ: 実際に取得されたconfigの中身を確認
+  console.log('🔍 renderAnswerBoard - 実際のconfig取得状況:', {
+    hasSpreadsheetId: !!config.spreadsheetId,
+    hasSheetName: !!config.sheetName,
+    spreadsheetIdValue: config.spreadsheetId?.substring(0, 20) + '...',
+    sheetNameValue: config.sheetName,
+    configKeys: Object.keys(config)
+  });
 
   console.log('renderAnswerBoard - userId:', userInfo.userId);
   console.log('renderAnswerBoard - mode:', params.mode);
@@ -1142,17 +1161,6 @@ function renderAnswerBoard(userInfo, params) {
     const userSpreadsheetId = config.spreadsheetId || userInfo.spreadsheetId || null;
     const userSheetName = config.sheetName || userInfo.sheetName || null;
     
-    // ✅ デバッグ：設定取得状況の詳細確認
-    console.log('🔍 renderAnswerBoard - 設定取得詳細:', {
-      'config.spreadsheetId': config.spreadsheetId,
-      'userInfo.spreadsheetId': userInfo.spreadsheetId,
-      'config.sheetName': config.sheetName,
-      'userInfo.sheetName': userInfo.sheetName,
-      finalSpreadsheetId: userSpreadsheetId,
-      finalSheetName: userSheetName,
-      configKeys: Object.keys(config),
-      userInfoKeys: Object.keys(userInfo)
-    });
 
     // 📊 ユーザーIDをテンプレートに適切に設定
     template.USER_ID = userInfo.userId || null;

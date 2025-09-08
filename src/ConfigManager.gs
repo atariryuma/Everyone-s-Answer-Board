@@ -95,10 +95,27 @@ const ConfigManager = Object.freeze({
         userId,
         configFields: Object.keys(enhancedConfig).length,
         hasSpreadsheetId: !!enhancedConfig.spreadsheetId,
+        hasSheetName: !!enhancedConfig.sheetName,
         spreadsheetId: enhancedConfig.spreadsheetId
           ? `${enhancedConfig.spreadsheetId.substring(0, 8)}...`
           : 'null',
+        sheetName: enhancedConfig.sheetName || 'null',
+        setupStatus: enhancedConfig.setupStatus || 'null',
+        appPublished: enhancedConfig.appPublished || false,
         configKeys: Object.keys(enhancedConfig),
+      });
+      
+      // 詳細なconfigJSON内容ログ（デバッグ用）
+      console.log('🔍 ConfigManager.getUserConfig: configJSON詳細内容', {
+        userId,
+        rawConfigJson: JSON.stringify(enhancedConfig).substring(0, 500) + '...',
+        coreFields: {
+          spreadsheetId: enhancedConfig.spreadsheetId,
+          sheetName: enhancedConfig.sheetName,
+          formUrl: enhancedConfig.formUrl,
+          setupStatus: enhancedConfig.setupStatus,
+          opinionHeader: enhancedConfig.opinionHeader
+        }
       });
 
       return enhancedConfig;
