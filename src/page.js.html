@@ -2,116 +2,7 @@
   // === TEMPLATE LAYER - 2024 GAS Best Practice ===
   // 統一されたテンプレート変数受け取りシステム
 
-  /**
-   * 🦾 スマート診断システム - 問題を自動特定してユーザーに適切なガイダンスを提供
-   */
-  const smartDiagnosis = () => {
-    const issues = [];
-    const solutions = [];
 
-    // 診断1: テンプレート展開状況
-    // ✅ Phase 5: 初期診断では直接window変数を使用（循環参照回避）
-    const userId = window.USER_ID;
-    if (!userId || typeof userId === 'object' || userId.trim() === '') {
-      issues.push('テンプレート変数が正しく展開されていません');
-      solutions.push('🔄 ページをリロードしてください');
-    }
-
-    // 診断2: URLパラメータ状況
-    const urlUserId = new URLSearchParams(window.location.search).get('userId');
-    if (!urlUserId) {
-      issues.push('URLにユーザーIDが含まれていません');
-      solutions.push('🔗 正しいリンクからアクセスしてください');
-    }
-
-    // 診断3: システム設定状況
-    if (window.DIAGNOSTIC_INFO) {
-      if (!window.DIAGNOSTIC_INFO.hasSpreadsheetId) {
-        issues.push('データソース（スプレッドシート）が設定されていません');
-        solutions.push('🛠️ 管理パネルでデータソースを接続してください');
-      }
-      if (!window.DIAGNOSTIC_INFO.hasSheetName) {
-        issues.push('シート名が設定されていません');
-        solutions.push('📊 管理パネルでシートを選択してください');
-      }
-    }
-
-    return { issues, solutions, severity: issues.length > 0 ? 'needs_setup' : 'healthy' };
-  };
-
-  /**
-   * ✅ configJSON中心型アーキテクチャ - 自動回復不要
-   */
-  const autoRecovery = async (diagnosis) => {
-    return diagnosis.severity === 'healthy';
-  };
-
-  /**
-   * 📱 ユーザーフレンドリーエラー表示
-   */
-  const showUserFriendlyError = (diagnosis) => {
-    const container = this._getCachedElement('answersContainer');
-    if (!container) return;
-
-    const errorHtml = `
-      <div class="setup-guide-container" style="max-width: 600px; margin: 2rem auto; padding: 2rem; background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-        <div class="setup-header" style="text-align: center; margin-bottom: 2rem;">
-          <div style="font-size: 4rem; margin-bottom: 1rem;">🛠️</div>
-          <h2 style="color: #2563eb; margin-bottom: 0.5rem;">初期設定が必要です</h2>
-          <p style="color: #6b7280;">回答ボードを使用するために、いくつかの設定が必要です。</p>
-        </div>
-        
-        <div class="issues-list" style="margin-bottom: 2rem;">
-          <h3 style="color: #dc2626; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-            <span>❌</span> 解決が必要な問題
-          </h3>
-          <ul style="list-style: none; padding: 0; margin-bottom: 2rem;">
-            ${diagnosis.issues
-              .map(
-                (issue) => `
-              <li style="padding: 0.75rem; margin-bottom: 0.5rem; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
-                ${issue}
-              </li>
-            `
-              )
-              .join('')}
-          </ul>
-          
-          <h3 style="color: #059669; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-            <span>✅</span> 推奨される解決策
-          </h3>
-          <ul style="list-style: none; padding: 0;">
-            ${diagnosis.solutions
-              .map(
-                (solution) => `
-              <li style="padding: 0.75rem; margin-bottom: 0.5rem; background: #ecfdf5; border-left: 4px solid #059669; border-radius: 4px;">
-                ${solution}
-              </li>
-            `
-              )
-              .join('')}
-          </ul>
-        </div>
-        
-        <div class="action-buttons" style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-          <button onclick="window.location.reload()" 
-                  style="padding: 0.75rem 1.5rem; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
-            🔄 ページをリロード
-          </button>
-          <button onclick="window.location.href = window.location.href.split('?')[0] + '?mode=admin&userId=' + (configManager.config?.userId || window.USER_ID || '')" 
-                  style="padding: 0.75rem 1.5rem; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
-            🛠️ 管理パネルへ
-          </button>
-        </div>
-        
-        <div class="help-text" style="margin-top: 2rem; padding: 1rem; background: #f8fafc; border-radius: 6px; text-align: center; color: #64748b; font-size: 0.875rem;">
-          📞 お困りの場合は管理者にお問い合わせください
-        </div>
-      </div>
-    `;
-
-    container.innerHTML = errorHtml;
-  };
 
   // ✅ Phase 1: 古いgetConfigFromBackend関数を削除（ConfigManagerに統合済み）
 
@@ -154,32 +45,6 @@
       return this._initialized;
     }
 
-    // 状態同期：configManager初期化後にAnswerBoardAppの状態を更新
-    syncToAnswerBoardApp(answerBoardApp) {
-      if (!this._initialized || !answerBoardApp) return;
-
-      const config = this._config;
-      if (config && answerBoardApp.state) {
-        // configManagerの値でstate値を更新
-        answerBoardApp.state.isStudentMode = config.isStudentMode ?? answerBoardApp.state.isStudentMode;
-        answerBoardApp.state.isAdminUser = config.isAdminUser ?? answerBoardApp.state.isAdminUser;
-        answerBoardApp.state.showCounts = config.showCounts ?? answerBoardApp.state.showCounts;
-        answerBoardApp.state.showScoreSort = config.showScoreSort ?? answerBoardApp.state.showScoreSort;
-        answerBoardApp.state.displayMode = config.displayMode ?? answerBoardApp.state.displayMode;
-        answerBoardApp.state.sheetName = config.sheetName ?? answerBoardApp.state.sheetName;
-        answerBoardApp.state.userId = config.userId ?? answerBoardApp.state.userId;
-
-        // サーバー状態も更新
-        answerBoardApp.serverShowCounts = config.showCounts ?? answerBoardApp.serverShowCounts;
-        answerBoardApp.serverDisplayMode = config.displayMode ?? answerBoardApp.serverDisplayMode;
-
-        debugInfo('✅ ConfigManager → AnswerBoardApp 状態同期完了', {
-          userId: config.userId,
-          sheetName: config.sheetName,
-          displayMode: config.displayMode
-        });
-      }
-    }
 
     async _loadConfigFromBackend() {
       // ✅ Phase 2: 簡素化されたデータ取得フロー
@@ -188,22 +53,8 @@
       try {
         return await this._runGasCall('getCurrentConfig', userId);
       } catch (error) {
-        // エラー時のみ診断実行（パフォーマンス最適化）
-        console.warn('⚠️ 初回取得失敗、診断システム実行:', error.message);
-        
-        const diagnosis = smartDiagnosis();
-        if (diagnosis.severity === 'healthy') {
-          throw error; // 診断問題なしの場合、元エラーを再スロー
-        }
-
-        // 自動回復試行
-        const recovered = await autoRecovery(diagnosis);
-        if (recovered) {
-          debugInfo('✅ 自動回復成功、再取得実行');
-          return await this._runGasCall('getCurrentConfig', userId);
-        }
-        
-        throw new Error(`設定取得失敗: ${error.message} (診断: ${diagnosis.severity})`);
+        console.error('❌ 設定取得失敗:', error.message);
+        throw new Error(`設定取得失敗: ${error.message}`);
       }
     }
 
@@ -1060,8 +911,6 @@
       // Step 4: Reset polling failure count on successful data update
       this.state.pollingFailureCount = 0;
 
-      // Phase 4.1: Enhanced monitoring and logging (※ DOM整合性はレンダリング後にチェック)
-      // this.logDataConsistencyMetrics(context, dataLength, previousLength); // レンダリング後に移動
 
       Logger.debug('✅ State synchronization completed:', {
         context,
@@ -1078,112 +927,8 @@
       };
     }
 
-    // Comprehensive data consistency and cache monitoring (Phase 4.1)
-    logDataConsistencyMetrics(context, currentDataLength, previousDataLength) {
-      const domCardCount = this.elements.answersContainer
-        ? this.elements.answersContainer.querySelectorAll('.answer-card').length
-        : 0;
 
-      const metrics = {
-        timestamp: new Date().toISOString(),
-        context,
-        dataMetrics: {
-          currentLength: currentDataLength,
-          previousLength: previousDataLength,
-          lastSeenCount: this.state.lastSeenCount,
-          changeAmount: currentDataLength - previousDataLength,
-        },
-        domMetrics: {
-          cardCount: domCardCount,
-          dataVsDom: currentDataLength - domCardCount,
-          isConsistent: currentDataLength === domCardCount,
-        },
-        stateMetrics: {
-          hasNewContent: this.state.hasNewContent,
-          newContentCount: this.state.newContentCount,
-          pollingFailureCount: this.state.pollingFailureCount,
-          initialDataLoaded: this.initialDataLoaded,
-        },
-      };
 
-      // Alert on significant inconsistencies + 自動修復試行
-      if (!metrics.domMetrics.isConsistent) {
-        console.warn('⚠️ DOM-Data inconsistency detected:', {
-          data: currentDataLength,
-          dom: domCardCount,
-          context,
-        });
-
-        // 🔧 自動修復の試行（初回読み込み時のみ、無限ループ防止）
-        if (
-          context === 'performDataLoad' &&
-          currentDataLength > 0 &&
-          domCardCount < currentDataLength / 2
-        ) {
-          Logger.debug('🔧 DOM-Data不整合を自動修復中...', {
-            expectedData: currentDataLength,
-            actualDOM: domCardCount,
-            trigger: 'auto_repair',
-          });
-
-          // 次のフレームで修復実行（非同期で実行）
-          requestAnimationFrame(() => {
-            this.attemptConsistencyRepair(currentDataLength, domCardCount, context);
-          });
-        }
-      }
-
-      return metrics;
-    }
-
-    // 🔧 DOM-Data整合性の自動修復メソッド
-    attemptConsistencyRepair(expectedData, actualDOM, context) {
-      try {
-        Logger.debug('🔧 整合性修復開始:', { expectedData, actualDOM, context });
-
-        // スケルトンやローディングカードを除去
-        const container = this.elements.answersContainer;
-        if (container) {
-          const skeletons = container.querySelectorAll('.skeleton, .loading');
-          if (skeletons.length > 0) {
-            Logger.debug('🧹 修復：スケルトンカード削除', skeletons.length + '個');
-            skeletons.forEach((skeleton) => skeleton.remove());
-          }
-
-          // データが存在するがDOMが少ない場合、再レンダリングを強制
-          if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
-            Logger.debug(
-              '🔄 修復：データ再レンダリング実行',
-              this.state.currentAnswers.length + '件'
-            );
-            this.renderBoard(this.state.currentAnswers, []);
-          }
-        }
-
-        Logger.debug('✅ 整合性修復完了');
-      } catch (error) {
-        console.warn('⚠️ 整合性修復中にエラー:', error.message);
-        // エラーが発生してもシステムを停止させない
-      }
-    }
-
-    // Cache hit/miss tracking (Phase 4.1)
-    logCacheActivity(operation, hit, details = {}) {
-      const cacheLog = {
-        timestamp: new Date().toISOString(),
-        operation,
-        hit,
-        details,
-        context: this.state.currentActiveSheet || 'unknown',
-      };
-
-      // Store cache metrics
-      if (!this.cacheMetrics) this.cacheMetrics = [];
-      this.cacheMetrics.push(cacheLog);
-      if (this.cacheMetrics.length > 20) {
-        this.cacheMetrics.shift();
-      }
-    }
 
     // Enhanced error handling and recovery system (Phase 4.2)
     async handleDataLoadError(error, context, retryOptions = {}) {
@@ -4562,13 +4307,6 @@
                 await this.renderBoard(false, isInitialLoad);
                 Logger.debug('✅ Step 3: DOM update completed');
 
-                // Step 4: DOM整合性チェック(レンダリング後に実行)
-                const currentDataLength = this.state.currentAnswers?.length || 0;
-                this.logDataConsistencyMetrics(
-                  'performDataLoad-after-render',
-                  currentDataLength,
-                  0
-                );
 
                 // Step 5: Consistency validation after DOM update (Phase 2.1)
                 Logger.debug('✅ Step 5: Consistency validation starting...');
@@ -8697,36 +8435,6 @@
       return false;
     }
 
-    setupPerformanceMonitoring() {
-      let frameCount = 0;
-      let lastTime = performance.now();
-
-      const measurePerformance = () => {
-        const now = performance.now();
-        const delta = now - lastTime;
-
-        if (frameCount > 0) {
-          this.performanceMetrics.frameTime = delta;
-
-          // If frame time is consistently over 16ms, enable low performance mode
-          if (delta > PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
-            console.warn('Low performance detected, enabling optimizations');
-            this.isLowPerformanceMode = true;
-            this.optimizeForLowPerformance();
-          }
-        }
-
-        lastTime = now;
-        frameCount++;
-
-        if (frameCount < 60) {
-          // Monitor first 60 frames
-          requestAnimationFrame(measurePerformance);
-        }
-      };
-
-      requestAnimationFrame(measurePerformance);
-    }
 
     optimizeForLowPerformance() {
       Logger.perf('Enabling low performance optimizations');
@@ -9722,10 +9430,6 @@
 
         // AnswerBoardApp インスタンス初期化
         window.answerBoardApp = new AnswerBoardApp();
-        
-        // ✅ 状態同期: ConfigManager → AnswerBoardApp
-        configManager.syncToAnswerBoardApp(window.answerBoardApp);
-        
         debugInfo('✅ AnswerBoardApp初期化完了');
       })
       .catch((error) => {
