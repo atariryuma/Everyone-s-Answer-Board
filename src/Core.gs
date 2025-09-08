@@ -2619,6 +2619,113 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
 }
 
 /**
+ * ⚠️ レガシー互換性のためのsheetConfig代替関数
+ * 既存のconfigJSONから必要な設定を生成
+ */
+function getSheetConfig(userId) {
+  try {
+    const userInfo = getActiveUserInfo();
+    if (!userInfo || !userInfo.parsedConfig) {
+      return null;
+    }
+    
+    const config = userInfo.parsedConfig;
+    
+    // sheetConfigとして期待される構造を再現
+    return {
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      opinionHeader: config.opinionHeader,
+      reasonHeader: config.reasonHeader,
+      classHeader: config.classHeader,
+      nameHeader: config.nameHeader,
+      displayMode: config.displayMode,
+      setupStatus: config.setupStatus
+    };
+  } catch (error) {
+    console.error('getSheetConfig エラー:', error.message);
+    return null;
+  }
+}
+
+/**
+ * 動的sheetConfig取得関数（レガシー互換性）
+ * 実行時にユーザー情報を取得して設定を構築
+ */
+function buildSheetConfigDynamically(userIdParam) {
+  try {
+    let userInfo;
+    
+    if (userIdParam) {
+      userInfo = DB.findUserById(userIdParam);
+    } else {
+      userInfo = getActiveUserInfo();
+    }
+    
+    if (!userInfo || !userInfo.parsedConfig) {
+      console.warn('buildSheetConfigDynamically: ユーザー情報なし');
+      return {
+        spreadsheetId: null,
+        sheetName: null,
+        opinionHeader: 'お題',
+        reasonHeader: '理由',
+        classHeader: 'クラス',
+        nameHeader: '名前',
+        displayMode: 'anonymous',
+        setupStatus: 'pending'
+      };
+    }
+    
+    const config = userInfo.parsedConfig;
+    return {
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      opinionHeader: config.opinionHeader || 'お題',
+      reasonHeader: config.reasonHeader || '理由',
+      classHeader: config.classHeader || 'クラス',
+      nameHeader: config.nameHeader || '名前',
+      displayMode: config.displayMode || 'anonymous',
+      setupStatus: config.setupStatus || 'pending'
+    };
+  } catch (error) {
+    console.error('buildSheetConfigDynamically エラー:', error.message);
+    // フォールバック用デフォルト設定
+    return {
+      spreadsheetId: null,
+      sheetName: null,
+      opinionHeader: 'お題',
+      reasonHeader: '理由',
+      classHeader: 'クラス',
+      nameHeader: '名前',
+      displayMode: 'anonymous',
+      setupStatus: 'pending'
+    };
+  }
+}
+
+// ✅ レガシー互換性のためのアクセサー関数
+function getSheetConfigSafe() {
+  return buildSheetConfigDynamically();
+}
+
+// ✅ グローバル変数代替（必要時に動的生成）
+let _cachedSheetConfig = null;
+function getSheetConfigCached() {
+  if (!_cachedSheetConfig) {
+    _cachedSheetConfig = buildSheetConfigDynamically();
+  }
+  return _cachedSheetConfig;
+}
+
+// ✅ 直接アクセス用のプロパティ設定
+Object.defineProperty(globalThis, 'sheetConfig', {
+  get: function() {
+    return buildSheetConfigDynamically();
+  },
+  configurable: true
+});
+
+/**
  * 実際のシートデータ取得処理（キャッシュ制御から分離）
  */
 function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
