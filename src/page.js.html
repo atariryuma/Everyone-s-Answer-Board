@@ -31,10 +31,6 @@
 
     get config() {
       if (!this._initialized) {
-        // デバッグ時のみ警告表示、本番では静かに処理
-        if (isDebugMode()) {
-          console.warn('⚠️ ConfigManagerが未初期化です');
-        }
         return this._createFallbackConfig();
       }
       return this._config;
@@ -227,26 +223,16 @@
   const CHUNK_SIZE = 5; // DOM operations per chunk
   const IDLE_TIMEOUT = 5000; // requestIdleCallback timeout
 
-  // 生産環境対応デバッグシステム
-  const DEBUG_MODE =
-    window.location.search.includes('debug=true') ||
-    window.localStorage?.getItem('debug') === 'true';
-  const PERF_MODE = !DEBUG_MODE; // プロダクションでは性能重視
-
-  // 最適化されたログシステム
+  // シンプルログシステム - デバッグ無効化
   const Logger = {
-    debug: DEBUG_MODE ? console.debug.bind(console) : () => {},
-    // 情報ログ（重要な情報のみ）
-    info: (msg, ...args) => console.info(`📊 ${msg}`, ...args),
-    // 警告（本番でも必要）
+    debug: () => {}, // デバッグログ完全無効化
+    info: () => {},  // 情報ログも無効化
     warn: (msg, ...args) => console.warn(`⚠️ ${msg}`, ...args),
-    // エラー（本番でも必要）
     error: (msg, ...args) => console.error(`❌ ${msg}`, ...args),
-    // 性能ログ（条件付き）
-    perf: PERF_MODE ? () => {} : (msg, ...args) => Logger.perf(`⚡ ${msg}`, ...args),
+    perf: () => {} // 性能ログ無効化
   };
 
-  const debugLog = Logger.debug;
+  const debugLog = () => {}; // デバッグログ無効化
 
   // アイコンシステム
   const ICONS = Object.freeze({
@@ -785,8 +771,6 @@
         this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
       });
 
-      // パブリケーション状態監視システムの初期化
-      this.initPublicationStatusMonitoring();
     }
 
     // 効率化ヘルパーメソッド
@@ -930,231 +914,14 @@
 
 
 
-    // Enhanced error handling and recovery system (Phase 4.2)
-    async handleDataLoadError(error, context, retryOptions = {}) {
-      const {
-        maxRetries = 2,
-        retryDelay = 1000,
-        fallbackStrategy = 'clearAndReload',
-      } = retryOptions;
 
-      console.error(`❌ Data load error in ${context}:`, error);
 
-      // Log detailed error information
-      this.logErrorDetails(error, context);
 
-      // Increment failure count
-      this.state.pollingFailureCount = (this.state.pollingFailureCount || 0) + 1;
 
-      // Determine recovery strategy based on error type and failure count
-      const recoveryStrategy = this.determineRecoveryStrategy(error, context);
 
-      try {
-        switch (recoveryStrategy) {
-          case 'retry':
-            Logger.debug(`🔄 Attempting retry for ${context}...`);
-            await new Promise((resolve) => setTimeout(resolve, retryDelay));
-            return await this.executeRecoveryRetry(context);
 
-          case 'clearAndReload':
-            Logger.debug(`🔄 Executing clear and reload for ${context}...`);
-            return await this.executeRecoveryReload();
 
-          case 'fallbackMode':
-            Logger.debug(`🔄 Switching to fallback mode for ${context}...`);
-            return await this.executeRecoveryFallback();
 
-          default:
-            Logger.debug(`ℹ️ No recovery action taken for ${context}`);
-            this.displayUserFriendlyError(error, context);
-            return null;
-        }
-      } catch (recoveryError) {
-        console.error('❌ Recovery strategy failed:', recoveryError);
-        this.displayUserFriendlyError(error, context, true);
-        return null;
-      }
-    }
-
-    logErrorDetails(error, context) {
-      const errorDetails = {
-        timestamp: new Date().toISOString(),
-        context,
-        error: {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-        },
-        state: {
-          currentAnswersLength: this.state.currentAnswers?.length || 0,
-          lastSeenCount: this.state.lastSeenCount,
-          pollingFailureCount: this.state.pollingFailureCount,
-          isLoading: this.state.isLoading,
-        },
-        environment: {
-          userAgent: navigator.userAgent,
-          currentSheet: this.state.currentActiveSheet,
-          timeSinceInit: Date.now() - this.state.startTime,
-        },
-      };
-
-      Logger.debug('📝 Error Details (Phase 4.2):', errorDetails);
-
-      // Store error history
-      if (!this.errorHistory) this.errorHistory = [];
-      this.errorHistory.push(errorDetails);
-      if (this.errorHistory.length > 5) {
-        this.errorHistory.shift();
-      }
-    }
-
-    /**
-     * パブリケーション状態監視システムの初期化
-     * キャッシュ関連のアクセス問題を防ぐため、リアルタイムで状態を監視
-     */
-    initPublicationStatusMonitoring() {
-      Logger.debug('🔍 初期化: パブリケーション状態監視システム');
-
-      // 定期的なパブリケーション状態チェック（3分間隔）
-      this.publicationCheckInterval = setInterval(() => {
-        this.checkPublicationStatus();
-      }, 180000); // 3分 = 180,000ms
-
-      // ページの可視性変更時（ユーザーがタブに戻ってきた時）の状態チェック
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          Logger.debug('📱 ページが可視状態に戻りました - パブリケーション状態をチェック');
-          this.checkPublicationStatus();
-        }
-      });
-
-      // ページフォーカス時の状態チェック
-      window.addEventListener('focus', () => {
-        Logger.debug('🎯 ページがフォーカスされました - パブリケーション状態をチェック');
-        this.checkPublicationStatus();
-      });
-
-      // 初回チェック（10秒後に実行）
-      setTimeout(() => {
-        this.checkPublicationStatus();
-      }, 10000);
-    }
-
-    /**
-     * パブリケーション状態の実際のチェック処理
-     * 非公開状態が検出された場合、Unpublished.htmlにリダイレクト
-     */
-    async checkPublicationStatus() {
-      try {
-        Logger.debug('🔍 パブリケーション状態をチェック中...');
-
-        // ✅ Phase 4: テンプレート変数統一化 - configManager優先
-        const userId = configManager.config?.userId || window.USER_ID || new URLSearchParams(window.location.search).get('userId');
-        if (!userId) {
-          console.error('❌ パブリケーション状態チェック: userIdが取得できません');
-          return { error: 'userId is required', isPublished: false };
-        }
-        const result = await App.getStatus().checkPublicationStatus(userId);
-
-        Logger.debug('📊 パブリケーション状態チェック結果:', result);
-
-        // 非公開状態が検出された場合の処理
-        if (result && result.isPublished === false) {
-          Logger.debug('⚠️ ボードが非公開状態に変更されました - Unpublished.htmlにリダイレクト');
-
-          // キャッシュをクリア
-          if (this.cache && typeof this.cache.clear === 'function') {
-            this.cache.clear();
-          }
-          if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-            window.unifiedCache.clear();
-          }
-
-          // ローカルストレージのキャッシュもクリア
-          try {
-            Object.keys(localStorage).forEach((key) => {
-              if (key.includes('studyquest') || key.includes('board') || key.includes('sheet')) {
-                localStorage.removeItem(key);
-              }
-            });
-          } catch (e) {
-            console.warn('localStorage clear warning:', e);
-          }
-
-          // 非公開ページにリダイレクト（キャッシュバスティング付き）
-          const unpublishedUrl = new URL(window.location.href);
-          unpublishedUrl.searchParams.delete('mode'); // mode=viewを削除
-          unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
-
-          window.location.href = unpublishedUrl.toString();
-          return;
-        }
-
-        // 公開状態の場合は正常継続
-        Logger.debug('✅ ボードは正常に公開中です');
-      } catch (error) {
-        console.warn('⚠️ パブリケーション状態チェックでエラー:', error.message);
-        // エラーの場合は継続（ネットワーク問題などを考慮）
-      }
-    }
-
-    determineRecoveryStrategy(error, context) {
-      // Determine best recovery strategy based on error characteristics
-      const failCount = this.state.pollingFailureCount;
-      return failCount <= 2 ? 'retry' : failCount <= 5 ? 'clearAndReload' : 'fallbackMode';
-    }
-
-    async executeRecoveryRetry(context) {
-      try {
-        await this.clearDataCaches(true);
-        return await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-      } catch (retryError) {
-        throw new Error(`Retry failed: ${retryError.message}`);
-      }
-    }
-
-    async executeRecoveryReload() {
-      try {
-        await this.clearAllCardsForEmptyData();
-        this.resetStateForCleanInit();
-        return await this.loadSheetData({ bypassCache: true, isInitialLoad: true });
-      } catch (reloadError) {
-        throw new Error(`Reload failed: ${reloadError.message}`);
-      }
-    }
-
-    async executeRecoveryFallback() {
-      // Implement minimal functional state
-      this.displayEmptyState();
-      this.provideFeedback(
-        'データの読み込みに問題が発生しました。ページを更新してください。',
-        'error'
-      );
-
-      // Reset polling to longer intervals
-      if (this.pollingTimeout) {
-        clearTimeout(this.pollingTimeout);
-        this.currentPollInterval = 60000; // 1 minute
-        this.startPolling();
-      }
-
-      return { fallbackMode: true };
-    }
-
-    displayUserFriendlyError(error, context, isRecoveryFailed = false) {
-      let userMessage = 'データの読み込み中に問題が発生しました。';
-
-      if (isRecoveryFailed) {
-        userMessage = '復旧処理が失敗しました。ページを再読み込みしてください。';
-      } else if (context.includes('polling')) {
-        userMessage = '新着チェック中に問題が発生しました。自動的に再試行します。';
-      } else if (context.includes('initial')) {
-        userMessage =
-          'アプリケーションの初期化中に問題が発生しました。ページを再読み込みしてください。';
-      }
-
-      this.provideFeedback(userMessage, 'error');
-    }
 
     async init() {
       try {
@@ -2569,21 +2336,7 @@
       this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
 
       // Start automatic cleanup for memory management
-      // 定期的なクリーンアップとメモリ管理
-      this.cleanupInterval = setInterval(
-        () => {
-          this.performMemoryCleanup();
-        },
-        5 * 60 * 1000
-      ); // Cleanup every 5 minutes
 
-      // 長時間実行監視（1時間ごと）
-      this.longRunningCheckInterval = setInterval(
-        () => {
-          this.checkLongRunningPerformance();
-        },
-        60 * 60 * 1000
-      ); // Check every hour
     }
     stopPolling() {
       if (this.pollingInterval) {
@@ -2608,110 +2361,10 @@
     }
 
     // メモリ管理とクリーンアップ
-    performMemoryCleanup() {
-      try {
-        Logger.debug('🧹 Performing memory cleanup...');
 
-        // キャッシュクリーンアップ
-        if (this.cache) {
-          const cacheSize = this.cache.size();
-          this.cache.cleanup();
-          Logger.debug('🗑️ Cache cleanup completed', { cacheSize });
-        }
 
-        // 古いDOM要素の参照をクリア
-        this.cleanupDOMReferences();
 
-        // イベントリスナーの整理
-        this.cleanupEventListeners();
 
-        // 仮想スクロール状態の最適化
-        this.optimizeVirtualScrollState();
-
-        Logger.debug('✅ Memory cleanup completed');
-      } catch (error) {
-        console.warn('⚠️ Memory cleanup failed:', error);
-      }
-    }
-
-    cleanupDOMReferences() {
-      // 削除されたDOM要素への参照をクリア
-      const elementsToCheck = ['answersContainer', 'loadingOverlay', 'newContentBanner'];
-      elementsToCheck.forEach((key) => {
-        const element = this.elements[key];
-        if (element && !document.contains(element)) {
-          Logger.debug(`🧹 Removing stale DOM reference: ${key}`);
-          delete this.elements[key];
-        }
-      });
-    }
-
-    cleanupEventListeners() {
-      // 重複したイベントリスナーの確認とクリーンアップ
-      if (this.handlers) {
-        Object.keys(this.handlers).forEach((key) => {
-          if (typeof this.handlers[key] !== 'function') {
-            Logger.debug(`🧹 Removing invalid handler: ${key}`);
-            delete this.handlers[key];
-          }
-        });
-      }
-    }
-
-    optimizeVirtualScrollState() {
-      // 仮想スクロール状態の最適化
-      if (this.virtualScrollState && this.virtualScrollState.renderedRowIndexes) {
-        const size = this.virtualScrollState.renderedRowIndexes.size;
-        if (size > 1000) {
-          // 大量のインデックスが蓄積されている場合
-          Logger.debug(`🧹 Optimizing virtual scroll state (${size} items)`);
-          this.virtualScrollState.renderedRowIndexes.clear();
-          this.virtualScrollState.renderedItems = 0;
-        }
-      }
-    }
-
-    checkLongRunningPerformance() {
-      try {
-        const uptime = Date.now() - this.state.startTime;
-        const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
-
-        Logger.debug(`⏰ Long-running check: ${uptimeHours}h uptime`);
-
-        // 2時間以上実行されている場合のパフォーマンス対策
-        if (uptimeHours >= 2) {
-          Logger.debug('🔧 Applying long-running optimizations...');
-
-          // ポーリング間隔を延長（負荷軽減）
-          if (this.currentPollInterval < 60000) {
-            // 1分未満の場合
-            this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
-            Logger.debug(`📉 Polling interval extended to ${this.currentPollInterval}ms`);
-          }
-
-          // 強制的なメモリクリーンアップ
-          this.performMemoryCleanup();
-
-          // 可能であればガベージコレクションを促す
-          if (window.gc && typeof window.gc === 'function') {
-            window.gc();
-            Logger.debug('🗑️ Manual garbage collection triggered');
-          }
-        }
-
-        // 6時間以上の場合は警告
-        if (uptimeHours >= 6) {
-          console.warn(
-            '⚠️ Application has been running for over 6 hours. Consider refreshing the page.'
-          );
-          this.showWarningMessage(
-            '長時間の実行が検出されました。パフォーマンス向上のため、ページの再読み込みを推奨します。'
-          );
-        }
-      } catch (error) {
-        console.warn('⚠️ Long-running performance check failed:', error);
-      }
-    }
 
     showWarningMessage(message) {
       // 警告メッセージを表示（既存のshowErrorMessageを参考に）
@@ -3928,72 +3581,6 @@
      * 非公開状態遷移用の包括的キャッシュクリア
      * 既存のclearDataCachesを拡張し、より強力なキャッシュクリアを実行
      */
-    clearAllCachesForUnpublished() {
-      Logger.debug('🧹 非公開状態遷移: 包括的キャッシュクリア開始');
-
-      try {
-        // 1. 既存のキャッシュクリア機能を使用
-        if (this.cache && typeof this.cache.clear === 'function') {
-          this.cache.clear();
-          Logger.debug('🗑️ Frontend cache cleared');
-        }
-
-        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-          window.unifiedCache.clear();
-          Logger.debug('🗑️ Unified cache cleared');
-        }
-
-        // 2. 拡張されたローカルストレージクリア
-        const localStorageKeys = Object.keys(localStorage);
-        const studyQuestKeys = localStorageKeys.filter(
-          (key) =>
-            key.includes('studyquest') ||
-            key.includes('board') ||
-            key.includes('sheet') ||
-            key.includes('admin') ||
-            key.includes('publication') ||
-            key.includes('answer') ||
-            key.includes('cache_') ||
-            key.includes('lastSeenCount_') ||
-            key.includes('differentialCards_')
-        );
-
-        studyQuestKeys.forEach((key) => {
-          localStorage.removeItem(key);
-          Logger.debug('🗑️ Removed localStorage key:', key);
-        });
-
-        // 3. セッションストレージクリア
-        if (window.sessionStorage) {
-          const sessionKeys = Object.keys(sessionStorage);
-          const studyQuestSessionKeys = sessionKeys.filter(
-            (key) => key.includes('studyquest') || key.includes('board') || key.includes('admin')
-          );
-
-          studyQuestSessionKeys.forEach((key) => {
-            sessionStorage.removeItem(key);
-            Logger.debug('🗑️ Removed sessionStorage key:', key);
-          });
-        }
-
-        // 4. アプリケーションの状態リセット
-        if (this.state) {
-          this.state.currentAnswers = [];
-          this.state.hasNewContent = false;
-          this.state.newContentCount = 0;
-          this.state.lastSeenCount = 0;
-        }
-
-        // 5. キャッシュ無効化タイムスタンプ設定
-        localStorage.setItem('lastUnpublishTime', Date.now().toString());
-        localStorage.setItem('unpublishedRedirectTimestamp', new Date().toISOString());
-
-        Logger.debug('✅ 非公開状態遷移用キャッシュクリア完了');
-      } catch (error) {
-        console.error('❌ 非公開状態キャッシュクリアでエラー:', error);
-        // エラーがあっても処理は継続
-      }
-    }
 
     async performDataLoad(config, oldAnswers) {
       // Get current filter and sort settings
@@ -7797,7 +7384,8 @@
       Logger.debug('🚫 Redirecting to unpublished page (legacy function)');
 
       // キャッシュクリア処理（新機能と統合）
-      this.clearAllCachesForUnpublished();
+      // キャッシュクリア簡略化
+      if (this.cache) this.cache.clear();
 
       // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
       try {
@@ -8518,14 +8106,6 @@
 
           // Process batched changes
           cardChanges.forEach(({ card, entry }) => {
-            // Only log significant visibility changes for debugging
-            if (DEBUG_MODE && (entry.intersectionRatio === 0 || entry.intersectionRatio === 1)) {
-              Logger.perf('IntersectionObserver visibility change:', {
-                rowIndex: card.dataset.rowIndex,
-                isIntersecting: entry.isIntersecting,
-                intersectionRatio: entry.intersectionRatio,
-              });
-            }
 
             if (entry.isIntersecting) {
               // Card is becoming visible
@@ -8752,11 +8332,8 @@
         });
       }
 
-      // Use dynamic batch sizing for better performance adaptation
-      const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
-      const batchSize = this.isLowPerformanceMode
-        ? Math.min(CHUNK_SIZE, dynamicBatchSize)
-        : dynamicBatchSize;
+      // シンプルなバッチサイズ
+      const batchSize = this.isLowPerformanceMode ? 5 : 10;
 
       // Find items that haven't been rendered yet
       const unrenderedItems = this.state.currentAnswers.filter(
