@@ -107,7 +107,6 @@ function getSheetsServiceCached() {
   // ✅ 修正: CacheServiceは関数オブジェクトを正しく保存できないため、メモリキャッシュのみ使用
   // ✅ 最適化：先にキャッシュ存在確認とヒット率向上
   const cacheKey = 'sheets_service_optimized';
-  console.log('🔧 getSheetsServiceCached: キャッシュ確認', { key: cacheKey });
 
   // 🔧 メモリキャッシュから直接確認（関数オブジェクト保護考慮）
   try {
@@ -542,7 +541,6 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
       SimpleCacheManager.set(cacheKey, headerIndices, { ttl: 1800 });
     }
 
-    console.log(`📊 スプレッドシートヘッダーを取得しました: ${spreadsheetId}/${sheetName}`);
     return headerIndices;
   } catch (error) {
     console.error('[ERROR] getSpreadsheetHeaders:', error.message);
@@ -697,7 +695,6 @@ function synchronizeCacheAfterCriticalUpdate(
   newSpreadsheetId
 ) {
   try {
-    console.log('🔄 クリティカル更新後のキャッシュ同期開始:', {
       userId,
       oldSpreadsheetId,
       newSpreadsheetId,

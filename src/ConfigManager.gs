@@ -71,7 +71,6 @@ const ConfigManager = Object.freeze({
             // 修復したデータをDBに保存
             this.saveConfig(userId, baseConfig);
 
-            console.log('✅ ConfigManager.getUserConfig: 二重構造を自動修復完了', {
               userId,
               fixedFields: Object.keys(baseConfig),
             });
@@ -305,7 +304,6 @@ const ConfigManager = Object.freeze({
       dataSourceFields.forEach((field) => {
         if (currentConfig[field] !== undefined && updatedConfig[field] === undefined) {
           updatedConfig[field] = currentConfig[field];
-          console.log(`🔒 ConfigManager.updateAppStatus: ${field}を保護`, {
             userId,
             field,
             value: currentConfig[field],
@@ -662,7 +660,6 @@ const ConfigManager = Object.freeze({
 
         const success = this.updateConfig(userId, updates);
         if (success) {
-          console.log('✅ ConfigManager.fixSetupConsistency: 整合性修正完了', {
             userId,
             after: {
               setupStatus: updates.setupStatus || config.setupStatus,
@@ -672,7 +669,6 @@ const ConfigManager = Object.freeze({
         }
         return success;
       } else {
-        console.log('✅ ConfigManager.fixSetupConsistency: 整合性問題なし', { userId });
         return true;
       }
     } catch (error) {
@@ -706,7 +702,6 @@ const ConfigManager = Object.freeze({
 
       // フォーム情報が既に存在する場合はスキップ
       if (config.formUrl && config.formTitle) {
-        console.log('✅ ConfigManager.restoreFormInfo: フォーム情報は既に存在', { userId });
         return true;
       }
 
@@ -734,7 +729,6 @@ const ConfigManager = Object.freeze({
 
           const success = this.updateConfig(userId, updates);
           if (success) {
-            console.log('✅ ConfigManager.restoreFormInfo: フォーム情報復元完了', {
               userId,
               formUrl: updates.formUrl,
               formTitle: updates.formTitle
@@ -783,7 +777,6 @@ const ConfigManager = Object.freeze({
       const allUsers = DB.getAllUsers();
       results.totalUsers = allUsers.length;
 
-      console.log(`🔧 ConfigManager.fixAllDoubleStructure: ${allUsers.length}ユーザーの一括修正開始`);
 
       allUsers.forEach(user => {
         try {
@@ -856,7 +849,6 @@ const ConfigManager = Object.freeze({
         }
       });
 
-      console.log('✅ ConfigManager.fixAllDoubleStructure: 一括修正完了', {
         total: results.totalUsers,
         fixed: results.fixedUsers,
         error: results.errorUsers,
@@ -891,7 +883,6 @@ const ConfigManager = Object.freeze({
         return cacheManager.get(
           cacheKey,
           () => {
-            console.log(`ConfigManager: ユーザー情報取得 - ${email}`);
             return DB.findUserByEmail(email);
           },
           { ttl: 300 }
@@ -899,7 +890,6 @@ const ConfigManager = Object.freeze({
       }
 
       // フォールバック: 直接取得
-      console.log(`ConfigManager: ユーザー情報取得（キャッシュなし） - ${email}`);
       return DB.findUserByEmail(email);
     } catch (error) {
       console.error('ConfigManager.getUserInfo エラー:', error.message);
@@ -916,7 +906,6 @@ const ConfigManager = Object.freeze({
     try {
       const userInfo = this.getUserInfo(email);
       if (!userInfo) {
-        console.log(`ConfigManager: ユーザーが見つかりません - ${email}`);
         return null;
       }
 
@@ -961,7 +950,6 @@ const ConfigManager = Object.freeze({
    */
   performHealthCheck() {
     try {
-      console.log('🔍 ConfigManager.performHealthCheck: システム健全性チェック開始');
       
       const results = {
         totalUsers: 0,
@@ -1024,7 +1012,6 @@ const ConfigManager = Object.freeze({
 
       const healthScore = Math.round((results.healthyUsers / results.totalUsers) * 100);
       
-      console.log('✅ ConfigManager.performHealthCheck: システム健全性チェック完了', {
         total: results.totalUsers,
         healthy: results.healthyUsers,
         doubleStructure: results.doubleStructureUsers,

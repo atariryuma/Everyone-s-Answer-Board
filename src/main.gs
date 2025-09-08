@@ -686,7 +686,6 @@ function getWebAppUrl() {
     try {
       const url = urlMethods[i]();
       if (url && url.includes('script.google.com') && url.includes('exec')) {
-        console.log(`getWebAppUrl: 方法${i + 1}で公式URL取得成功`, url);
         return url;
       }
     } catch (e) {
@@ -720,11 +719,9 @@ function getWebAppUrl() {
       if (domain && domain !== 'gmail.com' && domain !== 'googlemail.com') {
         // Google Workspace環境
         baseUrl = `https://script.google.com/a/${domain}/macros/s/${scriptId}/exec`;
-        console.log('getWebAppUrl: Google Workspace URL構築', { domain, scriptId });
       } else {
         // 個人Google環境
         baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
-        console.log('getWebAppUrl: 個人Google環境 URL構築', { scriptId });
       }
 
       // URLをキャッシュ保存
@@ -1048,7 +1045,6 @@ function processLoginAction() {
       };
     }
 
-    console.log('🔄 ログインアクション: DB確認', { currentUserEmail });
 
     // DB直接検索（キャッシュバイパス）
     let userInfo = DB.findUserByEmail(currentUserEmail);
@@ -1210,7 +1206,6 @@ function renderAnswerBoard(userInfo, params) {
       if (config?.opinionHeader && config.opinionHeader !== 'お題') {
         opinionHeader = config.opinionHeader;
         opinionHeaderSource = 'configJson';
-        console.log('📋 renderAnswerBoard: opinionHeader取得（configJson）:', {
           value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
           length: opinionHeader.length,
           source: 'configJson'
@@ -1218,7 +1213,6 @@ function renderAnswerBoard(userInfo, params) {
       } 
       // ✅ Step 2: configJsonが「お題」の場合、または未設定の場合は高精度検出実行
       else if (finalSpreadsheetId && finalSheetName) {
-        console.log('🔍 renderAnswerBoard: opinionHeader高精度検出実行中...');
         
         // 2-1: getSpreadsheetColumnIndicesによる高精度検出
         const headerIndices = getSpreadsheetColumnIndices(finalSpreadsheetId, finalSheetName);
@@ -1226,7 +1220,6 @@ function renderAnswerBoard(userInfo, params) {
         if (headerIndices?.opinionHeader && headerIndices.opinionHeader !== 'お題') {
           opinionHeader = headerIndices.opinionHeader;
           opinionHeaderSource = 'getSpreadsheetColumnIndices';
-          console.log('🎯 renderAnswerBoard: opinionHeader高精度検出成功:', {
             value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
             length: opinionHeader.length,
             source: 'Core.gs高精度検出システム'
@@ -1266,7 +1259,6 @@ function renderAnswerBoard(userInfo, params) {
     }
     
     // 最終確認ログ
-    console.log('✅ renderAnswerBoard: opinionHeader最終確定:', {
       finalValue: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
       source: opinionHeaderSource,
       isDefault: opinionHeader === 'お題',
@@ -1550,7 +1542,6 @@ function getUser(format = 'object') {
             'LAST_USER_SESSION',
             JSON.stringify(sessionData)
           );
-          console.log('getUser: セッション保存完了', { userId, email });
         }
       } catch (dbError) {
         console.warn('getUser: DB検索失敗（セッション保存スキップ）', dbError.message);
@@ -1926,7 +1917,6 @@ function validateUserDataState(userInfo) {
  */
 function diagnoseSystem() {
   try {
-    console.log('🔍 システム診断開始...');
     
     const currentUser = UserManager.getCurrentEmail();
     const userInfo = currentUser ? DB.findUserByEmail(currentUser) : null;
@@ -2006,7 +1996,6 @@ function repairCurrentUser() {
       DB.updateUser(userInfo.userId, { isActive: true });
     }
     
-    console.log('✅ ユーザー修復完了:', {
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
       isActive: userInfo.isActive

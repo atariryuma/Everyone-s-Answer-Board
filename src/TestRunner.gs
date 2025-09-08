@@ -30,20 +30,17 @@ function testOptimizedManagementPanel() {
     });
 
     // Test 1: connectDataSource 最適化版テスト
-    console.log('\n📝 Test 1: connectDataSource 最適化版テスト');
     const testSpreadsheetId = '1test-spreadsheet-id-for-optimization-test';
     const testSheetName = 'テストシート';
 
     // 現在の設定を取得（テスト前状態）
     const beforeConfig = JSON.parse(userInfo.configJson || '{}');
-    console.log('🔍 テスト前設定:', {
       spreadsheetId: beforeConfig.spreadsheetId,
       sheetName: beforeConfig.sheetName,
       setupStatus: beforeConfig.setupStatus,
     });
 
     // Test 2: DB.updateUserInDatabase 直接テスト
-    console.log('\n📝 Test 2: DB.updateUserInDatabase 直接テスト');
     
     const testConfig = {
       ...beforeConfig,
@@ -61,7 +58,6 @@ function testOptimizedManagementPanel() {
       lastModified: new Date().toISOString(),
     });
 
-    console.log('🔍 DB更新結果:', {
       success: updateResult.success,
       error: updateResult.error,
       updatedCells: updateResult.updatedCells,
@@ -75,7 +71,6 @@ function testOptimizedManagementPanel() {
       const updatedUserInfo = DB.findUserById(userInfo.userId);
       const updatedConfig = JSON.parse(updatedUserInfo.configJson || '{}');
       
-      console.log('🔍 更新後設定確認:', {
         spreadsheetId: updatedConfig.spreadsheetId,
         sheetName: updatedConfig.sheetName,
         setupStatus: updatedConfig.setupStatus,
@@ -95,10 +90,8 @@ function testOptimizedManagementPanel() {
       }
 
       // Test 3: Service Account 認証テスト
-      console.log('\n📝 Test 3: Service Account 認証動作確認');
       const serviceTest = getSheetsServiceWithRetry();
       
-      console.log('🔍 Service Account サービス取得結果:', {
         hasService: !!serviceTest,
         hasSpreadsheets: !!serviceTest?.spreadsheets,
         hasValues: !!serviceTest?.spreadsheets?.values,
@@ -128,7 +121,6 @@ function testOptimizedManagementPanel() {
       timestamp: new Date().toISOString(),
     };
 
-    console.log('📊 テスト結果サマリー:', testSummary);
     return testSummary;
 
   } catch (error) {
@@ -163,7 +155,6 @@ function testPerformanceOptimizations() {
     };
 
     // Test 1: Service Object キャッシュ効率テスト
-    console.log('\n📝 Test 1: Service Object キャッシュ効率');
     
     console.log('🔧 1回目: Service Object取得（キャッシュミス想定）');
     const start1 = Date.now();
@@ -192,10 +183,8 @@ function testPerformanceOptimizations() {
       cacheWorking: time2 < (time1 * 0.5) && time3 < (time1 * 0.5),
     };
 
-    console.log('📊 Service Object キャッシュ結果:', results.serviceObjectCache);
 
     // Test 2: User Search キャッシュテスト
-    console.log('\n📝 Test 2: User Search キャッシュ効率');
     
     const currentUser = UserManager.getCurrentEmail();
     if (currentUser) {
@@ -228,11 +217,9 @@ function testPerformanceOptimizations() {
         userFound: !!user1 && !!user2 && !!user3,
       };
 
-      console.log('📊 User Search キャッシュ結果:', results.userSearchCache);
     }
 
     // Test 3: 全体的なパフォーマンス評価
-    console.log('\n📝 Test 3: 総合パフォーマンス評価');
     
     const overallStart = Date.now();
     
@@ -249,7 +236,6 @@ function testPerformanceOptimizations() {
       excellent: overallTime < 500,   // 0.5秒以内が理想
     };
 
-    console.log('📊 総合パフォーマンス:', results.overallPerformance);
 
     // 最終評価
     const serviceOK = results.serviceObjectCache?.cacheWorking || false;
@@ -261,10 +247,6 @@ function testPerformanceOptimizations() {
 
     console.log('\n='.repeat(60));
     console.log('🎯 最適化検証結果サマリー');
-    console.log(`📈 総合スコア: ${overallScore}/${maxScore}`);
-    console.log(`🔧 Service Object キャッシュ: ${serviceOK ? '✅ 正常' : '❌ 要改善'}`);
-    console.log(`👤 User Search キャッシュ: ${userOK ? '✅ 正常' : '❌ 要改善'}`);  
-    console.log(`⚡ 総合パフォーマンス: ${performanceOK ? '✅ 良好' : '❌ 要改善'}`);
     console.log('='.repeat(60));
 
     results.overallScore = `${overallScore}/${maxScore}`;
@@ -292,7 +274,6 @@ function testPerformanceOptimizations() {
 function checkServiceAccountStatus() {
   try {
     console.log('='.repeat(50));
-    console.log('🔍 サービスアカウント動作確認開始');
     console.log('='.repeat(50));
 
     // 1. PropertiesService確認
@@ -301,13 +282,10 @@ function checkServiceAccountStatus() {
     const databaseId = props.getProperty('DATABASE_SPREADSHEET_ID');
     const adminEmail = props.getProperty('ADMIN_EMAIL');
 
-    console.log('📋 PropertiesService確認:');
     console.log(
       '- SERVICE_ACCOUNT_CREDS:',
       serviceAccountCreds ? `設定済み (${serviceAccountCreds.length}文字)` : '❌未設定'
     );
-    console.log('- DATABASE_SPREADSHEET_ID:', databaseId ? `設定済み (${databaseId})` : '❌未設定');
-    console.log('- ADMIN_EMAIL:', adminEmail ? `設定済み (${adminEmail})` : '❌未設定');
 
     if (!serviceAccountCreds) {
       throw new Error('SERVICE_ACCOUNT_CREDSが設定されていません');
@@ -334,7 +312,6 @@ function checkServiceAccountStatus() {
       try {
         const dbSpreadsheet = SpreadsheetApp.openById(databaseId);
         const dbSheets = dbSpreadsheet.getSheets();
-        console.log('📊 データベース接続成功:');
         console.log('- スプレッドシート名:', dbSpreadsheet.getName());
         console.log('- シート数:', dbSheets.length);
         console.log(
@@ -360,7 +337,6 @@ function checkServiceAccountStatus() {
       const token = getServiceAccountTokenCached();
       console.log('🔑 サービスアカウントトークン:', token ? '✅生成成功' : '❌生成失敗');
     } catch (tokenError) {
-      console.log('❌ トークン生成エラー: [詳細は非表示]');
     }
 
     console.log('='.repeat(50));
@@ -416,7 +392,6 @@ function forceCleanupConfigJson() {
     if (userInfo.configJson) {
       try {
         const parsedConfig = JSON.parse(userInfo.configJson);
-        console.log('📋 解析されたconfig構造:', Object.keys(parsedConfig));
 
         // 重複したconfigJsonフィールドを検出
         if (parsedConfig.configJson) {
@@ -512,7 +487,6 @@ function diagnoseDatabase() {
     const values = usersSheet.getDataRange().getValues();
     const headers = values[0];
 
-    console.log('📊 データベース構造:');
     console.log('- ヘッダー:', headers);
     console.log('- 総行数:', values.length);
     console.log('- データ行数:', Math.max(0, values.length - 1));
@@ -524,7 +498,6 @@ function diagnoseDatabase() {
       const configJsonIndex = headers.indexOf('configJson');
       if (configJsonIndex >= 0) {
         const configJson = row[configJsonIndex];
-        console.log(`👤 ユーザー${i}:`, {
           email: row[1],
           configJsonLength: configJson?.length || 0,
           configJsonPreview: configJson?.substring(0, 100) || 'データなし',

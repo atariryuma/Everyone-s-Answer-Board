@@ -48,7 +48,6 @@ function getSheetsServiceWithRetry(maxRetries = 2) {
       // Service Objectの完全性確認
       if (service?.spreadsheets?.values?.append && 
           typeof service.spreadsheets.values.append === 'function') {
-        console.log(`✅ Service Object取得成功 (試行 ${attempt})`);
         return service;
       }
       
@@ -142,7 +141,6 @@ const DB = {
         insertDataOption: 'INSERT_ROWS'
       });
 
-      console.log('✅ ユーザー作成完了（シンプル版）', {
         userId: userData.userId,
         setupStatus: configJson.setupStatus
       });
@@ -225,7 +223,6 @@ const DB = {
     }
 
     try {
-      console.log('🔍 findUserById: configJSON中心型検索開始');
 
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
@@ -270,7 +267,6 @@ const DB = {
             console.warn('findUserById: キャッシュ保存エラー', cacheError.message);
           }
 
-          console.log('✅ findUserById: configJSON中心型ユーザー発見', {
             userId,
             userEmail: userObj.userEmail,
             configFields: Object.keys(userObj.parsedConfig).length,
@@ -336,7 +332,6 @@ const DB = {
    */
   updateUserConfig_DEPRECATED(userId, configData) {
     try {
-      console.log('🔥 updateUserConfig: configJSON重複回避更新開始', {
         userId,
         configFields: Object.keys(configData),
         timestamp: new Date().toISOString(),
@@ -360,7 +355,6 @@ const DB = {
       // キャッシュクリア
       this.clearUserCache(userId, currentUser.userEmail);
 
-      console.log('✅ updateUserConfig: configJSON重複回避更新完了', {
         userId,
         configFields: Object.keys(configData),
         configSize: dbUpdateData.configJson.length,
@@ -429,7 +423,6 @@ const DB = {
       // キャッシュクリア
       this.clearUserCache(userId, currentUser.userEmail);
 
-      console.log('✅ ユーザー更新完了（シンプル版）', {
         userId,
         setupStatus: updatedConfig.setupStatus,
         hasFormUrl: !!updatedConfig.formUrl
@@ -454,7 +447,6 @@ const DB = {
    */
   updateUserInDatabase(userId, dbUpdateData) {
     try {
-      console.log('📝 updateUserInDatabase: 更新開始（最適化版）', {
         userId,
         hasConfigJson: !!dbUpdateData.configJson,
         configJsonSize: dbUpdateData.configJson?.length || 0,
@@ -522,7 +514,6 @@ const DB = {
         };
       }
 
-      console.log('🔍 updateUserInDatabase: ユーザー行発見', {
         userId,
         rowIndex,
         currentConfigSize: values[rowIndex - 1][3]?.length || 0,
@@ -546,7 +537,6 @@ const DB = {
         valueInputOption: 'RAW'
       });
 
-      console.log('✅ updateUserInDatabase: 最適化版更新完了', {
         userId,
         row: rowIndex,
         configJsonSize: dbUpdateData.configJson.length,
@@ -609,7 +599,6 @@ const DB = {
         console.warn('⚠️ getAllUsers: パフォーマンス警告 - 1000件超の取得は非推奨');
       }
       
-      console.log('📋 getAllUsers: configJSON中心型取得開始', { 
         limit: Math.min(limit, 1000), 
         offset, 
         activeOnly 
@@ -660,7 +649,6 @@ const DB = {
         nextOffset: endIndex < total ? endIndex : null
       };
 
-      console.log(`✅ getAllUsers: ${result.returned}/${result.total}件取得完了`);
       return result;
     } catch (error) {
       console.error('❌ getAllUsers: configJSON中心型取得エラー:', error.message);
@@ -697,7 +685,6 @@ const DB = {
       try {
         const cachedUser = cacheManager.get(cacheKey);
         if (cachedUser !== null) {
-          console.log('🎯 findUserByEmail: キャッシュヒット（高速取得）', { 
             email, 
             executionTime: `${Date.now() - startTime}ms` 
           });
@@ -709,7 +696,6 @@ const DB = {
     }
 
     const logPrefix = forceRefresh ? '🔄 findUserByEmail: 強制更新' : '🔍 findUserByEmail: キャッシュミス';
-    console.log(logPrefix, { email });
 
     try {
       const service = getSheetsServiceWithRetry();
@@ -748,7 +734,6 @@ const DB = {
           }
           
           const executionTime = Date.now() - startTime;
-          console.log('✅ findUserByEmail: ユーザー発見（最適化版）', {
             email,
             userId: user.userId,
             cached: true,
@@ -872,7 +857,6 @@ const DB = {
       // 8. 削除ログ記録
       this.logAccountDeletion(targetUserId, targetUser.userEmail, reason, currentUserEmail);
 
-      console.log('✅ ユーザー削除完了', {
         targetUserId,
         targetEmail: targetUser.userEmail,
         rowIndex: targetRowIndex,
@@ -915,7 +899,6 @@ const DB = {
         cache.remove(key);
       });
 
-      console.log('🔥 キャッシュ完全クリア完了', {
         userId,
         userEmail,
         clearedKeys: cacheKeys.length,
@@ -974,7 +957,6 @@ const DB = {
         }
       }
 
-      console.log('📝 削除ログ記録完了', { targetUserId, targetEmail });
     } catch (error) {
       console.warn('削除ログ記録エラー:', error.message);
     }
@@ -988,7 +970,6 @@ const DB = {
    */
   cleanupNestedConfigJson(userId = null) {
     try {
-      console.log('🧹 cleanupNestedConfigJson: 重複configJSON修正開始', {
         targetUserId: userId || 'all_users',
         timestamp: new Date().toISOString(),
       });
@@ -1028,7 +1009,6 @@ const DB = {
               delete cleanedConfig.configJson;
               needsCleaning = true;
 
-              console.log(`🧹 ネストしたconfigJsonを修正: ${user.userEmail}`);
             } catch (parseError) {
               console.warn('configJson解析エラー:', parseError.message);
             }
@@ -1208,7 +1188,6 @@ function cleanupEmptyUsers() {
       });
     }
 
-    console.log(`✅ クリーンアップ完了: ${deletedCount}件の空ユーザーを削除`);
 
     return {
       success: true,
@@ -1227,7 +1206,6 @@ function cleanupEmptyUsers() {
  */
 function debugShowAllUsers() {
   try {
-    console.log('🔍 データベース診断開始...');
 
     const service = getSheetsServiceWithRetry();
     const dbId = getSecureDatabaseId();
@@ -1246,7 +1224,6 @@ function debugShowAllUsers() {
     
     const allData = batchGetResult.valueRanges[0].values || [];
 
-    console.log('📊 データベース診断結果:', {
       spreadsheetId: dbId,
       sheetName,
       totalRows: allData.length,
@@ -1256,7 +1233,6 @@ function debugShowAllUsers() {
     // 各ユーザーの詳細を表示
     for (let i = 1; i < allData.length; i++) {
       const row = allData[i];
-      console.log(`ユーザー ${i}:`, {
         userId: row[0],
         userEmail: row[1],
         isActive: row[2],
@@ -1277,7 +1253,6 @@ function debugShowAllUsers() {
       for (let i = 1; i < Math.min(deletionLogs.length, 6); i++) {
         // 最新5件まで
         const log = deletionLogs[i];
-        console.log(`削除ログ ${i}:`, {
           timestamp: log[0],
           executor: log[1],
           targetUserId: log[2],
@@ -1308,7 +1283,6 @@ function debugShowAllUsers() {
  */
 function updateUserFields(userId, fields) {
   try {
-    console.log('🚨 updateUserFields: 緊急修正開始', { userId, fields });
 
     if (!userId) {
       throw new Error('userIdが必要です');
@@ -1363,7 +1337,6 @@ function updateUserFields(userId, fields) {
       sheet.getRange(targetRowIndex, lastModifiedColIndex + 1).setValue(new Date().toISOString());
     }
 
-    console.log('✅ updateUserFields: 緊急修正完了', { userId });
     return { success: true };
   } catch (error) {
     console.error('❌ updateUserFields: 緊急修正エラー:', error.message);

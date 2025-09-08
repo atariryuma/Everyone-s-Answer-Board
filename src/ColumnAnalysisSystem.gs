@@ -26,7 +26,6 @@ function analyzeColumnType(headerName, sampleData = []) {
 
     const confidence = Math.max(75, ensembleScores[bestType] || 0);
 
-    console.log('🚀 超高精度列タイプ分析完了:', {
       headerName: headerName.substring(0, 30),
       bestType,
       confidence,
@@ -714,7 +713,6 @@ function resolveColumnConflicts(headerRow, allData) {
     }
   });
 
-  console.log('🎯 重複回避・最適割り当て完了:', {
     totalColumns: columnCount,
     assignedColumns: assignmentLog.length,
     assignments: assignmentLog,

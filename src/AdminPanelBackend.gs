@@ -46,18 +46,15 @@ function connectDataSource(spreadsheetId, sheetName) {
     // 🎯 フォーム連携情報取得（正規実装）
     let formInfo = null;
     try {
-      console.log('🔍 connectDataSource: フォーム情報取得開始', { spreadsheetId });
       formInfo = checkFormConnection(spreadsheetId);
       
       if (formInfo && formInfo.hasForm) {
-        console.log('✅ connectDataSource: フォーム情報取得成功', {
           formUrl: formInfo.formUrl,
           formTitle: formInfo.formTitle,
           hasFormUrl: !!formInfo.formUrl,
           hasFormTitle: !!formInfo.formTitle
         });
       } else {
-        console.log('ℹ️ connectDataSource: フォーム未連携', { spreadsheetId });
       }
     } catch (formError) {
       console.error('❌ connectDataSource: フォーム情報取得エラー', {
@@ -74,7 +71,6 @@ function connectDataSource(spreadsheetId, sheetName) {
       // 現在のconfigJSONを直接取得（ConfigManager経由削除）
       const currentConfig = JSON.parse(userInfo.configJson || '{}');
 
-      console.log('🔍 connectDataSource: 現在の設定状態', {
         userId: userInfo.userId,
         currentSpreadsheetId: currentConfig.spreadsheetId,
         currentSheetName: currentConfig.sheetName,
@@ -93,7 +89,6 @@ function connectDataSource(spreadsheetId, sheetName) {
           const actualHeaderName = headerRow[answerIndex];
           if (actualHeaderName && actualHeaderName.trim() !== '') {
             opinionHeader = actualHeaderName;
-            console.log('🎯 connectDataSource: opinionHeader高精度設定（columnMapping連携）:', {
               answerIndex,
               headerName: actualHeaderName.substring(0, 50) + (actualHeaderName.length > 50 ? '...' : ''),
               confidence: columnMapping.confidence?.answer || '不明'
@@ -129,7 +124,6 @@ function connectDataSource(spreadsheetId, sheetName) {
           suggestion: 'Core.gsの高精度検出システムが後で自動修正します'
         });
       } else {
-        console.log('✅ connectDataSource: opinionHeader確実設定完了:', {
           finalValue: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
           length: opinionHeader.length,
           source: 'columnMapping連携'
@@ -195,13 +189,11 @@ function connectDataSource(spreadsheetId, sheetName) {
       // 🚀 シンプル化：新しいupdateUserメソッドを使用
       DB.updateUser(userInfo.userId, updatedConfig);
 
-      console.log('✅ connectDataSource: 設定更新完了', {
         userId: userInfo.userId,
         setupStatus: updatedConfig.setupStatus,
         hasFormUrl: !!updatedConfig.formUrl
       });
 
-      console.log('✅ connectDataSource: 最適化版データソース接続完了', {
         userId: userInfo.userId,
         updatedFields: Object.keys(updatedConfig).length,
         configJsonSize: JSON.stringify(updatedConfig).length,
@@ -242,7 +234,6 @@ function connectDataSource(spreadsheetId, sheetName) {
  */
 function publishApplication(config) {
   try {
-    console.log('🚀 publishApplication: 最適化版開始（直接DB更新）', {
       hasSpreadsheetId: !!config.spreadsheetId,
       hasSheetName: !!config.sheetName,
       hasColumnMapping: !!config.columnMapping,
@@ -263,7 +254,6 @@ function publishApplication(config) {
     // 現在のconfigJSONを直接取得（パフォーマンス向上）
     const currentConfig = JSON.parse(userInfo.configJson || '{}');
 
-    console.log('🔍 publishApplication: 現在の設定状態', {
       userId: userInfo.userId,
       currentConfig: {
         spreadsheetId: currentConfig.spreadsheetId,
@@ -313,7 +303,6 @@ function publishApplication(config) {
       },
     });
 
-    console.log('📊 publishApplication: executeAppPublish実行結果', {
       userId: userInfo.userId,
       success: publishResult.success,
       hasAppUrl: !!publishResult.appUrl,
@@ -354,12 +343,10 @@ function publishApplication(config) {
       // 🚀 シンプル化：新しいupdateUserメソッドを使用
       DB.updateUser(userInfo.userId, updatedConfig);
 
-      console.log('✅ publishApplication: 公開設定更新完了', {
         userId: userInfo.userId,
         appPublished: updatedConfig.appPublished
       });
 
-      console.log('✅ publishApplication: 最適化版公開完了（直接DB更新）', {
         userId: userInfo.userId,
         appUrl: publishResult.appUrl,
         appPublished: updatedConfig.appPublished,
@@ -430,7 +417,6 @@ function saveDraftConfiguration(config) {
       throw new Error('設定の保存に失敗しました');
     }
 
-    console.log('✅ saveDraftConfiguration: ConfigManager統一版保存完了', {
       userId: userInfo.userId,
       configFields: Object.keys(cleanConfig).length,
       claudeMdCompliant: true,
@@ -461,7 +447,6 @@ function saveDraftConfiguration(config) {
  */
 function getFormInfo(spreadsheetId, sheetName) {
   try {
-    console.log('📋 getFormInfo: シート固有フォーム情報取得開始', { spreadsheetId, sheetName });
 
     if (!spreadsheetId || !sheetName) {
       return {
@@ -525,7 +510,6 @@ function getFormInfo(spreadsheetId, sheetName) {
       sheetName,
     };
 
-    console.log('✅ getFormInfo: シート固有フォーム情報取得完了', {
       sheetName,
       hasForm: formData.hasForm,
       formTitle: formData.formTitle,
@@ -557,7 +541,6 @@ function getFormInfo(spreadsheetId, sheetName) {
  */
 function getSpreadsheetList() {
   try {
-    console.log('📊 getSpreadsheetList: スプレッドシート一覧取得開始');
 
     // キャッシュキー生成（ユーザー固有）
     const currentUser = UserManager.getCurrentEmail();
@@ -567,7 +550,6 @@ function getSpreadsheetList() {
     return cacheManager.get(
       cacheKey,
       () => {
-        console.log('📊 getSpreadsheetList: キャッシュなし、新規取得開始');
 
         const startTime = new Date().getTime();
         const spreadsheets = [];
@@ -723,7 +705,6 @@ function executeConfigCleanup() {
  */
 function generateColumnMapping(headerRow, data = []) {
   try {
-    console.log('🎯 超高精度列マッピング生成開始:', {
       columnCount: headerRow.length,
       dataRows: data.length,
       timestamp: new Date().toISOString(),
@@ -732,7 +713,6 @@ function generateColumnMapping(headerRow, data = []) {
     // 重複回避・最適割り当てアルゴリズム実行
     const result = resolveColumnConflicts(headerRow, data);
 
-    console.log('✅ 超高精度列マッピング生成完了:', {
       mappedColumns: Object.keys(result.mapping).length,
       averageConfidence: result.averageConfidence || 'N/A',
       conflictsResolved: result.conflictsResolved,
@@ -998,7 +978,6 @@ function getCurrentConfig() {
     }
 
     const executionTime = Date.now() - startTime;
-    console.log('✅ getCurrentConfig: 設定取得完了', {
       userId: userInfo.userId,
       configFields: Object.keys(config || {}).length,
       setupStatus: config.setupStatus,
@@ -1024,7 +1003,6 @@ function getCurrentConfig() {
 
 function getCurrentBoardInfoAndUrls() {
   try {
-    console.log('📊 getCurrentBoardInfoAndUrls: ボード情報取得開始');
 
     // 現在のユーザーの設定を取得
     const currentUser = UserManager.getCurrentEmail();
@@ -1104,7 +1082,6 @@ function getCurrentBoardInfoAndUrls() {
       dataCount: 0, // 後で実際のデータ数を取得可能
     };
 
-    console.log('✅ getCurrentBoardInfoAndUrls: ボード情報取得完了', {
       isActive: boardInfo.isActive,
       hasQuestionText: !!boardInfo.questionText,
       questionText: boardInfo.questionText,
@@ -1142,7 +1119,6 @@ function checkIsSystemAdmin() {
     const currentUserEmail = UserManager.getCurrentEmail();
     const isSystemAdmin = App.getAccess().isSystemAdmin(currentUserEmail);
 
-    console.log('✅ checkIsSystemAdmin: 権限確認完了', {
       userEmail: currentUserEmail,
       isSystemAdmin,
       timestamp: new Date().toISOString(),
@@ -1168,7 +1144,6 @@ function checkIsSystemAdmin() {
  */
 function migrateUserDataToConfigJson(userId = null) {
   try {
-    console.log('🔄 migrateUserDataToConfigJson: データマイグレーション開始', {
       targetUserId: userId || 'all_users',
       timestamp: new Date().toISOString(),
     });
@@ -1240,7 +1215,6 @@ function migrateUserDataToConfigJson(userId = null) {
             fieldsUpdated: Object.keys(migratedConfig).length,
           });
 
-          console.log(`✅ マイグレーション完了: ${user.userEmail}`);
         } else {
           migrationResults.skipped++;
           migrationResults.details.push({
@@ -1311,7 +1285,6 @@ function analyzeColumns(spreadsheetId, sheetName) {
     // 高精度列マッピング生成（データ分析付き）
     const columnMapping = generateColumnMapping(headerRow, allData);
 
-    console.log('✅ analyzeColumns: CLAUDE.md準拠列分析完了', {
       headerCount: headerRow.length,
       mappingCount: Object.keys(columnMapping).length,
       claudeMdCompliant: true,
@@ -1360,7 +1333,6 @@ function getHeaderIndices(spreadsheetId, sheetName) {
     // 既存のgetSpreadsheetColumnIndices関数を使用
     const result = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
-    console.log('✅ getHeaderIndices: フロントエンド互換関数完了', {
       hasResult: !!result,
       opinionHeader: result?.opinionHeader,
     });
@@ -1410,7 +1382,6 @@ function getSheetList(spreadsheetId) {
       };
     });
 
-    console.log('✅ getSheetList: シート一覧取得完了', {
       spreadsheetId,
       sheetCount: sheetList.length,
       formSheets: sheetList.filter((s) => s.isFormResponseSheet).length,
@@ -1450,7 +1421,6 @@ function getActualHeaderName(headerRow, columnIndex) {
  */
 function fixFormInfoForUser(userId) {
   try {
-    console.log('🔧 fixFormInfoForUser: フォーム情報修復開始', { userId });
 
     // 現在のユーザー設定を取得
     const currentConfig = ConfigManager.getUserConfig(userId);
@@ -1484,7 +1454,6 @@ function fixFormInfoForUser(userId) {
       currentConfig.formUrl !== formInfo.formUrl || currentConfig.formTitle !== formInfo.formTitle;
 
     if (!needsUpdate) {
-      console.log('修復不要: フォーム情報は正常', { userId });
       return {
         success: true,
         reason: 'no_update_needed',
@@ -1505,7 +1474,6 @@ function fixFormInfoForUser(userId) {
       throw new Error('設定の保存に失敗しました');
     }
 
-    console.log('✅ fixFormInfoForUser: フォーム情報修復完了', {
       userId,
       oldFormUrl: currentConfig.formUrl,
       newFormUrl: formInfo.formUrl,

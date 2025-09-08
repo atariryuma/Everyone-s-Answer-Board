@@ -146,7 +146,6 @@ function fixConfigJsonNestingImpl() {
 
         // configJsonフィールドが存在する場合は除去
         if ('configJson' in config) {
-          console.log(`🚨 重複ネスト発見: ${user.userId}`);
           delete config.configJson;
 
           // ConfigManager経由で修正保存
@@ -159,7 +158,6 @@ function fixConfigJsonNestingImpl() {
               userEmail: user.userEmail,
               status: 'fixed',
             });
-            console.log(`✅ 修正完了: ${user.userEmail}`);
           } else {
             results.errors.push({
               userId: user.userId,
@@ -177,7 +175,6 @@ function fixConfigJsonNestingImpl() {
       }
     }
 
-    console.log('✅ SystemManager.fixConfigJsonNesting: 修正完了', {
       total: results.total,
       fixed: results.fixed,
       errors: results.errors.length,
@@ -372,7 +369,6 @@ function cleanAllConfigJson() {
 
         // configJsonフィールドが存在する場合
         if (config.configJson) {
-          console.log(`🔧 ユーザー ${user.userId} の二重構造を修復中`);
 
           if (typeof config.configJson === 'string') {
             try {
@@ -423,7 +419,6 @@ function cleanAllConfigJson() {
             status: 'cleaned',
           });
 
-          console.log(`✅ ユーザー ${user.userId} をクリーンアップ完了`);
         }
       } catch (error) {
         console.error(`❌ ユーザー ${user.userId} の処理エラー:`, error.message);
@@ -440,7 +435,6 @@ function cleanAllConfigJson() {
     });
   }
 
-  console.log('🧹 クリーンアップ完了:', {
     総数: results.total,
     修復: results.cleaned,
     エラー: results.errors.length,
@@ -469,7 +463,6 @@ const SystemManager = {
  * GASエディタから直接実行してください
  */
 function testSystemStatus() {
-  console.log('🔍 システム診断実行開始');
 
   const diagnostics = {
     security: SystemManager.testSecurity(),
@@ -479,7 +472,6 @@ function testSystemStatus() {
     timestamp: new Date().toISOString(),
   };
 
-  console.log('🔍 システム診断完了:', diagnostics);
   console.log('✅ セキュリティ:', diagnostics.security.isComplete ? '正常' : '要修正');
   console.log('✅ データベース:', diagnostics.database.success ? '正常' : '要修正');
   console.log(
@@ -505,7 +497,6 @@ function fixConfigJsonNesting() {
   });
 
   if (result.fixed > 0) {
-    console.log(`✅ ${result.fixed}名のユーザーの重複ネストを修正しました`);
   }
   if (result.errors.length > 0) {
     console.warn('❌ エラーが発生したユーザー:', result.errors);
@@ -600,7 +591,6 @@ function testDoubleStructurePrevention() {
     console.log("Test 1: システム健全性チェック");
     try {
       testResults.healthCheck = ConfigManager.performHealthCheck();
-      console.log("✅ 健全性チェック完了:", {
         total: testResults.healthCheck.totalUsers,
         healthy: testResults.healthCheck.healthyUsers,
         healthScore: testResults.healthCheck.healthScore + "%"
@@ -640,7 +630,6 @@ function testDoubleStructurePrevention() {
         const passed = result === testCase.expected;
         const status = passed ? "✅ PASS" : "❌ FAIL";
         
-        console.log(`Test 3.${index + 1}: ${status} - Input: "${testCase.input}" -> ${result} (expected: ${testCase.expected})`);
         
         if (passed) {
           testResults.jsonStringDetection.passed++;
@@ -725,7 +714,6 @@ function testDoubleStructurePrevention() {
     
     // 結果まとめ
     const overallStatus = testResults.success ? "✅ PASS" : "❌ FAIL";
-    console.log(`${overallStatus} 二重構造予防システム統合テスト完了`);
     
     if (testResults.success) {
       console.log("🎉 全テストが成功しました！");
@@ -783,7 +771,6 @@ function testCompleteRepair() {
     });
     
     const improvement = afterHealth.healthScore - beforeHealth.healthScore;
-    console.log(`健全性スコア改善: ${improvement > 0 ? "+" : ""}${improvement}%`);
     
     console.log("✅ ConfigManager総合修復処理テスト完了");
     
@@ -929,7 +916,6 @@ function diagnoseOpinionHeader(userId = null) {
     diagnosis.overallScore = Math.max(0, score);
     diagnosis.status = score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
 
-    console.log('✅ opinionHeader診断完了:', {
       userId: userInfo.userId,
       score: diagnosis.overallScore,
       status: diagnosis.status,
@@ -1109,7 +1095,6 @@ function testOpinionHeaderSystem() {
  */
 function validateLegacyDebtCleanup() {
   const startTime = Date.now();
-  console.log('🔍 包括的レガシー債務検証開始...');
   
   const results = {
     phase1_identifiers: validateIdentifierUnification(),
@@ -1129,7 +1114,6 @@ function validateLegacyDebtCleanup() {
   });
   
   const duration = Date.now() - startTime;
-  console.log(`🎯 包括的レガシー債務検証完了 (${duration}ms):`, JSON.stringify(results, null, 2));
   
   return results;
 }
@@ -1142,7 +1126,6 @@ function validateIdentifierUnification() {
   const warnings = [];
   
   try {
-    console.log('📋 Phase 1検証: 識別子統一確認中...');
     
     // configJson内のデータ整合性確認
     const sampleUser = DB.getAllUsers()[0];
@@ -1173,7 +1156,6 @@ function validateConfigStructureUnification() {
   const warnings = [];
   
   try {
-    console.log('📋 Phase 2検証: sheetConfig構造削除確認中...');
     
     const users = DB.getAllUsers();
     let sheetConfigFound = false;
@@ -1193,7 +1175,6 @@ function validateConfigStructureUnification() {
         const requiredProps = ['opinionHeader', 'reasonHeader', 'spreadsheetId', 'sheetName'];
         requiredProps.forEach(prop => {
           if (config[prop]) {
-            console.log(`✅ ${prop} 統一化確認完了`);
           }
         });
       }
@@ -1218,7 +1199,6 @@ function validateTemplateVariables() {
   const warnings = [];
   
   try {
-    console.log('📋 Phase 3検証: テンプレート変数整合性確認中...');
     console.log('✅ Phase 3: テンプレート変数統合確認完了');
     
   } catch (error) {
@@ -1236,7 +1216,6 @@ function validateApiNormalization() {
   const warnings = [];
   
   try {
-    console.log('📋 Phase 4検証: API呼び出し正規化確認中...');
     console.log('✅ Phase 4: API正規化確認完了');
     
   } catch (error) {
@@ -1254,7 +1233,6 @@ function validateDiagnosticSystem() {
   const warnings = [];
   
   try {
-    console.log('📋 Phase 5検証: 診断システム強化確認中...');
     console.log('✅ Phase 5: 診断システム強化確認完了');
     
   } catch (error) {
@@ -1325,7 +1303,6 @@ function validateClaudeMdCompliance() {
   const overallCompliance = Object.values(compliance).every(Boolean);
   const duration = Date.now() - startTime;
   
-  console.log(`📖 CLAUDE.md準拠度検証完了 (${duration}ms):`, JSON.stringify({
     overallCompliance,
     details: compliance
   }, null, 2));
@@ -1396,7 +1373,6 @@ function runComprehensiveSystemTest() {
   const overallSuccess = Object.values(testResults).every(Boolean);
   const duration = Date.now() - startTime;
   
-  console.log(`🧪 システム完全性テスト完了 (${duration}ms):`, JSON.stringify({
     overallSuccess,
     results: testResults
   }, null, 2));

@@ -63,7 +63,6 @@ function getBulkData(userId, options = {}) {
     
     const executionTime = Date.now() - startTime;
     // 全体の受信成功を簡潔にログ
-    console.log(`✅ データ取得完了: ${Object.keys(bulkData).length}項目 (${executionTime}ms)`);
     
     return {
       success: true,
@@ -297,7 +296,6 @@ function registerNewUser(userEmail) {
   // Sanitize email input
   const sanitizedEmail = SecurityValidator.sanitizeInput(userEmail, SECURITY.MAX_LENGTHS.EMAIL);
 
-  console.log('🚀 registerNewUser: Starting registration process', {
     userEmail: sanitizedEmail,
     timestamp: new Date().toISOString(),
   });
@@ -370,7 +368,6 @@ function registerNewUser(userEmail) {
       // 統一ユーザー作成関数を使用（ログイン時はキャッシュバイパス）
       const newUser = handleUserRegistration(sanitizedEmail, true);
 
-      console.log('✅ registerNewUser: New user created successfully', {
         userEmail: sanitizedEmail,
         userId: newUser.userId,
         databaseWriteTime: `${Date.now() - startTime}ms`,
@@ -696,7 +693,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       data: formattedData,
     };
 
-    console.log('🔍 最終結果:', {
       adminMode,
       originalDisplayMode: sheetData.displayMode,
       finalDisplayMode,
@@ -903,7 +899,6 @@ function formatSheetDataForFrontend(
 ) {
   // 🔍 formatSheetDataForFrontend - マッピングデータ処理調査ログ
   console.log('🎭 formatSheetDataForFrontend - データフォーマット調査');
-  console.log('📊 入力パラメータ:', {
     rawDataCount: rawData.length,
     mappedIndices: mappedIndices,
     headerIndicesKeys: Object.keys(headerIndices),
@@ -922,7 +917,6 @@ function formatSheetDataForFrontend(
     const nameIndex = mappedIndices.nameHeader;
 
     // 🔍 各行の詳細データ抽出調査
-    console.log(`🔍 Row ${index} フォーマット処理:`);
     console.log('📄 インデックス情報:', {
       classIndex: classIndex,
       opinionIndex: opinionIndex,
@@ -932,7 +926,6 @@ function formatSheetDataForFrontend(
     });
     
     if (row.originalData) {
-      console.log('📝 実際のデータ抽出:', {
         classValue: classIndex !== undefined ? row.originalData[classIndex] : 'INDEX_UNDEFINED',
         opinionValue: opinionIndex !== undefined ? row.originalData[opinionIndex] : 'INDEX_UNDEFINED',
         reasonValue: reasonIndex !== undefined ? row.originalData[reasonIndex] : 'INDEX_UNDEFINED',
@@ -987,7 +980,6 @@ function formatSheetDataForFrontend(
     let reasonValue = '';
     
     console.log('🎯 理由列データ抽出詳細:');
-    console.log('📊 理由列抽出パラメータ:', {
       reasonIndex: reasonIndex,
       hasOriginalData: !!row.originalData,
       originalDataLength: row.originalData ? row.originalData.length : 'NO_DATA',
@@ -997,7 +989,6 @@ function formatSheetDataForFrontend(
 
     if (reasonIndex !== undefined && row.originalData && reasonIndex >= 0 && reasonIndex < row.originalData.length) {
       const rawReasonValue = row.originalData[reasonIndex];
-      console.log('📝 生の理由データ:', {
         rawValue: rawReasonValue,
         rawType: typeof rawReasonValue,
         isNull: rawReasonValue === null,
@@ -1054,7 +1045,6 @@ function formatSheetDataForFrontend(
     };
     
     // 🔍 最終結果のログ出力
-    console.log('✅ formatSheetDataForFrontend完了 Row ' + index + ':', {
       rowIndex: finalResult.rowIndex,
       hasName: !!finalResult.name,
       hasEmail: !!finalResult.email,
@@ -1112,7 +1102,6 @@ function getAppConfig(requestUserId) {
     // 🆕 フォーム情報の自動取得・修復
     if (configJson.spreadsheetId && configJson.sheetName && (!configJson.formUrl || !configJson.formTitle)) {
       try {
-        console.log('🔄 フォーム情報自動取得開始', { spreadsheetId: configJson.spreadsheetId, sheetName: configJson.sheetName });
         const formInfo = getFormInfo(configJson.spreadsheetId, configJson.sheetName);
         if (formInfo.success && formInfo.formData.hasForm) {
           if (!configJson.formUrl && formInfo.formData.formUrl) {
@@ -1122,7 +1111,6 @@ function getAppConfig(requestUserId) {
           if (!configJson.formTitle && formInfo.formData.formTitle) {
             healingUpdates.formTitle = formInfo.formData.formTitle;
           }
-          console.log('✅ フォーム情報自動修復完了', { formUrl: formInfo.formData.formUrl, formTitle: formInfo.formData.formTitle });
         }
       } catch (formError) {
         console.warn('⚠️ フォーム情報取得エラー:', formError.message);
@@ -1181,7 +1169,6 @@ function getAppConfig(requestUserId) {
         }
         
         // 古いheaderIndicesを削除予約（段階的移行）
-        console.log('🔄 headerIndices最適化完了', { 
           columnMappingCount: Object.keys(columnMapping).length,
           reactionMappingCount: Object.keys(reactionMapping).length 
         });
@@ -1944,7 +1931,6 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
           // 他のリアクション列からユーザーを削除（1人1リアクション制限）
           if (userIndex >= 0) {
             currentReactions.splice(userIndex, 1);
-            console.log(`他のリアクションから削除: ${reactingUserEmail} from ${key}`);
           }
         }
 
@@ -2232,7 +2218,6 @@ function addUnifiedQuestions(form, questionType, customConfig) {
       nameItem.setRequired(false);
     }
 
-    console.log(`フォームに統一質問を追加しました: ${questionType}`);
   } catch (error) {
     console.error('addUnifiedQuestions エラー:', error.message);
     throw error;
@@ -2468,7 +2453,6 @@ function createLinkedSpreadsheet(userEmail, form, dateTimeString) {
       file.setSharing(DriveApp.Access.DOMAIN, DriveApp.Permission.VIEW);
 
       // 作成者（現在のユーザー）は所有者として保持
-      console.log(`作成者は所有者として権限を保持: ${userEmail}`);
     } catch (sharingError) {
       console.warn(`共有設定の変更に失敗しましたが、処理を続行します: ${sharingError.message}`);
     }
@@ -2550,7 +2534,6 @@ function shareAllSpreadsheetsWithServiceAccount() {
       }
     }
 
-    console.log('全スプレッドシート共有完了:', `${successCount}件成功`, `${errorCount}件失敗`);
 
     return {
       status: 'completed',
@@ -2596,7 +2579,6 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
       // ドメイン共有に失敗した場合は個別にユーザーを追加
       try {
         file.addEditor(userEmail);
-        console.log(`ユーザーを個別に編集者として追加しました: ${userEmail}`);
       } catch (individualError) {
         console.error(`個別ユーザー追加も失敗: ${individualError.message}`);
       }
@@ -2606,7 +2588,6 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     try {
       const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       spreadsheet.addEditor(userEmail);
-      console.log(`SpreadsheetApp経由でユーザーを編集者として追加: ${userEmail}`);
     } catch (spreadsheetAddError) {
       console.warn(`SpreadsheetApp経由の追加で警告: ${spreadsheetAddError.message}`);
     }
@@ -2619,7 +2600,6 @@ function repairUserSpreadsheetAccess(userEmail, spreadsheetId) {
     if (serviceAccountEmail) {
       try {
         file.addEditor(serviceAccountEmail);
-        console.log(`サービスアカウントも編集者として追加: ${serviceAccountEmail}`);
       } catch (serviceError) {
         console.warn(`サービスアカウント追加で警告: ${serviceError.message}`);
       }
@@ -2679,7 +2659,6 @@ function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName) {
       console.warn('Auto-resize failed:', resizeError.message);
     }
 
-    console.log(`リアクション列を追加しました: ${sheetName}`);
   } catch (e) {
     console.error(`リアクション列追加エラー: ${e.message}`);
     // エラーでも処理は継続
@@ -2866,8 +2845,6 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const dataRows = sheetData.slice(1);
 
     // 🔍 スプレッドシート生データの詳細調査ログ（理由列問題対応）
-    console.log('📊 executeGetSheetData - スプレッドシート生データ調査');
-    console.log('📋 ヘッダー情報:', {
       headers: headers,
       headerCount: headers.length,
       reasonRelatedHeaders: headers.map((h, i) => ({ index: i, header: h }))
@@ -2877,7 +2854,6 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     console.log('📄 データ行サンプル（最初の3行）:');
     for (let i = 0; i < Math.min(3, dataRows.length); i++) {
       const row = dataRows[i];
-      console.log(`🔍 Row ${i + 2} (index ${i}):`, {
         rowLength: row.length,
         hasReasonData: row[5] ? 'YES' : 'NO',  // index 5は理由列の予想位置
         reasonValue: row[5] || 'EMPTY',
@@ -2887,7 +2863,6 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       // 各列の詳細情報
       row.forEach((cell, colIndex) => {
         if (colIndex <= 6) { // 重要な列のみ
-          console.log(`  Column ${colIndex} (${headers[colIndex] || 'unknown'}): "${cell || 'EMPTY'}"`);
         }
       });
     }
@@ -3086,7 +3061,6 @@ function buildRosterMap(rosterData) {
  */
 function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber, isOwner) {
   // 🔍 processRowData - 行データ処理の詳細調査ログ
-  console.log(`🎯 processRowData - Row ${rowNumber} 詳細調査`);
   console.log('📄 入力データ:', {
     rowLength: row.length,
     rowData: row,
@@ -3098,7 +3072,6 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
   ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', 'どうして、メダカと一緒に、水草、ミジンコを入れると思いますか？観察していて、気づいたことを書きましょう。', 'そう考える理由や体験があれば教えてください。'].forEach((header, expectedIndex) => {
     const actualIndex = headerIndices[header];
     const cellValue = actualIndex !== undefined ? row[actualIndex] : 'HEADER_NOT_FOUND';
-    console.log(`  🔍 "${header.substring(0, 20)}...": index=${actualIndex}, value="${cellValue || 'EMPTY'}"`);
   });
 
   const processedRow = {
@@ -3425,7 +3398,6 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices, configJson
 
       // ✅ opinionHeaderが見つからない場合の詳細デバッグ情報
       if (mappedIndex === undefined) {
-        console.log('🔍 opinionHeader検出失敗 - 利用可能なヘッダー一覧:', {
           allHeaders: Object.keys(actualHeaderIndices),
           columnMapping: columnMapping || '未設定',
           suggestion: '手動で列マッピングを設定するか、列名に「どうして」「なぜ」「？」などを含めてください'
@@ -3501,7 +3473,6 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices, configJson
       );
       // ✅ 理由列が見つからない場合の詳細デバッグ情報
       if (configKey === 'reasonHeader') {
-        console.log('🔍 理由列検出失敗 - 利用可能なヘッダー一覧:', {
           availableHeaders: availableHeaders,
           searchedPatterns: reasonKeywords || ['基本パターンのみ'],
           configHeaderName: configHeaderName,
@@ -4201,7 +4172,6 @@ function getInitialData(requestUserId, sheetName) {
 
     // === ステップ1.5: データ整合性の自動チェックと修正 ===
     try {
-      console.log('🔍 データ整合性の自動チェック開始...');
       const consistencyResult = fixUserDataConsistency(currentUserId);
       if (consistencyResult.updated) {
         console.log('✅ データ整合性が自動修正されました');
@@ -4325,7 +4295,6 @@ function getInitialData(requestUserId, sheetName) {
     const includeSheetDetails = sheetName || configJson.sheetName;
 
     // デバッグ: シート詳細取得パラメータの確認
-    console.log('🔍 getInitialData: シート詳細取得パラメータ確認:', {
       sheetName,
       sheetName: configJson.sheetName,
       includeSheetDetails,
@@ -4399,7 +4368,6 @@ function getInitialData(requestUserId, sheetName) {
     const endTime = new Date().getTime();
     response._meta.executionTime = endTime - startTime;
 
-    console.log('🎯 getInitialData: 統合初期化完了', {
       executionTime: `${response._meta.executionTime}ms`,
       userId: currentUserId,
       setupStep,
@@ -4922,14 +4890,12 @@ function performAutoRepair(userId) {
       config.claudeMdCompliant = true;
 
       DB.DB.updateUser(userId, config);
-      console.log('✅ performAutoRepair: configJSON更新完了', {
         userId,
         fixedItems: repairResults.fixedItems.length,
         claudeMdCompliant: true,
       });
     }
 
-    console.log('✅ performAutoRepair: CLAUDE.md準拠システム修復完了', {
       userId,
       fixedItems: repairResults.fixedItems,
       configUpdated: repairResults.configUpdated,
