@@ -256,10 +256,9 @@ function getOpinionHeaderSafely(userId, sheetName) {
     }
 
     const config = userInfo.parsedConfig || {};
-    const sheetConfigKey = `sheet_${config.sheetName || sheetName}`;
-    const sheetConfig = config[sheetConfigKey] || {};
-
-    const opinionHeader = sheetConfig.opinionHeader || config.sheetName || 'お題';
+    
+    // ✅ configJSON中心型: sheetConfig廃止、直接configJSON使用
+    const opinionHeader = config.opinionHeader || config.sheetName || 'お題';
 
     console.log('getOpinionHeaderSafely:', {
       userId,
@@ -579,16 +578,14 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
     }
 
-    // シート固有の設定を取得 (sheetKey is based only on sheet name)
-    const sheetKey = `sheet_${sheetName}`;
-    const sheetConfig = configJson[sheetKey] || {};
+    // ✅ configJSON中心型: sheetConfig廃止、直接configJSON使用
 
     // Check if current user is the board owner
-    const isOwner = configJson.ownerId === currentUserId;
+    const isOwner = configJson.userId === currentUserId;
     console.log(
-      'getPublishedSheetData: isOwner=%s, ownerId=%s, currentUserId=%s',
+      'getPublishedSheetData: isOwner=%s, userId=%s, currentUserId=%s',
       isOwner,
-      configJson.ownerId,
+      configJson.userId,
       currentUserId
     );
 
@@ -616,7 +613,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     if (setupStatus === 'pending') {
       mainHeaderName = 'セットアップ中...';
     } else {
-      mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
+      mainHeaderName = configJson.opinionHeader || COLUMN_HEADERS.OPINION;
     }
 
     // その他のヘッダーフィールドも安全に取得
@@ -626,11 +623,11 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       classHeaderName = 'セットアップ中...';
       nameHeaderName = 'セットアップ中...';
     } else {
-      reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
+      reasonHeaderName = configJson.reasonHeader || COLUMN_HEADERS.REASON;
       classHeaderName =
-        sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+        configJson.classHeader !== undefined ? configJson.classHeader : COLUMN_HEADERS.CLASS;
       nameHeaderName =
-        sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+        configJson.nameHeader !== undefined ? configJson.nameHeader : COLUMN_HEADERS.NAME;
     }
     console.log(
       'getPublishedSheetData: Configured Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s, nameHeaderName=%s',
@@ -651,7 +648,8 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
         classHeader: classHeaderName,
         nameHeader: nameHeaderName,
       },
-      headerIndices
+      headerIndices,
+      configJson
     );
 
     const formattedData = formatSheetDataForFrontend(
@@ -805,14 +803,13 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
-    // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
-    const sheetConfig = configJson[`sheet_${sheetName}`] || {};
-    const mainHeaderName = sheetConfig.opinionHeader || COLUMN_HEADERS.OPINION;
-    const reasonHeaderName = sheetConfig.reasonHeader || COLUMN_HEADERS.REASON;
+    // ✅ configJSON中心型: 動的列名マッピングでsheetConfig廃止
+    const mainHeaderName = configJson.opinionHeader || COLUMN_HEADERS.OPINION;
+    const reasonHeaderName = configJson.reasonHeader || COLUMN_HEADERS.REASON;
     const classHeaderName =
-      sheetConfig.classHeader !== undefined ? sheetConfig.classHeader : COLUMN_HEADERS.CLASS;
+      configJson.classHeader !== undefined ? configJson.classHeader : COLUMN_HEADERS.CLASS;
     const nameHeaderName =
-      sheetConfig.nameHeader !== undefined ? sheetConfig.nameHeader : COLUMN_HEADERS.NAME;
+      configJson.nameHeader !== undefined ? configJson.nameHeader : COLUMN_HEADERS.NAME;
     const mappedIndices = mapConfigToActualHeaders(
       {
         opinionHeader: mainHeaderName,
@@ -820,11 +817,12 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
         classHeader: classHeaderName,
         nameHeader: nameHeaderName,
       },
-      headerIndices
+      headerIndices,
+      configJson
     );
 
     // ユーザー情報と管理者モードの取得
-    const isOwner = configJson.ownerId === currentUserId;
+    const isOwner = configJson.userId === currentUserId;
     const displayMode = configJson.displayMode || SYSTEM_CONSTANTS.DISPLAY_MODES.ANONYMOUS;
 
     // 新しいデータを既存の処理パイプラインと同様に加工
@@ -2679,11 +2677,11 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const displayMode = configJson.displayMode || SYSTEM_CONSTANTS.DISPLAY_MODES.ANONYMOUS;
 
     // Check if current user is the board owner
-    const isOwner = configJson.ownerId === userId;
+    const isOwner = configJson.userId === userId;
     console.log(
-      'getSheetData: isOwner=%s, ownerId=%s, userId=%s',
+      'getSheetData: isOwner=%s, userId=%s, userId=%s',
       isOwner,
-      configJson.ownerId,
+      configJson.userId,
       userId
     );
 
@@ -3006,9 +3004,10 @@ function getColumnHeaderName(columnKey) {
  * 設定された列名と実際のスプレッドシートヘッダーをマッピング
  * @param {Object} configHeaders - 設定されたヘッダー名
  * @param {Object} actualHeaderIndices - 実際のヘッダーインデックスマップ
+ * @param {Object} configJson - ✅ configJSON中心型：全設定情報
  * @returns {Object} マッピングされたインデックス
  */
-function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
+function mapConfigToActualHeaders(configHeaders, actualHeaderIndices, configJson = {}) {
   const mappedIndices = {};
   const availableHeaders = Object.keys(actualHeaderIndices);
   console.log(
@@ -3071,16 +3070,16 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
     }
 
     // opinionHeader（メイン質問）の特別処理：見つからない場合または「お題」の場合は高精度自動検出
-    if ((mappedIndex === undefined || sheetConfig[configKey] === 'お題') && configKey === 'opinionHeader') {
+    if ((mappedIndex === undefined || configHeaders[configKey] === 'お題') && configKey === 'opinionHeader') {
       console.log(
         'mapConfigToActualHeaders: opinionHeader高精度検出開始 - current value: %s, mappedIndex: %s',
-        sheetConfig[configKey],
+        configHeaders[configKey],
         mappedIndex
       );
 
       // ✅ Step 1: columnMappingからanswerインデックスを直接取得（最優先）
       let answerIndex = undefined;
-      const columnMapping = sheetConfig.columnMapping;
+      const columnMapping = configJson.columnMapping;
       
       if (columnMapping && columnMapping.mapping && columnMapping.mapping.answer !== undefined) {
         answerIndex = columnMapping.mapping.answer;
@@ -3694,29 +3693,17 @@ function createForm(requestUserId, config) {
       updatedConfigJson.folderId = folder ? folder.getId() : '';
       updatedConfigJson.folderUrl = folder ? folder.getUrl() : '';
 
-      // カスタムフォーム設定情報を保存
-      // カスタムフォーム設定情報をシート固有のキーの下に保存
-      const sheetKey = `sheet_${result.sheetName}`;
-      updatedConfigJson[sheetKey] = {
-        ...(updatedConfigJson[sheetKey] || {}), // 既存のシート設定を保持
-        formTitle: config.formTitle,
-        mainQuestion: config.mainQuestion,
-        questionType: config.questionType,
-        choices: config.choices,
-        includeOthers: config.includeOthers,
-        enableClass: config.enableClass,
-        classChoices: config.classChoices,
-        lastModified: new Date().toISOString(),
-      };
+      // ✅ configJSON中心型: カスタムフォーム設定を直接configJSONに統合
+      updatedConfigJson.formTitle = config.formTitle;
+      updatedConfigJson.mainQuestion = config.mainQuestion;
+      updatedConfigJson.questionType = config.questionType;
+      updatedConfigJson.choices = config.choices;
+      updatedConfigJson.includeOthers = config.includeOthers;
+      updatedConfigJson.enableClass = config.enableClass;
+      updatedConfigJson.classChoices = config.classChoices;
+      updatedConfigJson.lastModified = new Date().toISOString();
 
-      // 以前の実行で誤ってトップレベルに追加された可能性のあるプロパティを削除
-      delete updatedConfigJson.formTitle;
-      delete updatedConfigJson.mainQuestion;
-      delete updatedConfigJson.questionType;
-      delete updatedConfigJson.choices;
-      delete updatedConfigJson.includeOthers;
-      delete updatedConfigJson.enableClass;
-      delete updatedConfigJson.classChoices;
+      // ✅ configJSON中心型: すべての設定を統合済み、削除処理不要
 
       // 🔧 修正: 直接フィールド更新 + ConfigManager経由での安全保存
       const directUpdateData = {
@@ -4034,15 +4021,12 @@ function getInitialData(requestUserId, sheetName) {
     // === ステップ5: セットアップステップの決定 ===
     const setupStep = determineSetupStep(userInfo, configJson);
 
-    // 公開シート設定とヘッダー情報を取得
+    // ✅ configJSON中心型: 公開シート設定でsheetConfig廃止
     const sheetName = configJson.sheetName || '';
-    const sheetConfigKey = sheetName ? `sheet_${sheetName}` : '';
-    const activeSheetConfig =
-      sheetConfigKey && configJson[sheetConfigKey] ? configJson[sheetConfigKey] : {};
-
-    const opinionHeader = activeSheetConfig.opinionHeader || '';
-    const nameHeader = activeSheetConfig.nameHeader || '';
-    const classHeader = activeSheetConfig.classHeader || '';
+    
+    const opinionHeader = configJson.opinionHeader || '';
+    const nameHeader = configJson.nameHeader || '';
+    const classHeader = configJson.classHeader || '';
 
     // === ベース応答の構築 ===
     const response = {

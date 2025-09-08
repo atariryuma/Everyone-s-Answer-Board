@@ -10,7 +10,9 @@
     const solutions = [];
 
     // 診断1: テンプレート展開状況
-    if (!window.USER_ID || typeof window.USER_ID === 'object' || window.USER_ID.trim() === '') {
+    // ✅ Phase 5: 初期診断もconfigManager優先
+    const userId = configManager.config?.userId || window.USER_ID;
+    if (!userId || typeof userId === 'object' || userId.trim() === '') {
       issues.push('テンプレート変数が正しく展開されていません');
       solutions.push('🔄 ページをリロードしてください');
     }
@@ -96,7 +98,7 @@
                   style="padding: 0.75rem 1.5rem; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
             🔄 ページをリロード
           </button>
-          <button onclick="window.location.href = window.location.href.split('?')[0] + '?mode=admin&userId=' + (window.USER_ID || '')" 
+          <button onclick="window.location.href = window.location.href.split('?')[0] + '?mode=admin&userId=' + (configManager.config?.userId || window.USER_ID || '')" 
                   style="padding: 0.75rem 1.5rem; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
             🛠️ 管理パネルへ
           </button>
@@ -111,102 +113,227 @@
     container.innerHTML = errorHtml;
   };
 
-  /**
-   * ✅ CLAUDE.md準拠: configJSONベース設定取得（スマート診断統合）
-   * @returns {Promise<Object>} 設定オブジェクト
-   */
-  const getConfigFromBackend = async () => {
-    // 🦾 スマート診断実行
-    const diagnosis = smartDiagnosis();
-    debugInfo('🦾 システム診断結果:', diagnosis);
+  // ✅ Phase 1: 古いgetConfigFromBackend関数を削除（ConfigManagerに統合済み）
 
-    // 🎆 自動回復試行
-    if (diagnosis.severity !== 'healthy') {
-      const recovered = await autoRecovery(diagnosis);
-      if (recovered) {
-        debugInfo('✅ 自動回復成功 - 再診断を実行');
-        return getConfigFromBackend(); // 再帰的再試行
+  // ✅ Phase 1: CONFIG管理統一化 - 単一責任原則適用
+  class ConfigManager {
+    constructor() {
+      this._config = null;
+      this._initialized = false;
+    }
+
+    async initialize() {
+      if (this._initialized) return this._config;
+      
+      try {
+        this._config = await this._loadConfigFromBackend();
+        this._initialized = true;
+        debugInfo('✅ ConfigManager初期化完了:', this._config.userId);
+        return this._config;
+      } catch (error) {
+        console.error('❌ ConfigManager初期化エラー:', error);
+        this._config = this._createFallbackConfig();
+        this._initialized = true;
+        return this._config;
       }
     }
 
-    try {
-      // 🚀 複数ソースからuserId取得（超効率化）
-      let userId = new URLSearchParams(window.location.search).get('userId');
-
-      // フォールバック1: 既存のCONFIGから取得
-      if (!userId && CONFIG && CONFIG.userId) {
-        userId = CONFIG.userId;
+    get config() {
+      if (!this._initialized) {
+        console.warn('⚠️ ConfigManagerが未初期化です');
+        return this._createFallbackConfig();
       }
-
-      // フォールバック2: テンプレート変数から取得（GAS側で展開される可能性）
-      if (!userId && window.USER_ID) {
-        userId = window.USER_ID;
-      }
-
-      if (!userId) {
-        // 📱 ユーザーフレンドリーエラー表示
-        showUserFriendlyError(diagnosis);
-        throw new Error('ユーザーIDを取得できません。初期設定が必要です。');
-      }
-
-      // SecurityValidator使用でセキュリティ強化
-      if (!SecurityValidator.isValidUUID(userId)) {
-        throw new Error('無効なuserID形式です');
-      }
-
-      // App名前空間パターン使用
-      return await App.getConfig().getUserConfig(userId);
-    } catch (error) {
-      console.error('❌ getConfigFromBackend エラー:', error);
-
-      // エラーが診断関連でない場合、ユーザーフレンドリーエラーを表示
-      if (diagnosis.severity !== 'healthy') {
-        showUserFriendlyError(diagnosis);
-      }
-
-      throw error;
+      return this._config;
     }
-  };
 
-  // configJSON中心設定（CLAUDE.md準拠）
-  let CONFIG = {};
+    async _loadConfigFromBackend() {
+      // ✅ Phase 2: 簡素化されたデータ取得フロー
+      const userId = this._extractUserId();
+      
+      try {
+        return await this._runGasCall('getCurrentConfig', userId);
+      } catch (error) {
+        // エラー時のみ診断実行（パフォーマンス最適化）
+        console.warn('⚠️ 初回取得失敗、診断システム実行:', error.message);
+        
+        const diagnosis = smartDiagnosis();
+        if (diagnosis.severity === 'healthy') {
+          throw error; // 診断問題なしの場合、元エラーを再スロー
+        }
 
-  // 設定初期化
-  const initializeConfig = async () => {
-    try {
-      CONFIG = await getConfigFromBackend();
-      Object.assign(window, CONFIG);
-      debugInfo('✅ Config初期化完了:', CONFIG.userId);
-    } catch (error) {
-      console.error('❌ Config初期化エラー:', error);
+        // 自動回復試行
+        const recovered = await autoRecovery(diagnosis);
+        if (recovered) {
+          debugInfo('✅ 自動回復成功、再取得実行');
+          return await this._runGasCall('getCurrentConfig', userId);
+        }
+        
+        throw new Error(`設定取得失敗: ${error.message} (診断: ${diagnosis.severity})`);
+      }
+    }
 
-      // 📱 ユーザーフレンドリーエラーハンドリング
-      const diagnosis = smartDiagnosis();
-      if (diagnosis.severity !== 'healthy') {
-        debugInfo('📱 ユーザーフレンドリーエラー表示をスキップ（既に表示済み）');
-        return; // 既にshowUserFriendlyErrorが呼ばれているため、フォールバック設定は不要
+    _extractUserId() {
+      // ✅ 統一されたuserId取得ロジック
+      const sources = [
+        () => new URLSearchParams(window.location.search).get('userId'),
+        () => configManager.config?.userId || window.USER_ID,
+        () => this._config?.userId
+      ];
+
+      for (const getSource of sources) {
+        const userId = getSource();
+        if (userId && typeof userId === 'string' && userId.trim()) {
+          // SecurityValidator使用でセキュリティ強化
+          if (SecurityValidator.isValidUUID(userId)) {
+            return userId;
+          }
+          console.warn('⚠️ 無効なuserID形式をスキップ:', userId);
+        }
+      }
+      
+      throw new Error('有効なuserIdが見つかりません');
+    }
+
+    _createFallbackConfig() {
+      // ✅ Phase 2: 簡素化されたフォールバック設定
+      try {
+        const fallbackUserId = this._extractUserId();
+        const fallbackSheetName = window.SHEET_NAME || 'Sheet1';
+
+        return Object.freeze({
+          showCounts: false,
+          displayMode: 'anonymous',
+          sheetName: fallbackSheetName,
+          userId: fallbackUserId,
+          ownerName: '',
+          showAdminFeatures: false,
+          showHighlightToggle: false,
+          showScoreSort: false,
+          isStudentMode: true,
+          isAdminUser: false,
+          mapping: {},
+        });
+      } catch (error) {
+        console.error('❌ フォールバック設定作成失敗:', error.message);
+        // 最小限の安全な設定を返す
+        return Object.freeze({
+          showCounts: false,
+          displayMode: 'anonymous',
+          sheetName: 'Sheet1',
+          userId: '',
+          ownerName: '',
+          showAdminFeatures: false,
+          showHighlightToggle: false,
+          showScoreSort: false,
+          isStudentMode: true,
+          isAdminUser: false,
+          mapping: {},
+        });
+      }
+    }
+
+    // ✅ Phase 3: API呼び出しの最適化 - 統一API管理システム
+    async _runGasCall(funcName, ...args) {
+      // パラメータ統一化
+      const callParams = {
+        funcName,
+        args,
+        timestamp: Date.now(),
+        cacheKey: this._generateCacheKey(funcName, args)
+      };
+
+      // キャッシュチェック（読み取り系のみ）
+      if (this._isReadOnlyCall(funcName)) {
+        const cached = this._getApiCache(callParams.cacheKey);
+        if (cached) {
+          debugInfo(`⚡ APIキャッシュヒット: ${funcName}`, { cacheKey: callParams.cacheKey });
+          return cached;
+        }
       }
 
-      // フォールバック設定（SHEET_NAME空文字対策）
-      const fallbackUserId = new URLSearchParams(window.location.search).get('userId') || '';
-      const fallbackSheetName = window.SHEET_NAME || 'Sheet1'; // テンプレート変数フォールバック
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error(`API call timeout: ${funcName} (30秒)`));
+        }, 30000);
 
-      CONFIG = Object.freeze({
-        showCounts: false,
-        displayMode: 'anonymous',
-        sheetName: fallbackSheetName,
-        userId: fallbackUserId,
-        ownerName: '',
-        showAdminFeatures: false,
-        showHighlightToggle: false,
-        showScoreSort: false,
-        isStudentMode: true,
-        isAdminUser: false,
-        mapping: {},
+        const handleSuccess = (result) => {
+          clearTimeout(timeout);
+          
+          // 読み取り系の結果をキャッシュ（5分間）
+          if (this._isReadOnlyCall(funcName) && result) {
+            this._setApiCache(callParams.cacheKey, result, 300000);
+          }
+          
+          debugInfo(`✅ API成功: ${funcName}`, { 
+            duration: Date.now() - callParams.timestamp,
+            cached: this._isReadOnlyCall(funcName)
+          });
+          resolve(result);
+        };
+
+        const handleFailure = (error) => {
+          clearTimeout(timeout);
+          console.error(`❌ API失敗: ${funcName}`, { 
+            error: error.message,
+            args: callParams.args,
+            duration: Date.now() - callParams.timestamp 
+          });
+          reject(error);
+        };
+
+        google.script.run
+          .withSuccessHandler(handleSuccess)
+          .withFailureHandler(handleFailure)
+          [funcName](...args);
       });
-      Object.assign(window, CONFIG);
     }
-  };
+
+    // キャッシュキー生成（統一化）
+    _generateCacheKey(funcName, args) {
+      return `api_${funcName}_${JSON.stringify(args).slice(0, 100)}`;
+    }
+
+    // 読み取り系API判定
+    _isReadOnlyCall(funcName) {
+      const readOnlyCalls = [
+        'getCurrentConfig', 'getPublishedSheetData', 'getBulkData',
+        'checkCurrentPublicationStatus', 'getSystemDomainInfo'
+      ];
+      return readOnlyCalls.includes(funcName);
+    }
+
+    // APIキャッシュ管理
+    _getApiCache(key) {
+      try {
+        const cached = sessionStorage.getItem(key);
+        if (cached) {
+          const { data, expiry } = JSON.parse(cached);
+          if (Date.now() < expiry) {
+            return data;
+          }
+          sessionStorage.removeItem(key);
+        }
+      } catch (error) {
+        console.warn('APIキャッシュ読み込みエラー:', error.message);
+      }
+      return null;
+    }
+
+    _setApiCache(key, data, ttl = 300000) {
+      try {
+        const cacheData = {
+          data,
+          expiry: Date.now() + ttl
+        };
+        sessionStorage.setItem(key, JSON.stringify(cacheData));
+      } catch (error) {
+        console.warn('APIキャッシュ保存エラー:', error.message);
+      }
+    }
+  }
+
+  // グローバルConfigManagerインスタンス
+  const configManager = new ConfigManager();
 
   // === APPLICATION CONSTANTS ===
   // GAS optimized constants
@@ -286,16 +413,12 @@
     }),
   });
 
-  // ✅ CLAUDE.md準拠: App名前空間パターン（効率化版）
+  // ✅ Phase 3: App名前空間 統一API管理（効率化版）
   const createGasMethod = (methodName, funcName, errorContext) => {
     return async (...args) => {
       try {
-        return new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            [funcName](...args);
-        });
+        // configManagerの統一API呼び出し使用
+        return await configManager._runGasCall(funcName, ...args);
       } catch (error) {
         console.error(`❌ ${errorContext} エラー:`, error);
         throw error;
@@ -369,10 +492,10 @@
               fn(...args);
             };
 
-          google.script.run
-            .withSuccessHandler(cleanup(resolve))
-            .withFailureHandler(cleanup(reject))
-            .checkCurrentPublicationStatus(userId);
+          // ✅ Phase 3: 統一API呼び出し使用
+          configManager._runGasCall('checkCurrentPublicationStatus', userId)
+            .then(cleanup(resolve))
+            .catch(cleanup(reject));
         }).catch((error) => {
           console.error('❌ App.getStatus.checkPublicationStatus エラー:', error);
           throw error;
@@ -501,8 +624,8 @@
      * @returns {string} 有効なユーザーID、またはフォールバック値
      */
     validateUserId(userId) {
-      // シンプル版：基本的な値確認のみ
-      return userId || window.USER_ID || '';
+      // ✅ Phase 4: テンプレート変数統一化 - configManager経由で取得
+      return userId || configManager.config?.userId || window.USER_ID || '';
     }
 
     /**
@@ -515,7 +638,7 @@
       
       while (Date.now() - startTime < timeout) {
         // CONFIG初期化状態をチェック
-        if (CONFIG && typeof CONFIG === 'object' && CONFIG.initialized !== false) {
+        if (configManager._initialized && configManager.config) {
           console.log('✅ waitForConfigInitialization: CONFIG初期化確認完了');
           return true;
         }
@@ -542,21 +665,21 @@
       let validUserId = null;
 
       try {
-        // Source 1: state.tenantId (最優先)
-        if (this.state?.tenantId && this.state.tenantId.trim() !== '') {
-          sources.push({ source: 'state.tenantId', value: this.state.tenantId });
-          validUserId = this.state.tenantId;
+        // Source 1: state.userId (最優先)
+        if (this.state?.userId && this.state.userId.trim() !== '') {
+          sources.push({ source: 'state.userId', value: this.state.userId });
+          validUserId = this.state.userId;
         }
 
-        // Source 2: CONFIG.userId  
-        if (!validUserId && CONFIG?.userId && CONFIG.userId.trim() !== '') {
-          sources.push({ source: 'CONFIG.userId', value: CONFIG.userId });
-          validUserId = CONFIG.userId;
+        // Source 2: configManager.config.userId  
+        if (!validUserId && configManager.config?.userId && configManager.config.userId.trim() !== '') {
+          sources.push({ source: 'configManager.config.userId', value: configManager.config.userId });
+          validUserId = configManager.config.userId;
         }
 
-        // Source 3: window.USER_ID (GAS template variable)
+        // Source 3: window.USER_ID (GAS template variable) - フォールバックのみ
         if (!validUserId && window.USER_ID && window.USER_ID.trim() !== '') {
-          sources.push({ source: 'window.USER_ID', value: window.USER_ID });
+          sources.push({ source: 'window.USER_ID_fallback', value: window.USER_ID });
           validUserId = window.USER_ID;
         }
 
@@ -597,12 +720,11 @@
           sources: sources,
           finalUserId: validUserId,
           savedToSession: !!validUserId,
-          configState: CONFIG ? Object.keys(CONFIG) : 'undefined',
-          windowUserIdState: {
-            exists: !!window.USER_ID,
-            value: window.USER_ID,
-            type: typeof window.USER_ID,
-            length: window.USER_ID?.length
+          configState: configManager.config ? Object.keys(configManager.config) : 'undefined',
+          configManagerState: {
+            initialized: configManager._initialized,
+            hasConfig: !!configManager.config,
+            userId: configManager.config?.userId
           }
         });
 
@@ -672,15 +794,16 @@
         currentAnswers: [], // CLAUDE.md準拠: 常に配列として初期化
         isLoading: false,
         lastFocusedElement: null,
-        isStudentMode: window.isStudentMode,
-        isAdminUser: window.isAdminUser,
-        showCounts: window.showCounts,
+        // ✅ Phase 4: テンプレート変数統一化 - configManager優先順位
+        isStudentMode: configManager.config?.isStudentMode ?? window.isStudentMode,
+        isAdminUser: configManager.config?.isAdminUser ?? window.isAdminUser,
+        showCounts: configManager.config?.showCounts ?? window.showCounts,
         showAdminFeatures: false, // 初期状態は常に閲覧モード
-        showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
-        showScoreSort: window.showScoreSort,
-        displayMode: window.displayMode,
-        sheetName: CONFIG.sheetName || 'Sheet1',
-        tenantId: this.validateUserId(CONFIG.userId || window.USER_ID), // Validate and add userId to state with fallback
+        showHighlightToggle: configManager.config?.isAdminUser ?? window.isAdminUser, // 管理者なら常に表示
+        showScoreSort: configManager.config?.showScoreSort ?? window.showScoreSort,
+        displayMode: configManager.config?.displayMode ?? window.displayMode,
+        sheetName: configManager.config?.sheetName || 'Sheet1',
+        userId: this.validateUserId(configManager.config?.userId),
         hasNewContent: false,
         newContentCount: 0,
         lastSeenCount: this.loadLastSeenCount(), // ローカルストレージから復元
@@ -693,9 +816,9 @@
       this.initialDataLoaded = false;
       this.hadInitialDataLoadFailure = false; // 初期データロード失敗フラグ
 
-      // Initial state setup complete
-      this.serverShowCounts = window.showCounts;
-      this.serverDisplayMode = window.displayMode;
+      // ✅ Phase 4: テンプレート変数統一化 - サーバー状態もconfigManager優先
+      this.serverShowCounts = configManager.config?.showCounts ?? window.showCounts;
+      this.serverDisplayMode = configManager.config?.displayMode ?? window.displayMode;
       this.pollingInterval = null;
       this.handlers = {};
       this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
@@ -725,12 +848,12 @@
       ]);
 
       // リアクション状態保存用のキー
-      this.reactionStorageKey = `reactions_${CONFIG.userId}_${CONFIG.sheetName}`;
+      this.reactionStorageKey = `reactions_${configManager.config.userId}_${configManager.config.sheetName}`;
       this.gas = {
         getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
           this.runGas(
             'getPublishedSheetData',
-            this.state.tenantId,
+            this.state.userId,
             classFilter,
             sort,
             adminMode,
@@ -739,24 +862,24 @@
         getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) =>
           this.runGas(
             'getIncrementalSheetData',
-            this.state.tenantId,
+            this.state.userId,
             classFilter,
             sort,
             adminMode,
             sinceRowCount
           ),
-        getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.tenantId),
+        getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
         addReactionBatch: (batchOperations) =>
-          this.runGas('addReactionBatch', this.state.tenantId, batchOperations), // 新しいバッチAPI
+          this.runGas('addReactionBatch', this.state.userId, batchOperations), // 新しいバッチAPI
         addReaction: (rowIndex, reaction, sheetName) =>
-          this.runGas('addReaction', this.state.tenantId, rowIndex, reaction, sheetName),
+          this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
         toggleHighlight: (rowIndex, sheetName) =>
-          this.runGas('toggleHighlight', this.state.tenantId, rowIndex, sheetName),
-        checkAdmin: () => this.runGas('checkAdmin', this.state.tenantId),
-        clearCache: () => this.runGas('refreshBoardData', this.state.tenantId),
+          this.runGas('toggleHighlight', this.state.userId, rowIndex, sheetName),
+        checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
+        clearCache: () => this.runGas('refreshBoardData', this.state.userId),
         validateData: () => this.validateBoardDataIntegrity(),
         getDataCount: (classFilter, sortOrder, adminMode) =>
-          this.runGas('getDataCount', this.state.tenantId, classFilter, sortOrder, adminMode),
+          this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode),
       };
 
       // Polling settings
@@ -868,7 +991,7 @@
       this.contentCheckInProgress = false;
 
       // Reset current active sheet state
-      this.state.currentActiveSheet = CONFIG.sheetName;
+      this.state.currentActiveSheet = configManager.config.sheetName;
 
       Logger.debug('✅ State reset completed', {
         currentAnswers: this.state.currentAnswers?.length || 0,
@@ -1145,8 +1268,8 @@
       try {
         Logger.debug('🔍 パブリケーション状態をチェック中...');
 
-        // ✅ CLAUDE.md準拠: App名前空間パターン使用
-        const userId = window.USER_ID || new URLSearchParams(window.location.search).get('userId');
+        // ✅ Phase 4: テンプレート変数統一化 - configManager優先
+        const userId = configManager.config?.userId || window.USER_ID || new URLSearchParams(window.location.search).get('userId');
         if (!userId) {
           console.error('❌ パブリケーション状態チェック: userIdが取得できません');
           return { error: 'userId is required', isPublished: false };
@@ -1331,7 +1454,9 @@
           this.updateSortOptions();
           this.setupObservers();
           // Initial admin state setup - 管理者権限があっても最初は閲覧モードで起動
-          if (window.hasAdminCapability && window.isAdminUser) {
+          const hasAdminCapability = window.hasAdminCapability;
+          const isAdminUser = configManager.config?.isAdminUser ?? window.isAdminUser;
+          if (hasAdminCapability && isAdminUser) {
             this.state.isAdminUser = true;
             this.state.showAdminFeatures = false; // 初期は閲覧モード
             if (this.elements.adminToggleBtn) {
@@ -1721,7 +1846,7 @@
         
         // フォールバック: 既存ロジックも維持
         if (!userId) {
-          userId = CONFIG.userId || '';
+          userId = configManager.config.userId || '';
         }
         
         // 🚨 事前検証: 空のuserIdでのAPI呼び出しを防ぐ
@@ -1729,10 +1854,10 @@
           const errorMsg = `ユーザーIDが取得できません。システム初期化が必要です。`;
           console.error('❌ runGas: ユーザーID取得失敗', {
             funcName: funcName,
-            configUserId: CONFIG?.userId,
+            configUserId: configManager.config?.userId,
             windowUserId: window.USER_ID,
             urlUserId: new URLSearchParams(window.location.search).get('userId'),
-            stateUserId: this.state?.tenantId,
+            stateUserId: this.state?.userId,
             args: args
           });
           throw new Error(errorMsg);
@@ -1773,12 +1898,8 @@
               finalUserId: bulkUserId,
               userIdValidated: true
             });
-            result = await new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getBulkData(bulkUserId, ...args.slice(1));
-            });
+            // ✅ Phase 3: 統一API呼び出し使用
+            result = await configManager._runGasCall('getBulkData', bulkUserId, ...args.slice(1));
             break;
           case 'getPublishedSheetData':
             result = await App.getData().getPublishedSheetData(userId, ...args);
@@ -1800,18 +1921,8 @@
             break;
           default:
             // フォールバック: 直接呼び出し（段階的移行用）
-            result = await new Promise((resolve, reject) => {
-              if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                  .withSuccessHandler(resolve)
-                  .withFailureHandler(reject)
-                  .withUserObject({ tenantId: userId })
-                  [funcName](...args);
-              } else {
-                // GAS実行環境が利用できない場合
-                reject(new Error('Google Apps Script実行環境が利用できません'));
-              }
-            });
+            // ✅ Phase 3: 統一API呼び出し使用
+            result = await configManager._runGasCall(funcName, ...args);
         }
 
         if (!isStateChanging) {
@@ -1833,13 +1944,15 @@
       Logger.debug('🔍 verifyAdminAsync: 管理者権限確認開始', {
         windowUserId: window.USER_ID,
         userIdLength: window.USER_ID?.length,
-        stateUserId: this.state.tenantId,
+        stateUserId: this.state.userId,
         windowIsAdmin: window.isAdminUser,
         hasAdminCapability: window.hasAdminCapability,
       });
 
       // Use server-provided flag first (fast)
-      if (window.isAdminUser && window.USER_ID && window.USER_ID.trim()) {
+      const isAdminUser = configManager.config?.isAdminUser ?? window.isAdminUser;
+      const userId = configManager.config?.userId || window.USER_ID;
+      if (isAdminUser && userId && userId.trim()) {
         this.state.isAdminUser = true;
         this.state.showHighlightToggle = true; // 管理者なら常に表示
         Logger.debug('✅ サーバー提供フラグで管理者権限を確認しました');
@@ -1852,13 +1965,17 @@
       // Fallback API call (slower)
       let prevState;
       try {
-        if (!window.USER_ID || !window.USER_ID.trim()) {
+        if (!userId || !userId.trim()) {
           Logger.warn('❌ USER_IDが設定されていないため、管理者チェックをスキップします');
           return;
         }
 
         const isAdmin = await this.gas.checkAdmin();
         if (isAdmin) {
+          // ✅ Phase 5: configManager経由で状態更新
+          if (configManager.config) {
+            configManager.config.isAdminUser = true;
+          }
           window.isAdminUser = true;
           this.state.isAdminUser = true;
           this.state.showHighlightToggle = true; // 管理者なら常に表示
@@ -1985,7 +2102,7 @@
       }
 
       // 初期化状態の確認
-      if (!this.state.tenantId) {
+      if (!this.state.userId) {
         console.warn('User ID not available for content check');
         return false;
       }
@@ -3017,7 +3134,7 @@
      * @returns {boolean} true if all prerequisites are met
      */
     validatePrerequisites() {
-      const userId = window.USER_ID || new URLSearchParams(window.location.search).get('userId');
+      const userId = configManager.config?.userId || window.USER_ID || new URLSearchParams(window.location.search).get('userId');
       const checks = [
         { name: 'userId', value: userId, required: true },
         { name: 'answersContainer', value: this.elements.answersContainer, required: true },
@@ -3046,7 +3163,7 @@
 
       // 検証済みのuserIdをstateに保存
       if (userId && allValid) {
-        this.state.tenantId = userId;
+        this.state.userId = userId;
       }
 
       return allValid;
@@ -3429,8 +3546,8 @@
     }
 
     hasRelevantLocalStorage() {
-      const userId = this.state?.userId || CONFIG.userId;
-      const sheetName = CONFIG.sheetName;
+      const userId = this.state?.userId || configManager.config.userId;
+      const sheetName = configManager.config.sheetName;
 
       return {
         hasLastSeen: localStorage.getItem(`lastSeenCount_${userId}_${sheetName}`) !== null,
@@ -3511,12 +3628,8 @@
 
       // サーバーキャッシュをクリア
       try {
-        await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .refreshBoardData();
-        });
+        // ✅ Phase 3: 統一API呼び出し使用
+        await configManager._runGasCall('refreshBoardData');
         Logger.debug('✅ サーバーキャッシュをクリア');
       } catch (error) {
         console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
@@ -3685,8 +3798,8 @@
 
             // パラメータ詳細ログ
             Logger.debug(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
-              tenantId: fetchParams.tenantId,
-              tenantIdType: typeof fetchParams.tenantId,
+              userId: fetchParams.userId,
+              userIdType: typeof fetchParams.userId,
               classFilter: fetchParams.classFilter,
               sortOrder: fetchParams.sortOrder,
               showAdminFeatures: fetchParams.showAdminFeatures,
@@ -3694,8 +3807,16 @@
               allFetchParams: fetchParams,
             });
 
-            google.script.run
-              .withSuccessHandler((response) => {
+            // ✅ Phase 3: 統一API呼び出し使用
+            configManager._runGasCall('getPublishedSheetData', 
+              fetchParams.userId,
+              fetchParams.classFilter,
+              fetchParams.sortOrder,
+              fetchParams.showCounts,
+              fetchParams.displayMode,
+              fetchParams.showAdminFeatures,
+              fetchParams.bypassCache || false
+            ).then((response) => {
                 clearTimeout(timeout);
                 Logger.debug(`✅ GAS API成功レスポンス受信 (試行 ${attempt + 1}):`, {
                   hasResponse: !!response,
@@ -3704,7 +3825,7 @@
                 });
                 resolve(response);
               })
-              .withFailureHandler((error) => {
+              .catch((error) => {
                 clearTimeout(timeout);
                 console.error(`❌ GAS API失敗レスポンス受信 (試行 ${attempt + 1}):`, {
                   error: error,
@@ -3712,14 +3833,7 @@
                   errorType: typeof error,
                 });
                 reject(error);
-              })
-              .getPublishedSheetData(
-                fetchParams.tenantId,
-                fetchParams.classFilter,
-                fetchParams.sortOrder,
-                fetchParams.showAdminFeatures,
-                fetchParams.bypassCache || false
-              );
+              });
           });
 
           // レスポンスの詳細ログ
@@ -3761,12 +3875,8 @@
               // ユーザー情報エラーの場合は診断・修復を試行
               try {
                 Logger.debug('🔧 サーバー側診断・修復を要求中...');
-                await new Promise((resolve, reject) => {
-                  google.script.run
-                    .withSuccessHandler(resolve)
-                    .withFailureHandler(reject)
-                    .performAutoRepair(fetchParams.tenantId);
-                });
+                // ✅ Phase 3: 統一API呼び出し使用
+                await configManager._runGasCall('performAutoRepair', fetchParams.userId);
                 Logger.debug('✅ サーバー側修復完了、次の試行に進みます');
               } catch (repairError) {
                 console.warn('⚠️ サーバー側修復失敗:', repairError);
@@ -4127,7 +4237,7 @@
 
         // データ取得パラメータの詳細ログ
         const fetchParams = {
-          tenantId: this.state.tenantId,
+          userId: this.state.userId,
           classFilter,
           sortOrder,
           showAdminFeatures: this.state.showAdminFeatures,
@@ -4164,8 +4274,8 @@
                   // ユーザー情報エラーの特別な処理
                   if (result.message && result.message.includes('ユーザー情報が見つかりません')) {
                     console.error(
-                      '❌ AnswerBoardApp: User not found. Current tenantId:',
-                      this.state.tenantId
+                      '❌ AnswerBoardApp: User not found. Current userId:',
+                      this.state.userId
                     );
                     console.error('❌ AnswerBoardApp: URL parameters:', window.location.href);
                     console.error('❌ AnswerBoardApp: This may indicate:');
@@ -4240,18 +4350,14 @@
                         // 簡素化されたフォールバック（待機時間短縮）
                         await new Promise((resolve) => setTimeout(resolve, 500));
 
-                        const retryResult = await new Promise((resolve, reject) => {
-                          google.script.run
-                            .withSuccessHandler(resolve)
-                            .withFailureHandler(reject)
-                            .getPublishedSheetData(
-                              this.state.tenantId,
+                        // ✅ Phase 3: 統一API呼び出し使用
+                        const retryResult = await configManager._runGasCall('getPublishedSheetData',
+                              this.state.userId,
                               classFilter,
                               this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
                               this.state.showAdminFeatures,
                               true
                             );
-                        });
 
                         if (retryResult && retryResult.data && retryResult.data.length > 0) {
                           Logger.debug(
@@ -4513,7 +4619,7 @@
 
         // 構造化ログでデバッグ情報を詳細記録
         console.error('📋 Error context:', {
-          tenantId: this.state.tenantId,
+          userId: this.state.userId,
           currentAnswers: this.state.currentAnswers?.length || 0,
           isInitialLoad: config.isInitialLoad,
           bypassCache: config.bypassCache,
@@ -4846,7 +4952,7 @@
       Logger.debug('🔄 Starting sheet switch:', {
         from: this.state.currentActiveSheet,
         to: selectedSheet,
-        tenantId: this.state.tenantId,
+        userId: this.state.userId,
       });
 
       try {
@@ -4875,7 +4981,7 @@
 
     async prepareForSheetSwitch(targetSheet) {
       // 必要な前提条件をチェック
-      if (!this.state.tenantId) {
+      if (!this.state.userId) {
         throw new Error('User ID is missing - cannot switch sheet');
       }
 
@@ -4951,7 +5057,7 @@
         error: error.message,
         targetSheet,
         currentSheet: this.state.currentActiveSheet,
-        tenantId: this.state.tenantId,
+        userId: this.state.userId,
       });
 
       // 元のシートの選択に戻す
@@ -6640,8 +6746,8 @@
 
     // ユーザーIDとシート名に基づくローカルストレージキー生成
     getScopedKey(base) {
-      const userId = this.state?.userId || CONFIG.userId;
-      return `${base}_${userId}_${CONFIG.sheetName}`;
+      const userId = this.state?.userId || configManager.config.userId;
+      return `${base}_${userId}_${configManager.config.sheetName}`;
     }
 
     // lastSeenCount永続化機能
@@ -7652,34 +7758,52 @@
           showHighlightToggle: window.showHighlightToggle,
         });
         if (enable) {
-          // 管理モード時は強制的に名前とリアクション数を表示
-          window.showCounts = true;
-          window.displayMode = 'named';
-          window.isStudentMode = false;
-          window.showScoreSort = window.showCounts;
+          // ✅ Phase 5: 管理モード時のconfigManager統一化
+          const adminSettings = {
+            showCounts: true,
+            displayMode: 'named',
+            isStudentMode: false,
+            showScoreSort: true
+          };
+          
+          // configManagerとwindowの両方を更新
+          if (configManager.config) {
+            Object.assign(configManager.config, adminSettings);
+          }
+          Object.assign(window, adminSettings);
+          
           Logger.perf('管理モード有効化: 名前とリアクション数を強制表示', {
-            showCounts: window.showCounts,
-            displayMode: window.displayMode,
+            showCounts: adminSettings.showCounts,
+            displayMode: adminSettings.displayMode,
           });
         } else {
-          // 閲覧モード時はサーバー設定に戻す
-          window.showCounts = this.serverShowCounts;
-          window.displayMode = this.serverDisplayMode;
-          window.isStudentMode = true;
-          window.showScoreSort = window.showCounts;
+          // ✅ Phase 5: 閲覧モード時のconfigManager統一化
+          const studentSettings = {
+            showCounts: this.serverShowCounts,
+            displayMode: this.serverDisplayMode,
+            isStudentMode: true,
+            showScoreSort: this.serverShowCounts
+          };
+          
+          // configManagerとwindowの両方を更新
+          if (configManager.config) {
+            Object.assign(configManager.config, studentSettings);
+          }
+          Object.assign(window, studentSettings);
+          
           Logger.perf('閲覧モード有効化: サーバー設定を復元', {
-            showCounts: window.showCounts,
-            displayMode: window.displayMode,
+            showCounts: studentSettings.showCounts,
+            displayMode: studentSettings.displayMode,
             serverShowCounts: this.serverShowCounts,
             serverDisplayMode: this.serverDisplayMode,
           });
         }
 
-        // 管理モード有効時は強制的にローカル状態も更新
+        // ✅ Phase 5: ローカル状態もconfigManagerから統一取得
         if (enable) {
-          this.state.displayMode = 'named';
-          this.state.showCounts = true;
-          this.state.isStudentMode = false;
+          this.state.displayMode = configManager.config?.displayMode || 'named';
+          this.state.showCounts = configManager.config?.showCounts ?? true;
+          this.state.isStudentMode = configManager.config?.isStudentMode ?? false;
         } else {
           this.state.displayMode = this.serverDisplayMode;
           this.state.showCounts = this.serverShowCounts;
@@ -7700,8 +7824,8 @@
           enable,
           stateDisplayMode: this.state.displayMode,
           stateShowCounts: this.state.showCounts,
-          windowDisplayMode: window.displayMode,
-          windowShowCounts: window.showCounts,
+          windowDisplayMode: configManager.config?.displayMode ?? window.displayMode,
+          windowShowCounts: configManager.config?.showCounts ?? window.showCounts,
         });
 
         // キャッシュをクリアして新しい設定で再描画
@@ -7813,7 +7937,7 @@
         Logger.debug('🔗 フォーム回答画面を開きます...');
 
         // formUrlを取得
-        const result = await this.runGas('getBulkData', { userId: this.state.tenantId });
+        const result = await this.runGas('getBulkData', { userId: this.state.userId });
         
         if (result && result.success && result.data && result.data.formUrl) {
           const formUrl = result.data.formUrl;
@@ -7920,14 +8044,16 @@
       window.location.href = unpublishedUrl.toString();
     }
 
-    endAdminMode() {
-      google.script.run
-        .withSuccessHandler(function (adminUrl) {
-          const url = new URL(adminUrl);
-          url.searchParams.set('mode', 'admin');
-          window.location.href = url.toString();
-        })
-        .getWebAppUrl();
+    async endAdminMode() {
+      try {
+        // ✅ Phase 3: 統一API呼び出し使用
+        const adminUrl = await configManager._runGasCall('getWebAppUrl');
+        const url = new URL(adminUrl);
+        url.searchParams.set('mode', 'admin');
+        window.location.href = url.toString();
+      } catch (error) {
+        console.error('Failed to get admin URL:', error);
+      }
     }
 
     /**
@@ -8480,17 +8606,24 @@
         currentDisplayMode: this.state.displayMode,
       });
 
-      this.state.isStudentMode = window.isStudentMode;
-      this.state.showCounts = window.showCounts;
-      window.showScoreSort = window.showCounts;
+      // ✅ Phase 5: 状態更新もconfigManager統一化
+      this.state.isStudentMode = configManager.config?.isStudentMode ?? window.isStudentMode;
+      this.state.showCounts = configManager.config?.showCounts ?? window.showCounts;
+      
+      const showScoreSort = configManager.config?.showScoreSort ?? this.state.showCounts;
+      if (configManager.config) {
+        configManager.config.showScoreSort = showScoreSort;
+      }
+      window.showScoreSort = showScoreSort;
+      
       this.state.showAdminFeatures = window.showAdminFeatures;
       this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
-      this.state.showScoreSort = window.showScoreSort;
+      this.state.showScoreSort = showScoreSort;
       this.state.showPublishControls = window.showPublishControls;
 
       // Only update displayMode if not in admin mode
       if (!this.state.showAdminFeatures) {
-        this.state.displayMode = window.displayMode;
+        this.state.displayMode = configManager.config?.displayMode ?? window.displayMode;
       }
 
       Logger.perf('updateConfigFromGlobals後の状態:', {
@@ -8500,7 +8633,7 @@
         showAdminFeatures: this.state.showAdminFeatures,
         windowShowAdminFeatures: window.showAdminFeatures,
         finalDisplayMode: this.state.displayMode,
-        windowDisplayMode: window.displayMode,
+        windowDisplayMode: configManager.config?.displayMode ?? window.displayMode,
       });
     }
     escapeHtml(str) {
@@ -9290,7 +9423,7 @@
         try {
           const headerValidation = await this.runGas(
             'validateHeaderIntegrity',
-            this.state.tenantId
+            this.state.userId
           );
           if (!headerValidation.success) {
             validationResults.headerIssues++;
@@ -9356,18 +9489,17 @@
    * @param {Function} onSuccess - 成功時のコールバック（オプション）
    * @param {Function} onError - エラー時のコールバック（オプション）
    */
-  function loadDomainInfo(onSuccess, onError) {
-    google.script.run
-      .withSuccessHandler((info) => {
-        displayDomainInfo(info);
-        if (onSuccess) onSuccess(info);
-      })
-      .withFailureHandler((error) => {
-        console.error('ドメイン情報の取得に失敗しました:', error);
-        displayDomainInfo({ error: error.message || error });
-        if (onError) onError(error);
-      })
-      .getSystemDomainInfo();
+  async function loadDomainInfo(onSuccess, onError) {
+    try {
+      // ✅ Phase 3: 統一API呼び出し使用
+      const info = await configManager._runGasCall('getSystemDomainInfo');
+      displayDomainInfo(info);
+      if (onSuccess) onSuccess(info);
+    } catch (error) {
+      console.error('ドメイン情報の取得に失敗しました:', error);
+      displayDomainInfo({ error: error.message || error });
+      if (onError) onError(error);
+    }
   }
 
   /**
@@ -9414,21 +9546,21 @@
   /**
    * フォームリンクを取得して表示する関数
    */
-  function loadFormLink() {
-    google.script.run
-      .withSuccessHandler((formInfo) => {
-        if (formInfo && formInfo.formUrl) {
-          const formLinkBtn = this._getCachedElement('form-link-btn');
-          if (formLinkBtn) {
-            formLinkBtn.href = formInfo.formUrl;
-            formLinkBtn.classList.remove('hidden');
-          }
+  async function loadFormLink() {
+    try {
+      // ✅ Phase 4: テンプレート変数統一化 - configManager優先
+      const userId = configManager.config?.userId || window.USER_ID;
+      const formInfo = await configManager._runGasCall('getActiveFormInfo', userId);
+      if (formInfo && formInfo.formUrl) {
+        const formLinkBtn = this._getCachedElement('form-link-btn');
+        if (formLinkBtn) {
+          formLinkBtn.href = formInfo.formUrl;
+          formLinkBtn.classList.remove('hidden');
         }
-      })
-      .withFailureHandler((error) => {
-        console.warn('フォーム情報の取得に失敗しました:', error);
-      })
-      .getActiveFormInfo(CONFIG.userId);
+      }
+    } catch (error) {
+      console.warn('フォーム情報の取得に失敗しました:', error);
+    }
   }
 
   // システムフロー表示関数の定義
@@ -9549,9 +9681,9 @@
     };
 
     // ✅ CLAUDE.md準拠: configJSON中心設定の初期化
-    initializeConfig()
+    configManager.initialize()
       .then(() => {
-        debugInfo('✅ Config初期化完了');
+        debugInfo('✅ ConfigManager初期化完了');
 
         // AnswerBoardApp インスタンス初期化
         window.answerBoardApp = new AnswerBoardApp();

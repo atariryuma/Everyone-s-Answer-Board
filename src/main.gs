@@ -1158,9 +1158,8 @@ function renderAnswerBoard(userInfo, params) {
     template.USER_ID = userInfo.userId || null;
     template.SHEET_NAME = userSheetName || '';
 
-    const sheetConfigKey = `sheet_${userSheetName || params.sheetName}`;
-    const sheetConfig = config[sheetConfigKey] || {};
-
+    // ✅ configJSON中心型: sheetConfig廃止、直接config使用
+    
     // シンプルな判定: ユーザーがスプレッドシートを設定済みかどうか
     const hasUserConfig = !!(userSpreadsheetId && userSheetName);
     const finalSpreadsheetId = hasUserConfig ? userSpreadsheetId : params.spreadsheetId;
@@ -1170,9 +1169,8 @@ function renderAnswerBoard(userInfo, params) {
     console.log('renderAnswerBoard - finalSpreadsheetId:', finalSpreadsheetId);
     console.log('renderAnswerBoard - finalSheetName:', finalSheetName);
 
-    // テンプレート変数設定
+    // ✅ テンプレート変数設定: sheetConfig廃止
     template.config = config;
-    template.sheetConfig = sheetConfig;
     template.spreadsheetId = finalSpreadsheetId;
     template.sheetName = finalSheetName;
     template.isDirectPageAccess = params.isDirectPageAccess;

@@ -692,7 +692,7 @@
                             <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
                             <td class="px-4 py-3 text-center">
                                 <button 
-                                    data-user-id="${user.tenantId}"
+                                    data-user-id="${user.userId}"
                                     data-user-email="${user.ownerEmail}"
                                     onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
                                     class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
@@ -755,7 +755,7 @@
             confirmBtn.disabled = false;
             confirmBtn.textContent = '削除実行';
           })
-          .deleteUserAccountByAdminForUI(userToDelete.tenantId, reason);
+          .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
       }
 
       // 削除ログを表示
