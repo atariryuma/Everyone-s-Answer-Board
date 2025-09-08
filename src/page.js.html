@@ -2999,8 +2999,20 @@
             
             // シートデータを状態に反映
             if (data.sheetData) {
-              this.synchronizeStateAfterDataUpdate(data.sheetData, 'bulk_api_init');
-              this.renderAnswerCards(data.sheetData);
+              // ✅ sheetDataがオブジェクト形式の場合、dataプロパティを使用
+              const actualData = data.sheetData.data || data.sheetData;
+              
+              // デバッグログ追加
+              Logger.debug('🔍 sheetData構造確認:', {
+                isObject: typeof data.sheetData === 'object',
+                hasDataProperty: !!data.sheetData.data,
+                dataLength: Array.isArray(actualData) ? actualData.length : 0,
+                actualDataSample: actualData[0] || null
+              });
+              
+              this.synchronizeStateAfterDataUpdate(actualData, 'bulk_api_init');
+              // ✅ renderAnswerCardsをrenderBoardに置き換え（未定義メソッドエラー修正）
+              await this.renderBoard(false, true); // isInitialLoad = true
             }
             
             // フォーム回答ボタンの表示制御
