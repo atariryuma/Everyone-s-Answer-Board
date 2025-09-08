@@ -180,8 +180,12 @@ function getSheetsServiceCached() {
       };
       console.log('🔧 getSheetsServiceCached: 実行コンテキスト', executionContext);
       
+      // Service Objectトークン取得（legacy互換性のため）
+      const initialAccessToken = getServiceAccountTokenCached();
+      
       const serviceObject = {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
+        accessToken: initialAccessToken, // ✅ getSpreadsheetsData互換性修復
         spreadsheets: {
           batchUpdate: function (params) {
             // 最新のアクセストークンを取得（トークンの期限切れ対応）

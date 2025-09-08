@@ -1604,11 +1604,18 @@
         switch (funcName) {
           case 'getBulkData':
             // 🚀 バルクデータAPI: 複数データを一括取得で高速化
+            // ✅ パラメータからuserIdを優先的に使用（引数からuserIdを抽出）
+            const bulkUserId = (args[0] && args[0].userId) || userId;
+            console.log('🔧 getBulkData呼び出し: userIdの決定', { 
+              passedUserId: args[0]?.userId, 
+              fallbackUserId: userId, 
+              finalUserId: bulkUserId 
+            });
             result = await new Promise((resolve, reject) => {
               google.script.run
                 .withSuccessHandler(resolve)
                 .withFailureHandler(reject)
-                .getBulkData(userId, ...args);
+                .getBulkData(bulkUserId, ...args.slice(1));
             });
             break;
           case 'getPublishedSheetData':

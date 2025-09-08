@@ -3120,7 +3120,12 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
 
     // reasonHeader（理由列）の特別処理：見つからない場合は理由らしいヘッダーを自動検出
     if (mappedIndex === undefined && configKey === 'reasonHeader') {
-      const reasonKeywords = ['理由', 'reason', 'なぜ', 'why', '根拠', 'わけ'];
+      // ✅ SYSTEM_CONSTANTS準拠の包括的な理由列検出パターン
+      const reasonKeywords = [
+        ...SYSTEM_CONSTANTS.COLUMN_MAPPING.reason.alternates, // ['理由', '根拠', '体験', 'なぜ', '詳細', '説明']
+        ...SYSTEM_CONSTANTS.COLUMN_MAPPING.reason.aiPatterns,  // ['理由', '体験', '根拠', '詳細']
+        'reason', 'why', 'わけ', '背景', '経験', '感想' // 追加パターン
+      ];
 
       console.log(
         'mapConfigToActualHeaders: Searching for reason header with keywords: %s',
@@ -3148,14 +3153,16 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
         if (mappedIndex !== undefined) break;
       }
 
-      // より広範囲の検索（部分一致）
+      // より広範囲の検索（部分一致） - 全パターンで検索
       if (mappedIndex === undefined) {
         for (const header in actualHeaderIndices) {
           const normalizedHeader = header.toLowerCase().trim();
-          if (
-            normalizedHeader.indexOf('理由') !== -1 ||
-            normalizedHeader.indexOf('reason') !== -1
-          ) {
+          // 理由列パターンの部分一致検索
+          const reasonFound = reasonKeywords.some(keyword => 
+            normalizedHeader.includes(keyword.toLowerCase()) || 
+            keyword.toLowerCase().includes(normalizedHeader)
+          );
+          if (reasonFound) {
             mappedIndex = actualHeaderIndices[header];
             console.log(
               'mapConfigToActualHeaders: Found reason header by partial match for %s: "%s" -> index %s',
@@ -3177,6 +3184,15 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
         configKey,
         configHeaderName
       );
+      // ✅ 理由列が見つからない場合の詳細デバッグ情報
+      if (configKey === 'reasonHeader') {
+        console.log('🔍 理由列検出失敗 - 利用可能なヘッダー一覧:', {
+          availableHeaders: availableHeaders,
+          searchedPatterns: reasonKeywords || ['基本パターンのみ'],
+          configHeaderName: configHeaderName,
+          suggestion: '手動で列マッピングを設定するか、列名に「理由」「根拠」「詳細」などを含めてください'
+        });
+      }
     }
   }
 
