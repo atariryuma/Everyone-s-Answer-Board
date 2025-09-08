@@ -91,32 +91,7 @@ const ConfigManager = Object.freeze({
 
       const enhancedConfig = this.enhanceConfigWithDynamicUrls(baseConfig, userId);
 
-      console.log('✅ ConfigManager.getUserConfig: 設定取得完了', {
-        userId,
-        configFields: Object.keys(enhancedConfig).length,
-        hasSpreadsheetId: !!enhancedConfig.spreadsheetId,
-        hasSheetName: !!enhancedConfig.sheetName,
-        spreadsheetId: enhancedConfig.spreadsheetId
-          ? `${enhancedConfig.spreadsheetId.substring(0, 8)}...`
-          : 'null',
-        sheetName: enhancedConfig.sheetName || 'null',
-        setupStatus: enhancedConfig.setupStatus || 'null',
-        appPublished: enhancedConfig.appPublished || false,
-        configKeys: Object.keys(enhancedConfig),
-      });
-      
-      // 詳細なconfigJSON内容ログ（デバッグ用）
-      console.log('🔍 ConfigManager.getUserConfig: configJSON詳細内容', {
-        userId,
-        rawConfigJson: JSON.stringify(enhancedConfig).substring(0, 500) + '...',
-        coreFields: {
-          spreadsheetId: enhancedConfig.spreadsheetId,
-          sheetName: enhancedConfig.sheetName,
-          formUrl: enhancedConfig.formUrl,
-          setupStatus: enhancedConfig.setupStatus,
-          opinionHeader: enhancedConfig.opinionHeader
-        }
-      });
+      // 設定取得完了（詳細ログは削除 - 必要時のみエラー情報をログ出力）
 
       return enhancedConfig;
     } catch (error) {
@@ -187,14 +162,7 @@ const ConfigManager = Object.freeze({
         }
       });
 
-      // 🔍 デバッグ: cleanConfig詳細ログ
-      console.log('🔍 ConfigManager.saveConfig: cleanConfig詳細', {
-        userId,
-        cleanConfigKeys: Object.keys(cleanConfig),
-        spreadsheetId: cleanConfig.spreadsheetId,
-        sheetName: cleanConfig.sheetName,
-        formUrl: cleanConfig.formUrl,
-      });
+      // cleanConfig準備完了（詳細ログは削除）
 
       // 設定の検証とサニタイズ
       const validatedConfig = this.validateAndSanitizeConfig(cleanConfig);
@@ -203,14 +171,7 @@ const ConfigManager = Object.freeze({
         return false;
       }
 
-      // 🔍 デバッグ: validatedConfig詳細ログ
-      console.log('🔍 ConfigManager.saveConfig: validatedConfig詳細', {
-        userId,
-        validatedConfigKeys: Object.keys(validatedConfig),
-        spreadsheetId: validatedConfig.spreadsheetId,
-        sheetName: validatedConfig.sheetName,
-        formUrl: validatedConfig.formUrl,
-      });
+      // 設定検証完了（詳細ログは削除）
 
       // タイムスタンプ更新
       validatedConfig.lastModified = new Date().toISOString();
@@ -229,14 +190,7 @@ const ConfigManager = Object.freeze({
         success = false;
       }
 
-      if (success) {
-        console.log('✅ ConfigManager.saveConfig: 設定保存完了', {
-          userId,
-          configSize: JSON.stringify(validatedConfig).length,
-          configFields: Object.keys(validatedConfig),
-          timestamp: validatedConfig.lastModified,
-        });
-      } else {
+      if (!success) {
         console.error('❌ ConfigManager.saveConfig: データベース更新失敗', { userId });
       }
 

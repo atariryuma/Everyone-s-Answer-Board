@@ -149,6 +149,11 @@ function connectDataSource(spreadsheetId, sheetName) {
         // 🔸 列マッピング・ヘッダー情報
         columnMapping: columnMapping,
         opinionHeader: opinionHeader,
+        
+        // 🔸 理由ヘッダー情報（columnMappingから抽出）
+        reasonHeader: columnMapping?.reason?.header || columnMapping?.reason || '理由',
+        classHeader: columnMapping?.class?.header || columnMapping?.class || 'クラス',
+        nameHeader: columnMapping?.name?.header || columnMapping?.name || '名前',
 
         // 🔸 フォーム情報（確実な設定）
         formUrl: formInfo?.formUrl || null,

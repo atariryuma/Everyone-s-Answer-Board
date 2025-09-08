@@ -60,7 +60,8 @@
       "Bash(npx eslint:*)",
       "Bash(clasp run:*)",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": [],

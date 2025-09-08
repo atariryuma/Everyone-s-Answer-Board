@@ -22,23 +22,23 @@ const SECURITY_CONFIG = Object.freeze({
  */
 function getServiceAccountTokenCached() {
   try {
-    console.log('🔧 getServiceAccountTokenCached: CacheService永続キャッシュ確認開始');
+    // Service Accountトークン取得開始
     
     // CacheService直接使用（GAS環境で真に永続化）
     const scriptCache = CacheService.getScriptCache();
     const cachedToken = scriptCache.get(SECURITY_CONFIG.AUTH_CACHE_KEY);
     
     if (cachedToken) {
-      console.log('✅ Service Accountトークン: CacheServiceヒット（永続キャッシュ）');
+      // キャッシュヒット
       return cachedToken;
     }
     
-    console.log('🔧 Service Accountトークン: キャッシュミス - 新規生成開始');
+    // キャッシュミス - 新規生成
     const newToken = generateNewServiceAccountToken();
     
     // 1時間（3600秒）永続キャッシュ
     scriptCache.put(SECURITY_CONFIG.AUTH_CACHE_KEY, newToken, 3600);
-    console.log('✅ Service Accountトークン: CacheServiceに永続保存完了（1時間TTL）');
+    // キャッシュ保存完了
     
     return newToken;
   } catch (error) {
@@ -56,7 +56,7 @@ function getServiceAccountTokenCached() {
  */
 function generateNewServiceAccountToken() {
   try {
-    console.log('🔑 Service Accountトークン生成開始');
+    // トークン生成開始
     
     // 統一秘密情報管理システムで安全に取得
     const serviceAccountCreds = getSecureServiceAccountCreds();
@@ -65,11 +65,7 @@ function generateNewServiceAccountToken() {
   const clientEmail = serviceAccountCreds.client_email;
   const tokenUrl = 'https://www.googleapis.com/oauth2/v4/token';
 
-  console.log('🔑 JWT生成準備完了', {
-    hasPrivateKey: !!privateKey,
-    clientEmail: clientEmail,
-    privateKeyLength: privateKey.length
-  });
+  // JWT準備完了
 
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = now + 3600; // 1時間後
@@ -119,7 +115,7 @@ function generateNewServiceAccountToken() {
   }
 
   // Security: Never log access tokens - removed token logging
-  console.log('🔑 Service Accountトークン生成完了');
+  // トークン生成完了
   return responseData.access_token;
   } catch (error) {
     console.error('🔑 Service Accountトークン生成失敗:', error.message);
@@ -132,7 +128,7 @@ function generateNewServiceAccountToken() {
  */
 function getSecureServiceAccountCreds() {
   try {
-    console.log('🔐 Service Account認証情報取得開始');
+    // 認証情報取得開始
     const props = PropertiesService.getScriptProperties();
     const credsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
 
@@ -141,11 +137,7 @@ function getSecureServiceAccountCreds() {
       throw new Error('サービスアカウント認証情報が設定されていません');
     }
 
-    console.log('🔐 Service Account認証情報取得成功', { 
-      credsLength: credsJson.length,
-      hasPrivateKey: credsJson.includes('private_key'),
-      hasClientEmail: credsJson.includes('client_email')
-    });
+    // 認証情報取得成功
 
     return JSON.parse(credsJson);
   } catch (error) {

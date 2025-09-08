@@ -47,6 +47,9 @@ const CORE = Object.freeze({
     LIKE_MULTIPLIER_FACTOR: 0.1, // いいね！のスコア倍率
     RANDOM_SCORE_FACTOR: 0.001, // ランダム要素の範囲
   }),
+
+  // デバッグモード設定（本番環境では false に設定）
+  DEBUG_MODE: false, // true: 詳細ログ出力, false: エラーのみ
 });
 
 /**
