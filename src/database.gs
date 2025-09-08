@@ -141,6 +141,7 @@ const DB = {
         insertDataOption: 'INSERT_ROWS'
       });
 
+      console.info('✅ ユーザー作成完了', {
         userId: userData.userId,
         setupStatus: configJson.setupStatus
       });
@@ -267,6 +268,7 @@ const DB = {
             console.warn('findUserById: キャッシュ保存エラー', cacheError.message);
           }
 
+          console.log("ユーザー検索完了", {
             userId,
             userEmail: userObj.userEmail,
             configFields: Object.keys(userObj.parsedConfig).length,

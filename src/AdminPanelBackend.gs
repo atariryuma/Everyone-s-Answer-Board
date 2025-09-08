@@ -49,12 +49,14 @@ function connectDataSource(spreadsheetId, sheetName) {
       formInfo = checkFormConnection(spreadsheetId);
       
       if (formInfo && formInfo.hasForm) {
+        console.info('✅ フォーム情報取得成功', {
           formUrl: formInfo.formUrl,
           formTitle: formInfo.formTitle,
           hasFormUrl: !!formInfo.formUrl,
           hasFormTitle: !!formInfo.formTitle
         });
       } else {
+        console.info('⚠️ フォーム情報が見つかりません', { spreadsheetId });
       }
     } catch (formError) {
       console.error('❌ connectDataSource: フォーム情報取得エラー', {
@@ -71,6 +73,7 @@ function connectDataSource(spreadsheetId, sheetName) {
       // 現在のconfigJSONを直接取得（ConfigManager経由削除）
       const currentConfig = JSON.parse(userInfo.configJson || '{}');
 
+      console.log("connectDataSource: 接続情報確認", {
         userId: userInfo.userId,
         currentSpreadsheetId: currentConfig.spreadsheetId,
         currentSheetName: currentConfig.sheetName,

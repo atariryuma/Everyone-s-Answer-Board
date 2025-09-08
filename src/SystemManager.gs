@@ -175,6 +175,7 @@ function fixConfigJsonNestingImpl() {
       }
     }
 
+    console.info('✅ configJsonネスト修正完了', {
       total: results.total,
       fixed: results.fixed,
       errors: results.errors.length,
@@ -435,6 +436,7 @@ function cleanAllConfigJson() {
     });
   }
 
+  console.log("修復処理結果", {
     総数: results.total,
     修復: results.cleaned,
     エラー: results.errors.length,

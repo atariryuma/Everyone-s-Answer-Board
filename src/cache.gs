@@ -695,6 +695,7 @@ function synchronizeCacheAfterCriticalUpdate(
   newSpreadsheetId
 ) {
   try {
+    console.info('🔄 キャッシュ同期開始', {
       userId,
       oldSpreadsheetId,
       newSpreadsheetId,

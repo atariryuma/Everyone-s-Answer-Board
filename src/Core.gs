@@ -296,6 +296,7 @@ function registerNewUser(userEmail) {
   // Sanitize email input
   const sanitizedEmail = SecurityValidator.sanitizeInput(userEmail, SECURITY.MAX_LENGTHS.EMAIL);
 
+  console.info('🔐 認証開始', {
     userEmail: sanitizedEmail,
     timestamp: new Date().toISOString(),
   });
@@ -368,6 +369,7 @@ function registerNewUser(userEmail) {
       // 統一ユーザー作成関数を使用（ログイン時はキャッシュバイパス）
       const newUser = handleUserRegistration(sanitizedEmail, true);
 
+      console.log("ユーザー作成成功", {
         userEmail: sanitizedEmail,
         userId: newUser.userId,
         databaseWriteTime: `${Date.now() - startTime}ms`,

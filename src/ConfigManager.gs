@@ -71,6 +71,7 @@ const ConfigManager = Object.freeze({
             // 修復したデータをDBに保存
             this.saveConfig(userId, baseConfig);
 
+            console.info('✅ configJson修復完了', {
               userId,
               fixedFields: Object.keys(baseConfig),
             });
@@ -304,10 +305,6 @@ const ConfigManager = Object.freeze({
       dataSourceFields.forEach((field) => {
         if (currentConfig[field] !== undefined && updatedConfig[field] === undefined) {
           updatedConfig[field] = currentConfig[field];
-            userId,
-            field,
-            value: currentConfig[field],
-          });
         }
       });
     }
@@ -660,6 +657,7 @@ const ConfigManager = Object.freeze({
 
         const success = this.updateConfig(userId, updates);
         if (success) {
+          console.log('⚡ セットアップ状態修正完了', {
             userId,
             after: {
               setupStatus: updates.setupStatus || config.setupStatus,
@@ -729,6 +727,7 @@ const ConfigManager = Object.freeze({
 
           const success = this.updateConfig(userId, updates);
           if (success) {
+            console.log('✅ フォーム情報復元完了', {
               userId,
               formUrl: updates.formUrl,
               formTitle: updates.formTitle
@@ -849,6 +848,7 @@ const ConfigManager = Object.freeze({
         }
       });
 
+      console.log('⚡ 全ユーザーの構造修正完了', {
         total: results.totalUsers,
         fixed: results.fixedUsers,
         error: results.errorUsers,
@@ -1012,6 +1012,7 @@ const ConfigManager = Object.freeze({
 
       const healthScore = Math.round((results.healthyUsers / results.totalUsers) * 100);
       
+      console.log('📊 データベース健康状態診断完了', {
         total: results.totalUsers,
         healthy: results.healthyUsers,
         doubleStructure: results.doubleStructureUsers,
@@ -1109,7 +1110,7 @@ const ConfigManager = Object.freeze({
       console.error('❌ ConfigManager.performCompleteRepair: エラー', error.message);
       throw error;
     }
-  },
+  }
 });
 
 // ========================================

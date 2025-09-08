@@ -65,7 +65,12 @@
       "Bash(for:*)",
       "Bash(do)",
       "Bash(if [[ \"$file\" != \"src/Core.gs\")",
-      "Bash(then)"
+      "Bash(then)",
+      "Bash(awk:*)",
+      "Bash(perl:*)",
+      "Bash(if [ -f \"package.json\" ])",
+      "Bash(then npm run check)",
+      "Bash(else echo \"package.json not found\")"
     ],
     "deny": [],
     "ask": [],

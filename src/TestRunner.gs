@@ -35,6 +35,7 @@ function testOptimizedManagementPanel() {
 
     // 現在の設定を取得（テスト前状態）
     const beforeConfig = JSON.parse(userInfo.configJson || '{}');
+    console.info('📋 テスト前設定状態', {
       spreadsheetId: beforeConfig.spreadsheetId,
       sheetName: beforeConfig.sheetName,
       setupStatus: beforeConfig.setupStatus,
@@ -58,6 +59,7 @@ function testOptimizedManagementPanel() {
       lastModified: new Date().toISOString(),
     });
 
+    console.log("設定更新結果", {
       success: updateResult.success,
       error: updateResult.error,
       updatedCells: updateResult.updatedCells,
