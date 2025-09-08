@@ -3070,51 +3070,125 @@ function mapConfigToActualHeaders(configHeaders, actualHeaderIndices) {
       }
     }
 
-    // opinionHeader（メイン質問）の特別処理：見つからない場合は最も長い質問様ヘッダーを使用
-    if (mappedIndex === undefined && configKey === 'opinionHeader') {
-      const standardHeaders = [
-        'タイムスタンプ',
-        'メールアドレス',
-        'クラス',
-        '名前',
-        '理由',
-        'なるほど！',
-        'いいね！',
-        'もっと知りたい！',
-        'ハイライト',
-      ];
-      const questionHeaders = [];
+    // opinionHeader（メイン質問）の特別処理：見つからない場合または「お題」の場合は高精度自動検出
+    if ((mappedIndex === undefined || sheetConfig[configKey] === 'お題') && configKey === 'opinionHeader') {
+      console.log(
+        'mapConfigToActualHeaders: opinionHeader高精度検出開始 - current value: %s, mappedIndex: %s',
+        sheetConfig[configKey],
+        mappedIndex
+      );
 
-      for (const header in actualHeaderIndices) {
-        let isStandardHeader = false;
-        for (let i = 0; i < standardHeaders.length; i++) {
-          if (
-            header.toLowerCase().includes(standardHeaders[i].toLowerCase()) ||
-            standardHeaders[i].toLowerCase().includes(header.toLowerCase())
-          ) {
-            isStandardHeader = true;
+      // ✅ Step 1: columnMappingからanswerインデックスを直接取得（最優先）
+      let answerIndex = undefined;
+      const columnMapping = sheetConfig.columnMapping;
+      
+      if (columnMapping && columnMapping.mapping && columnMapping.mapping.answer !== undefined) {
+        answerIndex = columnMapping.mapping.answer;
+        console.log(
+          'mapConfigToActualHeaders: columnMapping.answer からopinionHeader候補を発見: index=%s',
+          answerIndex
+        );
+        
+        // answerインデックスに対応するヘッダー名を検索
+        for (const [headerName, headerIndex] of Object.entries(actualHeaderIndices)) {
+          if (headerIndex === answerIndex) {
+            mappedIndex = answerIndex;
+            console.log(
+              'mapConfigToActualHeaders: ✅ opinionHeader高精度検出成功（columnMapping連携）: "%s" -> index %s',
+              headerName.substring(0, 50) + '...',
+              mappedIndex
+            );
             break;
           }
         }
+      }
 
-        if (!isStandardHeader && header.length > 10) {
-          // 質問は通常長い
-          questionHeaders.push({ header, index: actualHeaderIndices[header] });
+      // ✅ Step 2: columnMappingが利用できない場合のフォールバック（既存ロジック改良版）
+      if (mappedIndex === undefined) {
+        console.log('mapConfigToActualHeaders: columnMapping利用不可、フォールバック検出開始');
+        
+        // ✅ SYSTEM_CONSTANTS準拠の包括的な回答列検出パターン
+        const answerKeywords = [
+          ...SYSTEM_CONSTANTS.COLUMN_MAPPING.answer.alternates, // ['どうして', '質問', '問題', '意見', '答え', 'なぜ', '思います', '考え']
+          ...SYSTEM_CONSTANTS.COLUMN_MAPPING.answer.aiPatterns,  // ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか']
+          'について', 'でしょうか', 'ますか', '観察', '書きましょう', '教えて' // 追加パターン
+        ];
+
+        console.log(
+          'mapConfigToActualHeaders: Searching for opinion header with keywords: %s',
+          JSON.stringify(answerKeywords)
+        );
+
+        // キーワードベース検索（高精度）
+        for (const header in actualHeaderIndices) {
+          const normalizedHeader = header.toLowerCase();
+          for (let k = 0; k < answerKeywords.length; k++) {
+            if (
+              normalizedHeader.includes(answerKeywords[k]) ||
+              answerKeywords[k].includes(normalizedHeader)
+            ) {
+              mappedIndex = actualHeaderIndices[header];
+              console.log(
+                'mapConfigToActualHeaders: ✅ opinionHeader高精度検出成功（キーワード）: "%s" -> index %s (keyword: %s)',
+                header.substring(0, 50) + '...',
+                mappedIndex,
+                answerKeywords[k]
+              );
+              break;
+            }
+          }
+          if (mappedIndex !== undefined) break;
+        }
+
+        // ✅ Step 3: 最終フォールバック - 長文質問検出（既存ロジック）
+        if (mappedIndex === undefined) {
+          const standardHeaders = [
+            'タイムスタンプ', 'メールアドレス', 'クラス', '名前', '理由',
+            'なるほど！', 'いいね！', 'もっと知りたい！', 'ハイライト',
+            'そう考える理由', 'そう思う理由' // 理由系も除外
+          ];
+          const questionHeaders = [];
+
+          for (const header in actualHeaderIndices) {
+            let isStandardHeader = false;
+            for (let i = 0; i < standardHeaders.length; i++) {
+              if (
+                header.toLowerCase().includes(standardHeaders[i].toLowerCase()) ||
+                standardHeaders[i].toLowerCase().includes(header.toLowerCase())
+              ) {
+                isStandardHeader = true;
+                break;
+              }
+            }
+
+            if (!isStandardHeader && header.length > 10) {
+              // 質問は通常長い
+              questionHeaders.push({ header, index: actualHeaderIndices[header] });
+            }
+          }
+
+          if (questionHeaders.length > 0) {
+            // 最も長いヘッダーを選択（通常メイン質問が最も長い）
+            const longestHeader = questionHeaders.reduce((prev, current) => {
+              return prev.header.length > current.header.length ? prev : current;
+            });
+            mappedIndex = longestHeader.index;
+            console.log(
+              'mapConfigToActualHeaders: ✅ opinionHeader長文検出成功: "%s" -> index %s',
+              longestHeader.header.substring(0, 50) + '...',
+              mappedIndex
+            );
+          }
         }
       }
 
-      if (questionHeaders.length > 0) {
-        // 最も長いヘッダーを選択（通常メイン質問が最も長い）
-        const longestHeader = questionHeaders.reduce((prev, current) => {
-          return prev.header.length > current.header.length ? prev : current;
+      // ✅ opinionHeaderが見つからない場合の詳細デバッグ情報
+      if (mappedIndex === undefined) {
+        console.log('🔍 opinionHeader検出失敗 - 利用可能なヘッダー一覧:', {
+          allHeaders: Object.keys(actualHeaderIndices),
+          columnMapping: columnMapping || '未設定',
+          suggestion: '手動で列マッピングを設定するか、列名に「どうして」「なぜ」「？」などを含めてください'
         });
-        mappedIndex = longestHeader.index;
-        console.log(
-          'mapConfigToActualHeaders: Auto-detected main question header for %s: "%s" -> index %s',
-          configKey,
-          longestHeader.header,
-          mappedIndex
-        );
       }
     }
 

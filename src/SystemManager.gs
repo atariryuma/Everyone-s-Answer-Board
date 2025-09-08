@@ -805,3 +805,296 @@ function testCompleteRepair() {
     };
   }
 }
+
+// =============================================================================
+// opinionHeader診断機能（2025年9月追加）
+// =============================================================================
+
+/**
+ * 🎯 opinionHeader設定の診断とテスト
+ * 現在のシステムでopinionHeaderが正しく設定・表示されているかをチェック
+ * @param {string} userId - 診断対象ユーザーID（省略時は現在のユーザー）
+ * @returns {Object} 診断結果
+ */
+function diagnoseOpinionHeader(userId = null) {
+  try {
+    console.log('🎯 opinionHeader診断開始');
+    
+    // ユーザー情報取得
+    const targetUserId = userId || UserManager.getCurrentEmail();
+    const userInfo = userId ? DB.findUserById(userId) : DB.findUserByEmail(targetUserId);
+    
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+
+    const diagnosis = {
+      userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
+      timestamp: new Date().toISOString(),
+      checks: {},
+      recommendations: []
+    };
+
+    // 🔍 Check 1: ConfigJSONのopinionHeader設定
+    const config = ConfigManager.getUserConfig(userInfo.userId);
+    diagnosis.checks.configJson = {
+      hasConfig: !!config,
+      opinionHeaderValue: config?.opinionHeader || 'なし',
+      isDefault: config?.opinionHeader === 'お題' || !config?.opinionHeader,
+      confidence: 'N/A'
+    };
+
+    // 🔍 Check 2: columnMapping設定との整合性
+    const columnMapping = config?.columnMapping;
+    if (columnMapping?.mapping?.answer !== undefined) {
+      diagnosis.checks.columnMapping = {
+        hasAnswerMapping: true,
+        answerIndex: columnMapping.mapping.answer,
+        answerConfidence: columnMapping.confidence?.answer || 'N/A'
+      };
+    } else {
+      diagnosis.checks.columnMapping = {
+        hasAnswerMapping: false,
+        issue: 'columnMapping.mapping.answerが未設定'
+      };
+    }
+
+    // 🔍 Check 3: 実際のスプレッドシートヘッダーとの整合性
+    if (config?.spreadsheetId && config?.sheetName) {
+      try {
+        const headerIndices = getSpreadsheetColumnIndices(config.spreadsheetId, config.sheetName);
+        
+        diagnosis.checks.spreadsheetHeaders = {
+          detection: 'success',
+          detectedOpinionHeader: headerIndices?.opinionHeader || 'お題',
+          isDetectedDefault: headerIndices?.opinionHeader === 'お題' || !headerIndices?.opinionHeader,
+          availableHeaders: headerIndices ? Object.keys(headerIndices) : []
+        };
+
+        // 整合性チェック
+        const configOpinion = config.opinionHeader;
+        const detectedOpinion = headerIndices?.opinionHeader;
+        
+        diagnosis.checks.consistency = {
+          configVsDetected: configOpinion === detectedOpinion,
+          configValue: configOpinion,
+          detectedValue: detectedOpinion,
+          issue: configOpinion !== detectedOpinion ? '設定値と検出値が不一致' : '整合性OK'
+        };
+      } catch (headerError) {
+        diagnosis.checks.spreadsheetHeaders = {
+          detection: 'error',
+          error: headerError.message
+        };
+      }
+    } else {
+      diagnosis.checks.spreadsheetHeaders = {
+        detection: 'unavailable',
+        reason: 'スプレッドシート情報が不足'
+      };
+    }
+
+    // 🔍 Check 4: 推奨アクション生成
+    if (diagnosis.checks.configJson.isDefault) {
+      diagnosis.recommendations.push({
+        priority: 'high',
+        action: 'opinionHeader自動検出の実行',
+        description: 'Core.gsの高精度検出システムでopinionHeaderを自動設定'
+      });
+    }
+
+    if (diagnosis.checks.columnMapping && !diagnosis.checks.columnMapping.hasAnswerMapping) {
+      diagnosis.recommendations.push({
+        priority: 'high',
+        action: '列マッピングの再実行',
+        description: 'AdminPanelでデータソース再接続を実行'
+      });
+    }
+
+    if (diagnosis.checks.consistency && !diagnosis.checks.consistency.configVsDetected) {
+      diagnosis.recommendations.push({
+        priority: 'medium',
+        action: 'opinionHeaderの同期',
+        description: 'ConfigJSONと検出値を同期'
+      });
+    }
+
+    // 🔍 Check 5: 総合評価
+    let score = 100;
+    if (diagnosis.checks.configJson.isDefault) score -= 40;
+    if (diagnosis.checks.columnMapping && !diagnosis.checks.columnMapping.hasAnswerMapping) score -= 30;
+    if (diagnosis.checks.consistency && !diagnosis.checks.consistency.configVsDetected) score -= 20;
+    
+    diagnosis.overallScore = Math.max(0, score);
+    diagnosis.status = score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
+
+    console.log('✅ opinionHeader診断完了:', {
+      userId: userInfo.userId,
+      score: diagnosis.overallScore,
+      status: diagnosis.status,
+      recommendations: diagnosis.recommendations.length
+    });
+
+    return {
+      success: true,
+      diagnosis
+    };
+
+  } catch (error) {
+    console.error('❌ opinionHeader診断エラー:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * 🔧 opinionHeader自動修復機能
+ * 診断結果に基づいてopinionHeaderの問題を自動修復
+ * @param {string} userId - 修復対象ユーザーID（省略時は現在のユーザー）
+ * @returns {Object} 修復結果
+ */
+function repairOpinionHeader(userId = null) {
+  try {
+    console.log('🔧 opinionHeader自動修復開始');
+    
+    // まず診断を実行
+    const diagnosisResult = diagnoseOpinionHeader(userId);
+    if (!diagnosisResult.success) {
+      throw new Error('診断に失敗しました: ' + diagnosisResult.error);
+    }
+
+    const diagnosis = diagnosisResult.diagnosis;
+    const repairs = [];
+
+    // 修復1: opinionHeaderがデフォルト値の場合、高精度検出を実行
+    if (diagnosis.checks.configJson.isDefault && diagnosis.checks.spreadsheetHeaders.detection === 'success') {
+      const detectedOpinion = diagnosis.checks.spreadsheetHeaders.detectedOpinionHeader;
+      
+      if (detectedOpinion && detectedOpinion !== 'お題') {
+        const userInfo = userId ? DB.findUserById(userId) : DB.findUserByEmail(UserManager.getCurrentEmail());
+        const currentConfig = ConfigManager.getUserConfig(userInfo.userId);
+        
+        const updatedConfig = {
+          ...currentConfig,
+          opinionHeader: detectedOpinion,
+          lastModified: new Date().toISOString()
+        };
+        
+        ConfigManager.saveConfig(userInfo.userId, updatedConfig);
+        
+        repairs.push({
+          type: 'opinionHeader_update',
+          before: currentConfig.opinionHeader || 'お題',
+          after: detectedOpinion,
+          status: 'success'
+        });
+        
+        console.log('✅ opinionHeader修復完了:', detectedOpinion.substring(0, 50) + '...');
+      }
+    }
+
+    // 修復後の診断実行
+    const postDiagnosis = diagnoseOpinionHeader(userId);
+    
+    console.log('🔧 opinionHeader自動修復完了:', {
+      repairsCount: repairs.length,
+      scoreBefore: diagnosis.overallScore,
+      scoreAfter: postDiagnosis.success ? postDiagnosis.diagnosis.overallScore : '不明'
+    });
+
+    return {
+      success: true,
+      repairs,
+      beforeDiagnosis: diagnosis,
+      afterDiagnosis: postDiagnosis.success ? postDiagnosis.diagnosis : null,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('❌ opinionHeader自動修復エラー:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * 🧪 opinionHeader統合テスト
+ * システム全体でのopinionHeader機能をテスト
+ */
+function testOpinionHeaderSystem() {
+  try {
+    console.log('🧪 opinionHeader統合テスト開始');
+    
+    const testResults = {
+      timestamp: new Date().toISOString(),
+      tests: {},
+      summary: {}
+    };
+
+    // Test 1: 診断機能テスト
+    console.log('Test 1: 診断機能テスト');
+    const diagnosisResult = diagnoseOpinionHeader();
+    testResults.tests.diagnosis = {
+      success: diagnosisResult.success,
+      score: diagnosisResult.success ? diagnosisResult.diagnosis.overallScore : 0,
+      status: diagnosisResult.success ? diagnosisResult.diagnosis.status : 'error'
+    };
+
+    // Test 2: Core.gs検出システムテスト
+    console.log('Test 2: Core.gs検出システムテスト');
+    const currentUser = UserManager.getCurrentEmail();
+    const userInfo = DB.findUserByEmail(currentUser);
+    const config = ConfigManager.getUserConfig(userInfo.userId);
+    
+    if (config?.spreadsheetId && config?.sheetName) {
+      try {
+        const headerIndices = getSpreadsheetColumnIndices(config.spreadsheetId, config.sheetName);
+        testResults.tests.coreDetection = {
+          success: true,
+          detectedOpinionHeader: headerIndices?.opinionHeader || 'お題',
+          isDetectedDefault: headerIndices?.opinionHeader === 'お題'
+        };
+      } catch (error) {
+        testResults.tests.coreDetection = {
+          success: false,
+          error: error.message
+        };
+      }
+    } else {
+      testResults.tests.coreDetection = {
+        success: false,
+        reason: 'スプレッドシート情報不足'
+      };
+    }
+
+    // Test 3: 統合評価
+    const allTestsPassed = Object.values(testResults.tests).every(test => test.success !== false);
+    testResults.summary = {
+      overallSuccess: allTestsPassed,
+      testsCount: Object.keys(testResults.tests).length,
+      passedTests: Object.values(testResults.tests).filter(test => test.success !== false).length
+    };
+
+    console.log('✅ opinionHeader統合テスト完了:', testResults.summary);
+    
+    return {
+      success: true,
+      testResults
+    };
+
+  } catch (error) {
+    console.error('❌ opinionHeader統合テストエラー:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}

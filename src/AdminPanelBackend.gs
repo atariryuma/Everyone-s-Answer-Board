@@ -83,12 +83,57 @@ function connectDataSource(spreadsheetId, sheetName) {
         newSheetName: sheetName,
       });
 
-      // opinionHeader決定（シンプル化）
-      let opinionHeader = 'お題';
-      if (columnMapping.answer && typeof columnMapping.answer === 'string') {
-        opinionHeader = columnMapping.answer;
-      } else if (columnMapping.answer && typeof columnMapping.answer === 'number') {
-        opinionHeader = headerRow[columnMapping.answer] || 'お題';
+      // opinionHeader決定（高精度・確実設定版）
+      let opinionHeader = 'お題'; // デフォルト値
+      
+      // ✅ Step 1: columnMapping.mapping.answerから実際のヘッダー名を取得（最優先）
+      if (columnMapping?.mapping?.answer !== undefined) {
+        const answerIndex = columnMapping.mapping.answer;
+        if (typeof answerIndex === 'number' && answerIndex >= 0 && answerIndex < headerRow.length) {
+          const actualHeaderName = headerRow[answerIndex];
+          if (actualHeaderName && actualHeaderName.trim() !== '') {
+            opinionHeader = actualHeaderName;
+            console.log('🎯 connectDataSource: opinionHeader高精度設定（columnMapping連携）:', {
+              answerIndex,
+              headerName: actualHeaderName.substring(0, 50) + (actualHeaderName.length > 50 ? '...' : ''),
+              confidence: columnMapping.confidence?.answer || '不明'
+            });
+          }
+        }
+      }
+      
+      // ✅ Step 2: レガシー形式でのフォールバック（後方互換性）
+      if (opinionHeader === 'お題' && columnMapping.answer) {
+        if (typeof columnMapping.answer === 'string') {
+          opinionHeader = columnMapping.answer;
+          console.log('🔄 connectDataSource: opinionHeaderレガシー形式適用（string）:', opinionHeader.substring(0, 50) + '...');
+        } else if (typeof columnMapping.answer === 'number' && columnMapping.answer < headerRow.length) {
+          opinionHeader = headerRow[columnMapping.answer] || 'お題';
+          console.log('🔄 connectDataSource: opinionHeaderレガシー形式適用（number）:', opinionHeader.substring(0, 50) + '...');
+        }
+      }
+      
+      // ✅ Step 3: 最終検証と詳細ログ
+      if (opinionHeader === 'お題') {
+        console.warn('⚠️ connectDataSource: opinionHeader自動検出失敗、デフォルト値を使用:', {
+          columnMappingStructure: {
+            hasMapping: !!columnMapping?.mapping,
+            hasAnswer: columnMapping?.mapping?.answer !== undefined,
+            answerValue: columnMapping?.mapping?.answer,
+            answerType: typeof columnMapping?.mapping?.answer
+          },
+          headerRowInfo: {
+            length: headerRow.length,
+            headers: headerRow.map((h, i) => `${i}:${String(h).substring(0, 20)}${String(h).length > 20 ? '...' : ''}`)
+          },
+          suggestion: 'Core.gsの高精度検出システムが後で自動修正します'
+        });
+      } else {
+        console.log('✅ connectDataSource: opinionHeader確実設定完了:', {
+          finalValue: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
+          length: opinionHeader.length,
+          source: 'columnMapping連携'
+        });
       }
 
       // 🎯 正規的な設定更新：明確で確実な状態管理

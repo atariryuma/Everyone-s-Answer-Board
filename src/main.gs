@@ -1194,38 +1194,77 @@ function renderAnswerBoard(userInfo, params) {
       systemHealthy: hasUserConfig && config.appPublished,
     };
 
-    // __OPINION_HEADER__テンプレート変数を設定（configJson優先）
+    // __OPINION_HEADER__テンプレート変数を設定（高精度・確実取得版）
     let opinionHeader = 'お題'; // デフォルト値
+    let opinionHeaderSource = 'default';
+    
     try {
-      // 1. configJsonからopinionHeaderを優先取得
-      if (config?.opinionHeader) {
+      // ✅ Step 1: configJsonからopinionHeaderを優先取得（「お題」以外の場合）
+      if (config?.opinionHeader && config.opinionHeader !== 'お題') {
         opinionHeader = config.opinionHeader;
-        console.log('renderAnswerBoard: configJsonからopinionHeaderを取得:', opinionHeader);
-      } else if (finalSpreadsheetId && finalSheetName) {
-        // 2. 既存のgetSpreadsheetColumnIndices方式（フォールバック）
+        opinionHeaderSource = 'configJson';
+        console.log('📋 renderAnswerBoard: opinionHeader取得（configJson）:', {
+          value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
+          length: opinionHeader.length,
+          source: 'configJson'
+        });
+      } 
+      // ✅ Step 2: configJsonが「お題」の場合、または未設定の場合は高精度検出実行
+      else if (finalSpreadsheetId && finalSheetName) {
+        console.log('🔍 renderAnswerBoard: opinionHeader高精度検出実行中...');
+        
+        // 2-1: getSpreadsheetColumnIndicesによる高精度検出
         const headerIndices = getSpreadsheetColumnIndices(finalSpreadsheetId, finalSheetName);
-        opinionHeader = headerIndices?.opinionHeader || 'お題';
-        console.log(
-          'renderAnswerBoard: getSpreadsheetColumnIndicesからopinionHeaderを取得:',
-          opinionHeader
-        );
+        
+        if (headerIndices?.opinionHeader && headerIndices.opinionHeader !== 'お題') {
+          opinionHeader = headerIndices.opinionHeader;
+          opinionHeaderSource = 'getSpreadsheetColumnIndices';
+          console.log('🎯 renderAnswerBoard: opinionHeader高精度検出成功:', {
+            value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
+            length: opinionHeader.length,
+            source: 'Core.gs高精度検出システム'
+          });
 
-        // 3. 取得したopinionHeaderをconfigJsonに保存（次回用の最適化）
-        if (headerIndices?.opinionHeader && userInfo?.userId) {
-          try {
-            const updatedConfig = { ...config, opinionHeader: headerIndices.opinionHeader };
-            // 🔧 修正: ConfigManager経由で安全な保存（二重構造防止）
-            ConfigManager.saveConfig(userInfo.userId, updatedConfig);
-            console.log('renderAnswerBoard: opinionHeaderをConfigManager経由で保存');
-          } catch (saveError) {
-            console.warn('renderAnswerBoard: configJson保存エラー:', saveError.message);
+          // 3. 取得したopinionHeaderをconfigJsonに保存（永続化・最適化）
+          if (userInfo?.userId) {
+            try {
+              const updatedConfig = { ...config, opinionHeader: headerIndices.opinionHeader };
+              ConfigManager.saveConfig(userInfo.userId, updatedConfig);
+              console.log('💾 renderAnswerBoard: opinionHeader永続化完了 - 次回はconfigJsonから直接取得');
+            } catch (saveError) {
+              console.warn('⚠️ renderAnswerBoard: configJson保存エラー:', saveError.message);
+            }
           }
+        } else {
+          console.warn('⚠️ renderAnswerBoard: 高精度検出でもopinionHeaderが「お題」:', {
+            headerIndicesOpinionHeader: headerIndices?.opinionHeader,
+            availableHeaders: headerIndices ? Object.keys(headerIndices) : '取得失敗'
+          });
         }
+      } else {
+        console.warn('⚠️ renderAnswerBoard: スプレッドシート情報不足でopinionHeader検出不可:', {
+          finalSpreadsheetId: !!finalSpreadsheetId,
+          finalSheetName: !!finalSheetName
+        });
       }
     } catch (headerError) {
-      console.warn('renderAnswerBoard: ヘッダー情報取得エラー:', headerError.message);
-      opinionHeader = 'お題'; // フォールバック
+      console.error('❌ renderAnswerBoard: opinionHeader取得エラー:', {
+        error: headerError.message,
+        stack: headerError.stack,
+        finalSpreadsheetId: !!finalSpreadsheetId,
+        finalSheetName: !!finalSheetName
+      });
+      opinionHeader = 'お題'; // エラー時フォールバック
+      opinionHeaderSource = 'error_fallback';
     }
+    
+    // 最終確認ログ
+    console.log('✅ renderAnswerBoard: opinionHeader最終確定:', {
+      finalValue: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
+      source: opinionHeaderSource,
+      isDefault: opinionHeader === 'お題',
+      templateVariableSet: true
+    });
     template.__OPINION_HEADER__ = opinionHeader;
 
     // StudyQuestApp用のユーザーID設定（エラー対策）
