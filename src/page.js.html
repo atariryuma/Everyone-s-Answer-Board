@@ -3301,6 +3301,34 @@
                 }
               }
 
+              // 🔍 理由列データ受信状況のデバッグログ（調査用）
+              console.group('🔍 データ受信詳細調査（理由列問題対応）');
+              console.log('📊 受信したJSONデータの構造:', {
+                resultType: typeof result,
+                hasData: !!result?.data,
+                dataLength: Array.isArray(result?.data) ? result.data.length : 'not array',
+                firstItem: result?.data?.[0] || 'none',
+                dataKeys: result?.data?.[0] ? Object.keys(result.data[0]) : 'none'
+              });
+              
+              // 理由列データの受信確認
+              if (result?.data?.[0]) {
+                const sampleItem = result.data[0];
+                console.log('🎯 サンプルデータ項目の詳細:', {
+                  reason: sampleItem.reason || 'MISSING',
+                  reasonHeader: sampleItem.reasonHeader || 'MISSING', 
+                  allFields: Object.keys(sampleItem).filter(key => key.toLowerCase().includes('reason')),
+                  fullSample: sampleItem
+                });
+              }
+              
+              console.log('🔧 設定情報:', {
+                configReason: configManager.config?.reasonHeader,
+                mappedHeaders: configManager.config?.columnMapping,
+                sheetName: configManager.config?.sheetName
+              });
+              console.groupEnd();
+
               const syncResult = this.synchronizeStateAfterDataUpdate(
                 result.data,
                 'performDataLoad'
@@ -4596,7 +4624,15 @@
         }
 
         // Ensure required properties exist with safe defaults（理由列の堅牢化）
-        // 理由データのデバッグログ追加
+        // 🔍 理由データのデバッグログ追加（調査用）
+        console.log('🎯 createAnswerCard - 理由列データ調査:', {
+          rowIndex: data.rowIndex,
+          hasReason: !!data.reason,
+          reasonValue: data.reason || 'MISSING',
+          reasonLength: data.reason ? data.reason.length : 0,
+          allDataKeys: Object.keys(data),
+          reasonFields: Object.keys(data).filter(key => key.toLowerCase().includes('reason'))
+        });
 
         const safeData = {
           rowIndex: data.rowIndex || 0,
