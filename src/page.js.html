@@ -1061,7 +1061,7 @@
           // フォームが作成された時のフォームリンク更新
           Logger.debug('📝 新しいフォームが作成されました:', event.data.formUrl);
           try {
-            const formLinkBtn = this._getCachedElement('form-link-btn');
+            const formLinkBtn = this._getCachedElement('formAnswerBtn');
             if (formLinkBtn && event.data.formUrl) {
               formLinkBtn.href = event.data.formUrl;
               formLinkBtn.classList.remove('hidden');
@@ -1098,7 +1098,7 @@
             // フォームが作成された時のフォームリンク更新（BroadcastChannel）
             Logger.debug('📝 BroadcastChannelから新しいフォーム作成を受信:', event.data.formUrl);
             try {
-              const formLinkBtn = this._getCachedElement('form-link-btn');
+              const formLinkBtn = this._getCachedElement('formAnswerBtn');
               if (formLinkBtn && event.data.formUrl) {
                 formLinkBtn.href = event.data.formUrl;
                 formLinkBtn.classList.remove('hidden');
@@ -3934,7 +3934,7 @@
         // Post-processing after successful data load
         this.adjustLayout();
 
-        if (!this.state.isAdminUser || !window.hasAdminCapability) {
+        if (!this.state.isAdminUser) {
           this.state.showAdminFeatures = false;
           this.state.showHighlightToggle = false;
           // 管理モードボタンを確実に非表示
@@ -8732,7 +8732,7 @@
       const userId = configManager.config?.userId || window.USER_ID;
       const formInfo = await configManager._runGasCall('getActiveFormInfo', userId);
       if (formInfo && formInfo.formUrl) {
-        const formLinkBtn = this._getCachedElement('form-link-btn');
+        const formLinkBtn = this._getCachedElement('formAnswerBtn');
         if (formLinkBtn) {
           formLinkBtn.href = formInfo.formUrl;
           formLinkBtn.classList.remove('hidden');
