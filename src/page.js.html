@@ -1,12 +1,6 @@
 <script>
-  // === TEMPLATE LAYER - 2024 GAS Best Practice ===
   // 統一されたテンプレート変数受け取りシステム
 
-
-
-  // ✅ Phase 1: 古いgetConfigFromBackend関数を削除（ConfigManagerに統合済み）
-
-  // ✅ Phase 1: CONFIG管理統一化 - 単一責任原則適用
   class ConfigManager {
     constructor() {
       this._config = null;
@@ -15,11 +9,10 @@
 
     async initialize() {
       if (this._initialized) return this._config;
-      
+
       try {
         this._config = await this._loadConfigFromBackend();
         this._initialized = true;
-        debugInfo('✅ ConfigManager初期化完了:', this._config.userId);
         return this._config;
       } catch (error) {
         console.error('❌ ConfigManager初期化エラー:', error);
@@ -36,16 +29,13 @@
       return this._config;
     }
 
-    // 初期化状態を確認するヘルパー
     get isInitialized() {
       return this._initialized;
     }
 
-
     async _loadConfigFromBackend() {
-      // ✅ Phase 2: 簡素化されたデータ取得フロー
       const userId = this._extractUserId();
-      
+
       try {
         return await this._runGasCall('getCurrentConfig', userId);
       } catch (error) {
@@ -72,12 +62,11 @@
           console.warn('⚠️ 無効なuserID形式をスキップ:', userId);
         }
       }
-      
+
       throw new Error('有効なuserIdが見つかりません');
     }
 
     _createFallbackConfig() {
-      // ✅ Phase 2: 簡素化されたフォールバック設定
       try {
         const fallbackUserId = this._extractUserId();
         const fallbackSheetName = window.SHEET_NAME || 'Sheet1';
@@ -97,7 +86,6 @@
         });
       } catch (error) {
         console.error('❌ フォールバック設定作成失敗:', error.message);
-        // 最小限の安全な設定を返す
         return Object.freeze({
           showCounts: false,
           displayMode: 'anonymous',
@@ -114,9 +102,7 @@
       }
     }
 
-    // ✅ Phase 3: API呼び出しの最適化 - 統一API管理システム
     async _runGasCall(funcName, ...args) {
-      // パラメータ統一化
       const callParams = {
         funcName,
         args,
@@ -128,7 +114,6 @@
       if (this._isReadOnlyCall(funcName)) {
         const cached = this._getApiCache(callParams.cacheKey);
         if (cached) {
-          debugInfo(`⚡ APIキャッシュヒット: ${funcName}`, { cacheKey: callParams.cacheKey });
           return cached;
         }
       }
@@ -140,25 +125,21 @@
 
         const handleSuccess = (result) => {
           clearTimeout(timeout);
-          
+
           // 読み取り系の結果をキャッシュ（5分間）
           if (this._isReadOnlyCall(funcName) && result) {
             this._setApiCache(callParams.cacheKey, result, 300000);
           }
-          
-          debugInfo(`✅ API成功: ${funcName}`, { 
-            duration: Date.now() - callParams.timestamp,
-            cached: this._isReadOnlyCall(funcName)
-          });
+
           resolve(result);
         };
 
         const handleFailure = (error) => {
           clearTimeout(timeout);
-          console.error(`❌ API失敗: ${funcName}`, { 
+          console.error(`❌ API失敗: ${funcName}`, {
             error: error.message,
             args: callParams.args,
-            duration: Date.now() - callParams.timestamp 
+            duration: Date.now() - callParams.timestamp
           });
           reject(error);
         };
@@ -217,7 +198,6 @@
   // グローバルConfigManagerインスタンス
   const configManager = new ConfigManager();
 
-  // === APPLICATION CONSTANTS ===
   // GAS optimized constants
   const RENDER_BATCH_SIZE = 50; // 件数闾值最適化: 大量データ対応
   const CHUNK_SIZE = 5; // DOM operations per chunk
@@ -234,7 +214,6 @@
 
   const debugLog = () => {}; // デバッグログ無効化
 
-  // アイコンシステム
   const ICONS = Object.freeze({
     'lightbulb-outline':
       '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
@@ -285,7 +264,6 @@
     }),
   });
 
-  // ✅ Phase 3: App名前空間 統一API管理（効率化版）
   const createGasMethod = (methodName, funcName, errorContext) => {
     return async (...args) => {
       try {
@@ -364,7 +342,6 @@
               fn(...args);
             };
 
-          // ✅ Phase 3: 統一API呼び出し使用
           configManager._runGasCall('checkCurrentPublicationStatus', userId)
             .then(cleanup(resolve))
             .catch(cleanup(reject));
@@ -496,7 +473,6 @@
      * @returns {string} 有効なユーザーID、またはフォールバック値
      */
     validateUserId(userId) {
-      // ✅ Phase 4: テンプレート変数統一化 - configManager経由で取得
       return userId || configManager.config?.userId || window.USER_ID || '';
     }
 
@@ -507,18 +483,17 @@
      */
     async waitForConfigInitialization(timeout = 5000) {
       const startTime = Date.now();
-      
+
       while (Date.now() - startTime < timeout) {
         // CONFIG初期化状態をチェック
         if (configManager._initialized && configManager.config) {
-          console.log('✅ waitForConfigInitialization: CONFIG初期化確認完了');
           return true;
         }
-        
+
         // 50ms待機してリトライ
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      
+
       console.warn('⚠️ waitForConfigInitialization: タイムアウト', {
         timeout: timeout,
         configState: CONFIG ? typeof CONFIG : 'undefined',
@@ -543,7 +518,7 @@
           validUserId = this.state.userId;
         }
 
-        // Source 2: configManager.config.userId  
+        // Source 2: configManager.config.userId
         if (!validUserId && configManager.config?.userId && configManager.config.userId.trim() !== '') {
           sources.push({ source: 'configManager.config.userId', value: configManager.config.userId });
           validUserId = configManager.config.userId;
@@ -586,19 +561,6 @@
             console.warn('getValidUserId: sessionStorage保存失敗:', storageError.message);
           }
         }
-        
-        // 詳細デバッグログ
-        console.log('🔍 getValidUserId: ユーザーID取得結果', {
-          sources: sources,
-          finalUserId: validUserId,
-          savedToSession: !!validUserId,
-          configState: configManager.config ? Object.keys(configManager.config) : 'undefined',
-          configManagerState: {
-            initialized: configManager._initialized,
-            hasConfig: !!configManager.config,
-            userId: configManager.config?.userId
-          }
-        });
 
         return validUserId;
 
@@ -683,7 +645,6 @@
         startTime: Date.now(), // パフォーマンス監視用
       };
 
-      // 新着チェック用の初期化
       this.lastViewKey = null;
       this.initialDataLoaded = false;
       this.hadInitialDataLoadFailure = false; // 初期データロード失敗フラグ
@@ -700,7 +661,6 @@
       this.reactionQueue = new Map(); // リアクション操作キュー
       this.reactionEventListeners = new Map(); // 処理完了通知用
       this.isProcessingReactionQueue = false; // キュー処理中フラグ
-
 
       // イベントリスナー重複登録防止フラグ
       this.eventDelegationSetup = false;
@@ -805,17 +765,14 @@
     setCurrentAnswers(answers) {
       const safeAnswers = Array.isArray(answers) ? answers : [];
       this.state.currentAnswers = safeAnswers;
-      Logger.debug('setCurrentAnswers: 設定完了', { length: safeAnswers.length });
     }
 
-    // currentAnswersの安全な長さ取得
     getCurrentAnswersLength() {
       return this.getCurrentAnswers().length;
     }
 
     // Reset state for clean initialization (Phase 1.2)
     resetStateForCleanInit() {
-      Logger.debug('🔄 Resetting state for clean initialization...');
 
       // Reset core data arrays
       this.state.currentAnswers = [];
@@ -828,7 +785,6 @@
       if (container) {
         const existingCards = container.querySelectorAll('.answer-card');
         if (existingCards.length > 0) {
-          Logger.debug('🧹 Clearing', existingCards.length, 'existing DOM cards during init reset');
           // Remove observers
           existingCards.forEach((card) => {
             if (this.visibilityObserver) {
@@ -856,27 +812,18 @@
       // Reset current active sheet state
       this.state.currentActiveSheet = configManager.config.sheetName;
 
-      Logger.debug('✅ State reset completed', {
-        currentAnswers: this.state.currentAnswers?.length || 0,
-        initialDataLoaded: this.initialDataLoaded,
-        currentActiveSheet: this.state.currentActiveSheet,
-      });
     }
 
     // Unified state management synchronization (Phase 2.3)
     synchronizeStateAfterDataUpdate(newData, context = 'unknown') {
-      Logger.debug(`🔄 Synchronizing state after data update (${context})...`);
 
       const dataLength = newData ? newData.length : 0;
       const previousLength = this.state.currentAnswers?.length || 0;
 
-      // Step 1: Update data
       this.state.currentAnswers = newData || [];
 
-      // Step 2: Update count-related state variables simultaneously
       this.updateLastSeenCount(dataLength);
 
-      // Step 3: Update content flags
       if (dataLength > previousLength) {
         this.state.hasNewContent = true;
         this.state.newContentCount = dataLength - previousLength;
@@ -885,36 +832,13 @@
         this.state.newContentCount = 0;
       }
 
-      // Step 4: Reset polling failure count on successful data update
       this.state.pollingFailureCount = 0;
-
-
-      Logger.debug('✅ State synchronization completed:', {
-        context,
-        dataLength,
-        previousLength,
-        hasNewContent: this.state.hasNewContent,
-        newContentCount: this.state.newContentCount,
-        lastSeenCount: this.state.lastSeenCount,
-      });
 
       return {
         dataLength,
         hasChanges: dataLength !== previousLength,
       };
     }
-
-
-
-
-
-
-
-
-
-
-
-
 
     async init() {
       try {
@@ -925,7 +849,6 @@
           (hasSeenDigitalCitizenship && Date.now() > parseInt(hasSeenDigitalCitizenship));
 
         if (shouldShowModal && window.sharedModals) {
-          Logger.debug('🌐 初回アクセス/期限切れ: デジタルシティズンシップモーダルを表示');
           window.sharedModals.showDigitalCitizenship();
           // 表示済みフラグを設定（24時間有効）
           const expiry = Date.now() + 24 * 60 * 60 * 1000;
@@ -1037,8 +960,6 @@
             console.error('ボードデータ更新エラー:', error);
           }
         } else if (event.data && event.data.type === 'BOARD_PUBLISHED') {
-          // 新しいボードが公開された時の即座更新
-          Logger.debug('新しいボードが公開されました:', event.data.sheetName);
           try {
             // キャッシュバイパスで新しいデータをチェック
             await this.checkForNewContentLight(true);
@@ -1058,14 +979,11 @@
             this.showInfoModal();
           }
         } else if (event.data && event.data.type === 'FORM_CREATED') {
-          // フォームが作成された時のフォームリンク更新
-          Logger.debug('📝 新しいフォームが作成されました:', event.data.formUrl);
           try {
             const formLinkBtn = this._getCachedElement('formAnswerBtn');
             if (formLinkBtn && event.data.formUrl) {
               formLinkBtn.href = event.data.formUrl;
               formLinkBtn.classList.remove('hidden');
-              Logger.debug('✅ フォームリンクが更新されました');
             }
           } catch (error) {
             console.warn('フォームリンク更新でエラー:', error);
@@ -1073,12 +991,10 @@
         }
       });
 
-      // BroadcastChannelで他のタブからの更新通知も受信
       if (typeof BroadcastChannel !== 'undefined') {
         const channel = new BroadcastChannel('board-updates');
         channel.addEventListener('message', async (event) => {
           if (event.data && event.data.type === 'BOARD_PUBLISHED') {
-            Logger.debug('BroadcastChannelから新しいボード公開を受信:', event.data.sheetName);
             try {
               await this.checkForNewContentLight(true);
               await this.loadSheetData({ bypassCache: true });
@@ -1095,14 +1011,11 @@
               this.showInfoModal();
             }
           } else if (event.data && event.data.type === 'FORM_CREATED') {
-            // フォームが作成された時のフォームリンク更新（BroadcastChannel）
-            Logger.debug('📝 BroadcastChannelから新しいフォーム作成を受信:', event.data.formUrl);
             try {
               const formLinkBtn = this._getCachedElement('formAnswerBtn');
               if (formLinkBtn && event.data.formUrl) {
                 formLinkBtn.href = event.data.formUrl;
                 formLinkBtn.classList.remove('hidden');
-                Logger.debug('✅ フォームリンクが更新されました（BroadcastChannel）');
               }
             } catch (error) {
               console.warn('BroadcastChannel フォームリンク更新でエラー:', error);
@@ -1145,7 +1058,6 @@
     }
 
     setupNonCriticalEventListeners() {
-      // 重複登録防止
       if (this.nonCriticalListenersSetup) {
         // Non-critical event listeners already set up
         return;
@@ -1285,7 +1197,6 @@
      * これにより、クリックイベントが他のイベントと競合しなくなります。
      */
     setupEventDelegation() {
-      // 重複登録防止
       if (this.eventDelegationSetup) {
         // Event delegation already set up
         return;
@@ -1361,15 +1272,13 @@
       if (!this._executionQueue) {
         this._executionQueue = Promise.resolve();
       }
-      
+
       return this._executionQueue = this._executionQueue.then(async () => {
-        console.log(`⚡ runGas順次実行: ${funcName} 開始`);
         const startTime = performance.now();
 
         if (!isStateChanging) {
           const cached = this.cache.get(cacheKey);
           if (cached) {
-            console.log(`📦 runGas順次実行: ${funcName} キャッシュヒット (${(performance.now() - startTime).toFixed(1)}ms)`);
             return Promise.resolve(cached);
           }
         }
@@ -1380,15 +1289,15 @@
         if (!configReady) {
           console.warn('⚠️ runGas: CONFIG初期化タイムアウト、フォールバック処理継続');
         }
-        
+
         // ✅ 包括的なユーザーID取得（空のuserId問題根本解決）
         let userId = this.getValidUserId();
-        
+
         // フォールバック: 既存ロジックも維持
         if (!userId) {
           userId = configManager.config.userId || '';
         }
-        
+
         // 🚨 事前検証: 空のuserIdでのAPI呼び出しを防ぐ
         if (!userId || userId.trim() === '') {
           const errorMsg = `ユーザーIDが取得できません。システム初期化が必要です。`;
@@ -1402,14 +1311,7 @@
           });
           throw new Error(errorMsg);
         }
-        
-        console.log('🔧 runGas: ユーザーID確定', { 
-          funcName: funcName,
-          finalUserId: userId,
-          userIdLength: userId.length,
-          userIdValid: userId.trim() !== ''
-        });
-        
+
         let result;
 
         // ✅ App名前空間パターンでの統一データアクセス
@@ -1418,7 +1320,7 @@
             // 🚀 バルクデータAPI: 複数データを一括取得で高速化
             // ✅ パラメータからuserIdを優先的に使用（引数からuserIdを抽出）
             const bulkUserId = (args[0] && args[0].userId && args[0].userId.trim() !== '') ? args[0].userId : userId;
-            
+
             // ✅ getBulkData専用の最終検証
             if (!bulkUserId || bulkUserId.trim() === '') {
               const detailedError = {
@@ -1431,15 +1333,8 @@
               console.error('❌ getBulkData: 呼び出し前userId検証失敗', detailedError);
               throw new Error(`getBulkData: ${detailedError.error}`);
             }
-            
-            console.log('🔧 getBulkData呼び出し: userIdの最終決定', { 
-              passedUserId: args[0]?.userId, 
-              fallbackUserId: userId, 
-              finalUserId: bulkUserId,
-              userIdValidated: true
-            });
-            // ✅ Phase 3: 統一API呼び出し使用
-            result = await configManager._runGasCall('getBulkData', bulkUserId, ...args.slice(1));
+
+              result = await configManager._runGasCall('getBulkData', bulkUserId, ...args.slice(1));
             break;
           case 'getPublishedSheetData':
             result = await App.getData().getPublishedSheetData(userId, ...args);
@@ -1461,8 +1356,7 @@
             break;
           default:
             // フォールバック: 直接呼び出し（段階的移行用）
-            // ✅ Phase 3: 統一API呼び出し使用
-            result = await configManager._runGasCall(funcName, ...args);
+              result = await configManager._runGasCall(funcName, ...args);
         }
 
         if (!isStateChanging) {
@@ -1470,7 +1364,6 @@
         }
 
         const executionTime = (performance.now() - startTime).toFixed(1);
-        console.log(`✅ runGas順次実行: ${funcName} 完了 (${executionTime}ms)`);
         return result;
       } catch (error) {
         const executionTime = (performance.now() - startTime).toFixed(1);
@@ -1481,13 +1374,6 @@
     }
     async verifyAdminAsync() {
       // UserIDが正しく設定されているかチェック
-      Logger.debug('🔍 verifyAdminAsync: 管理者権限確認開始', {
-        windowUserId: window.USER_ID,
-        userIdLength: window.USER_ID?.length,
-        stateUserId: this.state.userId,
-        windowIsAdmin: window.isAdminUser,
-        hasAdminCapability: window.hasAdminCapability,
-      });
 
       // Use server-provided flag first (fast)
       const isAdminUser = configManager.config?.isAdminUser ?? window.isAdminUser;
@@ -1495,7 +1381,6 @@
       if (isAdminUser && userId && userId.trim()) {
         this.state.isAdminUser = true;
         this.state.showHighlightToggle = true; // 管理者なら常に表示
-        Logger.debug('✅ サーバー提供フラグで管理者権限を確認しました');
         // Admin permissions verified
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
@@ -1512,14 +1397,12 @@
 
         const isAdmin = await this.gas.checkAdmin();
         if (isAdmin) {
-          // ✅ Phase 5: configManager経由で状態更新
           if (configManager.config) {
             configManager.config.isAdminUser = true;
           }
           window.isAdminUser = true;
           this.state.isAdminUser = true;
           this.state.showHighlightToggle = true; // 管理者なら常に表示
-          Logger.debug('✅ API経由で管理者権限を確認しました');
           // API admin permissions verified
           this.updateAdminButtonUI();
           this.updateEndPublicationButtonUI();
@@ -1602,19 +1485,16 @@
     async checkForNewContentLight(bypassCache = false) {
       // ポーリング実行中の場合は重複実行を防ぐ
       if (this.contentCheckInProgress) {
-        Logger.debug('Content check already in progress, skipping...');
         return;
       }
 
       try {
         this.contentCheckInProgress = true;
 
-        // 基本状態の検証
         if (!this.validateContentCheckPrerequisites()) {
           return;
         }
 
-        // パラメータの準備
         const { selectedClass, sortOrder } = this.prepareContentCheckParams();
 
         // キャッシュクリア（必要な場合）
@@ -1625,7 +1505,6 @@
         // サーバーから件数を取得
         const countData = await this.fetchContentCount(selectedClass, sortOrder);
 
-        // レスポンスの処理
         await this.processContentCountResponse(countData, selectedClass, sortOrder);
       } catch (error) {
         await this.handleContentCheckError(error);
@@ -1635,13 +1514,11 @@
     }
 
     validateContentCheckPrerequisites() {
-      // 必要な要素の存在確認
       if (!this.elements.classFilter || !this.elements.sortOrder) {
         console.warn('Required UI elements not available for content check');
         return false;
       }
 
-      // 初期化状態の確認
       if (!this.state.userId) {
         console.warn('User ID not available for content check');
         return false;
@@ -1666,7 +1543,6 @@
     async clearCacheForContentCheck() {
       try {
         await this.gas.clearCache();
-        Logger.debug('✅ Cache cleared for content check');
       } catch (error) {
         console.warn('⚠️ Failed to clear cache:', error.message);
         // Continue without cache clearing
@@ -1701,20 +1577,9 @@
         significantChange: newCount !== lastSeen,
       };
 
-      Logger.debug('📊 Enhanced content count check (Phase 3.1):', {
-        newCount,
-        currentCount,
-        lastSeenCount: lastSeen,
-        selectedClass,
-        sortOrder,
-        hadInitialFailure: this.hadInitialDataLoadFailure,
-        consistencyCheck,
-      });
-
       // ポーリング成功のマーク - unified state management (Phase 2.3)
       this.state.pollingFailureCount = 0;
 
-      // 現在のビューキー
       const currentViewKey = `${selectedClass}-${sortOrder}`;
 
       // 初回データロード完了の処理
@@ -1738,11 +1603,6 @@
 
       // 初期データロード失敗後の初回成功ポーリング時の特別処理
       if (this.hadInitialDataLoadFailure && newCount > this.state.lastSeenCount) {
-        Logger.debug('🔄 初期データロード失敗後の新着検出:', {
-          newCount,
-          lastSeenCount: this.state.lastSeenCount,
-          difference: newCount - this.state.lastSeenCount,
-        });
 
         await this.checkForNewItems(newCount);
         return; // データ取得成功まで基準は更新しない
@@ -1751,19 +1611,9 @@
       this.updateLastSeenCount(newCount);
       this.initialDataLoaded = true;
 
-      Logger.debug('✅ Initial content load completed:', {
-        viewKey: currentViewKey,
-        count: newCount,
-        hadPreviousFailure: this.hadInitialDataLoadFailure,
-      });
     }
 
     async handleViewChange(currentViewKey, newCount) {
-      Logger.debug('🔄 View settings changed:', {
-        from: this.lastViewKey,
-        to: currentViewKey,
-        newCount,
-      });
 
       this.lastViewKey = currentViewKey;
       this.updateLastSeenCount(newCount);
@@ -1783,8 +1633,6 @@
         hasNewItems: newCount > lastSeen,
         dataIsStale: currentCount > 0 && newCount > currentCount,
       };
-
-      Logger.debug('📢 Enhanced new content detection (Phase 3.1):', detectionMetrics);
 
       if (detectionMetrics.hasNewItems && detectionMetrics.expectedNewItems > 0) {
         const newItems = detectionMetrics.expectedNewItems;
@@ -1807,9 +1655,7 @@
         failureCount: this.state.pollingFailureCount,
       });
 
-      // 連続失敗時の対処
       if (this.state.pollingFailureCount >= 3) {
-        Logger.debug('⏳ Too many polling failures, extending interval...');
         await this.handlePollingFailures();
       }
     }
@@ -1821,7 +1667,6 @@
       setTimeout(() => {
         this.startPolling();
         this.state.pollingFailureCount = 0;
-        Logger.debug('✅ Polling restarted after failure recovery');
       }, 5000);
     }
 
@@ -1832,17 +1677,12 @@
       // デバウンス：短時間内の連続通知を防ぐ
       const now = Date.now();
       if (this.lastNotificationTime && now - this.lastNotificationTime < 2000) {
-        Logger.debug('🚫 通知デバウンス: 短時間内の連続通知をスキップ');
         return;
       }
       this.lastNotificationTime = now;
 
       // 既に表示されている場合は、新しい数で上書き（累積しない）
       if (!this.elements.newContentBanner.classList.contains('hidden')) {
-        Logger.debug('📱 通知更新: 既存バナーを新しい数で更新', {
-          oldCount: this.state.newContentCount,
-          newCount: newItems,
-        });
         this.state.newContentCount = newItems; // 累積せず上書き
       } else {
         this.state.newContentCount = newItems;
@@ -1868,13 +1708,8 @@
         }
       }, 3000);
 
-      Logger.debug('📢 新着通知表示:', {
-        count: this.state.newContentCount,
-        message: message,
-      });
     }
 
-    // 新着バナーを閉じる
     dismissNewContentBanner() {
       if (!this.elements.newContentBanner) return;
 
@@ -1887,17 +1722,14 @@
     // コンテンツ更新（通知バナーからの呼び出し）
     async refreshContent() {
       try {
-        // まず増分更新を試行
         await this.refreshContentIncremental();
       } catch (error) {
         console.error('コンテンツ更新エラー:', error);
         // 増分更新が失敗した場合はフル更新にフォールバック
-        Logger.debug('🔄 フォールバック: 全体更新を実行');
         await this.refreshContentFull();
       }
     }
 
-    // 増分コンテンツ更新（新しいカードのみ取得・追加）
     async refreshContentIncremental() {
       this.dismissNewContentBanner();
 
@@ -1910,9 +1742,6 @@
           this.elements.refreshContentBtn.disabled = true;
         }
 
-        Logger.debug('🔄 増分リフレッシュ開始 - 基準行数:', this.state.lastSeenCount || 0);
-
-        // 現在のフィルタ設定を取得
         const selectedClass = this.elements.classFilter
           ? this.elements.classFilter.value
           : 'すべて';
@@ -1920,38 +1749,12 @@
         const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
         const adminMode = this.state.showAdminFeatures;
 
-        Logger.debug('📤 増分取得パラメータ:', {
-          originalSelectedClass: selectedClass,
-          processedClassFilter: classFilter,
-        });
-
-        // 増分データを取得
         const incrementalData = await this.gas.getIncrementalSheetData(
           classFilter,
           sortOrder,
           adminMode,
           this.state.lastSeenCount || 0
         );
-
-        Logger.debug('📊 API整合性ログ - 増分データ取得完了:', {
-          endpoint: 'getIncrementalSheetData',
-          requestParams: {
-            classFilter,
-            sortOrder,
-            adminMode,
-            sinceRowCount: this.state.lastSeenCount || 0,
-          },
-          responseStructure: {
-            status: incrementalData.status,
-            newCount: incrementalData.newCount,
-            totalCount: incrementalData.totalCount,
-            hasData: !!incrementalData.data,
-          },
-          contextInfo: {
-            purpose: 'refreshContentIncremental',
-            currentAnswersLength: this.state.currentAnswers?.length || 0,
-          },
-        });
 
         if (incrementalData.status === 'error') {
           throw new Error(incrementalData.message);
@@ -1967,9 +1770,6 @@
           serverNewItems: incrementalData.newCount,
         };
 
-        Logger.debug('📥 Enhanced incremental analysis (Phase 3.2) - 改善版:', preUpdateAnalysis);
-
-        // サーバーベースの一貫性チェック（DOM更新前の最小限チェック）
         const criticalInconsistency = {
           zeroStateWithServerData:
             preUpdateAnalysis.totalCount > 0 &&
@@ -2023,21 +1823,12 @@
         // Third: Clear server cache for consistency across sort orders
         this.gas.clearCache().catch((err) => console.warn('Cache clear failed', err));
 
-        Logger.debug('✅ 増分リフレッシュ完了:', {
-          addedCards: incrementalData.newCount,
-          totalCards: this.state.currentAnswers?.length || 0,
-          newBaseline: this.state.lastSeenCount,
-        });
-
         this.provideFeedback(`${incrementalData.newCount}件の新しい投稿を追加しました`, 'success');
       } catch (error) {
         console.error('増分コンテンツ更新に失敗:', error);
 
-        // エラー時は従来の全体更新にフォールバック
-        Logger.debug('🔄 フォールバック: 全体更新を実行');
         await this.refreshContentFull();
       } finally {
-        // ボタンを元に戻す
         if (this.elements.refreshContentBtn) {
           this.elements.refreshContentBtn.textContent =
             this.elements.refreshContentBtn.textContent.includes('更新中')
@@ -2054,35 +1845,18 @@
         // lastSeenCountを保持（安定化のため）
         const preservedLastSeenCount = this.state.lastSeenCount;
 
-        // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
         this.cache.clear();
-        Logger.debug(
-          '🔄 全体リフレッシュ開始 - キャッシュクリア完了, lastSeenCount保持:',
-          preservedLastSeenCount
-        );
 
         await this.loadSheetData({ bypassCache: true });
 
-        // 手動リフレッシュ後の新着チェック基準更新戦略
         const shouldUpdateLastSeen =
           (this.state.currentAnswers?.length || 0) > preservedLastSeenCount;
 
         if (shouldUpdateLastSeen) {
-          // データが増加している場合のみ更新
           this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
-          Logger.debug('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
-            newLastSeenCount: this.state.lastSeenCount,
-            preservedCount: preservedLastSeenCount,
-            currentAnswersLength: this.state.currentAnswers?.length || 0,
-          });
         } else {
           // データが減少または同じ場合は保持
           this.state.lastSeenCount = preservedLastSeenCount;
-          Logger.debug('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
-            preservedLastSeenCount: preservedLastSeenCount,
-            currentAnswersLength: this.state.currentAnswers?.length || 0,
-            maintainedStability: true,
-          });
         }
 
         this.provideFeedback('更新完了！', 'success');
@@ -2119,10 +1893,6 @@
         }
       }, this.pollingSettings.interval);
 
-      Logger.debug('🔄 新着回答ポーリング開始:', {
-        interval: this.pollingSettings.interval,
-        enabled: this.pollingSettings.enabled,
-      });
     }
 
     // 新着回答のポーリング停止
@@ -2130,11 +1900,9 @@
       if (this.pollingInterval) {
         clearInterval(this.pollingInterval);
         this.pollingInterval = null;
-        Logger.debug('⏹️ 新着回答ポーリング停止');
       }
     }
 
-    // 新着回答の確認
     async checkForNewAnswers() {
       if (this.state.isLoading) return; // 既にロード中の場合は跳ばす
 
@@ -2145,11 +1913,6 @@
         const classFilter = !selectedClass || selectedClass === 'すべて' ? null : selectedClass;
         const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
         const adminMode = this.state.showAdminFeatures;
-
-        Logger.debug('📤 新着確認パラメータ:', {
-          originalSelectedClass: selectedClass,
-          processedClassFilter: classFilter,
-        });
 
         const incrementalData = await this.gas.getIncrementalSheetData(
           classFilter,
@@ -2164,10 +1927,6 @@
 
         // 新着データがある場合
         if (incrementalData.newCount > 0) {
-          Logger.debug('🆕 新着回答検出:', {
-            newCount: incrementalData.newCount,
-            totalCount: incrementalData.totalCount,
-          });
 
           this.state.hasNewContent = true;
           this.state.newContentCount = incrementalData.newCount;
@@ -2188,8 +1947,6 @@
     // 新しいカードを既存のカードコンテナに追加
     async appendNewCards(newData, sortOrder = 'newest') {
       if (!newData || newData.length === 0) return;
-
-      Logger.debug('📌 新しいカードを追加:', newData.length + '件');
 
       const container = this.elements.answersContainer;
       if (!container) return;
@@ -2212,7 +1969,6 @@
           cardElement.style.transform = 'translateY(20px)';
           fragment.appendChild(cardElement);
 
-          // 追加されたカードのIDを記録
           if (data.rowIndex !== undefined) {
             addedCardIds.push(data.rowIndex);
           }
@@ -2286,12 +2042,6 @@
       this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
 
       const adaptivePoll = async () => {
-        Logger.debug('⏰ ポーリング実行:', {
-          currentInterval: this.currentPollInterval,
-          successCount: this.pollSuccessCount,
-          failureCount: this.pollFailureCount,
-          timestamp: new Date().toLocaleTimeString(),
-        });
 
         try {
           await this.checkForNewContentLight();
@@ -2303,10 +2053,6 @@
             this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
           }
 
-          Logger.debug('✅ ポーリング成功:', {
-            successCount: this.pollSuccessCount,
-            nextInterval: this.currentPollInterval,
-          });
         } catch (error) {
           this.pollFailureCount++;
           this.pollSuccessCount = 0;
@@ -2355,10 +2101,6 @@
 
     // メモリ管理とクリーンアップ
 
-
-
-
-
     showWarningMessage(message) {
       // 警告メッセージを表示（既存のshowErrorMessageを参考に）
       const warningDiv = this._createElement('div');
@@ -2380,7 +2122,6 @@
 
       document.body.appendChild(warningDiv);
 
-      // 10秒後に自動削除
       setTimeout(() => {
         if (warningDiv.parentNode) {
           warningDiv.parentNode.removeChild(warningDiv);
@@ -2497,37 +2238,30 @@
     }
     async loadDataImmediate() {
       try {
-        Logger.debug('🚀 AnswerBoardApp: Starting immediate data loading...');
 
-        // 1. ✅ シンプル化：基本的な前提条件のみチェック
         if (!this.elements || !this.elements.answersContainer) {
           console.error('❌ AnswerBoardApp: 基本要素が見つかりません');
           return;
         }
 
         // 2. ✅ シンプル化：管理者確認を非同期で並行実行（メインフローをブロックしない）
-        Logger.debug('🔍 AnswerBoardApp: 管理者確認開始（非同期）...');
         this.verifyAdminAsync().catch((error) => {
           console.warn('⚠️ AnswerBoardApp: 管理者確認失敗、デフォルト権限で継続:', error.message);
         }); // awaitを削除して非ブロッキングに変更
 
         // 3. ✅ シンプル化データ取得：確実に動作する従来方式を優先使用
-        Logger.debug('📊 AnswerBoardApp: シンプル化データ読み込み開始...');
         try {
           // ✅ 確実に動作する従来のloadSheetDataを使用（複雑なバルクAPIは廃止）
-          await this.loadSheetData({ 
-            showLoading: false, 
-            isInitialLoad: true, 
-            bypassCache: true 
+          await this.loadSheetData({
+            showLoading: false,
+            isInitialLoad: true,
+            bypassCache: true
           });
-          
-          Logger.debug('✅ AnswerBoardApp: シンプル化データ読み込み完了');
 
           // 差分カードの復元（シンプル化）
           this.restoreDifferentialCards();
 
           // ポーリング開始（シンプル化）
-          Logger.debug('✅ AnswerBoardApp: ポーリング開始...');
           this.startPolling();
         } catch (error) {
           console.error('❌ AnswerBoardApp: シンプル化データ読み込み失敗:', error);
@@ -2538,17 +2272,14 @@
         if (this.state.isAdminUser) {
           // ✅ 非ブロッキング：メインデータ読み込み完了後に非同期実行
           setTimeout(async () => {
-            Logger.debug('👑 AnswerBoardApp: 管理者用シート読み込み開始（非同期）...');
             try {
               await this.loadAvailableSheets();
-              Logger.debug('✅ 管理者用シート読み込み完了');
             } catch (error) {
               console.warn('⚠️ 管理者用シート読み込み失敗:', error.message);
             }
           }, 1000); // 1秒後に実行
         }
 
-        Logger.debug('✅ AnswerBoardApp: シンプル化初期化完了');
       } catch (error) {
         console.error('❌ AnswerBoardApp: 初期化エラー:', error);
         this.displayInitializationError('初期化エラー: ' + error.message);
@@ -2573,14 +2304,10 @@
       ];
 
       let allValid = true;
-      Logger.debug('🔍 AnswerBoardApp: Validating prerequisites:');
 
       checks.forEach((check) => {
         const isValid = check.required ? !!check.value : true;
         const status = isValid ? '✅' : '❌';
-        Logger.debug(
-          `  ${status} ${check.name}: ${check.required ? 'required' : 'optional'} - ${isValid ? 'OK' : 'MISSING'}`
-        );
 
         if (check.required && !isValid) {
           allValid = false;
@@ -2608,7 +2335,7 @@
       const retryBtn =
         config.buttons === 'both'
           ? `
-          <button onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
+          <button onclick="window.answerBoardApp && window.answerBoardApp.loadSheetData({ bypassCache: true, isInitialLoad: true })"
             class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600">再試行</button>`
           : '';
 
@@ -2620,7 +2347,7 @@
         <h3 class="mt-2 text-lg font-medium text-${config.color}-400">${config.title}</h3>
         <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
-          <button onclick="window.location.reload()" 
+          <button onclick="window.location.reload()"
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
             ページを再読み込み
           </button>${retryBtn}
@@ -2652,7 +2379,6 @@
       document.body.appendChild(errorDiv);
 
       if (isTemporary) {
-        // 5秒後に自動削除
         setTimeout(() => {
           if (errorDiv.parentNode) {
             errorDiv.parentNode.removeChild(errorDiv);
@@ -2708,45 +2434,29 @@
       const container = this.elements.answersContainer;
       if (!container) return;
 
-      // 既存のカードがあるかチェック
       const existingCards = container.querySelectorAll('.answer-card');
       if (existingCards.length > 0) {
-        Logger.debug(
-          'safeDisplayEmptyState: 既存カードが',
-          existingCards.length,
-          '個あるため空状態を表示しません'
-        );
         return; // カードがある場合は空状態を表示しない
       }
 
       // currentAnswersもチェック
       if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
-        Logger.debug(
-          'safeDisplayEmptyState: currentAnswersに',
-          this.state.currentAnswers?.length || 0,
-          '個のアイテムがあるため空状態を表示しません'
-        );
         return; // データがある場合も空状態を表示しない
       }
 
       // ローディング中は表示しない
       if (this.state.isLoading) {
-        Logger.debug('safeDisplayEmptyState: ローディング中のため空状態を表示しません');
         return;
       }
 
-      Logger.debug('safeDisplayEmptyState: 条件を満たしたため空状態を表示します');
       this.displayEmptyState();
     }
 
     async clearAllCardsForEmptyData() {
-      // 真の初回判定: localStorage状態 + DOM状態を確認
       const isFirstTime = this.isFirstTimeBoardAccess();
 
       if (isFirstTime) {
-        Logger.debug('🎯 初回ボードアクセス: 初期化処理を実行します');
       } else {
-        Logger.debug('🗑️ clearAllCardsForEmptyData: 空データ受信のため全カードをクリアします');
       }
 
       // currentAnswersを空にリセット
@@ -2759,17 +2469,7 @@
 
         if (existingCards.length > 0) {
           if (isFirstTime) {
-            Logger.debug(
-              '初回ボード初期化: DOM内の',
-              existingCards.length,
-              '個の要素を初期化します'
-            );
           } else {
-            Logger.debug(
-              'clearAllCardsForEmptyData: DOMから',
-              existingCards.length,
-              '個のカードを削除します'
-            );
           }
 
           // オブザーバーからカードを解除
@@ -2782,12 +2482,10 @@
             }
           });
 
-          // DOMをクリア
           container.innerHTML = '';
 
           // DOM clearing completion wait (Phase 1.3)
           await new Promise((resolve) => requestAnimationFrame(resolve));
-          Logger.debug('✅ DOM清除完了、次のフレームで差分復元準備完了');
         }
       }
 
@@ -2802,7 +2500,6 @@
         };
       }
 
-      Logger.debug('✅', isFirstTime ? '初回初期化完了' : 'clearAllCardsForEmptyData: クリア完了');
     }
 
     async validatePostLoadState() {
@@ -2811,13 +2508,6 @@
 
       const domCards = container.querySelectorAll('.answer-card');
       const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
-
-      Logger.debug(
-        '🔍 validatePostLoadState: DOMカード数:',
-        domCards.length,
-        'currentAnswers数:',
-        dataLength
-      );
 
       // 空データなのにDOMにカードが残っている場合
       if (dataLength === 0 && domCards.length > 0) {
@@ -2830,18 +2520,13 @@
         // 空データのためのクリーンアップを実行
         await this.clearAllCardsForEmptyData();
 
-        // 空状態を表示
         this.displayEmptyState();
 
-        Logger.debug('✅ 状態不整合を修正しました');
       } else if (dataLength !== domCards.length) {
         // 仮想スクロール時は正常な状態なので警告を出さない
         const isVirtualScrollActive = dataLength > RENDER_BATCH_SIZE;
 
         if (isVirtualScrollActive) {
-          Logger.debug(
-            `🌀 仮想スクロールアクティブ: DOM=${domCards.length}, データ=${dataLength} (正常状態)`
-          );
         } else {
           // 通常レンダリングでの不整合のみ警告
           console.warn(
@@ -2851,11 +2536,9 @@
             dataLength
           );
           // 不整合がある場合は再レンダリング
-          Logger.debug('再レンダリングを実行します...');
           this.renderBoard(false, false);
         }
       } else {
-        Logger.debug('✅ 状態検証: DOMとデータの状態が一致しています');
       }
 
       // 設定と表示内容の一致性を検証
@@ -2863,19 +2546,11 @@
     }
 
     validateConfigConsistency() {
-      // フロントエンドの表示している質問文を取得
       const displayedHeader = this.elements.headingLabel
         ? this.elements.headingLabel.textContent
         : '';
 
-      // 現在のデータ数とポーリングで取得したカウントを比較
       const currentDataCount = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
-
-      Logger.debug('🔍 設定一致性検証:', {
-        表示中の質問文: displayedHeader,
-        現在のデータ数: currentDataCount,
-        最新ポーリング結果: this.lastPollingResult || '未実行',
-      });
 
       // ポーリング結果と現在のデータ数の不一致を検出
       if (this.lastPollingResult && this.lastPollingResult.newCount !== currentDataCount) {
@@ -2891,7 +2566,6 @@
     }
 
     async handleDataInconsistency() {
-      Logger.debug('🔄 データ不整合を解決するため詳細分析を開始します...');
 
       try {
         // 1. 現在の状態を詳細に分析
@@ -2941,32 +2615,26 @@
     }
 
     async executeRepairStrategy(type, state) {
-      Logger.debug('🔧 不整合修復戦略:', type, state);
 
       switch (type) {
         case 'phantom_cards_on_init':
-          Logger.debug('👻 初回読み込み時の幽霊カードを修復');
           await this.clearAllCardsForEmptyData();
           await this.loadSheetData({ bypassCache: true });
           break;
 
         case 'empty_state_with_server_data':
-          Logger.debug('📡 サーバーデータ存在時の空状態を修復');
           await this.performServerDataSync();
           break;
 
         case 'dom_state_mismatch':
-          Logger.debug('🔄 DOM-State不整合を修復');
           await this.resyncDOMWithState();
           break;
 
         case 'seen_count_ahead':
-          Logger.debug('📊 lastSeenCount先行問題を修復');
           this.updateLastSeenCount(state.stateDataCount);
           break;
 
         default:
-          Logger.debug('🔄 一般的な不整合修復');
           await this.forceDataRefresh();
       }
     }
@@ -2982,39 +2650,15 @@
     }
 
     async performServerDataSync() {
-      Logger.debug('🔄 サーバーデータ同期開始');
 
-      // 軽量チェックで最新のカウントを取得
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const classFilter = !selectedClass || selectedClass === 'すべて' ? null : selectedClass;
-
-      Logger.debug('📤 軽量チェックパラメータ:', {
-        originalSelectedClass: selectedClass,
-        processedClassFilter: classFilter,
-      });
 
       const countData = await this.gas.getDataCount(
         classFilter,
         'newest',
         this.state.showAdminFeatures
       );
-
-      Logger.debug('📊 API整合性ログ - 軽量チェック完了:', {
-        endpoint: 'getDataCount',
-        requestParams: {
-          classFilter,
-          sortOrder: 'newest',
-          showAdminFeatures: this.state.showAdminFeatures,
-        },
-        responseData: countData,
-        contextInfo: {
-          lastSeenCount: this.state.lastSeenCount,
-          currentAnswersLength: this.state.currentAnswers?.length || 0,
-          purpose: 'performServerDataSync',
-        },
-      });
-
-      Logger.debug('📊 サーバーカウント確認:', countData);
 
       if (countData && countData.count > 0) {
         // サーバーにデータがある場合は強制再読み込み
@@ -3026,7 +2670,6 @@
     }
 
     async resyncDOMWithState() {
-      Logger.debug('🔄 DOM-State再同期開始');
 
       // 現在のstateデータに基づいてDOMを再構築
       if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
@@ -3038,7 +2681,6 @@
     }
 
     async forceDataRefresh() {
-      Logger.debug('🗑️ 強制データリフレッシュ開始...');
 
       // lastSeenCountを保持（安定化のため）
       const preservedLastSeenCount = this.state.lastSeenCount;
@@ -3046,17 +2688,11 @@
       // フロントエンドキャッシュをクリア
       if (this.cache) {
         this.cache.clear();
-        Logger.debug(
-          '✅ フロントエンドキャッシュをクリア, lastSeenCount保持:',
-          preservedLastSeenCount
-        );
       }
 
       // サーバーキャッシュをクリア
       try {
-        // ✅ Phase 3: 統一API呼び出し使用
         await configManager._runGasCall('refreshBoardData');
-        Logger.debug('✅ サーバーキャッシュをクリア');
       } catch (error) {
         console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
       }
@@ -3069,17 +2705,7 @@
         (this.state.currentAnswers?.length || 0) <= preservedLastSeenCount;
       if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
         this.state.lastSeenCount = preservedLastSeenCount;
-        Logger.debug('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
-          preservedCount: preservedLastSeenCount,
-          currentAnswersLength: this.state.currentAnswers?.length || 0,
-          stabilityMaintained: true,
-        });
       } else {
-        Logger.debug('✅ 強制データリフレッシュ完了、新データによりlastSeenCount更新:', {
-          oldCount: preservedLastSeenCount,
-          newCount: this.state.lastSeenCount,
-          currentAnswersLength: this.state.currentAnswers?.length || 0,
-        });
       }
     }
 
@@ -3090,23 +2716,11 @@
      */
     isValidDataResult(result) {
       try {
-        // 基本構造の確認
         if (!result || typeof result !== 'object') {
-          Logger.debug('🔍 データ判定: 結果がオブジェクトではない');
           return false;
         }
 
         // レスポンス構造の詳細ログ
-        Logger.debug('🔍 データ判定: レスポンス構造確認', {
-          hasStatus: 'status' in result,
-          status: result.status,
-          hasData: 'data' in result,
-          dataType: Array.isArray(result.data) ? 'array' : typeof result.data,
-          dataLength: Array.isArray(result.data) ? result.data.length : 'N/A',
-          hasHeader: 'header' in result,
-          hasSheetName: 'sheetName' in result,
-          keys: Object.keys(result),
-        });
 
         // 2つの可能なレスポンス形式に対応
         // 1. 新形式: { status: 'success', data: [...], header: '...', sheetName: '...' }
@@ -3116,34 +2730,20 @@
 
         // ステータス確認（存在する場合のみ）
         if (hasStatusField && result.status !== 'success') {
-          Logger.debug('🔍 データ判定: ステータスが成功ではない -', result.status);
           return false;
         }
 
-        // データ配列の存在確認
         if (!Array.isArray(result.data)) {
-          Logger.debug('🔍 データ判定: dataが配列ではない', typeof result.data);
           return false;
         }
 
-        // ヘッダー情報の確認（任意フィールド）
         if (result.header && typeof result.header !== 'string') {
-          Logger.debug('🔍 データ判定: ヘッダー情報の型が不正', typeof result.header);
           return false;
         }
 
-        // シート名の確認（任意フィールド）
         if (result.sheetName && typeof result.sheetName !== 'string') {
-          Logger.debug('🔍 データ判定: シート名の型が不正', typeof result.sheetName);
           return false;
         }
-
-        Logger.debug('✅ データ判定: 有効なデータ構造 -', {
-          status: result.status || '(no status field)',
-          dataLength: result.data?.length || 0,
-          hasHeader: !!result.header,
-          sheetName: result.sheetName,
-        });
 
         return true;
       } catch (error) {
@@ -3201,7 +2801,6 @@
 
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         try {
-          Logger.debug(`📡 データ取得試行 ${attempt + 1}/${MAX_ATTEMPTS}:`, fetchParams);
 
           // データ取得を Promise で実行
           const result = await new Promise((resolve, reject) => {
@@ -3212,29 +2811,13 @@
               dataCountEstimate > 200 ? 1.5 : dataCountEstimate > 100 ? 1.25 : 1;
             const dynamicTimeout = Math.round(baseTimeout * timeoutMultiplier);
 
-            Logger.debug(
-              `⏱️ 動的タイムアウト設定: ${dynamicTimeout}ms (データ件数: ${dataCountEstimate}, 倍率: ${timeoutMultiplier})`
-            );
-
             const timeout = setTimeout(() => {
               reject(
                 new Error(`データ取得がタイムアウトしました (タイムアウト: ${dynamicTimeout}ms)`)
               );
             }, dynamicTimeout);
 
-            // パラメータ詳細ログ
-            Logger.debug(`📡 GAS API呼び出し直前 (試行 ${attempt + 1}):`, {
-              userId: fetchParams.userId,
-              userIdType: typeof fetchParams.userId,
-              classFilter: fetchParams.classFilter,
-              sortOrder: fetchParams.sortOrder,
-              showAdminFeatures: fetchParams.showAdminFeatures,
-              bypassCache: fetchParams.bypassCache || false,
-              allFetchParams: fetchParams,
-            });
-
-            // ✅ Phase 3: 統一API呼び出し使用
-            configManager._runGasCall('getPublishedSheetData', 
+              configManager._runGasCall('getPublishedSheetData',
               fetchParams.userId,
               fetchParams.classFilter,
               fetchParams.sortOrder,
@@ -3244,11 +2827,6 @@
               fetchParams.bypassCache || false
             ).then((response) => {
                 clearTimeout(timeout);
-                Logger.debug(`✅ GAS API成功レスポンス受信 (試行 ${attempt + 1}):`, {
-                  hasResponse: !!response,
-                  responseType: typeof response,
-                  responseKeys: response ? Object.keys(response) : [],
-                });
                 resolve(response);
               })
               .catch((error) => {
@@ -3263,27 +2841,9 @@
           });
 
           // レスポンスの詳細ログ
-          Logger.debug(`🔍 データ取得レスポンス (試行 ${attempt + 1}):`, {
-            hasResult: !!result,
-            resultType: typeof result,
-            resultKeys: result ? Object.keys(result) : [],
-            hasData: result && 'data' in result,
-            dataType:
-              result && result.data
-                ? Array.isArray(result.data)
-                  ? 'array'
-                  : typeof result.data
-                : 'undefined',
-            dataLength: result && Array.isArray(result.data) ? result.data.length : 'N/A',
-          });
 
           // 成功した場合は結果を返す - 改善された判定条件
           if (result && this.isValidDataResult(result)) {
-            Logger.debug(
-              `✅ データ取得成功 (試行 ${attempt + 1}):`,
-              result.data?.length || 0,
-              '件'
-            );
             return result;
           }
 
@@ -3300,10 +2860,7 @@
 
               // ユーザー情報エラーの場合は診断・修復を試行
               try {
-                Logger.debug('🔧 サーバー側診断・修復を要求中...');
-                // ✅ Phase 3: 統一API呼び出し使用
-                await configManager._runGasCall('performAutoRepair', fetchParams.userId);
-                Logger.debug('✅ サーバー側修復完了、次の試行に進みます');
+                      await configManager._runGasCall('performAutoRepair', fetchParams.userId);
               } catch (repairError) {
                 console.warn('⚠️ サーバー側修復失敗:', repairError);
               }
@@ -3335,7 +2892,6 @@
             timestamp: new Date().toISOString(),
           });
 
-          // 最後の試行で失敗した場合：包括的なエラーレポートを作成
           if (attempt >= MAX_ATTEMPTS - 1) {
             const comprehensiveError = new Error(
               `データ取得に${MAX_ATTEMPTS}回失敗しました。最後のエラー: ${error.message}`
@@ -3360,7 +2916,6 @@
 
           if (isTemporaryError || attempt < MAX_ATTEMPTS - 1) {
             const delay = retryDelays[attempt] || 3000;
-            Logger.debug(`⏳ ${delay}ms 待機後にリトライ...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           } else {
             throw error;
@@ -3427,8 +2982,8 @@
         }
         <p class="mt-2 text-xs text-gray-500">エラー詳細: ${this.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">
-          <button 
-            onclick="window.location.reload()" 
+          <button
+            onclick="window.location.reload()"
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
           >
             ${this.getIcon('x', '-ml-1 mr-2 h-4 w-4')}
@@ -3491,7 +3046,6 @@
 
       // Prevent concurrent loading
       if (this.state.isLoading && config.showLoading) {
-        Logger.debug('loadSheetData: Already loading, skipping...');
         return;
       }
 
@@ -3501,7 +3055,6 @@
           this.showLoadingOverlay();
         }
 
-        Logger.debug('🔍 loadSheetData started:', config);
         const oldAnswers = [...(this.state.currentAnswers || [])];
 
         // Clear caches if needed
@@ -3530,18 +3083,15 @@
     }
 
     async clearDataCaches(isCompleteBypass = false) {
-      Logger.debug('🧹 Clearing data caches...', { isCompleteBypass });
 
       // Clear frontend cache
       if (this.cache) {
         this.cache.clear();
-        Logger.debug('✅ Frontend cache cleared');
       }
 
       // Clear UnifiedCache if available
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
-        Logger.debug('✅ UnifiedCache cleared');
       }
 
       // Clear localStorage cache entries for complete bypass
@@ -3555,7 +3105,6 @@
               key.includes('differentialCards_')
           );
           cacheKeys.forEach((key) => localStorage.removeItem(key));
-          Logger.debug('✅ localStorage cache cleared:', cacheKeys.length, 'keys');
         } catch (error) {
           console.warn('⚠️ Failed to clear localStorage cache:', error);
         }
@@ -3564,7 +3113,6 @@
       // Clear server cache
       try {
         await this.gas.clearCache();
-        Logger.debug('✅ Server cache cleared');
       } catch (error) {
         console.warn('⚠️ Failed to clear server cache:', error);
       }
@@ -3592,7 +3140,6 @@
         this.showMinimalSkeleton();
       }
       try {
-        // classFilter「すべて」または空の場合はサーバーに送信しない（全データ取得のため）
         const classFilter = !selectedClass || selectedClass === 'すべて' ? null : selectedClass;
 
         // データ取得パラメータの詳細ログ
@@ -3605,14 +3152,6 @@
           bypassCache: config.bypassCache || false,
         };
 
-        Logger.debug('📤 データ取得パラメータ:', {
-          ...fetchParams,
-          originalSelectedClass: selectedClass,
-          processedClassFilter: classFilter,
-        });
-        Logger.debug('📡 Starting data fetch with parameters:', fetchParams);
-
-        // エラーハンドリング強化版のデータ取得
         await this.performDataFetchWithRetry(fetchParams, isInitialLoad)
           .then(async (result) => {
             try {
@@ -3659,7 +3198,6 @@
                   try {
                     // 初期データロード時は高速復旧戦略を採用
                     if (isInitialLoad) {
-                      Logger.debug('🚀 初期データロード失敗 - 高速復旧戦略を実行');
 
                       // 軽量チェックでデータ存在を確認
                       const countData = await this.gas.getDataCount(
@@ -3669,9 +3207,6 @@
                       );
 
                       if (countData && countData.count > 0) {
-                        Logger.debug(
-                          `⚡ 軽量チェックで${countData.count}件検出 - 後続ポーリングで復旧予定`
-                        );
                         // 初期データロード失敗フラグを設定してポーリングに委ねる
                         this.hadInitialDataLoadFailure = true;
                         this.state.lastSeenCount = 0;
@@ -3688,16 +3223,6 @@
                       const actual = result?.data ? result.data.length : 0;
                       const lastSeen = this.state.lastSeenCount || 0;
 
-                      Logger.debug('🔍 Enhanced data consistency check (Phase 2.2):', {
-                        expected,
-                        actual,
-                        lastSeen,
-                        fullDataEmpty: actual === 0,
-                        requestedSheet: requestedSheetName,
-                        currentSheet: this.state.currentActiveSheet,
-                        shouldTriggerRefresh: expected > 0 && actual === 0 && expected !== lastSeen,
-                      });
-
                       // Only trigger fallback if there's significant inconsistency
                       // considering user's previously seen count
                       if (expected > 0 && actual === 0 && expected !== lastSeen) {
@@ -3705,13 +3230,11 @@
                           '⚠️ Significant data inconsistency detected!',
                           `Expected: ${expected}, Actual: ${actual}, LastSeen: ${lastSeen}`
                         );
-                        Logger.debug('🔄 Attempting simplified fallback...');
 
                         // 簡素化されたフォールバック（待機時間短縮）
                         await new Promise((resolve) => setTimeout(resolve, 500));
 
-                        // ✅ Phase 3: 統一API呼び出し使用
-                        const retryResult = await configManager._runGasCall('getPublishedSheetData',
+                                      const retryResult = await configManager._runGasCall('getPublishedSheetData',
                               this.state.userId,
                               classFilter,
                               this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',
@@ -3720,11 +3243,6 @@
                             );
 
                         if (retryResult && retryResult.data && retryResult.data.length > 0) {
-                          Logger.debug(
-                            '✅ Fallback retry successful! Got',
-                            retryResult.data.length,
-                            'items'
-                          );
                           result = retryResult; // 成功した結果を使用
                         } else {
                           console.warn('❌ Fallback retry also returned empty data');
@@ -3745,68 +3263,21 @@
                   // 空データ受信時は古いカードを強制的にクリア
                   await this.clearAllCardsForEmptyData();
 
-                  // 空状態を表示
                   this.displayEmptyState();
                   if (isInitialLoad) {
                     this.state.lastSeenCount = 0;
                     // 初期データロード失敗フラグを設定
                     this.hadInitialDataLoadFailure = true;
-                    Logger.debug('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
                   }
                   return;
                 }
               }
 
-              Logger.debug('📊 API整合性ログ - データ受信完了:', {
-                endpoint: 'getPublishedSheetData',
-                requestParams: {
-                  classFilter: fetchParams.classFilter,
-                  sortOrder: fetchParams.sortOrder,
-                  showAdminFeatures: fetchParams.showAdminFeatures,
-                  bypassCache: fetchParams.bypassCache,
-                },
-                responseStructure: {
-                  hasData: !!result.data,
-                  dataLength: result.data?.length || 0,
-                  hasHeader: !!result.header,
-                  status: result.status,
-                },
-                contextInfo: {
-                  isInitialLoad,
-                  lastSeenCount: this.state.lastSeenCount,
-                  currentAnswersLength: this.state.currentAnswers?.length || 0,
-                },
-              });
-
-              Logger.debug('Received data:', result.data);
-
-              // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
-              // Step 1 & 2: Data acquisition and unified state synchronization
               const syncResult = this.synchronizeStateAfterDataUpdate(
                 result.data,
                 'performDataLoad'
               );
-              Logger.debug(
-                '✅ Step 1-2: Data acquisition and state synchronization completed:',
-                syncResult
-              );
 
-              // 取得されたデータの詳細を確認
-              Logger.debug(
-                '取得データ詳細:',
-                (result.data || []).map((item, index) => ({
-                  index: index,
-                  rowIndex: item.rowIndex,
-                  opinion: item.opinion?.substring(0, 50) + '...',
-                  reason: item.reason,
-                  reasonLength: item.reason?.length || 0,
-                  reasonExists: !!item.reason,
-                  reasonTrimmed: item.reason?.trim(),
-                  allKeys: Object.keys(item),
-                }))
-              );
-
-              // サーバーからの質問文と現在表示の一致性をチェック
               if (result.header) {
                 const currentDisplayed = this.elements.headingLabel
                   ? this.elements.headingLabel.textContent
@@ -3835,7 +3306,6 @@
                 opinionHeader: result.header || 'お題',
                 lastUpdated: Date.now(),
               };
-              Logger.debug('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
 
               this.lastDataLoadTime = Date.now();
 
@@ -3849,11 +3319,6 @@
                 '.skeleton, .answer-card.loading'
               );
               if (existingSkeletons.length > 0) {
-                Logger.debug(
-                  '🧹 データ読み込み成功：',
-                  existingSkeletons.length,
-                  '個のスケルトンカードをクリア'
-                );
                 existingSkeletons.forEach((skeleton) => skeleton.remove());
               }
 
@@ -3881,17 +3346,10 @@
                 this.elements.headingLabel.textContent = result.header;
               }
 
-              // Step 3: DOM update with proper sequencing (Phase 2.1)
               requestAnimationFrame(async () => {
-                Logger.debug('✅ Step 3: DOM update starting...');
                 await this.renderBoard(false, isInitialLoad);
-                Logger.debug('✅ Step 3: DOM update completed');
 
-
-                // Step 5: Consistency validation after DOM update (Phase 2.1)
-                Logger.debug('✅ Step 5: Consistency validation starting...');
                 await this.validatePostLoadState();
-                Logger.debug('✅ Step 5: Consistency validation completed');
               });
             } finally {
               // 成功時にローディング状態を解除
@@ -3918,7 +3376,6 @@
                 errorStr.includes('not found')
               ) {
                 // Board has been unpublished, redirect to Unpublished.html
-                Logger.debug('Board appears to be unpublished, redirecting...');
                 this.redirectToUnpublishedPage();
                 return;
               }
@@ -3985,10 +3442,8 @@
         const errorAnalysis = this.analyzeErrorType(error);
         const userMessage = this.generateUserFriendlyErrorMessage(errorAnalysis);
 
-        // スケルトン削除
         this.elements.answersContainer.querySelectorAll('.skeleton').forEach((el) => el.remove());
 
-        // エラー表示UI作成
         this.elements.answersContainer.innerHTML = `
           <div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg border border-red-800/30">
             <div class="mb-4">
@@ -4010,10 +3465,8 @@
           </div>
         `;
 
-        // エラーリトライボタンのイベントリスナー設定
         this.setupErrorRecoveryHandlers(errorAnalysis);
 
-        // エラー統計更新
         this.updateErrorStatistics(errorAnalysis.type);
 
         // 同期エラーの場合にもローディング状態を解除
@@ -4047,7 +3500,6 @@
         severity = 'high';
         recoverable = true;
       }
-      // 認証・権限エラー
       else if (
         errorMessage.includes('unauthorized') ||
         errorMessage.includes('forbidden') ||
@@ -4161,7 +3613,6 @@
             const backoffDelay = Math.min(1000 * Math.pow(2, errorAnalysis.retryAttempts), 10000);
             await new Promise((resolve) => setTimeout(resolve, backoffDelay));
 
-            // データリロード実行
             await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
           } catch (retryError) {
             console.error('❌ Retry failed:', retryError);
@@ -4224,15 +3675,12 @@
           }
         });
 
-        // キャッシュクリア
         if (this.cache) {
           this.cache.clear();
         }
 
-        // エラー統計リセット
         this.resetErrorRetryCount();
 
-        // ページリロード
         window.location.reload();
       } catch (resetError) {
         console.error('❌ App reset failed:', resetError);
@@ -4264,7 +3712,6 @@
         return;
       }
 
-      // シート選択肢を構築
       if (!Array.isArray(sheets)) {
         console.error('Invalid sheets data:', sheets);
         selector.innerHTML = '<option>シートデータが無効です</option>';
@@ -4292,21 +3739,13 @@
 
       // 早期リターン: 無効な選択または同じシート
       if (!selectedSheet || selectedSheet === this.state.currentActiveSheet) {
-        Logger.debug('Sheet switch skipped - same sheet or invalid selection');
         return;
       }
 
       // 現在切り替え中の場合は処理を拒否
       if (this.sheetSwitchInProgress) {
-        Logger.debug('Sheet switch already in progress - ignoring request');
         return;
       }
-
-      Logger.debug('🔄 Starting sheet switch:', {
-        from: this.state.currentActiveSheet,
-        to: selectedSheet,
-        userId: this.state.userId,
-      });
 
       try {
         this.sheetSwitchInProgress = true;
@@ -4320,10 +3759,6 @@
         // 後処理: 状態の確定
         await this.finalizeSheetSwitch(selectedSheet);
 
-        Logger.debug('✅ Sheet switch completed:', {
-          newSheet: selectedSheet,
-          dataCount: this.state.currentAnswers?.length || 0,
-        });
       } catch (error) {
         console.error('❌ Sheet switch failed:', error);
         await this.handleSheetSwitchError(error, selectedSheet);
@@ -4338,7 +3773,6 @@
         throw new Error('User ID is missing - cannot switch sheet');
       }
 
-      // UI状態をリセット
       this.dismissNewContentBanner();
 
       // 仮想スクロール状態をクリア
@@ -4350,7 +3784,6 @@
         this.pollingInterval = null;
       }
 
-      Logger.debug('Sheet switch preparation completed');
     }
 
     async performSheetSwitch(targetSheet) {
@@ -4359,7 +3792,6 @@
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          Logger.debug(`🔄 Loading sheet data (attempt ${attempt}/${maxRetries}):`, targetSheet);
 
           await this.loadSheetData({
             bypassCache: true,
@@ -4367,7 +3799,6 @@
             showLoading: true,
           });
 
-          Logger.debug('✅ Sheet data loaded successfully on attempt', attempt);
           return; // 成功時は早期リターン
         } catch (error) {
           lastError = error;
@@ -4375,7 +3806,6 @@
 
           if (attempt < maxRetries) {
             const delay = attempt * 1000; // 指数バックオフ
-            Logger.debug(`⏳ Retrying in ${delay}ms...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
@@ -4388,21 +3818,17 @@
     }
 
     async finalizeSheetSwitch(targetSheet) {
-      // 状態の確定
       this.state.currentActiveSheet = targetSheet;
       this.state.sheetName = targetSheet;
 
       // 新着通知の基準をリセット
       this.state.lastSeenCount = this.state.currentAnswers?.length || 0;
 
-      // UIの更新
       this.updateSheetSelectorLabels();
       this.updateSheetDisplayName(targetSheet);
 
-      // ポーリングを再開
       this.startPolling();
 
-      Logger.debug('Sheet switch finalization completed');
     }
 
     async handleSheetSwitchError(error, targetSheet) {
@@ -4430,7 +3856,6 @@
         );
       }
 
-      // 現在のデータでUI更新を試行
       try {
         this.renderBoard(false, false);
       } catch (renderError) {
@@ -4495,11 +3920,6 @@
         }
 
         // CLAUDE.md準拠: 包括的null安全性チェック
-        Logger.debug('populateClassFilter: 引数チェック', {
-          rows: rows,
-          isArray: Array.isArray(rows),
-          length: rows ? rows.length : 'N/A',
-        });
 
         // 安全な配列確保とクラス抽出
         const safeRows = Array.isArray(rows) ? rows : [];
@@ -4509,13 +3929,6 @@
           .filter((cls) => cls && typeof cls === 'string' && cls.trim());
 
         const uniqueClasses = ['すべて', ...new Set(classValues)];
-
-        Logger.debug('populateClassFilter: 処理結果', {
-          totalRows: safeRows.length,
-          validRows: validRows.length,
-          classValues: classValues.length,
-          uniqueClasses: uniqueClasses,
-        });
 
         classFilter.innerHTML = uniqueClasses
           .map(
@@ -4575,7 +3988,6 @@
         )
         .map((rt) => rt.key);
 
-      // 背景色クラスを適用
       if (active.length === 1) {
         if (active[0] === 'LIKE') element.classList.add('reaction-bg-like');
         else element.classList.add(`reaction-bg-${active[0].toLowerCase()}`);
@@ -4591,7 +4003,6 @@
         element.classList.add('reaction-bg-like-understand-curious');
       }
 
-      // ボーダー幅を適用
       const totalReactions = this.reactionTypes.reduce(
         (sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0),
         0
@@ -4613,12 +4024,10 @@
 
         // 空データの場合の早期処理
         if (!newRows || newRows.length === 0) {
-          Logger.debug('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
           await this.renderEmptyState();
           return;
         }
 
-        // 管理者ハイライト設定の初期化
         this.initializeAdminSettings();
 
         // レンダリング前の状態準備
@@ -4627,7 +4036,6 @@
         // メインレンダリング処理
         this.performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad);
 
-        // レンダリング後の状態更新
         this.finalizeRenderingState();
         this.validatePostLoadState();
       } catch (error) {
@@ -4698,13 +4106,11 @@
     performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
       const container = this.elements.answersContainer;
 
-      // DOMクリア前に既存カードのマップを作成
       const existingMap = new Map();
       container.querySelectorAll('.answer-card').forEach((card) => {
         existingMap.set(card.dataset.rowIndex, card);
       });
 
-      // 不要なカードを削除
       existingMap.forEach((card, id) => {
         if (!newRows.some((r) => String(r.rowIndex) === id)) {
           card.remove();
@@ -4770,9 +4176,6 @@
           container.getBoundingClientRect().height ||
           window.innerHeight ||
           800;
-        Logger.debug(
-          `🔧 containerHeight修復: ${containerHeight}px (元値: ${container.clientHeight}px)`
-        );
       }
 
       let startIndex = 0;
@@ -4825,7 +4228,6 @@
         this.clearVirtualScrollingState();
       }
 
-      // 🚀 Phase1最適化: 仮想スクロール状態の適切な初期化
       if (!this.virtualScrollState) {
         this.virtualScrollState = {
           totalItems: newRows.length,
@@ -4877,11 +4279,6 @@
           this.showVirtualScrollInfo(visibleRows.length, newRows.length);
         });
 
-        Logger.info('✅ Virtual scroll初期化完了:', {
-          rendered: renderedCount,
-          totalRendered: this.virtualScrollState.renderedItems,
-          totalItems: this.virtualScrollState.totalItems,
-        });
       }
     }
 
@@ -4907,7 +4304,6 @@
 
       document.body.appendChild(info);
 
-      // 3秒後に自動消去
       setTimeout(() => {
         if (info.parentNode) {
           info.remove();
@@ -4929,7 +4325,6 @@
     }
 
     finalizeRenderingState() {
-      // レンダリング完了後の状態更新
       this.updateAnswerCount();
       this.applyAnimations();
     }
@@ -5014,7 +4409,6 @@
       const reactionContainer = card.querySelector('.reaction-container');
       if (!reactionContainer) return;
 
-      // DOM操作をバッチ化
       const updates = [];
 
       this.reactionTypes.forEach((reactionType) => {
@@ -5051,20 +4445,17 @@
 
             buttons.forEach((btn) => {
               if (!updatedElements.has(btn)) {
-                // カウント表示更新
                 const countEl = btn.querySelector('.reaction-count');
                 if (countEl && this.state.showCounts) {
                   countEl.textContent = update.count;
                 }
 
-                // アイコン更新
                 const rt = this.reactionTypes.find((r) => r.key === update.reaction);
                 const svgEl = btn.querySelector('svg');
                 if (svgEl && rt) {
                   svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
                 }
 
-                // スタイル更新
                 const colorClass =
                   update.reaction === 'LIKE'
                     ? 'text-red-500'
@@ -5076,7 +4467,6 @@
                 btn.classList.toggle('liked', update.reacted);
                 btn.setAttribute('aria-pressed', update.reacted.toString());
 
-                // 表示/非表示
                 btn.style.display = update.shouldDisplay ? 'flex' : 'none';
 
                 // aria-label更新
@@ -5090,7 +4480,6 @@
             });
           });
 
-          // 完了コールバック実行
           if (onComplete) {
             onComplete(updatedElements);
           }
@@ -5111,7 +4500,6 @@
     }
 
     updateCardReactionBackground(card, data) {
-      // リアクションに基づいてカードの背景とボーダーを更新
       this.applyReactionStyles(card, data);
     }
 
@@ -5181,12 +4569,6 @@
 
         // Ensure required properties exist with safe defaults（理由列の堅牢化）
         // 理由データのデバッグログ追加
-        Logger.debug('🔍 createAnswerCard: 理由データ検証', {
-          originalReason: data.reason,
-          reasonType: typeof data.reason,
-          reasonLength: data.reason?.length,
-          dataKeys: Object.keys(data),
-        });
 
         const safeData = {
           rowIndex: data.rowIndex || 0,
@@ -5332,7 +4714,6 @@
         opinionTitle.className =
           'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
 
-        // テキスト設定の強化
         try {
           opinionTitle.textContent = safeData.opinion || '(回答データが見つかりません)';
         } catch (opinionError) {
@@ -5353,27 +4734,17 @@
         contentDiv.appendChild(opinionTitle);
 
         // 理由テキストの表示処理（デバッグ強化版）
-        Logger.debug('🔍 理由テキスト表示判定:', {
-          reasonExists: !!safeData.reason,
-          reasonTrimmed: safeData.reason?.trim(),
-          reasonLength: safeData.reason?.length,
-          willShow: !!(safeData.reason && safeData.reason.trim()),
-        });
 
         if (safeData.reason && safeData.reason.trim()) {
-          Logger.debug('✅ 理由テキストを追加します:', safeData.reason);
           try {
             // 理由テキストの有効性を検証
             if (reasonText && reasonText.textContent === safeData.reason) {
               contentDiv.appendChild(reasonText);
-              Logger.debug('✅ 理由テキスト追加完了（既存要素使用）');
             } else {
-              // 理由テキスト要素の再作成が必要な場合
               const newReasonText = document.createElement('p');
               newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
               newReasonText.textContent = safeData.reason;
               contentDiv.appendChild(newReasonText);
-              Logger.debug('✅ 理由テキスト追加完了（新規要素作成）');
             }
           } catch (reasonError) {
             // 理由テキスト追加でエラーが発生した場合の回復処理
@@ -5386,7 +4757,6 @@
               fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
               fallbackReasonText.textContent = safeData.reason;
               contentDiv.appendChild(fallbackReasonText);
-              Logger.debug('✅ 理由テキスト追加完了（フォールバック）');
             } catch (fallbackError) {
               console.error(
                 'createAnswerCard: Failed to add reason text even with fallback:',
@@ -5396,14 +4766,12 @@
             }
           }
         } else {
-          Logger.debug('❌ 理由テキストが空のため追加をスキップ');
         }
 
         // Create footer div
         const footerDiv = this._createElement('div');
         footerDiv.className = containerClass;
 
-        // 名前表示部分を追加
         if (nameHtml) {
           try {
             const nameContainer = this._createElement('div');
@@ -5495,7 +4863,6 @@
       const lastOperation = this.lastReactionTimes?.get(reactionKey);
       if (lastOperation && now - lastOperation < 1000) {
         // 1秒以内の重複操作を防ぐ
-        Logger.debug(`⚡ 重複操作スキップ: ${reactionKey}`);
         return;
       }
 
@@ -5510,7 +4877,6 @@
       if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
       this.lastReactionTimes.set(reactionKey, now);
 
-
       // 既存のキュー処理を開始（既存機能を保持）
       this.processReactionQueue();
     }
@@ -5521,7 +4887,6 @@
 
       try {
 
-        // 個別処理システム
         while (this.reactionQueue.size > 0) {
           const [reactionKey, operation] = this.reactionQueue.entries().next().value;
           this.reactionQueue.delete(reactionKey);
@@ -5551,12 +4916,6 @@
           throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
 
-        Logger.debug('📡 リアクション送信 (Server-first):', {
-          rowIndex,
-          reaction,
-          sheetName: this.state.sheetName,
-        });
-
         // Server-first approach: サーバーに送信してから結果を適用
         const response = await this.sendReactionToServer(rowIndex, reaction);
         await this.processReactionResponse(item, response, reaction);
@@ -5564,15 +4923,11 @@
         // UI更新（サーバー応答後のみ）
         await this.updateReactionUI(item, false);
 
-        Logger.debug('✅ リアクション処理完了:', reactionKey);
-
-        // 処理完了を通知
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
       } catch (error) {
         console.error('❌ リアクション処理エラー:', error);
         await this.handleReactionError(error, rowIndex, reaction);
 
-        // エラー完了を通知
         this.notifyReactionComplete(reactionKey, {
           rowIndex,
           reaction,
@@ -5600,7 +4955,6 @@
             console.error('❌ リアクション完了リスナーエラー:', error);
           }
         });
-        // 一度実行したら削除
         this.reactionEventListeners.delete(reactionKey);
       }
     }
@@ -5691,7 +5045,6 @@
       const reactionKey = `${rowIndex}-${reaction}`;
 
       try {
-        // 完了通知システムのみを使用（シンプルで信頼性が高い）
         const result = await this.waitForReactionComplete(reactionKey, maxWaitMs);
         return result || { timeout: false, success: true };
       } catch (error) {
@@ -5723,9 +5076,6 @@
       };
     }
 
-
-
-
     setReactionButtonsLoading(buttons, isLoading) {
       buttons.forEach((btn) => {
         btn.disabled = isLoading;
@@ -5752,7 +5102,6 @@
     }
 
     async processReactionResponse(item, response, reaction) {
-      Logger.debug('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
 
       // サーバー状態を絶対的に適用（楽観的更新なし）
       if (response.reactions && typeof response.reactions === 'object') {
@@ -5760,25 +5109,15 @@
         const serverState = response.reactions;
         item.reactions = JSON.parse(JSON.stringify(serverState));
 
-        Logger.debug('✅ サーバー状態適用完了:', {
-          rowIndex: item.rowIndex,
-          reaction,
-          serverState: item.reactions,
-        });
       } else {
         console.warn('⚠️ 期待されたリアクション形式ではありません:', response);
         // フォールバック処理（サーバー応答が不正な場合のみ）
         this.applyFallbackReactionUpdate(item, reaction);
-        Logger.debug('🔄 フォールバック処理実行:', item.reactions);
       }
 
       // ローカルストレージに保存（サーバー状態を保存）
       this.saveReactionState(item.rowIndex, item.reactions);
 
-      Logger.debug('🎯 サーバー応答処理完了:', {
-        rowIndex: item.rowIndex,
-        finalState: item.reactions,
-      });
     }
 
     // リアクション状態整合性検証
@@ -5822,7 +5161,6 @@
         // 不整合を記録（デバッグ用）
         this.recordReactionInconsistency(rowIndex, inconsistencies);
       } else {
-        Logger.debug('✅ リアクション状態整合性確認:', { rowIndex });
       }
 
       return inconsistencies;
@@ -5840,7 +5178,6 @@
         inconsistencies,
       });
 
-      // 最新10件のみ保持
       if (this.reactionInconsistencies.length > 10) {
         this.reactionInconsistencies.shift();
       }
@@ -5882,7 +5219,6 @@
       }
 
       try {
-        // カードのUI更新（同期実行）
         this.updateCardIfExists(rowIndex, item);
 
         // モーダルが開いている場合はそちらも更新
@@ -5895,24 +5231,20 @@
           }
         }
 
-        Logger.debug('⚡ 即座UI更新完了:', { rowIndex, reaction });
       } catch (error) {
         console.error('❌ 即座UI更新エラー:', error);
       }
     }
 
     async updateReactionUI(item, immediate = false) {
-      // パフォーマンス最適化: 変更が必要な場合のみ更新
       const lastUpdateKey = `ui_update_${item.rowIndex}`;
       const currentStateHash = this.calculateStateHash(item);
       const lastStateHash = this.lastUIStates?.get(lastUpdateKey);
 
       if (lastStateHash === currentStateHash && !immediate) {
-        Logger.debug(`⚡ UI更新スキップ (変更なし): rowIndex=${item.rowIndex}`);
         return;
       }
 
-      // 状態ハッシュを記録
       if (!this.lastUIStates) this.lastUIStates = new Map();
       this.lastUIStates.set(lastUpdateKey, currentStateHash);
 
@@ -5932,10 +5264,6 @@
             }
           }
 
-          Logger.debug('⚡ リアクションUI即座更新完了:', {
-            rowIndex: item.rowIndex,
-            reactions: item.reactions,
-          });
         } catch (error) {
           console.error('❌ UI即座更新エラー:', error);
         }
@@ -5946,7 +5274,6 @@
       return new Promise((resolve) => {
         requestAnimationFrame(() => {
           try {
-            // カードのリアクション表示を更新
             if (!this.updateCardIfExists(item.rowIndex, item)) {
               console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
             }
@@ -5962,10 +5289,6 @@
               }
             }
 
-            Logger.debug('✅ リアクションUI更新完了:', {
-              rowIndex: item.rowIndex,
-              reactions: item.reactions,
-            });
             resolve();
           } catch (error) {
             console.error('UI更新エラー:', error);
@@ -5988,7 +5311,6 @@
         const stored = localStorage.getItem(key);
         const count = stored ? parseInt(stored, 10) : 0;
 
-        Logger.debug('📥 lastSeenCount復元:', { key, count });
         return isNaN(count) ? 0 : count;
       } catch (error) {
         console.warn('⚠️ lastSeenCount読み込みエラー:', error);
@@ -5999,29 +5321,16 @@
     // 真の初回ボードアクセス判定
     isFirstTimeBoardAccess() {
       try {
-        // 1. lastSeenCountの存在確認
         const hasLastSeen = localStorage.getItem(this.getScopedKey('lastSeenCount')) !== null;
 
-        // 2. 差分カードの存在確認
         const hasDiffCards = localStorage.getItem(this.getScopedKey('differentialCards')) !== null;
 
-        // 3. 初期データロード状態の確認
         const hasInitialLoad = this.initialDataLoaded === true;
 
-        // 4. DOM内の既存カード確認
         const container = this.elements?.answersContainer;
         const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
 
-        // 真の初回判定: すべてが未設定/初期状態の場合
         const isFirstTime = !hasLastSeen && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
-
-        Logger.debug('🔍 初回判定結果:', {
-          hasLastSeen,
-          hasDiffCards,
-          hasInitialLoad,
-          hasDOMCards,
-          isFirstTime,
-        });
 
         return isFirstTime;
       } catch (error) {
@@ -6036,7 +5345,6 @@
         const key = this.getScopedKey('lastSeenCount');
         localStorage.setItem(key, count.toString());
 
-        Logger.debug('💾 lastSeenCount保存:', { key, count });
       } catch (error) {
         console.warn('⚠️ lastSeenCount保存エラー:', error);
       }
@@ -6048,11 +5356,6 @@
         this.state.lastSeenCount = newCount;
         this.saveLastSeenCount(newCount);
 
-        Logger.debug('📊 lastSeenCount更新:', {
-          oldCount,
-          newCount,
-          timestamp: new Date().toISOString(),
-        });
       }
     }
 
@@ -6063,7 +5366,6 @@
         const stored = localStorage.getItem(key);
         const cards = stored ? JSON.parse(stored) : [];
 
-        Logger.debug('📥 差分カード復元:', { key, count: cards.length });
         return Array.isArray(cards) ? cards : [];
       } catch (error) {
         console.warn('⚠️ 差分カード読み込みエラー:', error);
@@ -6078,7 +5380,6 @@
         const merged = [...new Set([...existing, ...cardIds])];
         localStorage.setItem(key, JSON.stringify(merged));
 
-        Logger.debug('💾 差分カード保存:', { key, count: merged.length, new: cardIds.length });
       } catch (error) {
         console.warn('⚠️ 差分カード保存エラー:', error);
       }
@@ -6088,7 +5389,6 @@
       try {
         const key = this.getScopedKey('differentialCards');
         localStorage.removeItem(key);
-        Logger.debug('🗑️ 差分カードクリア:', { key });
       } catch (error) {
         console.warn('⚠️ 差分カードクリアエラー:', error);
       }
@@ -6098,8 +5398,6 @@
     restoreDifferentialCards() {
       const differentialCardIds = this.loadDifferentialCards();
       if (differentialCardIds.length === 0) return;
-
-      Logger.debug('🔄 差分カード復元開始:', differentialCardIds.length + '件');
 
       const container = this.elements.answersContainer;
       if (!container) return;
@@ -6114,11 +5412,9 @@
           card.setAttribute('data-differential-card', 'true');
           card.setAttribute('data-restored', 'true');
           restoredCount++;
-          Logger.debug('📌 差分カード復元:', rowIndex);
         }
       });
 
-      Logger.debug('✅ 差分カード復元完了:', restoredCount + '件');
     }
 
     async handleReactionError(error, rowIndex, reaction) {
@@ -6142,14 +5438,11 @@
     showErrorFeedback(btn, message) {
       if (!btn) return;
 
-      // 元のクラスを保存
       const originalClasses = btn.className;
 
-      // エラー表示
       btn.classList.add('bg-red-500');
       btn.title = message;
 
-      // 2秒後に元に戻す
       setTimeout(() => {
         btn.className = originalClasses;
         btn.title = '';
@@ -6158,8 +5451,6 @@
 
     async handleHighlight(rowIndex) {
       // Highlight processing started
-
-      // バックエンド側で管理者権限をチェックするので、フロントエンド側のチェックは不要
 
       const numericRowIndex = parseInt(rowIndex, 10);
       const highlightKey = `${numericRowIndex}-highlight`;
@@ -6207,7 +5498,6 @@
         const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
 
         if (res && res.status === 'ok') {
-          // ★修正ポイント③：サーバーからの応答成功後に、UIを完全に更新する
           item.highlight = res.highlight;
           requestAnimationFrame(() => this.applyUpdates([item])); // 次の描画フレームで安全にUIを更新
 
@@ -6221,7 +5511,6 @@
             }
           }
 
-          // ハイライト操作後の状態同期確認（遅延実行）
           setTimeout(() => {
             this.verifyHighlightSync(numericRowIndex, res.highlight);
           }, 1000);
@@ -6254,7 +5543,6 @@
         const item = this.state.currentAnswers?.find((i) => i.rowIndex == rowIndex);
         if (!item) return;
 
-        // UI状態とサーバー応答の一致確認
         if (item.highlight !== expectedHighlight) {
           console.warn(
             `⚠️ ハイライト状態不整合検出: rowIndex=${rowIndex}, UI=${item.highlight}, Expected=${expectedHighlight}`
@@ -6264,9 +5552,7 @@
           item.highlight = expectedHighlight;
           requestAnimationFrame(() => this.applyUpdates([item]));
 
-          Logger.debug('✅ ハイライト状態を修正しました');
         } else {
-          Logger.debug('✅ ハイライト状態同期確認: 正常');
         }
       } catch (error) {
         console.error('ハイライト状態同期確認エラー:', error);
@@ -6275,7 +5561,6 @@
 
     // 包括的同期状態監視システム
     async performSyncHealthCheck() {
-      Logger.debug('🔍 同期状態ヘルスチェック開始');
       const issues = [];
 
       try {
@@ -6292,7 +5577,6 @@
           });
         }
 
-        // 2. 保留中のリアクション確認
         if (this.pendingReactions.size > 0) {
           issues.push({
             type: 'pending_reactions',
@@ -6302,7 +5586,6 @@
           });
         }
 
-        // 3. UI状態とデータ状態の整合性チェック
         const uiButtons = document.querySelectorAll('.reaction-btn, .highlight-btn');
         const inconsistentButtons = [];
 
@@ -6373,9 +5656,7 @@
           }
         }
 
-        // 5. 結果出力
         if (issues.length === 0) {
-          Logger.debug('✅ 同期状態ヘルスチェック: 問題なし');
           return { status: 'healthy', issues: [] };
         } else {
           console.warn('⚠️ 同期状態ヘルスチェック: 問題検出', issues);
@@ -6391,7 +5672,6 @@
       }
     }
 
-    // 不整合の自動修復
     async fixSyncIssues(healthCheckResult) {
       if (!healthCheckResult.issues || healthCheckResult.issues.length === 0) {
         return { fixed: 0, skipped: 0 };
@@ -6418,13 +5698,11 @@
 
             case 'data_staleness':
               // データを強制リフレッシュ
-              Logger.debug('🔄 古いデータを検出、強制リフレッシュ実行');
               await this.forceDataRefresh();
               fixed++;
               break;
 
             case 'cache_bloat':
-              // キャッシュクリア
               if (this.cache && typeof this.cache.clear === 'function') {
                 this.cache.clear();
                 fixed++;
@@ -6441,7 +5719,6 @@
         }
       }
 
-      Logger.debug(`🔧 自動修復完了: ${fixed}件修復, ${skipped}件スキップ`);
       return { fixed, skipped };
     }
 
@@ -6465,7 +5742,6 @@
               );
 
               if (criticalIssues.length > 0) {
-                Logger.debug('🔧 重要な同期問題を検出、自動修復を実行');
                 await this.fixSyncIssues({ issues: criticalIssues });
               }
             }
@@ -6476,15 +5752,12 @@
         5 * 60 * 1000
       ); // 5分間隔
 
-      Logger.debug('✅ 同期状態監視を開始しました（5分間隔）');
     }
 
-    // 同期監視の停止
     stopSyncMonitoring() {
       if (this.syncMonitoringInterval) {
         clearInterval(this.syncMonitoringInterval);
         this.syncMonitoringInterval = null;
-        Logger.debug('🛑 同期状態監視を停止しました');
       }
     }
 
@@ -6499,7 +5772,6 @@
 
     // バッチ処理パフォーマンステスト（開発・デバッグ用）
     async testBatchPerformance() {
-      Logger.debug('🧪 バッチ処理パフォーマンステスト開始');
 
       const testResults = {
         batchTest: null,
@@ -6508,7 +5780,6 @@
       };
 
       try {
-        // テスト用の模擬リアクション操作データ
         const testOperations = [];
         const testRowCount = Math.min(this.state.currentAnswers?.length || 0, 5); // 最大5行でテスト
 
@@ -6528,10 +5799,7 @@
           return { error: 'テスト用データが不足' };
         }
 
-        Logger.debug(`📊 ${testOperations.length}件の操作でテスト実行`);
-
         // 1. バッチ処理のテスト
-        Logger.debug('🔄 バッチ処理テスト開始');
         const batchStartTime = performance.now();
 
         try {
@@ -6543,14 +5811,12 @@
             avgTimePerOp: (batchEndTime - batchStartTime) / testOperations.length,
           };
 
-          Logger.debug('✅ バッチ処理テスト完了:', testResults.batchTest);
         } catch (error) {
           console.error('❌ バッチ処理テストエラー:', error);
           testResults.batchTest = { error: error.message };
         }
 
         // 2. 個別処理のテスト（シミュレーション）
-        Logger.debug('🔄 個別処理テスト開始');
         const individualStartTime = performance.now();
 
         try {
@@ -6569,7 +5835,6 @@
             avgTimePerOp: (individualEndTime - individualStartTime) / testOperations.length,
           };
 
-          Logger.debug('✅ 個別処理テスト完了:', testResults.individualTest);
         } catch (error) {
           console.error('❌ 個別処理テストエラー:', error);
           testResults.individualTest = { error: error.message };
@@ -6600,7 +5865,6 @@
                   : '同程度',
           };
 
-          Logger.debug('📈 パフォーマンス比較結果:', testResults.comparison);
         }
 
         // 4. メモリ使用量チェック（概算）
@@ -6613,7 +5877,6 @@
 
         testResults.memoryUsage = memoryInfo;
 
-        Logger.debug('🧪 バッチ処理パフォーマンステスト完了', testResults);
         return testResults;
       } catch (error) {
         console.error('❌ バッチ処理テストエラー:', error);
@@ -6621,33 +5884,25 @@
       }
     }
 
-    // バッチ処理の健全性チェック
     validateBatchSystem() {
-      Logger.debug('🔍 バッチ処理システム健全性チェック');
 
       const issues = [];
 
-
-      // 1. 個別キューの状態確認
       if (!this.reactionQueue) {
         issues.push('リアクションキューが初期化されていません');
       } else if (this.reactionQueue.size > 50) {
         issues.push(`リアクションキューサイズが大きすぎます: ${this.reactionQueue.size}`);
       }
 
-      // 3. 処理状態の確認
       if (this.isProcessingReactionQueue && this.batchProcessingActive) {
         issues.push('個別処理とバッチ処理が同時に動作中です');
       }
 
-      // 4. 設定の確認
       if (this.enableBatchProcessing === undefined) {
         issues.push('バッチ処理設定が未定義です');
       }
 
-      // 5. 結果
       if (issues.length === 0) {
-        Logger.debug('✅ バッチ処理システム健全性: 正常');
         return { status: 'healthy', issues: [] };
       } else {
         console.warn('⚠️ バッチ処理システム健全性: 問題検出', issues);
@@ -6657,7 +5912,6 @@
 
     // 通知システムのエッジケーステスト（開発・デバッグ用）
     async testNotificationEdgeCases() {
-      Logger.debug('🧪 通知システムエッジケーステスト開始');
 
       const testResults = {
         tests: [],
@@ -6665,27 +5919,18 @@
       };
 
       try {
-        // テスト1: 初期データロード失敗後の通知
-        Logger.debug('📋 テスト1: 初期データロード失敗→ポーリング成功シナリオ');
         const test1 = await this.testInitialLoadFailureNotification();
         testResults.tests.push(test1);
 
-        // テスト2: 通知バナー要素の存在確認
-        Logger.debug('📋 テスト2: 通知バナー要素の存在確認');
         const test2 = this.testNotificationBannerElements();
         testResults.tests.push(test2);
 
-        // テスト3: 通知条件のロジック確認
-        Logger.debug('📋 テスト3: 通知条件ロジックの確認');
         const test3 = this.testNotificationLogic();
         testResults.tests.push(test3);
 
-        // テスト4: デバウンス機能の確認
-        Logger.debug('📋 テスト4: 通知デバウンス機能の確認');
         const test4 = await this.testNotificationDebounce();
         testResults.tests.push(test4);
 
-        // 結果集計
         testResults.tests.forEach((test) => {
           testResults.summary.total++;
           if (test.passed) {
@@ -6695,7 +5940,6 @@
           }
         });
 
-        Logger.debug('✅ 通知システムエッジケーステスト完了:', testResults.summary);
         return testResults;
       } catch (error) {
         console.error('❌ 通知システムテストエラー:', error);
@@ -6706,39 +5950,27 @@
     async testInitialLoadFailureNotification() {
       const testName = '初期データロード失敗後の通知';
       try {
-        // 現在の状態を保存
         const originalInitialDataLoaded = this.initialDataLoaded;
         const originalHadInitialDataLoadFailure = this.hadInitialDataLoadFailure;
         const originalLastSeenCount = this.state.lastSeenCount;
 
-        // テスト状態を設定
         this.initialDataLoaded = false;
         this.hadInitialDataLoadFailure = true;
         this.state.lastSeenCount = 0;
 
-        Logger.debug('🔧 テスト状態設定:', {
-          initialDataLoaded: this.initialDataLoaded,
-          hadInitialDataLoadFailure: this.hadInitialDataLoadFailure,
-          lastSeenCount: this.state.lastSeenCount,
-        });
-
-        // モック通知関数
         let notificationShown = false;
         const originalShowNewContentBanner = this.showNewContentBanner;
         this.showNewContentBanner = (newItems) => {
           notificationShown = true;
-          Logger.debug('🎯 テスト中：通知が表示されました -', newItems, '件');
           return originalShowNewContentBanner.call(this, newItems);
         };
 
         // 模擬的な handleInitialContentLoad 呼び出し
         await this.handleInitialContentLoad('すべて-newest', 1);
 
-        // 結果検証
         const passed =
           notificationShown && this.state.lastSeenCount === 1 && !this.hadInitialDataLoadFailure;
 
-        // 状態を復元
         this.initialDataLoaded = originalInitialDataLoaded;
         this.hadInitialDataLoadFailure = originalHadInitialDataLoadFailure;
         this.state.lastSeenCount = originalLastSeenCount;
@@ -6840,11 +6072,9 @@
 
         this.showNewContentBanner = (newItems) => {
           notificationCount++;
-          Logger.debug('🎯 デバウンステスト：通知回数 =', notificationCount);
           return originalShowNewContentBanner.call(this, newItems);
         };
 
-        // 最初の通知
         this.lastNotificationTime = null;
         await this.checkForNewItems(1);
         const firstNotificationCount = notificationCount;
@@ -6859,7 +6089,6 @@
         await this.checkForNewItems(3);
         const thirdNotificationCount = notificationCount;
 
-        // 復元
         this.showNewContentBanner = originalShowNewContentBanner;
         this.lastNotificationTime = originalLastNotificationTime;
 
@@ -6884,13 +6113,10 @@
       }
     }
 
-    // 通知システムの健全性チェック
     validateNotificationSystem() {
-      Logger.debug('🔍 通知システム健全性チェック');
 
       const issues = [];
 
-      // 1. 通知バナー要素の存在確認
       if (!this.elements.newContentBanner) {
         issues.push('newContentBanner要素が見つかりません');
       }
@@ -6901,7 +6127,6 @@
         issues.push('refreshContentBtn要素が見つかりません');
       }
 
-      // 2. 初期化状態の確認
       if (this.initialDataLoaded === undefined) {
         issues.push('initialDataLoaded状態が未定義です');
       }
@@ -6909,19 +6134,15 @@
         issues.push('hadInitialDataLoadFailure状態が未定義です');
       }
 
-      // 3. 通知状態の確認
       if (this.state.lastSeenCount === undefined) {
         issues.push('lastSeenCount状態が未定義です');
       }
 
-      // 4. ポーリング状態の確認
       if (!this.pollingSettings || this.pollingSettings.enabled === undefined) {
         issues.push('ポーリング設定が不正です');
       }
 
-      // 5. 結果
       if (issues.length === 0) {
-        Logger.debug('✅ 通知システム健全性: 正常');
         return { status: 'healthy', issues: [] };
       } else {
         console.warn('⚠️ 通知システム健全性: 問題検出', issues);
@@ -6938,20 +6159,17 @@
       try {
         const enable = !this.state.showAdminFeatures;
 
-        // 管理者権限チェック
         if (enable) {
           if (!this.state.isAdminUser || !window.hasAdminCapability) {
             console.warn('管理者権限がありません。');
             return;
           }
 
-          // 管理モード移行時の確認モーダル
           const confirmed = await this.showAdminModeConfirmation();
           if (!confirmed) {
             return; // ユーザーがキャンセルした場合
           }
 
-          // 最初の管理モード切り替え時のみサーバー側で再確認（オプション）
           if (!this.adminModeVerified) {
             try {
               const ok = await this.gas.checkAdmin();
@@ -6978,39 +6196,35 @@
           showHighlightToggle: window.showHighlightToggle,
         });
         if (enable) {
-          // ✅ Phase 5: 管理モード時のconfigManager統一化
           const adminSettings = {
             showCounts: true,
             displayMode: 'named',
             isStudentMode: false,
             showScoreSort: true
           };
-          
-          // configManagerとwindowの両方を更新
+
           if (configManager.config) {
             Object.assign(configManager.config, adminSettings);
           }
           Object.assign(window, adminSettings);
-          
+
           Logger.perf('管理モード有効化: 名前とリアクション数を強制表示', {
             showCounts: adminSettings.showCounts,
             displayMode: adminSettings.displayMode,
           });
         } else {
-          // ✅ Phase 5: 閲覧モード時のconfigManager統一化
           const studentSettings = {
             showCounts: this.serverShowCounts,
             displayMode: this.serverDisplayMode,
             isStudentMode: true,
             showScoreSort: this.serverShowCounts
           };
-          
-          // configManagerとwindowの両方を更新
+
           if (configManager.config) {
             Object.assign(configManager.config, studentSettings);
           }
           Object.assign(window, studentSettings);
-          
+
           Logger.perf('閲覧モード有効化: サーバー設定を復元', {
             showCounts: studentSettings.showCounts,
             displayMode: studentSettings.displayMode,
@@ -7019,7 +6233,6 @@
           });
         }
 
-        // ✅ Phase 5: ローカル状態もconfigManagerから統一取得
         if (enable) {
           this.state.displayMode = configManager.config?.displayMode || 'named';
           this.state.showCounts = configManager.config?.showCounts ?? true;
@@ -7039,7 +6252,6 @@
           this.state.showCounts = true;
         }
 
-        // 管理モード切り替え後の状態を確認
         Logger.perf('管理モード切り替え後の状態確認:', {
           enable,
           stateDisplayMode: this.state.displayMode,
@@ -7054,18 +6266,12 @@
         // 管理モード切り替え時は既存のカードを全て削除して強制再生成
         this.elements.answersContainer.innerHTML = '';
 
-        // UI状態を更新
         this.updateSortOptions();
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
         // 管理モード切り替え時は設定変更のため再描画が必要
         this.loadSheetData({ bypassCache: true }).then(() => {
-          // 管理モード切り替え後に新着チェックの基準を更新
           this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
-          Logger.debug('🔄 管理モード切り替え完了、新着チェック基準更新:', {
-            newBaselineCount: this.state.lastSeenCount,
-            adminMode: this.state.showAdminFeatures,
-          });
         });
       } finally {
         // Re-enable button
@@ -7080,7 +6286,6 @@
      */
     async showAdminModeConfirmation() {
       return new Promise((resolve) => {
-        // モーダル要素を作成
         const modal = this._createElement('div');
         modal.className =
           'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
@@ -7141,7 +6346,6 @@
         };
         document.addEventListener('keydown', handleKeydown);
 
-        // モーダルを表示
         document.body.appendChild(modal);
 
         // フォーカスを確認ボタンに移動
@@ -7154,15 +6358,13 @@
      */
     async openFormAnswer() {
       try {
-        Logger.debug('🔗 フォーム回答画面を開きます...');
 
         // formUrlを取得
         const result = await this.runGas('getBulkData', { userId: this.state.userId });
-        
+
         if (result && result.success && result.data && result.data.formUrl) {
           const formUrl = result.data.formUrl;
-          Logger.debug('✅ フォームURLを取得しました:', formUrl);
-          
+
           // 新しいタブでフォームを開く
           window.open(formUrl, '_blank', 'noopener,noreferrer');
         } else {
@@ -7180,7 +6382,6 @@
         return;
       }
 
-      // ボタンのローディング状態を設定
       const endPublicationBtn = this.elements.endPublicationBtn;
       let originalButtonContent = '';
       if (endPublicationBtn) {
@@ -7196,12 +6397,9 @@
       }
 
       try {
-        Logger.debug('🔄 公開終了処理を開始します...');
 
         // サーバーに公開終了リクエストを送信
         const result = await this.runGas('clearActiveSheet');
-
-        Logger.debug('✅ 公開終了処理が完了しました:', result);
 
         // 成功メッセージを表示
         const successMessage = result.message || '公開を終了しました。非公開画面に移動します。';
@@ -7241,16 +6439,13 @@
       }
     }
     redirectToUnpublishedPage() {
-      Logger.debug('🚫 Redirecting to unpublished page (legacy function)');
 
       // キャッシュクリア処理（新機能と統合）
       // キャッシュクリア簡略化
       if (this.cache) this.cache.clear();
 
-      // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
       try {
         localStorage.setItem('expandAllSections', 'true');
-        Logger.debug('✅ アコーディオン全展開フラグを設定しました');
       } catch (error) {
         console.warn('⚠️ localStorage設定に失敗:', error);
       }
@@ -7261,13 +6456,11 @@
       unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
       unpublishedUrl.searchParams.set('_redirect', 'unpublished'); // リダイレクト理由
 
-      Logger.debug('🔄 Redirecting to unpublished URL:', unpublishedUrl.toString());
       window.location.href = unpublishedUrl.toString();
     }
 
     async endAdminMode() {
       try {
-        // ✅ Phase 3: 統一API呼び出し使用
         const adminUrl = await configManager._runGasCall('getWebAppUrl');
         const url = new URL(adminUrl);
         url.searchParams.set('mode', 'admin');
@@ -7284,7 +6477,6 @@
      */
     saveReactionState(rowIndex, reactions) {
       try {
-        // 既存の保存データを取得
         const existingData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
 
         // 現在のリアクション状態を保存
@@ -7397,19 +6589,16 @@
         );
 
         if (modalBtn) {
-          // カウント表示更新
           const countEl = modalBtn.querySelector('.reaction-count');
           if (countEl && this.state.showCounts) {
             countEl.textContent = info.count;
           }
 
-          // アイコン更新
           const svgEl = modalBtn.querySelector('svg');
           if (svgEl) {
             svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', info.reacted);
           }
 
-          // スタイル更新
           const colorClass =
             rt.key === 'LIKE'
               ? 'text-red-500'
@@ -7439,18 +6628,14 @@
           return false; // 変更なし - スキップ
         }
 
-        // 状態を記録
         if (!this.lastApplyStates) this.lastApplyStates = new Map();
         this.lastApplyStates.set(updateKey, currentHash);
         return true; // 変更あり - 更新対象
       });
 
       if (itemsToUpdate.length === 0) {
-        Logger.debug('⚡ applyUpdates: 全アイテムスキップ (変更なし)');
         return;
       }
-
-      Logger.debug(`⚡ applyUpdates: ${itemsToUpdate.length}/${items.length}件を更新`);
 
       // バッチ処理用にリアクション更新データを蓄積
       const reactionUpdates = [];
@@ -7500,11 +6685,6 @@
       }
     }
     showAnswerModal(rowIndex) {
-      Logger.debug('📱 [MODAL DEBUG] showAnswerModal called:', {
-        rowIndex: rowIndex,
-        rowIndexType: typeof rowIndex,
-        timestamp: new Date().toISOString(),
-      });
 
       // Show answer modal called
 
@@ -7703,7 +6883,6 @@
 
       this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
 
-      // モーダルカードのスタイルを更新
       Logger.perf('updateModalContent装飾適用:', {
         rowIndex: data.rowIndex,
         highlight: data.highlight,
@@ -7827,16 +7006,15 @@
         currentDisplayMode: this.state.displayMode,
       });
 
-      // ✅ Phase 5: 状態更新もconfigManager統一化
       this.state.isStudentMode = configManager.config?.isStudentMode ?? window.isStudentMode;
       this.state.showCounts = configManager.config?.showCounts ?? window.showCounts;
-      
+
       const showScoreSort = configManager.config?.showScoreSort ?? this.state.showCounts;
       if (configManager.config) {
         configManager.config.showScoreSort = showScoreSort;
       }
       window.showScoreSort = showScoreSort;
-      
+
       this.state.showAdminFeatures = window.showAdminFeatures;
       this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
       this.state.showScoreSort = showScoreSort;
@@ -7883,7 +7061,6 @@
       return false;
     }
 
-
     optimizeForLowPerformance() {
       Logger.perf('Enabling low performance optimizations');
 
@@ -7902,21 +7079,21 @@
         backdrop-filter: blur(4px) !important;
         background: var(--color-surface) !important;
       }
-      
+
       /* Simplify hover effects */
       .answer-card:hover {
         transform: none !important;
         box-shadow: var(--shadow-sm) !important;
       }
-      
+
       .reaction-btn:hover {
         transform: scale(1.02) !important;
       }
-      
+
       .game-btn:hover {
         transform: translateY(-1px) !important;
       }
-      
+
       /* Disable complex animations */
       .answer-card.highlighted {
         transform: none !important;
@@ -7924,17 +7101,17 @@
         border-image: none !important;
         box-shadow: 0 0 12px rgba(147, 51, 234, 0.5) !important;
       }
-      
+
       /* Remove will-change to reduce GPU usage */
       * {
         will-change: auto !important;
       }
-      
+
       /* Simplify shadows */
       .answer-card {
         box-shadow: var(--shadow-sm) !important;
       }
-      
+
     `;
       document.head.appendChild(style);
 
@@ -8085,8 +7262,6 @@
     }
 
     // Enhanced cache methods with timestamp tracking
-
-    // ===== Virtual Scrolling Methods =====
 
     setupScrollObserver() {
       if (!this.elements.answersContainer) {
@@ -8502,28 +7677,14 @@
      */
     validateReasonText(reason) {
       try {
-        Logger.debug('🔍 validateReasonText デバッグ:', {
-          input: reason,
-          inputType: typeof reason,
-          inputIsNull: reason === null,
-          inputIsUndefined: reason === undefined,
-          inputLength: reason?.length,
-        });
 
         // null, undefined, 空文字列チェック
         if (!reason && reason !== 0) {
-          Logger.debug('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
           return '';
         }
 
         // 文字列変換と基本検証
         const reasonStr = String(reason).trim();
-
-        Logger.debug('🔍 validateReasonText 処理結果:', {
-          reasonStr: reasonStr,
-          reasonStrLength: reasonStr.length,
-          willBeEmpty: reasonStr.length === 0,
-        });
 
         // 長すぎる理由テキストの制限（10000文字まで）
         if (reasonStr.length > 10000) {
@@ -8550,7 +7711,6 @@
      */
     async validateBoardDataIntegrity() {
       try {
-        Logger.debug('🔍 Starting real-time board data integrity validation...');
 
         const validationResults = {
           timestamp: new Date().toISOString(),
@@ -8572,14 +7732,12 @@
             const opinionElement = card.querySelector('.opinion-text');
             const reasonElement = card.querySelector('.answer-preview p');
 
-            // 基本要素の存在チェック
             if (!opinionElement || !rowIndex) {
               validationResults.invalidCards++;
               validationResults.errors.push(`Card ${index}: Missing essential elements`);
               return;
             }
 
-            // 理由列の状態チェック
             const hasReasonData = this.state.currentAnswers.find(
               (a) => a.rowIndex == rowIndex
             )?.reason;
@@ -8599,7 +7757,6 @@
           }
         });
 
-        // ヘッダー情報の検証
         try {
           const headerValidation = await this.runGas(
             'validateHeaderIntegrity',
@@ -8614,7 +7771,6 @@
           validationResults.errors.push(`Header validation error: ${headerError.message}`);
         }
 
-        // 検証結果のログ出力
         const issueCount =
           validationResults.invalidCards +
           validationResults.reasonFieldIssues +
@@ -8624,11 +7780,9 @@
 
           // 自動修復の試行（理由列の問題のみ）
           if (validationResults.reasonFieldIssues > 0) {
-            Logger.debug('🔧 Attempting automatic reason field recovery...');
             await this.autoRecoverReasonFields();
           }
         } else {
-          Logger.debug('✅ Board data integrity validation passed');
         }
 
         return validationResults;
@@ -8647,7 +7801,6 @@
      */
     async autoRecoverReasonFields() {
       try {
-        Logger.debug('🔧 Starting automatic reason field recovery...');
 
         // キャッシュクリアして最新データを取得
         await this.gas.clearCache();
@@ -8655,13 +7808,11 @@
         // データを再取得してカードを更新
         await this.loadBoardData();
 
-        Logger.debug('✅ Reason field recovery completed');
       } catch (error) {
         console.error('❌ Automatic reason field recovery failed:', error);
       }
     }
   }
-  // ===== 共通ドメイン情報処理関数 =====
   // AdminPanel.html と Login.html で共通使用
 
   /**
@@ -8693,7 +7844,6 @@
     const headerDomainMatchText = this._getCachedElement('header-domain-match-text');
     const headerDomainMismatchText = this._getCachedElement('header-domain-mismatch-text');
 
-    // 全ての表示を一旦非表示にする
     if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
     if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
     if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
@@ -8728,7 +7878,6 @@
    */
   async function loadFormLink() {
     try {
-      // ✅ Phase 4: テンプレート変数統一化 - configManager優先
       const userId = configManager.config?.userId || window.USER_ID;
       const formInfo = await configManager._runGasCall('getActiveFormInfo', userId);
       if (formInfo && formInfo.formUrl) {
@@ -8745,20 +7894,17 @@
 
   // システムフロー表示関数の定義
   function showSystemFlow() {
-    Logger.debug('🔄 システムフロー初期化開始');
     try {
       // 基本的なシステムフロー初期化処理
       if (window.answerBoardApp && typeof window.answerBoardApp.destroy === 'function') {
         window.answerBoardApp.destroy();
       }
-      Logger.debug('✅ システムフロー初期化完了');
     } catch (error) {
       console.warn('⚠️ システムフロー初期化中にエラー:', error);
     }
   }
 
   try {
-    // システムフロー表示
     showSystemFlow();
 
     // Expose debug functions globally for console access
@@ -8766,7 +7912,6 @@
       if (window.answerBoardApp && window.answerBoardApp.debugAnswerCards) {
         window.answerBoardApp.debugAnswerCards();
       } else {
-        Logger.debug('AnswerBoardApp not available or debug function not found');
       }
     };
 
@@ -8775,45 +7920,31 @@
       if (window.answerBoardApp && window.answerBoardApp.debugClickAnswerCard) {
         return window.answerBoardApp.debugClickAnswerCard(cardIndex, options);
       } else {
-        Logger.debug('AnswerBoardApp not available or debug function not found');
         return { success: false, error: 'AnswerBoardApp not available' };
       }
     };
 
-    // システムフロー表示をグローバルで利用可能にする
     window.showSystemFlow = showSystemFlow;
 
-    // デバッグ用：データ構造確認機能
     window.debugCurrentData = () => {
       if (window.answerBoardApp && window.answerBoardApp.state) {
-        Logger.debug('現在のデータ構造:', {
-          currentAnswers: window.answerBoardApp.state.currentAnswers,
-          currentAnswersLength: window.answerBoardApp.state.currentAnswers?.length,
-          firstItem: window.answerBoardApp.state.currentAnswers?.[0],
-          header: window.answerBoardApp.elements?.headingLabel?.textContent,
-        });
       } else {
-        Logger.debug('AnswerBoardApp not available');
       }
     };
 
     // Additional global debug utilities
     window.debugClickAllAnswerCards = async (options = {}) => {
       if (!window.answerBoardApp) {
-        Logger.debug('AnswerBoardApp not available');
         return { success: false, error: 'AnswerBoardApp not available' };
       }
 
       const container = window.answerBoardApp.elements?.answersContainer;
       if (!container) {
-        Logger.debug('No answers container found');
         return { success: false, error: 'No answers container found' };
       }
 
       const answerCards = container.querySelectorAll('.answer-card');
       const results = [];
-
-      Logger.debug(`Found ${answerCards.length} answer cards, clicking all...`);
 
       for (let i = 0; i < answerCards.length; i++) {
         try {
@@ -8849,25 +7980,19 @@
       }
 
       if (enable === null) {
-        // 現在の状態をトグル
         app.enableBatchProcessing = !app.enableBatchProcessing;
       } else {
         app.enableBatchProcessing = Boolean(enable);
       }
 
-      Logger.debug('🔧 バッチ処理:', app.enableBatchProcessing ? '有効' : '無効');
-      Logger.debug('💡 個別処理システムは常に動作します（フォールバック保証）');
       return app.enableBatchProcessing;
     };
 
-    // ✅ CLAUDE.md準拠: configJSON中心設定の初期化
     configManager.initialize()
       .then(() => {
-        debugInfo('✅ ConfigManager初期化完了');
 
         // AnswerBoardApp インスタンス初期化
         window.answerBoardApp = new AnswerBoardApp();
-        debugInfo('✅ AnswerBoardApp初期化完了');
       })
       .catch((error) => {
         console.error('❌ 初期化エラー:', error);
