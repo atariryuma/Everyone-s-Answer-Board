@@ -456,11 +456,7 @@ function refreshBoardData(requestUserId) {
 function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
   try {
     const currentUserEmail = UserManager.getCurrentEmail();
-    console.log('getDataCount: データ件数取得開始', {
-      userId: requestUserId ? `${requestUserId.substring(0, 8)}...` : 'null',
-      classFilter,
-      adminMode,
-    });
+    // データ件数取得開始
 
     // ユーザーID検証
     if (!SecurityValidator.isValidUUID(requestUserId)) {

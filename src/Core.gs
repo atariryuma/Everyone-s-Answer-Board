@@ -12,7 +12,7 @@
  */
 function getBulkData(userId, options = {}) {
   try {
-    console.log('🚀 getBulkData: バルクデータ取得開始', { userId, options });
+    // デバッグログを削除（個別ログ不要）
     const startTime = Date.now();
     
     // ユーザー情報取得（必須）
@@ -62,10 +62,8 @@ function getBulkData(userId, options = {}) {
     }
     
     const executionTime = Date.now() - startTime;
-    console.log(`✅ getBulkData: 一括データ取得完了 (${executionTime}ms)`, {
-      includedData: Object.keys(bulkData),
-      dataSize: JSON.stringify(bulkData).length
-    });
+    // 全体の受信成功を簡潔にログ
+    console.log(`✅ データ取得完了: ${Object.keys(bulkData).length}項目 (${executionTime}ms)`);
     
     return {
       success: true,
@@ -707,7 +705,7 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     });
     return result;
   } catch (e) {
-    console.error(`公開シートデータ取得エラー: ${e.message}`);
+    console.error('データ取得エラー:', e.message);
     return {
       status: 'error',
       message: `データの取得に失敗しました: ${e.message}`,
@@ -868,7 +866,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       isIncremental: true,
     };
   } catch (e) {
-    console.error(`増分データ取得エラー: ${e.message}`);
+    console.error('増分データ取得エラー:', e.message);
     return {
       status: 'error',
       message: `増分データの取得に失敗しました: ${e.message}`,
@@ -1014,7 +1012,7 @@ function formatSheetDataForFrontend(
         const stringValue = String(rawReasonValue).trim();
         if (stringValue.length > 0) {
           reasonValue = stringValue;
-          console.log('✅ 理由データ正常取得:', reasonValue.substring(0, 50) + '...');
+          // 個別データログ削除（詳細不要）
         } else {
           console.log('⚠️ 理由データは空文字列');
         }
@@ -1360,7 +1358,7 @@ function getResponsesData(userId, sheetName) {
       headers: values[0],
     };
   } catch (e) {
-    console.error(`回答データの取得に失敗: ${e.message}`);
+    console.error('回答データ取得失敗:', e.message);
     return { status: 'error', message: `回答データの取得に失敗しました: ${e.message}` };
   }
 }
@@ -2946,7 +2944,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
       displayMode,
     };
   } catch (e) {
-    console.error(`シートデータ取得エラー: ${e.message}`);
+    console.error('シートデータ取得エラー:', e.message);
     return {
       status: 'error',
       message: `データの取得に失敗しました: ${e.message}`,

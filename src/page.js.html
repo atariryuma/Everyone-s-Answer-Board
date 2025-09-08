@@ -1596,14 +1596,7 @@
       const currentCount = this.state.currentAnswers?.length || 0;
       const lastSeen = this.state.lastSeenCount || 0;
 
-      // Enhanced consistency verification (Phase 3.1)
-      const consistencyCheck = {
-        lightCheckCount: newCount,
-        currentDataCount: currentCount,
-        lastSeenCount: lastSeen,
-        hasInconsistency: Math.abs(newCount - currentCount) > 0 && currentCount > 0,
-        significantChange: newCount !== lastSeen,
-      };
+      // データ整合性の確認
 
       // ポーリング成功のマーク - unified state management (Phase 2.3)
       this.state.pollingFailureCount = 0;
@@ -1652,15 +1645,7 @@
       const currentCount = this.state.currentAnswers?.length || 0;
       const lastSeen = this.state.lastSeenCount || 0;
 
-      // Enhanced new item detection with consistency validation (Phase 3.1)
-      const detectionMetrics = {
-        lightCheckCount: newCount,
-        currentDataCount: currentCount,
-        lastSeenCount: lastSeen,
-        expectedNewItems: newCount - lastSeen,
-        hasNewItems: newCount > lastSeen,
-        dataIsStale: currentCount > 0 && newCount > currentCount,
-      };
+      // 新着データ検出
 
       if (detectionMetrics.hasNewItems && detectionMetrics.expectedNewItems > 0) {
         const newItems = detectionMetrics.expectedNewItems;
@@ -1762,12 +1747,11 @@
       this.dismissNewContentBanner();
 
       try {
-        const originalText = this.elements.refreshContentBtn
-          ? this.elements.refreshContentBtn.textContent
-          : '';
-        if (this.elements.refreshContentBtn) {
-          this.elements.refreshContentBtn.textContent = '更新中...';
-          this.elements.refreshContentBtn.disabled = true;
+        const refreshBtn = this.elements.refreshContentBtn;
+        const originalText = refreshBtn ? refreshBtn.textContent : '';
+        if (refreshBtn) {
+          refreshBtn.textContent = '更新中...';
+          refreshBtn.disabled = true;
         }
 
         const selectedClass = this.elements.classFilter
@@ -1788,37 +1772,17 @@
           throw new Error(incrementalData.message);
         }
 
-        // Enhanced incremental data analysis (Phase 3.2) - 改善版
-        const preUpdateAnalysis = {
-          newCount: incrementalData.newCount,
-          totalCount: incrementalData.totalCount,
-          hasNewData: incrementalData.newCount > 0,
-          lastSeenCount: this.state.lastSeenCount,
-          serverExpectedCount: incrementalData.totalCount,
-          serverNewItems: incrementalData.newCount,
-        };
+        // データ整合性の簡潔な確認
 
-        const criticalInconsistency = {
-          zeroStateWithServerData:
-            preUpdateAnalysis.totalCount > 0 &&
-            (this.state.currentAnswers?.length || 0) === 0 &&
-            this.state.lastSeenCount > 0,
-          significantCountMismatch:
-            Math.abs(preUpdateAnalysis.totalCount - this.state.lastSeenCount) > 10,
-        };
+        // 重大な不整合の場合のみフルリフレッシュ
+        const hasSignificantInconsistency = 
+          (incrementalData.totalCount > 0 && 
+           (this.state.currentAnswers?.length || 0) === 0 && 
+           this.state.lastSeenCount > 0) ||
+          Math.abs(incrementalData.totalCount - this.state.lastSeenCount) > 10;
 
-        // 重大な不整合のみフルリフレッシュ（false positiveを削減）
-        if (
-          criticalInconsistency.zeroStateWithServerData ||
-          criticalInconsistency.significantCountMismatch
-        ) {
-          console.warn('🚨 重大なサーバー・クライアント不整合検出 - フルリフレッシュ実行:', {
-            preUpdateAnalysis,
-            criticalInconsistency,
-            currentAnswersLength: this.state.currentAnswers?.length || 0,
-          });
-
-          // 重大な不整合の場合のみ全体リフレッシュを実行
+        if (hasSignificantInconsistency) {
+          console.warn('🚨 データ不整合検出 - フルリフレッシュ実行');
           await this.refreshContentFull();
           return;
         }
@@ -1857,12 +1821,9 @@
 
         await this.refreshContentFull();
       } finally {
-        if (this.elements.refreshContentBtn) {
-          this.elements.refreshContentBtn.textContent =
-            this.elements.refreshContentBtn.textContent.includes('更新中')
-              ? originalText || '更新して表示'
-              : this.elements.refreshContentBtn.textContent;
-          this.elements.refreshContentBtn.disabled = false;
+        if (refreshBtn) {
+          refreshBtn.textContent = originalText || '更新して表示';
+          refreshBtn.disabled = false;
         }
       }
     }
@@ -1955,7 +1916,6 @@
 
         // 新着データがある場合
         if (incrementalData.newCount > 0) {
-
           this.state.hasNewContent = true;
           this.state.newContentCount = incrementalData.newCount;
           this.showNewContentBanner(incrementalData.newCount);
@@ -2748,7 +2708,7 @@
           return false;
         }
 
-        // レスポンス構造の詳細ログ
+        // レスポンス構造の確認
 
         // 2つの可能なレスポンス形式に対応
         // 1. 新形式: { status: 'success', data: [...], header: '...', sheetName: '...' }
@@ -2868,9 +2828,7 @@
               });
           });
 
-          // レスポンスの詳細ログ
-
-          // 成功した場合は結果を返す - 改善された判定条件
+          // 成功した場合は結果を返す
           if (result && this.isValidDataResult(result)) {
             return result;
           }
@@ -2898,7 +2856,7 @@
             }
           }
 
-          // 無効なデータの場合（詳細な理由を記録）
+          // 無効なデータの場合の処理
           const validationReason = this.getValidationFailureReason(result);
           if (attempt < MAX_ATTEMPTS - 1) {
             console.warn(
@@ -3170,7 +3128,7 @@
       try {
         const classFilter = !selectedClass || selectedClass === 'すべて' ? null : selectedClass;
 
-        // データ取得パラメータの詳細ログ
+        // データ取得パラメータの設定
         const fetchParams = {
           userId: this.state.userId,
           classFilter,
@@ -3194,7 +3152,7 @@
                 !result.data ||
                 (Array.isArray(result.data) && result.data.length === 0)
               ) {
-                // 詳細なエラーログ出力
+                // エラー情報の記録
                 if (result && result.status === 'error') {
                   console.error('❌ AnswerBoardApp: Data fetch failed with error:', result.message);
 
@@ -3246,7 +3204,7 @@
                         'newest',
                         this.state.showAdminFeatures
                       );
-                      // Enhanced consistency check with lastSeenCount (Phase 2.2)
+                      // データ整合性の確認
                       const expected = countData?.count || 0;
                       const actual = result?.data ? result.data.length : 0;
                       const lastSeen = this.state.lastSeenCount || 0;

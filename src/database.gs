@@ -720,7 +720,7 @@ const DB = {
       const data = batchGetSheetsData(service, dbId, [`'${sheetName}'!${DB_CONFIG.RANGE}`]);
 
       if (!data.valueRanges || !data.valueRanges[0] || !data.valueRanges[0].values) {
-        console.warn('findUserByEmail: データベースからデータを取得できませんでした');
+        console.warn('データベースアクセス失敗');
         return null;
       }
 

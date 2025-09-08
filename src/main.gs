@@ -1281,7 +1281,7 @@ function renderAnswerBoard(userInfo, params) {
     // データ取得とテンプレート設定の処理
     try {
       if (finalSpreadsheetId && finalSheetName) {
-        console.log('renderAnswerBoard - データ取得開始');
+        // データ取得開始
         const dataResult = getPublishedSheetData(
           userInfo.userId,
           finalSpreadsheetId,
@@ -1304,10 +1304,7 @@ function renderAnswerBoard(userInfo, params) {
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
       template.showCounts = displaySettings.showReactions !== false;
 
-      console.log('renderAnswerBoard - 表示設定:', {
-        displayMode: template.displayMode,
-        showCounts: template.showCounts,
-      });
+      // 表示設定完了
     } catch (dataError) {
       console.error('renderAnswerBoard - データ取得エラー:', dataError);
       template.data = [];
