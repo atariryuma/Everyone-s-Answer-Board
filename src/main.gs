@@ -1138,12 +1138,13 @@ function renderAnswerBoard(userInfo, params) {
   
   // デバッグ: 実際に取得されたconfigの中身を確認
   // config取得状況デバッグ（必要時のみ有効化）
-    hasSpreadsheetId: !!config.spreadsheetId,
-    hasSheetName: !!config.sheetName,
-    spreadsheetIdValue: config.spreadsheetId?.substring(0, 20) + '...',
-    sheetNameValue: config.sheetName,
-    configKeys: Object.keys(config)
-  });
+  // console.log('config状況:', {
+  //   hasSpreadsheetId: !!config.spreadsheetId,
+  //   hasSheetName: !!config.sheetName,
+  //   spreadsheetIdValue: config.spreadsheetId?.substring(0, 20) + '...',
+  //   sheetNameValue: config.sheetName,
+  //   configKeys: Object.keys(config)
+  // });
 
   console.log('renderAnswerBoard - userId:', userInfo.userId);
   console.log('renderAnswerBoard - mode:', params.mode);
