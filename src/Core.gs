@@ -903,6 +903,17 @@ function formatSheetDataForFrontend(
   isOwner,
   displayMode
 ) {
+  // 🔍 formatSheetDataForFrontend - マッピングデータ処理調査ログ
+  console.group('🎭 formatSheetDataForFrontend - データフォーマット調査');
+  console.log('📊 入力パラメータ:', {
+    rawDataCount: rawData.length,
+    mappedIndices: mappedIndices,
+    headerIndicesKeys: Object.keys(headerIndices),
+    adminMode: adminMode,
+    isOwner: isOwner,
+    displayMode: displayMode
+  });
+
   // 現在のユーザーメールを取得（リアクション状態判定用）
   const currentUserEmail = UserManager.getCurrentEmail();
 
@@ -911,6 +922,26 @@ function formatSheetDataForFrontend(
     const opinionIndex = mappedIndices.opinionHeader;
     const reasonIndex = mappedIndices.reasonHeader;
     const nameIndex = mappedIndices.nameHeader;
+
+    // 🔍 各行の詳細データ抽出調査
+    console.group(`🔍 Row ${index} フォーマット処理:`);
+    console.log('📄 インデックス情報:', {
+      classIndex: classIndex,
+      opinionIndex: opinionIndex,
+      reasonIndex: reasonIndex,
+      nameIndex: nameIndex,
+      originalDataLength: row.originalData ? row.originalData.length : 'NO_DATA'
+    });
+    
+    if (row.originalData) {
+      console.log('📝 実際のデータ抽出:', {
+        classValue: classIndex !== undefined ? row.originalData[classIndex] : 'INDEX_UNDEFINED',
+        opinionValue: opinionIndex !== undefined ? row.originalData[opinionIndex] : 'INDEX_UNDEFINED',
+        reasonValue: reasonIndex !== undefined ? row.originalData[reasonIndex] : 'INDEX_UNDEFINED',
+        nameValue: nameIndex !== undefined ? row.originalData[nameIndex] : 'INDEX_UNDEFINED'
+      });
+    }
+    console.groupEnd();
 
     let nameValue = '';
     const shouldShowName =
@@ -955,17 +986,54 @@ function formatSheetDataForFrontend(
       return { count, reacted };
     }
 
-    // 理由列の値を取得
+    // 🔍 理由列の値を取得（包括的null/undefined/空文字列処理）
     let reasonValue = '';
-    if (
-      reasonIndex !== undefined &&
-      row.originalData &&
-      row.originalData[reasonIndex] !== undefined
-    ) {
-      reasonValue = row.originalData[reasonIndex] || '';
-    }
+    
+    console.group('🎯 理由列データ抽出詳細:');
+    console.log('📊 理由列抽出パラメータ:', {
+      reasonIndex: reasonIndex,
+      hasOriginalData: !!row.originalData,
+      originalDataLength: row.originalData ? row.originalData.length : 'NO_DATA',
+      reasonIndexValid: reasonIndex !== undefined && reasonIndex >= 0,
+      reasonIndexInRange: reasonIndex !== undefined && row.originalData && reasonIndex < row.originalData.length
+    });
 
-    return {
+    if (reasonIndex !== undefined && row.originalData && reasonIndex >= 0 && reasonIndex < row.originalData.length) {
+      const rawReasonValue = row.originalData[reasonIndex];
+      console.log('📝 生の理由データ:', {
+        rawValue: rawReasonValue,
+        rawType: typeof rawReasonValue,
+        isNull: rawReasonValue === null,
+        isUndefined: rawReasonValue === undefined,
+        isEmpty: rawReasonValue === '',
+        isEmptyString: rawReasonValue === ' ',
+        stringLength: typeof rawReasonValue === 'string' ? rawReasonValue.length : 'NOT_STRING'
+      });
+      
+      // null/undefined/空文字列の適切な処理
+      if (rawReasonValue !== null && rawReasonValue !== undefined) {
+        const stringValue = String(rawReasonValue).trim();
+        if (stringValue.length > 0) {
+          reasonValue = stringValue;
+          console.log('✅ 理由データ正常取得:', reasonValue.substring(0, 50) + '...');
+        } else {
+          console.log('⚠️ 理由データは空文字列');
+        }
+      } else {
+        console.log('⚠️ 理由データはnull/undefined');
+      }
+    } else {
+      console.log('❌ 理由列インデックス無効または範囲外');
+    }
+    
+    console.log('🔚 最終理由値:', {
+      finalReasonValue: reasonValue,
+      finalLength: reasonValue.length,
+      willDisplay: reasonValue.length > 0
+    });
+    console.groupEnd();
+
+    const finalResult = {
       rowIndex: row.rowNumber || index + 2,
       name: nameValue,
       email:
@@ -988,7 +1056,23 @@ function formatSheetDataForFrontend(
       },
       highlight: row.isHighlighted || false,
     };
+    
+    // 🔍 最終結果のログ出力
+    console.log('✅ formatSheetDataForFrontend完了 Row ' + index + ':', {
+      rowIndex: finalResult.rowIndex,
+      hasName: !!finalResult.name,
+      hasEmail: !!finalResult.email,
+      hasClass: !!finalResult.class,
+      hasOpinion: !!finalResult.opinion,
+      hasReason: !!finalResult.reason,
+      reasonLength: finalResult.reason ? finalResult.reason.length : 0,
+      finalReasonValue: finalResult.reason
+    });
+    
+    return finalResult;
   });
+  
+  console.groupEnd(); // formatSheetDataForFrontend ログ終了
 }
 
 /**
@@ -2787,6 +2871,35 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const headers = sheetData[0];
     const dataRows = sheetData.slice(1);
 
+    // 🔍 スプレッドシート生データの詳細調査ログ（理由列問題対応）
+    console.group('📊 executeGetSheetData - スプレッドシート生データ調査');
+    console.log('📋 ヘッダー情報:', {
+      headers: headers,
+      headerCount: headers.length,
+      reasonRelatedHeaders: headers.map((h, i) => ({ index: i, header: h }))
+        .filter(item => item.header && item.header.toLowerCase().includes('理由'))
+    });
+    
+    console.log('📄 データ行サンプル（最初の3行）:');
+    for (let i = 0; i < Math.min(3, dataRows.length); i++) {
+      const row = dataRows[i];
+      console.group(`🔍 Row ${i + 2} (index ${i}):`, {
+        rowLength: row.length,
+        hasReasonData: row[5] ? 'YES' : 'NO',  // index 5は理由列の予想位置
+        reasonValue: row[5] || 'EMPTY',
+        fullRow: row
+      });
+      
+      // 各列の詳細情報
+      row.forEach((cell, colIndex) => {
+        if (colIndex <= 6) { // 重要な列のみ
+          console.log(`  Column ${colIndex} (${headers[colIndex] || 'unknown'}): "${cell || 'EMPTY'}"`);
+        }
+      });
+      console.groupEnd();
+    }
+    console.groupEnd();
+
     // ヘッダーインデックスを取得（キャッシュ利用）
     const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
@@ -2980,6 +3093,23 @@ function buildRosterMap(rosterData) {
  * 行データを処理（スコア計算、名前変換など）
  */
 function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber, isOwner) {
+  // 🔍 processRowData - 行データ処理の詳細調査ログ
+  console.group(`🎯 processRowData - Row ${rowNumber} 詳細調査`);
+  console.log('📄 入力データ:', {
+    rowLength: row.length,
+    rowData: row,
+    headerIndicesKeys: Object.keys(headerIndices),
+    headerIndicesValues: headerIndices
+  });
+  
+  // 重要な列のデータ存在確認
+  ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', 'どうして、メダカと一緒に、水草、ミジンコを入れると思いますか？観察していて、気づいたことを書きましょう。', 'そう考える理由や体験があれば教えてください。'].forEach((header, expectedIndex) => {
+    const actualIndex = headerIndices[header];
+    const cellValue = actualIndex !== undefined ? row[actualIndex] : 'HEADER_NOT_FOUND';
+    console.log(`  🔍 "${header.substring(0, 20)}...": index=${actualIndex}, value="${cellValue || 'EMPTY'}"`);
+  });
+  console.groupEnd();
+
   const processedRow = {
     rowNumber,
     originalData: row,
