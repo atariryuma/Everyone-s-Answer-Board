@@ -505,6 +505,119 @@
       return userId || window.USER_ID || '';
     }
 
+    /**
+     * waitForConfigInitialization - CONFIG初期化完了を待つ（タイムアウト付き）
+     * @param {number} timeout - タイムアウト時間（ミリ秒）デフォルト5秒
+     * @returns {Promise<boolean>} CONFIG初期化完了時にtrue、タイムアウト時にfalse
+     */
+    async waitForConfigInitialization(timeout = 5000) {
+      const startTime = Date.now();
+      
+      while (Date.now() - startTime < timeout) {
+        // CONFIG初期化状態をチェック
+        if (CONFIG && typeof CONFIG === 'object' && CONFIG.initialized !== false) {
+          console.log('✅ waitForConfigInitialization: CONFIG初期化確認完了');
+          return true;
+        }
+        
+        // 50ms待機してリトライ
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      console.warn('⚠️ waitForConfigInitialization: タイムアウト', {
+        timeout: timeout,
+        configState: CONFIG ? typeof CONFIG : 'undefined',
+        configKeys: CONFIG ? Object.keys(CONFIG) : []
+      });
+      return false;
+    }
+
+    /**
+     * getValidUserId - 包括的なユーザーID取得（複数ソース対応）
+     * ✅ 空のuserId問題を根本解決する統合取得メソッド
+     * @returns {string|null} 有効なユーザーID、見つからない場合はnull
+     */
+    getValidUserId() {
+      const sources = [];
+      let validUserId = null;
+
+      try {
+        // Source 1: state.tenantId (最優先)
+        if (this.state?.tenantId && this.state.tenantId.trim() !== '') {
+          sources.push({ source: 'state.tenantId', value: this.state.tenantId });
+          validUserId = this.state.tenantId;
+        }
+
+        // Source 2: CONFIG.userId  
+        if (!validUserId && CONFIG?.userId && CONFIG.userId.trim() !== '') {
+          sources.push({ source: 'CONFIG.userId', value: CONFIG.userId });
+          validUserId = CONFIG.userId;
+        }
+
+        // Source 3: window.USER_ID (GAS template variable)
+        if (!validUserId && window.USER_ID && window.USER_ID.trim() !== '') {
+          sources.push({ source: 'window.USER_ID', value: window.USER_ID });
+          validUserId = window.USER_ID;
+        }
+
+        // Source 4: URL parameter
+        if (!validUserId) {
+          const urlUserId = new URLSearchParams(window.location.search).get('userId');
+          if (urlUserId && urlUserId.trim() !== '') {
+            sources.push({ source: 'URL_param', value: urlUserId });
+            validUserId = urlUserId;
+          }
+        }
+
+        // Source 5: sessionStorage fallback
+        if (!validUserId) {
+          try {
+            const sessionUserId = sessionStorage.getItem('userId');
+            if (sessionUserId && sessionUserId.trim() !== '') {
+              sources.push({ source: 'sessionStorage', value: sessionUserId });
+              validUserId = sessionUserId;
+            }
+          } catch (storageError) {
+            console.warn('getValidUserId: sessionStorage access failed:', storageError.message);
+          }
+        }
+
+        // ✅ 取得成功時はsessionStorageに保存（次回フォールバック用）
+        if (validUserId) {
+          try {
+            sessionStorage.setItem('userId', validUserId);
+            sessionStorage.setItem('userId_timestamp', Date.now().toString());
+          } catch (storageError) {
+            console.warn('getValidUserId: sessionStorage保存失敗:', storageError.message);
+          }
+        }
+        
+        // 詳細デバッグログ
+        console.log('🔍 getValidUserId: ユーザーID取得結果', {
+          sources: sources,
+          finalUserId: validUserId,
+          savedToSession: !!validUserId,
+          configState: CONFIG ? Object.keys(CONFIG) : 'undefined',
+          windowUserIdState: {
+            exists: !!window.USER_ID,
+            value: window.USER_ID,
+            type: typeof window.USER_ID,
+            length: window.USER_ID?.length
+          }
+        });
+
+        return validUserId;
+
+      } catch (error) {
+        console.error('❌ getValidUserId: ユーザーID取得エラー:', {
+          error: error.message,
+          sources: sources,
+          stack: error.stack
+        });
+        return null;
+      }
+    }
+
     constructor() {
       this.cache = new Cache();
       this.visibilityObserver = null;
@@ -1597,7 +1710,41 @@
         }
 
       try {
-        const userId = CONFIG.userId || '';
+        // ✅ CONFIG初期化完了を待つ（初期化順序問題解決）
+        const configReady = await this.waitForConfigInitialization(2000); // 2秒タイムアウト
+        if (!configReady) {
+          console.warn('⚠️ runGas: CONFIG初期化タイムアウト、フォールバック処理継続');
+        }
+        
+        // ✅ 包括的なユーザーID取得（空のuserId問題根本解決）
+        let userId = this.getValidUserId();
+        
+        // フォールバック: 既存ロジックも維持
+        if (!userId) {
+          userId = CONFIG.userId || '';
+        }
+        
+        // 🚨 事前検証: 空のuserIdでのAPI呼び出しを防ぐ
+        if (!userId || userId.trim() === '') {
+          const errorMsg = `ユーザーIDが取得できません。システム初期化が必要です。`;
+          console.error('❌ runGas: ユーザーID取得失敗', {
+            funcName: funcName,
+            configUserId: CONFIG?.userId,
+            windowUserId: window.USER_ID,
+            urlUserId: new URLSearchParams(window.location.search).get('userId'),
+            stateUserId: this.state?.tenantId,
+            args: args
+          });
+          throw new Error(errorMsg);
+        }
+        
+        console.log('🔧 runGas: ユーザーID確定', { 
+          funcName: funcName,
+          finalUserId: userId,
+          userIdLength: userId.length,
+          userIdValid: userId.trim() !== ''
+        });
+        
         let result;
 
         // ✅ App名前空間パターンでの統一データアクセス
@@ -1605,11 +1752,26 @@
           case 'getBulkData':
             // 🚀 バルクデータAPI: 複数データを一括取得で高速化
             // ✅ パラメータからuserIdを優先的に使用（引数からuserIdを抽出）
-            const bulkUserId = (args[0] && args[0].userId) || userId;
-            console.log('🔧 getBulkData呼び出し: userIdの決定', { 
+            const bulkUserId = (args[0] && args[0].userId && args[0].userId.trim() !== '') ? args[0].userId : userId;
+            
+            // ✅ getBulkData専用の最終検証
+            if (!bulkUserId || bulkUserId.trim() === '') {
+              const detailedError = {
+                method: 'getBulkData',
+                providedArgs: args,
+                extractedUserId: args[0]?.userId,
+                fallbackUserId: userId,
+                error: '有効なユーザーIDが見つかりません'
+              };
+              console.error('❌ getBulkData: 呼び出し前userId検証失敗', detailedError);
+              throw new Error(`getBulkData: ${detailedError.error}`);
+            }
+            
+            console.log('🔧 getBulkData呼び出し: userIdの最終決定', { 
               passedUserId: args[0]?.userId, 
               fallbackUserId: userId, 
-              finalUserId: bulkUserId 
+              finalUserId: bulkUserId,
+              userIdValidated: true
             });
             result = await new Promise((resolve, reject) => {
               google.script.run
