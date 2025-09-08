@@ -1384,6 +1384,7 @@
         // Admin permissions verified
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
+        this.updateFormButtonUI();
         return;
       }
 
@@ -1406,6 +1407,7 @@
           // API admin permissions verified
           this.updateAdminButtonUI();
           this.updateEndPublicationButtonUI();
+          this.updateFormButtonUI();
         }
       } catch (e) {
         console.error('Admin check failed', e);
@@ -1464,6 +1466,32 @@
         } else {
           this.elements.endPublicationBtn.classList.add('hidden');
           this.elements.endPublicationBtn.setAttribute('hidden', '');
+        }
+      }
+    }
+
+    updateFormButtonUI() {
+      // フォームボタンの表示制御（configJSON中心）
+      if (this.elements.formAnswerBtn) {
+        const formUrl = configManager.config?.formUrl;
+        
+        if (formUrl && formUrl.trim() !== '') {
+          // フォームURLが設定されている場合：ボタンを表示
+          this.elements.formAnswerBtn.style.display = '';
+          this.elements.formAnswerBtn.classList.remove('hidden');
+          this.elements.formAnswerBtn.removeAttribute('hidden');
+          
+          Logger.debug('✅ フォームボタン表示:', {
+            formUrl: formUrl.substring(0, 50) + '...',
+            hasFormUrl: true
+          });
+        } else {
+          // フォームURLが未設定の場合：ボタンを非表示
+          this.elements.formAnswerBtn.style.display = 'none';
+          this.elements.formAnswerBtn.classList.add('hidden');
+          this.elements.formAnswerBtn.setAttribute('hidden', '');
+          
+          Logger.debug('ℹ️ フォームボタン非表示: formURL未設定');
         }
       }
     }
@@ -6269,6 +6297,7 @@
         this.updateSortOptions();
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
+        this.updateFormButtonUI();
         // 管理モード切り替え時は設定変更のため再描画が必要
         this.loadSheetData({ bypassCache: true }).then(() => {
           this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
@@ -6358,17 +6387,20 @@
      */
     async openFormAnswer() {
       try {
+        Logger.debug('🔗 フォーム回答画面を開きます...');
 
-        // formUrlを取得
-        const result = await this.runGas('getBulkData', { userId: this.state.userId });
+        // configJSONから直接formURLを取得（高速化）
+        const formUrl = configManager.config?.formUrl;
 
-        if (result && result.success && result.data && result.data.formUrl) {
-          const formUrl = result.data.formUrl;
-
+        if (formUrl && formUrl.trim() !== '') {
           // 新しいタブでフォームを開く
           window.open(formUrl, '_blank', 'noopener,noreferrer');
+          
+          Logger.debug('✅ フォーム回答画面を開きました:', {
+            formUrl: formUrl.substring(0, 50) + '...'
+          });
         } else {
-          console.warn('❌ フォームURLが見つかりません:', result);
+          console.warn('❌ フォームURLがconfigJSONに設定されていません');
           alert('フォームURLが設定されていません。管理者にお問い合わせください。');
         }
       } catch (error) {
