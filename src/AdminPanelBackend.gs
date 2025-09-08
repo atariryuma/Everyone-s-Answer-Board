@@ -150,10 +150,16 @@ function connectDataSource(spreadsheetId, sheetName) {
         columnMapping: columnMapping,
         opinionHeader: opinionHeader,
         
-        // 🔸 理由ヘッダー情報（columnMappingから抽出）
-        reasonHeader: columnMapping?.reason?.header || columnMapping?.reason || '理由',
-        classHeader: columnMapping?.class?.header || columnMapping?.class || 'クラス',
-        nameHeader: columnMapping?.name?.header || columnMapping?.name || '名前',
+        // 🔸 理由ヘッダー情報（実際のヘッダー名を確実取得）
+        reasonHeader: getActualHeaderName(headerRow, columnMapping?.mapping?.reason) || 
+                      getActualHeaderName(headerRow, columnMapping?.reason) || 
+                      '理由',
+        classHeader: getActualHeaderName(headerRow, columnMapping?.mapping?.class) || 
+                     getActualHeaderName(headerRow, columnMapping?.class) || 
+                     'クラス',
+        nameHeader: getActualHeaderName(headerRow, columnMapping?.mapping?.name) || 
+                    getActualHeaderName(headerRow, columnMapping?.name) || 
+                    '名前',
 
         // 🔸 フォーム情報（確実な設定）
         formUrl: formInfo?.formUrl || null,
@@ -774,10 +780,19 @@ function generateLegacyColumnMapping(headerRow) {
       }
     }
 
-    if (normalizedHeader.includes('理由') || normalizedHeader.includes('体験')) {
+    // 理由列の高精度検出（CLAUDE.md準拠）
+    if (
+      normalizedHeader.includes('理由') || 
+      normalizedHeader.includes('体験') ||
+      normalizedHeader.includes('根拠') ||
+      normalizedHeader.includes('詳細') ||
+      normalizedHeader.includes('説明') ||
+      normalizedHeader.includes('なぜなら') ||
+      normalizedHeader.includes('だから')
+    ) {
       if (!mapping.reason) {
         mapping.reason = index;
-        confidence.reason = 75;
+        confidence.reason = 85; // 信頼度向上
       }
     }
 
@@ -1409,6 +1424,22 @@ function getSheetList(spreadsheetId) {
     });
     throw error;
   }
+}
+
+/**
+ * 列インデックスから実際のヘッダー名を取得
+ * @param {Array} headerRow - ヘッダー行の配列
+ * @param {number} columnIndex - 列インデックス
+ * @returns {string|null} 実際のヘッダー名
+ */
+function getActualHeaderName(headerRow, columnIndex) {
+  if (typeof columnIndex === 'number' && columnIndex >= 0 && columnIndex < headerRow.length) {
+    const headerName = headerRow[columnIndex];
+    if (headerName && typeof headerName === 'string' && headerName.trim() !== '') {
+      return headerName.trim();
+    }
+  }
+  return null;
 }
 
 /**

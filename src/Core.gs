@@ -432,15 +432,22 @@ function registerNewUser(userEmail) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
-  const accessResult = App.getAccess().verifyAccess(
-    requestUserId,
-    'view',
-    UserManager.getCurrentEmail()
-  );
-  if (!accessResult.allowed) {
-    throw new Error(`アクセスが拒否されました: ${accessResult.reason}`);
-  }
-  clearExecutionUserInfoCache();
+  return PerformanceMonitor.measure('addReaction', () => {
+    const accessResult = App.getAccess().verifyAccess(
+      requestUserId,
+      'view',
+      UserManager.getCurrentEmail()
+    );
+    if (!accessResult.allowed) {
+      throw new Error(`アクセスが拒否されました: ${accessResult.reason}`);
+    }
+    clearExecutionUserInfoCache();
+
+    return executeAddReaction(requestUserId, rowIndex, reactionKey, sheetName);
+  });
+}
+
+function executeAddReaction(requestUserId, rowIndex, reactionKey, sheetName) {
 
   try {
     const reactingUserEmail = UserManager.getCurrentEmail();
@@ -1524,14 +1531,21 @@ function saveSystemConfig(requestUserId, config) {
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
 function toggleHighlight(requestUserId, rowIndex, sheetName) {
-  const accessResult = App.getAccess().verifyAccess(
-    requestUserId,
-    'view',
-    UserManager.getCurrentEmail()
-  );
-  if (!accessResult.allowed) {
-    throw new Error(`アクセスが拒否されました: ${accessResult.reason}`);
-  }
+  return PerformanceMonitor.measure('toggleHighlight', () => {
+    const accessResult = App.getAccess().verifyAccess(
+      requestUserId,
+      'view',
+      UserManager.getCurrentEmail()
+    );
+    if (!accessResult.allowed) {
+      throw new Error(`アクセスが拒否されました: ${accessResult.reason}`);
+    }
+
+    return executeToggleHighlight(requestUserId, rowIndex, sheetName);
+  });
+}
+
+function executeToggleHighlight(requestUserId, rowIndex, sheetName) {
   try {
     const currentUserId = requestUserId; // requestUserId を使用
 

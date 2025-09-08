@@ -1137,7 +1137,7 @@ function renderAnswerBoard(userInfo, params) {
   }
   
   // デバッグ: 実際に取得されたconfigの中身を確認
-  console.log('🔍 renderAnswerBoard - 実際のconfig取得状況:', {
+  // config取得状況デバッグ（必要時のみ有効化）
     hasSpreadsheetId: !!config.spreadsheetId,
     hasSheetName: !!config.sheetName,
     spreadsheetIdValue: config.spreadsheetId?.substring(0, 20) + '...',
