@@ -904,7 +904,7 @@ function formatSheetDataForFrontend(
   displayMode
 ) {
   // 🔍 formatSheetDataForFrontend - マッピングデータ処理調査ログ
-  console.group('🎭 formatSheetDataForFrontend - データフォーマット調査');
+  console.log('🎭 formatSheetDataForFrontend - データフォーマット調査');
   console.log('📊 入力パラメータ:', {
     rawDataCount: rawData.length,
     mappedIndices: mappedIndices,
@@ -924,7 +924,7 @@ function formatSheetDataForFrontend(
     const nameIndex = mappedIndices.nameHeader;
 
     // 🔍 各行の詳細データ抽出調査
-    console.group(`🔍 Row ${index} フォーマット処理:`);
+    console.log(`🔍 Row ${index} フォーマット処理:`);
     console.log('📄 インデックス情報:', {
       classIndex: classIndex,
       opinionIndex: opinionIndex,
@@ -941,7 +941,6 @@ function formatSheetDataForFrontend(
         nameValue: nameIndex !== undefined ? row.originalData[nameIndex] : 'INDEX_UNDEFINED'
       });
     }
-    console.groupEnd();
 
     let nameValue = '';
     const shouldShowName =
@@ -989,7 +988,7 @@ function formatSheetDataForFrontend(
     // 🔍 理由列の値を取得（包括的null/undefined/空文字列処理）
     let reasonValue = '';
     
-    console.group('🎯 理由列データ抽出詳細:');
+    console.log('🎯 理由列データ抽出詳細:');
     console.log('📊 理由列抽出パラメータ:', {
       reasonIndex: reasonIndex,
       hasOriginalData: !!row.originalData,
@@ -1031,7 +1030,6 @@ function formatSheetDataForFrontend(
       finalLength: reasonValue.length,
       willDisplay: reasonValue.length > 0
     });
-    console.groupEnd();
 
     const finalResult = {
       rowIndex: row.rowNumber || index + 2,
@@ -1071,8 +1069,6 @@ function formatSheetDataForFrontend(
     
     return finalResult;
   });
-  
-  console.groupEnd(); // formatSheetDataForFrontend ログ終了
 }
 
 /**
@@ -2872,7 +2868,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const dataRows = sheetData.slice(1);
 
     // 🔍 スプレッドシート生データの詳細調査ログ（理由列問題対応）
-    console.group('📊 executeGetSheetData - スプレッドシート生データ調査');
+    console.log('📊 executeGetSheetData - スプレッドシート生データ調査');
     console.log('📋 ヘッダー情報:', {
       headers: headers,
       headerCount: headers.length,
@@ -2883,7 +2879,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     console.log('📄 データ行サンプル（最初の3行）:');
     for (let i = 0; i < Math.min(3, dataRows.length); i++) {
       const row = dataRows[i];
-      console.group(`🔍 Row ${i + 2} (index ${i}):`, {
+      console.log(`🔍 Row ${i + 2} (index ${i}):`, {
         rowLength: row.length,
         hasReasonData: row[5] ? 'YES' : 'NO',  // index 5は理由列の予想位置
         reasonValue: row[5] || 'EMPTY',
@@ -2896,9 +2892,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
           console.log(`  Column ${colIndex} (${headers[colIndex] || 'unknown'}): "${cell || 'EMPTY'}"`);
         }
       });
-      console.groupEnd();
     }
-    console.groupEnd();
 
     // ヘッダーインデックスを取得（キャッシュ利用）
     const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
@@ -3094,7 +3088,7 @@ function buildRosterMap(rosterData) {
  */
 function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber, isOwner) {
   // 🔍 processRowData - 行データ処理の詳細調査ログ
-  console.group(`🎯 processRowData - Row ${rowNumber} 詳細調査`);
+  console.log(`🎯 processRowData - Row ${rowNumber} 詳細調査`);
   console.log('📄 入力データ:', {
     rowLength: row.length,
     rowData: row,
@@ -3108,7 +3102,6 @@ function processRowData(row, headers, headerIndices, rosterMap, displayMode, row
     const cellValue = actualIndex !== undefined ? row[actualIndex] : 'HEADER_NOT_FOUND';
     console.log(`  🔍 "${header.substring(0, 20)}...": index=${actualIndex}, value="${cellValue || 'EMPTY'}"`);
   });
-  console.groupEnd();
 
   const processedRow = {
     rowNumber,
