@@ -10,8 +10,8 @@
     const solutions = [];
 
     // 診断1: テンプレート展開状況
-    // ✅ Phase 5: 初期診断もconfigManager優先
-    const userId = configManager.config?.userId || window.USER_ID;
+    // ✅ Phase 5: 初期診断では直接window変数を使用（循環参照回避）
+    const userId = window.USER_ID;
     if (!userId || typeof userId === 'object' || userId.trim() === '') {
       issues.push('テンプレート変数が正しく展開されていません');
       solutions.push('🔄 ページをリロードしてください');
@@ -140,10 +140,45 @@
 
     get config() {
       if (!this._initialized) {
-        console.warn('⚠️ ConfigManagerが未初期化です');
+        // デバッグ時のみ警告表示、本番では静かに処理
+        if (isDebugMode()) {
+          console.warn('⚠️ ConfigManagerが未初期化です');
+        }
         return this._createFallbackConfig();
       }
       return this._config;
+    }
+
+    // 初期化状態を確認するヘルパー
+    get isInitialized() {
+      return this._initialized;
+    }
+
+    // 状態同期：configManager初期化後にAnswerBoardAppの状態を更新
+    syncToAnswerBoardApp(answerBoardApp) {
+      if (!this._initialized || !answerBoardApp) return;
+
+      const config = this._config;
+      if (config && answerBoardApp.state) {
+        // configManagerの値でstate値を更新
+        answerBoardApp.state.isStudentMode = config.isStudentMode ?? answerBoardApp.state.isStudentMode;
+        answerBoardApp.state.isAdminUser = config.isAdminUser ?? answerBoardApp.state.isAdminUser;
+        answerBoardApp.state.showCounts = config.showCounts ?? answerBoardApp.state.showCounts;
+        answerBoardApp.state.showScoreSort = config.showScoreSort ?? answerBoardApp.state.showScoreSort;
+        answerBoardApp.state.displayMode = config.displayMode ?? answerBoardApp.state.displayMode;
+        answerBoardApp.state.sheetName = config.sheetName ?? answerBoardApp.state.sheetName;
+        answerBoardApp.state.userId = config.userId ?? answerBoardApp.state.userId;
+
+        // サーバー状態も更新
+        answerBoardApp.serverShowCounts = config.showCounts ?? answerBoardApp.serverShowCounts;
+        answerBoardApp.serverDisplayMode = config.displayMode ?? answerBoardApp.serverDisplayMode;
+
+        debugInfo('✅ ConfigManager → AnswerBoardApp 状態同期完了', {
+          userId: config.userId,
+          sheetName: config.sheetName,
+          displayMode: config.displayMode
+        });
+      }
     }
 
     async _loadConfigFromBackend() {
@@ -173,10 +208,10 @@
     }
 
     _extractUserId() {
-      // ✅ 統一されたuserId取得ロジック
+      // ✅ 循環参照回避：初期化中はconfigManagerを参照しない
       const sources = [
         () => new URLSearchParams(window.location.search).get('userId'),
-        () => configManager.config?.userId || window.USER_ID,
+        () => window.USER_ID,
         () => this._config?.userId
       ];
 
@@ -794,16 +829,16 @@
         currentAnswers: [], // CLAUDE.md準拠: 常に配列として初期化
         isLoading: false,
         lastFocusedElement: null,
-        // ✅ Phase 4: テンプレート変数統一化 - configManager優先順位
-        isStudentMode: configManager.config?.isStudentMode ?? window.isStudentMode,
-        isAdminUser: configManager.config?.isAdminUser ?? window.isAdminUser,
-        showCounts: configManager.config?.showCounts ?? window.showCounts,
+        // ✅ Phase 4改良: 初期化時は直接window変数使用、後でconfigManagerと同期
+        isStudentMode: window.isStudentMode,
+        isAdminUser: window.isAdminUser,
+        showCounts: window.showCounts,
         showAdminFeatures: false, // 初期状態は常に閲覧モード
-        showHighlightToggle: configManager.config?.isAdminUser ?? window.isAdminUser, // 管理者なら常に表示
-        showScoreSort: configManager.config?.showScoreSort ?? window.showScoreSort,
-        displayMode: configManager.config?.displayMode ?? window.displayMode,
-        sheetName: configManager.config?.sheetName || 'Sheet1',
-        userId: this.validateUserId(configManager.config?.userId),
+        showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
+        showScoreSort: window.showScoreSort,
+        displayMode: window.displayMode,
+        sheetName: 'Sheet1', // 初期値、後でconfigManagerから更新
+        userId: this.validateUserId(window.USER_ID),
         hasNewContent: false,
         newContentCount: 0,
         lastSeenCount: this.loadLastSeenCount(), // ローカルストレージから復元
@@ -816,9 +851,9 @@
       this.initialDataLoaded = false;
       this.hadInitialDataLoadFailure = false; // 初期データロード失敗フラグ
 
-      // ✅ Phase 4: テンプレート変数統一化 - サーバー状態もconfigManager優先
-      this.serverShowCounts = configManager.config?.showCounts ?? window.showCounts;
-      this.serverDisplayMode = configManager.config?.displayMode ?? window.displayMode;
+      // ✅ Phase 4改良: 初期化時は直接window変数使用
+      this.serverShowCounts = window.showCounts;
+      this.serverDisplayMode = window.displayMode;
       this.pollingInterval = null;
       this.handlers = {};
       this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
@@ -9687,6 +9722,10 @@
 
         // AnswerBoardApp インスタンス初期化
         window.answerBoardApp = new AnswerBoardApp();
+        
+        // ✅ 状態同期: ConfigManager → AnswerBoardApp
+        configManager.syncToAnswerBoardApp(window.answerBoardApp);
+        
         debugInfo('✅ AnswerBoardApp初期化完了');
       })
       .catch((error) => {
