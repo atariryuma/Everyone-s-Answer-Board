@@ -109,7 +109,7 @@
       await loadSpreadsheetListAsync();
 
       // 現在の設定から既存データを取得・反映
-      const config = await getCurrentConfigAsync();
+      const config = await getConfigAsync();
       if (config && config.spreadsheetId) {
         spreadsheetSelect.value = config.spreadsheetId;
 
@@ -300,7 +300,7 @@
   async function loadAndApplyCurrentConfig() {
     try {
       // 設定データを非同期で取得
-      const config = await getCurrentConfigAsync();
+      const config = await getConfigAsync();
 
       // リソースボタンを更新
       updateResourceButtons(config);
@@ -374,13 +374,13 @@
   };
 
   // 設定データ取得（最適化版 - 重複実行防止）
-  function getCurrentConfigAsync() {
+  function getConfigAsync() {
     return executionManager.execute('getCurrentConfig', () => {
       return new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler(resolve)
           .withFailureHandler(reject)
-          .getCurrentConfig();
+          .getConfig();
       });
     });
   }
@@ -865,7 +865,7 @@
         console.error('エクスポートエラー:', error);
         showError('設定のエクスポートに失敗しました');
       })
-      .getCurrentConfig();
+      .getConfig();
   }
 
   // システム管理者アクセス確認
@@ -1419,10 +1419,10 @@
 
     // マッピングの対応関係（バックエンドのconvertIndicesToMappingと統一）
     const mappingKeys = {
-      answer: ['answer'], // バックエンドのCOLUMN_HEADERS.OPINION → answer
-      reason: ['reason'], // バックエンドのCOLUMN_HEADERS.REASON → reason
-      class: ['class'], // バックエンドのCOLUMN_HEADERS.CLASS → class
-      name: ['name'], // バックエンドのCOLUMN_HEADERS.NAME → name
+      answer: ['answer'], // バックエンドのCONSTANTS.COLUMNS.OPINION → answer
+      reason: ['reason'], // バックエンドのCONSTANTS.COLUMNS.REASON → reason
+      class: ['class'], // バックエンドのCONSTANTS.COLUMNS.CLASS → class
+      name: ['name'], // バックエンドのCONSTANTS.COLUMNS.NAME → name
     };
 
     Object.keys(dropdowns).forEach((columnType) => {
@@ -1883,7 +1883,7 @@
         showError('現在の設定の取得に失敗しました: ' + error.message);
         setLoading(false);
       })
-      .getCurrentConfig(); // 現在の完全な設定を先に取得
+      .getConfig(); // 現在の完全な設定を先に取得
   }
 
   // 設定収集（ドロップダウン式対応）

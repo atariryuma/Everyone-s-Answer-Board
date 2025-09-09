@@ -4,26 +4,15 @@
  */
 
 /**
+ * ✅ 統一：CONSTANTS.DATABASE使用（重複削除）
  * CLAUDE.md準拠：configJSON中心型データベーススキーマ（5フィールド構造）
- * 絶対遵守：この構造以外は使用禁止
  */
 const DB_CONFIG = Object.freeze({
   CACHE_TTL: CORE.TIMEOUTS.LONG, // 30秒
   BATCH_SIZE: 100,
   LOCK_TIMEOUT: 10000, // 10秒
-  SHEET_NAME: 'Users',
-
-  /**
-   * CLAUDE.md絶対遵守：5フィールド構造
-   * 全データはconfigJsonに統合し、単一JSON操作で全データ取得・更新
-   */
-  HEADERS: Object.freeze([
-    'userId', // [0] UUID - 必須ID（検索用）
-    'userEmail', // [1] メールアドレス - 必須認証（検索用）
-    'isActive', // [2] アクティブ状態 - 必須フラグ（検索用）
-    'configJson', // [3] 全設定統合 - メインデータ（JSON一括処理）
-    'lastModified', // [4] 最終更新 - 監査用
-  ]),
+  SHEET_NAME: CONSTANTS.DATABASE.SHEET_NAME,
+  HEADERS: CONSTANTS.DATABASE.HEADERS,
 
   // CLAUDE.md準拠：A:E範囲（5列のみ）
   RANGE: 'A:E',
@@ -1317,7 +1306,7 @@ function updateUserFields(userId, fields) {
 
     const dbId = getSecureDatabaseId();
     const sheetName = DB_CONFIG.SHEET_NAME;
-    const spreadsheet = SpreadsheetApp.openById(dbId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(dbId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {

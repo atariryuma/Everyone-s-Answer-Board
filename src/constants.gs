@@ -218,7 +218,7 @@ const SecurityValidator = Object.freeze({
  * 統合定数オブジェクト（フラット構造）
  * GAS 2025 Best Practices準拠
  */
-const SYSTEM_CONSTANTS = Object.freeze({
+const CONSTANTS = Object.freeze({
   // 🚀 configJSON中心型超効率化データベース定数
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
@@ -386,10 +386,5 @@ const PerformanceMonitor = Object.freeze({
   }
 });
 
-// 後方互換性のための旧定数エイリアス
-const REACTION_KEYS = SYSTEM_CONSTANTS.REACTIONS.KEYS;
-const COLUMN_HEADERS = {
-  ...SYSTEM_CONSTANTS.COLUMNS,
-  ...SYSTEM_CONSTANTS.REACTIONS.LABELS,
-};
-const DELETE_LOG_SHEET_CONFIG = SYSTEM_CONSTANTS.DATABASE.DELETE_LOG;
+// ✅ 簡素化：直接CONSTANTSを使用（エイリアス削除でメモリ効率化）
+// 使用例: CONSTANTS.REACTIONS.KEYS, CONSTANTS.COLUMNS, CONSTANTS.DATABASE.DELETE_LOG

@@ -85,7 +85,7 @@ function testUnifiedSystem() {
     
     // 4. スプレッドシートデータ取得テスト
     if (config.spreadsheetId && config.sheetName) {
-      const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+      const spreadsheet = this.getSpreadsheet(config.spreadsheetId);
       const sheet = spreadsheet.getSheetByName(config.sheetName);
       const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
@@ -155,7 +155,7 @@ function testSystemStatus() {
       // スプレッドシートアクセステスト
       if (config.spreadsheetId) {
         try {
-          const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+          const spreadsheet = this.getSpreadsheet(config.spreadsheetId);
           console.log('✅ スプレッドシート接続: 成功');
           
           if (config.sheetName) {
@@ -271,7 +271,8 @@ const UserIdResolver = Object.freeze({
    */
   getCurrentUserId() {
     try {
-      const currentEmail = UserManager.getCurrentEmail();
+      const currentInfo = new ConfigurationManager().getCurrentUserInfoSafely();
+      const currentEmail = currentInfo?.currentUserEmail;
       if (!currentEmail) {
         console.warn('UserIdResolver.getCurrentUserId: 現在のユーザーメールが取得できません');
         return null;
@@ -346,11 +347,45 @@ class ConfigurationManager {
    * @param {string} userId ユーザーID
    * @return {Object|null} 統合ユーザー設定オブジェクト
    */
+  // ✅ 統一された設定取得関数（システム全体で唯一のエントリーポイント）
   getUserConfig(userId) {
     return ConfigManager.getUserConfig(userId);
-  }
+  },
 
-  // getOptimizedUserInfo removed - use getUserConfig() directly
+  // ✅ 共通ユーティリティ：現在のユーザー情報取得（重複削減）
+  getCurrentUserInfo() {
+    const currentUserEmail = UserManager.getCurrentEmail();
+    if (!currentUserEmail) {
+      throw new Error('ユーザーメール取得に失敗しました');
+    }
+    const userInfo = DB.findUserByEmail(currentUserEmail);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    return { currentUserEmail, userInfo };
+  },
+
+  // ✅ 安全な現在のユーザー情報取得（nullを返すバージョン）
+  getCurrentUserInfoSafely() {
+    try {
+      return this.getCurrentUserInfo();
+    } catch (error) {
+      console.warn('getCurrentUserInfoSafely:', error.message);
+      return null;
+    }
+  },
+
+  // ✅ 共通ユーティリティ：スプレッドシート取得（重複削減・エラーハンドリング統一）
+  getSpreadsheet(spreadsheetId) {
+    if (!spreadsheetId) {
+      throw new Error('スプレッドシートIDが指定されていません');
+    }
+    try {
+      return SpreadsheetApp.openById(spreadsheetId);
+    } catch (error) {
+      throw new Error(`スプレッドシートアクセスエラー: ${error.message}`);
+    }
+  }
 
   // setUserConfig removed - use ConfigManager.saveConfig() directly
 
@@ -369,7 +404,7 @@ class ConfigurationManager {
    * @return {Object|null} 公開設定オブジェクト
    */
   getPublicConfig(userId) {
-    const config = ConfigManager.getUserConfig(userId);
+    const config = this.getUserConfig(userId);
     if (!config || !config.isPublic) return null;
 
     return {
@@ -494,7 +529,7 @@ class ConfigurationManager {
    * @return {boolean} 存在可否
    */
   hasUserConfig(userId) {
-    const config = ConfigManager.getUserConfig(userId);
+    const config = this.getUserConfig(userId);
     return config !== null && Object.keys(config).length > 0;
   }
 }
@@ -650,7 +685,8 @@ class AccessController {
       return 'owner';
     }
 
-    if (UserManager.getCurrentEmail() === currentUserEmail) {
+    const currentInfo = this.getCurrentUserInfoSafely();
+    if (currentInfo?.currentUserEmail === currentUserEmail) {
       return 'authenticated_user';
     }
 
@@ -666,7 +702,7 @@ class AccessController {
     try {
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-      const userEmail = currentUserEmail || UserManager.getCurrentEmail();
+      const userEmail = currentUserEmail || (this.getCurrentUserInfoSafely()?.currentUserEmail);
       return adminEmail && userEmail && adminEmail === userEmail;
     } catch (e) {
       console.error(`isSystemAdmin エラー: ${e.message}`);

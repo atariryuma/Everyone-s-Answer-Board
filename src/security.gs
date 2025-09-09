@@ -273,7 +273,7 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
     }
 
     // スプレッドシートをサービスアカウントと共有
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     spreadsheet.addEditor(serviceAccountEmail);
 
     console.log(
@@ -395,7 +395,7 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
       return;
     }
 
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const permissions = spreadsheet.getEditors();
     const isAlreadyEditor = permissions.some((editor) => editor.getEmail() === serviceAccountEmail);
 

@@ -705,7 +705,7 @@ const ConfigManager = Object.freeze({
 
       try {
         // スプレッドシートからフォーム情報を取得
-        const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+        const spreadsheet = new ConfigurationManager().getSpreadsheet(config.spreadsheetId);
         const formUrl = spreadsheet.getFormUrl();
         
         if (formUrl) {

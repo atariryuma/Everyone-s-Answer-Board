@@ -238,10 +238,10 @@
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   });
 
-  // ✅ CLAUDE.md準拠: SYSTEM_CONSTANTS統合 + 必須UI定数
+  // ✅ CLAUDE.md準拠: CONSTANTS統合 + 必須UI定数
   const VIEWPORT_BUFFER = 100; // setupObservers用の必須定数
 
-  const SYSTEM_CONSTANTS = Object.freeze({
+  const CONSTANTS = Object.freeze({
     REACTIONS: Object.freeze({
       KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
       LABELS: Object.freeze({
@@ -333,7 +333,7 @@
         return new Promise((resolve, reject) => {
           const timeout = setTimeout(
             () => reject(new Error('Publication status check timeout')),
-            SYSTEM_CONSTANTS.TIMEOUTS.SHORT * 8
+            CONSTANTS.TIMEOUTS.SHORT * 8
           );
           const cleanup =
             (fn) =>
@@ -694,8 +694,8 @@
             sinceRowCount
           ),
         getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
-        addReactionBatch: (batchOperations) =>
-          this.runGas('addReactionBatch', this.state.userId, batchOperations), // 新しいバッチAPI
+        addReactions: (batchOperations) =>
+          this.runGas('addReactions', this.state.userId, batchOperations), // 新しいバッチAPI
         addReaction: (rowIndex, reaction, sheetName) =>
           this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
         toggleHighlight: (rowIndex, sheetName) =>
@@ -1360,7 +1360,7 @@
         }
 
         if (!isStateChanging) {
-          this.cache.set(cacheKey, result, SYSTEM_CONSTANTS.TIMEOUTS.LONG);
+          this.cache.set(cacheKey, result, CONSTANTS.TIMEOUTS.LONG);
         }
 
         const executionTime = (performance.now() - startTime).toFixed(1);
@@ -1647,8 +1647,9 @@
 
       // 新着データ検出
 
-      if (detectionMetrics.hasNewItems && detectionMetrics.expectedNewItems > 0) {
-        const newItems = detectionMetrics.expectedNewItems;
+      const hasNewItems = newCount > lastSeen;
+      if (hasNewItems && newCount > currentCount) {
+        const newItems = newCount - lastSeen;
 
         // 新着通知バナーを表示
         this.showNewContentBanner(newItems);
@@ -3260,17 +3261,17 @@
               }
 
               // 🔍 データ受信確認（簡素化）
-              const firstItem = result?.data?.[0];
               console.log('📊 データ受信:', {
                 count: result?.data?.length || 0,
-                hasHeader: !!result?.header,
-                firstReasonEmpty: !firstItem?.reason || firstItem.reason.trim() === ''
+                hasHeader: !!result?.header
               });
               
-              // 理由データが空の場合の警告
-              if (firstItem && (!firstItem.reason || firstItem.reason.trim() === '')) {
-                console.warn('⚠️ 理由データが空です - columnMapping設定を確認してください', {
-                  reasonHeader: configManager.config?.reasonHeader,
+              // 理由データ全体の警告チェック（簡素化）
+              const emptyReasonCount = result?.data?.filter(item => !item?.reason || item.reason.trim() === '').length || 0;
+              if (emptyReasonCount > 0) {
+                console.warn('⚠️ 理由データが空の項目があります:', {
+                  emptyCount: emptyReasonCount,
+                  totalCount: result?.data?.length || 0,
                   columnMapping: configManager.config?.columnMapping?.reason
                 });
               }
@@ -4473,7 +4474,7 @@
 
                 // aria-label更新
                 const reactionName =
-                  SYSTEM_CONSTANTS.REACTIONS.LABELS[update.reaction] || update.reaction;
+                  CONSTANTS.REACTIONS.LABELS[update.reaction] || update.reaction;
                 const ariaLabel = `${reactionName}${update.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${update.count}件)` : ''}`;
                 btn.setAttribute('aria-label', ariaLabel);
 
@@ -4570,14 +4571,6 @@
         }
 
         // Ensure required properties exist with safe defaults（理由列の堅牢化）
-        // 🔍 カード作成時の簡潔ログ（理由データ問題デバッグ用）
-        if (!data.reason || data.reason.trim() === '') {
-          console.warn(`⚠️ Row ${data.rowIndex}: 理由データが空です`, {
-            reason: data.reason,
-            hasReason: !!data.reason,
-            opinion: data.opinion?.substring(0, 30) + '...'
-          });
-        }
 
         const safeData = {
           rowIndex: data.rowIndex || 0,
@@ -4686,7 +4679,7 @@
                   (info.count || 0) +
                   '</span>'
                 : '';
-              const reactionName = SYSTEM_CONSTANTS.REACTIONS.LABELS[rt.key] || rt.key;
+              const reactionName = CONSTANTS.REACTIONS.LABELS[rt.key] || rt.key;
               const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
               return (
                 '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' +
@@ -6600,7 +6593,7 @@
           modalBtn.setAttribute('aria-pressed', info.reacted.toString());
 
           // aria-label更新
-          const reactionName = SYSTEM_CONSTANTS.REACTIONS.LABELS[rt.key] || rt.key;
+          const reactionName = CONSTANTS.REACTIONS.LABELS[rt.key] || rt.key;
           const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
           modalBtn.setAttribute('aria-label', ariaLabel);
         }

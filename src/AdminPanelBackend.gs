@@ -19,7 +19,7 @@ function connectDataSource(spreadsheetId, sheetName) {
     }
 
     // 基本的な接続検証
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -105,7 +105,7 @@ function connectDataSource(spreadsheetId, sheetName) {
 
     // 現在のユーザー取得と設定準備（最適化版）
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
 
     if (userInfo) {
       // 現在のconfigJSONを直接取得（ConfigManager経由削除）
@@ -228,7 +228,7 @@ function publishApplication(config) {
     });
 
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
 
     if (!userInfo) {
       console.error('❌ publishApplication: ユーザー情報が見つかりません', {
@@ -390,7 +390,7 @@ function saveDraftConfiguration(config) {
     });
 
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
 
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -458,7 +458,7 @@ function getFormInfo(spreadsheetId, sheetName) {
     }
 
     // シート固有のフォーム連携確認
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -558,7 +558,7 @@ function getSpreadsheetList() {
         let count = 0;
 
         // 現在のユーザーを取得（オーナーフィルタリング用）
-        const currentUserEmail = UserManager.getCurrentEmail();
+        const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
 
         // Drive APIでオーナーが自分のスプレッドシートのみを検索
         const files = DriveApp.searchFiles(
@@ -660,7 +660,7 @@ function executeConfigCleanup() {
     console.log('🧹 configJSONクリーンアップ実行開始');
 
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
 
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -855,7 +855,7 @@ function validateAdminPanelMapping(columnMapping) {
  */
 function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -901,7 +901,7 @@ function addMissingColumns(spreadsheetId, sheetName, columnMapping) {
  */
 function checkFormConnection(spreadsheetId) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const formUrl = spreadsheet.getFormUrl();
 
     if (formUrl) {
@@ -945,24 +945,25 @@ function checkFormConnection(spreadsheetId) {
  */
 /**
  * 現在のユーザー設定を取得（最適化版 - データ上書き防止）
- * App.getConfig().getUserConfig() の実装として使用される
+ * ✅ 統一された設定取得（フロントエンド用エントリーポイント）
+ * ConfigManager.getUserConfig() への統一されたアクセス
  */
-function getCurrentConfig() {
+function getConfig() {
   const startTime = Date.now();
   
   try {
-    console.log('🔧 getCurrentConfig: ユーザー設定取得開始');
+    console.log('🔧 getConfig: ユーザー設定取得開始');
 
     // 現在のユーザーの設定を取得
     const currentUser = UserManager.getCurrentEmail();
     if (!currentUser) {
-      console.error('❌ getCurrentConfig: ユーザーメール取得失敗');
+      console.error('❌ getConfig: ユーザーメール取得失敗');
       throw new Error('ユーザー認証が必要です');
     }
 
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
     if (!userInfo) {
-      console.error('❌ getCurrentConfig: ユーザー情報が見つかりません', {
+      console.error('❌ getConfig: ユーザー情報が見つかりません', {
         currentUser,
         timestamp: new Date().toISOString(),
       });
@@ -972,7 +973,7 @@ function getCurrentConfig() {
 
     const config = ConfigManager.getUserConfig(userInfo.userId);
     if (!config) {
-      console.error('❌ getCurrentConfig: 設定データが見つかりません', {
+      console.error('❌ getConfig: 設定データが見つかりません', {
         userId: userInfo.userId,
         userEmail: currentUser,
       });
@@ -981,7 +982,7 @@ function getCurrentConfig() {
     }
 
     const executionTime = Date.now() - startTime;
-    console.log('✅ getCurrentConfig: ユーザー設定取得完了（最適化版）', {
+    console.log('✅ getConfig: ユーザー設定取得完了（最適化版）', {
       userId: userInfo.userId,
       configFields: Object.keys(config || {}).length,
       setupStatus: config.setupStatus,
@@ -1010,7 +1011,7 @@ function getCurrentBoardInfoAndUrls() {
 
     // 現在のユーザーの設定を取得
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
     const config = userInfo ? ConfigManager.getUserConfig(userInfo.userId) : null;
 
     // フッター表示用の問題文を管理パネルの回答列と一致させる（シンプル版）
@@ -1121,7 +1122,7 @@ function checkIsSystemAdmin() {
   try {
     console.log('🔐 checkIsSystemAdmin: システム管理者権限確認開始');
 
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     const isSystemAdmin = App.getAccess().isSystemAdmin(currentUserEmail);
 
     console.log('✅ checkIsSystemAdmin: 権限確認完了', {
@@ -1283,7 +1284,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
     });
 
     // スプレッドシートアクセス
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -1345,7 +1346,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
     });
 
     // 統一システム: ヘッダー行から直接インデックスを生成
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     
@@ -1385,7 +1386,7 @@ function getSheetList(spreadsheetId) {
       throw new Error('スプレッドシートIDが必要です');
     }
 
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const sheets = spreadsheet.getSheets();
 
     // 最小限のフォーム連携チェック（軽量版）
@@ -1448,7 +1449,7 @@ function diagnoseColumnMappingIssue() {
     console.log('🔍 columnMapping診断開始');
     
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
     
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -1469,7 +1470,7 @@ function diagnoseColumnMappingIssue() {
     let spreadsheetInfo = null;
     if (config.spreadsheetId && config.sheetName) {
       try {
-        const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+        const spreadsheet = new ConfigurationManager().getSpreadsheet(config.spreadsheetId);
         const sheet = spreadsheet.getSheetByName(config.sheetName);
         const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         
@@ -1521,7 +1522,7 @@ function repairColumnMapping() {
     console.log('🔧 columnMapping自動修復開始');
     
     const currentUser = UserManager.getCurrentEmail();
-    const userInfo = DB.findUserByEmail(currentUser);
+    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
     
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
@@ -1534,7 +1535,7 @@ function repairColumnMapping() {
     }
     
     // スプレッドシートからヘッダーを取得
-    const spreadsheet = SpreadsheetApp.openById(currentConfig.spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(currentConfig.spreadsheetId);
     const sheet = spreadsheet.getSheetByName(currentConfig.sheetName);
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     

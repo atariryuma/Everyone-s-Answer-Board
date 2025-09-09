@@ -1,0 +1,1625 @@
+{
+  "summary": {
+    "totalFiles": 32,
+    "verboseFunctions": 0,
+    "duplicateVars": 3,
+    "complexChains": 0,
+    "longNames": 227
+  },
+  "details": {
+    "verboseFunctions": [],
+    "duplicateVars": [
+      {
+        "file": "src/Base.gs",
+        "line": 74,
+        "pattern": "const userInfo = DB.findUserByEmail",
+        "count": 3
+      },
+      {
+        "file": "src/Base.gs",
+        "line": 143,
+        "pattern": "const userInfo = DB.findUserByEmail",
+        "count": 3
+      },
+      {
+        "file": "src/Base.gs",
+        "line": 361,
+        "pattern": "const userInfo = DB.findUserByEmail",
+        "count": 3
+      }
+    ],
+    "verboseConstants": [],
+    "complexChains": [],
+    "longNames": [
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 58,
+        "name": "initializeFooter",
+        "length": 16,
+        "suggestion": "Initializefooter"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 101,
+        "name": "initializeDropdowns",
+        "length": 19,
+        "suggestion": "Initializedropdowns"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 134,
+        "name": "setupSimpleChangeEvents",
+        "length": 23,
+        "suggestion": "Upsimplechangeevents"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 147,
+        "name": "resetSheetSelect",
+        "length": 16,
+        "suggestion": "Resetsheetselect"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 155,
+        "name": "loadSpreadsheetListAsync",
+        "length": 24,
+        "suggestion": "Loadspreadsheetlistasync"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 255,
+        "name": "loadSpreadsheetList",
+        "length": 19,
+        "suggestion": "Loadspreadsheetlist"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 260,
+        "name": "loadUserInfoAsync",
+        "length": 17,
+        "suggestion": "Loaduserinfoasync"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 300,
+        "name": "loadAndApplyCurrentConfig",
+        "length": 25,
+        "suggestion": "Loadandapply"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 389,
+        "name": "loadCurrentConfig",
+        "length": 17,
+        "suggestion": "Load"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 396,
+        "name": "autoSelectSpreadsheet",
+        "length": 21,
+        "suggestion": "Autoselectspreadsheet"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 444,
+        "name": "autoInitializeColumnSettings",
+        "length": 28,
+        "suggestion": "Autoinitializecolumnsettings"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 489,
+        "name": "detectBestSheetName",
+        "length": 19,
+        "suggestion": "Detectbestsheetname"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 537,
+        "name": "restoreColumnSettingsFromConfig",
+        "length": 31,
+        "suggestion": "Restorecolumnsettingsfrom"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 558,
+        "name": "analyzeAndSetupColumns",
+        "length": 22,
+        "suggestion": "Analyzeandsetupcolumns"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 573,
+        "name": "applyPreviousColumnSelections",
+        "length": 29,
+        "suggestion": "Applypreviouscolumnselections"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 596,
+        "name": "updateProgressFromConfig",
+        "length": 24,
+        "suggestion": "Progressfrom"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 617,
+        "name": "loadSheetListAsync",
+        "length": 18,
+        "suggestion": "Loadsheetlistasync"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 651,
+        "name": "analyzeColumnsAsync",
+        "length": 19,
+        "suggestion": "Analyzecolumnsasync"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 692,
+        "name": "updateResourceButtons",
+        "length": 21,
+        "suggestion": "Resourcebuttons"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 805,
+        "name": "checkSheetFormConnection",
+        "length": 24,
+        "suggestion": "Checksheetformconnection"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 872,
+        "name": "checkSystemAdminAccess",
+        "length": 22,
+        "suggestion": "Checksystemadminaccess"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 891,
+        "name": "createFormInterface",
+        "length": 19,
+        "suggestion": "Forminterface"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 973,
+        "name": "toggleSourceMethod",
+        "length": 18,
+        "suggestion": "Togglesourcemethod"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 987,
+        "name": "validateSpreadsheetUrl",
+        "length": 22,
+        "suggestion": "Validatespreadsheeturl"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1033,
+        "name": "updateSheetNameSuggestions",
+        "length": 26,
+        "suggestion": "Sheetnamesuggestions"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1058,
+        "name": "connectToUrlSource",
+        "length": 18,
+        "suggestion": "Connecttourlsource"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1278,
+        "name": "handleConnectionError",
+        "length": 21,
+        "suggestion": "Connectionerror"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1324,
+        "name": "updateColumnMapping",
+        "length": 19,
+        "suggestion": "Columnmapping"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1353,
+        "name": "populateColumnDropdowns",
+        "length": 23,
+        "suggestion": "Populatecolumndropdowns"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1414,
+        "name": "setAIDetectionSelections",
+        "length": 24,
+        "suggestion": "Aidetectionselections"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1463,
+        "name": "autoApplyAIDetection",
+        "length": 20,
+        "suggestion": "Autoapplyaidetection"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1530,
+        "name": "showNextStepGuidance",
+        "length": 20,
+        "suggestion": "Shownextstepguidance"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1549,
+        "name": "setupDropdownEventListeners",
+        "length": 27,
+        "suggestion": "Updropdowneventlisteners"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1569,
+        "name": "handleDropdownChange",
+        "length": 20,
+        "suggestion": "Dropdownchange"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1602,
+        "name": "showConfidenceBadge",
+        "length": 19,
+        "suggestion": "Showconfidencebadge"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1634,
+        "name": "hideConfidenceBadge",
+        "length": 19,
+        "suggestion": "Hideconfidencebadge"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1642,
+        "name": "displayAIDetectionInfo",
+        "length": 22,
+        "suggestion": "Displayaidetection"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1667,
+        "name": "updateSelectionStatus",
+        "length": 21,
+        "suggestion": "Selectionstatus"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1682,
+        "name": "resetToAIDetection",
+        "length": 18,
+        "suggestion": "Resettoaidetection"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1717,
+        "name": "verifyColumnMapping",
+        "length": 19,
+        "suggestion": "Verifycolumnmapping"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1760,
+        "name": "displayVerificationResults",
+        "length": 26,
+        "suggestion": "Displayverificationresults"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1779,
+        "name": "saveColumnConfiguration",
+        "length": 23,
+        "suggestion": "Savecolumnconfiguration"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1890,
+        "name": "gatherConfiguration",
+        "length": 19,
+        "suggestion": "Gatherconfiguration"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1922,
+        "name": "gatherColumnSelections",
+        "length": 22,
+        "suggestion": "Gathercolumnselections"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1964,
+        "name": "getColumnConfidence",
+        "length": 19,
+        "suggestion": "Columnconfidence"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1981,
+        "name": "updatePublishStatus",
+        "length": 19,
+        "suggestion": "Publishstatus"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 1992,
+        "name": "updateConfigSummary",
+        "length": 19,
+        "suggestion": "Configsummary"
+      },
+      {
+        "file": "src/AdminPanel.js.html",
+        "line": 2080,
+        "name": "updateFooterDisplay",
+        "length": 19,
+        "suggestion": "Footerdisplay"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 10,
+        "name": "connectDataSource",
+        "length": 17,
+        "suggestion": "Connectdatasource"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 221,
+        "name": "publishApplication",
+        "length": 18,
+        "suggestion": "Publishapplication"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 385,
+        "name": "saveDraftConfiguration",
+        "length": 22,
+        "suggestion": "Savedraftconfiguration"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 540,
+        "name": "getSpreadsheetList",
+        "length": 18,
+        "suggestion": "Spreadsheetlist"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 633,
+        "name": "executeAppPublish",
+        "length": 17,
+        "suggestion": "Executeapppublish"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 658,
+        "name": "executeConfigCleanup",
+        "length": 20,
+        "suggestion": "Executeconfigcleanup"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 707,
+        "name": "generateColumnMapping",
+        "length": 21,
+        "suggestion": "Generatecolumnmapping"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 747,
+        "name": "generateLegacyColumnMapping",
+        "length": 27,
+        "suggestion": "Generatelegacycolumnmapping"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 826,
+        "name": "detectColumnMapping",
+        "length": 19,
+        "suggestion": "Detectcolumnmapping"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 834,
+        "name": "validateAdminPanelMapping",
+        "length": 25,
+        "suggestion": "Validateadminpanelmapping"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 856,
+        "name": "addMissingColumns",
+        "length": 17,
+        "suggestion": "Addmissingcolumns"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 902,
+        "name": "checkFormConnection",
+        "length": 19,
+        "suggestion": "Checkformconnection"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1009,
+        "name": "getCurrentBoardInfoAndUrls",
+        "length": 26,
+        "suggestion": "Boardiurls"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1121,
+        "name": "checkIsSystemAdmin",
+        "length": 18,
+        "suggestion": "Checkissystemadmin"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1152,
+        "name": "migrateUserDataToConfigJson",
+        "length": 27,
+        "suggestion": "Migrateuserdatatoconfigjson"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1341,
+        "name": "getHeaderIndices",
+        "length": 16,
+        "suggestion": "Headerindices"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1433,
+        "name": "getActualHeaderName",
+        "length": 19,
+        "suggestion": "Actualheadername"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1447,
+        "name": "diagnoseColumnMappingIssue",
+        "length": 26,
+        "suggestion": "Diagnosecolumnmappingissue"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1520,
+        "name": "repairColumnMapping",
+        "length": 19,
+        "suggestion": "Repaircolumnmapping"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1596,
+        "name": "generateRecommendations",
+        "length": 23,
+        "suggestion": "Generaterecommendations"
+      },
+      {
+        "file": "src/AdminPanelBackend.gs",
+        "line": 1624,
+        "name": "fixFormInfoForUser",
+        "length": 18,
+        "suggestion": "Fixforminfoforuser"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 481,
+        "name": "loadCurrentStatus",
+        "length": 17,
+        "suggestion": "Loadstatus"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 499,
+        "name": "updateStatusDisplay",
+        "length": 19,
+        "suggestion": "Statusdisplay"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 546,
+        "name": "updateIsActiveStatus",
+        "length": 20,
+        "suggestion": "Isstatus"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 591,
+        "name": "goBackToAdminPanel",
+        "length": 18,
+        "suggestion": "Gobacktoadminpanel"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 617,
+        "name": "toggleUserManagement",
+        "length": 20,
+        "suggestion": "Toggleusermanagement"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 712,
+        "name": "showDeleteConfirmation",
+        "length": 22,
+        "suggestion": "Showdeleteconfirmation"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 762,
+        "name": "viewDeletionLogs",
+        "length": 16,
+        "suggestion": "Viewdeletionlogs"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 792,
+        "name": "displayDeletionLogs",
+        "length": 19,
+        "suggestion": "Displaydeletionlogs"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 838,
+        "name": "closeDeletionLogs",
+        "length": 17,
+        "suggestion": "Closedeletionlogs"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 843,
+        "name": "runSystemDiagnosis",
+        "length": 18,
+        "suggestion": "Runsystemdiagnosis"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 856,
+        "name": "runSystemMonitoring",
+        "length": 19,
+        "suggestion": "Runsystemmonitoring"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 865,
+        "name": "runIntegrityCheck",
+        "length": 17,
+        "suggestion": "Runintegritycheck"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 875,
+        "name": "executeSystemFunction",
+        "length": 21,
+        "suggestion": "Executesystemfunction"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 931,
+        "name": "formatDiagnosticResult",
+        "length": 22,
+        "suggestion": "Formatdiagnosticresult"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 982,
+        "name": "createDiagnosticSummary",
+        "length": 23,
+        "suggestion": "Diagnosticsummary"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 1034,
+        "name": "saveDiagnosticToHistory",
+        "length": 23,
+        "suggestion": "Savediagnostictohistory"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 1059,
+        "name": "viewDiagnosticHistory",
+        "length": 21,
+        "suggestion": "Viewdiagnostichistory"
+      },
+      {
+        "file": "src/AppSetupPage.html",
+        "line": 1080,
+        "name": "displayDiagnosticHistory",
+        "length": 24,
+        "suggestion": "Displaydiagnostichistory"
+      },
+      {
+        "file": "src/Base.gs",
+        "line": 29,
+        "name": "getColumnHeaderByIndex",
+        "length": 22,
+        "suggestion": "Columnheaderbyindex"
+      },
+      {
+        "file": "src/Base.gs",
+        "line": 41,
+        "name": "getAllColumnIndices",
+        "length": 19,
+        "suggestion": "Allcolumnindices"
+      },
+      {
+        "file": "src/Base.gs",
+        "line": 58,
+        "name": "testUnifiedSystem",
+        "length": 17,
+        "suggestion": "Testunifiedsystem"
+      },
+      {
+        "file": "src/Base.gs",
+        "line": 130,
+        "name": "testSystemStatus",
+        "length": 16,
+        "suggestion": "Testsystemstatus"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 13,
+        "name": "analyzeColumnType",
+        "length": 17,
+        "suggestion": "Analyzecolumntype"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 57,
+        "name": "analyzeHeaderName",
+        "length": 17,
+        "suggestion": "Analyzeheadername"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 134,
+        "name": "analyzeColumnContent",
+        "length": 20,
+        "suggestion": "Analyzecolumncontent"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 208,
+        "name": "calculateFinalConfidence",
+        "length": 24,
+        "suggestion": "Calculatefinalconfidence"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 256,
+        "name": "calculateAdvancedFeatures",
+        "length": 25,
+        "suggestion": "Calculateadvancedfeatures"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 325,
+        "name": "getEmptyFeatureVector",
+        "length": 21,
+        "suggestion": "Emptyfeaturevector"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 348,
+        "name": "calculateSkewness",
+        "length": 17,
+        "suggestion": "Calculateskewness"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 358,
+        "name": "calculateKurtosis",
+        "length": 17,
+        "suggestion": "Calculatekurtosis"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 368,
+        "name": "calculateShannonEntropy",
+        "length": 23,
+        "suggestion": "Calculateshannonentropy"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 392,
+        "name": "calculateConditionalEntropy",
+        "length": 27,
+        "suggestion": "Calculateconditionalentropy"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 429,
+        "name": "calculateMutualInformation",
+        "length": 26,
+        "suggestion": "Calculatemutualinformation"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 453,
+        "name": "calculatePatternDensity",
+        "length": 23,
+        "suggestion": "Calculatepatterndensity"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 469,
+        "name": "calculateNamePatternScore",
+        "length": 25,
+        "suggestion": "Calculatenamepatternscore"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 493,
+        "name": "calculateClassPatternScore",
+        "length": 26,
+        "suggestion": "Calculateclasspatternscore"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 525,
+        "name": "ensembleClassification",
+        "length": 22,
+        "suggestion": "Ensembleclassification"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 556,
+        "name": "classifyByAdvancedFeatures",
+        "length": 26,
+        "suggestion": "Classifybyadvancedfeatures"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 594,
+        "name": "calculateDynamicWeights",
+        "length": 23,
+        "suggestion": "Calculatedynamicweights"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 615,
+        "name": "calculateBayesianConfidence",
+        "length": 27,
+        "suggestion": "Calculatebayesianconfidence"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 644,
+        "name": "resolveColumnConflicts",
+        "length": 22,
+        "suggestion": "Resolvecolumnconflicts"
+      },
+      {
+        "file": "src/ColumnAnalysisSystem.gs",
+        "line": 743,
+        "name": "hungarianAlgorithmSimplified",
+        "length": 28,
+        "suggestion": "Hungarianalgorithmsimplified"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 122,
+        "name": "determineSetupStep",
+        "length": 18,
+        "suggestion": "Determinesetupstep"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 165,
+        "name": "validateHeaderIntegrity",
+        "length": 23,
+        "suggestion": "Validateheaderintegrity"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 254,
+        "name": "getOpinionHeaderSafely",
+        "length": 22,
+        "suggestion": "Opinionheadersafely"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 454,
+        "name": "executeAddReaction",
+        "length": 18,
+        "suggestion": "Executeaddreaction"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 517,
+        "name": "getCurrentSheetName",
+        "length": 19,
+        "suggestion": "Sheetname"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 551,
+        "name": "executeGetPublishedSheetData",
+        "length": 28,
+        "suggestion": "Executegetpublishedsheet"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 753,
+        "name": "getIncrementalData",
+        "length": 18,
+        "suggestion": "Incremental"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 917,
+        "name": "formatSheetDataForFrontend",
+        "length": 26,
+        "suggestion": "Formatsheetdataforfrontend"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 954,
+        "name": "checkReactionState",
+        "length": 18,
+        "suggestion": "Checkreactionstate"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1080,
+        "name": "getResponsesData",
+        "length": 16,
+        "suggestion": "Responses"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1121,
+        "name": "getCurrentUserStatus",
+        "length": 20,
+        "suggestion": "Userstatus"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1165,
+        "name": "getActiveFormInfo",
+        "length": 17,
+        "suggestion": "Form"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1261,
+        "name": "updateFormSettings",
+        "length": 18,
+        "suggestion": "Formsettings"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1313,
+        "name": "saveSystemConfig",
+        "length": 16,
+        "suggestion": "Savesystem"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1373,
+        "name": "executeToggleHighlight",
+        "length": 22,
+        "suggestion": "Executetogglehighlight"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1429,
+        "name": "createUserFolder",
+        "length": 16,
+        "suggestion": "Userfolder"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1459,
+        "name": "processHighlightToggle",
+        "length": 22,
+        "suggestion": "Highlighttoggle"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1571,
+        "name": "extractFormIdFromUrl",
+        "length": 20,
+        "suggestion": "Extractformidfromurl"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1791,
+        "name": "createFormFactory",
+        "length": 17,
+        "suggestion": "Formfactory"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1849,
+        "name": "addUnifiedQuestions",
+        "length": 19,
+        "suggestion": "Addunifiedquestions"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 1987,
+        "name": "getQuestionConfig",
+        "length": 17,
+        "suggestion": "Question"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2028,
+        "name": "doGetQuestionConfig",
+        "length": 19,
+        "suggestion": "Dogetquestion"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2056,
+        "name": "saveClassChoices",
+        "length": 16,
+        "suggestion": "Saveclasschoices"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2082,
+        "name": "getSavedClassChoices",
+        "length": 20,
+        "suggestion": "Savedclasschoices"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2150,
+        "name": "createUnifiedForm",
+        "length": 17,
+        "suggestion": "Unifiedform"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2190,
+        "name": "createLinkedSpreadsheet",
+        "length": 23,
+        "suggestion": "Linkedspreadsheet"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2257,
+        "name": "shareAllSpreadsheetsWithServiceAccount",
+        "length": 38,
+        "suggestion": "Shareallspreadsheetswithserviceaccount"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2312,
+        "name": "repairUserSpreadsheetAccess",
+        "length": 27,
+        "suggestion": "Repairuserspreadsheetaccess"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2381,
+        "name": "addReactionColumnsToSpreadsheet",
+        "length": 31,
+        "suggestion": "Addreactioncolumnstospreadsheet"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2480,
+        "name": "buildSheetConfigDynamically",
+        "length": 27,
+        "suggestion": "Buildsheetconfigdynamically"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2532,
+        "name": "getSheetConfigSafe",
+        "length": 18,
+        "suggestion": "Sheetconfigsafe"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2538,
+        "name": "getSheetConfigCached",
+        "length": 20,
+        "suggestion": "Sheetconfigcached"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2556,
+        "name": "executeGetSheetData",
+        "length": 19,
+        "suggestion": "Executegetsheet"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2870,
+        "name": "calculateRowScore",
+        "length": 17,
+        "suggestion": "Calculaterowscore"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2939,
+        "name": "getColumnHeaderName",
+        "length": 19,
+        "suggestion": "Columnheadername"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2957,
+        "name": "mapColumnIndices",
+        "length": 16,
+        "suggestion": "Mapcolumnindices"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 2997,
+        "name": "updateIsActiveStatus",
+        "length": 20,
+        "suggestion": "Isstatus"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3063,
+        "name": "hasSetupPageAccess",
+        "length": 18,
+        "suggestion": "Hassetuppageaccess"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3104,
+        "name": "shouldEnableDebugMode",
+        "length": 21,
+        "suggestion": "Shouldenabledebugmode"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3147,
+        "name": "deleteUserAccountByAdminForUI",
+        "length": 29,
+        "suggestion": "Useraccountbyadminforui"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3167,
+        "name": "getDeletionLogsForUI",
+        "length": 20,
+        "suggestion": "Deletionlogsforui"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3183,
+        "name": "getAllUsersForAdminForUI",
+        "length": 24,
+        "suggestion": "Allusersforadminforui"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3392,
+        "name": "deleteCurrentUserAccount",
+        "length": 24,
+        "suggestion": "Useraccount"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3426,
+        "name": "activateSheetSimple",
+        "length": 19,
+        "suggestion": "Activatesheetsimple"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3811,
+        "name": "fixDataConsistencyManual",
+        "length": 24,
+        "suggestion": "Fixdataconsistencymanual"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3866,
+        "name": "getApplicationStatusForUI",
+        "length": 25,
+        "suggestion": "Applicationstatusforui"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3894,
+        "name": "setApplicationStatusForUI",
+        "length": 25,
+        "suggestion": "Applicationstatusforui"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3924,
+        "name": "identifyHeadersAdvanced",
+        "length": 23,
+        "suggestion": "Identifyheadersadvanced"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 3957,
+        "name": "enhanceWithWebKnowledge",
+        "length": 23,
+        "suggestion": "Enhancewithwebknowledge"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 4017,
+        "name": "analyzeContextualMeaning",
+        "length": 24,
+        "suggestion": "Analyzecontextualmeaning"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 4047,
+        "name": "calculateAdvancedConfidence",
+        "length": 27,
+        "suggestion": "Calculateadvancedconfidence"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 4235,
+        "name": "performAutoRepair",
+        "length": 17,
+        "suggestion": "Performautorepair"
+      },
+      {
+        "file": "src/Core.gs",
+        "line": 4355,
+        "name": "clearExecutionUserInfoCache",
+        "length": 27,
+        "suggestion": "Clearexecutionuserinfocache"
+      },
+      {
+        "file": "src/ErrorBoundary.html",
+        "line": 524,
+        "name": "forceLogoutAndRedirect",
+        "length": 22,
+        "suggestion": "Forcelredirect"
+      },
+      {
+        "file": "src/ErrorBoundary.html",
+        "line": 590,
+        "name": "testServerFunction",
+        "length": 18,
+        "suggestion": "Testserverfunction"
+      },
+      {
+        "file": "src/PageBackend.gs",
+        "line": 74,
+        "name": "getAvailableSheets",
+        "length": 18,
+        "suggestion": "getSheets"
+      },
+      {
+        "file": "src/PageBackend.gs",
+        "line": 137,
+        "name": "clearActiveSheet",
+        "length": 16,
+        "suggestion": "clearCache"
+      },
+      {
+        "file": "src/PageBackend.gs",
+        "line": 347,
+        "name": "refreshBoardData",
+        "length": 16,
+        "suggestion": "refreshData"
+      },
+      {
+        "file": "src/SetupPage.html",
+        "line": 251,
+        "name": "validateSpreadsheetId",
+        "length": 21,
+        "suggestion": "Validatespreadsheetid"
+      },
+      {
+        "file": "src/auth.gs",
+        "line": 11,
+        "name": "createCompleteUser",
+        "length": 18,
+        "suggestion": "Completeuser"
+      },
+      {
+        "file": "src/auth.gs",
+        "line": 72,
+        "name": "handleUserRegistration",
+        "length": 22,
+        "suggestion": "Userregistration"
+      },
+      {
+        "file": "src/auth.gs",
+        "line": 98,
+        "name": "updateUserLastAccess",
+        "length": 20,
+        "suggestion": "Userlastaccess"
+      },
+      {
+        "file": "src/auth.gs",
+        "line": 134,
+        "name": "getSetupStatusFromConfig",
+        "length": 24,
+        "suggestion": "Setupstatusfrom"
+      },
+      {
+        "file": "src/auth.gs",
+        "line": 149,
+        "name": "processAdminAccess",
+        "length": 18,
+        "suggestion": "Adminaccess"
+      },
+      {
+        "file": "src/cache.gs",
+        "line": 104,
+        "name": "getSheetsServiceCached",
+        "length": 22,
+        "suggestion": "Sheetsservicecached"
+      },
+      {
+        "file": "src/cache.gs",
+        "line": 492,
+        "name": "getSpreadsheetHeaders",
+        "length": 21,
+        "suggestion": "Spreadsheetheaders"
+      },
+      {
+        "file": "src/cache.gs",
+        "line": 556,
+        "name": "validateSpreadsheetHeaders",
+        "length": 26,
+        "suggestion": "Validatespreadsheetheaders"
+      },
+      {
+        "file": "src/cache.gs",
+        "line": 636,
+        "name": "invalidateUserCache",
+        "length": 19,
+        "suggestion": "Invalidateusercache"
+      },
+      {
+        "file": "src/cache.gs",
+        "line": 691,
+        "name": "synchronizeCacheAfterCriticalUpdate",
+        "length": 35,
+        "suggestion": "Synchronizecacheaftercriticalupdate"
+      },
+      {
+        "file": "src/database.gs",
+        "line": 29,
+        "name": "getSheetsServiceWithRetry",
+        "length": 25,
+        "suggestion": "Sheetsservicewithretry"
+      },
+      {
+        "file": "src/database.gs",
+        "line": 1094,
+        "name": "initializeDatabaseSheet",
+        "length": 23,
+        "suggestion": "Initializedatabasesheet"
+      },
+      {
+        "file": "src/database.gs",
+        "line": 1138,
+        "name": "cleanupEmptyUsers",
+        "length": 17,
+        "suggestion": "Cleanupemptyusers"
+      },
+      {
+        "file": "src/database.gs",
+        "line": 1210,
+        "name": "debugShowAllUsers",
+        "length": 17,
+        "suggestion": "Debugshowallusers"
+      },
+      {
+        "file": "src/database.gs",
+        "line": 1300,
+        "name": "updateUserFields",
+        "length": 16,
+        "suggestion": "Userfields"
+      },
+      {
+        "file": "src/database.gs",
+        "line": 1369,
+        "name": "getSpreadsheetsData",
+        "length": 19,
+        "suggestion": "Spreadsheets"
+      },
+      {
+        "file": "src/login.js.html",
+        "line": 197,
+        "name": "updateDomainDisplay",
+        "length": 19,
+        "suggestion": "Domaindisplay"
+      },
+      {
+        "file": "src/login.js.html",
+        "line": 270,
+        "name": "showSecurityModal",
+        "length": 17,
+        "suggestion": "Showsecuritymodal"
+      },
+      {
+        "file": "src/login.js.html",
+        "line": 284,
+        "name": "closeSecurityModal",
+        "length": 18,
+        "suggestion": "Closesecuritymodal"
+      },
+      {
+        "file": "src/login.js.html",
+        "line": 311,
+        "name": "showAdminPanelRedirect",
+        "length": 22,
+        "suggestion": "Showadminpanelredirect"
+      },
+      {
+        "file": "src/login.js.html",
+        "line": 697,
+        "name": "handleAdminPanelRedirect",
+        "length": 24,
+        "suggestion": "Adminpanelredirect"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 440,
+        "name": "getGoogleClientId",
+        "length": 17,
+        "suggestion": "Googleclientid"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 519,
+        "name": "getSystemDomainInfo",
+        "length": 19,
+        "suggestion": "Systemdomain"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 652,
+        "name": "getSuggestedAction",
+        "length": 18,
+        "suggestion": "Suggestedaction"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 787,
+        "name": "buildUserAdminUrl",
+        "length": 17,
+        "suggestion": "Builduseradminurl"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 963,
+        "name": "generateUserUrls",
+        "length": 16,
+        "suggestion": "Generateuserurls"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 977,
+        "name": "parseRequestParams",
+        "length": 18,
+        "suggestion": "Parserequestparams"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1030,
+        "name": "renderAdminPanel",
+        "length": 16,
+        "suggestion": "Renderadminpanel"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1057,
+        "name": "processLoginAction",
+        "length": 18,
+        "suggestion": "Loginaction"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1143,
+        "name": "renderAnswerBoard",
+        "length": 17,
+        "suggestion": "Renderanswerboard"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1387,
+        "name": "checkCurrentPublicationStatus",
+        "length": 29,
+        "suggestion": "Checkpublicationstatus"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1441,
+        "name": "getTestMockResponse",
+        "length": 19,
+        "suggestion": "Testmockresponse"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1450,
+        "name": "saveApplicationConfig",
+        "length": 21,
+        "suggestion": "Saveapplication"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1465,
+        "name": "setupApplication",
+        "length": 16,
+        "suggestion": "Upapplication"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1623,
+        "name": "forceUrlSystemReset",
+        "length": 19,
+        "suggestion": "Forceurlsystemreset"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1638,
+        "name": "reportClientError",
+        "length": 17,
+        "suggestion": "Reportclienterror"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1676,
+        "name": "addSpreadsheetUrl",
+        "length": 17,
+        "suggestion": "Addspreadsheeturl"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1708,
+        "name": "testForceLogoutRedirect",
+        "length": 23,
+        "suggestion": "Testforcelogoutredirect"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1722,
+        "name": "verifyUserAuthentication",
+        "length": 24,
+        "suggestion": "Verifyuserauthentication"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1741,
+        "name": "forceLogoutAndRedirectToLogin",
+        "length": 29,
+        "suggestion": "Forcelredirecttologin"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1864,
+        "name": "handleSystemError",
+        "length": 17,
+        "suggestion": "Systemerror"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1888,
+        "name": "getActiveUserInfo",
+        "length": 17,
+        "suggestion": "User"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 1914,
+        "name": "validateUserDataState",
+        "length": 21,
+        "suggestion": "Validateuserdatastate"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 2005,
+        "name": "emergencyClearCache",
+        "length": 19,
+        "suggestion": "Emergencyclearcache"
+      },
+      {
+        "file": "src/main.gs",
+        "line": 2020,
+        "name": "repairCurrentUser",
+        "length": 17,
+        "suggestion": "Repairuser"
+      },
+      {
+        "file": "src/page.js.html",
+        "line": 7822,
+        "name": "displayDomainInfo",
+        "length": 17,
+        "suggestion": "Displaydomain"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 23,
+        "name": "getServiceAccountTokenCached",
+        "length": 28,
+        "suggestion": "Serviceaccounttokencached"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 57,
+        "name": "generateNewServiceAccountToken",
+        "length": 30,
+        "suggestion": "Generatenewserviceaccounttoken"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 129,
+        "name": "getSecureServiceAccountCreds",
+        "length": 28,
+        "suggestion": "Secureserviceaccountcreds"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 158,
+        "name": "verifyAdminAccess",
+        "length": 17,
+        "suggestion": "Verifyadminaccess"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 246,
+        "name": "getSecureDatabaseId",
+        "length": 19,
+        "suggestion": "Securedatabaseid"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 257,
+        "name": "shareSpreadsheetWithServiceAccount",
+        "length": 34,
+        "suggestion": "Sharespreadsheetwithserviceaccount"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 297,
+        "name": "getSheetsService",
+        "length": 16,
+        "suggestion": "Sheetsservice"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 310,
+        "name": "updateSheetsData",
+        "length": 16,
+        "suggestion": "Sheets"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 344,
+        "name": "batchGetSheetsData",
+        "length": 18,
+        "suggestion": "Batchgetsheets"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 374,
+        "name": "getServiceAccountEmail",
+        "length": 22,
+        "suggestion": "Serviceaccountemail"
+      },
+      {
+        "file": "src/security.gs",
+        "line": 388,
+        "name": "addServiceAccountToSpreadsheet",
+        "length": 30,
+        "suggestion": "Addserviceaccounttospreadsheet"
+      }
+    ]
+  }
+}

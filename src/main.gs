@@ -72,8 +72,7 @@ function doGet(e) {
       case 'debug':
         // 🔍 デバッグモード：現在のユーザー情報を表示
         try {
-          const currentUserEmail = UserManager.getCurrentEmail();
-          const userByEmail = DB.findUserByEmail(currentUserEmail);
+          const { currentUserEmail, userInfo: userByEmail } = new ConfigurationManager().getCurrentUserInfo();
           const debugData = {
             current_user_email: currentUserEmail,
             user_exists_in_db: !!userByEmail,
@@ -148,7 +147,7 @@ function doGet(e) {
             return HtmlService.createHtmlOutput('<h2>Error</h2><p>userIdが必要です</p>');
           }
 
-          const currentUserEmail = UserManager.getCurrentEmail();
+          const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfo();
           const userInfo = DB.findUserById(params.userId);
 
           if (!userInfo) {
@@ -182,14 +181,7 @@ function doGet(e) {
         }
 
         try {
-          const currentUserEmail = UserManager.getCurrentEmail();
-          if (!currentUserEmail) {
-            // 未認証の場合はログイン画面へ
-            return renderLoginPage(params);
-          }
-
-          // ユーザー検証（キャッシュバイパス）
-          const userInfo = DB.findUserByEmail(currentUserEmail);
+          const { currentUserEmail, userInfo } = new ConfigurationManager().getCurrentUserInfo();
           if (!userInfo || userInfo.userId !== params.userId) {
             // ユーザーが存在しないか、userIdが一致しない場合
             return showErrorPage('アクセス拒否', '管理パネルへのアクセス権限がありません');
@@ -312,8 +304,9 @@ const Services = {
   user: {
     get current() {
       try {
-        const email = UserManager.getCurrentEmail();
-        if (!email) return null;
+        const result = new ConfigurationManager().getCurrentUserInfoSafely();
+        if (!result) return null;
+        const { currentUserEmail: email } = result;
 
         // 簡易的なユーザー情報を返す（将来的にはApp.getConfig()経由）
         return {
@@ -370,7 +363,8 @@ const Deploy = {
     try {
       console.log('Deploy.domain() - start');
 
-      const activeUserEmail = UserManager.getCurrentEmail();
+      const result = new ConfigurationManager().getCurrentUserInfoSafely();
+      const activeUserEmail = result?.currentUserEmail;
       const currentDomain = getEmailDomain(activeUserEmail);
 
       // WebAppのURLを取得してドメインを判定
@@ -412,7 +406,7 @@ const Deploy = {
     try {
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-      const currentUserEmail = UserManager.getCurrentEmail();
+      const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
 
       console.log('Deploy.isUser() - 管理者確認:', adminEmail, currentUserEmail);
       return adminEmail === currentUserEmail;
@@ -476,7 +470,7 @@ function getGoogleClientId() {
 /**
  * システム設定状況をチェック
  */
-function checkSystemConfiguration() {
+function checkSystem() {
   try {
     const properties = PropertiesService.getScriptProperties();
     const allProperties = properties.getProperties();
@@ -563,7 +557,8 @@ function showAdminPanel() {
     console.log('showAdminPanel - start');
 
     // Admin権限でのアクセス確認
-    const activeUserEmail = UserManager.getCurrentEmail();
+    const result = new ConfigurationManager().getCurrentUserInfoSafely();
+    const activeUserEmail = result?.currentUserEmail;
     if (activeUserEmail) {
       const userProperties = PropertiesService.getUserProperties();
       const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
@@ -738,7 +733,8 @@ function getWebAppUrl() {
       console.log('getWebAppUrl: Script ID確認', scriptId);
 
       // Google Workspace環境を考慮した動的URL構築
-      const currentUser = UserManager.getCurrentEmail();
+      const result = new ConfigurationManager().getCurrentUserInfoSafely();
+      const currentUser = result?.currentUserEmail;
       const domain = getEmailDomain(currentUser);
 
       let baseUrl;
@@ -1062,7 +1058,7 @@ function processLoginAction() {
   try {
     // キャッシュをクリアして最新情報取得
     UserManager.clearCache();
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
 
     if (!currentUserEmail) {
       return {
@@ -1243,7 +1239,7 @@ function renderAnswerBoard(userInfo, params) {
         
         // 2-1: ヘッダー行から直接検出
         try {
-          const spreadsheet = SpreadsheetApp.openById(finalSpreadsheetId);
+          const spreadsheet = new ConfigurationManager().getSpreadsheet(finalSpreadsheetId);
           const sheet = spreadsheet.getSheetByName(finalSheetName);
           const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
           
@@ -1318,7 +1314,7 @@ function renderAnswerBoard(userInfo, params) {
     try {
       if (finalSpreadsheetId && finalSheetName) {
         // データ取得開始
-        const dataResult = getPublishedSheetData(
+        const dataResult = getData(
           userInfo.userId,
           finalSpreadsheetId,
           finalSheetName
@@ -1476,7 +1472,7 @@ function setupApplication(
     console.log('setupApplication - セットアップ開始');
 
     // 現在のユーザーのメールアドレスを取得
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!currentUserEmail) {
       throw new Error('認証されたユーザーが必要です');
     }
@@ -1567,7 +1563,8 @@ function setupApplication(
  */
 function getUser(format = 'object') {
   try {
-    const email = UserManager.getCurrentEmail() || null;
+    const result = new ConfigurationManager().getCurrentUserInfoSafely();
+    const email = result?.currentUserEmail || null;
     let userId = null;
 
     // emailが取得できた場合、userIdも取得してセッション保存
@@ -1690,15 +1687,16 @@ function addSpreadsheetUrl(url) {
  * ユーザー認証リセット関数
  * SharedUtilities.html、login.js.htmlで使用
  */
-function resetUserAuthentication() {
+function resetAuth() {
   try {
-    const userEmail = UserManager.getCurrentEmail();
+    const result = new ConfigurationManager().getCurrentUserInfoSafely();
+    const userEmail = result?.currentUserEmail;
     if (userEmail) {
       console.log('ユーザー認証をリセットしました');
     }
     return createResponse(true, '認証リセット完了');
   } catch (error) {
-    console.error('resetUserAuthentication エラー:', error);
+    console.error('resetAuth エラー:', error);
     return createResponse(false, error.message, null, error);
   }
 }
@@ -1723,7 +1721,8 @@ function testForceLogoutRedirect() {
  */
 function verifyUserAuthentication() {
   try {
-    const email = UserManager.getCurrentEmail();
+    const result = new ConfigurationManager().getCurrentUserInfoSafely();
+    const email = result?.currentUserEmail;
     const isAuthenticated = !!email;
     return createResponse(true, isAuthenticated ? '認証済み' : '未認証', {
       authenticated: isAuthenticated,
@@ -1758,7 +1757,7 @@ function forceLogoutAndRedirectToLogin() {
  * page.js.htmlで使用
  * @param {Object} params 取得パラメータ
  */
-function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypassCache) {
+function getData(userId, classFilter, sortOrder, adminMode, bypassCache) {
   try {
     // CLAUDE.md準拠: 個別引数とオブジェクト引数の両方に対応
     let params;
@@ -1770,7 +1769,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
       params = { userId, classFilter, sortOrder, adminMode, bypassCache };
     }
 
-    console.log('getPublishedSheetData: Core.gs実装呼び出し開始', {
+    console.log('getData: Core.gs実装呼び出し開始', {
       argumentsLength: arguments.length,
       firstArgType: typeof userId,
       params,
@@ -1783,15 +1782,15 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
 
     // Step 1: 直接指定されたuserIdを確認
     if (targetUserId && typeof targetUserId === 'string' && targetUserId.trim()) {
-      console.log('getPublishedSheetData: 指定userIdを使用', targetUserId);
+      console.log('getData: 指定userIdを使用', targetUserId);
     } else {
       // Step 2: User.email()からの取得を試行
       try {
         currentUserEmail = UserManager.getCurrentEmail();
-        console.log('getPublishedSheetData: UserManager.getCurrentEmail()結果', currentUserEmail);
+        console.log('getData: UserManager.getCurrentEmail()結果', currentUserEmail);
       } catch (emailError) {
         console.warn(
-          'getPublishedSheetData: UserManager.getCurrentEmail()取得失敗',
+          'getData: UserManager.getCurrentEmail()取得失敗',
           emailError.message
         );
       }
@@ -1801,12 +1800,12 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
         try {
           const user = DB.findUserByEmail(currentUserEmail);
           targetUserId = user ? user.userId : null;
-          console.log('getPublishedSheetData: DB検索結果', {
+          console.log('getData: DB検索結果', {
             email: currentUserEmail,
             userId: targetUserId,
           });
         } catch (dbError) {
-          console.warn('getPublishedSheetData: DB検索失敗', dbError.message);
+          console.warn('getData: DB検索失敗', dbError.message);
         }
       }
 
@@ -1820,11 +1819,11 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
             if (session.userId && Date.now() - session.timestamp < 3600000) {
               // 1時間以内
               targetUserId = session.userId;
-              console.log('getPublishedSheetData: セッション復元成功', targetUserId);
+              console.log('getData: セッション復元成功', targetUserId);
             }
           }
         } catch (sessionError) {
-          console.warn('getPublishedSheetData: セッション復元失敗', sessionError.message);
+          console.warn('getData: セッション復元失敗', sessionError.message);
         }
       }
     }
@@ -1836,7 +1835,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
         hasValidEmail: !!currentUserEmail,
         timestamp: new Date().toISOString(),
       };
-      console.error('getPublishedSheetData: 全認証方法失敗', errorDetails);
+      console.error('getData: 全認証方法失敗', errorDetails);
       throw new Error(`ユーザー認証情報が取得できません。詳細: ${JSON.stringify(errorDetails)}`);
     }
 
@@ -1847,7 +1846,7 @@ function getPublishedSheetData(userId, classFilter, sortOrder, adminMode, bypass
       params.adminMode
     );
   } catch (error) {
-    console.error('getPublishedSheetData エラー:', error);
+    console.error('getData エラー:', error);
     return createResponse(false, error.message, { data: [] }, error);
   }
 }
@@ -1888,8 +1887,9 @@ function handleSystemError(context, error, userId = null, additionalData = {}) {
  */
 function getActiveUserInfo() {
   try {
-    const currentUserEmail = UserManager.getCurrentEmail();
-    if (!currentUserEmail) return null;
+    const result = new ConfigurationManager().getCurrentUserInfoSafely();
+    if (!result) return null;
+    const { currentUserEmail } = result;
 
     const userInfo = DB.findUserByEmail(currentUserEmail);
     if (!userInfo) return null;
@@ -1962,8 +1962,9 @@ function validateUserDataState(userInfo) {
 function diagnoseSystem() {
   try {
     
-    const currentUser = UserManager.getCurrentEmail();
-    const userInfo = currentUser ? DB.findUserByEmail(currentUser) : null;
+    const result = new ConfigurationManager().getCurrentUserInfoSafely();
+    const currentUser = result?.currentUserEmail;
+    const userInfo = result?.userInfo;
     
     const diagnosis = {
       timestamp: new Date().toISOString(),
@@ -2020,7 +2021,8 @@ function repairCurrentUser() {
   try {
     console.log('🔧 現在のユーザー修復開始...');
     
-    const currentUser = UserManager.getCurrentEmail();
+    const result = new ConfigurationManager().getCurrentUserInfoSafely();
+    const currentUser = result?.currentUserEmail;
     if (!currentUser) {
       throw new Error('認証されたユーザーが見つかりません');
     }

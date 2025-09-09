@@ -719,7 +719,7 @@
               console.warn('認証リセットエラー:', error);
               window.sharedUtilities.auth.showAccountSwitchFallback();
             })
-            .resetUserAuthentication();
+            .resetAuth();
         } catch (error) {
           console.warn('アカウント切り替えエラー:', error);
           window.sharedUtilities.auth.showAccountSwitchFallback();

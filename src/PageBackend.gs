@@ -21,7 +21,7 @@ const PAGE_CONFIG = Object.freeze({
  */
 function checkAdmin(userId = null) {
   try {
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     console.log('checkAdmin: 管理者権限チェック開始', {
       userId: userId ? `${userId.substring(0, 8)}...` : 'null',
       currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null',
@@ -73,7 +73,7 @@ function checkAdmin(userId = null) {
  */
 function getAvailableSheets(userId = null) {
   try {
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     console.log('getAvailableSheets: シート一覧取得開始', {
       userId: userId ? `${userId.substring(0, 8)}...` : 'null',
     });
@@ -136,7 +136,7 @@ function getAvailableSheets(userId = null) {
  */
 function clearActiveSheet(userId = null) {
   try {
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     console.log('clearActiveSheet: アクティブシートクリア開始', {
       userId: userId ? `${userId.substring(0, 8)}...` : 'null',
     });
@@ -208,10 +208,10 @@ function clearActiveSheet(userId = null) {
  * @param {Array<Object>} batchOperations - バッチ操作の配列
  * @returns {Object} 処理結果
  */
-function addReactionBatch(requestUserId, batchOperations) {
+function addReactions(requestUserId, batchOperations) {
   try {
-    const currentUserEmail = UserManager.getCurrentEmail();
-    console.log('addReactionBatch: バッチリアクション処理開始', {
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
+    console.log('addReactions: バッチリアクション処理開始', {
       userId: requestUserId ? `${requestUserId.substring(0, 8)}...` : 'null',
       operationsCount: Array.isArray(batchOperations) ? batchOperations.length : 0,
     });
@@ -253,10 +253,10 @@ function addReactionBatch(requestUserId, batchOperations) {
     const processedRows = new Set(); // 重複行の追跡
 
     // シート名を取得（統一データソース使用）
-    const userConfig = App.getConfig().getUserConfig(requestUserId);
+    const userConfig = ConfigManager.getUserConfig(requestUserId);
     const sheetName = userConfig?.sheetName || 'フォームの回答 1';
 
-    console.log('addReactionBatch: 処理対象シート', {
+    console.log('addReactions: 処理対象シート', {
       spreadsheetId: `${ownerConfig.spreadsheetId.substring(0, 20)}...`,
       sheetName,
     });
@@ -268,7 +268,7 @@ function addReactionBatch(requestUserId, batchOperations) {
       try {
         // 入力検証
         if (!operation.rowIndex || !operation.reaction) {
-          console.warn('addReactionBatch: 無効な操作をスキップ', operation);
+          console.warn('addReactions: 無効な操作をスキップ', operation);
           continue;
         }
 
@@ -289,7 +289,7 @@ function addReactionBatch(requestUserId, batchOperations) {
           });
           processedRows.add(operation.rowIndex);
         } else {
-          console.warn('addReactionBatch: リアクション処理失敗', operation, result?.message);
+          console.warn('addReactions: リアクション処理失敗', operation, result?.message);
           batchResults.push({
             rowIndex: operation.rowIndex,
             reaction: operation.reaction,
@@ -298,7 +298,7 @@ function addReactionBatch(requestUserId, batchOperations) {
           });
         }
       } catch (operationError) {
-        console.error('addReactionBatch: 個別操作エラー', operation, operationError.message);
+        console.error('addReactions: 個別操作エラー', operation, operationError.message);
         batchResults.push({
           rowIndex: operation.rowIndex,
           reaction: operation.reaction,
@@ -309,7 +309,7 @@ function addReactionBatch(requestUserId, batchOperations) {
     }
 
     const successCount = batchResults.filter((r) => r.status === 'success').length;
-    console.log('addReactionBatch: バッチリアクション処理完了', {
+    console.log('addReactions: バッチリアクション処理完了', {
       total: batchOperations.length,
       processed: processedRows.size,
       success: successCount,
@@ -321,7 +321,7 @@ function addReactionBatch(requestUserId, batchOperations) {
       details: batchResults,
     });
   } catch (error) {
-    console.error('addReactionBatch エラー:', {
+    console.error('addReactions エラー:', {
       error: error.message,
       stack: error.stack,
       requestUserId,
@@ -346,7 +346,7 @@ function addReactionBatch(requestUserId, batchOperations) {
  */
 function refreshBoardData(requestUserId) {
   try {
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     console.log('refreshBoardData: ボードデータ更新開始', {
       userId: requestUserId ? `${requestUserId.substring(0, 8)}...` : 'null',
     });
@@ -399,15 +399,10 @@ function refreshBoardData(requestUserId) {
       console.warn('refreshBoardData: ユーザーキャッシュ無効化エラー:', invalidateError.message);
     }
 
-    // 最新の設定情報を取得
+    // 最新の設定情報を取得（統一された設定取得）
     let latestConfig = {};
     try {
-      if (typeof getAppConfig === 'function') {
-        latestConfig = getAppConfig(requestUserId);
-      } else {
-        // フォールバック: App.getConfig()を使用
-        latestConfig = App.getConfig().getUserConfig(requestUserId) || {};
-      }
+      latestConfig = ConfigManager.getUserConfig(requestUserId) || {};
     } catch (configError) {
       console.warn('refreshBoardData: 設定取得エラー:', configError.message);
       latestConfig = { status: 'error', message: '設定の取得に失敗しました' };
@@ -455,7 +450,7 @@ function refreshBoardData(requestUserId) {
  */
 function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
   try {
-    const currentUserEmail = UserManager.getCurrentEmail();
+    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     // データ件数取得開始
 
     // ユーザーID検証
@@ -498,7 +493,7 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
         count = countSheetRows(spreadsheetId, sheetName, classFilter);
       } else {
         // フォールバック: 直接スプレッドシートにアクセス
-        const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
         const sheet = spreadsheet.getSheetByName(sheetName);
         if (sheet) {
           count = Math.max(0, sheet.getLastRow() - 1); // ヘッダー行を除く

@@ -508,7 +508,7 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
 
   try {
     // スプレッドシートから直接取得
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = new ConfigurationManager().getSpreadsheet(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
