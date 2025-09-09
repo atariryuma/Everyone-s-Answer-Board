@@ -613,25 +613,34 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
 
     // Page.html期待形式に変換
     // 設定からヘッダー名を取得。setupStatus未完了時は安全なデフォルト値を使用。
-    let mainHeaderName;
+    let mainHeaderName, reasonHeaderName, classHeaderName, nameHeaderName;
+    
     if (setupStatus === 'pending') {
       mainHeaderName = 'セットアップ中...';
-    } else {
-      mainHeaderName = configJson.opinionHeader || COLUMN_HEADERS.OPINION;
-    }
-
-    // その他のヘッダーフィールドも安全に取得
-    let reasonHeaderName, classHeaderName, nameHeaderName;
-    if (setupStatus === 'pending') {
       reasonHeaderName = 'セットアップ中...';
       classHeaderName = 'セットアップ中...';
       nameHeaderName = 'セットアップ中...';
     } else {
-      reasonHeaderName = configJson.reasonHeader || COLUMN_HEADERS.REASON;
-      classHeaderName =
-        configJson.classHeader !== undefined ? configJson.classHeader : COLUMN_HEADERS.CLASS;
-      nameHeaderName =
-        configJson.nameHeader !== undefined ? configJson.nameHeader : COLUMN_HEADERS.NAME;
+      // ✅ columnMapping形式を使用（legacy形式を完全削除）
+      const columnMapping = configJson.columnMapping;
+      
+      if (!columnMapping) {
+        console.warn('⚠️ columnMappingが設定されていません。デフォルト値を使用します。');
+        mainHeaderName = COLUMN_HEADERS.OPINION;
+        reasonHeaderName = COLUMN_HEADERS.REASON;
+        classHeaderName = COLUMN_HEADERS.CLASS;
+        nameHeaderName = COLUMN_HEADERS.NAME;
+      } else {
+        mainHeaderName = columnMapping.answer?.header || COLUMN_HEADERS.OPINION;
+        reasonHeaderName = columnMapping.reason?.header || COLUMN_HEADERS.REASON;
+        classHeaderName = columnMapping.class?.header || COLUMN_HEADERS.CLASS;
+        nameHeaderName = columnMapping.name?.header || COLUMN_HEADERS.NAME;
+        
+        // 必須列の存在確認
+        if (!columnMapping.reason?.header) {
+          console.warn('⚠️ 理由列のcolumnMappingが見つかりません:', columnMapping);
+        }
+      }
     }
     console.log(
       'getPublishedSheetData: Configured Headers - mainHeaderName=%s, reasonHeaderName=%s, classHeaderName=%s, nameHeaderName=%s',
@@ -641,10 +650,10 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       nameHeaderName
     );
 
-    // 🔍 理由列設定の詳細デバッグ
-    console.log('🔍 理由列設定デバッグ:', {
-      'configJson.reasonHeader': configJson.reasonHeader,
-      'COLUMN_HEADERS.REASON': COLUMN_HEADERS.REASON,
+    // 🔍 columnMapping設定の詳細デバッグ
+    console.log('🔍 columnMapping設定デバッグ:', {
+      'hasColumnMapping': !!configJson.columnMapping,
+      'columnMapping.reason': configJson.columnMapping?.reason,
       'reasonHeaderName': reasonHeaderName,
       'setupStatus': setupStatus
     });
@@ -823,13 +832,17 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
-    // ✅ configJSON中心型: 動的列名マッピングでsheetConfig廃止
-    const mainHeaderName = configJson.opinionHeader || COLUMN_HEADERS.OPINION;
-    const reasonHeaderName = configJson.reasonHeader || COLUMN_HEADERS.REASON;
-    const classHeaderName =
-      configJson.classHeader !== undefined ? configJson.classHeader : COLUMN_HEADERS.CLASS;
-    const nameHeaderName =
-      configJson.nameHeader !== undefined ? configJson.nameHeader : COLUMN_HEADERS.NAME;
+    // ✅ columnMapping形式を使用（legacy形式を完全削除）
+    const columnMapping = configJson.columnMapping;
+    
+    if (!columnMapping) {
+      console.warn('⚠️ getSheetData: columnMappingが設定されていません。デフォルト値を使用します。');
+    }
+    
+    const mainHeaderName = columnMapping?.answer?.header || COLUMN_HEADERS.OPINION;
+    const reasonHeaderName = columnMapping?.reason?.header || COLUMN_HEADERS.REASON;
+    const classHeaderName = columnMapping?.class?.header || COLUMN_HEADERS.CLASS;
+    const nameHeaderName = columnMapping?.name?.header || COLUMN_HEADERS.NAME;
     const mappedIndices = mapConfigToActualHeaders(
       {
         opinionHeader: mainHeaderName,
@@ -4231,9 +4244,16 @@ function getInitialData(requestUserId, sheetName) {
     // ✅ configJSON中心型: 公開シート設定でsheetConfig廃止
     const sheetName = configJson.sheetName || '';
     
-    const opinionHeader = configJson.opinionHeader || '';
-    const nameHeader = configJson.nameHeader || '';
-    const classHeader = configJson.classHeader || '';
+    // ✅ columnMapping形式を使用（legacy形式を完全削除）
+    const columnMapping = configJson.columnMapping;
+    
+    if (!columnMapping) {
+      console.warn('⚠️ getCurrentConfig: columnMappingが設定されていません。');
+    }
+    
+    const opinionHeader = columnMapping?.answer?.header || '';
+    const nameHeader = columnMapping?.name?.header || '';
+    const classHeader = columnMapping?.class?.header || '';
 
     // === ベース応答の構築 ===
     const response = {
