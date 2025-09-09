@@ -291,6 +291,54 @@ class StudyQuestApp {
     return userId;
   }
 
+  /**
+   * 🔍 デバイス性能検出 - 低性能デバイス判定
+   * @returns {boolean} 低性能モードが必要かどうか
+   */
+  detectLowEndDevice() {
+    try {
+      // メモリ情報（使用可能な場合）
+      const memory = navigator.deviceMemory;
+      if (memory && memory <= 2) {
+        console.log('🔋 低メモリデバイス検出:', memory + 'GB');
+        return true;
+      }
+
+      // CPU コア数（使用可能な場合）
+      const cores = navigator.hardwareConcurrency;
+      if (cores && cores <= 2) {
+        console.log('🔋 低CPU性能デバイス検出:', cores + 'コア');
+        return true;
+      }
+
+      // ユーザーエージェント検出（モバイル・低性能デバイス）
+      const ua = navigator.userAgent.toLowerCase();
+      const lowEndPatterns = [
+        'android 4', 'android 5', 'android 6',  // 古いAndroid
+        'webview',                              // WebView (通常低性能)
+        'mobile.*safari.*version/[89]'          // 古いiOSブラウザ
+      ];
+      
+      if (lowEndPatterns.some(pattern => new RegExp(pattern).test(ua))) {
+        console.log('🔋 古いブラウザ/OSを検出');
+        return true;
+      }
+
+      // 接続速度（使用可能な場合）
+      const connection = navigator.connection;
+      if (connection && (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g')) {
+        console.log('🔋 低速ネットワーク検出:', connection.effectiveType);
+        return true;
+      }
+
+      console.log('✅ 標準性能デバイス');
+      return false;
+    } catch (error) {
+      console.warn('⚠️ デバイス性能検出エラー:', error.message);
+      return false; // エラー時は標準モード
+    }
+  }
+
   constructor() {
     this.cache = new UnifiedCache();
     this.requestManager = new RequestManager(); // 🚀 429エラー対策
@@ -8177,17 +8225,41 @@ class StudyQuestApp {
  * @param {Function} onError - エラー時のコールバック（オプション）
  */
 const loadDomainInfo = (onSuccess, onError) => {
-  google.script.run
-    .withSuccessHandler(info => {
-      displayDomainInfo(info);
-      if (onSuccess) onSuccess(info);
-    })
-    .withFailureHandler(error => {
-      console.error('ドメイン情報の取得に失敗しました:', error);
-      displayDomainInfo({ error: error.message || error });
-      if (onError) onError(error);
-    })
-    .getDeployUserDomainInfo();
+  try {
+    // 🚀 安全な関数呼び出し - 存在チェック付き
+    if (typeof google !== 'undefined' && 
+        google.script && 
+        google.script.run && 
+        typeof google.script.run.getDeployUserDomainInfo === 'function') {
+      
+      google.script.run
+        .withSuccessHandler(info => {
+          displayDomainInfo(info);
+          if (onSuccess) onSuccess(info);
+        })
+        .withFailureHandler(error => {
+          console.error('ドメイン情報の取得に失敗しました:', error);
+          displayDomainInfo({ error: error.message || error });
+          if (onError) onError(error);
+        })
+        .getDeployUserDomainInfo();
+    } else {
+      // 関数が存在しない場合のフォールバック
+      console.warn('⚠️ getDeployUserDomainInfo関数が利用できません');
+      const fallbackInfo = { 
+        domain: 'ローカル環境', 
+        note: 'ドメイン情報を取得できませんでした',
+        timestamp: new Date().toISOString()
+      };
+      displayDomainInfo(fallbackInfo);
+      if (onSuccess) onSuccess(fallbackInfo);
+    }
+  } catch (error) {
+    console.error('❌ loadDomainInfo実行エラー:', error);
+    const errorInfo = { error: error.message || error };
+    displayDomainInfo(errorInfo);
+    if (onError) onError(error);
+  }
 }
 
 /**
