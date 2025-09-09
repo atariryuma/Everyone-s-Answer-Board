@@ -8114,13 +8114,22 @@
 
     configManager.initialize()
       .then(() => {
-
         // AnswerBoardApp インスタンス初期化
         window.answerBoardApp = new AnswerBoardApp();
       })
       .catch((error) => {
         console.error('❌ 初期化エラー:', error);
-        throw error;
+        // エラーでも初期化を試みる
+        try {
+          window.answerBoardApp = new AnswerBoardApp();
+        } catch (e) {
+          console.error('❌ AnswerBoardApp初期化失敗:', e);
+          // 最小限のエラーメッセージを表示
+          const container = document.getElementById('answers-container');
+          if (container) {
+            container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました</div>';
+          }
+        }
       });
 
     window.addEventListener('beforeunload', () => {
