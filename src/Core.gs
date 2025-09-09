@@ -659,9 +659,9 @@ function getCurrentSheetName(spreadsheetId) {
 /**
  * 実際のデータ取得処理（キャッシュ制御から分離） (マルチテナント対応版)
  */
-function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode) {
+function getPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode) {
   try {
-    logDebug('executeGetPublishedSheetData', {
+    logDebug('getPublishedSheetData', {
       requestUserId,
       classFilter,
       sortOrder,
@@ -841,9 +841,9 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
  * @param {number} sinceRowCount - この行数以降のデータを取得
  * @returns {object} 新しいデータのみを含む結果
  */
-function getIncrementalData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount) {
+function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount) {
   try {
-    logDebug('getIncrementalData', {
+    logDebug('getIncrementalSheetData', {
       requestUserId,
       classFilter,
       sortOrder,
@@ -912,7 +912,7 @@ function getIncrementalData(requestUserId, classFilter, sortOrder, adminMode, si
       isIncremental: true
     });
   } catch (error) {
-    logDebug('getIncrementalData_error', {
+    logDebug('getIncrementalSheetData_error', {
       requestUserId,
       error: error.message
     });
@@ -6128,10 +6128,10 @@ function clearActiveSheet(userId = null) {
  * @param {Array<Object>} batchOperations - バッチ操作の配列
  * @returns {Object} 処理結果
  */
-function addReactions(requestUserId, batchOperations) {
+function addReactionBatch(requestUserId, batchOperations) {
   try {
     const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
-    console.log('addReactions: バッチリアクション処理開始', {
+    console.log('addReactionBatch: バッチリアクション処理開始', {
       userId: requestUserId ? `${requestUserId.substring(0, 8)}...` : 'null',
       operationsCount: Array.isArray(batchOperations) ? batchOperations.length : 0,
     });
@@ -6176,7 +6176,7 @@ function addReactions(requestUserId, batchOperations) {
     const userConfig = ConfigManager.getUserConfig(requestUserId);
     const sheetName = userConfig?.sheetName || 'フォームの回答 1';
 
-    console.log('addReactions: 処理対象シート', {
+    console.log('addReactionBatch: 処理対象シート', {
       spreadsheetId: `${ownerConfig.spreadsheetId.substring(0, 20)}...`,
       sheetName,
     });
@@ -6188,7 +6188,7 @@ function addReactions(requestUserId, batchOperations) {
       try {
         // 入力検証
         if (!operation.rowIndex || !operation.reaction) {
-          console.warn('addReactions: 無効な操作をスキップ', operation);
+          console.warn('addReactionBatch: 無効な操作をスキップ', operation);
           continue;
         }
 
@@ -6209,7 +6209,7 @@ function addReactions(requestUserId, batchOperations) {
           });
           processedRows.add(operation.rowIndex);
         } else {
-          console.warn('addReactions: リアクション処理失敗', operation, result?.message);
+          console.warn('addReactionBatch: リアクション処理失敗', operation, result?.message);
           batchResults.push({
             rowIndex: operation.rowIndex,
             reaction: operation.reaction,
@@ -6218,7 +6218,7 @@ function addReactions(requestUserId, batchOperations) {
           });
         }
       } catch (operationError) {
-        console.error('addReactions: 個別操作エラー', operation, operationError.message);
+        console.error('addReactionBatch: 個別操作エラー', operation, operationError.message);
         batchResults.push({
           rowIndex: operation.rowIndex,
           reaction: operation.reaction,
@@ -6229,7 +6229,7 @@ function addReactions(requestUserId, batchOperations) {
     }
 
     const successCount = batchResults.filter((r) => r.status === 'success').length;
-    console.log('addReactions: バッチリアクション処理完了', {
+    console.log('addReactionBatch: バッチリアクション処理完了', {
       total: batchOperations.length,
       processed: processedRows.size,
       success: successCount,
@@ -6241,7 +6241,7 @@ function addReactions(requestUserId, batchOperations) {
       details: batchResults,
     });
   } catch (error) {
-    console.error('addReactions エラー:', {
+    console.error('addReactionBatch エラー:', {
       error: error.message,
       stack: error.stack,
       requestUserId,

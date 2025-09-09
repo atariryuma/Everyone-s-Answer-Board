@@ -7599,7 +7599,7 @@ class StudyQuestApp {
       }, 50); // Increased debounce to 50ms for better stability
       
       this.visibilityObserver = new IntersectionObserver(debouncedVisibilityHandler, {
-        rootMargin: `${VIEWPORT_BUFFER}px`,
+        rootMargin: `${StudyQuestApp.PERFORMANCE_CONFIG.VIEWPORT_BUFFER}px`,
         threshold: [0, 1.0] // Simplified thresholds: fully out vs fully in
       });
     }
@@ -8230,7 +8230,7 @@ const loadDomainInfo = (onSuccess, onError) => {
     if (typeof google !== 'undefined' && 
         google.script && 
         google.script.run && 
-        typeof google.script.run.getDeployUserDomainInfo === 'function') {
+        typeof google.script.run.getSystemDomainInfo === 'function') {
       
       google.script.run
         .withSuccessHandler(info => {
@@ -8242,10 +8242,10 @@ const loadDomainInfo = (onSuccess, onError) => {
           displayDomainInfo({ error: error.message || error });
           if (onError) onError(error);
         })
-        .getDeployUserDomainInfo();
+        .getSystemDomainInfo();
     } else {
       // 関数が存在しない場合のフォールバック
-      console.warn('⚠️ getDeployUserDomainInfo関数が利用できません');
+      console.warn('⚠️ getSystemDomainInfo関数が利用できません');
       const fallbackInfo = { 
         domain: 'ローカル環境', 
         note: 'ドメイン情報を取得できませんでした',

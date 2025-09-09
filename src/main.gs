@@ -1863,7 +1863,7 @@ function getData(userId, classFilter, sortOrder, adminMode, bypassCache) {
       throw new Error(`ユーザー認証情報が取得できません。詳細: ${JSON.stringify(errorDetails)}`);
     }
 
-    return executeGetPublishedSheetData(
+    return getPublishedSheetData(
       targetUserId,
       params.classFilter,
       params.sortOrder,
