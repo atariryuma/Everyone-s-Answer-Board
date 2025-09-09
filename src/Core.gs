@@ -641,6 +641,14 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       nameHeaderName
     );
 
+    // 🔍 理由列設定の詳細デバッグ
+    console.log('🔍 理由列設定デバッグ:', {
+      'configJson.reasonHeader': configJson.reasonHeader,
+      'COLUMN_HEADERS.REASON': COLUMN_HEADERS.REASON,
+      'reasonHeaderName': reasonHeaderName,
+      'setupStatus': setupStatus
+    });
+
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
     const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
 
@@ -655,6 +663,14 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       headerIndices,
       configJson
     );
+
+    // 🔍 マッピング結果の詳細デバッグ
+    console.log('🔍 マッピング結果デバッグ:', {
+      'headerIndices': headerIndices,
+      'mappedIndices': mappedIndices,
+      'reasonHeader設定値': reasonHeaderName,
+      'reasonHeaderマッピング結果': mappedIndices.reasonHeader
+    });
 
     const formattedData = formatSheetDataForFrontend(
       sheetData.data,
@@ -900,14 +916,11 @@ function formatSheetDataForFrontend(
   isOwner,
   displayMode
 ) {
-  // 🔍 formatSheetDataForFrontend - マッピングデータ処理調査ログ
-  console.log('🎭 formatSheetDataForFrontend - データフォーマット調査', {
-    rawDataCount: rawData.length,
-    mappedIndices: mappedIndices,
-    headerIndicesKeys: Object.keys(headerIndices),
-    adminMode: adminMode,
-    isOwner: isOwner,
-    displayMode: displayMode
+  // 🔍 データフォーマット処理サマリー
+  console.log('🎭 データフォーマット処理:', {
+    dataCount: rawData.length,
+    reasonIndex: mappedIndices.reasonHeader,
+    hasReasonMapping: mappedIndices.reasonHeader !== undefined
   });
 
   // 現在のユーザーメールを取得（リアクション状態判定用）
@@ -919,21 +932,12 @@ function formatSheetDataForFrontend(
     const reasonIndex = mappedIndices.reasonHeader;
     const nameIndex = mappedIndices.nameHeader;
 
-    // 🔍 各行の詳細データ抽出調査
-    console.log('📄 インデックス情報:', {
-      classIndex: classIndex,
-      opinionIndex: opinionIndex,
-      reasonIndex: reasonIndex,
-      nameIndex: nameIndex,
-      originalDataLength: row.originalData ? row.originalData.length : 'NO_DATA'
-    });
-    
-    if (row.originalData) {
-      console.log('🔍 実データ値:', {
-        classValue: classIndex !== undefined ? row.originalData[classIndex] : 'INDEX_UNDEFINED',
-        opinionValue: opinionIndex !== undefined ? row.originalData[opinionIndex] : 'INDEX_UNDEFINED',
-        reasonValue: reasonIndex !== undefined ? row.originalData[reasonIndex] : 'INDEX_UNDEFINED',
-        nameValue: nameIndex !== undefined ? row.originalData[nameIndex] : 'INDEX_UNDEFINED'
+    // 🔍 最初の行のみデバッグ出力（サマリー）
+    if (index === 0) {
+      console.log('📄 データ処理サマリー:', {
+        reasonIndex: reasonIndex,
+        hasReasonData: reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex] ? 'YES' : 'NO',
+        reasonValue: reasonIndex !== undefined && row.originalData ? row.originalData[reasonIndex] : 'NO_INDEX'
       });
     }
 
@@ -983,47 +987,27 @@ function formatSheetDataForFrontend(
     // 🔍 理由列の値を取得（包括的null/undefined/空文字列処理）
     let reasonValue = '';
     
-    console.log('🎯 理由列データ抽出詳細:', {
-      reasonIndex: reasonIndex,
-      hasOriginalData: !!row.originalData,
-      originalDataLength: row.originalData ? row.originalData.length : 'NO_DATA',
-      reasonIndexValid: reasonIndex !== undefined && reasonIndex >= 0,
-      reasonIndexInRange: reasonIndex !== undefined && row.originalData && reasonIndex < row.originalData.length
-    });
-
     if (reasonIndex !== undefined && row.originalData && reasonIndex >= 0 && reasonIndex < row.originalData.length) {
       const rawReasonValue = row.originalData[reasonIndex];
-      console.log('📝 理由の生データ詳細:', {
-        rawValue: rawReasonValue,
-        rawType: typeof rawReasonValue,
-        isNull: rawReasonValue === null,
-        isUndefined: rawReasonValue === undefined,
-        isEmpty: rawReasonValue === '',
-        isEmptyString: rawReasonValue === ' ',
-        stringLength: typeof rawReasonValue === 'string' ? rawReasonValue.length : 'NOT_STRING'
-      });
+      
+      // 最初の行のみ理由データの詳細を出力
+      if (index === 0) {
+        console.log('🎯 理由データ確認:', {
+          rawValue: rawReasonValue,
+          hasData: !!rawReasonValue && String(rawReasonValue).trim().length > 0
+        });
+      }
       
       // null/undefined/空文字列の適切な処理
       if (rawReasonValue !== null && rawReasonValue !== undefined) {
         const stringValue = String(rawReasonValue).trim();
         if (stringValue.length > 0) {
           reasonValue = stringValue;
-          // 個別データログ削除（詳細不要）
-        } else {
-          console.log('⚠️ 理由データは空文字列');
         }
-      } else {
-        console.log('⚠️ 理由データはnull/undefined');
       }
-    } else {
-      console.log('❌ 理由列インデックス無効または範囲外');
+    } else if (index === 0) {
+      console.log('❌ 理由列マッピング失敗:', { reasonIndex });
     }
-    
-    console.log('🔚 最終理由値:', {
-      finalReasonValue: reasonValue,
-      finalLength: reasonValue.length,
-      willDisplay: reasonValue.length > 0
-    });
 
     const finalResult = {
       rowIndex: row.rowNumber || index + 2,
