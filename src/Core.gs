@@ -653,9 +653,11 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     // 🔍 columnMapping設定の詳細デバッグ
     console.log('🔍 columnMapping設定デバッグ:', {
       'hasColumnMapping': !!configJson.columnMapping,
-      'columnMapping.reason': configJson.columnMapping?.reason,
+      'columnMapping.reason.header': configJson.columnMapping?.reason?.header,
       'reasonHeaderName': reasonHeaderName,
-      'setupStatus': setupStatus
+      'setupStatus': setupStatus,
+      'configJson.spreadsheetId': configJson.spreadsheetId,
+      'configJson.sheetName': configJson.sheetName
     });
 
     // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）

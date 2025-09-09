@@ -70,7 +70,14 @@
       "Bash(perl:*)",
       "Bash(if [ -f \"package.json\" ])",
       "Bash(then npm run check)",
-      "Bash(else echo \"package.json not found\")"
+      "Bash(else echo \"package.json not found\")",
+      "Bash(do echo \"=== Checking $file ===\")",
+      "Bash(do echo:*)",
+      "Bash(if node -c \"$file%.gs.temp.js\")",
+      "Bash(then echo \"✅ OK\")",
+      "Bash(else echo \"❌ ERROR\")",
+      "Bash(then echo \"✅\")",
+      "Bash(else echo \"❌\")"
     ],
     "deny": [],
     "ask": [],

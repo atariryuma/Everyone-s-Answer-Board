@@ -3259,54 +3259,21 @@
                 }
               }
 
-              // 🔍 包括的JSONデータ受信調査ログ（全要素比較用）
-              console.group('📊 JSONデータ受信完全調査（全要素分析）');
-              console.log('🏗️ 基本構造:', {
-                resultType: typeof result,
-                hasData: !!result?.data,
-                dataLength: Array.isArray(result?.data) ? result.data.length : 'not array',
+              // 🔍 データ受信確認（簡素化）
+              const firstItem = result?.data?.[0];
+              console.log('📊 データ受信:', {
+                count: result?.data?.length || 0,
                 hasHeader: !!result?.header,
-                headerValue: result?.header || 'none'
+                firstReasonEmpty: !firstItem?.reason || firstItem.reason.trim() === ''
               });
               
-              // 全データサンプル表示（最初の3件）
-              if (result?.data && Array.isArray(result.data)) {
-                const sampleCount = Math.min(3, result.data.length);
-                console.log(`📋 データサンプル（最初の${sampleCount}件）:`);
-                
-                for (let i = 0; i < sampleCount; i++) {
-                  const item = result.data[i];
-                  console.group(`📝 データ項目 ${i + 1}:`);
-                  console.log('🔑 全フィールド:', Object.keys(item));
-                  console.log('📄 完全なJSONデータ:', JSON.stringify(item, null, 2));
-                  console.log('🎯 重要フィールド詳細:', {
-                    rowIndex: item.rowIndex,
-                    opinion: item.opinion || 'MISSING',
-                    reason: item.reason || 'MISSING',
-                    name: item.name || 'MISSING',
-                    class: item.class || 'MISSING',
-                    email: item.email || 'MISSING',
-                    timestamp: item.timestamp || 'MISSING'
-                  });
-                  console.log('🔍 リアクションデータ:', {
-                    understand: item.understand || 0,
-                    like: item.like || 0,
-                    curious: item.curious || 0,
-                    highlight: item.highlight || false
-                  });
-                  console.groupEnd();
-                }
+              // 理由データが空の場合の警告
+              if (firstItem && (!firstItem.reason || firstItem.reason.trim() === '')) {
+                console.warn('⚠️ 理由データが空です - columnMapping設定を確認してください', {
+                  reasonHeader: configManager.config?.reasonHeader,
+                  columnMapping: configManager.config?.columnMapping?.reason
+                });
               }
-              
-              console.log('🔧 現在の設定情報:', {
-                userId: configManager.config?.userId,
-                sheetName: configManager.config?.sheetName,
-                spreadsheetId: configManager.config?.spreadsheetId,
-                reasonHeader: configManager.config?.reasonHeader,
-                opinionHeader: configManager.config?.opinionHeader,
-                columnMapping: configManager.config?.columnMapping
-              });
-              console.groupEnd();
 
               const syncResult = this.synchronizeStateAfterDataUpdate(
                 result.data,
@@ -4603,26 +4570,14 @@
         }
 
         // Ensure required properties exist with safe defaults（理由列の堅牢化）
-        // 🔍 カード作成時の完全データ調査ログ（全要素比較用）
-        console.group(`🎯 createAnswerCard - データ項目 ${data.rowIndex} 完全調査`);
-        console.log('📄 受信した生データ（JSON）:', JSON.stringify(data, null, 2));
-        console.log('🔑 全フィールドキー:', Object.keys(data));
-        console.log('📝 重要フィールド存在確認:', {
-          rowIndex: { exists: !!data.rowIndex, value: data.rowIndex },
-          opinion: { exists: !!data.opinion, value: data.opinion || 'MISSING', length: data.opinion?.length || 0 },
-          reason: { exists: !!data.reason, value: data.reason || 'MISSING', length: data.reason?.length || 0 },
-          name: { exists: !!data.name, value: data.name || 'MISSING', length: data.name?.length || 0 },
-          class: { exists: !!data.class, value: data.class || 'MISSING', length: data.class?.length || 0 },
-          email: { exists: !!data.email, value: data.email || 'MISSING', length: data.email?.length || 0 },
-          timestamp: { exists: !!data.timestamp, value: data.timestamp || 'MISSING' }
-        });
-        console.log('🎭 リアクション状態:', {
-          understand: data.understand || 0,
-          like: data.like || 0,
-          curious: data.curious || 0,
-          highlight: data.highlight || false
-        });
-        console.groupEnd();
+        // 🔍 カード作成時の簡潔ログ（理由データ問題デバッグ用）
+        if (!data.reason || data.reason.trim() === '') {
+          console.warn(`⚠️ Row ${data.rowIndex}: 理由データが空です`, {
+            reason: data.reason,
+            hasReason: !!data.reason,
+            opinion: data.opinion?.substring(0, 30) + '...'
+          });
+        }
 
         const safeData = {
           rowIndex: data.rowIndex || 0,
@@ -4787,58 +4742,16 @@
 
         contentDiv.appendChild(opinionTitle);
 
-        // 🔍 理由テキストの表示処理（包括的デバッグ版）
-        console.group(`🎭 理由テキスト処理 - Row ${safeData.rowIndex}`);
-        console.log('📝 理由データ詳細:', {
-          originalReason: data.reason,
-          safeDataReason: safeData.reason,
-          hasOriginalReason: !!data.reason,
-          hasSafeReason: !!safeData.reason,
-          reasonLength: safeData.reason?.length || 0,
-          trimmedLength: safeData.reason?.trim()?.length || 0,
-          willRender: !!(safeData.reason && safeData.reason.trim())
-        });
+        // 🔍 理由テキストの表示処理（簡素化）
 
         if (safeData.reason && safeData.reason.trim()) {
           try {
             // 理由テキストの有効性を検証
-            if (reasonText && reasonText.textContent === safeData.reason) {
-              contentDiv.appendChild(reasonText);
-              console.log('✅ 理由テキスト正常追加 (既存element使用)');
-            } else {
-              const newReasonText = document.createElement('p');
-              newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-              newReasonText.textContent = safeData.reason;
-              contentDiv.appendChild(newReasonText);
-              console.log('✅ 理由テキスト正常追加 (新規element作成)');
-            }
+            contentDiv.appendChild(reasonText);
           } catch (reasonError) {
-            // 理由テキスト追加でエラーが発生した場合の回復処理
-            console.warn(
-              'createAnswerCard: Reason text append error, attempting recovery:',
-              reasonError
-            );
-            try {
-              const fallbackReasonText = document.createElement('p');
-              fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-              fallbackReasonText.textContent = safeData.reason;
-              contentDiv.appendChild(fallbackReasonText);
-            } catch (fallbackError) {
-              console.error(
-                'createAnswerCard: Failed to add reason text even with fallback:',
-                fallbackError
-              );
-              // 理由テキストが追加できない場合でもカード生成は継続
-            }
+            console.warn('createAnswerCard: Reason text error:', reasonError);
           }
-        } else {
-          console.log('❌ 理由テキストなし - 表示スキップ', {
-            hasReason: !!safeData.reason,
-            reasonValue: safeData.reason,
-            trimmed: safeData.reason?.trim()
-          });
         }
-        console.groupEnd(); // 理由テキスト処理ログ終了
 
         // Create footer div
         const footerDiv = this._createElement('div');
