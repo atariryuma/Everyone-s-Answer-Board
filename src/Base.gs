@@ -5,6 +5,189 @@
  */
 
 // ===============================
+// 🎯 統一列アクセス関数（レガシー完全削除版）
+// ===============================
+
+/**
+ * 統一列インデックス取得関数
+ * 単一のcolumnMapping.mappingのみを使用（レガシー削除）
+ * @param {Object} config - ユーザー設定
+ * @param {string} columnType - 列タイプ (answer/reason/class/name)
+ * @returns {number} 列インデックス（見つからない場合は-1）
+ */
+function getColumnIndex(config, columnType) {
+  const index = config?.columnMapping?.mapping?.[columnType];
+  return typeof index === 'number' ? index : -1;
+}
+
+/**
+ * 列インデックスから実際のヘッダー名を取得
+ * @param {Array} headers - ヘッダー配列
+ * @param {number} columnIndex - 列インデックス
+ * @returns {string} ヘッダー名（見つからない場合は空文字）
+ */
+function getColumnHeaderByIndex(headers, columnIndex) {
+  if (!Array.isArray(headers) || columnIndex < 0 || columnIndex >= headers.length) {
+    return '';
+  }
+  return headers[columnIndex] || '';
+}
+
+/**
+ * 設定から全列インデックスを一括取得
+ * @param {Object} config - ユーザー設定
+ * @returns {Object} 列タイプ別インデックスマップ
+ */
+function getAllColumnIndices(config) {
+  return {
+    answer: getColumnIndex(config, 'answer'),
+    reason: getColumnIndex(config, 'reason'),
+    class: getColumnIndex(config, 'class'),
+    name: getColumnIndex(config, 'name')
+  };
+}
+
+// ===============================
+// 🧪 システム診断テスト関数
+// ===============================
+
+/**
+ * 統合システムテスト関数
+ * 列マッピングとデータ表示の整合性をテスト
+ */
+function testUnifiedSystem() {
+  try {
+    console.log('=== 統合システムテスト開始 ===');
+    
+    // 1. システム設定確認
+    const isSetup = Services.system.isSystemSetup();
+    console.log('システム設定状況:', isSetup);
+    
+    if (!isSetup) {
+      return { success: false, message: 'システムが未設定です' };
+    }
+    
+    // 2. 現在のユーザー設定取得
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    console.log('現在のユーザー:', currentUserEmail);
+    
+    const userInfo = DB.findUserByEmail(currentUserEmail);
+    if (!userInfo) {
+      return { success: false, message: 'ユーザー情報が見つかりません' };
+    }
+    
+    const config = JSON.parse(userInfo.configJson || '{}');
+    console.log('設定取得成功');
+    
+    // 3. 列マッピング確認
+    const columnIndices = getAllColumnIndices(config);
+    console.log('列インデックス:', columnIndices);
+    
+    // 4. スプレッドシートデータ取得テスト
+    if (config.spreadsheetId && config.sheetName) {
+      const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+      const sheet = spreadsheet.getSheetByName(config.sheetName);
+      const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      
+      console.log('ヘッダー行:', headerRow);
+      console.log('回答列ヘッダー:', getColumnHeaderByIndex(headerRow, columnIndices.answer));
+      console.log('理由列ヘッダー:', getColumnHeaderByIndex(headerRow, columnIndices.reason));
+      
+      // データ行数確認
+      const dataRows = sheet.getLastRow() - 1;
+      console.log('データ行数:', dataRows);
+      
+      // 最初の数行のデータをサンプル取得
+      if (dataRows > 0) {
+        const sampleData = sheet.getRange(2, 1, Math.min(3, dataRows), sheet.getLastColumn()).getValues();
+        sampleData.forEach((row, index) => {
+          console.log(`サンプル${index + 1}:`, {
+            answer: row[columnIndices.answer] || '[なし]',
+            reason: row[columnIndices.reason] || '[なし]'
+          });
+        });
+      }
+    }
+    
+    return {
+      success: true,
+      message: 'テスト完了',
+      config: {
+        columnMapping: config.columnMapping,
+        columnIndices: columnIndices
+      }
+    };
+    
+  } catch (error) {
+    console.error('テストエラー:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * 簡単なシステム診断関数（clasp run で実行可能）
+ */
+function testSystemStatus() {
+  console.log('=== システム診断開始 ===');
+  
+  try {
+    // システム設定確認
+    const isSetup = Services.system.isSystemSetup();
+    console.log('✅ システム設定:', isSetup ? '完了' : '未完了');
+    
+    // 現在のユーザー取得
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    console.log('✅ 現在のユーザー:', currentUserEmail);
+    
+    // データベース接続確認
+    const userInfo = DB.findUserByEmail(currentUserEmail);
+    console.log('✅ ユーザー情報:', userInfo ? '存在' : '未登録');
+    
+    if (userInfo) {
+      // 設定解析
+      const config = JSON.parse(userInfo.configJson || '{}');
+      console.log('✅ 設定情報:', !!config);
+      
+      // 列マッピング確認
+      const columnIndices = getAllColumnIndices(config);
+      console.log('✅ 列マッピング:', columnIndices);
+      
+      // スプレッドシートアクセステスト
+      if (config.spreadsheetId) {
+        try {
+          const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+          console.log('✅ スプレッドシート接続: 成功');
+          
+          if (config.sheetName) {
+            const sheet = spreadsheet.getSheetByName(config.sheetName);
+            const lastRow = sheet.getLastRow();
+            console.log('✅ データ行数:', lastRow - 1);
+            
+            // ヘッダー確認
+            const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+            console.log('✅ ヘッダー行:', headerRow.slice(0, 6));
+            
+            // 列マッピングされたヘッダー確認
+            console.log('✅ 回答列:', getColumnHeaderByIndex(headerRow, columnIndices.answer));
+            console.log('✅ 理由列:', getColumnHeaderByIndex(headerRow, columnIndices.reason));
+            
+          }
+        } catch (sheetError) {
+          console.error('❌ スプレッドシートエラー:', sheetError.message);
+        }
+      }
+    }
+    
+    console.log('=== 診断完了 ===');
+    return 'システム診断完了 - ログを確認してください';
+    
+  } catch (error) {
+    console.error('❌ 診断エラー:', error.message);
+    return `診断エラー: ${error.message}`;
+  }
+}
+
+// ===============================
 // 統一エラーハンドラ（CLAUDE.md準拠）
 // ===============================
 

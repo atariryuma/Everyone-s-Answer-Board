@@ -115,6 +115,32 @@ function doGet(e) {
           return HtmlService.createHtmlOutput(`<h2>Debug Error</h2><pre>${error.message}</pre>`);
         }
 
+      case 'test':
+        // 🧪 統合システムテストモード
+        try {
+          const testResult = testUnifiedSystem();
+          return HtmlService.createHtmlOutput(`
+            <h2>🧪 統合システムテスト結果</h2>
+            <div style="font-family: monospace; background: #f5f5f5; padding: 20px; border-radius: 8px;">
+              <h3>テスト結果: ${testResult.success ? '✅ 成功' : '❌ 失敗'}</h3>
+              <p><strong>メッセージ:</strong> ${testResult.message}</p>
+              ${testResult.config ? `
+                <h3>設定情報:</h3>
+                <pre>${JSON.stringify(testResult.config, null, 2)}</pre>
+              ` : ''}
+            </div>
+            <hr>
+            <p><a href="?mode=debug">デバッグ情報を見る</a></p>
+            <p><a href="${WebApp.getUrl()}">ホームに戻る</a></p>
+          `);
+        } catch (error) {
+          return HtmlService.createHtmlOutput(`
+            <h2>❌ テストエラー</h2>
+            <pre>${error.message}</pre>
+            <p><a href="${WebApp.getUrl()}">ホームに戻る</a></p>
+          `);
+        }
+
       case 'fix_user':
         // 🔧 緊急修正：ユーザーデータの修正
         try {

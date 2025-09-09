@@ -611,8 +611,16 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       throw new Error(sheetData.message);
     }
 
-    // Page.html期待形式に変換
-    // 設定からヘッダー名を取得。setupStatus未完了時は安全なデフォルト値を使用。
+    // 🎯 統一列アクセス関数を使用（レガシー完全削除）
+    // スプレッドシートからヘッダー行を取得
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // 統一関数で列インデックスを取得
+    const columnIndices = getAllColumnIndices(configJson);
+    
+    // ヘッダー名を取得（インデックスから実際のヘッダー名を取得）
     let mainHeaderName, reasonHeaderName, classHeaderName, nameHeaderName;
     
     if (setupStatus === 'pending') {
@@ -621,25 +629,20 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       classHeaderName = 'セットアップ中...';
       nameHeaderName = 'セットアップ中...';
     } else {
-      // ✅ columnMapping形式を使用（legacy形式を完全削除）
-      const columnMapping = configJson.columnMapping;
+      // 統一関数でヘッダー名取得
+      mainHeaderName = getColumnHeaderByIndex(headerRow, columnIndices.answer) || '回答';
+      reasonHeaderName = getColumnHeaderByIndex(headerRow, columnIndices.reason) || '理由';
+      classHeaderName = getColumnHeaderByIndex(headerRow, columnIndices.class) || 'クラス';
+      nameHeaderName = getColumnHeaderByIndex(headerRow, columnIndices.name) || '名前';
       
-      if (!columnMapping) {
-        console.warn('⚠️ columnMappingが設定されていません。デフォルト値を使用します。');
-        mainHeaderName = COLUMN_HEADERS.OPINION;
-        reasonHeaderName = COLUMN_HEADERS.REASON;
-        classHeaderName = COLUMN_HEADERS.CLASS;
-        nameHeaderName = COLUMN_HEADERS.NAME;
-      } else {
-        mainHeaderName = columnMapping.answer?.header || COLUMN_HEADERS.OPINION;
-        reasonHeaderName = columnMapping.reason?.header || COLUMN_HEADERS.REASON;
-        classHeaderName = columnMapping.class?.header || COLUMN_HEADERS.CLASS;
-        nameHeaderName = columnMapping.name?.header || COLUMN_HEADERS.NAME;
-        
-        // 必須列の存在確認
-        if (!columnMapping.reason?.header) {
-          console.warn('⚠️ 理由列のcolumnMappingが見つかりません:', columnMapping);
-        }
+      // columnMappingの存在確認
+      if (!configJson.columnMapping || !configJson.columnMapping.mapping) {
+        console.warn('⚠️ columnMappingが設定されていません');
+      }
+      
+      // 理由列の存在確認
+      if (columnIndices.reason === -1) {
+        console.warn('⚠️ 理由列のマッピングが見つかりません');
       }
     }
     console.log(
@@ -653,31 +656,23 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     // 🔍 columnMapping設定の詳細デバッグ
     console.log('🔍 columnMapping設定デバッグ:', {
       'hasColumnMapping': !!configJson.columnMapping,
-      'columnMapping.reason.header': configJson.columnMapping?.reason?.header,
-      'reasonHeaderName': reasonHeaderName,
+      'columnIndices': columnIndices,
+      'reasonIndex': columnIndices.reason,
       'setupStatus': setupStatus,
       'configJson.spreadsheetId': configJson.spreadsheetId,
       'configJson.sheetName': configJson.sheetName
     });
 
-    // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
-    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
-
-    // 動的列名のマッピング: 設定された名前と実際のヘッダーを照合
-    const mappedIndices = mapConfigToActualHeaders(
-      {
-        opinionHeader: mainHeaderName,
-        reasonHeader: reasonHeaderName,
-        classHeader: classHeaderName,
-        nameHeader: nameHeaderName,
-      },
-      headerIndices,
-      configJson
-    );
+    // 🎯 統一関数で直接インデックスを使用（mapConfigToActualHeaders削除）
+    const mappedIndices = {
+      opinionHeader: columnIndices.answer,
+      reasonHeader: columnIndices.reason,
+      classHeader: columnIndices.class,
+      nameHeader: columnIndices.name
+    };
 
     // 🔍 マッピング結果の詳細デバッグ
     console.log('🔍 マッピング結果デバッグ:', {
-      'headerIndices': headerIndices,
       'mappedIndices': mappedIndices,
       'reasonHeader設定値': reasonHeaderName,
       'reasonHeaderマッピング結果': mappedIndices.reasonHeader
@@ -831,30 +826,20 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
     const lastColumn = sheet.getLastColumn();
     const rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
 
-    // ヘッダーインデックスマップを取得（キャッシュされた実際のマッピング）
-    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
-
-    // ✅ columnMapping形式を使用（legacy形式を完全削除）
-    const columnMapping = configJson.columnMapping;
+    // 🎯 統一関数で列インデックスを取得（レガシー削除）
+    const columnIndices = getAllColumnIndices(configJson);
     
-    if (!columnMapping) {
-      console.warn('⚠️ getSheetData: columnMappingが設定されていません。デフォルト値を使用します。');
+    if (!configJson.columnMapping || !configJson.columnMapping.mapping) {
+      console.warn('⚠️ getSheetData: columnMappingが設定されていません');
     }
     
-    const mainHeaderName = columnMapping?.answer?.header || COLUMN_HEADERS.OPINION;
-    const reasonHeaderName = columnMapping?.reason?.header || COLUMN_HEADERS.REASON;
-    const classHeaderName = columnMapping?.class?.header || COLUMN_HEADERS.CLASS;
-    const nameHeaderName = columnMapping?.name?.header || COLUMN_HEADERS.NAME;
-    const mappedIndices = mapConfigToActualHeaders(
-      {
-        opinionHeader: mainHeaderName,
-        reasonHeader: reasonHeaderName,
-        classHeader: classHeaderName,
-        nameHeader: nameHeaderName,
-      },
-      headerIndices,
-      configJson
-    );
+    // 統一形式でマッピング
+    const mappedIndices = {
+      opinionHeader: columnIndices.answer,
+      reasonHeader: columnIndices.reason,
+      classHeader: columnIndices.class,
+      nameHeader: columnIndices.name
+    };
 
     // ユーザー情報と管理者モードの取得
     const isOwner = configJson.userId === currentUserId;
@@ -3224,333 +3209,23 @@ function getColumnHeaderName(columnKey) {
  */
 
 /**
- * 設定された列名と実際のスプレッドシートヘッダーをマッピング
- * @param {Object} configHeaders - 設定されたヘッダー名
- * @param {Object} actualHeaderIndices - 実際のヘッダーインデックスマップ
- * @param {Object} configJson - ✅ configJSON中心型：全設定情報
+ * 🎯 簡素化された列マッピング関数（レガシー削除版）
+ * 統一関数を使用してシンプルに実装
+ * @param {Object} config - ユーザー設定
+ * @param {Array} headers - ヘッダー配列
  * @returns {Object} マッピングされたインデックス
  */
-function mapConfigToActualHeaders(configHeaders, actualHeaderIndices, configJson = {}) {
-  const mappedIndices = {};
-  const availableHeaders = Object.keys(actualHeaderIndices);
-  console.log(
-    'mapConfigToActualHeaders: Available headers in spreadsheet: %s',
-    JSON.stringify(availableHeaders)
-  );
-
-  // 各設定ヘッダーでマッピングを試行
-  for (const configKey in configHeaders) {
-    const configHeaderName = configHeaders[configKey];
-    let mappedIndex = undefined;
-
-    console.log('mapConfigToActualHeaders: Trying to map %s = "%s"', configKey, configHeaderName);
-
-    if (configHeaderName && actualHeaderIndices.hasOwnProperty(configHeaderName)) {
-      // 完全一致
-      mappedIndex = actualHeaderIndices[configHeaderName];
-      console.log(
-        'mapConfigToActualHeaders: Exact match found for %s: index %s',
-        configKey,
-        mappedIndex
-      );
-    } else if (configHeaderName) {
-      // 部分一致で検索（大文字小文字を区別しない）
-      const normalizedConfigName = configHeaderName.toLowerCase().trim();
-
-      for (const actualHeader in actualHeaderIndices) {
-        const normalizedActualHeader = actualHeader.toLowerCase().trim();
-        if (normalizedActualHeader === normalizedConfigName) {
-          mappedIndex = actualHeaderIndices[actualHeader];
-          console.log(
-            'mapConfigToActualHeaders: Case-insensitive match found for %s: "%s" -> index %s',
-            configKey,
-            actualHeader,
-            mappedIndex
-          );
-          break;
-        }
-      }
-
-      // 部分一致検索
-      if (mappedIndex === undefined) {
-        for (const actualHeader in actualHeaderIndices) {
-          const normalizedActualHeader = actualHeader.toLowerCase().trim();
-          if (
-            normalizedActualHeader.includes(normalizedConfigName) ||
-            normalizedConfigName.includes(normalizedActualHeader)
-          ) {
-            mappedIndex = actualHeaderIndices[actualHeader];
-            console.log(
-              'mapConfigToActualHeaders: Partial match found for %s: "%s" -> index %s',
-              configKey,
-              actualHeader,
-              mappedIndex
-            );
-            break;
-          }
-        }
-      }
-    }
-
-    // opinionHeader（メイン質問）の特別処理：見つからない場合または「お題」の場合は高精度自動検出
-    if ((mappedIndex === undefined || configHeaders[configKey] === 'お題') && configKey === 'opinionHeader') {
-      console.log(
-        'mapConfigToActualHeaders: opinionHeader高精度検出開始 - current value: %s, mappedIndex: %s',
-        configHeaders[configKey],
-        mappedIndex
-      );
-
-      // ✅ Step 1: columnMappingからanswerインデックスを直接取得（最優先）
-      let answerIndex = undefined;
-      const columnMapping = configJson.columnMapping;
-      
-      if (columnMapping && columnMapping.mapping && columnMapping.mapping.answer !== undefined) {
-        answerIndex = columnMapping.mapping.answer;
-        console.log(
-          'mapConfigToActualHeaders: columnMapping.answer からopinionHeader候補を発見: index=%s',
-          answerIndex
-        );
-        
-        // answerインデックスに対応するヘッダー名を検索
-        for (const [headerName, headerIndex] of Object.entries(actualHeaderIndices)) {
-          if (headerIndex === answerIndex) {
-            mappedIndex = answerIndex;
-            console.log(
-              'mapConfigToActualHeaders: ✅ opinionHeader高精度検出成功（columnMapping連携）: "%s" -> index %s',
-              headerName.substring(0, 50) + '...',
-              mappedIndex
-            );
-            break;
-          }
-        }
-      }
-
-      // ✅ Step 2: columnMappingが利用できない場合のフォールバック（既存ロジック改良版）
-      if (mappedIndex === undefined) {
-        console.log('mapConfigToActualHeaders: columnMapping利用不可、フォールバック検出開始');
-        
-        // ✅ SYSTEM_CONSTANTS準拠の包括的な回答列検出パターン
-        const answerKeywords = [
-          ...SYSTEM_CONSTANTS.COLUMN_MAPPING.answer.alternates, // ['どうして', '質問', '問題', '意見', '答え', 'なぜ', '思います', '考え']
-          ...SYSTEM_CONSTANTS.COLUMN_MAPPING.answer.aiPatterns,  // ['？', '?', 'どうして', 'なぜ', '思いますか', '考えますか']
-          'について', 'でしょうか', 'ますか', '観察', '書きましょう', '教えて' // 追加パターン
-        ];
-
-        console.log(
-          'mapConfigToActualHeaders: Searching for opinion header with keywords: %s',
-          JSON.stringify(answerKeywords)
-        );
-
-        // キーワードベース検索（高精度）
-        for (const header in actualHeaderIndices) {
-          const normalizedHeader = header.toLowerCase();
-          for (let k = 0; k < answerKeywords.length; k++) {
-            if (
-              normalizedHeader.includes(answerKeywords[k]) ||
-              answerKeywords[k].includes(normalizedHeader)
-            ) {
-              mappedIndex = actualHeaderIndices[header];
-              console.log(
-                'mapConfigToActualHeaders: ✅ opinionHeader高精度検出成功（キーワード）: "%s" -> index %s (keyword: %s)',
-                header.substring(0, 50) + '...',
-                mappedIndex,
-                answerKeywords[k]
-              );
-              break;
-            }
-          }
-          if (mappedIndex !== undefined) break;
-        }
-
-        // ✅ Step 3: 最終フォールバック - 長文質問検出（既存ロジック）
-        if (mappedIndex === undefined) {
-          const standardHeaders = [
-            'タイムスタンプ', 'メールアドレス', 'クラス', '名前', '理由',
-            'なるほど！', 'いいね！', 'もっと知りたい！', 'ハイライト',
-            'そう考える理由', 'そう思う理由' // 理由系も除外
-          ];
-          const questionHeaders = [];
-
-          for (const header in actualHeaderIndices) {
-            let isStandardHeader = false;
-            for (let i = 0; i < standardHeaders.length; i++) {
-              if (
-                header.toLowerCase().includes(standardHeaders[i].toLowerCase()) ||
-                standardHeaders[i].toLowerCase().includes(header.toLowerCase())
-              ) {
-                isStandardHeader = true;
-                break;
-              }
-            }
-
-            if (!isStandardHeader && header.length > 10) {
-              // 質問は通常長い
-              questionHeaders.push({ header, index: actualHeaderIndices[header] });
-            }
-          }
-
-          if (questionHeaders.length > 0) {
-            // 最も長いヘッダーを選択（通常メイン質問が最も長い）
-            const longestHeader = questionHeaders.reduce((prev, current) => {
-              return prev.header.length > current.header.length ? prev : current;
-            });
-            mappedIndex = longestHeader.index;
-            console.log(
-              'mapConfigToActualHeaders: ✅ opinionHeader長文検出成功: "%s" -> index %s',
-              longestHeader.header.substring(0, 50) + '...',
-              mappedIndex
-            );
-          }
-        }
-      }
-
-      // ✅ opinionHeaderが見つからない場合の詳細デバッグ情報
-      if (mappedIndex === undefined) {
-        console.warn('🚨 opinionHeader検出失敗:', {
-          allHeaders: Object.keys(actualHeaderIndices),
-          columnMapping: columnMapping || '未設定',
-          suggestion: '手動で列マッピングを設定するか、列名に「どうして」「なぜ」「？」などを含めてください'
-        });
-      }
-    }
-
-    // reasonHeader（理由列）の特別処理：見つからない場合は理由らしいヘッダーを自動検出
-    if (mappedIndex === undefined && configKey === 'reasonHeader') {
-      // ✅ SYSTEM_CONSTANTS準拠の包括的な理由列検出パターン
-      const reasonKeywords = [
-        ...SYSTEM_CONSTANTS.COLUMN_MAPPING.reason.alternates, // ['理由', '根拠', '体験', 'なぜ', '詳細', '説明']
-        ...SYSTEM_CONSTANTS.COLUMN_MAPPING.reason.aiPatterns,  // ['理由', '体験', '根拠', '詳細']
-        'reason', 'why', 'わけ', '背景', '経験', '感想' // 追加パターン
-      ];
-
-      console.log(
-        'mapConfigToActualHeaders: Searching for reason header with keywords: %s',
-        JSON.stringify(reasonKeywords)
-      );
-
-      for (const header in actualHeaderIndices) {
-        const normalizedHeader = header.toLowerCase().trim();
-        for (let k = 0; k < reasonKeywords.length; k++) {
-          if (
-            normalizedHeader.includes(reasonKeywords[k]) ||
-            reasonKeywords[k].includes(normalizedHeader)
-          ) {
-            mappedIndex = actualHeaderIndices[header];
-            console.log(
-              'mapConfigToActualHeaders: Auto-detected reason header for %s: "%s" -> index %s (keyword: %s)',
-              configKey,
-              header,
-              mappedIndex,
-              reasonKeywords[k]
-            );
-            break;
-          }
-        }
-        if (mappedIndex !== undefined) break;
-      }
-
-      // より広範囲の検索（部分一致） - 全パターンで検索
-      if (mappedIndex === undefined) {
-        for (const header in actualHeaderIndices) {
-          const normalizedHeader = header.toLowerCase().trim();
-          // 理由列パターンの部分一致検索
-          const reasonFound = reasonKeywords.some(keyword => 
-            normalizedHeader.includes(keyword.toLowerCase()) || 
-            keyword.toLowerCase().includes(normalizedHeader)
-          );
-          if (reasonFound) {
-            mappedIndex = actualHeaderIndices[header];
-            console.log(
-              'mapConfigToActualHeaders: Found reason header by partial match for %s: "%s" -> index %s',
-              configKey,
-              header,
-              mappedIndex
-            );
-            break;
-          }
-        }
-      }
-    }
-
-    mappedIndices[configKey] = mappedIndex;
-
-    if (mappedIndex === undefined) {
-      console.log(
-        'mapConfigToActualHeaders: WARNING - No match found for %s = "%s"',
-        configKey,
-        configHeaderName
-      );
-      // ✅ 理由列が見つからない場合の詳細デバッグ情報
-      if (configKey === 'reasonHeader') {
-        console.warn('🚨 reasonHeader検出失敗:', {
-          availableHeaders: availableHeaders,
-          searchedPatterns: reasonKeywords || ['基本パターンのみ'],
-          configHeaderName: configHeaderName,
-          suggestion: '手動で列マッピングを設定するか、列名に「理由」「根拠」「詳細」などを含めてください'
-        });
-      }
-    }
-  }
-
-  console.log('mapConfigToActualHeaders: Final mapping result: %s', JSON.stringify(mappedIndices));
-  return mappedIndices;
-}
-
-/**
- * 特定の行のリアクション情報を取得
- */
-function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
-  try {
-    const service = getSheetsServiceCached();
-    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
-
-    const reactionData = {
-      UNDERSTAND: { count: 0, reacted: false },
-      LIKE: { count: 0, reacted: false },
-      CURIOUS: { count: 0, reacted: false },
-    };
-
-    // 各リアクション列からデータを取得
-    ['UNDERSTAND', 'LIKE', 'CURIOUS'].forEach((reactionKey) => {
-      const columnName = COLUMN_HEADERS[reactionKey];
-      const columnIndex = headerIndices[columnName];
-
-      if (columnIndex !== undefined) {
-        const range = `${sheetName}!${String.fromCharCode(65 + columnIndex)}${rowIndex}`;
-        try {
-          const response = batchGetSheetsData(service, spreadsheetId, [range]);
-          let cellValue = '';
-          if (
-            response &&
-            response.valueRanges &&
-            response.valueRanges[0] &&
-            response.valueRanges[0].values &&
-            response.valueRanges[0].values[0] &&
-            response.valueRanges[0].values[0][0]
-          ) {
-            cellValue = response.valueRanges[0].values[0][0];
-          }
-
-          if (cellValue) {
-            const reactions = parseReactionString(cellValue);
-            reactionData[reactionKey].count = reactions.length;
-            reactionData[reactionKey].reacted = reactions.indexOf(userEmail) !== -1;
-          }
-        } catch (cellError) {
-          console.warn(`リアクション取得エラー(${reactionKey}): ${cellError.message}`);
-        }
-      }
-    });
-
-    return reactionData;
-  } catch (e) {
-    console.error(`getRowReactions エラー: ${e.message}`);
-    return {
-      UNDERSTAND: { count: 0, reacted: false },
-      LIKE: { count: 0, reacted: false },
-      CURIOUS: { count: 0, reacted: false },
-    };
-  }
+function mapColumnIndices(config, headers) {
+  // 統一関数で全インデックスを取得
+  const columnIndices = getAllColumnIndices(config);
+  
+  // レガシー形式の互換性マッピング
+  return {
+    opinionHeader: columnIndices.answer,
+    reasonHeader: columnIndices.reason,
+    classHeader: columnIndices.class,
+    nameHeader: columnIndices.name
+  };
 }
 
 // =================================================================
