@@ -440,7 +440,7 @@ function isSystemSetup() {
 function getGoogleClientId() {
   try {
     const properties = PropertiesService.getScriptProperties();
-    const clientId = properties.getProperty('GOOGLE_CLIENT_ID');
+    const clientId = properties.getProperty(PROPS_KEYS.GOOGLE_CLIENT_ID);
 
     if (!clientId) {
       console.warn('GOOGLE_CLIENT_ID not found in script properties');
@@ -476,10 +476,10 @@ function checkSystem() {
     const allProperties = properties.getProperties();
 
     const requiredProperties = [
-      'GOOGLE_CLIENT_ID',
-      'DATABASE_SPREADSHEET_ID',
-      'ADMIN_EMAIL',
-      'SERVICE_ACCOUNT_CREDS',
+      PROPS_KEYS.GOOGLE_CLIENT_ID,
+      PROPS_KEYS.DATABASE_SPREADSHEET_ID,
+      PROPS_KEYS.ADMIN_EMAIL,
+      PROPS_KEYS.SERVICE_ACCOUNT_CREDS,
     ];
 
     const configStatus = {};
@@ -1525,7 +1525,7 @@ function setupApplication(
 
     // Google Client IDが提供されている場合は設定
     if (googleClientId && googleClientId.trim()) {
-      properties.setProperty('GOOGLE_CLIENT_ID', googleClientId.trim());
+      properties.setProperty(PROPS_KEYS.GOOGLE_CLIENT_ID, googleClientId.trim());
     }
 
     console.log('setupApplication - プロパティ設定完了');
@@ -1854,9 +1854,8 @@ function getData(userId, classFilter, sortOrder, adminMode, bypassCache) {
 /**
  * セットアップテスト実行
  */
-// testSetup関数はSystemManager.gsに完全移行しました
-
-// testDatabaseMigration関数はSystemManager.gsに完全移行しました
+// 注意: testSetup関数とtestDatabaseMigration関数は削除されました
+// 必要な場合は、AdminPanelBackend.gsのexecuteConfigCleanup()を使用してください
 
 /**
  * 🔧 統一エラーハンドリング関数

@@ -3,6 +3,7 @@
  * 最小限のコア定数のみ定義、Lazy-Loading Pattern対応
  */
 
+
 /**
  * システム全体で使用するコア定数
  * CONSTANT_CASE命名 (Google Style Guide準拠)
@@ -60,6 +61,7 @@ const PROPS_KEYS = Object.freeze({
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
   ADMIN_EMAIL: 'ADMIN_EMAIL',
+  GOOGLE_CLIENT_ID: 'GOOGLE_CLIENT_ID',
 });
 
 /**

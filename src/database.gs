@@ -172,7 +172,7 @@ const DB = {
 
     try {
       // キャッシュから取得を試行
-      const cached = CacheService.getScriptCache().get(cacheKey);
+      const cached = cacheManager.get(cacheKey);
       if (cached) {
         if (cached === 'null') {
           return null;
@@ -219,10 +219,10 @@ const DB = {
 
           // キャッシュに保存
           try {
-            CacheService.getScriptCache().put(
+            cacheManager.set(
               cacheKey,
               JSON.stringify(userObj),
-              DB_CONFIG.CACHE_TTL
+              { ttl: DB_CONFIG.CACHE_TTL }
             );
           } catch (cacheError) {
             console.warn('findUserById: キャッシュ保存エラー', cacheError.message);
@@ -240,7 +240,7 @@ const DB = {
 
       // 見つからなかった場合
       try {
-        CacheService.getScriptCache().put(cacheKey, 'null', 60);
+        cacheManager.set(cacheKey, 'null', { ttl: 60 });
       } catch (cacheError) {
         console.warn('findUserById: nullキャッシュ保存エラー', cacheError.message);
       }
