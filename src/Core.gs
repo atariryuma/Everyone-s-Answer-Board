@@ -186,8 +186,15 @@ function validateHeaderIntegrity(userId) {
       };
     }
 
-    // 理由列のヘッダー検証を重点的に実施
-    const indices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
+    // 統一システムでの列マッピング検証
+    const columnIndices = getAllColumnIndices(config);
+    
+    // 互換性のためのindices作成
+    const indices = {};
+    if (columnIndices.answer >= 0) indices[COLUMN_HEADERS.OPINION] = columnIndices.answer;
+    if (columnIndices.reason >= 0) indices[COLUMN_HEADERS.REASON] = columnIndices.reason;
+    if (columnIndices.class >= 0) indices[COLUMN_HEADERS.CLASS] = columnIndices.class;
+    if (columnIndices.name >= 0) indices[COLUMN_HEADERS.NAME] = columnIndices.name;
 
     const validationResults = {
       success: true,
@@ -653,15 +660,6 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       nameHeaderName
     );
 
-    // 🔍 columnMapping設定の詳細デバッグ
-    console.log('🔍 columnMapping設定デバッグ:', {
-      'hasColumnMapping': !!configJson.columnMapping,
-      'columnIndices': columnIndices,
-      'reasonIndex': columnIndices.reason,
-      'setupStatus': setupStatus,
-      'configJson.spreadsheetId': configJson.spreadsheetId,
-      'configJson.sheetName': configJson.sheetName
-    });
 
     // 🎯 統一関数で直接インデックスを使用（mapConfigToActualHeaders削除）
     const mappedIndices = {
@@ -671,12 +669,20 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       nameHeader: columnIndices.name
     };
 
-    // 🔍 マッピング結果の詳細デバッグ
-    console.log('🔍 マッピング結果デバッグ:', {
-      'mappedIndices': mappedIndices,
-      'reasonHeader設定値': reasonHeaderName,
-      'reasonHeaderマッピング結果': mappedIndices.reasonHeader
+
+    // 統一システム用のheaderIndices生成
+    const headerIndices = {};
+    headerRow.forEach((header, index) => {
+      if (header && String(header).trim()) {
+        headerIndices[header] = index;
+      }
     });
+    
+    // COLUMN_HEADERS定数による標準ヘッダーマッピングも追加
+    if (columnIndices.answer >= 0) headerIndices[COLUMN_HEADERS.OPINION] = columnIndices.answer;
+    if (columnIndices.reason >= 0) headerIndices[COLUMN_HEADERS.REASON] = columnIndices.reason;
+    if (columnIndices.class >= 0) headerIndices[COLUMN_HEADERS.CLASS] = columnIndices.class;
+    if (columnIndices.name >= 0) headerIndices[COLUMN_HEADERS.NAME] = columnIndices.name;
 
     const formattedData = formatSheetDataForFrontend(
       sheetData.data,
@@ -916,12 +922,6 @@ function formatSheetDataForFrontend(
   isOwner,
   displayMode
 ) {
-  // 🔍 データフォーマット処理サマリー
-  console.log('🎭 データフォーマット処理:', {
-    dataCount: rawData.length,
-    reasonIndex: mappedIndices.reasonHeader,
-    hasReasonMapping: mappedIndices.reasonHeader !== undefined
-  });
 
   // 現在のユーザーメールを取得（リアクション状態判定用）
   const currentUserEmail = UserManager.getCurrentEmail();
@@ -932,14 +932,6 @@ function formatSheetDataForFrontend(
     const reasonIndex = mappedIndices.reasonHeader;
     const nameIndex = mappedIndices.nameHeader;
 
-    // 🔍 最初の行のみデバッグ出力（サマリー）
-    if (index === 0) {
-      console.log('📄 データ処理サマリー:', {
-        reasonIndex: reasonIndex,
-        hasReasonData: reasonIndex !== undefined && row.originalData && row.originalData[reasonIndex] ? 'YES' : 'NO',
-        reasonValue: reasonIndex !== undefined && row.originalData ? row.originalData[reasonIndex] : 'NO_INDEX'
-      });
-    }
 
     let nameValue = '';
     const shouldShowName =
@@ -990,13 +982,6 @@ function formatSheetDataForFrontend(
     if (reasonIndex !== undefined && row.originalData && reasonIndex >= 0 && reasonIndex < row.originalData.length) {
       const rawReasonValue = row.originalData[reasonIndex];
       
-      // 最初の行のみ理由データの詳細を出力
-      if (index === 0) {
-        console.log('🎯 理由データ確認:', {
-          rawValue: rawReasonValue,
-          hasData: !!rawReasonValue && String(rawReasonValue).trim().length > 0
-        });
-      }
       
       // null/undefined/空文字列の適切な処理
       if (rawReasonValue !== null && rawReasonValue !== undefined) {
@@ -1005,8 +990,6 @@ function formatSheetDataForFrontend(
           reasonValue = stringValue;
         }
       }
-    } else if (index === 0) {
-      console.log('❌ 理由列マッピング失敗:', { reasonIndex });
     }
 
     const finalResult = {
@@ -1033,17 +1016,6 @@ function formatSheetDataForFrontend(
       highlight: row.isHighlighted || false,
     };
     
-    // 🔍 最終結果のログ出力
-    console.log('🎯 行データ最終結果:', {
-      rowIndex: finalResult.rowIndex,
-      hasName: !!finalResult.name,
-      hasEmail: !!finalResult.email,
-      hasClass: !!finalResult.class,
-      hasOpinion: !!finalResult.opinion,
-      hasReason: !!finalResult.reason,
-      reasonLength: finalResult.reason ? finalResult.reason.length : 0,
-      finalReasonValue: finalResult.reason
-    });
     
     return finalResult;
   });
@@ -1745,26 +1717,6 @@ function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
 
 // getWebAppUrl function removed - now using the unified version from url.gs
 
-function getSpreadsheetColumnIndices(spreadsheetId, sheetName) {
-  console.log(
-    'getSpreadsheetColumnIndices received in core.gs: spreadsheetId=%s, sheetName=%s',
-    spreadsheetId,
-    sheetName
-  );
-
-  let indices = getSpreadsheetHeaders(spreadsheetId, sheetName, { validate: false });
-
-  // 理由列が取得できていない場合は強制リフレッシュで再取得
-  if (!indices || indices[COLUMN_HEADERS.REASON] === undefined) {
-    console.log('getSpreadsheetColumnIndices: Reason header missing, force refreshing headers');
-    indices = getSpreadsheetHeaders(spreadsheetId, sheetName, {
-      forceRefresh: true,
-      validate: true,
-    });
-  }
-
-  return indices;
-}
 
 function getSheetColumns(userId, sheetId) {
   const accessResult = App.getAccess().verifyAccess(userId, 'view', UserManager.getCurrentEmail());
@@ -2843,22 +2795,6 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
         .filter(item => item.header && item.header.toLowerCase().includes('理由'))
     });
     
-    console.log('📄 データ行サンプル（最初の3行）:');
-    for (let i = 0; i < Math.min(3, dataRows.length); i++) {
-      const row = dataRows[i];
-      console.log(`  📋 行${i + 1}:`, {
-        rowLength: row.length,
-        hasReasonData: row[5] ? 'YES' : 'NO',  // index 5は理由列の予想位置
-        reasonValue: row[5] || 'EMPTY',
-        fullRow: row
-      });
-      
-      // 各列の詳細情報
-      row.forEach((cell, colIndex) => {
-        if (colIndex <= 6) { // 重要な列のみ
-        }
-      });
-    }
 
     // ヘッダーインデックスを取得（キャッシュ利用）
     const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
@@ -3053,19 +2989,6 @@ function buildRosterMap(rosterData) {
  * 行データを処理（スコア計算、名前変換など）
  */
 function processRowData(row, headers, headerIndices, rosterMap, displayMode, rowNumber, isOwner) {
-  // 🔍 processRowData - 行データ処理の詳細調査ログ
-  console.log('📄 入力データ:', {
-    rowLength: row.length,
-    rowData: row,
-    headerIndicesKeys: Object.keys(headerIndices),
-    headerIndicesValues: headerIndices
-  });
-  
-  // 重要な列のデータ存在確認
-  ['タイムスタンプ', 'メールアドレス', 'クラス', '名前', 'どうして、メダカと一緒に、水草、ミジンコを入れると思いますか？観察していて、気づいたことを書きましょう。', 'そう考える理由や体験があれば教えてください。'].forEach((header, expectedIndex) => {
-    const actualIndex = headerIndices[header];
-    const cellValue = actualIndex !== undefined ? row[actualIndex] : 'HEADER_NOT_FOUND';
-  });
 
   const processedRow = {
     rowNumber,
