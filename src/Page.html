@@ -4,10 +4,6 @@
     <meta charset="UTF-8" />
     <title>StudyQuest - みんなのかいとうボード</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      http-equiv="Permissions-Policy"
-      content="camera=(), microphone=(), geolocation=()"
-    />
     <link
       rel="preload"
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
@@ -975,9 +971,7 @@
         console.log('🔍 Page.html: USER_ID設定確認', {
           userId: window.USER_ID,
           userIdLength: window.USER_ID?.length,
-          userIdType: typeof window.USER_ID,
-          hasUserInfo: '<?= typeof userInfo !== "undefined" && userInfo ? "true" : "false" ?>',
-          userInfoKeys: '<?= typeof userInfo !== "undefined" && userInfo ? "userId,userEmail,configJson,spreadsheetId,sheetName" : "none" ?>'
+          userIdType: typeof window.USER_ID
         });
       } catch (error) {
         console.error('❌ Page.html: USER_ID設定エラー:', error);
