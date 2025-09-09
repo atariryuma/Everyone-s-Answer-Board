@@ -977,7 +977,7 @@
           userIdLength: window.USER_ID?.length,
           userIdType: typeof window.USER_ID,
           hasUserInfo: '<?= typeof userInfo !== "undefined" && userInfo ? "true" : "false" ?>',
-          userInfoKeys: '<?= typeof userInfo !== "undefined" && userInfo ? Object.keys(userInfo).join(",") : "none" ?>',
+          userInfoKeys: '<?= typeof userInfo !== "undefined" && userInfo ? Object.keys(userInfo).join(",") : "none" ?>'
         });
       } catch (error) {
         console.error('❌ Page.html: USER_ID設定エラー:', error);

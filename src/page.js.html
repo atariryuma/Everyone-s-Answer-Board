@@ -2032,34 +2032,53 @@
         clearInterval(this.pollingInterval);
       }
 
-      // 429エラー対策：大幅に緩和されたポーリング間隔
+      // 429エラー対策：さらに大幅に緩和されたポーリング間隔（最大制限）
       this.pollSuccessCount = 0;
       this.pollFailureCount = 0;
-      this.currentPollInterval = this.isLowPerformanceMode ? 120000 : 60000; // 2分または1分間隔
+      this.currentPollInterval = this.isLowPerformanceMode ? 300000 : 180000; // 5分または3分間隔
+      this.lastApiCall = 0; // 最後のAPI呼び出し時刻を記録
 
       const adaptivePoll = async () => {
+        // 429エラー対策：API呼び出し前に最小待機時間を強制
+        const now = Date.now();
+        const minWaitTime = 120000; // 最小2分間隔を強制
+        const timeSinceLastCall = now - this.lastApiCall;
+        
+        if (timeSinceLastCall < minWaitTime) {
+          const waitTime = minWaitTime - timeSinceLastCall;
+          console.log(`⏳ API呼び出し間隔制限: ${Math.round(waitTime/1000)}秒待機中...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
 
         try {
+          this.lastApiCall = Date.now();
           await this.checkForNewContentLight();
           this.pollSuccessCount++;
           this.pollFailureCount = 0;
 
-          // Reduce interval on consistent success (but not below minimum)
-          if (this.pollSuccessCount > 5 && this.currentPollInterval > 30000) {
-            this.currentPollInterval = Math.max(30000, this.currentPollInterval * 0.95); // 最小30秒間隔に変更
+          // 成功時も間隔を短縮しない（429エラー対策強化）
+          if (this.pollSuccessCount > 10 && this.currentPollInterval > 240000) {
+            this.currentPollInterval = Math.max(240000, this.currentPollInterval * 0.98); // 最小4分間隔維持
           }
 
         } catch (error) {
           this.pollFailureCount++;
           this.pollSuccessCount = 0;
 
-          // Increase interval on failures (exponential backoff) - より積極的に間隔を増加
-          if (this.pollFailureCount > 1) {
-            this.currentPollInterval = Math.min(300000, this.currentPollInterval * 2); // 最大5分間隔
+          // 429エラー時は大幅に間隔を増加（最大15分まで）
+          if (error.message && error.message.includes('429')) {
+            this.currentPollInterval = Math.min(900000, this.currentPollInterval * 3); // 429エラー時は3倍、最大15分
+            console.error('🚫 429エラー検出: ポーリング間隔を大幅増加', {
+              newInterval: `${Math.round(this.currentPollInterval/1000/60)}分`,
+              error: error.message
+            });
+          } else if (this.pollFailureCount > 1) {
+            this.currentPollInterval = Math.min(600000, this.currentPollInterval * 2); // 通常エラーは2倍、最大10分
           }
-          console.warn('❌ ポーリング失敗:', error, {
+          
+          console.warn('❌ ポーリング失敗:', error.message || error, {
             failureCount: this.pollFailureCount,
-            newInterval: this.currentPollInterval,
+            newInterval: `${Math.round(this.currentPollInterval/1000/60)}分`,
           });
         }
 
@@ -7221,10 +7240,10 @@
       // Add low-performance class to body for CSS targeting
       document.body.classList.add('low-performance');
 
-      // 429エラー対策：ポーリング頻度を大幅削減
+      // 429エラー対策：ポーリング頻度を大幅削減（最大制限）
       if (this.pollingInterval) {
         clearInterval(this.pollingInterval);
-        this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 180000); // 3分間隔に変更
+        this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 600000); // 10分間隔に変更
       }
     }
 
