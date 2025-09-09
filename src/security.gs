@@ -244,8 +244,17 @@ function verifyAdminAccess(userId) {
  * セキュアなデータベースIDを取得
  */
 function getSecureDatabaseId() {
-  const props = PropertiesService.getScriptProperties();
-  return props.getProperty('DATABASE_SPREADSHEET_ID');
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const databaseId = props.getProperty('DATABASE_SPREADSHEET_ID');
+    if (!databaseId) {
+      throw new Error('データベースIDが設定されていません');
+    }
+    return databaseId;
+  } catch (error) {
+    console.error('getSecureDatabaseIdエラー:', error.message);
+    throw error;
+  }
 }
 
 // verifyUserAccess function removed - standardized to use App.getAccess().verifyAccess() directly
@@ -289,15 +298,6 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
   }
 }
 
-/**
- * Sheets APIサービスを取得（getSheetsServiceCachedへのエイリアス）
- * @deprecated getSheetsServiceCached()を使用してください
- * @returns {Object|null} Sheetsサービスオブジェクト
- */
-function getSheetsService() {
-  // キャッシュ版に統一
-  return getSheetsServiceCached();
-}
 
 /**
  * Sheets APIを使用してデータを更新

@@ -150,35 +150,6 @@ const DB = {
   },
 
   /**
-   * 🚨 廃止予定：buildConfigJson（ConfigManagerに移行済み）
-   * @deprecated ConfigManager.buildInitialConfigを使用
-   */
-  buildConfigJson_DEPRECATED(userData) {
-    const now = new Date().toISOString();
-
-    // ✅ userDataがconfigJson文字列を既に持っている場合はそれを使用
-    if (userData.configJson && typeof userData.configJson === 'string') {
-      try {
-        return JSON.parse(userData.configJson);
-      } catch (error) {
-        console.warn('buildConfigJson: configJson解析エラー、最小構成で再構築', error.message);
-      }
-    }
-
-    // 🎯 最小限configJSON構築（JSON bloat完全回避）
-    return {
-      setupStatus: userData.setupStatus || 'pending',
-      appPublished: userData.appPublished || false,
-      displaySettings: userData.displaySettings || {
-        showNames: false, // CLAUDE.md準拠：心理的安全性重視
-        showReactions: false,
-      },
-      createdAt: userData.createdAt || now,
-      lastModified: userData.lastModified || now,
-    };
-  },
-
-  /**
    * メールでユーザー検索（CLAUDE.md準拠版）
    * @param {string} email - メールアドレス
    * @returns {Object|null} ユーザー情報またはnull
@@ -315,58 +286,6 @@ const DB = {
     // parsedConfigは参照専用、userObjへの展開は行わない（データ重複排除）
 
     return userObj;
-  },
-
-  /**
-   * 🚨 廃止予定：updateUserConfig（ConfigManagerに移行済み）
-   * @deprecated ConfigManager.saveConfigまたはConfigManager.updateConfigを使用
-   */
-  updateUserConfig_DEPRECATED(userId, configData) {
-    try {
-      console.log('updateUserConfig_DEPRECATED: 設定更新開始', {
-        userId,
-        configFields: Object.keys(configData),
-        timestamp: new Date().toISOString(),
-      });
-
-      // 現在のユーザーデータを取得
-      const currentUser = this.findUserById(userId);
-      if (!currentUser) {
-        throw new Error('更新対象のユーザーが見つかりません');
-      }
-
-      // 🔥 重要：configDataをそのままJSONとして保存（マージなし）
-      const dbUpdateData = {
-        configJson: JSON.stringify(configData),
-        lastModified: configData.lastModified || new Date().toISOString(),
-      };
-
-      // データベース更新実行
-      this.updateUserInDatabase(userId, dbUpdateData);
-
-      // キャッシュクリア
-      this.clearUserCache(userId, currentUser.userEmail);
-
-      console.log('updateUserConfig_DEPRECATED: 設定更新完了', {
-        userId,
-        configFields: Object.keys(configData),
-        configSize: dbUpdateData.configJson.length,
-      });
-
-      return {
-        success: true,
-        userId,
-        updatedConfig: configData,
-        timestamp: dbUpdateData.lastModified,
-      };
-    } catch (error) {
-      console.error('❌ updateUserConfig: configJSON重複回避更新エラー:', {
-        userId,
-        error: error.message,
-        stack: error.stack,
-      });
-      throw error;
-    }
   },
 
   /**

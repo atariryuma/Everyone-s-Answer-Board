@@ -121,7 +121,7 @@ function getAutoStopTime(publishedAt, minutes) {
  */
 function determineSetupStep(userInfo, configJson) {
   // 🚀 統一データソース：parsedConfig優先、configJsonフォールバック
-  const config = userInfo.parsedConfig || configJson || {};
+  const config = JSON.parse(userInfo.configJson || '{}') || configJson || {};
   const setupStatus = config.setupStatus || 'pending';
 
   // Step 1: データソース未設定 OR セットアップ初期状態
@@ -165,7 +165,7 @@ const _executionSheetsServiceCache = null;
 function validateHeaderIntegrity(userId) {
   try {
     const userInfo = getActiveUserInfo();
-    if (!userInfo || !userInfo.parsedConfig) {
+    if (!userInfo || !JSON.parse(userInfo.configJson || '{}')) {
       return {
         success: false,
         error: 'User configuration not found',
@@ -174,7 +174,7 @@ function validateHeaderIntegrity(userId) {
     }
 
     // 🚀 統一データソース：parsedConfig経由でのみデータアクセス
-    const config = userInfo.parsedConfig;
+    const config = JSON.parse(userInfo.configJson || '{}');
     const { spreadsheetId } = config;
     const sheetName = config.sheetName || 'EABDB';
 
@@ -259,7 +259,7 @@ function getOpinionHeaderSafely(userId, sheetName) {
       return 'お題';
     }
 
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
     
     // ✅ configJSON中心型: sheetConfig廃止、直接configJSON使用
     const opinionHeader = config.opinionHeader || config.sheetName || 'お題';
@@ -565,13 +565,13 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
       throw new Error(`ユーザー情報が見つかりません (userId: ${currentUserId})`);
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
 
     // セットアップ状況を確認
     const setupStatus = configJson.setupStatus || 'pending';
 
     // 🚀 CLAUDE.md準拠：統一データソース原則 - configJSONからのみデータ取得
-    const config = userInfo.parsedConfig || configJson || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || configJson || {};
     const spreadsheetId = config.spreadsheetId;
     const sheetName = config.sheetName;
 
@@ -767,11 +767,11 @@ function getIncrementalData(requestUserId, classFilter, sortOrder, adminMode, si
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
     const setupStatus = configJson.setupStatus || 'pending';
 
     // 🚀 CLAUDE.md準拠：統一データソース原則 - configJSONからのみデータ取得
-    const config = userInfo.parsedConfig || configJson;
+    const config = JSON.parse(userInfo.configJson || '{}') || configJson;
     const spreadsheetId = config.spreadsheetId;
     const sheetName = config.sheetName;
 
@@ -1049,7 +1049,7 @@ function switchToSheet(userId, spreadsheetId, sheetName, options = {}) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
 
     configJson.appPublished = true; // シートを切り替えたら公開状態にする
     configJson.lastModified = new Date().toISOString();
@@ -1086,7 +1086,7 @@ function getResponsesData(userId, sheetName) {
   try {
     const service = getSheetsServiceCached();
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
     const { spreadsheetId } = config;
     // 🚀 CLAUDE.md準拠：A:E範囲使用でパフォーマンス最適化
     const range = `'${sheetName || 'フォームの回答 1'}'!A:E`;
@@ -1179,7 +1179,7 @@ function getActiveFormInfo(requestUserId) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
 
     // フォーム回答数を取得
     let answerCount = 0;
@@ -1275,7 +1275,7 @@ function updateFormSettings(requestUserId, title, description) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
 
     if (configJson.editFormUrl) {
       try {
@@ -1327,7 +1327,7 @@ function saveSystemConfig(requestUserId, config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
 
     // システム設定を更新
     configJson.systemConfig = {
@@ -1386,7 +1386,7 @@ function executeToggleHighlight(requestUserId, rowIndex, sheetName) {
     }
 
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
     const result = processHighlightToggle(
       config.spreadsheetId,
       sheetName || 'フォームの回答 1',
@@ -1529,7 +1529,7 @@ function getSheetColumns(userId, sheetId) {
     const userInfo = DB.findUserById(userId);
 
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo ? userInfo.parsedConfig || {} : {};
+    const config = userInfo ? JSON.parse(userInfo.configJson || '{}') || {} : {};
     if (!userInfo || !config.spreadsheetId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
@@ -1761,7 +1761,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
 //       throw new Error('ユーザー情報が見つかりません');
 //     }
 
-//     const configJson = userInfo.parsedConfig || {};
+//     const configJson = JSON.parse(userInfo.configJson || '{}') || {};
 
 //     configJson.spreadsheetId = '';
 //     configJson.sheetName = '';
@@ -1769,7 +1769,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
 //     configJson.setupStatus = 'completed'; // 公開停止後もセットアップは完了状態とする
 
 //     DB.updateUser(currentUserId, { configJson: JSON.stringify(configJson) });
-//     invalidateUserCache(currentUserId, userInfo.userEmail, userInfo.spreadsheetId, true);
+//     invalidateUserCache(currentUserId, userInfo.userEmail, config.spreadsheetId, true);
 
 //     console.log('✅ 回答ボードの公開を停止しました: %s', currentUserId);
 //     return { status: 'success', message: '回答ボードの公開を停止しました。' };
@@ -2061,7 +2061,7 @@ function saveClassChoices(userId, classChoices) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
     configJson.savedClassChoices = classChoices;
     configJson.lastClassChoicesUpdate = new Date().toISOString();
 
@@ -2087,7 +2087,7 @@ function getSavedClassChoices(userId) {
       return { status: 'error', message: 'ユーザー情報が見つかりません' };
     }
 
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
     const savedClassChoices = configJson.savedClassChoices || [
       'クラス1',
       'クラス2',
@@ -2450,11 +2450,11 @@ function getSheetData(userId, sheetName, classFilter, sortMode, adminMode) {
 function getSheetConfig(userId) {
   try {
     const userInfo = getActiveUserInfo();
-    if (!userInfo || !userInfo.parsedConfig) {
+    if (!userInfo || !JSON.parse(userInfo.configJson || '{}')) {
       return null;
     }
     
-    const config = userInfo.parsedConfig;
+    const config = JSON.parse(userInfo.configJson || '{}');
     
     // sheetConfigとして期待される構造を再現
     return {
@@ -2487,7 +2487,7 @@ function buildSheetConfigDynamically(userIdParam) {
       userInfo = getActiveUserInfo();
     }
     
-    if (!userInfo || !userInfo.parsedConfig) {
+    if (!userInfo || !JSON.parse(userInfo.configJson || '{}')) {
       console.warn('buildSheetConfigDynamically: ユーザー情報なし');
       return {
         spreadsheetId: null,
@@ -2501,7 +2501,7 @@ function buildSheetConfigDynamically(userIdParam) {
       };
     }
     
-    const config = userInfo.parsedConfig;
+    const config = JSON.parse(userInfo.configJson || '{}');
     return {
       spreadsheetId: config.spreadsheetId,
       sheetName: config.sheetName,
@@ -2561,7 +2561,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     }
 
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
     const { spreadsheetId } = config;
 
     // spreadsheetIDの型と存在をチェック
@@ -2619,7 +2619,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     const rosterMap = buildRosterMap(rosterData);
 
     // 表示モードを取得
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
     const displayMode = configJson.displayMode || CONSTANTS.DISPLAY_MODES.ANONYMOUS;
 
     // Check if current user is the board owner
@@ -2687,7 +2687,7 @@ function getSheetsList(userId) {
     }
 
     // 🚀 CLAUDE.md準拠：configJSON統一データソース
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
 
     console.log('getSheetsList: UserInfo found:', {
       userId: userInfo.userId,
@@ -3015,7 +3015,6 @@ function updateIsActiveStatus(requestUserId, isActive) {
       };
     }
     const { currentUserEmail: activeUserEmail, userInfo } = currentUserInfo;
-    }
 
     // 編集者権限があるか確認（自分自身の状態変更も含む）
     if (!isTrue(userInfo.isActive)) {
@@ -3081,20 +3080,30 @@ function hasSetupPageAccess() {
  * @returns {object} Drive APIサービス
  */
 function getDriveService() {
-  const accessToken = getServiceAccountTokenCached();
-  return {
-    accessToken,
-    baseUrl: 'https://www.googleapis.com/drive/v3',
-    files: {
-      get(params) {
-        const url = `${this.baseUrl}/files/${params.fileId}?fields=${encodeURIComponent(params.fields)}`;
-        const response = UrlFetchApp.fetch(url, {
-          headers: { Authorization: `Bearer ${this.accessToken}` },
-        });
-        return JSON.parse(response.getContentText());
+  try {
+    const accessToken = getServiceAccountTokenCached();
+    return {
+      accessToken,
+      baseUrl: 'https://www.googleapis.com/drive/v3',
+      files: {
+        get(params) {
+          try {
+            const url = `${this.baseUrl}/files/${params.fileId}?fields=${encodeURIComponent(params.fields)}`;
+            const response = UrlFetchApp.fetch(url, {
+              headers: { Authorization: `Bearer ${this.accessToken}` },
+            });
+            return JSON.parse(response.getContentText());
+          } catch (error) {
+            console.error('Drive API呼び出しエラー:', error.message);
+            throw error;
+          }
+        },
       },
-    },
-  };
+    };
+  } catch (error) {
+    console.error('getDriveService初期化エラー:', error.message);
+    throw error;
+  }
 }
 
 /**
@@ -3386,37 +3395,6 @@ function createForm(requestUserId, config) {
  */
 // createQuickStartFormUI - 削除済み（クイックスタート機能不要）
 
-/**
- * @deprecated createCustomFormUIを使用してください
- */
-function deleteCurrentUserAccount(requestUserId) {
-  try {
-    if (!requestUserId) {
-      throw new Error('認証エラー: ユーザーIDが指定されていません');
-    }
-    const accessResult = App.getAccess().verifyAccess(
-      requestUserId,
-      'view',
-      UserManager.getCurrentEmail()
-    );
-    if (!accessResult.allowed) {
-      throw new Error(`アクセスが拒否されました: ${accessResult.reason}`);
-    }
-    const result = deleteUserAccount(requestUserId);
-
-    return {
-      status: 'success',
-      message: 'アカウントが正常に削除されました',
-      result,
-    };
-  } catch (error) {
-    console.error('deleteCurrentUserAccount error:', error.message);
-    return {
-      status: 'error',
-      message: error.message,
-    };
-  }
-}
 
 /**
  * シートを有効化（AdminPanel.html用のシンプル版）
@@ -3435,7 +3413,7 @@ function activateSheetSimple(requestUserId, sheetName) {
     }
     const userInfo = DB.findUserById(requestUserId);
     // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = userInfo ? userInfo.parsedConfig || {} : {};
+    const config = userInfo ? JSON.parse(userInfo.configJson || '{}') || {} : {};
     if (!userInfo || !config.spreadsheetId) {
       throw new Error('ユーザー情報またはスプレッドシートIDが見つかりません');
     }
@@ -3591,7 +3569,7 @@ function getInitialData(requestUserId, sheetName) {
     }
 
     // === ステップ2: 設定データの取得と自動修復 ===
-    const configJson = userInfo.parsedConfig || {};
+    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
 
     // Auto-healing for inconsistent setup states
     let needsUpdate = false;
@@ -4249,7 +4227,7 @@ function performAutoRepair(userId) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
     const repairResults = {
       fixedItems: [],
       warnings: [],
